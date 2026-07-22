@@ -22,3 +22,9 @@ String faNum(Object? value) {
   const en = '0123456789'; const fa = '۰۱۲۳۴۵۶۷۸۹';
   var s = '$value'; for (var i=0;i<10;i++){ s = s.replaceAll(en[i], fa[i]); } return s;
 }
+String fullAssetUrl(Object? value) {
+  final s = (value ?? '').toString();
+  if (s.isEmpty) return '';
+  if (s.startsWith('http://') || s.startsWith('https://')) return s;
+  return '${ApiClient.defaultBaseUrl}$s';
+}

@@ -11,3 +11,7 @@ Workflow `Build Android APK` بعد از push اجرا می‌شود و APK دی
 
 ## Firebase / FCM
 برای Push Notification واقعی، فایل `android/app/google-services.json` و تنظیمات FlutterFire پروژه Firebase باید قبل از build production اضافه شود. در debug بدون این فایل، اپ با try/catch اجرا می‌شود ولی دریافت push فعال نیست.
+
+## ورود تست بدون پیامک
+
+بعد از اجرای `npm run seed:admin` در backend، در اپ از دکمه «ورود تست با Admin / admin» استفاده کنید.

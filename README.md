@@ -41,3 +41,18 @@ flutter pub get
 flutter create --platforms=android .
 flutter run
 ```
+
+## حساب‌های تست فعال
+
+بعد از اجرای migration و seed:
+
+```bash
+cd backend
+npm run migrate
+npm run seed:admin
+```
+
+- پنل مدیریت: `Admin / admin`
+- اپلیکیشن اندروید برای تست بدون پیامک: `Admin / admin`
+
+در اپ Flutter یک دکمه «ورود تست با Admin / admin» هم اضافه شده است.

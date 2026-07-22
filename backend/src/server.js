@@ -1,6 +1,9 @@
 require('dotenv').config();
 const express = require('express');
 const http = require('http');
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
@@ -25,7 +28,22 @@ app.use(helmet());
 app.use(cors({ origin: process.env.CORS_ORIGIN?.split(',') || '*', credentials: true }));
 app.use(express.json({ limit: '2mb' }));
 app.use(morgan('dev'));
+const uploadRoot = path.join(__dirname, '..', 'uploads');
+const imageUploadDir = path.join(uploadRoot, 'images');
+fs.mkdirSync(imageUploadDir, { recursive: true });
+app.use('/uploads', express.static(uploadRoot));
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(YAML.load(__dirname + '/../docs/openapi.yaml')));
+const imageUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, imageUploadDir),
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname || '').toLowerCase() || '.jpg';
+      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => cb(null, /^image\/(png|jpe?g|webp|gif)$/i.test(file.mimetype)),
+});
 
 const asyncHandler = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const signUser = user => jwt.sign({ sub: user.id, type: 'user' }, JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '30d' });
@@ -242,6 +260,11 @@ app.get('/api/admin/dashboard', adminAuth, asyncHandler(async (req, res) => {
     getLeaderboard(10)
   ]);
   res.json({ users: q[0].rows[0].count, usedCodesToday: q[1].rows[0].count, usedCodesThisMonth: q[2].rows[0].count, pendingClaims: q[3].rows[0].count, league: q[4] });
+}));
+
+app.post('/api/admin/uploads/image', adminAuth, requireRole('support'), imageUpload.single('image'), asyncHandler(async (req, res) => {
+  if (!req.file) return res.status(400).json({ message: 'فایل عکس معتبر نیست' });
+  res.json({ url: `/uploads/images/${req.file.filename}` });
 }));
 
 app.get('/api/admin/card-types', adminAuth, asyncHandler(async (req, res) => res.json((await pool.query('SELECT * FROM card_types ORDER BY created_at DESC')).rows)));
