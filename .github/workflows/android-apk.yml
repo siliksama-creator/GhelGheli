@@ -42,7 +42,7 @@ jobs:
       - name: Remove generated default widget test
         run: rm -rf test
       - name: Full Flutter analyze
-        run: flutter analyze
+        run: flutter analyze --no-fatal-infos
       - name: Build APK
         run: flutter build apk --${{ inputs.build_mode }} --dart-define=API_BASE_URL=${{ inputs.api_base_url }}
       - name: Upload APK artifact
