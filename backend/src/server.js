@@ -73,6 +73,13 @@ async function adminAuth(req, res, next) {
 }
 function requireRole(...roles) { return (req, res, next) => req.admin?.role === 'super_admin' || roles.includes(req.admin?.role) ? next() : res.status(403).json({ message: 'دسترسی کافی نیست' }); }
 
+async function getChatMinLifetimePoints(client = pool) {
+  const { rows } = await client.query("SELECT value FROM app_settings WHERE key='chat_min_lifetime_points' LIMIT 1");
+  const raw = rows[0]?.value;
+  const n = Number(typeof raw === 'object' && raw !== null ? raw.value : raw);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
+}
+
 const cardRedeemLimiter = rateLimit({ windowMs: 60_000, limit: 12, standardHeaders: true, legacyHeaders: false, message: { message: 'تعداد تلاش زیاد است؛ کمی بعد دوباره امتحان کنید' } });
 const chatLimiter = rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false });
 const otpLimiter = rateLimit({ windowMs: 10 * 60_000, limit: 5, standardHeaders: true, legacyHeaders: false });
@@ -208,7 +215,13 @@ app.get('/api/rewards/claims/me', auth, asyncHandler(async (req, res) => {
 
 app.get('/api/league/current', auth, asyncHandler(async (req, res) => res.json(await getLeaderboard(Number(req.query.limit || 100)))));
 
+app.get('/api/chat/config', auth, asyncHandler(async (req, res) => {
+  const minLifetimePoints = await getChatMinLifetimePoints();
+  res.json({ minLifetimePoints, eligible: Number(req.user.lifetime_points || 0) >= minLifetimePoints, userLifetimePoints: req.user.lifetime_points });
+}));
 app.get('/api/chat/messages', auth, asyncHandler(async (req, res) => {
+  const minLifetimePoints = await getChatMinLifetimePoints();
+  if (Number(req.user.lifetime_points || 0) < minLifetimePoints) return res.status(403).json({ message: `برای ورود به چت باید حداقل ${minLifetimePoints} امتیاز تاریخی داشته باشید`, minLifetimePoints });
   const { rows } = await pool.query(`SELECT m.*, u.nickname,u.first_name,u.last_name,u.profile_image_url FROM chat_messages m JOIN users u ON u.id=m.user_id WHERE m.is_deleted=false ORDER BY m.sent_at DESC LIMIT 100`);
   res.json(rows.reverse());
 }));
@@ -266,6 +279,22 @@ app.get('/api/admin/dashboard', adminAuth, asyncHandler(async (req, res) => {
 app.post('/api/admin/uploads/image', adminAuth, requireRole('support'), imageUpload.single('image'), asyncHandler(async (req, res) => {
   if (!req.file) return res.status(400).json({ message: 'فایل عکس معتبر نیست' });
   res.json({ url: `/uploads/images/${req.file.filename}` });
+}));
+
+app.get('/api/admin/settings/chat', adminAuth, asyncHandler(async (req, res) => {
+  const minLifetimePoints = await getChatMinLifetimePoints();
+  res.json({ minLifetimePoints });
+}));
+app.patch('/api/admin/settings/chat', adminAuth, requireRole(), asyncHandler(async (req, res) => {
+  const minLifetimePoints = Math.max(0, Math.floor(Number(req.body.minLifetimePoints || 0)));
+  await pool.query(
+    `INSERT INTO app_settings(key,value,updated_by_admin_id,updated_at)
+     VALUES('chat_min_lifetime_points',$1,$2,NOW())
+     ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value, updated_by_admin_id=EXCLUDED.updated_by_admin_id, updated_at=NOW()`,
+    [JSON.stringify(minLifetimePoints), req.admin.id]
+  );
+  await audit(req.admin.id, 'update_chat_min_points', 'app_settings', null, req.body.reason || 'تنظیم از پنل مدیریت', { minLifetimePoints });
+  res.json({ message: 'حداقل امتیاز چت ذخیره شد', minLifetimePoints });
 }));
 
 app.get('/api/admin/card-types', adminAuth, asyncHandler(async (req, res) => res.json((await pool.query('SELECT * FROM card_types ORDER BY created_at DESC')).rows)));
@@ -393,7 +422,7 @@ io.use(async (socket, next) => {
     const token = socket.handshake.auth?.token;
     const payload = jwt.verify(token, JWT_SECRET);
     if (payload.type !== 'user') throw new Error('bad token');
-    const { rows } = await pool.query('SELECT id,nickname,first_name,last_name,profile_image_url,chat_banned_until,status FROM users WHERE id=$1', [payload.sub]);
+    const { rows } = await pool.query('SELECT id,nickname,first_name,last_name,profile_image_url,chat_banned_until,status,lifetime_points,current_points FROM users WHERE id=$1', [payload.sub]);
     if (!rows[0] || rows[0].status !== 'active') throw new Error('inactive');
     socket.user = rows[0]; next();
   } catch(e){ next(new Error('unauthorized')); }
@@ -405,6 +434,8 @@ io.on('connection', socket => {
       const now = Date.now();
       const arr = (socketMessageTimes.get(socket.user.id) || []).filter(t => now - t < 60_000);
       if (arr.length >= 20) throw new Error('ضد اسپم: تعداد پیام زیاد است');
+      const minLifetimePoints = await getChatMinLifetimePoints();
+      if (Number(socket.user.lifetime_points || 0) < minLifetimePoints) throw new Error(`برای ارسال پیام باید حداقل ${minLifetimePoints} امتیاز تاریخی داشته باشید`);
       if (socket.user.chat_banned_until && new Date(socket.user.chat_banned_until) > new Date()) throw new Error('شما موقتاً از چت محروم هستید');
       const clean = String(text || '').trim();
       if (!clean || clean.length > 1000) throw new Error('متن پیام معتبر نیست');

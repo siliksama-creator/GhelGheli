@@ -1,15 +1,23 @@
 name: Build Android APK
 
 on:
-  push:
-    branches: [ main, master ]
-    paths:
-      - 'mobile/**'
-      - '.github/workflows/android-apk.yml'
   workflow_dispatch:
+    inputs:
+      api_base_url:
+        description: 'Backend API base URL for the APK'
+        required: false
+        default: 'https://api.example.com'
+      build_mode:
+        description: 'APK build mode'
+        required: true
+        default: 'debug'
+        type: choice
+        options:
+          - debug
+          - release
 
 jobs:
-  build-apk:
+  analyze-and-build-apk:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -31,12 +39,12 @@ jobs:
           fi
       - name: Get dependencies
         run: flutter pub get
-      - name: Build debug APK
-        env:
-          API_BASE_URL: ${{ vars.API_BASE_URL }}
-        run: flutter build apk --debug --dart-define=API_BASE_URL=${API_BASE_URL:-https://api.example.com}
+      - name: Full Flutter analyze
+        run: flutter analyze
+      - name: Build APK
+        run: flutter build apk --${{ inputs.build_mode }} --dart-define=API_BASE_URL=${{ inputs.api_base_url }}
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ghelgheli-debug-apk
-          path: mobile/build/app/outputs/flutter-apk/app-debug.apk
+          name: ghelgheli-${{ inputs.build_mode }}-apk
+          path: mobile/build/app/outputs/flutter-apk/*.apk
