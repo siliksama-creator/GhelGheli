@@ -1,0 +1,62 @@
+openapi: 3.0.0
+info:
+  title: GhelGheli API
+  version: 1.0.0
+  description: مستندات ساده API پلتفرم وفاداری کارت‌های فوتبالی
+servers:
+  - url: http://localhost:4000
+paths:
+  /health:
+    get:
+      summary: وضعیت سرویس
+      responses: { '200': { description: OK } }
+  /api/auth/request-otp:
+    post:
+      summary: ارسال OTP برای ثبت‌نام/ورود/بازیابی
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: { mobile: { type: string }, purpose: { type: string, enum: [register, login, reset_password] } }
+      responses: { '200': { description: Sent } }
+  /api/auth/verify-otp:
+    post: { summary: تایید OTP, responses: { '200': { description: Verified } } }
+  /api/auth/register:
+    post: { summary: تکمیل ثبت‌نام پس از OTP, responses: { '200': { description: JWT } } }
+  /api/auth/login:
+    post: { summary: ورود با موبایل و رمز عبور, responses: { '200': { description: JWT } } }
+  /api/cards/redeem:
+    post:
+      summary: ثبت کد کارت و افزایش امتیاز سمت سرور
+      security: [{ bearerAuth: [] }]
+      responses: { '200': { description: Redeemed } }
+  /api/profile:
+    get: { summary: پروفایل و موجودی کارت‌ها, security: [{ bearerAuth: [] }], responses: { '200': { description: Profile } } }
+    patch: { summary: ویرایش پروفایل و ثبت FCM token, security: [{ bearerAuth: [] }], responses: { '200': { description: Updated } } }
+  /api/rewards:
+    get: { summary: لیست جوایز و eligibility, security: [{ bearerAuth: [] }], responses: { '200': { description: Rewards } } }
+  /api/rewards/{id}/claim:
+    post: { summary: درخواست جایزه و صفر کردن امتیاز فعلی, security: [{ bearerAuth: [] }], parameters: [{ in: path, name: id, required: true, schema: { type: string } }], responses: { '200': { description: Claimed } } }
+  /api/league/current:
+    get: { summary: لیدربرد زنده ماه جاری, security: [{ bearerAuth: [] }], responses: { '200': { description: Leaderboard } } }
+  /api/chat/messages:
+    get: { summary: آخرین پیام‌های چت, security: [{ bearerAuth: [] }], responses: { '200': { description: Messages } } }
+  /api/support/tickets:
+    get: { summary: تیکت‌های کاربر, security: [{ bearerAuth: [] }], responses: { '200': { description: Tickets } } }
+    post: { summary: ایجاد تیکت, security: [{ bearerAuth: [] }], responses: { '200': { description: Ticket } } }
+  /api/notifications:
+    get: { summary: اعلان‌های کاربر, security: [{ bearerAuth: [] }], responses: { '200': { description: Notifications } } }
+  /api/admin/auth/login:
+    post: { summary: ورود ادمین, responses: { '200': { description: Admin JWT } } }
+  /api/admin/dashboard:
+    get: { summary: داشبورد آماری, security: [{ bearerAuth: [] }], responses: { '200': { description: Dashboard } } }
+  /api/admin/card-codes/bulk:
+    post: { summary: افزودن دسته‌جمعی کد با گزارش تکراری و نامعتبر, security: [{ bearerAuth: [] }], responses: { '200': { description: Import report } } }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
