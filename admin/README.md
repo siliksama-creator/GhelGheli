@@ -13,5 +13,5 @@ VITE_API_BASE=http://localhost:4000 npm run dev
 
 ```text
 Username: Admin
-Password: admin
+Password: Ali@0142
 ```

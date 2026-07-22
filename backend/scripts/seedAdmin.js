@@ -4,9 +4,7 @@ const { pool } = require('../src/config/db');
 
 (async () => {
   const adminAccounts = new Map([
-    [process.env.ADMIN_DEFAULT_USERNAME || 'Admin', process.env.ADMIN_DEFAULT_PASSWORD || 'admin'],
-    ['Admin', 'admin'],
-    ['admin', 'admin'],
+    [process.env.ADMIN_DEFAULT_USERNAME || 'Admin', process.env.ADMIN_DEFAULT_PASSWORD || 'Ali@0142'],
   ]);
 
   // For the real owner/admin account, do not hardcode the password in the APK or repository.
@@ -27,7 +25,7 @@ const { pool } = require('../src/config/db');
   }
 
   const testMobile = process.env.TEST_USER_MOBILE || 'Admin';
-  const testPassword = process.env.TEST_USER_PASSWORD || 'admin';
+  const testPassword = process.env.TEST_USER_PASSWORD || 'Ali@0142';
   const testHash = await bcrypt.hash(testPassword, 12);
   await pool.query(
     `INSERT INTO users(mobile,mobile_verified,password_hash,nickname,status)

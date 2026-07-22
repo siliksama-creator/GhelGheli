@@ -23,5 +23,5 @@ npm run seed:admin
 
 این دستور علاوه بر ادمین، یک کاربر تست اپ هم می‌سازد:
 
-- Admin panel: `Admin / admin`
-- Mobile app: `Admin / admin`
+- Admin panel: `Admin / Ali@0142`
+- Mobile app: `Admin / Ali@0142`

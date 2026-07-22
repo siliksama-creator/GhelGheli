@@ -357,7 +357,11 @@ app.post('/api/admin/card-codes/bulk', adminAuth, requireRole('support'), asyncH
 app.get('/api/admin/rewards', adminAuth, asyncHandler(async (req, res) => res.json((await pool.query('SELECT * FROM reward_tiers ORDER BY display_order, required_points')).rows)));
 app.post('/api/admin/rewards', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
   const r = req.body;
-  const { rows } = await pool.query('INSERT INTO reward_tiers(name,description,image_url,required_points,reward_type,reward_value,display_order,is_active) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *', [r.name,r.description,r.imageUrl,r.requiredPoints,r.rewardType,r.rewardValue,r.displayOrder||0,r.isActive!==false]);
+  const count = await pool.query('SELECT count(*)::int AS count FROM reward_tiers');
+  if (count.rows[0].count >= 30) return res.status(400).json({ message: 'حداکثر ۳۰ جایزه قابل تعریف است' });
+  const requiredPoints = Number(r.requiredPoints);
+  if (!r.name || !Number.isFinite(requiredPoints) || requiredPoints <= 0) return res.status(400).json({ message: 'نام جایزه و امتیاز معتبر الزامی است' });
+  const { rows } = await pool.query('INSERT INTO reward_tiers(name,description,image_url,required_points,reward_type,reward_value,display_order,is_active) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *', [r.name,r.description,r.imageUrl,requiredPoints,r.rewardType,r.rewardValue,r.displayOrder||0,r.isActive!==false]);
   await audit(req.admin.id,'create_reward','reward_tiers',rows[0].id,null,r); res.json(rows[0]);
 }));
 app.patch('/api/admin/rewards/:id', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
