@@ -1,0 +1,12 @@
+node_modules/
+.env
+.DS_Store
+*.log
+mobile/.dart_tool/
+mobile/build/
+mobile/android/
+mobile/ios/
+mobile/linux/
+mobile/macos/
+mobile/windows/
+admin/dist/
