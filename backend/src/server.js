@@ -49,7 +49,8 @@ const asyncHandler = fn => (req, res, next) => Promise.resolve(fn(req, res, next
 const signUser = user => jwt.sign({ sub: user.id, type: 'user' }, JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '30d' });
 const signAdmin = admin => jwt.sign({ sub: admin.id, type: 'admin', role: admin.role }, JWT_SECRET, { expiresIn: '12h' });
 function normalizeMobile(m) { return String(m || '').replace(/\s+/g, '').trim(); }
-function validateCodeFormat(code) { return /^[A-Za-z0-9_-]{8,128}$/.test(String(code || '').trim()); }
+function normalizeCardCode(code) { return String(code || '').trim().toUpperCase(); }
+function validateCodeFormat(code) { return /^[A-Z0-9_-]{8,128}$/.test(normalizeCardCode(code)); }
 async function auth(req, res, next) {
   try {
     const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
@@ -136,7 +137,7 @@ app.post('/api/auth/forgot-password/reset', asyncHandler(async (req, res) => {
 function safeUser(u) { const { password_hash, ...rest } = u; return rest; }
 
 app.post('/api/cards/redeem', auth, cardRedeemLimiter, asyncHandler(async (req, res) => {
-  const code = String(req.body.code || '').trim();
+  const code = normalizeCardCode(req.body.code);
   if (!validateCodeFormat(code)) return res.status(400).json({ message: 'فرمت کد کارت معتبر نیست' });
   const client = await pool.connect();
   try {
@@ -291,13 +292,14 @@ app.get('/api/admin/card-codes', adminAuth, asyncHandler(async (req, res) => {
 }));
 app.post('/api/admin/card-codes', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
   const { code, cardTypeId } = req.body;
-  if (!validateCodeFormat(code)) return res.status(400).json({ message: 'فرمت کد معتبر نیست' });
-  const { rows } = await pool.query('INSERT INTO card_codes(code,card_type_id) VALUES($1,$2) RETURNING *', [code.trim(), cardTypeId]);
+  const normalizedCode = normalizeCardCode(code);
+  if (!validateCodeFormat(normalizedCode)) return res.status(400).json({ message: 'فرمت کد معتبر نیست' });
+  const { rows } = await pool.query('INSERT INTO card_codes(code,card_type_id) VALUES($1,$2) RETURNING *', [normalizedCode, cardTypeId]);
   await audit(req.admin.id, 'create_card_code', 'card_codes', rows[0].id, null, { code: code.slice(0,4)+'...' }); res.json(rows[0]);
 }));
 app.post('/api/admin/card-codes/bulk', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
   const { cardTypeId, rawCodes = '' } = req.body;
-  const input = String(rawCodes).split(/[\n,;\t ]+/).map(c => c.trim()).filter(Boolean);
+  const input = String(rawCodes).split(/[\n,;\t ]+/).map(c => normalizeCardCode(c)).filter(Boolean);
   const seen = new Set(), duplicateInFile = [], invalid = [], candidates = [];
   for (const c of input) {
     if (!validateCodeFormat(c)) { invalid.push(c); continue; }
