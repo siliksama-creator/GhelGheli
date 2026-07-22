@@ -10,11 +10,21 @@ on:
       build_mode:
         description: 'APK build mode'
         required: true
-        default: 'debug'
+        default: 'release'
         type: choice
         options:
           - debug
           - release
+      split_per_abi:
+        description: 'Build separate smaller APKs per CPU ABI (recommended for APK < 40 MB)'
+        required: true
+        default: true
+        type: boolean
+      obfuscate_release:
+        description: 'Obfuscate Dart code in release mode and upload symbols'
+        required: true
+        default: true
+        type: boolean
 
 jobs:
   analyze-and-build-apk:
@@ -44,9 +54,26 @@ jobs:
       - name: Full Flutter analyze
         run: flutter analyze --no-fatal-infos
       - name: Build APK
-        run: flutter build apk --${{ inputs.build_mode }} --dart-define=API_BASE_URL=${{ inputs.api_base_url }}
+        run: |
+          ARGS="--${{ inputs.build_mode }} --dart-define=API_BASE_URL=${{ inputs.api_base_url }}"
+          if [ "${{ inputs.split_per_abi }}" = "true" ]; then
+            ARGS="$ARGS --split-per-abi"
+          fi
+          if [ "${{ inputs.build_mode }}" = "release" ] && [ "${{ inputs.obfuscate_release }}" = "true" ]; then
+            ARGS="$ARGS --obfuscate --split-debug-info=build/symbols"
+          fi
+          echo "flutter build apk $ARGS"
+          flutter build apk $ARGS
+      - name: List APK sizes
+        run: ls -lh build/app/outputs/flutter-apk/*.apk
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: ghelgheli-${{ inputs.build_mode }}-apk
           path: mobile/build/app/outputs/flutter-apk/*.apk
+      - name: Upload release symbols
+        if: ${{ inputs.build_mode == 'release' && inputs.obfuscate_release == true }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ghelgheli-release-symbols
+          path: mobile/build/symbols
