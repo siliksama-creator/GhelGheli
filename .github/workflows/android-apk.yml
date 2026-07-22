@@ -22,6 +22,13 @@ jobs:
           cache: true
       - name: Create Android platform files
         run: flutter create --platforms=android .
+      - name: Ensure Firebase compatible minSdk
+        run: |
+          if [ -f android/app/build.gradle.kts ]; then
+            sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 23/' android/app/build.gradle.kts
+          elif [ -f android/app/build.gradle ]; then
+            sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/' android/app/build.gradle
+          fi
       - name: Get dependencies
         run: flutter pub get
       - name: Build debug APK
