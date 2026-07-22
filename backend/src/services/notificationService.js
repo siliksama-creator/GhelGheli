@@ -20,6 +20,7 @@ async function createNotification(userId, type, title, body) {
     [userId || null, type, title, body]
   );
   if (userId) await sendPushToUser(userId, title, body, { type });
+  else await sendPushToAll(title, body, { type });
   return rows[0];
 }
 async function sendPushToUser(userId, title, body, data = {}) {
@@ -30,4 +31,14 @@ async function sendPushToUser(userId, title, body, data = {}) {
   await fb.messaging().send({ token: rows[0].fcm_token, notification: { title, body }, data });
   return true;
 }
-module.exports = { createNotification, sendPushToUser };
+async function sendPushToAll(title, body, data = {}) {
+  const fb = getFirebase();
+  if (!fb) return false;
+  const { rows } = await pool.query('SELECT fcm_token FROM users WHERE fcm_token IS NOT NULL AND status=\'active\'');
+  const tokens = rows.map(r => r.fcm_token).filter(Boolean);
+  for (let i = 0; i < tokens.length; i += 500) {
+    await fb.messaging().sendEachForMulticast({ tokens: tokens.slice(i, i + 500), notification: { title, body }, data });
+  }
+  return true;
+}
+module.exports = { createNotification, sendPushToUser, sendPushToAll };

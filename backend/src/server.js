@@ -67,7 +67,7 @@ app.post('/api/auth/request-otp', otpLimiter, asyncHandler(async (req, res) => {
   const code = String(Math.floor(100000 + Math.random() * 900000));
   const hash = await bcrypt.hash(code, 10);
   const ttl = Number(process.env.OTP_TTL_MINUTES || 5);
-  await pool.query('INSERT INTO otp_codes(mobile,code_hash,purpose,expires_at) VALUES($1,$2,$3,NOW()+($4||\' minutes\')::interval)', [mobile, hash, purpose, ttl]);
+  await pool.query('INSERT INTO otp_codes(mobile,code_hash,purpose,expires_at) VALUES($1,$2,$3,NOW()+($4::text||\' minutes\')::interval)', [mobile, hash, purpose, ttl]);
   if (process.env.OTP_DEV_MODE === 'true') console.log(`DEV OTP for ${mobile}: ${code}`);
   res.json({ message: 'کد تایید ارسال شد', devCode: process.env.OTP_DEV_MODE === 'true' ? code : undefined });
 }));
@@ -342,7 +342,7 @@ app.post('/api/admin/users/:id/points', adminAuth, requireRole(), asyncHandler(a
 
 app.get('/api/admin/chat/messages', adminAuth, asyncHandler(async (req, res) => res.json((await pool.query('SELECT m.*, u.mobile,u.nickname FROM chat_messages m JOIN users u ON u.id=m.user_id ORDER BY m.sent_at DESC LIMIT 300')).rows)));
 app.patch('/api/admin/chat/messages/:id/delete', adminAuth, requireRole('support'), asyncHandler(async (req, res) => { await pool.query('UPDATE chat_messages SET is_deleted=true WHERE id=$1', [req.params.id]); await audit(req.admin.id,'delete_chat_message','chat_messages',req.params.id,req.body.reason); res.json({message:'حذف شد'}); }));
-app.patch('/api/admin/chat/users/:id/ban', adminAuth, requireRole('support'), asyncHandler(async (req, res) => { await pool.query("UPDATE users SET chat_banned_until=NOW()+($1||' minutes')::interval WHERE id=$2", [req.body.minutes||1440, req.params.id]); await audit(req.admin.id,'ban_chat_user','users',req.params.id,req.body.reason,{minutes:req.body.minutes}); res.json({message:'کاربر از چت محروم شد'}); }));
+app.patch('/api/admin/chat/users/:id/ban', adminAuth, requireRole('support'), asyncHandler(async (req, res) => { await pool.query("UPDATE users SET chat_banned_until=NOW()+($1::text||' minutes')::interval WHERE id=$2", [req.body.minutes||1440, req.params.id]); await audit(req.admin.id,'ban_chat_user','users',req.params.id,req.body.reason,{minutes:req.body.minutes}); res.json({message:'کاربر از چت محروم شد'}); }));
 
 app.get('/api/admin/support/tickets', adminAuth, requireRole('support','observer'), asyncHandler(async (req, res) => res.json((await pool.query('SELECT t.*, u.mobile FROM support_tickets t JOIN users u ON u.id=t.user_id ORDER BY t.updated_at DESC')).rows)));
 app.get('/api/admin/support/tickets/:id/messages', adminAuth, requireRole('support','observer'), asyncHandler(async (req, res) => res.json((await pool.query('SELECT * FROM support_ticket_messages WHERE ticket_id=$1 ORDER BY created_at', [req.params.id])).rows)));
