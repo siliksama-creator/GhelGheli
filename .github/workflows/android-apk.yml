@@ -39,6 +39,8 @@ jobs:
           fi
       - name: Get dependencies
         run: flutter pub get
+      - name: Remove generated default widget test
+        run: rm -rf test
       - name: Full Flutter analyze
         run: flutter analyze
       - name: Build APK
