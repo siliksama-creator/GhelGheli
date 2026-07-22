@@ -24,6 +24,13 @@ const { pool } = require('../src/config/db');
     console.log(`admin ready: ${username}`);
   }
 
+
+  // Disable the old lowercase admin/admin test account if it exists from earlier seeds.
+  if ((process.env.KEEP_LEGACY_ADMIN || 'false') !== 'true') {
+    await pool.query("UPDATE admin_users SET is_active=false, updated_at=NOW() WHERE username='admin'");
+    console.log('legacy lowercase admin disabled');
+  }
+
   const testMobile = process.env.TEST_USER_MOBILE || 'Admin';
   const testPassword = process.env.TEST_USER_PASSWORD || 'Ali@0142';
   const testHash = await bcrypt.hash(testPassword, 12);
