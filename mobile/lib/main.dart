@@ -47,36 +47,82 @@ class Splash extends StatelessWidget { const Splash({super.key}); @override Widg
 class HeroLogo extends StatelessWidget { const HeroLogo({super.key}); @override Widget build(BuildContext c) => Column(mainAxisSize: MainAxisSize.min, children: [Image.asset('assets/brand/logo.png', width: 240, height: 200, fit: BoxFit.contain), const SizedBox(height: 6), const Text('قلقلی', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900))]); }
 class CardShell extends StatelessWidget { final Widget child; const CardShell({super.key, required this.child}); @override Widget build(BuildContext c) => Container(constraints: const BoxConstraints(maxWidth: 720), padding: const EdgeInsets.all(20), decoration: BoxDecoration(borderRadius: BorderRadius.circular(28), color: Theme.of(c).colorScheme.surface.withValues(alpha: .9), border: Border.all(color: Colors.white.withValues(alpha: .10)), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .22), blurRadius: 35, offset: const Offset(0, 14))]), child: child); }
 
-class AuthScreen extends StatefulWidget { final ApiClient api; final VoidCallback onDone; const AuthScreen({super.key, required this.api, required this.onDone}); @override State<AuthScreen> createState() => _AuthScreenState(); }
+class AuthScreen extends StatefulWidget {
+  final ApiClient api;
+  final VoidCallback onDone;
+  const AuthScreen({super.key, required this.api, required this.onDone});
+  @override State<AuthScreen> createState() => _AuthScreenState();
+}
 class _AuthScreenState extends State<AuthScreen> {
   final mobile = TextEditingController(text: 'Admin');
   final pass = TextEditingController();
-  final code = TextEditingController();
   final name = TextEditingController();
   bool registerMode = false;
   bool adminMode = false;
   bool loading = false;
   String? msg;
 
-  Future<void> run(Future<void> Function() fn) async { setState(() { loading = true; msg = null; }); try { await fn(); } catch (e) { msg = apiError(e); } finally { if (mounted) setState(() => loading = false); } }
+  Future<void> run(Future<void> Function() fn) async {
+    setState(() { loading = true; msg = null; });
+    try { await fn(); } catch (e) { msg = apiError(e); }
+    finally { if (mounted) setState(() => loading = false); }
+  }
 
-  @override Widget build(BuildContext c) => Scaffold(body: Container(decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xff0b2b4f), Color(0xff07111f)])), child: Center(child: SingleChildScrollView(padding: const EdgeInsets.all(24), child: CardShell(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-    const HeroLogo(), const SizedBox(height: 10), const Text('ورود به دنیای کارت‌های قلقلی', textAlign: TextAlign.center, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)), const SizedBox(height: 8), Wrap(alignment: WrapAlignment.center, spacing: 8, children: [Chip(label: Text('کارت فیزیکی')), Chip(label: Text('لیگ ماهانه')), Chip(label: Text('چت روم'))]), const SizedBox(height: 18),
-    SegmentedButton<String>(segments: const [ButtonSegment(value: 'login', label: Text('ورود کاربر')), ButtonSegment(value: 'register', label: Text('ثبت‌نام')), ButtonSegment(value: 'admin', label: Text('ورود مدیر'))], selected: {adminMode ? 'admin' : registerMode ? 'register' : 'login'}, onSelectionChanged: (s) => setState(() { adminMode = s.first == 'admin'; registerMode = s.first == 'register'; if (adminMode) { mobile.text = 'Admin'; pass.clear(); } })),
-    const SizedBox(height: 16),
-    TextField(controller: mobile, keyboardType: adminMode ? TextInputType.text : TextInputType.phone, decoration: InputDecoration(labelText: adminMode ? 'نام کاربری مدیر' : 'شماره موبایل')),
-    if (registerMode) ...[const SizedBox(height: 10), TextField(controller: name, decoration: const InputDecoration(labelText: 'نام مستعار اختیاری')), const SizedBox(height: 6), const Text('ثبت‌نام سریع است؛ بعد از ورود از بخش پروفایل اطلاعات کامل را تکمیل کن.')],
-    const SizedBox(height: 10), TextField(controller: pass, obscureText: true, decoration: const InputDecoration(labelText: 'رمز عبور')), const SizedBox(height: 18),
-    FilledButton.icon(icon: Icon(adminMode ? Icons.admin_panel_settings : Icons.login), onPressed: loading ? null : () => run(() async {
-      if (adminMode) { final r = await widget.api.post('/api/admin/auth/login', {'username': mobile.text, 'password': pass.text}); await widget.api.saveToken(r['token'], admin: true); }
-      else if (registerMode) { final r = await widget.api.post('/api/auth/register-password', {'mobile': mobile.text, 'password': pass.text, 'nickname': name.text.isEmpty ? mobile.text : name.text, 'profileAvatarKey': avatarFiles.first}); await widget.api.saveToken(r['token']); }
-      else { final r = await widget.api.post('/api/auth/login', {'mobile': mobile.text, 'password': pass.text}); await widget.api.saveToken(r['token']); }
-      widget.onDone();
-    }), label: Text(loading ? 'لطفاً صبر کنید...' : adminMode ? 'ورود به مدیریت' : registerMode ? 'ساخت حساب' : 'ورود')),
-    TextButton.icon(onPressed: () => setState(() { adminMode = true; registerMode = false; mobile.text = 'Admin'; pass.clear(); }), icon: const Icon(Icons.admin_panel_settings), label: const Text('ورود مدیر تست: نام کاربری Admin، رمز را وارد کنید')),
-    if (msg != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(msg!, style: TextStyle(color: Theme.of(c).colorScheme.primary))),
-  ]))))));
+  @override
+  Widget build(BuildContext c) => Scaffold(
+    body: Stack(children: [
+      Positioned.fill(child: Image.asset('assets/brand/login_hero.png', fit: BoxFit.cover)),
+      Positioned.fill(child: Container(decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xcc06101d), Color(0xee07111f), Color(0xff07111f)])))),
+      Positioned(top: -80, right: -70, child: _GlowOrb(color: const Color(0xff00d49a), size: 210)),
+      Positioned(bottom: -100, left: -80, child: _GlowOrb(color: const Color(0xff1c78ff), size: 260)),
+      Center(child: SingleChildScrollView(padding: const EdgeInsets.all(20), child: Container(
+        constraints: const BoxConstraints(maxWidth: 470),
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(34),
+          gradient: LinearGradient(colors: [Colors.white.withValues(alpha: .18), Colors.white.withValues(alpha: .07)]),
+          border: Border.all(color: Colors.white.withValues(alpha: .20)),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .45), blurRadius: 55, offset: const Offset(0, 26))],
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          HeroLogo(),
+          const SizedBox(height: 8),
+          const Text('کارت‌های فوتبالی، امتیاز، لیگ و جایزه', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white70)),
+          const SizedBox(height: 14),
+          Wrap(alignment: WrapAlignment.center, spacing: 8, runSpacing: 8, children: const [
+            _FeaturePill(icon: Icons.style, text: 'کارت فیزیکی'), _FeaturePill(icon: Icons.emoji_events, text: 'لیگ ماهانه'), _FeaturePill(icon: Icons.chat_bubble, text: 'چت روم'),
+          ]),
+          const SizedBox(height: 18),
+          SegmentedButton<String>(
+            segments: const [ButtonSegment(value: 'login', label: Text('ورود')), ButtonSegment(value: 'register', label: Text('ثبت‌نام')), ButtonSegment(value: 'admin', label: Text('مدیر'))],
+            selected: {adminMode ? 'admin' : registerMode ? 'register' : 'login'},
+            onSelectionChanged: (s) => setState(() { adminMode = s.first == 'admin'; registerMode = s.first == 'register'; if (adminMode) { mobile.text = 'Admin'; pass.clear(); } }),
+          ),
+          const SizedBox(height: 14),
+          TextField(controller: mobile, keyboardType: adminMode ? TextInputType.text : TextInputType.phone, decoration: InputDecoration(prefixIcon: Icon(adminMode ? Icons.admin_panel_settings : Icons.phone_android), labelText: adminMode ? 'نام کاربری مدیر' : 'شماره موبایل')),
+          if (registerMode) ...[const SizedBox(height: 10), TextField(controller: name, decoration: const InputDecoration(prefixIcon: Icon(Icons.person), labelText: 'نام مستعار اختیاری')), const SizedBox(height: 6), const Text('ثبت‌نام سریع است؛ اطلاعات کامل را بعداً در پروفایل تکمیل کن.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70))],
+          const SizedBox(height: 10),
+          TextField(controller: pass, obscureText: true, decoration: const InputDecoration(prefixIcon: Icon(Icons.lock), labelText: 'رمز عبور')),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            icon: Icon(adminMode ? Icons.dashboard_customize : Icons.login),
+            onPressed: loading ? null : () => run(() async {
+              if (adminMode) { final r = await widget.api.post('/api/admin/auth/login', {'username': mobile.text, 'password': pass.text}); await widget.api.saveToken(r['token'], admin: true); }
+              else if (registerMode) { final r = await widget.api.post('/api/auth/register-password', {'mobile': mobile.text, 'password': pass.text, 'nickname': name.text.isEmpty ? mobile.text : name.text, 'profileAvatarKey': avatarFiles.first}); await widget.api.saveToken(r['token']); }
+              else { final r = await widget.api.post('/api/auth/login', {'mobile': mobile.text, 'password': pass.text}); await widget.api.saveToken(r['token']); }
+              widget.onDone();
+            }),
+            label: Padding(padding: const EdgeInsets.symmetric(vertical: 5), child: Text(loading ? 'در حال ورود...' : adminMode ? 'ورود به مدیریت' : registerMode ? 'ساخت حساب' : 'ورود به قلقلی')),
+          ),
+          TextButton.icon(onPressed: () => setState(() { adminMode = true; registerMode = false; mobile.text = 'Admin'; pass.clear(); }), icon: const Icon(Icons.bolt), label: const Text('ورود مدیر تست با نام کاربری Admin')),
+          if (msg != null) Container(margin: const EdgeInsets.only(top: 10), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.redAccent.withValues(alpha: .16), borderRadius: BorderRadius.circular(16)), child: Text(msg!, textAlign: TextAlign.center)),
+        ]),
+      ))),
+    ]),
+  );
 }
+class _GlowOrb extends StatelessWidget { final Color color; final double size; const _GlowOrb({required this.color, required this.size}); @override Widget build(BuildContext c) => Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, color: color.withValues(alpha: .20), boxShadow: [BoxShadow(color: color.withValues(alpha: .35), blurRadius: 90, spreadRadius: 30)])); }
+class _FeaturePill extends StatelessWidget { final IconData icon; final String text; const _FeaturePill({required this.icon, required this.text}); @override Widget build(BuildContext c) => Chip(avatar: Icon(icon, size: 17), label: Text(text), backgroundColor: Colors.white.withValues(alpha: .12), side: BorderSide(color: Colors.white.withValues(alpha: .18))); }
 
 // -------------------- User app --------------------
 class HomeShell extends StatefulWidget { final ApiClient api; final VoidCallback onLogout; final bool dark; final VoidCallback onTheme; const HomeShell({super.key, required this.api, required this.onLogout, required this.dark, required this.onTheme}); @override State<HomeShell> createState() => _HomeShellState(); }
@@ -155,25 +201,22 @@ class _LeaguePageState extends State<LeaguePage>{Map? d;Timer? t;@override void 
 class RankTile extends StatelessWidget { final int rank; final Map row; final VoidCallback? onTap; const RankTile({super.key, required this.rank, required this.row, this.onTap}); @override Widget build(BuildContext c) => InkWell(onTap: onTap, borderRadius: BorderRadius.circular(20), child: Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(16), decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), color: rank <= 3 ? Colors.amber.withValues(alpha: .22) : Theme.of(c).colorScheme.surfaceContainerHighest), child: Row(children: [CircleAvatar(child: Text(faNum(rank))), const SizedBox(width: 12), Expanded(child: Text(row['nickname'] ?? row['first_name'] ?? 'کاربر')), Text('${faNum(row['points'])} امتیاز', style: const TextStyle(fontWeight: FontWeight.bold))]))); }
 class ChatPage extends StatefulWidget { final ApiClient api; const ChatPage({super.key, required this.api}); @override State<ChatPage> createState()=>_ChatPageState(); }
 class _ChatPageState extends State<ChatPage>{
-  final text=TextEditingController();
-  List msgs=[]; List stickers=[]; Map? reply; String? error; Timer? t;
-  final emojis=const ['😀','😍','🔥','⚽','🏆','👏','😂','😎','❤️','👍'];
-  @override void initState(){super.initState();load();t=Timer.periodic(const Duration(seconds:5),(_)=>load());}
-  @override void dispose(){t?.cancel();super.dispose();}
+  final text=TextEditingController(); List msgs=[]; List stickers=[]; Map? reply; String? error; Timer? t;
+  final emojis=const ['😀','😍','🔥','⚽','🏆','👏','😂','😎','❤️','👍','🎉','💚','🥇','✨','🙌','😜'];
+  @override void initState(){super.initState();load();t=Timer.periodic(const Duration(seconds:3),(_)=>load());}
+  @override void dispose(){t?.cancel();text.dispose();super.dispose();}
   Future<void> load()async{try{final cfg=await widget.api.get('/api/chat/config');if(cfg['eligible']!=true){setState(()=>error='برای چت باید حداقل ${faNum(cfg['minLifetimePoints'])} امتیاز تاریخی داشته باشید.');return;}final m=await widget.api.get('/api/chat/messages');final st=await widget.api.get('/api/chat/stickers');setState((){msgs=m;stickers=st;error=null;});}catch(e){setState(()=>error=apiError(e));}}
   Future<void> send({String? stickerId})async{try{if(stickerId==null&&text.text.trim().isEmpty)return;await widget.api.post('/api/chat/messages',{'message':text.text,'stickerId':stickerId,'replyTo':reply?['id']});text.clear();reply=null;await load();}catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(apiError(e))));}}
   Future<void> like(String id)async{await widget.api.post('/api/chat/messages/$id/like',{});await load();}
+  Future<void> pickEmoji() async { final e = await showModalBottomSheet<String>(context: context, showDragHandle: true, builder: (_) => Directionality(textDirection: TextDirection.rtl, child: GridView.count(padding: const EdgeInsets.all(18), crossAxisCount: 5, shrinkWrap: true, children: emojis.map((x)=>InkWell(onTap:()=>Navigator.pop(context,x), child: Center(child: Text(x, style: const TextStyle(fontSize: 30))))).toList()))); if(e!=null) text.text='${text.text}$e'; }
   @override Widget build(BuildContext c)=>Column(children:[
     CardShell(child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:const [Text('چت روم قلقلی',style:TextStyle(fontWeight:FontWeight.w900,fontSize:18)),Text('کاربران در این قسمت میتوانند باهم گفتگو کنند. (از الفاظ رکیک و بحث های سیاسی جدا خودداری بشه.)') ])),
     if(error!=null) Expanded(child:Center(child:CardShell(child:Text(error!,textAlign:TextAlign.center)))) else Expanded(child:ListView(padding:const EdgeInsets.all(14),children:[
-      SizedBox(height:72,child:ListView.separated(scrollDirection:Axis.horizontal,itemCount:stickers.length,separatorBuilder:(_,__)=>const SizedBox(width:8),itemBuilder:(_,i){final st=stickers[i];return InkWell(onTap:()=>send(stickerId:st['id']),child:Container(width:64,padding:const EdgeInsets.all(6),decoration:BoxDecoration(color:Colors.white10,borderRadius:BorderRadius.circular(16)),child:Image.network(fullAssetUrl(st['image_url']),fit:BoxFit.contain)));})),
-      ...msgs.map((m)=>ListTile(leading:AvatarImage(keyName:m['profile_avatar_key'],imageUrl:m['profile_image_url'],radius:22),title:Text(m['nickname']??m['first_name']??'کاربر'),onTap:()=>showPublicProfile(c,widget.api,m['user_id']),subtitle:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[if(m['reply_text']!=null)Text('↩ ${m['reply_nickname']??'کاربر'}: ${m['reply_text']}',style:const TextStyle(color:Colors.lightGreenAccent)),m['message_type']=='sticker'&&m['sticker_url']!=null?Image.network(fullAssetUrl(m['sticker_url']),width:110,height:110,fit:BoxFit.contain):Text(m['message_text']??''),Row(children:[TextButton(onPressed:()=>setState(()=>reply=Map.from(m)),child:const Text('ریپلای')),TextButton(onPressed:()=>like(m['id']),child:Text('❤ ${faNum(m['like_count']??0)}'))])]),trailing:IconButton(icon:const Icon(Icons.flag),onPressed:()=>widget.api.post('/api/chat/messages/${m['id']}/report',{}))))
+      if(stickers.isNotEmpty) SizedBox(height:76,child:ListView.separated(scrollDirection:Axis.horizontal,itemCount:stickers.length,separatorBuilder:(_,__)=>const SizedBox(width:8),itemBuilder:(_,i){final st=stickers[i];return InkWell(onTap:()=>send(stickerId:st['id']),child:Container(width:68,padding:const EdgeInsets.all(7),decoration:BoxDecoration(color:Colors.white10,borderRadius:BorderRadius.circular(18)),child:Image.network(fullAssetUrl(st['image_url']),fit:BoxFit.contain)));})),
+      ...msgs.map((m)=>Card(margin: const EdgeInsets.symmetric(vertical: 6), child: ListTile(leading:AvatarImage(keyName:m['profile_avatar_key'],imageUrl:m['profile_image_url'],radius:22),title:Text(m['nickname']??m['first_name']??'کاربر'),onTap:()=>showPublicProfile(c, widget.api, m['user_id']),subtitle:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[if(m['reply_text']!=null)Text('↩ ${m['reply_nickname']??'کاربر'}: ${m['reply_text']}',style:const TextStyle(color:Colors.lightGreenAccent)),m['message_type']=='sticker'&&m['sticker_url']!=null?Image.network(fullAssetUrl(m['sticker_url']),width:110,height:110,fit:BoxFit.contain):Text(m['message_text']??''),Wrap(spacing:4,children:[TextButton(onPressed:()=>setState(()=>reply=Map.from(m)),child:const Text('ریپلای')),TextButton(onPressed:()=>like(m['id']),child:Text('❤ ${faNum(m['like_count']??0)}'))])]),trailing:IconButton(icon:const Icon(Icons.flag),onPressed:()=>widget.api.post('/api/chat/messages/${m['id']}/report',{}))))),
     ])),
     if(reply!=null) Container(width:double.infinity,padding:const EdgeInsets.all(8),color:Colors.lightGreen.withValues(alpha:.15),child:Row(children:[Expanded(child:Text('در پاسخ به: ${reply?['message_text']??''}')),IconButton(onPressed:()=>setState(()=>reply=null),icon:const Icon(Icons.close))])),
-    SafeArea(child:Padding(padding:const EdgeInsets.all(12),child:Column(mainAxisSize:MainAxisSize.min,children:[
-      SizedBox(height:42,child:ListView(scrollDirection:Axis.horizontal,children:emojis.map((e)=>Padding(padding:const EdgeInsets.symmetric(horizontal:3),child:ActionChip(label:Text(e),onPressed:(){text.text=text.text+e;}))).toList())),
-      Row(children:[Expanded(child:TextField(controller:text,enabled:error==null,decoration:const InputDecoration(hintText:'پیام گروهی...'))),IconButton.filled(onPressed:error!=null?null:()=>send(),icon:const Icon(Icons.send))])
-    ])))
+    SafeArea(child:Padding(padding:const EdgeInsets.all(12),child:Row(children:[IconButton.filledTonal(onPressed:pickEmoji,icon:const Icon(Icons.emoji_emotions)),const SizedBox(width:6),Expanded(child:TextField(controller:text,enabled:error==null,decoration:const InputDecoration(hintText:'پیام گروهی...'))),const SizedBox(width:6),IconButton.filled(onPressed:error!=null?null:()=>send(),icon:const Icon(Icons.send))])))
   ]);
 }
 class SupportPage extends StatefulWidget { final ApiClient api; const SupportPage({super.key, required this.api}); @override State<SupportPage> createState() => _SupportPageState(); }
