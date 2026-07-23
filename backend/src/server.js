@@ -32,6 +32,7 @@ const uploadRoot = path.join(__dirname, '..', 'uploads');
 const imageUploadDir = path.join(uploadRoot, 'images');
 fs.mkdirSync(imageUploadDir, { recursive: true });
 app.use('/uploads', express.static(uploadRoot));
+app.use('/public', express.static(path.join(__dirname, '..', 'public')));
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(YAML.load(__dirname + '/../docs/openapi.yaml')));
 const imageUpload = multer({
   storage: multer.diskStorage({
@@ -122,6 +123,24 @@ app.post('/api/auth/register', asyncHandler(async (req, res) => {
   res.json({ token: signUser(updated.rows[0]), user: safeUser(updated.rows[0]) });
 }));
 
+
+app.post('/api/auth/register-password', asyncHandler(async (req, res) => {
+  if (process.env.ALLOW_PASSWORD_REGISTRATION !== 'true') return res.status(403).json({ message: 'ثبت‌نام مستقیم فعلاً غیرفعال است' });
+  const mobile = normalizeMobile(req.body.mobile);
+  const { password, firstName, lastName, nickname, age, city, province, profileImageUrl, profileAvatarKey, bankAccount } = req.body;
+  if (!/^\+?[0-9A-Za-z]{3,20}$/.test(mobile)) return res.status(400).json({ message: 'شماره/نام کاربری معتبر نیست' });
+  if (!password || String(password).length < 6) return res.status(400).json({ message: 'رمز عبور حداقل ۶ کاراکتر باشد' });
+  const hash = await bcrypt.hash(String(password), 12);
+  const { rows } = await pool.query(
+    `INSERT INTO users(mobile,mobile_verified,password_hash,first_name,last_name,nickname,age,city,province,profile_image_url,profile_avatar_key,bank_account,status)
+     VALUES($1,true,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'active')
+     ON CONFLICT(mobile) DO UPDATE SET password_hash=EXCLUDED.password_hash, first_name=EXCLUDED.first_name, last_name=EXCLUDED.last_name, nickname=EXCLUDED.nickname, age=EXCLUDED.age, city=EXCLUDED.city, province=EXCLUDED.province, profile_image_url=EXCLUDED.profile_image_url, profile_avatar_key=EXCLUDED.profile_avatar_key, bank_account=EXCLUDED.bank_account, mobile_verified=true, status='active', updated_at=NOW()
+     RETURNING *`,
+    [mobile, hash, firstName || null, lastName || null, nickname || mobile, age ? Number(age) : null, city || null, province || null, profileImageUrl || null, profileAvatarKey || null, bankAccount || null]
+  );
+  res.json({ token: signUser(rows[0]), user: safeUser(rows[0]) });
+}));
+
 app.post('/api/auth/login', asyncHandler(async (req, res) => {
   const mobile = normalizeMobile(req.body.mobile);
   const { rows } = await pool.query('SELECT * FROM users WHERE mobile=$1', [mobile]);
@@ -178,14 +197,15 @@ app.get('/api/profile', auth, asyncHandler(async (req, res) => {
   res.json({ user: safeUser(req.user), inventory: inv.rows });
 }));
 app.patch('/api/profile', auth, asyncHandler(async (req, res) => {
-  const { firstName, lastName, nickname, profileImageUrl, bankAccount, fcmToken } = req.body;
-  const { rows } = await pool.query(`UPDATE users SET first_name=COALESCE($1,first_name), last_name=COALESCE($2,last_name), nickname=COALESCE($3,nickname), profile_image_url=COALESCE($4,profile_image_url), bank_account=COALESCE($5,bank_account), fcm_token=COALESCE($6,fcm_token), updated_at=NOW() WHERE id=$7 RETURNING *`, [firstName,lastName,nickname,profileImageUrl,bankAccount,fcmToken,req.user.id]);
+  const { firstName, lastName, nickname, profileImageUrl, profileAvatarKey, bankAccount, age, city, province, fcmToken } = req.body;
+  const { rows } = await pool.query(`UPDATE users SET first_name=COALESCE($1,first_name), last_name=COALESCE($2,last_name), nickname=COALESCE($3,nickname), profile_image_url=COALESCE($4,profile_image_url), profile_avatar_key=COALESCE($5,profile_avatar_key), bank_account=COALESCE($6,bank_account), age=COALESCE($7,age), city=COALESCE($8,city), province=COALESCE($9,province), fcm_token=COALESCE($10,fcm_token), updated_at=NOW() WHERE id=$11 RETURNING *`, [firstName,lastName,nickname,profileImageUrl,profileAvatarKey,bankAccount,age ? Number(age) : null,city,province,fcmToken,req.user.id]);
   res.json({ user: safeUser(rows[0]) });
 }));
 app.get('/api/users/:id/public', auth, asyncHandler(async (req, res) => {
-  const { rows } = await pool.query('SELECT id,nickname,first_name,last_name,profile_image_url,lifetime_points,current_points,monthly_league_points,joined_at FROM users WHERE id=$1', [req.params.id]);
+  const { rows } = await pool.query('SELECT id,nickname,profile_image_url,profile_avatar_key,lifetime_points,current_points,monthly_league_points,joined_at FROM users WHERE id=$1', [req.params.id]);
   if (!rows[0]) return res.status(404).json({ message: 'کاربر پیدا نشد' });
-  res.json(rows[0]);
+  const rewards = await pool.query(`SELECT c.claimed_at,c.status,r.name,r.image_url,r.reward_type,r.reward_value FROM user_reward_claims c JOIN reward_tiers r ON r.id=c.reward_tier_id WHERE c.user_id=$1 AND c.status IN ('approved','paid') ORDER BY c.claimed_at DESC LIMIT 50`, [req.params.id]);
+  res.json({ ...rows[0], rewards: rewards.rows });
 }));
 
 app.get('/api/rewards', auth, asyncHandler(async (req, res) => {
@@ -222,7 +242,7 @@ app.get('/api/chat/config', auth, asyncHandler(async (req, res) => {
 app.get('/api/chat/messages', auth, asyncHandler(async (req, res) => {
   const minLifetimePoints = await getChatMinLifetimePoints();
   if (Number(req.user.lifetime_points || 0) < minLifetimePoints) return res.status(403).json({ message: `برای ورود به چت باید حداقل ${minLifetimePoints} امتیاز تاریخی داشته باشید`, minLifetimePoints });
-  const { rows } = await pool.query(`SELECT m.*, u.nickname,u.first_name,u.last_name,u.profile_image_url FROM chat_messages m JOIN users u ON u.id=m.user_id WHERE m.is_deleted=false ORDER BY m.sent_at DESC LIMIT 100`);
+  const { rows } = await pool.query(`SELECT m.*, u.nickname,u.first_name,u.last_name,u.profile_image_url,u.profile_avatar_key FROM chat_messages m JOIN users u ON u.id=m.user_id WHERE m.is_deleted=false ORDER BY m.sent_at DESC LIMIT 100`);
   res.json(rows.reverse());
 }));
 app.post('/api/chat/messages/:id/report', auth, asyncHandler(async (req, res) => {
@@ -388,7 +408,7 @@ app.patch('/api/admin/league/payouts/:id', adminAuth, requireRole('support'), as
 
 app.get('/api/admin/users', adminAuth, asyncHandler(async (req, res) => {
   const search = `%${req.query.search || ''}%`;
-  res.json((await pool.query('SELECT id,mobile,first_name,last_name,nickname,current_points,lifetime_points,monthly_league_points,status,joined_at FROM users WHERE mobile ILIKE $1 OR nickname ILIKE $1 ORDER BY joined_at DESC LIMIT 300', [search])).rows);
+  res.json((await pool.query('SELECT id,mobile,first_name,last_name,nickname,age,city,province,bank_account,profile_image_url,profile_avatar_key,current_points,lifetime_points,monthly_league_points,status,joined_at FROM users WHERE mobile ILIKE $1 OR nickname ILIKE $1 ORDER BY joined_at DESC LIMIT 300', [search])).rows);
 }));
 app.get('/api/admin/users/:id', adminAuth, asyncHandler(async (req, res) => {
   const user = await pool.query('SELECT * FROM users WHERE id=$1', [req.params.id]);
@@ -426,7 +446,7 @@ io.use(async (socket, next) => {
     const token = socket.handshake.auth?.token;
     const payload = jwt.verify(token, JWT_SECRET);
     if (payload.type !== 'user') throw new Error('bad token');
-    const { rows } = await pool.query('SELECT id,nickname,first_name,last_name,profile_image_url,chat_banned_until,status,lifetime_points,current_points FROM users WHERE id=$1', [payload.sub]);
+    const { rows } = await pool.query('SELECT id,nickname,first_name,last_name,profile_image_url,profile_avatar_key,chat_banned_until,status,lifetime_points,current_points FROM users WHERE id=$1', [payload.sub]);
     if (!rows[0] || rows[0].status !== 'active') throw new Error('inactive');
     socket.user = rows[0]; next();
   } catch(e){ next(new Error('unauthorized')); }
@@ -445,7 +465,7 @@ io.on('connection', socket => {
       if (!clean || clean.length > 1000) throw new Error('متن پیام معتبر نیست');
       arr.push(now); socketMessageTimes.set(socket.user.id, arr);
       const { rows } = await pool.query('INSERT INTO chat_messages(user_id,message_text) VALUES($1,$2) RETURNING *', [socket.user.id, clean]);
-      const msg = { ...rows[0], nickname: socket.user.nickname, first_name: socket.user.first_name, last_name: socket.user.last_name, profile_image_url: socket.user.profile_image_url };
+      const msg = { ...rows[0], nickname: socket.user.nickname, first_name: socket.user.first_name, last_name: socket.user.last_name, profile_image_url: socket.user.profile_image_url, profile_avatar_key: socket.user.profile_avatar_key };
       io.emit('chat:new', msg); cb && cb({ ok: true, message: msg });
     } catch(e){ cb && cb({ ok: false, error: e.message }); }
   });
