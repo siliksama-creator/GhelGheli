@@ -86,6 +86,12 @@ async function getChatCooldownSeconds(client = pool) {
   const n = Number(typeof raw === 'object' && raw !== null ? raw.value : raw);
   return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 5;
 }
+async function getLeagueWinnerCount(client = pool) {
+  const { rows } = await client.query("SELECT value FROM app_settings WHERE key='league_winner_count' LIMIT 1");
+  const raw = rows[0]?.value;
+  const n = Number(typeof raw === 'object' && raw !== null ? raw.value : raw);
+  return Number.isFinite(n) && n > 0 ? Math.min(100, Math.floor(n)) : 10;
+}
 async function ensureChatCooldown(userId) {
   const cooldown = await getChatCooldownSeconds();
   if (!cooldown) return { cooldown, remaining: 0 };
@@ -227,7 +233,8 @@ app.post('/api/cards/redeem', auth, cardRedeemLimiter, asyncHandler(async (req, 
 
 app.get('/api/profile', auth, asyncHandler(async (req, res) => {
   const inv = await pool.query(`SELECT i.*, t.name, t.image_url, t.point_value FROM user_card_inventory i JOIN card_types t ON t.id=i.card_type_id WHERE i.user_id=$1 AND i.consumed_in_reward=false ORDER BY t.name`, [req.user.id]);
-  res.json({ user: safeUser(req.user), inventory: inv.rows });
+  const leaguePayouts = await pool.query(`SELECT p.*, s.month_year FROM league_payouts p JOIN league_seasons s ON s.id=p.league_season_id WHERE p.user_id=$1 ORDER BY p.created_at DESC LIMIT 20`, [req.user.id]);
+  res.json({ user: safeUser(req.user), inventory: inv.rows, leaguePayouts: leaguePayouts.rows });
 }));
 app.patch('/api/profile', auth, asyncHandler(async (req, res) => {
   const { firstName, lastName, nickname, profileImageUrl, profileAvatarKey, bankAccount, age, city, province, fcmToken } = req.body;
@@ -239,7 +246,8 @@ app.get('/api/users/:id/public', auth, asyncHandler(async (req, res) => {
   if (!rows[0]) return res.status(404).json({ message: 'کاربر پیدا نشد' });
   const rewards = await pool.query(`SELECT c.claimed_at,c.status,r.name,r.image_url,r.reward_type,r.reward_value FROM user_reward_claims c JOIN reward_tiers r ON r.id=c.reward_tier_id WHERE c.user_id=$1 AND c.status IN ('approved','paid') ORDER BY c.claimed_at DESC LIMIT 50`, [req.params.id]);
   const cards = await pool.query(`SELECT t.id AS card_type_id,t.name,t.image_url,t.point_value,count(c.id)::int AS registered_count,max(c.used_at) AS last_registered_at FROM card_codes c JOIN card_types t ON t.id=c.card_type_id WHERE c.used_by_user_id=$1 GROUP BY t.id,t.name,t.image_url,t.point_value ORDER BY registered_count DESC,t.name LIMIT 50`, [req.params.id]);
-  res.json({ ...rows[0], rewards: rewards.rows, cards: cards.rows });
+  const leaguePayouts = await pool.query(`SELECT p.rank,p.amount,p.payment_status,p.created_at,s.month_year FROM league_payouts p JOIN league_seasons s ON s.id=p.league_season_id WHERE p.user_id=$1 ORDER BY p.created_at DESC LIMIT 20`, [req.params.id]);
+  res.json({ ...rows[0], rewards: rewards.rows, cards: cards.rows, leaguePayouts: leaguePayouts.rows });
 }));
 
 app.get('/api/rewards', auth, asyncHandler(async (req, res) => {
@@ -538,14 +546,17 @@ app.patch('/api/admin/reward-claims/:id', adminAuth, requireRole('support'), asy
   await audit(req.admin.id,'update_reward_claim','user_reward_claims',req.params.id,adminNote,{status}); res.json({ message: 'به‌روزرسانی شد' });
 }));
 
-app.get('/api/admin/league', adminAuth, asyncHandler(async (req, res) => res.json(await getLeaderboard(100))));
+app.get('/api/admin/league', adminAuth, asyncHandler(async (req, res) => { const data = await getLeaderboard(100); data.winnerCount = await getLeagueWinnerCount(); res.json(data); }));
 app.patch('/api/admin/league/current/prizes', adminAuth, requireRole(), asyncHandler(async (req, res) => {
   const season = await ensureActiveSeason();
-  await pool.query('UPDATE league_seasons SET prize_table=$1, updated_at=NOW() WHERE id=$2', [JSON.stringify(req.body.prizeTable || []), season.id]);
-  await audit(req.admin.id,'update_league_prizes','league_seasons',season.id,null,req.body); res.json({ message: 'جدول جوایز لیگ ذخیره شد' });
+  const prizeTable = req.body.prizeTable || [];
+  const winnerCount = Math.max(1, Math.min(100, Number(req.body.winnerCount || prizeTable.length || 10)));
+  await pool.query('UPDATE league_seasons SET prize_table=$1, updated_at=NOW() WHERE id=$2', [JSON.stringify(prizeTable), season.id]);
+  await pool.query(`INSERT INTO app_settings(key,value,updated_by_admin_id,updated_at) VALUES('league_winner_count',$1,$2,NOW()) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value, updated_by_admin_id=EXCLUDED.updated_by_admin_id, updated_at=NOW()`, [JSON.stringify(winnerCount), req.admin.id]);
+  await audit(req.admin.id,'update_league_prizes','league_seasons',season.id,null,{...req.body,winnerCount}); res.json({ message: 'جدول جوایز لیگ ذخیره شد', winnerCount });
 }));
 app.post('/api/admin/league/close', adminAuth, requireRole(), asyncHandler(async (req, res) => res.json(await closeActiveSeason())));
-app.get('/api/admin/league/payouts', adminAuth, asyncHandler(async (req, res) => res.json((await pool.query('SELECT p.*, u.mobile FROM league_payouts p JOIN users u ON u.id=p.user_id ORDER BY p.created_at DESC')).rows)));
+app.get('/api/admin/league/payouts', adminAuth, asyncHandler(async (req, res) => res.json((await pool.query('SELECT p.*, u.mobile,u.first_name,u.last_name,u.nickname,u.bank_account FROM league_payouts p JOIN users u ON u.id=p.user_id ORDER BY p.created_at DESC')).rows)));
 app.patch('/api/admin/league/payouts/:id', adminAuth, requireRole('support'), asyncHandler(async (req, res) => { await pool.query('UPDATE league_payouts SET payment_status=$1, paid_at=CASE WHEN $1=\'paid\' THEN NOW() ELSE paid_at END WHERE id=$2', [req.body.status, req.params.id]); res.json({message:'ثبت شد'}); }));
 
 app.get('/api/admin/users', adminAuth, asyncHandler(async (req, res) => {
@@ -558,11 +569,12 @@ app.get('/api/admin/users/:id', adminAuth, asyncHandler(async (req, res) => {
   res.json({ user: safeUser(user.rows[0]), codes: codes.rows });
 }));
 app.patch('/api/admin/users/:id/status', adminAuth, requireRole('support'), asyncHandler(async (req, res) => { await pool.query('UPDATE users SET status=$1 WHERE id=$2', [req.body.status, req.params.id]); await audit(req.admin.id,'update_user_status','users',req.params.id,req.body.reason,{status:req.body.status}); res.json({message:'ثبت شد'}); }));
-app.post('/api/admin/users/:id/points', adminAuth, requireRole(), asyncHandler(async (req, res) => { const p=Number(req.body.points||0); await pool.query('UPDATE users SET current_points=GREATEST(0,current_points+$1), lifetime_points=GREATEST(0,lifetime_points+$1), monthly_league_points=GREATEST(0,monthly_league_points+$1) WHERE id=$2', [p, req.params.id]); await audit(req.admin.id,'manual_points','users',req.params.id,req.body.reason,{points:p}); res.json({message:'امتیاز تغییر کرد'}); }));
+app.post('/api/admin/users/:id/points', adminAuth, requireRole(), asyncHandler(async (req, res) => { const p=Number(req.body.points||0); await pool.query('UPDATE users SET current_points=GREATEST(0,current_points+$1), lifetime_points=GREATEST(0,lifetime_points+$1), monthly_league_points=GREATEST(0,monthly_league_points+$1) WHERE id=$2', [p, req.params.id]); await audit(req.admin.id,'manual_points','users',req.params.id,req.body.reason,{points:p}); await createNotification(req.params.id, 'admin_points', 'تغییر امتیاز توسط مدیریت', `امتیاز شما به مقدار ${p} تغییر کرد. ${req.body.reason||''}`); res.json({message:'امتیاز تغییر کرد'}); }));
+app.post('/api/admin/users/:id/notify', adminAuth, requireRole('support'), asyncHandler(async (req, res) => { await createNotification(req.params.id, 'admin_private', req.body.title || 'پیام اختصاصی مدیریت', req.body.body || req.body.message || ''); await audit(req.admin.id,'private_message_user','users',req.params.id,null,{title:req.body.title}); res.json({message:'پیام اختصاصی ارسال شد'}); }));
 
 app.get('/api/admin/chat/messages', adminAuth, asyncHandler(async (req, res) => res.json((await pool.query('SELECT m.*, u.mobile,u.nickname FROM chat_messages m JOIN users u ON u.id=m.user_id ORDER BY m.sent_at DESC LIMIT 300')).rows)));
 app.patch('/api/admin/chat/messages/:id/delete', adminAuth, requireRole('support'), asyncHandler(async (req, res) => { await pool.query('UPDATE chat_messages SET is_deleted=true WHERE id=$1', [req.params.id]); await audit(req.admin.id,'delete_chat_message','chat_messages',req.params.id,req.body.reason); res.json({message:'حذف شد'}); }));
-app.patch('/api/admin/chat/users/:id/ban', adminAuth, requireRole('support'), asyncHandler(async (req, res) => { await pool.query("UPDATE users SET chat_banned_until=NOW()+($1::text||' minutes')::interval WHERE id=$2", [req.body.minutes||1440, req.params.id]); await audit(req.admin.id,'ban_chat_user','users',req.params.id,req.body.reason,{minutes:req.body.minutes}); res.json({message:'کاربر از چت محروم شد'}); }));
+app.patch('/api/admin/chat/users/:id/ban', adminAuth, requireRole('support'), asyncHandler(async (req, res) => { await pool.query("UPDATE users SET chat_banned_until=NOW()+($1::text||' minutes')::interval WHERE id=$2", [req.body.minutes||1440, req.params.id]); await audit(req.admin.id,'ban_chat_user','users',req.params.id,req.body.reason,{minutes:req.body.minutes}); await createNotification(req.params.id,'chat_penalty','محدودیت چت',`شما به مدت ${req.body.minutes||1440} دقیقه از چت محروم شدید. ${req.body.reason||''}`); res.json({message:'کاربر از چت محروم شد'}); }));
 
 app.get('/api/admin/support/tickets', adminAuth, requireRole('support','observer'), asyncHandler(async (req, res) => res.json((await pool.query('SELECT t.*, u.mobile FROM support_tickets t JOIN users u ON u.id=t.user_id ORDER BY t.updated_at DESC')).rows)));
 app.get('/api/admin/support/tickets/:id/messages', adminAuth, requireRole('support','observer'), asyncHandler(async (req, res) => res.json((await pool.query('SELECT * FROM support_ticket_messages WHERE ticket_id=$1 ORDER BY created_at', [req.params.id])).rows)));

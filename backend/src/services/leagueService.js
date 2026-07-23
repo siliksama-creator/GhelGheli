@@ -51,10 +51,13 @@ async function closeActiveSeason() {
   try {
     await client.query('BEGIN');
     const season = await ensureActiveSeason(client);
+    const setting = await client.query("SELECT value FROM app_settings WHERE key='league_winner_count' LIMIT 1");
+    const rawWinnerCount = setting.rows[0]?.value;
+    const winnerCount = Number.isFinite(Number(rawWinnerCount)) && Number(rawWinnerCount) > 0 ? Math.floor(Number(rawWinnerCount)) : Math.max(10, (season.prize_table || []).length || 10);
     const { rows: leaders } = await client.query(
       `SELECT e.user_id, e.points, DENSE_RANK() OVER(ORDER BY e.points DESC) AS rank
-       FROM league_leaderboard_entries e WHERE e.league_season_id=$1 ORDER BY e.points DESC LIMIT 10`,
-      [season.id]
+       FROM league_leaderboard_entries e WHERE e.league_season_id=$1 ORDER BY e.points DESC LIMIT $2`,
+      [season.id, winnerCount]
     );
     const prizeMap = new Map((season.prize_table || []).map(p => [Number(p.rank), Number(p.amount || 0)]));
     for (const entry of leaders) {
