@@ -80,6 +80,22 @@ async function getChatMinLifetimePoints(client = pool) {
   const n = Number(typeof raw === 'object' && raw !== null ? raw.value : raw);
   return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
 }
+async function getChatCooldownSeconds(client = pool) {
+  const { rows } = await client.query("SELECT value FROM app_settings WHERE key='chat_message_cooldown_seconds' LIMIT 1");
+  const raw = rows[0]?.value;
+  const n = Number(typeof raw === 'object' && raw !== null ? raw.value : raw);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 5;
+}
+async function ensureChatCooldown(userId) {
+  const cooldown = await getChatCooldownSeconds();
+  if (!cooldown) return { cooldown, remaining: 0 };
+  const { rows } = await pool.query('SELECT sent_at FROM chat_messages WHERE user_id=$1 ORDER BY sent_at DESC LIMIT 1', [userId]);
+  if (!rows[0]) return { cooldown, remaining: 0 };
+  const diff = (Date.now() - new Date(rows[0].sent_at).getTime()) / 1000;
+  const remaining = Math.ceil(cooldown - diff);
+  return { cooldown, remaining: remaining > 0 ? remaining : 0 };
+}
+function maskSecret(v) { if (!v) return ''; const s=String(v); return s.length <= 4 ? '****' : `${s.slice(0,2)}****${s.slice(-2)}`; }
 
 const cardRedeemLimiter = rateLimit({ windowMs: 60_000, limit: 12, standardHeaders: true, legacyHeaders: false, message: { message: 'تعداد تلاش زیاد است؛ کمی بعد دوباره امتحان کنید' } });
 const chatLimiter = rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false });
@@ -237,7 +253,7 @@ app.get('/api/league/current', auth, asyncHandler(async (req, res) => res.json(a
 
 app.get('/api/chat/config', auth, asyncHandler(async (req, res) => {
   const minLifetimePoints = await getChatMinLifetimePoints();
-  res.json({ minLifetimePoints, eligible: Number(req.user.lifetime_points || 0) >= minLifetimePoints, userLifetimePoints: req.user.lifetime_points });
+  res.json({ minLifetimePoints, messageCooldownSeconds: await getChatCooldownSeconds(), eligible: Number(req.user.lifetime_points || 0) >= minLifetimePoints, userLifetimePoints: req.user.lifetime_points });
 }));
 app.get('/api/chat/messages', auth, asyncHandler(async (req, res) => {
   const minLifetimePoints = await getChatMinLifetimePoints();
@@ -249,6 +265,8 @@ app.post('/api/chat/messages', auth, chatLimiter, asyncHandler(async (req, res) 
   const minLifetimePoints = await getChatMinLifetimePoints();
   if (Number(req.user.lifetime_points || 0) < minLifetimePoints) return res.status(403).json({ message: `برای ارسال پیام باید حداقل ${minLifetimePoints} امتیاز تاریخی داشته باشید` });
   if (req.user.chat_banned_until && new Date(req.user.chat_banned_until) > new Date()) return res.status(403).json({ message: 'شما موقتاً از چت محروم هستید' });
+  const cd = await ensureChatCooldown(req.user.id);
+  if (cd.remaining > 0) return res.status(429).json({ message: `برای جلوگیری از اسپم، ${cd.remaining} ثانیه دیگر پیام بدهید`, cooldownSeconds: cd.cooldown, remainingSeconds: cd.remaining });
   const clean = String(req.body.message || req.body.text || '').trim();
   if (!clean || clean.length > 1000) return res.status(400).json({ message: 'متن پیام معتبر نیست' });
   const { rows } = await pool.query('INSERT INTO chat_messages(user_id,message_text) VALUES($1,$2) RETURNING *', [req.user.id, clean]);
@@ -314,18 +332,47 @@ app.post('/api/admin/uploads/image', adminAuth, requireRole('support'), imageUpl
 
 app.get('/api/admin/settings/chat', adminAuth, asyncHandler(async (req, res) => {
   const minLifetimePoints = await getChatMinLifetimePoints();
-  res.json({ minLifetimePoints });
+  const messageCooldownSeconds = await getChatCooldownSeconds();
+  res.json({ minLifetimePoints, messageCooldownSeconds });
 }));
 app.patch('/api/admin/settings/chat', adminAuth, requireRole(), asyncHandler(async (req, res) => {
   const minLifetimePoints = Math.max(0, Math.floor(Number(req.body.minLifetimePoints || 0)));
+  const messageCooldownSeconds = Math.max(0, Math.floor(Number(req.body.messageCooldownSeconds ?? req.body.cooldownSeconds ?? 5)));
   await pool.query(
     `INSERT INTO app_settings(key,value,updated_by_admin_id,updated_at)
      VALUES('chat_min_lifetime_points',$1,$2,NOW())
      ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value, updated_by_admin_id=EXCLUDED.updated_by_admin_id, updated_at=NOW()`,
     [JSON.stringify(minLifetimePoints), req.admin.id]
   );
-  await audit(req.admin.id, 'update_chat_min_points', 'app_settings', null, req.body.reason || 'تنظیم از پنل مدیریت', { minLifetimePoints });
-  res.json({ message: 'حداقل امتیاز چت ذخیره شد', minLifetimePoints });
+  await pool.query(
+    `INSERT INTO app_settings(key,value,updated_by_admin_id,updated_at)
+     VALUES('chat_message_cooldown_seconds',$1,$2,NOW())
+     ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value, updated_by_admin_id=EXCLUDED.updated_by_admin_id, updated_at=NOW()`,
+    [JSON.stringify(messageCooldownSeconds), req.admin.id]
+  );
+  await audit(req.admin.id, 'update_chat_settings', 'app_settings', null, req.body.reason || 'تنظیم از پنل مدیریت', { minLifetimePoints, messageCooldownSeconds });
+  res.json({ message: 'تنظیمات چت ذخیره شد', minLifetimePoints, messageCooldownSeconds });
+}));
+app.get('/api/admin/settings/sms', adminAuth, asyncHandler(async (req, res) => {
+  const { rows } = await pool.query("SELECT value FROM app_settings WHERE key='sms_config' LIMIT 1");
+  const cfg = rows[0]?.value || {};
+  res.json({ ...cfg, apiKey: undefined, apiKeyMasked: maskSecret(cfg.apiKey) });
+}));
+app.patch('/api/admin/settings/sms', adminAuth, requireRole(), asyncHandler(async (req, res) => {
+  const current = await pool.query("SELECT value FROM app_settings WHERE key='sms_config' LIMIT 1");
+  const oldCfg = current.rows[0]?.value || {};
+  const body = req.body || {};
+  const cfg = {
+    provider: body.provider ?? oldCfg.provider ?? '',
+    sender: body.sender ?? oldCfg.sender ?? '',
+    apiKey: body.apiKey && !String(body.apiKey).includes('****') ? body.apiKey : (oldCfg.apiKey || ''),
+    patternCode: body.patternCode ?? oldCfg.patternCode ?? '',
+    enabled: Boolean(body.enabled),
+    testMode: body.testMode !== undefined ? Boolean(body.testMode) : Boolean(oldCfg.testMode ?? true),
+  };
+  await pool.query(`INSERT INTO app_settings(key,value,updated_by_admin_id,updated_at) VALUES('sms_config',$1,$2,NOW()) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value, updated_by_admin_id=EXCLUDED.updated_by_admin_id, updated_at=NOW()`, [JSON.stringify(cfg), req.admin.id]);
+  await audit(req.admin.id, 'update_sms_settings', 'app_settings', null, null, { ...cfg, apiKey: maskSecret(cfg.apiKey) });
+  res.json({ message: 'تنظیمات پیامک ذخیره شد', ...cfg, apiKey: undefined, apiKeyMasked: maskSecret(cfg.apiKey) });
 }));
 
 app.get('/api/admin/card-types', adminAuth, asyncHandler(async (req, res) => res.json((await pool.query('SELECT * FROM card_types ORDER BY created_at DESC')).rows)));
@@ -471,6 +518,8 @@ io.on('connection', socket => {
       if (arr.length >= 20) throw new Error('ضد اسپم: تعداد پیام زیاد است');
       const minLifetimePoints = await getChatMinLifetimePoints();
       if (Number(socket.user.lifetime_points || 0) < minLifetimePoints) throw new Error(`برای ارسال پیام باید حداقل ${minLifetimePoints} امتیاز تاریخی داشته باشید`);
+      const cd = await ensureChatCooldown(socket.user.id);
+      if (cd.remaining > 0) throw new Error(`برای جلوگیری از اسپم، ${cd.remaining} ثانیه دیگر پیام بدهید`);
       if (socket.user.chat_banned_until && new Date(socket.user.chat_banned_until) > new Date()) throw new Error('شما موقتاً از چت محروم هستید');
       const clean = String(text || '').trim();
       if (!clean || clean.length > 1000) throw new Error('متن پیام معتبر نیست');
