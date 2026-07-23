@@ -258,7 +258,17 @@ app.get('/api/chat/config', auth, asyncHandler(async (req, res) => {
 app.get('/api/chat/messages', auth, asyncHandler(async (req, res) => {
   const minLifetimePoints = await getChatMinLifetimePoints();
   if (Number(req.user.lifetime_points || 0) < minLifetimePoints) return res.status(403).json({ message: `برای ورود به چت باید حداقل ${minLifetimePoints} امتیاز تاریخی داشته باشید`, minLifetimePoints });
-  const { rows } = await pool.query(`SELECT m.*, u.nickname,u.first_name,u.last_name,u.profile_image_url,u.profile_avatar_key FROM chat_messages m JOIN users u ON u.id=m.user_id WHERE m.is_deleted=false ORDER BY m.sent_at DESC LIMIT 100`);
+  const { rows } = await pool.query(`SELECT m.*, u.nickname,u.first_name,u.last_name,u.profile_image_url,u.profile_avatar_key,
+      s.title AS sticker_title, s.image_url AS sticker_url, s.sticker_type,
+      rm.message_text AS reply_text, rm.message_type AS reply_type, ru.nickname AS reply_nickname,
+      (SELECT count(*)::int FROM chat_message_likes l WHERE l.message_id=m.id) AS like_count,
+      EXISTS(SELECT 1 FROM chat_message_likes l WHERE l.message_id=m.id AND l.user_id=$1) AS liked_by_me
+    FROM chat_messages m
+    JOIN users u ON u.id=m.user_id
+    LEFT JOIN chat_stickers s ON s.id=m.sticker_id
+    LEFT JOIN chat_messages rm ON rm.id=m.reply_to_message_id
+    LEFT JOIN users ru ON ru.id=rm.user_id
+    WHERE m.is_deleted=false ORDER BY m.sent_at DESC LIMIT 100`, [req.user.id]);
   res.json(rows.reverse());
 }));
 app.post('/api/chat/messages', auth, chatLimiter, asyncHandler(async (req, res) => {
@@ -267,16 +277,42 @@ app.post('/api/chat/messages', auth, chatLimiter, asyncHandler(async (req, res) 
   if (req.user.chat_banned_until && new Date(req.user.chat_banned_until) > new Date()) return res.status(403).json({ message: 'شما موقتاً از چت محروم هستید' });
   const cd = await ensureChatCooldown(req.user.id);
   if (cd.remaining > 0) return res.status(429).json({ message: `برای جلوگیری از اسپم، ${cd.remaining} ثانیه دیگر پیام بدهید`, cooldownSeconds: cd.cooldown, remainingSeconds: cd.remaining });
-  const clean = String(req.body.message || req.body.text || '').trim();
-  if (!clean || clean.length > 1000) return res.status(400).json({ message: 'متن پیام معتبر نیست' });
-  const { rows } = await pool.query('INSERT INTO chat_messages(user_id,message_text) VALUES($1,$2) RETURNING *', [req.user.id, clean]);
-  const msg = { ...rows[0], nickname: req.user.nickname, first_name: req.user.first_name, last_name: req.user.last_name, profile_image_url: req.user.profile_image_url, profile_avatar_key: req.user.profile_avatar_key };
+  const stickerId = req.body.stickerId || req.body.sticker_id || null;
+  const replyTo = req.body.replyTo || req.body.reply_to_message_id || null;
+  let clean = String(req.body.message || req.body.text || '').trim();
+  let messageType = 'text';
+  if (stickerId) {
+    const st = await pool.query('SELECT * FROM chat_stickers WHERE id=$1 AND is_active=true', [stickerId]);
+    if (!st.rows[0]) return res.status(400).json({ message: 'استیکر معتبر نیست' });
+    messageType = 'sticker';
+    clean = clean || st.rows[0].title;
+  }
+  if (messageType === 'text' && (!clean || clean.length > 1000)) return res.status(400).json({ message: 'متن پیام معتبر نیست' });
+  const { rows } = await pool.query('INSERT INTO chat_messages(user_id,message_text,reply_to_message_id,sticker_id,message_type) VALUES($1,$2,$3,$4,$5) RETURNING *', [req.user.id, clean, replyTo, stickerId, messageType]);
+  const msg = { ...rows[0], nickname: req.user.nickname, first_name: req.user.first_name, last_name: req.user.last_name, profile_image_url: req.user.profile_image_url, profile_avatar_key: req.user.profile_avatar_key, like_count: 0, liked_by_me: false };
   io.emit('chat:new', msg);
   res.json(msg);
 }));
 app.post('/api/chat/messages/:id/report', auth, asyncHandler(async (req, res) => {
   await pool.query('UPDATE chat_messages SET is_reported=true, report_count=report_count+1 WHERE id=$1', [req.params.id]);
   res.json({ message: 'گزارش ثبت شد' });
+}));
+
+app.get('/api/chat/stickers', auth, asyncHandler(async (req, res) => {
+  const { rows } = await pool.query('SELECT id,title,image_url,sticker_type FROM chat_stickers WHERE is_active=true ORDER BY created_at DESC');
+  res.json(rows);
+}));
+app.post('/api/chat/messages/:id/like', auth, asyncHandler(async (req, res) => {
+  await pool.query('INSERT INTO chat_message_likes(message_id,user_id) VALUES($1,$2) ON CONFLICT DO NOTHING', [req.params.id, req.user.id]);
+  const c = await pool.query('SELECT count(*)::int AS count FROM chat_message_likes WHERE message_id=$1', [req.params.id]);
+  io.emit('chat:liked', { messageId: req.params.id, likeCount: c.rows[0].count });
+  res.json({ liked: true, likeCount: c.rows[0].count });
+}));
+app.delete('/api/chat/messages/:id/like', auth, asyncHandler(async (req, res) => {
+  await pool.query('DELETE FROM chat_message_likes WHERE message_id=$1 AND user_id=$2', [req.params.id, req.user.id]);
+  const c = await pool.query('SELECT count(*)::int AS count FROM chat_message_likes WHERE message_id=$1', [req.params.id]);
+  io.emit('chat:liked', { messageId: req.params.id, likeCount: c.rows[0].count });
+  res.json({ liked: false, likeCount: c.rows[0].count });
 }));
 
 app.post('/api/support/tickets', auth, asyncHandler(async (req, res) => {
@@ -328,6 +364,27 @@ app.get('/api/admin/dashboard', adminAuth, asyncHandler(async (req, res) => {
 app.post('/api/admin/uploads/image', adminAuth, requireRole('support'), imageUpload.single('image'), asyncHandler(async (req, res) => {
   if (!req.file) return res.status(400).json({ message: 'فایل عکس معتبر نیست' });
   res.json({ url: `/uploads/images/${req.file.filename}` });
+}));
+
+app.get('/api/admin/chat/stickers', adminAuth, asyncHandler(async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM chat_stickers ORDER BY created_at DESC');
+  res.json(rows);
+}));
+app.post('/api/admin/chat/stickers', adminAuth, requireRole('support'), imageUpload.single('sticker'), asyncHandler(async (req, res) => {
+  const title = req.body.title || 'استیکر';
+  let imageUrl = req.body.imageUrl;
+  if (req.file) imageUrl = `/uploads/images/${req.file.filename}`;
+  if (!imageUrl) return res.status(400).json({ message: 'فایل یا آدرس استیکر لازم است' });
+  const stickerType = req.body.stickerType || req.body.sticker_type || (/\.(gif|webp)$/i.test(imageUrl) ? 'animated' : 'static');
+  const { rows } = await pool.query('INSERT INTO chat_stickers(title,image_url,sticker_type,is_active,created_by_admin_id) VALUES($1,$2,$3,$4,$5) RETURNING *', [title, imageUrl, stickerType, req.body.isActive !== 'false', req.admin.id]);
+  await audit(req.admin.id,'create_chat_sticker','chat_stickers',rows[0].id,null,{ title, stickerType });
+  res.json(rows[0]);
+}));
+app.patch('/api/admin/chat/stickers/:id', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
+  const { title, imageUrl, stickerType, isActive } = req.body;
+  const { rows } = await pool.query('UPDATE chat_stickers SET title=COALESCE($1,title), image_url=COALESCE($2,image_url), sticker_type=COALESCE($3,sticker_type), is_active=COALESCE($4,is_active), updated_at=NOW() WHERE id=$5 RETURNING *', [title,imageUrl,stickerType,isActive,req.params.id]);
+  await audit(req.admin.id,'update_chat_sticker','chat_stickers',req.params.id,null,req.body);
+  res.json(rows[0]);
 }));
 
 app.get('/api/admin/settings/chat', adminAuth, asyncHandler(async (req, res) => {
@@ -511,7 +568,7 @@ io.use(async (socket, next) => {
 });
 const socketMessageTimes = new Map();
 io.on('connection', socket => {
-  socket.on('chat:send', async (text, cb) => {
+  socket.on('chat:send', async (payload, cb) => {
     try {
       const now = Date.now();
       const arr = (socketMessageTimes.get(socket.user.id) || []).filter(t => now - t < 60_000);
@@ -521,11 +578,20 @@ io.on('connection', socket => {
       const cd = await ensureChatCooldown(socket.user.id);
       if (cd.remaining > 0) throw new Error(`برای جلوگیری از اسپم، ${cd.remaining} ثانیه دیگر پیام بدهید`);
       if (socket.user.chat_banned_until && new Date(socket.user.chat_banned_until) > new Date()) throw new Error('شما موقتاً از چت محروم هستید');
-      const clean = String(text || '').trim();
-      if (!clean || clean.length > 1000) throw new Error('متن پیام معتبر نیست');
+      const body = typeof payload === 'object' && payload ? payload : { text: payload };
+      const stickerId = body.stickerId || null;
+      const replyTo = body.replyTo || null;
+      let clean = String(body.text || '').trim();
+      let messageType = stickerId ? 'sticker' : 'text';
+      if (stickerId) {
+        const st = await pool.query('SELECT * FROM chat_stickers WHERE id=$1 AND is_active=true', [stickerId]);
+        if (!st.rows[0]) throw new Error('استیکر معتبر نیست');
+        clean = clean || st.rows[0].title;
+      }
+      if (messageType === 'text' && (!clean || clean.length > 1000)) throw new Error('متن پیام معتبر نیست');
       arr.push(now); socketMessageTimes.set(socket.user.id, arr);
-      const { rows } = await pool.query('INSERT INTO chat_messages(user_id,message_text) VALUES($1,$2) RETURNING *', [socket.user.id, clean]);
-      const msg = { ...rows[0], nickname: socket.user.nickname, first_name: socket.user.first_name, last_name: socket.user.last_name, profile_image_url: socket.user.profile_image_url, profile_avatar_key: socket.user.profile_avatar_key };
+      const { rows } = await pool.query('INSERT INTO chat_messages(user_id,message_text,reply_to_message_id,sticker_id,message_type) VALUES($1,$2,$3,$4,$5) RETURNING *', [socket.user.id, clean, replyTo, stickerId, messageType]);
+      const msg = { ...rows[0], nickname: socket.user.nickname, first_name: socket.user.first_name, last_name: socket.user.last_name, profile_image_url: socket.user.profile_image_url, profile_avatar_key: socket.user.profile_avatar_key, like_count: 0 };
       io.emit('chat:new', msg); cb && cb({ ok: true, message: msg });
     } catch(e){ cb && cb({ ok: false, error: e.message }); }
   });
