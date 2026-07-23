@@ -5,7 +5,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shamsi_date/shamsi_date.dart';
-import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'api_client.dart';
 
 const avatarFiles = [
