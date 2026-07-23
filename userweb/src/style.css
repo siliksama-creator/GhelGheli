@@ -6,3 +6,4 @@
 
 /* logo size update */
 .hero img{width:300px!important;height:220px!important;object-fit:contain!important}.hero{max-width:720px!important}.hero b{margin-top:-14px}@media(max-width:900px){.hero img{width:230px!important;height:170px!important}}
+.clickable{cursor:pointer}.clickable:hover{border-color:#b5ef58}.clickableText{cursor:pointer}.clickableText:hover{color:#b5ef58}.modalShade{position:fixed;inset:0;background:#0009;display:grid;place-items:center;z-index:30;padding:18px}.publicModal{width:min(720px,96vw);max-height:88vh;overflow:auto;background:linear-gradient(180deg,#183657,#0b1d32);border:1px solid #ffffff22;border-radius:28px;padding:22px;box-shadow:0 30px 100px #000}.close{float:left;background:#ff5070;color:#fff}.publicHead{display:flex;align-items:center;gap:14px}.publicHead img{width:82px;height:82px;border-radius:50%;object-fit:cover;box-shadow:0 0 25px #b5ef5855}

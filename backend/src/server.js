@@ -238,7 +238,8 @@ app.get('/api/users/:id/public', auth, asyncHandler(async (req, res) => {
   const { rows } = await pool.query('SELECT id,nickname,profile_image_url,profile_avatar_key,lifetime_points,current_points,monthly_league_points,joined_at FROM users WHERE id=$1', [req.params.id]);
   if (!rows[0]) return res.status(404).json({ message: 'کاربر پیدا نشد' });
   const rewards = await pool.query(`SELECT c.claimed_at,c.status,r.name,r.image_url,r.reward_type,r.reward_value FROM user_reward_claims c JOIN reward_tiers r ON r.id=c.reward_tier_id WHERE c.user_id=$1 AND c.status IN ('approved','paid') ORDER BY c.claimed_at DESC LIMIT 50`, [req.params.id]);
-  res.json({ ...rows[0], rewards: rewards.rows });
+  const cards = await pool.query(`SELECT t.id AS card_type_id,t.name,t.image_url,t.point_value,count(c.id)::int AS registered_count,max(c.used_at) AS last_registered_at FROM card_codes c JOIN card_types t ON t.id=c.card_type_id WHERE c.used_by_user_id=$1 GROUP BY t.id,t.name,t.image_url,t.point_value ORDER BY registered_count DESC,t.name LIMIT 50`, [req.params.id]);
+  res.json({ ...rows[0], rewards: rewards.rows, cards: cards.rows });
 }));
 
 app.get('/api/rewards', auth, asyncHandler(async (req, res) => {
