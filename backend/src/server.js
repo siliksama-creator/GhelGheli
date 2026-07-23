@@ -96,6 +96,23 @@ async function ensureChatCooldown(userId) {
   return { cooldown, remaining: remaining > 0 ? remaining : 0 };
 }
 function maskSecret(v) { if (!v) return ''; const s=String(v); return s.length <= 4 ? '****' : `${s.slice(0,2)}****${s.slice(-2)}`; }
+function normalizeChatText(text) { return String(text || '').toLowerCase().replace(/[\s\u200c_\-.]+/g, ''); }
+async function getChatBadWords(client = pool) {
+  const { rows } = await client.query("SELECT value FROM app_settings WHERE key='chat_bad_words' LIMIT 1");
+  const raw = rows[0]?.value;
+  return Array.isArray(raw) ? raw.map(w => String(w).trim()).filter(Boolean) : [];
+}
+async function assertNoBadWords(text) {
+  const words = await getChatBadWords();
+  if (!words.length) return;
+  const normalized = normalizeChatText(text);
+  const hit = words.find(w => normalizeChatText(w) && normalized.includes(normalizeChatText(w)));
+  if (hit) {
+    const err = new Error('پیام شامل کلمات غیرمجاز است');
+    err.status = 400;
+    throw err;
+  }
+}
 
 const cardRedeemLimiter = rateLimit({ windowMs: 60_000, limit: 12, standardHeaders: true, legacyHeaders: false, message: { message: 'تعداد تلاش زیاد است؛ کمی بعد دوباره امتحان کنید' } });
 const chatLimiter = rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false });
@@ -288,6 +305,7 @@ app.post('/api/chat/messages', auth, chatLimiter, asyncHandler(async (req, res) 
     clean = clean || st.rows[0].title;
   }
   if (messageType === 'text' && (!clean || clean.length > 1000)) return res.status(400).json({ message: 'متن پیام معتبر نیست' });
+  if (clean) await assertNoBadWords(clean);
   const { rows } = await pool.query('INSERT INTO chat_messages(user_id,message_text,reply_to_message_id,sticker_id,message_type) VALUES($1,$2,$3,$4,$5) RETURNING *', [req.user.id, clean, replyTo, stickerId, messageType]);
   const msg = { ...rows[0], nickname: req.user.nickname, first_name: req.user.first_name, last_name: req.user.last_name, profile_image_url: req.user.profile_image_url, profile_avatar_key: req.user.profile_avatar_key, like_count: 0, liked_by_me: false };
   io.emit('chat:new', msg);
@@ -390,11 +408,13 @@ app.patch('/api/admin/chat/stickers/:id', adminAuth, requireRole('support'), asy
 app.get('/api/admin/settings/chat', adminAuth, asyncHandler(async (req, res) => {
   const minLifetimePoints = await getChatMinLifetimePoints();
   const messageCooldownSeconds = await getChatCooldownSeconds();
-  res.json({ minLifetimePoints, messageCooldownSeconds });
+  const badWords = await getChatBadWords();
+  res.json({ minLifetimePoints, messageCooldownSeconds, badWords });
 }));
 app.patch('/api/admin/settings/chat', adminAuth, requireRole(), asyncHandler(async (req, res) => {
   const minLifetimePoints = Math.max(0, Math.floor(Number(req.body.minLifetimePoints || 0)));
   const messageCooldownSeconds = Math.max(0, Math.floor(Number(req.body.messageCooldownSeconds ?? req.body.cooldownSeconds ?? 5)));
+  const badWords = Array.isArray(req.body.badWords) ? req.body.badWords.map(w => String(w).trim()).filter(Boolean) : String(req.body.badWordsText || '').split(/[\n,،]+/).map(w => w.trim()).filter(Boolean);
   await pool.query(
     `INSERT INTO app_settings(key,value,updated_by_admin_id,updated_at)
      VALUES('chat_min_lifetime_points',$1,$2,NOW())
@@ -407,8 +427,14 @@ app.patch('/api/admin/settings/chat', adminAuth, requireRole(), asyncHandler(asy
      ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value, updated_by_admin_id=EXCLUDED.updated_by_admin_id, updated_at=NOW()`,
     [JSON.stringify(messageCooldownSeconds), req.admin.id]
   );
-  await audit(req.admin.id, 'update_chat_settings', 'app_settings', null, req.body.reason || 'تنظیم از پنل مدیریت', { minLifetimePoints, messageCooldownSeconds });
-  res.json({ message: 'تنظیمات چت ذخیره شد', minLifetimePoints, messageCooldownSeconds });
+  await pool.query(
+    `INSERT INTO app_settings(key,value,updated_by_admin_id,updated_at)
+     VALUES('chat_bad_words',$1,$2,NOW())
+     ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value, updated_by_admin_id=EXCLUDED.updated_by_admin_id, updated_at=NOW()`,
+    [JSON.stringify(badWords), req.admin.id]
+  );
+  await audit(req.admin.id, 'update_chat_settings', 'app_settings', null, req.body.reason || 'تنظیم از پنل مدیریت', { minLifetimePoints, messageCooldownSeconds, badWordsCount: badWords.length });
+  res.json({ message: 'تنظیمات چت ذخیره شد', minLifetimePoints, messageCooldownSeconds, badWords });
 }));
 app.get('/api/admin/settings/sms', adminAuth, asyncHandler(async (req, res) => {
   const { rows } = await pool.query("SELECT value FROM app_settings WHERE key='sms_config' LIMIT 1");
@@ -589,6 +615,7 @@ io.on('connection', socket => {
         clean = clean || st.rows[0].title;
       }
       if (messageType === 'text' && (!clean || clean.length > 1000)) throw new Error('متن پیام معتبر نیست');
+      if (clean) await assertNoBadWords(clean);
       arr.push(now); socketMessageTimes.set(socket.user.id, arr);
       const { rows } = await pool.query('INSERT INTO chat_messages(user_id,message_text,reply_to_message_id,sticker_id,message_type) VALUES($1,$2,$3,$4,$5) RETURNING *', [socket.user.id, clean, replyTo, stickerId, messageType]);
       const msg = { ...rows[0], nickname: socket.user.nickname, first_name: socket.user.first_name, last_name: socket.user.last_name, profile_image_url: socket.user.profile_image_url, profile_avatar_key: socket.user.profile_avatar_key, like_count: 0 };
