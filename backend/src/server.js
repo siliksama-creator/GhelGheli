@@ -245,6 +245,17 @@ app.get('/api/chat/messages', auth, asyncHandler(async (req, res) => {
   const { rows } = await pool.query(`SELECT m.*, u.nickname,u.first_name,u.last_name,u.profile_image_url,u.profile_avatar_key FROM chat_messages m JOIN users u ON u.id=m.user_id WHERE m.is_deleted=false ORDER BY m.sent_at DESC LIMIT 100`);
   res.json(rows.reverse());
 }));
+app.post('/api/chat/messages', auth, chatLimiter, asyncHandler(async (req, res) => {
+  const minLifetimePoints = await getChatMinLifetimePoints();
+  if (Number(req.user.lifetime_points || 0) < minLifetimePoints) return res.status(403).json({ message: `برای ارسال پیام باید حداقل ${minLifetimePoints} امتیاز تاریخی داشته باشید` });
+  if (req.user.chat_banned_until && new Date(req.user.chat_banned_until) > new Date()) return res.status(403).json({ message: 'شما موقتاً از چت محروم هستید' });
+  const clean = String(req.body.message || req.body.text || '').trim();
+  if (!clean || clean.length > 1000) return res.status(400).json({ message: 'متن پیام معتبر نیست' });
+  const { rows } = await pool.query('INSERT INTO chat_messages(user_id,message_text) VALUES($1,$2) RETURNING *', [req.user.id, clean]);
+  const msg = { ...rows[0], nickname: req.user.nickname, first_name: req.user.first_name, last_name: req.user.last_name, profile_image_url: req.user.profile_image_url, profile_avatar_key: req.user.profile_avatar_key };
+  io.emit('chat:new', msg);
+  res.json(msg);
+}));
 app.post('/api/chat/messages/:id/report', auth, asyncHandler(async (req, res) => {
   await pool.query('UPDATE chat_messages SET is_reported=true, report_count=report_count+1 WHERE id=$1', [req.params.id]);
   res.json({ message: 'گزارش ثبت شد' });
