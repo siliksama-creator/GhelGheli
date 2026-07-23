@@ -17,7 +17,7 @@ async function req(path,method='GET',body,token){
 function App(){
   const[token,setToken]=useState(localStorage.token||'');
   const[mode,setMode]=useState(location.hostname.startsWith('register.')?'register':'login');
-  return <div className="page"><div className="hero"><b>⚽ قلقلی</b><span>وب‌اپ کاربر؛ همان حساب و همان اطلاعات اپلیکیشن</span></div>{token?<Portal token={token} logout={()=>{localStorage.removeItem('token');setToken('')}}/>:<Auth mode={mode} setMode={setMode} done={t=>{localStorage.token=t;setToken(t)}}/>}</div>;
+  return <div className="page"><div className="hero"><img src="/logo.png" alt="قلقلی"/><b>قلقلی</b><span>وب‌اپ کاربر؛ همان حساب و همان اطلاعات اپلیکیشن</span></div>{token?<Portal token={token} logout={()=>{localStorage.removeItem('token');setToken('')}}/>:<Auth mode={mode} setMode={setMode} done={t=>{localStorage.token=t;setToken(t)}}/>}</div>;
 }
 
 function Auth({mode,setMode,done}){
