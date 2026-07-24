@@ -75,6 +75,61 @@ class _AdminUsersState extends State<AdminUsers> {
     }
   }
 
+  // SMS OTP isn't active yet, so users can't self-service a forgotten
+  // password. Support can set a temporary one here after verifying the
+  // user's identity by phone/in person — the action is written to the
+  // audit log on the backend.
+  Future<void> _resetPassword(String id) async {
+    final controller = TextEditingController();
+    final value = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('تنظیم رمز موقت'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+                'چون پیامک هنوز فعال نیست، کاربر نمی‌تواند رمز را خودش بازیابی کند. فقط بعد از احراز هویت کاربر این کار را انجام دهید.',
+                style: TextStyle(fontSize: 12.5)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                  labelText: 'رمز جدید (حداقل ۶ کاراکتر)',
+                  prefixIcon: Icon(Icons.key_rounded)),
+              autofocus: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('لغو')),
+          FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, controller.text),
+              child: const Text('ثبت')),
+        ],
+      ),
+    );
+    if (value == null || value.isEmpty) return;
+    if (value.length < 6) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('رمز باید حداقل ۶ کاراکتر باشد')));
+      }
+      return;
+    }
+    await widget.api.post('/api/admin/users/$id/reset-password', {
+      'newPassword': value,
+      'reason': 'بازیابی رمز توسط پشتیبانی',
+    });
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('رمز عبور کاربر تغییر کرد؛ رمز جدید را به او اطلاع دهید')));
+    }
+  }
+
   Future<void> _showDetails(String id) async {
     final d = await widget.api.get('/api/admin/users/$id');
     final u = Map<String, dynamic>.from(d['user']);
@@ -181,6 +236,8 @@ class _AdminUsersState extends State<AdminUsers> {
                         onSelected: (s) async {
                           if (s == 'points') {
                             await _adjustPoints(u['id']);
+                          } else if (s == 'reset_password') {
+                            await _resetPassword(u['id']);
                           } else {
                             await widget.api.patch(
                                 '/api/admin/users/${u['id']}/status',
@@ -191,6 +248,9 @@ class _AdminUsersState extends State<AdminUsers> {
                         itemBuilder: (_) => [
                           const PopupMenuItem(
                               value: 'points', child: Text('تغییر امتیاز')),
+                          const PopupMenuItem(
+                              value: 'reset_password',
+                              child: Text('بازیابی رمز عبور')),
                           PopupMenuItem(
                               value: u['status'] == 'active'
                                   ? 'blocked'

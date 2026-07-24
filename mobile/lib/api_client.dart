@@ -79,3 +79,15 @@ String apiError(Object e) {
   } catch (_) {}
   return 'خطای ارتباط با سرور';
 }
+
+/// HTTP status code of a failed API call, or null if unavailable. Used by
+/// the auth screen to detect "account already exists" (409) so it can offer
+/// the current-password field instead of just showing a generic error.
+int? apiStatusCode(Object e) {
+  try {
+    return (e as dynamic).response?.statusCode as int?;
+  } catch (_) {
+    return null;
+  }
+}
+

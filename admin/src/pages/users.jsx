@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Coins, MessageSquareText, Search, ShieldOff, UserRoundSearch } from 'lucide-react';
+import { Coins, KeyRound, MessageSquareText, Search, ShieldOff, UserRoundSearch } from 'lucide-react';
 import { fmtNumber } from '../lib/api.js';
 import { Badge, Button, Card, DataRow, EmptyState, Input } from '../components/ui.jsx';
 import { useDialog } from '../components/dialog.jsx';
@@ -41,6 +41,23 @@ export function UsersPage({ request }) {
     notify('پیام اختصاصی ارسال شد');
   }
 
+  // Since the SMS gateway isn't active yet, users can't reset a forgotten
+  // password themselves via OTP. Support can set a temporary password here
+  // after verifying the user's identity by phone/in person — every use is
+  // recorded in the audit log.
+  async function resetPassword(id) {
+    const pw = await promptText({
+      title: 'تنظیم رمز موقت برای کاربر',
+      description: 'چون پیامک هنوز فعال نیست، کاربر نمی‌تواند رمز را خودش بازیابی کند. فقط بعد از احراز هویت کاربر (تماس تلفنی و ...) این کار را انجام دهید.',
+      placeholder: 'رمز جدید (حداقل ۶ کاراکتر)',
+      type: 'text',
+    });
+    if (!pw) return;
+    if (pw.length < 6) return notify('رمز باید حداقل ۶ کاراکتر باشد');
+    await request(`/api/admin/users/${id}/reset-password`, { method: 'POST', body: { newPassword: pw, reason: 'بازیابی رمز توسط پشتیبانی' } });
+    notify('رمز عبور کاربر تغییر کرد؛ رمز جدید را به او اطلاع دهید');
+  }
+
   return (
     <Card>
       <div className="field-row" style={{ marginBottom: 16 }}>
@@ -70,6 +87,9 @@ export function UsersPage({ request }) {
                 <Button size="sm" variant="secondary" icon={MessageSquareText} onClick={() => privateMessage(u.id)}>
                   پیام
                 </Button>
+                <Button size="sm" variant="secondary" icon={KeyRound} onClick={() => resetPassword(u.id)}>
+                  بازیابی رمز
+                </Button>
                 <Button size="sm" variant={u.status === 'active' ? 'danger' : 'secondary'} icon={ShieldOff} onClick={() => block(u.id, u.status === 'active' ? 'blocked' : 'active')}>
                   {u.status === 'active' ? 'مسدود' : 'رفع مسدودی'}
                 </Button>
@@ -81,3 +101,4 @@ export function UsersPage({ request }) {
     </Card>
   );
 }
+

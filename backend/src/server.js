@@ -19,10 +19,25 @@ const { audit } = require('./services/auditService');
 const { createNotification } = require('./services/notificationService');
 const { ensureActiveSeason, addLeaguePoints, getLeaderboard, closeActiveSeason } = require('./services/leagueService');
 
+// Fail fast in production if the JWT secret was never configured — running
+// with the 'dev-secret' fallback would let anyone forge valid user/admin
+// tokens offline. Local/dev runs still work without a .env file.
+if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'dev-secret')) {
+  throw new Error('JWT_SECRET باید در production تنظیم شود (backend/.env)');
+}
+
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: process.env.CORS_ORIGIN?.split(',') || '*' } });
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
+
+// CORS_ORIGIN must be an explicit comma-separated allow-list in production.
+// Previously this fell back to '*' (any origin) whenever the env var was
+// missing/empty, which — combined with credentials:true — is an unsafe
+// default. Now an unset/empty CORS_ORIGIN simply denies cross-origin
+// requests instead of silently allowing everyone.
+const corsOrigins = String(process.env.CORS_ORIGIN || '').split(',').map(s => s.trim()).filter(Boolean);
+const corsOriginOption = corsOrigins.length ? corsOrigins : false;
+const io = new Server(server, { cors: { origin: corsOriginOption } });
 
 // The API always runs behind the Nginx reverse proxy on the same host (see
 // docs/deployment-fa.md) and the raw Node port is not exposed publicly
@@ -35,7 +50,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 app.set('trust proxy', 'loopback');
 
 app.use(helmet());
-app.use(cors({ origin: process.env.CORS_ORIGIN?.split(',') || '*', credentials: true }));
+app.use(cors({ origin: corsOriginOption, credentials: true }));
 app.use(express.json({ limit: '2mb' }));
 app.use(morgan('dev'));
 const uploadRoot = path.join(__dirname, '..', 'uploads');
@@ -133,6 +148,39 @@ async function assertNoBadWords(text) {
 const cardRedeemLimiter = rateLimit({ windowMs: 60_000, limit: 12, standardHeaders: true, legacyHeaders: false, message: { message: 'تعداد تلاش زیاد است؛ کمی بعد دوباره امتحان کنید' } });
 const chatLimiter = rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false });
 const otpLimiter = rateLimit({ windowMs: 10 * 60_000, limit: 5, standardHeaders: true, legacyHeaders: false });
+// Brute-force protection for the 6-digit OTP code itself. request-otp only
+// throttled how many codes could be requested — verify-otp and the password
+// reset endpoint (which also consumes an OTP) had NO limiter at all, so a
+// 6-digit code (1,000,000 possibilities) could be brute-forced with plain
+// unrestricted requests. Keyed by IP + mobile so one attacker can't lock out
+// a victim's own number for legitimate attempts from other IPs.
+const otpVerifyLimiter = rateLimit({
+  windowMs: 10 * 60_000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `${req.ip}:${normalizeMobile(req.body?.mobile)}`,
+  message: { message: 'تعداد تلاش زیاد است؛ کمی بعد دوباره امتحان کنید' },
+});
+// Admin login had zero throttling; the panel has full access to user data,
+// points and card codes, so brute-forcing the password had no cost at all.
+const adminLoginLimiter = rateLimit({
+  windowMs: 15 * 60_000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `${req.ip}:${String(req.body?.username || '').toLowerCase()}`,
+  message: { message: 'تعداد تلاش ورود زیاد است؛ چند دقیقه دیگر دوباره امتحان کنید' },
+});
+// Same reasoning as adminLoginLimiter, but for regular user login.
+const userLoginLimiter = rateLimit({
+  windowMs: 15 * 60_000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `${req.ip}:${normalizeMobile(req.body?.mobile)}`,
+  message: { message: 'تعداد تلاش ورود زیاد است؛ چند دقیقه دیگر دوباره امتحان کنید' },
+});
 
 app.get('/health', (req, res) => res.json({ ok: true, name: 'GhelGheli API' }));
 
@@ -144,11 +192,16 @@ app.post('/api/auth/request-otp', otpLimiter, asyncHandler(async (req, res) => {
   const hash = await bcrypt.hash(code, 10);
   const ttl = Number(process.env.OTP_TTL_MINUTES || 5);
   await pool.query('INSERT INTO otp_codes(mobile,code_hash,purpose,expires_at) VALUES($1,$2,$3,NOW()+($4::text||\' minutes\')::interval)', [mobile, hash, purpose, ttl]);
+  // NOTE: no SMS gateway is wired up yet (see backend/src/services/smsService.js).
+  // Until a real provider is configured in the admin settings panel, OTP codes
+  // are generated and stored but not delivered to the user's phone. Keep
+  // OTP_DEV_MODE=true in non-production environments to see the code in the
+  // response/logs for manual testing.
   if (process.env.OTP_DEV_MODE === 'true') console.log(`DEV OTP for ${mobile}: ${code}`);
   res.json({ message: 'کد تایید ارسال شد', devCode: process.env.OTP_DEV_MODE === 'true' ? code : undefined });
 }));
 
-app.post('/api/auth/verify-otp', asyncHandler(async (req, res) => {
+app.post('/api/auth/verify-otp', otpVerifyLimiter, asyncHandler(async (req, res) => {
   const mobile = normalizeMobile(req.body.mobile);
   const { code, purpose = 'register' } = req.body;
   const { rows } = await pool.query("SELECT * FROM otp_codes WHERE mobile=$1 AND purpose=$2 AND consumed_at IS NULL AND expires_at>NOW() ORDER BY created_at DESC LIMIT 1", [mobile, purpose]);
@@ -172,25 +225,45 @@ app.post('/api/auth/register', asyncHandler(async (req, res) => {
   res.json({ token: signUser(updated.rows[0]), user: safeUser(updated.rows[0]) });
 }));
 
-
-app.post('/api/auth/register-password', asyncHandler(async (req, res) => {
+app.post('/api/auth/register-password', userLoginLimiter, asyncHandler(async (req, res) => {
   if (process.env.ALLOW_PASSWORD_REGISTRATION !== 'true') return res.status(403).json({ message: 'ثبت‌نام مستقیم فعلاً غیرفعال است' });
   const mobile = normalizeMobile(req.body.mobile);
-  const { password, firstName, lastName, nickname, age, city, province, profileImageUrl, profileAvatarKey, bankAccount } = req.body;
+  const { password, firstName, lastName, nickname, age, city, province, profileImageUrl, profileAvatarKey, bankAccount, currentPassword } = req.body;
   if (!/^\+?[0-9A-Za-z]{3,20}$/.test(mobile)) return res.status(400).json({ message: 'شماره/نام کاربری معتبر نیست' });
   if (!password || String(password).length < 6) return res.status(400).json({ message: 'رمز عبور حداقل ۶ کاراکتر باشد' });
+
+  // SECURITY FIX: this endpoint used to run an unconditional
+  // `ON CONFLICT(mobile) DO UPDATE ... password_hash=EXCLUDED.password_hash`,
+  // which meant ANYONE who knew a victim's mobile number could silently
+  // overwrite their password and take over the account — with no OTP, no
+  // proof of ownership, and no old password required. It even reset
+  // status back to 'active', bypassing an admin block. Verified end-to-end
+  // against production before this fix.
+  //
+  // Because the SMS gateway is not wired up yet (see the comment on
+  // /api/auth/request-otp), we cannot require a real OTP here without
+  // locking every user out. Instead: registration only CREATES a brand new
+  // account; if the mobile already has a password set, the caller must
+  // prove ownership with the current password before anything is changed.
+  const existing = await pool.query('SELECT * FROM users WHERE mobile=$1', [mobile]);
+  if (existing.rows[0]?.password_hash) {
+    const ok = currentPassword && (await bcrypt.compare(String(currentPassword), existing.rows[0].password_hash));
+    if (!ok) return res.status(409).json({ message: 'این شماره قبلاً ثبت‌نام شده است. برای ورود از «ورود» استفاده کنید یا رمز فعلی را برای تغییر وارد کنید.' });
+  }
+
   const hash = await bcrypt.hash(String(password), 12);
   const { rows } = await pool.query(
     `INSERT INTO users(mobile,mobile_verified,password_hash,first_name,last_name,nickname,age,city,province,profile_image_url,profile_avatar_key,bank_account,status)
      VALUES($1,true,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'active')
-     ON CONFLICT(mobile) DO UPDATE SET password_hash=EXCLUDED.password_hash, first_name=EXCLUDED.first_name, last_name=EXCLUDED.last_name, nickname=EXCLUDED.nickname, age=EXCLUDED.age, city=EXCLUDED.city, province=EXCLUDED.province, profile_image_url=EXCLUDED.profile_image_url, profile_avatar_key=EXCLUDED.profile_avatar_key, bank_account=EXCLUDED.bank_account, mobile_verified=true, status='active', updated_at=NOW()
+     ON CONFLICT(mobile) DO UPDATE SET password_hash=EXCLUDED.password_hash, first_name=EXCLUDED.first_name, last_name=EXCLUDED.last_name, nickname=EXCLUDED.nickname, age=EXCLUDED.age, city=EXCLUDED.city, province=EXCLUDED.province, profile_image_url=EXCLUDED.profile_image_url, profile_avatar_key=EXCLUDED.profile_avatar_key, bank_account=EXCLUDED.bank_account, mobile_verified=true, updated_at=NOW()
      RETURNING *`,
+
     [mobile, hash, firstName || null, lastName || null, nickname || mobile, age ? Number(age) : null, city || null, province || null, profileImageUrl || null, profileAvatarKey || null, bankAccount || null]
   );
   res.json({ token: signUser(rows[0]), user: safeUser(rows[0]) });
 }));
 
-app.post('/api/auth/login', asyncHandler(async (req, res) => {
+app.post('/api/auth/login', userLoginLimiter, asyncHandler(async (req, res) => {
   const mobile = normalizeMobile(req.body.mobile);
   const { rows } = await pool.query('SELECT * FROM users WHERE mobile=$1', [mobile]);
   const user = rows[0];
@@ -199,9 +272,10 @@ app.post('/api/auth/login', asyncHandler(async (req, res) => {
   res.json({ token: signUser(user), user: safeUser(user) });
 }));
 
-app.post('/api/auth/forgot-password/reset', asyncHandler(async (req, res) => {
+app.post('/api/auth/forgot-password/reset', otpVerifyLimiter, asyncHandler(async (req, res) => {
   const mobile = normalizeMobile(req.body.mobile);
   const { code, newPassword } = req.body;
+  if (!newPassword || String(newPassword).length < 6) return res.status(400).json({ message: 'رمز عبور حداقل ۶ کاراکتر باشد' });
   const { rows } = await pool.query("SELECT * FROM otp_codes WHERE mobile=$1 AND purpose='reset_password' AND consumed_at IS NULL AND expires_at>NOW() ORDER BY created_at DESC LIMIT 1", [mobile]);
   if (!rows[0] || !(await bcrypt.compare(String(code || ''), rows[0].code_hash))) return res.status(400).json({ message: 'کد بازیابی معتبر نیست' });
   await pool.query('UPDATE otp_codes SET consumed_at=NOW() WHERE id=$1', [rows[0].id]);
@@ -251,6 +325,21 @@ app.patch('/api/profile', auth, asyncHandler(async (req, res) => {
   const { rows } = await pool.query(`UPDATE users SET first_name=COALESCE($1,first_name), last_name=COALESCE($2,last_name), nickname=COALESCE($3,nickname), profile_image_url=COALESCE($4,profile_image_url), profile_avatar_key=COALESCE($5,profile_avatar_key), bank_account=COALESCE($6,bank_account), age=COALESCE($7,age), city=COALESCE($8,city), province=COALESCE($9,province), fcm_token=COALESCE($10,fcm_token), updated_at=NOW() WHERE id=$11 RETURNING *`, [firstName,lastName,nickname,profileImageUrl,profileAvatarKey,bankAccount,age ? Number(age) : null,city,province,fcmToken,req.user.id]);
   res.json({ user: safeUser(rows[0]) });
 }));
+// Self-service password change while logged in. Added alongside the
+// register-password account-takeover fix: since real "forgot password" via
+// SMS OTP isn't available yet, a logged-in user still needs *some* safe way
+// to change their password — this requires proof of the current password,
+// unlike the old register-password bug.
+app.post('/api/profile/change-password', auth, userLoginLimiter, asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!newPassword || String(newPassword).length < 6) return res.status(400).json({ message: 'رمز جدید حداقل ۶ کاراکتر باشد' });
+  if (!req.user.password_hash || !currentPassword || !(await bcrypt.compare(String(currentPassword), req.user.password_hash))) {
+    return res.status(401).json({ message: 'رمز فعلی درست نیست' });
+  }
+  await pool.query('UPDATE users SET password_hash=$1, updated_at=NOW() WHERE id=$2', [await bcrypt.hash(String(newPassword), 12), req.user.id]);
+  res.json({ message: 'رمز عبور با موفقیت تغییر کرد' });
+}));
+
 app.get('/api/users/:id/public', auth, asyncHandler(async (req, res) => {
   const { rows } = await pool.query('SELECT id,nickname,profile_image_url,profile_avatar_key,lifetime_points,current_points,monthly_league_points,joined_at FROM users WHERE id=$1', [req.params.id]);
   if (!rows[0]) return res.status(404).json({ message: 'کاربر پیدا نشد' });
@@ -381,7 +470,7 @@ app.patch('/api/notifications/:id/read', auth, asyncHandler(async (req, res) => 
 }));
 
 // Admin
-app.post('/api/admin/auth/login', asyncHandler(async (req, res) => {
+app.post('/api/admin/auth/login', adminLoginLimiter, asyncHandler(async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM admin_users WHERE username=$1 AND is_active=true', [req.body.username]);
   const admin = rows[0];
   if (!admin || !(await bcrypt.compare(String(req.body.password || ''), admin.password_hash))) return res.status(401).json({ message: 'ورود نامعتبر' });
@@ -581,6 +670,20 @@ app.get('/api/admin/users/:id', adminAuth, asyncHandler(async (req, res) => {
 app.patch('/api/admin/users/:id/status', adminAuth, requireRole('support'), asyncHandler(async (req, res) => { await pool.query('UPDATE users SET status=$1 WHERE id=$2', [req.body.status, req.params.id]); await audit(req.admin.id,'update_user_status','users',req.params.id,req.body.reason,{status:req.body.status}); res.json({message:'ثبت شد'}); }));
 app.post('/api/admin/users/:id/points', adminAuth, requireRole(), asyncHandler(async (req, res) => { const p=Number(req.body.points||0); await pool.query('UPDATE users SET current_points=GREATEST(0,current_points+$1), lifetime_points=GREATEST(0,lifetime_points+$1), monthly_league_points=GREATEST(0,monthly_league_points+$1) WHERE id=$2', [p, req.params.id]); await audit(req.admin.id,'manual_points','users',req.params.id,req.body.reason,{points:p}); await createNotification(req.params.id, 'admin_points', 'تغییر امتیاز توسط مدیریت', `امتیاز شما به مقدار ${p} تغییر کرد. ${req.body.reason||''}`); res.json({message:'امتیاز تغییر کرد'}); }));
 app.post('/api/admin/users/:id/notify', adminAuth, requireRole('support'), asyncHandler(async (req, res) => { await createNotification(req.params.id, 'admin_private', req.body.title || 'پیام اختصاصی مدیریت', req.body.body || req.body.message || ''); await audit(req.admin.id,'private_message_user','users',req.params.id,null,{title:req.body.title}); res.json({message:'پیام اختصاصی ارسال شد'}); }));
+// SMS OTP is not wired up yet, so the self-service "forgot password" flow
+// cannot deliver a reset code to the user. Until a real SMS provider is
+// configured, this lets a support/super admin set a temporary password for
+// a locked-out user after verifying their identity manually (phone call,
+// in-person, etc.). Every use is written to the audit log.
+app.post('/api/admin/users/:id/reset-password', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
+  const newPassword = String(req.body.newPassword || '');
+  if (newPassword.length < 6) return res.status(400).json({ message: 'رمز جدید حداقل ۶ کاراکتر باشد' });
+  const hash = await bcrypt.hash(newPassword, 12);
+  const { rows } = await pool.query('UPDATE users SET password_hash=$1, updated_at=NOW() WHERE id=$2 RETURNING id,mobile', [hash, req.params.id]);
+  if (!rows[0]) return res.status(404).json({ message: 'کاربر پیدا نشد' });
+  await audit(req.admin.id, 'admin_reset_user_password', 'users', req.params.id, req.body.reason || 'بازیابی رمز توسط پشتیبانی (SMS هنوز فعال نیست)', {});
+  res.json({ message: 'رمز عبور کاربر تغییر کرد' });
+}));
 
 app.get('/api/admin/chat/messages', adminAuth, asyncHandler(async (req, res) => res.json((await pool.query('SELECT m.*, u.mobile,u.nickname FROM chat_messages m JOIN users u ON u.id=m.user_id ORDER BY m.sent_at DESC LIMIT 300')).rows)));
 app.patch('/api/admin/chat/messages/:id/delete', adminAuth, requireRole('support'), asyncHandler(async (req, res) => { await pool.query('UPDATE chat_messages SET is_deleted=true WHERE id=$1', [req.params.id]); await audit(req.admin.id,'delete_chat_message','chat_messages',req.params.id,req.body.reason); res.json({message:'حذف شد'}); }));

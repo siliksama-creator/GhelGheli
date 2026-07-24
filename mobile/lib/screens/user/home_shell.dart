@@ -30,9 +30,25 @@ class HomeShell extends StatefulWidget {
   State<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> {
+class _HomeShellState extends State<HomeShell>
+    with SingleTickerProviderStateMixin {
   int _index = 0;
   Map<String, dynamic>? _profile;
+
+  // A subtle one-shot "welcome" entrance the moment the user lands on the
+  // home shell after logging in — fades and lifts the whole shell into
+  // place instead of just snapping onto the screen, so the first thing a
+  // user feels after signing in is a small, polished moment of delight.
+  late final AnimationController _entrance = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 520),
+  )..forward();
+  late final Animation<double> _entranceFade =
+      CurvedAnimation(parent: _entrance, curve: Curves.easeOut);
+  late final Animation<Offset> _entranceSlide = Tween(
+    begin: const Offset(0, 0.04),
+    end: Offset.zero,
+  ).animate(CurvedAnimation(parent: _entrance, curve: Curves.easeOutCubic));
 
   late final List<Widget> _pages = [
     DashboardPage(api: widget.api, reloadProfile: _loadProfile),
@@ -75,6 +91,12 @@ class _HomeShellState extends State<HomeShell> {
     super.initState();
     _loadProfile();
     _registerFcm();
+  }
+
+  @override
+  void dispose() {
+    _entrance.dispose();
+    super.dispose();
   }
 
   Future<void> _loadProfile() async {
@@ -146,13 +168,19 @@ class _HomeShellState extends State<HomeShell> {
           const SizedBox(width: 4),
         ],
       ),
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 260),
-        switchInCurve: Curves.easeOut,
-        switchOutCurve: Curves.easeIn,
-        transitionBuilder: (child, animation) =>
-            FadeTransition(opacity: animation, child: child),
-        child: KeyedSubtree(key: ValueKey(_index), child: _pages[_index]),
+      body: FadeTransition(
+        opacity: _entranceFade,
+        child: SlideTransition(
+          position: _entranceSlide,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 260),
+            switchInCurve: Curves.easeOut,
+            switchOutCurve: Curves.easeIn,
+            transitionBuilder: (child, animation) =>
+                FadeTransition(opacity: animation, child: child),
+            child: KeyedSubtree(key: ValueKey(_index), child: _pages[_index]),
+          ),
+        ),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
@@ -162,3 +190,4 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 }
+

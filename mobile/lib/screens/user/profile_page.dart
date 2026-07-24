@@ -27,11 +27,16 @@ class _ProfilePageState extends State<ProfilePage> {
   final _age = TextEditingController();
   final _city = TextEditingController();
   final _province = TextEditingController();
+  final _currentPassword = TextEditingController();
+  final _newPassword = TextEditingController();
   String _selectedAvatar = avatarFiles.first;
   bool _loaded = false;
   bool _saving = false;
+  bool _changingPassword = false;
   String? _message;
   bool _messageIsError = false;
+  String? _passwordMessage;
+  bool _passwordMessageIsError = false;
 
   @override
   void initState() {
@@ -48,8 +53,11 @@ class _ProfilePageState extends State<ProfilePage> {
     _age.dispose();
     _city.dispose();
     _province.dispose();
+    _currentPassword.dispose();
+    _newPassword.dispose();
     super.dispose();
   }
+
 
   Future<void> _load() async {
     final d = await widget.api.get('/api/profile');
@@ -93,6 +101,37 @@ class _ProfilePageState extends State<ProfilePage> {
       });
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  // Self-service password change. Since the SMS gateway isn't wired up yet,
+  // there is no "forgot password" flow that can text a reset code — this is
+  // the only safe way a signed-in user can change their password (support
+  // can also set a temporary one from the admin panel if the user is
+  // locked out entirely).
+  Future<void> _changePassword() async {
+    setState(() {
+      _changingPassword = true;
+      _passwordMessage = null;
+    });
+    try {
+      await widget.api.post('/api/profile/change-password', {
+        'currentPassword': _currentPassword.text,
+        'newPassword': _newPassword.text,
+      });
+      _currentPassword.clear();
+      _newPassword.clear();
+      setState(() {
+        _passwordMessage = 'رمز عبور با موفقیت تغییر کرد';
+        _passwordMessageIsError = false;
+      });
+    } catch (e) {
+      setState(() {
+        _passwordMessage = apiError(e);
+        _passwordMessageIsError = true;
+      });
+    } finally {
+      if (mounted) setState(() => _changingPassword = false);
     }
   }
 
@@ -219,6 +258,67 @@ class _ProfilePageState extends State<ProfilePage> {
                           Gaps.hXs,
                           Expanded(
                               child: Text(_message!,
+                                  style: theme.textTheme.bodySmall)),
+                        ]),
+                      ),
+              ],
+            ],
+          ),
+        ),
+        Gaps.vMd,
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('تغییر رمز عبور', style: theme.textTheme.headlineSmall),
+              Gaps.vXxs,
+              Text(
+                'چون فعلاً سامانه پیامک فعال نیست، بازیابی خودکار رمز در دسترس نیست. رمز را فقط با وارد کردن رمز فعلی می‌توانید عوض کنید. اگر رمز را فراموش کرده‌اید، از پشتیبانی بخواهید یک رمز موقت برایتان تنظیم کند.',
+                style: theme.textTheme.bodySmall,
+              ),
+              Gaps.vLg,
+              _FieldGroup(children: [
+                TextField(
+                    controller: _currentPassword,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                        labelText: 'رمز فعلی',
+                        prefixIcon: Icon(Icons.lock_outline_rounded))),
+                TextField(
+                    controller: _newPassword,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                        labelText: 'رمز جدید (حداقل ۶ کاراکتر)',
+                        prefixIcon: Icon(Icons.lock_reset_rounded))),
+              ]),
+              Gaps.vLg,
+              FilledButton.icon(
+                onPressed: _changingPassword ? null : _changePassword,
+                icon: _changingPassword
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2.2, color: Colors.white))
+                    : const Icon(Icons.key_rounded),
+                label: const Text('تغییر رمز عبور'),
+              ),
+              if (_passwordMessage != null) ...[
+                Gaps.vSm,
+                _passwordMessageIsError
+                    ? ErrorBanner(message: _passwordMessage!)
+                    : Container(
+                        padding: const EdgeInsets.all(Gaps.sm),
+                        decoration: BoxDecoration(
+                            color: theme.colorScheme.primary
+                                .withValues(alpha: 0.12),
+                            borderRadius: Corners.rMd),
+                        child: Row(children: [
+                          Icon(Icons.check_circle_rounded,
+                              color: theme.colorScheme.primary, size: 18),
+                          Gaps.hXs,
+                          Expanded(
+                              child: Text(_passwordMessage!,
                                   style: theme.textTheme.bodySmall)),
                         ]),
                       ),

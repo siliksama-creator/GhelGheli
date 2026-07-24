@@ -28,18 +28,27 @@ class _AuthScreenState extends State<AuthScreen> {
   final _mobile = TextEditingController(text: 'Admin');
   final _pass = TextEditingController();
   final _name = TextEditingController();
+  final _currentPassword = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
   _AuthMode _mode = _AuthMode.login;
   bool _loading = false;
   bool _obscure = true;
   String? _errorMessage;
+  // The backend now requires proof of the current password when
+  // re-registering an already-used mobile number (fixes an account-takeover
+  // bug where anyone could overwrite someone else's password just by
+  // knowing their phone number). It replies with 409 the first time; we
+  // then reveal this field so the real owner can prove ownership and change
+  // their password — a real SMS-based reset isn't available yet.
+  bool _needsCurrentPassword = false;
 
   @override
   void dispose() {
     _mobile.dispose();
     _pass.dispose();
     _name.dispose();
+    _currentPassword.dispose();
     super.dispose();
   }
 
@@ -51,7 +60,12 @@ class _AuthScreenState extends State<AuthScreen> {
     try {
       await fn();
     } catch (e) {
-      setState(() => _errorMessage = apiError(e));
+      setState(() {
+        _errorMessage = apiError(e);
+        if (_mode == _AuthMode.register && apiStatusCode(e) == 409) {
+          _needsCurrentPassword = true;
+        }
+      });
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -73,6 +87,8 @@ class _AuthScreenState extends State<AuthScreen> {
             'password': _pass.text,
             'nickname': _name.text.isEmpty ? _mobile.text : _name.text,
             'profileAvatarKey': avatarFiles.first,
+            if (_needsCurrentPassword)
+              'currentPassword': _currentPassword.text,
           });
           await widget.api.saveToken(r['token']);
           break;
@@ -91,6 +107,8 @@ class _AuthScreenState extends State<AuthScreen> {
   void _setMode(_AuthMode mode) {
     setState(() {
       _mode = mode;
+      _needsCurrentPassword = false;
+      _currentPassword.clear();
       if (mode == _AuthMode.admin) {
         _mobile.text = 'Admin';
         _pass.clear();
@@ -98,6 +116,7 @@ class _AuthScreenState extends State<AuthScreen> {
         _mobile.clear();
       }
       _errorMessage = null;
+
     });
   }
 
@@ -150,6 +169,8 @@ class _AuthScreenState extends State<AuthScreen> {
                     mobile: _mobile,
                     pass: _pass,
                     name: _name,
+                    currentPassword: _currentPassword,
+                    needsCurrentPassword: _needsCurrentPassword,
                     loading: _loading,
                     obscure: _obscure,
                     errorMessage: _errorMessage,
@@ -176,6 +197,8 @@ class _AuthGlassCard extends StatelessWidget {
   final TextEditingController mobile;
   final TextEditingController pass;
   final TextEditingController name;
+  final TextEditingController currentPassword;
+  final bool needsCurrentPassword;
   final bool loading;
   final bool obscure;
   final String? errorMessage;
@@ -190,6 +213,8 @@ class _AuthGlassCard extends StatelessWidget {
     required this.mobile,
     required this.pass,
     required this.name,
+    required this.currentPassword,
+    required this.needsCurrentPassword,
     required this.loading,
     required this.obscure,
     required this.errorMessage,
@@ -287,13 +312,24 @@ class _AuthGlassCard extends StatelessWidget {
                     ),
                     Gaps.vXs,
                     Text(
-                      'ثبت‌نام سریع است؛ اطلاعات کامل را بعداً در پروفایل تکمیل کن.',
+                      'ثبت‌نام سریع است؛ اطلاعات کامل را بعداً در پروفایل تکمیل کن. چون پیامک هنوز فعال نیست، اگر قبلاً با این شماره ثبت‌نام کرده‌ای رمز فعلی را هم وارد کن.',
                       textAlign: TextAlign.center,
                       style: Theme.of(context)
                           .textTheme
                           .bodySmall
                           ?.copyWith(color: Colors.white60),
                     ),
+                    if (needsCurrentPassword) ...[
+                      Gaps.vSm,
+                      TextFormField(
+                        controller: currentPassword,
+                        obscureText: true,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: _fieldDecoration(
+                            icon: Icons.lock_person_rounded,
+                            label: 'رمز فعلی این شماره'),
+                      ),
+                    ],
                   ],
                   Gaps.vSm,
                   TextFormField(
