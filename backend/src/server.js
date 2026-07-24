@@ -24,6 +24,16 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: process.env.CORS_ORIGIN?.split(',') || '*' } });
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 
+// The API always runs behind the Nginx reverse proxy on the same host (see
+// docs/deployment-fa.md) and the raw Node port is not exposed publicly
+// (firewalled), so it is safe to trust only loopback as a proxy. Without
+// this, Express falls back to the raw socket address for every request —
+// which behind Nginx is always 127.0.0.1 — so express-rate-limit silently
+// shares ONE global bucket across every user instead of limiting per-client
+// IP, and req.ip / audit logs report the proxy's address instead of the
+// real client. See ERR_ERL_UNEXPECTED_X_FORWARDED_FOR in the PM2 logs.
+app.set('trust proxy', 'loopback');
+
 app.use(helmet());
 app.use(cors({ origin: process.env.CORS_ORIGIN?.split(',') || '*', credentials: true }));
 app.use(express.json({ limit: '2mb' }));
