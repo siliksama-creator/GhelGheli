@@ -2,8 +2,12 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiClient {
-  static const String defaultBaseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://10.0.2.2:4000');
-  final Dio dio = Dio(BaseOptions(baseUrl: defaultBaseUrl, connectTimeout: const Duration(seconds: 12), receiveTimeout: const Duration(seconds: 12)));
+  static const String defaultBaseUrl = String.fromEnvironment('API_BASE_URL',
+      defaultValue: 'http://10.0.2.2:4000');
+  final Dio dio = Dio(BaseOptions(
+      baseUrl: defaultBaseUrl,
+      connectTimeout: const Duration(seconds: 12),
+      receiveTimeout: const Duration(seconds: 12)));
   String? token;
   bool isAdmin = false;
 
@@ -37,11 +41,14 @@ class ApiClient {
   }
 
   Future<dynamic> get(String path) async => (await dio.get(path)).data;
-  Future<dynamic> post(String path, Map<String, dynamic> body) async => (await dio.post(path, data: body)).data;
-  Future<dynamic> patch(String path, Map<String, dynamic> body) async => (await dio.patch(path, data: body)).data;
+  Future<dynamic> post(String path, Map<String, dynamic> body) async =>
+      (await dio.post(path, data: body)).data;
+  Future<dynamic> patch(String path, Map<String, dynamic> body) async =>
+      (await dio.patch(path, data: body)).data;
 
   Future<String> uploadAdminImage(String filePath) async {
-    final form = FormData.fromMap({'image': await MultipartFile.fromFile(filePath)});
+    final form =
+        FormData.fromMap({'image': await MultipartFile.fromFile(filePath)});
     final res = await dio.post('/api/admin/uploads/image', data: form);
     return res.data['url'].toString();
   }
@@ -67,7 +74,8 @@ String fullAssetUrl(Object? value) {
 String apiError(Object e) {
   try {
     final data = (e as dynamic).response?.data;
-    if (data is Map && data['message'] != null) return data['message'].toString();
+    if (data is Map && data['message'] != null)
+      return data['message'].toString();
   } catch (_) {}
   return 'خطای ارتباط با سرور';
 }
