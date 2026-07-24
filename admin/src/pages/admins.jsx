@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
-import { History, ShieldPlus, Users } from 'lucide-react';
+import { History, ShieldOff, ShieldPlus, Users } from 'lucide-react';
 import { fmtDateTime } from '../lib/api.js';
 import { Badge, Button, Card, EmptyState, Field, Input, Select } from '../components/ui.jsx';
+import { useDialog } from '../components/dialog.jsx';
 import { useToast } from '../lib/toast.jsx';
 
 const ROLE_LABEL = { super_admin: 'مدیر کل', support: 'پشتیبان', observer: 'ناظر' };
 
 export function AdminsPage({ request }) {
   const notify = useToast();
+  const { confirmAction } = useDialog();
   const [admins, setAdmins] = useState([]);
   const [logs, setLogs] = useState([]);
   const [form, setForm] = useState({ username: '', password: '', role: 'support' });
@@ -31,6 +33,29 @@ export function AdminsPage({ request }) {
       notify(err.message, 'error');
     } finally {
       setSaving(false);
+    }
+  }
+
+  // Previously there was no way to revoke an admin account short of direct
+  // DB access — a departing or compromised support account stayed usable
+  // until its JWT naturally expired (up to 12h).
+  async function toggleActive(a) {
+    const activating = !a.is_active;
+    const ok = await confirmAction({
+      title: activating ? 'فعال‌سازی ادمین' : 'غیرفعال‌سازی ادمین',
+      description: activating
+        ? `${a.username} دوباره می‌تواند وارد پنل شود.`
+        : `${a.username} دیگر نمی‌تواند وارد پنل شود و نشست‌های فعلی هم در اولین درخواست رد می‌شوند.`,
+      danger: !activating,
+      confirmLabel: activating ? 'فعال کن' : 'غیرفعال کن',
+    });
+    if (!ok) return;
+    try {
+      await request(`/api/admin/admins/${a.id}/status`, { method: 'PATCH', body: { isActive: activating } });
+      notify(activating ? 'ادمین فعال شد' : 'ادمین غیرفعال شد');
+      load();
+    } catch (err) {
+      notify(err.message, 'error');
     }
   }
 
@@ -66,6 +91,11 @@ export function AdminsPage({ request }) {
                   <div className="data-row-sub">{ROLE_LABEL[a.role] || a.role}</div>
                 </div>
                 <Badge tone={a.is_active ? 'success' : 'neutral'}>{a.is_active ? 'فعال' : 'غیرفعال'}</Badge>
+                <div className="data-row-actions">
+                  <Button size="sm" variant={a.is_active ? 'danger' : 'secondary'} icon={ShieldOff} onClick={() => toggleActive(a)}>
+                    {a.is_active ? 'غیرفعال‌سازی' : 'فعال‌سازی'}
+                  </Button>
+                </div>
               </div>
             ))
           )}
@@ -88,3 +118,4 @@ export function AdminsPage({ request }) {
     </div>
   );
 }
+

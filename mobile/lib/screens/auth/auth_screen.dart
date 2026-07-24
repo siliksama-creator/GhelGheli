@@ -85,7 +85,11 @@ class _AuthScreenState extends State<AuthScreen> {
           final r = await widget.api.post('/api/auth/register-password', {
             'mobile': _mobile.text,
             'password': _pass.text,
-            'nickname': _name.text.isEmpty ? _mobile.text : _name.text,
+            // PRIVACY FIX: previously defaulted to the mobile number itself
+            // when left blank, which is shown publicly on the leaderboard
+            // and in chat — leaking the user's phone number to everyone.
+            // Omit it and let the backend assign an anonymous placeholder.
+            if (_name.text.isNotEmpty) 'nickname': _name.text,
             'profileAvatarKey': avatarFiles.first,
             if (_needsCurrentPassword)
               'currentPassword': _currentPassword.text,

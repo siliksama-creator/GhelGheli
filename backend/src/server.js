@@ -75,8 +75,28 @@ const asyncHandler = fn => (req, res, next) => Promise.resolve(fn(req, res, next
 const signUser = user => jwt.sign({ sub: user.id, type: 'user' }, JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '30d' });
 const signAdmin = admin => jwt.sign({ sub: admin.id, type: 'admin', role: admin.role }, JWT_SECRET, { expiresIn: '12h' });
 function normalizeMobile(m) { return String(m || '').replace(/\s+/g, '').trim(); }
+// PRIVACY FIX: register-password used to fall back to the raw mobile
+// number/username as the public nickname whenever the optional nickname
+// field was left blank. Nickname is shown to every other user on the
+// public leaderboard and in the chat room, so any user who skipped that
+// one optional field had their phone number broadcast to the entire user
+// base. Generate an anonymous placeholder instead; the user can still set
+// a real nickname later from their profile.
+function anonymousNickname() {
+  return `کاربر-${Math.floor(1000 + Math.random() * 9000)}`;
+}
 function normalizeCardCode(code) { return String(code || '').trim().toUpperCase(); }
 function validateCodeFormat(code) { return /^[A-Z0-9_-]{8,128}$/.test(normalizeCardCode(code)); }
+// bcrypt silently truncates input at 72 BYTES — anything past that is
+// ignored when hashing, so e.g. "AAAA...(72 x's)...AAAA-realsecret" and
+// "AAAA...(72 x's)...AAAA-totallydifferent" hash identically and both
+// "work" as the password. That's confusing/unsafe for a password field, so
+// cap length explicitly instead of silently accepting (and discarding) the
+// extra characters.
+function isValidPasswordLength(pw) {
+  const s = String(pw || '');
+  return s.length >= 6 && Buffer.byteLength(s, 'utf8') <= 72;
+}
 async function auth(req, res, next) {
   try {
     const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
@@ -127,7 +147,20 @@ async function ensureChatCooldown(userId) {
   return { cooldown, remaining: remaining > 0 ? remaining : 0 };
 }
 function maskSecret(v) { if (!v) return ''; const s=String(v); return s.length <= 4 ? '****' : `${s.slice(0,2)}****${s.slice(-2)}`; }
-function normalizeChatText(text) { return String(text || '').toLowerCase().replace(/[\s\u200c_\-.]+/g, ''); }
+// Strips whitespace, punctuation and invisible/zero-width Unicode
+// characters before comparing against the bad-word list. Previously only
+// \u200c (ZWNJ, used legitimately in Persian text) was stripped, so a
+// message like "f\u200bu\u200bc\u200bk" (zero-width SPACE, \u200b, not
+// ZWNJ) sailed straight through the filter untouched. \u200b/\u200d/\uFEFF
+// are never meaningful in normal chat text, so it's safe to always strip
+// them for the purposes of this check (the stored/displayed message is
+// untouched — only this comparison copy is normalized).
+function normalizeChatText(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/[\u200b\u200c\u200d\uFEFF]/g, '')
+    .replace(/[\s_\-.]+/g, '');
+}
 async function getChatBadWords(client = pool) {
   const { rows } = await client.query("SELECT value FROM app_settings WHERE key='chat_bad_words' LIMIT 1");
   const raw = rows[0]?.value;
@@ -216,7 +249,7 @@ app.post('/api/auth/register', asyncHandler(async (req, res) => {
   const { password, firstName, lastName, nickname } = req.body;
   const { rows } = await pool.query('SELECT * FROM users WHERE mobile=$1 AND mobile_verified=true', [mobile]);
   if (!rows[0]) return res.status(400).json({ message: 'ابتدا شماره موبایل را با OTP تایید کنید' });
-  if (!password || password.length < 6) return res.status(400).json({ message: 'رمز عبور حداقل ۶ کاراکتر باشد' });
+  if (!isValidPasswordLength(password)) return res.status(400).json({ message: 'رمز عبور باید بین ۶ تا ۷۲ کاراکتر باشد' });
   const hash = await bcrypt.hash(password, 12);
   const updated = await pool.query(
     'UPDATE users SET password_hash=$1, first_name=$2, last_name=$3, nickname=$4, updated_at=NOW() WHERE mobile=$5 RETURNING *',
@@ -230,7 +263,7 @@ app.post('/api/auth/register-password', userLoginLimiter, asyncHandler(async (re
   const mobile = normalizeMobile(req.body.mobile);
   const { password, firstName, lastName, nickname, age, city, province, profileImageUrl, profileAvatarKey, bankAccount, currentPassword } = req.body;
   if (!/^\+?[0-9A-Za-z]{3,20}$/.test(mobile)) return res.status(400).json({ message: 'شماره/نام کاربری معتبر نیست' });
-  if (!password || String(password).length < 6) return res.status(400).json({ message: 'رمز عبور حداقل ۶ کاراکتر باشد' });
+  if (!isValidPasswordLength(password)) return res.status(400).json({ message: 'رمز عبور باید بین ۶ تا ۷۲ کاراکتر باشد' });
 
   // SECURITY FIX: this endpoint used to run an unconditional
   // `ON CONFLICT(mobile) DO UPDATE ... password_hash=EXCLUDED.password_hash`,
@@ -251,6 +284,10 @@ app.post('/api/auth/register-password', userLoginLimiter, asyncHandler(async (re
     if (!ok) return res.status(409).json({ message: 'این شماره قبلاً ثبت‌نام شده است. برای ورود از «ورود» استفاده کنید یا رمز فعلی را برای تغییر وارد کنید.' });
   }
 
+  // Keep an already-set nickname when re-registering to change the password
+  // (don't clobber it with a fresh random placeholder); only fall back to
+  // an anonymous placeholder for a brand-new account with no nickname.
+  const finalNickname = nickname || existing.rows[0]?.nickname || anonymousNickname();
   const hash = await bcrypt.hash(String(password), 12);
   const { rows } = await pool.query(
     `INSERT INTO users(mobile,mobile_verified,password_hash,first_name,last_name,nickname,age,city,province,profile_image_url,profile_avatar_key,bank_account,status)
@@ -258,9 +295,10 @@ app.post('/api/auth/register-password', userLoginLimiter, asyncHandler(async (re
      ON CONFLICT(mobile) DO UPDATE SET password_hash=EXCLUDED.password_hash, first_name=EXCLUDED.first_name, last_name=EXCLUDED.last_name, nickname=EXCLUDED.nickname, age=EXCLUDED.age, city=EXCLUDED.city, province=EXCLUDED.province, profile_image_url=EXCLUDED.profile_image_url, profile_avatar_key=EXCLUDED.profile_avatar_key, bank_account=EXCLUDED.bank_account, mobile_verified=true, updated_at=NOW()
      RETURNING *`,
 
-    [mobile, hash, firstName || null, lastName || null, nickname || mobile, age ? Number(age) : null, city || null, province || null, profileImageUrl || null, profileAvatarKey || null, bankAccount || null]
+    [mobile, hash, firstName || null, lastName || null, finalNickname, age ? Number(age) : null, city || null, province || null, profileImageUrl || null, profileAvatarKey || null, bankAccount || null]
   );
   res.json({ token: signUser(rows[0]), user: safeUser(rows[0]) });
+
 }));
 
 app.post('/api/auth/login', userLoginLimiter, asyncHandler(async (req, res) => {
@@ -275,7 +313,7 @@ app.post('/api/auth/login', userLoginLimiter, asyncHandler(async (req, res) => {
 app.post('/api/auth/forgot-password/reset', otpVerifyLimiter, asyncHandler(async (req, res) => {
   const mobile = normalizeMobile(req.body.mobile);
   const { code, newPassword } = req.body;
-  if (!newPassword || String(newPassword).length < 6) return res.status(400).json({ message: 'رمز عبور حداقل ۶ کاراکتر باشد' });
+  if (!isValidPasswordLength(newPassword)) return res.status(400).json({ message: 'رمز عبور باید بین ۶ تا ۷۲ کاراکتر باشد' });
   const { rows } = await pool.query("SELECT * FROM otp_codes WHERE mobile=$1 AND purpose='reset_password' AND consumed_at IS NULL AND expires_at>NOW() ORDER BY created_at DESC LIMIT 1", [mobile]);
   if (!rows[0] || !(await bcrypt.compare(String(code || ''), rows[0].code_hash))) return res.status(400).json({ message: 'کد بازیابی معتبر نیست' });
   await pool.query('UPDATE otp_codes SET consumed_at=NOW() WHERE id=$1', [rows[0].id]);
@@ -296,6 +334,7 @@ app.post('/api/cards/redeem', auth, cardRedeemLimiter, asyncHandler(async (req, 
     const card = q.rows[0];
     if (!card) throw Object.assign(new Error('کد نامعتبر است'), { status: 404 });
     if (card.status === 'used') throw Object.assign(new Error('این کد قبلاً استفاده شده است'), { status: 409 });
+    if (card.status !== 'unused') throw Object.assign(new Error('این کد دیگر معتبر نیست'), { status: 409 });
     if (!card.is_active) throw Object.assign(new Error('نوع این کارت غیرفعال است'), { status: 400 });
     await client.query("UPDATE card_codes SET status='used', used_by_user_id=$1, used_at=NOW(), updated_at=NOW() WHERE id=$2", [req.user.id, card.id]);
     await client.query('UPDATE users SET current_points=current_points+$1, lifetime_points=lifetime_points+$1, monthly_league_points=monthly_league_points+$1, updated_at=NOW() WHERE id=$2', [card.point_value, req.user.id]);
@@ -311,7 +350,7 @@ app.post('/api/cards/redeem', auth, cardRedeemLimiter, asyncHandler(async (req, 
     res.json({ message: 'کد با موفقیت ثبت شد', cardType: card.card_type_name, addedPoints: card.point_value, points: userNow.rows[0] });
   } catch (e) {
     await client.query('ROLLBACK');
-    res.status(e.status || 500).json({ message: e.message || 'خطای ثبت کد' });
+    res.status(e.status || 500).json({ message: (e.code && friendlyDbError(e)) || e.message || 'خطای ثبت کد' });
   } finally { client.release(); }
 }));
 
@@ -332,7 +371,7 @@ app.patch('/api/profile', auth, asyncHandler(async (req, res) => {
 // unlike the old register-password bug.
 app.post('/api/profile/change-password', auth, userLoginLimiter, asyncHandler(async (req, res) => {
   const { currentPassword, newPassword } = req.body;
-  if (!newPassword || String(newPassword).length < 6) return res.status(400).json({ message: 'رمز جدید حداقل ۶ کاراکتر باشد' });
+  if (!isValidPasswordLength(newPassword)) return res.status(400).json({ message: 'رمز جدید باید بین ۶ تا ۷۲ کاراکتر باشد' });
   if (!req.user.password_hash || !currentPassword || !(await bcrypt.compare(String(currentPassword), req.user.password_hash))) {
     return res.status(401).json({ message: 'رمز فعلی درست نیست' });
   }
@@ -412,6 +451,13 @@ app.post('/api/chat/messages', auth, chatLimiter, asyncHandler(async (req, res) 
     messageType = 'sticker';
     clean = clean || st.rows[0].title;
   }
+  // Validate reply target up front instead of letting a bad/deleted id hit
+  // the DB's foreign key constraint, which previously bubbled up as a raw
+  // Postgres error message to the client (see friendlyDbError note above).
+  if (replyTo) {
+    const rm = await pool.query('SELECT id FROM chat_messages WHERE id=$1 AND is_deleted=false', [replyTo]);
+    if (!rm.rows[0]) return res.status(400).json({ message: 'پیام موردنظر برای پاسخ پیدا نشد' });
+  }
   if (messageType === 'text' && (!clean || clean.length > 1000)) return res.status(400).json({ message: 'متن پیام معتبر نیست' });
   if (clean) await assertNoBadWords(clean);
   const { rows } = await pool.query('INSERT INTO chat_messages(user_id,message_text,reply_to_message_id,sticker_id,message_type) VALUES($1,$2,$3,$4,$5) RETURNING *', [req.user.id, clean, replyTo, stickerId, messageType]);
@@ -419,6 +465,7 @@ app.post('/api/chat/messages', auth, chatLimiter, asyncHandler(async (req, res) 
   io.emit('chat:new', msg);
   res.json(msg);
 }));
+
 app.post('/api/chat/messages/:id/report', auth, asyncHandler(async (req, res) => {
   await pool.query('UPDATE chat_messages SET is_reported=true, report_count=report_count+1 WHERE id=$1', [req.params.id]);
   res.json({ message: 'گزارش ثبت شد' });
@@ -595,6 +642,18 @@ app.post('/api/admin/card-codes', adminAuth, requireRole('support'), asyncHandle
   const { rows } = await pool.query('INSERT INTO card_codes(code,card_type_id) VALUES($1,$2) RETURNING *', [normalizedCode, cardTypeId]);
   await audit(req.admin.id, 'create_card_code', 'card_codes', rows[0].id, null, { code: code.slice(0,4)+'...' }); res.json(rows[0]);
 }));
+// Void a leaked/mistaken card code before anyone redeems it. There was
+// previously no way to disable a code once created — only 'unused'/'used'
+// existed, and there is deliberately no DELETE endpoint (codes are kept
+// forever for audit purposes). 'voided' behaves like a dead-end status: the
+// redeem endpoint below already only accepts codes with status='unused' via
+// its explicit check, so a voided code simply can never be redeemed.
+app.patch('/api/admin/card-codes/:id/void', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
+  const { rows } = await pool.query("UPDATE card_codes SET status='voided', updated_at=NOW() WHERE id=$1 AND status='unused' RETURNING id,code", [req.params.id]);
+  if (!rows[0]) return res.status(400).json({ message: 'فقط کدهای استفاده‌نشده قابل ابطال هستند' });
+  await audit(req.admin.id, 'void_card_code', 'card_codes', rows[0].id, req.body.reason || 'ابطال دستی', {});
+  res.json({ message: 'کد باطل شد' });
+}));
 app.post('/api/admin/card-codes/bulk', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
   const { cardTypeId, rawCodes = '' } = req.body;
   const input = String(rawCodes).split(/[\n,;\t ]+/).map(c => normalizeCardCode(c)).filter(Boolean);
@@ -677,7 +736,7 @@ app.post('/api/admin/users/:id/notify', adminAuth, requireRole('support'), async
 // in-person, etc.). Every use is written to the audit log.
 app.post('/api/admin/users/:id/reset-password', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
   const newPassword = String(req.body.newPassword || '');
-  if (newPassword.length < 6) return res.status(400).json({ message: 'رمز جدید حداقل ۶ کاراکتر باشد' });
+  if (!isValidPasswordLength(newPassword)) return res.status(400).json({ message: 'رمز جدید باید بین ۶ تا ۷۲ کاراکتر باشد' });
   const hash = await bcrypt.hash(newPassword, 12);
   const { rows } = await pool.query('UPDATE users SET password_hash=$1, updated_at=NOW() WHERE id=$2 RETURNING id,mobile', [hash, req.params.id]);
   if (!rows[0]) return res.status(404).json({ message: 'کاربر پیدا نشد' });
@@ -706,7 +765,21 @@ app.post('/api/admin/notifications/broadcast', adminAuth, requireRole('support')
 }));
 app.get('/api/admin/admins', adminAuth, requireRole(), asyncHandler(async (req, res) => res.json((await pool.query('SELECT id,username,role,is_active,created_at FROM admin_users ORDER BY created_at DESC')).rows)));
 app.post('/api/admin/admins', adminAuth, requireRole(), asyncHandler(async (req, res) => { const hash=await bcrypt.hash(req.body.password,12); const r=await pool.query('INSERT INTO admin_users(username,password_hash,role) VALUES($1,$2,$3) RETURNING id,username,role,is_active,created_at',[req.body.username,hash,req.body.role]); await audit(req.admin.id,'create_admin','admin_users',r.rows[0].id,null,{username:req.body.username,role:req.body.role}); res.json(r.rows[0]); }));
+// There was previously no way to revoke an admin/support account once
+// created — only DB access could set is_active=false. A departing
+// support/support-with-a-compromised-password account could keep a fully
+// working session/token until natural JWT expiry (12h) with no way for a
+// super_admin to cut it off sooner or prevent future logins.
+app.patch('/api/admin/admins/:id/status', adminAuth, requireRole(), asyncHandler(async (req, res) => {
+  if (req.params.id === req.admin.id) return res.status(400).json({ message: 'نمی‌توانید حساب خودتان را غیرفعال کنید' });
+  const isActive = req.body.isActive !== false;
+  const { rows } = await pool.query('UPDATE admin_users SET is_active=$1, updated_at=NOW() WHERE id=$2 RETURNING id,username,role,is_active', [isActive, req.params.id]);
+  if (!rows[0]) return res.status(404).json({ message: 'ادمین پیدا نشد' });
+  await audit(req.admin.id, isActive ? 'activate_admin' : 'deactivate_admin', 'admin_users', req.params.id, req.body.reason || null, { username: rows[0].username });
+  res.json(rows[0]);
+}));
 app.get('/api/admin/audit-log', adminAuth, requireRole(), asyncHandler(async (req, res) => res.json((await pool.query('SELECT a.*, ad.username FROM audit_log a LEFT JOIN admin_users ad ON ad.id=a.admin_user_id ORDER BY a.created_at DESC LIMIT 500')).rows)));
+
 
 io.use(async (socket, next) => {
   try {
@@ -740,6 +813,10 @@ io.on('connection', socket => {
         if (!st.rows[0]) throw new Error('استیکر معتبر نیست');
         clean = clean || st.rows[0].title;
       }
+      if (replyTo) {
+        const rm = await pool.query('SELECT id FROM chat_messages WHERE id=$1 AND is_deleted=false', [replyTo]);
+        if (!rm.rows[0]) throw new Error('پیام موردنظر برای پاسخ پیدا نشد');
+      }
       if (messageType === 'text' && (!clean || clean.length > 1000)) throw new Error('متن پیام معتبر نیست');
       if (clean) await assertNoBadWords(clean);
       arr.push(now); socketMessageTimes.set(socket.user.id, arr);
@@ -748,11 +825,37 @@ io.on('connection', socket => {
       io.emit('chat:new', msg); cb && cb({ ok: true, message: msg });
     } catch(e){ cb && cb({ ok: false, error: e.message }); }
   });
+
 });
 
 cron.schedule('5 0 1 * *', () => closeActiveSeason().catch(e => console.error('monthly close failed', e)));
 
-app.use((err, req, res, next) => { console.error(err); res.status(err.status || 500).json({ message: err.message || 'خطای سرور' }); });
+// Centralized error handler. Previously this forwarded err.message straight
+// to the client, which meant raw PostgreSQL errors (unique/foreign-key
+// constraint names, column/table names, data types) leaked verbatim to
+// end users whenever a route didn't pre-validate input — e.g. replying to a
+// deleted/invalid message id, creating a card code with a bogus card type,
+// or a duplicate admin username. That's an information-disclosure issue
+// (reveals internal schema) and a bad user experience (raw English/SQL
+// text mixed into a Persian UI). Postgres errors are now mapped to safe,
+// Persian, user-facing messages; everything else still uses err.message
+// (which for validation errors thrown deliberately in route handlers is
+// already a safe Persian string).
+function friendlyDbError(err) {
+  switch (err.code) {
+    case '23505': return 'این مقدار تکراری است';
+    case '23503': return 'مقدار انتخاب‌شده معتبر نیست یا حذف شده است';
+    case '23502': return 'اطلاعات لازم کامل نیست';
+    case '22P02': return 'فرمت اطلاعات ارسالی معتبر نیست';
+    case '22001': return 'یکی از مقادیر ارسالی خیلی طولانی است';
+    default: return null;
+  }
+}
+app.use((err, req, res, next) => {
+  console.error(err);
+  const friendly = err.code ? friendlyDbError(err) : null;
+  res.status(err.status || 500).json({ message: friendly || err.message || 'خطای سرور' });
+});
 
 const port = process.env.PORT || 4000;
 server.listen(port, async () => { await ensureActiveSeason(); console.log(`GhelGheli API on :${port}`); });

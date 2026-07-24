@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BarChart3, Bell, CreditCard, Gift, MessageCircle, LifeBuoy, Settings, Shield, Trophy, Users } from 'lucide-react';
 
@@ -6,7 +6,7 @@ import './theme.css';
 import './styles.css';
 
 import { createApi } from './lib/api.js';
-import { ToastProvider } from './lib/toast.jsx';
+import { ToastProvider, useToast } from './lib/toast.jsx';
 import { DialogProvider } from './components/dialog.jsx';
 import { AppShell } from './components/app-shell.jsx';
 
@@ -39,7 +39,22 @@ function App() {
   const [token, setToken] = useState(localStorage.getItem('adminToken') || '');
   const [page, setPage] = useState('dashboard');
   const [theme, setTheme] = useState(localStorage.getItem('adminTheme') || 'dark');
-  const request = useMemo(() => createApi(token), [token]);
+  const notify = useToast();
+
+  const logout = useCallback((message) => {
+    localStorage.removeItem('adminToken');
+    setToken('');
+    if (message) notify(message, 'error');
+  }, [notify]);
+
+  // Session expired / revoked (e.g. deactivated by another super admin) —
+  // previously the panel just silently failed requests with a generic
+  // error toast on whatever page was open, with no way to tell the admin
+  // *why* or get them back to a working login screen.
+  const request = useMemo(
+    () => createApi(token, () => logout('نشست شما منقضی یا لغو شده است؛ دوباره وارد شوید')),
+    [token, logout],
+  );
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -65,10 +80,7 @@ function App() {
       nav={NAV}
       activePage={page}
       onNavigate={setPage}
-      onLogout={() => {
-        localStorage.removeItem('adminToken');
-        setToken('');
-      }}
+      onLogout={() => logout()}
       theme={theme}
       onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
       title={active[1]}
@@ -86,3 +98,4 @@ createRoot(document.getElementById('root')).render(
     </DialogProvider>
   </ToastProvider>,
 );
+

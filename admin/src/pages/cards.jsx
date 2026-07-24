@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
-import { CreditCard, Image as ImageIcon, ListChecks, Pencil, Upload } from 'lucide-react';
+import { Ban, CreditCard, Image as ImageIcon, ListChecks, Pencil, Upload } from 'lucide-react';
 import { assetUrl, fmtNumber } from '../lib/api.js';
-import { Button, Card, DataRow, EmptyState, Field, Input, Select, Textarea } from '../components/ui.jsx';
+import { Badge, Button, Card, DataRow, EmptyState, Field, Input, Select, Textarea } from '../components/ui.jsx';
 import { useDialog } from '../components/dialog.jsx';
 import { useToast } from '../lib/toast.jsx';
 
 export function CardsPage({ request }) {
   const notify = useToast();
-  const { promptText } = useDialog();
+  const { promptText, confirmAction } = useDialog();
   const [types, setTypes] = useState([]);
   const [codes, setCodes] = useState([]);
   const [report, setReport] = useState(null);
@@ -93,6 +93,21 @@ export function CardsPage({ request }) {
     } finally {
       setSavingBulk(false);
     }
+  }
+
+  // Void a code that leaked or was created by mistake before it's ever
+  // redeemed — previously there was no way to disable a code once created.
+  async function voidCode(c) {
+    const ok = await confirmAction({
+      title: 'ابطال کد',
+      description: `کد «${c.code}» برای همیشه غیرقابل استفاده می‌شود. این کار قابل بازگشت نیست.`,
+      danger: true,
+      confirmLabel: 'ابطال کن',
+    });
+    if (!ok) return;
+    await request(`/api/admin/card-codes/${c.id}/void`, { method: 'PATCH', body: { reason: 'ابطال دستی از پنل' } });
+    notify('کد باطل شد');
+    load();
   }
 
   return (
@@ -218,7 +233,25 @@ export function CardsPage({ request }) {
           ) : (
             codes
               .slice(0, 12)
-              .map((c) => <DataRow key={c.id} title={c.code} subtitle={`${c.card_type_name} — ${c.status} — ${c.used_by_mobile || ''}`} />)
+              .map((c) => (
+                <DataRow
+                  key={c.id}
+                  title={c.code}
+                  subtitle={`${c.card_type_name} — ${c.used_by_mobile || ''}`}
+                  trailing={
+                    <Badge tone={c.status === 'used' ? 'neutral' : c.status === 'voided' ? 'danger' : 'success'}>
+                      {c.status === 'used' ? 'استفاده‌شده' : c.status === 'voided' ? 'باطل‌شده' : 'استفاده‌نشده'}
+                    </Badge>
+                  }
+                  actions={
+                    c.status === 'unused' ? (
+                      <Button size="sm" variant="danger" icon={Ban} onClick={() => voidCode(c)}>
+                        ابطال
+                      </Button>
+                    ) : null
+                  }
+                />
+              ))
           )}
         </Card>
       </div>

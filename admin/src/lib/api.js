@@ -3,7 +3,12 @@
 // resolution, same auth header injection, same error shape.
 export const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4000';
 
-export function createApi(token) {
+// The admin JWT expires after 12h server-side, but the panel previously had
+// no way to notice — every request after expiry just failed silently with a
+// generic "خطای ارتباط با سرور" toast on whatever page happened to be open,
+// leaving the admin stuck without knowing why. onUnauthorized (wired up in
+// main.jsx) lets us drop back to the login screen automatically on any 401.
+export function createApi(token, onUnauthorized) {
   const request = async (path, options = {}) => {
     const res = await fetch(`${API_BASE}${path}`, {
       ...options,
@@ -14,6 +19,7 @@ export function createApi(token) {
       },
       body: options.body && typeof options.body !== 'string' ? JSON.stringify(options.body) : options.body,
     });
+    if (res.status === 401 && token) onUnauthorized?.();
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.message || 'خطای ارتباط با سرور');
     return data;
@@ -26,12 +32,14 @@ export function createApi(token) {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: fd,
     });
+    if (res.status === 401 && token) onUnauthorized?.();
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.message || 'خطای آپلود عکس');
     return data.url;
   };
   return request;
 }
+
 
 export function fmtNumber(n) {
   return new Intl.NumberFormat('fa-IR').format(Number(n || 0));
