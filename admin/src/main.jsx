@@ -1,66 +1,88 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Trophy, Users, CreditCard, Gift, MessageCircle, LifeBuoy, Bell, Shield, BarChart3, LogOut, Settings } from 'lucide-react';
+import { BarChart3, Bell, CreditCard, Gift, MessageCircle, LifeBuoy, Settings, Shield, Trophy, Users } from 'lucide-react';
+
+import './theme.css';
 import './styles.css';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4000';
-function api(token) {
-  const request = async (path, options = {}) => {
-    const res = await fetch(`${API_BASE}${path}`, {
-      ...options,
-      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options.headers || {}) },
-      body: options.body && typeof options.body !== 'string' ? JSON.stringify(options.body) : options.body,
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.message || 'خطای ارتباط با سرور');
-    return data;
-  };
-  request.uploadImage = async (file) => {
-    const fd = new FormData();
-    fd.append('image', file);
-    const res = await fetch(`${API_BASE}/api/admin/uploads/image`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: fd });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.message || 'خطای آپلود عکس');
-    return data.url;
-  };
-  return request;
-}
-const nav = [
-  ['dashboard','داشبورد',BarChart3], ['cards','کارت و کد',CreditCard], ['rewards','جوایز',Gift], ['league','لیگ ماهانه',Trophy],
-  ['users','کاربران',Users], ['chat','چت',MessageCircle], ['support','پشتیبانی',LifeBuoy], ['notifications','اطلاعیه‌ها',Bell], ['settings','تنظیمات',Settings], ['admins','ادمین‌ها',Shield]
-];
-function fmt(n){ return new Intl.NumberFormat('fa-IR').format(Number(n||0)); }
-function App(){
-  const [token,setToken]=useState(localStorage.getItem('adminToken')||'');
-  const [page,setPage]=useState('dashboard');
-  const [toast,setToast]=useState('');
-  const request=useMemo(()=>api(token),[token]);
-  if(!token) return <Login onLogin={t=>{localStorage.setItem('adminToken',t);setToken(t)}} />;
-  return <div className="app">
-    <aside className="sidebar"><div className="brand"><span className="ball">⚽</span><div><b>قل‌قلی</b><small>پنل مدیریت وفاداری</small></div></div>
-      {nav.map(([id,label,Icon])=><button key={id} className={page===id?'active':''} onClick={()=>setPage(id)}><Icon size={19}/>{label}</button>)}
-      <button className="danger" onClick={()=>{localStorage.removeItem('adminToken');setToken('')}}><LogOut size={19}/>خروج</button>
-    </aside>
-    <main><header><h1>{nav.find(x=>x[0]===page)?.[1]}</h1><span>تمام تغییرات حساس در Audit Log ثبت می‌شود.</span></header>
-      {toast && <div className="toast" onAnimationEnd={()=>setToast('')}>{toast}</div>}
-      {page==='dashboard'&&<Dashboard request={request}/>} {page==='cards'&&<Cards request={request} notify={setToast}/>} {page==='rewards'&&<Rewards request={request} notify={setToast}/>} {page==='league'&&<League request={request} notify={setToast}/>} {page==='users'&&<UsersPage request={request} notify={setToast}/>} {page==='chat'&&<ChatModeration request={request} notify={setToast}/>} {page==='support'&&<Support request={request} notify={setToast}/>} {page==='notifications'&&<Notifications request={request} notify={setToast}/>} {page==='settings'&&<SettingsPage request={request} notify={setToast}/>} {page==='admins'&&<Admins request={request} notify={setToast}/>} 
-    </main>
-  </div>
-}
-function Login({onLogin}){ const [username,setU]=useState('Admin'),[password,setP]=useState(''),[err,setErr]=useState(''); const request=api(); return <div className="login"><form onSubmit={async e=>{e.preventDefault();setErr('');try{const d=await request('/api/admin/auth/login',{method:'POST',body:{username,password}});onLogin(d.token)}catch(x){setErr(x.message)}}}><img className="login-logo" src="/logo.png" alt="قلقلی"/><h2>ورود پنل مدیریت قلقلی</h2><input value={username} onChange={e=>setU(e.target.value)} placeholder="نام کاربری"/><input type="password" value={password} onChange={e=>setP(e.target.value)} placeholder="رمز عبور"/><button>ورود امن</button>{err&&<p className="err">{err}</p>}</form></div> }
-function Dashboard({request}){ const [d,setD]=useState(null); useEffect(()=>{request('/api/admin/dashboard').then(setD)},[]); if(!d)return <Loading/>; return <div className="grid"><Stat title="کاربران" value={d.users}/><Stat title="کدهای امروز" value={d.usedCodesToday}/><Stat title="کدهای ماه" value={d.usedCodesThisMonth}/><Stat title="درخواست‌های در انتظار" value={d.pendingClaims}/><section className="card wide"><h3>لیدربرد زنده</h3><Leader entries={d.league.entries}/></section></div> }
-function Stat({title,value}){return <section className="card stat"><span>{title}</span><b>{fmt(value)}</b></section>}
-function Loading(){return <div className="card">در حال بارگذاری...</div>}
-function Cards({request,notify}){ const [types,setTypes]=useState([]),[codes,setCodes]=useState([]),[report,setReport]=useState(null); const load=()=>{request('/api/admin/card-types').then(setTypes);request('/api/admin/card-codes').then(setCodes)}; useEffect(load,[]); async function editType(t){const name=prompt('نام کارت',t.name); if(!name)return; const pointValue=Number(prompt('امتیاز کارت',t.point_value)||t.point_value); const imageUrl=prompt('آدرس عکس کارت',t.image_url||'')||''; const description=prompt('توضیحات کارت',t.description||'')||''; await request(`/api/admin/card-types/${t.id}`,{method:'PATCH',body:{name,pointValue,imageUrl,description}}); notify('کارت ویرایش شد'); load()} async function addType(e){e.preventDefault();const f=new FormData(e.currentTarget);let imageUrl=f.get('image')||'';const imageFile=f.get('imageFile');if(imageFile&&imageFile.size) imageUrl=await request.uploadImage(imageFile);await request('/api/admin/card-types',{method:'POST',body:{name:f.get('name'),pointValue:Number(f.get('point')),description:f.get('desc'),imageUrl}}); e.currentTarget.reset(); notify('نوع کارت ساخته شد'); load()} async function bulk(e){e.preventDefault();const f=new FormData(e.currentTarget);const r=await request('/api/admin/card-codes/bulk',{method:'POST',body:{cardTypeId:f.get('type'),rawCodes:f.get('codes')}});setReport(r);notify('گزارش ورود دسته‌جمعی آماده شد');load()} return <div className="grid two"><section className="card"><h3>تعریف نوع کارت</h3><form onSubmit={addType} className="form"><input name="name" placeholder="نام کارت" required/><input name="point" type="number" placeholder="امتیاز دلخواه" required/><input name="imageFile" type="file" accept="image/*"/><input name="image" placeholder="یا آدرس عکس آماده"/><textarea name="desc" placeholder="توضیحات"/><button>ذخیره نوع کارت</button></form><Table rows={types} cols={[['name','نام'],['point_value','امتیاز'],['image_url','عکس'],['is_active','فعال']]}/><h3>ویرایش کارت‌های ثبت‌شده</h3>{types.map(t=><div className="row" key={t.id}><span>{t.name} — {fmt(t.point_value)} امتیاز</span><button type="button" onClick={()=>editType(t)}>ویرایش</button></div>)}</section><section className="card"><h3>افزودن دسته‌جمعی کد</h3><form onSubmit={bulk} className="form"><select name="type" required>{types.map(t=><option value={t.id} key={t.id}>{t.name} — {fmt(t.point_value)} امتیاز</option>)}</select><textarea name="codes" rows="8" placeholder="هر خط یک کد یا جدا شده با کاما" required/><button>بررسی و ورود کدها</button></form>{report&&<div className="report"><b>موفق: {fmt(report.insertedCount)}</b><b>تکراری فایل: {fmt(report.duplicateInFileCount)}</b><b>تکراری دیتابیس: {fmt(report.duplicateInDbCount)}</b><b>نامعتبر: {fmt(report.invalidCount)}</b><details><summary>جزئیات رد شده‌ها</summary><pre>{JSON.stringify({duplicateInFile:report.duplicateInFile,duplicateInDb:report.duplicateInDb,invalid:report.invalid},null,2)}</pre></details></div>}<h3>آخرین کدها</h3><Table rows={codes.slice(0,12)} cols={[['code','کد'],['card_type_name','نوع'],['status','وضعیت'],['used_by_mobile','مصرف‌کننده']]}/></section></div> }
-function Rewards({request,notify}){const [rows,setRows]=useState([]),[claims,setClaims]=useState([]);const load=()=>{request('/api/admin/rewards').then(setRows);request('/api/admin/reward-claims').then(setClaims)};useEffect(load,[]);async function add(e){e.preventDefault();const f=new FormData(e.currentTarget);let imageUrl=f.get('image')||'';const imageFile=f.get('imageFile');if(imageFile&&imageFile.size) imageUrl=await request.uploadImage(imageFile);await request('/api/admin/rewards',{method:'POST',body:{name:f.get('name'),requiredPoints:+f.get('points'),rewardType:f.get('type'),rewardValue:f.get('value'),description:f.get('desc'),imageUrl,displayOrder:+f.get('order')}});notify('جایزه ذخیره شد');e.currentTarget.reset();load()}async function status(id,s){await request(`/api/admin/reward-claims/${id}`,{method:'PATCH',body:{status:s}});load()}return <div className="grid two"><section className="card"><h3>سطح جایزه جدید</h3><form onSubmit={add} className="form"><input name="name" placeholder="نام"/><input name="points" type="number" placeholder="آستانه امتیاز"/><select name="type"><option value="cash">نقدی</option><option value="physical">فیزیکی</option></select><input name="value" placeholder="مبلغ/توضیح جایزه"/><input name="imageFile" type="file" accept="image/*"/><input name="image" placeholder="یا آدرس عکس جایزه"/><input name="order" type="number" placeholder="ترتیب نمایش"/><textarea name="desc" placeholder="توضیحات"/><button>ذخیره</button></form><Table rows={rows} cols={[['name','نام'],['required_points','امتیاز'],['image_url','عکس'],['reward_type','نوع'],['reward_value','جایزه']]}/></section><section className="card"><h3>درخواست‌های جایزه</h3>{claims.map(c=><div className="row" key={c.id}><span>{c.mobile} — {c.reward_name}</span><b>{c.status}</b><button onClick={()=>status(c.id,'approved')}>تایید</button><button onClick={()=>status(c.id,'paid')}>پرداخت‌شده</button><button className="danger" onClick={()=>status(c.id,'rejected')}>رد</button></div>)}</section></div>}
-function League({request,notify}){const [d,setD]=useState(null);const [winnerCount,setWinnerCount]=useState(10);const [prizes,setPrizes]=useState(Array.from({length:10},(_,i)=>({rank:i+1,amount:0})));const load=()=>request('/api/admin/league').then(x=>{setD(x);setPrizes(x.season.prize_table?.length?x.season.prize_table:prizes);setWinnerCount(x.winnerCount||x.season.prize_table?.length||10)});useEffect(load,[]);async function save(){await request('/api/admin/league/current/prizes',{method:'PATCH',body:{prizeTable:prizes,winnerCount}});notify('جوایز لیگ ذخیره شد');load()}return <div className="grid two"><section className="card"><h3>رتبه‌های زنده</h3>{d?<Leader entries={d.entries}/>:<Loading/>}</section><section className="card"><h3>تعداد برندگان لیگ و مبلغ جوایز</h3><label className="inline">تعداد برندگان<input type="number" value={winnerCount} onChange={e=>{const n=+e.target.value;setWinnerCount(n);setPrizes(Array.from({length:n},(_,i)=>prizes[i]||{rank:i+1,amount:0}))}}/></label>{prizes.map((p,i)=><label className="inline" key={p.rank}>رتبه {fmt(p.rank)}<input type="number" value={p.amount} onChange={e=>setPrizes(ps=>ps.map((x,j)=>j===i?{...x,amount:+e.target.value}:x))}/></label>)}<button onClick={save}>ذخیره جدول جوایز</button></section></div>}
-function UsersPage({request,notify}){const [rows,setRows]=useState([]),[q,setQ]=useState('');const load=()=>request('/api/admin/users?search='+encodeURIComponent(q)).then(setRows);useEffect(load,[]);async function block(id,status){await request(`/api/admin/users/${id}/status`,{method:'PATCH',body:{status,reason:'مدیریت پنل'}});notify('وضعیت کاربر ثبت شد');load()}async function points(id){const p=prompt('مقدار امتیاز مثبت یا منفی؟'); if(!p)return; await request(`/api/admin/users/${id}/points`,{method:'POST',body:{points:+p,reason:'تغییر دستی'}});load()}async function privateMsg(id){const body=prompt('متن پیام اختصاصی برای کاربر؟'); if(!body)return; await request(`/api/admin/users/${id}/notify`,{method:'POST',body:{title:'پیام اختصاصی مدیریت',body}});notify('پیام اختصاصی ارسال شد')}return <section className="card"><div className="toolbar"><input value={q} onChange={e=>setQ(e.target.value)} placeholder="جستجوی موبایل یا نام مستعار"/><button onClick={load}>جستجو</button></div>{rows.map(u=><div className="row" key={u.id}><span>{u.mobile} — {u.nickname||'بدون نام'} — {fmt(u.current_points)} امتیاز</span><b>{u.status}</b><button onClick={()=>points(u.id)}>تغییر امتیاز</button><button onClick={()=>privateMsg(u.id)}>پیام اختصاصی</button><button onClick={()=>block(u.id,u.status==='active'?'blocked':'active')}>{u.status==='active'?'مسدود':'رفع مسدودی'}</button></div>)}</section>}
-function ChatModeration({request,notify}){const [rows,setRows]=useState([]);const load=()=>request('/api/admin/chat/messages').then(setRows);useEffect(load,[]);async function del(id){await request(`/api/admin/chat/messages/${id}/delete`,{method:'PATCH',body:{reason:'پیام نامناسب'}});notify('پیام حذف شد');load()}async function ban(uid){await request(`/api/admin/chat/users/${uid}/ban`,{method:'PATCH',body:{minutes:1440,reason:'اسپم/تخلف'}});notify('کاربر از چت محروم شد')}async function penalty(uid){const p=prompt('چند امتیاز کسر شود؟');if(!p)return;await request(`/api/admin/users/${uid}/points`,{method:'POST',body:{points:-Math.abs(+p),reason:'تنبیه بابت گزارش چت'}});notify('امتیاز کاربر کسر شد')}return <section className="card">{rows.map(m=><div className="row" key={m.id}><span>{m.nickname||m.mobile}: {m.message_text}</span><b>{m.is_reported?'گزارش‌شده':''}</b><button onClick={()=>del(m.id)}>حذف</button><button onClick={()=>ban(m.user_id)}>بن چت</button><button onClick={()=>penalty(m.user_id)}>کسر امتیاز</button></div>)}</section>}
-function Support({request,notify}){const [tickets,setTickets]=useState([]),[sel,setSel]=useState(null),[msgs,setMsgs]=useState([]);const load=()=>request('/api/admin/support/tickets').then(setTickets);useEffect(load,[]);useEffect(()=>{if(sel)request(`/api/admin/support/tickets/${sel.id}/messages`).then(setMsgs)},[sel]);async function send(e){e.preventDefault();const msg=e.currentTarget.msg.value;await request(`/api/admin/support/tickets/${sel.id}/messages`,{method:'POST',body:{message:msg}});e.currentTarget.reset();notify('پاسخ ارسال شد');setSel({...sel});load()}return <div className="grid two"><section className="card">{tickets.map(t=><div className="row" onClick={()=>setSel(t)} key={t.id}><span>{t.mobile} — {t.subject}</span><b>{t.status}</b></div>)}</section><section className="card"><h3>{sel?sel.subject:'یک تیکت را انتخاب کنید'}</h3>{msgs.map(m=><p className={m.sender_type==='admin'?'bubble admin':'bubble'} key={m.id}>{m.message_text}</p>)}{sel&&<form onSubmit={send} className="form"><textarea name="msg" placeholder="پاسخ پشتیبانی"/><button>ارسال پاسخ</button></form>}</section></div>}
-function Notifications({request,notify}){async function send(e){e.preventDefault();const f=new FormData(e.currentTarget);await request('/api/admin/notifications/broadcast',{method:'POST',body:{title:f.get('title'),body:f.get('body')}});notify('اطلاعیه همگانی ثبت شد');e.currentTarget.reset()}return <section className="card"><h3>ارسال اطلاعیه همگانی</h3><form onSubmit={send} className="form"><input name="title" placeholder="عنوان"/><textarea name="body" placeholder="متن اعلان"/><button>ارسال</button></form></section>}
+import { createApi } from './lib/api.js';
+import { ToastProvider } from './lib/toast.jsx';
+import { DialogProvider } from './components/dialog.jsx';
+import { AppShell } from './components/app-shell.jsx';
 
-function SettingsPage({request,notify}){const[chat,setChat]=useState({minLifetimePoints:0,messageCooldownSeconds:5,badWords:[]});const[sms,setSms]=useState({provider:'',sender:'',apiKey:'',patternCode:'',enabled:false,testMode:true});const[stickers,setStickers]=useState([]);const loadStickers=()=>request('/api/admin/chat/stickers').then(setStickers);useEffect(()=>{request('/api/admin/settings/chat').then(setChat);request('/api/admin/settings/sms').then(d=>setSms({...d,apiKey:d.apiKeyMasked||''}));loadStickers()},[]);async function saveChat(e){e.preventDefault();await request('/api/admin/settings/chat',{method:'PATCH',body:{minLifetimePoints:+chat.minLifetimePoints,messageCooldownSeconds:+chat.messageCooldownSeconds,badWordsText:chat.badWordsText ?? (chat.badWords||[]).join('\n'),reason:'تنظیم از پنل وب'}});notify('تنظیمات چت ذخیره شد')}async function saveSms(e){e.preventDefault();await request('/api/admin/settings/sms',{method:'PATCH',body:sms});notify('تنظیمات پیامک ذخیره شد')}async function addSticker(e){e.preventDefault();const f=new FormData(e.currentTarget);let imageUrl=f.get('image')||'';const file=f.get('file');if(file&&file.size) imageUrl=await request.uploadImage(file);await request('/api/admin/chat/stickers',{method:'POST',body:{title:f.get('title'),imageUrl,stickerType:f.get('type')}});notify('استیکر اضافه شد');e.currentTarget.reset();loadStickers()}return <div className="grid two"><section className="card"><h3>تنظیمات چت</h3><form onSubmit={saveChat} className="form"><input type="number" value={chat.minLifetimePoints||0} onChange={e=>setChat({...chat,minLifetimePoints:e.target.value})} placeholder="حداقل امتیاز تاریخی برای چت"/><input type="number" value={chat.messageCooldownSeconds??5} onChange={e=>setChat({...chat,messageCooldownSeconds:e.target.value})} placeholder="فاصله زمانی بین پیام‌ها - ثانیه"/><textarea value={chat.badWordsText ?? (chat.badWords||[]).join('\n')} onChange={e=>setChat({...chat,badWordsText:e.target.value})} placeholder="کلمات رکیک/ممنوعه؛ هر خط یک کلمه"/><button>ذخیره چت</button></form></section><section className="card"><h3>تنظیمات SMS</h3><form onSubmit={saveSms} className="form"><input value={sms.provider||''} onChange={e=>setSms({...sms,provider:e.target.value})} placeholder="نام سرویس‌دهنده پیامک"/><input value={sms.sender||''} onChange={e=>setSms({...sms,sender:e.target.value})} placeholder="شماره/فرستنده"/><input value={sms.apiKey||''} onChange={e=>setSms({...sms,apiKey:e.target.value})} placeholder="API Key"/><input value={sms.patternCode||''} onChange={e=>setSms({...sms,patternCode:e.target.value})} placeholder="کد پترن/قالب"/><label><input type="checkbox" checked={!!sms.enabled} onChange={e=>setSms({...sms,enabled:e.target.checked})}/> فعال</label><label><input type="checkbox" checked={!!sms.testMode} onChange={e=>setSms({...sms,testMode:e.target.checked})}/> حالت تست</label><button>ذخیره SMS</button></form></section><section className="card"><h3>استیکرهای چت</h3><form onSubmit={addSticker} className="form"><input name="title" placeholder="نام استیکر"/><select name="type"><option value="static">ثابت</option><option value="animated">متحرک</option></select><input name="file" type="file" accept="image/*,.gif,.webp"/><input name="image" placeholder="یا آدرس فایل"/><button>افزودن استیکر</button></form>{stickers.map(st=><div className="row" key={st.id}><span>{st.title} — {st.sticker_type}</span><img src={st.image_url?.startsWith('http')?st.image_url:API_BASE+st.image_url} style={{width:42,height:42,objectFit:'contain'}}/></div>)}</section></div>}
-function Admins({request,notify}){const [rows,setRows]=useState([]),[logs,setLogs]=useState([]);const load=()=>{request('/api/admin/admins').then(setRows);request('/api/admin/audit-log').then(setLogs)};useEffect(load,[]);async function add(e){e.preventDefault();const f=new FormData(e.currentTarget);await request('/api/admin/admins',{method:'POST',body:{username:f.get('username'),password:f.get('password'),role:f.get('role')}});notify('ادمین ساخته شد');e.currentTarget.reset();load()}return <div className="grid two"><section className="card"><h3>ادمین جدید</h3><form onSubmit={add} className="form"><input name="username" placeholder="نام کاربری"/><input name="password" placeholder="رمز"/><select name="role"><option value="super_admin">مدیر کل</option><option value="support">پشتیبان</option><option value="observer">ناظر</option></select><button>ایجاد</button></form><Table rows={rows} cols={[['username','کاربری'],['role','نقش'],['is_active','فعال']]}/></section><section className="card"><h3>لاگ فعالیت</h3>{logs.slice(0,80).map(l=><p key={l.id} className="log">{l.username||'سیستم'} — {l.action} — {new Date(l.created_at).toLocaleString('fa-IR')}</p>)}</section></div>}
-function Leader({entries=[]}){return <div className="leader">{entries.map((e,i)=><div className={'rank r'+(i+1)} key={e.user_id}><b>{fmt(e.rank||i+1)}</b><span>{e.nickname||e.first_name||'کاربر'}</span><strong>{fmt(e.points)} امتیاز</strong></div>)}</div>}
-function Table({rows,cols}){return <div className="table"><table><thead><tr>{cols.map(c=><th key={c[0]}>{c[1]}</th>)}</tr></thead><tbody>{rows.map((r,i)=><tr key={r.id||i}>{cols.map(c=><td key={c[0]}>{typeof r[c[0]]==='boolean'?(r[c[0]]?'بله':'خیر'):(r[c[0]]??'-')}</td>)}</tr>)}</tbody></table></div>}
-createRoot(document.getElementById('root')).render(<App/>);
+import { LoginScreen } from './pages/login.jsx';
+import { Dashboard } from './pages/dashboard.jsx';
+import { CardsPage } from './pages/cards.jsx';
+import { RewardsPage } from './pages/rewards.jsx';
+import { LeaguePage } from './pages/league.jsx';
+import { UsersPage } from './pages/users.jsx';
+import { ChatModerationPage } from './pages/chat-moderation.jsx';
+import { SupportPage } from './pages/support.jsx';
+import { NotificationsPage } from './pages/notifications.jsx';
+import { SettingsPage } from './pages/settings.jsx';
+import { AdminsPage } from './pages/admins.jsx';
+
+const NAV = [
+  ['dashboard', 'داشبورد', BarChart3, Dashboard],
+  ['cards', 'کارت و کد', CreditCard, CardsPage],
+  ['rewards', 'جوایز', Gift, RewardsPage],
+  ['league', 'لیگ ماهانه', Trophy, LeaguePage],
+  ['users', 'کاربران', Users, UsersPage],
+  ['chat', 'چت', MessageCircle, ChatModerationPage],
+  ['support', 'پشتیبانی', LifeBuoy, SupportPage],
+  ['notifications', 'اطلاعیه‌ها', Bell, NotificationsPage],
+  ['settings', 'تنظیمات', Settings, SettingsPage],
+  ['admins', 'ادمین‌ها', Shield, AdminsPage],
+];
+
+function App() {
+  const [token, setToken] = useState(localStorage.getItem('adminToken') || '');
+  const [page, setPage] = useState('dashboard');
+  const [theme, setTheme] = useState(localStorage.getItem('adminTheme') || 'dark');
+  const request = useMemo(() => createApi(token), [token]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem('adminTheme', theme);
+  }, [theme]);
+
+  if (!token) {
+    return (
+      <LoginScreen
+        onLogin={(t) => {
+          localStorage.setItem('adminToken', t);
+          setToken(t);
+        }}
+      />
+    );
+  }
+
+  const active = NAV.find((x) => x[0] === page);
+  const ActivePage = active[3];
+
+  return (
+    <AppShell
+      nav={NAV}
+      activePage={page}
+      onNavigate={setPage}
+      onLogout={() => {
+        localStorage.removeItem('adminToken');
+        setToken('');
+      }}
+      theme={theme}
+      onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+      title={active[1]}
+      subtitle="تمام تغییرات حساس در Audit Log ثبت می‌شود."
+    >
+      <ActivePage request={request} />
+    </AppShell>
+  );
+}
+
+createRoot(document.getElementById('root')).render(
+  <ToastProvider>
+    <DialogProvider>
+      <App />
+    </DialogProvider>
+  </ToastProvider>,
+);

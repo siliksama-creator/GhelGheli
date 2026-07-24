@@ -1,0 +1,183 @@
+/*
+  GhelGheli shared design tokens.
+  Mirrors mobile/lib/theme/{colors,tokens}.dart so the admin panel, the user
+  web app and the Flutter app all speak the same visual language:
+  emerald + electric blue brand gradient, deep navy dark surfaces, an 8dp-ish
+  spacing scale, consistent radii and shadows.
+*/
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('/fonts/Vazirmatn-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('/fonts/Vazirmatn-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('/fonts/Vazirmatn-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('/fonts/Vazirmatn-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('/fonts/Vazirmatn-ExtraBold.woff2') format('woff2');
+  font-weight: 800;
+  font-display: swap;
+}
+
+:root {
+  /* Brand */
+  --gg-emerald: #00d49a;
+  --gg-emerald-deep: #00a87a;
+  --gg-blue: #1c78ff;
+  --gg-blue-deep: #0b4fcc;
+  --gg-amber: #ffc94d;
+  --gg-amber-deep: #7a4d00;
+  --gg-success: #22c58b;
+  --gg-warning: #f2a93b;
+  --gg-danger: #ff5d6c;
+  --gg-info: #4ea1ff;
+
+  /* Dark surfaces (default theme) */
+  --gg-bg: #060d18;
+  --gg-surface: #0e1826;
+  --gg-surface-alt: #141f30;
+  --gg-surface-high: #1b2a40;
+  --gg-surface-highest: #223349;
+  --gg-border: rgba(255, 255, 255, 0.10);
+  --gg-border-soft: rgba(255, 255, 255, 0.06);
+  --gg-text: #eaf1fb;
+  --gg-text-muted: #9fb0c8;
+  --gg-text-faint: #6c7d97;
+
+  /* Gradients */
+  --gg-gradient-hero: linear-gradient(135deg, var(--gg-emerald), var(--gg-blue));
+  --gg-gradient-gold: linear-gradient(135deg, var(--gg-amber), var(--gg-amber-deep));
+  --gg-gradient-league: linear-gradient(135deg, #172f56, var(--gg-emerald));
+
+  /* Spacing scale (8dp grid) */
+  --gg-space-1: 4px;
+  --gg-space-2: 8px;
+  --gg-space-3: 12px;
+  --gg-space-4: 16px;
+  --gg-space-5: 20px;
+  --gg-space-6: 24px;
+  --gg-space-8: 32px;
+  --gg-space-10: 40px;
+
+  /* Radii */
+  --gg-radius-sm: 12px;
+  --gg-radius-md: 16px;
+  --gg-radius-lg: 20px;
+  --gg-radius-xl: 24px;
+  --gg-radius-xxl: 28px;
+  --gg-radius-pill: 999px;
+
+  /* Shadows */
+  --gg-shadow-soft: 0 18px 44px rgba(0, 0, 0, 0.28);
+  --gg-shadow-raised: 0 28px 70px rgba(0, 0, 0, 0.40);
+  --gg-shadow-glow-emerald: 0 16px 40px rgba(0, 212, 154, 0.22);
+  --gg-shadow-glow-blue: 0 16px 40px rgba(28, 120, 255, 0.22);
+
+  /* Motion */
+  --gg-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --gg-fast: 150ms;
+  --gg-normal: 240ms;
+
+  font-family: 'Vazirmatn', Tahoma, sans-serif;
+  color-scheme: dark;
+}
+
+/* Light theme variant (opt-in via [data-theme="light"] on <html>) */
+:root[data-theme='light'] {
+  --gg-bg: #f4f7fc;
+  --gg-surface: #ffffff;
+  --gg-surface-alt: #eef2fa;
+  --gg-surface-high: #e4eaf6;
+  --gg-surface-highest: #dbe3f2;
+  --gg-border: rgba(16, 24, 42, 0.10);
+  --gg-border-soft: rgba(16, 24, 42, 0.06);
+  --gg-text: #10182a;
+  --gg-text-muted: #5c6b85;
+  --gg-text-faint: #8592a8;
+  --gg-shadow-soft: 0 14px 34px rgba(23, 40, 74, 0.10);
+  --gg-shadow-raised: 0 22px 50px rgba(23, 40, 74, 0.14);
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+body {
+  font-family: 'Vazirmatn', Tahoma, sans-serif;
+  background: var(--gg-bg);
+  color: var(--gg-text);
+  direction: rtl;
+  transition: background var(--gg-normal) var(--gg-ease), color var(--gg-normal) var(--gg-ease);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--gg-emerald) 35%, transparent);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--gg-surface-highest);
+  border-radius: var(--gg-radius-pill);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gg-surface-high);
+}
+
+h1, h2, h3, h4 {
+  margin: 0;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+p {
+  margin: 0;
+  color: var(--gg-text-muted);
+  line-height: 1.7;
+}
+
+a {
+  color: inherit;
+}
+
+button, input, select, textarea {
+  font-family: inherit;
+}
+
+/* Utility classes shared across pages */
+.gg-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
