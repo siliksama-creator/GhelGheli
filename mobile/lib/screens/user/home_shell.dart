@@ -119,8 +119,9 @@ class _HomeShellState extends State<HomeShell>
       await Firebase.initializeApp();
       await FirebaseMessaging.instance.requestPermission();
       final token = await FirebaseMessaging.instance.getToken();
-      if (token != null)
+      if (token != null) {
         await widget.api.patch('/api/profile', {'fcmToken': token});
+      }
     } catch (_) {
       // Push notifications are optional; ignore failures (e.g. no Firebase config).
     }

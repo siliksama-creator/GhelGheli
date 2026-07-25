@@ -1,7 +1,12 @@
 // Thin fetch-based API client shared by every admin page.
 // Behavior is unchanged from the legacy implementation: same base URL
 // resolution, same auth header injection, same error shape.
-export const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4000';
+// Falls back to the production API instead of http://localhost:4000: a
+// production build made without VITE_API_BASE used to silently ship a
+// localhost URL, so the deployed panel called the *visitor's own* machine
+// and every request failed with a connection error. Override with
+// VITE_API_BASE=http://localhost:4000 for local development.
+export const API_BASE = import.meta.env.VITE_API_BASE || 'https://api.ghelghelishop.ir';
 
 // The admin JWT expires after 12h server-side, but the panel previously had
 // no way to notice — every request after expiry just failed silently with a

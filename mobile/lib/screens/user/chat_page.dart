@@ -29,25 +29,6 @@ class _ChatPageState extends State<ChatPage> {
   Timer? _timer;
   bool _loading = true;
 
-  static const _emojis = [
-    '😀',
-    '😍',
-    '🔥',
-    '⚽',
-    '🏆',
-    '👏',
-    '😂',
-    '😎',
-    '❤️',
-    '👍',
-    '🎉',
-    '💚',
-    '🥇',
-    '✨',
-    '🙌',
-    '😜'
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -66,18 +47,19 @@ class _ChatPageState extends State<ChatPage> {
     try {
       final cfg = await widget.api.get('/api/chat/config');
       if (cfg['eligible'] != true) {
-        if (mounted)
+        if (mounted) {
           setState(() {
             _error =
                 'برای چت باید حداقل ${faNum(cfg['minLifetimePoints'])} امتیاز تاریخی داشته باشید.';
             _loading = false;
           });
+        }
         return;
       }
       final m = await widget.api.get('/api/chat/messages');
       final st = await widget.api.get('/api/chat/stickers');
       final cm = await widget.api.get('/api/chat/canned-messages');
-      if (mounted)
+      if (mounted) {
         setState(() {
           _messages = m;
           _stickers = st;
@@ -85,12 +67,14 @@ class _ChatPageState extends State<ChatPage> {
           _error = null;
           _loading = false;
         });
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _error = apiError(e);
           _loading = false;
         });
+      }
     }
   }
 
@@ -106,9 +90,10 @@ class _ChatPageState extends State<ChatPage> {
       setState(() => _reply = null);
       await _load();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(apiError(e))));
+      }
     }
   }
 
@@ -146,7 +131,7 @@ class _ChatPageState extends State<ChatPage> {
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      border: Border.all(color: textColor.withOpacity(0.2)),
+                      border: Border.all(color: textColor.withValues(alpha: 0.2)),
                       borderRadius: Corners.rMd,
                     ),
                     child: Text(

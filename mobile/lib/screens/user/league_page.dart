@@ -40,11 +40,12 @@ class _LeaguePageState extends State<LeaguePage> {
 
   Future<void> _load() async {
     final x = await widget.api.get('/api/league/current');
-    if (mounted)
+    if (mounted) {
       setState(() {
         _data = x;
         _loading = false;
       });
+    }
   }
 
   @override

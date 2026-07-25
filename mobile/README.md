@@ -3,7 +3,9 @@
 ```bash
 flutter pub get
 flutter create --platforms=android .
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:4000
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:4000   # emulator -> local backend
+# Production build (default if the flag is omitted):
+# flutter build apk --release --dart-define=API_BASE_URL=https://api.ghelghelishop.ir
 ```
 
 ## ساختار UI (بازطراحی ۲۰۲۶)

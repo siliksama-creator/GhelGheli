@@ -33,9 +33,10 @@ class _RewardsPageState extends State<RewardsPage> {
       }
       await _reload();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(apiError(e))));
+      }
     }
   }
 

@@ -55,12 +55,13 @@ class _AdminCardsState extends State<AdminCards> {
     final types = await widget.api.get('/api/admin/card-types');
     final codes = await widget.api.get('/api/admin/card-codes');
     _selectedType ??= types.isNotEmpty ? types.first['id'] : null;
-    if (mounted)
+    if (mounted) {
       setState(() {
         _types = types;
         _codes = codes;
         _loading = false;
       });
+    }
   }
 
   Future<void> _pickImage() async {
@@ -87,9 +88,10 @@ class _AdminCardsState extends State<AdminCards> {
       _imageUrl.clear();
       await _load();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(apiError(e))));
+      }
     } finally {
       if (mounted) setState(() => _savingType = false);
     }
@@ -157,9 +159,10 @@ class _AdminCardsState extends State<AdminCards> {
       _singleCode.clear();
       await _load();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(apiError(e))));
+      }
     } finally {
       if (mounted) setState(() => _savingSingle = false);
     }
@@ -174,9 +177,10 @@ class _AdminCardsState extends State<AdminCards> {
       setState(() => _report = Map.from(r));
       await _load();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(apiError(e))));
+      }
     } finally {
       if (mounted) setState(() => _savingBulk = false);
     }

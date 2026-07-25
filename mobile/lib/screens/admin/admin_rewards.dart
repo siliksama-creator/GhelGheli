@@ -57,12 +57,13 @@ class _AdminRewardsState extends State<AdminRewards> {
   Future<void> _load() async {
     final rewards = await widget.api.get('/api/admin/rewards');
     final claims = await widget.api.get('/api/admin/reward-claims');
-    if (mounted)
+    if (mounted) {
       setState(() {
         _rewards = rewards;
         _claims = claims;
         _loading = false;
       });
+    }
   }
 
   Future<void> _pickRewardImage() async {
@@ -98,9 +99,10 @@ class _AdminRewardsState extends State<AdminRewards> {
       _imageUrl.clear();
       await _load();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(apiError(e))));
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }

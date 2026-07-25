@@ -19,8 +19,9 @@ class AsyncSection<T> extends StatelessWidget {
     return FutureBuilder<T>(
       future: future,
       builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done)
+        if (snapshot.connectionState != ConnectionState.done) {
           return const LoadingView();
+        }
         if (snapshot.hasError) {
           return Padding(
             padding: const EdgeInsets.all(20),

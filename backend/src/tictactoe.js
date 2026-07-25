@@ -89,6 +89,15 @@ module.exports = function(io) {
       }
     });
 
+    // Locates the active game this socket belongs to (used when the client
+    // leaves without telling us which room it was in).
+    function findRoomIdForSocket(sock) {
+      for (const [rid, g] of activeGames.entries()) {
+        if (g.players['X'] === sock || g.players['O'] === sock) return rid;
+      }
+      return null;
+    }
+
     function makeBotMove(roomId) {
       const game = activeGames.get(roomId);
       if (!game || !game.isBot || game.turn !== 'O') return;
@@ -132,7 +141,13 @@ module.exports = function(io) {
       }
     }
 
-    socket.on('game:move', ({ roomId, index }) => {
+    socket.on('game:move', (payload) => {
+      // Same defensive handling as 'game:leave': never let a malformed
+      // payload from any client throw and kill the process.
+      if (!payload || typeof payload !== 'object') return;
+      const { roomId } = payload;
+      const index = Number(payload.index);
+      if (!Number.isInteger(index) || index < 0 || index > 8) return;
       const game = activeGames.get(roomId);
       if (!game) return;
 
@@ -160,8 +175,17 @@ module.exports = function(io) {
       }
     });
 
-    socket.on('game:leave', ({ roomId }) => {
-      const game = activeGames.get(roomId);
+    // CRASH FIX: the Flutter client emits 'game:leave' with NO payload when
+    // the player cancels matchmaking, so destructuring `{ roomId }` straight
+    // from the argument threw "Cannot destructure property 'roomId' of
+    // undefined". A throw inside a socket.io listener is an uncaught
+    // exception that takes the whole API process down (PM2 then restarts it,
+    // dropping every other user's socket). Accept a missing/!object payload
+    // and fall back to whatever room this socket is actually playing in.
+    socket.on('game:leave', (payload) => {
+      const roomId = (payload && typeof payload === 'object' ? payload.roomId : null)
+        || findRoomIdForSocket(socket);
+      const game = roomId ? activeGames.get(roomId) : null;
       if (game) {
         io.to(roomId).emit('game:over', { winner: 'DISCONNECT' });
         activeGames.delete(roomId);

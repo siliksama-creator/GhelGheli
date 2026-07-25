@@ -18,19 +18,42 @@ jobs:
           java-version: '17'
 
       - name: Setup Flutter
+        # NOTE: do NOT pin an old Flutter here. The app uses modern APIs
+        # (Color.withValues, CardThemeData, DialogThemeData,
+        # FadeForwardsPageTransitionsBuilder, DropdownButtonFormField
+        # .initialValue) that only exist on Flutter >= 3.32. Pinning 3.24.0
+        # is what made every "Build APK" run fail to compile.
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          flutter-version: '3.24.0' # Matches SDK constraint >=3.4.0 <4.0.0
+          cache: true
+
+      - name: Recreate Platform Folders
+        run: cd mobile && flutter create --platforms=android .
+
+      - name: Ensure Firebase compatible minSdk
+        run: |
+          cd mobile
+          if [ -f android/app/build.gradle.kts ]; then
+            sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 23/' android/app/build.gradle.kts
+          elif [ -f android/app/build.gradle ]; then
+            sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/' android/app/build.gradle
+          fi
 
       - name: Install dependencies
         run: cd mobile && flutter pub get
 
-      - name: Recreate Platform Folders
-        run: cd mobile && flutter create --platforms android .
+      - name: Remove generated default widget test
+        run: rm -rf mobile/test
+
+      - name: Analyze
+        run: cd mobile && flutter analyze --no-fatal-infos
 
       - name: Build APK
-        run: cd mobile && flutter build apk --release
+        run: |
+          cd mobile
+          flutter build apk --release \
+            --dart-define=API_BASE_URL=${{ vars.API_BASE_URL || 'https://api.ghelghelishop.ir' }}
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

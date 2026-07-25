@@ -3,13 +3,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiClient {
   static const String defaultBaseUrl = String.fromEnvironment('API_BASE_URL',
-      defaultValue: 'http://10.0.2.2:4000');
+      defaultValue: 'https://api.ghelghelishop.ir');
   final Dio dio = Dio(BaseOptions(
       baseUrl: defaultBaseUrl,
       connectTimeout: const Duration(seconds: 12),
       receiveTimeout: const Duration(seconds: 12)));
   String? token;
   bool isAdmin = false;
+
+  /// Base URL of the backend (also used for the Socket.IO connection).
+  String get baseUrl => dio.options.baseUrl;
 
   ApiClient() {
     dio.interceptors.add(InterceptorsWrapper(onRequest: (options, handler) {
@@ -74,8 +77,9 @@ String fullAssetUrl(Object? value) {
 String apiError(Object e) {
   try {
     final data = (e as dynamic).response?.data;
-    if (data is Map && data['message'] != null)
+    if (data is Map && data['message'] != null) {
       return data['message'].toString();
+    }
   } catch (_) {}
   return 'خطای ارتباط با سرور';
 }

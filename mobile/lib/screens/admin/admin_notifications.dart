@@ -34,9 +34,10 @@ class _AdminNotificationsState extends State<AdminNotifications> {
           {'title': _title.text, 'body': _body.text});
       _title.clear();
       _body.clear();
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text('اطلاعیه ارسال شد')));
+      }
     } finally {
       if (mounted) setState(() => _sending = false);
     }

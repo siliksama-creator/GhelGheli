@@ -81,11 +81,11 @@ class _SplashScreenState extends State<SplashScreen>
                       ),
                     ),
                     Gaps.vXl,
-                    SizedBox(
+                    const SizedBox(
                       width: 26,
                       height: 26,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2.4, color: const Color(0xFF00D49A)),
+                          strokeWidth: 2.4, color: Color(0xFF00D49A)),
                     ),
                   ],
                 ),

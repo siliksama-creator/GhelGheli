@@ -6,7 +6,7 @@ on:
       api_base_url:
         description: 'Backend API base URL for the APK'
         required: false
-        default: 'https://api.example.com'
+        default: 'https://api.ghelghelishop.ir'
       build_mode:
         description: 'APK build mode'
         required: true

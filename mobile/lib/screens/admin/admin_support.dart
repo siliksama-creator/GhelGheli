@@ -45,21 +45,23 @@ class _AdminSupportState extends State<AdminSupport> {
 
   Future<void> _load() async {
     final tickets = await widget.api.get('/api/admin/support/tickets');
-    if (mounted)
+    if (mounted) {
       setState(() {
         _tickets = tickets;
         _loading = false;
       });
+    }
   }
 
   Future<void> _open(Map t) async {
     final msgs =
         await widget.api.get('/api/admin/support/tickets/${t['id']}/messages');
-    if (mounted)
+    if (mounted) {
       setState(() {
         _selected = t;
         _messages = msgs;
       });
+    }
   }
 
   Future<void> _send() async {

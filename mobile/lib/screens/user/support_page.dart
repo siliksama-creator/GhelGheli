@@ -45,11 +45,12 @@ class _SupportPageState extends State<SupportPage> {
 
   Future<void> _load() async {
     final d = await widget.api.get('/api/support/tickets');
-    if (mounted)
+    if (mounted) {
       setState(() {
         _tickets = d;
         _loading = false;
       });
+    }
   }
 
   Future<void> _submit() async {
@@ -62,9 +63,10 @@ class _SupportPageState extends State<SupportPage> {
       _message.clear();
       await _load();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(apiError(e))));
+      }
     } finally {
       if (mounted) setState(() => _sending = false);
     }

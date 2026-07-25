@@ -46,12 +46,13 @@ class _AdminAdminsState extends State<AdminAdmins> {
   Future<void> _load() async {
     final admins = await widget.api.get('/api/admin/admins');
     final logs = await widget.api.get('/api/admin/audit-log');
-    if (mounted)
+    if (mounted) {
       setState(() {
         _admins = admins;
         _logs = logs;
         _loading = false;
       });
+    }
   }
 
   Future<void> _add() async {
@@ -67,9 +68,10 @@ class _AdminAdminsState extends State<AdminAdmins> {
       _password.clear();
       await _load();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(apiError(e))));
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }

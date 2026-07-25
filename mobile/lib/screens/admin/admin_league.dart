@@ -30,12 +30,13 @@ class _AdminLeagueState extends State<AdminLeague> {
 
   Future<void> _load() async {
     final d = await widget.api.get('/api/admin/league');
-    if (mounted)
+    if (mounted) {
       setState(() {
         _data = d;
         _prizes = List<Map>.from(d?['season']?['prize_table'] ?? _prizes);
         _loading = false;
       });
+    }
   }
 
   Future<void> _save() async {

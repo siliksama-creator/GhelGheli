@@ -1,6 +1,5 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../../api_client.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
@@ -47,13 +46,13 @@ class _GamesHubPageState extends State<GamesHubPage> {
                   icon: '❌⭕',
                   onTap: () => setState(() => _activeGame = 'tictactoe'),
                 ),
-                _GameCard(
+                const _GameCard(
                   title: 'منچ آنلاین',
                   subtitle: 'به‌زودی...',
                   icon: '🎲',
                   opacity: 0.5,
                 ),
-                _GameCard(
+                const _GameCard(
                   title: 'نقطه‌بازی',
                   subtitle: 'به‌زودی...',
                   icon: '🎯',
@@ -114,7 +113,7 @@ class TicTacToeGame extends StatefulWidget {
 }
 
 class _TicTacToeGameState extends State<TicTacToeGame> {
-  IO.Socket? _socket;
+  io.Socket? _socket;
   String _status = 'idle'; // idle, waiting, playing, over
   Map? _gameData;
   String? _mySymbol;
@@ -126,37 +125,43 @@ class _TicTacToeGameState extends State<TicTacToeGame> {
   }
 
   void _initSocket() {
-    _socket = IO.io(widget.api.baseUrl, IO.OptionBuilder()
+    _socket = io.io(widget.api.baseUrl, io.OptionBuilder()
       .setTransports(['websocket'])
       .setAuth({'token': widget.api.token})
       .build());
 
-    _socket?.onConnect((_) => print('Connected to socket'));
+    _socket?.onConnect((_) => debugPrint('Connected to game socket'));
 
     _socket?.on('game:waiting', (_) {
       if(mounted) setState(() => _status = 'waiting');
     });
 
     _socket?.on('game:start', (data) {
-      if(mounted) setState(() {
+      if(mounted) {
+        setState(() {
         _gameData = data;
         _mySymbol = data['yourSymbol'];
         _status = 'playing';
       });
+      }
     });
 
     _socket?.on('game:update', (data) {
-      if(mounted) setState(() {
+      if(mounted) {
+        setState(() {
         _gameData!['board'] = data['board'];
         if(data['turn'] != null) _gameData!['turn'] = data['turn'];
       });
+      }
     });
 
     _socket?.on('game:over', (data) {
-      if(mounted) setState(() {
+      if(mounted) {
+        setState(() {
         _status = 'over';
         _gameData!['winner'] = data['winner'];
       });
+      }
     });
   }
 
@@ -173,8 +178,26 @@ class _TicTacToeGameState extends State<TicTacToeGame> {
   }
 
   void _play(int index) {
-    if (_status != 'playing') return;
+    if (_status != 'playing' || _gameData == null) return;
+    // Only allow a move on our own turn and on a still-empty cell, so the
+    // UI doesn't fire pointless events the server will just reject.
+    if (_mySymbol == null || _gameData!['turn'] != _mySymbol) return;
+    final board = _gameData!['board'];
+    if (board is List && board[index] != null) return;
     _socket?.emit('game:move', {'roomId': _gameData!['roomId'], 'index': index});
+  }
+
+  /// Human readable end-of-game line. Previously this was a string with an
+  /// escaped `\$`, so the app literally printed the Dart expression instead
+  /// of the winner.
+  String _resultText(Object? winner) {
+    if (winner == 'DRAW') return 'مساوی!';
+    if (winner == 'DISCONNECT') return 'حریف خارج شد!';
+    if (winner == null) return 'پایان بازی';
+    if (_mySymbol != null) {
+      return winner == _mySymbol ? 'شما بردید! 🎉' : 'شما باختید';
+    }
+    return winner == 'X' ? 'برنده: ❌' : 'برنده: ⭕';
   }
 
   @override
@@ -283,8 +306,9 @@ class _TicTacToeGameState extends State<TicTacToeGame> {
                   Gaps.vLg,
                   if (_status == 'over') ...[
                     Text(
-                      winner == 'DRAW' ? 'مساوی!' : (winner == 'DISCONNECT' ? 'حریف خارج شد!' : "برنده: \${winner == 'X' ? '❌' : '⭕'}"),
-                      style: theme.textTheme.headlineSmall?.copyWith(color: theme.colorScheme.primary),
+                      _resultText(winner),
+                      style: theme.textTheme.headlineSmall
+                          ?.copyWith(color: theme.colorScheme.primary),
                     ),
                     Gaps.vMd,
                     ElevatedButton(

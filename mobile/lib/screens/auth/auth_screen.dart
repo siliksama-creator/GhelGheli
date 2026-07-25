@@ -137,9 +137,9 @@ class _AuthScreenState extends State<AuthScreen> {
           Positioned.fill(
               child: Image.asset('assets/brand/login_hero.webp',
                   fit: BoxFit.cover)),
-          Positioned.fill(
+          const Positioned.fill(
             child: DecoratedBox(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,

@@ -2,8 +2,8 @@
 
 فرض‌ها:
 
-- دامنه API: `api.example.com`
-- دامنه پنل: `admin.example.com`
+- دامنه API: `api.ghelghelishop.ir`
+- دامنه پنل: `admin.ghelghelishop.ir`
 - مسیر پروژه: `/var/www/GhelGheli`
 
 ## ۱) نصب پیش‌نیازها
@@ -44,7 +44,7 @@ PORT=4000
 DATABASE_URL=postgres://ghelgheli:A_STRONG_PASSWORD@localhost:5432/ghelgheli
 JWT_SECRET=یک_رشته_بسیار_طولانی_و_تصادفی
 OTP_DEV_MODE=false
-CORS_ORIGIN=https://admin.example.com
+CORS_ORIGIN=https://admin.ghelghelishop.ir
 FCM_SERVICE_ACCOUNT_JSON={...json firebase service account...}
 ```
 
@@ -64,7 +64,7 @@ pm2 startup
 ```bash
 cd /var/www/GhelGheli/admin
 npm install
-VITE_API_BASE=https://api.example.com npm run build
+VITE_API_BASE=https://api.ghelghelishop.ir npm run build
 ```
 
 ## ۵) تنظیم Nginx reverse proxy
@@ -75,7 +75,7 @@ sudo nano /etc/nginx/sites-available/ghelgheli
 
 ```nginx
 server {
-  server_name api.example.com;
+  server_name api.ghelghelishop.ir;
   location /socket.io/ {
     proxy_pass http://127.0.0.1:4000;
     proxy_http_version 1.1;
@@ -93,7 +93,7 @@ server {
 }
 
 server {
-  server_name admin.example.com;
+  server_name admin.ghelghelishop.ir;
   root /var/www/GhelGheli/admin/dist;
   index index.html;
   location / { try_files $uri /index.html; }
@@ -111,7 +111,7 @@ sudo systemctl reload nginx
 ## ۶) SSL رایگان Let's Encrypt
 
 ```bash
-sudo certbot --nginx -d api.example.com -d admin.example.com
+sudo certbot --nginx -d api.ghelghelishop.ir -d admin.ghelghelishop.ir
 sudo certbot renew --dry-run
 ```
 

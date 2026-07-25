@@ -12,3 +12,7 @@ mobile/windows/
 admin/dist/
 backend/uploads/
 apk/
+
+# Build output (built on the server / in CI, never committed — a tracked
+# dist/ makes `git pull` conflict on the VPS every deploy).
+userweb/dist/

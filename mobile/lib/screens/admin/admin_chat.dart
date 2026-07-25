@@ -27,11 +27,12 @@ class _AdminChatState extends State<AdminChat> {
 
   Future<void> _load() async {
     final rows = await widget.api.get('/api/admin/chat/messages');
-    if (mounted)
+    if (mounted) {
       setState(() {
         _rows = rows;
         _loading = false;
       });
+    }
   }
 
   @override

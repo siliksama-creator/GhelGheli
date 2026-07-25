@@ -37,11 +37,12 @@ class _AdminUsersState extends State<AdminUsers> {
     setState(() => _loading = true);
     final rows = await widget.api
         .get('/api/admin/users?search=${Uri.encodeComponent(_query.text)}');
-    if (mounted)
+    if (mounted) {
       setState(() {
         _rows = rows;
         _loading = false;
       });
+    }
   }
 
   Future<void> _adjustPoints(String id) async {
