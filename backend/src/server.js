@@ -166,6 +166,22 @@ function normalizeChatText(text) {
     .replace(/[\u200b\u200c\u200d\uFEFF]/g, '')
     .replace(/[\s_\-.]+/g, '');
 }
+// Admin-pinned chat announcement. Kept in app_settings (not chat_messages)
+// so it can't be replied to/liked/reported like a normal message.
+const PIN_ACCENTS = ['gold', 'green', 'blue', 'red'];
+async function getChatPinnedMessage(client = pool) {
+  const { rows } = await client.query("SELECT value FROM app_settings WHERE key='chat_pinned_message' LIMIT 1");
+  const v = rows[0]?.value;
+  if (!v || typeof v !== 'object') return { text: '', accent: 'gold', active: false };
+  return {
+    text: String(v.text || ''),
+    accent: PIN_ACCENTS.includes(v.accent) ? v.accent : 'gold',
+    active: Boolean(v.active) && String(v.text || '').trim().length > 0,
+    pinnedAt: v.pinnedAt || null,
+    pinnedBy: v.pinnedBy || null,
+  };
+}
+
 async function getChatBadWords(client = pool) {
   const { rows } = await client.query("SELECT value FROM app_settings WHERE key='chat_bad_words' LIMIT 1");
   const raw = rows[0]?.value;
@@ -426,7 +442,13 @@ app.get('/api/league/current', auth, asyncHandler(async (req, res) => res.json(a
 
 app.get('/api/chat/config', auth, asyncHandler(async (req, res) => {
   const minLifetimePoints = await getChatMinLifetimePoints();
-  res.json({ minLifetimePoints, messageCooldownSeconds: await getChatCooldownSeconds(), eligible: Number(req.user.lifetime_points || 0) >= minLifetimePoints, userLifetimePoints: req.user.lifetime_points });
+  res.json({
+    minLifetimePoints,
+    messageCooldownSeconds: await getChatCooldownSeconds(),
+    eligible: Number(req.user.lifetime_points || 0) >= minLifetimePoints,
+    userLifetimePoints: req.user.lifetime_points,
+    pinned: await getChatPinnedMessage(),
+  });
 }));
 
 const CANNED_MESSAGES = [
@@ -639,6 +661,32 @@ app.patch('/api/admin/settings/chat', adminAuth, requireRole(), asyncHandler(asy
   await audit(req.admin.id, 'update_chat_settings', 'app_settings', null, req.body.reason || 'تنظیم از پنل مدیریت', { minLifetimePoints, messageCooldownSeconds, badWordsCount: badWords.length });
   res.json({ message: 'تنظیمات چت ذخیره شد', minLifetimePoints, messageCooldownSeconds, badWords });
 }));
+app.get('/api/admin/chat/pinned', adminAuth, asyncHandler(async (req, res) => {
+  res.json(await getChatPinnedMessage());
+}));
+app.patch('/api/admin/chat/pinned', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
+  const text = String(req.body.text ?? '').trim().slice(0, 300);
+  const accent = PIN_ACCENTS.includes(req.body.accent) ? req.body.accent : 'gold';
+  // Unpinning keeps the text around so the admin can toggle it back on
+  // without retyping; `active` is what the clients actually check.
+  const active = Boolean(req.body.active) && text.length > 0;
+  const value = {
+    text, accent, active,
+    pinnedAt: active ? new Date().toISOString() : null,
+    pinnedBy: active ? (req.admin.username || null) : null,
+  };
+  await pool.query(
+    `INSERT INTO app_settings(key,value,updated_by_admin_id,updated_at)
+     VALUES('chat_pinned_message',$1,$2,NOW())
+     ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value, updated_by_admin_id=EXCLUDED.updated_by_admin_id, updated_at=NOW()`,
+    [JSON.stringify(value), req.admin.id]
+  );
+  await audit(req.admin.id, active ? 'pin_chat_message' : 'unpin_chat_message', 'app_settings', null, req.body.reason || null, { accent, length: text.length });
+  // Live-update everyone who currently has the chat room open.
+  io.emit('chat:pinned', value);
+  res.json({ message: active ? 'پیام سنجاق شد' : 'سنجاق برداشته شد', ...value });
+}));
+
 app.get('/api/admin/settings/sms', adminAuth, asyncHandler(async (req, res) => {
   const { rows } = await pool.query("SELECT value FROM app_settings WHERE key='sms_config' LIMIT 1");
   const cfg = rows[0]?.value || {};

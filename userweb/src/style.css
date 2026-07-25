@@ -204,3 +204,26 @@
   .mobileNav button { min-width: 68px; flex: 0 0 auto; padding: 8px 10px; }
   .mobileNav .navLabel { font-size: 11.5px; }
 }
+
+/* Admin-pinned chat announcement */
+.pinnedBanner {
+  display: flex; gap: 10px; align-items: flex-start;
+  margin: 0 0 12px; padding: 11px 13px; border-radius: 14px;
+  background: color-mix(in srgb, var(--pin) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pin) 55%, transparent);
+}
+.pinnedBanner .pinIcon { font-size: 15px; line-height: 1.4; }
+.pinnedBanner b { display: block; font-size: 11px; color: var(--pin); }
+.pinnedBanner p { margin: 2px 0 0; color: var(--pin); font-weight: 700; line-height: 1.5; }
+
+/* Club: chat + games switcher */
+.clubWrap { width: 100%; display: grid; gap: 12px; justify-items: center; }
+.clubTabs {
+  display: inline-flex; gap: 6px; padding: 5px; border-radius: 999px;
+  background: #ffffff12; border: 1px solid #ffffff1a;
+}
+.clubTabs button {
+  background: transparent; color: #dbeeff; border: 0; border-radius: 999px;
+  padding: 8px 20px; font-size: 13.5px;
+}
+.clubTabs .on { background: #b5ef58; color: #10210a; box-shadow: 0 8px 20px #b5ef5830; }

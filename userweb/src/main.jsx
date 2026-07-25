@@ -4,6 +4,9 @@ import GamesHub from './games.jsx';
 import'./style.css';
 
 const API=import.meta.env.VITE_API_BASE||'https://api.ghelghelishop.ir';
+// Accent palette for the admin-pinned announcement (mirrors the server's
+// PIN_ACCENTS and the Flutter pinAccents map).
+const PIN_COLORS={gold:'#FFC53D',green:'#34D399',blue:'#60A5FA',red:'#F87171'};
 const avatars=['avatar_1_football.png','avatar_2_trophy.png','avatar_3_star.png','avatar_4_rocket.png','avatar_5_lion.png','avatar_6_tiger.png','avatar_7_eagle.png','avatar_8_target.png','avatar_9_bolt.png','avatar_10_crown.png'];
 const fa=n=>new Intl.NumberFormat('fa-IR').format(Number(n||0));
 const asset=v=>!v?'':String(v).startsWith('http')?v:API+v;
@@ -33,7 +36,7 @@ function Portal({token,logout}){
   async function load(){const pr=await req('/api/profile','GET',null,token);setP(pr);setRewards(await req('/api/rewards','GET',null,token));}
   useEffect(()=>{load()},[]);
   if(!p)return <div className="card">در حال بارگذاری...</div>;
-  return <div className="portal"><nav className="mobileNav">{[['home','خانه','🏠'],['rewards','جوایز','🎁'],['league','لیگ','🏆'],['chat','چت روم','💬'],['games','بازی‌ها','🎮'],['support','پشتیبانی','🎧'],['profile','پروفایل','👤']].map(x=><button key={x[0]} className={tab===x[0]?'on':''} onClick={()=>setTab(x[0])}><span className="navIcon">{x[2]}</span><span className="navLabel">{x[1]}</span></button>)}<button className="danger" onClick={logout}>خروج</button></nav>{msg&&<div className="toast">{msg}</div>}{tab==='home'&&<Home token={token} p={p} rewards={rewards} load={load} setMsg={setMsg}/>} {tab==='profile'&&<Profile token={token} p={p} load={load} setMsg={setMsg}/>} {tab==='rewards'&&<Rewards rewards={rewards}/>} {tab==='league'&&<League token={token} openProfile={setPublicUser}/>} {tab==='chat'&&<Chat token={token} openProfile={setPublicUser}/>} {tab==='games'&&<GamesHub api={API} token={token} openProfile={setPublicUser}/>}
+  return <div className="portal"><nav className="mobileNav">{[['home','خانه','🏠'],['rewards','جوایز','🎁'],['league','لیگ','🏆'],['club','باشگاه','💬'],['support','پشتیبانی','🎧'],['profile','پروفایل','👤']].map(x=><button key={x[0]} className={tab===x[0]?'on':''} onClick={()=>setTab(x[0])}><span className="navIcon">{x[2]}</span><span className="navLabel">{x[1]}</span></button>)}<button className="danger" onClick={logout}>خروج</button></nav>{msg&&<div className="toast">{msg}</div>}{tab==='home'&&<Home token={token} p={p} rewards={rewards} load={load} setMsg={setMsg}/>} {tab==='profile'&&<Profile token={token} p={p} load={load} setMsg={setMsg}/>} {tab==='rewards'&&<Rewards rewards={rewards}/>} {tab==='league'&&<League token={token} openProfile={setPublicUser}/>} {tab==='club'&&<Club token={token} openProfile={setPublicUser}/>}
  {tab==='support'&&<Support token={token}/>} {publicUser&&<PublicProfile token={token} userId={publicUser} close={()=>setPublicUser(null)}/>}</div>;
 }
 
@@ -66,14 +69,29 @@ function League({token,openProfile}){
   const top=entries.slice(0,3); const rest=entries.slice(3);
   return <section className="card wide leaguePage"><div className="sectionHead"><div><h2>لیگ ماهانه قلقلی</h2><p>رتبه‌بندی زنده کاربران تا پایان ماه؛ امتیاز لیگ آخر ماه ریست می‌شود، امتیاز کلی دست نمی‌خورد.</p></div><b className="countdown">{fa(days)} روز مانده</b></div><div className="podium">{top.map((e,i)=><div className={`podiumCard p${i+1}`} onClick={()=>openProfile(e.user_id)} key={e.user_id}><span className="medal">{['🥇','🥈','🥉'][i]}</span><b>{e.nickname||e.first_name||'کاربر'}</b><strong>{fa(e.points)} امتیاز</strong></div>)}</div><div className="leagueList">{rest.map((e,i)=><div className="row clickable leagueRow" key={e.user_id} onClick={()=>openProfile(e.user_id)}><b>#{fa(i+4)}</b><span>{e.nickname||e.first_name||'کاربر'}</span><strong>{fa(e.points)} امتیاز</strong></div>)}</div>{!entries.length&&<div className="empty">هنوز امتیازی در لیگ ثبت نشده است.</div>}</section>
 }
+// Chat and games are both social features; merging them behind one switcher
+// frees a nav slot and keeps related things together.
+function Club({token,openProfile}){
+  const[sub,setSub]=useState('chat');
+  return <div className="clubWrap">
+    <div className="clubTabs">
+      <button className={sub==='chat'?'on':''} onClick={()=>setSub('chat')}>💬 چت روم</button>
+      <button className={sub==='games'?'on':''} onClick={()=>setSub('games')}>🎮 بازی‌ها</button>
+    </div>
+    {sub==='chat'
+      ? <Chat token={token} openProfile={openProfile}/>
+      : <GamesHub api={API} token={token} openProfile={openProfile}/>}
+  </div>;
+}
+
 function Chat({token,openProfile}){
-  const[messages,setMessages]=useState([]),[stickers,setStickers]=useState([]),[text,setText]=useState(''),[err,setErr]=useState(''),[reply,setReply]=useState(null),[canned,setCanned]=useState([]),[cannedOpen,setCannedOpen]=useState(false);
+  const[messages,setMessages]=useState([]),[stickers,setStickers]=useState([]),[text,setText]=useState(''),[err,setErr]=useState(''),[reply,setReply]=useState(null),[canned,setCanned]=useState([]),[cannedOpen,setCannedOpen]=useState(false),[pinned,setPinned]=useState(null);
   const emojis=['😀','😍','🔥','⚽','🏆','👏','😂','😎','❤️','👍','🎉','💚','🥇','✨','🙌','😜'];
-  async function load(){try{setMessages(await req('/api/chat/messages','GET',null,token));setStickers(await req('/api/chat/stickers','GET',null,token));setCanned(await req('/api/chat/canned-messages','GET',null,token));setErr('')}catch(e){setErr(e.message)}}
+  async function load(){try{const cfg=await req('/api/chat/config','GET',null,token);setPinned(cfg.pinned||null);setMessages(await req('/api/chat/messages','GET',null,token));setStickers(await req('/api/chat/stickers','GET',null,token));setCanned(await req('/api/chat/canned-messages','GET',null,token));setErr('')}catch(e){setErr(e.message)}}
   useEffect(()=>{load();const t=setInterval(load,3000);return()=>clearInterval(t)},[]);
   async function send(stickerId=null, msgText=text){try{if(!stickerId&&!msgText.trim())return;await req('/api/chat/messages','POST',{message:msgText,stickerId,replyTo:reply?.id},token);setText('');setReply(null);setCannedOpen(false);load()}catch(e){setErr(e.message)}}
   async function like(m){try{await req(`/api/chat/messages/${m.id}/like`,'POST',{},token);load()}catch(e){setErr(e.message)}}async function report(m){try{await req(`/api/chat/messages/${m.id}/report`,'POST',{},token);setErr('گزارش ثبت شد و برای مدیر ارسال می‌شود')}catch(e){setErr(e.message)}}
-  return <section className="card wide chatPage"><div className="sectionHead"><div><h2>چت روم قلقلی</h2><p>کاربران در این قسمت میتوانند باهم گفتگو کنند. (از الفاظ رکیک و بحث های سیاسی جدا خودداری بشه.)</p></div><span className="liveBadge">زنده</span></div>{err&&<p className="msg">{err}</p>}{reply&&<div className="replybar">در پاسخ به {reply.nickname||'کاربر'}: {reply.message_text}<button onClick={()=>setReply(null)}>×</button></div>}<div className="stickerTray">{stickers.map(st=><button key={st.id} onClick={()=>send(st.id)} title={st.title}><img src={asset(st.image_url)}/></button>)}{!stickers.length&&<span className="hint">استیکری هنوز توسط مدیر اضافه نشده است.</span>}</div><div className="chatbox">{messages.map(m=><div className="chatmsg" key={m.id}><img onClick={()=>openProfile(m.user_id)} src={m.profile_image_url?asset(m.profile_image_url):`/avatars/${m.profile_avatar_key||avatars[0]}`}/><div className="chatbody"><b onClick={()=>openProfile(m.user_id)} className="clickableText">{m.nickname||m.first_name||'کاربر'}</b>{m.reply_text&&<small className="reply">↩ {m.reply_nickname||'کاربر'}: {m.reply_text}</small>}{m.message_type==='sticker'&&m.sticker_url?<img className="stickerMsg" src={asset(m.sticker_url)}/>:<p>{m.message_text}</p>}<div className="chatActions"><button onClick={()=>setReply(m)}>ریپلای</button><button onClick={()=>like(m)}>❤ {fa(m.like_count)}</button><button onClick={()=>report(m)}>گزارش</button></div></div></div>)}</div><div className="sendDock">
+  return <section className="card wide chatPage"><div className="sectionHead"><div><h2>چت روم قلقلی</h2><p>با هواداران دیگر گفتگو کن ⚽</p></div><span className="liveBadge">زنده</span></div>{pinned&&pinned.active&&pinned.text&&<div className="pinnedBanner" style={{'--pin':PIN_COLORS[pinned.accent]||PIN_COLORS.gold}}><span className="pinIcon">📌</span><div><b>اعلان مدیریت</b><p>{pinned.text}</p></div></div>}{err&&<p className="msg">{err}</p>}{reply&&<div className="replybar">در پاسخ به {reply.nickname||'کاربر'}: {reply.message_text}<button onClick={()=>setReply(null)}>×</button></div>}<div className="stickerTray">{stickers.map(st=><button key={st.id} onClick={()=>send(st.id)} title={st.title}><img src={asset(st.image_url)}/></button>)}{!stickers.length&&<span className="hint">استیکری هنوز توسط مدیر اضافه نشده است.</span>}</div><div className="chatbox">{messages.map(m=><div className="chatmsg" key={m.id}><img onClick={()=>openProfile(m.user_id)} src={m.profile_image_url?asset(m.profile_image_url):`/avatars/${m.profile_avatar_key||avatars[0]}`}/><div className="chatbody"><b onClick={()=>openProfile(m.user_id)} className="clickableText">{m.nickname||m.first_name||'کاربر'}</b>{m.reply_text&&<small className="reply">↩ {m.reply_nickname||'کاربر'}: {m.reply_text}</small>}{m.message_type==='sticker'&&m.sticker_url?<img className="stickerMsg" src={asset(m.sticker_url)}/>:<p>{m.message_text}</p>}<div className="chatActions"><button onClick={()=>setReply(m)}>ریپلای</button><button onClick={()=>like(m)}>❤ {fa(m.like_count)}</button><button onClick={()=>report(m)}>گزارش</button></div></div></div>)}</div><div className="sendDock">
   <button className="emojiBtn" onClick={() => setCannedOpen(!cannedOpen)}>💬 انتخاب پیام</button>
   {cannedOpen && <div className="cannedPopover">
     {canned.map((c, i) => <button key={i} onClick={() => { setText(c); setCannedOpen(false); }}>{c}</button>)}

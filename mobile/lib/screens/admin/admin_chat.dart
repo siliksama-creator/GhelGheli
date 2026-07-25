@@ -4,6 +4,7 @@ import '../../api_client.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/state_views.dart';
+import 'widgets/pinned_editor.dart';
 
 /// Chat moderation: delete messages / ban users. Same endpoints as legacy
 /// `AdminChat`.
@@ -43,7 +44,10 @@ class _AdminChatState extends State<AdminChat> {
       onRefresh: _load,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(Gaps.lg, Gaps.md, Gaps.lg, Gaps.xxl),
-        children: _rows.isEmpty
+        children: [
+          PinnedEditor(api: widget.api),
+          Gaps.vLg,
+          ..._rows.isEmpty
             ? const [
                 AppCard(
                     child: EmptyState(
@@ -99,6 +103,7 @@ class _AdminChatState extends State<AdminChat> {
                       ),
                     ))
                 .toList(),
+        ],
       ),
     );
   }

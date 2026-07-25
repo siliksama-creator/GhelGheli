@@ -14,8 +14,22 @@ import '../shared/hero_header.dart';
 class DashboardPage extends StatefulWidget {
   final ApiClient api;
   final Future<void> Function() reloadProfile;
-  const DashboardPage(
-      {super.key, required this.api, required this.reloadProfile});
+
+  /// Jumps to the profile tab (used by the hero header + completion nudge).
+  final VoidCallback? onOpenProfile;
+
+  /// Light/dark switch, surfaced at the top of the dashboard.
+  final VoidCallback? onToggleTheme;
+  final bool isDark;
+
+  const DashboardPage({
+    super.key,
+    required this.api,
+    required this.reloadProfile,
+    this.onOpenProfile,
+    this.onToggleTheme,
+    this.isDark = true,
+  });
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
@@ -106,10 +120,15 @@ class _DashboardPageState extends State<DashboardPage> {
         padding: const EdgeInsets.fromLTRB(Gaps.lg, Gaps.md, Gaps.lg, Gaps.xxl),
         children: [
           HeroHeader(
-              points: points,
-              nickname: user?['nickname'] ?? 'قهرمان',
-              nextReward: nextReward),
-          Gaps.vLg,
+            points: points,
+            nickname: user?['nickname'] ?? 'قهرمان',
+            nextReward: nextReward,
+            user: user is Map ? Map<String, dynamic>.from(user) : null,
+            onOpenProfile: widget.onOpenProfile,
+            onToggleTheme: widget.onToggleTheme,
+            isDark: widget.isDark,
+          ),
+          Gaps.vMd,
           AppCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,

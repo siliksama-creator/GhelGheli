@@ -8,6 +8,7 @@ import '../../widgets/app_card.dart';
 import '../../widgets/avatar_image.dart';
 import '../../widgets/state_views.dart';
 import '../shared/public_profile_sheet.dart';
+import 'games/pinned_banner.dart';
 
 /// Group chat room: same endpoints & polling cadence (3s) as the legacy
 /// `ChatPage` — messages, stickers, replies, likes, reporting, emoji picker.
@@ -26,6 +27,7 @@ class _ChatPageState extends State<ChatPage> {
   List _cannedMessages = [];
   Map? _reply;
   String? _error;
+  Map<String, dynamic>? _pinned;
   Timer? _timer;
   bool _loading = true;
 
@@ -46,6 +48,10 @@ class _ChatPageState extends State<ChatPage> {
   Future<void> _load() async {
     try {
       final cfg = await widget.api.get('/api/chat/config');
+      final pin = cfg['pinned'];
+      if (mounted && pin is Map) {
+        setState(() => _pinned = Map<String, dynamic>.from(pin));
+      }
       if (cfg['eligible'] != true) {
         if (mounted) {
           setState(() {
@@ -177,9 +183,13 @@ class _ChatPageState extends State<ChatPage> {
                     children: [
                       Text('چت روم قلقلی', style: theme.textTheme.titleSmall),
                       const SizedBox(height: 2),
-                      Text('از الفاظ رکیک و بحث‌های سیاسی خودداری کنید.',
+                      // The old "avoid profanity" line was removed: users can
+                      // only send predefined messages now, so it warned about
+                      // something that is no longer possible. The slot below
+                      // is an admin-pinned announcement instead.
+                      Text('با هواداران دیگر گفتگو کن ⚽',
                           style: theme.textTheme.bodySmall,
-                          maxLines: 2,
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis),
                     ],
                   ),
@@ -188,6 +198,7 @@ class _ChatPageState extends State<ChatPage> {
             ),
           ),
         ),
+        PinnedBanner(pinned: _pinned),
         if (_loading)
           const Expanded(child: LoadingView())
         else if (_error != null)

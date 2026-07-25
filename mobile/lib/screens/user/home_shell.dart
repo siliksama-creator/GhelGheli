@@ -3,8 +3,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
-import 'chat_page.dart';
-import 'games_page.dart';
+import 'social_page.dart';
 import 'dashboard_page.dart';
 import 'league_page.dart';
 import 'profile_page.dart';
@@ -51,12 +50,17 @@ class _HomeShellState extends State<HomeShell>
     end: Offset.zero,
   ).animate(CurvedAnimation(parent: _entrance, curve: Curves.easeOutCubic));
 
-  late final List<Widget> _pages = [
-    DashboardPage(api: widget.api, reloadProfile: _loadProfile),
+  List<Widget> get _pages => [
+    DashboardPage(
+      api: widget.api,
+      reloadProfile: _loadProfile,
+      onOpenProfile: () => setState(() => _index = 5),
+      onToggleTheme: widget.onTheme,
+      isDark: widget.dark,
+    ),
     RewardsPage(api: widget.api),
     LeaguePage(api: widget.api),
-    ChatPage(api: widget.api),
-    GamesHubPage(api: widget.api),
+    SocialPage(api: widget.api),
     SupportPage(api: widget.api),
     ProfilePage(api: widget.api, reloadProfile: _loadProfile),
   ];
@@ -66,8 +70,10 @@ class _HomeShellState extends State<HomeShell>
   // guidance caps a navigation bar at five. The two least-used sections
   // (پشتیبانی / پروفایل) moved into a "بیشتر" sheet, which lets the
   // remaining icons breathe at full size.
-  static const _navIndexes = [0, 1, 2, 3, 4];
-  static const _moreIndexes = [5, 6];
+  // Chat + games now share one "باشگاه" destination, so all five primary
+  // sections fit the bar and only two rarely-used ones sit under "بیشتر".
+  static const _navIndexes = [0, 1, 2, 3];
+  static const _moreIndexes = [4, 5];
 
   static const _destinations = [
     NavigationDestination(
@@ -83,13 +89,9 @@ class _HomeShellState extends State<HomeShell>
         selectedIcon: Icon(Icons.emoji_events_rounded),
         label: 'لیگ'),
     NavigationDestination(
-        icon: Icon(Icons.chat_bubble_outline_rounded),
-        selectedIcon: Icon(Icons.chat_bubble_rounded),
-        label: 'چت روم'),
-    NavigationDestination(
-        icon: Icon(Icons.sports_esports_outlined),
-        selectedIcon: Icon(Icons.sports_esports_rounded),
-        label: 'بازی‌ها'),
+        icon: Icon(Icons.forum_outlined),
+        selectedIcon: Icon(Icons.forum_rounded),
+        label: 'باشگاه'),
     NavigationDestination(
         icon: Icon(Icons.support_agent_outlined),
         selectedIcon: Icon(Icons.support_agent_rounded),
@@ -139,8 +141,7 @@ class _HomeShellState extends State<HomeShell>
     'خانه',
     'جوایز',
     'لیگ',
-    'چت روم',
-    'بازی‌ها',
+    'باشگاه',
     'پشتیبانی',
     'پروفایل'
   ];
