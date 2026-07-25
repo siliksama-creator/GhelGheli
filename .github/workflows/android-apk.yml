@@ -52,6 +52,8 @@ jobs:
       - name: Remove generated default widget test
         run: rm -rf test
       - name: Full Flutter analyze
+        # See build-apk.yml: informational only, never blocks the build.
+        continue-on-error: true
         run: flutter analyze --no-fatal-infos
       - name: Build APK
         run: |

@@ -3,6 +3,13 @@
 // alongside this file, plus consistent component themes (buttons, inputs,
 // cards, nav bar, dialogs, sheets) so every screen looks hand-crafted
 // instead of relying on Flutter's raw defaults.
+// Required for CupertinoPageTransitionsBuilder below. Some Flutter versions
+// re-export it from material.dart (their analyzer then calls this import
+// "unnecessary"), but others do NOT — dropping this import broke the CI
+// build with "CupertinoPageTransitionsBuilder isn't defined". Keep it, and
+// silence the version-dependent lint.
+// ignore: unnecessary_import
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'brand_theme.dart';
 import 'colors.dart';
