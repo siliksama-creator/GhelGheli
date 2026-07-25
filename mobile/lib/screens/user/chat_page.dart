@@ -23,6 +23,7 @@ class _ChatPageState extends State<ChatPage> {
   final _text = TextEditingController();
   List _messages = [];
   List _stickers = [];
+  List _cannedMessages = [];
   Map? _reply;
   String? _error;
   Timer? _timer;
@@ -75,10 +76,12 @@ class _ChatPageState extends State<ChatPage> {
       }
       final m = await widget.api.get('/api/chat/messages');
       final st = await widget.api.get('/api/chat/stickers');
+      final cm = await widget.api.get('/api/chat/canned-messages');
       if (mounted)
         setState(() {
           _messages = m;
           _stickers = st;
+          _cannedMessages = cm;
           _error = null;
           _loading = false;
         });
@@ -114,36 +117,56 @@ class _ChatPageState extends State<ChatPage> {
     await _load();
   }
 
-  Future<void> _pickEmoji() async {
+  
+  Future<void> _pickCanned() async {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
+    // Invert colors for high contrast
+    final bgColor = isDark ? Colors.white : Colors.black87;
+    final textColor = isDark ? Colors.black : Colors.white;
+
     final e = await showModalBottomSheet<String>(
       context: context,
+      backgroundColor: bgColor,
+      isScrollControlled: true,
       builder: (_) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(Gaps.lg),
-          child: GridView.count(
-            crossAxisCount: 5,
-            shrinkWrap: true,
-            mainAxisSpacing: Gaps.sm,
-            children: _emojis
-                .map((x) => Material(
-                      color: theme.colorScheme.surfaceContainerHigh,
+        child: FractionallySizedBox(
+          heightFactor: 0.6,
+          child: Padding(
+            padding: const EdgeInsets.all(Gaps.lg),
+            child: ListView.separated(
+              itemCount: _cannedMessages.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (_, i) {
+                final msg = _cannedMessages[i];
+                return InkWell(
+                  onTap: () => Navigator.pop(context, msg),
+                  borderRadius: Corners.rMd,
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: textColor.withOpacity(0.2)),
                       borderRadius: Corners.rMd,
-                      child: InkWell(
-                        borderRadius: Corners.rMd,
-                        onTap: () => Navigator.pop(context, x),
-                        child: Center(
-                            child:
-                                Text(x, style: const TextStyle(fontSize: 26))),
-                      ),
-                    ))
-                .toList(),
+                    ),
+                    child: Text(
+                      msg,
+                      style: TextStyle(fontSize: 16, color: textColor, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
         ),
       ),
     );
-    if (e != null) _text.text = '${_text.text}$e';
+    if (e != null) {
+      _text.text = e;
+      _send(); // Auto send
+    }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -267,24 +290,17 @@ class _ChatPageState extends State<ChatPage> {
             padding: const EdgeInsets.all(Gaps.md),
             child: Row(
               children: [
-                IconButton.filledTonal(
-                    onPressed: _pickEmoji,
-                    icon: const Icon(Icons.emoji_emotions_rounded)),
-                Gaps.hXs,
                 Expanded(
-                  child: TextField(
-                    controller: _text,
-                    enabled: _error == null,
-                    textInputAction: TextInputAction.send,
-                    onSubmitted: (_) => _send(),
-                    decoration:
-                        const InputDecoration(hintText: 'پیام گروهی...'),
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.all(16),
+                      shape: RoundedRectangleBorder(borderRadius: Corners.rMd),
+                    ),
+                    onPressed: _error != null ? null : _pickCanned,
+                    icon: const Icon(Icons.chat_bubble_outline),
+                    label: const Text('انتخاب پیام آماده...'),
                   ),
                 ),
-                Gaps.hXs,
-                IconButton.filled(
-                    onPressed: _error != null ? null : () => _send(),
-                    icon: const Icon(Icons.send_rounded)),
               ],
             ),
           ),

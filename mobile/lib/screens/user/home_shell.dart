@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
 import 'chat_page.dart';
+import 'games_page.dart';
 import 'dashboard_page.dart';
 import 'league_page.dart';
 import 'profile_page.dart';
@@ -55,6 +56,7 @@ class _HomeShellState extends State<HomeShell>
     RewardsPage(api: widget.api),
     LeaguePage(api: widget.api),
     ChatPage(api: widget.api),
+    GamesHubPage(api: widget.api),
     SupportPage(api: widget.api),
     ProfilePage(api: widget.api, reloadProfile: _loadProfile),
   ];
@@ -76,6 +78,10 @@ class _HomeShellState extends State<HomeShell>
         icon: Icon(Icons.chat_bubble_outline_rounded),
         selectedIcon: Icon(Icons.chat_bubble_rounded),
         label: 'چت روم'),
+    NavigationDestination(
+        icon: Icon(Icons.gamepad_outlined),
+        selectedIcon: Icon(Icons.gamepad_rounded),
+        label: 'بازی‌ها'),
     NavigationDestination(
         icon: Icon(Icons.support_agent_outlined),
         selectedIcon: Icon(Icons.support_agent_rounded),
@@ -125,6 +131,7 @@ class _HomeShellState extends State<HomeShell>
     'جوایز',
     'لیگ',
     'چت روم',
+    'بازی‌ها',
     'پشتیبانی',
     'پروفایل'
   ];
