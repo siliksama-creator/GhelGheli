@@ -6,15 +6,15 @@ import { io } from 'socket.io-client';
 import { play, isEnabled, setEnabled } from './gameAudio.js';
 
 const GAMES = [
-  { id: 'tictactoe', title: 'دوز', emoji: '❌', desc: 'کلاسیک سه‌تایی', accent: '#22D3EE' },
+  { id: 'snakes', title: 'مار و پله', emoji: '🐍', desc: 'دو تاس بریز، هوشمندانه انتخاب کن', accent: '#A855F7' },
   { id: 'connect4', title: 'چهار در یک ردیف', emoji: '🔴', desc: 'چهارتا رو ردیف کن', accent: '#F59E0B' },
   { id: 'reversi', title: 'اتللو', emoji: '⚫', desc: 'مهره‌ها را برگردان', accent: '#34D399' },
 ];
 
-const MOVE_SFX = { tictactoe: 'move', connect4: 'drop', reversi: 'flip' };
+const MOVE_SFX = { snakes: 'drop', connect4: 'drop', reversi: 'flip' };
 
 const SYMBOLS = {
-  tictactoe: { X: '❌', O: '⭕' },
+  snakes: { X: '🟣', O: '🔵' },
   connect4: { X: '🔴', O: '🟡' },
   reversi: { X: '⚫', O: '⚪' },
 };
@@ -139,15 +139,70 @@ function resultText(winner, me) {
   return winner === me ? 'شما بردید! 🎉' : 'شما باختید';
 }
 
-function TicTacToeBoard({ g }) {
-  const board = g.state.board || Array(9).fill(null);
+// Boustrophedon numbering: 1 bottom-left, rows alternate direction.
+function squareAt(row, col) {
+  const fromBottom = 9 - row;
+  const ltr = fromBottom % 2 === 0;
+  return fromBottom * 10 + (ltr ? col + 1 : 10 - col);
+}
+
+const DIE_FACE = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+
+const EVENT_TEXT = {
+  ladder: '🪜 نردبان! بالا رفتی',
+  snake: '🐍 مار! پایین افتادی',
+  bump: '💥 حریف را به عقب زدی',
+  blocked: '⛔ حرکت ممکن نبود، نوبت رد شد',
+  win: '🏁 رسیدی!',
+};
+
+function SnakesBoard({ g }) {
+  const pos = g.state.pos || { X: 0, O: 0 };
+  const ladders = g.state.ladders || {};
+  const snakes = g.state.snakes || {};
+  const dice = g.state.dice || [];
+  const playable = g.state.playable || [];
+
   return (
-    <div className="ttt-board">
-      {board.map((c, i) => (
-        <button key={i} className="ttt-cell" disabled={!g.myTurn || c} onClick={() => g.move(i)}>
-          {c === 'X' ? '❌' : c === 'O' ? '⭕' : ''}
-        </button>
-      ))}
+    <div className="snakesWrap">
+      <div className="snakesBoard">
+        {Array.from({ length: 10 }, (_, row) =>
+          Array.from({ length: 10 }, (_, col) => {
+            const n = squareAt(row, col);
+            const cls = [
+              'sqr',
+              ladders[n] ? 'ladder' : '',
+              snakes[n] ? 'snake' : '',
+              n === 100 ? 'finish' : '',
+            ].join(' ');
+            return (
+              <div key={n} className={cls}>
+                <span className="sqn">{n === 100 ? '🏁' : n}</span>
+                {pos.X === n && <i className="tok x" />}
+                {pos.O === n && <i className="tok o" />}
+              </div>
+            );
+          }),
+        )}
+      </div>
+
+      {g.state.event && EVENT_TEXT[g.state.event] && (
+        <p className="snakeEvent">{EVENT_TEXT[g.state.event]}</p>
+      )}
+
+      <p className="hint">{g.myTurn ? 'یک تاس را انتخاب کن' : 'نوبت حریف...'}</p>
+      <div className="diceRow">
+        {dice.map((d, i) => (
+          <button
+            key={i}
+            className={`die ${g.myTurn && playable.includes(i) ? 'on' : ''}`}
+            disabled={!g.myTurn || !playable.includes(i)}
+            onClick={() => g.move(i)}
+          >
+            {DIE_FACE[d] || d}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -187,7 +242,7 @@ function ReversiBoard({ g }) {
   );
 }
 
-const BOARDS = { tictactoe: TicTacToeBoard, connect4: Connect4Board, reversi: ReversiBoard };
+const BOARDS = { snakes: SnakesBoard, connect4: Connect4Board, reversi: ReversiBoard };
 
 function Seat({ g, sym, symbol, openProfile }) {
   const info = g.players?.[symbol];

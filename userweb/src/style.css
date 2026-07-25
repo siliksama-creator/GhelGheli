@@ -260,3 +260,35 @@
 .ticketState.on { background: #b5ef5822; color: #b5ef58; }
 .ticketState.off { background: #ffffff14; color: #9fb6cc; }
 .row b.muted { color: #9fb6cc; }
+
+/* ---------- مار و پله ---------- */
+.snakesWrap { display: grid; justify-items: center; gap: 10px; width: 100%; }
+.snakesBoard {
+  display: grid; grid-template-columns: repeat(10, 1fr); gap: 1px;
+  width: min(360px, 92vw); aspect-ratio: 1; padding: 5px;
+  background: linear-gradient(135deg, #3B0764, #1E1B4B);
+  border: 2px solid #FBBF24; border-radius: 16px;
+  box-shadow: 0 10px 30px #a855f755;
+}
+.snakesBoard .sqr {
+  position: relative; border-radius: 2px; background: #ffffff10;
+  display: grid; place-items: center;
+}
+.snakesBoard .sqr:nth-child(odd) { background: #ffffff18; }
+.snakesBoard .sqr.ladder { outline: 1px solid #FBBF24; background: #fbbf2422; }
+.snakesBoard .sqr.snake { outline: 1px solid #34D399; background: #34d39922; }
+.snakesBoard .sqr.finish { background: #fbbf2455; }
+.snakesBoard .sqn { font-size: 8px; color: #ffffff8c; font-weight: 600; }
+.snakesBoard .tok {
+  position: absolute; width: 58%; aspect-ratio: 1; border-radius: 50%;
+  border: 1px solid #ffffffb0;
+}
+.snakesBoard .tok.x { background: radial-gradient(#fff, #C084FC 75%); box-shadow: 0 0 7px #c084fc; transform: translateX(-22%); }
+.snakesBoard .tok.o { background: radial-gradient(#fff, #38BDF8 75%); box-shadow: 0 0 7px #38bdf8; transform: translateX(22%); }
+.snakeEvent { margin: 0; font-weight: 800; color: #FBBF24; }
+.diceRow { display: flex; gap: 16px; }
+.die {
+  width: 62px; height: 62px; border-radius: 14px; background: #fff; color: #1E1B4B;
+  font-size: 38px; line-height: 1; border: 2px solid transparent; opacity: .45; cursor: default;
+}
+.die.on { opacity: 1; border-color: #A855F7; box-shadow: 0 0 14px #a855f788; cursor: pointer; }

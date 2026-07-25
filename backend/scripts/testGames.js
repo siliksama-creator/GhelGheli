@@ -20,40 +20,95 @@ const play = (rules, state, moves, start = 'X') => {
   return state;
 };
 
-console.log('\n== tictactoe ==');
+console.log('\n== snakes & ladders ==');
 {
-  const r = RULES.tictactoe;
+  const r = RULES.snakes;
   let s = r.create();
-  ok(s.board.length === 9 && s.board.every(v => v === null), 'starts empty');
-  ok(r.isValidMove(s, 0) && !r.isValidMove(s, 99), 'move legality');
+  ok(s.pos.X === 0 && s.pos.O === 0, 'both players start off-board');
+  ok(s.size === 100, '100 squares');
+
+  // Two dice are offered and only legal ones are playable.
+  s.dice = [3, 5];
+  ok(r.isValidMove(s, 0, 'X') && r.isValidMove(s, 1, 'X'), 'both dice playable early');
+  ok(!r.isValidMove(s, 2, 'X') && !r.isValidMove(s, 9, 'X'), 'invalid die index rejected');
+
+  // Exact finish required — overshooting is illegal.
+  s = r.create(); s.pos.X = 97; s.dice = [3, 5];
+  ok(r.isValidMove(s, 0, 'X'), 'exact roll to 100 allowed');
+  ok(!r.isValidMove(s, 1, 'X'), 'overshooting 100 rejected');
   r.applyMove(s, 0, 'X');
-  ok(!r.isValidMove(s, 0), 'occupied cell rejected');
+  ok(s.pos.X === 100 && r.result(s) === 'X', 'landing exactly on 100 wins');
 
+  // Ladder.
+  s = r.create(); s.pos.X = 0; s.dice = [3, 1];
+  r.applyMove(s, 0, 'X');
+  ok(s.pos.X === 22 && s.event === 'ladder', 'ladder at 3 lifts to 22');
+  ok(s.safe.X === 22, 'ladder top becomes the fallback point');
+
+  // Snake.
+  s = r.create(); s.pos.X = 14; s.dice = [3, 1];
+  r.applyMove(s, 0, 'X');
+  ok(s.pos.X === 4 && s.event === 'snake', 'snake at 17 drops to 4');
+
+  // Bump: landing on the opponent sends them to their fallback.
+  s = r.create(); s.pos.X = 10; s.pos.O = 12; s.safe.O = 8; s.dice = [2, 1];
+  r.applyMove(s, 0, 'X');
+  ok(s.pos.O === 8 && s.event === 'bump', 'opponent bumped back to their safe square');
+
+  // Six grants another turn (capped).
+  s = r.create(); s.dice = [6, 1];
+  r.applyMove(s, 0, 'X');
+  ok(r.nextTurn(s, 'X') === 'X', 'rolling a 6 keeps the turn');
+  ok(s.dice !== null, 'fresh dice issued for the extra turn');
+
+  // The cap prevents an endless chain of sixes.
   s = r.create();
-  [0, 3, 1, 4, 2].forEach((m, i) => r.applyMove(s, m, i % 2 ? 'O' : 'X'));
-  ok(r.result(s) === 'X', 'detects row win');
-
-  s = r.create();
-  ['X', 'O', 'X', 'X', 'O', 'O', 'O', 'X', 'X'].forEach((v, i) => { s.board[i] = v; });
-  ok(r.result(s) === 'DRAW', 'detects draw');
-
-  s = r.create();
-  s.board[0] = 'O'; s.board[1] = 'O';
-  ok(r.botMove(s, 'O') === 2, 'bot takes the win');
-
-  s = r.create();
-  s.board[0] = 'X'; s.board[1] = 'X';
-  ok(r.botMove(s, 'O') === 2, 'bot blocks the loss');
-
-  // A perfect bot must never lose to itself.
-  let losses = 0;
-  for (let g = 0; g < 200; g++) {
-    const st = r.create();
-    let t = 'X';
-    while (!r.result(st)) { r.applyMove(st, r.botMove(st, t), t); t = r.nextTurn(st, t); }
-    if (r.result(st) !== 'DRAW') losses++;
+  let sixes = 0;
+  for (let i = 0; i < 10; i++) {
+    s.dice = [6, 6];
+    if (s.pos.X + 6 > 100) break;
+    r.applyMove(s, 0, 'X');
+    if (r.nextTurn(s, 'X') !== 'X') break;
+    sixes++;
   }
-  ok(losses === 0, `bot vs bot always draws (${losses} decisive)`);
+  ok(sixes <= 3, `extra turns are capped (${sixes} chained)`);
+
+  // Bot must pick the winning die when one exists.
+  s = r.create(); s.pos.X = 96; s.dice = [4, 2];
+  ok(r.botMove(s, 'X') === 0, 'bot takes the exact winning roll');
+
+  // Bot prefers a ladder over a plain step.
+  s = r.create(); s.pos.X = 0; s.dice = [3, 2];
+  ok(r.botMove(s, 'X') === 0, 'bot prefers the ladder');
+
+  // Bot avoids a snake when it has a choice.
+  s = r.create(); s.pos.X = 14; s.dice = [3, 1];
+  ok(r.botMove(s, 'X') === 1, 'bot avoids the snake');
+
+  // Full self-play must always terminate with a winner.
+  let finished = 0, crashed = 0;
+  for (let g = 0; g < 60; g++) {
+    const st = r.create();
+    let turn = 'X', guard = 0;
+    try {
+      while (!r.result(st) && guard++ < 4000) {
+        const mv = r.botMove(st, turn);
+        if (mv === null) { st.dice = null; turn = r.nextTurn(st, turn); continue; }
+        r.applyMove(st, mv, turn);
+        if (r.result(st)) break;
+        turn = r.nextTurn(st, turn);
+      }
+      if (r.result(st)) finished++;
+    } catch { crashed++; }
+  }
+  ok(crashed === 0, `no crashes in 60 self-play games (${crashed})`);
+  ok(finished === 60, `all 60 games reached a winner (${finished})`);
+
+  // decorate() must tell each client which dice it may actually play.
+  s = r.create(); s.pos.X = 98; s.dice = [1, 5];
+  const d = r.decorate(s, 'X');
+  ok(Array.isArray(d.playable) && d.playable.length === 1 && d.playable[0] === 0,
+    'decorate exposes only the legal die');
 }
 
 console.log('\n== connect4 ==');

@@ -238,6 +238,8 @@ class GameSession extends ChangeNotifier {
         return Sfx.drop;
       case 'reversi':
         return Sfx.flip;
+      case 'snakes':
+        return Sfx.drop;
       default:
         return Sfx.move;
     }

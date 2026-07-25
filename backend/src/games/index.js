@@ -2,17 +2,20 @@
 // here; the engine and the client hub pick it up automatically.
 const attachGames = require('./engine');
 
-const tictactoe = require('./rules/tictactoe');
+const snakes = require('./rules/snakes');
 const connect4 = require('./rules/connect4');
 const reversi = require('./rules/reversi');
 
-const RULES = { tictactoe, connect4, reversi };
+// Tic-tac-toe was retired: a solved 3x3 game has no replay value once the
+// bot plays perfectly. Snakes & Ladders replaces it with a two-dice
+// "choose your move" variant that stays tense to the last square.
+const RULES = { snakes, connect4, reversi };
 
 // Public catalogue served over REST so the app never hardcodes the list.
 const CATALOG = [
   {
-    id: 'tictactoe', title: 'دوز', emoji: '❌',
-    subtitle: 'کلاسیک سه‌تایی', accent: '#22D3EE', minutes: 2,
+    id: 'snakes', title: 'مار و پله', emoji: '🐍',
+    subtitle: 'دو تاس بریز، هوشمندانه انتخاب کن', accent: '#A855F7', minutes: 6,
   },
   {
     id: 'connect4', title: 'چهار در یک ردیف', emoji: '🔴',

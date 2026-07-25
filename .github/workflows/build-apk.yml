@@ -40,6 +40,13 @@ jobs:
             sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/' android/app/build.gradle
           fi
 
+      # `flutter create` only puts INTERNET in the DEBUG manifest; the
+      # release manifest it generates has NO permissions, so the shipped APK
+      # had no network access at all. android/ is gitignored and regenerated
+      # here, so the fix must run in CI. See the script for details.
+      - name: Patch release AndroidManifest
+        run: cd mobile && bash tool/patch_android.sh
+
       - name: Install dependencies
         run: cd mobile && flutter pub get
 

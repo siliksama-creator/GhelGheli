@@ -18,6 +18,7 @@ const { pool } = require('./config/db');
 const { audit } = require('./services/auditService');
 const { createNotification } = require('./services/notificationService');
 const { ensureActiveSeason, addLeaguePoints, getLeaderboard, closeActiveSeason } = require('./services/leagueService');
+const { optimizeUpload, kb } = require('./services/imageService');
 
 // Fail fast in production if the JWT secret was never configured — running
 // with the 'dev-secret' fallback would let anyone forge valid user/admin
@@ -67,7 +68,9 @@ const imageUpload = multer({
       cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
     },
   }),
-  limits: { fileSize: 5 * 1024 * 1024 },
+  // 12 MB: modern phone photos routinely exceed 5 MB. The server re-encodes
+  // every upload straight away, so what actually gets stored stays small.
+  limits: { fileSize: 12 * 1024 * 1024 },
   fileFilter: (req, file, cb) => cb(null, /^image\/(png|jpe?g|webp|gif)$/i.test(file.mimetype)),
 });
 
@@ -591,7 +594,10 @@ function sanitizeAttachments(input) {
 // endpoint requires an admin token). Same multer instance, same 5 MB cap.
 app.post('/api/support/uploads/image', auth, imageUpload.single('image'), asyncHandler(async (req, res) => {
   if (!req.file) return res.status(400).json({ message: 'فقط فایل تصویری (PNG/JPG/WEBP/GIF) مجاز است' });
-  res.json({ url: `/uploads/images/${req.file.filename}` });
+  // Phone photos are multi-megabyte; shrink before anyone has to download it.
+  const r = await optimizeUpload(req.file);
+  console.log(`[upload] support ${kb(r.bytesBefore)} -> ${kb(r.bytesAfter)}`);
+  res.json({ url: `/uploads/images/${r.filename}`, bytes: r.bytesAfter });
 }));
 
 // Tells the client whether the "new ticket" form should be enabled, and why
@@ -711,7 +717,9 @@ app.post('/api/admin/uploads/image', adminAuth, requireRole('support'), imageUpl
   // fileFilter drops anything that isn't png/jpg/webp/gif without raising,
   // so a missing req.file here means "wrong type" rather than "no file".
   if (!req.file) return res.status(400).json({ message: 'فقط فایل تصویری (PNG/JPG/WEBP/GIF) مجاز است' });
-  res.json({ url: `/uploads/images/${req.file.filename}` });
+  const r = await optimizeUpload(req.file);
+  console.log(`[upload] admin ${kb(r.bytesBefore)} -> ${kb(r.bytesAfter)}`);
+  res.json({ url: `/uploads/images/${r.filename}`, bytes: r.bytesAfter });
 }));
 
 app.get('/api/admin/chat/stickers', adminAuth, asyncHandler(async (req, res) => {
@@ -1099,7 +1107,7 @@ app.use((err, req, res, next) => {
   // the middle of a Persian panel with no hint about the real limit.
   if (err.name === 'MulterError') {
     const map = {
-      LIMIT_FILE_SIZE: 'حجم عکس بیش از ۵ مگابایت است',
+      LIMIT_FILE_SIZE: 'حجم عکس بیش از ۱۲ مگابایت است',
       LIMIT_FILE_COUNT: 'تعداد فایل‌ها بیش از حد مجاز است',
       LIMIT_UNEXPECTED_FILE: 'فیلد فایل ارسالی معتبر نیست',
     };

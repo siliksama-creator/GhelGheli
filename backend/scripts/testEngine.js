@@ -41,9 +41,9 @@ function makeIo() {
     const io = makeIo(); attach(io, RULES);
     const a = io.connect(new FakeSocket('u1', 'علی'));
     const b = io.connect(new FakeSocket('u2', 'رضا'));
-    a.fire('game:join', { gameId: 'tictactoe' });
+    a.fire('game:join', { gameId: 'snakes' });
     ok(a.has('game:waiting'), 'first player queues');
-    b.fire('game:join', { gameId: 'tictactoe' });
+    b.fire('game:join', { gameId: 'snakes' });
 
     const sa = a.last('game:start'), sb = b.last('game:start');
     ok(!!sa && !!sb, 'both players get game:start');
@@ -52,24 +52,37 @@ function makeIo() {
     ok(sa.vsBot === false, 'flagged as human match');
     ok(sb.players.X.nickname === 'علی', 'opponent name propagated');
 
-    // turn enforcement
+    // turn enforcement (snakes: a move is the index of the die to play)
     b.fire('game:move', { roomId: sb.roomId, move: 0 });
     ok(!b.has('game:update'), 'out-of-turn move ignored');
-    a.fire('game:move', { roomId: sa.roomId, move: 0 });
-    ok(a.last('game:update').state.board[0] === 'X', 'valid move applied');
-    a.fire('game:move', { roomId: sa.roomId, move: 1 });
-    ok(a.last('game:update').state.board[1] === null, 'cannot move twice');
-    b.fire('game:move', { roomId: sb.roomId, move: 0 });
-    ok(b.last('game:update').state.board[0] === 'X', 'occupied cell rejected');
 
-    // X wins along the top row. Board so far: X at 0, and it is O's turn
-    // (the rejected attempts above changed nothing).
-    b.fire('game:move', { roomId: sb.roomId, move: 3 });
-    a.fire('game:move', { roomId: sa.roomId, move: 1 });
-    b.fire('game:move', { roomId: sb.roomId, move: 4 });
-    a.fire('game:move', { roomId: sa.roomId, move: 2 });
-    ok(a.last('game:over')?.winner === 'X', 'winner announced to X');
-    ok(b.last('game:over')?.winner === 'X', 'winner announced to O');
+    const startPos = sa.state.pos.X;
+    a.fire('game:move', { roomId: sa.roomId, move: 0 });
+    const afterMove = a.last('game:update');
+    ok(!!afterMove, 'valid move produced an update');
+    ok(afterMove.state.pos.X !== startPos, 'the token actually advanced');
+
+    // Whoever is on move now, the other side cannot act.
+    const onMove = afterMove.turn;
+    const idle = onMove === 'X' ? b : a;
+    const before = idle.events.filter(e => e.ev === 'game:update').length;
+    idle.fire('game:move', { roomId: sa.roomId, move: 0 });
+    ok(idle.events.filter(e => e.ev === 'game:update').length === before,
+      'the player not on move is ignored');
+
+    // Drive the game to completion and confirm both sides are told.
+    let guard = 0;
+    while (!a.has('game:over') && guard++ < 4000) {
+      const upd = a.last('game:update') || sa;
+      const turn = upd.turn;
+      const sock = turn === 'X' ? a : b;
+      const playable = (turn === 'X' ? a : b).last('game:update')?.state?.playable
+        ?? sa.state.playable ?? [0, 1];
+      sock.fire('game:move', { roomId: sa.roomId, move: playable[0] ?? 0 });
+    }
+    ok(a.has('game:over'), 'game reached a conclusion');
+    ok(['X', 'O'].includes(a.last('game:over').winner), 'a winner was declared');
+    ok(b.has('game:over'), 'both players told the result');
     ok(a.rooms.size === 0 && b.rooms.size === 0, 'room cleaned up');
   }
 
@@ -77,7 +90,7 @@ function makeIo() {
   {
     const io = makeIo(); attach(io, RULES);
     const a = io.connect(new FakeSocket('solo', 'تنها'));
-    a.fire('game:join', { gameId: 'tictactoe' });
+    a.fire('game:join', { gameId: 'snakes' });
     ok(a.has('game:waiting'), 'waits for a human first');
     ok(!a.has('game:start'), 'no instant bot game');
     await wait(15400);
@@ -85,11 +98,15 @@ function makeIo() {
     ok(!!st && st.vsBot === true, 'falls back to the bot');
     ok(st.players.O.id === 'bot', 'bot occupies the second seat');
 
-    a.fire('game:move', { roomId: st.roomId, move: 4 });
-    await wait(900);
-    const board = a.last('game:update').state.board;
-    ok(board.filter(v => v === 'O').length === 1, 'bot replies with one move');
-    ok(a.last('game:update').turn === 'X', 'turn returns to the player');
+    const before = st.state.pos.O;
+    a.fire('game:move', { roomId: st.roomId, move: 0 });
+    await wait(1400);
+    const upd = a.last('game:update');
+    ok(!!upd, 'bot game produced an update');
+    // Either the bot already answered, or a 6 kept the turn with the human.
+    ok(upd.state.pos.O !== before || upd.turn === 'X',
+      'bot responded or the player kept an extra turn');
+    ok(['X', 'O'].includes(upd.turn), 'a valid player is on move');
   }
 
   console.log('\n== reversi over the engine ==');
@@ -126,35 +143,35 @@ function makeIo() {
     const io = makeIo(); attach(io, RULES);
     const a = io.connect(new FakeSocket('l1', 'الف'));
     const b = io.connect(new FakeSocket('l2', 'ب'));
-    a.fire('game:join', { gameId: 'tictactoe' });
-    b.fire('game:join', { gameId: 'tictactoe' });
+    a.fire('game:join', { gameId: 'snakes' });
+    b.fire('game:join', { gameId: 'snakes' });
     a.fire('game:leave', { roomId: a.last('game:start').roomId });
     ok(b.last('game:over')?.winner === 'DISCONNECT', 'opponent told on leave');
 
     const c = io.connect(new FakeSocket('l3', 'ج'));
     const d = io.connect(new FakeSocket('l4', 'د'));
-    c.fire('game:join', { gameId: 'tictactoe' });
-    d.fire('game:join', { gameId: 'tictactoe' });
+    c.fire('game:join', { gameId: 'snakes' });
+    d.fire('game:join', { gameId: 'snakes' });
     c.fire('disconnect');
     ok(d.last('game:over')?.winner === 'DISCONNECT', 'opponent told on disconnect');
 
     // The original crash: 'game:leave' with NO payload at all.
     const e = io.connect(new FakeSocket('l5', 'ه'));
     let threw = false;
-    try { e.fire('game:join', { gameId: 'tictactoe' }); e.fire('game:leave', undefined); }
+    try { e.fire('game:join', { gameId: 'snakes' }); e.fire('game:leave', undefined); }
     catch { threw = true; }
     ok(!threw, 'payload-less game:leave does not throw');
   }
 
-  console.log('\n== turn clock (15s) ==');
+  console.log('\n== turn clock (25s for snakes) ==');
   {
     const io = makeIo(); attach(io, RULES);
     const a = io.connect(new FakeSocket('t1', 'الف'));
     const b = io.connect(new FakeSocket('t2', 'ب'));
-    a.fire('game:join', { gameId: 'tictactoe' });
-    b.fire('game:join', { gameId: 'tictactoe' });
+    a.fire('game:join', { gameId: 'snakes' });
+    b.fire('game:join', { gameId: 'snakes' });
     const st = a.last('game:start');
-    ok(st.turnMs === 15000, 'tictactoe turn budget (15s) advertised');
+    ok(st.turnMs === 25000, 'snakes turn budget (25s) advertised');
     ok(typeof st.deadline === 'number' && st.deadline > Date.now(), 'deadline sent on start');
     ok(!!st.players.X.profileAvatarKey || st.players.X.profileAvatarKey === null,
       'player profile fields present');
@@ -163,13 +180,13 @@ function makeIo() {
 
     const before = a.last('game:update');
     ok(before === undefined, 'no move yet');
-    // Let X's clock expire; the server should auto-play and pass the turn.
-    await wait(15600);
+    // Let X's clock expire. Snakes uses a 25s budget, so wait past that.
+    await wait(25600);
     const after = a.last('game:update');
     ok(!!after, 'server acted when the clock ran out');
     ok(after && after.timedOut === 'X', 'timeout attributed to the right player');
-    ok(after && after.turn === 'O', 'turn moved to the opponent');
-    ok(after && after.state.board.filter(Boolean).length === 1, 'exactly one auto-move played');
+    ok(after && ['X', 'O'].includes(after.turn), 'turn handed on after the timeout');
+    ok(after && after.state.pos && after.state.pos.X > 0, 'an auto-move was played for the timed-out player');
     ok(typeof after.deadline === 'number', 'new deadline issued for the next turn');
     a.fire('game:leave');
   }
@@ -177,7 +194,7 @@ function makeIo() {
   console.log('\n== per-game turn budgets & match countdown ==');
   {
     const io = makeIo(); attach(io, RULES);
-    const budgets = { tictactoe: 15000, connect4: 20000, reversi: 30000 };
+    const budgets = { snakes: 25000, connect4: 20000, reversi: 30000 };
     for (const [gid, want] of Object.entries(budgets)) {
       const p1 = io.connect(new FakeSocket(`b-${gid}-1`, 'الف'));
       const p2 = io.connect(new FakeSocket(`b-${gid}-2`, 'ب'));
@@ -199,8 +216,8 @@ function makeIo() {
     const io = makeIo(); attach(io, RULES);
     const a = io.connect(new FakeSocket('g1', 'الف'));
     const b = io.connect(new FakeSocket('g2', 'ب'));
-    a.fire('game:join', { gameId: 'tictactoe' });
-    b.fire('game:join', { gameId: 'tictactoe' });
+    a.fire('game:join', { gameId: 'snakes' });
+    b.fire('game:join', { gameId: 'snakes' });
     ok(!!a.last('game:start'), 'match started');
     // Switching games mid-match must not strand the opponent in a dead room.
     a.fire('game:join', { gameId: 'connect4' });
@@ -223,8 +240,8 @@ function makeIo() {
     const io = makeIo(); attach(io, RULES);
     const a = io.connect(new FakeSocket('f1', 'الف'));
     const b = io.connect(new FakeSocket('f2', 'ب'));
-    a.fire('game:join', { gameId: 'tictactoe' });
-    b.fire('game:join', { gameId: 'tictactoe' });
+    a.fire('game:join', { gameId: 'snakes' });
+    b.fire('game:join', { gameId: 'snakes' });
     const room = a.last('game:start').roomId;
 
     const junk = [
