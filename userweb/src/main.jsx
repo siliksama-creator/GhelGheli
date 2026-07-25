@@ -1,5 +1,6 @@
 import React,{useEffect,useState}from'react';
 import{createRoot}from'react-dom/client';
+import { io } from 'socket.io-client';
 import'./style.css';
 
 const API=import.meta.env.VITE_API_BASE||'https://api.ghelghelishop.ir';
@@ -32,7 +33,8 @@ function Portal({token,logout}){
   async function load(){const pr=await req('/api/profile','GET',null,token);setP(pr);setRewards(await req('/api/rewards','GET',null,token));}
   useEffect(()=>{load()},[]);
   if(!p)return <div className="card">در حال بارگذاری...</div>;
-  return <div className="portal"><nav className="mobileNav">{[['home','خانه'],['profile','پروفایل'],['rewards','جوایز'],['league','لیگ'],['chat','چت روم'],['support','پشتیبانی']].map(x=><button key={x[0]} className={tab===x[0]?'on':''} onClick={()=>setTab(x[0])}>{x[1]}</button>)}<button className="danger" onClick={logout}>خروج</button></nav>{msg&&<div className="toast">{msg}</div>}{tab==='home'&&<Home token={token} p={p} rewards={rewards} load={load} setMsg={setMsg}/>} {tab==='profile'&&<Profile token={token} p={p} load={load} setMsg={setMsg}/>} {tab==='rewards'&&<Rewards rewards={rewards}/>} {tab==='league'&&<League token={token} openProfile={setPublicUser}/>} {tab==='chat'&&<Chat token={token} openProfile={setPublicUser}/>} {tab==='support'&&<Support token={token}/>} {publicUser&&<PublicProfile token={token} userId={publicUser} close={()=>setPublicUser(null)}/>}</div>;
+  return <div className="portal"><nav className="mobileNav">{[['home','خانه'],['profile','پروفایل'],['rewards','جوایز'],['league','لیگ'],['chat','چت روم'],['game','بازی دوز'],['support','پشتیبانی']].map(x=><button key={x[0]} className={tab===x[0]?'on':''} onClick={()=>setTab(x[0])}>{x[1]}</button>)}<button className="danger" onClick={logout}>خروج</button></nav>{msg&&<div className="toast">{msg}</div>}{tab==='home'&&<Home token={token} p={p} rewards={rewards} load={load} setMsg={setMsg}/>} {tab==='profile'&&<Profile token={token} p={p} load={load} setMsg={setMsg}/>} {tab==='rewards'&&<Rewards rewards={rewards}/>} {tab==='league'&&<League token={token} openProfile={setPublicUser}/>} {tab==='chat'&&<Chat token={token} openProfile={setPublicUser}/>} {tab==='game'&&<Game token={token} />}
+ {tab==='support'&&<Support token={token}/>} {publicUser&&<PublicProfile token={token} userId={publicUser} close={()=>setPublicUser(null)}/>}</div>;
 }
 
 function Avatar({u,size=72}){return <img className="avatar" style={{width:size,height:size}} src={u?.profile_image_url?asset(u.profile_image_url):`/avatars/${u?.profile_avatar_key||avatars[0]}`}/>}
@@ -51,15 +53,87 @@ function League({token,openProfile}){
   return <section className="card wide leaguePage"><div className="sectionHead"><div><h2>لیگ ماهانه قلقلی</h2><p>رتبه‌بندی زنده کاربران تا پایان ماه؛ امتیاز لیگ آخر ماه ریست می‌شود، امتیاز کلی دست نمی‌خورد.</p></div><b className="countdown">{fa(days)} روز مانده</b></div><div className="podium">{top.map((e,i)=><div className={`podiumCard p${i+1}`} onClick={()=>openProfile(e.user_id)} key={e.user_id}><span className="medal">{['🥇','🥈','🥉'][i]}</span><b>{e.nickname||e.first_name||'کاربر'}</b><strong>{fa(e.points)} امتیاز</strong></div>)}</div><div className="leagueList">{rest.map((e,i)=><div className="row clickable leagueRow" key={e.user_id} onClick={()=>openProfile(e.user_id)}><b>#{fa(i+4)}</b><span>{e.nickname||e.first_name||'کاربر'}</span><strong>{fa(e.points)} امتیاز</strong></div>)}</div>{!entries.length&&<div className="empty">هنوز امتیازی در لیگ ثبت نشده است.</div>}</section>
 }
 function Chat({token,openProfile}){
-  const[messages,setMessages]=useState([]),[stickers,setStickers]=useState([]),[text,setText]=useState(''),[err,setErr]=useState(''),[reply,setReply]=useState(null),[emojiOpen,setEmojiOpen]=useState(false);
+  const[messages,setMessages]=useState([]),[stickers,setStickers]=useState([]),[text,setText]=useState(''),[err,setErr]=useState(''),[reply,setReply]=useState(null),[canned,setCanned]=useState([]),[cannedOpen,setCannedOpen]=useState(false);
   const emojis=['😀','😍','🔥','⚽','🏆','👏','😂','😎','❤️','👍','🎉','💚','🥇','✨','🙌','😜'];
-  async function load(){try{setMessages(await req('/api/chat/messages','GET',null,token));setStickers(await req('/api/chat/stickers','GET',null,token));setErr('')}catch(e){setErr(e.message)}}
+  async function load(){try{setMessages(await req('/api/chat/messages','GET',null,token));setStickers(await req('/api/chat/stickers','GET',null,token));setCanned(await req('/api/chat/canned-messages','GET',null,token));setErr('')}catch(e){setErr(e.message)}}
   useEffect(()=>{load();const t=setInterval(load,3000);return()=>clearInterval(t)},[]);
-  async function send(stickerId=null){try{if(!stickerId&&!text.trim())return;await req('/api/chat/messages','POST',{message:text,stickerId,replyTo:reply?.id},token);setText('');setReply(null);setEmojiOpen(false);load()}catch(e){setErr(e.message)}}
+  async function send(stickerId=null, msgText=text){try{if(!stickerId&&!msgText.trim())return;await req('/api/chat/messages','POST',{message:msgText,stickerId,replyTo:reply?.id},token);setText('');setReply(null);setCannedOpen(false);load()}catch(e){setErr(e.message)}}
   async function like(m){try{await req(`/api/chat/messages/${m.id}/like`,'POST',{},token);load()}catch(e){setErr(e.message)}}async function report(m){try{await req(`/api/chat/messages/${m.id}/report`,'POST',{},token);setErr('گزارش ثبت شد و برای مدیر ارسال می‌شود')}catch(e){setErr(e.message)}}
-  return <section className="card wide chatPage"><div className="sectionHead"><div><h2>چت روم قلقلی</h2><p>کاربران در این قسمت میتوانند باهم گفتگو کنند. (از الفاظ رکیک و بحث های سیاسی جدا خودداری بشه.)</p></div><span className="liveBadge">زنده</span></div>{err&&<p className="msg">{err}</p>}{reply&&<div className="replybar">در پاسخ به {reply.nickname||'کاربر'}: {reply.message_text}<button onClick={()=>setReply(null)}>×</button></div>}<div className="stickerTray">{stickers.map(st=><button key={st.id} onClick={()=>send(st.id)} title={st.title}><img src={asset(st.image_url)}/></button>)}{!stickers.length&&<span className="hint">استیکری هنوز توسط مدیر اضافه نشده است.</span>}</div><div className="chatbox">{messages.map(m=><div className="chatmsg" key={m.id}><img onClick={()=>openProfile(m.user_id)} src={m.profile_image_url?asset(m.profile_image_url):`/avatars/${m.profile_avatar_key||avatars[0]}`}/><div className="chatbody"><b onClick={()=>openProfile(m.user_id)} className="clickableText">{m.nickname||m.first_name||'کاربر'}</b>{m.reply_text&&<small className="reply">↩ {m.reply_nickname||'کاربر'}: {m.reply_text}</small>}{m.message_type==='sticker'&&m.sticker_url?<img className="stickerMsg" src={asset(m.sticker_url)}/>:<p>{m.message_text}</p>}<div className="chatActions"><button onClick={()=>setReply(m)}>ریپلای</button><button onClick={()=>like(m)}>❤ {fa(m.like_count)}</button><button onClick={()=>report(m)}>گزارش</button></div></div></div>)}</div><div className="sendDock"><button className="emojiBtn" onClick={()=>setEmojiOpen(!emojiOpen)}>😊</button>{emojiOpen&&<div className="emojiPopover">{emojis.map(e=><button key={e} onClick={()=>setText(text+e)}>{e}</button>)}</div>}<input value={text} onChange={e=>setText(e.target.value)} placeholder="پیام..."/><button className="main" onClick={()=>send()}>ارسال</button></div></section>
+  return <section className="card wide chatPage"><div className="sectionHead"><div><h2>چت روم قلقلی</h2><p>کاربران در این قسمت میتوانند باهم گفتگو کنند. (از الفاظ رکیک و بحث های سیاسی جدا خودداری بشه.)</p></div><span className="liveBadge">زنده</span></div>{err&&<p className="msg">{err}</p>}{reply&&<div className="replybar">در پاسخ به {reply.nickname||'کاربر'}: {reply.message_text}<button onClick={()=>setReply(null)}>×</button></div>}<div className="stickerTray">{stickers.map(st=><button key={st.id} onClick={()=>send(st.id)} title={st.title}><img src={asset(st.image_url)}/></button>)}{!stickers.length&&<span className="hint">استیکری هنوز توسط مدیر اضافه نشده است.</span>}</div><div className="chatbox">{messages.map(m=><div className="chatmsg" key={m.id}><img onClick={()=>openProfile(m.user_id)} src={m.profile_image_url?asset(m.profile_image_url):`/avatars/${m.profile_avatar_key||avatars[0]}`}/><div className="chatbody"><b onClick={()=>openProfile(m.user_id)} className="clickableText">{m.nickname||m.first_name||'کاربر'}</b>{m.reply_text&&<small className="reply">↩ {m.reply_nickname||'کاربر'}: {m.reply_text}</small>}{m.message_type==='sticker'&&m.sticker_url?<img className="stickerMsg" src={asset(m.sticker_url)}/>:<p>{m.message_text}</p>}<div className="chatActions"><button onClick={()=>setReply(m)}>ریپلای</button><button onClick={()=>like(m)}>❤ {fa(m.like_count)}</button><button onClick={()=>report(m)}>گزارش</button></div></div></div>)}</div><div className="sendDock">
+  <button className="emojiBtn" onClick={() => setCannedOpen(!cannedOpen)}>💬 انتخاب پیام</button>
+  {cannedOpen && <div className="cannedPopover">
+    {canned.map((c, i) => <button key={i} onClick={() => { setText(c); setCannedOpen(false); }}>{c}</button>)}
+  </div>}
+  <input value={text} readOnly placeholder="یک پیام آماده انتخاب کنید..." onClick={() => setCannedOpen(true)} />
+  <button className="main" onClick={() => send(null, text)}>ارسال</button>
+</div></section>
 }
 function PublicProfile({token,userId,close}){const[u,setU]=useState(null),[err,setErr]=useState('');useEffect(()=>{req(`/api/users/${userId}/public`,'GET',null,token).then(setU).catch(e=>setErr(e.message))},[userId]);return <div className="modalShade" onClick={close}><div className="publicModal" onClick={e=>e.stopPropagation()}><button className="close" onClick={close}>×</button>{err&&<p className="msg">{err}</p>}{!u&&!err?<p>در حال بارگذاری...</p>:u&&<><div className="publicHead"><img src={u.profile_image_url?asset(u.profile_image_url):`/avatars/${u.profile_avatar_key||avatars[0]}`}/><div><h2>{u.nickname||'کاربر'}</h2><p>عضویت: {new Date(u.joined_at).toLocaleDateString('fa-IR')}</p><p>امتیاز کسب‌شده: {fa(u.lifetime_points)} | امتیاز فعلی: {fa(u.current_points)}</p></div></div><h3>کارت‌های ثبت‌شده</h3>{(!u.cards||!u.cards.length)&&<p className="hint">هنوز کارتی ثبت نکرده است.</p>}{(u.cards||[]).map(c=><div className="reward" key={c.card_type_id}><img src={asset(c.image_url)||'/avatars/avatar_1_football.png'}/><div><b>{c.name}</b><p>تعداد ثبت: {fa(c.registered_count)} — {fa(c.point_value)} امتیاز</p></div></div>)}<h3>جوایز دریافت‌شده</h3>{(!u.rewards||!u.rewards.length)&&<p className="hint">هنوز جایزه تاییدشده‌ای ندارد.</p>}{(u.rewards||[]).map((r,i)=><div className="reward" key={i}><img src={asset(r.image_url)||'/avatars/avatar_2_trophy.png'}/><div><b>{r.name}</b><p>{r.status}</p></div></div>)}</>}</div></div>}
 function Support({token}){const[subject,setSubject]=useState(''),[message,setMessage]=useState(''),[tickets,setTickets]=useState([]),[msg,setMsg]=useState('');async function load(){setTickets(await req('/api/support/tickets','GET',null,token))}useEffect(()=>{load()},[]);async function send(){try{await req('/api/support/tickets','POST',{subject,message},token);setSubject('');setMessage('');setMsg('تیکت ارسال شد');load()}catch(e){setMsg(e.message)}}return <section className="card wide"><h2>پشتیبانی</h2><input value={subject} onChange={e=>setSubject(e.target.value)} placeholder="موضوع"/><textarea value={message} onChange={e=>setMessage(e.target.value)} placeholder="پیام"/><button className="main" onClick={send}>ارسال تیکت</button>{msg&&<p className="msg">{msg}</p>}<h3>تیکت‌های من</h3>{tickets.map(t=><div className="row" key={t.id}><span>{t.subject}</span><b>{t.status}</b></div>)}</section>}
 
 createRoot(document.getElementById('root')).render(<App/>);
+
+
+function Game({token}){
+  const [socket, setSocket] = useState(null);
+  const [status, setStatus] = useState('idle'); // idle, waiting, playing, over
+  const [gameData, setGameData] = useState(null);
+  const [mySymbol, setMySymbol] = useState(null);
+
+  useEffect(() => {
+    const s = io(API, { auth: { token } });
+    setSocket(s);
+
+    s.on('game:waiting', (data) => setStatus('waiting'));
+    s.on('game:start', (data) => {
+      setGameData(data);
+      setStatus('playing');
+      setMySymbol(data.yourSymbol); 
+      // Need a safer way to determine mySymbol. The server gives IDs. 
+      // Actually, mySymbol can be determined by decoding the JWT or fetching profile, but since we didn't pass user ID to Game component,
+      // Let's deduce it inside the start event. Wait, data.players['X'].id will match the user.id, but socket.id is different!
+      // I'll adjust the server code to pass 'yourSymbol' in game:start. 
+    });
+    s.on('game:update', (data) => {
+      setGameData(prev => ({ ...prev, board: data.board, turn: data.turn || prev.turn }));
+    });
+    s.on('game:over', (data) => {
+      setStatus('over');
+      setGameData(prev => ({ ...prev, winner: data.winner }));
+    });
+
+    return () => s.disconnect();
+  }, [token]);
+
+  function joinGame() { socket.emit('game:join'); }
+  function leaveQueue() { socket.emit('game:leave'); setStatus('idle'); }
+  function play(index) {
+    if (status !== 'playing') return;
+    socket.emit('game:move', { roomId: gameData.roomId, index });
+  }
+
+  return <section className="card wide gamePage">
+    <h2>بازی دوز آنلاین 🎮</h2>
+    {status === 'idle' && <button className="main" onClick={joinGame}>شروع جستجوی حریف</button>}
+    {status === 'waiting' && <div><p>در حال جستجوی حریف...</p><button className="danger" onClick={leaveQueue}>لغو جستجو</button></div>}
+    {status === 'playing' && gameData && <div>
+      <div className="scoreboard">
+        <div className="player"><span>❌</span><b>{gameData.players['X'].nickname}</b></div>
+        <div className="turn-indicator">نوبت: {gameData.turn === 'X' ? '❌' : '⭕'}</div>
+        <div className="player"><span>⭕</span><b>{gameData.players['O'].nickname}</b></div>
+      </div>
+      <div className="board">
+        {(gameData.board || Array(9).fill(null)).map((c, i) => (
+          <button key={i} className="cell" onClick={() => play(i)}>
+            {c === 'X' ? '❌' : (c === 'O' ? '⭕' : '')}
+          </button>
+        ))}
+      </div>
+      <button className="danger" style={{marginTop:'15px'}} onClick={leaveQueue}>خروج از بازی</button>
+    </div>}
+    {status === 'over' && gameData && <div>
+      <h3>نتیجه بازی: {gameData.winner === 'DRAW' ? 'مساوی!' : (gameData.winner === 'DISCONNECT' ? 'حریف خارج شد!' : 'برنده: ' + (gameData.winner === 'X' ? '❌' : '⭕'))}</h3>
+      <button className="main" onClick={() => { setStatus('idle'); setGameData(null); }}>بازی دوباره</button>
+    </div>}
+  </section>;
+}

@@ -419,6 +419,42 @@ app.get('/api/chat/config', auth, asyncHandler(async (req, res) => {
   const minLifetimePoints = await getChatMinLifetimePoints();
   res.json({ minLifetimePoints, messageCooldownSeconds: await getChatCooldownSeconds(), eligible: Number(req.user.lifetime_points || 0) >= minLifetimePoints, userLifetimePoints: req.user.lifetime_points });
 }));
+
+const CANNED_MESSAGES = [
+  "سلام بچه‌ها! 👋",
+  "من اومدم! 😎",
+  "بازی خیلی باحال بود! 🎮",
+  "خوشبختم دوستان! 🤝",
+  "کی پایه بازیه؟ 🙋‍♂️",
+  "عالی بود! ✨",
+  "خیلی خفن بود! 🔥",
+  "موفق باشی! 🌟",
+  "چه خبر بچه‌ها؟ 🎈",
+  "خداحافظ تا بعد! 👋",
+  "مواظب خودتون باشید! 🛡️",
+  "کسی کد جدید داره؟ 🎁",
+  "وای چقدر خنده‌دار بود! 😂",
+  "تبریک میگم! 🎉",
+  "میشه کمکم کنید؟ 🤔",
+  "ممنون از شما! 🙏",
+  "شما تو کدوم لیگ هستید؟ 🏅",
+  "چقدر امتیازم بالا رفت! 📈",
+  "کارت جدید پیدا کردم! 🃏",
+  "امروز روز منه! 🎯",
+  "ایول به همگی! ✌️",
+  "دوباره امتحان می‌کنم! 💪",
+  "شگفت‌انگیز بود! 😲",
+  "کجا زندگی می‌کنید؟ 🌍",
+  "امروز چیکار کردید؟ 🌞",
+  "من عاشق این بازی‌ام! ❤️",
+  "بریم برای برد! 🏆",
+  "منم می‌خوام بازی کنم! 🕹️"
+];
+
+app.get('/api/chat/canned-messages', asyncHandler(async (req, res) => {
+  res.json(CANNED_MESSAGES);
+}));
+
 app.get('/api/chat/messages', auth, asyncHandler(async (req, res) => {
   const minLifetimePoints = await getChatMinLifetimePoints();
   if (Number(req.user.lifetime_points || 0) < minLifetimePoints) return res.status(403).json({ message: `برای ورود به چت باید حداقل ${minLifetimePoints} امتیاز تاریخی داشته باشید`, minLifetimePoints });
@@ -458,7 +494,7 @@ app.post('/api/chat/messages', auth, chatLimiter, asyncHandler(async (req, res) 
     const rm = await pool.query('SELECT id FROM chat_messages WHERE id=$1 AND is_deleted=false', [replyTo]);
     if (!rm.rows[0]) return res.status(400).json({ message: 'پیام موردنظر برای پاسخ پیدا نشد' });
   }
-  if (messageType === 'text' && (!clean || clean.length > 1000)) return res.status(400).json({ message: 'متن پیام معتبر نیست' });
+  if (messageType === 'text' && !CANNED_MESSAGES.includes(clean)) return res.status(400).json({ message: 'فقط پیام‌های آماده مجاز هستند.' });
   if (clean) await assertNoBadWords(clean);
   const { rows } = await pool.query('INSERT INTO chat_messages(user_id,message_text,reply_to_message_id,sticker_id,message_type) VALUES($1,$2,$3,$4,$5) RETURNING *', [req.user.id, clean, replyTo, stickerId, messageType]);
   const msg = { ...rows[0], nickname: req.user.nickname, first_name: req.user.first_name, last_name: req.user.last_name, profile_image_url: req.user.profile_image_url, profile_avatar_key: req.user.profile_avatar_key, like_count: 0, liked_by_me: false };
@@ -817,7 +853,7 @@ io.on('connection', socket => {
         const rm = await pool.query('SELECT id FROM chat_messages WHERE id=$1 AND is_deleted=false', [replyTo]);
         if (!rm.rows[0]) throw new Error('پیام موردنظر برای پاسخ پیدا نشد');
       }
-      if (messageType === 'text' && (!clean || clean.length > 1000)) throw new Error('متن پیام معتبر نیست');
+      if (messageType === 'text' && !CANNED_MESSAGES.includes(clean)) throw new Error('فقط پیام‌های آماده مجاز هستند.');
       if (clean) await assertNoBadWords(clean);
       arr.push(now); socketMessageTimes.set(socket.user.id, arr);
       const { rows } = await pool.query('INSERT INTO chat_messages(user_id,message_text,reply_to_message_id,sticker_id,message_type) VALUES($1,$2,$3,$4,$5) RETURNING *', [socket.user.id, clean, replyTo, stickerId, messageType]);
@@ -827,6 +863,8 @@ io.on('connection', socket => {
   });
 
 });
+
+require('./tictactoe')(io);
 
 cron.schedule('5 0 1 * *', () => closeActiveSeason().catch(e => console.error('monthly close failed', e)));
 
