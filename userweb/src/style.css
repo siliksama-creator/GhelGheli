@@ -71,3 +71,41 @@
   font-weight: bold;
   color: #ff9800;
 }
+
+/* Fix Chat Visbility */
+.chatbody {
+  background: #1a1a1a !important;
+  color: #ffffff !important;
+  border: 1px solid #333 !important;
+}
+.chatbody p {
+  color: #ffffff !important;
+  font-size: 16px !important;
+  font-weight: 500 !important;
+}
+.chatbody b.clickableText {
+  color: #4fc3f7 !important;
+}
+.cannedPopover {
+  background: #111111 !important;
+  border: 1px solid #444 !important;
+}
+.cannedPopover button {
+  background: #2a2a2a !important;
+  color: #ffffff !important;
+  border: 1px solid #444 !important;
+  font-size: 15px !important;
+  font-weight: bold !important;
+}
+.cannedPopover button:hover {
+  background: #3a3a3a !important;
+}
+.sendDock input {
+  background: #1a1a1a !important;
+  color: #ffffff !important;
+  font-size: 16px !important;
+  border: 1px solid #444 !important;
+}
+.sendDock input::placeholder {
+  color: #aaaaaa !important;
+}
