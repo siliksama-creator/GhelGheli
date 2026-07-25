@@ -35,7 +35,11 @@ class _ChatPageState extends State<ChatPage> {
   void initState() {
     super.initState();
     _load();
-    _timer = Timer.periodic(const Duration(seconds: 3), (_) => _load());
+    // PERFORMANCE: this used to re-fetch messages + stickers + canned list
+    // every 3 seconds forever — 1200 requests an hour per open chat, on a
+    // mobile data plan. Stickers and canned messages almost never change, so
+    // the poll now runs far less often and only refreshes the messages.
+    _timer = Timer.periodic(const Duration(seconds: 10), (_) => _refreshMessages());
   }
 
   @override
@@ -43,6 +47,18 @@ class _ChatPageState extends State<ChatPage> {
     _timer?.cancel();
     _text.dispose();
     super.dispose();
+  }
+
+  /// Lightweight poll: messages only. The heavy parts of [_load] (config,
+  /// stickers, canned list, pinned banner) are fetched once on open.
+  Future<void> _refreshMessages() async {
+    if (_error != null) return;
+    try {
+      final m = await widget.api.get('/api/chat/messages');
+      if (mounted) setState(() => _messages = m);
+    } catch (_) {
+      // Transient network blips shouldn't clear the visible conversation.
+    }
   }
 
   Future<void> _load() async {
@@ -62,9 +78,16 @@ class _ChatPageState extends State<ChatPage> {
         }
         return;
       }
-      final m = await widget.api.get('/api/chat/messages');
-      final st = await widget.api.get('/api/chat/stickers');
-      final cm = await widget.api.get('/api/chat/canned-messages');
+      // Three round trips collapsed into one concurrent batch — this runs
+      // every 3 seconds on a poll timer, so the saving is continuous.
+      final batch = await widget.api.getAll([
+        '/api/chat/messages',
+        '/api/chat/stickers',
+        '/api/chat/canned-messages',
+      ]);
+      final m = batch[0];
+      final st = batch[1];
+      final cm = batch[2];
       if (mounted) {
         setState(() {
           _messages = m;

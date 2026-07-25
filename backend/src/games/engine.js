@@ -71,6 +71,11 @@ function emitState(room, event, extra = {}) {
         turn: room.turn,
         turnMs: room.turnMs,
         deadline: room.deadline || null,
+        // CLOCK-SKEW FIX: never make the client subtract our timestamp from
+        // its own Date.now(). Phones with a wrong clock produced a garbage
+        // difference that clamped to the max, freezing the countdown. This
+        // is a plain "you have N ms left from the moment you receive this".
+        remainingMs: room.deadline ? Math.max(0, room.deadline - Date.now()) : null,
         ...extra,
       });
     }
@@ -189,6 +194,7 @@ function startRoom(io, rules, gameId, a, b) {
         roomId: id, gameId, players, turn: 'X',
         yourSymbol: sym, vsBot, state: snapshot(room, sym),
         turnMs: room.turnMs, deadline: room.deadline,
+        remainingMs: room.deadline ? Math.max(0, room.deadline - Date.now()) : null,
       });
     }
   }
@@ -229,6 +235,7 @@ module.exports = function attachGames(io, rulesById) {
         message: 'در حال جستجوی حریف واقعی...',
         waitMs: MATCH_WAIT_MS,
         deadline: Date.now() + MATCH_WAIT_MS,
+        remainingMs: MATCH_WAIT_MS,
       });
       socket.botTimeout = setTimeout(() => {
         const i = q.findIndex(s => s.user?.id === socket.user?.id);

@@ -78,7 +78,7 @@ class GameSession extends ChangeNotifier {
       final m = _asMap(d);
       phase = GamePhase.waiting;
       error = null;
-      _startSearchClock(m['deadline'], m['waitMs']);
+      _startSearchClock(m['deadline'], m['waitMs'], m['remainingMs']);
       notifyListeners();
     });
 
@@ -96,7 +96,7 @@ class GameSession extends ChangeNotifier {
       error = null;
       GameAudio.instance.play(Sfx.matchFound);
       _stopSearchClock();
-      _startClock(m['deadline'], m['turnMs']);
+      _startClock(m['deadline'], m['turnMs'], m['remainingMs']);
       notifyListeners();
     });
 
@@ -116,7 +116,7 @@ class GameSession extends ChangeNotifier {
       }
       if (!wasMyTurn && myTurn) GameAudio.instance.play(Sfx.yourTurn);
 
-      _startClock(m['deadline'], m['turnMs']);
+      _startClock(m['deadline'], m['turnMs'], m['remainingMs']);
       notifyListeners();
     });
 
@@ -133,22 +133,36 @@ class GameSession extends ChangeNotifier {
     });
   }
 
-  void _startClock(dynamic deadline, dynamic turnMs) {
+  void _startClock(dynamic deadline, dynamic turnMs, dynamic remainingMs) {
     _ticker?.cancel();
     final ms = (turnMs as num?)?.toInt();
     if (ms != null && ms > 0) turnSeconds = (ms / 1000).round();
-    final end = (deadline as num?)?.toInt();
-    if (end == null) {
+
+    // Use the server's REMAINING milliseconds against a local stopwatch
+    // rather than `deadline - DateTime.now()`. A device with a wrong clock
+    // (extremely common on Android) produced a nonsense difference that
+    // clamped to the maximum, so the countdown sat frozen at 15 and never
+    // moved. A stopwatch is monotonic and immune to that.
+    final remaining = (remainingMs as num?)?.toInt() ??
+        ((deadline as num?) != null
+            ? (deadline as num).toInt() - DateTime.now().millisecondsSinceEpoch
+            : null);
+    if (remaining == null) {
       secondsLeft = 0;
+      notifyListeners();
       return;
     }
+
+    final total = remaining < 0 ? 0 : remaining;
+    final watch = Stopwatch()..start();
     _lastTickPlayed = -1;
+
     void tick() {
-      final left = ((end - DateTime.now().millisecondsSinceEpoch) / 1000).ceil();
+      final leftMs = total - watch.elapsedMilliseconds;
+      final left = (leftMs / 1000).ceil();
       final clamped = left < 0 ? 0 : (left > turnSeconds ? turnSeconds : left);
       if (clamped != secondsLeft) {
         secondsLeft = clamped;
-        // Audible warning only on our own turn, once per second, last 5s.
         if (myTurn && clamped <= 5 && clamped > 0 && clamped != _lastTickPlayed) {
           _lastTickPlayed = clamped;
           GameAudio.instance
@@ -156,7 +170,7 @@ class GameSession extends ChangeNotifier {
         }
         notifyListeners();
       }
-      if (clamped <= 0) _ticker?.cancel();
+      if (leftMs <= 0) _ticker?.cancel();
     }
 
     tick();
@@ -164,28 +178,35 @@ class GameSession extends ChangeNotifier {
   }
 
   /// Ticks down the "looking for a real opponent" window.
-  void _startSearchClock(dynamic deadline, dynamic waitMs) {
+  void _startSearchClock(dynamic deadline, dynamic waitMs, dynamic remainingMs) {
     _searchTicker?.cancel();
     final ms = (waitMs as num?)?.toInt();
     if (ms != null && ms > 0) searchSeconds = (ms / 1000).round();
-    final end = (deadline as num?)?.toInt();
-    if (end == null) {
-      searchSecondsLeft = searchSeconds;
-      return;
-    }
+
+    // Same monotonic approach as the turn clock — this is exactly the timer
+    // that was reported stuck on 15.
+    final remaining = (remainingMs as num?)?.toInt() ??
+        ((deadline as num?) != null
+            ? (deadline as num).toInt() - DateTime.now().millisecondsSinceEpoch
+            : searchSeconds * 1000);
+    final total = remaining < 0 ? 0 : remaining;
+    final watch = Stopwatch()..start();
+
     void tick() {
-      final left = ((end - DateTime.now().millisecondsSinceEpoch) / 1000).ceil();
+      final leftMs = total - watch.elapsedMilliseconds;
+      final left = (leftMs / 1000).ceil();
       final clamped =
           left < 0 ? 0 : (left > searchSeconds ? searchSeconds : left);
       if (clamped != searchSecondsLeft) {
         searchSecondsLeft = clamped;
         notifyListeners();
       }
-      if (clamped <= 0) _searchTicker?.cancel();
+      if (leftMs <= 0) _searchTicker?.cancel();
     }
 
     tick();
-    _searchTicker = Timer.periodic(const Duration(milliseconds: 250), (_) => tick());
+    _searchTicker =
+        Timer.periodic(const Duration(milliseconds: 200), (_) => tick());
   }
 
   void _stopSearchClock() {

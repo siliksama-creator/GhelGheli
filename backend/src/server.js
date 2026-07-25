@@ -555,23 +555,129 @@ app.delete('/api/chat/messages/:id/like', auth, asyncHandler(async (req, res) =>
   res.json({ liked: false, likeCount: c.rows[0].count });
 }));
 
+// ── Support tickets ───────────────────────────────────────────────────────
+// Rules:
+//   * one OPEN ticket at a time, and at most one NEW ticket per calendar day
+//   * while a ticket is open the user replies inside that thread instead
+//   * only an admin can close it, which frees the user to open a new one
+//   * every message may carry 1..5 image attachments
+const TICKET_MAX_ATTACHMENTS = 5;
+
+// Accepts an array of upload URLs previously returned by the upload route.
+// Anything that isn't one of our own /uploads/ paths is rejected so a caller
+// can't smuggle in an arbitrary external URL.
+function sanitizeAttachments(input) {
+  if (!Array.isArray(input)) return [];
+  const out = [];
+  for (const raw of input) {
+    const v = String(raw || '').trim();
+    if (!v) continue;
+    if (!/^\/uploads\/images\/[A-Za-z0-9._-]+$/.test(v)) {
+      const err = new Error('یکی از پیوست‌ها معتبر نیست');
+      err.status = 400;
+      throw err;
+    }
+    out.push(v);
+    if (out.length > TICKET_MAX_ATTACHMENTS) {
+      const err = new Error(`حداکثر ${TICKET_MAX_ATTACHMENTS} عکس می‌توانید ارسال کنید`);
+      err.status = 400;
+      throw err;
+    }
+  }
+  return out;
+}
+
+// Users upload ticket images through their own route (the admin upload
+// endpoint requires an admin token). Same multer instance, same 5 MB cap.
+app.post('/api/support/uploads/image', auth, imageUpload.single('image'), asyncHandler(async (req, res) => {
+  if (!req.file) return res.status(400).json({ message: 'فقط فایل تصویری (PNG/JPG/WEBP/GIF) مجاز است' });
+  res.json({ url: `/uploads/images/${req.file.filename}` });
+}));
+
+// Tells the client whether the "new ticket" form should be enabled, and why
+// not — so the app can explain the rule instead of just failing on submit.
+async function ticketQuota(userId) {
+  const open = await pool.query(
+    "SELECT id, subject, status FROM support_tickets WHERE user_id=$1 AND status <> 'closed' ORDER BY created_at DESC LIMIT 1",
+    [userId]
+  );
+  if (open.rows[0]) {
+    return {
+      canCreate: false,
+      reason: 'open_ticket',
+      message: 'یک تیکت باز دارید؛ تا بسته شدن آن، پاسخ خود را در همان تیکت بفرستید.',
+      openTicket: open.rows[0],
+    };
+  }
+  const today = await pool.query(
+    "SELECT count(*)::int AS c FROM support_tickets WHERE user_id=$1 AND created_at >= date_trunc('day', NOW())",
+    [userId]
+  );
+  if (today.rows[0].c >= 1) {
+    return {
+      canCreate: false,
+      reason: 'daily_limit',
+      message: 'در هر روز فقط یک تیکت می‌توانید ثبت کنید. فردا دوباره امتحان کنید.',
+      openTicket: null,
+    };
+  }
+  return { canCreate: true, reason: null, message: null, openTicket: null };
+}
+
+app.get('/api/support/quota', auth, asyncHandler(async (req, res) => {
+  res.json({ ...(await ticketQuota(req.user.id)), maxAttachments: TICKET_MAX_ATTACHMENTS });
+}));
+
 app.post('/api/support/tickets', auth, asyncHandler(async (req, res) => {
   const { subject, message } = req.body;
+  const attachments = sanitizeAttachments(req.body.attachments);
+  if (!String(subject || '').trim()) return res.status(400).json({ message: 'موضوع تیکت را وارد کنید' });
+  if (!String(message || '').trim() && !attachments.length) {
+    return res.status(400).json({ message: 'متن پیام یا حداقل یک عکس لازم است' });
+  }
+  const quota = await ticketQuota(req.user.id);
+  if (!quota.canCreate) return res.status(429).json({ ...quota });
+
   const client = await pool.connect();
-  try { await client.query('BEGIN');
-    const ticket = await client.query('INSERT INTO support_tickets(user_id,subject) VALUES($1,$2) RETURNING *', [req.user.id, subject]);
-    await client.query("INSERT INTO support_ticket_messages(ticket_id,sender_type,sender_user_id,message_text) VALUES($1,'user',$2,$3)", [ticket.rows[0].id, req.user.id, message]);
-    await client.query('COMMIT'); res.json(ticket.rows[0]);
-  } catch(e){ await client.query('ROLLBACK'); throw e; } finally { client.release(); }
+  try {
+    await client.query('BEGIN');
+    const ticket = await client.query('INSERT INTO support_tickets(user_id,subject) VALUES($1,$2) RETURNING *', [req.user.id, String(subject).trim().slice(0, 180)]);
+    await client.query(
+      "INSERT INTO support_ticket_messages(ticket_id,sender_type,sender_user_id,message_text,attachments) VALUES($1,'user',$2,$3,$4)",
+      [ticket.rows[0].id, req.user.id, String(message || '').trim(), JSON.stringify(attachments)]
+    );
+    await client.query('COMMIT');
+    res.json(ticket.rows[0]);
+  } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
 }));
+
 app.get('/api/support/tickets', auth, asyncHandler(async (req, res) => {
-  const { rows } = await pool.query('SELECT * FROM support_tickets WHERE user_id=$1 ORDER BY updated_at DESC', [req.user.id]); res.json(rows);
+  const { rows } = await pool.query('SELECT * FROM support_tickets WHERE user_id=$1 ORDER BY updated_at DESC', [req.user.id]);
+  res.json(rows);
 }));
+
 app.get('/api/support/tickets/:id/messages', auth, asyncHandler(async (req, res) => {
-  const { rows } = await pool.query('SELECT m.* FROM support_ticket_messages m JOIN support_tickets t ON t.id=m.ticket_id WHERE t.id=$1 AND t.user_id=$2 ORDER BY m.created_at', [req.params.id, req.user.id]); res.json(rows);
+  const { rows } = await pool.query('SELECT m.* FROM support_ticket_messages m JOIN support_tickets t ON t.id=m.ticket_id WHERE t.id=$1 AND t.user_id=$2 ORDER BY m.created_at', [req.params.id, req.user.id]);
+  res.json(rows);
 }));
+
 app.post('/api/support/tickets/:id/messages', auth, asyncHandler(async (req, res) => {
-  await pool.query("INSERT INTO support_ticket_messages(ticket_id,sender_type,sender_user_id,message_text) VALUES($1,'user',$2,$3)", [req.params.id, req.user.id, req.body.message]);
+  const attachments = sanitizeAttachments(req.body.attachments);
+  const text = String(req.body.message || '').trim();
+  if (!text && !attachments.length) return res.status(400).json({ message: 'متن پیام یا حداقل یک عکس لازم است' });
+
+  // A closed ticket is final: replying would silently reopen a conversation
+  // support considers finished (and would bypass the one-ticket-a-day rule).
+  const t = await pool.query('SELECT status FROM support_tickets WHERE id=$1 AND user_id=$2', [req.params.id, req.user.id]);
+  if (!t.rows[0]) return res.status(404).json({ message: 'تیکت پیدا نشد' });
+  if (t.rows[0].status === 'closed') {
+    return res.status(409).json({ message: 'این تیکت بسته شده است. در صورت نیاز تیکت جدیدی ثبت کنید.' });
+  }
+
+  await pool.query(
+    "INSERT INTO support_ticket_messages(ticket_id,sender_type,sender_user_id,message_text,attachments) VALUES($1,'user',$2,$3,$4)",
+    [req.params.id, req.user.id, text, JSON.stringify(attachments)]
+  );
   await pool.query("UPDATE support_tickets SET status='open', updated_at=NOW() WHERE id=$1 AND user_id=$2", [req.params.id, req.user.id]);
   res.json({ message: 'پیام ارسال شد' });
 }));
@@ -851,10 +957,39 @@ app.patch('/api/admin/chat/users/:id/ban', adminAuth, requireRole('support'), as
 app.get('/api/admin/support/tickets', adminAuth, requireRole('support','observer'), asyncHandler(async (req, res) => res.json((await pool.query('SELECT t.*, u.mobile FROM support_tickets t JOIN users u ON u.id=t.user_id ORDER BY t.updated_at DESC')).rows)));
 app.get('/api/admin/support/tickets/:id/messages', adminAuth, requireRole('support','observer'), asyncHandler(async (req, res) => res.json((await pool.query('SELECT * FROM support_ticket_messages WHERE ticket_id=$1 ORDER BY created_at', [req.params.id])).rows)));
 app.post('/api/admin/support/tickets/:id/messages', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
-  await pool.query("INSERT INTO support_ticket_messages(ticket_id,sender_type,sender_admin_id,message_text) VALUES($1,'admin',$2,$3)", [req.params.id, req.admin.id, req.body.message]);
+  const attachments = sanitizeAttachments(req.body.attachments);
+  const text = String(req.body.message || '').trim();
+  if (!text && !attachments.length) return res.status(400).json({ message: 'متن پاسخ یا حداقل یک عکس لازم است' });
+  const cur = await pool.query('SELECT status FROM support_tickets WHERE id=$1', [req.params.id]);
+  if (!cur.rows[0]) return res.status(404).json({ message: 'تیکت پیدا نشد' });
+  if (cur.rows[0].status === 'closed') return res.status(409).json({ message: 'این تیکت بسته شده است' });
+  await pool.query("INSERT INTO support_ticket_messages(ticket_id,sender_type,sender_admin_id,message_text,attachments) VALUES($1,'admin',$2,$3,$4)", [req.params.id, req.admin.id, text, JSON.stringify(attachments)]);
   const ticket = await pool.query("UPDATE support_tickets SET status='answered', updated_at=NOW() WHERE id=$1 RETURNING user_id", [req.params.id]);
-  if (ticket.rows[0]) await createNotification(ticket.rows[0].user_id, 'support_answer', 'پاسخ پشتیبانی', 'تیکت شما پاسخ داده شد.');
+  if (ticket.rows[0]) await createNotification(ticket.rows[0].user_id, 'support_answer', 'پاسخ پشتیبانی', 'تیکت شما پاسخ داده شد. می‌توانید در همان تیکت پاسخ دهید.');
   res.json({ message: 'پاسخ ارسال شد' });
+}));
+
+// Closing is the ONLY way a user becomes eligible to open a new ticket, so
+// it is an explicit admin action rather than a side effect of replying.
+app.patch('/api/admin/support/tickets/:id/close', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
+  const { rows } = await pool.query(
+    "UPDATE support_tickets SET status='closed', closed_at=NOW(), closed_by_admin_id=$2, updated_at=NOW() WHERE id=$1 AND status <> 'closed' RETURNING user_id, subject",
+    [req.params.id, req.admin.id]
+  );
+  if (!rows[0]) return res.status(400).json({ message: 'این تیکت از قبل بسته شده است' });
+  await audit(req.admin.id, 'close_support_ticket', 'support_tickets', req.params.id, req.body.reason || null, {});
+  await createNotification(rows[0].user_id, 'support_closed', 'تیکت بسته شد', `تیکت «${rows[0].subject}» توسط پشتیبانی بسته شد.`);
+  res.json({ message: 'تیکت بسته شد' });
+}));
+
+app.patch('/api/admin/support/tickets/:id/reopen', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
+  const { rows } = await pool.query(
+    "UPDATE support_tickets SET status='open', closed_at=NULL, closed_by_admin_id=NULL, updated_at=NOW() WHERE id=$1 AND status='closed' RETURNING user_id",
+    [req.params.id]
+  );
+  if (!rows[0]) return res.status(400).json({ message: 'این تیکت باز است' });
+  await audit(req.admin.id, 'reopen_support_ticket', 'support_tickets', req.params.id, null, {});
+  res.json({ message: 'تیکت دوباره باز شد' });
 }));
 
 app.post('/api/admin/notifications/broadcast', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {

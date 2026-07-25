@@ -33,8 +33,12 @@ function useGame(api, token, gameId) {
   const [searchLeft, setSearchLeft] = useState(0);
   const [searchSecs, setSearchSecs] = useState(15);
   const room = useRef(null);
-  const deadline = useRef(null);
-  const searchEnd = useRef(null);
+  // Monotonic timers: store "ms remaining" captured against performance.now()
+  // instead of the server's absolute deadline. Subtracting a server timestamp
+  // from a client Date.now() breaks whenever the device clock is off, which
+  // froze the countdown at its maximum value.
+  const turnEnd = useRef(null);   // performance.now() target
+  const searchEnd = useRef(null); // performance.now() target
   const meRef = useRef(null);
   const turnRef = useRef(null);
   const tickedAt = useRef(-1);
@@ -48,7 +52,7 @@ function useGame(api, token, gameId) {
       setError('');
       setPhase('waiting');
       if (d?.waitMs) setSearchSecs(Math.round(d.waitMs / 1000));
-      searchEnd.current = d?.deadline || null;
+      searchEnd.current = performance.now() + (d?.remainingMs ?? d?.waitMs ?? 15000);
     });
 
     s.on('game:start', d => {
@@ -56,8 +60,8 @@ function useGame(api, token, gameId) {
       searchEnd.current = null;
       meRef.current = d.yourSymbol;
       turnRef.current = d.turn;
-      deadline.current = d.deadline || null;
       if (d.turnMs) setTurnSecs(Math.round(d.turnMs / 1000));
+      turnEnd.current = d.remainingMs != null ? performance.now() + d.remainingMs : null;
       tickedAt.current = -1;
       play('match_found');
       setG({
@@ -70,7 +74,7 @@ function useGame(api, token, gameId) {
     s.on('game:update', d => {
       const wasMine = turnRef.current && turnRef.current === meRef.current;
       turnRef.current = d.turn;
-      deadline.current = d.deadline || null;
+      turnEnd.current = d.remainingMs != null ? performance.now() + d.remainingMs : null;
       tickedAt.current = -1;
       if (d.timedOut) play('timeout');
       else if (!wasMine) play(MOVE_SFX[gameId] || 'move', 0.9);
@@ -79,7 +83,7 @@ function useGame(api, token, gameId) {
     });
 
     s.on('game:over', d => {
-      deadline.current = null;
+      turnEnd.current = null;
       setLeft(0);
       const won = d.winner && d.winner === meRef.current;
       play(d.winner === 'DRAW' ? 'draw' : won ? 'win' : 'lose');
@@ -94,10 +98,10 @@ function useGame(api, token, gameId) {
   useEffect(() => {
     const id = setInterval(() => {
       if (searchEnd.current) {
-        setSearchLeft(Math.max(0, Math.ceil((searchEnd.current - Date.now()) / 1000)));
+        setSearchLeft(Math.max(0, Math.ceil((searchEnd.current - performance.now()) / 1000)));
       }
-      if (!deadline.current) { setLeft(0); return; }
-      const secs = Math.max(0, Math.ceil((deadline.current - Date.now()) / 1000));
+      if (!turnEnd.current) { setLeft(0); return; }
+      const secs = Math.max(0, Math.ceil((turnEnd.current - performance.now()) / 1000));
       setLeft(secs);
       const mine = turnRef.current && turnRef.current === meRef.current;
       if (mine && secs > 0 && secs <= 5 && tickedAt.current !== secs) {
@@ -119,7 +123,7 @@ function useGame(api, token, gameId) {
     },
     move: i => { play(MOVE_SFX[gameId] || 'move'); ref.current?.emit('game:move', { roomId: room.current, move: i }); },
     leave: () => {
-      deadline.current = null;
+      turnEnd.current = null;
       searchEnd.current = null;
       ref.current?.emit('game:leave', { roomId: room.current });
       setPhase('idle');

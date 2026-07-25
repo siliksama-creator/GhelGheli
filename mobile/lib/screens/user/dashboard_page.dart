@@ -57,8 +57,11 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _load() async {
-    final d = await widget.api.get('/api/profile');
-    final rw = await widget.api.get('/api/rewards');
+    // Fetched together instead of one-after-the-other: the dashboard used to
+    // wait for the SUM of both round trips before it could paint.
+    final results = await widget.api.getAll(['/api/profile', '/api/rewards']);
+    final d = results[0];
+    final rw = results[1];
     if (!mounted) return;
     setState(() {
       _data = Map<String, dynamic>.from(d);

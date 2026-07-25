@@ -15,7 +15,18 @@ import 'screens/user/home_shell.dart';
 import 'screens/user/games/game_audio.dart';
 import 'theme/app_theme.dart';
 
-void main() => runApp(const GhelGheliApp());
+void main() {
+  // Binding must exist before we touch platform channels below.
+  WidgetsFlutterBinding.ensureInitialized();
+  // Decoded-image cache: the card artwork, avatars and game banners are
+  // re-shown constantly while navigating. The default 100 MB budget is far
+  // more than this app needs and pushes low-end devices into GC churn;
+  // 40 MB / 200 entries keeps everything hot without the pressure.
+  PaintingBinding.instance.imageCache
+    ..maximumSizeBytes = 40 << 20
+    ..maximumSize = 200;
+  runApp(const GhelGheliApp());
+}
 
 class GhelGheliApp extends StatefulWidget {
   const GhelGheliApp({super.key});

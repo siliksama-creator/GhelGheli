@@ -89,9 +89,9 @@ class _HomeShellState extends State<HomeShell>
         selectedIcon: Icon(Icons.emoji_events_rounded),
         label: 'لیگ'),
     NavigationDestination(
-        icon: Icon(Icons.forum_outlined),
-        selectedIcon: Icon(Icons.forum_rounded),
-        label: 'باشگاه'),
+        icon: Icon(Icons.sports_esports_outlined),
+        selectedIcon: Icon(Icons.sports_esports_rounded),
+        label: 'چت و بازی'),
     NavigationDestination(
         icon: Icon(Icons.support_agent_outlined),
         selectedIcon: Icon(Icons.support_agent_rounded),
@@ -106,7 +106,9 @@ class _HomeShellState extends State<HomeShell>
   void initState() {
     super.initState();
     _loadProfile();
-    _registerFcm();
+    // Firebase init + permission prompt can take seconds on a cold start and
+    // nothing on screen depends on it, so let the first frames render first.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _registerFcm());
   }
 
   @override
@@ -141,7 +143,7 @@ class _HomeShellState extends State<HomeShell>
     'خانه',
     'جوایز',
     'لیگ',
-    'باشگاه',
+    'چت و بازی',
     'پشتیبانی',
     'پروفایل'
   ];

@@ -5,6 +5,7 @@ import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/badges.dart';
 import '../../widgets/state_views.dart';
+import '../user/support/attachment_picker.dart';
 
 /// Support-ticket inbox + reply thread. Same endpoints as legacy
 /// `AdminSupport`. Uses a responsive two-pane layout on wide screens and a
@@ -26,10 +27,16 @@ class _AdminSupportState extends State<AdminSupport> {
 
   static const _statusLabels = {
     'open': 'باز',
+    'answered': 'پاسخ داده شد',
     'pending': 'در انتظار',
     'resolved': 'حل‌شده',
     'closed': 'بسته‌شده'
   };
+
+  List<String> _attachments = [];
+  bool _busy = false;
+
+  bool get _selectedClosed => '${_selected?['status']}' == 'closed';
 
   @override
   void initState() {
@@ -65,13 +72,70 @@ class _AdminSupportState extends State<AdminSupport> {
   }
 
   Future<void> _send() async {
-    if (_selected == null || _reply.text.trim().isEmpty) return;
-    await widget.api.post(
-        '/api/admin/support/tickets/${_selected!['id']}/messages',
-        {'message': _reply.text});
-    _reply.clear();
-    await _open(_selected!);
-    await _load();
+    if (_selected == null) return;
+    if (_reply.text.trim().isEmpty && _attachments.isEmpty) {
+      _toast('متن پاسخ یا حداقل یک عکس لازم است');
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      await widget.api.post(
+          '/api/admin/support/tickets/${_selected!['id']}/messages',
+          {'message': _reply.text.trim(), 'attachments': _attachments});
+      _reply.clear();
+      setState(() => _attachments = []);
+      await _open(_selected!);
+      await _load();
+    } catch (e) {
+      _toast(apiError(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Closing a ticket is what frees the user to open a new one, so it's an
+  /// explicit action with a confirmation rather than a side effect.
+  Future<void> _setClosed(bool close) async {
+    if (_selected == null) return;
+    if (close) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('بستن تیکت؟'),
+          content: const Text(
+              'با بستن تیکت، گفتگو پایان می‌یابد و کاربر می‌تواند تیکت جدیدی ثبت کند.'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(c, false),
+                child: const Text('انصراف')),
+            FilledButton(
+                onPressed: () => Navigator.pop(c, true),
+                child: const Text('بستن تیکت')),
+          ],
+        ),
+      );
+      if (ok != true) return;
+    }
+    setState(() => _busy = true);
+    try {
+      await widget.api.patch(
+          '/api/admin/support/tickets/${_selected!['id']}/${close ? 'close' : 'reopen'}',
+          {});
+      final refreshed = Map<String, dynamic>.from(_selected!)
+        ..['status'] = close ? 'closed' : 'open';
+      setState(() => _selected = refreshed);
+      await _load();
+      _toast(close ? 'تیکت بسته شد' : 'تیکت دوباره باز شد');
+    } catch (e) {
+      _toast(apiError(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _toast(String m) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
   }
 
   @override
@@ -135,19 +199,66 @@ class _AdminSupportState extends State<AdminSupport> {
                               : theme.colorScheme.surfaceContainerHighest,
                           borderRadius: Corners.rMd,
                         ),
-                        child: Text(m['message_text']),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if ('${m['message_text'] ?? ''}'.trim().isNotEmpty)
+                              Text('${m['message_text']}'),
+                            AttachmentGallery(
+                                attachments:
+                                    (m['attachments'] as List?) ?? const []),
+                          ],
+                        ),
                       ),
                     )),
                 Gaps.vSm,
-                TextField(
-                    controller: _reply,
-                    maxLines: 3,
-                    decoration: const InputDecoration(labelText: 'پاسخ')),
-                Gaps.vSm,
-                FilledButton.icon(
-                    onPressed: _send,
-                    icon: const Icon(Icons.send_rounded),
-                    label: const Text('ارسال پاسخ')),
+                if (_selectedClosed)
+                  Row(
+                    children: [
+                      Icon(Icons.lock_outline_rounded,
+                          size: 18, color: theme.colorScheme.outline),
+                      Gaps.hXs,
+                      Expanded(
+                          child: Text('این تیکت بسته شده است.',
+                              style: theme.textTheme.bodySmall)),
+                      TextButton.icon(
+                        onPressed: _busy ? null : () => _setClosed(false),
+                        icon: const Icon(Icons.lock_open_rounded, size: 18),
+                        label: const Text('بازکردن دوباره'),
+                      ),
+                    ],
+                  )
+                else ...[
+                  TextField(
+                      controller: _reply,
+                      maxLines: 3,
+                      decoration: const InputDecoration(labelText: 'پاسخ')),
+                  Gaps.vSm,
+                  AttachmentPicker(
+                    api: widget.api,
+                    urls: _attachments,
+                    enabled: !_busy,
+                    onChanged: (v) => setState(() => _attachments = v),
+                  ),
+                  Gaps.vSm,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                            onPressed: _busy ? null : _send,
+                            icon: const Icon(Icons.send_rounded),
+                            label: const Text('ارسال پاسخ')),
+                      ),
+                      Gaps.hXs,
+                      OutlinedButton.icon(
+                        onPressed: _busy ? null : () => _setClosed(true),
+                        icon: const Icon(Icons.check_circle_outline_rounded,
+                            size: 18),
+                        label: const Text('بستن تیکت'),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           );

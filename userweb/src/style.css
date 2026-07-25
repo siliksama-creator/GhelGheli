@@ -227,3 +227,36 @@
   padding: 8px 20px; font-size: 13.5px;
 }
 .clubTabs .on { background: #b5ef58; color: #10210a; box-shadow: 0 8px 20px #b5ef5830; }
+
+/* ---------- Support tickets ---------- */
+.quotaBox {
+  padding: 16px; border-radius: 16px; background: #ffd36b14;
+  border: 1px solid #ffd36b33; margin-bottom: 4px;
+}
+.quotaBox b { display: block; margin-bottom: 4px; }
+.quotaBox p { margin: 0 0 10px; color: #c9ddf2; }
+.ticketForm { display: grid; gap: 4px; }
+.ticketActions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+.ticketActions .main { margin-top: 0; }
+.shotBtn {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  padding: 11px 16px; border-radius: 16px; font-weight: 800; font-size: 13px;
+  background: #ffffff14; border: 1px solid #ffffff22; color: #dbeeff;
+}
+.shots { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+.shot { position: relative; display: inline-block; }
+.shot img { width: 76px; height: 76px; object-fit: cover; border-radius: 12px; border: 1px solid #ffffff22; }
+.shot button {
+  position: absolute; top: 3px; inset-inline-start: 3px; width: 20px; height: 20px;
+  padding: 0; border-radius: 7px; background: #000000a6; color: #fff; font-size: 13px; line-height: 1;
+}
+.thread { display: grid; gap: 10px; max-height: 52vh; overflow: auto; padding: 4px 0 10px; }
+.tmsg { padding: 11px 13px; border-radius: 16px; max-width: 86%; }
+.tmsg b { font-size: 11px; opacity: .75; }
+.tmsg p { margin: 4px 0 0; line-height: 1.6; }
+.tmsg.me { justify-self: start; background: #b5ef5820; border: 1px solid #b5ef5840; }
+.tmsg.admin { justify-self: end; background: #ffffff10; border: 1px solid #ffffff18; }
+.ticketState { padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 800; }
+.ticketState.on { background: #b5ef5822; color: #b5ef58; }
+.ticketState.off { background: #ffffff14; color: #9fb6cc; }
+.row b.muted { color: #9fb6cc; }
