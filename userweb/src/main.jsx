@@ -33,7 +33,7 @@ function Portal({token,logout}){
   async function load(){const pr=await req('/api/profile','GET',null,token);setP(pr);setRewards(await req('/api/rewards','GET',null,token));}
   useEffect(()=>{load()},[]);
   if(!p)return <div className="card">در حال بارگذاری...</div>;
-  return <div className="portal"><nav className="mobileNav">{[['home','خانه'],['profile','پروفایل'],['rewards','جوایز'],['league','لیگ'],['chat','چت روم'],['game','بازی دوز'],['support','پشتیبانی']].map(x=><button key={x[0]} className={tab===x[0]?'on':''} onClick={()=>setTab(x[0])}>{x[1]}</button>)}<button className="danger" onClick={logout}>خروج</button></nav>{msg&&<div className="toast">{msg}</div>}{tab==='home'&&<Home token={token} p={p} rewards={rewards} load={load} setMsg={setMsg}/>} {tab==='profile'&&<Profile token={token} p={p} load={load} setMsg={setMsg}/>} {tab==='rewards'&&<Rewards rewards={rewards}/>} {tab==='league'&&<League token={token} openProfile={setPublicUser}/>} {tab==='chat'&&<Chat token={token} openProfile={setPublicUser}/>} {tab==='game'&&<Game token={token} />}
+  return <div className="portal"><nav className="mobileNav">{[['home','خانه'],['profile','پروفایل'],['rewards','جوایز'],['league','لیگ'],['chat','چت روم'],['game','بازی دوز'],['support','پشتیبانی']].map(x=><button key={x[0]} className={tab===x[0]?'on':''} onClick={()=>setTab(x[0])}>{x[1]}</button>)}<button className="danger" onClick={logout}>خروج</button></nav>{msg&&<div className="toast">{msg}</div>}{tab==='home'&&<Home token={token} p={p} rewards={rewards} load={load} setMsg={setMsg}/>} {tab==='profile'&&<Profile token={token} p={p} load={load} setMsg={setMsg}/>} {tab==='rewards'&&<Rewards rewards={rewards}/>} {tab==='league'&&<League token={token} openProfile={setPublicUser}/>} {tab==='chat'&&<Chat token={token} openProfile={setPublicUser}/>} {tab==='games'&&<GamesHub token={token} />}
  {tab==='support'&&<Support token={token}/>} {publicUser&&<PublicProfile token={token} userId={publicUser} close={()=>setPublicUser(null)}/>}</div>;
 }
 
@@ -74,7 +74,7 @@ function Support({token}){const[subject,setSubject]=useState(''),[message,setMes
 createRoot(document.getElementById('root')).render(<App/>);
 
 
-function Game({token}){
+function Game({token, onBack}){
   const [socket, setSocket] = useState(null);
   const [status, setStatus] = useState('idle'); // idle, waiting, playing, over
   const [gameData, setGameData] = useState(null);
@@ -114,6 +114,7 @@ function Game({token}){
 
   return <section className="card wide gamePage">
     <h2>بازی دوز آنلاین 🎮</h2>
+    <button onClick={onBack} style={{marginBottom:'15px', padding:'5px 10px', borderRadius:'8px', background:'var(--border)', color:'var(--text)', border:'none', cursor:'pointer'}}>🔙 بازگشت به منوی بازی‌ها</button>
     {status === 'idle' && <button className="main" onClick={joinGame}>شروع جستجوی حریف</button>}
     {status === 'waiting' && <div><p>در حال جستجوی حریف...</p><button className="danger" onClick={leaveQueue}>لغو جستجو</button></div>}
     {status === 'playing' && gameData && <div>
@@ -135,5 +136,35 @@ function Game({token}){
       <h3>نتیجه بازی: {gameData.winner === 'DRAW' ? 'مساوی!' : (gameData.winner === 'DISCONNECT' ? 'حریف خارج شد!' : 'برنده: ' + (gameData.winner === 'X' ? '❌' : '⭕'))}</h3>
       <button className="main" onClick={() => { setStatus('idle'); setGameData(null); }}>بازی دوباره</button>
     </div>}
+  </section>;
+}
+
+function GamesHub({token}) {
+  const [activeGame, setActiveGame] = useState(null);
+  if (activeGame === 'tictactoe') return <Game token={token} onBack={() => setActiveGame(null)} />;
+  return <section className="card wide">
+    <h2>بخش بازی‌ها 🎮</h2>
+    <p className="hint">بازی مورد نظر خود را انتخاب کنید تا با دیگر بازیکنان رقابت کنید!</p>
+    <div style={{display:'flex', gap:'15px', flexWrap:'wrap', marginTop:'20px'}}>
+      
+      <div className="card clickable" style={{width:'160px', textAlign:'center', display:'flex', flexDirection:'column', alignItems:'center', background:'var(--surface)', border:'1px solid var(--border)'}} onClick={() => setActiveGame('tictactoe')}>
+        <span style={{fontSize:'60px', marginBottom:'10px'}}>❌⭕</span>
+        <b style={{fontSize:'18px'}}>دوز آنلاین</b>
+        <p className="hint">رقابت دو نفره</p>
+      </div>
+
+      <div className="card" style={{width:'160px', textAlign:'center', opacity:0.5, display:'flex', flexDirection:'column', alignItems:'center', background:'var(--surface)', border:'1px solid var(--border)'}}>
+        <span style={{fontSize:'60px', marginBottom:'10px'}}>🎲</span>
+        <b style={{fontSize:'18px'}}>منچ آنلاین</b>
+        <p className="hint">به‌زودی...</p>
+      </div>
+      
+      <div className="card" style={{width:'160px', textAlign:'center', opacity:0.5, display:'flex', flexDirection:'column', alignItems:'center', background:'var(--surface)', border:'1px solid var(--border)'}}>
+        <span style={{fontSize:'60px', marginBottom:'10px'}}>🎯</span>
+        <b style={{fontSize:'18px'}}>نقطه‌بازی</b>
+        <p className="hint">به‌زودی...</p>
+      </div>
+
+    </div>
   </section>;
 }

@@ -109,3 +109,51 @@
 .sendDock input::placeholder {
   color: #aaaaaa !important;
 }
+
+/* Grid Lines for Tic-Tac-Toe */
+.gamePage .board {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px !important; /* Thick grid lines */
+  background: var(--text) !important; /* The color of the lines */
+  border: 6px solid var(--text) !important; /* Outer border */
+  max-width: 320px;
+  margin: 30px auto;
+  border-radius: 12px;
+  overflow: hidden; /* Keep it rounded */
+}
+.gamePage .cell {
+  height: 100px !important;
+  font-size: 50px !important;
+  background: var(--bg) !important; /* Cell color, contrasts with lines */
+  border: none !important;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text) !important;
+  transition: background 0.2s;
+}
+.gamePage .cell:hover {
+  background: var(--surface) !important;
+}
+
+/* Invert colors for Canned Chat Options */
+.cannedPopover {
+  background: var(--bg) !important;
+}
+.cannedPopover button {
+  /* Using standard CSS variables to achieve complete inverse contrast */
+  background: var(--text) !important;
+  color: var(--bg) !important; 
+  border: none !important;
+  font-size: 15px !important;
+  font-weight: bold !important;
+  border-radius: 8px;
+  margin-bottom: 5px;
+  transition: opacity 0.2s;
+}
+.cannedPopover button:hover {
+  background: var(--text) !important;
+  opacity: 0.8 !important;
+}
