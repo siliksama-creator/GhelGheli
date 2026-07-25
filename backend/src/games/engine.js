@@ -7,11 +7,17 @@
 // plumbing — which is what kept tictactoe.js from growing into a monolith.
 const crypto = require('crypto');
 
-const BOT_WAIT_MS = 10_000; // how long to look for a human before using a bot
+// How long we hunt for a REAL opponent before falling back to the bot. The
+// client shows this as a visible countdown so waiting feels intentional
+// rather than broken.
+const MATCH_WAIT_MS = 15_000;
 const BOT_MOVE_MS = 650;    // small delay so the bot feels like it "thinks"
-// Per-turn time limit. Enforced HERE (not on the client) so a tampered or
-// frozen client can't stall the game forever for its opponent.
-const TURN_MS = 15_000;
+// Per-turn time limit, enforced HERE (not on the client) so a tampered or
+// frozen client can't stall the game forever. Each game overrides this with
+// its own `turnMs` — a Reversi board needs more thinking time than a 3x3
+// grid, and one global value made the bigger games feel rushed.
+const DEFAULT_TURN_MS = 20_000;
+const turnMsFor = rules => Number(rules.turnMs) || DEFAULT_TURN_MS;
 
 const queues = new Map(); // gameId -> [socket]
 const rooms = new Map();  // roomId -> room
@@ -63,7 +69,7 @@ function emitState(room, event, extra = {}) {
       sock.emit(event, {
         state: snapshot(room, sym),
         turn: room.turn,
-        turnMs: TURN_MS,
+        turnMs: room.turnMs,
         deadline: room.deadline || null,
         ...extra,
       });
@@ -80,7 +86,7 @@ function armTurnClock(room) {
   // The bot moves on its own schedule; no clock needed for its seat.
   const seat = room.seats[room.turn];
   if (!seat || seat === 'BOT') { room.deadline = null; return; }
-  room.deadline = Date.now() + TURN_MS;
+  room.deadline = Date.now() + room.turnMs;
   room.turnTimer = setTimeout(() => {
     if (room.done) return;
     const sym = room.turn;
@@ -101,7 +107,7 @@ function armTurnClock(room) {
     }
     room.rules.applyMove(room.state, move, sym);
     advance(room, move);
-  }, TURN_MS);
+  }, room.turnMs);
 }
 
 function finish(room, winner) {
@@ -164,6 +170,7 @@ function startRoom(io, rules, gameId, a, b) {
     id, gameId, rules, vsBot, done: false,
     state: rules.create(),
     turn: 'X',
+    turnMs: turnMsFor(rules),
     seats: { X: a, O: b || 'BOT' },
   };
   rooms.set(id, room);
@@ -181,7 +188,7 @@ function startRoom(io, rules, gameId, a, b) {
       sock.emit('game:start', {
         roomId: id, gameId, players, turn: 'X',
         yourSymbol: sym, vsBot, state: snapshot(room, sym),
-        turnMs: TURN_MS, deadline: room.deadline,
+        turnMs: room.turnMs, deadline: room.deadline,
       });
     }
   }
@@ -215,13 +222,20 @@ module.exports = function attachGames(io, rulesById) {
       }
 
       q.push(socket);
-      socket.emit('game:waiting', { gameId, message: 'در حال جستجوی حریف...' });
+      // Tell the client exactly how long the hunt lasts so it can render a
+      // real countdown instead of an open-ended spinner.
+      socket.emit('game:waiting', {
+        gameId,
+        message: 'در حال جستجوی حریف واقعی...',
+        waitMs: MATCH_WAIT_MS,
+        deadline: Date.now() + MATCH_WAIT_MS,
+      });
       socket.botTimeout = setTimeout(() => {
         const i = q.findIndex(s => s.user?.id === socket.user?.id);
         if (i === -1) return;
         q.splice(i, 1);
         startRoom(io, rules, gameId, socket, null);
-      }, BOT_WAIT_MS);
+      }, MATCH_WAIT_MS);
     });
 
     socket.on('game:move', payload => {

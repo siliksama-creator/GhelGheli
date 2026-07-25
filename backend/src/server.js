@@ -146,6 +146,11 @@ async function ensureChatCooldown(userId) {
   const remaining = Math.ceil(cooldown - diff);
   return { cooldown, remaining: remaining > 0 ? remaining : 0 };
 }
+// Treats an empty-string image field as "unchanged". Without this, any admin
+// form that submits a blank picture input silently ERASES the stored image
+// (COALESCE only guards against NULL/undefined, not ''). Pass null to clear
+// an image on purpose.
+function keepImage(v) { return v === '' ? undefined : v; }
 function maskSecret(v) { if (!v) return ''; const s=String(v); return s.length <= 4 ? '****' : `${s.slice(0,2)}****${s.slice(-2)}`; }
 // Strips whitespace, punctuation and invisible/zero-width Unicode
 // characters before comparing against the bad-word list. Previously only
@@ -575,7 +580,9 @@ app.get('/api/admin/dashboard', adminAuth, asyncHandler(async (req, res) => {
 }));
 
 app.post('/api/admin/uploads/image', adminAuth, requireRole('support'), imageUpload.single('image'), asyncHandler(async (req, res) => {
-  if (!req.file) return res.status(400).json({ message: 'فایل عکس معتبر نیست' });
+  // fileFilter drops anything that isn't png/jpg/webp/gif without raising,
+  // so a missing req.file here means "wrong type" rather than "no file".
+  if (!req.file) return res.status(400).json({ message: 'فقط فایل تصویری (PNG/JPG/WEBP/GIF) مجاز است' });
   res.json({ url: `/uploads/images/${req.file.filename}` });
 }));
 
@@ -594,7 +601,8 @@ app.post('/api/admin/chat/stickers', adminAuth, requireRole('support'), imageUpl
   res.json(rows[0]);
 }));
 app.patch('/api/admin/chat/stickers/:id', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
-  const { title, imageUrl, stickerType, isActive } = req.body;
+  const { title, stickerType, isActive } = req.body;
+  const imageUrl = keepImage(req.body.imageUrl);
   const { rows } = await pool.query('UPDATE chat_stickers SET title=COALESCE($1,title), image_url=COALESCE($2,image_url), sticker_type=COALESCE($3,sticker_type), is_active=COALESCE($4,is_active), updated_at=NOW() WHERE id=$5 RETURNING *', [title,imageUrl,stickerType,isActive,req.params.id]);
   await audit(req.admin.id,'update_chat_sticker','chat_stickers',req.params.id,null,req.body);
   res.json(rows[0]);
@@ -660,7 +668,8 @@ app.post('/api/admin/card-types', adminAuth, requireRole('support'), asyncHandle
   await audit(req.admin.id, 'create_card_type', 'card_types', rows[0].id, null, req.body); res.json(rows[0]);
 }));
 app.patch('/api/admin/card-types/:id', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
-  const { name, imageUrl, description, pointValue, isActive } = req.body;
+  const { name, description, pointValue, isActive } = req.body;
+  const imageUrl = keepImage(req.body.imageUrl);
   const { rows } = await pool.query('UPDATE card_types SET name=COALESCE($1,name), image_url=COALESCE($2,image_url), description=COALESCE($3,description), point_value=COALESCE($4,point_value), is_active=COALESCE($5,is_active), updated_at=NOW() WHERE id=$6 RETURNING *', [name,imageUrl,description,pointValue,isActive,req.params.id]);
   await audit(req.admin.id, 'update_card_type', 'card_types', req.params.id, null, req.body); res.json(rows[0]);
 }));
@@ -734,7 +743,7 @@ app.post('/api/admin/rewards', adminAuth, requireRole('support'), asyncHandler(a
 }));
 app.patch('/api/admin/rewards/:id', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
   const r = req.body;
-  const { rows } = await pool.query('UPDATE reward_tiers SET name=COALESCE($1,name),description=COALESCE($2,description),image_url=COALESCE($3,image_url),required_points=COALESCE($4,required_points),reward_type=COALESCE($5,reward_type),reward_value=COALESCE($6,reward_value),display_order=COALESCE($7,display_order),is_active=COALESCE($8,is_active),updated_at=NOW() WHERE id=$9 RETURNING *', [r.name,r.description,r.imageUrl,r.requiredPoints,r.rewardType,r.rewardValue,r.displayOrder,r.isActive,req.params.id]);
+  const { rows } = await pool.query('UPDATE reward_tiers SET name=COALESCE($1,name),description=COALESCE($2,description),image_url=COALESCE($3,image_url),required_points=COALESCE($4,required_points),reward_type=COALESCE($5,reward_type),reward_value=COALESCE($6,reward_value),display_order=COALESCE($7,display_order),is_active=COALESCE($8,is_active),updated_at=NOW() WHERE id=$9 RETURNING *', [r.name,r.description,keepImage(r.imageUrl),r.requiredPoints,r.rewardType,r.rewardValue,r.displayOrder,r.isActive,req.params.id]);
   await audit(req.admin.id,'update_reward','reward_tiers',req.params.id,null,r); res.json(rows[0]);
 }));
 app.get('/api/admin/reward-claims', adminAuth, asyncHandler(async (req, res) => res.json((await pool.query('SELECT c.*, u.mobile, r.name AS reward_name FROM user_reward_claims c JOIN users u ON u.id=c.user_id JOIN reward_tiers r ON r.id=c.reward_tier_id ORDER BY c.claimed_at DESC')).rows)));
@@ -898,6 +907,18 @@ function friendlyDbError(err) {
 }
 app.use((err, req, res, next) => {
   console.error(err);
+  // Multer (file uploads) throws its own error class with English messages
+  // like "File too large". Those used to fall through to the generic 500
+  // handler, so an admin uploading a big photo got a raw English string in
+  // the middle of a Persian panel with no hint about the real limit.
+  if (err.name === 'MulterError') {
+    const map = {
+      LIMIT_FILE_SIZE: 'حجم عکس بیش از ۵ مگابایت است',
+      LIMIT_FILE_COUNT: 'تعداد فایل‌ها بیش از حد مجاز است',
+      LIMIT_UNEXPECTED_FILE: 'فیلد فایل ارسالی معتبر نیست',
+    };
+    return res.status(400).json({ message: map[err.code] || 'آپلود فایل ناموفق بود' });
+  }
   const friendly = err.code ? friendlyDbError(err) : null;
   res.status(err.status || 500).json({ message: friendly || err.message || 'خطای سرور' });
 });

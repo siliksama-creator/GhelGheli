@@ -13,6 +13,7 @@ export function CardsPage({ request }) {
   const [report, setReport] = useState(null);
   const [form, setForm] = useState({ name: '', point: '', desc: '', image: '' });
   const [imageFile, setImageFile] = useState(null);
+  const [uploadingFor, setUploadingFor] = useState('');
   const [bulkType, setBulkType] = useState('');
   const [bulkCodes, setBulkCodes] = useState('');
   const [singleCode, setSingleCode] = useState('');
@@ -34,14 +35,39 @@ export function CardsPage({ request }) {
     const name = await promptText({ title: 'نام کارت', defaultValue: t.name });
     if (!name) return;
     const pointValue = await promptText({ title: 'امتیاز کارت', defaultValue: `${t.point_value}`, type: 'number' });
-    const imageUrl = await promptText({ title: 'آدرس عکس کارت', defaultValue: t.image_url || '' });
     const description = await promptText({ title: 'توضیحات کارت', defaultValue: t.description || '', multiline: true });
+    // NOTE: the image is intentionally NOT edited here — it used to be a bare
+    // text prompt that sent `imageUrl: ''` whenever the admin cancelled or
+    // left it blank, silently WIPING the card's picture. Use the dedicated
+    // "تغییر عکس" button (real file upload) instead, and omit the field here
+    // so the server's COALESCE keeps the existing image untouched.
     await request(`/api/admin/card-types/${t.id}`, {
       method: 'PATCH',
-      body: { name, pointValue: Number(pointValue) || t.point_value, imageUrl: imageUrl || '', description: description || '' },
+      body: {
+        name,
+        pointValue: Number(pointValue) || t.point_value,
+        description: description || '',
+      },
     });
     notify('کارت ویرایش شد');
     load();
+  }
+
+  /// Uploads a new picture for an existing card type. The file goes to the
+  /// VPS (backend/uploads/images) and only the returned URL is stored.
+  async function changeTypeImage(t, file) {
+    if (!file) return;
+    setUploadingFor(t.id);
+    try {
+      const imageUrl = await request.uploadImage(file);
+      await request(`/api/admin/card-types/${t.id}`, { method: 'PATCH', body: { imageUrl } });
+      notify('عکس کارت به‌روزرسانی شد');
+      load();
+    } catch (err) {
+      notify(err.message, 'error');
+    } finally {
+      setUploadingFor('');
+    }
   }
 
   async function addType(e) {
@@ -159,9 +185,24 @@ export function CardsPage({ request }) {
                 title={t.name}
                 subtitle={`${fmtNumber(t.point_value)} امتیاز`}
                 actions={
-                  <Button size="sm" variant="secondary" icon={Pencil} onClick={() => editType(t)}>
-                    ویرایش
-                  </Button>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer' }}>
+                      {uploadingFor === t.id ? 'در حال آپلود...' : 'تغییر عکس'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        hidden
+                        disabled={uploadingFor === t.id}
+                        onChange={(e) => {
+                          changeTypeImage(t, e.target.files?.[0]);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                    <Button size="sm" variant="secondary" icon={Pencil} onClick={() => editType(t)}>
+                      ویرایش
+                    </Button>
+                  </div>
                 }
               />
             ))

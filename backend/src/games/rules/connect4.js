@@ -88,6 +88,8 @@ function botMove(state, me) {
 
 module.exports = {
   id: 'connect4',
+  // Per-turn thinking time: 7 columns to weigh up.
+  turnMs: 20000,
   title: 'چهار در یک ردیف',
   create, result, isValidMove, applyMove, nextTurn, botMove,
 };

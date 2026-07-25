@@ -34,8 +34,12 @@ class GameSession extends ChangeNotifier {
   /// `deadline` so both clients agree even if one lags.
   int secondsLeft = 0;
   int turnSeconds = 15;
+  /// Countdown while hunting for a real opponent (before the bot steps in).
+  int searchSecondsLeft = 0;
+  int searchSeconds = 15;
   String? timedOutSymbol;
   Timer? _ticker;
+  Timer? _searchTicker;
   int _lastTickPlayed = -1;
 
   bool get myTurn => phase == GamePhase.playing && turn != null && turn == mySymbol;
@@ -70,9 +74,11 @@ class GameSession extends ChangeNotifier {
 
     s.on('game:error', (d) => _fail(_msg(d) ?? 'خطا در بازی'));
 
-    s.on('game:waiting', (_) {
+    s.on('game:waiting', (d) {
+      final m = _asMap(d);
       phase = GamePhase.waiting;
       error = null;
+      _startSearchClock(m['deadline'], m['waitMs']);
       notifyListeners();
     });
 
@@ -89,6 +95,7 @@ class GameSession extends ChangeNotifier {
       phase = GamePhase.playing;
       error = null;
       GameAudio.instance.play(Sfx.matchFound);
+      _stopSearchClock();
       _startClock(m['deadline'], m['turnMs']);
       notifyListeners();
     });
@@ -156,6 +163,36 @@ class GameSession extends ChangeNotifier {
     _ticker = Timer.periodic(const Duration(milliseconds: 200), (_) => tick());
   }
 
+  /// Ticks down the "looking for a real opponent" window.
+  void _startSearchClock(dynamic deadline, dynamic waitMs) {
+    _searchTicker?.cancel();
+    final ms = (waitMs as num?)?.toInt();
+    if (ms != null && ms > 0) searchSeconds = (ms / 1000).round();
+    final end = (deadline as num?)?.toInt();
+    if (end == null) {
+      searchSecondsLeft = searchSeconds;
+      return;
+    }
+    void tick() {
+      final left = ((end - DateTime.now().millisecondsSinceEpoch) / 1000).ceil();
+      final clamped =
+          left < 0 ? 0 : (left > searchSeconds ? searchSeconds : left);
+      if (clamped != searchSecondsLeft) {
+        searchSecondsLeft = clamped;
+        notifyListeners();
+      }
+      if (clamped <= 0) _searchTicker?.cancel();
+    }
+
+    tick();
+    _searchTicker = Timer.periodic(const Duration(milliseconds: 250), (_) => tick());
+  }
+
+  void _stopSearchClock() {
+    _searchTicker?.cancel();
+    _searchTicker = null;
+  }
+
   void _stopClock() {
     _ticker?.cancel();
     _ticker = null;
@@ -198,6 +235,7 @@ class GameSession extends ChangeNotifier {
     state = const {};
     timedOutSymbol = null;
     _stopClock();
+    _stopSearchClock();
     notifyListeners();
   }
 
@@ -228,6 +266,7 @@ class GameSession extends ChangeNotifier {
     error = m;
     phase = GamePhase.idle;
     _stopClock();
+    _stopSearchClock();
     notifyListeners();
   }
 
@@ -240,6 +279,7 @@ class GameSession extends ChangeNotifier {
   @override
   void dispose() {
     _ticker?.cancel();
+    _searchTicker?.cancel();
     _socket?.dispose();
     _socket = null;
     super.dispose();

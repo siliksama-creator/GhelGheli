@@ -73,14 +73,14 @@ function makeIo() {
     ok(a.rooms.size === 0 && b.rooms.size === 0, 'room cleaned up');
   }
 
-  console.log('\n== bot fallback (10s) ==');
+  console.log('\n== bot fallback (15s) ==');
   {
     const io = makeIo(); attach(io, RULES);
     const a = io.connect(new FakeSocket('solo', 'تنها'));
     a.fire('game:join', { gameId: 'tictactoe' });
     ok(a.has('game:waiting'), 'waits for a human first');
     ok(!a.has('game:start'), 'no instant bot game');
-    await wait(10300);
+    await wait(15400);
     const st = a.last('game:start');
     ok(!!st && st.vsBot === true, 'falls back to the bot');
     ok(st.players.O.id === 'bot', 'bot occupies the second seat');
@@ -154,7 +154,7 @@ function makeIo() {
     a.fire('game:join', { gameId: 'tictactoe' });
     b.fire('game:join', { gameId: 'tictactoe' });
     const st = a.last('game:start');
-    ok(st.turnMs === 15000, 'turn budget advertised to clients');
+    ok(st.turnMs === 15000, 'tictactoe turn budget (15s) advertised');
     ok(typeof st.deadline === 'number' && st.deadline > Date.now(), 'deadline sent on start');
     ok(!!st.players.X.profileAvatarKey || st.players.X.profileAvatarKey === null,
       'player profile fields present');
@@ -164,7 +164,7 @@ function makeIo() {
     const before = a.last('game:update');
     ok(before === undefined, 'no move yet');
     // Let X's clock expire; the server should auto-play and pass the turn.
-    await wait(15400);
+    await wait(15600);
     const after = a.last('game:update');
     ok(!!after, 'server acted when the clock ran out');
     ok(after && after.timedOut === 'X', 'timeout attributed to the right player');
@@ -172,6 +172,26 @@ function makeIo() {
     ok(after && after.state.board.filter(Boolean).length === 1, 'exactly one auto-move played');
     ok(typeof after.deadline === 'number', 'new deadline issued for the next turn');
     a.fire('game:leave');
+  }
+
+  console.log('\n== per-game turn budgets & match countdown ==');
+  {
+    const io = makeIo(); attach(io, RULES);
+    const budgets = { tictactoe: 15000, connect4: 20000, reversi: 30000 };
+    for (const [gid, want] of Object.entries(budgets)) {
+      const p1 = io.connect(new FakeSocket(`b-${gid}-1`, 'الف'));
+      const p2 = io.connect(new FakeSocket(`b-${gid}-2`, 'ب'));
+      p1.fire('game:join', { gameId: gid });
+      const waiting = p1.last('game:waiting');
+      ok(waiting && waiting.waitMs === 15000, `${gid}: 15s match hunt advertised`);
+      ok(waiting && typeof waiting.deadline === 'number' && waiting.deadline > Date.now(),
+        `${gid}: match countdown deadline sent`);
+      p2.fire('game:join', { gameId: gid });
+      const st = p1.last('game:start');
+      ok(st && st.turnMs === want, `${gid}: turn budget is ${want / 1000}s`);
+      ok(st && st.deadline - Date.now() > want - 1500, `${gid}: first deadline matches budget`);
+      p1.fire('game:leave'); p2.fire('game:leave');
+    }
   }
 
   console.log('\n== regression: ghost rooms & sticky timeout ==');

@@ -100,15 +100,59 @@ class GameScaffold extends StatelessWidget {
         );
 
       case GamePhase.waiting:
-        return _Centered(
-          icon: Icons.search_rounded,
-          title: 'در حال جستجوی حریف...',
-          subtitle: 'تا ۱۰ ثانیه دیگر با ربات شروع می‌کنیم.',
-          spinner: true,
-          action: OutlinedButton.icon(
-            onPressed: session.leave,
-            icon: const Icon(Icons.close_rounded),
-            label: const Text('لغو'),
+        final left = session.searchSecondsLeft;
+        final total = session.searchSeconds <= 0 ? 15 : session.searchSeconds;
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(Gaps.lg),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 96,
+                  height: 96,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      SizedBox.expand(
+                        child: CircularProgressIndicator(
+                          value: (left / total).clamp(0.0, 1.0),
+                          strokeWidth: 6,
+                          backgroundColor: theme.colorScheme.outline
+                              .withValues(alpha: 0.2),
+                          valueColor: AlwaysStoppedAnimation(accent),
+                        ),
+                      ),
+                      Text(
+                        faNum(left),
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.w900,
+                          color: accent,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Gaps.vLg,
+                Text('در حال جستجوی حریف واقعی...',
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w700)),
+                Gaps.vXxs,
+                Text(
+                  left > 0
+                      ? 'اگر حریفی پیدا نشود، بعد از ${faNum(left)} ثانیه با ربات شروع می‌کنیم.'
+                      : 'در حال آماده‌سازی بازی با ربات...',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall,
+                ),
+                Gaps.vLg,
+                OutlinedButton.icon(
+                  onPressed: session.leave,
+                  icon: const Icon(Icons.close_rounded),
+                  label: const Text('لغو'),
+                ),
+              ],
+            ),
           ),
         );
 
@@ -249,13 +293,11 @@ class _Centered extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.action,
-    this.spinner = false,
   });
   final IconData icon;
   final String title;
   final String? subtitle;
   final Widget? action;
-  final bool spinner;
 
   @override
   Widget build(BuildContext context) {
@@ -266,10 +308,7 @@ class _Centered extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (spinner)
-              const CircularProgressIndicator()
-            else
-              Icon(icon, size: 56, color: theme.colorScheme.outline),
+            Icon(icon, size: 56, color: theme.colorScheme.outline),
             Gaps.vMd,
             Text(title,
                 textAlign: TextAlign.center,

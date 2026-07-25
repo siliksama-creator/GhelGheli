@@ -30,8 +30,11 @@ function useGame(api, token, gameId) {
   const [error, setError] = useState('');
   const [left, setLeft] = useState(0);
   const [turnSecs, setTurnSecs] = useState(15);
+  const [searchLeft, setSearchLeft] = useState(0);
+  const [searchSecs, setSearchSecs] = useState(15);
   const room = useRef(null);
   const deadline = useRef(null);
+  const searchEnd = useRef(null);
   const meRef = useRef(null);
   const turnRef = useRef(null);
   const tickedAt = useRef(-1);
@@ -41,10 +44,16 @@ function useGame(api, token, gameId) {
     ref.current = s;
     s.on('connect_error', () => setError('اتصال به سرور بازی برقرار نشد'));
     s.on('game:error', d => setError(d?.message || 'خطا در بازی'));
-    s.on('game:waiting', () => { setError(''); setPhase('waiting'); });
+    s.on('game:waiting', d => {
+      setError('');
+      setPhase('waiting');
+      if (d?.waitMs) setSearchSecs(Math.round(d.waitMs / 1000));
+      searchEnd.current = d?.deadline || null;
+    });
 
     s.on('game:start', d => {
       room.current = d.roomId;
+      searchEnd.current = null;
       meRef.current = d.yourSymbol;
       turnRef.current = d.turn;
       deadline.current = d.deadline || null;
@@ -84,6 +93,9 @@ function useGame(api, token, gameId) {
   // Countdown driven by the server deadline, so both players agree.
   useEffect(() => {
     const id = setInterval(() => {
+      if (searchEnd.current) {
+        setSearchLeft(Math.max(0, Math.ceil((searchEnd.current - Date.now()) / 1000)));
+      }
       if (!deadline.current) { setLeft(0); return; }
       const secs = Math.max(0, Math.ceil((deadline.current - Date.now()) / 1000));
       setLeft(secs);
@@ -97,7 +109,7 @@ function useGame(api, token, gameId) {
   }, []);
 
   return {
-    phase, error, left, turnSecs, ...g,
+    phase, error, left, turnSecs, searchLeft, searchSecs, ...g,
     myTurn: phase === 'playing' && g.turn && g.turn === g.me,
     join: () => {
       setError('');
@@ -108,6 +120,7 @@ function useGame(api, token, gameId) {
     move: i => { play(MOVE_SFX[gameId] || 'move'); ref.current?.emit('game:move', { roomId: room.current, move: i }); },
     leave: () => {
       deadline.current = null;
+      searchEnd.current = null;
       ref.current?.emit('game:leave', { roomId: room.current });
       setPhase('idle');
     },
@@ -225,7 +238,15 @@ function GameRoom({ api, token, game, onBack, openProfile }) {
 
       {g.phase === 'waiting' && (
         <div className="gameCenter">
-          <p>در حال جستجوی حریف...</p>
+          <div className="searchRing" style={{ '--pct': `${((g.searchLeft / (g.searchSecs || 15)) * 100).toFixed(0)}%` }}>
+            <span>{g.searchLeft}</span>
+          </div>
+          <p><b>در حال جستجوی حریف واقعی...</b></p>
+          <p className="hint">
+            {g.searchLeft > 0
+              ? `اگر حریفی پیدا نشود، بعد از ${g.searchLeft} ثانیه با ربات شروع می‌کنیم.`
+              : 'در حال آماده‌سازی بازی با ربات...'}
+          </p>
           <button className="danger" onClick={g.leave}>لغو</button>
         </div>
       )}

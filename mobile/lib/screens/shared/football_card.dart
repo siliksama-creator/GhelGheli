@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
 import '../../theme/tokens.dart';
+import 'card_detail_sheet.dart';
 
 /// Football-card inventory tile shown in the horizontally-scrolling
 /// "موجودی کارت‌ها" list on the dashboard.
@@ -12,7 +13,10 @@ class FootballCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final img = fullAssetUrl(item['image_url']);
-    return Container(
+    // Tapping opens the full-size player artwork — the tile crops it hard.
+    return GestureDetector(
+      onTap: () => showCardDetail(context, item),
+      child: Container(
       width: 168,
       padding: const EdgeInsets.all(Gaps.sm + 2),
       decoration: BoxDecoration(
@@ -72,6 +76,7 @@ class FootballCard extends StatelessWidget {
           Text('${faNum(item['point_value'])} امتیاز',
               style: const TextStyle(color: Colors.white70, fontSize: 12)),
         ],
+      ),
       ),
     );
   }

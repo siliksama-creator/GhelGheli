@@ -46,6 +46,8 @@ function botMove(state, me) {
 
 module.exports = {
   id: 'tictactoe',
+  // Per-turn thinking time: 3x3 board — decisions are quick.
+  turnMs: 15000,
   title: 'دوز',
   create, result, isValidMove, applyMove, nextTurn, botMove,
 };

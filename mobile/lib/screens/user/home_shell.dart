@@ -61,6 +61,14 @@ class _HomeShellState extends State<HomeShell>
     ProfilePage(api: widget.api, reloadProfile: _loadProfile),
   ];
 
+  // UI FIX: seven destinations squeezed into one bar made every icon and
+  // label tiny (and the Persian labels were truncating). Material's own
+  // guidance caps a navigation bar at five. The two least-used sections
+  // (پشتیبانی / پروفایل) moved into a "بیشتر" sheet, which lets the
+  // remaining icons breathe at full size.
+  static const _navIndexes = [0, 1, 2, 3, 4];
+  static const _moreIndexes = [5, 6];
+
   static const _destinations = [
     NavigationDestination(
         icon: Icon(Icons.home_outlined),
@@ -79,8 +87,8 @@ class _HomeShellState extends State<HomeShell>
         selectedIcon: Icon(Icons.chat_bubble_rounded),
         label: 'چت روم'),
     NavigationDestination(
-        icon: Icon(Icons.gamepad_outlined),
-        selectedIcon: Icon(Icons.gamepad_rounded),
+        icon: Icon(Icons.sports_esports_outlined),
+        selectedIcon: Icon(Icons.sports_esports_rounded),
         label: 'بازی‌ها'),
     NavigationDestination(
         icon: Icon(Icons.support_agent_outlined),
@@ -137,6 +145,55 @@ class _HomeShellState extends State<HomeShell>
     'پروفایل'
   ];
 
+  /// Which bar slot to highlight — the "more" slot when a sheet-only page
+  /// is open, otherwise the matching tab.
+  int get _barSelection {
+    final i = _navIndexes.indexOf(_index);
+    return i == -1 ? _navIndexes.length : i;
+  }
+
+  void _onNavTap(int slot) {
+    if (slot < _navIndexes.length) {
+      setState(() => _index = _navIndexes[slot]);
+    } else {
+      _openMore();
+    }
+  }
+
+  Future<void> _openMore() async {
+    final picked = await showModalBottomSheet<int>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final i in _moreIndexes)
+              ListTile(
+                leading: Icon(_index == i
+                    ? (_destinations[i].selectedIcon as Icon).icon
+                    : (_destinations[i].icon as Icon).icon),
+                title: Text(_titles[i]),
+                selected: _index == i,
+                onTap: () => Navigator.pop(sheetContext, i),
+              ),
+            ListTile(
+              leading: Icon(
+                  widget.dark ? Icons.light_mode_rounded : Icons.dark_mode_rounded),
+              title: Text(widget.dark ? 'حالت روشن' : 'حالت تیره'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                widget.onTheme();
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (picked != null && mounted) setState(() => _index = picked);
+  }
+
   @override
   Widget build(BuildContext context) {
     final nickname = _profile?['user']?['nickname'];
@@ -162,13 +219,8 @@ class _HomeShellState extends State<HomeShell>
           ],
         ),
         actions: [
-          IconButton(
-            tooltip: widget.dark ? 'حالت روشن' : 'حالت تیره',
-            onPressed: widget.onTheme,
-            icon: Icon(widget.dark
-                ? Icons.light_mode_rounded
-                : Icons.dark_mode_rounded),
-          ),
+          // The theme switch moved into the "بیشتر" sheet, leaving the bar
+          // uncluttered with just the logout action.
           IconButton(
               tooltip: 'خروج',
               onPressed: widget.onLogout,
@@ -191,9 +243,22 @@ class _HomeShellState extends State<HomeShell>
         ),
       ),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: _destinations,
+        // Taller bar + always-visible labels: the default height with seven
+        // items clipped the Persian text.
+        height: 68,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        selectedIndex: _barSelection,
+        onDestinationSelected: _onNavTap,
+        destinations: [
+          for (final i in _navIndexes) _destinations[i],
+          NavigationDestination(
+            icon: Icon(_moreIndexes.contains(_index)
+                ? Icons.more_horiz_rounded
+                : Icons.more_horiz_outlined),
+            selectedIcon: const Icon(Icons.more_horiz_rounded),
+            label: 'بیشتر',
+          ),
+        ],
       ),
     );
   }

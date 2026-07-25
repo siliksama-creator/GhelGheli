@@ -100,6 +100,8 @@ const decorate = (state, sym) => ({
 
 module.exports = {
   id: 'reversi',
+  // Per-turn thinking time: 64 squares and flip chains need real thought.
+  turnMs: 30000,
   title: 'اتللو',
   create, result, finalResult, isValidMove, applyMove, nextTurn, botMove, decorate,
 };
