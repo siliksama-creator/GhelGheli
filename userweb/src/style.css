@@ -423,3 +423,14 @@
   .mobileNav { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; }
   .mobileNav button { flex: 0 0 auto; }
 }
+
+/* Composer: the middle button's label wrapped to two lines and squeezed the
+   layout ("انتخاب / پیام" stacked vertically). Give it room and keep it on
+   one line. */
+.sendDock { grid-template-columns: 52px 1fr 96px; }
+.sendDock > button { white-space: nowrap; }
+.sendDock .emojiBtn { padding: 9px 0; }
+@media (max-width: 900px) {
+  .sendDock { grid-template-columns: 46px 1fr 84px; gap: 6px; }
+  .sendDock > button { font-size: 13px; padding: 11px 8px; }
+}
