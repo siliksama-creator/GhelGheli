@@ -1,6 +1,6 @@
 import React,{useEffect,useState}from'react';
 import{createRoot}from'react-dom/client';
-import { io } from 'socket.io-client';
+import GamesHub from './games.jsx';
 import'./style.css';
 
 const API=import.meta.env.VITE_API_BASE||'https://api.ghelghelishop.ir';
@@ -33,7 +33,7 @@ function Portal({token,logout}){
   async function load(){const pr=await req('/api/profile','GET',null,token);setP(pr);setRewards(await req('/api/rewards','GET',null,token));}
   useEffect(()=>{load()},[]);
   if(!p)return <div className="card">در حال بارگذاری...</div>;
-  return <div className="portal"><nav className="mobileNav">{[['home','خانه'],['profile','پروفایل'],['rewards','جوایز'],['league','لیگ'],['chat','چت روم'],['game','بازی دوز'],['support','پشتیبانی']].map(x=><button key={x[0]} className={tab===x[0]?'on':''} onClick={()=>setTab(x[0])}>{x[1]}</button>)}<button className="danger" onClick={logout}>خروج</button></nav>{msg&&<div className="toast">{msg}</div>}{tab==='home'&&<Home token={token} p={p} rewards={rewards} load={load} setMsg={setMsg}/>} {tab==='profile'&&<Profile token={token} p={p} load={load} setMsg={setMsg}/>} {tab==='rewards'&&<Rewards rewards={rewards}/>} {tab==='league'&&<League token={token} openProfile={setPublicUser}/>} {tab==='chat'&&<Chat token={token} openProfile={setPublicUser}/>} {tab==='games'&&<GamesHub token={token} />}
+  return <div className="portal"><nav className="mobileNav">{[['home','خانه'],['profile','پروفایل'],['rewards','جوایز'],['league','لیگ'],['chat','چت روم'],['games','بازی‌ها'],['support','پشتیبانی']].map(x=><button key={x[0]} className={tab===x[0]?'on':''} onClick={()=>setTab(x[0])}>{x[1]}</button>)}<button className="danger" onClick={logout}>خروج</button></nav>{msg&&<div className="toast">{msg}</div>}{tab==='home'&&<Home token={token} p={p} rewards={rewards} load={load} setMsg={setMsg}/>} {tab==='profile'&&<Profile token={token} p={p} load={load} setMsg={setMsg}/>} {tab==='rewards'&&<Rewards rewards={rewards}/>} {tab==='league'&&<League token={token} openProfile={setPublicUser}/>} {tab==='chat'&&<Chat token={token} openProfile={setPublicUser}/>} {tab==='games'&&<GamesHub api={API} token={token}/>}
  {tab==='support'&&<Support token={token}/>} {publicUser&&<PublicProfile token={token} userId={publicUser} close={()=>setPublicUser(null)}/>}</div>;
 }
 
@@ -72,99 +72,3 @@ function PublicProfile({token,userId,close}){const[u,setU]=useState(null),[err,s
 function Support({token}){const[subject,setSubject]=useState(''),[message,setMessage]=useState(''),[tickets,setTickets]=useState([]),[msg,setMsg]=useState('');async function load(){setTickets(await req('/api/support/tickets','GET',null,token))}useEffect(()=>{load()},[]);async function send(){try{await req('/api/support/tickets','POST',{subject,message},token);setSubject('');setMessage('');setMsg('تیکت ارسال شد');load()}catch(e){setMsg(e.message)}}return <section className="card wide"><h2>پشتیبانی</h2><input value={subject} onChange={e=>setSubject(e.target.value)} placeholder="موضوع"/><textarea value={message} onChange={e=>setMessage(e.target.value)} placeholder="پیام"/><button className="main" onClick={send}>ارسال تیکت</button>{msg&&<p className="msg">{msg}</p>}<h3>تیکت‌های من</h3>{tickets.map(t=><div className="row" key={t.id}><span>{t.subject}</span><b>{t.status}</b></div>)}</section>}
 
 createRoot(document.getElementById('root')).render(<App/>);
-
-
-function Game({token, onBack}){
-  const [socket, setSocket] = useState(null);
-  const [status, setStatus] = useState('idle'); // idle, waiting, playing, over
-  const [gameData, setGameData] = useState(null);
-  const [mySymbol, setMySymbol] = useState(null);
-
-  useEffect(() => {
-    const s = io(API, { auth: { token } });
-    setSocket(s);
-
-    s.on('game:waiting', (data) => setStatus('waiting'));
-    s.on('game:start', (data) => {
-      setGameData(data);
-      setStatus('playing');
-      setMySymbol(data.yourSymbol); 
-      // Need a safer way to determine mySymbol. The server gives IDs. 
-      // Actually, mySymbol can be determined by decoding the JWT or fetching profile, but since we didn't pass user ID to Game component,
-      // Let's deduce it inside the start event. Wait, data.players['X'].id will match the user.id, but socket.id is different!
-      // I'll adjust the server code to pass 'yourSymbol' in game:start. 
-    });
-    s.on('game:update', (data) => {
-      setGameData(prev => ({ ...prev, board: data.board, turn: data.turn || prev.turn }));
-    });
-    s.on('game:over', (data) => {
-      setStatus('over');
-      setGameData(prev => ({ ...prev, winner: data.winner }));
-    });
-
-    return () => s.disconnect();
-  }, [token]);
-
-  function joinGame() { socket.emit('game:join'); }
-  function leaveQueue() { socket.emit('game:leave'); setStatus('idle'); }
-  function play(index) {
-    if (status !== 'playing') return;
-    socket.emit('game:move', { roomId: gameData.roomId, index });
-  }
-
-  return <section className="card wide gamePage">
-    <h2>بازی دوز آنلاین 🎮</h2>
-    <button onClick={onBack} style={{marginBottom:'15px', padding:'5px 10px', borderRadius:'8px', background:'var(--border)', color:'var(--text)', border:'none', cursor:'pointer'}}>🔙 بازگشت به منوی بازی‌ها</button>
-    {status === 'idle' && <button className="main" onClick={joinGame}>شروع جستجوی حریف</button>}
-    {status === 'waiting' && <div><p>در حال جستجوی حریف...</p><button className="danger" onClick={leaveQueue}>لغو جستجو</button></div>}
-    {status === 'playing' && gameData && <div>
-      <div className="scoreboard">
-        <div className="player"><span>❌</span><b>{gameData.players['X'].nickname}</b></div>
-        <div className="turn-indicator">نوبت: {gameData.turn === 'X' ? '❌' : '⭕'}</div>
-        <div className="player"><span>⭕</span><b>{gameData.players['O'].nickname}</b></div>
-      </div>
-      <div className="board">
-        {(gameData.board || Array(9).fill(null)).map((c, i) => (
-          <button key={i} className="cell" onClick={() => play(i)}>
-            {c === 'X' ? '❌' : (c === 'O' ? '⭕' : '')}
-          </button>
-        ))}
-      </div>
-      <button className="danger" style={{marginTop:'15px'}} onClick={leaveQueue}>خروج از بازی</button>
-    </div>}
-    {status === 'over' && gameData && <div>
-      <h3>نتیجه بازی: {gameData.winner === 'DRAW' ? 'مساوی!' : (gameData.winner === 'DISCONNECT' ? 'حریف خارج شد!' : 'برنده: ' + (gameData.winner === 'X' ? '❌' : '⭕'))}</h3>
-      <button className="main" onClick={() => { setStatus('idle'); setGameData(null); }}>بازی دوباره</button>
-    </div>}
-  </section>;
-}
-
-function GamesHub({token}) {
-  const [activeGame, setActiveGame] = useState(null);
-  if (activeGame === 'tictactoe') return <Game token={token} onBack={() => setActiveGame(null)} />;
-  return <section className="card wide">
-    <h2>بخش بازی‌ها 🎮</h2>
-    <p className="hint">بازی مورد نظر خود را انتخاب کنید تا با دیگر بازیکنان رقابت کنید!</p>
-    <div style={{display:'flex', gap:'15px', flexWrap:'wrap', marginTop:'20px'}}>
-      
-      <div className="card clickable" style={{width:'160px', textAlign:'center', display:'flex', flexDirection:'column', alignItems:'center', background:'var(--surface)', border:'1px solid var(--border)'}} onClick={() => setActiveGame('tictactoe')}>
-        <span style={{fontSize:'60px', marginBottom:'10px'}}>❌⭕</span>
-        <b style={{fontSize:'18px'}}>دوز آنلاین</b>
-        <p className="hint">رقابت دو نفره</p>
-      </div>
-
-      <div className="card" style={{width:'160px', textAlign:'center', opacity:0.5, display:'flex', flexDirection:'column', alignItems:'center', background:'var(--surface)', border:'1px solid var(--border)'}}>
-        <span style={{fontSize:'60px', marginBottom:'10px'}}>🎲</span>
-        <b style={{fontSize:'18px'}}>منچ آنلاین</b>
-        <p className="hint">به‌زودی...</p>
-      </div>
-      
-      <div className="card" style={{width:'160px', textAlign:'center', opacity:0.5, display:'flex', flexDirection:'column', alignItems:'center', background:'var(--surface)', border:'1px solid var(--border)'}}>
-        <span style={{fontSize:'60px', marginBottom:'10px'}}>🎯</span>
-        <b style={{fontSize:'18px'}}>نقطه‌بازی</b>
-        <p className="hint">به‌زودی...</p>
-      </div>
-
-    </div>
-  </section>;
-}

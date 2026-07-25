@@ -31,46 +31,6 @@
   background: var(--border);
 }
 
-.gamePage .board {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  max-width: 300px;
-  margin: 20px auto;
-}
-.gamePage .cell {
-  height: 90px;
-  font-size: 50px;
-  background: var(--surface);
-  border: 2px solid var(--border);
-  border-radius: 12px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text);
-}
-.gamePage .cell:hover {
-  background: var(--bg);
-}
-.gamePage .scoreboard {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: var(--surface);
-  padding: 15px;
-  border-radius: 12px;
-  margin-bottom: 20px;
-}
-.gamePage .player {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-.gamePage .turn-indicator {
-  font-weight: bold;
-  color: #ff9800;
-}
 
 /* Fix Chat Visbility */
 .chatbody {
@@ -110,33 +70,6 @@
   color: #aaaaaa !important;
 }
 
-/* Grid Lines for Tic-Tac-Toe */
-.gamePage .board {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px !important; /* Thick grid lines */
-  background: var(--text) !important; /* The color of the lines */
-  border: 6px solid var(--text) !important; /* Outer border */
-  max-width: 320px;
-  margin: 30px auto;
-  border-radius: 12px;
-  overflow: hidden; /* Keep it rounded */
-}
-.gamePage .cell {
-  height: 100px !important;
-  font-size: 50px !important;
-  background: var(--bg) !important; /* Cell color, contrasts with lines */
-  border: none !important;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text) !important;
-  transition: background 0.2s;
-}
-.gamePage .cell:hover {
-  background: var(--surface) !important;
-}
 
 /* Invert colors for Canned Chat Options */
 .cannedPopover {
@@ -157,3 +90,55 @@
   background: var(--text) !important;
   opacity: 0.8 !important;
 }
+
+/* ---------- Games (hub + all boards) ---------- */
+.gameGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 14px; }
+.gameTile {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 18px 12px; cursor: pointer; color: var(--text);
+  background: var(--surface); border: 1px solid var(--border);
+  border-top: 3px solid var(--accent); border-radius: 16px;
+  transition: transform .15s, box-shadow .15s;
+}
+.gameTile:hover { transform: translateY(-3px); box-shadow: 0 8px 22px rgba(0,0,0,.28); }
+.gameTile .gEmoji { font-size: 34px; }
+.gameTile b { font-size: 15px; }
+.gameTile small { opacity: .7; font-size: 12px; }
+.gameTile i { font-style: normal; font-size: 11px; color: var(--accent); margin-top: 4px; }
+
+.gameHead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.gameHead h2 { margin: 0; flex: 1; }
+.botTag { font-size: 12px; padding: 3px 10px; border-radius: 999px; background: rgba(255,255,255,.12); }
+.ghost { background: transparent; border: 1px solid var(--border); color: var(--text); border-radius: 10px; padding: 6px 12px; cursor: pointer; }
+.gameCenter { display: flex; flex-direction: column; align-items: center; gap: 12px; margin: 18px 0; text-align: center; }
+
+.gamePage .scoreboard { display: flex; justify-content: space-between; align-items: center; background: var(--surface); padding: 12px; border-radius: 12px; margin: 14px 0; }
+.gamePage .player { display: flex; flex-direction: column; align-items: center; padding: 6px 14px; border-radius: 10px; border: 1px solid transparent; }
+.gamePage .player.on { border-color: #ff9800; background: rgba(255,152,0,.12); }
+.gamePage .player i { font-style: normal; font-weight: 700; }
+.gamePage .turn-indicator { font-weight: bold; color: #ff9800; }
+
+/* دوز */
+.ttt-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; background: var(--text); border: 6px solid var(--text); max-width: 300px; margin: 18px auto; border-radius: 12px; overflow: hidden; }
+.ttt-cell { aspect-ratio: 1; font-size: 44px; background: var(--bg); border: none; cursor: pointer; color: var(--text); display: flex; align-items: center; justify-content: center; }
+.ttt-cell:disabled { cursor: default; }
+.ttt-cell:hover:not(:disabled) { background: var(--surface); }
+
+/* چهار در یک ردیف */
+.c4-board { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; background: linear-gradient(135deg,#1D4ED8,#1E3A8A); padding: 8px; border-radius: 14px; max-width: 380px; margin: 18px auto; }
+.c4-col { display: flex; flex-direction: column; gap: 4px; background: transparent; border: none; padding: 0; cursor: pointer; }
+.c4-col:disabled { cursor: default; }
+.c4-col:hover:not(:disabled) { background: rgba(255,255,255,.10); border-radius: 8px; }
+.c4-disc { aspect-ratio: 1; border-radius: 50%; background: rgba(15,23,42,.6); display: block; }
+.c4-disc.red { background: #EF4444; box-shadow: 0 0 8px rgba(239,68,68,.6); }
+.c4-disc.yellow { background: #FACC15; box-shadow: 0 0 8px rgba(250,204,21,.6); }
+.c4-disc.win { outline: 2px solid #fff; }
+
+/* اتللو */
+.rv-board { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; background: #14532D; padding: 6px; border-radius: 12px; max-width: 360px; margin: 18px auto; }
+.rv-cell { aspect-ratio: 1; background: rgba(22,163,74,.85); border: none; border-radius: 3px; cursor: pointer; padding: 2px; display: flex; align-items: center; justify-content: center; }
+.rv-cell:disabled { cursor: default; }
+.rv-disc { width: 84%; aspect-ratio: 1; border-radius: 50%; display: block; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+.rv-disc.dark { background: #111827; }
+.rv-disc.light { background: #fff; }
+.rv-hint { width: 26%; aspect-ratio: 1; border-radius: 50%; background: rgba(255,255,255,.55); display: block; }

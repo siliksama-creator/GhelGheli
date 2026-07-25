@@ -8,7 +8,10 @@
     "start": "node src/server.js",
     "migrate": "node scripts/migrate.js",
     "seed:admin": "node scripts/seedAdmin.js",
-    "close:league": "node scripts/closeLeague.js"
+    "close:league": "node scripts/closeLeague.js",
+    "test": "node scripts/testGames.js && node scripts/testEngine.js",
+    "test:games": "node scripts/testGames.js",
+    "test:engine": "node scripts/testEngine.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

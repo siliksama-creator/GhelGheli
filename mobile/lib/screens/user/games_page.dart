@@ -1,101 +1,172 @@
+// Games hub. Each board lives in its own file under ./games/ so this screen
+// stays a thin launcher rather than growing every time a game is added.
 import 'package:flutter/material.dart';
-import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../../api_client.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
+import 'games/connect4_board.dart';
+import 'games/reversi_board.dart';
+import 'games/tictactoe_board.dart';
+
+class _GameEntry {
+  const _GameEntry(
+      this.id, this.title, this.subtitle, this.emoji, this.accent, this.art);
+  final String id;
+  final String title;
+  final String subtitle;
+  final String emoji;
+  final Color accent;
+  final String art;
+}
+
+const _games = <_GameEntry>[
+  _GameEntry('tictactoe', 'دوز', 'کلاسیک سه‌تایی', '❌', Color(0xFF22D3EE),
+      'assets/games/tictactoe.webp'),
+  _GameEntry('connect4', 'چهار در یک ردیف', 'چهارتا رو ردیف کن', '🔴',
+      Color(0xFFF59E0B), 'assets/games/connect4.webp'),
+  _GameEntry('reversi', 'اتللو', 'مهره‌ها را برگردان', '⚫', Color(0xFF34D399),
+      'assets/games/reversi.webp'),
+];
 
 class GamesHubPage extends StatefulWidget {
-  final ApiClient api;
   const GamesHubPage({super.key, required this.api});
+  final ApiClient api;
 
   @override
   State<GamesHubPage> createState() => _GamesHubPageState();
 }
 
 class _GamesHubPageState extends State<GamesHubPage> {
-  String? _activeGame;
+  String? _active;
+
+  void _back() => setState(() => _active = null);
 
   @override
   Widget build(BuildContext context) {
-    if (_activeGame == 'tictactoe') {
-      return TicTacToeGame(
-        api: widget.api,
-        onBack: () => setState(() => _activeGame = null),
-      );
+    switch (_active) {
+      case 'tictactoe':
+        return TicTacToeScreen(api: widget.api, onBack: _back);
+      case 'connect4':
+        return Connect4Screen(api: widget.api, onBack: _back);
+      case 'reversi':
+        return ReversiScreen(api: widget.api, onBack: _back);
     }
 
     final theme = Theme.of(context);
-    return Padding(
+    return ListView(
       padding: const EdgeInsets.all(Gaps.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('بخش بازی‌ها 🎮', style: theme.textTheme.headlineSmall),
-          Gaps.vXs,
-          Text('بازی مورد نظر خود را انتخاب کنید تا با دیگر بازیکنان رقابت کنید!', style: theme.textTheme.bodyMedium),
-          Gaps.vLg,
-          Expanded(
-            child: GridView.count(
-              crossAxisCount: 2,
-              mainAxisSpacing: Gaps.md,
-              crossAxisSpacing: Gaps.md,
-              children: [
-                _GameCard(
-                  title: 'دوز آنلاین',
-                  subtitle: 'رقابت دو نفره',
-                  icon: '❌⭕',
-                  onTap: () => setState(() => _activeGame = 'tictactoe'),
-                ),
-                const _GameCard(
-                  title: 'منچ آنلاین',
-                  subtitle: 'به‌زودی...',
-                  icon: '🎲',
-                  opacity: 0.5,
-                ),
-                const _GameCard(
-                  title: 'نقطه‌بازی',
-                  subtitle: 'به‌زودی...',
-                  icon: '🎯',
-                  opacity: 0.5,
-                ),
-              ],
-            ),
-          )
+      children: [
+        Text('بخش بازی‌ها 🎮',
+            style: theme.textTheme.headlineSmall
+                ?.copyWith(fontWeight: FontWeight.w800)),
+        Gaps.vXxs,
+        Text(
+          'با کاربران دیگر آنلاین رقابت کن — اگر حریفی پیدا نشد، ربات هوشمند وارد می‌شود.',
+          style: theme.textTheme.bodyMedium,
+        ),
+        Gaps.vLg,
+        for (final g in _games) ...[
+          _GameTile(entry: g, onTap: () => setState(() => _active = g.id)),
+          Gaps.vSm,
         ],
-      ),
+      ],
     );
   }
 }
 
-class _GameCard extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final String icon;
-  final VoidCallback? onTap;
-  final double opacity;
-
-  const _GameCard({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    this.onTap,
-    this.opacity = 1.0,
-  });
+class _GameTile extends StatelessWidget {
+  const _GameTile({required this.entry, required this.onTap});
+  final _GameEntry entry;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Opacity(
-      opacity: opacity,
-      child: AppCard(
-        onTap: onTap,
+    return AppCard(
+      onTap: onTap,
+      padding: EdgeInsets.zero,
+      child: ClipRRect(
+        borderRadius: Corners.rXl,
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(icon, style: const TextStyle(fontSize: 48)),
-            Gaps.vSm,
-            Text(title, style: theme.textTheme.titleMedium),
-            Text(subtitle, style: theme.textTheme.bodySmall),
+            Stack(
+              children: [
+                AspectRatio(
+                  aspectRatio: 16 / 7,
+                  child: Image.asset(
+                    entry.art,
+                    fit: BoxFit.cover,
+                    // Never let a missing/corrupt asset blank the whole hub.
+                    errorBuilder: (_, __, ___) => Container(
+                      color: entry.accent.withValues(alpha: 0.18),
+                      alignment: Alignment.center,
+                      child: Text(entry.emoji,
+                          style: const TextStyle(fontSize: 40)),
+                    ),
+                  ),
+                ),
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.72),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: Gaps.md,
+                  bottom: Gaps.xs,
+                  left: Gaps.md,
+                  child: Row(
+                    children: [
+                      Text(entry.emoji, style: const TextStyle(fontSize: 22)),
+                      Gaps.hXs,
+                      Expanded(
+                        child: Text(
+                          entry.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.all(Gaps.md),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(entry.subtitle, style: theme.textTheme.bodySmall),
+                        Gaps.vXs,
+                        Row(children: [
+                          _Tag(label: 'دو نفره آنلاین', color: entry.accent),
+                          Gaps.hXxs,
+                          _Tag(label: 'بازی با ربات', color: entry.accent),
+                        ]),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.play_circle_fill_rounded,
+                      size: 34, color: entry.accent),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -103,228 +174,25 @@ class _GameCard extends StatelessWidget {
   }
 }
 
-class TicTacToeGame extends StatefulWidget {
-  final ApiClient api;
-  final VoidCallback onBack;
-  const TicTacToeGame({super.key, required this.api, required this.onBack});
-
-  @override
-  State<TicTacToeGame> createState() => _TicTacToeGameState();
-}
-
-class _TicTacToeGameState extends State<TicTacToeGame> {
-  io.Socket? _socket;
-  String _status = 'idle'; // idle, waiting, playing, over
-  Map? _gameData;
-  String? _mySymbol;
-
-  @override
-  void initState() {
-    super.initState();
-    _initSocket();
-  }
-
-  void _initSocket() {
-    _socket = io.io(widget.api.baseUrl, io.OptionBuilder()
-      .setTransports(['websocket'])
-      .setAuth({'token': widget.api.token})
-      .build());
-
-    _socket?.onConnect((_) => debugPrint('Connected to game socket'));
-
-    _socket?.on('game:waiting', (_) {
-      if(mounted) setState(() => _status = 'waiting');
-    });
-
-    _socket?.on('game:start', (data) {
-      if(mounted) {
-        setState(() {
-        _gameData = data;
-        _mySymbol = data['yourSymbol'];
-        _status = 'playing';
-      });
-      }
-    });
-
-    _socket?.on('game:update', (data) {
-      if(mounted) {
-        setState(() {
-        _gameData!['board'] = data['board'];
-        if(data['turn'] != null) _gameData!['turn'] = data['turn'];
-      });
-      }
-    });
-
-    _socket?.on('game:over', (data) {
-      if(mounted) {
-        setState(() {
-        _status = 'over';
-        _gameData!['winner'] = data['winner'];
-      });
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _socket?.disconnect();
-    super.dispose();
-  }
-
-  void _joinGame() => _socket?.emit('game:join');
-  void _leaveQueue() {
-    _socket?.emit('game:leave');
-    setState(() => _status = 'idle');
-  }
-
-  void _play(int index) {
-    if (_status != 'playing' || _gameData == null) return;
-    // Only allow a move on our own turn and on a still-empty cell, so the
-    // UI doesn't fire pointless events the server will just reject.
-    if (_mySymbol == null || _gameData!['turn'] != _mySymbol) return;
-    final board = _gameData!['board'];
-    if (board is List && board[index] != null) return;
-    _socket?.emit('game:move', {'roomId': _gameData!['roomId'], 'index': index});
-  }
-
-  /// Human readable end-of-game line. Previously this was a string with an
-  /// escaped `\$`, so the app literally printed the Dart expression instead
-  /// of the winner.
-  String _resultText(Object? winner) {
-    if (winner == 'DRAW') return 'مساوی!';
-    if (winner == 'DISCONNECT') return 'حریف خارج شد!';
-    if (winner == null) return 'پایان بازی';
-    if (_mySymbol != null) {
-      return winner == _mySymbol ? 'شما بردید! 🎉' : 'شما باختید';
-    }
-    return winner == 'X' ? 'برنده: ❌' : 'برنده: ⭕';
-  }
+class _Tag extends StatelessWidget {
+  const _Tag({required this.label, required this.color});
+  final String label;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final board = _gameData?['board'] ?? List.filled(9, null);
-    final turn = _gameData?['turn'];
-    final winner = _gameData?['winner'];
-
-    return Padding(
-      padding: const EdgeInsets.all(Gaps.lg),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              IconButton(icon: const Icon(Icons.arrow_back), onPressed: widget.onBack),
-              Text('بازی دوز آنلاین', style: theme.textTheme.titleLarge),
-            ],
-          ),
-          Gaps.vLg,
-          if (_status == 'idle')
-            ElevatedButton(
-              onPressed: _joinGame,
-              style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
-              child: const Text('شروع جستجوی حریف', style: TextStyle(fontSize: 18)),
-            )
-          else if (_status == 'waiting')
-            Column(
-              children: [
-                const CircularProgressIndicator(),
-                Gaps.vMd,
-                Text('در حال جستجوی حریف...', style: theme.textTheme.bodyLarge),
-                Gaps.vMd,
-                ElevatedButton(
-                  onPressed: _leaveQueue,
-                  style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.error),
-                  child: const Text('لغو جستجو', style: TextStyle(color: Colors.white)),
-                ),
-              ],
-            )
-          else if (_status == 'playing' || _status == 'over')
-            Expanded(
-              child: Column(
-                children: [
-                  AppCard(
-                    child: Padding(
-                      padding: const EdgeInsets.all(Gaps.md),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            children: [
-                              const Text('❌', style: TextStyle(fontSize: 24)),
-                              Text(_gameData?['players']['X']['nickname'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
-                            ],
-                          ),
-                          Column(
-                            children: [
-                              Text('نوبت', style: theme.textTheme.labelMedium),
-                              Text(turn == 'X' ? '❌' : '⭕', style: const TextStyle(fontSize: 24)),
-                            ],
-                          ),
-                          Column(
-                            children: [
-                              const Text('⭕', style: TextStyle(fontSize: 24)),
-                              Text(_gameData?['players']['O']['nickname'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  Gaps.vLg,
-                  // The board grid with explicit thick lines
-                  Container(
-                    constraints: const BoxConstraints(maxWidth: 320, maxHeight: 320),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.onSurface, // The grid lines color (opposite of surface)
-                      borderRadius: Corners.rLg,
-                      border: Border.all(color: theme.colorScheme.onSurface, width: 6),
-                    ),
-                    child: GridView.builder(
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        mainAxisSpacing: 6, // Thick line
-                        crossAxisSpacing: 6, // Thick line
-                      ),
-                      itemCount: 9,
-                      itemBuilder: (context, i) {
-                        return GestureDetector(
-                          onTap: () => _play(i),
-                          child: Container(
-                            color: theme.colorScheme.surface, // Cell background
-                            child: Center(
-                              child: Text(
-                                board[i] == 'X' ? '❌' : (board[i] == 'O' ? '⭕' : ''),
-                                style: const TextStyle(fontSize: 50),
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  Gaps.vLg,
-                  if (_status == 'over') ...[
-                    Text(
-                      _resultText(winner),
-                      style: theme.textTheme.headlineSmall
-                          ?.copyWith(color: theme.colorScheme.primary),
-                    ),
-                    Gaps.vMd,
-                    ElevatedButton(
-                      onPressed: () => setState(() { _status = 'idle'; _gameData = null; }),
-                      child: const Text('بازی دوباره'),
-                    ),
-                  ] else
-                    ElevatedButton(
-                      onPressed: _leaveQueue,
-                      style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.error),
-                      child: const Text('خروج از بازی', style: TextStyle(color: Colors.white)),
-                    ),
-                ],
-              ),
-            ),
-        ],
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: Gaps.xs, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: Corners.rPill,
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context)
+            .textTheme
+            .labelSmall
+            ?.copyWith(color: color, fontWeight: FontWeight.w700),
       ),
     );
   }

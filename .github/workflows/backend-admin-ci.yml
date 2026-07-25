@@ -19,6 +19,9 @@ jobs:
         with: { node-version: 22 }
       - run: npm install
       - run: node -c src/server.js
+      # Rules + engine tests (matchmaking, bots, turn order, and the hostile
+      # payload fuzz that guards against socket handlers crashing the API).
+      - run: npm test
   admin-build:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: admin } }

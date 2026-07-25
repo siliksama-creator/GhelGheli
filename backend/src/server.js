@@ -217,6 +217,10 @@ const userLoginLimiter = rateLimit({
 
 app.get('/health', (req, res) => res.json({ ok: true, name: 'GhelGheli API' }));
 
+// Catalogue of playable games, so the mobile/web clients can render the hub
+// dynamically instead of shipping a hardcoded list that drifts out of sync.
+app.get('/api/games', (req, res) => res.json(require('./games').CATALOG));
+
 app.post('/api/auth/request-otp', otpLimiter, asyncHandler(async (req, res) => {
   const mobile = normalizeMobile(req.body.mobile);
   const purpose = req.body.purpose || 'register';
@@ -864,7 +868,10 @@ io.on('connection', socket => {
 
 });
 
-require('./tictactoe')(io);
+// Multiplayer games: a shared engine + one small rules file per game
+// (backend/src/games/). Replaces the old single-purpose tictactoe.js.
+const games = require('./games');
+games.attach(io);
 
 cron.schedule('5 0 1 * *', () => closeActiveSeason().catch(e => console.error('monthly close failed', e)));
 
