@@ -1,13 +1,14 @@
 // مار و پله — 10x10 boustrophedon board with animated token movement,
 // snake/ladder overlays and a two-dice chooser.
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../api_client.dart';
 import '../../../theme/tokens.dart';
 import '../../../widgets/app_card.dart';
 import 'game_scaffold.dart';
 import 'game_session.dart';
-import 'snakes_painter.dart';
+import 'snakes_art.dart';
 
 const _accent = Color(0xFFA855F7);
 
@@ -23,6 +24,17 @@ class SnakesScreen extends StatefulWidget {
 class _SnakesScreenState extends State<SnakesScreen> {
   late final GameSession _s =
       GameSession(api: widget.api, gameId: 'snakes')..connect();
+  SnakeSprites? _sprites;
+
+  @override
+  void initState() {
+    super.initState();
+    // Decode the board artwork once; the painter falls back to plain shapes
+    // for the frame or two before it is ready.
+    SnakeSprites.load().then((v) {
+      if (mounted) setState(() => _sprites = v);
+    });
+  }
 
   @override
   void dispose() {
@@ -42,7 +54,7 @@ class _SnakesScreenState extends State<SnakesScreen> {
       scoreboard: _Progress(session: _s),
       boardBuilder: (_) => Column(
         children: [
-          _Board(session: _s),
+          _Board(session: _s, sprites: _sprites),
           Gaps.vSm,
           _DiceRow(session: _s),
         ],
@@ -82,8 +94,9 @@ class _Progress extends StatelessWidget {
 }
 
 class _Board extends StatelessWidget {
-  const _Board({required this.session});
+  const _Board({required this.session, this.sprites});
   final GameSession session;
+  final SnakeSprites? sprites;
 
   @override
   Widget build(BuildContext context) {
@@ -140,28 +153,33 @@ class _Board extends StatelessWidget {
                           ),
                       ],
                     ),
-                    // snakes + ladders overlay
+                    // snakes + ladders overlay (real sprites)
                     Positioned.fill(
                       child: CustomPaint(
-                        painter: SnakesLaddersPainter(
+                        painter: SnakesBoardPainter(
                           cell: cell,
                           ladders: ladders,
                           snakes: snakes,
+                          sprites: sprites,
                         ),
                       ),
                     ),
-                    // tokens
+                    // Tokens. The player's own piece is bigger, ringed in
+                    // white and marked "شما" — users could not tell which
+                    // token was theirs before.
                     _Token(
                       square: _asInt(pos['X']),
                       cell: cell,
                       color: const Color(0xFFC084FC),
                       offset: -0.18,
+                      isMine: session.mySymbol == 'X',
                     ),
                     _Token(
                       square: _asInt(pos['O']),
                       cell: cell,
                       color: const Color(0xFF38BDF8),
                       offset: 0.18,
+                      isMine: session.mySymbol == 'O',
                     ),
                   ],
                 );
@@ -289,35 +307,70 @@ class _Token extends StatelessWidget {
     required this.cell,
     required this.color,
     required this.offset,
+    required this.isMine,
   });
 
   final int square;
   final double cell;
   final Color color;
   final double offset;
+  final bool isMine;
 
   @override
   Widget build(BuildContext context) {
-    final p = SnakesLaddersPainter.centerOf(square, cell);
+    final p = SnakesBoardPainter.centerOf(square, cell);
+    final size = cell * (isMine ? 0.68 : 0.54);
     return AnimatedPositioned(
       duration: Motion.slow,
       curve: Curves.easeInOutCubic,
-      left: p.dx - cell * 0.28 + cell * offset,
-      top: p.dy - cell * 0.28,
-      width: cell * 0.56,
-      height: cell * 0.56,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: RadialGradient(
-            colors: [Colors.white.withValues(alpha: 0.9), color],
-            stops: const [0.0, 0.75],
+      left: p.dx - size / 2 + cell * offset,
+      top: p.dy - size / 2,
+      width: size,
+      height: size,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          DecoratedBox(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [Colors.white.withValues(alpha: 0.95), color],
+                stops: const [0.0, 0.78],
+              ),
+              border: Border.all(
+                color: isMine ? Colors.white : Colors.white38,
+                width: isMine ? 2.6 : 1.2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withValues(alpha: isMine ? 0.95 : 0.5),
+                  blurRadius: isMine ? 14 : 6,
+                ),
+              ],
+            ),
           ),
-          border: Border.all(color: Colors.white70, width: 1),
-          boxShadow: [
-            BoxShadow(color: color.withValues(alpha: 0.7), blurRadius: 8),
-          ],
-        ),
+          if (isMine)
+            Positioned(
+              bottom: -cell * 0.20,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'شما',
+                  style: TextStyle(
+                    fontSize: cell * 0.17,
+                    height: 1.1,
+                    fontWeight: FontWeight.w900,
+                    color: const Color(0xFF1E1B4B),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -428,7 +481,14 @@ class _Die extends StatelessWidget {
       duration: Motion.fast,
       opacity: enabled ? 1 : 0.42,
       child: InkWell(
-        onTap: enabled ? onTap : null,
+        onTap: enabled
+            ? () {
+                // Tactile feedback makes the dice feel physical — a small
+                // 2026 polish detail that costs nothing.
+                HapticFeedback.selectionClick();
+                onTap();
+              }
+            : null,
         borderRadius: Corners.rMd,
         child: AnimatedContainer(
           duration: Motion.normal,
@@ -446,9 +506,21 @@ class _Die extends StatelessWidget {
                 : null,
           ),
           child: Center(
-            child: Text(
-              face,
-              style: const TextStyle(fontSize: 40, color: Color(0xFF1E1B4B), height: 1),
+            // Cross-fade + slight scale when the value changes, so a new
+            // roll reads as a roll rather than a silent swap.
+            child: AnimatedSwitcher(
+              duration: Motion.normal,
+              transitionBuilder: (child, anim) => ScaleTransition(
+                scale: Tween(begin: 0.72, end: 1.0).animate(
+                    CurvedAnimation(parent: anim, curve: Curves.easeOutBack)),
+                child: FadeTransition(opacity: anim, child: child),
+              ),
+              child: Text(
+                face,
+                key: ValueKey(value),
+                style: const TextStyle(
+                    fontSize: 40, color: Color(0xFF1E1B4B), height: 1),
+              ),
             ),
           ),
         ),

@@ -6,6 +6,7 @@ import '../../api_client.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/avatar_image.dart';
+import '../../widgets/safe_image.dart';
 import '../../widgets/state_views.dart';
 import '../../widgets/lifecycle_poller.dart';
 import '../shared/public_profile_sheet.dart';
@@ -257,8 +258,10 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
                             decoration: BoxDecoration(
                                 color: theme.colorScheme.surfaceContainerHigh,
                                 borderRadius: Corners.rLg),
-                            child: Image.network(fullAssetUrl(st['image_url']),
-                                fit: BoxFit.contain),
+                            child: SafeImage(
+                                url: st['image_url'],
+                                fit: BoxFit.contain,
+                                fallbackEmoji: '🙂'),
                           ),
                         );
                       },
@@ -402,8 +405,10 @@ class _ChatBubble extends StatelessWidget {
                       ),
                     ),
                   isSticker
-                      ? Image.network(fullAssetUrl(message['sticker_url']),
-                          width: 100, height: 100, fit: BoxFit.contain)
+                      ? SafeImage(
+                          url: message['sticker_url'],
+                          width: 100, height: 100,
+                          fit: BoxFit.contain, fallbackEmoji: '🙂')
                       : Text(message['message_text'] ?? '',
                           style: theme.textTheme.bodyMedium),
                   Gaps.vXxs,

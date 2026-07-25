@@ -4,6 +4,7 @@ import '../../api_client.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/async_section.dart';
 import '../../widgets/avatar_image.dart';
+import '../../widgets/safe_image.dart';
 import '../../widgets/state_views.dart';
 
 /// Shows a user's public profile (nickname, points, cards, rewards) in a
@@ -95,8 +96,9 @@ class _PublicProfileBody extends StatelessWidget {
                   leading: card['image_url'] != null
                       ? ClipRRect(
                           borderRadius: Corners.rSm,
-                          child: Image.network(fullAssetUrl(card['image_url']),
-                              width: 40, height: 40, fit: BoxFit.cover))
+                          child: SafeImage(
+                              url: card['image_url'],
+                              width: 40, height: 40, fallbackEmoji: '🃏'))
                       : const Icon(Icons.credit_card_rounded),
                   title: Text(card['name'] ?? ''),
                   subtitle:
@@ -117,8 +119,9 @@ class _PublicProfileBody extends StatelessWidget {
                   leading: r['image_url'] != null
                       ? ClipRRect(
                           borderRadius: Corners.rSm,
-                          child: Image.network(fullAssetUrl(r['image_url']),
-                              width: 40, height: 40, fit: BoxFit.cover))
+                          child: SafeImage(
+                              url: r['image_url'],
+                              width: 40, height: 40, fallbackEmoji: '🎁'))
                       : const Icon(Icons.card_giftcard_rounded),
                   title: Text(r['name'] ?? ''),
                   subtitle: Text(r['status'] ?? ''),

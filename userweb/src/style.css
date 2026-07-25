@@ -262,29 +262,48 @@
 .row b.muted { color: #9fb6cc; }
 
 /* ---------- مار و پله ---------- */
-.snakesWrap { display: grid; justify-items: center; gap: 10px; width: 100%; }
+.snakesWrap { display: grid; justify-items: center; gap: 12px; width: 100%; }
 .snakesBoard {
+  position: relative;
   display: grid; grid-template-columns: repeat(10, 1fr); gap: 1px;
-  width: min(360px, 92vw); aspect-ratio: 1; padding: 5px;
+  width: min(420px, 94vw); aspect-ratio: 1; padding: 6px;
   background: linear-gradient(135deg, #3B0764, #1E1B4B);
-  border: 2px solid #FBBF24; border-radius: 16px;
-  box-shadow: 0 10px 30px #a855f755;
+  border: 3px solid #FBBF24; border-radius: 18px;
+  box-shadow: 0 14px 40px #a855f755, inset 0 0 40px #00000055;
 }
 .snakesBoard .sqr {
-  position: relative; border-radius: 2px; background: #ffffff10;
-  display: grid; place-items: center;
+  position: relative; border-radius: 3px; background: #ffffff0e;
+  display: grid; place-items: start; padding: 2px;
 }
-.snakesBoard .sqr:nth-child(odd) { background: #ffffff18; }
-.snakesBoard .sqr.ladder { outline: 1px solid #FBBF24; background: #fbbf2422; }
-.snakesBoard .sqr.snake { outline: 1px solid #34D399; background: #34d39922; }
-.snakesBoard .sqr.finish { background: #fbbf2455; }
-.snakesBoard .sqn { font-size: 8px; color: #ffffff8c; font-weight: 600; }
-.snakesBoard .tok {
-  position: absolute; width: 58%; aspect-ratio: 1; border-radius: 50%;
-  border: 1px solid #ffffffb0;
+.snakesBoard .sqr:nth-child(odd) { background: #ffffff1c; }
+.snakesBoard .sqr.ladder { background: #fbbf2438; box-shadow: inset 0 0 0 1px #fbbf24aa; }
+.snakesBoard .sqr.snake  { background: #34d39938; box-shadow: inset 0 0 0 1px #34d399aa; }
+.snakesBoard .sqr.finish { background: #fbbf2470; }
+.snakesBoard .sqn { font-size: 9px; color: #ffffffa0; font-weight: 700; line-height: 1; }
+
+/* sprite overlay sits above the squares, below the pawns */
+.chuteLayer { position: absolute; inset: 6px; pointer-events: none; }
+.ladderSprite { position: absolute; object-fit: fill; filter: drop-shadow(0 2px 3px #0008); }
+.snakeSvg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.snakeSvg .snakeOutline { stroke: #064E3B; stroke-width: 5; fill: none; stroke-linecap: round; }
+.snakeSvg .snakeBody { stroke: #10B981; stroke-width: 3.4; fill: none; stroke-linecap: round; }
+.snakeHeadSprite { position: absolute; width: 11%; filter: drop-shadow(0 2px 3px #0009); }
+.snakeTailSprite { position: absolute; width: 6%; transform: translate(-50%,-50%); }
+
+/* pawns */
+.pawn {
+  position: absolute; width: 6.4%; aspect-ratio: 1; border-radius: 50%;
+  transform: translate(-50%,-50%); transition: left .45s cubic-bezier(.4,0,.2,1), top .45s cubic-bezier(.4,0,.2,1);
+  border: 1.5px solid #ffffff70; z-index: 3;
 }
-.snakesBoard .tok.x { background: radial-gradient(#fff, #C084FC 75%); box-shadow: 0 0 7px #c084fc; transform: translateX(-22%); }
-.snakesBoard .tok.o { background: radial-gradient(#fff, #38BDF8 75%); box-shadow: 0 0 7px #38bdf8; transform: translateX(22%); }
+.pawn.px { background: radial-gradient(#fff, #C084FC 78%); box-shadow: 0 0 9px #c084fc; }
+.pawn.po { background: radial-gradient(#fff, #38BDF8 78%); box-shadow: 0 0 9px #38bdf8; }
+.pawn.mine { width: 8.2%; border: 2.5px solid #fff; z-index: 4; }
+.pawn.mine b {
+  position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+  background: #fff; color: #1E1B4B; font-size: 9px; font-weight: 900;
+  padding: 0 4px; border-radius: 5px; white-space: nowrap; margin-top: 2px;
+}
 .snakeEvent { margin: 0; font-weight: 800; color: #FBBF24; }
 .diceRow { display: flex; gap: 16px; }
 .die {
@@ -293,13 +312,79 @@
 }
 .die.on { opacity: 1; border-color: #A855F7; box-shadow: 0 0 14px #a855f788; cursor: pointer; }
 
-/* Snakes/ladders overlay + offline notice */
-.snakesBoard { position: relative; }
-.chutes { position: absolute; inset: 5px; width: calc(100% - 10px); height: calc(100% - 10px); pointer-events: none; }
-.chutes .ladderLine { stroke: #FBBF24; stroke-width: 1.6; stroke-linecap: round; opacity: .95; }
-.chutes .snakeLine { stroke: #10B981; stroke-width: 2.2; fill: none; stroke-linecap: round; }
-.chutes .snakeHead { fill: #34D399; stroke: #065F46; stroke-width: .6; }
 .offlineBar {
   margin: 0 0 10px; padding: 9px 12px; border-radius: 12px; text-align: center;
   background: #f59e0b22; border: 1px solid #f59e0b66; color: #f59e0b; font-weight: 800;
+}
+
+/* ================= 2026 refresh: app bar, nav, layout ================= */
+/* The user area felt "thrown together": no consistent header, the nav wrapped
+   into ragged rows, cards floated at random widths and toasts never left the
+   screen. These rules give the whole portal one rhythm. */
+
+.portal { gap: 14px; padding-bottom: 8px; }
+
+.appBar {
+  position: sticky; top: 8px; z-index: 25;
+  width: min(1080px, 96vw);
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px; border-radius: 20px;
+  background: #07111fd9; backdrop-filter: blur(20px) saturate(1.3);
+  border: 1px solid #ffffff1f;
+  box-shadow: 0 14px 40px #0007;
+}
+.appLogo { width: 34px; height: 34px; border-radius: 10px; object-fit: cover; }
+.appWho { display: flex; flex-direction: column; line-height: 1.25; flex: 1; min-width: 0; }
+.appWho b { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.appWho span { font-size: 12px; color: #b5ef58; font-weight: 700; }
+.iconBtn {
+  width: 38px; height: 38px; border-radius: 12px; font-size: 16px;
+  background: #ffffff14; color: #dbeeff; border: 1px solid #ffffff1f;
+  display: grid; place-items: center; flex: 0 0 auto;
+}
+.iconBtn.danger { background: #ff507024; color: #ff8098; border-color: #ff507055; }
+
+/* Nav: one tidy scroll strip instead of a wrapping block */
+.mobileNav {
+  width: min(1080px, 96vw);
+  position: sticky; top: 66px; z-index: 24;
+}
+
+/* Every tab lands in the same column with a soft entrance */
+.tabPane {
+  width: 100%; display: grid; justify-items: center; gap: 16px;
+  animation: paneIn .28s cubic-bezier(.4,0,.2,1);
+}
+@keyframes paneIn { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
+
+/* Toast floats instead of pushing the layout around */
+.toast {
+  position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
+  z-index: 40; max-width: 90vw; text-align: center;
+  box-shadow: 0 14px 40px #0009;
+  animation: toastIn .25s cubic-bezier(.4,0,.2,1);
+}
+@keyframes toastIn { from { opacity: 0; transform: translate(-50%, 12px) } to { opacity: 1; transform: translateX(-50%) } }
+
+.loadingCard { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.spinner {
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 2.5px solid #ffffff30; border-top-color: #b5ef58;
+  animation: spin .8s linear infinite; display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg) } }
+
+/* Cards: consistent width and a subtle lift, so sections stop looking random */
+.card { transition: transform .2s cubic-bezier(.4,0,.2,1), box-shadow .2s; }
+.sectionHead h2 { font-size: clamp(20px, 4vw, 28px); }
+
+/* Respect users who prefer less motion */
+@media (prefers-reduced-motion: reduce) {
+  .tabPane, .toast, .pawn, .card { animation: none !important; transition: none !important; }
+}
+
+@media (max-width: 900px) {
+  .appBar { top: 4px; padding: 8px 10px; border-radius: 16px; }
+  .mobileNav { top: 58px; }
+  .appLogo { width: 30px; height: 30px; }
 }

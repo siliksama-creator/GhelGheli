@@ -33,15 +33,74 @@ function Auth({mode,setMode,done}){
 
 
 function Portal({token,logout}){
-  const[tab,setTab]=useState('home');const[p,setP]=useState(null);const[rewards,setRewards]=useState([]);const[msg,setMsg]=useState('');const[publicUser,setPublicUser]=useState(null);
-  async function load(){const pr=await req('/api/profile','GET',null,token);setP(pr);setRewards(await req('/api/rewards','GET',null,token));}
+  const [tab,setTab]=useState('home');
+  const [p,setP]=useState(null);
+  const [rewards,setRewards]=useState([]);
+  const [msg,setMsg]=useState('');
+  const [publicUser,setPublicUser]=useState(null);
+
+  async function load(){
+    const pr=await req('/api/profile','GET',null,token);
+    setP(pr);
+    setRewards(await req('/api/rewards','GET',null,token));
+  }
   useEffect(()=>{load()},[]);
-  if(!p)return <div className="card">در حال بارگذاری...</div>;
-  return <div className="portal"><nav className="mobileNav">{[['home','خانه','🏠'],['rewards','جوایز','🎁'],['league','لیگ','🏆'],['club','چت و بازی','🎮'],['support','پشتیبانی','🎧'],['profile','پروفایل','👤']].map(x=><button key={x[0]} className={tab===x[0]?'on':''} onClick={()=>setTab(x[0])}><span className="navIcon">{x[2]}</span><span className="navLabel">{x[1]}</span></button>)}<button className="danger" onClick={logout}>خروج</button></nav>{msg&&<div className="toast">{msg}</div>}{tab==='home'&&<Home token={token} p={p} rewards={rewards} load={load} setMsg={setMsg}/>} {tab==='profile'&&<Profile token={token} p={p} load={load} setMsg={setMsg}/>} {tab==='rewards'&&<Rewards rewards={rewards}/>} {tab==='league'&&<League token={token} openProfile={setPublicUser}/>} {tab==='club'&&<Club token={token} openProfile={setPublicUser}/>}
- {tab==='support'&&<Support token={token} api={API} req={req} asset={asset}/>} {publicUser&&<PublicProfile token={token} userId={publicUser} close={()=>setPublicUser(null)}/>}</div>;
+
+  // Auto-dismiss toasts; they used to stay on screen forever and pile up.
+  useEffect(()=>{
+    if(!msg) return;
+    const t=setTimeout(()=>setMsg(''),4000);
+    return ()=>clearTimeout(t);
+  },[msg]);
+
+  if(!p) return <div className="card loadingCard"><span className="spinner"/>در حال بارگذاری...</div>;
+
+  const TABS=[
+    ['home','خانه','🏠'],
+    ['rewards','جوایز','🎁'],
+    ['league','لیگ','🏆'],
+    ['club','چت و بازی','🎮'],
+    ['support','پشتیبانی','🎧'],
+    ['profile','پروفایل','👤'],
+  ];
+  const u=p.user||{};
+
+  return (
+    <div className="portal">
+      <header className="appBar">
+        <img className="appLogo" src="/logo.png" alt="" />
+        <div className="appWho">
+          <b>{u.nickname||'کاربر'}</b>
+          <span>{fa(u.current_points)} امتیاز</span>
+        </div>
+        <button className="iconBtn danger" onClick={logout} title="خروج">⏻</button>
+      </header>
+
+      <nav className="mobileNav">
+        {TABS.map(x=>(
+          <button key={x[0]} className={tab===x[0]?'on':''} onClick={()=>setTab(x[0])}>
+            <span className="navIcon">{x[2]}</span>
+            <span className="navLabel">{x[1]}</span>
+          </button>
+        ))}
+      </nav>
+
+      {msg && <div className="toast">{msg}</div>}
+
+      <main className="tabPane" key={tab}>
+        {tab==='home'    && <Home token={token} p={p} rewards={rewards} load={load} setMsg={setMsg}/>}
+        {tab==='profile' && <Profile token={token} p={p} load={load} setMsg={setMsg}/>}
+        {tab==='rewards' && <Rewards rewards={rewards}/>}
+        {tab==='league'  && <League token={token} openProfile={setPublicUser}/>}
+        {tab==='club'    && <Club token={token} openProfile={setPublicUser}/>}
+        {tab==='support' && <Support token={token} api={API} req={req} asset={asset}/>}
+      </main>
+
+      {publicUser && <PublicProfile token={token} userId={publicUser} close={()=>setPublicUser(null)}/>}
+    </div>
+  );
 }
 
-function Avatar({u,size=72}){return <img className="avatar" style={{width:size,height:size}} src={u?.profile_image_url?asset(u.profile_image_url):`/avatars/${u?.profile_avatar_key||avatars[0]}`}/>}
 function Home({token,p,rewards,load,setMsg}){const[code,setCode]=useState('');const[bigCard,setBigCard]=useState(null);const u=p.user;const sorted=[...rewards].sort((a,b)=>a.required_points-b.required_points);let next=sorted.find(r=>u.current_points<r.required_points)||sorted.at(-1);const progress=next?Math.min(1,u.current_points/next.required_points):0;async function redeem(){try{const d=await req('/api/cards/redeem','POST',{code},token);setMsg(d.message);setCode('');load()}catch(e){setMsg(e.message)}}return <div className="grid"><section className="card heroCard"><Avatar u={u}/><h2>{u.nickname||u.mobile}</h2><h1>{fa(u.current_points)} امتیاز</h1><div className="bar"><span style={{width:(progress*100)+'%'}}/></div><p>{next?`تا جایزه ${next.name}: ${fa(Math.max(0,next.required_points-u.current_points))} امتیاز مانده`:'هنوز جایزه‌ای تعریف نشده'}</p><h2>ثبت کد کارت های قلقلی</h2><p className="hint">(پک کارت های قلقلی بصورت فیزیکی در فروشگاه ها و سوپرمارکت ها به فروش می رسند.)</p><input value={code} onChange={e=>setCode(e.target.value.toUpperCase())} placeholder="کد کارت"/><button className="main" onClick={redeem}>ثبت کد</button></section><section className="card"><h2>موجودی کارت‌ها</h2>{(p.inventory||[]).map(i=><div className="reward clickable" key={i.id} onClick={()=>setBigCard(i)} title="نمایش بزرگ کارت"><img src={asset(i.image_url)||'/avatars/avatar_1_football.png'}/><div><b>{i.name}</b><p>تعداد: {fa(i.quantity)} — {fa(i.point_value)} امتیاز</p></div></div>)}</section>{bigCard&&<CardLightbox item={bigCard} close={()=>setBigCard(null)}/>}</div>}
 
 // Full-size view of an inventory card: the thumbnail crops the player
@@ -89,7 +148,19 @@ function Chat({token,openProfile}){
   const[messages,setMessages]=useState([]),[stickers,setStickers]=useState([]),[text,setText]=useState(''),[err,setErr]=useState(''),[reply,setReply]=useState(null),[canned,setCanned]=useState([]),[cannedOpen,setCannedOpen]=useState(false),[pinned,setPinned]=useState(null);
   const emojis=['😀','😍','🔥','⚽','🏆','👏','😂','😎','❤️','👍','🎉','💚','🥇','✨','🙌','😜'];
   async function load(){try{const cfg=await req('/api/chat/config','GET',null,token);setPinned(cfg.pinned||null);setMessages(await req('/api/chat/messages','GET',null,token));setStickers(await req('/api/chat/stickers','GET',null,token));setCanned(await req('/api/chat/canned-messages','GET',null,token));setErr('')}catch(e){setErr(e.message)}}
-  useEffect(()=>{load();const t=setInterval(load,3000);return()=>clearInterval(t)},[]);
+  // Poll only while the tab is visible, and at a calmer cadence. The old
+  // 3-second interval kept running on a hidden/background tab, hammering the
+  // API and draining mobile battery for updates nobody could see.
+  useEffect(()=>{
+    load();
+    let t=null;
+    const start=()=>{ if(!t) t=setInterval(load,8000); };
+    const stop=()=>{ if(t){ clearInterval(t); t=null; } };
+    const onVis=()=>{ if(document.hidden) stop(); else { load(); start(); } };
+    if(!document.hidden) start();
+    document.addEventListener('visibilitychange',onVis);
+    return ()=>{ stop(); document.removeEventListener('visibilitychange',onVis); };
+  },[]);
   async function send(stickerId=null, msgText=text){try{if(!stickerId&&!msgText.trim())return;await req('/api/chat/messages','POST',{message:msgText,stickerId,replyTo:reply?.id},token);setText('');setReply(null);setCannedOpen(false);load()}catch(e){setErr(e.message)}}
   async function like(m){try{await req(`/api/chat/messages/${m.id}/like`,'POST',{},token);load()}catch(e){setErr(e.message)}}async function report(m){try{await req(`/api/chat/messages/${m.id}/report`,'POST',{},token);setErr('گزارش ثبت شد و برای مدیر ارسال می‌شود')}catch(e){setErr(e.message)}}
   return <section className="card wide chatPage"><div className="sectionHead"><div><h2>چت روم قلقلی</h2><p>با هواداران دیگر گفتگو کن ⚽</p></div><span className="liveBadge">زنده</span></div>{pinned&&pinned.active&&pinned.text&&<div className="pinnedBanner" style={{'--pin':PIN_COLORS[pinned.accent]||PIN_COLORS.gold}}><span className="pinIcon">📌</span><div><b>اعلان مدیریت</b><p>{pinned.text}</p></div></div>}{err&&<p className="msg">{err}</p>}{reply&&<div className="replybar">در پاسخ به {reply.nickname||'کاربر'}: {reply.message_text}<button onClick={()=>setReply(null)}>×</button></div>}<div className="stickerTray">{stickers.map(st=><button key={st.id} onClick={()=>send(st.id)} title={st.title}><img src={asset(st.image_url)}/></button>)}{!stickers.length&&<span className="hint">استیکری هنوز توسط مدیر اضافه نشده است.</span>}</div><div className="chatbox">{messages.map(m=><div className="chatmsg" key={m.id}><img onClick={()=>openProfile(m.user_id)} src={m.profile_image_url?asset(m.profile_image_url):`/avatars/${m.profile_avatar_key||avatars[0]}`}/><div className="chatbody"><b onClick={()=>openProfile(m.user_id)} className="clickableText">{m.nickname||m.first_name||'کاربر'}</b>{m.reply_text&&<small className="reply">↩ {m.reply_nickname||'کاربر'}: {m.reply_text}</small>}{m.message_type==='sticker'&&m.sticker_url?<img className="stickerMsg" src={asset(m.sticker_url)}/>:<p>{m.message_text}</p>}<div className="chatActions"><button onClick={()=>setReply(m)}>ریپلای</button><button onClick={()=>like(m)}>❤ {fa(m.like_count)}</button><button onClick={()=>report(m)}>گزارش</button></div></div></div>)}</div><div className="sendDock">

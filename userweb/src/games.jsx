@@ -178,15 +178,55 @@ function SnakesBoard({ g }) {
   const dice = g.state.dice || [];
   const playable = g.state.playable || [];
 
-  // Geometry for the SVG overlay: percentage coordinates of a square centre.
+  // Percentage centre of a square, for absolutely-positioned sprites.
   const pct = (sq) => {
     const i = Math.min(Math.max(sq, 1), 100) - 1;
     const rb = Math.floor(i / 10);
     const w = i % 10;
     const col = rb % 2 === 0 ? w : 9 - w;
-    const row = 9 - rb;
-    return { x: col * 10 + 5, y: row * 10 + 5 };
+    return { x: col * 10 + 5, y: (9 - rb) * 10 + 5 };
   };
+
+  // A ladder is the sprite stretched along the vector and rotated; a snake is
+  // a curved body with the head sprite pinned at its top square.
+  const chutes = [];
+  Object.entries(ladders).forEach(([f, t]) => {
+    const a = pct(+f), b = pct(+t);
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.hypot(dx, dy);
+    const ang = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+    chutes.push(
+      <img key={'l' + f} src="/games/ladder.png" alt="" className="ladderSprite"
+        style={{
+          left: `${(a.x + b.x) / 2}%`, top: `${(a.y + b.y) / 2}%`,
+          width: '6.2%', height: `${len}%`,
+          transform: `translate(-50%,-50%) rotate(${ang}deg)`,
+        }} />,
+    );
+  });
+  Object.entries(snakes).forEach(([f, t]) => {
+    const a = pct(+f), b = pct(+t);
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len * 7, ny = dx / len * 7;
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    const ang = Math.atan2(dy, dx) * 180 / Math.PI - 90;
+    chutes.push(
+      <svg key={'sv' + f} className="snakeSvg" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <path d={`M ${a.x} ${a.y} Q ${mx + nx} ${my + ny} ${b.x} ${b.y}`} className="snakeOutline" />
+        <path d={`M ${a.x} ${a.y} Q ${mx + nx} ${my + ny} ${b.x} ${b.y}`} className="snakeBody" />
+      </svg>,
+    );
+    chutes.push(
+      <img key={'st' + f} src="/games/snake_tail.png" alt="" className="snakeTailSprite"
+        style={{ left: `${b.x}%`, top: `${b.y}%` }} />,
+    );
+    chutes.push(
+      <img key={'sh' + f} src="/games/snake_head.png" alt="" className="snakeHeadSprite"
+        style={{ left: `${a.x}%`, top: `${a.y}%`,
+          transform: `translate(-50%,-50%) rotate(${ang}deg)` }} />,
+    );
+  });
 
   return (
     <div className="snakesWrap">
@@ -203,33 +243,23 @@ function SnakesBoard({ g }) {
             return (
               <div key={n} className={cls}>
                 <span className="sqn">{n === 100 ? '🏁' : n}</span>
-                {pos.X === n && <i className="tok x" />}
-                {pos.O === n && <i className="tok o" />}
               </div>
             );
           }),
         )}
-        <svg className="chutes" viewBox="0 0 100 100" preserveAspectRatio="none">
-          {Object.entries(ladders).map(([f, t]) => {
-            const a = pct(+f), b = pct(+t);
-            return <line key={'l' + f} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-              className="ladderLine" />;
-          })}
-          {Object.entries(snakes).map(([f, t]) => {
-            const a = pct(+f), b = pct(+t);
-            const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-            const dx = b.x - a.x, dy = b.y - a.y;
-            const len = Math.hypot(dx, dy) || 1;
-            const nx = -dy / len * 7, ny = dx / len * 7;
-            return (
-              <g key={'s' + f}>
-                <path d={`M ${a.x} ${a.y} Q ${mx + nx} ${my + ny} ${b.x} ${b.y}`}
-                  className="snakeLine" />
-                <circle cx={a.x} cy={a.y} r="2.4" className="snakeHead" />
-              </g>
-            );
-          })}
-        </svg>
+        <div className="chuteLayer">{chutes}</div>
+        {['X', 'O'].map((sym) => {
+          const p = pct(pos[sym] || 1);
+          const mine = g.me === sym;
+          if (!pos[sym]) return null;
+          return (
+            <div key={sym}
+              className={`pawn ${sym === 'X' ? 'px' : 'po'} ${mine ? 'mine' : ''}`}
+              style={{ left: `${p.x + (sym === 'X' ? -2 : 2)}%`, top: `${p.y}%` }}>
+              {mine && <b>شما</b>}
+            </div>
+          );
+        })}
       </div>
 
       {g.state.event && EVENT_TEXT[g.state.event] && (

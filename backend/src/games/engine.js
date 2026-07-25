@@ -4,7 +4,7 @@
 // human (or fall back to a bot), take turns, detect the end. Only the RULES
 // differ. So that logic lives here once, and each game contributes a small
 // pure-rules module (see ./rules/*.js) instead of duplicating socket
-// plumbing — which is what kept tictactoe.js from growing into a monolith.
+// plumbing — which is what keeps each game's file small and focused.
 const crypto = require('crypto');
 
 // How long we hunt for a REAL opponent before falling back to the bot. The
@@ -238,7 +238,11 @@ module.exports = function attachGames(io, rulesById) {
     if (!socket.user) return;
 
     socket.on('game:join', payload => {
-      const gameId = (payload && typeof payload === 'object' && payload.gameId) || 'tictactoe';
+      // Default to the first registered game. This used to say 'tictactoe',
+      // which no longer exists — an older client that omitted gameId got a
+      // silent "game unavailable" instead of a playable match.
+      const gameId = (payload && typeof payload === 'object' && payload.gameId)
+        || Object.keys(rulesById)[0];
       const rules = rulesById[gameId];
       if (!rules) return safeEmit(socket, 'game:error', { message: 'این بازی در دسترس نیست' });
 

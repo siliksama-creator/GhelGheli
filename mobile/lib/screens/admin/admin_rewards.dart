@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../api_client.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/badges.dart';
+import '../../widgets/safe_image.dart';
 import '../../widgets/state_views.dart';
 import 'widgets/form_section.dart';
 import 'widgets/image_url_field.dart';
@@ -193,11 +194,11 @@ class _AdminRewardsState extends State<AdminRewards> {
                                 '${r['image_url']}'.isNotEmpty
                             ? ClipRRect(
                                 borderRadius: Corners.rSm,
-                                child: Image.network(
-                                    fullAssetUrl(r['image_url']),
+                                child: SafeImage(
+                                    url: r['image_url'],
                                     width: 48,
                                     height: 48,
-                                    fit: BoxFit.cover))
+                                    fallbackEmoji: '🎁'))
                             : const Icon(Icons.card_giftcard_rounded),
                         title: Text(r['name']),
                         subtitle: Text(

@@ -1082,7 +1082,7 @@ io.on('connection', socket => {
 });
 
 // Multiplayer games: a shared engine + one small rules file per game
-// (backend/src/games/). Replaces the old single-purpose tictactoe.js.
+// (backend/src/games/), so adding a game never touches this file.
 const games = require('./games');
 games.attach(io);
 

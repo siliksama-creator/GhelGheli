@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../api_client.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/safe_image.dart';
 import '../../widgets/state_views.dart';
 import 'widgets/form_section.dart';
 import 'widgets/image_url_field.dart';
@@ -376,11 +377,11 @@ class _AdminCardsState extends State<AdminCards> {
                                 '${t['image_url']}'.isNotEmpty
                             ? ClipRRect(
                                 borderRadius: Corners.rSm,
-                                child: Image.network(
-                                    fullAssetUrl(t['image_url']),
+                                child: SafeImage(
+                                    url: t['image_url'],
                                     width: 44,
                                     height: 44,
-                                    fit: BoxFit.cover))
+                                    fallbackEmoji: '🃏'))
                             : const Icon(Icons.credit_card_rounded),
                         title: Text(t['name']),
                         subtitle: Text('${faNum(t['point_value'])} امتیاز'),

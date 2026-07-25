@@ -4,6 +4,7 @@ import '../../api_client.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/async_section.dart';
+import '../../widgets/safe_image.dart';
 import '../../widgets/state_views.dart';
 
 /// Rewards catalogue: same GET /api/rewards + POST /api/rewards/:id/claim
@@ -86,8 +87,10 @@ class _RewardsPageState extends State<RewardsPage> {
                             ClipRRect(
                               borderRadius: Corners.rMd,
                               child: r['image_url'] != null
-                                  ? Image.network(fullAssetUrl(r['image_url']),
-                                      width: 56, height: 56, fit: BoxFit.cover)
+                                  ? SafeImage(
+                                      url: r['image_url'],
+                                      width: 56, height: 56,
+                                      fallbackEmoji: '🎁')
                                   : Container(
                                       width: 56,
                                       height: 56,
