@@ -663,7 +663,10 @@ app.patch('/api/admin/settings/sms', adminAuth, requireRole(), asyncHandler(asyn
 
 app.get('/api/admin/card-types', adminAuth, asyncHandler(async (req, res) => res.json((await pool.query('SELECT * FROM card_types ORDER BY created_at DESC')).rows)));
 app.post('/api/admin/card-types', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
-  const { name, imageUrl, description, pointValue, isActive = true } = req.body;
+  const { name, description, pointValue, isActive = true } = req.body;
+  // Normalise '' to null so an image-less card is stored consistently
+  // (and never as an empty string that later reads as "has an image").
+  const imageUrl = req.body.imageUrl ? String(req.body.imageUrl).trim() || null : null;
   const { rows } = await pool.query('INSERT INTO card_types(name,image_url,description,point_value,is_active) VALUES($1,$2,$3,$4,$5) RETURNING *', [name,imageUrl,description,pointValue,isActive]);
   await audit(req.admin.id, 'create_card_type', 'card_types', rows[0].id, null, req.body); res.json(rows[0]);
 }));

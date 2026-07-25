@@ -28,6 +28,8 @@ class _AdminCardsState extends State<AdminCards> {
   final _point = TextEditingController();
   final _desc = TextEditingController();
   final _imageUrl = TextEditingController();
+  bool _uploadingImage = false;
+  String? _imageError;
   final _singleCode = TextEditingController();
   final _bulkCodes = TextEditingController();
   bool _savingType = false;
@@ -67,13 +69,36 @@ class _AdminCardsState extends State<AdminCards> {
   Future<void> _pickImage() async {
     final x = await ImagePicker()
         .pickImage(source: ImageSource.gallery, imageQuality: 82);
-    if (x != null) {
+    if (x == null) return;
+    setState(() {
+      _uploadingImage = true;
+      _imageError = null;
+    });
+    try {
       final url = await widget.api.uploadAdminImage(x.path);
       if (mounted) setState(() => _imageUrl.text = url);
+    } catch (e) {
+      // Previously this threw into the void: the upload failed silently and
+      // the admin went on to save a card with no picture.
+      if (mounted) setState(() => _imageError = apiError(e));
+    } finally {
+      if (mounted) setState(() => _uploadingImage = false);
     }
   }
 
   Future<void> _createType() async {
+    // RACE FIX: the image upload runs in the background, so tapping save a
+    // moment after picking a photo used to create the card with an EMPTY
+    // image_url even though the file had already reached the VPS (confirmed
+    // in the production audit log). Wait for the upload instead.
+    if (_uploadingImage) {
+      _toast('لطفاً تا پایان آپلود عکس صبر کنید');
+      return;
+    }
+    if (_imageUrl.text.trim().isEmpty) {
+      final go = await _confirmNoImage();
+      if (go != true) return;
+    }
     setState(() => _savingType = true);
     try {
       await widget.api.post('/api/admin/card-types', {
@@ -97,11 +122,37 @@ class _AdminCardsState extends State<AdminCards> {
     }
   }
 
+  void _toast(String m) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+  }
+
+  /// Creating a card with no picture is almost always a mistake (the user's
+  /// inventory then shows a generic ⚽ placeholder), so confirm it.
+  Future<bool?> _confirmNoImage() => showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('بدون عکس ذخیره شود؟'),
+          content: const Text(
+              'برای این کارت عکسی انتخاب نشده است. در موجودی کاربران یک تصویر پیش‌فرض نمایش داده می‌شود.'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(c, false),
+                child: const Text('برگرد و عکس بگذار')),
+            FilledButton(
+                onPressed: () => Navigator.pop(c, true),
+                child: const Text('بدون عکس ادامه بده')),
+          ],
+        ),
+      );
+
   Future<void> _editType(Map t) async {
     final n = TextEditingController(text: t['name'] ?? '');
     final pts = TextEditingController(text: '${t['point_value'] ?? 0}');
     final img = TextEditingController(text: t['image_url'] ?? '');
     final ds = TextEditingController(text: t['description'] ?? '');
+    var editUploading = false;
+    String? editError;
     final ok = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -119,9 +170,34 @@ class _AdminCardsState extends State<AdminCards> {
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(labelText: 'امتیاز')),
               Gaps.vSm,
-              TextField(
+              // Real picker instead of a bare URL box: typing/clearing this
+              // by hand used to send an empty string, which wiped the card's
+              // picture on the server.
+              StatefulBuilder(
+                builder: (ctx, setLocal) => ImageUrlField(
                   controller: img,
-                  decoration: const InputDecoration(labelText: 'عکس')),
+                  label: 'عکس کارت',
+                  uploading: editUploading,
+                  error: editError,
+                  onPick: () async {
+                    final x = await ImagePicker().pickImage(
+                        source: ImageSource.gallery, imageQuality: 82);
+                    if (x == null) return;
+                    setLocal(() {
+                      editUploading = true;
+                      editError = null;
+                    });
+                    try {
+                      final url = await widget.api.uploadAdminImage(x.path);
+                      img.text = url;
+                    } catch (e) {
+                      editError = apiError(e);
+                    } finally {
+                      setLocal(() => editUploading = false);
+                    }
+                  },
+                ),
+              ),
               Gaps.vSm,
               TextField(
                   controller: ds,
@@ -140,12 +216,20 @@ class _AdminCardsState extends State<AdminCards> {
       ),
     );
     if (ok == true) {
-      await widget.api.patch('/api/admin/card-types/${t['id']}', {
+      if (editUploading) {
+        _toast('آپلود عکس تمام نشده بود؛ تغییرات ذخیره نشد');
+        return;
+      }
+      final body = <String, dynamic>{
         'name': n.text,
         'pointValue': int.tryParse(pts.text) ?? 0,
-        'imageUrl': img.text,
         'description': ds.text,
-      });
+      };
+      // Only send the image when there IS one. Sending '' told the server to
+      // blank the existing picture — exactly how cards lost their artwork.
+      final newImg = img.text.trim();
+      if (newImg.isNotEmpty) body['imageUrl'] = newImg;
+      await widget.api.patch('/api/admin/card-types/${t['id']}', body);
       await _load();
     }
   }
@@ -207,7 +291,12 @@ class _AdminCardsState extends State<AdminCards> {
             TextField(
                 controller: _desc,
                 decoration: const InputDecoration(labelText: 'توضیحات')),
-            ImageUrlField(controller: _imageUrl, onPick: _pickImage),
+            ImageUrlField(
+              controller: _imageUrl,
+              onPick: _pickImage,
+              uploading: _uploadingImage,
+              error: _imageError,
+            ),
             FilledButton.icon(
               onPressed: _savingType ? null : _createType,
               icon: _savingType

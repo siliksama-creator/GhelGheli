@@ -46,7 +46,17 @@ class FootballCard extends StatelessWidget {
                     ? Image.network(
                         img,
                         width: double.infinity,
-                        fit: BoxFit.cover,
+                        // Player cards are portrait artwork; `cover` cropped
+                        // the head/feet off. `contain` keeps the whole card.
+                        fit: BoxFit.contain,
+                        loadingBuilder: (_, child, p) => p == null
+                            ? child
+                            : const Center(
+                                child: SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2))),
                         errorBuilder: (_, __, ___) => const Center(
                             child: Text('⚽', style: TextStyle(fontSize: 40))),
                       )

@@ -29,6 +29,8 @@ class _AdminRewardsState extends State<AdminRewards> {
   final _value = TextEditingController();
   final _desc = TextEditingController();
   final _imageUrl = TextEditingController();
+  bool _uploadingImage = false;
+  String? _imageError;
   String _type = 'cash';
 
   static const _claimLabels = {
@@ -69,9 +71,18 @@ class _AdminRewardsState extends State<AdminRewards> {
   Future<void> _pickRewardImage() async {
     final x = await ImagePicker()
         .pickImage(source: ImageSource.gallery, imageQuality: 82);
-    if (x != null) {
+    if (x == null) return;
+    setState(() {
+      _uploadingImage = true;
+      _imageError = null;
+    });
+    try {
       final url = await widget.api.uploadAdminImage(x.path);
       if (mounted) setState(() => _imageUrl.text = url);
+    } catch (e) {
+      if (mounted) setState(() => _imageError = apiError(e));
+    } finally {
+      if (mounted) setState(() => _uploadingImage = false);
     }
   }
 
@@ -134,6 +145,8 @@ class _AdminRewardsState extends State<AdminRewards> {
             ImageUrlField(
                 controller: _imageUrl,
                 onPick: _pickRewardImage,
+                uploading: _uploadingImage,
+                error: _imageError,
                 label: 'عکس جایزه / آدرس آپلودشده'),
             DropdownButtonFormField<String>(
               initialValue: _type,
