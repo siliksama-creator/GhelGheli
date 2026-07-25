@@ -3,12 +3,15 @@
 // join / waiting / start / update / over.
 import React, { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
+import { play, isEnabled, setEnabled } from './gameAudio.js';
 
 const GAMES = [
   { id: 'tictactoe', title: 'دوز', emoji: '❌', desc: 'کلاسیک سه‌تایی', accent: '#22D3EE' },
   { id: 'connect4', title: 'چهار در یک ردیف', emoji: '🔴', desc: 'چهارتا رو ردیف کن', accent: '#F59E0B' },
   { id: 'reversi', title: 'اتللو', emoji: '⚫', desc: 'مهره‌ها را برگردان', accent: '#34D399' },
 ];
+
+const MOVE_SFX = { tictactoe: 'move', connect4: 'drop', reversi: 'flip' };
 
 const SYMBOLS = {
   tictactoe: { X: '❌', O: '⭕' },
@@ -20,9 +23,18 @@ const SYMBOLS = {
 function useGame(api, token, gameId) {
   const ref = useRef(null);
   const [phase, setPhase] = useState('idle');
-  const [g, setG] = useState({ state: {}, players: null, me: null, turn: null, winner: null, vsBot: false });
+  const [g, setG] = useState({
+    state: {}, players: null, me: null, turn: null, winner: null,
+    vsBot: false, timedOut: null,
+  });
   const [error, setError] = useState('');
+  const [left, setLeft] = useState(0);
+  const [turnSecs, setTurnSecs] = useState(15);
   const room = useRef(null);
+  const deadline = useRef(null);
+  const meRef = useRef(null);
+  const turnRef = useRef(null);
+  const tickedAt = useRef(-1);
 
   useEffect(() => {
     const s = io(api, { auth: { token }, transports: ['websocket'], forceNew: true });
@@ -30,25 +42,75 @@ function useGame(api, token, gameId) {
     s.on('connect_error', () => setError('اتصال به سرور بازی برقرار نشد'));
     s.on('game:error', d => setError(d?.message || 'خطا در بازی'));
     s.on('game:waiting', () => { setError(''); setPhase('waiting'); });
+
     s.on('game:start', d => {
       room.current = d.roomId;
-      setG({ state: d.state || {}, players: d.players, me: d.yourSymbol, turn: d.turn, winner: null, vsBot: !!d.vsBot });
+      meRef.current = d.yourSymbol;
+      turnRef.current = d.turn;
+      deadline.current = d.deadline || null;
+      if (d.turnMs) setTurnSecs(Math.round(d.turnMs / 1000));
+      tickedAt.current = -1;
+      play('match_found');
+      setG({
+        state: d.state || {}, players: d.players, me: d.yourSymbol,
+        turn: d.turn, winner: null, vsBot: !!d.vsBot, timedOut: null,
+      });
       setPhase('playing');
     });
-    s.on('game:update', d => setG(p => ({ ...p, state: d.state || p.state, turn: d.turn })));
+
+    s.on('game:update', d => {
+      const wasMine = turnRef.current && turnRef.current === meRef.current;
+      turnRef.current = d.turn;
+      deadline.current = d.deadline || null;
+      tickedAt.current = -1;
+      if (d.timedOut) play('timeout');
+      else if (!wasMine) play(MOVE_SFX[gameId] || 'move', 0.9);
+      if (!wasMine && d.turn === meRef.current) play('your_turn');
+      setG(p => ({ ...p, state: d.state || p.state, turn: d.turn, timedOut: d.timedOut || null }));
+    });
+
     s.on('game:over', d => {
+      deadline.current = null;
+      setLeft(0);
+      const won = d.winner && d.winner === meRef.current;
+      play(d.winner === 'DRAW' ? 'draw' : won ? 'win' : 'lose');
       setG(p => ({ ...p, state: d.state || p.state, winner: d.winner }));
       setPhase('over');
     });
+
     return () => s.disconnect();
   }, [api, token, gameId]);
 
+  // Countdown driven by the server deadline, so both players agree.
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (!deadline.current) { setLeft(0); return; }
+      const secs = Math.max(0, Math.ceil((deadline.current - Date.now()) / 1000));
+      setLeft(secs);
+      const mine = turnRef.current && turnRef.current === meRef.current;
+      if (mine && secs > 0 && secs <= 5 && tickedAt.current !== secs) {
+        tickedAt.current = secs;
+        play(secs <= 3 ? 'tick_urgent' : 'tick', 0.65);
+      }
+    }, 200);
+    return () => clearInterval(id);
+  }, []);
+
   return {
-    phase, error, ...g,
+    phase, error, left, turnSecs, ...g,
     myTurn: phase === 'playing' && g.turn && g.turn === g.me,
-    join: () => { setError(''); ref.current?.emit('game:join', { gameId }); setPhase('waiting'); },
-    move: i => ref.current?.emit('game:move', { roomId: room.current, move: i }),
-    leave: () => { ref.current?.emit('game:leave', { roomId: room.current }); setPhase('idle'); },
+    join: () => {
+      setError('');
+      tickedAt.current = -1;
+      ref.current?.emit('game:join', { gameId });
+      setPhase('waiting');
+    },
+    move: i => { play(MOVE_SFX[gameId] || 'move'); ref.current?.emit('game:move', { roomId: room.current, move: i }); },
+    leave: () => {
+      deadline.current = null;
+      ref.current?.emit('game:leave', { roomId: room.current });
+      setPhase('idle');
+    },
   };
 }
 
@@ -110,11 +172,37 @@ function ReversiBoard({ g }) {
 
 const BOARDS = { tictactoe: TicTacToeBoard, connect4: Connect4Board, reversi: ReversiBoard };
 
-function GameRoom({ api, token, game, onBack }) {
+function Seat({ g, sym, symbol, openProfile }) {
+  const info = g.players?.[symbol];
+  const isMe = g.me === symbol;
+  const isBot = info?.isBot;
+  const active = g.turn === symbol && g.phase === 'playing';
+  const canOpen = !isMe && !isBot && info?.id;
+  const urgent = active && g.left <= 5 && g.left > 0;
+  const pct = active && g.turnSecs ? Math.max(0, Math.min(100, (g.left / g.turnSecs) * 100)) : 0;
+
+  return (
+    <div className={`player ${active ? 'on' : ''} ${canOpen ? 'clickable' : ''}`}
+      onClick={canOpen ? () => openProfile(info.id) : undefined}
+      title={canOpen ? 'مشاهده پروفایل' : undefined}>
+      <span>{isBot ? '🤖' : sym[symbol]}</span>
+      <b>{isMe ? 'شما' : info?.nickname || 'حریف'}{canOpen ? ' ⓘ' : ''}</b>
+      {g.state.scores && <i>{g.state.scores[symbol]}</i>}
+      {active && (
+        <span className={`timer ${urgent ? 'urgent' : ''}`}>
+          <span className="timerBar" style={{ width: `${pct}%` }} />
+          <em>{g.left}</em>
+        </span>
+      )}
+    </div>
+  );
+}
+
+function GameRoom({ api, token, game, onBack, openProfile }) {
   const g = useGame(api, token, game.id);
   const Board = BOARDS[game.id];
   const sym = SYMBOLS[game.id];
-  const scores = g.state.scores;
+  const [muted, setMuted] = useState(!isEnabled());
 
   return (
     <section className="card wide gamePage">
@@ -122,6 +210,8 @@ function GameRoom({ api, token, game, onBack }) {
         <button className="ghost" onClick={() => { g.leave(); onBack(); }}>‹ بازگشت</button>
         <h2>{game.emoji} {game.title}</h2>
         {g.vsBot && g.phase === 'playing' && <span className="botTag">🤖 با ربات</span>}
+        <button className="ghost" title={muted ? 'وصل صدا' : 'قطع صدا'}
+          onClick={() => setMuted(!setEnabled(muted))}>{muted ? '🔇' : '🔊'}</button>
       </div>
 
       {g.error && <p className="msg">{g.error}</p>}
@@ -143,18 +233,18 @@ function GameRoom({ api, token, game, onBack }) {
       {(g.phase === 'playing' || g.phase === 'over') && (
         <>
           <div className="scoreboard">
-            <div className={`player ${g.turn === 'X' ? 'on' : ''}`}>
-              <span>{sym.X}</span><b>{g.me === 'X' ? 'شما' : g.players?.X?.nickname || 'حریف'}</b>
-              {scores && <i>{scores.X}</i>}
-            </div>
+            <Seat g={g} sym={sym} symbol="X" openProfile={openProfile} />
             <div className="turn-indicator">
               {g.phase === 'over' ? 'پایان' : g.myTurn ? 'نوبت شماست' : 'نوبت حریف'}
             </div>
-            <div className={`player ${g.turn === 'O' ? 'on' : ''}`}>
-              <span>{sym.O}</span><b>{g.me === 'O' ? 'شما' : g.players?.O?.nickname || 'حریف'}</b>
-              {scores && <i>{scores.O}</i>}
-            </div>
+            <Seat g={g} sym={sym} symbol="O" openProfile={openProfile} />
           </div>
+
+          {g.timedOut && g.phase === 'playing' && (
+            <p className="timeoutNote">
+              {g.timedOut === g.me ? 'وقت شما تمام شد؛ یک حرکت خودکار انجام شد' : 'وقت حریف تمام شد'}
+            </p>
+          )}
 
           <Board g={g} />
 
@@ -173,10 +263,11 @@ function GameRoom({ api, token, game, onBack }) {
   );
 }
 
-export default function GamesHub({ api, token }) {
+export default function GamesHub({ api, token, openProfile = () => {} }) {
   const [active, setActive] = useState(null);
   if (active) {
-    return <GameRoom api={api} token={token} game={active} onBack={() => setActive(null)} />;
+    return <GameRoom api={api} token={token} game={active}
+      onBack={() => setActive(null)} openProfile={openProfile} />;
   }
   return (
     <section className="card wide">
@@ -184,7 +275,8 @@ export default function GamesHub({ api, token }) {
       <p className="hint">با کاربران دیگر آنلاین رقابت کن — اگر حریفی نبود، ربات وارد می‌شود.</p>
       <div className="gameGrid">
         {GAMES.map(g => (
-          <button key={g.id} className="gameTile" style={{ '--accent': g.accent }} onClick={() => setActive(g)}>
+          <button key={g.id} className="gameTile" style={{ '--accent': g.accent }}
+            onClick={() => { play('tap'); setActive(g); }}>
             <span className="gEmoji">{g.emoji}</span>
             <b>{g.title}</b>
             <small>{g.desc}</small>

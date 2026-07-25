@@ -19,6 +19,7 @@ dependencies:
   firebase_core: ^3.4.0
   firebase_messaging: ^15.1.0
   image_picker: ^1.1.2
+  audioplayers: ^6.1.0
 
 dev_dependencies:
   flutter_test:
@@ -51,6 +52,7 @@ flutter:
   assets:
     - assets/brand/
     - assets/games/
+    - assets/sfx/
     - assets/avatars/
     - assets/icon/
     - assets/splash/

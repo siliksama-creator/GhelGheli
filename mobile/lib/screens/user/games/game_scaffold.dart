@@ -1,14 +1,18 @@
 // Shared chrome for every game screen: header, versus bar, status banners
 // and the end-of-game panel. Each individual board only supplies its grid.
 import 'package:flutter/material.dart';
+import '../../../api_client.dart';
 import '../../../theme/tokens.dart';
 import '../../../widgets/app_card.dart';
+import 'game_audio.dart';
 import 'game_session.dart';
+import 'versus_bar.dart';
 
 class GameScaffold extends StatelessWidget {
   const GameScaffold({
     super.key,
     required this.session,
+    required this.api,
     required this.title,
     required this.accent,
     required this.symbols,
@@ -18,6 +22,7 @@ class GameScaffold extends StatelessWidget {
   });
 
   final GameSession session;
+  final ApiClient api;
   final String title;
   final Color accent;
   final Map<String, String> symbols; // 'X' -> '❌'
@@ -52,6 +57,7 @@ class GameScaffold extends StatelessWidget {
                   ),
                   if (session.vsBot && session.phase == GamePhase.playing)
                     _Chip(label: 'با ربات', color: accent),
+                  const _SoundToggle(),
                 ],
               ),
               Gaps.vSm,
@@ -111,10 +117,26 @@ class GameScaffold extends StatelessWidget {
         return SingleChildScrollView(
           child: Column(
             children: [
-              _VersusBar(session: session, symbols: symbols, accent: accent),
+              VersusBar(
+                  session: session,
+                  api: api,
+                  symbols: symbols,
+                  accent: accent),
               Gaps.vSm,
               if (scoreboard != null) ...[scoreboard!, Gaps.vSm],
               _TurnBanner(session: session, accent: accent),
+              if (session.timedOutSymbol != null &&
+                  session.phase == GamePhase.playing) ...[
+                Gaps.vXxs,
+                Text(
+                  session.timedOutSymbol == session.mySymbol
+                      ? 'وقت شما تمام شد؛ یک حرکت خودکار انجام شد'
+                      : 'وقت حریف تمام شد',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: const Color(0xFFEF4444),
+                      fontWeight: FontWeight.w700),
+                ),
+              ],
               Gaps.vSm,
               boardBuilder(context),
               Gaps.vMd,
@@ -131,65 +153,6 @@ class GameScaffold extends StatelessWidget {
           ),
         );
     }
-  }
-}
-
-class _VersusBar extends StatelessWidget {
-  const _VersusBar(
-      {required this.session, required this.symbols, required this.accent});
-  final GameSession session;
-  final Map<String, String> symbols;
-  final Color accent;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    Widget side(String sym) {
-      final active = session.turn == sym && session.phase == GamePhase.playing;
-      final me = session.mySymbol == sym;
-      return Expanded(
-        child: AnimatedContainer(
-          duration: Motion.fast,
-          padding: const EdgeInsets.symmetric(vertical: Gaps.xs),
-          decoration: BoxDecoration(
-            borderRadius: Corners.rMd,
-            color: active ? accent.withValues(alpha: 0.16) : Colors.transparent,
-            border: Border.all(
-              color: active ? accent : Colors.transparent,
-              width: 1.4,
-            ),
-          ),
-          child: Column(
-            children: [
-              Text(symbols[sym] ?? sym, style: const TextStyle(fontSize: 26)),
-              Text(
-                me ? 'شما' : session.nameOf(sym),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(fontWeight: FontWeight.w700),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return AppCard(
-      padding: const EdgeInsets.symmetric(horizontal: Gaps.sm, vertical: Gaps.xs),
-      child: Row(
-        children: [
-          side('X'),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: Gaps.xs),
-            child: Text('VS',
-                style: theme.textTheme.labelLarge
-                    ?.copyWith(color: theme.colorScheme.outline)),
-          ),
-          side('O'),
-        ],
-      ),
-    );
   }
 }
 
@@ -348,6 +311,30 @@ class _Chip extends StatelessWidget {
                 .labelSmall
                 ?.copyWith(color: color, fontWeight: FontWeight.w700)),
       ]),
+    );
+  }
+}
+
+/// Mute button. Lives in the game header so players can silence SFX
+/// instantly without digging through settings.
+class _SoundToggle extends StatefulWidget {
+  const _SoundToggle();
+
+  @override
+  State<_SoundToggle> createState() => _SoundToggleState();
+}
+
+class _SoundToggleState extends State<_SoundToggle> {
+  @override
+  Widget build(BuildContext context) {
+    final on = GameAudio.instance.enabled;
+    return IconButton(
+      tooltip: on ? 'قطع صدا' : 'وصل صدا',
+      icon: Icon(on ? Icons.volume_up_rounded : Icons.volume_off_rounded),
+      onPressed: () async {
+        await GameAudio.instance.setEnabled(!on);
+        if (mounted) setState(() {});
+      },
     );
   }
 }

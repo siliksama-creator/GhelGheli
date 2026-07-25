@@ -30,6 +30,7 @@ class _TicTacToeScreenState extends State<TicTacToeScreen> {
   Widget build(BuildContext context) {
     return GameScaffold(
       session: _s,
+      api: widget.api,
       title: 'دوز',
       accent: _accent,
       symbols: const {'X': '❌', 'O': '⭕'},

@@ -142,3 +142,23 @@
 .rv-disc.dark { background: #111827; }
 .rv-disc.light { background: #fff; }
 .rv-hint { width: 26%; aspect-ratio: 1; border-radius: 50%; background: rgba(255,255,255,.55); display: block; }
+
+/* ---------- Turn timer, clickable seats, timeout notice ---------- */
+.gamePage .player { position: relative; min-width: 92px; }
+.gamePage .player.clickable { cursor: pointer; }
+.gamePage .player.clickable:hover { background: rgba(255,255,255,.07); }
+.gamePage .player .timer {
+  position: relative; display: block; width: 62px; height: 14px; margin-top: 5px;
+  border-radius: 999px; background: rgba(255,255,255,.14); overflow: hidden;
+}
+.gamePage .player .timerBar {
+  position: absolute; inset: 0 auto 0 0; background: #22c55e;
+  transition: width .2s linear;
+}
+.gamePage .player .timer.urgent .timerBar { background: #ef4444; }
+.gamePage .player .timer em {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-style: normal; font-size: 10px; font-weight: 800; color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,.6);
+}
+.timeoutNote { text-align: center; color: #ef4444; font-weight: 700; font-size: 13px; margin: 6px 0 0; }

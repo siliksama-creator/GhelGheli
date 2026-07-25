@@ -34,6 +34,7 @@ class _ReversiScreenState extends State<ReversiScreen> {
   Widget build(BuildContext context) {
     return GameScaffold(
       session: _s,
+      api: widget.api,
       title: 'اتللو',
       accent: _accent,
       symbols: const {'X': '⚫', 'O': '⚪'},

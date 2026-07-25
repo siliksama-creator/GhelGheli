@@ -34,6 +34,7 @@ class _Connect4ScreenState extends State<Connect4Screen> {
   Widget build(BuildContext context) {
     return GameScaffold(
       session: _s,
+      api: widget.api,
       title: 'چهار در یک ردیف',
       accent: _accent,
       symbols: const {'X': '🔴', 'O': '🟡'},

@@ -3,9 +3,12 @@
 // All games speak the same protocol (join / waiting / start / update / over),
 // so the connection handling lives here once and each board file only draws
 // its own grid. Keeps every game screen small.
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../../../api_client.dart';
+import 'game_audio.dart';
 
 enum GamePhase { idle, waiting, playing, over }
 
@@ -27,7 +30,28 @@ class GameSession extends ChangeNotifier {
   String? _roomId;
   int? lastMove;
 
+  /// Countdown for the player currently on move. Driven by the server's
+  /// `deadline` so both clients agree even if one lags.
+  int secondsLeft = 0;
+  int turnSeconds = 15;
+  String? timedOutSymbol;
+  Timer? _ticker;
+  int _lastTickPlayed = -1;
+
   bool get myTurn => phase == GamePhase.playing && turn != null && turn == mySymbol;
+
+  /// Opponent's user id, for opening their public profile.
+  Object? get opponentId {
+    if (mySymbol == null) return null;
+    final other = players?[mySymbol == 'X' ? 'O' : 'X'];
+    if (other is Map && other['isBot'] != true) return other['id'];
+    return null;
+  }
+
+  Map? playerInfo(String symbol) {
+    final p = players?[symbol];
+    return p is Map ? p : null;
+  }
 
   void connect() {
     if (_socket != null) return;
@@ -61,16 +85,31 @@ class GameSession extends ChangeNotifier {
       turn = m['turn'] as String?;
       state = _asMap(m['state']);
       winner = null;
+      timedOutSymbol = null;
       phase = GamePhase.playing;
       error = null;
+      GameAudio.instance.play(Sfx.matchFound);
+      _startClock(m['deadline'], m['turnMs']);
       notifyListeners();
     });
 
     s.on('game:update', (d) {
       final m = _asMap(d);
+      final wasMyTurn = myTurn;
       state = _asMap(m['state']);
       turn = m['turn'] as String?;
       lastMove = (m['lastMove'] as num?)?.toInt();
+      timedOutSymbol = m['timedOut'] as String?;
+
+      if (timedOutSymbol != null) {
+        GameAudio.instance.play(Sfx.timeout);
+      } else if (!wasMyTurn) {
+        // The move we just received came from the opponent.
+        GameAudio.instance.play(moveSound, volume: 0.9);
+      }
+      if (!wasMyTurn && myTurn) GameAudio.instance.play(Sfx.yourTurn);
+
+      _startClock(m['deadline'], m['turnMs']);
       notifyListeners();
     });
 
@@ -79,8 +118,48 @@ class GameSession extends ChangeNotifier {
       if (m['state'] != null) state = _asMap(m['state']);
       winner = m['winner'] as String?;
       phase = GamePhase.over;
+      _stopClock();
+      GameAudio.instance.play(
+        winner == 'DRAW' ? Sfx.draw : (iWon ? Sfx.win : Sfx.lose),
+      );
       notifyListeners();
     });
+  }
+
+  void _startClock(dynamic deadline, dynamic turnMs) {
+    _ticker?.cancel();
+    final ms = (turnMs as num?)?.toInt();
+    if (ms != null && ms > 0) turnSeconds = (ms / 1000).round();
+    final end = (deadline as num?)?.toInt();
+    if (end == null) {
+      secondsLeft = 0;
+      return;
+    }
+    _lastTickPlayed = -1;
+    void tick() {
+      final left = ((end - DateTime.now().millisecondsSinceEpoch) / 1000).ceil();
+      final clamped = left < 0 ? 0 : (left > turnSeconds ? turnSeconds : left);
+      if (clamped != secondsLeft) {
+        secondsLeft = clamped;
+        // Audible warning only on our own turn, once per second, last 5s.
+        if (myTurn && clamped <= 5 && clamped > 0 && clamped != _lastTickPlayed) {
+          _lastTickPlayed = clamped;
+          GameAudio.instance
+              .play(clamped <= 3 ? Sfx.tickUrgent : Sfx.tick, volume: 0.65);
+        }
+        notifyListeners();
+      }
+      if (clamped <= 0) _ticker?.cancel();
+    }
+
+    tick();
+    _ticker = Timer.periodic(const Duration(milliseconds: 200), (_) => tick());
+  }
+
+  void _stopClock() {
+    _ticker?.cancel();
+    _ticker = null;
+    secondsLeft = 0;
   }
 
   void join() {
@@ -88,13 +167,27 @@ class GameSession extends ChangeNotifier {
     error = null;
     winner = null;
     lastMove = null;
+    timedOutSymbol = null;
     _socket?.emit('game:join', {'gameId': gameId});
     phase = GamePhase.waiting;
     notifyListeners();
   }
 
+  /// Piece-placement sound, chosen per game so each board feels distinct.
+  Sfx get moveSound {
+    switch (gameId) {
+      case 'connect4':
+        return Sfx.drop;
+      case 'reversi':
+        return Sfx.flip;
+      default:
+        return Sfx.move;
+    }
+  }
+
   void move(int index) {
     if (!myTurn) return;
+    GameAudio.instance.play(moveSound);
     _socket?.emit('game:move', {'roomId': _roomId, 'move': index});
   }
 
@@ -103,6 +196,8 @@ class GameSession extends ChangeNotifier {
     phase = GamePhase.idle;
     winner = null;
     state = const {};
+    timedOutSymbol = null;
+    _stopClock();
     notifyListeners();
   }
 
@@ -132,6 +227,7 @@ class GameSession extends ChangeNotifier {
   void _fail(String m) {
     error = m;
     phase = GamePhase.idle;
+    _stopClock();
     notifyListeners();
   }
 
@@ -143,6 +239,7 @@ class GameSession extends ChangeNotifier {
 
   @override
   void dispose() {
+    _ticker?.cancel();
     _socket?.dispose();
     _socket = null;
     super.dispose();

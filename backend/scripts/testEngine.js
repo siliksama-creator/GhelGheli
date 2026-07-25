@@ -146,6 +146,58 @@ function makeIo() {
     ok(!threw, 'payload-less game:leave does not throw');
   }
 
+  console.log('\n== turn clock (15s) ==');
+  {
+    const io = makeIo(); attach(io, RULES);
+    const a = io.connect(new FakeSocket('t1', 'الف'));
+    const b = io.connect(new FakeSocket('t2', 'ب'));
+    a.fire('game:join', { gameId: 'tictactoe' });
+    b.fire('game:join', { gameId: 'tictactoe' });
+    const st = a.last('game:start');
+    ok(st.turnMs === 15000, 'turn budget advertised to clients');
+    ok(typeof st.deadline === 'number' && st.deadline > Date.now(), 'deadline sent on start');
+    ok(!!st.players.X.profileAvatarKey || st.players.X.profileAvatarKey === null,
+      'player profile fields present');
+    ok(st.players.X.id === 'u-t1' || typeof st.players.X.id === 'string',
+      'player id exposed for profile lookup');
+
+    const before = a.last('game:update');
+    ok(before === undefined, 'no move yet');
+    // Let X's clock expire; the server should auto-play and pass the turn.
+    await wait(15400);
+    const after = a.last('game:update');
+    ok(!!after, 'server acted when the clock ran out');
+    ok(after && after.timedOut === 'X', 'timeout attributed to the right player');
+    ok(after && after.turn === 'O', 'turn moved to the opponent');
+    ok(after && after.state.board.filter(Boolean).length === 1, 'exactly one auto-move played');
+    ok(typeof after.deadline === 'number', 'new deadline issued for the next turn');
+    a.fire('game:leave');
+  }
+
+  console.log('\n== regression: ghost rooms & sticky timeout ==');
+  {
+    const io = makeIo(); attach(io, RULES);
+    const a = io.connect(new FakeSocket('g1', 'الف'));
+    const b = io.connect(new FakeSocket('g2', 'ب'));
+    a.fire('game:join', { gameId: 'tictactoe' });
+    b.fire('game:join', { gameId: 'tictactoe' });
+    ok(!!a.last('game:start'), 'match started');
+    // Switching games mid-match must not strand the opponent in a dead room.
+    a.fire('game:join', { gameId: 'connect4' });
+    ok(b.last('game:over')?.winner === 'DISCONNECT', 'opponent released from abandoned room');
+    ok(b.rooms.size === 0, 'abandoned room cleaned up');
+
+    // Re-tapping the same game while queued must not duplicate the queue slot.
+    const c = io.connect(new FakeSocket('g3', 'ج'));
+    c.fire('game:join', { gameId: 'reversi' });
+    c.fire('game:join', { gameId: 'reversi' });
+    const d = io.connect(new FakeSocket('g4', 'د'));
+    d.fire('game:join', { gameId: 'reversi' });
+    ok(!!c.last('game:start') && !!d.last('game:start'), 'no duplicate queue entry');
+    ok(c.last('game:start').roomId === d.last('game:start').roomId, 'paired correctly after re-join');
+    c.fire('game:leave'); d.fire('game:leave');
+  }
+
   console.log('\n== hostile payload fuzz ==');
   {
     const io = makeIo(); attach(io, RULES);

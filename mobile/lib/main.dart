@@ -12,6 +12,7 @@ import 'screens/auth/auth_screen.dart';
 import 'screens/auth/splash_screen.dart';
 import 'screens/admin/admin_shell.dart';
 import 'screens/user/home_shell.dart';
+import 'screens/user/games/game_audio.dart';
 import 'theme/app_theme.dart';
 
 void main() => runApp(const GhelGheliApp());
@@ -33,7 +34,11 @@ class _GhelGheliAppState extends State<GhelGheliApp> {
   @override
   void initState() {
     super.initState();
-    api.loadToken().then((_) => setState(() => _ready = true));
+    // Restore the saved mute preference before any game can play a sound.
+    GameAudio.instance.load();
+    api.loadToken().then((_) {
+      if (mounted) setState(() => _ready = true);
+    });
   }
 
   void _toggleTheme() =>
