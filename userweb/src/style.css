@@ -388,3 +388,38 @@
   .mobileNav { top: 58px; }
   .appLogo { width: 30px; height: 30px; }
 }
+
+/* ============ layout fixes found by the headless screenshot pass ============ */
+
+/* Chat composer was `position: sticky` inside the card, so it floated ON TOP
+   of the message list and covered the last few messages. Make it a normal
+   flow element at the end of the column instead. */
+.chatPage { display: flex; flex-direction: column; }
+.sendDock {
+  position: relative; bottom: auto;
+  margin-top: 12px; box-shadow: 0 -6px 24px #0006;
+}
+/* The canned-message popover anchored to the page, not the dock, and landed
+   across the conversation. Anchor it to the composer. */
+.chatPage { position: relative; }
+.cannedPopover { bottom: 78px; inset-inline: 10px; width: auto; max-width: none; }
+
+/* Chat bubbles: the dark override made text sit on near-black inside an
+   already-dark card, which read as clipped/unreadable. */
+.chatbody {
+  background: transparent !important;
+  border: 0 !important;
+  color: inherit !important;
+  min-width: 0;
+}
+.chatmsg { align-items: flex-start; }
+.chatmsg p { word-break: break-word; }
+
+/* Signed-in pages start at the app bar, no hero gap. */
+.page.signedIn { padding-top: 10px; }
+
+/* Nav overflowed to a second row on narrow phones; keep it one tidy strip. */
+@media (max-width: 720px) {
+  .mobileNav { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; }
+  .mobileNav button { flex: 0 0 auto; }
+}
