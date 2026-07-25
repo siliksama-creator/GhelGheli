@@ -94,7 +94,7 @@ class _Board extends StatelessWidget {
 
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 360),
+        constraints: const BoxConstraints(maxWidth: 420),
         child: AspectRatio(
           aspectRatio: 1,
           child: Container(
@@ -211,37 +211,72 @@ class _Cell extends StatelessWidget {
     final isSnake = snakes.containsKey(number);
     final dark = ((number ~/ 10) + number).isEven;
 
+    // Chute endpoints get a tinted square so the player can see WHERE a
+    // snake/ladder starts even where the artwork overlaps a neighbour.
+    Color bg;
+    if (number == 100) {
+      bg = const Color(0xFFFBBF24).withValues(alpha: 0.42);
+    } else if (isLadder) {
+      bg = const Color(0xFFFBBF24).withValues(alpha: 0.20);
+    } else if (isSnake) {
+      bg = const Color(0xFF34D399).withValues(alpha: 0.20);
+    } else {
+      bg = dark
+          ? Colors.white.withValues(alpha: 0.05)
+          : Colors.white.withValues(alpha: 0.11);
+    }
+
     return Container(
-      margin: const EdgeInsets.all(0.5),
+      margin: const EdgeInsets.all(0.6),
       decoration: BoxDecoration(
-        color: number == 100
-            ? const Color(0xFFFBBF24).withValues(alpha: 0.35)
-            : (dark
-                ? Colors.white.withValues(alpha: 0.06)
-                : Colors.white.withValues(alpha: 0.12)),
-        borderRadius: BorderRadius.circular(2),
+        color: bg,
+        borderRadius: BorderRadius.circular(3),
         border: isLadder
-            ? Border.all(color: const Color(0xFFFBBF24), width: 0.8)
+            ? Border.all(color: const Color(0xFFFBBF24), width: 1)
             : (isSnake
-                ? Border.all(color: const Color(0xFF34D399), width: 0.8)
+                ? Border.all(color: const Color(0xFF34D399), width: 1)
                 : null),
       ),
-      child: Center(
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Padding(
-            padding: const EdgeInsets.all(1),
+      child: Stack(
+        children: [
+          Positioned(
+            top: 1,
+            right: 2,
             child: Text(
-              number == 100 ? '🏁' : '$number',
+              '$number',
               style: TextStyle(
-                fontSize: 8,
+                fontSize: 7.5,
                 height: 1,
-                color: Colors.white.withValues(alpha: 0.55),
-                fontWeight: FontWeight.w600,
+                color: Colors.white.withValues(alpha: 0.5),
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
-        ),
+          if (number == 100)
+            const Center(child: Text('🏁', style: TextStyle(fontSize: 13)))
+          else if (isLadder)
+            Align(
+              alignment: Alignment.bottomLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 1, bottom: 1),
+                child: Text('🪜',
+                    style: TextStyle(
+                        fontSize: 7,
+                        color: Colors.white.withValues(alpha: 0.9))),
+              ),
+            )
+          else if (isSnake)
+            Align(
+              alignment: Alignment.bottomLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 1, bottom: 1),
+                child: Text('🐍',
+                    style: TextStyle(
+                        fontSize: 7,
+                        color: Colors.white.withValues(alpha: 0.9))),
+              ),
+            ),
+        ],
       ),
     );
   }

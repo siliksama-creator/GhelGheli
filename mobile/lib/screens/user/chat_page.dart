@@ -7,6 +7,7 @@ import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/avatar_image.dart';
 import '../../widgets/state_views.dart';
+import '../../widgets/lifecycle_poller.dart';
 import '../shared/public_profile_sheet.dart';
 import 'games/pinned_banner.dart';
 
@@ -20,7 +21,7 @@ class ChatPage extends StatefulWidget {
   State<ChatPage> createState() => _ChatPageState();
 }
 
-class _ChatPageState extends State<ChatPage> {
+class _ChatPageState extends State<ChatPage> with LifecyclePoller {
   final _text = TextEditingController();
   List _messages = [];
   List _stickers = [];
@@ -28,7 +29,6 @@ class _ChatPageState extends State<ChatPage> {
   Map? _reply;
   String? _error;
   Map<String, dynamic>? _pinned;
-  Timer? _timer;
   bool _loading = true;
 
   @override
@@ -36,15 +36,15 @@ class _ChatPageState extends State<ChatPage> {
     super.initState();
     _load();
     // PERFORMANCE: this used to re-fetch messages + stickers + canned list
-    // every 3 seconds forever — 1200 requests an hour per open chat, on a
-    // mobile data plan. Stickers and canned messages almost never change, so
-    // the poll now runs far less often and only refreshes the messages.
-    _timer = Timer.periodic(const Duration(seconds: 10), (_) => _refreshMessages());
+    // every 3 seconds forever. Now only the messages are polled, at a calmer
+    // cadence, and the poll PAUSES while the app is backgrounded instead of
+    // draining battery and data for updates nobody can see.
+    startPolling(const Duration(seconds: 10), _refreshMessages);
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    stopPolling();
     _text.dispose();
     super.dispose();
   }

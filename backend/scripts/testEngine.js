@@ -235,6 +235,43 @@ function makeIo() {
     c.fire('game:leave'); d.fire('game:leave');
   }
 
+  console.log('\n== resilience: dead sockets ==');
+  {
+    const io = makeIo(); attach(io, RULES);
+    const a = io.connect(new FakeSocket('d1', 'الف'));
+    const b = io.connect(new FakeSocket('d2', 'ب'));
+    // Make emit throw the way a closed socket does.
+    b.emit = function (ev, data) {
+      if (!this.connected) throw new Error('socket closed');
+      this.events.push({ ev, data });
+    }.bind(b);
+
+    a.fire('game:join', { gameId: 'snakes' });
+    b.fire('game:join', { gameId: 'snakes' });
+    const st = a.last('game:start');
+    ok(!!st, 'match started');
+
+    // b dies WITHOUT firing 'disconnect' (cell tower drop, app killed...).
+    b.connected = false;
+    let threw = false;
+    try {
+      a.fire('game:move', { roomId: st.roomId, move: (st.state.playable || [0])[0] });
+    } catch { threw = true; }
+    ok(!threw, 'a dead peer socket does not crash the mover');
+    ok(a.last('game:over')?.winner === 'DISCONNECT', 'survivor is told the game ended');
+    ok(a.rooms.size === 0, 'room released instead of retrying forever');
+
+    // A queued socket that vanished must not be matched against.
+    const c = io.connect(new FakeSocket('d3', 'ج'));
+    c.fire('game:join', { gameId: 'reversi' });
+    c.connected = false;
+    const d = io.connect(new FakeSocket('d4', 'د'));
+    d.fire('game:join', { gameId: 'reversi' });
+    ok(!d.has('game:start'), 'not matched against a ghost in the queue');
+    ok(d.has('game:waiting'), 'live player keeps waiting for a real opponent');
+    d.fire('game:leave');
+  }
+
   console.log('\n== hostile payload fuzz ==');
   {
     const io = makeIo(); attach(io, RULES);

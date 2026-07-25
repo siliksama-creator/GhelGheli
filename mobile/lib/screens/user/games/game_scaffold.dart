@@ -60,6 +60,37 @@ class GameScaffold extends StatelessWidget {
                   const _SoundToggle(),
                 ],
               ),
+              if (!session.connected)
+                Padding(
+                  padding: const EdgeInsets.only(top: Gaps.xs),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: Gaps.sm, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF59E0B).withValues(alpha: 0.16),
+                      borderRadius: Corners.rMd,
+                      border: Border.all(
+                          color: const Color(0xFFF59E0B).withValues(alpha: 0.6)),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                            width: 13,
+                            height: 13,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Color(0xFFF59E0B))),
+                        SizedBox(width: 8),
+                        Text('اتصال قطع شد؛ در حال تلاش دوباره...',
+                            style: TextStyle(
+                                color: Color(0xFFF59E0B),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700)),
+                      ],
+                    ),
+                  ),
+                ),
               Gaps.vSm,
               Expanded(child: _body(context, theme)),
             ],

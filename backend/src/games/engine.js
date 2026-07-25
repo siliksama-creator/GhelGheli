@@ -62,11 +62,29 @@ function snapshot(room, symbol) {
   return { ...s, turn: room.turn };
 }
 
+// Emitting to a socket that died without firing 'disconnect' throws. That
+// exception used to escape through advance() — including from the turn-clock
+// TIMER, where an uncaught throw takes the whole API process down and drops
+// every other player's game. Each emit is now isolated.
+function safeEmit(sock, event, payload, room) {
+  try {
+    sock.emit(event, payload);
+    return true;
+  } catch (e) {
+    console.error(`[games:${room?.gameId}] emit '${event}' failed:`, e.message);
+    return false;
+  }
+}
+
 function emitState(room, event, extra = {}) {
+  // A seat whose socket is gone means the match cannot continue; end it once
+  // rather than retrying every turn forever (which spammed the logs and left
+  // the surviving player staring at a board nobody was answering).
+  let lost = null;
   for (const sym of ['X', 'O']) {
     const sock = room.seats[sym];
     if (sock && sock.emit) {
-      sock.emit(event, {
+      const ok = safeEmit(sock, event, {
         state: snapshot(room, sym),
         turn: room.turn,
         turnMs: room.turnMs,
@@ -77,8 +95,13 @@ function emitState(room, event, extra = {}) {
         // is a plain "you have N ms left from the moment you receive this".
         remainingMs: room.deadline ? Math.max(0, room.deadline - Date.now()) : null,
         ...extra,
-      });
+      }, room);
+      if (!ok) lost = sym;
     }
+  }
+  if (lost && !room.done && event !== 'game:over') {
+    // Tell whoever is still there, then close the room.
+    finish(room, 'DISCONNECT');
   }
 }
 
@@ -93,6 +116,7 @@ function armTurnClock(room) {
   if (!seat || seat === 'BOT') { room.deadline = null; return; }
   room.deadline = Date.now() + room.turnMs;
   room.turnTimer = setTimeout(() => {
+    try {
     if (room.done) return;
     const sym = room.turn;
     let move = null;
@@ -112,6 +136,11 @@ function armTurnClock(room) {
     }
     room.rules.applyMove(room.state, move, sym);
     advance(room, move);
+    } catch (e) {
+      // Never let a timer callback throw: it would be an uncaught exception
+      // and would take the whole API process down.
+      console.error(`[games:${room.gameId}] turn timer failed:`, e.message);
+    }
   }, room.turnMs);
 }
 
@@ -123,7 +152,9 @@ function finish(room, winner) {
   emitState(room, 'game:over', { winner });
   for (const sym of ['X', 'O']) {
     const s = room.seats[sym];
-    if (s && s.leave) s.leave(room.id);
+    if (s && s.leave) {
+      try { s.leave(room.id); } catch { /* socket already gone */ }
+    }
   }
   rooms.delete(room.id);
 }
@@ -132,14 +163,15 @@ function scheduleBot(room) {
   if (!room.vsBot || room.done || room.turn !== 'O') return;
   clearTimeout(room.botTimer);
   room.botTimer = setTimeout(() => {
-    if (room.done || room.turn !== 'O') return;
     try {
+      if (room.done || room.turn !== 'O') return;
       const move = room.rules.botMove(room.state, 'O');
       if (move === null || move === undefined) return advance(room, null);
       room.rules.applyMove(room.state, move, 'O');
       advance(room, move);
     } catch (e) {
-      console.error(`[games:${room.gameId}] bot failed`, e);
+      // Same reasoning as the turn timer: an escape here kills the process.
+      console.error(`[games:${room.gameId}] bot move failed:`, e.message);
     }
   }, BOT_MOVE_MS);
 }
@@ -190,12 +222,12 @@ function startRoom(io, rules, gameId, a, b) {
   for (const sym of ['X', 'O']) {
     const sock = room.seats[sym];
     if (sock && sock.emit) {
-      sock.emit('game:start', {
+      safeEmit(sock, 'game:start', {
         roomId: id, gameId, players, turn: 'X',
         yourSymbol: sym, vsBot, state: snapshot(room, sym),
         turnMs: room.turnMs, deadline: room.deadline,
         remainingMs: room.deadline ? Math.max(0, room.deadline - Date.now()) : null,
-      });
+      }, room);
     }
   }
   return room;
@@ -208,7 +240,7 @@ module.exports = function attachGames(io, rulesById) {
     socket.on('game:join', payload => {
       const gameId = (payload && typeof payload === 'object' && payload.gameId) || 'tictactoe';
       const rules = rulesById[gameId];
-      if (!rules) return socket.emit('game:error', { message: 'این بازی در دسترس نیست' });
+      if (!rules) return safeEmit(socket, 'game:error', { message: 'این بازی در دسترس نیست' });
 
       dropFromQueue(socket); // never sit in two queues at once
       // Abandon any room we're already in. Without this, tapping a different
@@ -219,6 +251,9 @@ module.exports = function attachGames(io, rulesById) {
       if (previous) finish(previous, 'DISCONNECT');
 
       const q = queueFor(gameId);
+      // Discard queued sockets that have since gone away, otherwise a player
+      // gets matched against a ghost and the game never starts.
+      while (q.length && q[0] && q[0].connected === false) q.shift();
       const opponent = q.shift();
 
       if (opponent && opponent.connected && opponent.user.id !== socket.user.id) {
@@ -230,7 +265,7 @@ module.exports = function attachGames(io, rulesById) {
       q.push(socket);
       // Tell the client exactly how long the hunt lasts so it can render a
       // real countdown instead of an open-ended spinner.
-      socket.emit('game:waiting', {
+      safeEmit(socket, 'game:waiting', {
         gameId,
         message: 'در حال جستجوی حریف واقعی...',
         waitMs: MATCH_WAIT_MS,
@@ -238,10 +273,14 @@ module.exports = function attachGames(io, rulesById) {
         remainingMs: MATCH_WAIT_MS,
       });
       socket.botTimeout = setTimeout(() => {
-        const i = q.findIndex(s => s.user?.id === socket.user?.id);
-        if (i === -1) return;
-        q.splice(i, 1);
-        startRoom(io, rules, gameId, socket, null);
+        try {
+          const i = q.findIndex(s => s.user?.id === socket.user?.id);
+          if (i === -1) return;
+          q.splice(i, 1);
+          startRoom(io, rules, gameId, socket, null);
+        } catch (e) {
+          console.error(`[games:${gameId}] bot fallback failed:`, e.message);
+        }
       }, MATCH_WAIT_MS);
     });
 

@@ -591,8 +591,18 @@ function sanitizeAttachments(input) {
 }
 
 // Users upload ticket images through their own route (the admin upload
-// endpoint requires an admin token). Same multer instance, same 5 MB cap.
-app.post('/api/support/uploads/image', auth, imageUpload.single('image'), asyncHandler(async (req, res) => {
+// endpoint requires an admin token). Rate-limited because this is the only
+// endpoint where an ordinary user can write files to the VPS disk — without
+// a cap one account could fill the volume and take the whole service down.
+const uploadLimiter = rateLimit({
+  windowMs: 10 * 60_000,
+  limit: 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'تعداد آپلود زیاد است؛ کمی بعد دوباره تلاش کنید' },
+});
+
+app.post('/api/support/uploads/image', auth, uploadLimiter, imageUpload.single('image'), asyncHandler(async (req, res) => {
   if (!req.file) return res.status(400).json({ message: 'فقط فایل تصویری (PNG/JPG/WEBP/GIF) مجاز است' });
   // Phone photos are multi-megabyte; shrink before anyone has to download it.
   const r = await optimizeUpload(req.file);
@@ -1115,6 +1125,18 @@ app.use((err, req, res, next) => {
   }
   const friendly = err.code ? friendlyDbError(err) : null;
   res.status(err.status || 500).json({ message: friendly || err.message || 'خطای سرور' });
+});
+
+// LAST-RESORT SAFETY NET.
+// Node kills the process on an unhandled rejection (default since v15) and on
+// an uncaught exception. A single stray error in any async path would take
+// the whole API down and disconnect every player mid-game. Log loudly and
+// keep serving; PM2 still restarts us if the process genuinely dies.
+process.on('unhandledRejection', (reason) => {
+  console.error('[fatal] unhandled promise rejection:', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[fatal] uncaught exception:', err);
 });
 
 const port = process.env.PORT || 4000;

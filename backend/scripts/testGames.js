@@ -39,16 +39,16 @@ console.log('\n== snakes & ladders ==');
   r.applyMove(s, 0, 'X');
   ok(s.pos.X === 100 && r.result(s) === 'X', 'landing exactly on 100 wins');
 
-  // Ladder.
-  s = r.create(); s.pos.X = 0; s.dice = [3, 1];
+  // Ladder (4 -> 14).
+  s = r.create(); s.pos.X = 1; s.dice = [3, 1];
   r.applyMove(s, 0, 'X');
-  ok(s.pos.X === 22 && s.event === 'ladder', 'ladder at 3 lifts to 22');
-  ok(s.safe.X === 22, 'ladder top becomes the fallback point');
+  ok(s.pos.X === 14 && s.event === 'ladder', 'ladder at 4 lifts to 14');
+  ok(s.safe.X === 14, 'ladder top becomes the fallback point');
 
-  // Snake.
+  // Snake (17 -> 7).
   s = r.create(); s.pos.X = 14; s.dice = [3, 1];
   r.applyMove(s, 0, 'X');
-  ok(s.pos.X === 4 && s.event === 'snake', 'snake at 17 drops to 4');
+  ok(s.pos.X === 7 && s.event === 'snake', 'snake at 17 drops to 7');
 
   // Bump: landing on the opponent sends them to their fallback.
   s = r.create(); s.pos.X = 10; s.pos.O = 12; s.safe.O = 8; s.dice = [2, 1];
@@ -77,11 +77,11 @@ console.log('\n== snakes & ladders ==');
   s = r.create(); s.pos.X = 96; s.dice = [4, 2];
   ok(r.botMove(s, 'X') === 0, 'bot takes the exact winning roll');
 
-  // Bot prefers a ladder over a plain step.
-  s = r.create(); s.pos.X = 0; s.dice = [3, 2];
+  // Bot prefers a ladder over a plain step (1 + 3 = 4 -> 14).
+  s = r.create(); s.pos.X = 1; s.dice = [3, 2];
   ok(r.botMove(s, 'X') === 0, 'bot prefers the ladder');
 
-  // Bot avoids a snake when it has a choice.
+  // Bot avoids a snake when it has a choice (14 + 3 = 17 -> 7).
   s = r.create(); s.pos.X = 14; s.dice = [3, 1];
   ok(r.botMove(s, 'X') === 1, 'bot avoids the snake');
 
@@ -103,6 +103,54 @@ console.log('\n== snakes & ladders ==');
   }
   ok(crashed === 0, `no crashes in 60 self-play games (${crashed})`);
   ok(finished === 60, `all 60 games reached a winner (${finished})`);
+
+  // REGRESSION: the endgame used to deadlock. When both players sat near 100
+  // and neither could use either die, nextTurn handed the turn back to the
+  // same player with dice=null forever — the game froze in ~18% of matches
+  // and users reported it as "the connection dropped".
+  {
+    let frozen = 0;
+    for (let g = 0; g < 400; g++) {
+      const st = r.create();
+      let turn = 'X', guard = 0;
+      while (!r.result(st) && guard++ < 3000) {
+        const playable = [0, 1].filter(i => r.isValidMove(st, i, turn));
+        if (playable.length === 0) { frozen++; break; }
+        r.applyMove(st, r.botMove(st, turn), turn);
+        if (r.result(st)) break;
+        turn = r.nextTurn(st, turn);
+      }
+    }
+    ok(frozen === 0, `no endgame deadlock in 400 games (${frozen} frozen)`);
+  }
+
+  // The player on move must ALWAYS have at least one playable die.
+  {
+    let bad = 0;
+    for (let g = 0; g < 200; g++) {
+      const st = r.create();
+      let turn = 'X', guard = 0;
+      while (!r.result(st) && guard++ < 2000) {
+        if (![0, 1].some(i => r.isValidMove(st, i, turn))) { bad++; break; }
+        r.applyMove(st, r.botMove(st, turn), turn);
+        if (r.result(st)) break;
+        turn = r.nextTurn(st, turn);
+      }
+    }
+    ok(bad === 0, 'the player on move always has a legal die');
+  }
+
+  // Board sanity: no square is both a chute head and a ladder foot, and no
+  // chute lands the player straight onto another one.
+  {
+    const heads = Object.keys(r.SNAKES).map(Number);
+    const feet = Object.keys(r.LADDERS).map(Number);
+    ok(!feet.some(f => heads.includes(f)), 'no square is both a snake and a ladder');
+    const dests = [...Object.values(r.SNAKES), ...Object.values(r.LADDERS)];
+    ok(!dests.some(d => r.SNAKES[d] || r.LADDERS[d]), 'no chained chutes');
+    ok(!r.LADDERS[100] && !r.SNAKES[100] && !r.LADDERS[1] && !r.SNAKES[1],
+      'start and finish squares are clear');
+  }
 
   // decorate() must tell each client which dice it may actually play.
   s = r.create(); s.pos.X = 98; s.dice = [1, 5];

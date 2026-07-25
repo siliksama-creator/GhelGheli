@@ -38,6 +38,9 @@ class GameSession extends ChangeNotifier {
   int searchSecondsLeft = 0;
   int searchSeconds = 15;
   String? timedOutSymbol;
+  /// False while the socket is down, so the UI can show a reconnect notice
+  /// instead of a silently frozen board.
+  bool connected = true;
   Timer? _ticker;
   Timer? _searchTicker;
   int _lastTickPlayed = -1;
@@ -62,15 +65,51 @@ class GameSession extends ChangeNotifier {
     final s = io.io(
       api.baseUrl,
       io.OptionBuilder()
-          .setTransports(['websocket'])
+          // Allow the polling fallback: some mobile carriers and captive
+          // proxies block raw websockets, and a websocket-only client simply
+          // never connects on those networks.
+          .setTransports(['websocket', 'polling'])
           .setAuth({'token': api.token})
           .enableForceNew()
+          .enableReconnection()
+          .setReconnectionAttempts(20)
+          .setReconnectionDelay(800)
+          .setReconnectionDelayMax(5000)
+          .setTimeout(10000)
           .build(),
     );
     _socket = s;
 
-    s.onConnectError((e) => _fail('اتصال به سرور بازی برقرار نشد'));
+    s.onConnectError((e) {
+      // Only surface a hard failure before we ever connected; once a game is
+      // running a blip is handled by the reconnect logic below.
+      if (phase == GamePhase.idle || phase == GamePhase.waiting) {
+        _fail('اتصال به سرور بازی برقرار نشد');
+      } else {
+        _setConnected(false);
+      }
+    });
     s.onError((e) => debugPrint('game socket error: $e'));
+
+    // CONNECTION RESILIENCE. Previously there was no disconnect handling at
+    // all: if the phone changed cell tower or dropped Wi-Fi mid-match the
+    // board simply froze with no explanation and no recovery.
+    s.onDisconnect((_) {
+      _setConnected(false);
+      _stopClock();
+    });
+    s.onConnect((_) => _setConnected(true));
+    s.on('reconnect', (_) {
+      _setConnected(true);
+      // Our room is gone server-side after a real disconnect, so drop back
+      // to the lobby rather than showing a stale board.
+      if (phase == GamePhase.playing) {
+        error = 'اتصال قطع شد؛ لطفاً دوباره شروع کنید';
+        phase = GamePhase.idle;
+        _stopClock();
+        notifyListeners();
+      }
+    });
 
     s.on('game:error', (d) => _fail(_msg(d) ?? 'خطا در بازی'));
 
@@ -283,6 +322,12 @@ class GameSession extends ChangeNotifier {
     final p = players?[symbol];
     if (p is Map && p['nickname'] != null) return '${p['nickname']}';
     return 'کاربر';
+  }
+
+  void _setConnected(bool v) {
+    if (connected == v) return;
+    connected = v;
+    notifyListeners();
   }
 
   void _fail(String m) {

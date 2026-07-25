@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../api_client.dart';
 import '../../theme/brand_theme.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/lifecycle_poller.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/state_views.dart';
 import '../shared/public_profile_sheet.dart';
@@ -20,21 +21,21 @@ class LeaguePage extends StatefulWidget {
   State<LeaguePage> createState() => _LeaguePageState();
 }
 
-class _LeaguePageState extends State<LeaguePage> {
+class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
   Map? _data;
-  Timer? _timer;
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
     _load();
-    _timer = Timer.periodic(const Duration(seconds: 12), (_) => _load());
+    // Paused automatically while the app is backgrounded.
+    startPolling(const Duration(seconds: 12), _load);
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    stopPolling();
     super.dispose();
   }
 
