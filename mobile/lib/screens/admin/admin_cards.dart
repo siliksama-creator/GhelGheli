@@ -216,22 +216,44 @@ class _AdminCardsState extends State<AdminCards> {
         ],
       ),
     );
-    if (ok == true) {
+    // These four controllers were created per dialog and never disposed, so
+    // every edit leaked their text buffers and change listeners for the life
+    // of the app. `try/finally` guarantees cleanup even when the save throws.
+    try {
+      if (ok != true) return;
       if (editUploading) {
         _toast('آپلود عکس تمام نشده بود؛ تغییرات ذخیره نشد');
         return;
       }
+      final name = n.text.trim();
+      if (name.isEmpty) {
+        _toast('نام کارت نمی‌تواند خالی باشد');
+        return;
+      }
       final body = <String, dynamic>{
-        'name': n.text,
+        'name': name,
         'pointValue': int.tryParse(pts.text) ?? 0,
-        'description': ds.text,
+        'description': ds.text.trim(),
       };
       // Only send the image when there IS one. Sending '' told the server to
       // blank the existing picture — exactly how cards lost their artwork.
       final newImg = img.text.trim();
       if (newImg.isNotEmpty) body['imageUrl'] = newImg;
-      await widget.api.patch('/api/admin/card-types/${t['id']}', body);
-      await _load();
+      // A failed save used to throw silently out of this handler: the dialog
+      // closed, nothing changed on screen, and the admin believed the edit
+      // had been applied.
+      try {
+        await widget.api.patch('/api/admin/card-types/${t['id']}', body);
+        await _load();
+        _toast('کارت ذخیره شد');
+      } catch (e) {
+        _toast(apiError(e));
+      }
+    } finally {
+      n.dispose();
+      pts.dispose();
+      img.dispose();
+      ds.dispose();
     }
   }
 

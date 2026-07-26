@@ -27,6 +27,9 @@ const BOT_MOVE_MS = 650;    // small delay so the bot feels like it "thinks"
 // its own `turnMs` — a Reversi board needs more thinking time than a 3x3
 // grid, and one global value made the bigger games feel rushed.
 const DEFAULT_TURN_MS = 20_000;
+// How often we ping a player parked in an open-ended (bot-less) queue.
+// Short enough to keep a carrier NAT mapping alive, long enough to be free.
+const QUEUE_PING_MS = 25_000;
 const turnMsFor = rules => Number(rules.turnMs) || DEFAULT_TURN_MS;
 
 const queues = new Map(); // gameId -> [socket]
@@ -54,6 +57,13 @@ function dropFromQueue(socket, gameId) {
     if (i > -1) q.splice(i, 1);
   }
   clearTimeout(socket.botTimeout);
+  // The open-ended queue keep-alive must die with the queue entry, otherwise
+  // it fires forever against a socket that has left — a slow leak that only
+  // shows up after days of uptime.
+  if (socket.queuePing) {
+    clearInterval(socket.queuePing);
+    socket.queuePing = null;
+  }
 }
 
 function roomOfSocket(socket) {
@@ -300,6 +310,11 @@ module.exports = function attachGames(io, rulesById) {
 
       if (opponent && opponent.connected && opponent.user.id !== socket.user.id) {
         clearTimeout(opponent.botTimeout);
+        // The waiting player may have been parked in the open-ended queue.
+        if (opponent.queuePing) {
+          clearInterval(opponent.queuePing);
+          opponent.queuePing = null;
+        }
         startRoom(io, rules, gameId, opponent, socket);
         return;
       }
@@ -331,11 +346,47 @@ module.exports = function attachGames(io, rulesById) {
           if (!botAllowed) {
             // Stay queued; just let the client know the first window closed
             // so it can surface the solo option.
-            return safeEmit(socket, 'game:still-waiting', {
+            safeEmit(socket, 'game:still-waiting', {
               gameId,
               soloAvailable: Boolean(rules.solo),
               message: 'هنوز حریفی پیدا نشده — می‌توانی منتظر بمانی یا تنها بازی کنی',
             });
+            // KEEP-ALIVE FOR AN OPEN-ENDED QUEUE.
+            // Without this the player sat in the queue in total silence.
+            // Two things went wrong in practice:
+            //   1. an idle websocket behind a mobile carrier NAT gets
+            //      reaped after a few minutes, so the player was silently
+            //      dropped from matchmaking while their screen still said
+            //      "looking for an opponent" — forever;
+            //   2. if the socket died without firing 'disconnect', the dead
+            //      entry stayed in the queue and the next real player was
+            //      paired with a ghost.
+            // A periodic ping both keeps the connection warm and prunes the
+            // queue when the emit fails.
+            clearInterval(socket.queuePing);
+            socket.queuePing = setInterval(() => {
+              const stillQueued = q.findIndex(x => x.user?.id === socket.user?.id);
+              if (stillQueued === -1 || socket.connected === false) {
+                clearInterval(socket.queuePing);
+                socket.queuePing = null;
+                if (stillQueued > -1) q.splice(stillQueued, 1);
+                return;
+              }
+              const alive = safeEmit(socket, 'game:still-waiting', {
+                gameId,
+                soloAvailable: Boolean(rules.solo),
+                queued: q.length,
+                message: 'هنوز در صف حریف واقعی هستی',
+              });
+              if (!alive) {
+                // Emit failed => the socket is gone. Remove it so nobody is
+                // matched against a corpse.
+                q.splice(stillQueued, 1);
+                clearInterval(socket.queuePing);
+                socket.queuePing = null;
+              }
+            }, QUEUE_PING_MS);
+            return;
           }
           q.splice(i, 1);
           startRoom(io, rules, gameId, socket, null);

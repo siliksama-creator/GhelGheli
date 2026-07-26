@@ -41,7 +41,10 @@ class _AttachmentPickerState extends State<AttachmentPicker> {
     if (remaining <= 0) return;
 
     final picked = await ImagePicker().pickMultiImage(imageQuality: 78);
-    if (picked.isEmpty) return;
+    // The picker is a full-screen system UI; the user can navigate away
+    // from the ticket while it is open, so this widget may be gone by the
+    // time it returns.
+    if (!mounted || picked.isEmpty) return;
 
     // Silently trim rather than failing the whole batch when the user picks
     // more than the remaining slots.

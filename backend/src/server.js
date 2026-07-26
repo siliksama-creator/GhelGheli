@@ -363,6 +363,69 @@ app.post('/api/auth/forgot-password/reset', otpVerifyLimiter, asyncHandler(async
 
 function safeUser(u) { const { password_hash, ...rest } = u; return rest; }
 
+// ── Input validation helpers ──────────────────────────────────────────────
+
+/// Every `:id` in this API is a Postgres UUID. Passing a non-UUID straight to
+/// a query makes Postgres raise 22P02, which surfaced as a **500 Server
+/// Error** — telling the client "we broke" when the truth is "you sent
+/// nonsense". Proven live: GET /api/support/tickets/abc/messages returned 500.
+/// Worse, it burns a database round trip and a pool connection on garbage,
+/// which is a cheap denial-of-service lever.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/// Express middleware factory: rejects malformed ids before any query runs.
+const validateUuid = (...names) => (req, res, next) => {
+  for (const n of names) {
+    const v = req.params[n];
+    if (v !== undefined && !UUID_RE.test(String(v))) {
+      return res.status(400).json({ message: 'شناسه ارسالی معتبر نیست' });
+    }
+  }
+  next();
+};
+
+/// Clamp a user-supplied integer into a safe range.
+/// `?limit=99999999` used to be accepted verbatim by anything that trusted
+/// it, which is how one request can ask the database for the whole table.
+function intInRange(value, { min, max, fallback }) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.trunc(n)));
+}
+
+/// Trim and hard-cap a free-text field. Postgres raises 22001 on overflow,
+/// which reached the user as a 500 instead of a clear "too long" message.
+function boundedText(value, max) {
+  if (value === undefined || value === null) return null;
+  const t = String(value).trim();
+  if (!t) return null;
+  return t.slice(0, max);
+}
+
+/// Whitelist of bundled avatar keys. The API previously stored ANY string,
+/// so `profileAvatarKey: "../../etc/passwd"` was accepted with a 200 and then
+/// interpolated straight into an asset path by the clients
+/// (mobile/lib/core/assets.dart: 'assets/avatars/$key'). That is a path
+/// traversal waiting for a client that resolves it.
+const AVATAR_KEYS = new Set([
+  'avatar_1_football.png', 'avatar_2_trophy.png', 'avatar_3_star.png',
+  'avatar_4_rocket.png', 'avatar_5_lion.png', 'avatar_6_tiger.png',
+  'avatar_7_eagle.png', 'avatar_8_target.png', 'avatar_9_bolt.png',
+  'avatar_10_crown.png',
+]);
+const safeAvatarKey = v => (v && AVATAR_KEYS.has(String(v)) ? String(v) : null);
+
+/// Only accept an image URL we ourselves produced, or a plain https URL.
+/// Blocks `javascript:` and `data:` payloads from reaching a webview.
+function safeImageUrl(v) {
+  if (v === undefined || v === null) return null;
+  const t = String(v).trim();
+  if (!t) return null;
+  if (t.startsWith('/uploads/') || t.startsWith('/public/')) return t.slice(0, 400);
+  if (/^https:\/\//i.test(t)) return t.slice(0, 400);
+  return null;
+}
+
 app.post('/api/cards/redeem', auth, cardRedeemLimiter, asyncHandler(async (req, res) => {
   const code = normalizeCardCode(req.body.code);
   if (!validateCodeFormat(code)) return res.status(400).json({ message: 'فرمت کد کارت معتبر نیست' });
@@ -409,8 +472,49 @@ app.get('/api/profile', auth, asyncHandler(async (req, res) => {
   res.json({ user: safeUser(req.user), inventory: inv.rows, leaguePayouts: leaguePayouts.rows });
 }));
 app.patch('/api/profile', auth, asyncHandler(async (req, res) => {
-  const { firstName, lastName, nickname, profileImageUrl, profileAvatarKey, bankAccount, age, city, province, fcmToken } = req.body;
-  const { rows } = await pool.query(`UPDATE users SET first_name=COALESCE($1,first_name), last_name=COALESCE($2,last_name), nickname=COALESCE($3,nickname), profile_image_url=COALESCE($4,profile_image_url), profile_avatar_key=COALESCE($5,profile_avatar_key), bank_account=COALESCE($6,bank_account), age=COALESCE($7,age), city=COALESCE($8,city), province=COALESCE($9,province), fcm_token=COALESCE($10,fcm_token), updated_at=NOW() WHERE id=$11 RETURNING *`, [firstName,lastName,nickname,profileImageUrl,profileAvatarKey,bankAccount,age ? Number(age) : null,city,province,fcmToken,req.user.id]);
+  const b = req.body || {};
+  // EVERY field is validated here rather than trusted. Before this, three
+  // separate inputs produced a 500 Server Error instead of a clear message:
+  //   age:-5 / age:99999  -> CHECK constraint violation  (23514)
+  //   age:"abc"           -> invalid integer syntax      (22P02)
+  //   a 3000-char nickname-> value too long              (22001)
+  // and `profileAvatarKey: "../../etc/passwd"` was accepted outright.
+  let age = null;
+  if (b.age !== undefined && b.age !== null && b.age !== '') {
+    const n = Number(b.age);
+    if (!Number.isFinite(n) || !Number.isInteger(n) || n < 5 || n > 120) {
+      return res.status(400).json({ message: 'سن باید عددی بین ۵ تا ۱۲۰ باشد' });
+    }
+    age = n;
+  }
+  if (b.profileAvatarKey !== undefined && b.profileAvatarKey !== null
+      && b.profileAvatarKey !== '' && !safeAvatarKey(b.profileAvatarKey)) {
+    return res.status(400).json({ message: 'آواتار انتخابی معتبر نیست' });
+  }
+
+  const { rows } = await pool.query(
+    `UPDATE users SET
+       first_name=COALESCE($1,first_name), last_name=COALESCE($2,last_name),
+       nickname=COALESCE($3,nickname), profile_image_url=COALESCE($4,profile_image_url),
+       profile_avatar_key=COALESCE($5,profile_avatar_key),
+       bank_account=COALESCE($6,bank_account), age=COALESCE($7,age),
+       city=COALESCE($8,city), province=COALESCE($9,province),
+       fcm_token=COALESCE($10,fcm_token), updated_at=NOW()
+     WHERE id=$11 RETURNING *`,
+    [
+      boundedText(b.firstName, 60),
+      boundedText(b.lastName, 60),
+      boundedText(b.nickname, 40),
+      safeImageUrl(b.profileImageUrl),
+      safeAvatarKey(b.profileAvatarKey),
+      boundedText(b.bankAccount, 40),
+      age,
+      boundedText(b.city, 60),
+      boundedText(b.province, 60),
+      boundedText(b.fcmToken, 500),
+      req.user.id,
+    ],
+  );
   res.json({ user: safeUser(rows[0]) });
 }));
 // Self-service password change while logged in. Added alongside the
@@ -428,7 +532,7 @@ app.post('/api/profile/change-password', auth, userLoginLimiter, asyncHandler(as
   res.json({ message: 'رمز عبور با موفقیت تغییر کرد' });
 }));
 
-app.get('/api/users/:id/public', auth, asyncHandler(async (req, res) => {
+app.get('/api/users/:id/public', auth, validateUuid('id'), asyncHandler(async (req, res) => {
   const { rows } = await pool.query('SELECT id,nickname,profile_image_url,profile_avatar_key,lifetime_points,current_points,monthly_league_points,joined_at FROM users WHERE id=$1', [req.params.id]);
   if (!rows[0]) return res.status(404).json({ message: 'کاربر پیدا نشد' });
   const rewards = await pool.query(`SELECT c.claimed_at,c.status,r.name,r.image_url,r.reward_type,r.reward_value FROM user_reward_claims c JOIN reward_tiers r ON r.id=c.reward_tier_id WHERE c.user_id=$1 AND c.status IN ('approved','paid') ORDER BY c.claimed_at DESC LIMIT 50`, [req.params.id]);
@@ -441,7 +545,7 @@ app.get('/api/rewards', auth, asyncHandler(async (req, res) => {
   const { rows } = await pool.query('SELECT *, ($1 >= required_points) AS eligible FROM reward_tiers WHERE is_active=true ORDER BY display_order, required_points', [req.user.current_points]);
   res.json(rows);
 }));
-app.post('/api/rewards/:id/claim', auth, asyncHandler(async (req, res) => {
+app.post('/api/rewards/:id/claim', auth, validateUuid('id'), asyncHandler(async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -557,7 +661,7 @@ app.post('/api/chat/messages', auth, chatLimiter, asyncHandler(async (req, res) 
   res.json(msg);
 }));
 
-app.post('/api/chat/messages/:id/report', auth, asyncHandler(async (req, res) => {
+app.post('/api/chat/messages/:id/report', auth, validateUuid('id'), asyncHandler(async (req, res) => {
   await pool.query('UPDATE chat_messages SET is_reported=true, report_count=report_count+1 WHERE id=$1', [req.params.id]);
   res.json({ message: 'گزارش ثبت شد' });
 }));
@@ -566,13 +670,13 @@ app.get('/api/chat/stickers', auth, asyncHandler(async (req, res) => {
   const { rows } = await pool.query('SELECT id,title,image_url,sticker_type FROM chat_stickers WHERE is_active=true ORDER BY created_at DESC');
   res.json(rows);
 }));
-app.post('/api/chat/messages/:id/like', auth, asyncHandler(async (req, res) => {
+app.post('/api/chat/messages/:id/like', auth, validateUuid('id'), asyncHandler(async (req, res) => {
   await pool.query('INSERT INTO chat_message_likes(message_id,user_id) VALUES($1,$2) ON CONFLICT DO NOTHING', [req.params.id, req.user.id]);
   const c = await pool.query('SELECT count(*)::int AS count FROM chat_message_likes WHERE message_id=$1', [req.params.id]);
   io.emit('chat:liked', { messageId: req.params.id, likeCount: c.rows[0].count });
   res.json({ liked: true, likeCount: c.rows[0].count });
 }));
-app.delete('/api/chat/messages/:id/like', auth, asyncHandler(async (req, res) => {
+app.delete('/api/chat/messages/:id/like', auth, validateUuid('id'), asyncHandler(async (req, res) => {
   await pool.query('DELETE FROM chat_message_likes WHERE message_id=$1 AND user_id=$2', [req.params.id, req.user.id]);
   const c = await pool.query('SELECT count(*)::int AS count FROM chat_message_likes WHERE message_id=$1', [req.params.id]);
   io.emit('chat:liked', { messageId: req.params.id, likeCount: c.rows[0].count });
@@ -693,12 +797,12 @@ app.get('/api/support/tickets', auth, asyncHandler(async (req, res) => {
   res.json(rows);
 }));
 
-app.get('/api/support/tickets/:id/messages', auth, asyncHandler(async (req, res) => {
+app.get('/api/support/tickets/:id/messages', auth, validateUuid('id'), asyncHandler(async (req, res) => {
   const { rows } = await pool.query('SELECT m.* FROM support_ticket_messages m JOIN support_tickets t ON t.id=m.ticket_id WHERE t.id=$1 AND t.user_id=$2 ORDER BY m.created_at', [req.params.id, req.user.id]);
   res.json(rows);
 }));
 
-app.post('/api/support/tickets/:id/messages', auth, asyncHandler(async (req, res) => {
+app.post('/api/support/tickets/:id/messages', auth, validateUuid('id'), asyncHandler(async (req, res) => {
   const attachments = sanitizeAttachments(req.body.attachments);
   const text = String(req.body.message || '').trim();
   if (!text && !attachments.length) return res.status(400).json({ message: 'متن پیام یا حداقل یک عکس لازم است' });
@@ -722,7 +826,7 @@ app.post('/api/support/tickets/:id/messages', auth, asyncHandler(async (req, res
 app.get('/api/notifications', auth, asyncHandler(async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM notifications WHERE user_id=$1 OR user_id IS NULL ORDER BY created_at DESC LIMIT 100', [req.user.id]); res.json(rows);
 }));
-app.patch('/api/notifications/:id/read', auth, asyncHandler(async (req, res) => {
+app.patch('/api/notifications/:id/read', auth, validateUuid('id'), asyncHandler(async (req, res) => {
   await pool.query('UPDATE notifications SET is_read=true WHERE id=$1 AND (user_id=$2 OR user_id IS NULL)', [req.params.id, req.user.id]); res.json({ message: 'خوانده شد' });
 }));
 
@@ -767,7 +871,7 @@ app.post('/api/admin/chat/stickers', adminAuth, requireRole('support'), imageUpl
   await audit(req.admin.id,'create_chat_sticker','chat_stickers',rows[0].id,null,{ title, stickerType });
   res.json(rows[0]);
 }));
-app.patch('/api/admin/chat/stickers/:id', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
+app.patch('/api/admin/chat/stickers/:id', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
   const { title, stickerType, isActive } = req.body;
   const imageUrl = keepImage(req.body.imageUrl);
   const { rows } = await pool.query('UPDATE chat_stickers SET title=COALESCE($1,title), image_url=COALESCE($2,image_url), sticker_type=COALESCE($3,sticker_type), is_active=COALESCE($4,is_active), updated_at=NOW() WHERE id=$5 RETURNING *', [title,imageUrl,stickerType,isActive,req.params.id]);
@@ -885,7 +989,7 @@ app.post('/api/admin/card-types', adminAuth, requireRole('support'), asyncHandle
   const { rows } = await pool.query('INSERT INTO card_types(name,image_url,description,point_value,is_active) VALUES($1,$2,$3,$4,$5) RETURNING *', [name,imageUrl,description,pointValue,isActive]);
   await audit(req.admin.id, 'create_card_type', 'card_types', rows[0].id, null, req.body); res.json(rows[0]);
 }));
-app.patch('/api/admin/card-types/:id', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
+app.patch('/api/admin/card-types/:id', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
   const { name, description, pointValue, isActive } = req.body;
   const imageUrl = keepImage(req.body.imageUrl);
   const { rows } = await pool.query('UPDATE card_types SET name=COALESCE($1,name), image_url=COALESCE($2,image_url), description=COALESCE($3,description), point_value=COALESCE($4,point_value), is_active=COALESCE($5,is_active), updated_at=NOW() WHERE id=$6 RETURNING *', [name,imageUrl,description,pointValue,isActive,req.params.id]);
@@ -915,7 +1019,7 @@ app.post('/api/admin/card-codes', adminAuth, requireRole('support'), asyncHandle
 // forever for audit purposes). 'voided' behaves like a dead-end status: the
 // redeem endpoint below already only accepts codes with status='unused' via
 // its explicit check, so a voided code simply can never be redeemed.
-app.patch('/api/admin/card-codes/:id/void', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
+app.patch('/api/admin/card-codes/:id/void', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
   const { rows } = await pool.query("UPDATE card_codes SET status='voided', updated_at=NOW() WHERE id=$1 AND status='unused' RETURNING id,code", [req.params.id]);
   if (!rows[0]) return res.status(400).json({ message: 'فقط کدهای استفاده‌نشده قابل ابطال هستند' });
   await audit(req.admin.id, 'void_card_code', 'card_codes', rows[0].id, req.body.reason || 'ابطال دستی', {});
@@ -959,13 +1063,13 @@ app.post('/api/admin/rewards', adminAuth, requireRole('support'), asyncHandler(a
   const { rows } = await pool.query('INSERT INTO reward_tiers(name,description,image_url,required_points,reward_type,reward_value,display_order,is_active) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *', [r.name,r.description,r.imageUrl,requiredPoints,r.rewardType,r.rewardValue,r.displayOrder||0,r.isActive!==false]);
   await audit(req.admin.id,'create_reward','reward_tiers',rows[0].id,null,r); res.json(rows[0]);
 }));
-app.patch('/api/admin/rewards/:id', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
+app.patch('/api/admin/rewards/:id', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
   const r = req.body;
   const { rows } = await pool.query('UPDATE reward_tiers SET name=COALESCE($1,name),description=COALESCE($2,description),image_url=COALESCE($3,image_url),required_points=COALESCE($4,required_points),reward_type=COALESCE($5,reward_type),reward_value=COALESCE($6,reward_value),display_order=COALESCE($7,display_order),is_active=COALESCE($8,is_active),updated_at=NOW() WHERE id=$9 RETURNING *', [r.name,r.description,keepImage(r.imageUrl),r.requiredPoints,r.rewardType,r.rewardValue,r.displayOrder,r.isActive,req.params.id]);
   await audit(req.admin.id,'update_reward','reward_tiers',req.params.id,null,r); res.json(rows[0]);
 }));
 app.get('/api/admin/reward-claims', adminAuth, asyncHandler(async (req, res) => res.json((await pool.query('SELECT c.*, u.mobile, r.name AS reward_name FROM user_reward_claims c JOIN users u ON u.id=c.user_id JOIN reward_tiers r ON r.id=c.reward_tier_id ORDER BY c.claimed_at DESC')).rows)));
-app.patch('/api/admin/reward-claims/:id', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
+app.patch('/api/admin/reward-claims/:id', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
   const { status, adminNote } = req.body;
   await pool.query('UPDATE user_reward_claims SET status=$1, admin_note=$2, updated_at=NOW() WHERE id=$3', [status, adminNote, req.params.id]);
   await audit(req.admin.id,'update_reward_claim','user_reward_claims',req.params.id,adminNote,{status}); res.json({ message: 'به‌روزرسانی شد' });
@@ -982,26 +1086,26 @@ app.patch('/api/admin/league/current/prizes', adminAuth, requireRole(), asyncHan
 }));
 app.post('/api/admin/league/close', adminAuth, requireRole(), asyncHandler(async (req, res) => res.json(await closeActiveSeason())));
 app.get('/api/admin/league/payouts', adminAuth, asyncHandler(async (req, res) => res.json((await pool.query('SELECT p.*, u.mobile,u.first_name,u.last_name,u.nickname,u.bank_account FROM league_payouts p JOIN users u ON u.id=p.user_id ORDER BY p.created_at DESC')).rows)));
-app.patch('/api/admin/league/payouts/:id', adminAuth, requireRole('support'), asyncHandler(async (req, res) => { await pool.query('UPDATE league_payouts SET payment_status=$1, paid_at=CASE WHEN $1=\'paid\' THEN NOW() ELSE paid_at END WHERE id=$2', [req.body.status, req.params.id]); res.json({message:'ثبت شد'}); }));
+app.patch('/api/admin/league/payouts/:id', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => { await pool.query('UPDATE league_payouts SET payment_status=$1, paid_at=CASE WHEN $1=\'paid\' THEN NOW() ELSE paid_at END WHERE id=$2', [req.body.status, req.params.id]); res.json({message:'ثبت شد'}); }));
 
 app.get('/api/admin/users', adminAuth, asyncHandler(async (req, res) => {
   const search = `%${req.query.search || ''}%`;
   res.json((await pool.query('SELECT id,mobile,first_name,last_name,nickname,age,city,province,bank_account,profile_image_url,profile_avatar_key,current_points,lifetime_points,monthly_league_points,status,joined_at FROM users WHERE mobile ILIKE $1 OR nickname ILIKE $1 ORDER BY joined_at DESC LIMIT 300', [search])).rows);
 }));
-app.get('/api/admin/users/:id', adminAuth, asyncHandler(async (req, res) => {
+app.get('/api/admin/users/:id', adminAuth, validateUuid('id'), asyncHandler(async (req, res) => {
   const user = await pool.query('SELECT * FROM users WHERE id=$1', [req.params.id]);
   const codes = await pool.query('SELECT c.code,c.used_at,t.name,t.point_value FROM card_codes c JOIN card_types t ON t.id=c.card_type_id WHERE c.used_by_user_id=$1 ORDER BY c.used_at DESC LIMIT 100', [req.params.id]);
   res.json({ user: safeUser(user.rows[0]), codes: codes.rows });
 }));
-app.patch('/api/admin/users/:id/status', adminAuth, requireRole('support'), asyncHandler(async (req, res) => { await pool.query('UPDATE users SET status=$1 WHERE id=$2', [req.body.status, req.params.id]); await audit(req.admin.id,'update_user_status','users',req.params.id,req.body.reason,{status:req.body.status}); res.json({message:'ثبت شد'}); }));
-app.post('/api/admin/users/:id/points', adminAuth, requireRole(), asyncHandler(async (req, res) => { const p=Number(req.body.points||0); await pool.query('UPDATE users SET current_points=GREATEST(0,current_points+$1), lifetime_points=GREATEST(0,lifetime_points+$1), monthly_league_points=GREATEST(0,monthly_league_points+$1) WHERE id=$2', [p, req.params.id]); await audit(req.admin.id,'manual_points','users',req.params.id,req.body.reason,{points:p}); await createNotification(req.params.id, 'admin_points', 'تغییر امتیاز توسط مدیریت', `امتیاز شما به مقدار ${p} تغییر کرد. ${req.body.reason||''}`); res.json({message:'امتیاز تغییر کرد'}); }));
-app.post('/api/admin/users/:id/notify', adminAuth, requireRole('support'), asyncHandler(async (req, res) => { await createNotification(req.params.id, 'admin_private', req.body.title || 'پیام اختصاصی مدیریت', req.body.body || req.body.message || ''); await audit(req.admin.id,'private_message_user','users',req.params.id,null,{title:req.body.title}); res.json({message:'پیام اختصاصی ارسال شد'}); }));
+app.patch('/api/admin/users/:id/status', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => { await pool.query('UPDATE users SET status=$1 WHERE id=$2', [req.body.status, req.params.id]); await audit(req.admin.id,'update_user_status','users',req.params.id,req.body.reason,{status:req.body.status}); res.json({message:'ثبت شد'}); }));
+app.post('/api/admin/users/:id/points', adminAuth, validateUuid('id'), requireRole(), asyncHandler(async (req, res) => { const p=Number(req.body.points||0); await pool.query('UPDATE users SET current_points=GREATEST(0,current_points+$1), lifetime_points=GREATEST(0,lifetime_points+$1), monthly_league_points=GREATEST(0,monthly_league_points+$1) WHERE id=$2', [p, req.params.id]); await audit(req.admin.id,'manual_points','users',req.params.id,req.body.reason,{points:p}); await createNotification(req.params.id, 'admin_points', 'تغییر امتیاز توسط مدیریت', `امتیاز شما به مقدار ${p} تغییر کرد. ${req.body.reason||''}`); res.json({message:'امتیاز تغییر کرد'}); }));
+app.post('/api/admin/users/:id/notify', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => { await createNotification(req.params.id, 'admin_private', req.body.title || 'پیام اختصاصی مدیریت', req.body.body || req.body.message || ''); await audit(req.admin.id,'private_message_user','users',req.params.id,null,{title:req.body.title}); res.json({message:'پیام اختصاصی ارسال شد'}); }));
 // SMS OTP is not wired up yet, so the self-service "forgot password" flow
 // cannot deliver a reset code to the user. Until a real SMS provider is
 // configured, this lets a support/super admin set a temporary password for
 // a locked-out user after verifying their identity manually (phone call,
 // in-person, etc.). Every use is written to the audit log.
-app.post('/api/admin/users/:id/reset-password', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
+app.post('/api/admin/users/:id/reset-password', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
   const newPassword = String(req.body.newPassword || '');
   if (!isValidPasswordLength(newPassword)) return res.status(400).json({ message: 'رمز جدید باید بین ۶ تا ۷۲ کاراکتر باشد' });
   const hash = await bcrypt.hash(newPassword, 12);
@@ -1012,12 +1116,12 @@ app.post('/api/admin/users/:id/reset-password', adminAuth, requireRole('support'
 }));
 
 app.get('/api/admin/chat/messages', adminAuth, asyncHandler(async (req, res) => res.json((await pool.query('SELECT m.*, u.mobile,u.nickname FROM chat_messages m JOIN users u ON u.id=m.user_id ORDER BY m.sent_at DESC LIMIT 300')).rows)));
-app.patch('/api/admin/chat/messages/:id/delete', adminAuth, requireRole('support'), asyncHandler(async (req, res) => { await pool.query('UPDATE chat_messages SET is_deleted=true WHERE id=$1', [req.params.id]); await audit(req.admin.id,'delete_chat_message','chat_messages',req.params.id,req.body.reason); res.json({message:'حذف شد'}); }));
-app.patch('/api/admin/chat/users/:id/ban', adminAuth, requireRole('support'), asyncHandler(async (req, res) => { await pool.query("UPDATE users SET chat_banned_until=NOW()+($1::text||' minutes')::interval WHERE id=$2", [req.body.minutes||1440, req.params.id]); await audit(req.admin.id,'ban_chat_user','users',req.params.id,req.body.reason,{minutes:req.body.minutes}); await createNotification(req.params.id,'chat_penalty','محدودیت چت',`شما به مدت ${req.body.minutes||1440} دقیقه از چت محروم شدید. ${req.body.reason||''}`); res.json({message:'کاربر از چت محروم شد'}); }));
+app.patch('/api/admin/chat/messages/:id/delete', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => { await pool.query('UPDATE chat_messages SET is_deleted=true WHERE id=$1', [req.params.id]); await audit(req.admin.id,'delete_chat_message','chat_messages',req.params.id,req.body.reason); res.json({message:'حذف شد'}); }));
+app.patch('/api/admin/chat/users/:id/ban', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => { await pool.query("UPDATE users SET chat_banned_until=NOW()+($1::text||' minutes')::interval WHERE id=$2", [req.body.minutes||1440, req.params.id]); await audit(req.admin.id,'ban_chat_user','users',req.params.id,req.body.reason,{minutes:req.body.minutes}); await createNotification(req.params.id,'chat_penalty','محدودیت چت',`شما به مدت ${req.body.minutes||1440} دقیقه از چت محروم شدید. ${req.body.reason||''}`); res.json({message:'کاربر از چت محروم شد'}); }));
 
 app.get('/api/admin/support/tickets', adminAuth, requireRole('support','observer'), asyncHandler(async (req, res) => res.json((await pool.query('SELECT t.*, u.mobile FROM support_tickets t JOIN users u ON u.id=t.user_id ORDER BY t.updated_at DESC')).rows)));
-app.get('/api/admin/support/tickets/:id/messages', adminAuth, requireRole('support','observer'), asyncHandler(async (req, res) => res.json((await pool.query('SELECT * FROM support_ticket_messages WHERE ticket_id=$1 ORDER BY created_at', [req.params.id])).rows)));
-app.post('/api/admin/support/tickets/:id/messages', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
+app.get('/api/admin/support/tickets/:id/messages', adminAuth, validateUuid('id'), requireRole('support','observer'), asyncHandler(async (req, res) => res.json((await pool.query('SELECT * FROM support_ticket_messages WHERE ticket_id=$1 ORDER BY created_at', [req.params.id])).rows)));
+app.post('/api/admin/support/tickets/:id/messages', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
   const attachments = sanitizeAttachments(req.body.attachments);
   const text = String(req.body.message || '').trim();
   if (!text && !attachments.length) return res.status(400).json({ message: 'متن پاسخ یا حداقل یک عکس لازم است' });
@@ -1032,7 +1136,7 @@ app.post('/api/admin/support/tickets/:id/messages', adminAuth, requireRole('supp
 
 // Closing is the ONLY way a user becomes eligible to open a new ticket, so
 // it is an explicit admin action rather than a side effect of replying.
-app.patch('/api/admin/support/tickets/:id/close', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
+app.patch('/api/admin/support/tickets/:id/close', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
   const { rows } = await pool.query(
     "UPDATE support_tickets SET status='closed', closed_at=NOW(), closed_by_admin_id=$2, updated_at=NOW() WHERE id=$1 AND status <> 'closed' RETURNING user_id, subject",
     [req.params.id, req.admin.id]
@@ -1043,7 +1147,7 @@ app.patch('/api/admin/support/tickets/:id/close', adminAuth, requireRole('suppor
   res.json({ message: 'تیکت بسته شد' });
 }));
 
-app.patch('/api/admin/support/tickets/:id/reopen', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
+app.patch('/api/admin/support/tickets/:id/reopen', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
   const { rows } = await pool.query(
     "UPDATE support_tickets SET status='open', closed_at=NULL, closed_by_admin_id=NULL, updated_at=NOW() WHERE id=$1 AND status='closed' RETURNING user_id",
     [req.params.id]
@@ -1066,7 +1170,7 @@ app.post('/api/admin/admins', adminAuth, requireRole(), asyncHandler(async (req,
 // support/support-with-a-compromised-password account could keep a fully
 // working session/token until natural JWT expiry (12h) with no way for a
 // super_admin to cut it off sooner or prevent future logins.
-app.patch('/api/admin/admins/:id/status', adminAuth, requireRole(), asyncHandler(async (req, res) => {
+app.patch('/api/admin/admins/:id/status', adminAuth, validateUuid('id'), requireRole(), asyncHandler(async (req, res) => {
   if (req.params.id === req.admin.id) return res.status(400).json({ message: 'نمی‌توانید حساب خودتان را غیرفعال کنید' });
   const isActive = req.body.isActive !== false;
   const { rows } = await pool.query('UPDATE admin_users SET is_active=$1, updated_at=NOW() WHERE id=$2 RETURNING id,username,role,is_active', [isActive, req.params.id]);
@@ -1152,8 +1256,24 @@ function friendlyDbError(err) {
     default: return null;
   }
 }
+// A request to a path that does not exist used to fall through to Express'
+// default handler, which replies with an HTML error page. Every client here
+// expects JSON, so a typo'd URL produced "Unexpected token '<'" in the app
+// instead of a readable message.
+app.use('/api', (req, res) => {
+  res.status(404).json({ message: 'این آدرس در سرور وجود ندارد' });
+});
+
 app.use((err, req, res, next) => {
   console.error(err);
+  // Malformed JSON reached the user as the raw parser message in English
+  // ("Unexpected token 'n'..."), inside an otherwise Persian UI.
+  if (err.type === 'entity.parse.failed' || err instanceof SyntaxError && 'body' in err) {
+    return res.status(400).json({ message: 'ساختار داده ارسالی معتبر نیست' });
+  }
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ message: 'حجم اطلاعات ارسالی بیش از حد مجاز است' });
+  }
   // Multer (file uploads) throws its own error class with English messages
   // like "File too large". Those used to fall through to the generic 500
   // handler, so an admin uploading a big photo got a raw English string in

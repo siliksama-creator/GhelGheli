@@ -69,11 +69,33 @@ class _AdminUsersState extends State<AdminUsers> {
         ],
       ),
     );
-    if (value != null) {
-      await widget.api.post('/api/admin/users/$id/points',
-          {'points': int.tryParse(value) ?? 0, 'reason': 'تغییر از اپ مدیریت'});
-      await _load();
+    // Dialog-scoped controller: never disposed before, so every points
+    // adjustment leaked one. try/finally also covers the error path.
+    try {
+      if (value == null) return;
+      final delta = int.tryParse(value.trim());
+      if (delta == null || delta == 0) {
+        _snack('عدد وارد‌شده معتبر نیست');
+        return;
+      }
+      try {
+        await widget.api.post('/api/admin/users/$id/points',
+            {'points': delta, 'reason': 'تغییر از اپ مدیریت'});
+        await _load();
+        _snack('امتیاز ثبت شد');
+      } catch (e) {
+        // A failed adjustment used to vanish silently, leaving the admin
+        // convinced the points had been applied.
+        _snack(apiError(e));
+      }
+    } finally {
+      controller.dispose();
     }
+  }
+
+  void _snack(String m) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
   }
 
   // SMS OTP isn't active yet, so users can't self-service a forgotten
@@ -113,21 +135,25 @@ class _AdminUsersState extends State<AdminUsers> {
         ],
       ),
     );
-    if (value == null || value.isEmpty) return;
-    if (value.length < 6) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('رمز باید حداقل ۶ کاراکتر باشد')));
+    try {
+      if (value == null || value.isEmpty) return;
+      if (value.length < 6) {
+        _snack('رمز باید حداقل ۶ کاراکتر باشد');
+        return;
       }
-      return;
-    }
-    await widget.api.post('/api/admin/users/$id/reset-password', {
-      'newPassword': value,
-      'reason': 'بازیابی رمز توسط پشتیبانی',
-    });
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('رمز عبور کاربر تغییر کرد؛ رمز جدید را به او اطلاع دهید')));
+      try {
+        await widget.api.post('/api/admin/users/$id/reset-password', {
+          'newPassword': value,
+          'reason': 'بازیابی رمز توسط پشتیبانی',
+        });
+        _snack('رمز عبور کاربر تغییر کرد؛ رمز جدید را به او اطلاع دهید');
+      } catch (e) {
+        // Critical to report: support would otherwise tell the user a new
+        // password that was never actually set.
+        _snack(apiError(e));
+      }
+    } finally {
+      controller.dispose();
     }
   }
 

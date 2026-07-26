@@ -90,6 +90,7 @@ class _ProfilePageState extends State<ProfilePage> {
         'profileAvatarKey': _selectedAvatar,
       });
       await widget.reloadProfile();
+      if (!mounted) return;
       setState(() {
         _message = 'پروفایل ذخیره شد';
         _messageIsError = false;

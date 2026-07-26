@@ -78,6 +78,10 @@ class _DashboardPageState extends State<DashboardPage> {
     try {
       final r =
           await widget.api.post('/api/cards/redeem', {'code': _code.text});
+      // The user can close this screen while the request is in flight;
+      // calling setState after that throws "setState() called after
+      // dispose()" and the error surfaces as a red screen in release mode.
+      if (!mounted) return;
       setState(() {
         _message = '${r['message']} +${faNum(r['addedPoints'])} امتیاز';
         _messageIsError = false;

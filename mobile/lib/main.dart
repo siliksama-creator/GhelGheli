@@ -59,6 +59,7 @@ class _GhelGheliAppState extends State<GhelGheliApp> {
 
   Future<void> _logout() async {
     await api.logout();
+    if (!mounted) return;
     setState(() {});
   }
 
