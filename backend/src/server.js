@@ -58,8 +58,19 @@ app.use(morgan('dev'));
 const uploadRoot = path.join(__dirname, '..', 'uploads');
 const imageUploadDir = path.join(uploadRoot, 'images');
 fs.mkdirSync(imageUploadDir, { recursive: true });
-app.use('/uploads', express.static(uploadRoot));
-app.use('/public', express.static(path.join(__dirname, '..', 'public')));
+// CROSS-ORIGIN FIX: helmet() sets Cross-Origin-Resource-Policy: same-origin
+// by default. The API is on api.ghelghelishop.ir but the web app runs on
+// user.ghelghelishop.ir, so every uploaded card image / ticket attachment was
+// BLOCKED by the browser (net::ERR_BLOCKED_BY_RESPONSE.NotSameOrigin) and
+// silently failed to render. Static assets are public images, so mark them
+// cross-origin readable. Caching is added here too: these files are content
+// -addressed (timestamped filenames) and never change once written.
+const publicAssetHeaders = (res) => {
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+};
+app.use('/uploads', express.static(uploadRoot, { setHeaders: publicAssetHeaders }));
+app.use('/public', express.static(path.join(__dirname, '..', 'public'), { setHeaders: publicAssetHeaders }));
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(YAML.load(__dirname + '/../docs/openapi.yaml')));
 const imageUpload = multer({
   storage: multer.diskStorage({
