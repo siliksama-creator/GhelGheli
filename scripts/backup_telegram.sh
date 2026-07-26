@@ -292,14 +292,33 @@ SIZE_BYTES=$(stat -c%s "$ARCHIVE")
 SIZE_H=$(du -h "$ARCHIVE" | cut -f1)
 log "archive $ARCHIVE ($SIZE_H)"
 
-# Telegram rejects documents over 50 MB from bots. We are ~1 MB, but if the
-# uploads folder ever explodes we must fail LOUDLY rather than silently stop
-# having off-site backups.
+# Telegram rejects documents over 50 MB from bots. Today the archive is
+# ~750 KB, but it grows with every image an admin uploads: roughly 100-150 KB
+# per optimised card image, so ~300 cards would cross the limit.
+#
+# Rather than fail on that day, split the archive into numbered parts and
+# send them in order. `cat part.* > archive.tar.gz` reassembles it, and
+# restore.sh does that automatically, so a split backup restores exactly like
+# a single-file one. Chunk at 45 MB to leave room for Telegram's overhead.
 MAX=$((50 * 1024 * 1024))
+CHUNK=$((45 * 1024 * 1024))
+PARTS=()
 if [ "$SIZE_BYTES" -gt "$MAX" ]; then
-  notify_failure "حجم بکاپ ${SIZE_H} از سقف ۵۰MB تلگرام بیشتر شد. باید فایل‌های آپلودی جداگانه آرشیو شوند."
-  log "FATAL: archive exceeds Telegram's 50MB bot limit"
-  exit 1
+  log "archive exceeds 50MB — splitting into ${CHUNK} byte parts"
+  split -b "$CHUNK" -d -a 2 "$ARCHIVE" "${ARCHIVE}.part"
+  while IFS= read -r f; do PARTS+=("$f"); done < <(ls "${ARCHIVE}".part* | sort)
+  if [ "${#PARTS[@]}" -eq 0 ]; then
+    notify_failure "تقسیم آرشیو ${SIZE_H} ناموفق بود."
+    exit 1
+  fi
+  # Telegram bots are rate-limited; more than a handful of parts means the
+  # uploads folder needs its own strategy (object storage), not more chunks.
+  if [ "${#PARTS[@]}" -gt 8 ]; then
+    notify_failure "بکاپ به ${#PARTS[@]} تکه نیاز دارد (${SIZE_H}). وقت آن است که فایل‌های آپلودی به فضای ابری منتقل شوند."
+    rm -f "${ARCHIVE}".part*
+    exit 1
+  fi
+  log "split into ${#PARTS[@]} parts"
 fi
 
 # ── 7. Send ───────────────────────────────────────────────────────────────
@@ -313,18 +332,41 @@ CAPTION="✅ <b>بکاپ کامل قل‌قلی</b>
 
 <i>برای بازیابی: فایل را روی سرور جدید باز کن و</i> <code>bash restore.sh</code> <i>را اجرا کن.</i>"
 
-HTTP=$(curl -sS --max-time 300 -w '%{http_code}' -o /tmp/tg_resp.json \
-  -F "chat_id=${TELEGRAM_CHAT_ID}" \
-  -F "parse_mode=HTML" \
-  -F "caption=${CAPTION}" \
-  -F "document=@${ARCHIVE}" \
-  "$API/sendDocument")
+send_doc() {
+  local file="$1" caption="$2"
+  local http
+  http=$(curl -sS --max-time 600 -w '%{http_code}' -o /tmp/tg_resp.json \
+    -F "chat_id=${TELEGRAM_CHAT_ID}" \
+    -F "parse_mode=HTML" \
+    -F "caption=${caption}" \
+    -F "document=@${file}" \
+    "$API/sendDocument")
+  if [ "$http" != "200" ] || ! grep -q '"ok":true' /tmp/tg_resp.json 2>/dev/null; then
+    local err; err=$(head -c 300 /tmp/tg_resp.json 2>/dev/null)
+    notify_failure "ارسال $(basename "$file") شکست خورد (HTTP $http): $err"
+    log "FATAL: Telegram upload failed: $http $err"
+    return 1
+  fi
+  return 0
+}
 
-if [ "$HTTP" != "200" ] || ! grep -q '"ok":true' /tmp/tg_resp.json 2>/dev/null; then
-  ERR=$(head -c 300 /tmp/tg_resp.json 2>/dev/null)
-  notify_failure "ارسال فایل به تلگرام شکست خورد (HTTP $HTTP): $ERR"
-  log "FATAL: Telegram upload failed: $HTTP $ERR"
-  exit 1
+if [ "${#PARTS[@]}" -eq 0 ]; then
+  send_doc "$ARCHIVE" "$CAPTION" || exit 1
+else
+  # Parts must arrive in order and be obviously reassemblable, so each caption
+  # states its index and repeats the command.
+  n=${#PARTS[@]}
+  i=1
+  for part in "${PARTS[@]}"; do
+    send_doc "$part" "📦 <b>بکاپ قل‌قلی</b> — تکه <b>${i}</b> از <b>${n}</b>
+📅 $(date '+%Y-%m-%d  %H:%M')
+
+<i>همه تکه‌ها را در یک پوشه بگذار و اجرا کن:</i>
+<code>cat *.part* > backup.tar.gz && tar xzf backup.tar.gz</code>" || exit 1
+    i=$((i + 1))
+  done
+  rm -f "${ARCHIVE}".part*
+  log "sent $n parts"
 fi
 
 # Record the Telegram file_id. A bot cannot list its own sent messages, so

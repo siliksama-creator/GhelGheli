@@ -128,6 +128,20 @@ ok "دانلود شد: $(du -h "$ARCHIVE" | cut -f1)"
 
 step "باز کردن"
 rm -rf "$DEST"/ghelgheli_full_* 2>/dev/null || true
+
+# A very large backup is sent as numbered parts (ghelgheli_*.tar.gz.part00,
+# .part01, ...). If the user dropped those in here, join them first.
+if ls "$DEST"/*.part[0-9][0-9] >/dev/null 2>&1; then
+  step "ادغام تکه‌های بکاپ"
+  cat "$DEST"/*.part[0-9][0-9] > "$DEST/joined.tar.gz"
+  if tar tzf "$DEST/joined.tar.gz" >/dev/null 2>&1; then
+    ARCHIVE="$DEST/joined.tar.gz"
+    ok "$(ls "$DEST"/*.part[0-9][0-9] | wc -l) تکه ادغام شد"
+  else
+    die "ادغام تکه‌ها ناموفق بود — احتمالاً یک تکه کم است"
+  fi
+fi
+
 tar xzf "$ARCHIVE" -C "$DEST"
 UNPACKED=$(ls -d "$DEST"/ghelgheli_full_* 2>/dev/null | head -1)
 [ -n "$UNPACKED" ] || die "پوشه بازشده پیدا نشد"
