@@ -231,6 +231,19 @@ if [ -f "$HERE/config/telegram_file_ids.tsv" ]; then
 fi
 ok "ابزار بکاپ نصب شد"
 
+# The monthly league close. Without this cron a restored server would run
+# happily for weeks and then simply never pay out a league season — the kind
+# of silent gap nobody notices until users start asking where their prize is.
+if [ ! -f /etc/cron.d/ghelgheli-league ]; then
+  cat > /etc/cron.d/ghelgheli-league << 'LEAGUECRON'
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+20 0 * * * root cd /var/www/GhelGheli/backend && /usr/bin/node scripts/closeLeague.js >> /var/log/ghelgheli-league.log 2>&1
+LEAGUECRON
+  chmod 644 /etc/cron.d/ghelgheli-league
+  ok "زمان‌بندی بستن لیگ نصب شد"
+fi
+
 # ── 10. Firewall ──────────────────────────────────────────────────────────
 step "فایروال"
 ufw allow OpenSSH >/dev/null 2>&1 || true
