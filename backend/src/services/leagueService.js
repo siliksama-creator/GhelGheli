@@ -46,11 +46,27 @@ async function getLeaderboard(limit = 100) {
   );
   return { season, entries: rows };
 }
-async function closeActiveSeason() {
+async function closeActiveSeason({ force = false } = {}) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    // Lock the season row so two concurrent runs (a cron overlapping a manual
+    // admin trigger) cannot both pay out the same month.
     const season = await ensureActiveSeason(client);
+    const locked = await client.query(
+      'SELECT status, ends_at FROM league_seasons WHERE id=$1 FOR UPDATE', [season.id]);
+    if (locked.rows[0]?.status === 'closed') {
+      await client.query('COMMIT');
+      return { seasonId: season.id, winners: 0, skipped: 'already closed' };
+    }
+    // Refuse to close a season early unless explicitly forced. A misfiring
+    // cron in the middle of the month would otherwise wipe every player's
+    // monthly points and hand out prizes for a half-finished league.
+    const endsAt = locked.rows[0]?.ends_at;
+    if (!force && endsAt && new Date(endsAt) > new Date()) {
+      await client.query('COMMIT');
+      return { seasonId: season.id, winners: 0, skipped: 'season still running' };
+    }
     const setting = await client.query("SELECT value FROM app_settings WHERE key='league_winner_count' LIMIT 1");
     const rawWinnerCount = setting.rows[0]?.value;
     const winnerCount = Number.isFinite(Number(rawWinnerCount)) && Number(rawWinnerCount) > 0 ? Math.floor(Number(rawWinnerCount)) : Math.max(10, (season.prize_table || []).length || 10);
@@ -62,9 +78,17 @@ async function closeActiveSeason() {
     const prizeMap = new Map((season.prize_table || []).map(p => [Number(p.rank), Number(p.amount || 0)]));
     for (const entry of leaders) {
       const amount = prizeMap.get(Number(entry.rank)) || 0;
+      // TIE HANDLING.
+      // DENSE_RANK gives tied players the same rank, which is correct. The
+      // conflict target used to be (season, rank), so on a tie for 3rd place
+      // the second player's insert hit ON CONFLICT DO NOTHING and their prize
+      // vanished with no error. The real invariant is one payout per USER per
+      // season — see migration 014.
       await client.query(
         `INSERT INTO league_payouts(league_season_id,user_id,rank,amount)
-         VALUES($1,$2,$3,$4) ON CONFLICT(league_season_id, rank) DO NOTHING`,
+         VALUES($1,$2,$3,$4)
+         ON CONFLICT(league_season_id, user_id) DO UPDATE
+           SET rank = EXCLUDED.rank, amount = EXCLUDED.amount`,
         [season.id, entry.user_id, entry.rank, amount]
       );
       await client.query('UPDATE league_leaderboard_entries SET rank=$1 WHERE league_season_id=$2 AND user_id=$3', [entry.rank, season.id, entry.user_id]);
