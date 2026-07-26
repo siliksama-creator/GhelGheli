@@ -150,6 +150,29 @@ if [ -d "$HERE/uploads" ]; then
   ok "$(find "$APP_DIR/backend/uploads" -type f | wc -l) فایل آپلودی بازگردانده شد"
 fi
 
+# Files that existed only on the old server (not in git, not in uploads).
+if [ -d "$HERE/untracked" ]; then
+  cp -a "$HERE/untracked/." "$APP_DIR/"
+  ok "فایل‌های خارج از گیت بازگردانده شدند"
+fi
+
+# Sanity check: the data actually landed.
+if [ -f "$HERE/db/TABLE_COUNTS.txt" ]; then
+  echo "  ${BOLD}مقایسه با بکاپ:${OFF}"
+  export PGPASSWORD="$DB_PASS"
+  while read -r tbl expected; do
+    [ -n "$tbl" ] || continue
+    actual=$(psql -h localhost -U "$DB_USER" -d "$DB_NAME" -tAc \
+      "SELECT count(*) FROM public.\"$tbl\"" 2>/dev/null || echo '?')
+    if [ "$actual" = "$expected" ]; then
+      [ "$expected" != "0" ] && printf '    ✓ %-30s %s\n' "$tbl" "$actual"
+    else
+      printf "${YEL}    ! %-30s انتظار %s، یافت %s${OFF}\n" "$tbl" "$expected" "$actual"
+    fi
+  done < "$HERE/db/TABLE_COUNTS.txt"
+  unset PGPASSWORD
+fi
+
 # ── 7. Web server ─────────────────────────────────────────────────────────
 step "پیکربندی nginx و SSL"
 if [ -d "$HERE/server/nginx-sites" ]; then

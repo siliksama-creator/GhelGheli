@@ -76,6 +76,37 @@ mkdir -p "$STAGE/db"
 pg_dump -h "$DB_HOST" -U "$DB_USER" --clean --if-exists --no-owner --no-privileges \
   "$DB_NAME" > "$STAGE/db/ghelgheli.sql"
 DB_BYTES=$(stat -c%s "$STAGE/db/ghelgheli.sql")
+
+# COMPLETENESS GUARD.
+# pg_dump takes the whole database, so any table added in the future (new
+# leagues, new game modes, new reward types) is included automatically with
+# no change here. But "automatically" is a claim worth PROVING on every run:
+# a permission change or a --exclude-table slipping into the command would
+# silently drop a table and nobody would notice until a restore.
+# So: count the tables Postgres knows about, count the ones in the dump, and
+# refuse to ship a backup that lost any of them.
+LIVE_TABLES=$(sudo -u postgres psql -d "$DB_NAME" -tAc \
+  "SELECT count(*) FROM information_schema.tables
+   WHERE table_schema='public' AND table_type='BASE TABLE'" 2>/dev/null || echo 0)
+DUMP_TABLES=$(grep -c '^CREATE TABLE public\.' "$STAGE/db/ghelgheli.sql" || echo 0)
+
+if [ "$LIVE_TABLES" -gt 0 ] && [ "$DUMP_TABLES" -lt "$LIVE_TABLES" ]; then
+  notify_failure "دامپ ناقص است: $DUMP_TABLES جدول از $LIVE_TABLES جدول دیتابیس. بکاپ ارسال نشد."
+  log "FATAL: dump has $DUMP_TABLES of $LIVE_TABLES tables"
+  exit 1
+fi
+log "database: $DUMP_TABLES/$LIVE_TABLES tables captured"
+
+# Per-table row counts, stored in the archive. This turns "the backup ran"
+# into "the backup contains 6 users and 2 card types" — the only way to spot
+# a dump that succeeded but captured an empty database.
+: > "$STAGE/db/TABLE_COUNTS.txt"
+for t in $(sudo -u postgres psql -d "$DB_NAME" -tAc \
+  "SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename"); do
+  n=$(sudo -u postgres psql -d "$DB_NAME" -tAc "SELECT count(*) FROM public.\"$t\"" 2>/dev/null || echo '?')
+  printf '%-34s %s\n' "$t" "$n" >> "$STAGE/db/TABLE_COUNTS.txt"
+done
+
 unset PGPASSWORD
 
 # ── 2. Uploaded files ─────────────────────────────────────────────────────
@@ -83,6 +114,28 @@ log "collecting uploads"
 if [ -d "$APP_DIR/backend/uploads" ]; then
   mkdir -p "$STAGE/uploads"
   cp -a "$APP_DIR/backend/uploads/." "$STAGE/uploads/" 2>/dev/null || true
+fi
+
+# ── 2b. Anything on disk that git does NOT track ──────────────────────────
+# Static assets (avatars, logo, fonts, game art) live in git, so they come
+# back with `git clone` and do not belong in a daily archive. But a file that
+# is BOTH untracked and outside uploads/ exists only on this server — if we
+# skip it, it is gone forever. This sweeps up any such stragglers so future
+# features cannot quietly create an unbacked-up directory.
+log "checking for untracked files"
+if command -v git >/dev/null && [ -d "$APP_DIR/.git" ]; then
+  STRAY=$(cd "$APP_DIR" && git status --porcelain --ignored 2>/dev/null \
+    | grep '^!!' | cut -c4- \
+    | grep -vE '^(node_modules/|.*/node_modules/|backend/uploads/|.*/dist/|.*/build/|.*\.log$|backend/\.env$|admin/\.env$|userweb/\.env$)' || true)
+  if [ -n "$STRAY" ]; then
+    mkdir -p "$STAGE/untracked"
+    echo "$STRAY" | while read -r f; do
+      [ -e "$APP_DIR/$f" ] || continue
+      mkdir -p "$STAGE/untracked/$(dirname "$f")"
+      cp -a "$APP_DIR/$f" "$STAGE/untracked/$f" 2>/dev/null || true
+    done
+    log "captured untracked: $(echo "$STRAY" | tr '\n' ' ')"
+  fi
 fi
 
 # ── 3. Secrets & server configuration ─────────────────────────────────────
@@ -136,6 +189,7 @@ postgres   : $(psql --version 2>/dev/null | head -1 || echo n/a)
 
 CONTENTS
   db/ghelgheli.sql         full database dump (--clean --if-exists)
+  db/TABLE_COUNTS.txt      row count per table, to verify the dump is not empty
   uploads/                 user-uploaded images
   config/backend.env       API secrets: DB password, JWT_SECRET, Firebase
   config/db_password       PostgreSQL password for the ghelgheli role
@@ -144,7 +198,15 @@ CONTENTS
   server/pm2-dump.json     PM2 process list
   server/root.crontab      scheduled jobs
   server/ssh/              GitHub read-only deploy key
+  untracked/               any file on disk that git does not track
   restore.sh               ONE-COMMAND full restore
+
+WHAT IS IN THE DATABASE DUMP
+  Every table, always — pg_dump takes the whole database, so features added
+  later are captured with no change to this script. Verified on each run by
+  comparing the table count in the dump against the live database.
+
+$(cat "$STAGE/db/TABLE_COUNTS.txt" 2>/dev/null | sed 's/^/  /')
 
 NOT INCLUDED (regenerated, not lost)
   node_modules/  -> npm ci rebuilds it exactly from package-lock.json
