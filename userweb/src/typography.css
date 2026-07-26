@@ -158,20 +158,52 @@ small,
   font-feature-settings: 'tnum', 'ss01';
 }
 
-/* Buttons: 900 was heavier than Vazirmatn's real top weight (800), so the
-   browser SYNTHESISED a fake bold — that smeared, slightly blurry look. */
-button {
-  font-weight: 700;
-  letter-spacing: 0;
-}
-button.main {
+/*
+  SYNTHETIC BOLD.
+  Vazirmatn's heaviest real cut is 800. Ask for 900 or 1000 and the browser
+  cannot find a matching face, so it FAKES one by smearing the 800 outline —
+  the result is the slightly blurry, over-inked look the user described.
+  style.css was full of `font-weight: 900` (and one 1000 on the logo), and
+  because those rules come later in the cascade they beat a plain `button`
+  selector here. Clamping them explicitly is the only reliable fix, and it
+  is verified by tool/typography.mjs, which fails the build if any rendered
+  element reports a computed weight above 800.
+*/
+button,
+.tabs button,
+.mobileNav button,
+.clubTabs button,
+.chatActions button,
+.emojiBtn,
+.iconBtn,
+.searchRing span,
+.soloRow .rk,
+.soloRow .soloTime,
+.podiumCard b,
+.podiumCard strong,
+.liveBadge,
+.countdown,
+.timer em,
+.gamePage .player i,
+.gameTile b,
+.hero b,
+b, strong {
   font-weight: 800;
-  font-size: var(--fs-base);
 }
 
-/* Same problem, same fix: 1000 is not a real weight in this family. */
-.hero b {
+/* Ordinary buttons don't need the top weight; 700 reads cleaner at 14px. */
+button {
+  letter-spacing: 0;
+  font-weight: 700;
+}
+button.main,
+.tabs .on,
+.mobileNav .on,
+.clubTabs .on {
   font-weight: 800;
+}
+
+.hero b {
   letter-spacing: -0.02em;
 }
 

@@ -2,8 +2,12 @@ import React,{useEffect,useRef,useState}from'react';
 import{createRoot}from'react-dom/client';
 import GamesHub from './games.jsx';
 import Support from './support.jsx';
-import'./typography.css';
 import'./style.css';
+// AFTER style.css on purpose: style.css is a single minified line full of
+// `font-weight:900` (and one 1000), which would otherwise win the cascade
+// and force the browser to synthesise a smeared fake bold. Vazirmatn's
+// heaviest real cut is 800. Enforced by tool/typography.mjs.
+import'./typography.css';
 
 const API=import.meta.env.VITE_API_BASE||'https://api.ghelghelishop.ir';
 // Accent palette for the admin-pinned announcement (mirrors the server's
