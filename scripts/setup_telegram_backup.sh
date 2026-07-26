@@ -113,8 +113,10 @@ chmod 600 /root/ghelgheli-backups/.telegram.conf 2>/dev/null || true
 step "نصب اسکریپت‌ها"
 install -m 700 "$APP_DIR/scripts/backup_telegram.sh"      /usr/local/bin/ghelgheli-backup-telegram.sh
 install -m 700 "$APP_DIR/scripts/restore_from_backup.sh"  /usr/local/bin/ghelgheli-restore.sh
+install -m 700 "$APP_DIR/scripts/fetch_backup_from_telegram.sh" /usr/local/bin/ghelgheli-fetch-backup.sh
 ok "/usr/local/bin/ghelgheli-backup-telegram.sh"
 ok "/usr/local/bin/ghelgheli-restore.sh"
+ok "/usr/local/bin/ghelgheli-fetch-backup.sh"
 
 step "زمان‌بندی روزانه"
 cat > /etc/cron.d/ghelgheli-telegram-backup << 'CRON'

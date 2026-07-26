@@ -203,6 +203,10 @@ find "$APP_DIR/backend" -maxdepth 2 -name '*firebase*.json' -not -path '*/node_m
 # failure mode, because you'd only discover it the second time you needed a
 # backup. restore.sh reads this file back into /root/.ghelgheli_backup.conf.
 [ -f "$CONF" ] && cp "$CONF" "$STAGE/config/telegram.conf"
+# Index of previous archives' Telegram file_ids, so a restored server can
+# reach back to an OLDER backup (e.g. if the newest one contains a mistake
+# you are trying to undo).
+[ -f "$WORK/file_ids.tsv" ] && cp "$WORK/file_ids.tsv" "$STAGE/config/telegram_file_ids.tsv"
 
 mkdir -p "$STAGE/server"
 cp -a /etc/nginx/sites-available "$STAGE/server/nginx-sites" 2>/dev/null || true
@@ -321,6 +325,39 @@ if [ "$HTTP" != "200" ] || ! grep -q '"ok":true' /tmp/tg_resp.json 2>/dev/null; 
   notify_failure "ارسال فایل به تلگرام شکست خورد (HTTP $HTTP): $ERR"
   log "FATAL: Telegram upload failed: $HTTP $ERR"
   exit 1
+fi
+
+# Record the Telegram file_id. A bot cannot list its own sent messages, so
+# without this the only way to fetch yesterday's archive is to open Telegram
+# by hand. Storing the id means `ghelgheli-fetch-backup.sh` can pull the
+# latest archive straight onto a brand-new server with one command.
+FILE_ID=$(python3 -c "
+import sys, json
+try:
+    print(json.load(open('/tmp/tg_resp.json'))['result']['document']['file_id'])
+except Exception:
+    pass
+" 2>/dev/null || true)
+
+if [ -n "$FILE_ID" ]; then
+  printf '%s\t%s\t%s\n' "$(date -Is)" "$(basename "$ARCHIVE")" "$FILE_ID" >> "$WORK/file_ids.tsv"
+  # Keep only the last 60 entries so the index cannot grow without bound.
+  tail -60 "$WORK/file_ids.tsv" > "$WORK/file_ids.tsv.tmp" && mv "$WORK/file_ids.tsv.tmp" "$WORK/file_ids.tsv"
+  chmod 600 "$WORK/file_ids.tsv"
+  # Pin the newest id to the chat itself, so it survives losing the server:
+  # a pinned message is the one thing you can always find in a busy chat.
+  MSG_ID=$(python3 -c "
+import json
+try: print(json.load(open('/tmp/tg_resp.json'))['result']['message_id'])
+except Exception: pass
+" 2>/dev/null || true)
+  if [ -n "$MSG_ID" ]; then
+    curl -sS --max-time 20 -X POST "$API/unpinAllChatMessages" \
+      -d "chat_id=${TELEGRAM_CHAT_ID}" >/dev/null 2>&1 || true
+    curl -sS --max-time 20 -X POST "$API/pinChatMessage" \
+      -d "chat_id=${TELEGRAM_CHAT_ID}" -d "message_id=${MSG_ID}" \
+      -d "disable_notification=true" >/dev/null 2>&1 || true
+  fi
 fi
 
 date -Is > "$STATE"

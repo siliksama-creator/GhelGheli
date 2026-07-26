@@ -218,11 +218,17 @@ step "بازگرداندن زمان‌بندی بکاپ"
 [ -f "$HERE/server/root.crontab" ] && crontab "$HERE/server/root.crontab" 2>/dev/null || true
 # Put the backup tooling back in place so the restored server keeps protecting
 # itself — a restored box with no backups is a trap waiting to spring.
-for s in backup_telegram.sh backup_latest.sh; do
+for s in backup_telegram.sh backup_latest.sh fetch_backup_from_telegram.sh; do
   [ -f "$APP_DIR/scripts/$s" ] && install -m 700 "$APP_DIR/scripts/$s" "/usr/local/bin/ghelgheli-${s%.sh}.sh"
 done
 [ -f "$APP_DIR/scripts/restore_from_backup.sh" ] && install -m 700 "$APP_DIR/scripts/restore_from_backup.sh" /usr/local/bin/ghelgheli-restore.sh
+[ -f "$APP_DIR/scripts/fetch_backup_from_telegram.sh" ] && install -m 700 "$APP_DIR/scripts/fetch_backup_from_telegram.sh" /usr/local/bin/ghelgheli-fetch-backup.sh
 [ -f "$HERE/config/telegram.conf" ] && { cp "$HERE/config/telegram.conf" /root/.ghelgheli_backup.conf; chmod 600 /root/.ghelgheli_backup.conf; }
+if [ -f "$HERE/config/telegram_file_ids.tsv" ]; then
+  mkdir -p /root/ghelgheli-backups
+  cp "$HERE/config/telegram_file_ids.tsv" /root/ghelgheli-backups/file_ids.tsv
+  chmod 600 /root/ghelgheli-backups/file_ids.tsv
+fi
 ok "ابزار بکاپ نصب شد"
 
 # ── 10. Firewall ──────────────────────────────────────────────────────────
