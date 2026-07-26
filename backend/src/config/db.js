@@ -8,9 +8,12 @@ const { Pool } = require('pg');
 // an unhandled 'error' event, which terminates the whole API process.
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  // The VPS runs a single API process next to Postgres; 10 is plenty for
-  // this workload and keeps us far below Postgres' default max_connections.
-  max: Number(process.env.PG_POOL_MAX || 10),
+  // Raised from 10 after a load test on the real VPS: at ~1600 concurrent
+  // users the REST p95 jumped from 54ms to 817ms while the pool sat pegged
+  // at its ceiling, with CPU load only at 1.37 — i.e. requests were queueing
+  // for a CONNECTION, not for the database. 24 keeps us well under
+  // Postgres' max_connections (100) even with headroom for psql/pgAdmin.
+  max: Number(process.env.PG_POOL_MAX || 24),
   idleTimeoutMillis: 30_000,
   // Fail fast instead of hanging a request forever when the DB is stuck.
   connectionTimeoutMillis: 8_000,
