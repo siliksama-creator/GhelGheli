@@ -97,6 +97,11 @@ mkdir -p "$STAGE/config"
 # Firebase service account, if one is present anywhere in backend/
 find "$APP_DIR/backend" -maxdepth 2 -name '*firebase*.json' -not -path '*/node_modules/*' \
   -exec cp {} "$STAGE/config/" \; 2>/dev/null || true
+# The Telegram credentials themselves. Without these a restored server would
+# come up healthy but SILENTLY STOP BACKING ITSELF UP — the worst possible
+# failure mode, because you'd only discover it the second time you needed a
+# backup. restore.sh reads this file back into /root/.ghelgheli_backup.conf.
+[ -f "$CONF" ] && cp "$CONF" "$STAGE/config/telegram.conf"
 
 mkdir -p "$STAGE/server"
 cp -a /etc/nginx/sites-available "$STAGE/server/nginx-sites" 2>/dev/null || true
