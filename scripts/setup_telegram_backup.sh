@@ -122,13 +122,17 @@ step "زمان‌بندی روزانه"
 cat > /etc/cron.d/ghelgheli-telegram-backup << 'CRON'
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-# Full off-site backup to Telegram, nightly at 03:30 server time. Chosen to
-# sit after the existing local backup at 03:30 and well outside peak hours.
-35 3 * * * root /usr/local/bin/ghelgheli-backup-telegram.sh >> /var/log/ghelgheli-backup.log 2>&1
+# Full off-site backup to Telegram, TWICE a day — 03:35 and 15:35.
+#
+# Twelve-hour spacing halves the worst-case data loss window: an image an
+# admin uploads at 14:00 is safely off-server by 15:35 instead of waiting
+# until the following night. At ~750 KB per run the extra cost is about
+# 22 MB/year of bandwidth, which is nothing.
+35 3,15 * * * root /usr/local/bin/ghelgheli-backup-telegram.sh >> /var/log/ghelgheli-backup.log 2>&1
 CRON
 chmod 644 /etc/cron.d/ghelgheli-telegram-backup
 systemctl restart cron >/dev/null 2>&1 || true
-ok "هر شب ساعت ۳:۳۵ اجرا می‌شود"
+ok "روزی دو بار: ۳:۳۵ بامداد و ۱۵:۳۵ بعدازظهر"
 
 # Rotate our own log so it can never fill the disk.
 cat > /etc/logrotate.d/ghelgheli-backup << 'LOGR'
