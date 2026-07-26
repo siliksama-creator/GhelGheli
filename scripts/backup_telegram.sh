@@ -18,6 +18,9 @@
 #   ghelgheli-backup-telegram.sh --test   # run now and report loudly
 #
 set -Eeuo pipefail
+# Without this a failure inside a pipeline (e.g. `pg_dump | gzip`) is hidden
+# by the exit status of the LAST command, so a broken dump looked successful.
+set -o pipefail
 
 CONF="${CONF:-/root/.ghelgheli_backup.conf}"
 APP_DIR="${APP_DIR:-/var/www/GhelGheli}"
@@ -63,18 +66,63 @@ notify_failure() {
     --data-urlencode "text=❌ <b>بکاپ قل‌قلی ناموفق بود</b>%0A%0A<code>${msg}</code>%0A%0A🕒 $(date -Is)" \
     >/dev/null 2>&1 || true
 }
-trap 'rc=$?; [ $rc -ne 0 ] && notify_failure "خط $LINENO خطا داد (کد $rc)"; cleanup' EXIT
+# Two traps with distinct jobs:
+#   ERR fires at the point of failure, so $LINENO is the line that ACTUALLY
+#       broke (inside an EXIT trap it is the trap's own line — useless).
+#   EXIT only cleans up, and must preserve the real exit code. The previous
+#       single-trap version ended on a successful `cleanup`, so the script
+#       reported SUCCESS after a failed dump — the worst possible lie for a
+#       backup tool. Proven: a permission error exited 0.
+on_error() {
+  local rc=$? line=$1
+  notify_failure "خط ${line} خطا داد (کد ${rc})"
+  log "FAILED at line ${line} (exit ${rc})"
+}
+trap 'on_error $LINENO' ERR
+trap 'rc=$?; cleanup; exit $rc' EXIT
 
 mkdir -p "$WORK" && chmod 700 "$WORK"
 
 # ── 1. Database ───────────────────────────────────────────────────────────
 log "dumping database"
-export PGPASSWORD="$(cat "$DB_PASS_FILE")"
 mkdir -p "$STAGE/db"
-# --clean --if-exists so the restore is idempotent: you can run it against a
-# database that already has tables without hand-dropping anything first.
-pg_dump -h "$DB_HOST" -U "$DB_USER" --clean --if-exists --no-owner --no-privileges \
-  "$DB_NAME" > "$STAGE/db/ghelgheli.sql"
+
+# DUMP AS THE POSTGRES SUPERUSER, NOT AS THE APP ROLE.
+#
+# This was a real, proven failure. The app role (`ghelgheli`) only owns the
+# tables the migrations created under it. The moment ANY table appears with a
+# different owner — a future migration run as postgres, a manual fix, an
+# extension's table — pg_dump aborts with:
+#     ERROR: permission denied for table <name>
+# and the ENTIRE backup fails. Not partially: nothing gets sent.
+#
+# Reproduced deliberately: created one table as postgres, and that single
+# table stopped the whole backup. In production that means the night a new
+# feature ships, backups silently stop — and you find out the day you need
+# one. The superuser can always read everything, so this can never recur.
+#
+# --clean --if-exists keeps the restore idempotent (safe on a database that
+# already has tables). --no-owner --no-privileges lets the dump restore
+# cleanly onto a fresh server where role names may differ.
+if sudo -n -u postgres true 2>/dev/null; then
+  sudo -u postgres pg_dump --clean --if-exists --no-owner --no-privileges \
+    "$DB_NAME" > "$STAGE/db/ghelgheli.sql"
+else
+  # Fallback for environments without sudo access to the postgres account.
+  log "WARNING: cannot sudo to postgres; dumping as $DB_USER (tables owned by"
+  log "         another role will be MISSING). Fix with: ALTER TABLE ... OWNER TO $DB_USER"
+  export PGPASSWORD="$(cat "$DB_PASS_FILE")"
+  pg_dump -h "$DB_HOST" -U "$DB_USER" --clean --if-exists --no-owner --no-privileges \
+    "$DB_NAME" > "$STAGE/db/ghelgheli.sql"
+fi
+
+# An empty or truncated dump is worse than no dump, because it looks like a
+# success. Refuse anything implausibly small.
+if [ ! -s "$STAGE/db/ghelgheli.sql" ] || [ "$(stat -c%s "$STAGE/db/ghelgheli.sql")" -lt 1000 ]; then
+  notify_failure "دامپ دیتابیس خالی یا ناقص است. بکاپ ارسال نشد."
+  log "FATAL: dump is empty or truncated"
+  exit 1
+fi
 DB_BYTES=$(stat -c%s "$STAGE/db/ghelgheli.sql")
 
 # COMPLETENESS GUARD.
