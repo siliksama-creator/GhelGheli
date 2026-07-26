@@ -98,12 +98,18 @@ try {
       check(`tab "${TABS[i]}"`, await audit());
     }
 
-    // The games hub lives behind a sub-tab, and it is where the newest
-    // markup (جفت‌یاب + solo mode) lives, so check it explicitly.
+    // The games hub lives behind a sub-tab of «چت و بازی», so we have to get
+    // back onto that top-level tab first — the loop above left us on
+    // "profile". Selecting by LABEL rather than index keeps this working if
+    // the nav is ever reordered.
+    for (const t of await page.locator('.mobileNav button').all()) {
+      if ((await t.innerText()).includes('بازی')) { await t.click(); break; }
+    }
+    await page.waitForTimeout(1000);
     for (const t of await page.locator('.clubTabs button').all()) {
       if ((await t.innerText()).includes('بازی')) { await t.click(); break; }
     }
-    await page.waitForTimeout(1200);
+    await page.waitForTimeout(1600);
     check('games hub', await audit());
 
     const tiles = await page.locator('.gameTile').count();

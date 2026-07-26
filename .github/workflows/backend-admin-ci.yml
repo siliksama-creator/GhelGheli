@@ -6,6 +6,7 @@ on:
     paths:
       - 'backend/**'
       - 'admin/**'
+      - 'userweb/**'
       - '.github/workflows/backend-admin-ci.yml'
   pull_request:
 
@@ -31,3 +32,30 @@ jobs:
         with: { node-version: 22 }
       - run: npm install
       - run: npm run build
+
+  # The user web app had NO job at all, which is how a build that compiled
+  # but rendered a blank page (missing Avatar component) reached production,
+  # and how the Tahoma font regression survived for so long. A `vite build`
+  # is not proof: JSX identifiers resolve at RUNTIME, and CSS never fails a
+  # build. These two steps open the real app in a real browser.
+  userweb:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: userweb } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Serve the built app
+        run: npx vite preview --port 4173 &
+      - name: Wait for the preview server
+        run: npx wait-on http://localhost:4173 --timeout 60000
+      # Without a token this covers the login screen only — enough to catch a
+      # missing @font-face, a synthetic bold or a render crash. The full
+      # logged-in walk runs against production after each deploy.
+      - name: Typography regression
+        run: node tool/typography.mjs http://localhost:4173
+      - name: Render smoke test
+        run: node tool/smoke.mjs http://localhost:4173

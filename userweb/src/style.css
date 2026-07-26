@@ -104,7 +104,12 @@
 .gameTile .gEmoji { font-size: 34px; }
 .gameTile b { font-size: 15px; }
 .gameTile small { opacity: .7; font-size: 12px; }
-.gameTile i { font-style: normal; font-size: 11px; color: var(--accent); margin-top: 4px; }
+/* Was 11px — genuinely hard to read on a phone, and it is the line that
+   tells the player whether a bot is involved, so it matters. */
+.gameTile i {
+  font-style: normal; font-size: var(--fs-xs); font-weight: 700;
+  color: var(--accent); margin-top: 5px; line-height: 1.4;
+}
 
 .gameHead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .gameHead h2 { margin: 0; flex: 1; }
