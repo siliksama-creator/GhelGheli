@@ -66,7 +66,11 @@
   /* A real type scale (1.2 minor-third), fluid between phone and desktop.
      Everything was hand-picked pixel values before, which is exactly why the
      hierarchy looked arbitrary. */
-  --fs-xs: clamp(11px, 0.68rem + 0.1vw, 12.5px);
+  /* Floor raised to 12px: below that Persian diacritics and the dots under
+     ب/پ/ج stop resolving on a phone. The typography test enforces 11.5px as
+     the hard minimum, and clamp()'s lower bound is what a 360px screen
+     actually gets. */
+  --fs-xs: clamp(12px, 0.7rem + 0.1vw, 13px);
   --fs-sm: clamp(12.5px, 0.76rem + 0.12vw, 14px);
   --fs-base: clamp(14.5px, 0.88rem + 0.14vw, 16px);
   --fs-lg: clamp(16.5px, 1rem + 0.2vw, 18.5px);
