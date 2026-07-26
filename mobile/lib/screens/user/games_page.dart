@@ -6,7 +6,7 @@ import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import 'games/connect4_board.dart';
 import 'games/reversi_board.dart';
-import 'games/snakes_board.dart';
+import 'games/memory_board.dart';
 
 class _GameEntry {
   const _GameEntry(
@@ -20,8 +20,8 @@ class _GameEntry {
 }
 
 const _games = <_GameEntry>[
-  _GameEntry('snakes', 'مار و پله', 'دو تاس بریز، هوشمندانه انتخاب کن', '🐍',
-      Color(0xFFA855F7), 'assets/games/snakes.webp'),
+  _GameEntry('memory', 'جفت‌یاب', 'جفت‌ها را به خاطر بسپار و ببر', '🃏',
+      Color(0xFFA855F7), 'assets/games/memory.webp'),
   _GameEntry('connect4', 'چهار در یک ردیف', 'چهارتا رو ردیف کن', '🔴',
       Color(0xFFF59E0B), 'assets/games/connect4.webp'),
   _GameEntry('reversi', 'اتللو', 'مهره‌ها را برگردان', '⚫', Color(0xFF34D399),
@@ -44,8 +44,8 @@ class _GamesHubPageState extends State<GamesHubPage> {
   @override
   Widget build(BuildContext context) {
     switch (_active) {
-      case 'snakes':
-        return SnakesScreen(api: widget.api, onBack: _back);
+      case 'memory':
+        return MemoryScreen(api: widget.api, onBack: _back);
       case 'connect4':
         return Connect4Screen(api: widget.api, onBack: _back);
       case 'reversi':

@@ -20,143 +20,168 @@ const play = (rules, state, moves, start = 'X') => {
   return state;
 };
 
-console.log('\n== snakes & ladders ==');
+console.log('\n== memory (جفت‌یاب) ==');
 {
-  const r = RULES.snakes;
+  const r = RULES.memory;
   let s = r.create();
-  ok(s.pos.X === 0 && s.pos.O === 0, 'both players start off-board');
-  ok(s.size === 100, '100 squares');
+  ok(s.deck.length === 16, '16 cards');
+  ok(new Set(s.deck).size === 8, '8 distinct faces');
+  ok(s.deck.every(f => s.deck.filter(x => x === f).length === 2), 'every face appears exactly twice');
+  ok(s.matched.every(m => m === null) && s.scores.X === 0, 'clean starting board');
 
-  // Two dice are offered and only legal ones are playable.
-  s.dice = [3, 5];
-  ok(r.isValidMove(s, 0, 'X') && r.isValidMove(s, 1, 'X'), 'both dice playable early');
-  ok(!r.isValidMove(s, 2, 'X') && !r.isValidMove(s, 9, 'X'), 'invalid die index rejected');
+  // SECURITY: the client must never receive the hidden deck.
+  const view = r.decorate(s, 'X');
+  ok(view.cards.every(c => c.face === null), 'face-down cards hide their value');
+  ok(view.deck === undefined && view._seen === undefined, 'deck and bot memory are not serialised');
+  ok(view.playable.length === 16, 'all cards playable at the start');
 
-  // Exact finish required — overshooting is illegal.
-  s = r.create(); s.pos.X = 97; s.dice = [3, 5];
-  ok(r.isValidMove(s, 0, 'X'), 'exact roll to 100 allowed');
-  ok(!r.isValidMove(s, 1, 'X'), 'overshooting 100 rejected');
-  r.applyMove(s, 0, 'X');
-  ok(s.pos.X === 100 && r.result(s) === 'X', 'landing exactly on 100 wins');
-
-  // Ladder (4 -> 14).
-  s = r.create(); s.pos.X = 1; s.dice = [3, 1];
-  r.applyMove(s, 0, 'X');
-  ok(s.pos.X === 14 && s.event === 'ladder', 'ladder at 4 lifts to 14');
-  ok(s.safe.X === 14, 'ladder top becomes the fallback point');
-
-  // Snake (17 -> 7).
-  s = r.create(); s.pos.X = 14; s.dice = [3, 1];
-  r.applyMove(s, 0, 'X');
-  ok(s.pos.X === 7 && s.event === 'snake', 'snake at 17 drops to 7');
-
-  // Bump: landing on the opponent sends them to their fallback.
-  s = r.create(); s.pos.X = 10; s.pos.O = 12; s.safe.O = 8; s.dice = [2, 1];
-  r.applyMove(s, 0, 'X');
-  ok(s.pos.O === 8 && s.event === 'bump', 'opponent bumped back to their safe square');
-
-  // Six grants another turn (capped).
-  s = r.create(); s.dice = [6, 1];
-  r.applyMove(s, 0, 'X');
-  ok(r.nextTurn(s, 'X') === 'X', 'rolling a 6 keeps the turn');
-  ok(s.dice !== null, 'fresh dice issued for the extra turn');
-
-  // The cap prevents an endless chain of sixes.
+  // Flipping one card reveals only that card.
   s = r.create();
-  let sixes = 0;
-  for (let i = 0; i < 10; i++) {
-    s.dice = [6, 6];
-    if (s.pos.X + 6 > 100) break;
-    r.applyMove(s, 0, 'X');
-    if (r.nextTurn(s, 'X') !== 'X') break;
-    sixes++;
-  }
-  ok(sixes <= 3, `extra turns are capped (${sixes} chained)`);
+  r.applyMove(s, 0, 'X');
+  ok(r.decorate(s, 'X').cards[0].face === s.deck[0], 'flipped card is revealed');
+  ok(r.decorate(s, 'X').cards.filter(c => c.face).length === 1, 'only the flipped card is revealed');
+  ok(r.nextTurn(s, 'X') === 'X', 'same player flips the second card');
 
-  // Bot must pick the winning die when one exists.
-  s = r.create(); s.pos.X = 96; s.dice = [4, 2];
-  ok(r.botMove(s, 'X') === 0, 'bot takes the exact winning roll');
+  // A matching pair scores and keeps the turn.
+  s = r.create();
+  const face = s.deck[0];
+  const twin = s.deck.findIndex((f, i) => i !== 0 && f === face);
+  r.applyMove(s, 0, 'X');
+  r.applyMove(s, twin, 'X');
+  ok(s.scores.X === 1, 'match scores a point');
+  ok(s.matched[0] === 'X' && s.matched[twin] === 'X', 'both cards are claimed');
+  ok(s.lastResult === 'match', 'match reported');
+  ok(r.nextTurn(s, 'X') === 'X', 'a match earns another turn');
+  ok(!r.isValidMove(s, 0), 'a claimed card cannot be flipped again');
 
-  // Bot prefers a ladder over a plain step (1 + 3 = 4 -> 14).
-  s = r.create(); s.pos.X = 1; s.dice = [3, 2];
-  ok(r.botMove(s, 'X') === 0, 'bot prefers the ladder');
+  // A miss hands the turn over and leaves the cards visible until next flip.
+  s = r.create();
+  const a0 = 0;
+  const b0 = s.deck.findIndex(f => f !== s.deck[0]);
+  r.applyMove(s, a0, 'X');
+  r.applyMove(s, b0, 'X');
+  ok(s.lastResult === 'miss', 'mismatch reported');
+  ok(s.scores.X === 0, 'no point for a miss');
+  ok(r.nextTurn(s, 'X') === 'O', 'a miss passes the turn');
+  ok(r.decorate(s, 'O').cards.filter(c => c.up).length === 2, 'missed pair stays visible for the opponent');
+  r.applyMove(s, 2, 'O');
+  ok(s.flipped.length === 1, 'the stale pair clears on the next flip');
 
-  // Bot avoids a snake when it has a choice (14 + 3 = 17 -> 7).
-  s = r.create(); s.pos.X = 14; s.dice = [3, 1];
-  ok(r.botMove(s, 'X') === 1, 'bot avoids the snake');
+  // Winner is whoever holds more pairs.
+  s = r.create();
+  s.matched = Array(16).fill('X');
+  s.scores = { X: 5, O: 3 };
+  ok(r.result(s) === 'X', 'majority of pairs wins');
+  s.scores = { X: 4, O: 4 };
+  ok(r.result(s) === 'DRAW', 'equal pairs is a draw');
+  s.matched[0] = null;
+  ok(r.result(s) === null, 'game is not over while a card remains');
 
-  // Full self-play must always terminate with a winner.
-  let finished = 0, crashed = 0;
-  for (let g = 0; g < 60; g++) {
-    const st = r.create();
-    let turn = 'X', guard = 0;
-    try {
-      while (!r.result(st) && guard++ < 4000) {
-        const mv = r.botMove(st, turn);
-        if (mv === null) { st.dice = null; turn = r.nextTurn(st, turn); continue; }
-        r.applyMove(st, mv, turn);
-        if (r.result(st)) break;
-        turn = r.nextTurn(st, turn);
-      }
-      if (r.result(st)) finished++;
-    } catch { crashed++; }
-  }
-  ok(crashed === 0, `no crashes in 60 self-play games (${crashed})`);
-  ok(finished === 60, `all 60 games reached a winner (${finished})`);
+  // Bot: completes a pair it has just seen.
+  s = r.create();
+  const f0 = s.deck[0];
+  const t0 = s.deck.findIndex((f, i) => i !== 0 && f === f0);
+  s._seen = { 0: f0, [t0]: f0 };
+  ok(r.botMove(s, 'O') === 0 || r.botMove(s, 'O') === t0, 'bot takes a remembered pair');
+  // ...and finishes it on the second flip.
+  r.applyMove(s, 0, 'O');
+  ok(r.botMove(s, 'O') === t0, 'bot completes the pair it started');
 
-  // REGRESSION: the endgame used to deadlock. When both players sat near 100
-  // and neither could use either die, nextTurn handed the turn back to the
-  // same player with dice=null forever — the game froze in ~18% of matches
-  // and users reported it as "the connection dropped".
-  {
-    let frozen = 0;
-    for (let g = 0; g < 400; g++) {
-      const st = r.create();
-      let turn = 'X', guard = 0;
-      while (!r.result(st) && guard++ < 3000) {
-        const playable = [0, 1].filter(i => r.isValidMove(st, i, turn));
-        if (playable.length === 0) { frozen++; break; }
-        r.applyMove(st, r.botMove(st, turn), turn);
-        if (r.result(st)) break;
-        turn = r.nextTurn(st, turn);
-      }
-    }
-    ok(frozen === 0, `no endgame deadlock in 400 games (${frozen} frozen)`);
-  }
-
-  // The player on move must ALWAYS have at least one playable die.
+  // Bot never picks an illegal card.
   {
     let bad = 0;
     for (let g = 0; g < 200; g++) {
       const st = r.create();
       let turn = 'X', guard = 0;
-      while (!r.result(st) && guard++ < 2000) {
-        if (![0, 1].some(i => r.isValidMove(st, i, turn))) { bad++; break; }
-        r.applyMove(st, r.botMove(st, turn), turn);
+      while (!r.result(st) && guard++ < 400) {
+        const mv = r.botMove(st, turn);
+        if (mv === null) break;
+        if (!r.isValidMove(st, mv, turn)) { bad++; break; }
+        r.applyMove(st, mv, turn);
         if (r.result(st)) break;
         turn = r.nextTurn(st, turn);
       }
     }
-    ok(bad === 0, 'the player on move always has a legal die');
+    ok(bad === 0, 'bot always plays a legal card');
   }
 
-  // Board sanity: no square is both a chute head and a ladder foot, and no
-  // chute lands the player straight onto another one.
+  // Every self-play game terminates with all pairs claimed.
   {
-    const heads = Object.keys(r.SNAKES).map(Number);
-    const feet = Object.keys(r.LADDERS).map(Number);
-    ok(!feet.some(f => heads.includes(f)), 'no square is both a snake and a ladder');
-    const dests = [...Object.values(r.SNAKES), ...Object.values(r.LADDERS)];
-    ok(!dests.some(d => r.SNAKES[d] || r.LADDERS[d]), 'no chained chutes');
-    ok(!r.LADDERS[100] && !r.SNAKES[100] && !r.LADDERS[1] && !r.SNAKES[1],
-      'start and finish squares are clear');
+    let done = 0;
+    for (let g = 0; g < 120; g++) {
+      const st = r.create();
+      let turn = 'X', guard = 0;
+      while (!r.result(st) && guard++ < 400) {
+        const mv = r.botMove(st, turn);
+        if (mv === null) break;
+        r.applyMove(st, mv, turn);
+        if (r.result(st)) break;
+        turn = r.nextTurn(st, turn);
+      }
+      if (r.result(st) && st.matched.every(m => m !== null)) done++;
+    }
+    ok(done === 120, `all 120 self-play games completed (${done})`);
   }
 
-  // decorate() must tell each client which dice it may actually play.
-  s = r.create(); s.pos.X = 98; s.dice = [1, 5];
-  const d = r.decorate(s, 'X');
-  ok(Array.isArray(d.playable) && d.playable.length === 1 && d.playable[0] === 0,
-    'decorate exposes only the legal die');
+  // REGRESSION: a client that always picks the FIRST legal card (the timeout
+  // autoplay does exactly this) used to cycle the same few cards forever and
+  // the match never ended — it looked like the game had frozen. A hard flip
+  // ceiling now guarantees termination for any strategy.
+  {
+    const strategies = {
+      'lowest index': pl => pl[0],
+      'highest index': pl => pl[pl.length - 1],
+      random: pl => pl[Math.floor(Math.random() * pl.length)],
+    };
+    for (const [name, pick] of Object.entries(strategies)) {
+      let done = 0;
+      for (let g = 0; g < 100; g++) {
+        const st = r.create();
+        let turn = 'X', guard = 0;
+        while (!r.result(st) && guard++ < 3000) {
+          const pl = [...Array(16).keys()].filter(k => r.isValidMove(st, k, turn));
+          if (!pl.length) break;
+          r.applyMove(st, pick(pl), turn);
+          if (r.result(st)) break;
+          turn = r.nextTurn(st, turn);
+        }
+        if (r.result(st)) done++;
+      }
+      ok(done === 100, `"${name}" strategy always terminates (${done}/100)`);
+    }
+  }
+
+  // Every open card must stay reachable: hiding both halves of a pair would
+  // make the board unwinnable (an earlier anti-stall attempt did exactly that).
+  {
+    const st = r.create();
+    let turn = 'X', guard = 0, unreachable = 0;
+    while (!r.result(st) && guard++ < 600) {
+      const open = st.matched.map((m, i) => (m === null ? i : -1)).filter(i => i >= 0);
+      const legal = open.filter(i => r.isValidMove(st, i, turn));
+      // Allow the 1-2 cards currently face-up to be excluded, nothing more.
+      if (legal.length < open.length - 2) unreachable++;
+      r.applyMove(st, r.botMove(st, turn), turn);
+      if (r.result(st)) break;
+      turn = r.nextTurn(st, turn);
+    }
+    ok(unreachable === 0, 'open cards always remain reachable');
+  }
+
+  // The two scores must always add up to the 8 available pairs.
+  {
+    const st = r.create();
+    let turn = 'X', guard = 0;
+    while (!r.result(st) && guard++ < 400) {
+      const mv = r.botMove(st, turn);
+      if (mv === null) break;
+      r.applyMove(st, mv, turn);
+      if (r.result(st)) break;
+      turn = r.nextTurn(st, turn);
+    }
+    ok(st.scores.X + st.scores.O === 8, 'scores always total 8 pairs');
+    ok(st.totalFlips > 0 && st.totalFlips < 200, `flip count stays sane (${st.totalFlips})`);
+  }
 }
 
 console.log('\n== connect4 ==');

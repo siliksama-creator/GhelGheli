@@ -6,15 +6,15 @@ import { io } from 'socket.io-client';
 import { play, isEnabled, setEnabled } from './gameAudio.js';
 
 const GAMES = [
-  { id: 'snakes', title: 'مار و پله', emoji: '🐍', desc: 'دو تاس بریز، هوشمندانه انتخاب کن', accent: '#A855F7' },
+  { id: 'memory', title: 'جفت‌یاب', emoji: '🃏', desc: 'جفت‌ها را به خاطر بسپار و ببر', accent: '#A855F7' },
   { id: 'connect4', title: 'چهار در یک ردیف', emoji: '🔴', desc: 'چهارتا رو ردیف کن', accent: '#F59E0B' },
   { id: 'reversi', title: 'اتللو', emoji: '⚫', desc: 'مهره‌ها را برگردان', accent: '#34D399' },
 ];
 
-const MOVE_SFX = { snakes: 'drop', connect4: 'drop', reversi: 'flip' };
+const MOVE_SFX = { memory: 'flip', connect4: 'drop', reversi: 'flip' };
 
 const SYMBOLS = {
-  snakes: { X: '🟣', O: '🔵' },
+  memory: { X: '🟣', O: '🔵' },
   connect4: { X: '🔴', O: '🟡' },
   reversi: { X: '⚫', O: '⚪' },
 };
@@ -154,130 +154,41 @@ function resultText(winner, me) {
   return winner === me ? 'شما بردید! 🎉' : 'شما باختید';
 }
 
-// Boustrophedon numbering: 1 bottom-left, rows alternate direction.
-function squareAt(row, col) {
-  const fromBottom = 9 - row;
-  const ltr = fromBottom % 2 === 0;
-  return fromBottom * 10 + (ltr ? col + 1 : 10 - col);
-}
-
-const DIE_FACE = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
-
 const EVENT_TEXT = {
-  ladder: '🪜 نردبان! بالا رفتی',
-  snake: '🐍 مار! پایین افتادی',
-  bump: '💥 حریف را به عقب زدی',
-  blocked: '⛔ حرکت ممکن نبود، نوبت رد شد',
-  win: '🏁 رسیدی!',
+  match: '✅ جفت شد! دوباره بزن',
+  miss: '❌ جفت نشد',
 };
 
-function SnakesBoard({ g }) {
-  const pos = g.state.pos || { X: 0, O: 0 };
-  const ladders = g.state.ladders || {};
-  const snakes = g.state.snakes || {};
-  const dice = g.state.dice || [];
+function MemoryBoard({ g }) {
+  const cards = g.state.cards || [];
   const playable = g.state.playable || [];
-
-  // Percentage centre of a square, for absolutely-positioned sprites.
-  const pct = (sq) => {
-    const i = Math.min(Math.max(sq, 1), 100) - 1;
-    const rb = Math.floor(i / 10);
-    const w = i % 10;
-    const col = rb % 2 === 0 ? w : 9 - w;
-    return { x: col * 10 + 5, y: (9 - rb) * 10 + 5 };
-  };
-
-  // A ladder is the sprite stretched along the vector and rotated; a snake is
-  // a curved body with the head sprite pinned at its top square.
-  const chutes = [];
-  Object.entries(ladders).forEach(([f, t]) => {
-    const a = pct(+f), b = pct(+t);
-    const dx = b.x - a.x, dy = b.y - a.y;
-    const len = Math.hypot(dx, dy);
-    const ang = Math.atan2(dy, dx) * 180 / Math.PI + 90;
-    chutes.push(
-      <img key={'l' + f} src="/games/ladder.png" alt="" className="ladderSprite"
-        style={{
-          left: `${(a.x + b.x) / 2}%`, top: `${(a.y + b.y) / 2}%`,
-          width: '6.2%', height: `${len}%`,
-          transform: `translate(-50%,-50%) rotate(${ang}deg)`,
-        }} />,
-    );
-  });
-  Object.entries(snakes).forEach(([f, t]) => {
-    const a = pct(+f), b = pct(+t);
-    const dx = b.x - a.x, dy = b.y - a.y;
-    const len = Math.hypot(dx, dy) || 1;
-    const nx = -dy / len * 7, ny = dx / len * 7;
-    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-    const ang = Math.atan2(dy, dx) * 180 / Math.PI - 90;
-    chutes.push(
-      <svg key={'sv' + f} className="snakeSvg" viewBox="0 0 100 100" preserveAspectRatio="none">
-        <path d={`M ${a.x} ${a.y} Q ${mx + nx} ${my + ny} ${b.x} ${b.y}`} className="snakeOutline" />
-        <path d={`M ${a.x} ${a.y} Q ${mx + nx} ${my + ny} ${b.x} ${b.y}`} className="snakeBody" />
-      </svg>,
-    );
-    chutes.push(
-      <img key={'st' + f} src="/games/snake_tail.png" alt="" className="snakeTailSprite"
-        style={{ left: `${b.x}%`, top: `${b.y}%` }} />,
-    );
-    chutes.push(
-      <img key={'sh' + f} src="/games/snake_head.png" alt="" className="snakeHeadSprite"
-        style={{ left: `${a.x}%`, top: `${a.y}%`,
-          transform: `translate(-50%,-50%) rotate(${ang}deg)` }} />,
-    );
-  });
+  const cols = g.state.cols || 4;
+  const result = g.state.lastResult;
 
   return (
-    <div className="snakesWrap">
-      <div className="snakesBoard">
-        {Array.from({ length: 10 }, (_, row) =>
-          Array.from({ length: 10 }, (_, col) => {
-            const n = squareAt(row, col);
-            const cls = [
-              'sqr',
-              ladders[n] ? 'ladder' : '',
-              snakes[n] ? 'snake' : '',
-              n === 100 ? 'finish' : '',
-            ].join(' ');
-            return (
-              <div key={n} className={cls}>
-                <span className="sqn">{n === 100 ? '🏁' : n}</span>
-              </div>
-            );
-          }),
-        )}
-        <div className="chuteLayer">{chutes}</div>
-        {['X', 'O'].map((sym) => {
-          const p = pct(pos[sym] || 1);
-          const mine = g.me === sym;
-          if (!pos[sym]) return null;
+    <div className="memWrap">
+      {result && EVENT_TEXT[result] && (
+        <p className={`memEvent ${result}`}>{EVENT_TEXT[result]}</p>
+      )}
+      <div className="memGrid" style={{ '--cols': cols }}>
+        {cards.map((c, i) => {
+          const revealed = c.up || c.matched;
+          const mine = c.matched && c.matched === g.me;
+          const can = g.myTurn && playable.includes(i);
           return (
-            <div key={sym}
-              className={`pawn ${sym === 'X' ? 'px' : 'po'} ${mine ? 'mine' : ''}`}
-              style={{ left: `${p.x + (sym === 'X' ? -2 : 2)}%`, top: `${p.y}%` }}>
-              {mine && <b>شما</b>}
-            </div>
+            <button
+              key={i}
+              className={`memCard ${revealed ? 'up' : ''} ${c.matched ? (mine ? 'mine' : 'theirs') : ''} ${can ? 'can' : ''}`}
+              disabled={!can}
+              onClick={() => g.move(i)}
+            >
+              <span className="inner">
+                <span className="back">⚽</span>
+                <span className="front">{c.face || ''}</span>
+              </span>
+            </button>
           );
         })}
-      </div>
-
-      {g.state.event && EVENT_TEXT[g.state.event] && (
-        <p className="snakeEvent">{EVENT_TEXT[g.state.event]}</p>
-      )}
-
-      <p className="hint">{g.myTurn ? 'یک تاس را انتخاب کن' : 'نوبت حریف...'}</p>
-      <div className="diceRow">
-        {dice.map((d, i) => (
-          <button
-            key={i}
-            className={`die ${g.myTurn && playable.includes(i) ? 'on' : ''}`}
-            disabled={!g.myTurn || !playable.includes(i)}
-            onClick={() => g.move(i)}
-          >
-            {DIE_FACE[d] || d}
-          </button>
-        ))}
       </div>
     </div>
   );
@@ -318,7 +229,7 @@ function ReversiBoard({ g }) {
   );
 }
 
-const BOARDS = { snakes: SnakesBoard, connect4: Connect4Board, reversi: ReversiBoard };
+const BOARDS = { memory: MemoryBoard, connect4: Connect4Board, reversi: ReversiBoard };
 
 function Seat({ g, sym, symbol, openProfile }) {
   const info = g.players?.[symbol];

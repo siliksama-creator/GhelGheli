@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BarChart3, Bell, CreditCard, Gift, MessageCircle, LifeBuoy, Settings, Shield, Trophy, Users } from 'lucide-react';
+import { BarChart3, Bell, CreditCard, Gift, MessageCircle, LifeBuoy, Settings, Shield, Trophy, Users, Gamepad2 } from 'lucide-react';
 
 import './theme.css';
 import './styles.css';
@@ -19,6 +19,7 @@ import { UsersPage } from './pages/users.jsx';
 import { ChatModerationPage } from './pages/chat-moderation.jsx';
 import { SupportPage } from './pages/support.jsx';
 import { NotificationsPage } from './pages/notifications.jsx';
+import { GameRewardsPage } from './pages/game-rewards.jsx';
 import { SettingsPage } from './pages/settings.jsx';
 import { AdminsPage } from './pages/admins.jsx';
 
@@ -29,6 +30,7 @@ const NAV = [
   ['league', 'لیگ ماهانه', Trophy, LeaguePage],
   ['users', 'کاربران', Users, UsersPage],
   ['chat', 'چت', MessageCircle, ChatModerationPage],
+  ['game-rewards', 'امتیاز بازی', Gamepad2, GameRewardsPage],
   ['support', 'پشتیبانی', LifeBuoy, SupportPage],
   ['notifications', 'اطلاعیه‌ها', Bell, NotificationsPage],
   ['settings', 'تنظیمات', Settings, SettingsPage],

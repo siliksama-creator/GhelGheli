@@ -19,6 +19,7 @@ const { audit } = require('./services/auditService');
 const { createNotification } = require('./services/notificationService');
 const { ensureActiveSeason, addLeaguePoints, getLeaderboard, closeActiveSeason } = require('./services/leagueService');
 const { optimizeUpload, kb } = require('./services/imageService');
+const { getGameRewardSettings, saveGameRewardSettings } = require('./services/gameRewardService');
 
 // Fail fast in production if the JWT secret was never configured — running
 // with the 'dev-secret' fallback would let anyone forge valid user/admin
@@ -809,6 +810,28 @@ app.patch('/api/admin/chat/pinned', adminAuth, requireRole('support'), asyncHand
   // Live-update everyone who currently has the chat room open.
   io.emit('chat:pinned', value);
   res.json({ message: active ? 'پیام سنجاق شد' : 'سنجاق برداشته شد', ...value });
+}));
+
+// ── Game reward settings (online human-vs-human matches only) ──
+app.get('/api/admin/settings/games', adminAuth, asyncHandler(async (req, res) => {
+  res.json(await getGameRewardSettings());
+}));
+app.patch('/api/admin/settings/games', adminAuth, requireRole(), asyncHandler(async (req, res) => {
+  const value = await saveGameRewardSettings(req.body || {}, req.admin.id);
+  await audit(req.admin.id, 'update_game_rewards', 'app_settings', null, req.body.reason || null, value);
+  res.json({ message: 'تنظیمات امتیاز بازی‌ها ذخیره شد', ...value });
+}));
+
+// Recent scoring history, so support can answer "why did my points change?".
+app.get('/api/admin/games/results', adminAuth, asyncHandler(async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT r.*, u.nickname, u.mobile, o.nickname AS opponent_nickname
+     FROM game_results r
+     JOIN users u ON u.id = r.user_id
+     LEFT JOIN users o ON o.id = r.opponent_user_id
+     ORDER BY r.created_at DESC LIMIT 100`,
+  );
+  res.json(rows);
 }));
 
 app.get('/api/admin/settings/sms', adminAuth, asyncHandler(async (req, res) => {

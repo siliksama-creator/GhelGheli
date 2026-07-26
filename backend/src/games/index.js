@@ -2,20 +2,21 @@
 // here; the engine and the client hub pick it up automatically.
 const attachGames = require('./engine');
 
-const snakes = require('./rules/snakes');
+const memory = require('./rules/memory');
 const connect4 = require('./rules/connect4');
 const reversi = require('./rules/reversi');
 
-// Tic-tac-toe was retired: a solved 3x3 game has no replay value once the
-// bot plays perfectly. Snakes & Ladders replaces it with a two-dice
-// "choose your move" variant that stays tense to the last square.
-const RULES = { snakes, connect4, reversi };
+// Snakes & Ladders was retired: keeping the board legible needed constant
+// artwork tuning, and it was ultimately dice-driven. جفت‌یاب (memory) needs
+// ZERO image assets — the whole board is emoji + colour — while showcasing
+// Flutter's 3D card-flip, and it rewards real skill (a match keeps your turn).
+const RULES = { memory, connect4, reversi };
 
 // Public catalogue served over REST so the app never hardcodes the list.
 const CATALOG = [
   {
-    id: 'snakes', title: 'مار و پله', emoji: '🐍',
-    subtitle: 'دو تاس بریز، هوشمندانه انتخاب کن', accent: '#A855F7', minutes: 6,
+    id: 'memory', title: 'جفت‌یاب', emoji: '🃏',
+    subtitle: 'جفت‌ها را به خاطر بسپار و ببر', accent: '#A855F7', minutes: 4,
   },
   {
     id: 'connect4', title: 'چهار در یک ردیف', emoji: '🔴',

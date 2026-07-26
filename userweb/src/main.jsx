@@ -1,4 +1,4 @@
-import React,{useEffect,useState}from'react';
+import React,{useEffect,useRef,useState}from'react';
 import{createRoot}from'react-dom/client';
 import GamesHub from './games.jsx';
 import Support from './support.jsx';
@@ -170,9 +170,41 @@ function Club({token,openProfile}){
 }
 
 function Chat({token,openProfile}){
-  const[messages,setMessages]=useState([]),[stickers,setStickers]=useState([]),[text,setText]=useState(''),[err,setErr]=useState(''),[reply,setReply]=useState(null),[canned,setCanned]=useState([]),[cannedOpen,setCannedOpen]=useState(false),[pinned,setPinned]=useState(null);
+  const[messages,setMessages]=useState([]),[stickers,setStickers]=useState([]),[text,setText]=useState(''),[err,setErr]=useState(''),[reply,setReply]=useState(null),[canned,setCanned]=useState([]),[cannedOpen,setCannedOpen]=useState(false),[pinned,setPinned]=useState(null),[cooldown,setCooldown]=useState(0),[cdLeft,setCdLeft]=useState(0);
+  const boxRef=useRef(null); const lastCount=useRef(0);
   const emojis=['😀','😍','🔥','⚽','🏆','👏','😂','😎','❤️','👍','🎉','💚','🥇','✨','🙌','😜'];
-  async function load(){try{const cfg=await req('/api/chat/config','GET',null,token);setPinned(cfg.pinned||null);setMessages(await req('/api/chat/messages','GET',null,token));setStickers(await req('/api/chat/stickers','GET',null,token));setCanned(await req('/api/chat/canned-messages','GET',null,token));setErr('')}catch(e){setErr(e.message)}}
+  async function load(){
+    try{
+      const cfg=await req('/api/chat/config','GET',null,token);
+      setPinned(cfg.pinned||null);
+      if(typeof cfg.messageCooldownSeconds==='number') setCooldown(cfg.messageCooldownSeconds);
+      const msgs=await req('/api/chat/messages','GET',null,token);
+      // Auto-scroll only when a NEW message arrives, and only if the reader is
+      // already near the bottom — yanking the view while someone reads history
+      // would be hostile.
+      const grew=msgs.length>lastCount.current;
+      lastCount.current=msgs.length;
+      setMessages(msgs);
+      setStickers(await req('/api/chat/stickers','GET',null,token));
+      setCanned(await req('/api/chat/canned-messages','GET',null,token));
+      setErr('');
+      if(grew) scrollDown();
+    }catch(e){setErr(e.message)}
+  }
+  function scrollDown(force){
+    requestAnimationFrame(()=>{
+      const el=boxRef.current; if(!el) return;
+      const near=el.scrollHeight-el.scrollTop-el.clientHeight<260;
+      if(force||near) el.scrollTo({top:el.scrollHeight,behavior:'smooth'});
+    });
+  }
+  // Visible cooldown so the send button explains the wait instead of the
+  // server silently rejecting the message.
+  useEffect(()=>{
+    if(cdLeft<=0) return;
+    const t=setTimeout(()=>setCdLeft(c=>c-1),1000);
+    return ()=>clearTimeout(t);
+  },[cdLeft]);
   // Poll only while the tab is visible, and at a calmer cadence. The old
   // 3-second interval kept running on a hidden/background tab, hammering the
   // API and draining mobile battery for updates nobody could see.
@@ -186,15 +218,27 @@ function Chat({token,openProfile}){
     document.addEventListener('visibilitychange',onVis);
     return ()=>{ stop(); document.removeEventListener('visibilitychange',onVis); };
   },[]);
-  async function send(stickerId=null, msgText=text){try{if(!stickerId&&!msgText.trim())return;await req('/api/chat/messages','POST',{message:msgText,stickerId,replyTo:reply?.id},token);setText('');setReply(null);setCannedOpen(false);load()}catch(e){setErr(e.message)}}
+  async function send(stickerId=null, msgText=text){
+    if(cdLeft>0) return;
+    try{
+      if(!stickerId&&!msgText.trim())return;
+      await req('/api/chat/messages','POST',{message:msgText,stickerId,replyTo:reply?.id},token);
+      setText('');setReply(null);setCannedOpen(false);
+      setCdLeft(cooldown);
+      await load();
+      scrollDown(true);   // always show our own message
+    }catch(e){setErr(e.message)}
+  }
   async function like(m){try{await req(`/api/chat/messages/${m.id}/like`,'POST',{},token);load()}catch(e){setErr(e.message)}}async function report(m){try{await req(`/api/chat/messages/${m.id}/report`,'POST',{},token);setErr('گزارش ثبت شد و برای مدیر ارسال می‌شود')}catch(e){setErr(e.message)}}
-  return <section className="card wide chatPage"><div className="sectionHead"><div><h2>چت روم قلقلی</h2><p>با هواداران دیگر گفتگو کن ⚽</p></div><span className="liveBadge">زنده</span></div>{pinned&&pinned.active&&pinned.text&&<div className="pinnedBanner" style={{'--pin':PIN_COLORS[pinned.accent]||PIN_COLORS.gold}}><span className="pinIcon">📌</span><div><b>اعلان مدیریت</b><p>{pinned.text}</p></div></div>}{err&&<p className="msg">{err}</p>}{reply&&<div className="replybar">در پاسخ به {reply.nickname||'کاربر'}: {reply.message_text}<button onClick={()=>setReply(null)}>×</button></div>}<div className="stickerTray">{stickers.map(st=><button key={st.id} onClick={()=>send(st.id)} title={st.title}><img src={asset(st.image_url)}/></button>)}{!stickers.length&&<span className="hint">استیکری هنوز توسط مدیر اضافه نشده است.</span>}</div><div className="chatbox">{messages.map(m=><div className="chatmsg" key={m.id}><img onClick={()=>openProfile(m.user_id)} src={m.profile_image_url?asset(m.profile_image_url):`/avatars/${m.profile_avatar_key||avatars[0]}`}/><div className="chatbody"><b onClick={()=>openProfile(m.user_id)} className="clickableText">{m.nickname||m.first_name||'کاربر'}</b>{m.reply_text&&<small className="reply">↩ {m.reply_nickname||'کاربر'}: {m.reply_text}</small>}{m.message_type==='sticker'&&m.sticker_url?<img className="stickerMsg" src={asset(m.sticker_url)}/>:<p>{m.message_text}</p>}<div className="chatActions"><button onClick={()=>setReply(m)}>ریپلای</button><button onClick={()=>like(m)}>❤ {fa(m.like_count)}</button><button onClick={()=>report(m)}>گزارش</button></div></div></div>)}</div><div className="sendDock">
+  return <section className="card wide chatPage"><div className="sectionHead"><div><h2>چت روم قلقلی</h2><p>با هواداران دیگر گفتگو کن ⚽</p></div><span className="liveBadge">زنده</span></div>{pinned&&pinned.active&&pinned.text&&<div className="pinnedBanner" style={{'--pin':PIN_COLORS[pinned.accent]||PIN_COLORS.gold}}><span className="pinIcon">📌</span><div><b>اعلان مدیریت</b><p>{pinned.text}</p></div></div>}{err&&<p className="msg">{err}</p>}{reply&&<div className="replybar">در پاسخ به {reply.nickname||'کاربر'}: {reply.message_text}<button onClick={()=>setReply(null)}>×</button></div>}<div className="stickerTray">{stickers.map(st=><button key={st.id} onClick={()=>send(st.id)} title={st.title}><img src={asset(st.image_url)}/></button>)}{!stickers.length&&<span className="hint">استیکری هنوز توسط مدیر اضافه نشده است.</span>}</div><div className="chatbox" ref={boxRef}>{messages.map(m=><div className="chatmsg" key={m.id}><img onClick={()=>openProfile(m.user_id)} src={m.profile_image_url?asset(m.profile_image_url):`/avatars/${m.profile_avatar_key||avatars[0]}`}/><div className="chatbody"><b onClick={()=>openProfile(m.user_id)} className="clickableText">{m.nickname||m.first_name||'کاربر'}</b>{m.reply_text&&<small className="reply">↩ {m.reply_nickname||'کاربر'}: {m.reply_text}</small>}{m.message_type==='sticker'&&m.sticker_url?<img className="stickerMsg" src={asset(m.sticker_url)}/>:<p>{m.message_text}</p>}<div className="chatActions"><button onClick={()=>setReply(m)}>ریپلای</button><button onClick={()=>like(m)}>❤ {fa(m.like_count)}</button><button onClick={()=>report(m)}>گزارش</button></div></div></div>)}</div><div className="sendDock">
   <button className="emojiBtn" onClick={() => setCannedOpen(!cannedOpen)}>💬 انتخاب پیام</button>
   {cannedOpen && <div className="cannedPopover">
     {canned.map((c, i) => <button key={i} onClick={() => { setText(c); setCannedOpen(false); }}>{c}</button>)}
   </div>}
   <input value={text} readOnly placeholder="یک پیام آماده انتخاب کنید..." onClick={() => setCannedOpen(true)} />
-  <button className="main" onClick={() => send(null, text)}>ارسال</button>
+  <button className="main" disabled={cdLeft>0} onClick={() => send(null, text)}>
+    {cdLeft>0 ? `${fa(cdLeft)} ثانیه` : 'ارسال'}
+  </button>
 </div></section>
 }
 function PublicProfile({token,userId,close}){const[u,setU]=useState(null),[err,setErr]=useState('');useEffect(()=>{req(`/api/users/${userId}/public`,'GET',null,token).then(setU).catch(e=>setErr(e.message))},[userId]);return <div className="modalShade" onClick={close}><div className="publicModal" onClick={e=>e.stopPropagation()}><button className="close" onClick={close}>×</button>{err&&<p className="msg">{err}</p>}{!u&&!err?<p>در حال بارگذاری...</p>:u&&<><div className="publicHead"><img src={u.profile_image_url?asset(u.profile_image_url):`/avatars/${u.profile_avatar_key||avatars[0]}`}/><div><h2>{u.nickname||'کاربر'}</h2><p>عضویت: {new Date(u.joined_at).toLocaleDateString('fa-IR')}</p><p>امتیاز کسب‌شده: {fa(u.lifetime_points)} | امتیاز فعلی: {fa(u.current_points)}</p></div></div><h3>کارت‌های ثبت‌شده</h3>{(!u.cards||!u.cards.length)&&<p className="hint">هنوز کارتی ثبت نکرده است.</p>}{(u.cards||[]).map(c=><div className="reward" key={c.card_type_id}><img src={asset(c.image_url)||'/avatars/avatar_1_football.png'}/><div><b>{c.name}</b><p>تعداد ثبت: {fa(c.registered_count)} — {fa(c.point_value)} امتیاز</p></div></div>)}<h3>جوایز دریافت‌شده</h3>{(!u.rewards||!u.rewards.length)&&<p className="hint">هنوز جایزه تاییدشده‌ای ندارد.</p>}{(u.rewards||[]).map((r,i)=><div className="reward" key={i}><img src={asset(r.image_url)||'/avatars/avatar_2_trophy.png'}/><div><b>{r.name}</b><p>{r.status}</p></div></div>)}</>}</div></div>}

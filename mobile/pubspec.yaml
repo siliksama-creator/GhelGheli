@@ -52,7 +52,6 @@ flutter:
   assets:
     - assets/brand/
     - assets/games/
-    - assets/games/pieces/
     - assets/sfx/
     - assets/avatars/
     - assets/icon/

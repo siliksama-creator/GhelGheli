@@ -7,6 +7,16 @@
 // plumbing — which is what keeps each game's file small and focused.
 const crypto = require('crypto');
 
+// Loaded lazily AND defensively: the pure game logic (and its dependency-free
+// tests) must never fail just because the database layer isn't installed.
+function rewardService() {
+  try {
+    return require('../services/gameRewardService');
+  } catch {
+    return null;
+  }
+}
+
 // How long we hunt for a REAL opponent before falling back to the bot. The
 // client shows this as a visible countdown so waiting feels intentional
 // rather than broken.
@@ -149,6 +159,32 @@ function finish(room, winner) {
   room.done = true;
   clearTimeout(room.botTimer);
   clearTimeout(room.turnTimer);
+
+  // Award points for a completed ONLINE match, then tell both players what
+  // they earned. Fire-and-forget with its own catch: a scoring hiccup must
+  // never stop the game from ending cleanly.
+  const rewards = rewardService();
+  const scoring = rewards
+    ? rewards.recordMatch({
+        gameId: room.gameId,
+        vsBot: room.vsBot,
+        winner,
+        players: room.players,
+      })
+    : Promise.resolve([]);
+  scoring
+    .then(applied => {
+      if (!applied.length) return;
+      for (const sym of ['X', 'O']) {
+        const sock = room.seats[sym];
+        const info = room.players?.[sym];
+        if (!sock || !sock.emit || !info) continue;
+        const mine = applied.find(a => a.userId === info.id);
+        if (mine) safeEmit(sock, 'game:points', mine, room);
+      }
+    })
+    .catch(e => console.error(`[games:${room.gameId}] reward failed:`, e.message));
+
   emitState(room, 'game:over', { winner });
   for (const sym of ['X', 'O']) {
     const s = room.seats[sym];
@@ -218,6 +254,8 @@ function startRoom(io, rules, gameId, a, b) {
     X: infoOf(a.user),
     O: b ? infoOf(b.user) : { id: 'bot', nickname: 'ربات هوشمند 🤖', isBot: true },
   };
+  // Kept on the room so finish() can attribute points to the right accounts.
+  room.players = players;
   armTurnClock(room);
   for (const sym of ['X', 'O']) {
     const sock = room.seats[sym];

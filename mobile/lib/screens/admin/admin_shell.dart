@@ -10,6 +10,7 @@ import 'admin_dashboard.dart';
 import 'admin_league.dart';
 import 'admin_notifications.dart';
 import 'admin_rewards.dart';
+import 'admin_game_rewards.dart';
 import 'admin_settings.dart';
 import 'admin_support.dart';
 import 'admin_users.dart';
@@ -45,6 +46,7 @@ class _AdminShellState extends State<AdminShell> {
     AdminLeague(api: widget.api),
     AdminUsers(api: widget.api),
     AdminChat(api: widget.api),
+    AdminGameRewards(api: widget.api),
     AdminSupport(api: widget.api),
     AdminNotifications(api: widget.api),
     AdminSettings(api: widget.api),
@@ -58,6 +60,7 @@ class _AdminShellState extends State<AdminShell> {
     'لیگ',
     'کاربران',
     'چت',
+    'امتیاز بازی',
     'پشتیبانی',
     'اطلاعیه‌ها',
     'تنظیمات',
@@ -70,6 +73,7 @@ class _AdminShellState extends State<AdminShell> {
     Icons.emoji_events_rounded,
     Icons.people_alt_rounded,
     Icons.chat_bubble_rounded,
+    Icons.sports_esports_rounded,
     Icons.support_agent_rounded,
     Icons.campaign_rounded,
     Icons.settings_rounded,

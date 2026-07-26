@@ -30,6 +30,15 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
   Map? _reply;
   String? _error;
   Map<String, dynamic>? _pinned;
+  // Auto-scroll: without a controller the list stayed pinned at the top and
+  // new messages appeared off-screen until the user scrolled manually.
+  final _scroll = ScrollController();
+  int _lastCount = 0;
+  // Server-enforced send cooldown, surfaced so the button explains itself
+  // instead of silently rejecting.
+  int _cooldownSeconds = 0;
+  int _cooldownLeft = 0;
+  Timer? _cooldownTimer;
   bool _loading = true;
 
   @override
@@ -46,6 +55,8 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
   @override
   void dispose() {
     stopPolling();
+    _cooldownTimer?.cancel();
+    _scroll.dispose();
     _text.dispose();
     super.dispose();
   }
@@ -56,10 +67,45 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
     if (_error != null) return;
     try {
       final m = await widget.api.get('/api/chat/messages');
-      if (mounted) setState(() => _messages = m);
+      if (!mounted) return;
+      final count = (m is List) ? m.length : 0;
+      final grew = count > _lastCount;
+      _lastCount = count;
+      setState(() => _messages = m);
+      if (grew) _scrollToBottom();
     } catch (_) {
       // Transient network blips shouldn't clear the visible conversation.
     }
+  }
+
+  /// Scrolls the conversation to the newest message.
+  ///
+  /// Only auto-scrolls when the user is already near the bottom — yanking the
+  /// view down while somebody is reading older messages would be hostile.
+  void _scrollToBottom({bool force = false}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scroll.hasClients) return;
+      final pos = _scroll.position;
+      final nearBottom = pos.maxScrollExtent - pos.pixels < 260;
+      if (!force && !nearBottom) return;
+      pos.animateTo(
+        pos.maxScrollExtent,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
+
+  /// Starts the visible countdown after a successful send.
+  void _startCooldown() {
+    if (_cooldownSeconds <= 0) return;
+    _cooldownTimer?.cancel();
+    setState(() => _cooldownLeft = _cooldownSeconds);
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) return t.cancel();
+      setState(() => _cooldownLeft--);
+      if (_cooldownLeft <= 0) t.cancel();
+    });
   }
 
   Future<void> _load() async {
@@ -69,6 +115,8 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
       if (mounted && pin is Map) {
         setState(() => _pinned = Map<String, dynamic>.from(pin));
       }
+      final cd = (cfg['messageCooldownSeconds'] as num?)?.toInt();
+      if (mounted && cd != null) setState(() => _cooldownSeconds = cd);
       if (cfg['eligible'] != true) {
         if (mounted) {
           setState(() {
@@ -94,9 +142,12 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
           _messages = m;
           _stickers = st;
           _cannedMessages = cm;
+          _lastCount = (m is List) ? m.length : 0;
           _error = null;
           _loading = false;
         });
+        // Open the room already showing the newest message.
+        _scrollToBottom(force: true);
       }
     } catch (e) {
       if (mounted) {
@@ -118,7 +169,10 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
       });
       _text.clear();
       setState(() => _reply = null);
+      _startCooldown();
       await _load();
+      // Always jump to our own message, even if we were reading history.
+      _scrollToBottom(force: true);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -238,6 +292,7 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
         else
           Expanded(
             child: ListView(
+              controller: _scroll,
               padding: const EdgeInsets.symmetric(horizontal: Gaps.md),
               children: [
                 if (_stickers.isNotEmpty)
@@ -318,9 +373,18 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
                       padding: const EdgeInsets.all(16),
                       shape: RoundedRectangleBorder(borderRadius: Corners.rMd),
                     ),
-                    onPressed: _error != null ? null : _pickCanned,
-                    icon: const Icon(Icons.chat_bubble_outline),
-                    label: const Text('انتخاب پیام آماده...'),
+                    // Disabled during the server-side cooldown, with the
+                    // remaining seconds shown so the wait is explained rather
+                    // than the send silently failing.
+                    onPressed: (_error != null || _cooldownLeft > 0)
+                        ? null
+                        : _pickCanned,
+                    icon: Icon(_cooldownLeft > 0
+                        ? Icons.hourglass_bottom_rounded
+                        : Icons.chat_bubble_outline),
+                    label: Text(_cooldownLeft > 0
+                        ? 'کمی صبر کن... ${faNum(_cooldownLeft)} ثانیه'
+                        : 'انتخاب پیام آماده...'),
                   ),
                 ),
               ],
