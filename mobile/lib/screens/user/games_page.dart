@@ -10,18 +10,34 @@ import 'games/memory_board.dart';
 
 class _GameEntry {
   const _GameEntry(
-      this.id, this.title, this.subtitle, this.emoji, this.accent, this.art);
+    this.id,
+    this.title,
+    this.subtitle,
+    this.emoji,
+    this.accent,
+    this.art, {
+    this.bot = true,
+    this.solo = false,
+  });
   final String id;
   final String title;
   final String subtitle;
   final String emoji;
   final Color accent;
   final String art;
+
+  /// Whether an empty lobby falls back to a computer opponent. جفت‌یاب says
+  /// no — the tile must not advertise a bot that will never appear.
+  final bool bot;
+
+  /// Playable alone against the clock (records only, no points).
+  final bool solo;
 }
 
 const _games = <_GameEntry>[
   _GameEntry('memory', 'جفت‌یاب', 'جفت‌ها را به خاطر بسپار و ببر', '🃏',
-      Color(0xFFA855F7), 'assets/games/memory.webp'),
+      Color(0xFFA855F7), 'assets/games/memory.webp',
+      bot: false, solo: true),
   _GameEntry('connect4', 'چهار در یک ردیف', 'چهارتا رو ردیف کن', '🔴',
       Color(0xFFF59E0B), 'assets/games/connect4.webp'),
   _GameEntry('reversi', 'اتللو', 'مهره‌ها را برگردان', '⚫', Color(0xFF34D399),
@@ -61,7 +77,8 @@ class _GamesHubPageState extends State<GamesHubPage> {
                 ?.copyWith(fontWeight: FontWeight.w800)),
         Gaps.vXxs,
         Text(
-          'با کاربران دیگر آنلاین رقابت کن — اگر حریفی پیدا نشد، ربات هوشمند وارد می‌شود.',
+          'با کاربران دیگر آنلاین رقابت کن و امتیاز بگیر. جفت‌یاب را می‌توانی '
+          'تنها هم بازی کنی و رکورد بزنی.',
           style: theme.textTheme.bodyMedium,
         ),
         Gaps.vLg,
@@ -154,10 +171,17 @@ class _GameTile extends StatelessWidget {
                       children: [
                         Text(entry.subtitle, style: theme.textTheme.bodySmall),
                         Gaps.vXs,
-                        Row(children: [
+                        Wrap(spacing: Gaps.xxs, runSpacing: Gaps.xxs, children: [
                           _Tag(label: 'دو نفره آنلاین', color: entry.accent),
-                          Gaps.hXxs,
-                          _Tag(label: 'بازی با ربات', color: entry.accent),
+                          if (entry.bot)
+                            _Tag(label: 'بازی با ربات', color: entry.accent)
+                          else
+                            const _Tag(
+                                label: 'فقط حریف واقعی', color: Color(0xFF38BDF8)),
+                          if (entry.solo)
+                            const _Tag(
+                                label: 'بازی تنها · رکوردی',
+                                color: Color(0xFF34D399)),
                         ]),
                       ],
                     ),

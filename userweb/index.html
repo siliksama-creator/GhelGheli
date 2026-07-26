@@ -1,1 +1,26 @@
-<!doctype html><html lang="fa" dir="rtl"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>قل‌قلی - ورود و ثبت‌نام</title></head><body><div id="root"></div><script type="module" src="/src/main.jsx"></script></body></html>
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#06101d" />
+    <meta name="description" content="قل‌قلی — باشگاه کارت‌های فوتبالی: امتیاز جمع کن، جایزه بگیر و با دوستانت بازی کن." />
+    <title>قل‌قلی - ورود و ثبت‌نام</title>
+    <link rel="icon" href="/favicon.png" />
+    <!--
+      Preload only the two weights that are on screen before any interaction
+      (body text + headings). Without this the first paint used the OS
+      fallback and every line visibly reflowed a moment later.
+      Preloading all five instead wasted ~100KB the user never sees.
+    -->
+    <link rel="preload" href="/fonts/Vazirmatn-Regular.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/Vazirmatn-ExtraBold.woff2" as="font" type="font/woff2" crossorigin />
+    <!-- The API lives on another subdomain; warming the connection removes a
+         DNS + TLS round trip from the very first request after login. -->
+    <link rel="preconnect" href="https://api.ghelghelishop.ir" crossorigin />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

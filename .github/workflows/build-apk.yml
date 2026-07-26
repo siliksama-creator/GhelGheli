@@ -50,8 +50,14 @@ jobs:
       - name: Install dependencies
         run: cd mobile && flutter pub get
 
+      # `flutter create` drops a placeholder widget_test.dart that references
+      # a MyApp class this project doesn't have, so it fails to compile.
+      # Delete ONLY that file — the real tests under mobile/test/ must run.
       - name: Remove generated default widget test
-        run: rm -rf mobile/test
+        run: rm -f mobile/test/widget_test.dart
+
+      - name: Run widget tests
+        run: cd mobile && flutter test
 
       - name: Analyze
         # Informational: `flutter analyze` results depend on the exact stable

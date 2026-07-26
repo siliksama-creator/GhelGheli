@@ -394,6 +394,15 @@ app.post('/api/cards/redeem', auth, cardRedeemLimiter, asyncHandler(async (req, 
   } finally { client.release(); }
 }));
 
+// Solo (time-attack) records: my personal best + the public leaderboard, in
+// one round trip so the solo screen never has to fan out two requests.
+// Solo awards NO points on purpose — the record IS the reward.
+app.get('/api/games/:gameId/solo', auth, asyncHandler(async (req, res) => {
+  const rules = require('./games').RULES[req.params.gameId];
+  if (!rules || !rules.solo) return res.status(404).json({ message: 'این بازی حالت تک‌نفره ندارد' });
+  res.json(await require('./services/soloRecordService').summary(req.user.id, req.params.gameId));
+}));
+
 app.get('/api/profile', auth, asyncHandler(async (req, res) => {
   const inv = await pool.query(`SELECT i.*, t.name, t.image_url, t.point_value FROM user_card_inventory i JOIN card_types t ON t.id=i.card_type_id WHERE i.user_id=$1 AND i.consumed_in_reward=false ORDER BY t.name`, [req.user.id]);
   const leaguePayouts = await pool.query(`SELECT p.*, s.month_year FROM league_payouts p JOIN league_seasons s ON s.id=p.league_season_id WHERE p.user_id=$1 ORDER BY p.created_at DESC LIMIT 20`, [req.user.id]);

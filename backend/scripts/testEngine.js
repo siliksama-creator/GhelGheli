@@ -91,12 +91,14 @@ function makeIo() {
     ok(a.rooms.size === 0 && b.rooms.size === 0, 'room cleaned up');
   }
 
-  console.log('\n== bot fallback (15s) ==');
+  // جفت‌یاب no longer has a bot, so the fallback is exercised on connect4.
+  console.log('\n== bot fallback (15s, connect4) ==');
   {
     const io = makeIo(); attach(io, RULES);
-    const a = io.connect(new FakeSocket('solo', 'تنها'));
-    a.fire('game:join', { gameId: 'memory' });
+    const a = io.connect(new FakeSocket('lonely', 'تنها'));
+    a.fire('game:join', { gameId: 'connect4' });
     ok(a.has('game:waiting'), 'waits for a human first');
+    ok(a.last('game:waiting').botFallback === true, 'a bot IS promised');
     ok(!a.has('game:start'), 'no instant bot game');
     await wait(15400);
     const st = a.last('game:start');
@@ -107,8 +109,30 @@ function makeIo() {
     await wait(1400);
     const upd = a.last('game:update');
     ok(!!upd, 'bot game produced an update');
-    ok(upd.state.cards.some(c => c.up || c.matched), 'the board changed');
+    ok(upd.state.board.some(c => c !== null), 'the board changed');
     ok(['X', 'O'].includes(upd.turn), 'a valid player is on move');
+  }
+
+  // REGRESSION: جفت‌یاب must never quietly hand the player a computer
+  // opponent. The user's requirement is explicit — real rival, or solo.
+  console.log('\n== جفت‌یاب never falls back to a bot ==');
+  {
+    const io = makeIo(); attach(io, RULES);
+    const a = io.connect(new FakeSocket('nb1', 'بدون‌ربات'));
+    a.fire('game:join', { gameId: 'memory' });
+    ok(a.last('game:waiting').botFallback === false, 'no bot is promised');
+    ok(a.last('game:waiting').soloAvailable === true, 'solo mode is offered');
+    await wait(15400);
+    ok(!a.has('game:start'), 'still no game after the wait window');
+    ok(a.has('game:still-waiting'), 'told we are still queued');
+
+    // ...and a human arriving late must still find them waiting.
+    const b = io.connect(new FakeSocket('nb2', 'حریف'));
+    b.fire('game:join', { gameId: 'memory' });
+    const st = a.last('game:start');
+    ok(!!st && st.vsBot === false, 'a late human is matched, human-vs-human');
+    ok(st.players.X.isBot !== true && st.players.O.isBot !== true,
+      'neither seat is a bot');
   }
 
   console.log('\n== reversi over the engine ==');

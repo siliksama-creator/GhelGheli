@@ -305,6 +305,12 @@ module.exports = function attachGames(io, rulesById) {
       }
 
       q.push(socket);
+      // Games flagged `noBot` (جفت‌یاب) never fall back to a computer
+      // opponent. The player simply STAYS in the queue until a human shows
+      // up — the client turns the countdown into an open invitation and
+      // offers the solo time-attack mode instead. Silently starting a bot
+      // match there made the whole "play a real person" promise a lie.
+      const botAllowed = !rules.noBot;
       // Tell the client exactly how long the hunt lasts so it can render a
       // real countdown instead of an open-ended spinner.
       safeEmit(socket, 'game:waiting', {
@@ -313,11 +319,24 @@ module.exports = function attachGames(io, rulesById) {
         waitMs: MATCH_WAIT_MS,
         deadline: Date.now() + MATCH_WAIT_MS,
         remainingMs: MATCH_WAIT_MS,
+        // Drives the UI: with a bot the countdown means "then we start with
+        // the bot", without one it means "then we suggest solo mode".
+        botFallback: botAllowed,
+        soloAvailable: Boolean(rules.solo),
       });
       socket.botTimeout = setTimeout(() => {
         try {
           const i = q.findIndex(s => s.user?.id === socket.user?.id);
           if (i === -1) return;
+          if (!botAllowed) {
+            // Stay queued; just let the client know the first window closed
+            // so it can surface the solo option.
+            return safeEmit(socket, 'game:still-waiting', {
+              gameId,
+              soloAvailable: Boolean(rules.solo),
+              message: 'هنوز حریفی پیدا نشده — می‌توانی منتظر بمانی یا تنها بازی کنی',
+            });
+          }
           q.splice(i, 1);
           startRoom(io, rules, gameId, socket, null);
         } catch (e) {

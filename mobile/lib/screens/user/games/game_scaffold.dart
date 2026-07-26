@@ -19,6 +19,7 @@ class GameScaffold extends StatelessWidget {
     required this.onBack,
     required this.boardBuilder,
     this.scoreboard,
+    this.soloOffer,
   });
 
   final GameSession session;
@@ -29,6 +30,11 @@ class GameScaffold extends StatelessWidget {
   final VoidCallback onBack;
   final WidgetBuilder boardBuilder;
   final Widget? scoreboard;
+
+  /// Escape hatch for games with NO bot (جفت‌یاب): shown in the lobby and
+  /// while hunting, so an empty lobby offers solo play instead of silently
+  /// starting a fake "opponent".
+  final Widget? soloOffer;
 
   @override
   Widget build(BuildContext context) {
@@ -115,25 +121,47 @@ class GameScaffold extends StatelessWidget {
 
     switch (session.phase) {
       case GamePhase.idle:
-        return _Centered(
-          icon: Icons.sports_esports_rounded,
-          title: 'آماده‌ای شروع کنیم؟',
-          subtitle: 'اگر حریفی پیدا نشود، با ربات بازی می‌کنی.',
-          action: FilledButton.icon(
-            onPressed: session.join,
-            style: FilledButton.styleFrom(
-              backgroundColor: accent,
-              minimumSize: const Size(220, 52),
-            ),
-            icon: const Icon(Icons.play_arrow_rounded),
-            label: const Text('شروع بازی'),
+        return SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(vertical: Gaps.lg),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _Centered(
+                icon: Icons.sports_esports_rounded,
+                title: 'آماده‌ای شروع کنیم؟',
+                subtitle: soloOffer != null
+                    // No bot here: be honest about what "start" means.
+                    ? 'با یک حریف واقعی بازی می‌کنی و امتیاز می‌گیری.'
+                    : 'اگر حریفی پیدا نشود، با ربات بازی می‌کنی.',
+                action: FilledButton.icon(
+                  onPressed: session.join,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: accent,
+                    minimumSize: const Size(220, 52),
+                  ),
+                  icon: const Icon(Icons.play_arrow_rounded),
+                  label: const Text('پیدا کردن حریف'),
+                ),
+              ),
+              if (soloOffer != null) ...[
+                Gaps.vMd,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: Gaps.md),
+                  child: soloOffer!,
+                ),
+              ],
+            ],
           ),
         );
 
       case GamePhase.waiting:
         final left = session.searchSecondsLeft;
         final total = session.searchSeconds <= 0 ? 15 : session.searchSeconds;
-        return Center(
+        // With no bot to fall back on the countdown is meaningless once it
+        // hits zero — we keep looking, so show a live pulse instead of a
+        // number frozen at ۰.
+        final open = session.stillSearching || !session.botFallback && left <= 0;
+        return SingleChildScrollView(
           child: Padding(
             padding: const EdgeInsets.all(Gaps.lg),
             child: Column(
@@ -147,35 +175,42 @@ class GameScaffold extends StatelessWidget {
                     children: [
                       SizedBox.expand(
                         child: CircularProgressIndicator(
-                          value: (left / total).clamp(0.0, 1.0),
+                          // Indeterminate spinner once the window is open.
+                          value: open ? null : (left / total).clamp(0.0, 1.0),
                           strokeWidth: 6,
                           backgroundColor: theme.colorScheme.outline
                               .withValues(alpha: 0.2),
                           valueColor: AlwaysStoppedAnimation(accent),
                         ),
                       ),
-                      Text(
-                        faNum(left),
-                        style: theme.textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.w900,
-                          color: accent,
-                        ),
-                      ),
+                      open
+                          ? Icon(Icons.person_search_rounded,
+                              size: 34, color: accent)
+                          : Text(
+                              faNum(left),
+                              style: theme.textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.w900,
+                                color: accent,
+                              ),
+                            ),
                     ],
                   ),
                 ),
                 Gaps.vLg,
-                Text('در حال جستجوی حریف واقعی...',
+                Text(
+                    open
+                        ? 'هنوز در صف حریف واقعی هستی'
+                        : 'در حال جستجوی حریف واقعی...',
+                    textAlign: TextAlign.center,
                     style: theme.textTheme.titleMedium
                         ?.copyWith(fontWeight: FontWeight.w700)),
                 Gaps.vXxs,
                 Text(
-                  left > 0
-                      ? 'اگر حریفی پیدا نشود، بعد از ${faNum(left)} ثانیه با ربات شروع می‌کنیم.'
-                      : 'در حال آماده‌سازی بازی با ربات...',
+                  _waitHint(session, left),
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodySmall,
                 ),
+                if (soloOffer != null) ...[Gaps.vMd, soloOffer!],
                 Gaps.vLg,
                 OutlinedButton.icon(
                   onPressed: session.leave,
@@ -229,6 +264,21 @@ class GameScaffold extends StatelessWidget {
         );
     }
   }
+}
+
+/// The line under the search spinner. Three honest variants: counting down
+/// to a bot, counting down to "we'll suggest solo", or still hunting.
+String _waitHint(GameSession session, int left) {
+  if (session.stillSearching || (!session.botFallback && left <= 0)) {
+    return 'به محض اینکه بازیکنی وارد شود، بازی شروع می‌شود.\n'
+        'می‌توانی منتظر بمانی یا همین حالا تنها بازی کنی.';
+  }
+  if (!session.botFallback) {
+    return 'در این بازی ربات نداریم — فقط حریف واقعی.';
+  }
+  return left > 0
+      ? 'اگر حریفی پیدا نشود، بعد از ${faNum(left)} ثانیه با ربات شروع می‌کنیم.'
+      : 'در حال آماده‌سازی بازی با ربات...';
 }
 
 class _TurnBanner extends StatelessWidget {

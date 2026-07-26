@@ -4,11 +4,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import { play, isEnabled, setEnabled } from './gameAudio.js';
+import MemorySolo, { MemoryGrid, runTime } from './memoryGame.jsx';
 
+// `bot: false` = جفت‌یاب never falls back to a computer opponent; the player
+// stays queued for a human, or plays the solo time-attack mode instead.
 const GAMES = [
-  { id: 'memory', title: 'جفت‌یاب', emoji: '🃏', desc: 'جفت‌ها را به خاطر بسپار و ببر', accent: '#A855F7' },
-  { id: 'connect4', title: 'چهار در یک ردیف', emoji: '🔴', desc: 'چهارتا رو ردیف کن', accent: '#F59E0B' },
-  { id: 'reversi', title: 'اتللو', emoji: '⚫', desc: 'مهره‌ها را برگردان', accent: '#34D399' },
+  { id: 'memory', title: 'جفت‌یاب', emoji: '🃏', desc: 'جفت‌ها را به خاطر بسپار و ببر', accent: '#A855F7', bot: false, solo: true },
+  { id: 'connect4', title: 'چهار در یک ردیف', emoji: '🔴', desc: 'چهارتا رو ردیف کن', accent: '#F59E0B', bot: true },
+  { id: 'reversi', title: 'اتللو', emoji: '⚫', desc: 'مهره‌ها را برگردان', accent: '#34D399', bot: true },
 ];
 
 const MOVE_SFX = { memory: 'flip', connect4: 'drop', reversi: 'flip' };
@@ -33,6 +36,10 @@ function useGame(api, token, gameId) {
   const [online, setOnline] = useState(true);
   const [searchLeft, setSearchLeft] = useState(0);
   const [searchSecs, setSearchSecs] = useState(15);
+  // Does the server intend to hand us a bot when the window closes? For
+  // جفت‌یاب the answer is no, and the UI must not promise one.
+  const [botFallback, setBotFallback] = useState(true);
+  const [stillSearching, setStillSearching] = useState(false);
   const room = useRef(null);
   // Monotonic timers: store "ms remaining" captured against performance.now()
   // instead of the server's absolute deadline. Subtracting a server timestamp
@@ -66,8 +73,18 @@ function useGame(api, token, gameId) {
     s.on('game:waiting', d => {
       setError('');
       setPhase('waiting');
+      setBotFallback(d?.botFallback !== false);
+      setStillSearching(false);
       if (d?.waitMs) setSearchSecs(Math.round(d.waitMs / 1000));
       searchEnd.current = performance.now() + (d?.remainingMs ?? d?.waitMs ?? 15000);
+    });
+
+    // Only sent by bot-less games: the first window closed, we're still queued.
+    s.on('game:still-waiting', () => {
+      setBotFallback(false);
+      setStillSearching(true);
+      searchEnd.current = null;
+      setSearchLeft(0);
     });
 
     s.on('game:start', d => {
@@ -78,6 +95,7 @@ function useGame(api, token, gameId) {
       if (d.turnMs) setTurnSecs(Math.round(d.turnMs / 1000));
       turnEnd.current = d.remainingMs != null ? performance.now() + d.remainingMs : null;
       tickedAt.current = -1;
+      setStillSearching(false);
       play('match_found');
       setG({
         state: d.state || {}, players: d.players, me: d.yourSymbol,
@@ -128,10 +146,12 @@ function useGame(api, token, gameId) {
   }, []);
 
   return {
-    phase, error, online, left, turnSecs, searchLeft, searchSecs, ...g,
+    phase, error, online, left, turnSecs, searchLeft, searchSecs,
+    botFallback, stillSearching, ...g,
     myTurn: phase === 'playing' && g.turn && g.turn === g.me,
     join: () => {
       setError('');
+      setStillSearching(false);
       tickedAt.current = -1;
       ref.current?.emit('game:join', { gameId });
       setPhase('waiting');
@@ -141,6 +161,7 @@ function useGame(api, token, gameId) {
       turnEnd.current = null;
       searchEnd.current = null;
       ref.current?.emit('game:leave', { roomId: room.current });
+      setStillSearching(false);
       setPhase('idle');
     },
   };
@@ -154,43 +175,17 @@ function resultText(winner, me) {
   return winner === me ? 'شما بردید! 🎉' : 'شما باختید';
 }
 
-const EVENT_TEXT = {
-  match: '✅ جفت شد! دوباره بزن',
-  miss: '❌ جفت نشد',
-};
-
 function MemoryBoard({ g }) {
-  const cards = g.state.cards || [];
-  const playable = g.state.playable || [];
-  const cols = g.state.cols || 4;
-  const result = g.state.lastResult;
-
   return (
-    <div className="memWrap">
-      {result && EVENT_TEXT[result] && (
-        <p className={`memEvent ${result}`}>{EVENT_TEXT[result]}</p>
-      )}
-      <div className="memGrid" style={{ '--cols': cols }}>
-        {cards.map((c, i) => {
-          const revealed = c.up || c.matched;
-          const mine = c.matched && c.matched === g.me;
-          const can = g.myTurn && playable.includes(i);
-          return (
-            <button
-              key={i}
-              className={`memCard ${revealed ? 'up' : ''} ${c.matched ? (mine ? 'mine' : 'theirs') : ''} ${can ? 'can' : ''}`}
-              disabled={!can}
-              onClick={() => g.move(i)}
-            >
-              <span className="inner">
-                <span className="back">⚽</span>
-                <span className="front">{c.face || ''}</span>
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
+    <MemoryGrid
+      cards={g.state.cards}
+      playable={g.state.playable}
+      cols={g.state.cols}
+      lastResult={g.state.lastResult}
+      me={g.me}
+      enabled={g.myTurn}
+      onMove={g.move}
+    />
   );
 }
 
@@ -257,11 +252,28 @@ function Seat({ g, sym, symbol, openProfile }) {
   );
 }
 
-function GameRoom({ api, token, game, onBack, openProfile }) {
+function GameRoom({ api, token, game, onBack, openProfile, onSolo, records }) {
   const g = useGame(api, token, game.id);
   const Board = BOARDS[game.id];
   const sym = SYMBOLS[game.id];
   const [muted, setMuted] = useState(!isEnabled());
+  // Offered in place of the bot for جفت‌یاب: an empty lobby means solo play,
+  // not a fake "opponent".
+  const solo = game.solo ? (
+    <div className="soloOffer">
+      <div>
+        <b>⏱ بازی تنها (رکوردی)</b>
+        <small>
+          {records?.best
+            ? `رکورد فعلی تو: ${runTime(records.best.durationMs)}`
+            : 'با ساعت مسابقه بده و رکورد بزن'}
+        </small>
+      </div>
+      <button className="ghost accent" onClick={() => { g.leave(); onSolo(); }}>
+        شروع بازی تنها
+      </button>
+    </div>
+  ) : null;
 
   return (
     <section className="card wide gamePage">
@@ -278,25 +290,41 @@ function GameRoom({ api, token, game, onBack, openProfile }) {
 
       {g.phase === 'idle' && (
         <div className="gameCenter">
-          <p>اگر حریفی پیدا نشود، با ربات هوشمند بازی می‌کنی.</p>
-          <button className="main" onClick={g.join}>شروع بازی</button>
+          <p>{game.bot === false
+            ? 'با یک حریف واقعی بازی می‌کنی و امتیاز می‌گیری.'
+            : 'اگر حریفی پیدا نشود، با ربات هوشمند بازی می‌کنی.'}</p>
+          <button className="main" onClick={g.join}>
+            {game.bot === false ? 'پیدا کردن حریف' : 'شروع بازی'}
+          </button>
+          {solo}
         </div>
       )}
 
-      {g.phase === 'waiting' && (
-        <div className="gameCenter">
-          <div className="searchRing" style={{ '--pct': `${((g.searchLeft / (g.searchSecs || 15)) * 100).toFixed(0)}%` }}>
-            <span>{g.searchLeft}</span>
+      {g.phase === 'waiting' && (() => {
+        // With no bot to fall back on, a countdown stuck at ۰ is a lie — we
+        // keep hunting, so switch to an open-ended pulse instead.
+        const open = g.stillSearching || (!g.botFallback && g.searchLeft <= 0);
+        return (
+          <div className="gameCenter">
+            <div className={`searchRing${open ? ' open' : ''}`}
+              style={{ '--pct': `${((g.searchLeft / (g.searchSecs || 15)) * 100).toFixed(0)}%` }}>
+              <span>{open ? '🔎' : g.searchLeft}</span>
+            </div>
+            <p><b>{open ? 'هنوز در صف حریف واقعی هستی' : 'در حال جستجوی حریف واقعی...'}</b></p>
+            <p className="hint">
+              {open
+                ? 'به محض اینکه بازیکنی وارد شود، بازی شروع می‌شود.'
+                : !g.botFallback
+                  ? 'در این بازی ربات نداریم — فقط حریف واقعی.'
+                  : g.searchLeft > 0
+                    ? `اگر حریفی پیدا نشود، بعد از ${g.searchLeft} ثانیه با ربات شروع می‌کنیم.`
+                    : 'در حال آماده‌سازی بازی با ربات...'}
+            </p>
+            {solo}
+            <button className="danger" onClick={g.leave}>لغو</button>
           </div>
-          <p><b>در حال جستجوی حریف واقعی...</b></p>
-          <p className="hint">
-            {g.searchLeft > 0
-              ? `اگر حریفی پیدا نشود، بعد از ${g.searchLeft} ثانیه با ربات شروع می‌کنیم.`
-              : 'در حال آماده‌سازی بازی با ربات...'}
-          </p>
-          <button className="danger" onClick={g.leave}>لغو</button>
-        </div>
-      )}
+        );
+      })()}
 
       {(g.phase === 'playing' || g.phase === 'over') && (
         <>
@@ -333,22 +361,53 @@ function GameRoom({ api, token, game, onBack, openProfile }) {
 
 export default function GamesHub({ api, token, openProfile = () => {} }) {
   const [active, setActive] = useState(null);
+  const [mode, setMode] = useState('versus');
+  const [records, setRecords] = useState(null);
+
+  // Personal best + leaderboard for the solo mode. Loaded once per visit and
+  // refreshed after a run; a failure must never block play.
+  const loadRecords = React.useCallback(async () => {
+    try {
+      const r = await fetch(`${api}/api/games/memory/solo`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (r.ok) setRecords(await r.json());
+    } catch { /* leaderboard is optional */ }
+  }, [api, token]);
+
+  useEffect(() => { loadRecords(); }, [loadRecords]);
+
+  if (active && mode === 'solo') {
+    return <MemorySolo api={api} token={token} records={records}
+      reload={loadRecords}
+      onVersus={() => setMode('versus')}
+      onBack={() => { setMode('versus'); setActive(null); }} />;
+  }
+
   if (active) {
-    return <GameRoom api={api} token={token} game={active}
+    return <GameRoom api={api} token={token} game={active} records={records}
+      onSolo={() => setMode('solo')}
       onBack={() => setActive(null)} openProfile={openProfile} />;
   }
+
   return (
     <section className="card wide">
       <h2>بخش بازی‌ها 🎮</h2>
-      <p className="hint">با کاربران دیگر آنلاین رقابت کن — اگر حریفی نبود، ربات وارد می‌شود.</p>
+      <p className="hint">
+        با کاربران دیگر آنلاین رقابت کن و امتیاز بگیر.
+        جفت‌یاب را می‌توانی تنها هم بازی کنی و رکورد بزنی.
+      </p>
       <div className="gameGrid">
         {GAMES.map(g => (
           <button key={g.id} className="gameTile" style={{ '--accent': g.accent }}
-            onClick={() => { play('tap'); setActive(g); }}>
+            onClick={() => { play('tap'); setMode('versus'); setActive(g); }}>
             <span className="gEmoji">{g.emoji}</span>
             <b>{g.title}</b>
             <small>{g.desc}</small>
-            <i>دو نفره · با ربات</i>
+            <i>
+              {g.bot === false ? 'فقط حریف واقعی' : 'دو نفره · با ربات'}
+              {g.solo ? ' · بازی تنها' : ''}
+            </i>
           </button>
         ))}
       </div>

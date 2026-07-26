@@ -37,6 +37,14 @@ class GameSession extends ChangeNotifier {
   /// Countdown while hunting for a real opponent (before the bot steps in).
   int searchSecondsLeft = 0;
   int searchSeconds = 15;
+  /// Whether the server will hand us a bot when the hunt window closes.
+  /// جفت‌یاب says NO: the player stays queued and is offered solo instead,
+  /// so the UI must not promise a bot that will never arrive.
+  bool botFallback = true;
+  bool soloAvailable = false;
+  /// True once the first search window elapsed with no opponent found and
+  /// there is no bot to fall back on — we keep looking.
+  bool stillSearching = false;
   String? timedOutSymbol;
   /// False while the socket is down, so the UI can show a reconnect notice
   /// instead of a silently frozen board.
@@ -117,7 +125,22 @@ class GameSession extends ChangeNotifier {
       final m = _asMap(d);
       phase = GamePhase.waiting;
       error = null;
+      botFallback = m['botFallback'] != false;
+      soloAvailable = m['soloAvailable'] == true;
+      stillSearching = false;
       _startSearchClock(m['deadline'], m['waitMs'], m['remainingMs']);
+      notifyListeners();
+    });
+
+    // Sent only by games with no bot: the first window closed and we are
+    // still queued, waiting for a real human.
+    s.on('game:still-waiting', (d) {
+      final m = _asMap(d);
+      soloAvailable = m['soloAvailable'] == true;
+      botFallback = false;
+      stillSearching = true;
+      searchSecondsLeft = 0;
+      _stopSearchClock();
       notifyListeners();
     });
 
@@ -131,6 +154,7 @@ class GameSession extends ChangeNotifier {
       state = _asMap(m['state']);
       winner = null;
       timedOutSymbol = null;
+      stillSearching = false;
       phase = GamePhase.playing;
       error = null;
       GameAudio.instance.play(Sfx.matchFound);
@@ -265,6 +289,7 @@ class GameSession extends ChangeNotifier {
     winner = null;
     lastMove = null;
     timedOutSymbol = null;
+    stillSearching = false;
     _socket?.emit('game:join', {'gameId': gameId});
     phase = GamePhase.waiting;
     notifyListeners();
@@ -296,6 +321,7 @@ class GameSession extends ChangeNotifier {
     winner = null;
     state = const {};
     timedOutSymbol = null;
+    stillSearching = false;
     _stopClock();
     _stopSearchClock();
     notifyListeners();

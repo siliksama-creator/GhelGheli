@@ -6,17 +6,29 @@
 //   * the 3D card-flip is one of the nicest things Flutter can render
 //   * it is genuinely competitive: a match keeps your turn, so a good memory
 //     can chain several pairs in a row
-//   * the bot's strength is a single honest dial (how much it remembers)
+//
+// NO BOT. جفت‌یاب is deliberately human-only: a computer with perfect recall
+// is not a fun memory opponent, and a *deliberately* forgetful one is just
+// theatre. Instead the player either waits for a real opponent or switches to
+// the solo TIME-ATTACK mode (see ../solo.js), which is scored on the clock
+// rather than on points.
 //
 // Move = the index of the card to flip.
 const SIZE = 16; // 4x4 => 8 pairs
 const COLS = 4;
 
-// Football-flavoured faces. Pairs are identified by this symbol.
-const FACES = ['⚽', '🏆', '🥇', '🎽', '🧤', '🥅', '🎯', '🔥'];
+// Card faces. These are ASSET KEYS, not emoji: each one maps to a purpose-made
+// 3D football illustration shipped with the clients
+// (mobile/assets/games/memory/<key>.webp and userweb/public/games/memory/).
+// Emoji were replaced because every phone/browser renders them differently —
+// on some Androids half of them fell back to flat monochrome glyphs, which
+// made two different cards look identical and the game unplayable.
+const FACES = [
+  'ball', 'trophy', 'medal', 'jersey',
+  'glove', 'boot', 'whistle', 'stopwatch',
+];
 
-// How many distinct cards the bot reliably remembers. Low enough that a
-// sharp human beats it, high enough that careless play gets punished.
+// Only used to auto-play a turn that ran out of time (never as an opponent).
 const BOT_MEMORY = 6;
 
 function shuffle(a) {
@@ -127,6 +139,8 @@ function botKnown(state) {
   return Object.fromEntries(entries);
 }
 
+/// NOT an opponent — this only picks a legal card when a HUMAN's turn clock
+/// expires, so the match keeps moving instead of hanging. See `noBot` below.
 function botMove(state, me) {
   const open = openIndexes(state);
   if (!open.length) return null;
@@ -188,6 +202,11 @@ module.exports = {
   // Flipping two cards while recalling the board needs a little thought,
   // but the turn is short — 20s keeps the match brisk.
   turnMs: 20000,
+  // Never fall back to a computer opponent: the engine keeps the player in
+  // the matchmaking queue and offers solo time-attack instead.
+  noBot: true,
+  // Playable alone against the clock (backend/src/games/solo.js).
+  solo: true,
   create, result, isValidMove, applyMove, nextTurn, botMove, decorate,
   FACES, SIZE, COLS,
 };

@@ -2,6 +2,7 @@ import React,{useEffect,useRef,useState}from'react';
 import{createRoot}from'react-dom/client';
 import GamesHub from './games.jsx';
 import Support from './support.jsx';
+import'./typography.css';
 import'./style.css';
 
 const API=import.meta.env.VITE_API_BASE||'https://api.ghelghelishop.ir';

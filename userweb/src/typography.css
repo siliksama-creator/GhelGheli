@@ -1,0 +1,212 @@
+/*
+  Typography layer for the user web app.
+
+  THE BUG THIS FIXES: style.css shipped `font-family: Tahoma, Arial, sans-serif`
+  while five Vazirmatn weights sat unused in /public/fonts. Tahoma has no
+  Persian design at all — the browser fell back to whatever the OS happened to
+  have (Nazli on some Linux, Segoe UI on Windows, Geeza Pro on macOS), so the
+  same screen looked different on every device and the text read as cramped
+  and amateurish. Confirmed live: the deployed CSS bundle contained ZERO
+  @font-face rules.
+
+  Loaded BEFORE style.css so the `body` rule below can be overridden if a
+  screen ever needs to, while the variables stay authoritative.
+*/
+
+/* Subset to Persian + Latin + ZWNJ, so each weight is ~33KB instead of ~49KB
+   and the whole family costs less than one photo. */
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('/fonts/Vazirmatn-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  /* `swap` keeps text visible while the font loads — with `block` the whole
+     page flashed empty on a slow mobile connection. */
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('/fonts/Vazirmatn-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('/fonts/Vazirmatn-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('/fonts/Vazirmatn-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('/fonts/Vazirmatn-ExtraBold.woff2') format('woff2');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* The emoji fonts at the END matter: Vazirmatn has no emoji coverage, so
+     without them the browser falls back to whatever it can find — and on
+     several systems that is NOTHING, leaving empty boxes. This is the same
+     class of bug that forced the جفت‌یاب card faces off emoji and onto real
+     image assets. Anywhere an emoji still carries meaning it now has a CSS
+     fallback too (see .rk / .searchRing.open). */
+  --gg-font: 'Vazirmatn', 'Segoe UI', Tahoma, system-ui,
+    'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+
+  /* A real type scale (1.2 minor-third), fluid between phone and desktop.
+     Everything was hand-picked pixel values before, which is exactly why the
+     hierarchy looked arbitrary. */
+  --fs-xs: clamp(11px, 0.68rem + 0.1vw, 12.5px);
+  --fs-sm: clamp(12.5px, 0.76rem + 0.12vw, 14px);
+  --fs-base: clamp(14.5px, 0.88rem + 0.14vw, 16px);
+  --fs-lg: clamp(16.5px, 1rem + 0.2vw, 18.5px);
+  --fs-xl: clamp(19px, 1.12rem + 0.4vw, 23px);
+  --fs-2xl: clamp(23px, 1.3rem + 0.8vw, 30px);
+  --fs-3xl: clamp(28px, 1.5rem + 1.6vw, 44px);
+
+  --lh-tight: 1.25;
+  --lh-snug: 1.45;
+  /* Persian needs more leading than Latin: the descenders and the dots below
+     ب/پ/ج collide at the 1.4 that looks fine in English. */
+  --lh-body: 1.75;
+}
+
+html {
+  font-size: 16px;
+  /* Stops iOS Safari from silently inflating text in landscape, which broke
+     the chat dock layout. */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--gg-font);
+  font-size: var(--fs-base);
+  line-height: var(--lh-body);
+  font-weight: 400;
+  letter-spacing: 0;
+  /* Persian numerals inside otherwise-Latin runs, plus proper kerning. */
+  font-feature-settings: 'ss01', 'kern', 'liga';
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Everything interactive inherits the family — a stray Tahoma in a <button>
+   or <input> was the most visible offender on the login screen. */
+button,
+input,
+textarea,
+select,
+optgroup {
+  font-family: var(--gg-font);
+  font-size: inherit;
+  line-height: var(--lh-snug);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--gg-font);
+  line-height: var(--lh-tight);
+  /* Persian headings look thin and washed out at 700; Vazirmatn's 800 is
+     what gives them presence. */
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.4em;
+  text-wrap: balance; /* no lonely last word on a line of its own */
+}
+
+h1 { font-size: var(--fs-3xl); }
+h2 { font-size: var(--fs-2xl); }
+h3 { font-size: var(--fs-xl); }
+h4 { font-size: var(--fs-lg); }
+
+p {
+  line-height: var(--lh-body);
+  text-wrap: pretty;
+  max-width: 68ch; /* long lines are unreadable; cap the measure */
+}
+
+b, strong { font-weight: 700; }
+
+small,
+.hint,
+.chatActions button,
+.mobileNav .navLabel {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-snug);
+}
+
+/* Numbers that sit in a column (scores, timers, points) must not jitter as
+   digits change width. */
+.points,
+.timer em,
+.countdown,
+.searchRing span,
+.gamePage .player i,
+.soloTime {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum', 'ss01';
+}
+
+/* Buttons: 900 was heavier than Vazirmatn's real top weight (800), so the
+   browser SYNTHESISED a fake bold — that smeared, slightly blurry look. */
+button {
+  font-weight: 700;
+  letter-spacing: 0;
+}
+button.main {
+  font-weight: 800;
+  font-size: var(--fs-base);
+}
+
+/* Same problem, same fix: 1000 is not a real weight in this family. */
+.hero b {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+label,
+.tabs button,
+.mobileNav button {
+  font-weight: 600;
+}
+
+/* Placeholders were the same size as the value, so a field looked "filled"
+   when it was empty. */
+::placeholder {
+  font-weight: 400;
+  opacity: 0.62;
+}
+
+/* Latin/technical strings (mobile numbers, card codes) inside RTL text. */
+.ltr,
+input[type='tel'],
+input[type='password'],
+code {
+  direction: ltr;
+  text-align: left;
+  font-feature-settings: 'tnum';
+  letter-spacing: 0.02em;
+  unicode-bidi: plaintext;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
