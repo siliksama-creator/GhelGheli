@@ -209,7 +209,7 @@ export default function Wallet({ token, req, reloadProfile, setMsg }) {
                   <b>{fa(r.amount)} تومان</b>
                   <span className={`wdBadge ${STATUS_CLASS[r.status] || ''}`}>{r.statusLabel}</span>
                 </div>
-                <small>💳 {r.cardMasked} {r.cardBank ? `— ${r.cardBank}` : ''}</small>
+                <small>💳 <bdi dir="ltr">{r.cardMasked}</bdi>{r.cardBank ? ` — ${r.cardBank}` : ''}</small>
                 <small className="txDate">{new Date(r.createdAt).toLocaleString('fa-IR')}</small>
                 {r.trackingCode && <small className="wdOk">کد پیگیری: {r.trackingCode}</small>}
                 {r.adminNote && <small className="wdNote">پیام مدیریت: {r.adminNote}</small>}
