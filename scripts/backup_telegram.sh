@@ -155,6 +155,73 @@ for t in $(sudo -u postgres psql -d "$DB_NAME" -tAc \
   printf '%-34s %s\n' "$t" "$n" >> "$STAGE/db/TABLE_COUNTS.txt"
 done
 
+# ── 1b. Financial integrity report ───────────────────────────────────────
+# The database now holds real money (wallet_transactions + withdrawal_requests).
+# A row count proves the dump is not empty; it does NOT prove the money in it
+# is coherent. If the ledger and the cached balances ever disagree, the moment
+# to find out is BEFORE that state gets frozen into every future backup — not
+# months later when a user disputes their balance and there is no clean
+# archive left to compare against.
+#
+# So every backup carries a financial statement, and a mismatch raises a
+# Telegram alert while still shipping the archive (the data is worth keeping
+# either way — you just need to know it is suspect).
+if sudo -u postgres psql -d "$DB_NAME" -tAc \
+     "SELECT to_regclass('public.wallet_transactions')" 2>/dev/null | grep -q wallet; then
+  log "auditing wallet integrity"
+  {
+    echo "GhelGheli — financial statement at $(date -Is)"
+    echo
+    echo "-- کیف پول --"
+    sudo -u postgres psql -d "$DB_NAME" -tAc \
+      "SELECT 'total_wallet_balance  ' || COALESCE(SUM(wallet_balance),0) FROM users"
+    sudo -u postgres psql -d "$DB_NAME" -tAc \
+      "SELECT 'ledger_net            ' || COALESCE(SUM(CASE WHEN direction='credit' THEN amount ELSE -amount END),0) FROM wallet_transactions"
+    sudo -u postgres psql -d "$DB_NAME" -tAc \
+      "SELECT 'transactions          ' || count(*) FROM wallet_transactions"
+    echo
+    echo "-- برداشت‌ها بر اساس وضعیت --"
+    sudo -u postgres psql -d "$DB_NAME" -tAc \
+      "SELECT status || '  count=' || count(*) || '  sum=' || COALESCE(SUM(amount),0)
+         FROM withdrawal_requests GROUP BY status ORDER BY status"
+    echo
+    echo "-- ورودی پول بر اساس منبع --"
+    sudo -u postgres psql -d "$DB_NAME" -tAc \
+      "SELECT source || '  ' || count(*) || '  ' || COALESCE(SUM(amount),0)
+         FROM wallet_transactions GROUP BY source ORDER BY source"
+  } > "$STAGE/db/FINANCIAL_STATEMENT.txt" 2>/dev/null || true
+
+  # The one invariant that must always hold: every user's cached balance
+  # equals the sum of their own ledger rows.
+  DRIFT=$(sudo -u postgres psql -d "$DB_NAME" -tAc "
+    SELECT count(*) FROM (
+      SELECT u.id
+        FROM users u
+        LEFT JOIN wallet_transactions t ON t.user_id = u.id
+       GROUP BY u.id, u.wallet_balance
+      HAVING u.wallet_balance <> COALESCE(
+        SUM(CASE WHEN t.direction='credit' THEN t.amount ELSE -t.amount END), 0)
+    ) q" 2>/dev/null || echo 0)
+
+  if [ "${DRIFT:-0}" -gt 0 ]; then
+    log "WARNING: wallet drift on $DRIFT user(s)"
+    echo "!! MISMATCH: $DRIFT user(s) whose balance disagrees with their ledger" \
+      >> "$STAGE/db/FINANCIAL_STATEMENT.txt"
+    # Name them, so the alert is actionable instead of just alarming.
+    sudo -u postgres psql -d "$DB_NAME" -tAc "
+      SELECT '  user ' || u.id || ' balance=' || u.wallet_balance || ' ledger=' ||
+             COALESCE(SUM(CASE WHEN t.direction='credit' THEN t.amount ELSE -t.amount END),0)
+        FROM users u LEFT JOIN wallet_transactions t ON t.user_id = u.id
+       GROUP BY u.id, u.wallet_balance
+      HAVING u.wallet_balance <> COALESCE(
+        SUM(CASE WHEN t.direction='credit' THEN t.amount ELSE -t.amount END), 0)
+       LIMIT 20" >> "$STAGE/db/FINANCIAL_STATEMENT.txt" 2>/dev/null || true
+    notify_failure "هشدار مالی: موجودی کیف پول $DRIFT کاربر با دفتر کل نمی‌خواند. بکاپ ارسال شد ولی این وضعیت باید بررسی شود."
+  else
+    log "wallet integrity OK"
+  fi
+fi
+
 unset PGPASSWORD
 
 # ── 2. Uploaded files ─────────────────────────────────────────────────────
@@ -242,6 +309,7 @@ postgres   : $(psql --version 2>/dev/null | head -1 || echo n/a)
 CONTENTS
   db/ghelgheli.sql         full database dump (--clean --if-exists)
   db/TABLE_COUNTS.txt      row count per table, to verify the dump is not empty
+  db/FINANCIAL_STATEMENT.txt  موجودی کیف پول‌ها، دفتر کل و برداشت‌ها + بررسی صحت
   uploads/                 user-uploaded images
   config/backend.env       API secrets: DB password, JWT_SECRET, Firebase
   config/db_password       PostgreSQL password for the ghelgheli role

@@ -2,6 +2,7 @@ import React,{useEffect,useRef,useState}from'react';
 import{createRoot}from'react-dom/client';
 import GamesHub from './games.jsx';
 import Support from './support.jsx';
+import Wallet from './wallet.jsx';
 import'./style.css';
 // AFTER style.css on purpose: style.css is a single minified line full of
 // `font-weight:900` (and one 1000), which would otherwise win the cascade
@@ -78,6 +79,7 @@ function Portal({token,logout}){
   const TABS=[
     ['home','خانه','🏠'],
     ['rewards','جوایز','🎁'],
+    ['wallet','کیف پول','👛'],
     ['league','لیگ','🏆'],
     ['club','چت و بازی','🎮'],
     ['support','پشتیبانی','🎧'],
@@ -108,9 +110,10 @@ function Portal({token,logout}){
       {msg && <div className="toast">{msg}</div>}
 
       <main className="tabPane" key={tab}>
-        {tab==='home'    && <Home token={token} p={p} rewards={rewards} load={load} setMsg={setMsg}/>}
+        {tab==='home'    && <Home token={token} p={p} rewards={rewards} load={load} setMsg={setMsg} openWallet={()=>setTab('wallet')}/>}
         {tab==='profile' && <Profile token={token} p={p} load={load} setMsg={setMsg}/>}
         {tab==='rewards' && <Rewards rewards={rewards}/>}
+        {tab==='wallet'  && <Wallet token={token} req={req} reloadProfile={load} setMsg={setMsg}/>}
         {tab==='league'  && <League token={token} openProfile={setPublicUser}/>}
         {tab==='club'    && <Club token={token} openProfile={setPublicUser}/>}
         {tab==='support' && <Support token={token} api={API} req={req} asset={asset}/>}
@@ -131,7 +134,7 @@ function Avatar({u,size=72}){
     onError={e=>{ if(e.currentTarget.src!==location.origin+fallback) e.currentTarget.src=fallback; }}/>;
 }
 
-function Home({token,p,rewards,load,setMsg}){const[code,setCode]=useState('');const[bigCard,setBigCard]=useState(null);const u=p.user;const sorted=[...rewards].sort((a,b)=>a.required_points-b.required_points);let next=sorted.find(r=>u.current_points<r.required_points)||sorted.at(-1);const progress=next?Math.min(1,u.current_points/next.required_points):0;async function redeem(){try{const d=await req('/api/cards/redeem','POST',{code},token);setMsg(d.message);setCode('');load()}catch(e){setMsg(e.message)}}return <div className="grid"><section className="card heroCard"><Avatar u={u}/><h2>{u.nickname||u.mobile}</h2><h1>{fa(u.current_points)} امتیاز</h1><div className="bar"><span style={{width:(progress*100)+'%'}}/></div><p>{next?`تا جایزه ${next.name}: ${fa(Math.max(0,next.required_points-u.current_points))} امتیاز مانده`:'هنوز جایزه‌ای تعریف نشده'}</p><h2>ثبت کد کارت های قلقلی</h2><p className="hint">(پک کارت های قلقلی بصورت فیزیکی در فروشگاه ها و سوپرمارکت ها به فروش می رسند.)</p><input value={code} onChange={e=>setCode(e.target.value.toUpperCase())} placeholder="کد کارت"/><button className="main" onClick={redeem}>ثبت کد</button></section><section className="card"><h2>موجودی کارت‌ها</h2>{(p.inventory||[]).map(i=><div className="reward clickable" key={i.id} onClick={()=>setBigCard(i)} title="نمایش بزرگ کارت"><img src={asset(i.image_url)||'/avatars/avatar_1_football.png'}/><div><b>{i.name}</b><p>تعداد: {fa(i.quantity)} — {fa(i.point_value)} امتیاز</p></div></div>)}</section>{bigCard&&<CardLightbox item={bigCard} close={()=>setBigCard(null)}/>}</div>}
+function Home({token,p,rewards,load,setMsg,openWallet}){const[code,setCode]=useState('');const[bigCard,setBigCard]=useState(null);const u=p.user;const sorted=[...rewards].sort((a,b)=>a.required_points-b.required_points);let next=sorted.find(r=>u.current_points<r.required_points)||sorted.at(-1);const progress=next?Math.min(1,u.current_points/next.required_points):0;async function redeem(){try{const d=await req('/api/cards/redeem','POST',{code},token);setMsg(d.message);setCode('');load()}catch(e){setMsg(e.message)}}return <div className="grid"><section className="card heroCard"><Avatar u={u}/><h2>{u.nickname||u.mobile}</h2><h1>{fa(u.current_points)} امتیاز</h1><div className="bar"><span style={{width:(progress*100)+'%'}}/></div><p>{next?`تا جایزه ${next.name}: ${fa(Math.max(0,next.required_points-u.current_points))} امتیاز مانده`:'هنوز جایزه‌ای تعریف نشده'}</p><button className={`walletEntry${Number(u.wallet_balance)>0?' hasMoney':''}`} onClick={openWallet}><span className="weIcon">👛</span><span className="weBody"><small>کیف پول من</small><b>{fa(u.wallet_balance)} <i>تومان</i></b></span><span className="weCta">{Number(u.wallet_balance)>0?'برداشت':'مشاهده'} ‹</span></button><h2>ثبت کد کارت های قلقلی</h2><p className="hint">(پک کارت های قلقلی بصورت فیزیکی در فروشگاه ها و سوپرمارکت ها به فروش می رسند.)</p><input value={code} onChange={e=>setCode(e.target.value.toUpperCase())} placeholder="کد کارت"/><button className="main" onClick={redeem}>ثبت کد</button></section><section className="card"><h2>موجودی کارت‌ها</h2>{(p.inventory||[]).map(i=><div className="reward clickable" key={i.id} onClick={()=>setBigCard(i)} title="نمایش بزرگ کارت"><img src={asset(i.image_url)||'/avatars/avatar_1_football.png'}/><div><b>{i.name}</b><p>تعداد: {fa(i.quantity)} — {fa(i.point_value)} امتیاز</p></div></div>)}</section>{bigCard&&<CardLightbox item={bigCard} close={()=>setBigCard(null)}/>}</div>}
 
 // Full-size view of an inventory card: the thumbnail crops the player
 // artwork the admin uploaded, so tapping opens it properly.

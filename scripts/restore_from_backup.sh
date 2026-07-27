@@ -173,6 +173,49 @@ if [ -f "$HERE/db/TABLE_COUNTS.txt" ]; then
   unset PGPASSWORD
 fi
 
+# Financial verification. Row counts prove the rows arrived; they do not prove
+# the money is coherent. Since users can withdraw real Toman, a restore that
+# silently lands an inconsistent ledger would let people withdraw money they
+# never earned — or lose money they did. So the invariant is re-checked here,
+# on the restored data, before the site is allowed to serve traffic.
+if [ -f "$HERE/db/FINANCIAL_STATEMENT.txt" ]; then
+  echo
+  echo "  ${BOLD}بررسی صحت مالی:${OFF}"
+  export PGPASSWORD="$DB_PASS"
+  HAS_WALLET=$(psql -h localhost -U "$DB_USER" -d "$DB_NAME" -tAc \
+    "SELECT to_regclass('public.wallet_transactions')" 2>/dev/null || echo '')
+  if [ -n "$HAS_WALLET" ] && [ "$HAS_WALLET" != "" ]; then
+    BAL=$(psql -h localhost -U "$DB_USER" -d "$DB_NAME" -tAc \
+      "SELECT COALESCE(SUM(wallet_balance),0) FROM users" 2>/dev/null || echo '?')
+    LEDGER=$(psql -h localhost -U "$DB_USER" -d "$DB_NAME" -tAc \
+      "SELECT COALESCE(SUM(CASE WHEN direction='credit' THEN amount ELSE -amount END),0)
+         FROM wallet_transactions" 2>/dev/null || echo '?')
+    DRIFT=$(psql -h localhost -U "$DB_USER" -d "$DB_NAME" -tAc "
+      SELECT count(*) FROM (
+        SELECT u.id FROM users u
+          LEFT JOIN wallet_transactions t ON t.user_id = u.id
+         GROUP BY u.id, u.wallet_balance
+        HAVING u.wallet_balance <> COALESCE(
+          SUM(CASE WHEN t.direction='credit' THEN t.amount ELSE -t.amount END), 0)
+      ) q" 2>/dev/null || echo '?')
+    PEND=$(psql -h localhost -U "$DB_USER" -d "$DB_NAME" -tAc \
+      "SELECT COALESCE(SUM(amount),0) FROM withdrawal_requests WHERE status IN ('pending','approved')" 2>/dev/null || echo 0)
+
+    printf '    مجموع موجودی کیف پول‌ها : %s تومان\n' "$BAL"
+    printf '    جمع جبری دفتر کل        : %s تومان\n' "$LEDGER"
+    printf '    برداشت در جریان         : %s تومان\n' "$PEND"
+
+    if [ "$BAL" = "$LEDGER" ] && [ "${DRIFT:-1}" = "0" ]; then
+      ok "دفتر کل و موجودی‌ها کاملاً می‌خوانند"
+    else
+      printf "${YEL}    ! اختلاف مالی: %s کاربر — موجودی با دفتر کل نمی‌خواند${OFF}\n" "$DRIFT"
+      printf "${YEL}    ! قبل از باز کردن برداشت برای کاربران این را بررسی کنید${OFF}\n"
+      echo "    (مقایسه کنید با db/FINANCIAL_STATEMENT.txt داخل همین بکاپ)"
+    fi
+  fi
+  unset PGPASSWORD
+fi
+
 # ── 7. Web server ─────────────────────────────────────────────────────────
 step "پیکربندی nginx و SSL"
 if [ -d "$HERE/server/nginx-sites" ]; then

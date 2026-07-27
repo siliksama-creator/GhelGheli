@@ -11,7 +11,7 @@ export function CardsPage({ request }) {
   const [types, setTypes] = useState([]);
   const [codes, setCodes] = useState([]);
   const [report, setReport] = useState(null);
-  const [form, setForm] = useState({ name: '', point: '', desc: '', image: '' });
+  const [form, setForm] = useState({ name: '', point: '', cash: '', desc: '', image: '' });
   const [imageFile, setImageFile] = useState(null);
   const [uploadingFor, setUploadingFor] = useState('');
   const [bulkType, setBulkType] = useState('');
@@ -35,6 +35,7 @@ export function CardsPage({ request }) {
     const name = await promptText({ title: 'نام کارت', defaultValue: t.name });
     if (!name) return;
     const pointValue = await promptText({ title: 'امتیاز کارت', defaultValue: `${t.point_value}`, type: 'number' });
+    const cashAmount = await promptText({ title: 'جایزهٔ نقدی (تومان) — صفر یعنی بدون جایزه', defaultValue: `${t.cash_amount || 0}`, type: 'number' });
     const description = await promptText({ title: 'توضیحات کارت', defaultValue: t.description || '', multiline: true });
     // NOTE: the image is intentionally NOT edited here — it used to be a bare
     // text prompt that sent `imageUrl: ''` whenever the admin cancelled or
@@ -46,6 +47,9 @@ export function CardsPage({ request }) {
       body: {
         name,
         pointValue: Number(pointValue) || t.point_value,
+        // صفر مقدار معتبری است، پس `|| fallback` اینجا اشتباه است: با آن،
+        // پاک کردن جایزهٔ نقدی هرگز ذخیره نمی‌شد.
+        cashAmount: cashAmount === null || cashAmount === '' ? t.cash_amount || 0 : Number(cashAmount) || 0,
         description: description || '',
       },
     });
@@ -78,9 +82,15 @@ export function CardsPage({ request }) {
       if (imageFile) imageUrl = await request.uploadImage(imageFile);
       await request('/api/admin/card-types', {
         method: 'POST',
-        body: { name: form.name, pointValue: Number(form.point), description: form.desc, imageUrl },
+        body: {
+          name: form.name,
+          pointValue: Number(form.point),
+          cashAmount: Number(form.cash) || 0,
+          description: form.desc,
+          imageUrl,
+        },
       });
-      setForm({ name: '', point: '', desc: '', image: '' });
+      setForm({ name: '', point: '', cash: '', desc: '', image: '' });
       setImageFile(null);
       notify('نوع کارت ساخته شد');
       load();
@@ -147,6 +157,20 @@ export function CardsPage({ request }) {
             <Field label="امتیاز">
               <Input type="number" value={form.point} onChange={(e) => setForm({ ...form, point: e.target.value })} required />
             </Field>
+            <Field label="جایزهٔ نقدی (تومان)">
+              <Input
+                type="number"
+                min="0"
+                placeholder="0"
+                value={form.cash}
+                onChange={(e) => setForm({ ...form, cash: e.target.value })}
+              />
+              <span className="topbar-sub" style={{ fontSize: 12 }}>
+                {Number(form.cash) > 0
+                  ? `با ثبت این کارت، ${new Intl.NumberFormat('fa-IR').format(Number(form.cash))} تومان به کیف پول کاربر اضافه می‌شود`
+                  : 'صفر = کارت بدون جایزهٔ نقدی'}
+              </span>
+            </Field>
             <Field label="توضیحات">
               <Textarea value={form.desc} onChange={(e) => setForm({ ...form, desc: e.target.value })} rows={3} />
             </Field>
@@ -183,7 +207,11 @@ export function CardsPage({ request }) {
                   )
                 }
                 title={t.name}
-                subtitle={`${fmtNumber(t.point_value)} امتیاز`}
+                subtitle={
+                  Number(t.cash_amount) > 0
+                    ? `${fmtNumber(t.point_value)} امتیاز + ${fmtNumber(t.cash_amount)} تومان`
+                    : `${fmtNumber(t.point_value)} امتیاز`
+                }
                 actions={
                   <div style={{ display: 'flex', gap: 8 }}>
                     <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer' }}>

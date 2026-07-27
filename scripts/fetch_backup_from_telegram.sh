@@ -156,6 +156,17 @@ if [ -f "$UNPACKED/db/TABLE_COUNTS.txt" ]; then
 fi
 IMGS=$(find "$UNPACKED/uploads" -type f 2>/dev/null | wc -l)
 echo "  عکس‌های آپلودی: $IMGS فایل"
+# وضعیت مالی این آرشیو: قبل از بازیابی باید بدانید چه مقدار پول در آن است و
+# آیا در لحظهٔ گرفتن بکاپ، دفتر کل سالم بوده یا نه.
+if [ -f "$UNPACKED/db/FINANCIAL_STATEMENT.txt" ]; then
+  echo "  ${BOLD}وضعیت مالی این بکاپ:${OFF}"
+  grep -E 'total_wallet_balance|ledger_net|transactions ' \
+    "$UNPACKED/db/FINANCIAL_STATEMENT.txt" 2>/dev/null | sed 's/^/    /'
+  if grep -q '!! MISMATCH' "$UNPACKED/db/FINANCIAL_STATEMENT.txt" 2>/dev/null; then
+    echo "    ⚠️  این بکاپ با اختلاف مالی گرفته شده — قبل از بازیابی بخوانید:"
+    echo "        $UNPACKED/db/FINANCIAL_STATEMENT.txt"
+  fi
+fi
 
 # ── Restore ───────────────────────────────────────────────────────────────
 echo

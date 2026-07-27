@@ -10,7 +10,7 @@ export function RewardsPage({ request }) {
   const notify = useToast();
   const [rewards, setRewards] = useState([]);
   const [claims, setClaims] = useState([]);
-  const [form, setForm] = useState({ name: '', points: '', type: 'cash', value: '', desc: '', image: '' });
+  const [form, setForm] = useState({ name: '', points: '', type: 'cash', value: '', cash: '', desc: '', image: '' });
   const [imageFile, setImageFile] = useState(null);
   const [saving, setSaving] = useState(false);
 
@@ -37,12 +37,14 @@ export function RewardsPage({ request }) {
           requiredPoints: Number(form.points) || 0,
           rewardType: form.type,
           rewardValue: form.value,
+          // فقط جایزهٔ نقدی مبلغ واریزی دارد؛ برای جایزهٔ فیزیکی صفر می‌رود
+          cashAmount: form.type === 'cash' ? Number(form.cash) || 0 : 0,
           description: form.desc,
           imageUrl,
           displayOrder: rewards.length + 1,
         },
       });
-      setForm({ name: '', points: '', type: 'cash', value: '', desc: '', image: '' });
+      setForm({ name: '', points: '', type: 'cash', value: '', cash: '', desc: '', image: '' });
       setImageFile(null);
       notify('جایزه ذخیره شد');
       load();
@@ -79,6 +81,22 @@ export function RewardsPage({ request }) {
             <Field label="مبلغ / توضیح جایزه">
               <Input value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} />
             </Field>
+            {form.type === 'cash' && (
+              <Field label="مبلغ واریز به کیف پول (تومان)">
+                <Input
+                  type="number"
+                  min="0"
+                  placeholder="0"
+                  value={form.cash}
+                  onChange={(e) => setForm({ ...form, cash: e.target.value })}
+                />
+                <span className="topbar-sub" style={{ fontSize: 12 }}>
+                  {Number(form.cash) > 0
+                    ? `هنگام «پرداخت شد»، ${new Intl.NumberFormat('fa-IR').format(Number(form.cash))} تومان به کیف پول واریز می‌شود`
+                    : 'صفر = واریز خودکار انجام نمی‌شود؛ فیلد بالا فقط متن است'}
+                </span>
+              </Field>
+            )}
             <Field label="عکس جایزه">
               <div className="file-field">
                 <Input placeholder="آدرس عکس آماده" value={form.image} onChange={(e) => setForm({ ...form, image: e.target.value })} />
