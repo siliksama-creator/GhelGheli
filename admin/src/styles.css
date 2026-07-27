@@ -830,3 +830,37 @@ table.data-table {
   .card-grid.cols-4 { grid-template-columns: 1fr; }
   .wallet-stat { min-height: auto; }
 }
+
+/* ---------- مدیریت نوع کارت (ویرایش + کد دسته‌ای) ---------- */
+.ct-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 14px 0 14px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--gg-surface-2, rgba(255, 255, 255, .05));
+}
+.ct-tabs button {
+  flex: 1;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--gg-text-muted);
+  font: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background .18s, color .18s;
+}
+.ct-tabs button.on {
+  background: var(--gg-primary, #00d49a);
+  color: #04101c;
+}
+.bulk-report {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(0, 212, 154, .08);
+  border: 1px solid rgba(0, 212, 154, .25);
+}

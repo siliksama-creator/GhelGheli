@@ -8,6 +8,7 @@ import '../../theme/tokens.dart';
 import '../../widgets/safe_image.dart';
 import '../../widgets/state_views.dart';
 import 'widgets/form_section.dart';
+import 'widgets/card_type_sheet.dart';
 import 'widgets/image_url_field.dart';
 
 /// Card-type + card-code administration. Same endpoints as legacy
@@ -36,6 +37,9 @@ class _AdminCardsState extends State<AdminCards> {
   String? _imageError;
   final _singleCode = TextEditingController();
   final _bulkCodes = TextEditingController();
+  /// همان سقف سرور. اگر این عدد با سرور فرق کند، یا بی‌دلیل جلوی مدیر
+  /// گرفته می‌شود یا بعد از انتظار پیام خطای سرور را می‌بیند.
+  static const int _bulkLimit = 1000;
   bool _savingType = false;
   bool _savingSingle = false;
   bool _savingBulk = false;
@@ -43,6 +47,7 @@ class _AdminCardsState extends State<AdminCards> {
   @override
   void initState() {
     super.initState();
+    _bulkCodes.addListener(() => setState(() {}));
     _load();
   }
 
@@ -153,124 +158,15 @@ class _AdminCardsState extends State<AdminCards> {
         ),
       );
 
-  Future<void> _editType(Map t) async {
-    final n = TextEditingController(text: t['name'] ?? '');
-    final pts = TextEditingController(text: '${t['point_value'] ?? 0}');
-    final cash = TextEditingController(text: '${t['cash_amount'] ?? 0}');
-    final img = TextEditingController(text: t['image_url'] ?? '');
-    final ds = TextEditingController(text: t['description'] ?? '');
-    var editUploading = false;
-    String? editError;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('ویرایش کارت'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                  controller: n,
-                  decoration: const InputDecoration(labelText: 'نام کارت')),
-              Gaps.vSm,
-              TextField(
-                  controller: pts,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'امتیاز')),
-              Gaps.vSm,
-              TextField(
-                  controller: cash,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                      labelText: 'جایزهٔ نقدی (تومان)',
-                      helperText: 'صفر = بدون جایزهٔ نقدی')),
-              Gaps.vSm,
-              // Real picker instead of a bare URL box: typing/clearing this
-              // by hand used to send an empty string, which wiped the card's
-              // picture on the server.
-              StatefulBuilder(
-                builder: (ctx, setLocal) => ImageUrlField(
-                  controller: img,
-                  label: 'عکس کارت',
-                  uploading: editUploading,
-                  error: editError,
-                  onPick: () async {
-                    final x = await ImagePicker().pickImage(
-                        source: ImageSource.gallery, imageQuality: 82);
-                    if (x == null) return;
-                    setLocal(() {
-                      editUploading = true;
-                      editError = null;
-                    });
-                    try {
-                      final url = await widget.api.uploadAdminImage(x.path);
-                      img.text = url;
-                    } catch (e) {
-                      editError = apiError(e);
-                    } finally {
-                      setLocal(() => editUploading = false);
-                    }
-                  },
-                ),
-              ),
-              Gaps.vSm,
-              TextField(
-                  controller: ds,
-                  decoration: const InputDecoration(labelText: 'توضیحات')),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('لغو')),
-          FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('ذخیره')),
-        ],
-      ),
-    );
-    // These four controllers were created per dialog and never disposed, so
-    // every edit leaked their text buffers and change listeners for the life
-    // of the app. `try/finally` guarantees cleanup even when the save throws.
-    try {
-      if (ok != true) return;
-      if (editUploading) {
-        _toast('آپلود عکس تمام نشده بود؛ تغییرات ذخیره نشد');
-        return;
-      }
-      final name = n.text.trim();
-      if (name.isEmpty) {
-        _toast('نام کارت نمی‌تواند خالی باشد');
-        return;
-      }
-      final body = <String, dynamic>{
-        'name': name,
-        'pointValue': int.tryParse(pts.text) ?? 0,
-        'cashAmount': Money.parse(cash.text) ?? 0,
-        'description': ds.text.trim(),
-      };
-      // Only send the image when there IS one. Sending '' told the server to
-      // blank the existing picture — exactly how cards lost their artwork.
-      final newImg = img.text.trim();
-      if (newImg.isNotEmpty) body['imageUrl'] = newImg;
-      // A failed save used to throw silently out of this handler: the dialog
-      // closed, nothing changed on screen, and the admin believed the edit
-      // had been applied.
-      try {
-        await widget.api.patch('/api/admin/card-types/${t['id']}', body);
-        await _load();
-        _toast('کارت ذخیره شد');
-      } catch (e) {
-        _toast(apiError(e));
-      }
-    } finally {
-      n.dispose();
-      pts.dispose();
-      cash.dispose();
-      img.dispose();
-      ds.dispose();
-    }
+  /// مدیریت یک کارت موجود: ویرایش مشخصات و افزودن کد دسته‌ای، در یک شیت.
+  ///
+  /// پیش‌تر این دو کار در دو نقطهٔ جدا بودند و مدیر باید کارت را از یک
+  /// کشویی دوباره پیدا می‌کرد تا کد اضافه کند — با ده‌ها کارت، انتخاب
+  /// اشتباه یعنی هزار کد روی کارت غلط.
+  Future<void> _manageType(Map t) async {
+    final changed = await CardTypeSheet.show(
+        context, widget.api, Map<String, dynamic>.from(t));
+    if (changed == true) await _load();
   }
 
   Future<void> _addSingle() async {
@@ -291,8 +187,17 @@ class _AdminCardsState extends State<AdminCards> {
     }
   }
 
+  int get _bulkCount => _bulkCodes.text
+      .split(RegExp(r'[\n,;\t ]+'))
+      .where((c) => c.trim().isNotEmpty)
+      .length;
+
   Future<void> _addBulk() async {
     if (_selectedType == null || _bulkCodes.text.trim().isEmpty) return;
+    if (_bulkCount > _bulkLimit) {
+      _toast('حداکثر ${faNum(_bulkLimit)} کد در هر بار؛ ${faNum(_bulkCount)} کد وارد شده');
+      return;
+    }
     setState(() => _savingBulk = true);
     try {
       final r = await widget.api.post('/api/admin/card-codes/bulk',
@@ -394,11 +299,20 @@ class _AdminCardsState extends State<AdminCards> {
               textCapitalization: TextCapitalization.characters,
               minLines: 4,
               maxLines: 8,
-              decoration: const InputDecoration(
-                  labelText: 'ثبت دسته‌جمعی؛ هر خط یک کد یا جدا با کاما'),
+              decoration: InputDecoration(
+                labelText: 'ثبت دسته‌جمعی؛ هر خط یک کد یا جدا با کاما',
+                errorText: _bulkCount > _bulkLimit
+                    ? 'حداکثر ${faNum(_bulkLimit)} کد در هر بار'
+                    : null,
+                counterText: _bulkCount == 0
+                    ? null
+                    : '${faNum(_bulkCount)} کد از ${faNum(_bulkLimit)}',
+              ),
             ),
             FilledButton.icon(
-              onPressed: _savingBulk ? null : _addBulk,
+              onPressed: (_savingBulk || _bulkCount > _bulkLimit)
+                  ? null
+                  : _addBulk,
               icon: _savingBulk
                   ? const _MiniSpinner()
                   : const Icon(Icons.upload_file_rounded),
@@ -441,18 +355,32 @@ class _AdminCardsState extends State<AdminCards> {
                                     fallbackEmoji: '🃏'))
                             : const Icon(Icons.credit_card_rounded),
                         title: Text(t['name']),
-                        subtitle: Text(
-                          (t['cash_amount'] ?? 0) > 0
-                              ? '${faNum(t['point_value'])} امتیاز + ${Money.withUnit(t['cash_amount'])}'
-                              : '${faNum(t['point_value'])} امتیاز',
-                          style: (t['cash_amount'] ?? 0) > 0
-                              ? const TextStyle(
-                                  color: BrandColors.emerald,
-                                  fontWeight: FontWeight.w600)
-                              : null,
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              (t['cash_amount'] ?? 0) > 0
+                                  ? '${faNum(t['point_value'])} امتیاز + ${Money.withUnit(t['cash_amount'])}'
+                                  : '${faNum(t['point_value'])} امتیاز',
+                              style: (t['cash_amount'] ?? 0) > 0
+                                  ? const TextStyle(
+                                      color: BrandColors.emerald,
+                                      fontWeight: FontWeight.w600)
+                                  : null,
+                            ),
+                            // شمار کدها همین‌جا دیده می‌شود تا مدیر بفهمد
+                            // کدام کارت به کد جدید نیاز دارد، بدون باز کردن آن.
+                            Text(
+                              '${faNum(t['code_count'] ?? 0)} کد · '
+                              '${faNum(t['unused_count'] ?? 0)} مصرف‌نشده',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
                         ),
-                        trailing: const Icon(Icons.edit_rounded),
-                        onTap: () => _editType(Map<String, dynamic>.from(t)),
+                        isThreeLine: true,
+                        trailing: const Icon(Icons.tune_rounded),
+                        onTap: () => _manageType(Map<String, dynamic>.from(t)),
                       ))
                   .toList(),
         ),

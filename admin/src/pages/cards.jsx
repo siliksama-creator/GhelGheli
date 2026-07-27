@@ -3,11 +3,12 @@ import { Ban, CreditCard, Image as ImageIcon, ListChecks, Pencil, Upload } from 
 import { assetUrl, fmtNumber } from '../lib/api.js';
 import { Badge, Button, Card, DataRow, EmptyState, Field, Input, Select, Textarea } from '../components/ui.jsx';
 import { useDialog } from '../components/dialog.jsx';
+import { CardTypeModal, BULK_LIMIT } from '../components/card-type-modal.jsx';
 import { useToast } from '../lib/toast.jsx';
 
 export function CardsPage({ request }) {
   const notify = useToast();
-  const { promptText, confirmAction } = useDialog();
+  const { confirmAction } = useDialog();
   const [types, setTypes] = useState([]);
   const [codes, setCodes] = useState([]);
   const [report, setReport] = useState(null);
@@ -17,6 +18,7 @@ export function CardsPage({ request }) {
   const [bulkType, setBulkType] = useState('');
   const [bulkCodes, setBulkCodes] = useState('');
   const [singleCode, setSingleCode] = useState('');
+  const [managing, setManaging] = useState(null);
   const [savingType, setSavingType] = useState(false);
   const [savingBulk, setSavingBulk] = useState(false);
   const [savingSingle, setSavingSingle] = useState(false);
@@ -30,32 +32,6 @@ export function CardsPage({ request }) {
   };
 
   useEffect(load, [request]);
-
-  async function editType(t) {
-    const name = await promptText({ title: 'نام کارت', defaultValue: t.name });
-    if (!name) return;
-    const pointValue = await promptText({ title: 'امتیاز کارت', defaultValue: `${t.point_value}`, type: 'number' });
-    const cashAmount = await promptText({ title: 'جایزهٔ نقدی (تومان) — صفر یعنی بدون جایزه', defaultValue: `${t.cash_amount || 0}`, type: 'number' });
-    const description = await promptText({ title: 'توضیحات کارت', defaultValue: t.description || '', multiline: true });
-    // NOTE: the image is intentionally NOT edited here — it used to be a bare
-    // text prompt that sent `imageUrl: ''` whenever the admin cancelled or
-    // left it blank, silently WIPING the card's picture. Use the dedicated
-    // "تغییر عکس" button (real file upload) instead, and omit the field here
-    // so the server's COALESCE keeps the existing image untouched.
-    await request(`/api/admin/card-types/${t.id}`, {
-      method: 'PATCH',
-      body: {
-        name,
-        pointValue: Number(pointValue) || t.point_value,
-        // صفر مقدار معتبری است، پس `|| fallback` اینجا اشتباه است: با آن،
-        // پاک کردن جایزهٔ نقدی هرگز ذخیره نمی‌شد.
-        cashAmount: cashAmount === null || cashAmount === '' ? t.cash_amount || 0 : Number(cashAmount) || 0,
-        description: description || '',
-      },
-    });
-    notify('کارت ویرایش شد');
-    load();
-  }
 
   /// Uploads a new picture for an existing card type. The file goes to the
   /// VPS (backend/uploads/images) and only the returned URL is stored.
@@ -116,8 +92,16 @@ export function CardsPage({ request }) {
     }
   }
 
+  // همان قاعدهٔ جداسازی که سرور استفاده می‌کند، تا شمارنده با آنچه واقعاً
+  // ثبت می‌شود یکی باشد.
+  const bulkCount = bulkCodes.split(/[\n,;\t ]+/).filter((c) => c.trim()).length;
+
   async function bulk() {
     if (!bulkType || !bulkCodes.trim()) return;
+    if (bulkCount > BULK_LIMIT) {
+      notify(`حداکثر ${fmtNumber(BULK_LIMIT)} کد در هر بار`, 'error');
+      return;
+    }
     setSavingBulk(true);
     try {
       const r = await request('/api/admin/card-codes/bulk', { method: 'POST', body: { cardTypeId: bulkType, rawCodes: bulkCodes } });
@@ -208,9 +192,10 @@ export function CardsPage({ request }) {
                 }
                 title={t.name}
                 subtitle={
-                  Number(t.cash_amount) > 0
+                  `${Number(t.cash_amount) > 0
                     ? `${fmtNumber(t.point_value)} امتیاز + ${fmtNumber(t.cash_amount)} تومان`
-                    : `${fmtNumber(t.point_value)} امتیاز`
+                    : `${fmtNumber(t.point_value)} امتیاز`}`
+                  + ` — ${fmtNumber(t.code_count || 0)} کد، ${fmtNumber(t.unused_count || 0)} مصرف‌نشده`
                 }
                 actions={
                   <div style={{ display: 'flex', gap: 8 }}>
@@ -227,8 +212,8 @@ export function CardsPage({ request }) {
                         }}
                       />
                     </label>
-                    <Button size="sm" variant="secondary" icon={Pencil} onClick={() => editType(t)}>
-                      ویرایش
+                    <Button size="sm" variant="secondary" icon={Pencil} onClick={() => setManaging(t)}>
+                      ویرایش و کد
                     </Button>
                   </div>
                 }
@@ -268,11 +253,30 @@ export function CardsPage({ request }) {
               onChange={(e) => setBulkCodes(e.target.value.toUpperCase())}
               placeholder="هر خط یک کد یا جدا شده با کاما"
               rows={7}
-              style={{ textTransform: 'uppercase' }}
+              style={{
+                textTransform: 'uppercase',
+                ...(bulkCount > BULK_LIMIT ? { borderColor: 'var(--gg-danger)' } : {}),
+              }}
             />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginTop: 4 }}>
+              <span className="topbar-sub">
+                {fmtNumber(bulkCount)} کد از {fmtNumber(BULK_LIMIT)}
+              </span>
+              {bulkCount > BULK_LIMIT && (
+                <span style={{ color: 'var(--gg-danger)', fontWeight: 700 }}>
+                  حداکثر {fmtNumber(BULK_LIMIT)} کد در هر بار
+                </span>
+              )}
+            </div>
           </Field>
-          <Button icon={ListChecks} onClick={bulk} loading={savingBulk} className="btn-block">
-            بررسی و ورود کدها
+          <Button
+            icon={ListChecks}
+            onClick={bulk}
+            loading={savingBulk}
+            disabled={bulkCount > BULK_LIMIT}
+            className="btn-block"
+          >
+            {bulkCount === 0 ? 'بررسی و ورود کدها' : `ورود ${fmtNumber(bulkCount)} کد`}
           </Button>
           {report && (
             <div className="report-grid">
@@ -324,6 +328,18 @@ export function CardsPage({ request }) {
           )}
         </Card>
       </div>
+      {managing && (
+        <CardTypeModal
+          cardType={managing}
+          request={request}
+          notify={notify}
+          onSaved={load}
+          onClose={(changed) => {
+            setManaging(null);
+            if (changed) load();
+          }}
+        />
+      )}
     </div>
   );
 }
