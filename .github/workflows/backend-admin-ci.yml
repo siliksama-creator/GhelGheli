@@ -53,9 +53,19 @@ jobs:
       - name: Wait for the preview server
         run: npx wait-on http://localhost:4173 --timeout 60000
       # Without a token this covers the login screen only — enough to catch a
-      # missing @font-face, a synthetic bold or a render crash. The full
-      # logged-in walk runs against production after each deploy.
+      # missing @font-face, a synthetic bold or a render crash.
+      #
+      # The logged-in half of smoke.mjs (which walks all 7 tabs, including
+      # کیف پول, and asserts the wallet hero/actions actually render) needs a
+      # real JWT and a reachable API, so it CANNOT run here: the API only
+      # allows its own origins via CORS, and a CI runner is not one of them.
+      # It is run against the live domain right after every deploy:
+      #
+      #   node tool/smoke.mjs https://user.ghelghelishop.ir "$JWT"
+      #
+      # Keep that step in the deploy checklist — a green CI here does NOT
+      # mean the wallet renders.
       - name: Typography regression
         run: node tool/typography.mjs http://localhost:4173
-      - name: Render smoke test
+      - name: Render smoke test (login screen only)
         run: node tool/smoke.mjs http://localhost:4173
