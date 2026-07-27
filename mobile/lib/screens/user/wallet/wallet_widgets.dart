@@ -322,15 +322,25 @@ class _MiniStat extends StatelessWidget {
     final theme = Theme.of(context);
     return Column(
       children: [
+        // BUG FIX: با مبلغ‌های خیلی بزرگ، برچسبِ کنار آیکون از عرض ستون
+        // بیرون می‌زد (RenderFlex overflow). Flexible اجازه می‌دهد متن
+        // کوچک/کوتاه شود به‌جای اینکه چیدمان را بشکند.
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, size: 14, color: color),
             Gaps.hXxs,
-            Text(label,
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: Colors.white.withValues(alpha: 0.72),
-                )),
+                ),
+              ),
+            ),
           ],
         ),
         Gaps.vXxs,

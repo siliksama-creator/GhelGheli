@@ -18,12 +18,20 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ghelgheli_mobile/core/money.dart';
 import 'package:ghelgheli_mobile/screens/user/wallet/wallet_widgets.dart';
+import 'package:ghelgheli_mobile/theme/app_theme.dart';
 
-Widget _wrap(Widget child) => MaterialApp(
-      theme: ThemeData(useMaterial3: true, brightness: Brightness.dark),
+// از تم واقعی اپ استفاده می‌کنیم، نه یک ThemeData خالی: ویجت‌هایی مثل
+// AppCard به افزونهٔ BrandTheme نیاز دارند و با تم خالی کرش می‌کنند.
+// تست باید همان چیزی را بسنجد که کاربر می‌بیند.
+Widget _wrap(Widget child, {double width = 400}) => MaterialApp(
+      theme: AppTheme.dark(),
       home: Directionality(
         textDirection: TextDirection.rtl,
-        child: Scaffold(body: SingleChildScrollView(child: child)),
+        child: Scaffold(
+          body: SingleChildScrollView(
+            child: SizedBox(width: width, child: child),
+          ),
+        ),
       ),
     );
 
@@ -416,15 +424,15 @@ void main() {
     });
 
     testWidgets('مبلغ خیلی بزرگ سرریز چیدمان نمی‌کند', (tester) async {
-      await tester.pumpWidget(_wrap(const SizedBox(
-        width: 320,
-        child: WalletBalanceCard(
+      await tester.pumpWidget(_wrap(
+        const WalletBalanceCard(
           balance: 987654321000,
           totalIn: 987654321000,
           totalOut: 0,
           pendingAmount: 0,
         ),
-      )));
+        width: 320,
+      ));
       await tester.pumpAndSettle();
       // اگر RenderFlex سرریز کند، takeException آن را می‌گیرد
       expect(tester.takeException(), isNull);
