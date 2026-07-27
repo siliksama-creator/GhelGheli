@@ -37,8 +37,7 @@ class _AdminCardsState extends State<AdminCards> {
   String? _imageError;
   final _singleCode = TextEditingController();
   final _bulkCodes = TextEditingController();
-  /// همان سقف سرور. اگر این عدد با سرور فرق کند، یا بی‌دلیل جلوی مدیر
-  /// گرفته می‌شود یا بعد از انتظار پیام خطای سرور را می‌بیند.
+  /// سقف **هر بار ثبت**، نه سقف کل کارت. مجموع کدهای یک کارت نامحدود است.
   static const int _bulkLimit = 1000;
   bool _savingType = false;
   bool _savingSingle = false;
@@ -195,7 +194,8 @@ class _AdminCardsState extends State<AdminCards> {
   Future<void> _addBulk() async {
     if (_selectedType == null || _bulkCodes.text.trim().isEmpty) return;
     if (_bulkCount > _bulkLimit) {
-      _toast('حداکثر ${faNum(_bulkLimit)} کد در هر بار؛ ${faNum(_bulkCount)} کد وارد شده');
+      _toast('هر بار حداکثر ${faNum(_bulkLimit)} کد؛ ${faNum(_bulkCount)} کد وارد شده. '
+          'بقیه را در نوبت بعد اضافه کنید.');
       return;
     }
     setState(() => _savingBulk = true);
@@ -302,11 +302,11 @@ class _AdminCardsState extends State<AdminCards> {
               decoration: InputDecoration(
                 labelText: 'ثبت دسته‌جمعی؛ هر خط یک کد یا جدا با کاما',
                 errorText: _bulkCount > _bulkLimit
-                    ? 'حداکثر ${faNum(_bulkLimit)} کد در هر بار'
+                    ? 'هر بار حداکثر ${faNum(_bulkLimit)} کد — می‌توانید چند نوبت اضافه کنید'
                     : null,
                 counterText: _bulkCount == 0
-                    ? null
-                    : '${faNum(_bulkCount)} کد از ${faNum(_bulkLimit)}',
+                    ? 'هر بار تا ${faNum(_bulkLimit)} کد · بدون سقف برای مجموع'
+                    : '${faNum(_bulkCount)} کد در این نوبت (حداکثر ${faNum(_bulkLimit)})',
               ),
             ),
             FilledButton.icon(

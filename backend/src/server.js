@@ -1218,10 +1218,17 @@ app.patch('/api/admin/card-codes/:id/void', adminAuth, validateUuid('id'), requi
   await audit(req.admin.id, 'void_card_code', 'card_codes', rows[0].id, req.body.reason || 'ابطال دستی', {});
   res.json({ message: 'کد باطل شد' });
 }));
-// حداکثر تعداد کد در یک بار ثبت دسته‌ای.
-// چرا سقف لازم است: بدون آن، یک چسباندن اشتباهی (مثلاً کل یک فایل CSV)
-// می‌تواند صدها هزار ردیف بسازد، تراکنش را دقیقه‌ها باز نگه دارد و پاسخ
-// چندمگابایتی تولید کند. سقف ۱۰۰۰ همان چیزی است که محصول وعده می‌دهد.
+// حداکثر تعداد کد در **یک درخواست**.
+//
+// این سقفِ کل کارت نیست: هیچ محدودیتی برای مجموع کدهای یک نوع کارت وجود
+// ندارد و مدیر می‌تواند این عملیات را هر چند بار که خواست تکرار کند.
+// (آزموده‌شده روی سرور: سه بار ۱۰۰۰تایی روی یک کارت = ۳۰۰۰ کد، هر بار
+// حدود نیم ثانیه.)
+//
+// چرا اصلاً سقفِ هر-درخواست لازم است: بدون آن، یک چسباندن اشتباهی (مثلاً
+// کل یک فایل CSV) می‌تواند صدها هزار ردیف بسازد، تراکنش را دقیقه‌ها باز
+// نگه دارد — و همان تراکنش روی جدولی قفل می‌گیرد که مسیر «ثبت کد»
+// کاربران هم به آن نیاز دارد.
 const BULK_CODE_LIMIT = 1000;
 
 app.post('/api/admin/card-codes/bulk', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
@@ -1242,7 +1249,8 @@ app.post('/api/admin/card-codes/bulk', adminAuth, requireRole('support'), asyncH
   if (!input.length) return res.status(400).json({ message: 'هیچ کدی وارد نشده است' });
   if (input.length > BULK_CODE_LIMIT) {
     return res.status(400).json({
-      message: `حداکثر ${BULK_CODE_LIMIT} کد در هر بار قابل ثبت است؛ شما ${input.length} کد فرستادید`,
+      message: `در هر نوبت حداکثر ${BULK_CODE_LIMIT} کد قابل ثبت است؛ شما ${input.length} کد فرستادید. `
+        + `بقیه را در نوبت بعد اضافه کنید — برای مجموع کدهای یک کارت هیچ سقفی وجود ندارد.`,
     });
   }
 

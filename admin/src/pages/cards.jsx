@@ -99,7 +99,10 @@ export function CardsPage({ request }) {
   async function bulk() {
     if (!bulkType || !bulkCodes.trim()) return;
     if (bulkCount > BULK_LIMIT) {
-      notify(`حداکثر ${fmtNumber(BULK_LIMIT)} کد در هر بار`, 'error');
+      notify(
+        `هر بار حداکثر ${fmtNumber(BULK_LIMIT)} کد؛ بقیه را در نوبت بعد اضافه کنید.`,
+        'error',
+      );
       return;
     }
     setSavingBulk(true);
@@ -260,11 +263,13 @@ export function CardsPage({ request }) {
             />
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginTop: 4 }}>
               <span className="topbar-sub">
-                {fmtNumber(bulkCount)} کد از {fmtNumber(BULK_LIMIT)}
+                {bulkCount === 0
+                  ? `هر بار تا ${fmtNumber(BULK_LIMIT)} کد · بدون سقف برای مجموع`
+                  : `${fmtNumber(bulkCount)} کد در این نوبت (حداکثر ${fmtNumber(BULK_LIMIT)})`}
               </span>
               {bulkCount > BULK_LIMIT && (
                 <span style={{ color: 'var(--gg-danger)', fontWeight: 700 }}>
-                  حداکثر {fmtNumber(BULK_LIMIT)} کد در هر بار
+                  این نوبت را به چند بخش تقسیم کنید
                 </span>
               )}
             </div>

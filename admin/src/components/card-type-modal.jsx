@@ -12,7 +12,14 @@ import { Badge, Button, Field, Input, Textarea } from './ui.jsx';
  * کارت، انتخاب اشتباه یعنی هزار کد روی کارت غلط.
  */
 
-/** باید با BULK_CODE_LIMIT سمت سرور یکی باشد. */
+/**
+ * سقف **هر بار ثبت**، نه سقف کل کارت.
+ *
+ * هیچ محدودیتی برای مجموع کدهای یک کارت نیست؛ مدیر می‌تواند بارها تکرار
+ * کند. این عدد فقط اندازهٔ یک درخواست را محدود می‌کند تا یک چسباندن
+ * اشتباهی تراکنش را دقیقه‌ها باز نگه ندارد.
+ * باید با BULK_CODE_LIMIT سمت سرور یکی باشد.
+ */
 export const BULK_LIMIT = 1000;
 
 const fa = (n) => new Intl.NumberFormat('fa-IR').format(Number(n || 0));
@@ -76,7 +83,10 @@ export function CardTypeModal({ cardType, request, notify, onClose, onSaved }) {
       return;
     }
     if (tooMany) {
-      notify(`حداکثر ${fa(BULK_LIMIT)} کد در هر بار`, 'error');
+      notify(
+        `هر بار حداکثر ${fa(BULK_LIMIT)} کد؛ بقیه را در نوبت بعد اضافه کنید — سقفی برای مجموع کدهای کارت نیست.`,
+        'error',
+      );
       return;
     }
     // تأیید صریح با نام کارت مقصد: ثبت کد برگشت‌پذیر نیست (کدها فقط باطل
@@ -186,6 +196,7 @@ export function CardTypeModal({ cardType, request, notify, onClose, onSaved }) {
           <div>
             <p className="topbar-sub" style={{ fontSize: 12, marginBottom: 8 }}>
               کدها به «<b>{cardType.name}</b>» اضافه می‌شوند. هر خط یک کد، یا جدا با کاما.
+              {' '}هر نوبت تا {fa(BULK_LIMIT)} کد؛ می‌توانید بارها تکرار کنید (مجموع نامحدود).
             </p>
             <Textarea
               rows={8}
@@ -203,11 +214,13 @@ export function CardTypeModal({ cardType, request, notify, onClose, onSaved }) {
               }}
             >
               <span className="topbar-sub">
-                {fa(codeCount)} کد از {fa(BULK_LIMIT)}
+                {codeCount === 0
+                  ? `هر بار تا ${fa(BULK_LIMIT)} کد · بدون سقف برای مجموع`
+                  : `${fa(codeCount)} کد در این نوبت (حداکثر ${fa(BULK_LIMIT)})`}
               </span>
               {tooMany && (
                 <span style={{ color: 'var(--gg-danger)', fontWeight: 700 }}>
-                  حداکثر {fa(BULK_LIMIT)} کد در هر بار
+                  این نوبت را به چند بخش تقسیم کنید
                 </span>
               )}
             </div>

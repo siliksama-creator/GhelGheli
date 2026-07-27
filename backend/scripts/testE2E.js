@@ -1137,6 +1137,32 @@ async function testCardTypeManagement() {
     'پاسخ فقط نمونه برمی‌گرداند نه هزار کد',
     `sample=${okBulk.data?.inserted?.length}`);
 
+  group('⚠️ بدون سقف تجمعی: چند نوبت روی همان کارت');
+  // این کارت تا اینجا ۱۰۰۰+۱۲۰ کد دارد. سه نوبت دیگر اضافه می‌کنیم تا
+  // ثابت شود سقف ۱۰۰۰ فقط «هر بار» است و مجموع کدهای یک کارت محدود نیست.
+  // اگر روزی کسی سهواً یک شرط تجمعی اضافه کند، این تست می‌افتد.
+  const before = Number((await GET('/api/admin/card-types', A)).data
+    .find(t => t.id === id).code_count);
+  let added = 0;
+  for (let round = 0; round < 3; round++) {
+    const more = Array.from({ length: 500 },
+      (_, i) => `CUM${round}${uniq().toUpperCase()}${String(i).padStart(4, '0')}`);
+    const r = await POST('/api/admin/card-codes/bulk',
+      { cardTypeId: id, rawCodes: more.join('\n') }, A);
+    ok(r.status === 200 && r.data?.insertedCount === 500,
+      `نوبت ${round + 1}: ۵۰۰ کد دیگر اضافه شد`,
+      `status=${r.status} inserted=${r.data?.insertedCount} msg=${r.data?.message || ''}`);
+    added += r.data?.insertedCount || 0;
+  }
+  const after = Number((await GET('/api/admin/card-types', A)).data
+    .find(t => t.id === id).code_count);
+  ok(after === before + added,
+    'همهٔ نوبت‌ها روی هم جمع شدند — هیچ سقف تجمعی وجود ندارد',
+    `${before} + ${added} = ${before + added}، سرور می‌گوید ${after}`);
+  ok(after > 2000,
+    'یک کارت بیش از ۲۰۰۰ کد دارد و سرور همچنان قبول می‌کند',
+    `total=${after}`);
+
   group('ورودی‌های نامعتبر');
   const noType = await POST('/api/admin/card-codes/bulk', { rawCodes: 'ABC12345' }, A);
   ok(noType.status === 400, 'بدون نوع کارت ۴۰۰ می‌دهد', `status=${noType.status}`);

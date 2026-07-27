@@ -63,8 +63,13 @@ class _CardTypeSheetState extends State<CardTypeSheet>
   Map? _report;
   bool _changed = false;
 
-  /// همان سقفی که سرور اعمال می‌کند. اگر این دو از هم فاصله بگیرند، کاربر
-  /// یا بی‌دلیل جلویش گرفته می‌شود یا پیام خطای سرور را بعد از انتظار می‌بیند.
+  /// سقف **هر بار ثبت**، نه سقف کل کارت.
+  ///
+  /// هیچ محدودیتی برای مجموع کدهای یک کارت وجود ندارد: مدیر می‌تواند این
+  /// کار را هر چند بار که خواست تکرار کند و کارت به هزاران کد برسد. این
+  /// عدد فقط اندازهٔ یک درخواست را محدود می‌کند تا یک چسباندن اشتباهی
+  /// تراکنش را دقیقه‌ها باز نگه ندارد. (روی سرور آزموده شد: سه بار ۱۰۰۰
+  /// تایی روی یک کارت = ۳۰۰۰ کد، هر بار ~۰.۵ ثانیه.)
   static const int bulkLimit = 1000;
 
   @override
@@ -157,7 +162,8 @@ class _CardTypeSheetState extends State<CardTypeSheet>
       return;
     }
     if (codes.length > bulkLimit) {
-      _toast('حداکثر ${faNum(bulkLimit)} کد در هر بار؛ شما ${faNum(codes.length)} کد وارد کرده‌اید');
+      _toast('هر بار حداکثر ${faNum(bulkLimit)} کد؛ ${faNum(codes.length)} کد وارد کرده‌اید. '
+          'بقیه را در نوبت بعد اضافه کنید — سقفی برای مجموع کدهای کارت نیست.');
       return;
     }
 
@@ -366,7 +372,8 @@ class _CardTypeSheetState extends State<CardTypeSheet>
                               Gaps.hXs,
                               Expanded(
                                 child: Text(
-                                  'کدها به «${t['name']}» اضافه می‌شوند. هر خط یک کد، یا جدا با کاما.',
+                                  'کدها به «${t['name']}» اضافه می‌شوند. هر خط یک کد، یا جدا با کاما. '
+                              'هر نوبت تا ${faNum(bulkLimit)} کد؛ می‌توانید بارها تکرار کنید.',
                                   style: theme.textTheme.bodySmall,
                                 ),
                               ),
@@ -383,10 +390,11 @@ class _CardTypeSheetState extends State<CardTypeSheet>
                             labelText: 'کدها',
                             hintText: 'GHEL-0001\nGHEL-0002\n...',
                             errorText: tooMany
-                                ? 'حداکثر ${faNum(bulkLimit)} کد در هر بار'
+                                ? 'هر بار حداکثر ${faNum(bulkLimit)} کد — می‌توانید چند نوبت اضافه کنید'
                                 : null,
-                            counterText:
-                                '${faNum(count)} کد از ${faNum(bulkLimit)}',
+                            counterText: count == 0
+                                ? 'هر بار تا ${faNum(bulkLimit)} کد · بدون سقف برای مجموع'
+                                : '${faNum(count)} کد در این نوبت (حداکثر ${faNum(bulkLimit)})',
                             counterStyle: TextStyle(
                               color: tooMany
                                   ? theme.colorScheme.error
