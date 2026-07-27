@@ -371,16 +371,25 @@ class _Pill extends StatelessWidget {
           borderRadius: Corners.rPill,
           border: Border.all(color: color.withValues(alpha: 0.45)),
         ),
+        // BUG FIX: برچسب بلند («۶۰٬۰۰۰ تومان در حال بررسی») روی گوشی باریک
+        // از عرض کارت بیرون می‌زد. Flexible + ellipsis جلوی سرریز را
+        // می‌گیرد بدون اینکه متن کوتاه را بشکند.
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, size: 13, color: color),
             Gaps.hXxs,
-            Text(label,
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: Theme.of(context)
                     .textTheme
                     .bodySmall
-                    ?.copyWith(color: color, fontWeight: FontWeight.w600)),
+                    ?.copyWith(color: color, fontWeight: FontWeight.w600),
+              ),
+            ),
           ],
         ),
       );
@@ -493,14 +502,23 @@ class WithdrawalTile extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // BUG FIX: مبلغ و برچسب وضعیت با هم از عرض ردیف بیرون می‌زدند.
+          // مبلغ داخل Expanded می‌رود تا در صورت نیاز کوچک شود؛ برچسب
+          // وضعیت کوتاه است و اندازهٔ طبیعی خودش را نگه می‌دارد.
           Row(
             children: [
               Icon(style.$2, color: style.$1, size: 20),
               Gaps.hXs,
-              Text(Money.withUnit(request['amount']),
+              Expanded(
+                child: Text(
+                  Money.withUnit(request['amount']),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.titleSmall
-                      ?.copyWith(fontWeight: FontWeight.w800)),
-              const Spacer(),
+                      ?.copyWith(fontWeight: FontWeight.w800),
+                ),
+              ),
+              Gaps.hXs,
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: Gaps.sm, vertical: 4),

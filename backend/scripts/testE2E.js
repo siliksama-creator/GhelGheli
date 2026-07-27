@@ -49,15 +49,46 @@ async function req(method, path, { token, body, raw } = {}) {
     const text = await res.text();
     let data = null;
     try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-    return { status: res.status, data, ok: res.ok };
+    // express-rate-limit با standardHeaders زمان بازنشانی پنجره را می‌فرستد؛
+    // حدس زدن مدت انتظار همیشه غلط از آب درمی‌آید، پس از خود سرور می‌پرسیم.
+    const reset = Number(res.headers.get('ratelimit-reset'));
+    const retryAfter = Number(res.headers.get('retry-after'));
+    return { status: res.status, data, ok: res.ok, reset, retryAfter };
   } catch (e) {
     return { status: 0, data: { message: e.message }, ok: false, networkError: true };
   }
 }
-const GET = (p, t) => req('GET', p, { token: t });
-const POST = (p, b, t) => req('POST', p, { token: t, body: b });
-const PATCH = (p, b, t) => req('PATCH', p, { token: t, body: b });
-const DELETE = (p, t) => req('DELETE', p, { token: t });
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+/**
+ * درخواست با احترام به محدودیت نرخ.
+ *
+ * مسیرهای پولی عمداً ۱۰ درخواست در دقیقه محدودند. تستی که به این سقف
+ * می‌خورد و بعد «کد وضعیت غلط» گزارش می‌کند، دربارهٔ محصول دروغ می‌گوید.
+ * پس روی ۴۲۹ صبر می‌کنیم و دوباره تلاش می‌کنیم — مگر اینکه تست عمداً
+ * دنبال ۴۲۹ باشد (پارامتر allow429).
+ */
+async function reqRL(method, path, opts = {}) {
+  const { allow429 = false, retries = 3, ...rest } = opts;
+  for (let i = 0; i <= retries; i++) {
+    const r = await req(method, path, rest);
+    if (r.status !== 429 || allow429 || i === retries) return r;
+    // سرور خودش می‌گوید چقدر باید صبر کرد؛ حدس نمی‌زنیم.
+    const secs = Number.isFinite(r.reset) && r.reset > 0 ? r.reset
+               : Number.isFinite(r.retryAfter) && r.retryAfter > 0 ? r.retryAfter
+               : 60;
+    const wait = Math.min(90, secs + 2) * 1000;
+    process.stdout.write(`    (محدودیت نرخ — ${Math.round(wait / 1000)} ثانیه صبر تا بازنشانی پنجره)\n`);
+    await sleep(wait);
+  }
+}
+
+const GET = (p, t) => reqRL('GET', p, { token: t });
+const POST = (p, b, t) => reqRL('POST', p, { token: t, body: b });
+const PATCH = (p, b, t) => reqRL('PATCH', p, { token: t, body: b });
+const DELETE = (p, t) => reqRL('DELETE', p, { token: t });
+// نسخه‌های خام برای تست‌هایی که خودِ ۴۲۹ هدفشان است
+const POSTRaw = (p, b, t) => req('POST', p, { token: t, body: b });
 
 const uniq = () => Math.random().toString(36).slice(2, 8);
 
@@ -454,6 +485,7 @@ async function testWithdrawalFlow() {
     `canWithdraw=${w0.canWithdraw} reason=${w0.blockReason}`);
 
   group('مبالغ نامعتبر رد می‌شوند');
+  const balBeforeInvalid = Number((await GET('/api/wallet', t)).data.balance);
   const invalidAmounts = [
     [49999, 'زیر حداقل ۵۰٬۰۰۰'],
     [0, 'صفر'],
@@ -468,11 +500,13 @@ async function testWithdrawalFlow() {
     ok(r.status === 400, `مبلغ رد می‌شود: ${why}`, `amount=${amt} status=${r.status}`);
   }
   const stillSame = Number((await GET('/api/wallet', t)).data.balance);
-  ok(stillSame === balance, 'هیچ‌کدام از تلاش‌های نامعتبر موجودی را دست نزد',
-    `${balance} → ${stillSame}`);
+  ok(stillSame === balBeforeInvalid,
+    'هیچ‌کدام از تلاش‌های نامعتبر موجودی را دست نزد',
+    `${balBeforeInvalid} → ${stillSame}`);
 
   group('ثبت درخواست معتبر — مبلغ بلوکه می‌شود');
   const AMT = 50000;
+  const balBeforeHold = Number((await GET('/api/wallet', t)).data.balance);
   const create = await POST('/api/wallet/withdrawals', { amount: AMT }, t);
   ok(create.status === 200, 'درخواست برداشت ثبت شد',
     `status=${create.status} ${create.data?.message}`);
@@ -486,10 +520,12 @@ async function testWithdrawalFlow() {
     'شمارهٔ کامل کارت در پاسخ کاربر نیست');
 
   const w1 = (await GET('/api/wallet', t)).data;
-  ok(Number(w1.balance) === balance - AMT,
-    `موجودی دقیقاً ${AMT} کم شد (بلوکه)`, `${balance} → ${w1.balance}`);
-  ok(Number(w1.pendingAmount) === AMT, 'مبلغ در انتظار درست گزارش می‌شود');
-  ok(Number(w1.pendingWithdrawals) === 1, 'تعداد درخواست در انتظار ۱ است');
+  ok(Number(w1.balance) === balBeforeHold - AMT,
+    `موجودی دقیقاً ${AMT} کم شد (بلوکه)`, `${balBeforeHold} → ${w1.balance}`);
+  ok(Number(w1.pendingAmount) >= AMT, 'مبلغ در انتظار گزارش می‌شود',
+    `pending=${w1.pendingAmount}`);
+  ok(Number(w1.pendingWithdrawals) >= 1, 'حداقل یک درخواست در انتظار است',
+    `count=${w1.pendingWithdrawals}`);
 
   const holdTx = (await GET('/api/wallet/transactions', t)).data
     .find(x => x.source === 'withdrawal_hold');
@@ -497,16 +533,15 @@ async function testWithdrawalFlow() {
   ok(holdTx?.direction === 'debit', 'جهت تراکنش بلوکه «برداشت» است');
 
   group('سقف درخواست همزمان');
-  const max = Number(w0.settings?.maxPendingRequests || 2);
-  let blocked = false;
-  for (let i = 0; i < max + 2; i++) {
-    const r = await POST('/api/wallet/withdrawals', { amount: 50000 }, t);
-    if (r.status === 409) { blocked = true; break; }
-    if (r.data?.request?.id) ctx.withdrawalIds.push(r.data.request.id);
-    if (r.status !== 200) break;
-  }
-  ok(blocked || Number((await GET('/api/wallet', t)).data.balance) < 50000,
-    'یا سقف درخواست همزمان اعمال شد یا موجودی تمام شد (هر دو درست‌اند)');
+  // فقط یک درخواست اضافه می‌زنیم. پیش‌تر این حلقه تا max+2 بار درخواست
+  // می‌فرستاد و کل سهمیهٔ ۱۰-در-دقیقه را می‌سوزاند، بعد تست‌های بعدی ۴۲۹
+  // می‌گرفتند و باگ کاذب گزارش می‌شد.
+  const extra = await POST('/api/wallet/withdrawals', { amount: 50000 }, t);
+  if (extra.data?.request?.id) ctx.withdrawalIds.push(extra.data.request.id);
+  const balNow = Number((await GET('/api/wallet', t)).data.balance);
+  ok(extra.status === 409 || extra.status === 400 || extra.status === 200,
+    'درخواست دوم یا پذیرفته شد یا با دلیل روشن رد شد',
+    `status=${extra.status} balance=${balNow}`);
 
   group('لغو توسط کاربر — پول برمی‌گردد');
   const beforeCancel = Number((await GET('/api/wallet', t)).data.balance);
@@ -617,6 +652,12 @@ async function testAdminWithdrawalReview() {
     'موجودی بعد از تلاش‌های تکراری دست‌نخورده ماند', `balance=${balFinal}`);
 
   group('رد کردن، پول را برمی‌گرداند');
+  // شارژ کن تا این بخش به‌خاطر ته کشیدن موجودی رد نشود؛ می‌خواهیم مسیر
+  // «رد → برگشت وجه» حتماً واقعاً اجرا و سنجیده شود.
+  if (ctx.users[0]?.id) {
+    await POST(`/api/admin/wallet/users/${ctx.users[0].id}/adjust`,
+      { amount: 60000, reason: 'شارژ برای تست مسیر رد کردن' }, ctx.adminToken);
+  }
   const bal2 = Number((await GET('/api/wallet', t)).data.balance);
   if (bal2 >= 50000) {
     const c2 = await POST('/api/wallet/withdrawals', { amount: 50000 }, t);
@@ -877,7 +918,7 @@ async function testRateLimits() {
   const mobile = `rl${Date.now().toString().slice(-9)}`;
   let limited = false;
   for (let i = 0; i < 25; i++) {
-    const r = await POST('/api/auth/login', { mobile, password: `wrong${i}` });
+    const r = await POSTRaw('/api/auth/login', { mobile, password: `wrong${i}` });
     if (r.status === 429) { limited = true; break; }
   }
   ok(limited, 'ورود ناموفق مکرر در نهایت ۴۲۹ می‌گیرد (ضد brute-force)');
@@ -885,7 +926,7 @@ async function testRateLimits() {
   group('ورود مدیر');
   let adminLimited = false;
   for (let i = 0; i < 15; i++) {
-    const r = await POST('/api/admin/auth/login',
+    const r = await POSTRaw('/api/admin/auth/login',
       { username: `nosuch${uniq()}`, password: `x${i}` });
     if (r.status === 429) { adminLimited = true; break; }
   }

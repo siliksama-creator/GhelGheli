@@ -553,6 +553,15 @@ app.patch('/api/profile', auth, asyncHandler(async (req, res) => {
       && b.profileAvatarKey !== '' && !safeAvatarKey(b.profileAvatarKey)) {
     return res.status(400).json({ message: 'آواتار انتخابی معتبر نیست' });
   }
+  // BUG FIX: آواتار محافظ صریح داشت ولی آدرس عکس نداشت. safeImageUrl برای
+  // ورودی خطرناک (javascript: / data: / http) مقدار null برمی‌گرداند، و
+  // COALESCE در کوئری پایین آن را «تغییری نده» تفسیر می‌کرد — یعنی سرور
+  // ۲۰۰ OK برمی‌گرداند و کاربر فکر می‌کرد عکسش ذخیره شده، در حالی که
+  // بی‌صدا نادیده گرفته شده بود. حالا مثل آواتار، صریحاً ۴۰۰ می‌دهد.
+  if (b.profileImageUrl !== undefined && b.profileImageUrl !== null
+      && b.profileImageUrl !== '' && !safeImageUrl(b.profileImageUrl)) {
+    return res.status(400).json({ message: 'آدرس عکس پروفایل معتبر نیست' });
+  }
 
   const { rows } = await pool.query(
     `UPDATE users SET
@@ -635,11 +644,22 @@ app.get('/api/rewards/claims/me', auth, asyncHandler(async (req, res) => {
 // Withdrawal is the one place where a bug costs real money, so it gets its
 // own throttle on top of the global one: a script hammering this endpoint
 // would otherwise be able to probe balance/state transitions rapidly.
+//
+// CGNAT FIX: هر دو محدودکننده با شناسهٔ **کاربر** کلید می‌خورند، نه IP.
+// اپراتورهای موبایل ایران گستردهٔ CGNAT استفاده می‌کنند: صدها کاربر واقعی
+// از یک IP عمومی بیرون می‌روند. با کلید IP، یک کاربر که چند بار کارتش را
+// تصحیح می‌کند سهمیهٔ همهٔ کاربران آن اپراتور را می‌سوزاند و بقیه پیام
+// «تعداد تلاش زیاد» می‌گیرند بدون اینکه کاری کرده باشند.
+// هر دو مسیر پشت `auth` هستند، پس req.user همیشه موجود است؛ IP فقط
+// به‌عنوان جایگزین اضطراری می‌ماند.
+const perUserKey = (req) => req.user?.id || req.ip;
+
 const withdrawalLimiter = rateLimit({
   windowMs: 60_000,
   limit: 10,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: perUserKey,
   message: { message: 'تعداد درخواست‌ها زیاد است؛ کمی بعد دوباره تلاش کنید' },
 });
 const bankCardLimiter = rateLimit({
@@ -647,6 +667,7 @@ const bankCardLimiter = rateLimit({
   limit: 15,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: perUserKey,
   message: { message: 'تعداد تلاش برای ثبت کارت زیاد است؛ کمی بعد دوباره تلاش کنید' },
 });
 
@@ -1397,7 +1418,9 @@ app.patch('/api/admin/league/payouts/:id', adminAuth, validateUuid('id'), requir
     if (!payout) throw Object.assign(new Error('پرداخت پیدا نشد'), { status: 404 });
 
     await client.query(
-      "UPDATE league_payouts SET payment_status=$1, paid_at=CASE WHEN $1='paid' THEN NOW() ELSE paid_at END WHERE id=$2",
+      // همان باگ 42P08: $1 هم varchar و هم text استنتاج می‌شد و کوئری با
+      // ۵۰۰ می‌افتاد، یعنی جایزهٔ لیگ هرگز «پرداخت‌شده» نمی‌شد. cast صریح.
+      "UPDATE league_payouts SET payment_status=$1::text, paid_at=CASE WHEN $1::text='paid' THEN NOW() ELSE paid_at END WHERE id=$2",
       [status, req.params.id],
     );
 

@@ -81,9 +81,13 @@ async function createRequest(userId, rawAmount) {
     throw Object.assign(new Error('برداشت در حال حاضر غیرفعال است'), { status: 403 });
   }
 
-  const amount = Math.floor(Number(rawAmount));
-  if (!Number.isFinite(amount) || amount <= 0) {
-    throw Object.assign(new Error('مبلغ برداشت معتبر نیست'), { status: 400 });
+  // BUG FIX: قبلاً Math.floor روی ورودی اجرا می‌شد، یعنی «۵۰۰۰۰.۵» بی‌صدا
+  // به ۵۰۰۰۰ تبدیل و پذیرفته می‌شد. کاربر مبلغی غیر از آنچه تایپ کرده بود
+  // برداشت می‌کرد و هیچ هشداری نمی‌گرفت. تومان واحد صحیح است؛ ورودی اعشاری
+  // یعنی اشتباه، پس صریحاً رد می‌شود.
+  const amount = Number(rawAmount);
+  if (!Number.isFinite(amount) || !Number.isInteger(amount) || amount <= 0) {
+    throw Object.assign(new Error('مبلغ برداشت باید عددی صحیح و بزرگ‌تر از صفر باشد'), { status: 400 });
   }
   if (amount < settings.minWithdrawal) {
     throw Object.assign(
@@ -251,14 +255,20 @@ async function decide(adminId, requestId, { status, adminNote, trackingCode }) {
       });
     }
 
+    // BUG FIX (Postgres 42P08 «inconsistent types deduced for parameter $1»):
+    // پارامتر $1 هم در `SET status=$1` (varchar) و هم در
+    // `CASE WHEN $1='paid'` (text) استفاده می‌شد و Postgres نمی‌توانست یک
+    // نوع واحد برایش استنتاج کند، پس کل درخواست با خطای ۵۰۰ رد می‌شد و
+    // **هیچ برداشتی قابل تأیید نبود**. با cast صریح به ::text ابهام برطرف
+    // می‌شود. (این دقیقاً همان الگویی است که در league_payouts هم بود.)
     const updated = await client.query(
       `UPDATE withdrawal_requests
-          SET status=$1,
+          SET status=$1::text,
               admin_note=COALESCE($2, admin_note),
               tracking_code=COALESCE($3, tracking_code),
               decided_by_admin_id=$4,
               decided_at=NOW(),
-              paid_at=CASE WHEN $1='paid' THEN NOW() ELSE paid_at END,
+              paid_at=CASE WHEN $1::text='paid' THEN NOW() ELSE paid_at END,
               updated_at=NOW()
         WHERE id=$5 RETURNING *`,
       [status, note, tracking, adminId, requestId],
