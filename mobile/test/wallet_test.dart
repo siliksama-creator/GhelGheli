@@ -191,7 +191,7 @@ void main() {
   group('ویجت ردیف تراکنش', () {
     testWidgets('واریز با علامت + و برداشت با علامت − نشان داده می‌شود',
         (tester) async {
-      await tester.pumpWidget(_wrap(Column(children: const [
+      await tester.pumpWidget(_wrap(const Column(children: [
         WalletTransactionTile(tx: {
           'direction': 'credit',
           'amount': 50000,
@@ -237,7 +237,7 @@ void main() {
 
     testWidgets('منبع ناشناخته اپ را نمی‌شکند', (tester) async {
       // سرور ممکن است در آینده منبع جدیدی اضافه کند و اپ قدیمی آن را نشناسد
-      await tester.pumpWidget(_wrap(WalletTransactionTile(tx: const {
+      await tester.pumpWidget(_wrap(const WalletTransactionTile(tx: {
         'direction': 'credit',
         'amount': 1000,
         'source': 'something_new_from_server',
@@ -250,7 +250,7 @@ void main() {
     });
 
     testWidgets('تاریخ نامعتبر یا خالی باعث کرش نمی‌شود', (tester) async {
-      await tester.pumpWidget(_wrap(WalletTransactionTile(tx: const {
+      await tester.pumpWidget(_wrap(const WalletTransactionTile(tx: {
         'direction': 'credit',
         'amount': 1000,
         'source': 'reward',
@@ -318,7 +318,7 @@ void main() {
     });
 
     testWidgets('فیلدهای اختیاری غایب باعث کرش نمی‌شوند', (tester) async {
-      await tester.pumpWidget(_wrap(WithdrawalTile(request: const {
+      await tester.pumpWidget(_wrap(const WithdrawalTile(request: {
         'id': 'x',
         'amount': 50000,
         'status': 'pending',
