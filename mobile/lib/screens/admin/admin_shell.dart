@@ -14,6 +14,7 @@ import 'admin_game_rewards.dart';
 import 'admin_settings.dart';
 import 'admin_support.dart';
 import 'admin_users.dart';
+import 'admin_wallet.dart';
 
 /// Root shell for the in-app admin console: responsive layout that shows a
 /// permanent side rail on tablets/desktop and a drawer + bottom nav on
@@ -43,6 +44,7 @@ class _AdminShellState extends State<AdminShell> {
     AdminDashboard(api: widget.api),
     AdminCards(api: widget.api),
     AdminRewards(api: widget.api),
+    AdminWallet(api: widget.api),
     AdminLeague(api: widget.api),
     AdminUsers(api: widget.api),
     AdminChat(api: widget.api),
@@ -57,6 +59,7 @@ class _AdminShellState extends State<AdminShell> {
     'داشبورد',
     'کارت و کد',
     'جوایز',
+    'کیف پول',
     'لیگ',
     'کاربران',
     'چت',
@@ -70,6 +73,7 @@ class _AdminShellState extends State<AdminShell> {
     Icons.dashboard_rounded,
     Icons.credit_card_rounded,
     Icons.card_giftcard_rounded,
+    Icons.account_balance_wallet_rounded,
     Icons.emoji_events_rounded,
     Icons.people_alt_rounded,
     Icons.chat_bubble_rounded,
