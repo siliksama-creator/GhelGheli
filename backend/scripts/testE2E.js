@@ -23,6 +23,33 @@ const BASE = process.env.BASE || `http://127.0.0.1:${process.env.PORT || 4000}`;
 const ADMIN_USER = process.env.E2E_ADMIN_USER || process.env.ADMIN_DEFAULT_USERNAME || 'Admin';
 const ADMIN_PASS = process.env.E2E_ADMIN_PASS || process.env.ADMIN_DEFAULT_PASSWORD;
 
+// ---------------------------------------------------------------------------
+//  محافظ اجرا روی production
+// ---------------------------------------------------------------------------
+// این تست کاربر می‌سازد، کارت تعریف می‌کند و پول جابه‌جا می‌کند. اجرای
+// تصادفی‌اش روی سرور واقعی، دادهٔ آزمایشی در دیتابیس زنده می‌گذارد (یک بار
+// اتفاق افتاد و دستی پاک شد). پس اجرا روی هاست production فقط با تأیید
+// صریح ممکن است.
+const PROD_HOSTS = ['api.ghelghelishop.ir', 'ghelghelishop.ir'];
+const targetHost = (() => { try { return new URL(BASE).hostname; } catch { return ''; } })();
+if (PROD_HOSTS.includes(targetHost) && process.env.ALLOW_PROD !== 'yes-i-know') {
+  console.error(`
+⛔ هدف این اجرا سرور production است (${targetHost}).
+
+   این تست دادهٔ واقعی می‌سازد و پول جابه‌جا می‌کند.
+   روی یک دیتابیس staging اجرایش کنید:
+
+     BASE=http://127.0.0.1:4999 node scripts/testE2E.js
+
+   اگر واقعاً می‌خواهید روی production اجرا شود:
+
+     ALLOW_PROD=yes-i-know BASE=${BASE} node scripts/testE2E.js
+
+   و بعد حتماً کاربران e2e* و کارت‌های E2E* را پاک کنید.
+`);
+  process.exit(2);
+}
+
 let pass = 0, fail = 0, skip = 0;
 const failures = [];
 
