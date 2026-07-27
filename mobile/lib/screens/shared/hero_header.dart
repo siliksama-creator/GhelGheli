@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
 import '../../core/assets.dart';
+import '../../core/money.dart';
 import '../../theme/brand_theme.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/avatar_image.dart';
@@ -25,6 +26,10 @@ class HeroHeader extends StatelessWidget {
   /// Opens the profile tab.
   final VoidCallback? onOpenProfile;
 
+  /// باز کردن کیف پول. کیف پول از نوار پایین به «بیشتر» منتقل شد، پس این
+  /// ورودی در هدر تنها راه سریع رسیدن به آن است و باید واضح دیده شود.
+  final VoidCallback? onOpenWallet;
+
   /// Toggles light/dark. Lives here (top of the dashboard) because that's
   /// where it was most reachable.
   final VoidCallback? onToggleTheme;
@@ -37,6 +42,7 @@ class HeroHeader extends StatelessWidget {
     this.nextReward,
     this.user,
     this.onOpenProfile,
+    this.onOpenWallet,
     this.onToggleTheme,
     this.isDark = true,
   });
@@ -200,6 +206,15 @@ class HeroHeader extends StatelessWidget {
                 fontSize: 11.5),
           ),
 
+          // ── ورودی کیف پول ──
+          if (onOpenWallet != null) ...[
+            const SizedBox(height: 9),
+            _WalletStrip(
+              balance: NumberParser.toInt(user?['wallet_balance']),
+              onTap: onOpenWallet!,
+            ),
+          ],
+
           // ── profile completion nudge (only while something is missing) ──
           if (missing.isNotEmpty) ...[
             const SizedBox(height: 7),
@@ -268,6 +283,149 @@ class _CompletionBar extends StatelessWidget {
               const Icon(Icons.chevron_left_rounded,
                   size: 15, color: Color(0xFFFFD36B)),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// نوار ورود به کیف پول در هدر داشبورد.
+///
+/// طراحی عمداً «طلایی» است تا از سبز/آبی خود هدر جدا شود و چشم فوراً پیدایش
+/// کند — کیف پول تنها جای اپ است که پول واقعی در آن است و نباید مثل بقیهٔ
+/// بخش‌ها دیده شود. موجودی همین‌جا نمایش داده می‌شود، پس کاربر برای دانستن
+/// «چقدر پول دارم» لازم نیست هیچ‌جا برود.
+class _WalletStrip extends StatelessWidget {
+  const _WalletStrip({required this.balance, required this.onTap});
+
+  final int balance;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    const gold = Color(0xFFFFD36B);
+    final hasMoney = balance > 0;
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: Corners.rLg,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: Corners.rLg,
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: Corners.rLg,
+            // لایهٔ تیرهٔ نیمه‌شفاف روی گرادیان هدر + حاشیهٔ طلایی
+            color: Colors.black.withValues(alpha: 0.24),
+            border: Border.all(
+              color: gold.withValues(alpha: hasMoney ? 0.55 : 0.28),
+              width: 1.1,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+                horizontal: Gaps.sm, vertical: Gaps.xs),
+            child: Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: hasMoney
+                          ? const [Color(0xFFFFE9A8), Color(0xFFD4A227)]
+                          : [
+                              Colors.white.withValues(alpha: 0.22),
+                              Colors.white.withValues(alpha: 0.10),
+                            ],
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.account_balance_wallet_rounded,
+                    size: 18,
+                    color: hasMoney
+                        ? const Color(0xFF6B4E00)
+                        : Colors.white.withValues(alpha: 0.85),
+                  ),
+                ),
+                Gaps.hSm,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'کیف پول من',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            Text(
+                              Money.format(balance),
+                              style: TextStyle(
+                                color: hasMoney ? gold : Colors.white,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w900,
+                                height: 1.1,
+                              ),
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              'تومان',
+                              style: TextStyle(
+                                color: (hasMoney ? gold : Colors.white)
+                                    .withValues(alpha: 0.75),
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Gaps.hXs,
+                // وقتی پول دارد، دعوت به برداشت؛ وقتی ندارد، راهنمای ورود.
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: Gaps.xs, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: hasMoney
+                        ? gold.withValues(alpha: 0.20)
+                        : Colors.white.withValues(alpha: 0.12),
+                    borderRadius: Corners.rPill,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        hasMoney ? 'برداشت' : 'مشاهده',
+                        style: TextStyle(
+                          color: hasMoney ? gold : Colors.white,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Icon(Icons.chevron_left_rounded,
+                          size: 15, color: hasMoney ? gold : Colors.white),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

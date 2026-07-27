@@ -18,6 +18,9 @@ class DashboardPage extends StatefulWidget {
   /// Jumps to the profile tab (used by the hero header + completion nudge).
   final VoidCallback? onOpenProfile;
 
+  /// پرش مستقیم به کیف پول از هدر داشبورد.
+  final VoidCallback? onOpenWallet;
+
   /// Light/dark switch, surfaced at the top of the dashboard.
   final VoidCallback? onToggleTheme;
   final bool isDark;
@@ -27,6 +30,7 @@ class DashboardPage extends StatefulWidget {
     required this.api,
     required this.reloadProfile,
     this.onOpenProfile,
+    this.onOpenWallet,
     this.onToggleTheme,
     this.isDark = true,
   });
@@ -132,6 +136,7 @@ class _DashboardPageState extends State<DashboardPage> {
             nextReward: nextReward,
             user: user is Map ? Map<String, dynamic>.from(user) : null,
             onOpenProfile: widget.onOpenProfile,
+            onOpenWallet: widget.onOpenWallet,
             onToggleTheme: widget.onToggleTheme,
             isDark: widget.isDark,
           ),

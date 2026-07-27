@@ -56,6 +56,7 @@ class _HomeShellState extends State<HomeShell>
       api: widget.api,
       reloadProfile: _loadProfile,
       onOpenProfile: () => setState(() => _index = 6),
+      onOpenWallet: () => setState(() => _index = _walletIndex),
       onToggleTheme: widget.onTheme,
       isDark: widget.dark,
     ),
@@ -69,13 +70,17 @@ class _HomeShellState extends State<HomeShell>
 
   // UI FIX: seven destinations squeezed into one bar made every icon and
   // label tiny (and the Persian labels were truncating). Material's own
-  // guidance caps a navigation bar at five. The two least-used sections
-  // (پشتیبانی / پروفایل) moved into a "بیشتر" sheet, which lets the
-  // remaining icons breathe at full size.
-  // Chat + games now share one "باشگاه" destination, so all five primary
-  // sections fit the bar and only two rarely-used ones sit under "بیشتر".
-  static const _navIndexes = [0, 1, 2, 3];
-  static const _moreIndexes = [4, 5, 6];
+  // guidance caps a navigation bar at five.
+  //
+  // کیف پول از نوار پایین به «بیشتر» منتقل شد و به‌جایش یک ورودی بزرگ و
+  // واضح در هدر داشبورد (همان‌جا که «سلام ...» نوشته شده) نشسته است. آنجا
+  // موجودی واقعی هم دیده می‌شود، پس هم دم‌دست‌تر است و هم اطلاعات بیشتری
+  // می‌دهد تا یک آیکون کوچک در نوار پایین.
+  static const _navIndexes = [0, 1, 3, 4];
+  static const _moreIndexes = [2, 5, 6];
+
+  /// شمارهٔ صفحهٔ کیف پول — از هدر داشبورد مستقیم به آن پرش می‌شود.
+  static const _walletIndex = 2;
 
   static const _destinations = [
     NavigationDestination(
