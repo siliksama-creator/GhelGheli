@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../api_client.dart';
+import '../../core/money.dart';
+import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/badges.dart';
 import '../../widgets/safe_image.dart';
@@ -28,6 +30,7 @@ class _AdminRewardsState extends State<AdminRewards> {
   final _name = TextEditingController();
   final _points = TextEditingController();
   final _value = TextEditingController();
+  final _cash = TextEditingController();
   final _desc = TextEditingController();
   final _imageUrl = TextEditingController();
   bool _uploadingImage = false;
@@ -52,6 +55,7 @@ class _AdminRewardsState extends State<AdminRewards> {
     _name.dispose();
     _points.dispose();
     _value.dispose();
+    _cash.dispose();
     _desc.dispose();
     _imageUrl.dispose();
     super.dispose();
@@ -100,6 +104,7 @@ class _AdminRewardsState extends State<AdminRewards> {
         'requiredPoints': int.tryParse(_points.text) ?? 0,
         'rewardType': _type,
         'rewardValue': _value.text,
+        'cashAmount': _type == 'cash' ? (Money.parse(_cash.text) ?? 0) : 0,
         'description': _desc.text,
         'imageUrl': _imageUrl.text,
         'displayOrder': _rewards.length + 1,
@@ -107,6 +112,7 @@ class _AdminRewardsState extends State<AdminRewards> {
       _name.clear();
       _points.clear();
       _value.clear();
+      _cash.clear();
       _desc.clear();
       _imageUrl.clear();
       await _load();
@@ -162,6 +168,26 @@ class _AdminRewardsState extends State<AdminRewards> {
                 controller: _value,
                 decoration:
                     const InputDecoration(labelText: 'مبلغ / توضیح جایزه')),
+            // فقط برای جایزهٔ نقدی: مبلغ عددی که واقعاً به کیف پول واریز
+            // می‌شود. فیلد «مبلغ / توضیح» بالا متن آزاد است و ماشین نمی‌تواند
+            // رویش حساب کند، پس مبلغ واریزی جدا و عددی گرفته می‌شود.
+            if (_type == 'cash')
+              TextField(
+                controller: _cash,
+                keyboardType: TextInputType.number,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  labelText: 'مبلغ واریز به کیف پول (تومان)',
+                  prefixIcon: const Icon(Icons.account_balance_wallet_rounded),
+                  helperText: (Money.parse(_cash.text) ?? 0) > 0
+                      ? 'هنگام «پرداخت شد»، ${Money.withUnit(Money.parse(_cash.text))} به کیف پول واریز می‌شود'
+                      : 'صفر = واریز خودکار انجام نمی‌شود',
+                  helperStyle: TextStyle(
+                      color: (Money.parse(_cash.text) ?? 0) > 0
+                          ? BrandColors.emerald
+                          : null),
+                ),
+              ),
             TextField(
                 controller: _desc,
                 decoration: const InputDecoration(labelText: 'توضیحات')),
@@ -202,7 +228,10 @@ class _AdminRewardsState extends State<AdminRewards> {
                             : const Icon(Icons.card_giftcard_rounded),
                         title: Text(r['name']),
                         subtitle: Text(
-                            '${faNum(r['required_points'])} امتیاز — ${r['reward_value']}'),
+                          (r['cash_amount'] ?? 0) > 0
+                              ? '${faNum(r['required_points'])} امتیاز — ${Money.withUnit(r['cash_amount'])}'
+                              : '${faNum(r['required_points'])} امتیاز — ${r['reward_value']}',
+                        ),
                       ))
                   .toList(),
         ),

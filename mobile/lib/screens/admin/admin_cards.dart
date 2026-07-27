@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../api_client.dart';
+import '../../core/money.dart';
+import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/safe_image.dart';
 import '../../widgets/state_views.dart';
@@ -27,6 +29,7 @@ class _AdminCardsState extends State<AdminCards> {
 
   final _name = TextEditingController();
   final _point = TextEditingController();
+  final _cash = TextEditingController();
   final _desc = TextEditingController();
   final _imageUrl = TextEditingController();
   bool _uploadingImage = false;
@@ -47,6 +50,7 @@ class _AdminCardsState extends State<AdminCards> {
   void dispose() {
     _name.dispose();
     _point.dispose();
+    _cash.dispose();
     _desc.dispose();
     _imageUrl.dispose();
     _singleCode.dispose();
@@ -105,11 +109,13 @@ class _AdminCardsState extends State<AdminCards> {
       await widget.api.post('/api/admin/card-types', {
         'name': _name.text,
         'pointValue': int.tryParse(_point.text) ?? 0,
+        'cashAmount': Money.parse(_cash.text) ?? 0,
         'description': _desc.text,
         'imageUrl': _imageUrl.text,
       });
       _name.clear();
       _point.clear();
+      _cash.clear();
       _desc.clear();
       _imageUrl.clear();
       await _load();
@@ -150,6 +156,7 @@ class _AdminCardsState extends State<AdminCards> {
   Future<void> _editType(Map t) async {
     final n = TextEditingController(text: t['name'] ?? '');
     final pts = TextEditingController(text: '${t['point_value'] ?? 0}');
+    final cash = TextEditingController(text: '${t['cash_amount'] ?? 0}');
     final img = TextEditingController(text: t['image_url'] ?? '');
     final ds = TextEditingController(text: t['description'] ?? '');
     var editUploading = false;
@@ -170,6 +177,13 @@ class _AdminCardsState extends State<AdminCards> {
                   controller: pts,
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(labelText: 'امتیاز')),
+              Gaps.vSm,
+              TextField(
+                  controller: cash,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                      labelText: 'جایزهٔ نقدی (تومان)',
+                      helperText: 'صفر = بدون جایزهٔ نقدی')),
               Gaps.vSm,
               // Real picker instead of a bare URL box: typing/clearing this
               // by hand used to send an empty string, which wiped the card's
@@ -233,6 +247,7 @@ class _AdminCardsState extends State<AdminCards> {
       final body = <String, dynamic>{
         'name': name,
         'pointValue': int.tryParse(pts.text) ?? 0,
+        'cashAmount': Money.parse(cash.text) ?? 0,
         'description': ds.text.trim(),
       };
       // Only send the image when there IS one. Sending '' told the server to
@@ -252,6 +267,7 @@ class _AdminCardsState extends State<AdminCards> {
     } finally {
       n.dispose();
       pts.dispose();
+      cash.dispose();
       img.dispose();
       ds.dispose();
     }
@@ -311,6 +327,25 @@ class _AdminCardsState extends State<AdminCards> {
                 controller: _point,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(labelText: 'امتیاز')),
+            // جایزهٔ نقدی کارت. صفر یعنی کارت فقط امتیاز می‌دهد — رفتار
+            // پیش‌فرض و همان چیزی که کارت‌های قبلی داشتند.
+            TextField(
+              controller: _cash,
+              keyboardType: TextInputType.number,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                labelText: 'جایزهٔ نقدی (تومان)',
+                hintText: '0',
+                prefixIcon: const Icon(Icons.payments_rounded),
+                helperText: (Money.parse(_cash.text) ?? 0) > 0
+                    ? 'با ثبت این کارت، ${Money.withUnit(Money.parse(_cash.text))} به کیف پول کاربر اضافه می‌شود'
+                    : 'صفر = کارت بدون جایزهٔ نقدی',
+                helperStyle: TextStyle(
+                    color: (Money.parse(_cash.text) ?? 0) > 0
+                        ? BrandColors.emerald
+                        : null),
+              ),
+            ),
             TextField(
                 controller: _desc,
                 decoration: const InputDecoration(labelText: 'توضیحات')),
@@ -406,7 +441,16 @@ class _AdminCardsState extends State<AdminCards> {
                                     fallbackEmoji: '🃏'))
                             : const Icon(Icons.credit_card_rounded),
                         title: Text(t['name']),
-                        subtitle: Text('${faNum(t['point_value'])} امتیاز'),
+                        subtitle: Text(
+                          (t['cash_amount'] ?? 0) > 0
+                              ? '${faNum(t['point_value'])} امتیاز + ${Money.withUnit(t['cash_amount'])}'
+                              : '${faNum(t['point_value'])} امتیاز',
+                          style: (t['cash_amount'] ?? 0) > 0
+                              ? const TextStyle(
+                                  color: BrandColors.emerald,
+                                  fontWeight: FontWeight.w600)
+                              : null,
+                        ),
                         trailing: const Icon(Icons.edit_rounded),
                         onTap: () => _editType(Map<String, dynamic>.from(t)),
                       ))

@@ -20,6 +20,8 @@ const { createNotification } = require('./services/notificationService');
 const { ensureActiveSeason, addLeaguePoints, getLeaderboard, closeActiveSeason } = require('./services/leagueService');
 const { optimizeUpload, kb } = require('./services/imageService');
 const { getGameRewardSettings, saveGameRewardSettings } = require('./services/gameRewardService');
+const walletService = require('./services/walletService');
+const withdrawalService = require('./services/withdrawalService');
 
 // Fail fast in production if the JWT secret was never configured — running
 // with the 'dev-secret' fallback would let anyone forge valid user/admin
@@ -166,6 +168,20 @@ async function ensureChatCooldown(userId) {
 // (COALESCE only guards against NULL/undefined, not ''). Pass null to clear
 // an image on purpose.
 function keepImage(v) { return v === '' ? undefined : v; }
+// Parses a Toman amount coming from an admin form. Returns undefined when the
+// field was simply not submitted (so COALESCE keeps the stored value), and
+// throws on garbage rather than letting NaN reach a BIGINT column as a 500.
+function cashAmountInput(v) {
+  if (v === undefined || v === null || v === '') return undefined;
+  const n = Math.floor(Number(v));
+  if (!Number.isFinite(n) || n < 0) {
+    throw Object.assign(new Error('مبلغ نقدی باید عددی صحیح و مثبت باشد'), { status: 400 });
+  }
+  if (n > 100000000000) {
+    throw Object.assign(new Error('مبلغ نقدی خارج از محدودهٔ مجاز است'), { status: 400 });
+  }
+  return n;
+}
 function maskSecret(v) { if (!v) return ''; const s=String(v); return s.length <= 4 ? '****' : `${s.slice(0,2)}****${s.slice(-2)}`; }
 // Strips whitespace, punctuation and invisible/zero-width Unicode
 // characters before comparing against the bad-word list. Previously only
@@ -361,7 +377,22 @@ app.post('/api/auth/forgot-password/reset', otpVerifyLimiter, asyncHandler(async
   res.json({ message: 'رمز عبور تغییر کرد' });
 }));
 
-function safeUser(u) { const { password_hash, ...rest } = u; return rest; }
+// Strips everything the client must never see. The bank card number is as
+// sensitive as the password hash: /api/profile is fetched on every app start
+// and ends up in HTTP caches, crash reports and debug logs, so the full PAN
+// is replaced by a masked form. The only endpoint that returns the real
+// number is the admin withdrawal list (behind adminAuth), because the admin
+// physically has to make the transfer.
+function safeUser(u) {
+  const { password_hash, bank_card_number, bank_card_sheba, ...rest } = u;
+  return {
+    ...rest,
+    wallet_balance: Number(rest.wallet_balance || 0),
+    bank_card_masked: bank_card_number ? walletService.maskCard(bank_card_number) : null,
+    bank_card_sheba_masked: bank_card_sheba ? `${bank_card_sheba.slice(0, 6)}••••${bank_card_sheba.slice(-4)}` : null,
+    has_bank_card: Boolean(bank_card_number),
+  };
+}
 
 // ── Input validation helpers ──────────────────────────────────────────────
 
@@ -432,7 +463,7 @@ app.post('/api/cards/redeem', auth, cardRedeemLimiter, asyncHandler(async (req, 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const q = await client.query(`SELECT c.*, t.point_value, t.name AS card_type_name, t.is_active
+    const q = await client.query(`SELECT c.*, t.point_value, t.cash_amount, t.name AS card_type_name, t.is_active
       FROM card_codes c JOIN card_types t ON t.id=c.card_type_id WHERE c.code=$1 FOR UPDATE`, [code]);
     const card = q.rows[0];
     if (!card) throw Object.assign(new Error('کد نامعتبر است'), { status: 404 });
@@ -445,12 +476,43 @@ app.post('/api/cards/redeem', auth, cardRedeemLimiter, asyncHandler(async (req, 
     if (inv.rows[0]) await client.query('UPDATE user_card_inventory SET quantity=quantity+1, updated_at=NOW() WHERE id=$1', [inv.rows[0].id]);
     else await client.query('INSERT INTO user_card_inventory(user_id, card_type_id, quantity, consumed_in_reward) VALUES($1,$2,1,false)', [req.user.id, card.card_type_id]);
     await addLeaguePoints(client, req.user.id, card.point_value);
+
+    // جایزهٔ نقدی کارت → کیف پول، در همان تراکنش مصرف کد.
+    // مرجع = شناسهٔ خود کد کارت، پس حتی اگر این مسیر به هر دلیلی دوباره اجرا
+    // شود، ایندکس یکتای دفتر کل مانع واریز دوم می‌شود.
+    const cashAmount = Number(card.cash_amount || 0);
+    if (cashAmount > 0) {
+      await walletService.credit(client, {
+        userId: req.user.id,
+        amount: cashAmount,
+        source: 'card_cash',
+        referenceType: 'card_codes',
+        referenceId: card.id,
+        description: `جایزهٔ نقدی کارت «${card.card_type_name}»`,
+      });
+    }
+
     await client.query('COMMIT');
-    const userNow = await pool.query('SELECT current_points,lifetime_points,monthly_league_points FROM users WHERE id=$1', [req.user.id]);
+    if (cashAmount > 0) {
+      createNotification(
+        req.user.id,
+        'wallet',
+        'جایزهٔ نقدی به کیف پول اضافه شد 💰',
+        `${cashAmount.toLocaleString('en-US')} تومان بابت کارت «${card.card_type_name}» به کیف پول شما واریز شد.`,
+      ).catch(() => {});
+    }
+    const userNow = await pool.query('SELECT current_points,lifetime_points,monthly_league_points,wallet_balance FROM users WHERE id=$1', [req.user.id]);
     const reward = await pool.query('SELECT * FROM reward_tiers WHERE is_active=true AND required_points <= $1 ORDER BY required_points DESC LIMIT 1', [userNow.rows[0].current_points]);
     if (reward.rows[0]) createNotification(req.user.id, 'reward_threshold', 'تبریک! به جایزه رسیدی', `شما به سطح ${reward.rows[0].name} رسیدید.`).catch(()=>{});
     io.emit('leaderboard:update', await getLeaderboard(20));
-    res.json({ message: 'کد با موفقیت ثبت شد', cardType: card.card_type_name, addedPoints: card.point_value, points: userNow.rows[0] });
+    res.json({
+      message: 'کد با موفقیت ثبت شد',
+      cardType: card.card_type_name,
+      addedPoints: card.point_value,
+      addedCash: cashAmount,
+      walletBalance: Number(userNow.rows[0].wallet_balance || 0),
+      points: userNow.rows[0],
+    });
   } catch (e) {
     await client.query('ROLLBACK');
     res.status(e.status || 500).json({ message: (e.code && friendlyDbError(e)) || e.message || 'خطای ثبت کد' });
@@ -490,6 +552,15 @@ app.patch('/api/profile', auth, asyncHandler(async (req, res) => {
   if (b.profileAvatarKey !== undefined && b.profileAvatarKey !== null
       && b.profileAvatarKey !== '' && !safeAvatarKey(b.profileAvatarKey)) {
     return res.status(400).json({ message: 'آواتار انتخابی معتبر نیست' });
+  }
+  // BUG FIX: آواتار محافظ صریح داشت ولی آدرس عکس نداشت. safeImageUrl برای
+  // ورودی خطرناک (javascript: / data: / http) مقدار null برمی‌گرداند، و
+  // COALESCE در کوئری پایین آن را «تغییری نده» تفسیر می‌کرد — یعنی سرور
+  // ۲۰۰ OK برمی‌گرداند و کاربر فکر می‌کرد عکسش ذخیره شده، در حالی که
+  // بی‌صدا نادیده گرفته شده بود. حالا مثل آواتار، صریحاً ۴۰۰ می‌دهد.
+  if (b.profileImageUrl !== undefined && b.profileImageUrl !== null
+      && b.profileImageUrl !== '' && !safeImageUrl(b.profileImageUrl)) {
+    return res.status(400).json({ message: 'آدرس عکس پروفایل معتبر نیست' });
   }
 
   const { rows } = await pool.query(
@@ -565,6 +636,110 @@ app.get('/api/rewards/claims/me', auth, asyncHandler(async (req, res) => {
   const { rows } = await pool.query('SELECT c.*, r.name, r.reward_type, r.reward_value FROM user_reward_claims c JOIN reward_tiers r ON r.id=c.reward_tier_id WHERE c.user_id=$1 ORDER BY c.claimed_at DESC', [req.user.id]);
   res.json(rows);
 }));
+
+// ===========================================================================
+//  کیف پول تومانی — مسیرهای کاربر
+// ===========================================================================
+
+// Withdrawal is the one place where a bug costs real money, so it gets its
+// own throttle on top of the global one: a script hammering this endpoint
+// would otherwise be able to probe balance/state transitions rapidly.
+//
+// CGNAT FIX: هر دو محدودکننده با شناسهٔ **کاربر** کلید می‌خورند، نه IP.
+// اپراتورهای موبایل ایران گستردهٔ CGNAT استفاده می‌کنند: صدها کاربر واقعی
+// از یک IP عمومی بیرون می‌روند. با کلید IP، یک کاربر که چند بار کارتش را
+// تصحیح می‌کند سهمیهٔ همهٔ کاربران آن اپراتور را می‌سوزاند و بقیه پیام
+// «تعداد تلاش زیاد» می‌گیرند بدون اینکه کاری کرده باشند.
+// هر دو مسیر پشت `auth` هستند، پس req.user همیشه موجود است؛ IP فقط
+// به‌عنوان جایگزین اضطراری می‌ماند.
+const perUserKey = (req) => req.user?.id || req.ip;
+
+const withdrawalLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: perUserKey,
+  message: { message: 'تعداد درخواست‌ها زیاد است؛ کمی بعد دوباره تلاش کنید' },
+});
+const bankCardLimiter = rateLimit({
+  windowMs: 10 * 60_000,
+  limit: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: perUserKey,
+  message: { message: 'تعداد تلاش برای ثبت کارت زیاد است؛ کمی بعد دوباره تلاش کنید' },
+});
+
+// خلاصهٔ کیف پول: موجودی، آمار، کارت ماسک‌شده، قوانین و دلیل مسدودی برداشت
+app.get('/api/wallet', auth, asyncHandler(async (req, res) => {
+  res.json(await walletService.summary(req.user.id));
+}));
+
+// دفتر تراکنش‌ها با صفحه‌بندی
+app.get('/api/wallet/transactions', auth, asyncHandler(async (req, res) => {
+  res.json(await walletService.transactions(req.user.id, {
+    limit: req.query.limit,
+    offset: req.query.offset,
+  }));
+}));
+
+// ذخیره/به‌روزرسانی کارت بانکی (اعتبارسنجی Luhn + شبا + تشخیص بانک)
+app.post('/api/wallet/bank-card', auth, bankCardLimiter, asyncHandler(async (req, res) => {
+  const card = await withdrawalService.saveBankCard(req.user.id, req.body || {});
+  res.json({ message: 'کارت بانکی ذخیره شد', card });
+}));
+
+app.delete('/api/wallet/bank-card', auth, asyncHandler(async (req, res) => {
+  res.json(await withdrawalService.deleteBankCard(req.user.id));
+}));
+
+// ثبت درخواست برداشت (مبلغ همان لحظه بلوکه می‌شود)
+app.post('/api/wallet/withdrawals', auth, withdrawalLimiter, asyncHandler(async (req, res) => {
+  const request = await withdrawalService.createRequest(req.user.id, req.body?.amount);
+  res.json({ message: 'درخواست برداشت ثبت شد و در انتظار بررسی مدیریت است', request });
+}));
+
+app.get('/api/wallet/withdrawals', auth, asyncHandler(async (req, res) => {
+  res.json(await withdrawalService.listForUser(req.user.id));
+}));
+
+// لغو توسط کاربر — فقط تا قبل از تأیید مدیر
+app.post('/api/wallet/withdrawals/:id/cancel', auth, validateUuid('id'), withdrawalLimiter, asyncHandler(async (req, res) => {
+  res.json(await withdrawalService.cancelRequest(req.user.id, req.params.id));
+}));
+
+// نقطهٔ اتصال گردونهٔ شانس (طراحی UI بعداً انجام می‌شود).
+//
+// عمداً به‌صورت یک تابع سرویس و نه یک endpoint عمومی نوشته شده: اگر مسیری
+// مثل POST /api/wheel/spin وجود داشته باشد که مبلغ را از بدنهٔ درخواست
+// بگیرد، هر کاربری می‌تواند با curl هر مبلغی برای خودش واریز کند. وقتی
+// منطق گردونه ساخته شد، باید مبلغ را **سمت سرور** از روی جدول جوایز گردونه
+// تعیین کند و بعد این تابع را صدا بزند:
+//
+//   await creditWheelPrize(userId, amount, spinId)
+//
+// spinId مرجع یکتاست و تضمین می‌کند یک چرخش دو بار پول ندهد.
+async function creditWheelPrize(userId, amount, spinId, label = 'جایزهٔ گردونهٔ شانس') {
+  const result = await walletService.creditStandalone({
+    userId,
+    amount,
+    source: 'wheel',
+    referenceType: 'wheel_spins',
+    referenceId: spinId,
+    description: label,
+  });
+  if (!result.duplicate) {
+    createNotification(
+      userId,
+      'wallet',
+      'برندهٔ گردونه شدی 🎡',
+      `${Number(amount).toLocaleString('en-US')} تومان به کیف پول شما اضافه شد.`,
+    ).catch(() => {});
+  }
+  return result;
+}
+module.exports.creditWheelPrize = creditWheelPrize;
 
 app.get('/api/league/current', auth, asyncHandler(async (req, res) => res.json(await getLeaderboard(Number(req.query.limit || 100)))));
 
@@ -986,13 +1161,15 @@ app.post('/api/admin/card-types', adminAuth, requireRole('support'), asyncHandle
   // Normalise '' to null so an image-less card is stored consistently
   // (and never as an empty string that later reads as "has an image").
   const imageUrl = req.body.imageUrl ? String(req.body.imageUrl).trim() || null : null;
-  const { rows } = await pool.query('INSERT INTO card_types(name,image_url,description,point_value,is_active) VALUES($1,$2,$3,$4,$5) RETURNING *', [name,imageUrl,description,pointValue,isActive]);
+  const cashAmount = cashAmountInput(req.body.cashAmount) ?? 0;
+  const { rows } = await pool.query('INSERT INTO card_types(name,image_url,description,point_value,cash_amount,is_active) VALUES($1,$2,$3,$4,$5,$6) RETURNING *', [name,imageUrl,description,pointValue,cashAmount,isActive]);
   await audit(req.admin.id, 'create_card_type', 'card_types', rows[0].id, null, req.body); res.json(rows[0]);
 }));
 app.patch('/api/admin/card-types/:id', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
   const { name, description, pointValue, isActive } = req.body;
   const imageUrl = keepImage(req.body.imageUrl);
-  const { rows } = await pool.query('UPDATE card_types SET name=COALESCE($1,name), image_url=COALESCE($2,image_url), description=COALESCE($3,description), point_value=COALESCE($4,point_value), is_active=COALESCE($5,is_active), updated_at=NOW() WHERE id=$6 RETURNING *', [name,imageUrl,description,pointValue,isActive,req.params.id]);
+  const cashAmount = cashAmountInput(req.body.cashAmount);
+  const { rows } = await pool.query('UPDATE card_types SET name=COALESCE($1,name), image_url=COALESCE($2,image_url), description=COALESCE($3,description), point_value=COALESCE($4,point_value), cash_amount=COALESCE($5,cash_amount), is_active=COALESCE($6,is_active), updated_at=NOW() WHERE id=$7 RETURNING *', [name,imageUrl,description,pointValue,cashAmount,isActive,req.params.id]);
   await audit(req.admin.id, 'update_card_type', 'card_types', req.params.id, null, req.body); res.json(rows[0]);
 }));
 
@@ -1060,19 +1237,161 @@ app.post('/api/admin/rewards', adminAuth, requireRole('support'), asyncHandler(a
   if (count.rows[0].count >= 30) return res.status(400).json({ message: 'حداکثر ۳۰ جایزه قابل تعریف است' });
   const requiredPoints = Number(r.requiredPoints);
   if (!r.name || !Number.isFinite(requiredPoints) || requiredPoints <= 0) return res.status(400).json({ message: 'نام جایزه و امتیاز معتبر الزامی است' });
-  const { rows } = await pool.query('INSERT INTO reward_tiers(name,description,image_url,required_points,reward_type,reward_value,display_order,is_active) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *', [r.name,r.description,r.imageUrl,requiredPoints,r.rewardType,r.rewardValue,r.displayOrder||0,r.isActive!==false]);
+  const cashAmount = cashAmountInput(r.cashAmount) ?? 0;
+  const { rows } = await pool.query('INSERT INTO reward_tiers(name,description,image_url,required_points,reward_type,reward_value,cash_amount,display_order,is_active) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *', [r.name,r.description,r.imageUrl,requiredPoints,r.rewardType,r.rewardValue,cashAmount,r.displayOrder||0,r.isActive!==false]);
   await audit(req.admin.id,'create_reward','reward_tiers',rows[0].id,null,r); res.json(rows[0]);
 }));
 app.patch('/api/admin/rewards/:id', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
   const r = req.body;
-  const { rows } = await pool.query('UPDATE reward_tiers SET name=COALESCE($1,name),description=COALESCE($2,description),image_url=COALESCE($3,image_url),required_points=COALESCE($4,required_points),reward_type=COALESCE($5,reward_type),reward_value=COALESCE($6,reward_value),display_order=COALESCE($7,display_order),is_active=COALESCE($8,is_active),updated_at=NOW() WHERE id=$9 RETURNING *', [r.name,r.description,keepImage(r.imageUrl),r.requiredPoints,r.rewardType,r.rewardValue,r.displayOrder,r.isActive,req.params.id]);
+  const cashAmount = cashAmountInput(r.cashAmount);
+  const { rows } = await pool.query('UPDATE reward_tiers SET name=COALESCE($1,name),description=COALESCE($2,description),image_url=COALESCE($3,image_url),required_points=COALESCE($4,required_points),reward_type=COALESCE($5,reward_type),reward_value=COALESCE($6,reward_value),cash_amount=COALESCE($7,cash_amount),display_order=COALESCE($8,display_order),is_active=COALESCE($9,is_active),updated_at=NOW() WHERE id=$10 RETURNING *', [r.name,r.description,keepImage(r.imageUrl),r.requiredPoints,r.rewardType,r.rewardValue,cashAmount,r.displayOrder,r.isActive,req.params.id]);
   await audit(req.admin.id,'update_reward','reward_tiers',req.params.id,null,r); res.json(rows[0]);
 }));
 app.get('/api/admin/reward-claims', adminAuth, asyncHandler(async (req, res) => res.json((await pool.query('SELECT c.*, u.mobile, r.name AS reward_name FROM user_reward_claims c JOIN users u ON u.id=c.user_id JOIN reward_tiers r ON r.id=c.reward_tier_id ORDER BY c.claimed_at DESC')).rows)));
 app.patch('/api/admin/reward-claims/:id', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
   const { status, adminNote } = req.body;
-  await pool.query('UPDATE user_reward_claims SET status=$1, admin_note=$2, updated_at=NOW() WHERE id=$3', [status, adminNote, req.params.id]);
-  await audit(req.admin.id,'update_reward_claim','user_reward_claims',req.params.id,adminNote,{status}); res.json({ message: 'به‌روزرسانی شد' });
+  if (!['pending', 'approved', 'rejected', 'paid'].includes(status)) {
+    return res.status(400).json({ message: 'وضعیت نامعتبر است' });
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const q = await client.query(
+      `SELECT c.*, r.cash_amount, r.reward_type, r.name AS reward_name
+         FROM user_reward_claims c JOIN reward_tiers r ON r.id=c.reward_tier_id
+        WHERE c.id=$1 FOR UPDATE OF c`,
+      [req.params.id],
+    );
+    const claim = q.rows[0];
+    if (!claim) throw Object.assign(new Error('درخواست جایزه پیدا نشد'), { status: 404 });
+
+    await client.query(
+      'UPDATE user_reward_claims SET status=$1, admin_note=$2, updated_at=NOW() WHERE id=$3',
+      [status, adminNote, req.params.id],
+    );
+
+    // جایزهٔ نقدی وقتی «پرداخت شده» علامت می‌خورد به کیف پول واریز می‌شود،
+    // نه هنگام تأیید — تا مدیر بتواند اول تأیید کند و بعد در زمان مناسب
+    // پول را آزاد کند. مرجع = شناسهٔ claim، پس کلیک دوباره روی «پرداخت شد»
+    // مبلغ را دو بار واریز نمی‌کند (ایندکس یکتای دفتر کل).
+    const cash = Number(claim.cash_amount || 0);
+    let credited = 0;
+    if (status === 'paid' && claim.reward_type === 'cash' && cash > 0) {
+      const r = await walletService.credit(client, {
+        userId: claim.user_id,
+        amount: cash,
+        source: 'reward',
+        referenceType: 'user_reward_claims',
+        referenceId: claim.id,
+        description: `جایزهٔ نقدی «${claim.reward_name}»`,
+        adminId: req.admin.id,
+      });
+      if (!r.duplicate) credited = cash;
+    }
+    await client.query('COMMIT');
+
+    if (credited > 0) {
+      createNotification(
+        claim.user_id,
+        'wallet',
+        'جایزهٔ نقدی به کیف پول اضافه شد 🎁',
+        `${credited.toLocaleString('en-US')} تومان بابت جایزهٔ «${claim.reward_name}» به کیف پول شما واریز شد.`,
+      ).catch(() => {});
+    }
+    await audit(req.admin.id, 'update_reward_claim', 'user_reward_claims', req.params.id, adminNote, { status, credited });
+    res.json({ message: credited > 0 ? `به‌روزرسانی شد و ${credited.toLocaleString('en-US')} تومان به کیف پول کاربر واریز شد` : 'به‌روزرسانی شد' });
+  } catch (e) {
+    await client.query('ROLLBACK');
+    res.status(e.status || 500).json({ message: e.message || 'خطا در به‌روزرسانی' });
+  } finally { client.release(); }
+}));
+
+// ===========================================================================
+//  کیف پول — مسیرهای مدیر
+// ===========================================================================
+
+// آمار سرصفحه: چند درخواست در انتظار، چه مبلغی، و کل بدهی کیف پول‌ها
+app.get('/api/admin/wallet/stats', adminAuth, asyncHandler(async (req, res) => {
+  res.json(await withdrawalService.adminStats());
+}));
+
+// فهرست درخواست‌های برداشت. تنها نقطه‌ای که شمارهٔ کامل کارت برمی‌گردد،
+// چون مدیر باید واریز را واقعاً انجام دهد.
+app.get('/api/admin/wallet/withdrawals', adminAuth, asyncHandler(async (req, res) => {
+  res.json(await withdrawalService.listForAdmin({
+    status: req.query.status,
+    search: req.query.search,
+    limit: req.query.limit,
+  }));
+}));
+
+// تأیید / پرداخت / رد یک درخواست
+app.patch('/api/admin/wallet/withdrawals/:id', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
+  const request = await withdrawalService.decide(req.admin.id, req.params.id, {
+    status: req.body?.status,
+    adminNote: req.body?.adminNote,
+    trackingCode: req.body?.trackingCode,
+  });
+  await audit(req.admin.id, `withdrawal_${req.body?.status}`, 'withdrawal_requests', req.params.id, req.body?.adminNote, {
+    status: req.body?.status,
+    amount: request.amount,
+    trackingCode: request.trackingCode,
+  });
+  res.json({ message: 'وضعیت درخواست به‌روزرسانی شد', request });
+}));
+
+// دفتر تراکنش‌های یک کاربر خاص (برای بررسی اختلاف حساب)
+app.get('/api/admin/wallet/users/:id/transactions', adminAuth, validateUuid('id'), asyncHandler(async (req, res) => {
+  res.json(await walletService.transactions(req.params.id, { limit: req.query.limit || 100 }));
+}));
+
+// واریز/کسر دستی توسط مدیر ارشد. عمداً محدود به super_admin است: این
+// endpoint عملاً «چاپ پول» می‌کند و نباید در اختیار نقش پشتیبانی باشد.
+app.post('/api/admin/wallet/users/:id/adjust', adminAuth, validateUuid('id'), requireRole(), asyncHandler(async (req, res) => {
+  const amount = Math.floor(Number(req.body?.amount || 0));
+  const reason = String(req.body?.reason || '').trim();
+  if (!Number.isFinite(amount) || amount === 0) {
+    return res.status(400).json({ message: 'مبلغ باید عددی مخالف صفر باشد' });
+  }
+  // دلیل اجباری است: بدون آن، دفتر کل پر از تراکنش‌های بی‌توضیح می‌شود و
+  // ممیزی مالی بعدی غیرممکن است.
+  if (reason.length < 3) {
+    return res.status(400).json({ message: 'ثبت دلیل برای تغییر دستی موجودی الزامی است' });
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const fn = amount > 0 ? walletService.credit : walletService.debit;
+    const result = await fn(client, {
+      userId: req.params.id,
+      amount: Math.abs(amount),
+      source: amount > 0 ? 'admin_credit' : 'admin_debit',
+      referenceType: 'admin_adjustment',
+      description: reason,
+      adminId: req.admin.id,
+    });
+    await client.query('COMMIT');
+    await audit(req.admin.id, 'wallet_adjust', 'users', req.params.id, reason, { amount });
+    createNotification(
+      req.params.id,
+      'wallet',
+      amount > 0 ? 'افزایش موجودی کیف پول' : 'کسر از کیف پول',
+      `${Math.abs(amount).toLocaleString('en-US')} تومان ${amount > 0 ? 'به' : 'از'} کیف پول شما ${amount > 0 ? 'اضافه شد' : 'کسر شد'}. ${reason}`,
+    ).catch(() => {});
+    res.json({ message: 'موجودی کیف پول تغییر کرد', balance: result.balance });
+  } catch (e) {
+    await client.query('ROLLBACK');
+    res.status(e.status || 500).json({ message: e.message || 'خطا در تغییر موجودی' });
+  } finally { client.release(); }
+}));
+
+app.get('/api/admin/wallet/settings', adminAuth, asyncHandler(async (req, res) => {
+  res.json(await walletService.getWalletSettings());
+}));
+app.patch('/api/admin/wallet/settings', adminAuth, requireRole(), asyncHandler(async (req, res) => {
+  const saved = await walletService.saveWalletSettings(req.body || {}, req.admin.id);
+  await audit(req.admin.id, 'update_wallet_settings', 'app_settings', null, null, saved);
+  res.json({ message: 'تنظیمات کیف پول ذخیره شد', settings: saved });
 }));
 
 app.get('/api/admin/league', adminAuth, asyncHandler(async (req, res) => { const data = await getLeaderboard(100); data.winnerCount = await getLeagueWinnerCount(); res.json(data); }));
@@ -1086,7 +1405,58 @@ app.patch('/api/admin/league/current/prizes', adminAuth, requireRole(), asyncHan
 }));
 app.post('/api/admin/league/close', adminAuth, requireRole(), asyncHandler(async (req, res) => res.json(await closeActiveSeason())));
 app.get('/api/admin/league/payouts', adminAuth, asyncHandler(async (req, res) => res.json((await pool.query('SELECT p.*, u.mobile,u.first_name,u.last_name,u.nickname,u.bank_account FROM league_payouts p JOIN users u ON u.id=p.user_id ORDER BY p.created_at DESC')).rows)));
-app.patch('/api/admin/league/payouts/:id', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => { await pool.query('UPDATE league_payouts SET payment_status=$1, paid_at=CASE WHEN $1=\'paid\' THEN NOW() ELSE paid_at END WHERE id=$2', [req.body.status, req.params.id]); res.json({message:'ثبت شد'}); }));
+app.patch('/api/admin/league/payouts/:id', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
+  const status = req.body.status;
+  if (!['pending', 'approved', 'paid'].includes(status)) {
+    return res.status(400).json({ message: 'وضعیت نامعتبر است' });
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const q = await client.query('SELECT * FROM league_payouts WHERE id=$1 FOR UPDATE', [req.params.id]);
+    const payout = q.rows[0];
+    if (!payout) throw Object.assign(new Error('پرداخت پیدا نشد'), { status: 404 });
+
+    await client.query(
+      // همان باگ 42P08: $1 هم varchar و هم text استنتاج می‌شد و کوئری با
+      // ۵۰۰ می‌افتاد، یعنی جایزهٔ لیگ هرگز «پرداخت‌شده» نمی‌شد. cast صریح.
+      "UPDATE league_payouts SET payment_status=$1::text, paid_at=CASE WHEN $1::text='paid' THEN NOW() ELSE paid_at END WHERE id=$2",
+      [status, req.params.id],
+    );
+
+    // جایزهٔ لیگ هنگام «پرداخت شده» به کیف پول واریز می‌شود. مرجع =
+    // شناسهٔ payout، پس تکرار عملیات پول اضافه تولید نمی‌کند.
+    const amount = Number(payout.amount || 0);
+    let credited = 0;
+    if (status === 'paid' && amount > 0) {
+      const r = await walletService.credit(client, {
+        userId: payout.user_id,
+        amount,
+        source: 'league',
+        referenceType: 'league_payouts',
+        referenceId: payout.id,
+        description: `جایزهٔ لیگ — رتبهٔ ${payout.rank}`,
+        adminId: req.admin.id,
+      });
+      if (!r.duplicate) credited = amount;
+    }
+    await client.query('COMMIT');
+
+    if (credited > 0) {
+      createNotification(
+        payout.user_id,
+        'wallet',
+        'جایزهٔ لیگ به کیف پول اضافه شد 🏆',
+        `${credited.toLocaleString('en-US')} تومان بابت رتبهٔ ${payout.rank} لیگ به کیف پول شما واریز شد.`,
+      ).catch(() => {});
+    }
+    await audit(req.admin.id, 'update_league_payout', 'league_payouts', req.params.id, null, { status, credited });
+    res.json({ message: credited > 0 ? `ثبت شد و ${credited.toLocaleString('en-US')} تومان به کیف پول واریز شد` : 'ثبت شد' });
+  } catch (e) {
+    await client.query('ROLLBACK');
+    res.status(e.status || 500).json({ message: e.message || 'خطا در ثبت' });
+  } finally { client.release(); }
+}));
 
 app.get('/api/admin/users', adminAuth, asyncHandler(async (req, res) => {
   const search = `%${req.query.search || ''}%`;

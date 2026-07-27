@@ -8,6 +8,7 @@ import 'dashboard_page.dart';
 import 'league_page.dart';
 import 'profile_page.dart';
 import 'rewards_page.dart';
+import 'wallet_page.dart';
 import 'support_page.dart';
 
 /// Root shell for the regular user app: top bar + animated page switcher +
@@ -54,11 +55,12 @@ class _HomeShellState extends State<HomeShell>
     DashboardPage(
       api: widget.api,
       reloadProfile: _loadProfile,
-      onOpenProfile: () => setState(() => _index = 5),
+      onOpenProfile: () => setState(() => _index = 6),
       onToggleTheme: widget.onTheme,
       isDark: widget.dark,
     ),
     RewardsPage(api: widget.api),
+    WalletPage(api: widget.api, reloadProfile: _loadProfile),
     LeaguePage(api: widget.api),
     SocialPage(api: widget.api),
     SupportPage(api: widget.api),
@@ -73,7 +75,7 @@ class _HomeShellState extends State<HomeShell>
   // Chat + games now share one "باشگاه" destination, so all five primary
   // sections fit the bar and only two rarely-used ones sit under "بیشتر".
   static const _navIndexes = [0, 1, 2, 3];
-  static const _moreIndexes = [4, 5];
+  static const _moreIndexes = [4, 5, 6];
 
   static const _destinations = [
     NavigationDestination(
@@ -84,6 +86,10 @@ class _HomeShellState extends State<HomeShell>
         icon: Icon(Icons.card_giftcard_outlined),
         selectedIcon: Icon(Icons.card_giftcard_rounded),
         label: 'جوایز'),
+    NavigationDestination(
+        icon: Icon(Icons.account_balance_wallet_outlined),
+        selectedIcon: Icon(Icons.account_balance_wallet_rounded),
+        label: 'کیف پول'),
     NavigationDestination(
         icon: Icon(Icons.emoji_events_outlined),
         selectedIcon: Icon(Icons.emoji_events_rounded),
@@ -142,6 +148,7 @@ class _HomeShellState extends State<HomeShell>
   static const List<String> _titles = [
     'خانه',
     'جوایز',
+    'کیف پول',
     'لیگ',
     'چت و بازی',
     'پشتیبانی',
