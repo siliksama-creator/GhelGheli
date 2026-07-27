@@ -75,7 +75,22 @@ async function closeActiveSeason({ force = false } = {}) {
        FROM league_leaderboard_entries e WHERE e.league_season_id=$1 ORDER BY e.points DESC LIMIT $2`,
       [season.id, winnerCount]
     );
-    const prizeMap = new Map((season.prize_table || []).map(p => [Number(p.rank), Number(p.amount || 0)]));
+    // دفاع لایه‌دوم: ورودی از API حالا اعتبارسنجی می‌شود، ولی جدول‌های
+    // ذخیره‌شدهٔ قدیمی (یا ویرایش مستقیم در دیتابیس) ممکن است هنوز مبلغ
+    // منفی/NaN داشته باشند. یک مقدار بد نباید **کل بستن لیگ** را بخواباند
+    // و همهٔ برنده‌ها را بی‌جایزه بگذارد — بازتولید شد: قید
+    // league_payouts_amount_check می‌شکست و فصل «active» می‌ماند.
+    // پس مقدار نامعتبر را به صفر تبدیل می‌کنیم و هشدار می‌دهیم.
+    const prizeMap = new Map();
+    for (const p of season.prize_table || []) {
+      const rank = Number(p?.rank);
+      let amount = Number(p?.amount ?? 0);
+      if (!Number.isFinite(amount) || !Number.isInteger(amount) || amount < 0) {
+        console.error(`[league] جایزهٔ نامعتبر برای رتبهٔ ${p?.rank} (${p?.amount}) — صفر در نظر گرفته شد`);
+        amount = 0;
+      }
+      if (Number.isFinite(rank)) prizeMap.set(rank, amount);
+    }
     for (const entry of leaders) {
       const amount = prizeMap.get(Number(entry.rank)) || 0;
       // TIE HANDLING.

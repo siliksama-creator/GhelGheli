@@ -1052,6 +1052,74 @@ async function testAdminSettings() {
 }
 
 // ---------------------------------------------------------------------------
+async function testAuditFindings() {
+  section('۲۰. باگ‌های ممیزی — نباید برگردند');
+
+  group('ثبت‌نام باید همان اعتبارسنجی PATCH /api/profile را داشته باشد');
+  // یافتهٔ ممیزی: register-password همان فیلدهای پروفایل را می‌نوشت ولی
+  // هیچ‌کدام از گاردهای آن را نداشت. روی production بازتولید شد:
+  //   age:-5 -> ۵۰۰ · avatar traversal -> ۲۰۰ ذخیره شد
+  //   profileImageUrl:"javascript:..." -> ۲۰۰ ذخیره شد
+  const bad = [
+    ['age منفی', { age: -5 }, 400],
+    ['age نجومی', { age: 99999 }, 400],
+    ['age اعشاری', { age: 7.5 }, 400],
+    ['آواتار path-traversal', { profileAvatarKey: '../../etc/passwd' }, 400],
+    ['عکس javascript:', { profileImageUrl: 'javascript:alert(1)' }, 400],
+    ['عکس data:', { profileImageUrl: 'data:text/html,<script>' }, 400],
+    ['عکس http ناامن', { profileImageUrl: 'http://evil.example.com/x.png' }, 400],
+  ];
+  for (const [label, extra, want] of bad) {
+    const r = await POST('/api/auth/register-password', {
+      mobile: `aud${uniq()}`, password: 'Test@12345', ...extra,
+    });
+    ok(r.status === want, `ثبت‌نام رد می‌کند: ${label}`,
+      `status=${r.status} (انتظار ${want})`);
+    ok(r.status !== 500, `«${label}» خطای ۵۰۰ نمی‌دهد`);
+  }
+
+  group('متن بلند به‌جای ۵۰۰، کوتاه می‌شود');
+  const longName = await POST('/api/auth/register-password', {
+    mobile: `aud${uniq()}`, password: 'Test@12345', firstName: 'ا'.repeat(5000),
+  });
+  ok(longName.status === 200, 'نام ۵۰۰۰ کاراکتری پذیرفته و کوتاه می‌شود',
+    `status=${longName.status}`);
+  ok((longName.data?.user?.first_name || '').length <= 60,
+    'نام ذخیره‌شده حداکثر ۶۰ کاراکتر است',
+    `len=${(longName.data?.user?.first_name || '').length}`);
+
+  group('ثبت‌نام سالم همچنان کار می‌کند');
+  const good = await POST('/api/auth/register-password', {
+    mobile: `aud${uniq()}`, password: 'Test@12345',
+    age: 25, profileAvatarKey: 'avatar_1_football.png',
+  });
+  ok(good.status === 200, 'ثبت‌نام با مقادیر معتبر موفق است', `status=${good.status}`);
+  ok(Number(good.data?.user?.age) === 25, 'سن معتبر ذخیره شد');
+
+  if (!ctx.adminToken) { skipped('جدول جایزهٔ لیگ', 'توکن مدیر نداریم'); return; }
+  const A = ctx.adminToken;
+
+  group('⚠️ جدول جایزهٔ لیگ: مقدار بد نباید بستن لیگ را بخواباند');
+  // یافتهٔ ممیزی: prizeTable خام ذخیره می‌شد. یک مبلغ منفی بعداً قید
+  // league_payouts_amount_check را می‌شکست و **کل بستن لیگ** شکست
+  // می‌خورد — فصل active می‌ماند و هیچ برنده‌ای پول نمی‌گرفت، هر شب.
+  const badPrizes = [
+    ['مبلغ منفی', [{ rank: 1, amount: -500000 }]],
+    ['مبلغ متنی', [{ rank: 1, amount: 'abc' }]],
+    ['مبلغ نجومی', [{ rank: 1, amount: 99999999999999 }]],
+    ['رتبهٔ منفی', [{ rank: -3, amount: 1000 }]],
+    ['رتبهٔ تکراری', [{ rank: 1, amount: 100 }, { rank: 1, amount: 200 }]],
+  ];
+  for (const [label, table] of badPrizes) {
+    const r = await PATCH('/api/admin/league/current/prizes', { prizeTable: table }, A);
+    ok(r.status === 400, `جدول جایزه رد می‌شود: ${label}`, `status=${r.status}`);
+  }
+  const okTable = await PATCH('/api/admin/league/current/prizes',
+    { prizeTable: [{ rank: 1, amount: 500000 }, { rank: 2, amount: 250000 }] }, A);
+  ok(okTable.status === 200, 'جدول جایزهٔ سالم پذیرفته می‌شود', `status=${okTable.status}`);
+}
+
+// ---------------------------------------------------------------------------
 async function testCardTypeManagement() {
   section('۱۹. ویرایش کارت و ثبت کد دسته‌ای');
 
@@ -1266,6 +1334,7 @@ async function cleanup() {
     await testConcurrency();
     await testAdminSettings();
     await testCardTypeManagement();
+    await testAuditFindings();
     await cleanup();
   } catch (e) {
     fail++;

@@ -73,7 +73,25 @@ const publicAssetHeaders = (res) => {
 };
 app.use('/uploads', express.static(uploadRoot, { setHeaders: publicAssetHeaders }));
 app.use('/public', express.static(path.join(__dirname, '..', 'public'), { setHeaders: publicAssetHeaders }));
-app.use('/docs', swaggerUi.serve, swaggerUi.setup(YAML.load(__dirname + '/../docs/openapi.yaml')));
+// مستندات Swagger.
+//
+// AUDIT: این مسیر برای همه باز بود و کل سطح API (از جمله مسیرهای مدیریتی
+// و کیف پول) را به هر بازدیدکننده‌ای نشان می‌داد. خودِ مستندات راز نیست،
+// ولی نقشهٔ کاملِ آماده برای کسی که دنبال نقطهٔ ورود می‌گردد هم لازم نیست
+// رایگان باشد. در production پشت یک هدر ساده می‌رود؛ در توسعه باز است.
+//
+// (آسیب‌پذیری yamljs که npm audit گزارش می‌کند اینجا قابل بهره‌برداری
+// نیست: فقط همین فایل ثابتِ خودمان هنگام بوت پارس می‌شود و هیچ ورودی
+// کاربری به آن نمی‌رسد.)
+const docsGuard = (req, res, next) => {
+  if (process.env.NODE_ENV !== 'production') return next();
+  const key = process.env.DOCS_ACCESS_KEY;
+  if (!key) return res.status(404).json({ message: 'یافت نشد' });
+  const given = req.query.key || req.headers['x-docs-key'];
+  if (given === key) return next();
+  return res.status(404).json({ message: 'یافت نشد' });
+};
+app.use('/docs', docsGuard, swaggerUi.serve, swaggerUi.setup(YAML.load(__dirname + '/../docs/openapi.yaml')));
 const imageUpload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => cb(null, imageUploadDir),
@@ -344,6 +362,36 @@ app.post('/api/auth/register-password', userLoginLimiter, asyncHandler(async (re
   // (don't clobber it with a fresh random placeholder); only fall back to
   // an anonymous placeholder for a brand-new account with no nickname.
   const finalNickname = nickname || existing.rows[0]?.nickname || anonymousNickname();
+
+  // AUDIT FIX: این مسیر همان فیلدهایی را می‌نویسد که PATCH /api/profile
+  // می‌نویسد، ولی هیچ‌کدام از اعتبارسنجی‌های آن را نداشت. بازتولید روی
+  // production:
+  //   age:-5                              -> ۵۰۰ (نقض CHECK دیتابیس)
+  //   firstName با ۵۰۰۰ کاراکتر            -> ۵۰۰ (سرریز varchar)
+  //   profileAvatarKey:"../../etc/passwd"  -> ۲۰۰ و ذخیره شد
+  //   profileImageUrl:"javascript:alert(1)"-> ۲۰۰ و ذخیره شد
+  //
+  // دو مورد آخر جدی‌ترند: هر دو بعداً به کلاینت‌ها برمی‌گردند و مستقیم در
+  // مسیر فایل / تگ تصویر می‌نشینند. ممیزی قبلی این‌ها را در PATCH بست ولی
+  // این در ثبت‌نام باز مانده بود — یعنی مهاجم فقط کافی بود موقع ثبت‌نام
+  // مقدار را بفرستد، نه بعدش.
+  let ageValue = null;
+  if (age !== undefined && age !== null && age !== '') {
+    const n = Number(age);
+    if (!Number.isFinite(n) || !Number.isInteger(n) || n < 5 || n > 120) {
+      return res.status(400).json({ message: 'سن باید عددی بین ۵ تا ۱۲۰ باشد' });
+    }
+    ageValue = n;
+  }
+  if (profileAvatarKey !== undefined && profileAvatarKey !== null
+      && profileAvatarKey !== '' && !safeAvatarKey(profileAvatarKey)) {
+    return res.status(400).json({ message: 'آواتار انتخابی معتبر نیست' });
+  }
+  if (profileImageUrl !== undefined && profileImageUrl !== null
+      && profileImageUrl !== '' && !safeImageUrl(profileImageUrl)) {
+    return res.status(400).json({ message: 'آدرس عکس پروفایل معتبر نیست' });
+  }
+
   const hash = await bcrypt.hash(String(password), 12);
   const { rows } = await pool.query(
     `INSERT INTO users(mobile,mobile_verified,password_hash,first_name,last_name,nickname,age,city,province,profile_image_url,profile_avatar_key,bank_account,status)
@@ -351,7 +399,20 @@ app.post('/api/auth/register-password', userLoginLimiter, asyncHandler(async (re
      ON CONFLICT(mobile) DO UPDATE SET password_hash=EXCLUDED.password_hash, first_name=EXCLUDED.first_name, last_name=EXCLUDED.last_name, nickname=EXCLUDED.nickname, age=EXCLUDED.age, city=EXCLUDED.city, province=EXCLUDED.province, profile_image_url=EXCLUDED.profile_image_url, profile_avatar_key=EXCLUDED.profile_avatar_key, bank_account=EXCLUDED.bank_account, mobile_verified=true, updated_at=NOW()
      RETURNING *`,
 
-    [mobile, hash, firstName || null, lastName || null, finalNickname, age ? Number(age) : null, city || null, province || null, profileImageUrl || null, profileAvatarKey || null, bankAccount || null]
+    // همان محدودیت طولی که PATCH /api/profile اعمال می‌کند، تا رشتهٔ بلند
+    // به‌جای ۵۰۰، به‌آرامی کوتاه شود.
+    [
+      mobile, hash,
+      boundedText(firstName, 60),
+      boundedText(lastName, 60),
+      boundedText(finalNickname, 40),
+      ageValue,
+      boundedText(city, 60),
+      boundedText(province, 60),
+      safeImageUrl(profileImageUrl),
+      safeAvatarKey(profileAvatarKey),
+      boundedText(bankAccount, 40),
+    ]
   );
   res.json({ token: signUser(rows[0]), user: safeUser(rows[0]) });
 
@@ -1477,7 +1538,41 @@ app.patch('/api/admin/wallet/settings', adminAuth, requireRole(), asyncHandler(a
 app.get('/api/admin/league', adminAuth, asyncHandler(async (req, res) => { const data = await getLeaderboard(100); data.winnerCount = await getLeagueWinnerCount(); res.json(data); }));
 app.patch('/api/admin/league/current/prizes', adminAuth, requireRole(), asyncHandler(async (req, res) => {
   const season = await ensureActiveSeason();
-  const prizeTable = req.body.prizeTable || [];
+
+  // AUDIT FIX: prizeTable هرچه بود خام ذخیره می‌شد. یک مبلغ منفی (یا متنی
+  // که به NaN تبدیل می‌شود) بعداً در closeActiveSeason به league_payouts
+  // می‌رفت و قید CHECK (amount >= 0) را می‌شکست.
+  //
+  // بازتولید شد: با رتبهٔ ۱ = منفی ۵۰۰٬۰۰۰ و دو کاربر واجد شرایط،
+  //   [league] close failed: violates check constraint league_payouts_amount_check
+  // فصل «active» می‌ماند، هیچ‌کس پول نمی‌گیرد، و cron شبانه **هر شب**
+  // بی‌صدا شکست می‌خورد. یعنی یک تایپو در پنل، پرداخت کل لیگ را می‌خواباند.
+  //
+  // حالا همین‌جا اعتبارسنجی می‌شود، جایی که مدیر بازخورد می‌گیرد.
+  const rawTable = Array.isArray(req.body.prizeTable) ? req.body.prizeTable : [];
+  if (rawTable.length > 100) {
+    return res.status(400).json({ message: 'جدول جوایز حداکثر ۱۰۰ رتبه می‌تواند داشته باشد' });
+  }
+  const prizeTable = [];
+  const seenRanks = new Set();
+  for (const row of rawTable) {
+    const rank = Number(row?.rank);
+    const amount = Number(row?.amount ?? 0);
+    if (!Number.isInteger(rank) || rank < 1 || rank > 100) {
+      return res.status(400).json({ message: `رتبه باید عددی صحیح بین ۱ تا ۱۰۰ باشد (دریافت شد: ${row?.rank})` });
+    }
+    if (seenRanks.has(rank)) {
+      return res.status(400).json({ message: `رتبهٔ ${rank} تکراری است` });
+    }
+    seenRanks.add(rank);
+    if (!Number.isFinite(amount) || !Number.isInteger(amount) || amount < 0) {
+      return res.status(400).json({ message: `مبلغ جایزهٔ رتبهٔ ${rank} باید عددی صحیح و صفر یا بیشتر باشد` });
+    }
+    if (amount > 100000000000) {
+      return res.status(400).json({ message: `مبلغ جایزهٔ رتبهٔ ${rank} خارج از محدودهٔ مجاز است` });
+    }
+    prizeTable.push({ rank, amount });
+  }
   const winnerCount = Math.max(1, Math.min(100, Number(req.body.winnerCount || prizeTable.length || 10)));
   await pool.query('UPDATE league_seasons SET prize_table=$1, updated_at=NOW() WHERE id=$2', [JSON.stringify(prizeTable), season.id]);
   await pool.query(`INSERT INTO app_settings(key,value,updated_by_admin_id,updated_at) VALUES('league_winner_count',$1,$2,NOW()) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value, updated_by_admin_id=EXCLUDED.updated_by_admin_id, updated_at=NOW()`, [JSON.stringify(winnerCount), req.admin.id]);
