@@ -21,6 +21,10 @@ const { ensureActiveSeason, addLeaguePoints, getLeaderboard, closeActiveSeason }
 const { optimizeUpload, kb } = require('./services/imageService');
 const { getGameRewardSettings, saveGameRewardSettings } = require('./services/gameRewardService');
 const walletService = require('./services/walletService');
+// Hoisted with the other services: /api/users/:id/public uses it and sits
+// above the shop routes, so a require next to those would read as a
+// temporal-dead-zone bug even though route handlers run after startup.
+const shop = require('./services/shopService');
 const withdrawalService = require('./services/withdrawalService');
 
 // Fail fast in production if the JWT secret was never configured — running
@@ -707,7 +711,44 @@ app.get('/api/users/:id/public', auth, validateUuid('id'), asyncHandler(async (r
   const rewards = await pool.query(`SELECT c.claimed_at,c.status,r.name,r.image_url,r.reward_type,r.reward_value FROM user_reward_claims c JOIN reward_tiers r ON r.id=c.reward_tier_id WHERE c.user_id=$1 AND c.status IN ('approved','paid') ORDER BY c.claimed_at DESC LIMIT 50`, [req.params.id]);
   const cards = await pool.query(`SELECT t.id AS card_type_id,t.name,t.image_url,t.point_value,count(c.id)::int AS registered_count,max(c.used_at) AS last_registered_at FROM card_codes c JOIN card_types t ON t.id=c.card_type_id WHERE c.used_by_user_id=$1 GROUP BY t.id,t.name,t.image_url,t.point_value ORDER BY registered_count DESC,t.name LIMIT 50`, [req.params.id]);
   const leaguePayouts = await pool.query(`SELECT p.rank,p.amount,p.payment_status,p.created_at,s.month_year FROM league_payouts p JOIN league_seasons s ON s.id=p.league_season_id WHERE p.user_id=$1 ORDER BY p.created_at DESC LIMIT 20`, [req.params.id]);
-  res.json({ ...rows[0], rewards: rewards.rows, cards: cards.rows, leaguePayouts: leaguePayouts.rows });
+
+  // Everything a visitor should see when they tap someone in chat or the
+  // league table: their finishes, their prizes, and their cosmetics.
+  const leagueHistory = await pool.query(
+    `SELECT month_year, rank, points, prize_amount
+       FROM user_league_history WHERE user_id=$1
+      ORDER BY created_at DESC LIMIT 24`, [req.params.id]);
+
+  // Physical trophies keep their own snapshot, so they survive a tier being
+  // edited or deleted — the JOIN above would lose them.
+  const trophies = await pool.query(
+    `SELECT reward_name AS name, reward_image AS image_url, status, claimed_at
+       FROM user_reward_claims
+      WHERE user_id=$1 AND reward_type='physical'
+      ORDER BY claimed_at DESC LIMIT 50`, [req.params.id]);
+
+  const cosmeticsMap = await shop.cosmeticsFor([req.params.id]);
+  const cosmetics = cosmeticsMap.get(req.params.id) || {};
+
+  // Best rank ever, for the headline medal.
+  const best = leagueHistory.rows.reduce(
+    (acc, r) => (acc === null || r.rank < acc ? r.rank : acc), null);
+
+  res.json({
+    ...rows[0],
+    rewards: rewards.rows,
+    cards: cards.rows,
+    leaguePayouts: leaguePayouts.rows,
+    leagueHistory: leagueHistory.rows.map(r => ({
+      monthYear: r.month_year, rank: r.rank,
+      points: r.points, prizeAmount: Number(r.prize_amount),
+    })),
+    trophies: trophies.rows,
+    bestRank: best,
+    totalPrizeAmount: leagueHistory.rows
+      .reduce((a, r) => a + Number(r.prize_amount || 0), 0),
+    cosmetics,
+  });
 }));
 
 app.get('/api/rewards', auth, asyncHandler(async (req, res) => {
@@ -719,6 +760,42 @@ const rewardGroups = require('./services/rewardGroupService');
 
 app.get('/api/reward-groups', auth, asyncHandler(async (req, res) => {
   res.json(await rewardGroups.userView(req.user.id));
+}));
+
+// ── Shop: cosmetics + GhelGheli Plus ───────────────────────────────────────
+app.get('/api/shop', auth, asyncHandler(async (req, res) => {
+  res.json(await shop.catalogue(req.user.id));
+}));
+
+// Buying spends from the wallet, so it is rate-limited like other money paths.
+const shopLimiter = rateLimit({
+  windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false,
+  keyGenerator: (req) => req.user?.id || req.ip,
+  message: { message: 'تعداد درخواست‌ها زیاد است؛ کمی صبر کن' },
+});
+
+app.post('/api/shop/items/:id/buy', auth, validateUuid('id'), shopLimiter, asyncHandler(async (req, res) => {
+  try {
+    res.json(await shop.buyItem(req.user.id, req.params.id));
+  } catch (e) {
+    res.status(e.status || 500).json({ message: e.message || 'خطا در خرید' });
+  }
+}));
+
+app.post('/api/shop/plus', auth, shopLimiter, asyncHandler(async (req, res) => {
+  try {
+    res.json(await shop.buyPlus(req.user.id));
+  } catch (e) {
+    res.status(e.status || 500).json({ message: e.message || 'خطا در خرید اشتراک' });
+  }
+}));
+
+app.post('/api/shop/equip', auth, asyncHandler(async (req, res) => {
+  try {
+    res.json(await shop.equip(req.user.id, req.body?.slug || null));
+  } catch (e) {
+    res.status(e.status || 500).json({ message: e.message || 'خطا در انتخاب' });
+  }
 }));
 
 // Physical prizes won — rendered as a trophy shelf on the profile.
@@ -1521,15 +1598,13 @@ app.put('/api/admin/rewards/:id/cards', adminAuth, validateUuid('id'), requireRo
 
 app.post('/api/admin/rewards', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
   const r = req.body;
-  // Count only ACTIVE tiers. Counting retired ones too meant an admin who
-  // had deactivated 30 prizes over time could never create another — the
-  // limit is about how many are on offer, not how many ever existed.
-  // Found on production: 28 of the 30 slots were retired test rewards.
+  // No practical cap: the admin owns the catalogue. A sanity ceiling stays
+  // only to catch a runaway script, not to constrain real use.
   const count = await pool.query(
     'SELECT count(*)::int AS count FROM reward_tiers WHERE is_active = true');
-  if (count.rows[0].count >= 30) {
+  if (count.rows[0].count >= 500) {
     return res.status(400).json({
-      message: 'حداکثر ۳۰ جایزهٔ فعال می‌توانید داشته باشید؛ برای افزودن جایزهٔ جدید یکی را غیرفعال کنید',
+      message: 'تعداد جوایز فعال بیش از حد است (۵۰۰)؛ چند مورد را غیرفعال کنید',
     });
   }
   const requiredPoints = Number(r.requiredPoints);
@@ -1576,6 +1651,16 @@ app.patch('/api/admin/rewards/:id', adminAuth, validateUuid('id'), requireRole('
        ? Math.max(0, Number(r.maxClaimsPerUser) || 0) : null]);
   await audit(req.admin.id,'update_reward','reward_tiers',req.params.id,null,r); res.json(rows[0]);
 }));
+app.delete('/api/admin/rewards/:id', adminAuth, validateUuid('id'), requireRole('super_admin'), asyncHandler(async (req, res) => {
+  // Full control for the admin. Past claims survive because each one stores
+  // its own snapshot of the prize (name/image/type/amount) — see migration
+  // 021, which also relaxed the FK from RESTRICT to SET NULL.
+  const before = await pool.query('SELECT * FROM reward_tiers WHERE id=$1', [req.params.id]);
+  if (!before.rows[0]) return res.status(404).json({ message: 'جایزه پیدا نشد' });
+  await pool.query('DELETE FROM reward_tiers WHERE id=$1', [req.params.id]);
+  await audit(req.admin.id, 'delete_reward', 'reward_tiers', req.params.id, before.rows[0], null);
+  res.json({ message: 'جایزه حذف شد؛ سابقهٔ دریافت‌های قبلی حفظ شد' });
+}));
 app.get('/api/admin/reward-claims', adminAuth, asyncHandler(async (req, res) => res.json((await pool.query('SELECT c.*, u.mobile, r.name AS reward_name FROM user_reward_claims c JOIN users u ON u.id=c.user_id JOIN reward_tiers r ON r.id=c.reward_tier_id ORDER BY c.claimed_at DESC')).rows)));
 app.patch('/api/admin/reward-claims/:id', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
   const { status, adminNote } = req.body;
@@ -1586,7 +1671,8 @@ app.patch('/api/admin/reward-claims/:id', adminAuth, validateUuid('id'), require
   try {
     await client.query('BEGIN');
     const q = await client.query(
-      `SELECT c.*, r.cash_amount, r.reward_type, r.name AS reward_name
+      `SELECT c.*, r.cash_amount, r.reward_type, r.name AS reward_name,
+              r.required_points
          FROM user_reward_claims c JOIN reward_tiers r ON r.id=c.reward_tier_id
         WHERE c.id=$1 FOR UPDATE OF c`,
       [req.params.id],
@@ -1617,7 +1703,44 @@ app.patch('/api/admin/reward-claims/:id', adminAuth, validateUuid('id'), require
       });
       if (!r.duplicate) credited = cash;
     }
+    // REFUND ON REJECTION.
+    //
+    // Points are spent the moment a user claims, but a physical prize stays
+    // pending until an admin posts it. If the admin then REJECTS it, the user
+    // had paid for nothing and had no way to get those points back.
+    //
+    // The refund goes to current_points (the spendable balance) only:
+    // lifetime_points was never reduced by the claim, and monthly league
+    // points were never touched, so restoring either would invent points the
+    // user did not earn.
+    let refunded = 0;
+    if (status === 'rejected' && !claim.refunded_at) {
+      const { rows: tierRows } = await client.query(
+        'SELECT required_points FROM reward_tiers WHERE id=$1',
+        [claim.reward_tier_id]);
+      const cost = Number(tierRows[0]?.required_points || 0);
+      if (cost > 0) {
+        await client.query(
+          'UPDATE users SET current_points = current_points + $2, updated_at=NOW() WHERE id=$1',
+          [claim.user_id, cost]);
+        // Stamped so a second rejection (or a re-save) cannot refund twice.
+        await client.query(
+          'UPDATE user_reward_claims SET refunded_at=NOW() WHERE id=$1',
+          [claim.id]);
+        refunded = cost;
+      }
+    }
+
     await client.query('COMMIT');
+
+    if (refunded > 0) {
+      createNotification(
+        claim.user_id,
+        'reward',
+        'درخواست جایزه رد شد — امتیازت برگشت',
+        `درخواست «${claim.reward_name}» تایید نشد و ${refunded} امتیاز به حسابت برگردانده شد.`,
+      ).catch(() => {});
+    }
 
     if (credited > 0) {
       createNotification(
@@ -1628,7 +1751,14 @@ app.patch('/api/admin/reward-claims/:id', adminAuth, validateUuid('id'), require
       ).catch(() => {});
     }
     await audit(req.admin.id, 'update_reward_claim', 'user_reward_claims', req.params.id, adminNote, { status, credited });
-    res.json({ message: credited > 0 ? `به‌روزرسانی شد و ${credited.toLocaleString('en-US')} تومان به کیف پول کاربر واریز شد` : 'به‌روزرسانی شد' });
+    res.json({
+      message: credited > 0
+        ? `به‌روزرسانی شد و ${credited.toLocaleString('en-US')} تومان به کیف پول کاربر واریز شد`
+        : refunded > 0
+          ? `درخواست رد شد و ${refunded} امتیاز به کاربر برگشت`
+          : 'به‌روزرسانی شد',
+      refunded,
+    });
   } catch (e) {
     await client.query('ROLLBACK');
     res.status(e.status || 500).json({ message: e.message || 'خطا در به‌روزرسانی' });

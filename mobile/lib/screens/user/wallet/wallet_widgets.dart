@@ -103,7 +103,7 @@ class _WalletBalanceCardState extends State<WalletBalanceCard>
                   children: [
                     const _GoldChip(),
                     Gaps.hSm,
-                    Text('کیف پول قل‌قلی',
+                    Text('کیف پول قلقلی',
                         style: theme.textTheme.titleSmall?.copyWith(
                           color: Colors.white.withValues(alpha: 0.92),
                           fontWeight: FontWeight.w600,

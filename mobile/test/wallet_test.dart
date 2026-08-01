@@ -339,7 +339,7 @@ void main() {
         pendingAmount: 0,
       )));
       await tester.pumpAndSettle();
-      expect(find.text('کیف پول قل‌قلی'), findsOneWidget);
+      expect(find.text('کیف پول قلقلی'), findsOneWidget);
       expect(find.text('موجودی قابل برداشت'), findsOneWidget);
       // انیمیشن شمارش باید به مقدار نهایی رسیده باشد
       expect(find.text('۲۵۰٬۰۰۰'), findsOneWidget);

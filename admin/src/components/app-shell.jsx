@@ -14,7 +14,7 @@ export function AppShell({ nav, activePage, onNavigate, onLogout, theme, onToggl
         <div className="sidebar-brand">
           <img src="/logo.png" alt="قلقلی" />
           <div>
-            <b>قل‌قلی</b>
+            <b>قلقلی</b>
             <small>پنل مدیریت وفاداری</small>
           </div>
         </div>

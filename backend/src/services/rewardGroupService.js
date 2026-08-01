@@ -166,6 +166,14 @@ async function userView(userId) {
       // reads "full" rather than snapping back to empty.
       const next = tiers.find(t => !t.pointsMet) || tiers[tiers.length - 1];
 
+      // CARD-GATED GROUPS.
+      //
+      // Points keep accruing globally — a card-gated group must never stop a
+      // user earning. But its BAR holds at full instead of reading "ready",
+      // because the prize genuinely is not claimable until the cards are in
+      // hand. Showing a finished bar next to a dead button would look broken.
+      const blockedByCards = !!next && next.pointsMet && !next.cardsMet;
+
       return {
         id: g.id,
         name: g.name,
@@ -178,6 +186,12 @@ async function userView(userId) {
         nextTier: next || null,
         progress: next && next.requiredPoints > 0
           ? Math.min(1, earned / next.requiredPoints) : 0,
+        // The UI uses this to say "کارت‌های لازم را جمع کن" rather than
+        // "آمادهٔ دریافت" on a tier the user cannot actually take.
+        blockedByCards,
+        missingCards: blockedByCards
+          ? next.requiredCards.filter(c => !c.met)
+          : [],
         tiers,
       };
     }),
