@@ -294,3 +294,28 @@ body {
 :root[data-theme='light'] .bigavatar {
   box-shadow: 0 6px 18px #00d49a33;
 }
+
+/* Club sub-tabs: the inactive label is #dbeeff (near-white), invisible on a
+   light page. Seen in the light-theme screenshot of the games tab. */
+:root[data-theme='light'] .clubTabs {
+  background: #101a2c0a;
+  border-color: #101a2c1a;
+}
+:root[data-theme='light'] .clubTabs button {
+  color: var(--text-muted);
+}
+:root[data-theme='light'] .clubTabs button:hover {
+  color: var(--page-fg);
+}
+
+/* Same class of problem anywhere a near-white label sits on a light surface. */
+:root[data-theme='light'] .chatActions button,
+:root[data-theme='light'] .presetRow button,
+:root[data-theme='light'] .wdTarget b,
+:root[data-theme='light'] .sectionHead p {
+  color: var(--text-muted);
+}
+:root[data-theme='light'] .chatmsg .clickableText,
+:root[data-theme='light'] .publicHead b {
+  color: var(--page-fg);
+}
