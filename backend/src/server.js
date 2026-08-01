@@ -714,22 +714,30 @@ app.get('/api/rewards', auth, asyncHandler(async (req, res) => {
   const { rows } = await pool.query('SELECT *, ($1 >= required_points) AS eligible FROM reward_tiers WHERE is_active=true ORDER BY display_order, required_points', [req.user.current_points]);
   res.json(rows);
 }));
-app.post('/api/rewards/:id/claim', auth, validateUuid('id'), asyncHandler(async (req, res) => {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const tier = await client.query('SELECT * FROM reward_tiers WHERE id=$1 AND is_active=true', [req.params.id]);
-    if (!tier.rows[0]) throw Object.assign(new Error('جایزه یافت نشد'), { status: 404 });
-    const user = await client.query('SELECT current_points FROM users WHERE id=$1 FOR UPDATE', [req.user.id]);
-    if (user.rows[0].current_points < tier.rows[0].required_points) throw Object.assign(new Error('امتیاز کافی برای این جایزه ندارید'), { status: 400 });
-    const claim = await client.query(`INSERT INTO user_reward_claims(user_id,reward_tier_id,points_at_claim,status) VALUES($1,$2,$3,'pending') RETURNING *`, [req.user.id, tier.rows[0].id, user.rows[0].current_points]);
-    await client.query('UPDATE users SET current_points=0, updated_at=NOW() WHERE id=$1', [req.user.id]);
-    await client.query('UPDATE user_card_inventory SET consumed_in_reward=true, updated_at=NOW() WHERE user_id=$1 AND consumed_in_reward=false', [req.user.id]);
-    await client.query('COMMIT');
-    res.json({ message: 'درخواست جایزه ثبت شد', claim: claim.rows[0] });
-  } catch (e) { await client.query('ROLLBACK'); res.status(e.status || 500).json({ message: e.message }); }
-  finally { client.release(); }
+// Reward groups: the user-facing catalogue with per-group progress.
+const rewardGroups = require('./services/rewardGroupService');
+
+app.get('/api/reward-groups', auth, asyncHandler(async (req, res) => {
+  res.json(await rewardGroups.userView(req.user.id));
 }));
+
+// Physical prizes won — rendered as a trophy shelf on the profile.
+app.get('/api/profile/trophies', auth, asyncHandler(async (req, res) => {
+  res.json({ trophies: await rewardGroups.trophies(req.user.id) });
+}));
+
+app.post('/api/rewards/:id/claim', auth, validateUuid('id'), asyncHandler(async (req, res) => {
+  // Delegated to rewardGroupService, which (unlike the previous inline
+  // version) credits cash rewards to the wallet, consumes only the cards the
+  // tier actually requires instead of the user's entire inventory, and
+  // restarts that group's progress bar.
+  try {
+    res.json(await rewardGroups.claim(req.user.id, req.params.id));
+  } catch (e) {
+    res.status(e.status || 500).json({ message: e.message || 'خطا در ثبت جایزه' });
+  }
+}));
+
 app.get('/api/rewards/claims/me', auth, asyncHandler(async (req, res) => {
   const { rows } = await pool.query('SELECT c.*, r.name, r.reward_type, r.reward_value FROM user_reward_claims c JOIN reward_tiers r ON r.id=c.reward_tier_id WHERE c.user_id=$1 ORDER BY c.claimed_at DESC', [req.user.id]);
   res.json(rows);
@@ -1409,6 +1417,89 @@ app.post('/api/admin/card-codes/bulk', adminAuth, requireRole('support'), asyncH
 }));
 
 app.get('/api/admin/rewards', adminAuth, asyncHandler(async (req, res) => res.json((await pool.query('SELECT * FROM reward_tiers ORDER BY display_order, required_points')).rows)));
+// ── Admin: reward groups ───────────────────────────────────────────────────
+// Both the web panel and the Flutter admin app drive these, so the two stay
+// in lockstep by construction rather than by discipline.
+
+app.get('/api/admin/reward-groups', adminAuth, asyncHandler(async (req, res) => {
+  res.json({ groups: await rewardGroups.listGroups({ includeInactive: true }) });
+}));
+
+app.post('/api/admin/reward-groups', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
+  const b = req.body || {};
+  if (!b.name || !String(b.name).trim()) {
+    return res.status(400).json({ message: 'نام گروه الزامی است' });
+  }
+  const type = rewardGroups.GROUP_TYPES.includes(b.groupType) ? b.groupType : 'mixed';
+  const { rows } = await pool.query(
+    `INSERT INTO reward_groups(name, description, image_url, group_type, accent, display_order, is_active)
+     VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+    [String(b.name).trim(), b.description || null, safeImageUrl(b.imageUrl),
+     type, b.accent || 'emerald', Number(b.displayOrder) || 0, b.isActive !== false]);
+  await audit(req.admin.id, 'create_reward_group', 'reward_groups', rows[0].id, null, b);
+  res.json(rows[0]);
+}));
+
+app.patch('/api/admin/reward-groups/:id', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
+  const b = req.body || {};
+  const before = await pool.query('SELECT * FROM reward_groups WHERE id=$1', [req.params.id]);
+  if (!before.rows[0]) return res.status(404).json({ message: 'گروه پیدا نشد' });
+  const type = rewardGroups.GROUP_TYPES.includes(b.groupType)
+    ? b.groupType : before.rows[0].group_type;
+  const { rows } = await pool.query(
+    `UPDATE reward_groups SET
+       name=COALESCE($2,name), description=COALESCE($3,description),
+       image_url=COALESCE($4,image_url), group_type=$5,
+       accent=COALESCE($6,accent), display_order=COALESCE($7,display_order),
+       is_active=COALESCE($8,is_active), updated_at=NOW()
+     WHERE id=$1 RETURNING *`,
+    [req.params.id, b.name ?? null, b.description ?? null,
+     b.imageUrl !== undefined ? safeImageUrl(b.imageUrl) : null, type,
+     b.accent ?? null,
+     b.displayOrder !== undefined ? Number(b.displayOrder) : null,
+     b.isActive !== undefined ? !!b.isActive : null]);
+  await audit(req.admin.id, 'update_reward_group', 'reward_groups', req.params.id, before.rows[0], b);
+  res.json(rows[0]);
+}));
+
+app.delete('/api/admin/reward-groups/:id', adminAuth, validateUuid('id'), requireRole('super_admin'), asyncHandler(async (req, res) => {
+  // Tiers keep existing and fall back to the "بدون گروه" bucket (the FK is
+  // ON DELETE SET NULL) — deleting a group must never delete prizes.
+  const before = await pool.query('SELECT * FROM reward_groups WHERE id=$1', [req.params.id]);
+  if (!before.rows[0]) return res.status(404).json({ message: 'گروه پیدا نشد' });
+  await pool.query('DELETE FROM reward_groups WHERE id=$1', [req.params.id]);
+  await audit(req.admin.id, 'delete_reward_group', 'reward_groups', req.params.id, before.rows[0], null);
+  res.json({ message: 'گروه حذف شد؛ جوایزش بدون گروه ماندند' });
+}));
+
+// Card requirements for a tier.
+app.put('/api/admin/rewards/:id/cards', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
+  const list = Array.isArray(req.body?.cards) ? req.body.cards : [];
+  if (list.length > 20) {
+    return res.status(400).json({ message: 'حداکثر ۲۰ نوع کارت برای هر جایزه' });
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('DELETE FROM reward_tier_cards WHERE reward_tier_id=$1', [req.params.id]);
+    for (const c of list) {
+      const qty = Number(c?.quantity);
+      if (!c?.cardTypeId || !Number.isInteger(qty) || qty < 1 || qty > 999) {
+        throw Object.assign(new Error('تعداد کارت باید عددی بین ۱ تا ۹۹۹ باشد'), { status: 400 });
+      }
+      await client.query(
+        'INSERT INTO reward_tier_cards(reward_tier_id, card_type_id, quantity) VALUES($1,$2,$3)',
+        [req.params.id, c.cardTypeId, qty]);
+    }
+    await client.query('COMMIT');
+    await audit(req.admin.id, 'set_reward_cards', 'reward_tiers', req.params.id, null, { cards: list });
+    res.json({ message: 'کارت‌های موردنیاز ذخیره شد' });
+  } catch (e) {
+    await client.query('ROLLBACK');
+    res.status(e.status || 500).json({ message: e.message });
+  } finally { client.release(); }
+}));
+
 app.post('/api/admin/rewards', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
   const r = req.body;
   const count = await pool.query('SELECT count(*)::int AS count FROM reward_tiers');
@@ -1426,13 +1517,32 @@ app.post('/api/admin/rewards', adminAuth, requireRole('support'), asyncHandler(a
     return res.status(400).json({ message: 'نوع جایزه باید «cash» یا «physical» باشد' });
   }
   const cashAmount = cashAmountInput(r.cashAmount) ?? 0;
-  const { rows } = await pool.query('INSERT INTO reward_tiers(name,description,image_url,required_points,reward_type,reward_value,cash_amount,display_order,is_active) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *', [r.name,r.description,r.imageUrl,requiredPoints,r.rewardType,r.rewardValue,cashAmount,r.displayOrder||0,r.isActive!==false]);
+  // A cash reward with no amount would silently pay nothing on claim.
+  if (r.rewardType === 'cash' && cashAmount <= 0) {
+    return res.status(400).json({ message: 'برای جایزهٔ نقدی، مبلغ باید بیشتر از صفر باشد' });
+  }
+  const { rows } = await pool.query('INSERT INTO reward_tiers(name,description,image_url,required_points,reward_type,reward_value,cash_amount,display_order,is_active,group_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *', [r.name,r.description,safeImageUrl(r.imageUrl),requiredPoints,r.rewardType,r.rewardValue,cashAmount,r.displayOrder||0,r.isActive!==false,r.groupId||null]);
   await audit(req.admin.id,'create_reward','reward_tiers',rows[0].id,null,r); res.json(rows[0]);
 }));
 app.patch('/api/admin/rewards/:id', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
   const r = req.body;
   const cashAmount = cashAmountInput(r.cashAmount);
-  const { rows } = await pool.query('UPDATE reward_tiers SET name=COALESCE($1,name),description=COALESCE($2,description),image_url=COALESCE($3,image_url),required_points=COALESCE($4,required_points),reward_type=COALESCE($5,reward_type),reward_value=COALESCE($6,reward_value),cash_amount=COALESCE($7,cash_amount),display_order=COALESCE($8,display_order),is_active=COALESCE($9,is_active),updated_at=NOW() WHERE id=$10 RETURNING *', [r.name,r.description,keepImage(r.imageUrl),r.requiredPoints,r.rewardType,r.rewardValue,cashAmount,r.displayOrder,r.isActive,req.params.id]);
+  // groupId is deliberately settable to NULL (move a tier out of a group), so
+  // it uses an explicit sentinel rather than COALESCE.
+  const moveGroup = r.groupId !== undefined;
+  const { rows } = await pool.query(
+    `UPDATE reward_tiers SET
+       name=COALESCE($1,name), description=COALESCE($2,description),
+       image_url=COALESCE($3,image_url), required_points=COALESCE($4,required_points),
+       reward_type=COALESCE($5,reward_type), reward_value=COALESCE($6,reward_value),
+       cash_amount=COALESCE($7,cash_amount), display_order=COALESCE($8,display_order),
+       is_active=COALESCE($9,is_active),
+       group_id = CASE WHEN $11::boolean THEN $12::uuid ELSE group_id END,
+       updated_at=NOW()
+     WHERE id=$10 RETURNING *`,
+    [r.name,r.description,keepImage(r.imageUrl),r.requiredPoints,r.rewardType,
+     r.rewardValue,cashAmount,r.displayOrder,r.isActive,req.params.id,
+     moveGroup, moveGroup ? (r.groupId || null) : null]);
   await audit(req.admin.id,'update_reward','reward_tiers',req.params.id,null,r); res.json(rows[0]);
 }));
 app.get('/api/admin/reward-claims', adminAuth, asyncHandler(async (req, res) => res.json((await pool.query('SELECT c.*, u.mobile, r.name AS reward_name FROM user_reward_claims c JOIN users u ON u.id=c.user_id JOIN reward_tiers r ON r.id=c.reward_tier_id ORDER BY c.claimed_at DESC')).rows)));
