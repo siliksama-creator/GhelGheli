@@ -1136,7 +1136,12 @@ app.post('/api/chat/messages', auth, chatLimiter, asyncHandler(async (req, res) 
   if (messageType === 'text' && !CANNED_MESSAGES.includes(clean)) return res.status(400).json({ message: 'فقط پیام‌های آماده مجاز هستند.' });
   if (clean) await assertNoBadWords(clean);
   const { rows } = await pool.query('INSERT INTO chat_messages(user_id,message_text,reply_to_message_id,sticker_id,message_type) VALUES($1,$2,$3,$4,$5) RETURNING *', [req.user.id, clean, replyTo, stickerId, messageType]);
-  const msg = { ...rows[0], nickname: req.user.nickname, first_name: req.user.first_name, last_name: req.user.last_name, profile_image_url: req.user.profile_image_url, profile_avatar_key: req.user.profile_avatar_key, like_count: 0, liked_by_me: false };
+  // BUG: the message BROADCAST carried no cosmetics, while GET /api/chat
+  // does. A paying user's club badge and name colour therefore appeared on
+  // every old message but vanished from their own new one until the page was
+  // reloaded — reading as "my badge stopped working".
+  const cosNew = await shop.cosmeticsFor([req.user.id]);
+  const msg = { ...rows[0], nickname: req.user.nickname, first_name: req.user.first_name, last_name: req.user.last_name, profile_image_url: req.user.profile_image_url, profile_avatar_key: req.user.profile_avatar_key, like_count: 0, liked_by_me: false, cosmetics: cosNew.get(req.user.id) || null };
   io.emit('chat:new', msg);
   res.json(msg);
 }));
@@ -2200,7 +2205,10 @@ io.on('connection', socket => {
       if (clean) await assertNoBadWords(clean);
       arr.push(now); socketMessageTimes.set(socket.user.id, arr);
       const { rows } = await pool.query('INSERT INTO chat_messages(user_id,message_text,reply_to_message_id,sticker_id,message_type) VALUES($1,$2,$3,$4,$5) RETURNING *', [socket.user.id, clean, replyTo, stickerId, messageType]);
-      const msg = { ...rows[0], nickname: socket.user.nickname, first_name: socket.user.first_name, last_name: socket.user.last_name, profile_image_url: socket.user.profile_image_url, profile_avatar_key: socket.user.profile_avatar_key, like_count: 0 };
+      // Same fix as the REST path: without cosmetics here, a badge bought
+      // seconds earlier does not show on the sender's own new message.
+      const cosWs = await shop.cosmeticsFor([socket.user.id]);
+      const msg = { ...rows[0], nickname: socket.user.nickname, first_name: socket.user.first_name, last_name: socket.user.last_name, profile_image_url: socket.user.profile_image_url, profile_avatar_key: socket.user.profile_avatar_key, like_count: 0, cosmetics: cosWs.get(socket.user.id) || null };
       io.emit('chat:new', msg); cb && cb({ ok: true, message: msg });
     } catch(e){ cb && cb({ ok: false, error: e.message }); }
   });
