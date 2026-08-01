@@ -108,10 +108,18 @@ void main() {
       var accepted = 0;
       // 50ms apart == 20 taps/s, above the 12/s ceiling but past the debounce,
       // so only the sliding window can catch it.
-      for (var i = 0; i < 40; i++) {
-        if (guard.register(i * 50) == TapVerdict.accepted) accepted++;
+      const count = 40;
+      const spacingMs = 50;
+      for (var i = 0; i < count; i++) {
+        if (guard.register(i * spacingMs) == TapVerdict.accepted) accepted++;
       }
-      expect(accepted, lessThanOrEqualTo(config.maxTapsPerSecond + 1));
+      // The window SLIDES, so the budget is per second of wall time, not per
+      // burst: 40 taps at 50ms spans 2s and therefore earns ~2 windows worth.
+      const spanSeconds = (count * spacingMs) / 1000;
+      final budget = (config.maxTapsPerSecond * spanSeconds).ceil() + 1;
+      expect(accepted, lessThanOrEqualTo(budget));
+      // The real assertion: a 20/s stream must lose a meaningful share.
+      expect(accepted, lessThan(count));
       expect(guard.rejectedCount, greaterThan(0));
     });
 
