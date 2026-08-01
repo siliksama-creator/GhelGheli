@@ -1399,3 +1399,20 @@
 .card:after {
   pointer-events: none;
 }
+
+/* ── Two last overflow findings from the visual audit ──────────────────── */
+
+/* The unread-count badge is absolutely positioned 3px OUTSIDE the bell, which
+   is the intended look — but it also makes the button a 39px scroll container
+   inside a 36px box. Harmless visually, yet it means any horizontal scroll
+   chain treats the header as scrollable. `overflow: visible` is what was
+   wanted all along: draw outside the box without becoming scrollable. */
+.iconBtn.bell { overflow: visible; }
+
+/* `.portal` is a grid whose children are `width: min(1080px, 96vw)` cards.
+   96vw is measured against the VIEWPORT including the scrollbar gutter, so on
+   a 366px content box the card computes to 374px and overflows by 8px — a
+   sliver of horizontal scroll on every screen. `min-width: 0` lets the grid
+   item shrink to its column instead of forcing the track wider. */
+.portal { min-width: 0; }
+.portal > * { max-width: 100%; }
