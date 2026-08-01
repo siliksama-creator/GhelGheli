@@ -1076,7 +1076,7 @@
     flex-wrap: nowrap;
     overflow-x: auto;
     gap: 3px;
-    padding: 7px;
+    padding: 7px 5px;
     /* Keep the fade so a row that DOES overflow looks scrollable rather
        than cut off. */
     mask-image: linear-gradient(to left, #000 92%, transparent 100%);
@@ -1091,11 +1091,12 @@
        anything narrower the row scrolls with the gradient hint above. */
     min-width: 0;
     flex: 0 0 auto;
-    /* Tight enough that all seven tabs total ~372px and fit a 390px screen
-       without scrolling, while each button is still wider than its own
-       label. Measured, not guessed: at 5px padding the row is 372px against
-       a 372px viewport. */
-    padding: 7px 4px;
+    /* Tight enough that all seven tabs fit a 390px screen without scrolling
+       while each button stays wider than its own label. Measured, not
+       guessed: 3px padding puts the row at 362px inside a 364px strip.
+       Anything narrower than ~380px still scrolls, which is why the fade
+       hint above stays. */
+    padding: 7px 3px;
   }
   .mobileNav .navIcon { font-size: 16px; }
   .mobileNav .navLabel {
