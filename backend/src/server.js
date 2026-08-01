@@ -1521,8 +1521,17 @@ app.put('/api/admin/rewards/:id/cards', adminAuth, validateUuid('id'), requireRo
 
 app.post('/api/admin/rewards', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
   const r = req.body;
-  const count = await pool.query('SELECT count(*)::int AS count FROM reward_tiers');
-  if (count.rows[0].count >= 30) return res.status(400).json({ message: 'حداکثر ۳۰ جایزه قابل تعریف است' });
+  // Count only ACTIVE tiers. Counting retired ones too meant an admin who
+  // had deactivated 30 prizes over time could never create another — the
+  // limit is about how many are on offer, not how many ever existed.
+  // Found on production: 28 of the 30 slots were retired test rewards.
+  const count = await pool.query(
+    'SELECT count(*)::int AS count FROM reward_tiers WHERE is_active = true');
+  if (count.rows[0].count >= 30) {
+    return res.status(400).json({
+      message: 'حداکثر ۳۰ جایزهٔ فعال می‌توانید داشته باشید؛ برای افزودن جایزهٔ جدید یکی را غیرفعال کنید',
+    });
+  }
   const requiredPoints = Number(r.requiredPoints);
   if (!r.name || !Number.isFinite(requiredPoints) || requiredPoints <= 0) return res.status(400).json({ message: 'نام جایزه و امتیاز معتبر الزامی است' });
   // reward_value is NOT NULL in the schema but was never validated here, so
