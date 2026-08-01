@@ -9,6 +9,8 @@ import'./style.css';
 // and force the browser to synthesise a smeared fake bold. Vazirmatn's
 // heaviest real cut is 800. Enforced by tool/typography.mjs.
 import'./typography.css';
+// AFTER the others: the theme layer overrides style.css surface colours.
+import'./theme.css';
 
 const API=import.meta.env.VITE_API_BASE||'https://api.ghelghelishop.ir';
 // Accent palette for the admin-pinned announcement (mirrors the server's
@@ -25,8 +27,28 @@ async function req(path,method='GET',body,token){
   return d;
 }
 
+// Light/dark theme.
+//
+// Mirrors the Flutter app, which has had a theme switch since launch while
+// the web was dark-only. The choice is persisted so it survives a reload,
+// and applied to <html> as a data attribute that theme.css keys off.
+function useTheme(){
+  const[theme,setTheme]=useState(()=>{
+    try{ return localStorage.theme==='light'?'light':'dark' }catch{ return 'dark' }
+  });
+  useEffect(()=>{
+    document.documentElement.setAttribute('data-theme',theme);
+    // Keeps the mobile browser chrome in step with the page.
+    const meta=document.querySelector('meta[name="theme-color"]');
+    if(meta) meta.setAttribute('content',theme==='light'?'#f4f7fc':'#06101d');
+    try{ localStorage.theme=theme }catch{ /* private mode */ }
+  },[theme]);
+  return[theme,()=>setTheme(t=>t==='light'?'dark':'light')];
+}
+
 function App(){
   const[token,setToken]=useState(localStorage.token||'');
+  const[theme,toggleTheme]=useTheme();
   const[mode,setMode]=useState(location.hostname.startsWith('register.')?'register':'login');
   // The big hero logo belongs on the LOGIN screen only. Rendering it inside
   // the portal pushed every screen a full viewport down — the user had to
@@ -40,7 +62,7 @@ function App(){
         </div>
       )}
       {token
-        ? <Portal token={token} logout={()=>{
+        ? <Portal token={token} theme={theme} toggleTheme={toggleTheme} logout={()=>{
             localStorage.removeItem('token');
             // Game progress is per-user. Leaving it behind meant the next
             // person to sign in on a shared browser saw (and briefly played
@@ -48,7 +70,11 @@ function App(){
             localStorage.removeItem('tap_game_progress_v1');
             setToken('');
           }}/>
-        : <Auth mode={mode} setMode={setMode} done={t=>{localStorage.token=t;setToken(t)}}/>}
+        : <><Auth mode={mode} setMode={setMode} done={t=>{localStorage.token=t;setToken(t)}}/>
+            <button className="themeToggleFloat" onClick={toggleTheme}
+              title={theme==='light'?'حالت تیره':'حالت روشن'}>
+              {theme==='light'?'🌙':'☀️'}
+            </button></>}
     </div>
   );
 }
@@ -60,7 +86,7 @@ function Auth({mode,setMode,done}){
 }
 
 
-function Portal({token,logout}){
+function Portal({token,logout,theme,toggleTheme}){
   const [tab,setTab]=useState('home');
   const [p,setP]=useState(null);
   const [rewards,setRewards]=useState([]);
@@ -102,6 +128,10 @@ function Portal({token,logout}){
           <b>{u.nickname||'کاربر'}</b>
           <span>{fa(u.current_points)} امتیاز</span>
         </div>
+        <button className="iconBtn" onClick={toggleTheme}
+          title={theme==='light'?'حالت تیره':'حالت روشن'}>
+          {theme==='light'?'🌙':'☀️'}
+        </button>
         <Notifications token={token}/>
         <button className="iconBtn danger" onClick={logout} title="خروج">⏻</button>
       </header>

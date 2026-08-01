@@ -274,4 +274,43 @@ test('the server schedules the sweep', () => {
   assert.ok(/cron\.schedule\('[^']*'[^)]*\)/.test(src), 'must be on a schedule');
 });
 
+
+console.log('\ntap game — two devices, one account');
+
+test('the sequence number no longer gates acceptance', () => {
+  // REGRESSION: `seq` is a per-CLIENT counter (every client starts at 1) but
+  // was compared against per-USER state. Playing on a phone and a browser
+  // meant the second device was refused forever — and a refusal BURNS the
+  // batch, so the player silently lost those taps. Replay protection is the
+  // nonce's job; it is genuinely per-user.
+  const src = require('fs').readFileSync(
+    require('path').join(__dirname, '../src/services/tapGameService.js'), 'utf8');
+  assert.ok(
+    !/if\s*\(body\.seq\s*<=\s*Number\(current\.last_sequence\)\)/.test(src),
+    'submitBatch must not reject on a non-increasing sequence'
+  );
+});
+
+test('last_sequence records the highest seen', () => {
+  const src = require('fs').readFileSync(
+    require('path').join(__dirname, '../src/services/tapGameService.js'), 'utf8');
+  assert.ok(/GREATEST\(last_sequence/.test(src),
+    'with two devices a plain overwrite would bounce between their counters');
+});
+
+test('the nonce is still single-use', () => {
+  // Dropping the sequence gate must not weaken replay protection.
+  const src = require('fs').readFileSync(
+    require('path').join(__dirname, '../src/services/tapGameService.js'), 'utf8');
+  assert.ok(/ON CONFLICT \(user_id, nonce\) DO NOTHING RETURNING nonce/.test(src));
+  assert.ok(/nonceInsert\.rowCount === 0/.test(src), 'a repeat nonce must be refused');
+});
+
+test('a level-up carries over correctly mid-session', () => {
+  // The exact numbers from the cross-client test: 60 banked, +50 arrives.
+  const r = svc.advance(1, 60, 50);
+  assert.strictEqual(r.level, 2);
+  assert.strictEqual(r.levelTaps, 10);
+});
+
 console.log(`\n${passed} tap-game assertions passed\n`);

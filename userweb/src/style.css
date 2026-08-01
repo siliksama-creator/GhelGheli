@@ -823,3 +823,13 @@
 .notifItem b{display:block;font-size:14px;font-weight:800;margin-bottom:3px}
 .notifItem p{margin:0 0 5px;font-size:13px;color:#c9ddf2cc;line-height:1.6}
 .notifItem small{font-size:11px;color:#c9ddf280}
+
+/* Floating theme toggle for the signed-out screen, where there is no app bar. */
+.themeToggleFloat{
+  position:fixed;top:14px;inset-inline-start:14px;z-index:40;
+  width:42px;height:42px;border-radius:999px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:19px;
+  background:#ffffff14;border:1px solid #ffffff26;color:inherit;
+  backdrop-filter:blur(10px);
+}
+.themeToggleFloat:hover{background:#ffffff24}

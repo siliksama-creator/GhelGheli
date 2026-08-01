@@ -245,21 +245,25 @@ async function submitBatch(userId, token, raw) {
     );
     const current = rows[0];
 
-    // Gate 4a — sequence must strictly increase.
-    if (body.seq <= Number(current.last_sequence)) {
-      await client.query('COMMIT');
-      return {
-        status: 409,
-        payload: {
-          ok: false,
-          rejected: true,
-          message: 'این batch قبلاً ثبت شده است',
-          level: current.level,
-          levelTaps: current.level_taps,
-          totalTaps: Number(current.total_taps),
-        },
-      };
-    }
+    // Gate 4a — REPLAY PROTECTION IS THE NONCE'S JOB, NOT THE SEQUENCE'S.
+    //
+    // This used to refuse any batch whose `seq` was not strictly greater than
+    // the last one stored. That is wrong the moment a user plays on two
+    // devices, which is the whole point of a shared account:
+    //
+    //   phone   sends seq 1  -> accepted, last_sequence = 1
+    //   browser sends seq 1  -> refused (1 <= 1)
+    //   browser sends seq 2  -> refused, its counter is behind the phone's
+    //   ...the second device stays locked out, and because a refusal BURNS
+    //      the batch the player silently loses those taps.
+    //
+    // `seq` is a per-CLIENT counter (each client starts at 1) that was being
+    // compared against per-USER state, so two honest sessions collide. The
+    // nonce below already makes every batch single-use and is genuinely
+    // per-user, so dropping the ordering requirement loses no protection.
+    //
+    // The value is still recorded — it is useful telemetry for spotting a
+    // client that never increments — but it no longer gates acceptance.
 
     // Gate 4b — nonce must be unseen.
     //
@@ -339,7 +343,10 @@ async function submitBatch(userId, token, raw) {
               total_taps = total_taps + $4,
               flagged_taps = flagged_taps + $5,
               rejected_batches = rejected_batches + $6,
-              last_sequence = $7,
+              -- Highest seen, not last written: with two devices the value
+              -- would otherwise bounce up and down between their independent
+              -- counters and mean nothing.
+              last_sequence = GREATEST(last_sequence, $7),
               last_batch_at = NOW(),
               updated_at = NOW()
         WHERE user_id = $1
