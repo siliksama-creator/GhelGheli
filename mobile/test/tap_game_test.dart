@@ -388,7 +388,7 @@ void main() {
       SharedPreferences.setMockInitialValues({
         'boundary': '{"level":9,"taps":0,"totalTaps":0}',
       });
-      final cfg = const TapGameConfig(baseTaps: 2, growthFactor: 1.0);
+      const cfg = TapGameConfig(baseTaps: 2, growthFactor: 1.0);
       final engine = TapEngine(config: cfg, storage: TapStorage(key: 'boundary'));
       await engine.init();
       expect(cfg.skinIndexForLevel(9), 0);

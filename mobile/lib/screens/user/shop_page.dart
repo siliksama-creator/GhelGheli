@@ -9,7 +9,6 @@ import '../../core/money.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/async_section.dart';
-import '../../widgets/safe_image.dart';
 
 const clubAsset = <String, String>{
   'esteghlal': 'assets/shop/club_esteghlal.webp',

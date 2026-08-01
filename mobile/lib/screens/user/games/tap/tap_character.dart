@@ -79,8 +79,8 @@ class TapCharacterState extends State<TapCharacter>
   }
 
   @override
-  void didUpdateWidget(covariant TapCharacter old) {
-    super.didUpdateWidget(old);
+  void didUpdateWidget(covariant TapCharacter oldWidget) {
+    super.didUpdateWidget(oldWidget);
     if (widget.skin != _currentSkin) {
       // Cross-fade rather than a hard swap: the skin change is a reward
       // moment and should feel like one.
