@@ -1044,3 +1044,59 @@
   margin:0 0 14px;padding:9px 12px;border-radius:12px;font-size:12.5px;
   background:#ffd36b18;border:1px solid #ffd36b40;color:#ffd36b;text-align:center;
 }
+
+/* ── Nav: reachable on every phone ───────────────────────────────────────
+   THE BUG: the strip is `flex-wrap:nowrap; overflow-x:auto` so it should
+   scroll — but with seven tabs on a 360px screen the last two ("پشتیبانی",
+   "پروفایل") measured at left:-199px, i.e. off-screen and unreachable. In an
+   RTL flex row `justify-content:flex-start` packs items toward the right edge
+   and the overflow spills to the LEFT, which browsers do not expose as
+   scrollable content the way they do for LTR.
+
+   Two fixes, both needed:
+     * scroll-snap plus explicit `direction` keeps the row scrollable in RTL,
+     * the row also stays usable if scrolling fails, because the tabs shrink
+       to fit rather than overflowing at all on the narrowest screens. */
+@media (max-width: 900px) {
+  .mobileNav {
+    /* `safe` prevents the browser clipping the overflow edge in RTL. */
+    justify-content: safe flex-start;
+    scroll-snap-type: x proximity;
+    /* A visible hint that there is more to scroll. */
+    mask-image: linear-gradient(to left, #000 88%, transparent 100%);
+  }
+  .mobileNav button { scroll-snap-align: start; }
+}
+
+/* Below ~430px seven tabs cannot fit even scrolled comfortably, so let them
+   shrink instead: icon stays, label gets smaller, nothing leaves the screen. */
+@media (max-width: 430px) {
+  .mobileNav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 5px;
+    padding: 7px;
+    mask-image: none;
+  }
+  .mobileNav button {
+    min-width: 0;
+    flex: 1 1 0;
+    padding: 7px 4px;
+  }
+  .mobileNav .navIcon { font-size: 17px; }
+  .mobileNav .navLabel {
+    font-size: 9.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+}
+
+/* ── Touch targets ───────────────────────────────────────────────────────
+   Chat action chips measured 27px tall. Apple and Material both put the
+   minimum comfortable target at ~44px; below ~30px mis-taps become common. */
+.chatActions button { min-height: 32px; padding: 6px 11px; }
+.confirmActions button,
+.rgClaim,
+.tapHead .ghost { min-height: 40px; }
