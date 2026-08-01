@@ -80,12 +80,21 @@ class DisplayName extends StatelessWidget {
     this.cosmetics,
     this.style,
     this.maxLines = 1,
+    this.avatarKey,
   });
 
   final String name;
   final Map? cosmetics;
   final TextStyle? style;
   final int maxLines;
+
+  /// What picture is already shown next to this name.
+  ///
+  /// If the user set their crest AS their profile picture, drawing the same
+  /// crest again beside their name shows it twice in a row — which read as a
+  /// rendering glitch, not a flourish. The badge exists to say "I support
+  /// this club"; once the avatar says it, the badge is redundant.
+  final Object? avatarKey;
 
   @override
   Widget build(BuildContext context) {
@@ -116,10 +125,14 @@ class DisplayName extends StatelessWidget {
       );
     }
 
+    final club = c['club'] as String?;
+    final avatarIsSameCrest =
+        club != null && avatarKey?.toString() == 'club:$club';
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        ClubBadge(club: c['club'] as String?),
+        if (!avatarIsSameCrest) ClubBadge(club: club),
         Flexible(child: text),
         if (c['plus'] == true)
           const Padding(

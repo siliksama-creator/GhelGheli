@@ -449,6 +449,11 @@ class _ChatBubble extends StatelessWidget {
                               message['first_name'] ??
                               'کاربر',
                           cosmetics: message['cosmetics'] as Map?,
+                          // Suppress the inline crest when the avatar beside
+                          // it is already that same crest.
+                          avatarKey: message['profile_image_url'] == null
+                              ? message['profile_avatar_key']
+                              : null,
                           style: theme.textTheme.titleSmall,
                         ),
                       ),

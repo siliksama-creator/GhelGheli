@@ -68,6 +68,9 @@ class _PublicProfileBody extends StatelessWidget {
               child: DisplayName(
                 name: data['nickname'] ?? 'کاربر',
                 cosmetics: data['cosmetics'] as Map?,
+                avatarKey: data['profile_image_url'] == null
+                    ? data['profile_avatar_key']
+                    : null,
                 style: theme.textTheme.headlineSmall,
               ),
             ),

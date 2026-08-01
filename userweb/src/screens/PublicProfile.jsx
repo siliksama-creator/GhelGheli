@@ -53,7 +53,9 @@ export default function PublicProfile({ token, userId, close }) {
                   src={u.profile_image_url
                     ? asset(u.profile_image_url)
                     : avatarUrl(u.profile_avatar_key)} />
-                {cos.club && (
+                {/* Not when the avatar IS that crest: the corner badge
+                    would be the same picture overlapping itself. */}
+                {cos.club && u.profile_avatar_key !== `club:${cos.club}` && (
                   <img className="ppClub" src={clubImg(cos.club)}
                     alt="نشان باشگاه" width="30" height="30"
                     onError={e => { e.currentTarget.style.display = 'none'; }} />

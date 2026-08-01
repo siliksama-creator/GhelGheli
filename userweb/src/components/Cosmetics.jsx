@@ -44,12 +44,22 @@ export function ClubBadge({ club }) {
   );
 }
 
-/** A display name with its badge, colour and Plus star. */
-export function DisplayName({ name, cosmetics, className, onClick }) {
+/**
+ * A display name with its badge, colour and Plus star.
+ *
+ * `avatarKey` lets the caller say what picture is already shown next to this
+ * name. If the user set their crest AS their profile picture, drawing the
+ * same crest again beside their name shows it twice in a row — which is what
+ * chat did, and it read as a rendering glitch rather than a flourish. The
+ * badge is a way to say "I support this club"; once the avatar says it, the
+ * badge is redundant.
+ */
+export function DisplayName({ name, cosmetics, className, onClick, avatarKey }) {
   const c = cosmetics || {};
+  const avatarIsSameCrest = c.club && avatarKey === `club:${c.club}`;
   return (
     <b className={className} onClick={onClick} style={nameColorStyle(c.color)}>
-      <ClubBadge club={c.club} />
+      {!avatarIsSameCrest && <ClubBadge club={c.club} />}
       {name}
       {c.plus && <span className="plusStarSm" title="عضو پلاس">⭐</span>}
     </b>
