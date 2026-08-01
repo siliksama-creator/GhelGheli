@@ -1085,12 +1085,23 @@
   }
   .mobileNav .navIcon { font-size: 17px; }
   .mobileNav .navLabel {
-    font-size: 9.5px;
+    /* Small enough that the longest label ("کیف پول", "پشتیبانی") fits
+       whole. Truncating to "پشت..." saved no space and just made the tab
+       unreadable — the icon above it is the primary cue, but a half-word
+       label is worse than a small one. */
+    font-size: 8.5px;
+    letter-spacing: -.2px;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
     max-width: 100%;
   }
+}
+
+/* Very narrow phones (<=340px): the label genuinely cannot fit, so drop it
+   and let the icon carry the tab. An icon alone reads better than "پشت...". */
+@media (max-width: 340px) {
+  .mobileNav .navLabel { display: none; }
+  .mobileNav .navIcon { font-size: 20px; }
+  .mobileNav button { padding: 9px 4px; }
 }
 
 /* ── Touch targets ───────────────────────────────────────────────────────
