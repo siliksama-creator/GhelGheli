@@ -1415,6 +1415,16 @@ app.post('/api/admin/rewards', adminAuth, requireRole('support'), asyncHandler(a
   if (count.rows[0].count >= 30) return res.status(400).json({ message: 'حداکثر ۳۰ جایزه قابل تعریف است' });
   const requiredPoints = Number(r.requiredPoints);
   if (!r.name || !Number.isFinite(requiredPoints) || requiredPoints <= 0) return res.status(400).json({ message: 'نام جایزه و امتیاز معتبر الزامی است' });
+  // reward_value is NOT NULL in the schema but was never validated here, so
+  // omitting it produced a 500 with the generic 'اطلاعات لازم کامل نیست' —
+  // which named no field and looked like a server fault rather than a form
+  // mistake. Reproduced against production.
+  if (!r.rewardValue || !String(r.rewardValue).trim()) {
+    return res.status(400).json({ message: 'شرح جایزه (مثلاً نام کالا یا مبلغ) الزامی است' });
+  }
+  if (!['cash', 'physical'].includes(r.rewardType)) {
+    return res.status(400).json({ message: 'نوع جایزه باید «cash» یا «physical» باشد' });
+  }
   const cashAmount = cashAmountInput(r.cashAmount) ?? 0;
   const { rows } = await pool.query('INSERT INTO reward_tiers(name,description,image_url,required_points,reward_type,reward_value,cash_amount,display_order,is_active) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *', [r.name,r.description,r.imageUrl,requiredPoints,r.rewardType,r.rewardValue,cashAmount,r.displayOrder||0,r.isActive!==false]);
   await audit(req.admin.id,'create_reward','reward_tiers',rows[0].id,null,r); res.json(rows[0]);
