@@ -261,3 +261,36 @@ body {
 :root[data-theme='light'] .hero b {
   color: var(--page-fg);
 }
+
+/* The wallet entry uses a black scrim (#00000038) that reads as dirty grey
+   on a light card. Spotted in a real screenshot, not in the source. */
+:root[data-theme='light'] .walletEntry {
+  background: linear-gradient(135deg, #fffaf0, #fff6e2);
+  border-color: #d9a441;
+  color: var(--page-fg);
+}
+:root[data-theme='light'] .walletEntry:hover {
+  background: linear-gradient(135deg, #fff6e2, #ffefd0);
+  border-color: #c9922c;
+}
+:root[data-theme='light'] .walletEntry small,
+:root[data-theme='light'] .walletEntry .weCta {
+  color: #7a5a12;
+}
+:root[data-theme='light'] .walletEntry b {
+  color: #5c3f06;
+}
+
+/* Toast/message chips are amber-on-dark; keep them readable on white. */
+:root[data-theme='light'] .msg,
+:root[data-theme='light'] .toast {
+  color: #7a5a12;
+  background: #fff6e2;
+  border-color: #d9a44166;
+}
+
+/* Avatar glow and card art shadows are tuned for a dark stage. */
+:root[data-theme='light'] .avatar,
+:root[data-theme='light'] .bigavatar {
+  box-shadow: 0 6px 18px #00d49a33;
+}

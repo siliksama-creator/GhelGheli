@@ -298,23 +298,34 @@ class _FloaterState extends State<_Floater>
             ),
           );
         },
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-              horizontal: Gaps.xs, vertical: Gaps.xxs),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.55),
-            borderRadius: Corners.rPill,
-            border: Border.all(color: widget.accent.withValues(alpha: 0.7)),
-          ),
-          child: Text(
-            '+۱',
-            style: TextStyle(
-              color: widget.accent,
-              fontWeight: FontWeight.w900,
-              fontSize: 18,
+        child: Builder(builder: (context) {
+          // A hardcoded black chip looks pasted-on in the app's light theme,
+          // which the web build made obvious. Derive the surface from the
+          // active scheme so it works in both.
+          final scheme = Theme.of(context).colorScheme;
+          final isDark = scheme.brightness == Brightness.dark;
+          return Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: Gaps.xs, vertical: Gaps.xxs),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.black.withValues(alpha: 0.55)
+                  : Colors.white.withValues(alpha: 0.92),
+              borderRadius: Corners.rPill,
+              border: Border.all(color: widget.accent.withValues(alpha: 0.7)),
             ),
-          ),
-        ),
+            child: Text(
+              '+۱',
+              style: TextStyle(
+                // The lime accent is too pale to read on white; darken it
+                // for the light theme only.
+                color: isDark ? widget.accent : const Color(0xFF4D7C0F),
+                fontWeight: FontWeight.w900,
+                fontSize: 18,
+              ),
+            ),
+          );
+        }),
       ),
     );
   }
