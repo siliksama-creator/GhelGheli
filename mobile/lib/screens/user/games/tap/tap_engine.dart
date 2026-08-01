@@ -88,13 +88,21 @@ class TapEngine extends ChangeNotifier {
       isComplete ? 0 : (requiredTaps - _progress.taps).clamp(0, 1 << 30);
 
   /// Levels until the character changes; null when no more skins remain.
+  /// Levels remaining until the character changes; null when no further skin
+  /// is reachable.
+  ///
+  /// Derived by SEARCHING for the next level whose skin differs, rather than
+  /// recomputing the boundary arithmetic by hand. That keeps this in lockstep
+  /// with [TapGameConfig.skinIndexForLevel] — the previous version duplicated
+  /// the formula and silently disagreed with it after the boundary was fixed.
   int? get levelsUntilNextSkin {
     if (isComplete) return null;
-    final nextBoundary =
-        ((_progress.level - 1) ~/ config.levelsPerSkin + 1) * config.levelsPerSkin;
-    if (nextBoundary >= config.levelCount) return null;
-    if (config.skinIndexForLevel(nextBoundary + 1) == skinIndex) return null;
-    return nextBoundary + 1 - _progress.level;
+    for (var lv = _progress.level + 1; lv <= config.levelCount; lv++) {
+      if (config.skinIndexForLevel(lv) != skinIndex) {
+        return lv - _progress.level;
+      }
+    }
+    return null;
   }
 
   TapEvent? get lastEvent => _lastEvent;
@@ -206,6 +214,19 @@ class TapEngine extends ChangeNotifier {
 
   // ── server sync ──────────────────────────────────────────────────────────
 
+  /// How many taps a window of [elapsedMs] can plausibly contain.
+  ///
+  /// Mirrors `plausibleCeiling()` in backend/src/services/tapGameService.js
+  /// but uses the CLIENT's stricter rate, so a batch we send is always
+  /// comfortably inside what the server will accept. Kept slightly
+  /// conservative on purpose: the cost of under-sending is a few seconds of
+  /// delay, the cost of over-sending is the player losing taps.
+  int _affordableTaps(int elapsedMs) {
+    const burstAllowance = 20;
+    final byRate = (elapsedMs / 1000.0) * config.maxTapsPerSecond;
+    return byRate.ceil() + burstAllowance;
+  }
+
   Future<void> _flush({bool force = false}) async {
     final sync = _sync;
     if (sync == null) return;
@@ -214,14 +235,37 @@ class TapEngine extends ChangeNotifier {
     if (_batchTaps <= 0 && _batchFlagged <= 0) return;
 
     _syncing = true;
-    final sentTaps = _batchTaps;
-    final sentFlagged = _batchFlagged;
     final nowMs = _clock.elapsedMilliseconds;
     final elapsed = nowMs - _batchStartMs;
 
+    // CAP THE BATCH TO WHAT ITS OWN WINDOW CAN JUSTIFY.
+    //
+    // The server rejects any batch whose tap count exceeds what a human hand
+    // could produce in the reported window. Two legitimate situations used to
+    // trip that and BURN the player's taps:
+    //
+    //   * `maxBatchTaps` fires back-to-back flushes. The second one carries a
+    //     full 400 taps but its window is only the few milliseconds since the
+    //     previous flush, so it looks impossible.
+    //   * A level-up forces an immediate flush right after a timed one.
+    //
+    // Sending only what the window supports and KEEPING the remainder for the
+    // next flush fixes both: nothing is lost, and an attacker gains nothing
+    // because the server still enforces the same ceiling independently.
+    final affordable = _affordableTaps(elapsed);
+    final sentTaps = _batchTaps <= affordable ? _batchTaps : affordable;
+    final sentFlagged = _batchFlagged;
+
+    if (sentTaps <= 0 && sentFlagged <= 0) {
+      // Nothing can be justified yet — wait for the window to grow.
+      _syncing = false;
+      return;
+    }
+
     // Reset the accumulator BEFORE awaiting so taps landing during the round
-    // trip belong to the next batch instead of being double-counted.
-    _batchTaps = 0;
+    // trip belong to the next batch instead of being double-counted. Any
+    // remainder above the cap is carried forward, never dropped.
+    _batchTaps -= sentTaps;
     _batchFlagged = 0;
     _batchStartMs = nowMs;
 

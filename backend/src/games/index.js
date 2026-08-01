@@ -32,6 +32,16 @@ const CATALOG = [
     subtitle: 'مهره‌ها را برگردان', accent: '#34D399', minutes: 8,
     noBot: false, solo: false,
   },
+  {
+    // Single-player: no lobby, no socket room, no rules file — it lives
+    // entirely in the clients plus the signed-progress endpoint. Listed here
+    // anyway so the catalogue stays the ONE description of what is playable;
+    // a hub that hardcodes its own list drifts the moment a game is added.
+    id: 'tap', title: 'ضربه‌زن', emoji: '👊',
+    subtitle: '۵۰ لول ضربه بزن و شخصیت‌ها را باز کن', accent: '#84CC16',
+    minutes: 3,
+    noBot: true, solo: true, singlePlayer: true,
+  },
 ];
 
 module.exports = {

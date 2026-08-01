@@ -81,18 +81,23 @@ class TapGameConfig {
     return raw.round();
   }
 
-  /// Artwork for [level], changing every [levelsPerSkin] levels and clamped
-  /// to the available skins so level 50 with 5 skins still resolves.
+  /// Artwork for [level], clamped to the available skins so level 50 with
+  /// 5 skins still resolves.
   String skinForLevel(int level) {
     if (skins.isEmpty) return '';
-    final index = ((level - 1) ~/ levelsPerSkin).clamp(0, skins.length - 1);
-    return skins[index];
+    return skins[skinIndexForLevel(level)];
   }
 
-  /// 0-based skin index, for change detection.
+  /// 0-based skin index for [level].
+  ///
+  /// The character changes **on arrival at** level 10, 20, 30, 40 — so
+  /// levels 1-9 use skin 1, level 10 is already skin 2, and so on. An
+  /// earlier version divided `(level - 1)`, which pushed every change one
+  /// level late (skin 2 only appeared at level 11).
   int skinIndexForLevel(int level) {
     if (skins.isEmpty) return 0;
-    return ((level - 1) ~/ levelsPerSkin).clamp(0, skins.length - 1);
+    if (level < levelsPerSkin) return 0;
+    return (level ~/ levelsPerSkin).clamp(0, skins.length - 1);
   }
 
   /// Total taps needed to go from level 1 all the way through [level].

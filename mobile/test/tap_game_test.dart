@@ -52,14 +52,43 @@ void main() {
   });
 
   group('skins', () {
-    test('a new skin every 10 levels', () {
-      expect(config.skinForLevel(1), config.skins[0]);
-      expect(config.skinForLevel(10), config.skins[0]);
-      expect(config.skinForLevel(11), config.skins[1]);
-      expect(config.skinForLevel(20), config.skins[1]);
-      expect(config.skinForLevel(21), config.skins[2]);
-      expect(config.skinForLevel(31), config.skins[3]);
-      expect(config.skinForLevel(41), config.skins[4]);
+    test('the character changes ON level 10, 20, 30, 40', () {
+      // Levels 1-9 are the first character; arriving AT level 10 already
+      // shows the second. A previous version changed one level late.
+      for (var lv = 1; lv <= 9; lv++) {
+        expect(config.skinForLevel(lv), config.skins[0], reason: 'level $lv');
+      }
+      for (var lv = 10; lv <= 19; lv++) {
+        expect(config.skinForLevel(lv), config.skins[1], reason: 'level $lv');
+      }
+      for (var lv = 20; lv <= 29; lv++) {
+        expect(config.skinForLevel(lv), config.skins[2], reason: 'level $lv');
+      }
+      for (var lv = 30; lv <= 39; lv++) {
+        expect(config.skinForLevel(lv), config.skins[3], reason: 'level $lv');
+      }
+      for (var lv = 40; lv <= 50; lv++) {
+        expect(config.skinForLevel(lv), config.skins[4], reason: 'level $lv');
+      }
+    });
+
+    test('exactly four changes across the whole game', () {
+      var changes = 0;
+      for (var lv = 2; lv <= config.levelCount; lv++) {
+        if (config.skinIndexForLevel(lv) != config.skinIndexForLevel(lv - 1)) {
+          changes++;
+          expect(lv % config.levelsPerSkin, 0,
+              reason: 'a change must land on a multiple of 10, got $lv');
+        }
+      }
+      expect(changes, 4);
+    });
+
+    test('the skin index never goes backwards', () {
+      for (var lv = 2; lv <= config.levelCount; lv++) {
+        expect(config.skinIndexForLevel(lv),
+            greaterThanOrEqualTo(config.skinIndexForLevel(lv - 1)));
+      }
     });
 
     test('all five skins are reachable within 50 levels', () {
@@ -73,13 +102,24 @@ void main() {
     test('a level beyond the last skin clamps instead of crashing', () {
       expect(config.skinForLevel(999), config.skins.last);
       expect(config.skinForLevel(0), config.skins.first);
+      expect(config.skinForLevel(-5), config.skins.first);
+      // Level 51 (the "finished" sentinel) must still resolve to artwork.
+      expect(config.skinForLevel(config.levelCount + 1), config.skins.last);
     });
 
     test('skin count can change without breaking the lookup', () {
       final three = config.copyWith(skins: const ['a', 'b', 'c']);
       expect(three.skinForLevel(1), 'a');
-      expect(three.skinForLevel(21), 'c');
+      expect(three.skinForLevel(10), 'b');
+      expect(three.skinForLevel(20), 'c');
       expect(three.skinForLevel(50), 'c'); // clamped
+    });
+
+    test('levelsPerSkin is tunable', () {
+      final every5 = config.copyWith(levelsPerSkin: 5);
+      expect(every5.skinIndexForLevel(4), 0);
+      expect(every5.skinIndexForLevel(5), 1);
+      expect(every5.skinIndexForLevel(10), 2);
     });
   });
 
@@ -293,8 +333,76 @@ void main() {
 
     test('levelsUntilNextSkin counts down to the boundary', () async {
       final engine = await freshEngine();
-      // Level 1 with a boundary at 11 => 10 levels to go.
-      expect(engine.levelsUntilNextSkin, 10);
+      // Level 1 with the next change AT level 10 => 9 levels to go.
+      expect(engine.levelsUntilNextSkin, 9);
+      engine.dispose();
+    });
+
+    test('the countdown agrees with skinIndexForLevel at every level', () async {
+      // Guards against the countdown and the lookup drifting apart, which is
+      // exactly what happened when the boundary formula was corrected in one
+      // place but not the other.
+      for (final startLevel in [1, 5, 9, 10, 15, 19, 20, 35, 45, 49]) {
+        SharedPreferences.setMockInitialValues({
+          'cd': '{"level":$startLevel,"taps":0,"totalTaps":0}',
+        });
+        final engine = TapEngine(config: config, storage: TapStorage(key: 'cd'));
+        await engine.init();
+        final n = engine.levelsUntilNextSkin;
+        if (n != null) {
+          expect(config.skinIndexForLevel(startLevel + n),
+              isNot(config.skinIndexForLevel(startLevel)),
+              reason: 'from level $startLevel, +$n must change the skin');
+          expect(config.skinIndexForLevel(startLevel + n - 1),
+              config.skinIndexForLevel(startLevel),
+              reason: 'from level $startLevel, +${n - 1} must NOT change it yet');
+        }
+        engine.dispose();
+      }
+    });
+
+
+    test('a rapid double flush does not lose taps', () async {
+      // REGRESSION: two flushes back-to-back meant the second carried a full
+      // batch with a near-zero window, the server called it impossible, and
+      // the taps were burned. The engine now caps each batch to what its own
+      // window supports and CARRIES the remainder.
+      final engine = await freshEngine();
+      for (var i = 0; i < 6; i++) {
+        engine.tap();
+        await Future<void>.delayed(const Duration(milliseconds: 60));
+      }
+      final banked = engine.taps;
+      // Two flushes in immediate succession, the second with no new taps.
+      await engine.flushNow();
+      await engine.flushNow();
+      // Nothing may vanish from the local count as a result of flushing.
+      expect(engine.taps, banked);
+      expect(engine.totalTaps, banked);
+      engine.dispose();
+    });
+
+    test('level-up carry-over is exact across a skin boundary', () async {
+      // Level 9 -> 10 is both a level-up AND a character change, the busiest
+      // moment in the game: it forces an extra flush while state is moving.
+      SharedPreferences.setMockInitialValues({
+        'boundary': '{"level":9,"taps":0,"totalTaps":0}',
+      });
+      final cfg = const TapGameConfig(baseTaps: 2, growthFactor: 1.0);
+      final engine = TapEngine(config: cfg, storage: TapStorage(key: 'boundary'));
+      await engine.init();
+      expect(cfg.skinIndexForLevel(9), 0);
+
+      engine.tap();
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      engine.tap();
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+
+      expect(engine.level, 10);
+      expect(engine.taps, 0);
+      // The character must have changed exactly here.
+      expect(cfg.skinIndexForLevel(engine.level), 1);
+      expect(engine.skin, cfg.skins[1]);
       engine.dispose();
     });
 

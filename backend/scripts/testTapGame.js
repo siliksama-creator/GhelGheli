@@ -193,4 +193,67 @@ test('finishing the game takes a realistic amount of tapping', () => {
   );
 });
 
+
+console.log('\ntap game — offline batch must survive the ceiling');
+
+test('a burst split across two flushes is affordable in each', () => {
+  // Reproduces the bug: 400 taps flushed with a ~50ms window looked
+  // impossible and the whole batch was burned. The client now caps each
+  // batch to what its own window supports, so every batch it sends must fit
+  // inside the SERVER's ceiling too.
+  const clientRate = 12;      // TapGameConfig.maxTapsPerSecond
+  const clientBurst = 20;     // _affordableTaps burst allowance
+  for (const windowMs of [50, 200, 800, 1000, 5000, 8000, 60000]) {
+    const clientWouldSend = Math.ceil((windowMs / 1000) * clientRate) + clientBurst;
+    const serverAllows = svc.plausibleCeiling(windowMs);
+    assert.ok(
+      clientWouldSend <= serverAllows,
+      `window ${windowMs}ms: client sends ${clientWouldSend} but server allows ${serverAllows}`
+    );
+  }
+});
+
+test('the client cap stays strictly under the server ceiling', () => {
+  // A margin is what absorbs latency jitter; without it a borderline batch
+  // gets burned on a slow network.
+  const windowMs = 8000;
+  const clientWouldSend = Math.ceil((windowMs / 1000) * 12) + 20;
+  assert.ok(clientWouldSend < svc.plausibleCeiling(windowMs));
+});
+
+console.log('\ntap game — skin boundary parity');
+
+test('the server never needs skin knowledge', () => {
+  // Skins are purely cosmetic and must stay client-side; a server that
+  // encoded the boundary would be a second place to keep in sync.
+  const src = require('fs').readFileSync(
+    require('path').join(__dirname, '../src/services/tapGameService.js'), 'utf8');
+  assert.ok(!/skin/i.test(src), 'server must not reference skins');
+});
+
+
+console.log('\ntap game — catalogue integration');
+
+test('tap is listed in the public catalogue', () => {
+  const { CATALOG } = require('../src/games');
+  const tap = CATALOG.find(g => g.id === 'tap');
+  assert.ok(tap, 'tap must appear in /api/games');
+  assert.strictEqual(tap.singlePlayer, true);
+});
+
+test('tap has no multiplayer rules module', () => {
+  // It is client-side plus a signed endpoint; a rules entry would make the
+  // socket engine try to open lobbies for a game that has none.
+  const { RULES } = require('../src/games');
+  assert.strictEqual(RULES.tap, undefined);
+});
+
+test('the solo endpoint refuses tap instead of crashing', () => {
+  // GET /api/games/tap/solo looks up RULES[id]; a missing entry must produce
+  // a clean 404, not a TypeError on `rules.solo`.
+  const { RULES } = require('../src/games');
+  const rules = RULES.tap;
+  assert.ok(!rules || !rules.solo, 'must fall into the 404 branch');
+});
+
 console.log(`\n${passed} tap-game assertions passed\n`);

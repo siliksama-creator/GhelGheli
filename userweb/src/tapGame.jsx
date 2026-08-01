@@ -32,9 +32,13 @@ export const requiredTaps = (level, cfg = TAP_CONFIG) =>
   level < 1 ? cfg.baseTaps
     : Math.round(cfg.baseTaps * Math.pow(cfg.growthFactor, level - 1));
 
-export const skinIndexForLevel = (level, cfg = TAP_CONFIG) =>
-  Math.min(Math.max(Math.floor((level - 1) / cfg.levelsPerSkin), 0),
-    cfg.skins.length - 1);
+// The character changes ON arrival at level 10, 20, 30, 40 — levels 1-9 are
+// skin 1, level 10 is already skin 2. Dividing (level - 1) pushed every
+// change one level late, which is the bug this replaces.
+export const skinIndexForLevel = (level, cfg = TAP_CONFIG) => {
+  if (level < cfg.levelsPerSkin) return 0;
+  return Math.min(Math.floor(level / cfg.levelsPerSkin), cfg.skins.length - 1);
+};
 
 export const skinForLevel = (level, cfg = TAP_CONFIG) =>
   cfg.skins[skinIndexForLevel(level, cfg)];
@@ -170,12 +174,16 @@ export default function TapGame({ token, api, onBack }) {
   const skin = skinForLevel(Math.min(level, TAP_CONFIG.levelCount));
   const remaining = isComplete ? 0 : Math.max(0, need - progress.taps);
 
+  // Search for the next level whose skin differs instead of duplicating the
+  // boundary arithmetic — that duplication is what drifted out of sync with
+  // skinIndexForLevel when the boundary was corrected.
   const untilNextSkin = useMemo(() => {
     if (isComplete) return null;
-    const boundary = (Math.floor((level - 1) / TAP_CONFIG.levelsPerSkin) + 1) * TAP_CONFIG.levelsPerSkin;
-    if (boundary >= TAP_CONFIG.levelCount) return null;
-    if (skinIndexForLevel(boundary + 1) === skinIndexForLevel(level)) return null;
-    return boundary + 1 - level;
+    const here = skinIndexForLevel(level);
+    for (let lv = level + 1; lv <= TAP_CONFIG.levelCount; lv++) {
+      if (skinIndexForLevel(lv) !== here) return lv - level;
+    }
+    return null;
   }, [level, isComplete]);
 
   // ── server sync ──────────────────────────────────────────────────────────
@@ -187,13 +195,28 @@ export default function TapGame({ token, api, onBack }) {
     if (!token) return;
 
     syncingRef.current = true;
-    const sentTaps = b.taps;
-    const sentFlagged = b.flagged;
     const nowMs = clock();
     const elapsed = Math.max(1, nowMs - b.startMs);
+
+    // CAP THE BATCH TO WHAT ITS OWN WINDOW CAN JUSTIFY.
+    //
+    // The server refuses any batch carrying more taps than a human could
+    // produce in the reported window, and a refused batch is BURNED. Two
+    // honest cases used to trip that: back-to-back flushes from
+    // `maxBatchTaps`, and the forced flush on a level-up landing right after
+    // a timed one — both send a full batch with a near-zero window.
+    // Sending only the affordable slice and carrying the rest loses nothing,
+    // and gains an attacker nothing since the server checks independently.
+    const affordable = Math.ceil((elapsed / 1000) * TAP_CONFIG.maxTapsPerSecond) + 20;
+    const sentTaps = Math.min(b.taps, affordable);
+    const sentFlagged = b.flagged;
+    if (sentTaps <= 0 && sentFlagged <= 0) {
+      syncingRef.current = false;
+      return;
+    }
     // Reset BEFORE awaiting so taps during the round trip land in the next
-    // batch instead of being counted twice.
-    batchRef.current = { taps: 0, flagged: 0, startMs: nowMs };
+    // batch instead of being counted twice; the remainder is carried forward.
+    batchRef.current = { taps: b.taps - sentTaps, flagged: 0, startMs: nowMs };
 
     try {
       const cur = progressRef.current;

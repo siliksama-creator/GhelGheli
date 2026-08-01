@@ -9,7 +9,8 @@
     "migrate": "node scripts/migrate.js",
     "seed:admin": "node scripts/seedAdmin.js",
     "close:league": "node scripts/closeLeague.js",
-    "test": "node scripts/testGames.js && node scripts/testEngine.js && node scripts/testSolo.js && node scripts/testValidation.js && node scripts/testWallet.js",
+    "test": "node scripts/testGames.js && node scripts/testEngine.js && node scripts/testSolo.js && node scripts/testValidation.js && node scripts/testWallet.js && node scripts/testTapGame.js",
+    "test:tap": "node scripts/testTapGame.js",
     "test:games": "node scripts/testGames.js",
     "test:engine": "node scripts/testEngine.js",
     "test:wallet": "node scripts/testWallet.js"

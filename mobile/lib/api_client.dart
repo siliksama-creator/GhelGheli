@@ -95,6 +95,10 @@ class ApiClient {
     final sp = await SharedPreferences.getInstance();
     await sp.remove('token');
     await sp.remove('isAdmin');
+    // Per-user game saves must not survive a sign-out: on a shared phone the
+    // next person saw the previous user's tap-game level until the server
+    // reconciled it.
+    await sp.remove('tap_game_progress_v1');
   }
 
   Future<dynamic> get(String path) async => (await dio.get(path)).data;

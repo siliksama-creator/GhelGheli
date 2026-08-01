@@ -40,7 +40,14 @@ function App(){
         </div>
       )}
       {token
-        ? <Portal token={token} logout={()=>{localStorage.removeItem('token');setToken('')}}/>
+        ? <Portal token={token} logout={()=>{
+            localStorage.removeItem('token');
+            // Game progress is per-user. Leaving it behind meant the next
+            // person to sign in on a shared browser saw (and briefly played
+            // as) the previous user's save until the server corrected it.
+            localStorage.removeItem('tap_game_progress_v1');
+            setToken('');
+          }}/>
         : <Auth mode={mode} setMode={setMode} done={t=>{localStorage.token=t;setToken(t)}}/>}
     </div>
   );
