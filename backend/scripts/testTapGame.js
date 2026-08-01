@@ -256,4 +256,22 @@ test('the solo endpoint refuses tap instead of crashing', () => {
   assert.ok(!rules || !rules.solo, 'must fall into the 404 branch');
 });
 
+
+console.log('\ntap game — nonce housekeeping');
+
+test('a global prune function exists and is exported', () => {
+  // The inline prune inside submitBatch is user-scoped, so rows belonging to
+  // players who stopped playing are never reached. Observed on production:
+  // 54 expired rows lingering. A global sweep is the only thing that clears
+  // them.
+  assert.strictEqual(typeof svc.pruneNonces, 'function');
+});
+
+test('the server schedules the sweep', () => {
+  const src = require('fs').readFileSync(
+    require('path').join(__dirname, '../src/server.js'), 'utf8');
+  assert.ok(/pruneNonces\(\)/.test(src), 'server must call pruneNonces');
+  assert.ok(/cron\.schedule\('[^']*'[^)]*\)/.test(src), 'must be on a schedule');
+});
+
 console.log(`\n${passed} tap-game assertions passed\n`);

@@ -1817,6 +1817,17 @@ games.attach(io);
 
 cron.schedule('5 0 1 * *', () => closeActiveSeason().catch(e => console.error('monthly close failed', e)));
 
+// Sweep expired tap-game nonces hourly.
+//
+// submitBatch() prunes only the CALLING user's rows, so a player who stops
+// playing leaves theirs behind forever — the table grew unbounded with
+// replay-protection records that were long past their 30-minute TTL.
+cron.schedule('17 * * * *', () => {
+  tapGame.pruneNonces()
+    .then(n => { if (n > 0) console.log(`[tap] pruned ${n} expired nonces`); })
+    .catch(e => console.error('[tap] nonce prune failed:', e.message));
+});
+
 // Centralized error handler. Previously this forwarded err.message straight
 // to the client, which meant raw PostgreSQL errors (unique/foreign-key
 // constraint names, column/table names, data types) leaked verbatim to

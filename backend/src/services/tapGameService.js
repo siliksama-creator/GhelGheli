@@ -261,7 +261,13 @@ async function submitBatch(userId, token, raw) {
       };
     }
 
-    // Gate 4b — nonce must be unseen. Prune expired ones in the same trip.
+    // Gate 4b — nonce must be unseen.
+    //
+    // Prune this user's expired rows on every write (cheap, index-backed).
+    // Note the scope: user-scoped pruning alone LEAKS, because a player who
+    // stops playing never runs this again and their rows sit there forever.
+    // The periodic sweep in `pruneNonces()` handles those; this inline delete
+    // just keeps the common case tidy without waiting for the sweep.
     await client.query(
       'DELETE FROM tap_game_nonces WHERE user_id=$1 AND seen_at < NOW() - ($2::text || \' milliseconds\')::interval',
       [userId, String(NONCE_TTL_MS)]
@@ -375,6 +381,25 @@ async function submitBatch(userId, token, raw) {
   }
 }
 
+/**
+ * Deletes every expired nonce, for every user.
+ *
+ * The inline prune inside submitBatch() is scoped to the caller, so rows
+ * belonging to players who stopped playing are never reached and the table
+ * grows without bound. Observed on production: 54 expired rows still present
+ * from users who had finished their session. Runs on an interval from
+ * server.js.
+ *
+ * @returns {Promise<number>} rows removed
+ */
+async function pruneNonces() {
+  const { rowCount } = await pool.query(
+    "DELETE FROM tap_game_nonces WHERE seen_at < NOW() - ($1::text || ' milliseconds')::interval",
+    [String(NONCE_TTL_MS)]
+  );
+  return rowCount;
+}
+
 /** Top tappers — cheap to serve, useful for a future leaderboard tab. */
 async function leaderboard(limit = 50) {
   const { rows } = await pool.query(
@@ -401,6 +426,7 @@ module.exports = {
   getProgress,
   submitBatch,
   leaderboard,
+  pruneNonces,
   // exported for tests
   requiredTaps,
   canonical,
