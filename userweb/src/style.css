@@ -1077,12 +1077,21 @@
     overflow-x: auto;
     gap: 5px;
     padding: 7px;
-    mask-image: none;
+    /* Keep the fade so a row that DOES overflow looks scrollable rather
+       than cut off. */
+    mask-image: linear-gradient(to left, #000 92%, transparent 100%);
   }
   .mobileNav button {
+    /* BUG: `flex: 1 1 0` split the row into seven EQUAL 37px columns, but
+       the labels are `white-space: nowrap`, so "چت و بازی" (58px) and
+       "پشتیبانی" (47px) spilled out of their buttons and printed on top of
+       the neighbouring tab — the nav read "چت و بازپشتیبانی". Sizing each
+       button to its own content and scrolling the row keeps every label
+       whole and legible; the seven tabs still fit on a 390px screen, and on
+       anything narrower the row scrolls with the gradient hint above. */
     min-width: 0;
-    flex: 1 1 0;
-    padding: 7px 4px;
+    flex: 0 0 auto;
+    padding: 7px 7px;
   }
   .mobileNav .navIcon { font-size: 17px; }
   .mobileNav .navLabel {
@@ -1370,3 +1379,19 @@
 }
 .avatarNote{margin:0 0 10px;font-size:12px}
 .rosterNew{color:#c9ddf2;font-weight:600}
+
+/* ── Decorative pseudo-elements must not eat taps ─────────────────────────
+   BUG: `.auth:before` is a 260px blurred circle anchored to the login card's
+   bottom-left corner. It has no pointer-events rule, so it is a real hit
+   target painted OVER the submit button. On a 320px screen the card is
+   narrow enough that the circle covers the button's centre, and tapping
+   "ورود" did nothing at all — the login page was unusable on small phones.
+   Verified with elementFromPoint: at 320px the topmost element at the
+   button's centre was the FORM, at 360px+ it was the BUTTON.
+
+   Decoration is never interactive, so opt every decorative layer out. */
+.auth:before,
+.card:before,
+.card:after {
+  pointer-events: none;
+}
