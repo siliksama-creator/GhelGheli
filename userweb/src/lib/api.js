@@ -46,7 +46,31 @@ export const asset = v =>
   !v ? '' : String(v).startsWith('http') ? v : API + v;
 
 /** Persian digits, used everywhere numbers are shown. */
-export const fa = n => new Intl.NumberFormat('fa-IR').format(Number(n || 0));
+/**
+ * Persian digits with Persian thousands separators.
+ *
+ * `Intl.NumberFormat('fa-IR')` is supposed to do this, but headless Chrome and
+ * some Android WebViews ship reduced ICU data and fall back to Latin commas —
+ * producing "۱۰۰,۰۰۰", a mix of two scripts in one number. Requesting the
+ * numbering system explicitly and normalising the separator guarantees the
+ * same output everywhere.
+ */
+export const fa = n => {
+  const v = Number(n || 0);
+  let s;
+  try {
+    s = new Intl.NumberFormat('fa-IR-u-nu-arabext').format(v);
+  } catch {
+    s = String(v);
+  }
+  // Map any Latin digits/separators the runtime left behind.
+  const latin = '0123456789';
+  const persian = '۰۱۲۳۴۵۶۷۸۹';
+  s = s.replace(/[0-9]/g, d => persian[latin.indexOf(d)]);
+  // U+066C is the Arabic thousands separator Persian uses; a plain comma is
+  // what the degraded fallback emits.
+  return s.replace(/,/g, '٬');
+};
 
 /**
  * URL for a stored avatar key.

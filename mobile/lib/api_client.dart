@@ -131,10 +131,29 @@ class ApiClient {
   }
 }
 
+/// Persian digits, with thousands separators for plain integers.
+///
+/// The previous version only swapped digits, so a wallet balance rendered as
+/// "۱۰۰۰۰۰۰" — seven characters a reader has to count. Grouping is applied
+/// only when the value is a bare integer, so ids, codes and pre-formatted
+/// strings pass through untouched.
 String faNum(Object? value) {
   const en = '0123456789';
   const fa = '۰۱۲۳۴۵۶۷۸۹';
   var s = '$value';
+
+  final isPlainInt = RegExp(r'^-?\d+$').hasMatch(s);
+  if (isPlainInt && s.replaceAll('-', '').length > 3) {
+    final negative = s.startsWith('-');
+    final digits = negative ? s.substring(1) : s;
+    final buf = StringBuffer();
+    for (var i = 0; i < digits.length; i++) {
+      if (i > 0 && (digits.length - i) % 3 == 0) buf.write('٬');
+      buf.write(digits[i]);
+    }
+    s = (negative ? '-' : '') + buf.toString();
+  }
+
   for (var i = 0; i < 10; i++) {
     s = s.replaceAll(en[i], fa[i]);
   }
