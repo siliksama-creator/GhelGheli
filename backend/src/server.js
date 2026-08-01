@@ -1521,7 +1521,7 @@ app.post('/api/admin/rewards', adminAuth, requireRole('support'), asyncHandler(a
   if (r.rewardType === 'cash' && cashAmount <= 0) {
     return res.status(400).json({ message: 'برای جایزهٔ نقدی، مبلغ باید بیشتر از صفر باشد' });
   }
-  const { rows } = await pool.query('INSERT INTO reward_tiers(name,description,image_url,required_points,reward_type,reward_value,cash_amount,display_order,is_active,group_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *', [r.name,r.description,safeImageUrl(r.imageUrl),requiredPoints,r.rewardType,r.rewardValue,cashAmount,r.displayOrder||0,r.isActive!==false,r.groupId||null]);
+  const { rows } = await pool.query('INSERT INTO reward_tiers(name,description,image_url,required_points,reward_type,reward_value,cash_amount,display_order,is_active,group_id,max_claims_per_user) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *', [r.name,r.description,safeImageUrl(r.imageUrl),requiredPoints,r.rewardType,r.rewardValue,cashAmount,r.displayOrder||0,r.isActive!==false,r.groupId||null,Math.max(0, Number(r.maxClaimsPerUser) || 0)]);
   await audit(req.admin.id,'create_reward','reward_tiers',rows[0].id,null,r); res.json(rows[0]);
 }));
 app.patch('/api/admin/rewards/:id', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
@@ -1538,11 +1538,14 @@ app.patch('/api/admin/rewards/:id', adminAuth, validateUuid('id'), requireRole('
        cash_amount=COALESCE($7,cash_amount), display_order=COALESCE($8,display_order),
        is_active=COALESCE($9,is_active),
        group_id = CASE WHEN $11::boolean THEN $12::uuid ELSE group_id END,
+       max_claims_per_user = COALESCE($13, max_claims_per_user),
        updated_at=NOW()
      WHERE id=$10 RETURNING *`,
     [r.name,r.description,keepImage(r.imageUrl),r.requiredPoints,r.rewardType,
      r.rewardValue,cashAmount,r.displayOrder,r.isActive,req.params.id,
-     moveGroup, moveGroup ? (r.groupId || null) : null]);
+     moveGroup, moveGroup ? (r.groupId || null) : null,
+     r.maxClaimsPerUser !== undefined
+       ? Math.max(0, Number(r.maxClaimsPerUser) || 0) : null]);
   await audit(req.admin.id,'update_reward','reward_tiers',req.params.id,null,r); res.json(rows[0]);
 }));
 app.get('/api/admin/reward-claims', adminAuth, asyncHandler(async (req, res) => res.json((await pool.query('SELECT c.*, u.mobile, r.name AS reward_name FROM user_reward_claims c JOIN users u ON u.id=c.user_id JOIN reward_tiers r ON r.id=c.reward_tier_id ORDER BY c.claimed_at DESC')).rows)));

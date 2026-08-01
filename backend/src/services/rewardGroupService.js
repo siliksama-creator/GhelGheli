@@ -98,6 +98,13 @@ async function userView(userId) {
         [userId]),
     ]);
 
+  // How many times this user has already taken each tier, for the per-tier
+  // limit an admin can set.
+  const { rows: claimCounts } = await pool.query(
+    'SELECT reward_tier_id, COUNT(*)::int AS n FROM user_reward_claims WHERE user_id=$1 GROUP BY reward_tier_id',
+    [userId]);
+  const claimed = new Map(claimCounts.map(c => [c.reward_tier_id, c.n]));
+
   const lifetime = Number(userRows[0]?.lifetime_points || 0);
   const current = Number(userRows[0]?.current_points || 0);
   const baseline = new Map(baselines.map(b => [b.group_id, b]));
@@ -120,6 +127,10 @@ async function userView(userId) {
         }));
         const pointsMet = earned >= t.required_points;
         const cardsMet = cards.every(c => c.met);
+        const limit = Number(t.max_claims_per_user || 0);
+        const taken = claimed.get(t.id) || 0;
+        // 0 means unlimited — the default, so existing tiers are unchanged.
+        const limitReached = limit > 0 && taken >= limit;
         return {
           id: t.id,
           name: t.name,
@@ -134,7 +145,10 @@ async function userView(userId) {
             ? Math.min(1, earned / t.required_points) : 1,
           pointsMet,
           cardsMet,
-          eligible: pointsMet && cardsMet,
+          maxClaims: limit,
+          timesClaimed: taken,
+          limitReached,
+          eligible: pointsMet && cardsMet && !limitReached,
         };
       });
 
@@ -205,6 +219,21 @@ async function claim(userId, tierId) {
     if (earned < tier.required_points) {
       throw Object.assign(
         new Error('امتیاز کافی برای این جایزه ندارید'), { status: 400 });
+    }
+
+    // Per-tier limit. Without this a user with banked points could take the
+    // same prize over and over in one sitting — each claim individually valid
+    // but collectively absurd. 0 = unlimited.
+    const limit = Number(tier.max_claims_per_user || 0);
+    if (limit > 0) {
+      const { rows: cnt } = await client.query(
+        'SELECT COUNT(*)::int AS n FROM user_reward_claims WHERE user_id=$1 AND reward_tier_id=$2',
+        [userId, tierId]);
+      if (Number(cnt[0].n) >= limit) {
+        throw Object.assign(
+          new Error(`این جایزه حداکثر ${limit} بار قابل دریافت است`),
+          { status: 400 });
+      }
     }
 
     // Card requirements, checked against un-consumed inventory.

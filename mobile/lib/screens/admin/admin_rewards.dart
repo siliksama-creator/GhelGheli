@@ -38,6 +38,7 @@ class _AdminRewardsState extends State<AdminRewards> {
   final _value = TextEditingController();
   final _cash = TextEditingController();
   final _desc = TextEditingController();
+  final _maxClaims = TextEditingController(text: '0');
   final _imageUrl = TextEditingController();
   bool _uploadingImage = false;
   String? _imageError;
@@ -63,6 +64,7 @@ class _AdminRewardsState extends State<AdminRewards> {
     _value.dispose();
     _cash.dispose();
     _desc.dispose();
+    _maxClaims.dispose();
     _imageUrl.dispose();
     _groupName.dispose();
     super.dispose();
@@ -176,6 +178,7 @@ class _AdminRewardsState extends State<AdminRewards> {
         'imageUrl': _imageUrl.text,
         'displayOrder': _rewards.length + 1,
         'groupId': _groupId,
+        'maxClaimsPerUser': int.tryParse(_maxClaims.text) ?? 0,
       });
       _name.clear();
       _points.clear();
@@ -183,6 +186,7 @@ class _AdminRewardsState extends State<AdminRewards> {
       _cash.clear();
       _desc.clear();
       _imageUrl.clear();
+      _maxClaims.text = '0';
       await _load();
     } catch (e) {
       if (mounted) {
@@ -294,6 +298,11 @@ class _AdminRewardsState extends State<AdminRewards> {
             TextField(
                 controller: _name,
                 decoration: const InputDecoration(labelText: 'نام جایزه')),
+            TextField(
+                controller: _maxClaims,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                    labelText: 'حداکثر دریافت هر کاربر (۰ = نامحدود)')),
             TextField(
                 controller: _points,
                 keyboardType: TextInputType.number,

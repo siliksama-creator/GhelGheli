@@ -16,7 +16,7 @@ export function RewardsPage({ request }) {
   const [groupSaving, setGroupSaving] = useState(false);
   // Which tier's card requirements are being edited, and the draft list.
   const [cardEditor, setCardEditor] = useState(null);
-  const [form, setForm] = useState({ name: '', points: '', type: 'cash', value: '', cash: '', desc: '', image: '', groupId: '' });
+  const [form, setForm] = useState({ name: '', points: '', type: 'cash', value: '', cash: '', desc: '', image: '', groupId: '', maxClaims: '0' });
   const [imageFile, setImageFile] = useState(null);
   const [saving, setSaving] = useState(false);
 
@@ -52,6 +52,7 @@ export function RewardsPage({ request }) {
           imageUrl,
           displayOrder: rewards.length + 1,
           groupId: form.groupId || null,
+          maxClaimsPerUser: Number(form.maxClaims) || 0,
         },
       });
       setForm({ name: '', points: '', type: 'cash', value: '', cash: '', desc: '', image: '', groupId: form.groupId });
@@ -201,6 +202,10 @@ export function RewardsPage({ request }) {
                   <option key={g.id} value={g.id}>{g.name}</option>
                 ))}
               </Select>
+            </Field>
+            <Field label="حداکثر دریافت برای هر کاربر (۰ = نامحدود)">
+              <Input type="number" min="0" value={form.maxClaims}
+                onChange={(e) => setForm({ ...form, maxClaims: e.target.value })} />
             </Field>
             <Field label="آستانه امتیاز">
               <Input type="number" value={form.points} onChange={(e) => setForm({ ...form, points: e.target.value })} required />
