@@ -4,7 +4,7 @@
 // standing — that separation is deliberate and worth keeping.
 import React, { useCallback, useState } from 'react';
 
-import { req, asset, fa } from '../lib/api.js';
+import { req, fa } from '../lib/api.js';
 import { useAsync } from '../lib/useAsync.js';
 import { AsyncSection } from '../components/states.jsx';
 
@@ -126,7 +126,10 @@ export default function Shop({ token, setMsg, reloadProfile }) {
                                 background: FRAME_STYLE[it.payload] || '#334155',
                               }} />
                             ) : (
-                              <img src={asset(it.imageUrl)} alt={it.name}
+                              // Shop artwork ships WITH the web app, so it must
+                              // not go through asset(): that prefixes the API
+                              // domain and produced broken images.
+                              <img src={it.imageUrl} alt={it.name}
                                 loading="lazy" decoding="async"
                                 width="72" height="72" />
                             )}
