@@ -1,8 +1,15 @@
 name: Build APK
 
+# MANUAL ONLY.
+#
+# This used to run on every push to main, which meant an APK was produced for
+# work-in-progress commits nobody had asked to ship. Compilation is still
+# verified on every change by the "Flutter Check" workflow (analyze + tests,
+# no packaging), so nothing is lost by not building here automatically.
+#
+# Run it from Actions → Build APK → Run workflow when a build is actually
+# wanted.
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
 
 jobs:

@@ -1,5 +1,19 @@
 name: Flutter Check
+
+# Runs on every change to the app: analyze + unit tests, no packaging.
+#
+# This is what now guards the mobile code on each push — "Build APK" was
+# switched to manual so no APK is produced unless someone asks for one, and
+# without this the Flutter code would go unverified between releases.
 on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/flutter-check.yml'
+  pull_request:
+    paths:
+      - 'mobile/**'
   workflow_dispatch:
 jobs:
   analyze-and-test:
