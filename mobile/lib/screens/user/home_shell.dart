@@ -9,6 +9,7 @@ import 'dashboard_page.dart';
 import 'league_page.dart';
 import 'profile_page.dart';
 import 'rewards_page.dart';
+import 'shop_page.dart';
 import 'wallet_page.dart';
 import 'support_page.dart';
 
@@ -61,7 +62,7 @@ class _HomeShellState extends State<HomeShell>
       onToggleTheme: widget.onTheme,
       isDark: widget.dark,
     ),
-    RewardsPage(api: widget.api),
+    _RewardsShopTab(api: widget.api),
     WalletPage(api: widget.api, reloadProfile: _loadProfile),
     LeaguePage(api: widget.api),
     SocialPage(api: widget.api),
@@ -281,3 +282,45 @@ class _HomeShellState extends State<HomeShell>
   }
 }
 
+
+
+/// Rewards and the shop share one tab.
+///
+/// An eighth bottom-nav destination would crowd the bar past the point where
+/// Persian labels stay readable, and the two belong together: both are where
+/// a user spends what they have earned.
+class _RewardsShopTab extends StatefulWidget {
+  const _RewardsShopTab({required this.api});
+  final ApiClient api;
+
+  @override
+  State<_RewardsShopTab> createState() => _RewardsShopTabState();
+}
+
+class _RewardsShopTabState extends State<_RewardsShopTab> {
+  int _sub = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: SegmentedButton<int>(
+            segments: const [
+              ButtonSegment(value: 0, label: Text('جوایز'), icon: Icon(Icons.card_giftcard_rounded)),
+              ButtonSegment(value: 1, label: Text('فروشگاه'), icon: Icon(Icons.storefront_rounded)),
+            ],
+            selected: {_sub},
+            onSelectionChanged: (v) => setState(() => _sub = v.first),
+          ),
+        ),
+        Expanded(
+          child: _sub == 0
+              ? RewardsPage(api: widget.api)
+              : ShopPage(api: widget.api),
+        ),
+      ],
+    );
+  }
+}

@@ -79,6 +79,7 @@ flutter:
     - assets/games/
     - assets/games/memory/
     - assets/games/tap/
+    - assets/shop/
     - assets/sfx/
     - assets/avatars/
     - assets/icon/

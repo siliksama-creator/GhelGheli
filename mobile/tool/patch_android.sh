@@ -39,7 +39,7 @@ if missing:
     src = src.replace(anchor, anchor + '\n' + block, 1)
 
 # Ship a real Persian app name rather than the raw Dart package identifier.
-src = src.replace('android:label="ghelgheli_mobile"', 'android:label="قل‌قلی"')
+src = src.replace('android:label="ghelgheli_mobile"', 'android:label="GhelGheli"')
 
 with open(path, 'w', encoding='utf-8') as f:
     f.write(src)
@@ -56,4 +56,4 @@ for p in INTERNET ACCESS_NETWORK_STATE POST_NOTIFICATIONS; do
     exit 1
   fi
 done
-grep -q 'android:label="قل‌قلی"' "$MANIFEST" && echo "  OK   app label" || echo "  WARN app label unchanged"
+grep -q 'android:label="GhelGheli"' "$MANIFEST" && echo "  OK   app label" || echo "  WARN app label unchanged"
