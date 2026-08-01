@@ -1,0 +1,431 @@
+// Tap game for the web app — the same game as the Flutter client.
+//
+// PARITY CONTRACT: the level curve, the skin schedule, the client-side rate
+// limits and the signed-batch protocol here MUST match
+// mobile/lib/screens/user/games/tap/*. The server re-derives all of it in
+// backend/src/services/tapGameService.js, so a drift between the two clients
+// shows up as one platform silently losing taps.
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { play as playSfx } from './gameAudio.js';
+
+// ── config (mirrors TapGameConfig in Dart) ─────────────────────────────────
+export const TAP_CONFIG = {
+  levelCount: 50,
+  baseTaps: 100,
+  growthFactor: 1.15,
+  levelsPerSkin: 10,
+  skins: [
+    '/games/tap/skin_1.webp',
+    '/games/tap/skin_2.webp',
+    '/games/tap/skin_3.webp',
+    '/games/tap/skin_4.webp',
+    '/games/tap/skin_5.webp',
+  ],
+  maxTapsPerSecond: 12,
+  burstWindowMs: 1000,
+  minTapIntervalMs: 45,
+  flushIntervalMs: 8000,
+  maxBatchTaps: 400,
+};
+
+export const requiredTaps = (level, cfg = TAP_CONFIG) =>
+  level < 1 ? cfg.baseTaps
+    : Math.round(cfg.baseTaps * Math.pow(cfg.growthFactor, level - 1));
+
+export const skinIndexForLevel = (level, cfg = TAP_CONFIG) =>
+  Math.min(Math.max(Math.floor((level - 1) / cfg.levelsPerSkin), 0),
+    cfg.skins.length - 1);
+
+export const skinForLevel = (level, cfg = TAP_CONFIG) =>
+  cfg.skins[skinIndexForLevel(level, cfg)];
+
+const STORAGE_KEY = 'tap_game_progress_v1';
+const fa = n => new Intl.NumberFormat('fa-IR').format(Number(n || 0));
+
+// ── local persistence (mirrors TapStorage) ─────────────────────────────────
+function loadProgress() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { level: 1, taps: 0, totalTaps: 0, pendingTaps: 0, flaggedTaps: 0 };
+    const p = JSON.parse(raw);
+    const int = k => (Number.isFinite(Number(p[k])) && Number(p[k]) > 0 ? Math.floor(Number(p[k])) : 0);
+    const level = int('level');
+    return {
+      level: level < 1 ? 1 : Math.min(level, TAP_CONFIG.levelCount + 1),
+      taps: int('taps'),
+      totalTaps: int('totalTaps'),
+      pendingTaps: int('pendingTaps'),
+      flaggedTaps: int('flaggedTaps'),
+    };
+  } catch {
+    // Corrupt storage must never brick the game.
+    return { level: 1, taps: 0, totalTaps: 0, pendingTaps: 0, flaggedTaps: 0 };
+  }
+}
+
+function saveProgress(p) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); } catch { /* quota/private mode */ }
+}
+
+// ── batch signing (mirrors TapSync) ────────────────────────────────────────
+//
+// Key = SHA-256 of the session token, exactly like the Flutter client, so the
+// server derives the identical key from the token it just authenticated.
+// A constant secret shipped in JS would be readable in devtools, which is why
+// the key is session-derived instead.
+async function signBatch(token, payload, nonce) {
+  const enc = new TextEncoder();
+  const keyBytes = await crypto.subtle.digest('SHA-256', enc.encode(token));
+  const key = await crypto.subtle.importKey(
+    'raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  // Field ORDER is part of the wire contract — never reorder.
+  const canonical = [
+    payload.taps, payload.flagged, payload.elapsedMs,
+    payload.level, payload.levelTaps, payload.seq, nonce,
+  ].join('|');
+  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(canonical));
+  return [...new Uint8Array(sig)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function makeNonce() {
+  const bytes = crypto.getRandomValues(new Uint8Array(12));
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+// ── anti-cheat guard (mirrors TapGuard) ────────────────────────────────────
+function createGuard(cfg = TAP_CONFIG) {
+  return { window: [], lastTapMs: -1, accepted: 0, rejected: 0, cfg };
+}
+
+function registerTap(guard, nowMs) {
+  const { cfg } = guard;
+  // Gate 1: hard debounce — faster than a human can physically tap.
+  if (guard.lastTapMs >= 0 && nowMs - guard.lastTapMs < cfg.minTapIntervalMs) {
+    guard.rejected++;
+    return 'tooFast';
+  }
+  // Gate 2: sustained rate over a sliding window.
+  const cutoff = nowMs - cfg.burstWindowMs;
+  while (guard.window.length && guard.window[0] <= cutoff) guard.window.shift();
+  if (guard.window.length >= cfg.maxTapsPerSecond) {
+    guard.rejected++;
+    return 'rateLimited';
+  }
+  guard.window.push(nowMs);
+  guard.lastTapMs = nowMs;
+  guard.accepted++;
+  return 'accepted';
+}
+
+// ── component ──────────────────────────────────────────────────────────────
+// Minimal request helper. games.jsx passes the API base URL (not a helper),
+// so this module owns its own fetch to avoid reaching across modules.
+async function request(base, path, method, body, token) {
+  const r = await fetch(base + path, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    // 409/401 carry a meaningful body the caller wants to read, so surface
+    // the payload rather than throwing away the reason.
+    const err = new Error(data.message || 'خطا در ارتباط با سرور');
+    err.status = r.status;
+    err.data = data;
+    throw err;
+  }
+  return data;
+}
+
+export default function TapGame({ token, api, onBack }) {
+  const [progress, setProgress] = useState(loadProgress);
+  const [notice, setNotice] = useState('');
+  const [rate, setRate] = useState(0);
+  const [floaters, setFloaters] = useState([]);
+  const [pulse, setPulse] = useState(false);
+  const [squash, setSquash] = useState(false);
+
+  const guardRef = useRef(createGuard());
+  const seqRef = useRef(0);
+  const batchRef = useRef({ taps: 0, flagged: 0, startMs: 0 });
+  const progressRef = useRef(progress);
+  const floaterId = useRef(0);
+  const syncingRef = useRef(false);
+  const areaRef = useRef(null);
+  // performance.now() is monotonic: changing the device clock cannot reset
+  // the rate-limit window, which Date.now() would allow.
+  const clock = useCallback(() => Math.round(performance.now()), []);
+
+  useEffect(() => { progressRef.current = progress; }, [progress]);
+
+  const level = progress.level;
+  const isComplete = level > TAP_CONFIG.levelCount;
+  const need = requiredTaps(level);
+  const pct = isComplete ? 100 : Math.min(100, (progress.taps / need) * 100);
+  const skin = skinForLevel(Math.min(level, TAP_CONFIG.levelCount));
+  const remaining = isComplete ? 0 : Math.max(0, need - progress.taps);
+
+  const untilNextSkin = useMemo(() => {
+    if (isComplete) return null;
+    const boundary = (Math.floor((level - 1) / TAP_CONFIG.levelsPerSkin) + 1) * TAP_CONFIG.levelsPerSkin;
+    if (boundary >= TAP_CONFIG.levelCount) return null;
+    if (skinIndexForLevel(boundary + 1) === skinIndexForLevel(level)) return null;
+    return boundary + 1 - level;
+  }, [level, isComplete]);
+
+  // ── server sync ──────────────────────────────────────────────────────────
+  const flush = useCallback(async (force = false) => {
+    if (syncingRef.current) return;
+    const b = batchRef.current;
+    if (!force && b.taps <= 0 && b.flagged <= 0) return;
+    if (b.taps <= 0 && b.flagged <= 0) return;
+    if (!token) return;
+
+    syncingRef.current = true;
+    const sentTaps = b.taps;
+    const sentFlagged = b.flagged;
+    const nowMs = clock();
+    const elapsed = Math.max(1, nowMs - b.startMs);
+    // Reset BEFORE awaiting so taps during the round trip land in the next
+    // batch instead of being counted twice.
+    batchRef.current = { taps: 0, flagged: 0, startMs: nowMs };
+
+    try {
+      const cur = progressRef.current;
+      const payload = {
+        taps: sentTaps, flagged: sentFlagged, elapsedMs: elapsed,
+        level: cur.level, levelTaps: cur.taps, seq: ++seqRef.current,
+      };
+      const nonce = makeNonce();
+      const sig = await signBatch(token, payload, nonce);
+      let res;
+      try {
+        res = await request(api, '/api/games/tap/progress', 'POST',
+          { ...payload, nonce, sig }, token);
+      } catch (err) {
+        // A rejected batch (409/400) is an ANSWER, not a network failure:
+        // retrying it would just replay the same refusal forever.
+        if (err.status && err.status !== 0 && err.status < 500) {
+          if (err.data && err.data.rejected) {
+            setNotice(err.data.message || 'ضربه‌های غیرعادی نادیده گرفته شد');
+          }
+          setProgress(p => {
+            const next = { ...p, pendingTaps: Math.max(0, p.pendingTaps - sentTaps) };
+            saveProgress(next);
+            return next;
+          });
+          return;
+        }
+        throw err;
+      }
+
+      if (res && res.rejected) {
+        setNotice(res.message || 'ضربه‌های غیرعادی نادیده گرفته شد');
+      }
+      // The server is authoritative: adopt its numbers when they differ.
+      if (res && typeof res.level === 'number') {
+        setProgress(p => {
+          const next = {
+            ...p,
+            pendingTaps: Math.max(0, p.pendingTaps - sentTaps),
+          };
+          if (res.level !== p.level || Math.abs((res.levelTaps ?? p.taps) - p.taps) > 5) {
+            next.level = res.level;
+            next.taps = Math.min(res.levelTaps ?? 0, requiredTaps(res.level));
+            next.totalTaps = res.totalTaps ?? p.totalTaps;
+          }
+          saveProgress(next);
+          return next;
+        });
+      }
+    } catch {
+      // Offline or a server hiccup: put the taps back so the next flush
+      // retries them. Losing a batch must never lose the player's progress.
+      batchRef.current.taps += sentTaps;
+      batchRef.current.flagged += sentFlagged;
+    } finally {
+      syncingRef.current = false;
+    }
+  }, [token, api, clock]);
+
+  // Reconcile on entry, then flush on a timer.
+  useEffect(() => {
+    batchRef.current.startMs = clock();
+    let alive = true;
+    (async () => {
+      try {
+        const server = await request(api, '/api/games/tap/progress', 'GET', null, token);
+        if (!alive || !server || typeof server.level !== 'number') return;
+        setProgress(p => {
+          // Another device may be ahead; the server always wins.
+          if (server.level > p.level ||
+              (server.level === p.level && server.levelTaps > p.taps)) {
+            const next = {
+              ...p, level: server.level, taps: server.levelTaps,
+              totalTaps: server.totalTaps, pendingTaps: 0,
+            };
+            saveProgress(next);
+            return next;
+          }
+          return p;
+        });
+      } catch { /* offline: keep playing locally */ }
+    })();
+    const t = setInterval(() => flush(), TAP_CONFIG.flushIntervalMs);
+    return () => { alive = false; clearInterval(t); };
+  }, [api, token, flush, clock]);
+
+  // Bank taps before the tab is hidden or closed.
+  useEffect(() => {
+    const onHide = () => { if (document.visibilityState === 'hidden') flush(true); };
+    document.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pagehide', onHide);
+    return () => {
+      document.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('pagehide', onHide);
+      flush(true);
+    };
+  }, [flush]);
+
+  // Live rate readout, so the player can see why taps stop counting.
+  useEffect(() => {
+    const t = setInterval(() => {
+      const g = guardRef.current;
+      const cutoff = clock() - g.cfg.burstWindowMs;
+      while (g.window.length && g.window[0] <= cutoff) g.window.shift();
+      setRate(g.window.length);
+    }, 250);
+    return () => clearInterval(t);
+  }, [clock]);
+
+  // ── tap handling ─────────────────────────────────────────────────────────
+  const handleTap = useCallback(e => {
+    if (isComplete) return;
+    // Ignore synthetic events: a script dispatching click() has isTrusted
+    // false. Real users are unaffected.
+    if (e && e.isTrusted === false) return;
+
+    const verdict = registerTap(guardRef.current, clock());
+    setSquash(true);
+    setTimeout(() => setSquash(false), 110);
+
+    if (verdict !== 'accepted') {
+      batchRef.current.flagged++;
+      setProgress(p => ({ ...p, flaggedTaps: p.flaggedTaps + 1 }));
+      if (verdict === 'rateLimited') setNotice('یواش‌تر! سرعت ضربه‌ها بیش از حد مجاز است');
+      return;
+    }
+
+    setNotice('');
+    batchRef.current.taps++;
+
+    // Floating +1 at the pointer.
+    const box = areaRef.current?.getBoundingClientRect();
+    if (box) {
+      const cx = (e.clientX ?? box.left + box.width / 2) - box.left;
+      const cy = (e.clientY ?? box.top + box.height / 2) - box.top;
+      const id = floaterId.current++;
+      setFloaters(f => [...f.slice(-13), { id, x: cx, y: cy, dx: (Math.random() - 0.5) * 50 }]);
+      setTimeout(() => setFloaters(f => f.filter(x => x.id !== id)), 700);
+    }
+
+    setProgress(p => {
+      let lv = p.level;
+      let taps = p.taps + 1;
+      const prevSkin = skinIndexForLevel(lv);
+      let leveled = false;
+      // `while`, not `if`: a big offline batch can clear several levels.
+      while (lv <= TAP_CONFIG.levelCount && taps >= requiredTaps(lv)) {
+        taps -= requiredTaps(lv);
+        lv += 1;
+        leveled = true;
+      }
+      const next = {
+        ...p, level: lv, taps,
+        totalTaps: p.totalTaps + 1,
+        pendingTaps: p.pendingTaps + 1,
+      };
+      saveProgress(next);
+
+      if (leveled) {
+        playSfx('match_found');
+        setPulse(true);
+        setTimeout(() => setPulse(false), 450);
+        if (skinIndexForLevel(lv) !== prevSkin) {
+          playSfx('win');
+          setNotice('شخصیت جدید باز شد! 🎉');
+          setTimeout(() => setNotice(''), 2500);
+        }
+        // A level boundary is a natural checkpoint.
+        setTimeout(() => flush(true), 0);
+      } else {
+        playSfx('tap', 0.5);
+        if (batchRef.current.taps >= TAP_CONFIG.maxBatchTaps) setTimeout(() => flush(), 0);
+      }
+      return next;
+    });
+  }, [isComplete, clock, flush]);
+
+  const nearLimit = rate >= TAP_CONFIG.maxTapsPerSecond - 2;
+
+  return (
+    <section className="card wide tapGame">
+      <div className="tapHead">
+        <button className="ghost" onClick={() => { flush(true); onBack(); }}>‹ بازگشت</button>
+        <div className="tapTitle">
+          <b>ضربه‌زن</b>
+          <span>لول {fa(Math.min(level, TAP_CONFIG.levelCount))} از {fa(TAP_CONFIG.levelCount)}</span>
+        </div>
+        <span className="tapTotal">⚡ {fa(progress.totalTaps)}</span>
+      </div>
+
+      <div className="tapProgress">
+        <div className="tapProgressTop">
+          <b>{fa(progress.taps)} / {fa(need)}</b>
+          {untilNextSkin != null &&
+            <small>{fa(untilNextSkin)} لول تا شخصیت بعدی</small>}
+        </div>
+        <div className="tapBar"><span style={{ width: pct + '%' }} /></div>
+        <div className="tapMeta">
+          <small className={nearLimit ? 'warn' : ''}>⚡ {fa(rate)} ضربه بر ثانیه</small>
+          {progress.pendingTaps > 0 && <small>در حال ثبت: {fa(progress.pendingTaps)}</small>}
+        </div>
+      </div>
+
+      {notice && <div className="tapNotice">{notice}</div>}
+
+      {isComplete ? (
+        <div className="tapDone">
+          <img src={skinForLevel(TAP_CONFIG.levelCount)} alt="" />
+          <h2>🏆 تبریک! همهٔ لول‌ها را تمام کردی</h2>
+          <p>مجموع ضربه‌ها: {fa(progress.totalTaps)}</p>
+        </div>
+      ) : (
+        <div
+          className={`tapArea${squash ? ' squash' : ''}${pulse ? ' pulse' : ''}`}
+          ref={areaRef}
+          onPointerDown={handleTap}
+          role="button"
+          tabIndex={0}
+          aria-label="ضربه بزن"
+        >
+          <img src={skin} alt="شخصیت" draggable="false" />
+          {floaters.map(f => (
+            <span key={f.id} className="tapFloat"
+              style={{ left: f.x, top: f.y, '--dx': f.dx + 'px' }}>+۱</span>
+          ))}
+        </div>
+      )}
+
+      <p className="tapHint">
+        {isComplete ? 'همهٔ ۵۰ لول تمام شد!'
+          : `روی شخصیت ضربه بزن — ${fa(remaining)} ضربه تا لول بعد`}
+      </p>
+    </section>
+  );
+}

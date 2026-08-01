@@ -134,7 +134,14 @@ function Avatar({u,size=72}){
     onError={e=>{ if(e.currentTarget.src!==location.origin+fallback) e.currentTarget.src=fallback; }}/>;
 }
 
-function Home({token,p,rewards,load,setMsg,openWallet}){const[code,setCode]=useState('');const[bigCard,setBigCard]=useState(null);const u=p.user;const sorted=[...rewards].sort((a,b)=>a.required_points-b.required_points);let next=sorted.find(r=>u.current_points<r.required_points)||sorted.at(-1);const progress=next?Math.min(1,u.current_points/next.required_points):0;async function redeem(){try{const d=await req('/api/cards/redeem','POST',{code},token);setMsg(d.message);setCode('');load()}catch(e){setMsg(e.message)}}return <div className="grid"><section className="card heroCard"><Avatar u={u}/><h2>{u.nickname||u.mobile}</h2><h1>{fa(u.current_points)} امتیاز</h1><div className="bar"><span style={{width:(progress*100)+'%'}}/></div><p>{next?`تا جایزه ${next.name}: ${fa(Math.max(0,next.required_points-u.current_points))} امتیاز مانده`:'هنوز جایزه‌ای تعریف نشده'}</p><button className={`walletEntry${Number(u.wallet_balance)>0?' hasMoney':''}`} onClick={openWallet}><span className="weIcon">👛</span><span className="weBody"><small>کیف پول من</small><b>{fa(u.wallet_balance)} <i>تومان</i></b></span><span className="weCta">{Number(u.wallet_balance)>0?'برداشت':'مشاهده'} ‹</span></button><h2>ثبت کد کارت های قلقلی</h2><p className="hint">(پک کارت های قلقلی بصورت فیزیکی در فروشگاه ها و سوپرمارکت ها به فروش می رسند.)</p><input value={code} onChange={e=>setCode(e.target.value.toUpperCase())} placeholder="کد کارت"/><button className="main" onClick={redeem}>ثبت کد</button></section><section className="card"><h2>موجودی کارت‌ها</h2>{(p.inventory||[]).map(i=><div className="reward clickable" key={i.id} onClick={()=>setBigCard(i)} title="نمایش بزرگ کارت"><img src={asset(i.image_url)||'/avatars/avatar_1_football.png'}/><div><b>{i.name}</b><p>تعداد: {fa(i.quantity)} — {fa(i.point_value)} امتیاز</p></div></div>)}</section>{bigCard&&<CardLightbox item={bigCard} close={()=>setBigCard(null)}/>}</div>}
+function Home({token,p,rewards,load,setMsg,openWallet}){const[code,setCode]=useState('');const[bigCard,setBigCard]=useState(null);const u=p.user;const sorted=[...rewards].sort((a,b)=>a.required_points-b.required_points);let next=sorted.find(r=>u.current_points<r.required_points)||sorted.at(-1);const progress=next?Math.min(1,u.current_points/next.required_points):0;async function redeem(){try{const d=await req('/api/cards/redeem','POST',{code},token);setMsg(d.message);setCode('');load()}catch(e){setMsg(e.message)}}return <div className="grid"><section className="card heroCard"><Avatar u={u}/><h2>{u.nickname||u.mobile}</h2><h1>{fa(u.current_points)} امتیاز</h1><div className="bar"><span style={{width:(progress*100)+'%'}}/></div><p>{next?`تا جایزه ${next.name}: ${fa(Math.max(0,next.required_points-u.current_points))} امتیاز مانده`:'هنوز جایزه‌ای تعریف نشده'}</p><button className={`walletEntry${Number(u.wallet_balance)>0?' hasMoney':''}`} onClick={openWallet}><span className="weIcon">👛</span><span className="weBody"><small>کیف پول من</small><b>{fa(u.wallet_balance)} <i>تومان</i></b></span><span className="weCta">{Number(u.wallet_balance)>0?'برداشت':'مشاهده'} ‹</span></button><h2>ثبت کد کارت های قلقلی</h2><p className="hint">(پک کارت های قلقلی بصورت فیزیکی در فروشگاه ها و سوپرمارکت ها به فروش می رسند.)</p><input value={code} onChange={e=>setCode(e.target.value.toUpperCase())} placeholder="کد کارت"/><button className="main" onClick={redeem}>ثبت کد</button></section><section className="card"><h2>موجودی کارت‌ها</h2>{(p.inventory||[]).length
+      ? <div className="invGrid">{(p.inventory||[]).map(i=>
+          <button className="invCard" key={i.id} onClick={()=>setBigCard(i)} title="نمایش بزرگ کارت">
+            <span className="invArt"><img src={asset(i.image_url)||'/avatars/avatar_1_football.png'} alt={i.name||'کارت'}/></span>
+            <b>{i.name}</b>
+            <small>{fa(i.quantity)}× · {fa(i.point_value)} امتیاز</small>
+          </button>)}</div>
+      : <div className="empty">🃏 هنوز کارتی ثبت نکرده‌ای. کد پشت کارت را بالا وارد کن.</div>}</section>{bigCard&&<CardLightbox item={bigCard} close={()=>setBigCard(null)}/>}</div>}
 
 // Full-size view of an inventory card: the thumbnail crops the player
 // artwork the admin uploaded, so tapping opens it properly.
@@ -149,9 +156,44 @@ function CardLightbox({item,close}){
     </div>
   </div>;
 }
-function Profile({token,p,load,setMsg}){const u=p.user;const[edit,setEdit]=useState({firstName:u.first_name||'',lastName:u.last_name||'',nickname:u.nickname||'',age:u.age||'',city:u.city||'',province:u.province||'',bankAccount:u.bank_account||'',profileAvatarKey:u.profile_avatar_key||avatars[0]});const[pw,setPw]=useState({currentPassword:'',newPassword:''});const[pwMsg,setPwMsg]=useState('');async function save(){try{await req('/api/profile','PATCH',edit,token);setMsg('پروفایل ذخیره شد');load()}catch(e){setMsg(e.message)}}async function changePassword(e){e.preventDefault();setPwMsg('');try{await req('/api/profile/change-password','POST',pw,token);setPwMsg('رمز عبور با موفقیت تغییر کرد');setPw({currentPassword:'',newPassword:''})}catch(e){setPwMsg(e.message)}}return <section className="card wide"><h2>تکمیل پروفایل خصوصی</h2><p className="hint">این اطلاعات فقط برای مدیر است. در چت فقط نام مستعار و عکس دیده می‌شود.</p><div className="avatars">{avatars.map(a=><img key={a} className={edit.profileAvatarKey===a?'sel':''} src={`/avatars/${a}`} onClick={()=>setEdit({...edit,profileAvatarKey:a})}/>)}</div><div className="formgrid"><input placeholder="نام" value={edit.firstName} onChange={e=>setEdit({...edit,firstName:e.target.value})}/><input placeholder="نام خانوادگی" value={edit.lastName} onChange={e=>setEdit({...edit,lastName:e.target.value})}/><input placeholder="نام مستعار" value={edit.nickname} onChange={e=>setEdit({...edit,nickname:e.target.value})}/><input placeholder="سن" value={edit.age} onChange={e=>setEdit({...edit,age:e.target.value})}/><input placeholder="استان" value={edit.province} onChange={e=>setEdit({...edit,province:e.target.value})}/><input placeholder="شهر / محل زندگی" value={edit.city} onChange={e=>setEdit({...edit,city:e.target.value})}/><input placeholder="شماره کارت بانکی / شبا" value={edit.bankAccount} onChange={e=>setEdit({...edit,bankAccount:e.target.value})}/></div><button className="main" onClick={save}>ذخیره پروفایل</button><hr className="divider"/><h2>تغییر رمز عبور</h2><p className="hint">چون فعلاً سامانه پیامک فعال نیست، بازیابی خودکار رمز در دسترس نیست؛ رمز را فقط از همینجا (با وارد کردن رمز فعلی) می‌توانید عوض کنید. اگر رمز را فراموش کرده‌اید، از پشتیبانی بخواهید رمز موقت برایتان تنظیم کند.</p><form className="formgrid" onSubmit={changePassword}><input type="password" placeholder="رمز فعلی" value={pw.currentPassword} onChange={e=>setPw({...pw,currentPassword:e.target.value})}/><input type="password" placeholder="رمز جدید (حداقل ۶ کاراکتر)" value={pw.newPassword} onChange={e=>setPw({...pw,newPassword:e.target.value})}/><button className="main" type="submit">تغییر رمز عبور</button></form>{pwMsg&&<p className="msg">{pwMsg}</p>}</section>}
+function Profile({token,p,load,setMsg}){const u=p.user;const[edit,setEdit]=useState({firstName:u.first_name||'',lastName:u.last_name||'',nickname:u.nickname||'',age:u.age||'',city:u.city||'',province:u.province||'',bankAccount:u.bank_account||'',profileAvatarKey:u.profile_avatar_key||avatars[0]});const[pw,setPw]=useState({currentPassword:'',newPassword:''});const[pwMsg,setPwMsg]=useState('');async function save(){try{await req('/api/profile','PATCH',edit,token);setMsg('پروفایل ذخیره شد');load()}catch(e){setMsg(e.message)}}async function changePassword(e){e.preventDefault();setPwMsg('');try{await req('/api/profile/change-password','POST',pw,token);setPwMsg('رمز عبور با موفقیت تغییر کرد');setPw({currentPassword:'',newPassword:''})}catch(e){setPwMsg(e.message)}}return <section className="card wide"><h2>تکمیل پروفایل خصوصی</h2><p className="hint">این اطلاعات فقط برای مدیر است. در چت فقط نام مستعار و عکس دیده می‌شود.</p><div className="avatars">{avatars.map(a=><img key={a} className={edit.profileAvatarKey===a?'sel':''} src={`/avatars/${a}`} onClick={()=>setEdit({...edit,profileAvatarKey:a})}/>)}</div><div className="formgrid">
+      <Field label="نام" value={edit.firstName} onChange={v=>setEdit({...edit,firstName:v})}/>
+      <Field label="نام خانوادگی" value={edit.lastName} onChange={v=>setEdit({...edit,lastName:v})}/>
+      <Field label="نام مستعار عمومی" hint="این نام در چت و لیگ دیده می‌شود" value={edit.nickname} onChange={v=>setEdit({...edit,nickname:v})}/>
+      <Field label="سن" type="number" inputMode="numeric" value={edit.age} onChange={v=>setEdit({...edit,age:v})}/>
+      <Field label="استان" value={edit.province} onChange={v=>setEdit({...edit,province:v})}/>
+      <Field label="شهر / محل زندگی" value={edit.city} onChange={v=>setEdit({...edit,city:v})}/>
+      <Field label="شماره کارت بانکی / شبا" inputMode="numeric" value={edit.bankAccount} onChange={v=>setEdit({...edit,bankAccount:v})}/>
+    </div><button className="main" onClick={save}>ذخیره پروفایل</button><hr className="divider"/><h2>تغییر رمز عبور</h2><p className="hint">چون فعلاً سامانه پیامک فعال نیست، بازیابی خودکار رمز در دسترس نیست؛ رمز را فقط از همینجا (با وارد کردن رمز فعلی) می‌توانید عوض کنید. اگر رمز را فراموش کرده‌اید، از پشتیبانی بخواهید رمز موقت برایتان تنظیم کند.</p><form className="formgrid" onSubmit={changePassword}>
+      <Field label="رمز فعلی" type="password" value={pw.currentPassword} onChange={v=>setPw({...pw,currentPassword:v})}/>
+      <Field label="رمز جدید" hint="حداقل ۶ کاراکتر" type="password" value={pw.newPassword} onChange={v=>setPw({...pw,newPassword:v})}/>
+      <button className="main" type="submit">تغییر رمز عبور</button>
+    </form>{pwMsg&&<p className="msg">{pwMsg}</p>}</section>}
 
-function Rewards({rewards}){return <section className="card wide"><h2>جوایز</h2><div className="cards">{rewards.map(r=><div className="rewardCard" key={r.id}><img src={asset(r.image_url)||'/avatars/avatar_2_trophy.png'}/><b>{r.name}</b><p>{fa(r.required_points)} امتیاز</p><small>{r.reward_value}</small></div>)}</div></section>}
+// Labelled form field.
+//
+// Placeholders alone are not labels: they vanish the moment the field has a
+// value, so a filled form becomes a column of anonymous boxes. This keeps the
+// label visible at all times, matching the Flutter app's InputDecoration.
+function Field({label,value,onChange,type='text',hint,inputMode}){
+  return <label className="field">
+    <span className="fieldLabel">{label}</span>
+    <input type={type} inputMode={inputMode} value={value}
+      placeholder={hint||label}
+      onChange={e=>onChange(e.target.value)}/>
+    {hint&&<small className="fieldHint">{hint}</small>}
+  </label>;
+}
+
+function Rewards({rewards}){
+  // An empty list used to render a bare heading over blank space, with no
+  // explanation — the Flutter app has always shown a real empty state here.
+  if(!rewards||!rewards.length) return <section className="card wide">
+    <h2>جوایز</h2>
+    <div className="empty">🎁 هنوز جایزه‌ای تعریف نشده است.</div>
+  </section>;
+  return <section className="card wide"><h2>جوایز</h2><div className="cards">{rewards.map(r=><div className="rewardCard" key={r.id}><img src={asset(r.image_url)||'/avatars/avatar_2_trophy.png'} alt={r.name||'جایزه'}/><b>{r.name}</b><p>{fa(r.required_points)} امتیاز</p>{r.reward_value&&<small>{r.reward_value}</small>}</div>)}</div></section>;
+}
 function League({token,openProfile}){
   const[d,setD]=useState(null);
   useEffect(()=>{req('/api/league/current','GET',null,token).then(setD)},[]);

@@ -5,10 +5,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import { play, isEnabled, setEnabled } from './gameAudio.js';
 import MemorySolo, { MemoryGrid, runTime } from './memoryGame.jsx';
+import TapGame from './tapGame.jsx';
 
 // `bot: false` = جفت‌یاب never falls back to a computer opponent; the player
 // stays queued for a human, or plays the solo time-attack mode instead.
 const GAMES = [
+  // Single-player: no lobby, no opponent, no bot. Mirrors the Flutter hub.
+  { id: 'tap', title: 'ضربه‌زن', emoji: '👊', desc: '۵۰ لول ضربه بزن و شخصیت‌ها را باز کن', accent: '#84CC16', singlePlayer: true },
   { id: 'memory', title: 'جفت‌یاب', emoji: '🃏', desc: 'جفت‌ها را به خاطر بسپار و ببر', accent: '#A855F7', bot: false, solo: true },
   { id: 'connect4', title: 'چهار در یک ردیف', emoji: '🔴', desc: 'چهارتا رو ردیف کن', accent: '#F59E0B', bot: true },
   { id: 'reversi', title: 'اتللو', emoji: '⚫', desc: 'مهره‌ها را برگردان', accent: '#34D399', bot: true },
@@ -377,6 +380,10 @@ export default function GamesHub({ api, token, openProfile = () => {} }) {
 
   useEffect(() => { loadRecords(); }, [loadRecords]);
 
+  if (active && active.id === 'tap') {
+    return <TapGame token={token} api={api} onBack={() => setActive(null)} />;
+  }
+
   if (active && mode === 'solo') {
     return <MemorySolo api={api} token={token} records={records}
       reload={loadRecords}
@@ -405,8 +412,9 @@ export default function GamesHub({ api, token, openProfile = () => {} }) {
             <b>{g.title}</b>
             <small>{g.desc}</small>
             <i>
-              {g.bot === false ? 'فقط حریف واقعی' : 'دو نفره · با ربات'}
-              {g.solo ? ' · بازی تنها' : ''}
+              {g.singlePlayer
+                ? 'تک‌نفره · ۵۰ لول · ذخیرهٔ خودکار'
+                : `${g.bot === false ? 'فقط حریف واقعی' : 'دو نفره · با ربات'}${g.solo ? ' · بازی تنها' : ''}`}
             </i>
           </button>
         ))}
