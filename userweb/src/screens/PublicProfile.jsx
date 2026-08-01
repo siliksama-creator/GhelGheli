@@ -1,7 +1,7 @@
 // Another player's public profile, opened from chat or the league table.
 import React, { useCallback, useEffect } from 'react';
 
-import { req, asset, fa, avatars } from '../lib/api.js';
+import { req, asset, fa, avatars, avatarUrl } from '../lib/api.js';
 import { useAsync } from '../lib/useAsync.js';
 import { LoadingView, ErrorView } from '../components/states.jsx';
 
@@ -35,7 +35,7 @@ export default function PublicProfile({ token, userId, close }) {
               <img alt="آواتار"
                 src={u.profile_image_url
                   ? asset(u.profile_image_url)
-                  : `/avatars/${u.profile_avatar_key || avatars[0]}`} />
+                  : avatarUrl(u.profile_avatar_key)} />
               <div>
                 <h2>{u.nickname || 'کاربر'}</h2>
                 <p>عضویت: {new Date(u.joined_at).toLocaleDateString('fa-IR')}</p>
@@ -52,7 +52,7 @@ export default function PublicProfile({ token, userId, close }) {
             {(u.cards || []).map(c => (
               <div className="reward" key={c.card_type_id}>
                 <img alt={c.name || 'کارت'}
-                  src={asset(c.image_url) || '/avatars/avatar_1_football.png'} />
+                  src={asset(c.image_url) || avatarUrl('avatar_1_football.png')} />
                 <div>
                   <b>{c.name}</b>
                   <p>
@@ -68,7 +68,7 @@ export default function PublicProfile({ token, userId, close }) {
             {(u.rewards || []).map((r, i) => (
               <div className="reward" key={i}>
                 <img alt={r.name || 'جایزه'}
-                  src={asset(r.image_url) || '/avatars/avatar_2_trophy.png'} />
+                  src={asset(r.image_url) || avatarUrl('avatar_2_trophy.png')} />
                 <div><b>{r.name}</b><p>{r.status}</p></div>
               </div>
             ))}

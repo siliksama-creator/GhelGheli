@@ -48,6 +48,18 @@ export const asset = v =>
 /** Persian digits, used everywhere numbers are shown. */
 export const fa = n => new Intl.NumberFormat('fa-IR').format(Number(n || 0));
 
+/**
+ * URL for a stored avatar key.
+ *
+ * The database stores keys like `avatar_1_football.png` and the server
+ * validates against that exact list, so the KEY must stay .png. The files
+ * themselves are now WebP (the PNGs were 384px and 240KB each, displayed at
+ * 62px — 3.6MB of avatars on a screen that shows ten of them). Mapping the
+ * extension here means no migration and no server change.
+ */
+export const avatarUrl = key =>
+  `/avatars/${String(key || avatars[0]).replace(/\.png$/, '.webp')}`;
+
 export const avatars = [
   'avatar_1_football.png', 'avatar_2_trophy.png', 'avatar_3_star.png',
   'avatar_4_rocket.png', 'avatar_5_lion.png', 'avatar_6_tiger.png',

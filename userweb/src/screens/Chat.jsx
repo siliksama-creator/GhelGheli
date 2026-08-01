@@ -1,7 +1,7 @@
 // Public chat room.
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 
-import { req, asset, fa, avatars, PIN_COLORS } from '../lib/api.js';
+import { req, asset, fa, avatars, PIN_COLORS, avatarUrl } from '../lib/api.js';
 
 const POLL_MS = 8000;
 
@@ -177,37 +177,9 @@ export default function Chat({ token, openProfile, meId }) {
 
       <div className="chatbox" ref={boxRef}>
         {messages.map(m => (
-          <div className={`chatmsg${m.user_id === meId ? ' mine' : ''}`}
-            key={m.id}>
-            <img alt="آواتار" onClick={() => openProfile(m.user_id)}
-              src={m.profile_image_url
-                ? asset(m.profile_image_url)
-                : `/avatars/${m.profile_avatar_key || avatars[0]}`} />
-            <div className="chatbody">
-              <b className="clickableText" onClick={() => openProfile(m.user_id)}>
-                {m.nickname || m.first_name || 'کاربر'}
-              </b>
-              {m.reply_text && (
-                <small className="reply">
-                  ↩ {m.reply_nickname || 'کاربر'}: {m.reply_text}
-                </small>
-              )}
-              {m.message_type === 'sticker' && m.sticker_url
-                ? <img className="stickerMsg" src={asset(m.sticker_url)} alt="استیکر" />
-                : <p>{m.message_text}</p>}
-              {m.created_at && (
-                <span className="chatTime">
-                  {new Date(m.created_at).toLocaleTimeString('fa-IR',
-                    { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              )}
-              <div className="chatActions">
-                <button onClick={() => setReply(m)}>ریپلای</button>
-                <button onClick={() => like(m)}>❤ {fa(m.like_count)}</button>
-                <button onClick={() => report(m)}>گزارش</button>
-              </div>
-            </div>
-          </div>
+          <Message key={m.id} m={m} mine={m.user_id === meId}
+            onProfile={openProfile} onReply={setReply}
+            onLike={like} onReport={report} />
         ))}
       </div>
 
@@ -234,3 +206,53 @@ export default function Chat({ token, openProfile, meId }) {
     </section>
   );
 }
+
+
+/**
+ * One chat message.
+ *
+ * Memoised because the room re-polls every 8 seconds: without this, each poll
+ * re-rendered every message and re-evaluated every avatar `src`, so a
+ * 50-message room did 50 pointless subtree renders three times a minute. The
+ * comparator only looks at the fields that can actually change.
+ */
+const Message = memo(function Message({ m, mine, onProfile, onReply, onLike, onReport }) {
+  return (
+    <div className={`chatmsg${mine ? ' mine' : ''}`}>
+      <img alt="آواتار" onClick={() => onProfile(m.user_id)}
+        width="40" height="40" loading="lazy" decoding="async"
+        src={m.profile_image_url
+          ? asset(m.profile_image_url)
+          : avatarUrl(m.profile_avatar_key)} />
+      <div className="chatbody">
+        <b className="clickableText" onClick={() => onProfile(m.user_id)}>
+          {m.nickname || m.first_name || 'کاربر'}
+        </b>
+        {m.reply_text && (
+          <small className="reply">
+            ↩ {m.reply_nickname || 'کاربر'}: {m.reply_text}
+          </small>
+        )}
+        {m.message_type === 'sticker' && m.sticker_url
+          ? <img className="stickerMsg" src={asset(m.sticker_url)} alt="استیکر"
+              loading="lazy" decoding="async" />
+          : <p>{m.message_text}</p>}
+        {m.created_at && (
+          <span className="chatTime">
+            {new Date(m.created_at).toLocaleTimeString('fa-IR',
+              { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        )}
+        <div className="chatActions">
+          <button onClick={() => onReply(m)}>ریپلای</button>
+          <button onClick={() => onLike(m)}>❤ {fa(m.like_count)}</button>
+          <button onClick={() => onReport(m)}>گزارش</button>
+        </div>
+      </div>
+    </div>
+  );
+}, (a, b) =>
+  a.m.id === b.m.id &&
+  a.m.like_count === b.m.like_count &&
+  a.m.message_text === b.m.message_text &&
+  a.mine === b.mine);

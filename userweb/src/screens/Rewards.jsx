@@ -2,7 +2,7 @@
 // prize artwork and required-card strip.
 import React, { useCallback, useState } from 'react';
 
-import { req, asset, fa } from '../lib/api.js';
+import { req, asset, fa, avatarUrl } from '../lib/api.js';
 import { useAsync } from '../lib/useAsync.js';
 import { AsyncSection, EmptyView } from '../components/states.jsx';
 
@@ -53,7 +53,7 @@ function GroupBar({ group, accent }) {
             {next.requiredCards.map(c => (
               <div className={`rgCard${c.met ? ' met' : ''}`} key={c.cardTypeId}
                 title={c.name}>
-                <img src={asset(c.imageUrl) || '/avatars/avatar_1_football.png'}
+                <img src={asset(c.imageUrl) || avatarUrl('avatar_1_football.png')}
                   alt={c.name} />
                 <b>{fa(c.have)}/{fa(c.quantity)}</b>
               </div>
@@ -69,7 +69,7 @@ function TierCard({ tier, accent, onClaim, busy }) {
   return (
     <div className={`rgTier${tier.eligible ? ' eligible' : ''}`}>
       <div className="rgTierArt">
-        <img src={asset(tier.imageUrl) || '/avatars/avatar_2_trophy.png'}
+        <img src={asset(tier.imageUrl) || avatarUrl('avatar_2_trophy.png')}
           alt={tier.name} />
         <span className={`rgKind ${tier.rewardType}`}>
           {tier.rewardType === 'cash' ? '💰 نقدی' : '🎁 فیزیکی'}
@@ -181,26 +181,81 @@ export default function Rewards({ token, setMsg, reloadProfile }) {
 
             {confirm && (
               <div className="modalShade" onClick={() => setConfirm(null)}>
-                <div className="confirmBox" onClick={e => e.stopPropagation()}
+                <div className="confirmBox claimConfirm"
+                  onClick={e => e.stopPropagation()}
                   role="dialog" aria-label="تایید دریافت جایزه">
-                  <h3>دریافت «{confirm.tier.name}»</h3>
-                  <p>
-                    {confirm.tier.rewardType === 'cash'
-                      ? <>مبلغ <b>{fa(confirm.tier.cashAmount)} تومان</b> به کیف
-                          پولت اضافه می‌شود.</>
-                      : <>این جایزه پس از تایید مدیر برایت ارسال می‌شود و در
-                          پروفایلت ثبت می‌ماند.</>}
-                    {' '}
-                    <b>{fa(confirm.tier.requiredPoints)} امتیاز</b> کم می‌شود و
-                    نوار پیشرفت «{confirm.group.name}» از ابتدا شروع می‌شود.
+                  <div className="ccHead">
+                    <img
+                      src={asset(confirm.tier.imageUrl)
+                        || avatarUrl('avatar_2_trophy.png')}
+                      alt={confirm.tier.name} />
+                    <div>
+                      <h3>مطمئنی می‌خوای این جایزه رو بگیری؟</h3>
+                      <b className="ccName">{confirm.tier.name}</b>
+                    </div>
+                  </div>
+
+                  {/* Spelled out as a list of consequences rather than a
+                      paragraph: claiming is irreversible and the two effects
+                      (points spent, bar reset) are easy to miss in prose. */}
+                  <ul className="ccList">
+                    <li>
+                      <span className="ccIcon">📉</span>
+                      <span>
+                        <b>{fa(confirm.tier.requiredPoints)} امتیاز</b> از
+                        امتیازت کم می‌شه
+                        <small>
+                          الان {fa(confirm.group.earnedPoints)} امتیاز داری،
+                          بعدش {fa(Math.max(0,
+                            confirm.group.earnedPoints
+                            - confirm.tier.requiredPoints))} امتیاز می‌مونه
+                        </small>
+                      </span>
+                    </li>
+                    <li>
+                      <span className="ccIcon">🔄</span>
+                      <span>
+                        نوار پیشرفت <b>«{confirm.group.name}»</b> از صفر شروع
+                        می‌شه
+                        <small>
+                          برای جایزهٔ بعدی این گروه باید دوباره امتیاز جمع کنی
+                        </small>
+                      </span>
+                    </li>
+                    <li>
+                      <span className="ccIcon">
+                        {confirm.tier.rewardType === 'cash' ? '💰' : '🎁'}
+                      </span>
+                      <span>
+                        {confirm.tier.rewardType === 'cash' ? (
+                          <>
+                            <b>{fa(confirm.tier.cashAmount)} تومان</b> همین الان
+                            به کیف پولت اضافه می‌شه
+                            <small>می‌تونی از بخش کیف پول برداشتش کنی</small>
+                          </>
+                        ) : (
+                          <>
+                            جایزه بعد از تایید مدیر برات فرستاده می‌شه
+                            <small>
+                              عکسش هم توی پروفایلت ثبت می‌مونه
+                            </small>
+                          </>
+                        )}
+                      </span>
+                    </li>
+                  </ul>
+
+                  <p className="ccWarn">
+                    این کار برگشت‌پذیر نیست.
                   </p>
+
                   <div className="confirmActions">
                     <button className="ghost" onClick={() => setConfirm(null)}>
-                      انصراف
+                      نه، فعلاً نه
                     </button>
                     <button className="main"
                       onClick={() => claim(confirm.tier)}>
-                      بله، دریافت کن
+                      آره، جایزه‌مو بگیر
                     </button>
                   </div>
                 </div>

@@ -1,13 +1,13 @@
 // Dashboard: points, next reward, wallet shortcut, card redemption, inventory.
 import React, { useState } from 'react';
 
-import { req, asset, fa, avatars } from '../lib/api.js';
+import { req, asset, fa, avatars, avatarUrl } from '../lib/api.js';
 import { EmptyView } from '../components/states.jsx';
 
 function Avatar({ u, size = 72 }) {
   const src = u.profile_image_url
     ? asset(u.profile_image_url)
-    : `/avatars/${u.profile_avatar_key || avatars[0]}`;
+    : avatarUrl(u.profile_avatar_key);
   return (
     <img className="avatar" src={src} alt="آواتار"
       style={{ width: size, height: size }} />
@@ -19,7 +19,7 @@ function CardLightbox({ item, close }) {
     <div className="modalShade" onClick={close}>
       <div className="cardBig" onClick={e => e.stopPropagation()}>
         <button className="close" onClick={close}>×</button>
-        <img src={asset(item.image_url) || '/avatars/avatar_1_football.png'}
+        <img src={asset(item.image_url) || avatarUrl('avatar_1_football.png')}
           alt={item.name || 'کارت'} />
         <h2>{item.name || 'کارت'}</h2>
         <p>تعداد: {fa(item.quantity)} — {fa(item.point_value)} امتیاز</p>
@@ -110,7 +110,7 @@ export default function Home({ token, p, rewards, load, setMsg, openWallet }) {
               <button className="invCard" key={i.id} title="نمایش بزرگ کارت"
                 onClick={() => setBigCard(i)}>
                 <span className="invArt">
-                  <img src={asset(i.image_url) || '/avatars/avatar_1_football.png'}
+                  <img src={asset(i.image_url) || avatarUrl('avatar_1_football.png')}
                     alt={i.name || 'کارت'} />
                 </span>
                 <b>{i.name}</b>

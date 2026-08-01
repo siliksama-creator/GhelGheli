@@ -82,7 +82,7 @@ function App() {
     <div className={`page ${token ? 'signedIn' : ''}`}>
       {!token && (
         <div className="hero">
-          <img src="/logo.png" alt="قلقلی" />
+          <img src="/logo.webp" alt="قلقلی" width="330" height="273" />
           <b>قلقلی</b>
         </div>
       )}
@@ -154,7 +154,7 @@ function Portal({ token, logout, theme, toggleTheme }) {
   return (
     <div className="portal">
       <header className="appBar">
-        <img className="appLogo" src="/logo.png" alt="" />
+        <img className="appLogo" src="/logo.webp" alt="" width="30" height="30" />
         <div className="appWho">
           <b>{u.nickname || 'کاربر'}</b>
           <span>{fa(u.current_points)} امتیاز</span>

@@ -41,27 +41,73 @@ class _RewardsPageState extends State<RewardsPage> {
   Future<void> _confirmAndClaim(
       Map<String, dynamic> tier, Map<String, dynamic> group) async {
     final isCash = tier['rewardType'] == 'cash';
+    final cost = tier['requiredPoints'] as num? ?? 0;
+    final have = group['earnedPoints'] as num? ?? 0;
+    final left = (have - cost).clamp(0, 1 << 40);
+
+    // Spelled out as a list of consequences rather than a paragraph:
+    // claiming is irreversible, and the two effects (points spent, bar reset)
+    // are easy to skim past in prose. Wording matches the web client.
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('دریافت «${tier['name']}»'),
-        content: Text(
-          isCash
-              ? 'مبلغ ${faNum(tier['cashAmount'])} تومان به کیف پولت اضافه '
-                  'می‌شود. ${faNum(tier['requiredPoints'])} امتیاز کم می‌شود و '
-                  'نوار پیشرفت «${group['name']}» از ابتدا شروع می‌شود.'
-              : 'این جایزه پس از تایید مدیر برایت ارسال می‌شود و در پروفایلت '
-                  'ثبت می‌ماند. ${faNum(tier['requiredPoints'])} امتیاز کم '
-                  'می‌شود و نوار پیشرفت «${group['name']}» از ابتدا شروع '
-                  'می‌شود.',
+        title: const Text('مطمئنی می‌خوای این جایزه رو بگیری؟'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${tier['name']}',
+                style: Theme.of(ctx).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF84CC16))),
+            Gaps.vSm,
+            _ConfirmLine(
+              icon: '📉',
+              title: '${faNum(cost)} امتیاز از امتیازت کم می‌شه',
+              note: 'الان ${faNum(have)} امتیاز داری، '
+                  'بعدش ${faNum(left)} امتیاز می‌مونه',
+            ),
+            Gaps.vXs,
+            _ConfirmLine(
+              icon: '🔄',
+              title: 'نوار پیشرفت «${group['name']}» از صفر شروع می‌شه',
+              note: 'برای جایزهٔ بعدی این گروه باید دوباره امتیاز جمع کنی',
+            ),
+            Gaps.vXs,
+            _ConfirmLine(
+              icon: isCash ? '💰' : '🎁',
+              title: isCash
+                  ? '${faNum(tier['cashAmount'])} تومان همین الان به کیف پولت اضافه می‌شه'
+                  : 'جایزه بعد از تایید مدیر برات فرستاده می‌شه',
+              note: isCash
+                  ? 'می‌تونی از بخش کیف پول برداشتش کنی'
+                  : 'عکسش هم توی پروفایلت ثبت می‌مونه',
+            ),
+            Gaps.vSm,
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                  horizontal: Gaps.sm, vertical: Gaps.xs),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFD36B).withValues(alpha: 0.12),
+                borderRadius: Corners.rMd,
+                border: Border.all(
+                    color: const Color(0xFFFFD36B).withValues(alpha: 0.35)),
+              ),
+              child: const Text('این کار برگشت‌پذیر نیست.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: 12.5, color: Color(0xFFFFD36B))),
+            ),
+          ],
         ),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('انصراف')),
+              child: const Text('نه، فعلاً نه')),
           FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('بله، دریافت کن')),
+              child: const Text('آره، جایزه‌مو بگیر')),
         ],
       ),
     );
@@ -439,6 +485,44 @@ class _TierRow extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+
+/// One consequence line in the claim confirmation.
+class _ConfirmLine extends StatelessWidget {
+  const _ConfirmLine({
+    required this.icon,
+    required this.title,
+    required this.note,
+  });
+
+  final String icon;
+  final String title;
+  final String note;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(icon, style: const TextStyle(fontSize: 17)),
+        Gaps.hXs,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: theme.textTheme.bodyMedium),
+              Text(note,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurface
+                          .withValues(alpha: 0.6))),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

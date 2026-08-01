@@ -1023,3 +1023,24 @@
   font-size:9.5px;font-weight:800;padding:2px 6px;border-radius:999px;
   background:#f2a93b;color:#2a1a00;
 }
+
+/* ── Claim confirmation ──────────────────────────────────────────────────
+   Claiming spends points AND resets the group's bar. Both consequences were
+   buried in a sentence; as a list with icons they are impossible to miss. */
+.claimConfirm{width:min(440px,94vw)}
+.ccHead{display:flex;gap:12px;align-items:center;margin-bottom:14px}
+.ccHead img{width:62px;height:62px;border-radius:16px;object-fit:cover;flex:none;border:2px solid #b5ef5866}
+.ccHead h3{margin:0 0 3px;font-size:16px;line-height:1.5}
+.ccName{font-size:13px;color:#b5ef58}
+
+.ccList{list-style:none;margin:0 0 12px;padding:0;display:flex;flex-direction:column;gap:11px}
+.ccList li{display:flex;gap:10px;align-items:flex-start}
+.ccIcon{font-size:19px;flex:none;line-height:1.4}
+.ccList b{color:#fff}
+.ccList small{display:block;margin-top:2px;font-size:11.5px;color:#c9ddf290;line-height:1.7}
+.ccList>li>span:last-child{font-size:13.5px;line-height:1.7}
+
+.ccWarn{
+  margin:0 0 14px;padding:9px 12px;border-radius:12px;font-size:12.5px;
+  background:#ffd36b18;border:1px solid #ffd36b40;color:#ffd36b;text-align:center;
+}

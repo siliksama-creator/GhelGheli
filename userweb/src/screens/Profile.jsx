@@ -1,7 +1,7 @@
 // Private profile + password change.
 import React, { useCallback, useState } from 'react';
 
-import { req, avatars, asset } from '../lib/api.js';
+import { req, avatars, asset, avatarUrl } from '../lib/api.js';
 import { useAsync } from '../lib/useAsync.js';
 import Field from '../components/Field.jsx';
 
@@ -68,7 +68,12 @@ export default function Profile({ token, p, load, setMsg }) {
 
       <div className="avatars">
         {avatars.map(a => (
-          <img key={a} src={`/avatars/${a}`} alt="آواتار"
+          <img key={a} src={avatarUrl(a)} alt="آواتار"
+            width="62" height="62"
+            /* Ten avatars render at once. `async` decoding keeps them off the
+               main thread, and the intrinsic size stops the grid reflowing as
+               each one arrives. */
+            loading="lazy" decoding="async"
             className={edit.profileAvatarKey === a ? 'sel' : ''}
             onClick={() => setEdit({ ...edit, profileAvatarKey: a })} />
         ))}
@@ -135,7 +140,7 @@ function Trophies({ token }) {
       <div className="trophyShelf">
         {list.map(t => (
           <div className="trophy" key={t.id}>
-            <img src={asset(t.image_url) || '/avatars/avatar_2_trophy.png'}
+            <img src={asset(t.image_url) || avatarUrl('avatar_2_trophy.png')}
               alt={t.name || 'جایزه'} />
             {t.status === 'pending' && <span className="trophyPending">در انتظار</span>}
             <b>{t.name || 'جایزه'}</b>

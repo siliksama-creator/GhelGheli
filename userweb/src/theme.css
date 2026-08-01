@@ -395,3 +395,8 @@ body {
 }
 :root[data-theme='light'] .sendDock input { background: #ffffff; }
 :root[data-theme='light'] .trophy img { border-color: var(--veil-6); }
+
+:root[data-theme='light'] .ccList b { color: var(--page-fg); }
+:root[data-theme='light'] .ccList small { color: var(--text-muted); }
+:root[data-theme='light'] .ccName { color: #4d7c0f; }
+:root[data-theme='light'] .ccWarn { background:#fff6e2; border-color:#d9a44166; color:#7a5a12; }
