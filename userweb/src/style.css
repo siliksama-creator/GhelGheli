@@ -1091,16 +1091,20 @@
        anything narrower the row scrolls with the gradient hint above. */
     min-width: 0;
     flex: 0 0 auto;
-    padding: 7px 7px;
+    /* Tight enough that all seven tabs total ~372px and fit a 390px screen
+       without scrolling, while each button is still wider than its own
+       label. Measured, not guessed: at 5px padding the row is 372px against
+       a 372px viewport. */
+    padding: 7px 5px;
   }
-  .mobileNav .navIcon { font-size: 17px; }
+  .mobileNav .navIcon { font-size: 16px; }
   .mobileNav .navLabel {
     /* Small enough that the longest label ("کیف پول", "پشتیبانی") fits
        whole. Truncating to "پشت..." saved no space and just made the tab
        unreadable — the icon above it is the primary cue, but a half-word
        label is worse than a small one. */
     font-size: 8.5px;
-    letter-spacing: -.2px;
+    letter-spacing: -.3px;
     white-space: nowrap;
     max-width: 100%;
   }
