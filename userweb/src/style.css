@@ -1402,17 +1402,28 @@
 
 /* ── Two last overflow findings from the visual audit ──────────────────── */
 
-/* The unread-count badge is absolutely positioned 3px OUTSIDE the bell, which
-   is the intended look — but it also makes the button a 39px scroll container
-   inside a 36px box. Harmless visually, yet it means any horizontal scroll
-   chain treats the header as scrollable. `overflow: visible` is what was
-   wanted all along: draw outside the box without becoming scrollable. */
+/* The unread-count badge sits 3px OUTSIDE the bell by design, so the button
+   reports scrollWidth 39 against clientWidth 36. That is NOT a defect — an
+   `overflow: visible` box does not scroll and nothing is clipped; it is the
+   audit's scrollWidth heuristic being fooled by a deliberate overhang. Stated
+   explicitly so the next person does not "fix" the badge back inside the
+   button. */
 .iconBtn.bell { overflow: visible; }
 
-/* `.portal` is a grid whose children are `width: min(1080px, 96vw)` cards.
-   96vw is measured against the VIEWPORT including the scrollbar gutter, so on
-   a 366px content box the card computes to 374px and overflows by 8px — a
-   sliver of horizontal scroll on every screen. `min-width: 0` lets the grid
-   item shrink to its column instead of forcing the track wider. */
+/* THE 8px OF HORIZONTAL SCROLL ON EVERY PAGE.
+   `.appBar`, `.mobileNav` and `.tabPane` are all `width: min(1080px, 96vw)`.
+   vw is measured against the VIEWPORT, but these sit inside `.page`, which
+   has 12px of padding each side. On a 390px phone 96vw = 374.4px against a
+   366px content box, so each one is 8px too wide and the whole app has a
+   permanent horizontal jiggle.
+   `max-width: 100%` alone did not help: these elements set an explicit
+   `width`, and max-width caps the used width but the grid track has already
+   been sized from it. Setting the width relative to the CONTAINER (100%)
+   with the 1080px cap preserved fixes the cause instead of the symptom. */
 .portal { min-width: 0; }
-.portal > * { max-width: 100%; }
+.portal > .appBar,
+.portal > .mobileNav,
+.portal > .tabPane {
+  width: 100%;
+  max-width: 1080px;
+}
