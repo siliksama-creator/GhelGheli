@@ -68,6 +68,10 @@ async function saveWalletSettings(body, adminId) {
 const VALID_SOURCES = new Set([
   'card_cash', 'wheel', 'reward', 'league',
   'admin_credit', 'admin_debit', 'withdrawal_hold', 'withdrawal_refund',
+  // Cosmetic purchases and Plus payments get their own sources so they are
+  // filterable in the ledger and can never collide with an admin adjustment
+  // on the shared UNIQUE (source, reference_id) index.
+  'shop', 'subscription',
 ]);
 
 function normalizeAmount(amount) {

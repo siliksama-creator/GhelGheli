@@ -103,20 +103,23 @@ async function buyItem(userId, itemId) {
       throw Object.assign(new Error('این آیتم را قبلاً خریده‌ای'), { status: 409 });
     }
 
-    // Record the purchase first so its id can be the payment's idempotency
-    // key — a retried request then hits the unique constraint instead of
-    // charging twice.
-    await client.query(
-      'INSERT INTO user_shop_items(user_id, item_id, price_paid) VALUES($1,$2,$3)',
+    // Record the purchase first so ITS id can be the payment's idempotency
+    // key. Using the item id here was a real bug: uq_wallet_tx_reference is
+    // UNIQUE (source, reference_id) with no user column, so keying on the
+    // product meant only the first buyer of each item could ever pay — every
+    // subsequent purchase failed with a duplicate-key 500.
+    const { rows: purchase } = await client.query(
+      `INSERT INTO user_shop_items(user_id, item_id, price_paid)
+       VALUES($1,$2,$3) RETURNING purchase_id`,
       [userId, itemId, item.price]);
 
     if (item.price > 0) {
       await walletService.debit(client, {
         userId,
         amount: item.price,
-        source: 'admin_debit',
+        source: 'shop',
         referenceType: 'shop_item',
-        referenceId: itemId,
+        referenceId: purchase[0].purchase_id,
         description: `خرید آیتم: ${item.name}`,
       });
     }
@@ -156,7 +159,7 @@ async function buyPlus(userId) {
     await walletService.debit(client, {
       userId,
       amount: PLUS_PRICE,
-      source: 'admin_debit',
+      source: 'subscription',
       referenceType: 'subscription',
       referenceId: sub[0].id,
       description: 'اشتراک قلقلی پلاس (۳۰ روز)',
