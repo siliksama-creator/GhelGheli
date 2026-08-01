@@ -580,6 +580,43 @@ app.post('/api/cards/redeem', auth, cardRedeemLimiter, asyncHandler(async (req, 
   } finally { client.release(); }
 }));
 
+// ── Tap game ───────────────────────────────────────────────────────────────
+// Progress is reported in signed BATCHES, never one tap per request: a
+// per-tap endpoint is both chatty and trivially replayable. All validation
+// (signature, replay, plausibility) lives in tapGameService — see the header
+// comment there for the full threat model.
+const tapGame = require('./services/tapGameService');
+
+// Rate limit sized against the client's 8s flush cadence: ~7 legitimate
+// batches per minute, so 20 leaves room for level-up flushes and a retry
+// after a dropped connection while still stopping a request flood.
+const tapBatchLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Key on the user, not the IP: a whole school behind one NAT must not
+  // share a bucket, and a single cheater must not escape by changing IP.
+  keyGenerator: (req) => req.user?.id || req.ip,
+  message: { message: 'تعداد درخواست‌ها زیاد است؛ کمی صبر کن' },
+});
+
+app.get('/api/games/tap/progress', auth, asyncHandler(async (req, res) => {
+  res.json(await tapGame.getProgress(req.user.id));
+}));
+
+app.post('/api/games/tap/progress', auth, tapBatchLimiter, asyncHandler(async (req, res) => {
+  // The raw token doubles as the HMAC key material, so the signature can only
+  // be produced by whoever holds a live session for this user.
+  const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  const { status, payload } = await tapGame.submitBatch(req.user.id, token, req.body || {});
+  res.status(status).json(payload);
+}));
+
+app.get('/api/games/tap/leaderboard', auth, asyncHandler(async (req, res) => {
+  res.json({ entries: await tapGame.leaderboard(req.query.limit) });
+}));
+
 // Solo (time-attack) records: my personal best + the public leaderboard, in
 // one round trip so the solo screen never has to fan out two requests.
 // Solo awards NO points on purpose — the record IS the reward.

@@ -7,6 +7,7 @@ import '../../widgets/app_card.dart';
 import 'games/connect4_board.dart';
 import 'games/reversi_board.dart';
 import 'games/memory_board.dart';
+import 'games/tap/tap_screen.dart';
 
 class _GameEntry {
   const _GameEntry(
@@ -18,6 +19,7 @@ class _GameEntry {
     this.art, {
     this.bot = true,
     this.solo = false,
+    this.singlePlayer = false,
   });
   final String id;
   final String title;
@@ -32,9 +34,16 @@ class _GameEntry {
 
   /// Playable alone against the clock (records only, no points).
   final bool solo;
+
+  /// Purely single-player: no lobby, no opponent, no bot. The tile must not
+  /// advertise any multiplayer affordance for these.
+  final bool singlePlayer;
 }
 
 const _games = <_GameEntry>[
+  _GameEntry('tap', 'ضربه‌زن', '۵۰ لول ضربه بزن و شخصیت‌ها را باز کن', '👊',
+      Color(0xFF84CC16), 'assets/games/tap/skin_1.webp',
+      bot: false, singlePlayer: true),
   _GameEntry('memory', 'جفت‌یاب', 'جفت‌ها را به خاطر بسپار و ببر', '🃏',
       Color(0xFFA855F7), 'assets/games/memory.webp',
       bot: false, solo: true),
@@ -60,6 +69,8 @@ class _GamesHubPageState extends State<GamesHubPage> {
   @override
   Widget build(BuildContext context) {
     switch (_active) {
+      case 'tap':
+        return TapGameScreen(api: widget.api, onBack: _back);
       case 'memory':
         return MemoryScreen(api: widget.api, onBack: _back);
       case 'connect4':
@@ -172,16 +183,26 @@ class _GameTile extends StatelessWidget {
                         Text(entry.subtitle, style: theme.textTheme.bodySmall),
                         Gaps.vXs,
                         Wrap(spacing: Gaps.xxs, runSpacing: Gaps.xxs, children: [
-                          _Tag(label: 'دو نفره آنلاین', color: entry.accent),
-                          if (entry.bot)
-                            _Tag(label: 'بازی با ربات', color: entry.accent)
-                          else
+                          if (entry.singlePlayer) ...[
+                            _Tag(label: 'تک‌نفره', color: entry.accent),
                             const _Tag(
-                                label: 'فقط حریف واقعی', color: Color(0xFF38BDF8)),
-                          if (entry.solo)
+                                label: '۵۰ لول', color: Color(0xFFF59E0B)),
                             const _Tag(
-                                label: 'بازی تنها · رکوردی',
+                                label: 'ذخیرهٔ خودکار',
                                 color: Color(0xFF34D399)),
+                          ] else ...[
+                            _Tag(label: 'دو نفره آنلاین', color: entry.accent),
+                            if (entry.bot)
+                              _Tag(label: 'بازی با ربات', color: entry.accent)
+                            else
+                              const _Tag(
+                                  label: 'فقط حریف واقعی',
+                                  color: Color(0xFF38BDF8)),
+                            if (entry.solo)
+                              const _Tag(
+                                  label: 'بازی تنها · رکوردی',
+                                  color: Color(0xFF34D399)),
+                          ],
                         ]),
                       ],
                     ),
