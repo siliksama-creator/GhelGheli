@@ -1267,3 +1267,14 @@
 .prevPrize{font-size:11px;font-weight:800;background:#b5ef5822;color:#b5ef58;
   border-radius:999px;padding:2px 9px;white-space:nowrap}
 .plusStarSm{font-size:10px;margin-inline-start:3px}
+
+/* The public-profile sheet is a flex column, and `float` does nothing in a
+   flex container — the close button stretched to full width and became a big
+   red bar across the top. Pin it instead. */
+.pp{position:relative}
+.pp .close{
+  position:absolute;top:12px;inset-inline-start:12px;z-index:2;
+  float:none;width:34px;height:34px;padding:0;border-radius:50%;
+  display:grid;place-items:center;font-size:18px;line-height:1;
+}
+.pp .ppHead{padding-inline-start:44px}
