@@ -386,7 +386,7 @@ export default function TapGame({ token, api, onBack }) {
 
       <div className="tapProgress">
         <div className="tapProgressTop">
-          <b>{fa(progress.taps)} / {fa(need)}</b>
+          <b dir="ltr">{fa(progress.taps)} / {fa(need)}</b>
           {untilNextSkin != null &&
             <small>{fa(untilNextSkin)} لول تا شخصیت بعدی</small>}
         </div>

@@ -1,4 +1,4 @@
-import React,{useEffect,useRef,useState}from'react';
+import React,{useCallback,useEffect,useRef,useState}from'react';
 import{createRoot}from'react-dom/client';
 import GamesHub from './games.jsx';
 import Support from './support.jsx';
@@ -95,6 +95,7 @@ function Portal({token,logout}){
           <b>{u.nickname||'کاربر'}</b>
           <span>{fa(u.current_points)} امتیاز</span>
         </div>
+        <Notifications token={token}/>
         <button className="iconBtn danger" onClick={logout} title="خروج">⏻</button>
       </header>
 
@@ -169,6 +170,63 @@ function Profile({token,p,load,setMsg}){const u=p.user;const[edit,setEdit]=useSt
       <Field label="رمز جدید" hint="حداقل ۶ کاراکتر" type="password" value={pw.newPassword} onChange={v=>setPw({...pw,newPassword:v})}/>
       <button className="main" type="submit">تغییر رمز عبور</button>
     </form>{pwMsg&&<p className="msg">{pwMsg}</p>}</section>}
+
+// Notification bell + panel.
+//
+// The admin panel can broadcast announcements (POST
+// /api/admin/notifications/broadcast) and the API serves them from
+// /api/notifications, but no client ever displayed them, so every
+// announcement was written to the database and never seen. Polls on a slow
+// interval; a failure is silent because an announcement is not worth an
+// error toast.
+function Notifications({token}){
+  const[open,setOpen]=useState(false);
+  const[items,setItems]=useState([]);
+
+  const load=useCallback(async()=>{
+    try{ setItems(await req('/api/notifications','GET',null,token)||[]) }
+    catch{ /* announcements are best-effort */ }
+  },[token]);
+
+  useEffect(()=>{
+    load();
+    const t=setInterval(load,60000);
+    return()=>clearInterval(t);
+  },[load]);
+
+  const unread=items.filter(n=>!n.is_read).length;
+
+  async function markRead(n){
+    if(n.is_read) return;
+    setItems(list=>list.map(x=>x.id===n.id?{...x,is_read:true}:x));
+    try{ await req(`/api/notifications/${n.id}/read`,'PATCH',{},token) }
+    catch{ /* the local state already reflects it */ }
+  }
+
+  return <>
+    <button className="iconBtn bell" onClick={()=>setOpen(o=>!o)} title="اعلان‌ها">
+      🔔{unread>0&&<i className="badge">{fa(unread)}</i>}
+    </button>
+    {open&&<div className="notifShade" onClick={()=>setOpen(false)}>
+      <div className="notifPanel" onClick={e=>e.stopPropagation()}>
+        <div className="notifHead">
+          <b>اعلان‌ها</b>
+          <button className="ghost" onClick={()=>setOpen(false)}>بستن</button>
+        </div>
+        {items.length
+          ? <div className="notifList">{items.map(n=>
+              <div key={n.id} className={`notifItem${n.is_read?'':' unread'}`}
+                onClick={()=>markRead(n)}>
+                <b>{n.title}</b>
+                <p>{n.body}</p>
+                <small>{new Date(n.created_at).toLocaleDateString('fa-IR')}</small>
+              </div>)}</div>
+          : <div className="empty">📭 اعلانی نداری.</div>}
+      </div>
+    </div>}
+  </>;
+}
+
 
 // Labelled form field.
 //

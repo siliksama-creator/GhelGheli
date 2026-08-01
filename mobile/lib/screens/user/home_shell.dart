@@ -3,6 +3,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
+import '../../widgets/notification_bell.dart';
 import 'social_page.dart';
 import 'dashboard_page.dart';
 import 'league_page.dart';
@@ -235,7 +236,8 @@ class _HomeShellState extends State<HomeShell>
         ),
         actions: [
           // The theme switch moved into the "بیشتر" sheet, leaving the bar
-          // uncluttered with just the logout action.
+          // uncluttered with just notifications + logout.
+          NotificationBell(api: widget.api),
           IconButton(
               tooltip: 'خروج',
               onPressed: widget.onLogout,

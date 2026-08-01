@@ -297,6 +297,11 @@ class _ProgressPanel extends StatelessWidget {
           children: [
             Text(
               '${faNum(engine.taps)} / ${faNum(engine.requiredTaps)}',
+              // The pair is a single LTR expression. Inside the app's RTL
+              // directionality the bidi algorithm reorders the numbers around
+              // the slash, so "۱۵ / ۱۰۰" reads back as "۱۰۰ / ۱۵" — spotted on
+              // the live web build, and this widget has the same shape.
+              textDirection: TextDirection.ltr,
               style: theme.textTheme.labelLarge?.copyWith(
                 fontWeight: FontWeight.w800,
                 color: accent,
