@@ -1831,7 +1831,20 @@ app.get('/api/admin/users/:id', adminAuth, validateUuid('id'), asyncHandler(asyn
   res.json({ user: safeUser(user.rows[0]), codes: codes.rows });
 }));
 app.patch('/api/admin/users/:id/status', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => { await pool.query('UPDATE users SET status=$1 WHERE id=$2', [req.body.status, req.params.id]); await audit(req.admin.id,'update_user_status','users',req.params.id,req.body.reason,{status:req.body.status}); res.json({message:'ثبت شد'}); }));
-app.post('/api/admin/users/:id/points', adminAuth, validateUuid('id'), requireRole(), asyncHandler(async (req, res) => { const p=Number(req.body.points||0); await pool.query('UPDATE users SET current_points=GREATEST(0,current_points+$1), lifetime_points=GREATEST(0,lifetime_points+$1), monthly_league_points=GREATEST(0,monthly_league_points+$1) WHERE id=$2', [p, req.params.id]); await audit(req.admin.id,'manual_points','users',req.params.id,req.body.reason,{points:p}); await createNotification(req.params.id, 'admin_points', 'تغییر امتیاز توسط مدیریت', `امتیاز شما به مقدار ${p} تغییر کرد. ${req.body.reason||''}`); res.json({message:'امتیاز تغییر کرد'}); }));
+app.post('/api/admin/users/:id/points', adminAuth, validateUuid('id'), requireRole(), asyncHandler(async (req, res) => {
+  const p = Number(req.body.points || 0);
+  // lifetime_points is a permanent record of everything a user has ever
+  // earned, so a deduction must not rewrite it — only additions count.
+  // Otherwise correcting a mistake with -100 would erase history the user
+  // legitimately built up, and the profile would under-report their total.
+  await pool.query(
+    `UPDATE users SET
+       current_points        = GREATEST(0, current_points + $1),
+       lifetime_points       = lifetime_points + GREATEST($1, 0),
+       monthly_league_points = GREATEST(0, monthly_league_points + $1),
+       updated_at = NOW()
+     WHERE id = $2`,
+    [p, req.params.id]); await audit(req.admin.id,'manual_points','users',req.params.id,req.body.reason,{points:p}); await createNotification(req.params.id, 'admin_points', 'تغییر امتیاز توسط مدیریت', `امتیاز شما به مقدار ${p} تغییر کرد. ${req.body.reason||''}`); res.json({message:'امتیاز تغییر کرد'}); }));
 app.post('/api/admin/users/:id/notify', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => { await createNotification(req.params.id, 'admin_private', req.body.title || 'پیام اختصاصی مدیریت', req.body.body || req.body.message || ''); await audit(req.admin.id,'private_message_user','users',req.params.id,null,{title:req.body.title}); res.json({message:'پیام اختصاصی ارسال شد'}); }));
 // SMS OTP is not wired up yet, so the self-service "forgot password" flow
 // cannot deliver a reset code to the user. Until a real SMS provider is
