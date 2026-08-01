@@ -1,16 +1,22 @@
-// Reward groups: two parallel prize tracks with independent progress.
+// Reward groups.
 //
-// MODEL
+// MODEL — one spendable wallet of points.
 //
-// Points are global (users.lifetime_points). A group's progress bar measures
-// how far the user has come SINCE that group was last claimed:
+//     current_points         spendable. Every group's bar measures THIS.
+//                            Claiming subtracts from it, so all bars move
+//                            back together.
+//     lifetime_points        permanent history, never decreases.
+//     monthly_league_points  this month's ranking. Reset at season close,
+//                            NEVER touched by a reward claim.
 //
-//     progress = lifetime_points - baseline_points(user, group)
+// An earlier version gave each group its own `baseline` against
+// lifetime_points. That was wrong: spending in group A only advanced A's
+// baseline, so group B still saw the full lifetime total. Reproduced against
+// production — a user with 110 points claimed a 100-point reward and then
+// immediately claimed a second 100-point reward in another group with 10
+// points to their name. With N groups you got N prizes for the price of one.
 //
-// Storing a baseline instead of a second points balance means the two groups
-// never drift apart from the real total, and claiming one group cannot reduce
-// progress in the other — the bug you get if you subtract from a shared
-// counter.
+// One balance makes that impossible by construction.
 //
 // A tier may additionally require specific CARDS. Those are checked against
 // the user's un-consumed inventory and consumed on claim.
@@ -85,10 +91,10 @@ async function userView(userId) {
   const [{ rows: userRows }, { rows: baselines }, { rows: inventory }] =
     await Promise.all([
       pool.query(
-        'SELECT lifetime_points, current_points FROM users WHERE id=$1',
+        'SELECT lifetime_points, current_points, monthly_league_points FROM users WHERE id=$1',
         [userId]),
       pool.query(
-        'SELECT group_id, baseline_points, claims_count FROM user_group_progress WHERE user_id=$1',
+        'SELECT group_id, claims_count FROM user_group_progress WHERE user_id=$1',
         [userId]),
       pool.query(
         `SELECT card_type_id, SUM(quantity)::int AS qty
@@ -106,18 +112,21 @@ async function userView(userId) {
   const claimed = new Map(claimCounts.map(c => [c.reward_tier_id, c.n]));
 
   const lifetime = Number(userRows[0]?.lifetime_points || 0);
+  // The spendable balance. Every bar measures this, so spending anywhere
+  // moves every bar.
   const current = Number(userRows[0]?.current_points || 0);
-  const baseline = new Map(baselines.map(b => [b.group_id, b]));
+  const leaguePoints = Number(userRows[0]?.monthly_league_points || 0);
+  const history = new Map(baselines.map(b => [b.group_id, b]));
   const held = new Map(inventory.map(i => [i.card_type_id, i.qty]));
 
   return {
     currentPoints: current,
     lifetimePoints: lifetime,
+    leaguePoints,
     groups: groups.map(g => {
-      const b = g.id ? baseline.get(g.id) : null;
-      const base = Number(b?.baseline_points || 0);
-      // Progress since the last claim in THIS group.
-      const earned = Math.max(0, lifetime - base);
+      const b = g.id ? history.get(g.id) : null;
+      // Every group measures the same spendable balance.
+      const earned = current;
 
       const tiers = g.tiers.map(t => {
         const cards = (t.required_cards || []).map(c => ({
@@ -197,29 +206,34 @@ async function claim(userId, tierId) {
     // Lock the user row: two devices claiming at once must not both pass the
     // affordability check against the same balance.
     const { rows: userRows } = await client.query(
-      'SELECT lifetime_points, current_points FROM users WHERE id=$1 FOR UPDATE',
+      `SELECT lifetime_points, current_points, monthly_league_points
+         FROM users WHERE id=$1 FOR UPDATE`,
       [userId]);
     if (!userRows[0]) {
       throw Object.assign(new Error('کاربر پیدا نشد'), { status: 404 });
     }
-    const lifetime = Number(userRows[0].lifetime_points);
 
-    // Progress is measured against this group's baseline, not the raw total.
+    // ONE spendable balance, checked and spent here. Reading a per-group
+    // baseline instead is what let a user claim in every group after paying
+    // only once.
+    const spendable = Number(userRows[0].current_points);
     const groupId = tier.group_id;
-    let baseline = 0;
-    if (groupId) {
-      const { rows } = await client.query(
-        `INSERT INTO user_group_progress(user_id, group_id) VALUES($1,$2)
-         ON CONFLICT (user_id, group_id) DO UPDATE SET updated_at = NOW()
-         RETURNING baseline_points`,
-        [userId, groupId]);
-      baseline = Number(rows[0].baseline_points);
-    }
-    const earned = Math.max(0, lifetime - baseline);
-    if (earned < tier.required_points) {
+
+    if (spendable < tier.required_points) {
       throw Object.assign(
-        new Error('امتیاز کافی برای این جایزه ندارید'), { status: 400 });
+        new Error(
+          `امتیاز کافی نداری — ${tier.required_points} امتیاز لازم است و ` +
+          `${spendable} امتیاز داری`),
+        { status: 400 });
     }
+
+    if (groupId) {
+      await client.query(
+        `INSERT INTO user_group_progress(user_id, group_id) VALUES($1,$2)
+         ON CONFLICT (user_id, group_id) DO UPDATE SET updated_at = NOW()`,
+        [userId, groupId]);
+    }
+    const earned = spendable;
 
     // Per-tier limit. Without this a user with banked points could take the
     // same prize over and over in one sitting — each claim individually valid
@@ -313,22 +327,31 @@ async function claim(userId, tierId) {
       }
     }
 
-    // Spend the points and restart THIS group's bar. lifetime_points is a
-    // permanent record and must never be reduced; moving the baseline is what
-    // makes the bar start from zero again.
+    // SPEND. This is the only place points leave the wallet.
+    //
+    // Deliberately touches ONLY current_points:
+    //   * lifetime_points is permanent history — a user who has earned
+    //     1,000,000 points over a year should still show that after
+    //     spending them.
+    //   * monthly_league_points decides this month's ranking. Spending a
+    //     reward must not cost the user their league position, or claiming
+    //     anything mid-month would be a self-inflicted penalty.
     await client.query(
-      'UPDATE users SET current_points = GREATEST(0, current_points - $2), updated_at=NOW() WHERE id=$1',
+      `UPDATE users
+          SET current_points = GREATEST(0, current_points - $2),
+              updated_at = NOW()
+        WHERE id = $1`,
       [userId, tier.required_points]);
 
     if (groupId) {
+      // History only — the bar itself now reads current_points.
       await client.query(
         `UPDATE user_group_progress
-            SET baseline_points = $3,
-                claims_count = claims_count + 1,
+            SET claims_count = claims_count + 1,
                 last_claim_at = NOW(),
                 updated_at = NOW()
           WHERE user_id=$1 AND group_id=$2`,
-        [userId, groupId, baseline + tier.required_points]);
+        [userId, groupId]);
     }
 
     await client.query('COMMIT');

@@ -224,6 +224,23 @@ async function closeActiveSeason({ force = false } = {}) {
       );
       await client.query('UPDATE league_leaderboard_entries SET rank=$1 WHERE league_season_id=$2 AND user_id=$3', [entry.rank, season.id, entry.user_id]);
 
+      // PERMANENT PROFILE RECORD.
+      //
+      // monthly_league_points is wiped below, and the leaderboard belongs to
+      // a season nobody will look at again. Without this row the user has no
+      // way to see "I finished 3rd in Mordad and won 100,000" once the new
+      // month starts — which the product explicitly wants on the profile.
+      await client.query(
+        `INSERT INTO user_league_history
+           (user_id, season_id, month_year, rank, points, prize_amount)
+         VALUES ($1,$2,$3,$4,$5,$6)
+         ON CONFLICT (user_id, season_id) DO UPDATE
+           SET rank = EXCLUDED.rank,
+               points = EXCLUDED.points,
+               prize_amount = EXCLUDED.prize_amount`,
+        [entry.user_id, season.id, season.month_year,
+         entry.rank, entry.points, amount]);
+
       // PAY THE WINNER.
       //
       // This step did not exist: closing a season wrote a league_payouts row
@@ -254,7 +271,10 @@ async function closeActiveSeason({ force = false } = {}) {
     await client.query(
       "UPDATE league_seasons SET status='closed', paid_at=NOW(), updated_at=NOW() WHERE id=$1",
       [season.id]);
-    await client.query('UPDATE users SET monthly_league_points=0');
+    // Reset ONLY the monthly counter. current_points (spendable) and
+    // lifetime_points (history) are untouched: a user's saved-up points and
+    // their all-time total must survive the month rolling over.
+    await client.query('UPDATE users SET monthly_league_points=0, updated_at=NOW()');
     await client.query('COMMIT');
     return {
       seasonId: season.id,

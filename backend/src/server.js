@@ -726,6 +726,25 @@ app.get('/api/profile/trophies', auth, asyncHandler(async (req, res) => {
   res.json({ trophies: await rewardGroups.trophies(req.user.id) });
 }));
 
+// Past league finishes. monthly_league_points is wiped when a season closes,
+// so without this the user loses all evidence of "I came 3rd in Mordad".
+app.get('/api/profile/league-history', auth, asyncHandler(async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT month_year, rank, points, prize_amount, created_at
+       FROM user_league_history
+      WHERE user_id=$1
+      ORDER BY created_at DESC
+      LIMIT 24`,
+    [req.user.id]);
+  res.json({ seasons: rows.map(r => ({
+    monthYear: r.month_year,
+    rank: r.rank,
+    points: r.points,
+    prizeAmount: Number(r.prize_amount),
+    at: r.created_at,
+  })) });
+}));
+
 app.post('/api/rewards/:id/claim', auth, validateUuid('id'), asyncHandler(async (req, res) => {
   // Delegated to rewardGroupService, which (unlike the previous inline
   // version) credits cash rewards to the wallet, consumes only the cards the
