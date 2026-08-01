@@ -57,6 +57,20 @@ jobs:
       - name: Install dependencies
         run: cd mobile && flutter pub get
 
+      # WITHOUT THIS THE APK SHIPPED FLUTTER'S DEFAULT BLUE ICON.
+      #
+      # `flutter create` regenerates android/ on every CI run (the directory is
+      # gitignored), which wipes any icons committed to the repo. pubspec has a
+      # flutter_launcher_icons block but nothing ever executed it, so the
+      # launcher icons were simply absent — verified by unzipping the built
+      # APK: zero mipmap entries.
+      - name: Generate launcher icons
+        run: cd mobile && dart run flutter_launcher_icons
+
+      # Same reasoning for the splash screen.
+      - name: Generate splash screen
+        run: cd mobile && dart run flutter_native_splash:create || true
+
       # `flutter create` drops a placeholder widget_test.dart that references
       # a MyApp class this project doesn't have, so it fails to compile.
       # Delete ONLY that file — the real tests under mobile/test/ must run.
