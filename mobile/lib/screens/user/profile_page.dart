@@ -5,6 +5,7 @@ import '../../core/assets.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/avatar_image.dart';
+import '../../widgets/safe_image.dart';
 import '../../widgets/state_views.dart';
 
 /// Private profile editor: same fields & PATCH /api/profile payload as the
@@ -37,11 +38,25 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _messageIsError = false;
   String? _passwordMessage;
   bool _passwordMessageIsError = false;
+  // Physical prizes the user has won. Cash rewards go straight to the wallet;
+  // physical ones are displayed here so there is a visible record of them.
+  List _trophies = const [];
 
   @override
   void initState() {
     super.initState();
     _load();
+    _loadTrophies();
+  }
+
+  Future<void> _loadTrophies() async {
+    try {
+      final r = await widget.api.get('/api/profile/trophies');
+      if (!mounted) return;
+      setState(() => _trophies = (r['trophies'] as List?) ?? const []);
+    } catch (_) {
+      // The shelf is decorative; a failure must not block the profile form.
+    }
   }
 
   @override
@@ -144,6 +159,75 @@ class _ProfilePageState extends State<ProfilePage> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(Gaps.lg, Gaps.md, Gaps.lg, Gaps.xxl),
       children: [
+        if (_trophies.isNotEmpty) ...[
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('جوایز دریافتی 🏆',
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w800)),
+                Gaps.vXs,
+                SizedBox(
+                  height: 118,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _trophies.length,
+                    separatorBuilder: (_, __) => Gaps.hXs,
+                    itemBuilder: (_, i) {
+                      final t = Map<String, dynamic>.from(_trophies[i] as Map);
+                      final pending = t['status'] == 'pending';
+                      return SizedBox(
+                        width: 92,
+                        child: Column(
+                          children: [
+                            Stack(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: Corners.rMd,
+                                  child: SafeImage(
+                                      url: fullAssetUrl(t['image_url']),
+                                      width: 92,
+                                      height: 78,
+                                      fallbackEmoji: '🎁'),
+                                ),
+                                if (pending)
+                                  Positioned(
+                                    top: 4,
+                                    right: 4,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF2A93B),
+                                        borderRadius: Corners.rPill,
+                                      ),
+                                      child: const Text('در انتظار',
+                                          style: TextStyle(
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w800,
+                                              color: Color(0xFF2A1A00))),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            Gaps.vXxs,
+                            Text('${t['name'] ?? 'جایزه'}',
+                                maxLines: 2,
+                                textAlign: TextAlign.center,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.labelSmall),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Gaps.vMd,
+        ],
         AppCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -5,7 +5,7 @@ import { req, asset, fa, avatars, PIN_COLORS } from '../lib/api.js';
 
 const POLL_MS = 8000;
 
-export default function Chat({ token, openProfile }) {
+export default function Chat({ token, openProfile, meId }) {
   const [messages, setMessages] = useState([]);
   const [stickers, setStickers] = useState([]);
   const [canned, setCanned] = useState([]);
@@ -177,7 +177,8 @@ export default function Chat({ token, openProfile }) {
 
       <div className="chatbox" ref={boxRef}>
         {messages.map(m => (
-          <div className="chatmsg" key={m.id}>
+          <div className={`chatmsg${m.user_id === meId ? ' mine' : ''}`}
+            key={m.id}>
             <img alt="آواتار" onClick={() => openProfile(m.user_id)}
               src={m.profile_image_url
                 ? asset(m.profile_image_url)
@@ -194,6 +195,12 @@ export default function Chat({ token, openProfile }) {
               {m.message_type === 'sticker' && m.sticker_url
                 ? <img className="stickerMsg" src={asset(m.sticker_url)} alt="استیکر" />
                 : <p>{m.message_text}</p>}
+              {m.created_at && (
+                <span className="chatTime">
+                  {new Date(m.created_at).toLocaleTimeString('fa-IR',
+                    { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
               <div className="chatActions">
                 <button onClick={() => setReply(m)}>ریپلای</button>
                 <button onClick={() => like(m)}>❤ {fa(m.like_count)}</button>

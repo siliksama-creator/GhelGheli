@@ -10,13 +10,22 @@ export function RewardsPage({ request }) {
   const notify = useToast();
   const [rewards, setRewards] = useState([]);
   const [claims, setClaims] = useState([]);
-  const [form, setForm] = useState({ name: '', points: '', type: 'cash', value: '', cash: '', desc: '', image: '' });
+  const [groups, setGroups] = useState([]);
+  const [cardTypes, setCardTypes] = useState([]);
+  const [groupForm, setGroupForm] = useState({ name: '', groupType: 'mixed', accent: 'emerald', desc: '', image: '' });
+  const [groupSaving, setGroupSaving] = useState(false);
+  // Which tier's card requirements are being edited, and the draft list.
+  const [cardEditor, setCardEditor] = useState(null);
+  const [form, setForm] = useState({ name: '', points: '', type: 'cash', value: '', cash: '', desc: '', image: '', groupId: '' });
   const [imageFile, setImageFile] = useState(null);
   const [saving, setSaving] = useState(false);
 
   const load = () => {
     request('/api/admin/rewards').then(setRewards);
     request('/api/admin/reward-claims').then(setClaims);
+    request('/api/admin/reward-groups').then(d => setGroups(d.groups || []));
+    // Needed for the "required cards" picker.
+    request('/api/admin/card-types').then(d => setCardTypes(Array.isArray(d) ? d : (d.cardTypes || [])));
   };
   useEffect(load, [request]);
 
@@ -42,9 +51,10 @@ export function RewardsPage({ request }) {
           description: form.desc,
           imageUrl,
           displayOrder: rewards.length + 1,
+          groupId: form.groupId || null,
         },
       });
-      setForm({ name: '', points: '', type: 'cash', value: '', cash: '', desc: '', image: '' });
+      setForm({ name: '', points: '', type: 'cash', value: '', cash: '', desc: '', image: '', groupId: form.groupId });
       setImageFile(null);
       notify('جایزه ذخیره شد');
       load();
@@ -52,6 +62,63 @@ export function RewardsPage({ request }) {
       notify(err.message, 'error');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function addGroup(e) {
+    e.preventDefault();
+    if (!groupForm.name.trim()) return;
+    setGroupSaving(true);
+    try {
+      await request('/api/admin/reward-groups', {
+        method: 'POST',
+        body: {
+          name: groupForm.name.trim(),
+          groupType: groupForm.groupType,
+          accent: groupForm.accent,
+          description: groupForm.desc,
+          imageUrl: groupForm.image,
+          displayOrder: groups.length + 1,
+        },
+      });
+      setGroupForm({ name: '', groupType: 'mixed', accent: 'emerald', desc: '', image: '' });
+      notify('گروه جایزه ساخته شد');
+      load();
+    } catch (err) {
+      notify(err.message, 'error');
+    } finally {
+      setGroupSaving(false);
+    }
+  }
+
+  async function toggleGroup(g) {
+    await request(`/api/admin/reward-groups/${g.id}`, {
+      method: 'PATCH', body: { isActive: !g.is_active },
+    });
+    notify(g.is_active ? 'گروه غیرفعال شد' : 'گروه فعال شد');
+    load();
+  }
+
+  async function moveTier(tierId, groupId) {
+    await request(`/api/admin/rewards/${tierId}`, {
+      method: 'PATCH', body: { groupId: groupId || null },
+    });
+    notify('گروه جایزه تغییر کرد');
+    load();
+  }
+
+  async function saveCards() {
+    if (!cardEditor) return;
+    try {
+      await request(`/api/admin/rewards/${cardEditor.tierId}/cards`, {
+        method: 'PUT',
+        body: { cards: cardEditor.cards.filter(c => c.cardTypeId && c.quantity > 0) },
+      });
+      notify('کارت‌های موردنیاز ذخیره شد');
+      setCardEditor(null);
+      load();
+    } catch (err) {
+      notify(err.message, 'error');
     }
   }
 
@@ -64,10 +131,76 @@ export function RewardsPage({ request }) {
   return (
     <div className="card-grid cols-2">
       <div style={{ display: 'grid', gap: 20, alignContent: 'start' }}>
+        <Card title="گروه‌های جایزه">
+          <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>
+            هر گروه نوار پیشرفت مستقل دارد؛ کاربر می‌تواند در هر گروه جداگانه
+            جایزه بگیرد و نوار همان گروه از ابتدا شروع می‌شود.
+          </p>
+          <form onSubmit={addGroup} style={{ display: 'grid', gap: 10 }}>
+            <Field label="نام گروه">
+              <Input value={groupForm.name} onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })} required />
+            </Field>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <Field label="نوع گروه">
+                <Select value={groupForm.groupType} onChange={(e) => setGroupForm({ ...groupForm, groupType: e.target.value })}>
+                  <option value="mixed">ترکیبی</option>
+                  <option value="cash">نقدی</option>
+                  <option value="physical">فیزیکی</option>
+                </Select>
+              </Field>
+              <Field label="رنگ">
+                <Select value={groupForm.accent} onChange={(e) => setGroupForm({ ...groupForm, accent: e.target.value })}>
+                  <option value="emerald">زمردی</option>
+                  <option value="gold">طلایی</option>
+                  <option value="blue">آبی</option>
+                  <option value="purple">بنفش</option>
+                  <option value="rose">قرمز</option>
+                </Select>
+              </Field>
+            </div>
+            <Field label="توضیح">
+              <Input value={groupForm.desc} onChange={(e) => setGroupForm({ ...groupForm, desc: e.target.value })} />
+            </Field>
+            <Field label="آدرس عکس گروه">
+              <Input value={groupForm.image} onChange={(e) => setGroupForm({ ...groupForm, image: e.target.value })} placeholder="/uploads/images/..." />
+            </Field>
+            <Button type="submit" disabled={groupSaving}>
+              {groupSaving ? 'در حال ذخیره...' : 'ساخت گروه'}
+            </Button>
+          </form>
+
+          <div style={{ display: 'grid', gap: 8, marginTop: 16 }}>
+            {groups.filter((g) => g.id).map((g) => (
+              <DataRow key={g.id}
+                title={g.name}
+                subtitle={`${g.group_type === 'cash' ? 'نقدی' : g.group_type === 'physical' ? 'فیزیکی' : 'ترکیبی'} · ${fmtNumber((g.tiers || []).length)} جایزه`}
+                right={
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <Badge tone={g.is_active ? 'success' : 'muted'}>
+                      {g.is_active ? 'فعال' : 'غیرفعال'}
+                    </Badge>
+                    <Button variant="ghost" onClick={() => toggleGroup(g)}>
+                      {g.is_active ? 'غیرفعال' : 'فعال'}
+                    </Button>
+                  </div>
+                } />
+            ))}
+            {!groups.filter((g) => g.id).length && <EmptyState title="هنوز گروهی نساخته‌اید" />}
+          </div>
+        </Card>
+
         <Card title={`سطح جایزه جدید (${fmtNumber(rewards.length)}/۳۰)`}>
           <form onSubmit={add}>
             <Field label="نام جایزه">
               <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+            </Field>
+            <Field label="گروه جایزه">
+              <Select value={form.groupId} onChange={(e) => setForm({ ...form, groupId: e.target.value })}>
+                <option value="">بدون گروه</option>
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </Select>
             </Field>
             <Field label="آستانه امتیاز">
               <Input type="number" value={form.points} onChange={(e) => setForm({ ...form, points: e.target.value })} required />
@@ -133,11 +266,75 @@ export function RewardsPage({ request }) {
                 }
                 title={r.name}
                 subtitle={`${fmtNumber(r.required_points)} امتیاز — ${r.reward_value}`}
+                right={
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <Select value={r.group_id || ''} onChange={(e) => moveTier(r.id, e.target.value)}
+                      style={{ minWidth: 130 }}>
+                      <option value="">بدون گروه</option>
+                      {groups.filter((g) => g.id).map((g) => (
+                        <option key={g.id} value={g.id}>{g.name}</option>
+                      ))}
+                    </Select>
+                    <Button variant="ghost" onClick={() => setCardEditor({
+                      tierId: r.id,
+                      name: r.name,
+                      cards: (r.required_cards || []).map((c) => ({
+                        cardTypeId: c.cardTypeId, quantity: c.quantity,
+                      })),
+                    })}>کارت‌های لازم</Button>
+                  </div>
+                }
               />
             ))
           )}
         </Card>
       </div>
+
+      {cardEditor && (
+        <div className="modal-shade" onClick={() => setCardEditor(null)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ marginTop: 0 }}>کارت‌های لازم برای «{cardEditor.name}»</h3>
+            <p className="muted" style={{ fontSize: 13 }}>
+              کاربر علاوه بر امتیاز، باید این کارت‌ها را داشته باشد. هنگام
+              دریافت جایزه فقط همین تعداد از موجودی‌اش کم می‌شود.
+            </p>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {cardEditor.cards.map((c, i) => (
+                <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 90px auto', gap: 8 }}>
+                  <Select value={c.cardTypeId} onChange={(e) => {
+                    const next = [...cardEditor.cards];
+                    next[i] = { ...next[i], cardTypeId: e.target.value };
+                    setCardEditor({ ...cardEditor, cards: next });
+                  }}>
+                    <option value="">انتخاب کارت...</option>
+                    {cardTypes.map((ct) => (
+                      <option key={ct.id} value={ct.id}>{ct.name}</option>
+                    ))}
+                  </Select>
+                  <Input type="number" min="1" value={c.quantity} onChange={(e) => {
+                    const next = [...cardEditor.cards];
+                    next[i] = { ...next[i], quantity: Number(e.target.value) || 1 };
+                    setCardEditor({ ...cardEditor, cards: next });
+                  }} />
+                  <Button variant="ghost" onClick={() => setCardEditor({
+                    ...cardEditor,
+                    cards: cardEditor.cards.filter((_, j) => j !== i),
+                  })}>حذف</Button>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+              <Button variant="ghost" onClick={() => setCardEditor({
+                ...cardEditor,
+                cards: [...cardEditor.cards, { cardTypeId: '', quantity: 1 }],
+              })}>+ افزودن کارت</Button>
+              <div style={{ flex: 1 }} />
+              <Button variant="ghost" onClick={() => setCardEditor(null)}>انصراف</Button>
+              <Button onClick={saveCards}>ذخیره</Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Card title="درخواست‌های جایزه">
         {claims.length === 0 ? (

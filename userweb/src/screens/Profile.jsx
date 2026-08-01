@@ -1,7 +1,8 @@
 // Private profile + password change.
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 
-import { req, avatars } from '../lib/api.js';
+import { req, avatars, asset } from '../lib/api.js';
+import { useAsync } from '../lib/useAsync.js';
 import Field from '../components/Field.jsx';
 
 export default function Profile({ token, p, load, setMsg }) {
@@ -54,7 +55,12 @@ export default function Profile({ token, p, load, setMsg }) {
   }
 
   return (
-    <section className="card wide">
+    <>
+      {/* Physical prizes won. Cash rewards land in the wallet; physical ones
+          are only visible here, so the shelf is the user's record of them. */}
+      <Trophies token={token} />
+
+      <section className="card wide">
       <h2>تکمیل پروفایل خصوصی</h2>
       <p className="hint">
         این اطلاعات فقط برای مدیر است. در چت فقط نام مستعار و عکس دیده می‌شود.
@@ -110,6 +116,32 @@ export default function Profile({ token, p, load, setMsg }) {
         </button>
       </form>
       {pwMsg && <p className="msg">{pwMsg}</p>}
+      </section>
+    </>
+  );
+}
+
+function Trophies({ token }) {
+  const load = useCallback(
+    () => req('/api/profile/trophies', 'GET', null, token), [token]);
+  const state = useAsync(load, [load]);
+  const list = state.data?.trophies || [];
+  // Decorative: a failure must not push an error card above the profile form.
+  if (state.loading || state.error || !list.length) return null;
+
+  return (
+    <section className="card wide trophyCard">
+      <h2>جوایز دریافتی 🏆</h2>
+      <div className="trophyShelf">
+        {list.map(t => (
+          <div className="trophy" key={t.id}>
+            <img src={asset(t.image_url) || '/avatars/avatar_2_trophy.png'}
+              alt={t.name || 'جایزه'} />
+            {t.status === 'pending' && <span className="trophyPending">در انتظار</span>}
+            <b>{t.name || 'جایزه'}</b>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }

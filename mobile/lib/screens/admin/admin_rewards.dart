@@ -24,6 +24,12 @@ class AdminRewards extends StatefulWidget {
 class _AdminRewardsState extends State<AdminRewards> {
   List _rewards = [];
   List _claims = [];
+  List _groups = [];
+  String? _groupId;          // group for the tier being created
+  final _groupName = TextEditingController();
+  String _groupType = 'mixed';
+  String _groupAccent = 'emerald';
+  bool _groupSaving = false;
   bool _loading = true;
   bool _saving = false;
 
@@ -58,16 +64,26 @@ class _AdminRewardsState extends State<AdminRewards> {
     _cash.dispose();
     _desc.dispose();
     _imageUrl.dispose();
+    _groupName.dispose();
     super.dispose();
   }
 
   Future<void> _load() async {
-    final rewards = await widget.api.get('/api/admin/rewards');
-    final claims = await widget.api.get('/api/admin/reward-claims');
+    // Fan out: three sequential awaits made the admin wait for the sum of the
+    // round trips every time the page refreshed.
+    final results = await Future.wait([
+      widget.api.get('/api/admin/rewards'),
+      widget.api.get('/api/admin/reward-claims'),
+      widget.api.get('/api/admin/reward-groups'),
+    ]);
+    final rewards = results[0];
+    final claims = results[1];
+    final groups = (results[2] as Map)['groups'] as List? ?? [];
     if (mounted) {
       setState(() {
         _rewards = rewards;
         _claims = claims;
+        _groups = groups.where((g) => g['id'] != null).toList();
         _loading = false;
       });
     }
@@ -91,6 +107,57 @@ class _AdminRewardsState extends State<AdminRewards> {
     }
   }
 
+  Future<void> _addGroup() async {
+    if (_groupName.text.trim().isEmpty) return;
+    setState(() => _groupSaving = true);
+    try {
+      await widget.api.post('/api/admin/reward-groups', {
+        'name': _groupName.text.trim(),
+        'groupType': _groupType,
+        'accent': _groupAccent,
+        'displayOrder': _groups.length + 1,
+      });
+      _groupName.clear();
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('گروه ساخته شد')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(apiError(e))));
+    } finally {
+      if (mounted) setState(() => _groupSaving = false);
+    }
+  }
+
+  Future<void> _toggleGroup(Map g) async {
+    try {
+      await widget.api.patch('/api/admin/reward-groups/${g['id']}',
+          {'isActive': !(g['is_active'] == true)});
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(apiError(e))));
+    }
+  }
+
+  Future<void> _moveTier(String tierId, String? groupId) async {
+    try {
+      await widget.api
+          .patch('/api/admin/rewards/$tierId', {'groupId': groupId});
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('گروه جایزه تغییر کرد')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(apiError(e))));
+    }
+  }
+
   Future<void> _add() async {
     if (_rewards.length >= 30) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -108,6 +175,7 @@ class _AdminRewardsState extends State<AdminRewards> {
         'description': _desc.text,
         'imageUrl': _imageUrl.text,
         'displayOrder': _rewards.length + 1,
+        'groupId': _groupId,
       });
       _name.clear();
       _points.clear();
@@ -139,8 +207,90 @@ class _AdminRewardsState extends State<AdminRewards> {
       padding: const EdgeInsets.fromLTRB(Gaps.lg, Gaps.md, Gaps.lg, Gaps.xxl),
       children: [
         FormSection(
+          title: 'گروه‌های جایزه',
+          children: [
+            Text(
+              'هر گروه نوار پیشرفت مستقل دارد؛ بعد از دریافت جایزه، نوار همان '
+              'گروه از ابتدا شروع می‌شود.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            Gaps.vXs,
+            TextField(
+                controller: _groupName,
+                decoration: const InputDecoration(labelText: 'نام گروه')),
+            Gaps.vXs,
+            Row(children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  initialValue: _groupType,
+                  decoration: const InputDecoration(labelText: 'نوع گروه'),
+                  items: const [
+                    DropdownMenuItem(value: 'mixed', child: Text('ترکیبی')),
+                    DropdownMenuItem(value: 'cash', child: Text('نقدی')),
+                    DropdownMenuItem(value: 'physical', child: Text('فیزیکی')),
+                  ],
+                  onChanged: (v) => setState(() => _groupType = v ?? 'mixed'),
+                ),
+              ),
+              Gaps.hXs,
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  initialValue: _groupAccent,
+                  decoration: const InputDecoration(labelText: 'رنگ'),
+                  items: const [
+                    DropdownMenuItem(value: 'emerald', child: Text('زمردی')),
+                    DropdownMenuItem(value: 'gold', child: Text('طلایی')),
+                    DropdownMenuItem(value: 'blue', child: Text('آبی')),
+                    DropdownMenuItem(value: 'purple', child: Text('بنفش')),
+                    DropdownMenuItem(value: 'rose', child: Text('قرمز')),
+                  ],
+                  onChanged: (v) =>
+                      setState(() => _groupAccent = v ?? 'emerald'),
+                ),
+              ),
+            ]),
+            Gaps.vXs,
+            FilledButton(
+              onPressed: _groupSaving ? null : _addGroup,
+              child: Text(_groupSaving ? 'در حال ذخیره...' : 'ساخت گروه'),
+            ),
+            if (_groups.isNotEmpty) ...[
+              Gaps.vSm,
+              for (final g in _groups)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: Text('${g['name']}'),
+                  subtitle: Text(g['group_type'] == 'cash'
+                      ? 'نقدی'
+                      : g['group_type'] == 'physical'
+                          ? 'فیزیکی'
+                          : 'ترکیبی'),
+                  trailing: TextButton(
+                    onPressed: () => _toggleGroup(g),
+                    child: Text(
+                        g['is_active'] == true ? 'غیرفعال کن' : 'فعال کن'),
+                  ),
+                ),
+            ],
+          ],
+        ),
+        Gaps.vMd,
+        FormSection(
           title: 'جایزه جدید (${faNum(_rewards.length)}/۳۰)',
           children: [
+            DropdownButtonFormField<String?>(
+              initialValue: _groupId,
+              decoration: const InputDecoration(labelText: 'گروه جایزه'),
+              items: [
+                const DropdownMenuItem<String?>(
+                    value: null, child: Text('بدون گروه')),
+                for (final g in _groups)
+                  DropdownMenuItem<String?>(
+                      value: g['id'] as String, child: Text('${g['name']}')),
+              ],
+              onChanged: (v) => setState(() => _groupId = v),
+            ),
             TextField(
                 controller: _name,
                 decoration: const InputDecoration(labelText: 'نام جایزه')),
@@ -231,6 +381,26 @@ class _AdminRewardsState extends State<AdminRewards> {
                           (r['cash_amount'] ?? 0) > 0
                               ? '${faNum(r['required_points'])} امتیاز — ${Money.withUnit(r['cash_amount'])}'
                               : '${faNum(r['required_points'])} امتیاز — ${r['reward_value']}',
+                        ),
+                        trailing: SizedBox(
+                          width: 132,
+                          child: DropdownButtonFormField<String?>(
+                            initialValue: r['group_id'] as String?,
+                            isDense: true,
+                            decoration: const InputDecoration(
+                                labelText: 'گروه', isDense: true),
+                            items: [
+                              const DropdownMenuItem<String?>(
+                                  value: null, child: Text('بدون گروه')),
+                              for (final g in _groups)
+                                DropdownMenuItem<String?>(
+                                    value: g['id'] as String,
+                                    child: Text('${g['name']}',
+                                        overflow: TextOverflow.ellipsis)),
+                            ],
+                            onChanged: (v) =>
+                                _moveTier(r['id'] as String, v),
+                          ),
                         ),
                       ))
                   .toList(),

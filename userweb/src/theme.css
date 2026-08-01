@@ -328,3 +328,50 @@ body {
 }
 :root[data-theme='light'] .confirmBox p { color: var(--text-muted); }
 :root[data-theme='light'] .rewardLocked { color: var(--text-muted); }
+
+/* Reward groups in light mode. */
+:root[data-theme='light'] .rgBar,
+:root[data-theme='light'] .rgTier {
+  background: var(--veil-2);
+  border-color: var(--veil-5);
+}
+:root[data-theme='light'] .rgTrack { background: var(--veil-4); }
+:root[data-theme='light'] .rgBarText small,
+:root[data-theme='light'] .rgScale,
+:root[data-theme='light'] .rgCards>small,
+:root[data-theme='light'] .rgPoints,
+:root[data-theme='light'] .rgTier small,
+:root[data-theme='light'] .rgLocked { color: var(--text-muted); }
+:root[data-theme='light'] .rgCash { color: #4d7c0f; }
+:root[data-theme='light'] .rgKind {
+  background: #ffffffe8; border-color: var(--veil-6); color: var(--page-fg);
+}
+:root[data-theme='light'] .rgTierCards span {
+  background: var(--veil-3); color: var(--text-muted);
+}
+:root[data-theme='light'] .rgTierCards span.met { color: #4d7c0f; }
+:root[data-theme='light'] .rgCard img { border-color: var(--veil-6); }
+
+/* Chat in light mode. */
+:root[data-theme='light'] .chatbox { background: #101a2c05; }
+:root[data-theme='light'] .chatmsg {
+  background: #ffffff; border-color: var(--veil-5);
+}
+:root[data-theme='light'] .chatmsg.mine {
+  background: linear-gradient(135deg,#eefbe0,#e3f7f0);
+  border-color: #b5ef5899;
+}
+:root[data-theme='light'] .chatbody>b { color: #0369a1; }
+:root[data-theme='light'] .chatmsg.mine .chatbody>b { color: #4d7c0f; }
+:root[data-theme='light'] .chatTime { color: var(--text-muted); }
+:root[data-theme='light'] .cannedPopover {
+  background: #ffffff; border-color: var(--veil-6);
+}
+:root[data-theme='light'] .cannedPopover button {
+  background: var(--veil-2); color: var(--page-fg); border-color: var(--veil-5);
+}
+:root[data-theme='light'] .chatActions button {
+  background: var(--veil-3); color: var(--text-muted);
+}
+:root[data-theme='light'] .sendDock input { background: #ffffff; }
+:root[data-theme='light'] .trophy img { border-color: var(--veil-6); }

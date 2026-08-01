@@ -870,3 +870,14 @@ table.data-table {
   background: rgba(0, 212, 154, .08);
   border: 1px solid rgba(0, 212, 154, .25);
 }
+
+/* Modal used by the reward card-requirement editor. */
+.modal-shade{
+  position:fixed;inset:0;background:#000000a8;z-index:80;
+  display:grid;place-items:center;padding:18px;
+}
+.modal-box{
+  width:min(560px,96vw);max-height:86vh;overflow:auto;
+  background:var(--panel,#111a2b);border:1px solid #ffffff1f;
+  border-radius:20px;padding:20px;box-shadow:0 30px 90px #000a;
+}

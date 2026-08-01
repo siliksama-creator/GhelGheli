@@ -861,3 +861,232 @@
 .confirmBox p{margin:0 0 16px;font-size:13.5px;line-height:1.8;color:#c9ddf2}
 .confirmActions{display:flex;gap:10px}
 .confirmActions button{flex:1;margin:0}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CHAT — rebuilt.
+
+   What was wrong (visible in a real screenshot on a 1080p desktop):
+
+   * `.cannedPopover` referenced `var(--surface)` and `var(--bg)`, which are
+     defined NOWHERE. Both resolved to nothing, so the panel had no
+     background and its buttons rendered as a black slab over the messages.
+   * `.chatmsg` had no max-width, so on a wide screen a short message
+     stretched the full width and the layout read as a pile of empty boxes.
+   * `.chatbox` is a fixed 56vh with `.sendDock` sticky INSIDE the same flow,
+     so on a short viewport the dock overlapped the last messages.
+   * Nothing distinguished the reader's own messages from everyone else's.
+   * `.chatActions` buttons wrapped under each message, tripling its height.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.chatPage{display:flex;flex-direction:column;gap:10px;padding-bottom:14px}
+
+.chatbox{
+  /* Grows with the card instead of a hard 56vh that fought the sticky dock. */
+  height:clamp(320px,58vh,620px);
+  overflow-y:auto;overscroll-behavior:contain;scroll-behavior:smooth;
+  display:flex;flex-direction:column;gap:10px;
+  border:1px solid #ffffff12;border-radius:22px;
+  padding:14px;background:#00000016;
+}
+
+.chatmsg{
+  display:flex;gap:10px;align-items:flex-start;
+  /* Bubbles, not full-width bars. */
+  max-width:min(76%,560px);align-self:flex-start;
+  margin:0;padding:10px 12px;border-radius:18px;
+  border-top-right-radius:6px;              /* tail towards the avatar (RTL) */
+  background:#ffffff0d;border:1px solid #ffffff10;
+  animation:popIn .22s ease-out;
+}
+/* The reader's own messages sit on the other side, in brand colour, so a
+   conversation is readable at a glance. */
+.chatmsg.mine{
+  align-self:flex-end;
+  background:linear-gradient(135deg,#b5ef5824,#00d49a1c);
+  border-color:#b5ef5840;
+  border-top-right-radius:18px;border-top-left-radius:6px;
+}
+.chatmsg img{width:40px;height:40px;border-radius:50%;object-fit:cover;cursor:pointer;flex:none}
+.chatbody{flex:1;min-width:0}          /* min-width:0 lets long words wrap */
+.chatbody>b{font-size:13px;font-weight:800;color:#7dd3fc}
+.chatmsg.mine .chatbody>b{color:#b5ef58}
+.chatmsg p{
+  margin:4px 0 0;font-size:14px;line-height:1.7;
+  /* A pasted URL used to blow out the bubble width. */
+  overflow-wrap:anywhere;word-break:break-word;
+}
+.chatTime{display:block;margin-top:3px;font-size:10.5px;color:#c9ddf266}
+
+.reply{
+  display:block;color:#b5ef58;background:#ffffff0c;
+  border-inline-start:3px solid #b5ef5866;
+  border-radius:8px;padding:5px 8px;margin:5px 0;font-size:12px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+
+/* Actions stay on one line and only reveal themselves on hover/focus so a
+   message is one compact unit rather than a three-storey card. */
+.chatActions{display:flex;gap:6px;margin-top:7px;flex-wrap:nowrap}
+.chatActions button{
+  font-size:11.5px;padding:4px 9px;border-radius:999px;
+  background:#ffffff10;color:#c9ddf2cc;font-weight:600;
+  opacity:.65;transition:opacity .15s,background .15s;
+}
+.chatmsg:hover .chatActions button,
+.chatActions button:focus-visible{opacity:1;background:#ffffff1c}
+.chatActions button:hover{transform:none;background:#ffffff28;color:#fff}
+
+.stickerTray{
+  display:flex;gap:8px;overflow-x:auto;overscroll-behavior-x:contain;
+  padding:8px;background:#ffffff0a;border-radius:18px;
+  max-height:82px;flex:none;
+}
+.stickerTray button{min-width:58px;height:58px;padding:5px;background:#ffffff12;flex:none}
+.stickerTray img{width:48px;height:48px;object-fit:contain}
+.stickerMsg{width:120px;max-height:120px;object-fit:contain;display:block;border-radius:12px}
+
+.sendDock{
+  position:relative;                   /* anchors the popover to the dock */
+  display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;
+  background:#07111fe6;border:1px solid #ffffff18;border-radius:22px;
+  padding:8px;backdrop-filter:blur(18px);box-shadow:0 -10px 35px #0007;
+  flex:none;
+}
+.sendDock input{
+  margin:0;padding:11px 14px;border-radius:15px;font-size:13.5px;
+  background:#ffffff0e;border-color:#ffffff1f;cursor:pointer;
+}
+.sendDock .main{margin:0;white-space:nowrap;padding:11px 18px}
+.emojiBtn{background:#ffffff12;color:#fff;font-size:13px;padding:11px 14px;white-space:nowrap}
+
+/* THE BLACK BOX FIX: these two rules had no background at all. */
+.cannedPopover{
+  position:absolute;bottom:calc(100% + 10px);inset-inline:0;
+  display:flex;flex-direction:column;gap:6px;
+  max-height:min(300px,44vh);overflow-y:auto;
+  background:#0c2138;border:1px solid #ffffff22;border-radius:18px;
+  padding:10px;box-shadow:0 18px 60px #000b;z-index:40;
+}
+.cannedPopover button{
+  background:#ffffff12;color:#eef8ff;border:1px solid #ffffff14;
+  padding:10px 12px;border-radius:12px;cursor:pointer;
+  text-align:start;font-family:inherit;font-size:13px;font-weight:600;
+  transition:background .18s;
+}
+.cannedPopover button:hover{background:#ffffff22;transform:none}
+
+.pinnedBanner{
+  display:flex;gap:10px;align-items:flex-start;
+  padding:11px 13px;border-radius:16px;
+  background:color-mix(in srgb,var(--pin) 14%,transparent);
+  border:1px solid color-mix(in srgb,var(--pin) 45%,transparent);
+}
+.pinnedBanner b{display:block;font-size:12.5px;color:var(--pin)}
+.pinnedBanner p{margin:3px 0 0;font-size:13px;line-height:1.7}
+.pinIcon{font-size:17px;flex:none}
+
+@media(max-width:600px){
+  .chatmsg{max-width:88%}
+  .sendDock{grid-template-columns:auto 1fr auto;gap:6px}
+  .sendDock .main{padding:11px 14px}
+  .emojiBtn{padding:11px}
+  /* Touch has no hover, so actions must always be visible on a phone. */
+  .chatActions button{opacity:1}
+}
+
+/* ═══ Reward groups ═════════════════════════════════════════════════════ */
+.rgWrap{display:flex;flex-direction:column;gap:18px;width:100%;align-items:center}
+.rgGroup{display:flex;flex-direction:column;gap:16px}
+
+.rgHead{display:flex;align-items:center;gap:12px}
+.rgHead h2{margin:0;font-size:22px}
+.rgHead .hint{margin:3px 0 0;font-size:12.5px}
+.rgGroupArt{width:52px;height:52px;border-radius:16px;object-fit:cover;flex:none}
+.rgType{
+  margin-inline-start:auto;padding:5px 12px;border-radius:999px;
+  font-size:11.5px;font-weight:800;color:#04101c;white-space:nowrap;
+}
+
+/* progress bar */
+.rgBar{
+  display:flex;flex-direction:column;gap:8px;
+  padding:14px;border-radius:20px;
+  background:#ffffff08;border:1px solid #ffffff14;
+}
+.rgBarHead{display:flex;align-items:center;gap:11px}
+.rgPrizeArt{
+  width:54px;height:54px;border-radius:14px;object-fit:cover;flex:none;
+  border:2px solid var(--accent);box-shadow:0 6px 18px #0006;
+}
+.rgBarText{flex:1;min-width:0}
+.rgBarText b{display:block;font-size:14.5px;font-weight:800}
+.rgBarText small{font-size:12px;color:#c9ddf2a0}
+.rgPct{font-size:17px;font-weight:900;flex:none}
+
+.rgTrack{height:14px;border-radius:999px;background:#ffffff14;overflow:hidden}
+.rgTrack span{
+  display:block;height:100%;border-radius:999px;
+  transition:width .45s cubic-bezier(.22,1,.36,1);
+}
+.rgScale{display:flex;justify-content:space-between;font-size:11px;color:#c9ddf280}
+
+.rgCards{display:flex;flex-direction:column;gap:6px;margin-top:2px}
+.rgCards>small{font-size:11.5px;color:#c9ddf2a0}
+.rgCardStrip{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px}
+.rgCard{
+  position:relative;flex:none;width:56px;text-align:center;
+  opacity:.5;transition:opacity .2s;
+}
+.rgCard.met{opacity:1}
+.rgCard img{
+  width:56px;height:56px;border-radius:12px;object-fit:cover;
+  border:2px solid #ffffff22;
+}
+.rgCard.met img{border-color:#b5ef58}
+.rgCard b{display:block;font-size:10.5px;margin-top:3px}
+.rgCard.met b{color:#b5ef58}
+
+/* tiers */
+.rgTiers{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.rgTier{
+  display:flex;flex-direction:column;align-items:center;gap:5px;
+  padding:13px;border-radius:20px;text-align:center;
+  background:#ffffff0b;border:1px solid #ffffff14;
+}
+.rgTier.eligible{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.rgTierArt{position:relative;width:100%}
+.rgTierArt img{width:82px;height:82px;border-radius:18px;object-fit:cover}
+.rgKind{
+  position:absolute;top:-4px;inset-inline-end:-2px;
+  font-size:10px;font-weight:800;padding:3px 8px;border-radius:999px;
+  background:#0c2138e8;border:1px solid #ffffff22;
+}
+.rgTier b{font-size:13.5px;font-weight:800;line-height:1.4}
+.rgPoints{margin:0;font-size:12px;color:#c9ddf2b0}
+.rgCash{margin:0;font-size:13px;font-weight:800;color:#b5ef58}
+.rgTier small{font-size:11px;color:#c9ddf290}
+.rgTierCards{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin-top:2px}
+.rgTierCards span{
+  font-size:10px;padding:2px 7px;border-radius:999px;
+  background:#ffffff10;color:#c9ddf2a0;
+}
+.rgTierCards span.met{background:#b5ef5822;color:#b5ef58}
+.rgClaim{width:100%;margin-top:6px;padding:9px;font-size:13px;color:#04101c}
+.rgLocked{margin-top:6px;font-size:11px;color:#c9ddf280}
+
+@media(max-width:600px){
+  .rgTiers{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+  .rgHead h2{font-size:19px}
+}
+
+/* Trophy shelf: physical prizes a user has won. */
+.trophyCard{margin-bottom:18px}
+.trophyShelf{display:flex;gap:12px;overflow-x:auto;padding:4px 0 8px}
+.trophy{position:relative;flex:none;width:96px;text-align:center}
+.trophy img{width:96px;height:80px;object-fit:cover;border-radius:14px;border:1px solid #ffffff1f}
+.trophy b{display:block;margin-top:5px;font-size:11.5px;font-weight:700;line-height:1.4}
+.trophyPending{
+  position:absolute;top:5px;inset-inline-end:5px;
+  font-size:9.5px;font-weight:800;padding:2px 6px;border-radius:999px;
+  background:#f2a93b;color:#2a1a00;
+}

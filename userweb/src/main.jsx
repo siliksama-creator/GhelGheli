@@ -188,8 +188,7 @@ function Portal({ token, logout, theme, toggleTheme }) {
           <Profile token={token} p={p} load={load} setMsg={setMsg} />
         )}
         {tab === 'rewards' && (
-          <Rewards rewards={rewards} points={u.current_points} token={token}
-            reload={load} setMsg={setMsg} />
+          <Rewards token={token} setMsg={setMsg} reloadProfile={load} />
         )}
         {tab === 'wallet' && (
           <Wallet token={token} req={req} reloadProfile={load} setMsg={setMsg} />
@@ -197,7 +196,9 @@ function Portal({ token, logout, theme, toggleTheme }) {
         {tab === 'league' && (
           <League token={token} openProfile={setPublicUser} />
         )}
-        {tab === 'club' && <Club token={token} openProfile={setPublicUser} />}
+        {tab === 'club' && (
+          <Club token={token} openProfile={setPublicUser} meId={u.id} />
+        )}
         {tab === 'support' && (
           <Support token={token} api={API} req={req} asset={v =>
             (!v ? '' : String(v).startsWith('http') ? v : API + v)} />
@@ -212,7 +213,7 @@ function Portal({ token, logout, theme, toggleTheme }) {
   );
 }
 
-function Club({ token, openProfile }) {
+function Club({ token, openProfile, meId }) {
   const [sub, setSub] = useState('chat');
   return (
     <div className="clubWrap">
@@ -223,7 +224,7 @@ function Club({ token, openProfile }) {
           onClick={() => setSub('games')}>🎮 بازی‌ها</button>
       </div>
       {sub === 'chat'
-        ? <Chat token={token} openProfile={openProfile} />
+        ? <Chat token={token} openProfile={openProfile} meId={meId} />
         : <GamesHub api={API} token={token} openProfile={openProfile} />}
     </div>
   );
