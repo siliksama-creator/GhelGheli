@@ -459,3 +459,4 @@ body {
 :root[data-theme='light'] .clubMine { background: #4f8a14; color: #fff; }
 :root[data-theme='light'] .short { color: #c02040; }
 :root[data-theme='light'] .avatars .clubAvatarPick { background: var(--veil-3); }
+:root[data-theme='light'] .rosterNew { color: var(--text-muted); }

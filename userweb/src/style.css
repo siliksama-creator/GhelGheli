@@ -1156,8 +1156,13 @@
   background:#ffffff0a;border:1px solid #ffffff14;
 }
 .shopItem.equipped{border-color:#b5ef58;box-shadow:0 0 0 1px #b5ef5855}
-.shopArt{position:relative;display:grid;place-items:center;height:72px}
-.shopArt img{width:72px;height:72px;object-fit:contain;border-radius:14px}
+/* The art well must be allowed to SHRINK. It was fixed at a 72px image
+   inside a grid cell that can fall to ~56px on a 360px phone, so every crest
+   overflowed its tile by 6px and clipped against the neighbour. `width:100%`
+   plus a max keeps the artwork at its intended size when there is room and
+   lets it scale down when there is not. */
+.shopArt{position:relative;display:grid;place-items:center;height:72px;width:100%;min-width:0}
+.shopArt img{width:100%;max-width:72px;height:72px;object-fit:contain;border-radius:14px}
 .colorChip{width:56px;height:56px;border-radius:50%;border:3px solid #ffffff26}
 .framePreview{width:60px;height:60px;border-radius:14px;border:3px solid #ffffff26}
 .shopOn{
@@ -1306,7 +1311,7 @@
 .clubTag{font-size:10px;font-weight:800;border-radius:999px;padding:2px 9px}
 .clubTag.own{background:#b5ef5822;color:#b5ef58}
 .clubTag.plus{background:#ffd36b22;color:#ffd36b}
-.tiny{font-size:10.5px;padding:5px 8px;min-height:28px;width:100%;margin:0}
+.tiny{font-size:10.5px;padding:6px 8px;min-height:32px;width:100%;margin:0}
 .clubWarn{margin:12px 0 0;font-size:12px;line-height:1.8}
 
 .offerCrest{display:block;margin:0 auto 12px;object-fit:contain}
@@ -1364,3 +1369,4 @@
   object-fit:contain;padding:6px;background:#ffffff12;
 }
 .avatarNote{margin:0 0 10px;font-size:12px}
+.rosterNew{color:#c9ddf2;font-weight:600}

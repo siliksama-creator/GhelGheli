@@ -260,10 +260,28 @@ class _RosterState extends State<_Roster> {
                                   style: theme.textTheme.bodyMedium
                                       ?.copyWith(fontWeight: FontWeight.w700)),
                             ),
-                            Text('${faNum(m['monthlyPoints'])} امتیاز ماه',
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                    color: const Color(0xFF6BA31F),
-                                    fontWeight: FontWeight.w800)),
+                            // "۰ امتیاز ماه" next to every name reads as a
+                            // broken counter, especially just after the
+                            // monthly reset when nobody has points yet. Fall
+                            // back to the lifetime total and say which is
+                            // being shown.
+                            Builder(builder: (_) {
+                              final monthly =
+                                  (m['monthlyPoints'] as num?)?.toInt() ?? 0;
+                              final lifetime =
+                                  (m['lifetimePoints'] as num?)?.toInt() ?? 0;
+                              final label = monthly > 0
+                                  ? '${faNum(monthly)} امتیاز ماه'
+                                  : lifetime > 0
+                                      ? '${faNum(lifetime)} امتیاز کل'
+                                      : 'تازه‌وارد';
+                              return Text(label,
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                      color: (monthly > 0 || lifetime > 0)
+                                          ? const Color(0xFF6BA31F)
+                                          : null,
+                                      fontWeight: FontWeight.w800));
+                            }),
                           ],
                         ),
                       ),

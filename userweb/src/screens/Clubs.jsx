@@ -47,8 +47,19 @@ function Roster({ token, club, back, openProfile }) {
                     : avatarUrl(m.profileAvatarKey)}
                   width="34" height="34" loading="lazy" />
                 <b className="rosterName">{m.nickname}</b>
+                {/* "۰ امتیاز ماه" next to every name reads as a broken
+                    counter, especially early in a month when the league has
+                    just reset and NOBODY has points yet. Fall back to the
+                    lifetime total, which is never zero for an active user,
+                    and label which one is being shown. */}
                 <span className="rosterPts">
-                  {fa(m.monthlyPoints)} <small>امتیاز ماه</small>
+                  {m.monthlyPoints > 0 ? (
+                    <>{fa(m.monthlyPoints)} <small>امتیاز ماه</small></>
+                  ) : m.lifetimePoints > 0 ? (
+                    <>{fa(m.lifetimePoints)} <small>امتیاز کل</small></>
+                  ) : (
+                    <small className="rosterNew">تازه‌وارد</small>
+                  )}
                 </span>
               </div>
             ))}
