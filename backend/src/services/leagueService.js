@@ -84,9 +84,49 @@ function monthBounds(d = new Date()) {
 function defaultPrizeTable() {
   return Array.from({ length: 10 }, (_, i) => ({ rank: i + 1, amount: 0 }));
 }
+/**
+ * Repairs a season whose bounds were computed with the old Gregorian/UTC
+ * maths.
+ *
+ * Seasons created before the calendar fix are labelled like "2026-07" and run
+ * 00:00 UTC to 00:00 UTC — i.e. 03:30 Tehran, mid-Jalali-month. Left alone
+ * they would close on the wrong day and display a month name that does not
+ * match the dates.
+ *
+ * The row is updated IN PLACE so leaderboard entries (which reference the
+ * season id) keep their points. Seasons that already paid out are never
+ * touched: rewriting settled history would be worse than a wrong label.
+ */
+async function repairSeasonBounds(client, season) {
+  const looksGregorian = /^20\d\d-/.test(season.month_year || '');
+  if (!looksGregorian || season.paid_at) return season;
+
+  const { start, end } = monthBounds(new Date(season.starts_at));
+  const label = currentMonthYear(new Date(season.starts_at));
+
+  // A correctly-labelled season for this month may already exist (e.g. the
+  // job ran on a newer deploy first); in that case leave well alone rather
+  // than colliding with the UNIQUE(month_year) constraint.
+  const clash = await client.query(
+    'SELECT id FROM league_seasons WHERE month_year=$1 AND id<>$2',
+    [label, season.id]);
+  if (clash.rows[0]) return season;
+
+  const { rows } = await client.query(
+    `UPDATE league_seasons
+        SET month_year=$2, starts_at=$3, ends_at=$4,
+            timezone='Asia/Tehran', updated_at=NOW()
+      WHERE id=$1 RETURNING *`,
+    [season.id, label, start, end]);
+  console.log(
+    `[league] season ${season.month_year} re-based to Jalali ${label} ` +
+    `(${start.toISOString()} → ${end.toISOString()})`);
+  return rows[0];
+}
+
 async function ensureActiveSeason(client = pool) {
   const { rows } = await client.query("SELECT * FROM league_seasons WHERE status='active' ORDER BY starts_at DESC LIMIT 1");
-  if (rows[0]) return rows[0];
+  if (rows[0]) return repairSeasonBounds(client, rows[0]);
   const { start, end } = monthBounds();
   const my = currentMonthYear();
   const inserted = await client.query(
