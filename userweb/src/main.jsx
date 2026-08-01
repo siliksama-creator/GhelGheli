@@ -187,7 +187,10 @@ function Portal({ token, logout, theme, toggleTheme }) {
         {tab === 'profile' && (
           <Profile token={token} p={p} load={load} setMsg={setMsg} />
         )}
-        {tab === 'rewards' && <Rewards rewards={rewards} />}
+        {tab === 'rewards' && (
+          <Rewards rewards={rewards} points={u.current_points} token={token}
+            reload={load} setMsg={setMsg} />
+        )}
         {tab === 'wallet' && (
           <Wallet token={token} req={req} reloadProfile={load} setMsg={setMsg} />
         )}

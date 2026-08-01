@@ -321,3 +321,10 @@ body {
 }
 
 :root[data-theme='light'] .errorCard p { color: var(--text-muted); }
+
+:root[data-theme='light'] .confirmBox {
+  background: #ffffff;
+  border-color: var(--veil-6);
+}
+:root[data-theme='light'] .confirmBox p { color: var(--text-muted); }
+:root[data-theme='light'] .rewardLocked { color: var(--text-muted); }
