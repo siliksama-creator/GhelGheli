@@ -44,6 +44,9 @@ const BURST_ALLOWANCE = 25;
 const MAX_BATCH_TAPS = 2000;
 const MAX_BATCH_WINDOW_MS = 10 * 60 * 1000;
 const NONCE_TTL_MS = 30 * 60 * 1000;
+// Latency + scheduling slack allowed when comparing the client's self-reported
+// window against the gap our own clock measured between batches.
+const CLOCK_SLACK_MS = 5000;
 
 /**
  * Canonical string that both sides sign. Field ORDER is part of the wire
@@ -296,18 +299,24 @@ async function submitBatch(userId, token, raw) {
       rejected = true;
     }
 
-    // Wall-clock cross-check: the gap since the previous accepted batch is
-    // measured by OUR clock, not the client's. A client that lies about
-    // elapsedMs to inflate its ceiling gets caught here.
+    // Wall-clock cross-check.
+    //
+    // `elapsedMs` is self-reported, so on its own it is worthless: a cheater
+    // simply claims a huge window to raise their own ceiling. We therefore
+    // cap the window by the gap OUR clock measured since the last accepted
+    // batch, and judge the ceiling against whichever is smaller.
+    //
+    // Capping (rather than rejecting outright on any mismatch) is deliberate.
+    // A legitimate client's elapsedMs can slightly exceed the server gap
+    // because of network latency and because a level-up forces an early
+    // flush; punishing that would burn honest taps. Inflating the number
+    // still gains an attacker nothing, because the cap ignores the claim.
     if (!rejected && current.last_batch_at) {
       const gapMs = Date.now() - new Date(current.last_batch_at).getTime();
-      // Allow generous slack for a batch that accumulated while offline: the
-      // server gap can legitimately be much LARGER than elapsedMs, never
-      // meaningfully smaller.
-      if (body.elapsedMs > gapMs + 5000) {
-        accepted = 0;
-        rejected = true;
-      } else if (accepted > plausibleCeiling(gapMs)) {
+      // The gap may legitimately be much LARGER than elapsedMs (the player
+      // was away), so only the upper bound matters.
+      const effectiveWindow = Math.min(body.elapsedMs, gapMs + CLOCK_SLACK_MS);
+      if (accepted > plausibleCeiling(effectiveWindow)) {
         accepted = 0;
         rejected = true;
       }
