@@ -381,7 +381,7 @@ export default function GamesHub({ api, token, openProfile = () => {} }) {
   useEffect(() => { loadRecords(); }, [loadRecords]);
 
   if (active && active.id === 'tap') {
-    return <TapGame token={token} api={api} onBack={() => setActive(null)} />;
+    return <TapGame token={token} onBack={() => setActive(null)} />;
   }
 
   if (active && mode === 'solo') {

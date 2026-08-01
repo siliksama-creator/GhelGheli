@@ -72,8 +72,12 @@ class _AdminSettingsState extends State<AdminSettings> {
         'badWordsText': _badWords.text,
         'reason': 'تنظیم از اپ مدیریت',
       });
+      // The admin can leave the screen while the request is in flight;
+      // setState on a disposed widget throws.
+      if (!mounted) return;
       setState(() => _message = r['message'] ?? 'ذخیره شد');
     } catch (e) {
+      if (!mounted) return;
       setState(() => _message = apiError(e));
     } finally {
       if (mounted) setState(() => _savingChat = false);
@@ -91,8 +95,10 @@ class _AdminSettingsState extends State<AdminSettings> {
         'enabled': _smsEnabled,
         'testMode': _smsTest,
       });
+      if (!mounted) return;
       setState(() => _message = r['message'] ?? 'ذخیره شد');
     } catch (e) {
+      if (!mounted) return;
       setState(() => _message = apiError(e));
     } finally {
       if (mounted) setState(() => _savingSms = false);

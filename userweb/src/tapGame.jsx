@@ -7,6 +7,7 @@
 // shows up as one platform silently losing taps.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { play as playSfx } from './gameAudio.js';
+import { req } from './lib/api.js';
 
 // ── config (mirrors TapGameConfig in Dart) ─────────────────────────────────
 export const TAP_CONFIG = {
@@ -123,30 +124,7 @@ function registerTap(guard, nowMs) {
 }
 
 // ── component ──────────────────────────────────────────────────────────────
-// Minimal request helper. games.jsx passes the API base URL (not a helper),
-// so this module owns its own fetch to avoid reaching across modules.
-async function request(base, path, method, body, token) {
-  const r = await fetch(base + path, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const data = await r.json().catch(() => ({}));
-  if (!r.ok) {
-    // 409/401 carry a meaningful body the caller wants to read, so surface
-    // the payload rather than throwing away the reason.
-    const err = new Error(data.message || 'خطا در ارتباط با سرور');
-    err.status = r.status;
-    err.data = data;
-    throw err;
-  }
-  return data;
-}
-
-export default function TapGame({ token, api, onBack }) {
+export default function TapGame({ token, onBack }) {
   const [progress, setProgress] = useState(loadProgress);
   const [notice, setNotice] = useState('');
   const [rate, setRate] = useState(0);
@@ -228,7 +206,7 @@ export default function TapGame({ token, api, onBack }) {
       const sig = await signBatch(token, payload, nonce);
       let res;
       try {
-        res = await request(api, '/api/games/tap/progress', 'POST',
+        res = await req('/api/games/tap/progress', 'POST',
           { ...payload, nonce, sig }, token);
       } catch (err) {
         // A rejected batch (409/400) is an ANSWER, not a network failure:
@@ -274,7 +252,7 @@ export default function TapGame({ token, api, onBack }) {
     } finally {
       syncingRef.current = false;
     }
-  }, [token, api, clock]);
+  }, [token, clock]);
 
   // Reconcile on entry, then flush on a timer.
   useEffect(() => {
@@ -282,7 +260,7 @@ export default function TapGame({ token, api, onBack }) {
     let alive = true;
     (async () => {
       try {
-        const server = await request(api, '/api/games/tap/progress', 'GET', null, token);
+        const server = await req('/api/games/tap/progress', 'GET', null, token);
         if (!alive || !server || typeof server.level !== 'number') return;
         setProgress(p => {
           // Another device may be ahead; the server always wins.
@@ -301,7 +279,7 @@ export default function TapGame({ token, api, onBack }) {
     })();
     const t = setInterval(() => flush(), TAP_CONFIG.flushIntervalMs);
     return () => { alive = false; clearInterval(t); };
-  }, [api, token, flush, clock]);
+  }, [token, flush, clock]);
 
   // Bank taps before the tab is hidden or closed.
   useEffect(() => {

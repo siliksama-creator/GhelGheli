@@ -319,3 +319,5 @@ body {
 :root[data-theme='light'] .publicHead b {
   color: var(--page-fg);
 }
+
+:root[data-theme='light'] .errorCard p { color: var(--text-muted); }

@@ -833,3 +833,15 @@
   backdrop-filter:blur(10px);
 }
 .themeToggleFloat:hover{background:#ffffff24}
+
+/* ── Error state ─────────────────────────────────────────────────────────
+   Screens used to have only a loading branch, so any failed request left the
+   user on a spinner forever with no explanation and no way to retry. */
+.errorCard{
+  display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;
+  padding:32px 24px;
+}
+.errorCard .errIcon{font-size:40px;line-height:1}
+.errorCard b{font-size:16px;font-weight:800}
+.errorCard p{margin:0;font-size:13.5px;color:#c9ddf2b0;max-width:36ch;line-height:1.7}
+.errorCard .main{margin-top:6px;min-width:150px}

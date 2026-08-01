@@ -202,6 +202,10 @@ class _AdminCardsState extends State<AdminCards> {
     try {
       final r = await widget.api.post('/api/admin/card-codes/bulk',
           {'cardTypeId': _selectedType, 'rawCodes': _bulkCodes.text});
+      // A bulk insert of up to 1000 codes is slow enough that the admin can
+      // easily navigate away mid-request; calling setState on a disposed
+      // widget throws.
+      if (!mounted) return;
       setState(() => _report = Map.from(r));
       await _load();
     } catch (e) {
