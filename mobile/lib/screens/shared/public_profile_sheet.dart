@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
+import '../../core/cosmetics.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/async_section.dart';
 import '../../widgets/avatar_image.dart';
@@ -64,8 +65,11 @@ class _PublicProfileBody extends StatelessWidget {
                 ring: true),
             Gaps.hMd,
             Expanded(
-              child: Text(data['nickname'] ?? 'کاربر',
-                  style: theme.textTheme.headlineSmall),
+              child: DisplayName(
+                name: data['nickname'] ?? 'کاربر',
+                cosmetics: data['cosmetics'] as Map?,
+                style: theme.textTheme.headlineSmall,
+              ),
             ),
           ],
         ),

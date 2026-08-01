@@ -25,6 +25,9 @@ const walletService = require('./services/walletService');
 // above the shop routes, so a require next to those would read as a
 // temporal-dead-zone bug even though route handlers run after startup.
 const shop = require('./services/shopService');
+// Same reason: the profile endpoint checks club membership before letting
+// someone wear a crest, and it is defined above the club routes.
+const clubs = require('./services/clubService');
 const withdrawalService = require('./services/withdrawalService');
 
 // Fail fast in production if the JWT secret was never configured — running
@@ -509,7 +512,21 @@ const AVATAR_KEYS = new Set([
   'avatar_7_eagle.png', 'avatar_8_target.png', 'avatar_9_bolt.png',
   'avatar_10_crown.png',
 ]);
-const safeAvatarKey = v => (v && AVATAR_KEYS.has(String(v)) ? String(v) : null);
+/// A club crest may also be a profile picture, stored as `club:<slug>`. The
+/// slug is bounded to the same characters the shop generates, so this stays a
+/// whitelist — it can never resolve to a path segment.
+const CLUB_AVATAR_RE = /^club:[a-z0-9_]{1,40}$/;
+
+const safeAvatarKey = (v) => {
+  if (!v) return null;
+  const s = String(v);
+  if (AVATAR_KEYS.has(s)) return s;
+  // NOTE: this only validates the SHAPE. Whether the user is actually a
+  // member of that club is enforced in shopService.useClubAvatar and swept
+  // by clubService.clearOrphanedCosmetics; the generic profile endpoint must
+  // not become a way to wear a crest you never joined.
+  return CLUB_AVATAR_RE.test(s) ? s : null;
+};
 
 /// Only accept an image URL we ourselves produced, or a plain https URL.
 /// Blocks `javascript:` and `data:` payloads from reaching a webview.
@@ -655,6 +672,17 @@ app.patch('/api/profile', auth, asyncHandler(async (req, res) => {
       && b.profileAvatarKey !== '' && !safeAvatarKey(b.profileAvatarKey)) {
     return res.status(400).json({ message: 'آواتار انتخابی معتبر نیست' });
   }
+  // Shape alone is not enough for a club crest: without this check any user
+  // could PATCH `profileAvatarKey: "club:real_madrid"` and wear a badge they
+  // never bought. The dedicated endpoint checks membership, so this generic
+  // one has to as well.
+  if (typeof b.profileAvatarKey === 'string'
+      && b.profileAvatarKey.startsWith('club:')) {
+    const slug = b.profileAvatarKey.slice(5);
+    if (!await clubs.isMember(req.user.id, slug)) {
+      return res.status(403).json({ message: 'عضو این باشگاه نیستی' });
+    }
+  }
   // BUG FIX: آواتار محافظ صریح داشت ولی آدرس عکس نداشت. safeImageUrl برای
   // ورودی خطرناک (javascript: / data: / http) مقدار null برمی‌گرداند، و
   // COALESCE در کوئری پایین آن را «تغییری نده» تفسیر می‌کرد — یعنی سرور
@@ -792,10 +820,44 @@ app.post('/api/shop/plus', auth, shopLimiter, asyncHandler(async (req, res) => {
 
 app.post('/api/shop/equip', auth, asyncHandler(async (req, res) => {
   try {
-    res.json(await shop.equip(req.user.id, req.body?.slug || null));
+    // `kind` scopes an unequip to one slot. Without it "برداشتن" under the
+    // badges also wiped the user's frame and name colour.
+    res.json(await shop.equip(
+      req.user.id, req.body?.slug || null, req.body?.kind || null));
   } catch (e) {
     res.status(e.status || 500).json({ message: e.message || 'خطا در انتخاب' });
   }
+}));
+
+// Use a club crest as the profile picture. Membership is checked server-side.
+app.post('/api/shop/club-avatar', auth, asyncHandler(async (req, res) => {
+  try {
+    res.json(await shop.useClubAvatar(
+      req.user.id, String(req.body?.club || '').slice(0, 64)));
+  } catch (e) {
+    res.status(e.status || 500).json({ message: e.message || 'خطا در تغییر عکس' });
+  }
+}));
+
+// ── Clubs ──────────────────────────────────────────────────────────────────
+// The league page's club tab: who belongs where. (clubService is required at
+// the top, next to the other services.)
+app.get('/api/clubs', auth, asyncHandler(async (req, res) => {
+  res.json({
+    clubs: await clubs.rosterSummary(),
+    mine: await clubs.myClubs(req.user.id),
+  });
+}));
+
+app.get('/api/clubs/:slug/members', auth, asyncHandler(async (req, res) => {
+  const slug = String(req.params.slug || '').slice(0, 64);
+  // Reject anything that is not a real club rather than returning an empty
+  // roster, so a typo in the client shows up instead of looking like a club
+  // nobody joined.
+  const known = await clubs.clubCatalogue();
+  const club = known.find(c => c.slug === slug);
+  if (!club) return res.status(404).json({ message: 'باشگاه پیدا نشد' });
+  res.json({ club, members: await clubs.members(slug, req.query.limit) });
 }));
 
 // Physical prizes won — rendered as a trophy shelf on the profile.

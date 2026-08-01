@@ -14,9 +14,29 @@
 // transaction with the existing ledger and cannot half-succeed.
 const { pool } = require('../config/db');
 const walletService = require('./walletService');
+const clubService = require('./clubService');
 
 const PLUS_PRICE = 99000;
 const PLUS_DAYS = 30;
+
+// What Plus actually buys, in the user's words, so the app and the store
+// listing never drift apart. Kept here (not in the client) because the
+// clients must agree with each other.
+const PLUS_PERKS = [
+  'عضویت هم‌زمان در هر تعداد باشگاه که بخواهی',
+  'همهٔ نشان‌ها، قاب‌ها و رنگ‌های اسم باز می‌شوند',
+  'هر روز می‌توانی ظاهرت را عوض کنی، بدون خرید دوباره',
+  'ستارهٔ پلاس کنار اسمت در چت و لیگ',
+];
+
+// The honest small print. A subscription that quietly takes things back is
+// the fastest way to lose a paying user's trust, so it is stated up front and
+// repeated at the moment of purchase.
+const PLUS_EXPIRY_NOTE =
+  'بعد از پایان ۳۰ روز، هر آیتمی که جداگانه خریده باشی برای همیشه مال توست. '
+  + 'از باشگاه‌هایی که فقط با پلاس عضو شده‌ای، تنها آخرین باشگاهی که انتخاب '
+  + 'کرده‌ای برایت می‌ماند و عضو همان می‌مانی؛ بقیه تا تمدید پلاس یا خرید '
+  + 'جداگانهٔ نشانشان غیرفعال می‌شوند.';
 
 /** Is this user's Plus currently active? */
 async function plusStatus(userId, client = pool) {
@@ -37,7 +57,7 @@ async function plusStatus(userId, client = pool) {
  * it, whether Plus is unlocking it, and what they currently have equipped.
  */
 async function catalogue(userId) {
-  const [{ rows: items }, { rows: owned }, { rows: userRows }, plus] =
+  const [{ rows: items }, { rows: owned }, { rows: userRows }, plus, myClubs] =
     await Promise.all([
       pool.query(
         `SELECT id, slug, kind, name, description, image_url, payload, price
@@ -45,22 +65,35 @@ async function catalogue(userId) {
           ORDER BY display_order, name`),
       pool.query('SELECT item_id FROM user_shop_items WHERE user_id=$1', [userId]),
       pool.query(
-        `SELECT wallet_balance, equipped_club, equipped_frame, equipped_color
+        `SELECT wallet_balance, equipped_club, equipped_frame, equipped_color,
+                profile_avatar_key
            FROM users WHERE id=$1`, [userId]),
       plusStatus(userId),
+      clubService.myClubs(userId),
     ]);
 
   const ownedIds = new Set(owned.map(o => o.item_id));
+  const memberOf = new Set(myClubs.map(c => c.slug));
   const u = userRows[0] || {};
 
   return {
     balance: Number(u.wallet_balance || 0),
-    plus: { ...plus, price: PLUS_PRICE, days: PLUS_DAYS },
+    plus: {
+      ...plus,
+      price: PLUS_PRICE,
+      days: PLUS_DAYS,
+      perks: PLUS_PERKS,
+      expiryNote: PLUS_EXPIRY_NOTE,
+    },
     equipped: {
       club: u.equipped_club || null,
       frame: u.equipped_frame || null,
       color: u.equipped_color || null,
+      // A club crest can be the profile picture. Stored as `club:<slug>` so
+      // it cannot collide with a bundled avatar filename.
+      avatarKey: u.profile_avatar_key || null,
     },
+    clubs: myClubs,
     items: items.map(i => ({
       id: i.id,
       slug: i.slug,
@@ -75,6 +108,8 @@ async function catalogue(userId) {
       // with Plus" rather than a price the user does not need to pay.
       unlockedByPlus: !ownedIds.has(i.id) && plus.active,
       usable: ownedIds.has(i.id) || plus.active,
+      // Badges only: is this user in that club right now?
+      member: i.kind === 'club_badge' ? memberOf.has(i.payload) : undefined,
     })),
   };
 }
@@ -124,8 +159,29 @@ async function buyItem(userId, itemId) {
       });
     }
 
+    // A badge is not just a picture: buying it makes you a member of the club
+    // for good, and equips it, because that is obviously what the buyer
+    // wanted. Equipping here also means the roster and the badge appear in
+    // the same request, with no second round trip that could fail halfway.
+    let joined = null;
+    if (item.kind === 'club_badge') {
+      await clubService.join(client, userId, item.payload, 'purchase');
+      await client.query(
+        'UPDATE users SET equipped_club=$2, updated_at=NOW() WHERE id=$1',
+        [userId, item.payload]);
+      joined = item.payload;
+    }
+
     await client.query('COMMIT');
-    return { message: `«${item.name}» خریداری شد`, item: item.slug };
+    return {
+      message: item.kind === 'club_badge'
+        ? `عضو باشگاه «${item.name}» شدی`
+        : `«${item.name}» خریداری شد`,
+      item: item.slug,
+      joinedClub: joined,
+      // Prompt the client to offer the crest as a profile picture.
+      offerAvatar: joined ? `club:${joined}` : null,
+    };
   } catch (e) {
     await client.query('ROLLBACK');
     throw e;
@@ -190,9 +246,22 @@ const SLOTS = {
  * Allowed if the user owns it OR Plus is active — that is the whole point of
  * the subscription: change your look daily for a month.
  */
-async function equip(userId, slug) {
+async function equip(userId, slug, kind = null) {
   if (!slug) {
-    // Clearing is always allowed, whatever the subscription state.
+    // BUG: each section had its own "برداشتن" button but they all called
+    // equip(null), which wiped ALL THREE slots. Taking off your club badge
+    // silently removed your card frame and name colour too. Clearing is now
+    // scoped to the kind the button belongs to; no kind still means all,
+    // which is what the profile's "reset look" needs.
+    const column = SLOTS[kind];
+    if (column) {
+      await pool.query(
+        `UPDATE users SET ${column}=NULL, updated_at=NOW() WHERE id=$1`,
+        [userId]);
+      // Taking a badge OFF is not leaving the club — you stay a member and
+      // stay in the roster, you just are not displaying it.
+      return { message: 'برداشته شد' };
+    }
     await pool.query(
       `UPDATE users SET equipped_club=NULL, equipped_frame=NULL,
                         equipped_color=NULL, updated_at=NOW() WHERE id=$1`,
@@ -212,7 +281,14 @@ async function equip(userId, slug) {
     [userId, item.id]);
   const plus = await plusStatus(userId);
 
-  if (!owned[0] && !plus.active) {
+  // For badges, membership is the real gate. A lapsed subscriber who kept
+  // their grace club owns no shop row and holds no Plus, yet must still be
+  // able to wear that one crest — checking only owned/Plus would lock them
+  // out of the club they were promised.
+  const member = item.kind === 'club_badge'
+    && await clubService.isMember(userId, item.payload);
+
+  if (!owned[0] && !plus.active && !member) {
     throw Object.assign(
       new Error('اول باید این آیتم را بخری یا اشتراک پلاس بگیری'),
       { status: 403 });
@@ -223,10 +299,48 @@ async function equip(userId, slug) {
     throw Object.assign(new Error('این آیتم قابل انتخاب نیست'), { status: 400 });
   }
 
+  // Equipping a badge on Plus is also how you JOIN that club — the owner's
+  // rule is that a Plus member may belong to as many clubs as they pick.
+  if (item.kind === 'club_badge' && !member) {
+    const client = await pool.connect();
+    try {
+      await clubService.join(client, userId, item.payload,
+        owned[0] ? 'purchase' : 'plus');
+    } finally {
+      client.release();
+    }
+  }
+
   await pool.query(
     `UPDATE users SET ${column}=$2, updated_at=NOW() WHERE id=$1`,
     [userId, item.payload || item.slug]);
-  return { message: `«${item.name}» انتخاب شد` };
+  return {
+    message: item.kind === 'club_badge' && !member
+      ? `عضو باشگاه «${item.name}» شدی`
+      : `«${item.name}» انتخاب شد`,
+    joinedClub: item.kind === 'club_badge' ? item.payload : null,
+  };
+}
+
+/**
+ * Uses a club crest as the profile picture.
+ *
+ * Stored in profile_avatar_key as `club:<slug>` rather than a new column: the
+ * clients already resolve that field for every avatar they draw, so one
+ * prefix makes crests work in chat, the league table, the roster and the
+ * profile at once. A bundled avatar filename can never contain a colon, so
+ * the two namespaces cannot collide.
+ */
+async function useClubAvatar(userId, clubSlug) {
+  if (!await clubService.isMember(userId, clubSlug)) {
+    throw Object.assign(
+      new Error('اول باید عضو این باشگاه بشوی'), { status: 403 });
+  }
+  await pool.query(
+    `UPDATE users SET profile_avatar_key = $2, profile_image_url = NULL,
+                      updated_at = NOW() WHERE id = $1`,
+    [userId, `club:${clubSlug}`]);
+  return { message: 'عکس پروفایلت به نشان باشگاه تغییر کرد' };
 }
 
 /**
@@ -245,16 +359,23 @@ async function cosmeticsFor(userIds) {
                        AND s.expires_at > NOW()) AS has_plus,
             ARRAY(SELECT i.payload FROM user_shop_items usi
                     JOIN shop_items i ON i.id = usi.item_id
-                   WHERE usi.user_id = u.id) AS owned_payloads
+                   WHERE usi.user_id = u.id) AS owned_payloads,
+            -- Badges follow MEMBERSHIP, not ownership: the one club a lapsed
+            -- subscriber keeps is neither owned nor covered by Plus, but they
+            -- are still a member and must still show the crest.
+            ARRAY(SELECT m.club_slug FROM effective_club_memberships m
+                   WHERE m.user_id = u.id) AS club_slugs
        FROM users u WHERE u.id = ANY($1)`,
     [userIds]);
 
   const out = new Map();
   for (const r of rows) {
     const owned = new Set(r.owned_payloads || []);
+    const clubs = new Set(r.club_slugs || []);
     const can = v => !!v && (r.has_plus || owned.has(v));
     out.set(r.id, {
-      club: can(r.equipped_club) ? r.equipped_club : null,
+      club: r.equipped_club && clubs.has(r.equipped_club)
+        ? r.equipped_club : null,
       frame: can(r.equipped_frame) ? r.equipped_frame : null,
       color: can(r.equipped_color) ? r.equipped_color : null,
       plus: r.has_plus,
@@ -264,6 +385,6 @@ async function cosmeticsFor(userIds) {
 }
 
 module.exports = {
-  catalogue, buyItem, buyPlus, equip, plusStatus, cosmeticsFor,
-  PLUS_PRICE, PLUS_DAYS,
+  catalogue, buyItem, buyPlus, equip, plusStatus, cosmeticsFor, useClubAvatar,
+  PLUS_PRICE, PLUS_DAYS, PLUS_PERKS, PLUS_EXPIRY_NOTE,
 };

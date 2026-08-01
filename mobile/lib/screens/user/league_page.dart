@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
+import '../../core/cosmetics.dart';
 import '../../theme/brand_theme.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/lifecycle_poller.dart';
@@ -10,6 +11,7 @@ import '../../widgets/app_card.dart';
 import '../../widgets/state_views.dart';
 import '../shared/public_profile_sheet.dart';
 import '../shared/rank_tile.dart';
+import 'clubs_page.dart';
 
 /// Monthly league leaderboard: podium (top 3) + ranked list, refreshed
 /// every 12s exactly as in the legacy `LeaguePage`.
@@ -24,6 +26,9 @@ class LeaguePage extends StatefulWidget {
 class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
   Map? _data;
   bool _loading = true;
+  // 0 = standings, 1 = club rosters. The rosters are their own screen so the
+  // table does not pay for a request nobody looked at.
+  int _tab = 0;
 
   @override
   void initState() {
@@ -49,9 +54,46 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
     }
   }
 
+  /// The two-way switch above both views. Kept as one widget so the tabs sit
+  /// in exactly the same place whichever is showing — moving them would read
+  /// as the page jumping.
+  Widget _tabs() => Padding(
+        padding: const EdgeInsets.fromLTRB(Gaps.lg, Gaps.md, Gaps.lg, 0),
+        child: SegmentedButton<int>(
+          segments: const [
+            ButtonSegment(value: 0, label: Text('جدول لیگ')),
+            ButtonSegment(value: 1, label: Text('باشگاه‌ها')),
+          ],
+          selected: {_tab},
+          showSelectedIcon: false,
+          onSelectionChanged: (s) => setState(() => _tab = s.first),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const LoadingView();
+    if (_tab == 1) {
+      return Column(
+        children: [
+          _tabs(),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: Gaps.lg),
+              child: ClubsTab(api: widget.api),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (_loading) {
+      return Column(
+        children: [
+          _tabs(),
+          const Expanded(child: LoadingView()),
+        ],
+      );
+    }
 
     final entries = List<Map>.from(_data?['entries'] ?? []);
     final season = _data?['season'];
@@ -65,7 +107,11 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
     final brand = context.brand;
     final theme = Theme.of(context);
 
-    return RefreshIndicator(
+    return Column(
+      children: [
+        _tabs(),
+        Expanded(
+          child: RefreshIndicator(
       onRefresh: _load,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(Gaps.lg, Gaps.md, Gaps.lg, Gaps.xxl),
@@ -172,10 +218,9 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
                           Text(['🥇', '🥈', '🥉'][i],
                               style: const TextStyle(fontSize: 30)),
                           const SizedBox(height: 4),
-                          Text(
-                            r['nickname'] ?? r['first_name'] ?? 'کاربر',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          DisplayName(
+                            name: r['nickname'] ?? r['first_name'] ?? 'کاربر',
+                            cosmetics: r['cosmetics'] as Map?,
                             style: TextStyle(
                                 fontWeight: FontWeight.w800,
                                 fontSize: 13,
@@ -213,6 +258,9 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
                     title: 'هنوز امتیازی در لیگ ثبت نشده است')),
         ],
       ),
+          ),
+        ),
+      ],
     );
   }
 }

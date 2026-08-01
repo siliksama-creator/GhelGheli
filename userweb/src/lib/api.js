@@ -81,8 +81,15 @@ export const fa = n => {
  * 62px — 3.6MB of avatars on a screen that shows ten of them). Mapping the
  * extension here means no migration and no server change.
  */
-export const avatarUrl = key =>
-  `/avatars/${String(key || avatars[0]).replace(/\.png$/, '.webp')}`;
+export const avatarUrl = (key) => {
+  const k = String(key || avatars[0]);
+  // A purchased club crest can stand in for an avatar. It is stored with a
+  // `club:` prefix so the two namespaces cannot collide (a bundled avatar
+  // filename never contains a colon), and it resolves to the same shop
+  // artwork the badge uses — one file, not a second copy.
+  if (k.startsWith('club:')) return `/shop/club_${k.slice(5)}.webp`;
+  return `/avatars/${k.replace(/\.png$/, '.webp')}`;
+};
 
 export const avatars = [
   'avatar_1_football.png', 'avatar_2_trophy.png', 'avatar_3_star.png',

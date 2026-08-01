@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
+import '../../core/cosmetics.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/avatar_image.dart';
@@ -439,13 +440,16 @@ class _ChatBubble extends StatelessWidget {
                   Row(
                     children: [
                       Expanded(
-                        child: Text(
-                          message['nickname'] ??
+                        // PARITY FIX: the web chat drew the club badge, the
+                        // name colour and the Plus star; the app drew a plain
+                        // name, so cosmetics people had paid for were
+                        // invisible on the main client.
+                        child: DisplayName(
+                          name: message['nickname'] ??
                               message['first_name'] ??
                               'کاربر',
+                          cosmetics: message['cosmetics'] as Map?,
                           style: theme.textTheme.titleSmall,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       IconButton(

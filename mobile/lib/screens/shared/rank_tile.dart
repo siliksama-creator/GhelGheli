@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
+import '../../core/cosmetics.dart';
 import '../../theme/tokens.dart';
 
 /// Leaderboard row for ranks beyond the podium (used by both the user
@@ -51,10 +52,13 @@ class RankTile extends StatelessWidget {
                 ),
                 Gaps.hSm,
                 Expanded(
-                  child: Text(
-                    row['nickname'] ?? row['first_name'] ?? 'کاربر',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  // PARITY FIX: the web league table drew the club badge,
+                  // name colour and Plus star; the app drew a plain name, so
+                  // a paying user's cosmetics were invisible on the client
+                  // most of them actually use.
+                  child: DisplayName(
+                    name: row['nickname'] ?? row['first_name'] ?? 'کاربر',
+                    cosmetics: row['cosmetics'] as Map?,
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                 ),

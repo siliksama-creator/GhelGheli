@@ -1278,3 +1278,89 @@
   display:grid;place-items:center;font-size:18px;line-height:1;
 }
 .pp .ppHead{padding-inline-start:44px}
+
+/* ═══ Shop v2: permanence, Plus terms, club membership ═════════════════ */
+.shopIntro h2{margin:0 0 8px;font-size:19px}
+.shopIntro p{margin:0 0 6px;font-size:13px;line-height:1.9;color:#c9ddf2}
+
+/* The subscription's small print. Deliberately loud enough to read before
+   paying, not a grey footnote — a lapsed Plus takes things away, and the
+   user has to know that first. */
+.plusNote{
+  background:#ffd36b12;border:1px solid #ffd36b33;border-radius:16px;
+  padding:11px 13px;margin:0 0 12px;
+}
+.plusNote b{display:block;font-size:12.5px;color:#ffd36b;margin-bottom:5px}
+.plusNote p{margin:0;font-size:12px;line-height:1.9;color:#c9ddf2}
+.plusRenewHint{margin:8px 0 0;font-size:11.5px}
+
+.myClubs h2{margin:0 0 12px;font-size:18px}
+.myClubGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:11px}
+.myClub{
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  padding:12px 9px;border-radius:18px;text-align:center;
+  background:#ffffff0a;border:1px solid #ffffff14;
+}
+.myClub img{width:46px;height:46px;object-fit:contain}
+.myClub b{font-size:12.5px;line-height:1.4}
+.clubTag{font-size:10px;font-weight:800;border-radius:999px;padding:2px 9px}
+.clubTag.own{background:#b5ef5822;color:#b5ef58}
+.clubTag.plus{background:#ffd36b22;color:#ffd36b}
+.tiny{font-size:10.5px;padding:5px 8px;min-height:28px;width:100%;margin:0}
+.clubWarn{margin:12px 0 0;font-size:12px;line-height:1.8}
+
+.offerCrest{display:block;margin:0 auto 12px;object-fit:contain}
+.short{color:#ff8fa3}
+
+/* ═══ League tabs + club rosters ═══════════════════════════════════════ */
+.leagueTabs{display:flex;gap:8px;margin-bottom:14px}
+.leagueTabs button{
+  flex:1;background:#ffffff0d;color:#c9ddf2;border:1px solid #ffffff14;
+  font-size:13.5px;padding:10px;min-height:42px;
+}
+.leagueTabs .on{background:#b5ef58;color:#10210a;border-color:transparent}
+
+.clubsIntro{margin:0 0 14px;font-size:12.5px;line-height:1.9}
+.clubGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(124px,1fr));gap:11px}
+.clubCard{
+  position:relative;display:flex;flex-direction:column;align-items:center;
+  gap:6px;padding:14px 9px;border-radius:20px;text-align:center;
+  background:#ffffff0a;border:1px solid #ffffff14;color:inherit;
+  font-family:inherit;cursor:pointer;
+}
+.clubCard:hover{border-color:#b5ef58}
+.clubCard.mine{border-color:#b5ef5866;background:#b5ef580d}
+.clubCard img{width:56px;height:56px;object-fit:contain}
+.clubCard b{font-size:12.5px;font-weight:800;line-height:1.4;min-height:2.4em}
+.clubCount{font-size:11px;color:#c9ddf2}
+.clubMine{
+  position:absolute;top:7px;inset-inline-start:7px;font-size:9.5px;
+  font-weight:800;background:#b5ef58;color:#10210a;border-radius:999px;
+  padding:2px 7px;
+}
+
+.rosterHead{display:flex;align-items:center;gap:11px;margin-bottom:14px}
+.rosterHead img{width:42px;height:42px;object-fit:contain}
+.rosterHead h3{margin:0;font-size:17px}
+.rosterHead small{color:#c9ddf2;font-size:11.5px}
+.rosterHead .ghost{font-size:12px;padding:6px 11px;min-height:32px}
+
+.rosterRow{gap:10px}
+.rosterRank{flex:none;min-width:34px;font-size:12.5px;color:#c9ddf2}
+.rosterPic{width:34px;height:34px;border-radius:50%;object-fit:cover;flex:none}
+.rosterName{flex:1;text-align:start;font-size:13.5px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rosterPts{flex:none;font-size:12px;font-weight:800;color:#b5ef58}
+.rosterPts small{font-weight:500;color:#c9ddf2;font-size:10px}
+
+@media(max-width:600px){
+  .clubGrid,.myClubGrid{grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:9px}
+  .clubCard img{width:46px;height:46px}
+}
+
+/* Club crests in the avatar picker: square-ish artwork inside a round well,
+   so a crest never gets its corners clipped like a photo would. */
+.avatars .clubAvatarPick{
+  object-fit:contain;padding:6px;background:#ffffff12;
+}
+.avatarNote{margin:0 0 10px;font-size:12px}

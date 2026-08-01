@@ -5,39 +5,16 @@
 import React, { useCallback, useEffect, useState } from 'react';
 
 import { req, asset, fa, avatarUrl } from '../lib/api.js';
+import { clubImg, FRAME_STYLE, nameColorStyle } from '../components/Cosmetics.jsx';
 import { useAsync } from '../lib/useAsync.js';
 import { LoadingView, ErrorView } from '../components/states.jsx';
 
-const CLUB_IMG = {
-  esteghlal: '/shop/club_esteghlal.webp',
-  persepolis: '/shop/club_persepolis.webp',
-  sepahan: '/shop/club_sepahan.webp',
-  tractor: '/shop/club_tractor.webp',
-  malavan: '/shop/club_malavan.webp',
-};
-
-const FRAME_STYLE = {
-  gold: 'linear-gradient(135deg,#FFD36B,#B8860B)',
-  neon: 'linear-gradient(135deg,#B5EF58,#00D49A)',
-  fire: 'linear-gradient(135deg,#FF8A3D,#F43F5E)',
-  ice: 'linear-gradient(135deg,#7DD3FC,#2563EB)',
-  holo: 'linear-gradient(135deg,#F472B6,#A855F7,#38BDF8,#34D399)',
-};
-
+// Cosmetics render identically wherever they appear, so the crest path, the
+// frame gradients and the name colour all come from one module. This file
+// used to redefine all three — and its club map still listed only the five
+// original Iranian clubs, so the eleven new crests rendered nothing here even
+// though chat and the league table showed them.
 const medal = r => (r === 1 ? '🥇' : r === 2 ? '🥈' : r === 3 ? '🥉' : '🏅');
-
-export function nameColorStyle(color) {
-  if (!color) return undefined;
-  if (color === 'rainbow') {
-    return {
-      background: 'linear-gradient(90deg,#F472B6,#A855F7,#38BDF8,#34D399)',
-      WebkitBackgroundClip: 'text',
-      WebkitTextFillColor: 'transparent',
-      backgroundClip: 'text',
-    };
-  }
-  return { color };
-}
 
 export default function PublicProfile({ token, userId, close }) {
   const load = useCallback(
@@ -76,9 +53,10 @@ export default function PublicProfile({ token, userId, close }) {
                   src={u.profile_image_url
                     ? asset(u.profile_image_url)
                     : avatarUrl(u.profile_avatar_key)} />
-                {cos.club && CLUB_IMG[cos.club] && (
-                  <img className="ppClub" src={CLUB_IMG[cos.club]}
-                    alt="نشان باشگاه" width="30" height="30" />
+                {cos.club && (
+                  <img className="ppClub" src={clubImg(cos.club)}
+                    alt="نشان باشگاه" width="30" height="30"
+                    onError={e => { e.currentTarget.style.display = 'none'; }} />
                 )}
               </div>
 

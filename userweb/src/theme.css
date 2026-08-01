@@ -430,3 +430,32 @@ body {
 :root[data-theme='light'] .prevPts { color: var(--text-muted); }
 :root[data-theme='light'] .prevPrize { background:#eefbe0; color:#4d7c0f; }
 :root[data-theme='light'] .prevSeason { border-top-color: var(--veil-5); }
+
+/* ── Shop v2 + club rosters in light mode ───────────────────────────────
+   Same approach as the rest of this file: only the opaque anchors and the
+   light-on-dark text tints need flipping; the brand accents are shared. */
+:root[data-theme='light'] .shopIntro p,
+:root[data-theme='light'] .plusNote p,
+:root[data-theme='light'] .clubCount,
+:root[data-theme='light'] .rosterRank,
+:root[data-theme='light'] .rosterHead small,
+:root[data-theme='light'] .rosterPts small { color: var(--text-muted); }
+
+:root[data-theme='light'] .myClub,
+:root[data-theme='light'] .clubCard { background: var(--veil-2); border-color: var(--veil-5); }
+:root[data-theme='light'] .clubCard.mine { background: #b5ef5824; border-color: #6ba31f66; }
+:root[data-theme='light'] .leagueTabs button { background: var(--veil-2); border-color: var(--veil-5); color: var(--text-muted); }
+:root[data-theme='light'] .leagueTabs .on { background: #b5ef58; color: #10210a; }
+
+/* On white, the yellow Plus text and the green tags fail contrast; darken
+   both rather than leaving unreadable labels. */
+:root[data-theme='light'] .plusNote { background: #b8860b12; border-color: #b8860b33; }
+:root[data-theme='light'] .plusNote b { color: #8a6300; }
+:root[data-theme='light'] .clubTag.plus,
+:root[data-theme='light'] .shopTag.plus { background: #b8860b1f; color: #8a6300; }
+:root[data-theme='light'] .clubTag.own,
+:root[data-theme='light'] .shopTag.owned { background: #4f8a1420; color: #3d6b0f; }
+:root[data-theme='light'] .rosterPts { color: #3d6b0f; }
+:root[data-theme='light'] .clubMine { background: #4f8a14; color: #fff; }
+:root[data-theme='light'] .short { color: #c02040; }
+:root[data-theme='light'] .avatars .clubAvatarPick { background: var(--veil-3); }

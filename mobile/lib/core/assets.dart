@@ -16,8 +16,20 @@ const List<String> avatarFiles = [
   'avatar_10_crown.png',
 ];
 
-String avatarAsset(Object? key) =>
-    'assets/avatars/${(key ?? avatarFiles.first).toString()}';
+/// Asset path for a stored avatar key.
+///
+/// A purchased club crest can stand in for an avatar. It is stored as
+/// `club:<slug>` — a bundled avatar filename never contains a colon, so the
+/// two namespaces cannot collide — and resolves to the same shop artwork the
+/// badge uses rather than a duplicated file.
+String avatarAsset(Object? key) {
+  final k = (key ?? avatarFiles.first).toString();
+  if (k.startsWith('club:')) return 'assets/shop/club_${k.substring(5)}.webp';
+  return 'assets/avatars/$k';
+}
+
+/// Asset path for a club crest, by slug.
+String clubAssetOf(String slug) => 'assets/shop/club_$slug.webp';
 
 class NumberParser {
   NumberParser._();

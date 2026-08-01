@@ -5,13 +5,10 @@
 // applies (ownership vs an active Plus); this only draws it.
 import React from 'react';
 
-export const CLUB_IMG = {
-  esteghlal: '/shop/club_esteghlal.webp',
-  persepolis: '/shop/club_persepolis.webp',
-  sepahan: '/shop/club_sepahan.webp',
-  tractor: '/shop/club_tractor.webp',
-  malavan: '/shop/club_malavan.webp',
-};
+// Every crest lives at /shop/club_<slug>.webp, so derive the path instead of
+// maintaining a map. The hand-written map went stale the moment eleven world
+// clubs were added: unlisted slugs rendered no badge at all, silently.
+export const clubImg = slug => (slug ? `/shop/club_${slug}.webp` : null);
 
 export const FRAME_STYLE = {
   gold: 'linear-gradient(135deg,#FFD36B,#B8860B)',
@@ -37,10 +34,13 @@ export function nameColorStyle(color) {
 
 /** Small club badge shown before a name. */
 export function ClubBadge({ club }) {
-  if (!club || !CLUB_IMG[club]) return null;
+  if (!club) return null;
   return (
-    <img className="nameClub" src={CLUB_IMG[club]} alt=""
-      width="16" height="16" loading="lazy" decoding="async" />
+    <img className="nameClub" src={clubImg(club)} alt=""
+      width="16" height="16" loading="lazy" decoding="async"
+      // A crest that 404s (a club retired from the catalogue) should vanish,
+      // not leave a broken-image glyph next to someone's name.
+      onError={e => { e.currentTarget.style.display = 'none'; }} />
   );
 }
 

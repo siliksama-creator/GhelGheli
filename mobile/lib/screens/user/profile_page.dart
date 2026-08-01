@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
 import '../../core/assets.dart';
+import '../../core/cosmetics.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/avatar_image.dart';
@@ -43,6 +44,10 @@ class _ProfilePageState extends State<ProfilePage> {
   List _trophies = const [];
   // Past league finishes. monthly_league_points is wiped each month, so this
   // is the only lasting record of "I came 3rd in Mordad and won 250,000".
+  // Crests of clubs the user belongs to. They can be worn as an avatar, so
+  // they live in the SAME picker as the bundled ones — to the user they are
+  // just more avatars, and splitting them would feel like two settings.
+  List _myClubs = const [];
   List _leagueHistory = const [];
 
   @override
@@ -51,6 +56,7 @@ class _ProfilePageState extends State<ProfilePage> {
     _load();
     _loadTrophies();
     _loadLeagueHistory();
+    _loadClubs();
   }
 
   Future<void> _loadLeagueHistory() async {
@@ -60,6 +66,17 @@ class _ProfilePageState extends State<ProfilePage> {
       setState(() => _leagueHistory = (r['seasons'] as List?) ?? const []);
     } catch (_) {
       // Decorative; must not block the profile form.
+    }
+  }
+
+  Future<void> _loadClubs() async {
+    try {
+      final r = await widget.api.get('/api/clubs');
+      if (!mounted) return;
+      setState(() => _myClubs = (r['mine'] as List?) ?? const []);
+    } catch (_) {
+      // Optional: a user in no club, or a failed call, just sees the ten
+      // bundled avatars. It must never block the profile form.
     }
   }
 
@@ -333,28 +350,47 @@ class _ProfilePageState extends State<ProfilePage> {
               Wrap(
                 spacing: Gaps.sm,
                 runSpacing: Gaps.sm,
-                children: avatarFiles
-                    .map((a) => GestureDetector(
-                          onTap: () => setState(() => _selectedAvatar = a),
-                          child: AnimatedContainer(
-                            duration: Motion.fast,
-                            padding: const EdgeInsets.all(3),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: _selectedAvatar == a
-                                    ? theme.colorScheme.primary
-                                    : Colors.transparent,
-                                width: 3,
-                              ),
-                            ),
-                            child: CircleAvatar(
-                                radius: 24,
-                                backgroundImage: AssetImage(avatarAsset(a))),
-                          ),
-                        ))
-                    .toList(),
+                children: [
+                  for (final a in avatarFiles)
+                    _AvatarChoice(
+                      selected: _selectedAvatar == a,
+                      onTap: () => setState(() => _selectedAvatar = a),
+                      child: CircleAvatar(
+                          radius: 24,
+                          backgroundImage: AssetImage(avatarAsset(a))),
+                    ),
+                  // Club crests the user has joined, in the same picker.
+                  for (final c in _myClubs)
+                    _AvatarChoice(
+                      selected: _selectedAvatar == 'club:${c['slug']}',
+                      onTap: () => setState(
+                          () => _selectedAvatar = 'club:${c['slug']}'),
+                      child: CircleAvatar(
+                        radius: 24,
+                        backgroundColor:
+                            theme.colorScheme.onSurface.withValues(alpha: 0.06),
+                        // A crest is not a photo: pad it inside the circle
+                        // instead of letting a round clip eat the shield's
+                        // corners.
+                        child: Padding(
+                          padding: const EdgeInsets.all(5),
+                          child: Image.asset(clubAsset('${c['slug']}'),
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) =>
+                                  const Icon(Icons.shield_outlined, size: 22)),
+                        ),
+                      ),
+                    ),
+                ],
               ),
+              if (_myClubs.isNotEmpty) ...[
+                Gaps.vXs,
+                Text(
+                  '🛡️ نشان باشگاه‌هایی که عضوشان هستی هم می‌تواند عکس '
+                  'پروفایلت باشد.',
+                  style: theme.textTheme.labelSmall,
+                ),
+              ],
               Gaps.vXl,
               _FieldGroup(children: [
                 TextField(
@@ -492,6 +528,39 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Selection ring around one avatar option. Extracted so a bundled avatar
+/// and a club crest get identical selection affordance rather than two
+/// near-copies drifting apart.
+class _AvatarChoice extends StatelessWidget {
+  const _AvatarChoice(
+      {required this.selected, required this.onTap, required this.child});
+
+  final bool selected;
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: Motion.fast,
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: selected
+                ? Theme.of(context).colorScheme.primary
+                : Colors.transparent,
+            width: 3,
+          ),
+        ),
+        child: child,
+      ),
     );
   }
 }

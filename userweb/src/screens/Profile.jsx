@@ -3,6 +3,7 @@ import React, { useCallback, useState } from 'react';
 
 import { req, avatars, asset, avatarUrl, fa } from '../lib/api.js';
 import { useAsync } from '../lib/useAsync.js';
+import { clubImg } from '../components/Cosmetics.jsx';
 import Field from '../components/Field.jsx';
 
 export default function Profile({ token, p, load, setMsg }) {
@@ -17,6 +18,13 @@ export default function Profile({ token, p, load, setMsg }) {
     bankAccount: u.bank_account || '',
     profileAvatarKey: u.profile_avatar_key || avatars[0],
   });
+  // Club crests the user has joined can also be worn as an avatar. Fetched
+  // separately so the profile still loads for anyone in no club.
+  const loadClubs = useCallback(
+    () => req('/api/clubs', 'GET', null, token).then(d => d.mine || []),
+    [token]);
+  const clubs = useAsync(loadClubs, [loadClubs]);
+
   const [pw, setPw] = useState({ currentPassword: '', newPassword: '' });
   const [pwMsg, setPwMsg] = useState('');
   const [saving, setSaving] = useState(false);
@@ -78,7 +86,25 @@ export default function Profile({ token, p, load, setMsg }) {
             className={edit.profileAvatarKey === a ? 'sel' : ''}
             onClick={() => setEdit({ ...edit, profileAvatarKey: a })} />
         ))}
+
+        {/* Crests sit in the same picker, not a separate one: to the user
+            they are just more avatars, and splitting them would make
+            switching back and forth feel like two different settings. */}
+        {(clubs.data || []).map(c => (
+          <img key={c.slug} src={clubImg(c.slug)} alt={c.name}
+            width="62" height="62" loading="lazy" decoding="async"
+            title={`نشان ${c.name}`}
+            className={`clubAvatarPick${
+              edit.profileAvatarKey === `club:${c.slug}` ? ' sel' : ''}`}
+            onClick={() =>
+              setEdit({ ...edit, profileAvatarKey: `club:${c.slug}` })} />
+        ))}
       </div>
+      {(clubs.data || []).length > 0 && (
+        <p className="hint avatarNote">
+          🛡️ نشان باشگاه‌هایی که عضوشان هستی هم می‌تواند عکس پروفایلت باشد.
+        </p>
+      )}
 
       <div className="formgrid">
         <Field label="نام" value={edit.firstName}

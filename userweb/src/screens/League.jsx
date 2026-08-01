@@ -2,17 +2,33 @@
 //
 // Previously this had no error branch: `req(...).then(setD)` with no
 // `.catch`, so any failure left the user on "در حال بارگذاری لیگ..." forever.
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 
 import { req, fa, asset, avatarUrl } from '../lib/api.js';
 import { DisplayName } from '../components/Cosmetics.jsx';
 import { useAsync } from '../lib/useAsync.js';
 import { AsyncSection, EmptyView } from '../components/states.jsx';
+import Clubs from './Clubs.jsx';
 
 export default function League({ token, openProfile }) {
   const load = useCallback(
     () => req('/api/league/current', 'GET', null, token), [token]);
   const state = useAsync(load, [load]);
+  const [tab, setTab] = useState('table');
+
+  // The club rosters are their own screen; mounting them only when selected
+  // means the league table does not pay for a request nobody looked at.
+  if (tab === 'clubs') {
+    return (
+      <section className="card wide leaguePage">
+        <div className="leagueTabs">
+          <button onClick={() => setTab('table')}>جدول لیگ</button>
+          <button className="on">باشگاه‌ها</button>
+        </div>
+        <Clubs token={token} openProfile={openProfile} />
+      </section>
+    );
+  }
 
   return (
     <AsyncSection state={state} loadingLabel="در حال بارگذاری لیگ...">
@@ -28,6 +44,11 @@ export default function League({ token, openProfile }) {
 
         return (
           <section className="card wide leaguePage">
+            <div className="leagueTabs">
+              <button className="on">جدول لیگ</button>
+              <button onClick={() => setTab('clubs')}>باشگاه‌ها</button>
+            </div>
+
             <div className="sectionHead">
               <div>
                 <h2>لیگ ماهانه قلقلی</h2>
