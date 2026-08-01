@@ -943,7 +943,42 @@ async function creditWheelPrize(userId, amount, spinId, label = 'جایزهٔ گ
 }
 module.exports.creditWheelPrize = creditWheelPrize;
 
-app.get('/api/league/current', auth, asyncHandler(async (req, res) => res.json(await getLeaderboard(Number(req.query.limit || 100)))));
+app.get('/api/league/current', auth, asyncHandler(async (req, res) => {
+  const data = await getLeaderboard(Number(req.query.limit || 100));
+
+  // Cosmetics for the standings (club badge, name colour).
+  const cos = await shop.cosmeticsFor(data.entries.map(e => e.user_id));
+
+  // Last month's podium, shown alongside the live table so the previous
+  // season's winners stay visible instead of vanishing at the reset.
+  const { rows: prev } = await pool.query(
+    `SELECT h.user_id, h.month_year, h.rank, h.points, h.prize_amount,
+            u.nickname, u.first_name, u.profile_image_url, u.profile_avatar_key
+       FROM user_league_history h
+       JOIN users u ON u.id = h.user_id
+      WHERE h.season_id = (
+              SELECT id FROM league_seasons
+               WHERE status='closed' ORDER BY ends_at DESC LIMIT 1)
+        AND h.rank <= 3
+      ORDER BY h.rank`);
+
+  res.json({
+    ...data,
+    entries: data.entries.map(e => ({
+      ...e, cosmetics: cos.get(e.user_id) || null,
+    })),
+    previousSeason: prev.length ? {
+      monthYear: prev[0].month_year,
+      winners: prev.map(p => ({
+        userId: p.user_id, rank: p.rank, points: p.points,
+        prizeAmount: Number(p.prize_amount),
+        nickname: p.nickname || p.first_name || 'کاربر',
+        profileImageUrl: p.profile_image_url,
+        profileAvatarKey: p.profile_avatar_key,
+      })),
+    } : null,
+  });
+}));
 
 app.get('/api/chat/config', auth, asyncHandler(async (req, res) => {
   const minLifetimePoints = await getChatMinLifetimePoints();
@@ -1005,7 +1040,13 @@ app.get('/api/chat/messages', auth, asyncHandler(async (req, res) => {
     LEFT JOIN chat_messages rm ON rm.id=m.reply_to_message_id
     LEFT JOIN users ru ON ru.id=rm.user_id
     WHERE m.is_deleted=false ORDER BY m.sent_at DESC LIMIT 100`, [req.user.id]);
-  res.json(rows.reverse());
+  // Attach cosmetics so the club badge and name colour render next to each
+  // message. Resolved server-side because an equipped item stops applying the
+  // moment Plus lapses unless the user actually bought it.
+  const cos = await shop.cosmeticsFor([...new Set(rows.map(r => r.user_id))]);
+  res.json(rows.reverse().map(r => ({
+    ...r, cosmetics: cos.get(r.user_id) || null,
+  })));
 }));
 app.post('/api/chat/messages', auth, chatLimiter, asyncHandler(async (req, res) => {
   const minLifetimePoints = await getChatMinLifetimePoints();

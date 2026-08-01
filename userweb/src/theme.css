@@ -405,3 +405,28 @@ body {
 :root[data-theme='light'] .lhRank { color: var(--text-muted); }
 :root[data-theme='light'] .lhPts { color: var(--text-muted); }
 :root[data-theme='light'] .lhPrize { background:#eefbe0; color:#4d7c0f; }
+
+:root[data-theme='light'] .shopItem { background: var(--veil-2); border-color: var(--veil-5); }
+:root[data-theme='light'] .plusList li { color: var(--text-muted); }
+:root[data-theme='light'] .shopPrice { color: #a16207; }
+:root[data-theme='light'] .plusPrice { color: #a16207; }
+:root[data-theme='light'] .shopTag.owned { background:#eefbe0; color:#4d7c0f; }
+:root[data-theme='light'] .shopTag.plus { background:#fff6e2; color:#a16207; }
+
+:root[data-theme='light'] .ppStats>div,
+:root[data-theme='light'] .ppPrize,
+:root[data-theme='light'] .ppLeagueRow { background: var(--veil-2); border-color: var(--veil-5); }
+:root[data-theme='light'] .ppStats span,
+:root[data-theme='light'] .ppPrize em,
+:root[data-theme='light'] .ppPts,
+:root[data-theme='light'] .ppWho small { color: var(--text-muted); }
+:root[data-theme='light'] .ppRank { color: var(--page-fg); }
+:root[data-theme='light'] .ppTabs button { background: var(--veil-2); color: var(--text-muted); border-color: var(--veil-5); }
+:root[data-theme='light'] .ppStats .ppMoney b { color: #4d7c0f; }
+:root[data-theme='light'] .ppPrizeTag { background:#eefbe0; color:#4d7c0f; }
+:root[data-theme='light'] .ppClub { border-color:#fff; background:#fff; }
+:root[data-theme='light'] .ppBest { background:#fff6e2; color:#a16207; }
+:root[data-theme='light'] .prevRow { background: var(--veil-2); border-color: var(--veil-5); }
+:root[data-theme='light'] .prevPts { color: var(--text-muted); }
+:root[data-theme='light'] .prevPrize { background:#eefbe0; color:#4d7c0f; }
+:root[data-theme='light'] .prevSeason { border-top-color: var(--veil-5); }

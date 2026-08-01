@@ -4,7 +4,8 @@
 // `.catch`, so any failure left the user on "در حال بارگذاری لیگ..." forever.
 import React, { useCallback } from 'react';
 
-import { req, fa } from '../lib/api.js';
+import { req, fa, asset, avatarUrl } from '../lib/api.js';
+import { DisplayName } from '../components/Cosmetics.jsx';
 import { useAsync } from '../lib/useAsync.js';
 import { AsyncSection, EmptyView } from '../components/states.jsx';
 
@@ -43,7 +44,8 @@ export default function League({ token, openProfile }) {
                 <div className={`podiumCard p${i + 1}`} key={e.user_id}
                   onClick={() => openProfile(e.user_id)}>
                   <span className="medal">{['🥇', '🥈', '🥉'][i]}</span>
-                  <b>{e.nickname || e.first_name || 'کاربر'}</b>
+                  <DisplayName name={e.nickname || e.first_name || 'کاربر'}
+                    cosmetics={e.cosmetics} />
                   <strong>{fa(e.points)} امتیاز</strong>
                 </div>
               ))}
@@ -54,7 +56,8 @@ export default function League({ token, openProfile }) {
                 <div className="row clickable leagueRow" key={e.user_id}
                   onClick={() => openProfile(e.user_id)}>
                   <b>#{fa(i + 4)}</b>
-                  <span>{e.nickname || e.first_name || 'کاربر'}</span>
+                  <DisplayName name={e.nickname || e.first_name || 'کاربر'}
+                    cosmetics={e.cosmetics} />
                   <strong>{fa(e.points)} امتیاز</strong>
                 </div>
               ))}
@@ -62,6 +65,35 @@ export default function League({ token, openProfile }) {
 
             {!entries.length &&
               <EmptyView icon="🏆">هنوز امتیازی در لیگ ثبت نشده است.</EmptyView>}
+
+            {/* Last month's winners. Without this the previous season simply
+                vanishes when the points reset. */}
+            {d.previousSeason?.winners?.length > 0 && (
+              <div className="prevSeason">
+                <h3>🏅 برندگان ماه گذشته ({d.previousSeason.monthYear})</h3>
+                <div className="prevList">
+                  {d.previousSeason.winners.map(w => (
+                    <div className="prevRow" key={w.userId}
+                      onClick={() => openProfile(w.userId)}>
+                      <span className="prevMedal">
+                        {['🥇', '🥈', '🥉'][w.rank - 1] || '🏅'}
+                      </span>
+                      <img src={w.profileImageUrl
+                        ? asset(w.profileImageUrl)
+                        : avatarUrl(w.profileAvatarKey)}
+                        alt="" width="32" height="32" loading="lazy" />
+                      <b>{w.nickname}</b>
+                      <span className="prevPts">{fa(w.points)} امتیاز</span>
+                      {w.prizeAmount > 0 && (
+                        <span className="prevPrize">
+                          {fa(w.prizeAmount)} تومان
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
         );
       }}

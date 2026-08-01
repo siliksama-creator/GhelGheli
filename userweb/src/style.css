@@ -1128,3 +1128,142 @@
   margin-inline-start:auto;font-size:12px;font-weight:800;
   background:#b5ef5822;color:#b5ef58;border-radius:999px;padding:3px 10px;
 }
+
+/* ═══ Shop ══════════════════════════════════════════════════════════════ */
+.shopWrap{display:flex;flex-direction:column;gap:18px;width:100%;align-items:center}
+
+.plusCard{border-color:#ffd36b55}
+.plusCard.on{border-color:#ffd36b;box-shadow:0 0 0 1px #ffd36b66,0 30px 90px #0009}
+.plusHead{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.plusStar{font-size:30px;flex:none}
+.plusHead h2{margin:0;font-size:20px}
+.plusHead .hint{margin:2px 0 0;font-size:12.5px}
+.plusPrice{margin-inline-start:auto;font-size:17px;font-weight:900;color:#ffd36b;white-space:nowrap}
+.plusPrice i{font-size:11px;font-style:normal;font-weight:600}
+.plusList{list-style:none;margin:0 0 14px;padding:0;display:flex;flex-direction:column;gap:7px}
+.plusList li{font-size:13px;line-height:1.7;color:#c9ddf2}
+
+.shopHead{display:flex;align-items:center;gap:11px;margin-bottom:12px}
+.shopIcon{font-size:24px;flex:none}
+.shopHead h2{margin:0;font-size:18px}
+.shopHead .hint{margin:2px 0 0;font-size:12px}
+.shopClear{margin-inline-start:auto;font-size:12px;padding:6px 12px;min-height:32px}
+
+.shopGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:11px}
+.shopItem{
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  padding:11px 9px;border-radius:18px;text-align:center;
+  background:#ffffff0a;border:1px solid #ffffff14;
+}
+.shopItem.equipped{border-color:#b5ef58;box-shadow:0 0 0 1px #b5ef5855}
+.shopArt{position:relative;display:grid;place-items:center;height:72px}
+.shopArt img{width:72px;height:72px;object-fit:contain;border-radius:14px}
+.colorChip{width:56px;height:56px;border-radius:50%;border:3px solid #ffffff26}
+.framePreview{width:60px;height:60px;border-radius:14px;border:3px solid #ffffff26}
+.shopOn{
+  position:absolute;bottom:-4px;font-size:9.5px;font-weight:800;
+  background:#b5ef58;color:#10210a;border-radius:999px;padding:2px 8px;
+}
+.shopItem b{font-size:12px;font-weight:700;line-height:1.4;min-height:2.4em}
+.shopPrice{font-size:11.5px;font-weight:800;color:#ffd36b}
+.shopTag{font-size:10px;font-weight:800;border-radius:999px;padding:2px 8px}
+.shopTag.owned{background:#b5ef5822;color:#b5ef58}
+.shopTag.plus{background:#ffd36b22;color:#ffd36b}
+.shopBtn{width:100%;margin:0;padding:7px;font-size:12px;min-height:34px}
+
+@media(max-width:600px){
+  .shopGrid{grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:9px}
+  .plusHead h2{font-size:18px}
+}
+
+/* ═══ Public profile — compact, tabbed ═════════════════════════════════ */
+.pp{width:min(520px,96vw);max-height:88vh;display:flex;flex-direction:column;padding:18px}
+
+.ppHead{display:flex;align-items:center;gap:13px;margin-bottom:14px}
+.ppAvatarWrap{
+  position:relative;width:78px;height:78px;border-radius:50%;flex:none;
+  padding:3px;background:#ffffff1f;display:grid;place-items:center;
+}
+.ppAvatar{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}
+.ppClub{
+  position:absolute;bottom:-2px;inset-inline-end:-4px;
+  width:30px;height:30px;border-radius:50%;object-fit:cover;
+  border:2px solid #0e1826;background:#0e1826;
+}
+.ppWho{flex:1;min-width:0}
+.ppWho h2{margin:0;font-size:20px;font-weight:900;line-height:1.3}
+.ppPlus{font-size:14px;margin-inline-start:5px}
+.ppWho small{display:block;font-size:11.5px;color:#c9ddf280;margin-top:2px}
+.ppBest{
+  display:inline-block;margin-top:5px;font-size:11.5px;font-weight:700;
+  background:#ffd36b1f;color:#ffd36b;border-radius:999px;padding:3px 10px;
+}
+
+.ppStats{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(78px,1fr));gap:8px;
+  margin-bottom:13px;
+}
+.ppStats>div{
+  text-align:center;padding:9px 6px;border-radius:14px;
+  background:#ffffff0a;border:1px solid #ffffff12;
+}
+.ppStats b{display:block;font-size:15px;font-weight:900}
+.ppStats span{font-size:10px;color:#c9ddf290}
+.ppStats .ppMoney b{color:#b5ef58}
+
+.ppTabs{display:flex;gap:6px;margin-bottom:11px}
+.ppTabs button{
+  flex:1;padding:8px 6px;font-size:11.5px;border-radius:12px;
+  background:#ffffff0d;color:#c9ddf2;border:1px solid #ffffff14;min-height:36px;
+}
+.ppTabs button.on{background:#b5ef58;color:#10210a;border-color:#b5ef58}
+.ppTabs button:hover{transform:none}
+
+.ppPane{overflow-y:auto;flex:1;min-height:120px}
+.ppGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:9px}
+.ppPrize{
+  display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;
+  padding:9px 6px;border-radius:15px;
+  background:#ffffff0a;border:1px solid #ffffff12;
+}
+.ppPrize img{width:56px;height:56px;border-radius:12px;object-fit:cover}
+.ppPrize b{font-size:11px;line-height:1.4;font-weight:700}
+.ppPrize em{font-style:normal;font-size:9.5px;color:#c9ddf290}
+.ppPrize.cash{border-color:#b5ef5840}
+
+.ppLeague{display:flex;flex-direction:column;gap:7px}
+.ppLeagueRow{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:9px 11px;border-radius:13px;
+  background:#ffffff0a;border:1px solid #ffffff12;
+}
+.ppMedal{font-size:18px}
+.ppMonth{font-weight:800;font-size:12.5px}
+.ppRank{font-size:12px;color:#c9ddf2}
+.ppPts{font-size:11px;color:#c9ddf280}
+.ppPrizeTag{
+  margin-inline-start:auto;font-size:11px;font-weight:800;
+  background:#b5ef5822;color:#b5ef58;border-radius:999px;padding:2px 9px;
+}
+
+/* Club badge next to a name in chat and the league table. */
+.nameClub{width:16px;height:16px;border-radius:50%;object-fit:cover;
+  vertical-align:-3px;margin-inline-end:4px}
+
+/* Previous season's podium, kept visible after the monthly reset. */
+.prevSeason{margin-top:18px;padding-top:14px;border-top:1px solid #ffffff14}
+.prevSeason h3{margin:0 0 10px;font-size:14px}
+.prevList{display:flex;flex-direction:column;gap:7px}
+.prevRow{
+  display:flex;align-items:center;gap:9px;cursor:pointer;
+  padding:8px 11px;border-radius:13px;
+  background:#ffffff0a;border:1px solid #ffffff12;
+}
+.prevRow:hover{border-color:#b5ef5866}
+.prevMedal{font-size:17px}
+.prevRow img{width:32px;height:32px;border-radius:50%;object-fit:cover}
+.prevRow b{font-size:12.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prevPts{font-size:11px;color:#c9ddf280;white-space:nowrap}
+.prevPrize{font-size:11px;font-weight:800;background:#b5ef5822;color:#b5ef58;
+  border-radius:999px;padding:2px 9px;white-space:nowrap}
+.plusStarSm{font-size:10px;margin-inline-start:3px}

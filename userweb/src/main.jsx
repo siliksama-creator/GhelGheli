@@ -18,6 +18,7 @@ import League from './screens/League.jsx';
 import Chat from './screens/Chat.jsx';
 import PublicProfile from './screens/PublicProfile.jsx';
 import Rewards from './screens/Rewards.jsx';
+import Shop from './screens/Shop.jsx';
 import GamesHub from './games.jsx';
 import Support from './support.jsx';
 import Wallet from './wallet.jsx';
@@ -188,7 +189,7 @@ function Portal({ token, logout, theme, toggleTheme }) {
           <Profile token={token} p={p} load={load} setMsg={setMsg} />
         )}
         {tab === 'rewards' && (
-          <Rewards token={token} setMsg={setMsg} reloadProfile={load} />
+          <RewardsAndShop token={token} setMsg={setMsg} reloadProfile={load} />
         )}
         {tab === 'wallet' && (
           <Wallet token={token} req={req} reloadProfile={load} setMsg={setMsg} />
@@ -209,6 +210,30 @@ function Portal({ token, logout, theme, toggleTheme }) {
         <PublicProfile token={token} userId={publicUser}
           close={() => setPublicUser(null)} />
       )}
+    </div>
+  );
+}
+
+/**
+ * Rewards and the shop share a tab.
+ *
+ * An eighth nav tab would not fit on a 360px phone — the seven current ones
+ * only just do. They also belong together conceptually: both are where a
+ * user spends what they have earned.
+ */
+function RewardsAndShop({ token, setMsg, reloadProfile }) {
+  const [sub, setSub] = useState('rewards');
+  return (
+    <div className="clubWrap">
+      <div className="clubTabs">
+        <button className={sub === 'rewards' ? 'on' : ''}
+          onClick={() => setSub('rewards')}>🎁 جوایز</button>
+        <button className={sub === 'shop' ? 'on' : ''}
+          onClick={() => setSub('shop')}>🛍️ فروشگاه</button>
+      </div>
+      {sub === 'rewards'
+        ? <Rewards token={token} setMsg={setMsg} reloadProfile={reloadProfile} />
+        : <Shop token={token} setMsg={setMsg} reloadProfile={reloadProfile} />}
     </div>
   );
 }

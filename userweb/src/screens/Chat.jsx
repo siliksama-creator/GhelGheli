@@ -2,6 +2,7 @@
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 
 import { req, asset, fa, avatars, PIN_COLORS, avatarUrl } from '../lib/api.js';
+import { DisplayName } from '../components/Cosmetics.jsx';
 
 const POLL_MS = 8000;
 
@@ -225,9 +226,10 @@ const Message = memo(function Message({ m, mine, onProfile, onReply, onLike, onR
           ? asset(m.profile_image_url)
           : avatarUrl(m.profile_avatar_key)} />
       <div className="chatbody">
-        <b className="clickableText" onClick={() => onProfile(m.user_id)}>
-          {m.nickname || m.first_name || 'کاربر'}
-        </b>
+        <DisplayName className="clickableText"
+          onClick={() => onProfile(m.user_id)}
+          name={m.nickname || m.first_name || 'کاربر'}
+          cosmetics={m.cosmetics} />
         {m.reply_text && (
           <small className="reply">
             ↩ {m.reply_nickname || 'کاربر'}: {m.reply_text}
@@ -255,4 +257,6 @@ const Message = memo(function Message({ m, mine, onProfile, onReply, onLike, onR
   a.m.id === b.m.id &&
   a.m.like_count === b.m.like_count &&
   a.m.message_text === b.m.message_text &&
-  a.mine === b.mine);
+  a.mine === b.mine &&
+  // A user equipping a badge mid-session must re-render their messages.
+  JSON.stringify(a.m.cosmetics) === JSON.stringify(b.m.cosmetics));
