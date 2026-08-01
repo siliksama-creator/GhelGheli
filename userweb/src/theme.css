@@ -38,6 +38,21 @@
   --panel-bg: #0e1826;
   --shadow-strong: #0009;
   --shadow-soft: #00000040;
+
+  /* THESE WERE MISSING.
+     style.css, typography.css and the game boards reference --bg, --surface,
+     --text, --border and the --fs-* scale in ~40 places, but nothing ever
+     declared them. Every one of those rules resolved to an invalid value, so
+     backgrounds came out transparent and font sizes fell back to the browser
+     default. That is why several panels looked unstyled. */
+  --bg: var(--page-bg);
+  --surface: #16233a;
+  --text: var(--page-fg);
+  --border: #ffffff22;
+
+  --fs-xs: 11.5px;
+  --fs-sm: 13px;
+  --fs-lg: 18px;
 }
 
 /* ── light ──────────────────────────────────────────────────────────────── */
@@ -61,6 +76,11 @@
   --panel-bg: #ffffff;
   --shadow-strong: #0b1b2e1f;
   --shadow-soft: #0b1b2e14;
+
+  --bg: var(--page-bg);
+  --surface: #ffffff;
+  --text: var(--page-fg);
+  --border: #101a2c26;
 }
 
 /* ── apply ──────────────────────────────────────────────────────────────── */
