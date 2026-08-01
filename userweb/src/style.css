@@ -1075,7 +1075,7 @@
   .mobileNav {
     flex-wrap: nowrap;
     overflow-x: auto;
-    gap: 5px;
+    gap: 3px;
     padding: 7px;
     /* Keep the fade so a row that DOES overflow looks scrollable rather
        than cut off. */
@@ -1095,7 +1095,7 @@
        without scrolling, while each button is still wider than its own
        label. Measured, not guessed: at 5px padding the row is 372px against
        a 372px viewport. */
-    padding: 7px 5px;
+    padding: 7px 4px;
   }
   .mobileNav .navIcon { font-size: 16px; }
   .mobileNav .navLabel {
@@ -1103,7 +1103,7 @@
        whole. Truncating to "پشت..." saved no space and just made the tab
        unreadable — the icon above it is the primary cue, but a half-word
        label is worse than a small one. */
-    font-size: 8.5px;
+    font-size: 8px;
     letter-spacing: -.3px;
     white-space: nowrap;
     max-width: 100%;
