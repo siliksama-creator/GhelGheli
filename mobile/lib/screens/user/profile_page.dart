@@ -41,12 +41,26 @@ class _ProfilePageState extends State<ProfilePage> {
   // Physical prizes the user has won. Cash rewards go straight to the wallet;
   // physical ones are displayed here so there is a visible record of them.
   List _trophies = const [];
+  // Past league finishes. monthly_league_points is wiped each month, so this
+  // is the only lasting record of "I came 3rd in Mordad and won 250,000".
+  List _leagueHistory = const [];
 
   @override
   void initState() {
     super.initState();
     _load();
     _loadTrophies();
+    _loadLeagueHistory();
+  }
+
+  Future<void> _loadLeagueHistory() async {
+    try {
+      final r = await widget.api.get('/api/profile/league-history');
+      if (!mounted) return;
+      setState(() => _leagueHistory = (r['seasons'] as List?) ?? const []);
+    } catch (_) {
+      // Decorative; must not block the profile form.
+    }
   }
 
   Future<void> _loadTrophies() async {
@@ -159,6 +173,72 @@ class _ProfilePageState extends State<ProfilePage> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(Gaps.lg, Gaps.md, Gaps.lg, Gaps.xxl),
       children: [
+        if (_leagueHistory.isNotEmpty) ...[
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('سابقهٔ لیگ 🏆',
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w800)),
+                Text(
+                    'امتیاز لیگ آخر هر ماه صفر می‌شود، ولی رتبه و جایزه‌ات '
+                    'اینجا می‌ماند.',
+                    style: theme.textTheme.bodySmall),
+                Gaps.vXs,
+                for (final raw in _leagueHistory)
+                  Builder(builder: (ctx) {
+                    final h = Map<String, dynamic>.from(raw as Map);
+                    final rank = h['rank'] as int? ?? 0;
+                    final medal = rank == 1
+                        ? '🥇'
+                        : rank == 2
+                            ? '🥈'
+                            : rank == 3
+                                ? '🥉'
+                                : '🏅';
+                    final prize = (h['prizeAmount'] as num?) ?? 0;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: Gaps.xs),
+                      child: Row(
+                        children: [
+                          Text(medal, style: const TextStyle(fontSize: 19)),
+                          Gaps.hXs,
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('${h['monthYear']} · رتبهٔ ${faNum(rank)}',
+                                    style: theme.textTheme.titleSmall),
+                                Text('${faNum(h['points'])} امتیاز',
+                                    style: theme.textTheme.labelSmall),
+                              ],
+                            ),
+                          ),
+                          if (prize > 0)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: Gaps.xs, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFB5EF58)
+                                    .withValues(alpha: 0.14),
+                                borderRadius: Corners.rPill,
+                              ),
+                              child: Text('${faNum(prize)} تومان',
+                                  style: const TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF84CC16))),
+                            ),
+                        ],
+                      ),
+                    );
+                  }),
+              ],
+            ),
+          ),
+          Gaps.vMd,
+        ],
         if (_trophies.isNotEmpty) ...[
           AppCard(
             child: Column(

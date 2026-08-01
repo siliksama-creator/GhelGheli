@@ -1112,3 +1112,19 @@
 .confirmActions button,
 .rgClaim,
 .tapHead .ghost { min-height: 40px; }
+
+/* League history: rank + prize survive the monthly points reset. */
+.lhList{display:flex;flex-direction:column;gap:8px}
+.lhRow{
+  display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+  padding:10px 12px;border-radius:14px;
+  background:#ffffff0a;border:1px solid #ffffff14;
+}
+.lhMedal{font-size:20px;flex:none}
+.lhMonth{font-weight:800;font-size:13px}
+.lhRank{font-size:12.5px;color:#c9ddf2}
+.lhPts{font-size:11.5px;color:#c9ddf280}
+.lhPrize{
+  margin-inline-start:auto;font-size:12px;font-weight:800;
+  background:#b5ef5822;color:#b5ef58;border-radius:999px;padding:3px 10px;
+}

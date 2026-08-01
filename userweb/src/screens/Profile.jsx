@@ -1,7 +1,7 @@
 // Private profile + password change.
 import React, { useCallback, useState } from 'react';
 
-import { req, avatars, asset, avatarUrl } from '../lib/api.js';
+import { req, avatars, asset, avatarUrl, fa } from '../lib/api.js';
 import { useAsync } from '../lib/useAsync.js';
 import Field from '../components/Field.jsx';
 
@@ -59,6 +59,7 @@ export default function Profile({ token, p, load, setMsg }) {
       {/* Physical prizes won. Cash rewards land in the wallet; physical ones
           are only visible here, so the shelf is the user's record of them. */}
       <Trophies token={token} />
+      <LeagueHistory token={token} />
 
       <section className="card wide">
       <h2>تکمیل پروفایل خصوصی</h2>
@@ -123,6 +124,39 @@ export default function Profile({ token, p, load, setMsg }) {
       {pwMsg && <p className="msg">{pwMsg}</p>}
       </section>
     </>
+  );
+}
+
+function LeagueHistory({ token }) {
+  const load = useCallback(
+    () => req('/api/profile/league-history', 'GET', null, token), [token]);
+  const state = useAsync(load, [load]);
+  const seasons = state.data?.seasons || [];
+  // Decorative: never push an error above the profile form.
+  if (state.loading || state.error || !seasons.length) return null;
+
+  const medal = r => (r === 1 ? '🥇' : r === 2 ? '🥈' : r === 3 ? '🥉' : '🏅');
+
+  return (
+    <section className="card wide">
+      <h2>سابقهٔ لیگ 🏆</h2>
+      <p className="hint">
+        امتیاز لیگ آخر هر ماه صفر می‌شود، ولی رتبه و جایزه‌ات اینجا می‌ماند.
+      </p>
+      <div className="lhList">
+        {seasons.map(s2 => (
+          <div className="lhRow" key={s2.monthYear + s2.rank}>
+            <span className="lhMedal">{medal(s2.rank)}</span>
+            <span className="lhMonth">{s2.monthYear}</span>
+            <span className="lhRank">رتبهٔ {fa(s2.rank)}</span>
+            <span className="lhPts">{fa(s2.points)} امتیاز</span>
+            {s2.prizeAmount > 0 && (
+              <span className="lhPrize">{fa(s2.prizeAmount)} تومان</span>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 

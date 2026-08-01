@@ -401,3 +401,7 @@ body {
 :root[data-theme='light'] .ccName { color: #4d7c0f; }
 :root[data-theme='light'] .ccWarn { background:#fff6e2; border-color:#d9a44166; color:#7a5a12; }
 :root[data-theme='light'] .rgScale b { color: var(--page-fg); }
+:root[data-theme='light'] .lhRow { background: var(--veil-2); border-color: var(--veil-5); }
+:root[data-theme='light'] .lhRank { color: var(--text-muted); }
+:root[data-theme='light'] .lhPts { color: var(--text-muted); }
+:root[data-theme='light'] .lhPrize { background:#eefbe0; color:#4d7c0f; }
