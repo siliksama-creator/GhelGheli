@@ -40,9 +40,12 @@ function GroupBar({ group, accent }) {
       <div className="rgTrack">
         <span style={{ width: pct + '%', background: accent }} />
       </div>
+      {/* Label the numbers. Bare "۱۰۰ ... ۲۵۰" at the ends of a bar is
+          ambiguous in RTL — a reader cannot tell which end is their score
+          and which is the target. */}
       <div className="rgScale">
-        <span>{fa(group.earnedPoints)}</span>
-        <span>{next ? fa(next.requiredPoints) : '—'}</span>
+        <span>امتیاز تو: <b>{fa(group.earnedPoints)}</b></span>
+        <span>هدف: <b>{next ? fa(next.requiredPoints) : '—'}</b></span>
       </div>
 
       {/* Cards this prize needs, with the artwork and how many you hold. */}

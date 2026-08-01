@@ -311,11 +311,18 @@ class _GroupCard extends StatelessWidget {
                   ),
                 ),
                 Gaps.vXxs,
+                // Bare numbers at the ends of a bar are ambiguous in RTL —
+                // a reader cannot tell which is their score and which is the
+                // target. Same labelling as the web client.
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(faNum(earned), style: theme.textTheme.labelSmall),
-                    Text(next == null ? '—' : faNum(next['requiredPoints']),
+                    Text('امتیاز تو: ${faNum(earned)}',
+                        style: theme.textTheme.labelSmall),
+                    Text(
+                        next == null
+                            ? 'هدف: —'
+                            : 'هدف: ${faNum(next['requiredPoints'])}',
                         style: theme.textTheme.labelSmall),
                   ],
                 ),
