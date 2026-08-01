@@ -71,17 +71,77 @@ body {
   transition: background-color .25s ease, color .25s ease;
 }
 
-/* The page wrapper paints its own gradient backdrop in style.css; in light
-   mode that dark wash has to go. */
-:root[data-theme='light'] .page::before,
-:root[data-theme='light'] .page::after {
-  opacity: .35;
+/* THE BACKDROP.
+   style.css paints two fixed layers on `body` — a dark navy gradient wash
+   (body:before) and a white grid overlay (body:after). Both are built for a
+   dark stage: left alone in light mode the page keeps navy edges and the
+   white grid disappears. Repaint them rather than hide them, so the light
+   theme keeps the same depth. */
+:root[data-theme='light'] body:before {
+  background:
+    radial-gradient(circle at 80% -10%, #1c78ff1f, transparent 38%),
+    radial-gradient(circle at 15% 15%, #00d49a1c, transparent 34%),
+    radial-gradient(circle at 50% 110%, #b5ef5824, transparent 32%),
+    linear-gradient(135deg, #f7fAfe 0%, #eaf1fb 48%, #f7fafe 100%);
+}
+:root[data-theme='light'] body:after {
+  /* Dark hairlines on a light page; the white ones were invisible. */
+  background-image:
+    linear-gradient(#101a2c0a 1px, transparent 1px),
+    linear-gradient(90deg, #101a2c08 1px, transparent 1px);
 }
 
+/* Cards are a translucent white veil over a dark page. On white that veil
+   reads as dirty grey, so give them a real opaque surface instead. */
 :root[data-theme='light'] .card {
-  background: linear-gradient(165deg, #ffffff, #fbfdff 48%, #00d49a0a);
-  border-color: var(--veil-7);
-  box-shadow: 0 20px 50px var(--shadow-strong), inset 0 1px 0 #ffffff;
+  background: linear-gradient(165deg, #ffffff, #fdfeff 55%, #f2fbf8);
+  border-color: #101a2c1f;
+  box-shadow: 0 18px 44px var(--shadow-strong), inset 0 1px 0 #ffffff;
+}
+
+/* Same problem for every other translucent surface. */
+:root[data-theme='light'] .heroCard,
+:root[data-theme='light'] .auth {
+  background: linear-gradient(160deg, #ffffff, #f6fbff 55%, #f2fbf8);
+  border-color: #101a2c1f;
+}
+:root[data-theme='light'] .auth:before {
+  background: #b5ef5833;
+}
+:root[data-theme='light'] .chatbox {
+  background: #101a2c05;
+  border-color: var(--veil-5);
+}
+:root[data-theme='light'] .sendDock,
+:root[data-theme='light'] .stickerTray {
+  background: #ffffffe8;
+  border-color: var(--veil-6);
+}
+:root[data-theme='light'] .bar {
+  background: var(--veil-4);
+}
+:root[data-theme='light'] .divider {
+  border-top-color: var(--veil-5);
+}
+:root[data-theme='light'] .empty {
+  border-color: #101a2c26;
+  color: var(--text-muted);
+}
+:root[data-theme='light'] .publicModal,
+:root[data-theme='light'] .emojiPopover {
+  background: #ffffff;
+  border-color: var(--veil-6);
+}
+:root[data-theme='light'] .tabs button {
+  background: var(--veil-2);
+  color: var(--page-fg);
+  border-color: var(--veil-5);
+}
+:root[data-theme='light'] .chatActions button,
+:root[data-theme='light'] .emojiBtn,
+:root[data-theme='light'] .stickerTray button {
+  background: var(--veil-3);
+  color: var(--page-fg);
 }
 
 :root[data-theme='light'] .appBar,
@@ -136,10 +196,22 @@ body {
   background: var(--veil-4);
 }
 
-/* Nav pills: the inactive ones need a visible surface on white. */
-:root[data-theme='light'] .mobileNav button {
-  background: var(--veil-2);
+/* Nav pills. style.css gives the inactive ones a hard #0b2039 navy, which
+   stays dark in light mode and made the whole nav strip look broken. */
+:root[data-theme='light'] .mobileNav,
+:root[data-theme='light'] .appBar {
+  background: #ffffffe8;
+  border-color: var(--veil-6);
+  box-shadow: 0 12px 30px var(--shadow-soft);
+}
+:root[data-theme='light'] .mobileNav button,
+:root[data-theme='light'] .tabs button {
+  background: #101a2c0a;
   color: var(--page-fg);
+  border-color: #101a2c14;
+}
+:root[data-theme='light'] .mobileNav button:hover {
+  background: #101a2c14;
 }
 :root[data-theme='light'] .mobileNav button.on {
   /* The active pill keeps the brand green, but its label must stay legible. */
