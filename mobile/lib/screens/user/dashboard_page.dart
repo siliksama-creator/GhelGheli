@@ -94,6 +94,7 @@ class _DashboardPageState extends State<DashboardPage> {
       await _load();
       await widget.reloadProfile();
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _message = apiError(e);
         _messageIsError = true;
@@ -148,7 +149,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 ClipRRect(
                   borderRadius: Corners.rLg,
                   child: Image.asset('assets/brand/card_pack_banner.webp',
-                      height: 130, fit: BoxFit.cover),
+                      height: 130, fit: BoxFit.cover, cacheHeight: 390),
                 ),
                 Gaps.vMd,
                 Text('ثبت کد کارت‌های قلقلی',

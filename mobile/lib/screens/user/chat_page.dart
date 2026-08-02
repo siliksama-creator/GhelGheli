@@ -169,6 +169,7 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
         'replyTo': _reply?['id'],
       });
       _text.clear();
+      if (!mounted) return;
       setState(() => _reply = null);
       _startCooldown();
       await _load();
@@ -252,8 +253,12 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
               children: [
                 ClipRRect(
                   borderRadius: Corners.rMd,
+                  // Shown at 64px but the source is 700px wide: without
+                  // cacheWidth Flutter decodes and stores the full bitmap,
+                  // ~40x the memory actually needed. 192 = 64 at 3x density.
                   child: Image.asset('assets/brand/chat_banner.webp',
-                      width: 64, height: 56, fit: BoxFit.cover),
+                      width: 64, height: 56, fit: BoxFit.cover,
+                      cacheWidth: 192),
                 ),
                 Gaps.hMd,
                 Expanded(

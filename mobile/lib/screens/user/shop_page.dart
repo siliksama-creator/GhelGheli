@@ -168,6 +168,7 @@ class _ShopPageState extends State<ShopPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Image.asset(clubAsset(slug), width: 84, height: 84,
+                cacheWidth: 252,
                 errorBuilder: (_, __, ___) => const SizedBox.shrink()),
             Gaps.vXs,
             Text('نشان «$name» می‌تواند عکس پروفایلت شود. '
@@ -373,6 +374,7 @@ class _MyClubsCard extends StatelessWidget {
                     Image.asset(clubAsset('${c['slug']}'),
                         width: 42,
                         height: 42,
+                        cacheWidth: 126,
                         fit: BoxFit.contain,
                         errorBuilder: (_, __, ___) =>
                             const Icon(Icons.shield_outlined, size: 42)),
@@ -660,6 +662,7 @@ class _ShopTile extends StatelessWidget {
         clubAsset(payload),
         width: 56,
         height: 56,
+        cacheWidth: 168,
         // contain, not cover: a crest is not a photo and cropping its corners
         // mangles the shield shapes.
         fit: BoxFit.contain,

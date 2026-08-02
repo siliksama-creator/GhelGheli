@@ -168,6 +168,10 @@ class _ProfilePageState extends State<ProfilePage> {
       });
       _currentPassword.clear();
       _newPassword.clear();
+      // The request can outlive this screen — the user may go back while it
+      // is in flight. setState() after dispose() throws, and in a release
+      // build that is a red error screen rather than a caught exception.
+      if (!mounted) return;
       setState(() {
         _passwordMessage = 'رمز عبور با موفقیت تغییر کرد';
         _passwordMessageIsError = false;
@@ -332,7 +336,7 @@ class _ProfilePageState extends State<ProfilePage> {
               ClipRRect(
                   borderRadius: Corners.rLg,
                   child: Image.asset('assets/brand/profile_banner.webp',
-                      height: 128, fit: BoxFit.cover)),
+                      height: 128, fit: BoxFit.cover, cacheHeight: 384)),
               Gaps.vMd,
               Text('تکمیل پروفایل خصوصی', style: theme.textTheme.headlineSmall),
               Gaps.vXxs,
@@ -376,6 +380,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           padding: const EdgeInsets.all(5),
                           child: Image.asset(clubAsset('${c['slug']}'),
                               fit: BoxFit.contain,
+                              cacheWidth: 150,
                               errorBuilder: (_, __, ___) =>
                                   const Icon(Icons.shield_outlined, size: 22)),
                         ),

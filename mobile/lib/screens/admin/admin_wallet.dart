@@ -71,7 +71,7 @@ class _AdminWalletState extends State<AdminWallet> {
       if (!mounted) return;
       setState(() {
         _stats = Map<String, dynamic>.from(res[0]);
-        _requests = res[1] as List;
+        _requests = res[1] is List ? res[1] as List : const [];
         _settings = Map<String, dynamic>.from(res[2]);
         _loading = false;
       });

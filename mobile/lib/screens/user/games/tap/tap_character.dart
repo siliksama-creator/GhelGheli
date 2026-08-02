@@ -269,6 +269,11 @@ class _SkinImage extends StatelessWidget {
       fit: BoxFit.contain,
       filterQuality: FilterQuality.medium,
       gaplessPlayback: true,
+      // The skins are ~620x900. The character never draws wider than about a
+      // third of a phone screen, and two of them are alive at once during a
+      // cross-fade. Halving the decode halves the steady-state cost of the
+      // screen the player spends the most time on.
+      cacheWidth: 480,
       // A missing skin must never blank the game area.
       errorBuilder: (_, __, ___) => const Center(
         child: Text('🟢', style: TextStyle(fontSize: 120)),

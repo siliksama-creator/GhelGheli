@@ -338,11 +338,16 @@ class _GroupCard extends StatelessWidget {
                     height: 76,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
-                      itemCount: (next!['requiredCards'] as List).length,
+                      // `as List` threw whenever the key was absent, which
+                      // it is for any cash-only tier — the server includes
+                      // requiredCards only when the group needs cards.
+                      itemCount:
+                          (next!['requiredCards'] as List? ?? const []).length,
                       separatorBuilder: (_, __) => Gaps.hXs,
                       itemBuilder: (_, i) {
                         final c = Map<String, dynamic>.from(
-                            (next['requiredCards'] as List)[i] as Map);
+                            ((next['requiredCards'] as List? ?? const [])[i])
+                                as Map);
                         final met = c['met'] == true;
                         return Opacity(
                           opacity: met ? 1 : 0.5,

@@ -96,6 +96,7 @@ class _TicketThreadPageState extends State<TicketThreadPage> {
         'attachments': _attachments,
       });
       _reply.clear();
+      if (!mounted) return;
       setState(() => _attachments = []);
       await _load();
     } catch (e) {

@@ -21,9 +21,16 @@ class AvatarImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final url = fullAssetUrl(imageUrl);
+    // Decode at the size actually drawn. Avatars appear in every chat row,
+    // every league row and every club roster row; at a 32px radius the
+    // widget draws 64 logical px, so a full-resolution decode of each
+    // distinct avatar is pure waste multiplied by the length of the list.
+    // x3 covers the densest common Android screen.
+    final cacheSide = (radius * 2 * 3).round();
     final image = url.isNotEmpty
-        ? NetworkImage(url)
-        : AssetImage(avatarAsset(keyName)) as ImageProvider;
+        ? ResizeImage(NetworkImage(url), width: cacheSide)
+        : ResizeImage(AssetImage(avatarAsset(keyName)), width: cacheSide)
+            as ImageProvider;
     final avatar = CircleAvatar(radius: radius, backgroundImage: image);
     if (!ring) return avatar;
     final scheme = Theme.of(context).colorScheme;

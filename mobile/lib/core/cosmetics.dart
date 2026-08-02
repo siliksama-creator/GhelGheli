@@ -61,6 +61,12 @@ class ClubBadge extends StatelessWidget {
         width: size,
         height: size,
         fit: BoxFit.contain,
+        // THE HOTTEST IMAGE IN THE APP. This badge is drawn beside every
+        // chat message and every league row, at 15px, from a 512px source.
+        // Without cacheWidth each distinct crest costs 1 MB of decoded
+        // bitmap; a chat full of different clubs could alone exceed the
+        // 40 MB cache and start evicting everything else.
+        cacheWidth: (size * 3).round(),
         // A crest for a club that was retired from the catalogue should
         // vanish, not leave a broken-image box next to someone's name.
         errorBuilder: (_, __, ___) => const SizedBox.shrink(),

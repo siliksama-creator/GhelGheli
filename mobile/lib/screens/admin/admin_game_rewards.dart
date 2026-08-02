@@ -48,14 +48,18 @@ class _AdminGameRewardsState extends State<AdminGameRewards> {
       final batch = await widget.api.getAll(
           ['/api/admin/settings/games', '/api/admin/games/results']);
       if (!mounted) return;
-      final s = Map<String, dynamic>.from(batch[0] as Map);
+      // A batch element is only a Map on success; an error response is a
+      // String and used to throw here instead of showing the message.
+      final s = batch[0] is Map
+          ? Map<String, dynamic>.from(batch[0] as Map)
+          : <String, dynamic>{};
       setState(() {
         _enabled = s['enabled'] == true;
         _win.text = '${s['winPoints'] ?? 10}';
         _lose.text = '${s['losePoints'] ?? 0}';
         _draw.text = '${s['drawPoints'] ?? 0}';
         _cap.text = '${s['dailyCap'] ?? 10}';
-        _results = batch[1] as List;
+        _results = batch[1] is List ? batch[1] as List : const [];
         _loading = false;
       });
     } catch (e) {

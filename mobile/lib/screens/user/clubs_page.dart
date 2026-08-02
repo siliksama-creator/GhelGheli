@@ -106,6 +106,10 @@ class _ClubsTabState extends State<ClubsTab> {
                             clubAsset('${c['slug']}'),
                             width: 52,
                             height: 52,
+                            // 16 crests in this grid at 512px each is 17 MB
+                            // decoded — nearly half the whole image cache —
+                            // to draw them at 52px. 156 = 52 at 3x.
+                            cacheWidth: 156,
                             fit: BoxFit.contain,
                             errorBuilder: (_, __, ___) =>
                                 const Icon(Icons.shield_outlined, size: 52),
@@ -176,6 +180,7 @@ class _RosterState extends State<_Roster> {
             Image.asset(clubAsset('${widget.club['slug']}'),
                 width: 36,
                 height: 36,
+                cacheWidth: 108,
                 fit: BoxFit.contain,
                 errorBuilder: (_, __, ___) =>
                     const Icon(Icons.shield_outlined, size: 36)),

@@ -94,7 +94,10 @@ class _AdminRewardsState extends State<AdminRewards> {
   Future<void> _pickRewardImage() async {
     final x = await ImagePicker()
         .pickImage(source: ImageSource.gallery, imageQuality: 82);
-    if (x == null) return;
+    // The gallery is a separate activity and can stay open for minutes; on a
+    // low-memory device Android may destroy this one behind it. Checking
+    // `x == null` is not enough — the widget itself may be gone.
+    if (x == null || !mounted) return;
     setState(() {
       _uploadingImage = true;
       _imageError = null;

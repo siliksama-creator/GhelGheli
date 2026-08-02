@@ -135,7 +135,8 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
                 ClipRRect(
                   borderRadius: Corners.rLg,
                   child: Image.asset('assets/brand/league_banner.webp',
-                      height: 116, width: double.infinity, fit: BoxFit.cover),
+                      height: 116, width: double.infinity, fit: BoxFit.cover,
+                      cacheHeight: 348),
                 ),
                 Gaps.vMd,
                 const Text('لیگ ماهانه قلقلی',

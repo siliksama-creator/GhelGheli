@@ -60,6 +60,9 @@ class _AuthScreenState extends State<AuthScreen> {
     try {
       await fn();
     } catch (e) {
+      // A failed login can resolve after the user has already navigated
+      // away; guard before touching state.
+      if (!mounted) return;
       setState(() {
         _errorMessage = apiError(e);
         if (_mode == _AuthMode.register && apiStatusCode(e) == 409) {
@@ -135,8 +138,11 @@ class _AuthScreenState extends State<AuthScreen> {
         fit: StackFit.expand,
         children: [
           Positioned.fill(
+              // Full-bleed backdrop behind a translucent card, so it can be
+              // decoded well below its native 768x1376 without any visible
+              // difference — it is heavily darkened by the gradient above it.
               child: Image.asset('assets/brand/login_hero.webp',
-                  fit: BoxFit.cover)),
+                  fit: BoxFit.cover, cacheWidth: 720)),
           const Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(

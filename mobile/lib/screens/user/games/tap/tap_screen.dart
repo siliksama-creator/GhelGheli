@@ -454,6 +454,7 @@ class _CompletionView extends StatelessWidget {
             child: Image.asset(
               skin,
               fit: BoxFit.contain,
+              cacheWidth: 600,
               errorBuilder: (_, __, ___) =>
                   const Text('🏆', style: TextStyle(fontSize: 90)),
             ),

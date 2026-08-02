@@ -92,6 +92,7 @@ class _SupportPageState extends State<SupportPage> {
       });
       _subject.clear();
       _message.clear();
+      if (!mounted) return;
       setState(() => _attachments = []);
       _toast('تیکت ثبت شد');
       await _load();

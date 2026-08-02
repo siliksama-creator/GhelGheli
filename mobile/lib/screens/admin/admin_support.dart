@@ -83,6 +83,7 @@ class _AdminSupportState extends State<AdminSupport> {
           '/api/admin/support/tickets/${_selected!['id']}/messages',
           {'message': _reply.text.trim(), 'attachments': _attachments});
       _reply.clear();
+      if (!mounted) return;
       setState(() => _attachments = []);
       await _open(_selected!);
       await _load();
@@ -123,6 +124,7 @@ class _AdminSupportState extends State<AdminSupport> {
           {});
       final refreshed = Map<String, dynamic>.from(_selected!)
         ..['status'] = close ? 'closed' : 'open';
+      if (!mounted) return;
       setState(() => _selected = refreshed);
       await _load();
       _toast(close ? 'تیکت بسته شد' : 'تیکت دوباره باز شد');

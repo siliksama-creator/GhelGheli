@@ -105,7 +105,10 @@ class _CardTypeSheetState extends State<CardTypeSheet>
   Future<void> _pickImage() async {
     final x = await ImagePicker()
         .pickImage(source: ImageSource.gallery, imageQuality: 82);
-    if (x == null) return;
+    // The gallery is a separate activity and can stay open for minutes; on a
+    // low-memory device Android may destroy this one behind it. Checking
+    // `x == null` is not enough — the widget itself may be gone.
+    if (x == null || !mounted) return;
     setState(() {
       _uploading = true;
       _imageError = null;
@@ -495,7 +498,8 @@ class _BulkReport extends StatelessWidget {
           if ((report['invalid'] as List?)?.isNotEmpty ?? false) ...[
             Gaps.vXxs,
             Text(
-              'نمونهٔ نامعتبرها: ${(report['invalid'] as List).take(5).join('، ')}',
+              'نمونهٔ نامعتبرها: '
+              '${(report['invalid'] as List? ?? const []).take(5).join('، ')}',
               style: theme.textTheme.bodySmall
                   ?.copyWith(color: BrandColors.danger, fontSize: 11),
             ),
