@@ -305,7 +305,17 @@ class _FloaterState extends State<_Floater>
     _c = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 700),
-    )..forward().then((_) => widget.onDone());
+    );
+    // `mounted` guard: the parent evicts the oldest floater once more than 14
+    // exist, so this widget can be disposed before its 700ms is up. Without
+    // the check the callback still runs and calls setState on the parent for
+    // an id that is no longer in the list.
+    //
+    // Unlike the squash controller this one is started once and never
+    // interrupted, so `.then` here cannot orphan a TickerFuture.
+    _c.forward().then((_) {
+      if (mounted) widget.onDone();
+    });
   }
 
   @override
