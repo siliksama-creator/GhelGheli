@@ -460,3 +460,27 @@ body {
 :root[data-theme='light'] .short { color: #c02040; }
 :root[data-theme='light'] .avatars .clubAvatarPick { background: var(--veil-3); }
 :root[data-theme='light'] .rosterNew { color: var(--text-muted); }
+
+/* ── Animated brand mark in light mode ──────────────────────────────────
+   The aurora is a green wash designed to read against a near-black page; on
+   the light canvas it is invisible, so it is strengthened and shifted
+   warmer. The logo's drop shadow is the opposite problem: `#000a` under a
+   mark floating on white looks like a heavy smudge, so it becomes a soft
+   coloured shadow instead. The sweep also needs to be dimmer — `screen`
+   blending adds light, and on a bright background there is less headroom
+   before it clips to white. */
+:root[data-theme='light'] .heroAurora {
+  background:
+    radial-gradient(closest-side, #6ba31f2e, #00a97a1a 46%, transparent 72%);
+}
+:root[data-theme='light'] .heroMark img {
+  filter: drop-shadow(0 16px 30px #1a3d0a2e);
+}
+:root[data-theme='light'] .heroSweep {
+  background: linear-gradient(112deg,
+    transparent 44%, #ffffff5c 50%, transparent 56%);
+}
+:root[data-theme='light'] .heroSparks i {
+  background: #f6ffe2;
+  box-shadow: 0 0 10px 2px #6ba31fcc;
+}
