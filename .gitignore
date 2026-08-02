@@ -16,3 +16,11 @@ apk/
 # Build output (built on the server / in CI, never committed — a tracked
 # dist/ makes `git pull` conflict on the VPS every deploy).
 userweb/dist/
+
+# ── signing material — never commit ────────────────────────────────────────
+# The release keystore is the ONLY way to update an already-installed app.
+# Committing it to a repo (even a private one) puts it in every clone and
+# every CI cache. It lives in GitHub Actions secrets and offline copies.
+*.jks
+*.keystore
+**/key.properties
