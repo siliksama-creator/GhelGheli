@@ -62,8 +62,16 @@ class TapProgress {
   static TapProgress fromJson(Map<String, dynamic> json) {
     int readInt(String key) {
       final v = json[key];
-      if (v is int) return v < 0 ? 0 : v;
-      if (v is num) return v.toInt().clamp(0, 1 << 40);
+      // Clamp the TOP as well as the bottom. `v is int` returned the value
+      // untouched however large it was, so a hand-edited prefs file could
+      // seed a level of 1e9 — which then flowed into the difficulty curve and
+      // overflowed it. The engine clamps level separately, but a counter in
+      // the billions is meaningless everywhere else too.
+      if (v is int) return v.clamp(0, 1 << 40);
+      if (v is num) {
+        if (!v.isFinite) return 0;
+        return v.toInt().clamp(0, 1 << 40);
+      }
       return 0;
     }
 

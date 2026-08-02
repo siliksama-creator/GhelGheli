@@ -4,6 +4,8 @@
 // in this app); this file listens and paints. Follows the same
 // `{Game}Screen(api, onBack)` contract as the other games so the hub can
 // launch it identically.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -56,6 +58,9 @@ class _TapGameScreenState extends State<TapGameScreen>
 
   @override
   void dispose() {
+    // Must be cancelled: a pending rebuild firing after dispose would call
+    // setState on a defunct State.
+    _rebuildTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _engine.removeListener(_onEngineChanged);
     _engine.dispose();
@@ -75,6 +80,14 @@ class _TapGameScreenState extends State<TapGameScreen>
   void _onEngineChanged() {
     if (!mounted) return;
 
+    // Coalesce rebuilds to one per frame.
+    //
+    // The engine notifies on every tap, and at the 12/s ceiling a player who
+    // is hammering also generates a notification for every REJECTED tap —
+    // taps that change nothing on screen. Each one triggered a full subtree
+    // rebuild including the progress bar's TweenAnimationBuilder. Marking
+    // dirty at most once per frame keeps the UI identical while cutting the
+    // work to what the display can actually show.
     if (_engine.eventSerial != _seenEventSerial) {
       _seenEventSerial = _engine.eventSerial;
       switch (_engine.lastEvent) {
@@ -101,7 +114,21 @@ class _TapGameScreenState extends State<TapGameScreen>
           break;
       }
     }
-    setState(() {});
+    _scheduleRebuild();
+  }
+
+  Timer? _rebuildTimer;
+
+  void _scheduleRebuild() {
+    if (_rebuildTimer?.isActive ?? false) return;
+    // A short timer rather than addPostFrameCallback: the post-frame callback
+    // only runs when a frame is already scheduled, and if the last tap of a
+    // burst arrives while the tree happens to be idle the rebuild would never
+    // fire and the counter would freeze until the next tap. A 16ms timer is
+    // one frame at 60Hz and always runs.
+    _rebuildTimer = Timer(const Duration(milliseconds: 16), () {
+      if (mounted) setState(() {});
+    });
   }
 
   void _showSkinToast() {

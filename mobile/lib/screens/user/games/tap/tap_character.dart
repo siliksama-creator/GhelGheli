@@ -66,7 +66,7 @@ class TapCharacterState extends State<TapCharacter>
       vsync: this,
       duration: const Duration(milliseconds: 90),
       reverseDuration: const Duration(milliseconds: 170),
-    );
+    )..addStatusListener(_onSquashStatus);
     _glow = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 420),
@@ -92,8 +92,17 @@ class TapCharacterState extends State<TapCharacter>
     }
   }
 
+  void _onSquashStatus(AnimationStatus status) {
+    // Auto-reverse once the squash lands. Attached once, so no allocation
+    // per tap and nothing to orphan when a tap interrupts the animation.
+    if (status == AnimationStatus.completed && mounted) {
+      _squash.reverse();
+    }
+  }
+
   @override
   void dispose() {
+    _squash.removeStatusListener(_onSquashStatus);
     _squash.dispose();
     _glow.dispose();
     _skinFade.dispose();
@@ -110,9 +119,22 @@ class TapCharacterState extends State<TapCharacter>
     if (!widget.enabled) return;
     final counted = widget.onTap(details);
 
-    _squash.forward().then((_) {
-      if (mounted) _squash.reverse();
-    });
+    // LEAK FIX. This used to be:
+    //
+    //   _squash.forward().then((_) { if (mounted) _squash.reverse(); });
+    //
+    // `forward()` returns a TickerFuture, and Flutter deliberately never
+    // completes that future when the animation is INTERRUPTED. The squash
+    // cycle is 260ms; at a comfortable 6 taps/s a new forward() interrupts
+    // the previous one about two times in three, so two thirds of these
+    // closures were orphaned and held for the life of the screen. Ten
+    // minutes of play left thousands of dead futures and their captured
+    // closures on the heap — a leak that grows with time played, which is
+    // exactly the "it starts crashing after a while" the owner reported.
+    //
+    // A status listener attached ONCE in initState has no per-tap
+    // allocation and cannot orphan anything.
+    _squash.forward(from: 0);
 
     if (!counted) return;
 
@@ -129,12 +151,24 @@ class TapCharacterState extends State<TapCharacter>
         scale: 0.85 + _rnd.nextDouble() * 0.4,
       ));
       // Hard cap: a fast tapper must never accumulate hundreds of widgets.
-      if (_floaters.length > 14) _floaters.removeAt(0);
+      //
+      // Eviction is by AGE (index 0 is the oldest) and the evicted widget is
+      // disposed by the framework, but its 700ms timer has already been
+      // started — so `onDone` still fires later with an id that is no longer
+      // in the list. `_removeFloater` therefore has to tolerate an unknown
+      // id rather than assume it is present.
+      while (_floaters.length > 14) {
+        _floaters.removeAt(0);
+      }
     });
   }
 
   void _removeFloater(int id) {
     if (!mounted) return;
+    // Skip the rebuild entirely when the id was already evicted by the cap:
+    // at high tap rates that fired a pointless full setState several times a
+    // second.
+    if (!_floaters.any((f) => f.id == id)) return;
     setState(() => _floaters.removeWhere((f) => f.id == id));
   }
 

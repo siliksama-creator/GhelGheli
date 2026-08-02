@@ -73,12 +73,57 @@ class TapGameConfig {
 
   /// Taps needed to clear [level] (1-based).
   ///
-  /// Kept as a pure function so it can be unit-tested and so the server can
-  /// mirror the exact same formula.
+  /// CRASH FIX. The old version was `(baseTaps * pow).round()` over a raw
+  /// double, with no bound on `level`:
+  ///
+  ///   * around level 300 the product exceeds 2^63 and `.round()` returns an
+  ///     undefined int — in practice a negative one, which makes the
+  ///     level-up `while` loop in the engine run forever;
+  ///   * around level 1100 the double reaches Infinity and `.round()` throws
+  ///     `UnsupportedError`, killing the frame.
+  ///
+  /// A player cannot legitimately pass [levelCount], but the engine adopts
+  /// whatever `level` the SERVER reports after a sync and nothing clamped the
+  /// upper end there. One bad response, one edited prefs file, or one large
+  /// offline batch and the game starts throwing on every rebuild — which is
+  /// exactly the reported "after a while it starts crashing".
+  ///
+  /// Clamping to [levelCount] is correct rather than defensive: beyond the
+  /// last level the game is complete and the requirement is meaningless.
   int requiredTaps(int level) {
     if (level < 1) return baseTaps;
-    final raw = baseTaps * _pow(growthFactor, level - 1);
-    return raw.round();
+    final capped = level > levelCount ? levelCount : level;
+    return _curve[capped - 1];
+  }
+
+  /// The whole curve, computed once per distinct configuration.
+  ///
+  /// `requiredTaps` used to run an O(level) multiply loop, and it is called
+  /// several times per rebuild — and the screen rebuilds on EVERY tap. At
+  /// level 50 that was ~150 float operations per frame to answer a question
+  /// whose inputs never change. A lookup table makes it O(1).
+  ///
+  /// The cache is STATIC rather than an instance field because this class
+  /// must stay `const`-constructible: it is a default parameter value on
+  /// TapGameScreen, and Dart requires those to be compile-time constants.
+  /// The key covers every input to the curve, so two configs that differ in
+  /// difficulty never share a table.
+  static final Map<String, List<int>> _curveCache = {};
+
+  List<int> get _curve {
+    final key = '$levelCount|$baseTaps|$growthFactor';
+    return _curveCache.putIfAbsent(key, () {
+      return List<int>.generate(levelCount, (i) {
+        var v = baseTaps.toDouble();
+        for (var n = 0; n < i; n++) {
+          v *= growthFactor;
+        }
+        // Belt and braces: an operator could set an absurd growthFactor in a
+        // future tuning pass and the same overflow would return.
+        if (!v.isFinite || v > 1e15) return 1000000000;
+        return v.round();
+      });
+    });
   }
 
   /// Artwork for [level], clamped to the available skins so level 50 with
@@ -97,24 +142,24 @@ class TapGameConfig {
   int skinIndexForLevel(int level) {
     if (skins.isEmpty) return 0;
     if (level < levelsPerSkin) return 0;
+    // clamp() on a negative or absurd level would still be well-defined, but
+    // guarding here keeps every caller safe without repeating the check.
+    if (level < 0) return 0;
     return (level ~/ levelsPerSkin).clamp(0, skins.length - 1);
   }
 
   /// Total taps needed to go from level 1 all the way through [level].
+  ///
+  /// Bounded by [levelCount] for the same reason as [requiredTaps]: an
+  /// out-of-range level used to spin this loop millions of times on the UI
+  /// thread.
   int cumulativeTaps(int level) {
+    final capped = level > levelCount ? levelCount : level;
     var sum = 0;
-    for (var i = 1; i <= level; i++) {
+    for (var i = 1; i <= capped; i++) {
       sum += requiredTaps(i);
     }
     return sum;
-  }
-
-  static double _pow(double base, int exp) {
-    var result = 1.0;
-    for (var i = 0; i < exp; i++) {
-      result *= base;
-    }
-    return result;
   }
 
   TapGameConfig copyWith({

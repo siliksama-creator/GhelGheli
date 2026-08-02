@@ -29,9 +29,45 @@ export const TAP_CONFIG = {
   maxBatchTaps: 400,
 };
 
-export const requiredTaps = (level, cfg = TAP_CONFIG) =>
-  level < 1 ? cfg.baseTaps
-    : Math.round(cfg.baseTaps * Math.pow(cfg.growthFactor, level - 1));
+// Taps needed to clear `level`.
+//
+// CRASH FIX, mirroring the Flutter side. The old version was an unbounded
+// `baseTaps * growthFactor^(level-1)`:
+//
+//   * past level ~300 the result exceeds Number.MAX_SAFE_INTEGER and the
+//     arithmetic silently loses precision;
+//   * past level ~1100 it becomes Infinity, and then `taps >= Infinity` is
+//     never true, so the level-up loop stops advancing and the progress bar
+//     divides by Infinity — the UI freezes on a level it can never clear.
+//
+// A player cannot legitimately pass levelCount, but the client adopts
+// whatever `level` the SERVER reports after a sync, and nothing clamped the
+// upper end. Clamping is also semantically right: past the last level the
+// game is complete and the requirement is meaningless.
+//
+// The curve is memoised because this is called several times per render and
+// the render happens on every tap.
+const _curveCache = new Map();
+const _curve = (cfg) => {
+  const key = `${cfg.levelCount}|${cfg.baseTaps}|${cfg.growthFactor}`;
+  let table = _curveCache.get(key);
+  if (!table) {
+    table = new Array(cfg.levelCount);
+    let v = cfg.baseTaps;
+    for (let i = 0; i < cfg.levelCount; i++) {
+      table[i] = Number.isFinite(v) && v < 1e15 ? Math.round(v) : 1e9;
+      v *= cfg.growthFactor;
+    }
+    _curveCache.set(key, table);
+  }
+  return table;
+};
+
+export const requiredTaps = (level, cfg = TAP_CONFIG) => {
+  if (level < 1) return cfg.baseTaps;
+  const capped = level > cfg.levelCount ? cfg.levelCount : level;
+  return _curve(cfg)[capped - 1];
+};
 
 // The character changes ON arrival at level 10, 20, 30, 40 — levels 1-9 are
 // skin 1, level 10 is already skin 2. Dividing (level - 1) pushed every
@@ -145,6 +181,32 @@ export default function TapGame({ token, onBack }) {
 
   useEffect(() => { progressRef.current = progress; }, [progress]);
 
+  // TRACKED TIMEOUTS.
+  //
+  // The tap handler fired bare setTimeout()s that call setState — one for the
+  // squash reset and one per floating "+1", plus more on level-up. None were
+  // cancelled, so leaving the screen mid-session left up to ~15 pending
+  // callbacks that then ran against an unmounted component. React logs a
+  // warning for each and the closures keep the whole component tree alive
+  // until they fire.
+  //
+  // At several taps per second over a long session this is the browser-side
+  // twin of the Flutter ticker leak, and it is why the game degraded the
+  // longer it was played.
+  const timers = useRef(new Set());
+  const later = useCallback((fn, ms) => {
+    const id = setTimeout(() => {
+      timers.current.delete(id);
+      fn();
+    }, ms);
+    timers.current.add(id);
+    return id;
+  }, []);
+  useEffect(() => () => {
+    for (const id of timers.current) clearTimeout(id);
+    timers.current.clear();
+  }, []);
+
   const level = progress.level;
   const isComplete = level > TAP_CONFIG.levelCount;
   const need = requiredTaps(level);
@@ -235,9 +297,17 @@ export default function TapGame({ token, onBack }) {
             ...p,
             pendingTaps: Math.max(0, p.pendingTaps - sentTaps),
           };
-          if (res.level !== p.level || Math.abs((res.levelTaps ?? p.taps) - p.taps) > 5) {
-            next.level = res.level;
-            next.taps = Math.min(res.levelTaps ?? 0, requiredTaps(res.level));
+          // Clamp the level the SERVER pushes, not just the one loaded from
+          // storage. This is the path that actually reached the broken curve
+          // in production: it needs a sync to happen first, which is why the
+          // fault only appeared "after a while".
+          const safeLevel = Math.min(
+            Math.max(1, Math.floor(res.level)),
+            TAP_CONFIG.levelCount + 1,
+          );
+          if (safeLevel !== p.level || Math.abs((res.levelTaps ?? p.taps) - p.taps) > 5) {
+            next.level = safeLevel;
+            next.taps = Math.min(res.levelTaps ?? 0, requiredTaps(safeLevel));
             next.totalTaps = res.totalTaps ?? p.totalTaps;
           }
           saveProgress(next);
@@ -313,7 +383,7 @@ export default function TapGame({ token, onBack }) {
 
     const verdict = registerTap(guardRef.current, clock());
     setSquash(true);
-    setTimeout(() => setSquash(false), 110);
+    later(() => setSquash(false), 110);
 
     if (verdict !== 'accepted') {
       batchRef.current.flagged++;
@@ -332,7 +402,7 @@ export default function TapGame({ token, onBack }) {
       const cy = (e.clientY ?? box.top + box.height / 2) - box.top;
       const id = floaterId.current++;
       setFloaters(f => [...f.slice(-13), { id, x: cx, y: cy, dx: (Math.random() - 0.5) * 50 }]);
-      setTimeout(() => setFloaters(f => f.filter(x => x.id !== id)), 700);
+      later(() => setFloaters(f => f.filter(x => x.id !== id)), 700);
     }
 
     setProgress(p => {
@@ -341,8 +411,15 @@ export default function TapGame({ token, onBack }) {
       const prevSkin = skinIndexForLevel(lv);
       let leveled = false;
       // `while`, not `if`: a big offline batch can clear several levels.
-      while (lv <= TAP_CONFIG.levelCount && taps >= requiredTaps(lv)) {
-        taps -= requiredTaps(lv);
+      // Bounded: a zero-cost level would otherwise spin forever and lock the
+      // tab. requiredTaps can no longer return 0, but the guard is free.
+      let spins = 0;
+      while (lv <= TAP_CONFIG.levelCount
+             && taps >= requiredTaps(lv)
+             && spins++ < TAP_CONFIG.levelCount) {
+        const cost = requiredTaps(lv);
+        if (cost <= 0) break;
+        taps -= cost;
         lv += 1;
         leveled = true;
       }
@@ -356,17 +433,17 @@ export default function TapGame({ token, onBack }) {
       if (leveled) {
         playSfx('match_found');
         setPulse(true);
-        setTimeout(() => setPulse(false), 450);
+        later(() => setPulse(false), 450);
         if (skinIndexForLevel(lv) !== prevSkin) {
           playSfx('win');
           setNotice('شخصیت جدید باز شد! 🎉');
-          setTimeout(() => setNotice(''), 2500);
+          later(() => setNotice(''), 2500);
         }
         // A level boundary is a natural checkpoint.
-        setTimeout(() => flush(true), 0);
+        later(() => flush(true), 0);
       } else {
         playSfx('tap', 0.5);
-        if (batchRef.current.taps >= TAP_CONFIG.maxBatchTaps) setTimeout(() => flush(), 0);
+        if (batchRef.current.taps >= TAP_CONFIG.maxBatchTaps) later(() => flush(), 0);
       }
       return next;
     });

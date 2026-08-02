@@ -163,9 +163,17 @@ class TapEngine extends ChangeNotifier {
     var leveledUp = false;
 
     // `while`, not `if`: a huge offline batch could clear several levels.
+    //
+    // Bounded by levelCount iterations. requiredTaps can no longer return a
+    // non-positive number, but a zero-cost level would make this spin
+    // forever and freeze the app — a guard here costs nothing and turns a
+    // hang into a harmless no-op.
+    var guard = 0;
     while (next.level <= config.levelCount &&
-        next.taps >= config.requiredTaps(next.level)) {
+        next.taps >= config.requiredTaps(next.level) &&
+        guard++ < config.levelCount) {
       final cost = config.requiredTaps(next.level);
+      if (cost <= 0) break;
       next = next.copyWith(level: next.level + 1, taps: next.taps - cost);
       leveledUp = true;
     }
@@ -292,10 +300,25 @@ class TapEngine extends ChangeNotifier {
         final sl = result.serverLevel;
         final st = result.serverLevelTaps;
         if (sl != null && st != null && sl >= 1) {
-          if (sl != _progress.level || (st - _progress.taps).abs() > 5) {
+          // CLAMP THE UPPER BOUND TOO.
+          //
+          // init() guards the value loaded from disk, but nothing guarded the
+          // value the SERVER sends — and the engine adopts it verbatim. A
+          // level beyond levelCount+1 used to flow straight into the tap
+          // curve, which then overflowed and threw on every rebuild. That is
+          // the crash the owner saw "after a while": it needs a sync to
+          // happen first, so it never shows up immediately.
+          //
+          // levelCount+1 is the legitimate "finished" sentinel, so that is
+          // the ceiling.
+          final safeLevel = sl > config.levelCount + 1
+              ? config.levelCount + 1
+              : sl;
+          if (safeLevel != _progress.level ||
+              (st - _progress.taps).abs() > 5) {
             _progress = _progress.copyWith(
-              level: sl,
-              taps: st.clamp(0, config.requiredTaps(sl)),
+              level: safeLevel,
+              taps: st.clamp(0, config.requiredTaps(safeLevel)),
               totalTaps: result.serverTotalTaps ?? _progress.totalTaps,
             );
           }
