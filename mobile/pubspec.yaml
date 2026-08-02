@@ -61,16 +61,51 @@ flutter_launcher_icons:
   adaptive_icon_monochrome: "assets/icon/icon_monochrome.png"
   min_sdk_android: 23
 
+# LAUNCH SPLASH.
+#
+# Three real defects were fixed here; keep the comments, they are the reason
+# each line looks the way it does.
+#
+# 1. ANDROID 12+ CROPS THE SPLASH ICON TO A CIRCLE. Since Android 12 the boot
+#    screen is drawn by the SYSTEM: it fits `android_12.image` into a 240dp
+#    circle and reveals only the inner 160dp. We were handing it the same
+#    full-length standing character used for the legacy splash, so the head
+#    and feet fell outside the circle and the boot screen showed a slice of
+#    torso. `android_12` now gets its own square, face-centred, padded image.
+#
+# 2. NO DARK-MODE ENTRY. Without `color_dark`/`image_dark`, a device in dark
+#    mode fell back to the platform default — a white flash before the app's
+#    dark theme painted. Both modes are declared, with the same near-black
+#    the app itself opens on, so there is no flash in either.
+#
+# 3. `fullscreen: true` HID THE STATUS BAR for the splash only. The app then
+#    restores it a frame later, so the whole UI visibly jumped down at
+#    startup. The splash now keeps the normal system bars, and the transition
+#    into the app is seamless.
 flutter_native_splash:
+  # Matches BrandColors' dark canvas, so the splash and the first frame of
+  # the app are literally the same colour.
   color: "#060D18"
   image: assets/splash/splash_logo.png
+  color_dark: "#060D18"
+  image_dark: assets/splash/splash_logo.png
+
   android_12:
     color: "#060D18"
-    image: assets/splash/splash_logo.png
+    color_dark: "#060D18"
+    # Square, face-centred crop with its own padding: this one goes inside
+    # the system's circular mask.
+    image: assets/splash/splash_android12.png
+    image_dark: assets/splash/splash_android12.png
+    # The circle behind the icon. Same colour as the page, so the mask is
+    # invisible instead of reading as a grey coin behind the character.
     icon_background_color: "#060D18"
+    icon_background_color_dark: "#060D18"
+
   android: true
   ios: false
-  fullscreen: true
+  # See note 3 above: hiding the bars here made the app jump on launch.
+  fullscreen: false
 
 flutter:
   uses-material-design: true
