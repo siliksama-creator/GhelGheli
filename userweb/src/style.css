@@ -1596,3 +1596,31 @@
   .heroMark { opacity: 1; transform: none; }
   .heroSweep { opacity: 0; }
 }
+
+/* ═══ Off-screen rendering cost ════════════════════════════════════════════
+   The chat can hold 100 messages and the league table 100 rows. React builds
+   them all — that is correct for a browser, but the BROWSER then also styles,
+   lays out and paints every one, including the rows scrolled far out of view.
+   On a mid-range Android phone that is the difference between a smooth
+   scroll and a stuttering one.
+
+   `content-visibility: auto` tells the browser to skip layout and paint for
+   an element that is off-screen, while still keeping it in the DOM and
+   searchable. `contain-intrinsic-size` supplies a placeholder height so the
+   scrollbar does not jump as rows enter and leave.
+
+   The values are the measured natural heights of each row type; being a
+   little off only affects scrollbar smoothness, never correctness. */
+.chatmsg {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 96px;
+}
+.leagueRow,
+.rosterRow {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 62px;
+}
+.clubCard {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 148px;
+}
