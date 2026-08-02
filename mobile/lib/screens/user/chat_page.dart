@@ -297,10 +297,28 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
           )
         else
           Expanded(
-            child: ListView(
+            // ListView.builder, NOT ListView(children: [...]).
+            //
+            // The old form spread all 100 messages into the children list, so
+            // every bubble — and every avatar inside it — was constructed and
+            // laid out on each build, including the ones scrolled far out of
+            // view. The screen rebuilds on every 10-second poll and on every
+            // send, so that was ~100 widget subtrees rebuilt for a change
+            // that usually affects one row.
+            //
+            // The header (stickers, spacing) is item 0 and the messages
+            // follow, which keeps a single scroll view while letting Flutter
+            // build only what is visible.
+            child: ListView.builder(
               controller: _scroll,
               padding: const EdgeInsets.symmetric(horizontal: Gaps.md),
-              children: [
+              // +1 header, +1 trailing gap
+              itemCount: _messages.length + 2,
+              itemBuilder: (context, index) {
+                if (index == 0) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
                 if (_stickers.isNotEmpty)
                   SizedBox(
                     height: 74,
@@ -328,18 +346,23 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
                       },
                     ),
                   ),
-                Gaps.vXs,
-                ..._messages.map((m) => _ChatBubble(
-                      message: m,
-                      onTapAvatar: () =>
-                          showPublicProfile(context, widget.api, m['user_id']),
-                      onReply: () => setState(() => _reply = Map.from(m)),
-                      onLike: () => _like(m['id']),
-                      onReport: () => widget.api
-                          .post('/api/chat/messages/${m['id']}/report', {}),
-                    )),
-                Gaps.vMd,
-              ],
+                      Gaps.vXs,
+                    ],
+                  );
+                }
+                if (index == _messages.length + 1) return Gaps.vMd;
+
+                final m = _messages[index - 1];
+                return _ChatBubble(
+                  message: m,
+                  onTapAvatar: () =>
+                      showPublicProfile(context, widget.api, m['user_id']),
+                  onReply: () => setState(() => _reply = Map.from(m)),
+                  onLike: () => _like(m['id']),
+                  onReport: () => widget.api
+                      .post('/api/chat/messages/${m['id']}/report', {}),
+                );
+              },
             ),
           ),
         if (_reply != null)
