@@ -1428,3 +1428,141 @@
   width: 100%;
   max-width: 1080px;
 }
+
+/* ═══ Animated brand mark (login) ══════════════════════════════════════════
+   Mirrors mobile/lib/widgets/animated_logo.dart, effect for effect, so the
+   two clients open the same way.
+
+   WHY CSS AND NOT A GIF/VIDEO: the logo is a 130KB WebP that was already
+   being downloaded. A GIF of the same motion is megabytes, caps at 256
+   colours (this mark is a green gradient — it would band badly), and cannot
+   scale. Everything below is composited on the GPU with transform/opacity
+   only, so it costs no layout and no extra bytes.
+
+   WHY THE SWEEP IS A SEPARATE ELEMENT: the highlight has to be clipped to the
+   logo's own silhouette. A band drawn over the container crosses the empty
+   corners as well and reads as a scanline over a rectangle. `mask-image`
+   with the logo as its own mask means only real pixels of the mark light up. */
+
+.heroAnim { position: relative; }
+
+/* The mark settles in — overshoot, then relax — instead of just fading. */
+.heroMark {
+  position: relative;
+  display: inline-block;
+  animation:
+    heroSettle .95s cubic-bezier(.22,1.2,.36,1) both,
+    heroFloat 6s ease-in-out 1s infinite;
+}
+.heroMark img {
+  display: block;
+  width: min(330px, 72vw);
+  height: auto;
+  filter: drop-shadow(0 22px 44px #000a);
+}
+
+@keyframes heroSettle {
+  0%   { opacity: 0; transform: scale(.74) translateY(14px); }
+  62%  { opacity: 1; transform: scale(1.05) translateY(0); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+/* Long, shallow float. Translate only — animating anything that triggers
+   layout on a permanently-visible element is a battery cost. */
+@keyframes heroFloat {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+
+/* Aurora behind the mark, breathing at a different rate to the float so the
+   two never sync into an obvious beat. */
+.heroAurora {
+  position: absolute;
+  left: 50%; top: 46%;
+  width: min(420px, 88vw); height: min(300px, 62vw);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  background:
+    radial-gradient(closest-side, #b5ef5824, #00d49a12 46%, transparent 72%);
+  animation: heroBreathe 7s ease-in-out infinite;
+}
+@keyframes heroBreathe {
+  0%, 100% { opacity: .55; transform: translate(-50%,-50%) scale(.94); }
+  50%      { opacity: 1;   transform: translate(-50%,-50%) scale(1.06); }
+}
+
+/* Specular sweep, masked to the logo's alpha.
+   The band is deliberately NARROW and semi-transparent. A first attempt used
+   a wide 24%-of-width band at 70% white and it washed the whole mark pale —
+   the brand green disappeared for a third of a second on every pass, which
+   looked like a rendering fault rather than a highlight. 6% wide at 55%
+   white reads as light travelling across the letters while the colour
+   underneath stays green. */
+.heroSweep {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  background: linear-gradient(112deg,
+    transparent 44%, #ffffff8c 50%, transparent 56%);
+  background-size: 320% 100%;
+  /* `screen` adds light instead of painting over: the green stays green and
+     only gets brighter where the band crosses it. Plain alpha compositing is
+     what made the mark look washed out. */
+  mix-blend-mode: screen;
+  -webkit-mask-image: url(/logo.webp);
+  mask-image: url(/logo.webp);
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  /* Long pause between passes: a highlight that runs constantly pulls the
+     eye away from the form the user is trying to fill in. */
+  animation: heroSweep 6s cubic-bezier(.4,0,.2,1) 1.4s infinite;
+  opacity: 0;
+}
+@keyframes heroSweep {
+  0%   { background-position: 140% 0; opacity: 0; }
+  6%   { opacity: 1; }
+  22%  { opacity: 1; }
+  28%  { background-position: -40% 0; opacity: 0; }
+  100% { background-position: -40% 0; opacity: 0; }
+}
+
+/* Sparkles. Fixed positions and staggered delays — a login screen that
+   sparkles differently every load looks unstable rather than alive. */
+.heroSparks { position: absolute; inset: 0; pointer-events: none; }
+.heroSparks i {
+  position: absolute;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #effFc9;
+  box-shadow: 0 0 10px 2px #b5ef5899;
+  opacity: 0;
+  animation: heroSpark 6s ease-in-out infinite;
+}
+.heroSparks i:nth-child(1) { left: 16%; top: 20%; animation-delay: .2s; }
+.heroSparks i:nth-child(2) { left: 38%; top: 10%; animation-delay: 1.9s; }
+.heroSparks i:nth-child(3) { left: 62%; top: 15%; animation-delay: 3.4s; }
+.heroSparks i:nth-child(4) { left: 84%; top: 28%; animation-delay: .9s; }
+.heroSparks i:nth-child(5) { left: 27%; top: 70%; animation-delay: 2.6s; }
+.heroSparks i:nth-child(6) { left: 73%; top: 78%; animation-delay: 4.3s; }
+@keyframes heroSpark {
+  0%, 88%, 100% { opacity: 0; transform: scale(.4); }
+  92%           { opacity: 1; transform: scale(1.25); }
+  96%           { opacity: 0; transform: scale(.5); }
+}
+
+/* RESPECT THE USER'S SETTING. Anyone who has asked their OS to reduce motion
+   gets the finished frame with no movement at all — required for WCAG 2.3.3
+   and, for people with vestibular disorders, the difference between a usable
+   screen and a nauseating one. */
+@media (prefers-reduced-motion: reduce) {
+  .heroMark,
+  .heroAurora,
+  .heroSweep,
+  .heroSparks i {
+    animation: none !important;
+  }
+  .heroMark { opacity: 1; transform: none; }
+  .heroSweep { opacity: 0; }
+}

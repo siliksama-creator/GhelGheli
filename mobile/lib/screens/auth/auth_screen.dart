@@ -5,7 +5,7 @@ import '../../core/assets.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/badges.dart';
 import '../../widgets/gradient_panel.dart';
-import '../../widgets/hero_logo.dart';
+import '../../widgets/animated_logo.dart';
 
 /// Unified login / register / admin-login screen.
 ///
@@ -259,9 +259,11 @@ class _AuthGlassCard extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Center(
-                child:
-                    HeroLogo(logoWidth: 168, logoHeight: 140, titleSize: 26)),
+            // The animated brand mark. This is the first thing a user sees,
+            // so it earns a real entrance rather than a static PNG — see
+            // widgets/animated_logo.dart for why the motion is built as
+            // passes over one image instead of separated layers.
+            const Center(child: AnimatedLogo(width: 230)),
             Gaps.vXs,
             Text(
               'کارت‌های فوتبالی، امتیاز، لیگ و جایزه',

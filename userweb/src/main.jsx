@@ -81,9 +81,24 @@ function App() {
 
   return (
     <div className={`page ${token ? 'signedIn' : ''}`}>
+      {/* The animated brand mark. Matches the Flutter AnimatedLogo widget:
+          aurora behind, settle-in entrance, a specular sweep clipped to the
+          logo's own shape, and phased sparkles. Built with CSS rather than a
+          GIF/video so it stays crisp at any size and costs no extra download
+          over the image that was already here. */}
       {!token && (
-        <div className="hero">
-          <img src="/logo.webp" alt="قلقلی" width="330" height="273" />
+        <div className="hero heroAnim">
+          <div className="heroAurora" aria-hidden="true" />
+          <div className="heroMark">
+            <img src="/logo.webp" alt="قلقلی" width="330" height="273" />
+            {/* The sweep is a second copy of the artwork, masked to itself,
+                so the highlight travels across the LETTERS instead of over
+                an invisible rectangle. */}
+            <span className="heroSweep" aria-hidden="true" />
+            <span className="heroSparks" aria-hidden="true">
+              <i /><i /><i /><i /><i /><i />
+            </span>
+          </div>
           <b>قلقلی</b>
         </div>
       )}
