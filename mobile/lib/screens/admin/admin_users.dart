@@ -227,7 +227,19 @@ class _AdminUsersState extends State<AdminUsers> {
               child: EmptyState(
                   icon: Icons.person_search_rounded, title: 'کاربری یافت نشد'))
         else
-          ..._rows.map((u) => Padding(
+          // 300 rows is the server's cap here and each row carries an avatar,
+          // so spreading them constructed all 300 subtrees on every rebuild —
+          // and every status change calls _load(), rebuilding the lot.
+          // shrinkWrap + NeverScrollable keeps the single outer scroll view
+          // while letting Flutter build only the visible rows.
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.zero,
+            itemCount: _rows.length,
+            itemBuilder: (context, index) {
+              final u = _rows[index];
+              return Padding(
                 padding: const EdgeInsets.only(bottom: Gaps.sm),
                 child: AppCard(
                   padding: const EdgeInsets.all(Gaps.md),
@@ -290,7 +302,9 @@ class _AdminUsersState extends State<AdminUsers> {
                     ],
                   ),
                 ),
-              )),
+              );
+            },
+          ),
       ],
     );
   }

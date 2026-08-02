@@ -247,11 +247,27 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
             ),
           Gaps.vMd,
           if (rest.isNotEmpty)
-            ...rest.asMap().entries.map((e) => RankTile(
-                rank: e.key + 4,
-                row: e.value,
-                onTap: () => showPublicProfile(
-                    context, widget.api, e.value['user_id']))),
+            // sliver-less lazy list inside the existing ListView.
+            //
+            // This spread built all 97 remaining rank tiles — each with an
+            // avatar — on every build, and this screen re-polls every 12
+            // seconds. ListView.builder with shrinkWrap keeps the single
+            // outer scroll while constructing only the visible rows.
+            //
+            // `physics: NeverScrollable` is required so the inner list does
+            // not fight the outer one for drag gestures.
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: EdgeInsets.zero,
+              itemCount: rest.length,
+              itemBuilder: (context, i) => RankTile(
+                rank: i + 4,
+                row: rest[i],
+                onTap: () =>
+                    showPublicProfile(context, widget.api, rest[i]['user_id']),
+              ),
+            ),
           if (entries.isEmpty)
             const AppCard(
                 child: EmptyState(
