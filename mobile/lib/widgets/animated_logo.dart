@@ -135,7 +135,13 @@ class _AnimatedLogoState extends State<AnimatedLogo>
         final t = _ambient.value;
 
         // Slow vertical float. 2π so it is continuous across the loop seam.
-        final float = math.sin(t * 2 * math.pi) * 4.0;
+        //
+        // 4px on a 230px mark is 1.7% — below the threshold where motion
+        // reads as deliberate, so it registered only as a vague instability.
+        // 9px with a matching scale breath is unmistakably intentional while
+        // still calm.
+        final float = math.sin(t * 2 * math.pi) * 9.0;
+        final breathe = 1 + math.sin(t * 2 * math.pi) * 0.012;
 
         // Glow breathes at half the float's rate, so the two drift apart.
         final glow = 0.5 + 0.5 * math.sin(t * math.pi);
@@ -145,7 +151,7 @@ class _AnimatedLogoState extends State<AnimatedLogo>
           child: Transform.translate(
             offset: Offset(0, float),
             child: Transform.scale(
-              scale: _scale.value,
+              scale: _scale.value * breathe,
               child: Stack(
                 alignment: Alignment.center,
                 clipBehavior: Clip.none,
@@ -215,11 +221,11 @@ class _AnimatedLogoState extends State<AnimatedLogo>
                     ),
                   ),
 
-                  // 4 ── sparkles
+                  // 4 ── one glint on the mascot's eye
                   Positioned.fill(
                     child: IgnorePointer(
                       child: CustomPaint(
-                        painter: _SparklePainter(progress: t),
+                        painter: _GlintPainter(progress: t),
                       ),
                     ),
                   ),
@@ -253,65 +259,79 @@ class _AnimatedLogoState extends State<AnimatedLogo>
   }
 }
 
-/// Small points of light that pop around the top of the mark.
+/// A single glint on the mascot's eye.
 ///
-/// Positions and phases come from a fixed seed rather than `Random()`, so
-/// the pattern is identical every launch — a login screen that sparkles
-/// differently each time looks unstable, not lively.
-class _SparklePainter extends CustomPainter {
-  _SparklePainter({required this.progress});
+/// The first version scattered six generic dots over the logo's bounding box
+/// for 8% of every cycle. They were unrelated to anything in the artwork —
+/// the visual language of a stock template. A crafted mark puts light on a
+/// SPECIFIC feature.
+///
+/// The position was found by overlaying a coordinate grid on the logo and
+/// reading the mascot's eye off it, not by guessing: an earlier attempt
+/// derived it from "the brightest pixels in the mascot's quadrant" and
+/// landed on his white vest, producing a blurry splodge on his chest.
+///
+/// Mirrors `.heroGlint` in userweb/src/style.css, same position and timing.
+class _GlintPainter extends CustomPainter {
+  _GlintPainter({required this.progress});
 
   final double progress;
 
-  // x, y as fractions of the box; phase offset within the loop.
-  static const _points = <List<double>>[
-    [0.16, 0.22, 0.00],
-    [0.38, 0.10, 0.28],
-    [0.62, 0.16, 0.55],
-    [0.84, 0.30, 0.13],
-    [0.28, 0.72, 0.41],
-    [0.72, 0.80, 0.68],
-  ];
+  /// The mascot's eye, as a fraction of the lockup.
+  static const _x = 0.19;
+  static const _y = 0.22;
+
+  /// Fires just after the sweep has crossed that point, so it reads as the
+  /// light catching a highlight rather than a second unrelated effect.
+  static const _start = 0.33;
+  static const _len = 0.10;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..style = PaintingStyle.fill;
+    final local = (progress - _start) / _len;
+    if (local < 0 || local > 1) return;
 
-    for (final p in _points) {
-      // Each sparkle has its own phase, so they twinkle in sequence rather
-      // than blinking in unison.
-      final local = (progress + p[2]) % 1.0;
-      // Visible for a short window, invisible the rest of the time.
-      if (local > 0.22) continue;
-      final k = local / 0.22;
-      // Rise and fall within that window.
-      final a = math.sin(k * math.pi);
+    // Rise fast, fall slower — a spark, not a pulse.
+    final a = local < 0.35
+        ? local / 0.35
+        : 1 - (local - 0.35) / 0.65;
+    if (a <= 0) return;
 
-      final centre = Offset(p[0] * size.width, p[1] * size.height);
-      final r = 1.6 + 2.4 * a;
+    final centre = Offset(_x * size.width, _y * size.height);
+    final len = 13.0 * a;
+    final thick = 1.4 * a + 0.6;
+    final angle = math.pi / 4 * local;
 
-      paint.color = const Color(0xFFEFFFC9).withValues(alpha: 0.85 * a);
-      canvas.drawCircle(centre, r, paint);
+    canvas.save();
+    canvas.translate(centre.dx, centre.dy);
+    canvas.rotate(angle);
 
-      // A soft four-point flare, which reads as "sparkle" where a plain dot
-      // reads as "dust".
-      paint.color = const Color(0xFFB5EF58).withValues(alpha: 0.45 * a);
-      final len = r * 3.2;
-      canvas.drawOval(
-        Rect.fromCenter(center: centre, width: len, height: r * 0.7),
-        paint,
-      );
-      canvas.drawOval(
-        Rect.fromCenter(center: centre, width: r * 0.7, height: len),
-        paint,
-      );
-    }
+    final paint = Paint()
+      ..color = Colors.white.withValues(alpha: a.clamp(0.0, 1.0))
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.2);
+
+    // Two crossed tapered bars. A plain dot with a large glow reads as a
+    // smudge; the cross is what makes it read as a sparkle.
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset.zero, width: len * 2, height: thick),
+        Radius.circular(thick),
+      ),
+      paint,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset.zero, width: thick, height: len * 2),
+        Radius.circular(thick),
+      ),
+      paint,
+    );
+    canvas.restore();
   }
 
   @override
-  bool shouldRepaint(_SparklePainter old) => old.progress != progress;
+  bool shouldRepaint(_GlintPainter old) => old.progress != progress;
 }
-
 
 /// Applies a blend mode to a subtree.
 ///

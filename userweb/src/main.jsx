@@ -95,9 +95,11 @@ function App() {
                 so the highlight travels across the LETTERS instead of over
                 an invisible rectangle. */}
             <span className="heroSweep" aria-hidden="true" />
-            <span className="heroSparks" aria-hidden="true">
-              <i /><i /><i /><i /><i /><i />
-            </span>
+            {/* One glint on the mascot's face, fired just after the sweep
+                passes it — so it reads as the light catching a highlight,
+                not as an unrelated effect. Replaced six generic dots
+                scattered over the bounding box. */}
+            <span className="heroGlint" aria-hidden="true" />
           </div>
           <b>قلقلی</b>
         </div>

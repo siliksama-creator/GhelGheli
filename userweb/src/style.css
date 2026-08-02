@@ -1468,9 +1468,12 @@
 }
 /* Long, shallow float. Translate only — animating anything that triggers
    layout on a permanently-visible element is a battery cost. */
+/* 6px on a 270px mark is 2.2% — below the threshold where motion reads as
+   intentional, so it registered only as a vague instability. 14px with a
+   slight scale breath is unmistakably deliberate while still calm. */
 @keyframes heroFloat {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-6px); }
+  0%, 100% { transform: translateY(0) scale(1); }
+  50%      { transform: translateY(-14px) scale(1.015); }
 }
 
 /* Aurora behind the mark, breathing at a different rate to the float so the
@@ -1528,28 +1531,54 @@
   100% { background-position: -40% 0; opacity: 0; }
 }
 
-/* Sparkles. Fixed positions and staggered delays — a login screen that
-   sparkles differently every load looks unstable rather than alive. */
-.heroSparks { position: absolute; inset: 0; pointer-events: none; }
-.heroSparks i {
+/* ONE DELIBERATE GLINT, NOT SCATTERED SPARKLES.
+   The first version threw six generic dots over the logo's bounding box for
+   8% of every cycle — unrelated to anything in the artwork, the visual
+   language of a stock template. A crafted mark puts light on a SPECIFIC
+   feature.
+
+   POSITION. Found by overlaying a coordinate grid on the logo and reading
+   the mascot's eye off it: x 19%, y 22%. An earlier attempt derived the
+   spot from "the brightest pixels in the mascot's quadrant" and landed on
+   his white vest, producing a blurry splodge on his chest.
+
+   TIMING. Fires at 2.0s, just after the sweep has crossed that point, so it
+   reads as the light catching a highlight rather than as a second unrelated
+   effect. */
+.heroGlint {
   position: absolute;
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: #effFc9;
-  box-shadow: 0 0 10px 2px #b5ef5899;
+  left: 19%; top: 22%;
+  width: 22px; height: 22px;
+  margin: -11px 0 0 -11px;
+  pointer-events: none;
   opacity: 0;
-  animation: heroSpark 6s ease-in-out infinite;
+  animation: heroGlint 6s ease-out 2s infinite;
 }
-.heroSparks i:nth-child(1) { left: 16%; top: 20%; animation-delay: .2s; }
-.heroSparks i:nth-child(2) { left: 38%; top: 10%; animation-delay: 1.9s; }
-.heroSparks i:nth-child(3) { left: 62%; top: 15%; animation-delay: 3.4s; }
-.heroSparks i:nth-child(4) { left: 84%; top: 28%; animation-delay: .9s; }
-.heroSparks i:nth-child(5) { left: 27%; top: 70%; animation-delay: 2.6s; }
-.heroSparks i:nth-child(6) { left: 73%; top: 78%; animation-delay: 4.3s; }
-@keyframes heroSpark {
-  0%, 88%, 100% { opacity: 0; transform: scale(.4); }
-  92%           { opacity: 1; transform: scale(1.25); }
-  96%           { opacity: 0; transform: scale(.5); }
+/* A four-point star drawn as two crossed tapered bars. A plain dot with a
+   large box-shadow reads as a smudge; the cross is what makes it read as a
+   sparkle. */
+.heroGlint::before,
+.heroGlint::after {
+  content: "";
+  position: absolute;
+  left: 50%; top: 50%;
+  background: #fff;
+  border-radius: 999px;
+  box-shadow: 0 0 6px 1px #ffffffdd;
+}
+.heroGlint::before {
+  width: 100%; height: 2.5px;
+  margin: -1.25px 0 0 -50%;
+}
+.heroGlint::after {
+  width: 2.5px; height: 100%;
+  margin: -50% 0 0 -1.25px;
+}
+@keyframes heroGlint {
+  0%, 4%  { opacity: 0; transform: scale(.25) rotate(0deg); }
+  9%      { opacity: 1; transform: scale(1) rotate(45deg); }
+  18%     { opacity: 0; transform: scale(.4) rotate(90deg); }
+  100%    { opacity: 0; transform: scale(.25) rotate(90deg); }
 }
 
 /* RESPECT THE USER'S SETTING. Anyone who has asked their OS to reduce motion
@@ -1560,9 +1589,10 @@
   .heroMark,
   .heroAurora,
   .heroSweep,
-  .heroSparks i {
+  .heroGlint {
     animation: none !important;
   }
+  .heroGlint { opacity: 0; }
   .heroMark { opacity: 1; transform: none; }
   .heroSweep { opacity: 0; }
 }
