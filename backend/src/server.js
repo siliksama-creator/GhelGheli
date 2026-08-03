@@ -2079,12 +2079,37 @@ app.post('/api/admin/rewards', adminAuth, requireRole('support'), asyncHandler(a
   if (r.rewardType === 'cash' && cashAmount <= 0) {
     return res.status(400).json({ message: 'برای جایزهٔ نقدی، مبلغ باید بیشتر از صفر باشد' });
   }
-  const { rows } = await pool.query('INSERT INTO reward_tiers(name,description,image_url,required_points,reward_type,reward_value,cash_amount,display_order,is_active,group_id,max_claims_per_user) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *', [r.name,r.description,safeImageUrl(r.imageUrl),requiredPoints,r.rewardType,r.rewardValue,cashAmount,r.displayOrder||0,r.isActive!==false,r.groupId||null,Math.max(0, Number(r.maxClaimsPerUser) || 0)]);
+  // ═══════════════════════════════════════════════════════════════════════
+  // جایزهٔ نقدی بدون سقف دریافت = بدهی نامحدود
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // `max_claims_per_user = 0` یعنی «نامحدود» (rewardGroupService خط ۲۵۵).
+  // این پیش‌فرض برای جایزهٔ فیزیکی منطقی است، ولی برای جایزهٔ نقدی یک
+  // تلهٔ واقعی است که یک بار روی همین سرور فعال بود:
+  //
+  //   «کارت هدیه ۱۰۰ هزار تومانی» با required_points=100 و بدون سقف.
+  //   کاربری با ۱۶٬۱۲۲ امتیاز می‌توانست ۱۶۱ بار پشت سر هم بگیرد
+  //   → ۱۶٬۱۰۰٬۰۰۰ تومان از یک ردیفِ جامانده از تست.
+  //
+  // هر claim به‌تنهایی معتبر بود؛ فقط جمعشان فاجعه بود. حالا برای
+  // جایزهٔ نقدی، سقف اجباری است تا چنین ردیفی اصلاً ساخته نشود.
+  const maxClaims = Math.max(0, Number(r.maxClaimsPerUser) || 0);
+  if (r.rewardType === 'cash' && maxClaims <= 0) {
+    return res.status(400).json({
+      message: 'برای جایزهٔ نقدی، سقف دریافت هر کاربر باید مشخص و بیشتر از صفر باشد',
+    });
+  }
+  const { rows } = await pool.query('INSERT INTO reward_tiers(name,description,image_url,required_points,reward_type,reward_value,cash_amount,display_order,is_active,group_id,max_claims_per_user) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *', [r.name,r.description,safeImageUrl(r.imageUrl),requiredPoints,r.rewardType,r.rewardValue,cashAmount,r.displayOrder||0,r.isActive!==false,r.groupId||null,maxClaims]);
   await audit(req.admin.id,'create_reward','reward_tiers',rows[0].id,null,r); res.json(rows[0]);
 }));
 app.patch('/api/admin/rewards/:id', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
   const r = req.body;
   const cashAmount = cashAmountInput(r.cashAmount);
+  // حالت قبلی را نگه می‌داریم تا اگر محافظِ پایین رد کرد، دقیقاً به همین
+  // حالت برگردانده شود.
+  const prev = await pool.query('SELECT * FROM reward_tiers WHERE id=$1', [req.params.id]);
+  if (!prev.rows[0]) return res.status(404).json({ message: 'جایزه پیدا نشد' });
+  const before0 = prev.rows[0];
   // groupId is deliberately settable to NULL (move a tier out of a group), so
   // it uses an explicit sentinel rather than COALESCE.
   const moveGroup = r.groupId !== undefined;
@@ -2104,6 +2129,24 @@ app.patch('/api/admin/rewards/:id', adminAuth, validateUuid('id'), requireRole('
      moveGroup, moveGroup ? (r.groupId || null) : null,
      r.maxClaimsPerUser !== undefined
        ? Math.max(0, Number(r.maxClaimsPerUser) || 0) : null]);
+  if (!rows[0]) return res.status(404).json({ message: 'جایزه پیدا نشد' });
+  // همان محافظِ ساخت، ولی روی نتیجهٔ نهایی.
+  //
+  // اینجا COALESCE است، پس نمی‌شود فقط ورودی را چک کرد: ادمین می‌تواند
+  // تیرِ نقدیِ غیرفعالی که سقفش صفر است را با یک PATCHِ
+  // `{isActive:true}` دوباره زنده کند و هیچ فیلدِ خطرناکی هم نفرستد.
+  // پس ردیفِ بعد از به‌روزرسانی سنجیده می‌شود و در صورت خطا تراکنش
+  // برگردانده می‌شود. (جزئیات در محافظِ POST بالا.)
+  const after = rows[0];
+  if (after.is_active && after.reward_type === 'cash'
+      && Number(after.max_claims_per_user || 0) <= 0) {
+    await pool.query(
+      'UPDATE reward_tiers SET max_claims_per_user=$2, is_active=$3 WHERE id=$1',
+      [req.params.id, before0.max_claims_per_user, before0.is_active]);
+    return res.status(400).json({
+      message: 'برای جایزهٔ نقدی فعال، سقف دریافت هر کاربر باید بیشتر از صفر باشد',
+    });
+  }
   await audit(req.admin.id,'update_reward','reward_tiers',req.params.id,null,r); res.json(rows[0]);
 }));
 app.delete('/api/admin/rewards/:id', adminAuth, validateUuid('id'), requireRole('super_admin'), asyncHandler(async (req, res) => {
