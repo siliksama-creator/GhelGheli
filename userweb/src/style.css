@@ -442,6 +442,14 @@
   display: grid; place-items: center; flex: 0 0 auto;
 }
 .iconBtn.danger { background: #ff507024; color: #ff8098; border-color: #ff507055; }
+/* میان‌برهای نوار بالا (فروشگاه و گردونه) در نوار پایین هایلایت نمی‌شوند،
+   پس حالت فعالشان باید روی خودِ دکمه دیده شود — وگرنه کاربر نمی‌داند
+   کدام صفحه باز است. */
+.iconBtn.on {
+  background: #b5ef5826;
+  border-color: #b5ef5866;
+  color: #eaffd0;
+}
 
 /* Nav: one tidy scroll strip instead of a wrapping block */
 .mobileNav {

@@ -54,6 +54,9 @@ const NAV_TABS = [
 
 const MORE_TABS = [
   ['wallet', 'کیف پول', '👛'],
+  // دعوت دوستان قبلاً فقط از میان‌بر داشبورد باز می‌شد؛ اگر کاربر آن
+  // کارت را رد می‌کرد، صفحه عملاً گم می‌شد.
+  ['invite', 'دعوت دوستان', '🤝'],
   ['support', 'پشتیبانی', '🎧'],
   ['profile', 'پروفایل', '👤'],
 ];
@@ -203,7 +206,14 @@ function Portal({ token, logout, theme, toggleTheme }) {
           <b>{u.nickname || 'کاربر'}</b>
           <span>{fa(u.current_points)} امتیاز</span>
         </div>
-        <button className="iconBtn wheelShortcut" onClick={() => setTab('wheel')}
+        {/* فروشگاه کنار گردونه — همان چیدمانی که در اپ اندروید هست، تا
+            کاربری که هر دو را استفاده می‌کند دنبال دکمه نگردد. */}
+        <button className={`iconBtn${tab === 'shop' ? ' on' : ''}`}
+          onClick={() => setTab('shop')} title="فروشگاه">
+          🛍️
+        </button>
+        <button className={`iconBtn wheelShortcut${tab === 'wheel' ? ' on' : ''}`}
+          onClick={() => setTab('wheel')}
           title={spins === '∞' ? 'چرخش نامحدود (حساب تست)'
             : spins > 0 ? `${spins} چرخش گردونه داری` : 'گردونهٔ شانس'}>
           🎡
@@ -274,7 +284,10 @@ function Portal({ token, logout, theme, toggleTheme }) {
           <Profile token={token} p={p} load={load} setMsg={setMsg} />
         )}
         {tab === 'rewards' && (
-          <RewardsAndShop token={token} setMsg={setMsg} reloadProfile={load} />
+          <Rewards token={token} setMsg={setMsg} reloadProfile={load} />
+        )}
+        {tab === 'shop' && (
+          <Shop token={token} setMsg={setMsg} reloadProfile={load} />
         )}
         {tab === 'wallet' && (
           <Wallet token={token} req={req} reloadProfile={load} setMsg={setMsg} />
@@ -302,30 +315,6 @@ function Portal({ token, logout, theme, toggleTheme }) {
         <PublicProfile token={token} userId={publicUser}
           close={() => setPublicUser(null)} />
       )}
-    </div>
-  );
-}
-
-/**
- * Rewards and the shop share a tab.
- *
- * An eighth nav tab would not fit on a 360px phone — the seven current ones
- * only just do. They also belong together conceptually: both are where a
- * user spends what they have earned.
- */
-function RewardsAndShop({ token, setMsg, reloadProfile }) {
-  const [sub, setSub] = useState('rewards');
-  return (
-    <div className="clubWrap">
-      <div className="clubTabs">
-        <button className={sub === 'rewards' ? 'on' : ''}
-          onClick={() => setSub('rewards')}>🎁 جوایز</button>
-        <button className={sub === 'shop' ? 'on' : ''}
-          onClick={() => setSub('shop')}>🛍️ فروشگاه</button>
-      </div>
-      {sub === 'rewards'
-        ? <Rewards token={token} setMsg={setMsg} reloadProfile={reloadProfile} />
-        : <Shop token={token} setMsg={setMsg} reloadProfile={reloadProfile} />}
     </div>
   );
 }

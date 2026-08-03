@@ -76,7 +76,7 @@ class _HomeShellState extends State<HomeShell>
       onToggleTheme: widget.onTheme,
       isDark: widget.dark,
     ),
-    _RewardsShopTab(api: widget.api),
+    RewardsPage(api: widget.api),
     WalletPage(api: widget.api, reloadProfile: _loadProfile),
     LeaguePage(api: widget.api),
     SocialPage(api: widget.api),
@@ -101,11 +101,25 @@ class _HomeShellState extends State<HomeShell>
       },
     ),
     ReferralPage(api: widget.api),
+    ShopPage(api: widget.api),
   ];
 
   /// شمارهٔ صفحهٔ گردونه — از آیکون نوار بالا مستقیم به آن پرش می‌شود.
   static const wheelIndex = 7;
   static const referralIndex = 8;
+
+  /// شمارهٔ صفحهٔ فروشگاه.
+  ///
+  /// درخواست مالک: «آیکون فروشگاه باید کنار آیکون گردونه باشه».
+  ///
+  /// قبلاً فروشگاه یک زیرتبِ SegmentedButton داخل تبِ «جوایز» بود — یعنی
+  /// برای رسیدن به جایی که کاربر پول خرج می‌کند، باید اول «جوایز» را
+  /// می‌زد و بعد متوجه می‌شد دکمهٔ دومی هم آن بالا هست. یک قدم اضافه و
+  /// نامرئی، دقیقاً روی مسیر درآمدزاترین صفحهٔ اپ.
+  ///
+  /// حالا فروشگاه یک مقصد مستقل است که از آیکون همیشه‌حاضرِ نوار بالا،
+  /// کنار گردونه، مستقیم باز می‌شود.
+  static const shopIndex = 9;
 
   // UI FIX: seven destinations squeezed into one bar made every icon and
   // label tiny (and the Persian labels were truncating). Material's own
@@ -116,7 +130,13 @@ class _HomeShellState extends State<HomeShell>
   // موجودی واقعی هم دیده می‌شود، پس هم دم‌دست‌تر است و هم اطلاعات بیشتری
   // می‌دهد تا یک آیکون کوچک در نوار پایین.
   static const _navIndexes = [0, 1, 3, 4];
-  static const _moreIndexes = [2, 5, 6];
+  // «دعوت دوستان» (۸) به شیت اضافه شد.
+  //
+  // قبلاً تنها راه رسیدن به آن، یک میان‌بر در داشبورد بود. کاربری که آن
+  // کارت را رد می‌کرد یا اسکرول می‌کرد، دیگر هیچ راهی به صفحهٔ دعوت
+  // نداشت — یعنی سیستمِ رشدِ اپ عملاً پنهان بود. کیف پول (۲)، پشتیبانی
+  // (۵) و پروفایل (۶) از قبل اینجا بودند.
+  static const _moreIndexes = [2, referralIndex, 5, 6];
 
   /// شمارهٔ صفحهٔ کیف پول — از هدر داشبورد مستقیم به آن پرش می‌شود.
   static const _walletIndex = 2;
@@ -150,6 +170,22 @@ class _HomeShellState extends State<HomeShell>
         icon: Icon(Icons.person_outline_rounded),
         selectedIcon: Icon(Icons.person_rounded),
         label: 'پروفایل'),
+    // ۷، ۸ و ۹ در نوار پایین نیستند، ولی شیتِ «بیشتر» با همین ایندکسِ
+    // صفحه در این لیست جست‌وجو می‌کند. تا وقتی این سه ردیف نبودند،
+    // گذاشتنِ «دعوت دوستان» در شیت باعث RangeError و کرشِ کاملِ اپ
+    // می‌شد — تستِ navigation_test.dart دقیقاً همین را گرفت.
+    NavigationDestination(
+        icon: Icon(Icons.casino_outlined),
+        selectedIcon: Icon(Icons.casino_rounded),
+        label: 'گردونه'),
+    NavigationDestination(
+        icon: Icon(Icons.handshake_outlined),
+        selectedIcon: Icon(Icons.handshake_rounded),
+        label: 'دعوت دوستان'),
+    NavigationDestination(
+        icon: Icon(Icons.storefront_outlined),
+        selectedIcon: Icon(Icons.storefront_rounded),
+        label: 'فروشگاه'),
   ];
 
   @override
@@ -218,7 +254,8 @@ class _HomeShellState extends State<HomeShell>
     'پشتیبانی',
     'پروفایل',
     'گردونهٔ شانس',
-    'دعوت دوستان'
+    'دعوت دوستان',
+    'فروشگاه'
   ];
 
   /// Which bar slot to highlight — the "more" slot when a sheet-only page
@@ -240,8 +277,14 @@ class _HomeShellState extends State<HomeShell>
     final picked = await showModalBottomSheet<int>(
       context: context,
       showDragHandle: true,
+      // اسکرول‌پذیر: با اضافه شدن «دعوت دوستان»، شیت روی گوشی کوتاه
+      // ۳۹ پیکسل سرریز می‌کرد (نوار زرد-مشکی) و آخرین گزینه بریده
+      // می‌شد. تستِ navigation_test.dart همین را گرفت. SingleChild
+      // ScrollView + shrinkWrap یعنی هر تعداد گزینه‌ای که بعداً اضافه
+      // شود هم جا می‌شود.
       builder: (sheetContext) => SafeArea(
-        child: Column(
+        child: SingleChildScrollView(
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             for (final i in _moreIndexes)
@@ -264,6 +307,7 @@ class _HomeShellState extends State<HomeShell>
             ),
             const SizedBox(height: 8),
           ],
+          ),
         ),
       ),
     );
@@ -305,9 +349,19 @@ class _HomeShellState extends State<HomeShell>
           // uncluttered with just notifications + logout.
           // میان‌بر گردونه — درخواست مالک: «در صفحه اصلی بالا آیکون کوچیک
           // گردونه باشه که به صفحه گردونه منتقل بشن».
+          // فروشگاه کنار گردونه — درخواست مالک.
+          //
+          // هر دو میان‌بر به صفحه‌هایی می‌روند که در نوار پایین جا
+          // نمی‌شوند (متریال حداکثر پنج مقصد) ولی مهم‌ترین‌اند: یکی جایی
+          // که کاربر جایزه می‌گیرد، یکی جایی که خرج می‌کند.
+          _ShopButton(
+            selected: _index == shopIndex,
+            onPressed: () => setState(() => _index = shopIndex),
+          ),
           _WheelButton(
             spins: _spins,
             unlimited: _unlimitedSpins,
+            selected: _index == wheelIndex,
             onPressed: () => setState(() => _index = wheelIndex),
           ),
           NotificationBell(api: widget.api),
@@ -356,48 +410,6 @@ class _HomeShellState extends State<HomeShell>
 
 
 
-/// Rewards and the shop share one tab.
-///
-/// An eighth bottom-nav destination would crowd the bar past the point where
-/// Persian labels stay readable, and the two belong together: both are where
-/// a user spends what they have earned.
-class _RewardsShopTab extends StatefulWidget {
-  const _RewardsShopTab({required this.api});
-  final ApiClient api;
-
-  @override
-  State<_RewardsShopTab> createState() => _RewardsShopTabState();
-}
-
-class _RewardsShopTabState extends State<_RewardsShopTab> {
-  int _sub = 0;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: SegmentedButton<int>(
-            segments: const [
-              ButtonSegment(value: 0, label: Text('جوایز'), icon: Icon(Icons.card_giftcard_rounded)),
-              ButtonSegment(value: 1, label: Text('فروشگاه'), icon: Icon(Icons.storefront_rounded)),
-            ],
-            selected: {_sub},
-            onSelectionChanged: (v) => setState(() => _sub = v.first),
-          ),
-        ),
-        Expanded(
-          child: _sub == 0
-              ? RewardsPage(api: widget.api)
-              : ShopPage(api: widget.api),
-        ),
-      ],
-    );
-  }
-}
-
-
 /// آیکون گردونه با نشانِ تعداد چرخش.
 ///
 /// نشان روی خود دکمه می‌نشیند تا در نگاه اول دیده شود؛ اگر فقط داخل صفحهٔ
@@ -406,11 +418,13 @@ class _WheelButton extends StatelessWidget {
   const _WheelButton({
     required this.spins,
     required this.unlimited,
+    required this.selected,
     required this.onPressed,
   });
 
   final int? spins;
   final bool unlimited;
+  final bool selected;
   final VoidCallback onPressed;
 
   @override
@@ -423,6 +437,14 @@ class _WheelButton extends StatelessWidget {
         IconButton(
           tooltip: n > 0 ? '$n چرخش گردونه داری' : 'گردونهٔ شانس',
           onPressed: onPressed,
+          // حالت انتخاب‌شده: بدون این، کاربر که روی صفحهٔ گردونه است هیچ
+          // نشانه‌ای نمی‌بیند که کدام میان‌بر فعال است — چون این دو صفحه
+          // در نوار پایین هایلایت نمی‌شوند.
+          style: selected
+              ? IconButton.styleFrom(
+                  backgroundColor:
+                      Theme.of(context).colorScheme.primary.withValues(alpha: 0.18))
+              : null,
           icon: const Text('🎡', style: TextStyle(fontSize: 20)),
         ),
         if (n > 0)
@@ -459,6 +481,48 @@ class _WheelButton extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// آیکون فروشگاه در نوار بالا، کنار گردونه.
+///
+/// ═══════════════════════════════════════════════════════════════════════
+/// چرا فروشگاه از زیرتب به نوار بالا منتقل شد
+/// ═══════════════════════════════════════════════════════════════════════
+///
+/// قبلاً فروشگاه یک `SegmentedButton` داخل تبِ «جوایز» بود. یعنی مسیر
+/// رسیدن به تنها صفحه‌ای که کاربر در آن خرج می‌کند این بود:
+///
+///     نوار پایین → «جوایز» → دیدنِ دکمهٔ دوم بالای صفحه → «فروشگاه»
+///
+/// دو مشکل داشت. اول اینکه یک قدم اضافه روی درآمدزاترین مسیر اپ بود.
+/// دوم و مهم‌تر: فروشگاه **از بیرون دیده نمی‌شد** — کاربری که روی تبِ
+/// جوایز نرفته بود، اصلاً نمی‌دانست فروشگاهی وجود دارد.
+///
+/// حالا یک آیکون همیشه‌حاضر کنار گردونه است: هر دو میان‌بر به صفحه‌هایی
+/// می‌روند که در نوار پایین جا نمی‌شوند (متریال حداکثر پنج مقصد را
+/// توصیه می‌کند) ولی مهم‌ترین‌اند — یکی جایی که کاربر جایزه می‌گیرد،
+/// یکی جایی که خرج می‌کند.
+class _ShopButton extends StatelessWidget {
+  const _ShopButton({required this.selected, required this.onPressed});
+
+  final bool selected;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: 'فروشگاه',
+      onPressed: onPressed,
+      style: selected
+          ? IconButton.styleFrom(
+              backgroundColor:
+                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.18))
+          : null,
+      // آیکون متریال به‌جای اموجی: اموجیِ 🛒 روی بعضی گوشی‌های اندروید
+      // با رنگ و اندازهٔ متفاوت رندر می‌شود و کنار 🎡 ناهماهنگ می‌افتد.
+      icon: const Icon(Icons.storefront_rounded, size: 22),
     );
   }
 }

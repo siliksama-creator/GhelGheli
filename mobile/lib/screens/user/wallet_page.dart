@@ -345,7 +345,12 @@ class _EarningGuide extends StatelessWidget {
     final theme = Theme.of(context);
     const items = [
       (Icons.credit_score_rounded, 'ثبت کارت جایزه‌دار', 'کارت‌هایی که جایزهٔ نقدی دارند'),
-      (Icons.casino_rounded, 'گردونهٔ شانس', 'به‌زودی'),
+      // این قبلاً «به‌زودی» بود در حالی که گردونه ماه‌هاست فعال است و
+      // جایزهٔ نقدی‌اش مستقیم به همین کیف پول واریز می‌شود
+      // (creditWheelPrize → walletService.creditStandalone). یعنی درست
+      // در صفحه‌ای که کاربر دنبال راهِ پول‌درآوردن می‌گشت، یکی از
+      // واقعی‌ترین راه‌ها را «هنوز نیست» معرفی می‌کردیم.
+      (Icons.casino_rounded, 'گردونهٔ شانس', 'جایزهٔ نقدی مستقیم به کیف پول'),
       (Icons.card_giftcard_rounded, 'جوایز نقدی', 'با امتیازهایت جایزهٔ نقدی بگیر'),
       (Icons.emoji_events_rounded, 'جایزهٔ لیگ ماهانه', 'در جمع نفرات برتر ماه باش'),
     ];

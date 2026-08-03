@@ -125,6 +125,14 @@ class _GameTile extends StatelessWidget {
                   child: Image.asset(
                     entry.art,
                     fit: BoxFit.cover,
+                    // PERF: هر سه بنر بازی ۷۲۰ پیکسل عرض دارند و هر کدام
+                    // ~۱.۱ مگابایت رم موقع دیکد می‌گیرند — یعنی ۳.۳
+                    // مگابایت فقط برای صفحهٔ فهرست بازی‌ها. کارت‌ها روی
+                    // موبایل حدود ۳۴۰ پیکسل منطقی عرض دارند، پس ۷۲۰ کف
+                    // یک نمایشگر ۲x را هم پوشش می‌دهد و بالاترش هدر است.
+                    // بقیهٔ بنرهای اپ این راهنما را داشتند؛ همین یکی جا
+                    // افتاده بود.
+                    cacheWidth: 720,
                     // Never let a missing/corrupt asset blank the whole hub.
                     errorBuilder: (_, __, ___) => Container(
                       color: entry.accent.withValues(alpha: 0.18),

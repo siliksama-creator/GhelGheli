@@ -394,9 +394,18 @@ class _ProfilePageState extends State<ProfilePage> {
                     _AvatarChoice(
                       selected: _selectedAvatar == a,
                       onTap: () => setState(() => _selectedAvatar = a),
+                      // PERF: بدون ResizeImage، انتخابگرِ آواتار هر ۱۰
+                      // تصویر ۳۸۴×۳۸۴ را با اندازهٔ کامل دیکد می‌کرد —
+                      // حدود ۶ مگابایت رم برای دایره‌هایی به قطر ۴۸ پیکسل.
+                      // روی گوشی ضعیف همین یک صفحه کش حافظه را پر می‌کرد و
+                      // باعث GC و پرش انیمیشن می‌شد. AvatarImage جای دیگر
+                      // اپ این کار را درست انجام می‌داد؛ فقط همین‌جا جا
+                      // افتاده بود.
                       child: CircleAvatar(
                           radius: 24,
-                          backgroundImage: AssetImage(avatarAsset(a))),
+                          backgroundImage: ResizeImage(
+                              AssetImage(avatarAsset(a)),
+                              width: 144)),
                     ),
                   // Club crests the user has joined, in the same picker.
                   for (final c in _myClubs)
