@@ -87,6 +87,20 @@ class _DashboardPageState extends State<DashboardPage> {
       final m = boot is Map
           ? Map<String, dynamic>.from(boot)
           : <String, dynamic>{};
+      // اگر پاسخ شکل درستی ندارد، آن را «موفق» حساب نکن.
+      //
+      // بدون این، یک پاسخ ناقص (پراکسی که body را بُرید، استقرار
+      // نیمه‌کاره، پاسخ کش‌شدهٔ غلط) `_data` را غیرnull می‌کرد و شرط
+      // «خطا و دادهٔ خالی» رد می‌شد — نتیجه یک صفحهٔ نیمه‌خالی بدون هیچ
+      // راه خروجی. بهتر است صریحاً خطا بدهیم و دکمهٔ تلاش دوباره نشان
+      // دهیم.
+      if (m['user'] is! Map) {
+        setState(() {
+          _error = 'پاسخ سرور ناقص بود';
+          _loading = false;
+        });
+        return;
+      }
       setState(() {
         _data = <String, dynamic>{
           'user': m['user'],

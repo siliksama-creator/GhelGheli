@@ -20,6 +20,7 @@ class _AdminUsersState extends State<AdminUsers> {
   List _rows = [];
   final _query = TextEditingController();
   bool _loading = true;
+  String? _loadError;
 
   @override
   void initState() {
@@ -35,11 +36,22 @@ class _AdminUsersState extends State<AdminUsers> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final rows = await widget.api
-        .get('/api/admin/users?search=${Uri.encodeComponent(_query.text)}');
-    if (mounted) {
+    // بدون try، هر شکست شبکه‌ای `_loading` را برای همیشه true نگه می‌داشت
+    // و فهرست کاربران تا ابد چرخنده نشان می‌داد. پاس قبلی این فایل را جا
+    // انداخته بود چون نام متد با الگوی جست‌وجو نمی‌خواند.
+    try {
+      final rows = await widget.api
+          .get('/api/admin/users?search=${Uri.encodeComponent(_query.text)}');
+      if (!mounted) return;
       setState(() {
         _rows = rows;
+        _loadError = null;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = apiError(e);
         _loading = false;
       });
     }
@@ -222,6 +234,11 @@ class _AdminUsersState extends State<AdminUsers> {
           const Padding(
               padding: EdgeInsets.symmetric(vertical: Gaps.xxl),
               child: LoadingView())
+        else if (_loadError != null)
+          Padding(
+            padding: const EdgeInsets.all(Gaps.lg),
+            child: ErrorBanner(message: _loadError!, onRetry: _load),
+          )
         else if (_rows.isEmpty)
           const AppCard(
               child: EmptyState(

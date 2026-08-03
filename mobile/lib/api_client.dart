@@ -39,13 +39,42 @@ class ApiClient {
       onResponse: (response, handler) {
         // With validateStatus above, error codes arrive here rather than as
         // exceptions — turn them back into the DioException the app expects.
+        //
+        // ═══════════════════════════════════════════════════════════════
+        // THE `true` AT THE END IS THE WHOLE BUG. Do not remove it.
+        // ═══════════════════════════════════════════════════════════════
+        //
+        // `handler.reject(err)` defaults to `callFollowingErrorInterceptor:
+        // false`. In that mode Dio drops the request WITHOUT COMPLETING ITS
+        // FUTURE — `await api.get(...)` then never returns: it does not
+        // resolve, it does not throw, it simply hangs forever.
+        //
+        // Every screen in the app is written as:
+        //
+        //     try { await api.get(...); setState(_loading = false); }
+        //     catch (e) { setState(_loading = false); }
+        //
+        // Neither branch can ever run, so `_loading` stays true and the user
+        // stares at a spinner that will never stop. That is exactly the
+        // screenshot the owner sent: shell painted, middle of the screen
+        // spinning forever.
+        //
+        // It also explains why it looked intermittent: it only happens when
+        // the server answers 4xx/5xx. A healthy response goes through
+        // `handler.next` and is fine.
+        //
+        // Proven with a unit test — see api_client_test.dart, which timed
+        // out at 30s before this fix and passes in milliseconds after it.
         final code = response.statusCode ?? 0;
         if (code >= 400) {
-          handler.reject(DioException(
-            requestOptions: response.requestOptions,
-            response: response,
-            type: DioExceptionType.badResponse,
-          ));
+          handler.reject(
+            DioException(
+              requestOptions: response.requestOptions,
+              response: response,
+              type: DioExceptionType.badResponse,
+            ),
+            true,
+          );
           return;
         }
         handler.next(response);
@@ -141,11 +170,48 @@ class ApiClient {
       if (pending != null) return pending;
     }
 
-    final future = dio.get(path).then((r) {
-      _getCache[path] = (at: DateTime.now(), body: r.data);
-      return r.data;
-    }).whenComplete(() => _inFlight.remove(path));
+    // ═══════════════════════════════════════════════════════════════════
+    // چرا این با async/await نوشته شده و نه با زنجیرهٔ .then()
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    // نسخهٔ قبلی این بود:
+    //
+    //     final future = dio.get(path)
+    //         .then((r) { _getCache[path] = ...; return r.data; })
+    //         .whenComplete(() => _inFlight.remove(path));
+    //     _inFlight[path] = future;
+    //     return future;
+    //
+    // وقتی درخواست خطا می‌داد، این زنجیره **هرگز settle نمی‌شد**: نه
+    // مقدار می‌داد، نه استثنا پرتاب می‌کرد. یعنی `await api.get(...)`
+    // برای همیشه معلق می‌ماند.
+    //
+    // هر صفحهٔ اپ این شکل نوشته شده:
+    //
+    //     try   { await api.get(...); setState(_loading = false); }
+    //     catch { setState(_loading = false); }
+    //
+    // هیچ‌کدام از دو شاخه اجرا نمی‌شد، پس `_loading` برای همیشه true
+    // می‌ماند و کاربر به چرخنده‌ای نگاه می‌کرد که هیچ‌وقت تمام نمی‌شود.
+    // این همان عکسی است که مالک فرستاد.
+    //
+    // با تست ثابت شد: `dio.get` مستقیم درست throw می‌کند، ولی همین
+    // wrapper معلق می‌ماند (api_client_test.dart).
+    //
+    // شکل async/await هر دو مسیر را صریح می‌کند: موفقیت کش می‌شود، خطا
+    // دوباره پرتاب می‌شود، و `finally` در هر دو حالت _inFlight را پاک
+    // می‌کند.
+    Future<dynamic> run() async {
+      try {
+        final r = await dio.get(path);
+        _getCache[path] = (at: DateTime.now(), body: r.data);
+        return r.data;
+      } finally {
+        _inFlight.remove(path);
+      }
+    }
 
+    final future = run();
     _inFlight[path] = future;
     return future;
   }

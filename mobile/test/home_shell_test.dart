@@ -32,13 +32,21 @@ final Map<String, int> hits = {};
 
 /// آداپتور جعلی: به‌جای شبکه، از این جدول جواب می‌دهد.
 class _FakeAdapter implements HttpClientAdapter {
-  _FakeAdapter({this.slow = const {}, this.failing = const {}});
+  _FakeAdapter({
+    this.slow = const {},
+    this.failing = const {},
+    this.body = const {},
+  });
 
   /// مسیرهایی که عمداً کند جواب می‌دهند (برای تست موازی بودن).
   final Map<String, Duration> slow;
 
-  /// مسیرهایی که خطا می‌دهند.
-  final Map<String, int> failing;
+  /// مسیرهایی که خطا می‌دهند. غیرfinal تا تست بتواند وسط کار «شبکه
+  /// برگشت» را شبیه‌سازی کند.
+  Map<String, int> failing;
+
+  /// بدنهٔ سفارشی برای یک مسیر — برای تست پاسخ ناقص یا HTML.
+  final Map<String, String> body;
 
   static const _profile = '{"user":{"id":"u1","nickname":"تست",'
       '"current_points":120,"lifetime_points":300,"monthly_league_points":50,'
@@ -97,6 +105,13 @@ class _FakeAdapter implements HttpClientAdapter {
           });
     }
 
+    final custom = this.body[path];
+    if (custom != null) {
+      return ResponseBody.fromString(custom, 200, headers: {
+        Headers.contentTypeHeader: [Headers.jsonContentType]
+      });
+    }
+
     final body = _routes[path];
     if (body == null) {
       // مسیر ناشناخته: ۴۰۴ می‌دهیم نه کرش — دقیقاً مثل سرور واقعی.
@@ -116,10 +131,12 @@ class _FakeAdapter implements HttpClientAdapter {
 ApiClient _fakeApi({
   Map<String, Duration> slow = const {},
   Map<String, int> failing = const {},
+  Map<String, String> body = const {},
 }) {
   final api = ApiClient();
   api.token = 'fake-token';
-  api.dio.httpClientAdapter = _FakeAdapter(slow: slow, failing: failing);
+  api.dio.httpClientAdapter =
+      _FakeAdapter(slow: slow, failing: failing, body: body);
   return api;
 }
 
@@ -202,6 +219,8 @@ void main() {
     });
   });
 
+  _stuckSpinnerTests();
+
   group('مقاومت در برابر خطای شبکه', () {
     testWidgets('۵۰۰ روی پروفایل اپ را سفید نمی‌کند', (tester) async {
       await tester.pumpWidget(
@@ -240,6 +259,87 @@ void main() {
           reason: 'یک درخواست کند کل صفحه را نگه داشته');
       await tester.pump(const Duration(seconds: 5));
       expect(tester.takeException(), isNull);
+    });
+  });
+}
+
+// ============================================================================
+//  بازتولید دقیقِ چیزی که کاربر روی گوشی دید
+// ============================================================================
+//
+// عکس کاربر: پوسته بالا آمده (نوار بالا و پایین هستند) ولی وسط صفحه فقط یک
+// چرخنده است که هیچ‌وقت تمام نمی‌شود.
+//
+// این تست‌ها همان حالت را می‌سازند و مطمئن می‌شوند که دیگر ممکن نیست.
+
+void _stuckSpinnerTests() {
+  group('چرخندهٔ گیرکرده — بازتولید گزارش کاربر', () {
+    testWidgets('تایم‌اوت شبکه صفحه را روی چرخنده رها نمی‌کند',
+        (tester) async {
+      // بدترین حالت واقعی: سرور جواب نمی‌دهد و درخواست تایم‌اوت می‌شود.
+      // قبل از اصلاح، `_loading = false` هرگز اجرا نمی‌شد.
+      await tester.pumpWidget(_wrap(_fakeApi(failing: {
+        '/api/bootstrap': 504,
+      })));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 3));
+
+      // نباید هیچ چرخنده‌ای باقی مانده باشد.
+      expect(find.byType(CircularProgressIndicator), findsNothing,
+          reason: 'صفحه روی چرخنده گیر کرده — دقیقاً باگی که کاربر دید');
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('پاسخ ناقص (بدون user) هم چرخنده را باز می‌کند',
+        (tester) async {
+      // یک پراکسی که body را می‌بُرد، یا استقرار نیمه‌کاره. قبلاً `_data`
+      // غیرnull می‌شد و شرط «خطا و دادهٔ خالی» رد می‌شد — یعنی نه خطا نشان
+      // داده می‌شد نه محتوا.
+      await tester.pumpWidget(_wrap(_fakeApi(body: {
+        '/api/bootstrap': '{"inventory":[],"rewards":[]}',
+      })));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 3));
+
+      expect(find.byType(CircularProgressIndicator), findsNothing,
+          reason: 'پاسخ ناقص نباید چرخندهٔ ابدی بسازد');
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('پاسخ کاملاً بی‌ربط (HTML به‌جای JSON) کرش نمی‌دهد',
+        (tester) async {
+      // صفحهٔ خطای پراکسی یا کپچای اپراتور — روی موبایل ایران رایج است.
+      await tester.pumpWidget(_wrap(_fakeApi(body: {
+        '/api/bootstrap': '<html><body>503</body></html>',
+      })));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 3));
+      expect(tester.takeException(), isNull);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+    });
+
+    testWidgets('بعد از خطا، تلاش دوباره واقعاً کار می‌کند', (tester) async {
+      // یک راه خروج که خودش کار نکند، بدتر از نبودنش است.
+      final adapter = _FakeAdapter(failing: {'/api/bootstrap': 500});
+      final api = ApiClient();
+      api.token = 'fake';
+      api.dio.httpClientAdapter = adapter;
+
+      await tester.pumpWidget(_wrap(api));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 2));
+
+      final retry = find.text('تلاش مجدد');
+      expect(retry, findsWidgets, reason: 'دکمهٔ تلاش دوباره باید باشد');
+
+      // حالا شبکه برمی‌گردد.
+      adapter.failing = const {};
+      await tester.tap(retry.first, warnIfMissed: false);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 2));
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
     });
   });
 }

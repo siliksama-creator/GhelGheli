@@ -175,6 +175,8 @@ class _HomeShellState extends State<HomeShell>
       final d = await widget.api.get('/api/bootstrap');
       if (!mounted || d is! Map) return;
       final m = Map<String, dynamic>.from(d);
+      // پاسخ ناقص را «موفق» حساب نکن — وگرنه هدر با نام خالی رندر می‌شود.
+      if (m['user'] is! Map) return;
       final w = m['wheel'];
       setState(() {
         _profile = <String, dynamic>{
