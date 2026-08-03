@@ -29,7 +29,17 @@ class _ClubsTabState extends State<ClubsTab> {
 
   Future<void> _reload() async {
     setState(() => _future = widget.api.get('/api/clubs'));
-    await _future;
+    // خطا اینجا بلعیده می‌شود، عمداً.
+    //
+    // AsyncSection دقیقاً همین future را می‌خواند و خودش حالت خطا را با
+    // دکمهٔ تلاش دوباره رندر می‌کند. اگر اینجا هم rethrow شود،
+    // RefreshIndicator آن را به یک خطای مدیریت‌نشدهٔ فریم‌ورک تبدیل می‌کند
+    // — یعنی یک خطا، دو بار گزارش، یکی‌شان به شکل کرش.
+    try {
+      await _future;
+    } catch (_) {
+      // AsyncSection نمایشش می‌دهد.
+    }
   }
 
   @override
@@ -160,7 +170,11 @@ class _RosterState extends State<_Roster> {
   Future<void> _reload() async {
     setState(() =>
         _future = widget.api.get('/api/clubs/${widget.club['slug']}/members'));
-    await _future;
+    // خطا عمداً بلعیده می‌شود — AsyncSection همین future را می‌خواند و حالت
+    // خطا را نشان می‌دهد. rethrow اینجا فقط RefreshIndicator را می‌شکند.
+    try {
+      await _future;
+    } catch (_) {/* AsyncSection نمایشش می‌دهد */}
   }
 
   @override

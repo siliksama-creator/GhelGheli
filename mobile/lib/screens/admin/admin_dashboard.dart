@@ -22,7 +22,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Future<void> _reload() async {
     setState(() => _data = widget.api.get('/api/admin/dashboard'));
-    await _data;
+    // خطا اینجا بلعیده می‌شود، عمداً.
+    //
+    // AsyncSection دقیقاً همین future را می‌خواند و خودش حالت خطا را با
+    // دکمهٔ تلاش دوباره رندر می‌کند. اگر اینجا هم rethrow شود،
+    // RefreshIndicator آن را به یک خطای مدیریت‌نشدهٔ فریم‌ورک تبدیل می‌کند
+    // — یعنی یک خطا، دو بار گزارش، یکی‌شان به شکل کرش.
+    try {
+      await _data;
+    } catch (_) {
+      // AsyncSection نمایشش می‌دهد.
+    }
   }
 
   @override

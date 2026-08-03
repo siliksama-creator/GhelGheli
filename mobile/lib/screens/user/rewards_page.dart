@@ -35,7 +35,17 @@ class _RewardsPageState extends State<RewardsPage> {
 
   Future<void> _reload() async {
     setState(() => _future = widget.api.get('/api/reward-groups'));
-    await _future;
+    // خطا اینجا بلعیده می‌شود، عمداً.
+    //
+    // AsyncSection دقیقاً همین future را می‌خواند و خودش حالت خطا را با
+    // دکمهٔ تلاش دوباره رندر می‌کند. اگر اینجا هم rethrow شود،
+    // RefreshIndicator آن را به یک خطای مدیریت‌نشدهٔ فریم‌ورک تبدیل می‌کند
+    // — یعنی یک خطا، دو بار گزارش، یکی‌شان به شکل کرش.
+    try {
+      await _future;
+    } catch (_) {
+      // AsyncSection نمایشش می‌دهد.
+    }
   }
 
   Future<void> _confirmAndClaim(

@@ -182,7 +182,17 @@ class _WheelPageState extends State<WheelPage>
     try {
       final res = await widget.api.post('/api/wheel/spin', const {});
       if (!mounted) return;
-      final map = Map<String, dynamic>.from(res as Map);
+      // castهای دفاعی: جایزه واریز *شده* است، پس یک پاسخ عجیب نباید با
+      // کرش تمام شود — کاربر فکر می‌کند جایزه‌اش را نگرفته.
+      final map = res is Map
+          ? Map<String, dynamic>.from(res)
+          : <String, dynamic>{};
+      if (map['prize'] is! Map) {
+        // چرخش ثبت شده ولی نمی‌دانیم چه چیزی؛ فقط تازه‌سازی کن.
+        if (mounted) setState(() => _spinning = false);
+        await _load();
+        return;
+      }
       final prize =
           WheelPrize.fromJson(Map<String, dynamic>.from(map['prize'] as Map));
 

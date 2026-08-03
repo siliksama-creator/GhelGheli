@@ -34,7 +34,17 @@ class _ShopPageState extends State<ShopPage> {
 
   Future<void> _reload() async {
     setState(() => _future = widget.api.get('/api/shop'));
-    await _future;
+    // خطا اینجا بلعیده می‌شود، عمداً.
+    //
+    // AsyncSection دقیقاً همین future را می‌خواند و خودش حالت خطا را با
+    // دکمهٔ تلاش دوباره رندر می‌کند. اگر اینجا هم rethrow شود،
+    // RefreshIndicator آن را به یک خطای مدیریت‌نشدهٔ فریم‌ورک تبدیل می‌کند
+    // — یعنی یک خطا، دو بار گزارش، یکی‌شان به شکل کرش.
+    try {
+      await _future;
+    } catch (_) {
+      // AsyncSection نمایشش می‌دهد.
+    }
   }
 
   Future<dynamic> _run(Future<dynamic> Function() fn, String key) async {
@@ -199,11 +209,25 @@ class _ShopPageState extends State<ShopPage> {
         future: _future,
         onRetry: _reload,
         builder: (context, data) {
-          final d = Map<String, dynamic>.from(data as Map);
-          final plus = Map<String, dynamic>.from(d['plus'] as Map);
-          final equipped = Map<String, dynamic>.from(d['equipped'] as Map);
+          // castهای دفاعی.
+          //
+          // اگر سرور روزی یکی از این کلیدها را نفرستد — یک استقرار نیمه‌کاره،
+          // یک پراکسی که پاسخ را می‌بُرد، یا یک نسخهٔ قدیمی‌تر — یک
+          // `as Map` روی null کل صفحهٔ فروشگاه را با صفحهٔ قرمز می‌ترکاند.
+          // فروشگاه خالی خیلی بهتر از کرش است.
+          final d = data is Map
+              ? Map<String, dynamic>.from(data)
+              : <String, dynamic>{};
+          final plus = d['plus'] is Map
+              ? Map<String, dynamic>.from(d['plus'] as Map)
+              : <String, dynamic>{};
+          final equipped = d['equipped'] is Map
+              ? Map<String, dynamic>.from(d['equipped'] as Map)
+              : <String, dynamic>{};
           final items = List<Map<String, dynamic>>.from(
-              (d['items'] as List).map((e) => Map<String, dynamic>.from(e)));
+              ((d['items'] as List?) ?? const [])
+                  .whereType<Map>()
+                  .map((e) => Map<String, dynamic>.from(e)));
           final myClubs = List<Map<String, dynamic>>.from(
               ((d['clubs'] as List?) ?? const [])
                   .map((e) => Map<String, dynamic>.from(e)));
