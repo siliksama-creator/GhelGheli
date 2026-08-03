@@ -21,6 +21,8 @@ const { ensureActiveSeason, addLeaguePoints, getLeaderboard, closeActiveSeason }
 const { optimizeUpload, kb } = require('./services/imageService');
 const { getGameRewardSettings, saveGameRewardSettings } = require('./services/gameRewardService');
 const walletService = require('./services/walletService');
+const referrals = require('./services/referralService');
+const wheel = require('./services/wheelService');
 // Hoisted with the other services: /api/users/:id/public uses it and sits
 // above the shop routes, so a require next to those would read as a
 // temporal-dead-zone bug even though route handlers run after startup.
@@ -336,7 +338,41 @@ app.post('/api/auth/register', asyncHandler(async (req, res) => {
     'UPDATE users SET password_hash=$1, first_name=$2, last_name=$3, nickname=$4, updated_at=NOW() WHERE mobile=$5 RETURNING *',
     [hash, firstName, lastName, nickname, mobile]
   );
-  res.json({ token: signUser(updated.rows[0]), user: safeUser(updated.rows[0]) });
+
+  // همان منطق مسیر ثبت‌نام مستقیم — این مسیر (OTP) وقتی درگاه پیامک وصل
+  // شود مسیر اصلی می‌شود، پس نباید بدون سیستم معرفی بماند.
+  const newUser = updated.rows[0];
+  const myCode = await referrals.ensureCode(newUser.id).catch(() => null);
+
+  let referral = null;
+  const referralCode = req.body.referralCode || req.body.referral_code;
+  if (referralCode) {
+    const refClient = await pool.connect();
+    try {
+      await refClient.query('BEGIN');
+      referral = await referrals.attachReferrer(refClient, newUser.id, referralCode);
+      await refClient.query('COMMIT');
+    } catch (e) {
+      await refClient.query('ROLLBACK').catch(() => {});
+      referral = { ok: false, reason: 'error' };
+    } finally {
+      refClient.release();
+    }
+    if (referral?.ok) {
+      createNotification(
+        referral.referrerId, 'referral', 'یک دوست با کد تو عضو شد 🎉',
+        `${referrals.SPINS_PER_REFERRAL} چرخش گردونه گرفتی و از این به بعد `
+        + `${referrals.COMMISSION_PERCENT}٪ امتیازهای او هم به تو می‌رسد.`,
+      ).catch(() => {});
+    }
+  }
+
+  res.json({
+    token: signUser(newUser),
+    user: safeUser(newUser),
+    referralCode: myCode,
+    referralApplied: referral?.ok === true,
+  });
 }));
 
 app.post('/api/auth/register-password', userLoginLimiter, asyncHandler(async (req, res) => {
@@ -421,7 +457,45 @@ app.post('/api/auth/register-password', userLoginLimiter, asyncHandler(async (re
       boundedText(bankAccount, 40),
     ]
   );
-  res.json({ token: signUser(rows[0]), user: safeUser(rows[0]) });
+
+  // کد اختصاصی این کاربر. همیشه ساخته می‌شود، حتی اگر خودش با کد کسی
+  // نیامده باشد — کد برای دعوت کردن *دیگران* است.
+  const myCode = await referrals.ensureCode(rows[0].id).catch(() => null);
+
+  // اگر با کد دوستی آمده، ثبتش کن.
+  //
+  // شکست اینجا **نباید** ثبت‌نام را خراب کند: کد اشتباه یعنی «معرفی ثبت
+  // نشد»، نه «اکانت ساخته نشد». نتیجه به کلاینت برمی‌گردد تا پیام درست
+  // بدهد به‌جای اینکه سکوت کند و کاربر فکر کند کد کار کرد.
+  let referral = null;
+  const referralCode = req.body.referralCode || req.body.referral_code;
+  if (referralCode && !existing.rows[0]) {
+    const refClient = await pool.connect();
+    try {
+      await refClient.query('BEGIN');
+      referral = await referrals.attachReferrer(refClient, rows[0].id, referralCode);
+      await refClient.query('COMMIT');
+    } catch (e) {
+      await refClient.query('ROLLBACK').catch(() => {});
+      referral = { ok: false, reason: 'error' };
+    } finally {
+      refClient.release();
+    }
+    if (referral?.ok) {
+      createNotification(
+        referral.referrerId, 'referral', 'یک دوست با کد تو عضو شد 🎉',
+        `${referrals.SPINS_PER_REFERRAL} چرخش گردونه گرفتی و از این به بعد `
+        + `${referrals.COMMISSION_PERCENT}٪ امتیازهای او هم به تو می‌رسد.`,
+      ).catch(() => {});
+    }
+  }
+
+  res.json({
+    token: signUser(rows[0]),
+    user: safeUser(rows[0]),
+    referralCode: myCode,
+    referralApplied: referral?.ok === true,
+  });
 
 }));
 
@@ -554,6 +628,9 @@ app.post('/api/cards/redeem', auth, cardRedeemLimiter, asyncHandler(async (req, 
     if (!card.is_active) throw Object.assign(new Error('نوع این کارت غیرفعال است'), { status: 400 });
     await client.query("UPDATE card_codes SET status='used', used_by_user_id=$1, used_at=NOW(), updated_at=NOW() WHERE id=$2", [req.user.id, card.id]);
     await client.query('UPDATE users SET current_points=current_points+$1, lifetime_points=lifetime_points+$1, monthly_league_points=monthly_league_points+$1, updated_at=NOW() WHERE id=$2', [card.point_value, req.user.id]);
+    // کمیسیون ۵٪ معرف. روی همان تراکنش، تا اگر ثبت کارت برگشت، کمیسیون
+    // هم برگردد و امتیازی از هوا ساخته نشود.
+    await referrals.payCommission(client, req.user.id, card.point_value, 'card');
     const inv = await client.query('SELECT id FROM user_card_inventory WHERE user_id=$1 AND card_type_id=$2 AND consumed_in_reward=false', [req.user.id, card.card_type_id]);
     if (inv.rows[0]) await client.query('UPDATE user_card_inventory SET quantity=quantity+1, updated_at=NOW() WHERE id=$1', [inv.rows[0].id]);
     else await client.query('INSERT INTO user_card_inventory(user_id, card_type_id, quantity, consumed_in_reward) VALUES($1,$2,1,false)', [req.user.id, card.card_type_id]);
@@ -1004,6 +1081,83 @@ async function creditWheelPrize(userId, amount, spinId, label = 'جایزهٔ گ
   return result;
 }
 module.exports.creditWheelPrize = creditWheelPrize;
+
+// ── گردونهٔ شانس ──────────────────────────────────────────────────────────
+//
+// دقیقاً همان هشداری که بالای creditWheelPrize نوشته شده بود رعایت می‌شود:
+// هیچ مبلغی از بدنهٔ درخواست خوانده نمی‌شود. کلاینت فقط می‌گوید «چرخاندم»؛
+// جایزه را wheelService از روی جدول وزن‌دار سرور انتخاب می‌کند.
+
+app.get('/api/wheel', auth, asyncHandler(async (req, res) => {
+  res.json(await wheel.status(req.user.id));
+}));
+
+// محدودکنندهٔ نرخ: سهمیهٔ روزانه و قید یکتای دیتابیس کار اصلی را می‌کنند،
+// ولی این جلوی کوبیدن endpoint را می‌گیرد — هر تلاش یک تراکنش با قفل ردیف
+// باز می‌کند و بدون این، یک اسکریپت می‌تواند ردیف کاربر را قفل نگه دارد.
+const wheelLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'تعداد درخواست‌ها زیاد است، کمی صبر کن' },
+});
+
+app.post('/api/wheel/spin', auth, wheelLimiter, asyncHandler(async (req, res) => {
+  const result = await wheel.spin(req.user.id, {
+    // پرداخت نقدی از همان مسیر امن کیف پول می‌رود: spinId مرجع یکتاست، پس
+    // حتی اگر این تابع دو بار صدا زده شود، واریز دوم duplicate تشخیص داده
+    // می‌شود و پول دو بار داده نمی‌شود.
+    creditCash: async (client, userId, amount, spinId, label) => {
+      await walletService.credit(client, {
+        userId,
+        amount,
+        source: 'wheel',
+        referenceType: 'wheel_spins',
+        referenceId: spinId,
+        description: `گردونهٔ شانس — ${label}`,
+      });
+    },
+    // امتیاز گردونه هم مثل هر امتیاز دیگری کمیسیون ۵٪ معرف را می‌سازد؛
+    // مالک گفت «تمامی امتیازاتی که به هر طریقی به دست می‌آورند».
+    addPoints: async (client, userId, amount, source) => {
+      await client.query(
+        `UPDATE users SET
+           current_points        = current_points + $2,
+           lifetime_points       = lifetime_points + $2,
+           monthly_league_points = monthly_league_points + $2,
+           updated_at = NOW()
+         WHERE id = $1`, [userId, amount]);
+      await addLeaguePoints(client, userId, amount);
+      await referrals.payCommission(client, userId, amount, source);
+    },
+  });
+
+  // اعلان فقط برای جوایز نقدی: یک اعلان روزانه بابت ۱۰۰ امتیاز، نوتیفیکیشن
+  // را به نویز تبدیل می‌کند و کاربر خاموشش می‌کند.
+  if (result.prize.kind === 'cash') {
+    createNotification(
+      req.user.id, 'wallet', 'برندهٔ گردونه شدی 🎡',
+      `${result.prize.label} به کیف پولت اضافه شد.`).catch(() => {});
+  }
+  res.json(result);
+}));
+
+app.get('/api/wheel/history', auth, asyncHandler(async (req, res) => {
+  res.json({ spins: await wheel.history(req.user.id, req.query.limit) });
+}));
+
+// ── معرفی دوستان ─────────────────────────────────────────────────────────
+app.get('/api/referrals', auth, asyncHandler(async (req, res) => {
+  res.json(await referrals.summary(req.user.id));
+}));
+
+// آمار گردونه برای مدیر — بدون این هیچ راهی نیست بفهمیم نرخ واقعی جوایز با
+// نرخ طراحی‌شده می‌خواند یا نه.
+app.get('/api/admin/wheel/stats', adminAuth, requireRole('support'),
+  asyncHandler(async (req, res) => {
+    res.json(await wheel.stats());
+  }));
 
 app.get('/api/league/current', auth, asyncHandler(async (req, res) => {
   const data = await getLeaderboard(Number(req.query.limit || 100));
@@ -2075,14 +2229,29 @@ app.post('/api/admin/users/:id/points', adminAuth, validateUuid('id'), requireRo
   // earned, so a deduction must not rewrite it — only additions count.
   // Otherwise correcting a mistake with -100 would erase history the user
   // legitimately built up, and the profile would under-report their total.
-  await pool.query(
-    `UPDATE users SET
-       current_points        = GREATEST(0, current_points + $1),
-       lifetime_points       = lifetime_points + GREATEST($1, 0),
-       monthly_league_points = GREATEST(0, monthly_league_points + $1),
-       updated_at = NOW()
-     WHERE id = $2`,
-    [p, req.params.id]); await audit(req.admin.id,'manual_points','users',req.params.id,req.body.reason,{points:p}); await createNotification(req.params.id, 'admin_points', 'تغییر امتیاز توسط مدیریت', `امتیاز شما به مقدار ${p} تغییر کرد. ${req.body.reason||''}`); res.json({message:'امتیاز تغییر کرد'}); }));
+  // در یک تراکنش، چون کمیسیون معرف هم باید همراهش برود یا اصلاً نرود.
+  const pointsClient = await pool.connect();
+  try {
+    await pointsClient.query('BEGIN');
+    await pointsClient.query(
+      `UPDATE users SET
+         current_points        = GREATEST(0, current_points + $1),
+         lifetime_points       = lifetime_points + GREATEST($1, 0),
+         monthly_league_points = GREATEST(0, monthly_league_points + $1),
+         updated_at = NOW()
+       WHERE id = $2`,
+      [p, req.params.id]);
+    // فقط افزایش کمیسیون می‌سازد — payCommission خودش امتیاز منفی را رد
+    // می‌کند، چون معرف کاری نکرده که بابت اصلاح خطای مدیر جریمه شود.
+    await referrals.payCommission(pointsClient, req.params.id, p, 'admin');
+    await pointsClient.query('COMMIT');
+  } catch (e) {
+    await pointsClient.query('ROLLBACK').catch(() => {});
+    throw e;
+  } finally {
+    pointsClient.release();
+  }
+  await audit(req.admin.id,'manual_points','users',req.params.id,req.body.reason,{points:p}); await createNotification(req.params.id, 'admin_points', 'تغییر امتیاز توسط مدیریت', `امتیاز شما به مقدار ${p} تغییر کرد. ${req.body.reason||''}`); res.json({message:'امتیاز تغییر کرد'}); }));
 app.post('/api/admin/users/:id/notify', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => { await createNotification(req.params.id, 'admin_private', req.body.title || 'پیام اختصاصی مدیریت', req.body.body || req.body.message || ''); await audit(req.admin.id,'private_message_user','users',req.params.id,null,{title:req.body.title}); res.json({message:'پیام اختصاصی ارسال شد'}); }));
 // SMS OTP is not wired up yet, so the self-service "forgot password" flow
 // cannot deliver a reset code to the user. Until a real SMS provider is

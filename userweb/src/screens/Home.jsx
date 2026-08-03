@@ -29,7 +29,8 @@ function CardLightbox({ item, close }) {
   );
 }
 
-export default function Home({ token, p, rewards, load, setMsg, openWallet }) {
+export default function Home({ token, p, rewards, load, setMsg, openWallet,
+  openWheel, openInvite }) {
   const [code, setCode] = useState('');
   const [bigCard, setBigCard] = useState(null);
   const [redeeming, setRedeeming] = useState(false);
@@ -99,6 +100,22 @@ export default function Home({ token, p, rewards, load, setMsg, openWallet }) {
         <button className="main" onClick={redeem}
           disabled={redeeming || !code.trim()}>
           {redeeming ? 'در حال ثبت...' : 'ثبت کد'}
+        </button>
+      </section>
+
+      {/* دو میان‌بر: گردونهٔ روزانه و دعوت دوستان. روی صفحهٔ اصلی‌اند چون
+          هر دو کاری هستند که کاربر باید هر روز انجام دهد؛ اگر فقط در تب
+          خودشان بودند، بیشترِ کاربرها هیچ‌وقت پیدایشان نمی‌کردند. */}
+      <section className="card quickRow">
+        <button className="quickTile wheelTile" onClick={openWheel}>
+          <span className="quickIcon">🎡</span>
+          <b>گردونهٔ شانس</b>
+          <small>هر روز یک چرخش رایگان</small>
+        </button>
+        <button className="quickTile inviteTile" onClick={openInvite}>
+          <span className="quickIcon">🤝</span>
+          <b>دعوت دوستان</b>
+          <small>۵٪ امتیازشان + ۳ چرخش</small>
         </button>
       </section>
 

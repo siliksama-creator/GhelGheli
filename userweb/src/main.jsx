@@ -19,6 +19,8 @@ import Chat from './screens/Chat.jsx';
 import PublicProfile from './screens/PublicProfile.jsx';
 import Rewards from './screens/Rewards.jsx';
 import Shop from './screens/Shop.jsx';
+import Wheel from './screens/Wheel.jsx';
+import Referral from './screens/Referral.jsx';
 import GamesHub from './games.jsx';
 import Support from './support.jsx';
 import Wallet from './wallet.jsx';
@@ -177,6 +179,8 @@ function Portal({ token, logout, theme, toggleTheme }) {
           <b>{u.nickname || 'کاربر'}</b>
           <span>{fa(u.current_points)} امتیاز</span>
         </div>
+        <button className="iconBtn wheelShortcut" onClick={() => setTab('wheel')}
+          title="گردونهٔ شانس">🎡</button>
         <button className="iconBtn" onClick={toggleTheme}
           title={theme === 'light' ? 'حالت تیره' : 'حالت روشن'}>
           {theme === 'light' ? '🌙' : '☀️'}
@@ -200,7 +204,9 @@ function Portal({ token, logout, theme, toggleTheme }) {
       <main className="tabPane" key={tab}>
         {tab === 'home' && (
           <Home token={token} p={p} rewards={rewards} load={load}
-            setMsg={setMsg} openWallet={() => setTab('wallet')} />
+            setMsg={setMsg} openWallet={() => setTab('wallet')}
+            openWheel={() => setTab('wheel')}
+            openInvite={() => setTab('invite')} />
         )}
         {tab === 'profile' && (
           <Profile token={token} p={p} load={load} setMsg={setMsg} />
@@ -216,6 +222,12 @@ function Portal({ token, logout, theme, toggleTheme }) {
         )}
         {tab === 'club' && (
           <Club token={token} openProfile={setPublicUser} meId={u.id} />
+        )}
+        {tab === 'wheel' && (
+          <Wheel token={token} setMsg={setMsg} reloadProfile={load} />
+        )}
+        {tab === 'invite' && (
+          <Referral token={token} setMsg={setMsg} />
         )}
         {tab === 'support' && (
           <Support token={token} api={API} req={req} asset={v =>

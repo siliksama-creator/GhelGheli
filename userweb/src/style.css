@@ -1641,3 +1641,152 @@
   content-visibility: auto;
   contain-intrinsic-size: auto 148px;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   گردونهٔ شانس
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.wheelPage { text-align: center; }
+.wheelTitle { margin: 0 0 14px; font-size: 20px; }
+
+/* صحنه مربع است تا گردونه در هر عرضی گرد بماند. min() یعنی روی موبایل
+   عرض صفحه تعیین‌کننده است و روی دسکتاپ سقف ۴۲۰ پیکسل. */
+.wheelStage {
+  position: relative;
+  width: min(88vw, 420px);
+  aspect-ratio: 1;
+  margin: 0 auto 18px;
+}
+.wheelSpinner { width: 100%; height: 100%; will-change: transform; }
+.wheelDisc { width: 100%; height: 100%; display: block; }
+
+/* سوزن بالای گردونه، بیرون از عنصر چرخان — نباید بچرخد. */
+.wheelPointer {
+  position: absolute;
+  top: -14px; left: 50%;
+  transform: translateX(-50%);
+  width: 13%;
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* سر شخصیت هم بیرون از عنصر چرخان است: اگر داخلش بود با گردونه می‌چرخید
+   و شخصیت سرگیجه‌آور می‌شد. عرضش با نسبت حفرهٔ SVG (۰.۳۱۶) هماهنگ است. */
+.wheelHub {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width: 27%;
+  z-index: 2;
+  pointer-events: none;
+  filter: drop-shadow(0 6px 12px #0009);
+}
+
+.wheelActions { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+.wheelBtn { min-width: 220px; font-size: 16px; font-weight: 800; }
+.wheelReset {
+  margin: 0; font-size: 13px; font-weight: 700;
+  color: #a3e635; background: #84cc1620;
+  padding: 6px 14px; border-radius: 999px;
+}
+.wheelBonus { margin: 0; }
+
+.wheelResult {
+  margin: 16px auto 0; max-width: 360px;
+  padding: 14px 18px; border-radius: 16px;
+  display: flex; flex-direction: column; gap: 4px;
+  animation: wheelPop .45s cubic-bezier(.2,1.4,.4,1);
+}
+.wheelResult b { font-size: 17px; }
+.wheelResult span { font-size: 22px; font-weight: 900; }
+.wheelResult.points { background: #22d3ee1f; color: #67e8f9; }
+.wheelResult.cash   { background: #f59e0b24; color: #fcd34d; }
+@keyframes wheelPop {
+  from { opacity: 0; transform: scale(.85) translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.wheelHistory { margin-top: 22px; text-align: right; }
+.wheelHistory h3 { font-size: 15px; margin: 0 0 8px; }
+.wheelHistory ul { list-style: none; margin: 0; padding: 0; }
+.wheelHistory li {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 12px; border-radius: 10px; margin-bottom: 6px;
+  background: #ffffff08; font-size: 14px;
+}
+.wheelHistory li .cash { color: #fcd34d; font-weight: 800; }
+.wheelHistory small { opacity: .55; font-size: 12px; }
+
+/* کسانی که انیمیشن کمتر می‌خواهند: گردونه بلافاصله روی نتیجه می‌ایستد.
+   بازی از دست نمی‌رود، فقط تعلیقش حذف می‌شود. WCAG 2.3.3 */
+@media (prefers-reduced-motion: reduce) {
+  .wheelSpinner { transition: none !important; }
+  .wheelResult  { animation: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   دعوت دوستان
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.refPage h2 { margin: 0 0 8px; }
+.refCodeBox {
+  margin: 16px 0; padding: 16px; border-radius: 16px;
+  background: linear-gradient(135deg, #84cc1620, #22d3ee18);
+  border: 1px dashed #84cc1666;
+  display: flex; flex-direction: column; gap: 12px; align-items: center;
+}
+.refCode {
+  font-size: 30px; font-weight: 900; letter-spacing: 5px;
+  color: #a3e635; font-family: monospace;
+  /* dir=ltr روی خود عنصر است: کد لاتین داخل صفحهٔ راست‌به‌چپ وگرنه
+     کاراکترهایش جابه‌جا خوانده می‌شود. */
+}
+.refCodeBtns { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+
+.refStats { display: flex; gap: 10px; margin: 14px 0; }
+.refStats > div {
+  flex: 1; text-align: center; padding: 12px 6px;
+  background: #ffffff08; border-radius: 14px;
+}
+.refStats b { display: block; font-size: 22px; color: #a3e635; }
+.refStats span { font-size: 12px; opacity: .7; }
+
+.refList h3 { font-size: 15px; margin: 18px 0 8px; }
+.refList ul { list-style: none; margin: 0; padding: 0; }
+.refList li {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 12px; background: #ffffff08;
+  border-radius: 10px; margin-bottom: 6px; font-size: 14px;
+}
+.refList li b { color: #a3e635; }
+.refEmpty { text-align: center; padding: 18px 0; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   میان‌برهای صفحهٔ اصلی
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.quickRow { display: flex; gap: 10px; padding: 12px; }
+.quickTile {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  gap: 3px; padding: 14px 8px; border-radius: 16px; cursor: pointer;
+  border: 1px solid #ffffff14; background: #ffffff08;
+  color: inherit; font: inherit; text-align: center;
+  transition: transform .15s ease, background .15s ease;
+  /* هدف لمس ۴۴ پیکسلی طبق راهنمای دسترس‌پذیری */
+  min-height: 44px;
+}
+.quickTile:hover { background: #ffffff12; transform: translateY(-2px); }
+.quickTile:active { transform: translateY(0); }
+.quickTile b { font-size: 14px; }
+.quickTile small { font-size: 11px; opacity: .65; }
+.quickIcon { font-size: 26px; line-height: 1; }
+.wheelTile  { background: linear-gradient(135deg, #f59e0b1a, #f43f5e14); }
+.inviteTile { background: linear-gradient(135deg, #84cc161a, #22d3ee14); }
+
+/* آیکون گردونه در نوار بالا — طبق درخواست مالک، میان‌بر همیشه در دسترس */
+.wheelShortcut { font-size: 18px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .quickTile { transition: none; }
+  .quickTile:hover { transform: none; }
+}
