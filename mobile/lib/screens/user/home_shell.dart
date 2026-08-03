@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -40,6 +42,13 @@ class _HomeShellState extends State<HomeShell>
   int _index = 0;
   Map<String, dynamic>? _profile;
 
+  /// تعداد چرخش گردونهٔ در دسترس، برای نشانِ کنار آیکون نوار بالا.
+  ///
+  /// مالک: «کنار آیکون گردونه در صفحه اصلی تعداد شانس روز گردونه برای
+  /// کاربرا مشخص باشه». null یعنی هنوز نمی‌دانیم — نشان اصلاً کشیده
+  /// نمی‌شود تا از یک «۰» گذرا که بعد به «۱» می‌پرد جلوگیری شود.
+  int? _spins;
+
   // A subtle one-shot "welcome" entrance the moment the user lands on the
   // home shell after logging in — fades and lifts the whole shell into
   // place instead of just snapping onto the screen, so the first thing a
@@ -75,7 +84,15 @@ class _HomeShellState extends State<HomeShell>
     // ۷ و ۸ در نوار پایین نیستند: از آیکون گردونه در نوار بالا و از
     // میان‌برهای داشبورد باز می‌شوند. نوار پایین طبق راهنمای متریال
     // حداکثر پنج مقصد دارد و شلوغ کردنش همان مشکلی بود که قبلاً حل شد.
-    WheelPage(api: widget.api, onChanged: _loadProfile),
+    WheelPage(
+      api: widget.api,
+      onChanged: _loadProfile,
+      // بعد از هر چرخش، نشانِ نوار بالا فوراً به‌روز می‌شود — وگرنه کاربر
+      // می‌چرخاند و عدد کنار آیکون هنوز قدیمی است.
+      onSpinsChanged: (n) {
+        if (mounted && n != _spins) setState(() => _spins = n);
+      },
+    ),
     ReferralPage(api: widget.api),
   ];
 
@@ -149,6 +166,20 @@ class _HomeShellState extends State<HomeShell>
       if (mounted) setState(() => _profile = Map<String, dynamic>.from(d));
     } catch (_) {
       // Non-fatal: dashboard/profile pages fetch their own data too.
+    }
+    // جدا و بی‌صدا: نشانِ گردونه یک زینت است و شکستش نباید روی داشبورد
+    // اثر بگذارد.
+    unawaited(_loadSpins());
+  }
+
+  Future<void> _loadSpins() async {
+    try {
+      final d = await widget.api.get('/api/wheel');
+      if (!mounted || d is! Map) return;
+      final n = (d['spinsLeft'] as num?)?.toInt();
+      if (n != null && n != _spins) setState(() => _spins = n);
+    } catch (_) {
+      // بدون نشان بهتر از یک عدد غلط است.
     }
   }
 
@@ -261,10 +292,9 @@ class _HomeShellState extends State<HomeShell>
           // uncluttered with just notifications + logout.
           // میان‌بر گردونه — درخواست مالک: «در صفحه اصلی بالا آیکون کوچیک
           // گردونه باشه که به صفحه گردونه منتقل بشن».
-          IconButton(
-            tooltip: 'گردونهٔ شانس',
+          _WheelButton(
+            spins: _spins,
             onPressed: () => setState(() => _index = wheelIndex),
-            icon: const Text('🎡', style: TextStyle(fontSize: 20)),
           ),
           NotificationBell(api: widget.api),
           IconButton(
@@ -348,6 +378,66 @@ class _RewardsShopTabState extends State<_RewardsShopTab> {
               ? RewardsPage(api: widget.api)
               : ShopPage(api: widget.api),
         ),
+      ],
+    );
+  }
+}
+
+
+/// آیکون گردونه با نشانِ تعداد چرخش.
+///
+/// نشان روی خود دکمه می‌نشیند تا در نگاه اول دیده شود؛ اگر فقط داخل صفحهٔ
+/// گردونه بود، کاربر باید وارد می‌شد تا بفهمد اصلاً چرخشی دارد یا نه.
+class _WheelButton extends StatelessWidget {
+  const _WheelButton({required this.spins, required this.onPressed});
+
+  final int? spins;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final n = spins ?? 0;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        IconButton(
+          tooltip: n > 0 ? '$n چرخش گردونه داری' : 'گردونهٔ شانس',
+          onPressed: onPressed,
+          icon: const Text('🎡', style: TextStyle(fontSize: 20)),
+        ),
+        if (n > 0)
+          Positioned(
+            top: 4,
+            right: 2,
+            child: IgnorePointer(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                constraints: const BoxConstraints(minWidth: 17, minHeight: 17),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF43F5E),
+                  borderRadius: BorderRadius.circular(999),
+                  // حلقهٔ هم‌رنگ نوار بالا: بدون آن، نشان روی لبهٔ آیکون
+                  // محو می‌شود.
+                  border: Border.all(
+                    color: Theme.of(context).appBarTheme.backgroundColor
+                        ?? Theme.of(context).colorScheme.surface,
+                    width: 2,
+                  ),
+                ),
+                child: Center(
+                  child: Text(
+                    faNum(n),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      height: 1.1,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }

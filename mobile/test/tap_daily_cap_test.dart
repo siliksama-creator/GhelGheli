@@ -1,10 +1,10 @@
 // ============================================================================
-//  سقف روزانهٔ سه لول در بازی ضربه‌زن
+//  سقف روزانهٔ دو لول در بازی ضربه‌زن
 // ============================================================================
 //
 //   flutter test test/tap_daily_cap_test.dart
 //
-// درخواست کاربر: «در بازی ضربه زن فقط میتونن تا سه لول بازی کنن» — روزی سه
+// درخواست کاربر: روزی دو لول، و نیم‌لول باقی‌مانده فردا ادامه پیدا کند —
 // لول، و بعد بازی قفل شود تا فردا.
 //
 // قانون در سرور (tapGameService.js) اجرا می‌شود چون گوشی قابل اعتماد نیست و
@@ -112,17 +112,17 @@ void main() {
   });
 
   group('سقف روزانه', () {
-    test('یک موتور تازه سه لول سهمیه دارد', () async {
+    test('یک موتور تازه دو لول سهمیه دارد', () async {
       final e = await freshEngine();
-      expect(e.levelsLeftToday, 3);
+      expect(e.levelsLeftToday, 2);
       expect(e.dailyCapReached, isFalse);
       e.dispose();
     });
 
-    test('بعد از سه لول بازی قفل می‌شود', () async {
+    test('بعد از دو لول بازی قفل می‌شود', () async {
       final e = await freshEngine();
       hammer(e);
-      expect(e.level, 4, reason: 'دقیقاً سه لول بالا رفته');
+      expect(e.level, 3, reason: 'دقیقاً دو لول بالا رفته');
       expect(e.levelsLeftToday, 0);
       expect(e.dailyCapReached, isTrue);
       e.dispose();
@@ -167,11 +167,11 @@ void main() {
       SharedPreferences.setMockInitialValues({
         'tap_game_progress_v1':
             '{"level":4,"taps":10,"totalTaps":1000,"pendingTaps":0,'
-            '"flaggedTaps":0,"levelsToday":3,"levelsDay":"2020-01-01"}',
+            '"flaggedTaps":0,"levelsToday":2,"levelsDay":"2020-01-01"}',
       });
       final e = TapEngine(config: openGuard, storage: TapStorage());
       await e.init();
-      expect(e.levelsLeftToday, 3, reason: 'روز عوض شده، سهمیه پر است');
+      expect(e.levelsLeftToday, 2, reason: 'روز عوض شده، سهمیه پر است');
       expect(e.dailyCapReached, isFalse);
       expect(e.level, 4, reason: 'پیشرفت لول حفظ شده');
       e.dispose();
@@ -181,7 +181,7 @@ void main() {
       SharedPreferences.setMockInitialValues({
         'tap_game_progress_v1':
             '{"level":1,"taps":0,"totalTaps":0,"pendingTaps":0,'
-            '"flaggedTaps":0,"levelsToday":2,"levelsDay":"${tehranDay()}"}',
+            '"flaggedTaps":0,"levelsToday":1,"levelsDay":"${tehranDay()}"}',
       });
       final e = TapEngine(config: openGuard, storage: TapStorage());
       await e.init();
@@ -196,7 +196,7 @@ void main() {
       SharedPreferences.setMockInitialValues({
         'tap_game_progress_v1':
             '{"level":5,"taps":0,"totalTaps":0,"pendingTaps":0,'
-            '"flaggedTaps":0,"levelsToday":3,"levelsDay":"${tehranDay()}"}',
+            '"flaggedTaps":0,"levelsToday":2,"levelsDay":"${tehranDay()}"}',
       });
       final e = TapEngine(config: openGuard, storage: TapStorage());
       await e.init();
@@ -213,11 +213,11 @@ void main() {
         SharedPreferences.setMockInitialValues({
           'tap_game_progress_v1':
               '{"level":1,"taps":0,"totalTaps":0,"pendingTaps":0,'
-              '"flaggedTaps":0,"levelsToday":3,"levelsDay":$bad}',
+              '"flaggedTaps":0,"levelsToday":2,"levelsDay":$bad}',
         });
         final e = TapEngine(config: openGuard, storage: TapStorage());
         await e.init();
-        expect(e.levelsLeftToday, 3, reason: 'روز خراب: $bad');
+        expect(e.levelsLeftToday, 2, reason: 'روز خراب: $bad');
         e.dispose();
       }
     });
@@ -262,7 +262,7 @@ void main() {
       SharedPreferences.setMockInitialValues({
         'tap_game_progress_v1':
             '{"level":51,"taps":0,"totalTaps":0,"pendingTaps":0,'
-            '"flaggedTaps":0,"levelsToday":3,"levelsDay":"${tehranDay()}"}',
+            '"flaggedTaps":0,"levelsToday":2,"levelsDay":"${tehranDay()}"}',
       });
       final e = TapEngine(config: openGuard, storage: TapStorage());
       await e.init();
@@ -299,7 +299,7 @@ void main() {
       await e.init();
       expect(e.level, 7, reason: 'پیشرفت قبلی حفظ شده');
       expect(e.taps, 33);
-      expect(e.levelsLeftToday, 3, reason: 'سهمیهٔ کامل، نه قفل');
+      expect(e.levelsLeftToday, 2, reason: 'سهمیهٔ کامل، نه قفل');
       e.dispose();
     });
 

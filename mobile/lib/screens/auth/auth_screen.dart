@@ -29,6 +29,7 @@ class _AuthScreenState extends State<AuthScreen> {
   final _pass = TextEditingController();
   final _name = TextEditingController();
   final _currentPassword = TextEditingController();
+  final _referral = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
   _AuthMode _mode = _AuthMode.login;
@@ -49,6 +50,7 @@ class _AuthScreenState extends State<AuthScreen> {
     _pass.dispose();
     _name.dispose();
     _currentPassword.dispose();
+    _referral.dispose();
     super.dispose();
   }
 
@@ -93,11 +95,22 @@ class _AuthScreenState extends State<AuthScreen> {
             // and in chat — leaking the user's phone number to everyone.
             // Omit it and let the backend assign an anonymous placeholder.
             if (_name.text.isNotEmpty) 'nickname': _name.text,
+            if (_referral.text.trim().isNotEmpty)
+              'referralCode': _referral.text.trim(),
             'profileAvatarKey': avatarFiles.first,
             if (_needsCurrentPassword)
               'currentPassword': _currentPassword.text,
           });
           await widget.api.saveToken(r['token']);
+          // اگر کد دعوت گرفت، جایزه‌اش را بگو. یک ورود بی‌صدا، جایزه را
+          // نامرئی می‌کند و کاربر فکر می‌کند کد کار نکرد.
+          if (r is Map && r['referralApplied'] == true && mounted) {
+            final n = (r['referralSpins'] as num?)?.toInt() ?? 3;
+            ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+              content: Text('🎉 ${faNum(n)} چرخش گردونهٔ شانس گرفتی!'),
+              behavior: SnackBarBehavior.floating,
+            ));
+          }
           break;
         case _AuthMode.login:
           final r = await widget.api.post('/api/auth/login', {
@@ -188,6 +201,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     mobile: _mobile,
                     pass: _pass,
                     name: _name,
+                    referral: _referral,
                     currentPassword: _currentPassword,
                     needsCurrentPassword: _needsCurrentPassword,
                     loading: _loading,
@@ -216,6 +230,7 @@ class _AuthGlassCard extends StatelessWidget {
   final TextEditingController mobile;
   final TextEditingController pass;
   final TextEditingController name;
+  final TextEditingController referral;
   final TextEditingController currentPassword;
   final bool needsCurrentPassword;
   final bool loading;
@@ -232,6 +247,7 @@ class _AuthGlassCard extends StatelessWidget {
     required this.mobile,
     required this.pass,
     required this.name,
+    required this.referral,
     required this.currentPassword,
     required this.needsCurrentPassword,
     required this.loading,
@@ -330,6 +346,50 @@ class _AuthGlassCard extends StatelessWidget {
                       decoration: _fieldDecoration(
                           icon: Icons.badge_rounded,
                           label: 'نام مستعار اختیاری'),
+                    ),
+                    Gaps.vSm,
+                    // کد دعوت. keyboardType عددی است چون کد فقط رقم است،
+                    // و maxLength جلوی تایپ اضافه را می‌گیرد. ارقام فارسی
+                    // هم پذیرفته می‌شوند — سرور نرمال‌سازی می‌کند.
+                    TextFormField(
+                      controller: referral,
+                      keyboardType: TextInputType.number,
+                      maxLength: 4,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 6,
+                      ),
+                      decoration: _fieldDecoration(
+                        icon: Icons.card_giftcard_rounded,
+                        label: 'کد دعوت دوستت (اختیاری)',
+                      ).copyWith(counterText: ''),
+                    ),
+                    Gaps.vXs,
+                    // خواستهٔ مالک: «در قسمت ثبت نام نوشته باشه که در صورت
+                    // استفاده از کد دعوت بقیه ۳ شانس گردونه بدست میارن».
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: Gaps.sm, vertical: Gaps.xs),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF84CC16).withValues(alpha: 0.10),
+                        borderRadius: Corners.rMd,
+                        border: Border.all(
+                          color: const Color(0xFF84CC16)
+                              .withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: Text(
+                        '🎁 اگر کد دعوت یکی از دوستانت را وارد کنی، '
+                        'هر دوی شما ۳ چرخش گردونهٔ شانس می‌گیرید.',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: const Color(0xFFBEF264),
+                              height: 1.7,
+                            ),
+                      ),
                     ),
                     Gaps.vXs,
                     Text(

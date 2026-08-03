@@ -67,9 +67,17 @@ class WheelPrize {
 }
 
 class WheelPage extends StatefulWidget {
-  const WheelPage({super.key, required this.api, this.onChanged});
+  const WheelPage({
+    super.key,
+    required this.api,
+    this.onChanged,
+    this.onSpinsChanged,
+  });
 
   final ApiClient api;
+
+  /// تعداد چرخش باقی‌مانده، برای نشانِ کنار آیکون نوار بالا.
+  final ValueChanged<int>? onSpinsChanged;
 
   /// وقتی جایزه‌ای داده شد صدا زده می‌شود تا امتیاز/موجودی هدر تازه شود.
   /// بدون این، کاربر جایزه را می‌بیند ولی عدد بالای صفحه هنوز قدیمی است.
@@ -96,6 +104,7 @@ class _WheelPageState extends State<WheelPage>
   List<WheelPrize> _prizes = const [];
   int _spinsLeft = 0;
   int _bonusSpins = 0;
+  int _dailyQuota = 1;
   int _resetInMs = 0;
   bool _loading = true;
   bool _spinning = false;
@@ -134,10 +143,12 @@ class _WheelPageState extends State<WheelPage>
           ..sort((a, b) => a.sliceOrder.compareTo(b.sliceOrder));
         _spinsLeft = (map['spinsLeft'] as num?)?.toInt() ?? 0;
         _bonusSpins = (map['bonusSpins'] as num?)?.toInt() ?? 0;
+        _dailyQuota = (map['dailyQuota'] as num?)?.toInt() ?? 1;
         _resetInMs = (map['resetInMs'] as num?)?.toInt() ?? 0;
         _loading = false;
         _error = null;
       });
+      widget.onSpinsChanged?.call(_spinsLeft);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -190,9 +201,11 @@ class _WheelPageState extends State<WheelPage>
         _result = prize;
         _spinsLeft = (map['spinsLeft'] as num?)?.toInt() ?? 0;
         _bonusSpins = (map['bonusSpins'] as num?)?.toInt() ?? 0;
+        _dailyQuota = (map['dailyQuota'] as num?)?.toInt() ?? _dailyQuota;
         _resetInMs = (map['resetInMs'] as num?)?.toInt() ?? _resetInMs;
         _spinning = false;
       });
+      widget.onSpinsChanged?.call(_spinsLeft);
       GameAudio.instance.play(prize.kind == 'cash' ? Sfx.win : Sfx.matchFound);
       HapticFeedback.heavyImpact();
       widget.onChanged?.call();
@@ -364,6 +377,11 @@ class _WheelPageState extends State<WheelPage>
             Gaps.vLg,
             _ResultCard(prize: _result!),
           ],
+          Gaps.vLg,
+          // قوانین — مالک خواست همه‌چیز برای کاربر توضیح داده شود. بدون
+          // این، کاربر نمی‌داند چرا امروز ۱ چرخش دارد و دوستش ۳ تا، و فکر
+          // می‌کند سیستم خراب است.
+          _RulesCard(dailyQuota: _dailyQuota),
           Gaps.vLg,
         ],
       ),
@@ -621,6 +639,64 @@ class _ResultCard extends StatelessWidget {
           Text(prize.label,
               style: theme.textTheme.headlineSmall
                   ?.copyWith(color: tint, fontWeight: FontWeight.w900)),
+        ],
+      ),
+    );
+  }
+}
+
+
+/// توضیح قوانین گردونه.
+class _RulesCard extends StatelessWidget {
+  const _RulesCard({required this.dailyQuota});
+
+  final int dailyQuota;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dim = theme.colorScheme.onSurface.withValues(alpha: 0.72);
+
+    Widget row(String text) => Padding(
+          padding: const EdgeInsets.only(bottom: Gaps.xs),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('•  ', style: TextStyle(color: dim, height: 1.7)),
+              Expanded(
+                child: Text(text,
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: dim, height: 1.7)),
+              ),
+            ],
+          ),
+        );
+
+    return Container(
+      padding: const EdgeInsets.all(Gaps.md),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.onSurface.withValues(alpha: 0.04),
+        borderRadius: Corners.rLg,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('گردونه چطور کار می‌کند؟',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFFA3E635),
+              )),
+          Gaps.vXs,
+          row('هر روز ${faNum(dailyQuota)} چرخش رایگان داری'
+              '${dailyQuota > 1 ? ' (به‌خاطر دوستانی که دعوت کردی)' : ''}.'),
+          row('چرخاندن گردونه هیچ هزینه‌ای ندارد و هیچ‌وقت نخواهد داشت.'),
+          row('به ازای هر ${faNum(10)} دوستی که دعوت کنی، یک چرخش رایگانِ '
+              'روزانهٔ دیگر می‌گیری — تا سقف ${faNum(50)} دوست.'),
+          row('هر دعوت موفق، ${faNum(3)} چرخش فوری هم به تو و هم به دوستت '
+              'می‌دهد.'),
+          row('سهمیهٔ روزانه هر شب ساعت ۱۲ به وقت تهران تازه می‌شود.'),
+          row('جایزه‌های بزرگ عمداً خیلی کم‌یاب‌اند؛ بیشتر چرخش‌ها امتیاز '
+              'می‌دهند. جایزه را سرور انتخاب می‌کند، نه گوشی تو.'),
         ],
       ),
     );

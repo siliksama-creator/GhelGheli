@@ -13,22 +13,35 @@ void main() {
 
   group('level curve', () {
     test('level 1 costs the base amount', () {
-      expect(config.requiredTaps(1), 100);
+      expect(config.requiredTaps(1), config.baseTaps);
+      expect(config.baseTaps, 239);
     });
 
-    test('matches round(100 * 1.15^(n-1)) for every level', () {
-      var expected = 100.0;
+    test('the whole game sums to exactly totalPoints', () {
+      var sum = 0;
       for (var lv = 1; lv <= config.levelCount; lv++) {
-        expect(config.requiredTaps(lv), expected.round(), reason: 'level $lv');
-        expected *= 1.15;
+        sum += config.requiredTaps(lv);
+      }
+      expect(sum, config.totalPoints);
+      expect(sum, 50000);
+    });
+
+    test('follows the 1.05 curve, allowing for rounding', () {
+      // Checked as a RATIO, not against hardcoded integers: the exact values
+      // depend on how the rounding drift is distributed, but the SHAPE is
+      // the contract.
+      for (var lv = 2; lv < config.levelCount; lv++) {
+        final ratio = config.requiredTaps(lv) / config.requiredTaps(lv - 1);
+        expect(ratio, greaterThan(1.03), reason: 'level $lv');
+        expect(ratio, lessThan(1.07), reason: 'level $lv');
       }
     });
 
     test('known checkpoints — must equal the server', () {
-      expect(config.requiredTaps(2), 115);
-      expect(config.requiredTaps(10), 352);
-      expect(config.requiredTaps(25), 2863);
-      expect(config.requiredTaps(50), 94231);
+      expect(config.requiredTaps(2), 251);
+      expect(config.requiredTaps(10), 371);
+      expect(config.requiredTaps(25), 770);
+      expect(config.requiredTaps(50), 2611);
     });
 
     test('is strictly increasing', () {
@@ -38,16 +51,18 @@ void main() {
     });
 
     test('the growth factor is tunable without touching game code', () {
-      final easy = config.copyWith(growthFactor: 1.05);
-      expect(easy.requiredTaps(1), 100);
-      expect(easy.requiredTaps(2), 105);
-      expect(easy.requiredTaps(10), (100 * 1.05 * 1.05 * 1.05 * 1.05 * 1.05 *
-              1.05 * 1.05 * 1.05 * 1.05)
-          .round());
-      // A gentler curve must be strictly easier from level 2 on.
-      for (var lv = 2; lv <= 50; lv++) {
-        expect(easy.requiredTaps(lv), lessThan(config.requiredTaps(lv)));
+      // A FLATTER curve spreads the same total more evenly: cheaper at the
+      // end, dearer at the start. That is the useful invariant now that the
+      // total is fixed — "uniformly easier" is impossible when both curves
+      // must sum to 50,000.
+      final flat = config.copyWith(growthFactor: 1.01);
+      var sum = 0;
+      for (var lv = 1; lv <= flat.levelCount; lv++) {
+        sum += flat.requiredTaps(lv);
       }
+      expect(sum, flat.totalPoints, reason: 'a tuned curve still totals right');
+      expect(flat.requiredTaps(1), greaterThan(config.requiredTaps(1)));
+      expect(flat.requiredTaps(50), lessThan(config.requiredTaps(50)));
     });
   });
 
@@ -253,7 +268,7 @@ void main() {
       final engine = await freshEngine();
       expect(engine.level, 1);
       expect(engine.taps, 0);
-      expect(engine.requiredTaps, 100);
+      expect(engine.requiredTaps, config.requiredTaps(1));
       expect(engine.levelProgress, 0);
       engine.dispose();
     });
@@ -273,7 +288,9 @@ void main() {
     test('reaching the threshold advances the level', () async {
       // A 3-tap level makes this fast and readable.
       final engine = await freshEngine(
-        cfg: const TapGameConfig(baseTaps: 3, growthFactor: 1.0, levelCount: 5),
+        // ۵ لول × ۳ امتیاز = ۱۵. با growthFactor=1 همهٔ لول‌ها برابرند.
+        cfg: const TapGameConfig(
+            growthFactor: 1.0, levelCount: 5, totalPoints: 15),
       );
       for (var i = 0; i < 3; i++) {
         engine.tap();
@@ -286,7 +303,12 @@ void main() {
 
     test('finishing the last level marks the game complete', () async {
       final engine = await freshEngine(
-        cfg: const TapGameConfig(baseTaps: 1, growthFactor: 1.0, levelCount: 3),
+        // ۳ لول × ۱ امتیاز = ۳. levelsPerDay بالا برده شده چون این تست
+        // دربارهٔ *پایان بازی* است نه سقف روزانه؛ با سقف پیش‌فرض ۲، بازی
+        // هرگز به لول ۴ نمی‌رسید و تست به دلیل غلط شکست می‌خورد.
+        cfg: const TapGameConfig(
+            growthFactor: 1.0, levelCount: 3, totalPoints: 3,
+            levelsPerDay: 99),
       );
       for (var i = 0; i < 3; i++) {
         engine.tap();
@@ -388,13 +410,14 @@ void main() {
       SharedPreferences.setMockInitialValues({
         'boundary': '{"level":9,"taps":0,"totalTaps":0}',
       });
-      const cfg = TapGameConfig(baseTaps: 2, growthFactor: 1.0);
+      // levelsPerDay بالا: این تست مرز شخصیت را می‌سنجد، نه سقف روزانه.
+      const cfg = TapGameConfig(
+          growthFactor: 1.0, totalPoints: 50, levelsPerDay: 99);
       final engine = TapEngine(config: cfg, storage: TapStorage(key: 'boundary'));
       await engine.init();
       expect(cfg.skinIndexForLevel(9), 0);
 
-      engine.tap();
-      await Future<void>.delayed(const Duration(milliseconds: 60));
+      // هر لول ۱ امتیاز (۵۰ امتیاز ÷ ۵۰ لول)، پس یک ضربه یک لول.
       engine.tap();
       await Future<void>.delayed(const Duration(milliseconds: 60));
 

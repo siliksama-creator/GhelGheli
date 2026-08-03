@@ -21,9 +21,11 @@ void main() {
     const cfg = TapGameConfig();
 
     test('لول‌های معتبر عدد درست می‌دهند', () {
-      expect(cfg.requiredTaps(1), 100);
-      expect(cfg.requiredTaps(10), 352);
-      expect(cfg.requiredTaps(50), 94231);
+      // منحنی بازطراحی شد: کل بازی حالا ۵۰٬۰۰۰ امتیاز است با رشد ۱.۰۵.
+      // این اعداد باید با tapGameService.js یکی باشند.
+      expect(cfg.requiredTaps(1), 239);
+      expect(cfg.requiredTaps(10), 371);
+      expect(cfg.requiredTaps(50), 2611);
     });
 
     // ریشهٔ کراش: requiredTaps از round() روی یک double استفاده می‌کند.

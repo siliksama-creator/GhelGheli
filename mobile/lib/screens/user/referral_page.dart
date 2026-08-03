@@ -92,14 +92,19 @@ class _ReferralPageState extends State<ReferralPage> {
                   ?.copyWith(fontWeight: FontWeight.w900)),
           Gaps.vXs,
           Text(
-            'کدت را به دوستانت بده. هر کس با آن عضو شود، '
-            '${faNum(spins)} چرخش گردونه می‌گیری و برای همیشه '
-            '${faNum(percent)}٪ از تمام امتیازهایی که او به دست می‌آورد به تو '
-            'هم می‌رسد — بدون اینکه از امتیاز او کم شود.',
+            'کدت را به دوستانت بده. هر کس موقع ثبت‌نام آن را وارد کند، '
+            'هر دوی شما ${faNum(spins)} چرخش گردونه می‌گیرید.',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
               height: 1.7,
             ),
+          ),
+          Gaps.vSm,
+          _Rules(
+            percent: percent,
+            spins: spins,
+            perDaily: _int(d['invitesPerDailySpin']),
+            maxDaily: _int(d['maxInvitesForDaily']),
           ),
           Gaps.vMd,
 
@@ -161,9 +166,28 @@ class _ReferralPageState extends State<ReferralPage> {
               Gaps.hXs,
               _Stat(value: _int(d['totalEarned']), label: 'امتیاز از دوستان'),
               Gaps.hXs,
-              _Stat(value: _int(d['bonusSpins']), label: 'چرخش باقی‌مانده'),
+              _Stat(value: _int(d['dailySpins']), label: 'چرخش روزانه'),
             ],
           ),
+          Gaps.vSm,
+          // پیشرفت تا چرخش روزانهٔ بعدی. یک هدف نزدیک و دیدنی، خیلی
+          // مؤثرتر از یک قانون نوشته‌شده در متن است.
+          if (d['atDailyCap'] != true && d['invitesToNextDailySpin'] != null)
+            _NextSpinProgress(
+              toNext: _int(d['invitesToNextDailySpin']),
+              perDaily: _int(d['invitesPerDailySpin']),
+              nextTotal: _int(d['dailySpins']) + 1,
+            )
+          else if (d['atDailyCap'] == true)
+            Text(
+              '🏆 به سقف ${faNum(_int(d['maxInvitesForDaily']))} دوست رسیدی — '
+              'هر روز ${faNum(_int(d['dailySpins']))} چرخش رایگان داری!',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: const Color(0xFFA3E635),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           Gaps.vLg,
 
           if (friends.isEmpty)
@@ -251,6 +275,121 @@ class _Stat extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+
+/// توضیح قوانین دعوت.
+class _Rules extends StatelessWidget {
+  const _Rules({
+    required this.percent,
+    required this.spins,
+    required this.perDaily,
+    required this.maxDaily,
+  });
+
+  final int percent;
+  final int spins;
+  final int perDaily;
+  final int maxDaily;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dim = theme.colorScheme.onSurface.withValues(alpha: 0.72);
+
+    Widget row(String bold, String rest) => Padding(
+          padding: const EdgeInsets.only(bottom: Gaps.xs),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('•  ', style: TextStyle(color: dim, height: 1.75)),
+              Expanded(
+                child: Text.rich(
+                  TextSpan(children: [
+                    TextSpan(
+                      text: bold,
+                      style: const TextStyle(
+                        color: Color(0xFFA3E635),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    TextSpan(text: rest),
+                  ]),
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: dim, height: 1.75),
+                ),
+              ),
+            ],
+          ),
+        );
+
+    return Container(
+      padding: const EdgeInsets.all(Gaps.md),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.onSurface.withValues(alpha: 0.04),
+        borderRadius: Corners.rLg,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          row('${faNum(percent)}٪ کمیسیون دائمی',
+              ' — از امتیازی که دوستت با ثبت کد کارت یا بازی ضربه‌زن به دست '
+              'می‌آورد، ${faNum(percent)}٪ به تو هم می‌رسد. از امتیاز او '
+              'چیزی کم نمی‌شود؛ این را ما اضافه می‌کنیم.'),
+          row('هر ${faNum(perDaily)} دعوت = یک چرخش روزانهٔ دائمی',
+              ' — با ${faNum(perDaily)} دوست، هر روز ${faNum(2)} چرخش داری '
+              'به‌جای یکی. تا سقف ${faNum(maxDaily)} دوست ادامه دارد.'),
+          row('دعوت نامحدود است',
+              ' — هر چند نفر که بخواهی می‌توانی دعوت کنی.'),
+          row('یک بار برای هر دوست',
+              ' — جایزهٔ ${faNum(spins)} چرخش فقط یک بار داده می‌شود.'),
+        ],
+      ),
+    );
+  }
+}
+
+/// نوار پیشرفت تا چرخش روزانهٔ بعدی.
+class _NextSpinProgress extends StatelessWidget {
+  const _NextSpinProgress({
+    required this.toNext,
+    required this.perDaily,
+    required this.nextTotal,
+  });
+
+  final int toNext;
+  final int perDaily;
+  final int nextTotal;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    // perDaily صفر نمی‌شود، ولی تقسیم بر صفر یک NaN می‌سازد که فلاتر
+    // موقع رسم نوار پرتاب می‌کند.
+    final done = perDaily > 0 ? (perDaily - toNext) / perDaily : 0.0;
+    return Column(
+      children: [
+        ClipRRect(
+          borderRadius: Corners.rPill,
+          child: LinearProgressIndicator(
+            value: done.clamp(0.0, 1.0),
+            minHeight: 8,
+            backgroundColor:
+                theme.colorScheme.onSurface.withValues(alpha: 0.08),
+            valueColor:
+                const AlwaysStoppedAnimation(Color(0xFF84CC16)),
+          ),
+        ),
+        Gaps.vXxs,
+        Text(
+          '${faNum(toNext)} دوست دیگر تا ${faNum(nextTotal)} چرخش روزانه 🎯',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
+          ),
+        ),
+      ],
     );
   }
 }

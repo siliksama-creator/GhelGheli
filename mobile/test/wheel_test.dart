@@ -17,6 +17,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ghelgheli_mobile/screens/user/wheel_page.dart';
+import 'package:ghelgheli_mobile/screens/user/games/tap/tap_config.dart';
 
 /// همان محاسبه‌ای که WheelPage برای زاویهٔ توقف انجام می‌دهد.
 ///
@@ -136,6 +137,8 @@ void main() {
     });
   });
 
+  _v2();
+
   group('نمایش گردونه', () {
     testWidgets('بدون جایزه هم کرش نمی‌کند', (tester) async {
       // اگر کاتالوگ خالی باشد (مدیر همه را غیرفعال کرده)، صفحه باید
@@ -144,6 +147,92 @@ void main() {
         home: Scaffold(body: SizedBox(width: 300, height: 300)),
       ));
       expect(tester.takeException(), isNull);
+    });
+  });
+}
+
+// ============================================================================
+//  مشخصات نسخهٔ دوم — کد ۴ رقمی، سهمیهٔ متغیر، امتیاز بازی
+// ============================================================================
+
+void _v2() {
+  group('منحنی امتیاز بازی ضربه‌زن', () {
+    const cfg = TapGameConfig();
+
+    test('کل بازی دقیقاً ۵۰٬۰۰۰ امتیاز است', () {
+      // عددی که مالک تعیین کرد. پنجاه جملهٔ گرد‌شده به‌تنهایی عدد رُندی
+      // نمی‌سازند، پس خطای گرد کردن در لول آخر جبران می‌شود؛ اگر آن
+      // بشکند، بازی بی‌سروصدا ۴۹٬۹۹۷ امتیاز می‌ارزد.
+      expect(cfg.gameTotalPoints, 50000);
+      var sum = 0;
+      for (var lv = 1; lv <= cfg.levelCount; lv++) {
+        sum += cfg.requiredTaps(lv);
+      }
+      expect(sum, 50000);
+    });
+
+    test('با سرور یکی است — همان چند نقطهٔ کلیدی', () {
+      // این اعداد از tapGameService.js می‌آیند. اگر دو سر از هم جدا شوند،
+      // کلاینت نوار پیشرفتی نشان می‌دهد که سینک بعدی عوضش می‌کند.
+      expect(cfg.requiredTaps(1), 239);
+      expect(cfg.requiredTaps(2), 251);
+      expect(cfg.requiredTaps(25), 770);
+      expect(cfg.requiredTaps(50), 2611);
+    });
+
+    test('هیچ لولی رایگان نیست', () {
+      // لول با هزینهٔ صفر، حلقهٔ لول‌آپ موتور را بی‌نهایت می‌چرخاند.
+      for (var lv = 1; lv <= cfg.levelCount; lv++) {
+        expect(cfg.requiredTaps(lv), greaterThanOrEqualTo(1), reason: 'لول $lv');
+      }
+    });
+
+    test('منحنی صعودی است', () {
+      for (var lv = 2; lv <= cfg.levelCount; lv++) {
+        expect(cfg.requiredTaps(lv),
+            greaterThanOrEqualTo(cfg.requiredTaps(lv - 1)));
+      }
+    });
+
+    test('سقف روزانه ۲ لول است', () {
+      expect(cfg.levelsPerDay, 2);
+    });
+
+    test('cumulativePoints از صفر شروع می‌شود', () {
+      expect(cfg.cumulativePoints(1, 0), 0);
+    });
+
+    test('cumulativePoints لول‌های تمام‌شده را می‌شمارد', () {
+      expect(cfg.cumulativePoints(2, 0), cfg.requiredTaps(1));
+      expect(cfg.cumulativePoints(2, 7), cfg.requiredTaps(1) + 7);
+    });
+
+    test('بازی تمام‌شده برابر ۵۰٬۰۰۰ است', () {
+      expect(cfg.cumulativePoints(cfg.levelCount + 1, 0), 50000);
+    });
+
+    test('مقدار خراب امتیاز را باد نمی‌کند', () {
+      // اختلاف دو خوانش cumulativePoints همان چیزی است که **پرداخت**
+      // می‌شود؛ یک مقدار کران‌نخورده اینجا یعنی ساختن امتیاز از هوا.
+      expect(cfg.cumulativePoints(1, 1000000), cfg.requiredTaps(1));
+      expect(cfg.cumulativePoints(1, -99), 0);
+      // لولِ منفی به ۱ کلمپ می‌شود، پس امتیازِ درونِ لول همچنان شمرده
+      // می‌شود. سرور هم دقیقاً همین کار را می‌کند — و همین «یکی بودن»
+      // چیزی است که اهمیت دارد، نه خودِ عدد.
+      expect(cfg.cumulativePoints(-5, 10), 10);
+      expect(cfg.cumulativePoints(9999, 10), 50000);
+    });
+
+    test('پیکربندی خراب کرش نمی‌کند', () {
+      // یک پاس تنظیم اشتباه نباید NaN تولید کند و کل صفحه را بترکاند.
+      for (final bad in [
+        const TapGameConfig(totalPoints: 0),
+        const TapGameConfig(growthFactor: 0),
+        const TapGameConfig(levelCount: 1),
+      ]) {
+        expect(() => bad.requiredTaps(1), returnsNormally);
+        expect(bad.requiredTaps(1), greaterThanOrEqualTo(1));
+      }
     });
   });
 }
