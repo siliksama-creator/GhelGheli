@@ -1889,3 +1889,251 @@
   /* درخشش می‌ماند (اطلاعات است، نه تزئین) ولی نبض نمی‌زند. */
   .wheelWin { animation: none; opacity: 1; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ناوبری — بازطراحی
+   ═══════════════════════════════════════════════════════════════════════
+
+   قبلاً هفت تب در یک نوار افقیِ اسکرول‌شونده بالای صفحه بودند. سه مشکل
+   داشت که هر سه در عکس‌های واقعی دیده می‌شد:
+
+     ۱. دکمه‌ها ۶۸ پیکسل و چسبیده به هم بودند — کوچک‌تر از هدف لمسی ۴۴px
+        که استاندارد دسترس‌پذیری است، و کنار هم یعنی زدن اشتباه.
+     ۲. تب‌های آخر (پشتیبانی، پروفایل) بیرون از کادر بودند و کاربر
+        نمی‌دانست وجود دارند.
+     ۳. بالای صفحه بود، یعنی دورترین نقطه از شست روی موبایل.
+
+   حالا: پنج مقصد، پایین صفحه، در دسترس شست. بقیه پشت «بیشتر».
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.mobileNav {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 40;
+  display: flex;
+  justify-content: space-around;
+  gap: 2px;
+  max-width: none;
+  margin: 0;
+  padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px));
+  border-radius: 22px 22px 0 0;
+  background: color-mix(in srgb, var(--surface, #0b1a2e) 92%, transparent);
+  backdrop-filter: blur(24px) saturate(1.3);
+  border: 1px solid #ffffff14;
+  border-bottom: 0;
+  box-shadow: 0 -12px 40px #0009;
+}
+
+.mobileNav button {
+  flex: 1 1 0;
+  min-width: 0;
+  /* ۵۶ ارتفاع کامل هدف لمسی — بالاتر از کف ۴۴ که راهنما می‌گوید. */
+  min-height: 56px;
+  padding: 7px 2px;
+  gap: 4px;
+  background: transparent;
+  border: 0;
+  border-radius: 16px;
+  color: #93aac4;
+  transition: color .18s ease, background .18s ease;
+}
+.mobileNav button:hover { transform: none; background: #ffffff0a; }
+
+.mobileNav .navIcon {
+  font-size: 20px;
+  line-height: 1;
+  /* آیکون فعال کمی بالا می‌پرد — یک نشانهٔ ظریف که کدام تب باز است. */
+  transition: transform .22s cubic-bezier(.2, 1.4, .4, 1);
+}
+.mobileNav .navLabel {
+  font-size: 10.5px; font-weight: 800; letter-spacing: -.2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* حالت فعال: قرصِ سبز نیست — فقط رنگ و یک نقطه. قرص روی نوار پایین
+   سنگین به‌نظر می‌رسید و با دکمهٔ اصلی صفحه رقابت می‌کرد. */
+.mobileNav .on {
+  background: transparent;
+  color: var(--brand, #b5ef58);
+  box-shadow: none;
+}
+.mobileNav .on .navIcon { transform: translateY(-2px) scale(1.12); }
+.mobileNav .on::after {
+  content: ""; position: absolute; bottom: 3px;
+  width: 4px; height: 4px; border-radius: 50%;
+  background: var(--brand, #b5ef58);
+}
+.mobileNav button { position: relative; }
+
+/* جا برای نوار پایین، تا آخرین کارت زیرش گم نشود. */
+.portal { padding-bottom: 78px; }
+
+/* ── شیت «بیشتر» ─────────────────────────────────────────────────────── */
+.sheetShade {
+  position: fixed; inset: 0; z-index: 41;
+  background: #000a;
+  animation: shadeIn .18s ease-out;
+}
+@keyframes shadeIn { from { opacity: 0 } to { opacity: 1 } }
+
+.moreSheet {
+  position: fixed; z-index: 42;
+  left: 0; right: 0;
+  bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  margin-inline: 10px;
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 8px;
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--surface, #0e2036) 96%, transparent);
+  border: 1px solid #ffffff1c;
+  box-shadow: 0 24px 70px #000b;
+  backdrop-filter: blur(24px);
+  animation: sheetUp .24s cubic-bezier(.2, 1, .3, 1);
+}
+@keyframes sheetUp {
+  from { opacity: 0; transform: translateY(14px) }
+  to { opacity: 1; transform: none }
+}
+.sheetGrip {
+  width: 38px; height: 4px; border-radius: 99px;
+  background: #ffffff28; margin: 2px auto 6px;
+}
+.moreSheet button {
+  display: flex; align-items: center; gap: 12px;
+  min-height: 50px; padding: 12px 16px;
+  background: transparent; border: 0; border-radius: 15px;
+  color: #dbeeff; font-size: 14.5px; font-weight: 700;
+  text-align: start;
+}
+.moreSheet button span { font-size: 19px; width: 24px; text-align: center; }
+.moreSheet button:hover { background: #ffffff10; transform: none; }
+.moreSheet .on { background: #b5ef5818; color: var(--brand, #b5ef58); }
+.sheetDanger { color: #ff8095 !important; }
+.sheetDanger:hover { background: #ff507018 !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .moreSheet, .sheetShade { animation: none }
+  .mobileNav .navIcon { transition: none }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   سکوی قهرمانان — اصلاح چیدمان
+   ═══════════════════════════════════════════════════════════════════════
+
+   با یک یا دو نفر روی سکو (که ماه اول همیشه همین است)، گرید سه‌ستونی یک
+   کارت کشیده و تقریباً خالی می‌ساخت و مدال هم زیر متن گم می‌شد. در عکس
+   واقعی یک مستطیل خاکستری بزرگ دیده می‌شد.
+
+   با auto-fit، تعداد ستون‌ها با تعداد واقعی نفرات تطبیق می‌کند.
+   ═══════════════════════════════════════════════════════════════════════ */
+.podium {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  align-items: stretch;
+}
+.podiumCard {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 2px;
+  padding: 18px 12px;
+  position: relative; overflow: hidden;
+}
+.podiumCard .medal {
+  font-size: 30px; line-height: 1;
+  /* اموجی روی بعضی اندرویدها با فونت فارسی رندر نمی‌شد. */
+  font-family: "Segoe UI Emoji", "Noto Color Emoji", "Apple Color Emoji", sans-serif;
+}
+.podiumCard strong { font-size: 13px; opacity: .85; font-weight: 700 }
+/* درخشش ملایم پشت نفر اول */
+.podiumCard.p1::before {
+  content: ""; position: absolute; inset: -40% 20% auto;
+  height: 80%; border-radius: 50%;
+  background: radial-gradient(circle, #ffd86b30, transparent 70%);
+  pointer-events: none;
+}
+@media (max-width: 900px) {
+  /* دو ستون روی موبایل، نه یک ستونِ کشیده. */
+  .podium { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)) }
+}
+
+/* ── عنوان بخش: نشان شمارش معکوس روی متن نمی‌افتد ──────────────────── */
+.sectionHead { flex-wrap: wrap }
+.countdown, .liveBadge { align-self: flex-start; flex: 0 0 auto }
+@media (max-width: 900px) {
+  .sectionHead { display: flex; flex-direction: column; align-items: stretch }
+  .countdown, .liveBadge { align-self: flex-start; margin-top: 10px }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   صیقل بصری — عمق، حرکت، و سلسله‌مراتب
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* اموجی‌ها روی بعضی اندرویدها با فونت فارسی رندر نمی‌شدند و جای خالی
+   می‌گذاشتند. یک fallback صریح مشکل را می‌بندد. */
+.quickIcon, .navIcon, .medal, .sheetGrip + button span,
+.moreSheet button span, .wheelShortcut {
+  font-family: "Segoe UI Emoji", "Noto Color Emoji", "Apple Color Emoji",
+    "Twemoji Mozilla", sans-serif;
+}
+
+/* ── ورود صفحه ────────────────────────────────────────────────────────
+   هر تب با یک محو + بالا آمدن کوتاه وارد می‌شود. ۲۲۰ms عمدی است: کمتر
+   از این دیده نمی‌شود، بیشتر از این کند حس می‌شود. */
+.tabPane { animation: paneIn .22s cubic-bezier(.2, .8, .3, 1) }
+@keyframes paneIn {
+  from { opacity: 0; transform: translateY(8px) }
+  to { opacity: 1; transform: none }
+}
+
+/* ── کارت‌ها: عمق واقعی ──────────────────────────────────────────────
+   قبلاً همه‌چیز یک تختهٔ تیره با همان سایه بود. یک هایلایت نازک بالای
+   کارت لبه را از پس‌زمینه جدا می‌کند — همان کاری که نور واقعی می‌کند. */
+.card { position: relative }
+.card::before {
+  content: ""; position: absolute; inset: 0 0 auto; height: 1px;
+  border-radius: 30px 30px 0 0;
+  background: linear-gradient(90deg, transparent, #ffffff30, transparent);
+  pointer-events: none;
+}
+
+/* ── دکمهٔ اصلی: بازخورد لمسی ─────────────────────────────────────── */
+.main, .primary {
+  position: relative; overflow: hidden;
+}
+.main:active, .primary:active, button:active { transform: translateY(0) scale(.985) }
+
+/* ── ردیف‌ها: هاور نرم‌تر و جهت‌دار ────────────────────────────────── */
+.row { transition: background .16s ease, border-color .16s ease, transform .16s ease }
+.clickable:hover { background: #ffffff16 }
+
+/* ── نوار پیشرفت: درخشش زنده ──────────────────────────────────────── */
+.bar span { position: relative; overflow: hidden; transition: width .5s cubic-bezier(.2,.8,.3,1) }
+.bar span::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, #ffffff55, transparent);
+  animation: barSheen 2.4s ease-in-out infinite;
+}
+@keyframes barSheen { 0% { transform: translateX(-100%) } 60%,100% { transform: translateX(100%) } }
+
+/* ── حالت خالی: کمتر شبیه خطا ─────────────────────────────────────── */
+.empty { background: #ffffff06; line-height: 1.9 }
+
+/* ── نشان اعلان: نبض ملایم تا دیده شود ────────────────────────────── */
+.notifDot, .wheelBadge { animation: badgePulse 2.6s ease-in-out infinite }
+@keyframes badgePulse {
+  0%, 100% { transform: scale(1) }
+  50% { transform: scale(1.12) }
+}
+
+/* ── تمرکز صفحه‌کلید: قابل دیدن، برای دسترس‌پذیری ─────────────────── */
+button:focus-visible, input:focus-visible, textarea:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--brand, #b5ef58);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabPane { animation: none }
+  .bar span::after { animation: none }
+  .notifDot, .wheelBadge { animation: none }
+  .bar span { transition: none }
+}

@@ -35,15 +35,29 @@ import './typography.css';
 // LAST: the theme layer overrides style.css surface colours.
 import './theme.css';
 
-const TABS = [
+// ── ناوبری ────────────────────────────────────────────────────────────────
+//
+// پنج مقصد در نوار پایین، بقیه پشت «بیشتر».
+//
+// قبلاً هر هفت تب در یک نوار افقیِ اسکرول‌شونده بودند. روی موبایل یعنی
+// دکمه‌های ۶۸ پیکسلی چسبیده به هم که باید اسکرول می‌شدند تا پیدا شوند —
+// کاربر نمی‌دانست چند تب هست و «پشتیبانی» عملاً نامرئی بود. راهنمای متریال
+// هم سقف پنج می‌گذارد، به همین دلیل.
+//
+// اپ اندروید از قبل همین کار را می‌کرد؛ این وب را با آن هم‌شکل می‌کند.
+const NAV_TABS = [
   ['home', 'خانه', '🏠'],
   ['rewards', 'جوایز', '🎁'],
-  ['wallet', 'کیف پول', '👛'],
   ['league', 'لیگ', '🏆'],
   ['club', 'چت و بازی', '🎮'],
+];
+
+const MORE_TABS = [
+  ['wallet', 'کیف پول', '👛'],
   ['support', 'پشتیبانی', '🎧'],
   ['profile', 'پروفایل', '👤'],
 ];
+
 
 // Light/dark theme. Mirrors the Flutter app, which has had a switch since
 // launch while the web was dark-only. Persisted so it survives a reload.
@@ -137,6 +151,7 @@ function Portal({ token, logout, theme, toggleTheme }) {
   // تعداد چرخش امروز، برای نشان کنار آیکون گردونه — خواستهٔ مالک:
   // «کنار آیکون گردونه در صفحه اصلی تعداد شانس روز گردونه مشخص باشه».
   const [spins, setSpins] = useState(null);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   async function load() {
     try {
@@ -203,18 +218,48 @@ function Portal({ token, logout, theme, toggleTheme }) {
           {theme === 'light' ? '🌙' : '☀️'}
         </button>
         <Notifications token={token} />
-        <button className="iconBtn danger" onClick={logout} title="خروج">⏻</button>
       </header>
 
-      <nav className="mobileNav">
-        {TABS.map(([id, label, icon]) => (
+      <nav className="mobileNav" aria-label="ناوبری اصلی">
+        {NAV_TABS.map(([id, label, icon]) => (
           <button key={id} className={tab === id ? 'on' : ''}
+            aria-current={tab === id ? 'page' : undefined}
             onClick={() => setTab(id)}>
             <span className="navIcon">{icon}</span>
             <span className="navLabel">{label}</span>
           </button>
         ))}
+        <button
+          className={MORE_TABS.some(([id]) => id === tab) ? 'on' : ''}
+          aria-haspopup="true"
+          aria-expanded={moreOpen}
+          onClick={() => setMoreOpen(v => !v)}>
+          <span className="navIcon">⋯</span>
+          <span className="navLabel">بیشتر</span>
+        </button>
       </nav>
+
+      {moreOpen && (
+        <>
+          {/* پشتِ شفاف: کلیک بیرون می‌بندد. بدون آن، تنها راه بستن، زدن
+              دوبارهٔ خودِ دکمه است که کاربر حدس نمی‌زند. */}
+          <div className="sheetShade" onClick={() => setMoreOpen(false)} />
+          <div className="moreSheet" role="menu">
+            <div className="sheetGrip" />
+            {MORE_TABS.map(([id, label, icon]) => (
+              <button key={id} role="menuitem"
+                className={tab === id ? 'on' : ''}
+                onClick={() => { setTab(id); setMoreOpen(false); }}>
+                <span>{icon}</span>{label}
+              </button>
+            ))}
+            <button role="menuitem" className="sheetDanger"
+              onClick={() => { setMoreOpen(false); logout(); }}>
+              <span>⏻</span>خروج از حساب
+            </button>
+          </div>
+        </>
+      )}
 
       {msg && <div className="toast">{msg}</div>}
 
