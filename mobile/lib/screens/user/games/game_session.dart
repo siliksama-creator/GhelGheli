@@ -315,6 +315,23 @@ class GameSession extends ChangeNotifier {
     _socket?.emit('game:move', {'roomId': _roomId, 'move': index});
   }
 
+  /// حرکت برای بازی‌های هم‌زمان (پنالتی).
+  ///
+  /// چرا جدا از move():
+  ///
+  /// ۱. حرکت اینجا یک **شیء** است (`{zone, power}`) نه یک عدد.
+  /// ۲. شرط `myTurn` نباید اعمال شود. در پنالتی هر دو بازیکن در یک لحظه
+  ///    انتخاب می‌کنند؛ `turn` فقط زننده را نشان می‌دهد، پس دروازه‌بان
+  ///    با آن شرط هرگز نمی‌توانست شیرجه بزند.
+  ///
+  /// جلوگیری از انتخاب دوباره روی سرور است (isValidMove)، نه اینجا —
+  /// کلاینت هیچ‌وقت منبع حقیقت نیست.
+  void moveObject(Map<String, dynamic> payload) {
+    if (phase != GamePhase.playing) return;
+    GameAudio.instance.play(moveSound);
+    _socket?.emit('game:move', {'roomId': _roomId, 'move': payload});
+  }
+
   void leave() {
     _socket?.emit('game:leave', {'roomId': _roomId});
     phase = GamePhase.idle;

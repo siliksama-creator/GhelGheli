@@ -7,6 +7,7 @@ import '../../widgets/app_card.dart';
 import 'games/connect4_board.dart';
 import 'games/reversi_board.dart';
 import 'games/memory_board.dart';
+import 'games/penalty_board.dart';
 import 'games/tap/tap_screen.dart';
 
 class _GameEntry {
@@ -77,6 +78,8 @@ class _GamesHubPageState extends State<GamesHubPage> {
         return Connect4Screen(api: widget.api, onBack: _back);
       case 'reversi':
         return ReversiScreen(api: widget.api, onBack: _back);
+      case 'penalty':
+        return PenaltyScreen(api: widget.api, onBack: _back);
     }
 
     final theme = Theme.of(context);
