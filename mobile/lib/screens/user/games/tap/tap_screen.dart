@@ -177,7 +177,7 @@ class _TapGameScreenState extends State<TapGameScreen>
           },
           level: _engine.level,
           levelCount: widget.config.levelCount,
-          totalTaps: _engine.totalTaps,
+          points: _engine.pointsEarned,
           levelsLeftToday: _engine.levelsLeftToday,
           levelsPerDay: widget.config.levelsPerDay,
           isComplete: _engine.isComplete,
@@ -194,7 +194,7 @@ class _TapGameScreenState extends State<TapGameScreen>
         Expanded(
           child: _engine.isComplete
               ? _CompletionView(
-                  totalTaps: _engine.totalTaps,
+                  points: _engine.pointsEarned,
                   accent: _accent,
                   skin: widget.config
                       .skinForLevel(widget.config.levelCount),
@@ -246,7 +246,7 @@ class _TapGameScreenState extends State<TapGameScreen>
                       ? 'همهٔ ${faNum(widget.config.levelCount)} لول تمام شد!'
                       : _engine.dailyCapReached
                           ? 'سهمیهٔ امروز تمام شد'
-                          : 'روی شخصیت ضربه بزن — ${faNum(_engine.tapsRemaining)} ضربه تا لول بعد',
+                          : 'ضربه بزن — ${faNum(_engine.pointsToNextLevel)} امتیاز تا لول بعد',
                   // The uncapped string is the longest in the app's smallest
                   // text style; on a 320px screen with a five-digit
                   // requirement it overflowed the row.
@@ -269,7 +269,7 @@ class _Header extends StatelessWidget {
     required this.onBack,
     required this.level,
     required this.levelCount,
-    required this.totalTaps,
+    required this.points,
     required this.levelsLeftToday,
     required this.levelsPerDay,
     required this.isComplete,
@@ -279,7 +279,7 @@ class _Header extends StatelessWidget {
   final VoidCallback onBack;
   final int level;
   final int levelCount;
-  final int totalTaps;
+  final int points;
   final int levelsLeftToday;
   final int levelsPerDay;
   final bool isComplete;
@@ -340,7 +340,7 @@ class _Header extends StatelessWidget {
                 Icon(Icons.bolt_rounded, size: 16, color: accent),
                 Gaps.hXxs,
                 Text(
-                  faNum(totalTaps),
+                  faNum(points),
                   style: theme.textTheme.labelLarge?.copyWith(
                     color: accent,
                     fontWeight: FontWeight.w900,
@@ -528,16 +528,29 @@ class _ProgressPanel extends StatelessWidget {
       children: [
         Row(
           children: [
+            // "۴۵ / ۲۳۹ امتیاز" — the unit is spelled out because the owner
+            // wants this screen to talk about points, and a bare pair of
+            // numbers next to a progress bar is ambiguous.
+            //
+            // The number pair stays a single LTR run: inside the app's RTL
+            // directionality the bidi algorithm reorders the values around
+            // the slash, so "۱۵ / ۱۰۰" reads back as "۱۰۰ / ۱۵". The word
+            // after it is a separate RTL Text so it is not dragged into the
+            // same run.
             Text(
               '${faNum(engine.taps)} / ${faNum(engine.requiredTaps)}',
-              // The pair is a single LTR expression. Inside the app's RTL
-              // directionality the bidi algorithm reorders the numbers around
-              // the slash, so "۱۵ / ۱۰۰" reads back as "۱۰۰ / ۱۵" — spotted on
-              // the live web build, and this widget has the same shape.
               textDirection: TextDirection.ltr,
               style: theme.textTheme.labelLarge?.copyWith(
                 fontWeight: FontWeight.w800,
                 color: accent,
+              ),
+            ),
+            Gaps.hXxs,
+            Text(
+              'امتیاز',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: accent.withValues(alpha: 0.75),
+                fontWeight: FontWeight.w700,
               ),
             ),
             const Spacer(),
@@ -639,12 +652,12 @@ class _NoticeBar extends StatelessWidget {
 
 class _CompletionView extends StatelessWidget {
   const _CompletionView({
-    required this.totalTaps,
+    required this.points,
     required this.accent,
     required this.skin,
   });
 
-  final int totalTaps;
+  final int points;
   final Color accent;
   final String skin;
 
@@ -676,7 +689,7 @@ class _CompletionView extends StatelessWidget {
           ),
           Gaps.vXxs,
           Text(
-            'مجموع ضربه‌ها: ${faNum(totalTaps)}',
+            'مجموع امتیاز: ${faNum(points)}',
             style: theme.textTheme.bodyMedium,
           ),
         ],

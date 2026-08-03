@@ -12,14 +12,16 @@ import { req } from './lib/api.js';
 // ── config (mirrors TapGameConfig in Dart) ─────────────────────────────────
 export const TAP_CONFIG = {
   levelCount: 50,
-  baseTaps: 100,
-  growthFactor: 1.15,
+  // کل بازی ۵۰٬۰۰۰ امتیاز است و هر ضربه دقیقاً یک امتیاز. MIRRORS
+  // TOTAL_POINTS در tapGameService.js.
+  totalPoints: 50000,
+  growthFactor: 1.05,
   levelsPerSkin: 10,
   // Levels clearable per calendar day (Asia/Tehran). MIRRORS
   // MAX_LEVELS_PER_DAY in tapGameService.js, which is the authority — this
   // copy exists so the UI can explain the rule and stop counting locally
   // instead of showing progress the next sync erases.
-  levelsPerDay: 3,
+  levelsPerDay: 2,
   skins: [
     '/games/tap/skin_1.webp',
     '/games/tap/skin_2.webp',
@@ -54,25 +56,55 @@ export const TAP_CONFIG = {
 // the render happens on every tap.
 const _curveCache = new Map();
 const _curve = (cfg) => {
-  const key = `${cfg.levelCount}|${cfg.baseTaps}|${cfg.growthFactor}`;
+  const key = `${cfg.levelCount}|${cfg.totalPoints}|${cfg.growthFactor}`;
   let table = _curveCache.get(key);
   if (!table) {
-    table = new Array(cfg.levelCount);
-    let v = cfg.baseTaps;
+    // ساخته می‌شود تا جمعش **دقیقاً** totalPoints شود.
+    //
+    // پنجاه جملهٔ هندسیِ جداگانه گرد شده، جمعشان عدد رُندی نمی‌شود؛ خطای
+    // گرد کردن در لول آخر جبران می‌شود. بدون این، بازی ۴۹٬۹۹۷ یا ۵۰٬۰۰۴
+    // امتیاز می‌ارزید و دو سرِ سیستم سر «کی بازی تمام شد» اختلاف پیدا
+    // می‌کردند. آینهٔ همین ساخت در tapGameService.js و tap_config.dart.
+    const terms = [];
+    let sum = 0;
     for (let i = 0; i < cfg.levelCount; i++) {
-      table[i] = Number.isFinite(v) && v < 1e15 ? Math.round(v) : 1e9;
-      v *= cfg.growthFactor;
+      const t = Math.pow(cfg.growthFactor, i);
+      terms.push(t);
+      sum += t;
     }
+    const base = cfg.totalPoints / sum;
+    table = terms.map((t) => {
+      const v = base * t;
+      if (!Number.isFinite(v) || v > 1e9) return 1e9;
+      // هرگز صفر: لول رایگان حلقهٔ لول‌آپ را بی‌نهایت می‌چرخاند.
+      return Math.max(1, Math.round(v));
+    });
+    const drift = cfg.totalPoints - table.reduce((a, b) => a + b, 0);
+    table[table.length - 1] = Math.max(1, table[table.length - 1] + drift);
     _curveCache.set(key, table);
   }
   return table;
 };
 
 export const requiredTaps = (level, cfg = TAP_CONFIG) => {
-  if (level < 1) return cfg.baseTaps;
-  const capped = level > cfg.levelCount ? cfg.levelCount : level;
+  const capped = level < 1 ? 1
+    : (level > cfg.levelCount ? cfg.levelCount : level);
   return _curve(cfg)[capped - 1];
 };
+
+/** امتیاز جمع‌شده تا این نقطه از منحنی. آینهٔ cumulativePoints سرور. */
+export const cumulativePoints = (level, levelTaps, cfg = TAP_CONFIG) => {
+  const lv = Math.max(1, Math.min(level, cfg.levelCount + 1));
+  const table = _curve(cfg);
+  let sum = 0;
+  for (let i = 0; i < lv - 1 && i < cfg.levelCount; i++) sum += table[i];
+  if (lv > cfg.levelCount) return sum;
+  return sum + Math.max(0, Math.min(levelTaps || 0, table[lv - 1]));
+};
+
+/** جمع کل امتیاز بازی — همان totalPoints، ولی از روی جدول واقعی. */
+export const totalGamePoints = (cfg = TAP_CONFIG) =>
+  _curve(cfg).reduce((a, b) => a + b, 0);
 
 // The character changes ON arrival at level 10, 20, 30, 40 — levels 1-9 are
 // skin 1, level 10 is already skin 2. Dividing (level - 1) pushed every
@@ -284,6 +316,9 @@ export default function TapGame({ token, onBack }) {
   const pct = isComplete ? 100 : Math.min(100, (progress.taps / need) * 100);
   const skin = skinForLevel(Math.min(level, TAP_CONFIG.levelCount));
   const remaining = isComplete ? 0 : Math.max(0, need - progress.taps);
+  // امتیاز، نه تعداد ضربه — خواستهٔ مالک. هر ضربه یک امتیاز است، پس این
+  // عدد همان کاری است که کاربر کرده.
+  const points = cumulativePoints(progress.level, progress.taps);
 
   // ── daily cap ────────────────────────────────────────────────────────────
   // Recomputed from `progress` on every render rather than held in its own
@@ -616,12 +651,13 @@ export default function TapGame({ token, onBack }) {
             ))}
           </span>
         )}
-        <span className="tapTotal">⚡ {fa(progress.totalTaps)}</span>
+        <span className="tapTotal">⚡ {fa(points)} امتیاز</span>
       </div>
 
       <div className="tapProgress">
         <div className="tapProgressTop">
           <b dir="ltr">{fa(progress.taps)} / {fa(need)}</b>
+          <small className="tapUnit">امتیاز</small>
           {untilNextSkin != null &&
             <small>{fa(untilNextSkin)} لول تا شخصیت بعدی</small>}
         </div>
@@ -638,7 +674,7 @@ export default function TapGame({ token, onBack }) {
         <div className="tapDone">
           <img src={skinForLevel(TAP_CONFIG.levelCount)} alt="" />
           <h2>🏆 تبریک! همهٔ لول‌ها را تمام کردی</h2>
-          <p>مجموع ضربه‌ها: {fa(progress.totalTaps)}</p>
+          <p>مجموع امتیاز: {fa(points)}</p>
         </div>
       ) : capped ? (
         // The tap area is REPLACED, not merely disabled. Leaving a tappable
@@ -670,7 +706,7 @@ export default function TapGame({ token, onBack }) {
       <p className="tapHint">
         {isComplete ? `همهٔ ${fa(TAP_CONFIG.levelCount)} لول تمام شد!`
           : capped ? 'فردا دوباره سر بزن'
-            : `روی شخصیت ضربه بزن — ${fa(remaining)} ضربه تا لول بعد`}
+            : `ضربه بزن — ${fa(remaining)} امتیاز تا لول بعد`}
       </p>
     </section>
   );

@@ -119,6 +119,17 @@ const asyncHandler = fn => (req, res, next) => Promise.resolve(fn(req, res, next
 const signUser = user => jwt.sign({ sub: user.id, type: 'user' }, JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '30d' });
 const signAdmin = admin => jwt.sign({ sub: admin.id, type: 'admin', role: admin.role }, JWT_SECRET, { expiresIn: '12h' });
 function normalizeMobile(m) { return String(m || '').replace(/\s+/g, '').trim(); }
+
+/**
+ * ارقام لاتین را به فارسی تبدیل می‌کند، برای متن اعلان‌ها.
+ *
+ * اعلان‌ها تنها جای سرور هستند که متن فارسی مستقیم به کاربر نشان می‌دهند؛
+ * «۳ چرخش» کنار «3 چرخش» در یک لیست، بد به‌نظر می‌رسد.
+ */
+const FA_DIGITS = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+function faDigits(n) {
+  return String(n).replace(/\d/g, (d) => FA_DIGITS[Number(d)]);
+}
 // PRIVACY FIX: register-password used to fall back to the raw mobile
 // number/username as the public nickname whenever the optional nickname
 // field was left blank. Nickname is shown to every other user on the
@@ -359,10 +370,20 @@ app.post('/api/auth/register', asyncHandler(async (req, res) => {
       refClient.release();
     }
     if (referral?.ok) {
+      // اعلان فقط برای معرف. دعوت‌شونده جایزه‌اش را همان لحظه در پاسخ
+      // ثبت‌نام می‌بیند، پس یک نوتیفیکیشن اضافه فقط تکرار است.
+      let body = `${referrals.SPINS_PER_REFERRAL} چرخش گردونه گرفتی و از `
+        + `این به بعد ${referrals.COMMISSION_PERCENT}٪ امتیازهای او از ثبت `
+        + `کارت و بازی ضربه‌زن هم به تو می‌رسد.`;
+      // اگر همین دعوت باعث شد سهمیهٔ روزانه بالا برود، بگو — این بزرگ‌ترین
+      // پاداش سیستم است و بی‌صدا دادنش حیف است.
+      if (referral.referrerInvites % referrals.INVITES_PER_DAILY_SPIN === 0
+          && referral.referrerInvites <= referrals.MAX_INVITES_FOR_DAILY) {
+        body += ` 🎉 با ${faDigits(referral.referrerInvites)} دعوت، از حالا `
+          + `روزی ${faDigits(referral.referrerDailySpins)} چرخش رایگان داری!`;
+      }
       createNotification(
-        referral.referrerId, 'referral', 'یک دوست با کد تو عضو شد 🎉',
-        `${referrals.SPINS_PER_REFERRAL} چرخش گردونه گرفتی و از این به بعد `
-        + `${referrals.COMMISSION_PERCENT}٪ امتیازهای او هم به تو می‌رسد.`,
+        referral.referrerId, 'referral', 'یک دوست با کد تو عضو شد 🎉', body,
       ).catch(() => {});
     }
   }
@@ -372,6 +393,10 @@ app.post('/api/auth/register', asyncHandler(async (req, res) => {
     user: safeUser(newUser),
     referralCode: myCode,
     referralApplied: referral?.ok === true,
+    // چند چرخش خودِ دعوت‌شونده گرفت — تا کلاینت بتواند بگوید «۳ چرخش
+    // گردونه گرفتی» به‌جای یک «ثبت شد» بی‌معنا.
+    referralSpins: referral?.ok ? referrals.SPINS_PER_REFERRAL : 0,
+    referralReason: referral && !referral.ok ? referral.reason : undefined,
   });
 }));
 
@@ -482,10 +507,20 @@ app.post('/api/auth/register-password', userLoginLimiter, asyncHandler(async (re
       refClient.release();
     }
     if (referral?.ok) {
+      // اعلان فقط برای معرف. دعوت‌شونده جایزه‌اش را همان لحظه در پاسخ
+      // ثبت‌نام می‌بیند، پس یک نوتیفیکیشن اضافه فقط تکرار است.
+      let body = `${referrals.SPINS_PER_REFERRAL} چرخش گردونه گرفتی و از `
+        + `این به بعد ${referrals.COMMISSION_PERCENT}٪ امتیازهای او از ثبت `
+        + `کارت و بازی ضربه‌زن هم به تو می‌رسد.`;
+      // اگر همین دعوت باعث شد سهمیهٔ روزانه بالا برود، بگو — این بزرگ‌ترین
+      // پاداش سیستم است و بی‌صدا دادنش حیف است.
+      if (referral.referrerInvites % referrals.INVITES_PER_DAILY_SPIN === 0
+          && referral.referrerInvites <= referrals.MAX_INVITES_FOR_DAILY) {
+        body += ` 🎉 با ${faDigits(referral.referrerInvites)} دعوت، از حالا `
+          + `روزی ${faDigits(referral.referrerDailySpins)} چرخش رایگان داری!`;
+      }
       createNotification(
-        referral.referrerId, 'referral', 'یک دوست با کد تو عضو شد 🎉',
-        `${referrals.SPINS_PER_REFERRAL} چرخش گردونه گرفتی و از این به بعد `
-        + `${referrals.COMMISSION_PERCENT}٪ امتیازهای او هم به تو می‌رسد.`,
+        referral.referrerId, 'referral', 'یک دوست با کد تو عضو شد 🎉', body,
       ).catch(() => {});
     }
   }
@@ -495,6 +530,10 @@ app.post('/api/auth/register-password', userLoginLimiter, asyncHandler(async (re
     user: safeUser(rows[0]),
     referralCode: myCode,
     referralApplied: referral?.ok === true,
+    // چند چرخش خودِ دعوت‌شونده گرفت — تا کلاینت بتواند بگوید «۳ چرخش
+    // گردونه گرفتی» به‌جای یک «ثبت شد» بی‌معنا.
+    referralSpins: referral?.ok ? referrals.SPINS_PER_REFERRAL : 0,
+    referralReason: referral && !referral.ok ? referral.reason : undefined,
   });
 
 }));
@@ -707,7 +746,31 @@ app.post('/api/games/tap/progress', auth, tapBatchLimiter, asyncHandler(async (r
   // The raw token doubles as the HMAC key material, so the signature can only
   // be produced by whoever holds a live session for this user.
   const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
-  const { status, payload } = await tapGame.submitBatch(req.user.id, token, req.body || {});
+  const { status, payload } = await tapGame.submitBatch(
+    req.user.id, token, req.body || {},
+    // ── امتیاز بازی ضربه‌زن ──────────────────────────────────────────────
+    //
+    // هر ضربه یک امتیاز. سرویس خودش حساب می‌کند چند ضربه واقعاً *شمرده*
+    // شده (بعد از اعمال سقف روزانه) و همان عدد را اینجا می‌فرستد، نه
+    // چیزی که کلاینت ادعا کرده.
+    //
+    // روی همان تراکنشِ ذخیرهٔ پیشرفت اجرا می‌شود: اگر یکی شکست بخورد هر
+    // دو برمی‌گردند، وگرنه یک کرش وسط کار یا دوبار پول می‌دهد یا لول را
+    // بالا می‌برد بدون پرداخت.
+    async (client, userId, points) => {
+      await client.query(
+        `UPDATE users SET
+           current_points        = current_points + $2,
+           lifetime_points       = lifetime_points + $2,
+           monthly_league_points = monthly_league_points + $2,
+           updated_at = NOW()
+         WHERE id = $1`, [userId, points]);
+      await addLeaguePoints(client, userId, points);
+      // کمیسیون ۵٪ معرف. مالک صریح گفت این کمیسیون فقط از دو منبع می‌آید:
+      // ثبت کد کارت، و بازی ضربه‌زن. این نقطهٔ دوم است.
+      await referrals.payCommission(client, userId, points, 'tap');
+    },
+  );
   res.status(status).json(payload);
 }));
 
@@ -1118,8 +1181,11 @@ app.post('/api/wheel/spin', auth, wheelLimiter, asyncHandler(async (req, res) =>
         description: `گردونهٔ شانس — ${label}`,
       });
     },
-    // امتیاز گردونه هم مثل هر امتیاز دیگری کمیسیون ۵٪ معرف را می‌سازد؛
-    // مالک گفت «تمامی امتیازاتی که به هر طریقی به دست می‌آورند».
+    // امتیاز گردونه کمیسیون معرف **نمی‌سازد**.
+    //
+    // مالک دامنه را محدود کرد به «ثبت کارت» و «بازی ضربه‌زن». گردونه
+    // هیچ‌کدام نیست — و اگر بود، هر چرخش رایگانِ دعوت‌شونده برای معرف هم
+    // پول می‌ساخت، یعنی دقیقاً همان حلقهٔ خودتغذیه‌ای که باید بسته بماند.
     addPoints: async (client, userId, amount, source) => {
       await client.query(
         `UPDATE users SET
@@ -1129,7 +1195,6 @@ app.post('/api/wheel/spin', auth, wheelLimiter, asyncHandler(async (req, res) =>
            updated_at = NOW()
          WHERE id = $1`, [userId, amount]);
       await addLeaguePoints(client, userId, amount);
-      await referrals.payCommission(client, userId, amount, source);
     },
   });
 
@@ -2241,9 +2306,11 @@ app.post('/api/admin/users/:id/points', adminAuth, validateUuid('id'), requireRo
          updated_at = NOW()
        WHERE id = $2`,
       [p, req.params.id]);
-    // فقط افزایش کمیسیون می‌سازد — payCommission خودش امتیاز منفی را رد
-    // می‌کند، چون معرف کاری نکرده که بابت اصلاح خطای مدیر جریمه شود.
-    await referrals.payCommission(pointsClient, req.params.id, p, 'admin');
+    // بدون کمیسیون معرف — عمدی.
+    //
+    // مالک دامنه را محدود کرد: کمیسیون فقط از «ثبت کارت» و «بازی ضربه‌زن».
+    // امتیاز دستی مدیر هیچ‌کدام نیست، و منطقی هم هست: یک اصلاح دستی
+    // نباید به شخص سومی پول بدهد.
     await pointsClient.query('COMMIT');
   } catch (e) {
     await pointsClient.query('ROLLBACK').catch(() => {});

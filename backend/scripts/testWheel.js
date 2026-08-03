@@ -19,25 +19,41 @@ function test(name, fn) {
   }
 }
 
-// همان جدولی که مایگریشن ۰۲۷ می‌کارد.
+// همان جدولی که مایگریشن ۰۲۸ می‌کارد. مخرج یک میلیون است نه ۱۰٬۰۰۰.
 const PRIZES = [
-  { id: 'a', label: '۱۰۰ امتیاز', kind: 'points', value: 100, weight: 3729, slice_order: 1 },
-  { id: 'b', label: '۵۰٬۰۰۰ تومان', kind: 'cash', value: 50000, weight: 1, slice_order: 2 },
-  { id: 'c', label: '۱۰۰۰ امتیاز', kind: 'points', value: 1000, weight: 1250, slice_order: 3 },
-  { id: 'd', label: '۱۰٬۰۰۰ تومان', kind: 'cash', value: 10000, weight: 20, slice_order: 4 },
-  { id: 'e', label: '۱۰۰ امتیاز', kind: 'points', value: 100, weight: 3728, slice_order: 5 },
-  { id: 'f', label: '۵۰۰۰ امتیاز', kind: 'points', value: 5000, weight: 1, slice_order: 6 },
-  { id: 'g', label: '۱۰۰۰ امتیاز', kind: 'points', value: 1000, weight: 1250, slice_order: 7 },
-  { id: 'h', label: '۲۰۰۰ امتیاز', kind: 'points', value: 2000, weight: 20, slice_order: 8 },
-  { id: 'i', label: '۱۰۰٬۰۰۰ تومان', kind: 'cash', value: 100000, weight: 1, slice_order: 9 },
+  { id: 'a', label: '۱۰۰ امتیاز', kind: 'points', value: 100, weight: 245000, slice_order: 1 },
+  { id: 'b', label: '۵۰٬۰۰۰ تومان', kind: 'cash', value: 50000, weight: 15, slice_order: 2 },
+  { id: 'c', label: '۵۰۰ امتیاز', kind: 'points', value: 500, weight: 100000, slice_order: 3 },
+  { id: 'd', label: '۱۰۰ امتیاز', kind: 'points', value: 100, weight: 245000, slice_order: 4 },
+  { id: 'e', label: '۲۰۰۰ امتیاز', kind: 'points', value: 2000, weight: 4000, slice_order: 5 },
+  { id: 'f', label: '۱۰۰۰ امتیاز', kind: 'points', value: 1000, weight: 30000, slice_order: 6 },
+  { id: 'g', label: '۱۰۰ امتیاز', kind: 'points', value: 100, weight: 245000, slice_order: 7 },
+  { id: 'h', label: '۱۰٬۰۰۰ تومان', kind: 'cash', value: 10000, weight: 900, slice_order: 8 },
+  { id: 'i', label: '۵۰۰ امتیاز', kind: 'points', value: 500, weight: 100000, slice_order: 9 },
+  { id: 'j', label: '۵۰۰۰ امتیاز', kind: 'points', value: 5000, weight: 80, slice_order: 10 },
+  { id: 'k', label: '۱۰۰۰ امتیاز', kind: 'points', value: 1000, weight: 30000, slice_order: 11 },
+  { id: 'l', label: '۱۰۰٬۰۰۰ تومان', kind: 'cash', value: 100000, weight: 5, slice_order: 12 },
 ];
 
 console.log('\nگردونه — وزن‌ها و انتخاب جایزه');
 
-test('جمع وزن‌ها دقیقاً ۱۰٬۰۰۰ است', () => {
+test('جمع وزن‌ها دقیقاً یک میلیون است', () => {
   const total = PRIZES.reduce((s, p) => s + p.weight, 0);
   assert.strictEqual(total, wheel.WEIGHT_TOTAL);
-  assert.strictEqual(total, 10000);
+  assert.strictEqual(total, 1000000);
+});
+
+test('جوایز بزرگ واقعاً «خیلی خیلی کم» هستند', () => {
+  // خواستهٔ صریح مالک. با ۲ چرخش در روز، هر کدام از این‌ها یعنی چند دهه
+  // انتظار برای یک کاربر — که همان چیزی است که خواسته شد.
+  const rate = (id) => {
+    const p = PRIZES.find((x) => x.id === id);
+    return wheel.WEIGHT_TOTAL / p.weight;
+  };
+  assert.ok(rate('l') >= 200000, `۱۰۰ هزار تومان: ۱ در ${rate('l')}`);
+  assert.ok(rate('b') >= 60000, `۵۰ هزار تومان: ۱ در ${rate('b')}`);
+  assert.ok(rate('j') >= 12000, `۵۰۰۰ امتیاز: ۱ در ${rate('j')}`);
+  assert.ok(rate('h') >= 1000, `۱۰ هزار تومان: ۱ در ${rate('h')}`);
 });
 
 test('وزن اشتباه خطا می‌دهد و بی‌صدا نرمال‌سازی نمی‌شود', () => {
@@ -51,7 +67,7 @@ test('وزن اشتباه خطا می‌دهد و بی‌صدا نرمال‌س�
 
 test('جایزه‌ای با وزن صفر هرگز انتخاب نمی‌شود', () => {
   const list = [
-    { ...PRIZES[0], weight: 10000 },
+    { ...PRIZES[0], weight: wheel.WEIGHT_TOTAL },
     { ...PRIZES[8], weight: 0 },
   ];
   for (let i = 0; i < 3000; i++) {
@@ -60,7 +76,7 @@ test('جایزه‌ای با وزن صفر هرگز انتخاب نمی‌شود
 });
 
 test('با یک جایزهٔ تک‌وزن، همیشه همان برمی‌گردد', () => {
-  const only = [{ ...PRIZES[0], weight: 10000 }];
+  const only = [{ ...PRIZES[0], weight: wheel.WEIGHT_TOTAL }];
   for (let i = 0; i < 200; i++) {
     assert.strictEqual(wheel.pickPrize(only).id, 'a');
   }
@@ -68,35 +84,68 @@ test('با یک جایزهٔ تک‌وزن، همیشه همان برمی‌گر
 
 test('هر جایزه‌ای که وزن دارد، دیده می‌شود', () => {
   // مرزهای بازهٔ تجمعی: یک `<` که باید `<=` باشد، آخرین جایزه را
-  // دست‌نیافتنی می‌کند. با ۲۰۰ هزار نمونه، جایزهٔ ۱-در-۱۰هزار باید
-  // با احتمال بسیار بالا حداقل یک بار بیاید.
+  // دست‌نیافتنی می‌کند.
+  //
+  // نادرترین جایزه ۱ در ۲۰۰٬۰۰۰ است، پس با ۲۰۰ هزار نمونه احتمال ندیدنش
+  // ۳۷٪ می‌شود و تست flaky. به‌جای بالا بردن N تا میلیون‌ها (کُند)،
+  // جوایز نادر با یک جدول کوچک‌ترِ هم‌ارز بررسی می‌شوند: همان کد انتخاب،
+  // ولی مرزها با تعداد نمونهٔ معقول قابل آزمون‌اند.
   const seen = new Set();
   for (let i = 0; i < 200000; i++) seen.add(wheel.pickPrize(PRIZES).id);
   for (const p of PRIZES) {
-    assert.ok(seen.has(p.id), `${p.label} هرگز انتخاب نشد`);
+    if (p.weight >= 4000) {
+      assert.ok(seen.has(p.id), `${p.label} هرگز انتخاب نشد`);
+    }
   }
+
+  // آخرین جایزهٔ جدول — همان که یک `<` اشتباه دست‌نیافتنی‌اش می‌کند.
+  //
+  // وزنش ۱-در-۱۰۰۰ گرفته شده نه ۱-در-یک‌میلیون: هدف اثبات *قابل انتخاب
+  // بودنِ* عنصر آخر است، نه سنجش یک نرخ نادر. با ۱-در-یک‌میلیون، خودِ تست
+  // با احتمال ۳۷٪ الکی قرمز می‌شد.
+  const boundary = [
+    { id: 'x', kind: 'points', value: 1, weight: wheel.WEIGHT_TOTAL - 1000 },
+    { id: 'last', kind: 'points', value: 2, weight: 1000 },
+  ];
+  let lastHits = 0;
+  for (let i = 0; i < 200000; i++) {
+    if (wheel.pickPrize(boundary).id === 'last') lastHits++;
+  }
+  // انتظار ~۲۰۰. صفر یعنی باگ مرز بازه.
+  assert.ok(lastHits > 50,
+    `آخرین جایزهٔ جدول فقط ${lastHits} بار آمد — باگ مرز بازه`);
 });
 
 test('نرخ جوایز نادر در محدودهٔ آماری درست است', () => {
-  const N = 200000;
-  let rare = 0; // جمع سه جایزهٔ ۱-در-۱۰٬۰۰۰
+  const N = 300000;
+  const rareWeight = PRIZES
+    .filter((p) => p.weight <= 1000)
+    .reduce((s, p) => s + p.weight, 0);
+  let rare = 0;
   for (let i = 0; i < N; i++) {
-    const p = wheel.pickPrize(PRIZES);
-    if (p.weight === 1) rare++;
+    if (wheel.pickPrize(PRIZES).weight <= 1000) rare++;
   }
-  const expected = N * 3 / 10000; // ۶۰
+  const pr = rareWeight / wheel.WEIGHT_TOTAL;
+  const expected = N * pr;
   // کران ۵ سیگما — عبور از این یعنی باگ، نه بدشانسی.
-  const sigma = Math.sqrt(N * (3 / 10000) * (1 - 3 / 10000));
+  const sigma = Math.sqrt(N * pr * (1 - pr));
   assert.ok(Math.abs(rare - expected) < 5 * sigma,
-    `${rare} در برابر انتظار ${expected}`);
+    `${rare} در برابر انتظار ${expected.toFixed(0)}`);
 });
 
-test('هزینهٔ نقدی مورد انتظار هر چرخش ۳۵ تومان است', () => {
+test('هزینهٔ نقدی مورد انتظار هر چرخش زیر ۱۵ تومان است', () => {
   // عددی که کل اقتصاد گردونه رویش بنا شده. اگر کسی وزنی را عوض کند و این
   // عدد بالا برود، اینجا معلوم می‌شود — نه سر ماه روی صورت‌حساب.
+  //
+  // کران بالا و نه یک عدد دقیق: وزن‌ها ممکن است کمی تنظیم شوند، ولی سقف
+  // هزینه نباید جابه‌جا شود. با ۱۰٬۰۰۰ کاربر و ۲ چرخش در روز، ۱۵ تومان
+  // یعنی حداکثر ۹ میلیون تومان در ماه.
   const ev = PRIZES.reduce(
-    (s, p) => s + (p.kind === 'cash' ? (p.weight / 10000) * p.value : 0), 0);
-  assert.strictEqual(ev, 35);
+    (s, p) => s + (p.kind === 'cash'
+      ? (p.weight / wheel.WEIGHT_TOTAL) * p.value : 0), 0);
+  assert.ok(ev < 15, `EV نقدی ${ev} تومان است`);
+  assert.ok(ev > 0, 'گردونه باید جایزهٔ نقدی داشته باشد');
+  console.log(`    (EV نقدی: ${ev.toFixed(2)} تومان هر چرخش)`);
 });
 
 console.log('\nگردونه — روز تهران');
@@ -192,28 +241,102 @@ test('جایزه قبل از پرداخت ثبت می‌شود', () => {
 
 console.log('\nدعوت دوستان');
 
-test('کد ۸ کاراکتری است', () => {
-  for (let i = 0; i < 100; i++) {
-    assert.strictEqual(referrals.generateCode().length, 8);
+test('کد دقیقاً ۴ رقم است', () => {
+  for (let i = 0; i < 500; i++) {
+    const c = referrals.generateCode();
+    assert.strictEqual(c.length, 4, `کد ${c}`);
   }
 });
 
-test('کد شامل نویسه‌های مبهم نیست', () => {
-  // کد قرار است شفاهی به دوست گفته شود. 0/O و 1/I/L در فارسی و انگلیسی
-  // مدام اشتباه شنیده و تایپ می‌شوند.
-  const banned = new Set(['0', 'O', '1', 'I', 'L']);
+test('کد فقط رقم است — هیچ حرف انگلیسی‌ای ندارد', () => {
+  // خواستهٔ مالک: «بدون حروف انگلیسی که ممکنه اشتباه کنن». وقتی حرفی در
+  // کار نباشد، مسئلهٔ بزرگی/کوچکی حروف هم اصلاً وجود ندارد — که بهترین
+  // شکلِ برآورده کردن «بزرگ کوچیکی حروف مهم نباشه» است.
   for (let i = 0; i < 2000; i++) {
-    for (const ch of referrals.generateCode()) {
-      assert.ok(!banned.has(ch), `نویسهٔ مبهم ${ch} در کد`);
-    }
+    assert.ok(/^[0-9]{4}$/.test(referrals.generateCode()));
   }
 });
 
-test('کدها به‌قدر کافی متنوع‌اند', () => {
+test('کد هرگز با صفر شروع نمی‌شود', () => {
+  // «۰۴۲۷» و «۴۲۷» نباید دو چیز متفاوت به‌نظر برسند؛ کاربر صفر ابتدایی را
+  // موقع گفتن یا تایپ کردن جا می‌اندازد.
+  for (let i = 0; i < 3000; i++) {
+    assert.notStrictEqual(referrals.generateCode()[0], '0');
+  }
+});
+
+test('کد در بازهٔ ۱۰۰۰ تا ۹۹۹۹ است', () => {
+  for (let i = 0; i < 3000; i++) {
+    const n = Number(referrals.generateCode());
+    assert.ok(n >= 1000 && n <= 9999, `کد ${n} خارج از بازه`);
+  }
+});
+
+test('توزیع کدها یکنواخت است', () => {
+  // اگر تولید سوگیری داشته باشد، بعضی کدها هرگز صادر نمی‌شوند و فضای
+  // ۹٬۰۰۰تایی عملاً کوچک‌تر می‌شود.
   const seen = new Set();
-  for (let i = 0; i < 5000; i++) seen.add(referrals.generateCode());
-  // با ۳۰^۸ فضای حالت، ۵۰۰۰ نمونه باید تقریباً همه یکتا باشند.
-  assert.ok(seen.size > 4990, `فقط ${seen.size} کد یکتا از ۵۰۰۰`);
+  for (let i = 0; i < 40000; i++) seen.add(referrals.generateCode());
+  assert.ok(seen.size > 8500, `فقط ${seen.size} کد یکتا از ۹٬۰۰۰ ممکن`);
+});
+
+console.log('\nدعوت — ارقام فارسی و نرمال‌سازی');
+
+test('ارقام فارسی به لاتین تبدیل می‌شوند', () => {
+  // کاربر ایرانی با کیبورد فارسی «۱۲۳۴» تایپ می‌کند نه «1234». بدون این
+  // نرمال‌سازی، کدِ درست هرگز پیدا نمی‌شد و کاربر فکر می‌کرد کد دوستش
+  // اشتباه است.
+  assert.strictEqual(referrals.normalizeDigits('۱۲۳۴'), '1234');
+  assert.strictEqual(referrals.normalizeDigits('۰۹۸۷'), '0987');
+});
+
+test('ارقام عربی هم تبدیل می‌شوند', () => {
+  assert.strictEqual(referrals.normalizeDigits('١٢٣٤'), '1234');
+});
+
+test('فاصله و خط تیره و حروف دور ریخته می‌شوند', () => {
+  assert.strictEqual(referrals.normalizeDigits(' 12-34 '), '1234');
+  assert.strictEqual(referrals.normalizeDigits('کد: ۱۲۳۴'), '1234');
+  assert.strictEqual(referrals.normalizeDigits('abc'), '');
+});
+
+test('ورودی نامعتبر خطا نمی‌دهد', () => {
+  for (const bad of [null, undefined, '', 0, {}, []]) {
+    assert.strictEqual(typeof referrals.normalizeDigits(bad), 'string');
+  }
+});
+
+console.log('\nدعوت — چرخش روزانه بر اساس تعداد دعوت');
+
+test('بدون دعوت، روزی یک چرخش', () => {
+  assert.strictEqual(referrals.dailySpinsFor(0), 1);
+  assert.strictEqual(referrals.dailySpinsFor(9), 1);
+});
+
+test('هر ۱۰ دعوت یک چرخش روزانه اضافه می‌کند', () => {
+  // خواستهٔ مالک: «به ازای هر ۱۰ نفری که دعوت کنه ۱ شانس روزانه اضافه بشه
+  // و ازون به بعد ۲ شانس در روز».
+  assert.strictEqual(referrals.dailySpinsFor(10), 2);
+  assert.strictEqual(referrals.dailySpinsFor(19), 2);
+  assert.strictEqual(referrals.dailySpinsFor(20), 3);
+  assert.strictEqual(referrals.dailySpinsFor(30), 4);
+  assert.strictEqual(referrals.dailySpinsFor(40), 5);
+  assert.strictEqual(referrals.dailySpinsFor(50), 6);
+});
+
+test('بعد از ۵۰ دعوت دیگر اضافه نمی‌شود', () => {
+  // «و این تا ۵۰ نفر ادامه پیدا میکنه» — دعوت همچنان نامحدود است، فقط
+  // این پاداشِ خاص سقف دارد.
+  assert.strictEqual(referrals.dailySpinsFor(60), 6);
+  assert.strictEqual(referrals.dailySpinsFor(500), 6);
+  assert.strictEqual(referrals.dailySpinsFor(100000), 6);
+});
+
+test('ورودی خراب سهمیه را منفی یا NaN نمی‌کند', () => {
+  for (const bad of [null, undefined, -5, NaN, 'x']) {
+    const v = referrals.dailySpinsFor(bad);
+    assert.ok(Number.isInteger(v) && v >= 1, `ورودی ${bad} داد ${v}`);
+  }
 });
 
 test('کمیسیون ۵٪ است و به بالا گرد می‌شود', () => {
@@ -228,8 +351,28 @@ test('کمیسیون ۵٪ است و به بالا گرد می‌شود', () => {
   assert.strictEqual(Math.ceil(1000 * pct / 100), 50);
 });
 
-test('هر معرفی ۳ چرخش می‌دهد', () => {
+test('هر معرفی ۳ چرخش می‌دهد — به هر دو طرف', () => {
   assert.strictEqual(referrals.SPINS_PER_REFERRAL, 3);
+  const src = require('fs').readFileSync(
+    require('path').join(__dirname, '../src/services/referralService.js'),
+    'utf8');
+  // خواستهٔ مالک: «هر دو کاربر یعنی هم کسی که دعوت شده هم کسی که دعوت
+  // کرده هر دو ۳ شانس گردونه بگیرند». یک UPDATE روی آرایه‌ای از دو id.
+  assert.ok(/id = ANY\(\$1::uuid\[\]\)/.test(src),
+    'باید هر دو طرف در یک UPDATE جایزه بگیرند');
+  assert.ok(/\[\[referrerId, newUserId\], SPINS_PER_REFERRAL\]/.test(src));
+});
+
+test('دعوت نامحدود است', () => {
+  // مالک: «هر کاربر هر چقدر میخواد میتونه دعوت کنه». هیچ سقفی روی تعداد
+  // دعوت نیست — فقط پاداشِ چرخش روزانه سقف دارد.
+  const src = require('fs').readFileSync(
+    require('path').join(__dirname, '../src/services/referralService.js'),
+    'utf8');
+  assert.ok(!/MAX_REFERRALS|maxInvites\s*=/.test(src),
+    'نباید سقفی روی تعداد دعوت باشد');
+  assert.strictEqual(referrals.MAX_INVITES_FOR_DAILY, 50,
+    'سقف فقط روی پاداش چرخش روزانه است');
 });
 
 test('کمیسیون از امتیاز منفی ساخته نمی‌شود', () => {
@@ -269,22 +412,39 @@ test('معرف دوم برای یک کاربر ثبت نمی‌شود', () => {
     'شرط باید مانع بازنویسی معرف قبلی و دادن ۳ چرخش دوم شود');
 });
 
-test('کمیسیون به هر سه مسیر امتیاز وصل است', () => {
+test('کمیسیون فقط از دو منبع می‌آید: کارت و ضربه‌زن', () => {
+  // مالک دامنه را محدود کرد: «این ۵ درصد فقط از امتیازهایی بدست میاد که
+  // کاربر خودش کارت ثبت کرده و یا امتیاز رو از بازی ضربه زن بدست آورده».
+  assert.deepStrictEqual([...referrals.COMMISSIONABLE].sort(),
+    ['card', 'tap']);
+});
+
+test('منبع ناشناخته کمیسیون نمی‌سازد — لیست سفید است نه سیاه', () => {
+  // پیش‌فرضِ امن: قابلیت جدید باید آگاهانه اضافه شود، نه اینکه بی‌سروصدا
+  // هزینه بسازد.
+  for (const s of ['game', 'admin', 'wheel', 'league', 'reward', 'unknown']) {
+    assert.ok(!referrals.COMMISSIONABLE.has(s), `${s} نباید کمیسیون بسازد`);
+  }
+});
+
+test('کمیسیون در کد فقط از همان دو نقطه صدا زده می‌شود', () => {
   const path = require('path');
   const fs = require('fs');
   const server = fs.readFileSync(
     path.join(__dirname, '../src/server.js'), 'utf8');
   const games = fs.readFileSync(
     path.join(__dirname, '../src/services/gameRewardService.js'), 'utf8');
-  // مالک گفت «تمامی امتیازاتی که به هر طریقی به دست میارن».
+
   assert.ok(/payCommission\(client, req\.user\.id, card\.point_value, 'card'\)/
     .test(server), 'ثبت کد کارت');
-  assert.ok(/payCommission\(pointsClient, req\.params\.id, p, 'admin'\)/
-    .test(server), 'امتیاز دستی مدیر');
-  assert.ok(/payCommission\(client, userId, delta, 'game'\)/
-    .test(games), 'جایزهٔ بازی');
-  assert.ok(/payCommission\(client, userId, amount, source\)/
-    .test(server), 'امتیاز گردونه');
+  assert.ok(/payCommission\(client, userId, points, 'tap'\)/
+    .test(server), 'بازی ضربه‌زن');
+  // و از جاهایی که مالک حذف کرد، صدا زده **نمی‌شود**.
+  assert.ok(!/payCommission/.test(games),
+    'بازی‌های آنلاین نباید کمیسیون بسازند');
+  const calls = server.match(/payCommission\(/g) || [];
+  assert.strictEqual(calls.length, 2,
+    `انتظار ۲ فراخوانی، ${calls.length} تا پیدا شد`);
 });
 
 console.log(`\n${passed} ادعای گردونه و دعوت موفق بود\n`);

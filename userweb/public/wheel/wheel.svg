@@ -15,27 +15,39 @@
       <stop offset="100%" stop-color="#155E75"/>
     </radialGradient>
     <radialGradient id="g3" cx="50%" cy="50%" r="50%">
-      <stop offset="30%" stop-color="#A855F7"/>
-      <stop offset="100%" stop-color="#581C87"/>
-    </radialGradient>
-    <radialGradient id="g4" cx="50%" cy="50%" r="50%">
       <stop offset="30%" stop-color="#84CC16"/>
       <stop offset="100%" stop-color="#3F6212"/>
     </radialGradient>
-    <radialGradient id="g5" cx="50%" cy="50%" r="50%">
-      <stop offset="30%" stop-color="#F43F5E"/>
-      <stop offset="100%" stop-color="#881337"/>
-    </radialGradient>
-    <radialGradient id="g6" cx="50%" cy="50%" r="50%">
-      <stop offset="30%" stop-color="#22D3EE"/>
-      <stop offset="100%" stop-color="#155E75"/>
-    </radialGradient>
-    <radialGradient id="g7" cx="50%" cy="50%" r="50%">
+    <radialGradient id="g4" cx="50%" cy="50%" r="50%">
       <stop offset="30%" stop-color="#38BDF8"/>
       <stop offset="100%" stop-color="#075985"/>
     </radialGradient>
-    <radialGradient id="g8" cx="50%" cy="50%" r="50%">
+    <radialGradient id="g5" cx="50%" cy="50%" r="50%">
+      <stop offset="30%" stop-color="#A855F7"/>
+      <stop offset="100%" stop-color="#581C87"/>
+    </radialGradient>
+    <radialGradient id="g6" cx="50%" cy="50%" r="50%">
+      <stop offset="30%" stop-color="#84CC16"/>
+      <stop offset="100%" stop-color="#3F6212"/>
+    </radialGradient>
+    <radialGradient id="g7" cx="50%" cy="50%" r="50%">
       <stop offset="30%" stop-color="#FBBF24"/>
+      <stop offset="100%" stop-color="#78350F"/>
+    </radialGradient>
+    <radialGradient id="g8" cx="50%" cy="50%" r="50%">
+      <stop offset="30%" stop-color="#22D3EE"/>
+      <stop offset="100%" stop-color="#155E75"/>
+    </radialGradient>
+    <radialGradient id="g9" cx="50%" cy="50%" r="50%">
+      <stop offset="30%" stop-color="#F43F5E"/>
+      <stop offset="100%" stop-color="#881337"/>
+    </radialGradient>
+    <radialGradient id="g10" cx="50%" cy="50%" r="50%">
+      <stop offset="30%" stop-color="#A855F7"/>
+      <stop offset="100%" stop-color="#581C87"/>
+    </radialGradient>
+    <radialGradient id="g11" cx="50%" cy="50%" r="50%">
+      <stop offset="30%" stop-color="#FDE68A"/>
       <stop offset="100%" stop-color="#78350F"/>
     </radialGradient>
     <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
@@ -81,23 +93,29 @@
   <path d="M 500.0 500.0 m -492,0 a 492,492 0 1,0 984,0 a 492,492 0 1,0 -984,0 M 500.0 500.0 m -150,0 a 150,150 0 1,1 300,0 a 150,150 0 1,1 -300,0 Z" fill-rule="evenodd" fill="#0B1220"
         fill-opacity="0.5" filter="url(#soft)"/>
   <g>
-    <path d="M 500.00 32.00 A 468 468 0 0 1 800.82 141.49 L 596.42 385.09 A 150 150 0 0 0 500.00 350.00 Z" fill="url(#g0)" stroke="#0B1220"
+    <path d="M 500.00 32.00 A 468 468 0 0 1 734.00 94.70 L 575.00 370.10 A 150 150 0 0 0 500.00 350.00 Z" fill="url(#g0)" stroke="#0B1220"
           stroke-width="3" stroke-linejoin="round"/>
-    <path d="M 800.82 141.49 A 468 468 0 0 1 960.89 418.73 L 647.72 473.95 A 150 150 0 0 0 596.42 385.09 Z" fill="url(#g1)" stroke="#0B1220"
+    <path d="M 734.00 94.70 A 468 468 0 0 1 905.30 266.00 L 629.90 425.00 A 150 150 0 0 0 575.00 370.10 Z" fill="url(#g1)" stroke="#0B1220"
           stroke-width="3" stroke-linejoin="round"/>
-    <path d="M 960.89 418.73 A 468 468 0 0 1 905.30 734.00 L 629.90 575.00 A 150 150 0 0 0 647.72 473.95 Z" fill="url(#g2)" stroke="#0B1220"
+    <path d="M 905.30 266.00 A 468 468 0 0 1 968.00 500.00 L 650.00 500.00 A 150 150 0 0 0 629.90 425.00 Z" fill="url(#g2)" stroke="#0B1220"
           stroke-width="3" stroke-linejoin="round"/>
-    <path d="M 905.30 734.00 A 468 468 0 0 1 660.07 939.78 L 551.30 640.95 A 150 150 0 0 0 629.90 575.00 Z" fill="url(#g3)" stroke="#0B1220"
+    <path d="M 968.00 500.00 A 468 468 0 0 1 905.30 734.00 L 629.90 575.00 A 150 150 0 0 0 650.00 500.00 Z" fill="url(#g3)" stroke="#0B1220"
           stroke-width="3" stroke-linejoin="round"/>
-    <path d="M 660.07 939.78 A 468 468 0 0 1 339.93 939.78 L 448.70 640.95 A 150 150 0 0 0 551.30 640.95 Z" fill="url(#g4)" stroke="#0B1220"
+    <path d="M 905.30 734.00 A 468 468 0 0 1 734.00 905.30 L 575.00 629.90 A 150 150 0 0 0 629.90 575.00 Z" fill="url(#g4)" stroke="#0B1220"
           stroke-width="3" stroke-linejoin="round"/>
-    <path d="M 339.93 939.78 A 468 468 0 0 1 94.70 734.00 L 370.10 575.00 A 150 150 0 0 0 448.70 640.95 Z" fill="url(#g5)" stroke="#0B1220"
+    <path d="M 734.00 905.30 A 468 468 0 0 1 500.00 968.00 L 500.00 650.00 A 150 150 0 0 0 575.00 629.90 Z" fill="url(#g5)" stroke="#0B1220"
           stroke-width="3" stroke-linejoin="round"/>
-    <path d="M 94.70 734.00 A 468 468 0 0 1 39.11 418.73 L 352.28 473.95 A 150 150 0 0 0 370.10 575.00 Z" fill="url(#g6)" stroke="#0B1220"
+    <path d="M 500.00 968.00 A 468 468 0 0 1 266.00 905.30 L 425.00 629.90 A 150 150 0 0 0 500.00 650.00 Z" fill="url(#g6)" stroke="#0B1220"
           stroke-width="3" stroke-linejoin="round"/>
-    <path d="M 39.11 418.73 A 468 468 0 0 1 199.18 141.49 L 403.58 385.09 A 150 150 0 0 0 352.28 473.95 Z" fill="url(#g7)" stroke="#0B1220"
+    <path d="M 266.00 905.30 A 468 468 0 0 1 94.70 734.00 L 370.10 575.00 A 150 150 0 0 0 425.00 629.90 Z" fill="url(#g7)" stroke="#0B1220"
           stroke-width="3" stroke-linejoin="round"/>
-    <path d="M 199.18 141.49 A 468 468 0 0 1 500.00 32.00 L 500.00 350.00 A 150 150 0 0 0 403.58 385.09 Z" fill="url(#g8)" stroke="#0B1220"
+    <path d="M 94.70 734.00 A 468 468 0 0 1 32.00 500.00 L 350.00 500.00 A 150 150 0 0 0 370.10 575.00 Z" fill="url(#g8)" stroke="#0B1220"
+          stroke-width="3" stroke-linejoin="round"/>
+    <path d="M 32.00 500.00 A 468 468 0 0 1 94.70 266.00 L 370.10 425.00 A 150 150 0 0 0 350.00 500.00 Z" fill="url(#g9)" stroke="#0B1220"
+          stroke-width="3" stroke-linejoin="round"/>
+    <path d="M 94.70 266.00 A 468 468 0 0 1 266.00 94.70 L 425.00 370.10 A 150 150 0 0 0 370.10 425.00 Z" fill="url(#g10)" stroke="#0B1220"
+          stroke-width="3" stroke-linejoin="round"/>
+    <path d="M 266.00 94.70 A 468 468 0 0 1 500.00 32.00 L 500.00 350.00 A 150 150 0 0 0 425.00 370.10 Z" fill="url(#g11)" stroke="#0B1220"
           stroke-width="3" stroke-linejoin="round"/>
   </g>
 
@@ -113,95 +131,125 @@
   <circle cx="500.0" cy="500.0" r="468" fill="none"
           stroke="#0B1220" stroke-width="4" stroke-opacity="0.55"/>
   <g>
-    <circle cx="583.4" cy="27.3" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
-    <circle cx="740.0" cy="84.3" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
-    <circle cx="867.7" cy="191.5" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
-    <circle cx="951.1" cy="335.8" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
-    <circle cx="980.0" cy="500.0" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
-    <circle cx="951.1" cy="664.2" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
-    <circle cx="867.7" cy="808.5" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
-    <circle cx="740.0" cy="915.7" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
-    <circle cx="583.4" cy="972.7" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
-    <circle cx="416.6" cy="972.7" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
-    <circle cx="260.0" cy="915.7" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
-    <circle cx="132.3" cy="808.5" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
-    <circle cx="48.9" cy="664.2" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
-    <circle cx="20.0" cy="500.0" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
-    <circle cx="48.9" cy="335.8" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
-    <circle cx="132.3" cy="191.5" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
-    <circle cx="260.0" cy="84.3" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
-    <circle cx="416.6" cy="27.3" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
+    <circle cx="562.7" cy="24.1" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
+    <circle cx="683.7" cy="56.5" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
+    <circle cx="792.2" cy="119.2" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
+    <circle cx="880.8" cy="207.8" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
+    <circle cx="943.5" cy="316.3" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
+    <circle cx="975.9" cy="437.3" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
+    <circle cx="975.9" cy="562.7" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
+    <circle cx="943.5" cy="683.7" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
+    <circle cx="880.8" cy="792.2" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
+    <circle cx="792.2" cy="880.8" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
+    <circle cx="683.7" cy="943.5" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
+    <circle cx="562.7" cy="975.9" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
+    <circle cx="437.3" cy="975.9" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
+    <circle cx="316.3" cy="943.5" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
+    <circle cx="207.8" cy="880.8" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
+    <circle cx="119.2" cy="792.2" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
+    <circle cx="56.5" cy="683.7" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
+    <circle cx="24.1" cy="562.7" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
+    <circle cx="24.1" cy="437.3" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
+    <circle cx="56.5" cy="316.3" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
+    <circle cx="119.2" cy="207.8" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
+    <circle cx="207.8" cy="119.2" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
+    <circle cx="316.3" cy="56.5" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
+    <circle cx="437.3" cy="24.1" r="7" fill="#FFFBEB" stroke="#92400E" stroke-width="1.5"/>
   </g>
   <g font-family="Vazirmatn, Tahoma, sans-serif" filter="url(#txtShadow)">
-    <g transform="rotate(20.0 620.4 169.2)">
-      <text x="620.4" y="153.2" font-size="56" font-weight="900"
+    <g transform="rotate(15.0 591.1 160.0)">
+      <text x="591.1" y="144.0" font-size="42" font-weight="900"
             fill="#FFFFFF" text-anchor="middle" dominant-baseline="central"
             direction="rtl">۱۰۰</text>
-      <text x="620.4" y="195.2" font-size="30" font-weight="700"
+      <text x="591.1" y="186.0" font-size="22" font-weight="700"
             fill="#FFFFFF" fill-opacity="0.92" text-anchor="middle"
             dominant-baseline="central" direction="rtl">امتیاز</text>
     </g>
-    <g transform="rotate(60.0 804.8 324.0)">
-      <text x="804.8" y="308.0" font-size="48" font-weight="900"
+    <g transform="rotate(45.0 748.9 251.1)">
+      <text x="748.9" y="235.1" font-size="36" font-weight="900"
             fill="#FFFFFF" text-anchor="middle" dominant-baseline="central"
             direction="rtl">۵۰٬۰۰۰</text>
-      <text x="804.8" y="350.0" font-size="30" font-weight="700"
+      <text x="748.9" y="277.1" font-size="22" font-weight="700"
             fill="#FFFFFF" fill-opacity="0.92" text-anchor="middle"
             dominant-baseline="central" direction="rtl">تومان</text>
     </g>
-    <g transform="rotate(280.0 846.7 561.1)">
-      <text x="846.7" y="545.1" font-size="56" font-weight="900"
+    <g transform="rotate(75.0 840.0 408.9)">
+      <text x="840.0" y="392.9" font-size="42" font-weight="900"
             fill="#FFFFFF" text-anchor="middle" dominant-baseline="central"
-            direction="rtl">۱۰۰۰</text>
-      <text x="846.7" y="587.1" font-size="30" font-weight="700"
+            direction="rtl">۵۰۰</text>
+      <text x="840.0" y="434.9" font-size="22" font-weight="700"
             fill="#FFFFFF" fill-opacity="0.92" text-anchor="middle"
             dominant-baseline="central" direction="rtl">امتیاز</text>
     </g>
-    <g transform="rotate(320.0 726.3 769.6)">
-      <text x="726.3" y="753.6" font-size="48" font-weight="900"
-            fill="#FFFFFF" text-anchor="middle" dominant-baseline="central"
-            direction="rtl">۱۰٬۰۰۰</text>
-      <text x="726.3" y="795.6" font-size="30" font-weight="700"
-            fill="#FFFFFF" fill-opacity="0.92" text-anchor="middle"
-            dominant-baseline="central" direction="rtl">تومان</text>
-    </g>
-    <g transform="rotate(360.0 500.0 852.0)">
-      <text x="500.0" y="836.0" font-size="56" font-weight="900"
+    <g transform="rotate(285.0 840.0 591.1)">
+      <text x="840.0" y="575.1" font-size="42" font-weight="900"
             fill="#FFFFFF" text-anchor="middle" dominant-baseline="central"
             direction="rtl">۱۰۰</text>
-      <text x="500.0" y="878.0" font-size="30" font-weight="700"
+      <text x="840.0" y="617.1" font-size="22" font-weight="700"
             fill="#FFFFFF" fill-opacity="0.92" text-anchor="middle"
             dominant-baseline="central" direction="rtl">امتیاز</text>
     </g>
-    <g transform="rotate(400.0 273.7 769.6)">
-      <text x="273.7" y="753.6" font-size="56" font-weight="900"
-            fill="#FFFFFF" text-anchor="middle" dominant-baseline="central"
-            direction="rtl">۵۰۰۰</text>
-      <text x="273.7" y="795.6" font-size="30" font-weight="700"
-            fill="#FFFFFF" fill-opacity="0.92" text-anchor="middle"
-            dominant-baseline="central" direction="rtl">امتیاز</text>
-    </g>
-    <g transform="rotate(440.0 153.3 561.1)">
-      <text x="153.3" y="545.1" font-size="56" font-weight="900"
-            fill="#FFFFFF" text-anchor="middle" dominant-baseline="central"
-            direction="rtl">۱۰۰۰</text>
-      <text x="153.3" y="587.1" font-size="30" font-weight="700"
-            fill="#FFFFFF" fill-opacity="0.92" text-anchor="middle"
-            dominant-baseline="central" direction="rtl">امتیاز</text>
-    </g>
-    <g transform="rotate(300.0 195.2 324.0)">
-      <text x="195.2" y="308.0" font-size="56" font-weight="900"
+    <g transform="rotate(315.0 748.9 748.9)">
+      <text x="748.9" y="732.9" font-size="42" font-weight="900"
             fill="#FFFFFF" text-anchor="middle" dominant-baseline="central"
             direction="rtl">۲۰۰۰</text>
-      <text x="195.2" y="350.0" font-size="30" font-weight="700"
+      <text x="748.9" y="774.9" font-size="22" font-weight="700"
             fill="#FFFFFF" fill-opacity="0.92" text-anchor="middle"
             dominant-baseline="central" direction="rtl">امتیاز</text>
     </g>
-    <g transform="rotate(340.0 379.6 169.2)">
-      <text x="379.6" y="153.2" font-size="42" font-weight="900"
+    <g transform="rotate(345.0 591.1 840.0)">
+      <text x="591.1" y="824.0" font-size="42" font-weight="900"
+            fill="#FFFFFF" text-anchor="middle" dominant-baseline="central"
+            direction="rtl">۱۰۰۰</text>
+      <text x="591.1" y="866.0" font-size="22" font-weight="700"
+            fill="#FFFFFF" fill-opacity="0.92" text-anchor="middle"
+            dominant-baseline="central" direction="rtl">امتیاز</text>
+    </g>
+    <g transform="rotate(375.0 408.9 840.0)">
+      <text x="408.9" y="824.0" font-size="42" font-weight="900"
+            fill="#FFFFFF" text-anchor="middle" dominant-baseline="central"
+            direction="rtl">۱۰۰</text>
+      <text x="408.9" y="866.0" font-size="22" font-weight="700"
+            fill="#FFFFFF" fill-opacity="0.92" text-anchor="middle"
+            dominant-baseline="central" direction="rtl">امتیاز</text>
+    </g>
+    <g transform="rotate(405.0 251.1 748.9)">
+      <text x="251.1" y="732.9" font-size="36" font-weight="900"
+            fill="#FFFFFF" text-anchor="middle" dominant-baseline="central"
+            direction="rtl">۱۰٬۰۰۰</text>
+      <text x="251.1" y="774.9" font-size="22" font-weight="700"
+            fill="#FFFFFF" fill-opacity="0.92" text-anchor="middle"
+            dominant-baseline="central" direction="rtl">تومان</text>
+    </g>
+    <g transform="rotate(435.0 160.0 591.1)">
+      <text x="160.0" y="575.1" font-size="42" font-weight="900"
+            fill="#FFFFFF" text-anchor="middle" dominant-baseline="central"
+            direction="rtl">۵۰۰</text>
+      <text x="160.0" y="617.1" font-size="22" font-weight="700"
+            fill="#FFFFFF" fill-opacity="0.92" text-anchor="middle"
+            dominant-baseline="central" direction="rtl">امتیاز</text>
+    </g>
+    <g transform="rotate(285.0 160.0 408.9)">
+      <text x="160.0" y="392.9" font-size="42" font-weight="900"
+            fill="#FFFFFF" text-anchor="middle" dominant-baseline="central"
+            direction="rtl">۵۰۰۰</text>
+      <text x="160.0" y="434.9" font-size="22" font-weight="700"
+            fill="#FFFFFF" fill-opacity="0.92" text-anchor="middle"
+            dominant-baseline="central" direction="rtl">امتیاز</text>
+    </g>
+    <g transform="rotate(315.0 251.1 251.1)">
+      <text x="251.1" y="235.1" font-size="42" font-weight="900"
+            fill="#FFFFFF" text-anchor="middle" dominant-baseline="central"
+            direction="rtl">۱۰۰۰</text>
+      <text x="251.1" y="277.1" font-size="22" font-weight="700"
+            fill="#FFFFFF" fill-opacity="0.92" text-anchor="middle"
+            dominant-baseline="central" direction="rtl">امتیاز</text>
+    </g>
+    <g transform="rotate(345.0 408.9 160.0)">
+      <text x="408.9" y="144.0" font-size="32" font-weight="900"
             fill="#FFFFFF" text-anchor="middle" dominant-baseline="central"
             direction="rtl">۱۰۰٬۰۰۰</text>
-      <text x="379.6" y="195.2" font-size="30" font-weight="700"
+      <text x="408.9" y="186.0" font-size="22" font-weight="700"
             fill="#FFFFFF" fill-opacity="0.92" text-anchor="middle"
             dominant-baseline="central" direction="rtl">تومان</text>
     </g>

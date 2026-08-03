@@ -7,7 +7,6 @@
 //     user's balance is never pushed below zero
 //   * every change is written to game_results so support can explain it
 const { pool } = require('../config/db');
-const referrals = require('./referralService');
 
 const DEFAULTS = {
   enabled: false,
@@ -129,12 +128,16 @@ async function recordMatch({ gameId, vsBot, winner, players }) {
            WHERE id = $2`,
           [delta, userId],
         );
-        // کمیسیون ۵٪ معرف. فقط روی برد (delta مثبت) — باخت کاربر نباید از
-        // معرفش امتیاز پس بگیرد. خودِ payCommission هم این را چک می‌کند،
-        // ولی صدا نزدنش برای delta منفی یک کوئری اضافه را حذف می‌کند.
-        if (delta > 0) {
-          await referrals.payCommission(client, userId, delta, 'game');
-        }
+        // NO REFERRAL COMMISSION HERE — deliberately.
+        //
+        // The owner narrowed the rule: "این ۵ درصد فقط از امتیازهایی بدست
+        // میاد که کاربر خودش کارت ثبت کرده و یا امتیاز رو از بازی ضربه زن
+        // بدست آورده". Online matches are neither.
+        //
+        // It also closes a farm: two accounts trading wins would mint
+        // commission for whoever referred them, on top of the points
+        // themselves. The daily cap limits the points but would not have
+        // limited that.
       }
       applied.push({ userId, delta, outcome });
     }

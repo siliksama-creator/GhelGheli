@@ -134,18 +134,25 @@ function Portal({ token, logout, theme, toggleTheme }) {
   const [msg, setMsg] = useState('');
   const [publicUser, setPublicUser] = useState(null);
   const [loadError, setLoadError] = useState(null);
+  // تعداد چرخش امروز، برای نشان کنار آیکون گردونه — خواستهٔ مالک:
+  // «کنار آیکون گردونه در صفحه اصلی تعداد شانس روز گردونه مشخص باشه».
+  const [spins, setSpins] = useState(null);
 
   async function load() {
     try {
       setLoadError(null);
       // Fan out: the profile and the reward list are independent, so awaiting
       // them in sequence made the user wait for the SUM of both round trips.
-      const [profile, rw] = await Promise.all([
+      const [profile, rw, wheel] = await Promise.all([
         req('/api/profile', 'GET', null, token),
         req('/api/rewards', 'GET', null, token),
+        // شکست این یکی نباید کل صفحه را از کار بیندازد: نشانِ گردونه یک
+        // زینت است، پروفایل نیست.
+        req('/api/wheel', 'GET', null, token).catch(() => null),
       ]);
       setP(profile);
       setRewards(rw || []);
+      if (wheel) setSpins(wheel.spinsLeft ?? 0);
     } catch (e) {
       // A failure here used to leave the app on its loading card forever with
       // no error and no way out. An expired session in particular looked
@@ -180,7 +187,10 @@ function Portal({ token, logout, theme, toggleTheme }) {
           <span>{fa(u.current_points)} امتیاز</span>
         </div>
         <button className="iconBtn wheelShortcut" onClick={() => setTab('wheel')}
-          title="گردونهٔ شانس">🎡</button>
+          title={spins > 0 ? `${spins} چرخش گردونه داری` : 'گردونهٔ شانس'}>
+          🎡
+          {spins > 0 && <span className="wheelBadge">{fa(spins)}</span>}
+        </button>
         <button className="iconBtn" onClick={toggleTheme}
           title={theme === 'light' ? 'حالت تیره' : 'حالت روشن'}>
           {theme === 'light' ? '🌙' : '☀️'}
@@ -224,7 +234,8 @@ function Portal({ token, logout, theme, toggleTheme }) {
           <Club token={token} openProfile={setPublicUser} meId={u.id} />
         )}
         {tab === 'wheel' && (
-          <Wheel token={token} setMsg={setMsg} reloadProfile={load} />
+          <Wheel token={token} setMsg={setMsg} reloadProfile={load}
+            onSpinsChange={setSpins} />
         )}
         {tab === 'invite' && (
           <Referral token={token} setMsg={setMsg} />

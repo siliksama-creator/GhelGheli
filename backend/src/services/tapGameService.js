@@ -20,16 +20,100 @@ const crypto = require('crypto');
 const { pool } = require('../config/db');
 
 // ── curve ──────────────────────────────────────────────────────────────────
-// MUST stay identical to mobile/lib/screens/user/games/tap/tap_config.dart.
-// If you change one, change the other in the same commit.
+// MUST stay identical to mobile/lib/screens/user/games/tap/tap_config.dart
+// and userweb/src/tapGame.jsx. If you change one, change all three in the
+// same commit.
+//
+// ONE TAP = ONE POINT, AND THE WHOLE GAME IS WORTH 50,000.
+//
+// The owner set the total: "کل بازی ۵۰ هزار امتیاز میدهد". Making a tap
+// worth exactly one point is the simplest model that can satisfy it, and it
+// buys something valuable: the number on screen IS the work done. There is
+// no hidden multiplier that later makes a player ask "why did 100 taps give
+// me 40 points?".
+//
+// WHY THE GROWTH FACTOR DROPPED FROM 1.15 TO 1.05
+//
+// The old curve summed to 721,772 taps. With a daily cap that is 25 hours of
+// uninterrupted tapping, and the shape was far worse than the total suggests:
+// the last three levels alone were 34% of the game, and day 14 demanded 2.8
+// hours in one sitting. Nobody was ever going to finish it, which also meant
+// the daily cap stopped mattering around day 12 — the curve was already
+// harsher than the cap.
+//
+// 1.05 over 50 levels sums to 50,000 and gives a shape a person can actually
+// live with: about a minute on day one, about ten minutes on the last day.
 const LEVEL_COUNT = 50;
-const BASE_TAPS = 100;
-const GROWTH_FACTOR = 1.15;
+const TOTAL_POINTS = 50000;
+const GROWTH_FACTOR = 1.05;
+
+/**
+ * Points needed to clear `level`, precomputed once.
+ *
+ * Built as a table rather than `round(base * g^(n-1))` per call because the
+ * rounding has to be reconciled: fifty independently rounded terms do not sum
+ * to exactly 50,000. The remainder is folded into the last level so the total
+ * the owner specified is exact rather than approximately right.
+ */
+const LEVEL_COST = (() => {
+  const geometric = [];
+  let sum = 0;
+  for (let i = 0; i < LEVEL_COUNT; i++) {
+    const term = Math.pow(GROWTH_FACTOR, i);
+    geometric.push(term);
+    sum += term;
+  }
+  const base = TOTAL_POINTS / sum;
+  const table = geometric.map((t) => Math.round(base * t));
+  const drift = TOTAL_POINTS - table.reduce((a, b) => a + b, 0);
+  table[table.length - 1] += drift;
+  return table;
+})();
 
 function requiredTaps(level) {
-  if (level < 1) return BASE_TAPS;
-  return Math.round(BASE_TAPS * Math.pow(GROWTH_FACTOR, level - 1));
+  if (level < 1) return LEVEL_COST[0];
+  const capped = level > LEVEL_COUNT ? LEVEL_COUNT : level;
+  return LEVEL_COST[capped - 1];
 }
+
+/** Total points across every level — exactly TOTAL_POINTS by construction. */
+function totalGamePoints() {
+  return LEVEL_COST.reduce((a, b) => a + b, 0);
+}
+
+/**
+ * Points a player has banked in total, given their position on the curve.
+ *
+ * Every level below the current one is fully paid for, plus whatever is
+ * banked inside the current level. This is what lets the batch handler work
+ * out how many points a batch is really worth: the difference between the
+ * position before and after, which is automatically correct when the daily
+ * cap trims the advance.
+ *
+ * A prefix-sum table rather than a loop: this is called on every batch, and
+ * summing up to 50 terms each time is pointless when the answer never
+ * changes.
+ */
+const CUMULATIVE = (() => {
+  const out = [0];
+  for (let i = 0; i < LEVEL_COST.length; i++) {
+    out.push(out[i] + LEVEL_COST[i]);
+  }
+  return out;
+})();
+
+function cumulativePoints(level, levelTaps) {
+  const lv = Math.max(1, Math.min(level, LEVEL_COUNT + 1));
+  const cleared = CUMULATIVE[lv - 1];
+  // Past the final level the game is complete; there is no "inside" left.
+  if (lv > LEVEL_COUNT) return cleared;
+  const inside = Math.max(0, Math.min(Number(levelTaps) || 0, LEVEL_COST[lv - 1]));
+  return cleared + inside;
+}
+
+// Kept for the old wire contract: a few tests and the client still speak of
+// "base taps". Level one's cost is that number.
+const BASE_TAPS = LEVEL_COST[0];
 
 // ── daily level cap ────────────────────────────────────────────────────────
 // A player may clear at most this many levels per calendar day.
@@ -38,7 +122,15 @@ function requiredTaps(level) {
 // grind, and so the 50-level curve lasts. It is enforced HERE because the
 // phone is treated as hostile and because two clients sharing an account must
 // share one allowance.
-const MAX_LEVELS_PER_DAY = 3;
+//
+// Two per day, over 50 levels, is 25 days to finish.
+//
+// PARTIAL PROGRESS IS KEPT. The owner was explicit: "یه روزایی بعد گرفتن نصف
+// لول یا کمی از لول خسته شدن اشکالی نداره میتونن ادامشو برن". So a player who
+// stops mid-level keeps those points and resumes tomorrow — `advance()` only
+// refuses to cross a level BOUNDARY once the allowance is spent, it never
+// discards banked progress inside the current level.
+const MAX_LEVELS_PER_DAY = 2;
 
 /**
  * Today's date in Asia/Tehran as YYYY-MM-DD.
@@ -212,19 +304,24 @@ function plausibleCeiling(elapsedMs) {
  * @param {number} levelsLeftToday how many more levels this player may clear
  *   today. Pass Infinity for the uncapped behaviour.
  *
- * WHAT HAPPENS AT THE CAP. The surplus is DISCARDED, not banked. Banking
- * would mean a player who kept tapping after the cap instantly clears
- * tomorrow's three levels at 00:00 without touching the screen, which turns
- * the cap into a queue rather than a limit.
+ * WHAT HAPPENS AT THE CAP — and why partial progress survives.
  *
- * The leftover is CLAMPED to one below the requirement rather than SET to it.
- * The difference matters: the honest clients refuse taps outright once capped,
- * so their leftover is whatever it happened to be — usually near zero. Setting
- * it to required-1 here would make the next sync push a nearly-full progress
- * bar back to the client, which reads as "one tap away" all evening and is a
- * lie. Clamping leaves an honest client's number untouched and only bites a
- * batch that carried more taps than the allowance could spend — a hostile
- * client, or a large offline batch from before the cap shipped.
+ * The owner's rule: "یه روزایی بعد گرفتن نصف لول یا کمی از لول خسته شدن
+ * اشکالی نداره میتونن ادامشو برن". Progress *inside* a level is never thrown
+ * away; only crossing a level BOUNDARY is refused once the allowance is gone.
+ *
+ * So the leftover is clamped to `required - 1`: the player sits just short of
+ * the next level, keeps every point banked toward it, and tomorrow one more
+ * tap carries them over. That is the whole point of the owner's rule — a
+ * half-finished level is a legitimate place to stop.
+ *
+ * The surplus BEYOND that boundary is still discarded. Without it, someone
+ * who kept hammering after the cap would bank enough to clear tomorrow's two
+ * levels at 00:00 without touching the screen, and the cap becomes a queue
+ * rather than a limit. `Math.min` means an honest client — which stops
+ * sending taps once capped — never loses anything, because its leftover is
+ * already below the boundary. Only a batch that genuinely overshot is
+ * trimmed.
  */
 function advance(level, levelTaps, taps, levelsLeftToday = Infinity) {
   let lv = level;
@@ -294,7 +391,7 @@ function storedDay(value) {
 async function getProgress(userId) {
   const { rows } = await pool.query(
     `SELECT level, level_taps, total_taps, flagged_taps,
-            levels_today, levels_day
+            levels_today, levels_day, points_awarded
        FROM tap_game_progress WHERE user_id=$1`,
     [userId]
   );
@@ -308,6 +405,9 @@ async function getProgress(userId) {
       flaggedTaps: 0,
       requiredTaps: requiredTaps(1),
       levelCount: LEVEL_COUNT,
+      pointsAwarded: 0,
+      pointsToNextLevel: requiredTaps(1),
+      totalGamePoints: totalGamePoints(),
       levelsPerDay: MAX_LEVELS_PER_DAY,
       levelsLeftToday: left,
       resetInMs: msUntilTehranMidnight(),
@@ -320,6 +420,10 @@ async function getProgress(userId) {
     flaggedTaps: Number(r.flagged_taps),
     requiredTaps: requiredTaps(r.level),
     levelCount: LEVEL_COUNT,
+    // نمایش بر حسب امتیاز است نه ضربه — خواستهٔ مالک.
+    pointsAwarded: Number(r.points_awarded || 0),
+    pointsToNextLevel: Math.max(0, requiredTaps(r.level) - r.level_taps),
+    totalGamePoints: totalGamePoints(),
     levelsPerDay: MAX_LEVELS_PER_DAY,
     levelsLeftToday: left,
     resetInMs: msUntilTehranMidnight(),
@@ -334,7 +438,7 @@ async function getProgress(userId) {
  * @param {object} raw     request body
  * @returns {Promise<{status:number, payload:object}>}
  */
-async function submitBatch(userId, token, raw) {
+async function submitBatch(userId, token, raw, onPointsEarned = null) {
   // Gate 2 — shape.
   const parsed = validateShape(raw);
   if (!parsed.ok) {
@@ -483,6 +587,21 @@ async function submitBatch(userId, token, raw) {
       (MAX_LEVELS_PER_DAY - left) + next.gained,
     );
 
+    // ── how many of the accepted taps actually COUNTED ───────────────────
+    //
+    // One tap is one point, but only taps that landed inside the player's
+    // remaining allowance are worth anything. When `advance()` hits the cap
+    // it clamps the leftover, so the difference between "points the player
+    // had before" and "points they have now" is the real, post-cap figure.
+    //
+    // Deriving it instead of using `accepted` matters: a batch that arrives
+    // after the cap is spent still reports its taps honestly, and paying for
+    // those would hand out points the cap was supposed to withhold — and,
+    // through the referral commission, pay the referrer for them too.
+    const pointsBefore = cumulativePoints(current.level, current.level_taps);
+    const pointsAfter = cumulativePoints(next.level, next.levelTaps);
+    const earnedPoints = rejected ? 0 : Math.max(0, pointsAfter - pointsBefore);
+
     const updated = await client.query(
       `UPDATE tap_game_progress
           SET level = $2,
@@ -500,11 +619,12 @@ async function submitBatch(userId, token, raw) {
               -- stale counter look current.
               levels_today = $8,
               levels_day = $9::date,
+              points_awarded = points_awarded + $10,
               last_batch_at = NOW(),
               updated_at = NOW()
         WHERE user_id = $1
         RETURNING level, level_taps, total_taps, flagged_taps,
-                  rejected_batches, levels_today`,
+                  rejected_batches, levels_today, points_awarded`,
       [
         userId,
         next.level,
@@ -515,8 +635,18 @@ async function submitBatch(userId, token, raw) {
         body.seq,
         usedToday,
         today,
+        earnedPoints,
       ]
     );
+
+    // ── credit the points ────────────────────────────────────────────────
+    //
+    // Inside the same transaction as the progress write. If either fails,
+    // both roll back — otherwise a crash between them either pays twice or
+    // advances the level without paying.
+    if (earnedPoints > 0 && typeof onPointsEarned === 'function') {
+      await onPointsEarned(client, userId, earnedPoints);
+    }
 
     await client.query('COMMIT');
 
@@ -535,6 +665,15 @@ async function submitBatch(userId, token, raw) {
         totalTaps: Number(row.total_taps),
         requiredTaps: requiredTaps(row.level),
         levelCount: LEVEL_COUNT,
+        // ── points ────────────────────────────────────────────────────────
+        // The owner wants the UI to show POINTS, not tap counts. Since a tap
+        // is worth exactly one point these are the same number today, but
+        // sending them explicitly means the client never has to know that —
+        // if the rate ever changes, only this file does.
+        pointsEarned: earnedPoints,
+        pointsAwarded: Number(row.points_awarded),
+        pointsToNextLevel: Math.max(0, requiredTaps(row.level) - row.level_taps),
+        totalGamePoints: totalGamePoints(),
         // The client needs all three: the limit to explain the rule, what is
         // left to decide whether to keep counting, and when it resets so the
         // countdown is real rather than "tomorrow".
@@ -602,6 +741,8 @@ module.exports = {
   pruneNonces,
   // exported for tests
   requiredTaps,
+  totalGamePoints,
+  cumulativePoints,
   canonical,
   sign,
   advance,
@@ -611,6 +752,7 @@ module.exports = {
   levelsLeftToday,
   LEVEL_COUNT,
   BASE_TAPS,
+  TOTAL_POINTS,
   GROWTH_FACTOR,
   MAX_TAPS_PER_SECOND,
   MAX_LEVELS_PER_DAY,

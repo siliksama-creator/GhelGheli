@@ -43,7 +43,8 @@ export default function Referral({ token, setMsg }) {
   };
 
   const share = async () => {
-    const text = `با کد دعوت من توی قلقلی عضو شو: ${d.code}`;
+    const text = `با کد دعوت من توی قلقلی عضو شو و ${fa(d.spinsPerReferral)}`
+      + ` چرخش گردونهٔ شانس بگیر! کد: ${d.code}`;
     if (navigator.share) {
       try { await navigator.share({ text }); return; } catch { /* لغو شد */ }
     }
@@ -57,11 +58,33 @@ export default function Referral({ token, setMsg }) {
     <section className="card wide refPage">
       <h2>🤝 دعوت دوستان</h2>
       <p className="hint">
-        کدت را به دوستانت بده. هر کس با آن عضو شود،
-        {' '}<b>{fa(d.spinsPerReferral)} چرخش گردونه</b> می‌گیری و برای همیشه
-        {' '}<b>{fa(d.commissionPercent)}٪</b> از تمام امتیازهایی که او به دست
-        می‌آورد به تو هم می‌رسد — بدون اینکه از امتیاز او کم شود.
+        کدت را به دوستانت بده. هر کس موقع ثبت‌نام آن را وارد کند،
+        {' '}<b>هر دوی شما {fa(d.spinsPerReferral)} چرخش گردونه</b> می‌گیرید.
       </p>
+
+      {/* توضیح کامل قوانین — خواستهٔ مالک. بدون این، کاربر نمی‌فهمد چرا
+          امتیازی به حسابش اضافه شده یا چرا سهمیهٔ گردونه‌اش بالا رفته. */}
+      <ul className="refRules">
+        <li>
+          <b>{fa(d.commissionPercent)}٪ کمیسیون دائمی</b> — از امتیازی که
+          دوستت با <b>ثبت کد کارت</b> یا <b>بازی ضربه‌زن</b> به دست می‌آورد،
+          {' '}{fa(d.commissionPercent)}٪ به تو هم می‌رسد. از امتیاز او
+          چیزی کم نمی‌شود؛ این را ما اضافه می‌کنیم.
+        </li>
+        <li>
+          <b>هر {fa(d.invitesPerDailySpin)} دعوت = یک چرخش روزانهٔ دائمی</b>
+          {' '}— با {fa(d.invitesPerDailySpin)} دوست، هر روز
+          {' '}{fa(2)} چرخش داری به‌جای یکی. تا سقف
+          {' '}{fa(d.maxInvitesForDaily)} دوست ادامه دارد.
+        </li>
+        <li>
+          <b>دعوت نامحدود است</b> — هر چند نفر که بخواهی می‌توانی دعوت کنی.
+        </li>
+        <li>
+          جایزهٔ {fa(d.spinsPerReferral)} چرخش فقط <b>یک بار</b> برای هر
+          دوست داده می‌شود.
+        </li>
+      </ul>
 
       <div className="refCodeBox">
         <span className="refCode" dir="ltr">{d.code}</span>
@@ -74,8 +97,31 @@ export default function Referral({ token, setMsg }) {
       <div className="refStats">
         <div><b>{fa(d.invitedCount)}</b><span>دوست دعوت‌شده</span></div>
         <div><b>{fa(d.totalEarned)}</b><span>امتیاز از دوستان</span></div>
-        <div><b>{fa(d.bonusSpins)}</b><span>چرخش باقی‌مانده</span></div>
+        <div><b>{fa(d.dailySpins)}</b><span>چرخش روزانه</span></div>
       </div>
+
+      {/* پیشرفت تا چرخش روزانهٔ بعدی. یک هدف نزدیک و قابل دیدن، خیلی
+          مؤثرتر از یک قانون نوشته‌شده در متن است. */}
+      {!d.atDailyCap && d.invitesToNextDailySpin != null && (
+        <div className="refProgress">
+          <div className="refProgressBar">
+            <span style={{
+              width: `${((d.invitesPerDailySpin - d.invitesToNextDailySpin)
+                / d.invitesPerDailySpin) * 100}%`,
+            }} />
+          </div>
+          <small>
+            {fa(d.invitesToNextDailySpin)} دوست دیگر تا
+            {' '}{fa(d.dailySpins + 1)} چرخش روزانه 🎯
+          </small>
+        </div>
+      )}
+      {d.atDailyCap && (
+        <p className="hint refCapped">
+          🏆 به سقف {fa(d.maxInvitesForDaily)} دوست رسیدی — هر روز
+          {' '}{fa(d.dailySpins)} چرخش رایگان داری!
+        </p>
+      )}
 
       {d.friends.length > 0 ? (
         <div className="refList">

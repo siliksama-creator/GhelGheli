@@ -5,17 +5,19 @@
 // lives HERE and nowhere else. The engine, the UI and the sync layer all read
 // from this one object, so changing the difficulty never means hunting through
 // widget code.
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 
 @immutable
 class TapGameConfig {
   const TapGameConfig({
     this.levelCount = 50,
-    this.baseTaps = 100,
-    this.growthFactor = 1.15,
+    this.totalPoints = 50000,
+    this.growthFactor = 1.05,
     this.skins = defaultSkins,
     this.levelsPerSkin = 10,
-    this.levelsPerDay = 3,
+    this.levelsPerDay = 2,
     this.maxTapsPerSecond = 12,
     this.burstWindow = const Duration(seconds: 1),
     this.minTapInterval = const Duration(milliseconds: 45),
@@ -34,8 +36,18 @@ class TapGameConfig {
   /// Change one, change the other in the same commit.
   final int levelsPerDay;
 
-  /// Taps required to clear level 1.
-  final int baseTaps;
+  /// Points the whole game is worth, spread across [levelCount] levels.
+  ///
+  /// The owner set this: "کل بازی ۵۰ هزار امتیاز میدهد". One tap is worth
+  /// exactly one point, so this is also the total number of taps to finish.
+  ///
+  /// MIRRORS `TOTAL_POINTS` in tapGameService.js. The server is the
+  /// authority; this copy exists so the UI can render a progress bar before
+  /// the first sync lands.
+  final int totalPoints;
+
+  /// Points required to clear level 1 — the first entry of the curve.
+  int get baseTaps => _curve[0];
 
   /// Multiplier applied per level. 1.15 == each level is ~15% harder.
   ///
@@ -119,20 +131,61 @@ class TapGameConfig {
   /// difficulty never share a table.
   static final Map<String, List<int>> _curveCache = {};
 
+  /// The level costs, derived so they sum to EXACTLY [totalPoints].
+  ///
+  /// Mirrors the same construction in tapGameService.js. Fifty independently
+  /// rounded geometric terms do not sum to a round number, so the rounding
+  /// drift is folded into the last level — otherwise the game would be worth
+  /// 49,997 or 50,004 points instead of the figure the owner specified, and
+  /// the two ends would disagree about when the game is finished.
   List<int> get _curve {
-    final key = '$levelCount|$baseTaps|$growthFactor';
+    final key = '$levelCount|$totalPoints|$growthFactor';
     return _curveCache.putIfAbsent(key, () {
-      return List<int>.generate(levelCount, (i) {
-        var v = baseTaps.toDouble();
-        for (var n = 0; n < i; n++) {
-          v *= growthFactor;
-        }
-        // Belt and braces: an operator could set an absurd growthFactor in a
-        // future tuning pass and the same overflow would return.
-        if (!v.isFinite || v > 1e15) return 1000000000;
-        return v.round();
-      });
+      // Guard against a nonsensical tuning pass rather than producing NaN.
+      if (levelCount <= 0 || totalPoints <= 0 || growthFactor <= 0) {
+        return List<int>.filled(levelCount > 0 ? levelCount : 1, 1);
+      }
+      final terms = List<double>.generate(
+          levelCount, (i) => math.pow(growthFactor, i).toDouble());
+      final sum = terms.fold<double>(0, (a, b) => a + b);
+      if (!sum.isFinite || sum <= 0) {
+        return List<int>.filled(levelCount, (totalPoints / levelCount).ceil());
+      }
+      final base = totalPoints / sum;
+      final table = terms.map((t) {
+        final v = base * t;
+        if (!v.isFinite || v > 1e9) return 1000000000;
+        // Never zero: a free level would make the engine's level-up loop
+        // spin forever.
+        final r = v.round();
+        return r < 1 ? 1 : r;
+      }).toList();
+      final drift = totalPoints - table.fold<int>(0, (a, b) => a + b);
+      table[table.length - 1] += drift;
+      if (table[table.length - 1] < 1) table[table.length - 1] = 1;
+      return table;
     });
+  }
+
+  /// Total points across the whole game — [totalPoints] by construction,
+  /// but read from the table so a clamped/guarded curve reports the truth.
+  int get gameTotalPoints => _curve.fold<int>(0, (a, b) => a + b);
+
+  /// Points banked in total at a given position on the curve.
+  ///
+  /// Mirrors `cumulativePoints` on the server. Used for the "points so far"
+  /// readout, which is what the owner asked to show instead of a tap count.
+  int cumulativePoints(int level, int levelTaps) {
+    final lv = level < 1 ? 1 : (level > levelCount + 1 ? levelCount + 1 : level);
+    var sum = 0;
+    for (var i = 0; i < lv - 1 && i < levelCount; i++) {
+      sum += _curve[i];
+    }
+    if (lv > levelCount) return sum;
+    final inside = levelTaps < 0
+        ? 0
+        : (levelTaps > _curve[lv - 1] ? _curve[lv - 1] : levelTaps);
+    return sum + inside;
   }
 
   /// Artwork for [level], clamped to the available skins so level 50 with
@@ -173,7 +226,7 @@ class TapGameConfig {
 
   TapGameConfig copyWith({
     int? levelCount,
-    int? baseTaps,
+    int? totalPoints,
     double? growthFactor,
     List<String>? skins,
     int? levelsPerSkin,
@@ -186,7 +239,7 @@ class TapGameConfig {
   }) {
     return TapGameConfig(
       levelCount: levelCount ?? this.levelCount,
-      baseTaps: baseTaps ?? this.baseTaps,
+      totalPoints: totalPoints ?? this.totalPoints,
       growthFactor: growthFactor ?? this.growthFactor,
       skins: skins ?? this.skins,
       levelsPerSkin: levelsPerSkin ?? this.levelsPerSkin,

@@ -122,6 +122,27 @@ class TapEngine extends ChangeNotifier {
   int get tapsRemaining =>
       isComplete ? 0 : (requiredTaps - _progress.taps).clamp(0, 1 << 30);
 
+  // ── points ───────────────────────────────────────────────────────────────
+  //
+  // The owner asked for the UI to speak in POINTS, not tap counts: "به جای
+  // اینکه تعداد تب نشان داده بشه ... فقط تعداد امتیاز نشون داده بشه، و تعداد
+  // امتیاز به مرحلهٔ بعدی هم بهشون نشون داده بشه".
+  //
+  // One tap is worth exactly one point, so these are numerically the same as
+  // the tap counters today. They exist as separate getters anyway, because
+  // that keeps the *screen* free of the assumption — if the rate ever stops
+  // being 1:1, only this file changes.
+
+  /// Points banked across the whole game so far.
+  int get pointsEarned =>
+      config.cumulativePoints(_progress.level, _progress.taps);
+
+  /// Points still needed to reach the next level.
+  int get pointsToNextLevel => tapsRemaining;
+
+  /// Points the whole game is worth.
+  int get totalGamePoints => config.gameTotalPoints;
+
   /// Levels until the character changes; null when no more skins remain.
   /// Levels remaining until the character changes; null when no further skin
   /// is reachable.

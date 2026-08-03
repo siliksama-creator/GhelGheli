@@ -19,22 +19,42 @@ function test(name, fn) {
 
 console.log('\ntap game — level curve');
 
-test('level 1 costs exactly the base', () => {
-  assert.strictEqual(svc.requiredTaps(1), 100);
+test('the whole game is worth exactly 50,000 points', () => {
+  // THE headline number, set by the owner. Fifty independently rounded
+  // geometric terms do not sum to a round figure on their own, so the
+  // construction folds the drift into the last level — if that ever breaks,
+  // the game silently becomes worth 49,997 and the two ends of the system
+  // disagree about when it is finished.
+  assert.strictEqual(svc.TOTAL_POINTS, 50000);
+  assert.strictEqual(svc.totalGamePoints(), 50000);
+  let sum = 0;
+  for (let lv = 1; lv <= svc.LEVEL_COUNT; lv++) sum += svc.requiredTaps(lv);
+  assert.strictEqual(sum, 50000);
 });
 
-test('curve matches round(100 * 1.15^(n-1))', () => {
-  for (let lv = 1; lv <= svc.LEVEL_COUNT; lv++) {
-    const expected = Math.round(100 * Math.pow(1.15, lv - 1));
-    assert.strictEqual(svc.requiredTaps(lv), expected, `level ${lv}`);
+test('the curve is geometric at 1.05, give or take rounding', () => {
+  // Checked as a RATIO rather than against hardcoded values: the exact
+  // integers depend on the rounding, but the shape must not drift.
+  for (let lv = 2; lv < svc.LEVEL_COUNT; lv++) {
+    const ratio = svc.requiredTaps(lv) / svc.requiredTaps(lv - 1);
+    assert.ok(ratio > 1.03 && ratio < 1.07,
+      `level ${lv} ratio ${ratio.toFixed(3)} is off the 1.05 curve`);
   }
 });
 
 test('known checkpoints', () => {
-  assert.strictEqual(svc.requiredTaps(2), 115);
-  assert.strictEqual(svc.requiredTaps(10), 352);
-  assert.strictEqual(svc.requiredTaps(25), 2863);
-  assert.strictEqual(svc.requiredTaps(50), 94231);
+  assert.strictEqual(svc.requiredTaps(1), 239);
+  assert.strictEqual(svc.requiredTaps(2), 251);
+  assert.strictEqual(svc.requiredTaps(25), 770);
+  assert.strictEqual(svc.requiredTaps(50), 2611);
+});
+
+test('no level is free', () => {
+  // A zero-cost level makes the engine's level-up loop spin forever. The
+  // curve cannot produce one today, but a future tuning pass could.
+  for (let lv = 1; lv <= svc.LEVEL_COUNT; lv++) {
+    assert.ok(svc.requiredTaps(lv) >= 1, `level ${lv} is free`);
+  }
 });
 
 test('curve is strictly increasing', () => {
@@ -47,8 +67,43 @@ test('curve is strictly increasing', () => {
 });
 
 test('a level below 1 cannot underflow', () => {
-  assert.strictEqual(svc.requiredTaps(0), 100);
-  assert.strictEqual(svc.requiredTaps(-5), 100);
+  assert.strictEqual(svc.requiredTaps(0), svc.requiredTaps(1));
+  assert.strictEqual(svc.requiredTaps(-5), svc.requiredTaps(1));
+});
+
+console.log('\ntap game — points');
+
+test('cumulativePoints is zero at the very start', () => {
+  assert.strictEqual(svc.cumulativePoints(1, 0), 0);
+});
+
+test('cumulativePoints counts cleared levels plus the current one', () => {
+  const l1 = svc.requiredTaps(1);
+  assert.strictEqual(svc.cumulativePoints(2, 0), l1);
+  assert.strictEqual(svc.cumulativePoints(2, 7), l1 + 7);
+});
+
+test('a finished game is worth the full 50,000', () => {
+  assert.strictEqual(svc.cumulativePoints(svc.LEVEL_COUNT + 1, 0), 50000);
+});
+
+test('cumulativePoints never exceeds the level it is inside', () => {
+  // A corrupt levelTaps must not inflate the total: the difference between
+  // two cumulative readings is what gets PAID, so an unclamped value here
+  // would mint points.
+  const l1 = svc.requiredTaps(1);
+  assert.strictEqual(svc.cumulativePoints(1, 10 ** 9), l1);
+  assert.strictEqual(svc.cumulativePoints(1, -50), 0);
+});
+
+test('walking the curve level by level sums to the total', () => {
+  let prev = 0;
+  for (let lv = 1; lv <= svc.LEVEL_COUNT; lv++) {
+    const at = svc.cumulativePoints(lv + 1, 0);
+    assert.strictEqual(at - prev, svc.requiredTaps(lv), `level ${lv}`);
+    prev = at;
+  }
+  assert.strictEqual(prev, 50000);
 });
 
 console.log('\ntap game — level advancement');
@@ -60,20 +115,20 @@ test('taps below the threshold do not level up', () => {
 });
 
 test('exactly the threshold levels up with no remainder', () => {
-  const r = svc.advance(1, 0, 100);
+  const r = svc.advance(1, 0, svc.requiredTaps(1));
   assert.strictEqual(r.level, 2);
   assert.strictEqual(r.levelTaps, 0);
 });
 
 test('overflow carries into the next level', () => {
-  const r = svc.advance(1, 0, 105);
+  const r = svc.advance(1, 0, svc.requiredTaps(1) + 5);
   assert.strictEqual(r.level, 2);
   assert.strictEqual(r.levelTaps, 5);
 });
 
 test('one huge batch can clear several levels', () => {
-  // 100 + 115 + 132 = 347 clears levels 1..3 exactly.
-  const r = svc.advance(1, 0, 347);
+  const exact = svc.requiredTaps(1) + svc.requiredTaps(2) + svc.requiredTaps(3);
+  const r = svc.advance(1, 0, exact);
   assert.strictEqual(r.level, 4);
   assert.strictEqual(r.levelTaps, 0);
 });
@@ -180,17 +235,30 @@ test('server ceiling is above the client cap but still strict', () => {
 
 console.log('\ntap game — grind sanity');
 
-test('finishing the game takes a realistic amount of tapping', () => {
-  let total = 0;
-  for (let lv = 1; lv <= svc.LEVEL_COUNT; lv++) total += svc.requiredTaps(lv);
-  // At the server's most generous rate this must still be hours of work,
-  // otherwise the curve is too soft to be worth anything.
-  const secondsAtMaxRate = total / svc.MAX_TAPS_PER_SECOND;
-  assert.ok(secondsAtMaxRate > 3600, `only ${Math.round(secondsAtMaxRate)}s at max rate`);
+test('the grind is humane, not endless', () => {
+  // The OLD curve summed to 721,772 taps — 25 hours, with day 14 alone
+  // demanding 2.8 hours in one sitting. Nobody finished it, and the daily
+  // cap stopped mattering because the curve was harsher than the cap.
+  //
+  // The bound is now two-sided: long enough to be worth something, short
+  // enough that a real person can reach the end.
+  const total = svc.totalGamePoints();
+  const hoursAtMax = total / svc.MAX_TAPS_PER_SECOND / 3600;
+  assert.ok(hoursAtMax > 0.5, `only ${(hoursAtMax * 60).toFixed(0)} minutes`);
+  assert.ok(hoursAtMax < 4, `${hoursAtMax.toFixed(1)}h is a second job`);
+
+  // And no single DAY may be brutal, which is the failure the old curve had.
+  // Worst day is the last two levels.
+  const worstDay = svc.requiredTaps(svc.LEVEL_COUNT)
+    + svc.requiredTaps(svc.LEVEL_COUNT - 1);
+  const worstMinutes = worstDay / 8 / 60; // 8/s is a comfortable human rate
+  assert.ok(worstMinutes < 20,
+    `worst day is ${worstMinutes.toFixed(0)} minutes of solid tapping`);
+
+  const days = Math.ceil(svc.LEVEL_COUNT / svc.MAX_LEVELS_PER_DAY);
   console.log(
-    `    (total ${total.toLocaleString()} taps · ` +
-      `${(secondsAtMaxRate / 3600).toFixed(1)}h at the ${svc.MAX_TAPS_PER_SECOND}/s ceiling)`
-  );
+    `    (total ${total.toLocaleString()} points · ` +
+    `${days} days · worst day ${worstMinutes.toFixed(1)} min)`);
 });
 
 
@@ -307,8 +375,8 @@ test('the nonce is still single-use', () => {
 });
 
 test('a level-up carries over correctly mid-session', () => {
-  // The exact numbers from the cross-client test: 60 banked, +50 arrives.
-  const r = svc.advance(1, 60, 50);
+  const need = svc.requiredTaps(1);
+  const r = svc.advance(1, need - 40, 50);
   assert.strictEqual(r.level, 2);
   assert.strictEqual(r.levelTaps, 10);
 });
@@ -316,15 +384,33 @@ test('a level-up carries over correctly mid-session', () => {
 // ── the daily level cap ────────────────────────────────────────────────────
 console.log('\ntap game — daily level cap');
 
-test('the cap is three levels', () => {
-  assert.strictEqual(svc.MAX_LEVELS_PER_DAY, 3);
+test('the cap is two levels', () => {
+  assert.strictEqual(svc.MAX_LEVELS_PER_DAY, 2);
 });
 
-test('a batch big enough for ten levels still only gains three', () => {
-  // 10^6 taps clears far more than three levels on the early curve.
-  const r = svc.advance(1, 0, 1_000_000, 3);
-  assert.strictEqual(r.gained, 3);
+test('PARTIAL PROGRESS SURVIVES THE CAP', () => {
+  // The owner was explicit: "یه روزایی بعد گرفتن نصف لول یا کمی از لول خسته
+  // شدن اشکالی نداره میتونن ادامشو برن". Stopping mid-level must keep the
+  // points banked toward it.
+  const r = svc.advance(3, 100, 50, 2);
+  assert.strictEqual(r.level, 3, 'still on the same level');
+  assert.strictEqual(r.levelTaps, 150, 'the 150 banked points are KEPT');
+  assert.ok(!r.capped, 'nothing hit the wall — no boundary was crossed');
+});
+
+test('a half-finished level resumes tomorrow', () => {
+  // Yesterday: banked 150 into level 3 and ran out of allowance.
+  // Today: the remainder finishes the level.
+  const need = svc.requiredTaps(3);
+  const r = svc.advance(3, 150, need - 150, 2);
   assert.strictEqual(r.level, 4);
+  assert.strictEqual(r.gained, 1);
+});
+
+test('a batch big enough for ten levels still only gains two', () => {
+  const r = svc.advance(1, 0, 1_000_000, 2);
+  assert.strictEqual(r.gained, 2);
+  assert.strictEqual(r.level, 3);
   assert.ok(r.capped, 'the batch hit the wall');
 });
 
@@ -430,7 +516,7 @@ test('a counter from a previous day is worth zero', () => {
 });
 
 test("today's counter is respected", () => {
-  const row = { levels_today: 2, levels_day: new Date('2026-03-02T00:00:00Z') };
+  const row = { levels_today: 1, levels_day: new Date('2026-03-02T00:00:00Z') };
   assert.strictEqual(svc.levelsLeftToday(row, '2026-03-02'), 1);
 });
 
@@ -467,12 +553,12 @@ test('the local-midnight Date is NOT mistaken for the previous day', () => {
 test('a plain ISO string is handled too', () => {
   // Some pg configurations return DATE as a string.
   const row = { levels_today: 1, levels_day: '2026-08-03' };
-  assert.strictEqual(svc.levelsLeftToday(row, '2026-08-03'), 2);
+  assert.strictEqual(svc.levelsLeftToday(row, '2026-08-03'), 1);
 });
 
 test('a timestamp string is truncated to its date part', () => {
   const row = { levels_today: 1, levels_day: '2026-08-03T00:00:00.000Z' };
-  assert.strictEqual(svc.levelsLeftToday(row, '2026-08-03'), 2);
+  assert.strictEqual(svc.levelsLeftToday(row, '2026-08-03'), 1);
 });
 
 test('a null or invalid day grants a full allowance', () => {

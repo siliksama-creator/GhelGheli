@@ -18,9 +18,16 @@
 // (modulo bias) هم ندارد — که خودِ `% n` روی یک عدد تصادفی دارد.
 const crypto = require('crypto');
 const { pool } = require('../config/db');
+const referrals = require('./referralService');
 
-/** مخرج مشترک وزن‌ها. جمع وزن جوایز فعال باید دقیقاً همین باشد. */
-const WEIGHT_TOTAL = 10000;
+/** مخرج مشترک وزن‌ها. جمع وزن جوایز فعال باید دقیقاً همین باشد.
+ *
+ * از ۱۰٬۰۰۰ به یک میلیون رفت. دلیل: با مخرج ۱۰٬۰۰۰ کمترین نرخِ قابل بیان
+ * «۱ در ۱۰٬۰۰۰» بود، ولی مالک خواست جوایز بزرگ «به احتمال خیلی خیلی کم
+ * نزدیک» باشند — و حالا که چرخش‌های روزانه می‌توانند تا ۶ برابر شوند،
+ * ۱ در ۱۰٬۰۰۰ دیگر کم نیست. با یک میلیون، «۱ در ۲۰۰٬۰۰۰» هم دقیق بیان
+ * می‌شود. */
+const WEIGHT_TOTAL = 1000000;
 
 /**
  * روز جاری در تهران به شکل YYYY-MM-DD.
@@ -112,16 +119,21 @@ function pickPrize(list) {
  */
 async function status(userId) {
   const today = tehranDay();
-  const [prizeRows, spun, user] = await Promise.all([
+  const [prizeRows, spun, user, invites] = await Promise.all([
     prizes(),
+    // COUNT، نه EXISTS: سهمیهٔ روزانه دیگر همیشه ۱ نیست. کاربری که ۲۰ نفر
+    // دعوت کرده روزی ۳ چرخش دارد، پس باید بدانیم چندتا خرج شده.
     pool.query(
-      `SELECT 1 FROM wheel_spins
+      `SELECT COUNT(*)::int AS n FROM wheel_spins
         WHERE user_id = $1 AND spin_source = 'daily' AND spun_day = $2::date`,
       [userId, today]),
     pool.query('SELECT bonus_spins FROM users WHERE id = $1', [userId]),
+    referrals.invitedCount(userId),
   ]);
 
-  const usedDaily = spun.rowCount > 0;
+  const usedToday = spun.rows[0].n;
+  const dailyQuota = referrals.dailySpinsFor(invites);
+  const dailyLeft = Math.max(0, dailyQuota - usedToday);
   const bonus = Number(user.rows[0]?.bonus_spins) || 0;
 
   return {
@@ -131,10 +143,14 @@ async function status(userId) {
       // وزن عمداً به کلاینت نمی‌رود: نه لازمش دارد، و نمایشش فقط باعث
       // می‌شود کاربر شانس واقعی‌اش را حساب کند و دلسرد شود.
     })),
-    dailyAvailable: !usedDaily,
+    dailyQuota,
+    dailyLeft,
+    dailyAvailable: dailyLeft > 0,
     bonusSpins: bonus,
-    // مجموع چرخش‌های قابل استفاده همین حالا.
-    spinsLeft: (usedDaily ? 0 : 1) + bonus,
+    // مجموع چرخش‌های قابل استفاده همین حالا — همان عددی که کنار آیکون
+    // گردونه در صفحهٔ اصلی نشان داده می‌شود.
+    spinsLeft: dailyLeft + bonus,
+    invitedCount: invites,
     resetInMs: msUntilTehranMidnight(),
   };
 }
@@ -144,13 +160,20 @@ async function status(userId) {
  *
  * ترتیب کارها مهم است و عمدی:
  *   ۱. تراکنش باز شود و ردیف کاربر قفل شود (FOR UPDATE).
- *   ۲. جایزه انتخاب شود.
- *   ۳. ردیف چرخش درج شود — اینجاست که قید یکتای روزانه اعمال می‌شود.
- *      اگر تکراری بود، خطای 23505 می‌گیریم و کل تراکنش برمی‌گردد.
- *   ۴. جایزه پرداخت شود.
+ *   ۲. سهمیهٔ امروز شمرده شود — *بعد* از قفل، وگرنه دو درخواست هم‌زمان هر
+ *      دو عدد قدیمی را می‌بینند.
+ *   ۳. جایزه انتخاب شود.
+ *   ۴. ردیف چرخش درج شود.
+ *   ۵. جایزه پرداخت شود.
  *
  * درج **قبل** از پرداخت است تا هیچ مسیری نباشد که پول پرداخت شود ولی
  * چرخش ثبت نشود.
+ *
+ * قفل ردیف کاربر (FOR UPDATE) حالا تنها چیزی است که مسابقه را می‌بندد.
+ * قبلاً یک ایندکس یکتا روی (user_id, spun_day) هم بود، ولی آن فرض می‌کرد
+ * سهمیهٔ روزانه همیشه ۱ است. حالا که می‌تواند تا ۶ باشد، آن ایندکس باید
+ * برداشته شود — و کل بار درستی روی قفل می‌افتد. به همین دلیل شمارش
+ * **داخل** تراکنش و **بعد** از قفل انجام می‌شود.
  */
 async function spin(userId, { creditCash, addPoints }) {
   const today = tehranDay();
@@ -167,15 +190,21 @@ async function spin(userId, { creditCash, addPoints }) {
     }
     const bonus = Number(u.rows[0].bonus_spins) || 0;
 
-    const usedDaily = await client.query(
-      `SELECT 1 FROM wheel_spins
+    // شمارش داخل تراکنش و بعد از قفل — این ترتیب همان چیزی است که جای
+    // ایندکس یکتای حذف‌شده را می‌گیرد.
+    const spunToday = await client.query(
+      `SELECT COUNT(*)::int AS n FROM wheel_spins
         WHERE user_id = $1 AND spin_source = 'daily' AND spun_day = $2::date`,
       [userId, today]);
+
+    const invites = await referrals.invitedCount(userId, client);
+    const dailyQuota = referrals.dailySpinsFor(invites);
+    const dailyLeft = Math.max(0, dailyQuota - spunToday.rows[0].n);
 
     // سهمیهٔ روزانه اول خرج می‌شود، بعد چرخش‌های جایزه‌ای. اگر برعکس بود،
     // کاربری که هم سهمیهٔ روزانه دارد و هم جایزه، جایزه‌اش را خرج می‌کرد و
     // سهمیهٔ روزانهٔ امروزش سر نیمه‌شب می‌سوخت.
-    const useDaily = usedDaily.rowCount === 0;
+    const useDaily = dailyLeft > 0;
     if (!useDaily && bonus <= 0) {
       throw Object.assign(
         new Error('چرخش امروزت تمام شده — فردا دوباره سر بزن'),
@@ -199,12 +228,12 @@ async function spin(userId, { creditCash, addPoints }) {
           useDaily ? 'daily' : 'referral', today]);
       spinRow = ins.rows[0];
     } catch (e) {
-      // 23505 = نقض قید یکتا. یعنی یک درخواست هم‌زمان زودتر رسیده و
-      // سهمیهٔ امروز را برداشته. این همان مسابقه‌ای است که چک بالا
-      // نمی‌تواند ببندد.
+      // 23505 اینجا دیگر انتظار نمی‌رود (ایندکس یکتای روزانه برداشته شد)،
+      // ولی اگر روزی قید تازه‌ای اضافه شود، بهتر است پیام درست بدهد تا
+      // یک ۵۰۰ مبهم.
       if (e.code === '23505') {
         throw Object.assign(
-          new Error('چرخش امروزت قبلاً ثبت شده'), { status: 429 });
+          new Error('این چرخش قبلاً ثبت شده'), { status: 429 });
       }
       throw e;
     }
@@ -226,15 +255,19 @@ async function spin(userId, { creditCash, addPoints }) {
     await client.query('COMMIT');
 
     const remainingBonus = useDaily ? bonus : bonus - 1;
+    const remainingDaily = useDaily ? dailyLeft - 1 : dailyLeft;
     return {
       spinId: spinRow.id,
       prize: {
         id: prize.id, label: prize.label, kind: prize.kind,
         value: prize.value, color: prize.color, sliceOrder: prize.slice_order,
       },
-      dailyAvailable: false,
+      dailyQuota,
+      dailyLeft: remainingDaily,
+      dailyAvailable: remainingDaily > 0,
       bonusSpins: remainingBonus,
-      spinsLeft: remainingBonus,
+      spinsLeft: remainingDaily + remainingBonus,
+      invitedCount: invites,
       resetInMs: msUntilTehranMidnight(),
     };
   } catch (e) {

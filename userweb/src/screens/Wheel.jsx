@@ -25,9 +25,12 @@ function countdown(ms) {
   return `${fa(Math.ceil(mins / 60))} ساعت`;
 }
 
-const SPIN_MS = 4200;
+// مالک: «گردونه یکم بیشتر بچرخه برای هیجان بیشتر».
+// ۵.۶ ثانیه و ۹ دور. بیشتر از این، انتظار حس می‌شود نه هیجان.
+const SPIN_MS = 5600;
+const FULL_SPINS = 9;
 
-export default function Wheel({ token, setMsg, reloadProfile }) {
+export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
   const [state, setState] = useState(null);
   const [error, setError] = useState('');
   const [spinning, setSpinning] = useState(false);
@@ -58,10 +61,13 @@ export default function Wheel({ token, setMsg, reloadProfile }) {
       setState(s);
       setHistory(h.spins || []);
       setError('');
+      // نشانِ کنار آیکون گردونه در نوار بالا باید با این صفحه هم‌گام بماند،
+      // وگرنه کاربر می‌چرخاند و نشان هنوز عدد قدیمی را نشان می‌دهد.
+      onSpinsChange?.(s.spinsLeft ?? 0);
     } catch (e) {
       setError(e?.data?.message || 'گردونه در دسترس نیست');
     }
-  }, [token]);
+  }, [token, onSpinsChange]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -82,7 +88,7 @@ export default function Wheel({ token, setMsg, reloadProfile }) {
       // کمی تصادفی داخل خودِ برش، تا سوزن همیشه دقیقاً وسط نایستد و
       // چرخش‌ها یک‌شکل به‌نظر نرسند. ۳۵٪ عرض برش، پس هرگز از مرز رد نمی‌شود.
       const jitter = (Math.random() - 0.5) * seg * 0.7;
-      const full = 6 * 360;                        // شش دور کامل
+      const full = FULL_SPINS * 360;
       const next = spunRef.current + full
         + (((target + jitter) - (spunRef.current % 360)) + 360) % 360;
       spunRef.current = next;
@@ -92,6 +98,7 @@ export default function Wheel({ token, setMsg, reloadProfile }) {
       later(() => {
         setResult(res.prize);
         setState(s => ({ ...s, ...res }));
+        onSpinsChange?.(res.spinsLeft ?? 0);
         playSfx(res.prize.kind === 'cash' ? 'win' : 'match_found');
         setSpinning(false);
         load();
@@ -130,7 +137,9 @@ export default function Wheel({ token, setMsg, reloadProfile }) {
             // فقط موقع چرخش transition داشته باشد: بدون این، بارگذاری اول
             // هم یک چرخش بی‌دلیل نشان می‌دهد.
             transition: spinning
-              ? `transform ${SPIN_MS}ms cubic-bezier(.17,.67,.16,1)`
+              ? // easeOutQuint — انتهای نرم‌تر از منحنی قبلی، پس گردونه در
+              // ثانیهٔ آخر آرام روی جایزه می‌نشیند به‌جای توقف ناگهانی.
+              `transform ${SPIN_MS}ms cubic-bezier(.15,.85,.2,1)`
               : 'none',
           }}
         >
@@ -143,7 +152,7 @@ export default function Wheel({ token, setMsg, reloadProfile }) {
       <div className="wheelActions">
         <button className="primary wheelBtn" onClick={spin} disabled={!canSpin}>
           {spinning ? 'در حال چرخش…'
-            : state.spinsLeft > 0 ? `بچرخان (${fa(state.spinsLeft)} شانس)`
+            : state.spinsLeft > 0 ? `بچرخان — ${fa(state.spinsLeft)} شانس`
               : 'شانس امروزت تمام شد'}
         </button>
         {state.spinsLeft <= 0 && (
@@ -164,6 +173,34 @@ export default function Wheel({ token, setMsg, reloadProfile }) {
           <span>{result.label}</span>
         </div>
       )}
+
+      {/* ── قوانین ────────────────────────────────────────────────────
+          مالک خواست: «تمامی توضیحات گردونه و قسمت دعوت به کاربرها توضیح
+          داده بشه». بدون این، کاربر نمی‌داند چرا امروز ۱ چرخش دارد و
+          دوستش ۳ تا، و فکر می‌کند سیستم خراب است. */}
+      <details className="wheelRules" open={state.spinsLeft <= 0}>
+        <summary>گردونه چطور کار می‌کند؟</summary>
+        <ul>
+          <li>
+            هر روز <b>{fa(state.dailyQuota ?? 1)} چرخش رایگان</b> داری.
+            {state.dailyQuota > 1 && ' (به‌خاطر دوستانی که دعوت کردی)'}
+          </li>
+          <li>چرخاندن گردونه <b>هیچ هزینه‌ای ندارد</b> و هیچ‌وقت نخواهد داشت.</li>
+          <li>
+            به ازای هر <b>{fa(10)} دوستی</b> که دعوت کنی، یک چرخش رایگانِ
+            روزانهٔ دیگر می‌گیری — تا سقف {fa(50)} دوست.
+          </li>
+          <li>
+            هر دعوت موفق، <b>{fa(3)} چرخش فوری</b> هم به تو و هم به دوستت
+            می‌دهد.
+          </li>
+          <li>سهمیهٔ روزانه هر شب ساعت ۱۲ به وقت تهران تازه می‌شود.</li>
+          <li className="wheelRuleOdds">
+            جایزه‌های بزرگ عمداً خیلی کم‌یاب‌اند؛ بیشتر چرخش‌ها امتیاز
+            می‌دهند. جایزه را سرور انتخاب می‌کند، نه گوشی تو.
+          </li>
+        </ul>
+      </details>
 
       {history.length > 0 && (
         <div className="wheelHistory">

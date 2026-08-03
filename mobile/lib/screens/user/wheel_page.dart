@@ -81,7 +81,12 @@ class WheelPage extends StatefulWidget {
 
 class _WheelPageState extends State<WheelPage>
     with SingleTickerProviderStateMixin {
-  static const Duration _spinDuration = Duration(milliseconds: 4200);
+  // مالک: «گردونه یکم بیشتر بچرخه برای هیجان بیشتر».
+  //
+  // ۵.۶ ثانیه و ۹ دور کامل. بیشتر از این، انتظار حس می‌شود نه هیجان —
+  // مخصوصاً برای کاربری که روزی چند بار می‌چرخاند.
+  static const Duration _spinDuration = Duration(milliseconds: 5600);
+  static const double _fullSpins = 9.0;
 
   late final AnimationController _spinCtl = AnimationController(
     vsync: this,
@@ -169,11 +174,10 @@ class _WheelPageState extends State<WheelPage>
       // کمی پراکندگی داخل خود برش تا چرخش‌ها یک‌شکل نباشند. ۷۰٪ عرض برش،
       // پس هیچ‌وقت از مرز رد نمی‌شود و سوزن روی برش اشتباه نمی‌ایستد.
       final jitter = (_rnd.nextDouble() - 0.5) * seg * 0.7;
-      const fullSpins = 6.0;
 
       _fromTurns = _toTurns;
       // به جلو تا اولین نقطه‌ای که هم چند دور کامل خورده و هم روی هدف است.
-      final base = _fromTurns + fullSpins;
+      final base = _fromTurns + _fullSpins;
       final frac = (target + jitter) - (base % 1.0);
       _toTurns = base + (frac < 0 ? frac + 1.0 : frac);
 
@@ -263,7 +267,11 @@ class _WheelPageState extends State<WheelPage>
                         child: AnimatedBuilder(
                           animation: _spinCtl,
                           builder: (context, child) {
-                            final t = Curves.easeOutQuart
+                            // easeOutQuint به‌جای Quart: انتهای نرم‌تر،
+                            // یعنی گردونه در ثانیهٔ آخر آرام‌آرام روی
+                            // جایزه می‌نشیند به‌جای اینکه ناگهان بایستد.
+                            // این همان «هیجان» است که مالک خواست.
+                            final t = Curves.easeOutQuint
                                 .transform(_spinCtl.value);
                             final turns =
                                 _fromTurns + (_toTurns - _fromTurns) * t;
@@ -516,10 +524,23 @@ class _WheelPainter extends CustomPainter {
       canvas.rotate(rot);
 
       final parts = _split(prizes[i]);
-      _text(canvas, parts.$1, size.width * 0.056, FontWeight.w900,
-          Offset(0, -size.width * 0.018));
-      _text(canvas, parts.$2, size.width * 0.030, FontWeight.w700,
-          Offset(0, size.width * 0.026), opacity: 0.92);
+
+      // اندازهٔ فونت با تعداد برش‌ها و طول عدد تنظیم می‌شود.
+      //
+      // با ۱۲ برش، عرضِ در دسترسِ هر برش حدود دو سوم حالت ۹ برشی است، و
+      // «۱۰۰٬۰۰۰» دو برابر «۱۰۰» جا می‌گیرد. بدون این تنظیم، برچسب‌های
+      // بلند از مرز برش بیرون می‌زنند و روی هم می‌افتند — همان چیزی که
+      // در رندر اول نسخهٔ وب اتفاق افتاد.
+      final fit = (9 / prizes.length).clamp(0.62, 1.0);
+      final digits = parts.$1.replaceAll(RegExp(r'[^\u06F0-\u06F9]'), '').length;
+      final lenScale = digits <= 3 ? 1.0 : (digits <= 5 ? 0.84 : 0.70);
+      final vSize = size.width * 0.058 * fit * lenScale;
+      final uSize = size.width * 0.030 * fit;
+
+      _text(canvas, parts.$1, vSize, FontWeight.w900,
+          Offset(0, -uSize * 0.62));
+      _text(canvas, parts.$2, uSize, FontWeight.w700,
+          Offset(0, vSize * 0.62), opacity: 0.95);
 
       canvas.restore();
     }
@@ -544,13 +565,22 @@ class _WheelPainter extends CustomPainter {
           fontSize: size,
           fontWeight: w,
           fontFamily: 'Vazirmatn',
+          // ارتفاع خط فشرده: پیش‌فرض وزیرمتن برای متن پاراگرافی تنظیم شده
+          // و دو خط برچسب را بی‌دلیل از هم دور می‌کند.
+          height: 1.0,
+          // دو سایه: یکی تیره و نزدیک برای خوانایی روی رنگ روشن، یکی
+          // پخش‌تر برای جدا کردن متن از پس‌زمینهٔ شلوغ. با یک سایه، متن
+          // روی برش زرد کم‌رنگ می‌شد.
           shadows: const [
-            Shadow(color: Color(0x9E000000), blurRadius: 3, offset: Offset(0, 1)),
+            Shadow(color: Color(0xCC000000), blurRadius: 2, offset: Offset(0, 1)),
+            Shadow(color: Color(0x66000000), blurRadius: 6),
           ],
         ),
       ),
       textDirection: TextDirection.rtl,
       textAlign: TextAlign.center,
+      // متن هرگز نباید بشکند: یک برچسب دوخطیِ ناخواسته از برش بیرون می‌زند.
+      maxLines: 1,
     )..layout();
     tp.paint(canvas, at + Offset(-tp.width / 2, -tp.height / 2));
   }
