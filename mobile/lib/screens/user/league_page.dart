@@ -134,9 +134,14 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
               children: [
                 ClipRRect(
                   borderRadius: Corners.rLg,
+                  // cacheWidth, not cacheHeight: BoxFit.cover in a box wider
+                  // than the source scales by WIDTH, so a height hint
+                  // constrains the axis that does not bind. The asset is
+                  // pre-cropped to the displayed aspect, so its native 820
+                  // width is both cheaper and sharper than the old hint.
                   child: Image.asset('assets/brand/league_banner.webp',
                       height: 116, width: double.infinity, fit: BoxFit.cover,
-                      cacheHeight: 348),
+                      cacheWidth: 820),
                 ),
                 Gaps.vMd,
                 const Text('لیگ ماهانه قلقلی',

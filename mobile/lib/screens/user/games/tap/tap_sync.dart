@@ -78,6 +78,8 @@ class TapSyncResult {
     this.serverLevel,
     this.serverLevelTaps,
     this.serverTotalTaps,
+    this.levelsLeftToday,
+    this.levelsPerDay,
     this.rejected = false,
     this.message,
   });
@@ -89,6 +91,15 @@ class TapSyncResult {
   final int? serverLevel;
   final int? serverLevelTaps;
   final int? serverTotalTaps;
+
+  /// The daily level allowance as the SERVER counts it.
+  ///
+  /// This is the value that matters: two devices share one allowance, and
+  /// only the server sees both. Null when the response predates the cap
+  /// (an old server, or the offline path), in which case the engine keeps
+  /// its local count rather than assuming a fresh allowance.
+  final int? levelsLeftToday;
+  final int? levelsPerDay;
 
   /// The batch was refused as implausible. The taps are burned, not retried.
   final bool rejected;
@@ -138,6 +149,41 @@ class TapSync {
 
   int nextSequence() => ++_sequence;
 
+  /// Reads the server's view without sending anything.
+  ///
+  /// BUG THIS FIXES. The engine's `init()` called `_flush(force: true)` and
+  /// its comment claimed that reconciled with the server. It did not: `_flush`
+  /// returns immediately when the batch is empty — `force` only bypasses the
+  /// *first* of the two empty-batch guards — and on entry the batch is always
+  /// empty. So the app NEVER adopted server state on open; it only ever
+  /// learned about it as a side effect of the first batch it happened to
+  /// send, minutes later. The web client has always done a real GET here,
+  /// which is why the two disagreed after playing on both.
+  ///
+  /// It matters more now: the daily level allowance is shared across devices,
+  /// so a player who spent it in the browser would otherwise gain levels in
+  /// the app and watch them be taken back on the first sync.
+  Future<TapSyncResult?> fetch() async {
+    if (api.token == null || api.token!.isEmpty) return null;
+    try {
+      final res = await api.get(endpoint);
+      if (res is! Map) return null;
+      final map = Map<String, dynamic>.from(res);
+      return TapSyncResult(
+        ok: true,
+        serverLevel: _asInt(map['level']),
+        serverLevelTaps: _asInt(map['levelTaps']),
+        serverTotalTaps: _asInt(map['totalTaps']),
+        levelsLeftToday: _asInt(map['levelsLeftToday']),
+        levelsPerDay: _asInt(map['levelsPerDay']),
+      );
+    } catch (e) {
+      // Offline: play on with local state. Never throws.
+      debugPrint('tap fetch failed: $e');
+      return null;
+    }
+  }
+
   /// Sends one batch. Returns null when there is nothing to do or the user is
   /// not authenticated; never throws.
   Future<TapSyncResult?> flush(TapBatch batch) async {
@@ -169,6 +215,8 @@ class TapSync {
         serverLevel: _asInt(map['level']),
         serverLevelTaps: _asInt(map['levelTaps']),
         serverTotalTaps: _asInt(map['totalTaps']),
+        levelsLeftToday: _asInt(map['levelsLeftToday']),
+        levelsPerDay: _asInt(map['levelsPerDay']),
         rejected: map['rejected'] == true,
         message: map['message']?.toString(),
       );

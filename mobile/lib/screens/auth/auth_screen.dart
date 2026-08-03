@@ -138,11 +138,20 @@ class _AuthScreenState extends State<AuthScreen> {
         fit: StackFit.expand,
         children: [
           Positioned.fill(
-              // Full-bleed backdrop behind a translucent card, so it can be
-              // decoded well below its native 768x1376 without any visible
-              // difference — it is heavily darkened by the gradient above it.
+              // Full-bleed backdrop behind a translucent card.
+              //
+              // 720 was still 3.5 MB — the most expensive bitmap in the app,
+              // decoded on the very first screen a new user sees. It can go
+              // much lower than a normal image because of what sits on top
+              // of it: the very next widget is an opaque-to-#CC..#FF vertical
+              // gradient, so between 80% and 100% of this image's luminance
+              // is thrown away before a pixel reaches the eye. There is no
+              // fine detail left to preserve.
+              //
+              // 360 covers a 360dp screen at 1x and, after the gradient, is
+              // indistinguishable from 720 — while costing a quarter as much.
               child: Image.asset('assets/brand/login_hero.webp',
-                  fit: BoxFit.cover, cacheWidth: 720)),
+                  fit: BoxFit.cover, cacheWidth: 360)),
           const Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(

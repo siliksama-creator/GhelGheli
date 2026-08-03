@@ -2,26 +2,73 @@
 //
 // Split out of the screen so the visual language (squash, glow, floating
 // "+1"s) can be iterated on without touching game logic.
+//
+// ─────────────────────────────────────────────────────────────────────────
+// MEMORY AND FRAME BUDGET — why this file looks the way it does
+//
+// This is the screen a player holds open for the longest, tapping several
+// times a second, and it was the most expensive screen in the app. Three
+// things were paying for that, all of them fixed here:
+//
+//  1. EVERY "+1" WAS ITS OWN StatefulWidget WITH ITS OWN AnimationController.
+//     Fourteen of them can be alive at once, so the screen ran up to
+//     fourteen independent Tickers, each waking the scheduler on every
+//     frame, each rebuilding an AnimatedBuilder that produced a
+//     Transform.translate → Opacity → Transform.scale → Container → Text
+//     subtree. `Opacity` with a non-trivial child forces a saveLayer: an
+//     offscreen buffer allocated, drawn into, and composited — per floater,
+//     per frame. Fourteen saveLayers at 60fps on a budget phone is where the
+//     jank and a good part of the memory churn came from.
+//
+//     Now: ONE Ticker, and the floaters are painted directly by a
+//     CustomPainter into the existing canvas. No layers, no per-floater
+//     widgets, no per-floater controllers. The text is laid out ONCE at
+//     construction — "+۱" never changes — instead of being shaped fourteen
+//     times a frame.
+//
+//  2. THE TICKER RAN FOREVER. Anything animation-driven that ticks while
+//     nothing is moving costs a frame callback for no pixels. The ticker
+//     here is started when the first floater appears and STOPPED the moment
+//     the last one expires, so an idle screen schedules nothing.
+//
+//  3. THE PREVIOUS SKIN WAS NEVER RELEASED. The cross-fade kept
+//     `_previousSkin` set for the life of the screen, so two ~1.3 MB decoded
+//     bitmaps stayed pinned in the image cache after every character change
+//     — and the cache is 40 MB total. It is now cleared when the fade ends.
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../../../../theme/tokens.dart';
 
 /// One short-lived "+1" that drifts up and fades.
+///
+/// A plain value object rather than a widget: it holds only what the painter
+/// needs, and it is born knowing when it dies so the painter can compute its
+/// own progress without a controller per instance.
 class _FloatingPoint {
   _FloatingPoint({
-    required this.id,
     required this.offset,
     required this.angle,
     required this.scale,
+    required this.bornMs,
   });
 
-  final int id;
   final Offset offset;
   final double angle;
   final double scale;
+  final int bornMs;
 }
+
+/// How long a "+1" lives. Matches the old per-floater controller duration so
+/// the motion is pixel-for-pixel what it was.
+const int _floaterLifeMs = 700;
+
+/// Hard cap on simultaneous floaters. A fast tapper must never accumulate
+/// hundreds; at 12 taps/s and a 700ms life, nine is the natural steady state,
+/// so fourteen leaves headroom without ever being reached in normal play.
+const int _maxFloaters = 14;
 
 class TapCharacter extends StatefulWidget {
   const TapCharacter({
@@ -51,8 +98,24 @@ class TapCharacterState extends State<TapCharacter>
   late final AnimationController _glow;
   late final AnimationController _skinFade;
 
+  /// The single clock for every floater.
+  Ticker? _floaterTicker;
+
+  /// Monotonic time base for floater ages. A Stopwatch rather than
+  /// DateTime.now() so changing the device clock cannot make a floater
+  /// immortal or make it vanish instantly.
+  final Stopwatch _clock = Stopwatch()..start();
+
   final List<_FloatingPoint> _floaters = [];
-  int _floaterId = 0;
+
+  /// Repaint signal for the floater layer ONLY.
+  ///
+  /// Driving the painter from a Listenable instead of setState means a
+  /// floater frame repaints the floater layer and nothing else — the
+  /// character image, the glow and the gesture detector are all untouched.
+  /// setState would mark the whole subtree dirty sixty times a second.
+  final ValueNotifier<int> _floaterTick = ValueNotifier<int>(0);
+
   final Random _rnd = Random();
 
   String _currentSkin = '';
@@ -75,7 +138,7 @@ class TapCharacterState extends State<TapCharacter>
       vsync: this,
       duration: const Duration(milliseconds: 520),
       value: 1,
-    );
+    )..addStatusListener(_onSkinFadeStatus);
   }
 
   @override
@@ -100,12 +163,26 @@ class TapCharacterState extends State<TapCharacter>
     }
   }
 
+  void _onSkinFadeStatus(AnimationStatus status) {
+    // RELEASE THE OLD ARTWORK. Without this the outgoing skin stayed
+    // referenced for the life of the screen, pinning a second ~1.3 MB
+    // decoded bitmap in a 40 MB cache for a frame nobody will ever see
+    // again. Four character changes meant four dead bitmaps.
+    if (status == AnimationStatus.completed && _previousSkin != null) {
+      setState(() => _previousSkin = null);
+    }
+  }
+
   @override
   void dispose() {
     _squash.removeStatusListener(_onSquashStatus);
+    _skinFade.removeStatusListener(_onSkinFadeStatus);
+    _floaterTicker?.dispose();
+    _floaterTick.dispose();
     _squash.dispose();
     _glow.dispose();
     _skinFade.dispose();
+    _clock.stop();
     super.dispose();
   }
 
@@ -115,11 +192,52 @@ class TapCharacterState extends State<TapCharacter>
     _glow.forward(from: 0);
   }
 
+  // ── floaters ─────────────────────────────────────────────────────────────
+
+  void _onFloaterFrame(Duration _) {
+    final cutoff = _clock.elapsedMilliseconds - _floaterLifeMs;
+    // The list is append-only and every floater has the same lifetime, so it
+    // is sorted by birth: the expired ones are always a prefix. Removing
+    // from the front while the front is dead is O(dead), not O(n) per frame.
+    var dead = 0;
+    while (dead < _floaters.length && _floaters[dead].bornMs <= cutoff) {
+      dead++;
+    }
+    if (dead > 0) _floaters.removeRange(0, dead);
+
+    if (_floaters.isEmpty) {
+      // STOP THE CLOCK. An idle screen must not schedule frames.
+      _floaterTicker?.stop();
+      // One final repaint to clear the last floater off the canvas.
+      _floaterTick.value++;
+      return;
+    }
+    _floaterTick.value++;
+  }
+
+  void _spawnFloater(Offset at) {
+    _floaters.add(_FloatingPoint(
+      offset: at,
+      angle: (_rnd.nextDouble() - 0.5) * 0.5,
+      scale: 0.85 + _rnd.nextDouble() * 0.4,
+      bornMs: _clock.elapsedMilliseconds,
+    ));
+    // Eviction by age; index 0 is the oldest.
+    while (_floaters.length > _maxFloaters) {
+      _floaters.removeAt(0);
+    }
+
+    // Lazily create the ticker on first use, then start/stop it as needed.
+    _floaterTicker ??= createTicker(_onFloaterFrame);
+    if (!_floaterTicker!.isActive) _floaterTicker!.start();
+    _floaterTick.value++;
+  }
+
   void _handleTapDown(TapDownDetails details) {
     if (!widget.enabled) return;
     final counted = widget.onTap(details);
 
-    // LEAK FIX. This used to be:
+    // LEAK FIX (kept from the earlier pass). This used to be:
     //
     //   _squash.forward().then((_) { if (mounted) _squash.reverse(); });
     //
@@ -127,10 +245,7 @@ class TapCharacterState extends State<TapCharacter>
     // completes that future when the animation is INTERRUPTED. The squash
     // cycle is 260ms; at a comfortable 6 taps/s a new forward() interrupts
     // the previous one about two times in three, so two thirds of these
-    // closures were orphaned and held for the life of the screen. Ten
-    // minutes of play left thousands of dead futures and their captured
-    // closures on the heap — a leak that grows with time played, which is
-    // exactly the "it starts crashing after a while" the owner reported.
+    // closures were orphaned and held for the life of the screen.
     //
     // A status listener attached ONCE in initState has no per-tap
     // allocation and cannot orphan anything.
@@ -140,40 +255,15 @@ class TapCharacterState extends State<TapCharacter>
 
     // Spawn a floater at the touch point with a little scatter.
     final box = context.findRenderObject() as RenderBox?;
-    final local = box?.globalToLocal(details.globalPosition) ??
-        Offset(box?.size.width ?? 0 / 2, box?.size.height ?? 0 / 2);
-
-    setState(() {
-      _floaters.add(_FloatingPoint(
-        id: _floaterId++,
-        offset: local,
-        angle: (_rnd.nextDouble() - 0.5) * 0.5,
-        scale: 0.85 + _rnd.nextDouble() * 0.4,
-      ));
-      // Hard cap: a fast tapper must never accumulate hundreds of widgets.
-      //
-      // Eviction is by AGE (index 0 is the oldest) and the evicted widget is
-      // disposed by the framework, but its 700ms timer has already been
-      // started — so `onDone` still fires later with an id that is no longer
-      // in the list. `_removeFloater` therefore has to tolerate an unknown
-      // id rather than assume it is present.
-      while (_floaters.length > 14) {
-        _floaters.removeAt(0);
-      }
-    });
-  }
-
-  void _removeFloater(int id) {
-    if (!mounted) return;
-    // Skip the rebuild entirely when the id was already evicted by the cap:
-    // at high tap rates that fired a pointless full setState several times a
-    // second.
-    if (!_floaters.any((f) => f.id == id)) return;
-    setState(() => _floaters.removeWhere((f) => f.id == id));
+    if (box == null) return;
+    _spawnFloater(box.globalToLocal(details.globalPosition));
   }
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = scheme.brightness == Brightness.dark;
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTapDown: _handleTapDown,
@@ -217,18 +307,29 @@ class TapCharacterState extends State<TapCharacter>
           alignment: Alignment.center,
           children: [
             _buildArtwork(),
-            for (final f in _floaters)
-              Positioned(
-                left: f.offset.dx - 24,
-                top: f.offset.dy - 30,
-                child: _Floater(
-                  key: ValueKey(f.id),
-                  angle: f.angle,
-                  scale: f.scale,
-                  accent: widget.accent,
-                  onDone: () => _removeFloater(f.id),
+            // The floater layer sits in its own RepaintBoundary so its 60fps
+            // repaints never dirty the character image underneath — which
+            // would otherwise re-composite a 1.3 MB bitmap every frame.
+            Positioned.fill(
+              child: IgnorePointer(
+                child: RepaintBoundary(
+                  child: CustomPaint(
+                    painter: _FloaterPainter(
+                      floaters: _floaters,
+                      clock: _clock,
+                      repaint: _floaterTick,
+                      accent: isDark
+                          ? widget.accent
+                          : const Color(0xFF4D7C0F),
+                      chip: isDark
+                          ? const Color(0x8C000000)
+                          : const Color(0xEBFFFFFF),
+                      border: widget.accent.withValues(alpha: 0.7),
+                    ),
+                  ),
                 ),
               ),
+            ),
           ],
         ),
       ),
@@ -236,17 +337,21 @@ class TapCharacterState extends State<TapCharacter>
   }
 
   Widget _buildArtwork() {
+    // Skip the AnimatedBuilder entirely when no cross-fade is running, which
+    // is almost always. Otherwise every frame of the squash animation walked
+    // through a builder that had nothing to say.
+    if (_previousSkin == null) return _SkinImage(path: _currentSkin);
+
     return AnimatedBuilder(
       animation: _skinFade,
       builder: (context, _) {
         return Stack(
           alignment: Alignment.center,
           children: [
-            if (_previousSkin != null && _skinFade.value < 1)
-              Opacity(
-                opacity: 1 - _skinFade.value,
-                child: _SkinImage(path: _previousSkin!),
-              ),
+            Opacity(
+              opacity: 1 - _skinFade.value,
+              child: _SkinImage(path: _previousSkin!),
+            ),
             Opacity(
               opacity: _skinFade.value,
               child: _SkinImage(path: _currentSkin),
@@ -256,6 +361,134 @@ class TapCharacterState extends State<TapCharacter>
       },
     );
   }
+}
+
+/// Paints every live "+1" in one pass.
+///
+/// Replaces fourteen widgets, fourteen AnimationControllers and fourteen
+/// saveLayers with one canvas walk over a list of value objects.
+class _FloaterPainter extends CustomPainter {
+  _FloaterPainter({
+    required this.floaters,
+    required this.clock,
+    required this.accent,
+    required this.chip,
+    required this.border,
+    required Listenable repaint,
+  }) : super(repaint: repaint);
+
+  final List<_FloatingPoint> floaters;
+  final Stopwatch clock;
+  final Color accent;
+  final Color chip;
+  final Color border;
+
+  /// Pre-laid-out "+۱" glyphs, one per opacity step.
+  ///
+  /// WHY QUANTISED RATHER THAN EXACT. A TextPainter bakes its colour into the
+  /// shaped run, so fading the text means a new painter — and `layout()` is
+  /// among the most expensive calls you can make inside `paint`. Laying out
+  /// once per floater per frame would have been fourteen shapes per frame,
+  /// which is worse than the widget tree this replaces.
+  ///
+  /// Eight steps over a 700 ms fade is a change every 87 ms; at 18 px the
+  /// difference between adjacent steps is invisible, and the alternative —
+  /// a saveLayer to apply opacity — is exactly the allocation this painter
+  /// exists to avoid.
+  ///
+  /// The cache is static and bounded at 2 themes x 8 steps = 16 entries, all
+  /// of them two glyphs wide, so it is a few kilobytes for the life of the
+  /// process.
+  static const int _alphaSteps = 8;
+  static final Map<int, TextPainter> _labels = {};
+
+  static TextPainter _labelFor(Color base, int step) {
+    // The key has to cover the colour too: the light and dark themes use
+    // different accents and would otherwise share a cache entry.
+    final key = (base.toARGB32() & 0x00FFFFFF) * (_alphaSteps + 1) + step;
+    return _labels.putIfAbsent(key, () {
+      final a = step / _alphaSteps;
+      return TextPainter(
+        text: TextSpan(
+          text: '+۱',
+          style: TextStyle(
+            color: base.withValues(alpha: base.a * a),
+            fontWeight: FontWeight.w900,
+            fontSize: 18,
+            fontFamily: 'Vazirmatn',
+          ),
+        ),
+        textDirection: TextDirection.rtl,
+      )..layout();
+    });
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (floaters.isEmpty) return;
+
+    // Any step gives the same metrics — the glyphs differ only in colour —
+    // so measure once and reuse for the chip geometry.
+    final metrics = _labelFor(accent, _alphaSteps);
+    final chipW = metrics.width + Gaps.xs * 2;
+    final chipH = metrics.height + Gaps.xxs * 2;
+
+    final fill = Paint()..color = chip;
+    final stroke = Paint()
+      ..color = border
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+
+    final nowMs = clock.elapsedMilliseconds;
+
+    for (final f in floaters) {
+      final age = nowMs - f.bornMs;
+      // Guard both ends: a floater spawned in the same millisecond as this
+      // frame has age 0, and one about to be swept has age slightly over the
+      // lifetime. Clamping keeps the maths inside the curve's domain.
+      final t = (age / _floaterLifeMs).clamp(0.0, 1.0);
+      final eased = Curves.easeOut.transform(t);
+
+      // Identical motion to the widget version it replaces: drift up by 80,
+      // sideways by the scatter angle, fading and growing as it goes.
+      final dx = f.offset.dx - 24 + f.angle * 60 * t;
+      final dy = f.offset.dy - 30 - 80 * eased;
+      final scale = f.scale * (0.8 + 0.4 * eased);
+      final opacity = 1 - t;
+      if (opacity <= 0) continue;
+
+      canvas.save();
+      canvas.translate(dx, dy);
+      canvas.scale(scale);
+
+      // Alpha is applied per-colour rather than with saveLayer. This is the
+      // whole reason the painter is cheap: a saveLayer allocates an
+      // offscreen buffer the size of the affected area, and the widget
+      // version did that once per floater per frame.
+      final a = opacity.clamp(0.0, 1.0);
+      fill.color = chip.withValues(alpha: chip.a * a);
+      stroke.color = border.withValues(alpha: border.a * a);
+
+      final rect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, 0, chipW, chipH),
+        Radius.circular(chipH / 2),
+      );
+      canvas.drawRRect(rect, fill);
+      canvas.drawRRect(rect, stroke);
+
+      // The glyph's alpha comes from a pre-shaped variant rather than a
+      // saveLayer — see the note on _labels.
+      final step = (a * _alphaSteps).round().clamp(1, _alphaSteps);
+      _labelFor(accent, step).paint(canvas, const Offset(Gaps.xs, Gaps.xxs));
+
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _FloaterPainter old) =>
+      // The Listenable drives repaints; this only has to catch a theme flip.
+      old.accent != accent || old.chip != chip || old.border != border;
 }
 
 class _SkinImage extends StatelessWidget {
@@ -269,112 +502,17 @@ class _SkinImage extends StatelessWidget {
       fit: BoxFit.contain,
       filterQuality: FilterQuality.medium,
       gaplessPlayback: true,
-      // The skins are ~620x900. The character never draws wider than about a
-      // third of a phone screen, and two of them are alive at once during a
-      // cross-fade. Halving the decode halves the steady-state cost of the
-      // screen the player spends the most time on.
-      cacheWidth: 480,
+      // The skins are ~620x900 and the character is never drawn wider than
+      // about a third of a phone screen — roughly 130 logical px, so 320
+      // physical px covers a 2.5x display with room to spare. At the old 480
+      // each skin cost 1.3 MB decoded; at 320 it is 0.57 MB, and during a
+      // cross-fade two are alive at once. Against a 40 MB cache shared with
+      // avatars, banners and crests, that difference is the game screen
+      // going from "evicts other screens" to "barely registers".
+      cacheWidth: 320,
       // A missing skin must never blank the game area.
       errorBuilder: (_, __, ___) => const Center(
         child: Text('🟢', style: TextStyle(fontSize: 120)),
-      ),
-    );
-  }
-}
-
-class _Floater extends StatefulWidget {
-  const _Floater({
-    super.key,
-    required this.angle,
-    required this.scale,
-    required this.accent,
-    required this.onDone,
-  });
-
-  final double angle;
-  final double scale;
-  final Color accent;
-  final VoidCallback onDone;
-
-  @override
-  State<_Floater> createState() => _FloaterState();
-}
-
-class _FloaterState extends State<_Floater>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c;
-
-  @override
-  void initState() {
-    super.initState();
-    _c = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 700),
-    );
-    // `mounted` guard: the parent evicts the oldest floater once more than 14
-    // exist, so this widget can be disposed before its 700ms is up. Without
-    // the check the callback still runs and calls setState on the parent for
-    // an id that is no longer in the list.
-    //
-    // Unlike the squash controller this one is started once and never
-    // interrupted, so `.then` here cannot orphan a TickerFuture.
-    _c.forward().then((_) {
-      if (mounted) widget.onDone();
-    });
-  }
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: AnimatedBuilder(
-        animation: _c,
-        builder: (context, child) {
-          final t = _c.value;
-          return Transform.translate(
-            offset: Offset(widget.angle * 60 * t, -80 * Curves.easeOut.transform(t)),
-            child: Opacity(
-              opacity: (1 - t).clamp(0.0, 1.0),
-              child: Transform.scale(
-                scale: widget.scale * (0.8 + 0.4 * Curves.easeOut.transform(t)),
-                child: child,
-              ),
-            ),
-          );
-        },
-        child: Builder(builder: (context) {
-          // A hardcoded black chip looks pasted-on in the app's light theme,
-          // which the web build made obvious. Derive the surface from the
-          // active scheme so it works in both.
-          final scheme = Theme.of(context).colorScheme;
-          final isDark = scheme.brightness == Brightness.dark;
-          return Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: Gaps.xs, vertical: Gaps.xxs),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? Colors.black.withValues(alpha: 0.55)
-                  : Colors.white.withValues(alpha: 0.92),
-              borderRadius: Corners.rPill,
-              border: Border.all(color: widget.accent.withValues(alpha: 0.7)),
-            ),
-            child: Text(
-              '+۱',
-              style: TextStyle(
-                // The lime accent is too pale to read on white; darken it
-                // for the light theme only.
-                color: isDark ? widget.accent : const Color(0xFF4D7C0F),
-                fontWeight: FontWeight.w900,
-                fontSize: 18,
-              ),
-            ),
-          );
-        }),
       ),
     );
   }

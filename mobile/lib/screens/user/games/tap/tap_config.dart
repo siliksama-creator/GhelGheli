@@ -15,6 +15,7 @@ class TapGameConfig {
     this.growthFactor = 1.15,
     this.skins = defaultSkins,
     this.levelsPerSkin = 10,
+    this.levelsPerDay = 3,
     this.maxTapsPerSecond = 12,
     this.burstWindow = const Duration(seconds: 1),
     this.minTapInterval = const Duration(milliseconds: 45),
@@ -24,6 +25,14 @@ class TapGameConfig {
 
   /// How many levels the game has in total.
   final int levelCount;
+
+  /// How many levels a player may clear per calendar day (Asia/Tehran).
+  ///
+  /// MIRRORS `MAX_LEVELS_PER_DAY` in tapGameService.js and the server is the
+  /// authority — this copy exists only so the UI can explain the rule and
+  /// stop counting locally instead of showing progress the next sync erases.
+  /// Change one, change the other in the same commit.
+  final int levelsPerDay;
 
   /// Taps required to clear level 1.
   final int baseTaps;
@@ -168,6 +177,7 @@ class TapGameConfig {
     double? growthFactor,
     List<String>? skins,
     int? levelsPerSkin,
+    int? levelsPerDay,
     int? maxTapsPerSecond,
     Duration? burstWindow,
     Duration? minTapInterval,
@@ -180,6 +190,7 @@ class TapGameConfig {
       growthFactor: growthFactor ?? this.growthFactor,
       skins: skins ?? this.skins,
       levelsPerSkin: levelsPerSkin ?? this.levelsPerSkin,
+      levelsPerDay: levelsPerDay ?? this.levelsPerDay,
       maxTapsPerSecond: maxTapsPerSecond ?? this.maxTapsPerSecond,
       burstWindow: burstWindow ?? this.burstWindow,
       minTapInterval: minTapInterval ?? this.minTapInterval,

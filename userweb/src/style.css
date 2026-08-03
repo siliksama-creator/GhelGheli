@@ -697,6 +697,23 @@
 .tapDone h2{color:#a3e635;font-size:18px;margin:6px 0 0}
 .tapDone p{color:#c9ddf2;font-size:14px;margin:0}
 
+/* Daily level allowance, as dots in the header. Deliberately tiny and
+   unlabelled: the count is three, so three shapes read faster than a
+   fraction, and the title/aria-label carry the words for anyone who needs
+   them. `flex:0 0 auto` keeps it from being squeezed by the title next to
+   it on a 320px screen. */
+.tapDots{display:flex;gap:3px;align-items:center;flex:0 0 auto}
+.tapDots i{width:7px;height:7px;border-radius:50%;background:#c9ddf233}
+.tapDots i.on{background:#a3e635}
+
+/* The locked panel reuses .tapDone's layout — same shape, different mood.
+   The character is dimmed rather than removed: taking it away entirely made
+   the screen look like an error page rather than a rest day. */
+.tapCapped img{opacity:.35;max-height:min(30vh,220px)}
+.tapCapped h2{color:#a3e635}
+.tapResetIn{background:#84cc1620;color:#a3e635;border-radius:999px;
+  padding:6px 14px;font-weight:800;font-size:13px;margin-top:4px !important}
+
 /* Users who prefer less motion still get the game, just calmer. */
 @media (prefers-reduced-motion:reduce){
   .tapArea,.tapArea.squash{transition:none;transform:none}

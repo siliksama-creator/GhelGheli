@@ -31,6 +31,53 @@ function requiredTaps(level) {
   return Math.round(BASE_TAPS * Math.pow(GROWTH_FACTOR, level - 1));
 }
 
+// ── daily level cap ────────────────────────────────────────────────────────
+// A player may clear at most this many levels per calendar day.
+//
+// The cap exists so the game is a daily habit rather than a single evening's
+// grind, and so the 50-level curve lasts. It is enforced HERE because the
+// phone is treated as hostile and because two clients sharing an account must
+// share one allowance.
+const MAX_LEVELS_PER_DAY = 3;
+
+/**
+ * Today's date in Asia/Tehran as YYYY-MM-DD.
+ *
+ * Fixed to Tehran for every player, never the device's zone: otherwise a
+ * player unlocks a fresh allowance by changing their time zone. Never UTC
+ * either — that rolls over at 03:30 local, which is nobody's "tomorrow".
+ *
+ * Derived from `sv-SE` because that locale's short date IS the ISO form, so
+ * this needs no padding arithmetic and cannot drift on a DST boundary.
+ */
+function tehranDay(now = new Date()) {
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Tehran',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
+}
+
+/**
+ * Milliseconds until the Tehran day rolls over, so the client can show an
+ * honest countdown instead of "come back tomorrow" with no idea when that is.
+ */
+function msUntilTehranMidnight(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Tehran',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(now);
+  const get = (t) => Number(parts.find((p) => p.type === t)?.value || 0);
+  // `hour` can come back as 24 for midnight itself in some ICU builds.
+  const h = get('hour') % 24;
+  const elapsed = (h * 3600 + get('minute') * 60 + get('second')) * 1000;
+  return 86400000 - elapsed;
+}
+
 // ── plausibility limits ────────────────────────────────────────────────────
 // The client caps itself at 12 taps/s. The server allows a little more to
 // absorb clock jitter and batching edges, but not enough to matter: at 18/s a
@@ -161,27 +208,72 @@ function plausibleCeiling(elapsedMs) {
 /**
  * Applies accepted taps to a progress row, walking the level curve exactly
  * the way the client does.
+ *
+ * @param {number} levelsLeftToday how many more levels this player may clear
+ *   today. Pass Infinity for the uncapped behaviour.
+ *
+ * WHAT HAPPENS AT THE CAP. The surplus is DISCARDED, not banked. Banking
+ * would mean a player who kept tapping after the cap instantly clears
+ * tomorrow's three levels at 00:00 without touching the screen, which turns
+ * the cap into a queue rather than a limit.
+ *
+ * The leftover is CLAMPED to one below the requirement rather than SET to it.
+ * The difference matters: the honest clients refuse taps outright once capped,
+ * so their leftover is whatever it happened to be — usually near zero. Setting
+ * it to required-1 here would make the next sync push a nearly-full progress
+ * bar back to the client, which reads as "one tap away" all evening and is a
+ * lie. Clamping leaves an honest client's number untouched and only bites a
+ * batch that carried more taps than the allowance could spend — a hostile
+ * client, or a large offline batch from before the cap shipped.
  */
-function advance(level, levelTaps, taps) {
+function advance(level, levelTaps, taps, levelsLeftToday = Infinity) {
   let lv = level;
   let lt = levelTaps + taps;
+  let gained = 0;
   while (lv <= LEVEL_COUNT && lt >= requiredTaps(lv)) {
+    if (gained >= levelsLeftToday) {
+      lt = Math.min(lt, requiredTaps(lv) - 1);
+      return { level: lv, levelTaps: lt, gained, capped: true };
+    }
     lt -= requiredTaps(lv);
     lv += 1;
+    gained += 1;
   }
   if (lv > LEVEL_COUNT) {
     lv = LEVEL_COUNT + 1;
     lt = 0;
   }
-  return { level: lv, levelTaps: lt };
+  return { level: lv, levelTaps: lt, gained, capped: false };
+}
+
+/**
+ * How many levels this row has left today.
+ *
+ * A stored day that is not today means the counter belongs to a previous
+ * session and is worth zero — the reset happens on READ as well as on write
+ * so `getProgress` never reports a stale allowance to a client that opens the
+ * game at 00:01 and taps before the first batch lands.
+ */
+function levelsLeftToday(row, today = tehranDay()) {
+  if (!row) return MAX_LEVELS_PER_DAY;
+  const day = row.levels_day
+    ? new Intl.DateTimeFormat('sv-SE', { timeZone: 'UTC' })
+      .format(new Date(row.levels_day))
+    : null;
+  const used = day === today ? Number(row.levels_today) || 0 : 0;
+  return Math.max(0, MAX_LEVELS_PER_DAY - used);
 }
 
 async function getProgress(userId) {
   const { rows } = await pool.query(
-    'SELECT level, level_taps, total_taps, flagged_taps FROM tap_game_progress WHERE user_id=$1',
+    `SELECT level, level_taps, total_taps, flagged_taps,
+            levels_today, levels_day
+       FROM tap_game_progress WHERE user_id=$1`,
     [userId]
   );
-  if (!rows[0]) {
+  const r = rows[0];
+  const left = levelsLeftToday(r);
+  if (!r) {
     return {
       level: 1,
       levelTaps: 0,
@@ -189,9 +281,11 @@ async function getProgress(userId) {
       flaggedTaps: 0,
       requiredTaps: requiredTaps(1),
       levelCount: LEVEL_COUNT,
+      levelsPerDay: MAX_LEVELS_PER_DAY,
+      levelsLeftToday: left,
+      resetInMs: msUntilTehranMidnight(),
     };
   }
-  const r = rows[0];
   return {
     level: r.level,
     levelTaps: r.level_taps,
@@ -199,6 +293,9 @@ async function getProgress(userId) {
     flaggedTaps: Number(r.flagged_taps),
     requiredTaps: requiredTaps(r.level),
     levelCount: LEVEL_COUNT,
+    levelsPerDay: MAX_LEVELS_PER_DAY,
+    levelsLeftToday: left,
+    resetInMs: msUntilTehranMidnight(),
   };
 }
 
@@ -239,7 +336,7 @@ async function submitBatch(userId, token, raw) {
     );
     const { rows } = await client.query(
       `SELECT level, level_taps, total_taps, flagged_taps, rejected_batches,
-              last_sequence, last_batch_at
+              last_sequence, last_batch_at, levels_today, levels_day
          FROM tap_game_progress WHERE user_id=$1 FOR UPDATE`,
       [userId]
     );
@@ -281,6 +378,9 @@ async function submitBatch(userId, token, raw) {
        ON CONFLICT (user_id, nonce) DO NOTHING RETURNING nonce`,
       [userId, nonce]
     );
+    const today = tehranDay();
+    const left = levelsLeftToday(current, today);
+
     if (nonceInsert.rowCount === 0) {
       await client.query('COMMIT');
       return {
@@ -292,6 +392,9 @@ async function submitBatch(userId, token, raw) {
           level: current.level,
           levelTaps: current.level_taps,
           totalTaps: Number(current.total_taps),
+          levelsPerDay: MAX_LEVELS_PER_DAY,
+          levelsLeftToday: left,
+          resetInMs: msUntilTehranMidnight(),
         },
       };
     }
@@ -332,9 +435,19 @@ async function submitBatch(userId, token, raw) {
       }
     }
 
+    // Gate 6 — the daily level cap.
+    //
+    // Applied to the ADVANCE, not to the taps: the taps themselves are real
+    // and still count toward the lifetime total and the leaderboard. Only the
+    // level-ups are limited. A player who has run out simply sits one tap
+    // below the next level until Tehran midnight.
     const next = rejected
-      ? { level: current.level, levelTaps: current.level_taps }
-      : advance(current.level, current.level_taps, accepted);
+      ? { level: current.level, levelTaps: current.level_taps,
+          gained: 0, capped: left <= 0 }
+      : advance(current.level, current.level_taps, accepted, left);
+
+    const usedToday = (left === MAX_LEVELS_PER_DAY ? 0
+      : MAX_LEVELS_PER_DAY - left) + next.gained;
 
     const updated = await client.query(
       `UPDATE tap_game_progress
@@ -347,10 +460,17 @@ async function submitBatch(userId, token, raw) {
               -- would otherwise bounce up and down between their independent
               -- counters and mean nothing.
               last_sequence = GREATEST(last_sequence, $7),
+              -- Written unconditionally, including the day, so the row is
+              -- self-consistent even on a batch that gained nothing. Storing
+              -- the count without the day it belongs to is what would make a
+              -- stale counter look current.
+              levels_today = $8,
+              levels_day = $9::date,
               last_batch_at = NOW(),
               updated_at = NOW()
         WHERE user_id = $1
-        RETURNING level, level_taps, total_taps, flagged_taps, rejected_batches`,
+        RETURNING level, level_taps, total_taps, flagged_taps,
+                  rejected_batches, levels_today`,
       [
         userId,
         next.level,
@@ -359,12 +479,15 @@ async function submitBatch(userId, token, raw) {
         Math.max(0, body.flagged) + (rejected ? body.taps : 0),
         rejected ? 1 : 0,
         body.seq,
+        usedToday,
+        today,
       ]
     );
 
     await client.query('COMMIT');
 
     const row = updated.rows[0];
+    const remaining = Math.max(0, MAX_LEVELS_PER_DAY - row.levels_today);
     return {
       status: 200,
       payload: {
@@ -378,6 +501,15 @@ async function submitBatch(userId, token, raw) {
         totalTaps: Number(row.total_taps),
         requiredTaps: requiredTaps(row.level),
         levelCount: LEVEL_COUNT,
+        // The client needs all three: the limit to explain the rule, what is
+        // left to decide whether to keep counting, and when it resets so the
+        // countdown is real rather than "tomorrow".
+        levelsPerDay: MAX_LEVELS_PER_DAY,
+        levelsLeftToday: remaining,
+        resetInMs: msUntilTehranMidnight(),
+        // True when THIS batch hit the wall — the moment to show the message,
+        // as opposed to `levelsLeftToday === 0` which stays true all evening.
+        cappedNow: next.capped === true,
       },
     };
   } catch (e) {
@@ -440,8 +572,12 @@ module.exports = {
   sign,
   advance,
   plausibleCeiling,
+  tehranDay,
+  msUntilTehranMidnight,
+  levelsLeftToday,
   LEVEL_COUNT,
   BASE_TAPS,
   GROWTH_FACTOR,
   MAX_TAPS_PER_SECOND,
+  MAX_LEVELS_PER_DAY,
 };

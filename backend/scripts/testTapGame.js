@@ -313,4 +313,146 @@ test('a level-up carries over correctly mid-session', () => {
   assert.strictEqual(r.levelTaps, 10);
 });
 
+// ── the daily level cap ────────────────────────────────────────────────────
+console.log('\ntap game — daily level cap');
+
+test('the cap is three levels', () => {
+  assert.strictEqual(svc.MAX_LEVELS_PER_DAY, 3);
+});
+
+test('a batch big enough for ten levels still only gains three', () => {
+  // 10^6 taps clears far more than three levels on the early curve.
+  const r = svc.advance(1, 0, 1_000_000, 3);
+  assert.strictEqual(r.gained, 3);
+  assert.strictEqual(r.level, 4);
+  assert.ok(r.capped, 'the batch hit the wall');
+});
+
+test('the surplus is DISCARDED, not banked for tomorrow', () => {
+  // This is the rule that stops the cap being a queue: a player who keeps
+  // hammering after the third level must not wake up tomorrow with the next
+  // three already cleared.
+  const r = svc.advance(1, 0, 1_000_000, 3);
+  assert.ok(r.levelTaps < svc.requiredTaps(4),
+    'must not be sitting on a completed level');
+  assert.strictEqual(r.levelTaps, svc.requiredTaps(4) - 1,
+    'a million taps is genuinely over the line, so the clamp bites here');
+});
+
+test('the leftover is CLAMPED, not inflated to required-1', () => {
+  // The honest clients refuse taps once capped, so they arrive at the wall
+  // with a small leftover. Setting it to required-1 instead of clamping
+  // would push a 99%-full progress bar back at them on the next sync — a
+  // bar that then sits there all evening claiming one tap remains.
+  const r = svc.advance(4, 5, 0, 0);
+  assert.strictEqual(r.levelTaps, 5, 'an honest small leftover is untouched');
+});
+
+test('the parked position cannot itself trigger a level-up tomorrow', () => {
+  // Sitting one short means ONE tap tomorrow gains ONE level. Parking AT the
+  // requirement would hand out a level the player earned on neither day.
+  const parked = svc.advance(1, 0, 1_000_000, 3);
+  const next = svc.advance(parked.level, parked.levelTaps, 1, 3);
+  assert.strictEqual(next.gained, 1);
+  assert.strictEqual(next.level, 5);
+});
+
+test('an allowance of zero gains nothing at all', () => {
+  const r = svc.advance(5, 0, 1_000_000, 0);
+  assert.strictEqual(r.gained, 0);
+  assert.strictEqual(r.level, 5);
+  assert.ok(r.capped);
+});
+
+test('a partial allowance is honoured exactly', () => {
+  const r = svc.advance(1, 0, 1_000_000, 2);
+  assert.strictEqual(r.gained, 2);
+  assert.strictEqual(r.level, 3);
+});
+
+test('taps below the next level are unaffected by the cap', () => {
+  // The cap limits LEVEL-UPS, not taps. A player with no allowance left who
+  // is mid-level must still see their bar move... which is why `capped` is
+  // false here: nothing hit the wall.
+  const r = svc.advance(1, 0, 50, 0);
+  assert.strictEqual(r.levelTaps, 50);
+  assert.strictEqual(r.gained, 0);
+  assert.ok(!r.capped);
+});
+
+test('an uncapped call behaves exactly as before', () => {
+  // Default parameter = Infinity, so every pre-existing caller and every
+  // test above the cap section keeps its old meaning.
+  const capped = svc.advance(1, 0, 1_000_000, Infinity);
+  const legacy = svc.advance(1, 0, 1_000_000);
+  assert.deepStrictEqual(legacy, capped);
+  assert.strictEqual(legacy.level, svc.LEVEL_COUNT + 1, 'runs to completion');
+});
+
+test('finishing the game is not blocked by the cap', () => {
+  // Reaching levelCount+1 from levelCount is one level-up; with allowance
+  // left it must complete rather than parking one tap short forever.
+  const r = svc.advance(svc.LEVEL_COUNT, 0, 10 ** 9, 3);
+  assert.strictEqual(r.level, svc.LEVEL_COUNT + 1);
+  assert.strictEqual(r.levelTaps, 0);
+});
+
+console.log('\ntap game — the Tehran day');
+
+test('the day is ISO and matches Asia/Tehran, not UTC', () => {
+  // 2026-03-01T21:00Z is already 2026-03-02 in Tehran (+03:30).
+  const d = new Date('2026-03-01T21:00:00Z');
+  assert.strictEqual(svc.tehranDay(d), '2026-03-02');
+});
+
+test('just before Tehran midnight it is still the old day', () => {
+  // 20:29Z = 23:59 Tehran.
+  const d = new Date('2026-03-01T20:29:00Z');
+  assert.strictEqual(svc.tehranDay(d), '2026-03-01');
+});
+
+test('the countdown reaches zero exactly at Tehran midnight', () => {
+  const oneMinuteBefore = new Date('2026-03-01T20:29:00Z');
+  const ms = svc.msUntilTehranMidnight(oneMinuteBefore);
+  assert.ok(ms > 0 && ms <= 61000, `expected ~60s, got ${ms}`);
+});
+
+test('the countdown is a full day just after midnight', () => {
+  const justAfter = new Date('2026-03-01T20:30:30Z');
+  const ms = svc.msUntilTehranMidnight(justAfter);
+  assert.ok(ms > 86_000_000, `expected ~24h, got ${ms}`);
+});
+
+test('a counter from a previous day is worth zero', () => {
+  const row = { levels_today: 3, levels_day: new Date('2026-03-01T00:00:00Z') };
+  assert.strictEqual(svc.levelsLeftToday(row, '2026-03-02'),
+    svc.MAX_LEVELS_PER_DAY);
+});
+
+test("today's counter is respected", () => {
+  const row = { levels_today: 2, levels_day: new Date('2026-03-02T00:00:00Z') };
+  assert.strictEqual(svc.levelsLeftToday(row, '2026-03-02'), 1);
+});
+
+test('a missing row grants a full allowance', () => {
+  assert.strictEqual(svc.levelsLeftToday(null), svc.MAX_LEVELS_PER_DAY);
+});
+
+test('a corrupt counter above the cap cannot go negative', () => {
+  const row = { levels_today: 99, levels_day: new Date('2026-03-02T00:00:00Z') };
+  assert.strictEqual(svc.levelsLeftToday(row, '2026-03-02'), 0);
+});
+
+test('the cap is enforced in submitBatch, not only in advance()', () => {
+  // A cap applied in the pure helper but never wired into the write path
+  // would pass every test above and do nothing in production.
+  const src = require('fs').readFileSync(
+    require('path').join(__dirname, '../src/services/tapGameService.js'), 'utf8');
+  assert.ok(/advance\(current\.level, current\.level_taps, accepted, left\)/
+    .test(src), 'submitBatch must pass the remaining allowance to advance()');
+  assert.ok(/levels_today = \$8/.test(src), 'the counter must be persisted');
+  assert.ok(/levels_day = \$9::date/.test(src),
+    'the day must be persisted alongside the count, or it goes stale');
+});
+
 console.log(`\n${passed} tap-game assertions passed\n`);

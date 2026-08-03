@@ -222,7 +222,13 @@ class _HomeShellState extends State<HomeShell>
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: Image.asset('assets/brand/logo.webp',
-                  width: 30, height: 30, fit: BoxFit.cover),
+                  width: 30, height: 30, fit: BoxFit.cover,
+                  // 30 logical px on screen, from a 720x595 source. Without
+                  // this hint Flutter decoded the full 1.63 MB bitmap and
+                  // kept it resident for the entire session — the app bar is
+                  // on every screen — to draw a 30px square. 90px covers a
+                  // 3x display.
+                  cacheWidth: 90),
             ),
             const SizedBox(width: 10),
             Expanded(

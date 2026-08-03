@@ -117,8 +117,21 @@ flutter:
     - assets/shop/
     - assets/sfx/
     - assets/avatars/
-    - assets/icon/
-    - assets/splash/
+    # NOT bundled, deliberately:
+    #
+    #   assets/icon/  — 1.7 MB of source art (icon, background, foreground,
+    #     monochrome, all 1024x1024) consumed by flutter_launcher_icons at
+    #     BUILD time. It generates the real mipmaps into android/res; nothing
+    #     in lib/ ever calls Image.asset on these, so listing them here only
+    #     shipped a second copy inside the APK for no one to read.
+    #
+    #   assets/splash/splash_logo.png — same story for
+    #     flutter_native_splash (528 KB).
+    #
+    # splash_android12.png IS still needed at runtime: splash_screen.dart
+    # draws it so the Flutter first frame matches the native splash exactly.
+    # It is listed as a single file rather than re-including the folder.
+    - assets/splash/splash_android12.png
   fonts:
     - family: Vazirmatn
       fonts:

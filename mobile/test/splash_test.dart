@@ -37,9 +37,24 @@ void main() {
         (tester) async {
       await tester.pumpWidget(const MaterialApp(home: SplashScreen()));
 
+      // نام فایل را از هر لایه‌ای بیرون می‌کشد.
+      //
+      // چرا cast مستقیم به AssetImage غلط بود: به محض اینکه به تصویر
+      // `cacheWidth` بدهیم — که برای کم کردن مصرف حافظه لازم است — فلاتر
+      // آن را داخل یک ResizeImage می‌پیچد و cast می‌ترکد. تست باید
+      // «کدام فایل نشان داده می‌شود» را بسنجد، نه اینکه چند لایه دورش
+      // پیچیده شده؛ وگرنه هر بهینه‌سازی حافظه یک تست بی‌ربط را می‌شکند.
+      String? nameOf(ImageProvider p) {
+        if (p is ResizeImage) return nameOf(p.imageProvider);
+        if (p is AssetImage) return p.assetName;
+        if (p is ExactAssetImage) return p.assetName;
+        return null;
+      }
+
       final images = tester
           .widgetList<Image>(find.byType(Image))
-          .map((w) => (w.image as AssetImage).assetName)
+          .map((w) => nameOf(w.image))
+          .whereType<String>()
           .toList();
 
       // قبلاً اینجا لوگوی متنی بود و اسپلش سیستمی شخصیت — دو نشان پشت سر

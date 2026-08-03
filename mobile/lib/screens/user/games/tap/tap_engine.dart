@@ -14,12 +14,25 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import 'tap_config.dart';
+import 'tap_day.dart';
 import 'tap_guard.dart';
 import 'tap_storage.dart';
 import 'tap_sync.dart';
 
 /// Emitted for one-shot UI reactions (sound, haptics, confetti).
-enum TapEvent { tap, rejected, levelUp, skinChanged, gameCompleted }
+enum TapEvent {
+  tap,
+  rejected,
+  levelUp,
+  skinChanged,
+  gameCompleted,
+
+  /// The player just used up the last of today's level allowance.
+  ///
+  /// Distinct from the steady `dailyCapReached` state so the celebration/
+  /// explanation fires once rather than on every subsequent tap.
+  dailyCapHit,
+}
 
 class TapEngine extends ChangeNotifier {
   TapEngine({
@@ -76,6 +89,28 @@ class TapEngine extends ChangeNotifier {
   bool get nearRateLimit => _guard.nearLimit;
   bool get isComplete => _progress.level > config.levelCount;
 
+  // ── daily cap ────────────────────────────────────────────────────────────
+
+  /// Levels cleared today, with the day checked.
+  ///
+  /// A stored count whose day is not today is worth zero. Checking here
+  /// rather than at midnight means no timer has to fire while the app is
+  /// backgrounded — the reset simply *is* true the next time anyone asks.
+  int get levelsToday =>
+      _progress.levelsDay == tehranDay() ? _progress.levelsToday : 0;
+
+  /// How many more levels the player may clear today.
+  int get levelsLeftToday =>
+      (config.levelsPerDay - levelsToday).clamp(0, config.levelsPerDay);
+
+  /// True while the player has run out of levels for today. Taps still
+  /// register — they count toward the lifetime total and the leaderboard —
+  /// but the level bar stops one tap short.
+  bool get dailyCapReached => !isComplete && levelsLeftToday <= 0;
+
+  /// Time until the allowance refills, for an honest countdown.
+  Duration get untilReset => untilTehranMidnight();
+
   /// 0..1 progress within the current level.
   double get levelProgress {
     if (isComplete) return 1;
@@ -122,13 +157,59 @@ class TapEngine extends ChangeNotifier {
     _batchStartMs = _clock.elapsedMilliseconds;
     _startFlushTimer();
     _safeNotify();
-    // Reconcile with the server on entry: another device may be ahead.
-    unawaited(_flush(force: true));
+    // Reconcile with the server on entry: another device may be ahead, and
+    // the daily allowance is shared between them.
+    //
+    // This used to be `_flush(force: true)`, which never sent anything on
+    // entry because the batch is empty — see TapSync.fetch() for why that
+    // silently did nothing for the life of the feature.
+    unawaited(_reconcile());
+  }
+
+  /// Pulls the server's view once, on entry.
+  Future<void> _reconcile() async {
+    final sync = _sync;
+    if (sync == null) return;
+    final result = await sync.fetch();
+    if (result == null || _disposed) return;
+
+    final sl = result.serverLevel;
+    final st = result.serverLevelTaps;
+    if (sl != null && st != null && sl >= 1) {
+      final safeLevel =
+          sl > config.levelCount + 1 ? config.levelCount + 1 : sl;
+      // Only move FORWARD. A device that played offline is legitimately
+      // ahead of the server until its taps are flushed; adopting the
+      // server's lower number would delete that progress before it was
+      // ever sent.
+      final ahead = safeLevel > _progress.level ||
+          (safeLevel == _progress.level && st > _progress.taps);
+      if (ahead) {
+        _progress = _progress.copyWith(
+          level: safeLevel,
+          taps: st.clamp(0, config.requiredTaps(safeLevel)),
+          totalTaps: result.serverTotalTaps ?? _progress.totalTaps,
+        );
+      }
+    }
+    // The allowance is adopted unconditionally (well, by the stricter-of-two
+    // rule inside): unlike level progress, spending it elsewhere is not
+    // something local play can undo.
+    _adoptDailyAllowance(result);
+    await _persist(immediate: true);
+    _safeNotify();
   }
 
   void _startFlushTimer() {
     _flushTimer?.cancel();
-    _flushTimer = Timer.periodic(config.flushInterval, (_) => _flush());
+    _flushTimer = Timer.periodic(config.flushInterval, (_) {
+      // Nothing to send once the cap is reached — taps are refused outright,
+      // so the batch can only be empty. `_flush` would return immediately
+      // anyway; skipping it means the timer's callback is the only thing
+      // running on a screen the player may leave open for a long time.
+      if (dailyCapReached && _batchTaps <= 0 && _batchFlagged <= 0) return;
+      _flush();
+    });
   }
 
   // ── gameplay ─────────────────────────────────────────────────────────────
@@ -136,6 +217,19 @@ class TapEngine extends ChangeNotifier {
   /// Registers one tap. Returns true when it counted.
   bool tap() {
     if (!_loaded || isComplete) return false;
+
+    // DAILY CAP — refuse before the guard, not after.
+    //
+    // The screen replaces the character with a locked panel at this point, so
+    // in practice nothing calls through. The check stays because a queued
+    // gesture can arrive in the same frame the cap is reached, and because
+    // "the UI hides it" is not a rule — this is.
+    //
+    // Refusing here rather than counting-but-not-advancing is deliberate and
+    // matches what the owner asked for: the game is locked, not throttled.
+    // It also means a capped player generates no batches at all, so the
+    // screen costs nothing while it sits there.
+    if (dailyCapReached) return false;
 
     final nowMs = _clock.elapsedMilliseconds;
     final verdict = _guard.register(nowMs);
@@ -161,6 +255,13 @@ class TapEngine extends ChangeNotifier {
 
     final previousSkin = config.skinIndexForLevel(next.level);
     var leveledUp = false;
+    var justCapped = false;
+
+    // The allowance is read once, before the loop. Reading `levelsLeftToday`
+    // inside it would consult `_progress`, which the loop is mutating, and
+    // the day string would be recomputed on every iteration.
+    final today = tehranDay();
+    var left = levelsLeftToday;
 
     // `while`, not `if`: a huge offline batch could clear several levels.
     //
@@ -174,8 +275,33 @@ class TapEngine extends ChangeNotifier {
         guard++ < config.levelCount) {
       final cost = config.requiredTaps(next.level);
       if (cost <= 0) break;
+      if (left <= 0) {
+        // Out of levels for today. DISCARD the surplus rather than banking
+        // it — banking would mean the player wakes up tomorrow with three
+        // levels already cleared, turning the cap into a queue.
+        //
+        // Clamp, do not set: `min` leaves an honest counter alone and only
+        // bites when a batch genuinely overshot. Setting it to cost-1 would
+        // park the bar at 99% every single day, which reads as "one tap
+        // away" for the whole evening. The server's advance() clamps the
+        // same way, so the next sync agrees.
+        final t = next.taps < cost - 1 ? next.taps : cost - 1;
+        next = next.copyWith(taps: t);
+        justCapped = true;
+        break;
+      }
       next = next.copyWith(level: next.level + 1, taps: next.taps - cost);
       leveledUp = true;
+      left--;
+    }
+
+    if (leveledUp) {
+      // Write the count and the day together — a count without the day it
+      // belongs to is what makes a stale counter look current.
+      next = next.copyWith(
+        levelsToday: config.levelsPerDay - left,
+        levelsDay: today,
+      );
     }
 
     _progress = next;
@@ -186,7 +312,15 @@ class TapEngine extends ChangeNotifier {
         _emit(TapEvent.skinChanged);
       }
       if (isComplete) _emit(TapEvent.gameCompleted);
+      if (dailyCapReached) _emit(TapEvent.dailyCapHit);
       // A level boundary is a natural, cheap moment to checkpoint.
+      unawaited(_flush(force: true));
+      unawaited(_persist(immediate: true));
+    } else if (justCapped) {
+      // Reached the wall without gaining a level (the allowance was already
+      // spent when this tap landed). Still worth a checkpoint and a flush so
+      // the server sees the same picture.
+      _emit(TapEvent.dailyCapHit);
       unawaited(_flush(force: true));
       unawaited(_persist(immediate: true));
     } else {
@@ -323,6 +457,7 @@ class TapEngine extends ChangeNotifier {
             );
           }
         }
+        _adoptDailyAllowance(result);
         await _persist(immediate: true);
         _safeNotify();
       } else if (result.rejected) {
@@ -342,6 +477,25 @@ class TapEngine extends ChangeNotifier {
     } finally {
       _syncing = false;
     }
+  }
+
+  /// Takes the server's word for how much of today's allowance is left.
+  ///
+  /// STRICTER OF THE TWO, never the looser. The server sees every device on
+  /// the account, so its count can only be higher than ours; but a response
+  /// can also arrive out of order (a slow batch landing after a fast one), so
+  /// blindly adopting it could hand back an allowance that was just spent.
+  /// Taking the minimum is correct in both directions and cannot be gamed.
+  void _adoptDailyAllowance(TapSyncResult result) {
+    final left = result.levelsLeftToday;
+    if (left == null) return; // old server, or nothing reported
+    final serverUsed =
+        (config.levelsPerDay - left).clamp(0, config.levelsPerDay);
+    if (serverUsed <= levelsToday) return;
+    _progress = _progress.copyWith(
+      levelsToday: serverUsed,
+      levelsDay: tehranDay(),
+    );
   }
 
   /// Flush on the way out (backgrounding, leaving the screen).

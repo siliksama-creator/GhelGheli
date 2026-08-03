@@ -15,6 +15,11 @@ export const TAP_CONFIG = {
   baseTaps: 100,
   growthFactor: 1.15,
   levelsPerSkin: 10,
+  // Levels clearable per calendar day (Asia/Tehran). MIRRORS
+  // MAX_LEVELS_PER_DAY in tapGameService.js, which is the authority — this
+  // copy exists so the UI can explain the rule and stop counting locally
+  // instead of showing progress the next sync erases.
+  levelsPerDay: 3,
   skins: [
     '/games/tap/skin_1.webp',
     '/games/tap/skin_2.webp',
@@ -83,26 +88,92 @@ export const skinForLevel = (level, cfg = TAP_CONFIG) =>
 const STORAGE_KEY = 'tap_game_progress_v1';
 const fa = n => new Intl.NumberFormat('fa-IR').format(Number(n || 0));
 
+// ── the Tehran day ─────────────────────────────────────────────────────────
+//
+// The daily cap resets at Tehran midnight for every player, never in the
+// browser's own zone — otherwise a fresh allowance is one Settings change
+// away. Unlike the Flutter client, the browser HAS a full timezone database
+// (Intl), so this is exact and stays correct if Iran ever reinstates DST.
+//
+// `sv-SE` is used because its short date IS the ISO form, so the result
+// matches the server's `tehranDay()` character for character — and these two
+// strings are compared.
+const TEHRAN = 'Asia/Tehran';
+const _dayFmt = new Intl.DateTimeFormat('sv-SE', {
+  timeZone: TEHRAN, year: 'numeric', month: '2-digit', day: '2-digit',
+});
+export const tehranDay = (now = new Date()) => _dayFmt.format(now);
+
+const _clockFmt = new Intl.DateTimeFormat('en-GB', {
+  timeZone: TEHRAN, hour: '2-digit', minute: '2-digit', second: '2-digit',
+  hour12: false,
+});
+
+/** Milliseconds until the Tehran day rolls over. Never zero or negative. */
+export function untilTehranMidnight(now = new Date()) {
+  const parts = _clockFmt.formatToParts(now);
+  const get = t => Number(parts.find(p => p.type === t)?.value || 0);
+  // Some ICU builds report midnight as hour 24.
+  const elapsed = ((get('hour') % 24) * 3600 + get('minute') * 60
+    + get('second')) * 1000;
+  const left = 86400000 - elapsed;
+  return left <= 0 ? 86400000 : left;
+}
+
+/**
+ * Short Persian phrasing of a duration, for the "unlocks in" line.
+ *
+ * Rounds UP: with 90 minutes left, "۲ ساعت" is a promise the game keeps and
+ * "۱ ساعت" is one it breaks.
+ */
+export function formatCountdown(ms) {
+  const mins = Math.floor(ms / 60000);
+  if (mins < 1) return 'کمتر از یک دقیقه';
+  if (mins < 60) return `${fa(mins)} دقیقه`;
+  return `${fa(Math.ceil(mins / 60))} ساعت`;
+}
+
 // ── local persistence (mirrors TapStorage) ─────────────────────────────────
+const EMPTY_PROGRESS = {
+  level: 1, taps: 0, totalTaps: 0, pendingTaps: 0, flaggedTaps: 0,
+  levelsToday: 0, levelsDay: '',
+};
+
 function loadProgress() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { level: 1, taps: 0, totalTaps: 0, pendingTaps: 0, flaggedTaps: 0 };
+    if (!raw) return { ...EMPTY_PROGRESS };
     const p = JSON.parse(raw);
     const int = k => (Number.isFinite(Number(p[k])) && Number(p[k]) > 0 ? Math.floor(Number(p[k])) : 0);
     const level = int('level');
+    // Only an ISO date is meaningful. Anything else — a number, an object, a
+    // hand-edited "tomorrow" — reads as "no day recorded", which grants a
+    // fresh allowance. That is the safe direction to fail: the server holds
+    // the real counter and corrects it on the first batch, whereas refusing
+    // to play on a corrupt string would brick the game offline.
+    const day = typeof p.levelsDay === 'string'
+      && /^\d{4}-\d{2}-\d{2}$/.test(p.levelsDay) ? p.levelsDay : '';
     return {
       level: level < 1 ? 1 : Math.min(level, TAP_CONFIG.levelCount + 1),
       taps: int('taps'),
       totalTaps: int('totalTaps'),
       pendingTaps: int('pendingTaps'),
       flaggedTaps: int('flaggedTaps'),
+      levelsToday: int('levelsToday'),
+      levelsDay: day,
     };
   } catch {
     // Corrupt storage must never brick the game.
-    return { level: 1, taps: 0, totalTaps: 0, pendingTaps: 0, flaggedTaps: 0 };
+    return { ...EMPTY_PROGRESS };
   }
 }
+
+/** Levels cleared today, with the stored day checked against the real one. */
+const levelsUsedToday = (p, today = tehranDay()) =>
+  (p.levelsDay === today ? p.levelsToday : 0);
+
+const levelsLeftToday = (p, today = tehranDay()) =>
+  Math.max(0, TAP_CONFIG.levelsPerDay - levelsUsedToday(p, today));
 
 function saveProgress(p) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); } catch { /* quota/private mode */ }
@@ -214,6 +285,23 @@ export default function TapGame({ token, onBack }) {
   const skin = skinForLevel(Math.min(level, TAP_CONFIG.levelCount));
   const remaining = isComplete ? 0 : Math.max(0, need - progress.taps);
 
+  // ── daily cap ────────────────────────────────────────────────────────────
+  // Recomputed from `progress` on every render rather than held in its own
+  // state: derived state that can go stale is how the two clients drift.
+  const levelsLeft = levelsLeftToday(progress);
+  const capped = !isComplete && levelsLeft <= 0;
+
+  // Live countdown for the locked panel. Ticks once a minute — a per-second
+  // countdown is a re-render per second for a number nobody is watching that
+  // closely — and only while the panel is actually on screen.
+  const [resetIn, setResetIn] = useState(() => untilTehranMidnight());
+  useEffect(() => {
+    if (!capped) return undefined;
+    setResetIn(untilTehranMidnight());
+    const t = setInterval(() => setResetIn(untilTehranMidnight()), 30000);
+    return () => clearInterval(t);
+  }, [capped]);
+
   // Search for the next level whose skin differs instead of duplicating the
   // boundary arithmetic — that duplication is what drifted out of sync with
   // skinIndexForLevel when the boundary was corrected.
@@ -297,6 +385,21 @@ export default function TapGame({ token, onBack }) {
             ...p,
             pendingTaps: Math.max(0, p.pendingTaps - sentTaps),
           };
+          // ADOPT THE STRICTER ALLOWANCE, never the looser one. The server
+          // sees every device on the account so its count can only be
+          // higher — but responses can also arrive out of order, and
+          // blindly adopting a stale one would hand back an allowance that
+          // was just spent. min() is right in both directions.
+          if (typeof res.levelsLeftToday === 'number') {
+            const serverUsed = Math.max(0, Math.min(
+              TAP_CONFIG.levelsPerDay,
+              TAP_CONFIG.levelsPerDay - res.levelsLeftToday));
+            const today = tehranDay();
+            if (serverUsed > levelsUsedToday(p, today)) {
+              next.levelsToday = serverUsed;
+              next.levelsDay = today;
+            }
+          }
           // Clamp the level the SERVER pushes, not just the one loaded from
           // storage. This is the path that actually reached the broken curve
           // in production: it needs a sync to happen first, which is why the
@@ -333,17 +436,30 @@ export default function TapGame({ token, onBack }) {
         const server = await req('/api/games/tap/progress', 'GET', null, token);
         if (!alive || !server || typeof server.level !== 'number') return;
         setProgress(p => {
-          // Another device may be ahead; the server always wins.
+          let next = p;
+          // Another device may be ahead; the server always wins. Only move
+          // FORWARD — a tab that played offline is legitimately ahead until
+          // its taps are flushed.
           if (server.level > p.level ||
               (server.level === p.level && server.levelTaps > p.taps)) {
-            const next = {
-              ...p, level: server.level, taps: server.levelTaps,
+            next = {
+              ...next, level: server.level, taps: server.levelTaps,
               totalTaps: server.totalTaps, pendingTaps: 0,
             };
-            saveProgress(next);
-            return next;
           }
-          return p;
+          // The allowance is shared across devices, so unlike level progress
+          // it is adopted whenever the server says more of it is spent.
+          if (typeof server.levelsLeftToday === 'number') {
+            const serverUsed = Math.max(0, Math.min(
+              TAP_CONFIG.levelsPerDay,
+              TAP_CONFIG.levelsPerDay - server.levelsLeftToday));
+            const today = tehranDay();
+            if (serverUsed > levelsUsedToday(p, today)) {
+              next = { ...next, levelsToday: serverUsed, levelsDay: today };
+            }
+          }
+          if (next !== p) saveProgress(next);
+          return next;
         });
       } catch { /* offline: keep playing locally */ }
     })();
@@ -377,6 +493,11 @@ export default function TapGame({ token, onBack }) {
   // ── tap handling ─────────────────────────────────────────────────────────
   const handleTap = useCallback(e => {
     if (isComplete) return;
+    // DAILY CAP. The locked panel replaces the tap area, so nothing normally
+    // reaches here; the check stays because a pointer event queued in the
+    // same frame the cap is hit would otherwise slip through, and because
+    // "the UI hides it" is not a rule.
+    if (capped) return;
     // Ignore synthetic events: a script dispatching click() has isTrusted
     // false. Real users are unaffected.
     if (e && e.isTrusted === false) return;
@@ -410,6 +531,11 @@ export default function TapGame({ token, onBack }) {
       let taps = p.taps + 1;
       const prevSkin = skinIndexForLevel(lv);
       let leveled = false;
+
+      // Allowance read once, before the loop, from the value being mutated.
+      const today = tehranDay();
+      let left = levelsLeftToday(p, today);
+
       // `while`, not `if`: a big offline batch can clear several levels.
       // Bounded: a zero-cost level would otherwise spin forever and lock the
       // tab. requiredTaps can no longer return 0, but the guard is free.
@@ -419,15 +545,34 @@ export default function TapGame({ token, onBack }) {
              && spins++ < TAP_CONFIG.levelCount) {
         const cost = requiredTaps(lv);
         if (cost <= 0) break;
+        if (left <= 0) {
+          // Out of levels for today. DISCARD the surplus rather than banking
+          // it — banking would mean waking up tomorrow with three levels
+          // already cleared, turning the cap into a queue.
+          //
+          // Clamp, do not set: `min` leaves an honest counter alone and only
+          // bites when a batch genuinely overshot. Setting it to cost-1 would
+          // park the bar at 99% every day, which reads as "one tap away" all
+          // evening. The server's advance() clamps identically.
+          taps = Math.min(taps, cost - 1);
+          break;
+        }
         taps -= cost;
         lv += 1;
         leveled = true;
+        left -= 1;
       }
       const next = {
         ...p, level: lv, taps,
         totalTaps: p.totalTaps + 1,
         pendingTaps: p.pendingTaps + 1,
       };
+      if (leveled) {
+        // Count and day written together — a count without the day it
+        // belongs to is what makes a stale counter look current.
+        next.levelsToday = TAP_CONFIG.levelsPerDay - left;
+        next.levelsDay = today;
+      }
       saveProgress(next);
 
       if (leveled) {
@@ -459,6 +604,18 @@ export default function TapGame({ token, onBack }) {
           <b>ضربه‌زن</b>
           <span>لول {fa(Math.min(level, TAP_CONFIG.levelCount))} از {fa(TAP_CONFIG.levelCount)}</span>
         </div>
+        {/* Today's allowance, as dots. Shown BEFORE the cap is hit, not only
+            after — a limit the player discovers by hitting it reads as a
+            bug; one they can see coming reads as a rule. */}
+        {!isComplete && (
+          <span className="tapDots"
+            title={`امروز ${fa(levelsLeft)} لول از ${fa(TAP_CONFIG.levelsPerDay)} باقی مانده`}
+            aria-label={`امروز ${levelsLeft} لول از ${TAP_CONFIG.levelsPerDay} باقی مانده`}>
+            {Array.from({ length: TAP_CONFIG.levelsPerDay }, (_, i) => (
+              <i key={i} className={i < levelsLeft ? 'on' : ''} />
+            ))}
+          </span>
+        )}
         <span className="tapTotal">⚡ {fa(progress.totalTaps)}</span>
       </div>
 
@@ -483,6 +640,16 @@ export default function TapGame({ token, onBack }) {
           <h2>🏆 تبریک! همهٔ لول‌ها را تمام کردی</h2>
           <p>مجموع ضربه‌ها: {fa(progress.totalTaps)}</p>
         </div>
+      ) : capped ? (
+        // The tap area is REPLACED, not merely disabled. Leaving a tappable
+        // character that silently does nothing is the worst version of a
+        // limit — the player assumes the game is broken.
+        <div className="tapDone tapCapped">
+          <img src={skin} alt="" />
+          <h2>😴 سهمیهٔ امروز تمام شد</h2>
+          <p>هر روز {fa(TAP_CONFIG.levelsPerDay)} لول می‌توانی بالا بروی.</p>
+          <p className="tapResetIn">⏳ باز شدن تا {formatCountdown(resetIn)} دیگر</p>
+        </div>
       ) : (
         <div
           className={`tapArea${squash ? ' squash' : ''}${pulse ? ' pulse' : ''}`}
@@ -501,8 +668,9 @@ export default function TapGame({ token, onBack }) {
       )}
 
       <p className="tapHint">
-        {isComplete ? 'همهٔ ۵۰ لول تمام شد!'
-          : `روی شخصیت ضربه بزن — ${fa(remaining)} ضربه تا لول بعد`}
+        {isComplete ? `همهٔ ${fa(TAP_CONFIG.levelCount)} لول تمام شد!`
+          : capped ? 'فردا دوباره سر بزن'
+            : `روی شخصیت ضربه بزن — ${fa(remaining)} ضربه تا لول بعد`}
       </p>
     </section>
   );

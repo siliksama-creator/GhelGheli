@@ -16,6 +16,8 @@ class TapProgress {
     this.totalTaps = 0,
     this.pendingTaps = 0,
     this.flaggedTaps = 0,
+    this.levelsToday = 0,
+    this.levelsDay = '',
   });
 
   /// Current level (1-based).
@@ -35,12 +37,26 @@ class TapProgress {
   /// is a strong signal of an autoclicker.
   final int flaggedTaps;
 
+  /// Levels cleared during [levelsDay]. The SERVER is the authority — this is
+  /// the local mirror so an offline session enforces the same rule instead of
+  /// racking up progress that the next sync silently erases.
+  final int levelsToday;
+
+  /// The Tehran calendar day [levelsToday] belongs to, as `YYYY-MM-DD`.
+  ///
+  /// Stored as the day rather than a timestamp so a mismatch is a plain
+  /// string compare with no timezone arithmetic at read time. Empty means
+  /// "never played", which reads as a fresh allowance.
+  final String levelsDay;
+
   TapProgress copyWith({
     int? level,
     int? taps,
     int? totalTaps,
     int? pendingTaps,
     int? flaggedTaps,
+    int? levelsToday,
+    String? levelsDay,
   }) {
     return TapProgress(
       level: level ?? this.level,
@@ -48,6 +64,8 @@ class TapProgress {
       totalTaps: totalTaps ?? this.totalTaps,
       pendingTaps: pendingTaps ?? this.pendingTaps,
       flaggedTaps: flaggedTaps ?? this.flaggedTaps,
+      levelsToday: levelsToday ?? this.levelsToday,
+      levelsDay: levelsDay ?? this.levelsDay,
     );
   }
 
@@ -57,6 +75,8 @@ class TapProgress {
         'totalTaps': totalTaps,
         'pendingTaps': pendingTaps,
         'flaggedTaps': flaggedTaps,
+        'levelsToday': levelsToday,
+        'levelsDay': levelsDay,
       };
 
   static TapProgress fromJson(Map<String, dynamic> json) {
@@ -76,6 +96,18 @@ class TapProgress {
     }
 
     final level = readInt('level');
+    // Only an ISO date is meaningful here. Anything else — a number, an
+    // object, a hand-edited "tomorrow" — is treated as "no day recorded",
+    // which grants a fresh allowance. That is the safe direction to fail:
+    // the server holds the real counter and will correct it on the first
+    // batch, whereas refusing to play on a corrupt string would brick the
+    // game offline.
+    final rawDay = json['levelsDay'];
+    final day = rawDay is String &&
+            RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(rawDay)
+        ? rawDay
+        : '';
+
     return TapProgress(
       // A corrupt/absent level must never render an empty screen.
       level: level < 1 ? 1 : level,
@@ -83,6 +115,8 @@ class TapProgress {
       totalTaps: readInt('totalTaps'),
       pendingTaps: readInt('pendingTaps'),
       flaggedTaps: readInt('flaggedTaps'),
+      levelsToday: readInt('levelsToday'),
+      levelsDay: day,
     );
   }
 }

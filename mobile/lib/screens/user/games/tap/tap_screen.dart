@@ -14,6 +14,7 @@ import '../../../../theme/tokens.dart';
 import '../game_audio.dart';
 import 'tap_character.dart';
 import 'tap_config.dart';
+import 'tap_day.dart';
 import 'tap_engine.dart';
 import 'tap_storage.dart';
 import 'tap_sync.dart';
@@ -109,6 +110,13 @@ class _TapGameScreenState extends State<TapGameScreen>
           GameAudio.instance.play(Sfx.win);
           HapticFeedback.heavyImpact();
           break;
+        case TapEvent.dailyCapHit:
+          // Fires once, on the level-up that spends the last of today's
+          // allowance — not on every tap afterwards. The panel below carries
+          // the standing explanation; this is the moment it arrives.
+          GameAudio.instance.play(Sfx.win);
+          HapticFeedback.heavyImpact();
+          break;
         case TapEvent.rejected:
         case null:
           break;
@@ -170,6 +178,9 @@ class _TapGameScreenState extends State<TapGameScreen>
           level: _engine.level,
           levelCount: widget.config.levelCount,
           totalTaps: _engine.totalTaps,
+          levelsLeftToday: _engine.levelsLeftToday,
+          levelsPerDay: widget.config.levelsPerDay,
+          isComplete: _engine.isComplete,
           accent: _accent,
         ),
         Gaps.vSm,
@@ -188,18 +199,31 @@ class _TapGameScreenState extends State<TapGameScreen>
                   skin: widget.config
                       .skinForLevel(widget.config.levelCount),
                 )
-              : Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: Gaps.xl, vertical: Gaps.md),
-                  child: Center(
-                    child: TapCharacter(
-                      key: _characterKey,
-                      skin: _engine.skin,
+              : _engine.dailyCapReached
+                  // The character is REPLACED, not merely disabled. Leaving a
+                  // tappable character that silently does nothing is the
+                  // worst version of a limit: the player assumes the game is
+                  // broken. It also means the whole animation stack —
+                  // ticker, painter, cross-fade — is torn down for the rest
+                  // of the day instead of idling on screen.
+                  ? _DailyCapView(
                       accent: _accent,
-                      onTap: _handleTap,
+                      levelsPerDay: widget.config.levelsPerDay,
+                      level: _engine.level,
+                      skin: _engine.skin,
+                    )
+                  : Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: Gaps.xl, vertical: Gaps.md),
+                      child: Center(
+                        child: TapCharacter(
+                          key: _characterKey,
+                          skin: _engine.skin,
+                          accent: _accent,
+                          onTap: _handleTap,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
         ),
         if (_engine.notice != null)
           Padding(
@@ -216,12 +240,20 @@ class _TapGameScreenState extends State<TapGameScreen>
                   size: 16,
                   color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
               Gaps.hXxs,
-              Text(
-                _engine.isComplete
-                    ? 'همهٔ ۵۰ لول تمام شد!'
-                    : 'روی شخصیت ضربه بزن — ${faNum(_engine.tapsRemaining)} ضربه تا لول بعد',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+              Flexible(
+                child: Text(
+                  _engine.isComplete
+                      ? 'همهٔ ${faNum(widget.config.levelCount)} لول تمام شد!'
+                      : _engine.dailyCapReached
+                          ? 'سهمیهٔ امروز تمام شد'
+                          : 'روی شخصیت ضربه بزن — ${faNum(_engine.tapsRemaining)} ضربه تا لول بعد',
+                  // The uncapped string is the longest in the app's smallest
+                  // text style; on a 320px screen with a five-digit
+                  // requirement it overflowed the row.
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
                 ),
               ),
             ],
@@ -238,6 +270,9 @@ class _Header extends StatelessWidget {
     required this.level,
     required this.levelCount,
     required this.totalTaps,
+    required this.levelsLeftToday,
+    required this.levelsPerDay,
+    required this.isComplete,
     required this.accent,
   });
 
@@ -245,6 +280,9 @@ class _Header extends StatelessWidget {
   final int level;
   final int levelCount;
   final int totalTaps;
+  final int levelsLeftToday;
+  final int levelsPerDay;
+  final bool isComplete;
   final Color accent;
 
   @override
@@ -278,6 +316,17 @@ class _Header extends StatelessWidget {
               ],
             ),
           ),
+          // Today's remaining levels, as dots. Shown BEFORE the cap is hit,
+          // not only after — a limit the player discovers by hitting it is a
+          // bug report; one they can see coming is a rule.
+          if (!isComplete) ...[
+            _DailyDots(
+              left: levelsLeftToday,
+              total: levelsPerDay,
+              accent: accent,
+            ),
+            Gaps.hXs,
+          ],
           Container(
             padding: const EdgeInsets.symmetric(
                 horizontal: Gaps.sm, vertical: Gaps.xxs),
@@ -295,6 +344,163 @@ class _Header extends StatelessWidget {
                   style: theme.textTheme.labelLarge?.copyWith(
                     color: accent,
                     fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Today's level allowance, as filled/empty dots.
+///
+/// Dots rather than "۲/۳" because the count is small and glanceable: three
+/// shapes read instantly where a fraction has to be parsed, and it fits in
+/// the header without competing with the level number beside it.
+class _DailyDots extends StatelessWidget {
+  const _DailyDots({
+    required this.left,
+    required this.total,
+    required this.accent,
+  });
+
+  final int left;
+  final int total;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final dim = Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.2);
+    return Semantics(
+      // Screen readers get the number; the dots are decoration to them.
+      label: 'امروز $left لول از $total باقی مانده',
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < total; i++)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 1.5),
+              child: Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: i < left ? accent : dim,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shown instead of the character once today's levels are used up.
+///
+/// A live countdown, because "فردا برگرد" ("come back tomorrow") at 23:50 is
+/// misleading by eleven hours in the wrong direction, and at 00:10 it is
+/// misleading by a whole day. The timer ticks once a minute — a second-by-
+/// second countdown on a screen the player is about to leave is a frame
+/// callback per second for information nobody is reading.
+class _DailyCapView extends StatefulWidget {
+  const _DailyCapView({
+    required this.accent,
+    required this.levelsPerDay,
+    required this.level,
+    required this.skin,
+  });
+
+  final Color accent;
+  final int levelsPerDay;
+  final int level;
+  final String skin;
+
+  @override
+  State<_DailyCapView> createState() => _DailyCapViewState();
+}
+
+class _DailyCapViewState extends State<_DailyCapView> {
+  Timer? _tick;
+  late Duration _left;
+
+  @override
+  void initState() {
+    super.initState();
+    _left = untilTehranMidnight();
+    _tick = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (!mounted) return;
+      setState(() => _left = untilTehranMidnight());
+    });
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.all(Gaps.xl),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // The character is still here, just resting — dimmed and small.
+          // Removing it entirely made the screen look like an error page.
+          Opacity(
+            opacity: 0.35,
+            child: Image.asset(
+              widget.skin,
+              height: 150,
+              fit: BoxFit.contain,
+              // Dimmed and at 150px; a small decode is more than enough.
+              cacheWidth: 220,
+              errorBuilder: (_, __, ___) =>
+                  const Text('😴', style: TextStyle(fontSize: 72)),
+            ),
+          ),
+          Gaps.vLg,
+          Text('😴', style: theme.textTheme.headlineMedium),
+          Gaps.vXs,
+          Text(
+            'سهمیهٔ امروز تمام شد',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w900,
+              color: widget.accent,
+            ),
+          ),
+          Gaps.vXxs,
+          Text(
+            'هر روز ${faNum(widget.levelsPerDay)} لول می‌توانی بالا بروی.',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+            ),
+          ),
+          Gaps.vSm,
+          Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: Gaps.md, vertical: Gaps.xs),
+            decoration: BoxDecoration(
+              color: widget.accent.withValues(alpha: 0.12),
+              borderRadius: Corners.rPill,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.schedule_rounded, size: 16, color: widget.accent),
+                Gaps.hXxs,
+                Text(
+                  'باز شدن تا ${formatCountdown(_left)} دیگر',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: widget.accent,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ],

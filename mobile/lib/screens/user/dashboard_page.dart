@@ -148,8 +148,20 @@ class _DashboardPageState extends State<DashboardPage> {
               children: [
                 ClipRRect(
                   borderRadius: Corners.rLg,
+                  // cacheWidth, not cacheHeight. With BoxFit.cover in a box
+                  // WIDER than the source, the scale is set by WIDTH and the
+                  // height is cropped — so the old `cacheHeight: 390`
+                  // constrained the axis that does not bind. It produced a
+                  // 700px-wide bitmap for a box needing ~1050px on a 412dp
+                  // screen at 3x: softer than necessary AND still carrying
+                  // the cropped-away rows.
+                  //
+                  // The asset itself is now pre-cropped to the displayed
+                  // aspect (see tools/crop_banners.py), so decoding at its
+                  // native 820 width costs less than the old hint did while
+                  // being sharp instead of upscaled.
                   child: Image.asset('assets/brand/card_pack_banner.webp',
-                      height: 130, fit: BoxFit.cover, cacheHeight: 390),
+                      height: 130, fit: BoxFit.cover, cacheWidth: 820),
                 ),
                 Gaps.vMd,
                 Text('ثبت کد کارت‌های قلقلی',

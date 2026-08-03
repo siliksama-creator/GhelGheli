@@ -335,8 +335,13 @@ class _ProfilePageState extends State<ProfilePage> {
             children: [
               ClipRRect(
                   borderRadius: Corners.rLg,
+                  // cacheWidth, not cacheHeight: BoxFit.cover in a box wider
+                  // than the source scales by WIDTH, so a height hint
+                  // constrains the axis that does not bind. The asset is
+                  // pre-cropped to the displayed aspect, so its native 820
+                  // width is both cheaper and sharper than the old hint.
                   child: Image.asset('assets/brand/profile_banner.webp',
-                      height: 128, fit: BoxFit.cover, cacheHeight: 384)),
+                      height: 128, fit: BoxFit.cover, cacheWidth: 820)),
               Gaps.vMd,
               Text('تکمیل پروفایل خصوصی', style: theme.textTheme.headlineSmall),
               Gaps.vXxs,

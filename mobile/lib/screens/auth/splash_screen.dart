@@ -53,9 +53,37 @@ class _SplashScreenState extends State<SplashScreen>
     duration: const Duration(milliseconds: 2200),
   )..repeat(reverse: true);
 
+  /// The exact provider used below, so it can be evicted by identity.
+  ///
+  /// Held as a field rather than constructed inline in `build` because
+  /// `evict()` matches on the provider's key, and a second identical
+  /// instance would work but is easy to get subtly wrong later.
+  /// 570 = the 190px draw size at 3x, so it is sharp on the densest common
+  /// screen without decoding the full 768x768.
+  static const _character = ResizeImage(
+    AssetImage('assets/splash/splash_android12.png'),
+    width: 570,
+  );
+
   @override
   void dispose() {
     _pulse.dispose();
+
+    // EVICT THE SPLASH ART.
+    //
+    // This screen is shown once, for the few dozen milliseconds it takes to
+    // restore the auth token, and then never again for the life of the
+    // process. Its 768x768 character is the largest single bitmap the app
+    // decodes; leaving it in the cache means ~1.2 MB of a 40 MB budget is
+    // permanently occupied by a picture that can no longer appear on screen,
+    // and it is the FIRST thing in the cache, so it is the last to be
+    // evicted by LRU pressure.
+    //
+    // Doing it here rather than trusting LRU also makes the win
+    // deterministic: on a device that never fills the cache it would
+    // otherwise simply sit there forever.
+    _character.evict();
+
     super.dispose();
   }
 
@@ -90,13 +118,20 @@ class _SplashScreenState extends State<SplashScreen>
                   child!,
                 ],
               ),
-              child: Image.asset(
-                'assets/splash/splash_android12.png',
+              child: const Image(
+                image: _character,
                 width: 190,
                 height: 190,
                 fit: BoxFit.contain,
                 // Same character the native splash just showed, so the two
                 // frames look like one continuous screen.
+                //
+                // 768x768 decoded to draw 190px was 2.25 MB — the largest
+                // single bitmap in the app, allocated at the worst possible
+                // moment: cold start, while the engine is also warming fonts
+                // and building the first route. Halved here, and evicted
+                // outright in dispose() since the screen never returns.
+                filterQuality: FilterQuality.medium,
               ),
             ),
             Gaps.vLg,
