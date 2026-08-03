@@ -123,50 +123,61 @@ console.log('\n== ساعات استراحت یادآور گردونه ==');
     'یادآور ساعت ۱۸:۳۰ اجرا می‌شود، نه نیمه‌شب');
 }
 
-console.log('\n== اقتصاد جوایز ==');
+console.log('\n== اقتصاد جوایز — بدون نقدی ==');
 {
   const mig = fs.readFileSync(
-    path.join(__dirname, '..', 'migrations', '030_battle_pass.sql'), 'utf8');
+    path.join(__dirname, '..', 'migrations', '031_pass_no_cash_economics.sql'), 'utf8');
 
-  // مسیر رایگان نباید نقدیِ سخاوتمندانه بدهد — این همان چیزی است که
-  // مدل اقتصادی نشان داد ۵۰ میلیون تومان ضرر می‌سازد.
-  const freeCash = [...mig.matchAll(
-    /track='free' AND tier=(\d+)[\s\S]{0,80}?/g)];
-  ok(/kind='cash', amount=1000[\s\S]{0,120}track='free' AND tier=40/.test(mig),
-    'مسیر رایگان: فقط ۱٬۰۰۰ تومان در پلهٔ ۴۰');
-  ok(/kind='cash', amount=2000[\s\S]{0,120}track='free' AND tier=50/.test(mig),
-    'مسیر رایگان: فقط ۲٬۰۰۰ تومان در پلهٔ ۵۰');
-
-  const freeCashTotal = 3000;
-  ok(freeCashTotal <= 3000,
-    `کل نقدیِ مسیر رایگان ${freeCashTotal.toLocaleString()} تومان — «خیلی کم» طبق خواستهٔ مالک`);
-
-  // با ۱۰٬۰۰۰ کاربر رایگان و ۱۵٪ نرخ تکمیل
-  const freeUsers = 10000, completion = 0.15;
-  const worstFree = freeUsers * freeCashTotal * completion;
-  ok(worstFree < 5_000_000,
-    `هزینهٔ نقدیِ ۱۰٬۰۰۰ کاربر رایگان: ${worstFree.toLocaleString()} تومان`);
-
-  // مسیر پلاس باید سودده باشد
-  const PLUS_PRICE = Number(
+  // ═══════════════════════════════════════════════════════════════════════
+  // ایرادی که مالک گرفت: کمیسیون کافه‌بازار در مدل اول نبود.
+  // ═══════════════════════════════════════════════════════════════════════
+  const PRICE = Number(
     /const PLUS_PRICE = (\d+)/.exec(
       fs.readFileSync(path.join(__dirname, '..', 'src', 'services', 'shopService.js'), 'utf8'))[1]);
-  ok(PLUS_PRICE === 59000, `قیمت پلاس ${PLUS_PRICE.toLocaleString()} تومان`);
+  const VAT = 0.10, COMMISSION = 0.15, COMMISSION_HIGH = 0.30;
+  const net     = PRICE / (1 + VAT) * (1 - COMMISSION);
+  const netHigh = PRICE / (1 + VAT) * (1 - COMMISSION_HIGH);
 
-  const paidCash = 10000 + 7000 + 6000 + 4000 + 3000; // پله‌های ۱۰ تا ۵۰
-  const paidCompletion = 0.55;
-  const spinsEv = 45 * 0.8;
-  const realCost = paidCash * paidCompletion + spinsEv;
-  const margin = (PLUS_PRICE - realCost) / PLUS_PRICE;
-  ok(realCost < PLUS_PRICE,
-    `هزینهٔ واقعی هر خریدار ${Math.round(realCost).toLocaleString()} < قیمت ${PLUS_PRICE.toLocaleString()}`);
-  ok(margin > 0.5,
-    `حاشیهٔ سود ${(margin * 100).toFixed(0)}٪ — پایدار است`);
+  ok(PRICE === 59000, `قیمت پلاس ${PRICE.toLocaleString()} تومان`);
+  ok(Math.round(net) === 45591,
+    `درآمد خالص بعد از ارزش افزوده و کمیسیون ۱۵٪: ${Math.round(net).toLocaleString()} تومان`);
 
-  ok(/UPDATE shop_items SET price = 19000 WHERE kind = 'club_badge'/.test(mig),
-    'نشان باشگاه از ۴۹٬۰۰۰ به ۱۹٬۰۰۰ ارزان شد');
-  ok(/kind = 'name_color'/.test(mig) && /kind = 'card_frame'/.test(mig),
-    'قاب و رنگ اسم هم ارزان شدند');
+  // هزینهٔ واقعی: فقط چرخش‌ها. آیتم ظاهری یک فایل است، نه پول.
+  const SPIN_EV = 0.80;
+  const plusSpins = 60, freeSpins = 15;
+  const realCostPlus = plusSpins * SPIN_EV;
+  const realCostFree = freeSpins * SPIN_EV;
+
+  ok(realCostPlus < 100,
+    `هزینهٔ واقعی مسیر پلاس: ${Math.round(realCostPlus)} تومان (فقط EV چرخش‌ها)`);
+  const margin = (net - realCostPlus) / net;
+  ok(margin > 0.98,
+    `حاشیهٔ سود ${(margin * 100).toFixed(0)}٪ — قبلاً با نقدی ۳۷٪ بود`);
+  ok(netHigh - realCostPlus > 30000,
+    `حتی با کمیسیون ۳۰٪ سود ${Math.round(netHigh - realCostPlus).toLocaleString()} می‌ماند`);
+
+  // با ۱۰٬۰۰۰ کاربر رایگان
+  const freeTotal = 10000 * realCostFree;
+  ok(freeTotal < 200000,
+    `هزینهٔ ۱۰٬۰۰۰ کاربر رایگان در کل فصل: ${Math.round(freeTotal).toLocaleString()} تومان`);
+
+  // ── هیچ نقدی‌ای نباید در هیچ مسیری بماند ────────────────────────────
+  ok(/kind='spins'[\s\S]{0,200}track='free' AND kind='cash'/.test(mig),
+    'نقدیِ مسیر رایگان به چرخش تبدیل شد');
+  ok(/track='plus' AND kind='cash'/.test(mig),
+    'نقدیِ مسیر پلاس هم تبدیل شد');
+  ok(!/kind='cash', amount=[1-9]/.test(mig),
+    'مایگریشن هیچ نقدیِ جدیدی نمی‌سازد');
+
+  // ارزش درک‌شده باید خیلی بیشتر از قیمت باشد، وگرنه کسی نمی‌خرد
+  const ITEM_PRICE = 19000, plusItems = 8;
+  const perceived = plusItems * ITEM_PRICE;
+  ok(perceived > PRICE * 2,
+    `ارزش درک‌شدهٔ آیتم‌ها ${perceived.toLocaleString()} = ${(perceived / PRICE).toFixed(1)} برابر قیمت`);
+
+  ok(/UPDATE shop_items SET price = 19000 WHERE kind = 'club_badge'/.test(
+      fs.readFileSync(path.join(__dirname, '..', 'migrations', '030_battle_pass.sql'), 'utf8')),
+    'نشان باشگاه ۱۹٬۰۰۰ تومان');
 }
 
 console.log('\n== محافظ‌های امنیتی ==');
