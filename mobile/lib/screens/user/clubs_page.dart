@@ -272,12 +272,19 @@ class _RosterState extends State<_Roster> {
                                 imageUrl: m['profileImageUrl'],
                                 radius: 16),
                             Gaps.hXs,
+                            // DisplayName به‌جای Text خام: ستارهٔ پلاس،
+                            // نشان باشگاه و رنگ اسم را هم می‌آورد. فهرست
+                            // اعضا تنها جای پرمخاطبی بود که این‌ها را
+                            // نشان نمی‌داد.
                             Expanded(
-                              child: Text('${m['nickname']}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.bodyMedium
-                                      ?.copyWith(fontWeight: FontWeight.w700)),
+                              child: DisplayName(
+                                name: '${m['nickname']}',
+                                cosmetics: m['cosmetics'] as Map?,
+                                avatarKey: m['profileAvatarKey'],
+                                maxLines: 1,
+                                style: theme.textTheme.bodyMedium
+                                    ?.copyWith(fontWeight: FontWeight.w700),
+                              ),
                             ),
                             // "۰ امتیاز ماه" next to every name reads as a
                             // broken counter, especially just after the

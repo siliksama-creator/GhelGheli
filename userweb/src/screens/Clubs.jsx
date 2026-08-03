@@ -11,7 +11,7 @@ import React, { useCallback, useState } from 'react';
 import { req, fa, asset, avatarUrl } from '../lib/api.js';
 import { useAsync } from '../lib/useAsync.js';
 import { AsyncSection, EmptyView } from '../components/states.jsx';
-import { clubImg } from '../components/Cosmetics.jsx';
+import { clubImg, DisplayName } from '../components/Cosmetics.jsx';
 
 function Roster({ token, club, back, openProfile }) {
   const load = useCallback(
@@ -46,7 +46,10 @@ function Roster({ token, club, back, openProfile }) {
                     ? asset(m.profileImageUrl)
                     : avatarUrl(m.profileAvatarKey)}
                   width="34" height="34" loading="lazy" />
-                <b className="rosterName">{m.nickname}</b>
+                {/* DisplayName به‌جای نام خام: ستارهٔ پلاس، نشان باشگاه و
+                    رنگ اسم را هم می‌آورد — همان چیزی که چت و لیگ دارند. */}
+                <DisplayName className="rosterName" name={m.nickname}
+                  cosmetics={m.cosmetics} avatarKey={m.profileAvatarKey} />
                 {/* "۰ امتیاز ماه" next to every name reads as a broken
                     counter, especially early in a month when the league has
                     just reset and NOBODY has points yet. Fall back to the

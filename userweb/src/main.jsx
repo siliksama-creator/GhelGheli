@@ -21,6 +21,7 @@ import Rewards from './screens/Rewards.jsx';
 import Shop from './screens/Shop.jsx';
 import Wheel from './screens/Wheel.jsx';
 import Referral from './screens/Referral.jsx';
+import Pass from './screens/Pass.jsx';
 import GamesHub from './games.jsx';
 import Support from './support.jsx';
 import Wallet from './wallet.jsx';
@@ -154,6 +155,9 @@ function Portal({ token, logout, theme, toggleTheme }) {
   // تعداد چرخش امروز، برای نشان کنار آیکون گردونه — خواستهٔ مالک:
   // «کنار آیکون گردونه در صفحه اصلی تعداد شانس روز گردونه مشخص باشه».
   const [spins, setSpins] = useState(null);
+  // خلاصهٔ گذر نبرد برای نشانِ نوار بالا. از همان /api/bootstrap می‌آید،
+  // پس هیچ رفت‌وبرگشت اضافه‌ای ندارد.
+  const [passBrief, setPassBrief] = useState(null);
   const [moreOpen, setMoreOpen] = useState(false);
 
   async function load() {
@@ -161,18 +165,20 @@ function Portal({ token, logout, theme, toggleTheme }) {
       setLoadError(null);
       // Fan out: the profile and the reward list are independent, so awaiting
       // them in sequence made the user wait for the SUM of both round trips.
-      const [profile, rw, wheel] = await Promise.all([
-        req('/api/profile', 'GET', null, token),
-        req('/api/rewards', 'GET', null, token),
-        // شکست این یکی نباید کل صفحه را از کار بیندازد: نشانِ گردونه یک
-        // زینت است، پروفایل نیست.
-        // /api/wheel/count نه /api/wheel: دومی کل کاتالوگ جوایز را
-        // می‌فرستد و نشانِ نوار بالا فقط یک عدد می‌خواهد.
-        req('/api/wheel/count', 'GET', null, token).catch(() => null),
-      ]);
-      setP(profile);
-      setRewards(rw || []);
+      // یک درخواست به‌جای سه تا. /api/bootstrap پروفایل، جوایز، وضعیت
+      // گردونه و خلاصهٔ گذر نبرد را با هم می‌دهد — تا ایران هر
+      // رفت‌وبرگشت حدود نیم ثانیه است، پس سه‌تا کردنش سه برابر انتظار
+      // بود برای دیتایی که سرور در چند میلی‌ثانیه آماده می‌کند.
+      const boot = await req('/api/bootstrap', 'GET', null, token);
+      setP({
+        user: boot.user,
+        inventory: boot.inventory || [],
+        leaguePayouts: boot.leaguePayouts || [],
+      });
+      setRewards(boot.rewards || []);
+      const wheel = boot.wheel;
       if (wheel) setSpins(wheel.unlimited ? '∞' : (wheel.spinsLeft ?? 0));
+      setPassBrief(boot.pass || null);
     } catch (e) {
       // A failure here used to leave the app on its loading card forever with
       // no error and no way out. An expired session in particular looked
@@ -206,6 +212,15 @@ function Portal({ token, logout, theme, toggleTheme }) {
           <b>{u.nickname || 'کاربر'}</b>
           <span>{fa(u.current_points)} امتیاز</span>
         </div>
+        {/* گذر نبرد — نشانِ «جایزهٔ آماده» مهم‌ترین بخشش است: کاربر باید
+            بدون باز کردن صفحه بفهمد چیزی منتظرش است. */}
+        <button className={`iconBtn passShortcut${tab === 'pass' ? ' on' : ''}`}
+          onClick={() => setTab('pass')} title="گذر نبرد فصلی">
+          🏅
+          {passBrief?.claimable > 0 && (
+            <span className="wheelBadge">{fa(passBrief.claimable)}</span>
+          )}
+        </button>
         {/* فروشگاه کنار گردونه — همان چیدمانی که در اپ اندروید هست، تا
             کاربری که هر دو را استفاده می‌کند دنبال دکمه نگردد. */}
         <button className={`iconBtn${tab === 'shop' ? ' on' : ''}`}
@@ -288,6 +303,9 @@ function Portal({ token, logout, theme, toggleTheme }) {
         )}
         {tab === 'shop' && (
           <Shop token={token} setMsg={setMsg} reloadProfile={load} />
+        )}
+        {tab === 'pass' && (
+          <Pass token={token} setMsg={setMsg} openShop={() => setTab('shop')} />
         )}
         {tab === 'wallet' && (
           <Wallet token={token} req={req} reloadProfile={load} setMsg={setMsg} />

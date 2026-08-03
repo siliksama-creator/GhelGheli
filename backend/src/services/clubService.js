@@ -114,6 +114,25 @@ async function members(clubSlug, limit = 200) {
       LIMIT $2`,
     [clubSlug, Math.min(Number(limit) || 200, 500)]);
 
+  // ستارهٔ پلاس و بقیهٔ ظاهرها.
+  //
+  // فهرست اعضای باشگاه تنها جای پرمخاطبی بود که نامِ کاربر را **خام**
+  // چاپ می‌کرد: چت و جدول لیگ هر دو cosmetics می‌فرستادند و ستاره را
+  // نشان می‌دادند، ولی اینجا نه. یعنی کسی که بابت پلاس پول داده بود، در
+  // باشگاه خودش هیچ نشانی نداشت — و دقیقاً همان‌جاست که هم‌تیمی‌هایش
+  // او را می‌بینند. ستاره‌ای که دیده نشود، دلیلی برای خرید نیست.
+  //
+  // require داخل تابع: shopService خودش clubService را لازم دارد و
+  // import بالادستی حلقهٔ وابستگی می‌سازد.
+  const shop = require('./shopService');
+  let cos = new Map();
+  try {
+    cos = await shop.cosmeticsFor(rows.map(r => r.id));
+  } catch (e) {
+    // ظاهر یک زینت است؛ نبودنش نباید فهرست اعضا را خالی کند.
+    console.error('[clubs] cosmetics failed:', e.message);
+  }
+
   return rows.map((r, i) => ({
     userId: r.id,
     rank: i + 1,
@@ -123,6 +142,7 @@ async function members(clubSlug, limit = 200) {
     monthlyPoints: Number(r.monthly_league_points || 0),
     lifetimePoints: Number(r.lifetime_points || 0),
     joinedAt: r.joined_at,
+    cosmetics: cos.get(r.id) || null,
   }));
 }
 

@@ -2200,3 +2200,147 @@ a:focus-visible {
   .wheelBtn::after { animation: none }
   .spinning .wheelPointer { animation: none }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   گذر نبرد فصلی
+   ═══════════════════════════════════════════════════════════════════════
+   خواستهٔ مالک: «یه جایگاه زیبا مناسب بزار هم تو چشم باشن و هم فارسی
+   برای کاربر قابل فهم باشه».
+
+   ستون فقرات طراحی: دو ردیفِ موازی (رایگان بالا، پلاس پایین) با اسکرول
+   افقی. کاربر در یک نگاه می‌بیند در هر پله چه چیزی را از دست می‌دهد
+   اگر پلاس نخرد — و این خودش قوی‌ترین دلیل خرید است. */
+.passWrap { display: flex; flex-direction: column; gap: 14px; }
+
+.passHead { background: linear-gradient(135deg, #10233a 0%, #0b1728 100%); }
+.passHeadTop {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.passTitle { margin: 0; font-size: 19px; }
+.passSub { margin: 4px 0 0; font-size: 13px; color: #9fb6d0; }
+
+/* نشانِ پلهٔ فعلی — بزرگ و روشن، چون اولین چیزی است که کاربر می‌خواهد بداند */
+.passTierBadge {
+  display: grid; place-items: center; min-width: 66px; padding: 8px 10px;
+  border-radius: 16px; background: #b5ef5820; border: 1px solid #b5ef5855;
+}
+.passTierBadge b { font-size: 26px; line-height: 1; color: #b5ef58; }
+.passTierBadge small { font-size: 11px; color: #9fb6d0; margin-top: 2px; }
+
+.passBar {
+  margin-top: 14px; height: 12px; border-radius: 999px;
+  background: #ffffff14; overflow: hidden;
+}
+.passBarFill {
+  height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, #84cc16, #b5ef58);
+  box-shadow: 0 0 12px #b5ef5866;
+  transition: width .5s cubic-bezier(.22,.9,.28,1);
+}
+.passBarNote { margin: 8px 0 0; font-size: 13px; color: #c9ddf2; }
+
+/* بلوک ترغیب به خرید — فقط وقتی پلاس ندارد */
+.passUpsell {
+  margin-top: 14px; padding: 12px 14px; border-radius: 16px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: linear-gradient(135deg, #ffd36b1f, #f59e0b14);
+  border: 1px solid #ffd36b44; flex-wrap: wrap;
+}
+.passUpsell b { display: block; color: #ffd36b; font-size: 14px; }
+.passUpsell span { font-size: 12.5px; color: #c9ddf2; }
+.passClaimAll { margin-top: 12px; width: 100%; }
+
+/* ── مسیر ── */
+.passTrackCard { padding-bottom: 8px; }
+.passLegend {
+  display: flex; gap: 16px; font-size: 12.5px; color: #9fb6d0;
+  margin-bottom: 10px;
+}
+.passLegend i.dot {
+  display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+  margin-inline-end: 5px;
+}
+.passLegend i.free { background: #38bdf8; }
+.passLegend i.plus { background: #ffd36b; }
+
+/* اسکرول افقی: ۵۰ پله در عرض موبایل جا نمی‌شود و این همان الگویی است
+   که کاربر از بازی‌های دیگر می‌شناسد. */
+.passScroll {
+  display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px;
+  scroll-snap-type: x proximity;
+}
+.passRowLabels {
+  display: grid; grid-template-rows: 68px 26px 68px; gap: 6px;
+  position: sticky; inset-inline-start: 0; z-index: 2;
+  background: linear-gradient(90deg, #0d1a2c 70%, transparent);
+  padding-inline-end: 8px;
+}
+.passRowLabels span {
+  display: grid; place-items: center; font-size: 11.5px; color: #9fb6d0;
+  font-weight: 800;
+}
+.passTiers { display: flex; gap: 8px; }
+.passCol {
+  display: grid; grid-template-rows: 68px 26px 68px; gap: 6px;
+  scroll-snap-align: center;
+}
+.passTierNo {
+  display: grid; place-items: center; font-size: 12px; font-weight: 900;
+  color: #6b829b; border-radius: 8px; background: #ffffff08;
+}
+.passCol.is-unlocked .passTierNo { color: #b5ef58; background: #b5ef5814; }
+
+/* خانهٔ جایزه */
+.passCell {
+  width: 76px; border-radius: 14px; border: 1px solid #ffffff1a;
+  background: #ffffff0a; color: #dbeeff; padding: 6px 4px;
+  display: grid; place-items: center; gap: 2px; position: relative;
+  font-family: inherit; cursor: default;
+}
+.passCellEmpty { opacity: .3; }
+.passCellIcon { font-size: 19px; line-height: 1; }
+.passCellText { font-size: 10.5px; text-align: center; line-height: 1.25; }
+
+/* آمادهٔ دریافت: باید فریاد بزند. این تنها حالتی است که کاربر باید
+   روی آن کلیک کند، پس تنها حالتی است که حرکت دارد. */
+.passCell.is-ready {
+  cursor: pointer; border-color: #b5ef5899;
+  background: linear-gradient(135deg, #b5ef5826, #84cc1614);
+  box-shadow: 0 0 0 1px #b5ef5833, 0 6px 18px #84cc1622;
+  animation: passPulse 2.2s ease-in-out infinite;
+}
+.passCell.is-ready:hover { transform: translateY(-2px); }
+@keyframes passPulse {
+  0%,100% { box-shadow: 0 0 0 1px #b5ef5833, 0 6px 18px #84cc1622; }
+  50%     { box-shadow: 0 0 0 2px #b5ef5866, 0 8px 24px #84cc1644; }
+}
+.passCell.is-claimed { opacity: .5; border-style: dashed; }
+.passCellTick {
+  position: absolute; top: 3px; inset-inline-end: 5px;
+  font-size: 11px; color: #b5ef58; font-weight: 900;
+}
+.passCell.is-locked { opacity: .55; }
+.passCellLock { position: absolute; top: 3px; inset-inline-end: 5px; font-size: 10px; }
+
+/* ── راهنمای کسب امتیاز تجربه ── */
+.passHow { margin: 0 0 6px; font-size: 16px; }
+.passHowNote { margin: 0 0 10px; font-size: 13px; }
+.passSources { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+.passSources li {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  padding: 9px 12px; border-radius: 12px; background: #ffffff08;
+}
+.passSources b { font-size: 13.5px; flex: 1; }
+.passSources span { font-size: 13px; color: #b5ef58; font-weight: 800; }
+.passSources small { font-size: 11.5px; color: #8ba3bd; }
+
+/* روی صفحهٔ بزرگ‌تر، خانه‌ها کمی بزرگ‌تر می‌شوند */
+@media (min-width: 720px) {
+  .passCell { width: 92px; }
+  .passCellText { font-size: 11.5px; }
+}
+/* احترام به کاربری که انیمیشن نمی‌خواهد */
+@media (prefers-reduced-motion: reduce) {
+  .passCell.is-ready { animation: none; }
+  .passBarFill { transition: none; }
+}
