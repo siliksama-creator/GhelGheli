@@ -26,6 +26,7 @@ class _AdminSettingsState extends State<AdminSettings> {
   bool _smsEnabled = false;
   bool _smsTest = true;
   bool _loading = true;
+  String? _loadError;
   bool _savingChat = false;
   bool _savingSms = false;
   String? _message;
@@ -49,18 +50,31 @@ class _AdminSettingsState extends State<AdminSettings> {
   }
 
   Future<void> _load() async {
-    final c = await widget.api.get('/api/admin/settings/chat');
-    _chatMin.text = '${c['minLifetimePoints'] ?? 0}';
-    _cooldown.text = '${c['messageCooldownSeconds'] ?? 5}';
-    _badWords.text = ((c['badWords'] as List?) ?? []).join('\n');
-    final s = await widget.api.get('/api/admin/settings/sms');
-    _provider.text = s['provider'] ?? '';
-    _sender.text = s['sender'] ?? '';
-    _apiKey.text = s['apiKeyMasked'] ?? '';
-    _pattern.text = s['patternCode'] ?? '';
-    _smsEnabled = s['enabled'] == true;
-    _smsTest = s['testMode'] != false;
-    if (mounted) setState(() => _loading = false);
+
+    // بدون try، هر شکست شبکه‌ای این صفحه را تا ابد روی چرخنده نگه می‌داشت:
+    // استثنا بالا می‌رفت و خط `_loading = false` هرگز اجرا نمی‌شد. همان
+    // باگی که کاربر با «صفحات لود نمیشن» گزارش داد.
+    try {
+      final c = await widget.api.get('/api/admin/settings/chat');
+      _chatMin.text = '${c['minLifetimePoints'] ?? 0}';
+      _cooldown.text = '${c['messageCooldownSeconds'] ?? 5}';
+      _badWords.text = ((c['badWords'] as List?) ?? []).join('\n');
+      final s = await widget.api.get('/api/admin/settings/sms');
+      _provider.text = s['provider'] ?? '';
+      _sender.text = s['sender'] ?? '';
+      _apiKey.text = s['apiKeyMasked'] ?? '';
+      _pattern.text = s['patternCode'] ?? '';
+      _smsEnabled = s['enabled'] == true;
+      _smsTest = s['testMode'] != false;
+      if (mounted) setState(() => _loading = false);
+  
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = apiError(e);
+        _loading = false;
+      });
+    }
   }
 
   Future<void> _saveChat() async {
@@ -108,6 +122,15 @@ class _AdminSettingsState extends State<AdminSettings> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return const LoadingView();
+    if (_loadError != null) {
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(padding: const EdgeInsets.all(20), children: [
+          const SizedBox(height: 40),
+          ErrorBanner(message: _loadError!, onRetry: _load),
+        ]),
+      );
+    }
     final theme = Theme.of(context);
 
     return ListView(

@@ -26,6 +26,7 @@ class LeaguePage extends StatefulWidget {
 class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
   Map? _data;
   bool _loading = true;
+  String? _error;
   // 0 = standings, 1 = club rosters. The rosters are their own screen so the
   // table does not pay for a request nobody looked at.
   int _tab = 0;
@@ -45,10 +46,26 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
   }
 
   Future<void> _load() async {
-    final x = await widget.api.get('/api/league/current');
-    if (mounted) {
+    // try/catch لازم است، نه یک احتیاط اضافه.
+    //
+    // بدون آن، هر شکستی — توکن منقضی، شبکهٔ لرزان، یک ۵۰۰ گذرا — استثنا
+    // پرتاب می‌کرد و خط `_loading = false` هرگز اجرا نمی‌شد. صفحه تا ابد
+    // روی چرخنده می‌ماند بدون هیچ پیام یا راه خروجی. این دقیقاً همان
+    // «صفحات لود نمیشن» بود که کاربر گزارش داد.
+    try {
+      final x = await widget.api.get('/api/league/current');
+      if (!mounted) return;
       setState(() {
         _data = x;
+        _error = null;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        // دادهٔ قبلی نگه داشته می‌شود: بهتر از پاک کردن جدولی که کاربر
+        // داشت می‌خواند، فقط چون یک رفرش پس‌زمینه شکست خورد.
+        _error = apiError(e);
         _loading = false;
       });
     }
@@ -91,6 +108,21 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
         children: [
           _tabs(),
           const Expanded(child: LoadingView()),
+        ],
+      );
+    }
+
+    // خطا و هیچ دادهٔ قبلی‌ای: راه خروج بده، نه صفحهٔ خالی.
+    if (_error != null && _data == null) {
+      return Column(
+        children: [
+          _tabs(),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(Gaps.lg),
+              child: ErrorBanner(message: _error!, onRetry: _load),
+            ),
+          ),
         ],
       );
     }

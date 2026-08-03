@@ -31,6 +31,7 @@ class _AdminRewardsState extends State<AdminRewards> {
   String _groupAccent = 'emerald';
   bool _groupSaving = false;
   bool _loading = true;
+  String? _loadError;
   bool _saving = false;
 
   final _name = TextEditingController();
@@ -71,21 +72,34 @@ class _AdminRewardsState extends State<AdminRewards> {
   }
 
   Future<void> _load() async {
-    // Fan out: three sequential awaits made the admin wait for the sum of the
-    // round trips every time the page refreshed.
-    final results = await Future.wait([
-      widget.api.get('/api/admin/rewards'),
-      widget.api.get('/api/admin/reward-claims'),
-      widget.api.get('/api/admin/reward-groups'),
-    ]);
-    final rewards = results[0];
-    final claims = results[1];
-    final groups = (results[2] as Map)['groups'] as List? ?? [];
-    if (mounted) {
+
+    // بدون try، هر شکست شبکه‌ای این صفحه را تا ابد روی چرخنده نگه می‌داشت:
+    // استثنا بالا می‌رفت و خط `_loading = false` هرگز اجرا نمی‌شد. همان
+    // باگی که کاربر با «صفحات لود نمیشن» گزارش داد.
+    try {
+      // Fan out: three sequential awaits made the admin wait for the sum of the
+      // round trips every time the page refreshed.
+      final results = await Future.wait([
+        widget.api.get('/api/admin/rewards'),
+        widget.api.get('/api/admin/reward-claims'),
+        widget.api.get('/api/admin/reward-groups'),
+      ]);
+      final rewards = results[0];
+      final claims = results[1];
+      final groups = (results[2] as Map)['groups'] as List? ?? [];
+      if (mounted) {
+        setState(() {
+          _rewards = rewards;
+          _claims = claims;
+          _groups = groups.where((g) => g['id'] != null).toList();
+          _loading = false;
+        });
+      }
+  
+    } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _rewards = rewards;
-        _claims = claims;
-        _groups = groups.where((g) => g['id'] != null).toList();
+        _loadError = apiError(e);
         _loading = false;
       });
     }
@@ -209,6 +223,15 @@ class _AdminRewardsState extends State<AdminRewards> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return const LoadingView();
+    if (_loadError != null) {
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(padding: const EdgeInsets.all(20), children: [
+          const SizedBox(height: 40),
+          ErrorBanner(message: _loadError!, onRetry: _load),
+        ]),
+      );
+    }
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(Gaps.lg, Gaps.md, Gaps.lg, Gaps.xxl),

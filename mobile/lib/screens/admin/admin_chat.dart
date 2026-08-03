@@ -19,6 +19,7 @@ class AdminChat extends StatefulWidget {
 class _AdminChatState extends State<AdminChat> {
   List _rows = [];
   bool _loading = true;
+  String? _loadError;
 
   @override
   void initState() {
@@ -27,10 +28,23 @@ class _AdminChatState extends State<AdminChat> {
   }
 
   Future<void> _load() async {
-    final rows = await widget.api.get('/api/admin/chat/messages');
-    if (mounted) {
+
+    // بدون try، هر شکست شبکه‌ای این صفحه را تا ابد روی چرخنده نگه می‌داشت:
+    // استثنا بالا می‌رفت و خط `_loading = false` هرگز اجرا نمی‌شد. همان
+    // باگی که کاربر با «صفحات لود نمیشن» گزارش داد.
+    try {
+      final rows = await widget.api.get('/api/admin/chat/messages');
+      if (mounted) {
+        setState(() {
+          _rows = rows;
+          _loading = false;
+        });
+      }
+  
+    } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _rows = rows;
+        _loadError = apiError(e);
         _loading = false;
       });
     }
@@ -39,6 +53,15 @@ class _AdminChatState extends State<AdminChat> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return const LoadingView();
+    if (_loadError != null) {
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(padding: const EdgeInsets.all(20), children: [
+          const SizedBox(height: 40),
+          ErrorBanner(message: _loadError!, onRetry: _load),
+        ]),
+      );
+    }
     final theme = Theme.of(context);
     return RefreshIndicator(
       onRefresh: _load,

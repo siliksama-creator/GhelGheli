@@ -20,6 +20,7 @@ class _AdminLeagueState extends State<AdminLeague> {
   Map? _data;
   List<Map> _prizes = List.generate(10, (i) => {'rank': i + 1, 'amount': 0});
   bool _loading = true;
+  String? _loadError;
   bool _saving = false;
 
   @override
@@ -29,11 +30,24 @@ class _AdminLeagueState extends State<AdminLeague> {
   }
 
   Future<void> _load() async {
-    final d = await widget.api.get('/api/admin/league');
-    if (mounted) {
+
+    // بدون try، هر شکست شبکه‌ای این صفحه را تا ابد روی چرخنده نگه می‌داشت:
+    // استثنا بالا می‌رفت و خط `_loading = false` هرگز اجرا نمی‌شد. همان
+    // باگی که کاربر با «صفحات لود نمیشن» گزارش داد.
+    try {
+      final d = await widget.api.get('/api/admin/league');
+      if (mounted) {
+        setState(() {
+          _data = d;
+          _prizes = List<Map>.from(d?['season']?['prize_table'] ?? _prizes);
+          _loading = false;
+        });
+      }
+  
+    } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _data = d;
-        _prizes = List<Map>.from(d?['season']?['prize_table'] ?? _prizes);
+        _loadError = apiError(e);
         _loading = false;
       });
     }
@@ -53,6 +67,15 @@ class _AdminLeagueState extends State<AdminLeague> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return const LoadingView();
+    if (_loadError != null) {
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(padding: const EdgeInsets.all(20), children: [
+          const SizedBox(height: 40),
+          ErrorBanner(message: _loadError!, onRetry: _load),
+        ]),
+      );
+    }
     return ListView(
       padding: const EdgeInsets.fromLTRB(Gaps.lg, Gaps.md, Gaps.lg, Gaps.xxl),
       children: [

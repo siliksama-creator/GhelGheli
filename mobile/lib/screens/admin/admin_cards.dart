@@ -27,6 +27,7 @@ class _AdminCardsState extends State<AdminCards> {
   Map? _report;
   String? _selectedType;
   bool _loading = true;
+  String? _loadError;
 
   final _name = TextEditingController();
   final _point = TextEditingController();
@@ -63,13 +64,26 @@ class _AdminCardsState extends State<AdminCards> {
   }
 
   Future<void> _load() async {
-    final types = await widget.api.get('/api/admin/card-types');
-    final codes = await widget.api.get('/api/admin/card-codes');
-    _selectedType ??= types.isNotEmpty ? types.first['id'] : null;
-    if (mounted) {
+
+    // بدون try، هر شکست شبکه‌ای این صفحه را تا ابد روی چرخنده نگه می‌داشت:
+    // استثنا بالا می‌رفت و خط `_loading = false` هرگز اجرا نمی‌شد. همان
+    // باگی که کاربر با «صفحات لود نمیشن» گزارش داد.
+    try {
+      final types = await widget.api.get('/api/admin/card-types');
+      final codes = await widget.api.get('/api/admin/card-codes');
+      _selectedType ??= types.isNotEmpty ? types.first['id'] : null;
+      if (mounted) {
+        setState(() {
+          _types = types;
+          _codes = codes;
+          _loading = false;
+        });
+      }
+  
+    } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _types = types;
-        _codes = codes;
+        _loadError = apiError(e);
         _loading = false;
       });
     }
@@ -224,6 +238,15 @@ class _AdminCardsState extends State<AdminCards> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return const LoadingView();
+    if (_loadError != null) {
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(padding: const EdgeInsets.all(20), children: [
+          const SizedBox(height: 40),
+          ErrorBanner(message: _loadError!, onRetry: _load),
+        ]),
+      );
+    }
     final theme = Theme.of(context);
 
     return ListView(

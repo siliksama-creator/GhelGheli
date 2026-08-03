@@ -19,6 +19,7 @@ class _AdminAdminsState extends State<AdminAdmins> {
   List _admins = [];
   List _logs = [];
   bool _loading = true;
+  String? _loadError;
   bool _saving = false;
   final _username = TextEditingController();
   final _password = TextEditingController();
@@ -44,12 +45,25 @@ class _AdminAdminsState extends State<AdminAdmins> {
   }
 
   Future<void> _load() async {
-    final admins = await widget.api.get('/api/admin/admins');
-    final logs = await widget.api.get('/api/admin/audit-log');
-    if (mounted) {
+
+    // بدون try، هر شکست شبکه‌ای این صفحه را تا ابد روی چرخنده نگه می‌داشت:
+    // استثنا بالا می‌رفت و خط `_loading = false` هرگز اجرا نمی‌شد. همان
+    // باگی که کاربر با «صفحات لود نمیشن» گزارش داد.
+    try {
+      final admins = await widget.api.get('/api/admin/admins');
+      final logs = await widget.api.get('/api/admin/audit-log');
+      if (mounted) {
+        setState(() {
+          _admins = admins;
+          _logs = logs;
+          _loading = false;
+        });
+      }
+  
+    } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _admins = admins;
-        _logs = logs;
+        _loadError = apiError(e);
         _loading = false;
       });
     }
@@ -80,6 +94,15 @@ class _AdminAdminsState extends State<AdminAdmins> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return const LoadingView();
+    if (_loadError != null) {
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(padding: const EdgeInsets.all(20), children: [
+          const SizedBox(height: 40),
+          ErrorBanner(message: _loadError!, onRetry: _load),
+        ]),
+      );
+    }
     final theme = Theme.of(context);
 
     return ListView(

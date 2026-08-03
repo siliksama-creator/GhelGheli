@@ -53,6 +53,7 @@ class _DashboardPageState extends State<DashboardPage> {
   bool _messageIsError = false;
   bool _sending = false;
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -67,17 +68,32 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _load() async {
+    // try/catch لازم است، نه یک احتیاط اضافه.
+    //
+    // این متد قبلاً هیچ محافظتی نداشت. هر شکستی — توکن منقضی، شبکهٔ لرزان،
+    // یک ۵۰۰ گذرا، حتی تایم‌اوت — استثنا پرتاب می‌کرد و خط `_loading =
+    // false` **هرگز** اجرا نمی‌شد. داشبورد صفحهٔ اول بعد از ورود است، پس
+    // کاربر تا ابد روی چرخنده می‌ماند بدون پیام و بدون دکمهٔ تلاش دوباره.
+    // این همان «صفحات اپ بعد ورود لود نمیشن» است.
+    //
     // Fetched together instead of one-after-the-other: the dashboard used to
     // wait for the SUM of both round trips before it could paint.
-    final results = await widget.api.getAll(['/api/profile', '/api/rewards']);
-    final d = results[0];
-    final rw = results[1];
-    if (!mounted) return;
-    setState(() {
-      _data = Map<String, dynamic>.from(d);
-      _rewards = List<Map<String, dynamic>>.from(rw);
-      _loading = false;
-    });
+    try {
+      final results = await widget.api.getAll(['/api/profile', '/api/rewards']);
+      if (!mounted) return;
+      setState(() {
+        _data = Map<String, dynamic>.from(results[0]);
+        _rewards = List<Map<String, dynamic>>.from(results[1]);
+        _error = null;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = apiError(e);
+        _loading = false;
+      });
+    }
   }
 
   Future<void> _redeem() async {
@@ -113,6 +129,20 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return const LoadingView();
+
+    // خطا و هیچ دادهٔ قبلی: راه خروج بده، نه صفحهٔ خالی یا چرخندهٔ ابدی.
+    if (_error != null && _data == null) {
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          padding: const EdgeInsets.all(Gaps.lg),
+          children: [
+            const SizedBox(height: 40),
+            ErrorBanner(message: _error!, onRetry: _load),
+          ],
+        ),
+      );
+    }
 
     final user = _data?['user'];
     final inventory =

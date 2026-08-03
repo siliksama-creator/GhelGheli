@@ -33,6 +33,7 @@ class _ProfilePageState extends State<ProfilePage> {
   final _newPassword = TextEditingController();
   String _selectedAvatar = avatarFiles.first;
   bool _loaded = false;
+  String? _loadError;
   bool _saving = false;
   bool _changingPassword = false;
   String? _message;
@@ -106,17 +107,31 @@ class _ProfilePageState extends State<ProfilePage> {
 
 
   Future<void> _load() async {
-    final d = await widget.api.get('/api/profile');
-    final u = Map<String, dynamic>.from(d['user']);
-    _first.text = u['first_name'] ?? '';
-    _last.text = u['last_name'] ?? '';
-    _nick.text = u['nickname'] ?? '';
-    _bank.text = u['bank_account'] ?? '';
-    _age.text = '${u['age'] ?? ''}';
-    _city.text = u['city'] ?? '';
-    _province.text = u['province'] ?? '';
-    _selectedAvatar = u['profile_avatar_key'] ?? avatarFiles.first;
-    if (mounted) setState(() => _loaded = true);
+    // بدون try، هر شکست شبکه‌ای `_loaded` را برای همیشه false نگه می‌داشت
+    // و صفحهٔ پروفایل تا ابد چرخنده نشان می‌داد — بدون پیام و بدون راه خروج.
+    try {
+      final d = await widget.api.get('/api/profile');
+      final u = Map<String, dynamic>.from(d['user']);
+      _first.text = u['first_name'] ?? '';
+      _last.text = u['last_name'] ?? '';
+      _nick.text = u['nickname'] ?? '';
+      _bank.text = u['bank_account'] ?? '';
+      _age.text = '${u['age'] ?? ''}';
+      _city.text = u['city'] ?? '';
+      _province.text = u['province'] ?? '';
+      _selectedAvatar = u['profile_avatar_key'] ?? avatarFiles.first;
+      if (!mounted) return;
+      setState(() {
+        _loadError = null;
+        _loaded = true;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = apiError(e);
+        _loaded = true; // فرم نشان داده می‌شود، با یک نوار خطا بالایش
+      });
+    }
   }
 
   Future<void> _save() async {
@@ -190,6 +205,21 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget build(BuildContext context) {
     if (!_loaded) return const LoadingView();
     final theme = Theme.of(context);
+
+    if (_loadError != null) {
+      // فرم خالی به کاربر نشان نمی‌دهیم — ذخیره کردنش اطلاعات واقعی‌اش را
+      // پاک می‌کرد. اول باید بارگذاری موفق شود.
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          padding: const EdgeInsets.all(Gaps.lg),
+          children: [
+            const SizedBox(height: 40),
+            ErrorBanner(message: _loadError!, onRetry: _load),
+          ],
+        ),
+      );
+    }
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(Gaps.lg, Gaps.md, Gaps.lg, Gaps.xxl),
