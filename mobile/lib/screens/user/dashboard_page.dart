@@ -21,6 +21,10 @@ class DashboardPage extends StatefulWidget {
   /// پرش مستقیم به کیف پول از هدر داشبورد.
   final VoidCallback? onOpenWallet;
 
+  /// میان‌برهای گردونه و دعوت دوستان روی داشبورد.
+  final VoidCallback? onOpenWheel;
+  final VoidCallback? onOpenReferral;
+
   /// Light/dark switch, surfaced at the top of the dashboard.
   final VoidCallback? onToggleTheme;
   final bool isDark;
@@ -31,6 +35,8 @@ class DashboardPage extends StatefulWidget {
     required this.reloadProfile,
     this.onOpenProfile,
     this.onOpenWallet,
+    this.onOpenWheel,
+    this.onOpenReferral,
     this.onToggleTheme,
     this.isDark = true,
   });
@@ -142,6 +148,33 @@ class _DashboardPageState extends State<DashboardPage> {
             isDark: widget.isDark,
           ),
           Gaps.vMd,
+          // دو میان‌بر: گردونهٔ روزانه و دعوت دوستان. روی داشبورد هستند چون
+          // هر دو کاری‌اند که کاربر باید هر روز انجام دهد؛ اگر فقط از نوار
+          // بالا باز می‌شدند، بیشترِ کاربرها هیچ‌وقت پیدایشان نمی‌کردند.
+          Row(
+            children: [
+              Expanded(
+                child: _QuickTile(
+                  icon: '🎡',
+                  title: 'گردونهٔ شانس',
+                  subtitle: 'هر روز یک چرخش رایگان',
+                  tint: const Color(0xFFF59E0B),
+                  onTap: widget.onOpenWheel,
+                ),
+              ),
+              Gaps.hXs,
+              Expanded(
+                child: _QuickTile(
+                  icon: '🤝',
+                  title: 'دعوت دوستان',
+                  subtitle: '۵٪ امتیازشان + ۳ چرخش',
+                  tint: const Color(0xFF84CC16),
+                  onTap: widget.onOpenReferral,
+                ),
+              ),
+            ],
+          ),
+          Gaps.vMd,
           AppCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -238,6 +271,62 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+
+/// کاشی میان‌بر روی داشبورد.
+class _QuickTile extends StatelessWidget {
+  const _QuickTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.tint,
+    this.onTap,
+  });
+
+  final String icon;
+  final String title;
+  final String subtitle;
+  final Color tint;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: tint.withValues(alpha: 0.10),
+      borderRadius: Corners.rLg,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: Corners.rLg,
+        child: Container(
+          // ۴۸ کف اندازهٔ هدف لمسی طبق راهنمای دسترس‌پذیری متریال.
+          constraints: const BoxConstraints(minHeight: 48),
+          padding: const EdgeInsets.symmetric(
+              horizontal: Gaps.sm, vertical: Gaps.md),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(icon, style: const TextStyle(fontSize: 26)),
+              Gaps.vXxs,
+              Text(title,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.labelLarge
+                      ?.copyWith(fontWeight: FontWeight.w800)),
+              Text(subtitle,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color:
+                        theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  )),
+            ],
+          ),
+        ),
       ),
     );
   }

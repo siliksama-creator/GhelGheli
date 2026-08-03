@@ -12,6 +12,8 @@ import 'rewards_page.dart';
 import 'shop_page.dart';
 import 'wallet_page.dart';
 import 'support_page.dart';
+import 'wheel_page.dart';
+import 'referral_page.dart';
 
 /// Root shell for the regular user app: top bar + animated page switcher +
 /// bottom navigation. Functionally identical to the legacy `HomeShell`
@@ -59,6 +61,8 @@ class _HomeShellState extends State<HomeShell>
       reloadProfile: _loadProfile,
       onOpenProfile: () => setState(() => _index = 6),
       onOpenWallet: () => setState(() => _index = _walletIndex),
+      onOpenWheel: () => setState(() => _index = wheelIndex),
+      onOpenReferral: () => setState(() => _index = referralIndex),
       onToggleTheme: widget.onTheme,
       isDark: widget.dark,
     ),
@@ -68,7 +72,16 @@ class _HomeShellState extends State<HomeShell>
     SocialPage(api: widget.api),
     SupportPage(api: widget.api),
     ProfilePage(api: widget.api, reloadProfile: _loadProfile),
+    // ۷ و ۸ در نوار پایین نیستند: از آیکون گردونه در نوار بالا و از
+    // میان‌برهای داشبورد باز می‌شوند. نوار پایین طبق راهنمای متریال
+    // حداکثر پنج مقصد دارد و شلوغ کردنش همان مشکلی بود که قبلاً حل شد.
+    WheelPage(api: widget.api, onChanged: _loadProfile),
+    ReferralPage(api: widget.api),
   ];
+
+  /// شمارهٔ صفحهٔ گردونه — از آیکون نوار بالا مستقیم به آن پرش می‌شود.
+  static const wheelIndex = 7;
+  static const referralIndex = 8;
 
   // UI FIX: seven destinations squeezed into one bar made every icon and
   // label tiny (and the Persian labels were truncating). Material's own
@@ -159,7 +172,9 @@ class _HomeShellState extends State<HomeShell>
     'لیگ',
     'چت و بازی',
     'پشتیبانی',
-    'پروفایل'
+    'پروفایل',
+    'گردونهٔ شانس',
+    'دعوت دوستان'
   ];
 
   /// Which bar slot to highlight — the "more" slot when a sheet-only page
@@ -244,6 +259,13 @@ class _HomeShellState extends State<HomeShell>
         actions: [
           // The theme switch moved into the "بیشتر" sheet, leaving the bar
           // uncluttered with just notifications + logout.
+          // میان‌بر گردونه — درخواست مالک: «در صفحه اصلی بالا آیکون کوچیک
+          // گردونه باشه که به صفحه گردونه منتقل بشن».
+          IconButton(
+            tooltip: 'گردونهٔ شانس',
+            onPressed: () => setState(() => _index = wheelIndex),
+            icon: const Text('🎡', style: TextStyle(fontSize: 20)),
+          ),
           NotificationBell(api: widget.api),
           IconButton(
               tooltip: 'خروج',
