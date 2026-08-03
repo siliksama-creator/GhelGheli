@@ -26,6 +26,61 @@ class ApiClient {
   String? token;
   bool isAdmin = false;
 
+  /// صدا زده می‌شود وقتی سرور می‌گوید توکن دیگر معتبر نیست (۴۰۱).
+  ///
+  /// ═════════════════════════════════════════════════════════════════════
+  /// چرا این وجود دارد — دومین علتِ «وارد اپ نمی‌شوم»
+  /// ═════════════════════════════════════════════════════════════════════
+  ///
+  /// توکن کاربر ۳۰ روزه است (`JWT_EXPIRES_IN`). بعد از آن — یا اگر
+  /// `JWT_SECRET` روی سرور عوض شود، یا حساب پاک/مسدود شود — گوشی هنوز یک
+  /// رشتهٔ توکن در `SharedPreferences` دارد.
+  ///
+  /// جریان قبلی این بود:
+  ///   main.dart می‌دید `api.token != null` → HomeShell را می‌ساخت →
+  ///   HomeShell و داشبورد `/api/bootstrap` می‌زدند → سرور ۴۰۱ می‌داد →
+  ///   هیچ‌جای اپ ۴۰۱ را مدیریت نمی‌کرد.
+  ///
+  /// نتیجه: کاربر **هرگز صفحهٔ ورود را نمی‌دید**. پوستهٔ اپ رندر می‌شد
+  /// (نوار بالا و پایین)، وسط صفحه یا چرخنده بود یا بنر خطا، و تنها راه
+  /// نجات دکمهٔ «خروج» بود که خیلی‌ها پیدایش نمی‌کردند — دقیقاً همان
+  /// عکسی که مالک فرستاد: پوسته سالم، وسط خالی، نام کاربر خالی.
+  ///
+  /// وب‌اپ این را از اول درست داشت (`if (e.status === 401) logout()` در
+  /// userweb/src/main.jsx) — فقط کلاینت موبایل جا افتاده بود.
+  ///
+  /// حالا هر ۴۰۱ روی یک مسیرِ نیازمندِ احراز هویت، توکنِ مرده را پاک
+  /// می‌کند و اپ به صفحهٔ ورود برمی‌گردد؛ یعنی حالتِ بن‌بست غیرممکن
+  /// می‌شود.
+  void Function()? onSessionExpired;
+
+  /// مسیرهایی که ۴۰۱ آن‌ها «جلسه منقضی شد» نیست بلکه «رمز غلط است».
+  ///
+  /// بدون این استثنا، یک تلاشِ ناموفقِ ورود، خودش را به‌عنوان انقضای
+  /// جلسه جا می‌زد و صفحه را ری‌ست می‌کرد — کاربر پیغام «رمز نادرست» را
+  /// هم نمی‌دید.
+  static bool _isAuthAttempt(String path) =>
+      path.contains('/auth/login') ||
+      path.contains('/auth/register') ||
+      path.contains('/auth/forgot-password');
+
+  /// توکن را پاک می‌کند و به اپ خبر می‌دهد که باید به صفحهٔ ورود برگردد.
+  void _handleUnauthorized(String path) {
+    if (_isAuthAttempt(path)) return;
+    if (token == null) return; // قبلاً خارج شده — دوباره کاری نکن.
+    // پاک‌سازی محلی؛ `logout()` چون async است اینجا منتظرش نمی‌مانیم،
+    // ولی حافظه را همین حالا تمیز می‌کنیم تا درخواست بعدی توکن مرده را
+    // نفرستد.
+    token = null;
+    isAdmin = false;
+    _getCache.clear();
+    SharedPreferences.getInstance().then((sp) {
+      sp.remove('token');
+      sp.remove('isAdmin');
+    }).catchError((_) => null);
+    onSessionExpired?.call();
+  }
+
   /// Base URL of the backend (also used for the Socket.IO connection).
   String get baseUrl => dio.options.baseUrl;
 
@@ -66,6 +121,11 @@ class ApiClient {
         // Proven with a unit test — see api_client_test.dart, which timed
         // out at 30s before this fix and passes in milliseconds after it.
         final code = response.statusCode ?? 0;
+        if (code == 401) {
+          // توکن مرده: کاربر را به صفحهٔ ورود برگردان، نه اینکه در پوستهٔ
+          // خالی گیر بیفتد. توضیح کامل روی `onSessionExpired`.
+          _handleUnauthorized(response.requestOptions.path);
+        }
         if (code >= 400) {
           handler.reject(
             DioException(
@@ -297,6 +357,53 @@ String fullAssetUrl(Object? value) {
   if (s.isEmpty) return '';
   if (s.startsWith('http://') || s.startsWith('https://')) return s;
   return '${ApiClient.defaultBaseUrl}$s';
+}
+
+/// شمارهٔ موبایل را دقیقاً مثل سرور به شکل متعارف در می‌آورد.
+///
+/// ═══════════════════════════════════════════════════════════════════════
+/// چرا این در کلاینت هم تکرار شده و فقط به سرور تکیه نشده
+/// ═══════════════════════════════════════════════════════════════════════
+///
+/// صفحه‌کلید فارسی اندروید پیش‌فرض «۰۹۱۲…» تایپ می‌کند. سرور تا پیش از
+/// این، آن رشته را با ردیفِ لاتینِ دیتابیس برابر نمی‌دید و ۴۰۱ می‌داد با
+/// پیامِ گمراه‌کنندهٔ «شماره موبایل یا رمز عبور نادرست است» — رمز درست
+/// بود. سمت سرور رفع شد (`normalizeMobile` در backend/src/server.js)، ولی
+/// این کپی سه دلیل مستقل دارد:
+///
+/// ۱. APKهایی که همین حالا روی گوشی مردم است ممکن است به سروری وصل شوند
+///    که هنوز به‌روزرسانی نشده؛ برعکسش هم ممکن است.
+/// ۲. کاربر باید در همان لحظهٔ تایپ، شمارهٔ خودش را به شکلی ببیند که
+///    ذخیره می‌شود — نه اینکه سرور بی‌صدا چیز دیگری ثبت کند.
+/// ۳. نرمال‌سازی در دو طرف تضمین می‌کند ثبت‌نام و ورود همیشه به یک ردیف
+///    برسند، پس «حساب سایه» ساخته نمی‌شود.
+///
+/// نام‌های کاربری غیرعددی (مثل `Admin`) هیچ رقمی ندارند و دست‌نخورده رد
+/// می‌شوند.
+String normalizeMobileInput(String raw) {
+  var s = raw.trim();
+  // ارقام فارسی (U+06F0–U+06F9) و عربی-هندی (U+0660–U+0669) → لاتین.
+  s = s.replaceAllMapped(RegExp('[\u06F0-\u06F9]'),
+      (m) => (m.group(0)!.codeUnitAt(0) - 0x06F0).toString());
+  s = s.replaceAllMapped(RegExp('[\u0660-\u0669]'),
+      (m) => (m.group(0)!.codeUnitAt(0) - 0x0660).toString());
+  // فاصله‌ها و نویسه‌های جهت‌دهی که از کپی‌پیست می‌آیند.
+  s = s.replaceAll(RegExp('[\\s\u200c\u200e\u200f\u202a-\u202e]'), '');
+
+  // فقط اگر واقعاً شماره است شکلش را عوض کن؛ نام کاربری را رها کن.
+  if (RegExp(r'^[+0-9()\-.]+$').hasMatch(s) && s.isNotEmpty) {
+    s = s.replaceAll(RegExp(r'[()\-.]'), '');
+    if (s.startsWith('+98')) {
+      s = '0${s.substring(3)}';
+    } else if (s.startsWith('0098')) {
+      s = '0${s.substring(4)}';
+    } else if (s.startsWith('98') && s.length == 12) {
+      s = '0${s.substring(2)}';
+    } else if (RegExp(r'^9\d{9}$').hasMatch(s)) {
+      s = '0$s';
+    }
+  }
+  return s;
 }
 
 String apiError(Object e) {

@@ -81,14 +81,14 @@ class _AuthScreenState extends State<AuthScreen> {
       switch (_mode) {
         case _AuthMode.admin:
           final r = await widget.api.post('/api/admin/auth/login', {
-            'username': _mobile.text,
+            'username': _mobile.text.trim(),
             'password': _pass.text,
           });
           await widget.api.saveToken(r['token'], admin: true);
           break;
         case _AuthMode.register:
           final r = await widget.api.post('/api/auth/register-password', {
-            'mobile': _mobile.text,
+            'mobile': normalizeMobileInput(_mobile.text),
             'password': _pass.text,
             // PRIVACY FIX: previously defaulted to the mobile number itself
             // when left blank, which is shown publicly on the leaderboard
@@ -114,7 +114,10 @@ class _AuthScreenState extends State<AuthScreen> {
           break;
         case _AuthMode.login:
           final r = await widget.api.post('/api/auth/login', {
-            'mobile': _mobile.text,
+            // ارقام فارسیِ کیبورد اندروید را به لاتین تبدیل می‌کند —
+            // بدون این، ورودِ کاملاً درست ۴۰۱ می‌گرفت. توضیح در
+            // normalizeMobileInput.
+            'mobile': normalizeMobileInput(_mobile.text),
             'password': _pass.text,
           });
           await widget.api.saveToken(r['token']);

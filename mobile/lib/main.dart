@@ -47,6 +47,16 @@ class _GhelGheliAppState extends State<GhelGheliApp> {
     super.initState();
     // Restore the saved mute preference before any game can play a sound.
     GameAudio.instance.load();
+    // توکنِ منقضی نباید کاربر را در پوستهٔ خالی حبس کند.
+    //
+    // اگر سرور به هر درخواستی ۴۰۱ بدهد، ApiClient توکن مرده را پاک
+    // می‌کند و این callback را می‌زند؛ یک setState کافی است تا build
+    // دوباره اجرا شود، `api.token == null` ببیند و AuthScreen را نشان
+    // دهد. بدون این، اپ برای همیشه HomeShell‌ای را نگه می‌داشت که هیچ
+    // دیتایی نمی‌توانست بگیرد. توضیح کامل در api_client.dart.
+    api.onSessionExpired = () {
+      if (mounted) setState(() {});
+    };
     api.loadToken().then((_) {
       if (mounted) setState(() => _ready = true);
     });
