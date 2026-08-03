@@ -245,6 +245,23 @@ async function payCommission(client, userId, basePoints, source) {
        updated_at = NOW()
      WHERE id = $1`, [referrerId, earned]);
 
+  // THE LEADERBOARD IS A SEPARATE TABLE, AND IT IS WHAT THE LEAGUE READS.
+  //
+  // `users.monthly_league_points` above feeds the profile screen;
+  // `league_leaderboard_entries` feeds the actual standings and the payout.
+  // Writing only the first meant a referrer saw their commission on their
+  // profile but never moved up the league — the two numbers would drift
+  // apart by exactly the commission earned, all month, and the prize would
+  // go to the wrong person.
+  //
+  // Required lazily to avoid a require cycle: leagueService does not import
+  // this file today, but it is one refactor away from doing so, and a cycle
+  // here would surface as an undefined function at runtime rather than a
+  // clear error at load.
+  // eslint-disable-next-line global-require
+  const { addLeaguePoints } = require('./leagueService');
+  await addLeaguePoints(client, referrerId, earned);
+
   await client.query(
     `INSERT INTO referral_earnings
        (referrer_id, referred_id, base_points, earned_points, source)

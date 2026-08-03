@@ -49,9 +49,11 @@ class TapGameConfig {
   /// Points required to clear level 1 — the first entry of the curve.
   int get baseTaps => _curve[0];
 
-  /// Multiplier applied per level. 1.15 == each level is ~15% harder.
+  /// Multiplier applied per level. 1.05 == each level is ~5% dearer than
+  /// the last. The curve is normalised so the fifty levels sum to
+  /// [totalPoints], so this controls the SHAPE, not the total.
   ///
-  /// required(level) = round(baseTaps * growthFactor^(level-1))
+
   final double growthFactor;
 
   /// Character artwork, in order. The list length does not have to match

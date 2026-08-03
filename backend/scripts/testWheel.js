@@ -447,4 +447,26 @@ test('کمیسیون در کد فقط از همان دو نقطه صدا زده 
     `انتظار ۲ فراخوانی، ${calls.length} تا پیدا شد`);
 });
 
+console.log('\nدعوت — یکپارچگی با لیگ');
+
+test('کمیسیون به جدول لیگ هم اضافه می‌شود', () => {
+  // باگ واقعی که در بازبینی سخت‌گیرانه پیدا شد: کمیسیون فقط
+  // users.monthly_league_points را بالا می‌برد، ولی جدول رتبه‌بندی که لیگ
+  // از آن می‌خواند (league_leaderboard_entries) دست‌نخورده می‌ماند.
+  //
+  // یعنی معرف کمیسیونش را روی پروفایل می‌دید ولی در جدول لیگ بالا
+  // نمی‌رفت — و دو عدد تمام ماه دقیقاً به اندازهٔ کمیسیون از هم فاصله
+  // می‌گرفتند. جایزهٔ ماهانه هم به نفر اشتباه می‌رسید.
+  const src = require('fs').readFileSync(
+    require('path').join(__dirname, '../src/services/referralService.js'),
+    'utf8');
+  assert.ok(/addLeaguePoints\(client, referrerId, earned\)/.test(src),
+    'کمیسیون باید به league_leaderboard_entries هم برود');
+  // و باید *بعد* از به‌روزرسانی users باشد، روی همان تراکنش.
+  const iUsers = src.indexOf('monthly_league_points = monthly_league_points + $2');
+  const iLeague = src.indexOf('addLeaguePoints(client, referrerId, earned)');
+  assert.ok(iUsers > 0 && iLeague > iUsers,
+    'هر دو باید روی همان تراکنش و به ترتیب باشند');
+});
+
 console.log(`\n${passed} ادعای گردونه و دعوت موفق بود\n`);
