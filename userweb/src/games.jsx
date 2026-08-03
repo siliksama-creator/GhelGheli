@@ -131,14 +131,42 @@ function useGame(api, token, gameId) {
   }, [api, token, gameId]);
 
   // Countdown driven by the server deadline, so both players agree.
+  //
+  // IDLE COST. This used to call setState five times a second for the whole
+  // life of the hook, including while sitting in the lobby with no game and
+  // no deadline — `setLeft(0)` on an already-zero value still schedules a
+  // React render, and the hook is mounted the entire time the games section
+  // is open. Two guards fix that without changing a single visible frame:
+  //
+  //   * the interval only exists while there IS a deadline to count down to;
+  //   * setLeft/setSearchLeft are skipped when the value has not changed —
+  //     at 200ms the same whole second is computed five times in a row, so
+  //     four of every five renders were redundant even mid-game.
   useEffect(() => {
+    // Only phases that can HAVE a deadline run a timer. Checking the phase
+    // rather than the refs is deliberate: a ref read during render sees
+    // whatever value happens to be there at that instant, and `game:update`
+    // reassigns turnEnd without touching phase — which is safe only because
+    // it can just fire while already 'playing'. Keying off the phase makes
+    // that guarantee explicit instead of incidental.
+    if (phase !== 'playing' && phase !== 'waiting') return undefined;
+
+    let lastLeft = null;
+    let lastSearch = null;
+
     const id = setInterval(() => {
       if (searchEnd.current) {
-        setSearchLeft(Math.max(0, Math.ceil((searchEnd.current - performance.now()) / 1000)));
+        const s = Math.max(0,
+          Math.ceil((searchEnd.current - performance.now()) / 1000));
+        if (s !== lastSearch) { lastSearch = s; setSearchLeft(s); }
       }
-      if (!turnEnd.current) { setLeft(0); return; }
-      const secs = Math.max(0, Math.ceil((turnEnd.current - performance.now()) / 1000));
-      setLeft(secs);
+      if (!turnEnd.current) {
+        if (lastLeft !== 0) { lastLeft = 0; setLeft(0); }
+        return;
+      }
+      const secs = Math.max(0,
+        Math.ceil((turnEnd.current - performance.now()) / 1000));
+      if (secs !== lastLeft) { lastLeft = secs; setLeft(secs); }
       const mine = turnRef.current && turnRef.current === meRef.current;
       if (mine && secs > 0 && secs <= 5 && tickedAt.current !== secs) {
         tickedAt.current = secs;
@@ -146,7 +174,10 @@ function useGame(api, token, gameId) {
       }
     }, 200);
     return () => clearInterval(id);
-  }, []);
+    // `phase` is the signal that a game started or ended, which is exactly
+    // when a deadline appears or disappears. The refs themselves cannot be
+    // dependencies — mutating a ref does not re-run an effect.
+  }, [phase]);
 
   return {
     phase, error, online, left, turnSecs, searchLeft, searchSecs,

@@ -8,12 +8,11 @@
 //
 // Polling (not sockets) on purpose: announcements are not time-critical and
 // the socket connection is reserved for live gameplay.
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../api_client.dart';
 import '../theme/tokens.dart';
+import 'lifecycle_poller.dart';
 
 class NotificationBell extends StatefulWidget {
   const NotificationBell({super.key, required this.api});
@@ -24,20 +23,31 @@ class NotificationBell extends StatefulWidget {
   State<NotificationBell> createState() => _NotificationBellState();
 }
 
-class _NotificationBellState extends State<NotificationBell> {
+class _NotificationBellState extends State<NotificationBell>
+    with LifecyclePoller {
   List<Map<String, dynamic>> _items = const [];
-  Timer? _poll;
 
   @override
   void initState() {
     super.initState();
     _load();
-    _poll = Timer.periodic(const Duration(seconds: 60), (_) => _load());
+    // LIFECYCLE-AWARE, not a bare Timer.periodic.
+    //
+    // This bell lives in the app bar, so it is mounted on EVERY user screen
+    // for the whole session. The old timer kept firing a network request
+    // once a minute even with the app minimised — battery and mobile data
+    // spent on announcements nobody could be looking at. Chat and the league
+    // table were fixed this way already; the bell was missed because it is a
+    // widget rather than a screen.
+    //
+    // The mixin also refreshes immediately on resume, so coming back to the
+    // app shows current announcements rather than up-to-a-minute-old ones.
+    startPolling(const Duration(seconds: 60), _load);
   }
 
   @override
   void dispose() {
-    _poll?.cancel();
+    stopPolling();
     super.dispose();
   }
 
