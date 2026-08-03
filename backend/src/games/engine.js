@@ -195,6 +195,28 @@ function finish(room, winner) {
     })
     .catch(e => console.error(`[games:${room.gameId}] reward failed:`, e.message));
 
+  // ── XP گذر نبرد ────────────────────────────────────────────────────
+  //
+  // هر بازیکنِ واقعی (نه ربات) بابت انجام بازی XP می‌گیرد، و برنده
+  // اضافه‌تر. سقف روزانهٔ هر منبع در passService جلوی «فارم کردن» با
+  // بازیِ پشت‌سرهم مقابل ربات را می‌گیرد.
+  //
+  // require داخل تابع، نه بالای فایل: موتور بازی‌ها عمداً از سرویس‌های
+  // اپ مستقل نگه داشته شده و یک import بالادستی این استقلال را
+  // می‌شکند. خطا هم بلعیده می‌شود — گذر نبرد نباید پایان بازی را خراب
+  // کند.
+  try {
+    const pass = require('../services/passService');
+    for (const sym of ['X', 'O']) {
+      const info = room.players?.[sym];
+      if (!info?.id || info.isBot) continue;
+      pass.grantXp(info.id, 'game_play').catch(() => {});
+      if (winner === sym) pass.grantXp(info.id, 'game_win').catch(() => {});
+    }
+  } catch (e) {
+    console.error('[games] pass xp failed:', e.message);
+  }
+
   emitState(room, 'game:over', { winner });
   for (const sym of ['X', 'O']) {
     const s = room.seats[sym];

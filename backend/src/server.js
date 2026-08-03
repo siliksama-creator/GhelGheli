@@ -23,6 +23,8 @@ const { getGameRewardSettings, saveGameRewardSettings } = require('./services/ga
 const walletService = require('./services/walletService');
 const referrals = require('./services/referralService');
 const wheel = require('./services/wheelService');
+const pass = require('./services/passService');
+const wheelReminder = require('./services/wheelReminderService');
 // Hoisted with the other services: /api/users/:id/public uses it and sits
 // above the shop routes, so a require next to those would read as a
 // temporal-dead-zone bug even though route handlers run after startup.
@@ -754,6 +756,9 @@ app.post('/api/cards/redeem', auth, cardRedeemLimiter, asyncHandler(async (req, 
         `${cashAmount.toLocaleString('en-US')} تومان بابت کارت «${card.card_type_name}» به کیف پول شما واریز شد.`,
       ).catch(() => {});
     }
+    // XP گذر نبرد. عمداً await نمی‌شود و خطایش بلعیده می‌شود: ثبت کارت
+    // نباید به‌خاطر یک مشکل گذرا در گذر نبرد شکست بخورد.
+    pass.grantXp(req.user.id, 'card_redeem').catch(() => {});
     const userNow = await pool.query('SELECT current_points,lifetime_points,monthly_league_points,wallet_balance FROM users WHERE id=$1', [req.user.id]);
     const reward = await pool.query('SELECT * FROM reward_tiers WHERE is_active=true AND required_points <= $1 ORDER BY required_points DESC LIMIT 1', [userNow.rows[0].current_points]);
     if (reward.rows[0]) createNotification(req.user.id, 'reward_threshold', 'تبریک! به جایزه رسیدی', `شما به سطح ${reward.rows[0].name} رسیدید.`).catch(()=>{});
@@ -801,6 +806,10 @@ app.post('/api/games/tap/progress', auth, tapBatchLimiter, asyncHandler(async (r
   // The raw token doubles as the HMAC key material, so the signature can only
   // be produced by whoever holds a live session for this user.
   const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  // لولِ قبل از ارسال، تا بعداً بفهمیم چند لول در همین بسته تمام شد.
+  // payload فقط لولِ فعلی را می‌دهد نه اختلاف را.
+  const lvlBefore = await tapGame.getProgress(req.user.id)
+    .then(p => Number(p?.level || 0)).catch(() => 0);
   const { status, payload } = await tapGame.submitBatch(
     req.user.id, token, req.body || {},
     // ── امتیاز بازی ضربه‌زن ──────────────────────────────────────────────
@@ -826,6 +835,12 @@ app.post('/api/games/tap/progress', auth, tapBatchLimiter, asyncHandler(async (r
       await referrals.payCommission(client, userId, points, 'tap');
     },
   );
+  // XP گذر نبرد به ازای هر لولی که در همین بستهٔ ارسالی تمام شده.
+  // سقف روزانهٔ منبع (۶۰) خودش جلوی سوءاستفاده را می‌گیرد.
+  const lvlUp = Math.max(0, Number(payload?.level || 0) - lvlBefore);
+  if (lvlUp > 0) {
+    pass.grantXp(req.user.id, 'tap_level', { multiplier: lvlUp }).catch(() => {});
+  }
   res.status(status).json(payload);
 }));
 
@@ -886,12 +901,32 @@ app.get('/api/bootstrap', auth, asyncHandler(async (req, res) => {
     wheel.status(req.user.id).catch(() => null),
   ]);
 
+  // XP ورود روزانه. سقف منبع ۲۰ است، پس هر بار باز کردن اپ در یک روز
+  // فقط یک بار حساب می‌شود — بقیه بی‌اثرند.
+  pass.grantXp(req.user.id, 'daily_login').catch(() => {});
+
+  // خلاصهٔ گذر نبرد برای نشانِ نوار بالا. کل وضعیت اینجا فرستاده
+  // نمی‌شود (۵۰ پله × ۲ مسیر حجیم است)؛ فقط چیزی که برای نشان لازم
+  // است. صفحهٔ گذر خودش /api/pass را می‌خواند.
+  let passBrief = null;
+  try {
+    const st = await pass.status(req.user.id);
+    if (st.active) {
+      passBrief = {
+        tier: st.tier, tierCount: st.tierCount, claimable: st.claimable,
+        hasPlus: st.hasPlus, daysLeft: st.season.daysLeft,
+        intoTier: st.intoTier, tierNeeds: st.tierNeeds,
+      };
+    }
+  } catch { /* گذر نبرد نباید بوت‌استرپ را بشکند */ }
+
   res.json({
     user: safeUser(req.user),
     inventory: inv.rows,
     leaguePayouts: payouts.rows,
     rewards: rewards.rows,
     wheel: wheelState,
+    pass: passBrief,
   });
 }));
 
@@ -1308,6 +1343,7 @@ app.post('/api/wheel/spin', auth, wheelLimiter, asyncHandler(async (req, res) =>
       req.user.id, 'wallet', 'برندهٔ گردونه شدی 🎡',
       `${result.prize.label} به کیف پولت اضافه شد.`).catch(() => {});
   }
+  pass.grantXp(req.user.id, 'wheel_spin').catch(() => {});
   res.json(result);
 }));
 
@@ -1315,6 +1351,22 @@ app.post('/api/wheel/spin', auth, wheelLimiter, asyncHandler(async (req, res) =>
 // جوایز را می‌فرستد.
 app.get('/api/wheel/count', auth, asyncHandler(async (req, res) => {
   res.json(await wheel.spinCount(req.user.id));
+}));
+
+// ── گذر نبرد ─────────────────────────────────────────────────────────────
+app.get('/api/pass', auth, asyncHandler(async (req, res) => {
+  res.json(await pass.status(req.user.id));
+}));
+
+app.post('/api/pass/claim/:tierId', auth, validateUuid('tierId'),
+  asyncHandler(async (req, res) => {
+    const granted = await pass.claim(req.user.id, req.params.tierId);
+    res.json({ message: 'جایزه دریافت شد', granted });
+  }));
+
+app.post('/api/pass/claim-all', auth, asyncHandler(async (req, res) => {
+  const r = await pass.claimAll(req.user.id);
+  res.json({ message: `${r.claimed} جایزه دریافت شد`, ...r });
 }));
 
 app.get('/api/wheel/history', auth, asyncHandler(async (req, res) => {
@@ -2634,6 +2686,19 @@ cron.schedule('5 0 1 * *', () => closeActiveSeason().catch(e => console.error('m
 // submitBatch() prunes only the CALLING user's rows, so a player who stops
 // playing leaves theirs behind forever — the table grew unbounded with
 // replay-protection records that were long past their 30-minute TTL.
+// ── یادآور چرخش رایگان ───────────────────────────────────────────────────
+//
+// ۱۸:۳۰ به وقت تهران. سرور روی Asia/Tehran است، ولی timezone صریح داده
+// شده تا اگر روزی سرور مهاجرت کرد، ساعتِ اعلان جابه‌جا نشود و نیمه‌شب
+// به گوشی مردم نرود.
+//
+// سرویس **خودش هم** ساعات استراحت (۲۲:۰۰–۰۹:۰۰) را بررسی می‌کند؛ این
+// دو لایه عمدی است. جزئیات در wheelReminderService.
+cron.schedule('30 18 * * *', () => {
+  wheelReminder.sendDailyReminder()
+    .catch(e => console.error('[wheel-reminder] failed:', e.message));
+}, { timezone: 'Asia/Tehran' });
+
 cron.schedule('17 * * * *', () => {
   tapGame.pruneNonces()
     .then(n => { if (n > 0) console.log(`[tap] pruned ${n} expired nonces`); })

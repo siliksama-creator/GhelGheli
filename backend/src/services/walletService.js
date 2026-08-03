@@ -72,6 +72,10 @@ const VALID_SOURCES = new Set([
   // filterable in the ledger and can never collide with an admin adjustment
   // on the shared UNIQUE (source, reference_id) index.
   'shop', 'subscription',
+  // جوایز نقدیِ گذر نبرد. منبع جدا لازم است چون UNIQUE (source,
+  // reference_id) مشترک است: بدون آن، شناسهٔ یک پله می‌توانست با شناسهٔ
+  // یک تراکنش دیگر برخورد کند و واریز بی‌صدا «تکراری» تشخیص داده شود.
+  'pass',
 ]);
 
 function normalizeAmount(amount) {
