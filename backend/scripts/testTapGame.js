@@ -434,6 +434,66 @@ test("today's counter is respected", () => {
   assert.strictEqual(svc.levelsLeftToday(row, '2026-03-02'), 1);
 });
 
+// ── the shape node-postgres actually returns ───────────────────────────────
+//
+// REGRESSION GUARD. These tests exist because the first version of the cap
+// passed every unit test above and was still completely broken in
+// production: it reset the allowance on every single request.
+//
+// The cause was that the tests hand-built rows with UTC-midnight Dates,
+// while node-postgres parses a DATE column into LOCAL midnight. On a server
+// set to Asia/Tehran the date 2026-08-03 arrives as 2026-08-02T20:30:00Z,
+// and reading that back in UTC gives the PREVIOUS day. The comparison always
+// failed. Only the live end-to-end test caught it.
+console.log('\ntap game — the shape pg actually returns');
+
+test('a local-midnight Date (what pg gives us) reads as the right day', () => {
+  // Exactly what came back from the live database for 2026-08-03 on a
+  // Tehran-clocked server.
+  const pgStyle = new Date(2026, 7, 3, 0, 0, 0); // local midnight, Aug 3
+  const row = { levels_today: 3, levels_day: pgStyle };
+  assert.strictEqual(svc.levelsLeftToday(row, '2026-08-03'), 0,
+    'the stored day must compare equal to today, not to yesterday');
+});
+
+test('the local-midnight Date is NOT mistaken for the previous day', () => {
+  const pgStyle = new Date(2026, 7, 3, 0, 0, 0);
+  const row = { levels_today: 3, levels_day: pgStyle };
+  assert.strictEqual(svc.levelsLeftToday(row, '2026-08-02'),
+    svc.MAX_LEVELS_PER_DAY,
+    'yesterday must still read as a different day');
+});
+
+test('a plain ISO string is handled too', () => {
+  // Some pg configurations return DATE as a string.
+  const row = { levels_today: 1, levels_day: '2026-08-03' };
+  assert.strictEqual(svc.levelsLeftToday(row, '2026-08-03'), 2);
+});
+
+test('a timestamp string is truncated to its date part', () => {
+  const row = { levels_today: 1, levels_day: '2026-08-03T00:00:00.000Z' };
+  assert.strictEqual(svc.levelsLeftToday(row, '2026-08-03'), 2);
+});
+
+test('a null or invalid day grants a full allowance', () => {
+  // Rows written before the migration have NULL here.
+  for (const bad of [null, undefined, '', new Date('nonsense')]) {
+    assert.strictEqual(
+      svc.levelsLeftToday({ levels_today: 3, levels_day: bad }, '2026-08-03'),
+      svc.MAX_LEVELS_PER_DAY, `levels_day = ${bad}`);
+  }
+});
+
+test('a rejected batch does not wipe the counter', () => {
+  // The live test surfaced this too: on a rejected batch `gained` is 0, so
+  // the written value is entirely (MAX - left). If `left` were wrong, a
+  // rejected batch would silently hand the allowance back.
+  const src = require('fs').readFileSync(
+    require('path').join(__dirname, '../src/services/tapGameService.js'), 'utf8');
+  assert.ok(/\(MAX_LEVELS_PER_DAY - left\) \+ next\.gained/.test(src),
+    'usedToday must be derived from what was already spent, not reset');
+});
+
 test('a missing row grants a full allowance', () => {
   assert.strictEqual(svc.levelsLeftToday(null), svc.MAX_LEVELS_PER_DAY);
 });

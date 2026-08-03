@@ -256,12 +256,39 @@ function advance(level, levelTaps, taps, levelsLeftToday = Infinity) {
  */
 function levelsLeftToday(row, today = tehranDay()) {
   if (!row) return MAX_LEVELS_PER_DAY;
-  const day = row.levels_day
-    ? new Intl.DateTimeFormat('sv-SE', { timeZone: 'UTC' })
-      .format(new Date(row.levels_day))
-    : null;
-  const used = day === today ? Number(row.levels_today) || 0 : 0;
+  const used = storedDay(row.levels_day) === today
+    ? Number(row.levels_today) || 0
+    : 0;
   return Math.max(0, MAX_LEVELS_PER_DAY - used);
+}
+
+/**
+ * Normalises whatever `pg` hands back for a DATE column into 'YYYY-MM-DD'.
+ *
+ * THE BUG THIS EXISTS TO PREVENT — caught by the live end-to-end test, not
+ * by any unit test, because it only appears with a real driver and a real
+ * database.
+ *
+ * node-postgres parses DATE into a JS Date at LOCAL midnight. The server's
+ * clock is Asia/Tehran, so the date 2026-08-03 comes back as the instant
+ * 2026-08-02T20:30:00Z. Formatting that in UTC — which the first version did
+ * — yields "2026-08-02": the day BEFORE the one stored. The comparison
+ * against tehranDay() therefore always failed, every read looked like a new
+ * day, and the cap silently reset on every request. The unit tests passed
+ * because they hand-built rows with UTC-midnight Dates.
+ *
+ * Reading the LOCAL components is correct precisely because the driver built
+ * the value from local ones. A string (some drivers/configs return one) is
+ * already in the right form and is passed through.
+ */
+function storedDay(value) {
+  if (!value) return null;
+  if (typeof value === 'string') return value.slice(0, 10);
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
 }
 
 async function getProgress(userId) {
@@ -446,8 +473,15 @@ async function submitBatch(userId, token, raw) {
           gained: 0, capped: left <= 0 }
       : advance(current.level, current.level_taps, accepted, left);
 
-    const usedToday = (left === MAX_LEVELS_PER_DAY ? 0
-      : MAX_LEVELS_PER_DAY - left) + next.gained;
+    // Spent before this batch, plus whatever it just gained.
+    //
+    // Clamped because a corrupt stored counter above the cap would otherwise
+    // be written straight back, and bounded below because `left` is already
+    // clamped to [0, MAX] by levelsLeftToday().
+    const usedToday = Math.min(
+      MAX_LEVELS_PER_DAY,
+      (MAX_LEVELS_PER_DAY - left) + next.gained,
+    );
 
     const updated = await client.query(
       `UPDATE tap_game_progress
