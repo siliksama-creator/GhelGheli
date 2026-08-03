@@ -27,7 +27,16 @@ const referrals = require('./referralService');
  * نزدیک» باشند — و حالا که چرخش‌های روزانه می‌توانند تا ۶ برابر شوند،
  * ۱ در ۱۰٬۰۰۰ دیگر کم نیست. با یک میلیون، «۱ در ۲۰۰٬۰۰۰» هم دقیق بیان
  * می‌شود. */
-const WEIGHT_TOTAL = 1000000;
+const WEIGHT_TOTAL = 10000000;
+
+/**
+ * چرخش‌های نمایشی برای حساب‌های نامحدود.
+ *
+ * Infinity واقعی به JSON نمی‌رود (به null تبدیل می‌شود) و کلاینت‌ها با آن
+ * حساب می‌کنند. یک عدد بزرگ ولی متناهی، هم در UI درست نشان داده می‌شود و
+ * هم هیچ‌وقت در عمل تمام نمی‌شود.
+ */
+const UNLIMITED_DISPLAY = 999999;
 
 /**
  * روز جاری در تهران به شکل YYYY-MM-DD.
@@ -127,13 +136,18 @@ async function status(userId) {
       `SELECT COUNT(*)::int AS n FROM wheel_spins
         WHERE user_id = $1 AND spin_source = 'daily' AND spun_day = $2::date`,
       [userId, today]),
-    pool.query('SELECT bonus_spins FROM users WHERE id = $1', [userId]),
+    pool.query(
+      'SELECT bonus_spins, unlimited_spins FROM users WHERE id = $1',
+      [userId]),
     referrals.invitedCount(userId),
   ]);
 
+  const unlimited = user.rows[0]?.unlimited_spins === true;
   const usedToday = spun.rows[0].n;
   const dailyQuota = referrals.dailySpinsFor(invites);
-  const dailyLeft = Math.max(0, dailyQuota - usedToday);
+  const dailyLeft = unlimited
+    ? UNLIMITED_DISPLAY
+    : Math.max(0, dailyQuota - usedToday);
   const bonus = Number(user.rows[0]?.bonus_spins) || 0;
 
   return {
@@ -143,10 +157,13 @@ async function status(userId) {
       // وزن عمداً به کلاینت نمی‌رود: نه لازمش دارد، و نمایشش فقط باعث
       // می‌شود کاربر شانس واقعی‌اش را حساب کند و دلسرد شود.
     })),
-    dailyQuota,
+    dailyQuota: unlimited ? UNLIMITED_DISPLAY : dailyQuota,
     dailyLeft,
     dailyAvailable: dailyLeft > 0,
     bonusSpins: bonus,
+    // کلاینت با این پرچم به‌جای عدد، «∞» نشان می‌دهد — یک «۹۹۹۹۹۹ شانس»
+    // روی دکمه هم زشت است و هم گیج‌کننده.
+    unlimited,
     // مجموع چرخش‌های قابل استفاده همین حالا — همان عددی که کنار آیکون
     // گردونه در صفحهٔ اصلی نشان داده می‌شود.
     spinsLeft: dailyLeft + bonus,
@@ -184,11 +201,13 @@ async function spin(userId, { creditCash, addPoints }) {
     // قفل کاربر: دو درخواست هم‌زمان باید پشت سر هم اجرا شوند، وگرنه هر دو
     // bonus_spins قدیمی را می‌خوانند و یکی از کسرها گم می‌شود.
     const u = await client.query(
-      'SELECT bonus_spins FROM users WHERE id = $1 FOR UPDATE', [userId]);
+      'SELECT bonus_spins, unlimited_spins FROM users WHERE id = $1 FOR UPDATE',
+      [userId]);
     if (!u.rows[0]) {
       throw Object.assign(new Error('کاربر پیدا نشد'), { status: 404 });
     }
     const bonus = Number(u.rows[0].bonus_spins) || 0;
+    const unlimited = u.rows[0].unlimited_spins === true;
 
     // شمارش داخل تراکنش و بعد از قفل — این ترتیب همان چیزی است که جای
     // ایندکس یکتای حذف‌شده را می‌گیرد.
@@ -199,7 +218,11 @@ async function spin(userId, { creditCash, addPoints }) {
 
     const invites = await referrals.invitedCount(userId, client);
     const dailyQuota = referrals.dailySpinsFor(invites);
-    const dailyLeft = Math.max(0, dailyQuota - spunToday.rows[0].n);
+    // حساب نامحدود (تست مالک): سهمیه هرگز تمام نمی‌شود. ردیف چرخش
+    // همچنان ثبت می‌شود تا آمار و تاریخچه واقعی بماند.
+    const dailyLeft = unlimited
+      ? UNLIMITED_DISPLAY
+      : Math.max(0, dailyQuota - spunToday.rows[0].n);
 
     // سهمیهٔ روزانه اول خرج می‌شود، بعد چرخش‌های جایزه‌ای. اگر برعکس بود،
     // کاربری که هم سهمیهٔ روزانه دارد و هم جایزه، جایزه‌اش را خرج می‌کرد و
@@ -238,7 +261,9 @@ async function spin(userId, { creditCash, addPoints }) {
       throw e;
     }
 
-    if (!useDaily) {
+    // حساب نامحدود چیزی خرج نمی‌کند — نه سهمیهٔ روزانه (که بی‌نهایت است)
+    // و نه چرخش جایزه‌ای، وگرنه تست کردن، جایزه‌های واقعی مالک را می‌سوزاند.
+    if (!useDaily && !unlimited) {
       await client.query(
         'UPDATE users SET bonus_spins = bonus_spins - 1, updated_at = NOW() WHERE id = $1',
         [userId]);
@@ -254,20 +279,23 @@ async function spin(userId, { creditCash, addPoints }) {
 
     await client.query('COMMIT');
 
-    const remainingBonus = useDaily ? bonus : bonus - 1;
-    const remainingDaily = useDaily ? dailyLeft - 1 : dailyLeft;
+    const remainingBonus = (useDaily || unlimited) ? bonus : bonus - 1;
+    const remainingDaily = unlimited
+      ? UNLIMITED_DISPLAY
+      : (useDaily ? dailyLeft - 1 : dailyLeft);
     return {
       spinId: spinRow.id,
       prize: {
         id: prize.id, label: prize.label, kind: prize.kind,
         value: prize.value, color: prize.color, sliceOrder: prize.slice_order,
       },
-      dailyQuota,
+      dailyQuota: unlimited ? UNLIMITED_DISPLAY : dailyQuota,
       dailyLeft: remainingDaily,
       dailyAvailable: remainingDaily > 0,
       bonusSpins: remainingBonus,
       spinsLeft: remainingDaily + remainingBonus,
       invitedCount: invites,
+      unlimited,
       resetInMs: msUntilTehranMidnight(),
     };
   } catch (e) {
@@ -340,5 +368,6 @@ async function stats() {
 module.exports = {
   prizes, status, spin, history, stats,
   // برای تست
-  pickPrize, tehranDay, msUntilTehranMidnight, storedDay, WEIGHT_TOTAL,
+  pickPrize, tehranDay, msUntilTehranMidnight, storedDay,
+  WEIGHT_TOTAL, UNLIMITED_DISPLAY,
 };

@@ -1224,6 +1224,25 @@ app.get('/api/admin/wheel/stats', adminAuth, requireRole('support'),
     res.json(await wheel.stats());
   }));
 
+// چرخش نامحدود برای یک حساب — ابزار تست مالک.
+//
+// requireRole() بدون آرگومان یعنی فقط سوپرادمین: این پرچم عملاً جوایز
+// نامحدود می‌دهد، پس نباید در دسترس نقش پشتیبانی باشد.
+app.post('/api/admin/users/:id/unlimited-spins', adminAuth, validateUuid('id'),
+  requireRole(), asyncHandler(async (req, res) => {
+    const on = req.body.enabled !== false;
+    const { rowCount } = await pool.query(
+      'UPDATE users SET unlimited_spins = $2, updated_at = NOW() WHERE id = $1',
+      [req.params.id, on]);
+    if (!rowCount) return res.status(404).json({ message: 'کاربر پیدا نشد' });
+    await audit(req.admin.id, 'unlimited_spins', 'users', req.params.id,
+      req.body.reason, { enabled: on });
+    res.json({
+      message: on ? 'چرخش نامحدود فعال شد' : 'چرخش نامحدود غیرفعال شد',
+      unlimitedSpins: on,
+    });
+  }));
+
 app.get('/api/league/current', auth, asyncHandler(async (req, res) => {
   const data = await getLeaderboard(Number(req.query.limit || 100));
 
