@@ -19,28 +19,28 @@ function test(name, fn) {
   }
 }
 
-// همان جدولی که مایگریشن ۰۲۸ می‌کارد. مخرج یک میلیون است نه ۱۰٬۰۰۰.
+// همان جدولی که مایگریشن ۰۲۹ می‌کارد. مخرج ده میلیون است.
 const PRIZES = [
-  { id: 'a', label: '۱۰۰ امتیاز', kind: 'points', value: 100, weight: 245000, slice_order: 1 },
-  { id: 'b', label: '۵۰٬۰۰۰ تومان', kind: 'cash', value: 50000, weight: 15, slice_order: 2 },
-  { id: 'c', label: '۵۰۰ امتیاز', kind: 'points', value: 500, weight: 100000, slice_order: 3 },
-  { id: 'd', label: '۱۰۰ امتیاز', kind: 'points', value: 100, weight: 245000, slice_order: 4 },
-  { id: 'e', label: '۲۰۰۰ امتیاز', kind: 'points', value: 2000, weight: 4000, slice_order: 5 },
-  { id: 'f', label: '۱۰۰۰ امتیاز', kind: 'points', value: 1000, weight: 30000, slice_order: 6 },
-  { id: 'g', label: '۱۰۰ امتیاز', kind: 'points', value: 100, weight: 245000, slice_order: 7 },
-  { id: 'h', label: '۱۰٬۰۰۰ تومان', kind: 'cash', value: 10000, weight: 900, slice_order: 8 },
-  { id: 'i', label: '۵۰۰ امتیاز', kind: 'points', value: 500, weight: 100000, slice_order: 9 },
-  { id: 'j', label: '۵۰۰۰ امتیاز', kind: 'points', value: 5000, weight: 80, slice_order: 10 },
-  { id: 'k', label: '۱۰۰۰ امتیاز', kind: 'points', value: 1000, weight: 30000, slice_order: 11 },
-  { id: 'l', label: '۱۰۰٬۰۰۰ تومان', kind: 'cash', value: 100000, weight: 5, slice_order: 12 },
+  { id: 'a', label: '۱۰۰ امتیاز', kind: 'points', value: 100, weight: 2069816, slice_order: 1 },
+  { id: 'b', label: '۵۰٬۰۰۰ تومان', kind: 'cash', value: 50000, weight: 40, slice_order: 2 },
+  { id: 'c', label: '۵۰۰ امتیاز', kind: 'points', value: 500, weight: 1400000, slice_order: 3 },
+  { id: 'd', label: '۱۰۰ امتیاز', kind: 'points', value: 100, weight: 2069817, slice_order: 4 },
+  { id: 'e', label: '۲۰۰۰ امتیاز', kind: 'points', value: 2000, weight: 80000, slice_order: 5 },
+  { id: 'f', label: '۱۰۰۰ امتیاز', kind: 'points', value: 1000, weight: 450000, slice_order: 6 },
+  { id: 'g', label: '۱۰۰ امتیاز', kind: 'points', value: 100, weight: 2069817, slice_order: 7 },
+  { id: 'h', label: '۱۰٬۰۰۰ تومان', kind: 'cash', value: 10000, weight: 500, slice_order: 8 },
+  { id: 'i', label: '۵۰۰ امتیاز', kind: 'points', value: 500, weight: 1400000, slice_order: 9 },
+  { id: 'j', label: '۵۰۰۰ امتیاز', kind: 'points', value: 5000, weight: 10000, slice_order: 10 },
+  { id: 'k', label: '۱۰۰۰ امتیاز', kind: 'points', value: 1000, weight: 450000, slice_order: 11 },
+  { id: 'l', label: '۱۰۰٬۰۰۰ تومان', kind: 'cash', value: 100000, weight: 10, slice_order: 12 },
 ];
 
 console.log('\nگردونه — وزن‌ها و انتخاب جایزه');
 
-test('جمع وزن‌ها دقیقاً یک میلیون است', () => {
+test('جمع وزن‌ها دقیقاً ده میلیون است', () => {
   const total = PRIZES.reduce((s, p) => s + p.weight, 0);
   assert.strictEqual(total, wheel.WEIGHT_TOTAL);
-  assert.strictEqual(total, 1000000);
+  assert.strictEqual(total, 10000000);
 });
 
 test('جوایز بزرگ واقعاً «خیلی خیلی کم» هستند', () => {
@@ -50,10 +50,24 @@ test('جوایز بزرگ واقعاً «خیلی خیلی کم» هستند', (
     const p = PRIZES.find((x) => x.id === id);
     return wheel.WEIGHT_TOTAL / p.weight;
   };
-  assert.ok(rate('l') >= 200000, `۱۰۰ هزار تومان: ۱ در ${rate('l')}`);
-  assert.ok(rate('b') >= 60000, `۵۰ هزار تومان: ۱ در ${rate('b')}`);
-  assert.ok(rate('j') >= 12000, `۵۰۰۰ امتیاز: ۱ در ${rate('j')}`);
-  assert.ok(rate('h') >= 1000, `۱۰ هزار تومان: ۱ در ${rate('h')}`);
+  // نسخهٔ سوم: چون گردونه رایگان است و درآمدی ندارد، جوایز نقدی باید
+  // بسیار نادرتر از یک گردونهٔ پولی باشند.
+  assert.ok(rate('l') >= 1000000, `۱۰۰ هزار تومان: ۱ در ${rate('l')}`);
+  assert.ok(rate('b') >= 250000, `۵۰ هزار تومان: ۱ در ${rate('b')}`);
+  assert.ok(rate('h') >= 20000, `۱۰ هزار تومان: ۱ در ${rate('h')}`);
+  assert.ok(rate('j') >= 1000, `۵۰۰۰ امتیاز: ۱ در ${rate('j')}`);
+});
+
+test('حتی فعال‌ترین کاربر هم در یک سال شانس ناچیزی دارد', () => {
+  // این تستِ اصلیِ «قمار نساختیم» است. سقفِ چرخش یک کاربر:
+  //   ۶ در روز (با ۵۰ دعوت) + ۳ به ازای هر دعوت = ۲٬۳۴۰ در سال.
+  // با آن سقف، شانس دیدن جایزهٔ ۱۰۰ هزاری باید زیر یک درصد بماند.
+  const spinsPerYear = 365 * 6 + 50 * 3;
+  const p = PRIZES.find((x) => x.id === 'l').weight / wheel.WEIGHT_TOTAL;
+  const atLeastOnce = 1 - Math.pow(1 - p, spinsPerYear);
+  assert.ok(atLeastOnce < 0.01,
+    `${(atLeastOnce * 100).toFixed(2)}% در سال — خیلی زیاد است`);
+  console.log(`    (فعال‌ترین کاربر: ${(atLeastOnce * 100).toFixed(2)}% در سال)`);
 });
 
 test('وزن اشتباه خطا می‌دهد و بی‌صدا نرمال‌سازی نمی‌شود', () => {
@@ -93,7 +107,7 @@ test('هر جایزه‌ای که وزن دارد، دیده می‌شود', () 
   const seen = new Set();
   for (let i = 0; i < 200000; i++) seen.add(wheel.pickPrize(PRIZES).id);
   for (const p of PRIZES) {
-    if (p.weight >= 4000) {
+    if (p.weight >= 400000) {
       assert.ok(seen.has(p.id), `${p.label} هرگز انتخاب نشد`);
     }
   }
@@ -103,9 +117,14 @@ test('هر جایزه‌ای که وزن دارد، دیده می‌شود', () 
   // وزنش ۱-در-۱۰۰۰ گرفته شده نه ۱-در-یک‌میلیون: هدف اثبات *قابل انتخاب
   // بودنِ* عنصر آخر است، نه سنجش یک نرخ نادر. با ۱-در-یک‌میلیون، خودِ تست
   // با احتمال ۳۷٪ الکی قرمز می‌شد.
+  // وزن نسبی ثابت نگه داشته می‌شود (۱ در ۱۰۰۰) تا تست به مخرج وابسته
+  // نباشد — با تغییر WEIGHT_TOTAL از یک میلیون به ده میلیون، نسخهٔ قبلی
+  // این تست الکی قرمز شد چون نسبت هزار برابر کوچک‌تر شده بود.
   const boundary = [
-    { id: 'x', kind: 'points', value: 1, weight: wheel.WEIGHT_TOTAL - 1000 },
-    { id: 'last', kind: 'points', value: 2, weight: 1000 },
+    { id: 'x', kind: 'points', value: 1,
+      weight: wheel.WEIGHT_TOTAL - wheel.WEIGHT_TOTAL / 1000 },
+    { id: 'last', kind: 'points', value: 2,
+      weight: wheel.WEIGHT_TOTAL / 1000 },
   ];
   let lastHits = 0;
   for (let i = 0; i < 200000; i++) {
@@ -119,11 +138,11 @@ test('هر جایزه‌ای که وزن دارد، دیده می‌شود', () 
 test('نرخ جوایز نادر در محدودهٔ آماری درست است', () => {
   const N = 300000;
   const rareWeight = PRIZES
-    .filter((p) => p.weight <= 1000)
+    .filter((p) => p.weight <= 80000)
     .reduce((s, p) => s + p.weight, 0);
   let rare = 0;
   for (let i = 0; i < N; i++) {
-    if (wheel.pickPrize(PRIZES).weight <= 1000) rare++;
+    if (wheel.pickPrize(PRIZES).weight <= 80000) rare++;
   }
   const pr = rareWeight / wheel.WEIGHT_TOTAL;
   const expected = N * pr;
@@ -133,17 +152,17 @@ test('نرخ جوایز نادر در محدودهٔ آماری درست است'
     `${rare} در برابر انتظار ${expected.toFixed(0)}`);
 });
 
-test('هزینهٔ نقدی مورد انتظار هر چرخش زیر ۱۵ تومان است', () => {
+test('هزینهٔ نقدی مورد انتظار هر چرخش زیر ۲ تومان است', () => {
   // عددی که کل اقتصاد گردونه رویش بنا شده. اگر کسی وزنی را عوض کند و این
   // عدد بالا برود، اینجا معلوم می‌شود — نه سر ماه روی صورت‌حساب.
   //
   // کران بالا و نه یک عدد دقیق: وزن‌ها ممکن است کمی تنظیم شوند، ولی سقف
-  // هزینه نباید جابه‌جا شود. با ۱۰٬۰۰۰ کاربر و ۲ چرخش در روز، ۱۵ تومان
-  // یعنی حداکثر ۹ میلیون تومان در ماه.
+  // هزینه نباید جابه‌جا شود. با ۱۰٬۰۰۰ کاربر و ۲ چرخش در روز، ۲ تومان
+  // یعنی حداکثر ۱.۲ میلیون تومان در ماه.
   const ev = PRIZES.reduce(
     (s, p) => s + (p.kind === 'cash'
       ? (p.weight / wheel.WEIGHT_TOTAL) * p.value : 0), 0);
-  assert.ok(ev < 15, `EV نقدی ${ev} تومان است`);
+  assert.ok(ev < 2, `EV نقدی ${ev} تومان است`);
   assert.ok(ev > 0, 'گردونه باید جایزهٔ نقدی داشته باشد');
   console.log(`    (EV نقدی: ${ev.toFixed(2)} تومان هر چرخش)`);
 });
@@ -467,6 +486,58 @@ test('کمیسیون به جدول لیگ هم اضافه می‌شود', () => 
   const iLeague = src.indexOf('addLeaguePoints(client, referrerId, earned)');
   assert.ok(iUsers > 0 && iLeague > iUsers,
     'هر دو باید روی همان تراکنش و به ترتیب باشند');
+});
+
+console.log('\nگردونه — چرخش نامحدود (ابزار تست مالک)');
+
+test('پرچم روی کاربر است نه لیست سخت‌کدشدهٔ شماره‌ها', () => {
+  // شمارهٔ ادمین عوض می‌شود و یک ثابت در کد از قلم می‌افتد؛ پرچم در
+  // دیتابیس یعنی در ممیزی هم می‌شود دید چه کسی نامحدود است.
+  const mig = require('fs').readFileSync(
+    require('path').join(__dirname,
+      '../migrations/029_wheel_odds_v3_and_admin.sql'), 'utf8');
+  assert.ok(/ADD COLUMN IF NOT EXISTS unlimited_spins BOOLEAN/.test(mig));
+  const src = require('fs').readFileSync(
+    require('path').join(__dirname, '../src/services/wheelService.js'), 'utf8');
+  assert.ok(!/'09\d{9}'|MAIN_ADMIN|process\.env\.ADMIN/.test(src),
+    'نباید شماره یا نام ادمین در سرویس سخت‌کد شود');
+});
+
+test('حساب نامحدود چرخش خرج نمی‌کند', () => {
+  // وگرنه تست کردنِ مالک، جایزه‌های واقعی خودش را می‌سوزاند.
+  const src = require('fs').readFileSync(
+    require('path').join(__dirname, '../src/services/wheelService.js'), 'utf8');
+  assert.ok(/if \(!useDaily && !unlimited\)/.test(src),
+    'کسر bonus_spins باید برای حساب نامحدود رد شود');
+});
+
+test('عدد نمایشی متناهی است، نه Infinity', () => {
+  // Infinity در JSON به null تبدیل می‌شود و کلاینت با آن حساب می‌کند.
+  assert.strictEqual(typeof wheel.UNLIMITED_DISPLAY, 'number');
+  assert.ok(Number.isFinite(wheel.UNLIMITED_DISPLAY));
+  assert.ok(wheel.UNLIMITED_DISPLAY > 1000);
+});
+
+test('endpoint فقط برای سوپرادمین است', () => {
+  // این پرچم عملاً جایزهٔ نامحدود می‌دهد؛ نقش پشتیبانی نباید بتواند
+  // روشنش کند.
+  const src = require('fs').readFileSync(
+    require('path').join(__dirname, '../src/server.js'), 'utf8');
+  const i = src.indexOf("'/api/admin/users/:id/unlimited-spins'");
+  assert.ok(i > 0, 'endpoint وجود ندارد');
+  const route = src.slice(i, i + 700);
+  assert.ok(/requireRole\(\)/.test(route),
+    'باید requireRole() بدون آرگومان باشد (فقط سوپرادمین)');
+  assert.ok(/audit\(/.test(route), 'باید در audit ثبت شود');
+});
+
+test('سرویس سبکِ شمارنده وجود دارد', () => {
+  // /api/wheel کل کاتالوگ ۱۲ جایزه را می‌فرستد؛ نشانِ نوار بالا فقط یک
+  // عدد می‌خواهد و روی هر بار باز شدن اپ صدا زده می‌شود.
+  assert.strictEqual(typeof wheel.spinCount, 'function');
+  const src = require('fs').readFileSync(
+    require('path').join(__dirname, '../src/server.js'), 'utf8');
+  assert.ok(/app\.get\('\/api\/wheel\/count'/.test(src));
 });
 
 console.log(`\n${passed} ادعای گردونه و دعوت موفق بود\n`);

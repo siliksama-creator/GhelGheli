@@ -148,11 +148,13 @@ function Portal({ token, logout, theme, toggleTheme }) {
         req('/api/rewards', 'GET', null, token),
         // شکست این یکی نباید کل صفحه را از کار بیندازد: نشانِ گردونه یک
         // زینت است، پروفایل نیست.
-        req('/api/wheel', 'GET', null, token).catch(() => null),
+        // /api/wheel/count نه /api/wheel: دومی کل کاتالوگ جوایز را
+        // می‌فرستد و نشانِ نوار بالا فقط یک عدد می‌خواهد.
+        req('/api/wheel/count', 'GET', null, token).catch(() => null),
       ]);
       setP(profile);
       setRewards(rw || []);
-      if (wheel) setSpins(wheel.spinsLeft ?? 0);
+      if (wheel) setSpins(wheel.unlimited ? '∞' : (wheel.spinsLeft ?? 0));
     } catch (e) {
       // A failure here used to leave the app on its loading card forever with
       // no error and no way out. An expired session in particular looked
@@ -187,9 +189,14 @@ function Portal({ token, logout, theme, toggleTheme }) {
           <span>{fa(u.current_points)} امتیاز</span>
         </div>
         <button className="iconBtn wheelShortcut" onClick={() => setTab('wheel')}
-          title={spins > 0 ? `${spins} چرخش گردونه داری` : 'گردونهٔ شانس'}>
+          title={spins === '∞' ? 'چرخش نامحدود (حساب تست)'
+            : spins > 0 ? `${spins} چرخش گردونه داری` : 'گردونهٔ شانس'}>
           🎡
-          {spins > 0 && <span className="wheelBadge">{fa(spins)}</span>}
+          {(spins === '∞' || spins > 0) && (
+            <span className="wheelBadge">
+              {spins === '∞' ? '∞' : fa(spins)}
+            </span>
+          )}
         </button>
         <button className="iconBtn" onClick={toggleTheme}
           title={theme === 'light' ? 'حالت تیره' : 'حالت روشن'}>

@@ -49,6 +49,9 @@ class _HomeShellState extends State<HomeShell>
   /// نمی‌شود تا از یک «۰» گذرا که بعد به «۱» می‌پرد جلوگیری شود.
   int? _spins;
 
+  /// حساب تست مالک: به‌جای «۹۹۹۹۹۹» نشانِ «∞» نشان داده می‌شود.
+  bool _unlimitedSpins = false;
+
   // A subtle one-shot "welcome" entrance the moment the user lands on the
   // home shell after logging in — fades and lifts the whole shell into
   // place instead of just snapping onto the screen, so the first thing a
@@ -89,8 +92,14 @@ class _HomeShellState extends State<HomeShell>
       onChanged: _loadProfile,
       // بعد از هر چرخش، نشانِ نوار بالا فوراً به‌روز می‌شود — وگرنه کاربر
       // می‌چرخاند و عدد کنار آیکون هنوز قدیمی است.
-      onSpinsChanged: (n) {
-        if (mounted && n != _spins) setState(() => _spins = n);
+      onSpinsChanged: (n, unlimited) {
+        if (!mounted) return;
+        if (n != _spins || unlimited != _unlimitedSpins) {
+          setState(() {
+            _spins = n;
+            _unlimitedSpins = unlimited;
+          });
+        }
       },
     ),
     ReferralPage(api: widget.api),
@@ -174,10 +183,18 @@ class _HomeShellState extends State<HomeShell>
 
   Future<void> _loadSpins() async {
     try {
-      final d = await widget.api.get('/api/wheel');
+      // /api/wheel/count نه /api/wheel: دومی کل کاتالوگ ۱۲ جایزه را با
+      // رنگ و برچسب می‌فرستد و نشانِ نوار بالا فقط یک عدد می‌خواهد.
+      final d = await widget.api.get('/api/wheel/count');
       if (!mounted || d is! Map) return;
       final n = (d['spinsLeft'] as num?)?.toInt();
-      if (n != null && n != _spins) setState(() => _spins = n);
+      final u = d['unlimited'] == true;
+      if (n != _spins || u != _unlimitedSpins) {
+        setState(() {
+          _spins = n;
+          _unlimitedSpins = u;
+        });
+      }
     } catch (_) {
       // بدون نشان بهتر از یک عدد غلط است.
     }
@@ -294,6 +311,7 @@ class _HomeShellState extends State<HomeShell>
           // گردونه باشه که به صفحه گردونه منتقل بشن».
           _WheelButton(
             spins: _spins,
+            unlimited: _unlimitedSpins,
             onPressed: () => setState(() => _index = wheelIndex),
           ),
           NotificationBell(api: widget.api),
@@ -389,14 +407,20 @@ class _RewardsShopTabState extends State<_RewardsShopTab> {
 /// نشان روی خود دکمه می‌نشیند تا در نگاه اول دیده شود؛ اگر فقط داخل صفحهٔ
 /// گردونه بود، کاربر باید وارد می‌شد تا بفهمد اصلاً چرخشی دارد یا نه.
 class _WheelButton extends StatelessWidget {
-  const _WheelButton({required this.spins, required this.onPressed});
+  const _WheelButton({
+    required this.spins,
+    required this.unlimited,
+    required this.onPressed,
+  });
 
   final int? spins;
+  final bool unlimited;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     final n = spins ?? 0;
+    final label = unlimited ? '∞' : faNum(n);
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -426,7 +450,7 @@ class _WheelButton extends StatelessWidget {
                 ),
                 child: Center(
                   child: Text(
-                    faNum(n),
+                    label,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 10,

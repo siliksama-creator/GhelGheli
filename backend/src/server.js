@@ -1208,6 +1208,12 @@ app.post('/api/wheel/spin', auth, wheelLimiter, asyncHandler(async (req, res) =>
   res.json(result);
 }));
 
+// فقط شمارنده، برای نشانِ نوار بالا. سبک‌تر از /api/wheel که کل کاتالوگ
+// جوایز را می‌فرستد.
+app.get('/api/wheel/count', auth, asyncHandler(async (req, res) => {
+  res.json(await wheel.spinCount(req.user.id));
+}));
+
 app.get('/api/wheel/history', auth, asyncHandler(async (req, res) => {
   res.json({ spins: await wheel.history(req.user.id, req.query.limit) });
 }));

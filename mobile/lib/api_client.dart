@@ -82,6 +82,8 @@ class ApiClient {
   }
 
   Future<void> saveToken(String t, {bool admin = false}) async {
+    // ورود با حساب دیگر یعنی هر پاسخِ کش‌شده مال شخص اشتباهی است.
+    invalidateCache();
     token = t;
     isAdmin = admin;
     final sp = await SharedPreferences.getInstance();
@@ -99,9 +101,64 @@ class ApiClient {
     // next person saw the previous user's tap-game level until the server
     // reconciled it.
     await sp.remove('tap_game_progress_v1');
+    // و کشِ پاسخ‌ها. روی یک گوشی مشترک، بدون این، نفر بعدی برای یک ثانیه
+    // پروفایل و امتیاز نفر قبلی را می‌دید — همان دلیلی که ذخیرهٔ بازی هم
+    // بالا پاک می‌شود.
+    invalidateCache();
   }
 
-  Future<dynamic> get(String path) async => (await dio.get(path)).data;
+  // ── request coalescing ────────────────────────────────────────────────
+  //
+  // THE PROBLEM THIS SOLVES, measured rather than assumed:
+  //
+  // Opening the app fires GET /api/profile TWICE — once from HomeShell (for
+  // the greeting and the points in the app bar) and once from DashboardPage
+  // (for the same data plus rewards). They are issued microseconds apart by
+  // two widgets that do not know about each other. Over a link to Iran that
+  // is ~400ms of latency spent twice for one answer.
+  //
+  // Rather than rewire the widget tree — which would couple the shell to the
+  // dashboard and make both harder to change — identical in-flight GETs
+  // share one response, and the answer stays warm for a moment afterwards.
+  //
+  // WHY THE WINDOW IS SHORT (1.2s). Long enough to absorb the burst of calls
+  // a screen makes as it mounts; far too short for a user to notice stale
+  // data. Anything that MUTATES clears the cache outright, so a purchase or
+  // a spin is never served a pre-change body.
+  static const Duration _cacheWindow = Duration(milliseconds: 1200);
+  final Map<String, ({DateTime at, dynamic body})> _getCache = {};
+  final Map<String, Future<dynamic>> _inFlight = {};
+
+  Future<dynamic> get(String path, {bool fresh = false}) {
+    if (!fresh) {
+      final hit = _getCache[path];
+      if (hit != null && DateTime.now().difference(hit.at) < _cacheWindow) {
+        return Future.value(hit.body);
+      }
+      // A second caller arriving while the first request is still open waits
+      // on the SAME future instead of opening its own socket.
+      final pending = _inFlight[path];
+      if (pending != null) return pending;
+    }
+
+    final future = dio.get(path).then((r) {
+      _getCache[path] = (at: DateTime.now(), body: r.data);
+      return r.data;
+    }).whenComplete(() => _inFlight.remove(path));
+
+    _inFlight[path] = future;
+    return future;
+  }
+
+  /// Drops cached GETs so the next read is authoritative.
+  ///
+  /// Called after every mutation. Clearing EVERYTHING rather than guessing
+  /// which paths a write touched: buying a shop item changes the profile,
+  /// the wallet and the shop at once, and a partial invalidation that misses
+  /// one of them shows the user a number that contradicts what they just did.
+  void invalidateCache() {
+    _getCache.clear();
+  }
 
   /// Runs several GETs concurrently over the pooled connection.
   ///
@@ -109,11 +166,20 @@ class ApiClient {
   /// waited for the SUM of the round trips. Now they overlap and the wait is
   /// just the slowest one.
   Future<List<dynamic>> getAll(List<String> paths) =>
-      Future.wait(paths.map(get));
-  Future<dynamic> post(String path, Map<String, dynamic> body) async =>
-      (await dio.post(path, data: body)).data;
-  Future<dynamic> patch(String path, Map<String, dynamic> body) async =>
-      (await dio.patch(path, data: body)).data;
+      Future.wait(paths.map((p) => get(p)));
+  Future<dynamic> post(String path, Map<String, dynamic> body) async {
+    final r = await dio.post(path, data: body);
+    // هر نوشتنی کش را باطل می‌کند — وگرنه کاربر می‌چرخاند و عددِ بعدی
+    // هنوز حالتِ قبل از چرخش است.
+    invalidateCache();
+    return r.data;
+  }
+
+  Future<dynamic> patch(String path, Map<String, dynamic> body) async {
+    final r = await dio.patch(path, data: body);
+    invalidateCache();
+    return r.data;
+  }
 
   /// Uploads a support-ticket attachment (user-scoped route).
   Future<String> uploadSupportImage(String filePath) async {

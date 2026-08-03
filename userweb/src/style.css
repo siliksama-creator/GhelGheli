@@ -1863,3 +1863,29 @@
 @media (prefers-reduced-motion: reduce) {
   .refProgressBar span { transition: none; }
 }
+
+
+/* ── درخشش برشِ برنده ───────────────────────────────────────────────────
+   یک قطاع با conic-gradient که سه بار نبض می‌زند. داخل .wheelSpinner است
+   پس با گردونه می‌چرخد و همیشه روی همان برش می‌ماند.
+   mask دایره‌ای، وگرنه گوشه‌های مربعِ عنصر هم روشن می‌شوند. */
+.wheelWin {
+  position: absolute; inset: 0; border-radius: 50%;
+  pointer-events: none; mix-blend-mode: plus-lighter;
+  background: conic-gradient(from var(--a0),
+    #ffffff59 0deg, #ffffff59 calc(var(--a1) - var(--a0)), transparent 0);
+  -webkit-mask: radial-gradient(circle,
+    transparent 30%, #000 31%, #000 93%, transparent 94%);
+  mask: radial-gradient(circle,
+    transparent 30%, #000 31%, #000 93%, transparent 94%);
+  animation: wheelWinPulse .52s ease-in-out 6 alternate;
+}
+@keyframes wheelWinPulse { from { opacity: 0 } to { opacity: 1 } }
+
+/* نشانِ «∞» کمی بزرگ‌تر از رقم‌هاست تا در همان قطر جا بیفتد. */
+.wheelBadge { font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) {
+  /* درخشش می‌ماند (اطلاعات است، نه تزئین) ولی نبض نمی‌زند. */
+  .wheelWin { animation: none; opacity: 1; }
+}

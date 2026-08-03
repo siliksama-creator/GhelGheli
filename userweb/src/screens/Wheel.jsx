@@ -36,6 +36,8 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
   const [spinning, setSpinning] = useState(false);
   const [angle, setAngle] = useState(0);
   const [result, setResult] = useState(null);
+  // برشِ برنده، برای درخشش بعد از توقف. null یعنی هیچ.
+  const [winner, setWinner] = useState(null);
   const [history, setHistory] = useState([]);
 
   // مجموع چرخش تجمعی است و هرگز کم نمی‌شود: اگر زاویه را ریست کنیم، گردونه
@@ -63,7 +65,7 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
       setError('');
       // نشانِ کنار آیکون گردونه در نوار بالا باید با این صفحه هم‌گام بماند،
       // وگرنه کاربر می‌چرخاند و نشان هنوز عدد قدیمی را نشان می‌دهد.
-      onSpinsChange?.(s.spinsLeft ?? 0);
+      onSpinsChange?.(s.unlimited ? '∞' : (s.spinsLeft ?? 0));
     } catch (e) {
       setError(e?.data?.message || 'گردونه در دسترس نیست');
     }
@@ -95,10 +97,12 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
       setAngle(next);
 
       playSfx('tick', 0.5);
+      setWinner(null);   // درخشش قبلی وسط چرخش تازه نماند
       later(() => {
         setResult(res.prize);
+        setWinner(idx);
         setState(s => ({ ...s, ...res }));
-        onSpinsChange?.(res.spinsLeft ?? 0);
+        onSpinsChange?.(res.unlimited ? '∞' : (res.spinsLeft ?? 0));
         playSfx(res.prize.kind === 'cash' ? 'win' : 'match_found');
         setSpinning(false);
         load();
@@ -144,6 +148,19 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
           }}
         >
           <img className="wheelDisc" src="/wheel/wheel.svg" alt="گردونهٔ شانس" />
+          {/* درخشش روی برشِ برنده — مهم‌ترین بازخورد بصری صفحه: بدون آن
+              کاربر باید سوزن را با متنِ نتیجه تطبیق بدهد تا مطمئن شود
+              گردونه واقعاً همان‌جا ایستاده. یک قطاعِ conic-gradient روی
+              دیسک، پس با خودِ گردونه می‌چرخد. */}
+          {winner != null && state.prizes.length > 0 && (
+            <span
+              className="wheelWin"
+              style={{
+                '--a0': `${(winner * 360) / state.prizes.length}deg`,
+                '--a1': `${((winner + 1) * 360) / state.prizes.length}deg`,
+              }}
+            />
+          )}
         </div>
         {/* سر شخصیت نمی‌چرخد — بیرون از عنصر چرخان است */}
         <img className="wheelHub" src="/wheel/hub_head.webp" alt="" />
@@ -152,10 +169,11 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
       <div className="wheelActions">
         <button className="primary wheelBtn" onClick={spin} disabled={!canSpin}>
           {spinning ? 'در حال چرخش…'
-            : state.spinsLeft > 0 ? `بچرخان — ${fa(state.spinsLeft)} شانس`
-              : 'شانس امروزت تمام شد'}
+            : state.unlimited ? 'بچرخان (نامحدود)'
+              : state.spinsLeft > 0 ? `بچرخان — ${fa(state.spinsLeft)} شانس`
+                : 'شانس امروزت تمام شد'}
         </button>
-        {state.spinsLeft <= 0 && (
+        {state.spinsLeft <= 0 && !state.unlimited && (
           <p className="wheelReset">
             ⏳ شانس بعدی تا {countdown(state.resetInMs)} دیگر
           </p>
@@ -182,8 +200,10 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
         <summary>گردونه چطور کار می‌کند؟</summary>
         <ul>
           <li>
-            هر روز <b>{fa(state.dailyQuota ?? 1)} چرخش رایگان</b> داری.
-            {state.dailyQuota > 1 && ' (به‌خاطر دوستانی که دعوت کردی)'}
+            {state.unlimited
+              ? <>این حساب <b>چرخش نامحدود</b> دارد (حالت تست).</>
+              : <>هر روز <b>{fa(state.dailyQuota ?? 1)} چرخش رایگان</b> داری.
+                {state.dailyQuota > 1 && ' (به‌خاطر دوستانی که دعوت کردی)'}</>}
           </li>
           <li>چرخاندن گردونه <b>هیچ هزینه‌ای ندارد</b> و هیچ‌وقت نخواهد داشت.</li>
           <li>

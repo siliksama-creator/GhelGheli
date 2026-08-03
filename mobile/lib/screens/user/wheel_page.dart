@@ -76,8 +76,8 @@ class WheelPage extends StatefulWidget {
 
   final ApiClient api;
 
-  /// تعداد چرخش باقی‌مانده، برای نشانِ کنار آیکون نوار بالا.
-  final ValueChanged<int>? onSpinsChanged;
+  /// تعداد چرخش باقی‌مانده و پرچم نامحدود، برای نشانِ کنار آیکون نوار بالا.
+  final void Function(int spins, bool unlimited)? onSpinsChanged;
 
   /// وقتی جایزه‌ای داده شد صدا زده می‌شود تا امتیاز/موجودی هدر تازه شود.
   /// بدون این، کاربر جایزه را می‌بیند ولی عدد بالای صفحه هنوز قدیمی است.
@@ -101,10 +101,22 @@ class _WheelPageState extends State<WheelPage>
     duration: _spinDuration,
   );
 
+  /// نبضِ درخشش روی برشِ برنده، بعد از توقف گردونه.
+  ///
+  /// سه بار نبض می‌زند و بس. یک درخشش دائمی، پس‌زمینهٔ بصری می‌شود و
+  /// معنایش را از دست می‌دهد؛ سه نبض دقیقاً همان‌قدر هست که چشم بگیردش.
+  late final AnimationController _glowCtl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 520),
+  );
+
+  int _winnerIndex = -1;
+
   List<WheelPrize> _prizes = const [];
   int _spinsLeft = 0;
   int _bonusSpins = 0;
   int _dailyQuota = 1;
+  bool _unlimited = false;
   int _resetInMs = 0;
   bool _loading = true;
   bool _spinning = false;
@@ -127,6 +139,7 @@ class _WheelPageState extends State<WheelPage>
   @override
   void dispose() {
     _spinCtl.dispose();
+    _glowCtl.dispose();
     super.dispose();
   }
 
@@ -144,11 +157,12 @@ class _WheelPageState extends State<WheelPage>
         _spinsLeft = (map['spinsLeft'] as num?)?.toInt() ?? 0;
         _bonusSpins = (map['bonusSpins'] as num?)?.toInt() ?? 0;
         _dailyQuota = (map['dailyQuota'] as num?)?.toInt() ?? 1;
+        _unlimited = map['unlimited'] == true;
         _resetInMs = (map['resetInMs'] as num?)?.toInt() ?? 0;
         _loading = false;
         _error = null;
       });
-      widget.onSpinsChanged?.call(_spinsLeft);
+      widget.onSpinsChanged?.call(_spinsLeft, _unlimited);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -193,8 +207,22 @@ class _WheelPageState extends State<WheelPage>
       _toTurns = base + (frac < 0 ? frac + 1.0 : frac);
 
       GameAudio.instance.play(Sfx.tick, volume: 0.5);
-      _spinCtl.forward(from: 0);
-      await Future<void>.delayed(_spinDuration);
+      // درخشش قبلی خاموش شود تا وسط چرخشِ تازه روی برش قدیمی نماند.
+      _glowCtl.stop();
+      _glowCtl.value = 0;
+      _winnerIndex = -1;
+      // RESPECT THE USER'S SETTING. کسی که از سیستم‌عامل خواسته انیمیشن
+      // کمتر باشد، نتیجه را بلافاصله می‌بیند — بازی از دست نمی‌رود، فقط
+      // تعلیقش حذف می‌شود. WCAG 2.3.3، و نسخهٔ وب هم همین کار را با
+      // prefers-reduced-motion می‌کند.
+      final reduce = mounted &&
+          (MediaQuery.maybeDisableAnimationsOf(context) ?? false);
+      if (reduce) {
+        _spinCtl.value = 1;
+      } else {
+        _spinCtl.forward(from: 0);
+        await Future<void>.delayed(_spinDuration);
+      }
       if (!mounted) return;
 
       setState(() {
@@ -202,12 +230,21 @@ class _WheelPageState extends State<WheelPage>
         _spinsLeft = (map['spinsLeft'] as num?)?.toInt() ?? 0;
         _bonusSpins = (map['bonusSpins'] as num?)?.toInt() ?? 0;
         _dailyQuota = (map['dailyQuota'] as num?)?.toInt() ?? _dailyQuota;
+        _unlimited = map['unlimited'] == true;
         _resetInMs = (map['resetInMs'] as num?)?.toInt() ?? _resetInMs;
         _spinning = false;
       });
-      widget.onSpinsChanged?.call(_spinsLeft);
+      widget.onSpinsChanged?.call(_spinsLeft, _unlimited);
       GameAudio.instance.play(prize.kind == 'cash' ? Sfx.win : Sfx.matchFound);
       HapticFeedback.heavyImpact();
+      // سه نبضِ درخشش روی برشی که سوزن رویش ایستاده.
+      _winnerIndex = idx;
+      if (reduce) {
+        // درخشش می‌ماند (اطلاعات است، نه تزئین) ولی نبض نمی‌زند.
+        _glowCtl.value = 1;
+      } else {
+        _glowCtl.repeat(reverse: true, count: 6);
+      }
       widget.onChanged?.call();
     } catch (e) {
       if (!mounted) return;
@@ -296,10 +333,23 @@ class _WheelPageState extends State<WheelPage>
                           // دیسک یک بار ساخته می‌شود و فقط چرخانده می‌شود:
                           // بازسازی‌اش در هر فریم یعنی محاسبهٔ دوبارهٔ ۹ مسیر
                           // و ۹ چیدمان متن، ۶۰ بار در ثانیه.
+                          // AnimatedBuilder روی نبضِ درخشش، *داخل* عنصر
+                          // چرخان: چرخش و درخشش دو انیمیشن مستقل‌اند و
+                          // ادغامشان یعنی دیسک در هر فریمِ چرخش هم دوباره
+                          // رسم شود — ۹ مسیر و ۱۲ چیدمان متن، ۶۰ بار در
+                          // ثانیه، برای چیزی که فقط می‌چرخد.
                           child: RepaintBoundary(
-                            child: CustomPaint(
-                              painter: _WheelPainter(_prizes),
-                              size: Size.square(side),
+                            child: AnimatedBuilder(
+                              animation: _glowCtl,
+                              builder: (context, _) => CustomPaint(
+                                painter: _WheelPainter(
+                                  _prizes,
+                                  winnerIndex: _winnerIndex,
+                                  glow: Curves.easeInOut
+                                      .transform(_glowCtl.value),
+                                ),
+                                size: Size.square(side),
+                              ),
                             ),
                           ),
                         ),
@@ -338,7 +388,9 @@ class _WheelPageState extends State<WheelPage>
               child: Text(_spinning
                   ? 'در حال چرخش…'
                   : _spinsLeft > 0
-                      ? 'بچرخان (${faNum(_spinsLeft)} شانس)'
+                      ? (_unlimited
+                          ? 'بچرخان (نامحدود)'
+                          : 'بچرخان — ${faNum(_spinsLeft)} شانس')
                       : 'شانس امروزت تمام شد'),
             ),
           ),
@@ -375,13 +427,15 @@ class _WheelPageState extends State<WheelPage>
           ],
           if (_result != null) ...[
             Gaps.vLg,
-            _ResultCard(prize: _result!),
+            // ValueKey روی برچسب: اگر دو چرخش پیاپی یک جایزه بدهند، کلید
+            // عوض نمی‌شود و didUpdateWidget انیمیشن را دوباره اجرا می‌کند.
+            _ResultCard(key: const ValueKey('wheelResult'), prize: _result!),
           ],
           Gaps.vLg,
           // قوانین — مالک خواست همه‌چیز برای کاربر توضیح داده شود. بدون
           // این، کاربر نمی‌داند چرا امروز ۱ چرخش دارد و دوستش ۳ تا، و فکر
           // می‌کند سیستم خراب است.
-          _RulesCard(dailyQuota: _dailyQuota),
+          _RulesCard(dailyQuota: _dailyQuota, unlimited: _unlimited),
           Gaps.vLg,
         ],
       ),
@@ -454,9 +508,15 @@ class _PointerPainter extends CustomPainter {
 /// سرور انتخاب کرده. اگر برش «۱۰۰ امتیاز» با احتمال ۷۴٪ سه‌چهارم دایره را
 /// می‌گرفت، دیگر گردونه به‌نظر نمی‌رسید.
 class _WheelPainter extends CustomPainter {
-  _WheelPainter(this.prizes);
+  _WheelPainter(this.prizes, {this.winnerIndex = -1, this.glow = 0});
 
   final List<WheelPrize> prizes;
+
+  /// برشِ برنده، برای درخشش بعد از توقف. ‎-1 یعنی هیچ.
+  final int winnerIndex;
+
+  /// شدت درخشش، ۰ تا ۱ — از یک انیمیشن نبض‌دار می‌آید.
+  final double glow;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -493,6 +553,29 @@ class _WheelPainter extends CustomPainter {
           ..strokeWidth = 1.6
           ..color = const Color(0xFF0B1220),
       );
+
+      // درخشش روی برشِ برنده.
+      //
+      // مهم‌ترین بازخورد بصری کل صفحه: بدون آن، کاربر باید سوزن را با متنِ
+      // کارت نتیجه تطبیق بدهد تا مطمئن شود گردونه واقعاً همان‌جا ایستاده.
+      // با آن، پاسخ در نگاه اول معلوم است — و همین «قابل اعتماد بودن»
+      // است که یک گردونهٔ خوب را از یک انیمیشن تصادفی جدا می‌کند.
+      if (i == winnerIndex && glow > 0) {
+        canvas.drawPath(
+          path,
+          Paint()
+            ..color = Colors.white.withValues(alpha: 0.30 * glow)
+            ..blendMode = BlendMode.plus,
+        );
+        canvas.drawPath(
+          path,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 3.5
+            ..color = Colors.white.withValues(alpha: 0.85 * glow)
+            ..maskFilter = MaskFilter.blur(BlurStyle.normal, 4 * glow),
+        );
+      }
     }
 
     // حلقهٔ طلایی بیرونی
@@ -610,17 +693,75 @@ class _WheelPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _WheelPainter old) => old.prizes != prizes;
+  bool shouldRepaint(covariant _WheelPainter old) =>
+      old.prizes != prizes ||
+      old.winnerIndex != winnerIndex ||
+      old.glow != glow;
 }
 
-class _ResultCard extends StatelessWidget {
-  const _ResultCard({required this.prize});
+/// کارت نتیجه، با ورودِ فنری.
+///
+/// چرا انیمیشن دارد: لحظهٔ رسیدن جایزه تنها بازخوردی است که کاربر بعد از
+/// ۵.۶ ثانیه انتظار می‌گیرد. ظاهر شدنِ ناگهانی، آن لحظه را به یک تغییرِ
+/// بی‌صدا در چیدمان تبدیل می‌کند.
+///
+/// StatefulWidget است نه یک AnimatedContainer ساده، چون باید **هر بار**
+/// که جایزهٔ تازه‌ای می‌آید دوباره اجرا شود — نه فقط بار اول.
+class _ResultCard extends StatefulWidget {
+  const _ResultCard({super.key, required this.prize});
 
   final WheelPrize prize;
 
   @override
+  State<_ResultCard> createState() => _ResultCardState();
+}
+
+class _ResultCardState extends State<_ResultCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _in = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 620),
+  )..forward();
+
+  @override
+  void didUpdateWidget(covariant _ResultCard old) {
+    super.didUpdateWidget(old);
+    // جایزهٔ تازه = ورود تازه. بدون این، چرخش دوم کارت را بی‌حرکت
+    // به‌روز می‌کرد و حس «برنده شدم» از بین می‌رفت.
+    if (old.prize.label != widget.prize.label ||
+        old.prize.value != widget.prize.value) {
+      _in.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _in.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _in,
+      builder: (context, child) {
+        // elasticOut یک «تاپ» کوچک می‌دهد؛ easeOut جداگانه برای شفافیت
+        // تا کارت در حال بزرگ شدن، محو هم نباشد.
+        final scale = Curves.elasticOut.transform(_in.value);
+        final fade = Curves.easeOut.transform(
+            (_in.value * 2.2).clamp(0.0, 1.0));
+        return Opacity(
+          opacity: fade,
+          child: Transform.scale(scale: 0.6 + 0.4 * scale, child: child),
+        );
+      },
+      child: _buildCard(context),
+    );
+  }
+
+  Widget _buildCard(BuildContext context) {
     final theme = Theme.of(context);
+    final prize = widget.prize;
     final isCash = prize.kind == 'cash';
     final tint = isCash ? const Color(0xFFFCD34D) : const Color(0xFF67E8F9);
     return Container(
@@ -629,6 +770,14 @@ class _ResultCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: tint.withValues(alpha: 0.14),
         borderRadius: Corners.rLg,
+        border: Border.all(color: tint.withValues(alpha: 0.35)),
+        boxShadow: [
+          BoxShadow(
+            color: tint.withValues(alpha: isCash ? 0.28 : 0.16),
+            blurRadius: 28,
+            spreadRadius: -6,
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -648,9 +797,10 @@ class _ResultCard extends StatelessWidget {
 
 /// توضیح قوانین گردونه.
 class _RulesCard extends StatelessWidget {
-  const _RulesCard({required this.dailyQuota});
+  const _RulesCard({required this.dailyQuota, this.unlimited = false});
 
   final int dailyQuota;
+  final bool unlimited;
 
   @override
   Widget build(BuildContext context) {
@@ -687,8 +837,11 @@ class _RulesCard extends StatelessWidget {
                 color: const Color(0xFFA3E635),
               )),
           Gaps.vXs,
-          row('هر روز ${faNum(dailyQuota)} چرخش رایگان داری'
-              '${dailyQuota > 1 ? ' (به‌خاطر دوستانی که دعوت کردی)' : ''}.'),
+          if (unlimited)
+            row('این حساب چرخش نامحدود دارد (حالت تست).')
+          else
+            row('هر روز ${faNum(dailyQuota)} چرخش رایگان داری'
+                '${dailyQuota > 1 ? ' (به‌خاطر دوستانی که دعوت کردی)' : ''}.'),
           row('چرخاندن گردونه هیچ هزینه‌ای ندارد و هیچ‌وقت نخواهد داشت.'),
           row('به ازای هر ${faNum(10)} دوستی که دعوت کنی، یک چرخش رایگانِ '
               'روزانهٔ دیگر می‌گیری — تا سقف ${faNum(50)} دوست.'),
