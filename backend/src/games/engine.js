@@ -76,9 +76,15 @@ function roomOfSocket(socket) {
 // Snapshot sent to the client. `decorate` lets a game expose per-player hints
 // (e.g. Reversi's legal squares) without the engine knowing the rules.
 function snapshot(room, symbol) {
-  const s = room.rules.decorate
-    ? room.rules.decorate(room.state, symbol)
+  // publicState اولویت دارد چون یک محافظ امنیتی است، نه یک زینت.
+  //
+  // در بازی‌های هم‌زمان (پنالتی) وضعیت شامل انتخابِ قفل‌نشدهٔ حریف است.
+  // اگر خامش برود، دروازه‌بان می‌بیند زننده کجا شوت می‌کند و بازی برای
+  // همیشه شکسته است. حذفش یک بار اینجا انجام می‌شود نه در چند نقطه.
+  let s = room.rules.publicState
+    ? room.rules.publicState(room.state, symbol)
     : room.state;
+  if (room.rules.decorate) s = room.rules.decorate(s, symbol);
   return { ...s, turn: room.turn };
 }
 
@@ -131,13 +137,32 @@ function emitState(room, event, extra = {}) {
 function armTurnClock(room) {
   clearTimeout(room.turnTimer);
   if (room.done) return;
+  const sim = !!room.rules.simultaneous;
   // The bot moves on its own schedule; no clock needed for its seat.
+  // در حالت هم‌زمان، ساعت برای هر دو صندلی است چون هر دو باید انتخاب
+  // کنند — پس فقط وقتی صرف‌نظر می‌کنیم که هر دو صندلی ربات باشند.
   const seat = room.seats[room.turn];
-  if (!seat || seat === 'BOT') { room.deadline = null; return; }
+  if (!sim && (!seat || seat === 'BOT')) { room.deadline = null; return; }
   room.deadline = Date.now() + room.turnMs;
   room.turnTimer = setTimeout(() => {
     try {
     if (room.done) return;
+    // در حالت هم‌زمان، هر بازیکن انسانی که هنوز انتخاب نکرده، خودکار
+    // برایش انتخاب می‌شود — وگرنه یک نفر که گوشی‌اش را زمین گذاشته،
+    // بازی را برای حریف قفل می‌کند.
+    if (sim) {
+      for (const s2 of ['X', 'O']) {
+        const sk = room.seats[s2];
+        if (!sk || sk === 'BOT') continue;
+        let m = null;
+        try { m = room.rules.botMove(room.state, s2); } catch { /* ignore */ }
+        if (m && room.rules.isValidMove(room.state, m, s2)) {
+          room.timedOut = s2;
+          room.rules.applyMove(room.state, m, s2);
+        }
+      }
+      return advance(room, null);
+    }
     const sym = room.turn;
     let move = null;
     try {
@@ -228,13 +253,19 @@ function finish(room, winner) {
 }
 
 function scheduleBot(room) {
-  if (!room.vsBot || room.done || room.turn !== 'O') return;
+  // در بازی هم‌زمان، ربات همیشه باید انتخاب کند — چه زننده باشد چه
+  // دروازه‌بان. شرط `turn !== 'O'` آن را در نیمی از ضربه‌ها خاموش
+  // می‌کرد و بازی مقابل کامپیوتر برای همیشه منتظر می‌ماند.
+  const sim = !!room.rules.simultaneous;
+  if (!room.vsBot || room.done || (!sim && room.turn !== 'O')) return;
   clearTimeout(room.botTimer);
   room.botTimer = setTimeout(() => {
     try {
-      if (room.done || room.turn !== 'O') return;
+      if (room.done || (!sim && room.turn !== 'O')) return;
       const move = room.rules.botMove(room.state, 'O');
       if (move === null || move === undefined) return advance(room, null);
+      // اگر ربات قبلاً در همین ضربه انتخاب کرده، دوباره نفرست.
+      if (!room.rules.isValidMove(room.state, move, 'O')) return;
       room.rules.applyMove(room.state, move, 'O');
       advance(room, move);
     } catch (e) {
@@ -261,7 +292,22 @@ function advance(room, lastMove, extra = {}) {
   room.turn = next;
   armTurnClock(room);
   emitState(room, 'game:update', {
-    lastMove,
+    // ═══════════════════════════════════════════════════════════════════
+    // چرا lastMove در بازی هم‌زمان حذف می‌شود
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    // publicState انتخابِ قفل‌نشدهٔ حریف را از `state` پاک می‌کند، ولی
+    // موتور همان حرکت را جداگانه در `lastMove` هم برای **هر دو** بازیکن
+    // می‌فرستاد. یعنی در پنالتی، لحظه‌ای که زننده شوتش را ثبت می‌کرد،
+    // دروازه‌بان دقیقاً می‌دید `{zone: 7, power: 0.9}` — و همیشه مهار
+    // می‌کرد. بازی از پایه شکسته بود.
+    //
+    // با تست یکپارچگی روی موتور واقعی پیدا شد، نه با تست واحد: فایل
+    // قوانین کاملاً درست بود و تنها این مسیرِ جانبی نشت داشت.
+    //
+    // در بازی‌های نوبتی lastMove لازم است (حریف باید حرکت را ببیند) و
+    // نشتی هم ندارد چون نوبت قبلاً تمام شده.
+    lastMove: room.rules.simultaneous ? null : lastMove,
     timedOut: room.timedOut || null,
     ...extra,
   });
@@ -426,10 +472,22 @@ module.exports = function attachGames(io, rulesById) {
       if (!room || room.done) return;
 
       const sym = room.seats.X === socket ? 'X' : (room.seats.O === socket ? 'O' : null);
-      if (!sym || room.turn !== sym) return;
+      // بازی هم‌زمان: هر دو بازیکن در یک لحظه انتخاب می‌کنند، پس شرطِ
+      // «نوبت تو نیست» آن را کاملاً قفل می‌کرد. خودِ فایل قوانین با
+      // isValidMove جلوی انتخاب دوباره را می‌گیرد.
+      if (!sym) return;
+      if (!room.rules.simultaneous && room.turn !== sym) return;
 
-      const move = Number(payload.move);
-      if (!Number.isInteger(move)) return;
+      // حرکت می‌تواند عدد باشد (تخته‌ای) یا شیء (پنالتی: ناحیه + قدرت).
+      // Number() روی شیء NaN می‌دهد و حرکت را بی‌صدا می‌انداخت.
+      const raw = payload.move;
+      let move;
+      if (raw !== null && typeof raw === 'object') {
+        move = raw;
+      } else {
+        move = Number(raw);
+        if (!Number.isInteger(move)) return;
+      }
       if (!room.rules.isValidMove(room.state, move, sym)) return;
 
       // A real move from this player clears their stale timeout notice.
