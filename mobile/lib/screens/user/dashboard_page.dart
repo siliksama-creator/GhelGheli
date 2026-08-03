@@ -76,14 +76,27 @@ class _DashboardPageState extends State<DashboardPage> {
     // کاربر تا ابد روی چرخنده می‌ماند بدون پیام و بدون دکمهٔ تلاش دوباره.
     // این همان «صفحات اپ بعد ورود لود نمیشن» است.
     //
-    // Fetched together instead of one-after-the-other: the dashboard used to
-    // wait for the SUM of both round trips before it could paint.
+    // یک درخواست به‌جای دو تا.
+    //
+    // موازی کردنشان قبلاً کمک کرد، ولی کف همچنان یک رفت‌وبرگشت کامل بود —
+    // و تا ایران آن کف حدود نیم ثانیه است. /api/bootstrap همان داده را در
+    // یک پاسخ می‌دهد.
     try {
-      final results = await widget.api.getAll(['/api/profile', '/api/rewards']);
+      final boot = await widget.api.get('/api/bootstrap');
       if (!mounted) return;
+      final m = boot is Map
+          ? Map<String, dynamic>.from(boot)
+          : <String, dynamic>{};
       setState(() {
-        _data = Map<String, dynamic>.from(results[0]);
-        _rewards = List<Map<String, dynamic>>.from(results[1]);
+        _data = <String, dynamic>{
+          'user': m['user'],
+          'inventory': m['inventory'] ?? const [],
+          'leaguePayouts': m['leaguePayouts'] ?? const [],
+        };
+        _rewards = List<Map<String, dynamic>>.from(
+            ((m['rewards'] as List?) ?? const [])
+                .whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e)));
         _error = null;
         _loading = false;
       });

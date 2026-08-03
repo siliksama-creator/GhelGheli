@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -170,33 +168,29 @@ class _HomeShellState extends State<HomeShell>
   }
 
   Future<void> _loadProfile() async {
+    // /api/bootstrap به‌جای /api/profile: همان داده را می‌دهد به‌علاوهٔ
+    // جوایز و وضعیت گردونه، در یک رفت‌وبرگشت. داشبورد هم از همین
+    // می‌خواند، پس این پاسخ عملاً کش گرم را برای هر دو پر می‌کند.
     try {
-      final d = await widget.api.get('/api/profile');
-      if (mounted) setState(() => _profile = Map<String, dynamic>.from(d));
+      final d = await widget.api.get('/api/bootstrap');
+      if (!mounted || d is! Map) return;
+      final m = Map<String, dynamic>.from(d);
+      final w = m['wheel'];
+      setState(() {
+        _profile = <String, dynamic>{
+          'user': m['user'],
+          'inventory': m['inventory'] ?? const [],
+          'leaguePayouts': m['leaguePayouts'] ?? const [],
+        };
+        // شمارندهٔ گردونه هم از همین پاسخ می‌آید، پس نشانِ نوار بالا
+        // هم‌زمان با بقیهٔ هدر ظاهر می‌شود نه نیم ثانیه بعد.
+        if (w is Map) {
+          _spins = (w['spinsLeft'] as num?)?.toInt() ?? _spins;
+          _unlimitedSpins = w['unlimited'] == true;
+        }
+      });
     } catch (_) {
       // Non-fatal: dashboard/profile pages fetch their own data too.
-    }
-    // جدا و بی‌صدا: نشانِ گردونه یک زینت است و شکستش نباید روی داشبورد
-    // اثر بگذارد.
-    unawaited(_loadSpins());
-  }
-
-  Future<void> _loadSpins() async {
-    try {
-      // /api/wheel/count نه /api/wheel: دومی کل کاتالوگ ۱۲ جایزه را با
-      // رنگ و برچسب می‌فرستد و نشانِ نوار بالا فقط یک عدد می‌خواهد.
-      final d = await widget.api.get('/api/wheel/count');
-      if (!mounted || d is! Map) return;
-      final n = (d['spinsLeft'] as num?)?.toInt();
-      final u = d['unlimited'] == true;
-      if (n != _spins || u != _unlimitedSpins) {
-        setState(() {
-          _spins = n;
-          _unlimitedSpins = u;
-        });
-      }
-    } catch (_) {
-      // بدون نشان بهتر از یک عدد غلط است.
     }
   }
 

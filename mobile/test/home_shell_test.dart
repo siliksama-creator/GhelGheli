@@ -45,7 +45,15 @@ class _FakeAdapter implements HttpClientAdapter {
       '"wallet_balance":0,"status":"active","profile_avatar_key":'
       '"avatar_1_football.png"},"inventory":[],"leaguePayouts":[]}';
 
+  static const _bootstrap = '{"user":{"id":"u1","nickname":"تست",'
+      '"current_points":120,"lifetime_points":300,"monthly_league_points":50,'
+      '"wallet_balance":0,"status":"active","profile_avatar_key":'
+      '"avatar_1_football.png"},"inventory":[],"leaguePayouts":[],'
+      '"rewards":[],"wheel":{"spinsLeft":1,"unlimited":false}}';
+
   static final Map<String, String> _routes = {
+    '/api/bootstrap': _bootstrap,
+    '/api/wheel/count': '{"spinsLeft":1,"unlimited":false}',
     '/api/profile': _profile,
     '/api/rewards': '[]',
     '/api/wheel': '{"prizes":[{"id":"p1","label":"۱۰۰ امتیاز","kind":"points",'
@@ -197,7 +205,7 @@ void main() {
   group('مقاومت در برابر خطای شبکه', () {
     testWidgets('۵۰۰ روی پروفایل اپ را سفید نمی‌کند', (tester) async {
       await tester.pumpWidget(
-          _wrap(_fakeApi(failing: {'/api/profile': 500})));
+          _wrap(_fakeApi(failing: {'/api/bootstrap': 500})));
       await tester.pump();
       await tester.pump(const Duration(seconds: 2));
 
@@ -222,7 +230,7 @@ void main() {
       // اگر بارگذاری‌ها سریالی باشند، کاربر مجموع همهٔ تأخیرها را
       // منتظر می‌ماند. با موازی بودن، کندترین یکی تعیین‌کننده است.
       await tester.pumpWidget(_wrap(_fakeApi(slow: {
-        '/api/rewards': const Duration(seconds: 4),
+        '/api/bootstrap': const Duration(seconds: 4),
       })));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 900));
