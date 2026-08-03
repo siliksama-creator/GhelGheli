@@ -283,9 +283,14 @@ class _AdminCardsState extends State<AdminCards> {
             DropdownButtonFormField<String>(
               initialValue: _selectedType,
               decoration: const InputDecoration(labelText: 'نوع کارت'),
+              // `as String` روی داده‌ای که از شبکه می‌آید یک کرش منتظر
+              // است: کافی است یک ردیف id نداشته باشد تا کل صفحهٔ مدیریت
+              // سفید شود. ردیف‌های بی‌شناسه کنار گذاشته می‌شوند — یک
+              // گزینهٔ کمتر، به‌جای یک پنل از کار افتاده.
               items: _types
+                  .where((t) => t['id'] != null)
                   .map<DropdownMenuItem<String>>((t) => DropdownMenuItem(
-                      value: t['id'] as String,
+                      value: '${t['id']}',
                       child: Text('${t['name']} — ${faNum(t['point_value'])}')))
                   .toList(),
               onChanged: (v) => setState(() => _selectedType = v),

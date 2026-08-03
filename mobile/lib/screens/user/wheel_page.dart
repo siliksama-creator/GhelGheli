@@ -655,9 +655,28 @@ class _WheelPainter extends CustomPainter {
     return (p.label.substring(0, i), p.label.substring(i + 1));
   }
 
+  /// برچسب‌های shape‌شده، کش‌شده بین فریم‌ها.
+  ///
+  /// TextPainter.layout() یکی از گران‌ترین کارهایی است که می‌شود داخل
+  /// paint() انجام داد، و این پینتر ۲۴ برچسب دارد (عدد + واحد، برای ۱۲
+  /// برش). هنگام نبضِ درخشش، paint در هر فریم صدا زده می‌شود — یعنی
+  /// بدون کش، ۲۴ چیدمان متن در هر فریم برای متنی که هرگز عوض نمی‌شود.
+  ///
+  /// کلید شامل اندازه و وزن است، پس گردونه در دو اندازهٔ مختلف (موبایل و
+  /// تبلت) برچسب‌های هم را خراب نمی‌کند. کش static است چون بین
+  /// نمونه‌های پینتر — که در هر فریم دوباره ساخته می‌شوند — باید بماند.
+  static final Map<String, TextPainter> _labelCache = {};
+
   void _text(Canvas canvas, String s, double size, FontWeight w, Offset at,
       {double opacity = 1}) {
     if (s.isEmpty) return;
+    final key = '$s|${size.toStringAsFixed(1)}|${w.value}|'
+        '${opacity.toStringAsFixed(2)}';
+    final cached = _labelCache[key];
+    if (cached != null) {
+      cached.paint(canvas, at + Offset(-cached.width / 2, -cached.height / 2));
+      return;
+    }
     final tp = TextPainter(
       text: TextSpan(
         text: s,
@@ -683,6 +702,10 @@ class _WheelPainter extends CustomPainter {
       // متن هرگز نباید بشکند: یک برچسب دوخطیِ ناخواسته از برش بیرون می‌زند.
       maxLines: 1,
     )..layout();
+    // کران بالا: اندازهٔ گردونه با عرض صفحه عوض می‌شود و بدون سقف، یک
+    // چرخش صفحه در حین بازی می‌تواند کش را بی‌نهایت بزرگ کند.
+    if (_labelCache.length > 96) _labelCache.clear();
+    _labelCache[key] = tp;
     tp.paint(canvas, at + Offset(-tp.width / 2, -tp.height / 2));
   }
 

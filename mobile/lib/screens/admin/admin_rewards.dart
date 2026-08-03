@@ -292,9 +292,10 @@ class _AdminRewardsState extends State<AdminRewards> {
               items: [
                 const DropdownMenuItem<String?>(
                     value: null, child: Text('بدون گروه')),
-                for (final g in _groups)
+                // `as String` روی دادهٔ شبکه = کرش با یک id نال.
+                for (final g in _groups.where((g) => g['id'] != null))
                   DropdownMenuItem<String?>(
-                      value: g['id'] as String, child: Text('${g['name']}')),
+                      value: '${g['id']}', child: Text('${g['name']}')),
               ],
               onChanged: (v) => setState(() => _groupId = v),
             ),
@@ -404,14 +405,16 @@ class _AdminRewardsState extends State<AdminRewards> {
                             items: [
                               const DropdownMenuItem<String?>(
                                   value: null, child: Text('بدون گروه')),
-                              for (final g in _groups)
+                              for (final g
+                                  in _groups.where((g) => g['id'] != null))
                                 DropdownMenuItem<String?>(
-                                    value: g['id'] as String,
+                                    value: '${g['id']}',
                                     child: Text('${g['name']}',
                                         overflow: TextOverflow.ellipsis)),
                             ],
-                            onChanged: (v) =>
-                                _moveTier(r['id'] as String, v),
+                            onChanged: r['id'] == null
+                                ? null
+                                : (v) => _moveTier('${r['id']}', v),
                           ),
                         ),
                       ))
