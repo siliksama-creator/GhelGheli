@@ -792,6 +792,54 @@ app.get('/api/profile', auth, asyncHandler(async (req, res) => {
   const leaguePayouts = await pool.query(`SELECT p.*, s.month_year FROM league_payouts p JOIN league_seasons s ON s.id=p.league_season_id WHERE p.user_id=$1 ORDER BY p.created_at DESC LIMIT 20`, [req.user.id]);
   res.json({ user: safeUser(req.user), inventory: inv.rows, leaguePayouts: leaguePayouts.rows });
 }));
+// ── بوت‌استرپ: هر چیزی که اپ بلافاصله بعد از ورود لازم دارد ──────────────
+//
+// چرا این endpoint وجود دارد
+//
+// اپ بعد از ورود سه درخواست جدا می‌زد: profile، rewards و wheel. هر سه
+// روی سرور در مجموع کمتر از ۵ میلی‌ثانیه کار می‌برند — اندازه‌گیری شد —
+// ولی هرکدام حدود ۵۰۰ میلی‌ثانیه طول می‌کشند چون تأخیر شبکه تا ایران
+// همین‌قدر است. یعنی ۹۹٪ زمان انتظار کاربر، رفت‌وبرگشت است نه محاسبه.
+//
+// موازی کردنشان کمک کرد (۱۸۴۸ به ۸۲۱ میلی‌ثانیه)، ولی کف همچنان یک
+// رفت‌وبرگشت کامل است. یکی کردنشان آن کف را به یک رفت‌وبرگشت می‌رساند و
+// دو تای دیگر را کاملاً حذف می‌کند.
+//
+// حجم پاسخ‌ها ناچیز است (۰.۸ تا ۱.۸ کیلوبایت)، پس یکی کردنشان هیچ هزینهٔ
+// پهنای باندی ندارد.
+//
+// Promise.all و نه await پشت سر هم: سه کوئری مستقل‌اند و سریالی کردنشان
+// همان اشتباهی است که این endpoint قرار است حل کند.
+app.get('/api/bootstrap', auth, asyncHandler(async (req, res) => {
+  const [inv, payouts, rewards, wheelState] = await Promise.all([
+    pool.query(
+      `SELECT i.*, t.name, t.image_url, t.point_value
+         FROM user_card_inventory i
+         JOIN card_types t ON t.id = i.card_type_id
+        WHERE i.user_id = $1 AND i.consumed_in_reward = false
+        ORDER BY t.name`, [req.user.id]),
+    pool.query(
+      `SELECT p.*, s.month_year FROM league_payouts p
+         JOIN league_seasons s ON s.id = p.league_season_id
+        WHERE p.user_id = $1 ORDER BY p.created_at DESC LIMIT 20`,
+      [req.user.id]),
+    pool.query(
+      `SELECT * FROM reward_tiers WHERE is_active = true
+        ORDER BY required_points`),
+    // شکست گردونه نباید کل بوت‌استرپ را ببرد: نشانِ چرخش یک زینت است،
+    // پروفایل نیست.
+    wheel.status(req.user.id).catch(() => null),
+  ]);
+
+  res.json({
+    user: safeUser(req.user),
+    inventory: inv.rows,
+    leaguePayouts: payouts.rows,
+    rewards: rewards.rows,
+    wheel: wheelState,
+  });
+}));
+
 app.patch('/api/profile', auth, asyncHandler(async (req, res) => {
   const b = req.body || {};
   // EVERY field is validated here rather than trusted. Before this, three

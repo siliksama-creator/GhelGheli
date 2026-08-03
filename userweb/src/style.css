@@ -2144,3 +2144,51 @@ a:focus-visible {
   .notifDot, .wheelBadge { animation: none }
   .bar span { transition: none }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   گردونه — دکمهٔ چرخاندن و جشن برد
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* دکمه قهرمانِ این صفحه است، پس باید مثل قهرمان به‌نظر برسد. سفیدِ ساده
+   با بقیهٔ دکمه‌های ثانویه اشتباه گرفته می‌شد. */
+.wheelBtn {
+  background: linear-gradient(135deg, #b5ef58, #00d49a 55%, #22d3ee);
+  color: #06210b;
+  font-size: 17px; font-weight: 900;
+  padding: 15px 30px; border-radius: 999px;
+  box-shadow: 0 14px 34px -8px #00d49a80, inset 0 1px 0 #ffffff60;
+  position: relative; overflow: hidden;
+}
+/* درخششی که آرام از رویش رد می‌شود — «بزن روی من». */
+.wheelBtn:not(:disabled)::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(100deg, transparent 30%, #ffffff55, transparent 70%);
+  animation: btnSheen 3.2s ease-in-out infinite;
+}
+@keyframes btnSheen { 0% { transform: translateX(-120%) } 55%,100% { transform: translateX(120%) } }
+.wheelBtn:disabled {
+  background: #ffffff10; color: #7f93aa;
+  box-shadow: none; cursor: not-allowed;
+}
+.wheelBtn:disabled::after { display: none }
+
+/* نتیجه: جشن کوچک برای جایزهٔ نقدی */
+.wheelResult.cash {
+  background: linear-gradient(135deg, #f59e0b28, #fbbf2418);
+  border: 1px solid #fbbf2455;
+  box-shadow: 0 0 40px -10px #f59e0b66;
+}
+.wheelResult.points { border: 1px solid #22d3ee33 }
+
+/* سوزن موقع چرخش کمی می‌لرزد، مثل گردونهٔ واقعی که به میخ‌ها می‌خورد */
+.wheelSpinner ~ .wheelPointer { transform-origin: 50% 18%; }
+.spinning .wheelPointer { animation: pointerTick .09s ease-in-out infinite }
+@keyframes pointerTick {
+  0%,100% { transform: translateX(-50%) rotate(0deg) }
+  50% { transform: translateX(-50%) rotate(-7deg) }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wheelBtn::after { animation: none }
+  .spinning .wheelPointer { animation: none }
+}

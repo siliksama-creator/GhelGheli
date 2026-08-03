@@ -132,7 +132,7 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
     <section className="card wide wheelPage">
       <h2 className="wheelTitle">🎡 گردونهٔ شانس</h2>
 
-      <div className="wheelStage">
+      <div className={`wheelStage${spinning ? ' spinning' : ''}`}>
         <img className="wheelPointer" src="/wheel/pointer.svg" alt="" />
         <div
           className="wheelSpinner"
