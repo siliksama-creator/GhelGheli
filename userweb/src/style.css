@@ -2210,7 +2210,14 @@ a:focus-visible {
    ستون فقرات طراحی: دو ردیفِ موازی (رایگان بالا، پلاس پایین) با اسکرول
    افقی. کاربر در یک نگاه می‌بیند در هر پله چه چیزی را از دست می‌دهد
    اگر پلاس نخرد — و این خودش قوی‌ترین دلیل خرید است. */
-.passWrap { display: flex; flex-direction: column; gap: 14px; }
+.passWrap {
+  display: flex; flex-direction: column; gap: 14px;
+  /* بدون این، ۵۰ ستونِ مسیر عرضِ خودشان را به کل صفحه تحمیل می‌کردند
+     (main به ۱۰۸۰px کشیده می‌شد روی نمایشگر ۳۹۰px) و کل اپ افقی
+     اسکرول می‌شد. min-width:0 اجازه می‌دهد فرزندِ flex کوچک‌تر از
+     محتوایش شود تا overflow داخل .passScroll بماند. */
+  min-width: 0; max-width: 100%;
+}
 
 .passHead { background: linear-gradient(135deg, #10233a 0%, #0b1728 100%); }
 .passHeadTop {
@@ -2268,7 +2275,15 @@ a:focus-visible {
 .passScroll {
   display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px;
   scroll-snap-type: x proximity;
+  /* همان دلیل بالا: این عنصر باید تنها جایی باشد که اسکرول افقی دارد. */
+  min-width: 0; max-width: 100%;
+  -webkit-overflow-scrolling: touch;
 }
+.passTrackCard { min-width: 0; max-width: 100%; overflow: hidden; }
+/* ستون‌ها نباید جمع شوند وگرنه خانه‌ها له می‌شوند */
+.passCol { flex: 0 0 auto; }
+.passRowLabels { flex: 0 0 auto; }
+.passTiers { flex: 0 0 auto; }
 .passRowLabels {
   display: grid; grid-template-rows: 68px 26px 68px; gap: 6px;
   position: sticky; inset-inline-start: 0; z-index: 2;
