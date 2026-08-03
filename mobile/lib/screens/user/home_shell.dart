@@ -10,6 +10,7 @@ import 'league_page.dart';
 import 'profile_page.dart';
 import 'rewards_page.dart';
 import 'shop_page.dart';
+import 'pass_page.dart';
 import 'wallet_page.dart';
 import 'support_page.dart';
 import 'wheel_page.dart';
@@ -49,6 +50,13 @@ class _HomeShellState extends State<HomeShell>
 
   /// حساب تست مالک: به‌جای «۹۹۹۹۹۹» نشانِ «∞» نشان داده می‌شود.
   bool _unlimitedSpins = false;
+
+  /// تعداد جوایز آمادهٔ دریافت در گذر نبرد — برای نشانِ نوار بالا.
+  ///
+  /// از همان /api/bootstrap می‌آید، پس هیچ درخواست اضافه‌ای ندارد. نشان
+  /// مهم‌ترین بخش است: کاربر باید بدون باز کردن صفحه بفهمد چیزی منتظرش
+  /// است.
+  int _passClaimable = 0;
 
   // A subtle one-shot "welcome" entrance the moment the user lands on the
   // home shell after logging in — fades and lifts the whole shell into
@@ -102,6 +110,11 @@ class _HomeShellState extends State<HomeShell>
     ),
     ReferralPage(api: widget.api),
     ShopPage(api: widget.api),
+    PassPage(
+      api: widget.api,
+      onOpenShop: () => setState(() => _index = shopIndex),
+      onChanged: _loadProfile,
+    ),
   ];
 
   /// شمارهٔ صفحهٔ گردونه — از آیکون نوار بالا مستقیم به آن پرش می‌شود.
@@ -121,6 +134,9 @@ class _HomeShellState extends State<HomeShell>
   /// کنار گردونه، مستقیم باز می‌شود.
   static const shopIndex = 9;
 
+  /// شمارهٔ صفحهٔ گذر نبرد.
+  static const passIndex = 10;
+
   // UI FIX: seven destinations squeezed into one bar made every icon and
   // label tiny (and the Persian labels were truncating). Material's own
   // guidance caps a navigation bar at five.
@@ -136,7 +152,7 @@ class _HomeShellState extends State<HomeShell>
   // کارت را رد می‌کرد یا اسکرول می‌کرد، دیگر هیچ راهی به صفحهٔ دعوت
   // نداشت — یعنی سیستمِ رشدِ اپ عملاً پنهان بود. کیف پول (۲)، پشتیبانی
   // (۵) و پروفایل (۶) از قبل اینجا بودند.
-  static const _moreIndexes = [2, referralIndex, 5, 6];
+  static const _moreIndexes = [2, referralIndex, passIndex, 5, 6];
 
   /// شمارهٔ صفحهٔ کیف پول — از هدر داشبورد مستقیم به آن پرش می‌شود.
   static const _walletIndex = 2;
@@ -186,6 +202,10 @@ class _HomeShellState extends State<HomeShell>
         icon: Icon(Icons.storefront_outlined),
         selectedIcon: Icon(Icons.storefront_rounded),
         label: 'فروشگاه'),
+    NavigationDestination(
+        icon: Icon(Icons.military_tech_outlined),
+        selectedIcon: Icon(Icons.military_tech_rounded),
+        label: 'گذر نبرد'),
   ];
 
   @override
@@ -226,6 +246,10 @@ class _HomeShellState extends State<HomeShell>
           _spins = (w['spinsLeft'] as num?)?.toInt() ?? _spins;
           _unlimitedSpins = w['unlimited'] == true;
         }
+        final p = m['pass'];
+        if (p is Map) {
+          _passClaimable = (p['claimable'] as num?)?.toInt() ?? 0;
+        }
       });
     } catch (_) {
       // Non-fatal: dashboard/profile pages fetch their own data too.
@@ -255,7 +279,8 @@ class _HomeShellState extends State<HomeShell>
     'پروفایل',
     'گردونهٔ شانس',
     'دعوت دوستان',
-    'فروشگاه'
+    'فروشگاه',
+    'گذر نبرد'
   ];
 
   /// Which bar slot to highlight — the "more" slot when a sheet-only page
@@ -354,6 +379,11 @@ class _HomeShellState extends State<HomeShell>
           // هر دو میان‌بر به صفحه‌هایی می‌روند که در نوار پایین جا
           // نمی‌شوند (متریال حداکثر پنج مقصد) ولی مهم‌ترین‌اند: یکی جایی
           // که کاربر جایزه می‌گیرد، یکی جایی که خرج می‌کند.
+          _PassButton(
+            claimable: _passClaimable,
+            selected: _index == passIndex,
+            onPressed: () => setState(() => _index = passIndex),
+          ),
           _ShopButton(
             selected: _index == shopIndex,
             onPressed: () => setState(() => _index = shopIndex),
@@ -523,6 +553,76 @@ class _ShopButton extends StatelessWidget {
       // آیکون متریال به‌جای اموجی: اموجیِ 🛒 روی بعضی گوشی‌های اندروید
       // با رنگ و اندازهٔ متفاوت رندر می‌شود و کنار 🎡 ناهماهنگ می‌افتد.
       icon: const Icon(Icons.storefront_rounded, size: 22),
+    );
+  }
+}
+
+/// آیکون گذر نبرد با نشانِ «جایزهٔ آماده».
+///
+/// چرا نشان مهم‌تر از خود آیکون است: گذر نبرد وقتی کار می‌کند که کاربر
+/// **برگردد**. اگر جایزه‌ای آماده باشد و او نداند، دلیلی برای باز کردن
+/// صفحه ندارد. عدد روی آیکون همان چیزی است که او را برمی‌گرداند — دقیقاً
+/// مثل نشانِ چرخش گردونه که همین کار را می‌کند.
+class _PassButton extends StatelessWidget {
+  const _PassButton({
+    required this.claimable,
+    required this.selected,
+    required this.onPressed,
+  });
+
+  final int claimable;
+  final bool selected;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        IconButton(
+          tooltip: claimable > 0
+              ? '$claimable جایزهٔ گذر نبرد آماده است'
+              : 'گذر نبرد فصلی',
+          onPressed: onPressed,
+          style: selected
+              ? IconButton.styleFrom(
+                  backgroundColor:
+                      Theme.of(context).colorScheme.primary.withValues(alpha: 0.18))
+              : null,
+          icon: const Text('🏅', style: TextStyle(fontSize: 20)),
+        ),
+        if (claimable > 0)
+          Positioned(
+            top: 4,
+            right: 2,
+            child: IgnorePointer(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                constraints: const BoxConstraints(minWidth: 17, minHeight: 17),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF43F5E),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: Theme.of(context).appBarTheme.backgroundColor
+                        ?? Theme.of(context).colorScheme.surface,
+                    width: 2,
+                  ),
+                ),
+                child: Center(
+                  child: Text(
+                    faNum(claimable),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      height: 1.1,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

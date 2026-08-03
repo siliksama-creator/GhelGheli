@@ -29,7 +29,9 @@ class _OkAdapter implements HttpClientAdapter {
     return ResponseBody.fromString(
       '{"user":{"id":"u1","nickname":"تست","current_points":0,'
       '"wallet_balance":0},"inventory":[],"leaguePayouts":[],'
-      '"rewards":[],"wheel":{"spinsLeft":2,"unlimited":false}}',
+      '"rewards":[],"wheel":{"spinsLeft":2,"unlimited":false},'
+      '"pass":{"tier":3,"tierCount":50,"claimable":4,"hasPlus":false,'
+      '"daysLeft":42,"intoTier":10,"tierNeeds":115}}',
       200,
       headers: {
         Headers.contentTypeHeader: [Headers.jsonContentType]
@@ -105,6 +107,32 @@ void main() {
       // SegmentedButtonِ قدیمیِ «جوایز | فروشگاه» نباید وجود داشته باشد.
       expect(find.byType(SegmentedButton<int>), findsNothing,
           reason: 'فروشگاه حالا مقصد مستقل است، نه زیرتب');
+    });
+  });
+
+  group('گذر نبرد', () {
+    testWidgets('آیکون گذر نبرد در نوار بالا هست', (tester) async {
+      await _pumpShell(tester);
+      expect(find.byWidgetPredicate((w) =>
+          w is IconButton && (w.tooltip?.contains('گذر نبرد') ?? false)),
+          findsOneWidget);
+    });
+
+    testWidgets('نشانِ تعداد جایزهٔ آماده روی آیکون دیده می‌شود',
+        (tester) async {
+      // بدون این نشان، کاربر نمی‌فهمد جایزه‌ای منتظرش است و برنمی‌گردد —
+      // که کل هدف گذر نبرد است.
+      await _pumpShell(tester);
+      expect(find.text('۴'), findsWidgets);
+    });
+
+    testWidgets('زدن آیکون صفحهٔ گذر نبرد را باز می‌کند', (tester) async {
+      await _pumpShell(tester);
+      await tester.tap(find.byWidgetPredicate((w) =>
+          w is IconButton && (w.tooltip?.contains('گذر نبرد') ?? false)));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.textContaining('گذر نبرد'), findsWidgets);
     });
   });
 
