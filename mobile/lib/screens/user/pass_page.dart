@@ -82,12 +82,50 @@ class _PassPageState extends State<PassPage> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    // ═══════════════════════════════════════════════════════════════════
+    // چرا اینجا repeat() صدا زده نمی‌شود
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    // این نبض فقط روی جایزه‌های **آمادهٔ دریافت** کشیده می‌شود. ولی
+    // کنترلر قبلاً از همان initState بی‌قید می‌چرخید — یعنی حتی برای
+    // کاربری که هیچ جایزهٔ آماده‌ای ندارد (حالت معمول: بیشتر روزها
+    // هیچ پله‌ای باز نشده)، یک Ticker در هر ۱۶ میلی‌ثانیه بیدار
+    // می‌شد و فریم می‌خواست.
+    //
+    // یک AnimationControllerِ در حال چرخش هرگز «رایگان» نیست: حتی
+    // اگر هیچ AnimatedBuilderی به آن گوش ندهد، خودِ Ticker باعث
+    // می‌شود موتور فلاتر برای هر فریم بیدار بماند به‌جای اینکه صفحه
+    // را ساکن اعلام کند.
+    //
+    // حالا `_syncPulse` بعد از هر بارگذاری تصمیم می‌گیرد: اگر چیزی
+    // برای گرفتن هست بچرخد، وگرنه بایستد.
     _pulse = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1600),
-    )..repeat(reverse: true);
+    );
     _scroll.addListener(_onScroll);
     _load();
+  }
+
+  /// نبض را فقط وقتی روشن نگه می‌دارد که چیزی برای گرفتن باشد.
+  ///
+  /// دو مصرف‌کنندهٔ نبض هر دو شرط دارند (`claimable > 0` در سربرگ و
+  /// `ready` در هر کاشی)، پس وقتی هیچ‌کدام برقرار نیست، چرخیدنِ کنترلر
+  /// خالص هدر دادنِ فریم و باتری است.
+  void _syncPulse() {
+    final claimable = NumberParser.toInt(_data?['claimable']);
+    final anyReady = (_data?['tiers'] as List? ?? const [])
+        .whereType<Map>()
+        .any((t) => t['ready'] == true || t['claimable'] == true);
+    final want = claimable > 0 || anyReady;
+    if (want && !_pulse.isAnimating) {
+      _pulse.repeat(reverse: true);
+    } else if (!want && _pulse.isAnimating) {
+      _pulse.stop();
+      // به حالتِ خنثی برگرد تا کاشی‌ها در اندازهٔ درست بمانند؛
+      // ایستادن روی یک مقدارِ میانی، همه را کمی بزرگ رها می‌کرد.
+      _pulse.value = 0;
+    }
   }
 
   @override
@@ -125,6 +163,7 @@ class _PassPageState extends State<PassPage> with TickerProviderStateMixin {
         _error = null;
         _loading = false;
       });
+      _syncPulse();
       if (jump) {
         // گارد mounted داخل callback لازم است، نه فقط بیرونش: بین این
         // فریم و فریم بعد، کاربر می‌تواند صفحه را ببندد.

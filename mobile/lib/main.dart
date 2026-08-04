@@ -14,6 +14,7 @@ import 'screens/admin/admin_shell.dart';
 import 'screens/user/home_shell.dart';
 import 'screens/user/games/game_audio.dart';
 import 'core/error_boundary.dart';
+import 'core/memory_guard.dart';
 import 'theme/app_theme.dart';
 
 void main() {
@@ -42,6 +43,22 @@ void main() {
   PaintingBinding.instance.imageCache
     ..maximumSizeBytes = 40 << 20
     ..maximumSize = 200;
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // واکنش به فشارِ حافظهٔ سیستم
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // سقفِ بالا فقط می‌گوید «بیشتر از این نگیر». چیزی که کم بود، پس دادنِ
+  // حافظه در لحظه‌ای است که سیستم درخواست می‌کند.
+  //
+  // اندروید پیش از کشتنِ اپ یک هشدار می‌فرستد (onTrimMemory). اپ آن را
+  // نادیده می‌گرفت، پس سیستم چیزی برای بازپس‌گیری پیدا نمی‌کرد و
+  // مستقیم اپ را می‌کشت — روی گوشیِ ۲ گیگابایتی که مخاطبِ اصلیِ این
+  // اپ است، این واقعاً اتفاق می‌افتد و کاربر آن را «اپ خودش بسته شد»
+  // می‌بیند.
+  //
+  // جزئیاتِ دو سطحِ واکنش در core/memory_guard.dart.
+  MemoryGuard.instance.install();
   runApp(const GhelGheliApp());
 }
 

@@ -34,6 +34,33 @@ class GameSession extends ChangeNotifier {
   /// `deadline` so both clients agree even if one lags.
   int secondsLeft = 0;
   int turnSeconds = 15;
+
+  /// ═════════════════════════════════════════════════════════════════════
+  /// چرا ساعت یک Listenable جدا دارد
+  /// ═════════════════════════════════════════════════════════════════════
+  ///
+  /// شمارش معکوس هر ثانیه یک بار عوض می‌شود و تنها چیزی که روی صفحه
+  /// تغییر می‌کند، یک عددِ دورقمی و یک حلقهٔ پیشرفت است.
+  ///
+  /// ولی تا پیش از این، ساعت روی **همان** `notifyListeners` سوار بود
+  /// که تغییرِ وضعیتِ بازی را اعلام می‌کند. یعنی `GameScaffold` — و از
+  /// طریق آن کل تخته — هر ثانیه یک بار کاملاً بازساخته می‌شد:
+  ///
+  ///   • اتللو: ۶۴ خانه با decoration و border،
+  ///   • جفت‌یاب: ۱۶ کارت با تصویر،
+  ///   • پنالتی: تابلوی امتیاز، شبکهٔ ۹ ناحیه و نقاشِ زمین.
+  ///
+  /// همهٔ اینها فقط برای اینکه «۱۲» به «۱۱» تبدیل شود. روی گوشیِ
+  /// کم‌توان همین باعثِ لرزشِ محسوس در بازی بود — دقیقاً همان «کند
+  /// شدن» که مالک گزارش کرد.
+  ///
+  /// حالا تیکِ ساعت فقط `clock` را اعلان می‌دهد. هر ویجتی که واقعاً
+  /// عدد را نشان می‌دهد (نوار حریف) به `clock` گوش می‌دهد و بقیهٔ
+  /// درخت دست‌نخورده می‌ماند.
+  ///
+  /// نکتهٔ مهم: `clock` علاوه بر تیک، در **شروع و پایانِ** هر نوبت هم
+  /// اعلان می‌دهد، وگرنه حلقهٔ شمارش روی مقدار نوبتِ قبلی یخ می‌زد.
+  final ChangeNotifier clock = ChangeNotifier();
   /// Countdown while hunting for a real opponent (before the bot steps in).
   int searchSecondsLeft = 0;
   int searchSeconds = 15;
@@ -231,7 +258,8 @@ class GameSession extends ChangeNotifier {
           GameAudio.instance
               .play(clamped <= 3 ? Sfx.tickUrgent : Sfx.tick, volume: 0.65);
         }
-        notifyListeners();
+        // فقط ساعت، نه کل نشست — توضیح کامل بالای فیلد `clock`.
+        clock.notifyListeners();
       }
       if (leftMs <= 0) _ticker?.cancel();
     }
@@ -281,6 +309,9 @@ class GameSession extends ChangeNotifier {
     _ticker?.cancel();
     _ticker = null;
     secondsLeft = 0;
+    // بدون این، حلقهٔ شمارش روی آخرین عدد یخ می‌زد چون کسی به شنوندگانِ
+    // ساعت نمی‌گفت که به صفر رسیده‌ایم.
+    clock.notifyListeners();
   }
 
   void join() {
@@ -391,6 +422,7 @@ class GameSession extends ChangeNotifier {
   void dispose() {
     _ticker?.cancel();
     _searchTicker?.cancel();
+    clock.dispose();
     _socket?.dispose();
     _socket = null;
     super.dispose();

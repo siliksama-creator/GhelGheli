@@ -144,6 +144,25 @@ class _Portrait extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ═══════════════════════════════════════════════════════════════════
+    // چرا اینجا به `session.clock` گوش می‌دهیم و نه به خودِ `session`
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    // این تنها ویجتی است که شمارش معکوس را نشان می‌دهد. تیکِ ساعت
+    // به‌جای اعلانِ سراسری، فقط `clock` را اعلان می‌دهد (توضیح کامل در
+    // game_session.dart)، پس این `ListenableBuilder` لازم است تا عدد
+    // همچنان هر ثانیه به‌روز شود.
+    //
+    // سودش این است که بازسازی در همین زیردرختِ کوچک محبوس می‌ماند و
+    // تختهٔ بازی — که ۶۴ خانه یا یک نقاشِ کامل دارد — دست‌نخورده
+    // می‌ماند.
+    return ListenableBuilder(
+      listenable: session.clock,
+      builder: (context, _) => _buildPortrait(context),
+    );
+  }
+
+  Widget _buildPortrait(BuildContext context) {
     const size = 44.0;
     final total = session.turnSeconds <= 0 ? 15 : session.turnSeconds;
     final left = session.secondsLeft;
