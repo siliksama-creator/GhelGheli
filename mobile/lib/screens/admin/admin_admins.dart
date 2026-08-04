@@ -51,7 +51,14 @@ class _AdminAdminsState extends State<AdminAdmins> {
     // باگی که کاربر با «صفحات لود نمیشن» گزارش داد.
     try {
       final admins = await widget.api.get('/api/admin/admins');
-      final logs = await widget.api.get('/api/admin/audit-log');
+      // پاسخ حالا صفحه‌بندی‌شده است: {entries, total, limit, offset}.
+      //
+      // قبلاً یک آرایهٔ ۵۰۰تایی با ستون‌های JSONB سنگین بود — ۱۹۳ کیلوبایت
+      // که روی گوشی پارس و در حافظه نگه داشته می‌شد. حالا ۵۰ ردیفِ سبک.
+      // شکل قدیمی (آرایهٔ خام) هم پذیرفته می‌شود تا نسخهٔ قدیمیِ اپ با
+      // سرور جدید نشکند.
+      final logsRaw = await widget.api.get('/api/admin/audit-log?limit=50');
+      final logs = logsRaw is Map ? (logsRaw['entries'] ?? const []) : logsRaw;
       if (mounted) {
         setState(() {
           _admins = admins;

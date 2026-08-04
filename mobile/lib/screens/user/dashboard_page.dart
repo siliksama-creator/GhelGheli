@@ -106,6 +106,9 @@ class _DashboardPageState extends State<DashboardPage> {
           'user': m['user'],
           'inventory': m['inventory'] ?? const [],
           'leaguePayouts': m['leaguePayouts'] ?? const [],
+          // ظاهرِ خودِ کاربر (ستارهٔ پلاس، رنگ اسم) — تا هدر داشبورد هم
+          // نشانِ اشتراکش را نشان دهد، نه فقط چت و لیگ.
+          if (m['cosmetics'] != null) 'cosmetics': m['cosmetics'],
         };
         _rewards = List<Map<String, dynamic>>.from(
             ((m['rewards'] as List?) ?? const [])
@@ -199,6 +202,7 @@ class _DashboardPageState extends State<DashboardPage> {
             nickname: user?['nickname'] ?? 'قهرمان',
             nextReward: nextReward,
             user: user is Map ? Map<String, dynamic>.from(user) : null,
+            cosmetics: _data?['cosmetics'] as Map<String, dynamic>?,
             onOpenProfile: widget.onOpenProfile,
             onOpenWallet: widget.onOpenWallet,
             onToggleTheme: widget.onToggleTheme,

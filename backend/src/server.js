@@ -908,6 +908,21 @@ app.get('/api/bootstrap', auth, asyncHandler(async (req, res) => {
   // خلاصهٔ گذر نبرد برای نشانِ نوار بالا. کل وضعیت اینجا فرستاده
   // نمی‌شود (۵۰ پله × ۲ مسیر حجیم است)؛ فقط چیزی که برای نشان لازم
   // است. صفحهٔ گذر خودش /api/pass را می‌خواند.
+  // ── ظاهرِ خودِ کاربر (ستارهٔ پلاس، قاب، رنگ اسم) ────────────────────
+  //
+  // درخواست مالک: «افرادی که اشتراک پلاس گرفتن در همه جای پلتفرم برای
+  // خودشون و افراد دیگه ستارشون مشخص باشه».
+  //
+  // «برای خودشون» بخش فراموش‌شده بود: چت و لیگ ستارهٔ **بقیه** را نشان
+  // می‌دادند، ولی داشبورد خودِ کاربر نام را خام چاپ می‌کرد. یعنی کسی که
+  // پول داده بود، در اولین صفحه‌ای که بعد از ورود می‌بیند هیچ نشانی از
+  // خریدش نداشت.
+  let myCosmetics = null;
+  try {
+    const m = await shop.cosmeticsFor([req.user.id]);
+    myCosmetics = m.get(req.user.id) || null;
+  } catch { /* ظاهر یک زینت است؛ نباید بوت‌استرپ را بشکند */ }
+
   let passBrief = null;
   try {
     const st = await pass.status(req.user.id);
@@ -933,6 +948,7 @@ app.get('/api/bootstrap', auth, asyncHandler(async (req, res) => {
     rewards: rewards.rows,
     wheel: wheelState,
     pass: passBrief,
+    cosmetics: myCosmetics,
   });
 }));
 
@@ -2627,7 +2643,60 @@ app.patch('/api/admin/admins/:id/status', adminAuth, validateUuid('id'), require
   await audit(req.admin.id, isActive ? 'activate_admin' : 'deactivate_admin', 'admin_users', req.params.id, req.body.reason || null, { username: rows[0].username });
   res.json(rows[0]);
 }));
-app.get('/api/admin/audit-log', adminAuth, requireRole(), asyncHandler(async (req, res) => res.json((await pool.query('SELECT a.*, ad.username FROM audit_log a LEFT JOIN admin_users ad ON ad.id=a.admin_user_id ORDER BY a.created_at DESC LIMIT 500')).rows)));
+// ── دفتر رخدادها ──────────────────────────────────────────────────────────
+//
+// ═══════════════════════════════════════════════════════════════════════════
+// چرا صفحه‌بندی شد و چرا ستون‌ها محدود شدند
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// نسخهٔ قبلی `SELECT a.*` با `LIMIT 500` بود. اندازه‌گیری روی سرور زنده:
+//
+//     ۱۹۳٬۷۹۸ بایت JSON خام (۲۹ کیلوبایت فشرده)
+//
+// یعنی هشت برابرِ سنگین‌ترین endpoint بعدی. `a.*` شامل دو ستون JSONB است
+// (`before_data` و `after_data`) که برای هر ویرایش، **کل ردیف قبل و بعد**
+// را نگه می‌دارند — چیزی که فهرست هرگز نشان نمی‌دهد و فقط در جزئیات یک
+// رخداد به‌کار می‌آید.
+//
+// روی گوشی، آن ۱۹۳ کیلوبایت باید کامل پارس شود و به‌صورت Map های دارت در
+// حافظه بماند؛ با سربارِ آبجکت‌های دارت، چند برابرِ خودِ متن رم می‌گیرد.
+// این دقیقاً همان «مصرف رم» است که باید پایین بیاید، بدون کم شدن امکانات.
+//
+// حالا:
+//   • فقط ستون‌های موردنیازِ فهرست انتخاب می‌شوند.
+//   • به‌جای دو ستون سنگین، فقط یک پرچم بولین می‌گوید آیا جزئیاتی هست.
+//   • صفحه‌بندی با limit/offset، پیش‌فرض ۵۰ به‌جای ۵۰۰.
+//
+// امکانات کم نشد: هر رخدادی که قبلاً دیده می‌شد هنوز دیده می‌شود، فقط
+// صفحه‌به‌صفحه — و جزئیات کامل از endpoint تک‌رخداد در دسترس است.
+app.get('/api/admin/audit-log', adminAuth, requireRole(), asyncHandler(async (req, res) => {
+  const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50));
+  const offset = Math.max(0, Number(req.query.offset) || 0);
+  const { rows } = await pool.query(
+    `SELECT a.id, a.admin_user_id, a.action, a.entity_type, a.entity_id,
+            a.created_at, ad.username,
+            (a.before_data IS NOT NULL OR a.after_data IS NOT NULL) AS has_detail
+       FROM audit_log a
+       LEFT JOIN admin_users ad ON ad.id = a.admin_user_id
+      ORDER BY a.created_at DESC
+      LIMIT $1 OFFSET $2`, [limit, offset]);
+  const { rows: cnt } = await pool.query('SELECT count(*)::int AS n FROM audit_log');
+  res.json({ entries: rows, total: cnt[0].n, limit, offset });
+}));
+
+/// جزئیات کاملِ یک رخداد — شامل before/after.
+///
+/// جدا از فهرست است تا آن دو ستون سنگین فقط وقتی منتقل شوند که ادمین
+/// واقعاً روی یک ردیف زده باشد.
+app.get('/api/admin/audit-log/:id', adminAuth, requireRole(), validateUuid('id'),
+  asyncHandler(async (req, res) => {
+    const { rows } = await pool.query(
+      `SELECT a.*, ad.username FROM audit_log a
+         LEFT JOIN admin_users ad ON ad.id = a.admin_user_id
+        WHERE a.id = $1`, [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ message: 'رخداد پیدا نشد' });
+    res.json(rows[0]);
+  }));
 
 
 io.use(async (socket, next) => {

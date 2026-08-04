@@ -232,11 +232,29 @@ function finish(room, winner) {
   // کند.
   try {
     const pass = require('../services/passService');
-    for (const sym of ['X', 'O']) {
-      const info = room.players?.[sym];
-      if (!info?.id || info.isBot) continue;
-      pass.grantXp(info.id, 'game_play').catch(() => {});
-      if (winner === sym) pass.grantXp(info.id, 'game_win').catch(() => {});
+    // ═══════════════════════════════════════════════════════════════════
+    // بازی مقابل کامپیوتر هیچ XPای نمی‌دهد
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    // درخواست مالک: «بازی ها زمانی که آفلاین برگزار میشن نباید exp بدن
+    // برای بتل پس».
+    //
+    // این فقط یک قانون دلبخواهی نیست، یک سوراخِ واقعی را می‌بندد: بازی
+    // مقابل ربات فوری شروع می‌شود، حریف واقعی لازم ندارد، و می‌شود در
+    // چند ثانیه تمامش کرد. بدون این شرط، کاربر می‌توانست ده‌ها بازیِ
+    // بی‌معنی مقابل ربات را پشت سر هم ببازد و سقفِ روزانهٔ XP را پر کند
+    // — بدون اینکه حتی یک بازیِ واقعی انجام دهد. گذر نبرد باید پاداشِ
+    // **بازی کردن با آدم‌ها** باشد.
+    //
+    // `room.vsBot` را خودِ موتور موقع ساختن اتاق تعیین می‌کند (وقتی
+    // حریف دوم پیدا نشود)، پس قابل جعل از سمت کلاینت نیست.
+    if (!room.vsBot) {
+      for (const sym of ['X', 'O']) {
+        const info = room.players?.[sym];
+        if (!info?.id || info.isBot) continue;
+        pass.grantXp(info.id, 'game_play').catch(() => {});
+        if (winner === sym) pass.grantXp(info.id, 'game_win').catch(() => {});
+      }
     }
   } catch (e) {
     console.error('[games] pass xp failed:', e.message);

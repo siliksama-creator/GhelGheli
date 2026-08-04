@@ -6,6 +6,7 @@ import '../../core/money.dart';
 import '../../theme/brand_theme.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/avatar_image.dart';
+import '../../core/cosmetics.dart';
 
 /// Compact dashboard hero: greeting, avatar, points and reward progress.
 ///
@@ -22,6 +23,17 @@ class HeroHeader extends StatelessWidget {
 
   /// Full user object, used for the avatar and completeness check.
   final Map<String, dynamic>? user;
+
+  /// ظاهرِ خودِ کاربر — ستارهٔ پلاس، نشان باشگاه، رنگ اسم.
+  ///
+  /// درخواست مالک: «افرادی که اشتراک پلاس گرفتن در همه جای پلتفرم برای
+  /// **خودشون** و افراد دیگه ستارشون مشخص باشه».
+  ///
+  /// «برای خودشون» بخش فراموش‌شده بود: چت و جدول لیگ ستارهٔ بقیه را نشان
+  /// می‌دادند، ولی داشبورد نام را خام چاپ می‌کرد — یعنی کسی که پول داده
+  /// بود، در اولین صفحه‌ای که بعد از ورود می‌بیند هیچ نشانی از خریدش
+  /// نداشت.
+  final Map<String, dynamic>? cosmetics;
 
   /// Opens the profile tab.
   final VoidCallback? onOpenProfile;
@@ -41,6 +53,7 @@ class HeroHeader extends StatelessWidget {
     required this.nickname,
     this.nextReward,
     this.user,
+    this.cosmetics,
     this.onOpenProfile,
     this.onOpenWallet,
     this.onToggleTheme,
@@ -114,10 +127,13 @@ class HeroHeader extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            'سلام $nickname 👋',
+                          // DisplayName به‌جای Text خام: ستارهٔ پلاس و
+                          // رنگ اسم را هم می‌آورد.
+                          DisplayName(
+                            name: 'سلام $nickname 👋',
+                            cosmetics: cosmetics,
+                            avatarKey: user?['profile_avatar_key'],
                             maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                                 fontSize: 14.5,
                                 fontWeight: FontWeight.w800,

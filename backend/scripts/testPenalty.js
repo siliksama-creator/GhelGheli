@@ -235,18 +235,43 @@ console.log('\n== ربات ==');
   }
   ok(true, 'ربات به‌عنوان دروازه‌بان همیشه حرکت معتبر می‌دهد');
 
-  // یادگیری عادت حریف
+  // ── ربات باید کاملاً تصادفی باشد ────────────────────────────────────
+  //
+  // مالک: «ربات در بازی پنالتی نباید خیلی باهوش باشه باید تصادفی بازی
+  // کنه».
+  //
+  // نسخهٔ قبلی تاریخچهٔ حریف را می‌خواند و در ۵۵٪ مواقع پرتکرارترین
+  // ناحیه را حدس می‌زد. برای بازیکنی که عادت دارد یک گوشه را بزند،
+  // ربات تقریباً همیشه مهار می‌کرد — و مهم‌تر از سختی، **حس تقلب**
+  // می‌داد: انگار ربات انتخاب کاربر را از قبل می‌داند.
   s.history = [
     { shooter: 'X', shotZone: 6, outcome: 'goal', diveZone: 0 },
     { shooter: 'X', shotZone: 6, outcome: 'goal', diveZone: 1 },
     { shooter: 'X', shotZone: 6, outcome: 'goal', diveZone: 2 },
     { shooter: 'X', shotZone: 6, outcome: 'goal', diveZone: 3 },
   ];
+  const N = 9000;
   let guessed6 = 0;
-  for (let i = 0; i < 400; i++) if (P.botMove(s, 'O').zone === 6) guessed6++;
-  ok(guessed6 > 120,
-    `ربات عادت حریف را یاد می‌گیرد (${guessed6}/۴۰۰ بار ناحیهٔ تکراری را حدس زد)`);
-  ok(guessed6 < 380, 'ولی همیشه درست حدس نمی‌زند — بازی باید قابل برد بماند');
+  for (let i = 0; i < N; i++) if (P.botMove(s, 'O').zone === 6) guessed6++;
+  const rate = guessed6 / N;
+  ok(Math.abs(rate - 1 / 9) < 0.025,
+    `ربات تاریخچه را نادیده می‌گیرد: ${(rate * 100).toFixed(1)}٪ (انتظار ۱۱.۱٪)`);
+
+  // و توزیع باید روی هر ۹ ناحیه یکنواخت باشد، نه فقط روی ناحیهٔ ۶.
+  const hits = new Array(9).fill(0);
+  for (let i = 0; i < N; i++) hits[P.botMove(s, 'O').zone]++;
+  const worst = Math.max(...hits.map(h => Math.abs(h / N - 1 / 9)));
+  ok(worst < 0.025,
+    `توزیع روی هر ۹ ناحیه یکنواخت است (بیشترین انحراف ${(worst * 100).toFixed(1)}٪)`);
+
+  // به‌عنوان زننده هم نباید گوشه‌ها را ترجیح دهد.
+  s.shooter = 'O';
+  const shotHits = new Array(9).fill(0);
+  for (let i = 0; i < N; i++) shotHits[P.botMove(s, 'O').zone]++;
+  const shotWorst = Math.max(...shotHits.map(h => Math.abs(h / N - 1 / 9)));
+  ok(shotWorst < 0.025,
+    `به‌عنوان زننده هم یکنواخت می‌زند (بیشترین انحراف ${(shotWorst * 100).toFixed(1)}٪)`);
+  s.shooter = 'X';
 
   // ربات بدون تاریخچه هم کرش نمی‌کند
   const empty = P.create();
@@ -281,6 +306,24 @@ console.log('\n== 🔒 نشت از مسیر lastMove — باگ واقعیِ پ�
     require('path').join(__dirname, '..', 'src', 'games', 'engine.js'), 'utf8');
   ok(/lastMove: room\.rules\.simultaneous \? null : lastMove/.test(eng),
     'موتور در بازی هم‌زمان lastMove را نمی‌فرستد');
+}
+
+console.log('\n== بازی مقابل کامپیوتر XP نمی‌دهد ==');
+{
+  // مالک: «بازی ها زمانی که آفلاین برگزار میشن نباید exp بدن برای بتل پس».
+  //
+  // این یک سوراخِ واقعی را می‌بندد: بازی مقابل ربات فوری شروع می‌شود،
+  // حریف لازم ندارد، و در چند ثانیه تمام می‌شود. بدون این شرط کاربر
+  // می‌توانست ده‌ها بازیِ بی‌معنی را پشت سر هم ببازد و سقف روزانهٔ XP را
+  // پر کند بدون یک بازیِ واقعی.
+  const eng = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'src', 'games', 'engine.js'), 'utf8');
+  ok(/if \(!room\.vsBot\) \{[\s\S]{0,400}grantXp/.test(eng),
+    'XP فقط وقتی داده می‌شود که بازی مقابل حریف واقعی باشد');
+  ok(/room\.vsBot/.test(eng), 'موتور پرچم vsBot را می‌شناسد');
+  // vsBot را خودِ سرور تعیین می‌کند، نه کلاینت
+  ok(/const vsBot = !b;/.test(eng),
+    'vsBot سمت سرور تعیین می‌شود، پس از کلاینت قابل جعل نیست');
 }
 
 console.log('\n== قرارداد موتور بازی ==');

@@ -17,7 +17,10 @@ export function AdminsPage({ request }) {
 
   const load = () => {
     request('/api/admin/admins').then(setAdmins);
-    request('/api/admin/audit-log').then(setLogs);
+    // پاسخ صفحه‌بندی‌شده: {entries, total, ...}. شکل قدیمی (آرایه) هم
+    // پذیرفته می‌شود تا اگر سرور قدیمی بود صفحه نشکند.
+    request('/api/admin/audit-log?limit=50')
+      .then(d => setLogs(Array.isArray(d) ? d : (d?.entries ?? [])));
   };
   useEffect(load, [request]);
 
