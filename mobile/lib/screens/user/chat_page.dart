@@ -515,6 +515,9 @@ class _ChatBubble extends StatelessWidget {
                               message['first_name'] ??
                               'کاربر',
                           cosmetics: message['cosmetics'] as Map?,
+                          // لولِ فرستنده — سرور آن را کنارِ cosmetics
+                          // در همان کوئریِ دسته‌ای می‌فرستد.
+                          level: (message['level'] as num?)?.toInt(),
                           // Suppress the inline crest when the avatar beside
                           // it is already that same crest.
                           avatarKey: message['profile_image_url'] == null

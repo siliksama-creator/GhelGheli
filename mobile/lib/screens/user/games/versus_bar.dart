@@ -6,6 +6,7 @@ import '../../../api_client.dart';
 import '../../../theme/tokens.dart';
 import '../../../widgets/app_card.dart';
 import '../../../widgets/avatar_image.dart';
+import '../../../widgets/level_badge.dart';
 import '../../shared/public_profile_sheet.dart';
 import 'game_session.dart';
 
@@ -100,6 +101,21 @@ class _Side extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
+                  // ═══════════════════════════════════════════════════
+                  // لولِ حریف، حین بازی
+                  // ═══════════════════════════════════════════════════
+                  //
+                  // درخواست مالک: «در حین بازی هم لول بقیه رو بشه دید».
+                  //
+                  // سرور آن را داخل `players` می‌فرستد (همان‌جا که نام
+                  // و آواتار می‌آید)، پس هیچ درخواستِ اضافه‌ای لازم
+                  // نیست. ربات لول ندارد و نشانش هم نباید بیاید —
+                  // وگرنه «Level 0» کنارِ ربات، معنیِ اشتباه می‌دهد.
+                  if (!isBot && info?['level'] != null) ...[
+                    LevelBadge(
+                        level: (info!['level'] as num?)?.toInt() ?? 0),
+                    const SizedBox(width: 3),
+                  ],
                   Flexible(
                     child: Text(
                       isMe ? 'شما' : session.nameOf(symbol),

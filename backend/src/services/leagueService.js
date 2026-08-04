@@ -1,5 +1,6 @@
 const { pool } = require('../config/db');
 const walletService = require('./walletService');
+const { createNotification } = require('./notificationService');
 
 // LEAGUE MONTHS RUN ON THE IRANIAN CALENDAR, IN TEHRAN TIME.
 //
@@ -204,6 +205,8 @@ async function closeActiveSeason({ force = false } = {}) {
       }
       if (Number.isFinite(rank)) prizeMap.set(rank, amount);
     }
+  // برندگانی که باید بعد از COMMIT خبردار شوند.
+  const winnersToNotify = [];
     let credited = 0;
     let creditedUsers = 0;
     for (const entry of leaders) {
@@ -262,6 +265,13 @@ async function closeActiveSeason({ force = false } = {}) {
         if (!res.duplicate) {
           credited += amount;
           creditedUsers += 1;
+          // برای اعلانِ بعد از COMMIT جمع می‌شود — توضیح پایین‌تر.
+          winnersToNotify.push({
+            userId: entry.user_id,
+            rank: entry.rank,
+            amount,
+            monthYear: season.month_year,
+          });
         }
         await client.query(
           'UPDATE league_payouts SET paid_at=NOW() WHERE id=$1',
@@ -276,6 +286,38 @@ async function closeActiveSeason({ force = false } = {}) {
     // their all-time total must survive the month rolling over.
     await client.query('UPDATE users SET monthly_league_points=0, updated_at=NOW()');
     await client.query('COMMIT');
+
+    // ═════════════════════════════════════════════════════════════════════
+    // اعلانِ برندگان — **بعد از** COMMIT، نه داخل تراکنش
+    // ═════════════════════════════════════════════════════════════════════
+    //
+    // درخواست مالک: «اخر ماه وقتی لیگ تموم میشه فردی جایزه ای ببره،
+    // زنگوله نوتیفیکیشن قرمز بشه».
+    //
+    // این مرحله اصلاً وجود نداشت: پول به کیف پول واریز می‌شد ولی هیچ
+    // خبری به برنده نمی‌رسید. کاربر فقط اگر تصادفاً کیف پولش را باز
+    // می‌کرد می‌فهمید برنده شده — یعنی بهترین لحظهٔ اپ، بی‌صدا رد
+    // می‌شد.
+    //
+    // چرا بعد از COMMIT و نه داخلش:
+    //
+    //   ۱. اگر داخل تراکنش بود و نوشتنِ یک اعلان شکست می‌خورد، کلِ
+    //      بستنِ فصل rollback می‌شد — یعنی هیچ‌کس پولش را نمی‌گرفت
+    //      چون یک ردیفِ اعلان ننشست. معاملهٔ بدی است.
+    //   ۲. اعلان‌ها تراکنشی نیستند و نباید قفلِ جدولِ کاربران را
+    //      طولانی‌تر کنند.
+    //
+    // خطاها عمداً بلعیده می‌شوند: پول از قبل واریز شده و آن مهم‌تر
+    // است؛ یک اعلانِ از‌دست‌رفته آزاردهنده است، نه فاجعه.
+    for (const w of winnersToNotify) {
+      createNotification(
+        w.userId,
+        'league',
+        `🏆 رتبهٔ ${w.rank} لیگ ${w.monthYear}`,
+        `تبریک! جایزهٔ ${w.amount.toLocaleString('en-US')} تومانی شما به کیف پول واریز شد.`,
+      ).catch((e) => console.error('[league] notify failed:', e.message));
+    }
+
     return {
       seasonId: season.id,
       winners: leaders.length,

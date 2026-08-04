@@ -59,6 +59,7 @@ class RankTile extends StatelessWidget {
                   child: DisplayName(
                     name: row['nickname'] ?? row['first_name'] ?? 'کاربر',
                     cosmetics: row['cosmetics'] as Map?,
+                    level: (row['level'] as num?)?.toInt(),
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                 ),

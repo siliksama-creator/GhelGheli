@@ -259,6 +259,7 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
                           DisplayName(
                             name: r['nickname'] ?? r['first_name'] ?? 'کاربر',
                             cosmetics: r['cosmetics'] as Map?,
+                            level: (r['level'] as num?)?.toInt(),
                             style: TextStyle(
                                 fontWeight: FontWeight.w800,
                                 fontSize: 13,

@@ -29,6 +29,8 @@ const wheelReminder = require('./services/wheelReminderService');
 // above the shop routes, so a require next to those would read as a
 // temporal-dead-zone bug even though route handlers run after startup.
 const shop = require('./services/shopService');
+// لولِ دائمیِ بازیکن — کنارِ cosmetics در همان مسیرها پخش می‌شود.
+const level = require('./services/levelService');
 // Same reason: the profile endpoint checks club membership before letting
 // someone wear a crest, and it is defined above the club routes.
 const clubs = require('./services/clubService');
@@ -949,7 +951,21 @@ app.get('/api/bootstrap', auth, asyncHandler(async (req, res) => {
     wheel: wheelState,
     pass: passBrief,
     cosmetics: myCosmetics,
+    // لولِ خودِ کاربر — صفحهٔ بازی‌ها و هدرِ داشبورد از همین می‌خوانند،
+    // پس هیچ درخواستِ اضافه‌ای لازم نیست.
+    level: await level.statusFor(req.user.id),
   });
+}));
+
+// ═══════════════════════════════════════════════════════════════════════════
+// وضعیتِ کاملِ لول — برای صفحهٔ بازی‌ها
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// bootstrap خلاصه را دارد، ولی صفحهٔ بازی‌ها بعد از هر بازی باید عددِ
+// تازه را بگیرد بدون اینکه کلِ bootstrap (که سنگین است) دوباره خوانده
+// شود.
+app.get('/api/level', auth, asyncHandler(async (req, res) => {
+  res.json(await level.statusFor(req.user.id));
 }));
 
 app.patch('/api/profile', auth, asyncHandler(async (req, res) => {
@@ -1057,6 +1073,9 @@ app.get('/api/users/:id/public', auth, validateUuid('id'), asyncHandler(async (r
 
   const cosmeticsMap = await shop.cosmeticsFor([req.params.id]);
   const cosmetics = cosmeticsMap.get(req.params.id) || {};
+  // صفحهٔ پروفایلِ عمومی جزئیاتِ کاملِ لول را نشان می‌دهد (نوار
+  // پیشرفت)، نه فقط عدد — پس `statusFor` و نه `levelsFor`.
+  const levelInfo = await level.statusFor(req.params.id);
 
   // Best rank ever, for the headline medal.
   const best = leagueHistory.rows.reduce(
@@ -1076,6 +1095,7 @@ app.get('/api/users/:id/public', auth, validateUuid('id'), asyncHandler(async (r
     totalPrizeAmount: leagueHistory.rows
       .reduce((a, r) => a + Number(r.prize_amount || 0), 0),
     cosmetics,
+    level: levelInfo,
   });
 }));
 
@@ -1431,6 +1451,17 @@ app.get('/api/league/current', auth, asyncHandler(async (req, res) => {
 
   // Cosmetics for the standings (club badge, name colour).
   const cos = await shop.cosmeticsFor(data.entries.map(e => e.user_id));
+  // ═══════════════════════════════════════════════════════════════════════
+  // چرا لول کنارِ cosmetics پخش می‌شود
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // درخواست مالک: «این لول رو پروفایل افراد در تمامی قسمت ها دیده بشه».
+  //
+  // `cosmeticsFor` از قبل دقیقاً همین کار را می‌کند: یک کوئریِ دسته‌ای
+  // برای همهٔ کاربرانِ یک صفحه. سوار شدن روی همان الگو یعنی صفرِ
+  // درخواستِ اضافه — به‌جای N+1 که یک صفحهٔ لیگِ ۵۰ ردیفی را به ۵۰
+  // رفت‌وبرگشتِ دیتابیس تبدیل می‌کرد.
+  const lvl = await level.levelsFor(data.entries.map(e => e.user_id));
 
   // Last month's podium, shown alongside the live table so the previous
   // season's winners stay visible instead of vanishing at the reset.
@@ -1448,7 +1479,9 @@ app.get('/api/league/current', auth, asyncHandler(async (req, res) => {
   res.json({
     ...data,
     entries: data.entries.map(e => ({
-      ...e, cosmetics: cos.get(e.user_id) || null,
+      ...e,
+      cosmetics: cos.get(e.user_id) || null,
+      level: lvl[e.user_id]?.level ?? 0,
     })),
     previousSeason: prev.length ? {
       monthYear: prev[0].month_year,
@@ -1526,9 +1559,15 @@ app.get('/api/chat/messages', auth, asyncHandler(async (req, res) => {
   // Attach cosmetics so the club badge and name colour render next to each
   // message. Resolved server-side because an equipped item stops applying the
   // moment Plus lapses unless the user actually bought it.
-  const cos = await shop.cosmeticsFor([...new Set(rows.map(r => r.user_id))]);
+  const ids = [...new Set(rows.map(r => r.user_id))];
+  const cos = await shop.cosmeticsFor(ids);
+  // لولِ فرستندهٔ هر پیام — یک کوئریِ دسته‌ای برای کل صفحه، نه یکی
+  // به‌ازای هر پیام.
+  const lvl = await level.levelsFor(ids);
   res.json(rows.reverse().map(r => ({
-    ...r, cosmetics: cos.get(r.user_id) || null,
+    ...r,
+    cosmetics: cos.get(r.user_id) || null,
+    level: lvl[r.user_id]?.level ?? 0,
   })));
 }));
 app.post('/api/chat/messages', auth, chatLimiter, asyncHandler(async (req, res) => {
@@ -2368,6 +2407,46 @@ app.patch('/api/admin/wallet/withdrawals/:id', adminAuth, validateUuid('id'), re
     amount: request.amount,
     trackingCode: request.trackingCode,
   });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // خبر دادن به کاربر — این مرحله وجود نداشت
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // درخواست مالک: «اگر ... برداشت کسی انجام بشه ... زنگوله نوتیفیکیشن
+  // قرمز بشه».
+  //
+  // برداشتِ پول مهم‌ترین رخدادِ مالیِ کاربر است و تا امروز **بی‌صدا**
+  // انجام می‌شد: مدیر تأیید می‌کرد، پول می‌رفت، و کاربر باید خودش
+  // حدس می‌زد که کِی. رد شدن هم همین‌طور — کاربر فقط می‌دید پولش
+  // برگشته بدون اینکه بداند چرا.
+  //
+  // متن‌ها عمداً کدِ پیگیری و دلیلِ رد را در خودشان دارند: کاربر
+  // نباید برای دیدنِ آن‌ها جای دیگری برود.
+  {
+    const amount = Number(request.amount || 0).toLocaleString('en-US');
+    const st = String(req.body?.status || '');
+    if (st === 'paid') {
+      const code = request.trackingCode
+        ? ` کد پیگیری: ${request.trackingCode}`
+        : '';
+      createNotification(request.userId || request.user_id, 'wallet',
+        '✅ برداشت شما پرداخت شد',
+        `مبلغ ${amount} تومان به حساب شما واریز شد.${code}`,
+      ).catch(() => {});
+    } else if (st === 'rejected') {
+      const why = req.body?.adminNote ? ` دلیل: ${req.body.adminNote}` : '';
+      createNotification(request.userId || request.user_id, 'wallet',
+        'درخواست برداشت رد شد',
+        `مبلغ ${amount} تومان به کیف پول شما برگشت.${why}`,
+      ).catch(() => {});
+    } else if (st === 'approved') {
+      createNotification(request.userId || request.user_id, 'wallet',
+        'درخواست برداشت تأیید شد',
+        `درخواست ${amount} تومانی شما تأیید شد و به‌زودی پرداخت می‌شود.`,
+      ).catch(() => {});
+    }
+  }
+
   res.json({ message: 'وضعیت درخواست به‌روزرسانی شد', request });
 }));
 
@@ -2704,7 +2783,14 @@ io.use(async (socket, next) => {
     const token = socket.handshake.auth?.token;
     const payload = jwt.verify(token, JWT_SECRET);
     if (payload.type !== 'user') throw new Error('bad token');
-    const { rows } = await pool.query('SELECT id,nickname,first_name,last_name,profile_image_url,profile_avatar_key,chat_banned_until,status,lifetime_points,current_points FROM users WHERE id=$1', [payload.sub]);
+    // `game_xp` اینجا خوانده می‌شود تا موتور بازی بتواند لولِ هر دو
+    // بازیکن را در `game:start` بفرستد — درخواست مالک: «در حین بازی هم
+    // لول بقیه رو بشه دید».
+    //
+    // چرا در همین کوئری و نه یک درخواستِ جدا: این تنها جایی است که
+    // کاربرِ سوکت بارگذاری می‌شود و یک ستونِ اضافه هزینه‌ای ندارد؛
+    // یک کوئریِ دوم در مسیرِ اتصال، تأخیرِ شروعِ بازی را زیاد می‌کرد.
+    const { rows } = await pool.query('SELECT id,nickname,first_name,last_name,profile_image_url,profile_avatar_key,chat_banned_until,status,lifetime_points,current_points,game_xp FROM users WHERE id=$1', [payload.sub]);
     if (!rows[0] || rows[0].status !== 'active') throw new Error('inactive');
     socket.user = rows[0]; next();
   } catch(e){ next(new Error('unauthorized')); }

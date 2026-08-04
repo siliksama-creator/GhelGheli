@@ -68,6 +68,11 @@ class _PublicProfileBody extends StatelessWidget {
               child: DisplayName(
                 name: data['nickname'] ?? 'کاربر',
                 cosmetics: data['cosmetics'] as Map?,
+                // پروفایلِ عمومی شیءِ کاملِ لول می‌گیرد (با نوار
+                // پیشرفت)، پس فقط عددش را به نشان می‌دهیم.
+                level: (data['level'] is Map)
+                    ? ((data['level'] as Map)['level'] as num?)?.toInt()
+                    : null,
                 avatarKey: data['profile_image_url'] == null
                     ? data['profile_avatar_key']
                     : null,

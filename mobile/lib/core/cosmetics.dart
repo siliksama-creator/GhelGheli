@@ -8,6 +8,8 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../widgets/level_badge.dart';
+
 import 'assets.dart';
 
 /// Crest asset for a club slug.
@@ -87,6 +89,7 @@ class DisplayName extends StatelessWidget {
     this.style,
     this.maxLines = 1,
     this.avatarKey,
+    this.level,
   });
 
   final String name;
@@ -101,6 +104,25 @@ class DisplayName extends StatelessWidget {
   /// rendering glitch, not a flourish. The badge exists to say "I support
   /// this club"; once the avatar says it, the badge is redundant.
   final Object? avatarKey;
+
+  /// لولِ بازیکن، اگر سرور فرستاده باشد.
+  ///
+  /// ═════════════════════════════════════════════════════════════════════
+  /// چرا اینجا و نه در هر صفحه جداگانه
+  /// ═════════════════════════════════════════════════════════════════════
+  ///
+  /// درخواست مالک: «این لول رو پروفایل افراد در تمامی قسمت ها دیده
+  /// بشه».
+  ///
+  /// `DisplayName` تنها جایی است که نامِ یک کاربر رندر می‌شود —
+  /// چت، لیگ، باشگاه، پروفایلِ عمومی، همه از همین می‌آیند. اضافه
+  /// کردنِ لول اینجا یعنی «تمامی قسمت ها» با یک تغییر پوشش داده
+  /// می‌شود، به‌جای شش تغییرِ جدا که فردا هفتمی‌اش یادمان می‌رود.
+  ///
+  /// `null` یعنی «نمایش نده»: برای ربات‌ها و هر جایی که سرور لول
+  /// نفرستاده. صفر یک لولِ **معتبر** است (کاربر تازه) و باید دیده
+  /// شود، پس نمی‌شد از صفر برای «ندارد» استفاده کرد.
+  final int? level;
 
   @override
   Widget build(BuildContext context) {
@@ -139,6 +161,10 @@ class DisplayName extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (!avatarIsSameCrest) ClubBadge(club: club),
+        if (level != null) ...[
+          LevelBadge(level: level!),
+          const SizedBox(width: 3),
+        ],
         Flexible(child: text),
         if (c['plus'] == true)
           const Padding(

@@ -1,9 +1,12 @@
 // Games hub. Each board lives in its own file under ./games/ so this screen
 // stays a thin launcher rather than growing every time a game is added.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../../api_client.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
+import '../../widgets/level_badge.dart';
 import 'games/connect4_board.dart';
 import 'games/reversi_board.dart';
 import 'games/memory_board.dart';
@@ -74,7 +77,46 @@ class GamesHubPage extends StatefulWidget {
 class _GamesHubPageState extends State<GamesHubPage> {
   String? _active;
 
-  void _back() => setState(() => _active = null);
+  /// وضعیتِ لولِ کاربر.
+  ///
+  /// ═══════════════════════════════════════════════════════════════════════
+  /// چرا اینجا و نه در داشبورد
+  /// ═══════════════════════════════════════════════════════════════════════
+  ///
+  /// درخواست مالک: «یک سیستم لول بندی هم **در قسمت بازی ها** اضافه کن».
+  ///
+  /// جای درستش هم همین‌جاست: لول فقط از بازیِ آنلاین می‌آید، پس باید
+  /// کنارِ همان کاری باشد که می‌سازدش. گذاشتنش در داشبورد، رابطهٔ
+  /// علت-و-معلول را پنهان می‌کرد.
+  Map<String, dynamic>? _level;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadLevel());
+  }
+
+  /// لول را می‌خواند. شکستش صفحه را نمی‌شکند.
+  ///
+  /// کارتِ لول یک زینت است، نه چیزی که بازی به آن وابسته باشد — اگر
+  /// نیامد، صفحه بدونِ آن رندر می‌شود و کاربر همچنان می‌تواند بازی
+  /// کند. نمایشِ یک پیامِ خطا برای این، فقط سروصدای بی‌مورد بود.
+  Future<void> _loadLevel() async {
+    try {
+      final d = await widget.api.get('/api/level');
+      if (!mounted || d is! Map) return;
+      setState(() => _level = Map<String, dynamic>.from(d));
+    } catch (_) {
+      // بی‌صدا: کارتِ لول اختیاری است.
+    }
+  }
+
+  void _back() {
+    setState(() => _active = null);
+    // برگشتن از یک بازی یعنی احتمالاً XP تازه گرفته شده — عددِ کارت
+    // باید تازه شود، وگرنه کاربر بازی می‌کند و هیچ تغییری نمی‌بیند.
+    unawaited(_loadLevel());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -104,6 +146,16 @@ class _GamesHubPageState extends State<GamesHubPage> {
           'تنها هم بازی کنی و رکورد بزنی.',
           style: theme.textTheme.bodyMedium,
         ),
+        Gaps.vMd,
+        if (_level != null)
+          LevelCard(
+            level: (_level!['level'] as num?)?.toInt() ?? 0,
+            into: (_level!['into'] as num?)?.toInt() ?? 0,
+            needed: (_level!['needed'] as num?)?.toInt() ?? 0,
+            progress: (_level!['progress'] as num?)?.toDouble() ?? 0,
+            isMax: _level!['isMax'] == true,
+            xp: (_level!['xp'] as num?)?.toInt() ?? 0,
+          ),
         Gaps.vLg,
         for (final g in _games) ...[
           _GameTile(entry: g, onTap: () => setState(() => _active = g.id)),
