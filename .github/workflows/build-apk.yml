@@ -150,8 +150,38 @@ jobs:
       - name: Build APK
         run: |
           cd mobile
-          flutter build apk --release \
+          # ══════════════════════════════════════════════════════════════
+          # چرا --target-platform و نه یک APK همه‌کاره
+          # ══════════════════════════════════════════════════════════════
+          #
+          # `flutter build apk --release` بدون قید، کتابخانه‌های بومیِ
+          # فلاتر را برای **هر سه** معماری داخل یک فایل می‌گذارد:
+          #
+          #     lib/arm64-v8a     18.8 MB
+          #     lib/armeabi-v7a   16.7 MB
+          #     lib/x86_64        20.3 MB   ← فقط شبیه‌ساز
+          #     ─────────────────────────
+          #     ۵۵.۸ MB از ۶۴ MB کلِ APK
+          #
+          # هر گوشی فقط **یکی** از این‌ها را استفاده می‌کند؛ بقیه فضای
+          # مردهٔ روی دیسکِ کاربرند. بدتر اینکه x86_64 اصلاً روی هیچ
+          # گوشیِ واقعی اجرا نمی‌شود — فقط برای شبیه‌ساز است.
+          #
+          # حذف x86_64 و ساختِ APK جدا برای هر ABI:
+          #   • arm64-v8a  → هر گوشیِ ۶۴ بیتی (تقریباً همهٔ گوشی‌های
+          #     امروز)
+          #   • armeabi-v7a → گوشی‌های قدیمی‌ترِ ۳۲ بیتی
+          #
+          # نتیجه: هر کاربر ~۲۰ مگابایت دانلود می‌کند به‌جای ۶۴.
+          #
+          # `--split-per-abi` علاوه بر حجم، یک سودِ حافظه‌ای هم دارد:
+          # اندروید کتابخانهٔ بومی را mmap می‌کند و یک APK کوچک‌تر یعنی
+          # فشارِ کمترِ صفحه‌بندی روی گوشیِ کم‌رم.
+          flutter build apk --release --split-per-abi \
+            --target-platform=android-arm,android-arm64 \
             --dart-define=API_BASE_URL=${{ vars.API_BASE_URL || 'https://api.ghelghelishop.ir' }}
+          echo "── خروجی‌ها ──"
+          ls -lh build/app/outputs/flutter-apk/*.apk
 
       # Prove the output is signed with OUR key before anyone uploads it.
       # A debug-signed APK is indistinguishable from a release one until
@@ -159,17 +189,26 @@ jobs:
       - name: Verify APK signature
         run: |
           cd mobile
-          APK=build/app/outputs/flutter-apk/app-release.apk
           BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
-          "$BT/apksigner" verify --print-certs "$APK" | tee /tmp/certs.txt
-          if grep -qi "CN=Android Debug" /tmp/certs.txt; then
-            echo "::error::APK is DEBUG-signed. It cannot be published and"
-            echo "future builds will not be able to update it."
-            exit 1
-          fi
-          grep -q "CN=GhelGheli" /tmp/certs.txt \
-            || { echo "::error::unexpected signing certificate"; exit 1; }
-          echo "signed with the GhelGheli release key"
+          # با --split-per-abi چند فایل تولید می‌شود؛ **همه** باید
+          # بررسی شوند. حلقه نزدن یعنی ممکن است یکی از آن‌ها
+          # دیباگ‌ساین باشد و کسی متوجه نشود.
+          shopt -s nullglob
+          FOUND=0
+          for APK in build/app/outputs/flutter-apk/*-release.apk; do
+            FOUND=1
+            echo "── $APK ──"
+            "$BT/apksigner" verify --print-certs "$APK" | tee /tmp/certs.txt
+            if grep -qi "CN=Android Debug" /tmp/certs.txt; then
+              echo "::error::$APK با کلید دیباگ امضا شده — نه قابل انتشار"
+              echo "است و نه قابل به‌روزرسانی."
+              exit 1
+            fi
+            grep -q "CN=GhelGheli" /tmp/certs.txt \
+              || { echo "::error::گواهی امضای غیرمنتظره در $APK"; exit 1; }
+          done
+          [ "$FOUND" = "1" ] || { echo "::error::هیچ APKی تولید نشد"; exit 1; }
+          echo "همهٔ APKها با کلید ریلیز GhelGheli امضا شده‌اند"
 
       # The signing material must not survive the job, even on a failure.
       - name: Scrub signing material
@@ -179,5 +218,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-release.apk
-          path: mobile/build/app/outputs/flutter-apk/app-release.apk
+          name: app-release-apks
+          path: mobile/build/app/outputs/flutter-apk/*-release.apk
