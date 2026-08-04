@@ -35,13 +35,27 @@ import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
 import '../../core/assets.dart';
+import '../../theme/brand_theme.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/state_views.dart';
 
 /// رنگ دو مسیر — همه‌جای صفحه از همین‌ها استفاده می‌شود تا «رایگان» و
 /// «پلاس» با یک نگاه از هم جدا شوند.
 const _freeColor = Color(0xFF38BDF8);
-const _plusColor = Color(0xFFFFD36B);
+// ═══════════════════════════════════════════════════════════════════════════
+// چرا این ثابت با یک تابعِ تم‌آگاه جایگزین شد
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// طلاییِ پلاس (#FFD36B) روی سطحِ سفیدِ تم روشن کنتراستِ **۱.۴۲:۱**
+// دارد — بدترین موردِ کل پالت. متن‌های «فقط پلاس»، «سقف امروز پر شد»
+// و برچسبِ مسیرِ پلاس در تم روشن عملاً نامرئی بودند.
+//
+// `context.gold` نسخهٔ درستِ تم را می‌دهد: همان hue، روشناییِ کمتر در
+// تم روشن، و همان طلاییِ درخشان در تم تیره.
+//
+// ثابتِ زیر فقط برای گرادیان‌ها می‌ماند، جایی که پس‌زمینه همیشه تیره
+// است و رنگِ ثابت درست‌تر از رنگِ تم است.
+const _plusGradient = Color(0xFFFFD36B);
 const _readyColor = Color(0xFFB5EF58);
 
 class PassPage extends StatefulWidget {
@@ -767,7 +781,7 @@ class _ProgressCard extends StatelessWidget {
           Row(
             children: [
               Icon(capReached ? Icons.lock_clock_rounded : Icons.bolt_rounded,
-                  size: 16, color: capReached ? _plusColor : _readyColor),
+                  size: 16, color: capReached ? context.gold : _readyColor),
               Gaps.hXs,
               Expanded(
                 child: Text(
@@ -775,7 +789,7 @@ class _ProgressCard extends StatelessWidget {
                       ? 'سقف امروز پر شد — فردا ${faNum(maxToday)} پلهٔ دیگر'
                       : 'امروز ${faNum(tiersToday)} از ${faNum(maxToday)} پله',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: capReached ? _plusColor : null,
+                    color: capReached ? context.gold : null,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -825,25 +839,42 @@ class _PlusUpsell extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
         gradient: LinearGradient(colors: [
-          _plusColor.withValues(alpha: 0.16),
-          _plusColor.withValues(alpha: 0.05),
+          _plusGradient.withValues(alpha: 0.16),
+          _plusGradient.withValues(alpha: 0.05),
         ]),
-        border: Border.all(color: _plusColor.withValues(alpha: 0.4)),
+        border: Border.all(color: _plusGradient.withValues(alpha: 0.4)),
       ),
       child: Row(
         children: [
           const Text('⭐', style: TextStyle(fontSize: 26)),
           Gaps.hSm,
-          const Expanded(
+          // ═══════════════════════════════════════════════════════════
+          // چرا این متن‌ها رنگِ ثابت ندارند
+          // ═══════════════════════════════════════════════════════════
+          //
+          // گرادیانِ بالا **نیمه‌شفاف** است (alpha ۰.۱۶ و ۰.۰۵)، پس
+          // سطحِ تم از پشتش دیده می‌شود. در تم تیره نتیجه تیره است و
+          // متنِ سفید کار می‌کرد؛ در تم روشن نتیجه تقریباً سفید است و
+          // `Colors.white70` روی آن محو می‌شد.
+          //
+          // این تلهٔ رایجی است: یک گرادیانِ نیمه‌شفاف، سطحِ زیرش را
+          // نمی‌پوشاند و نمی‌شود مثل یک پس‌زمینهٔ تیرهٔ قطعی با آن
+          // رفتار کرد.
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('مسیر طلایی قفل است',
                     style: TextStyle(
-                        fontWeight: FontWeight.w900, color: _plusColor)),
-                SizedBox(height: 2),
+                        fontWeight: FontWeight.w900, color: context.gold)),
+                const SizedBox(height: 2),
                 Text('چرخش گردونه، آیتم‌های ویژه و امتیاز دو برابر',
-                    style: TextStyle(fontSize: 12, color: Colors.white70)),
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.75))),
               ],
             ),
           ),
@@ -871,7 +902,7 @@ class _PlusUpsell extends StatelessWidget {
             child: FilledButton(
               onPressed: onOpenShop,
               style: FilledButton.styleFrom(
-                backgroundColor: _plusColor,
+                backgroundColor: _plusGradient,
                 foregroundColor: const Color(0xFF3A2A00),
                 padding: EdgeInsets.zero,
               ),
@@ -898,7 +929,7 @@ class _TrackLegend extends StatelessWidget {
         children: [
           _chip('رایگان', _freeColor),
           Gaps.hSm,
-          _chip('پلاس ⭐', _plusColor),
+          _chip('پلاس ⭐', context.gold),
           const Spacer(),
           Text('${faNum(tierCount)} پله',
               style: Theme.of(context).textTheme.labelMedium),
@@ -1077,7 +1108,7 @@ class _RewardTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = track == 'plus' ? _plusColor : _freeColor;
+    final color = track == 'plus' ? context.gold : _freeColor;
     final m = data;
 
     if (m == null) {
@@ -1162,8 +1193,8 @@ class _RewardTile extends StatelessWidget {
                   const Text('✓ گرفتی',
                       style: TextStyle(fontSize: 9.5, color: _readyColor))
                 else if (locked)
-                  const Text('⭐ فقط پلاس',
-                      style: TextStyle(fontSize: 9.5, color: _plusColor))
+                  Text('⭐ فقط پلاس',
+                      style: TextStyle(fontSize: 9.5, color: context.gold))
                 else if (ready)
                   const Text('برای گرفتن بزن',
                       style: TextStyle(

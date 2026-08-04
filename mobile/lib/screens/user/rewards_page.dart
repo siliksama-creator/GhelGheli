@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
+import '../../theme/brand_theme.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/async_section.dart';
@@ -98,16 +99,22 @@ class _RewardsPageState extends State<RewardsPage> {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(
                   horizontal: Gaps.sm, vertical: Gaps.xs),
+              // هشدارِ «برگشت‌ناپذیر» روی سطحِ دیالوگ می‌نشیند، نه روی
+              // گرادیان. طلاییِ ثابت آنجا ۱.۴۲:۱ کنتراست دارد یعنی در
+              // تم روشن اصلاً خوانده نمی‌شود — و این متنی است که کاربر
+              // **باید** بخواند پیش از یک کارِ برگشت‌ناپذیر.
               decoration: BoxDecoration(
-                color: const Color(0xFFFFD36B).withValues(alpha: 0.12),
+                color: context.gold.withValues(alpha: 0.12),
                 borderRadius: Corners.rMd,
                 border: Border.all(
-                    color: const Color(0xFFFFD36B).withValues(alpha: 0.35)),
+                    color: context.gold.withValues(alpha: 0.45)),
               ),
-              child: const Text('این کار برگشت‌پذیر نیست.',
+              child: Text('این کار برگشت‌پذیر نیست.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                      fontSize: 12.5, color: Color(0xFFFFD36B))),
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: context.gold)),
             ),
           ],
         ),
