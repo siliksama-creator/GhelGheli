@@ -58,8 +58,70 @@ const row = (z) => Math.floor(z / 3); // ۰ بالا، ۱ وسط، ۲ پایین
 // این یک **تصمیم واقعی** برای بازیکن می‌سازد؛ بدون آن، همه همیشه
 // محکم‌ترین شوت را می‌زنند.
 
+// ═══════════════════════════════════════════════════════════════════════════
+// «نقطهٔ تمیز» — ایده‌ای که پشت نوار قدرت گذاشته شد
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// نقد مالک: «نگه میداره محکم تر میزنه الان بنزم ایده جالبی پشتش راه انداره
+// نشده».
+//
+// حق داشت. نوار قدرتِ قبلی یک شیبِ ساده بود: هرچه بالاتر، مهار سخت‌تر و
+// خطا بیشتر. یعنی یک معاملهٔ خطیِ بی‌روح که بعد از سه ضربه بهترین
+// استراتژی‌اش معلوم می‌شد (همیشه حدود ۰.۷) و دیگر هیچ تصمیمی باقی
+// نمی‌ماند. یک نوار که همیشه یک جواب درست دارد، نوار نیست؛ تشریفات است.
+//
+// حالا در هر ضربه یک **پنجرهٔ باریکِ تصادفی** روی نوار روشن می‌شود
+// (`sweet`). رها کردن داخل آن پنجره یعنی «ضربهٔ تمیز»:
+//
+//   • خطای زننده به یک‌سوم می‌رسد (`_CLEAN_MISS`)
+//   • شانس مهارِ دروازه‌بان هم کم می‌شود (`_CLEAN_SAVE`)
+//
+// چرا این جالب است و شیبِ خطی نبود:
+//
+//   ۱. جای پنجره هر بار عوض می‌شود، پس حفظ کردنِ یک عدد جواب نمی‌دهد —
+//      باید هر بار **نگاه کنی و به‌موقع رها کنی**. مهارتِ واقعیِ زمان‌بندی.
+//   ۲. پنجره گاهی در ناحیهٔ قدرتِ بالا می‌افتد و گاهی پایین، پس گاهی
+//      «تمیز» یعنی محکم و گاهی یعنی آرام. تصمیم هر بار تازه است.
+//   ۳. اگر پنجره را از دست دادی، هنوز انتخاب داری: محکم بزنی (مهار سخت،
+//      خطا زیاد) یا کنترل‌شده (خطا کم، مهار راحت). یعنی خطا هم مسیر
+//      دارد، نه اینکه ضربه هدر برود.
+//
+// چرا پنجره **مخفی نیست** و به هر دو بازیکن می‌رسد: این یک چالشِ زننده
+// با خودش است، نه اطلاعاتی دربارهٔ انتخاب حریف. مخفی‌کردنش فقط کاربر را
+// کور می‌کرد. آنچه مخفی می‌ماند همچنان `pending` است.
+//
+// چرا سمت سرور محاسبه می‌شود: کلاینت فقط `power` می‌فرستد؛ اینکه آن عدد
+// داخل پنجره بوده یا نه را سرور تصمیم می‌گیرد. اگر یک پرچمِ `clean` از
+// کلاینت می‌گرفتیم، هر کسی با یک پروکسی همیشه ضربهٔ تمیز می‌زد.
+const SWEET_MIN = 0.35;   // کمترین قدرتی که کاربر می‌تواند بفرستد
+const SWEET_WIDTH = 0.15; // پهنای پنجره روی بازهٔ ۰.۳۵ تا ۱ (~۲۳٪ نوار)
+const _CLEAN_MISS = 0.34; // ضریب خطا در ضربهٔ تمیز
+const _CLEAN_SAVE = 0.70; // ضریب شانس مهار در ضربهٔ تمیز
+
+/**
+ * یک پنجرهٔ تازه برای ضربهٔ بعدی می‌سازد.
+ *
+ * عمداً هرگز کاملاً چسبیده به دو انتهای نوار نمی‌شود: پنجره‌ای که لبهٔ
+ * پایین است با «شل‌ترین ضربهٔ ممکن» یکی می‌شود و پنجره‌ای که لبهٔ بالاست
+ * با «محکم‌ترین» — هر دو بدون زمان‌بندی هم قابل زدن‌اند و چالش را از بین
+ * می‌برند.
+ */
+function makeSweet(rand = Math.random) {
+  const span = 1 - SWEET_MIN - SWEET_WIDTH; // فضای قابل جابه‌جایی
+  const min = SWEET_MIN + 0.04 + rand() * Math.max(0, span - 0.08);
+  return { min: round3(min), max: round3(min + SWEET_WIDTH) };
+}
+
+const round3 = (v) => Math.round(v * 1000) / 1000;
+
+/** آیا این قدرت داخل پنجرهٔ تمیز است؟ */
+function isClean(power, sweet) {
+  if (!sweet) return false;
+  return power >= sweet.min && power <= sweet.max;
+}
+
 /** احتمال بیرون رفتن توپ (خطای زننده)، بر اساس ناحیه و قدرت. */
-function missChance(zone, power) {
+function missChance(zone, power, clean = false) {
   const r = row(zone), c = col(zone);
   // ردیف بالا سخت‌ترین است، ردیف پایین راحت‌ترین.
   let base = r === 0 ? 0.16 : r === 1 ? 0.07 : 0.04;
@@ -67,7 +129,9 @@ function missChance(zone, power) {
   if (c !== 1) base += 0.04;
   // قدرت بالای ۰.۷ کنترل را کم می‌کند.
   base += Math.max(0, power - 0.7) * 0.35;
-  return Math.min(0.45, base);
+  const capped = Math.min(0.45, base);
+  // ضربهٔ تمیز پاداشِ زمان‌بندی است: توپ همان‌جایی می‌رود که نشانه رفتی.
+  return clean ? capped * _CLEAN_MISS : capped;
 }
 
 /**
@@ -76,7 +140,7 @@ function missChance(zone, power) {
  * دروازه‌بان اگر دقیقاً همان ناحیه را بزند شانس بالایی دارد؛ ناحیهٔ
  * مجاور شانس کمتر؛ ناحیهٔ دور تقریباً صفر.
  */
-function saveChance(shotZone, diveZone, power) {
+function saveChance(shotZone, diveZone, power, clean = false) {
   const dc = Math.abs(col(shotZone) - col(diveZone));
   const dr = Math.abs(row(shotZone) - row(diveZone));
   const dist = dc + dr;
@@ -91,6 +155,8 @@ function saveChance(shotZone, diveZone, power) {
   p *= (1 - power * 0.35);
   // گوشهٔ بالا حتی با حدس درست هم سخت مهار می‌شود.
   if (row(shotZone) === 0) p *= 0.65;
+  // ضربهٔ تمیز فقط دقیق‌تر نیست، تندتر هم هست.
+  if (clean) p *= _CLEAN_SAVE;
   return Math.max(0.01, Math.min(0.95, p));
 }
 
@@ -100,18 +166,19 @@ function saveChance(shotZone, diveZone, power) {
  * `rand` تزریق می‌شود تا تست بتواند قطعی باشد. بدون این، تست‌های احتمالی
  * گاهی سبز و گاهی قرمز می‌شدند — بدترین نوع تست.
  */
-function resolveKick(shotZone, power, diveZone, rand = Math.random) {
-  if (missChance(shotZone, power) > rand()) {
-    return { outcome: 'miss', shotZone, diveZone, power };
+function resolveKick(shotZone, power, diveZone, rand = Math.random, sweet = null) {
+  const clean = isClean(power, sweet);
+  if (missChance(shotZone, power, clean) > rand()) {
+    return { outcome: 'miss', shotZone, diveZone, power, clean };
   }
-  if (saveChance(shotZone, diveZone, power) > rand()) {
-    return { outcome: 'save', shotZone, diveZone, power };
+  if (saveChance(shotZone, diveZone, power, clean) > rand()) {
+    return { outcome: 'save', shotZone, diveZone, power, clean };
   }
-  return { outcome: 'goal', shotZone, diveZone, power };
+  return { outcome: 'goal', shotZone, diveZone, power, clean };
 }
 
 // ── وضعیت بازی ────────────────────────────────────────────────────────────
-const create = () => ({
+const create = (rand = Math.random) => ({
   // امتیاز هر بازیکن
   score: { X: 0, O: 0 },
   // چند ضربه هر کدام زده‌اند
@@ -125,6 +192,9 @@ const create = () => ({
   round: 1,
   suddenDeath: false,
   lastKick: null,
+  // پنجرهٔ «ضربهٔ تمیز» برای ضربهٔ جاری. هر ضربه یک پنجرهٔ تازه دارد،
+  // وگرنه بعد از دو ضربه جایش حفظ می‌شود و چالشِ زمان‌بندی می‌میرد.
+  sweet: makeSweet(rand),
 });
 
 /**
@@ -161,7 +231,7 @@ function applyMove(state, move, player, rand = Math.random) {
 
   const shot = state.pending[state.shooter];
   const dive = state.pending[keeper];
-  const res = resolveKick(shot.zone, shot.power, dive.zone, rand);
+  const res = resolveKick(shot.zone, shot.power, dive.zone, rand, state.sweet);
 
   if (res.outcome === 'goal') state.score[state.shooter] += 1;
   state.taken[state.shooter] += 1;
@@ -171,9 +241,13 @@ function applyMove(state, move, player, rand = Math.random) {
     outcome: res.outcome,
     shotZone: res.shotZone,
     diveZone: res.diveZone,
+    clean: res.clean,
   });
 
   state.pending = {};
+  // پنجرهٔ تازه برای ضربهٔ بعد — همان‌طور که بالا توضیح داده شد، ثابت
+  // ماندنش یعنی حفظ کردنِ یک عدد و پایانِ چالش.
+  state.sweet = makeSweet(rand);
   // نقش‌ها عوض می‌شوند.
   state.shooter = keeper;
   // یک دور کامل = هر دو زده‌اند.
@@ -286,6 +360,11 @@ function botMove(state, me) {
   if (state.shooter === me) {
     // قدرت هم تصادفی، در همان بازه‌ای که کاربر می‌تواند انتخاب کند
     // (۰.۳۵ تا ۱)، تا ربات نه مزیت داشته باشد نه ضعف.
+    //
+    // نکته: ربات **از پنجرهٔ تمیز خبر ندارد** و آن را هدف نمی‌گیرد.
+    // اگر می‌گرفت، همیشه ضربهٔ تمیز می‌زد و دقیقاً همان «ربات خیلی
+    // باهوش»ی می‌شد که مالک نمی‌خواست. شانس تصادفیِ افتادن داخل پنجره
+    // (~۲۳٪) همان چیزی است که یک بازیکنِ بی‌دقت هم دارد.
     return { zone, power: 0.35 + Math.random() * 0.65 };
   }
   return { zone, power: 0 };
@@ -301,6 +380,7 @@ module.exports = {
   // عوض کند.
   simultaneous: true,
   ZONES, ROUNDS,
+  SWEET_MIN, SWEET_WIDTH,
   create, result, isValidMove, applyMove, nextTurn, botMove,
-  publicState, resolveKick, missChance, saveChance,
+  publicState, resolveKick, missChance, saveChance, makeSweet, isClean,
 };
