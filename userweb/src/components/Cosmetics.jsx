@@ -54,12 +54,51 @@ export function ClubBadge({ club }) {
  * badge is a way to say "I support this club"; once the avatar says it, the
  * badge is redundant.
  */
-export function DisplayName({ name, cosmetics, className, onClick, avatarKey }) {
+// ═══════════════════════════════════════════════════════════════════════════
+// نشانِ لول — آینهٔ LevelBadge در اپ اندروید
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// سرور لول را کنارِ cosmetics در همان کوئریِ دسته‌ای می‌فرستد، ولی
+// وب‌اپ آن را نادیده می‌گرفت. نتیجه: کاربرِ اندروید لولِ همه را
+// می‌دید و کاربرِ وب هیچ‌کدام را — یک ناهماهنگیِ آشکار بین دو کلاینتِ
+// یک محصول.
+//
+// رده‌بندی و مرزها **دقیقاً** با نسخهٔ فلاتر یکی است
+// (mobile/lib/widgets/level_badge.dart). اگر یکی عوض شود و دیگری نه،
+// همان کاربر در دو کلاینت رنگِ متفاوت می‌بیند.
+export function levelTier(level) {
+  if (level >= 90) return 'legend';
+  if (level >= 60) return 'gold';
+  if (level >= 30) return 'silver';
+  if (level >= 10) return 'bronze';
+  return 'rookie';
+}
+
+/// نشانِ فشردهٔ لول.
+///
+/// `null`/`undefined` یعنی «سرور نفرستاده» و چیزی رسم نمی‌شود.
+/// **صفر یک لولِ معتبر است** (کاربر تازه) و باید دیده شود — همان
+/// تفکیکی که در اپ اندروید هم رعایت شده.
+export function LevelBadge({ level }) {
+  if (level === null || level === undefined) return null;
+  const n = Number(level);
+  if (!Number.isFinite(n)) return null;
+  return (
+    <span className={`lvlBadge lvl-${levelTier(n)}`} title={`لول ${n}`}>
+      {n}
+    </span>
+  );
+}
+
+export function DisplayName({
+  name, cosmetics, className, onClick, avatarKey, level,
+}) {
   const c = cosmetics || {};
   const avatarIsSameCrest = c.club && avatarKey === `club:${c.club}`;
   return (
     <b className={className} onClick={onClick} style={nameColorStyle(c.color)}>
       {!avatarIsSameCrest && <ClubBadge club={c.club} />}
+      <LevelBadge level={level} />
       {name}
       {c.plus && <span className="plusStarSm" title="عضو پلاس">⭐</span>}
     </b>

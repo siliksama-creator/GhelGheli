@@ -49,7 +49,8 @@ function Roster({ token, club, back, openProfile }) {
                 {/* DisplayName به‌جای نام خام: ستارهٔ پلاس، نشان باشگاه و
                     رنگ اسم را هم می‌آورد — همان چیزی که چت و لیگ دارند. */}
                 <DisplayName className="rosterName" name={m.nickname}
-                  cosmetics={m.cosmetics} avatarKey={m.profileAvatarKey} />
+                  cosmetics={m.cosmetics} avatarKey={m.profileAvatarKey}
+                  level={m.level} />
                 {/* "۰ امتیاز ماه" next to every name reads as a broken
                     counter, especially early in a month when the league has
                     just reset and NOBODY has points yet. Fall back to the

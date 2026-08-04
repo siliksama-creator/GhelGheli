@@ -5,11 +5,27 @@
    CHAT section for the working rules.) */
 
 
-/* Fix Chat Visbility */
+/* ═══════════════════════════════════════════════════════════════════════════
+   .chatbody — چرا override با !important حذف شد
+   ═══════════════════════════════════════════════════════════════════════════
+
+   این بلوک با کامنتِ «Fix Chat Visbility» اضافه شده بود و در تم تیره
+   کار می‌کرد. ولی سه `!important` داشت که مقادیرِ تم را دور می‌زدند:
+
+       background: #1a1a1a !important;   ← همیشه تیره
+       color:      #ffffff !important;   ← همیشه سفید
+
+   یعنی در **تم روشن** بدنهٔ هر پیامِ چت یک مستطیلِ سیاه بود وسطِ صفحهٔ
+   سفید — و بدتر، این روی `.chatbody` بود که ظرفِ نام و متنِ پیام است،
+   پس نامِ رنگیِ کاربر (آیتمِ خریدنیِ فروشگاه) هم زیرش گم می‌شد.
+
+   نکتهٔ ساختاری: `.chatmsg` (والد) از قبل پس‌زمینه و حاشیهٔ درستِ
+   تم‌آگاه دارد. این فرزند اصلاً نباید پس‌زمینه‌ای داشته باشد.
+   حذفِ کامل، درست‌ترین رفع است — نه جایگزینی با یک رنگِ دیگر. */
 .chatbody {
-  background: #1a1a1a !important;
-  color: #ffffff !important;
-  border: 1px solid #333 !important;
+  /* فقط چیدمان؛ رنگ از والد و از تم می‌آید. */
+  flex: 1;
+  min-width: 0; /* اجازهٔ کوتاه شدنِ متنِ بلند به‌جای سرریز */
 }
 /* (Forced white chat text removed — it made every message invisible in the
    light theme. Colour now comes from the theme layer.) */
@@ -2551,3 +2567,43 @@ a:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .appLogo.glow { animation: none; box-shadow: 0 0 10px #b5ef5866; }
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   نشانِ لول — آینهٔ LevelBadge در اپ اندروید
+   ═══════════════════════════════════════════════════════════════════════════
+
+   رنگ‌ها و مرزهای رده **دقیقاً** با نسخهٔ فلاتر یکی‌اند
+   (mobile/lib/widgets/level_badge.dart). اگر یکی عوض شود و دیگری نه،
+   همان کاربر در دو کلاینت رنگِ متفاوت می‌بیند.
+
+   هر رده دو متغیر دارد: یکی برای تم تیره، یکی برای روشن. دلیلش همان
+   چیزی است که در پالتِ اپ هم رفع شد — رنگی که روی سطحِ تیره درخشان
+   است، روی سفید محو می‌شود. مقادیرِ روشن با کنتراستِ ≥۴.۵:۱ روی
+   #ffffff انتخاب شده‌اند. */
+.lvlBadge {
+  display: inline-block;
+  margin-inline-end: 4px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.35;
+  /* ارقامِ هم‌عرض: بدون این، عوض شدنِ ۹ به ۱۰ کلِ ردیف را جابه‌جا
+     می‌کند و در فهرستِ زندهٔ چت دیده می‌شود. */
+  font-variant-numeric: tabular-nums;
+  /* عددِ لاتین داخل رابطِ راست‌به‌چپ باید جهتِ خودش را داشته باشد. */
+  direction: ltr;
+  vertical-align: middle;
+}
+
+.lvl-rookie { color: var(--lvl-rookie); border: 1px solid var(--lvl-rookie);
+  background: color-mix(in srgb, var(--lvl-rookie) 14%, transparent); }
+.lvl-bronze { color: var(--lvl-bronze); border: 1px solid var(--lvl-bronze);
+  background: color-mix(in srgb, var(--lvl-bronze) 14%, transparent); }
+.lvl-silver { color: var(--lvl-silver); border: 1px solid var(--lvl-silver);
+  background: color-mix(in srgb, var(--lvl-silver) 14%, transparent); }
+.lvl-gold   { color: var(--lvl-gold);   border: 1px solid var(--lvl-gold);
+  background: color-mix(in srgb, var(--lvl-gold) 14%, transparent); }
+.lvl-legend { color: var(--lvl-legend); border: 1px solid var(--lvl-legend);
+  background: color-mix(in srgb, var(--lvl-legend) 14%, transparent); }

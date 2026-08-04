@@ -66,7 +66,7 @@ export default function League({ token, openProfile }) {
                   onClick={() => openProfile(e.user_id)}>
                   <span className="medal">{['🥇', '🥈', '🥉'][i]}</span>
                   <DisplayName name={e.nickname || e.first_name || 'کاربر'}
-                    cosmetics={e.cosmetics} />
+                    cosmetics={e.cosmetics} level={e.level} />
                   <strong>{fa(e.points)} امتیاز</strong>
                 </div>
               ))}
@@ -78,7 +78,7 @@ export default function League({ token, openProfile }) {
                   onClick={() => openProfile(e.user_id)}>
                   <b>#{fa(i + 4)}</b>
                   <DisplayName name={e.nickname || e.first_name || 'کاربر'}
-                    cosmetics={e.cosmetics} />
+                    cosmetics={e.cosmetics} level={e.level} />
                   <strong>{fa(e.points)} امتیاز</strong>
                 </div>
               ))}

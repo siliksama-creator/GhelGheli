@@ -230,6 +230,7 @@ const Message = memo(function Message({ m, mine, onProfile, onReply, onLike, onR
           onClick={() => onProfile(m.user_id)}
           name={m.nickname || m.first_name || 'کاربر'}
           cosmetics={m.cosmetics}
+          level={m.level}
           // Suppress the inline crest when the avatar beside it is already
           // that same crest — otherwise the badge appears twice in a row.
           avatarKey={m.profile_image_url ? null : m.profile_avatar_key} />
