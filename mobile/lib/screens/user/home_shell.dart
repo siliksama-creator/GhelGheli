@@ -58,6 +58,17 @@ class _HomeShellState extends State<HomeShell>
   /// است.
   int _passClaimable = 0;
 
+  /// تعداد پله‌ای که **امروز** باز شده — عددِ روی نشانِ قرمز.
+  ///
+  /// درخواست مالک: «وقتی بتل پس کاربر باز میشه کنار آیکون بتل پس ۱ قرمز
+  /// میاد اگه دوتا باز شده ۲ میاد ولی سقف باز شدن ۲ هستش».
+  ///
+  /// عمداً از `_passClaimable` جداست: «چند جایزه می‌توانی بگیری» یک چیز
+  /// است، «امروز چند پله باز شد» چیز دیگری. عددی که هر روز از صفر شروع
+  /// می‌شود حس پیشرفتِ روزانه می‌سازد و کاربر را فردا برمی‌گرداند؛
+  /// عددی که فقط بالا می‌رود بعد از یک هفته بی‌معنی است.
+  int _passTiersToday = 0;
+
   // A subtle one-shot "welcome" entrance the moment the user lands on the
   // home shell after logging in — fades and lifts the whole shell into
   // place instead of just snapping onto the screen, so the first thing a
@@ -249,6 +260,11 @@ class _HomeShellState extends State<HomeShell>
         final p = m['pass'];
         if (p is Map) {
           _passClaimable = (p['claimable'] as num?)?.toInt() ?? 0;
+          final maxT = (p['maxTiersPerDay'] as num?)?.toInt() ?? 2;
+          // سقف در سرور هم اعمال می‌شود؛ این clamp محافظ دوم است تا اگر
+          // روزی سرور عدد بزرگ‌تری فرستاد، نشان «۷» نشان ندهد.
+          _passTiersToday =
+              ((p['tiersToday'] as num?)?.toInt() ?? 0).clamp(0, maxT);
         }
       });
     } catch (_) {
@@ -381,6 +397,7 @@ class _HomeShellState extends State<HomeShell>
           // که کاربر جایزه می‌گیرد، یکی جایی که خرج می‌کند.
           _PassButton(
             claimable: _passClaimable,
+            tiersToday: _passTiersToday,
             selected: _index == passIndex,
             onPressed: () => setState(() => _index = passIndex),
           ),
@@ -557,67 +574,147 @@ class _ShopButton extends StatelessWidget {
   }
 }
 
-/// آیکون گذر نبرد با نشانِ «جایزهٔ آماده».
+/// آیکون گذر نبرد با نشانِ «پله‌های امروز».
 ///
-/// چرا نشان مهم‌تر از خود آیکون است: گذر نبرد وقتی کار می‌کند که کاربر
-/// **برگردد**. اگر جایزه‌ای آماده باشد و او نداند، دلیلی برای باز کردن
-/// صفحه ندارد. عدد روی آیکون همان چیزی است که او را برمی‌گرداند — دقیقاً
-/// مثل نشانِ چرخش گردونه که همین کار را می‌کند.
-class _PassButton extends StatelessWidget {
+/// ═══════════════════════════════════════════════════════════════════════
+/// چه چیزی روی نشان نوشته می‌شود و چرا
+/// ═══════════════════════════════════════════════════════════════════════
+///
+/// درخواست مالک: «وقتی بتل پس کاربر باز میشه کنار آیکون بتل پس ۱ قرمز
+/// میاد اگه دوتا باز شده ۲ میاد ولی سقف باز شدن ۲ هستش».
+///
+/// پس نشان **تعداد پلهٔ باز شدهٔ امروز** را نشان می‌دهد (۱ یا ۲)، نه
+/// تعداد کل جوایز. این تفاوت مهم است: عددی که هر روز از صفر شروع می‌شود
+/// و به ۲ می‌رسد، حس پیشرفتِ روزانه می‌سازد و کاربر را فردا برمی‌گرداند.
+///
+/// اگر امروز هنوز پله‌ای باز نشده ولی جایزهٔ گرفته‌نشده‌ای مانده، یک
+/// نقطهٔ کوچک نشان داده می‌شود — بی‌سروصدا ولی قابل تشخیص.
+class _PassButton extends StatefulWidget {
   const _PassButton({
     required this.claimable,
+    required this.tiersToday,
     required this.selected,
     required this.onPressed,
   });
 
   final int claimable;
+  final int tiersToday;
   final bool selected;
   final VoidCallback onPressed;
 
   @override
+  State<_PassButton> createState() => _PassButtonState();
+}
+
+class _PassButtonState extends State<_PassButton>
+    with SingleTickerProviderStateMixin {
+  /// در initState ساخته می‌شود، نه به‌صورت مقداردهیِ `late final` روی
+  /// فیلد.
+  ///
+  /// یک `late final` تا اولین دسترسی مقداردهی نمی‌شود. اگر ویجت پیش از
+  /// آن حذف شود، `dispose()` اولین جایی است که به آن دست می‌زند — یعنی
+  /// `createTicker` روی عنصرِ غیرفعال صدا زده می‌شود و فلاتر پرتاب
+  /// می‌کند: «Looking up a deactivated widget's ancestor is unsafe».
+  /// روی گوشی واقعی هم رخ می‌دهد: کاربری که اپ را باز و فوراً می‌بندد.
+  late final AnimationController _pop;
+
+  @override
+  void initState() {
+    super.initState();
+    _pop = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 620),
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _PassButton old) {
+    super.didUpdateWidget(old);
+    // وقتی پلهٔ جدیدی باز می‌شود نشان یک «پاپ» کوچک می‌زند تا دیده شود؛
+    // بدون آن عدد بی‌صدا عوض می‌شود و کسی متوجه نمی‌شود.
+    if (widget.tiersToday > old.tiersToday) _pop.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _pop.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final n = widget.tiersToday;
+    final showDot = n == 0 && widget.claimable > 0;
+    final ringColor = Theme.of(context).appBarTheme.backgroundColor ??
+        Theme.of(context).colorScheme.surface;
+
     return Stack(
       clipBehavior: Clip.none,
       children: [
         IconButton(
-          tooltip: claimable > 0
-              ? '$claimable جایزهٔ گذر نبرد آماده است'
-              : 'گذر نبرد فصلی',
-          onPressed: onPressed,
-          style: selected
+          tooltip: n > 0
+              ? '$n پلهٔ گذر نبرد امروز باز شد'
+              : (widget.claimable > 0
+                  ? '${widget.claimable} جایزهٔ گذر نبرد آماده است'
+                  : 'گذر نبرد فصلی'),
+          onPressed: widget.onPressed,
+          style: widget.selected
               ? IconButton.styleFrom(
-                  backgroundColor:
-                      Theme.of(context).colorScheme.primary.withValues(alpha: 0.18))
+                  backgroundColor: Theme.of(context)
+                      .colorScheme
+                      .primary
+                      .withValues(alpha: 0.18))
               : null,
           icon: const Text('🏅', style: TextStyle(fontSize: 20)),
         ),
-        if (claimable > 0)
+        if (n > 0)
           Positioned(
             top: 4,
             right: 2,
             child: IgnorePointer(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                constraints: const BoxConstraints(minWidth: 17, minHeight: 17),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF43F5E),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: Theme.of(context).appBarTheme.backgroundColor
-                        ?? Theme.of(context).colorScheme.surface,
-                    width: 2,
+              child: ScaleTransition(
+                scale: TweenSequence<double>([
+                  TweenSequenceItem(
+                      tween: Tween(begin: 1.0, end: 1.55), weight: 40),
+                  TweenSequenceItem(
+                      tween: Tween(begin: 1.55, end: 1.0), weight: 60),
+                ]).animate(_pop),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  constraints:
+                      const BoxConstraints(minWidth: 17, minHeight: 17),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF43F5E),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: ringColor, width: 2),
                   ),
-                ),
-                child: Center(
-                  child: Text(
-                    faNum(claimable),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                      height: 1.1,
+                  child: Center(
+                    child: Text(
+                      faNum(n),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        height: 1.1,
+                      ),
                     ),
                   ),
+                ),
+              ),
+            ),
+          )
+        else if (showDot)
+          Positioned(
+            top: 7,
+            right: 6,
+            child: IgnorePointer(
+              child: Container(
+                width: 9,
+                height: 9,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFB5EF58),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: ringColor, width: 1.5),
                 ),
               ),
             ),

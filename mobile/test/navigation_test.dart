@@ -31,7 +31,8 @@ class _OkAdapter implements HttpClientAdapter {
       '"wallet_balance":0},"inventory":[],"leaguePayouts":[],'
       '"rewards":[],"wheel":{"spinsLeft":2,"unlimited":false},'
       '"pass":{"tier":3,"tierCount":50,"claimable":4,"hasPlus":false,'
-      '"daysLeft":42,"intoTier":10,"tierNeeds":115}}',
+      '"daysLeft":42,"intoTier":10,"tierNeeds":115,"tiersToday":2,'
+      '"maxTiersPerDay":2,"dayCapReached":true}}',
       200,
       headers: {
         Headers.contentTypeHeader: [Headers.jsonContentType]
@@ -118,12 +119,27 @@ void main() {
           findsOneWidget);
     });
 
-    testWidgets('نشانِ تعداد جایزهٔ آماده روی آیکون دیده می‌شود',
+    testWidgets('نشان، پله‌های باز شدهٔ امروز را نشان می‌دهد نه کل جوایز',
         (tester) async {
-      // بدون این نشان، کاربر نمی‌فهمد جایزه‌ای منتظرش است و برنمی‌گردد —
-      // که کل هدف گذر نبرد است.
+      // مالک: «وقتی بتل پس کاربر باز میشه کنار آیکون بتل پس ۱ قرمز میاد
+      // اگه دوتا باز شده ۲ میاد ولی سقف باز شدن ۲ هستش».
+      //
+      // در دادهٔ جعلی claimable=4 ولی tiersToday=2 → نشان باید «۲»
+      // باشد، نه «۴».
       await _pumpShell(tester);
-      expect(find.text('۴'), findsWidgets);
+      expect(find.text('۲'), findsWidgets,
+          reason: 'عدد نشان = پله‌های امروز');
+      expect(find.text('۴'), findsNothing,
+          reason: 'عدد جوایز نباید روی نشان بیاید');
+    });
+
+    testWidgets('نشان هرگز از سقف روزانه بیشتر نمی‌شود', (tester) async {
+      // محافظ دوم در کلاینت: اگر سرور روزی عدد بزرگ‌تری بفرستد، نشان
+      // نباید «۷» نشان دهد.
+      await _pumpShell(tester);
+      for (final n in ['۳', '۴', '۵', '۶', '۷']) {
+        expect(find.text(n), findsNothing, reason: 'نشان نباید $n باشد');
+      }
     });
 
     testWidgets('زدن آیکون صفحهٔ گذر نبرد را باز می‌کند', (tester) async {

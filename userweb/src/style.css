@@ -2359,3 +2359,173 @@ a:focus-visible {
   .passCell.is-ready { animation: none; }
   .passBarFill { transition: none; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   گذر نبرد فصلی — بازطراحی کامل
+   ═══════════════════════════════════════════════════════════════════════
+   بازخورد مالک روی نسخهٔ اول: «ظاهرش خیلی زشت و غیرقابل فهم هستش ... یه
+   اسکرول بار هم باید طراحی کنی که کاربرها بفهمن بعضی چیزا تو صفحه پایین
+   تر قرار داده شده». سه تغییر ریشه‌ای:
+     ۱. لیست عمودی به‌جای ریل افقی — فضای کافی برای متن فارسی.
+     ۲. نوار پیشرفتِ اسکرولِ همیشه‌پیدا (.pRail).
+     ۳. بنر تصویری، آیکون‌های سه‌بعدی، و انیمیشن روی جایزهٔ آماده. */
+.pWrap { position: relative; display: flex; flex-direction: column; gap: 12px; }
+
+.pRail {
+  position: fixed; top: 96px; bottom: 96px; inset-inline-end: 5px;
+  width: 8px; border-radius: 999px; background: #ffffff12; z-index: 5;
+  pointer-events: none;
+}
+.pRailThumb {
+  position: absolute; inset-inline-start: -3px; width: 14px; height: 46px;
+  transform: translateY(-50%); border-radius: 999px;
+  background: linear-gradient(180deg, #b5ef58, #6fae1f);
+  box-shadow: 0 0 12px #b5ef5877;
+  display: grid; place-items: center;
+  font-size: 9px; font-weight: 900; color: #06301a;
+  transition: top .12s linear;
+}
+
+.pBanner { position: relative; border-radius: 20px; overflow: hidden; }
+.pBanner img { width: 100%; height: 132px; object-fit: cover; display: block; }
+.pBannerFade {
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, transparent 35%, #000000bb 100%);
+}
+.pBannerText {
+  position: absolute; inset-inline: 14px; bottom: 10px;
+  display: flex; align-items: flex-end; gap: 10px;
+}
+.pBannerText > div:first-child { flex: 1; min-width: 0; }
+.pBannerText h2 {
+  margin: 0; font-size: 17px; color: #fff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pBannerText span { font-size: 12px; color: #ffffffb0; }
+.pMedal {
+  width: 62px; height: 62px; border-radius: 50%; flex: 0 0 auto;
+  background: linear-gradient(135deg, #b5ef58, #4d9e1f);
+  box-shadow: 0 0 16px #b5ef5866;
+  display: grid; place-items: center; align-content: center;
+}
+.pMedal b { font-size: 24px; line-height: 1; color: #07240f; }
+.pMedal small { font-size: 9px; font-weight: 700; color: #0b3a16; }
+
+.pProgress { display: flex; flex-direction: column; gap: 8px; }
+.pProgressTop { display: flex; justify-content: space-between; align-items: baseline; }
+.pProgressTop span { font-size: 12.5px; color: #9fb6d0; }
+.pBar { height: 14px; border-radius: 999px; background: #ffffff12; overflow: hidden; }
+.pBarFill {
+  height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, #4d9e1f, #b5ef58);
+  box-shadow: 0 0 10px #b5ef5877;
+  transition: width .7s cubic-bezier(.22,.9,.28,1);
+}
+.pDayCap {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font-size: 12.5px; font-weight: 700; color: #c9ddf2;
+}
+.pDayCap .capFull { color: #ffd36b; }
+.pDots { display: inline-flex; gap: 4px; }
+.pDots i { width: 9px; height: 9px; border-radius: 50%; background: #ffffff26; }
+.pDots i.on { background: #b5ef58; box-shadow: 0 0 6px #b5ef5899; }
+.pPending { margin: 0; font-size: 11.5px; color: #8ba3bd; }
+.pClaimAll { width: 100%; margin-top: 4px; animation: pClaimPulse 2s ease-in-out infinite; }
+@keyframes pClaimPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.015); } }
+
+.pUpsell {
+  display: flex; align-items: center; gap: 10px;
+  background: linear-gradient(135deg, #ffd36b26, #ffd36b0d);
+  border: 1px solid #ffd36b66;
+}
+.pUpsellStar { font-size: 26px; }
+.pUpsell > div { flex: 1; min-width: 0; }
+.pUpsell b { display: block; color: #ffd36b; font-size: 14px; }
+.pUpsell span { font-size: 12px; color: #c9ddf2; }
+
+.pLegend { display: flex; align-items: center; gap: 8px; padding: 0 2px; }
+.pLegend .chip {
+  font-style: normal; font-size: 12px; font-weight: 800;
+  padding: 3px 10px; border-radius: 999px;
+}
+.pLegend .chip.free { color: #38bdf8; background: #38bdf824; border: 1px solid #38bdf866; }
+.pLegend .chip.plus { color: #ffd36b; background: #ffd36b24; border: 1px solid #ffd36b66; }
+.pLegend .muted { margin-inline-start: auto; font-size: 12px; }
+
+.pTiers { display: flex; flex-direction: column; gap: 8px; }
+.pRow {
+  display: grid; grid-template-columns: 38px 1fr 1fr; gap: 6px;
+  align-items: stretch; padding: 8px; border-radius: 16px;
+  background: #ffffff08; border: 1px solid #ffffff10;
+}
+.pRow.is-unlocked { background: #ffffff0d; }
+.pRow.is-current { background: #b5ef5812; border-color: #b5ef5880; }
+.pNum {
+  display: grid; place-items: center; align-content: center; gap: 1px;
+  border-radius: 12px; background: #ffffff0d; min-height: 62px;
+}
+.pRow.is-unlocked .pNum { background: #b5ef5824; }
+.pNum .pLock { font-size: 10px; opacity: .8; }
+.pNum b { font-size: 15px; color: #8ba3bd; }
+.pRow.is-unlocked .pNum b { color: #b5ef58; }
+
+.pTile {
+  display: flex; align-items: center; gap: 6px; min-height: 62px;
+  padding: 6px 8px; border-radius: 12px; text-align: start;
+  font-family: inherit; color: #eaf3ff; cursor: default;
+  background: #38bdf814; border: 1px solid #38bdf84d;
+}
+.pTile-plus { background: #ffd36b14; border-color: #ffd36b4d; }
+.pTileEmpty {
+  justify-content: center; opacity: .3; background: #ffffff05;
+  border-color: #ffffff12; color: #8ba3bd;
+}
+.pTileArt { flex: 0 0 auto; width: 30px; height: 30px; display: grid; place-items: center; }
+.pTileArt img { width: 30px; height: 30px; object-fit: contain; }
+.pTileEmoji { font-size: 18px; }
+.pTileBody { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.pTileBody b { font-size: 11.5px; font-weight: 800; line-height: 1.25; }
+.pTileBody small { font-size: 9.5px; }
+.pTileBody .ok { color: #b5ef58; }
+.pTileBody .plus { color: #ffd36b; }
+.pTileBody .ready { color: #b5ef58; font-weight: 900; }
+
+.pTile.is-claimed { opacity: .55; }
+.pTile.is-locked { opacity: .7; }
+/* فقط جایزهٔ آماده حرکت دارد — تنها چیزی که کاربر باید رویش بزند. */
+.pTile.is-ready {
+  cursor: pointer; background: #b5ef5826; border-color: #b5ef58b3;
+  animation: pReady 2.2s ease-in-out infinite;
+}
+.pTile.is-ready:hover { transform: translateY(-1px); }
+@keyframes pReady {
+  0%,100% { box-shadow: 0 0 0 0 #b5ef5800; }
+  50%     { box-shadow: 0 0 0 3px #b5ef5833; }
+}
+
+.pHow h3 { margin: 0 0 6px; font-size: 16px; }
+.pSources { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.pSources li { display: flex; align-items: center; gap: 8px; }
+.pSources b { flex: 1; font-size: 13px; }
+.pSources .xp {
+  font-size: 12px; font-weight: 900; color: #b5ef58;
+  background: #b5ef5824; border-radius: 999px; padding: 2px 8px;
+}
+.pSources small { font-size: 11.5px; color: #8ba3bd; min-width: 52px; text-align: end; }
+
+.pEmpty { text-align: center; padding: 40px 20px; }
+.pEmptyIcon { font-size: 56px; }
+.pEmpty h2 { margin: 12px 0 4px; }
+
+/* نقطهٔ کوچک وقتی امروز پله‌ای باز نشده ولی جایزهٔ گرفته‌نشده مانده. */
+.passShortcut { position: relative; }
+.passDot {
+  position: absolute; top: 6px; inset-inline-end: 6px;
+  width: 9px; height: 9px; border-radius: 50%;
+  background: #b5ef58; border: 1.5px solid #0d1a2c;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pTile.is-ready, .pClaimAll { animation: none; }
+  .pBarFill, .pRailThumb { transition: none; }
+}

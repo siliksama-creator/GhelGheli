@@ -45,6 +45,15 @@ const _games = <_GameEntry>[
   _GameEntry('tap', 'ضربه‌زن', '۵۰ لول ضربه بزن و شخصیت‌ها را باز کن', '👊',
       Color(0xFF84CC16), 'assets/games/tap/skin_1.webp',
       bot: false, singlePlayer: true),
+  // پنالتی دقیقاً **بعد از** ضربه‌زن — درخواست مالک: «بازی پنالتی باید
+  // پایین ضربه زن باشه».
+  //
+  // این فهرست در کلاینت هاردکد است (نه از /api/games)، پس ترتیب سرور
+  // اینجا اثر ندارد و باید جداگانه هماهنگ بماند. پنالتی اصلاً در این
+  // فهرست نبود — یعنی با وجود آماده بودن سرور و صفحهٔ بازی، از اپ
+  // **قابل دسترس نبود**.
+  _GameEntry('penalty', 'ضربات پنالتی', 'یکی می‌زند، یکی می‌گیرد', '⚽',
+      Color(0xFF38BDF8), 'assets/games/penalty.webp'),
   _GameEntry('memory', 'جفت‌یاب', 'جفت‌ها را به خاطر بسپار و ببر', '🃏',
       Color(0xFFA855F7), 'assets/games/memory.webp',
       bot: false, solo: true),

@@ -118,6 +118,7 @@ flutter:
     - assets/sfx/
     - assets/avatars/
     - assets/wheel/
+    - assets/pass/
     # NOT bundled, deliberately:
     #
     #   assets/icon/  — 1.7 MB of source art (icon, background, foreground,

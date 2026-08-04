@@ -34,11 +34,6 @@ const CATALOG = [
     noBot: false, solo: false,
   },
   {
-    id: 'penalty', title: 'ضربات پنالتی', emoji: '⚽',
-    subtitle: 'یکی می‌زند، یکی می‌گیرد', accent: '#38BDF8', minutes: 4,
-    noBot: false, solo: false,
-  },
-  {
     // Single-player: no lobby, no socket room, no rules file — it lives
     // entirely in the clients plus the signed-progress endpoint. Listed here
     // anyway so the catalogue stays the ONE description of what is playable;
@@ -47,6 +42,16 @@ const CATALOG = [
     subtitle: '۵۰ لول ضربه بزن و شخصیت‌ها را باز کن', accent: '#84CC16',
     minutes: 3,
     noBot: true, solo: true, singlePlayer: true,
+  },
+  {
+    // پنالتی عمداً **بعد از** ضربه‌زن است — درخواست مالک: «بازی پنالتی
+    // باید پایین ضربه زن باشه». ترتیب این آرایه همان ترتیبی است که
+    // کاربر در فهرست بازی‌ها می‌بیند؛ هر دو کلاینت از همین می‌خوانند و
+    // فهرست خودشان را هاردکد نمی‌کنند، پس جای درستِ تغییر چیدمان
+    // همین‌جاست.
+    id: 'penalty', title: 'ضربات پنالتی', emoji: '⚽',
+    subtitle: 'یکی می‌زند، یکی می‌گیرد', accent: '#38BDF8', minutes: 4,
+    noBot: false, solo: false,
   },
 ];
 
