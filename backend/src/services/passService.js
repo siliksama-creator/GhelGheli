@@ -150,6 +150,60 @@ async function hasPlus(userId, client = pool) {
   return rows.length > 0;
 }
 
+/**
+ * XP انباشته را — تا سقف روزانه — به «پلهٔ باز شده» تبدیل می‌کند.
+ *
+ * ═══════════════════════════════════════════════════════════════════════
+ * چرا این تابع جداست و نه داخل grantXp
+ * ═══════════════════════════════════════════════════════════════════════
+ *
+ * نسخهٔ اول این منطق را وسط grantXp گذاشته بود، **بعد از** جایی که تابع
+ * وقتی سقفِ XPِ آن منبع پر بود `return` می‌کرد. نتیجهٔ باگ روی سرور زنده
+ * دیده شد:
+ *
+ *     XP=۵۰۰۰ (استحقاق پلهٔ ۲۹) ولی پلهٔ باز شده = ۰، معلق = ۲۹
+ *
+ * یعنی کاربری که XP داشت ولی سقفِ همهٔ منابعش پر شده بود، **هیچ‌وقت**
+ * پله‌اش باز نمی‌شد — حتی فردا. چون فردا هم اولین چیزی که صدا زده
+ * می‌شد grantXp بود و باز همان مسیر زودهنگام.
+ *
+ * حالا این تابع مستقل است و از دو جا صدا زده می‌شود: بعد از هر XP، و
+ * هر بار که کاربر وضعیت را می‌خواند. پس حتی اگر کاربر یک هفته چیزی
+ * نگیرد، لحظه‌ای که صفحه را باز کند پله‌های امروزش باز می‌شوند.
+ */
+async function syncTiers(userId, seasonId, client = pool) {
+  const day = tehranDay();
+  const { rows } = await client.query(
+    `SELECT xp, unlocked_tier, tiers_day, tiers_today
+       FROM user_pass_progress WHERE user_id=$1 AND season_id=$2`,
+    [userId, seasonId]);
+  const row = rows[0];
+  if (!row) return null;
+
+  const sameDay = row.tiers_day
+    && new Date(row.tiers_day).toISOString().slice(0, 10) === day;
+  const usedToday = sameDay ? Number(row.tiers_today) || 0 : 0;
+  const room = Math.max(0, MAX_TIERS_PER_DAY - usedToday);
+
+  const current = Math.min(TIER_COUNT, Number(row.unlocked_tier) || 0);
+  const earned = tierFromXp(Number(row.xp)).tier;
+  const grant = Math.min(Math.max(0, earned - current), room);
+
+  if (grant > 0 || !sameDay) {
+    await client.query(
+      `UPDATE user_pass_progress
+          SET unlocked_tier = $3, tiers_day = $4::date, tiers_today = $5
+        WHERE user_id = $1 AND season_id = $2`,
+      [userId, seasonId, current + grant, day, usedToday + grant]);
+  }
+  return {
+    tier: current + grant,
+    tiersToday: usedToday + grant,
+    pending: Math.max(0, earned - (current + grant)),
+    unlockedNow: grant,
+  };
+}
+
 // ── اعطای XP ───────────────────────────────────────────────────────────
 /**
  * XP می‌دهد و سقف روزانه را رعایت می‌کند.
@@ -180,7 +234,14 @@ async function grantXp(userId, source, { multiplier = 1 } = {}) {
       const already = Number(used[0]?.xp || 0);
       const room = Math.max(0, cfg.dailyCap - already);
       const gain = Math.min(want, room);
-      if (gain <= 0) { await client.query('ROLLBACK'); return { gained: 0, capped: true }; }
+      if (gain <= 0) {
+        // سقفِ این منبع پر است، ولی XPِ قبلی ممکن است هنوز منتظر تبدیل
+        // به پله باشد (مثلاً روز عوض شده). قبلاً اینجا return می‌شد و
+        // پله برای همیشه قفل می‌ماند — باگی که روی سرور زنده دیده شد.
+        const sync = await syncTiers(userId, season.id, client);
+        await client.query('COMMIT');
+        return { gained: 0, capped: true, ...(sync || {}) };
+      }
 
       await client.query(
         `INSERT INTO pass_xp_log(user_id, season_id, day, source, xp)
@@ -194,43 +255,20 @@ async function grantXp(userId, source, { multiplier = 1 } = {}) {
          VALUES($1,$2,$3)
          ON CONFLICT (user_id, season_id)
          DO UPDATE SET xp = user_pass_progress.xp + EXCLUDED.xp, updated_at = NOW()
-         RETURNING xp, unlocked_tier, tiers_day, tiers_today`,
+         RETURNING xp`,
         [userId, season.id, gain]);
 
-      // ── سقف روزانهٔ پله ──────────────────────────────────────────────
-      //
-      // XP همیشه اضافه می‌شود (بالا)، ولی تبدیلش به «پلهٔ باز شده» محدود
-      // است. اگر امروز روز جدیدی است، شمارنده صفر می‌شود.
-      const row = prog[0];
-      const sameDay = row.tiers_day
-        && new Date(row.tiers_day).toISOString().slice(0, 10) === day;
-      const usedToday = sameDay ? Number(row.tiers_today) : 0;
-      const roomToday = Math.max(0, MAX_TIERS_PER_DAY - usedToday);
-
-      const current = Number(row.unlocked_tier) || 0;
-      // پله‌ای که XP اجازه می‌دهد
-      const earned = tierFromXp(Number(row.xp)).tier;
-      const grantTiers = Math.min(Math.max(0, earned - current), roomToday);
-      const newTier = current + grantTiers;
-
-      if (grantTiers > 0 || !sameDay) {
-        await client.query(
-          `UPDATE user_pass_progress
-              SET unlocked_tier = $3,
-                  tiers_day     = $4::date,
-                  tiers_today   = $5
-            WHERE user_id = $1 AND season_id = $2`,
-          [userId, season.id, newTier, day, usedToday + grantTiers]);
-      }
+      // XP همیشه اضافه می‌شود (بالا)، ولی تبدیلش به پله سقف روزانه دارد.
+      const sync = await syncTiers(userId, season.id, client);
 
       await client.query('COMMIT');
       return {
         gained: gain,
-        xp: Number(row.xp),
+        xp: Number(prog[0].xp),
         capped: gain < want,
-        tier: newTier,
-        tiersToday: usedToday + grantTiers,
-        tierCapped: earned > newTier,
+        tier: sync?.tier ?? 0,
+        tiersToday: sync?.tiersToday ?? 0,
+        tierCapped: (sync?.pending ?? 0) > 0,
       };
     } catch (e) {
       await client.query('ROLLBACK');
@@ -248,6 +286,12 @@ async function grantXp(userId, source, { multiplier = 1 } = {}) {
 async function status(userId) {
   const season = await activeSeason();
   if (!season) return { active: false };
+
+  // پله‌های امروز را قبل از خواندن باز کن.
+  //
+  // بدون این، کاربری که دیروز XP جمع کرده و امروز فقط صفحه را باز
+  // می‌کند (بدون بازی)، پله‌اش باز نمی‌شد تا وقتی یک XP جدید بگیرد.
+  await syncTiers(userId, season.id).catch(() => null);
 
   const [progRes, tiersRes, claimsRes, plus] = await Promise.all([
     pool.query(`SELECT xp, unlocked_tier, tiers_day, tiers_today
@@ -455,6 +499,6 @@ async function claimAll(userId) {
 
 module.exports = {
   SOURCES, TIER_COUNT, MAX_TIERS_PER_DAY,
-  xpForTier, cumulativeXp, tierFromXp,
+  xpForTier, cumulativeXp, tierFromXp, syncTiers,
   activeSeason, hasPlus, grantXp, status, claim, claimAll, tehranDay,
 };
