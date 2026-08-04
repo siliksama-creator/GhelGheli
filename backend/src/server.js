@@ -916,6 +916,12 @@ app.get('/api/bootstrap', auth, asyncHandler(async (req, res) => {
         tier: st.tier, tierCount: st.tierCount, claimable: st.claimable,
         hasPlus: st.hasPlus, daysLeft: st.season.daysLeft,
         intoTier: st.intoTier, tierNeeds: st.tierNeeds,
+        // نشانِ قرمز کنار آیکون: تعداد پله‌ای که **امروز** باز شده.
+        // مالک: «وقتی بتل پس کاربر باز میشه کنار آیکون بتل پس ۱ قرمز
+        // میاد اگه دوتا باز شده ۲ میاد ولی سقف باز شدن ۲ هستش».
+        tiersToday: st.tiersToday,
+        maxTiersPerDay: st.maxTiersPerDay,
+        dayCapReached: st.dayCapReached,
       };
     }
   } catch { /* گذر نبرد نباید بوت‌استرپ را بشکند */ }

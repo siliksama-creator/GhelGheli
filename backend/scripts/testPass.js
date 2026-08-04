@@ -73,6 +73,67 @@ console.log('\n== تبدیل XP به پله ==');
   ok(p.tier === 1 && p.into === 50, 'پیشرفت داخل پله درست حساب می‌شود');
 }
 
+console.log('\n== 🔒 سقف سخت ۲ پله در روز — ایراد مالک ==');
+{
+  const svc = src;
+  const MAX = Number(/const MAX_TIERS_PER_DAY = (\d+)/.exec(svc)[1]);
+  ok(MAX === 2, `سقف روزانه ${MAX} پله است`);
+
+  // اندازه‌گیریِ مشکلِ قبلی، تا هرگز برنگردد
+  const caps = [...svc.matchAll(/dailyCap:\s*(\d+)/g)].map(m => Number(m[1]));
+  const maxXp = caps.reduce((a, b) => a + b, 0);
+  let acc = 0, tiersInOneDay = 0;
+  for (let t = 1; t <= 50; t++) {
+    acc += xpForTier(t);
+    if (acc <= maxXp) tiersInOneDay = t; else break;
+  }
+  ok(tiersInOneDay > MAX,
+    `بدون سقف، کاربر ${tiersInOneDay} پله در روز باز می‌کرد — برای همین سقف لازم بود`);
+
+  ok(/unlocked_tier/.test(svc), 'پلهٔ باز شده جدا از XP ذخیره می‌شود');
+  ok(/roomToday/.test(svc), 'فضای باقی‌ماندهٔ امروز محاسبه می‌شود');
+  ok(/Math\.min\(Math\.max\(0, earned - current\), roomToday\)/.test(svc),
+    'تعداد پلهٔ اعطایی به سقف روزانه محدود است');
+
+  // claim باید از unlocked_tier بخواند نه XP — وگرنه سقف بی‌معنی است
+  ok(/unlocked < tier\.tier/.test(svc),
+    'دریافت جایزه از unlocked_tier بررسی می‌شود نه از XP');
+  ok(!/pos\.tier < tier\.tier/.test(svc),
+    'مسیر قدیمیِ مبتنی بر XP حذف شده');
+
+  // XP نباید سوزانده شود
+  ok(/xp = user_pass_progress\.xp \+ EXCLUDED\.xp/.test(svc),
+    'XP اضافه همیشه ذخیره می‌شود — فردا تبدیل به پله می‌شود');
+
+  // وضعیت باید سقف را به کلاینت بگوید (برای نشانِ قرمز)
+  ok(/tiersToday/.test(svc) && /maxTiersPerDay/.test(svc),
+    'وضعیت شمارندهٔ امروز را برای نشانِ آیکون می‌فرستد');
+  ok(/dayCapReached/.test(svc), 'وضعیت می‌گوید سقف امروز پر شده یا نه');
+  ok(/pendingTiers/.test(svc), 'پله‌های معلق (XP دارد ولی سقف پر) گزارش می‌شود');
+
+  const srv = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'server.js'), 'utf8');
+  ok(/tiersToday: st\.tiersToday/.test(srv),
+    'بوت‌استرپ شمارندهٔ امروز را می‌فرستد — نشانِ نوار بالا به آن نیاز دارد');
+
+  const mig = fs.readFileSync(
+    path.join(__dirname, '..', 'migrations', '032_pass_daily_tier_cap.sql'), 'utf8');
+  ok(/unlocked_tier/.test(mig) && /tiers_today/.test(mig),
+    'مایگریشن ستون‌های لازم را می‌سازد');
+  ok(/n \* \(195 \+ 5 \* n\) \/ 2 <= p\.xp/.test(mig),
+    'کاربران فعلی پله‌شان از روی XP بازسازی می‌شود، نه صفر');
+}
+
+console.log('\n== ریاضیِ بازسازی پله برای کاربران فعلی ==');
+{
+  // فرمول SQL باید دقیقاً با cumulativeXp بخواند، وگرنه کاربران موجود
+  // یک پله جلو یا عقب می‌افتند.
+  const formula = (n) => (n * (195 + 5 * n)) / 2;
+  let same = true;
+  for (let n = 1; n <= 50; n++) if (cumulativeXp(n) !== formula(n)) same = false;
+  ok(same, 'فرمول SQL با cumulativeXp دقیقاً یکی است');
+}
+
 console.log('\n== سقف روزانهٔ منابع XP ==');
 {
   const caps = [...src.matchAll(/dailyCap:\s*(\d+)/g)].map(m => Number(m[1]));

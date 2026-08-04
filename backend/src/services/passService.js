@@ -47,6 +47,28 @@ const walletService = require('./walletService');
 //     می‌رفت. تستِ اقتصادی همین را گرفت: گذری که هیچ‌کس تمامش نمی‌کند،
 //     جایزهٔ آخرش تزئینی است و حس شکست می‌دهد نه پیشرفت.
 const TIER_COUNT = 50;
+
+/// حداکثر پله‌ای که در یک روز باز می‌شود.
+///
+/// ═══════════════════════════════════════════════════════════════════════
+/// چرا این وجود دارد — ایراد مالک
+/// ═══════════════════════════════════════════════════════════════════════
+///
+/// «افرادی که نخریدنش بیش از حد دارن امتیاز میگیرن ... فقط دوتا بتل پس
+///  در روز باز میشه»
+///
+/// اندازه‌گیری شد و درست بود: کاربرِ حداکثری با ۸۲۵ XP در روز، **هفت
+/// پله** در روز اول باز می‌کرد و کل مسیر ۵۰ پله‌ای را در چند روز تمام
+/// می‌کرد. وقتی مسیر رایگان این‌قدر سخاوتمند باشد نه کسی پلاس می‌خرد و
+/// نه گذر نبرد کاری که برایش ساخته شده (بازگشت روزانه) را انجام می‌دهد.
+///
+/// سقف XP کافی نبود چون پله‌های اول ارزان‌اند (۱۰۰، ۱۰۵، ۱۱۰...)، پس
+/// همان XP در روز اول هفت پله می‌داد و در روزهای آخر دو پله. سقف روی
+/// **تعداد پله** دقیقاً چیزی را محدود می‌کند که باید.
+///
+/// XPِ اضافه هدر نمی‌رود: در ستون xp می‌ماند و فردا که سقف باز می‌شود
+/// بلافاصله تبدیل به پله می‌شود.
+const MAX_TIERS_PER_DAY = 2;
 const XP_BASE = 100;   // پلهٔ ۱
 const XP_STEP = 5;     // هر پله این‌قدر گران‌تر از قبلی (پلهٔ ۵۰ = ۳۴۵)
 
@@ -172,11 +194,44 @@ async function grantXp(userId, source, { multiplier = 1 } = {}) {
          VALUES($1,$2,$3)
          ON CONFLICT (user_id, season_id)
          DO UPDATE SET xp = user_pass_progress.xp + EXCLUDED.xp, updated_at = NOW()
-         RETURNING xp`,
+         RETURNING xp, unlocked_tier, tiers_day, tiers_today`,
         [userId, season.id, gain]);
 
+      // ── سقف روزانهٔ پله ──────────────────────────────────────────────
+      //
+      // XP همیشه اضافه می‌شود (بالا)، ولی تبدیلش به «پلهٔ باز شده» محدود
+      // است. اگر امروز روز جدیدی است، شمارنده صفر می‌شود.
+      const row = prog[0];
+      const sameDay = row.tiers_day
+        && new Date(row.tiers_day).toISOString().slice(0, 10) === day;
+      const usedToday = sameDay ? Number(row.tiers_today) : 0;
+      const roomToday = Math.max(0, MAX_TIERS_PER_DAY - usedToday);
+
+      const current = Number(row.unlocked_tier) || 0;
+      // پله‌ای که XP اجازه می‌دهد
+      const earned = tierFromXp(Number(row.xp)).tier;
+      const grantTiers = Math.min(Math.max(0, earned - current), roomToday);
+      const newTier = current + grantTiers;
+
+      if (grantTiers > 0 || !sameDay) {
+        await client.query(
+          `UPDATE user_pass_progress
+              SET unlocked_tier = $3,
+                  tiers_day     = $4::date,
+                  tiers_today   = $5
+            WHERE user_id = $1 AND season_id = $2`,
+          [userId, season.id, newTier, day, usedToday + grantTiers]);
+      }
+
       await client.query('COMMIT');
-      return { gained: gain, xp: Number(prog[0].xp), capped: gain < want };
+      return {
+        gained: gain,
+        xp: Number(row.xp),
+        capped: gain < want,
+        tier: newTier,
+        tiersToday: usedToday + grantTiers,
+        tierCapped: earned > newTier,
+      };
     } catch (e) {
       await client.query('ROLLBACK');
       throw e;
@@ -195,7 +250,8 @@ async function status(userId) {
   if (!season) return { active: false };
 
   const [progRes, tiersRes, claimsRes, plus] = await Promise.all([
-    pool.query('SELECT xp FROM user_pass_progress WHERE user_id=$1 AND season_id=$2',
+    pool.query(`SELECT xp, unlocked_tier, tiers_day, tiers_today
+                  FROM user_pass_progress WHERE user_id=$1 AND season_id=$2`,
       [userId, season.id]),
     pool.query(`SELECT id, tier, track, kind, amount, payload, label
                   FROM pass_tiers WHERE season_id=$1 ORDER BY tier, track`,
@@ -207,8 +263,24 @@ async function status(userId) {
     hasPlus(userId),
   ]);
 
-  const xp = Number(progRes.rows[0]?.xp || 0);
-  const pos = tierFromXp(xp);
+  const pr = progRes.rows[0] || {};
+  const xp = Number(pr.xp || 0);
+  const day = tehranDay();
+  const sameDay = pr.tiers_day
+    && new Date(pr.tiers_day).toISOString().slice(0, 10) === day;
+  const tiersToday = sameDay ? Number(pr.tiers_today) || 0 : 0;
+
+  // پلهٔ واقعی از ستون unlocked_tier می‌آید، نه از XP.
+  //
+  // این تفاوت مهم است: XP می‌تواند جلوتر باشد (کاربر امروز زیاد بازی
+  // کرده) ولی پله تا فردا باز نمی‌شود. اگر اینجا از XP حساب می‌کردیم،
+  // سقف روزانه فقط یک عدد تزئینی بود.
+  const unlocked = Math.min(TIER_COUNT, Number(pr.unlocked_tier) || 0);
+  // پیشرفت داخل پلهٔ بعد، نسبت به پلهٔ باز شده.
+  const spent = cumulativeXp(unlocked);
+  const nextNeed = unlocked < TIER_COUNT ? xpForTier(unlocked + 1) : 0;
+  const into = Math.max(0, Math.min(nextNeed, xp - spent));
+  const pos = { tier: unlocked, into, need: nextNeed };
   const claimed = new Set(claimsRes.rows.map(r => r.tier_id));
 
   const tiers = [];
@@ -251,6 +323,15 @@ async function status(userId) {
     tierCount: TIER_COUNT,
     intoTier: pos.into,
     tierNeeds: pos.need,
+    // ── سقف روزانه ────────────────────────────────────────────────────
+    // کلاینت این‌ها را برای نشانِ قرمز کنار آیکون و پیام «سقف امروز پر
+    // شد» لازم دارد.
+    tiersToday,
+    maxTiersPerDay: MAX_TIERS_PER_DAY,
+    dayCapReached: tiersToday >= MAX_TIERS_PER_DAY,
+    // XP جمع‌شده‌ای که هنوز به پله تبدیل نشده چون سقف پر است. صفر یعنی
+    // چیزی معلق نمانده.
+    pendingTiers: Math.max(0, tierFromXp(xp).tier - unlocked),
     claimable,
     tiers,
     sources: Object.entries(SOURCES).map(([k, v]) => ({
@@ -280,13 +361,20 @@ async function claim(userId, tierId) {
     const tier = tr[0];
     if (!tier) throw Object.assign(new Error('این پله پیدا نشد'), { status: 404 });
 
-    // آیا کاربر اصلاً به این پله رسیده؟
+    // آیا کاربر اصلاً این پله را **باز کرده**؟
+    //
+    // از unlocked_tier خوانده می‌شود نه از XP. با سقف روزانهٔ ۲ پله،
+    // کاربر می‌تواند XPِ پلهٔ ۵ را داشته باشد ولی هنوز فقط پلهٔ ۲ را باز
+    // کرده باشد؛ اگر اینجا از XP حساب می‌کردیم، جایزه‌های قفل را
+    // می‌گرفت و کل سقف بی‌معنی می‌شد.
     const { rows: pr } = await client.query(
-      'SELECT xp FROM user_pass_progress WHERE user_id=$1 AND season_id=$2 FOR UPDATE',
+      `SELECT xp, unlocked_tier FROM user_pass_progress
+        WHERE user_id=$1 AND season_id=$2 FOR UPDATE`,
       [userId, season.id]);
-    const pos = tierFromXp(Number(pr[0]?.xp || 0));
-    if (pos.tier < tier.tier) {
-      throw Object.assign(new Error('هنوز به این پله نرسیده‌ای'), { status: 400 });
+    const unlocked = Number(pr[0]?.unlocked_tier || 0);
+    if (unlocked < tier.tier) {
+      throw Object.assign(
+        new Error('هنوز این پله را باز نکرده‌ای'), { status: 400 });
     }
 
     if (tier.track === 'plus' && !(await hasPlus(userId, client))) {
@@ -366,6 +454,7 @@ async function claimAll(userId) {
 }
 
 module.exports = {
-  SOURCES, TIER_COUNT, xpForTier, cumulativeXp, tierFromXp,
+  SOURCES, TIER_COUNT, MAX_TIERS_PER_DAY,
+  xpForTier, cumulativeXp, tierFromXp,
   activeSeason, hasPlus, grantXp, status, claim, claimAll, tehranDay,
 };
