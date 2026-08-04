@@ -30,11 +30,61 @@ class BrandColors {
   static const Color lightSurfaceHigh = Color(0xFFE4EAF6);
   static const Color lightBorder = Color(0x14101A2C);
 
-  // Semantic colors (consistent across themes).
+  // ═══════════════════════════════════════════════════════════════════════
+  // رنگ‌های معنایی — چرا هر کدام دو نسخه دارند
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // گزارش مالک: «قسمت کیف پول و بعضی قسمت های دیگه با تم روشن خوب دیده
+  // نمیشن».
+  //
+  // ریشه اینجا بود. کامنتِ قبلیِ همین بلوک می‌گفت
+  // «consistent across themes» — و دقیقاً همان «سازگاری» باگ بود:
+  //
+  // این رنگ‌ها برای پس‌زمینهٔ **تیره** انتخاب شده‌اند. روی سطحِ تیره
+  // درخشان و خوانا هستند، ولی همان‌ها روی سطحِ سفیدِ تم روشن محو
+  // می‌شوند. نسبتِ کنتراستِ اندازه‌گیری‌شده روی #FFFFFF:
+  //
+  //     amber    ۱.۵۳:۱   ← عملاً نامرئی
+  //     emerald  ۱.۹۳:۱
+  //     warning  ۲.۰۰:۱
+  //     success  ۲.۲۳:۱
+  //     info     ۲.۶۷:۱
+  //     danger   ۲.۹۹:۱
+  //
+  // استاندارد WCAG برای متنِ معمولی ۴.۵:۱ و برای متنِ بزرگ و آیکون
+  // ۳:۱ است. یعنی **هیچ‌کدام** حتی به حداقلِ گرافیکی هم نمی‌رسیدند.
+  //
+  // نسخهٔ `…OnLight` هر رنگ، همان **رنگ‌مایه (hue)** را دارد ولی
+  // روشنایی‌اش تا رسیدن به ≥۴.۵:۱ روی سفید پایین آمده. حفظِ hue مهم
+  // است: کاربر باید همچنان «سبز = موفق» و «قرمز = خطا» را بشناسد؛
+  // اگر رنگ عوض می‌شد، زبانِ بصریِ اپ بین دو تم فرق می‌کرد.
+  //
+  // برای انتخاب از کجا باید استفاده کرد، `BrandTheme` را ببینید:
+  // `context.brand.success` خودش نسخهٔ درست را می‌دهد. مستقیم استفاده
+  // کردن از این ثابت‌ها فقط جایی درست است که پس‌زمینه‌اش قطعاً تیره
+  // باشد (مثل گرادیانِ کارت موجودی).
   static const Color success = Color(0xFF22C58B);
   static const Color warning = Color(0xFFF2A93B);
   static const Color danger = Color(0xFFFF5D6C);
   static const Color info = Color(0xFF4EA1FF);
+
+  /// نسخهٔ تیره‌ترِ همان رنگ‌ها، برای نشستن روی سطحِ روشن.
+  ///
+  /// هر کدام با نگه داشتنِ hue و کم کردنِ روشنایی تا آستانهٔ ۴.۵:۱ روی
+  /// سفید ساخته شده‌اند. با تستِ `light_theme_contrast_test.dart` قفل
+  /// شده‌اند تا کسی نتواند بی‌سروصدا روشنشان کند.
+  static const Color successOnLight = Color(0xFF14865E);
+  static const Color warningOnLight = Color(0xFFA76707);
+  static const Color dangerOnLight = Color(0xFFEC0016);
+  static const Color infoOnLight = Color(0xFF0071F1);
+
+  /// طلاییِ خوانا روی سطحِ روشن — برای نشان‌های پلاس و جوایز.
+  ///
+  /// `amber` روی سفید ۱.۵۳:۱ است: بدترین موردِ کل پالت.
+  static const Color amberOnLight = Color(0xFF9A6B00);
+
+  /// سبزِ برند، خوانا روی سطحِ روشن.
+  static const Color emeraldOnLight = Color(0xFF00825F);
 
   static const List<Color> heroGradientDark = [emerald, blue];
   static const List<Color> heroGradientLight = [

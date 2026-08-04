@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../api_client.dart';
 import '../../core/money.dart';
 import '../../theme/colors.dart';
+import '../../theme/brand_theme.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/section_header.dart';
@@ -136,7 +137,7 @@ class _WalletPageState extends State<WalletPage>
         context: context,
         builder: (c) => AlertDialog(
           icon: Icon(needsCard ? Icons.add_card_rounded : Icons.info_outline_rounded,
-              color: BrandColors.warning, size: 32),
+              color: context.brand.warning, size: 32),
           title: const Text('امکان برداشت نیست'),
           content: Text('${w['blockReason'] ?? 'در حال حاضر امکان برداشت وجود ندارد'}'),
           actions: [
@@ -185,7 +186,7 @@ class _WalletPageState extends State<WalletPage>
               child: const Text('نه، بماند')),
           FilledButton(
             onPressed: () => Navigator.pop(c, true),
-            style: FilledButton.styleFrom(backgroundColor: BrandColors.danger),
+            style: FilledButton.styleFrom(backgroundColor: context.brand.danger),
             child: const Text('لغو کن'),
           ),
         ],
@@ -278,15 +279,15 @@ class _WalletPageState extends State<WalletPage>
             Container(
               padding: const EdgeInsets.all(Gaps.sm),
               decoration: BoxDecoration(
-                color: BrandColors.warning.withValues(alpha: 0.12),
+                color: context.brand.warning.withValues(alpha: 0.12),
                 borderRadius: Corners.rSm,
                 border:
-                    Border.all(color: BrandColors.warning.withValues(alpha: 0.3)),
+                    Border.all(color: context.brand.warning.withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline_rounded,
-                      size: 18, color: BrandColors.warning),
+                  Icon(Icons.info_outline_rounded,
+                      size: 18, color: context.brand.warning),
                   Gaps.hXs,
                   Expanded(
                     child: Text('${w['blockReason']}',

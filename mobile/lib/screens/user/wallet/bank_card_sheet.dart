@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../../api_client.dart';
 import '../../../theme/colors.dart';
+import '../../../theme/brand_theme.dart';
 import '../../../theme/tokens.dart';
 
 /// ---------------------------------------------------------------------------
@@ -130,7 +131,7 @@ class _BankCardSheetState extends State<BankCardSheet> {
           TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('انصراف')),
           FilledButton(
             onPressed: () => Navigator.pop(c, true),
-            style: FilledButton.styleFrom(backgroundColor: BrandColors.danger),
+            style: FilledButton.styleFrom(backgroundColor: context.brand.danger),
             child: const Text('حذف کن'),
           ),
         ],
@@ -208,7 +209,7 @@ class _BankCardSheetState extends State<BankCardSheet> {
                 suffixIcon: digits.length == 16
                     ? Icon(
                         complete ? Icons.check_circle_rounded : Icons.error_rounded,
-                        color: complete ? BrandColors.success : BrandColors.danger,
+                        color: complete ? context.brand.success : context.brand.danger,
                       )
                     : null,
                 errorText: _numberError,
@@ -245,18 +246,18 @@ class _BankCardSheetState extends State<BankCardSheet> {
               Container(
                 padding: const EdgeInsets.all(Gaps.sm),
                 decoration: BoxDecoration(
-                  color: BrandColors.danger.withValues(alpha: 0.12),
+                  color: context.brand.danger.withValues(alpha: 0.12),
                   borderRadius: Corners.rSm,
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.error_outline_rounded,
-                        size: 18, color: BrandColors.danger),
+                    Icon(Icons.error_outline_rounded,
+                        size: 18, color: context.brand.danger),
                     Gaps.hXs,
                     Expanded(
                       child: Text(_serverError!,
                           style: theme.textTheme.bodySmall
-                              ?.copyWith(color: BrandColors.danger)),
+                              ?.copyWith(color: context.brand.danger)),
                     ),
                   ],
                 ),
@@ -285,7 +286,7 @@ class _BankCardSheetState extends State<BankCardSheet> {
                 width: double.infinity,
                 child: TextButton.icon(
                   onPressed: _saving ? null : _delete,
-                  style: TextButton.styleFrom(foregroundColor: BrandColors.danger),
+                  style: TextButton.styleFrom(foregroundColor: context.brand.danger),
                   icon: const Icon(Icons.delete_outline_rounded, size: 18),
                   label: const Text('حذف کارت'),
                 ),

@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../api_client.dart';
 import '../../../core/money.dart';
 import '../../../theme/colors.dart';
+import '../../../theme/brand_theme.dart';
 import '../../../theme/tokens.dart';
 import '../../../widgets/safe_image.dart';
 import 'image_url_field.dart';
@@ -505,7 +506,7 @@ class _BulkReport extends StatelessWidget {
               'نمونهٔ نامعتبرها: '
               '${(report['invalid'] as List? ?? const []).take(5).join('، ')}',
               style: theme.textTheme.bodySmall
-                  ?.copyWith(color: BrandColors.danger, fontSize: 11),
+                  ?.copyWith(color: context.brand.danger, fontSize: 11),
             ),
           ],
         ],

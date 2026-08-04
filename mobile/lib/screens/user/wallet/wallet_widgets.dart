@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../api_client.dart';
 import '../../../core/money.dart';
 import '../../../theme/colors.dart';
+import '../../../theme/brand_theme.dart';
 import '../../../theme/tokens.dart';
 import '../../../widgets/app_card.dart';
 
@@ -418,7 +419,7 @@ class WalletTransactionTile extends StatelessWidget {
     final theme = Theme.of(context);
     final isCredit = tx['direction'] == 'credit';
     final meta = _sourceMeta[tx['source']] ?? ('تراکنش', Icons.swap_vert_rounded);
-    final color = isCredit ? BrandColors.success : BrandColors.warning;
+    final color = isCredit ? context.brand.success : context.brand.warning;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: Gaps.xs),
@@ -483,19 +484,57 @@ class WithdrawalTile extends StatelessWidget {
   final VoidCallback? onCancel;
   const WithdrawalTile({super.key, required this.request, this.onCancel});
 
-  static const _statusStyle = <String, (Color, IconData)>{
-    'pending': (BrandColors.warning, Icons.hourglass_top_rounded),
-    'approved': (BrandColors.info, Icons.verified_rounded),
-    'paid': (BrandColors.success, Icons.check_circle_rounded),
-    'rejected': (BrandColors.danger, Icons.cancel_rounded),
-    'canceled': (Colors.grey, Icons.remove_circle_outline_rounded),
+  /// آیکونِ هر وضعیت — ثابت است و به تم ربطی ندارد.
+  static const _statusIcon = <String, IconData>{
+    'pending': Icons.hourglass_top_rounded,
+    'approved': Icons.verified_rounded,
+    'paid': Icons.check_circle_rounded,
+    'rejected': Icons.cancel_rounded,
+    'canceled': Icons.remove_circle_outline_rounded,
   };
+
+  /// رنگِ هر وضعیت — **از تم** خوانده می‌شود، نه از یک ثابت.
+  ///
+  /// ═════════════════════════════════════════════════════════════════════
+  /// چرا این نگاشت از `static const` به تابع تبدیل شد
+  /// ═════════════════════════════════════════════════════════════════════
+  ///
+  /// نسخهٔ قبلی یک `static const` بود که مستقیم `BrandColors.warning`
+  /// و همتایانش را نگه می‌داشت. آن رنگ‌ها برای سطحِ **تیره** ساخته
+  /// شده‌اند و اینجا روی یک `AppCard` می‌نشینند که در تم روشن سفید
+  /// است. نتیجه: نسبتِ کنتراست ۲.۰:۱ برای «در انتظار» و ۲.۲:۱ برای
+  /// «پرداخت شد» — یعنی زیر حداقلِ WCAG و دقیقاً همان چیزی که مالک
+  /// دید.
+  ///
+  /// `const` بودن مانعِ خواندن از تم بود، چون `context` در زمانِ
+  /// کامپایل وجود ندارد. تبدیل به تابع تنها راهِ درست است؛ سربارش هم
+  /// صفر است چون فقط یک switch روی رشته است.
+  static Color _statusColor(BuildContext context, String status) {
+    final b = context.brand;
+    switch (status) {
+      case 'pending':
+        return b.warning;
+      case 'approved':
+        return b.info;
+      case 'paid':
+        return b.success;
+      case 'rejected':
+        return b.danger;
+      case 'canceled':
+        return Theme.of(context).colorScheme.outline;
+      default:
+        return Theme.of(context).colorScheme.outline;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final status = '${request['status']}';
-    final style = _statusStyle[status] ?? (Colors.grey, Icons.help_outline_rounded);
+    final style = (
+      _statusColor(context, status),
+      _statusIcon[status] ?? Icons.help_outline_rounded,
+    );
 
     return AppCard(
       padding: const EdgeInsets.all(Gaps.md),
@@ -561,12 +600,12 @@ class WithdrawalTile extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(Gaps.xs),
               decoration: BoxDecoration(
-                color: BrandColors.success.withValues(alpha: 0.10),
+                color: context.brand.success.withValues(alpha: 0.10),
                 borderRadius: Corners.rSm,
               ),
               child: Text('کد پیگیری: ${faNum(request['trackingCode'])}',
                   style: theme.textTheme.bodySmall
-                      ?.copyWith(color: BrandColors.success)),
+                      ?.copyWith(color: context.brand.success)),
             ),
           ],
           if ((request['adminNote'] ?? '').toString().isNotEmpty) ...[
@@ -589,7 +628,7 @@ class WithdrawalTile extends StatelessWidget {
               child: TextButton.icon(
                 onPressed: onCancel,
                 style: TextButton.styleFrom(
-                    foregroundColor: BrandColors.danger,
+                    foregroundColor: context.brand.danger,
                     padding: EdgeInsets.zero,
                     visualDensity: VisualDensity.compact),
                 icon: const Icon(Icons.close_rounded, size: 16),

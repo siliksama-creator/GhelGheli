@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../api_client.dart';
 import '../../core/money.dart';
 import '../../theme/colors.dart';
+import '../../theme/brand_theme.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/state_views.dart';
@@ -144,7 +145,7 @@ class _AdminWalletState extends State<AdminWallet> {
             onPressed: () => Navigator.pop(c, true),
             style: FilledButton.styleFrom(
               backgroundColor:
-                  status == 'rejected' ? BrandColors.danger : BrandColors.emerald,
+                  status == 'rejected' ? context.brand.danger : BrandColors.emerald,
             ),
             child: Text(meta.$1),
           ),
@@ -285,21 +286,21 @@ class _AdminWalletState extends State<AdminWallet> {
                 amount: st['pendingAmount'],
                 count: st['pendingCount'],
                 icon: Icons.hourglass_top_rounded,
-                color: BrandColors.warning,
+                color: context.brand.warning,
               ),
               _MoneyStat(
                 title: 'تأییدشده (در صف واریز)',
                 amount: st['approvedAmount'],
                 count: st['approvedCount'],
                 icon: Icons.verified_rounded,
-                color: BrandColors.info,
+                color: context.brand.info,
               ),
               _MoneyStat(
                 title: 'واریزشده ۳۰ روز اخیر',
                 amount: st['paidAmount30d'],
                 count: null,
                 icon: Icons.check_circle_rounded,
-                color: BrandColors.success,
+                color: context.brand.success,
               ),
               _MoneyStat(
                 title: 'کل موجودی کیف پول‌ها',
@@ -464,19 +465,57 @@ class _RequestCard extends StatelessWidget {
     required this.onCopy,
   });
 
-  static const _statusStyle = <String, (Color, IconData)>{
-    'pending': (BrandColors.warning, Icons.hourglass_top_rounded),
-    'approved': (BrandColors.info, Icons.verified_rounded),
-    'paid': (BrandColors.success, Icons.check_circle_rounded),
-    'rejected': (BrandColors.danger, Icons.cancel_rounded),
-    'canceled': (Colors.grey, Icons.remove_circle_outline_rounded),
+  /// آیکونِ هر وضعیت — ثابت است و به تم ربطی ندارد.
+  static const _statusIcon = <String, IconData>{
+    'pending': Icons.hourglass_top_rounded,
+    'approved': Icons.verified_rounded,
+    'paid': Icons.check_circle_rounded,
+    'rejected': Icons.cancel_rounded,
+    'canceled': Icons.remove_circle_outline_rounded,
   };
+
+  /// رنگِ هر وضعیت — **از تم** خوانده می‌شود، نه از یک ثابت.
+  ///
+  /// ═════════════════════════════════════════════════════════════════════
+  /// چرا این نگاشت از `static const` به تابع تبدیل شد
+  /// ═════════════════════════════════════════════════════════════════════
+  ///
+  /// نسخهٔ قبلی یک `static const` بود که مستقیم `BrandColors.warning`
+  /// و همتایانش را نگه می‌داشت. آن رنگ‌ها برای سطحِ **تیره** ساخته
+  /// شده‌اند و اینجا روی یک `AppCard` می‌نشینند که در تم روشن سفید
+  /// است. نتیجه: نسبتِ کنتراست ۲.۰:۱ برای «در انتظار» و ۲.۲:۱ برای
+  /// «پرداخت شد» — یعنی زیر حداقلِ WCAG و دقیقاً همان چیزی که مالک
+  /// دید.
+  ///
+  /// `const` بودن مانعِ خواندن از تم بود، چون `context` در زمانِ
+  /// کامپایل وجود ندارد. تبدیل به تابع تنها راهِ درست است؛ سربارش هم
+  /// صفر است چون فقط یک switch روی رشته است.
+  static Color _statusColor(BuildContext context, String status) {
+    final b = context.brand;
+    switch (status) {
+      case 'pending':
+        return b.warning;
+      case 'approved':
+        return b.info;
+      case 'paid':
+        return b.success;
+      case 'rejected':
+        return b.danger;
+      case 'canceled':
+        return Theme.of(context).colorScheme.outline;
+      default:
+        return Theme.of(context).colorScheme.outline;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final status = '${request['status']}';
-    final style = _statusStyle[status] ?? (Colors.grey, Icons.help_outline_rounded);
+    final style = (
+      _statusColor(context, status),
+      _statusIcon[status] ?? Icons.help_outline_rounded,
+    );
     final user = Map<String, dynamic>.from(request['user'] ?? {});
     final cardNumber = '${request['cardNumber'] ?? ''}';
 
@@ -588,14 +627,14 @@ class _RequestCard extends StatelessWidget {
                   FilledButton.icon(
                     onPressed: onPay,
                     style: FilledButton.styleFrom(
-                        backgroundColor: BrandColors.success),
+                        backgroundColor: context.brand.success),
                     icon: const Icon(Icons.payments_rounded, size: 18),
                     label: const Text('واریز کردم'),
                   ),
                 OutlinedButton.icon(
                   onPressed: onReject,
                   style: OutlinedButton.styleFrom(
-                      foregroundColor: BrandColors.danger),
+                      foregroundColor: context.brand.danger),
                   icon: const Icon(Icons.close_rounded, size: 18),
                   label: const Text('رد و برگشت وجه'),
                 ),

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../api_client.dart';
 import '../../../core/money.dart';
 import '../../../theme/colors.dart';
+import '../../../theme/brand_theme.dart';
 import '../../../theme/tokens.dart';
 
 /// ---------------------------------------------------------------------------
@@ -309,18 +310,18 @@ class _WithdrawSheetState extends State<WithdrawSheet> {
               Container(
                 padding: const EdgeInsets.all(Gaps.sm),
                 decoration: BoxDecoration(
-                  color: BrandColors.danger.withValues(alpha: 0.12),
+                  color: context.brand.danger.withValues(alpha: 0.12),
                   borderRadius: Corners.rSm,
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.error_outline_rounded,
-                        size: 18, color: BrandColors.danger),
+                    Icon(Icons.error_outline_rounded,
+                        size: 18, color: context.brand.danger),
                     Gaps.hXs,
                     Expanded(
                       child: Text(_serverError!,
                           style: theme.textTheme.bodySmall
-                              ?.copyWith(color: BrandColors.danger)),
+                              ?.copyWith(color: context.brand.danger)),
                     ),
                   ],
                 ),

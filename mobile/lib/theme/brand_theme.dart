@@ -13,6 +13,14 @@ class BrandTheme extends ThemeExtension<BrandTheme> {
   final Color warning;
   final Color danger;
   final Color info;
+
+  /// طلاییِ نشان‌ها (پلاس، جوایز، گذر نبرد).
+  ///
+  /// جدا از `goldGradient` است چون آن یک گرادیانِ تزئینی روی سطحِ
+  /// تیره است، ولی این یک **رنگِ جوهر** است که مستقیم روی سطحِ تم
+  /// می‌نشیند — و `amber` روی سفید ۱.۵۳:۱ است، یعنی بدترین موردِ کل
+  /// پالت.
+  final Color accent;
   final Color glassFill;
   final Color glassBorder;
   final Color subtleBorder;
@@ -30,6 +38,7 @@ class BrandTheme extends ThemeExtension<BrandTheme> {
     required this.warning,
     required this.danger,
     required this.info,
+    required this.accent,
     required this.glassFill,
     required this.glassBorder,
     required this.subtleBorder,
@@ -48,6 +57,7 @@ class BrandTheme extends ThemeExtension<BrandTheme> {
         warning: BrandColors.warning,
         danger: BrandColors.danger,
         info: BrandColors.info,
+        accent: BrandColors.amber,
         glassFill: Colors.white.withValues(alpha: 0.06),
         glassBorder: Colors.white.withValues(alpha: 0.10),
         subtleBorder: BrandColors.darkBorder,
@@ -67,15 +77,33 @@ class BrandTheme extends ThemeExtension<BrandTheme> {
         ],
       );
 
+  /// ═════════════════════════════════════════════════════════════════════
+  /// چرا نسخهٔ روشن رنگ‌های معناییِ **متفاوتی** دارد
+  /// ═════════════════════════════════════════════════════════════════════
+  ///
+  /// این تابع قبلاً دقیقاً همان `BrandColors.success/warning/danger/info`
+  /// را می‌داد که نسخهٔ تیره می‌دهد. آن رنگ‌ها برای نشستن روی سطحِ
+  /// تیره طراحی شده‌اند و روی سفید محو می‌شوند — اندازه‌گیری‌شده:
+  /// amber ۱.۵۳:۱، success ۲.۲۳:۱، danger ۲.۹۹:۱، همه زیر حداقلِ WCAG.
+  ///
+  /// این ریشهٔ گزارشِ «با تم روشن خوب دیده نمیشن» بود. حالا هر کدام
+  /// نسخهٔ `…OnLight` خودشان را می‌گیرند: همان hue، روشناییِ کمتر،
+  /// کنتراست ≥۴.۵:۱.
+  ///
+  /// **نکتهٔ مهم برای آینده:** به‌جای `BrandColors.danger` مستقیم، از
+  /// `context.brand.danger` استفاده کنید تا خودکار نسخهٔ درستِ تم
+  /// انتخاب شود. استفادهٔ مستقیم فقط جایی درست است که پس‌زمینه قطعاً
+  /// تیره باشد (مثل گرادیانِ کارت موجودی).
   factory BrandTheme.light() => BrandTheme(
         heroGradient: BrandColors.heroGradientLight,
         leagueGradient: BrandColors.leagueGradientLight,
         goldGradient: BrandColors.goldGradient,
         cardGradient: BrandColors.cardGradient,
-        success: BrandColors.success,
-        warning: BrandColors.warning,
-        danger: BrandColors.danger,
-        info: BrandColors.info,
+        success: BrandColors.successOnLight,
+        warning: BrandColors.warningOnLight,
+        danger: BrandColors.dangerOnLight,
+        info: BrandColors.infoOnLight,
+        accent: BrandColors.amberOnLight,
         glassFill: Colors.white.withValues(alpha: 0.55),
         glassBorder: Colors.white.withValues(alpha: 0.65),
         subtleBorder: BrandColors.lightBorder,
@@ -105,6 +133,7 @@ class BrandTheme extends ThemeExtension<BrandTheme> {
     Color? warning,
     Color? danger,
     Color? info,
+    Color? accent,
     Color? glassFill,
     Color? glassBorder,
     Color? subtleBorder,
@@ -122,6 +151,7 @@ class BrandTheme extends ThemeExtension<BrandTheme> {
       warning: warning ?? this.warning,
       danger: danger ?? this.danger,
       info: info ?? this.info,
+      accent: accent ?? this.accent,
       glassFill: glassFill ?? this.glassFill,
       glassBorder: glassBorder ?? this.glassBorder,
       subtleBorder: subtleBorder ?? this.subtleBorder,
@@ -144,6 +174,7 @@ class BrandTheme extends ThemeExtension<BrandTheme> {
       warning: Color.lerp(warning, other.warning, t)!,
       danger: Color.lerp(danger, other.danger, t)!,
       info: Color.lerp(info, other.info, t)!,
+      accent: Color.lerp(accent, other.accent, t)!,
       glassFill: Color.lerp(glassFill, other.glassFill, t)!,
       glassBorder: Color.lerp(glassBorder, other.glassBorder, t)!,
       subtleBorder: Color.lerp(subtleBorder, other.subtleBorder, t)!,
