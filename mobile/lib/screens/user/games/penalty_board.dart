@@ -360,9 +360,30 @@ class _ZoneGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // شبکه دقیقاً روی دهانهٔ دروازه می‌نشیند — نسبت‌ها با _PitchPainter
-    // یکی است. اگر یکی عوض شود، آن یکی هم باید عوض شود.
-    return LayoutBuilder(builder: (context, c) {
+    // ═══════════════════════════════════════════════════════════════════
+    // چرا اینجا Directionality.ltr اجباری است — باگ «به راست می‌زنیم به
+    // چپ می‌زنه»
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    // کل اپ داخل `Directionality(textDirection: rtl)` است (main.dart) و
+    // یک `Row` معمولی این جهت را به ارث می‌برد: فرزند اول سمت **راست**
+    // رندر می‌شود.
+    //
+    // ولی نقاشِ زمین ریاضیِ چپ‌به‌راست دارد:
+    //     x = gl + gw * (col + 0.5) / 3      → ستون ۰ سمت چپ
+    //
+    // پس کاربر گوشهٔ راست را لمس می‌کرد، ناحیهٔ ۰ ثبت می‌شد، و توپ به
+    // گوشهٔ **چپ** می‌رفت. دقیقاً چیزی که مالک گزارش داد. دروازه‌بان هم
+    // آینه‌ای شیرجه می‌زد.
+    //
+    // یک دروازهٔ فوتبال جهتِ متن ندارد؛ مختصاتش فیزیکی است. پس شبکه
+    // صریحاً LTR می‌شود تا با نقاش هم‌جهت بماند. متن‌های صفحه بیرون این
+    // ویجت‌اند و همچنان RTL می‌مانند.
+    //
+    // با تست قفل شد: penalty_rtl_test.dart
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: LayoutBuilder(builder: (context, c) {
       final gw = c.maxWidth * 0.78;
       final gh = c.maxHeight * 0.46;
       final left = (c.maxWidth - gw) / 2;
@@ -400,7 +421,8 @@ class _ZoneGrid extends StatelessWidget {
           ),
         ],
       );
-    });
+      }),
+    );
   }
 }
 
