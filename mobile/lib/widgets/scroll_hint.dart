@@ -115,7 +115,26 @@ class _ScrollHintState extends State<ScrollHint>
   /// یک AnimationController که همیشه در حال چرخش است، هر فریم یک تیک
   /// می‌گیرد حتی اگر چیزی روی صفحه نباشد — روی صفحه‌ای که اسکرول ندارد
   /// این خالص هدر دادنِ باتری است.
-  void _syncBob(bool visible) {
+  ///
+  /// ═════════════════════════════════════════════════════════════════════
+  /// چرا از داخلِ build صدا زده نمی‌شود
+  /// ═════════════════════════════════════════════════════════════════════
+  ///
+  /// نسخهٔ اول این را مستقیم در `build` صدا می‌زد — و این در پاسِ دومِ
+  /// بازبینی به‌عنوان یک باگ شناخته شد. `repeat()` و `stop()` وضعیتِ
+  /// Ticker را عوض می‌کنند و انجامش وسطِ فاز build دو مشکل دارد:
+  ///
+  ///   ۱. build باید **بدون اثرِ جانبی** باشد؛ فلاتر اجازه دارد یک
+  ///      ویجت را چند بار در یک فریم build کند (مثلاً هنگام
+  ///      اندازه‌گیریِ چیدمان) و آن‌وقت انیمیشن چند بار راه می‌افتد.
+  ///   ۲. `repeat()` می‌تواند یک فریمِ تازه زمان‌بندی کند در حالی که
+  ///      هنوز داخلِ همان فریم هستیم.
+  ///
+  /// حالا فقط از `_apply` صدا زده می‌شود — یعنی از یک گردانندهٔ رویداد،
+  /// که جای درستِ اثرِ جانبی است.
+  void _syncBob() {
+    final visible =
+        widget.showHint && _scrollable && !_atBottom && !_touched;
     if (visible && !_bob.isAnimating) {
       _bob.repeat(reverse: true);
     } else if (!visible && _bob.isAnimating) {
@@ -124,6 +143,16 @@ class _ScrollHintState extends State<ScrollHint>
   }
 
   void _apply(ScrollMetrics m, {bool userScrolled = false}) {
+    // ═══════════════════════════════════════════════════════════════════
+    // چرا بررسیِ mounted اینجا لازم است
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    // این از یک `NotificationListener` صدا زده می‌شود. اعلانِ اسکرول
+    // می‌تواند در همان فریمی برسد که درخت در حال برچیده شدن است —
+    // مثلاً وقتی کاربر با یک حرکتِ سریع تب را عوض می‌کند در حالی که
+    // لیست هنوز در حال لغزیدن است. آن‌وقت `setState` روی یک State
+    // مرده پرتاب می‌کند.
+    if (!mounted) return;
     // فقط محورِ عمودی. یک لیستِ افقیِ داخلی نباید ریلِ عمودی را تکان دهد.
     if (m.axis != Axis.vertical) return;
     final total = m.maxScrollExtent;
@@ -148,6 +177,9 @@ class _ScrollHintState extends State<ScrollHint>
       _atBottom = bottom;
       _touched = touched;
     });
+    // بعد از به‌روزرسانیِ حالت، تصمیم بگیر انیمیشن باید بچرخد یا نه.
+    // اینجا (گردانندهٔ رویداد) جای درستش است، نه داخلِ build.
+    _syncBob();
   }
 
   @override
@@ -158,7 +190,6 @@ class _ScrollHintState extends State<ScrollHint>
     // نفهمیده که می‌شود اسکرول کرد.
     final showPill =
         widget.showHint && _scrollable && !_atBottom && !_touched;
-    _syncBob(showPill);
 
     return NotificationListener<ScrollMetricsNotification>(
       // این یکی در همان اولین چیدمان می‌آید، پیش از هر لمسی.

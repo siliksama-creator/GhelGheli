@@ -61,6 +61,41 @@ class GameSession extends ChangeNotifier {
   /// نکتهٔ مهم: `clock` علاوه بر تیک، در **شروع و پایانِ** هر نوبت هم
   /// اعلان می‌دهد، وگرنه حلقهٔ شمارش روی مقدار نوبتِ قبلی یخ می‌زد.
   final ChangeNotifier clock = ChangeNotifier();
+
+  /// آیا این نشست آزاد شده است.
+  ///
+  /// ═════════════════════════════════════════════════════════════════════
+  /// چرا این پرچم لازم شد — باگی که خودِ افزودنِ `clock` ساخت
+  /// ═════════════════════════════════════════════════════════════════════
+  ///
+  /// این یک نمونهٔ خوب از «فیکس، باگ تازه می‌سازد» است و در پاسِ دومِ
+  /// بازبینی پیدا شد، نه در پاس اول.
+  ///
+  /// `ChangeNotifier.notifyListeners()` بعد از `dispose()` **پرتاب
+  /// می‌کند**. توالیِ واقعیِ خطرناک:
+  ///
+  ///   ۱. کاربر وسطِ بازی دکمهٔ back را می‌زند → صفحه dispose می‌شود،
+  ///   ۲. یک بستهٔ socket که همان لحظه در راه بود می‌رسد،
+  ///   ۳. گرداننده `_stopClock()` را صدا می‌زند،
+  ///   ۴. `_stopClock` روی `clock`ِ آزادشده اعلان می‌دهد → کرش در دستِ
+  ///      کاربر.
+  ///
+  /// این به زمان‌بندیِ شبکه بستگی دارد، پس در تستِ دستی تقریباً هرگز
+  /// دیده نمی‌شود و فقط روی گوشیِ کاربر با شبکهٔ کند رخ می‌دهد.
+  ///
+  /// نکته: نمی‌شود به `hasListeners` تکیه کرد، چون آن هم بعد از
+  /// dispose پرتاب می‌کند.
+  bool _disposed = false;
+
+  /// اعلانِ امنِ ساعت — بعد از dispose بی‌صدا نادیده گرفته می‌شود.
+  void _tickClock() {
+    if (_disposed) return;
+    clock.notifyListeners();
+  }
+
+  /// فقط برای تست: همان مسیرِ اعلانِ ساعت را صدا می‌زند.
+  @visibleForTesting
+  void clockTickForTest() => _tickClock();
   /// Countdown while hunting for a real opponent (before the bot steps in).
   int searchSecondsLeft = 0;
   int searchSeconds = 15;
@@ -259,7 +294,7 @@ class GameSession extends ChangeNotifier {
               .play(clamped <= 3 ? Sfx.tickUrgent : Sfx.tick, volume: 0.65);
         }
         // فقط ساعت، نه کل نشست — توضیح کامل بالای فیلد `clock`.
-        clock.notifyListeners();
+        _tickClock();
       }
       if (leftMs <= 0) _ticker?.cancel();
     }
@@ -311,7 +346,7 @@ class GameSession extends ChangeNotifier {
     secondsLeft = 0;
     // بدون این، حلقهٔ شمارش روی آخرین عدد یخ می‌زد چون کسی به شنوندگانِ
     // ساعت نمی‌گفت که به صفر رسیده‌ایم.
-    clock.notifyListeners();
+    _tickClock();
   }
 
   void join() {
@@ -364,6 +399,9 @@ class GameSession extends ChangeNotifier {
   }
 
   void leave() {
+    // یک رویدادِ دیرهنگامِ socket می‌تواند این را بعد از dispose صدا
+    // بزند؛ آن‌وقت `notifyListeners` پایین‌تر پرتاب می‌کرد.
+    if (_disposed) return;
     _socket?.emit('game:leave', {'roomId': _roomId});
     phase = GamePhase.idle;
     winner = null;
@@ -420,6 +458,10 @@ class GameSession extends ChangeNotifier {
 
   @override
   void dispose() {
+    // پرچم **پیش از** آزادسازی ست می‌شود: هر رویدادِ دیرهنگامی که در
+    // همین لحظه برسد، باید ساکت رد شود نه اینکه روی یک شیءِ نیمه‌آزاد
+    // اعلان بدهد.
+    _disposed = true;
     _ticker?.cancel();
     _searchTicker?.cancel();
     clock.dispose();

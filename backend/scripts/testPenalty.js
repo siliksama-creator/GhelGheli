@@ -342,5 +342,174 @@ console.log('\n== قرارداد موتور بازی ==');
   ok(/penalty/.test(idx), 'بازی در فهرست ثبت شده');
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+console.log('\n== پنجرهٔ «ضربهٔ تمیز» ==');
+{
+  // این بخش قلبِ ایده‌ای است که پشت نوار قدرت گذاشته شد. نقد مالک این
+  // بود که «نگه میداره محکم تر میزنه — ایده جالبی پشتش راه انداخته
+  // نشده». اگر این تست‌ها بشکنند، نوار دوباره همان شیبِ خطیِ بی‌روحی
+  // می‌شود که بعد از سه ضربه بهترین جوابش معلوم است.
+  const s = P.create();
+  ok(s.sweet && typeof s.sweet.min === 'number' && typeof s.sweet.max === 'number',
+    'وضعیت اولیه یک پنجرهٔ تمیز دارد');
+  ok(Math.abs((s.sweet.max - s.sweet.min) - P.SWEET_WIDTH) < 1e-6,
+    `پهنای پنجره دقیقاً ${P.SWEET_WIDTH} است`);
+  ok(s.sweet.min >= P.SWEET_MIN && s.sweet.max <= 1,
+    'پنجره داخل بازهٔ قابل انتخاب کاربر است');
+
+  // هرگز چسبیده به لبه‌ها نمی‌شود: پنجرهٔ لبه‌ای بدون زمان‌بندی هم قابل
+  // زدن است (کافی است انگشت را فوراً یا خیلی دیر رها کنی) و چالش را از
+  // بین می‌برد.
+  let hugsEdge = false;
+  for (let i = 0; i < 3000; i++) {
+    const w = P.makeSweet();
+    if (w.min <= P.SWEET_MIN + 0.001 || w.max >= 0.999) hugsEdge = true;
+  }
+  ok(!hugsEdge, 'پنجره هرگز کاملاً به لبه‌های نوار نمی‌چسبد');
+
+  // جای پنجره باید واقعاً عوض شود، وگرنه بعد از دو ضربه حفظ می‌شود.
+  //
+  // چرا آستانه ۲۰۰ و نه ۵۰۰: مقدار به سه رقم اعشار گرد می‌شود (تا عددِ
+  // فرستاده‌شده به کلاینت تمیز بماند)، پس فقط ~۴۲۰ مقدارِ ممکن وجود
+  // دارد و طبق پارادوکس کلکسیونر با ۵۰۰ نمونه انتظار حدود ۲۹۰ مقدار
+  // متمایز است، نه ۵۰۰.
+  const mins = new Set();
+  for (let i = 0; i < 500; i++) mins.add(P.makeSweet().min);
+  ok(mins.size > 200, `جای پنجره تصادفی است (${mins.size} مقدار متمایز از ۵۰۰)`);
+
+  ok(P.isClean((s.sweet.min + s.sweet.max) / 2, s.sweet), 'وسط پنجره تمیز است');
+  ok(!P.isClean(s.sweet.min - 0.02, s.sweet), 'کمی زیر پنجره تمیز نیست');
+  ok(!P.isClean(s.sweet.max + 0.02, s.sweet), 'کمی بالای پنجره تمیز نیست');
+  ok(!P.isClean(0.5, null), 'بدون پنجره هیچ ضربه‌ای تمیز نیست');
+}
+
+console.log('\n== ضربهٔ تمیز واقعاً بهتر است (نه فقط اسمش) ==');
+{
+  const zones = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+  let allBetterMiss = true, allBetterSave = true;
+  for (const z of zones) {
+    for (const pw of [0.4, 0.6, 0.8, 1.0]) {
+      if (!(P.missChance(z, pw, true) < P.missChance(z, pw, false))) allBetterMiss = false;
+      if (!(P.saveChance(z, z, pw, true) < P.saveChance(z, z, pw, false))) allBetterSave = false;
+    }
+  }
+  ok(allBetterMiss, 'ضربهٔ تمیز در همهٔ ۹ ناحیه و همهٔ قدرت‌ها خطای کمتری دارد');
+  ok(allBetterSave, 'ضربهٔ تمیز در همهٔ حالت‌ها سخت‌تر مهار می‌شود');
+
+  // بدون پرچم، رفتار باید دقیقاً مثل قبل بماند — سازگاری عقب‌رو.
+  ok(P.missChance(4, 0.5) === P.missChance(4, 0.5, false),
+    'پیش‌فرض missChance همان حالت غیرتمیز است');
+  ok(P.saveChance(4, 4, 0.5) === P.saveChance(4, 4, 0.5, false),
+    'پیش‌فرض saveChance همان حالت غیرتمیز است');
+}
+
+console.log('\n== ضربهٔ تمیز از کلاینت قابل جعل نیست ==');
+{
+  // اگر کلاینت می‌توانست `clean: true` بفرستد، هر کسی با یک پروکسی
+  // همیشه ضربهٔ تمیز می‌زد. تنها ورودیِ کاربر `power` است و قضاوت با
+  // سرور.
+  const s = P.create();
+  s.sweet = { min: 0.60, max: 0.75 };
+  P.applyMove(s, { zone: 4, power: 0.40, clean: true }, 'X', fixed(0.999));
+  P.applyMove(s, { zone: 0 }, 'O', fixed(0.999));
+  ok(s.lastKick.clean === false,
+    'پرچم clientی نادیده گرفته می‌شود؛ قدرت خارج پنجره یعنی غیرتمیز');
+
+  const s2 = P.create();
+  s2.sweet = { min: 0.60, max: 0.75 };
+  P.applyMove(s2, { zone: 4, power: 0.68 }, 'X', fixed(0.999));
+  P.applyMove(s2, { zone: 0 }, 'O', fixed(0.999));
+  ok(s2.lastKick.clean === true, 'قدرت داخل پنجره تمیز شناخته می‌شود');
+}
+
+console.log('\n== پنجره بعد از هر ضربه عوض می‌شود ==');
+{
+  const s = P.create();
+  const first = { ...s.sweet };
+  P.applyMove(s, { zone: 4, power: 0.5 }, 'X', fixed(0.999));
+  ok(s.sweet.min === first.min, 'تا وقتی ضربه قفل نشده پنجره ثابت می‌ماند');
+
+  let changed = 0;
+  for (let i = 0; i < 200; i++) {
+    const t = P.create();
+    const before = t.sweet.min;
+    P.applyMove(t, { zone: 4, power: 0.5 }, 'X', fixed(0.999));
+    P.applyMove(t, { zone: 0 }, 'O', fixed(0.999));
+    if (t.sweet.min !== before) changed++;
+  }
+  ok(changed >= 198, `بعد از قفل شدن ضربه پنجرهٔ تازه ساخته می‌شود (${changed}/۲۰۰)`);
+}
+
+console.log('\n== ربات از پنجره سوءاستفاده نمی‌کند ==');
+{
+  // اگر ربات پنجره را هدف می‌گرفت، دوباره همان «ربات خیلی باهوش»ی
+  // می‌شد که مالک صریحاً نخواست.
+  const src = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'src', 'games', 'rules', 'penalty.js'), 'utf8');
+  const botSrc = src.slice(src.indexOf('function botMove')).split('module.exports')[0]
+    .replace(/\/\/[^\n]*/g, '');
+  ok(!/sweet/.test(botSrc), 'کد botMove اصلاً به sweet نگاه نمی‌کند');
+
+  const st = P.create();
+  st.sweet = { min: 0.60, max: 0.75 };
+  st.shooter = 'X';
+  let cleanHits = 0;
+  const N = 20000;
+  for (let i = 0; i < N; i++) {
+    const m = P.botMove(st, 'X');
+    if (P.isClean(m.power, st.sweet)) cleanHits++;
+  }
+  const rate = cleanHits / N;
+  // انتظار ۰.۱۵/۰.۶۵ ≈ ۲۳٪. اگر ربات هدف می‌گرفت، نزدیک ۱۰۰٪ می‌شد.
+  ok(rate > 0.18 && rate < 0.28,
+    `ربات فقط شانسی داخل پنجره می‌افتد (${(rate * 100).toFixed(1)}٪)`);
+}
+
+console.log('\n== تعادل اقتصادیِ بازی ==');
+{
+  // درصد گل باید نزدیک آمار واقعی پنالتی (~۷۵٪) بماند و هیچ استراتژیِ
+  // ثابتی نباید از ضربهٔ تمیز بهتر باشد — وگرنه پنجره بی‌معنی است.
+  const rate = (strategy, n = 60000) => {
+    let g = 0;
+    for (let i = 0; i < n; i++) {
+      const st = P.create();
+      const r = P.resolveKick(
+        Math.floor(Math.random() * 9), strategy(st.sweet),
+        Math.floor(Math.random() * 9), Math.random, st.sweet);
+      if (r.outcome === 'goal') g++;
+    }
+    return g / n;
+  };
+  const random = rate(() => 0.35 + Math.random() * 0.65);
+  const clean = rate((sw) => (sw.min + sw.max) / 2);
+  const alwaysHard = rate(() => 1);
+  const alwaysSoft = rate(() => 0.35);
+
+  ok(random > 0.70 && random < 0.80,
+    `بازیِ بی‌دقت ~${(random * 100).toFixed(0)}٪ گل می‌زند — نزدیک آمار واقعی`);
+  ok(clean > random + 0.06,
+    `ضربهٔ تمیز محسوس بهتر است (${(clean * 100).toFixed(0)}٪ در برابر ${(random * 100).toFixed(0)}٪)`);
+  ok(clean > alwaysHard && clean > alwaysSoft,
+    'هیچ استراتژیِ ثابتی از زمان‌بندی بهتر نیست');
+  ok(alwaysHard < random,
+    'زدنِ همیشه محکم تنبیه دارد — نوار یک معاملهٔ واقعی است');
+}
+
+console.log('\n== پنجره به کلاینت می‌رسد (وگرنه نوار طلایی کشیده نمی‌شود) ==');
+{
+  // اپ پنجره را از `state.sweet` می‌خواند. اگر publicState حذفش کند،
+  // نوار قدرت بی‌نشان می‌شود و کل مکانیک نامرئی.
+  const s = P.create();
+  const pub = P.publicState(s, 'X');
+  ok(pub.sweet && typeof pub.sweet.min === 'number',
+    'publicState پنجره را برای زننده می‌فرستد');
+  // برای دروازه‌بان هم اشکالی ندارد: این اطلاعاتی دربارهٔ انتخابِ حریف
+  // نیست، فقط یک چالشِ زننده با خودش است.
+  ok(P.publicState(s, 'O').sweet !== undefined,
+    'برای دروازه‌بان هم می‌رود — اطلاعاتِ محرمانه‌ای نیست');
+  // ولی pending هرگز نباید برود.
+  ok(pub.pending === undefined, 'pending همچنان حذف می‌شود');
+}
+
 console.log(`\n${fail === 0 ? '✓' : '✗'} ${pass} تست موفق، ${fail} ناموفق`);
 process.exit(fail === 0 ? 0 : 1);
