@@ -146,7 +146,15 @@ void main() {
     // فراخوان به اندازهٔ خودش decode شود؛ یک عدد ثابت آنجا اشتباه بود.
     // به‌جای ضعیف کردن کل تست، همین یک مورد استثنا می‌شود و پایین‌تر
     // جداگانه بررسی می‌شود.
-    const computedHint = {'lib/widgets/hero_logo.dart'};
+    //
+    // app_bar_logo هم همین‌طور: اندازهٔ لوگوی نوار بالا پارامتری است
+    // (`widget.size`) تا بشود همان ویجت را جای دیگری بزرگ‌تر گذاشت،
+    // پس هینت هم باید از همان پارامتر مشتق شود. تستِ اختصاصی‌اش
+    // بلافاصله پایین‌تر است.
+    const computedHint = {
+      'lib/widgets/hero_logo.dart',
+      'lib/widgets/app_bar_logo.dart',
+    };
 
     test('هیچ تصویری بدون هینت بیش از ۱ مگابایت decode نمی‌شود', () {
       final offenders = <String>[];
@@ -164,6 +172,30 @@ void main() {
       expect(offenders, isEmpty,
           reason: 'این تصاویر گران decode می‌شوند؛ cacheWidth بگذارید یا '
               'خود فایل را کوچک کنید:\n${offenders.join('\n')}');
+    });
+
+    test('app_bar_logo هینتِ decode را از اندازهٔ درخواستی می‌سازد', () {
+      // این لوگو در نوار بالای **همهٔ** صفحه‌هاست، پس گران‌ترین جای
+      // ممکن برای یک decode بی‌هینت است: منبع ۷۲۰×۵۹۵ یعنی ۱.۶۳ مگابایت
+      // رزیدنت برای تمام نشست، برای چیزی که ۳۴ پیکسل رسم می‌شود.
+      final src = File('lib/widgets/app_bar_logo.dart').readAsStringSync();
+      expect(src.contains('cacheWidth: (s * 3).round()'), isTrue,
+          reason: 'app_bar_logo باید decode را از اندازهٔ درخواستی بسازد');
+
+      // و اندازهٔ پیش‌فرض باید کوچک بماند. اگر روزی کسی پیش‌فرض را به
+      // ۲۰۰ ببرد، هزینه ۳۵ برابر می‌شود بدون اینکه کسی متوجه شود.
+      final def = RegExp(r'this\.size = (\d+)').firstMatch(src);
+      expect(def, isNotNull, reason: 'اندازهٔ پیش‌فرض پیدا نشد');
+      final size = int.parse(def!.group(1)!);
+      expect(size, lessThanOrEqualTo(48));
+
+      final img = imageSize(File('assets/brand/logo.webp'))!;
+      final dw = size * 3;
+      final dh = (img.h * dw / img.w).round();
+      final mb = dw * dh * 4 / 1048576;
+      expect(mb, lessThan(0.10),
+          reason: 'لوگوی نوار بالا باید زیر ۱۰۰ کیلوبایت decode شود، '
+              'شد ${mb.toStringAsFixed(3)}MB');
     });
 
     test('hero_logo هینتِ محاسبه‌شده دارد و سقفش از منبع رد نمی‌شود', () {

@@ -18,6 +18,7 @@
 // اول POST، بعد چرخش. جایزه را همیشه سرور انتخاب می‌کند و گردونه فقط روی
 // همان می‌ایستد. اگر برعکس بود، هر کسی با یک پروکسی می‌توانست نتیجه را
 // عوض کند.
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -230,7 +231,13 @@ class _WheelPageState extends State<WheelPage>
       if (reduce) {
         _spinCtl.value = 1;
       } else {
-        _spinCtl.forward(from: 0);
+        // `forward` یک Future برمی‌گرداند که وقتی انیمیشن تمام شود
+        // کامل می‌شود. عمداً منتظرش نمی‌مانیم و به‌جایش روی
+        // `_spinDuration` تکیه می‌کنیم: اگر ویجت وسطِ چرخش dispose شود،
+        // آن Future **هرگز** کامل نمی‌شود و این تابع برای همیشه معلق
+        // می‌ماند. تأخیرِ زمانی چنین وابستگی‌ای ندارد و بعدش هم
+        // `mounted` بررسی می‌شود.
+        unawaited(_spinCtl.forward(from: 0));
         await Future<void>.delayed(_spinDuration);
       }
       if (!mounted) return;
@@ -246,14 +253,21 @@ class _WheelPageState extends State<WheelPage>
       });
       widget.onSpinsChanged?.call(_spinsLeft, _unlimited);
       GameAudio.instance.play(prize.kind == 'cash' ? Sfx.win : Sfx.matchFound);
-      HapticFeedback.heavyImpact();
+      // لرزش یک جلوهٔ جانبی است: روی دستگاهی بدون موتور لرزش یا با
+      // مجوزِ رد شده صرفاً کاری نمی‌کند. منتظر ماندنش هیچ چیزی به کاربر
+      // نمی‌دهد و فقط نمایش نتیجه را عقب می‌اندازد.
+      unawaited(HapticFeedback.heavyImpact());
       // سه نبضِ درخشش روی برشی که سوزن رویش ایستاده.
       _winnerIndex = idx;
       if (reduce) {
         // درخشش می‌ماند (اطلاعات است، نه تزئین) ولی نبض نمی‌زند.
         _glowCtl.value = 1;
       } else {
-        _glowCtl.repeat(reverse: true, count: 6);
+        // نبضِ درخشش عمداً رها می‌شود: این یک جلوهٔ تزئینی است که باید
+        // در پس‌زمینه بزند در حالی که کاربر نتیجه را می‌خواند. منتظر
+        // ماندنش یعنی تابع تا پایان شش نبض بلوکه شود، و اگر کاربر
+        // صفحه را ببندد آن Future هرگز کامل نمی‌شود.
+        unawaited(_glowCtl.repeat(reverse: true, count: 6));
       }
       widget.onChanged?.call();
     } catch (e) {
@@ -265,7 +279,28 @@ class _WheelPageState extends State<WheelPage>
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
         SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
       );
-      _load();
+      // ═══════════════════════════════════════════════════════════════
+      // چرا اینجا await و چرا خطایش بلعیده می‌شود
+      // ═══════════════════════════════════════════════════════════════
+      //
+      // این فراخوانی **داخل یک catch** است: بعد از یک چرخشِ ناموفق،
+      // تعداد چرخش‌های باقی‌مانده را از سرور تازه می‌کنیم چون ممکن است
+      // سرور چرخش را مصرف کرده باشد ولی پاسخ در راه گم شده باشد.
+      //
+      // قبلاً بدون await رها بود. اگر خودِ این تازه‌سازی هم شکست
+      // می‌خورد (که در همان قطعیِ شبکه‌ای که چرخش را شکست، محتمل است)
+      // یک استثنای مدیریت‌نشده به zone می‌رفت و در حالت دیباگ صفحهٔ
+      // قرمز می‌داد — یعنی یک خطای شبکهٔ ساده به کرشِ ظاهری تبدیل
+      // می‌شد.
+      //
+      // خطا اینجا عمداً بلعیده می‌شود: کاربر همین الان پیام خطای اصلی
+      // را گرفته و یک پیام دومِ «تازه‌سازی هم نشد» فقط سردرگمی است.
+      // خودِ `_load` وضعیت خطا را در UI منعکس می‌کند.
+      try {
+        await _load();
+      } catch (_) {
+        // بی‌صدا: پیام اصلی همین الان نمایش داده شد.
+      }
     }
   }
 

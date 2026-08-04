@@ -22,6 +22,12 @@ class _AdminUsersState extends State<AdminUsers> {
   bool _loading = true;
   String? _loadError;
 
+  /// آیا درخواستِ «جزئیات کاربر» در راه است.
+  ///
+  /// بدون این، روی شبکهٔ کند هر تپ یک درخواست تازه می‌ساخت و در پایان
+  /// چند دیالوگ روی هم باز می‌شد.
+  bool _detailsBusy = false;
+
   @override
   void initState() {
     super.initState();
@@ -169,11 +175,54 @@ class _AdminUsersState extends State<AdminUsers> {
     }
   }
 
+  /// جزئیات یک کاربر را می‌گیرد و در دیالوگ نشان می‌دهد.
+  ///
+  /// ═══════════════════════════════════════════════════════════════════════
+  /// دو باگِ واقعی که اینجا رفع شد
+  /// ═══════════════════════════════════════════════════════════════════════
+  ///
+  /// ۱. **بدون هیچ try/catch بود.** این تابع از یک `onTap` صدا زده
+  ///    می‌شود، یعنی هیچ‌کس بالادست منتظرش نیست. اگر درخواست شکست
+  ///    می‌خورد — شبکهٔ قطع، توکنِ منقضی، کاربرِ حذف‌شده، ۵۰۰ سرور —
+  ///    استثنا مستقیم به zone می‌رفت: در حالت دیباگ صفحهٔ قرمز، در
+  ///    ریلیز یک تپِ کاملاً بی‌اثر که مدیر فکر می‌کرد اپ هنگ کرده.
+  ///
+  /// ۲. **`d['user']` بدون بررسی به Map تبدیل می‌شد.** اگر پاسخ شکل
+  ///    دیگری داشت (خطای HTML یک پروکسی، پاسخ خالی، کلیدِ عوض‌شده)
+  ///    همان‌جا `TypeError` می‌داد. حالا شکلِ پاسخ بررسی می‌شود.
+  ///
+  /// همچنین یک نشانگرِ بارگذاری اضافه شد: قبلاً بین تپ و باز شدن
+  /// دیالوگ هیچ بازخوردی نبود و روی شبکهٔ کند، مدیر چند بار تپ می‌کرد
+  /// و چند دیالوگ روی هم باز می‌شد.
   Future<void> _showDetails(String id) async {
-    final d = await widget.api.get('/api/admin/users/$id');
-    final u = Map<String, dynamic>.from(d['user']);
+    // جلوگیری از تپِ دوباره تا وقتی درخواستِ قبلی در راه است.
+    if (_detailsBusy) return;
+    setState(() => _detailsBusy = true);
+
+    Map<String, dynamic> u;
+    try {
+      final d = await widget.api.get('/api/admin/users/$id');
+      final raw = d is Map ? d['user'] : null;
+      if (raw is! Map) {
+        throw StateError('پاسخ سرور شکل مورد انتظار را ندارد');
+      }
+      u = Map<String, dynamic>.from(raw);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _detailsBusy = false);
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(
+          content: Text(apiError(e)),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     if (!mounted) return;
-    showDialog(
+    setState(() => _detailsBusy = false);
+
+    await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(u['nickname'] ?? u['mobile'] ?? 'کاربر'),

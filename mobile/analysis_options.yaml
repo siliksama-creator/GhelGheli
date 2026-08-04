@@ -1,28 +1,82 @@
-# This file configures the analyzer, which statically analyzes Dart code to
-# check for errors, warnings, and lints.
+# پیکربندی تحلیلگر ایستا.
 #
-# The issues identified by the analyzer are surfaced in the UI of Dart-enabled
-# IDEs (https://dart.dev/tools#ides-and-editors). The analyzer can also be
-# invoked from the command line by running `flutter analyze`.
-
-# The following line activates a set of recommended lints for Flutter apps,
-# packages, and plugins designed to encourage good coding practices.
+# ═══════════════════════════════════════════════════════════════════════════
+# چرا از پیش‌فرضِ flutter_lints فراتر رفتیم
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# مجموعهٔ پیش‌فرض عمداً محافظه‌کار است تا پروژه‌های تازه را غرقِ هشدار
+# نکند. نتیجه‌اش این است که چند دسته از **باگ‌های واقعیِ زمانِ اجرا** را
+# اصلاً نمی‌بیند — دقیقاً همان دسته‌هایی که در این اپ قبلاً کرش ساخته‌اند:
+#
+#   • `use_build_context_synchronously` — استفاده از context بعد از یک
+#     await. این ریشهٔ کلاسیکِ «Looking up a deactivated widget's ancestor
+#     is unsafe» است که یک بار در این پروژه دیده شد.
+#   • `unawaited_futures` — یک Future رهاشده یعنی خطایش هرگز گرفته نمی‌شود
+#     و به‌صورت unhandled exception در لاگ گم می‌شود. باگِ تاریخیِ
+#     `ApiClient.get()` که هرگز settle نمی‌شد از همین خانواده بود.
+#   • `close_sinks` / `cancel_subscriptions` — نشتِ حافظه‌ای که فقط بعد از
+#     چند دقیقه استفاده خودش را نشان می‌دهد، پس در تستِ دستی هرگز دیده
+#     نمی‌شود.
+#
+# هر قانونی که اینجا روشن شده، دست‌کم یک باگِ واقعی در این مخزن را
+# می‌گرفت یا می‌گیرد. قانونی که فقط سلیقه است (مثل ترتیب import) عمداً
+# روشن نشده تا سیگنال در نویز گم نشود.
 include: package:flutter_lints/flutter.yaml
 
-linter:
-  # The lint rules applied to this project can be customized in the
-  # section below to disable rules from the `package:flutter_lints/flutter.yaml`
-  # included above or to enable additional rules. A list of all available lints
-  # and their documentation is published at https://dart.dev/lints.
-  #
-  # Instead of disabling a lint rule for the entire project in the
-  # section below, it can also be suppressed for a single line of code
-  # or a specific dart file by using the `// ignore: name_of_lint` and
-  # `// ignore_for_file: name_of_lint` syntax on the line or in the file
-  # producing the lint.
-  rules:
-    # avoid_print: false  # Uncomment to disable the `avoid_print` rule
-    # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
+analyzer:
+  # هشدارهای زیر به خطا ارتقا می‌یابند: هر کدام یک باگِ زمانِ اجراست،
+  # نه یک نکتهٔ سبکی. ارتقا به خطا یعنی CI جلویشان را می‌گیرد.
+  errors:
+    # context بعد از await — کرشِ «deactivated widget».
+    use_build_context_synchronously: error
+    # Future رهاشده — خطای بلعیده‌شده.
+    unawaited_futures: error
+    # منابعی که بسته نمی‌شوند — نشتِ حافظه.
+    close_sinks: error
+    cancel_subscriptions: error
+    # کدِ مرده و importهای بی‌مصرف: هزینهٔ بیلد و سردرگمیِ خواننده.
+    unused_import: error
+    unused_local_variable: error
+    unused_field: error
+    dead_code: error
+    # APIهای منسوخ: مهاجرتِ بعدیِ فلاتر را می‌شکنند.
+    deprecated_member_use: warning
+    deprecated_member_use_from_same_package: warning
 
-# Additional information about this file can be found at
-# https://dart.dev/guides/language/analysis-options
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+    - "build/**"
+
+linter:
+  rules:
+    # ── درستی و ایمنی (هر کدام یک کلاسِ باگِ واقعی) ──
+    always_use_package_imports: false      # importهای نسبی در این پروژه رایج‌اند
+    avoid_empty_else: true
+    avoid_slow_async_io: true
+    cancel_subscriptions: true
+    close_sinks: true
+    control_flow_in_finally: true
+    empty_statements: true
+    no_duplicate_case_values: true
+    throw_in_finally: true
+    unawaited_futures: true
+    unnecessary_statements: true
+    use_build_context_synchronously: true
+    valid_regexps: true
+
+    # ── عملکرد (مستقیماً به فازهای ۳ و ۴ مربوط‌اند) ──
+    avoid_unnecessary_containers: true
+    prefer_const_constructors: true
+    prefer_const_constructors_in_immutables: true
+    prefer_const_declarations: true
+    prefer_const_literals_to_create_immutables: true
+    sized_box_for_whitespace: true
+    use_colored_box: true
+    use_decorated_box: true
+
+    # ── خوانایی، فقط جایی که به درستی کمک می‌کند ──
+    avoid_returning_null_for_void: true
+    prefer_final_locals: false   # پرسروصدا و بدون سود ایمنی
+    prefer_is_empty: true
+    prefer_is_not_empty: true

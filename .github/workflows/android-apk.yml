@@ -1,5 +1,30 @@
 name: Build Android APK
 
+# ═══════════════════════════════════════════════════════════════════════════
+# این workflow مکمل «Build APK» است، نه جایگزینش
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# تفاوتش: split-per-abi و obfuscate را به‌صورت گزینه‌ای می‌دهد و حالت
+# debug هم دارد. برای انتشار روی کافه‌بازار از «Build APK» استفاده کنید.
+#
+# سه نقصِ جدی که اینجا رفع شد — هر سه باعث می‌شدند APKی تولید شود که
+# ظاهراً سالم است ولی در دستِ کاربر کار نمی‌کند:
+#
+#   ۱. **مجوزهای manifest اعمال نمی‌شد.** `flutter create` مجوز INTERNET
+#      را فقط در manifestِ دیباگ می‌گذارد؛ manifestِ ریلیز هیچ مجوزی
+#      ندارد. یعنی APKهای ریلیزِ این workflow **هیچ دسترسیِ شبکه‌ای**
+#      نداشتند: نه ورود، نه تصویر کارت، نه سوکتِ بازی.
+#
+#   ۲. **امضا نمی‌شد.** بدون signingConfig، فلاتر بی‌صدا به کلیدِ دیباگ
+#      برمی‌گردد. اندروید اپ را با **امضایش** می‌شناسد نه با نام بسته،
+#      پس چنین نصبی هرگز قابل به‌روزرسانی نیست — و کافه‌بازار هم ردش
+#      می‌کند.
+#
+#   ۳. **`rm -rf test` کل تست‌ها را پاک می‌کرد.** هدف فقط حذف
+#      widget_test.dartِ تولیدیِ `flutter create` بود، ولی کلِ پوشه را
+#      می‌برد و بعد هم هیچ تستی اجرا نمی‌شد. یعنی این مسیر بدون هیچ
+#      تستی APK می‌ساخت.
+
 on:
   workflow_dispatch:
     inputs:
@@ -47,14 +72,60 @@ jobs:
           elif [ -f android/app/build.gradle ]; then
             sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/' android/app/build.gradle
           fi
+      # بدون این، APKِ ریلیز هیچ مجوزی ندارد — از جمله INTERNET.
+      - name: Patch release AndroidManifest
+        run: bash tool/patch_android.sh
+
+      # R8: هم APK کوچک‌تر، هم جدول‌های DEX کمتر که اندروید برای کل عمرِ
+      # پروسه رزیدنت نگه می‌دارد.
+      - name: Enable R8 code shrinking
+        if: ${{ inputs.build_mode == 'release' }}
+        run: bash tool/patch_shrink.sh
+
       - name: Get dependencies
         run: flutter pub get
+
+      # فقط فایلِ تولیدیِ `flutter create` حذف می‌شود، نه کل پوشهٔ تست.
+      # `rm -rf test` قبلی همهٔ تست‌های واقعی را می‌برد.
       - name: Remove generated default widget test
-        run: rm -rf test
+        run: rm -f test/widget_test.dart
+
+      - name: Run widget tests
+        run: flutter test
       - name: Full Flutter analyze
         # See build-apk.yml: informational only, never blocks the build.
         continue-on-error: true
         run: flutter analyze --no-fatal-infos
+      # ── امضای ریلیز ──
+      #
+      # فقط برای ریلیز. بدون این، خروجی با کلیدِ دیباگ امضا می‌شود که
+      # نه قابل انتشار است و نه قابل به‌روزرسانی.
+      - name: Restore release keystore
+        if: ${{ inputs.build_mode == 'release' }}
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 تنظیم نشده است."
+            echo "بیلد ریلیزِ بدون امضا نه قابل انتشار است و نه قابل به‌روزرسانی."
+            exit 1
+          fi
+          mkdir -p android/app
+          echo "$KEYSTORE_B64" | base64 -d > android/app/release.jks
+          keytool -list -keystore android/app/release.jks \
+            -storepass '${{ secrets.ANDROID_KEYSTORE_PASSWORD }}' >/dev/null
+
+      - name: Write signing config
+        if: ${{ inputs.build_mode == 'release' }}
+        run: |
+          cat > android/key.properties <<EOF
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyPassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          storeFile=release.jks
+          EOF
+          bash tool/patch_signing.sh
+
       - name: Build APK
         run: |
           ARGS="--${{ inputs.build_mode }} --dart-define=API_BASE_URL=${{ inputs.api_base_url }}"
@@ -66,6 +137,29 @@ jobs:
           fi
           echo "flutter build apk $ARGS"
           flutter build apk $ARGS
+      # ثابت کن خروجی با کلیدِ خودمان امضا شده، پیش از اینکه کسی
+      # آپلودش کند. APKِ دیباگ‌ساین تا لحظهٔ ردشدن از کافه‌بازار
+      # قابل تشخیص نیست.
+      - name: Verify APK signature
+        if: ${{ inputs.build_mode == 'release' }}
+        run: |
+          BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
+          for APK in build/app/outputs/flutter-apk/*.apk; do
+            "$BT/apksigner" verify --print-certs "$APK" | tee /tmp/certs.txt
+            if grep -qi "CN=Android Debug" /tmp/certs.txt; then
+              echo "::error::$APK با کلیدِ دیباگ امضا شده"
+              exit 1
+            fi
+            grep -q "CN=GhelGheli" /tmp/certs.txt \
+              || { echo "::error::گواهیِ امضای غیرمنتظره در $APK"; exit 1; }
+          done
+          echo "همهٔ APKها با کلیدِ ریلیزِ GhelGheli امضا شده‌اند"
+
+      # مواد امضا نباید حتی در صورت شکست، از job زنده بیرون بیایند.
+      - name: Scrub signing material
+        if: always()
+        run: rm -f android/app/release.jks android/key.properties
+
       - name: List APK sizes
         run: ls -lh build/app/outputs/flutter-apk/*.apk
       - name: Upload APK artifact

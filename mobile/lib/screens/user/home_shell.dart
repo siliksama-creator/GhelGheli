@@ -3,7 +3,9 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
+import '../../widgets/app_bar_logo.dart';
 import '../../widgets/notification_bell.dart';
+import '../../widgets/scroll_hint.dart';
 import 'social_page.dart';
 import 'dashboard_page.dart';
 import 'league_page.dart';
@@ -297,6 +299,24 @@ class _HomeShellState extends State<HomeShell>
     'گذر نبرد'
   ];
 
+  /// متن قرصِ راهنمای اسکرول، برای هر صفحه.
+  ///
+  /// چرا متن‌ها فرق دارند: یک «پایین‌تر هم هست» عمومی، بعد از دو بار
+  /// دیده شدن نامرئی می‌شود. ولی «بازی‌های بیشتری پایین‌تر است» به
+  /// کاربر می‌گوید **چه چیزی** را دارد از دست می‌دهد و همان است که
+  /// انگشتش را حرکت می‌دهد. صفحه‌هایی که اینجا نیستند متن پیش‌فرض
+  /// می‌گیرند.
+  static const Map<int, String> _scrollHints = {
+    0: 'میان‌برها و کارت‌ها پایین‌ترند',
+    1: 'جوایز بیشتری پایین‌تر هست',
+    2: 'تاریخچهٔ تراکنش‌ها پایین‌تر است',
+    3: 'ادامهٔ جدول پایین‌تر است',
+    4: 'بازی‌های بیشتری پایین‌تر است',
+    7: 'جایزه‌ها و شرایط پایین‌تر است',
+    8: 'راهنمای دعوت پایین‌تر است',
+    9: 'محصولات بیشتری پایین‌تر است',
+  };
+
   /// Which bar slot to highlight — the "more" slot when a sheet-only page
   /// is open, otherwise the matching tab.
   int get _barSelection {
@@ -370,7 +390,7 @@ class _HomeShellState extends State<HomeShell>
         // که در اسکرین‌شات مالک هم دیده می‌شود («سلام h...»).
         title: Row(
           children: [
-            const _GlowLogo(),
+            const AppBarLogo(),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -424,7 +444,37 @@ class _HomeShellState extends State<HomeShell>
             switchOutCurve: Curves.easeIn,
             transitionBuilder: (child, animation) =>
                 FadeTransition(opacity: animation, child: child),
-            child: KeyedSubtree(key: ValueKey(_index), child: _pages[_index]),
+            // ═══════════════════════════════════════════════════════════
+            // نوار اسکرول برای همهٔ صفحه‌ها، از یک نقطه
+            // ═══════════════════════════════════════════════════════════
+            //
+            // درخواست مالک: «یه اسکرول بار برای صفحاتی که بیشتر از صفحه
+            // نمایش دیده میشن باید درست کنی که کاربر متوجه بشه که برای
+            // دیدن آیتم هایی که مشخص نیستن باید تاچ کنه بره سمت پایین».
+            //
+            // چرا اینجا و نه داخل تک‌تک صفحه‌ها: ۱۱ صفحهٔ کاربر هر کدام
+            // ساختار اسکرول متفاوتی دارند (ListView، ListView.builder،
+            // RefreshIndicator، Column+Expanded، تب‌های تودرتو). وصله
+            // زدن به هر کدام یعنی ۱۱ جای متفاوت که فردا یکی‌شان یادش
+            // می‌رود. ScrollHint فقط به ScrollNotification گوش می‌دهد،
+            // پس هر اسکرولی در هر عمقی از صفحه را می‌گیرد.
+            //
+            // داخل KeyedSubtree است نه بیرونش: هر صفحه باید حالت اسکرول
+            // خودش را داشته باشد. اگر بیرون بود، رفتن از یک صفحهٔ
+            // اسکرول‌شده به یک صفحهٔ کوتاه، ریل را با موقعیتِ صفحهٔ
+            // قبلی نشان می‌داد.
+            //
+            // گذر نبرد استثناست: ریلِ اختصاصیِ خودش را دارد که شمارهٔ
+            // پله را هم نشان می‌دهد. دو ریل کنار هم فقط شلوغی است.
+            child: KeyedSubtree(
+              key: ValueKey(_index),
+              child: _index == passIndex
+                  ? _pages[_index]
+                  : ScrollHint(
+                      hintLabel: _scrollHints[_index] ?? 'پایین‌تر هم هست',
+                      child: _pages[_index],
+                    ),
+            ),
           ),
         ),
       ),
@@ -715,113 +765,6 @@ class _PassButtonState extends State<_PassButton>
             ),
           ),
       ],
-    );
-  }
-}
-
-/// لوگوی درخشانِ نوار بالا.
-///
-/// ═══════════════════════════════════════════════════════════════════════
-/// چرا انیمیشن دارد و چرا این‌قدر ملایم است
-/// ═══════════════════════════════════════════════════════════════════════
-///
-/// درخواست مالک: «لوگو درخشان قلقلی رو قرار بده».
-///
-/// درخشش با دو لایه ساخته می‌شود:
-///   ۱. هالهٔ رنگی پشت لوگو (BoxShadow با blur زیاد) که **آرام نفس
-///      می‌کشد** — نه درخششِ ثابت که بعد از یک دقیقه نامرئی می‌شود، و
-///      نه چشمکِ تند که آزاردهنده است.
-///   ۲. حلقهٔ نازک با گرادیانِ رنگ برند، که لبهٔ لوگو را از پس‌زمینهٔ
-///      تیرهٔ نوار جدا می‌کند.
-///
-/// دورهٔ ۳ ثانیه‌ای عمدی است: نوار بالا در **همهٔ** صفحه‌ها حاضر است، پس
-/// هر حرکتِ تند اینجا در کل اپ آزاردهنده می‌شود.
-///
-/// `RepaintBoundary` مهم است: بدون آن، هر فریمِ این هاله کل نوار بالا
-/// (پنج آیکون + عنوان) را دوباره رنگ می‌کند.
-class _GlowLogo extends StatefulWidget {
-  const _GlowLogo();
-
-  @override
-  State<_GlowLogo> createState() => _GlowLogoState();
-}
-
-class _GlowLogoState extends State<_GlowLogo>
-    with SingleTickerProviderStateMixin {
-  // در initState ساخته می‌شود، نه مقداردهیِ `late final` روی فیلد —
-  // وگرنه اگر ویجت پیش از اولین build حذف شود، dispose() اولین جایی است
-  // که createTicker را روی عنصرِ غیرفعال صدا می‌زند و فلاتر پرتاب
-  // می‌کند: «Looking up a deactivated widget's ancestor is unsafe».
-  late final AnimationController _breathe;
-
-  @override
-  void initState() {
-    super.initState();
-    _breathe = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 3000),
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _breathe.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return RepaintBoundary(
-      child: AnimatedBuilder(
-        animation: _breathe,
-        builder: (context, child) {
-          final t = Curves.easeInOut.transform(_breathe.value);
-          return Container(
-            padding: const EdgeInsets.all(2),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  scheme.primary.withValues(alpha: 0.55 + t * 0.35),
-                  scheme.secondary.withValues(alpha: 0.45 + t * 0.35),
-                ],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: scheme.primary.withValues(alpha: 0.28 + t * 0.30),
-                  blurRadius: 10 + t * 9,
-                  spreadRadius: t * 1.6,
-                ),
-              ],
-            ),
-            child: child,
-          );
-        },
-        // تصویر ثابت است، پس یک بار ساخته و در هر فریم دوباره استفاده
-        // می‌شود — نه اینکه هر فریم Image.asset تازه بسازیم.
-        child: ClipOval(
-          child: Image.asset(
-            'assets/brand/logo.webp',
-            width: 32,
-            height: 32,
-            fit: BoxFit.cover,
-            // ۳۲ پیکسل منطقی از منبع ۷۲۰ پیکسلی. بدون این راهنما فلاتر
-            // کل بیت‌مپ ۱.۶ مگابایتی را برای تمام نشست رزیدنت نگه
-            // می‌داشت — نوار بالا در همهٔ صفحه‌هاست. ۹۶ = ۳۲ در ۳x.
-            cacheWidth: 96,
-            errorBuilder: (_, __, ___) => Container(
-              width: 32,
-              height: 32,
-              color: scheme.surface,
-              alignment: Alignment.center,
-              child: const Text('⚽', style: TextStyle(fontSize: 16)),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

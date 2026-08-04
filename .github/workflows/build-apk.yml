@@ -102,6 +102,17 @@ jobs:
           EOF
           bash tool/patch_signing.sh
 
+      # ── R8 / کوچک‌سازی کد ─────────────────────────────────────────────────
+      #
+      # فلاتر R8 را پیش‌فرض خاموش می‌گذارد. روشن کردنش هم APK را کوچک
+      # می‌کند و هم — مهم‌تر برای گوشی‌های کم‌رم — جدول‌های DEX را که
+      # اندروید برای کل عمرِ پروسه رزیدنت نگه می‌دارد.
+      #
+      # android/ در هر اجرا از نو ساخته می‌شود، پس مثل مجوزها و امضا،
+      # این هم باید در CI اعمال شود. قوانین keep داخل خود اسکریپت‌اند.
+      - name: Enable R8 code shrinking
+        run: cd mobile && bash tool/patch_shrink.sh
+
       - name: Install dependencies
         run: cd mobile && flutter pub get
 

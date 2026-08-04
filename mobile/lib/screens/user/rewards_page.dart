@@ -363,7 +363,10 @@ class _GroupCard extends StatelessWidget {
                           opacity: met ? 1 : 0.5,
                           child: Column(
                             children: [
-                              Container(
+                              // DecoratedBox: فقط یک قاب می‌خواهیم و
+                              // Container برای همین، یک ویجتِ ترکیبیِ
+                              // اضافه در یک لیستِ اسکرول‌شونده می‌سازد.
+                              DecoratedBox(
                                 decoration: BoxDecoration(
                                   borderRadius: Corners.rSm,
                                   border: Border.all(

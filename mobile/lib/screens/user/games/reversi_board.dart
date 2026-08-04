@@ -109,7 +109,13 @@ class _Board extends StatelessWidget {
                 final hint = canPlay && legal.contains(i);
                 return GestureDetector(
                   onTap: hint ? () => session.move(i) : null,
-                  child: Container(
+                  // DecoratedBox و نه Container: این ویجت در یک شبکهٔ ۸×۸
+                  // (۶۴ خانه) ساخته می‌شود و هر بار که حریف حرکت می‌کند
+                  // کل شبکه دوباره ساخته می‌شود. Container خودش یک
+                  // ویجتِ ترکیبی است که برای هر خانه چند لایهٔ اضافه
+                  // می‌سازد؛ وقتی فقط decoration می‌خواهیم، آن لایه‌ها
+                  // خالص هزینه‌اند.
+                  child: DecoratedBox(
                     decoration: BoxDecoration(
                       color: const Color(0xFF16A34A).withValues(alpha: 0.55),
                       borderRadius: BorderRadius.circular(3),
