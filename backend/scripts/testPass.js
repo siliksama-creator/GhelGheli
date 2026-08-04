@@ -28,6 +28,8 @@ function extract(name) {
   return src.slice(start, end);
 }
 const TIER_COUNT = Number(/const TIER_COUNT = (\d+)/.exec(src)[1]);
+// eslint-disable-next-line no-new-func
+const pgDateToDay = new Function(`${extract('pgDateToDay')}; return pgDateToDay;`)();
 const XP_BASE = Number(/const XP_BASE = (\d+)/.exec(src)[1]);
 const XP_STEP = Number(/const XP_STEP = (\d+)/.exec(src)[1]);
 // eslint-disable-next-line no-new-func
@@ -91,8 +93,9 @@ console.log('\n== 🔒 سقف سخت ۲ پله در روز — ایراد مال
     `بدون سقف، کاربر ${tiersInOneDay} پله در روز باز می‌کرد — برای همین سقف لازم بود`);
 
   ok(/unlocked_tier/.test(svc), 'پلهٔ باز شده جدا از XP ذخیره می‌شود');
-  ok(/roomToday/.test(svc), 'فضای باقی‌ماندهٔ امروز محاسبه می‌شود');
-  ok(/Math\.min\(Math\.max\(0, earned - current\), roomToday\)/.test(svc),
+  ok(/const room = Math\.max\(0, MAX_TIERS_PER_DAY - usedToday\)/.test(svc),
+    'فضای باقی‌ماندهٔ امروز محاسبه می‌شود');
+  ok(/const grant = Math\.min\(Math\.max\(0, earned - current\), room\)/.test(svc),
     'تعداد پلهٔ اعطایی به سقف روزانه محدود است');
 
   // claim باید از unlocked_tier بخواند نه XP — وگرنه سقف بی‌معنی است
@@ -122,6 +125,43 @@ console.log('\n== 🔒 سقف سخت ۲ پله در روز — ایراد مال
     'مایگریشن ستون‌های لازم را می‌سازد');
   ok(/n \* \(195 \+ 5 \* n\) \/ 2 <= p\.xp/.test(mig),
     'کاربران فعلی پله‌شان از روی XP بازسازی می‌شود، نه صفر');
+}
+
+console.log('\n== 🐛 دو باگ واقعی که روی سرور زنده پیدا شدند ==');
+{
+  const svc = src;
+
+  // باگ ۱: وقتی سقفِ XPِ یک منبع پر بود، grantXp زودهنگام return می‌کرد
+  // و پله **هرگز** باز نمی‌شد — حتی فردا.
+  ok(/const sync = await syncTiers\(userId, season\.id, client\);\s*\n\s*await client\.query\('COMMIT'\);\s*\n\s*return \{ gained: 0/.test(svc),
+    'وقتی سقف XP منبع پر است، باز هم پله‌ها همگام می‌شوند');
+  ok(/await syncTiers\(userId, season\.id\)\.catch/.test(svc),
+    'status هم پله‌ها را همگام می‌کند — کاربری که فقط صفحه را باز می‌کند هم پله می‌گیرد');
+
+  // باگ ۲: خطای منطقهٔ زمانی. pg یک DATE را با منطقهٔ سرور تفسیر می‌کند،
+  // پس toISOString() یک روز عقب می‌داد و سقف هر بار صفر می‌شد.
+  ok(typeof pgDateToDay === 'function', 'تابع تبدیل تاریخ وجود دارد');
+  ok(!/toISOString\(\)\.slice\(0, 10\)/.test(svc),
+    'هیچ‌جای سرویس دیگر از toISOString برای تاریخ استفاده نمی‌کند');
+  ok(/pgDateToDay\(row\.tiers_day\) === day/.test(svc)
+     && /pgDateToDay\(pr\.tiers_day\) === day/.test(svc),
+    'هر دو مقایسهٔ تاریخ از تابع امن استفاده می‌کنند');
+
+  // خودِ تابع را بسنج: یک DATE که pg برمی‌گرداند
+  const asPgWouldReturn = new Date(2026, 7, 4); // ۴ آگوست، محلی
+  ok(pgDateToDay(asPgWouldReturn) === '2026-08-04',
+    'DATE محلی درست به رشته تبدیل می‌شود (نه یک روز عقب)');
+  ok(pgDateToDay('2026-08-04') === '2026-08-04', 'رشته هم پشتیبانی می‌شود');
+  ok(pgDateToDay(null) === null, 'null کرش نمی‌کند');
+  ok(pgDateToDay('bad') === 'bad'.slice(0, 10), 'ورودی خراب کرش نمی‌کند');
+
+  // اثباتِ باگ، مستقل از منطقهٔ زمانیِ ماشینی که تست را اجرا می‌کند:
+  // سرور روی Asia/Tehran (UTC+3:30) است، پس نیمه‌شبِ محلی در UTC مربوط
+  // به روز قبل است. یک Date با آفست مثبت می‌سازیم تا همان شرایط را
+  // بازتولید کند.
+  const tehranMidnightUtc = new Date('2026-08-03T20:30:00.000Z');
+  ok(tehranMidnightUtc.toISOString().slice(0, 10) === '2026-08-03',
+    'روش قدیمی روی نیمه‌شبِ تهران «2026-08-03» می‌داد — یک روز عقب، و همین سقف را بی‌اثر می‌کرد');
 }
 
 console.log('\n== ریاضیِ بازسازی پله برای کاربران فعلی ==');
