@@ -13,11 +13,28 @@ import 'screens/auth/splash_screen.dart';
 import 'screens/admin/admin_shell.dart';
 import 'screens/user/home_shell.dart';
 import 'screens/user/games/game_audio.dart';
+import 'core/error_boundary.dart';
 import 'theme/app_theme.dart';
 
 void main() {
   // Binding must exist before we touch platform channels below.
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // شبکهٔ ایمنیِ خطا — باید پیش از هر چیز دیگری نصب شود
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // بدون این، دو چیز بی‌صدا اتفاق می‌افتاد:
+  //
+  //   ۱. هر خطای build در **ریلیز** یک مستطیلِ خاکستریِ خالی می‌شد،
+  //      بدون متن و بدون هیچ راهِ خروجی. کاربر فقط می‌توانست اپ را
+  //      ببندد.
+  //   ۲. هر Future رهاشده‌ای که reject می‌کرد، کاملاً گم می‌شد.
+  //
+  // زودتر از `runApp` نصب می‌شود تا حتی خطای همان اولین فریم هم پوشش
+  // داده شود.
+  installErrorHandlers();
+
   // Decoded-image cache: the card artwork, avatars and game banners are
   // re-shown constantly while navigating. The default 100 MB budget is far
   // more than this app needs and pushes low-end devices into GC churn;
@@ -57,7 +74,21 @@ class _GhelGheliAppState extends State<GhelGheliApp> {
     api.onSessionExpired = () {
       if (mounted) setState(() {});
     };
-    api.loadToken().then((_) {
+    // ═══════════════════════════════════════════════════════════════════
+    // چرا `whenComplete` و نه `then`
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    // `then` فقط در مسیرِ موفقیت اجرا می‌شود. اگر `loadToken` پرتاب
+    // می‌کرد، `_ready` هرگز true نمی‌شد و اپ **برای همیشه** روی صفحهٔ
+    // Splash می‌ماند — بدون پیام، بدون دکمه، و تنها راهِ کاربر حذف و
+    // نصب دوبارهٔ اپ بود.
+    //
+    // حالا `loadToken` خودش هم داخلاً catch دارد (توضیحش آنجاست)، ولی
+    // این خط به آن تکیه نمی‌کند: `whenComplete` در هر دو مسیر اجرا
+    // می‌شود، پس حتی اگر روزی آن catch برداشته شود، اپ باز بالا
+    // می‌آید. دو لایهٔ دفاعی برای چیزی که شکستش یعنی اپِ کاملاً
+    // غیرقابل‌استفاده.
+    api.loadToken().whenComplete(() {
       if (mounted) setState(() => _ready = true);
     });
   }

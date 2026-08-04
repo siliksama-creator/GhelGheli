@@ -481,9 +481,15 @@ class _TierRow extends StatelessWidget {
                   Wrap(
                     spacing: Gaps.xxs,
                     children: [
-                      for (final raw in (tier['requiredCards'] as List))
+                      // `whereType<Map>` به‌جای `as List` + `as Map`:
+                      // این حلقه داخل build است و هیچ try/catch ندارد،
+                      // پس یک ورودیِ بدشکل از سرور کل صفحهٔ جوایز را
+                      // می‌ترکاند. حالا فقط همان مورد نادیده گرفته
+                      // می‌شود.
+                      for (final c in ((tier['requiredCards'] as List?) ??
+                              const [])
+                          .whereType<Map>())
                         () {
-                          final c = Map<String, dynamic>.from(raw as Map);
                           final met = c['met'] == true;
                           return Text(
                             '${c['name']} ${faNum(c['have'])}/${faNum(c['quantity'])}',

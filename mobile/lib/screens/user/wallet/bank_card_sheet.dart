@@ -137,6 +137,10 @@ class _BankCardSheetState extends State<BankCardSheet> {
       ),
     );
     if (ok != true) return;
+    // `await showDialog` بالاتر یعنی این شیت ممکن است در این فاصله
+    // بسته شده باشد (کاربر با دکمهٔ back سیستم، یا با کشیدنِ شیت).
+    // بدون این نگهبان، setState روی یک State مرده کرش می‌دهد.
+    if (!mounted) return;
     setState(() => _saving = true);
     try {
       await widget.api.dio.delete('/api/wallet/bank-card');

@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -165,10 +167,35 @@ class ApiClient {
     }
   }
 
+  /// توکنِ ذخیره‌شده را می‌خواند.
+  ///
+  /// ═══════════════════════════════════════════════════════════════════════
+  /// چرا هرگز پرتاب نمی‌کند
+  /// ═══════════════════════════════════════════════════════════════════════
+  ///
+  /// این تابع در مسیرِ راه‌اندازیِ اپ است: `main.dart` تا کامل شدنش
+  /// صفحهٔ Splash نشان می‌دهد. اگر پرتاب کند، `_ready` هرگز true
+  /// نمی‌شود و کاربر **برای همیشه** روی Splash می‌ماند — نه پیامی، نه
+  /// دکمه‌ای، نه راهی جز حذف و نصب دوبارهٔ اپ.
+  ///
+  /// و `SharedPreferences.getInstance()` واقعاً می‌تواند شکست بخورد:
+  /// دیسکِ پر، فایلِ تنظیماتِ خرابِ ناشی از یک بستنِ ناگهانی، یا
+  /// پروفایل کاربرِ قفل‌شده در دستگاه‌های چنداکانتی.
+  ///
+  /// شکست اینجا کاملاً قابل بازیابی است: نبودِ توکن یعنی «وارد نشده»،
+  /// که همان چیزی است که به کاربر نشان می‌دهیم. پس بی‌صدا به همان
+  /// حالت می‌رویم به‌جای اینکه اپ را قفل کنیم.
   Future<void> loadToken() async {
-    final sp = await SharedPreferences.getInstance();
-    token = sp.getString('token');
-    isAdmin = sp.getBool('isAdmin') ?? false;
+    try {
+      final sp = await SharedPreferences.getInstance();
+      token = sp.getString('token');
+      isAdmin = sp.getBool('isAdmin') ?? false;
+    } catch (e) {
+      // بدترین حالت: کاربر یک بار دیگر وارد می‌شود.
+      token = null;
+      isAdmin = false;
+      debugPrint('loadToken failed, continuing signed-out: $e');
+    }
   }
 
   Future<void> saveToken(String t, {bool admin = false}) async {

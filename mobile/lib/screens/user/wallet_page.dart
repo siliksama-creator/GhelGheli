@@ -36,8 +36,20 @@ class _WalletPageState extends State<WalletPage>
   late final TabController _tabs = TabController(length: 2, vsync: this);
 
   Map? _wallet;
-  List _transactions = [];
-  List _withdrawals = [];
+  // ═══════════════════════════════════════════════════════════════════════
+  // چرا نوعِ دقیق و نه `List` خام
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // قبلاً این‌ها `List` خام بودند و `build` هر آیتم را با `as Map` کست
+  // می‌کرد. یعنی اگر سرور یک آیتمِ بدشکل می‌فرستاد (null در آرایه، یک
+  // رشته به‌جای شیء، یا پاسخِ یک نسخهٔ جلوترِ API)، کست **داخل
+  // itemBuilder** پرتاب می‌کرد — جایی که هیچ try/catch نیست و نتیجه‌اش
+  // ترکیدنِ کل صفحهٔ کیف پول است، نه فقط یک ردیفِ خراب.
+  //
+  // با فیلتر کردن در همان لحظهٔ دریافت، `build` دیگر هیچ کستی لازم
+  // ندارد و بدترین حالت این است که یک ردیفِ خراب **نمایش داده نشود**.
+  List<Map<String, dynamic>> _transactions = [];
+  List<Map<String, dynamic>> _withdrawals = [];
   bool _loading = true;
   String? _error;
 
@@ -59,6 +71,18 @@ class _WalletPageState extends State<WalletPage>
     super.dispose();
   }
 
+  /// یک پاسخِ آرایه‌ایِ سرور را به فهرستی از نگاشت‌های امن تبدیل می‌کند.
+  ///
+  /// هر چیزی که Map نباشد کنار گذاشته می‌شود، پس `build` می‌تواند بدون
+  /// هیچ کستی روی نتیجه حلقه بزند.
+  static List<Map<String, dynamic>> _rows(Object? raw) {
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+  }
+
   Future<void> _load() async {
     setState(() => _error = null);
     try {
@@ -71,9 +95,14 @@ class _WalletPageState extends State<WalletPage>
       ]);
       if (!mounted) return;
       setState(() {
-        _wallet = Map<String, dynamic>.from(results[0]);
-        _transactions = results[1] as List;
-        _withdrawals = results[2] as List;
+        // `whereType<Map>` هر چیزی که Map نیست را بی‌صدا کنار می‌گذارد.
+        // این عمدی است: یک ردیفِ خرابِ تراکنش نباید کل تاریخچه را
+        // از دسترس خارج کند.
+        _wallet = results[0] is Map
+            ? Map<String, dynamic>.from(results[0] as Map)
+            : <String, dynamic>{};
+        _transactions = _rows(results[1]);
+        _withdrawals = _rows(results[2]);
         _loading = false;
       });
     } catch (e) {
@@ -302,7 +331,7 @@ class _WalletPageState extends State<WalletPage>
                         itemCount: _transactions.length,
                         separatorBuilder: (_, __) => const Divider(height: 1),
                         itemBuilder: (_, i) =>
-                            WalletTransactionTile(tx: _transactions[i] as Map),
+                            WalletTransactionTile(tx: _transactions[i]),
                       ),
                 _withdrawals.isEmpty
                     ? const EmptyState(
@@ -313,7 +342,7 @@ class _WalletPageState extends State<WalletPage>
                         itemCount: _withdrawals.length,
                         separatorBuilder: (_, __) => Gaps.vXs,
                         itemBuilder: (_, i) {
-                          final r = _withdrawals[i] as Map;
+                          final r = _withdrawals[i];
                           return WithdrawalTile(
                             request: r,
                             onCancel: () => _cancel(r),

@@ -1103,7 +1103,11 @@ class _RewardTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _label(Map<String, dynamic>.from(m)),
+                  // `_label` خودش `Map` می‌گیرد؛ کپیِ اضافه هم یک
+                  // تخصیصِ بی‌فایده در هر build بود و هم روی یک `m`
+                  // بدشکل پرتاب می‌کرد — داخل build که هیچ catchی
+                  // ندارد.
+                  _label(m),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(

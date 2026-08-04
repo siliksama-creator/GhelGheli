@@ -212,6 +212,10 @@ class _CardTypeSheetState extends State<CardTypeSheet>
     );
     if (confirmed != true) return;
 
+    // بعد از `await showDialog` هیچ تضمینی نیست که شیت هنوز روی صفحه
+    // باشد؛ بقیهٔ setStateهای همین تابع نگهبان دارند و این یکی جا
+    // افتاده بود.
+    if (!mounted) return;
     setState(() {
       _savingCodes = true;
       _report = null;

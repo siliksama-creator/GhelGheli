@@ -144,6 +144,11 @@ class _WithdrawSheetState extends State<WithdrawSheet> {
     );
     if (confirmed != true) return;
 
+    // بعد از `await showDialog` شیت ممکن است بسته شده باشد. بقیهٔ
+    // setStateهای این تابع `if (mounted)` دارند — این یکی جا افتاده
+    // بود، یعنی دقیقاً همان مسیری که کاربر دیالوگ را تأیید می‌کند و
+    // بلافاصله شیت را می‌بندد، کرش می‌داد.
+    if (!mounted) return;
     setState(() {
       _saving = true;
       _serverError = null;

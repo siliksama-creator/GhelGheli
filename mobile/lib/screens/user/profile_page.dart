@@ -42,7 +42,8 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _passwordMessageIsError = false;
   // Physical prizes the user has won. Cash rewards go straight to the wallet;
   // physical ones are displayed here so there is a visible record of them.
-  List _trophies = const [];
+  // نوعِ دقیق: جامِ بدشکل نباید نوارِ افقیِ جام‌ها را بترکاند.
+  List<Map<String, dynamic>> _trophies = const [];
   // Past league finishes. monthly_league_points is wiped each month, so this
   // is the only lasting record of "I came 3rd in Mordad and won 250,000".
   // Crests of clubs the user belongs to. They can be worn as an avatar, so
@@ -85,7 +86,10 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       final r = await widget.api.get('/api/profile/trophies');
       if (!mounted) return;
-      setState(() => _trophies = (r['trophies'] as List?) ?? const []);
+      setState(() => _trophies = ((r['trophies'] as List?) ?? const [])
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList());
     } catch (_) {
       // The shelf is decorative; a failure must not block the profile form.
     }
@@ -306,7 +310,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     itemCount: _trophies.length,
                     separatorBuilder: (_, __) => Gaps.hXs,
                     itemBuilder: (_, i) {
-                      final t = Map<String, dynamic>.from(_trophies[i] as Map);
+                      final t = _trophies[i];
                       final pending = t['status'] == 'pending';
                       return SizedBox(
                         width: 92,

@@ -26,7 +26,9 @@ class _SupportPageState extends State<SupportPage> {
   final _subject = TextEditingController();
   final _message = TextEditingController();
   List<String> _attachments = [];
-  List _tickets = [];
+  // نوعِ دقیق: جزئیات در ticket_thread.dart — یک تیکتِ بدشکل نباید
+  // کل فهرست را از دسترس خارج کند.
+  List<Map<String, dynamic>> _tickets = [];
   Map<String, dynamic>? _quota;
   bool _loading = true;
   bool _sending = false;
@@ -59,8 +61,13 @@ class _SupportPageState extends State<SupportPage> {
           await widget.api.getAll(['/api/support/tickets', '/api/support/quota']);
       if (!mounted) return;
       setState(() {
-        _tickets = batch[0] as List;
-        _quota = Map<String, dynamic>.from(batch[1] as Map);
+        _tickets = (batch[0] is List ? batch[0] as List : const [])
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+        _quota = batch[1] is Map
+            ? Map<String, dynamic>.from(batch[1] as Map)
+            : <String, dynamic>{};
         _loading = false;
         _error = null;
       });
@@ -109,15 +116,33 @@ class _SupportPageState extends State<SupportPage> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
   }
 
-  void _openThread(Map ticket) {
-    Navigator.of(context)
-        .push(MaterialPageRoute(
-          builder: (_) => TicketThreadPage(
-            api: widget.api,
-            ticket: Map<String, dynamic>.from(ticket),
-          ),
-        ))
-        .then((_) => _load());
+  Future<void> _openThread(Map ticket) async {
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => TicketThreadPage(
+        api: widget.api,
+        ticket: Map<String, dynamic>.from(ticket),
+      ),
+    ));
+    // ═══════════════════════════════════════════════════════════════════
+    // چرا `await` + بررسی mounted، به‌جای `.then()`
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    // شکل قبلی `.then((_) => _load())` بود که دو مشکل داشت:
+    //
+    //   ۱. کاربر می‌تواند داخل صفحهٔ تیکت باشد و از آنجا کل اپ را به
+    //      عقب برگرداند؛ آن‌وقت `_load` روی یک State مرده صدا زده
+    //      می‌شد. `_load` خودش `mounted` را بررسی می‌کند، ولی تکیه
+    //      کردن به آن یک قرارداد نانوشته است.
+    //   ۲. خطای `_load` هیچ‌جا گرفته نمی‌شد و به یک استثنای
+    //      مدیریت‌نشده تبدیل می‌شد — این تازه‌سازی بعد از بازگشت از
+    //      صفحهٔ تیکت است و شکستنش نباید به کاربر خطا نشان دهد.
+    if (!mounted) return;
+    try {
+      await _load();
+    } catch (_) {
+      // تازه‌سازیِ پس‌زمینه؛ خودِ `_load` وضعیت خطا را در UI منعکس
+      // می‌کند و پیام دومی لازم نیست.
+    }
   }
 
   @override

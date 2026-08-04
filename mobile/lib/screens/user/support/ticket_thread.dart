@@ -24,7 +24,10 @@ class TicketThreadPage extends StatefulWidget {
 class _TicketThreadPageState extends State<TicketThreadPage> {
   final _reply = TextEditingController();
   final _scroll = ScrollController();
-  List _messages = [];
+  // نوعِ دقیق، نه `List` خام: `build` نباید هیچ کستی لازم داشته باشد.
+  // یک آیتمِ بدشکل از سرور باید فقط همان حباب را حذف کند، نه اینکه کل
+  // گفتگو را با یک TypeError داخل itemBuilder بترکاند.
+  List<Map<String, dynamic>> _messages = [];
   List<String> _attachments = [];
   Map<String, dynamic> _ticket = {};
   bool _loading = true;
@@ -60,8 +63,13 @@ class _TicketThreadPageState extends State<TicketThreadPage> {
         orElse: () => _ticket,
       );
       setState(() {
-        _messages = batch[0] as List;
-        _ticket = Map<String, dynamic>.from(fresh as Map);
+        _messages = (batch[0] is List ? batch[0] as List : const [])
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+        _ticket = fresh is Map
+            ? Map<String, dynamic>.from(fresh)
+            : _ticket;
         _loading = false;
         _error = null;
       });
@@ -156,7 +164,7 @@ class _TicketThreadPageState extends State<TicketThreadPage> {
                         padding: const EdgeInsets.all(Gaps.md),
                         itemCount: _messages.length,
                         itemBuilder: (_, i) =>
-                            _Bubble(message: _messages[i] as Map),
+                            _Bubble(message: _messages[i]),
                       )),
           ),
           SafeArea(
