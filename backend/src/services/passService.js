@@ -151,6 +151,42 @@ async function hasPlus(userId, client = pool) {
 }
 
 /**
+ * ستون DATE پستگرس را به رشتهٔ YYYY-MM-DD تبدیل می‌کند.
+ *
+ * ═══════════════════════════════════════════════════════════════════════
+ * چرا toISOString() اینجا غلط است — باگی که سقف روزانه را بی‌اثر کرد
+ * ═══════════════════════════════════════════════════════════════════════
+ *
+ * درایور pg یک ستون DATE را به Date جاوااسکریپت تبدیل می‌کند و آن را در
+ * **منطقهٔ زمانی سرور** تفسیر می‌کند. سرور روی Asia/Tehran است (UTC+3:30)،
+ * پس `2026-08-04` به این شکل در می‌آید:
+ *
+ *     2026-08-03T20:30:00.000Z
+ *
+ * و `toISOString().slice(0,10)` می‌دهد **«2026-08-03»** — یعنی یک روز
+ * عقب. نتیجه: `sameDay` همیشه false بود، شمارندهٔ روزانه هر بار صفر
+ * می‌شد، و سقف ۲ پله عملاً وجود نداشت. کاربر با یک XP، ۱۲ پله باز کرد.
+ *
+ * روی سرور زنده اثبات شد:
+ *     tiers_day در دیتابیس: 2026-08-04
+ *     toISOString():        2026-08-03   ← ناهماهنگ
+ *     tehranDay():          2026-08-04
+ *
+ * راه‌حل: از اجزای **محلیِ** Date استفاده کن، نه UTC. چون سرور روی
+ * تهران است، اجزای محلی همان روز تهران‌اند.
+ */
+function pgDateToDay(v) {
+  if (!v) return null;
+  if (typeof v === 'string') return v.slice(0, 10);
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return null;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+}
+
+/**
  * XP انباشته را — تا سقف روزانه — به «پلهٔ باز شده» تبدیل می‌کند.
  *
  * ═══════════════════════════════════════════════════════════════════════
@@ -180,8 +216,7 @@ async function syncTiers(userId, seasonId, client = pool) {
   const row = rows[0];
   if (!row) return null;
 
-  const sameDay = row.tiers_day
-    && new Date(row.tiers_day).toISOString().slice(0, 10) === day;
+  const sameDay = pgDateToDay(row.tiers_day) === day;
   const usedToday = sameDay ? Number(row.tiers_today) || 0 : 0;
   const room = Math.max(0, MAX_TIERS_PER_DAY - usedToday);
 
@@ -310,8 +345,7 @@ async function status(userId) {
   const pr = progRes.rows[0] || {};
   const xp = Number(pr.xp || 0);
   const day = tehranDay();
-  const sameDay = pr.tiers_day
-    && new Date(pr.tiers_day).toISOString().slice(0, 10) === day;
+  const sameDay = pgDateToDay(pr.tiers_day) === day;
   const tiersToday = sameDay ? Number(pr.tiers_today) || 0 : 0;
 
   // پلهٔ واقعی از ستون unlocked_tier می‌آید، نه از XP.
@@ -499,6 +533,6 @@ async function claimAll(userId) {
 
 module.exports = {
   SOURCES, TIER_COUNT, MAX_TIERS_PER_DAY,
-  xpForTier, cumulativeXp, tierFromXp, syncTiers,
+  xpForTier, cumulativeXp, tierFromXp, syncTiers, pgDateToDay,
   activeSeason, hasPlus, grantXp, status, claim, claimAll, tehranDay,
 };
