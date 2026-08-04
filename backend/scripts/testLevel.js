@@ -13,6 +13,8 @@
 // فایل فقط بخشِ محض را می‌سنجد.
 //
 //   node scripts/testLevel.js
+const fs = require('fs');
+const path = require('path');
 const L = require('../src/services/levelService');
 
 let pass = 0, fail = 0;
@@ -163,8 +165,6 @@ console.log('\n== فقط بازیِ آنلاین XP می‌دهد ==');
   // مالک قبلاً صریح گفته بود بازیِ آفلاین نباید XP بدهد، و همان قانون
   // باید برای لول هم برقرار باشد — وگرنه می‌شود در چند دقیقه با ربات
   // لول گرفت.
-  const fs = require('fs');
-  const path = require('path');
   const eng = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'games', 'engine.js'), 'utf8');
 
@@ -178,6 +178,50 @@ console.log('\n== فقط بازیِ آنلاین XP می‌دهد ==');
   const block = eng.slice(guard, eng.indexOf('} catch', guard));
   ok(block.includes('grantGameXp'),
     'XP لول داخلِ بلوکِ vsBot است، نه بیرونش');
+}
+
+console.log('\n== مسیرهای require واقعاً وجود دارند ==');
+{
+  // ═══════════════════════════════════════════════════════════════════════
+  // چرا این تست وجود دارد — یک باگِ واقعی که تستِ واحد نگرفت
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // `levelService` پول را **تنبل** بارگذاری می‌کند تا منحنی بدون
+  // دیتابیس قابل تست باشد. عوارضش این بود که مسیرِ اشتباهِ
+  // `require('../db')` تا **زمانِ اجرا روی سرور** پنهان ماند:
+  //
+  //     [level] statusFor failed: Cannot find module '../db'
+  //
+  // همهٔ ۳۸ تستِ واحد سبز بودند چون هیچ‌کدام تابعی را صدا نمی‌زدند که
+  // به دیتابیس نیاز داشته باشد. تابع هم خطا را می‌بلعد و مقدارِ
+  // پیش‌فرض می‌دهد، پس API «کار می‌کرد» و همه‌جا لول صفر نشان می‌داد
+  // — بدونِ هیچ خطای قابل دیدنی برای کاربر.
+  //
+  // این تست همان مسیرها را **بدون اتصال به دیتابیس** بررسی می‌کند:
+  // `require.resolve` فقط وجودِ فایل را می‌سنجد و چیزی را اجرا
+  // نمی‌کند.
+  const src = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'services', 'levelService.js'), 'utf8');
+  const paths = [...src.matchAll(/require\('(\.\.?\/[^']+)'\)/g)].map(m => m[1]);
+  ok(paths.length > 0, `${paths.length} مسیرِ نسبی در سرویس هست`);
+
+  let allResolve = true;
+  for (const rel of paths) {
+    try {
+      require.resolve(path.join(__dirname, '..', 'src', 'services', rel));
+    } catch {
+      allResolve = false;
+      console.error(`    مسیرِ شکسته: ${rel}`);
+    }
+  }
+  ok(allResolve, 'همهٔ مسیرهای require قابل حل هستند');
+
+  // و مسیرِ درستِ pool همان چیزی باشد که بقیهٔ سرویس‌ها استفاده می‌کنند.
+  const passSrc = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'services', 'passService.js'), 'utf8');
+  const dbPath = (passSrc.match(/require\('(\.\.\/[^']*db)'\)/) || [])[1];
+  ok(dbPath && src.includes(dbPath),
+    `مسیرِ دیتابیس با بقیهٔ سرویس‌ها یکی است (${dbPath})`);
 }
 
 console.log('\n== کارایی ==');

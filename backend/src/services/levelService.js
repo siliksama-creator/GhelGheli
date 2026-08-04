@@ -41,7 +41,7 @@
 // آن را می‌خواهند.
 let _pool = null;
 function db() {
-  _pool ??= require('../db').pool;
+  _pool ??= require('../config/db').pool;
   return _pool;
 }
 
