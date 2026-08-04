@@ -39,7 +39,10 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell>
     with SingleTickerProviderStateMixin {
   int _index = 0;
-  Map<String, dynamic>? _profile;
+  // `_profile` حذف شد: تنها مصرف‌کننده‌اش «سلام <نام>» در نوار بالا بود
+  // که به درخواست مالک برداشته شد. نگه داشتنِ یک کپیِ بی‌مصرف از پروفایل
+  // در حافظه، هم بی‌فایده است و هم این توهم را می‌سازد که نوار بالا به
+  // آن وابسته است.
 
   /// تعداد چرخش گردونهٔ در دسترس، برای نشانِ کنار آیکون نوار بالا.
   ///
@@ -246,11 +249,6 @@ class _HomeShellState extends State<HomeShell>
       if (m['user'] is! Map) return;
       final w = m['wheel'];
       setState(() {
-        _profile = <String, dynamic>{
-          'user': m['user'],
-          'inventory': m['inventory'] ?? const [],
-          'leaguePayouts': m['leaguePayouts'] ?? const [],
-        };
         // شمارندهٔ گردونه هم از همین پاسخ می‌آید، پس نشانِ نوار بالا
         // هم‌زمان با بقیهٔ هدر ظاهر می‌شود نه نیم ثانیه بعد.
         if (w is Map) {
@@ -357,29 +355,26 @@ class _HomeShellState extends State<HomeShell>
 
   @override
   Widget build(BuildContext context) {
-    final nickname = _profile?['user']?['nickname'];
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 20,
+        // ── نوار بالا: فقط لوگوی درخشان و عنوان صفحه ──
+        //
+        // درخواست مالک: «اون بالای بالا که سلام نوشته رو کلا حذف کن و
+        // لوگو درخشان قلقلی رو قرار بده».
+        //
+        // «سلام hotcat 👋» حذف شد. دلیلش فقط سلیقه نیست: همان نام دقیقاً
+        // چند پیکسل پایین‌تر در هدر داشبورد هم بود، پس دو بار تکرار
+        // می‌شد و جای نوار بالا را — که پنج آیکون مهم دارد — بی‌دلیل
+        // تنگ می‌کرد. روی گوشی‌های باریک عنوان با «...» بریده می‌شد،
+        // که در اسکرین‌شات مالک هم دیده می‌شود («سلام h...»).
         title: Row(
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.asset('assets/brand/logo.webp',
-                  width: 30, height: 30, fit: BoxFit.cover,
-                  // 30 logical px on screen, from a 720x595 source. Without
-                  // this hint Flutter decoded the full 1.63 MB bitmap and
-                  // kept it resident for the entire session — the app bar is
-                  // on every screen — to draw a 30px square. 90px covers a
-                  // 3x display.
-                  cacheWidth: 90),
-            ),
+            const _GlowLogo(),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                _index == 0 && nickname != null
-                    ? 'سلام $nickname 👋'
-                    : _titles[_index],
+                _titles[_index],
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -720,6 +715,113 @@ class _PassButtonState extends State<_PassButton>
             ),
           ),
       ],
+    );
+  }
+}
+
+/// لوگوی درخشانِ نوار بالا.
+///
+/// ═══════════════════════════════════════════════════════════════════════
+/// چرا انیمیشن دارد و چرا این‌قدر ملایم است
+/// ═══════════════════════════════════════════════════════════════════════
+///
+/// درخواست مالک: «لوگو درخشان قلقلی رو قرار بده».
+///
+/// درخشش با دو لایه ساخته می‌شود:
+///   ۱. هالهٔ رنگی پشت لوگو (BoxShadow با blur زیاد) که **آرام نفس
+///      می‌کشد** — نه درخششِ ثابت که بعد از یک دقیقه نامرئی می‌شود، و
+///      نه چشمکِ تند که آزاردهنده است.
+///   ۲. حلقهٔ نازک با گرادیانِ رنگ برند، که لبهٔ لوگو را از پس‌زمینهٔ
+///      تیرهٔ نوار جدا می‌کند.
+///
+/// دورهٔ ۳ ثانیه‌ای عمدی است: نوار بالا در **همهٔ** صفحه‌ها حاضر است، پس
+/// هر حرکتِ تند اینجا در کل اپ آزاردهنده می‌شود.
+///
+/// `RepaintBoundary` مهم است: بدون آن، هر فریمِ این هاله کل نوار بالا
+/// (پنج آیکون + عنوان) را دوباره رنگ می‌کند.
+class _GlowLogo extends StatefulWidget {
+  const _GlowLogo();
+
+  @override
+  State<_GlowLogo> createState() => _GlowLogoState();
+}
+
+class _GlowLogoState extends State<_GlowLogo>
+    with SingleTickerProviderStateMixin {
+  // در initState ساخته می‌شود، نه مقداردهیِ `late final` روی فیلد —
+  // وگرنه اگر ویجت پیش از اولین build حذف شود، dispose() اولین جایی است
+  // که createTicker را روی عنصرِ غیرفعال صدا می‌زند و فلاتر پرتاب
+  // می‌کند: «Looking up a deactivated widget's ancestor is unsafe».
+  late final AnimationController _breathe;
+
+  @override
+  void initState() {
+    super.initState();
+    _breathe = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3000),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _breathe.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _breathe,
+        builder: (context, child) {
+          final t = Curves.easeInOut.transform(_breathe.value);
+          return Container(
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  scheme.primary.withValues(alpha: 0.55 + t * 0.35),
+                  scheme.secondary.withValues(alpha: 0.45 + t * 0.35),
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: scheme.primary.withValues(alpha: 0.28 + t * 0.30),
+                  blurRadius: 10 + t * 9,
+                  spreadRadius: t * 1.6,
+                ),
+              ],
+            ),
+            child: child,
+          );
+        },
+        // تصویر ثابت است، پس یک بار ساخته و در هر فریم دوباره استفاده
+        // می‌شود — نه اینکه هر فریم Image.asset تازه بسازیم.
+        child: ClipOval(
+          child: Image.asset(
+            'assets/brand/logo.webp',
+            width: 32,
+            height: 32,
+            fit: BoxFit.cover,
+            // ۳۲ پیکسل منطقی از منبع ۷۲۰ پیکسلی. بدون این راهنما فلاتر
+            // کل بیت‌مپ ۱.۶ مگابایتی را برای تمام نشست رزیدنت نگه
+            // می‌داشت — نوار بالا در همهٔ صفحه‌هاست. ۹۶ = ۳۲ در ۳x.
+            cacheWidth: 96,
+            errorBuilder: (_, __, ___) => Container(
+              width: 32,
+              height: 32,
+              color: scheme.surface,
+              alignment: Alignment.center,
+              child: const Text('⚽', style: TextStyle(fontSize: 16)),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

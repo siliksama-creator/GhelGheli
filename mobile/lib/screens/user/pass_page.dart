@@ -226,7 +226,26 @@ class _PassPageState extends State<PassPage> with TickerProviderStateMixin {
     final tier = NumberParser.toInt(d['tier']);
     final tierCount = NumberParser.toInt(d['tierCount']);
 
-    return Stack(
+    // ═══════════════════════════════════════════════════════════════════
+    // چرا fit: StackFit.expand — ریشهٔ باگِ «کادر خالی بزرگ»
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    // یک `Stack` به فرزندِ **غیرPositioned** خود constraints شُل (loose)
+    // می‌دهد: «هر عرضی می‌خواهی بگیر». ListView آن را به فرزندانش پاس
+    // می‌دهد و در نهایت هر FilledButton پرتاب می‌کند:
+    //
+    //     BoxConstraints forces an infinite width
+    //
+    // آن خطا رندرِ کل سربرگ را می‌شکند. روی گوشیِ ریلیز خطاها پنهان‌اند،
+    // پس فقط یک کادرِ خالیِ بلند با حاشیهٔ طلایی باقی می‌ماند — دقیقاً
+    // همان چیزی که مالک در اسکرین‌شات فرستاد.
+    //
+    // `StackFit.expand` فرزند غیرPositioned را مجبور می‌کند اندازهٔ
+    // Stack شود، پس عرض همیشه متناهی است. مشکل از ریشه حل می‌شود، نه با
+    // وصله زدن به تک‌تک دکمه‌ها.
+    return SizedBox.expand(
+      child: Stack(
+      fit: StackFit.expand,
       children: [
         RefreshIndicator(
           onRefresh: () async => _load(jump: false),
@@ -291,6 +310,7 @@ class _PassPageState extends State<PassPage> with TickerProviderStateMixin {
           child: _ScrollRail(fraction: _scrollFrac, tierCount: tierCount),
         ),
       ],
+      ),
     );
   }
 }
@@ -424,10 +444,42 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ═══════════════════════════════════════════════════════════════════
+    // چرا stretch حذف شد و عرض‌ها صریح‌اند — باگِ «کادر خالی بزرگ»
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    // این Column داخل ListView است که خودش داخل Stack است. Stack به
+    // فرزندِ غیرPositioned، constraints شُل می‌دهد، پس عرض تا اینجا
+    // **بی‌کران** می‌رسد. با `crossAxisAlignment: stretch` همان بی‌کران
+    // مستقیم به فرزندان می‌رفت و هر FilledButton پرتاب می‌کرد:
+    //
+    //     BoxConstraints forces an infinite width
+    //
+    // آن خطا رندرِ کل سربرگ را می‌شکند. روی گوشیِ ریلیز خطاها پنهان‌اند،
+    // پس فقط یک کادرِ خالیِ بلند با حاشیهٔ طلایی باقی می‌ماند — دقیقاً
+    // همان چیزی که مالک در اسکرین‌شات فرستاد.
+    //
+    // `MediaQuery.sizeOf(context).width` همیشه عرضِ **واقعیِ صفحه** را
+    // می‌دهد و هرگز بی‌کران نیست، پس هر کارتی که باید تمام‌عرض باشد از
+    // آن استفاده می‌کند و دکمه‌ها اندازهٔ طبیعی‌شان را می‌گیرند.
+    //
+    // عرض از LayoutBuilder می‌آید نه MediaQuery: ListView یک padding
+    // افقی ۴۲ پیکسلی دارد، پس عرضِ واقعیِ آیتم ۳۱۸ است نه ۳۶۰. با
+    // MediaQuery کارت‌ها ۴۲ پیکسل از کادر بیرون می‌زدند.
+    //
+    // با pass_layout_test.dart قفل شد.
+    return LayoutBuilder(builder: (context, cons) {
+      final w = cons.maxWidth;
+      return _headerBody(context, w);
+    });
+  }
+
+  Widget _headerBody(BuildContext context, double w) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ClipRRect(
+        SizedBox(
+          width: w,
+          child: ClipRRect(
           borderRadius: BorderRadius.circular(20),
           child: Stack(
             children: [
@@ -495,6 +547,7 @@ class _Header extends StatelessWidget {
               ),
             ],
           ),
+          ),
         ),
         Gaps.vMd,
         _ProgressCard(
@@ -515,6 +568,8 @@ class _Header extends StatelessWidget {
             builder: (context, child) =>
                 Transform.scale(scale: 1 + pulse.value * 0.015, child: child),
             child: SizedBox(
+              // عرضِ متناهی — والد بی‌کران است (توضیح بالا).
+              width: w,
               height: 48,
               child: FilledButton.icon(
                 onPressed: busy ? null : onClaimAll,
@@ -610,6 +665,9 @@ class _ProgressCard extends StatelessWidget {
     final done = tier >= tierCount;
 
     return Container(
+      // عرض صریح از LayoutBuilder — نه MediaQuery، چون ListView حاشیهٔ
+      // افقی دارد و عرضِ صفحه ۴۲ پیکسل بزرگ‌تر از عرضِ آیتم است.
+      width: double.infinity,
       padding: const EdgeInsets.all(Gaps.md),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
@@ -720,6 +778,10 @@ class _PlusUpsell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      // بدون عرضِ صریح، Row داخلی بی‌کران می‌گیرد و FilledButton کرش
+      // می‌کند — همان کادر خالیِ اسکرین‌شات. حالا والد (LayoutBuilder
+      // در _Header) عرضِ متناهی می‌دهد، پس infinity اینجا امن است.
+      width: double.infinity,
       padding: const EdgeInsets.all(Gaps.sm),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
@@ -747,15 +809,36 @@ class _PlusUpsell extends StatelessWidget {
             ),
           ),
           Gaps.hXs,
-          FilledButton(
-            onPressed: onOpenShop,
-            style: FilledButton.styleFrom(
-              backgroundColor: _plusColor,
-              foregroundColor: const Color(0xFF3A2A00),
-              padding: const EdgeInsets.symmetric(horizontal: 14),
+          // ═══════════════════════════════════════════════════════════
+          // چرا دکمه داخل SizedBox با عرض ثابت است
+          // ═══════════════════════════════════════════════════════════
+          //
+          // این Row داخل زنجیره‌ای است که در نهایت از AnimatedSwitcher
+          // در HomeShell عرضِ شُل (unbounded) می‌گیرد. یک Material
+          // button با عرض بی‌کران پرتاب می‌کند:
+          //
+          //     BoxConstraints forces an infinite width
+          //
+          // و آن خطا رندرِ کل سربرگ را می‌شکند؛ روی گوشیِ ریلیز فقط یک
+          // کادرِ خالیِ بلند با حاشیهٔ طلایی باقی می‌ماند — دقیقاً همان
+          // اسکرین‌شاتی که مالک فرستاد.
+          //
+          // عرض ثابت ۹۶ برای «بازکردن» کافی است و مشکل را قطعی حل
+          // می‌کند: دکمه دیگر هرگز بی‌کران نمی‌بیند.
+          // با pass_layout_test.dart قفل شد.
+          SizedBox(
+            width: 96,
+            height: 40,
+            child: FilledButton(
+              onPressed: onOpenShop,
+              style: FilledButton.styleFrom(
+                backgroundColor: _plusColor,
+                foregroundColor: const Color(0xFF3A2A00),
+                padding: EdgeInsets.zero,
+              ),
+              child: const Text('بازکردن',
+                  style: TextStyle(fontWeight: FontWeight.w900)),
             ),
-            child: const Text('بازکردن',
-                style: TextStyle(fontWeight: FontWeight.w900)),
           ),
         ],
       ),
@@ -878,7 +961,7 @@ class _TierNumber extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 38,
-      height: 62,
+      height: 80,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
@@ -960,7 +1043,7 @@ class _RewardTile extends StatelessWidget {
 
     if (m == null) {
       return Container(
-        height: 62,
+        height: 80,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
@@ -977,7 +1060,11 @@ class _RewardTile extends StatelessWidget {
     final kind = '${m['kind']}';
 
     final tile = Container(
-      height: 62,
+      // ۷۶ نه ۶۲: وقتی برچسب دو خطی می‌شود (مثل «اسم آبی آسمانی») و
+      // زیرش هم یک خط وضعیت («⭐ فقط پلاس») می‌آید، ۶۲ پیکسل ۱۴ پیکسل
+      // کم می‌آورد و فلاتر نوار زرد-مشکیِ سرریز می‌کشد.
+      // با pass_layout_test.dart گرفته شد.
+      height: 80,
       padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),

@@ -157,7 +157,11 @@ void main() {
       await _pumpShell(tester);
 
       await tester.tap(find.text('بیشتر'));
-      await tester.pumpAndSettle();
+      // pumpAndSettle نه: لوگوی درخشانِ نوار بالا یک انیمیشنِ بی‌پایان
+      // دارد (repeat)، پس درخت هرگز «آرام» نمی‌شود و تست تایم‌اوت
+      // می‌خورد. چند فریمِ مشخص برای باز شدن شیت کافی است.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
 
       // داخل خود شیت جست‌وجو کن: عنوانِ صفحه هم ممکن است همین متن باشد.
       expect(
@@ -170,7 +174,11 @@ void main() {
     testWidgets('کیف پول، پشتیبانی و پروفایل هم در شیت هستند', (tester) async {
       await _pumpShell(tester);
       await tester.tap(find.text('بیشتر'));
-      await tester.pumpAndSettle();
+      // pumpAndSettle نه: لوگوی درخشانِ نوار بالا یک انیمیشنِ بی‌پایان
+      // دارد (repeat)، پس درخت هرگز «آرام» نمی‌شود و تست تایم‌اوت
+      // می‌خورد. چند فریمِ مشخص برای باز شدن شیت کافی است.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
 
       for (final t in ['کیف پول', 'پشتیبانی', 'پروفایل']) {
         expect(
