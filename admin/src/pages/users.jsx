@@ -75,6 +75,28 @@ export function UsersPage({ request }) {
             title={`${u.mobile} — ${u.nickname || 'بدون نام'}`}
             trailing={
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {/* لولِ بازیکن — مدیر باید همان چیزی را ببیند که کاربر
+                    می‌بیند. بدون این، پشتیبانی نمی‌تواند به سؤالِ
+                    «چرا لولم بالا نرفت» جواب دهد، و حسابِ مشکوک
+                    (لولِ خیلی بالا در چند روز) قابل تشخیص نیست. */}
+                {u.level !== undefined && u.level !== null && (
+                  <span
+                    title={`لول ${u.level}`}
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 900,
+                      padding: '1px 6px',
+                      borderRadius: 6,
+                      direction: 'ltr',
+                      fontVariantNumeric: 'tabular-nums',
+                      color: 'var(--gg-info)',
+                      border: '1px solid var(--gg-info)',
+                      background: 'color-mix(in srgb, var(--gg-info) 12%, transparent)',
+                    }}
+                  >
+                    Lv {u.level}
+                  </span>
+                )}
                 <span style={{ fontSize: 12.5, color: 'var(--gg-text-muted)' }}>{fmtNumber(u.current_points)} امتیاز</span>
                 <Badge tone={u.status === 'active' ? 'success' : 'danger'}>{u.status === 'active' ? 'فعال' : 'مسدود'}</Badge>
               </div>
