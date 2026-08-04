@@ -2529,3 +2529,25 @@ a:focus-visible {
   .pTile.is-ready, .pClaimAll { animation: none; }
   .pBarFill, .pRailThumb { transition: none; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   لوگوی درخشان نوار بالا
+   ═══════════════════════════════════════════════════════════════════════
+   معادلِ وبِ ویجت _GlowLogo در اپ اندروید. درخواست مالک: «لوگو درخشان
+   قلقلی رو قرار بده».
+
+   دورهٔ ۳ ثانیه‌ای عمدی است: نوار بالا در همهٔ صفحه‌هاست، پس هر حرکتِ
+   تند اینجا در کل اپ آزاردهنده می‌شود. */
+.appLogo.glow {
+  border-radius: 50%;
+  padding: 2px;
+  background: linear-gradient(135deg, #b5ef58, #00d49a);
+  animation: logoBreathe 3s ease-in-out infinite;
+}
+@keyframes logoBreathe {
+  0%, 100% { box-shadow: 0 0 8px #b5ef5847; }
+  50%      { box-shadow: 0 0 18px #b5ef5899, 0 0 6px #00d49a66; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .appLogo.glow { animation: none; box-shadow: 0 0 10px #b5ef5866; }
+}

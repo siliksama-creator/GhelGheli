@@ -207,7 +207,9 @@ function Portal({ token, logout, theme, toggleTheme }) {
   return (
     <div className="portal">
       <header className="appBar">
-        <img className="appLogo" src="/logo.webp" alt="" width="30" height="30" />
+        {/* لوگوی درخشان — همان چیزی که در اپ اندروید هست، تا دو کلاینت
+            یک حس بدهند. درخشش با CSS (کلاس .appLogo) ساخته می‌شود. */}
+        <img className="appLogo glow" src="/logo.webp" alt="" width="32" height="32" />
         <div className="appWho">
           <b>{u.nickname || 'کاربر'}</b>
           <span>{fa(u.current_points)} امتیاز</span>
