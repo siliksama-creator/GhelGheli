@@ -65,17 +65,40 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
   /// Lightweight poll: messages only. The heavy parts of [_load] (config,
   /// stickers, canned list, pinned banner) are fetched once on open.
   Future<void> _refreshMessages() async {
-    if (_error != null) return;
+    // ═══════════════════════════════════════════════════════════════════
+    // چرا شرطِ `if (_error != null) return` برداشته شد
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    // گزارش مالک: «خطای ارتباط با سرور زیاد شده مخصوصا قسمت چت».
+    //
+    // نسخهٔ قبلی به محضِ ست شدنِ `_error` **برای همیشه** از تازه‌سازی
+    // دست می‌کشید. یعنی یک بلیپِ یک‌ثانیه‌ایِ شبکه هنگام باز کردنِ
+    // صفحه، چت را تا بستن و باز کردنِ دوبارهٔ آن مرده می‌کرد: پیام‌ها
+    // دیگر نمی‌آمدند و کاربر فقط پیامِ خطا را می‌دید.
+    //
+    // این رفتار «خطای زیاد» را دو برابر بد می‌کرد: هم خطا دیده می‌شد،
+    // هم خودش را درمان نمی‌کرد.
+    //
+    // حالا برعکس: تازه‌سازی همیشه تلاش می‌کند و اگر **موفق** شد، حالتِ
+    // خطا را پاک می‌کند. یعنی چت خودش را از یک قطعیِ گذرا بازیابی
+    // می‌کند بدون اینکه کاربر کاری بکند.
     try {
       final m = await widget.api.get('/api/chat/messages');
       if (!mounted) return;
       final count = (m is List) ? m.length : 0;
       final grew = count > _lastCount;
       _lastCount = count;
-      setState(() => _messages = m);
+      setState(() {
+        _messages = m;
+        // بازیابیِ خودکار: شبکه برگشته، پس پیامِ خطا باید برود.
+        if (_error != null) _error = null;
+      });
       if (grew) _scrollToBottom();
     } catch (_) {
-      // Transient network blips shouldn't clear the visible conversation.
+      // یک بلیپِ گذرا نباید گفتگوی روی صفحه را پاک کند و نباید
+      // پیامِ خطا هم بسازد — تیکِ بعدی خودش دوباره تلاش می‌کند.
+      // (ApiClient خودش یک بار retry کرده، پس رسیدن به اینجا یعنی
+      // قطعیِ واقعی‌تر.)
     }
   }
 
@@ -152,8 +175,12 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
       }
     } catch (e) {
       if (mounted) {
+        final msg = apiError(e);
         setState(() {
-          _error = apiError(e);
+          // رشتهٔ خالی یعنی «لغو شد» — یک رخدادِ عادی وقتی کاربر پیش
+          // از رسیدنِ پاسخ تب را عوض می‌کند. نمایشش به‌عنوان خطا،
+          // بخش بزرگی از «خطاهای زیاد» بود که اصلاً خطا نبودند.
+          if (msg.isNotEmpty) _error = msg;
           _loading = false;
         });
       }

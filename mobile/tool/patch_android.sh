@@ -38,6 +38,58 @@ if missing:
     block = ''.join(f'    <uses-permission android:name="{p}"/>\n' for p in missing)
     src = src.replace(anchor, anchor + '\n' + block, 1)
 
+# ═══════════════════════════════════════════════════════════════════════════
+# <queries> — بدون این، دکمه‌های اشتراک‌گذاری روی اندروید ۱۱+ نمی‌کارند
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# از اندروید ۱۱ (API 30) «نمایان‌بودنِ بسته‌ها» محدود شد: یک اپ فقط
+# اپ‌هایی را می‌بیند که در <queries> اعلام کرده باشد. اثرش روی ما:
+#
+#   • `canLaunchUrl('tg://...')` همیشه false برمی‌گرداند، حتی وقتی
+#     تلگرام نصب است،
+#   • و در بعضی دستگاه‌ها خودِ `launchUrl` هم با
+#     ActivityNotFoundException شکست می‌خورد.
+#
+# یعنی صفحهٔ دعوت چهار دکمه داشت که هیچ‌کدام کار نمی‌کردند — و چون
+# استثنا گرفته می‌شود، هیچ خطایی هم دیده نمی‌شد. فقط «هیچ اتفاقی
+# نمی‌افتد»، بدترین حالتِ ممکن برای کاربر.
+#
+# منطقِ کد (core/share_invite.dart) عمداً به `canLaunchUrl` تکیه
+# نمی‌کند و مستقیم امتحان می‌کند، ولی اعلامِ scheme همچنان لازم است
+# تا Intent اصلاً حل شود.
+QUERIES = """    <queries>
+        <!-- پیام‌رسان‌هایی که کد دعوت به آن‌ها فرستاده می‌شود -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="tg"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="whatsapp"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="rubika"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="bale"/>
+        </intent>
+        <!-- بازگشتِ وب، وقتی هیچ‌کدام از اپ‌های بالا نصب نیستند -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
+    </queries>
+"""
+
+if "<queries>" not in src:
+    # درست پیش از بسته شدنِ <manifest> — هر جای دیگری معتبر نیست.
+    src = src.replace("</manifest>", QUERIES + "</manifest>", 1)
+    print("added <queries> for messenger deep links")
+else:
+    print("<queries> already present")
+
 # Ship a real Persian app name rather than the raw Dart package identifier.
 src = src.replace('android:label="ghelgheli_mobile"', 'android:label="GhelGheli"')
 
@@ -57,3 +109,14 @@ for p in INTERNET ACCESS_NETWORK_STATE POST_NOTIFICATIONS; do
   fi
 done
 grep -q 'android:label="GhelGheli"' "$MANIFEST" && echo "  OK   app label" || echo "  WARN app label unchanged"
+
+# بدون <queries> صفحهٔ دعوت چهار دکمهٔ بی‌اثر دارد و هیچ خطایی هم
+# دیده نمی‌شود — پس اینجا سخت‌گیرانه بررسی می‌شود.
+for sch in tg whatsapp rubika bale; do
+  if grep -q "android:scheme=\"$sch\"" "$MANIFEST"; then
+    echo "  OK   query scheme $sch"
+  else
+    echo "  FAIL query scheme $sch is missing — دکمهٔ اشتراک‌گذاری کار نمی‌کند"
+    exit 1
+  fi
+done

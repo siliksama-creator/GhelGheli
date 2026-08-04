@@ -291,7 +291,41 @@ class ApiClient {
     // می‌کند.
     Future<dynamic> run() async {
       try {
-        final r = await dio.get(path);
+        // ═══════════════════════════════════════════════════════════════
+        // تلاشِ دوبارهٔ خودکار برای خطاهای گذرا
+        // ═══════════════════════════════════════════════════════════════
+        //
+        // گزارش مالک: «خطای ارتباط با سرور زیاد شده مخصوصا قسمت چت».
+        //
+        // اندازه‌گیری روی سرور نشان داد /api/chat/messages در ۸
+        // میلی‌ثانیه پاسخ می‌دهد و سرور ۸ ساعت بدون مشکل بالاست. پس
+        // خطاها از **شبکهٔ موبایل** می‌آیند، نه از سرور: یک قطعیِ
+        // یک‌ثانیه‌ای هنگام جابه‌جایی بین دکل‌ها یا سوییچ Wi‑Fi/داده
+        // کافی است تا درخواست شکست بخورد.
+        //
+        // چت این را تشدید می‌کند چون هر ۱۰ ثانیه poll می‌کند: در یک
+        // ساعت ۳۶۰ فرصت برای دیدنِ یک بلیپِ گذرا.
+        //
+        // یک تلاشِ دوباره پس از ۴۰۰ میلی‌ثانیه، اکثریتِ قاطعِ این
+        // بلیپ‌ها را بی‌صدا حل می‌کند.
+        //
+        // چرا فقط **یک** تلاش و فقط برای GET:
+        //   • GET ذاتاً idempotent است؛ تکرارش هیچ چیزی را دوباره
+        //     نمی‌سازد. POST هرگز retry نمی‌شود — یک پیامِ چتِ دوبار
+        //     ارسال‌شده بدتر از یک خطاست.
+        //   • تلاشِ بیشتر یعنی کاربر ثانیه‌ها منتظرِ چیزی بماند که
+        //     واقعاً قطع است. یک تلاش، تعادلِ بینِ «بلیپ را ندید» و
+        //     «قطعیِ واقعی را سریع اعلام کن».
+        //   • فقط خطاهای گذرا (تایم‌اوت، قطع شبکه، ۵xx، ۴۲۹). یک ۴۰۳
+        //     یا ۴۰۴ دفعهٔ دوم هم همان جواب را می‌دهد.
+        Response<dynamic> r;
+        try {
+          r = await dio.get(path);
+        } catch (e) {
+          if (!isTransient(e)) rethrow;
+          await Future<void>.delayed(const Duration(milliseconds: 400));
+          r = await dio.get(path);
+        }
         _getCache[path] = (at: DateTime.now(), body: r.data);
         return r.data;
       } finally {
@@ -457,14 +491,114 @@ String normalizeMobileInput(String raw) {
   return s;
 }
 
+/// پیامِ فارسیِ قابل نمایش برای یک خطای API.
+///
+/// ═══════════════════════════════════════════════════════════════════════════
+/// چرا این تابع بازنویسی شد
+/// ═══════════════════════════════════════════════════════════════════════════
+///
+/// گزارش مالک: «خطای ارتباط با سرور زیاد شده مخصوصا قسمت چت».
+///
+/// نسخهٔ قبلی برای **هر** شکستی که پیامِ سرور نداشت، همان یک جملهٔ
+/// «خطای ارتباط با سرور» را برمی‌گرداند. یعنی این موارد کاملاً متفاوت
+/// همه یک شکل دیده می‌شدند:
+///
+///   • گوشی اصلاً اینترنت ندارد
+///   • سرور در دسترس است ولی کند (تایم‌اوت)
+///   • سرور ۵۰۰ داد
+///   • پاسخ JSON نبود (صفحهٔ خطای یک پروکسی)
+///   • درخواست لغو شد چون کاربر صفحه را بست
+///
+/// آخری مهم‌ترین است: وقتی کاربر بین تب‌ها جابه‌جا می‌شود، درخواستِ
+/// در پرواز لغو می‌شود و این **یک رخدادِ کاملاً عادی** است — ولی به
+/// کاربر به‌عنوان «خطای ارتباط با سرور» نشان داده می‌شد. بخش بزرگی از
+/// «زیاد شدنِ خطا» دقیقاً همین بود: خطاهایی که اصلاً خطا نبودند.
+///
+/// حالا هر نوع، پیامِ خودش را دارد و لغو شدن اصلاً پیام ندارد (رشتهٔ
+/// خالی برمی‌گرداند تا فراخواننده بتواند نادیده‌اش بگیرد).
 String apiError(Object e) {
+  // ۱. پیامِ صریحِ سرور همیشه اولویت دارد — فارسی و دقیق است.
   try {
     final data = (e as dynamic).response?.data;
     if (data is Map && data['message'] != null) {
-      return data['message'].toString();
+      final m = data['message'].toString().trim();
+      if (m.isNotEmpty) return m;
     }
-  } catch (_) {}
+  } catch (_) {/* شکلِ پاسخ غیرمنتظره بود */}
+
+  if (e is DioException) {
+    switch (e.type) {
+      case DioExceptionType.cancel:
+        // یک رخدادِ عادی، نه خطا. رشتهٔ خالی یعنی «چیزی نشان نده».
+        return '';
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.sendTimeout:
+      // transformTimeout یعنی تبدیلِ بدنهٔ پاسخ طول کشید — از دید
+      // کاربر همان «کند بودن» است.
+      case DioExceptionType.transformTimeout:
+        return 'اتصال کند است؛ دوباره تلاش کنید';
+      case DioExceptionType.receiveTimeout:
+        return 'پاسخ سرور طول کشید؛ دوباره تلاش کنید';
+      case DioExceptionType.connectionError:
+        return 'اینترنت وصل نیست';
+      case DioExceptionType.badCertificate:
+        return 'اتصال امن برقرار نشد';
+      case DioExceptionType.badResponse:
+        final code = e.response?.statusCode ?? 0;
+        if (code == 401) return 'نشست شما منقضی شده؛ دوباره وارد شوید';
+        if (code == 403) return 'به این بخش دسترسی ندارید';
+        if (code == 404) return 'این مورد پیدا نشد';
+        if (code == 429) {
+          return 'کمی سریع پیش رفتید؛ چند لحظه صبر کنید';
+        }
+        if (code >= 500) return 'سرور موقتاً در دسترس نیست';
+        return 'درخواست انجام نشد';
+      case DioExceptionType.unknown:
+        // بیشترِ خطاهای شبکه در اندروید اینجا می‌افتند.
+        final msg = '${e.error ?? ''}'.toLowerCase();
+        if (msg.contains('socket') ||
+            msg.contains('network') ||
+            msg.contains('failed host lookup') ||
+            msg.contains('connection')) {
+          return 'اینترنت وصل نیست';
+        }
+        return 'خطای ارتباط با سرور';
+    }
+  }
+
   return 'خطای ارتباط با سرور';
+}
+
+/// آیا این خطا صرفاً لغوِ یک درخواست است؟
+///
+/// لغو شدن وقتی رخ می‌دهد که کاربر پیش از رسیدنِ پاسخ صفحه را ببندد —
+/// یعنی یک رخدادِ عادی که **نباید** به‌عنوان خطا نمایش داده شود.
+bool isCanceled(Object e) =>
+    e is DioException && e.type == DioExceptionType.cancel;
+
+/// آیا این خطا گذراست و ارزشِ تلاشِ دوباره دارد؟
+///
+/// برای تصمیم‌گیریِ خودکار دربارهٔ retry استفاده می‌شود: یک تایم‌اوت
+/// یا ۵۰۳ احتمالاً دفعهٔ بعد جواب می‌دهد، ولی ۴۰۳ هرگز.
+bool isTransient(Object e) {
+  if (e is! DioException) return false;
+  switch (e.type) {
+    case DioExceptionType.connectionTimeout:
+    case DioExceptionType.sendTimeout:
+    case DioExceptionType.receiveTimeout:
+    case DioExceptionType.transformTimeout:
+    case DioExceptionType.connectionError:
+      return true;
+    case DioExceptionType.badResponse:
+      final code = e.response?.statusCode ?? 0;
+      // ۴۲۹ و ۵xx گذرا هستند؛ بقیهٔ ۴xx نه.
+      return code == 429 || code >= 500;
+    case DioExceptionType.unknown:
+      return true;
+    case DioExceptionType.cancel:
+    case DioExceptionType.badCertificate:
+      return false;
+  }
 }
 
 /// HTTP status code of a failed API call, or null if unavailable. Used by

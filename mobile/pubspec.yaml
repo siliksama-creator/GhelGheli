@@ -38,6 +38,26 @@ dependencies:
   # via firebase/shared_preferences; declared explicitly because we import it
   # directly and an implicit dependency can vanish on any upstream bump.
   crypto: ^3.0.3
+  # ═══════════════════════════════════════════════════════════════════════
+  # چرا url_launcher و نه share_plus
+  # ═══════════════════════════════════════════════════════════════════════
+  #
+  # درخواست مالک: «در قسمت دعوت قابلیت کپی کد و ارسال کد در تلگرام و
+  # واتس اپ و روبیکا و بله امکان پذیر باشه».
+  #
+  # `share_plus` فقط برگهٔ اشتراک‌گذاریِ سیستم را باز می‌کند — کاربر
+  # باید خودش از میان ده‌ها اپ، تلگرام را پیدا کند. مالک صریحاً
+  # **دکمهٔ مستقیم** برای هر اپ خواست.
+  #
+  # `url_launcher` اجازه می‌دهد مستقیم به deep link هر اپ برویم
+  # (tg://msg_url، whatsapp://send، ...). سبک‌تر هم هست: هیچ کد
+  # بومیِ اضافه‌ای ندارد، فقط یک Intent باز می‌کند.
+  #
+  # نکتهٔ اندروید ۱۱+: برای اینکه canLaunchUrl بتواند وجودِ اپ را
+  # تشخیص دهد، هر schemeی باید در <queries> مانیفست اعلام شود —
+  # در tool/patch_android.sh انجام می‌شود. بدون آن، همهٔ اپ‌ها
+  # «نصب‌نشده» گزارش می‌شدند.
+  url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_test:

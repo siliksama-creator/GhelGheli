@@ -1,8 +1,8 @@
 // دعوت دوستان — کد اختصاصی، آمار، و فهرست دوستان.
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../api_client.dart';
+import '../../core/share_invite.dart';
 import '../../theme/tokens.dart';
 
 class ReferralPage extends StatefulWidget {
@@ -47,13 +47,36 @@ class _ReferralPageState extends State<ReferralPage> {
       v is int ? v : (v is num ? v.toInt() : int.tryParse('$v') ?? 0);
 
   Future<void> _copy(String code) async {
-    await Clipboard.setData(ClipboardData(text: code));
+    final ok = await copyCode(code);
     if (!mounted) return;
+    _toast(ok ? 'کد کپی شد ✅' : 'کپی نشد؛ کد را دستی بردارید');
+  }
+
+  /// اشتراک‌گذاری در یک پیام‌رسان.
+  ///
+  /// پیامِ بازخورد به نتیجه بستگی دارد و این عمدی است: اگر روبیکا باز
+  /// شود ولی متن خودکار پر نشود، کاربر باید بداند که باید بچسباند —
+  /// وگرنه فکر می‌کند اپ خراب است.
+  Future<void> _share(ShareTarget t, String code) async {
+    final outcome = await shareInvite(t, code);
+    if (!mounted) return;
+    switch (outcome) {
+      case ShareOutcome.opened:
+        // اپ باز شد و متن آماده است؛ پیام لازم نیست و فقط مزاحم است.
+        break;
+      case ShareOutcome.openedWithClipboard:
+        _toast('متن دعوت کپی شد — در ${t.label} بچسبانید 📋');
+      case ShareOutcome.copiedOnly:
+        _toast('${t.label} باز نشد؛ متن دعوت کپی شد 📋');
+    }
+  }
+
+  void _toast(String text) {
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      const SnackBar(
-        content: Text('کد کپی شد ✅'),
+      SnackBar(
+        content: Text(text, textAlign: TextAlign.center),
         behavior: SnackBarBehavior.floating,
-        duration: Duration(seconds: 2),
+        duration: const Duration(seconds: 3),
       ),
     );
   }
@@ -154,6 +177,38 @@ class _ReferralPageState extends State<ReferralPage> {
                     ),
                   ],
                 ),
+                if (code.isNotEmpty) ...[
+                  Gaps.vSm,
+                  Divider(
+                      height: 1,
+                      color: theme.colorScheme.outline.withValues(alpha: 0.3)),
+                  Gaps.vSm,
+                  Text('ارسال برای دوستان',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: theme.colorScheme.onSurface
+                            .withValues(alpha: 0.75),
+                      )),
+                  Gaps.vXs,
+                  // ═══════════════════════════════════════════════════
+                  // چرا Wrap و نه Row
+                  // ═══════════════════════════════════════════════════
+                  //
+                  // چهار دکمه روی یک گوشیِ باریک (۳۲۰dp) سرریز
+                  // می‌کند و فلاتر نوارِ زرد-مشکی می‌کشد. Wrap خودش
+                  // به خطِ دوم می‌رود.
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: Gaps.xs,
+                    runSpacing: Gaps.xs,
+                    children: [
+                      for (final t in shareTargets)
+                        _ShareChip(
+                          target: t,
+                          onTap: () => _share(t, code),
+                        ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -390,6 +445,60 @@ class _NextSpinProgress extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// دکمهٔ کوچکِ یک پیام‌رسان.
+///
+/// ═══════════════════════════════════════════════════════════════════════════
+/// چرا رنگِ برند فقط در حاشیه و پس‌زمینهٔ کم‌رنگ استفاده می‌شود
+/// ═══════════════════════════════════════════════════════════════════════════
+///
+/// رنگِ سبزِ واتس‌اپ (#25D366) روی سطحِ روشن کنتراستِ ۱.۹:۱ دارد —
+/// همان دسته مشکلی که در رنگ‌های معنایی رفع شد. پس رنگِ برند فقط برای
+/// **شناسایی** به‌کار می‌رود (حاشیه و ته‌رنگ) و خودِ متن از تم می‌آید،
+/// که در هر دو حالت خوانا است.
+class _ShareChip extends StatelessWidget {
+  const _ShareChip({required this.target, required this.onTap});
+
+  final ShareTarget target;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final brand = Color(target.color);
+    return Material(
+      color: brand.withValues(alpha: 0.10),
+      borderRadius: Corners.rPill,
+      child: InkWell(
+        borderRadius: Corners.rPill,
+        onTap: onTap,
+        child: Container(
+          padding:
+              const EdgeInsets.symmetric(horizontal: Gaps.sm, vertical: Gaps.xs),
+          decoration: BoxDecoration(
+            borderRadius: Corners.rPill,
+            border: Border.all(color: brand.withValues(alpha: 0.55)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(target.emoji, style: const TextStyle(fontSize: 15)),
+              Gaps.hXxs,
+              Text(
+                target.label,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  // رنگِ متن از تم، نه از برند — توضیح بالای کلاس.
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
