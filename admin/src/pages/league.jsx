@@ -19,7 +19,22 @@ export function LeaguePage({ request }) {
       if (table?.length) setPrizes(table);
       setWinnerCount(x.winnerCount || table?.length || 10);
     });
-  useEffect(load, [request]);
+  // ═══════════════════════════════════════════════════════════════════
+  // چرا () => { load(); } و نه useEffect(load, ...)
+  // ═══════════════════════════════════════════════════════════════════
+  //
+  // اگر `load` یک Promise برگرداند (یعنی arrow بدون آکولاد)، ری‌اکت آن
+  // مقدارِ برگشتی را **تابعِ پاک‌سازی** فرض می‌کند و هنگام خروج از صفحه
+  // صدایش می‌زند. یک Promise تابع نیست، پس:
+  //
+  //     TypeError: n is not a function
+  //
+  // و کل پنل سفید می‌شود. روی سرور زنده بازتولید شد: رفتن به «لیگ
+  // ماهانه» و بعد «کاربران» → پنل خالی، بدنهٔ صفحه صفر بایت.
+  //
+  // پیچیدنِ فراخوانی در آکولاد یعنی effect همیشه undefined برمی‌گرداند
+  // و ری‌اکت هیچ‌وقت چیزی را به‌عنوان cleanup صدا نمی‌زند.
+  useEffect(() => { load(); }, [request]);
 
   function changeWinnerCount(n) {
     setWinnerCount(n);
