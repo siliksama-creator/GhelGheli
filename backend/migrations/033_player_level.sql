@@ -64,15 +64,22 @@ CREATE INDEX IF NOT EXISTS idx_users_game_xp
 --     تاریخچه دوباره ساخت.
 --
 -- عمداً سبک است: بدون متنِ آزاد، فقط شناسه و عدد.
+-- ═══════════════════════════════════════════════════════════════════════════
+-- نکته: کلیدِ کاربر در این پروژه **UUID** است، نه INTEGER
+-- ═══════════════════════════════════════════════════════════════════════════
+--
+-- نسخهٔ اولِ این مایگریشن `INTEGER` نوشته بود و روی سرورِ واقعی شکست
+-- خورد. حدس زدنِ نوعِ کلید یکی از رایج‌ترین راه‌های شکستنِ یک مایگریشن
+-- است؛ همیشه باید از `\d users` خوانده شود.
 CREATE TABLE IF NOT EXISTS game_xp_log (
   id          BIGSERIAL PRIMARY KEY,
-  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   game_id     TEXT    NOT NULL,
   -- 'play' یا 'win'
   reason      TEXT    NOT NULL,
   amount      INTEGER NOT NULL,
   -- شناسهٔ حریف، برای تشخیصِ تبانی (دو حساب که فقط با هم بازی کنند)
-  opponent_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  opponent_id UUID REFERENCES users(id) ON DELETE SET NULL,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -103,11 +110,17 @@ BEGIN
 
   IF has_results THEN
     -- ۲۰ برای هر بازی + ۱۵ اضافه برای برد، همان ضریب‌های سرویس.
+    --
+    -- نکته: ستونِ نتیجه `outcome` است با مقادیر win/loss/draw — نه یک
+    -- بولینِ `won`. و «آنلاین بودن» از روی `opponent_user_id IS NOT
+    -- NULL` تشخیص داده می‌شود، چون بازیِ مقابل ربات حریفِ ثبت‌شده
+    -- ندارد. هر دو از روی schema واقعی خوانده شدند، نه حدس.
     WITH tally AS (
       SELECT user_id,
-             COUNT(*) * 20 + COUNT(*) FILTER (WHERE won) * 15 AS xp
+             COUNT(*) * 20
+               + COUNT(*) FILTER (WHERE outcome = 'win') * 15 AS xp
       FROM game_results
-      WHERE vs_bot IS NOT TRUE
+      WHERE opponent_user_id IS NOT NULL
       GROUP BY user_id
     )
     UPDATE users u

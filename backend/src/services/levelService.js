@@ -291,12 +291,22 @@ async function grantGameXp(userId, { gameId, won, opponentId }) {
  * یک کوئری با `ANY($1)` همه را می‌آورد.
  */
 async function levelsFor(userIds) {
-  const ids = [...new Set((userIds || []).filter(Boolean).map(Number))]
-    .filter((n) => Number.isFinite(n));
+  // ═══════════════════════════════════════════════════════════════════════
+  // شناسهٔ کاربر در این پروژه UUID است، نه عدد
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // نسخهٔ اول `map(Number)` می‌کرد و `::int[]` می‌فرستاد — که هر
+  // شناسه‌ای را به NaN تبدیل می‌کرد و کوئری همیشه خالی برمی‌گشت.
+  // نتیجه‌اش این بود که هیچ لولی هیچ‌جا نمایش داده نمی‌شد، **بدون
+  // هیچ خطایی** — چون تابع خطا را می‌بلعد و شیءِ خالی می‌دهد.
+  //
+  // این دقیقاً همان دسته باگی است که در تستِ محلی دیده نمی‌شود و فقط
+  // روی دادهٔ واقعی ظاهر می‌شود.
+  const ids = [...new Set((userIds || []).filter(Boolean).map(String))];
   if (!ids.length) return {};
   try {
     const { rows } = await db().query(
-      'SELECT id, game_xp FROM users WHERE id = ANY($1::int[])',
+      'SELECT id, game_xp FROM users WHERE id = ANY($1::uuid[])',
       [ids],
     );
     const out = {};
