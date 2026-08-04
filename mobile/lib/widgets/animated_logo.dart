@@ -346,16 +346,24 @@ class BlendMask extends SingleChildRenderObjectWidget {
 
   @override
   RenderObject createRenderObject(BuildContext context) =>
-      _RenderBlendMask(blendMode);
+      RenderBlendMask(blendMode);
 
   @override
-  void updateRenderObject(BuildContext context, _RenderBlendMask renderObject) {
+  void updateRenderObject(
+      BuildContext context, RenderBlendMask renderObject) {
     renderObject.blendMode = blendMode;
   }
 }
 
-class _RenderBlendMask extends RenderProxyBox {
-  _RenderBlendMask(this._blendMode);
+/// عمومی است، نه خصوصی.
+///
+/// `updateRenderObject` یک متدِ عمومیِ override شده است و امضایش این نوع
+/// را افشا می‌کند. تا وقتی کلاس خصوصی بود، تحلیلگر
+/// `library_private_types_in_public_api` می‌داد — تنها هشدارِ باقی‌ماندهٔ
+/// کل پروژه. عمومی کردنِ کلاس، درست‌ترین رفع است: نوع واقعاً بخشی از
+/// قرارداد عمومیِ این ویجت است.
+class RenderBlendMask extends RenderProxyBox {
+  RenderBlendMask(this._blendMode);
 
   BlendMode _blendMode;
   set blendMode(BlendMode v) {

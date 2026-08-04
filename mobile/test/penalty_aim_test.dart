@@ -23,10 +23,10 @@ import 'package:flutter_test/flutter_test.dart';
 
 // هندسهٔ دروازه — همان نسبت‌هایی که _PitchPainter و _ZoneGrid دارند.
 const double w = 400, h = 300;
-final double gw = w * 0.78;
-final double gh = h * 0.46;
-final double gl = (w - gw) / 2;
-final double gt = h * 0.06;
+const double gw = w * 0.78;
+const double gh = h * 0.46;
+const double gl = (w - gw) / 2;
+const double gt = h * 0.06;
 
 /// کپیِ دقیق `_PitchPainter.zoneCenter`.
 Offset zoneCenter(int z) {
@@ -42,7 +42,7 @@ double touchX(int z) {
 
 /// موقعیت توپ در لحظهٔ t از انیمیشن (کپیِ منطق نقاش، بدون قوس).
 Offset ballAt(int shotZone, double t) {
-  final spot = Offset(w / 2, h * 0.88);
+  const spot = Offset(w / 2, h * 0.88);
   final target = zoneCenter(shotZone);
   final e = Curves.easeOutQuad.transform(math.min(1.0, t / 0.62));
   return Offset(
@@ -53,7 +53,7 @@ Offset ballAt(int shotZone, double t) {
 
 /// موقعیت دروازه‌بان در لحظهٔ t.
 Offset keeperAt(int diveZone, double t) {
-  final rest = Offset(w / 2, gt + gh * 0.72);
+  const rest = Offset(w / 2, gt + gh * 0.72);
   final target = zoneCenter(diveZone);
   final e = Curves.easeOutCubic.transform(math.min(1.0, t / 0.55));
   return Offset.lerp(rest, target, e)!;
@@ -191,7 +191,7 @@ void main() {
     });
 
     test('ناحیهٔ وسط یعنی نماندن سر جا نیست — عمودی حرکت می‌کند', () {
-      final rest = Offset(w / 2, gt + gh * 0.72);
+      const rest = Offset(w / 2, gt + gh * 0.72);
       final end = keeperAt(1, 1.0); // بالا-وسط
       expect(end.dx, closeTo(w / 2, 0.01), reason: 'افقی نمی‌رود');
       expect(end.dy, lessThan(rest.dy), reason: 'ولی باید بالا بپرد');
