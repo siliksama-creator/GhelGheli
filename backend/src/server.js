@@ -2653,10 +2653,10 @@ app.patch('/api/admin/admins/:id/status', adminAuth, validateUuid('id'), require
 //
 //     ۱۹۳٬۷۹۸ بایت JSON خام (۲۹ کیلوبایت فشرده)
 //
-// یعنی هشت برابرِ سنگین‌ترین endpoint بعدی. `a.*` شامل دو ستون JSONB است
-// (`before_data` و `after_data`) که برای هر ویرایش، **کل ردیف قبل و بعد**
-// را نگه می‌دارند — چیزی که فهرست هرگز نشان نمی‌دهد و فقط در جزئیات یک
-// رخداد به‌کار می‌آید.
+// یعنی هشت برابرِ سنگین‌ترین endpoint بعدی. `a.*` شامل ستون JSONB
+// `metadata` است که برای هر ویرایش کل بدنهٔ درخواست را نگه می‌دارد —
+// چیزی که فهرست هرگز نشان نمی‌دهد و فقط در جزئیات یک رخداد به‌کار
+// می‌آید.
 //
 // روی گوشی، آن ۱۹۳ کیلوبایت باید کامل پارس شود و به‌صورت Map های دارت در
 // حافظه بماند؛ با سربارِ آبجکت‌های دارت، چند برابرِ خودِ متن رم می‌گیرد.
@@ -2673,9 +2673,9 @@ app.get('/api/admin/audit-log', adminAuth, requireRole(), asyncHandler(async (re
   const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50));
   const offset = Math.max(0, Number(req.query.offset) || 0);
   const { rows } = await pool.query(
-    `SELECT a.id, a.admin_user_id, a.action, a.entity_type, a.entity_id,
-            a.created_at, ad.username,
-            (a.before_data IS NOT NULL OR a.after_data IS NOT NULL) AS has_detail
+    `SELECT a.id, a.admin_user_id, a.action, a.target_type, a.target_id,
+            a.reason, a.created_at, ad.username,
+            (a.metadata IS NOT NULL AND a.metadata::text <> '{}') AS has_detail
        FROM audit_log a
        LEFT JOIN admin_users ad ON ad.id = a.admin_user_id
       ORDER BY a.created_at DESC
@@ -2684,10 +2684,10 @@ app.get('/api/admin/audit-log', adminAuth, requireRole(), asyncHandler(async (re
   res.json({ entries: rows, total: cnt[0].n, limit, offset });
 }));
 
-/// جزئیات کاملِ یک رخداد — شامل before/after.
+/// جزئیات کاملِ یک رخداد — شامل metadata.
 ///
-/// جدا از فهرست است تا آن دو ستون سنگین فقط وقتی منتقل شوند که ادمین
-/// واقعاً روی یک ردیف زده باشد.
+/// جدا از فهرست است تا آن ستون سنگین فقط وقتی منتقل شود که ادمین واقعاً
+/// روی یک ردیف زده باشد.
 app.get('/api/admin/audit-log/:id', adminAuth, requireRole(), validateUuid('id'),
   asyncHandler(async (req, res) => {
     const { rows } = await pool.query(
