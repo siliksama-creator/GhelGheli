@@ -6,8 +6,8 @@ import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/state_views.dart';
-import '../shared/football_card.dart';
 import '../shared/hero_header.dart';
+import 'inventory_page.dart';
 import '../../widgets/photo_card_box.dart';
 
 /// Home / dashboard tab: points header, card-code redemption and card
@@ -26,6 +26,9 @@ class DashboardPage extends StatefulWidget {
   final VoidCallback? onOpenWheel;
   final VoidCallback? onOpenReferral;
 
+  /// رفتن به تبِ «کلکسیون». داشبورد فقط پیش‌نمایش نشان می‌دهد.
+  final VoidCallback? onOpenInventory;
+
   // `onToggleTheme` و `isDark` حذف شدند — اپ تک‌تم است (توضیح در main.dart).
 
   const DashboardPage({
@@ -36,6 +39,7 @@ class DashboardPage extends StatefulWidget {
     this.onOpenWallet,
     this.onOpenWheel,
     this.onOpenReferral,
+    this.onOpenInventory,
   });
 
   @override
@@ -324,24 +328,50 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
           ),
           Gaps.vXl,
-          const SectionHeader(title: 'موجودی کارت‌ها'),
+          // ── چرا داشبورد فقط پیش‌نمایش می‌دهد ──
+          //
+          // قبلاً کلِ اینونتوری اینجا در یک نوارِ افقی بود. با ۵۰ کارت
+          // یعنی ۵۰ تصویرِ شبکه‌ای که همگی روی صفحهٔ **اصلی** بارگذاری
+          // می‌شدند — هم کند، هم پرمصرف، و هم عملاً غیرقابل‌مرور.
+          //
+          // حالا شش کارتِ تازه به‌عنوان طعمه و یک دکمه به صفحهٔ کامل.
+          SectionHeader(
+            title: 'کلکسیون من',
+            trailing: inventory.length > 6 && widget.onOpenInventory != null
+                ? TextButton(
+                    onPressed: widget.onOpenInventory,
+                    child: Text('همه (${faNum(inventory.length)})'),
+                  )
+                : null,
+          ),
           if (inventory.isEmpty)
             const AppCard(
               child: EmptyState(
                   icon: Icons.style_outlined,
-                  title: 'هنوز کارتی در موجودی شما نیست',
-                  message: 'یک کد کارت را ثبت کن تا اینجا نمایش داده شود.'),
+                  title: 'هنوز کارتی در کلکسیون شما نیست',
+                  message: 'یک کد کارت را ثبت کن یا از کارتت عکس بگیر '
+                      'تا اینجا نمایش داده شود.'),
             )
           else
-            SizedBox(
-              height: 222,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: inventory.length,
-                separatorBuilder: (_, __) => Gaps.hMd,
-                itemBuilder: (_, i) => FootballCard(item: inventory[i]),
-              ),
-            ),
+            Builder(builder: (_) {
+              // همان مرتب‌سازیِ صفحهٔ کلکسیون تا ترتیب بینشان نپرد.
+              final recent =
+                  filterAndSort(inventory, sort: InvSort.recent).take(6).toList();
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: EdgeInsets.zero,
+                gridDelegate:
+                    const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 200,
+                  mainAxisSpacing: Gaps.sm,
+                  crossAxisSpacing: Gaps.sm,
+                  childAspectRatio: 0.66,
+                ),
+                itemCount: recent.length,
+                itemBuilder: (_, i) => InventoryTile(item: recent[i]),
+              );
+            }),
         ],
       ),
     );

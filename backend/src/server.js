@@ -897,7 +897,8 @@ app.get('/api/games/:gameId/solo', auth, asyncHandler(async (req, res) => {
 }));
 
 app.get('/api/profile', auth, asyncHandler(async (req, res) => {
-  const inv = await pool.query(`SELECT i.*, t.name, t.image_url, t.point_value FROM user_card_inventory i JOIN card_types t ON t.id=i.card_type_id WHERE i.user_id=$1 AND i.consumed_in_reward=false ORDER BY t.name`, [req.user.id]);
+  // همان ستون‌های bootstrap تا دو مسیر هرگز از هم جدا نیفتند.
+  const inv = await pool.query(`SELECT i.*, t.name, t.image_url, t.point_value, t.cash_amount FROM user_card_inventory i JOIN card_types t ON t.id=i.card_type_id WHERE i.user_id=$1 AND i.consumed_in_reward=false ORDER BY t.name`, [req.user.id]);
   const leaguePayouts = await pool.query(`SELECT p.*, s.month_year FROM league_payouts p JOIN league_seasons s ON s.id=p.league_season_id WHERE p.user_id=$1 ORDER BY p.created_at DESC LIMIT 20`, [req.user.id]);
   res.json({ user: safeUser(req.user), inventory: inv.rows, leaguePayouts: leaguePayouts.rows });
 }));
@@ -921,8 +922,18 @@ app.get('/api/profile', auth, asyncHandler(async (req, res) => {
 // همان اشتباهی است که این endpoint قرار است حل کند.
 app.get('/api/bootstrap', auth, asyncHandler(async (req, res) => {
   const [inv, payouts, rewards, wheelState] = await Promise.all([
+    // ── چرا `cash_amount` و `created_at` هم برمی‌گردند ──
+    //
+    // اینونتوری بازطراحی شد: کاربر می‌تواند نزدیک به ۵۰ نوع کارت داشته
+    // باشد و صفحهٔ جدید امکانِ مرتب‌سازی («تازه‌ترین»، «باارزش‌ترین») و
+    // نمایشِ ارزشِ نقدی را می‌دهد.
+    //
+    // `i.created_at` لحظهٔ **اولین** ثبتِ آن نوع کارت است و
+    // `i.updated_at` آخرین بار که تعدادش زیاد شده. برای «تازه‌ترین»
+    // دومی درست است — کاربر می‌خواهد کارتی را ببیند که همین حالا ثبت
+    // کرده، حتی اگر نسخهٔ اولش را ماه‌ها پیش گرفته باشد.
     pool.query(
-      `SELECT i.*, t.name, t.image_url, t.point_value
+      `SELECT i.*, t.name, t.image_url, t.point_value, t.cash_amount
          FROM user_card_inventory i
          JOIN card_types t ON t.id = i.card_type_id
         WHERE i.user_id = $1 AND i.consumed_in_reward = false

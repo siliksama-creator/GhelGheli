@@ -45,6 +45,46 @@ class _TapGameScreenState extends State<TapGameScreen>
 
   int _seenEventSerial = 0;
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // چرا شمارنده‌ها ValueNotifier شدند و نه setState
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // گزارش مالک: «بازی ضربه‌زن به شدت سرعت موبایل رو پایین میاره بعد
+  // مدتی».
+  //
+  // علت: هر ضربه `setState` روی کلِ `_TapGameScreenState` صدا می‌زد. یعنی در
+  // هر فریم **تمامِ** درخت دوباره ساخته می‌شد:
+  //
+  //   • `_Header` با شش ویجتِ متنی و `_DailyDots`
+  //   • `_ProgressPanel` با `TweenAnimationBuilder`
+  //   • و مهم‌تر از همه `TapCharacter` — که خودش تصویرِ شخصیت،
+  //     `AnimatedBuilder`، `CustomPaint`ِ شناورها و یک `Stack` دارد.
+  //
+  // `TapCharacter` بهینه است و **نیازی به بازسازی ندارد**: کلِ انیمیشنش
+  // با کنترلرهای داخلیِ خودش اجرا می‌شود. ولی چون والد دوباره ساخته
+  // می‌شد، فلاتر مجبور بود کلِ آن زیردرخت را هم دوباره بسازد و تطبیق
+  // دهد. با ۱۲ ضربه بر ثانیه یعنی ۱۲ بار در ثانیه کارِ کاملاً بی‌فایده.
+  //
+  // «بعد مدتی» هم توضیح دارد: فشارِ مداومِ ساختِ ویجت، GC را وادار به
+  // اجرای مکرر می‌کند و گوشی گرم و کند می‌شود.
+  //
+  // حالا فقط دو تکهٔ کوچک — هدر و پنلِ پیشرفت — به تغییرات گوش می‌دهند.
+  // بقیهٔ درخت، از جمله `TapCharacter`، **اصلاً بازسازی نمی‌شود**.
+  //
+  // ⚠️ `_uiTick` عمداً یک شمارنده است و نه خودِ داده: موتور منبعِ حقیقت
+  //    است و این فقط می‌گوید «چیزی عوض شد، دوباره بخوان».
+  final ValueNotifier<int> _uiTick = ValueNotifier<int>(0);
+
+  /// وضعیت‌هایی که **ساختار** صفحه را عوض می‌کنند (نه فقط عدد).
+  ///
+  /// این‌ها نادرند (چند بار در کلِ بازی) ولی وقتی اتفاق می‌افتند کلِ
+  /// صفحه باید عوض شود — مثلاً شخصیت جای خودش را به «سهمیهٔ امروز تمام
+  /// شد» می‌دهد. برای این‌ها `setState` درست است.
+  bool _lastComplete = false;
+  bool _lastCapReached = false;
+  String? _lastSkin;
+  String? _lastNotice;
+
   @override
   void initState() {
     super.initState();
@@ -62,6 +102,7 @@ class _TapGameScreenState extends State<TapGameScreen>
     // Must be cancelled: a pending rebuild firing after dispose would call
     // setState on a defunct State.
     _rebuildTimer?.cancel();
+    _uiTick.dispose();
     WidgetsBinding.instance.removeObserver(this);
     _engine.removeListener(_onEngineChanged);
     _engine.dispose();
@@ -135,7 +176,28 @@ class _TapGameScreenState extends State<TapGameScreen>
     // fire and the counter would freeze until the next tap. A 16ms timer is
     // one frame at 60Hz and always runs.
     _rebuildTimer = Timer(const Duration(milliseconds: 16), () {
-      if (mounted) setState(() {});
+      if (!mounted) return;
+      // ── مسیرِ داغ: فقط شمارنده‌ها ──
+      // ۹۹.۹٪ تیک‌ها فقط عدد را عوض می‌کنند. یک افزایشِ ValueNotifier
+      // دو ویجتِ کوچک را بازمی‌سازد، نه کلِ صفحه را.
+      _uiTick.value++;
+
+      // ── مسیرِ سرد: تغییرِ ساختاری ──
+      // فقط وقتی چیزی عوض شده که **چیدمان** را عوض می‌کند.
+      final complete = _engine.isComplete;
+      final capped = _engine.dailyCapReached;
+      final skin = _engine.skin;
+      final notice = _engine.notice;
+      if (complete != _lastComplete ||
+          capped != _lastCapReached ||
+          skin != _lastSkin ||
+          notice != _lastNotice) {
+        _lastComplete = complete;
+        _lastCapReached = capped;
+        _lastSkin = skin;
+        _lastNotice = notice;
+        setState(() {});
+      }
     });
   }
 
@@ -170,25 +232,34 @@ class _TapGameScreenState extends State<TapGameScreen>
 
     return Column(
       children: [
-        _Header(
-          onBack: () {
-            _engine.flushNow();
-            widget.onBack();
-          },
-          level: _engine.level,
-          levelCount: widget.config.levelCount,
-          points: _engine.pointsEarned,
-          levelsLeftToday: _engine.levelsLeftToday,
-          levelsPerDay: widget.config.levelsPerDay,
-          isComplete: _engine.isComplete,
-          accent: _accent,
+        // ── تنها دو تکه‌ای که هر ضربه بازسازی می‌شوند ──
+        // بقیهٔ این درخت — و مهم‌تر از همه `TapCharacter` — دست‌نخورده
+        // می‌ماند. توضیحِ کامل کنار تعریفِ `_uiTick`.
+        ValueListenableBuilder<int>(
+          valueListenable: _uiTick,
+          builder: (_, __, ___) => _Header(
+            onBack: () {
+              _engine.flushNow();
+              widget.onBack();
+            },
+            level: _engine.level,
+            levelCount: widget.config.levelCount,
+            points: _engine.pointsEarned,
+            levelsLeftToday: _engine.levelsLeftToday,
+            levelsPerDay: widget.config.levelsPerDay,
+            isComplete: _engine.isComplete,
+            accent: _accent,
+          ),
         ),
         Gaps.vSm,
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: Gaps.lg),
-          child: _ProgressPanel(
-            engine: _engine,
-            accent: _accent,
+          child: ValueListenableBuilder<int>(
+            valueListenable: _uiTick,
+            builder: (_, __, ___) => _ProgressPanel(
+              engine: _engine,
+              accent: _accent,
+            ),
           ),
         ),
         Expanded(
@@ -241,7 +312,9 @@ class _TapGameScreenState extends State<TapGameScreen>
                   color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
               Gaps.hXxs,
               Flexible(
-                child: Text(
+                child: ValueListenableBuilder<int>(
+                  valueListenable: _uiTick,
+                  builder: (_, __, ___) => Text(
                   _engine.isComplete
                       ? 'همهٔ ${faNum(widget.config.levelCount)} لول تمام شد!'
                       : _engine.dailyCapReached
@@ -254,6 +327,7 @@ class _TapGameScreenState extends State<TapGameScreen>
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
+                ),
                 ),
               ),
             ],

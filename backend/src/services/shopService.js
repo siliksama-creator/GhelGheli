@@ -318,13 +318,42 @@ async function equip(userId, slug, kind = null) {
     throw Object.assign(new Error('این آیتم قابل انتخاب نیست'), { status: 400 });
   }
 
-  // Equipping a badge on Plus is also how you JOIN that club — the owner's
-  // rule is that a Plus member may belong to as many clubs as they pick.
+  // ═════════════════════════════════════════════════════════════════════════
+  // قانونِ جدیدِ باشگاه برای پلاس: فقط **یک** باشگاه
+  // ═════════════════════════════════════════════════════════════════════════
+  //
+  // خواستهٔ صریح مالک: «دیگه پلاس اجازه عضویت در هر باشگاه رو نمیده،
+  // فقط پلاس میتونه فقط یک باشگاه رو انتخاب کنه که به عنوان عکس
+  // پروفایلش قرار داده بشه».
+  //
+  // قبلاً پلاس می‌توانست بی‌نهایت باشگاه جمع کند و در فهرستِ اعضای همهٔ
+  // آن‌ها ظاهر شود. این هم بی‌معنی بود (هوادارِ ۱۶ تیم؟) و هم ارزشِ
+  // خریدِ دائمیِ نشان را از بین می‌برد.
+  //
+  // حالا: انتخابِ باشگاهِ جدید روی اشتراک، باشگاهِ قبلیِ اشتراکی را
+  // **جایگزین** می‌کند. باشگاه‌هایی که کاربر واقعاً **خریده** هرگز حذف
+  // نمی‌شوند — او پولش را داده و مالکیتش دائمی است.
+  //
+  // چرا در یک تراکنش: بین حذفِ قدیمی و درجِ جدید، کاربر لحظه‌ای عضو هیچ
+  // باشگاهی نیست. اگر درخواستِ دیگری (مثلاً بارگذاریِ پروفایل) دقیقاً
+  // آنجا برسد، صفحه بدون باشگاه رندر می‌شود و کاربر فکر می‌کند
+  // باشگاهش پرید.
   if (item.kind === 'club_badge' && !member) {
     const client = await pool.connect();
     try {
+      await client.query('BEGIN');
+      if (!owned[0]) {
+        // فقط ردیف‌های 'plus' پاک می‌شوند؛ 'purchase' دست‌نخورده می‌ماند.
+        await client.query(
+          `DELETE FROM user_clubs WHERE user_id=$1 AND source='plus'`,
+          [userId]);
+      }
       await clubService.join(client, userId, item.payload,
         owned[0] ? 'purchase' : 'plus');
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw e;
     } finally {
       client.release();
     }

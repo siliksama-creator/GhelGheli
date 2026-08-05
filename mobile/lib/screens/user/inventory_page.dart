@@ -1,0 +1,467 @@
+// صفحهٔ «کلکسیون من» — خانهٔ واقعیِ کارت‌های کاربر.
+//
+// ═══════════════════════════════════════════════════════════════════════════
+// چرا این صفحه ساخته شد
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// گزارش مالک: «کاربر ممکنه نزدیک به ۵۰ نوع کارت مختلف ثبت کنه، الان
+// جایگاهش زیاد جذابیت نداره و ترتیب خوبی نداره».
+//
+// وضعیتِ قبلی یک `ListView` **افقی** با ارتفاع ۲۲۲ پیکسل ته داشبورد بود.
+// برای سه کارت خوب بود؛ برای پنجاه تا فاجعه:
+//
+//   • دیدنِ کارتِ پنجاهم یعنی چهل‌ونه بار سوایپ. عملاً کسی تهش نمی‌رسید.
+//   • هیچ راهی برای پیدا کردنِ یک کارتِ خاص نبود — نه جست‌وجو، نه ترتیب.
+//   • ترتیب همیشه الفبایی بود، پس کارتی که همین الان ثبت شده وسطِ لیست
+//     گم می‌شد و کاربر بازخوردِ «ثبت شد» را نمی‌دید.
+//   • ارزشِ کلکسیون هیچ‌جا دیده نمی‌شد. کاربر نمی‌دانست چقدر جمع کرده.
+//
+// ═══════════════════════════════════════════════════════════════════════════
+// تصمیم‌های طراحی
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ۱. **گرید به‌جای نوارِ افقی.** اسکرولِ عمودی طبیعی است و در یک نگاه
+//    شش کارت دیده می‌شود به‌جای دو تا.
+//
+// ۲. **نوارِ آمار بالای صفحه.** «۵۰ نوع · ۱۲۰ کارت · ۸۴٬۰۰۰ امتیاز».
+//    کلکسیون وقتی جذاب است که کاربر رشدش را ببیند.
+//
+// ۳. **جست‌وجو + سه ترتیب** (تازه‌ترین، باارزش‌ترین، الفبا). پیش‌فرض
+//    «تازه‌ترین» است چون بلافاصله بعد از ثبتِ کارت، کاربر همان را
+//    می‌خواهد ببیند.
+//
+// ۴. **نشانِ «جدید»** روی کارت‌هایی که در ۴۸ ساعت گذشته اضافه شده‌اند.
+//
+// ۵. داشبورد **کوتاه** شد: فقط شش کارتِ آخر به‌عنوان پیش‌نمایش، با دکمهٔ
+//    «همه». صفحهٔ اصلی نباید با پنجاه کارت شلوغ شود.
+import 'package:flutter/material.dart';
+
+import '../../api_client.dart';
+import '../../theme/tokens.dart';
+import '../../widgets/app_card.dart';
+import '../../widgets/state_views.dart';
+import '../shared/card_detail_sheet.dart';
+
+/// ترتیب‌های ممکن. پیش‌فرض `recent` است — توضیح بالا.
+enum InvSort { recent, value, name }
+
+const _sortLabels = {
+  InvSort.recent: 'تازه‌ترین',
+  InvSort.value: 'باارزش‌ترین',
+  InvSort.name: 'الفبا',
+};
+
+/// کارت در ۴۸ ساعت گذشته اضافه شده؟
+///
+/// چرا ۴۸ و نه ۲۴: کاربری که شب کارت ثبت می‌کند و فردا شب اپ را باز
+/// می‌کند، باید هنوز نشانِ «جدید» را ببیند. با ۲۴ ساعت دقیقاً همان کاربر
+/// از قلم می‌افتاد.
+bool isNewCard(Map<String, dynamic> item) {
+  final raw = item['updated_at'] ?? item['created_at'];
+  if (raw == null) return false;
+  final t = DateTime.tryParse('$raw');
+  if (t == null) return false;
+  return DateTime.now().difference(t).inHours < 48;
+}
+
+int _asInt(dynamic v) =>
+    v is int ? v : int.tryParse('${v ?? 0}'.split('.').first) ?? 0;
+
+DateTime _sortDate(Map<String, dynamic> m) =>
+    DateTime.tryParse('${m['updated_at'] ?? m['created_at'] ?? ''}') ??
+    DateTime.fromMillisecondsSinceEpoch(0);
+
+/// مرتب‌سازی و فیلترِ خالص — جدا از ویجت تا مستقیم تست شود.
+List<Map<String, dynamic>> filterAndSort(
+  List<Map<String, dynamic>> items, {
+  String query = '',
+  InvSort sort = InvSort.recent,
+}) {
+  final q = query.trim().toLowerCase();
+  final out = q.isEmpty
+      ? [...items]
+      : items
+          .where((m) => '${m['name'] ?? ''}'.toLowerCase().contains(q))
+          .toList();
+  switch (sort) {
+    case InvSort.recent:
+      // ── چرا ترتیبِ دوم لازم است ──
+      // چند کارت می‌توانند دقیقاً یک زمان داشته باشند (ثبتِ دسته‌ای، یا
+      // دقتِ ثانیه‌ایِ دیتابیس). بدون شکستنِ تساوی، ترتیبشان بین دو
+      // بارگذاری عوض می‌شود و کاربر فکر می‌کند لیست می‌پرد.
+      out.sort((a, b) {
+        final c = _sortDate(b).compareTo(_sortDate(a));
+        return c != 0 ? c : '${a['name']}'.compareTo('${b['name']}');
+      });
+    case InvSort.value:
+      out.sort((a, b) {
+        final c = _asInt(b['point_value']).compareTo(_asInt(a['point_value']));
+        return c != 0 ? c : '${a['name']}'.compareTo('${b['name']}');
+      });
+    case InvSort.name:
+      out.sort((a, b) => '${a['name']}'.compareTo('${b['name']}'));
+  }
+  return out;
+}
+
+/// جمعِ آمارِ کلکسیون. خالص، تا تست بتواند مستقیم بسنجد.
+({int kinds, int total, int points}) collectionStats(
+    List<Map<String, dynamic>> items) {
+  var total = 0;
+  var points = 0;
+  for (final m in items) {
+    final q = _asInt(m['quantity']);
+    total += q;
+    // امتیازِ هر نسخه ضرب در تعداد — کاربری که سه تا از یک کارت دارد،
+    // سه برابر امتیاز گرفته.
+    points += q * _asInt(m['point_value']);
+  }
+  return (kinds: items.length, total: total, points: points);
+}
+
+class InventoryPage extends StatefulWidget {
+  const InventoryPage({
+    super.key,
+    required this.items,
+    this.onRefresh,
+  });
+
+  final List<Map<String, dynamic>> items;
+  final Future<void> Function()? onRefresh;
+
+  @override
+  State<InventoryPage> createState() => _InventoryPageState();
+}
+
+class _InventoryPageState extends State<InventoryPage> {
+  final _search = TextEditingController();
+  InvSort _sort = InvSort.recent;
+
+  @override
+  void dispose() {
+    // بدون این، هر بار که کاربر صفحه را می‌بندد یک کنترلر نشت می‌کند.
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final shown =
+        filterAndSort(widget.items, query: _search.text, sort: _sort);
+    final stats = collectionStats(widget.items);
+
+    final body = CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+                Gaps.md, Gaps.md, Gaps.md, Gaps.xs),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _StatsStrip(stats: stats),
+                Gaps.vMd,
+                // ── جست‌وجو فقط وقتی معنا دارد که چیزی برای گشتن باشد ──
+                // زیر ۸ کارت، نوارِ جست‌وجو فقط فضا می‌گیرد.
+                if (widget.items.length >= 8) ...[
+                  TextField(
+                    controller: _search,
+                    onChanged: (_) => setState(() {}),
+                    textInputAction: TextInputAction.search,
+                    decoration: InputDecoration(
+                      hintText: 'جست‌وجو در کارت‌ها…',
+                      prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                      isDense: true,
+                      suffixIcon: _search.text.isEmpty
+                          ? null
+                          : IconButton(
+                              icon: const Icon(Icons.close_rounded, size: 18),
+                              onPressed: () => setState(_search.clear),
+                            ),
+                    ),
+                  ),
+                  Gaps.vSm,
+                ],
+                if (widget.items.length >= 2)
+                  SizedBox(
+                    height: 34,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: [
+                        for (final s in InvSort.values) ...[
+                          ChoiceChip(
+                            label: Text(_sortLabels[s]!),
+                            selected: _sort == s,
+                            onSelected: (_) => setState(() => _sort = s),
+                            visualDensity: VisualDensity.compact,
+                            labelStyle: theme.textTheme.labelMedium,
+                          ),
+                          Gaps.hXs,
+                        ],
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        if (shown.isEmpty)
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Padding(
+              padding: const EdgeInsets.all(Gaps.lg),
+              child: AppCard(
+                child: EmptyState(
+                  icon: widget.items.isEmpty
+                      ? Icons.style_outlined
+                      : Icons.search_off_rounded,
+                  title: widget.items.isEmpty
+                      ? 'هنوز کارتی در کلکسیون شما نیست'
+                      : 'کارتی با این نام پیدا نشد',
+                  message: widget.items.isEmpty
+                      ? 'یک کد کارت را ثبت کن یا از کارتت عکس بگیر تا اینجا نمایش داده شود.'
+                      : 'نام دیگری را امتحان کنید.',
+                ),
+              ),
+            ),
+          )
+        else
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(
+                Gaps.md, Gaps.xs, Gaps.md, Gaps.xxl),
+            sliver: SliverGrid(
+              gridDelegate:
+                  const SliverGridDelegateWithMaxCrossAxisExtent(
+                // ── چرا MaxCrossAxisExtent و نه crossAxisCount ثابت ──
+                // با عددِ ثابت، روی تبلت کارت‌ها کشیده و زشت می‌شوند و
+                // روی گوشیِ باریک له. این نسخه خودش تعداد ستون را از
+                // عرضِ موجود درمی‌آورد: ۲ ستون روی گوشی، ۳ تا ۴ روی تبلت.
+                maxCrossAxisExtent: 200,
+                mainAxisSpacing: Gaps.sm,
+                crossAxisSpacing: Gaps.sm,
+                childAspectRatio: 0.66,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (_, i) => InventoryTile(item: shown[i]),
+                childCount: shown.length,
+              ),
+            ),
+          ),
+      ],
+    );
+
+    return widget.onRefresh == null
+        ? body
+        : RefreshIndicator(onRefresh: widget.onRefresh!, child: body);
+  }
+}
+
+/// نوارِ آمارِ کلکسیون.
+class _StatsStrip extends StatelessWidget {
+  const _StatsStrip({required this.stats});
+  final ({int kinds, int total, int points}) stats;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(
+          horizontal: Gaps.md, vertical: Gaps.sm + 2),
+      decoration: BoxDecoration(
+        borderRadius: Corners.rXl,
+        gradient: LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [
+            theme.colorScheme.primary.withValues(alpha: 0.18),
+            theme.colorScheme.secondary.withValues(alpha: 0.14),
+          ],
+        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+      ),
+      child: Row(
+        children: [
+          _stat(context, 'نوع کارت', faNum(stats.kinds)),
+          _divider(),
+          _stat(context, 'کل کارت‌ها', faNum(stats.total)),
+          _divider(),
+          _stat(context, 'ارزش', faNum(stats.points)),
+        ],
+      ),
+    );
+  }
+
+  Widget _divider() => Container(
+      width: 1, height: 26, color: Colors.white.withValues(alpha: 0.14));
+
+  Widget _stat(BuildContext c, String label, String value) {
+    final t = Theme.of(c);
+    return Expanded(
+      child: Column(
+        children: [
+          Text(value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: t.textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w900)),
+          Text(label,
+              style: t.textTheme.labelSmall
+                  ?.copyWith(color: t.colorScheme.onSurfaceVariant)),
+        ],
+      ),
+    );
+  }
+}
+
+/// کاشیِ کارت در گرید.
+///
+/// نسبت به `FootballCard` قدیمی عرضِ ثابت ندارد (گرید تعیین می‌کند) و
+/// نشانِ «جدید» و تعداد را روی خودِ تصویر می‌گذارد تا فضای متنیِ زیر کارت
+/// کمتر شود — با ۵۰ کارت، هر پیکسل مهم است.
+class InventoryTile extends StatelessWidget {
+  const InventoryTile({super.key, required this.item});
+  final Map<String, dynamic> item;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final img = fullAssetUrl(item['image_url']);
+    final qty = _asInt(item['quantity']);
+    final fresh = isNewCard(item);
+
+    return GestureDetector(
+      onTap: () => showCardDetail(context, item),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: Corners.rXl,
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFFFD36B), Color(0xFF0B2B4F), Color(0xFF00D49A)],
+          ),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.25),
+                blurRadius: 14,
+                offset: const Offset(0, 6)),
+          ],
+        ),
+        padding: const EdgeInsets.all(Gaps.xs),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: ClipRRect(
+                      borderRadius: Corners.rMd,
+                      child: ColoredBox(
+                        color: Colors.black.withValues(alpha: 0.14),
+                        child: img.isEmpty
+                            ? const Center(
+                                child:
+                                    Text('⚽', style: TextStyle(fontSize: 34)))
+                            : Image.network(
+                                img,
+                                fit: BoxFit.contain,
+                                // کش را به اندازهٔ نمایش محدود می‌کنیم.
+                                // بدون این، ۵۰ تصویرِ تمام‌اندازه در حافظه
+                                // می‌نشیند و روی گوشیِ ضعیف اپ کشته می‌شود.
+                                cacheWidth: 320,
+                                loadingBuilder: (_, child, p) => p == null
+                                    ? child
+                                    : const Center(
+                                        child: SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(
+                                                strokeWidth: 2))),
+                                errorBuilder: (_, __, ___) => const Center(
+                                    child: Text('⚽',
+                                        style: TextStyle(fontSize: 34))),
+                              ),
+                      ),
+                    ),
+                  ),
+                  if (fresh)
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: _Chip(
+                        text: 'جدید',
+                        bg: theme.colorScheme.primary,
+                        fg: theme.colorScheme.onPrimary,
+                      ),
+                    ),
+                  // تعداد فقط وقتی نشان داده می‌شود که بیش از یکی باشد؛
+                  // «×۱» روی هر کارت فقط نویز است.
+                  if (qty > 1)
+                    Positioned(
+                      bottom: 4,
+                      left: 4,
+                      child: _Chip(
+                        text: '×${faNum(qty)}',
+                        bg: Colors.black.withValues(alpha: 0.62),
+                        fg: Colors.white,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '${item['name'] ?? 'کارت'}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13.5),
+            ),
+            const SizedBox(height: 3),
+            // پسِ‌زمینهٔ تیره پشتِ امتیاز: متن روی نقطهٔ روشنِ گرادیان
+            // می‌افتد و بدون آن کنتراست به ۲ هم نمی‌رسد.
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.42),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '${faNum(_asInt(item['point_value']))} امتیاز',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Chip extends StatelessWidget {
+  const _Chip({required this.text, required this.bg, required this.fg});
+  final String text;
+  final Color bg;
+  final Color fg;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+        decoration: BoxDecoration(
+            color: bg, borderRadius: BorderRadius.circular(999)),
+        child: Text(text,
+            style: TextStyle(
+                color: fg, fontSize: 10.5, fontWeight: FontWeight.w900)),
+      );
+}

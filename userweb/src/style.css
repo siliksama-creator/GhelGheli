@@ -2818,3 +2818,70 @@ a:focus-visible {
 }
 .pcResult.locked span,
 .pcResult.err span { font-weight: 600; opacity: .95; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   کلکسیون کارت‌ها — آمار، جست‌وجو و ترتیب
+   ══════════════════════════════════════════════════════════════════════════
+
+   کاربر ممکن است ~۵۰ نوع کارت داشته باشد. گرید از قبل بود، ولی بدون
+   ترتیب و جست‌وجو عملاً غیرقابل‌مرور بود و کارتی که همین حالا ثبت شده
+   وسطِ لیستِ الفبایی گم می‌شد. */
+.invStats {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  border-radius: 18px;
+  background: linear-gradient(120deg, #b5ef5820, #1c78ff18);
+  border: 1px solid var(--veil-4);
+}
+.invStats > div {
+  flex: 1;
+  text-align: center;
+  /* min-width:0 لازم است وگرنه عددِ بلند (ارزشِ کلکسیون) ستون را پهن
+     می‌کند و سه‌تایی به‌هم می‌ریزد. */
+  min-width: 0;
+}
+.invStats b {
+  display: block;
+  font-size: 17px;
+  font-weight: 900;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.invStats span { font-size: 11px; color: var(--text-muted); }
+
+.invSearch { margin: 0 0 10px; }
+
+.invSorts { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.invSorts button {
+  padding: 6px 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+  border-radius: 999px;
+  background: var(--veil-3);
+  color: var(--text-soft);
+  border: 1px solid var(--veil-4);
+}
+.invSorts button.on {
+  background: var(--brand-ink);
+  color: #10210a;
+  border-color: transparent;
+}
+
+/* نشان‌ها روی خودِ تصویر می‌نشینند تا فضای متنیِ زیر کارت کمتر شود —
+   با ۵۰ کارت هر پیکسل مهم است. */
+.invCard .invArt { position: relative; }
+.invNew, .invQty {
+  position: absolute;
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 900;
+  padding: 2px 7px;
+  border-radius: 999px;
+  line-height: 1.6;
+}
+.invNew { top: 5px; inset-inline-end: 5px; background: #b5ef58; color: #10210a; }
+.invQty { bottom: 5px; inset-inline-start: 5px; background: #000000a0; color: #fff; }

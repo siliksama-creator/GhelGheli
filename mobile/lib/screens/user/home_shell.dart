@@ -8,6 +8,7 @@ import '../../widgets/notification_bell.dart';
 import '../../widgets/scroll_hint.dart';
 import 'social_page.dart';
 import 'dashboard_page.dart';
+import 'inventory_page.dart';
 import 'league_page.dart';
 import 'profile_page.dart';
 import 'rewards_page.dart';
@@ -68,6 +69,14 @@ class _HomeShellState extends State<HomeShell>
   /// عددی که فقط بالا می‌رود بعد از یک هفته بی‌معنی است.
   int _passTiersToday = 0;
 
+  /// کارت‌های کلکسیون.
+  ///
+  /// از همان پاسخِ `/api/bootstrap` که `_loadProfile` می‌گیرد پر می‌شود،
+  /// پس صفحهٔ کلکسیون هیچ درخواستِ اضافه‌ای نمی‌زند. با ۵۰ کارت، یک
+  /// درخواستِ اضافه یعنی نیم ثانیه انتظارِ بی‌دلیل هر بار که تب باز
+  /// می‌شود.
+  List<Map<String, dynamic>> _inventory = const [];
+
   // A subtle one-shot "welcome" entrance the moment the user lands on the
   // home shell after logging in — fades and lifts the whole shell into
   // place instead of just snapping onto the screen, so the first thing a
@@ -91,6 +100,7 @@ class _HomeShellState extends State<HomeShell>
       onOpenWallet: () => setState(() => _index = _walletIndex),
       onOpenWheel: () => setState(() => _index = wheelIndex),
       onOpenReferral: () => setState(() => _index = referralIndex),
+      onOpenInventory: () => setState(() => _index = inventoryIndex),
     ),
     RewardsPage(api: widget.api),
     WalletPage(api: widget.api, reloadProfile: _loadProfile),
@@ -123,6 +133,15 @@ class _HomeShellState extends State<HomeShell>
       onOpenShop: () => setState(() => _index = shopIndex),
       onChanged: _loadProfile,
     ),
+    // ── چرا در **انتهای** لیست ──
+    // ایندکس‌های این آرایه در چند جای دیگر ثابت‌اند (wheelIndex=7،
+    // shopIndex=9 و …) و شیتِ «بیشتر» هم با همین شماره‌ها کار می‌کند.
+    // درج در وسط یعنی جابه‌جا شدنِ همهٔ آن‌ها و — همان‌طور که
+    // navigation_test قبلاً گرفت — RangeError و کرشِ کاملِ اپ.
+    InventoryPage(
+      items: _inventory,
+      onRefresh: _loadProfile,
+    ),
   ];
 
   /// شمارهٔ صفحهٔ گردونه — از آیکون نوار بالا مستقیم به آن پرش می‌شود.
@@ -145,6 +164,9 @@ class _HomeShellState extends State<HomeShell>
   /// شمارهٔ صفحهٔ گذر نبرد.
   static const passIndex = 10;
 
+  /// شمارهٔ صفحهٔ کلکسیون کارت‌ها.
+  static const inventoryIndex = 11;
+
   // UI FIX: seven destinations squeezed into one bar made every icon and
   // label tiny (and the Persian labels were truncating). Material's own
   // guidance caps a navigation bar at five.
@@ -160,7 +182,8 @@ class _HomeShellState extends State<HomeShell>
   // کارت را رد می‌کرد یا اسکرول می‌کرد، دیگر هیچ راهی به صفحهٔ دعوت
   // نداشت — یعنی سیستمِ رشدِ اپ عملاً پنهان بود. کیف پول (۲)، پشتیبانی
   // (۵) و پروفایل (۶) از قبل اینجا بودند.
-  static const _moreIndexes = [2, referralIndex, passIndex, 5, 6];
+  static const _moreIndexes = [
+    inventoryIndex, 2, referralIndex, passIndex, 5, 6];
 
   /// شمارهٔ صفحهٔ کیف پول — از هدر داشبورد مستقیم به آن پرش می‌شود.
   static const _walletIndex = 2;
@@ -214,6 +237,10 @@ class _HomeShellState extends State<HomeShell>
         icon: Icon(Icons.military_tech_outlined),
         selectedIcon: Icon(Icons.military_tech_rounded),
         label: 'گذر نبرد'),
+    NavigationDestination(
+        icon: Icon(Icons.style_outlined),
+        selectedIcon: Icon(Icons.style_rounded),
+        label: 'کلکسیون'),
   ];
 
   @override
@@ -248,6 +275,13 @@ class _HomeShellState extends State<HomeShell>
         if (w is Map) {
           _spins = (w['spinsLeft'] as num?)?.toInt() ?? _spins;
           _unlimitedSpins = w['unlimited'] == true;
+        }
+        final inv = m['inventory'];
+        if (inv is List) {
+          _inventory = inv
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
         }
         final p = m['pass'];
         if (p is Map) {
@@ -288,7 +322,8 @@ class _HomeShellState extends State<HomeShell>
     'گردونهٔ شانس',
     'دعوت دوستان',
     'فروشگاه',
-    'گذر نبرد'
+    'گذر نبرد',
+    'کلکسیون کارت‌ها',
   ];
 
   /// متن قرصِ راهنمای اسکرول، برای هر صفحه.
