@@ -16,7 +16,7 @@ class TapGameConfig {
     this.totalPoints = 50000,
     this.growthFactor = 1.05,
     this.skins = defaultSkins,
-    this.levelsPerSkin = 10,
+    this.levelsPerSkin = 5,
     this.levelsPerDay = 2,
     this.maxTapsPerSecond = 12,
     this.burstWindow = const Duration(seconds: 1),
@@ -60,7 +60,11 @@ class TapGameConfig {
   /// `levelCount / levelsPerSkin` — the lookup clamps.
   final List<String> skins;
 
-  /// A new skin unlocks every N levels (10 => levels 1-10, 11-20, ...).
+  /// هر N لول یک ظاهرِ جدید (۵ ⇒ لول ۱-۴ ظاهر اول، لول ۵ ظاهر دوم، …).
+  ///
+  /// از ۱۰ به ۵ کم شد: با ۵۰ لول و ۱۰ ظاهر، کاربر ده بار پاداشِ دیداری
+  /// می‌گیرد به‌جای پنج بار. تغییرِ ظاهر تنها بازخوردِ بلندمدتِ این بازی
+  /// است و دو برابر شدنش مستقیماً یعنی دو برابر انگیزهٔ ادامه دادن.
   final int levelsPerSkin;
 
   // ── anti-cheat (client side) ─────────────────────────────────────────────
@@ -86,12 +90,43 @@ class TapGameConfig {
   /// Safety valve — flush early if this many taps pile up before the timer.
   final int maxBatchTaps;
 
+  /// ده مرحلهٔ ظاهریِ کاراکتر — قوسِ «از فقر تا ثروت».
+  ///
+  /// ═══════════════════════════════════════════════════════════════════════
+  /// چرا ترتیب دقیقاً همین است
+  /// ═══════════════════════════════════════════════════════════════════════
+  ///
+  /// خواستهٔ مالک: «کاراکتر اول فقیر باشه بعد کم کم کلاس کاری و لباساش
+  /// بهتر شن»، و تغییر هر ۵ لول به‌جای هر ۱۰ لول.
+  ///
+  /// هر پله باید از پلهٔ قبلی **در یک نگاه** ثروتمندتر دیده شود، وگرنه
+  /// حسِ پیشرفت از بین می‌رود. ترتیب بر پایهٔ سه نشانه چیده شده: جنسِ
+  /// لباس، تمیزی/کهنگی، و مقدارِ طلا.
+  ///
+  ///   ۱  پیژامهٔ کهنه و دمپایی      → بی‌کار
+  ///   ۲  اورکالِ کارگری و کلاه ایمنی → اولین کار
+  ///   ۳  ژاکتِ کهنه و شلوار چهارخانه → کارگرِ ثابت
+  ///   ۴  هودی و جین و کتانی          → درآمدِ منظم
+  ///   ۵  پیراهن و جلیقه              → کارمند
+  ///   ۶  ورزشکارِ حرفه‌ای            → سرمایه‌گذاری روی خود
+  ///   ۷  بمبرِ برند و ساعتِ طلا       → کاسبِ موفق
+  ///   ۸  کتِ مخملیِ زرشکی            → تاجر
+  ///   ۹  کت‌وشلوارِ مشکیِ رسمی        → رئیس
+  ///   ۱۰ تاکسیدوی طلایی و جواهر      → میلیاردر
+  ///
+  /// ⚠️ اگر روزی این فهرست کوتاه‌تر شد، `skinIndexForLevel` خودش clamp
+  ///    می‌کند و کرش نمی‌دهد — ولی چند لولِ آخر ظاهرِ تکراری می‌گیرند.
   static const List<String> defaultSkins = [
     'assets/games/tap/skin_1.webp',
     'assets/games/tap/skin_2.webp',
     'assets/games/tap/skin_3.webp',
     'assets/games/tap/skin_4.webp',
     'assets/games/tap/skin_5.webp',
+    'assets/games/tap/skin_6.webp',
+    'assets/games/tap/skin_7.webp',
+    'assets/games/tap/skin_8.webp',
+    'assets/games/tap/skin_9.webp',
+    'assets/games/tap/skin_10.webp',
   ];
 
   /// Taps needed to clear [level] (1-based).
@@ -190,8 +225,8 @@ class TapGameConfig {
     return sum + inside;
   }
 
-  /// Artwork for [level], clamped to the available skins so level 50 with
-  /// 5 skins still resolves.
+  /// Artwork for [level], clamped to the available skins so a level beyond
+  /// the last skin still resolves instead of throwing.
   String skinForLevel(int level) {
     if (skins.isEmpty) return '';
     return skins[skinIndexForLevel(level)];
@@ -199,10 +234,10 @@ class TapGameConfig {
 
   /// 0-based skin index for [level].
   ///
-  /// The character changes **on arrival at** level 10, 20, 30, 40 — so
-  /// levels 1-9 use skin 1, level 10 is already skin 2, and so on. An
+  /// The character changes **on arrival at** level 5, 10, 15, … — so
+  /// levels 1-4 use skin 1, level 5 is already skin 2, and so on. An
   /// earlier version divided `(level - 1)`, which pushed every change one
-  /// level late (skin 2 only appeared at level 11).
+  /// level late (skin 2 only appeared at level 6).
   int skinIndexForLevel(int level) {
     if (skins.isEmpty) return 0;
     if (level < levelsPerSkin) return 0;

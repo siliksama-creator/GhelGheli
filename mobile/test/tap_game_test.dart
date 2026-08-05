@@ -67,74 +67,97 @@ void main() {
   });
 
   group('skins', () {
-    test('the character changes ON level 10, 20, 30, 40', () {
-      // Levels 1-9 are the first character; arriving AT level 10 already
-      // shows the second. A previous version changed one level late.
-      for (var lv = 1; lv <= 9; lv++) {
-        expect(config.skinForLevel(lv), config.skins[0], reason: 'level $lv');
-      }
-      for (var lv = 10; lv <= 19; lv++) {
-        expect(config.skinForLevel(lv), config.skins[1], reason: 'level $lv');
-      }
-      for (var lv = 20; lv <= 29; lv++) {
-        expect(config.skinForLevel(lv), config.skins[2], reason: 'level $lv');
-      }
-      for (var lv = 30; lv <= 39; lv++) {
-        expect(config.skinForLevel(lv), config.skins[3], reason: 'level $lv');
-      }
-      for (var lv = 40; lv <= 50; lv++) {
-        expect(config.skinForLevel(lv), config.skins[4], reason: 'level $lv');
+    // ⚠️ این تست‌ها عمداً هیچ عددی را هاردکد نمی‌کنند.
+    //
+    // نسخهٔ قبلی «۱۰»، «۴ تغییر» و «۵ اسکین» را مستقیم نوشته بود. وقتی
+    // مالک خواست ظاهر هر ۵ لول عوض شود (و ۱۰ ظاهر شد)، پنج تست شکستند
+    // بدون اینکه هیچ باگی وجود داشته باشد — یعنی تست‌ها داشتند یک
+    // **تصمیمِ محصول** را قفل می‌کردند، نه یک **قاعده** را.
+    //
+    // حالا هر ادعا از `config.levelsPerSkin` و `config.skins.length`
+    // مشتق می‌شود. اگر فردا هر ۳ لول شد، همین‌ها بدون تغییر سبز می‌مانند
+    // و فقط اگر منطق واقعاً بشکند قرمز می‌شوند.
+
+    test('ظاهر دقیقاً روی مضرب‌های levelsPerSkin عوض می‌شود', () {
+      final n = config.levelsPerSkin;
+      for (var lv = 1; lv <= config.levelCount; lv++) {
+        final expected =
+            (lv ~/ n).clamp(0, config.skins.length - 1);
+        expect(config.skinIndexForLevel(lv), expected, reason: 'لول $lv');
       }
     });
 
-    test('exactly four changes across the whole game', () {
+    test('لول‌های قبل از اولین مرز، ظاهر اول را دارند', () {
+      for (var lv = 1; lv < config.levelsPerSkin; lv++) {
+        expect(config.skinForLevel(lv), config.skins[0], reason: 'لول $lv');
+      }
+      // و دقیقاً روی مرز عوض می‌شود، نه یکی دیرتر.
+      expect(config.skinForLevel(config.levelsPerSkin), config.skins[1]);
+    });
+
+    test('تعداد تغییرها با تعداد ظاهرهای قابل‌دسترس می‌خواند', () {
       var changes = 0;
       for (var lv = 2; lv <= config.levelCount; lv++) {
         if (config.skinIndexForLevel(lv) != config.skinIndexForLevel(lv - 1)) {
           changes++;
           expect(lv % config.levelsPerSkin, 0,
-              reason: 'a change must land on a multiple of 10, got $lv');
+              reason: 'تغییر باید روی مضربِ ${config.levelsPerSkin} بیفتد، '
+                  'ولی روی $lv افتاد');
         }
       }
-      expect(changes, 4);
+      final reachable =
+          (config.levelCount ~/ config.levelsPerSkin) + 1;
+      final expected =
+          (reachable > config.skins.length ? config.skins.length : reachable) - 1;
+      expect(changes, expected);
     });
 
-    test('the skin index never goes backwards', () {
+    test('اندیس ظاهر هرگز عقب نمی‌رود', () {
       for (var lv = 2; lv <= config.levelCount; lv++) {
         expect(config.skinIndexForLevel(lv),
             greaterThanOrEqualTo(config.skinIndexForLevel(lv - 1)));
       }
     });
 
-    test('all five skins are reachable within 50 levels', () {
+    test('همهٔ ظاهرها در طول بازی دیده می‌شوند', () {
+      // اگر ظاهری هرگز دیده نشود یعنی داراییِ مرده در اپ داریم: حجمِ
+      // APK را بالا می‌برد و هیچ‌کس نمی‌بیندش.
       final seen = <String>{};
-      for (var lv = 1; lv <= 50; lv++) {
+      for (var lv = 1; lv <= config.levelCount; lv++) {
         seen.add(config.skinForLevel(lv));
       }
-      expect(seen.length, 5);
+      expect(seen.length, config.skins.length,
+          reason: 'با ${config.levelCount} لول و هر ${config.levelsPerSkin} '
+              'لول یک ظاهر، همهٔ ${config.skins.length} ظاهر باید برسند');
     });
 
-    test('a level beyond the last skin clamps instead of crashing', () {
+    test('همهٔ فایل‌های ظاهر مسیرِ یکتا دارند', () {
+      // کپیِ تصادفیِ یک مسیر یعنی کاربر دو بار پشت سر هم همان لباس را
+      // می‌بیند و فکر می‌کند ارتقا نگرفته.
+      expect(config.skins.toSet().length, config.skins.length);
+    });
+
+    test('لولِ بیرون از بازه clamp می‌شود و کرش نمی‌دهد', () {
       expect(config.skinForLevel(999), config.skins.last);
       expect(config.skinForLevel(0), config.skins.first);
       expect(config.skinForLevel(-5), config.skins.first);
-      // Level 51 (the "finished" sentinel) must still resolve to artwork.
       expect(config.skinForLevel(config.levelCount + 1), config.skins.last);
     });
 
-    test('skin count can change without breaking the lookup', () {
+    test('تعداد ظاهر می‌تواند عوض شود بدون شکستنِ جست‌وجو', () {
       final three = config.copyWith(skins: const ['a', 'b', 'c']);
+      final n = three.levelsPerSkin;
       expect(three.skinForLevel(1), 'a');
-      expect(three.skinForLevel(10), 'b');
-      expect(three.skinForLevel(20), 'c');
-      expect(three.skinForLevel(50), 'c'); // clamped
+      expect(three.skinForLevel(n), 'b');
+      expect(three.skinForLevel(n * 2), 'c');
+      expect(three.skinForLevel(config.levelCount), 'c'); // clamp
     });
 
-    test('levelsPerSkin is tunable', () {
-      final every5 = config.copyWith(levelsPerSkin: 5);
-      expect(every5.skinIndexForLevel(4), 0);
-      expect(every5.skinIndexForLevel(5), 1);
-      expect(every5.skinIndexForLevel(10), 2);
+    test('levelsPerSkin قابل تنظیم است', () {
+      final every3 = config.copyWith(levelsPerSkin: 3);
+      expect(every3.skinIndexForLevel(2), 0);
+      expect(every3.skinIndexForLevel(3), 1);
+      expect(every3.skinIndexForLevel(6), 2);
     });
   });
 
@@ -355,8 +378,9 @@ void main() {
 
     test('levelsUntilNextSkin counts down to the boundary', () async {
       final engine = await freshEngine();
-      // Level 1 with the next change AT level 10 => 9 levels to go.
-      expect(engine.levelsUntilNextSkin, 9);
+      // از لول ۱ تا اولین مرز. عدد از config مشتق می‌شود نه هاردکد،
+      // وگرنه هر بار که levelsPerSkin عوض شود این تست بی‌دلیل می‌شکند.
+      expect(engine.levelsUntilNextSkin, config.levelsPerSkin - 1);
       engine.dispose();
     });
 
@@ -405,25 +429,30 @@ void main() {
     });
 
     test('level-up carry-over is exact across a skin boundary', () async {
-      // Level 9 -> 10 is both a level-up AND a character change, the busiest
-      // moment in the game: it forces an extra flush while state is moving.
-      SharedPreferences.setMockInitialValues({
-        'boundary': '{"level":9,"taps":0,"totalTaps":0}',
-      });
-      // levelsPerDay بالا: این تست مرز شخصیت را می‌سنجد، نه سقف روزانه.
+      // مرزِ اولین تغییرِ شخصیت هم‌زمان یک level-up است — شلوغ‌ترین لحظهٔ
+      // بازی: وسطِ جابه‌جاییِ state یک flush اضافه هم اجرا می‌شود.
+      //
+      // ⚠️ عددِ مرز از خودِ config مشتق می‌شود. نسخهٔ قبلی «۹ → ۱۰» را
+      //    هاردکد کرده بود و وقتی levelsPerSkin از ۱۰ به ۵ رسید شکست،
+      //    بدون اینکه هیچ باگی وجود داشته باشد.
       const cfg = TapGameConfig(
           growthFactor: 1.0, totalPoints: 50, levelsPerDay: 99);
+      final boundary = cfg.levelsPerSkin;      // اولین لولی که ظاهر عوض می‌شود
+      final before = boundary - 1;
+      SharedPreferences.setMockInitialValues({
+        'boundary': '{"level":$before,"taps":0,"totalTaps":0}',
+      });
       final engine = TapEngine(config: cfg, storage: TapStorage(key: 'boundary'));
       await engine.init();
-      expect(cfg.skinIndexForLevel(9), 0);
+      expect(cfg.skinIndexForLevel(before), 0);
 
       // هر لول ۱ امتیاز (۵۰ امتیاز ÷ ۵۰ لول)، پس یک ضربه یک لول.
       engine.tap();
       await Future<void>.delayed(const Duration(milliseconds: 60));
 
-      expect(engine.level, 10);
+      expect(engine.level, boundary);
       expect(engine.taps, 0);
-      // The character must have changed exactly here.
+      // شخصیت باید دقیقاً همین‌جا عوض شده باشد.
       expect(cfg.skinIndexForLevel(engine.level), 1);
       expect(engine.skin, cfg.skins[1]);
       engine.dispose();
