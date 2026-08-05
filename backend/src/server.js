@@ -327,8 +327,37 @@ async function assertNoBadWords(text) {
   }
 }
 
-const cardRedeemLimiter = rateLimit({ windowMs: 60_000, limit: 12, standardHeaders: true, legacyHeaders: false, message: { message: 'تعداد تلاش زیاد است؛ کمی بعد دوباره امتحان کنید' } });
-const chatLimiter = rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false });
+// ═══════════════════════════════════════════════════════════════════════════
+// کلیدِ محدودکنندهٔ نرخ برای مسیرهای «بعد از ورود»
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// چرا این تابع وجود دارد و چرا اینجا (بالای همهٔ limiterها) تعریف شده:
+//
+// پیش‌فرضِ express-rate-limit کلید را از `req.ip` می‌سازد. برای مسیرهای
+// عمومی (ورود، OTP) درست است — آنجا هنوز نمی‌دانیم کاربر کیست.
+//
+// ولی برای مسیری که **پشتِ `auth` است** فاجعه است. در ایران بخش بزرگی از
+// ترافیک موبایل پشت CGNAT است: صدها مشترکِ همراه‌اول از یک IP بیرون
+// می‌آیند. یک IP یعنی یک سطل. پس:
+//
+//   • یک نفر که ۲۰ بار کارت ثبت می‌کند، سهمیهٔ صدها نفرِ دیگر را می‌سوزاند.
+//   • همان نفر اگر بخواهد سوءاستفاده کند، با عوض کردن IP (روشن/خاموش کردن
+//     دیتا) سطلِ تازه می‌گیرد — یعنی محدودیت او را نمی‌گیرد ولی
+//     بی‌گناه‌ها را می‌گیرد. دقیقاً برعکسِ هدف.
+//
+// این باگ در تستِ واقعی دیده شد: سناریوی «۴ درخواست هم‌زمان» هر بار
+// ۴۲۹ می‌گرفت و اصلاً به منطقِ برنامه نمی‌رسید، چون سطلِ IP از تست‌های
+// قبلی پر مانده بود.
+//
+// `req.user?.id || req.ip` : اگر به هر دلیلی احراز هویت انجام نشده باشد
+// (مثلاً limiter اشتباهاً قبل از `auth` سوار شود) به رفتار قبلی برمی‌گردیم
+// نه به «بدون محدودیت».
+const perUserKey = (req) => req.user?.id || req.ip;
+
+// همهٔ limiterهای زیر روی مسیرهای احراز هویت‌شده‌اند، پس همه `perUserKey`
+// می‌گیرند. (فهرست کامل در تستِ testRateLimit.js نگهبانی می‌شود.)
+const cardRedeemLimiter = rateLimit({ windowMs: 60_000, limit: 12, standardHeaders: true, legacyHeaders: false, keyGenerator: perUserKey, message: { message: 'تعداد تلاش زیاد است؛ کمی بعد دوباره امتحان کنید' } });
+const chatLimiter = rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false, keyGenerator: perUserKey });
 const otpLimiter = rateLimit({ windowMs: 10 * 60_000, limit: 5, standardHeaders: true, legacyHeaders: false });
 // Brute-force protection for the 6-digit OTP code itself. request-otp only
 // throttled how many codes could be requested — verify-otp and the password
@@ -1047,7 +1076,31 @@ app.patch('/api/profile', auth, asyncHandler(async (req, res) => {
 // SMS OTP isn't available yet, a logged-in user still needs *some* safe way
 // to change their password — this requires proof of the current password,
 // unlike the old register-password bug.
-app.post('/api/profile/change-password', auth, userLoginLimiter, asyncHandler(async (req, res) => {
+// ── چرا این مسیر limiterِ خودش را دارد ──
+//
+// قبلاً `userLoginLimiter` را قرض می‌گرفت. آن limiter کلیدش
+// `${req.ip}:${normalizeMobile(req.body?.mobile)}` است — منطقی برای
+// مسیرِ ورود، چون آنجا `mobile` در بدنه هست.
+//
+// ولی بدنهٔ «تغییر رمز» اصلاً فیلدِ `mobile` ندارد. پس
+// `normalizeMobile(undefined)` رشتهٔ خالی می‌داد و کلید عملاً می‌شد
+// «فقط IP». نتیجه: با CGNAT اپراتورهای موبایل، **همهٔ** کاربرانِ پشتِ
+// یک IP در یک سطلِ ۲۰تایی به ازای ۱۵ دقیقه شریک می‌شدند. بیست نفر که
+// رمزشان را عوض می‌کردند، نفرِ بیست‌ویکم پیامِ «تعداد تلاش ورود زیاد
+// است» می‌گرفت — پیامی که هیچ ربطی به کاری که کرده نداشت.
+//
+// اینجا کاربر قطعاً وارد شده و شناسه داریم، پس کلید روی خودش می‌رود.
+// سقف پایین‌تر (۱۰) چون تغییر رمزِ مکرر رفتار عادی نیست و این مسیر
+// `bcrypt.compare` دارد که عمداً کند است (~۱۰۰ms CPU).
+const changePasswordLimiter = rateLimit({
+  windowMs: 15 * 60_000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: perUserKey,
+  message: { message: 'تعداد تلاش‌ها زیاد است؛ چند دقیقه دیگر دوباره امتحان کنید' },
+});
+app.post('/api/profile/change-password', auth, changePasswordLimiter, asyncHandler(async (req, res) => {
   const { currentPassword, newPassword } = req.body;
   if (!isValidPasswordLength(newPassword)) return res.status(400).json({ message: 'رمز جدید باید بین ۶ تا ۷۲ کاراکتر باشد' });
   if (!req.user.password_hash || !currentPassword || !(await bcrypt.compare(String(currentPassword), req.user.password_hash))) {
@@ -1261,15 +1314,9 @@ app.get('/api/rewards/claims/me', auth, asyncHandler(async (req, res) => {
 // own throttle on top of the global one: a script hammering this endpoint
 // would otherwise be able to probe balance/state transitions rapidly.
 //
-// CGNAT FIX: هر دو محدودکننده با شناسهٔ **کاربر** کلید می‌خورند، نه IP.
-// اپراتورهای موبایل ایران گستردهٔ CGNAT استفاده می‌کنند: صدها کاربر واقعی
-// از یک IP عمومی بیرون می‌روند. با کلید IP، یک کاربر که چند بار کارتش را
-// تصحیح می‌کند سهمیهٔ همهٔ کاربران آن اپراتور را می‌سوزاند و بقیه پیام
-// «تعداد تلاش زیاد» می‌گیرند بدون اینکه کاری کرده باشند.
-// هر دو مسیر پشت `auth` هستند، پس req.user همیشه موجود است؛ IP فقط
-// به‌عنوان جایگزین اضطراری می‌ماند.
-const perUserKey = (req) => req.user?.id || req.ip;
-
+// CGNAT: `perUserKey` بالای فایل (کنار بقیهٔ limiterها) تعریف شده و حالا
+// **همهٔ** مسیرهای احراز هویت‌شده از آن استفاده می‌کنند، نه فقط این دو.
+// تعریفِ دومی که قبلاً اینجا بود حذف شد.
 const withdrawalLimiter = rateLimit({
   windowMs: 60_000,
   limit: 10,
@@ -1375,6 +1422,7 @@ const wheelLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: perUserKey, // CGNAT — توضیح کامل کنار تعریفِ perUserKey
   message: { message: 'تعداد درخواست‌ها زیاد است، کمی صبر کن' },
 });
 
@@ -1701,6 +1749,7 @@ const uploadLimiter = rateLimit({
   limit: 40,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: perUserKey, // CGNAT — توضیح کامل کنار تعریفِ perUserKey
   message: { message: 'تعداد آپلود زیاد است؛ کمی بعد دوباره تلاش کنید' },
 });
 

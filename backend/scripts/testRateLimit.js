@@ -1,0 +1,140 @@
+/**
+ * نگهبانِ کلیدِ محدودکنندهٔ نرخ.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * این تست برای چه باگی نوشته شد
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * `express-rate-limit` وقتی `keyGenerator` ندهی، کلید را از `req.ip`
+ * می‌سازد. برای مسیرهای عمومی (ورود، درخواست OTP) درست است — آنجا هنوز
+ * نمی‌دانیم کاربر کیست و IP تنها چیزی است که داریم.
+ *
+ * ولی برای مسیری که **پشتِ `auth`** است، کلیدِ IP یک باگِ تمام‌عیار است:
+ *
+ *   ۱. اپراتورهای موبایل ایران CGNAT دارند. صدها مشترکِ واقعی از یک IP
+ *      عمومی بیرون می‌روند. یک IP یعنی یک سطل. پس اولین کاربری که
+ *      سهمیه‌اش را تمام می‌کند، بقیه را هم قفل می‌کند — بدون اینکه آن‌ها
+ *      حتی یک درخواست فرستاده باشند.
+ *
+ *   ۲. کسی که واقعاً می‌خواهد سوءاستفاده کند، با خاموش/روشن کردنِ دیتای
+ *      موبایل IP تازه می‌گیرد و سطلش خالی می‌شود. یعنی محدودیت **او** را
+ *      نمی‌گیرد و فقط کاربرِ درستکار را می‌گیرد. دقیقاً برعکسِ هدف.
+ *
+ * این باگ روی `submitLimiter` («ثبت کارت با عکس») واقعاً اتفاق افتاد و
+ * حتی تست‌های سرتاسری را کور کرده بود: هر اجرا ۴۲۹ می‌گرفت و هرگز به
+ * منطقی که قرار بود آزمایش شود نمی‌رسید.
+ *
+ * چرا تستِ ایستا (خواندنِ سورس) و نه تستِ رفتاری:
+ * ساختنِ ۲۰ درخواستِ واقعی از دو IP جعلی برای هر limiter، هم کند است و
+ * هم شکننده. چیزی که واقعاً می‌خواهیم تضمین کنیم یک قاعدهٔ ساختاری است:
+ * «هر limiter که روی مسیرِ auth-شده سوار می‌شود باید keyGenerator داشته
+ * باشد». این را می‌شود مستقیم و قطعی از سورس خواند.
+ */
+const fs = require('fs');
+const path = require('path');
+
+let pass = 0; let fail = 0;
+const ok = (name, cond, detail = '') => {
+  if (cond) { pass += 1; console.log('  ✓', name); } else { fail += 1; console.log('  ✗', name, detail ? `→ ${detail}` : ''); }
+};
+
+const SRC = path.join(__dirname, '..', 'src');
+const serverSrc = fs.readFileSync(path.join(SRC, 'server.js'), 'utf8');
+
+/** همهٔ فایل‌هایی که ممکن است limiter تعریف کنند. */
+const files = [['server.js', serverSrc]];
+const routesDir = path.join(SRC, 'routes');
+if (fs.existsSync(routesDir)) {
+  for (const f of fs.readdirSync(routesDir).filter(x => x.endsWith('.js'))) {
+    files.push([`routes/${f}`, fs.readFileSync(path.join(routesDir, f), 'utf8')]);
+  }
+}
+
+/**
+ * بدنهٔ `rateLimit({...})` را با شمردنِ آکولاد بیرون می‌کشد.
+ *
+ * چرا با شمارش و نه regex: بدنه خودش آکولادِ تودرتو دارد
+ * (`message: { message: '...' }`) و یک regexِ حریص یا تنبل هر دو
+ * اشتباه می‌برند.
+ */
+function limiterBlocks(src) {
+  const out = [];
+  const re = /(?:const|let|var)\s+([A-Za-z0-9_]+)\s*=\s*rateLimit\(\s*\{/g;
+  let m;
+  while ((m = re.exec(src))) {
+    let i = re.lastIndex; let depth = 1;
+    while (i < src.length && depth > 0) {
+      if (src[i] === '{') depth += 1;
+      else if (src[i] === '}') depth -= 1;
+      i += 1;
+    }
+    out.push({ name: m[1], body: src.slice(re.lastIndex, i - 1) });
+  }
+  return out;
+}
+
+/**
+ * آیا این limiter روی مسیری سوار شده که میان‌افزارِ `auth` دارد؟
+ *
+ * ⚠️ تلهٔ اول که خودِ این تست در آن افتاد:
+ * مسیرِ `'/api/auth/request-otp'` رشتهٔ «auth» را **داخل خودش** دارد.
+ * نسخهٔ اولِ این تابع کلِ متنِ فراخوانی را با /\bauth\b/ می‌سنجید و
+ * نتیجه‌اش این بود که `otpLimiter` را «پشتِ auth» می‌دید و بابتِ نداشتنِ
+ * keyGenerator شکایت می‌کرد — در حالی که آن مسیر عمداً و درست روی IP است.
+ *
+ * پس اول همهٔ رشته‌های داخل فراخوانی حذف می‌شوند و بعد دنبالِ میان‌افزار
+ * می‌گردیم. یعنی فقط «auth» به‌عنوانِ **آرگومان** به حساب می‌آید، نه
+ * «auth» به‌عنوانِ بخشی از آدرس.
+ */
+function mountedBehindAuth(name, allSrc) {
+  const re = new RegExp(`\\.(?:get|post|patch|put|delete)\\([^)]*?\\b${name}\\b`, 'g');
+  let m; let found = false;
+  while ((m = re.exec(allSrc))) {
+    const withoutStrings = m[0].replace(/'[^']*'|"[^"]*"|`[^`]*`/g, "''");
+    if (/\bauth\b|\badminAuth\b/.test(withoutStrings)) found = true;
+  }
+  return found;
+}
+
+const allSrc = files.map(([, s]) => s).join('\n');
+
+console.log('\n══ هر limiter روی مسیرِ احراز هویت‌شده باید با کاربر کلید بخورد ══');
+
+let checked = 0;
+for (const [fname, src] of files) {
+  for (const { name, body } of limiterBlocks(src)) {
+    const hasKeyGen = /keyGenerator\s*:/.test(body);
+    const behindAuth = mountedBehindAuth(name, allSrc);
+    if (!behindAuth) continue;
+    checked += 1;
+    ok(`${fname} · ${name} کلیدِ کاربر دارد`, hasKeyGen,
+      'پشتِ auth است ولی keyGenerator ندارد → کلید روی IP می‌افتد و CGNAT کاربران بی‌گناه را قفل می‌کند');
+    if (hasKeyGen) {
+      const usesUser = /req\.user\?\.id|perUserKey|req\.user\.id/.test(body);
+      ok(`${fname} · ${name} کلیدش از req.user می‌آید`, usesUser,
+        'keyGenerator دارد ولی به شناسهٔ کاربر نگاه نمی‌کند');
+    }
+  }
+}
+ok('حداقل یک limiterِ احراز هویت‌شده پیدا شد', checked > 0,
+  'الگوی تشخیص شکسته — تست دارد بی‌صدا هیچ چیزی را بررسی نمی‌کند');
+
+console.log('\n══ limiterهای عمومی عمداً روی IP می‌مانند ══');
+// این‌ها **باید** روی IP یا IP+شناسه باشند: کاربر هنوز وارد نشده.
+for (const pub of ['otpLimiter', 'otpVerifyLimiter', 'adminLoginLimiter', 'userLoginLimiter']) {
+  const blk = limiterBlocks(serverSrc).find(b => b.name === pub);
+  ok(`${pub} تعریف شده`, !!blk);
+  if (blk && /keyGenerator\s*:/.test(blk.body)) {
+    ok(`${pub} هنوز IP را در کلید دارد`, /req\.ip/.test(blk.body),
+      'مسیرِ عمومی بدون IP در کلید یعنی مهاجم با شمارهٔ جعلیِ متفاوت بی‌نهایت تلاش می‌کند');
+  }
+}
+
+console.log('\n══ perUserKey فقط یک بار تعریف شده ══');
+// دو `const` هم‌نام در یک ماژول یعنی SyntaxError و سرور اصلاً بالا نمی‌آید.
+// این دقیقاً چیزی است که موقع رفعِ باگِ بالا نزدیک بود اتفاق بیفتد.
+const perUserDefs = (serverSrc.match(/^const perUserKey\s*=/gm) || []).length;
+ok('perUserKey دقیقاً یک تعریف دارد', perUserDefs === 1, `${perUserDefs} تعریف پیدا شد`);
+
+console.log(`\n${fail === 0 ? '✓' : '✗'} ${pass} تست موفق، ${fail} ناموفق`);
+process.exit(fail === 0 ? 0 : 1);

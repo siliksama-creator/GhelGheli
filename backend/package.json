@@ -9,14 +9,15 @@
     "migrate": "node scripts/migrate.js",
     "seed:admin": "node scripts/seedAdmin.js",
     "close:league": "node scripts/closeLeague.js",
-    "test": "node scripts/testGames.js && node scripts/testEngine.js && node scripts/testSolo.js && node scripts/testValidation.js && node scripts/testWallet.js && node scripts/testTapGame.js && node scripts/testClubs.js && node scripts/testMobileNormalize.js && node scripts/testPass.js && node scripts/testPenalty.js",
+    "test": "node scripts/testGames.js && node scripts/testEngine.js && node scripts/testSolo.js && node scripts/testValidation.js && node scripts/testWallet.js && node scripts/testTapGame.js && node scripts/testClubs.js && node scripts/testMobileNormalize.js && node scripts/testPass.js && node scripts/testPenalty.js && node scripts/testRateLimit.js",
     "test:tap": "node scripts/testTapGame.js",
     "test:games": "node scripts/testGames.js",
     "test:engine": "node scripts/testEngine.js",
     "test:wallet": "node scripts/testWallet.js",
     "test:mobile-normalize": "node scripts/testMobileNormalize.js",
     "test:pass": "node scripts/testPass.js",
-    "test:penalty": "node scripts/testPenalty.js"
+    "test:penalty": "node scripts/testPenalty.js",
+    "test:ratelimit": "node scripts/testRateLimit.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
