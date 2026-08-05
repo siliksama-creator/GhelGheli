@@ -1053,7 +1053,31 @@ app.get('/api/users/:id/public', auth, validateUuid('id'), asyncHandler(async (r
   const { rows } = await pool.query('SELECT id,nickname,profile_image_url,profile_avatar_key,lifetime_points,current_points,monthly_league_points,joined_at FROM users WHERE id=$1', [req.params.id]);
   if (!rows[0]) return res.status(404).json({ message: 'کاربر پیدا نشد' });
   const rewards = await pool.query(`SELECT c.claimed_at,c.status,r.name,r.image_url,r.reward_type,r.reward_value FROM user_reward_claims c JOIN reward_tiers r ON r.id=c.reward_tier_id WHERE c.user_id=$1 AND c.status IN ('approved','paid') ORDER BY c.claimed_at DESC LIMIT 50`, [req.params.id]);
-  const cards = await pool.query(`SELECT t.id AS card_type_id,t.name,t.image_url,t.point_value,count(c.id)::int AS registered_count,max(c.used_at) AS last_registered_at FROM card_codes c JOIN card_types t ON t.id=c.card_type_id WHERE c.used_by_user_id=$1 GROUP BY t.id,t.name,t.image_url,t.point_value ORDER BY registered_count DESC,t.name LIMIT 50`, [req.params.id]);
+  // ═══════════════════════════════════════════════════════════════════════
+  // کارت‌های عمومی: از **اینونتوری**، نه از جدولِ کدها
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // نسخهٔ قبلی فقط `card_codes` را می‌خواند — یعنی جدولِ سیستمِ قدیمی.
+  // نتیجه: کارتی که کاربر با **عکس** ثبت کرده بود در پروفایلِ عمومی
+  // اصلاً دیده نمی‌شد. کاربر کارت را در «کارت‌های من» می‌دید ولی
+  // حریفش در چت یا لیگ چیزی نمی‌دید — انگار کارتی نخریده.
+  //
+  // `user_card_inventory` منبعِ واحدِ حقیقت است: هر دو مسیرِ ثبت
+  // (کد تنها، و عکس+کد) در همان جدول می‌نویسند. پس این کوئری هر دو را
+  // با هم نشان می‌دهد و فردا اگر مسیرِ سومی اضافه شود، خودبه‌خود
+  // پوشش داده می‌شود.
+  //
+  // `consumed_in_reward=false`: کارتی که خرجِ جایزه شده دیگر در
+  // مجموعهٔ کاربر نیست.
+  const cards = await pool.query(
+    `SELECT t.id AS card_type_id, t.name, t.image_url, t.point_value,
+            i.quantity::int AS registered_count,
+            i.updated_at AS last_registered_at
+       FROM user_card_inventory i
+       JOIN card_types t ON t.id = i.card_type_id
+      WHERE i.user_id = $1 AND i.consumed_in_reward = false AND i.quantity > 0
+      ORDER BY i.quantity DESC, t.name
+      LIMIT 50`, [req.params.id]);
   const leaguePayouts = await pool.query(`SELECT p.rank,p.amount,p.payment_status,p.created_at,s.month_year FROM league_payouts p JOIN league_seasons s ON s.id=p.league_season_id WHERE p.user_id=$1 ORDER BY p.created_at DESC LIMIT 20`, [req.params.id]);
 
   // Everything a visitor should see when they tap someone in chat or the

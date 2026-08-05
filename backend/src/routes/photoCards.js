@@ -502,6 +502,172 @@ module.exports = function createPhotoCardRoutes(deps) {
     }),
   );
 
+  /**
+   * ویرایشِ یک کد.
+   *
+   * ═══════════════════════════════════════════════════════════════════════
+   * چرا فقط کدِ دست‌نخورده قابل ویرایش است
+   * ═══════════════════════════════════════════════════════════════════════
+   *
+   * کدِ `used` قبلاً امتیاز داده و در اینونتوریِ کاربر نشسته. عوض کردنِ
+   * رشته‌اش یعنی سابقه دروغ می‌شود: کاربر کارتی دارد که کدش دیگر آن
+   * نیست. کدِ `reserved` هم وسطِ یک پروندهٔ در جریان است.
+   *
+   * پس فقط `unused` و `voided`.
+   */
+  router.patch(
+    '/admin/photo-cards/codes/:id',
+    adminAuth, requireRole('support'),
+    asyncHandler(async (req, res) => {
+      if (!UUID_RE.test(String(req.params.id))) {
+        return res.status(400).json({ message: 'شناسه معتبر نیست' });
+      }
+      const cur = await pool.query(
+        'SELECT id, code, status FROM photo_card_codes WHERE id=$1',
+        [req.params.id],
+      );
+      if (!cur.rows[0]) return res.status(404).json({ message: 'کد پیدا نشد' });
+      if (!['unused', 'voided'].includes(cur.rows[0].status)) {
+        return res.status(409).json({
+          message: cur.rows[0].status === 'used'
+            ? 'این کد استفاده شده و قابل ویرایش نیست'
+            : 'این کد در حال بررسی است و قابل ویرایش نیست',
+        });
+      }
+
+      const fields = [];
+      const params = [];
+
+      if (req.body.code !== undefined) {
+        const code = photoCards.normalizePhotoCode(req.body.code);
+        if (!photoCards.isValidPhotoCode(code)) {
+          return res.status(400).json({ message: 'قالب کد معتبر نیست' });
+        }
+        // برخورد روی `code_fold` سنجیده می‌شود نه رشتهٔ خام: دو کدی که
+        // فقط در O/0 فرق دارند روی کارتِ چاپی یکسان دیده می‌شوند.
+        const clash = await pool.query(
+          'SELECT id FROM photo_card_codes WHERE code_fold=$1 AND id<>$2',
+          [photoCards.foldPhotoCode(code), req.params.id],
+        );
+        if (clash.rows[0]) {
+          return res.status(409).json({
+            message: 'کد دیگری با همین حروف در سیستم هست',
+          });
+        }
+        params.push(code);
+        fields.push(`code = $${params.length}`);
+      }
+
+      if (req.body.batchLabel !== undefined) {
+        const lbl = String(req.body.batchLabel || '').trim().slice(0, 80);
+        params.push(lbl || null);
+        fields.push(`batch_label = $${params.length}`);
+      }
+
+      // بازگرداندنِ کدِ باطل به چرخه — اشتباهِ ابطال قابل جبران باشد.
+      if (req.body.status !== undefined) {
+        const st = String(req.body.status);
+        if (!['unused', 'voided'].includes(st)) {
+          return res.status(400).json({ message: 'وضعیت معتبر نیست' });
+        }
+        params.push(st);
+        fields.push(`status = $${params.length}`);
+      }
+
+      if (!fields.length) {
+        return res.status(400).json({ message: 'چیزی برای تغییر نفرستادید' });
+      }
+
+      params.push(req.params.id);
+      const { rows } = await pool.query(
+        `UPDATE photo_card_codes SET ${fields.join(', ')}, updated_at=NOW()
+          WHERE id=$${params.length}
+        RETURNING id, code, status, batch_label`,
+        params,
+      );
+      await audit(req.admin.id, 'edit_photo_card_code', 'photo_card_codes',
+        rows[0].id, null, { from: cur.rows[0].code, to: rows[0].code });
+      res.json(rows[0]);
+    }),
+  );
+
+  /**
+   * حذفِ کد.
+   *
+   * حذفِ واقعی و نه «باطل کردن»، چون مالک خواست بتواند فهرست را تمیز
+   * کند. ولی همان محدودیت: کدِ مصرف‌شده حذف نمی‌شود.
+   *
+   * دلیلش صرفاً سابقه نیست — `photo_card_submissions.code_id` به این
+   * ردیف اشاره دارد. حذفش تاریخچهٔ ثبتِ کاربر را بی‌معنی می‌کند
+   * (`ON DELETE SET NULL`) و بعداً معلوم نیست آن کارت با چه کدی آمده.
+   */
+  router.delete(
+    '/admin/photo-cards/codes/:id',
+    adminAuth, requireRole('support'),
+    asyncHandler(async (req, res) => {
+      if (!UUID_RE.test(String(req.params.id))) {
+        return res.status(400).json({ message: 'شناسه معتبر نیست' });
+      }
+      const { rows } = await pool.query(
+        `DELETE FROM photo_card_codes
+          WHERE id=$1 AND status IN ('unused','voided')
+        RETURNING id, code`,
+        [req.params.id],
+      );
+      if (!rows[0]) {
+        const ex = await pool.query(
+          'SELECT status FROM photo_card_codes WHERE id=$1', [req.params.id]);
+        return res.status(ex.rows[0] ? 409 : 404).json({
+          message: ex.rows[0]
+            ? 'کدهای استفاده‌شده یا در حال بررسی حذف نمی‌شوند'
+            : 'کد پیدا نشد',
+        });
+      }
+      await audit(req.admin.id, 'delete_photo_card_code', 'photo_card_codes',
+        rows[0].id, req.body?.reason || null, { code: rows[0].code });
+      res.json({ ok: true, code: rows[0].code });
+    }),
+  );
+
+  /**
+   * حذفِ دسته‌ایِ کدهای یک دسته.
+   *
+   * وقتی مدیر ۱۵ هزار کد را اشتباه وارد کرده، حذفِ تک‌تک عملی نیست.
+   * فقط کدهای دست‌نخورده حذف می‌شوند و تعدادِ باقی‌مانده گزارش می‌شود،
+   * تا مدیر بداند چند تا به‌خاطر استفاده‌شدن ماندند.
+   */
+  router.post(
+    '/admin/photo-cards/codes/bulk-delete',
+    adminAuth, requireRole('support'),
+    asyncHandler(async (req, res) => {
+      const label = String(req.body.batchLabel || '').trim();
+      if (!label) {
+        return res.status(400).json({ message: 'برچسب دسته را مشخص کنید' });
+      }
+      const del = await pool.query(
+        `DELETE FROM photo_card_codes
+          WHERE batch_label=$1 AND status IN ('unused','voided')
+        RETURNING id`,
+        [label],
+      );
+      const left = await pool.query(
+        `SELECT count(*)::int AS n FROM photo_card_codes WHERE batch_label=$1`,
+        [label],
+      );
+      await audit(req.admin.id, 'bulk_delete_photo_card_codes',
+        'photo_card_codes', null, null,
+        { batchLabel: label, deleted: del.rowCount, kept: left.rows[0].n });
+      res.json({
+        deletedCount: del.rowCount,
+        keptCount: left.rows[0].n,
+        message: `${del.rowCount.toLocaleString('en-US')} کد حذف شد`
+          + (left.rows[0].n
+            ? ` · ${left.rows[0].n.toLocaleString('en-US')} کد به‌دلیل استفاده باقی ماند`
+            : ''),
+      });
+    }),
+  );
+
   /** فهرست کدها برای بازبینی و جست‌وجو. */
   router.get(
     '/admin/photo-cards/codes',
@@ -727,7 +893,15 @@ module.exports = function createPhotoCardRoutes(deps) {
           `کارت «${payload.cardTypeName}» به مجموعهٔ شما اضافه شد`
           + (payload.points ? ` و ${payload.points} امتیاز گرفتید.` : '.'),
         ).catch(() => {});
-        pass.grantXp(userId, 'card_redeem').catch(() => {});
+        // ── چرا XP گذر نبرد داده نمی‌شود ──
+        //
+        // خواستهٔ صریح مالک. منطقش هم روشن است: گذر نبرد پاداشِ
+        // **فعالیت در بازی** است. ثبتِ کارت خریدی است که کاربر بیرون
+        // از اپ انجام داده و امتیاز و جایزهٔ نقدیِ خودش را دارد.
+        // دادنِ XP بابتش یعنی کسی که پول بیشتری خرج می‌کند در گذر
+        // نبرد جلو می‌افتد — که هدفِ گذر نبرد نیست.
+        //
+        // مسیرِ قدیمیِ «ثبت کد کارت» (server.js) عمداً دست‌نخورده ماند.
         getLeaderboard(20).then(l => io.emit('leaderboard:update', l)).catch(() => {});
       } else if (!approve) {
         createNotification(userId, 'card',
@@ -894,6 +1068,57 @@ module.exports = function createPhotoCardRoutes(deps) {
           : { verdict: 'reject', design: null, score: 0, margin: 0 };
 
         // ═══════════════════════════════════════════════════════════════
+        // آیا همین عکس از قبل در صف بررسی است؟
+        // ═══════════════════════════════════════════════════════════════
+        //
+        // سناریو: کاربر ۱۰ کارت دارد با ۱۰ کد. عکسِ کارتِ اول را
+        // می‌فرستد، کیفیت پایین است و به صف می‌رود. کاربر منتظر
+        // نمی‌ماند و **همان عکس** را با **کدِ دوم** می‌فرستد.
+        //
+        // بدون این بررسی، دو کارت می‌گیرد در حالی که یکی دارد — و
+        // کدِ دومش هم بی‌دلیل می‌سوزد.
+        //
+        // چرا اثرانگشت و نه مقایسهٔ بایت‌ها: کاربر ممکن است همان عکس
+        // را دوباره فشرده کند، کمی برش بزند، یا اسکرین‌شات بگیرد.
+        // بایت‌ها فرق می‌کنند ولی تصویر همان است.
+        //
+        // ⚠️ فقط پرونده‌های `pending` بررسی می‌شوند. کاربر **حق دارد**
+        //    کارت‌های دیگرش را ثبت کند؛ فقط همان عکس دوباره پذیرفته
+        //    نمی‌شود.
+        const pend = await pool.query(
+          `SELECT s.id, s.img_dhash, s.img_phash, s.img_color, s.img_tex,
+                  c.code
+             FROM photo_card_submissions s
+             LEFT JOIN photo_card_codes c ON c.id = s.code_id
+            WHERE s.user_id = $1 AND s.status = 'pending'
+              AND s.img_dhash IS NOT NULL`,
+          [req.user.id],
+        );
+        for (const row of pend.rows) {
+          const sim = fpEngine.similarity(queryFp, {
+            dhash: row.img_dhash,
+            phash: row.img_phash,
+            colorSig: toFloats(row.img_color),
+            texSig: toFloats(row.img_tex),
+          });
+          // آستانهٔ سخت‌گیرانه‌تر از تطبیقِ معمولی: اینجا دنبال «همان
+          // عکس» می‌گردیم نه «همان کارت». دو عکسِ متفاوت از یک کارت
+          // نباید اینجا گیر کنند، چون کاربر ممکن است واقعاً دو نسخه
+          // از آن کارت داشته باشد.
+          if (sim >= DUPLICATE_SIMILARITY) {
+            return res.status(409).json({
+              status: 'duplicate_pending',
+              pendingCode: row.code || null,
+              message: 'این عکس قبلاً ارسال شده و هنوز در حال بررسی است. '
+                + 'عکسِ قبلی وضوح کامل نداشت، برای همین توسط کارشناس '
+                + 'بررسی می‌شود و پس از تأیید ثبت خواهد شد. '
+                + 'اجازهٔ ارسال دوبارهٔ همین عکس را ندارید — '
+                + 'ولی می‌توانید کارت‌های دیگرتان را ثبت کنید.',
+            });
+          }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
         // کدِ معتبر + عکسِ ناشناخته → صف بررسی، نه رد
         // ═══════════════════════════════════════════════════════════════
         //
@@ -932,21 +1157,34 @@ module.exports = function createPhotoCardRoutes(deps) {
           const sub = await pool.query(
             `INSERT INTO photo_card_submissions
                (user_id, code_id, matched_design_id, match_score, match_margin,
-                user_image_path, status, review_reason)
-             VALUES($1,$2,$3,$4,$5,$6,'pending',$7) RETURNING id`,
+                user_image_path, status, review_reason,
+                img_dhash, img_phash, img_color, img_tex)
+             VALUES($1,$2,$3,$4,$5,$6,'pending',$7,$8,$9,$10,$11) RETURNING id`,
             [req.user.id, codeId, match.design?.id ?? null,
-              match.score, match.margin, savedPath, reason],
+              match.score, match.margin, savedPath, reason,
+              // اثرانگشتِ عکسِ کاربر ذخیره می‌شود تا اگر همین عکس را
+              // دوباره فرستاد تشخیص داده شود. عکسِ خودش پس از تصمیمِ
+              // مدیر پاک می‌شود ولی این چند صد بایت می‌ماند — که هم
+              // ارزان است و هم برای بررسیِ تقلبِ بعدی مفید.
+              queryFp.dhash, queryFp.phash, queryFp.colorSig, queryFp.texSig],
           );
 
           return res.json({
             status: 'pending',
             reason,
             submissionId: sub.rows[0].id,
+            // ── چرا «۲۴ ساعت» صریح گفته می‌شود ──
+            //
+            // بدون بازهٔ زمانی، کاربر نمی‌داند منتظر بماند یا دوباره
+            // تلاش کند — و معمولاً دوباره تلاش می‌کند، که هم کدِ بعدی
+            // را می‌سوزاند و هم صف را شلوغ می‌کند.
             message: reason === 'image_unknown'
-              ? 'کد شما درست است ✅ ولی عکس به‌خوبی تشخیص داده نشد. '
-                + 'پرونده برای بررسی دستی به پشتیبانی رفت و نتیجه را '
-                + 'اطلاع می‌دهیم.'
-              : 'عکس شما برای بررسی ارسال شد. نتیجه را اطلاع می‌دهیم.',
+              ? 'کد شما درست است ✅ ولی کیفیت عکس پایین بود و به‌خوبی '
+                + 'تشخیص داده نشد. عکس توسط کارشناس بررسی می‌شود و '
+                + 'ممکن است تا ۲۴ ساعت طول بکشد. نتیجه را اطلاع می‌دهیم '
+                + 'و کد شما تا آن زمان محفوظ است.'
+              : 'کیفیت عکس کامل نبود، برای همین در حال بررسی است و '
+                + 'ممکن است تا ۲۴ ساعت طول بکشد. کد شما محفوظ است.',
           });
         }
 
@@ -980,7 +1218,8 @@ module.exports = function createPhotoCardRoutes(deps) {
         }
 
         // عکس کاربر در این مسیر اصلاً ماندگار نمی‌شود.
-        pass.grantXp(req.user.id, 'card_redeem').catch(() => {});
+        //
+        // XP گذر نبرد عمداً داده نمی‌شود — توضیح کامل در مسیر تأیید مدیر.
         if (payload.cash > 0) {
           createNotification(req.user.id, 'wallet',
             'جایزهٔ نقدی به کیف پول اضافه شد 💰',
