@@ -155,7 +155,7 @@ export default function Chat({ token, openProfile, meId }) {
       {pinned?.active && pinned.text && (
         <div className="pinnedBanner"
           style={{
-            '--pin': PIN_COLORS[pinned.accent] || PIN_COLORS.gold,
+            '--pin-dark': PIN_COLORS[pinned.accent] || PIN_COLORS.gold,
             '--pin-light':
               PIN_COLORS_LIGHT[pinned.accent] || PIN_COLORS_LIGHT.gold,
           }}>

@@ -70,8 +70,12 @@ function PinnedMessageCard({ request }) {
   // متغیرِ CSS به‌جای مقدارِ ثابت: پیش‌نمایش باید همان چیزی را نشان دهد
   // که کاربر می‌بیند، و کاربر بسته به تمش دو رنگِ متفاوت می‌بیند.
   const accentKey = ACCENTS.some((a) => a.key === accent) ? accent : 'gold';
+  // نکتهٔ آبشار: `--pin` را درون‌خطی **نمی‌نویسیم**. اعلانِ درون‌خطی از
+  // هر انتخابگری قوی‌تر است، پس قانونِ تم هیچ‌وقت نمی‌توانست عوضش کند
+  // (این دقیقاً همان اشتباهی بود که تلاشِ اول را بی‌اثر کرد). فقط دو
+  // متغیرِ ورودی می‌دهیم و `--pin` را theme.css می‌سازد.
   const colorVars = {
-    '--pin': (ACCENTS.find((a) => a.key === accentKey) || ACCENTS[0]).color,
+    '--pin-dark': (ACCENTS.find((a) => a.key === accentKey) || ACCENTS[0]).color,
     '--pin-light': ACCENTS_LIGHT[accentKey],
   };
   const color = 'var(--pin)';
