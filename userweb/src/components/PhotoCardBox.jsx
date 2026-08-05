@@ -19,7 +19,12 @@
  * OCR عمداً اجباری نیست: روی عکس واقعی گوشی اندازه‌گیری شد و قابل اتکا
  * نبود. تحمیلش یعنی رد کردن کاربران درستکار.
  */
-import { useEffect, useRef, useState } from 'react';
+// React باید صریح import شود: این پروژه vite.config ندارد، پس افزونهٔ
+// React با تنظیمات پیش‌فرض روی runtime کلاسیک کار می‌کند و هر JSX به
+// React.createElement ترجمه می‌شود. بدون این خط، صفحه با
+// «React is not defined» سفید می‌شد — و چون این کامپوننت پایین صفحه
+// بود، بقیهٔ صفحه هم با خودش می‌برد.
+import React, { useEffect, useRef, useState } from 'react';
 
 import { API } from '../lib/api.js';
 

@@ -4,10 +4,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "vite build",
+    "build": "node tool/jsx-react-import.mjs && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "test:typography": "node tool/typography.mjs",
-    "test:smoke": "node tool/smoke.mjs"
+    "test:smoke": "node tool/smoke.mjs",
+    "test:jsx": "node tool/jsx-react-import.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^4.3.1",
