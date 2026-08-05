@@ -1175,3 +1175,34 @@ table.data-table {
 .crWarn > div { display: grid; gap: 3px; font-size: 12.5px; line-height: 1.7; }
 .crWarn b { font-size: 13px; }
 .crWarn span { color: var(--gg-text-muted); }
+
+/* ── علتِ رفتن به صف بررسی ──
+   تصمیمِ مدیر در دو حالت فرق می‌کند («تأیید/رد» در برابر «کدام کارت؟»)،
+   پس علت باید صریح باشد نه اینکه از روی درصد شباهت حدس زده شود. */
+.reviewWhy {
+  display: grid;
+  gap: 2px;
+  margin-bottom: 6px;
+  padding: 7px 10px;
+  border-radius: var(--gg-radius-sm);
+  background: color-mix(in srgb, var(--gg-info) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--gg-info) 40%, transparent);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+.reviewWhy b { color: var(--gg-info); }
+.reviewWhy span { color: var(--gg-text-muted); }
+
+/* منوی انتخابِ دستیِ طرح */
+.reviewPick {
+  width: 100%;
+  min-width: 170px;
+  margin-bottom: 6px;
+  padding: 7px 10px;
+  border-radius: var(--gg-radius-sm);
+  border: 1px solid var(--gg-border);
+  background: var(--gg-surface);
+  color: var(--gg-text);
+  font: inherit;
+  font-size: 12.5px;
+}

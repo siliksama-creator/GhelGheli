@@ -31,6 +31,9 @@ export function PhotoCardsPage({ request }) {
   const [stats, setStats] = useState(null);
   const [batches, setBatches] = useState([]);
   const [subs, setSubs] = useState(null);
+  const [options, setOptions] = useState([]);
+  // انتخابِ طرح برای هر پرونده: { [submissionId]: designId }
+  const [picks, setPicks] = useState({});
   const [subFilter, setSubFilter] = useState('pending');
 
   // فرم آپلود
@@ -68,7 +71,15 @@ export function PhotoCardsPage({ request }) {
     [request],
   );
 
-  useEffect(() => { loadDesigns(); loadCodes(); }, [loadDesigns, loadCodes]);
+  const loadOptions = useCallback(
+    () => request('/api/admin/photo-cards/designs/options')
+      .then(r => setOptions(r.options || []))
+      .catch(() => setOptions([])),
+    [request],
+  );
+
+  useEffect(() => { loadDesigns(); loadCodes(); loadOptions(); },
+    [loadDesigns, loadCodes, loadOptions]);
   useEffect(() => { setSubs(null); loadSubs(subFilter); }, [subFilter, loadSubs]);
 
   // پیش‌نمایش محلی. بدون آن مدیر نمی‌داند فایل درست را انتخاب کرده یا نه.
@@ -139,6 +150,15 @@ export function PhotoCardsPage({ request }) {
 
   async function decide(sub, approve) {
     let reason = '';
+    // طرحی که مدیر انتخاب کرده؛ اگر انتخاب نکرده، حدسِ موتور.
+    const designId = picks[sub.id] || null;
+
+    // ── وقتی موتور حدسی ندارد، انتخاب الزامی است ──
+    // بدون آن سرور ۴۰۰ می‌دهد؛ بهتر است همین‌جا جلویش گرفته شود تا
+    // مدیر پیام روشن‌تری ببیند.
+    if (approve && !designId && !sub.design_image) {
+      return notify('اول مشخص کنید این کد مربوط به کدام کارت است', 'error');
+    }
     if (!approve) {
       const okGo = await confirmAction({
         title: 'رد کردن این ثبت',
@@ -151,7 +171,8 @@ export function PhotoCardsPage({ request }) {
     }
     try {
       await request(`/api/admin/photo-cards/submissions/${sub.id}/decide`, {
-        method: 'POST', body: { approve, reason },
+        method: 'POST',
+        body: { approve, reason, ...(designId ? { designId } : {}) },
       });
       notify(approve ? 'تأیید شد' : 'رد شد', 'success');
       loadSubs(subFilter);
@@ -371,6 +392,16 @@ export function PhotoCardsPage({ request }) {
               </figure>
             </div>
             <div className="reviewBody">
+              {/* ── چرا این پرونده اینجاست ──
+                  تصمیمِ مدیر در دو حالت فرق می‌کند، پس علت باید صریح
+                  باشد نه اینکه از روی درصد شباهت حدس زده شود. */}
+              {s.review_reason === 'image_unknown' && (
+                <div className="reviewWhy">
+                  <b>✅ کد معتبر است</b>
+                  <span>ولی عکس با هیچ کارتی تطبیق نخورد.
+                    مشخص کنید این کد مربوط به کدام کارت است.</span>
+                </div>
+              )}
               <b>{s.card_type_name || 'نامشخص'}</b>
               <div className="topbar-sub">
                 {s.nickname || s.mobile} · کد {s.code || '—'}
@@ -393,6 +424,26 @@ export function PhotoCardsPage({ request }) {
             </div>
             {s.status === 'pending' && (
               <div className="reviewActions">
+                {/* انتخابِ دستیِ طرح — خواستهٔ مالک.
+                    پیش‌فرض حدسِ موتور است (اگر داشته باشد) تا در حالتِ
+                    «کم‌اطمینان» مدیر مجبور به انتخاب دوباره نشود. */}
+                <select
+                  className="reviewPick"
+                  value={picks[s.id] || ''}
+                  onChange={e =>
+                    setPicks(p => ({ ...p, [s.id]: e.target.value }))}
+                >
+                  <option value="">
+                    {s.card_type_name
+                      ? `پیش‌فرض: ${s.card_type_name}`
+                      : '— انتخاب کارت —'}
+                  </option>
+                  {options.map(o => (
+                    <option key={o.id} value={o.id}>
+                      {o.card_type_name} ({fmtNumber(o.point_value)} امتیاز)
+                    </option>
+                  ))}
+                </select>
                 <Button size="sm" icon={CheckCircle2}
                   onClick={() => decide(s, true)}>تأیید</Button>
                 <Button size="sm" variant="danger" icon={XCircle}

@@ -16,8 +16,19 @@
  * **نسخهٔ** خاص هنوز خرج نشده. بدون عکس، هر کس کد را بداند امتیاز
  * می‌گیرد؛ بدون کد، یک کارت بی‌نهایت بار ثبت می‌شود.
  *
- * OCR عمداً اجباری نیست: روی عکس واقعی گوشی اندازه‌گیری شد و قابل اتکا
- * نبود. تحمیلش یعنی رد کردن کاربران درستکار.
+ * تشخیصِ خودکارِ کد از روی عکس عمداً وجود ندارد: روی عکس واقعیِ گوشی
+ * اندازه‌گیری شد و حتی در کیفیت عالی هم درست نخواند. تحمیلش فقط نرخِ
+ * خطا را بالا می‌برد. کاربر کد را تایپ می‌کند — ۱۰۰٪ قابل اتکا — و
+ * بارِ ضدتقلب را عکس به دوش می‌کشد.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * سه نتیجهٔ ممکن
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ *   approved   کد معتبر + عکس شناخته شد → کارت در اینونتوری
+ *   pending    کد معتبر ولی عکس شناخته نشد → بررسی دستی مدیر
+ *   bad_code   کد غلط → راهنمای حروفِ مبهم + شمارشِ تلاش
+ *   locked     ۵ کدِ غلطِ پشت‌سرهم → ۳ ساعت قفل
  */
 // React باید صریح import شود: این پروژه vite.config ندارد، پس افزونهٔ
 // React با تنظیمات پیش‌فرض روی runtime کلاسیک کار می‌کند و هر JSX به
@@ -78,6 +89,7 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
+  const [locked, setLocked] = useState(false);
   const previewRef = useRef('');
 
   useEffect(() => {
@@ -137,12 +149,32 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
         body: fd,
       });
       const d = await r.json().catch(() => ({}));
+
+      // ── قفل: کاربر تا چند ساعت نمی‌تواند تلاش کند ──
+      if (d.status === 'locked') {
+        setResult({ kind: 'locked', message: d.message });
+        setLocked(true);
+        return;
+      }
+
+      // ── کدِ غلط: راهنما + شمارشِ تلاش ──
+      // عکس عمداً پاک نمی‌شود: کاربر فقط باید کد را اصلاح کند و
+      // مجبور کردنش به عکس‌گرفتنِ دوباره بی‌دلیل آزاردهنده است.
+      if (d.status === 'bad_code') {
+        setResult({ kind: 'badcode', message: d.message,
+          triesLeft: d.triesLeft });
+        return;
+      }
+
       if (!r.ok) {
         setResult({ kind: 'error', message: d.message || 'ثبت نشد' });
         return;
       }
+
       if (d.status === 'pending') {
-        setResult({ kind: 'pending', message: d.message });
+        // کد درست بوده ولی عکس شناخته نشد → بررسی دستی.
+        setResult({ kind: 'pending', message: d.message,
+          reason: d.reason });
         reset();
         return;
       }
@@ -196,6 +228,22 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
       {result?.kind === 'pending' && (
         <div className="pcResult pending">⏳ {result.message}</div>
       )}
+      {result?.kind === 'badcode' && (
+        <div className="pcResult err">
+          <div>
+            <b>کد نادرست است</b>
+            <span>{result.message}</span>
+          </div>
+        </div>
+      )}
+      {result?.kind === 'locked' && (
+        <div className="pcResult locked">
+          <div>
+            <b>🔒 ثبت کارت موقتاً بسته است</b>
+            <span>{result.message}</span>
+          </div>
+        </div>
+      )}
       {result?.kind === 'error' && (
         <div className="pcResult err">{result.message}</div>
       )}
@@ -234,11 +282,23 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
         placeholder="کد روی کارت"
         inputMode="text"
         autoCapitalize="characters"
+        disabled={locked}
         onChange={e => setCode(e.target.value.toUpperCase())}
         onKeyDown={e => { if (e.key === 'Enter') submit(); }}
       />
 
-      <button className="main" onClick={submit} disabled={busy || !file || !code.trim()}>
+      {/* ── راهنمای حروفِ مبهم، همیشه دیده می‌شود ──
+          نه فقط بعد از خطا. کاربر باید **قبل** از تایپ بداند به چه چیزی
+          دقت کند؛ نشان دادنش بعد از شکست یعنی یکی از پنج تلاش را
+          بی‌دلیل سوزانده. */}
+      <div className="pcCodeHint">
+        <b>دقت کنید:</b> صفر <code>0</code> و حرف <code>O</code> شبیه‌اند،
+        و عدد یک <code>1</code> با حروف <code>I</code> و <code>L</code>.
+        بزرگ یا کوچک بودنِ حروف مهم نیست.
+      </div>
+
+      <button className="main" onClick={submit}
+        disabled={busy || locked || !file || !code.trim()}>
         {busy ? 'در حال بررسی عکس…' : 'ثبت کارت'}
       </button>
 

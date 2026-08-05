@@ -2737,3 +2737,49 @@ a:focus-visible {
   color: #fbbf24; border-color: #fbbf2452; background: #fbbf241a;
 }
 :root:not([data-theme='light']) .pcResult.err { color: #ff8a94; }
+
+/* ── راهنمای حروفِ مبهم زیر فیلد کد ──
+   همیشه دیده می‌شود، نه فقط بعد از خطا: کاربر باید قبل از تایپ بداند
+   به چه چیزی دقت کند، وگرنه یکی از پنج تلاشش را بی‌دلیل می‌سوزاند. */
+.pcCodeHint {
+  margin-top: 6px;
+  padding: 9px 11px;
+  border-radius: 12px;
+  background: var(--veil-2);
+  border: 1px solid var(--veil-5);
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.9;
+}
+.pcCodeHint b { color: var(--page-fg); }
+.pcCodeHint code {
+  display: inline-block;
+  min-width: 20px;
+  padding: 1px 5px;
+  margin: 0 1px;
+  border-radius: 6px;
+  background: var(--veil-4);
+  color: var(--page-fg);
+  font-family: ui-monospace, monospace;
+  font-weight: 800;
+  font-size: 12.5px;
+  /* کاراکترِ لاتین داخل متنِ راست‌به‌چپ: بدون این، پرانتز و نویسه‌های
+     کناری جابه‌جا رندر می‌شوند. */
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* حالتِ قفل. رنگ از خانوادهٔ خطا جداست چون این «اشتباه کردی» نیست،
+   «فعلاً نمی‌توانی» است — دو پیامِ متفاوت با دو واکنشِ متفاوت. */
+.pcResult.locked {
+  background: #7c3aed14;
+  border: 1px solid #7c3aed4d;
+  color: #6d28d9;
+}
+:root:not([data-theme='light']) .pcResult.locked {
+  color: #c4b5fd;
+  border-color: #a78bfa52;
+  background: #a78bfa1a;
+}
+.pcResult.locked span,
+.pcResult.err span { font-weight: 600; opacity: .95; }
