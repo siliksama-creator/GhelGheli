@@ -149,10 +149,10 @@ export default function Chat({ token, openProfile, meId }) {
         <span className="liveBadge">زنده</span>
       </div>
 
+      {/* دو متغیر می‌نویسیم و انتخاب را به theme.css می‌سپاریم — همان
+          الگوی رنگِ نام. مزیتش این است که تعویضِ تم نیازی به رندرِ
+          دوباره ندارد و استایلِ درون‌خطی جلوی قانونِ تم را نمی‌گیرد. */}
       {pinned?.active && pinned.text && (
-        {/* دو متغیر می‌نویسیم و انتخاب را به theme.css می‌سپاریم — همان
-            الگوی رنگِ نام. مزیتش این است که تعویضِ تم نیازی به رندرِ
-            دوباره ندارد و استایلِ درون‌خطی جلوی قانونِ تم را نمی‌گیرد. */}
         <div className="pinnedBanner"
           style={{
             '--pin': PIN_COLORS[pinned.accent] || PIN_COLORS.gold,
