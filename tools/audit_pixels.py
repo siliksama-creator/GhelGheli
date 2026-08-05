@@ -51,8 +51,16 @@ from PIL import Image
 from playwright.async_api import async_playwright
 
 # تب‌هایی که در نوارِ پایین‌اند و آن‌هایی که پشتِ شیتِ «بیشتر» پنهان‌اند.
-NAV = [('خانه', 'nav'), ('جایزه', 'nav'), ('چت', 'nav'), ('لیگ', 'nav'),
-       ('کیف پول', 'sheet'), ('فروشگاه', 'sheet'), ('دعوت', 'sheet'),
+# ⚠️ این برچسب‌ها باید **مو‌به‌مو** با NAV_TABS/MORE_TABS در
+# userweb/src/main.jsx یکی باشند. نسخهٔ اول از حافظه نوشته شده بود
+# («جایزه» به‌جای «جوایز»، «چت» به‌جای «چت و بازی»، «فروشگاه» که اصلاً
+# در منو نیست) و نتیجه‌اش این بود که چهار تب هرگز باز نمی‌شدند.
+#
+# ابزار هشدارِ «باز نشد» می‌داد ولی با خروجیِ موفق تمام می‌شد — یعنی
+# «۰ مشکل» گزارش می‌کرد در حالی که نصفِ اپ اصلاً بررسی نشده بود.
+# دقیقاً همان دروغِ سبزی که audit_deep.py هم به آن دچار بود.
+NAV = [('خانه', 'nav'), ('جوایز', 'nav'), ('لیگ', 'nav'), ('چت و بازی', 'nav'),
+       ('کیف پول', 'sheet'), ('دعوت دوستان', 'sheet'), ('پشتیبانی', 'sheet'),
        ('پروفایل', 'sheet')]
 
 SHOT = '/tmp/_audit_px.png'
@@ -82,23 +90,75 @@ def _parse(css):
 COLLECT = r"""
 () => {
   const out = [];
+  let i = 0;
+  // ── چرا فقط emoji رد می‌شود ──
+  // emoji یک glyph رنگی است و رنگش از `color` نمی‌آید. وقتی متن را
+  // `transparent` می‌کنیم، emoji همچنان رسم می‌شود — پس پیکسل‌های
+  // خودش به‌عنوان «پس‌زمینه» شمرده می‌شدند و ابزار برای 🔔 و 🏅 و 🎡
+  // مرتب هشدارِ دروغین می‌داد. قاعدهٔ کنتراستِ WCAG هم اصلاً دربارهٔ
+  // تصویر/emoji نیست.
+  const onlyEmoji = t => !/[\p{L}\p{N}]/u.test(t);
   for (const el of document.querySelectorAll('body *')) {
     const own = [...el.childNodes].filter(n => n.nodeType === 3)
       .map(n => n.textContent.trim()).join(' ').trim();
     if (own.length < 2) continue;
+    if (onlyEmoji(own)) continue;
     const cs = getComputedStyle(el);
     if (cs.visibility === 'hidden' || cs.display === 'none') continue;
     if (parseFloat(cs.opacity) < 0.25) continue;
     const r = el.getBoundingClientRect();
     if (r.width < 4 || r.height < 4) continue;
     if (r.bottom < 0 || r.top > innerHeight) continue;
+    // شناسه می‌گذاریم تا **بعد از** پنهان کردنِ متن دوباره مختصات را
+    // بخوانیم. اگر مختصاتِ قبلی را نگه داریم و در این فاصله چیزی جابه‌جا
+    // شود (بارگذاریِ ناهمگامِ تراکنش‌ها، انیمیشن، تصویری که می‌رسد)،
+    // مستطیل با اسکرین‌شات همخوان نیست و ابزار رنگِ جای دیگری را
+    // گزارش می‌کند. این دقیقاً همان چیزی بود که دکمهٔ «درخواست برداشت»
+    // را «۱.۴۴ روی سرمه‌ای» نشان می‌داد در حالی که سبزِ روشن است.
+    el.setAttribute('data-px-audit', String(i));
     out.push({
-      txt: own.slice(0, 30), color: cs.color, size: parseFloat(cs.fontSize),
-      weight: cs.fontWeight,
+      id: i++, txt: own.slice(0, 30), color: cs.color,
+      size: parseFloat(cs.fontSize), weight: cs.fontWeight,
       cls: (el.className || '').toString().slice(0, 34),
-      x: Math.round(r.left), y: Math.round(r.top),
-      w: Math.round(r.width), h: Math.round(r.height),
     });
+  }
+  return out;
+}
+"""
+
+# مختصات دوباره خوانده می‌شوند، درست پیش از اسکرین‌شات.
+#
+# ⚠️ مستطیلِ **خودِ حروف** با Range API گرفته می‌شود، نه
+# getBoundingClientRect عنصر. چرا این تفاوت حیاتی است:
+#
+# دکمهٔ «ثبت کد» گرادیانِ سبزِ روشن دارد با border-radius: 16px و
+# padding. مستطیلِ عنصر شاملِ آن گوشه‌های گرد است، و پشتِ گوشه‌ها
+# پس‌زمینهٔ تیرهٔ صفحه دیده می‌شود. ابزار روشن‌ترین/بدترین پیکسل را
+# می‌گرفت و به گوشه می‌رسید → «متنِ تیره روی سرمه‌ای ۱.۳۸» گزارش
+# می‌کرد، در حالی که حروف روی سبزِ روشن نشسته‌اند و کاملاً خوانا هستند.
+#
+# برشِ اسکرین‌شات این را قطعی ثابت کرد: تصویر دکمه سبزِ روشن بود ولی
+# پیکسلِ گوشه (23,46,67) سرمه‌ای.
+#
+# `Range.getClientRects()` دقیقاً کادرِ خطوطِ متن را می‌دهد — بدون
+# padding، بدون گوشهٔ گرد، بدون حاشیه.
+RECTS = r"""
+() => {
+  const out = {};
+  for (const el of document.querySelectorAll('[data-px-audit]')) {
+    const id = el.getAttribute('data-px-audit');
+    const boxes = [];
+    for (const n of el.childNodes) {
+      if (n.nodeType !== 3 || !n.textContent.trim()) continue;
+      const rg = document.createRange();
+      rg.selectNodeContents(n);
+      for (const r of rg.getClientRects()) {
+        if (r.width > 1 && r.height > 1) {
+          boxes.push({ x: r.left, y: r.top, w: r.width, h: r.height });
+        }
+      }
+    }
+    if (boxes.length) out[id] = boxes;
   }
   return out;
 }
@@ -138,7 +198,8 @@ async def goto(page, label, where):
     return True
 
 
-def analyse(items, scale):
+def analyse(items, rects, scale):
+    """کنتراستِ هر متن بر پایهٔ پیکسل‌های واقعیِ زیرِ خودِ حروف."""
     im = Image.open(SHOT).convert('RGB')
     W, H = im.size
     bad = []
@@ -146,31 +207,50 @@ def analyse(items, scale):
         fg = _parse(it['color'])
         if not fg or fg[3] < 0.25:
             continue
-        x0, y0 = int(it['x'] * scale), int(it['y'] * scale)
-        x1, y1 = int((it['x'] + it['w']) * scale), int((it['y'] + it['h']) * scale)
-        x0, y0 = max(0, x0), max(0, y0)
-        x1, y1 = min(W, x1), min(H, y1)
-        if x1 <= x0 or y1 <= y0:
+        boxes = rects.get(str(it['id']))
+        if not boxes:
             continue
-        px = [im.getpixel((x, y))
-              for y in range(y0, y1, max(1, (y1 - y0) // 12))
-              for x in range(x0, x1, max(1, (x1 - x0) // 24))]
+
+        px = []
+        for bx in boxes:
+            x0, y0 = int(bx['x'] * scale), int(bx['y'] * scale)
+            x1, y1 = int((bx['x'] + bx['w']) * scale), int((bx['y'] + bx['h']) * scale)
+            x0, y0 = max(0, x0), max(0, y0)
+            x1, y1 = min(W, x1), min(H, y1)
+            if x1 - x0 < 2 or y1 - y0 < 2:
+                continue
+            # ── چرا ۲۵٪ میانیِ ارتفاع ──
+            # بالا و پایینِ کادرِ خط «leading» است: فضای خالی که ممکن
+            # است روی عنصرِ دیگری بیفتد. میانه جایی است که خودِ حروف
+            # واقعاً رسم می‌شوند.
+            pad = max(1, (y1 - y0) // 4)
+            for y in range(y0 + pad, y1 - pad, max(1, (y1 - y0 - 2 * pad) // 6)):
+                for x in range(x0, x1, max(1, (x1 - x0) // 30)):
+                    px.append(im.getpixel((x, y)))
         if not px:
             continue
-        # بدترین پس‌زمینه = آنکه کمترین کنتراست را با این متن می‌دهد.
+
+        # ── چرا صدکِ ۹۰ و نه بدترین تکْ‌پیکسل ──
+        # یک پیکسلِ پرت (لبهٔ آیکنی که کنارِ متن است، یا ضدّالیاسِ
+        # حاشیه) نباید کلِ قضاوت را عوض کند. صدکِ ۹۰ از هر دو سمت
+        # یعنی «پس‌زمینهٔ غالب در بدترین حالتش».
+        px.sort(key=_lum)
+        cands = {px[max(0, int(len(px) * 0.10))], px[min(len(px) - 1, int(len(px) * 0.90))]}
+
         worst, worst_r = None, 99.0
-        for cand in px:
+        for cand in cands:
             mixed = tuple(fg[i] * fg[3] + cand[i] * (1 - fg[3]) for i in range(3))
             r = _ratio(mixed, cand)
             if r < worst_r:
                 worst, worst_r = cand, r
+
         bold = it['weight'].isdigit() and int(it['weight']) >= 700
         need = 3.0 if (it['size'] >= 24 or (it['size'] >= 18.66 and bold)) else 4.5
         if worst_r < need:
             bad.append({'txt': it['txt'], 'cls': it['cls'], 'size': it['size'],
                         'need': need, 'ratio': round(worst_r, 2),
                         'fg': it['color'], 'bg': f'rgb{worst}'})
-    # یکتاسازی تا یک قانونِ CSS ده بار گزارش نشود.
+
     seen, uniq = set(), []
     for b in bad:
         k = (b['cls'], b['fg'], b['bg'])
@@ -189,44 +269,63 @@ async def run(base, mobile, password, only):
         ctx = await br.new_context(viewport={'width': 412, 'height': 900},
                                    device_scale_factor=scale, locale='fa-IR')
         page = await ctx.new_page()
-        await page.goto(base, wait_until='networkidle')
-        await page.fill('input', mobile)
-        await page.fill('input[type="password"], input[placeholder*="رمز"]', password)
-        await page.click('button.main')
-        await page.wait_for_timeout(3500)
+
+        async def login():
+            await page.goto(base, wait_until='networkidle')
+            await page.fill('input', mobile)
+            await page.fill('input[type="password"], input[placeholder*="رمز"]',
+                            password)
+            await page.click('button.main')
+            await page.wait_for_timeout(3500)
+
+        await login()
 
         for theme in ('dark', 'light'):
-            if theme == 'light':
-                await page.evaluate(
-                    "() => document.documentElement.setAttribute('data-theme','light')")
-                await page.wait_for_timeout(400)
             for label, where in NAV:
                 if only and label not in only:
                     continue
+                # ── چرا هر صفحه از نو بارگذاری می‌شود ──
+                # `HIDE` رنگ‌ها را با `!important` دستکاری می‌کند و راهِ
+                # برگشتی ندارد. اگر صفحهٔ بعد را روی همان DOM بسنجیم،
+                # همهٔ متن‌ها هنوز نامرئی‌اند و ابزار «پس‌زمینه روی
+                # پس‌زمینه» می‌سنجد — یعنی خروجیِ کاملاً بی‌معنی.
+                await page.reload(wait_until='networkidle')
+                await page.wait_for_timeout(2200)
+                if theme == 'light':
+                    await page.evaluate(
+                        "() => document.documentElement"
+                        ".setAttribute('data-theme','light')")
+                    await page.wait_for_timeout(400)
                 if not await goto(page, label, where):
-                    print(f'  ⚠ {label} باز نشد')
+                    # ── چرا این خطاست و نه هشدار ──
+                    # تبی که باز نمی‌شود یعنی آن صفحه **اصلاً بررسی
+                    # نشده**. اگر فقط هشدار بدهیم، ابزار با «۰ مشکل»
+                    # تمام می‌شود و آدم خیال می‌کند همه‌چیز سالم است.
+                    # این بدترین حالتِ ممکن برای یک ابزارِ ممیزی است.
+                    findings[f'{label}/{theme}'] = [{
+                        'txt': '— صفحه باز نشد —', 'cls': '(ناوبری)',
+                        'size': 0, 'need': 0, 'ratio': 0,
+                        'fg': '-', 'bg': 'برچسبِ تب با main.jsx نمی‌خواند؟'}]
+                    print(f'  ✗ {label}/{theme} باز نشد')
                     continue
                 items = await page.evaluate(COLLECT)
                 await page.evaluate(HIDE)
-                await page.wait_for_timeout(250)
+                await page.wait_for_timeout(700)
+                rects = await page.evaluate(RECTS)
                 await page.screenshot(path=SHOT)
-                bad = analyse(items, scale)
+                bad = analyse(items, rects, scale)
                 if bad:
                     findings[f'{label}/{theme}'] = bad
                 print(f'  {label:10s} {theme:5s} — {len(items):3d} متن، '
                       f'{len(bad)} مشکل')
-                # حالتِ نامرئی باید برگردد وگرنه صفحهٔ بعد هم خراب می‌ماند.
-                await page.reload(wait_until='networkidle')
-                await page.wait_for_timeout(1800)
-                if theme == 'light':
-                    await page.evaluate(
-                        "() => document.documentElement.setAttribute('data-theme','light')")
-                    await page.wait_for_timeout(300)
         await br.close()
     return findings
 
 
 def main():
+    if len(sys.argv) < 4:
+        print(__doc__)
+        return 2
     base, mobile, pw = sys.argv[1], sys.argv[2], sys.argv[3]
     only = sys.argv[4:]
     res = asyncio.run(run(base, mobile, pw, only))
@@ -240,7 +339,8 @@ def main():
         print(f'── {k}')
         for b in sorted(v, key=lambda z: z['ratio']):
             print(f'   {b["ratio"]:5.2f} (نیاز {b["need"]}) '
-                  f'{b["txt"][:28]:30s} cls={b["cls"]!r} {b["fg"]} روی {b["bg"]}')
+                  f'{b["txt"][:28]:30s} cls={b["cls"]!r} '
+                  f'{b["fg"]} روی {b["bg"]}')
     return 1
 
 
