@@ -57,8 +57,7 @@ if missing:
 # منطقِ کد (core/share_invite.dart) عمداً به `canLaunchUrl` تکیه
 # نمی‌کند و مستقیم امتحان می‌کند، ولی اعلامِ scheme همچنان لازم است
 # تا Intent اصلاً حل شود.
-QUERIES = """    <queries>
-        <!-- پیام‌رسان‌هایی که کد دعوت به آن‌ها فرستاده می‌شود -->
+QUERIES_BODY = """        <!-- پیام‌رسان‌هایی که کد دعوت به آن‌ها فرستاده می‌شود -->
         <intent>
             <action android:name="android.intent.action.VIEW"/>
             <data android:scheme="tg"/>
@@ -80,15 +79,41 @@ QUERIES = """    <queries>
             <action android:name="android.intent.action.VIEW"/>
             <data android:scheme="https"/>
         </intent>
-    </queries>
 """
 
-if "<queries>" not in src:
-    # درست پیش از بسته شدنِ <manifest> — هر جای دیگری معتبر نیست.
-    src = src.replace("</manifest>", QUERIES + "</manifest>", 1)
-    print("added <queries> for messenger deep links")
+# ═══════════════════════════════════════════════════════════════════════════
+# چرا «آیا <queries> هست؟» بررسیِ غلطی بود
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# نسخهٔ قبلی این بود:
+#
+#     if "<queries>" not in src: ...اضافه کن
+#     else: print("already present")
+#
+# در فلاترِ قدیمی درست کار می‌کرد چون مانیفستِ تولیدشده هیچ <queries>
+# نداشت. ولی `flutter create` در نسخه‌های جدید **خودش** یک بلوکِ
+# <queries> می‌گذارد (برای PROCESS_TEXT). آن‌وقت شرط رد می‌شد، پیامِ
+# دلگرم‌کنندهٔ «already present» چاپ می‌شد، و scheme های پیام‌رسان‌ها
+# **هرگز اضافه نمی‌شدند**.
+#
+# بیلد بلافاصله بعدش در مرحلهٔ راستی‌آزمایی می‌افتاد — که خوب است —
+# ولی پیامِ لاگ دقیقاً خلافِ واقعیت را می‌گفت و دنبال کردنش وقت می‌برد.
+#
+# درسِ کلی: شرط باید همان چیزی را بسنجد که واقعاً می‌خواهیم، نه یک
+# نشانهٔ غیرمستقیم. چیزی که می‌خواهیم «scheme های ما اعلام شده‌اند»
+# است، نه «تگِ <queries> وجود دارد».
+if 'android:scheme="tg"' in src:
+    print("messenger schemes already declared")
+elif "<queries>" in src:
+    # بلوکِ فلاتر هست: محتوای ما را داخلش تزریق کن، نه یک بلوکِ دوم.
+    # دو تگِ <queries> در یک مانیفست خطای مِرج می‌دهد.
+    src = src.replace("<queries>", "<queries>\n" + QUERIES_BODY, 1)
+    print("merged messenger schemes into existing <queries>")
 else:
-    print("<queries> already present")
+    # درست پیش از بسته شدنِ <manifest> — هر جای دیگری معتبر نیست.
+    src = src.replace("</manifest>",
+                      "    <queries>\n" + QUERIES_BODY + "    </queries>\n</manifest>", 1)
+    print("added <queries> for messenger deep links")
 
 # Ship a real Persian app name rather than the raw Dart package identifier.
 src = src.replace('android:label="ghelgheli_mobile"', 'android:label="GhelGheli"')
