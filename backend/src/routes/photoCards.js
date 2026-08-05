@@ -23,6 +23,7 @@ const rateLimit = require('express-rate-limit');
 
 const fpEngine = require('../services/imageFingerprint');
 const photoCards = require('../services/photoCardService');
+const lockout = require('../services/photoCardLockout');
 
 // حداکثر کدی که در یک نوبت ساخته می‌شود.
 //
@@ -520,6 +521,25 @@ module.exports = function createPhotoCardRoutes(deps) {
     }),
   );
 
+  /**
+   * فهرستِ سبکِ طرح‌های فعال — برای انتخابِ دستیِ مدیر در صف بررسی.
+   *
+   * چرا جدا از `/designs`: آن مسیر شمارشِ مصرف و آمار هم می‌آورد که
+   * برای یک منوی انتخاب اضافی است. اینجا فقط چیزی که برای تصمیم لازم
+   * است برمی‌گردد، پس منو روی موبایل هم سریع باز می‌شود.
+   */
+  router.get('/admin/photo-cards/designs/options', adminAuth,
+    asyncHandler(async (req, res) => {
+      const { rows } = await pool.query(
+        `SELECT d.id, d.image_url, t.name AS card_type_name, t.point_value
+           FROM photo_card_designs d
+           JOIN card_types t ON t.id = d.card_type_id
+          WHERE d.is_active = true
+          ORDER BY t.name`,
+      );
+      res.json({ options: rows });
+    }));
+
   /** خروجی CSV برای چاپخانه. */
   router.get(
     '/admin/photo-cards/codes/export',
@@ -554,7 +574,7 @@ module.exports = function createPhotoCardRoutes(deps) {
       ? req.query.status : 'pending';
     const { rows } = await pool.query(
       `SELECT s.id, s.match_score, s.match_margin, s.status, s.created_at,
-              s.user_image_path, s.reject_reason,
+              s.user_image_path, s.reject_reason, s.review_reason,
               u.nickname, u.mobile,
               c.code,
               d.image_url AS design_image, t.name AS card_type_name, t.point_value
@@ -589,6 +609,17 @@ module.exports = function createPhotoCardRoutes(deps) {
       const approve = req.body.approve === true || req.body.approve === 'true';
       const reason = String(req.body.reason || '').trim().slice(0, 500);
 
+      // ── طرحی که مدیر **خودش** انتخاب کرده ──
+      //
+      // خواستهٔ مالک: وقتی کد معتبر است ولی عکس شناخته نشد، مدیر باید
+      // بتواند بگوید «این کد مالِ کدام طرح بوده». پس تأیید می‌تواند با
+      // طرحی غیر از حدسِ موتور انجام شود — یا حتی وقتی موتور اصلاً
+      // حدسی نداشته.
+      const chosenId = req.body.designId ? String(req.body.designId) : null;
+      if (chosenId && !UUID_RE.test(chosenId)) {
+        return res.status(400).json({ message: 'شناسهٔ طرح معتبر نیست' });
+      }
+
       const client = await pool.connect();
       let imagePathToDelete = null;
       let payload = null;
@@ -608,14 +639,22 @@ module.exports = function createPhotoCardRoutes(deps) {
         imagePathToDelete = sub.user_image_path;
 
         if (approve) {
-          if (!sub.matched_design_id || !sub.code_id) {
-            throw Object.assign(new Error('این پرونده طرح یا کد مشخصی ندارد'), { status: 400 });
+          // انتخابِ مدیر بر حدسِ موتور مقدم است. اگر موتور حدسی نداشته
+          // (عکس اصلاً شناخته نشد) انتخابِ مدیر **الزامی** است، وگرنه
+          // معلوم نیست کدام کارت باید به اینونتوری اضافه شود.
+          const designId = chosenId || sub.matched_design_id;
+          if (!designId || !sub.code_id) {
+            throw Object.assign(
+              new Error('برای تأیید باید مشخص کنید این کد مربوط به کدام کارت است'),
+              { status: 400 });
           }
           const d = await client.query(
-            'SELECT id, card_type_id, image_url FROM photo_card_designs WHERE id=$1',
-            [sub.matched_design_id],
+            'SELECT id, card_type_id, image_url FROM photo_card_designs WHERE id=$1 AND is_active=true',
+            [designId],
           );
-          if (!d.rows[0]) throw Object.assign(new Error('طرح پیدا نشد'), { status: 404 });
+          if (!d.rows[0]) {
+            throw Object.assign(new Error('طرح پیدا نشد یا غیرفعال است'), { status: 404 });
+          }
 
           payload = await photoCards.creditSubmission(client, {
             userId: sub.user_id,
@@ -626,6 +665,13 @@ module.exports = function createPhotoCardRoutes(deps) {
           if (payload.points > 0) {
             await addLeaguePoints(client, sub.user_id, payload.points);
           }
+          // حدسِ اولیه در `matched_design_id` دست‌نخورده می‌ماند تا
+          // بعداً بشود سنجید «چند بار مدیر حدسِ ما را عوض کرد؟» —
+          // تنها راهِ فهمیدنِ اینکه آستانه‌ها درست تنظیم شده‌اند.
+          await client.query(
+            'UPDATE photo_card_submissions SET chosen_design_id=$1 WHERE id=$2',
+            [d.rows[0].id, req.params.id],
+          );
         } else {
           // رد شد: کد آزاد می‌شود تا هدر نرود. کاربر ممکن است با عکس
           // بهتر دوباره تلاش کند، یا کد واقعاً مالِ کس دیگری باشد.
@@ -734,62 +780,124 @@ module.exports = function createPhotoCardRoutes(deps) {
       let filePath = req.file.path;
       let keepFile = false;
       try {
-        const code = photoCards.normalizePhotoCode(req.body.code);
-        if (!photoCards.isValidPhotoCode(code)) {
-          return res.status(400).json({ message: 'کد کارت را درست وارد کنید' });
+        // ── گامِ ۰: آیا کاربر قفل است؟ ──
+        //
+        // قبل از هر کاری، حتی قبل از خواندنِ کد. اگر قفل است نه CPU
+        // خرج می‌شود و نه چیزی در دیتابیس عوض می‌شود.
+        const lock = await lockout.getState(pool, req.user.id);
+        if (lock.locked) {
+          // ── چرا همان متنِ لحظهٔ قفل شدن ──
+          //
+          // نسخهٔ اول اینجا متنِ ملایم‌تری می‌داد. نتیجه: کاربر فقط
+          // **یک بار** — دقیقاً در لحظهٔ قفل شدن — می‌فهمید علت
+          // «فعالیت مشکوک و ۵ کد نادرست» است. اگر آن پیام را ندیده
+          // بود یا اپ را بسته بود، بقیهٔ سه ساعت پیامی می‌دید که
+          // علت را توضیح نمی‌داد.
+          //
+          // متن باید در هر بار تلاش کامل باشد، نه فقط بار اول.
+          return res.status(429).json({
+            status: 'locked',
+            lockedUntil: lock.until,
+            remainingMs: lock.remainingMs,
+            message: 'به دلیل فعالیت مشکوک و ثبتِ ۵ کدِ نادرست پشت‌سرهم، '
+              + `تا ${lockout.humanRemaining(lock.remainingMs)} دیگر امکان ثبت `
+              + 'کارت و کد ندارید.',
+          });
         }
 
-        // ── ترتیب عمداً: اول کد، بعد تصویر ──
+        const code = photoCards.normalizePhotoCode(req.body.code);
+
+        /** پاسخِ «کد غلط» + شمردنِ خطا. */
+        const wrongCode = async (why) => {
+          const r = await lockout.registerFailure(pool, req.user.id);
+          if (r.locked) {
+            return res.status(429).json({
+              status: 'locked',
+              remainingMs: r.remainingMs,
+              message: 'به دلیل فعالیت مشکوک و ثبتِ ۵ کدِ نادرست پشت‌سرهم، '
+                + `تا ${lockout.humanRemaining(r.remainingMs)} دیگر امکان ثبت کارت `
+                + 'و کد ندارید.',
+            });
+          }
+          return res.status(404).json({
+            status: 'bad_code',
+            triesLeft: r.triesLeft,
+            message: `${why} به حروفِ شبیه‌به‌هم دقت کنید: صفر (0) و حرف O، `
+              + 'و عدد یک (1) با حروف I و L. بزرگ یا کوچک بودنِ حروف مهم نیست. '
+              + `${r.triesLeft} تلاش دیگر باقی مانده.`,
+          });
+        };
+
+        if (!photoCards.isValidPhotoCode(code)) {
+          return wrongCode('کدِ واردشده معتبر نیست.');
+        }
+
+        // ── گامِ ۱: کد ──
         //
         // بررسی کد ارزان است (یک ایندکس)، تحلیل تصویر گران (~۲۰ms CPU).
-        // اگر کد از اول باطل است، دلیلی ندارد CPU خرج شود. این همان
-        // چیزی است که یک مهاجم می‌خواست: فرستادن پشت‌سرهم تصویر بزرگ.
+        // اگر کد از اول باطل است دلیلی ندارد CPU خرج شود.
         //
-        // جست‌وجو روی `code_fold` است نه `code`: کاربر کد را از روی کارتِ
-        // چاپی می‌خواند و O/0 و I/L/1 آنجا از هم قابل تشخیص نیستند.
-        // اگر روی رشتهٔ خام جست‌وجو می‌کردیم، کاربری که `0` تایپ کرده
-        // برای کارتی که `O` چاپ شده «کد یافت نشد» می‌گرفت — در حالی که
-        // کارت واقعی در دستش است. ستون STORED است پس ایندکس می‌گیرد.
+        // جست‌وجو روی `code_fold`: کاربر کد را از روی کارتِ چاپی می‌خواند
+        // و O/0 و I/L/1 آنجا از هم قابل تشخیص نیستند.
         const codeRow = await pool.query(
           `SELECT id, status FROM photo_card_codes WHERE code_fold=$1`,
           [photoCards.foldPhotoCode(code)],
         );
         if (!codeRow.rows[0]) {
-          return res.status(404).json({ message: 'این کد در سیستم ثبت نشده است' });
+          return wrongCode('این کد در سیستم ثبت نشده است.');
         }
+
+        // ── این حالت‌ها خطای کاربر نیستند و شمرده نمی‌شوند ──
+        //
+        // کاربری که کدِ مصرف‌شده وارد می‌کند، کد را واقعاً **داشته** —
+        // فقط دیر رسیده یا دوباره فرستاده. قفل کردنش یعنی مجازاتِ
+        // کسی که کارت دارد.
         if (codeRow.rows[0].status === 'used') {
           return res.status(409).json({ message: 'این کد قبلاً استفاده شده است' });
         }
         if (codeRow.rows[0].status === 'reserved') {
-          return res.status(409).json({ message: 'این کد در حال بررسی است' });
+          return res.status(409).json({
+            message: 'این کد در حال بررسی توسط پشتیبانی است' });
         }
         if (codeRow.rows[0].status !== 'unused') {
-          return res.status(409).json({ message: 'این کد معتبر نیست' });
+          return res.status(409).json({ message: 'این کد دیگر معتبر نیست' });
         }
         const codeId = codeRow.rows[0].id;
+
+        // از اینجا به بعد کد **معتبر** است. هر نتیجه‌ای که بگیریم،
+        // شمارندهٔ خطا صفر می‌شود: کاربر ثابت کرده کارت دارد.
+        await lockout.clearFailures(pool, req.user.id);
 
         const designsRes = await pool.query(
           `SELECT id, card_type_id, image_url, dhash, phash, color_sig, width, height
              FROM photo_card_designs WHERE is_active = true`,
         );
-        if (!designsRes.rows.length) {
-          return res.status(503).json({ message: 'هنوز کارتی برای تطبیق ثبت نشده است' });
-        }
 
+        // ── گامِ ۲: تصویر ──
         const buf = await fs.promises.readFile(filePath);
         const queryFp = await fpEngine.fingerprint(buf);
-        const match = fpEngine.matchAgainst(queryFp, designsRes.rows.map(rowToFp));
+        const match = designsRes.rows.length
+          ? fpEngine.matchAgainst(queryFp, designsRes.rows.map(rowToFp))
+          : { verdict: 'reject', design: null, score: 0, margin: 0 };
 
-        if (match.verdict === 'reject') {
-          return res.status(422).json({
-            message: 'عکس با هیچ‌کدام از کارت‌ها مطابقت نداشت. '
-              + 'لطفاً کل کارت را در کادر بگیرید و از نور کافی مطمئن شوید.',
-            matched: false,
-          });
-        }
+        // ═══════════════════════════════════════════════════════════════
+        // کدِ معتبر + عکسِ ناشناخته → صف بررسی، نه رد
+        // ═══════════════════════════════════════════════════════════════
+        //
+        // خواستهٔ صریح مالک. منطقِ پشتش: کد ثابت می‌کند کاربر کارتِ
+        // فیزیکی را در دست دارد — کدها روی کارت چاپ می‌شوند و در بانکِ
+        // ما هستند. اگر با آن کدِ معتبر عکسی فرستاده که ما نشناختیم،
+        // محتمل‌ترین توضیح این است که عکس بد گرفته شده، نه اینکه کاربر
+        // دروغ می‌گوید.
+        //
+        // ردِ خودکار در این حالت یعنی مجازاتِ کسی که واقعاً کارت خریده.
+        // مدیر عکس را می‌بیند و اگر کارت را شناخت، خودش طرح را انتخاب
+        // می‌کند.
+        if (match.verdict !== 'accept') {
+          const reason = match.verdict === 'reject'
+            ? 'image_unknown'
+            : 'low_confidence';
 
-        // ── مسیر مشکوک: صف بررسی ──
-        if (match.verdict === 'review') {
           // کد رزرو می‌شود: نه آزاد (وگرنه نفر دوم خرجش می‌کند) و نه
           // مصرف‌شده (وگرنه اگر مدیر رد کند بی‌دلیل سوخته است).
           const upd = await pool.query(
@@ -798,11 +906,12 @@ module.exports = function createPhotoCardRoutes(deps) {
             [codeId],
           );
           if (!upd.rows[0]) {
-            return res.status(409).json({ message: 'این کد همین حالا توسط شخص دیگری ثبت شد' });
+            return res.status(409).json({
+              message: 'این کد همین حالا توسط شخص دیگری ثبت شد' });
           }
 
-          // فقط اینجا عکس کاربر می‌ماند — تا مدیر ببیند. بعد از تصمیم
-          // پاک می‌شود.
+          // فقط اینجا عکس کاربر می‌ماند — تا مدیر ببیند. بلافاصله بعد
+          // از تصمیم پاک می‌شود.
           const opt = await optimizeUpload(req.file);
           const savedPath = path.join(path.dirname(req.file.path), opt.filename);
           keepFile = true;
@@ -810,19 +919,25 @@ module.exports = function createPhotoCardRoutes(deps) {
           const sub = await pool.query(
             `INSERT INTO photo_card_submissions
                (user_id, code_id, matched_design_id, match_score, match_margin,
-                user_image_path, status)
-             VALUES($1,$2,$3,$4,$5,$6,'pending') RETURNING id`,
-            [req.user.id, codeId, match.design.id, match.score, match.margin, savedPath],
+                user_image_path, status, review_reason)
+             VALUES($1,$2,$3,$4,$5,$6,'pending',$7) RETURNING id`,
+            [req.user.id, codeId, match.design?.id ?? null,
+              match.score, match.margin, savedPath, reason],
           );
 
           return res.json({
             status: 'pending',
+            reason,
             submissionId: sub.rows[0].id,
-            message: 'عکس شما برای بررسی ارسال شد. نتیجه را اطلاع می‌دهیم.',
+            message: reason === 'image_unknown'
+              ? 'کد شما درست است ✅ ولی عکس به‌خوبی تشخیص داده نشد. '
+                + 'پرونده برای بررسی دستی به پشتیبانی رفت و نتیجه را '
+                + 'اطلاع می‌دهیم.'
+              : 'عکس شما برای بررسی ارسال شد. نتیجه را اطلاع می‌دهیم.',
           });
         }
 
-        // ── مسیر تأیید خودکار ──
+        // ── گامِ ۳: تأیید خودکار ──
         const client = await pool.connect();
         let payload;
         try {
@@ -838,8 +953,9 @@ module.exports = function createPhotoCardRoutes(deps) {
           }
           await client.query(
             `INSERT INTO photo_card_submissions
-               (user_id, code_id, matched_design_id, match_score, match_margin, status)
-             VALUES($1,$2,$3,$4,$5,'approved')`,
+               (user_id, code_id, matched_design_id, chosen_design_id,
+                match_score, match_margin, status)
+             VALUES($1,$2,$3,$3,$4,$5,'approved')`,
             [req.user.id, codeId, match.design.id, match.score, match.margin],
           );
           await client.query('COMMIT');
