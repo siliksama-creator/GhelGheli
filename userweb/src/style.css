@@ -2884,4 +2884,7 @@ a:focus-visible {
   line-height: 1.6;
 }
 .invNew { top: 5px; inset-inline-end: 5px; background: #b5ef58; color: #10210a; }
-.invQty { bottom: 5px; inset-inline-start: 5px; background: #000000a0; color: #fff; }
+/* نشانِ تعداد بالا-چپ می‌نشیند و نه پایین: پایینِ تصویر درست بالای
+   نوارِ تیرهٔ نامِ کارت است و دو عنصرِ تیره روی هم چسبیده به نظر
+   می‌رسیدند. بالا هم قرینهٔ نشانِ «جدید» است. */
+.invQty { top: 5px; inset-inline-start: 5px; background: #000000a0; color: #fff; }
