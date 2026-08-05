@@ -344,13 +344,20 @@ module.exports = function createPhotoCardRoutes(deps) {
 
       // جداکننده‌ها: خط جدید، کاما، سمی‌کالن، تب، فاصله، و ویرگول فارسی.
       // مدیر ممکن است از اکسل، از فایل متنی، یا دستی کپی کند.
-      const input = raw.split(/[\n,;\t، ]+/)
-        .map(c => photoCards.normalizePhotoCode(c))
-        .filter(Boolean);
+      //
+      // نکته: توکنِ خام هم نگه داشته می‌شود. اگر فقط نتیجهٔ نرمال‌سازی را
+      // نگه می‌داشتیم، ورودی‌ای مثل «----» که به رشتهٔ خالی تبدیل می‌شود
+      // بی‌سروصدا حذف می‌شد — مدیر چیزی نوشته بود و بدون هیچ توضیحی
+      // ناپدید می‌شد. حالا به‌عنوان «نامعتبر» گزارش می‌شود.
+      const tokens = raw.split(/[\n,;\t، ]+/)
+        .map(x => x.trim())
+        .filter(Boolean)
+        .map(x => ({ raw: x, norm: photoCards.normalizePhotoCode(x) }));
 
-      if (!input.length) {
+      if (!tokens.length) {
         return res.status(400).json({ message: 'هیچ کدی وارد نشده است' });
       }
+      const input = tokens;
       if (input.length > MAX_BATCH) {
         return res.status(400).json({
           message: `در هر نوبت حداکثر ${MAX_BATCH.toLocaleString('en-US')} کد `
@@ -361,15 +368,23 @@ module.exports = function createPhotoCardRoutes(deps) {
 
       const label = String(req.body.batchLabel || '').trim().slice(0, 80) || null;
 
+      // ── تکراری بر پایهٔ fold سنجیده می‌شود، نه رشتهٔ خام ──
+      //
+      // `QL-2026-O001` و `QL-2026-0001` روی کارتِ چاپی از هم قابل تشخیص
+      // نیستند. اگر هر دو وارد شوند، کاربری که کارت را در دست دارد
+      // نمی‌تواند بگوید کدام‌یک را دارد. پس همین‌جا یکی‌شان تکراری
+      // شمرده می‌شود، نه اینکه ایندکس یکتای دیتابیس بعداً با خطای مبهم
+      // بیفتد.
       const seen = new Set();
       const duplicateInFile = [];
       const invalid = [];
       const candidates = [];
-      for (const c of input) {
-        if (!photoCards.isValidPhotoCode(c)) { invalid.push(c); continue; }
-        if (seen.has(c)) { duplicateInFile.push(c); continue; }
-        seen.add(c);
-        candidates.push(c);
+      for (const tok of input) {
+        if (!photoCards.isValidPhotoCode(tok.norm)) { invalid.push(tok.raw); continue; }
+        const key = photoCards.foldPhotoCode(tok.norm);
+        if (seen.has(key)) { duplicateInFile.push(tok.norm); continue; }
+        seen.add(key);
+        candidates.push(tok.norm);
       }
 
       let inserted = [];
@@ -397,10 +412,14 @@ module.exports = function createPhotoCardRoutes(deps) {
         // درج دسته‌ای با ON CONFLICT — اتمیک و بدون مسابقهٔ زمانی.
         // بررسی جداگانهٔ «آیا وجود دارد؟» قبل از درج، پنجره‌ای می‌ساخت
         // که ادمین دوم می‌توانست همان کد را وسطش درج کند.
+        //
+        // تعارض روی `code_fold` گرفته می‌شود نه `code`: دو کدی که فقط در
+        // O/0 یا I/L/1 فرق دارند روی کارت یکسان دیده می‌شوند و نباید هر
+        // دو در بانک باشند.
         const r = await pool.query(
           `INSERT INTO photo_card_codes(code, batch_label)
            SELECT unnest($1::citext[]), $2
-           ON CONFLICT (code) DO NOTHING
+           ON CONFLICT (code_fold) DO NOTHING
            RETURNING code`,
           [candidates, label],
         );
@@ -725,8 +744,15 @@ module.exports = function createPhotoCardRoutes(deps) {
         // بررسی کد ارزان است (یک ایندکس)، تحلیل تصویر گران (~۲۰ms CPU).
         // اگر کد از اول باطل است، دلیلی ندارد CPU خرج شود. این همان
         // چیزی است که یک مهاجم می‌خواست: فرستادن پشت‌سرهم تصویر بزرگ.
+        //
+        // جست‌وجو روی `code_fold` است نه `code`: کاربر کد را از روی کارتِ
+        // چاپی می‌خواند و O/0 و I/L/1 آنجا از هم قابل تشخیص نیستند.
+        // اگر روی رشتهٔ خام جست‌وجو می‌کردیم، کاربری که `0` تایپ کرده
+        // برای کارتی که `O` چاپ شده «کد یافت نشد» می‌گرفت — در حالی که
+        // کارت واقعی در دستش است. ستون STORED است پس ایندکس می‌گیرد.
         const codeRow = await pool.query(
-          `SELECT id, status FROM photo_card_codes WHERE code=$1`, [code],
+          `SELECT id, status FROM photo_card_codes WHERE code_fold=$1`,
+          [photoCards.foldPhotoCode(code)],
         );
         if (!codeRow.rows[0]) {
           return res.status(404).json({ message: 'این کد در سیستم ثبت نشده است' });
