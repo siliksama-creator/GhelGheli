@@ -18,7 +18,7 @@ import {
 
 import { assetUrl, fmtDateTime, fmtNumber } from '../lib/api.js';
 import {
-  Badge, Button, Card, EmptyState, Field, Input, Skeleton,
+  Badge, Button, Card, EmptyState, Field, Input, Skeleton, Textarea,
 } from '../components/ui.jsx';
 import { useDialog } from '../components/dialog.jsx';
 import { useToast } from '../lib/toast.jsx';
@@ -41,10 +41,11 @@ export function PhotoCardsPage({ request }) {
   const [cash, setCash] = useState('');
   const [uploading, setUploading] = useState(false);
 
-  // فرم کد
-  const [count, setCount] = useState('15000');
+  // فرم کد — مدیر خودش وارد می‌کند، سیستم نمی‌سازد
+  const [rawCodes, setRawCodes] = useState('');
   const [label, setLabel] = useState('');
-  const [generating, setGenerating] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [report, setReport] = useState(null);
 
   const loadDesigns = useCallback(
     () => request('/api/admin/photo-cards/designs')
@@ -106,30 +107,35 @@ export function PhotoCardsPage({ request }) {
     } catch (e) { notify(e.message, 'error'); }
   }
 
-  async function generateCodes() {
-    const n = Number(count);
-    if (!Number.isFinite(n) || n < 1) return notify('تعداد را درست وارد کنید', 'error');
-    const okGo = await confirmAction({
-      title: 'ساخت کد جدید',
-      message: `${fmtNumber(n)} کد ساخته می‌شود. این کدها بین همهٔ طرح‌ها مشترک‌اند `
-        + 'و هر کدام فقط یک بار قابل استفاده است.',
-      confirmText: 'بساز',
-    });
-    if (!okGo) return;
-    setGenerating(true);
+  /**
+   * کدها را همان‌طور که مدیر نوشته می‌فرستد.
+   *
+   * شمارشِ محلی فقط برای نمایش است؛ تفکیک و اعتبارسنجیِ واقعی سمت سرور
+   * انجام می‌شود. اگر اینجا هم منطق تفکیک را می‌نوشتم، دو جا برای واگرا
+   * شدن داشتیم و روزی یکی «۱۵۰۰۰ کد» می‌گفت و دیگری ۱۴۹۸۷ ثبت می‌کرد.
+   */
+  async function saveCodes() {
+    if (!rawCodes.trim()) return notify('کدها را وارد کنید', 'error');
+    setSaving(true);
+    setReport(null);
     try {
-      const r = await request('/api/admin/photo-cards/codes/generate', {
-        method: 'POST', body: { count: n, batchLabel: label.trim() || undefined },
+      const r = await request('/api/admin/photo-cards/codes', {
+        method: 'POST',
+        body: { rawCodes, batchLabel: label.trim() || undefined },
       });
-      notify(r.message, 'success');
-      setLabel('');
+      setReport(r);
+      notify(r.message, r.insertedCount ? 'success' : 'error');
+      if (r.insertedCount) setRawCodes('');
       loadCodes();
     } catch (e) {
       notify(e.message, 'error');
     } finally {
-      setGenerating(false);
+      setSaving(false);
     }
   }
+
+  // شمارشِ تقریبی برای نمایشِ زنده زیر کادر. همان جداکننده‌های سرور.
+  const typedCount = rawCodes.split(/[\n,;\t، ]+/).filter(Boolean).length;
 
   async function decide(sub, approve) {
     let reason = '';
@@ -211,7 +217,7 @@ export function PhotoCardsPage({ request }) {
       {/* ───────── ۲. بانک کد ───────── */}
       <Card
         title="بانک کد مشترک"
-        subtitle="این کدها بین همهٔ طرح‌ها مشترک‌اند — طرح جدید که اضافه شود، همین کدها پوششش می‌دهند."
+        subtitle="کدهای چاپ‌شده روی کارت‌ها را وارد کنید. این بانک بین همهٔ طرح‌ها مشترک است — طرح جدید که اضافه شود، همین کدها پوششش می‌دهند."
         action={
           <Button
             variant="secondary" icon={Download}
@@ -231,19 +237,89 @@ export function PhotoCardsPage({ request }) {
             <div className="statPill used"><b>{fmtNumber(stats.used)}</b><span>مصرف‌شده</span></div>
           </div>
         )}
+        {/* ── ورودِ کد: دانه‌ای یا انبوه، در یک کادر ──
+            کادر متنی چندخطی هر دو حالت را پوشش می‌دهد: یک کد در یک خط،
+            یا ۱۵ هزار کد چسبانده‌شده از اکسل. دو فرم جدا فقط مدیر را
+            مجبور می‌کرد بین دوتاشان انتخاب کند بدون اینکه سودی داشته
+            باشد. */}
+        <Field label="کدها — هر خط یک کد (یا با کاما/فاصله جدا کنید)">
+          <Textarea
+            rows={7}
+            dir="ltr"
+            className="codeInput"
+            value={rawCodes}
+            onChange={e => setRawCodes(e.target.value)}
+            placeholder={'GHP-A2B3-C4D5\nGHP-X7K9-M1N2\n…'}
+          />
+        </Field>
+        <div className="codeMetaRow">
+          <span className="topbar-sub">
+            {typedCount > 0
+              ? `${fmtNumber(typedCount)} کد نوشته‌اید`
+              : 'کدهایی که روی کارت‌ها چاپ شده را اینجا وارد کنید'}
+          </span>
+        </div>
         <div className="photoCodeForm">
-          <Field label="تعداد کد">
-            <Input type="number" min="1" max="20000" value={count}
-              onChange={e => setCount(e.target.value)} />
-          </Field>
           <Field label="برچسب دسته (اختیاری)">
             <Input value={label} onChange={e => setLabel(e.target.value)}
               placeholder="مثلاً: چاپ مهر ۱۴۰۵" />
           </Field>
-          <Button icon={KeyRound} loading={generating} onClick={generateCodes}>
-            ساخت کد
+          <Button icon={KeyRound} loading={saving} onClick={saveCodes}>
+            ثبت کدها
           </Button>
         </div>
+
+        {/* ── گزارش تفکیک‌شده ──
+            «۱۴٬۹۸۷ کد ثبت شد» به‌تنهایی بی‌فایده است — مدیر باید بداند
+            کدام‌ها جا افتادند و چرا. */}
+        {report && (
+          <div className="codeReport">
+            <div className="crRow">
+              <Badge tone="success">{fmtNumber(report.insertedCount)} ثبت شد</Badge>
+              {report.duplicateInDbCount > 0 && (
+                <Badge tone="warning">
+                  {fmtNumber(report.duplicateInDbCount)} از قبل بود
+                </Badge>
+              )}
+              {report.duplicateInFileCount > 0 && (
+                <Badge tone="warning">
+                  {fmtNumber(report.duplicateInFileCount)} تکراری در ورودی
+                </Badge>
+              )}
+              {report.invalidCount > 0 && (
+                <Badge tone="danger">{fmtNumber(report.invalidCount)} نامعتبر</Badge>
+              )}
+            </div>
+
+            {/* هشدارِ برخورد با بانکِ سیستم قدیمی. سکوت اینجا یعنی یک
+                کارت دو بار امتیاز می‌دهد و ماه‌ها بعد کشف می‌شود. */}
+            {report.clashWithOldBankCount > 0 && (
+              <div className="crWarn">
+                <AlertTriangle size={15} />
+                <div>
+                  <b>{fmtNumber(report.clashWithOldBankCount)} کد در سیستم «ثبت کد کارت» هم وجود دارد.</b>
+                  <span>
+                    یعنی همان کارت یک بار با کد و یک بار با عکس قابل ثبت است
+                    و دو بار امتیاز می‌دهد. اگر عمدی نیست، آن کدها را از یکی
+                    از دو سیستم باطل کنید.
+                  </span>
+                  <code>{report.clashWithOldBank.join('، ')}</code>
+                </div>
+              </div>
+            )}
+
+            {report.invalidCount > 0 && (
+              <p className="crList">
+                نامعتبر: <code>{report.invalid.join('، ')}</code>
+              </p>
+            )}
+            {report.duplicateInDbCount > 0 && (
+              <p className="crList">
+                از قبل موجود: <code>{report.duplicateInDb.join('، ')}</code>
+              </p>
+            )}
+          </div>
+        )}
         {batches.length > 0 && (
           <div className="batchList">
             {batches.map(b => (

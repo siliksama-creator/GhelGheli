@@ -102,82 +102,117 @@ async function testNormalize() {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// ۲. اعتبارسنجی فرمت
+// ۳. کدهایی که مدیر وارد می‌کند
 // ───────────────────────────────────────────────────────────────────────────
-async function testValidate() {
+//
+// مالک کدها را خودش وارد می‌کند (دانه‌ای یا انبوه) چون روی کارتِ فیزیکی
+// از قبل چاپ شده‌اند. پس تست‌ها باید قالب‌های واقعیِ متنوع را بپذیرند،
+// نه فقط قالبی که خودمان می‌ساختیم.
+async function testAdminEnteredCodes() {
+  const n = svc.normalizePhotoCode;
   const v = svc.isValidPhotoCode;
 
-  await t('کد معتبر پذیرفته می‌شود', () => {
-    assert.ok(v('GHP-A2B3-C4D5'));
+  await t('قالب‌های واقعیِ چاپخانه پذیرفته می‌شوند', () => {
+    // هیچ‌کدام قالبِ «ما» نیستند؛ همه باید کار کنند چون مالک ممکن است
+    // هرکدام را روی کارت‌هایش چاپ کرده باشد.
+    for (const c of ['GHP-A2B3-C4D5', 'ABCD1234', 'QL-2026-0001',
+      'X7K9', '1234567890', 'GHELGHELI-2026-SERIES-A-000001']) {
+      assert.ok(v(n(c)), `${c} باید معتبر باشد`);
+    }
   });
 
-  await t('کد کوتاه رد می‌شود', () => {
-    assert.ok(!v('GHP-1'));
+  await t('کد خیلی کوتاه رد می‌شود', () => {
+    // کمتر از ۴ کاراکتر یعنی فضای حالت کوچک و قابل حدس زدن.
+    assert.ok(!v(n('AB')));
+    assert.ok(!v(n('1')));
+  });
+
+  await t('کد فقط خط تیره رد می‌شود', () => {
+    // بدون این بررسی، '----' معتبر شمرده می‌شد.
+    assert.ok(!v(n('----')));
+    assert.ok(!v(n('-')));
   });
 
   await t('کاراکتر غیرمجاز رد می‌شود', () => {
-    assert.ok(!v('GHP-A2B3-C4D5!'));
-    assert.ok(!v('GHP_A2B3'));         // زیرخط بعد از نرمال‌سازی نباید بماند
-    assert.ok(!v('کد-فارسی-۱۲۳'));
+    assert.ok(!v(n('CODE!@#')));
+    assert.ok(!v(n('کد-فارسی')));
   });
 
   await t('رشتهٔ خیلی بلند رد می‌شود', () => {
-    assert.ok(!v('G'.repeat(65)));
+    assert.ok(!v(n('G'.repeat(65))));
   });
-}
 
-// ───────────────────────────────────────────────────────────────────────────
-// ۳. تولید کد
-// ───────────────────────────────────────────────────────────────────────────
-async function testGenerate() {
-  await t('قالب تولیدشده درست است', () => {
-    for (let i = 0; i < 200; i++) {
-      const c = svc.generateCode();
-      assert.ok(/^GHP-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(c), `قالب غلط: ${c}`);
+  // ── نکتهٔ حیاتیِ ورودِ دستی ──
+  //
+  // مدیر کد را وارد می‌کند و کاربر همان کد را تایپ می‌کند. اگر این دو
+  // مسیر یکسان نرمال نشوند، کدی که مدیر ثبت کرده هرگز پیدا نمی‌شود.
+  await t('کدِ مدیر و کدِ کاربر یکسان نرمال می‌شوند', () => {
+    const pairs = [
+      ['ghp-o234-5678', 'GHP-0234-5678'],   // حروف کوچک + O
+      ['GHP ۲۳۴۵ ۶۷۸۹', 'GHP-2345-6789'],   // فاصله + ارقام فارسی
+      ['ghp.i234.l678', 'GHP-1234-1678'],   // نقطه + I/L
+      ['  GHP--A2B3  ', 'GHP-A2B3'],        // فاصلهٔ اضافی + تیرهٔ تکراری
+    ];
+    for (const [typed, expected] of pairs) {
+      assert.strictEqual(n(typed), expected, `«${typed}» غلط نرمال شد`);
     }
   });
 
-  // ── مهم‌ترین تست این بخش ──
-  // اگر الفبا کاراکتر مبهم داشته باشد، `normalizePhotoCode` دو کد متفاوت
-  // را به یک رشته نگاشت می‌کند و یکتایی دیتابیس می‌شکند.
-  await t('کد تولیدشده تحت نرمال‌سازی تغییر نمی‌کند', () => {
-    for (let i = 0; i < 500; i++) {
-      const c = svc.generateCode();
-      assert.strictEqual(svc.normalizePhotoCode(c), c,
-        `کد ${c} بعد از نرمال‌سازی عوض شد`);
+  await t('نرمال‌سازی خودتوان است', () => {
+    // اگر این بشکند، کدِ ذخیره‌شده با کدِ تایپ‌شده مطابقت نمی‌کند.
+    for (const c of ['ghp o234 ۵۶۷۸', 'QL--2026..0001', 'x7k9']) {
+      const once = n(c);
+      assert.strictEqual(n(once), once, `«${c}» خودتوان نیست`);
     }
   });
 
-  await t('الفبا هیچ کاراکتر مبهمی ندارد', () => {
+  await t('کدهای مبهم به یک رشته می‌رسند', () => {
+    // O/0 و I/1/L روی چاپ یکسان‌اند. این عمدی است و باید ثابت بماند:
+    // یعنی مالک نباید هم O و هم 0 را به‌عنوان دو کدِ جدا چاپ کند.
+    assert.strictEqual(n('GHPO123'), n('GHP0123'));
+    assert.strictEqual(n('GHPI123'), n('GHP1123'));
+    assert.strictEqual(n('GHPL123'), n('GHP1123'));
+  });
+
+  await t('کد پیشنهادی معتبر و خودتوان است', () => {
+    // suggestCode فقط راهنمای طراحیِ چاپ است، ولی اگر مالک از آن
+    // استفاده کند نباید زیر نرمال‌سازی عوض شود.
+    for (let i = 0; i < 300; i++) {
+      const c = svc.suggestCode();
+      assert.ok(v(c), `${c} نامعتبر است`);
+      assert.strictEqual(n(c), c, `${c} زیر نرمال‌سازی عوض شد`);
+    }
+  });
+
+  await t('الفبای پیشنهادی کاراکتر مبهم ندارد', () => {
     for (const ch of 'OIL01U') {
       assert.ok(!svc.CODE_ALPHABET.includes(ch),
         `الفبا نباید ${ch} داشته باشد`);
     }
   });
 
-  await t('کد تولیدشده معتبر است', () => {
-    for (let i = 0; i < 100; i++) {
-      assert.ok(svc.isValidPhotoCode(svc.generateCode()));
-    }
+  await t('جداکننده‌های مختلف در ورودِ انبوه', () => {
+    // مدیر ممکن است از اکسل، فایل متنی یا دستی کپی کند. این همان
+    // تفکیکی است که مسیر ورودِ انبوه انجام می‌دهد.
+    const raw = 'GHP-0001\nGHP-0002,GHP-0003;GHP-0004\tGHP-0005 GHP-0006،GHP-0007';
+    const parsed = raw.split(/[\n,;\t، ]+/).map(n).filter(Boolean);
+    assert.strictEqual(parsed.length, 7, `${parsed.length} کد تفکیک شد`);
+    for (const c of parsed) assert.ok(v(c), `${c} نامعتبر`);
   });
 
-  await t('نرخ برخورد در ۲۰ هزار کد قابل قبول است', () => {
-    // ۱۵ هزار خواستهٔ مالک است؛ ۲۰ هزار حاشیهٔ اطمینان.
+  await t('تکراری در همان ورودی تشخیص داده می‌شود', () => {
+    // «ghp-0001» و «GHP-0001» یک کدند؛ اگر هر دو درج شوند، دومی با
+    // خطای یکتایی می‌افتد و گزارش برای مدیر گیج‌کننده می‌شود.
+    const raw = 'GHP-0001\nghp-0001\nGHP-0002';
     const seen = new Set();
-    let collisions = 0;
-    for (let i = 0; i < 20000; i++) {
-      const c = svc.generateCode();
-      if (seen.has(c)) collisions++;
-      seen.add(c);
+    const dupes = [];
+    const uniq = [];
+    for (const c of raw.split(/[\n,;\t، ]+/).map(n).filter(Boolean)) {
+      if (seen.has(c)) { dupes.push(c); continue; }
+      seen.add(c); uniq.push(c);
     }
-    // با فضای ۶.۶×۱۰¹¹ انتظار تقریباً صفر است؛ ۵ سقف بسیار سخاوتمندانه.
-    assert.ok(collisions <= 5, `${collisions} برخورد — فضای کد کوچک است`);
-  });
-
-  await t('فضای کد برای حدس زدن بزرگ است', () => {
-    // شانس یافتن یک کد معتبر از ۱۵۰۰۰ تا با حدس تصادفی
-    const chance = 15000 / svc.CODE_SPACE;
-    assert.ok(chance < 1e-6, `شانس حدس ${chance} خیلی زیاد است`);
+    assert.strictEqual(uniq.length, 2);
+    assert.strictEqual(dupes.length, 1);
   });
 }
 
@@ -337,8 +372,7 @@ async function testMatching() {
 // ───────────────────────────────────────────────────────────────────────────
 (async () => {
   await testNormalize();
-  await testValidate();
-  await testGenerate();
+  await testAdminEnteredCodes();
   await testMatching();
 
   for (const r of results) console.log(r);

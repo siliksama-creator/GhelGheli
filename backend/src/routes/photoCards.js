@@ -298,63 +298,206 @@ module.exports = function createPhotoCardRoutes(deps) {
   }));
 
   /**
-   * تولید دسته‌ای کد.
+   * ورودِ کد توسط مدیر — دانه‌ای یا انبوه.
    *
-   * بانک **مشترک** است: هیچ `card_type_id`ای نمی‌گیرد. خواستهٔ صریح مالک:
-   * «همان ۱۵ هزار کد تعریف‌شده باید عکس‌های جدید را هم پوشش دهند».
-   * کد در لحظهٔ ثبت به طرحی که تطبیق خورده بسته می‌شود.
+   * ═══════════════════════════════════════════════════════════════════════
+   * چرا مدیر کد را وارد می‌کند و سیستم نمی‌سازد
+   * ═══════════════════════════════════════════════════════════════════════
+   *
+   * خواستهٔ صریح مالک: «کدها رو ادمین دونه‌ای و یا تعداد بالا خودش وارد
+   * کنه». نسخهٔ اول کد تصادفی تولید می‌کرد که اشتباه بود: کدها روی کارتِ
+   * فیزیکی **چاپ** می‌شوند و آن چاپ ممکن است قبلاً انجام شده باشد یا
+   * چاپخانه قالب خودش را داشته باشد. سیستمی که کد می‌سازد، مالک را
+   * مجبور می‌کند چاپ را با خروجی نرم‌افزار هماهنگ کند — برعکسِ چیزی که
+   * در عمل لازم است.
+   *
+   * حالا مدیر همان کدهایی را که روی کارت‌ها چاپ شده وارد می‌کند.
+   *
+   * ═══════════════════════════════════════════════════════════════════════
+   * بانک همچنان مشترک است
+   * ═══════════════════════════════════════════════════════════════════════
+   *
+   * هیچ `card_type_id`ای گرفته نمی‌شود. کد در لحظهٔ ثبتِ کاربر به طرحی
+   * که تصویرش تطبیق خورده بسته می‌شود. پس طرح جدید که اضافه شود، همین
+   * کدها پوششش می‌دهند — دقیقاً همان چیزی که مالک خواست.
+   *
+   * ═══════════════════════════════════════════════════════════════════════
+   * چرا گزارش تفکیک‌شده برمی‌گردد
+   * ═══════════════════════════════════════════════════════════════════════
+   *
+   * وقتی مدیر ۱۵ هزار کد را از یک فایل اکسل کپی می‌کند، «۱۴٬۹۸۷ کد ثبت
+   * شد» به‌تنهایی بی‌فایده است — کدام ۱۳ تا جا افتاد و چرا؟ پس چهار
+   * دستهٔ جدا شمرده می‌شود: ثبت‌شده، تکراری در همین ورودی، تکراری در
+   * دیتابیس، و نامعتبر. همان الگویی که مسیر `card-codes/bulk` فعلی دارد،
+   * تا مدیر با دو رابطِ ناهماهنگ روبه‌رو نشود.
    */
   router.post(
-    '/admin/photo-cards/codes/generate',
+    '/admin/photo-cards/codes',
     adminAuth, requireRole('support'),
     asyncHandler(async (req, res) => {
-      const count = Math.floor(Number(req.body.count || 0));
-      if (!Number.isFinite(count) || count < 1) {
-        return res.status(400).json({ message: 'تعداد را وارد کنید' });
+      // هم `code` تکی را می‌پذیرد، هم `rawCodes` انبوه. یک مسیر برای هر
+      // دو حالت، چون منطقِ اعتبارسنجی و گزارش دقیقاً یکی است و دو مسیر
+      // یعنی دو جا برای واگرا شدن.
+      const raw = req.body.rawCodes !== undefined
+        ? String(req.body.rawCodes)
+        : String(req.body.code || '');
+
+      // جداکننده‌ها: خط جدید، کاما، سمی‌کالن، تب، فاصله، و ویرگول فارسی.
+      // مدیر ممکن است از اکسل، از فایل متنی، یا دستی کپی کند.
+      const input = raw.split(/[\n,;\t، ]+/)
+        .map(c => photoCards.normalizePhotoCode(c))
+        .filter(Boolean);
+
+      if (!input.length) {
+        return res.status(400).json({ message: 'هیچ کدی وارد نشده است' });
       }
-      if (count > MAX_BATCH) {
+      if (input.length > MAX_BATCH) {
         return res.status(400).json({
-          message: `در هر نوبت حداکثر ${MAX_BATCH.toLocaleString('en-US')} کد ساخته می‌شود. `
-            + 'می‌توانید چند بار تکرار کنید؛ برای مجموع کدها سقفی نیست.',
+          message: `در هر نوبت حداکثر ${MAX_BATCH.toLocaleString('en-US')} کد `
+            + `قابل ثبت است؛ شما ${input.length.toLocaleString('en-US')} کد فرستادید. `
+            + 'بقیه را در نوبت بعد اضافه کنید — برای مجموع کدها سقفی نیست.',
         });
       }
+
       const label = String(req.body.batchLabel || '').trim().slice(0, 80) || null;
 
-      // ── چرا حلقهٔ تلاش مجدد ──
-      //
-      // فضای کد ۶.۶×۱۰¹¹ است، پس برخورد تصادفی تقریباً محال است. ولی
-      // «تقریباً محال» با «محال» فرق دارد، و برخورد باعث می‌شود
-      // ON CONFLICT ردیف را رد کند و کاربر کمتر از چیزی که خواسته
-      // بگیرد — بی‌سروصدا. حلقه تضمین می‌کند دقیقاً `count` تا ساخته شود.
-      const inserted = [];
-      let attempts = 0;
-      while (inserted.length < count && attempts < 12) {
-        attempts++;
-        const need = count - inserted.length;
-        const batch = new Set();
-        while (batch.size < need) batch.add(photoCards.generateCode());
+      const seen = new Set();
+      const duplicateInFile = [];
+      const invalid = [];
+      const candidates = [];
+      for (const c of input) {
+        if (!photoCards.isValidPhotoCode(c)) { invalid.push(c); continue; }
+        if (seen.has(c)) { duplicateInFile.push(c); continue; }
+        seen.add(c);
+        candidates.push(c);
+      }
 
+      let inserted = [];
+      let duplicateInDb = [];
+      let clashWithOldBank = [];
+      if (candidates.length) {
+        // ── هشدار برخورد با بانکِ سیستم قدیمی ──
+        //
+        // دو بانک کاملاً مستقل‌اند (`card_codes` و `photo_card_codes`) و
+        // این عمدی است. ولی یک خطر واقعی دارد: اگر مدیر یک رشتهٔ یکسان
+        // را در **هر دو** بانک وارد کند، کاربر می‌تواند یک بار از راه
+        // «ثبت کد کارت» و یک بار از راه «ثبت با عکس» امتیاز بگیرد —
+        // دو بار برای یک کارت.
+        //
+        // بلوکش نمی‌کنیم چون ممکن است عمدی باشد (مثلاً همان کارت‌های
+        // قدیمی حالا با عکس هم قابل ثبت شوند). فقط گزارش می‌دهیم تا
+        // مدیر بداند چه چیزی را انتخاب کرده — سکوت اینجا یعنی نشتِ
+        // امتیاز که ماه‌ها بعد کشف می‌شود.
+        const clash = await pool.query(
+          `SELECT code FROM card_codes WHERE code = ANY($1::citext[])`,
+          [candidates],
+        );
+        clashWithOldBank = clash.rows.map(x => String(x.code));
+
+        // درج دسته‌ای با ON CONFLICT — اتمیک و بدون مسابقهٔ زمانی.
+        // بررسی جداگانهٔ «آیا وجود دارد؟» قبل از درج، پنجره‌ای می‌ساخت
+        // که ادمین دوم می‌توانست همان کد را وسطش درج کند.
         const r = await pool.query(
           `INSERT INTO photo_card_codes(code, batch_label)
            SELECT unnest($1::citext[]), $2
            ON CONFLICT (code) DO NOTHING
            RETURNING code`,
-          [Array.from(batch), label],
+          [candidates, label],
         );
-        for (const row of r.rows) inserted.push(String(row.code));
+        inserted = r.rows.map(x => String(x.code));
+        const okSet = new Set(inserted.map(c => c.toUpperCase()));
+        duplicateInDb = candidates.filter(c => !okSet.has(c.toUpperCase()));
       }
 
-      await audit(req.admin.id, 'generate_photo_card_codes', 'photo_card_codes',
-        null, null, { requested: count, created: inserted.length, batchLabel: label });
+      await audit(req.admin.id, 'import_photo_card_codes', 'photo_card_codes',
+        null, null, {
+          inserted: inserted.length,
+          duplicateInFile: duplicateInFile.length,
+          duplicateInDb: duplicateInDb.length,
+          invalid: invalid.length,
+          clashWithOldBank: clashWithOldBank.length,
+          batchLabel: label,
+        });
 
+      // فقط نمونه‌ای از هر دسته. با ۱۵ هزار کد، برگرداندن همهٔ آرایه‌ها
+      // پاسخ را چند مگابایت می‌کرد و رابط هم نشانش نمی‌دهد.
+      const sample = a => a.slice(0, 20);
       res.json({
-        createdCount: inserted.length,
-        requested: count,
+        insertedCount: inserted.length,
+        duplicateInFileCount: duplicateInFile.length,
+        duplicateInDbCount: duplicateInDb.length,
+        invalidCount: invalid.length,
+        inserted: sample(inserted),
+        duplicateInFile: sample(duplicateInFile),
+        duplicateInDb: sample(duplicateInDb),
+        invalid: sample(invalid),
+        // هشدار، نه خطا: مدیر باید بداند این کدها در سیستم قدیمی هم
+        // هستند و آن کارت دو بار قابل ثبت می‌شود.
+        clashWithOldBankCount: clashWithOldBank.length,
+        clashWithOldBank: sample(clashWithOldBank),
+        truncatedSamples: inserted.length > 20 || duplicateInDb.length > 20
+          || invalid.length > 20,
         batchLabel: label,
-        // فقط نمونه؛ ۱۵ هزار کد در پاسخ JSON بی‌معنی است.
-        sample: inserted.slice(0, 20),
-        message: `${inserted.length.toLocaleString('en-US')} کد ساخته شد`,
+        message: `${inserted.length.toLocaleString('en-US')} کد ثبت شد`,
       });
+    }),
+  );
+
+  /** ابطال یک کد پیش از آنکه کسی مصرفش کند. */
+  router.patch(
+    '/admin/photo-cards/codes/:id/void',
+    adminAuth, requireRole('support'),
+    asyncHandler(async (req, res) => {
+      if (!UUID_RE.test(String(req.params.id))) {
+        return res.status(400).json({ message: 'شناسه معتبر نیست' });
+      }
+      // فقط کدِ آزاد باطل می‌شود. کدِ مصرف‌شده را نمی‌شود پس گرفت (امتیازش
+      // داده شده) و کدِ رزروشده در صف بررسی است؛ باطل کردنش یعنی پروندهٔ
+      // آن کاربر بی‌سروصدا خراب می‌شود.
+      const { rows } = await pool.query(
+        `UPDATE photo_card_codes SET status='voided', updated_at=NOW()
+          WHERE id=$1 AND status='unused' RETURNING id, code`,
+        [req.params.id],
+      );
+      if (!rows[0]) {
+        return res.status(409).json({
+          message: 'فقط کدهای آزاد قابل ابطال‌اند',
+        });
+      }
+      await audit(req.admin.id, 'void_photo_card_code', 'photo_card_codes',
+        rows[0].id, req.body.reason || 'ابطال دستی', {});
+      res.json(rows[0]);
+    }),
+  );
+
+  /** فهرست کدها برای بازبینی و جست‌وجو. */
+  router.get(
+    '/admin/photo-cards/codes',
+    adminAuth,
+    asyncHandler(async (req, res) => {
+      const where = [];
+      const params = [];
+      if (['unused', 'reserved', 'used', 'voided'].includes(req.query.status)) {
+        params.push(req.query.status);
+        where.push(`c.status = $${params.length}`);
+      }
+      if (req.query.q) {
+        params.push(`%${photoCards.normalizePhotoCode(req.query.q)}%`);
+        where.push(`c.code::text ILIKE $${params.length}`);
+      }
+      const { rows } = await pool.query(
+        `SELECT c.id, c.code, c.status, c.batch_label, c.created_at, c.used_at,
+                u.mobile AS used_by_mobile, t.name AS card_type_name
+           FROM photo_card_codes c
+           LEFT JOIN users u ON u.id = c.used_by_user_id
+           LEFT JOIN photo_card_designs d ON d.id = c.bound_design_id
+           LEFT JOIN card_types t ON t.id = d.card_type_id
+          ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+          ORDER BY c.created_at DESC
+          LIMIT 300`,
+        params,
+      );
+      res.json({ codes: rows });
     }),
   );
 
