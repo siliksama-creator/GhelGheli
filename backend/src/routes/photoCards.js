@@ -76,6 +76,14 @@ module.exports = function createPhotoCardRoutes(deps) {
     dhash: r.dhash,
     phash: r.phash,
     colorSig: toFloats(r.color_sig),
+    // ── چرا این خط حیاتی است ──
+    //
+    // اگر `texSig` از دیتابیس خوانده نشود، `similarity` شرطِ `hasTex`
+    // را رد می‌کند و به فرمولِ سه‌سیگناله می‌افتد — در حالی که
+    // آستانه‌ها روی فرمولِ چهارسیگناله کالیبره شده‌اند. نتیجه‌اش
+    // امتیازهای ناسازگار بود: یک کارت تأیید خودکار می‌گرفت و کارتِ
+    // دیگر با همان کیفیتِ عکس به صف بررسی می‌رفت.
+    texSig: toFloats(r.tex_sig),
     width: r.width,
     height: r.height,
   });
@@ -167,14 +175,17 @@ module.exports = function createPhotoCardRoutes(deps) {
         // بفهمد چه شده. اگر واقعاً قصدش جایگزینی است، اول طرح قبلی را
         // غیرفعال کند.
         const existing = await pool.query(
-          `SELECT d.id, d.dhash, d.phash, d.color_sig, t.name
+          `SELECT d.id, d.dhash, d.phash, d.color_sig, d.tex_sig, t.name
              FROM photo_card_designs d
              JOIN card_types t ON t.id = d.card_type_id
             WHERE d.is_active = true`,
         );
         for (const row of existing.rows) {
           const sim = fpEngine.similarity(fp, {
-            dhash: row.dhash, phash: row.phash, colorSig: toFloats(row.color_sig),
+            dhash: row.dhash,
+            phash: row.phash,
+            colorSig: toFloats(row.color_sig),
+            texSig: toFloats(row.tex_sig),
           });
           if (sim >= DUPLICATE_SIMILARITY) {
             return res.status(409).json({
@@ -228,10 +239,11 @@ module.exports = function createPhotoCardRoutes(deps) {
 
           const d = await client.query(
             `INSERT INTO photo_card_designs
-               (card_type_id, image_url, dhash, phash, color_sig, width, height, created_by)
-             VALUES($1,$2,$3,$4,$5,$6,$7,$8)
+               (card_type_id, image_url, dhash, phash, color_sig, tex_sig,
+                width, height, created_by)
+             VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
              RETURNING id, image_url, width, height, created_at`,
-            [cardTypeId, imageUrl, fp.dhash, fp.phash, fp.colorSig,
+            [cardTypeId, imageUrl, fp.dhash, fp.phash, fp.colorSig, fp.texSig,
               fp.width, fp.height, req.admin.id],
           );
 
@@ -869,7 +881,8 @@ module.exports = function createPhotoCardRoutes(deps) {
         await lockout.clearFailures(pool, req.user.id);
 
         const designsRes = await pool.query(
-          `SELECT id, card_type_id, image_url, dhash, phash, color_sig, width, height
+          `SELECT id, card_type_id, image_url, dhash, phash, color_sig, tex_sig,
+                  width, height
              FROM photo_card_designs WHERE is_active = true`,
         );
 
