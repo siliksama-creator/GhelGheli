@@ -24,3 +24,4 @@ userweb/dist/
 *.jks
 *.keystore
 **/key.properties
+__pycache__/
