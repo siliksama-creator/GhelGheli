@@ -92,57 +92,124 @@ class _HomeShellState extends State<HomeShell>
     end: Offset.zero,
   ).animate(CurvedAnimation(parent: _entrance, curve: Curves.easeOutCubic));
 
-  List<Widget> get _pages => [
-    DashboardPage(
-      api: widget.api,
-      reloadProfile: _loadProfile,
-      onOpenProfile: () => setState(() => _index = 6),
-      onOpenWallet: () => setState(() => _index = _walletIndex),
-      onOpenWheel: () => setState(() => _index = wheelIndex),
-      onOpenReferral: () => setState(() => _index = referralIndex),
-      onOpenInventory: () => setState(() => _index = inventoryIndex),
-    ),
-    RewardsPage(api: widget.api),
-    WalletPage(api: widget.api, reloadProfile: _loadProfile),
-    LeaguePage(api: widget.api),
-    SocialPage(api: widget.api),
-    SupportPage(api: widget.api),
-    ProfilePage(api: widget.api, reloadProfile: _loadProfile),
-    // ۷ و ۸ در نوار پایین نیستند: از آیکون گردونه در نوار بالا و از
-    // میان‌برهای داشبورد باز می‌شوند. نوار پایین طبق راهنمای متریال
-    // حداکثر پنج مقصد دارد و شلوغ کردنش همان مشکلی بود که قبلاً حل شد.
-    WheelPage(
-      api: widget.api,
-      onChanged: _loadProfile,
-      // بعد از هر چرخش، نشانِ نوار بالا فوراً به‌روز می‌شود — وگرنه کاربر
-      // می‌چرخاند و عدد کنار آیکون هنوز قدیمی است.
-      onSpinsChanged: (n, unlimited) {
-        if (!mounted) return;
-        if (n != _spins || unlimited != _unlimitedSpins) {
-          setState(() {
-            _spins = n;
-            _unlimitedSpins = unlimited;
-          });
-        }
-      },
-    ),
-    ReferralPage(api: widget.api),
-    ShopPage(api: widget.api),
-    PassPage(
-      api: widget.api,
-      onOpenShop: () => setState(() => _index = shopIndex),
-      onChanged: _loadProfile,
-    ),
+  // ═══════════════════════════════════════════════════════════════════════
+  // چرا صفحه‌ها کش می‌شوند و نه در هر build ساخته
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // گزارش مالک: «میریم داخل بازی ضربه زن و یکم بازی میکنیم و برمیگردیم
+  // میریم سراغ قسمت های دیگه، سرعت کار با اپلیکیشن به مرور کم میشه و
+  // لودینگ هایی به وجود میاد».
+  //
+  // ریشه: `_pages` یک **getter** بود. هر بار که خوانده می‌شد، هر ۱۲
+  // ویجتِ صفحه از نو **ساخته** می‌شد — و در `build` خوانده می‌شد.
+  //
+  // پوستهٔ خانه ۱۳ جا `setState` دارد (تغییر تب، رسیدن نتیجهٔ
+  // bootstrap، عوض شدن شمارندهٔ گردونه، نشانِ گذر نبرد، …). یعنی هر
+  // یک از این‌ها ۱۲ شیءِ ویجتِ تازه می‌ساخت که ۱۱ تایشان اصلاً روی
+  // صفحه نبودند.
+  //
+  // چرا این «به مرور» بدتر می‌شود و نه از اول:
+  //   • ساختِ ویجت خودش ارزان است، ولی ۱۲ تا × ده‌ها setState یعنی
+  //     هزاران شیءِ کوتاه‌عمر. فشارِ تخصیص، GC را مرتب بیدار می‌کند و
+  //     هر بیدار شدن یک وقفهٔ کوچک است — همان «لودینگ‌های نه‌چندان
+  //     طولانی ولی محسوس».
+  //   • بدتر: `ValueKey(_index)` در AnimatedSwitcher باعث می‌شود فلاتر
+  //     زیردرختِ صفحه را با نمونهٔ **جدید** تطبیق دهد. چون نوعِ ویجت
+  //     یکی است State بازاستفاده می‌شود، ولی کلِ زیردرخت هر بار دوباره
+  //     پیمایش و مقایسه می‌شود.
+  //   • بازی ضربه‌زن بدترین حالت است: `TapGameScreen` را می‌ساخت حتی
+  //     وقتی کاربر در تبِ کیف پول بود.
+  //
+  // راه‌حل: هر صفحه **یک بار** ساخته و نگه داشته می‌شود. ساختِ تنبل
+  // است، پس صفحه‌ای که کاربر هرگز باز نکند هیچ هزینه‌ای ندارد — این
+  // مهم است چون قبلاً هر ۱۲ تا از لحظهٔ اول ساخته می‌شدند.
+  //
+  // ⚠️ نکتهٔ ظریف: `InventoryPage` به `_inventory` وابسته است که با
+  //    هر bootstrap عوض می‌شود. برای همین **عمداً کش نمی‌شود** —
+  //    توضیح در `_buildPage`.
+  final Map<int, Widget> _pageCache = {};
+
+  /// صفحهٔ [i] را می‌سازد یا از کش می‌دهد.
+  Widget _pageAt(int i) {
+    // صفحهٔ کلکسیون از کش مستثناست: ورودی‌اش (`_inventory`) داده است،
+    // نه فقط callback. اگر کش شود، کارتی که کاربر همین حالا ثبت کرده
+    // تا ری‌استارتِ اپ در کلکسیون دیده نمی‌شود.
+    //
+    // هزینه‌اش ناچیز است: یک ویجتِ سبک که فقط وقتی همین تب باز است
+    // ساخته می‌شود.
+    if (i == inventoryIndex) return _buildPage(i);
+    return _pageCache.putIfAbsent(i, () => _buildPage(i));
+  }
+
+  /// تنها جایی که یک صفحه واقعاً ساخته می‌شود.
+  ///
+  /// `switch` و نه ساختنِ کلِ لیست و برداشتنِ عنصرِ i-ام: آن کار همان
+  /// باگی بود که این تغییر قرار است رفعش کند — ۱۲ ویجت می‌ساخت تا
+  /// یکی را برگرداند.
+  Widget _buildPage(int i) {
+    switch (i) {
+      case 0:
+        return DashboardPage(
+          api: widget.api,
+          reloadProfile: _loadProfile,
+          onOpenProfile: () => setState(() => _index = 6),
+          onOpenWallet: () => setState(() => _index = _walletIndex),
+          onOpenWheel: () => setState(() => _index = wheelIndex),
+          onOpenReferral: () => setState(() => _index = referralIndex),
+          onOpenInventory: () => setState(() => _index = inventoryIndex),
+        );
+      case 1:
+        return RewardsPage(api: widget.api);
+      case 2:
+        return WalletPage(api: widget.api, reloadProfile: _loadProfile);
+      case 3:
+        return LeaguePage(api: widget.api);
+      case 4:
+        return SocialPage(api: widget.api);
+      case 5:
+        return SupportPage(api: widget.api);
+      case 6:
+        return ProfilePage(api: widget.api, reloadProfile: _loadProfile);
+      // ۷ به بعد در نوار پایین نیستند: از آیکون گردونه در نوار بالا و از
+      // میان‌برهای داشبورد و شیتِ «بیشتر» باز می‌شوند.
+      case wheelIndex:
+        return WheelPage(
+          api: widget.api,
+          onChanged: _loadProfile,
+          // بعد از هر چرخش، نشانِ نوار بالا فوراً به‌روز می‌شود — وگرنه
+          // کاربر می‌چرخاند و عدد کنار آیکون هنوز قدیمی است.
+          onSpinsChanged: (n, unlimited) {
+            if (!mounted) return;
+            if (n != _spins || unlimited != _unlimitedSpins) {
+              setState(() {
+                _spins = n;
+                _unlimitedSpins = unlimited;
+              });
+            }
+          },
+        );
+      case referralIndex:
+        return ReferralPage(api: widget.api);
+      case shopIndex:
+        return ShopPage(api: widget.api);
+      case passIndex:
+        return PassPage(
+          api: widget.api,
+          onOpenShop: () => setState(() => _index = shopIndex),
+          onChanged: _loadProfile,
+        );
     // ── چرا در **انتهای** لیست ──
     // ایندکس‌های این آرایه در چند جای دیگر ثابت‌اند (wheelIndex=7،
     // shopIndex=9 و …) و شیتِ «بیشتر» هم با همین شماره‌ها کار می‌کند.
     // درج در وسط یعنی جابه‌جا شدنِ همهٔ آن‌ها و — همان‌طور که
     // navigation_test قبلاً گرفت — RangeError و کرشِ کاملِ اپ.
-    InventoryPage(
-      items: _inventory,
-      onRefresh: _loadProfile,
-    ),
-  ];
+      case inventoryIndex:
+        return InventoryPage(items: _inventory, onRefresh: _loadProfile);
+      default:
+        // ایندکسِ ناشناخته نباید کرش بدهد؛ به خانه برمی‌گردیم.
+        return DashboardPage(api: widget.api, reloadProfile: _loadProfile);
+    }
+  }
 
   /// شمارهٔ صفحهٔ گردونه — از آیکون نوار بالا مستقیم به آن پرش می‌شود.
   static const wheelIndex = 7;
@@ -488,10 +555,10 @@ class _HomeShellState extends State<HomeShell>
             child: KeyedSubtree(
               key: ValueKey(_index),
               child: _index == passIndex
-                  ? _pages[_index]
+                  ? _pageAt(_index)
                   : ScrollHint(
                       hintLabel: _scrollHints[_index] ?? 'پایین‌تر هم هست',
-                      child: _pages[_index],
+                      child: _pageAt(_index),
                     ),
             ),
           ),
