@@ -34,6 +34,7 @@
 /// جداگانه‌ای وجود ندارد.
 library;
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -66,6 +67,14 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
   /// تا وقتی مدیر طرحی آپلود نکرده، این بخش اصلاً نشان داده نمی‌شود —
   /// بهتر از نشان دادن چیزی که همیشه شکست می‌خورد.
   bool _available = false;
+
+  /// تعدادِ پرونده‌های در انتظارِ بررسی — **از سرور**.
+  ///
+  /// باگِ قبلی: بنرِ «در حال بررسی» فقط حالتِ محلی بود. بعد از اینکه
+  /// مدیر تأیید می‌کرد، کاربر تا بازکردنِ دوبارهٔ اپ همان پیام را
+  /// می‌دید — یعنی «در حال بررسی» می‌گفت در حالی که کارت قبلاً به
+  /// مجموعه‌اش اضافه شده بود.
+  int _pendingCount = 0;
 
   Map? _result;
   String? _error;
@@ -103,10 +112,13 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
 
   Future<void> _checkAvailability() async {
     try {
-      final r = await widget.api.get('/api/photo-cards/status');
+      // `fresh: true` تا کشِ ۱.۲ ثانیه‌ایِ ApiClient دور زده شود؛ بعد
+      // از هر ثبت باید عددِ واقعی خوانده شود نه نسخهٔ کش‌شده.
+      final r = await widget.api.get('/api/photo-cards/status', fresh: true);
       if (!mounted) return;
       setState(() {
         _available = r['available'] == true;
+        _pendingCount = (r['pendingCount'] as num?)?.toInt() ?? 0;
         _checking = false;
       });
     } catch (_) {
@@ -175,6 +187,17 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
         return;
       }
 
+      // ── همان عکس، هنوز در صف بررسی ──
+      // عکس پاک می‌شود چون کاربر باید عکسِ **کارتِ دیگری** بگیرد؛
+      // نگه داشتنش فقط تشویقش می‌کند دوباره همان را بفرستد.
+      if (status == 'duplicate_pending') {
+        setState(() {
+          _result = d;
+          _imagePath = null;
+        });
+        return;
+      }
+
       // ── کدِ غلط: عکس عمداً نگه داشته می‌شود ──
       // کاربر فقط باید کد را اصلاح کند؛ مجبور کردنش به عکس‌گرفتنِ
       // دوباره بی‌دلیل آزاردهنده است.
@@ -194,6 +217,8 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
         _code.clear();
       });
       if (status == 'approved') widget.onRegistered?.call();
+      // شمارِ در انتظار را از سرور تازه کن — چه ثبت شد چه به صف رفت.
+      unawaited(_checkAvailability());
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = apiError(e));
@@ -222,6 +247,11 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
         ),
         Gaps.vMd,
 
+        // ── نوارِ وضعیت، از سرور نه از حافظهٔ محلی ──
+        // وقتی مدیر تأیید یا رد کند، این عدد صفر می‌شود و نوار خودش
+        // محو می‌شود.
+        if (_pendingCount > 0 && _result == null)
+          _pendingBanner(context),
         if (_result != null) _resultView(context, _result!),
         if (_error != null) ...[
           Container(
@@ -437,12 +467,52 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
     );
   }
 
+  Widget _pendingBanner(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      margin: const EdgeInsets.only(bottom: Gaps.sm),
+      padding: const EdgeInsets.all(Gaps.sm),
+      decoration: BoxDecoration(
+        borderRadius: Corners.rMd,
+        color: BrandColors.warningOnLight.withValues(alpha: 0.12),
+        border: Border.all(
+            color: BrandColors.warningOnLight.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.hourglass_top_rounded,
+              color: BrandColors.warningOnLight, size: 20),
+          const SizedBox(width: Gaps.xs),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${faNum(_pendingCount)} عکس در حال بررسی',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                        color: BrandColors.warningOnLight,
+                        fontWeight: FontWeight.w900)),
+                Text(
+                  'کیفیت عکس کامل نبود؛ کارشناس بررسی می‌کند و ممکن است '
+                  'تا ۲۴ ساعت طول بکشد. کد شما محفوظ است و می‌توانید '
+                  'کارت‌های دیگرتان را ثبت کنید.',
+                  style: theme.textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _resultView(BuildContext context, Map r) {
     final theme = Theme.of(context);
     final status = r['status'];
     final pending = status == 'pending';
     final badCode = status == 'bad_code';
     final locked = status == 'locked';
+    final dup = status == 'duplicate_pending';
 
     // ── سه خانوادهٔ رنگ برای سه پیامِ متفاوت ──
     // «اشتباه کردی» (قرمز)، «فعلاً نمی‌توانی» (بنفش) و «منتظر بمان»
@@ -455,6 +525,40 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
             : pending
                 ? BrandColors.warningOnLight
                 : BrandColors.successOnLight;
+
+    if (dup) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: Gaps.sm),
+        padding: const EdgeInsets.all(Gaps.sm),
+        decoration: BoxDecoration(
+          borderRadius: Corners.rMd,
+          color: BrandColors.warningOnLight.withValues(alpha: 0.13),
+          border: Border.all(
+              color: BrandColors.warningOnLight.withValues(alpha: 0.45)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.hourglass_top_rounded,
+                color: BrandColors.warningOnLight, size: 20),
+            const SizedBox(width: Gaps.xs),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('این عکس قبلاً ارسال شده',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                          color: BrandColors.warningOnLight,
+                          fontWeight: FontWeight.w900)),
+                  Text('${r['message'] ?? ''}',
+                      style: theme.textTheme.bodySmall),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     if (badCode || locked) {
       return Container(

@@ -42,6 +42,11 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
   List _options = [];
   /// انتخابِ طرح برای هر پرونده: { شناسهٔ پرونده: شناسهٔ طرح }
   final Map<String, String> _picks = {};
+
+  /// فهرست کدها + فیلترِ وضعیت. مالک خواست بتواند کدها را ویرایش و
+  /// حذف کند، و برای آن اول باید ببیندشان.
+  List _codeList = [];
+  String _codeFilter = 'unused';
   bool _loading = true;
   String? _loadError;
 
@@ -91,6 +96,8 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
         widget.api
             .get('/api/admin/photo-cards/submissions?status=pending', fresh: true),
         widget.api.get('/api/admin/photo-cards/designs/options', fresh: true),
+        widget.api.get(
+            '/api/admin/photo-cards/codes?status=$_codeFilter', fresh: true),
       ]);
       if (!mounted) return;
       setState(() {
@@ -98,6 +105,7 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
         _stats = (r[1]['stats'] as Map?) ?? const {};
         _submissions = (r[2]['submissions'] as List?) ?? const [];
         _options = (r[3]['options'] as List?) ?? const [];
+        _codeList = (r[4]['codes'] as List?) ?? const [];
         _loading = false;
       });
     } catch (e) {
@@ -193,6 +201,84 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
     }
   }
 
+  /// ویرایشِ متنِ کد. فقط برای کدِ آزاد یا باطل — سرور هم همین را
+  /// اجبار می‌کند، ولی دکمه‌اش را هم نشان نمی‌دهیم تا کاربر با خطای
+  /// همیشگی روبه‌رو نشود.
+  Future<void> _editCode(Map c) async {
+    final ctrl = TextEditingController(text: '${c['code']}');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('ویرایش کد'),
+        content: TextField(
+          controller: ctrl,
+          textDirection: TextDirection.ltr,
+          textAlign: TextAlign.left,
+          style: const TextStyle(fontFamily: 'monospace'),
+          decoration: const InputDecoration(labelText: 'کد جدید'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('انصراف')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('ذخیره')),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (ok != true) return;
+    try {
+      await widget.api.patch('/api/admin/photo-cards/codes/${c['id']}',
+          {'code': ctrl.text.trim()});
+      _snack('کد ویرایش شد');
+      await _load();
+    } catch (e) {
+      _snack(apiError(e));
+    }
+  }
+
+  Future<void> _deleteCode(Map c) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('حذف ${c['code']}'),
+        content: const Text('این کد برای همیشه حذف می‌شود. اگر فقط '
+            'می‌خواهید موقتاً از دسترس خارج شود، «ابطال» را بزنید.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('انصراف')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('حذف کن')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await widget.api.delete('/api/admin/photo-cards/codes/${c['id']}');
+      _snack('کد حذف شد');
+      await _load();
+    } catch (e) {
+      _snack(apiError(e));
+    }
+  }
+
+  Future<void> _setCodeStatus(Map c, String status) async {
+    try {
+      if (status == 'voided') {
+        await widget.api.patch(
+            '/api/admin/photo-cards/codes/${c['id']}/void',
+            {'reason': 'ابطال دستی'});
+      } else {
+        await widget.api.patch(
+            '/api/admin/photo-cards/codes/${c['id']}', {'status': status});
+      }
+      _snack(status == 'voided' ? 'کد باطل شد' : 'کد به چرخه برگشت');
+      await _load();
+    } catch (e) {
+      _snack(apiError(e));
+    }
+  }
+
   Future<void> _toggleDesign(Map d) async {
     try {
       await widget.api.patch(
@@ -273,6 +359,8 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
           _designForm(context),
           const SizedBox(height: Gaps.md),
           _codeBank(context),
+          const SizedBox(height: Gaps.md),
+          _codeListSection(context),
           const SizedBox(height: Gaps.md),
           _reviewQueue(context),
           const SizedBox(height: Gaps.md),
@@ -533,6 +621,114 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
           ],
         ),
       ),
+    );
+  }
+
+  // ── فهرست و مدیریتِ کدها ──
+  Widget _codeListSection(BuildContext context) {
+    final theme = Theme.of(context);
+    const filters = [
+      ('unused', 'آزاد'), ('used', 'مصرف‌شده'),
+      ('reserved', 'در بررسی'), ('voided', 'باطل'),
+    ];
+    return FormSection(
+      title: 'کدهای ثبت‌شده',
+      subtitle: 'ویرایش یا حذف فقط برای کدهای استفاده‌نشده ممکن است — '
+          'کدِ مصرف‌شده امتیاز داده و در مجموعهٔ کاربر نشسته.',
+      children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (final (k, label) in filters)
+                Padding(
+                  padding: const EdgeInsets.only(left: 6),
+                  child: ChoiceChip(
+                    selected: _codeFilter == k,
+                    label: Text(label),
+                    onSelected: (_) {
+                      setState(() => _codeFilter = k);
+                      _load();
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+        if (_codeList.isEmpty)
+          const EmptyState(
+            icon: Icons.vpn_key_outlined,
+            title: 'کدی در این دسته نیست',
+            message: 'فیلتر را عوض کنید یا کد جدید وارد کنید.',
+          ),
+        for (final c in _codeList.cast<Map>())
+          Container(
+            margin: const EdgeInsets.only(bottom: 6),
+            padding: const EdgeInsets.symmetric(
+                horizontal: Gaps.sm, vertical: Gaps.xs),
+            decoration: BoxDecoration(
+              borderRadius: Corners.rSm,
+              color: theme.colorScheme.surfaceContainerHighest
+                  .withValues(alpha: 0.32),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // کد لاتین است؛ در ردیفِ راست‌به‌چپ باید صریح
+                      // ltr شود وگرنه کاراکترهایش جابه‌جا دیده می‌شوند.
+                      Text('${c['code']}',
+                          textDirection: TextDirection.ltr,
+                          style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13)),
+                      if (c['card_type_name'] != null
+                          || c['batch_label'] != null)
+                        Text(
+                          [
+                            if (c['card_type_name'] != null)
+                              '${c['card_type_name']}',
+                            if (c['batch_label'] != null) '${c['batch_label']}',
+                          ].join(' · '),
+                          style: theme.textTheme.labelSmall,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
+                  ),
+                ),
+                // دکمه‌ها بر پایهٔ وضعیت: نشان دادنِ دکمه‌ای که همیشه
+                // خطا می‌دهد بدترین نوعِ رابط است.
+                if (c['status'] == 'unused' || c['status'] == 'voided') ...[
+                  IconButton(
+                    icon: const Icon(Icons.edit_rounded, size: 19),
+                    tooltip: 'ویرایش',
+                    onPressed: () => _editCode(c),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline_rounded, size: 19),
+                    tooltip: 'حذف',
+                    onPressed: () => _deleteCode(c),
+                  ),
+                ],
+                if (c['status'] == 'unused')
+                  IconButton(
+                    icon: const Icon(Icons.block_rounded, size: 19),
+                    tooltip: 'ابطال',
+                    onPressed: () => _setCodeStatus(c, 'voided'),
+                  ),
+                if (c['status'] == 'voided')
+                  IconButton(
+                    icon: const Icon(Icons.restore_rounded, size: 19),
+                    tooltip: 'بازگرداندن',
+                    onPressed: () => _setCodeStatus(c, 'unused'),
+                  ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 

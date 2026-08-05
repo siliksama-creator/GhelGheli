@@ -217,6 +217,12 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(seconds: 1));
         expect(tester.takeException(), isNull, reason: 'تب $label کرش داد');
+        // بخشِ «ثبت کارت با عکس» با هر بازگشت به خانه یک درخواستِ
+        // فرعی می‌فرستد (با `fresh: true` تا شمارِ در انتظار به‌روز
+        // بماند). اگر تست وسطِ آن تمام شود، فریم‌ورک
+        // «A Timer is still pending» می‌دهد — ایرادِ زمان‌بندیِ تست
+        // است نه اپ.
+        await tester.pump(const Duration(milliseconds: 600));
       }
     });
   });

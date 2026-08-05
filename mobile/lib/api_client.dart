@@ -392,6 +392,17 @@ class ApiClient {
     return r.data;
   }
 
+  /// حذفِ یک منبع.
+  ///
+  /// تا امروز هیچ صفحه‌ای به DELETE نیاز نداشت؛ مدیریتِ کدهای «کارت با
+  /// عکس» اولین مورد است. `validateStatus` پیش‌فرضِ ApiClient (کمتر از
+  /// ۵۰۰) اینجا هم کار می‌کند، پس ۴۰۹ «کد مصرف‌شده حذف نمی‌شود» به
+  /// استثنا تبدیل می‌شود و پیامش به کاربر می‌رسد.
+  Future<dynamic> delete(String path) async {
+    final res = await dio.delete(path);
+    return res.data;
+  }
+
   /// Uploads a support-ticket attachment (user-scoped route).
   Future<String> uploadSupportImage(String filePath) async {
     final form =

@@ -90,6 +90,9 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
   const [locked, setLocked] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+  // با تغییرش، وضعیت از سرور دوباره خوانده می‌شود.
+  const [refreshKey, setRefreshKey] = useState(0);
   const previewRef = useRef('');
 
   useEffect(() => {
@@ -98,12 +101,25 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(r => r.json())
-      .then(d => { if (alive) setAvailable(!!d.available); })
+      .then(d => {
+        if (!alive) return;
+        setAvailable(!!d.available);
+        // ── چرا شمارِ در انتظار از سرور می‌آید ──
+        //
+        // باگِ قبلی: بنرِ «در حال بررسی» فقط state محلی بود. بعد از
+        // اینکه مدیر تأیید می‌کرد، کاربر تا رفرشِ کاملِ صفحه همان
+        // پیام را می‌دید — یعنی می‌گفت «در حال بررسی» در حالی که
+        // کارت قبلاً به مجموعه‌اش اضافه شده بود.
+        //
+        // حالا سرور تعدادِ واقعیِ پرونده‌های در انتظار را می‌گوید و
+        // بنر بر پایهٔ همان ساخته می‌شود.
+        setPendingCount(Number(d.pendingCount) || 0);
+      })
       // خطا یعنی «نشان نده». این بخش اختیاری است و نباید صفحهٔ اصلی را
       // با پیام خطا شلوغ کند.
       .catch(() => { if (alive) setAvailable(false); });
     return () => { alive = false; };
-  }, [token]);
+  }, [token, refreshKey]);
 
   // آزادسازی بلاب هنگام خروج، وگرنه با هر انتخاب یک شیء در حافظه می‌ماند.
   useEffect(() => () => {
@@ -160,6 +176,15 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
       // ── کدِ غلط: راهنما + شمارشِ تلاش ──
       // عکس عمداً پاک نمی‌شود: کاربر فقط باید کد را اصلاح کند و
       // مجبور کردنش به عکس‌گرفتنِ دوباره بی‌دلیل آزاردهنده است.
+      // ── همان عکس، هنوز در صف بررسی ──
+      // عکس پاک می‌شود چون کاربر باید عکسِ **کارتِ دیگری** بگیرد؛
+      // نگه داشتنش فقط او را تشویق می‌کند دوباره همان را بفرستد.
+      if (d.status === 'duplicate_pending') {
+        setResult({ kind: 'duplicate', message: d.message });
+        reset();
+        return;
+      }
+
       if (d.status === 'bad_code') {
         setResult({ kind: 'badcode', message: d.message,
           triesLeft: d.triesLeft });
@@ -176,6 +201,7 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
         setResult({ kind: 'pending', message: d.message,
           reason: d.reason });
         reset();
+        setRefreshKey(k => k + 1);
         return;
       }
       setResult({
@@ -191,6 +217,7 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
       if (previewRef.current) URL.revokeObjectURL(previewRef.current);
       previewRef.current = '';
       setPreview('');
+      setRefreshKey(k => k + 1);
       onDone?.();
     } catch {
       setResult({ kind: 'error', message: 'اتصال اینترنت برقرار نیست' });
@@ -227,6 +254,27 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
       )}
       {result?.kind === 'pending' && (
         <div className="pcResult pending">⏳ {result.message}</div>
+      )}
+      {/* ── نوارِ وضعیت، از سرور نه از حافظهٔ محلی ──
+          وقتی مدیر تأیید یا رد کند، این عدد صفر می‌شود و نوار خودش
+          محو می‌شود. قبلاً پیامِ محلی تا رفرشِ صفحه می‌ماند. */}
+      {pendingCount > 0 && !result && (
+        <div className="pcResult pending">
+          <div>
+            <b>⏳ {pendingCount} عکس در حال بررسی</b>
+            <span>کیفیت عکس کامل نبود؛ کارشناس بررسی می‌کند و ممکن است
+              تا ۲۴ ساعت طول بکشد. کد شما محفوظ است و می‌توانید
+              کارت‌های دیگرتان را ثبت کنید.</span>
+          </div>
+        </div>
+      )}
+      {result?.kind === 'duplicate' && (
+        <div className="pcResult pending">
+          <div>
+            <b>⏳ این عکس قبلاً ارسال شده</b>
+            <span>{result.message}</span>
+          </div>
+        </div>
       )}
       {result?.kind === 'badcode' && (
         <div className="pcResult err">

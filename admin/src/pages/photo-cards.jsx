@@ -12,13 +12,15 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import {
-  AlertTriangle, CheckCircle2, Clock, Download, Image as ImageIcon,
-  KeyRound, ScanLine, Upload, XCircle,
+  AlertTriangle, Ban, Check, CheckCircle2, Clock, Download,
+  Image as ImageIcon, KeyRound, Pencil, RotateCcw, ScanLine, Trash2,
+  Upload, XCircle,
 } from 'lucide-react';
 
 import { assetUrl, fmtDateTime, fmtNumber } from '../lib/api.js';
 import {
-  Badge, Button, Card, EmptyState, Field, Input, Skeleton, Textarea,
+  Badge, Button, Card, EmptyState, Field, IconButton, Input, Skeleton,
+  Textarea,
 } from '../components/ui.jsx';
 import { useDialog } from '../components/dialog.jsx';
 import { useToast } from '../lib/toast.jsx';
@@ -34,6 +36,11 @@ export function PhotoCardsPage({ request }) {
   const [options, setOptions] = useState([]);
   // انتخابِ طرح برای هر پرونده: { [submissionId]: designId }
   const [picks, setPicks] = useState({});
+  // فهرست کدها + فیلتر و جست‌وجو
+  const [codes, setCodes] = useState([]);
+  const [codeFilter, setCodeFilter] = useState('unused');
+  const [codeQuery, setCodeQuery] = useState('');
+  const [editing, setEditing] = useState(null);   // { id, code }
   const [subFilter, setSubFilter] = useState('pending');
 
   // فرم آپلود
@@ -71,6 +78,14 @@ export function PhotoCardsPage({ request }) {
     [request],
   );
 
+  const loadCodeList = useCallback(
+    () => request(`/api/admin/photo-cards/codes?status=${codeFilter}`
+        + (codeQuery.trim() ? `&q=${encodeURIComponent(codeQuery.trim())}` : ''))
+      .then(r => setCodes(r.codes || []))
+      .catch(() => setCodes([])),
+    [request, codeFilter, codeQuery],
+  );
+
   const loadOptions = useCallback(
     () => request('/api/admin/photo-cards/designs/options')
       .then(r => setOptions(r.options || []))
@@ -80,6 +95,7 @@ export function PhotoCardsPage({ request }) {
 
   useEffect(() => { loadDesigns(); loadCodes(); loadOptions(); },
     [loadDesigns, loadCodes, loadOptions]);
+  useEffect(() => { loadCodeList(); }, [loadCodeList]);
   useEffect(() => { setSubs(null); loadSubs(subFilter); }, [subFilter, loadSubs]);
 
   // پیش‌نمایش محلی. بدون آن مدیر نمی‌داند فایل درست را انتخاب کرده یا نه.
@@ -147,6 +163,58 @@ export function PhotoCardsPage({ request }) {
 
   // شمارشِ تقریبی برای نمایشِ زنده زیر کادر. همان جداکننده‌های سرور.
   const typedCount = rawCodes.split(/[\n,;\t، ]+/).filter(Boolean).length;
+
+  async function saveEdit() {
+    if (!editing) return;
+    try {
+      await request(`/api/admin/photo-cards/codes/${editing.id}`, {
+        method: 'PATCH', body: { code: editing.code },
+      });
+      notify('کد ویرایش شد', 'success');
+      setEditing(null);
+      loadCodeList();
+      loadCodes();
+    } catch (e) { notify(e.message, 'error'); }
+  }
+
+  async function removeCode(c) {
+    const okGo = await confirmAction({
+      title: `حذف کد ${c.code}`,
+      message: 'این کد برای همیشه حذف می‌شود. اگر فقط می‌خواهید موقتاً '
+        + 'از دسترس خارج شود، به‌جایش «ابطال» را بزنید.',
+      confirmText: 'حذف کن',
+      danger: true,
+    });
+    if (!okGo) return;
+    try {
+      await request(`/api/admin/photo-cards/codes/${c.id}`, { method: 'DELETE' });
+      notify('کد حذف شد', 'success');
+      loadCodeList();
+      loadCodes();
+    } catch (e) { notify(e.message, 'error'); }
+  }
+
+  async function voidCode(c) {
+    try {
+      await request(`/api/admin/photo-cards/codes/${c.id}/void`, {
+        method: 'PATCH', body: { reason: 'ابطال دستی' },
+      });
+      notify('کد باطل شد', 'success');
+      loadCodeList();
+      loadCodes();
+    } catch (e) { notify(e.message, 'error'); }
+  }
+
+  async function restoreCode(c) {
+    try {
+      await request(`/api/admin/photo-cards/codes/${c.id}`, {
+        method: 'PATCH', body: { status: 'unused' },
+      });
+      notify('کد به چرخه برگشت', 'success');
+      loadCodeList();
+      loadCodes();
+    } catch (e) { notify(e.message, 'error'); }
+  }
 
   async function decide(sub, approve) {
     let reason = '';
@@ -351,6 +419,97 @@ export function PhotoCardsPage({ request }) {
               </div>
             ))}
           </div>
+        )}
+      </Card>
+
+      {/* ───────── فهرست و مدیریتِ کدها ───────── */}
+      <Card
+        title="کدهای ثبت‌شده"
+        subtitle="ویرایش یا حذف فقط برای کدهای استفاده‌نشده ممکن است — کدِ مصرف‌شده امتیاز داده و در مجموعهٔ کاربر نشسته."
+        action={
+          <div className="segmented">
+            {[['unused', 'آزاد'], ['used', 'مصرف‌شده'],
+              ['reserved', 'در بررسی'], ['voided', 'باطل']].map(([k, t]) => (
+                <button key={k} className={codeFilter === k ? 'on' : ''}
+                  onClick={() => setCodeFilter(k)}>{t}</button>
+              ))}
+          </div>
+        }
+      >
+        <div className="codeSearchRow">
+          <Input
+            value={codeQuery}
+            placeholder="جست‌وجوی کد…"
+            dir="ltr"
+            onChange={e => setCodeQuery(e.target.value)}
+          />
+        </div>
+
+        {codes.length === 0 && (
+          <EmptyState icon={KeyRound} title="کدی در این دسته نیست"
+            message="فیلتر را عوض کنید یا کد جدید وارد کنید." />
+        )}
+
+        <div className="codeList">
+          {codes.map(c => (
+            <div key={c.id} className="codeRow">
+              {editing?.id === c.id ? (
+                <>
+                  <Input
+                    className="codeEditInput"
+                    dir="ltr"
+                    value={editing.code}
+                    onChange={e => setEditing({ ...editing, code: e.target.value })}
+                    onKeyDown={e => { if (e.key === 'Enter') saveEdit(); }}
+                  />
+                  <div className="codeRowActions">
+                    <Button size="sm" icon={Check} onClick={saveEdit}>ذخیره</Button>
+                    <Button size="sm" variant="secondary"
+                      onClick={() => setEditing(null)}>انصراف</Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <code className="codeVal">{c.code}</code>
+                  <div className="codeMeta">
+                    {c.batch_label && <span className="codeBatch">{c.batch_label}</span>}
+                    {c.card_type_name && (
+                      <Badge tone="success">{c.card_type_name}</Badge>
+                    )}
+                    {c.used_by_mobile && (
+                      <span className="topbar-sub">{c.used_by_mobile}</span>
+                    )}
+                  </div>
+                  <div className="codeRowActions">
+                    {/* ── چرا دکمه‌ها بر پایهٔ وضعیت‌اند ──
+                        کدِ مصرف‌شده امتیاز داده و در اینونتوری نشسته؛
+                        ویرایش یا حذفش سابقه را دروغ می‌کند. سرور هم
+                        جلویش را می‌گیرد، ولی نشان دادنِ دکمه‌ای که
+                        همیشه خطا می‌دهد بدترین نوعِ رابط است. */}
+                    {(c.status === 'unused' || c.status === 'voided') && (
+                      <>
+                        <IconButton icon={Pencil} title="ویرایش"
+                          onClick={() => setEditing({ id: c.id, code: c.code })} />
+                        <IconButton icon={Trash2} title="حذف" variant="danger"
+                          onClick={() => removeCode(c)} />
+                      </>
+                    )}
+                    {c.status === 'unused' && (
+                      <IconButton icon={Ban} title="ابطال"
+                        onClick={() => voidCode(c)} />
+                    )}
+                    {c.status === 'voided' && (
+                      <IconButton icon={RotateCcw} title="بازگرداندن"
+                        onClick={() => restoreCode(c)} />
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+        {codes.length >= 300 && (
+          <p className="topbar-sub">فقط ۳۰۰ کدِ اول نشان داده می‌شود — برای یافتن کدِ خاص از جست‌وجو استفاده کنید.</p>
         )}
       </Card>
 
