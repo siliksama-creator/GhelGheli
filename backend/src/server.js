@@ -758,9 +758,17 @@ app.post('/api/cards/redeem', auth, cardRedeemLimiter, asyncHandler(async (req, 
         `${cashAmount.toLocaleString('en-US')} تومان بابت کارت «${card.card_type_name}» به کیف پول شما واریز شد.`,
       ).catch(() => {});
     }
-    // XP گذر نبرد. عمداً await نمی‌شود و خطایش بلعیده می‌شود: ثبت کارت
-    // نباید به‌خاطر یک مشکل گذرا در گذر نبرد شکست بخورد.
-    pass.grantXp(req.user.id, 'card_redeem').catch(() => {});
+    // ── چرا اینجا XP گذر نبرد داده نمی‌شود ──
+    //
+    // خواستهٔ صریح مالک: «ثبت کارت در هیچ حالتی نباید بتل‌پس رو چه در
+    // رایگان چه در پلاس باز کنه».
+    //
+    // قبلاً `pass.grantXp(req.user.id, 'card_redeem')` اینجا بود.
+    // اکشنِ `card_redeem` هم از `passService.SOURCES` حذف شد، پس حتی
+    // اگر کسی این خط را دوباره اضافه کند هیچ اثری ندارد و تستِ
+    // «هیچ اکشنی برای ثبت کارت وجود ندارد» قرمز می‌شود.
+    //
+    // مسیرِ «ثبت کارت با عکس» هم همین قاعده را دارد.
     const userNow = await pool.query('SELECT current_points,lifetime_points,monthly_league_points,wallet_balance FROM users WHERE id=$1', [req.user.id]);
     const reward = await pool.query('SELECT * FROM reward_tiers WHERE is_active=true AND required_points <= $1 ORDER BY required_points DESC LIMIT 1', [userNow.rows[0].current_points]);
     if (reward.rows[0]) createNotification(req.user.id, 'reward_threshold', 'تبریک! به جایزه رسیدی', `شما به سطح ${reward.rows[0].name} رسیدید.`).catch(()=>{});

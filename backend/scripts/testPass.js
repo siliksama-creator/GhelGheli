@@ -296,5 +296,82 @@ console.log('\n== محافظ‌های امنیتی ==');
   ok(/source: 'pass'/.test(svc), 'واریز نقدی منبع اختصاصی دارد');
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// ثبت کارت هرگز نباید گذر نبرد را باز کند
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// خواستهٔ صریح مالک: «ثبت کارت در هیچ حالتی نباید بتل‌پس رو چه در رایگان
+// چه در پلاس باز کنه».
+//
+// چرا سه بررسیِ جدا و نه یکی:
+//
+//   ۱. اکشن در `SOURCES` نباشد — چون `grantXp` برای اکشنِ ناشناخته
+//      بی‌سروصدا return می‌کند، این تنها ضمانتِ واقعی است.
+//   ۲. هیچ فایلی `grantXp` را با اکشنِ کارتی صدا نزند — تا اگر روزی
+//      کسی اکشن را برگرداند، این هم بگیردش.
+//   ۳. مسیرهای ثبت کارت اصلاً `grantXp` نداشته باشند — نگهبانِ سوم،
+//      چون نامِ اکشن ممکن است فردا عوض شود.
+{
+  const svcPath = path.join(__dirname, '..', 'src', 'services', 'passService.js');
+  const svcSrc = fs.readFileSync(svcPath, 'utf8');
+
+  // فقط بدنهٔ SOURCES، نه کامنت‌هایی که دربارهٔ حذفش توضیح می‌دهند.
+  const srcBlock = /const SOURCES = \{([\s\S]*?)\n\};/.exec(svcSrc)[1]
+    .split('\n')
+    .filter(line => !line.trim().startsWith('//'))
+    .join('\n');
+
+  ok(!/card_redeem|card_photo|photo_card/.test(srcBlock),
+    'هیچ اکشنی برای ثبت کارت در SOURCES نیست');
+
+  // فراخوانی‌ها در کلِ بک‌اند
+  const roots = [
+    path.join(__dirname, '..', 'src'),
+  ];
+  const files = [];
+  const walk = (dir) => {
+    for (const name of fs.readdirSync(dir)) {
+      const full = path.join(dir, name);
+      if (fs.statSync(full).isDirectory()) walk(full);
+      else if (name.endsWith('.js')) files.push(full);
+    }
+  };
+  roots.forEach(walk);
+
+  let cardXpCall = null;
+  let cardRouteXp = null;
+  for (const f of files) {
+    const body = fs.readFileSync(f, 'utf8');
+    const code = body.split('\n')
+      .filter(l => !l.trim().startsWith('//') && !l.trim().startsWith('*'))
+      .join('\n');
+
+    if (/grantXp\s*\([^)]*['"](card_redeem|card_photo|photo_card)['"]/.test(code)) {
+      cardXpCall = f;
+    }
+    // مسیرهای «ثبت کارت با عکس» نباید هیچ grantXpی داشته باشند.
+    if (f.endsWith('photoCards.js') && /grantXp/.test(code)) {
+      cardRouteXp = f;
+    }
+  }
+  ok(cardXpCall === null,
+    `هیچ‌جا grantXp با اکشنِ کارتی صدا زده نمی‌شود${cardXpCall ? ` (${cardXpCall})` : ''}`);
+  ok(cardRouteXp === null,
+    `مسیرِ «کارت با عکس» هیچ XP گذر نبردی نمی‌دهد${cardRouteXp ? ` (${cardRouteXp})` : ''}`);
+
+  // مسیرِ قدیمیِ ثبت کد هم همین‌طور: بلوکِ /api/cards/redeem را جدا کن.
+  const serverSrc = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'server.js'), 'utf8');
+  const redeemStart = serverSrc.indexOf("app.post('/api/cards/redeem'");
+  const redeemEnd = serverSrc.indexOf("app.post('/api/cards/", redeemStart + 10);
+  const redeemBlock = serverSrc.slice(
+    redeemStart, redeemEnd > 0 ? redeemEnd : redeemStart + 6000)
+    .split('\n')
+    .filter(l => !l.trim().startsWith('//'))
+    .join('\n');
+  ok(!/grantXp/.test(redeemBlock),
+    'مسیرِ قدیمیِ «ثبت کد کارت» هم XP گذر نبرد نمی‌دهد');
+}
+
 console.log(`\n${fail === 0 ? '✓' : '✗'} ${pass} تست موفق، ${fail} ناموفق`);
 process.exit(fail === 0 ? 0 : 1);
