@@ -142,7 +142,36 @@ const CODE_SPACE = Math.pow(CODE_ALPHABET.length, 8);
  *
  * @returns {{ points:number, cash:number, cardTypeName:string, imageUrl:string }}
  */
-async function creditSubmission(client, { userId, codeId, design, adminId = null }) {
+/**
+ * کارت را به حساب کاربر می‌گذارد و کد را مصرف می‌کند.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * چرا `design` می‌تواند null باشد
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * از وقتی کدها می‌توانند **از پیش** به یک نوع کارت گره بخورند
+ * (`expected_card_type_id`)، دو حالت وجود دارد:
+ *
+ *   • کدِ بی‌نام + تطبیقِ تصویر → `design` داریم و `cardTypeId` از آن
+ *     می‌آید. رفتارِ قدیمی، بدون تغییر.
+ *
+ *   • کدِ نام‌دار → نوعِ کارت را از خودِ کد می‌دانیم، حتی اگر هیچ طرحِ
+ *     تصویری برای آن آپلود نشده باشد. اینجا `design` می‌تواند null
+ *     باشد و `cardTypeId` صریح داده می‌شود.
+ *
+ * `bound_design_id` هم به همین دلیل nullable می‌ماند: وقتی طرحی در کار
+ * نبوده، چیزی برای گره زدن نیست و NULL صادقانه‌تر از یک شناسهٔ ساختگی
+ * است.
+ */
+async function creditSubmission(
+  client, { userId, codeId, design = null, cardTypeId = null, adminId = null },
+) {
+  // نوعِ کارت یا از پارامترِ صریح می‌آید یا از طرحِ تطبیق‌خورده.
+  const typeId = cardTypeId || design?.card_type_id || null;
+  if (!typeId) {
+    throw Object.assign(
+      new Error('نوع کارت مشخص نیست'), { status: 400 });
+  }
   // قفل ردیف کد. `FOR UPDATE` جلوی حالتی را می‌گیرد که دو درخواست هم‌زمان
   // (کاربر دوبار دکمه بزند، یا مدیر هم‌زمان با خودکار تأیید کند) هر دو
   // ببینند کد آزاد است. بدون این، یک کد دو بار امتیاز می‌داد.
@@ -162,9 +191,9 @@ async function creditSubmission(client, { userId, codeId, design, adminId = null
   }
 
   const typeRow = await client.query(
-    `SELECT id, name, point_value, cash_amount, is_active
+    `SELECT id, name, point_value, cash_amount, is_active, image_url
        FROM card_types WHERE id = $1`,
-    [design.card_type_id],
+    [typeId],
   );
   const type = typeRow.rows[0];
   if (!type) {
@@ -187,7 +216,7 @@ async function creditSubmission(client, { userId, codeId, design, adminId = null
         SET status = 'used', used_by_user_id = $1, used_at = NOW(),
             bound_design_id = $2, updated_at = NOW()
       WHERE id = $3`,
-    [userId, design.id, codeId],
+    [userId, design?.id ?? null, codeId],
   );
 
   if (points > 0) {
@@ -216,7 +245,7 @@ async function creditSubmission(client, { userId, codeId, design, adminId = null
   const inv = await client.query(
     `SELECT id FROM user_card_inventory
       WHERE user_id = $1 AND card_type_id = $2 AND consumed_in_reward = false`,
-    [userId, design.card_type_id],
+    [userId, typeId],
   );
   if (inv.rows[0]) {
     await client.query(
@@ -226,7 +255,7 @@ async function creditSubmission(client, { userId, codeId, design, adminId = null
   } else {
     await client.query(
       `INSERT INTO user_card_inventory(user_id, card_type_id, quantity, consumed_in_reward)
-       VALUES($1, $2, 1, false)`, [userId, design.card_type_id],
+       VALUES($1, $2, 1, false)`, [userId, typeId],
     );
   }
 
@@ -247,8 +276,191 @@ async function creditSubmission(client, { userId, codeId, design, adminId = null
     points, cash,
     cardTypeName: type.name,
     cardTypeId: type.id,
-    imageUrl: design.image_url,
+    // ── چرا تصویرِ نوعِ کارت جایگزینِ طرح می‌شود ──
+    //
+    // وقتی کد از پیش گره خورده ولی هیچ طرحِ تصویری آپلود نشده،
+    // `design` نداریم. بدونِ این fallback، کاربر بعد از ثبتِ موفق یک
+    // کارتِ بدونِ عکس در کلکسیون می‌دید — که شبیهِ خرابی است.
+    //
+    // `card_types.image_url` همان تصویری است که سیستمِ قدیمیِ «ثبت کد»
+    // هم استفاده می‌کند، پس ظاهرِ کارت در هر دو مسیر یکی می‌ماند.
+    imageUrl: design?.image_url || type.image_url || null,
     adminId,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// تصمیمِ ثبت — قلبِ ادغامِ دو سیستم
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// خواستهٔ مالک، کلمه به کلمه:
+//
+//   «اگه ما کد رو برای کارتی دقیقا در قسمت ادمین ثبت کردیم … وقتی فرد
+//    عکس گرفت و کدش رو وارد کرد، اگه کد درست بود و عکس فقط ۲۰٪ هم به
+//    عکس مرجع شباهت داشت اتوماتیک تایید بشه.
+//    ولی اگه کد صحیحه ولی هیچ عکس بخصوصی براش تعیین نشده و سیستم
+//    تشخیص داده کارت شبیهش وجود داره، مثل قبل اتوماتیک ثبت کنه.
+//    و اگر زیاد هم شبیه نبود و کد درست بود، مثل قبل بره برای تایید مدیر.»
+//
+// ───────────────────────────────────────────────────────────────────────────
+// چرا آستانه برای کدِ نام‌دار می‌تواند این‌قدر پایین باشد
+// ───────────────────────────────────────────────────────────────────────────
+//
+// چون نقشِ عکس عوض می‌شود.
+//
+//   • کدِ بی‌نام: عکس باید **هویتِ کارت را تعیین کند**. اگر اشتباه
+//     تشخیص دهد، کاربر امتیازِ کارتِ گران‌تری می‌گیرد. پس آستانه باید
+//     سخت‌گیر بماند (۰.۵۵ + حاشیه + نسبت).
+//
+//   • کدِ نام‌دار: هویتِ کارت را **خودِ کد** می‌گوید. عکس فقط باید
+//     نشان دهد کاربر واقعاً کارتِ فیزیکی را در دست دارد و عکسِ یک
+//     دیوارِ خالی نفرستاده. این کارِ بسیار ساده‌تری است.
+//
+// بدترین حالتِ سوءاستفاده در حالتِ دوم: کسی که کد را دارد ولی کارت را
+// ندارد، عکسی می‌فرستد که ۲۰٪ شبیه است. ولی او **قبلاً کد را دارد** —
+// و کد فقط روی همان کارتِ فیزیکی چاپ شده. یعنی یا کارت را دارد، یا
+// کسی که کارت را دارد کد را به او داده. در هر دو حالت کارت واقعی است
+// و یک بار مصرف می‌شود. ضرری متوجه سیستم نیست.
+//
+// ───────────────────────────────────────────────────────────────────────────
+// چرا حتی ۲۰٪ هم شرط است و صفر نه
+// ───────────────────────────────────────────────────────────────────────────
+//
+// اگر هیچ شرطی نگذاریم، کاربر می‌تواند عکسِ سقفِ اتاق را بفرستد و
+// کارت بگیرد. آن‌وقت «ثبت با عکس» عملاً همان «ثبت با کد» می‌شود و
+// دلیلِ وجودش از بین می‌رود — کارتِ فیزیکی دیگر لازم نیست، فقط رشتهٔ
+// کد کافی است که با پیامک هم منتقل می‌شود.
+//
+// ۰.۲۰ عمداً پایین است تا عکسِ تار، کج، در نورِ ضعیف و با گوشیِ قدیمی
+// هم رد شود، ولی عکسِ چیزی که اصلاً کارت نیست نه.
+const BOUND_ACCEPT_SCORE = 0.20;
+
+/**
+ * تصمیم می‌گیرد یک ثبتِ «عکس + کد» چه سرنوشتی دارد.
+ *
+ * تابعِ **خالص** است: هیچ I/O ندارد و مستقیم تست می‌شود. کلِ منطقِ
+ * شاخه‌بندی اینجاست تا در مسیرِ HTTP پخش نشود.
+ *
+ * @param {object}  a
+ * @param {?string} a.expectedTypeId  نوعِ کارتی که کد از پیش به آن گره خورده
+ * @param {object}  a.match           خروجی `imageFingerprint.matchAgainst`
+ * @param {boolean} a.hasReference    آیا طرحِ فعالی برای `expectedTypeId` هست؟
+ * @param {number}  a.boundThreshold  آستانهٔ نرم برای کدِ نام‌دار
+ * @returns {{ action, cardTypeId, design, path, reason }}
+ *   action = 'approve' | 'review'
+ *   path   = 'code_bound' | 'image_match'
+ */
+function decideSubmission({
+  expectedTypeId = null,
+  match,
+  hasReference = true,
+  boundThreshold = BOUND_ACCEPT_SCORE,
+} = {}) {
+  const best = match?.design || null;
+  const score = Number(match?.score || 0);
+
+  // ── مسیرِ ۱: کد از پیش گره خورده ──
+  if (expectedTypeId) {
+    // ── آیا اصلاً طرحی برای **این** کارت در کاتالوگ هست؟ ──
+    //
+    // این سؤال با «آیا موتور چیزی پیدا کرد؟» فرق دارد، و تفاوتش یک
+    // باگِ واقعی ساخت که فقط تستِ زنده گرفت:
+    //
+    // موتور همیشه بهترینِ **کلِ کاتالوگ** را برمی‌گرداند. اگر مدیر
+    // برای کارتِ «بی‌عکس» هزار کد ثبت کرده ولی طرحش را آپلود نکرده،
+    // موتور طرحِ یک کارتِ **دیگر** را به‌عنوان نزدیک‌ترین می‌دهد.
+    //
+    // نتیجه: `matchesExpected` می‌شد false و اگر آن نمره بالای ۰.۵۵
+    // بود، پرونده با علتِ «type_mismatch» به صف می‌رفت — برای کارتی
+    // که اصلاً عکسِ مرجعی ندارد و مقایسه بی‌معنی است.
+    //
+    // پس اول می‌پرسیم: آیا مرجعی برای مقایسه وجود دارد؟ اگر نه، هیچ
+    // قضاوتِ تصویری ممکن نیست و کد حرفِ آخر را می‌زند.
+    //
+    // ⚠️ `hasReference` از **فراخوان** می‌آید، نه از `match.ranked`.
+    //    `ranked` فقط سه تای اول را دارد؛ اگر کاتالوگ ۵۰ طرح داشته
+    //    باشد و طرحِ این کارت رتبهٔ دهم شود، `ranked` آن را نشان
+    //    نمی‌دهد و ما اشتباهاً «مرجعی نیست» نتیجه می‌گرفتیم.
+    //    مسیرِ HTTP کلِ کاتالوگ را در دست دارد و صریح جواب می‌دهد.
+    // آیا بهترین تطبیق **همان** کارتی است که انتظار داشتیم؟
+    //
+    // این ظرافت مهم است: اگر کاربر عکسِ کارتِ B را با کدِ کارتِ A
+    // بفرستد و موتور با اطمینان B را بشناسد، نباید بی‌سروصدا A را
+    // بدهیم. کد می‌گوید A، عکس می‌گوید B — این تناقض است و آدم باید
+    // ببیندش.
+    const matchesExpected = best && best.card_type_id === expectedTypeId;
+
+    // ⚠️ چرا وقتی `best` نداریم آستانه اصلاً بررسی نمی‌شود
+    //
+    // اگر هیچ طرحی در کاتالوگ نباشد (یا همه غیرفعال باشند)، موتور
+    // `score = 0` برمی‌گرداند — نه چون عکس بد است، بلکه چون **چیزی
+    // برای مقایسه وجود ندارد**.
+    //
+    // نسخهٔ اول همان صفر را با آستانهٔ ۰.۲۰ می‌سنجید و رد می‌کرد. یعنی
+    // مدیری که ۱۰۰۰ کد برای کارتی ثبت کرده ولی هنوز عکسِ مرجعش را
+    // آپلود نکرده، **همهٔ** ثبت‌ها را در صف بررسی می‌دید — دقیقاً
+    // برعکسِ هدفِ این قابلیت. تستِ «بدونِ هیچ طرحِ مرجع» همین را گرفت.
+    //
+    // منطق: نمرهٔ صفر در نبودِ مرجع، «شواهدی علیه کاربر» نیست؛ فقط
+    // «شواهدی نیست». و کد به‌تنهایی مدرکِ کافی است.
+    if (!best || !hasReference) {
+      return {
+        action: 'approve',
+        cardTypeId: expectedTypeId,
+        design: null,
+        path: 'code_bound',
+        reason: null,
+      };
+    }
+
+    if (score >= boundThreshold && matchesExpected) {
+      // تصویر همان کارتی را نشان می‌دهد که کد می‌گوید.
+      return {
+        action: 'approve',
+        cardTypeId: expectedTypeId,
+        design: best,
+        path: 'code_bound',
+        reason: null,
+      };
+    }
+
+    if (matchesExpected === false && best && score >= 0.55) {
+      // تناقضِ قاطع: عکس با اطمینان کارتِ **دیگری** را نشان می‌دهد.
+      return {
+        action: 'review',
+        cardTypeId: expectedTypeId,
+        design: best,
+        path: 'code_bound',
+        reason: 'type_mismatch',
+      };
+    }
+
+    // شباهت حتی به ۲۰٪ هم نرسید → احتمالاً عکسِ کارت نیست.
+    return {
+      action: 'review',
+      cardTypeId: expectedTypeId,
+      design: best,
+      path: 'code_bound',
+      reason: 'low_confidence',
+    };
+  }
+
+  // ── مسیرِ ۲: کدِ بی‌نام — رفتارِ قدیمی، دست‌نخورده ──
+  if (match?.verdict === 'accept' && best) {
+    return {
+      action: 'approve',
+      cardTypeId: best.card_type_id,
+      design: best,
+      path: 'image_match',
+      reason: null,
+    };
+  }
+  return {
+    action: 'review',
+    cardTypeId: null,
+    design: best,
+    path: 'image_match',
+    reason: match?.verdict === 'reject' ? 'image_unknown' : 'low_confidence',
   };
 }
 
@@ -258,6 +470,8 @@ module.exports = {
   isValidPhotoCode,
   suggestCode,
   creditSubmission,
+  decideSubmission,
+  BOUND_ACCEPT_SCORE,
   CODE_ALPHABET,
   CODE_SPACE,
 };

@@ -53,6 +53,9 @@ export function PhotoCardsPage({ request }) {
 
   // فرم کد — مدیر خودش وارد می‌کند، سیستم نمی‌سازد
   const [rawCodes, setRawCodes] = useState('');
+  // نوعِ کارتی که این دستهٔ کد رویش چاپ می‌شود. خالی = «نمی‌دانم».
+  const [codeType, setCodeType] = useState('');
+  const [assignBusy, setAssignBusy] = useState(false);
   const [label, setLabel] = useState('');
   const [saving, setSaving] = useState(false);
   const [report, setReport] = useState(null);
@@ -134,6 +137,49 @@ export function PhotoCardsPage({ request }) {
     } catch (e) { notify(e.message, 'error'); }
   }
 
+
+  /**
+   * فهرستِ نوعِ کارت‌ها برای منویِ انتخاب.
+   *
+   * از `designs` مشتق می‌شود و نه یک درخواستِ جدا: همان داده را دارد
+   * (`card_type_id` و `card_type_name`) و یک رفت‌وبرگشتِ اضافه فقط
+   * صفحه را کندتر می‌کرد.
+   *
+   * یکتاسازی لازم است چون یک نوع کارت می‌تواند چند طرح داشته باشد
+   * (نسخه‌های مختلفِ همان کارت) و منو نباید نامِ تکراری نشان دهد.
+   */
+  const cardTypeOptions = (() => {
+    const seen = new Map();
+    for (const d of designs || []) {
+      if (d.card_type_id && !seen.has(d.card_type_id)) {
+        seen.set(d.card_type_id, {
+          id: d.card_type_id, name: d.card_type_name || '—',
+        });
+      }
+    }
+    return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name, 'fa'));
+  })();
+
+  /** نوعِ کارتِ انتخاب‌شده را روی کلِ یک دستهٔ ثبت‌شده اعمال می‌کند. */
+  async function assignBatchType() {
+    if (!label.trim()) {
+      return notify('اول دسته را انتخاب کنید', 'error');
+    }
+    setAssignBusy(true);
+    try {
+      const r = await request('/api/admin/photo-cards/codes/assign-type', {
+        method: 'POST',
+        body: { batchLabel: label.trim(), cardTypeId: codeType || null },
+      });
+      notify(r.message, 'success');
+      loadCodes();
+    } catch (e) {
+      notify(e.message, 'error');
+    } finally {
+      setAssignBusy(false);
+    }
+  }
+
   /**
    * کدها را همان‌طور که مدیر نوشته می‌فرستد.
    *
@@ -148,7 +194,11 @@ export function PhotoCardsPage({ request }) {
     try {
       const r = await request('/api/admin/photo-cards/codes', {
         method: 'POST',
-        body: { rawCodes, batchLabel: label.trim() || undefined },
+        body: {
+          rawCodes,
+          batchLabel: label.trim() || undefined,
+          cardTypeId: codeType || undefined,
+        },
       });
       setReport(r);
       notify(r.message, r.insertedCount ? 'success' : 'error');
@@ -348,6 +398,44 @@ export function PhotoCardsPage({ request }) {
               : 'کدهایی که روی کارت‌ها چاپ شده را اینجا وارد کنید'}
           </span>
         </div>
+        {/* ══════════════════════════════════════════════════════════════
+            انتخابِ کارت — مهم‌ترین تصمیمِ این فرم
+            ══════════════════════════════════════════════════════════════
+
+            دو جنسِ کاملاً متفاوت از کد داریم:
+
+            • «نمی‌دانم» (پیش‌فرض) — کارت‌های قدیمی که نمی‌دانیم کدام کد
+              روی کدام کارت چاپ شده. تشخیص کاملاً به عهدهٔ عکس است و
+              آستانه سخت‌گیر می‌ماند.
+
+            • یک کارتِ مشخص — کارت‌های جدید که دسته‌بندی‌شان را می‌دانیم.
+              آن‌وقت خودِ کد مدرکِ مالکیت است و عکس فقط باید نشان دهد
+              کاربر کارتِ فیزیکی را در دست دارد. آستانه به ۲۰٪ می‌افتد
+              و تقریباً همهٔ ثبت‌ها خودکار تأیید می‌شوند.
+
+            پیش‌فرض عمداً «نمی‌دانم» است: انتخابِ اشتباهِ یک کارت بدتر
+            از انتخاب نکردن است — کاربر امتیازِ کارتِ دیگری می‌گیرد. */}
+        <Field label="این کدها روی کدام کارت چاپ می‌شوند؟">
+          <select className="input" value={codeType}
+            onChange={e => setCodeType(e.target.value)}>
+            <option value="">نمی‌دانم — تشخیص از روی عکس</option>
+            {cardTypeOptions.map(t => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+        </Field>
+        {codeType ? (
+          <p className="topbar-sub codeTypeHint ok">
+            ✅ ثبت این کدها تقریباً همیشه خودکار تأیید می‌شود — کاربر فقط
+            باید عکسی از کارت بفرستد، حتی اگر کیفیتش پایین باشد.
+          </p>
+        ) : (
+          <p className="topbar-sub codeTypeHint">
+            ℹ️ بدون انتخاب کارت، تشخیص فقط از روی عکس انجام می‌شود و
+            عکس‌های نامفهوم به صف بررسی شما می‌روند.
+          </p>
+        )}
+
         <div className="photoCodeForm">
           <Field label="برچسب دسته (اختیاری)">
             <Input value={label} onChange={e => setLabel(e.target.value)}
@@ -357,6 +445,34 @@ export function PhotoCardsPage({ request }) {
             ثبت کدها
           </Button>
         </div>
+
+        {/* ── تخصیصِ گروهی به دستهٔ موجود ──
+            مدیری که قبلاً کدها را بدون کارت وارد کرده، بدون این دکمه
+            بن‌بست است: کدها چاپ و توزیع شده‌اند و حذفشان ممکن نیست. */}
+        {batches.length > 0 && (
+          <div className="assignBox">
+            <b>تغییر کارتِ یک دستهٔ ثبت‌شده</b>
+            <p className="topbar-sub">
+              کدهای مصرف‌نشدهٔ دسته را به کارتِ بالا گره می‌زند. اگر
+              «نمی‌دانم» انتخاب باشد، گره باز می‌شود.
+            </p>
+            <div className="assignRow">
+              <select className="input" value={label}
+                onChange={e => setLabel(e.target.value)}>
+                <option value="">— دسته را انتخاب کنید —</option>
+                {batches.map(b => (
+                  <option key={b.batch_label} value={b.batch_label}>
+                    {b.batch_label} ({fmtNumber(b.total)} کد)
+                  </option>
+                ))}
+              </select>
+              <Button variant="ghost" loading={assignBusy}
+                onClick={assignBatchType}>
+                اعمال روی دسته
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* ── گزارش تفکیک‌شده ──
             «۱۴٬۹۸۷ کد ثبت شد» به‌تنهایی بی‌فایده است — مدیر باید بداند
@@ -473,6 +589,13 @@ export function PhotoCardsPage({ request }) {
                   <code className="codeVal">{c.code}</code>
                   <div className="codeMeta">
                     {c.batch_label && <span className="codeBatch">{c.batch_label}</span>}
+                    {/* کارتی که کد **از پیش** به آن گره خورده. با
+                        `card_type_name` فرق دارد: آن نتیجهٔ تطبیقِ عکس
+                        بعد از مصرف است، این تصمیمِ مدیر پیش از توزیع.
+                        نشانِ 🔗 تفکیکشان را در یک نگاه ممکن می‌کند. */}
+                    {c.expected_card_type_name && (
+                      <Badge tone="info">🔗 {c.expected_card_type_name}</Badge>
+                    )}
                     {c.card_type_name && (
                       <Badge tone="success">{c.card_type_name}</Badge>
                     )}

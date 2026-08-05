@@ -429,6 +429,37 @@ module.exports = function createPhotoCardRoutes(deps) {
 
       const label = String(req.body.batchLabel || '').trim().slice(0, 80) || null;
 
+      // ── نوعِ کارتِ از پیش معلوم ──
+      //
+      // خواستهٔ مالک: «اگه ما کد رو برای کارتی دقیقا ثبت کردیم، مثلا
+      // ۱۰۰۰ تا کد برای یه کارت مخصوص».
+      //
+      // اختیاری است. اگر نیاید، کدها «بی‌نام» می‌مانند و دقیقاً مثل
+      // قبل رفتار می‌کنند — همان کارت‌های قدیمی که نمی‌دانیم کدشان
+      // روی کدام کارت چاپ شده.
+      const expectedTypeId = String(req.body.cardTypeId || '').trim() || null;
+      if (expectedTypeId) {
+        if (!UUID_RE.test(expectedTypeId)) {
+          return res.status(400).json({ message: 'شناسهٔ نوع کارت معتبر نیست' });
+        }
+        // وجودِ نوعِ کارت **قبل از** درج بررسی می‌شود.
+        //
+        // کلید خارجی هم جلویش را می‌گیرد، ولی آنجا خطای خامِ Postgres
+        // می‌دهد که مدیر نمی‌فهمد. بدتر: با ۱۵ هزار کد، کلِ درج برمی‌گردد
+        // و مدیر نمی‌داند چرا.
+        const t = await pool.query(
+          'SELECT id, name, is_active FROM card_types WHERE id=$1',
+          [expectedTypeId]);
+        if (!t.rows[0]) {
+          return res.status(404).json({ message: 'نوع کارت یافت نشد' });
+        }
+        if (!t.rows[0].is_active) {
+          return res.status(400).json({
+            message: `نوع کارت «${t.rows[0].name}» غیرفعال است. `
+              + 'اول فعالش کنید بعد کد اضافه کنید.' });
+        }
+      }
+
       // ── تکراری بر پایهٔ fold سنجیده می‌شود، نه رشتهٔ خام ──
       //
       // `QL-2026-O001` و `QL-2026-0001` روی کارتِ چاپی از هم قابل تشخیص
@@ -478,11 +509,11 @@ module.exports = function createPhotoCardRoutes(deps) {
         // O/0 یا I/L/1 فرق دارند روی کارت یکسان دیده می‌شوند و نباید هر
         // دو در بانک باشند.
         const r = await pool.query(
-          `INSERT INTO photo_card_codes(code, batch_label)
-           SELECT unnest($1::citext[]), $2
+          `INSERT INTO photo_card_codes(code, batch_label, expected_card_type_id)
+           SELECT unnest($1::citext[]), $2, $3
            ON CONFLICT (code_fold) DO NOTHING
            RETURNING code`,
-          [candidates, label],
+          [candidates, label, expectedTypeId],
         );
         inserted = r.rows.map(x => String(x.code));
         const okSet = new Set(inserted.map(c => c.toUpperCase()));
@@ -497,6 +528,7 @@ module.exports = function createPhotoCardRoutes(deps) {
           invalid: invalid.length,
           clashWithOldBank: clashWithOldBank.length,
           batchLabel: label,
+          expectedCardTypeId: expectedTypeId,
         });
 
       // فقط نمونه‌ای از هر دسته. با ۱۵ هزار کد، برگرداندن همهٔ آرایه‌ها
@@ -518,7 +550,9 @@ module.exports = function createPhotoCardRoutes(deps) {
         truncatedSamples: inserted.length > 20 || duplicateInDb.length > 20
           || invalid.length > 20,
         batchLabel: label,
-        message: `${inserted.length.toLocaleString('en-US')} کد ثبت شد`,
+        expectedCardTypeId: expectedTypeId,
+        message: `${inserted.length.toLocaleString('en-US')} کد ثبت شد`
+          + (expectedTypeId ? ' و به این کارت گره خورد' : ''),
       });
     }),
   );
@@ -639,6 +673,97 @@ module.exports = function createPhotoCardRoutes(deps) {
     }),
   );
 
+
+  /**
+   * تخصیصِ گروهیِ نوعِ کارت به کدهای موجود.
+   *
+   * ═══════════════════════════════════════════════════════════════════════
+   * چرا این مسیر لازم است
+   * ═══════════════════════════════════════════════════════════════════════
+   *
+   * ثبتِ اولیه می‌تواند `cardTypeId` بگیرد، ولی دو حالت واقعی هست که
+   * بدون این مسیر بن‌بست‌اند:
+   *
+   *   ۱. مدیر ۱۰۰۰ کد را بدون نوع وارد کرده و بعد یادش افتاده. بدون
+   *      این مسیر باید همه را حذف و دوباره وارد کند — و کدهایی که
+   *      قبلاً چاپ شده‌اند دیگر قابلِ حذف نیستند.
+   *
+   *   ۲. یک دستهٔ قدیمی که حالا می‌داند مالِ کدام کارت است.
+   *
+   * روی `batch_label` کار می‌کند نه فهرستِ شناسه‌ها: مدیر با «دستهٔ
+   * تیرماه» فکر می‌کند، نه با ۱۰۰۰ تا UUID.
+   *
+   * ⚠️ فقط کدهای `unused` تغییر می‌کنند. کدی که مصرف شده یعنی کاربری
+   *    بابتش کارت گرفته؛ عوض کردنِ نوعش تاریخچه را دروغ می‌کند بدون
+   *    اینکه چیزی در اینونتوریِ او عوض شود.
+   */
+  router.post(
+    '/admin/photo-cards/codes/assign-type',
+    adminAuth, requireRole('support'),
+    asyncHandler(async (req, res) => {
+      const label = String(req.body.batchLabel || '').trim();
+      const typeId = String(req.body.cardTypeId || '').trim() || null;
+
+      if (!label) {
+        // بدونِ برچسب، این درخواست یعنی «همهٔ کدهای بانک» — که تقریباً
+        // همیشه اشتباه است و برگرداندنش ناممکن.
+        return res.status(400).json({
+          message: 'برچسب دسته را مشخص کنید. بدون آن، این عملیات همهٔ '
+            + 'کدهای بانک را تغییر می‌داد.' });
+      }
+
+      let typeName = null;
+      if (typeId) {
+        if (!UUID_RE.test(typeId)) {
+          return res.status(400).json({ message: 'شناسهٔ نوع کارت معتبر نیست' });
+        }
+        const t = await pool.query(
+          'SELECT id, name, is_active FROM card_types WHERE id=$1', [typeId]);
+        if (!t.rows[0]) {
+          return res.status(404).json({ message: 'نوع کارت یافت نشد' });
+        }
+        if (!t.rows[0].is_active) {
+          return res.status(400).json({
+            message: `نوع کارت «${t.rows[0].name}» غیرفعال است` });
+        }
+        typeName = t.rows[0].name;
+      }
+      // typeId === null یعنی «گره را باز کن» — کدها به حالتِ بی‌نام
+      // برمی‌گردند و دوباره با تشخیصِ تصویر کار می‌کنند.
+
+      const { rows } = await pool.query(
+        `UPDATE photo_card_codes
+            SET expected_card_type_id = $1, updated_at = NOW()
+          WHERE batch_label = $2 AND status = 'unused'
+        RETURNING id`,
+        [typeId, label],
+      );
+
+      // چند کد به‌خاطرِ مصرف‌شدن دست‌نخورده ماندند؟ سکوت اینجا یعنی
+      // مدیر فکر می‌کند همه عوض شدند.
+      const skipped = await pool.query(
+        `SELECT count(*)::int AS n FROM photo_card_codes
+          WHERE batch_label = $1 AND status <> 'unused'`,
+        [label],
+      );
+
+      await audit(req.admin.id, 'assign_photo_code_type', 'photo_card_codes',
+        null, null, { batchLabel: label, cardTypeId: typeId,
+          updated: rows.length, skipped: skipped.rows[0].n });
+
+      res.json({
+        updated: rows.length,
+        skipped: skipped.rows[0].n,
+        cardTypeName: typeName,
+        message: typeId
+          ? `${rows.length.toLocaleString('en-US')} کد به کارت «${typeName}» گره خورد`
+            + (skipped.rows[0].n
+              ? ` — ${skipped.rows[0].n} کد چون مصرف شده بود تغییر نکرد` : '')
+          : `${rows.length.toLocaleString('en-US')} کد به حالت بدون کارت برگشت`,
+      });
+    }),
+  );
+
   /**
    * حذفِ کد.
    *
@@ -733,11 +858,17 @@ module.exports = function createPhotoCardRoutes(deps) {
       }
       const { rows } = await pool.query(
         `SELECT c.id, c.code, c.status, c.batch_label, c.created_at, c.used_at,
-                u.mobile AS used_by_mobile, t.name AS card_type_name
+                u.mobile AS used_by_mobile, t.name AS card_type_name,
+                -- نوعِ کارتی که کد از پیش به آن گره خورده. با
+                -- card_type_name فرق دارد: آن نتیجهٔ تطبیقِ تصویر بعد
+                -- از مصرف است، این تصمیمِ مدیر پیش از توزیع.
+                c.expected_card_type_id,
+                et.name AS expected_card_type_name
            FROM photo_card_codes c
            LEFT JOIN users u ON u.id = c.used_by_user_id
            LEFT JOIN photo_card_designs d ON d.id = c.bound_design_id
            LEFT JOIN card_types t ON t.id = d.card_type_id
+           LEFT JOIN card_types et ON et.id = c.expected_card_type_id
           ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
           ORDER BY c.created_at DESC
           LIMIT 300`,
@@ -773,19 +904,25 @@ module.exports = function createPhotoCardRoutes(deps) {
     asyncHandler(async (req, res) => {
       const label = req.query.batchLabel ? String(req.query.batchLabel) : null;
       const { rows } = await pool.query(
-        `SELECT code, status, batch_label, created_at
-           FROM photo_card_codes
-          WHERE ($1::text IS NULL OR batch_label = $1)
-          ORDER BY created_at, code`,
+        `SELECT c.code, c.status, c.batch_label, c.created_at,
+                et.name AS expected_card_type_name
+           FROM photo_card_codes c
+           LEFT JOIN card_types et ON et.id = c.expected_card_type_id
+          WHERE ($1::text IS NULL OR c.batch_label = $1)
+          ORDER BY c.created_at, c.code`,
         [label],
       );
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', 'attachment; filename="photo-card-codes.csv"');
       // BOM تا اکسل فارسی را درست باز کند — بدون آن ستون‌ها به‌هم می‌ریزند.
       res.write('\uFEFF');
-      res.write('code,status,batch\n');
+      // ستونِ کارت اضافه شد: چاپخانه باید بداند هر کد روی کدام کارت
+      // چاپ شود، وگرنه کلِ هدفِ «کدِ نام‌دار» از بین می‌رود.
+      res.write('code,status,batch,card\n');
       for (const r of rows) {
-        res.write(`${r.code},${r.status},${r.batch_label || ''}\n`);
+        // نامِ کارت ممکن است کاما داشته باشد و ستون‌ها را جابه‌جا کند.
+        const card = String(r.expected_card_type_name || '').replace(/"/g, '""');
+        res.write(`${r.code},${r.status},${r.batch_label || ''},"${card}"\n`);
       }
       res.end();
     }),
@@ -868,24 +1005,57 @@ module.exports = function createPhotoCardRoutes(deps) {
           // انتخابِ مدیر بر حدسِ موتور مقدم است. اگر موتور حدسی نداشته
           // (عکس اصلاً شناخته نشد) انتخابِ مدیر **الزامی** است، وگرنه
           // معلوم نیست کدام کارت باید به اینونتوری اضافه شود.
+          if (!sub.code_id) {
+            throw Object.assign(
+              new Error('این پرونده کدی ندارد و قابل تأیید نیست'),
+              { status: 400 });
+          }
+
+          // ── نوعِ کارتی که کد از پیش به آن گره خورده ──
+          //
+          // اگر کد نام‌دار باشد، مدیر لازم نیست طرح انتخاب کند: خودِ
+          // کد می‌گوید کدام کارت. این همان چیزی است که کارِ مدیر را
+          // خودکار می‌کند — قبلاً حتی برای کدی که تکلیفش روشن بود،
+          // انتخابِ دستیِ طرح اجباری بود.
+          const cq = await client.query(
+            'SELECT expected_card_type_id FROM photo_card_codes WHERE id=$1',
+            [sub.code_id],
+          );
+          const expectedTypeId = cq.rows[0]?.expected_card_type_id || null;
+
           const designId = chosenId || sub.matched_design_id;
-          if (!designId || !sub.code_id) {
+          if (!designId && !expectedTypeId) {
             throw Object.assign(
               new Error('برای تأیید باید مشخص کنید این کد مربوط به کدام کارت است'),
               { status: 400 });
           }
-          const d = await client.query(
-            'SELECT id, card_type_id, image_url FROM photo_card_designs WHERE id=$1 AND is_active=true',
-            [designId],
-          );
-          if (!d.rows[0]) {
-            throw Object.assign(new Error('طرح پیدا نشد یا غیرفعال است'), { status: 404 });
+
+          // طرح اختیاری است؛ فقط اگر شناسه‌ای داریم می‌خوانیمش.
+          let design = null;
+          if (designId) {
+            const d = await client.query(
+              'SELECT id, card_type_id, image_url FROM photo_card_designs WHERE id=$1 AND is_active=true',
+              [designId],
+            );
+            if (!d.rows[0]) {
+              // اگر مدیر صریحاً طرحی انتخاب کرده و پیدا نشد، خطاست.
+              // ولی اگر فقط حدسِ موتور بود و کد نام‌دار داریم، بی‌صدا
+              // به نوعِ کارتِ کد برمی‌گردیم.
+              if (chosenId || !expectedTypeId) {
+                throw Object.assign(
+                  new Error('طرح پیدا نشد یا غیرفعال است'), { status: 404 });
+              }
+            } else {
+              design = d.rows[0];
+            }
           }
 
           payload = await photoCards.creditSubmission(client, {
             userId: sub.user_id,
             codeId: sub.code_id,
-            design: d.rows[0],
+            design,
+            // انتخابِ صریحِ مدیر مقدم است؛ وگرنه نوعِ کارتِ گره‌خورده.
+            cardTypeId: design ? null : expectedTypeId,
             adminId: req.admin.id,
           });
           if (payload.points > 0) {
@@ -895,8 +1065,9 @@ module.exports = function createPhotoCardRoutes(deps) {
           // بعداً بشود سنجید «چند بار مدیر حدسِ ما را عوض کرد؟» —
           // تنها راهِ فهمیدنِ اینکه آستانه‌ها درست تنظیم شده‌اند.
           await client.query(
-            'UPDATE photo_card_submissions SET chosen_design_id=$1 WHERE id=$2',
-            [d.rows[0].id, req.params.id],
+            `UPDATE photo_card_submissions
+                SET chosen_design_id=$1, decision_path='admin' WHERE id=$2`,
+            [design?.id ?? null, req.params.id],
           );
         } else {
           // رد شد: کد آزاد می‌شود تا هدر نرود. کاربر ممکن است با عکس
@@ -1075,8 +1246,12 @@ module.exports = function createPhotoCardRoutes(deps) {
         //
         // جست‌وجو روی `code_fold`: کاربر کد را از روی کارتِ چاپی می‌خواند
         // و O/0 و I/L/1 آنجا از هم قابل تشخیص نیستند.
+        // `expected_card_type_id` هم خوانده می‌شود: اگر این کد از پیش
+        // به یک نوع کارت گره خورده باشد، مسیرِ تصمیم کاملاً عوض می‌شود.
+        // توضیحِ کامل در `photoCardService.decideSubmission`.
         const codeRow = await pool.query(
-          `SELECT id, status FROM photo_card_codes WHERE code_fold=$1`,
+          `SELECT id, status, expected_card_type_id
+             FROM photo_card_codes WHERE code_fold=$1`,
           [photoCards.foldPhotoCode(code)],
         );
         if (!codeRow.rows[0]) {
@@ -1099,6 +1274,7 @@ module.exports = function createPhotoCardRoutes(deps) {
           return res.status(409).json({ message: 'این کد دیگر معتبر نیست' });
         }
         const codeId = codeRow.rows[0].id;
+        const expectedTypeId = codeRow.rows[0].expected_card_type_id || null;
 
         // از اینجا به بعد کد **معتبر** است. هر نتیجه‌ای که بگیریم،
         // شمارندهٔ خطا صفر می‌شود: کاربر ثابت کرده کارت دارد.
@@ -1253,10 +1429,33 @@ module.exports = function createPhotoCardRoutes(deps) {
         // ردِ خودکار در این حالت یعنی مجازاتِ کسی که واقعاً کارت خریده.
         // مدیر عکس را می‌بیند و اگر کارت را شناخت، خودش طرح را انتخاب
         // می‌کند.
-        if (match.verdict !== 'accept') {
-          const reason = match.verdict === 'reject'
-            ? 'image_unknown'
-            : 'low_confidence';
+        // ═══════════════════════════════════════════════════════════════
+        // تصمیم: کدِ نام‌دار یا بی‌نام؟
+        // ═══════════════════════════════════════════════════════════════
+        //
+        // کلِ منطق در `decideSubmission` است — یک تابعِ خالص که مستقیم
+        // تست می‌شود. اینجا فقط نتیجه‌اش اجرا می‌شود.
+        //
+        // خلاصه: اگر کد از پیش به کارتی گره خورده، عکس فقط باید ثابت
+        // کند کاربر کارتِ فیزیکی را در دست دارد (آستانهٔ نرمِ ۰.۲۰).
+        // اگر بی‌نام است، عکس باید هویتِ کارت را تعیین کند (رفتارِ
+        // سخت‌گیرِ قدیمی).
+        // آیا طرحِ فعالی برای کارتی که کد به آن گره خورده وجود دارد؟
+        //
+        // اینجا محاسبه می‌شود چون کلِ کاتالوگ در دست است. `match.ranked`
+        // فقط سه تای اول را دارد و برای این سؤال کافی نیست.
+        const hasReference = expectedTypeId
+          ? designsRes.rows.some(d => d.card_type_id === expectedTypeId)
+          : true;
+
+        const decision = photoCards.decideSubmission({
+          expectedTypeId,
+          match,
+          hasReference,
+        });
+
+        if (decision.action !== 'approve') {
+          const reason = decision.reason;
 
           // کد رزرو می‌شود: نه آزاد (وگرنه نفر دوم خرجش می‌کند) و نه
           // مصرف‌شده (وگرنه اگر مدیر رد کند بی‌دلیل سوخته است).
@@ -1280,9 +1479,9 @@ module.exports = function createPhotoCardRoutes(deps) {
           const sub = await pool.query(
             `INSERT INTO photo_card_submissions
                (user_id, code_id, matched_design_id, match_score, match_margin,
-                user_image_path, status, review_reason,
+                user_image_path, status, review_reason, decision_path,
                 img_dhash, img_phash, img_color, img_tex, img_luma)
-             VALUES($1,$2,$3,$4,$5,$6,'pending',$7,$8,$9,$10,$11,$12) RETURNING id`,
+             VALUES($1,$2,$3,$4,$5,$6,'pending',$7,$13,$8,$9,$10,$11,$12) RETURNING id`,
             [req.user.id, codeId, match.design?.id ?? null,
               match.score, match.margin, savedPath, reason,
               // اثرانگشتِ عکسِ کاربر ذخیره می‌شود تا اگر همین عکس را
@@ -1290,7 +1489,7 @@ module.exports = function createPhotoCardRoutes(deps) {
               // مدیر پاک می‌شود ولی این چند صد بایت می‌ماند — که هم
               // ارزان است و هم برای بررسیِ تقلبِ بعدی مفید.
               queryFp.dhash, queryFp.phash, queryFp.colorSig, queryFp.texSig,
-              queryFp.lumaSig],
+              queryFp.lumaSig, decision.path],
           );
 
           // قفل تا **بعد** از درجِ پرونده نگه داشته شد، پس درخواستِ
@@ -1306,7 +1505,17 @@ module.exports = function createPhotoCardRoutes(deps) {
             // بدون بازهٔ زمانی، کاربر نمی‌داند منتظر بماند یا دوباره
             // تلاش کند — و معمولاً دوباره تلاش می‌کند، که هم کدِ بعدی
             // را می‌سوزاند و هم صف را شلوغ می‌کند.
-            message: reason === 'image_unknown'
+            message: reason === 'type_mismatch'
+              // ── چرا این پیام صریح است ──
+              // کد و عکس دو کارتِ متفاوت را نشان می‌دهند. محتمل‌ترین
+              // توضیح اشتباهِ ساده است: کاربر چند کارت جلویش دارد و
+              // کدِ یکی را با عکسِ دیگری فرستاده. گفتنِ صریحش یعنی
+              // خودش در چند ثانیه درستش می‌کند، به‌جای ۲۴ ساعت انتظار.
+              ? 'کد شما معتبر است ✅ ولی عکسی که فرستادید با کارتِ '
+                + 'مربوط به این کد هم‌خوانی ندارد. اگر چند کارت دارید، '
+                + 'مطمئن شوید عکس و کد مالِ یک کارت‌اند. پرونده برای '
+                + 'بررسی به کارشناس رفت و کد شما محفوظ است.'
+              : reason === 'image_unknown'
               ? 'کد شما درست است ✅ ولی کیفیت عکس پایین بود و به‌خوبی '
                 + 'تشخیص داده نشد. عکس توسط کارشناس بررسی می‌شود و '
                 + 'ممکن است تا ۲۴ ساعت طول بکشد. نتیجه را اطلاع می‌دهیم '
@@ -1326,11 +1535,17 @@ module.exports = function createPhotoCardRoutes(deps) {
         let payload;
         try {
           await client.query('BEGIN');
-          const design = designsRes.rows.find(d => d.id === match.design.id);
+          // `design` ممکن است null باشد: کدِ نام‌داری که هیچ طرحِ
+          // تصویری برایش آپلود نشده. آن‌وقت نوعِ کارت از خودِ کد
+          // می‌آید — توضیح در `creditSubmission`.
+          const design = decision.design
+            ? designsRes.rows.find(d => d.id === decision.design.id) || null
+            : null;
           payload = await photoCards.creditSubmission(client, {
             userId: req.user.id,
             codeId,
             design,
+            cardTypeId: decision.cardTypeId,
           });
           if (payload.points > 0) {
             await addLeaguePoints(client, req.user.id, payload.points);
@@ -1338,9 +1553,10 @@ module.exports = function createPhotoCardRoutes(deps) {
           await client.query(
             `INSERT INTO photo_card_submissions
                (user_id, code_id, matched_design_id, chosen_design_id,
-                match_score, match_margin, status)
-             VALUES($1,$2,$3,$3,$4,$5,'approved')`,
-            [req.user.id, codeId, match.design.id, match.score, match.margin],
+                match_score, match_margin, status, decision_path)
+             VALUES($1,$2,$3,$3,$4,$5,'approved',$6)`,
+            [req.user.id, codeId, design?.id ?? null,
+              match.score, match.margin, decision.path],
           );
           await client.query('COMMIT');
         } catch (e) {

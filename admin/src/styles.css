@@ -1267,3 +1267,35 @@ table.data-table {
   .codeRow { flex-wrap: wrap; }
   .codeVal { min-width: 0; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   کدهای گره‌خورده به کارت
+   ══════════════════════════════════════════════════════════════════════════
+
+   دو جنسِ کد داریم و مدیر باید در یک نگاه تفکیکشان کند: کدی که
+   می‌دانیم روی کدام کارت چاپ شده (تأییدِ تقریباً همیشه خودکار)، و کدِ
+   قدیمی که تشخیصش فقط از روی عکس است. */
+.codeTypeHint {
+  margin: -4px 0 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--gg-surface-high);
+  line-height: 1.9;
+}
+.codeTypeHint.ok {
+  background: color-mix(in srgb, var(--gg-emerald) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--gg-emerald) 30%, transparent);
+}
+
+.assignBox {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--gg-surface-high);
+  border: 1px dashed var(--gg-border);
+}
+.assignBox > b { font-size: 13.5px; }
+.assignBox > p { margin: 4px 0 10px; }
+/* روی موبایل ستونی می‌شود تا انتخابگر و دکمه له نشوند. */
+.assignRow { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.assignRow > select { flex: 1 1 220px; min-width: 0; }

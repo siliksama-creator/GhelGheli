@@ -94,7 +94,7 @@ def admin_token(password, username='Admin'):
 # نکته: خودِ محافظ کاملاً درست کار می‌کرد (۹۴٪ شباهت را گرفت). این یک
 # باگِ **هماهنگی بین تست‌ها** بود، نه باگِ محصول — و دقیقاً همان جنسِ
 # خطایی که با کپی‌کردنِ یک لیست در چند جا ساخته می‌شود.
-TEST_PREFIXES = ('SP', 'EG', 'R2', 'IF', 'DBG')
+TEST_PREFIXES = ('SP', 'EG', 'R2', 'IF', 'BD', 'DBG')
 
 
 def deactivate_stale_designs(req, admin_tok, prefixes=TEST_PREFIXES):

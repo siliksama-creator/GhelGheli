@@ -60,6 +60,31 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
   // فرم کد — مدیر خودش وارد می‌کند
   final _codes = TextEditingController();
   final _batch = TextEditingController();
+
+  /// نوعِ کارتی که این دستهٔ کد رویش چاپ می‌شود. null = «نمی‌دانم».
+  ///
+  /// وقتی مقدار دارد، ثبتِ کاربر تقریباً همیشه خودکار تأیید می‌شود:
+  /// خودِ کد مدرکِ مالکیت است و عکس فقط باید نشان دهد کارتِ فیزیکی در
+  /// دست است. توضیحِ کاملِ منطق در `photoCardService.decideSubmission`.
+  String? _codeType;
+  bool _assigning = false;
+
+  /// (شناسهٔ نوعِ کارت، نام) — برای منویِ انتخاب.
+  ///
+  /// از `_designs` مشتق می‌شود و نه یک درخواستِ جدا: همان داده را دارد.
+  /// یکتاسازی لازم است چون یک نوع کارت می‌تواند چند طرح داشته باشد و
+  /// منو نباید نامِ تکراری نشان دهد.
+  List<(String, String)> get _cardTypeOptions {
+    final seen = <String, String>{};
+    for (final d in _designs) {
+      final id = d is Map ? d['card_type_id']?.toString() : null;
+      if (id == null || id.isEmpty || seen.containsKey(id)) continue;
+      seen[id] = (d['card_type_name'] ?? '—').toString();
+    }
+    final out = seen.entries.map((e) => (e.key, e.value)).toList()
+      ..sort((a, b) => a.$2.compareTo(b.$2));
+    return out;
+  }
   bool _savingCodes = false;
   Map? _report;
 
@@ -189,6 +214,7 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
       final r = await widget.api.post('/api/admin/photo-cards/codes', {
         'rawCodes': raw,
         if (_batch.text.trim().isNotEmpty) 'batchLabel': _batch.text.trim(),
+        if (_codeType != null) 'cardTypeId': _codeType,
       });
       setState(() => _report = r as Map);
       _snack(r['message']?.toString() ?? 'ثبت شد');
@@ -198,6 +224,29 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
       _snack(apiError(e));
     } finally {
       if (mounted) setState(() => _savingCodes = false);
+    }
+  }
+
+  /// نوعِ کارتِ انتخاب‌شده را روی کلِ یک دستهٔ ثبت‌شده اعمال می‌کند.
+  ///
+  /// چرا لازم است: مدیری که قبلاً کدها را بدون کارت وارد کرده بن‌بست
+  /// است — کدها چاپ و توزیع شده‌اند و حذفشان ممکن نیست.
+  Future<void> _assignBatchType() async {
+    final label = _batch.text.trim();
+    if (label.isEmpty) return _snack('اول برچسب دسته را بنویسید');
+    setState(() => _assigning = true);
+    try {
+      final r = await widget.api
+          .post('/api/admin/photo-cards/codes/assign-type', {
+        'batchLabel': label,
+        'cardTypeId': _codeType,
+      });
+      _snack(r['message']?.toString() ?? 'اعمال شد');
+      await _load();
+    } catch (e) {
+      _snack(apiError(e));
+    } finally {
+      if (mounted) setState(() => _assigning = false);
     }
   }
 
@@ -485,10 +534,53 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
               : 'کدهایی که روی کارت‌ها چاپ شده را اینجا وارد کنید',
           style: theme.textTheme.bodySmall,
         ),
+        const SizedBox(height: 10),
+        // ── انتخابِ کارت: مهم‌ترین تصمیمِ این فرم ──
+        //
+        // پیش‌فرض عمداً «نمی‌دانم» است: انتخابِ اشتباهِ یک کارت بدتر از
+        // انتخاب نکردن است، چون کاربر امتیازِ کارتِ دیگری می‌گیرد.
+        DropdownButtonFormField<String?>(
+          initialValue: _codeType,
+          isExpanded: true,
+          decoration: const InputDecoration(
+              labelText: 'این کدها روی کدام کارت چاپ می‌شوند؟'),
+          items: [
+            const DropdownMenuItem<String?>(
+                value: null, child: Text('نمی‌دانم — تشخیص از روی عکس')),
+            for (final t in _cardTypeOptions)
+              DropdownMenuItem<String?>(
+                  value: t.$1, child: Text(t.$2, overflow: TextOverflow.ellipsis)),
+          ],
+          onChanged: (v) => setState(() => _codeType = v),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 6, bottom: 4),
+          child: Text(
+            _codeType != null
+                ? '✅ ثبتِ این کدها تقریباً همیشه خودکار تأیید می‌شود — '
+                    'کاربر فقط باید عکسی از کارت بفرستد، حتی با کیفیت پایین.'
+                : 'ℹ️ بدون انتخاب کارت، تشخیص فقط از روی عکس است و '
+                    'عکس‌های نامفهوم به صف بررسی شما می‌روند.',
+            style: theme.textTheme.bodySmall,
+          ),
+        ),
         TextField(
           controller: _batch,
           decoration: const InputDecoration(
               labelText: 'برچسب دسته (اختیاری)', hintText: 'مثلاً: چاپ مهر ۱۴۰۵'),
+        ),
+        // تخصیصِ گروهی روی دستهٔ موجود.
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: OutlinedButton.icon(
+            onPressed: _assigning ? null : _assignBatchType,
+            icon: _assigning
+                ? const SizedBox(
+                    width: 14, height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.link_rounded, size: 18),
+            label: const Text('اعمال کارتِ بالا روی کلِ این دسته'),
+          ),
         ),
         FilledButton.icon(
           onPressed: _savingCodes || _typedCount > _maxBatch ? null : _saveCodes,
@@ -685,10 +777,17 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
                               fontFamily: 'monospace',
                               fontWeight: FontWeight.w800,
                               fontSize: 13)),
-                      if (c['card_type_name'] != null
+                      // 🔗 = کارتی که کد **از پیش** به آن گره خورده.
+                      // با `card_type_name` فرق دارد: آن نتیجهٔ تطبیقِ
+                      // عکس بعد از مصرف است، این تصمیمِ مدیر پیش از
+                      // توزیع. نشان تفکیکشان را در یک نگاه ممکن می‌کند.
+                      if (c['expected_card_type_name'] != null
+                          || c['card_type_name'] != null
                           || c['batch_label'] != null)
                         Text(
                           [
+                            if (c['expected_card_type_name'] != null)
+                              '🔗 ${c['expected_card_type_name']}',
                             if (c['card_type_name'] != null)
                               '${c['card_type_name']}',
                             if (c['batch_label'] != null) '${c['batch_label']}',
