@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 
 import { req, asset, fa, avatars, avatarUrl } from '../lib/api.js';
 import { EmptyView } from '../components/states.jsx';
+import PhotoCardBox from '../components/PhotoCardBox.jsx';
 
 function Avatar({ u, size = 72 }) {
   const src = u.profile_image_url
@@ -101,6 +102,12 @@ export default function Home({ token, p, rewards, load, setMsg, openWallet,
           disabled={redeeming || !code.trim()}>
           {redeeming ? 'در حال ثبت...' : 'ثبت کد'}
         </button>
+
+        {/* ── قابلیت جدید، کنارِ روشِ قدیمی نه به‌جای آن ──
+            کاربری که کارت قدیمی دارد باید بتواند مثل همیشه فقط کد را
+            وارد کند. این بخش خودش را وقتی مدیر هنوز طرحی آپلود نکرده
+            پنهان می‌کند، تا کاربر چیزی نبیند که همیشه شکست می‌خورد. */}
+        <PhotoCardBox token={token} setMsg={setMsg} onDone={load} />
       </section>
 
       {/* دو میان‌بر: گردونهٔ روزانه و دعوت دوستان. روی صفحهٔ اصلی‌اند چون
