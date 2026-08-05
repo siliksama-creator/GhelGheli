@@ -157,7 +157,18 @@ module.exports = function createPhotoCardRoutes(deps) {
         // فشرده‌شده گره می‌خورد. آن هم کار می‌کرد، ولی کیفیت بالاتر
         // یعنی اثر انگشت دقیق‌تر و طرح تمیزتر برای مقایسه.
         const buf = await fs.promises.readFile(filePath);
-        const fp = await fpEngine.fingerprint(buf);
+        // همان محافظتِ مسیرِ کاربر: تصویرِ خراب باید ۴۰۰ با پیامِ
+        // فارسی بدهد، نه ۵۰۰ با خطای انگلیسیِ VipsJpeg.
+        let fp;
+        try {
+          fp = await fpEngine.fingerprint(buf);
+        } catch (imgErr) {
+          console.warn('[photo-cards] طرحِ غیرقابل‌خواندن:', imgErr.message);
+          return res.status(400).json({
+            message: 'فایل تصویری قابل خواندن نبود. لطفاً یک عکس سالم '
+              + '(PNG یا JPG) انتخاب کنید.',
+          });
+        }
 
         // ── طرحِ تکراری را همین‌جا بگیر ──
         //
@@ -190,6 +201,7 @@ module.exports = function createPhotoCardRoutes(deps) {
             lumaSig: toFloats(row.luma_sig),
           });
           if (sim >= DUPLICATE_SIMILARITY) {
+            await releaseGuard();
             return res.status(409).json({
               message: `این تصویر با طرحِ «${row.name}» تقریباً یکسان است `
                 + `(${Math.round(sim * 100)}٪ شباهت). دو طرحِ همسان باعث می‌شوند `
@@ -967,6 +979,8 @@ module.exports = function createPhotoCardRoutes(deps) {
 
       let filePath = req.file.path;
       let keepFile = false;
+      // ارجاعِ بیرونی تا بلوکِ finally هم بتواند قفل را آزاد کند.
+      let guardRelease = null;
       try {
         // ── گامِ ۰: آیا کاربر قفل است؟ ──
         //
@@ -1064,7 +1078,32 @@ module.exports = function createPhotoCardRoutes(deps) {
 
         // ── گامِ ۲: تصویر ──
         const buf = await fs.promises.readFile(filePath);
-        const queryFp = await fpEngine.fingerprint(buf);
+
+        // ── چرا اثرانگشت‌گیری در try جداست ──
+        //
+        // فایلی که مرورگر «image/jpeg» اعلام کرده ممکن است در واقع
+        // خراب باشد: آپلودِ نیمه‌تمام روی شبکهٔ ضعیف، فایلِ صفربایتی،
+        // یا کاربری که چیزِ دیگری را دستکاری کرده.
+        //
+        // در آن حالت sharp استثنا پرتاب می‌کند و بدونِ این بلوک به
+        // مدیریت‌کنندهٔ خطای عمومی می‌رسید: **HTTP 500 با پیامِ
+        // انگلیسیِ VipsJpeg**. کاربر یک خطای مبهم می‌دید و در لاگ هم
+        // شبیهِ خرابیِ سرور به نظر می‌رسید، نه ورودیِ بد.
+        //
+        // این خطای کاربر است نه سرور، پس ۴۰۰ با پیامِ فارسی درست است.
+        // شمارندهٔ کدِ غلط هم بالا نمی‌رود: کدش ممکن است کاملاً درست
+        // باشد و فقط عکس خراب بوده.
+        let queryFp;
+        try {
+          queryFp = await fpEngine.fingerprint(buf);
+        } catch (imgErr) {
+          console.warn('[photo-cards] تصویرِ غیرقابل‌خواندن:', imgErr.message);
+          return res.status(400).json({
+            status: 'bad_image',
+            message: 'عکس ارسالی قابل خواندن نبود. لطفاً دوباره از کارت '
+              + 'عکس بگیرید و مطمئن شوید آپلود کامل انجام می‌شود.',
+          });
+        }
         const match = designsRes.rows.length
           ? fpEngine.matchAgainst(queryFp, designsRes.rows.map(rowToFp))
           : { verdict: 'reject', design: null, score: 0, margin: 0 };
@@ -1087,7 +1126,34 @@ module.exports = function createPhotoCardRoutes(deps) {
         // ⚠️ فقط پرونده‌های `pending` بررسی می‌شوند. کاربر **حق دارد**
         //    کارت‌های دیگرش را ثبت کند؛ فقط همان عکس دوباره پذیرفته
         //    نمی‌شود.
-        const pend = await pool.query(
+        // ── چرا قفلِ مشورتی لازم است ──
+        //
+        // مسابقهٔ زمانیِ واقعی که در تست دیده شد: کاربر چهار درخواستِ
+        // هم‌زمان با **همان عکس** و چهار کدِ متفاوت فرستاد. هر چهار
+        // تا جدول را خواندند **پیش از** آنکه هرکدام چیزی بنویسد، پس
+        // همه دیدند «هیچ پروندهٔ در انتظاری نیست» و سه تای‌شان رد
+        // شدند — یعنی سه کد به‌جای یکی رزرو شد.
+        //
+        // `pg_advisory_xact_lock` قفلی است که تا پایانِ تراکنش نگه
+        // داشته می‌شود و به هیچ ردیفی گره نمی‌خورد — دقیقاً چیزی که
+        // اینجا لازم است، چون هنوز ردیفی وجود ندارد که قفلش کنیم.
+        //
+        // کلید از شناسهٔ کاربر ساخته می‌شود، پس کاربران هم‌زمان
+        // یکدیگر را بلاک نمی‌کنند؛ فقط درخواست‌های **همان** کاربر
+        // پشت سر هم می‌شوند.
+        //
+        // `hashtextextended` به‌جای `hashtext`: دومی ۳۲ بیتی است و
+        // برخوردش بین دو کاربر محتمل‌تر. اولی ۶۴ بیتی است و دقیقاً
+        // همان bigint را می‌دهد که این تابع می‌خواهد.
+        const guard = await pool.connect();
+        let pend;
+        try {
+          await guard.query('BEGIN');
+          await guard.query(
+            "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+            [`photocard:${req.user.id}`],
+          );
+          pend = await guard.query(
           `SELECT s.id, s.img_dhash, s.img_phash, s.img_color, s.img_tex,
                   s.img_luma, c.code
              FROM photo_card_submissions s
@@ -1095,7 +1161,25 @@ module.exports = function createPhotoCardRoutes(deps) {
             WHERE s.user_id = $1 AND s.status = 'pending'
               AND s.img_dhash IS NOT NULL`,
           [req.user.id],
-        );
+          );
+        } catch (e) {
+          await guard.query('ROLLBACK').catch(() => {});
+          guard.release();
+          throw e;
+        }
+
+        // از اینجا تا پایانِ ساختِ پرونده، قفل در دست ماست. هر مسیرِ
+        // خروج باید آزادش کند — وگرنه اتصال نشت می‌کند و استخر پر
+        // می‌شود. `releaseGuard` را در همهٔ شاخه‌ها صدا می‌زنیم.
+        let guardOpen = true;
+        const releaseGuard = async () => {
+          if (!guardOpen) return;
+          guardOpen = false;
+          await guard.query('COMMIT').catch(() => {});
+          guard.release();
+        };
+        guardRelease = releaseGuard;
+
         for (const row of pend.rows) {
           const sim = fpEngine.similarity(queryFp, {
             dhash: row.img_dhash,
@@ -1109,6 +1193,7 @@ module.exports = function createPhotoCardRoutes(deps) {
           // نباید اینجا گیر کنند، چون کاربر ممکن است واقعاً دو نسخه
           // از آن کارت داشته باشد.
           if (sim >= DUPLICATE_SIMILARITY) {
+            await releaseGuard();
             return res.status(409).json({
               status: 'duplicate_pending',
               pendingCode: row.code || null,
@@ -1147,6 +1232,7 @@ module.exports = function createPhotoCardRoutes(deps) {
             [codeId],
           );
           if (!upd.rows[0]) {
+            await releaseGuard();
             return res.status(409).json({
               message: 'این کد همین حالا توسط شخص دیگری ثبت شد' });
           }
@@ -1173,6 +1259,10 @@ module.exports = function createPhotoCardRoutes(deps) {
               queryFp.lumaSig],
           );
 
+          // قفل تا **بعد** از درجِ پرونده نگه داشته شد، پس درخواستِ
+          // هم‌زمانِ بعدی حتماً این ردیف را می‌بیند.
+          await releaseGuard();
+
           return res.json({
             status: 'pending',
             reason,
@@ -1191,6 +1281,11 @@ module.exports = function createPhotoCardRoutes(deps) {
                 + 'ممکن است تا ۲۴ ساعت طول بکشد. کد شما محفوظ است.',
           });
         }
+
+        // مسیرِ تأیید خودکار پرونده‌ای در انتظار نمی‌سازد، پس قفل
+        // دیگر لازم نیست و باید پیش از تراکنشِ بعدی آزاد شود —
+        // نگه داشتنش یعنی دو اتصال به‌ازای یک درخواست.
+        await releaseGuard();
 
         // ── گامِ ۳: تأیید خودکار ──
         const client = await pool.connect();
@@ -1250,6 +1345,17 @@ module.exports = function createPhotoCardRoutes(deps) {
           walletBalance: Number(now.rows[0].wallet_balance || 0),
         });
       } finally {
+        // ── تورِ ایمنی ──
+        //
+        // `releaseGuard` در همهٔ شاخه‌های عادی صدا زده می‌شود، ولی یک
+        // استثنای پیش‌بینی‌نشده (مثلاً خطای sharp) می‌تواند از آن‌ها
+        // بپرد. بدون این خط، اتصال تا تایم‌اوتِ استخر گروگان می‌ماند
+        // و با چند خطای پشت‌سرهم کلِ استخر پر می‌شود — یعنی کلِ اپ
+        // می‌خوابد، نه فقط این مسیر.
+        //
+        // `guardRelease` خودش idempotent است، پس صدا زدنِ دوباره
+        // بی‌ضرر است.
+        if (typeof guardRelease === 'function') await guardRelease();
         if (!keepFile) safeUnlink(filePath);
       }
     }),
