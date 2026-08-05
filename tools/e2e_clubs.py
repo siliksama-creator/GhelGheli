@@ -29,7 +29,7 @@ import urllib.error
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _authcache import admin_token  # noqa: E402
+from _authcache import admin_token, block_test_user  # noqa: E402
 
 API = 'https://api.ghelghelishop.ir'
 RX = '/home/user/tools/rx.py'
@@ -89,6 +89,13 @@ ut = ru['token']
 _, b = req('GET', '/api/bootstrap', ut)
 uid = b['user']['id']
 print(f'کاربر تست: {mob}\n')
+
+# ── پاکسازی در هر مسیرِ خروج ──
+# قبلاً یک خطِ ساده ته فایل بود که **بعد از** sys.exit قرار می‌گرفت و
+# در مسیرِ شکست هرگز اجرا نمی‌شد. atexit همیشه اجرا می‌شود.
+import atexit as _atexit
+_atexit.register(lambda: block_test_user('/home/user/tools/rx.py', uid))
+
 
 # پلاس مستقیم در دیتابیس فعال می‌شود — درگاه پرداخت وجود ندارد.
 sql(f"insert into user_subscriptions(user_id,plan,price_paid,expires_at) "
@@ -150,6 +157,4 @@ else:
         ck('رد می‌شود', st == 403, f"{st} {r.get('message')}")
 
 print(f'\n{"✓" if bad == 0 else "✗"} {ok} موفق، {bad} ناموفق')
-# کاربرِ تست نباید در جدولِ لیگ دیده شود.
-sql(f"update users set status='blocked' where id='{uid}'")
 sys.exit(0 if bad == 0 else 1)

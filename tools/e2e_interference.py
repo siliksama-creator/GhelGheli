@@ -33,7 +33,7 @@ import urllib.error
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _authcache import admin_token, deactivate_stale_designs  # noqa: E402
+from _authcache import admin_token, deactivate_stale_designs, block_test_user  # noqa: E402
 
 from PIL import Image, ImageDraw, ImageFilter  # noqa: E402
 import colorsys  # noqa: E402
@@ -163,7 +163,26 @@ st, ru = req('POST', '/api/auth/register-password', body={
 if st != 200 or not ru.get('token'):
     raise SystemExit(f'✗ ساخت کاربر ناموفق: {st} {ru}')
 ut = ru['token']
+_, _b0 = req('GET', '/api/bootstrap', ut)
+# ⚠️ این تست **دو** کاربر می‌سازد (یکی رایگان، یکی پلاس). نسخهٔ
+#    اول فقط اولی را پاک می‌کرد و دومی در جدولِ لیگ می‌ماند.
+_TEST_UIDS = [(_b0.get('user') or {}).get('id')]
 print(f'کاربر تست: {UMOB}\n')
+# ── پاکسازی: کاربرِ تست نباید در جدولِ لیگِ زنده دیده شود ──
+#
+# بدون این، بعد از چند اجرا ردیف‌های اولِ لیگ پر می‌شود از اسم‌هایی
+# مثل «تداخلIF51008» — که هر کاربرِ واقعی هم می‌بیند.
+#
+# ⚠️ چرا atexit و نه یک خط ساده در انتهای فایل:
+#    این فایل‌ها با `sys.exit(...)` تمام می‌شوند و هر کدی که **بعد** از
+#    آن نوشته شود هرگز اجرا نمی‌شود. تلاشِ اولِ همین رفع دقیقاً همین
+#    اشتباه را داشت — کد نوشته شده بود ولی مرده بود.
+#    `atexit` در هر مسیرِ خروج اجرا می‌شود: موفق، ناموفق، یا استثنا.
+import atexit as _atexit
+_atexit.register(
+    lambda: [block_test_user('/home/user/tools/rx.py', u)
+             for u in _TEST_UIDS if u])
+
 
 # طرح‌های باقی‌مانده غیرفعال شوند تا محافظِ تکراری مانع نشود.
 deactivate_stale_designs(req, at)
@@ -324,6 +343,7 @@ if st == 200 and ru2.get('token'):
     ut2 = ru2['token']
     _, b2 = req('GET', '/api/bootstrap', ut2)
     uid2 = (b2.get('user') or {}).get('id')
+    _TEST_UIDS.append(uid2)
     # پلاس مستقیم در دیتابیس فعال می‌شود چون درگاه پرداخت وجود ندارد.
     import subprocess
     sql = ("insert into user_subscriptions(user_id,plan,price_paid,expires_at) "
@@ -376,3 +396,7 @@ else:
 
 print(f'\n{"✓" if bad == 0 else "✗"} {ok} موفق، {bad} ناموفق')
 sys.exit(0 if bad == 0 else 1)
+
+# ── پاکسازی: کاربرِ تست نباید در جدولِ لیگِ زنده دیده شود ──
+# بدون این، بعد از چند اجرا ردیف‌های اولِ لیگ پر می‌شود از
+# اسم‌هایی مثل «تداخلIF51008» — که هر کاربرِ واقعی هم می‌بیند.

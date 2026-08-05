@@ -3,7 +3,7 @@
 import io,json,sys,time,urllib.request,urllib.error,colorsys
 import os as _os, sys as _sys
 _sys.path.insert(0,_os.path.dirname(_os.path.abspath(__file__)))
-from _authcache import admin_token, deactivate_stale_designs
+from _authcache import admin_token, deactivate_stale_designs, block_test_user
 from PIL import Image,ImageDraw,ImageFilter
 API='https://api.ghelghelishop.ir'; B='--eg'
 def req(m,p,tok=None,body=None,files=None,raw=None):
@@ -63,6 +63,7 @@ st,ru=req('POST','/api/auth/register-password',body={
     'nickname':f'مرزی{PFX}'})
 if st==200 and ru.get('token'):
     ut=ru['token']
+    _TEST_UID=(ru.get('user') or {}).get('id')
 else:
     print(f'  ⚠ ساخت کاربر تازه نشد ({st}) — کاربرِ ثابت؛ ممکن است به سقفِ نرخ بخورد')
     _,u=req('POST','/api/auth/login',body={'mobile':'09001112233','password':'Qa!12345'}); ut=u['token']
@@ -72,6 +73,20 @@ else:
 # را می‌سنجد، پس همین کافی است.
 _n=deactivate_stale_designs(req,at)
 if _n: print(f'  ⓘ {_n} طرحِ باقی‌مانده غیرفعال شد')
+
+# ── پاکسازی: کاربرِ تست نباید در جدولِ لیگِ زنده دیده شود ──
+#
+# بدون این، بعد از چند اجرا ردیف‌های اولِ لیگ پر می‌شود از اسم‌هایی
+# مثل «تداخلIF51008» — که هر کاربرِ واقعی هم می‌بیند.
+#
+# ⚠️ چرا atexit و نه یک خط ساده در انتهای فایل:
+#    این فایل‌ها با `sys.exit(...)` تمام می‌شوند و هر کدی که **بعد** از
+#    آن نوشته شود هرگز اجرا نمی‌شود. تلاشِ اولِ همین رفع دقیقاً همین
+#    اشتباه را داشت — کد نوشته شده بود ولی مرده بود.
+#    `atexit` در هر مسیرِ خروج اجرا می‌شود: موفق، ناموفق، یا استثنا.
+import atexit as _atexit
+_atexit.register(
+    lambda: _TEST_UID and block_test_user('/home/user/tools/rx.py', _TEST_UID))
 
 def card(hue,seed=1):
     im=Image.new('RGB',(420,640)); d=ImageDraw.Draw(im)
@@ -164,3 +179,7 @@ st,_=req('GET','/api/pass',ut); ck('گذر نبرد',st==200,str(st))
 
 print(f'\n{"✓" if bad==0 else "✗"} {ok} موفق، {bad} ناموفق')
 for n in notes: print('   -',n)
+
+# ── پاکسازی: کاربرِ تست نباید در جدولِ لیگِ زنده دیده شود ──
+# بدون این، بعد از چند اجرا ردیف‌های اولِ لیگ پر می‌شود از
+# اسم‌هایی مثل «تداخلIF51008» — که هر کاربرِ واقعی هم می‌بیند.

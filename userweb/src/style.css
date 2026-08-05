@@ -893,7 +893,18 @@
    * `.chatActions` buttons wrapped under each message, tripling its height.
    ═══════════════════════════════════════════════════════════════════════ */
 
-.chatPage{display:flex;flex-direction:column;gap:10px;padding-bottom:14px}
+/* ── چرا این padding با بقیهٔ صفحه‌ها فرق دارد ──
+   نوارِ ناوبری `position:fixed` است و ۷۰ پیکسل پایینِ صفحه را می‌پوشاند.
+   `.portal` برای همین ۷۸px پدینگ دارد.
+
+   ولی صفحهٔ چت `.chatPage` است و پدینگِ خودش (۱۴px) را روی آن می‌نویسد.
+   نتیجه: آخرین پیامِ چت ۲۰ پیکسل زیرِ نوار می‌رفت — با اندازه‌گیریِ
+   واقعیِ همپوشانی در مرورگر پیدا شد، نه با نگاه کردن به کد.
+
+   دقیقاً همان‌جایی که کاربر بیشترین وقت را می‌گذراند و تازه‌ترین پیام
+   مهم‌ترین چیزِ صفحه است. */
+.chatPage{display:flex;flex-direction:column;gap:10px;
+  padding-bottom:calc(84px + env(safe-area-inset-bottom, 0px))}
 
 .chatbox{
   /* Grows with the card instead of a hard 56vh that fought the sticky dock. */

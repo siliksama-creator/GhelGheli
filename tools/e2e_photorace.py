@@ -3,7 +3,7 @@
 import io,json,sys,time,threading,urllib.request,urllib.error,colorsys
 import os as _os, sys as _sys
 _sys.path.insert(0,_os.path.dirname(_os.path.abspath(__file__)))
-from _authcache import admin_token, deactivate_stale_designs
+from _authcache import admin_token, deactivate_stale_designs, block_test_user
 from PIL import Image,ImageDraw,ImageFilter,ImageEnhance
 API='https://api.ghelghelishop.ir'; B='--r2'
 def req(m,p,tok=None,body=None,files=None):
@@ -42,10 +42,25 @@ st,ru=req('POST','/api/auth/register-password',body={
     'nickname':f'همزمان{PFX}'})
 if st==200 and ru.get('token'):
     ut=ru['token']
+    _TEST_UID=(ru.get('user') or {}).get('id')
 else:
     print(f'  ⚠ ساخت کاربر تازه نشد ({st}) — کاربرِ ثابت؛ ممکن است به سقفِ نرخ بخورد')
     _,u=req('POST','/api/auth/login',body={'mobile':'09001112233','password':'Qa!12345'}); ut=u['token']
 deactivate_stale_designs(req,at)
+# ── پاکسازی: کاربرِ تست نباید در جدولِ لیگِ زنده دیده شود ──
+#
+# بدون این، بعد از چند اجرا ردیف‌های اولِ لیگ پر می‌شود از اسم‌هایی
+# مثل «تداخلIF51008» — که هر کاربرِ واقعی هم می‌بیند.
+#
+# ⚠️ چرا atexit و نه یک خط ساده در انتهای فایل:
+#    این فایل‌ها با `sys.exit(...)` تمام می‌شوند و هر کدی که **بعد** از
+#    آن نوشته شود هرگز اجرا نمی‌شود. تلاشِ اولِ همین رفع دقیقاً همین
+#    اشتباه را داشت — کد نوشته شده بود ولی مرده بود.
+#    `atexit` در هر مسیرِ خروج اجرا می‌شود: موفق، ناموفق، یا استثنا.
+import atexit as _atexit
+_atexit.register(
+    lambda: _TEST_UID and block_test_user('/home/user/tools/rx.py', _TEST_UID))
+
 def card(hue):
     im=Image.new('RGB',(420,640)); d=ImageDraw.Draw(im)
     for y in range(640):
@@ -84,3 +99,7 @@ if pend==1: print('✓ گارد حتی زیر فشار هم‌زمانی هم گ
 else:
     print(f'⚠ {pend} پرونده ساخته شد — یعنی {pend} کد رزرو شد به‌جای ۱')
     sys.exit(1)
+
+# ── پاکسازی: کاربرِ تست نباید در جدولِ لیگِ زنده دیده شود ──
+# بدون این، بعد از چند اجرا ردیف‌های اولِ لیگ پر می‌شود از
+# اسم‌هایی مثل «تداخلIF51008» — که هر کاربرِ واقعی هم می‌بیند.

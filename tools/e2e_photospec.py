@@ -3,7 +3,7 @@
 import io, json, sys, time, urllib.request, urllib.error, colorsys
 import os as _os, sys as _sys
 _sys.path.insert(0,_os.path.dirname(_os.path.abspath(__file__)))
-from _authcache import admin_token, deactivate_stale_designs
+from _authcache import admin_token, deactivate_stale_designs, block_test_user
 from PIL import Image, ImageDraw, ImageFilter, ImageEnhance
 API='https://api.ghelghelishop.ir'; B='----spec'
 def req(m,p,tok=None,body=None,files=None):
@@ -74,6 +74,7 @@ st,ru=req('POST','/api/auth/register-password',body={
     'mobile':UMOB,'password':UPW,'firstName':'تست','lastName':'خودکار','nickname':f'تست{PFX}'})
 if st==200 and ru.get('token'):
     utok=ru['token']
+    _TEST_UID=(ru.get('user') or {}).get('id')
 else:
     # اگر ثبت‌نام مستقیم غیرفعال بود، به کاربرِ ثابت برمی‌گردیم و صریح
     # هشدار می‌دهیم — تا اگر نتیجه به‌خاطر سهمیه خراب شد، کسی آن را
@@ -99,6 +100,21 @@ else:
 # اینونتوری به آن‌ها ارجاع داشته باشد و حذف، تاریخچهٔ کاربر را خراب
 # می‌کند. محافظِ تکراری فقط طرح‌های `is_active` را می‌سنجد، پس
 # غیرفعال کردن کافی است.
+# ── پاکسازی: کاربرِ تست نباید در جدولِ لیگِ زنده دیده شود ──
+#
+# بدون این، بعد از چند اجرا ردیف‌های اولِ لیگ پر می‌شود از اسم‌هایی
+# مثل «تداخلIF51008» — که هر کاربرِ واقعی هم می‌بیند.
+#
+# ⚠️ چرا atexit و نه یک خط ساده در انتها:
+#    این فایل‌ها با `sys.exit(...)` تمام می‌شوند و هر کدی که **بعد** از
+#    آن نوشته شود هرگز اجرا نمی‌شود. تلاشِ اولِ همین رفع دقیقاً همین
+#    اشتباه را داشت: کد نوشته شده بود ولی مرده بود.
+#    `atexit` در هر مسیرِ خروج اجرا می‌شود — چه موفق، چه ناموفق، چه
+#    استثنای پیش‌بینی‌نشده.
+import atexit as _atexit
+_atexit.register(
+    lambda: _TEST_UID and block_test_user('/home/user/tools/rx.py', _TEST_UID))
+
 _n=deactivate_stale_designs(req,atok)
 if _n: print(f'  ⓘ {_n} طرحِ باقی‌مانده از اجرای قبلی غیرفعال شد')
 
