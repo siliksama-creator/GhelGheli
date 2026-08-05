@@ -3009,7 +3009,33 @@ app.use('/api', (req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  console.error(err);
+  // ═══════════════════════════════════════════════════════════════════════
+  // چرا خطاهای ۴xx فقط یک خط لاگ می‌شوند و نه کلِ stack
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // قبلاً هر خطایی — حتی «این کد قبلاً استفاده شده است» که یک وضعیتِ
+  // کاملاً عادی و پیش‌بینی‌شده است — با stack trace کامل در لاگ می‌نشست:
+  //
+  //     Error: این پرونده قبلاً بررسی شده است
+  //         at /var/www/.../photoCards.js:862:31
+  //         at process.processTicksAndRejections (...)
+  //       { status: 409 }
+  //
+  // چهار خط لاگ برای اتفاقی که روزی صدها بار می‌افتد و هیچ اقدامی
+  // نمی‌طلبد. نتیجه‌اش این است که وقتی یک باگِ **واقعی** رخ می‌دهد،
+  // بین انبوهِ این خطوط گم می‌شود.
+  //
+  // این دقیقاً همان چیزی بود که باعث شد باگِ `releaseGuard is not
+  // defined` مدت‌ها در لاگ باشد و دیده نشود.
+  //
+  // قاعده: خطای ۴xx یعنی «کاربر کارِ نادرستی کرد» → یک خط، بدون stack.
+  //        خطای ۵xx یعنی «ما خراب کردیم» → کلِ stack، چون باید رفع شود.
+  const status = err.status || 500;
+  if (status >= 500) {
+    console.error(err);
+  } else {
+    console.warn(`[${status}] ${req.method} ${req.originalUrl} — ${err.message}`);
+  }
   // Malformed JSON reached the user as the raw parser message in English
   // ("Unexpected token 'n'..."), inside an otherwise Persian UI.
   if (err.type === 'entity.parse.failed' || err instanceof SyntaxError && 'body' in err) {
