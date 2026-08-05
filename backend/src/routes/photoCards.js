@@ -31,6 +31,14 @@ const photoCards = require('../services/photoCardService');
 // از پا در بیاورد. مالک می‌تواند چند بار صدا بزند؛ مجموع سقفی ندارد.
 const MAX_BATCH = 20000;
 
+// آستانهٔ «این دو طرح عملاً یکی‌اند».
+//
+// عمداً بالاتر از آستانهٔ تأیید (۰.۶۸) است: دو کارتِ واقعاً متفاوت از یک
+// سری ممکن است ۰.۷ شباهت داشته باشند و آن‌ها مشکلی ندارند. چیزی که
+// مشکل می‌سازد دو نسخهٔ تقریباً یکسان است — آنجا موتور نمی‌تواند بین
+// دوتاشان انتخاب کند و همه‌چیز به بررسی دستی می‌افتد.
+const DUPLICATE_SIMILARITY = 0.93;
+
 module.exports = function createPhotoCardRoutes(deps) {
   const {
     pool, auth, adminAuth, requireRole, asyncHandler,
@@ -140,6 +148,44 @@ module.exports = function createPhotoCardRoutes(deps) {
         // یعنی اثر انگشت دقیق‌تر و طرح تمیزتر برای مقایسه.
         const buf = await fs.promises.readFile(filePath);
         const fp = await fpEngine.fingerprint(buf);
+
+        // ── طرحِ تکراری را همین‌جا بگیر ──
+        //
+        // این در تست واقعی پیدا شد، نه با حدس: بعد از چند بار اجرای
+        // تست سرتاسری، دو نسخهٔ **یکسان** از یک طرح در کاتالوگ نشست
+        // (شباهت ۱.۰۰۰۰). از آن لحظه هر عکسِ آن کارت به صف بررسی
+        // می‌رفت به‌جای تأیید خودکار — چون شرطِ «حاشیه تا رتبهٔ دوم»
+        // درست تشخیص می‌داد که نمی‌شود بین دو طرحِ یکسان یکی را
+        // انتخاب کرد.
+        //
+        // یعنی یک اشتباهِ سادهٔ مدیر (دوبار آپلود کردن یک عکس) بی‌سروصدا
+        // کل مسیر خودکار را برای آن کارت خاموش می‌کرد و بار دستی
+        // می‌ساخت. هیچ پیام خطایی هم در کار نبود.
+        //
+        // پس جلوش را در لحظهٔ آپلود می‌گیریم، جایی که مدیر می‌تواند
+        // بفهمد چه شده. اگر واقعاً قصدش جایگزینی است، اول طرح قبلی را
+        // غیرفعال کند.
+        const existing = await pool.query(
+          `SELECT d.id, d.dhash, d.phash, d.color_sig, t.name
+             FROM photo_card_designs d
+             JOIN card_types t ON t.id = d.card_type_id
+            WHERE d.is_active = true`,
+        );
+        for (const row of existing.rows) {
+          const sim = fpEngine.similarity(fp, {
+            dhash: row.dhash, phash: row.phash, colorSig: toFloats(row.color_sig),
+          });
+          if (sim >= DUPLICATE_SIMILARITY) {
+            return res.status(409).json({
+              message: `این تصویر با طرحِ «${row.name}» تقریباً یکسان است `
+                + `(${Math.round(sim * 100)}٪ شباهت). دو طرحِ همسان باعث می‌شوند `
+                + 'سیستم نتواند بینشان تشخیص دهد و همهٔ ثبت‌ها به بررسی دستی بروند. '
+                + 'اگر می‌خواهید جایگزین کنید، اول طرح قبلی را غیرفعال کنید.',
+              duplicateOf: row.id,
+              similarity: Number(sim.toFixed(3)),
+            });
+          }
+        }
 
         // بهینه‌سازی همان تابعی است که بقیهٔ آپلودها استفاده می‌کنند، پس
         // رفتار ذخیره‌سازی یکسان می‌ماند.
