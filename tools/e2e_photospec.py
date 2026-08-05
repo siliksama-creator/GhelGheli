@@ -3,7 +3,7 @@
 import io, json, sys, time, urllib.request, urllib.error, colorsys
 import os as _os, sys as _sys
 _sys.path.insert(0,_os.path.dirname(_os.path.abspath(__file__)))
-from _authcache import admin_token
+from _authcache import admin_token, deactivate_stale_designs
 from PIL import Image, ImageDraw, ImageFilter, ImageEnhance
 API='https://api.ghelghelishop.ir'; B='----spec'
 def req(m,p,tok=None,body=None,files=None):
@@ -99,18 +99,8 @@ else:
 # اینونتوری به آن‌ها ارجاع داشته باشد و حذف، تاریخچهٔ کاربر را خراب
 # می‌کند. محافظِ تکراری فقط طرح‌های `is_active` را می‌سنجد، پس
 # غیرفعال کردن کافی است.
-_,_old=req('GET','/api/admin/photo-cards/designs',atok)
-_stale=[d for d in _old.get('designs',[])
-        # ⚠️ بدون خط تیره: نام‌ها الگوی «<پیشوند><عدد>-<...>» دارند
-        # (مثلاً R247510-1)، پس 'R2-' هیچ‌وقت مطابقت نمی‌کرد و طرحِ
-        # اجرای قبلیِ e2e_photorace اینجا فعال می‌ماند و آپلود را ۴۰۹
-        # می‌کرد. سه فایلِ تست باید همین فهرست را داشته باشند.
-        if str(d.get('card_type_name','')).startswith(('SP','EG','R2','DBG'))
-        and d.get('is_active')]
-for d in _stale:
-    req('PATCH',f"/api/admin/photo-cards/designs/{d['id']}",atok,{'isActive':False})
-if _stale:
-    print(f'  ⓘ {len(_stale)} طرحِ باقی‌مانده از اجرای قبلی غیرفعال شد')
+_n=deactivate_stale_designs(req,atok)
+if _n: print(f'  ⓘ {_n} طرحِ باقی‌مانده از اجرای قبلی غیرفعال شد')
 
 def card(hue,seed):
     im=Image.new('RGB',(420,640)); d=ImageDraw.Draw(im)

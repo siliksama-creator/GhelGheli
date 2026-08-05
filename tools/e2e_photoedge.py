@@ -3,7 +3,7 @@
 import io,json,sys,time,urllib.request,urllib.error,colorsys
 import os as _os, sys as _sys
 _sys.path.insert(0,_os.path.dirname(_os.path.abspath(__file__)))
-from _authcache import admin_token
+from _authcache import admin_token, deactivate_stale_designs
 from PIL import Image,ImageDraw,ImageFilter
 API='https://api.ghelghelishop.ir'; B='--eg'
 def req(m,p,tok=None,body=None,files=None,raw=None):
@@ -70,12 +70,8 @@ else:
 # طرح‌های باقی‌مانده از اجراهای قبلی غیرفعال می‌شوند (نه حذف — ممکن است
 # اینونتوریِ کاربر به آن‌ها ارجاع بدهد). محافظِ تکراری فقط طرح‌های فعال
 # را می‌سنجد، پس همین کافی است.
-_,_o=req('GET','/api/admin/photo-cards/designs',at)
-_stale=[d for d in _o.get('designs',[])
-        if str(d.get('card_type_name','')).startswith(('EG','SP','R2','DBG')) and d.get('is_active')]
-for d in _stale:
-    req('PATCH',f"/api/admin/photo-cards/designs/{d['id']}",at,{'isActive':False})
-if _stale: print(f'  ⓘ {len(_stale)} طرحِ باقی‌مانده غیرفعال شد')
+_n=deactivate_stale_designs(req,at)
+if _n: print(f'  ⓘ {_n} طرحِ باقی‌مانده غیرفعال شد')
 
 def card(hue,seed=1):
     im=Image.new('RGB',(420,640)); d=ImageDraw.Draw(im)

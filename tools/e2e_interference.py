@@ -33,7 +33,7 @@ import urllib.error
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _authcache import admin_token  # noqa: E402
+from _authcache import admin_token, deactivate_stale_designs  # noqa: E402
 
 from PIL import Image, ImageDraw, ImageFilter  # noqa: E402
 import colorsys  # noqa: E402
@@ -166,12 +166,7 @@ ut = ru['token']
 print(f'کاربر تست: {UMOB}\n')
 
 # طرح‌های باقی‌مانده غیرفعال شوند تا محافظِ تکراری مانع نشود.
-_, _o = req('GET', '/api/admin/photo-cards/designs', at)
-for d0 in _o.get('designs', []):
-    if str(d0.get('card_type_name', '')).startswith(('IF', 'SP', 'EG', 'R2', 'DBG')) \
-            and d0.get('is_active'):
-        req('PATCH', f"/api/admin/photo-cards/designs/{d0['id']}", at,
-            {'isActive': False})
+deactivate_stale_designs(req, at)
 
 # ═══════════════════════════════════════════════════════════════════════
 print('══ ۱: ثبت کارت با عکس، گذر نبرد و سطح را تکان نمی‌دهد ══')

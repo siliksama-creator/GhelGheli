@@ -280,7 +280,9 @@ async def run(base, mobile, password, only):
 
         await login()
 
-        for theme in ('dark', 'light'):
+        # تمِ روشن حذف شد؛ فقط یک تم می‌ماند. حلقه نگه داشته شد تا اگر
+        # روزی تمِ دیگری اضافه شود، فقط همین رشته عوض شود.
+        for theme in ('dark',):
             for label, where in NAV:
                 if only and label not in only:
                     continue
@@ -291,11 +293,6 @@ async def run(base, mobile, password, only):
                 # پس‌زمینه» می‌سنجد — یعنی خروجیِ کاملاً بی‌معنی.
                 await page.reload(wait_until='networkidle')
                 await page.wait_for_timeout(2200)
-                if theme == 'light':
-                    await page.evaluate(
-                        "() => document.documentElement"
-                        ".setAttribute('data-theme','light')")
-                    await page.wait_for_timeout(400)
                 if not await goto(page, label, where):
                     # ── چرا این خطاست و نه هشدار ──
                     # تبی که باز نمی‌شود یعنی آن صفحه **اصلاً بررسی
