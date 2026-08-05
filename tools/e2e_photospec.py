@@ -101,7 +101,11 @@ else:
 # غیرفعال کردن کافی است.
 _,_old=req('GET','/api/admin/photo-cards/designs',atok)
 _stale=[d for d in _old.get('designs',[])
-        if str(d.get('card_type_name','')).startswith(('SP','SPEC-','EG-','R2-','DBG-'))
+        # ⚠️ بدون خط تیره: نام‌ها الگوی «<پیشوند><عدد>-<...>» دارند
+        # (مثلاً R247510-1)، پس 'R2-' هیچ‌وقت مطابقت نمی‌کرد و طرحِ
+        # اجرای قبلیِ e2e_photorace اینجا فعال می‌ماند و آپلود را ۴۰۹
+        # می‌کرد. سه فایلِ تست باید همین فهرست را داشته باشند.
+        if str(d.get('card_type_name','')).startswith(('SP','EG','R2','DBG'))
         and d.get('is_active')]
 for d in _stale:
     req('PATCH',f"/api/admin/photo-cards/designs/{d['id']}",atok,{'isActive':False})
