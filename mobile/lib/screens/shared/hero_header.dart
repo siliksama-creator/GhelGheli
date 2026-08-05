@@ -42,10 +42,8 @@ class HeroHeader extends StatelessWidget {
   /// ورودی در هدر تنها راه سریع رسیدن به آن است و باید واضح دیده شود.
   final VoidCallback? onOpenWallet;
 
-  /// Toggles light/dark. Lives here (top of the dashboard) because that's
-  /// where it was most reachable.
-  final VoidCallback? onToggleTheme;
-  final bool isDark;
+  // `onToggleTheme` و `isDark` حذف شدند — اپ تک‌تم (تیره) است.
+  // توضیحِ کاملِ چراییِ حذفِ تمِ روشن در main.dart.
 
   const HeroHeader({
     super.key,
@@ -56,8 +54,6 @@ class HeroHeader extends StatelessWidget {
     this.cosmetics,
     this.onOpenProfile,
     this.onOpenWallet,
-    this.onToggleTheme,
-    this.isDark = true,
   });
 
   /// Profile fields we consider essential for payouts/prizes.
@@ -175,19 +171,6 @@ class HeroHeader extends StatelessWidget {
                           fontSize: 10.5)),
                 ],
               ),
-              if (onToggleTheme != null)
-                IconButton(
-                  onPressed: onToggleTheme,
-                  visualDensity: VisualDensity.compact,
-                  tooltip: isDark ? 'حالت روشن' : 'حالت تیره',
-                  icon: Icon(
-                    isDark
-                        ? Icons.light_mode_rounded
-                        : Icons.dark_mode_rounded,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
             ],
           ),
 

@@ -1,6 +1,6 @@
 // Brand color system for GhelGheli.
 //
-// Centralised so both light & dark themes stay perfectly in sync and any
+// Centralised so every surface stays in sync and any
 // future rebrand only touches this file.
 import 'package:flutter/material.dart';
 
@@ -23,12 +23,15 @@ class BrandColors {
   static const Color darkSurfaceHigh = Color(0xFF1B2A40);
   static const Color darkBorder = Color(0x1FFFFFFF);
 
-  // Light theme surfaces — soft cool white, not stark.
-  static const Color lightBg = Color(0xFFF4F7FC);
-  static const Color lightSurface = Color(0xFFFFFFFF);
-  static const Color lightSurfaceAlt = Color(0xFFEEF2FA);
-  static const Color lightSurfaceHigh = Color(0xFFE4EAF6);
-  static const Color lightBorder = Color(0x14101A2C);
+  // ── سطوحِ تمِ روشن حذف شدند ──
+  //
+  // اپ تک‌تم (تیره) شد. این پنج ثابت هیچ مصرف‌کننده‌ای نداشتند و
+  // نگه داشتنشان فقط این توهم را می‌ساخت که تمِ روشن هنوز پشتیبانی
+  // می‌شود. توضیحِ کاملِ چراییِ حذفِ تمِ روشن در main.dart.
+  //
+  // ⚠️ ثابت‌های `*OnLight` (dangerOnLight و …) عمداً ماندند: آن‌ها
+  //    برای متن روی سطحِ **روشنِ موضعی** استفاده می‌شوند (مثل کارتِ
+  //    سفیدِ صفِ بررسی در پنل مدیریت)، نه برای تمِ روشن.
 
   // ═══════════════════════════════════════════════════════════════════════
   // رنگ‌های معنایی — چرا هر کدام دو نسخه دارند

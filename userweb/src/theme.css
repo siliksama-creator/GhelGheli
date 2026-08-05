@@ -1,25 +1,28 @@
 /*
-  Light/dark theme layer.
+  لایهٔ توکن‌های رنگ و اندازه.
 
-  WHY IT LOOKS LIKE THIS: style.css hardcodes 214 distinct colours across 424
-  places. Rewriting every one into a variable would be a large, risky diff
-  touching every screen. But the palette is structured — a dark page colour
-  plus translucent white overlays (#ffffffNN) for every surface, border and
-  divider. Those overlays already adapt to whatever is behind them.
+  ═══════════════════════════════════════════════════════════════════════════
+  تمِ روشن حذف شد — این فایل از ۶۳۹ خط به ~۱۲۰ خط رسید
+  ═══════════════════════════════════════════════════════════════════════════
 
-  So the theme only has to flip the few OPAQUE anchors:
-    * the page background and text colour,
-    * the translucent overlays (white on dark -> black on light),
-    * the handful of light-on-dark text tints.
+  قبلاً ۱۲۳ قانونِ `:root[data-theme='light']` اینجا بود که هر کدام یک
+  رنگِ style.css را برای سطحِ روشن بازنویسی می‌کرد. دو دلیل برای حذف:
 
-  Everything else — the brand greens, the accents, the gradients — is
-  identical in both themes by design, exactly like the Flutter app where
-  BrandColors is shared and only the surfaces differ.
+    ۱. منبعِ پایدارِ باگ بود. هر رنگِ جدید باید دو بار سنجیده می‌شد و در
+       عمل نمی‌شد؛ ممیزیِ پیکسلی چند متنِ ناخوانا **فقط** در تمِ روشن
+       پیدا کرد. هر کامپوننتِ جدید یک قانونِ اضافه لازم داشت که
+       فراموش کردنش بی‌صدا خرابی می‌ساخت.
 
-  Loaded AFTER style.css so these rules win.
+    ۲. هویتِ بصریِ قلقلی تیره است — سبزِ نئونی و آبی روی سرمه‌ای.
+
+  آنچه ماند: توکن‌هایی که style.css و typography.css و تخته‌های بازی به
+  آن‌ها ارجاع می‌دهند. این‌ها هرگز مربوط به «انتخابِ تم» نبودند؛ فقط
+  یک جای واحد برای پالت‌اند.
+
+  بعد از style.css بارگذاری می‌شود تا این قوانین برنده باشند.
 */
 
-/* ── dark (default) ─────────────────────────────────────────────────────── */
+/* ── توکن‌ها ─────────────────────────────────────────────────────────────── */
 :root {
 
   /* ═══════════════════════════════════════════════════════════════════════
@@ -30,22 +33,20 @@
      ولی روی سفید کنتراستش **۱.۳۶:۱** است — از طلایی هم بدتر، و
      عملاً نامرئی.
 
-     در style.css در ۴۴ جا به‌عنوان رنگِ متن استفاده شده بود: متنِ
-     پاسخ در چت، هاورِ نام کاربر، عنوان‌ها، لینک‌ها. همه در تم روشن
-     محو می‌شدند.
+     تفکیک عمدی: این متغیر فقط برای **جوهر** (متن) است و در ۴۴ جای
+     style.css استفاده می‌شود. جاهایی که همان سبز پس‌زمینه یا حاشیه
+     است دست‌نخورده ماند، چون آنجا متنِ تیره رویش می‌نشیند.
 
-     تفکیک عمدی: این متغیر فقط برای **جوهر** است. جاهایی که همان سبز
-     پس‌زمینه یا حاشیه است دست‌نخورده ماند، چون آنجا متنِ تیره رویش
-     می‌نشیند و مشکلی نیست. */
+     متغیر ماند (و به مقدارِ ثابت تبدیل نشد) چون یک نقطهٔ واحد برای
+     تنظیمِ رنگِ متنِ برند است. */
   --brand-ink: #b5ef58;
 
   /* ═══════════════════════════════════════════════════════════════════════
-     رنگ‌های ردهٔ لول — تم تیره
+     رنگ‌های ردهٔ لول
      ═══════════════════════════════════════════════════════════════════════
 
      دقیقاً همان مقادیری که LevelBadge در فلاتر از context.brand می‌گیرد.
-     نگه داشتنشان به‌صورت متغیر یعنی نسخهٔ روشن می‌تواند تیره‌ترشان کند
-     بدون اینکه هیچ قانونِ CSSی تکرار شود. */
+     یک جای واحد تا وب و اپ هرگز از هم جدا نیفتند. */
   --lvl-rookie: #7c93b0;
   --lvl-bronze: #22c58b;
   --lvl-silver: #4ea1ff;
@@ -84,556 +85,26 @@
   --fs-sm: 13px;
   --fs-lg: 18px;
 }
-
-/* ── light ──────────────────────────────────────────────────────────────── */
-:root[data-theme='light'] {
-
-  /* سبزِ برند به‌عنوان جوهر، تیره‌شده تا روی سفید خوانا بماند.
-     همان hue، کنتراست ۴.۵۲:۱ به‌جای ۱.۳۶:۱. */
-  --brand-ink: #4a7a06;
-
-  /* رنگ‌های ردهٔ لول — تم روشن.
-     همان hue، روشناییِ کمتر. مقادیر با همان روشی انتخاب شدند که برای
-     پالتِ اپ استفاده شد: کاهشِ روشنایی تا رسیدن به کنتراستِ ≥۴.۵:۱ روی
-     #ffffff. طلاییِ رده‌های بالا بدترین مورد بود (۱.۴۲:۱). */
-  --lvl-rookie: #5c6b85;
-  --lvl-bronze: #14865e;
-  --lvl-silver: #0071f1;
-  --lvl-gold:   #a76707;
-  --lvl-legend: #9a6b00;
-  /* Soft cool white, not stark — matches BrandColors.lightBg in Flutter. */
-  --page-bg: #f4f7fc;
-  --page-fg: #0b1b2e;
-  --text-muted: #445a75;
-  --text-soft: #24405e;
-
-  /* The veils invert: dark washes over a light page. Alphas are tuned a
-     little stronger because dark-on-light needs less opacity to read. */
-  --veil-1: #101a2c07;
-  --veil-2: #101a2c0a;
-  --veil-3: #101a2c0f;
-  --veil-4: #101a2c14;
-  --veil-5: #101a2c1a;
-  --veil-6: #101a2c26;
-  --veil-7: #101a2c2e;
-
-  --panel-bg: #ffffff;
-  --shadow-strong: #0b1b2e1f;
-  --shadow-soft: #0b1b2e14;
-
-  --bg: var(--page-bg);
-  --surface: #ffffff;
-  --text: var(--page-fg);
-  --border: #101a2c26;
-}
-
 /* ── apply ──────────────────────────────────────────────────────────────── */
 body {
   color: var(--page-fg);
   background: var(--page-bg);
-  /* Without a transition the flip is a jarring flash. */
-  transition: background-color .25s ease, color .25s ease;
 }
 
-/* THE BACKDROP.
-   style.css paints two fixed layers on `body` — a dark navy gradient wash
-   (body:before) and a white grid overlay (body:after). Both are built for a
-   dark stage: left alone in light mode the page keeps navy edges and the
-   white grid disappears. Repaint them rather than hide them, so the light
-   theme keeps the same depth. */
-:root[data-theme='light'] body:before {
-  background:
-    radial-gradient(circle at 80% -10%, #1c78ff1f, transparent 38%),
-    radial-gradient(circle at 15% 15%, #00d49a1c, transparent 34%),
-    radial-gradient(circle at 50% 110%, #b5ef5824, transparent 32%),
-    linear-gradient(135deg, #f7fAfe 0%, #eaf1fb 48%, #f7fafe 100%);
-}
-:root[data-theme='light'] body:after {
-  /* Dark hairlines on a light page; the white ones were invisible. */
-  background-image:
-    linear-gradient(#101a2c0a 1px, transparent 1px),
-    linear-gradient(90deg, #101a2c08 1px, transparent 1px);
-}
-
-/* Cards are a translucent white veil over a dark page. On white that veil
-   reads as dirty grey, so give them a real opaque surface instead. */
-:root[data-theme='light'] .card {
-  background: linear-gradient(165deg, #ffffff, #fdfeff 55%, #f2fbf8);
-  border-color: #101a2c1f;
-  box-shadow: 0 18px 44px var(--shadow-strong), inset 0 1px 0 #ffffff;
-}
-
-/* Same problem for every other translucent surface. */
-:root[data-theme='light'] .heroCard,
-:root[data-theme='light'] .auth {
-  background: linear-gradient(160deg, #ffffff, #f6fbff 55%, #f2fbf8);
-  border-color: #101a2c1f;
-}
-:root[data-theme='light'] .auth:before {
-  background: #b5ef5833;
-}
-:root[data-theme='light'] .chatbox {
-  background: #101a2c05;
-  border-color: var(--veil-5);
-}
-:root[data-theme='light'] .sendDock,
-:root[data-theme='light'] .stickerTray {
-  background: #ffffffe8;
-  border-color: var(--veil-6);
-}
-:root[data-theme='light'] .bar {
-  background: var(--veil-4);
-}
-:root[data-theme='light'] .divider {
-  border-top-color: var(--veil-5);
-}
-:root[data-theme='light'] .empty {
-  border-color: #101a2c26;
-  color: var(--text-muted);
-}
-:root[data-theme='light'] .publicModal,
-:root[data-theme='light'] .emojiPopover {
-  background: #ffffff;
-  border-color: var(--veil-6);
-}
-:root[data-theme='light'] .tabs button {
-  background: var(--veil-2);
-  color: var(--page-fg);
-  border-color: var(--veil-5);
-}
-:root[data-theme='light'] .chatActions button,
-:root[data-theme='light'] .emojiBtn,
-:root[data-theme='light'] .stickerTray button {
-  background: var(--veil-3);
-  color: var(--page-fg);
-}
-
-:root[data-theme='light'] .appBar,
-:root[data-theme='light'] .mobileNav {
-  background: #ffffffe6;
-  border-color: var(--veil-6);
-}
-
-:root[data-theme='light'] .notifPanel,
-:root[data-theme='light'] .cardBig {
-  background: var(--panel-bg);
-  border-color: var(--veil-6);
-}
-
-/* Inputs are white-on-dark by default; on a light page they need the
-   opposite treatment or they vanish into the card. */
-:root[data-theme='light'] input,
-:root[data-theme='light'] textarea,
-:root[data-theme='light'] select {
-  background: #ffffff;
-  border-color: var(--veil-7);
-  color: var(--page-fg);
-}
-:root[data-theme='light'] input::placeholder,
-:root[data-theme='light'] textarea::placeholder {
-  color: #8aa0b8;
-}
-
-/* Muted text: the dark-theme tints are far too light to read on white. */
-:root[data-theme='light'] .hint,
-:root[data-theme='light'] .fieldLabel,
-:root[data-theme='light'] .fieldHint,
-:root[data-theme='light'] .empty,
-:root[data-theme='light'] .tapHint,
-:root[data-theme='light'] .tapMeta small,
-:root[data-theme='light'] .tapProgressTop small,
-:root[data-theme='light'] .notifItem p,
-:root[data-theme='light'] .notifItem small,
-:root[data-theme='light'] .appWho span {
-  color: var(--text-muted);
-}
-
-/* Secondary buttons read as invisible outlines on white. */
-:root[data-theme='light'] .ghost,
-:root[data-theme='light'] .iconBtn {
-  background: var(--veil-3);
-  border-color: var(--veil-6);
-  color: var(--page-fg);
-}
-:root[data-theme='light'] .ghost:hover,
-:root[data-theme='light'] .iconBtn:hover {
-  background: var(--veil-4);
-}
-
-/* Nav pills. style.css gives the inactive ones a hard #0b2039 navy, which
-   stays dark in light mode and made the whole nav strip look broken. */
-:root[data-theme='light'] .mobileNav,
-:root[data-theme='light'] .appBar {
-  background: #ffffffe8;
-  border-color: var(--veil-6);
-  box-shadow: 0 12px 30px var(--shadow-soft);
-}
-:root[data-theme='light'] .mobileNav button,
-:root[data-theme='light'] .tabs button {
-  background: #101a2c0a;
-  color: var(--page-fg);
-  border-color: #101a2c14;
-}
-:root[data-theme='light'] .mobileNav button:hover {
-  background: #101a2c14;
-}
-:root[data-theme='light'] .mobileNav button.on {
-  /* The active pill keeps the brand green, but its label must stay legible. */
-  color: #0b2b12;
-}
-
-/* Chat bubbles and list rows. */
-:root[data-theme='light'] .chatmsg,
-:root[data-theme='light'] .row,
-:root[data-theme='light'] .reward,
-:root[data-theme='light'] .leagueRow,
-:root[data-theme='light'] .podiumCard,
-:root[data-theme='light'] .gameTile,
-:root[data-theme='light'] .rewardCard,
-:root[data-theme='light'] .notifItem {
-  background: var(--veil-2);
-  border-color: var(--veil-5);
-  color: var(--page-fg);
-}
-
-/* The tap game's radial glow is built for a dark stage. */
-:root[data-theme='light'] .tapArea {
-  background: radial-gradient(circle at 50% 60%, #84cc1626, transparent 70%);
-}
-:root[data-theme='light'] .tapBar {
-  background: var(--veil-4);
-}
-:root[data-theme='light'] .tapFloat {
-  background: #ffffffe0;
-  color: #4d7c0f;
-}
-:root[data-theme='light'] .tapTotal {
-  color: #4d7c0f;
-}
-:root[data-theme='light'] .tapProgressTop b {
-  color: #4d7c0f;
-}
-
-/* Modal scrims must stay dark in both themes — a light scrim over a light
-   page gives no separation at all. */
-:root[data-theme='light'] .modalShade,
-:root[data-theme='light'] .notifShade {
-  background: #0b1b2e73;
-}
-
-/* The login hero sits on the page background, not a card. */
-:root[data-theme='light'] .hero b {
-  color: var(--page-fg);
-}
-
-/* The wallet entry uses a black scrim (#00000038) that reads as dirty grey
-   on a light card. Spotted in a real screenshot, not in the source. */
-:root[data-theme='light'] .walletEntry {
-  background: linear-gradient(135deg, #fffaf0, #fff6e2);
-  border-color: #d9a441;
-  color: var(--page-fg);
-}
-:root[data-theme='light'] .walletEntry:hover {
-  background: linear-gradient(135deg, #fff6e2, #ffefd0);
-  border-color: #c9922c;
-}
-:root[data-theme='light'] .walletEntry small,
-:root[data-theme='light'] .walletEntry .weCta {
-  color: #7a5a12;
-}
-:root[data-theme='light'] .walletEntry b {
-  color: #5c3f06;
-}
-
-/* Toast/message chips are amber-on-dark; keep them readable on white. */
-:root[data-theme='light'] .msg,
-:root[data-theme='light'] .toast {
-  color: #7a5a12;
-  background: #fff6e2;
-  border-color: #d9a44166;
-}
-
-/* Avatar glow and card art shadows are tuned for a dark stage. */
-:root[data-theme='light'] .avatar,
-:root[data-theme='light'] .bigavatar {
-  box-shadow: 0 6px 18px #00d49a33;
-}
-
-/* Club sub-tabs: the inactive label is #dbeeff (near-white), invisible on a
-   light page. Seen in the light-theme screenshot of the games tab. */
-:root[data-theme='light'] .clubTabs {
-  background: #101a2c0a;
-  border-color: #101a2c1a;
-}
-:root[data-theme='light'] .clubTabs button {
-  color: var(--text-muted);
-}
-:root[data-theme='light'] .clubTabs button:hover {
-  color: var(--page-fg);
-}
-
-/* Same class of problem anywhere a near-white label sits on a light surface. */
-:root[data-theme='light'] .chatActions button,
-:root[data-theme='light'] .presetRow button,
-:root[data-theme='light'] .wdTarget b,
-:root[data-theme='light'] .sectionHead p {
-  color: var(--text-muted);
-}
-:root[data-theme='light'] .chatmsg .clickableText,
-:root[data-theme='light'] .publicHead b {
-  color: var(--page-fg);
-}
-
-:root[data-theme='light'] .errorCard p { color: var(--text-muted); }
-
-:root[data-theme='light'] .confirmBox {
-  background: #ffffff;
-  border-color: var(--veil-6);
-}
-:root[data-theme='light'] .confirmBox p { color: var(--text-muted); }
-:root[data-theme='light'] .rewardLocked { color: var(--text-muted); }
-
-/* Reward groups in light mode. */
-:root[data-theme='light'] .rgBar,
-:root[data-theme='light'] .rgTier {
-  background: var(--veil-2);
-  border-color: var(--veil-5);
-}
-:root[data-theme='light'] .rgTrack { background: var(--veil-4); }
-:root[data-theme='light'] .rgBarText small,
-:root[data-theme='light'] .rgScale,
-:root[data-theme='light'] .rgCards>small,
-:root[data-theme='light'] .rgPoints,
-:root[data-theme='light'] .rgTier small,
-:root[data-theme='light'] .rgLocked { color: var(--text-muted); }
-:root[data-theme='light'] .rgCash { color: #4d7c0f; }
-:root[data-theme='light'] .rgKind {
-  background: #ffffffe8; border-color: var(--veil-6); color: var(--page-fg);
-}
-:root[data-theme='light'] .rgTierCards span {
-  background: var(--veil-3); color: var(--text-muted);
-}
-:root[data-theme='light'] .rgTierCards span.met { color: #4d7c0f; }
-:root[data-theme='light'] .rgCard img { border-color: var(--veil-6); }
-
-/* Chat in light mode. */
-:root[data-theme='light'] .chatbox { background: #101a2c05; }
-:root[data-theme='light'] .chatmsg {
-  background: #ffffff; border-color: var(--veil-5);
-}
-:root[data-theme='light'] .chatmsg.mine {
-  background: linear-gradient(135deg,#eefbe0,#e3f7f0);
-  border-color: #b5ef5899;
-}
-:root[data-theme='light'] .chatbody>b { color: #0369a1; }
-:root[data-theme='light'] .chatmsg.mine .chatbody>b { color: #4d7c0f; }
-:root[data-theme='light'] .chatTime { color: var(--text-muted); }
-:root[data-theme='light'] .cannedPopover {
-  background: #ffffff; border-color: var(--veil-6);
-}
-:root[data-theme='light'] .cannedPopover button {
-  background: var(--veil-2); color: var(--page-fg); border-color: var(--veil-5);
-}
-:root[data-theme='light'] .chatActions button {
-  background: var(--veil-3); color: var(--text-muted);
-}
-:root[data-theme='light'] .sendDock input { background: #ffffff; }
-:root[data-theme='light'] .trophy img { border-color: var(--veil-6); }
-
-:root[data-theme='light'] .ccList b { color: var(--page-fg); }
-:root[data-theme='light'] .ccList small { color: var(--text-muted); }
-:root[data-theme='light'] .ccName { color: #4d7c0f; }
-:root[data-theme='light'] .ccWarn { background:#fff6e2; border-color:#d9a44166; color:#7a5a12; }
-:root[data-theme='light'] .rgScale b { color: var(--page-fg); }
-:root[data-theme='light'] .lhRow { background: var(--veil-2); border-color: var(--veil-5); }
-:root[data-theme='light'] .lhRank { color: var(--text-muted); }
-:root[data-theme='light'] .lhPts { color: var(--text-muted); }
-:root[data-theme='light'] .lhPrize { background:#eefbe0; color:#4d7c0f; }
-
-:root[data-theme='light'] .shopItem { background: var(--veil-2); border-color: var(--veil-5); }
-:root[data-theme='light'] .plusList li { color: var(--text-muted); }
-:root[data-theme='light'] .shopPrice { color: #a16207; }
-:root[data-theme='light'] .plusPrice { color: #a16207; }
-:root[data-theme='light'] .shopTag.owned { background:#eefbe0; color:#4d7c0f; }
-:root[data-theme='light'] .shopTag.plus { background:#fff6e2; color:#a16207; }
-
-:root[data-theme='light'] .ppStats>div,
-:root[data-theme='light'] .ppPrize,
-:root[data-theme='light'] .ppLeagueRow { background: var(--veil-2); border-color: var(--veil-5); }
-:root[data-theme='light'] .ppStats span,
-:root[data-theme='light'] .ppPrize em,
-:root[data-theme='light'] .ppPts,
-:root[data-theme='light'] .ppWho small { color: var(--text-muted); }
-:root[data-theme='light'] .ppRank { color: var(--page-fg); }
-:root[data-theme='light'] .ppTabs button { background: var(--veil-2); color: var(--text-muted); border-color: var(--veil-5); }
-:root[data-theme='light'] .ppStats .ppMoney b { color: #4d7c0f; }
-:root[data-theme='light'] .ppPrizeTag { background:#eefbe0; color:#4d7c0f; }
-:root[data-theme='light'] .ppClub { border-color:#fff; background:#fff; }
-:root[data-theme='light'] .ppBest { background:#fff6e2; color:#a16207; }
-:root[data-theme='light'] .prevRow { background: var(--veil-2); border-color: var(--veil-5); }
-:root[data-theme='light'] .prevPts { color: var(--text-muted); }
-:root[data-theme='light'] .prevPrize { background:#eefbe0; color:#4d7c0f; }
-:root[data-theme='light'] .prevSeason { border-top-color: var(--veil-5); }
-
-/* ── Shop v2 + club rosters in light mode ───────────────────────────────
-   Same approach as the rest of this file: only the opaque anchors and the
-   light-on-dark text tints need flipping; the brand accents are shared. */
-:root[data-theme='light'] .shopIntro p,
-:root[data-theme='light'] .plusNote p,
-:root[data-theme='light'] .clubCount,
-:root[data-theme='light'] .rosterRank,
-:root[data-theme='light'] .rosterHead small,
-:root[data-theme='light'] .rosterPts small { color: var(--text-muted); }
-
-:root[data-theme='light'] .myClub,
-:root[data-theme='light'] .clubCard { background: var(--veil-2); border-color: var(--veil-5); }
-:root[data-theme='light'] .clubCard.mine { background: #b5ef5824; border-color: #6ba31f66; }
-:root[data-theme='light'] .leagueTabs button { background: var(--veil-2); border-color: var(--veil-5); color: var(--text-muted); }
-:root[data-theme='light'] .leagueTabs .on { background: #b5ef58; color: #10210a; }
-
-/* On white, the yellow Plus text and the green tags fail contrast; darken
-   both rather than leaving unreadable labels. */
-:root[data-theme='light'] .plusNote { background: #b8860b12; border-color: #b8860b33; }
-:root[data-theme='light'] .plusNote b { color: #8a6300; }
-:root[data-theme='light'] .clubTag.plus,
-:root[data-theme='light'] .shopTag.plus { background: #b8860b1f; color: #8a6300; }
-:root[data-theme='light'] .clubTag.own,
-:root[data-theme='light'] .shopTag.owned { background: #4f8a1420; color: #3d6b0f; }
-:root[data-theme='light'] .rosterPts { color: #3d6b0f; }
-:root[data-theme='light'] .clubMine { background: #4f8a14; color: #fff; }
-:root[data-theme='light'] .short { color: #c02040; }
-:root[data-theme='light'] .avatars .clubAvatarPick { background: var(--veil-3); }
-:root[data-theme='light'] .rosterNew { color: var(--text-muted); }
-
-/* ── Animated brand mark in light mode ──────────────────────────────────
-   The aurora is a green wash designed to read against a near-black page; on
-   the light canvas it is invisible, so it is strengthened and shifted
-   warmer. The logo's drop shadow is the opposite problem: `#000a` under a
-   mark floating on white looks like a heavy smudge, so it becomes a soft
-   coloured shadow instead. The sweep also needs to be dimmer — `screen`
-   blending adds light, and on a bright background there is less headroom
-   before it clips to white. */
-:root[data-theme='light'] .heroAurora {
-  background:
-    radial-gradient(closest-side, #6ba31f2e, #00a97a1a 46%, transparent 72%);
-}
-:root[data-theme='light'] .heroMark img {
-  filter: drop-shadow(0 16px 30px #1a3d0a2e);
-}
-:root[data-theme='light'] .heroSweep {
-  background: linear-gradient(112deg,
-    transparent 44%, #ffffff5c 50%, transparent 56%);
-}
-:root[data-theme='light'] .heroSparks i {
-  background: #f6ffe2;
-  box-shadow: 0 0 10px 2px #6ba31fcc;
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   دورِ ممیزیِ کنتراستِ زنده — ده موردِ باقی‌مانده
-   ═══════════════════════════════════════════════════════════════════════════
-
-   این ده مورد با ابزارِ جدید `tools/audit_web.py` پیدا شدند: مرورگرِ
-   واقعی، ورودِ واقعی، و `getComputedStyle` روی هر عنصری که متنِ مستقیم
-   دارد. تفاوتش با ممیزیِ ایستای قبلی این است که رنگِ **نهایی** را
-   می‌سنجد — بعد از آبشارِ CSS، متغیرها، آلفا و ارث‌بری — نه رشته‌ای که
-   در فایل نوشته شده.
-
-   به همین دلیل چیزهایی را گرفت که ممیزیِ ایستا نمی‌توانست: مثلاً
-   `.walletHero` گرادیانِ تیره دارد و متنِ سفیدش آنجا درست است، ولی
-   بخشِ پایینِ همان صفحه روی کارتِ سفید می‌نشیند و همان کلاس‌ها آنجا
-   ناخواناست.
-
-   قاعدهٔ کلی: هر جا رنگِ متن برای «سفید روی تیره» طراحی شده بود، در تم
-   روشن به توکنِ تم‌آگاه سپرده شد. هیچ رنگی از تم تیره عوض نشده. */
-
-/* ── ۱. رنگِ نامِ خریداری‌شده ──────────────────────────────────────────
-   `nameColorStyle` دو متغیر می‌نویسد و انتخاب اینجا انجام می‌شود. چرا
-   این‌طور: استایلِ درون‌خطی را نمی‌شود با قانونِ تم دور زد مگر با
-   `!important` — و `!important` دقیقاً همان چیزی بود که قبلاً `.chatbody`
-   را در تم روشن به یک مستطیلِ سیاه تبدیل کرده بود. */
-:root[data-theme='light'] [style*='--nc-light'] { color: var(--nc-light) !important; }
-:root[data-theme='light'] [style*='--nc-grad-light'] { background: var(--nc-grad-light) !important; }
-
-/* ── ۲. کیف پول: متن‌هایی که از کارتِ تیره به کارتِ سفید نشت کرده‌اند ──
-   `.walletLabel/.wcBody small/.walletStats span` داخلِ `.walletHero`
-   گرادیانِ تیره دارند و آنجا سفید درست است. ولی همین کلاس‌ها بیرونِ
-   hero هم استفاده شده‌اند. محدودسازی با `:not()` تا رنگِ داخلِ hero
-   دست‌نخورده بماند. */
-:root[data-theme='light'] .walletPage > :not(.walletHero) :is(p, small, span, li),
-:root[data-theme='light'] .walletGuide ul,
-:root[data-theme='light'] .walletGuide li { color: var(--text-muted); }
-:root[data-theme='light'] .walletGuide h3,
-:root[data-theme='light'] .walletPage > :not(.walletHero) b { color: var(--page-fg); }
-
-/* یادداشتِ کهربایی «برای برداشت باید کارت ثبت کنید»: #ffd9a0 روی سفید
-   ۱.۳۴:۱ بود — عملاً یک نوارِ خالی. */
-:root[data-theme='light'] .walletNote {
-  background: #a9650014;
-  border-color: #a9650047;
-  color: #8a5200;
-}
-
-/* ── ۳. دکمه‌های ثانویه: #dbeeff روی سفید ۱.۱۹:۱ ──
-   «ثبت کارت» در کیف پول و «افزودن عکس» در پشتیبانی. هر دو دکمه‌اند،
-   یعنی کاربر باید ببیندشان تا بداند کاری هست که می‌تواند بکند. */
-:root[data-theme='light'] .walletActions button:not(.main),
-:root[data-theme='light'] .shotBtn {
-  background: var(--veil-3);
-  border-color: var(--veil-6);
-  color: var(--page-fg);
-}
-
-/* ── ۴. صفحهٔ دعوت دوستان ──
-   کدِ معرف با ۳۰ پیکسل و ۱.۵۱:۱ بزرگ‌ترین متنِ ناخوانای کلِ اپ بود؛
-   دقیقاً همان چیزی که کاربر باید بخواند و برای دوستش بفرستد. */
-:root[data-theme='light'] .refCode,
-:root[data-theme='light'] .refStats b,
-:root[data-theme='light'] .refRules li b,
-:root[data-theme='light'] .refList li b,
-:root[data-theme='light'] .refCapped { color: #4f7a0d !important; }
-:root[data-theme='light'] .refCodeBox {
-  background: linear-gradient(135deg, #4f7a0d14, #0e749012);
-  border-color: #4f7a0d5c;
-}
-:root[data-theme='light'] .refRules li,
-:root[data-theme='light'] .refProgress small,
-:root[data-theme='light'] .refStats span,
-:root[data-theme='light'] .refList li,
-:root[data-theme='light'] .refEmpty { color: var(--text-muted); }
-
-/* `opacity` جداگانه لازم است: چند قانون در style.css به‌جای رنگ از
-   `opacity:.55/.7` استفاده کرده‌اند. روی تیره محوکنندهٔ ملایمی است،
-   روی سفید متن را به خاکستریِ ۱.۲:۱ می‌برد. */
-:root[data-theme='light'] .refStats span,
-:root[data-theme='light'] .wheelHistory small { opacity: 1; }
-
-/* ── ۵. راهنمای زیرِ فیلدها در تم **تیره** ──
-   تنها موردِ تم تیره: #c9ddf280 یعنی آلفای ۵۰٪ که روی #06101d
+/* ── راهنمای زیرِ فیلدها ──
+   #c9ddf280 یعنی آلفای ۵۰٪ که روی #06101d
    کنتراست را به ۴.۱۴:۱ می‌رساند — درست زیرِ آستانهٔ ۴.۵. متن ۱۱
    پیکسلی است، پس «متنِ بزرگ» حساب نمی‌شود و تخفیفِ ۳:۱ نمی‌گیرد. */
 .fieldHint { color: #c9ddf2a8; }
 
-/* ── بنرِ «اعلان مدیریت» در تم روشن ────────────────────────────────────
-   متنِ بنر با همان رنگِ اکسنت نوشته می‌شود، روی پس‌زمینه‌ای که ۱۴٪
-   همان رنگ است. روی سطحِ روشن: طلایی ۱.۴۸:۱، سبز ۱.۷۵:۱، آبی ۲.۲۷:۱،
-   قرمز ۲.۴۴:۱ — و این تنها راهی است که مدیریت می‌تواند به همهٔ کاربران
-   پیام بدهد. مقادیرِ روشن در PIN_COLORS_LIGHT (lib/api.js) هستند.
+/* ── بنرِ «اعلان مدیریت» ────────────────────────────────────────────────
+   کامپوننت `--pin-dark` را درون‌خطی می‌نویسد و اینجا به `--pin`
+   تبدیل می‌شود.
 
-   ═══════════════════════════════════════════════════════════════════
-   چرا `--pin` اصلاً درون‌خطی نوشته نمی‌شود
-   ═══════════════════════════════════════════════════════════════════
+   چرا این حلقهٔ اضافه: اعلانِ درون‌خطی روی خودِ عنصر در آبشار از هر
+   انتخابگری قوی‌تر است. اگر کامپوننت مستقیم `--pin` را بنویسد،
+   هیچ قانونِ CSSی نمی‌تواند بازتعریفش کند. با یک متغیرِ **ورودی**
+   جداگانه، تصمیمِ نهایی اینجا گرفته می‌شود.
 
-   تلاشِ اول این بود: کامپوننت `--pin` و `--pin-light` را درون‌خطی
-   بنویسد و اینجا `--pin: var(--pin-light)` بگذاریم. کار نکرد و
-   ممیزی همچنان ۱.۵۸:۱ گرفت.
-
-   علت: اعلانِ درون‌خطیِ `--pin` روی خودِ عنصر است و در آبشار از هر
-   انتخابگری قوی‌تر است — حتی از `:root[data-theme='light'] .x`.
-   پس بازتعریفِ ما هیچ‌وقت برنده نمی‌شد.
-
-   راه‌حل: کامپوننت دو متغیرِ **ورودی** می‌نویسد (`--pin-dark` و
-   `--pin-light`) و هیچ‌کدام همان چیزی نیستند که CSS مصرف می‌کند.
-   `--pin` فقط اینجا ساخته می‌شود، جایی که تم می‌تواند انتخاب کند. */
+   مقادیر در PIN_COLORS (lib/api.js) هستند. */
 .pinnedBanner { --pin: var(--pin-dark); }
-:root[data-theme='light'] .pinnedBanner { --pin: var(--pin-light); }

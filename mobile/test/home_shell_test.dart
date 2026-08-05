@@ -144,12 +144,7 @@ ApiClient _fakeApi({
 
 Widget _wrap(ApiClient api) => MaterialApp(
       theme: AppTheme.dark(),
-      home: HomeShell(
-        api: api,
-        onLogout: () {},
-        onTheme: () {},
-        dark: true,
-      ),
+      home: HomeShell(api: api, onLogout: () {}),
     );
 
 void main() {

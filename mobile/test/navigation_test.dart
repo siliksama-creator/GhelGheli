@@ -52,12 +52,7 @@ Future<void> _pumpShell(WidgetTester tester) async {
     theme: AppTheme.dark(),
     home: Directionality(
       textDirection: TextDirection.rtl,
-      child: HomeShell(
-        api: api,
-        onLogout: () {},
-        dark: true,
-        onTheme: () {},
-      ),
+      child: HomeShell(api: api, onLogout: () {}),
     ),
   ));
   await tester.pump();

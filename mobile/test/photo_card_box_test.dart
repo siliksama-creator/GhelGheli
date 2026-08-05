@@ -55,7 +55,8 @@ ApiClient _api(Map<String, (int, String)> routes) {
 }
 
 Widget _wrap(ApiClient api, {bool dark = true}) => MaterialApp(
-      theme: dark ? AppTheme.dark() : AppTheme.light(),
+      // اپ تک‌تم است؛ پارامتر `dark` فقط برای سازگاریِ امضا مانده.
+      theme: AppTheme.dark(),
       home: Scaffold(
         body: SingleChildScrollView(child: PhotoCardBox(api: api)),
       ),

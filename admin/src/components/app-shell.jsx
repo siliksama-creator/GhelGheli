@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { LogOut, Menu, Moon, Sun, X } from 'lucide-react';
+import { LogOut, Menu, X } from 'lucide-react';
 
 // Responsive app shell: permanent sidebar on desktop, slide-in drawer +
 // hamburger on mobile — same principle as the Flutter admin shell
 // (side-rail vs. Drawer) so the whole product family behaves consistently.
-export function AppShell({ nav, activePage, onNavigate, onLogout, theme, onToggleTheme, title, subtitle, children }) {
+export function AppShell({ nav, activePage, onNavigate, onLogout, title, subtitle, children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -54,9 +54,6 @@ export function AppShell({ nav, activePage, onNavigate, onLogout, theme, onToggl
             </div>
           </div>
           <div className="topbar-actions">
-            <button className="btn btn-icon btn-ghost" onClick={onToggleTheme} aria-label="تغییر پوسته">
-              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
           </div>
         </header>
         <main className="content-area">{children}</main>

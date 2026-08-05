@@ -63,28 +63,38 @@ const MORE_TABS = [
 ];
 
 
-// Light/dark theme. Mirrors the Flutter app, which has had a switch since
-// launch while the web was dark-only. Persisted so it survives a reload.
-function useTheme() {
-  const [theme, setTheme] = useState(() => {
-    try { return localStorage.theme === 'light' ? 'light' : 'dark'; }
-    catch { return 'dark'; }
-  });
+// ═══════════════════════════════════════════════════════════════════════════
+// تمِ روشن حذف شد
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// دو دلیل:
+//
+//   ۱. منبعِ پایدارِ باگ بود. هر رنگی باید دو بار سنجیده می‌شد و در عمل
+//      نمی‌شد؛ ممیزیِ پیکسلیِ آخر چند متنِ ناخوانا **فقط** در تمِ روشن
+//      پیدا کرد. هر کامپوننتِ جدید یک شاخهٔ CSS اضافه لازم داشت که
+//      فراموش کردنش بی‌صدا خرابی می‌ساخت.
+//
+//   ۲. هویتِ بصریِ قلقلی تیره است — سبزِ نئونی و آبی روی سرمه‌ای.
+//
+// `data-theme` دیگر هرگز روی `light` تنظیم نمی‌شود و کلیدِ ذخیره‌شدهٔ
+// قدیمی هم پاک می‌شود، وگرنه کاربری که قبلاً روشن انتخاب کرده بود
+// برای همیشه با استایلِ نیمه‌کاره می‌ماند.
+function useDarkOnly() {
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.setAttribute('data-theme', 'dark');
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content',
-      theme === 'light' ? '#f4f7fc' : '#06101d');
-    try { localStorage.theme = theme; } catch { /* private mode */ }
-  }, [theme]);
-  return [theme, () => setTheme(t => (t === 'light' ? 'dark' : 'light'))];
+    if (meta) meta.setAttribute('content', '#06101d');
+    // پاکسازیِ ترجیحِ قدیمی — بدون این، `localStorage.theme` تا ابد
+    // 'light' می‌ماند و اگر روزی کسی دوباره کد را بخواند گیج می‌شود.
+    try { delete localStorage.theme; } catch { /* private mode */ }
+  }, []);
 }
 
 function App() {
   const [token, setToken] = useState(() => {
     try { return localStorage.token || ''; } catch { return ''; }
   });
-  const [theme, toggleTheme] = useTheme();
+  useDarkOnly();
   const [mode, setMode] = useState(
     location.hostname.startsWith('register.') ? 'register' : 'login');
 
@@ -126,8 +136,7 @@ function App() {
       )}
 
       {token ? (
-        <Portal token={token} theme={theme} toggleTheme={toggleTheme}
-          logout={logout} />
+        <Portal token={token} logout={logout} />
       ) : (
         <>
           <Auth mode={mode} setMode={setMode}
@@ -135,17 +144,13 @@ function App() {
               try { localStorage.token = t; } catch { /* private mode */ }
               setToken(t);
             }} />
-          <button className="themeToggleFloat" onClick={toggleTheme}
-            title={theme === 'light' ? 'حالت تیره' : 'حالت روشن'}>
-            {theme === 'light' ? '🌙' : '☀️'}
-          </button>
         </>
       )}
     </div>
   );
 }
 
-function Portal({ token, logout, theme, toggleTheme }) {
+function Portal({ token, logout }) {
   const [tab, setTab] = useState('home');
   const [p, setP] = useState(null);
   const [rewards, setRewards] = useState([]);
@@ -246,10 +251,6 @@ function Portal({ token, logout, theme, toggleTheme }) {
               {spins === '∞' ? '∞' : fa(spins)}
             </span>
           )}
-        </button>
-        <button className="iconBtn" onClick={toggleTheme}
-          title={theme === 'light' ? 'حالت تیره' : 'حالت روشن'}>
-          {theme === 'light' ? '🌙' : '☀️'}
         </button>
         <Notifications token={token} />
       </header>

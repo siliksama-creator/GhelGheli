@@ -46,7 +46,6 @@ const NAV = [
 function App() {
   const [token, setToken] = useState(localStorage.getItem('adminToken') || '');
   const [page, setPage] = useState('dashboard');
-  const [theme, setTheme] = useState(localStorage.getItem('adminTheme') || 'dark');
   const notify = useToast();
 
   const logout = useCallback((message) => {
@@ -64,10 +63,20 @@ function App() {
     [token, logout],
   );
 
+  // ═════════════════════════════════════════════════════════════════════
+  // تمِ روشن حذف شد
+  // ═════════════════════════════════════════════════════════════════════
+  //
+  // منبعِ پایدارِ باگ بود: هر رنگ باید دو بار سنجیده می‌شد و در عمل
+  // نمی‌شد. آخرین ممیزی هم یک متنِ ناخوانا (کنتراست ۳.۹۶) در همین پنل
+  // پیدا کرد. ضمناً پنل کنارِ اپِ تیره استفاده می‌شود و یکدستی بهتر است.
+  //
+  // ترجیحِ ذخیره‌شدهٔ قدیمی پاک می‌شود، وگرنه مدیری که قبلاً روشن را
+  // انتخاب کرده بود برای همیشه با استایلِ نیمه‌کاره می‌ماند.
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    localStorage.setItem('adminTheme', theme);
-  }, [theme]);
+    document.documentElement.dataset.theme = 'dark';
+    localStorage.removeItem('adminTheme');
+  }, []);
 
   if (!token) {
     return (
@@ -89,8 +98,6 @@ function App() {
       activePage={page}
       onNavigate={setPage}
       onLogout={() => logout()}
-      theme={theme}
-      onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
       title={active[1]}
       subtitle="تمام تغییرات حساس در Audit Log ثبت می‌شود."
     >

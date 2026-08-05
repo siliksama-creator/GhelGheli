@@ -72,9 +72,6 @@ class GhelGheliApp extends StatefulWidget {
 class _GhelGheliAppState extends State<GhelGheliApp> {
   final ApiClient api = ApiClient();
   bool _ready = false;
-  ThemeMode _themeMode = ThemeMode.dark;
-
-  bool get _isDark => _themeMode == ThemeMode.dark;
 
   @override
   void initState() {
@@ -110,9 +107,6 @@ class _GhelGheliAppState extends State<GhelGheliApp> {
     });
   }
 
-  void _toggleTheme() =>
-      setState(() => _themeMode = _isDark ? ThemeMode.light : ThemeMode.dark);
-
   Future<void> _refresh() async => setState(() {});
 
   Future<void> _logout() async {
@@ -133,9 +127,26 @@ class _GhelGheliAppState extends State<GhelGheliApp> {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      theme: AppTheme.light(),
+      // ═══════════════════════════════════════════════════════════════════
+      // چرا فقط تمِ تیره
+      // ═══════════════════════════════════════════════════════════════════
+      //
+      // تمِ روشن کاملاً حذف شد. دو دلیل:
+      //
+      //   ۱. منبعِ پایدارِ باگ بود. هر رنگی باید دو بار سنجیده می‌شد و
+      //      در عمل نمی‌شد؛ ممیزیِ پیکسلیِ آخر چند متنِ ناخوانا **فقط**
+      //      در تمِ روشن پیدا کرد. هر ویجتِ جدید یک شرطِ isDark لازم
+      //      داشت که فراموش کردنش بی‌صدا خرابی می‌ساخت.
+      //
+      //   ۲. هویتِ بصریِ قلقلی تیره است — سبزِ نئونی و آبی روی
+      //      سرمه‌ای. تمِ روشن هیچ‌وقت آن حس را نمی‌داد.
+      //
+      // `theme` هم به نسخهٔ تیره اشاره می‌کند تا اگر جایی از سیستم
+      // (مثلاً یک دیالوگِ پلتفرمی) به `theme` نگاه کند، باز هم تیره
+      // بگیرد و هرگز صفحهٔ سفید ندهد.
+      theme: AppTheme.dark(),
       darkTheme: AppTheme.dark(),
-      themeMode: _themeMode,
+      themeMode: ThemeMode.dark,
       builder: (context, child) =>
           Directionality(textDirection: TextDirection.rtl, child: child!),
       home: !_ready
@@ -143,16 +154,8 @@ class _GhelGheliAppState extends State<GhelGheliApp> {
           : api.token == null
               ? AuthScreen(api: api, onDone: _refresh)
               : api.isAdmin
-                  ? AdminShell(
-                      api: api,
-                      onLogout: _logout,
-                      dark: _isDark,
-                      onTheme: _toggleTheme)
-                  : HomeShell(
-                      api: api,
-                      onLogout: _logout,
-                      dark: _isDark,
-                      onTheme: _toggleTheme),
+                  ? AdminShell(api: api, onLogout: _logout)
+                  : HomeShell(api: api, onLogout: _logout),
     );
   }
 }

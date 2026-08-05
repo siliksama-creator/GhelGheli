@@ -94,34 +94,9 @@ class BrandTheme extends ThemeExtension<BrandTheme> {
   /// `context.brand.danger` استفاده کنید تا خودکار نسخهٔ درستِ تم
   /// انتخاب شود. استفادهٔ مستقیم فقط جایی درست است که پس‌زمینه قطعاً
   /// تیره باشد (مثل گرادیانِ کارت موجودی).
-  factory BrandTheme.light() => BrandTheme(
-        heroGradient: BrandColors.heroGradientLight,
-        leagueGradient: BrandColors.leagueGradientLight,
-        goldGradient: BrandColors.goldGradient,
-        cardGradient: BrandColors.cardGradient,
-        success: BrandColors.successOnLight,
-        warning: BrandColors.warningOnLight,
-        danger: BrandColors.dangerOnLight,
-        info: BrandColors.infoOnLight,
-        accent: BrandColors.amberOnLight,
-        glassFill: Colors.white.withValues(alpha: 0.55),
-        glassBorder: Colors.white.withValues(alpha: 0.65),
-        subtleBorder: BrandColors.lightBorder,
-        surfaceAlt: BrandColors.lightSurfaceAlt,
-        surfaceHigh: BrandColors.lightSurfaceHigh,
-        softShadow: [
-          BoxShadow(
-              color: const Color(0xFF17284A).withValues(alpha: 0.08),
-              blurRadius: 22,
-              offset: const Offset(0, 8)),
-        ],
-        raisedShadow: [
-          BoxShadow(
-              color: const Color(0xFF17284A).withValues(alpha: 0.14),
-              blurRadius: 34,
-              offset: const Offset(0, 16)),
-        ],
-      );
+  // `BrandTheme.light()` حذف شد — اپ تک‌تم (تیره) است.
+  // توضیحِ کاملِ چرایی در main.dart.
+
 
   @override
   BrandTheme copyWith({

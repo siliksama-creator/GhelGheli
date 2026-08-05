@@ -24,15 +24,9 @@ import 'admin_wallet.dart';
 class AdminShell extends StatefulWidget {
   final ApiClient api;
   final VoidCallback onLogout;
-  final bool dark;
-  final VoidCallback onTheme;
 
-  const AdminShell(
-      {super.key,
-      required this.api,
-      required this.onLogout,
-      required this.dark,
-      required this.onTheme});
+  // `dark` و `onTheme` حذف شدند — اپ تک‌تم است (توضیح در main.dart).
+  const AdminShell({super.key, required this.api, required this.onLogout});
 
   @override
   State<AdminShell> createState() => _AdminShellState();
@@ -103,11 +97,6 @@ class _AdminShellState extends State<AdminShell> {
         title: Text('مدیریت قلقلی — ${_titles[_index]}'),
         actions: [
           IconButton(
-              onPressed: widget.onTheme,
-              icon: Icon(widget.dark
-                  ? Icons.light_mode_rounded
-                  : Icons.dark_mode_rounded)),
-          IconButton(
               onPressed: widget.onLogout,
               icon: const Icon(Icons.logout_rounded)),
           const SizedBox(width: 4),
@@ -159,14 +148,7 @@ class _AdminShellState extends State<AdminShell> {
             child: Scaffold(
               appBar: AppBar(
                 title: Text('مدیریت قلقلی — ${_titles[_index]}'),
-                actions: [
-                  IconButton(
-                      onPressed: widget.onTheme,
-                      icon: Icon(widget.dark
-                          ? Icons.light_mode_rounded
-                          : Icons.dark_mode_rounded)),
-                  const SizedBox(width: 8),
-                ],
+                actions: const [SizedBox(width: 8)],
               ),
               body: AnimatedSwitcher(
                 duration: Motion.normal,

@@ -20,93 +20,59 @@ class AppTheme {
   AppTheme._();
 
   static ThemeData dark() => _build(brightness: Brightness.dark);
-  static ThemeData light() => _build(brightness: Brightness.light);
+
+  // ── چرا `light()` حذف شد ──
+  //
+  // اپ تک‌تم شد. نگه داشتنِ سازندهٔ تمِ روشن یعنی کدی که هیچ‌کس اجرا
+  // نمی‌کند ولی هر تغییرِ رنگی باید در آن هم اعمال شود — و چون اجرا
+  // نمی‌شود، هیچ‌وقت معلوم نمی‌شد که از قلم افتاده.
+  //
+  // `brightness` به‌عنوان پارامتر ماند تا امضای `_build` و ساختارش
+  // دست‌نخورده بماند؛ فقط تنها فراخوانی‌اش تیره است.
 
   static ThemeData _build({required Brightness brightness}) {
-    final isDark = brightness == Brightness.dark;
+    // تک‌تم: فقط طرحِ رنگِ تیره. شاخهٔ روشن حذف شد.
+    const colorScheme = ColorScheme.dark(
+      primary: BrandColors.emerald,
+      onPrimary: Color(0xFF00281D),
+      primaryContainer: Color(0xFF0B4536),
+      onPrimaryContainer: Color(0xFFB9FFE9),
+      secondary: BrandColors.blue,
+      onSecondary: Colors.white,
+      secondaryContainer: Color(0xFF0E2A55),
+      onSecondaryContainer: Color(0xFFD3E4FF),
+      tertiary: BrandColors.amber,
+      onTertiary: Color(0xFF241900),
+      surface: BrandColors.darkSurface,
+      onSurface: Color(0xFFEAF1FB),
+      surfaceContainerLowest: BrandColors.darkBg,
+      surfaceContainerLow: BrandColors.darkSurface,
+      surfaceContainer: BrandColors.darkSurfaceAlt,
+      surfaceContainerHigh: BrandColors.darkSurfaceHigh,
+      surfaceContainerHighest: Color(0xFF223349),
+      outline: Color(0xFF35486A),
+      outlineVariant: Color(0xFF223349),
+      error: BrandColors.danger,
+      // ═══════════════════════════════════════════════════════════
+      // چرا onError در تم تیره سفید نیست
+      // ═══════════════════════════════════════════════════════════
+      //
+      // `danger` (#FF5D6C) یک قرمزِ **روشن** است — عمداً، چون
+      // باید روی سطحِ تیرهٔ اپ بدرخشد. ولی متنِ سفید روی همان
+      // رنگ فقط ۲.۹۹:۱ می‌دهد: برچسبِ دکمه‌های خطا و اسنک‌بارها
+      // کم‌رنگ و سخت‌خوان بود.
+      //
+      // این همان الگویی است که خودِ Material 3 برای تم تیره
+      // به‌کار می‌برد: رنگِ ظرف روشن، جوهرِ رویش تیره. با
+      // #2A0206 کنتراست به ۶.۳۴:۱ می‌رسد.
+      //
+      onError: Color(0xFF2A0206),
+    );
 
-    final colorScheme = isDark
-        ? const ColorScheme.dark(
-            primary: BrandColors.emerald,
-            onPrimary: Color(0xFF00281D),
-            primaryContainer: Color(0xFF0B4536),
-            onPrimaryContainer: Color(0xFFB9FFE9),
-            secondary: BrandColors.blue,
-            onSecondary: Colors.white,
-            secondaryContainer: Color(0xFF0E2A55),
-            onSecondaryContainer: Color(0xFFD3E4FF),
-            tertiary: BrandColors.amber,
-            onTertiary: Color(0xFF241900),
-            surface: BrandColors.darkSurface,
-            onSurface: Color(0xFFEAF1FB),
-            surfaceContainerLowest: BrandColors.darkBg,
-            surfaceContainerLow: BrandColors.darkSurface,
-            surfaceContainer: BrandColors.darkSurfaceAlt,
-            surfaceContainerHigh: BrandColors.darkSurfaceHigh,
-            surfaceContainerHighest: Color(0xFF223349),
-            outline: Color(0xFF35486A),
-            outlineVariant: Color(0xFF223349),
-            error: BrandColors.danger,
-            // ═══════════════════════════════════════════════════════════
-            // چرا onError در تم تیره سفید نیست
-            // ═══════════════════════════════════════════════════════════
-            //
-            // `danger` (#FF5D6C) یک قرمزِ **روشن** است — عمداً، چون
-            // باید روی سطحِ تیرهٔ اپ بدرخشد. ولی متنِ سفید روی همان
-            // رنگ فقط ۲.۹۹:۱ می‌دهد: برچسبِ دکمه‌های خطا و اسنک‌بارها
-            // کم‌رنگ و سخت‌خوان بود.
-            //
-            // این همان الگویی است که خودِ Material 3 برای تم تیره
-            // به‌کار می‌برد: رنگِ ظرف روشن، جوهرِ رویش تیره. با
-            // #2A0206 کنتراست به ۶.۳۴:۱ می‌رسد.
-            //
-            // نکته: این با تم روشن قرینه است — آنجا `error` تیره شد و
-            // `onError` سفید ماند.
-            onError: Color(0xFF2A0206),
-          )
-        : const ColorScheme.light(
-            primary: BrandColors.emeraldDeep,
-            onPrimary: Colors.white,
-            primaryContainer: Color(0xFFCBFCE9),
-            onPrimaryContainer: Color(0xFF00351F),
-            secondary: BrandColors.blueDeep,
-            onSecondary: Colors.white,
-            secondaryContainer: Color(0xFFDCE8FF),
-            onSecondaryContainer: Color(0xFF06214F),
-            tertiary: Color(0xFFB8790A),
-            onTertiary: Colors.white,
-            surface: BrandColors.lightSurface,
-            onSurface: Color(0xFF10182A),
-            surfaceContainerLowest: Colors.white,
-            surfaceContainerLow: Color(0xFFF8FAFF),
-            surfaceContainer: BrandColors.lightSurfaceAlt,
-            surfaceContainerHigh: BrandColors.lightSurfaceHigh,
-            surfaceContainerHighest: Color(0xFFDBE3F2),
-            outline: Color(0xFFC3CEE2),
-            outlineVariant: Color(0xFFDCE3F2),
-            // ═══════════════════════════════════════════════════════════
-            // چرا تم روشن نسخهٔ متفاوتی از قرمزِ خطا دارد
-            // ═══════════════════════════════════════════════════════════
-            //
-            // `BrandColors.danger` (#FF5D6C) برای سطحِ تیره ساخته شده.
-            // روی سفید فقط ۲.۹۹:۱ کنتراست می‌دهد — زیر حداقلِ ۳:۱ برای
-            // آیکون و متنِ بولد، و خیلی زیرِ ۴.۵:۱ برای متنِ معمولی.
-            //
-            // یعنی پیام‌های خطا و اعتبارسنجیِ فرم‌ها در تم روشن کم‌رنگ
-            // و سخت‌خوان بودند — بخشی از همان چیزی که مالک گزارش کرد.
-            //
-            // `dangerOnLight` همان hue را دارد و ۴.۵۹:۱ می‌دهد.
-            // `onError` هم سفید می‌ماند چون روی این قرمزِ تیره‌تر
-            // ۴.۵۷:۱ است.
-            error: BrandColors.dangerOnLight,
-            onError: Colors.white,
-          );
-
-    final onSurfaceMuted =
-        isDark ? const Color(0xFF9FB0C8) : const Color(0xFF5C6B85);
+    const onSurfaceMuted = Color(0xFF9FB0C8);
     final textTheme =
         AppTypography.textTheme(colorScheme.onSurface, onSurfaceMuted);
-    final brandExt = isDark ? BrandTheme.dark() : BrandTheme.light();
+    final brandExt = BrandTheme.dark();
 
     return ThemeData(
       useMaterial3: true,
@@ -114,8 +80,7 @@ class AppTheme {
       colorScheme: colorScheme,
       fontFamily: AppTypography.fontFamily,
       textTheme: textTheme,
-      scaffoldBackgroundColor:
-          isDark ? BrandColors.darkBg : BrandColors.lightBg,
+      scaffoldBackgroundColor: BrandColors.darkBg,
       splashFactory: InkSparkle.splashFactory,
       visualDensity: VisualDensity.standard,
       extensions: [brandExt],
@@ -141,7 +106,7 @@ class AppTheme {
         backgroundColor: colorScheme.surfaceContainerLow,
         surfaceTintColor: Colors.transparent,
         indicatorColor:
-            colorScheme.primary.withValues(alpha: isDark ? 0.22 : 0.16),
+            colorScheme.primary.withValues(alpha: 0.22),
         indicatorShape: RoundedRectangleBorder(borderRadius: Corners.rPill),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
@@ -163,7 +128,7 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: colorScheme.surfaceContainerHigh
-            .withValues(alpha: isDark ? 0.55 : 0.7),
+            .withValues(alpha: 0.55),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: Gaps.md, vertical: Gaps.md),
         hintStyle: textTheme.bodyMedium?.copyWith(color: onSurfaceMuted),

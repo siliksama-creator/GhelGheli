@@ -23,7 +23,7 @@ import 'package:ghelgheli_mobile/theme/app_theme.dart';
 import 'package:ghelgheli_mobile/widgets/level_badge.dart';
 
 Widget _wrap(Widget child, {bool dark = true}) => MaterialApp(
-      theme: AppTheme.light(),
+      theme: AppTheme.dark(),
       darkTheme: AppTheme.dark(),
       themeMode: dark ? ThemeMode.dark : ThemeMode.light,
       home: Directionality(

@@ -2756,33 +2756,27 @@ a:focus-visible {
   flex: none;
 }
 .pcResult > div { display: flex; flex-direction: column; gap: 2px; }
+/* ── چرا مقادیرِ تیره مستقیم اینجا هستند ──
+   قبلاً قانونِ پایه رنگِ تمِ **روشن** را می‌داد و یک قانونِ
+   `:root:not([data-theme='light'])` بلافاصله بعدش آن را برای تمِ تیره
+   بازنویسی می‌کرد. با حذفِ تمِ روشن، آن الگوی وارونه فقط دو برابر کدِ
+   بی‌فایده بود. حالا همان مقادیرِ تیره — که روی #0e1c2e سنجیده
+   شده‌اند — مستقیم اعمال می‌شوند. */
 .pcResult.ok {
   background: #14865e1f;
   border: 1px solid #14865e5c;
-  color: var(--brand-ink);
+  color: #4ade80;
 }
 .pcResult.pending {
-  background: #a767071f;
-  border: 1px solid #a767075c;
-  /* #a76707 روی پس‌زمینهٔ روشنِ این نوار ۳.۷۶ می‌داد — زیرِ حدِ ۴.۵.
-     این نوار به کاربر می‌گوید عکسش در صف بررسی است و کدش محفوظ
-     مانده؛ پیامی که اگر خوانده نشود، کاربر دوباره تلاش می‌کند و
-     کدِ بعدی‌اش را می‌سوزاند. #855100 همان کهرباییِ هشدار است با
-     نسبتِ ۵.۴۴. */
-  color: #855100;
+  background: #fbbf241a;
+  border: 1px solid #fbbf2452;
+  color: #fbbf24;
 }
 .pcResult.err {
   background: #ec00161a;
   border: 1px solid #ec001652;
-  color: #ec0016;
+  color: #ff8a94;
 }
-/* تم تیره: همان رنگ‌ها روی پس‌زمینهٔ تیره ناخوانا می‌شوند، پس نسخهٔ
-   روشن‌تر می‌گیرند. مقادیر روی #0e1c2e سنجیده شده‌اند. */
-:root:not([data-theme='light']) .pcResult.ok { color: #4ade80; }
-:root:not([data-theme='light']) .pcResult.pending {
-  color: #fbbf24; border-color: #fbbf2452; background: #fbbf241a;
-}
-:root:not([data-theme='light']) .pcResult.err { color: #ff8a94; }
 
 /* ── راهنمای حروفِ مبهم زیر فیلد کد ──
    همیشه دیده می‌شود، نه فقط بعد از خطا: کاربر باید قبل از تایپ بداند
@@ -2818,14 +2812,9 @@ a:focus-visible {
 /* حالتِ قفل. رنگ از خانوادهٔ خطا جداست چون این «اشتباه کردی» نیست،
    «فعلاً نمی‌توانی» است — دو پیامِ متفاوت با دو واکنشِ متفاوت. */
 .pcResult.locked {
-  background: #7c3aed14;
-  border: 1px solid #7c3aed4d;
-  color: #6d28d9;
-}
-:root:not([data-theme='light']) .pcResult.locked {
-  color: #c4b5fd;
-  border-color: #a78bfa52;
   background: #a78bfa1a;
+  border: 1px solid #a78bfa52;
+  color: #c4b5fd;
 }
 .pcResult.locked span,
 .pcResult.err span { font-weight: 600; opacity: .95; }

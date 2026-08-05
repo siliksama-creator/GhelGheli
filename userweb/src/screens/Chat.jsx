@@ -1,7 +1,7 @@
 // Public chat room.
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 
-import { req, asset, fa, avatars, PIN_COLORS, PIN_COLORS_LIGHT, avatarUrl } from '../lib/api.js';
+import { req, asset, fa, avatars, PIN_COLORS, avatarUrl } from '../lib/api.js';
 import { DisplayName } from '../components/Cosmetics.jsx';
 
 const POLL_MS = 8000;
@@ -149,15 +149,14 @@ export default function Chat({ token, openProfile, meId }) {
         <span className="liveBadge">زنده</span>
       </div>
 
-      {/* دو متغیر می‌نویسیم و انتخاب را به theme.css می‌سپاریم — همان
-          الگوی رنگِ نام. مزیتش این است که تعویضِ تم نیازی به رندرِ
-          دوباره ندارد و استایلِ درون‌خطی جلوی قانونِ تم را نمی‌گیرد. */}
+      {/* `--pin-dark` نوشته می‌شود و theme.css آن را به `--pin` تبدیل
+          می‌کند. چرا این حلقهٔ اضافه: استایلِ درون‌خطی در آبشار از هر
+          قانونِ CSSی قوی‌تر است، پس اگر مستقیم `--pin` را بنویسیم هیچ
+          شیوه‌نامه‌ای نمی‌تواند بازتعریفش کند. */}
       {pinned?.active && pinned.text && (
         <div className="pinnedBanner"
           style={{
             '--pin-dark': PIN_COLORS[pinned.accent] || PIN_COLORS.gold,
-            '--pin-light':
-              PIN_COLORS_LIGHT[pinned.accent] || PIN_COLORS_LIGHT.gold,
           }}>
           <span className="pinIcon">📌</span>
           <div><b>اعلان مدیریت</b><p>{pinned.text}</p></div>

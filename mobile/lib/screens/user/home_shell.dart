@@ -24,15 +24,9 @@ import 'referral_page.dart';
 class HomeShell extends StatefulWidget {
   final ApiClient api;
   final VoidCallback onLogout;
-  final bool dark;
-  final VoidCallback onTheme;
 
-  const HomeShell(
-      {super.key,
-      required this.api,
-      required this.onLogout,
-      required this.dark,
-      required this.onTheme});
+  // `dark` و `onTheme` حذف شدند — اپ فقط تمِ تیره دارد. توضیح در main.dart.
+  const HomeShell({super.key, required this.api, required this.onLogout});
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -97,8 +91,6 @@ class _HomeShellState extends State<HomeShell>
       onOpenWallet: () => setState(() => _index = _walletIndex),
       onOpenWheel: () => setState(() => _index = wheelIndex),
       onOpenReferral: () => setState(() => _index = referralIndex),
-      onToggleTheme: widget.onTheme,
-      isDark: widget.dark,
     ),
     RewardsPage(api: widget.api),
     WalletPage(api: widget.api, reloadProfile: _loadProfile),
@@ -355,15 +347,7 @@ class _HomeShellState extends State<HomeShell>
                 selected: _index == i,
                 onTap: () => Navigator.pop(sheetContext, i),
               ),
-            ListTile(
-              leading: Icon(
-                  widget.dark ? Icons.light_mode_rounded : Icons.dark_mode_rounded),
-              title: Text(widget.dark ? 'حالت روشن' : 'حالت تیره'),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                widget.onTheme();
-              },
-            ),
+            // ردیفِ «حالت روشن/تیره» حذف شد — اپ تک‌تم است.
             const SizedBox(height: 8),
           ],
           ),

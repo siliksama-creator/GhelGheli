@@ -26,9 +26,7 @@ class DashboardPage extends StatefulWidget {
   final VoidCallback? onOpenWheel;
   final VoidCallback? onOpenReferral;
 
-  /// Light/dark switch, surfaced at the top of the dashboard.
-  final VoidCallback? onToggleTheme;
-  final bool isDark;
+  // `onToggleTheme` و `isDark` حذف شدند — اپ تک‌تم است (توضیح در main.dart).
 
   const DashboardPage({
     super.key,
@@ -38,8 +36,6 @@ class DashboardPage extends StatefulWidget {
     this.onOpenWallet,
     this.onOpenWheel,
     this.onOpenReferral,
-    this.onToggleTheme,
-    this.isDark = true,
   });
 
   @override
@@ -206,8 +202,6 @@ class _DashboardPageState extends State<DashboardPage> {
             cosmetics: _data?['cosmetics'] as Map<String, dynamic>?,
             onOpenProfile: widget.onOpenProfile,
             onOpenWallet: widget.onOpenWallet,
-            onToggleTheme: widget.onToggleTheme,
-            isDark: widget.isDark,
           ),
           Gaps.vMd,
           // دو میان‌بر: گردونهٔ روزانه و دعوت دوستان. روی داشبورد هستند چون

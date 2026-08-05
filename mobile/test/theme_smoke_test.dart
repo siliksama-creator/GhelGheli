@@ -1,21 +1,17 @@
-// رندرِ واقعیِ ویجت‌های کلیدی در **هر دو تم**.
+// رندرِ واقعیِ ویجت‌های کلیدی در تمِ اپ.
 //
 // ═══════════════════════════════════════════════════════════════════════════
-// چرا این تست جدا از light_theme_contrast_test است
+// این فایل بعد از حذفِ تمِ روشن چه چیزی را می‌سنجد
 // ═══════════════════════════════════════════════════════════════════════════
 //
-// آن فایل **رنگ‌ها** را می‌سنجد: یک تابعِ ریاضیِ محض روی مقادیرِ تم.
-// این فایل چیز دیگری را می‌سنجد: آیا این ویجت‌ها اصلاً در تم روشن
-// **بدون خطا رندر می‌شوند**؟
+// اپ تک‌تم (تیره) شد و `light_theme_contrast_test.dart` حذف شد چون
+// موضوعش دیگر وجود ندارد.
 //
-// این دو فرق دارند. یک ویجت می‌تواند رنگ‌های درست داشته باشد ولی در
-// تم روشن با `Null check operator used on a null value` بشکند — مثلاً
-// اگر یک `ThemeExtension` فقط در نسخهٔ تیره تعریف شده باشد، یا یک
-// `Color.lerp` روی مقدارِ null صدا زده شود.
-//
-// چون گزارش مالک دربارهٔ کیف پول بود، تمرکز روی همان ویجت‌هاست — ولی
-// بقیهٔ کارت‌های پرکاربرد هم پوشش داده شده‌اند تا اگر فردا کسی یک
-// رنگِ ثابتِ دیگر اضافه کرد، دست‌کم خطای رندر گرفته شود.
+// ولی این فایل هنوز لازم است: می‌سنجد که این ویجت‌ها اصلاً **بدون خطا
+// رندر می‌شوند** و همهٔ توکن‌های `BrandTheme` سرِ جایشان هستند. یک
+// ویجت می‌تواند رنگِ درست داشته باشد ولی با
+// `Null check operator used on a null value` بشکند — مثلاً اگر کسی
+// توکنی به BrandTheme اضافه کند و در `copyWith` یا `lerp` جا بیندازد.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -24,10 +20,12 @@ import 'package:ghelgheli_mobile/theme/brand_theme.dart';
 import 'package:ghelgheli_mobile/widgets/level_badge.dart';
 import 'package:ghelgheli_mobile/screens/user/wallet/wallet_widgets.dart';
 
+// پارامتر `dark` عمداً ماند تا امضای تست‌های موجود دست‌نخورده بماند،
+// ولی هر دو حالت حالا همان تمِ تیره را می‌گیرند.
 Widget _app(Widget child, {required bool dark}) => MaterialApp(
-      theme: AppTheme.light(),
+      theme: AppTheme.dark(),
       darkTheme: AppTheme.dark(),
-      themeMode: dark ? ThemeMode.dark : ThemeMode.light,
+      themeMode: ThemeMode.dark,
       home: Directionality(
         textDirection: TextDirection.rtl,
         child: Scaffold(
@@ -123,12 +121,10 @@ void main() {
   });
 
   group('توکن‌های تم در هر دو حالت موجودند', () {
-    test('BrandTheme در هر دو تم ثبت شده', () {
-      // اگر یکی از تم‌ها extension را نداشته باشد، `context.brand`
-      // با «Null check operator» می‌شکند — و چون در تم پیش‌فرض
-      // (تیره) کار می‌کند، فقط وقتی کاربر تم را عوض کند دیده می‌شود.
+    test('BrandTheme در تم ثبت شده', () {
+      // اگر تم extension را نداشته باشد، `context.brand` با
+      // «Null check operator» می‌شکند و کلِ صفحه سفید می‌شود.
       for (final (name, t) in [
-        ('روشن', AppTheme.light()),
         ('تیره', AppTheme.dark()),
       ]) {
         final b = t.extension<BrandTheme>();
@@ -142,12 +138,17 @@ void main() {
       }
     });
 
-    test('lerp بین دو تم هیچ توکنی را گم نمی‌کند', () {
-      // فلاتر هنگام عوض کردنِ تم بینشان درون‌یابی می‌کند. اگر `lerp`
-      // یک فیلد را جا بیندازد، آن مقدار وسطِ انیمیشن به مقدارِ قدیمی
-      // می‌پرد — یک پرشِ رنگیِ زشت که فقط در گذار دیده می‌شود.
-      final a = AppTheme.light().extension<BrandTheme>()!;
-      final b = AppTheme.dark().extension<BrandTheme>()!;
+    test('lerp هیچ توکنی را گم نمی‌کند', () {
+      // با تک‌تم شدن، `lerp` دیگر بین دو تم اجرا نمی‌شود — ولی فلاتر
+      // همچنان موقعِ هر تغییرِ ThemeData آن را صدا می‌زند. اگر یک فیلد
+      // در پیاده‌سازیِ lerp جا بیفتد، آن توکن وسطِ انیمیشن به مقدارِ
+      // قدیمی می‌پرد. با دو نمونهٔ ساختگی می‌سنجیم.
+      final a = AppTheme.dark().extension<BrandTheme>()!;
+      final b = a.copyWith(
+        accent: const Color(0xFF123456),
+        success: const Color(0xFF234567),
+        danger: const Color(0xFF345678),
+      );
       final mid = a.lerp(b, 0.5);
       expect(mid.accent, isNot(a.accent),
           reason: 'accent در lerp درون‌یابی نمی‌شود');
