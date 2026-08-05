@@ -996,7 +996,15 @@ table.data-table {
   font-size: 12.5px;
 }
 .batchItem span { color: var(--gg-emerald-ink); font-weight: 700; }
-.batchItem small { color: var(--gg-text-faint); }
+/* ── چرا muted و نه faint ──
+   ممیزی زندهٔ مرورگر گرفت: `--gg-text-faint` روی پس‌زمینهٔ صفحه درست
+   است، ولی `.batchItem` روی `--gg-surface-high` می‌نشیند که یک پله
+   روشن‌تر (در تم تیره) است. همان رنگ آنجا به ۳.۴۶:۱ می‌افتد.
+
+   توکن سراسری را عوض نکردم چون جای دیگر مشکلی ندارد و تیره‌تر کردنش
+   کل پنل را بی‌جهت سنگین می‌کرد. این همان درسِ دور قبل است: رنگ را
+   روی سطحی که واقعاً رویش می‌نشیند بسنج، نه روی سفیدِ فرضی. */
+.batchItem small { color: var(--gg-text-muted); }
 
 /* ── صف بررسی ── */
 .reviewRow {
