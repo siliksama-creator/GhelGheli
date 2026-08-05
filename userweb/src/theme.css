@@ -528,3 +528,88 @@ body {
   background: #f6ffe2;
   box-shadow: 0 0 10px 2px #6ba31fcc;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   دورِ ممیزیِ کنتراستِ زنده — ده موردِ باقی‌مانده
+   ═══════════════════════════════════════════════════════════════════════════
+
+   این ده مورد با ابزارِ جدید `tools/audit_web.py` پیدا شدند: مرورگرِ
+   واقعی، ورودِ واقعی، و `getComputedStyle` روی هر عنصری که متنِ مستقیم
+   دارد. تفاوتش با ممیزیِ ایستای قبلی این است که رنگِ **نهایی** را
+   می‌سنجد — بعد از آبشارِ CSS، متغیرها، آلفا و ارث‌بری — نه رشته‌ای که
+   در فایل نوشته شده.
+
+   به همین دلیل چیزهایی را گرفت که ممیزیِ ایستا نمی‌توانست: مثلاً
+   `.walletHero` گرادیانِ تیره دارد و متنِ سفیدش آنجا درست است، ولی
+   بخشِ پایینِ همان صفحه روی کارتِ سفید می‌نشیند و همان کلاس‌ها آنجا
+   ناخواناست.
+
+   قاعدهٔ کلی: هر جا رنگِ متن برای «سفید روی تیره» طراحی شده بود، در تم
+   روشن به توکنِ تم‌آگاه سپرده شد. هیچ رنگی از تم تیره عوض نشده. */
+
+/* ── ۱. رنگِ نامِ خریداری‌شده ──────────────────────────────────────────
+   `nameColorStyle` دو متغیر می‌نویسد و انتخاب اینجا انجام می‌شود. چرا
+   این‌طور: استایلِ درون‌خطی را نمی‌شود با قانونِ تم دور زد مگر با
+   `!important` — و `!important` دقیقاً همان چیزی بود که قبلاً `.chatbody`
+   را در تم روشن به یک مستطیلِ سیاه تبدیل کرده بود. */
+:root[data-theme='light'] [style*='--nc-light'] { color: var(--nc-light) !important; }
+:root[data-theme='light'] [style*='--nc-grad-light'] { background: var(--nc-grad-light) !important; }
+
+/* ── ۲. کیف پول: متن‌هایی که از کارتِ تیره به کارتِ سفید نشت کرده‌اند ──
+   `.walletLabel/.wcBody small/.walletStats span` داخلِ `.walletHero`
+   گرادیانِ تیره دارند و آنجا سفید درست است. ولی همین کلاس‌ها بیرونِ
+   hero هم استفاده شده‌اند. محدودسازی با `:not()` تا رنگِ داخلِ hero
+   دست‌نخورده بماند. */
+:root[data-theme='light'] .walletPage > :not(.walletHero) :is(p, small, span, li),
+:root[data-theme='light'] .walletGuide ul,
+:root[data-theme='light'] .walletGuide li { color: var(--text-muted); }
+:root[data-theme='light'] .walletGuide h3,
+:root[data-theme='light'] .walletPage > :not(.walletHero) b { color: var(--page-fg); }
+
+/* یادداشتِ کهربایی «برای برداشت باید کارت ثبت کنید»: #ffd9a0 روی سفید
+   ۱.۳۴:۱ بود — عملاً یک نوارِ خالی. */
+:root[data-theme='light'] .walletNote {
+  background: #a9650014;
+  border-color: #a9650047;
+  color: #8a5200;
+}
+
+/* ── ۳. دکمه‌های ثانویه: #dbeeff روی سفید ۱.۱۹:۱ ──
+   «ثبت کارت» در کیف پول و «افزودن عکس» در پشتیبانی. هر دو دکمه‌اند،
+   یعنی کاربر باید ببیندشان تا بداند کاری هست که می‌تواند بکند. */
+:root[data-theme='light'] .walletActions button:not(.main),
+:root[data-theme='light'] .shotBtn {
+  background: var(--veil-3);
+  border-color: var(--veil-6);
+  color: var(--page-fg);
+}
+
+/* ── ۴. صفحهٔ دعوت دوستان ──
+   کدِ معرف با ۳۰ پیکسل و ۱.۵۱:۱ بزرگ‌ترین متنِ ناخوانای کلِ اپ بود؛
+   دقیقاً همان چیزی که کاربر باید بخواند و برای دوستش بفرستد. */
+:root[data-theme='light'] .refCode,
+:root[data-theme='light'] .refStats b,
+:root[data-theme='light'] .refRules li b,
+:root[data-theme='light'] .refList li b,
+:root[data-theme='light'] .refCapped { color: #4f7a0d !important; }
+:root[data-theme='light'] .refCodeBox {
+  background: linear-gradient(135deg, #4f7a0d14, #0e749012);
+  border-color: #4f7a0d5c;
+}
+:root[data-theme='light'] .refRules li,
+:root[data-theme='light'] .refProgress small,
+:root[data-theme='light'] .refStats span,
+:root[data-theme='light'] .refList li,
+:root[data-theme='light'] .refEmpty { color: var(--text-muted); }
+
+/* `opacity` جداگانه لازم است: چند قانون در style.css به‌جای رنگ از
+   `opacity:.55/.7` استفاده کرده‌اند. روی تیره محوکنندهٔ ملایمی است،
+   روی سفید متن را به خاکستریِ ۱.۲:۱ می‌برد. */
+:root[data-theme='light'] .refStats span,
+:root[data-theme='light'] .wheelHistory small { opacity: 1; }
+
+/* ── ۵. راهنمای زیرِ فیلدها در تم **تیره** ──
+   تنها موردِ تم تیره: #c9ddf280 یعنی آلفای ۵۰٪ که روی #06101d
+   کنتراست را به ۴.۱۴:۱ می‌رساند — درست زیرِ آستانهٔ ۴.۵. متن ۱۱
+   پیکسلی است، پس «متنِ بزرگ» حساب نمی‌شود و تخفیفِ ۳:۱ نمی‌گیرد. */
+.fieldHint { color: #c9ddf2a8; }
