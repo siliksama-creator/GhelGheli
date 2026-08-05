@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """گاردِ عکسِ در انتظار زیرِ فشارِ هم‌زمانی: آیا با دو کدِ متفاوت دور می‌خورد؟"""
-import io,json,sys,threading,urllib.request,urllib.error,colorsys
+import io,json,sys,time,threading,urllib.request,urllib.error,colorsys
+import os as _os, sys as _sys
+_sys.path.insert(0,_os.path.dirname(_os.path.abspath(__file__)))
+from _authcache import admin_token
 from PIL import Image,ImageDraw,ImageFilter,ImageEnhance
 API='https://api.ghelghelishop.ir'; B='--r2'
 def req(m,p,tok=None,body=None,files=None):
@@ -23,8 +26,29 @@ def req(m,p,tok=None,body=None,files=None):
         try: return e.code,json.loads(e.read() or b'{}')
         except: return e.code,{}
 apw=sys.argv[1]
-_,a=req('POST','/api/admin/auth/login',body={'username':'Admin','password':apw}); at=a['token']
-_,u=req('POST','/api/auth/login',body={'mobile':'09001112233','password':'Qa!12345'}); ut=u['token']
+# توکن از کش می‌آید تا سقفِ ۱۰ ورود در ۱۵ دقیقه نسوزد — توضیح در _authcache.py
+at=admin_token(apw)
+
+# ── جداسازیِ اجرا ──
+# کاربرِ تازه: سهمیهٔ محدودکنندهٔ نرخ و شمارندهٔ قفلِ ۳ ساعته هر دو
+# per-user هستند، پس استفادهٔ دوباره از یک کاربر باعث می‌شد اجرای دوم
+# فقط ۴۲۹ ببیند و اصلاً به منطقِ مسابقهٔ زمانی نرسد — یعنی تست بی‌صدا
+# هیچ چیزی را نمی‌سنجید.
+# پیشوندِ یکتا: طرح و کدِ اجرای قبلی هنوز در دیتابیس‌اند.
+PFX=f'R2{int(time.time())%100000:05d}'
+UMOB=f'0900{int(time.time())%1000000:06d}'
+st,ru=req('POST','/api/auth/register-password',body={
+    'mobile':UMOB,'password':'Qa!12345','firstName':'تست','lastName':'همزمانی',
+    'nickname':f'همزمان{PFX}'})
+if st==200 and ru.get('token'):
+    ut=ru['token']
+else:
+    print(f'  ⚠ ساخت کاربر تازه نشد ({st}) — کاربرِ ثابت؛ ممکن است به سقفِ نرخ بخورد')
+    _,u=req('POST','/api/auth/login',body={'mobile':'09001112233','password':'Qa!12345'}); ut=u['token']
+_,_o=req('GET','/api/admin/photo-cards/designs',at)
+for d in _o.get('designs',[]):
+    if str(d.get('card_type_name','')).startswith(('R2','EG','SP','DBG')) and d.get('is_active'):
+        req('PATCH',f"/api/admin/photo-cards/designs/{d['id']}",at,{'isActive':False})
 def card(hue):
     im=Image.new('RGB',(420,640)); d=ImageDraw.Draw(im)
     for y in range(640):
@@ -40,13 +64,13 @@ def blurry(im):
     o=ImageEnhance.Brightness(o).enhance(1.5)
     b=io.BytesIO(); o.save(b,'JPEG',quality=30); return b.getvalue()
 pA,imA=card(200)
-req('POST','/api/admin/photo-cards/designs',at,{'name':'R2-1','pointValue':'44'},{'image':('a.png',pA,'image/png')})
-req('POST','/api/admin/photo-cards/codes',at,{'rawCodes':'R2-0001\nR2-0002\nR2-0003\nR2-0004'})
+req('POST','/api/admin/photo-cards/designs',at,{'name':f'{PFX}-1','pointValue':'44'},{'image':('a.png',pA,'image/png')})
+req('POST','/api/admin/photo-cards/codes',at,{'rawCodes':'\n'.join(f'{PFX}-{i:04d}' for i in range(1,5))})
 img=blurry(imA)
 res=[]
 def fire(code):
     res.append((code,)+req('POST','/api/photo-cards/submit',ut,{'code':code},{'image':('b.jpg',img,'image/jpeg')}))
-ts=[threading.Thread(target=fire,args=(f'R2-{i:04d}',)) for i in range(1,5)]
+ts=[threading.Thread(target=fire,args=(f'{PFX}-{i:04d}',)) for i in range(1,5)]
 [t.start() for t in ts]; [t.join() for t in ts]
 print('۴ درخواستِ هم‌زمان با **همان عکس** ولی ۴ کدِ متفاوت:')
 pend=dup=0
@@ -55,9 +79,11 @@ for code,st,r in sorted(res):
     if r.get('status')=='pending': pend+=1
     if r.get('status')=='duplicate_pending': dup+=1
 st,r=req('GET','/api/admin/photo-cards/codes?status=reserved',at)
-resv=[c for c in r.get('codes',[]) if str(c['code']).startswith('R2-')]
+resv=[c for c in r.get('codes',[]) if str(c['code']).startswith(PFX)]
 print(f'\nپرونده‌های در انتظار: {pend} (ایده‌آل ۱)')
 print(f'ردشده به‌عنوان تکراری: {dup}')
 print(f'کدهای رزروشده: {len(resv)} → {[c["code"] for c in resv]}')
 if pend==1: print('✓ گارد حتی زیر فشار هم‌زمانی هم گرفت')
-else: print(f'⚠ {pend} پرونده ساخته شد — یعنی {pend} کد رزرو شد به‌جای ۱')
+else:
+    print(f'⚠ {pend} پرونده ساخته شد — یعنی {pend} کد رزرو شد به‌جای ۱')
+    sys.exit(1)

@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """شکار باگ در حالت‌های مرزیِ سیستم «کارت با عکس»."""
-import io,json,sys,urllib.request,urllib.error,colorsys
+import io,json,sys,time,urllib.request,urllib.error,colorsys
+import os as _os, sys as _sys
+_sys.path.insert(0,_os.path.dirname(_os.path.abspath(__file__)))
+from _authcache import admin_token
 from PIL import Image,ImageDraw,ImageFilter
 API='https://api.ghelghelishop.ir'; B='--eg'
 def req(m,p,tok=None,body=None,files=None,raw=None):
@@ -32,8 +35,47 @@ def ck(n,c,d=''):
     else: bad+=1; print('  ✗',n,'→',str(d)[:170]); notes.append(n)
 
 apw=sys.argv[1]
-_,a=req('POST','/api/admin/auth/login',body={'username':'Admin','password':apw}); at=a['token']
-_,u=req('POST','/api/auth/login',body={'mobile':'09001112233','password':'Qa!12345'}); ut=u['token']
+# توکن از کش می‌آید تا سقفِ ۱۰ ورود در ۱۵ دقیقه نسوزد — توضیح در _authcache.py
+at=admin_token(apw)
+
+# ═══════════════════════════════════════════════════════════════════════════
+# جداسازیِ اجرا — کاربرِ تازه و پیشوندِ یکتا
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# دو منبعِ آلودگی بین اجراها وجود داشت و هر دو باعث می‌شدند تست دروغ
+# بگوید (هم دروغِ قرمز و هم دروغِ سبز):
+#
+#  ۱. سهمیهٔ نرخ. حالا که محدودکننده روی **کاربر** کلید می‌خورد (قبلاً
+#     روی IP بود که خودش باگ بود)، اجرای دوم با همان کاربر به سقفِ
+#     ۲۰ در ساعت می‌خورد و همه‌چیز ۴۲۹ می‌گیرد. کاربرِ تازه یعنی
+#     سهمیهٔ تازه — دقیقاً مثل کاربرِ واقعی.
+#
+#  ۲. طرح‌ها و کدهای باقی‌مانده. محافظِ «طرح تکراری» درست کار می‌کند و
+#     آپلودِ دوباره را ۴۰۹ می‌کند؛ کدهای `used` هم دیگر قابل استفاده
+#     نیستند. پس هر اجرا باید فضای نامِ خودش را داشته باشد.
+#
+# وسوسه‌کننده بود که به‌جای این کار سقفِ نرخ را بالا ببریم تا تست سبز
+# شود — یعنی خراب کردنِ محصول برای راحتیِ تست. این راهِ درست است.
+PFX=f'EG{int(time.time())%100000:05d}'
+UMOB=f'0900{int(time.time())%1000000:06d}'
+st,ru=req('POST','/api/auth/register-password',body={
+    'mobile':UMOB,'password':'Qa!12345','firstName':'تست','lastName':'مرزی',
+    'nickname':f'مرزی{PFX}'})
+if st==200 and ru.get('token'):
+    ut=ru['token']
+else:
+    print(f'  ⚠ ساخت کاربر تازه نشد ({st}) — کاربرِ ثابت؛ ممکن است به سقفِ نرخ بخورد')
+    _,u=req('POST','/api/auth/login',body={'mobile':'09001112233','password':'Qa!12345'}); ut=u['token']
+
+# طرح‌های باقی‌مانده از اجراهای قبلی غیرفعال می‌شوند (نه حذف — ممکن است
+# اینونتوریِ کاربر به آن‌ها ارجاع بدهد). محافظِ تکراری فقط طرح‌های فعال
+# را می‌سنجد، پس همین کافی است.
+_,_o=req('GET','/api/admin/photo-cards/designs',at)
+_stale=[d for d in _o.get('designs',[])
+        if str(d.get('card_type_name','')).startswith(('EG','SP','R2','DBG')) and d.get('is_active')]
+for d in _stale:
+    req('PATCH',f"/api/admin/photo-cards/designs/{d['id']}",at,{'isActive':False})
+if _stale: print(f'  ⓘ {len(_stale)} طرحِ باقی‌مانده غیرفعال شد')
 
 def card(hue,seed=1):
     im=Image.new('RGB',(420,640)); d=ImageDraw.Draw(im)
@@ -51,21 +93,21 @@ def good(im,q=70):
     b=io.BytesIO(); o.save(b,'JPEG',quality=q); return b.getvalue()
 
 pA,imA=card(200,1)
-st,rA=req('POST','/api/admin/photo-cards/designs',at,{'name':'EG-آبی','pointValue':'70'},{'image':('a.png',pA,'image/png')})
+st,rA=req('POST','/api/admin/photo-cards/designs',at,{'name':f'{PFX}-آبی','pointValue':'70'},{'image':('a.png',pA,'image/png')})
 did=rA.get('design',{}).get('id')
-req('POST','/api/admin/photo-cards/codes',at,{'rawCodes':'\n'.join(f'EG-{i:04d}' for i in range(1,15))})
+req('POST','/api/admin/photo-cards/codes',at,{'rawCodes':'\n'.join(f'{PFX}-{i:04d}' for i in range(1,15))})
 
 print('\n══ ورودی‌های خرابکارانه ══')
-st,r=req('POST','/api/photo-cards/submit',ut,{'code':'EG-0001'},{'image':('x.txt',b'not an image at all',
+st,r=req('POST','/api/photo-cards/submit',ut,{'code':f'{PFX}-0001'},{'image':('x.txt',b'not an image at all',
     'image/jpeg')})
 ck('فایلِ غیرتصویر کرش نمی‌دهد',st in (400,422,500) and st!=0,f'{st} {r.get("message","")[:60]}')
-st,r=req('POST','/api/photo-cards/submit',ut,{'code':'EG-0002'},{'image':('e.jpg',b'','image/jpeg')})
+st,r=req('POST','/api/photo-cards/submit',ut,{'code':f'{PFX}-0002'},{'image':('e.jpg',b'','image/jpeg')})
 ck('فایلِ خالی کرش نمی‌دهد',st in (400,422,500),f'{st}')
 st,r=req('POST','/api/photo-cards/submit',ut,{'code':'<script>alert(1)</script>'},{'image':('g.jpg',good(imA),'image/jpeg')})
 ck('کدِ حاوی HTML رد می‌شود',st in (400,404,429),f'{st} {r.get("status")}')
 st,r=req('POST','/api/photo-cards/submit',ut,{'code':"' OR 1=1 --"},{'image':('g.jpg',good(imA),'image/jpeg')})
 ck('تلاش SQL injection رد می‌شود',st in (400,404,429),f'{st}')
-st,r=req('POST','/api/photo-cards/submit',ut,{'code':'EG-0003'},{})
+st,r=req('POST','/api/photo-cards/submit',ut,{'code':f'{PFX}-0003'},{})
 ck('بدون فایل رد می‌شود',st==400,f'{st}')
 
 print('\n══ کنترل دسترسی ══')
@@ -93,7 +135,7 @@ st,r=req('POST','/api/admin/photo-cards/codes/bulk-delete',at,{'batchLabel':'و�
 ck('برچسبِ ناموجود صفر حذف می‌کند',st==200 and r.get('deletedCount')==0,f'{st} {r.get("deletedCount")}')
 
 print('\n══ یکتایی و برخورد ══')
-st,r=req('POST','/api/admin/photo-cards/codes',at,{'rawCodes':'EG-0001'})
+st,r=req('POST','/api/admin/photo-cards/codes',at,{'rawCodes':f'{PFX}-0001'})
 ck('کدِ تکراری دوباره درج نمی‌شود',r.get('insertedCount')==0 and r.get('duplicateInDbCount')==1,
    f"ins={r.get('insertedCount')} dup={r.get('duplicateInDbCount')}")
 st,r=req('POST','/api/admin/photo-cards/codes',at,{'rawCodes':'EG-000I'})  # I ↔ 1
@@ -111,10 +153,10 @@ else:
 
 print('\n══ طرح غیرفعال ══')
 req('PATCH',f'/api/admin/photo-cards/designs/{did}',at,{'isActive':False})
-st,r=req('POST','/api/photo-cards/submit',ut,{'code':'EG-0004'},{'image':('g.jpg',good(imA),'image/jpeg')})
+st,r=req('POST','/api/photo-cards/submit',ut,{'code':f'{PFX}-0004'},{'image':('g.jpg',good(imA),'image/jpeg')})
 ck('عکسِ طرحِ غیرفعال خودکار تأیید نمی‌شود',r.get('status')!='approved',f'{st} {r.get("status")}')
-st2,r2=req('GET','/api/admin/photo-cards/codes?q=EG-0004',at)
-row=[c for c in r2.get('codes',[]) if str(c['code'])=='EG-0004']
+st2,r2=req('GET',f'/api/admin/photo-cards/codes?q={PFX}-0004',at)
+row=[c for c in r2.get('codes',[]) if str(c['code'])==f'{PFX}-0004']
 ck('کد در حالت طرحِ غیرفعال مصرف نشد',row and row[0]['status']!='used',str(row[0]['status'] if row else '-'))
 req('PATCH',f'/api/admin/photo-cards/designs/{did}',at,{'isActive':True})
 
