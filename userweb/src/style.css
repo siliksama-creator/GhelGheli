@@ -769,7 +769,25 @@
   background:#00000038;display:flex;align-items:center;justify-content:center;
 }
 .invCard .invArt img{width:100%;height:100%;object-fit:cover}
-.invCard b{font-size:14px;font-weight:800;text-shadow:0 1px 3px #0009;line-height:1.3}
+/* ── چرا نامِ کارت لایهٔ تیرهٔ خودش را دارد ──
+   کارت روی گرادیانِ سه‌رنگ می‌نشیند: طلایی #FFD36B → سرمه‌ای #0B2B4F
+   → زمردی #00D49A. متنِ سفید روی سرمه‌ای عالی است (۱۴.۳) ولی روی
+   طلایی ۱.۴۲ و روی زمردی ۱.۹۳ — یعنی عملاً نامرئی.
+
+   نامِ کارت دقیقاً وسطِ گرادیان می‌افتد و با تعدادِ کارت‌ها و اندازهٔ
+   صفحه جابه‌جا می‌شود، پس نمی‌شود به «همیشه روی قسمتِ تیره است»
+   تکیه کرد — روی یک گوشی همان‌جاست و روی گوشیِ دیگر نه.
+
+   `text-shadow` که قبلاً بود فقط لبه‌ها را نرم می‌کند و کنتراست را
+   بالا نمی‌برد؛ WCAG آن را به حساب نمی‌آورد.
+
+   لایهٔ مشکیِ ۵۵٪ بدترین حالت را هم تضمین می‌کند:
+   طلایی ۶.۲۵ · زمردی ۷.۷۱ · سرمه‌ای ۱۸.۷ — همه بالای ۴.۵. */
+.invCard b{
+  font-size:14px;font-weight:800;line-height:1.3;
+  background:#0000008c;border-radius:10px;padding:3px 8px;
+  align-self:center;max-width:100%;
+}
 .invCard small{
   font-size:11.5px;font-weight:700;color:#06210f;
   background:#ffffffd6;border-radius:999px;padding:3px 9px;align-self:center;
@@ -784,7 +802,13 @@
   position:absolute;top:-3px;inset-inline-end:-3px;
   min-width:17px;height:17px;padding:0 4px;
   display:flex;align-items:center;justify-content:center;
-  background:#ff5d6c;color:#fff;border-radius:999px;
+  /* ── چرا #d81e33 و نه #ff5d6c ──
+     رنگِ قبلی روی متنِ سفید نسبتِ کنتراست ۲.۹۹ می‌داد. این نشان
+     شمارهٔ نوتیفیکیشن‌های خوانده‌نشده را نگه می‌دارد و در ۱۰.۵px
+     نمایش داده می‌شود — یعنی هم ریز است و هم عددِ مهمی دارد.
+     WCAG برای متنِ کوچک ۴.۵ می‌خواهد و ما تقریباً نصفش را داشتیم.
+     #d81e33 نسبت را به ۵.۰۶ می‌رساند و همان قرمزِ هشدار می‌ماند. */
+  background:#d81e33;color:#fff;border-radius:999px;
   font-size:10.5px;font-weight:800;font-style:normal;line-height:1;
 }
 .notifShade{position:fixed;inset:0;background:#000000a8;z-index:60;display:flex;align-items:flex-start;justify-content:center;padding:64px 12px 12px}

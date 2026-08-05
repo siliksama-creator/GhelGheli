@@ -91,25 +91,44 @@ CONTRAST_JS = r"""
   // حالت به والد می‌رفت و مثلاً دکمهٔ `.main` (گرادیانِ سبزِ روشن با
   // متنِ تیره) را «متنِ تیره روی پس‌زمینهٔ تیره ۱:۱» گزارش می‌کرد —
   // مثبتِ کاذبِ محض. حالا اولین رنگِ گرادیان را برمی‌داریم.
-  const gradColor = el => {
+  // ⚠️ نسخهٔ دوم: **همهٔ** رنگ‌های گرادیان بررسی می‌شوند، نه فقط اولی.
+  //
+  // نسخهٔ قبلی اولین توقفِ مات را برمی‌داشت و تمام. برای گرادیانِ
+  // `.invCard` (طلایی → سرمهٔ تیره → زمردی) یعنی همیشه «طلاییِ روشن»
+  // را پس‌زمینه فرض می‌کرد، در حالی که متنِ کارت پایینِ کارت و روی
+  // بخشِ **سرمه‌ای** می‌نشیند.
+  //
+  // نتیجه هر دو نوع خطا بود:
+  //   • مثبتِ کاذب — «سفید روی طلایی ۱.۴۲» گزارش می‌شد در حالی که
+  //     نمونه‌برداریِ واقعی از پیکسل نشان داد پشتِ متن سرمه‌ای است.
+  //   • منفیِ کاذب — اگر ترتیبِ توقف‌ها برعکس بود، یک متنِ واقعاً
+  //     ناخوانا اصلاً گزارش نمی‌شد.
+  //
+  // چون نمی‌دانیم متن دقیقاً روی کدام نقطهٔ گرادیان می‌افتد، بدترین
+  // حالت را برمی‌گردانیم: رنگی که کمترین کنتراست را با متن می‌دهد.
+  // این محافظه‌کارانه است — ممکن است گاهی سخت‌گیر باشد، ولی هرگز یک
+  // متنِ ناخوانا را از قلم نمی‌اندازد. برای ابزارِ ممیزی این جهتِ
+  // درستِ خطاست.
+  const gradColors = el => {
     const bi = getComputedStyle(el).backgroundImage || '';
     if (!bi.includes('gradient')) return null;
     const m = bi.match(/rgba?\([^)]+\)/g);
     if (!m) return null;
-    for (const s of m) { const c = parse(s); if (c && c.a > 0.5) return c; }
-    return null;
+    const cs = m.map(parse).filter(c => c && c.a > 0.5);
+    return cs.length ? cs : null;
   };
-  const bgOf = el => {
+  // همهٔ پس‌زمینه‌های ممکن پشتِ این عنصر (برای گرادیان چند رنگ).
+  const bgCandidates = el => {
     let n = el;
     while (n && n !== document.documentElement) {
-      const g = gradColor(n);
+      const g = gradColors(n);
       if (g) return g;
       const c = parse(getComputedStyle(n).backgroundColor);
-      if (c && c.a > 0.15) return c;
+      if (c && c.a > 0.15) return [c];
       n = n.parentElement;
     }
     const c = parse(getComputedStyle(document.body).backgroundColor);
-    return c && c.a > 0.15 ? c : { r: 255, g: 255, b: 255, a: 1 };
+    return [c && c.a > 0.15 ? c : { r: 255, g: 255, b: 255, a: 1 }];
   };
   const out = [];
   for (const el of document.querySelectorAll('body *')) {
@@ -126,12 +145,16 @@ CONTRAST_JS = r"""
     if (parseFloat(cs.opacity) < 0.25) continue;
     const fg = parse(cs.color);
     if (!fg || fg.a < 0.25) continue;
-    const bg = bgOf(el);
-    // ترکیبِ آلفای متن روی پس‌زمینه.
-    const mix = k => fg[k] * fg.a + bg[k] * (1 - fg.a);
-    const L1 = lum(mix('r'), mix('g'), mix('b'));
-    const L2 = lum(bg.r, bg.g, bg.b);
-    const ratio = (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05);
+    // بدترین (کم‌کنتراست‌ترین) رنگِ پس‌زمینهٔ ممکن را می‌گیریم.
+    const cands = bgCandidates(el);
+    let bg = cands[0], ratio = Infinity;
+    for (const cand of cands) {
+      const mixC = k => fg[k] * fg.a + cand[k] * (1 - fg.a);
+      const l1 = lum(mixC('r'), mixC('g'), mixC('b'));
+      const l2 = lum(cand.r, cand.g, cand.b);
+      const rr = (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+      if (rr < ratio) { ratio = rr; bg = cand; }
+    }
     const px = parseFloat(cs.fontSize);
     const bold = parseInt(cs.fontWeight, 10) >= 700;
     // آستانهٔ WCAG AA: متنِ بزرگ ۳:۱، بقیه ۴.۵:۱.
