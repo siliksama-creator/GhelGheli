@@ -8,6 +8,7 @@ import '../../widgets/section_header.dart';
 import '../../widgets/state_views.dart';
 import '../shared/football_card.dart';
 import '../shared/hero_header.dart';
+import '../../widgets/photo_card_box.dart';
 
 /// Home / dashboard tab: points header, card-code redemption and card
 /// inventory carousel. Same three API calls as the legacy `DashboardPage`.
@@ -285,6 +286,22 @@ class _DashboardPageState extends State<DashboardPage> {
                   label:
                       Text(_sending ? 'در حال ثبت...' : 'ثبت و دریافت امتیاز'),
                   onPressed: _sending ? null : _redeem,
+                ),
+
+                // ── قابلیت جدید، کنارِ روشِ قدیمی نه به‌جای آن ──
+                // کاربری که کارت قدیمی دارد باید بتواند مثل همیشه فقط
+                // کد را وارد کند. این بخش وقتی مدیر هنوز طرحی آپلود
+                // نکرده خودش را پنهان می‌کند.
+                PhotoCardBox(
+                  api: widget.api,
+                  // همان دو کاری که مسیر «ثبت کد» بعد از موفقیت می‌کند:
+                  // اینونتوریِ این صفحه و امتیازِ نوارِ بالا. اگر فقط
+                  // یکی صدا زده شود، کارت اضافه می‌شود ولی امتیاز قدیمی
+                  // می‌ماند و کاربر فکر می‌کند چیزی نگرفته.
+                  onRegistered: () {
+                    _load();
+                    widget.reloadProfile();
+                  },
                 ),
                 if (_message != null) ...[
                   Gaps.vSm,

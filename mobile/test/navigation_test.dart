@@ -62,6 +62,15 @@ Future<void> _pumpShell(WidgetTester tester) async {
   ));
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 600));
+  // ── چرا یک pump اضافه ──
+  //
+  // داشبورد حالا بخشِ «ثبت کارت با عکس» را دارد که بعد از اولین فریم یک
+  // درخواستِ فرعی می‌فرستد. اگر تست وسطِ آن تمام شود، فریم‌ورک
+  // «A Timer is still pending» می‌دهد — ایرادِ زمان‌بندیِ تست است نه اپ.
+  //
+  // چون همهٔ تست‌های این فایل از همین کمکی استفاده می‌کنند، یک اصلاح
+  // اینجا همه را پوشش می‌دهد.
+  await tester.pump(const Duration(milliseconds: 600));
 }
 
 void main() {

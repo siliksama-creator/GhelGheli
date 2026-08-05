@@ -19,8 +19,16 @@
 ///   • فقط کد  → هر کس کد را بداند امتیاز می‌گیرد بدون داشتن کارت
 ///   • فقط عکس → یک کارت بی‌نهایت بار ثبت می‌شود
 ///
-/// OCR عمداً اجباری نیست: روی عکس واقعی گوشی اندازه‌گیری شد و قابل اتکا
-/// نبود. تحمیلش یعنی رد کردن کاربران درستکار.
+/// تشخیصِ خودکارِ کد از روی عکس عمداً وجود ندارد: روی عکس واقعیِ گوشی
+/// اندازه‌گیری شد و حتی در کیفیت عالی هم درست نخواند، پس فقط نرخِ خطا را
+/// بالا می‌برد. کاربر کد را تایپ می‌کند و بارِ ضدتقلب را عکس به دوش
+/// می‌کشد.
+///
+/// چهار نتیجهٔ ممکن:
+///   approved   کد معتبر + عکس شناخته شد → کارت در اینونتوری
+///   pending    کد معتبر ولی عکس شناخته نشد → بررسی دستی مدیر
+///   bad_code   کد غلط → راهنمای حروفِ مبهم + شمارشِ تلاش
+///   locked     ۵ کدِ غلطِ پشت‌سرهم → ۳ ساعت قفل
 ///
 /// **همان دیتابیس و همان بانک کدِ وب‌اپ و پنل.** هیچ داده یا مسیرِ
 /// جداگانه‌ای وجود ندارد.
@@ -62,10 +70,29 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
   Map? _result;
   String? _error;
 
+  /// وقتی سرور قفل اعلام کند، ورودی و دکمه غیرفعال می‌شوند تا کاربر
+  /// بی‌جهت تلاش نکند و پیام را بخواند.
+  bool _locked = false;
+
   @override
   void initState() {
     super.initState();
-    _checkAvailability();
+    // ── چرا بعد از اولین فریم و نه داخل initState ──
+    //
+    // این ویجت در انتهای داشبورد است و داشبورد هنگام باز شدن حدود ده
+    // درخواستِ مهم‌تر می‌فرستد (پروفایل، اینونتوری، جوایز…). شروع کردنِ
+    // یک درخواستِ **فرعی** در همان لحظه، پهنای باندِ محدودِ موبایل را
+    // با چیزی می‌گیرد که فقط تصمیم می‌گیرد یک بخش دیده شود یا نه.
+    //
+    // `addPostFrameCallback` آن را به بعد از رندرِ اولین فریم می‌اندازد:
+    // کاربر صفحه را زودتر می‌بیند و این درخواست وقتی می‌رود که صف
+    // خلوت‌تر است.
+    //
+    // مزیت جانبی در تست‌ها: ویجتی که بلافاصله dispose می‌شود اصلاً
+    // درخواستی نمی‌فرستد، پس چیزی معلق نمی‌ماند.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _checkAvailability();
+    });
   }
 
   @override
@@ -131,18 +158,42 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
       _error = null;
     });
     try {
-      final r = await widget.api.postMultipart(
+      final res = await widget.api.postMultipart(
         '/api/photo-cards/submit',
         filePath: _imagePath,
         fields: {'code': _code.text.trim()},
       );
       if (!mounted) return;
+      final d = (res.data is Map) ? res.data as Map : const {};
+      final status = d['status'];
+
+      if (status == 'locked') {
+        setState(() {
+          _result = d;
+          _locked = true;
+        });
+        return;
+      }
+
+      // ── کدِ غلط: عکس عمداً نگه داشته می‌شود ──
+      // کاربر فقط باید کد را اصلاح کند؛ مجبور کردنش به عکس‌گرفتنِ
+      // دوباره بی‌دلیل آزاردهنده است.
+      if (status == 'bad_code') {
+        setState(() => _result = d);
+        return;
+      }
+
+      if (res.statusCode != null && res.statusCode! >= 400) {
+        setState(() => _error = '${d['message'] ?? 'ثبت نشد'}');
+        return;
+      }
+
       setState(() {
-        _result = r as Map;
+        _result = d;
         _imagePath = null;
         _code.clear();
       });
-      if (r['status'] == 'approved') widget.onRegistered?.call();
+      if (status == 'approved') widget.onRegistered?.call();
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = apiError(e));
@@ -256,6 +307,7 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
         Gaps.vSm,
         TextField(
           controller: _code,
+          enabled: !_locked,
           textCapitalization: TextCapitalization.characters,
           // کد لاتین است و در فیلدِ راست‌به‌چپ کاراکترهایش جابه‌جا دیده
           // می‌شود.
@@ -271,9 +323,12 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
           ),
           onChanged: (_) => setState(() {}),
         ),
+        Gaps.vXs,
+        _codeHint(context),
         Gaps.vSm,
         FilledButton.icon(
-          onPressed: (_busy || _imagePath == null || _code.text.trim().isEmpty)
+          onPressed: (_busy || _locked || _imagePath == null
+                  || _code.text.trim().isEmpty)
               ? null
               : _submit,
           icon: _busy
@@ -328,11 +383,112 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
     );
   }
 
+  /// راهنمای حروفِ مبهم — **همیشه** دیده می‌شود، نه فقط بعد از خطا.
+  ///
+  /// کاربر باید قبل از تایپ بداند به چه چیزی دقت کند. نشان دادنِ این
+  /// راهنما بعد از شکست یعنی یکی از پنج تلاشش را بی‌دلیل سوزانده.
+  Widget _codeHint(BuildContext context) {
+    final theme = Theme.of(context);
+    Widget chip(String t) => Container(
+          margin: const EdgeInsets.symmetric(horizontal: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+          decoration: BoxDecoration(
+            borderRadius: Corners.rSm,
+            color: theme.colorScheme.surfaceContainerHighest
+                .withValues(alpha: 0.7),
+          ),
+          child: Text(t,
+              style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.w900,
+                  fontSize: 12.5)),
+        );
+
+    return Container(
+      padding: const EdgeInsets.all(Gaps.xs),
+      decoration: BoxDecoration(
+        borderRadius: Corners.rMd,
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        border: Border.all(
+            color: theme.colorScheme.outline.withValues(alpha: 0.25)),
+      ),
+      child: DefaultTextStyle.merge(
+        style: theme.textTheme.bodySmall ?? const TextStyle(),
+        child: Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text('دقت کنید: ',
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(fontWeight: FontWeight.w800)),
+            const Text('صفر '),
+            chip('0'),
+            const Text(' و حرف '),
+            chip('O'),
+            const Text(' شبیه‌اند، و عدد یک '),
+            chip('1'),
+            const Text(' با حروف '),
+            chip('I'),
+            const Text(' و '),
+            chip('L'),
+            const Text('. بزرگ یا کوچک بودنِ حروف مهم نیست.'),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _resultView(BuildContext context, Map r) {
     final theme = Theme.of(context);
-    final pending = r['status'] == 'pending';
-    final color =
-        pending ? BrandColors.warningOnLight : BrandColors.successOnLight;
+    final status = r['status'];
+    final pending = status == 'pending';
+    final badCode = status == 'bad_code';
+    final locked = status == 'locked';
+
+    // ── سه خانوادهٔ رنگ برای سه پیامِ متفاوت ──
+    // «اشتباه کردی» (قرمز)، «فعلاً نمی‌توانی» (بنفش) و «منتظر بمان»
+    // (کهربایی) واکنش‌های متفاوتی می‌خواهند؛ یک رنگ برای همه یعنی
+    // کاربر نمی‌فهمد باید چه کند.
+    final color = locked
+        ? const Color(0xFF7C4DFF)
+        : badCode
+            ? BrandColors.dangerOnLight
+            : pending
+                ? BrandColors.warningOnLight
+                : BrandColors.successOnLight;
+
+    if (badCode || locked) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: Gaps.sm),
+        padding: const EdgeInsets.all(Gaps.sm),
+        decoration: BoxDecoration(
+          borderRadius: Corners.rMd,
+          color: color.withValues(alpha: 0.13),
+          border: Border.all(color: color.withValues(alpha: 0.45)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(locked ? Icons.lock_clock_rounded : Icons.error_outline_rounded,
+                color: color, size: 20),
+            const SizedBox(width: Gaps.xs),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    locked ? 'ثبت کارت موقتاً بسته است' : 'کد نادرست است',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                        color: color, fontWeight: FontWeight.w900),
+                  ),
+                  Text('${r['message'] ?? ''}',
+                      style: theme.textTheme.bodySmall),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: Gaps.sm),

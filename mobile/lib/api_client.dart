@@ -406,6 +406,41 @@ class ApiClient {
     final res = await dio.post('/api/admin/uploads/image', data: form);
     return res.data['url'].toString();
   }
+
+  /// ارسال فایل **به‌همراه فیلدهای متنی** به یک مسیر دلخواه.
+  ///
+  /// دو متد بالا فقط `url` برمی‌گردانند و فیلد متنی نمی‌فرستند. «ثبت
+  /// کارت با عکس» به عکس + کد در یک درخواست نیاز دارد و پاسخِ کامل
+  /// می‌خواهد (وضعیت تطبیق، امتیاز، پیام). آن دو عمداً دست‌نخورده
+  /// ماندند چون چند صفحه از آن‌ها استفاده می‌کنند.
+  ///
+  /// تایم‌اوت بالاتر از پیش‌فرض: سرور باید تصویر را رمزگشایی کند و سه
+  /// اثر انگشت بسازد. تایم‌اوتِ کوتاه یعنی کاربر خطا می‌بیند در حالی
+  /// که کارت درست ثبت شده — بدترین حالت.
+  ///
+  /// `validateStatus` عمداً همه را می‌پذیرد: این مسیر برای ۴۰۴ (کدِ
+  /// غلط) و ۴۲۹ (قفل) بدنهٔ معناداری برمی‌گرداند که باید خوانده شود،
+  /// نه اینکه به استثنا تبدیل شود و پیامش گم شود.
+  Future<Response<dynamic>> postMultipart(
+    String path, {
+    String? filePath,
+    String fileField = 'image',
+    Map<String, dynamic> fields = const {},
+  }) async {
+    final map = <String, dynamic>{...fields};
+    if (filePath != null) {
+      map[fileField] = await MultipartFile.fromFile(filePath);
+    }
+    return dio.post(
+      path,
+      data: FormData.fromMap(map),
+      options: Options(
+        receiveTimeout: const Duration(seconds: 60),
+        sendTimeout: const Duration(seconds: 60),
+        validateStatus: (_) => true,
+      ),
+    );
+  }
 }
 
 /// Persian digits, with thousands separators for plain integers.

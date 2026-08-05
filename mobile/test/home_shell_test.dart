@@ -86,6 +86,8 @@ class _FakeAdapter implements HttpClientAdapter {
     '/api/wallet': '{"balance":0,"transactions":[]}',
     '/api/support/tickets': '[]',
     '/api/chat/messages': '[]',
+    '/api/photo-cards/status':
+        '{"available":false,"designCount":0,"pendingCount":0}',
   };
 
   @override
@@ -243,6 +245,16 @@ void main() {
       await tester.pump(const Duration(seconds: 2));
       expect(find.byType(NavigationBar), findsOneWidget);
       expect(tester.takeException(), isNull);
+      // ── چرا این خط ──
+      // داشبورد حالا بخشِ «ثبت کارت با عکس» را هم دارد که بعد از اولین
+      // فریم یک درخواستِ فرعی می‌فرستد. تستی که دقیقاً وسطِ آن تمام
+      // شود، درخواست را معلق رها می‌کند و فریم‌ورک «A Timer is still
+      // pending» می‌دهد — ایرادِ زمان‌بندیِ تست است، نه اپ.
+      // `pump` با تأخیر، تایمرِ صفرِ Dio را اجرا می‌کند و درخواست را
+      // به پایان می‌رساند. `runAsync` اینجا کار نمی‌کند چون تایمرهای
+      // FakeAsync را جلو نمی‌برد.
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 600));
     });
 
     testWidgets('یک درخواست کند بقیه را بلاک نمی‌کند', (tester) async {
@@ -259,6 +271,16 @@ void main() {
           reason: 'یک درخواست کند کل صفحه را نگه داشته');
       await tester.pump(const Duration(seconds: 5));
       expect(tester.takeException(), isNull);
+      // ── چرا این خط ──
+      // داشبورد حالا بخشِ «ثبت کارت با عکس» را هم دارد که بعد از اولین
+      // فریم یک درخواستِ فرعی می‌فرستد. تستی که دقیقاً وسطِ آن تمام
+      // شود، درخواست را معلق رها می‌کند و فریم‌ورک «A Timer is still
+      // pending» می‌دهد — ایرادِ زمان‌بندیِ تست است، نه اپ.
+      // `pump` با تأخیر، تایمرِ صفرِ Dio را اجرا می‌کند و درخواست را
+      // به پایان می‌رساند. `runAsync` اینجا کار نمی‌کند چون تایمرهای
+      // FakeAsync را جلو نمی‌برد.
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 600));
     });
   });
 }
@@ -340,6 +362,16 @@ void _stuckSpinnerTests() {
 
       expect(tester.takeException(), isNull);
       expect(find.byType(CircularProgressIndicator), findsNothing);
+      // ── چرا این خط ──
+      // داشبورد حالا بخشِ «ثبت کارت با عکس» را هم دارد که بعد از اولین
+      // فریم یک درخواستِ فرعی می‌فرستد. تستی که دقیقاً وسطِ آن تمام
+      // شود، درخواست را معلق رها می‌کند و فریم‌ورک «A Timer is still
+      // pending» می‌دهد — ایرادِ زمان‌بندیِ تست است، نه اپ.
+      // `pump` با تأخیر، تایمرِ صفرِ Dio را اجرا می‌کند و درخواست را
+      // به پایان می‌رساند. `runAsync` اینجا کار نمی‌کند چون تایمرهای
+      // FakeAsync را جلو نمی‌برد.
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 600));
     });
   });
 }

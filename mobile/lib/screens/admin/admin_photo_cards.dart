@@ -39,6 +39,9 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
   List _designs = [];
   Map _stats = const {};
   List _submissions = [];
+  List _options = [];
+  /// انتخابِ طرح برای هر پرونده: { شناسهٔ پرونده: شناسهٔ طرح }
+  final Map<String, String> _picks = {};
   bool _loading = true;
   String? _loadError;
 
@@ -87,12 +90,14 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
         widget.api.get('/api/admin/photo-cards/codes/stats', fresh: true),
         widget.api
             .get('/api/admin/photo-cards/submissions?status=pending', fresh: true),
+        widget.api.get('/api/admin/photo-cards/designs/options', fresh: true),
       ]);
       if (!mounted) return;
       setState(() {
         _designs = (r[0]['designs'] as List?) ?? const [];
         _stats = (r[1]['stats'] as Map?) ?? const {};
         _submissions = (r[2]['submissions'] as List?) ?? const [];
+        _options = (r[3]['options'] as List?) ?? const [];
         _loading = false;
       });
     } catch (e) {
@@ -130,7 +135,7 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
     if (_name.text.trim().isEmpty) return _snack('نام کارت را بنویسید');
     setState(() => _uploading = true);
     try {
-      final r = await widget.api.postMultipart(
+      final res = await widget.api.postMultipart(
         '/api/admin/photo-cards/designs',
         filePath: _pickedImage,
         fields: {
@@ -139,7 +144,18 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
           'cashAmount': _cash.text.trim().isEmpty ? '0' : _cash.text.trim(),
         },
       );
-      _snack(r['message']?.toString() ?? 'طرح ثبت شد');
+      final d = (res.data is Map) ? res.data as Map : const {};
+
+      // ── چرا وضعیت دستی بررسی می‌شود ──
+      // `postMultipart` عمداً `validateStatus: (_) => true` دارد تا
+      // بدنهٔ خطاها (مثل ۴۰۹ «طرح تکراری») خوانده شود نه اینکه به
+      // استثنا تبدیل شود و پیامِ مفیدش گم گردد.
+      if (res.statusCode != null && res.statusCode! >= 400) {
+        _snack('${d['message'] ?? 'ثبت نشد'}');
+        return;
+      }
+
+      _snack(d['message']?.toString() ?? 'طرح ثبت شد');
       setState(() {
         _pickedImage = null;
         _name.clear();
@@ -190,6 +206,14 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
   }
 
   Future<void> _decide(Map s, bool approve) async {
+    final chosen = _picks['${s['id']}'];
+
+    // ── وقتی موتور حدسی ندارد، انتخاب الزامی است ──
+    // بدون آن سرور ۴۰۰ می‌دهد؛ بهتر است همین‌جا با پیام روشن‌تر
+    // جلویش گرفته شود.
+    if (approve && chosen == null && s['design_image'] == null) {
+      return _snack('اول مشخص کنید این کد مربوط به کدام کارت است');
+    }
     if (!approve) {
       final ok = await showDialog<bool>(
         context: context,
@@ -212,7 +236,11 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
     try {
       await widget.api.post(
         '/api/admin/photo-cards/submissions/${s['id']}/decide',
-        {'approve': approve, 'reason': approve ? '' : 'عکس با کارت مطابقت نداشت'},
+        {
+          'approve': approve,
+          'reason': approve ? '' : 'عکس با کارت مطابقت نداشت',
+          if (chosen != null) 'designId': chosen,
+        },
       );
       _snack(approve ? 'تأیید شد' : 'رد شد');
       await _load();
@@ -573,6 +601,62 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
                 ),
               ),
             ],
+          ),
+          // ── چرا این پرونده اینجاست ──
+          // تصمیم مدیر در دو حالت فرق می‌کند، پس علت باید صریح باشد نه
+          // اینکه از روی درصد شباهت حدس زده شود.
+          if (s['review_reason'] == 'image_unknown') ...[
+            const SizedBox(height: Gaps.xs),
+            Container(
+              padding: const EdgeInsets.all(Gaps.xs),
+              decoration: BoxDecoration(
+                borderRadius: Corners.rSm,
+                color: BrandColors.infoOnLight.withValues(alpha: 0.12),
+                border: Border.all(
+                    color: BrandColors.infoOnLight.withValues(alpha: 0.4)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('✅ کد معتبر است',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: BrandColors.infoOnLight)),
+                  Text(
+                    'ولی عکس با هیچ کارتی تطبیق نخورد. مشخص کنید این کد '
+                    'مربوط به کدام کارت است.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: Gaps.xs),
+          // انتخابِ دستیِ طرح. پیش‌فرض حدسِ موتور است تا در حالتِ
+          // کم‌اطمینان مدیر مجبور به انتخاب دوباره نشود.
+          DropdownButtonFormField<String>(
+            initialValue: _picks['${s['id']}'],
+            isExpanded: true,
+            decoration: const InputDecoration(
+              isDense: true,
+              labelText: 'این کد مربوط به کدام کارت است؟',
+            ),
+            hint: Text(s['card_type_name'] != null
+                ? 'پیش‌فرض: ${s['card_type_name']}'
+                : '— انتخاب کارت —'),
+            items: [
+              for (final o in _options.cast<Map>())
+                DropdownMenuItem(
+                  value: '${o['id']}',
+                  child: Text(
+                    '${o['card_type_name']} (${faNum(o['point_value'])} امتیاز)',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+            ],
+            onChanged: (v) => setState(() {
+              if (v != null) _picks['${s['id']}'] = v;
+            }),
           ),
           const SizedBox(height: Gaps.xs),
           Row(

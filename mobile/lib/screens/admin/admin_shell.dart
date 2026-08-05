@@ -5,6 +5,7 @@ import '../../theme/tokens.dart';
 import '../../widgets/hero_logo.dart';
 import 'admin_admins.dart';
 import 'admin_cards.dart';
+import 'admin_photo_cards.dart';
 import 'admin_chat.dart';
 import 'admin_dashboard.dart';
 import 'admin_league.dart';
@@ -43,6 +44,11 @@ class _AdminShellState extends State<AdminShell> {
   late final List<Widget> _pages = [
     AdminDashboard(api: widget.api),
     AdminCards(api: widget.api),
+    // صفحهٔ جدا از «کارت و کد»: آن سیستمِ ثبت با کدِ تنهاست و قاطی
+    // کردنشان باعث می‌شد مدیر کد را در بانکِ اشتباه وارد کند — اشتباهی
+    // که بی‌سروصداست، چون کد ثبت می‌شود ولی هیچ کاربری نمی‌تواند از آن
+    // استفاده کند.
+    AdminPhotoCards(api: widget.api),
     AdminRewards(api: widget.api),
     AdminWallet(api: widget.api),
     AdminLeague(api: widget.api),
@@ -58,6 +64,7 @@ class _AdminShellState extends State<AdminShell> {
   static const _titles = [
     'داشبورد',
     'کارت و کد',
+    'کارت با عکس',
     'جوایز',
     'کیف پول',
     'لیگ',
@@ -72,6 +79,7 @@ class _AdminShellState extends State<AdminShell> {
   static const _icons = [
     Icons.dashboard_rounded,
     Icons.credit_card_rounded,
+    Icons.document_scanner_rounded,
     Icons.card_giftcard_rounded,
     Icons.account_balance_wallet_rounded,
     Icons.emoji_events_rounded,
