@@ -560,24 +560,41 @@
 /* ── کیف پول تومانی ────────────────────────────────────────────────────
    طلایی عمداً از سبز/بنفش بقیهٔ اپ جدا است: کیف پول تنها جایی است که پول
    واقعی در آن است و باید در نگاه اول از بقیهٔ بخش‌ها تفکیک شود. */
-.walletHero{position:relative;overflow:hidden;border-radius:26px;padding:22px;margin-bottom:16px;background:linear-gradient(135deg,#0b2b4f,#0e5c4a 55%,#00d49a);box-shadow:0 24px 60px #00d49a30, inset 0 1px 0 #ffffff25}
+/* ── چرا توقفِ آخر #0b7058 است و نه #00d49a ──
+   با نمونه‌برداریِ واقعی از پیکسل (اسکرین‌شات با متنِ نامرئی) معلوم شد
+   گوشهٔ روشنِ گرادیان به rgb(36,190,147) می‌رسد و شش متنِ این کارت
+   رویش زیرِ حدِ WCAG بودند:
+
+     «موجودی قابل برداشت» ۳.۸۲ · «تومان» ۳.۸۴ · «کل دریافتی» ۲.۵۲
+     «کارت بانکی ثبت نشده» ۲.۸۳ · «برای برداشت لازم است» ۱.۹۷ · 💳 ۲.۳۷
+
+   این بدترین جای ممکن برای متنِ ناخوانا است: تنها صفحه‌ای که پولِ
+   واقعی را نشان می‌دهد. کاربر باید موجودی‌اش را بی‌زحمت بخواند.
+
+   #0b7058 همان سبزِ زمردی است، فقط تیره‌تر — هویتِ رنگیِ کیف پول حفظ
+   می‌شود و سفید رویش ۶.۰۵ می‌گیرد. */
+.walletHero{position:relative;overflow:hidden;border-radius:26px;padding:22px;margin-bottom:16px;background:linear-gradient(135deg,#0b2b4f,#0e5c4a 55%,#0b7058);box-shadow:0 24px 60px #00d49a30, inset 0 1px 0 #ffffff25}
 .walletHeroTop{display:flex;align-items:center;gap:10px;margin-bottom:14px;color:#fff;font-weight:800}
 .walletChip{display:inline-block;width:30px;height:22px;border-radius:5px;background:linear-gradient(135deg,#ffe9a8,#d4a227);flex:none}
-.walletLabel{margin:0;color:#ffffffbb;font-size:12px}
+/* آلفا (#ffffffbb ≈ ۷۳٪) کنتراست را از ۶.۰۵ به ۴.۰۱ می‌آورد و روی
+   روشن‌ترین نقطهٔ گرادیان زیرِ ۴.۵ می‌رفت. رنگِ **مات** روشن همان حسِ
+   «برچسبِ فرعی» را می‌دهد بدون اینکه شفافیت کنتراست را بخورد. */
+.walletLabel{margin:0;color:#dff3ec;font-size:12px}
 .walletBalance{margin:2px 0 0;color:#fff;font-size:34px;font-weight:900;letter-spacing:-.5px}
-.walletBalance small{font-size:14px;font-weight:600;color:#ffffffc0;margin-inline-start:4px}
+.walletBalance small{font-size:14px;font-weight:600;color:#e6f6f0;margin-inline-start:4px}
 .walletPill{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:4px 12px;border-radius:999px;background:#ffd36b30;border:1px solid #ffd36b70;color:#ffd36b;font-size:12px;font-weight:700}
 .walletStats{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:10px;margin-top:16px}
 .walletStats>div+div{border-inline-start:1px solid #ffffff2e}
 .walletStats>div{text-align:center;color:#fff}
-.walletStats>div span{display:block;font-size:11px;color:#ffffffaa}
+/* ۱۱px با آلفای ۶۷٪ روی سبزِ روشن ۲.۵۲ می‌داد — ناخواناترین متنِ کارت. */
+.walletStats>div span{display:block;font-size:11px;color:#dff3ec}
 .walletStats>div b{font-size:15px;font-weight:800}
 .walletCardRow{display:flex;align-items:center;gap:10px;width:100%;margin-top:16px;padding:10px 12px;border-radius:14px;background:#ffffff1f;border:1px solid #ffffff2e;color:#fff;cursor:pointer;text-align:start;font:inherit}
 .walletCardRow:hover{background:#ffffff2b}
 .wcIcon{font-size:18px}
 .wcBody{flex:1;display:flex;flex-direction:column;min-width:0}
 .wcBody b{font-size:14px;letter-spacing:1px;direction:ltr;text-align:left;unicode-bidi:isolate}
-.wcBody small{font-size:11px;color:#ffffffb0}
+.wcBody small{font-size:11px;color:#dff3ec}
 .wcArrow{font-size:20px;color:#ffffffb0}
 
 .walletActions{display:flex;gap:10px;margin-bottom:10px}
