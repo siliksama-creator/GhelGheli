@@ -898,3 +898,213 @@ table.data-table {
   background:var(--panel,#111a2b);border:1px solid #ffffff1f;
   border-radius:20px;padding:20px;box-shadow:0 30px 90px #000a;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ثبت کارت از طریق عکس
+   ═══════════════════════════════════════════════════════════════════════════
+
+   همهٔ رنگ‌ها از توکن‌های تم می‌آیند (--gg-*) نه مقدار ثابت، چون پنل دو
+   تم دارد و دور قبل ده متن ناخوانا دقیقاً از همین‌جا آمد: رنگی که برای
+   سطح تیره انتخاب شده بود روی کارت سفید محو می‌شد. */
+
+.stack-lg { display: flex; flex-direction: column; gap: var(--gg-space-5); }
+.stack { display: flex; flex-direction: column; gap: var(--gg-space-3); }
+
+/* ── فرم آپلود ── */
+.photoUploadGrid {
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) 1fr;
+  gap: var(--gg-space-5);
+  align-items: start;
+}
+
+/* ناحیهٔ انتخاب فایل. `label` است نه `div` تا کلیک روی کل کادر — و نه
+   فقط یک دکمهٔ کوچک — پنجرهٔ فایل را باز کند. */
+.photoDrop {
+  display: grid;
+  place-items: center;
+  min-height: 230px;
+  padding: var(--gg-space-3);
+  border: 2px dashed var(--gg-border);
+  border-radius: var(--gg-radius-lg);
+  background: var(--gg-surface-alt);
+  cursor: pointer;
+  transition: border-color var(--gg-fast) var(--gg-ease),
+              background var(--gg-fast) var(--gg-ease);
+}
+.photoDrop:hover {
+  border-color: var(--gg-emerald);
+  background: var(--gg-surface-high);
+}
+.photoDrop img {
+  max-width: 100%;
+  max-height: 300px;
+  border-radius: var(--gg-radius-md);
+  object-fit: contain;
+}
+.photoDropHint {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  color: var(--gg-text-muted);
+  text-align: center;
+}
+.photoDropHint b { color: var(--gg-text); font-size: 14px; }
+.photoDropHint small { font-size: 12px; }
+
+/* ── آمار بانک کد ── */
+.statRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gg-space-3);
+  margin-bottom: var(--gg-space-4);
+}
+.statPill {
+  flex: 1 1 120px;
+  padding: var(--gg-space-3);
+  border-radius: var(--gg-radius-md);
+  background: var(--gg-surface-alt);
+  border: 1px solid var(--gg-border-soft);
+  text-align: center;
+}
+.statPill b { display: block; font-size: 22px; font-weight: 800; }
+.statPill span { font-size: 12px; color: var(--gg-text-muted); }
+.statPill.ok b { color: var(--gg-success); }
+.statPill.warn b { color: var(--gg-warning); }
+.statPill.used b { color: var(--gg-text-muted); }
+
+.photoCodeForm {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: var(--gg-space-3);
+  align-items: end;
+}
+
+.batchList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gg-space-2);
+  margin-top: var(--gg-space-4);
+}
+.batchItem {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: var(--gg-radius-pill);
+  background: var(--gg-surface-high);
+  font-size: 12.5px;
+}
+.batchItem span { color: var(--gg-emerald-ink); font-weight: 700; }
+.batchItem small { color: var(--gg-text-faint); }
+
+/* ── صف بررسی ── */
+.reviewRow {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--gg-space-4);
+  align-items: center;
+  padding: var(--gg-space-3);
+  border-radius: var(--gg-radius-md);
+  background: var(--gg-surface-alt);
+  border: 1px solid var(--gg-border-soft);
+  margin-bottom: var(--gg-space-3);
+}
+
+/* دو عکس کنار هم: عکس کاربر و حدس سیستم.
+   مقایسهٔ چشمی تنها راهی است که مدیر می‌تواند در چند ثانیه تصمیم بگیرد. */
+.reviewShots { display: flex; align-items: center; gap: var(--gg-space-2); }
+.reviewShots figure { margin: 0; text-align: center; }
+.reviewShots img {
+  width: 74px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: var(--gg-radius-sm);
+  border: 1px solid var(--gg-border);
+  background: var(--gg-surface-high);
+}
+.reviewShots figcaption {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--gg-text-muted);
+}
+.reviewArrow { color: var(--gg-text-faint); flex-shrink: 0; }
+
+.reviewBody { display: grid; gap: 4px; min-width: 0; }
+.reviewMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gg-space-2);
+  margin-top: 2px;
+}
+.reviewActions { display: flex; flex-direction: column; gap: 6px; }
+
+/* ── فهرست طرح‌ها ── */
+.designGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: var(--gg-space-3);
+}
+.designTile {
+  display: grid;
+  gap: 8px;
+  padding: var(--gg-space-3);
+  border-radius: var(--gg-radius-md);
+  background: var(--gg-surface-alt);
+  border: 1px solid var(--gg-border-soft);
+}
+/* طرح غیرفعال کم‌رنگ می‌شود ولی نه آن‌قدر که خوانده نشود؛ ۰.۵۵ روی
+   هر دو تم بالای آستانهٔ خوانایی می‌ماند. */
+.designTile.off { opacity: 0.55; }
+.designTile img {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  border-radius: var(--gg-radius-sm);
+  background: var(--gg-surface-high);
+}
+.designInfo { display: grid; gap: 2px; }
+.designInfo b { font-size: 13.5px; }
+.designInfo span { font-size: 12px; color: var(--gg-emerald-ink); font-weight: 700; }
+.designInfo small {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  color: var(--gg-text-muted);
+}
+
+/* ── سوییچ سه‌حالته ── */
+.segmented {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border-radius: var(--gg-radius-pill);
+  background: var(--gg-surface-high);
+}
+.segmented button {
+  border: 0;
+  background: transparent;
+  color: var(--gg-text-muted);
+  padding: 6px 13px;
+  border-radius: var(--gg-radius-pill);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--gg-fast) var(--gg-ease),
+              color var(--gg-fast) var(--gg-ease);
+}
+.segmented button.on {
+  background: var(--gg-surface);
+  color: var(--gg-text);
+  box-shadow: var(--gg-shadow-soft);
+}
+
+@media (max-width: 860px) {
+  .photoUploadGrid,
+  .photoCodeForm { grid-template-columns: 1fr; }
+  .reviewRow { grid-template-columns: 1fr; }
+  .reviewActions { flex-direction: row; }
+}

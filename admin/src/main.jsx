@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BarChart3, Bell, CreditCard, Gift, MessageCircle, LifeBuoy, Settings, Shield, Trophy, Users, Gamepad2, Wallet } from 'lucide-react';
+import { BarChart3, Bell, CreditCard, Gift, MessageCircle, LifeBuoy, ScanLine, Settings, Shield, Trophy, Users, Gamepad2, Wallet } from 'lucide-react';
 
 import './theme.css';
 import './styles.css';
@@ -13,6 +13,7 @@ import { AppShell } from './components/app-shell.jsx';
 import { LoginScreen } from './pages/login.jsx';
 import { Dashboard } from './pages/dashboard.jsx';
 import { CardsPage } from './pages/cards.jsx';
+import { PhotoCardsPage } from './pages/photo-cards.jsx';
 import { RewardsPage } from './pages/rewards.jsx';
 import { LeaguePage } from './pages/league.jsx';
 import { WalletPage } from './pages/wallet.jsx';
@@ -27,6 +28,9 @@ import { AdminsPage } from './pages/admins.jsx';
 const NAV = [
   ['dashboard', 'داشبورد', BarChart3, Dashboard],
   ['cards', 'کارت و کد', CreditCard, CardsPage],
+  // قابلیت جدید. عمداً صفحهٔ جدا از «کارت و کد»: آن سیستمِ ثبت با کدِ
+  // تنهاست و قاطی کردنشان باعث می‌شد مدیر کد را در بانک اشتباه وارد کند.
+  ['photo-cards', 'کارت با عکس', ScanLine, PhotoCardsPage],
   ['rewards', 'جوایز', Gift, RewardsPage],
   ['wallet', 'کیف پول', Wallet, WalletPage],
   ['league', 'لیگ ماهانه', Trophy, LeaguePage],
