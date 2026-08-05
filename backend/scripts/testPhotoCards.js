@@ -429,7 +429,7 @@ async function testMatching() {
 
     // فیلدهایی که در جدول `photo_card_designs` ستون دارند.
     const persisted = new Set(['dhash', 'phash', 'colorSig', 'texSig',
-      'width', 'height']);
+      'lumaSig', 'width', 'height']);
     // فیلدهایی که عمداً ذخیره نمی‌شوند.
     const transient = new Set(['version']);
 

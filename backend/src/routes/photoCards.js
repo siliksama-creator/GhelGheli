@@ -84,6 +84,7 @@ module.exports = function createPhotoCardRoutes(deps) {
     // امتیازهای ناسازگار بود: یک کارت تأیید خودکار می‌گرفت و کارتِ
     // دیگر با همان کیفیتِ عکس به صف بررسی می‌رفت.
     texSig: toFloats(r.tex_sig),
+    lumaSig: toFloats(r.luma_sig),
     width: r.width,
     height: r.height,
   });
@@ -175,7 +176,7 @@ module.exports = function createPhotoCardRoutes(deps) {
         // بفهمد چه شده. اگر واقعاً قصدش جایگزینی است، اول طرح قبلی را
         // غیرفعال کند.
         const existing = await pool.query(
-          `SELECT d.id, d.dhash, d.phash, d.color_sig, d.tex_sig, t.name
+          `SELECT d.id, d.dhash, d.phash, d.color_sig, d.tex_sig, d.luma_sig, t.name
              FROM photo_card_designs d
              JOIN card_types t ON t.id = d.card_type_id
             WHERE d.is_active = true`,
@@ -186,6 +187,7 @@ module.exports = function createPhotoCardRoutes(deps) {
             phash: row.phash,
             colorSig: toFloats(row.color_sig),
             texSig: toFloats(row.tex_sig),
+            lumaSig: toFloats(row.luma_sig),
           });
           if (sim >= DUPLICATE_SIMILARITY) {
             return res.status(409).json({
@@ -240,11 +242,11 @@ module.exports = function createPhotoCardRoutes(deps) {
           const d = await client.query(
             `INSERT INTO photo_card_designs
                (card_type_id, image_url, dhash, phash, color_sig, tex_sig,
-                width, height, created_by)
-             VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
+                luma_sig, width, height, created_by)
+             VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
              RETURNING id, image_url, width, height, created_at`,
             [cardTypeId, imageUrl, fp.dhash, fp.phash, fp.colorSig, fp.texSig,
-              fp.width, fp.height, req.admin.id],
+              fp.lumaSig, fp.width, fp.height, req.admin.id],
           );
 
           await client.query('COMMIT');
@@ -1056,7 +1058,7 @@ module.exports = function createPhotoCardRoutes(deps) {
 
         const designsRes = await pool.query(
           `SELECT id, card_type_id, image_url, dhash, phash, color_sig, tex_sig,
-                  width, height
+                  luma_sig, width, height
              FROM photo_card_designs WHERE is_active = true`,
         );
 
@@ -1087,7 +1089,7 @@ module.exports = function createPhotoCardRoutes(deps) {
         //    نمی‌شود.
         const pend = await pool.query(
           `SELECT s.id, s.img_dhash, s.img_phash, s.img_color, s.img_tex,
-                  c.code
+                  s.img_luma, c.code
              FROM photo_card_submissions s
              LEFT JOIN photo_card_codes c ON c.id = s.code_id
             WHERE s.user_id = $1 AND s.status = 'pending'
@@ -1100,6 +1102,7 @@ module.exports = function createPhotoCardRoutes(deps) {
             phash: row.img_phash,
             colorSig: toFloats(row.img_color),
             texSig: toFloats(row.img_tex),
+            lumaSig: toFloats(row.img_luma),
           });
           // آستانهٔ سخت‌گیرانه‌تر از تطبیقِ معمولی: اینجا دنبال «همان
           // عکس» می‌گردیم نه «همان کارت». دو عکسِ متفاوت از یک کارت
@@ -1158,15 +1161,16 @@ module.exports = function createPhotoCardRoutes(deps) {
             `INSERT INTO photo_card_submissions
                (user_id, code_id, matched_design_id, match_score, match_margin,
                 user_image_path, status, review_reason,
-                img_dhash, img_phash, img_color, img_tex)
-             VALUES($1,$2,$3,$4,$5,$6,'pending',$7,$8,$9,$10,$11) RETURNING id`,
+                img_dhash, img_phash, img_color, img_tex, img_luma)
+             VALUES($1,$2,$3,$4,$5,$6,'pending',$7,$8,$9,$10,$11,$12) RETURNING id`,
             [req.user.id, codeId, match.design?.id ?? null,
               match.score, match.margin, savedPath, reason,
               // اثرانگشتِ عکسِ کاربر ذخیره می‌شود تا اگر همین عکس را
               // دوباره فرستاد تشخیص داده شود. عکسِ خودش پس از تصمیمِ
               // مدیر پاک می‌شود ولی این چند صد بایت می‌ماند — که هم
               // ارزان است و هم برای بررسیِ تقلبِ بعدی مفید.
-              queryFp.dhash, queryFp.phash, queryFp.colorSig, queryFp.texSig],
+              queryFp.dhash, queryFp.phash, queryFp.colorSig, queryFp.texSig,
+              queryFp.lumaSig],
           );
 
           return res.json({

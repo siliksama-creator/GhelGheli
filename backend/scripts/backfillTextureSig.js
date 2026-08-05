@@ -26,7 +26,7 @@ const uploadRoot = path.join(__dirname, '..', 'uploads');
 (async () => {
   const { rows } = await pool.query(
     `SELECT id, image_url FROM photo_card_designs
-      WHERE tex_sig IS NULL ORDER BY created_at`,
+      WHERE tex_sig IS NULL OR luma_sig IS NULL ORDER BY created_at`,
   );
   if (!rows.length) {
     console.log('✓ همهٔ طرح‌ها امضای بافت دارند');
@@ -44,8 +44,8 @@ const uploadRoot = path.join(__dirname, '..', 'uploads');
       const buf = await fs.promises.readFile(file);
       const fp = await fpEngine.fingerprint(buf);
       await pool.query(
-        'UPDATE photo_card_designs SET tex_sig=$1, updated_at=NOW() WHERE id=$2',
-        [fp.texSig, r.id],
+        'UPDATE photo_card_designs SET tex_sig=$1, luma_sig=$2, updated_at=NOW() WHERE id=$3',
+        [fp.texSig, fp.lumaSig, r.id],
       );
       done++;
     } catch (e) {

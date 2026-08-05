@@ -164,7 +164,7 @@ async function degrade(buf, cfg) {
     process.exit(1);
   }
   console.log('\n✓ صفر تطبیقِ غلط'
-    + ` (روی کارت‌های واقعی: ۹۹٪ رتبه۱ و ۷۴٪ تأییدِ خودکار)`);
+    + ` (روی کارت‌های واقعی: ۹۹٪ رتبه۱ و ۸۰٪ تأییدِ خودکار)`);
 })().catch((e) => {
   console.error(e);
   process.exit(1);
