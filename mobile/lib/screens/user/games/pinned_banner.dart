@@ -16,7 +16,32 @@ const pinAccents = <String, Color>{
   'red': Color(0xFFF87171),
 };
 
-Color pinColor(Object? key) => pinAccents[key] ?? pinAccents['gold']!;
+// ═══════════════════════════════════════════════════════════════════════════
+// همان چهار اکسنت برای تم روشن
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// بنر متن را با **همان** رنگِ اکسنت می‌نویسد، روی پس‌زمینه‌ای که ۱۳٪
+// همان رنگ است. این ترکیب روی سطحِ روشن ناخوان بود:
+//
+//     طلایی ۱.۴۸:۱ · سبز ۱.۷۵:۱ · آبی ۲.۲۷:۱ · قرمز ۲.۴۴:۱
+//
+// و این تنها راهی است که مدیریت می‌تواند به همهٔ کاربران پیام بدهد؛
+// یعنی مهم‌ترین متنِ صفحهٔ چت دقیقاً همانی بود که خوانده نمی‌شد.
+//
+// hue و اشباع دست‌نخورده، فقط روشنایی تا ≥۴.۷:۱ پایین آمده.
+// باید با `PIN_COLORS_LIGHT` در userweb/src/lib/api.js یکی بماند.
+const pinAccentsOnLight = <String, Color>{
+  'gold': Color(0xFF885F00),
+  'green': Color(0xFF197554),
+  'blue': Color(0xFF0762D3),
+  'red': Color(0xFFC90A0A),
+};
+
+/// رنگِ اکسنت. [onLight] را وقتی `true` بدهید که بنر روی سطحِ روشن است.
+Color pinColor(Object? key, {bool onLight = false}) {
+  final table = onLight ? pinAccentsOnLight : pinAccents;
+  return table[key] ?? table['gold']!;
+}
 
 class PinnedBanner extends StatelessWidget {
   const PinnedBanner({super.key, required this.pinned});
@@ -31,8 +56,9 @@ class PinnedBanner extends StatelessWidget {
     if (p == null || p['active'] != true || text.isEmpty) {
       return const SizedBox.shrink();
     }
-    final color = pinColor(p['accent']);
     final theme = Theme.of(context);
+    final color = pinColor(p['accent'],
+        onLight: theme.brightness == Brightness.light);
 
     return Container(
       margin: const EdgeInsets.fromLTRB(Gaps.md, 0, Gaps.md, Gaps.xs),

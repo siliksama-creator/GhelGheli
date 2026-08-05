@@ -96,8 +96,15 @@ export function GameRewardsPage({ request }) {
                     {OUTCOME[r.outcome] || r.outcome} · {r.game_id} · حریف: {r.opponent_nickname || '—'}
                   </div>
                 </div>
+                {/* توکنِ تم به‌جای رنگِ ثابت.
+                    #16a34a روی پس‌زمینهٔ روشنِ پنل ۳.۰۷:۱ و #ef4444
+                    ۳.۵۰:۱ می‌داد — هر دو زیر آستانهٔ ۴.۵. اینها عددِ
+                    امتیازند، یعنی مهم‌ترین چیزِ این جدول. متغیرهای
+                    --gg-success/--gg-danger در هر دو تم مقدارِ درست
+                    دارند و با تغییر تم خودشان عوض می‌شوند. */}
                 <b style={{
-                  color: r.points_delta > 0 ? '#16a34a' : r.points_delta < 0 ? '#ef4444' : 'inherit',
+                  color: r.points_delta > 0 ? 'var(--gg-success)'
+                    : r.points_delta < 0 ? 'var(--gg-danger)' : 'inherit',
                   whiteSpace: 'nowrap',
                 }}>
                   {r.points_delta > 0 ? `+${r.points_delta}` : r.points_delta}

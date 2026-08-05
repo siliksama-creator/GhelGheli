@@ -87,7 +87,13 @@ class _PinnedEditorState extends State<PinnedEditor> {
             height: 90, child: Center(child: CircularProgressIndicator())),
       );
     }
-    final color = pinColor(_accent);
+    // نشانِ «فعال» متن را با همین رنگ روی تینتِ ۱۸٪ همان رنگ می‌نویسد —
+    // همان ترکیبی که در بنر ناخوان بود. پس اینجا هم تم‌آگاه شد.
+    // نکته: دایره‌های انتخابِ رنگ (ChoiceChip.avatar) عمداً از
+    // `pinAccents` خام می‌آیند. آنجا رنگ، متن نیست؛ نمونه است. اگر
+    // نمونه را هم تیره کنیم، مدیر رنگی را انتخاب می‌کند که ندیده است.
+    final color =
+        pinColor(_accent, onLight: theme.brightness == Brightness.light);
 
     return AppCard(
       child: Column(

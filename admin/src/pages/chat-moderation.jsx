@@ -11,6 +11,22 @@ const ACCENTS = [
   { key: 'red', label: 'قرمز', color: '#F87171' },
 ];
 
+// ═══════════════════════════════════════════════════════════════════════════
+// همان اکسنت‌ها برای پیش‌نمایشِ تم روشن
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// پیش‌نمایش متن را با رنگِ اکسنت روی تینتِ ۱۳٪ همان رنگ می‌کشد. روی
+// پس‌زمینهٔ روشنِ پنل طلایی فقط ۱.۴۷:۱ می‌داد — مدیر متنی را که دارد
+// می‌نویسد نمی‌دید.
+//
+// باید با `PIN_COLORS_LIGHT` در userweb/src/lib/api.js و
+// `pinAccentsOnLight` در mobile/lib/.../pinned_banner.dart یکی بماند،
+// وگرنه پیش‌نمایشِ مدیر با چیزی که کاربر می‌بیند فرق می‌کند — که
+// بدترین حالتِ ممکن برای یک ابزارِ پیش‌نمایش است.
+const ACCENTS_LIGHT = {
+  gold: '#885F00', green: '#197554', blue: '#0762D3', red: '#C90A0A',
+};
+
 /// Editor for the announcement pinned above the chat room. Replaces the old
 /// static "avoid profanity" strip, which became meaningless once users could
 /// only send predefined messages.
@@ -51,7 +67,14 @@ function PinnedMessageCard({ request }) {
     }
   }
 
-  const color = (ACCENTS.find((a) => a.key === accent) || ACCENTS[0]).color;
+  // متغیرِ CSS به‌جای مقدارِ ثابت: پیش‌نمایش باید همان چیزی را نشان دهد
+  // که کاربر می‌بیند، و کاربر بسته به تمش دو رنگِ متفاوت می‌بیند.
+  const accentKey = ACCENTS.some((a) => a.key === accent) ? accent : 'gold';
+  const colorVars = {
+    '--pin': (ACCENTS.find((a) => a.key === accentKey) || ACCENTS[0]).color,
+    '--pin-light': ACCENTS_LIGHT[accentKey],
+  };
+  const color = 'var(--pin)';
 
   return (
     <Card
@@ -87,9 +110,15 @@ function PinnedMessageCard({ request }) {
         </div>
       </Field>
       <Field label="پیش‌نمایش">
-        <div style={{
+        {/* `${color}8c` جواب نمی‌دهد وقتی color یک `var()` است — الحاقِ
+            رشته‌ای روی متغیرِ CSS مقدارِ نامعتبر می‌سازد. `color-mix`
+            همان کار را می‌کند و با متغیر هم سازگار است. */}
+        <div className="pinPreview" style={{
+          ...colorVars,
           display: 'flex', gap: 8, alignItems: 'flex-start', padding: '10px 12px',
-          borderRadius: 12, border: `1px solid ${color}8c`, background: `${color}22`,
+          borderRadius: 12,
+          border: '1px solid color-mix(in srgb, var(--pin) 55%, transparent)',
+          background: 'color-mix(in srgb, var(--pin) 13%, transparent)',
         }}>
           <Pin size={15} style={{ color, flexShrink: 0, marginTop: 2 }} />
           <div>

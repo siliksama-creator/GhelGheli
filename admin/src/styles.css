@@ -78,7 +78,10 @@
 
 .nav-item.active {
   background: color-mix(in srgb, var(--gg-emerald) 16%, transparent);
-  color: var(--gg-emerald);
+  /* --gg-emerald-ink: نسخهٔ «جوهری» که در تم روشن تیره می‌شود.
+     با خودِ --gg-emerald اینجا ۱.۷۲:۱ می‌شد و آیتمِ فعالِ منو
+     کم‌رنگ‌ترین آیتم بود. */
+  color: var(--gg-emerald-ink);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gg-emerald) 35%, transparent);
 }
 
@@ -198,8 +201,22 @@
   background: var(--gg-surface-alt);
 }
 
+/* ── دکمهٔ خطرناک: سفید روی این گرادیان خوانا نبود ──
+   گرادیان از #ff5d6c به #ffb347 می‌رفت. سفید روی سرِ اول ۲.۹۹:۱ و روی
+   سرِ دوم فقط ۱.۷۸:۱ می‌داد — یعنی برچسبِ «رد» و «حذف» روی نیمهٔ
+   کهربایی عملاً محو بود. اینها عملیاتِ **برگشت‌ناپذیرند** (ردِ برداشت،
+   حذفِ کاربر)؛ دکمه‌ای که متنش خوانده نمی‌شود اینجا خطرناک‌تر از هر
+   جای دیگرِ پنل است.
+
+   دو راه بود: متن را تیره کنیم، یا گرادیان را. متنِ تیره روی دکمهٔ
+   قرمز قراردادِ «خطر» را می‌شکند (همه‌جا سفید روی قرمز است)، پس
+   گرادیان تیره شد. هر دو سر hue خودشان را نگه داشته‌اند و فقط
+   روشنایی پایین آمده؛ سفید حالا ۴.۶۲:۱ و ۴.۶۱:۱ می‌گیرد.
+
+   مقدارِ ثابت و نه var(--gg-danger): آن متغیر در تم تیره #ff5d6c است
+   و دوباره همین باگ برمی‌گشت. دکمهٔ پُررنگ در هر دو تم یکی است. */
 .btn-danger {
-  background: linear-gradient(135deg, var(--gg-danger), #ffb347);
+  background: linear-gradient(135deg, #eb0016, #ab6400);
   color: #ffffff;
 }
 .btn-danger:hover:not(:disabled) {
@@ -294,7 +311,7 @@
   display: grid;
   place-items: center;
   background: color-mix(in srgb, var(--gg-emerald) 16%, transparent);
-  color: var(--gg-emerald);
+  color: var(--gg-emerald-ink);
 }
 
 .stat-card .stat-value {
