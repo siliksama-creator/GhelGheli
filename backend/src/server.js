@@ -2080,6 +2080,23 @@ app.post('/api/admin/card-codes/bulk', adminAuth, requireRole('support'), asyncH
   });
 }));
 
+// ── «ثبت کارت از طریق عکس» ────────────────────────────────────────────────
+//
+// قابلیت جدید و مستقل، در ماژول جدا (src/routes/photoCards.js).
+//
+// چرا ماژول جدا و نه اینجا: این فایل ۲۸۰۰ خط است و مسیر «ثبت کد کارت»
+// داخلش روی پول واقعی کار می‌کند. خواستهٔ مالک «بدون هیچ تغییری در
+// بخش‌های قبلی» بود، پس تنها ردِ پای این قابلیت در server.js همین یک
+// خط است — هیچ کد موجودی جابه‌جا یا بازنویسی نشده.
+//
+// وابستگی‌ها تزریق می‌شوند چون pool/auth/adminAuth و بقیه اینجا ساخته
+// می‌شوند؛ جابه‌جا کردنشان یعنی دست زدن به چیزی که کار می‌کند.
+app.use('/api', require('./routes/photoCards')({
+  pool, auth, adminAuth, requireRole, asyncHandler, imageUpload, audit,
+  createNotification, addLeaguePoints, pass, io, getLeaderboard,
+  optimizeUpload, UUID_RE,
+}));
+
 app.get('/api/admin/rewards', adminAuth, asyncHandler(async (req, res) => res.json((await pool.query('SELECT * FROM reward_tiers ORDER BY display_order, required_points')).rows)));
 // ── Admin: reward groups ───────────────────────────────────────────────────
 // Both the web panel and the Flutter admin app drive these, so the two stay
