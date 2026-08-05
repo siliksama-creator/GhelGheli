@@ -651,6 +651,10 @@ class _ShopTile extends StatelessWidget {
 
     Widget art;
     if (kind == 'name_color') {
+      // عمداً `onLight` نمی‌دهیم. اینجا رنگ **متن** نیست، پُرکنندهٔ یک
+      // دایرهٔ ۴۸ پیکسلی است — نمونهٔ رنگی که کاربر می‌خرد. دوقلوی
+      // تیره‌شده برای خوانا ماندنِ متن ساخته شده؛ اگر نمونه را هم با آن
+      // نشان دهیم، کاربر رنگی را می‌خرد که در ویترین ندیده است.
       final c = nameColorOf(payload);
       art = Container(
         width: 48,
