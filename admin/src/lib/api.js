@@ -53,9 +53,19 @@ export function createApi(token, onUnauthorized) {
   // نکتهٔ ظریف: Content-Type عمداً ست نمی‌شود. مرورگر باید خودش
   // `boundary` را تولید و اضافه کند؛ اگر دستی بنویسیم boundary ندارد و
   // multer در سرور بدنه را خالی می‌بیند.
-  request.postForm = async (path, { file, fileField = 'image', fields = {} } = {}) => {
+  // ── چرا `files` هم پذیرفته می‌شود ──
+  //
+  // مسیرِ «ثبت کارت» حالا دو عکس می‌گیرد (رو و پشت) و هر کدام فیلدِ
+  // نامِ خودش را دارد. `file` تکی برای بقیهٔ مسیرها دست‌نخورده ماند تا
+  // چیزی نشکند.
+  request.postForm = async (
+    path, { file, fileField = 'image', files = {}, fields = {} } = {},
+  ) => {
     const fd = new FormData();
     if (file) fd.append(fileField, file);
+    for (const [k, f] of Object.entries(files)) {
+      if (f) fd.append(k, f);
+    }
     for (const [k, v] of Object.entries(fields)) {
       if (v !== undefined && v !== null) fd.append(k, String(v));
     }

@@ -10,7 +10,7 @@
  * (ثبت با کد تنها) و قاطی کردنشان در یک صفحه فقط باعث می‌شد مدیر کد را
  * در بانک اشتباه وارد کند.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle, Ban, Check, CheckCircle2, Clock, Download,
   Image as ImageIcon, KeyRound, Pencil, RotateCcw, ScanLine, Trash2,
@@ -41,11 +41,27 @@ export function PhotoCardsPage({ request }) {
   const [codeFilter, setCodeFilter] = useState('unused');
   const [codeQuery, setCodeQuery] = useState('');
   const [editing, setEditing] = useState(null);   // { id, code }
+  // ── گروهِ بازشده در فهرستِ کدها ──
+  //
+  // شکایتِ مالک: «قسمت ویرایش کد بازیکن برای کد هایی که ثبت شدن باید
+  // روی خود بازیکن ویرایش کرد و کد هاشو دید نباید انقدر اسکرول طولانی
+  // بشه».
+  //
+  // با ۱۰۰۰ کد برای هر بازیکن، فهرستِ تخت عملاً غیرقابل‌استفاده بود.
+  // حالا کدها زیرِ نامِ بازیکن جمع می‌شوند و فقط گروهِ بازشده ردیف نشان
+  // می‌دهد. `null` یعنی همه بسته.
+  const [openGroup, setOpenGroup] = useState(null);
   const [subFilter, setSubFilter] = useState('pending');
 
-  // فرم آپلود
+  // ── فرم آپلود: دو عکس، رو و پشت ──
+  //
+  // خواستهٔ مالک: «ادمین برای هر عکس کارت ۲ تا عکس بفرسه هم‌زمان هر ۲
+  // عکس آنالیز شن». پشت اختیاری است — کارت‌هایی که فقط یک طرفشان
+  // چاپ‌شده هم باید ثبت شوند.
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState('');
+  const [fileBack, setFileBack] = useState(null);
+  const [previewBack, setPreviewBack] = useState('');
   const [name, setName] = useState('');
   const [points, setPoints] = useState('');
   const [cash, setCash] = useState('');
@@ -104,11 +120,50 @@ export function PhotoCardsPage({ request }) {
   useEffect(() => { loadCodeList(); }, [loadCodeList]);
   useEffect(() => { setSubs(null); loadSubs(subFilter); }, [subFilter, loadSubs]);
 
+  // ══════════════════════════════════════════════════════════════════════
+  // گروه‌بندیِ کدها بر پایهٔ کارتی که به آن گره خورده‌اند
+  // ══════════════════════════════════════════════════════════════════════
+  //
+  // دو دستهٔ کاملاً متفاوت که مالک خواست از هم جدا شوند:
+  //
+  //   • کدهای **نام‌دار** — می‌دانیم روی کدام کارت چاپ شده‌اند. زیرِ نامِ
+  //     همان بازیکن جمع می‌شوند و مدیر روی خودِ بازیکن کار می‌کند.
+  //
+  //   • کدهای **بی‌نام** — «کارت‌های قدیمی که هنگام چاپ مشخص نشد کدام کد
+  //     روی کدام کارت رفت». بخشِ جدای خودشان را دارند.
+  //
+  // `useMemo` چون با ۳۰۰ کد در هر رندر دوباره محاسبه می‌شد و تایپ در
+  // کادرِ جست‌وجو محسوس کند بود.
+  const codeGroups = useMemo(() => {
+    const named = new Map();
+    const free = [];
+    for (const c of codes) {
+      const key = c.expected_card_type_name;
+      if (!key) { free.push(c); continue; }
+      if (!named.has(key)) named.set(key, []);
+      named.get(key).push(c);
+    }
+    return {
+      named: [...named.entries()]
+        .map(([name, list]) => ({ name, list }))
+        .sort((a, b) => b.list.length - a.list.length),
+      free,
+    };
+  }, [codes]);
+
   // پیش‌نمایش محلی. بدون آن مدیر نمی‌داند فایل درست را انتخاب کرده یا نه.
   function pickFile(f) {
     setFile(f || null);
     // آزادسازی بلابِ قبلی، وگرنه با هر انتخاب یک شیء در حافظه می‌ماند.
     setPreview(prev => { if (prev) URL.revokeObjectURL(prev); return f ? URL.createObjectURL(f) : ''; });
+  }
+
+  function pickBack(f) {
+    setFileBack(f || null);
+    setPreviewBack(prev => {
+      if (prev) URL.revokeObjectURL(prev);
+      return f ? URL.createObjectURL(f) : '';
+    });
   }
 
   async function uploadDesign() {
@@ -118,6 +173,9 @@ export function PhotoCardsPage({ request }) {
     try {
       const r = await request.postForm('/api/admin/photo-cards/designs', {
         file,
+        // پشت فقط وقتی فرستاده می‌شود که انتخاب شده باشد؛ سرور نبودش
+        // را «کارتِ یک‌طرفه» تفسیر می‌کند نه خطا.
+        files: fileBack ? { imageBack: fileBack } : {},
         fields: {
           name: name.trim(),
           pointValue: points || 0,
@@ -128,8 +186,9 @@ export function PhotoCardsPage({ request }) {
           ...(ownBatch.trim() ? { batchLabel: ownBatch.trim() } : {}),
         },
       });
-      notify(r.message || 'طرح ثبت شد', 'success');
+      notify(r.message || 'کارت ثبت شد', 'success');
       pickFile(null);
+      pickBack(null);
       setName(''); setPoints(''); setCash('');
       setOwnCodes(''); setOwnBatch('');
       loadCodes();
@@ -323,15 +382,26 @@ export function PhotoCardsPage({ request }) {
       >
         <div className="photoUploadGrid">
           <div>
-            <Field label="عکس کارت">
+            {/* ══════════════════════════════════════════════════════════
+                دو عکس: روی کارت و پشتِ کارت
+                ══════════════════════════════════════════════════════════
+
+                هر عکس طرحِ مستقلِ خودش می‌شود ولی هر دو به یک کارت وصل
+                می‌شوند. کاربر از هر طرف عکس بگیرد، به همان بازیکن
+                می‌رسد و کدش درست مصرف می‌شود.
+
+                چرا ادغام نمی‌شوند: شباهتِ تصویریِ رو و پشت فقط ۰.۳۸
+                اندازه‌گیری شد — کمتر از شباهتِ دو بازیکنِ متفاوت. یک
+                اثرانگشتِ مشترک هر دو را خراب می‌کرد. */}
+            <Field label="روی کارت">
               {/* label به‌جای دکمه: کلیک روی کل ناحیه فایل را باز می‌کند */}
               <label className="photoDrop">
                 {preview
-                  ? <img src={preview} alt="پیش‌نمایش" />
+                  ? <img src={preview} alt="پیش‌نمایش روی کارت" />
                   : (
                     <span className="photoDropHint">
                       <ImageIcon size={26} />
-                      <b>انتخاب عکس</b>
+                      <b>انتخاب عکسِ رو</b>
                       <small>PNG یا JPG — هرچه باکیفیت‌تر بهتر</small>
                     </span>
                   )}
@@ -341,6 +411,30 @@ export function PhotoCardsPage({ request }) {
                 />
               </label>
             </Field>
+            <Field label="پشت کارت (اختیاری)">
+              <label className="photoDrop">
+                {previewBack
+                  ? <img src={previewBack} alt="پیش‌نمایش پشت کارت" />
+                  : (
+                    <span className="photoDropHint">
+                      <ImageIcon size={26} />
+                      <b>انتخاب عکسِ پشت</b>
+                      <small>اگر پشتِ کارت هم طرح دارد</small>
+                    </span>
+                  )}
+                <input
+                  type="file" accept="image/*" hidden
+                  onChange={e => pickBack(e.target.files?.[0])}
+                />
+              </label>
+            </Field>
+            <p className={`topbar-sub codeTypeHint${fileBack ? ' ok' : ''}`}>
+              {fileBack
+                ? '✅ هر دو عکس آنالیز می‌شوند — کاربر از هر طرف عکس '
+                  + 'بگیرد شناخته می‌شود.'
+                : 'ℹ️ اگر پشتِ کارت هم طرح دارد اضافه‌اش کنید، وگرنه '
+                  + 'کاربری که از پشت عکس بگیرد شناخته نمی‌شود.'}
+            </p>
           </div>
           <div className="stack">
             <Field label="نام کارت">
@@ -393,7 +487,9 @@ export function PhotoCardsPage({ request }) {
             </p>
 
             <Button icon={Upload} loading={uploading} onClick={uploadDesign}>
-              {ownCodes.trim() ? 'ثبت کارت و کدهای آن' : 'آپلود و ساخت اثر انگشت'}
+              {ownCodes.trim()
+                ? `ثبت کارت${fileBack ? ' (رو و پشت)' : ''} و کدهای آن`
+                : `ثبت کارت${fileBack ? ' (رو و پشت)' : ''}`}
             </Button>
           </div>
         </div>
@@ -612,8 +708,34 @@ export function PhotoCardsPage({ request }) {
             message="فیلتر را عوض کنید یا کد جدید وارد کنید." />
         )}
 
-        <div className="codeList">
-          {codes.map(c => (
+        {/* ══════════════════════════════════════════════════════════════
+            کدهای نام‌دار — زیرِ نامِ خودِ بازیکن
+            ══════════════════════════════════════════════════════════════
+
+            هر بازیکن یک ردیفِ بسته است که تعدادِ کدهایش را نشان می‌دهد.
+            کلیک که شود، فقط کدهای همان بازیکن باز می‌شوند.
+
+            چرا این مهم بود: با ۱۰۰۰ کد برای هر کارت، فهرستِ تخت یعنی
+            چند هزار ردیف پشت سر هم — مدیر برای رسیدن به بازیکنِ دوم
+            باید بی‌نهایت اسکرول می‌کرد. حالا هر بازیکن یک خط است. */}
+        {codeGroups.named.map(g => {
+          const open = openGroup === g.name;
+          return (
+            <div key={g.name} className={`codeGroup${open ? ' open' : ''}`}>
+              <button
+                type="button"
+                className="codeGroupHead"
+                onClick={() => setOpenGroup(open ? null : g.name)}
+              >
+                <span className="codeGroupName">🔗 {g.name}</span>
+                <span className="codeGroupCount">
+                  {fmtNumber(g.list.length)} کد
+                </span>
+                <span className="codeGroupChevron">{open ? '▲' : '▼'}</span>
+              </button>
+              {open && (
+                <div className="codeList">
+                  {g.list.map(c => (
             <div key={c.id} className="codeRow">
               {editing?.id === c.id ? (
                 <>
@@ -675,8 +797,111 @@ export function PhotoCardsPage({ request }) {
                 </>
               )}
             </div>
-          ))}
-        </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {/* ══════════════════════════════════════════════════════════════
+            بانکِ کدِ بی‌نام — بخشِ جدای خودش
+            ══════════════════════════════════════════════════════════════
+
+            خواستهٔ صریح مالک: «کد هایی که برای هیچ کارت بخصوصی مشخص
+            نشدن هم باید در قسمت مخصوص خودشون ویرایش بشن».
+
+            این‌ها جنسِ متفاوتی دارند: تشخیصشان کاملاً به عکس وابسته است
+            و آستانه‌شان سخت‌گیرتر (۴۰٪ به‌جای ۲۰٪). قاطی کردنشان با
+            کدهای نام‌دار باعث می‌شد مدیر نفهمد کدام‌یک کدام است. */}
+        {codeGroups.free.length > 0 && (
+          <div className={`codeGroup free${openGroup === '__free__' ? ' open' : ''}`}>
+            <button
+              type="button"
+              className="codeGroupHead"
+              onClick={() => setOpenGroup(
+                openGroup === '__free__' ? null : '__free__')}
+            >
+              <span className="codeGroupName">
+                ❓ بدون کارتِ مشخص — تشخیص از روی عکس
+              </span>
+              <span className="codeGroupCount">
+                {fmtNumber(codeGroups.free.length)} کد
+              </span>
+              <span className="codeGroupChevron">
+                {openGroup === '__free__' ? '▲' : '▼'}
+              </span>
+            </button>
+            {openGroup === '__free__' && (
+              <div className="codeList">
+                {codeGroups.free.map(c => (
+            <div key={c.id} className="codeRow">
+              {editing?.id === c.id ? (
+                <>
+                  <Input
+                    className="codeEditInput"
+                    dir="ltr"
+                    value={editing.code}
+                    onChange={e => setEditing({ ...editing, code: e.target.value })}
+                    onKeyDown={e => { if (e.key === 'Enter') saveEdit(); }}
+                  />
+                  <div className="codeRowActions">
+                    <Button size="sm" icon={Check} onClick={saveEdit}>ذخیره</Button>
+                    <Button size="sm" variant="secondary"
+                      onClick={() => setEditing(null)}>انصراف</Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <code className="codeVal">{c.code}</code>
+                  <div className="codeMeta">
+                    {c.batch_label && <span className="codeBatch">{c.batch_label}</span>}
+                    {/* کارتی که کد **از پیش** به آن گره خورده. با
+                        `card_type_name` فرق دارد: آن نتیجهٔ تطبیقِ عکس
+                        بعد از مصرف است، این تصمیمِ مدیر پیش از توزیع.
+                        نشانِ 🔗 تفکیکشان را در یک نگاه ممکن می‌کند. */}
+                    {c.expected_card_type_name && (
+                      <Badge tone="info">🔗 {c.expected_card_type_name}</Badge>
+                    )}
+                    {c.card_type_name && (
+                      <Badge tone="success">{c.card_type_name}</Badge>
+                    )}
+                    {c.used_by_mobile && (
+                      <span className="topbar-sub">{c.used_by_mobile}</span>
+                    )}
+                  </div>
+                  <div className="codeRowActions">
+                    {/* ── چرا دکمه‌ها بر پایهٔ وضعیت‌اند ──
+                        کدِ مصرف‌شده امتیاز داده و در اینونتوری نشسته؛
+                        ویرایش یا حذفش سابقه را دروغ می‌کند. سرور هم
+                        جلویش را می‌گیرد، ولی نشان دادنِ دکمه‌ای که
+                        همیشه خطا می‌دهد بدترین نوعِ رابط است. */}
+                    {(c.status === 'unused' || c.status === 'voided') && (
+                      <>
+                        <IconButton icon={Pencil} title="ویرایش"
+                          onClick={() => setEditing({ id: c.id, code: c.code })} />
+                        <IconButton icon={Trash2} title="حذف" variant="danger"
+                          onClick={() => removeCode(c)} />
+                      </>
+                    )}
+                    {c.status === 'unused' && (
+                      <IconButton icon={Ban} title="ابطال"
+                        onClick={() => voidCode(c)} />
+                    )}
+                    {c.status === 'voided' && (
+                      <IconButton icon={RotateCcw} title="بازگرداندن"
+                        onClick={() => restoreCode(c)} />
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {codes.length >= 300 && (
           <p className="topbar-sub">فقط ۳۰۰ کدِ اول نشان داده می‌شود — برای یافتن کدِ خاص از جست‌وجو استفاده کنید.</p>
         )}

@@ -46,12 +46,50 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
   /// فهرست کدها + فیلترِ وضعیت. مالک خواست بتواند کدها را ویرایش و
   /// حذف کند، و برای آن اول باید ببیندشان.
   List _codeList = [];
+
+  /// گروهِ بازشده در فهرستِ کدها. `null` یعنی همه بسته.
+  String? _openGroup;
+
+  /// ── گروه‌بندیِ کدها بر پایهٔ کارتی که به آن گره خورده‌اند ──
+  ///
+  /// getter ساده است و در هر رندر اجرا می‌شود، ولی `_codeList` سقفِ
+  /// ۳۰۰ ردیف دارد (سرور بیشتر نمی‌دهد) پس هزینه‌اش ناچیز است. کش
+  /// کردنش یعنی یک منبعِ حقیقتِ دوم که باید هم‌گام نگه داشته شود —
+  /// همان چیزی که در `home_shell` باگِ کندی ساخت.
+  List<MapEntry<String, List>> get _namedGroups {
+    final m = <String, List>{};
+    for (final c in _codeList.cast<Map>()) {
+      final k = c['expected_card_type_name'];
+      if (k == null) continue;
+      (m['$k'] ??= []).add(c);
+    }
+    final out = m.entries.toList()
+      ..sort((a, b) => b.value.length.compareTo(a.value.length));
+    return out;
+  }
+
+  /// کدهایی که مالِ هیچ کارتِ مشخصی نیستند.
+  List get _freeCodes => _codeList
+      .cast<Map>()
+      .where((c) => c['expected_card_type_name'] == null)
+      .toList();
   String _codeFilter = 'unused';
   bool _loading = true;
   String? _loadError;
 
   // فرم طرح
   String? _pickedImage;
+
+  /// ── عکسِ پشتِ کارت، اختیاری ──
+  ///
+  /// خواستهٔ مالک: «ادمین برای هر عکس کارت ۲ تا عکس بفرسه هم‌زمان هر ۲
+  /// عکس آنالیز شن». هر عکس طرحِ مستقلِ خودش می‌شود ولی هر دو به یک
+  /// نوعِ کارت وصل می‌شوند، پس کاربر از هر طرف عکس بگیرد شناخته می‌شود.
+  ///
+  /// چرا ادغام نمی‌شوند: شباهتِ تصویریِ رو و پشت روی کارت‌های واقعی فقط
+  /// ۰.۳۸ اندازه‌گیری شد — کمتر از شباهتِ دو بازیکنِ متفاوت. یک
+  /// اثرانگشتِ مشترک هر دو را خراب می‌کرد.
+  String? _pickedBack;
   final _name = TextEditingController();
   final _points = TextEditingController();
   final _cash = TextEditingController();
@@ -155,7 +193,8 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
   }
 
-  Future<void> _pickImage() async {
+  /// `back = true` یعنی انتخابگر برای پشتِ کارت است.
+  Future<void> _pickImage({bool back = false}) async {
     try {
       final f = await ImagePicker().pickImage(
         source: ImageSource.gallery,
@@ -165,7 +204,13 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
         imageQuality: 92,
       );
       if (f == null) return;
-      setState(() => _pickedImage = f.path);
+      setState(() {
+        if (back) {
+          _pickedBack = f.path;
+        } else {
+          _pickedImage = f.path;
+        }
+      });
     } catch (e) {
       _snack(apiError(e));
     }
@@ -179,6 +224,9 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
       final res = await widget.api.postMultipart(
         '/api/admin/photo-cards/designs',
         filePath: _pickedImage,
+        // پشت فقط وقتی فرستاده می‌شود که انتخاب شده باشد؛ سرور نبودش
+        // را «کارتِ یک‌طرفه» تفسیر می‌کند نه خطا.
+        extraFiles: _pickedBack != null ? {'imageBack': _pickedBack!} : const {},
         fields: {
           'name': _name.text.trim(),
           'pointValue': _points.text.trim().isEmpty ? '0' : _points.text.trim(),
@@ -197,9 +245,10 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
         return;
       }
 
-      _snack(d['message']?.toString() ?? 'طرح ثبت شد');
+      _snack(d['message']?.toString() ?? 'کارت ثبت شد');
       setState(() {
         _pickedImage = null;
+        _pickedBack = null;
         _name.clear();
         _points.clear();
         _cash.clear();
@@ -429,48 +478,100 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
     );
   }
 
+  /// یک خانهٔ انتخابِ عکس با پیش‌نمایش.
+  ///
+  /// چرا تابعِ مشترک و نه دو بلوکِ کپی‌شده: رو و پشت باید **دقیقاً** یک
+  /// ظاهر و یک رفتار داشته باشند. کپی‌پیست یعنی روزی یکی‌شان عوض
+  /// می‌شود و دیگری نه — همان اشتباهی که یک بار با `releaseGuard` رخ
+  /// داد و ۵۰۰ به مدیر می‌داد.
+  Widget _photoSlot(BuildContext context,
+      {required String label,
+      required String? path,
+      required VoidCallback onTap}) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Gaps.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: Gaps.xxs),
+            child: Text(label,
+                style: theme.textTheme.labelLarge
+                    ?.copyWith(fontWeight: FontWeight.w800)),
+          ),
+          InkWell(
+            onTap: _uploading ? null : onTap,
+            borderRadius: Corners.rLg,
+            child: Container(
+              height: 170,
+              decoration: BoxDecoration(
+                borderRadius: Corners.rLg,
+                border: Border.all(
+                    color: theme.colorScheme.outline.withValues(alpha: 0.5)),
+                color: theme.colorScheme.surfaceContainerHighest
+                    .withValues(alpha: 0.35),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: path == null
+                  ? Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.add_photo_alternate_rounded,
+                            size: 32, color: theme.colorScheme.primary),
+                        const SizedBox(height: Gaps.xs),
+                        Text('انتخاب عکس', style: theme.textTheme.titleSmall),
+                        Text('هرچه باکیفیت‌تر، بهتر',
+                            style: theme.textTheme.bodySmall),
+                      ],
+                    )
+                  : Image.file(
+                      File(path),
+                      fit: BoxFit.contain,
+                      width: double.infinity,
+                      // اگر فایل بین انتخاب و رندر پاک شود (مثلاً کاربر
+                      // از گالری حذفش کند) نباید کل صفحه با استثنا
+                      // بشکند.
+                      errorBuilder: (_, __, ___) => const Center(
+                          child: Icon(Icons.broken_image_outlined, size: 30)),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ── ۱. آپلود عکس خام ──
   Widget _designForm(BuildContext context) {
     final theme = Theme.of(context);
     return FormSection(
-      title: 'آپلود عکس خام کارت',
-      subtitle: 'عکس باکیفیت کارت را بگذارید. سیستم اثر انگشت تصویر را '
-          'می‌سازد تا بعداً عکسِ کاربر را با آن تطبیق دهد.',
+      title: 'تعریف کارت (رو و پشت)',
+      subtitle: 'عکس باکیفیت هر دو طرفِ کارت را بگذارید. سیستم برای هر '
+          'کدام اثر انگشت جدا می‌سازد و هر دو به همین کارت وصل می‌شوند.',
       children: [
-        InkWell(
-          onTap: _uploading ? null : _pickImage,
-          borderRadius: Corners.rLg,
-          child: Container(
-            height: 190,
-            decoration: BoxDecoration(
-              borderRadius: Corners.rLg,
-              border: Border.all(
-                  color: theme.colorScheme.outline.withValues(alpha: 0.5)),
-              color: theme.colorScheme.surfaceContainerHighest
-                  .withValues(alpha: 0.35),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: _pickedImage == null
-                ? Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.add_photo_alternate_rounded,
-                          size: 34, color: theme.colorScheme.primary),
-                      const SizedBox(height: Gaps.xs),
-                      Text('انتخاب عکس', style: theme.textTheme.titleSmall),
-                      Text('هرچه باکیفیت‌تر، بهتر',
-                          style: theme.textTheme.bodySmall),
-                    ],
-                  )
-                : Image.file(
-                    File(_pickedImage!),
-                    fit: BoxFit.contain,
-                    width: double.infinity,
-                    // اگر فایل بین انتخاب و رندر پاک شود (مثلاً کاربر از
-                    // گالری حذفش کند) نباید کل صفحه با استثنا بشکند.
-                    errorBuilder: (_, __, ___) => const Center(
-                        child: Icon(Icons.broken_image_outlined, size: 30)),
-                  ),
+        // ══════════════════════════════════════════════════════════════
+        // دو انتخابگر: روی کارت و پشتِ کارت
+        // ══════════════════════════════════════════════════════════════
+        //
+        // پشت اختیاری است — کارت‌هایی که فقط یک طرفشان طرح دارد هم باید
+        // ثبت شوند. ولی اگر پشت هم طرح دارد و آپلود نشود، کاربری که از
+        // پشت عکس بگیرد شناخته نمی‌شود؛ راهنمای زیرِ کادرها همین را
+        // صریح می‌گوید.
+        _photoSlot(context, label: 'روی کارت', path: _pickedImage,
+            onTap: () => _pickImage()),
+        _photoSlot(context, label: 'پشت کارت (اختیاری)', path: _pickedBack,
+            onTap: () => _pickImage(back: true)),
+        Text(
+          _pickedBack != null
+              ? '✅ هر دو عکس آنالیز می‌شوند — کاربر از هر طرف عکس بگیرد '
+                  'شناخته می‌شود.'
+              : 'ℹ️ اگر پشتِ کارت هم طرح دارد اضافه‌اش کنید، وگرنه کاربری '
+                  'که از پشت عکس بگیرد شناخته نمی‌شود.',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: _pickedBack != null
+                ? BrandColors.successOnLight
+                : theme.colorScheme.onSurfaceVariant,
           ),
         ),
         TextField(
@@ -789,8 +890,39 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
             title: 'کدی در این دسته نیست',
             message: 'فیلتر را عوض کنید یا کد جدید وارد کنید.',
           ),
-        for (final c in _codeList.cast<Map>())
-          Container(
+        // ══════════════════════════════════════════════════════════════
+        // گروه‌بندی زیرِ نامِ بازیکن
+        // ══════════════════════════════════════════════════════════════
+        //
+        // شکایتِ مالک: «برای کد هایی که ثبت شدن باید روی خود بازیکن
+        // ویرایش کرد و کد هاشو دید، نباید انقدر اسکرول طولانی بشه».
+        //
+        // با ۱۰۰۰ کد در هر کارت، فهرستِ تخت روی موبایل عملاً بی‌نهایت
+        // اسکرول بود. حالا هر بازیکن یک ردیفِ بسته است و فقط گروهِ
+        // بازشده کدهایش را نشان می‌دهد.
+        for (final g in _namedGroups)
+          _codeGroup(context, theme,
+              key: g.key, title: '🔗 ${g.key}', list: g.value),
+        // کدهای بی‌نام بخشِ جدای خودشان را دارند: جنسشان فرق می‌کند
+        // (تشخیص کاملاً از روی عکس، آستانهٔ ۴۰٪ به‌جای ۲۰٪) و قاطی
+        // کردنشان باعث می‌شد مدیر نفهمد کدام‌یک کدام است.
+        if (_freeCodes.isNotEmpty)
+          _codeGroup(context, theme,
+              key: '__free__',
+              title: '❓ بدون کارتِ مشخص — تشخیص از روی عکس',
+              list: _freeCodes,
+              accent: BrandColors.warningOnLight),
+      ],
+    );
+  }
+
+  /// یک ردیفِ کد با دکمه‌های عملیات.
+  ///
+  /// از بدنهٔ فهرست جدا شد تا هم گروهِ نام‌دار و هم گروهِ بی‌نام از یک
+  /// کد استفاده کنند. کپی‌پیستِ ۷۳ خط بین دو جا یعنی روزی یکی عوض
+  /// می‌شود و دیگری نه.
+  Widget _codeRow(BuildContext context, Map c, ThemeData theme) {
+    return Container(
             margin: const EdgeInsets.only(bottom: 6),
             padding: const EdgeInsets.symmetric(
                 horizontal: Gaps.sm, vertical: Gaps.xs),
@@ -862,8 +994,74 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
                   ),
               ],
             ),
+    );
+  }
+
+  /// یک گروهِ تاشو از کدها.
+  Widget _codeGroup(BuildContext context, ThemeData theme,
+      {required String key,
+      required String title,
+      required List list,
+      Color? accent}) {
+    final open = _openGroup == key;
+    return Container(
+      margin: const EdgeInsets.only(bottom: Gaps.xs),
+      decoration: BoxDecoration(
+        borderRadius: Corners.rMd,
+        border: Border.all(
+          color: open
+              ? theme.colorScheme.primary.withValues(alpha: 0.6)
+              : theme.colorScheme.outline.withValues(alpha: 0.35),
+        ),
+        color: theme.colorScheme.surfaceContainerHighest
+            .withValues(alpha: 0.18),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () => setState(() => _openGroup = open ? null : key),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: Gaps.sm, vertical: Gaps.sm),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(title,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w800, color: accent)),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 9, vertical: 2),
+                    decoration: BoxDecoration(
+                      borderRadius: Corners.rPill,
+                      color: theme.colorScheme.surfaceContainerHighest,
+                    ),
+                    child: Text('${faNum(list.length)} کد',
+                        style: theme.textTheme.labelSmall),
+                  ),
+                  const SizedBox(width: Gaps.xs),
+                  Icon(open
+                      ? Icons.keyboard_arrow_up_rounded
+                      : Icons.keyboard_arrow_down_rounded),
+                ],
+              ),
+            ),
           ),
-      ],
+          if (open)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                  Gaps.xs, 0, Gaps.xs, Gaps.xs),
+              child: Column(
+                children: [
+                  for (final c in list.cast<Map>())
+                    _codeRow(context, c, theme),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 

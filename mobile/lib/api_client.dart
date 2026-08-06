@@ -432,15 +432,27 @@ class ApiClient {
   /// `validateStatus` عمداً همه را می‌پذیرد: این مسیر برای ۴۰۴ (کدِ
   /// غلط) و ۴۲۹ (قفل) بدنهٔ معناداری برمی‌گرداند که باید خوانده شود،
   /// نه اینکه به استثنا تبدیل شود و پیامش گم شود.
+  /// ارسالِ چندبخشی با یک یا چند فایل.
+  ///
+  /// `extraFiles` برای مسیرهایی است که بیش از یک تصویر می‌گیرند — مثلِ
+  /// «ثبت کارت» که رو و پشتِ کارت را هم‌زمان می‌فرستد. کلیدِ نقشه نامِ
+  /// فیلد است و مقدارش مسیرِ فایل.
+  ///
+  /// `filePath` تکی دست‌نخورده ماند تا هیچ‌کدام از فراخوان‌های موجود
+  /// نشکنند.
   Future<Response<dynamic>> postMultipart(
     String path, {
     String? filePath,
     String fileField = 'image',
+    Map<String, String> extraFiles = const {},
     Map<String, dynamic> fields = const {},
   }) async {
     final map = <String, dynamic>{...fields};
     if (filePath != null) {
       map[fileField] = await MultipartFile.fromFile(filePath);
+    }
+    for (final e in extraFiles.entries) {
+      map[e.key] = await MultipartFile.fromFile(e.value);
     }
     return dio.post(
       path,

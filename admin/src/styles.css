@@ -1221,6 +1221,58 @@ table.data-table {
 /* ── فهرست و مدیریتِ کدها ────────────────────────────────────────────── */
 .codeSearchRow { margin-bottom: var(--gg-space-3); max-width: 320px; }
 
+/* ══════════════════════════════════════════════════════════════════════
+   گروه‌بندیِ کدها زیرِ نامِ بازیکن
+   ══════════════════════════════════════════════════════════════════════
+
+   با ۱۰۰۰ کد برای هر کارت، فهرستِ تخت چند هزار ردیف می‌شد و مدیر برای
+   رسیدن به بازیکنِ دوم بی‌نهایت اسکرول می‌کرد. حالا هر بازیکن یک خطِ
+   بسته است و فقط گروهِ بازشده ردیف نشان می‌دهد. */
+.codeGroup {
+  border: 1px solid var(--gg-border);
+  border-radius: var(--gg-radius-md);
+  margin-bottom: 8px;
+  overflow: hidden;
+  background: var(--gg-surface-high);
+}
+.codeGroup.open { border-color: var(--gg-emerald); }
+
+.codeGroupHead {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  color: inherit;
+  text-align: start;
+  transition: background .15s;
+}
+.codeGroupHead:hover { background: var(--gg-surface-highest); }
+
+.codeGroupName { flex: 1; font-weight: 700; }
+
+/* شمارنده به شکلِ قرص، تا در یک نگاه معلوم شود کدام بازیکن چند کد دارد */
+.codeGroupCount {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--gg-surface-highest);
+  color: var(--gg-text-muted);
+  white-space: nowrap;
+}
+.codeGroupChevron { font-size: 10px; opacity: .6; }
+
+/* گروهِ بی‌نام رنگِ متفاوت می‌گیرد: جنسش فرق دارد (آستانهٔ ۴۰٪ به‌جای
+   ۲۰٪) و مدیر باید در یک نگاه تفکیکش کند. */
+.codeGroup.free .codeGroupName { color: var(--gg-amber); }
+
+.codeGroup .codeList { padding: 4px 10px 12px; }
+
 .codeList { display: flex; flex-direction: column; gap: 6px; }
 .codeRow {
   display: flex;
