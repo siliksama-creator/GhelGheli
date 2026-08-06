@@ -44,12 +44,35 @@ B = '--ts'
 
 # طرح‌های واقعی که مالک آپلود کرده. اگر نبودند تست با پیامِ روشن رد
 # می‌شود به‌جای اینکه با خطای مبهم بترکد.
-REAL = {
-    'hakimi_front': '1786001887532-u3uak3gz3al.webp',
-    'hakimi_back': '1786002127039-7yy994wiifi.webp',
-    'dembele_front': '1786002355596-yu7z2yqws2f.webp',
-    'dembele_back': '1786002420400-wgdyz78ul3.webp',
-}
+# ⚠️ نامِ فایل‌ها ثابت نیست: هر بار که مالک کاتالوگ را پاک و دوباره
+#    آپلود می‌کند، نام‌ها عوض می‌شوند. پس به‌جای رشتهٔ سفت‌وسخت، از
+#    خودِ API پرسیده می‌شود.
+#
+#    نسخهٔ قبلی نام‌ها را هاردکد کرده بود و بعد از اولین پاکسازی با
+#    پیامِ «تصویرِ مرجع روی سرور نیست» رد می‌شد — تستی که به‌خاطر
+#    دادهٔ عوض‌شده می‌میرد، نه به‌خاطر باگ.
+REAL = {}
+
+
+def discover(admin_tok):
+    """طرح‌های موجود را از کاتالوگ می‌گیرد و رو/پشتِ هر کارت را جدا می‌کند."""
+    st, d = req('GET', '/api/admin/photo-cards/designs', admin_tok)
+    if st != 200:
+        raise SystemExit(f'✗ فهرستِ طرح‌ها خوانده نشد: {st}')
+    by = {}
+    for x in d.get('designs', []):
+        n = str(x.get('card_type_name', ''))
+        by.setdefault(n, []).append(x.get('image_url', ''))
+    out = {}
+    for n, urls in by.items():
+        if len(urls) < 2:
+            continue
+        key = 'hakimi' if 'Hakimi' in n else ('dembele' if 'Demb' in n else None)
+        if not key:
+            continue
+        out[f'{key}_front'] = urls[0].split('/')[-1]
+        out[f'{key}_back'] = urls[1].split('/')[-1]
+    return out
 
 
 def req(m, p, tok=None, body=None, files=None):
@@ -152,6 +175,12 @@ apw = sys.argv[1]
 at = admin_token(apw)
 
 print('\n══ آماده‌سازی ══')
+REAL.update(discover(at))
+if len(REAL) < 4:
+    raise SystemExit(
+        '✗ کاتالوگ دو کارتِ دوطرفه ندارد.\n'
+        '  این تست به کارت‌های واقعیِ آپلودشده نیاز دارد — گرادیانِ\n'
+        '  ساختگی قالبِ مشترکِ کارت‌ها را بازتولید نمی‌کند.')
 src = {}
 for k, v in REAL.items():
     src[k] = fetch(v)

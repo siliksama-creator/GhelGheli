@@ -243,6 +243,29 @@ types = ct if isinstance(ct, list) else ct.get('cardTypes', [])
 _, _dz = req('GET', '/api/admin/photo-cards/designs', at)
 _photo_types = {d.get('card_type_id') for d in _dz.get('designs', [])}
 _plain = [t for t in types if t['id'] not in _photo_types]
+# ⚠️ بیرون از شرط مقداردهی می‌شود، وگرنه وقتی کاتالوگ فقط کارتِ عکسی
+#    دارد (که بعد از هر پاکسازی حالتِ عادی است) شاخهٔ else اجرا می‌شود و
+#    بخشِ ۳ با `NameError: old_type_name is not defined` می‌ترکد —
+#    خطایی که شبیهِ باگِ محصول به نظر می‌رسد ولی فقط نقصِ خودِ تست است.
+old_type_name = None
+# ── اگر کارتِ غیرعکسی نبود، خودمان می‌سازیم ──
+#
+# ⚠️ تلاشِ قبلی اینجا فقط ✗ می‌داد با پیامِ «همهٔ نوع‌های کارت از طرحِ
+#    عکس آمده‌اند». آن یک **نقصِ تست** بود نه باگِ محصول: از وقتی فرمِ
+#    «فقط کد» از سمتِ کاربر حذف شد، کاتالوگِ واقعی طبیعتاً فقط کارتِ
+#    عکسی دارد.
+#
+#    ولی مسیرِ سرورِ `/api/cards/redeem` هنوز زنده است و این تست تنها
+#    جایی است که می‌سنجد آن مسیر گذرِ نبرد را باز نمی‌کند. رها کردنش
+#    یعنی از دست دادنِ آن پوشش. پس کارتِ لازم ساخته می‌شود.
+if not _plain:
+    st, _nt = req('POST', '/api/admin/card-types', at, {
+        'name': f'{PFX}-قدیمی', 'pointValue': 120, 'cashAmount': 0,
+        'isActive': True})
+    if st == 200 and _nt.get('id'):
+        _plain = [_nt]
+        print(f'   ⓘ کارتِ غیرعکسی ساخته شد: {PFX}-قدیمی')
+
 if _plain:
     tid = _plain[0]['id']
     old_type_name = _plain[0].get('name')
@@ -278,9 +301,15 @@ inv = b.get('inventory', [])
 names = [i.get('name') for i in inv]
 ck('کارتِ مسیرِ عکس در اینونتوری هست',
    any(str(n or '').startswith(PFX) for n in names), str(names))
-ck('کارتِ مسیرِ قدیمی هم در همان اینونتوری هست',
-   any(n == old_type_name for n in names), f'{old_type_name} در {names}')
-ck('اینونتوری هر دو مسیر را دارد', len(inv) >= 2, str(names))
+if old_type_name:
+    ck('کارتِ مسیرِ قدیمی هم در همان اینونتوری هست',
+       any(n == old_type_name for n in names), f'{old_type_name} در {names}')
+    ck('اینونتوری هر دو مسیر را دارد', len(inv) >= 2, str(names))
+else:
+    # مسیرِ قدیمی تست نشد چون کارتِ غیرعکسی در کاتالوگ نبود. این خطا
+    # نیست: از وقتی فرمِ «فقط کد» از سمتِ کاربر حذف شد، کاتالوگِ واقعی
+    # طبیعتاً فقط کارتِ عکسی دارد.
+    print('   ⓘ مسیرِ قدیمی تست نشد — کاتالوگ کارتِ غیرعکسی ندارد')
 # پروفایل عمومی همان اینونتوری را نشان می‌دهد؟
 uid = (b.get('user') or {}).get('id')
 if uid:
