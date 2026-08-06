@@ -594,7 +594,12 @@
 .wcIcon{font-size:18px}
 .wcBody{flex:1;display:flex;flex-direction:column;min-width:0}
 .wcBody b{font-size:14px;letter-spacing:1px;direction:ltr;text-align:left;unicode-bidi:isolate}
-.wcBody small{font-size:11px;color:#dff3ec}
+.wcBody small{font-size:11px;color:#f2fbf8}
+/* ── چرا این رنگ روشن‌تر شد ──
+   ممیزیِ پیکسلی نسبتِ ۴.۴۶ داد در برابرِ نیازِ WCAG یعنی ۴.۵ —
+   فاصلهٔ ۰.۰۴. مرزی است ولی واقعی: این متن روی سبزِ کارتِ بانکی
+   می‌نشیند و «برای برداشت لازم است» دقیقاً همان جمله‌ای است که
+   کاربر باید ببیند تا کارتش را ثبت کند. */
 .wcArrow{font-size:20px;color:#ffffffb0}
 
 .walletActions{display:flex;gap:10px;margin-bottom:10px}
