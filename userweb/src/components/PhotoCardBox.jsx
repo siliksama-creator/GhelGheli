@@ -140,6 +140,13 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
   const [result, setResult] = useState(null);
   const [locked, setLocked] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+
+  // ── تعدادِ طرح‌های کاتالوگ ──
+  //
+  // فقط برای زمان‌بندیِ لودینگ. مقایسه با ۲۰۰ طرح ۲.۵ms طول می‌کشد
+  // (اندازه‌گیری‌شده) پس عملاً بی‌اثر است، ولی آپلودِ شبکه با کاتالوگِ
+  // بزرگ‌تر کندتر می‌شود چون سرور مشغول‌تر است.
+  const [designCount, setDesignCount] = useState(0);
   // با تغییرش، وضعیت از سرور دوباره خوانده می‌شود.
   const [refreshKey, setRefreshKey] = useState(0);
   const previewRef = useRef('');
@@ -169,6 +176,7 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
         // حالا سرور تعدادِ واقعیِ پرونده‌های در انتظار را می‌گوید و
         // بنر بر پایهٔ همان ساخته می‌شود.
         setPendingCount(Number(d.pendingCount) || 0);
+        setDesignCount(Number(d.designCount) || 0);
       })
       // خطا یعنی «نشان نده». این بخش اختیاری است و نباید صفحهٔ اصلی را
       // با پیام خطا شلوغ کند.
@@ -208,12 +216,21 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
     setBusy(true);
     setResult(null);
     setPhase(0);
-    // زمان‌بندی از اندازه‌گیریِ واقعیِ موتور می‌آید (بالا توضیح داده شد).
-    // اگر پاسخ زودتر برسد، `finally` تایمرها را پاک می‌کند.
+    // ── زمان‌بندی، متناسب با اندازهٔ کاتالوگ ──
+    //
+    // اعدادِ پایه از اندازه‌گیریِ واقعیِ موتور آمده‌اند. `slack` برای
+    // کاتالوگِ بزرگ کمی فاصله می‌دهد: خودِ مقایسه ۲.۵ms است (حتی با
+    // ۲۰۰ طرح)، ولی سرور با کاتالوگِ بزرگ‌تر ردیف‌های بیشتری از
+    // دیتابیس می‌خواند و در ساعتِ شلوغ کندتر پاسخ می‌دهد.
+    //
+    // ⚠️ سقفِ ۱.۵ ثانیه: بدونِ آن با ۵۰۰ کارت مرحلهٔ آخر دیر ظاهر
+    //    می‌شد و کاربر نوارِ متوقف می‌دید — دقیقاً همان حسِ «هنگ کرده»
+    //    که این لودینگ برای رفعش ساخته شده.
+    const slack = Math.min(1500, Math.round(designCount * 3));
     const timers = [
       setTimeout(() => setPhase(1), 350),
       setTimeout(() => setPhase(2), 750),
-      setTimeout(() => setPhase(3), 1700),
+      setTimeout(() => setPhase(3), 1700 + slack),
     ];
     try {
       const small = await shrink(file);

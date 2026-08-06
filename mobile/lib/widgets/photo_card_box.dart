@@ -136,6 +136,13 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
   /// مجموعه‌اش اضافه شده بود.
   int _pendingCount = 0;
 
+  /// تعدادِ طرح‌های کاتالوگ — فقط برای زمان‌بندیِ لودینگ.
+  ///
+  /// خودِ مقایسه با ۲۰۰ طرح ۲.۵ms است (اندازه‌گیری‌شده)، ولی سرور با
+  /// کاتالوگِ بزرگ‌تر ردیف‌های بیشتری می‌خواند و در ساعتِ شلوغ کندتر
+  /// پاسخ می‌دهد.
+  int _designCount = 0;
+
   Map? _result;
   String? _error;
 
@@ -187,6 +194,7 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
       setState(() {
         _available = r['available'] == true;
         _pendingCount = (r['pendingCount'] as num?)?.toInt() ?? 0;
+        _designCount = (r['designCount'] as num?)?.toInt() ?? 0;
         _checking = false;
       });
     } catch (_) {
@@ -242,12 +250,16 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
     for (final t in _phaseTimers) {
       t.cancel();
     }
+    // ⚠️ سقفِ ۱.۵ ثانیه برای `slack`: بدونِ آن با کاتالوگِ چندصدتایی
+    //    مرحلهٔ آخر دیر ظاهر می‌شد و کاربر نوارِ متوقف می‌دید — همان
+    //    حسِ «هنگ کرده» که این لودینگ برای رفعش ساخته شده.
+    final slack = (_designCount * 3).clamp(0, 1500);
     _phaseTimers
       ..clear()
       ..addAll([
         Timer(const Duration(milliseconds: 350),
             () { if (mounted) setState(() => _phase = 1); }),
-        Timer(const Duration(milliseconds: 1200),
+        Timer(Duration(milliseconds: 1200 + slack),
             () { if (mounted) setState(() => _phase = 2); }),
       ]);
     try {

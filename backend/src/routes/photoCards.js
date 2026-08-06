@@ -263,7 +263,10 @@ module.exports = function createPhotoCardRoutes(deps) {
         // آن‌وقت شرطِ «حاشیه تا رتبهٔ دوم» هرگز برآورده نمی‌شد — یعنی
         // همهٔ ثبت‌های آن کارت تا ابد به بررسیِ دستی می‌رفتند، بی‌صدا.
         if (sides.length === 2) {
-          const selfSim = fpEngine.similarity(sides[0].fp, sides[1].fp);
+          // `sameImageScore` و نه `similarity` خام: اگر متنِ دو عکس
+          // فرق کند قطعاً دو کارتِ متفاوت‌اند، هرچقدر هم تصویرشان
+          // شبیه باشد. توضیحِ کامل در خودِ تابع.
+          const selfSim = fpEngine.sameImageScore(sides[0].fp, sides[1].fp);
           if (selfSim >= DUPLICATE_SIMILARITY) {
             return res.status(409).json({
               message: 'عکسِ رو و پشت تقریباً یکسان‌اند '
@@ -304,7 +307,7 @@ module.exports = function createPhotoCardRoutes(deps) {
           let sim = 0;
           let simSide = sides[0];
           for (const side of sides) {
-            const v = fpEngine.similarity(side.fp, {
+            const v = fpEngine.sameImageScore(side.fp, {
               dhash: row.dhash,
               phash: row.phash,
               colorSig: toFloats(row.color_sig),

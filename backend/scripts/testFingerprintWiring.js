@@ -220,6 +220,43 @@ console.log('\n══ ۱. هر سیگنالِ اثرانگشت ستونِ خود
     `${JSON.stringify(dTokens)} — عددِ تنها معمولاً نویز است و `
     + 'نامتقارنی می‌سازد');
 
+  console.log('\n══ ۹. گاردِ طرحِ تکراری ══');
+  // ── دو باگِ متضاد که اندازه‌گیری روی کارت‌های هم‌قالب گرفت ──
+  //
+  //   الف) دو هم‌تیمیِ متفاوت (Mbappé و Griezmann) نمرهٔ ۰.۹۳۱ گرفتند
+  //        و «تکراری» اعلام می‌شدند — مدیر نمی‌توانست کارتِ دوم را
+  //        ثبت کند.
+  //
+  //   ب) همان کارت با فرمتِ متفاوت (PNG→JPEG) نمرهٔ ۰.۸۹۵ گرفت و
+  //        گارد **نمی‌گرفتش** — دقیقاً حالتی که برایش ساخته شده بود.
+  const mk = (name, num, hue) => sharp({
+    create: { width: 400, height: 600, channels: 3,
+      background: { r: 242, g: 242, b: 244 } },
+  }).composite([{
+    input: Buffer.from(
+      `<svg width="400" height="600">`
+      + `<rect width="400" height="110" fill="hsl(${hue},65%,42%)"/>`
+      + `<circle cx="200" cy="230" r="95" fill="#e8c9a0"/>`
+      + `<text x="200" y="420" font-size="70" font-weight="bold" `
+      + `fill="#111" text-anchor="middle">${num}</text>`
+      + `<text x="200" y="520" font-size="40" font-weight="bold" `
+      + `fill="#111" text-anchor="middle">${name}</text></svg>`),
+    top: 0, left: 0,
+  }]).png().toBuffer();
+
+  const pngA = await mk('MBAPPE', 10, 210);
+  const fA = await fp.fingerprint(pngA);
+  const fJpeg = await fp.fingerprint(await sharp(pngA).jpeg({ quality: 80 }).toBuffer());
+  const fOther = await fp.fingerprint(await mk('GRIEZMANN', 7, 210));
+
+  const sSame = fp.sameImageScore(fA, fJpeg);
+  ck('همان تصویر با فرمتِ متفاوت «تکراری» تشخیص داده می‌شود',
+    sSame >= 0.93, `نمره=${sSame.toFixed(3)} (آستانه ۰.۹۳)`);
+
+  const sDiff = fp.sameImageScore(fA, fOther);
+  ck('دو بازیکنِ متفاوت با قالبِ یکسان «تکراری» نیستند',
+    sDiff < 0.93, `نمره=${sDiff.toFixed(3)} — مدیر باید بتواند هر دو را ثبت کند`);
+
   console.log(`\n${fail ? '✗' : '✓'} ${pass} موفق، ${fail} ناموفق\n`);
   process.exit(fail ? 1 : 0);
 })().catch(e => {
