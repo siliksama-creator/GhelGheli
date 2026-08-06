@@ -30,6 +30,26 @@
 ///   bad_code   کد غلط → راهنمای حروفِ مبهم + شمارشِ تلاش
 ///   locked     ۵ کدِ غلطِ پشت‌سرهم → ۳ ساعت قفل
 ///
+/// ═══════════════════════════════════════════════════════════════════════════
+/// چند نسخه از یک کارت: عکس می‌ماند، فقط کد پاک می‌شود
+/// ═══════════════════════════════════════════════════════════════════════════
+///
+/// حالتِ رایجِ واقعی این است: کاربر ده بسته کارت خریده و پنج تای‌شان
+/// «محمد صلاح» درآمده. هر پنج کارت **از نظر تصویری کاملاً یکسان‌اند** و
+/// فقط کدِ پشت‌شان فرق می‌کند.
+///
+/// نسخهٔ قبلی بعد از هر ثبتِ موفق عکس را پاک می‌کرد، با این فرض که
+/// «کارتِ بعدی عکسِ دیگری دارد». آن فرض غلط بود و کاربر مجبور می‌شد پنج
+/// بار از پنج کارتِ یکسان عکس بگیرد — کاری بی‌معنی که فقط او را خسته
+/// می‌کرد.
+///
+/// حالا عکس می‌ماند و فقط فیلدِ کد خالی و فوکوس می‌شود. کاربر کدِ بعدی
+/// را تایپ می‌کند و دوباره «ثبت» می‌زند. اگر کارتِ بعدی واقعاً متفاوت
+/// است، خودش دکمهٔ ✕ روی عکس را می‌زند یا عکسِ تازه می‌گیرد.
+///
+/// سمتِ سرور **هیچ** محدودیتی روی تکرارِ عکس ندارد؛ اصالت را کد تضمین
+/// می‌کند و هر کد فقط یک بار مصرف می‌شود.
+///
 /// **همان دیتابیس و همان بانک کدِ وب‌اپ و پنل.** هیچ داده یا مسیرِ
 /// جداگانه‌ای وجود ندارد.
 library;
@@ -60,6 +80,12 @@ class PhotoCardBox extends StatefulWidget {
 
 class _PhotoCardBoxState extends State<PhotoCardBox> {
   final _code = TextEditingController();
+
+  /// فوکوسِ فیلدِ کد.
+  ///
+  /// بعد از هر ثبتِ موفق دوباره فوکوس می‌گیرد تا کاربری که چند نسخه از
+  /// یک کارت دارد بتواند بدونِ لمسِ اضافه کدِ بعدی را تایپ کند.
+  final _codeFocus = FocusNode();
   String? _imagePath;
   bool _busy = false;
   bool _checking = true;
@@ -107,6 +133,10 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
   @override
   void dispose() {
     _code.dispose();
+    // ⚠️ FocusNode هم مثل Controller باید dispose شود، وگرنه نشتِ
+    // حافظه می‌دهد و در تست‌های ویجت با «A FocusNode was used after
+    // being disposed» یا هشدارِ نشت گیر می‌کند.
+    _codeFocus.dispose();
     super.dispose();
   }
 
@@ -187,17 +217,6 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
         return;
       }
 
-      // ── همان عکس، هنوز در صف بررسی ──
-      // عکس پاک می‌شود چون کاربر باید عکسِ **کارتِ دیگری** بگیرد؛
-      // نگه داشتنش فقط تشویقش می‌کند دوباره همان را بفرستد.
-      if (status == 'duplicate_pending') {
-        setState(() {
-          _result = d;
-          _imagePath = null;
-        });
-        return;
-      }
-
       // ── کدِ غلط: عکس عمداً نگه داشته می‌شود ──
       // کاربر فقط باید کد را اصلاح کند؛ مجبور کردنش به عکس‌گرفتنِ
       // دوباره بی‌دلیل آزاردهنده است.
@@ -213,9 +232,15 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
 
       setState(() {
         _result = d;
-        _imagePath = null;
+        // ⚠️ عکس عمداً **پاک نمی‌شود** — توضیح کامل در سربرگِ فایل.
+        // کاربری که پنج نسخه از یک کارت دارد باید فقط کدِ بعدی را
+        // تایپ کند، نه اینکه پنج بار از پنج کارتِ یکسان عکس بگیرد.
         _code.clear();
       });
+      // فوکوس روی فیلدِ کد تا کیبورد باز بماند و کاربر بلافاصله کدِ
+      // بعدی را بزند. بدون این، باید دوباره روی فیلد ضربه بزند —
+      // ریزه‌کاری‌ای که در ثبتِ پشت‌سرهمِ ده کارت واقعاً حس می‌شود.
+      if (mounted) _codeFocus.requestFocus();
       if (status == 'approved') widget.onRegistered?.call();
       // شمارِ در انتظار را از سرور تازه کن — چه ثبت شد چه به صف رفت.
       unawaited(_checkAvailability());
@@ -244,6 +269,18 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
           'از کارت عکس بگیر و کدش را وارد کن. عکس ثابت می‌کند کارت را داری، '
           'پس کسی نمی‌تواند فقط با دانستن کد امتیاز بگیرد.',
           style: theme.textTheme.bodySmall,
+        ),
+        Gaps.vXxs,
+        // ── چرا این جمله لازم است ──
+        //
+        // بدونِ آن، کاربری که پنج نسخهٔ یک کارت دارد فکر می‌کند باید
+        // پنج بار عکس بگیرد — یا بدتر، فکر می‌کند فقط یکی‌شان قابل
+        // ثبت است و چهار کد را دور می‌ریزد.
+        Text(
+          'چند نسخه از یک کارت داری؟ یک بار عکس بگیر و کدها را '
+          'پشت‌سرهم وارد کن — عکس بعد از هر ثبت سرِ جایش می‌ماند.',
+          style: theme.textTheme.bodySmall
+              ?.copyWith(color: theme.colorScheme.primary),
         ),
         Gaps.vMd,
 
@@ -337,6 +374,7 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
         Gaps.vSm,
         TextField(
           controller: _code,
+          focusNode: _codeFocus,
           enabled: !_locked,
           textCapitalization: TextCapitalization.characters,
           // کد لاتین است و در فیلدِ راست‌به‌چپ کاراکترهایش جابه‌جا دیده
@@ -512,7 +550,6 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
     final pending = status == 'pending';
     final badCode = status == 'bad_code';
     final locked = status == 'locked';
-    final dup = status == 'duplicate_pending';
 
     // ── سه خانوادهٔ رنگ برای سه پیامِ متفاوت ──
     // «اشتباه کردی» (قرمز)، «فعلاً نمی‌توانی» (بنفش) و «منتظر بمان»
@@ -525,40 +562,6 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
             : pending
                 ? BrandColors.warningOnLight
                 : BrandColors.successOnLight;
-
-    if (dup) {
-      return Container(
-        margin: const EdgeInsets.only(bottom: Gaps.sm),
-        padding: const EdgeInsets.all(Gaps.sm),
-        decoration: BoxDecoration(
-          borderRadius: Corners.rMd,
-          color: BrandColors.warningOnLight.withValues(alpha: 0.13),
-          border: Border.all(
-              color: BrandColors.warningOnLight.withValues(alpha: 0.45)),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Icon(Icons.hourglass_top_rounded,
-                color: BrandColors.warningOnLight, size: 20),
-            const SizedBox(width: Gaps.xs),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('این عکس قبلاً ارسال شده',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                          color: BrandColors.warningOnLight,
-                          fontWeight: FontWeight.w900)),
-                  Text('${r['message'] ?? ''}',
-                      style: theme.textTheme.bodySmall),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
 
     if (badCode || locked) {
       return Container(

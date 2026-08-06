@@ -29,6 +29,23 @@
  *   pending    کد معتبر ولی عکس شناخته نشد → بررسی دستی مدیر
  *   bad_code   کد غلط → راهنمای حروفِ مبهم + شمارشِ تلاش
  *   locked     ۵ کدِ غلطِ پشت‌سرهم → ۳ ساعت قفل
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * چند نسخه از یک کارت: عکس می‌ماند، فقط کد پاک می‌شود
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * کارت‌ها سری‌ای چاپ می‌شوند. کاربری که پنج نسخه از «محمد صلاح» دارد،
+ * پنج کارتِ فیزیکیِ **کاملاً یکسان** در دست دارد که فقط کدشان فرق
+ * می‌کند.
+ *
+ * نسخهٔ قبلی دو کارِ اشتباه می‌کرد:
+ *
+ *   ۱. سرور با گاردِ «عکسِ تکراری» ثبتِ دوم را با ۴۰۹ رد می‌کرد.
+ *   ۲. کلاینت بعد از هر ثبتِ موفق عکس را پاک می‌کرد.
+ *
+ * هر دو رفتند. حالا عکس سرِ جایش می‌ماند و فقط فیلدِ کد خالی و فوکوس
+ * می‌شود، تا کاربر پنج کد را پشت‌سرهم وارد کند. اصالت را کد تضمین
+ * می‌کند — هر کد فقط یک بار مصرف می‌شود.
  */
 // React باید صریح import شود: این پروژه vite.config ندارد، پس افزونهٔ
 // React با تنظیمات پیش‌فرض روی runtime کلاسیک کار می‌کند و هر JSX به
@@ -94,6 +111,12 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
   // با تغییرش، وضعیت از سرور دوباره خوانده می‌شود.
   const [refreshKey, setRefreshKey] = useState(0);
   const previewRef = useRef('');
+
+  // ── چرا ref و نه autoFocus ──
+  //
+  // `autoFocus` فقط در اولین mount کار می‌کند. اینجا باید بعد از **هر**
+  // ثبتِ موفق دوباره فوکوس بگیرد، پس مرجعِ مستقیم به عنصر لازم است.
+  const codeRef = useRef(null);
 
   useEffect(() => {
     let alive = true;
@@ -176,15 +199,6 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
       // ── کدِ غلط: راهنما + شمارشِ تلاش ──
       // عکس عمداً پاک نمی‌شود: کاربر فقط باید کد را اصلاح کند و
       // مجبور کردنش به عکس‌گرفتنِ دوباره بی‌دلیل آزاردهنده است.
-      // ── همان عکس، هنوز در صف بررسی ──
-      // عکس پاک می‌شود چون کاربر باید عکسِ **کارتِ دیگری** بگیرد؛
-      // نگه داشتنش فقط او را تشویق می‌کند دوباره همان را بفرستد.
-      if (d.status === 'duplicate_pending') {
-        setResult({ kind: 'duplicate', message: d.message });
-        reset();
-        return;
-      }
-
       if (d.status === 'bad_code') {
         setResult({ kind: 'badcode', message: d.message,
           triesLeft: d.triesLeft });
@@ -198,9 +212,15 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
 
       if (d.status === 'pending') {
         // کد درست بوده ولی عکس شناخته نشد → بررسی دستی.
+        //
+        // ⚠️ عکس عمداً پاک **نمی‌شود** و فقط کد خالی می‌شود. اگر کاربر
+        //    پنج نسخهٔ همین کارت را دارد، همان عکس برای چهار کدِ بعدی
+        //    هم درست است — مجبور کردنش به عکس‌گرفتنِ دوباره فقط او را
+        //    خسته می‌کند و نتیجه‌اش هم دقیقاً همان است.
         setResult({ kind: 'pending', message: d.message,
           reason: d.reason });
-        reset();
+        setCode('');
+        codeRef.current?.focus();
         setRefreshKey(k => k + 1);
         return;
       }
@@ -212,11 +232,13 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
         cash: d.addedCash,
         imageUrl: d.imageUrl,
       });
-      setFile(null);
+      // ⚠️ فقط کد پاک می‌شود، نه عکس — توضیح کامل در سربرگِ فایل.
+      //
+      // فوکوس هم به فیلدِ کد برمی‌گردد تا کاربری که ده کد دارد بتواند
+      // بدونِ لمسِ اضافه پشت‌سرهم واردشان کند. در ثبتِ ده‌تایی این
+      // ریزه‌کاری ده لمسِ اضافه را حذف می‌کند.
       setCode('');
-      if (previewRef.current) URL.revokeObjectURL(previewRef.current);
-      previewRef.current = '';
-      setPreview('');
+      codeRef.current?.focus();
       setRefreshKey(k => k + 1);
       onDone?.();
     } catch {
@@ -236,6 +258,14 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
       <p className="hint">
         از کارت عکس بگیر و کدش را وارد کن. عکس ثابت می‌کند کارت را داری،
         پس کسی نمی‌تواند فقط با دانستن کد امتیاز بگیرد.
+      </p>
+      {/* ── چرا این جمله لازم است ──
+          بدونِ آن، کاربری که پنج نسخهٔ یک کارت دارد فکر می‌کند باید
+          پنج بار عکس بگیرد — یا بدتر، فکر می‌کند فقط یکی‌شان قابل
+          ثبت است و چهار کد را دور می‌ریزد. */}
+      <p className="hint hintAccent">
+        چند نسخه از یک کارت داری؟ یک بار عکس بگیر و کدها را پشت‌سرهم
+        وارد کن — عکس بعد از هر ثبت سرِ جایش می‌ماند.
       </p>
 
       {result?.kind === 'ok' && (
@@ -265,14 +295,6 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
             <span>کیفیت عکس کامل نبود؛ کارشناس بررسی می‌کند و ممکن است
               تا ۲۴ ساعت طول بکشد. کد شما محفوظ است و می‌توانید
               کارت‌های دیگرتان را ثبت کنید.</span>
-          </div>
-        </div>
-      )}
-      {result?.kind === 'duplicate' && (
-        <div className="pcResult pending">
-          <div>
-            <b>⏳ این عکس قبلاً ارسال شده</b>
-            <span>{result.message}</span>
           </div>
         </div>
       )}
@@ -325,6 +347,7 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
       )}
 
       <input
+        ref={codeRef}
         className="pcCode"
         value={code}
         placeholder="کد روی کارت"
