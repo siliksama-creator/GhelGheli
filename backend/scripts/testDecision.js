@@ -31,7 +31,8 @@ const TYPE_B = 'bbbbbbbb-0000-0000-0000-000000000002';
 const designOf = (typeId, id = 'd1') => ({ id, card_type_id: typeId });
 
 /** ساختِ خروجیِ جعلیِ موتورِ تصویر. */
-const m = (verdict, score, design = null) => ({ verdict, score, design, margin: 0.1 });
+const m = (verdict, score, design = null, decisive = true) =>
+  ({ verdict, score, design, margin: 0.1, decisive });
 
 console.log('\n══ کدِ نام‌دار: عکس فقط باید ثابت کند کارت در دست است ══');
 
@@ -111,45 +112,95 @@ console.log('\n══ تناقضِ کد و عکس — خطرناک‌ترین ح
 }
 
 {
-  // تناقضِ ضعیف: عکس کارتِ دیگری را نشان می‌دهد ولی با اطمینانِ کم.
-  // اینجا محتمل‌تر است که موتور اشتباه کرده باشد تا کاربر.
+  // نمره بالای آستانهٔ نرم است و موتور قاطع → این واقعاً تناقض است،
+  // حتی اگر نمرهٔ مطلق پایین باشد. عکسی که از زاویهٔ بد گرفته شده
+  // نمره‌اش می‌افتد ولی هنوز واضح کارتِ دیگری است.
   const d = svc.decideSubmission({
     expectedTypeId: TYPE_A, match: m('review', 0.30, designOf(TYPE_B, 'dB')) });
-  ok('تطبیقِ ضعیف با کارتِ دیگر → بررسی (نه تأیید)', d.action === 'review');
-  ok('ولی type_mismatch علامت نمی‌خورد', d.reason === 'low_confidence', d.reason);
+  ok('تطبیقِ بالای آستانه با کارتِ دیگر → بررسی', d.action === 'review');
+  ok('و type_mismatch علامت می‌خورد', d.reason === 'type_mismatch', d.reason);
 }
 
-console.log('\n══ کدِ بی‌نام: رفتارِ قدیمی باید دست‌نخورده بماند ══');
+{
+  // ولی اگر موتور **قاطع نباشد**، ادعای «کارتِ دیگری است» بی‌پایه
+  // می‌شود: خودِ موتور نمی‌داند کدام است.
+  const d = svc.decideSubmission({
+    expectedTypeId: TYPE_A,
+    match: m('review', 0.30, designOf(TYPE_B, 'dB'), false) });
+  ok('تطبیقِ غیرقاطع با کارتِ دیگر → low_confidence نه تناقض',
+    d.reason === 'low_confidence', d.reason);
+}
+
+{
+  // زیرِ آستانهٔ نرم: «کیفیتِ پایین» توضیحِ محتمل‌تری است.
+  const d = svc.decideSubmission({
+    expectedTypeId: TYPE_A, match: m('review', 0.12, designOf(TYPE_B, 'dB')) });
+  ok('تطبیقِ زیرِ آستانه با کارتِ دیگر → low_confidence',
+    d.reason === 'low_confidence', d.reason);
+}
+
+console.log('\n══ کدِ بی‌نام: آستانهٔ ۴۰٪ + شرطِ قاطعیت ══');
 
 {
   const d = svc.decideSubmission({
     expectedTypeId: null, match: m('accept', 0.70, designOf(TYPE_A)) });
-  ok('verdict=accept → تأیید خودکار', d.action === 'approve');
+  ok('۷۰٪ و قاطع → تأیید خودکار', d.action === 'approve', JSON.stringify(d));
   ok('نوعِ کارت از طرحِ تطبیق‌خورده می‌آید', d.cardTypeId === TYPE_A);
   ok('مسیر image_match است', d.path === 'image_match');
 }
 
 {
+  // خواستهٔ صریح مالک: «بیش از ۴۰ درصد → اتوماتیک».
   const d = svc.decideSubmission({
-    expectedTypeId: null, match: m('review', 0.50, designOf(TYPE_A)) });
-  ok('verdict=review → صف بررسی', d.action === 'review');
-  ok('علت low_confidence', d.reason === 'low_confidence');
+    expectedTypeId: null, match: m('review', 0.42, designOf(TYPE_A)) });
+  ok('۴۲٪ تأیید می‌شود (verdict قدیمی review بود)',
+    d.action === 'approve', JSON.stringify(d));
+}
+
+{
+  const at = svc.decideSubmission({
+    expectedTypeId: null, match: m('review', 0.40, designOf(TYPE_A)) });
+  ok('دقیقاً ۴۰٪ پذیرفته می‌شود (>=)', at.action === 'approve');
+  const below = svc.decideSubmission({
+    expectedTypeId: null, match: m('review', 0.3999, designOf(TYPE_A)) });
+  ok('۳۹.۹۹٪ به صف بررسی می‌رود', below.action === 'review');
+}
+
+{
+  // ⚠️ مهم‌ترین محافظ: نمره کافی است ولی موتور بین دو گزینه شک دارد.
+  //
+  // در مسیرِ بی‌نام، عکس باید **هویتِ کارت** را تعیین کند. اگر دو طرح
+  // هر دو ۰.۴۵ بگیرند، تأییدِ خودکار یعنی انتخابِ تصادفی و کاربر
+  // امتیازِ کارتِ اشتباه می‌گیرد.
+  const d = svc.decideSubmission({
+    expectedTypeId: null,
+    match: m('review', 0.60, designOf(TYPE_A), false) });
+  ok('نمرهٔ بالا ولی غیرقاطع → صف بررسی', d.action === 'review',
+    JSON.stringify(d));
+  ok('علتش ambiguous است تا مدیر بداند چرا', d.reason === 'ambiguous',
+    d.reason);
 }
 
 {
   const d = svc.decideSubmission({
     expectedTypeId: null, match: m('reject', 0.30, designOf(TYPE_A)) });
-  ok('verdict=reject → صف بررسی', d.action === 'review');
-  ok('علت image_unknown', d.reason === 'image_unknown');
+  ok('۳۰٪ → صف بررسی', d.action === 'review');
+  ok('علت low_confidence (شبیه هست ولی کم)',
+    d.reason === 'low_confidence', d.reason);
 }
 
 {
-  // ⚠️ مهم‌ترین تستِ رگرسیون: نمرهٔ ۰.۲۵ برای کدِ **بی‌نام** نباید
-  // تأیید شود. اگر آستانهٔ نرم اشتباهاً به این مسیر نشت کند، هر کسی
-  // با هر عکسی می‌تواند هر کارتی را ادعا کند.
+  const d = svc.decideSubmission({
+    expectedTypeId: null, match: m('reject', 0.05, designOf(TYPE_A)) });
+  ok('۵٪ → image_unknown (اصلاً شبیه نیست)',
+    d.reason === 'image_unknown', d.reason);
+}
+
+{
+  // رگرسیون: آستانهٔ نرمِ کدِ نام‌دار نباید به مسیرِ بی‌نام نشت کند.
   const d = svc.decideSubmission({
     expectedTypeId: null, match: m('review', 0.25, designOf(TYPE_A)) });
-  ok('آستانهٔ نرم به مسیرِ بی‌نام نشت نمی‌کند', d.action === 'review',
+  ok('آستانهٔ ۲۰٪ به مسیرِ بی‌نام نشت نمی‌کند', d.action === 'review',
     JSON.stringify(d));
 }
 
@@ -162,8 +213,8 @@ console.log('\n══ ورودی‌های خراب کرش نمی‌دهند ═�
     svc.decideSubmission({ match: { verdict: 'accept', score: 0.9 } }).action === 'review');
   ok('score رشته‌ای',
     svc.decideSubmission({ expectedTypeId: TYPE_A,
-      match: { verdict: 'review', score: '0.5', design: designOf(TYPE_A) } })
-      .action === 'approve');
+      match: { verdict: 'review', score: '0.5', design: designOf(TYPE_A),
+        decisive: true } }).action === 'approve');
   ok('score نامعتبر → بررسی',
     svc.decideSubmission({ expectedTypeId: TYPE_A,
       match: { verdict: 'review', score: NaN, design: designOf(TYPE_A) } })
@@ -176,7 +227,12 @@ console.log('\n══ آستانه قابل تنظیم است ══');
     expectedTypeId: TYPE_A, boundThreshold: 0.5,
     match: m('review', 0.30, designOf(TYPE_A)) });
   ok('با آستانهٔ ۰.۵، نمرهٔ ۰.۳ رد می‌شود', strict.action === 'review');
-  ok('مقدارِ پیش‌فرض ۰.۲۰ است', svc.BOUND_ACCEPT_SCORE === 0.20);
+  ok('آستانهٔ کدِ نام‌دار ۰.۲۰ است', svc.BOUND_ACCEPT_SCORE === 0.20);
+  ok('آستانهٔ کدِ بی‌نام ۰.۴۰ است', svc.FREE_ACCEPT_SCORE === 0.40);
+  const strictFree = svc.decideSubmission({
+    expectedTypeId: null, freeThreshold: 0.8,
+    match: m('review', 0.50, designOf(TYPE_A)) });
+  ok('آستانهٔ بی‌نام هم قابل تنظیم است', strictFree.action === 'review');
 }
 
 console.log(`\n${fail === 0 ? '✓' : '✗'} ${pass} تست موفق، ${fail} ناموفق`);

@@ -49,10 +49,10 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   Map<String, dynamic>? _data;
   List<Map<String, dynamic>> _rewards = [];
-  final _code = TextEditingController();
-  String? _message;
-  bool _messageIsError = false;
-  bool _sending = false;
+  // `_code`/`_message`/`_messageIsError`/`_sending` همگی حذف شدند:
+  // فرمِ «فقط کد» برداشته شد و ثبتِ کارت کاملاً به PhotoCardBox منتقل
+  // شد (عکس + کد با هم). آن ویجت بازخوردِ خودش را نشان می‌دهد، پس
+  // بنرِ پیامِ این صفحه هم بی‌مصرف شده بود.
   bool _loading = true;
   String? _error;
 
@@ -62,11 +62,6 @@ class _DashboardPageState extends State<DashboardPage> {
     _load();
   }
 
-  @override
-  void dispose() {
-    _code.dispose();
-    super.dispose();
-  }
 
   Future<void> _load() async {
     // try/catch لازم است، نه یک احتیاط اضافه.
@@ -124,36 +119,6 @@ class _DashboardPageState extends State<DashboardPage> {
         _error = apiError(e);
         _loading = false;
       });
-    }
-  }
-
-  Future<void> _redeem() async {
-    setState(() {
-      _sending = true;
-      _message = null;
-    });
-    try {
-      final r =
-          await widget.api.post('/api/cards/redeem', {'code': _code.text});
-      // The user can close this screen while the request is in flight;
-      // calling setState after that throws "setState() called after
-      // dispose()" and the error surfaces as a red screen in release mode.
-      if (!mounted) return;
-      setState(() {
-        _message = '${r['message']} +${faNum(r['addedPoints'])} امتیاز';
-        _messageIsError = false;
-      });
-      _code.clear();
-      await _load();
-      await widget.reloadProfile();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _message = apiError(e);
-        _messageIsError = true;
-      });
-    } finally {
-      if (mounted) setState(() => _sending = false);
     }
   }
 
@@ -257,39 +222,36 @@ class _DashboardPageState extends State<DashboardPage> {
                       height: 130, fit: BoxFit.cover, cacheWidth: 820),
                 ),
                 Gaps.vMd,
-                Text('ثبت کد کارت‌های قلقلی',
+                Text('ثبت کارت‌های قلقلی',
                     style: theme.textTheme.titleLarge),
                 Gaps.vXxs,
                 Text(
-                  'پک کارت‌های قلقلی به‌صورت فیزیکی در فروشگاه‌ها و سوپرمارکت‌ها به فروش می‌رسند.',
+                  'پک کارت‌های قلقلی به‌صورت فیزیکی در فروشگاه‌ها و '
+                  'سوپرمارکت‌ها به فروش می‌رسند.',
                   style: theme.textTheme.bodySmall,
                 ),
-                Gaps.vMd,
-                TextField(
-                  controller: _code,
-                  textCapitalization: TextCapitalization.characters,
-                  decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.qr_code_2_rounded),
-                      labelText: 'کد طولانی روی کارت'),
-                ),
-                Gaps.vSm,
-                FilledButton.icon(
-                  icon: _sending
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2.2, color: Colors.white))
-                      : const Icon(Icons.add_card_rounded),
-                  label:
-                      Text(_sending ? 'در حال ثبت...' : 'ثبت و دریافت امتیاز'),
-                  onPressed: _sending ? null : _redeem,
-                ),
 
-                // ── قابلیت جدید، کنارِ روشِ قدیمی نه به‌جای آن ──
-                // کاربری که کارت قدیمی دارد باید بتواند مثل همیشه فقط
-                // کد را وارد کند. این بخش وقتی مدیر هنوز طرحی آپلود
-                // نکرده خودش را پنهان می‌کند.
+                // ═══════════════════════════════════════════════════════
+                // چرا فرمِ «فقط کد» حذف شد
+                // ═══════════════════════════════════════════════════════
+                //
+                // خواستهٔ صریح مالک: «در هر صورت کاربر باید عکس و کد رو
+                // باهم بفرسته».
+                //
+                // دو مسیرِ موازی دو مشکل داشت:
+                //
+                //   ۱. کاربر نمی‌دانست کدامش را بزند. دو کادرِ «کد» پشت
+                //      سر هم روی یک صفحه، با دو دکمهٔ متفاوت.
+                //
+                //   ۲. مهم‌تر: مسیرِ «فقط کد» عکس نمی‌خواست، پس هیچ
+                //      مدرکی نبود که کاربر کارتِ فیزیکی را دارد. کسی که
+                //      فقط رشتهٔ کد را از دوستش گرفته بود امتیاز
+                //      می‌گرفت — و آن مسیر بانکِ کدِ جدا داشت که هرگز
+                //      با تشخیصِ تصویر بررسی نمی‌شد.
+                //
+                // حالا یک مسیر: همیشه عکس + کد. مسیرِ `/api/cards/redeem`
+                // در سرور دست‌نخورده باقی مانده (کدهای قدیمیِ در گردش)
+                // ولی دیگر از اپ صدا زده نمی‌شود.
                 PhotoCardBox(
                   api: widget.api,
                   // همان دو کاری که مسیر «ثبت کد» بعد از موفقیت می‌کند:
@@ -301,29 +263,6 @@ class _DashboardPageState extends State<DashboardPage> {
                     widget.reloadProfile();
                   },
                 ),
-                if (_message != null) ...[
-                  Gaps.vSm,
-                  _messageIsError
-                      ? ErrorBanner(message: _message!)
-                      : Container(
-                          padding: const EdgeInsets.all(Gaps.sm),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.primary
-                                .withValues(alpha: 0.12),
-                            borderRadius: Corners.rMd,
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.check_circle_rounded,
-                                  color: theme.colorScheme.primary, size: 18),
-                              Gaps.hXs,
-                              Expanded(
-                                  child: Text(_message!,
-                                      style: theme.textTheme.bodySmall)),
-                            ],
-                          ),
-                        ),
-                ],
               ],
             ),
           ),

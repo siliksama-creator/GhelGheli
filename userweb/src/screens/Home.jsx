@@ -95,9 +95,7 @@ function CardLightbox({ item, close }) {
 
 export default function Home({ token, p, rewards, load, setMsg, openWallet,
   openWheel, openInvite }) {
-  const [code, setCode] = useState('');
   const [bigCard, setBigCard] = useState(null);
-  const [redeeming, setRedeeming] = useState(false);
   const [invQuery, setInvQuery] = useState('');
   const [invSort, setInvSort] = useState('recent');
 
@@ -108,24 +106,6 @@ export default function Home({ token, p, rewards, load, setMsg, openWallet,
     || sorted.at(-1);
   const progress = next
     ? Math.min(1, u.current_points / next.required_points) : 0;
-
-  async function redeem() {
-    // Guard against a double-tap submitting the same code twice: the second
-    // request always fails with "already used", which looks like the first
-    // one failed.
-    if (redeeming || !code.trim()) return;
-    setRedeeming(true);
-    try {
-      const d = await req('/api/cards/redeem', 'POST', { code }, token);
-      setMsg(d.message);
-      setCode('');
-      load();
-    } catch (e) {
-      setMsg(e.message);
-    } finally {
-      setRedeeming(false);
-    }
-  }
 
   const inventory = p.inventory || [];
   const invStats = useMemo(() => collectionStats(inventory), [inventory]);
@@ -159,23 +139,30 @@ export default function Home({ token, p, rewards, load, setMsg, openWallet,
           </span>
         </button>
 
-        <h2>ثبت کد کارت های قلقلی</h2>
+        <h2>ثبت کارت‌های قلقلی</h2>
         <p className="hint">
           (پک کارت های قلقلی بصورت فیزیکی در فروشگاه ها و سوپرمارکت ها به فروش
           می رسند.)
         </p>
-        <input value={code} placeholder="کد کارت"
-          onChange={e => setCode(e.target.value.toUpperCase())}
-          onKeyDown={e => { if (e.key === 'Enter') redeem(); }} />
-        <button className="main" onClick={redeem}
-          disabled={redeeming || !code.trim()}>
-          {redeeming ? 'در حال ثبت...' : 'ثبت کد'}
-        </button>
 
-        {/* ── قابلیت جدید، کنارِ روشِ قدیمی نه به‌جای آن ──
-            کاربری که کارت قدیمی دارد باید بتواند مثل همیشه فقط کد را
-            وارد کند. این بخش خودش را وقتی مدیر هنوز طرحی آپلود نکرده
-            پنهان می‌کند، تا کاربر چیزی نبیند که همیشه شکست می‌خورد. */}
+        {/* ══════════════════════════════════════════════════════════════
+            چرا فرمِ «فقط کد» حذف شد
+            ══════════════════════════════════════════════════════════════
+
+            خواستهٔ صریح مالک: «در هر صورت کاربر باید عکس و کد رو باهم
+            بفرسته».
+
+            دو مسیرِ موازی دو مشکل داشت:
+
+              ۱. دو کادرِ «کد» پشتِ سرِ هم روی یک صفحه با دو دکمهٔ
+                 متفاوت — کاربر نمی‌دانست کدام را بزند.
+
+              ۲. مهم‌تر: مسیرِ «فقط کد» عکس نمی‌خواست، پس هیچ مدرکی نبود
+                 که کاربر کارتِ فیزیکی را دارد. کسی که فقط رشتهٔ کد را
+                 از دوستش گرفته بود امتیاز می‌گرفت.
+
+            مسیرِ `/api/cards/redeem` در سرور دست‌نخورده ماند (کدهای
+            قدیمیِ در گردش) ولی دیگر از رابط صدا زده نمی‌شود. */}
         <PhotoCardBox token={token} setMsg={setMsg} onDone={load} />
       </section>
 

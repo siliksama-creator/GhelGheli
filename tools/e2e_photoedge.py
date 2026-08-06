@@ -149,9 +149,13 @@ print('\n══ یکتایی و برخورد ══')
 st,r=req('POST','/api/admin/photo-cards/codes',at,{'rawCodes':f'{PFX}-0001'})
 ck('کدِ تکراری دوباره درج نمی‌شود',r.get('insertedCount')==0 and r.get('duplicateInDbCount')==1,
    f"ins={r.get('insertedCount')} dup={r.get('duplicateInDbCount')}")
-st,r=req('POST','/api/admin/photo-cards/codes',at,{'rawCodes':'EG-000I'})  # I ↔ 1
+# کدِ مبهم باید با همان پیشوندِ یکتای این اجرا ساخته شود، وگرنه با
+# اجراهای قبلی برخورد می‌کند. `{PFX}-0001` قبلاً درج شده؛ نسخهٔ با
+# حرفِ I به‌جای رقمِ ۱ باید تکراری شمرده شود.
+_ambig=f'{PFX}-OOOI'.replace('O','0')[:-1]+'I'   # → {PFX}-000I
+st,r=req('POST','/api/admin/photo-cards/codes',at,{'rawCodes':_ambig})
 ck('کدِ مبهم (I در برابر 1) تکراری شمرده می‌شود',r.get('duplicateInDbCount')==1,
-   f"ins={r.get('insertedCount')} dup={r.get('duplicateInDbCount')}")
+   f"code={_ambig} ins={r.get('insertedCount')} dup={r.get('duplicateInDbCount')}")
 
 print('\n══ صف بررسی: تصمیم دوباره ══')
 st,r=req('GET','/api/admin/photo-cards/submissions?status=approved',at)

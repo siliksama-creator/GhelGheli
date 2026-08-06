@@ -50,6 +50,9 @@ export function PhotoCardsPage({ request }) {
   const [points, setPoints] = useState('');
   const [cash, setCash] = useState('');
   const [uploading, setUploading] = useState(false);
+  // کدهای اختصاصیِ همین کارت — اختیاری، همراه با آپلودِ طرح ثبت می‌شوند.
+  const [ownCodes, setOwnCodes] = useState('');
+  const [ownBatch, setOwnBatch] = useState('');
 
   // فرم کد — مدیر خودش وارد می‌کند، سیستم نمی‌سازد
   const [rawCodes, setRawCodes] = useState('');
@@ -115,11 +118,21 @@ export function PhotoCardsPage({ request }) {
     try {
       const r = await request.postForm('/api/admin/photo-cards/designs', {
         file,
-        fields: { name: name.trim(), pointValue: points || 0, cashAmount: cash || 0 },
+        fields: {
+          name: name.trim(),
+          pointValue: points || 0,
+          cashAmount: cash || 0,
+          // اگر مدیر کد نوشته باشد، در **همان تراکنش** به این کارت گره
+          // می‌خورد. درخواستِ دوم یعنی احتمالِ کارتِ بدونِ کد.
+          ...(ownCodes.trim() ? { rawCodes: ownCodes } : {}),
+          ...(ownBatch.trim() ? { batchLabel: ownBatch.trim() } : {}),
+        },
       });
       notify(r.message || 'طرح ثبت شد', 'success');
       pickFile(null);
       setName(''); setPoints(''); setCash('');
+      setOwnCodes(''); setOwnBatch('');
+      loadCodes();
       loadDesigns();
     } catch (e) {
       notify(e.message, 'error');
@@ -305,8 +318,8 @@ export function PhotoCardsPage({ request }) {
 
       {/* ───────── ۱. آپلود عکس خام ───────── */}
       <Card
-        title="آپلود عکس خام کارت"
-        subtitle="عکس باکیفیت کارت را بگذارید. سیستم اثر انگشت تصویر را می‌سازد تا بعداً عکسِ کاربر را با آن تطبیق دهد."
+        title="۱ · تعریف کارت (عکس + امتیاز + کد اختصاصی)"
+        subtitle="عکس باکیفیت کارت را بگذارید. اگر می‌دانید کدام کدها روی همین کارت چاپ شده‌اند، همین‌جا واردشان کنید تا ثبتِ کاربر تقریباً همیشه خودکار تأیید شود."
       >
         <div className="photoUploadGrid">
           <div>
@@ -342,21 +355,54 @@ export function PhotoCardsPage({ request }) {
               <Input type="number" min="0" value={cash}
                 onChange={e => setCash(e.target.value)} placeholder="0" />
             </Field>
-            <Button icon={Upload} loading={uploading} onClick={uploadDesign}>
-              آپلود و ساخت اثر انگشت
-            </Button>
-            <p className="topbar-sub">
-              تحلیل تصویر چند ثانیه طول می‌کشد. بعد از آن، هر کاربری که از
-              این کارت عکس بگیرد به‌صورت خودکار شناسایی می‌شود.
+
+            {/* ══════════════════════════════════════════════════════════
+                کدهای اختصاصیِ همین کارت — اختیاری
+                ══════════════════════════════════════════════════════════
+
+                تفاوتِ اصلیِ دو حالت اینجاست:
+
+                • اگر کد بنویسید، آن کدها «نام‌دار» می‌شوند: سیستم
+                  می‌داند مالِ همین کارت‌اند. کاربر که عکس + کد بفرستد،
+                  کافی است عکس فقط ۲۰٪ شبیه باشد تا خودکار تأیید شود.
+
+                • اگر خالی بگذارید، فقط طرح ثبت می‌شود و تشخیص کاملاً
+                  به عهدهٔ تصویر است (آستانهٔ ۴۰٪). */}
+            <Field label="کدهای اختصاصی این کارت (اختیاری — هر خط یک کد)">
+              <Textarea
+                rows={4}
+                dir="ltr"
+                className="codeInput"
+                value={ownCodes}
+                onChange={e => setOwnCodes(e.target.value)}
+                placeholder={'GHP-A2B3-C4D5\nGHP-X7K9-M1N2\n…'}
+              />
+            </Field>
+            {ownCodes.trim() && (
+              <Field label="برچسب این دسته (اختیاری)">
+                <Input value={ownBatch} onChange={e => setOwnBatch(e.target.value)}
+                  placeholder="مثلاً: چاپ مهر ۱۴۰۵ — سری آبی" />
+              </Field>
+            )}
+            <p className={`topbar-sub codeTypeHint${ownCodes.trim() ? ' ok' : ''}`}>
+              {ownCodes.trim()
+                ? '✅ این کدها به همین کارت گره می‌خورند — ثبتِ کاربر با '
+                  + 'شباهت ۲۰٪ هم خودکار تأیید می‌شود.'
+                : 'ℹ️ بدون کد اختصاصی، فقط طرح ثبت می‌شود و تشخیص از روی '
+                  + 'عکس انجام می‌گیرد (آستانهٔ ۴۰٪).'}
             </p>
+
+            <Button icon={Upload} loading={uploading} onClick={uploadDesign}>
+              {ownCodes.trim() ? 'ثبت کارت و کدهای آن' : 'آپلود و ساخت اثر انگشت'}
+            </Button>
           </div>
         </div>
       </Card>
 
       {/* ───────── ۲. بانک کد ───────── */}
       <Card
-        title="بانک کد مشترک"
-        subtitle="کدهای چاپ‌شده روی کارت‌ها را وارد کنید. این بانک بین همهٔ طرح‌ها مشترک است — طرح جدید که اضافه شود، همین کدها پوششش می‌دهند."
+        title="۲ · بانک کد مشترک (کدهایی که نمی‌دانید مالِ کدام کارت‌اند)"
+        subtitle="کارت‌های قدیمی که هنگام چاپ مشخص نشد کدام کد روی کدام کارت رفت. تشخیص کاملاً از روی عکسِ کاربر: بالای ۴۰٪ شباهت خودکار، کمتر از آن به صف بررسی شما."
         action={
           <Button
             variant="secondary" icon={Download}

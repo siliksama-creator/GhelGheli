@@ -141,8 +141,16 @@ stA,rA=req('POST','/api/admin/photo-cards/designs',atok,{'name':f'{PFX}-آبی',
 stB,rB=req('POST','/api/admin/photo-cards/designs',atok,{'name':f'{PFX}-نارنجی','pointValue':'340'},{'image':('b.png',pngB,'image/png')})
 ck('طرح ۱ ثبت شد',stA==200,f'{stA} {rA}')
 ck('طرح ۲ ثبت شد',stB==200,f'{stB} {rB}')
-ck('پاسخِ آپلود هیچ کدی برنمی‌گرداند',
-   'code' not in json.dumps(rA) and 'codes' not in json.dumps(rA), json.dumps(rA,ensure_ascii=False)[:120])
+# ⚠️ این ادعا عوض شد.
+#
+# قبلاً آپلودِ طرح هیچ ربطی به کد نداشت، پس «هیچ کدی برنگردان» درست
+# بود. حالا مدیر می‌تواند در همان درخواست کدهای اختصاصی هم بفرستد و
+# پاسخ `codeReport` دارد.
+#
+# چیزی که هنوز باید تضمین شود: وقتی کدی **فرستاده نشده**، پاسخ هم
+# گزارشِ کد ندارد — یعنی آپلودِ ساده هیچ کدی از خودش نمی‌سازد.
+ck('آپلودِ بدونِ کد، گزارشِ کد ندارد',
+   rA.get('codeReport') in (None, {}), json.dumps(rA,ensure_ascii=False)[:140])
 idA=rA['design']['id']
 
 print('\n══ گام ۲: مدیر فقط یک سری کد تعریف می‌کند ══')

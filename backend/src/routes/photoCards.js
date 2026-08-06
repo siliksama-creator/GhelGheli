@@ -295,15 +295,70 @@ module.exports = function createPhotoCardRoutes(deps) {
               fp.lumaSig, fp.width, fp.height, req.admin.id],
           );
 
+          // ═══════════════════════════════════════════════════════════
+          // کدهای اختصاصیِ همین کارت — اختیاری، در همان درخواست
+          // ═══════════════════════════════════════════════════════════
+          //
+          // خواستهٔ مالک: «هم باید بتونه یه قسمت دیگه برای هر عکس یه کد
+          // یا تعداد بالایی کد ثبت کنه».
+          //
+          // چرا در همین مسیر و نه یک درخواستِ دوم از کلاینت: اگر کلاینت
+          // اول طرح را بسازد و بعد کدها را بفرستد، شکستِ درخواستِ دوم
+          // یک کارتِ بدونِ کد باقی می‌گذارد و مدیر نمی‌فهمد. اینجا هر
+          // دو در **یک تراکنش**‌اند: یا هر دو یا هیچ‌کدام.
+          let codeReport = null;
+          const rawCodes = String(req.body.rawCodes || '').trim();
+          if (rawCodes) {
+            const toks = rawCodes.split(/[\n,;\t، ]+/)
+              .map(x => x.trim()).filter(Boolean)
+              .map(x => photoCards.normalizePhotoCode(x));
+            const seen = new Set();
+            const valid = [];
+            let invalid = 0;
+            for (const t of toks) {
+              if (!photoCards.isValidPhotoCode(t)) { invalid += 1; continue; }
+              const k = photoCards.foldPhotoCode(t);
+              if (seen.has(k)) continue;
+              seen.add(k);
+              valid.push(t);
+            }
+            if (valid.length > MAX_BATCH) {
+              throw Object.assign(new Error(
+                `در هر نوبت حداکثر ${MAX_BATCH.toLocaleString('en-US')} کد `
+                + 'قابل ثبت است'), { status: 400 });
+            }
+            let insertedCount = 0;
+            if (valid.length) {
+              const ins = await client.query(
+                `INSERT INTO photo_card_codes(code, batch_label, expected_card_type_id)
+                 SELECT unnest($1::citext[]), $2, $3
+                 ON CONFLICT (code_fold) DO NOTHING
+                 RETURNING id`,
+                [valid, String(req.body.batchLabel || '').trim().slice(0, 80) || null,
+                  cardTypeId],
+              );
+              insertedCount = ins.rows.length;
+            }
+            codeReport = {
+              insertedCount,
+              duplicateCount: valid.length - insertedCount,
+              invalidCount: invalid,
+            };
+          }
+
           await client.query('COMMIT');
 
           await audit(req.admin.id, 'create_photo_card_design', 'photo_card_designs',
-            d.rows[0].id, null, { name, points, cash, imageUrl });
+            d.rows[0].id, null, { name, points, cash, imageUrl, codeReport });
 
           res.json({
             design: d.rows[0],
             cardTypeId,
-            message: 'طرح ثبت شد و اثر انگشت تصویر ساخته شد',
+            codeReport,
+            message: codeReport
+              ? `طرح ثبت شد و ${codeReport.insertedCount.toLocaleString('en-US')} `
+                + 'کد اختصاصی به آن گره خورد'
+              : 'طرح ثبت شد و اثر انگشت تصویر ساخته شد',
           });
         } catch (e) {
           await client.query('ROLLBACK').catch(() => {});
@@ -1363,13 +1418,30 @@ module.exports = function createPhotoCardRoutes(deps) {
             "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
             [`photocard:${req.user.id}`],
           );
+          // ── چرا `approved` هم بررسی می‌شود و نه فقط `pending` ──
+          //
+          // باگی که تستِ هم‌زمانی لو داد: کاربر **یک عکس** را با چهار
+          // کدِ متفاوت فرستاد و هر چهار کارت را گرفت.
+          //
+          // نسخهٔ قبلی فقط پرونده‌های `pending` را می‌دید. آن وقتی کافی
+          // بود که تأییدِ خودکار نادر باشد؛ حالا که آستانه ۴۰٪ شده،
+          // بیشترِ ثبت‌ها مستقیم `approved` می‌شوند و هیچ ردیفِ
+          // `pending` ای نمی‌ماند که گارد رویش گیر کند.
+          //
+          // پنجرهٔ ۲۴ ساعته: کاربرِ درستکار ممکن است هفتهٔ بعد نسخهٔ
+          // دومِ همان کارت را واقعاً بخرد و همان قاب را عکس بگیرد.
+          // بستنِ همیشگی او را مجازات می‌کند. ولی چهار درخواست در چهار
+          // ثانیه قطعاً یک عکسِ تکراری است.
           pend = await guard.query(
-          `SELECT s.id, s.img_dhash, s.img_phash, s.img_color, s.img_tex,
-                  s.img_luma, c.code
+          `SELECT s.id, s.status, s.img_dhash, s.img_phash, s.img_color,
+                  s.img_tex, s.img_luma, c.code
              FROM photo_card_submissions s
              LEFT JOIN photo_card_codes c ON c.id = s.code_id
-            WHERE s.user_id = $1 AND s.status = 'pending'
-              AND s.img_dhash IS NOT NULL`,
+            WHERE s.user_id = $1
+              AND s.img_dhash IS NOT NULL
+              AND (s.status = 'pending'
+                   OR (s.status = 'approved'
+                       AND s.created_at > NOW() - INTERVAL '24 hours'))`,
           [req.user.id],
           );
         } catch (e) {
@@ -1407,7 +1479,11 @@ module.exports = function createPhotoCardRoutes(deps) {
             return res.status(409).json({
               status: 'duplicate_pending',
               pendingCode: row.code || null,
-              message: 'این عکس قبلاً ارسال شده و هنوز در حال بررسی است. '
+              message: row.status === 'approved'
+                ? 'این عکس قبلاً ثبت شده و کارتش به مجموعهٔ شما اضافه '
+                  + 'شده است. برای ثبت کارتِ بعدی، از **همان کارت** عکس '
+                  + 'تازه بگیرید — هر کارت عکس مخصوص خودش را دارد.'
+                : 'این عکس قبلاً ارسال شده و هنوز در حال بررسی است. '
                 + 'عکسِ قبلی وضوح کامل نداشت، برای همین توسط کارشناس '
                 + 'بررسی می‌شود و پس از تأیید ثبت خواهد شد. '
                 + 'اجازهٔ ارسال دوبارهٔ همین عکس را ندارید — '
@@ -1550,13 +1626,25 @@ module.exports = function createPhotoCardRoutes(deps) {
           if (payload.points > 0) {
             await addLeaguePoints(client, req.user.id, payload.points);
           }
+          // ── چرا اثرانگشت در مسیرِ تأییدِ خودکار هم ذخیره می‌شود ──
+          //
+          // بدونِ آن، گاردِ «همان عکس دوباره» چیزی برای مقایسه ندارد و
+          // کاربر می‌تواند یک عکس را با چند کد بفرستد و چند کارت
+          // بگیرد. تستِ هم‌زمانی دقیقاً همین را گرفت.
+          //
+          // عکسِ خودِ کاربر ذخیره نمی‌شود (خواستهٔ مالک)، فقط این چند
+          // صد بایت اثرانگشت — که هم ارزان است و هم تنها راهِ تشخیصِ
+          // ارسالِ تکراری.
           await client.query(
             `INSERT INTO photo_card_submissions
                (user_id, code_id, matched_design_id, chosen_design_id,
-                match_score, match_margin, status, decision_path)
-             VALUES($1,$2,$3,$3,$4,$5,'approved',$6)`,
+                match_score, match_margin, status, decision_path,
+                img_dhash, img_phash, img_color, img_tex, img_luma)
+             VALUES($1,$2,$3,$3,$4,$5,'approved',$6,$7,$8,$9,$10,$11)`,
             [req.user.id, codeId, design?.id ?? null,
-              match.score, match.margin, decision.path],
+              match.score, match.margin, decision.path,
+              queryFp.dhash, queryFp.phash, queryFp.colorSig,
+              queryFp.texSig, queryFp.lumaSig],
           );
           await client.query('COMMIT');
         } catch (e) {

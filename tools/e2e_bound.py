@@ -105,27 +105,50 @@ def card(hue, seed=1):
     return b.getvalue(), im
 
 
-def good_shot(im, q=72):
-    """عکسِ قابل‌قبول از کارت."""
-    o = im.rotate(4, expand=True, fillcolor=(28, 28, 34))
+def good_shot(im, variant=0):
+    """عکسِ قابل‌قبول از کارت.
+
+    ⚠️ `variant` زاویه و برش را عوض می‌کند، نه فقط کیفیتِ JPEG را.
+    تغییرِ کیفیت اثرانگشت را تقریباً دست‌نخورده می‌گذارد (کلِ هدفِ
+    موتور همین است: مقاومت در برابر فشرده‌سازی)، پس دو ارسال با
+    کیفیتِ متفاوت هنوز «همان عکس» شمرده می‌شوند و گارد می‌گیردشان.
+
+    کاربرِ واقعی هر بار از زاویهٔ کمی متفاوت عکس می‌گیرد.
+    """
+    o = im.rotate(4 + variant * 6, expand=True, fillcolor=(28, 28, 34))
+    if variant:
+        w, h = o.size
+        c = variant * 11
+        o = o.crop((c, c, w - c, h - c))
     o = o.resize((int(o.width * .55), int(o.height * .55)), Image.LANCZOS)
     o = o.filter(ImageFilter.GaussianBlur(0.5))
     b = io.BytesIO()
-    o.save(b, 'JPEG', quality=q)
+    o.save(b, 'JPEG', quality=72)
     return b.getvalue()
 
 
-def awful_shot(im):
+def awful_shot(im, variant=0):
     """عکسِ فاجعه: کج، تار، تاریک، ریز — ولی هنوز همان کارت.
 
     این دقیقاً همان چیزی است که مالک توصیف کرد: «عکس فقط ۲۰٪ هم به عکس
     مرجع شباهت داشت».
+
+    ⚠️ `variant` زاویه و برش را کمی عوض می‌کند. بدونِ آن، دو ارسالِ
+    پیاپی **دقیقاً یک بایت** می‌شوند و گاردِ «همان عکس دوباره» جلوی
+    دومی را می‌گیرد — که رفتارِ درستِ محصول است ولی تست را کور می‌کند.
+
+    کاربرِ واقعی هم هر بار عکسِ تازه می‌گیرد، پس این نزدیک‌تر به
+    واقعیت است.
     """
-    o = im.rotate(19, expand=True, fillcolor=(20, 20, 26))
+    o = im.rotate(19 + variant * 7, expand=True, fillcolor=(20, 20, 26))
+    if variant:
+        w, h = o.size
+        c = variant * 9
+        o = o.crop((c, c, w - c, h - c))
     o = o.resize((int(o.width * .10), int(o.height * .10)), Image.LANCZOS)
     o = o.filter(ImageFilter.GaussianBlur(3.6))
     b = io.BytesIO()
-    o.save(b, 'JPEG', quality=22)
+    o.save(b, 'JPEG', quality=22 + variant)
     return b.getvalue()
 
 
@@ -197,7 +220,7 @@ ck('۵ کد با نوعِ کارتِ مشخص ثبت شد', st == 200 and r.get(
 ck('پاسخ نوعِ گره‌خورده را برمی‌گرداند', r.get('expectedCardTypeId') == typeA)
 
 st, r = req('POST', '/api/photo-cards/submit', ut, {'code': codes_bound[0]},
-            {'image': ('x.jpg', awful_shot(imA), 'image/jpeg')})
+            {'image': ('x.jpg', awful_shot(imA, 0), 'image/jpeg')})
 ck('عکسِ فاجعه با کدِ گره‌خورده تأیید شد', st == 200
    and r.get('status') == 'approved', f'{st} {r.get("status")} {r.get("message","")[:80]}')
 ck('امتیازِ همان کارت داده شد (۱۲۰)', r.get('addedPoints') == 120,
@@ -237,12 +260,30 @@ ck('عکسِ خوب + کدِ بی‌نام → تأیید خودکار',
 ck('کارتِ درست تشخیص داده شد', r.get('cardType') == f'{PFX}-نارنجی',
    r.get('cardType'))
 
-# مهم‌ترین رگرسیون: عکسِ فاجعه با کدِ **بی‌نام** نباید تأیید شود.
+# ⚠️ این تست عوض شد و دلیلش مهم است.
+#
+# نسخهٔ اول انتظار داشت «عکسِ فاجعه با کدِ بی‌نام» به صف برود. آن
+# انتظار وقتی درست بود که آستانهٔ بی‌نام ۰.۵۵ باشد.
+#
+# حالا آستانه ۰.۴۰ است (خواستهٔ صریح مالک) و همان عکسِ فاجعه نمرهٔ
+# ۰.۴۹۷ می‌گیرد — یعنی **باید** تأیید شود. تستِ قبلی داشت یک تصمیمِ
+# منسوخِ محصول را قفل می‌کرد، نه یک قاعده را.
+#
+# چیزی که واقعاً باید تضمین شود این است: عکسی که **زیرِ ۴۰٪** است
+# تأیید نشود. برای همین از عکسِ نویز استفاده می‌کنیم که قطعاً زیرِ
+# آستانه است.
 st, r = req('POST', '/api/photo-cards/submit', ut, {'code': codes_free[1]},
-            {'image': ('w.jpg', awful_shot(imA), 'image/jpeg')})
-ck('عکسِ فاجعه با کدِ بی‌نام → صف بررسی (نه تأیید)',
+            {'image': ('w.jpg', noise_shot(), 'image/jpeg')})
+ck('عکسِ زیرِ ۴۰٪ با کدِ بی‌نام → صف بررسی',
    st == 200 and r.get('status') == 'pending',
-   f'{st} {r.get("status")} — آستانهٔ نرم نباید به این مسیر نشت کند')
+   f'{st} {r.get("status")} — زیرِ آستانه نباید خودکار تأیید شود')
+
+# و عکسِ بدِ **ولی بالای ۴۰٪** باید تأیید شود — همان چیزی که مالک خواست.
+st, r = req('POST', '/api/photo-cards/submit', ut, {'code': codes_free[3]},
+            {'image': ('w2.jpg', awful_shot(imA, 1), 'image/jpeg')})
+ck('عکسِ بدِ بالای ۴۰٪ با کدِ بی‌نام → تأیید خودکار',
+   st == 200 and r.get('status') == 'approved',
+   f'{st} {r.get("status")} score={r.get("matchScore")}')
 
 # ═══════════════════════════════════════════════════════════════════════
 print('\n══ ۴: عکسِ نامفهوم حتی با کدِ گره‌خورده → بررسی ══')
@@ -257,7 +298,7 @@ print('\n══ ۵: تناقضِ کد و عکس ══')
 # ═══════════════════════════════════════════════════════════════════════
 # کد مالِ کارتِ آبی است، ولی عکسِ کارتِ نارنجی فرستاده می‌شود.
 st, r = req('POST', '/api/photo-cards/submit', ut, {'code': codes_bound[2]},
-            {'image': ('m.jpg', good_shot(imB), 'image/jpeg')})
+            {'image': ('m.jpg', good_shot(imB, 3), 'image/jpeg')})
 ck('عکسِ کارتِ دیگر → تأیید نمی‌شود', r.get('status') != 'approved',
    f'{st} {r.get("status")}')
 ck('و علتش به کاربر گفته می‌شود',
@@ -275,7 +316,7 @@ ck('کدهای مصرف‌شده دست نخوردند', r.get('skipped', 0) >= 
 
 # حالا کدی که قبلاً بی‌نام بود باید نام‌دار شده باشد.
 st, r = req('POST', '/api/photo-cards/submit', ut, {'code': codes_free[2]},
-            {'image': ('q.jpg', awful_shot(imB), 'image/jpeg')})
+            {'image': ('q.jpg', awful_shot(imB, 2), 'image/jpeg')})
 ck('کدِ تازه‌گره‌خورده حالا با عکسِ بد هم تأیید می‌شود',
    st == 200 and r.get('status') == 'approved', f'{st} {r.get("status")}')
 

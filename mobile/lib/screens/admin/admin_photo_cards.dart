@@ -69,6 +69,13 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
   String? _codeType;
   bool _assigning = false;
 
+  /// کدهای اختصاصیِ کارتی که همین حالا آپلود می‌شود — اختیاری.
+  ///
+  /// اگر پر باشد، کدها در **همان تراکنشِ** ساختِ طرح به آن گره
+  /// می‌خورند. درخواستِ دومِ جدا یعنی احتمالِ کارتِ بدونِ کد وقتی
+  /// شبکه وسطِ کار قطع شود.
+  final _ownCodes = TextEditingController();
+
   /// (شناسهٔ نوعِ کارت، نام) — برای منویِ انتخاب.
   ///
   /// از `_designs` مشتق می‌شود و نه یک درخواستِ جدا: همان داده را دارد.
@@ -104,6 +111,7 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
     _name.dispose();
     _points.dispose();
     _cash.dispose();
+    _ownCodes.dispose();
     _codes.dispose();
     _batch.dispose();
     super.dispose();
@@ -175,6 +183,7 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
           'name': _name.text.trim(),
           'pointValue': _points.text.trim().isEmpty ? '0' : _points.text.trim(),
           'cashAmount': _cash.text.trim().isEmpty ? '0' : _cash.text.trim(),
+          if (_ownCodes.text.trim().isNotEmpty) 'rawCodes': _ownCodes.text.trim(),
         },
       );
       final d = (res.data is Map) ? res.data as Map : const {};
@@ -482,6 +491,33 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           decoration: const InputDecoration(
               labelText: 'جایزهٔ نقدی (تومان، اختیاری)', hintText: '0'),
+        ),
+        const SizedBox(height: 10),
+        // ── کدهای اختصاصیِ همین کارت ──
+        //
+        // تفاوتِ دو حالت اینجاست: با کد، ثبتِ کاربر با شباهتِ ۲۰٪ هم
+        // خودکار تأیید می‌شود. بدونِ کد، تشخیص کاملاً از روی عکس است
+        // و آستانه ۴۰٪.
+        TextField(
+          controller: _ownCodes,
+          maxLines: 4,
+          textDirection: TextDirection.ltr,
+          onChanged: (_) => setState(() {}),
+          decoration: const InputDecoration(
+            labelText: 'کدهای اختصاصی این کارت (اختیاری — هر خط یک کد)',
+            hintText: 'GHP-A2B3-C4D5\nGHP-X7K9-M1N2\n…',
+            alignLabelWithHint: true,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 6, bottom: 4),
+          child: Text(
+            _ownCodes.text.trim().isNotEmpty
+                ? '✅ این کدها به همین کارت گره می‌خورند — ثبتِ کاربر با '
+                    'شباهت ۲۰٪ هم خودکار تأیید می‌شود.'
+                : 'ℹ️ بدون کد اختصاصی، تشخیص از روی عکس است (آستانهٔ ۴۰٪).',
+            style: theme.textTheme.bodySmall,
+          ),
         ),
         FilledButton.icon(
           onPressed: _uploading ? null : _uploadDesign,
