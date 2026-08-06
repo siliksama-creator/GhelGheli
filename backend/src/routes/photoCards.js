@@ -116,6 +116,10 @@ module.exports = function createPhotoCardRoutes(deps) {
     // دیگر با همان کیفیتِ عکس به صف بررسی می‌رفت.
     texSig: toFloats(r.tex_sig),
     lumaSig: toFloats(r.luma_sig),
+    // ⚠️ اگر این خط جا بیفتد، `hasRgb` همیشه false می‌شود و موتور به
+    //    فرمولِ قدیمی برمی‌گردد — بی‌صدا و بدونِ هیچ خطایی. دقیقاً
+    //    همان چیزی که یک بار با `texSig` رخ داد.
+    rgbSig: toFloats(r.rgb_sig),
     width: r.width,
     height: r.height,
   });
@@ -166,12 +170,48 @@ module.exports = function createPhotoCardRoutes(deps) {
   router.post(
     '/admin/photo-cards/designs',
     adminAuth, requireRole('support'),
-    imageUpload.single('image'),
+    // ═════════════════════════════════════════════════════════════════════
+    // دو عکس در یک درخواست: روی کارت و پشتِ کارت
+    // ═════════════════════════════════════════════════════════════════════
+    //
+    // خواستهٔ صریح مالک: «ادمین برای هر عکس کارت ۲ تا عکس بفرسته هم‌زمان
+    // هر ۲ عکس آنالیز شن» — رو و پشتِ همان کارتِ فیزیکی.
+    //
+    // ── چرا هر عکس یک **طرحِ جدا** می‌شود و نه یک طرح با دو تصویر ──
+    //
+    // روی کارت و پشتِ کارت از نظر تصویری هیچ شباهتی ندارند: یکی طرحِ
+    // آماری با پس‌زمینهٔ سفید است، دیگری طرحِ هنری با پس‌زمینهٔ تیره.
+    // اندازه‌گیری روی کارت‌های واقعیِ قلقلی: شباهتِ رو و پشتِ Hakimi فقط
+    // ۰.۳۸ بود — کمتر از شباهتِ رویِ Hakimi با رویِ Dembélé (۰.۶۵).
+    //
+    // پس ادغامشان در یک اثرانگشت هر دو را خراب می‌کرد. در عوض هر کدام
+    // طرحِ مستقلِ خودش را می‌گیرد و **هر دو به یک `card_type_id` وصل
+    // می‌شوند**. کاربر از هر طرف عکس بگیرد، به همان بازیکن می‌رسد.
+    //
+    // ── چرا در یک تراکنش ──
+    //
+    // اگر مدیر رو را آپلود کند و درخواستِ دومِ پشت شکست بخورد، کارتی
+    // می‌ماند که فقط از یک طرف قابلِ ثبت است — و مدیر نمی‌فهمد. اینجا
+    // یا هر دو ثبت می‌شوند یا هیچ‌کدام.
+    imageUpload.fields([
+      { name: 'image', maxCount: 1 },
+      { name: 'imageBack', maxCount: 1 },
+    ]),
     asyncHandler(async (req, res) => {
-      if (!req.file) return res.status(400).json({ message: 'تصویری فرستاده نشد' });
+      // ── چرا هر دو شکلِ ورودی پذیرفته می‌شود ──
+      //
+      // `upload.fields` ورودی را در `req.files` می‌گذارد نه `req.file`.
+      // کلاینت‌های قدیمی که هنوز فقط `image` می‌فرستند باید بدونِ تغییر
+      // کار کنند، وگرنه اپِ نصب‌شده روی گوشیِ مدیر با ۴۰۰ می‌شکند.
+      const front = req.files?.image?.[0] || req.file || null;
+      const back = req.files?.imageBack?.[0] || null;
+      if (!front) return res.status(400).json({ message: 'تصویری فرستاده نشد' });
 
-      let filePath = req.file.path;
-      let filename = req.file.filename;
+      // فایل‌های موقتِ multer باید در هر مسیرِ خروج پاک شوند، وگرنه
+      // دیسکِ VPS با هر آپلود چند صد کیلوبایت پر می‌شود.
+      const temps = [front, back].filter(Boolean).map(f => f.path);
+      let filePath = front.path;
+      let filename = front.filename;
       try {
         const name = String(req.body.name || '').trim();
         const points = Math.max(0, Math.floor(Number(req.body.pointValue || 0)));
@@ -187,18 +227,48 @@ module.exports = function createPhotoCardRoutes(deps) {
         // اگر بعد از فشرده‌سازی گرفته می‌شد، اثر انگشتِ طرح به نسخهٔ
         // فشرده‌شده گره می‌خورد. آن هم کار می‌کرد، ولی کیفیت بالاتر
         // یعنی اثر انگشت دقیق‌تر و طرح تمیزتر برای مقایسه.
-        const buf = await fs.promises.readFile(filePath);
-        // همان محافظتِ مسیرِ کاربر: تصویرِ خراب باید ۴۰۰ با پیامِ
-        // فارسی بدهد، نه ۵۰۰ با خطای انگلیسیِ VipsJpeg.
-        let fp;
-        try {
-          fp = await fpEngine.fingerprint(buf);
-        } catch (imgErr) {
-          console.warn('[photo-cards] طرحِ غیرقابل‌خواندن:', imgErr.message);
-          return res.status(400).json({
-            message: 'فایل تصویری قابل خواندن نبود. لطفاً یک عکس سالم '
-              + '(PNG یا JPG) انتخاب کنید.',
-          });
+        // ── هر دو عکس اثرانگشت می‌گیرند ──
+        //
+        // `sides` آرایه‌ای از {file, label, fp} است. اگر مدیر فقط یک
+        // عکس فرستاده باشد یک عضو دارد، وگرنه دو تا. بقیهٔ مسیر روی
+        // همین آرایه حلقه می‌زند، پس افزودنِ عکسِ سوم در آینده فقط
+        // تغییرِ `imageUpload.fields` است.
+        const sides = [{ file: front, label: 'رو' }];
+        if (back) sides.push({ file: back, label: 'پشت' });
+
+        for (const side of sides) {
+          const buf = await fs.promises.readFile(side.file.path);
+          // همان محافظتِ مسیرِ کاربر: تصویرِ خراب باید ۴۰۰ با پیامِ
+          // فارسی بدهد، نه ۵۰۰ با خطای انگلیسیِ VipsJpeg.
+          try {
+            side.fp = await fpEngine.fingerprint(buf);
+          } catch (imgErr) {
+            console.warn('[photo-cards] طرحِ غیرقابل‌خواندن:', imgErr.message);
+            return res.status(400).json({
+              message: `تصویرِ «${side.label}ی کارت» قابل خواندن نبود. `
+                + 'لطفاً یک عکس سالم (PNG یا JPG) انتخاب کنید.',
+            });
+          }
+        }
+        const fp = sides[0].fp;
+
+        // ── رو و پشت نباید یک عکس باشند ──
+        //
+        // اشتباهِ کاملاً محتمل: مدیر در انتخابگرِ فایل دوبار همان تصویر
+        // را برمی‌دارد. بدونِ این بررسی دو طرحِ **یکسان** ثبت می‌شد، و
+        // آن‌وقت شرطِ «حاشیه تا رتبهٔ دوم» هرگز برآورده نمی‌شد — یعنی
+        // همهٔ ثبت‌های آن کارت تا ابد به بررسیِ دستی می‌رفتند، بی‌صدا.
+        if (sides.length === 2) {
+          const selfSim = fpEngine.similarity(sides[0].fp, sides[1].fp);
+          if (selfSim >= DUPLICATE_SIMILARITY) {
+            return res.status(409).json({
+              message: 'عکسِ رو و پشت تقریباً یکسان‌اند '
+                + `(${Math.round(selfSim * 100)}٪ شباهت). احتمالاً یک فایل را `
+                + 'دوبار انتخاب کرده‌اید. دو طرحِ همسان باعث می‌شوند سیستم '
+                + 'نتواند بینشان تشخیص دهد و همهٔ ثبت‌ها به بررسی دستی بروند.',
+              similarity: Number(selfSim.toFixed(3)),
+            });
+          }
         }
 
         // ── طرحِ تکراری را همین‌جا بگیر ──
@@ -218,19 +288,28 @@ module.exports = function createPhotoCardRoutes(deps) {
         // بفهمد چه شده. اگر واقعاً قصدش جایگزینی است، اول طرح قبلی را
         // غیرفعال کند.
         const existing = await pool.query(
-          `SELECT d.id, d.dhash, d.phash, d.color_sig, d.tex_sig, d.luma_sig, t.name
+          `SELECT d.id, d.dhash, d.phash, d.color_sig, d.tex_sig, d.luma_sig,
+                  d.rgb_sig, t.name
              FROM photo_card_designs d
              JOIN card_types t ON t.id = d.card_type_id
             WHERE d.is_active = true`,
         );
         for (const row of existing.rows) {
-          const sim = fpEngine.similarity(fp, {
-            dhash: row.dhash,
-            phash: row.phash,
-            colorSig: toFloats(row.color_sig),
-            texSig: toFloats(row.tex_sig),
-            lumaSig: toFloats(row.luma_sig),
-          });
+          // بیشترین شباهت در میانِ عکس‌های این درخواست: اگر **هرکدام**
+          // از رو یا پشت با طرحِ موجود یکی باشد، باید جلویش گرفته شود.
+          let sim = 0;
+          let simSide = sides[0];
+          for (const side of sides) {
+            const v = fpEngine.similarity(side.fp, {
+              dhash: row.dhash,
+              phash: row.phash,
+              colorSig: toFloats(row.color_sig),
+              texSig: toFloats(row.tex_sig),
+              lumaSig: toFloats(row.luma_sig),
+              rgbSig: toFloats(row.rgb_sig),
+            });
+            if (v > sim) { sim = v; simSide = side; }
+          }
           if (sim >= DUPLICATE_SIMILARITY) {
             // ⚠️ اینجا قبلاً `await releaseGuard()` بود — کپی‌شده از مسیرِ
             // «ثبت کاربر». آن تابع فقط در مسیرِ کاربر تعریف می‌شود و
@@ -245,7 +324,8 @@ module.exports = function createPhotoCardRoutes(deps) {
             // در این مسیر هیچ قفلی گرفته نشده، پس چیزی برای آزاد کردن
             // نیست و حذفِ خط کافی است.
             return res.status(409).json({
-              message: `این تصویر با طرحِ «${row.name}» تقریباً یکسان است `
+              message: `تصویرِ «${simSide.label}ی کارت» با طرحِ «${row.name}» `
+                + 'تقریباً یکسان است '
                 + `(${Math.round(sim * 100)}٪ شباهت). دو طرحِ همسان باعث می‌شوند `
                 + 'سیستم نتواند بینشان تشخیص دهد و همهٔ ثبت‌ها به بررسی دستی بروند. '
                 + 'اگر می‌خواهید جایگزین کنید، اول طرح قبلی را غیرفعال کنید.',
@@ -256,11 +336,17 @@ module.exports = function createPhotoCardRoutes(deps) {
         }
 
         // بهینه‌سازی همان تابعی است که بقیهٔ آپلودها استفاده می‌کنند، پس
-        // رفتار ذخیره‌سازی یکسان می‌ماند.
-        const opt = await optimizeUpload(req.file);
-        filename = opt.filename;
-        filePath = path.join(path.dirname(req.file.path), filename);
-        const imageUrl = `/uploads/images/${filename}`;
+        // رفتار ذخیره‌سازی یکسان می‌ماند. هر عکس نسخهٔ بهینهٔ خودش را
+        // می‌گیرد و مسیرش روی همان عضوِ `sides` می‌نشیند.
+        for (const side of sides) {
+          const o = await optimizeUpload(side.file);
+          side.filename = o.filename;
+          side.savedPath = path.join(path.dirname(side.file.path), o.filename);
+          side.imageUrl = `/uploads/images/${o.filename}`;
+        }
+        filename = sides[0].filename;
+        filePath = sides[0].savedPath;
+        const imageUrl = sides[0].imageUrl;
 
         const client = await pool.connect();
         try {
@@ -283,25 +369,102 @@ module.exports = function createPhotoCardRoutes(deps) {
               );
             }
           } else {
-            // نوع کارت تازه در همان کاتالوگ موجود ساخته می‌شود، پس
-            // اینونتوری و جوایز پلکانی بدون هیچ تغییری کار می‌کنند.
-            const ins = await client.query(
-              `INSERT INTO card_types(name, image_url, point_value, cash_amount, is_active)
-               VALUES($1, $2, $3, $4, true) RETURNING id`,
-              [name, imageUrl, points, cash],
+            // ═══════════════════════════════════════════════════════════
+            // نامِ تکراری = **همان** کارت، نه یک کارتِ دوم
+            // ═══════════════════════════════════════════════════════════
+            //
+            // ── باگی که این را لازم کرد ──
+            //
+            // نسخهٔ قبلی بی‌قیدوشرط `INSERT` می‌کرد. مالک برای «Achraf
+            // Hakimi» یک بار عکس + ۱۰۰۰ کد ثبت کرد، و چهار دقیقه بعد
+            // **عکسِ دومی** از همان بازیکن آپلود کرد (زاویهٔ دیگر، طرحِ
+            // دیگر — کارِ کاملاً منطقی).
+            //
+            // نتیجه: دو ردیفِ `card_types` با نامِ یکسان و دو UUID
+            // متفاوت. کدها به اولی گره خوردند، ولی موتورِ تطبیق عکسِ
+            // دومی را می‌شناخت. `decideSubmission` می‌دید
+            // `best.card_type_id !== expectedTypeId` و **هر ثبت** را با
+            // علتِ `type_mismatch` به صف بررسی می‌فرستاد.
+            //
+            // یعنی: عکس درست، کد درست، شباهت ۵۵٪ — و پیامِ «عکس با
+            // کارتِ این کد هم‌خوانی ندارد». مالک در پنل می‌دید که سیستم
+            // خودش Hakimi را حدس زده ولی ردش کرده. کاملاً غیرقابل‌فهم.
+            //
+            // ⚠️ چرا هیچ‌کدام از محافظ‌های موجود این را نگرفتند:
+            //    محافظِ «طرحِ تکراری» فقط **تصویر** را می‌سنجد. دو عکسِ
+            //    متفاوت از یک بازیکن واقعاً متفاوت‌اند (شباهتِ زیرِ
+            //    ۰.۹۳)، پس درست اجازه داد. کسی نامِ کارت را نمی‌سنجید.
+            //
+            // ── راه‌حل ──
+            //
+            // اگر نامی که مدیر نوشته از قبل در کاتالوگ هست، طرحِ جدید
+            // به **همان** نوع وصل می‌شود. این دقیقاً نیتِ مدیر است:
+            // «یک عکسِ دیگر از همین کارت» نه «یک کارتِ جدید با همین
+            // نام».
+            //
+            // چند طرح برای یک نوعِ کارت از اول پشتیبانی می‌شد
+            // (`photo_card_designs.card_type_id` کلیدِ خارجیِ ساده است،
+            // نه یکتا) — این قابلیت بود، فقط راهی برای رسیدن به آن
+            // نبود.
+            //
+            // مقایسه با `lower(trim())`: «hakimi» و «Hakimi » و
+            // «Hakimi» یک کارت‌اند. مدیری که دومی را تایپ می‌کند قصدِ
+            // ساختنِ کارتِ جدید ندارد.
+            const dup = await client.query(
+              `SELECT id, point_value, cash_amount FROM card_types
+                WHERE lower(trim(name)) = lower(trim($1)) LIMIT 1`,
+              [name],
             );
-            cardTypeId = ins.rows[0].id;
+            if (dup.rows[0]) {
+              cardTypeId = dup.rows[0].id;
+              // ── چرا امتیاز فقط وقتی به‌روز می‌شود که صریح آمده باشد ──
+              //
+              // اگر مدیر فقط عکسِ تازه آپلود می‌کند و فیلدِ امتیاز را
+              // خالی گذاشته، `points` صفر می‌شود. بازنویسیِ کورکورانه
+              // یعنی کارتِ ۳۰۰۰ امتیازی بی‌سروصدا صفر می‌شد — و
+              // کاربرانی که بعدش ثبت می‌کردند هیچ امتیازی نمی‌گرفتند.
+              if (req.body.pointValue !== undefined
+                  || req.body.cashAmount !== undefined) {
+                await client.query(
+                  `UPDATE card_types
+                      SET point_value = $1, cash_amount = $2, updated_at = NOW()
+                    WHERE id = $3`,
+                  [points, cash, cardTypeId],
+                );
+              }
+            } else {
+              // نوع کارت تازه در همان کاتالوگ موجود ساخته می‌شود، پس
+              // اینونتوری و جوایز پلکانی بدون هیچ تغییری کار می‌کنند.
+              const ins = await client.query(
+                `INSERT INTO card_types(name, image_url, point_value, cash_amount, is_active)
+                 VALUES($1, $2, $3, $4, true) RETURNING id`,
+                [name, imageUrl, points, cash],
+              );
+              cardTypeId = ins.rows[0].id;
+            }
           }
 
-          const d = await client.query(
-            `INSERT INTO photo_card_designs
-               (card_type_id, image_url, dhash, phash, color_sig, tex_sig,
-                luma_sig, width, height, created_by)
-             VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-             RETURNING id, image_url, width, height, created_at`,
-            [cardTypeId, imageUrl, fp.dhash, fp.phash, fp.colorSig, fp.texSig,
-              fp.lumaSig, fp.width, fp.height, req.admin.id],
-          );
+          // ── یک طرح به ازای هر عکس، همه به یک نوعِ کارت ──
+          //
+          // این قلبِ قابلیتِ «رو و پشت» است: دو ردیفِ `photo_card_designs`
+          // با اثرانگشت‌های کاملاً متفاوت، ولی هر دو با یک
+          // `card_type_id`. کاربر از هر طرف عکس بگیرد، `decideSubmission`
+          // به همان بازیکن می‌رسد و کد درست مصرف می‌شود.
+          const inserted = [];
+          for (const side of sides) {
+            const r = await client.query(
+              `INSERT INTO photo_card_designs
+                 (card_type_id, image_url, dhash, phash, color_sig, tex_sig,
+                  luma_sig, rgb_sig, width, height, created_by)
+               VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+               RETURNING id, image_url, width, height, created_at`,
+              [cardTypeId, side.imageUrl, side.fp.dhash, side.fp.phash,
+                side.fp.colorSig, side.fp.texSig, side.fp.lumaSig,
+                side.fp.rgbSig, side.fp.width, side.fp.height, req.admin.id],
+            );
+            inserted.push({ ...r.rows[0], side: side.label });
+          }
+          const d = { rows: inserted };
 
           // ═══════════════════════════════════════════════════════════
           // کدهای اختصاصیِ همین کارت — اختیاری، در همان درخواست
@@ -359,14 +522,20 @@ module.exports = function createPhotoCardRoutes(deps) {
           await audit(req.admin.id, 'create_photo_card_design', 'photo_card_designs',
             d.rows[0].id, null, { name, points, cash, imageUrl, codeReport });
 
+          const sideNote = sides.length > 1 ? ' (رو و پشت)' : '';
           res.json({
+            // `design` تکی برای سازگاری با کلاینت‌های قدیمی می‌ماند؛
+            // `designs` فهرستِ کاملِ آنچه واقعاً ساخته شد.
             design: d.rows[0],
+            designs: d.rows,
+            sideCount: sides.length,
             cardTypeId,
             codeReport,
             message: codeReport
-              ? `طرح ثبت شد و ${codeReport.insertedCount.toLocaleString('en-US')} `
+              ? `کارت${sideNote} ثبت شد و `
+                + `${codeReport.insertedCount.toLocaleString('en-US')} `
                 + 'کد اختصاصی به آن گره خورد'
-              : 'طرح ثبت شد و اثر انگشت تصویر ساخته شد',
+              : `کارت${sideNote} ثبت شد و اثر انگشت تصویر ساخته شد`,
           });
         } catch (e) {
           await client.query('ROLLBACK').catch(() => {});
@@ -375,9 +544,21 @@ module.exports = function createPhotoCardRoutes(deps) {
           client.release();
         }
       } catch (e) {
-        // آپلود ناموفق نباید فایل یتیم روی دیسک بگذارد.
+        // ── آپلودِ ناموفق نباید فایلِ یتیم روی دیسک بگذارد ──
+        //
+        // با دو عکس این مهم‌تر شد: اگر درجِ عکسِ دوم شکست بخورد،
+        // تراکنش برمی‌گردد ولی **هر دو فایل** روی دیسک مانده‌اند.
+        // `temps` نسخهٔ خام و `sides` نسخهٔ بهینه را پوشش می‌دهد.
+        for (const t of temps) safeUnlink(t);
         safeUnlink(filePath);
         throw e;
+      } finally {
+        // نسخهٔ خامِ multer بعد از بهینه‌سازی دیگر لازم نیست — چه
+        // موفق چه ناموفق. بدونِ این، هر آپلود دو فایل روی دیسک
+        // می‌گذارد به‌جای یکی.
+        for (const t of temps) {
+          if (t !== filePath) safeUnlink(t);
+        }
       }
     }),
   );
@@ -1385,7 +1566,7 @@ module.exports = function createPhotoCardRoutes(deps) {
 
         const designsRes = await pool.query(
           `SELECT id, card_type_id, image_url, dhash, phash, color_sig, tex_sig,
-                  luma_sig, width, height
+                  luma_sig, rgb_sig, width, height
              FROM photo_card_designs WHERE is_active = true`,
         );
 
@@ -1558,8 +1739,8 @@ module.exports = function createPhotoCardRoutes(deps) {
             `INSERT INTO photo_card_submissions
                (user_id, code_id, matched_design_id, match_score, match_margin,
                 user_image_path, status, review_reason, decision_path,
-                img_dhash, img_phash, img_color, img_tex, img_luma)
-             VALUES($1,$2,$3,$4,$5,$6,'pending',$7,$13,$8,$9,$10,$11,$12) RETURNING id`,
+                img_dhash, img_phash, img_color, img_tex, img_luma, img_rgb)
+             VALUES($1,$2,$3,$4,$5,$6,'pending',$7,$13,$8,$9,$10,$11,$12,$14) RETURNING id`,
             [req.user.id, codeId, match.design?.id ?? null,
               match.score, match.margin, savedPath, reason,
               // اثرانگشت **فقط برای ممیزی** ذخیره می‌شود، نه برای
@@ -1567,7 +1748,7 @@ module.exports = function createPhotoCardRoutes(deps) {
               // مدیر پاک می‌شود ولی این چند صد بایت می‌ماند و اگر
               // روزی الگوی مشکوکی دیده شد، داده‌اش هست.
               queryFp.dhash, queryFp.phash, queryFp.colorSig, queryFp.texSig,
-              queryFp.lumaSig, decision.path],
+              queryFp.lumaSig, decision.path, queryFp.rgbSig],
           );
 
           return res.json({
@@ -1645,12 +1826,12 @@ module.exports = function createPhotoCardRoutes(deps) {
             `INSERT INTO photo_card_submissions
                (user_id, code_id, matched_design_id, chosen_design_id,
                 match_score, match_margin, status, decision_path,
-                img_dhash, img_phash, img_color, img_tex, img_luma)
-             VALUES($1,$2,$3,$3,$4,$5,'approved',$6,$7,$8,$9,$10,$11)`,
+                img_dhash, img_phash, img_color, img_tex, img_luma, img_rgb)
+             VALUES($1,$2,$3,$3,$4,$5,'approved',$6,$7,$8,$9,$10,$11,$12)`,
             [req.user.id, codeId, design?.id ?? null,
               match.score, match.margin, decision.path,
               queryFp.dhash, queryFp.phash, queryFp.colorSig,
-              queryFp.texSig, queryFp.lumaSig],
+              queryFp.texSig, queryFp.lumaSig, queryFp.rgbSig],
           );
           await client.query('COMMIT');
         } catch (e) {

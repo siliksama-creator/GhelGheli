@@ -9,7 +9,7 @@
     "migrate": "node scripts/migrate.js",
     "seed:admin": "node scripts/seedAdmin.js",
     "close:league": "node scripts/closeLeague.js",
-    "test": "npm run lint && node scripts/testGames.js && node scripts/testEngine.js && node scripts/testSolo.js && node scripts/testValidation.js && node scripts/testWallet.js && node scripts/testTapGame.js && node scripts/testClubs.js && node scripts/testMobileNormalize.js && node scripts/testPass.js && node scripts/testPenalty.js && node scripts/testRateLimit.js && node scripts/testDecision.js",
+    "test": "npm run lint && node scripts/testGames.js && node scripts/testEngine.js && node scripts/testSolo.js && node scripts/testValidation.js && node scripts/testWallet.js && node scripts/testTapGame.js && node scripts/testClubs.js && node scripts/testMobileNormalize.js && node scripts/testPass.js && node scripts/testPenalty.js && node scripts/testRateLimit.js && node scripts/testDecision.js && node scripts/testFingerprintWiring.js",
     "test:tap": "node scripts/testTapGame.js",
     "test:games": "node scripts/testGames.js",
     "test:engine": "node scripts/testEngine.js",
@@ -19,7 +19,7 @@
     "test:penalty": "node scripts/testPenalty.js",
     "test:ratelimit": "node scripts/testRateLimit.js",
     "lint": "eslint src scripts",
-    "test:decision": "node scripts/testDecision.js"
+    "test:decision": "node scripts/testDecision.js && node scripts/testFingerprintWiring.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -2040,6 +2040,28 @@ app.post('/api/admin/card-types', adminAuth, requireRole('support'), asyncHandle
   // (and never as an empty string that later reads as "has an image").
   const imageUrl = req.body.imageUrl ? String(req.body.imageUrl).trim() || null : null;
   const cashAmount = cashAmountInput(req.body.cashAmount) ?? 0;
+  // ── نامِ تکراری رد می‌شود ──
+  //
+  // باگی که این را لازم کرد: مالک برای «Achraf Hakimi» دو بار کارت
+  // ساخت (بارِ دوم برای آپلودِ پشتِ کارت). دو ردیف با نامِ یکسان و دو
+  // UUID متفاوت ساخته شد. کدها به اولی گره خوردند ولی موتورِ تطبیق
+  // طرحِ دومی را می‌شناخت، پس **هر ثبت** با علتِ `type_mismatch` به صف
+  // بررسی می‌رفت — با اینکه عکس و کد هر دو درست بودند.
+  //
+  // ایندکسِ یکتای `uq_card_types_name_ci` هم در مایگریشن ۰۴۲ اضافه شد،
+  // ولی این بررسی می‌ماند تا پیامِ فارسیِ روشن بدهد به‌جای خطای خامِ
+  // یکتاییِ پستگرس که مدیر معنی‌اش را نمی‌فهمد.
+  const dupType = await pool.query(
+    'SELECT id FROM card_types WHERE lower(trim(name)) = lower(trim($1))',
+    [name]);
+  if (dupType.rows[0]) {
+    return res.status(409).json({
+      message: `کارتی با نام «${name}» از قبل وجود دارد. برای افزودنِ `
+        + 'عکسِ دیگر (مثلاً پشتِ کارت) از بخش «ثبت کارت» همان نام را '
+        + 'دوباره وارد کنید — عکسِ تازه به همان کارت اضافه می‌شود.',
+      cardTypeId: dupType.rows[0].id,
+    });
+  }
   const { rows } = await pool.query('INSERT INTO card_types(name,image_url,description,point_value,cash_amount,is_active) VALUES($1,$2,$3,$4,$5,$6) RETURNING *', [name,imageUrl,description,pointValue,cashAmount,isActive]);
   await audit(req.admin.id, 'create_card_type', 'card_types', rows[0].id, null, req.body); res.json(rows[0]);
 }));
