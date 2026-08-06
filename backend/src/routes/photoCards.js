@@ -23,6 +23,7 @@ const rateLimit = require('express-rate-limit');
 
 const fpEngine = require('../services/imageFingerprint');
 const photoCards = require('../services/photoCardService');
+const cardCrop = require('../services/cardCrop');
 const lockout = require('../services/photoCardLockout');
 
 // حداکثر کدی که در یک نوبت ساخته می‌شود.
@@ -241,7 +242,24 @@ module.exports = function createPhotoCardRoutes(deps) {
         if (back) sides.push({ file: back, label: 'پشت' });
 
         for (const side of sides) {
-          const buf = await fs.promises.readFile(side.file.path);
+          const raw = await fs.promises.readFile(side.file.path);
+
+          // ── برشِ خودکار برای طرحِ مدیر هم ──
+          //
+          // ⚠️ چرا این هم لازم است: اگر مدیر عکسِ کارت را با حاشیه
+          //    آپلود کند و کاربر بدونِ حاشیه بفرستد (یا برعکس)، دو
+          //    اثرانگشت روی نواحیِ متفاوتی ساخته می‌شوند و مقایسه
+          //    بی‌معنی می‌شود.
+          //
+          //    بریدنِ **هر دو طرف** با یک قاعده تضمین می‌کند که
+          //    اثرانگشت‌ها روی چیزِ یکسانی ساخته شوند.
+          let buf = raw;
+          try {
+            const c = await cardCrop.cropCard(raw);
+            if (c.cropped) { buf = c.buffer; side.cropped = c.box; }
+          } catch { /* در تردید، تصویرِ اصلی */ }
+          side.analysed = buf;
+
           // همان محافظتِ مسیرِ کاربر: تصویرِ خراب باید ۴۰۰ با پیامِ
           // فارسی بدهد، نه ۵۰۰ با خطای انگلیسیِ VipsJpeg.
           try {
@@ -1596,9 +1614,35 @@ module.exports = function createPhotoCardRoutes(deps) {
         // این خطای کاربر است نه سرور، پس ۴۰۰ با پیامِ فارسی درست است.
         // شمارندهٔ کدِ غلط هم بالا نمی‌رود: کدش ممکن است کاملاً درست
         // باشد و فقط عکس خراب بوده.
+        // ══════════════════════════════════════════════════════════════
+        // بریدنِ کارت از پس‌زمینه، پیش از هر تحلیلی
+        // ══════════════════════════════════════════════════════════════
+        //
+        // ── چرا لازم است ──
+        //
+        // عکسِ واقعیِ یک کاربر بررسی شد: کارت روی میزِ چوبی و **۴۰٪ کادر
+        // خودِ میز**. موتور رنگِ چوب را هم وارد محاسبه می‌کرد و کارتِ
+        // اشتباه با حاشیهٔ ۰.۰۳۳ برنده شد.
+        //
+        // همان عکس با برش: شباهت از ۰.۴۳۱ به ۰.۶۲۷ رفت — از «زیرِ
+        // آستانه» به «بالای آستانه».
+        //
+        // ⚠️ `cropCard` هرگز استثنا نمی‌دهد و در هر تردیدی بافرِ اصلی
+        //    را برمی‌گرداند. برشِ اشتباه بدتر از نبریدن است.
+        let workBuf = buf;
+        let cropInfo = null;
+        try {
+          const c = await cardCrop.cropCard(buf);
+          if (c.cropped) { workBuf = c.buffer; cropInfo = c.box; }
+        } catch (e) {
+          // هرگز نباید اینجا برسیم (خودِ تابع try دارد)، ولی اگر رسید
+          // ثبتِ کاربر نباید به‌خاطرِ یک بهینه‌سازیِ اختیاری بشکند.
+          console.warn('[photo-cards] برشِ خودکار شکست خورد:', e.message);
+        }
+
         let queryFp;
         try {
-          queryFp = await fpEngine.fingerprint(buf);
+          queryFp = await fpEngine.fingerprint(workBuf);
         } catch (imgErr) {
           console.warn('[photo-cards] تصویرِ غیرقابل‌خواندن:', imgErr.message);
           return res.status(400).json({
@@ -1880,6 +1924,14 @@ module.exports = function createPhotoCardRoutes(deps) {
           // تصویر باکیفیتِ مدیر — نه عکس کاربر.
           imageUrl: payload.imageUrl,
           matchScore: Number(match.score.toFixed(3)),
+          // ── چرا این به کلاینت می‌رود ──
+          //
+          // فقط برای شفافیت و اشکال‌زدایی: اگر روزی کاربری شکایت کرد
+          // که «عکسم درست بود ولی رد شد»، دیدنِ اینکه برش چه ناحیه‌ای
+          // را انتخاب کرده اولین چیزی است که باید بررسی شود.
+          //
+          // کلاینت آن را نمایش نمی‌دهد؛ در لاگِ شبکه دیده می‌شود.
+          cropped: cropInfo ? true : false,
           points: now.rows[0],
           walletBalance: Number(now.rows[0].wallet_balance || 0),
         });

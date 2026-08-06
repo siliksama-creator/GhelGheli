@@ -63,6 +63,7 @@ import 'package:image_picker/image_picker.dart';
 import '../api_client.dart';
 import '../theme/colors.dart';
 import '../theme/tokens.dart';
+import 'card_frame_guide.dart';
 import 'safe_image.dart';
 
 /// مراحلِ واقعیِ آنالیز — برچسب و توضیح.
@@ -99,6 +100,13 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
   final _codeFocus = FocusNode();
   String? _imagePath;
   bool _busy = false;
+
+  /// آیا راهنمای کادر در این نشست نشان داده شده؟
+  ///
+  /// در حافظهٔ ویجت می‌ماند نه دیسک: هدف این است که در یک نشست تکرار
+  /// نشود، ولی کاربری که فردا برمی‌گردد دوباره ببیندش — چون احتمالاً
+  /// فراموش کرده.
+  bool _guideShown = false;
 
   /// ── مرحلهٔ آنالیز، برای نوارِ پیشرفت ──
   ///
@@ -209,6 +217,20 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
   }
 
   Future<void> _pick(ImageSource source) async {
+    // ── راهنمای کادر، فقط قبلِ دوربین ──
+    //
+    // برای گالری بی‌معنی است: عکس از قبل گرفته شده و کاربر نمی‌تواند
+    // کاری کند. نشان دادنش آنجا فقط یک مانعِ اضافه است.
+    //
+    // ⚠️ فقط **یک بار در هر نشست**. راهنمایی که هر بار ظاهر شود از
+    //    کمک به مزاحمت تبدیل می‌شود و کاربر یاد می‌گیرد بدونِ خواندن
+    //    ردش کند — یعنی دقیقاً برعکسِ هدف.
+    if (source == ImageSource.camera && !_guideShown) {
+      final go = await showCardFrameGuide(context);
+      if (!mounted) return;
+      _guideShown = true;
+      if (!go) return;
+    }
     try {
       final f = await ImagePicker().pickImage(
         source: source,

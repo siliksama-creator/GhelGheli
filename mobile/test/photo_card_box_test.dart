@@ -21,6 +21,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghelgheli_mobile/api_client.dart';
 import 'package:ghelgheli_mobile/theme/app_theme.dart';
+import 'package:ghelgheli_mobile/widgets/card_frame_guide.dart';
 import 'package:ghelgheli_mobile/widgets/photo_card_box.dart';
 
 /// آداپتور ساختگی: پاسخِ هر مسیر را دیکته می‌کند.
@@ -215,6 +216,117 @@ void main() {
       await t.pumpWidget(_wrap(_api({'/api/photo-cards/status': (200, _on)})));
       await t.pumpAndSettle();
       expect(find.textContaining('این عکس قبلاً ارسال شده'), findsNothing);
+    });
+  });
+
+  group('راهنمای کادرِ دوربین', () {
+    // ── چرا این تست‌ها ──
+    //
+    // راهنما بینِ کاربر و دوربین می‌ایستد. اگر خراب شود، کاربر اصلاً
+    // نمی‌تواند عکس بگیرد — یعنی کلِ قابلیت از کار می‌افتد. و چون
+    // مسیرِ دوربین در تستِ خودکار قابلِ اجرا نیست، دستِ‌کم باید
+    // مطمئن شویم خودِ شیت سالم رندر می‌شود.
+    testWidgets('شیتِ راهنما بدونِ خطا باز می‌شود', (t) async {
+      await t.pumpWidget(MaterialApp(
+        theme: AppTheme.dark(),
+        home: Builder(
+          builder: (ctx) => Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                onPressed: () => showCardFrameGuide(ctx),
+                child: const Text('باز کن'),
+              ),
+            ),
+          ),
+        ),
+      ));
+      await t.tap(find.text('باز کن'));
+      await t.pumpAndSettle();
+      expect(find.textContaining('عکسِ خوب'), findsOneWidget);
+      expect(_clean(), isTrue);
+    });
+
+    testWidgets('هر دو نمونهٔ درست و اشتباه نشان داده می‌شوند', (t) async {
+      // نشان دادنِ «اشتباه» عمدی است: کاربر اشتباهِ خودش را در آن
+      // می‌بیند و سریع‌تر می‌فهمد تا از توضیحِ «درست».
+      await t.pumpWidget(MaterialApp(
+        theme: AppTheme.dark(),
+        home: Builder(
+          builder: (ctx) => Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                onPressed: () => showCardFrameGuide(ctx),
+                child: const Text('باز کن'),
+              ),
+            ),
+          ),
+        ),
+      ));
+      await t.tap(find.text('باز کن'));
+      await t.pumpAndSettle();
+      expect(find.text('درست'), findsOneWidget);
+      expect(find.text('اشتباه'), findsOneWidget);
+    });
+
+    testWidgets('«بی‌خیال» false برمی‌گرداند تا دوربین باز نشود', (t) async {
+      // ⚠️ اگر این بشکند، کاربری که منصرف شده باز هم دوربینش باز
+      //    می‌شود — رفتاری که کاملاً غیرمنتظره است.
+      bool? result;
+      await t.pumpWidget(MaterialApp(
+        theme: AppTheme.dark(),
+        home: Builder(
+          builder: (ctx) => Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                onPressed: () async {
+                  result = await showCardFrameGuide(ctx);
+                },
+                child: const Text('باز کن'),
+              ),
+            ),
+          ),
+        ),
+      ));
+      await t.tap(find.text('باز کن'));
+      await t.pumpAndSettle();
+      // ⚠️ اسکرول لازم است و این خودش یافتهٔ مهمی است: روی صفحهٔ
+      //    ۸۰۰×۶۰۰ (و گوشیِ کوچک) دکمه‌ها زیرِ لبه می‌افتند. شیت
+      //    `SingleChildScrollView` دارد پس کاربر می‌تواند برسد، ولی
+      //    تست باید همان کار را بکند وگرنه چیزی را می‌سنجد که کاربر
+      //    نمی‌بیند.
+      await t.scrollUntilVisible(find.text('بی‌خیال'), 200,
+          scrollable: find.byType(Scrollable).last);
+      await t.pumpAndSettle();
+      await t.tap(find.text('بی‌خیال'));
+      await t.pumpAndSettle();
+      expect(result, isFalse);
+    });
+
+    testWidgets('«متوجه شدم» true برمی‌گرداند', (t) async {
+      bool? result;
+      await t.pumpWidget(MaterialApp(
+        theme: AppTheme.dark(),
+        home: Builder(
+          builder: (ctx) => Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                onPressed: () async {
+                  result = await showCardFrameGuide(ctx);
+                },
+                child: const Text('باز کن'),
+              ),
+            ),
+          ),
+        ),
+      ));
+      await t.tap(find.text('باز کن'));
+      await t.pumpAndSettle();
+      await t.scrollUntilVisible(find.textContaining('متوجه شدم'), 200,
+          scrollable: find.byType(Scrollable).last);
+      await t.pumpAndSettle();
+      await t.tap(find.textContaining('متوجه شدم'));
+      await t.pumpAndSettle();
+      expect(result, isTrue);
     });
   });
 
