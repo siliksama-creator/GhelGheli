@@ -1228,6 +1228,13 @@ table.data-table {
    با ۱۰۰۰ کد برای هر کارت، فهرستِ تخت چند هزار ردیف می‌شد و مدیر برای
    رسیدن به بازیکنِ دوم بی‌نهایت اسکرول می‌کرد. حالا هر بازیکن یک خطِ
    بسته است و فقط گروهِ بازشده ردیف نشان می‌دهد. */
+.uploadPhase {
+  margin: 0 0 6px;
+  color: var(--gg-emerald);
+  animation: upPulse 1.2s ease-in-out infinite;
+}
+@keyframes upPulse { 50% { opacity: .5 } }
+
 .codeGroup {
   border: 1px solid var(--gg-border);
   border-radius: var(--gg-radius-md);

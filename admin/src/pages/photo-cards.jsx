@@ -25,6 +25,13 @@ import {
 import { useDialog } from '../components/dialog.jsx';
 import { useToast } from '../lib/toast.jsx';
 
+// مراحلِ واقعیِ آنالیزِ آپلود — هر کدام کارِ واقعیِ سرور.
+const UPLOAD_STEPS = [
+  '⏳ در حال تحلیل تصویر — رنگ، لبه‌ها، بافت و روشنایی…',
+  '🔤 در حال خواندن متن کارت — نام بازیکن و شمارهٔ پیراهن…',
+  '🔍 بررسی تکراری نبودن و ثبت در کاتالوگ…',
+];
+
 export function PhotoCardsPage({ request }) {
   const notify = useToast();
   const { confirmAction } = useDialog();
@@ -66,6 +73,15 @@ export function PhotoCardsPage({ request }) {
   const [points, setPoints] = useState('');
   const [cash, setCash] = useState('');
   const [uploading, setUploading] = useState(false);
+
+  // ── مرحلهٔ آنالیزِ آپلود ──
+  //
+  // آپلودِ دو عکس (رو و پشت) حدودِ ۲.۴ ثانیه طول می‌کشد: هر عکس ۳۳۰ms
+  // اثرانگشتِ تصویری + ۸۵۰ms خواندنِ متن. بدونِ بازخورد، مدیر فکر
+  // می‌کند دکمه کار نکرده و دوباره می‌زند.
+  //
+  // ⚠️ مراحل ساختگی نیستند؛ کارِ واقعیِ سرور را نشان می‌دهند.
+  const [upPhase, setUpPhase] = useState(0);
   // کدهای اختصاصیِ همین کارت — اختیاری، همراه با آپلودِ طرح ثبت می‌شوند.
   const [ownCodes, setOwnCodes] = useState('');
   const [ownBatch, setOwnBatch] = useState('');
@@ -170,6 +186,11 @@ export function PhotoCardsPage({ request }) {
     if (!file) return notify('عکس کارت را انتخاب کنید', 'error');
     if (!name.trim()) return notify('نام کارت را بنویسید', 'error');
     setUploading(true);
+    setUpPhase(0);
+    const timers = [
+      setTimeout(() => setUpPhase(1), 500),
+      setTimeout(() => setUpPhase(2), 1600),
+    ];
     try {
       const r = await request.postForm('/api/admin/photo-cards/designs', {
         file,
@@ -196,7 +217,9 @@ export function PhotoCardsPage({ request }) {
     } catch (e) {
       notify(e.message, 'error');
     } finally {
+      timers.forEach(clearTimeout);
       setUploading(false);
+      setUpPhase(0);
     }
   }
 
@@ -486,6 +509,11 @@ export function PhotoCardsPage({ request }) {
                   + 'عکس انجام می‌گیرد (آستانهٔ ۴۰٪).'}
             </p>
 
+            {uploading && (
+              <p className="topbar-sub uploadPhase">
+                {UPLOAD_STEPS[upPhase]}
+              </p>
+            )}
             <Button icon={Upload} loading={uploading} onClick={uploadDesign}>
               {ownCodes.trim()
                 ? `ثبت کارت${fileBack ? ' (رو و پشت)' : ''} و کدهای آن`

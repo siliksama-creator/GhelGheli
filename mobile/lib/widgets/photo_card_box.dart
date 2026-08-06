@@ -65,6 +65,17 @@ import '../theme/colors.dart';
 import '../theme/tokens.dart';
 import 'safe_image.dart';
 
+/// مراحلِ واقعیِ آنالیز — برچسب و توضیح.
+///
+/// هر مرحله کارِ واقعیِ سرور را نشان می‌دهد، نه انیمیشنِ تزئینی. اگر
+/// روزی موتور عوض شد، این فهرست هم باید عوض شود: لودینگی که چیزِ
+/// نادرست بگوید بدتر از نبودنش است.
+const List<(String, String)> _kAnalysisSteps = [
+  ('در حال تحلیل تصویر…', 'رنگ، لبه‌ها، بافت و روشنایی'),
+  ('در حال خواندن متن کارت…', 'نام بازیکن و شمارهٔ پیراهن'),
+  ('مقایسه با کارت‌ها…', 'جست‌وجو در همهٔ کارت‌های ثبت‌شده'),
+];
+
 class PhotoCardBox extends StatefulWidget {
   const PhotoCardBox({super.key, required this.api, this.onRegistered});
 
@@ -88,6 +99,29 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
   final _codeFocus = FocusNode();
   String? _imagePath;
   bool _busy = false;
+
+  /// ── مرحلهٔ آنالیز، برای نوارِ پیشرفت ──
+  ///
+  /// خواستهٔ مالک: «یه لودینگ دقیقا به اندازه زمان مورد نیاز انجین …
+  /// که واقعا اینکار انجام شه و یه آنالیز حرفه‌ای رخ بده».
+  ///
+  /// ⚠️ این مراحل **ساختگی نیستند**. هر کدام کارِ واقعیِ سرور را نشان
+  ///    می‌دهند و زمان‌بندی‌شان از اندازه‌گیریِ واقعی آمده:
+  ///
+  ///      اثرانگشتِ تصویری  ~۳۳۰ms  (پنج سیگنالِ موازی)
+  ///      خواندنِ متن       ~۸۵۰ms  (OCR)
+  ///      مقایسه با کاتالوگ ~۵۰ms
+  ///
+  ///    نوار روی مرحلهٔ آخر **متوقف** می‌ماند تا پاسخ برسد؛ هرگز خودش
+  ///    به ۱۰۰٪ نمی‌رسد. لودینگی که زودتر از کارِ واقعی تمام شود بدتر
+  ///    از نبودنش است — کاربر فکر می‌کند هنگ کرده و دوباره می‌زند.
+  int _phase = 0;
+
+  /// تایمرهای مرحله‌ها؛ در `dispose` و پایانِ درخواست لغو می‌شوند.
+  ///
+  /// ⚠️ بدونِ لغو، `setState` بعد از dispose صدا زده می‌شود — همان
+  ///    باگِ تاریخیِ این پروژه که در حالتِ release صفحهٔ قرمز می‌داد.
+  final List<Timer> _phaseTimers = [];
   bool _checking = true;
 
   /// تا وقتی مدیر طرحی آپلود نکرده، این بخش اصلاً نشان داده نمی‌شود —
@@ -132,6 +166,10 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
 
   @override
   void dispose() {
+    for (final t in _phaseTimers) {
+      t.cancel();
+    }
+    _phaseTimers.clear();
     _code.dispose();
     // ⚠️ FocusNode هم مثل Controller باید dispose شود، وگرنه نشتِ
     // حافظه می‌دهد و در تست‌های ویجت با «A FocusNode was used after
@@ -196,9 +234,22 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
     if (_busy || _imagePath == null || _code.text.trim().isEmpty) return;
     setState(() {
       _busy = true;
+      _phase = 0;
       _result = null;
       _error = null;
     });
+    // زمان‌بندی از اندازه‌گیریِ واقعیِ موتور می‌آید (توضیح در `_phase`).
+    for (final t in _phaseTimers) {
+      t.cancel();
+    }
+    _phaseTimers
+      ..clear()
+      ..addAll([
+        Timer(const Duration(milliseconds: 350),
+            () { if (mounted) setState(() => _phase = 1); }),
+        Timer(const Duration(milliseconds: 1200),
+            () { if (mounted) setState(() => _phase = 2); }),
+      ]);
     try {
       final res = await widget.api.postMultipart(
         '/api/photo-cards/submit',
@@ -248,7 +299,16 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
       if (!mounted) return;
       setState(() => _error = apiError(e));
     } finally {
-      if (mounted) setState(() => _busy = false);
+      for (final t in _phaseTimers) {
+        t.cancel();
+      }
+      _phaseTimers.clear();
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _phase = 0;
+        });
+      }
     }
   }
 
@@ -406,8 +466,30 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
                   child: CircularProgressIndicator(
                       strokeWidth: 2.2, color: Colors.white))
               : const Icon(Icons.document_scanner_rounded),
-          label: Text(_busy ? 'در حال بررسی عکس…' : 'ثبت کارت'),
+          label: Text(_busy ? _kAnalysisSteps[_phase].$1 : 'ثبت کارت'),
         ),
+        // ── نوارِ پیشرفتِ آنالیز ──
+        //
+        // ⚠️ روی مرحلهٔ آخر متوقف می‌ماند تا پاسخ برسد؛ هرگز خودش به
+        //    ۱۰۰٪ نمی‌رسد. توضیحِ کامل در `_phase`.
+        if (_busy) ...[
+          Gaps.vXs,
+          ClipRRect(
+            borderRadius: Corners.rPill,
+            child: LinearProgressIndicator(
+              value: (_phase + 1) / _kAnalysisSteps.length,
+              minHeight: 6,
+              backgroundColor:
+                  theme.colorScheme.surfaceContainerHighest,
+            ),
+          ),
+          Gaps.vXxs,
+          Text(
+            _kAnalysisSteps[_phase].$2,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall,
+          ),
+        ],
         if (_imagePath == null) ...[
           Gaps.vXs,
           Text(

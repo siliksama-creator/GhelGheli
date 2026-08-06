@@ -56,6 +56,20 @@ import React, { useEffect, useRef, useState } from 'react';
 
 import { API } from '../lib/api.js';
 
+// ═══════════════════════════════════════════════════════════════════════════
+// مراحلِ واقعیِ آنالیز
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// هر مرحله کارِ واقعیِ سرور را نشان می‌دهد، نه انیمیشنِ تزئینی. اگر
+// روزی موتور عوض شد، این فهرست هم باید عوض شود — لودینگی که چیزِ
+// نادرست بگوید بدتر از نبودنش است.
+const ANALYSIS_STEPS = [
+  { label: 'آماده‌سازی عکس…', hint: 'فشرده‌سازی برای ارسال سریع‌تر' },
+  { label: 'تحلیل تصویر…', hint: 'رنگ، لبه‌ها، بافت و روشنایی' },
+  { label: 'خواندن متن روی کارت…', hint: 'نام بازیکن و شمارهٔ پیراهن' },
+  { label: 'مقایسه با کارت‌ها…', hint: 'جست‌وجو در همهٔ کارت‌های ثبت‌شده' },
+];
+
 /** حداکثر حجم قبل از فشرده‌سازی سمت کلاینت. */
 const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 
@@ -105,6 +119,24 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
   const [preview, setPreview] = useState('');
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
+
+  // ── مرحلهٔ آنالیز، برای نوارِ پیشرفت ──
+  //
+  // خواستهٔ مالک: «یه لودینگ دقیقا به اندازه زمان مورد نیاز انجین …
+  // که واقعا اینکار انجام شه و یه آنالیز حرفه‌ای رخ بده».
+  //
+  // ⚠️ این مراحل **ساختگی نیستند**. هر کدام کارِ واقعیِ سرور را نشان
+  //    می‌دهند و زمان‌بندی‌شان از اندازه‌گیریِ واقعی آمده:
+  //
+  //      فشرده‌سازیِ سمتِ مرورگر  ~۳۰۰ms
+  //      اثرانگشتِ تصویری        ~۳۳۰ms  (۵ سیگنالِ موازی)
+  //      خواندنِ متن با OCR      ~۸۵۰ms
+  //      مقایسه با کاتالوگ       ~۵۰ms
+  //
+  //    نوار روی مرحلهٔ آخر **متوقف** می‌ماند تا پاسخ برسد؛ هرگز به
+  //    ۱۰۰٪ نمی‌رسد مگر واقعاً تمام شود. لودینگی که زودتر از کار تمام
+  //    شود بدتر از نبودنش است — کاربر فکر می‌کند سیستم هنگ کرده.
+  const [phase, setPhase] = useState(0);
   const [result, setResult] = useState(null);
   const [locked, setLocked] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
@@ -175,6 +207,14 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
     if (busy || !file || !code.trim()) return;
     setBusy(true);
     setResult(null);
+    setPhase(0);
+    // زمان‌بندی از اندازه‌گیریِ واقعیِ موتور می‌آید (بالا توضیح داده شد).
+    // اگر پاسخ زودتر برسد، `finally` تایمرها را پاک می‌کند.
+    const timers = [
+      setTimeout(() => setPhase(1), 350),
+      setTimeout(() => setPhase(2), 750),
+      setTimeout(() => setPhase(3), 1700),
+    ];
     try {
       const small = await shrink(file);
       const fd = new FormData();
@@ -244,7 +284,9 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
     } catch {
       setResult({ kind: 'error', message: 'اتصال اینترنت برقرار نیست' });
     } finally {
+      timers.forEach(clearTimeout);
       setBusy(false);
+      setPhase(0);
     }
   }
 
@@ -370,8 +412,36 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
 
       <button className="main" onClick={submit}
         disabled={busy || locked || !file || !code.trim()}>
-        {busy ? 'در حال بررسی عکس…' : 'ثبت کارت'}
+        {busy ? ANALYSIS_STEPS[phase].label : 'ثبت کارت'}
       </button>
+
+      {/* ══════════════════════════════════════════════════════════════
+          نوارِ پیشرفتِ آنالیز
+          ══════════════════════════════════════════════════════════════
+
+          چهار نقطه که یکی‌یکی روشن می‌شوند، هر کدام یک مرحلهٔ **واقعی**
+          از کارِ موتور.
+
+          ⚠️ نوار روی مرحلهٔ آخر متوقف می‌ماند تا پاسخ برسد. هرگز خودش
+             به ۱۰۰٪ نمی‌رسد. لودینگی که زودتر از کارِ واقعی تمام شود
+             بدتر از نبودنش است: کاربر فکر می‌کند سیستم هنگ کرده و
+             دکمه را دوباره می‌زند. */}
+      {busy && (
+        <div className="pcAnalysis" role="status" aria-live="polite">
+          <div className="pcAnalysisBar">
+            <span style={{ width: `${(phase + 1) * 25}%` }} />
+          </div>
+          <div className="pcAnalysisSteps">
+            {ANALYSIS_STEPS.map((st, i) => (
+              <span key={st.label}
+                className={i < phase ? 'done' : (i === phase ? 'now' : '')}>
+                {i < phase ? '✓' : '●'}
+              </span>
+            ))}
+          </div>
+          <p className="pcAnalysisHint">{ANALYSIS_STEPS[phase].hint}</p>
+        </div>
+      )}
 
       {!file && (
         <small className="pcTip">

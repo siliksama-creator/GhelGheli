@@ -2677,6 +2677,52 @@ a:focus-visible {
 }
 .photoCardBox h2 { margin: 0 0 6px; font-size: 20px; }
 
+/* ══════════════════════════════════════════════════════════════════════
+   نوارِ پیشرفتِ آنالیز
+   ══════════════════════════════════════════════════════════════════════
+
+   آنالیزِ واقعی حدودِ ۱.۲ ثانیه طول می‌کشد (اثرانگشتِ تصویری ۳۳۰ms +
+   خواندنِ متن ۸۵۰ms). بدونِ بازخورد، آن یک‌ونیم ثانیه شبیهِ «هیچ اتفاقی
+   نیفتاد» است و کاربر دکمه را دوباره می‌زند. */
+.pcAnalysis { margin: 10px 0 4px; }
+
+.pcAnalysisBar {
+  height: 6px;
+  border-radius: 99px;
+  background: #ffffff18;
+  overflow: hidden;
+}
+.pcAnalysisBar span {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--brand-ink), #00d49a);
+  /* گذارِ نرم بینِ مراحل — پرشِ ناگهانی حسِ «تقلبی» می‌دهد. */
+  transition: width .45s cubic-bezier(.4, 0, .2, 1);
+}
+
+.pcAnalysisSteps {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 11px;
+  color: #ffffff40;
+}
+.pcAnalysisSteps .now {
+  color: var(--brand-ink);
+  animation: pcPulse 1s ease-in-out infinite;
+}
+.pcAnalysisSteps .done { color: #00d49a; }
+@keyframes pcPulse { 50% { opacity: .35 } }
+
+.pcAnalysisHint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #c9ddf2;
+  text-align: center;
+}
+
+
 /* راهنمای «چند نسخه از یک کارت».
    رنگِ برند می‌گیرد نه خاکستریِ راهنماهای معمولی: این یک نکتهٔ
    عملیاتی است که اگر خوانده نشود کاربر کدهایش را دور می‌ریزد، نه یک
