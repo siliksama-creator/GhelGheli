@@ -568,6 +568,145 @@ async function rgbLayout(buf) {
   return Array.from(out);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// خواندنِ متنِ روی کارت — قطعی‌ترین سیگنال
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ── چرا این لازم شد ──
+//
+// خواستهٔ صریح مالک: «کاش سیستمی که شباهت عکس رو داره پیدا میکنه، متن‌های
+// روی عکس رو زمان آپلود ادمین و آپلود کاربر سعی کنه بخونه که اینطوری
+// درصد اشتباه کمتر شه».
+//
+// اندازه‌گیری روی عکسِ واقعیِ یک کاربر (کارتِ دمبله روی میزِ چوبی):
+//
+//     مرجع      شباهتِ تصویری
+//     Hakimi-B      ۰.۵۳۳   ← برنده شد!
+//     Dembélé-B     ۰.۵۰۰
+//     Hakimi-A      ۰.۳۶۷
+//     Dembélé-A     ۰.۳۱۵
+//
+// حاشیه فقط ۰.۰۳۳ بود و **کارتِ اشتباه** برنده شد. علتش سه چیزِ هم‌زمان:
+// قالبِ مشترکِ کارت‌ها، میزِ چوبی که ۴۰٪ کادر را گرفته بود، و رنگِ طلاییِ
+// مشترکِ هر دو طرح.
+//
+// همان عکس با OCR:
+//
+//     Hakimi   ۰.۰۰۰
+//     Dembélé  ۱.۰۰۰   ← قاطع
+//
+// ── چرا OCR اینجا جواب می‌دهد ولی برای **کد** نداد ──
+//
+// قبلاً امتحان شد که کدِ چاپ‌شده را از عکس بخوانیم و شکست خورد: کد با
+// فونتِ ریز روی لبهٔ کارت است و حتی در کیفیت عالی درست خوانده نمی‌شد.
+//
+// نامِ بازیکن کاملاً فرق دارد: با حروفِ درشتِ چند سانتی‌متری وسطِ کارت
+// چاپ می‌شود. حتی روی عکسِ تارِ گوشی هم خوانده می‌شود.
+//
+// ── تحملِ خطا ──
+//
+// خروجیِ خام پر از نویز است (`~EMBELE`, `PR AN oc.`). دو تدبیر:
+//
+//   ۱. فقط رشته‌های ≥۴ حرف نگه داشته می‌شوند — تکه‌های تصادفی حذف
+//      می‌شوند و نامِ بازیکن می‌ماند.
+//   ۲. تطبیق با تحملِ زیررشته: `EMBELE` با `DEMBELE` یکی شمرده می‌شود.
+//      حرفِ اول اغلب در لبهٔ برش یا سایه گم می‌شود.
+//
+// ── چرا شکست کاملاً بی‌صداست ──
+//
+// اگر tesseract نصب نباشد یا کرش کند، آرایهٔ خالی برمی‌گردد و موتور
+// دقیقاً مثلِ قبل کار می‌کند. این قابلیت **افزودنی** است نه وابستگیِ
+// حیاتی؛ سرورِ بدونِ tesseract نباید ثبتِ کارت را از کار بیندازد.
+const { execFile } = require('child_process');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+
+/** آیا tesseract در دسترس است؟ یک بار سنجیده و کش می‌شود. */
+let _ocrReady = null;
+
+function ocrAvailable() {
+  if (_ocrReady !== null) return Promise.resolve(_ocrReady);
+  return new Promise((resolve) => {
+    execFile('tesseract', ['--version'], { timeout: 5000 }, (err) => {
+      _ocrReady = !err;
+      if (!_ocrReady) {
+        console.warn('[fingerprint] tesseract نصب نیست — تطبیقِ متنی خاموش است');
+      }
+      resolve(_ocrReady);
+    });
+  });
+}
+
+/**
+ * متنِ لاتینِ روی تصویر را می‌خواند و به توکن‌های معنادار می‌شکند.
+ *
+ * @returns {Promise<string[]>} توکن‌های یکتا، یا [] اگر چیزی خوانده نشد
+ */
+async function readText(buf) {
+  if (!(await ocrAvailable())) return [];
+
+  // فایلِ موقت لازم است: tesseract از stdin تصویر نمی‌گیرد.
+  const tmp = path.join(os.tmpdir(),
+    `gg-ocr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`);
+  try {
+    // ── چرا این پیش‌پردازش ──
+    //
+    // خاکستری + بزرگ‌نمایی تا ۱۴۰۰ پیکسل + نرمال‌سازیِ کنتراست + تیزی.
+    // روی عکسِ گوشی این ترکیب تفاوتِ «هیچ» و «DEMBELE» را می‌سازد:
+    // tesseract روی متنِ کم‌کنتراستِ فشرده‌شده عملاً کور است.
+    await sharp(buf, { failOn: 'none' })
+      .rotate().removeAlpha().greyscale()
+      .resize(1400, null, { fit: 'inside', withoutEnlargement: false })
+      .normalise()
+      .sharpen()
+      .png()
+      .toFile(tmp);
+
+    const raw = await new Promise((resolve) => {
+      execFile('tesseract',
+        [tmp, '-', '--psm', '11', '-c',
+          'tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ'],
+        { timeout: 20000, maxBuffer: 1 << 20 },
+        (err, stdout) => resolve(err ? '' : String(stdout || '')));
+    });
+
+    // فقط رشته‌های ≥۴ حرف. کوتاه‌تر از آن تقریباً همیشه نویز است و
+    // برخوردِ تصادفی بین دو کارتِ بی‌ربط می‌سازد.
+    const seen = new Set();
+    for (const t of (raw.toUpperCase().match(/[A-Z]{4,}/g) || [])) {
+      seen.add(t);
+      if (seen.size >= 40) break;   // سقف تا حافظه بی‌دلیل پر نشود
+    }
+    return [...seen];
+  } catch {
+    return [];
+  } finally {
+    fs.promises.unlink(tmp).catch(() => {});
+  }
+}
+
+/**
+ * شباهتِ دو مجموعه توکنِ متنی.
+ *
+ * @returns {?number} عددی در [۰,۱]، یا null اگر یکی از دو طرف متنی نداشت
+ *   — که با «صفر» فرق دارد: «نخواندم» در برابر «خواندم و فرق داشت».
+ */
+function textSimilarity(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b) || !a.length || !b.length) {
+    return null;
+  }
+  let hit = 0;
+  for (const x of a) {
+    for (const y of b) {
+      // تحملِ زیررشته: حرفِ اول اغلب در لبهٔ برش یا سایه گم می‌شود،
+      // پس `EMBELE` باید با `DEMBELE` یکی شمرده شود.
+      if (x === y || x.includes(y) || y.includes(x)) { hit += 1; break; }
+    }
+  }
+  return hit / Math.min(a.length, b.length);
+}
+
 function packBits(bits) {
   const out = Buffer.alloc(Math.ceil(bits.length / 8));
   for (let i = 0; i < bits.length; i++) {
@@ -592,9 +731,9 @@ function hamming(a, b) {
 /** اثر انگشت کامل یک تصویر. */
 async function fingerprint(buf) {
   const meta = await sharp(buf, { failOn: 'none' }).metadata();
-  const [d, p, c, t, l, rgb] = await Promise.all([
+  const [d, p, c, t, l, rgb, txt] = await Promise.all([
     dhash(buf), phash(buf), colorSignature(buf), radialTexture(buf),
-    lumaMap(buf), rgbLayout(buf),
+    lumaMap(buf), rgbLayout(buf), readText(buf),
   ]);
   return {
     version: FP_VERSION,
@@ -604,6 +743,7 @@ async function fingerprint(buf) {
     texSig: t,
     lumaSig: l,
     rgbSig: rgb,
+    textTokens: txt,
     width: meta.width || 0,
     height: meta.height || 0,
   };
@@ -731,6 +871,42 @@ function rgbLayoutSim(x, y) {
   if (hi < 1e-9) return 0;          // هر دو کاملاً یکنواخت: بی‌اطلاع
   return base * (Math.min(sx, sy) / hi);
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// وزنِ متن در نمرهٔ نهایی
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// متن **جایگزینِ** تصویر نمی‌شود، بلکه آن را جابه‌جا می‌کند:
+//
+//   • متنِ هم‌خوان  → نمره بالا می‌رود (تا سقفِ TEXT_BOOST)
+//   • متنِ متناقض   → نمره پایین می‌آید (تا کفِ TEXT_PENALTY)
+//   • متنی خوانده نشد → هیچ اثری ندارد، فقط تصویر حرف می‌زند
+//
+// ── چرا جابه‌جایی و نه وزنِ ثابت ──
+//
+// وزنِ ثابت یعنی هر عکسی که OCR رویش کار نکند (تارِ شدید، نورِ بد) نمرهٔ
+// کمتری بگیرد — حتی اگر تصویرش کاملاً واضح باشد. آن کاربر را برای چیزی
+// مجازات می‌کند که تقصیرش نیست.
+//
+// جابه‌جایی فقط وقتی عمل می‌کند که **هر دو طرف** متن داشته باشند. در
+// بقیهٔ حالات فرمولِ تصویری دست‌نخورده می‌ماند.
+//
+// ── اعداد ──
+//
+// روی عکسِ واقعیِ کاربر (کارتِ دمبله روی میزِ چوبی):
+//
+//     مرجع       تصویر   متن    نهایی
+//     Hakimi-B   ۰.۵۳۳   ۰.۰۰   ۰.۳۸۳  ← از رتبهٔ ۱ به ۳
+//     Dembélé-B  ۰.۵۰۰   ۰.۵۰   ۰.۵۵۰
+//     Dembélé-A  ۰.۳۱۵   ۱.۰۰   ۰.۴۶۵  ← از رتبهٔ ۴ به ۲
+//
+// حاشیه از ۰.۰۳۳ به ۰.۰۸۵ رسید و کارتِ **درست** برنده شد.
+//
+// ⚠️ سقفِ ۰.۱۵: متن نباید بتواند به‌تنهایی یک تطبیقِ ضعیف را به تأیید
+//    برساند. عکسی که هیچ شباهتی ندارد ولی اتفاقاً کلمهٔ مشترکی دارد
+//    (مثلاً «WORLDCUP» که روی همهٔ کارت‌هاست) نباید کارت بگیرد.
+const TEXT_BOOST = 0.15;
+const TEXT_PENALTY = 0.15;
 
 function similarity(a, b) {
   const dBits = Math.min(a.dhash.length, b.dhash.length) * 8;
@@ -893,12 +1069,41 @@ function similarity(a, b) {
  * بالا هم قابل اتکا نیست — ممکن است طرحِ اشتباه با اختلاف ناچیز برنده
  * شده باشد و کاربر کارتِ گران‌تری بگیرد که مالِ او نیست.
  */
+/**
+ * نمرهٔ نهایی: شباهتِ تصویری، جابه‌جا شده با شواهدِ متنی.
+ *
+ * این تابع همان چیزی است که بقیهٔ سیستم صدا می‌زند؛ `similarity` خام
+ * فقط بخشِ تصویری است و برای تست و اشکال‌زدایی باقی مانده.
+ */
+function combinedSimilarity(a, b) {
+  const visual = similarity(a, b);
+  const t = textSimilarity(a.textTokens, b.textTokens);
+  if (t === null) return visual;      // یکی از دو طرف متنی نداشت
+
+  // ── چرا نقطهٔ خنثی ۰.۳۵ است و نه ۰.۵ ──
+  //
+  // کارت‌ها کلماتِ مشترکِ زیادی دارند: WORLDCUP، RIGHT، HEIGHT، FOOT.
+  // دو کارتِ کاملاً متفاوت به‌طور طبیعی حدودِ ۰.۲ تا ۰.۳ شباهتِ متنی
+  // می‌گیرند. اگر نقطهٔ خنثی ۰.۵ بود، همان اشتراکِ بی‌معنی جریمه
+  // می‌شد و کارتِ درست هم پایین می‌آمد.
+  //
+  // ۰.۳۵ از اندازه‌گیری آمد: بالای آن یعنی «نامِ بازیکن هم‌خوان است»،
+  // زیرِ آن یعنی «فقط قالبِ مشترک».
+  const NEUTRAL = 0.35;
+  const shift = t >= NEUTRAL
+    ? TEXT_BOOST * ((t - NEUTRAL) / (1 - NEUTRAL))
+    : -TEXT_PENALTY * ((NEUTRAL - t) / NEUTRAL);
+  return Math.max(0, Math.min(1, visual + shift));
+}
+
 function matchAgainst(queryFp, designs) {
   if (!designs.length) {
     return { verdict: 'reject', design: null, score: 0, margin: 0, ranked: [] };
   }
   const ranked = designs
-    .map(d => ({ design: d, score: similarity(queryFp, d) }))
+    // `combinedSimilarity` و نه `similarity` خام: شواهدِ متنی باید در
+    // رتبه‌بندی اثر بگذارد، وگرنه کلِ OCR بی‌مصرف است.
+    .map(d => ({ design: d, score: combinedSimilarity(queryFp, d) }))
     .sort((x, y) => y.score - x.score);
 
   const best = ranked[0];
@@ -967,7 +1172,10 @@ function matchAgainst(queryFp, designs) {
 
 module.exports = {
   fingerprint,
+  readText,
+  textSimilarity,
   similarity,
+  combinedSimilarity,
   matchAgainst,
   hamming,
   FP_VERSION,

@@ -120,6 +120,10 @@ module.exports = function createPhotoCardRoutes(deps) {
     //    فرمولِ قدیمی برمی‌گردد — بی‌صدا و بدونِ هیچ خطایی. دقیقاً
     //    همان چیزی که یک بار با `texSig` رخ داد.
     rgbSig: toFloats(r.rgb_sig),
+    // ⚠️ اگر این خط جا بیفتد، تطبیقِ متنی بی‌صدا خاموش می‌شود و موتور
+    //    فقط به تصویر تکیه می‌کند — همان باگی که دو بار با texSig و
+    //    rgbSig رخ داد. نگهبانِ `testFingerprintWiring` می‌گیردش.
+    textTokens: Array.isArray(r.text_tokens) ? r.text_tokens : [],
     width: r.width,
     height: r.height,
   });
@@ -289,7 +293,7 @@ module.exports = function createPhotoCardRoutes(deps) {
         // غیرفعال کند.
         const existing = await pool.query(
           `SELECT d.id, d.dhash, d.phash, d.color_sig, d.tex_sig, d.luma_sig,
-                  d.rgb_sig, t.name
+                  d.rgb_sig, d.text_tokens, t.name
              FROM photo_card_designs d
              JOIN card_types t ON t.id = d.card_type_id
             WHERE d.is_active = true`,
@@ -307,6 +311,7 @@ module.exports = function createPhotoCardRoutes(deps) {
               texSig: toFloats(row.tex_sig),
               lumaSig: toFloats(row.luma_sig),
               rgbSig: toFloats(row.rgb_sig),
+              textTokens: Array.isArray(row.text_tokens) ? row.text_tokens : [],
             });
             if (v > sim) { sim = v; simSide = side; }
           }
@@ -455,12 +460,13 @@ module.exports = function createPhotoCardRoutes(deps) {
             const r = await client.query(
               `INSERT INTO photo_card_designs
                  (card_type_id, image_url, dhash, phash, color_sig, tex_sig,
-                  luma_sig, rgb_sig, width, height, created_by)
-               VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+                  luma_sig, rgb_sig, text_tokens, width, height, created_by)
+               VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
                RETURNING id, image_url, width, height, created_at`,
               [cardTypeId, side.imageUrl, side.fp.dhash, side.fp.phash,
                 side.fp.colorSig, side.fp.texSig, side.fp.lumaSig,
-                side.fp.rgbSig, side.fp.width, side.fp.height, req.admin.id],
+                side.fp.rgbSig, side.fp.textTokens || [],
+                side.fp.width, side.fp.height, req.admin.id],
             );
             inserted.push({ ...r.rows[0], side: side.label });
           }
@@ -1566,7 +1572,7 @@ module.exports = function createPhotoCardRoutes(deps) {
 
         const designsRes = await pool.query(
           `SELECT id, card_type_id, image_url, dhash, phash, color_sig, tex_sig,
-                  luma_sig, rgb_sig, width, height
+                  luma_sig, rgb_sig, text_tokens, width, height
              FROM photo_card_designs WHERE is_active = true`,
         );
 
@@ -1739,8 +1745,10 @@ module.exports = function createPhotoCardRoutes(deps) {
             `INSERT INTO photo_card_submissions
                (user_id, code_id, matched_design_id, match_score, match_margin,
                 user_image_path, status, review_reason, decision_path,
-                img_dhash, img_phash, img_color, img_tex, img_luma, img_rgb)
-             VALUES($1,$2,$3,$4,$5,$6,'pending',$7,$13,$8,$9,$10,$11,$12,$14) RETURNING id`,
+                img_dhash, img_phash, img_color, img_tex, img_luma, img_rgb,
+                img_text)
+             VALUES($1,$2,$3,$4,$5,$6,'pending',$7,$13,$8,$9,$10,$11,$12,$14,$15)
+             RETURNING id`,
             [req.user.id, codeId, match.design?.id ?? null,
               match.score, match.margin, savedPath, reason,
               // اثرانگشت **فقط برای ممیزی** ذخیره می‌شود، نه برای
@@ -1748,7 +1756,8 @@ module.exports = function createPhotoCardRoutes(deps) {
               // مدیر پاک می‌شود ولی این چند صد بایت می‌ماند و اگر
               // روزی الگوی مشکوکی دیده شد، داده‌اش هست.
               queryFp.dhash, queryFp.phash, queryFp.colorSig, queryFp.texSig,
-              queryFp.lumaSig, decision.path, queryFp.rgbSig],
+              queryFp.lumaSig, decision.path, queryFp.rgbSig,
+              queryFp.textTokens || []],
           );
 
           return res.json({
@@ -1826,12 +1835,14 @@ module.exports = function createPhotoCardRoutes(deps) {
             `INSERT INTO photo_card_submissions
                (user_id, code_id, matched_design_id, chosen_design_id,
                 match_score, match_margin, status, decision_path,
-                img_dhash, img_phash, img_color, img_tex, img_luma, img_rgb)
-             VALUES($1,$2,$3,$3,$4,$5,'approved',$6,$7,$8,$9,$10,$11,$12)`,
+                img_dhash, img_phash, img_color, img_tex, img_luma, img_rgb,
+                img_text)
+             VALUES($1,$2,$3,$3,$4,$5,'approved',$6,$7,$8,$9,$10,$11,$12,$13)`,
             [req.user.id, codeId, design?.id ?? null,
               match.score, match.margin, decision.path,
               queryFp.dhash, queryFp.phash, queryFp.colorSig,
-              queryFp.texSig, queryFp.lumaSig, queryFp.rgbSig],
+              queryFp.texSig, queryFp.lumaSig, queryFp.rgbSig,
+              queryFp.textTokens || []],
           );
           await client.query('COMMIT');
         } catch (e) {

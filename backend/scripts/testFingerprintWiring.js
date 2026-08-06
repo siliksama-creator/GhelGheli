@@ -51,6 +51,7 @@ const SIGNALS = [
   { key: 'texSig', design: 'tex_sig', sub: 'img_tex' },
   { key: 'lumaSig', design: 'luma_sig', sub: 'img_luma' },
   { key: 'rgbSig', design: 'rgb_sig', sub: 'img_rgb' },
+  { key: 'textTokens', design: 'text_tokens', sub: 'img_text' },
 ];
 
 console.log('\n══ ۱. هر سیگنالِ اثرانگشت ستونِ خودش را دارد ══');
@@ -148,6 +149,35 @@ console.log('\n══ ۱. هر سیگنالِ اثرانگشت ستونِ خود
     vsOrange < 0.40, `نمره=${vsOrange.toFixed(3)} (آستانهٔ بی‌نام ۰.۴۰)`);
   ck('کاغذِ راه‌راه با کارتِ رنگی تأیید نمی‌شود',
     vsRed < 0.40, `نمره=${vsRed.toFixed(3)}`);
+
+  console.log('\n══ ۶. تطبیقِ متنی ══');
+  // ── چرا این تست‌ها ──
+  //
+  // OCR سیگنالی است که می‌تواند بی‌صدا از کار بیفتد: اگر tesseract نصب
+  // نباشد، اگر پیش‌پردازش عوض شود، یا اگر ستونِ دیتابیس جا بیفتد.
+  // در همهٔ این حالات هیچ خطایی رخ نمی‌دهد و موتور فقط کمی بدتر کار
+  // می‌کند — بدترین نوعِ خرابی.
+  const t1 = fp.textSimilarity(['DEMBELE', 'FRANCE'], ['DEMBELE', 'WORLDCUP']);
+  ck('توکنِ یکسان شباهت می‌دهد', t1 !== null && t1 > 0,
+    String(t1));
+  const t2 = fp.textSimilarity(['EMBELE'], ['DEMBELE']);
+  ck('حرفِ اولِ گم‌شده تحمل می‌شود (EMBELE ≈ DEMBELE)', t2 === 1,
+    `${t2} — حرفِ اول اغلب در لبهٔ برش گم می‌شود`);
+  const t3 = fp.textSimilarity(['HAKIMI', 'MOROCCO'], ['DEMBELE', 'FRANCE']);
+  ck('دو نامِ متفاوت شباهتِ صفر می‌دهند', t3 === 0, String(t3));
+  ck('نبودِ متن null می‌دهد نه صفر',
+    fp.textSimilarity([], ['DEMBELE']) === null,
+    '«نخواندم» با «خواندم و فرق داشت» یکی نیست');
+
+  // متن نباید بتواند تطبیقِ ضعیف را نجات دهد و نه تطبیقِ قوی را بکشد.
+  const strong = { ...f, textTokens: ['DEMBELE'] };
+  const weak = { ...fb, textTokens: ['DEMBELE'] };
+  const cSame = fp.combinedSimilarity(strong, { ...f, textTokens: ['DEMBELE'] });
+  ck('متنِ هم‌خوان تطبیقِ درست را خراب نمی‌کند', cSame > 0.9,
+    cSame.toFixed(3));
+  const cCross = fp.combinedSimilarity(strong, weak);
+  ck('متنِ مشترک به‌تنهایی دو کارتِ متفاوت را تأیید نمی‌کند',
+    cCross < 0.55, `نمره=${cCross.toFixed(3)}`);
 
   console.log(`\n${fail ? '✗' : '✓'} ${pass} موفق، ${fail} ناموفق\n`);
   process.exit(fail ? 1 : 0);

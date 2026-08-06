@@ -31,6 +31,7 @@ const uploadRoot = path.join(__dirname, '..', 'uploads');
   const { rows } = await pool.query(
     `SELECT id, image_url FROM photo_card_designs
       WHERE tex_sig IS NULL OR luma_sig IS NULL OR rgb_sig IS NULL
+         OR text_tokens IS NULL
       ORDER BY created_at`,
   );
   if (!rows.length) {
@@ -50,9 +51,10 @@ const uploadRoot = path.join(__dirname, '..', 'uploads');
       const fp = await fpEngine.fingerprint(buf);
       await pool.query(
         `UPDATE photo_card_designs
-            SET tex_sig=$1, luma_sig=$2, rgb_sig=$3, updated_at=NOW()
-          WHERE id=$4`,
-        [fp.texSig, fp.lumaSig, fp.rgbSig, r.id],
+            SET tex_sig=$1, luma_sig=$2, rgb_sig=$3, text_tokens=$4,
+                updated_at=NOW()
+          WHERE id=$5`,
+        [fp.texSig, fp.lumaSig, fp.rgbSig, fp.textTokens || [], r.id],
       );
       done++;
     } catch (e) {
