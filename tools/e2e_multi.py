@@ -167,12 +167,19 @@ st, rd = req('POST', '/api/admin/photo-cards/designs', at,
              {'name': f'{PFX}-صلاح', 'pointValue': '80'},
              {'image': ('a.png', png, 'image/png')})
 ck('طرح ساخته شد', st == 200 and rd.get('design'), f'{st} {rd}')
-TYPE_ID = (rd.get('design') or {}).get('card_type_id')
+# ⚠️ پاسخِ ساختِ طرح `cardTypeId` را در **ریشه** برمی‌گرداند، نه داخل
+# `design`. تلاشِ اول `design.card_type_id` را خواند، `None` گرفت، و
+# چون سرور `cardTypeId`ِ خالی را «کدِ بی‌نام» تفسیر می‌کند، تست بی‌صدا
+# مسیرِ اشتباه را سنجید و **سبز شد**. بدترین نوعِ تست: آن که موفق
+# می‌شود بدونِ اینکه چیزی را که ادعا می‌کند بسنجد.
+TYPE_ID = rd.get('cardTypeId') or (rd.get('design') or {}).get('card_type_id')
+if not TYPE_ID:
+    raise SystemExit(f'✗ شناسهٔ نوعِ کارت از پاسخ خوانده نشد: {rd}')
 
 codes = [f'{PFX}-{i:04d}' for i in range(1, N + 1)]
 st, rc = req('POST', '/api/admin/photo-cards/codes', at,
              {'rawCodes': '\n'.join(codes),
-              'expectedCardTypeId': TYPE_ID,
+              'cardTypeId': TYPE_ID,
               'batchLabel': f'سریِ {PFX}'})
 ck(f'{N} کدِ نام‌دار ثبت شد', st == 200 and rc.get('insertedCount') == N,
    f"{st} ins={rc.get('insertedCount')}")
@@ -201,11 +208,21 @@ ck(f'هر {N} کد پذیرفته شد (تأیید یا بررسی)', approved +
    f'تأیید={approved} بررسی={pending} رد={rejected}')
 
 print('\n══ ۲. اینونتوری: تعداد باید برابرِ تأییدشده‌ها باشد ══')
-st, inv = req('GET', '/api/cards/inventory', ut)
-mine = [i for i in inv.get('inventory', inv.get('cards', []))
-        if str(i.get('name', '')).startswith(PFX)]
-qty = sum(int(i.get('quantity') or 0) for i in mine)
-ck(f'کارت در اینونتوری هست', len(mine) >= 1, f'{len(mine)} ردیف — {inv if not mine else ""}')
+# ⚠️ مسیر `/api/profile` است نه `/api/cards/inventory`.
+# تلاشِ اول مسیرِ دومی را زد و ۴۰۴ گرفت — که به‌شکلِ «صفر کارت در
+# اینونتوری» ظاهر شد و دقیقاً شبیهِ باگِ محصول به نظر می‌رسید. یعنی
+# تستِ اشتباه، خودش یک هشدارِ دروغینِ قانع‌کننده تولید کرد.
+def inventory(tok, pfx):
+    st, d = req('GET', '/api/profile', tok)
+    if st != 200:
+        raise SystemExit(f'✗ /api/profile پاسخ نداد: {st} {d}')
+    rows = [i for i in d.get('inventory', [])
+            if str(i.get('name', '')).startswith(pfx)]
+    return rows, sum(int(i.get('quantity') or 0) for i in rows)
+
+
+mine, qty = inventory(ut, PFX)
+ck('کارت در اینونتوری هست', len(mine) >= 1, f'{len(mine)} ردیف')
 ck(f'تعداد = {approved} (برابرِ ثبت‌های تأییدشده)', qty == approved,
    f'quantity={qty} approved={approved}')
 ck('همه در **یک ردیف** جمع شده‌اند، نه چند ردیفِ جدا', len(mine) <= 1,
@@ -217,10 +234,7 @@ st, r = req('POST', '/api/photo-cards/submit', ut, {'code': codes[0]},
 ck('کدِ مصرف‌شده ۴۰۹ می‌گیرد', st == 409, f'{st} {r.get("status")} {r.get("message","")[:80]}')
 ck('پیامش «قبلاً استفاده شده» است', 'استفاده شده' in str(r.get('message', '')),
    str(r.get('message'))[:100])
-st, inv2 = req('GET', '/api/cards/inventory', ut)
-mine2 = [i for i in inv2.get('inventory', inv2.get('cards', []))
-         if str(i.get('name', '')).startswith(PFX)]
-qty2 = sum(int(i.get('quantity') or 0) for i in mine2)
+mine2, qty2 = inventory(ut, PFX)
 ck('اینونتوری بعد از تلاشِ ناموفق تغییر نکرد', qty2 == qty, f'{qty} → {qty2}')
 
 print('\n══ ۴. کدِ ناموجود هم رد می‌شود (اصالت تنها معیار است) ══')
@@ -235,7 +249,7 @@ print('\n══ ۵. هم‌زمانی: چهار درخواست با یک عکس 
 print('   (قفلِ مشورتی حذف شد؛ باید هر چهار موفق شوند)')
 codes2 = [f'{PFX}-R{i:03d}' for i in range(1, 5)]
 st, rc2 = req('POST', '/api/admin/photo-cards/codes', at,
-              {'rawCodes': '\n'.join(codes2), 'expectedCardTypeId': TYPE_ID})
+              {'rawCodes': '\n'.join(codes2), 'cardTypeId': TYPE_ID})
 res = []
 lock = threading.Lock()
 
@@ -258,10 +272,7 @@ for c, s_, r in sorted(res):
 ck('هر ۴ درخواستِ هم‌زمان پذیرفته شدند', gran == 4,
    f'{gran} از ۴ — قفلِ حذف‌شده برگشته؟')
 
-st, inv3 = req('GET', '/api/cards/inventory', ut)
-mine3 = [i for i in inv3.get('inventory', inv3.get('cards', []))
-         if str(i.get('name', '')).startswith(PFX)]
-qty3 = sum(int(i.get('quantity') or 0) for i in mine3)
+mine3, qty3 = inventory(ut, PFX)
 appr2 = sum(1 for _c, _s, r in res if r.get('status') == 'approved')
 ck(f'اینونتوری از {qty} به {qty + appr2} رسید', qty3 == qty + appr2,
    f'انتظار={qty + appr2} واقعی={qty3}')
@@ -269,7 +280,7 @@ ck('باز هم یک ردیف، فقط quantity بالاتر', len(mine3) <= 1, 
 
 print('\n══ ۶. عکسِ بد + کدِ نام‌دار → همچنان تأیید (آستانهٔ ۲۰٪) ══')
 st, rc3 = req('POST', '/api/admin/photo-cards/codes', at,
-              {'rawCodes': f'{PFX}-BLUR1', 'expectedCardTypeId': TYPE_ID})
+              {'rawCodes': f'{PFX}-BLUR1', 'cardTypeId': TYPE_ID})
 st, r = req('POST', '/api/photo-cards/submit', ut, {'code': f'{PFX}-BLUR1'},
             {'image': ('bl.jpg', blurry(im), 'image/jpeg')})
 ck('عکسِ تارِ همان کارت با کدِ نام‌دار پذیرفته شد',

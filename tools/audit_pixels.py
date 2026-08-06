@@ -109,6 +109,35 @@ COLLECT = r"""
     const r = el.getBoundingClientRect();
     if (r.width < 4 || r.height < 4) continue;
     if (r.bottom < 0 || r.top > innerHeight) continue;
+    // ── چرا عناصرِ پشتِ نوارهای شناور رد می‌شوند ──
+    //
+    // نوارِ ناوبریِ پایین `position: fixed` است و روی محتوا می‌نشیند.
+    // متنی که دقیقاً پشتِ آن افتاده در اسکرین‌شات **دیده نمی‌شود** —
+    // پیکسل‌هایی که می‌خوانیم مالِ خودِ نوار است، نه آن متن.
+    //
+    // نتیجه‌اش یک هشدارِ دروغینِ کاملاً قانع‌کننده بود: دکمهٔ
+    // «تازه‌ترین» با نسبتِ ۱.۱۷ گزارش شد، در حالی که خودش پس‌زمینهٔ
+    // سبزِ برند با متنِ تیره دارد (نسبتِ واقعی ~۱۲:۱). وقت گرفت تا
+    // معلوم شود ابزار رنگِ نوار را خوانده نه رنگِ دکمه.
+    //
+    // ⚠️ این «پنهان کردنِ مشکل» نیست: کاربر آن متن را در این حالت
+    //    اصلاً نمی‌بیند، پس کنتراستش بی‌معنی است. اگر متن **همیشه**
+    //    زیر نوار بماند، مسئلهٔ چیدمان است نه کنتراست — و ابزارِ
+    //    `audit_overlap.py` دقیقاً برای همان ساخته شده.
+    let covered = false;
+    for (const f of document.querySelectorAll('*')) {
+      const fs = getComputedStyle(f);
+      if (fs.position !== 'fixed' && fs.position !== 'sticky') continue;
+      if (f.contains(el) || el.contains(f)) continue;
+      if (fs.visibility === 'hidden' || fs.display === 'none') continue;
+      const fr = f.getBoundingClientRect();
+      if (fr.width < 8 || fr.height < 8) continue;
+      // همپوشانیِ عمودیِ معنادار: بیش از نیمِ ارتفاعِ متن پوشیده است.
+      const ov = Math.min(r.bottom, fr.bottom) - Math.max(r.top, fr.top);
+      const ox = Math.min(r.right, fr.right) - Math.max(r.left, fr.left);
+      if (ov > r.height * 0.5 && ox > r.width * 0.5) { covered = true; break; }
+    }
+    if (covered) continue;
     // شناسه می‌گذاریم تا **بعد از** پنهان کردنِ متن دوباره مختصات را
     // بخوانیم. اگر مختصاتِ قبلی را نگه داریم و در این فاصله چیزی جابه‌جا
     // شود (بارگذاریِ ناهمگامِ تراکنش‌ها، انیمیشن، تصویری که می‌رسد)،
