@@ -427,16 +427,48 @@ async function testMatching() {
   await t('هر فیلدِ اثرانگشت مسیرِ ماندگاری دارد', async () => {
     const f = await fp.fingerprint(await makeCard({ hue: 40, seed: 3 }));
 
-    // فیلدهایی که در جدول `photo_card_designs` ستون دارند.
-    const persisted = new Set(['dhash', 'phash', 'colorSig', 'texSig',
-      'lumaSig', 'width', 'height']);
+    // ══════════════════════════════════════════════════════════════════
+    // فهرست از **مایگریشن‌های واقعی** خوانده می‌شود، نه دستی
+    // ══════════════════════════════════════════════════════════════════
+    //
+    // ── چرا عوض شد ──
+    //
+    // نسخهٔ قبلی یک `Set` دستی داشت. وقتی `rgbSig` و `textTokens` به
+    // اثرانگشت اضافه شدند، کسی این فهرست را به‌روز نکرد و تست قرمز شد
+    // با پیامِ «ستونِ دیتابیس ندارد» — در حالی که ستون **وجود داشت**
+    // (مایگریشن‌های ۰۴۲ و ۰۴۳).
+    //
+    // یعنی نگهبانی که برای گرفتنِ باگ ساخته شده بود، خودش هشدارِ
+    // دروغین می‌داد. و چون این تست در `npm test` نبود، ماه‌ها کسی
+    // ندیدش.
+    //
+    // حالا نامِ ستون‌ها از خودِ فایل‌های SQL خوانده می‌شود: افزودنِ
+    // سیگنالِ تازه بدونِ مایگریشن همچنان قرمز می‌شود، ولی افزودنِ
+    // سیگنال **با** مایگریشن خودبه‌خود سبز است.
+    const fsx = require('fs');
+    const pathx = require('path');
+    const migDir = pathx.join(__dirname, '..', 'migrations');
+    const sql = fsx.readdirSync(migDir)
+      .filter(x => x.endsWith('.sql'))
+      .map(x => fsx.readFileSync(pathx.join(migDir, x), 'utf8'))
+      .join('\n');
+
+    // نگاشتِ نامِ کلیدِ اثرانگشت → نامِ ستون (camelCase → snake_case).
+    const columnFor = (key) => key
+      .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+      .toLowerCase()
+      .replace(/_sig$/, '_sig');
+
     // فیلدهایی که عمداً ذخیره نمی‌شوند.
     const transient = new Set(['version']);
 
     for (const key of Object.keys(f)) {
-      assert.ok(persisted.has(key) || transient.has(key),
-        `فیلدِ «${key}» در اثرانگشت هست ولی ستونِ دیتابیس ندارد — `
-        + 'همان باگی که texSig داشت. یا ستون اضافه کن یا به transient ببر.');
+      if (transient.has(key)) continue;
+      const col = columnFor(key);
+      assert.ok(sql.includes(col),
+        `فیلدِ «${key}» در اثرانگشت هست ولی ستونِ «${col}» در هیچ `
+        + 'مایگریشنی نیست — همان باگی که texSig داشت. یا مایگریشن '
+        + 'بنویس یا فیلد را به transient ببر.');
     }
   });
 
