@@ -97,7 +97,7 @@ def admin_token(password, username='Admin'):
 # ⚠️ هر پیشوندِ تازه **باید** اینجا اضافه شود. سه بار فراموش شد و هر بار
 #    نتیجه‌اش یک تستِ قرمزِ گمراه‌کننده بود که شبیهِ باگِ محصول به نظر
 #    می‌رسید: MX پیشوندِ e2e_multi.py است.
-TEST_PREFIXES = ('SP', 'EG', 'R2', 'IF', 'BD', 'DBG', 'MX', 'V2', 'T2', 'WB')
+TEST_PREFIXES = ('SP', 'EG', 'R2', 'IF', 'BD', 'DBG', 'MX', 'V2', 'T2', 'WB', 'TS')
 
 
 def deactivate_stale_designs(req, admin_tok, prefixes=TEST_PREFIXES):

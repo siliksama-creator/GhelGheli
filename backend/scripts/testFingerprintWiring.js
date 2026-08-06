@@ -112,6 +112,43 @@ console.log('\n══ ۱. هر سیگنالِ اثرانگشت ستونِ خود
   ck('قرمزِ یکدست و آبیِ یکدست از هم جدا می‌شوند',
     cross < 0.55, `نمره=${cross.toFixed(3)} (باید زیرِ آستانهٔ تأیید باشد)`);
 
+  console.log('\n══ ۵. عکسی که کارت نیست تأیید نمی‌شود ══');
+  // ── رگرسیونی که تستِ سرتاسری گرفت ──
+  //
+  // بعد از افزودنِ `rgbSig`، عکسِ یک کاغذِ راه‌راهِ سفید با گرادیانِ
+  // نارنجی نمرهٔ ۰.۴۷۸ گرفت — بالای آستانهٔ ۰.۴۰ کدِ بی‌نام. یعنی کاربر
+  // می‌توانست عکسِ دیوار بفرستد و کارت بگیرد.
+  //
+  // دو تصویرِ «تخت» هش‌های یکسان می‌دهند (هیچ لبه‌ای ندارند که تفاوت
+  // بسازد) و با غیرفعال شدنِ رنگ، تمامِ وزن روی همان هش‌های بی‌معنی
+  // می‌افتاد.
+  const W = 300; const H = 300;
+  const flat = Buffer.alloc(W * H * 3, 240);
+  for (let y = 0; y < H; y += 20) {
+    for (let k = 0; k < 6; k++) {
+      for (let x = 0; x < W; x++) {
+        const i = ((y + k) * W + x) * 3;
+        if (i + 2 < flat.length) {
+          flat[i] = 225; flat[i + 1] = 222; flat[i + 2] = 220;
+        }
+      }
+    }
+  }
+  const paper = await fp.fingerprint(
+    await sharp(flat, { raw: { width: W, height: H, channels: 3 } })
+      .jpeg({ quality: 60 }).toBuffer());
+  const orange = await fp.fingerprint(await sharp({
+    create: { width: 420, height: 640, channels: 3,
+      background: { r: 250, g: 180, b: 60 } },
+  }).jpeg().toBuffer());
+
+  const vsOrange = fp.similarity(paper, orange);
+  const vsRed = fp.similarity(paper, f);
+  ck('کاغذِ راه‌راه با گرادیانِ نارنجی تأیید نمی‌شود',
+    vsOrange < 0.40, `نمره=${vsOrange.toFixed(3)} (آستانهٔ بی‌نام ۰.۴۰)`);
+  ck('کاغذِ راه‌راه با کارتِ رنگی تأیید نمی‌شود',
+    vsRed < 0.40, `نمره=${vsRed.toFixed(3)}`);
+
   console.log(`\n${fail ? '✗' : '✓'} ${pass} موفق، ${fail} ناموفق\n`);
   process.exit(fail ? 1 : 0);
 })().catch(e => {
