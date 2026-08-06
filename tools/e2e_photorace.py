@@ -3,7 +3,7 @@
 import io,json,sys,time,threading,urllib.request,urllib.error,colorsys
 import os as _os, sys as _sys
 _sys.path.insert(0,_os.path.dirname(_os.path.abspath(__file__)))
-from _authcache import admin_token, deactivate_stale_designs, block_test_user
+from _authcache import admin_token, deactivate_stale_designs, cleanup_own_run, block_test_user
 from PIL import Image,ImageDraw,ImageFilter,ImageEnhance
 API='https://api.ghelghelishop.ir'; B='--r2'
 def req(m,p,tok=None,body=None,files=None):
@@ -58,6 +58,7 @@ deactivate_stale_designs(req,at)
 #    اشتباه را داشت — کد نوشته شده بود ولی مرده بود.
 #    `atexit` در هر مسیرِ خروج اجرا می‌شود: موفق، ناموفق، یا استثنا.
 import atexit as _atexit
+_atexit.register(lambda: cleanup_own_run(req, at, PFX))
 _atexit.register(
     lambda: _TEST_UID and block_test_user('/home/user/tools/rx.py', _TEST_UID))
 

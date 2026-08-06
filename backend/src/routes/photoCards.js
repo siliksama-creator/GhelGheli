@@ -394,6 +394,48 @@ module.exports = function createPhotoCardRoutes(deps) {
     }),
   );
 
+  /**
+   * حذفِ کاملِ یک طرحِ تصویری.
+   *
+   * غیرفعال کردن (`PATCH isActive`) طرح را از تطبیق کنار می‌گذارد ولی
+   * ردیفش می‌ماند. برای پاک کردنِ واقعیِ کاتالوگ — مثلاً بعد از
+   * آپلودِ اشتباهی — این مسیر لازم است.
+   *
+   * ⚠️ فقط وقتی هیچ پرونده‌ای به این طرح ارجاع ندارد. پرونده‌ها
+   *    تاریخچهٔ ثبتِ کاربرند و `matched_design_id` بی‌معنی شدنش یعنی
+   *    بعداً معلوم نیست آن کارت چطور تأیید شده.
+   */
+  router.delete(
+    '/admin/photo-cards/designs/:id',
+    adminAuth, requireRole('support'),
+    asyncHandler(async (req, res) => {
+      if (!UUID_RE.test(String(req.params.id))) {
+        return res.status(400).json({ message: 'شناسه معتبر نیست' });
+      }
+      const used = await pool.query(
+        `SELECT count(*)::int AS n FROM photo_card_submissions
+          WHERE matched_design_id=$1 OR chosen_design_id=$1`,
+        [req.params.id],
+      );
+      if (used.rows[0].n) {
+        return res.status(409).json({
+          message: `این طرح در ${used.rows[0].n} پروندهٔ ثبت استفاده شده و `
+            + 'قابل حذف نیست. می‌توانید غیرفعالش کنید.' });
+      }
+      // کدهایی که در لحظهٔ مصرف به این طرح گره خورده‌اند: خودِ کد
+      // می‌ماند، فقط ارجاعش پاک می‌شود. آن ارجاع صرفاً اطلاعاتی است.
+      await pool.query(
+        'UPDATE photo_card_codes SET bound_design_id=NULL WHERE bound_design_id=$1',
+        [req.params.id]);
+      const { rows } = await pool.query(
+        'DELETE FROM photo_card_designs WHERE id=$1 RETURNING id', [req.params.id]);
+      if (!rows[0]) return res.status(404).json({ message: 'طرح پیدا نشد' });
+      await audit(req.admin.id, 'delete_photo_card_design',
+        'photo_card_designs', req.params.id, null, null);
+      res.json({ message: 'طرح حذف شد' });
+    }),
+  );
+
   // ═════════════════════════════════════════════════════════════════════════
   // مدیریت — بانک کد
   // ═════════════════════════════════════════════════════════════════════════
@@ -1601,10 +1643,25 @@ module.exports = function createPhotoCardRoutes(deps) {
           });
         }
 
-        // مسیرِ تأیید خودکار پرونده‌ای در انتظار نمی‌سازد، پس قفل
-        // دیگر لازم نیست و باید پیش از تراکنشِ بعدی آزاد شود —
-        // نگه داشتنش یعنی دو اتصال به‌ازای یک درخواست.
-        await releaseGuard();
+        // ═══════════════════════════════════════════════════════════════
+        // ⚠️ قفل تا **بعد از** درجِ ردیف نگه داشته می‌شود
+        // ═══════════════════════════════════════════════════════════════
+        //
+        // نسخهٔ قبلی اینجا `releaseGuard()` صدا می‌زد، با این استدلال
+        // که «مسیرِ تأیید خودکار پرونده‌ای در انتظار نمی‌سازد».
+        //
+        // آن استدلال از وقتی آستانه ۴۰٪ شد باطل است: این مسیر حالا
+        // ردیفِ `approved` **می‌سازد** و گاردِ تکراری هم دقیقاً همان
+        // ردیف‌ها را می‌خواند.
+        //
+        // با آزاد کردنِ زودهنگام، دو درخواستِ هم‌زمان هر دو قفل را
+        // می‌گرفتند، هر دو «چیزی نیست» می‌دیدند، و هر دو کارت
+        // می‌گرفتند. تستِ هم‌زمانی این را با «۲ کارت به‌جای ۱» گرفت —
+        // و چون به ترتیبِ زمان‌بندی بستگی دارد، گاهی سبز و گاهی قرمز
+        // می‌شد. بدترین نوعِ باگ.
+        //
+        // هزینه‌اش یک اتصالِ اضافه برای مدتِ کوتاهِ تراکنشِ اعتبار است.
+        // در برابرِ «یک عکس، چند کارت» معاملهٔ روشنی است.
 
         // ── گامِ ۳: تأیید خودکار ──
         const client = await pool.connect();
@@ -1652,6 +1709,10 @@ module.exports = function createPhotoCardRoutes(deps) {
           throw e;
         } finally {
           client.release();
+          // حالا که ردیف درج و COMMIT شده، درخواستِ هم‌زمانِ بعدی
+          // حتماً آن را می‌بیند. قفل در `finally` آزاد می‌شود تا
+          // حتی در مسیرِ خطا هم نشت نکند.
+          await releaseGuard();
         }
 
         // عکس کاربر در این مسیر اصلاً ماندگار نمی‌شود.

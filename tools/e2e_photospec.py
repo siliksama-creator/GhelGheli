@@ -3,7 +3,7 @@
 import io, json, sys, time, urllib.request, urllib.error, colorsys
 import os as _os, sys as _sys
 _sys.path.insert(0,_os.path.dirname(_os.path.abspath(__file__)))
-from _authcache import admin_token, deactivate_stale_designs, block_test_user
+from _authcache import admin_token, deactivate_stale_designs, cleanup_own_run, block_test_user
 from PIL import Image, ImageDraw, ImageFilter, ImageEnhance
 API='https://api.ghelghelishop.ir'; B='----spec'
 def req(m,p,tok=None,body=None,files=None):
@@ -112,6 +112,7 @@ else:
 #    `atexit` در هر مسیرِ خروج اجرا می‌شود — چه موفق، چه ناموفق، چه
 #    استثنای پیش‌بینی‌نشده.
 import atexit as _atexit
+_atexit.register(lambda: cleanup_own_run(req, atok, PFX))
 _atexit.register(
     lambda: _TEST_UID and block_test_user('/home/user/tools/rx.py', _TEST_UID))
 

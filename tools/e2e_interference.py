@@ -33,7 +33,7 @@ import urllib.error
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _authcache import admin_token, deactivate_stale_designs, block_test_user  # noqa: E402
+from _authcache import admin_token, deactivate_stale_designs, cleanup_own_run, block_test_user  # noqa: E402
 
 from PIL import Image, ImageDraw, ImageFilter  # noqa: E402
 import colorsys  # noqa: E402
@@ -179,6 +179,7 @@ print(f'کاربر تست: {UMOB}\n')
 #    اشتباه را داشت — کد نوشته شده بود ولی مرده بود.
 #    `atexit` در هر مسیرِ خروج اجرا می‌شود: موفق، ناموفق، یا استثنا.
 import atexit as _atexit
+_atexit.register(lambda: cleanup_own_run(req, at, PFX))
 _atexit.register(
     lambda: [block_test_user('/home/user/tools/rx.py', u)
              for u in _TEST_UIDS if u])

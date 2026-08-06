@@ -106,14 +106,32 @@ def deactivate_stale_designs(req, admin_tok, prefixes=TEST_PREFIXES):
 
     `req` همان تابعِ درخواستِ خودِ تست است تا این ماژول به شکلِ
     خاصی از HTTP وابسته نشود.
+
+    ⚠️ غیرفعال کردن **کافی نیست**. `card_types` باقی می‌ماند و در
+    منویِ «این کدها روی کدام کارت چاپ می‌شوند؟» ظاهر می‌شود. مالک با
+    اسکرین‌شات نشان داد که آن منو با ۹۱ کارتِ آزمایشی غیرقابل‌استفاده
+    شده بود.
+
+    پس بعد از غیرفعال کردنِ طرح، خودِ نوعِ کارت هم حذف می‌شود. سرور
+    اگر وابستگیِ واقعی ببیند ۴۰۹ می‌دهد و ما بی‌سروصدا رد می‌شویم —
+    یعنی کارتی که کاربرِ واقعی داردش هرگز پاک نمی‌شود.
     """
     _, data = req('GET', '/api/admin/photo-cards/designs', admin_tok)
     stale = [d for d in data.get('designs', [])
-             if str(d.get('card_type_name', '')).startswith(prefixes)
-             and d.get('is_active')]
+             if str(d.get('card_type_name', '')).startswith(prefixes)]
+    type_ids = set()
     for d in stale:
-        req('PATCH', f"/api/admin/photo-cards/designs/{d['id']}",
-            admin_tok, {'isActive': False})
+        if d.get('is_active'):
+            req('PATCH', f"/api/admin/photo-cards/designs/{d['id']}",
+                admin_tok, {'isActive': False})
+        if d.get('card_type_id'):
+            type_ids.add(d['card_type_id'])
+
+    # حالا خودِ نوعِ کارت. حذفِ طرح لازم است وگرنه سرور ۴۰۹ می‌دهد.
+    for d in stale:
+        req('DELETE', f"/api/admin/photo-cards/designs/{d['id']}", admin_tok)
+    for tid in type_ids:
+        req('DELETE', f'/api/admin/card-types/{tid}', admin_tok)
     return len(stale)
 
 
@@ -145,5 +163,60 @@ def block_test_user(rx_path, user_id):
              'sudo -u postgres psql -d ghelgheli -tAc '
              f'"update users set status=\'blocked\' where id=\'{user_id}\'"'],
             capture_output=True, timeout=120)
+    except Exception:
+        pass
+
+
+def cleanup_own_run(req, admin_tok, prefix, rx_path='/home/user/tools/rx.py'):
+    """داده‌ای که **همین اجرا** ساخته را کاملاً پاک می‌کند.
+
+    ═══════════════════════════════════════════════════════════════════════
+    چرا مستقیم روی دیتابیس و نه از راهِ API
+    ═══════════════════════════════════════════════════════════════════════
+
+    تلاشِ اول از `DELETE /card-types/:id` استفاده می‌کرد و هر بار ۴۰۹
+    می‌گرفت:
+
+        «قابل حذف نیست چون ۲ کارت در مجموعهٔ کاربران و ۱ طرح تصویری
+         به آن وابسته است»
+
+    و آن پیام **کاملاً درست** بود: تست واقعاً کارت به کاربرِ آزمایشی
+    داده و پروندهٔ ثبت ساخته. محافظِ سرور دقیقاً برای همین است و
+    نرم کردنش یعنی خراب کردنِ محصول برای راحتیِ تست — همان اشتباهی که
+    قبلاً با سقفِ نرخ نزدیک بود تکرار شود.
+
+    پس API دست‌نخورده می‌ماند و پاکسازیِ تست از پایین انجام می‌شود:
+    اول وابسته‌ها (پرونده، کد، اینونتوری، طرح) و بعد خودِ نوعِ کارت.
+
+    ⚠️ فقط ردیف‌هایی که نامشان با `prefix` شروع می‌شود. کارتِ واقعی
+       هرگز لمس نمی‌شود.
+
+    خطا بلعیده می‌شود: پاکسازیِ ناموفق نباید نتیجهٔ تست را عوض کند.
+    """
+    import subprocess
+    sql = f"""
+BEGIN;
+CREATE TEMP TABLE junk AS
+  SELECT id FROM card_types WHERE name LIKE '{prefix}%';
+DELETE FROM photo_card_submissions s
+ WHERE s.matched_design_id IN (SELECT id FROM photo_card_designs WHERE card_type_id IN (SELECT id FROM junk))
+    OR s.chosen_design_id  IN (SELECT id FROM photo_card_designs WHERE card_type_id IN (SELECT id FROM junk))
+    OR s.code_id IN (SELECT id FROM photo_card_codes WHERE expected_card_type_id IN (SELECT id FROM junk))
+    OR s.code_id IN (SELECT id FROM photo_card_codes WHERE code LIKE '{prefix}%');
+DELETE FROM photo_card_codes
+ WHERE expected_card_type_id IN (SELECT id FROM junk)
+    OR bound_design_id IN (SELECT id FROM photo_card_designs WHERE card_type_id IN (SELECT id FROM junk))
+    OR code LIKE '{prefix}%';
+DELETE FROM photo_card_designs WHERE card_type_id IN (SELECT id FROM junk);
+DELETE FROM user_card_inventory WHERE card_type_id IN (SELECT id FROM junk);
+DELETE FROM card_codes WHERE card_type_id IN (SELECT id FROM junk);
+DELETE FROM card_types WHERE id IN (SELECT id FROM junk);
+COMMIT;
+"""
+    try:
+        subprocess.run(
+            ['python3', rx_path,
+             f"sudo -u postgres psql -d ghelgheli -c \"{sql}\""],
+            capture_output=True, timeout=180)
     except Exception:
         pass

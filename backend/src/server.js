@@ -2051,6 +2051,63 @@ app.patch('/api/admin/card-types/:id', adminAuth, validateUuid('id'), requireRol
   await audit(req.admin.id, 'update_card_type', 'card_types', req.params.id, null, req.body); res.json(rows[0]);
 }));
 
+/**
+ * حذفِ کاملِ یک نوع کارت.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * چرا لازم شد
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * تا امروز فقط `is_active=false` ممکن بود. ولی کارتِ غیرفعال از کاتالوگ
+ * پاک نمی‌شود و در منویِ «این کدها روی کدام کارت چاپ می‌شوند؟» ظاهر
+ * می‌ماند. مالک با اسکرین‌شات نشان داد که آن منو با ۹۱ کارتِ آزمایشی
+ * عملاً غیرقابل‌استفاده شده بود.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * چرا حذف فقط وقتی هیچ ردِ پایی نمانده باشد
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * اگر کارتی در اینونتوریِ کسی نشسته یا کدی برایش مصرف شده، حذفش یعنی
+ * پاک کردنِ چیزی که کاربر واقعاً دارد. `ON DELETE RESTRICT` روی
+ * `expected_card_type_id` هم همین را می‌گوید.
+ *
+ * پس شرط‌ها صریح بررسی می‌شوند و پیامِ فارسیِ روشن می‌دهند — نه اینکه
+ * خطای خامِ Postgres به مدیر برسد و او نفهمد چرا نشد.
+ */
+app.delete('/api/admin/card-types/:id', adminAuth, validateUuid('id'),
+  requireRole('support'), asyncHandler(async (req, res) => {
+    const id = req.params.id;
+    const t = await pool.query('SELECT name FROM card_types WHERE id=$1', [id]);
+    if (!t.rows[0]) return res.status(404).json({ message: 'نوع کارت پیدا نشد' });
+
+    // هر وابستگی جداگانه شمرده می‌شود تا پیام بگوید **کدام** مانع است.
+    const [inv, codes, photoCodes, designs] = await Promise.all([
+      pool.query('SELECT count(*)::int n FROM user_card_inventory WHERE card_type_id=$1', [id]),
+      pool.query('SELECT count(*)::int n FROM card_codes WHERE card_type_id=$1', [id]),
+      pool.query('SELECT count(*)::int n FROM photo_card_codes WHERE expected_card_type_id=$1', [id]),
+      pool.query('SELECT count(*)::int n FROM photo_card_designs WHERE card_type_id=$1', [id]),
+    ]);
+    const blockers = [];
+    if (inv.rows[0].n) blockers.push(`${inv.rows[0].n} کارت در مجموعهٔ کاربران`);
+    if (codes.rows[0].n) blockers.push(`${codes.rows[0].n} کد در سیستم قدیمی`);
+    if (photoCodes.rows[0].n) blockers.push(`${photoCodes.rows[0].n} کد گره‌خورده`);
+    if (designs.rows[0].n) blockers.push(`${designs.rows[0].n} طرح تصویری`);
+
+    if (blockers.length) {
+      return res.status(409).json({
+        message: `«${t.rows[0].name}» قابل حذف نیست چون ${blockers.join(' و ')} `
+          + 'به آن وابسته است. اول آن‌ها را پاک کنید، یا کارت را فقط '
+          + 'غیرفعال کنید.',
+        blockers,
+      });
+    }
+
+    await pool.query('DELETE FROM card_types WHERE id=$1', [id]);
+    await audit(req.admin.id, 'delete_card_type', 'card_types', id, null,
+      { name: t.rows[0].name });
+    res.json({ message: `«${t.rows[0].name}» حذف شد` });
+  }));
+
 app.get('/api/admin/card-codes', adminAuth, asyncHandler(async (req, res) => {
   const { status, cardTypeId, userId, search } = req.query;
   const params = []; const where = [];

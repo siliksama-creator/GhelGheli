@@ -31,7 +31,7 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _authcache import (admin_token, block_test_user,  # noqa: E402
-                        deactivate_stale_designs)
+                        deactivate_stale_designs, cleanup_own_run)
 
 from PIL import Image, ImageDraw, ImageFilter  # noqa: E402
 
@@ -178,6 +178,7 @@ _, _b0 = req('GET', '/api/bootstrap', ut)
 _TEST_UID = (_b0.get('user') or {}).get('id')
 
 import atexit as _atexit  # noqa: E402
+_atexit.register(lambda: cleanup_own_run(req, at, PFX))
 _atexit.register(
     lambda: _TEST_UID and block_test_user('/home/user/tools/rx.py', _TEST_UID))
 
