@@ -4,7 +4,6 @@ import '../../api_client.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/hero_logo.dart';
 import 'admin_admins.dart';
-import 'admin_cards.dart';
 import 'admin_photo_cards.dart';
 import 'admin_chat.dart';
 import 'admin_dashboard.dart';
@@ -37,11 +36,21 @@ class _AdminShellState extends State<AdminShell> {
 
   late final List<Widget> _pages = [
     AdminDashboard(api: widget.api),
-    AdminCards(api: widget.api),
-    // صفحهٔ جدا از «کارت و کد»: آن سیستمِ ثبت با کدِ تنهاست و قاطی
-    // کردنشان باعث می‌شد مدیر کد را در بانکِ اشتباه وارد کند — اشتباهی
-    // که بی‌سروصداست، چون کد ثبت می‌شود ولی هیچ کاربری نمی‌تواند از آن
-    // استفاده کند.
+    // ═══════════════════════════════════════════════════════════════════
+    // چرا تبِ «کارت و کد» حذف شد
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    // دو تب وجود داشت که هر دو «کارت تعریف می‌کردند»: `AdminCards`
+    // (سیستمِ قدیمیِ کد-تنها، جدولِ `card_codes`) و `AdminPhotoCards`
+    // (سیستمِ فعلی، جدولِ `photo_card_codes`).
+    //
+    // مسیرِ قدیمی از سمتِ کاربر حذف شده — فرمِ «فقط کد» نه در وب‌اپ هست
+    // و نه در داشبوردِ اندروید. پس کدی که در تبِ قدیمی ساخته می‌شد
+    // **هیچ‌وقت قابلِ خرج کردن نبود**: مدیر پیامِ «ثبت شد» می‌گرفت، کد
+    // را چاپ می‌کرد، و کاربر با آن به هیچ‌جا نمی‌رسید. بدونِ هیچ خطایی.
+    //
+    // ⚠️ فقط رابط رفت، نه داده: جدول و مسیرهای سرور دست‌نخورده‌اند چون
+    //    کدهای مصرف‌شده در تاریخچهٔ کاربران به آن‌ها ارجاع دارند.
     AdminPhotoCards(api: widget.api),
     AdminRewards(api: widget.api),
     AdminWallet(api: widget.api),
@@ -57,8 +66,7 @@ class _AdminShellState extends State<AdminShell> {
 
   static const _titles = [
     'داشبورد',
-    'کارت و کد',
-    'کارت با عکس',
+    'ثبت کارت',
     'جوایز',
     'کیف پول',
     'لیگ',
@@ -72,7 +80,6 @@ class _AdminShellState extends State<AdminShell> {
   ];
   static const _icons = [
     Icons.dashboard_rounded,
-    Icons.credit_card_rounded,
     Icons.document_scanner_rounded,
     Icons.card_giftcard_rounded,
     Icons.account_balance_wallet_rounded,
