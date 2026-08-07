@@ -1,6 +1,8 @@
 // Shared chrome for every game screen: header, versus bar, status banners
 // and the end-of-game panel. Each individual board only supplies its grid.
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../api_client.dart';
 import '../../../theme/tokens.dart';
 import '../../../widgets/app_card.dart';
@@ -39,70 +41,80 @@ class GameScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return AnimatedBuilder(
-      animation: session,
-      builder: (context, _) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.md, Gaps.md, Gaps.xs),
-          child: Column(
-            children: [
-              Row(
+    return Stack(
+      children: [
+        AnimatedBuilder(
+          animation: session,
+          builder: (context, _) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.md, Gaps.md, Gaps.xs),
+              child: Column(
                 children: [
-                  IconButton(
-                    onPressed: () {
-                      session.leave();
-                      onBack();
-                    },
-                    icon: const Icon(Icons.arrow_back_rounded),
-                    tooltip: 'بازگشت',
+                  Row(
+                    children: [
+                      IconButton(
+                        onPressed: () {
+                          session.leave();
+                          onBack();
+                        },
+                        icon: const Icon(Icons.arrow_back_rounded),
+                        tooltip: 'بازگشت',
+                      ),
+                      Expanded(
+                        child: Text(title,
+                            style: theme.textTheme.titleLarge
+                                ?.copyWith(fontWeight: FontWeight.w800)),
+                      ),
+                      if (session.vsBot && session.phase == GamePhase.playing)
+                        _Chip(label: 'با ربات', color: accent),
+                      const _SoundToggle(),
+                    ],
                   ),
-                  Expanded(
-                    child: Text(title,
-                        style: theme.textTheme.titleLarge
-                            ?.copyWith(fontWeight: FontWeight.w800)),
-                  ),
-                  if (session.vsBot && session.phase == GamePhase.playing)
-                    _Chip(label: 'با ربات', color: accent),
-                  const _SoundToggle(),
+                  if (!session.connected)
+                    Padding(
+                      padding: const EdgeInsets.only(top: Gaps.xs),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: Gaps.sm, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF59E0B).withValues(alpha: 0.16),
+                          borderRadius: Corners.rMd,
+                          border: Border.all(
+                              color: const Color(0xFFF59E0B).withValues(alpha: 0.6)),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                                width: 13,
+                                height: 13,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Color(0xFFF59E0B))),
+                            SizedBox(width: 8),
+                            Text('اتصال قطع شد؛ در حال تلاش دوباره...',
+                                style: TextStyle(
+                                    color: Color(0xFFF59E0B),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  Gaps.vSm,
+                  Expanded(child: _body(context, theme)),
                 ],
               ),
-              if (!session.connected)
-                Padding(
-                  padding: const EdgeInsets.only(top: Gaps.xs),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: Gaps.sm, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF59E0B).withValues(alpha: 0.16),
-                      borderRadius: Corners.rMd,
-                      border: Border.all(
-                          color: const Color(0xFFF59E0B).withValues(alpha: 0.6)),
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        SizedBox(
-                            width: 13,
-                            height: 13,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Color(0xFFF59E0B))),
-                        SizedBox(width: 8),
-                        Text('اتصال قطع شد؛ در حال تلاش دوباره...',
-                            style: TextStyle(
-                                color: Color(0xFFF59E0B),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700)),
-                      ],
-                    ),
-                  ),
-                ),
-              Gaps.vSm,
-              Expanded(child: _body(context, theme)),
-            ],
+            );
+          },
+        ),
+        if (session.phase == GamePhase.over && session.iWon)
+          const Positioned.fill(
+            child: IgnorePointer(
+              child: _ConfettiOverlay(),
+            ),
           ),
-        );
-      },
+      ],
     );
   }
 
@@ -470,4 +482,145 @@ class _SoundToggleState extends State<_SoundToggle> {
       },
     );
   }
+}
+
+class _ConfettiOverlay extends StatefulWidget {
+  const _ConfettiOverlay();
+
+  @override
+  State<_ConfettiOverlay> createState() => _ConfettiOverlayState();
+}
+
+class _ConfettiOverlayState extends State<_ConfettiOverlay> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  final List<_Particle> _particles = [];
+  final _random = math.Random();
+
+  @override
+  void initState() {
+    super.initState();
+    // Epic victory vibrations!
+    HapticFeedback.heavyImpact();
+    Future.delayed(const Duration(milliseconds: 150), () => HapticFeedback.heavyImpact());
+    Future.delayed(const Duration(milliseconds: 300), () => HapticFeedback.heavyImpact());
+    Future.delayed(const Duration(milliseconds: 450), () => HapticFeedback.heavyImpact());
+
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 4),
+    )..repeat();
+
+    // Spawn 65 colorful confetti particles
+    final colors = [
+      const Color(0xFFB5EF58), // Green
+      const Color(0xFF38BDF8), // Blue
+      const Color(0xFFFFD36B), // Gold
+      const Color(0xFFEF4444), // Red
+      const Color(0xFFEC4899), // Pink
+    ];
+
+    for (var i = 0; i < 65; i++) {
+      _particles.add(_Particle(
+        x: _random.nextDouble(),
+        y: _random.nextDouble() * -0.5, // Start slightly above screen
+        speed: 0.05 + _random.nextDouble() * 0.1,
+        angle: _random.nextDouble() * math.pi * 2,
+        rotationSpeed: _random.nextDouble() * 4,
+        size: 6.0 + _random.nextDouble() * 8.0,
+        color: colors[_random.nextInt(colors.length)],
+      ));
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final size = MediaQuery.sizeOf(context);
+        return CustomPaint(
+          size: size,
+          painter: _ConfettiPainter(
+            particles: _particles,
+            progress: _controller.value,
+            screenSize: size,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _Particle {
+  _Particle({
+    required this.x,
+    required this.y,
+    required this.speed,
+    required this.angle,
+    required this.rotationSpeed,
+    required this.size,
+    required this.color,
+  });
+
+  double x; // 0.0 to 1.0 (screen width fraction)
+  double y; // 0.0 to 1.0 (screen height fraction)
+  final double speed;
+  final double angle;
+  final double rotationSpeed;
+  final double size;
+  final Color color;
+}
+
+class _ConfettiPainter extends CustomPainter {
+  _ConfettiPainter({
+    required this.particles,
+    required this.progress,
+    required this.screenSize,
+  });
+
+  final List<_Particle> particles;
+  final double progress;
+  final Size screenSize;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..style = PaintingStyle.fill;
+
+    for (final p in particles) {
+      // Move particles downwards based on speed and frame tick
+      p.y += p.speed * 0.05;
+      p.x += math.sin(p.y * 10 + p.angle) * 0.005; // zigzag path
+
+      // Reset when particle goes off screen bottom
+      if (p.y > 1.2) {
+        p.y = -0.1;
+        p.x = math.Random().nextDouble();
+      }
+
+      final px = p.x * size.width;
+      final py = p.y * size.height;
+
+      paint.color = p.color;
+
+      canvas.save();
+      canvas.translate(px, py);
+      canvas.rotate(p.y * p.rotationSpeed * math.pi);
+      
+      // Draw rectangular confetti piece
+      canvas.drawRect(
+        Rect.fromCenter(center: Offset.zero, width: p.size, height: p.size * 0.6),
+        paint,
+      );
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

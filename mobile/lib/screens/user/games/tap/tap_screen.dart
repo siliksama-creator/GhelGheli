@@ -141,11 +141,12 @@ class _TapGameScreenState extends State<TapGameScreen>
           GameAudio.instance.play(Sfx.matchFound);
           HapticFeedback.mediumImpact();
           _characterKey.currentState?.pulse();
+          _showLevelUpDialog(_engine.level);
           break;
         case TapEvent.skinChanged:
           GameAudio.instance.play(Sfx.win);
           HapticFeedback.heavyImpact();
-          _showSkinToast();
+          _showSkinDialog();
           break;
         case TapEvent.gameCompleted:
           GameAudio.instance.play(Sfx.win);
@@ -201,19 +202,127 @@ class _TapGameScreenState extends State<TapGameScreen>
     });
   }
 
-  void _showSkinToast() {
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    messenger?.hideCurrentSnackBar();
-    messenger?.showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: _accent,
-        duration: const Duration(seconds: 2),
-        content: Text(
-          'شخصیت جدید باز شد! 🎉',
-          style: TextStyle(
-            color: Colors.black.withValues(alpha: 0.85),
-            fontWeight: FontWeight.w800,
+  void _showLevelUpDialog(int newLevel) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(Gaps.lg),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF1E1B4B), Color(0xFF090514)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+            border: Border.all(color: _accent, width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: _accent.withValues(alpha: 0.35),
+                blurRadius: 20,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('🎉', style: TextStyle(fontSize: 54)),
+              Gaps.vSm,
+              Text(
+                'تبریک! لول آپ شدی',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  color: _accent,
+                ),
+              ),
+              Gaps.vXs,
+              Text(
+                'شما به لول ${faNum(newLevel)} رسیدی!',
+                style: const TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+              Gaps.vMd,
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  style: FilledButton.styleFrom(backgroundColor: _accent),
+                  child: Text(
+                    'ادامه بازی 💪',
+                    style: TextStyle(
+                      color: Colors.black.withValues(alpha: 0.85),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSkinDialog() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(Gaps.lg),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF581C87), Color(0xFF0F052D)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+            border: Border.all(color: Colors.amber, width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.amber.withValues(alpha: 0.35),
+                blurRadius: 24,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('👑', style: TextStyle(fontSize: 64)),
+              Gaps.vSm,
+              const Text(
+                'شخصیت جدید باز شد!',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.amber,
+                ),
+              ),
+              Gaps.vXs,
+              const Text(
+                'یک بازیکن کلکسیونی فوتبالی جدید به جمع شما پیوست!',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: Colors.white70),
+              ),
+              Gaps.vMd,
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  style: FilledButton.styleFrom(backgroundColor: Colors.amber),
+                  child: const Text(
+                    'ایول! دمت گرم 🔥',
+                    style: TextStyle(
+                      color: Color(0xFF3A2A00),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
