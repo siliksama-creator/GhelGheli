@@ -3,12 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../api_client.dart';
-import '../../core/money.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/badges.dart';
 import '../../widgets/state_views.dart';
-import 'widgets/form_section.dart';
 
 /// مانیتورینگ زنده سرور — تعداد سوکت‌ها، اتاق‌های بازی فعال، حافظه ردیس، اتصالات پستگرس و لاگ‌های خطا.
 /// آیینهٔ کاملِ مانیتورینگ وب.
@@ -112,7 +110,6 @@ class _AdminMetricsState extends State<AdminMetrics> {
     }
 
     final d = _data ?? {};
-    final theme = Theme.of(context);
 
     final socketCount = d['socketCount'] ?? 0;
     final activeRooms = d['activeRooms'] ?? 0;
@@ -212,7 +209,7 @@ class _AdminMetricsState extends State<AdminMetrics> {
               padding: const EdgeInsets.all(Gaps.sm),
               decoration: BoxDecoration(
                 color: const Color(0xFF040B15),
-                borderRadius: BorderRadius.circular(Corners.rMd),
+                borderRadius: Corners.rMd,
                 border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
               ),
               child: Scrollbar(
@@ -283,7 +280,6 @@ class _AdminMetricsState extends State<AdminMetrics> {
   }
 
   Widget _pgMetricTile(Map pg) {
-    final theme = Theme.of(context);
     return AppCard(
       padding: const EdgeInsets.all(Gaps.sm),
       child: Column(
@@ -292,7 +288,7 @@ class _AdminMetricsState extends State<AdminMetrics> {
         children: [
           const Row(
             children: [
-              Icon(Icons.database_rounded, size: 18, color: Colors.cyan),
+              Icon(Icons.storage_rounded, size: 18, color: Colors.cyan),
               Gaps.hXs,
               Text('اتصال PostgreSQL', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
             ],
