@@ -184,7 +184,7 @@ void main() {
         home: Scaffold(body: CachedCardImage(url: '', width: 60, height: 80)),
       ));
       await t.pump();
-      expect(tester_ok(t), isTrue);
+      expect(testerOk(t), isTrue);
     });
 
     testWidgets('URL نامعتبر کرش نمی‌دهد', (t) async {
@@ -195,7 +195,7 @@ void main() {
       ));
       await t.pump();
       await t.pump(const Duration(milliseconds: 300));
-      expect(tester_ok(t), isTrue);
+      expect(testerOk(t), isTrue);
     });
 
     testWidgets('placeholder وقتی داده شود نمایش می‌یابد', (t) async {
@@ -224,7 +224,7 @@ void main() {
       ));
       await t.pump();
       await t.pump(const Duration(milliseconds: 300));
-      expect(tester_ok(t), isTrue);
+      expect(testerOk(t), isTrue);
     });
 
     testWidgets('حذفِ ویجت وسطِ بارگذاری، setState بعد از dispose نمی‌دهد',
@@ -237,11 +237,11 @@ void main() {
       await t.pump();
       await t.pumpWidget(const MaterialApp(home: Scaffold(body: SizedBox())));
       await t.pump(const Duration(milliseconds: 400));
-      expect(tester_ok(t), isTrue);
+      expect(testerOk(t), isTrue);
     });
   });
 }
 
 /// آیا تست تا اینجا استثنایی ندیده؟
-bool tester_ok(WidgetTester t) =>
+bool testerOk(WidgetTester t) =>
     TestWidgetsFlutterBinding.instance.takeException() == null;
