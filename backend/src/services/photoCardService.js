@@ -242,20 +242,71 @@ async function creditSubmission(
   //
   // چون `card_type_id` همان کاتالوگ فعلی است، این ردیف دقیقاً مثل کارتی
   // که با کد ثبت شده رفتار می‌کند و جوایز پلکانی بدون تغییر کار می‌کنند.
+  // ── انتخابِ تصادفیِ رو یا پشت، برای زیباییِ اینونتوری ──
+  //
+  // خواستهٔ مالک: «وقتی کاربر کارت رو ثبت میکنه بصورت تصادفی پشت و یا
+  // روی کارت انتخاب بشه، اینطوری زیبایی اینونتوری بیشتر میشه».
+  //
+  // ⚠️ چرا انتخاب **اینجا** انجام می‌شود و نه هنگامِ خواندنِ اینونتوری
+  //
+  // راهِ ساده‌تر این بود که در کوئریِ خواندن `ORDER BY random() LIMIT 1`
+  // بزنیم. آن راه دو چیز را می‌شکند:
+  //
+  //   ۱. کارت هر بار که کاربر صفحه را باز کند ورق می‌خورد. صبح «رو»،
+  //      ظهر «پشت». این حسِ خرابی می‌دهد نه زیبایی.
+  //   ۲. **کشِ سمتِ گوشی را بی‌اثر می‌کند** — که هدفِ دیگرِ همین جلسه
+  //      است. URL متغیر یعنی هر بار دانلودِ دوباره.
+  //
+  // پس انتخاب یک بار در لحظهٔ ثبت انجام و در `display_design_id` ثابت
+  // می‌شود.
+  //
+  // ── چرا `ORDER BY random()` اینجا بی‌خطر است ──
+  //
+  // یک کارت حداکثر دو طرح دارد (رو و پشت). حتی اگر روزی ده تا شود،
+  // `random()` روی ده ردیفِ ایندکس‌شده هزینه‌ای ندارد. نگرانیِ معمولِ
+  // «random() روی جدولِ بزرگ کند است» اینجا مصداق ندارد چون
+  // `card_type_id` فیلتر شده.
+  //
+  // اگر هیچ طرحی نباشد (کدِ نام‌دار بدونِ عکس)، NULL می‌ماند و
+  // خواننده به `card_types.image_url` برمی‌گردد — همان رفتارِ قبلی.
+  const pick = await client.query(
+    `SELECT id FROM photo_card_designs
+      WHERE card_type_id = $1 AND is_active = true
+      ORDER BY random() LIMIT 1`,
+    [typeId],
+  );
+  const displayDesignId = pick.rows[0]?.id ?? null;
+
   const inv = await client.query(
-    `SELECT id FROM user_card_inventory
+    `SELECT id, display_design_id FROM user_card_inventory
       WHERE user_id = $1 AND card_type_id = $2 AND consumed_in_reward = false`,
     [userId, typeId],
   );
   if (inv.rows[0]) {
+    // ── چرا نسخهٔ دوم طرحِ نمایشی را عوض **نمی‌کند** ──
+    //
+    // کاربری که پنج نسخه از یک کارت دارد، یک خانه در اینونتوری می‌بیند
+    // با «×۵». اگر هر ثبت دوباره قرعه بیندازد، آن خانه جلوی چشمش ورق
+    // می‌خورد و کشِ گوشی هم هر بار باطل می‌شود.
+    //
+    // استثنا: اگر ردیفِ قدیمی هنوز طرحی ندارد (قبل از مایگریشنِ ۰۴۴
+    // ساخته شده، یا آن موقع هیچ طرحی آپلود نشده بود) همین حالا یکی
+    // می‌گیرد. این باعث می‌شود کارت‌های قدیمی هم به‌مرور زیبا شوند
+    // بدونِ اینکه backfill جداگانه لازم باشد.
     await client.query(
-      `UPDATE user_card_inventory SET quantity = quantity + 1, updated_at = NOW()
-        WHERE id = $1`, [inv.rows[0].id],
+      `UPDATE user_card_inventory
+          SET quantity = quantity + 1,
+              display_design_id = COALESCE(display_design_id, $2),
+              updated_at = NOW()
+        WHERE id = $1`,
+      [inv.rows[0].id, displayDesignId],
     );
   } else {
     await client.query(
-      `INSERT INTO user_card_inventory(user_id, card_type_id, quantity, consumed_in_reward)
-       VALUES($1, $2, 1, false)`, [userId, typeId],
+      `INSERT INTO user_card_inventory
+         (user_id, card_type_id, quantity, consumed_in_reward, display_design_id)
+       VALUES($1, $2, 1, false, $3)`,
+      [userId, typeId, displayDesignId],
     );
   }
 

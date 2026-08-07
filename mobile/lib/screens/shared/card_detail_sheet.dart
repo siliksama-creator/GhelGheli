@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/cached_card_image.dart';
 
 Future<void> showCardDetail(BuildContext context, Map<String, dynamic> item) {
   return showDialog(
@@ -64,22 +65,22 @@ class _CardDetailDialog extends StatelessWidget {
                         width: double.infinity,
                         child: img.isEmpty
                             ? const _Fallback()
+                            // همان کشِ دیسکیِ اینونتوری. اینجا مهم‌تر هم
+                            // هست: نمای بزرگ عمداً `cacheWidth` ندارد
+                            // (کاربر تا ۴ برابر زوم می‌کند و باید جزئیات
+                            // را ببیند)، پس بدونِ کش هر بار بازکردنِ
+                            // جزئیات یک دانلودِ تمام‌اندازه بود.
+                            //
+                            // چون کلیدِ کش خودِ URL است و همان URLی است
+                            // که خانهٔ اینونتوری استفاده می‌کند، فایل
+                            // قبلاً روی دیسک هست و این نما بدونِ هیچ
+                            // درخواستی باز می‌شود.
                             : InteractiveViewer(
                                 maxScale: 4,
-                                child: Image.network(
-                                  img,
+                                child: CachedCardImage(
+                                  url: img,
                                   fit: BoxFit.contain,
-                                  loadingBuilder: (_, child, progress) =>
-                                      progress == null
-                                          ? child
-                                          : const SizedBox(
-                                              height: 220,
-                                              child: Center(
-                                                  child:
-                                                      CircularProgressIndicator()),
-                                            ),
-                                  errorBuilder: (_, __, ___) =>
-                                      const _Fallback(),
+                                  placeholder: const _Fallback(),
                                 ),
                               ),
                       ),

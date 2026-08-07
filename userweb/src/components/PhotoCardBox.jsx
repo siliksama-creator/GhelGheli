@@ -343,21 +343,51 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
     );
   }
 
+  // ══════════════════════════════════════════════════════════════════════
+  // چیدمانِ جمع‌وجور
+  // ══════════════════════════════════════════════════════════════════════
+  //
+  // ── شکایتِ مالک ──
+  //
+  //   «حالا قسمت ثبت کد کاربر رو بهینه کن هم گوشی و هم وب اپ چون نوارش
+  //    خیلی دراز شده، یکم جمع و جور تر و کوتاه تر بشه»
+  //
+  // ── چه چیزی درازش کرده بود ──
+  //
+  //   ۱. دو پاراگرافِ توضیح (~۷۰ پیکسل)
+  //   ۲. دو دکمهٔ ۷۶ پیکسلی، عمودی (آیکون بالای متن)
+  //   ۳. پیش‌نمایشِ تا ۲۶۰ پیکسلی، تمامِ عرض
+  //   ۴. جعبهٔ راهنمای حروفِ مبهم، همیشه باز (~۶۰ پیکسل)
+  //   ۵. راهنمای عکس‌گرفتن زیرِ فرم
+  //
+  // ── چه شد ──
+  //
+  //   • دو پاراگراف → یک جمله. جملهٔ «چند نسخه» به داخلِ راهنمای تاشو
+  //     رفت، جایی که واقعاً به آن نیاز است.
+  //   • عکس و کد **کنارِ هم** در یک ردیف (`.pcRow`) به‌جای زیرِ هم.
+  //     بزرگ‌ترین صرفه‌جویی.
+  //   • دکمه‌ها ۷۶ → ۵۲ پیکسل، افقی.
+  //   • راهنمای حروف با `<details>` تاشو شد — عنصرِ بومیِ HTML، بدونِ
+  //     هیچ state اضافه‌ای و با دسترس‌پذیریِ صفحه‌خوان به‌صورت رایگان.
+  //
+  // ⚠️ هیچ اطلاعاتی حذف نشد، فقط جابه‌جا و تاشو. هشدارِ ۰/O یک خطِ
+  //    همیشه‌دیده‌شده دارد چون کاربر باید **قبل** از تایپ بداند، وگرنه
+  //    یکی از پنج تلاشش را می‌سوزاند.
   return (
     <div className="photoCardBox">
-      <h2>📸 ثبت کارت با عکس</h2>
-      <p className="hint">
-        از کارت عکس بگیر و کدش را وارد کن. عکس ثابت می‌کند کارت را داری،
-        پس کسی نمی‌تواند فقط با دانستن کد امتیاز بگیرد.
-      </p>
-      {/* ── چرا این جمله لازم است ──
-          بدونِ آن، کاربری که پنج نسخهٔ یک کارت دارد فکر می‌کند باید
-          پنج بار عکس بگیرد — یا بدتر، فکر می‌کند فقط یکی‌شان قابل
-          ثبت است و چهار کد را دور می‌ریزد. */}
-      <p className="hint hintAccent">
-        چند نسخه از یک کارت داری؟ یک بار عکس بگیر و کدها را پشت‌سرهم
-        وارد کن — عکس بعد از هر ثبت سرِ جایش می‌ماند.
-      </p>
+      <div className="pcHead">
+        <h2>📸 ثبت کارت با عکس</h2>
+        {/* شمارِ در انتظار به‌صورت نشانِ کوچک کنارِ عنوان، به‌جای بنرِ
+            سه‌خطی. متنِ کامل در `title` است، پس با نگه‌داشتنِ اشاره‌گر
+            دیده می‌شود و صفحه‌خوان هم می‌خواندش. */}
+        {pendingCount > 0 && !result && (
+          <span className="pcPendingChip"
+            title="کیفیت عکس کامل نبود؛ کارشناس بررسی می‌کند و ممکن است تا ۲۴ ساعت طول بکشد. کد شما محفوظ است و می‌توانید کارت‌های دیگرتان را ثبت کنید.">
+            ⏳ {pendingCount} در بررسی
+          </span>
+        )}
+      </div>
+      <p className="hint">از کارت عکس بگیر و کدش را وارد کن.</p>
 
       {result?.kind === 'ok' && (
         <div className="pcResult ok">
@@ -375,19 +405,6 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
       )}
       {result?.kind === 'pending' && (
         <div className="pcResult pending">⏳ {result.message}</div>
-      )}
-      {/* ── نوارِ وضعیت، از سرور نه از حافظهٔ محلی ──
-          وقتی مدیر تأیید یا رد کند، این عدد صفر می‌شود و نوار خودش
-          محو می‌شود. قبلاً پیامِ محلی تا رفرشِ صفحه می‌ماند. */}
-      {pendingCount > 0 && !result && (
-        <div className="pcResult pending">
-          <div>
-            <b>⏳ {pendingCount} عکس در حال بررسی</b>
-            <span>کیفیت عکس کامل نبود؛ کارشناس بررسی می‌کند و ممکن است
-              تا ۲۴ ساعت طول بکشد. کد شما محفوظ است و می‌توانید
-              کارت‌های دیگرتان را ثبت کنید.</span>
-          </div>
-        </div>
       )}
       {result?.kind === 'badcode' && (
         <div className="pcResult err">
@@ -409,55 +426,83 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
         <div className="pcResult err">{result.message}</div>
       )}
 
-      <div className="pcPickRow">
-        {/*
-          دو دکمهٔ جدا برای دوربین و گالری.
-          `capture="environment"` به گوشی می‌گوید مستقیم دوربینِ پشت را
-          باز کند. روی دسکتاپ نادیده گرفته می‌شود و مثل انتخاب فایل عمل
-          می‌کند، پس نیازی به تشخیص دستگاه نیست.
-        */}
-        <label className="pcPick">
-          <span className="pcPickIcon">📷</span>
-          دوربین
-          <input type="file" accept="image/*" capture="environment" hidden
-            onChange={e => pick(e.target.files?.[0])} />
-        </label>
-        <label className="pcPick">
-          <span className="pcPickIcon">🖼️</span>
-          گالری
-          <input type="file" accept="image/*" hidden
-            onChange={e => pick(e.target.files?.[0])} />
-        </label>
-      </div>
+      {/* ── عکس و کد در یک ردیف ──
+          بزرگ‌ترین صرفه‌جوییِ ارتفاع. قبلاً پیش‌نمایشِ تمام‌عرض بالا بود و
+          فیلدِ کد زیرش؛ حالا کنارِ هم. */}
+      <div className="pcRow">
+        {/* جایگاهِ عکس: خالی یک کادرِ انتخاب است، پر پیش‌نمایش. اندازه‌اش
+            در هر دو حالت یکسان است تا با انتخابِ عکس چیدمان نپرد.
 
-      {preview && (
-        <div className="pcPreview">
-          <img src={preview} alt="عکس انتخاب‌شده" />
-          <button className="pcClear" onClick={reset} aria-label="حذف عکس">×</button>
+            `capture="environment"` به گوشی می‌گوید مستقیم دوربینِ پشت را
+            باز کند. روی دسکتاپ نادیده گرفته می‌شود و مثل انتخاب فایل
+            عمل می‌کند، پس نیازی به تشخیص دستگاه نیست. */}
+        {preview ? (
+          <div className="pcSlot pcSlotFilled">
+            <img src={preview} alt="عکس انتخاب‌شده" />
+            <button className="pcClear" onClick={reset} aria-label="حذف عکس">×</button>
+          </div>
+        ) : (
+          <label className="pcSlot"
+            title="کل کارت داخل کادر باشد و نور کافی باشد. عکس تار هم معمولاً شناسایی می‌شود.">
+            <span className="pcSlotIcon">📷</span>
+            <span>عکس کارت</span>
+            <input type="file" accept="image/*" capture="environment" hidden
+              onChange={e => pick(e.target.files?.[0])} />
+          </label>
+        )}
+
+        <div className="pcFields">
+          <input
+            ref={codeRef}
+            className="pcCode"
+            value={code}
+            placeholder="کد روی کارت"
+            inputMode="text"
+            autoCapitalize="characters"
+            disabled={locked}
+            onChange={e => setCode(e.target.value.toUpperCase())}
+            onKeyDown={e => { if (e.key === 'Enter') submit(); }}
+          />
+          <div className="pcPickRow">
+            <label className="pcPick">
+              <span className="pcPickIcon">📷</span>
+              دوربین
+              <input type="file" accept="image/*" capture="environment" hidden
+                onChange={e => pick(e.target.files?.[0])} />
+            </label>
+            <label className="pcPick">
+              <span className="pcPickIcon">🖼️</span>
+              گالری
+              <input type="file" accept="image/*" hidden
+                onChange={e => pick(e.target.files?.[0])} />
+            </label>
+          </div>
         </div>
-      )}
-
-      <input
-        ref={codeRef}
-        className="pcCode"
-        value={code}
-        placeholder="کد روی کارت"
-        inputMode="text"
-        autoCapitalize="characters"
-        disabled={locked}
-        onChange={e => setCode(e.target.value.toUpperCase())}
-        onKeyDown={e => { if (e.key === 'Enter') submit(); }}
-      />
-
-      {/* ── راهنمای حروفِ مبهم، همیشه دیده می‌شود ──
-          نه فقط بعد از خطا. کاربر باید **قبل** از تایپ بداند به چه چیزی
-          دقت کند؛ نشان دادنش بعد از شکست یعنی یکی از پنج تلاش را
-          بی‌دلیل سوزانده. */}
-      <div className="pcCodeHint">
-        <b>دقت کنید:</b> صفر <code>0</code> و حرف <code>O</code> شبیه‌اند،
-        و عدد یک <code>1</code> با حروف <code>I</code> و <code>L</code>.
-        بزرگ یا کوچک بودنِ حروف مهم نیست.
       </div>
+
+      {/* ── راهنمای حروفِ مبهم: خلاصه همیشه، جزئیات تاشو ──
+
+          حذف نشد چون دلیلِ وجودی‌اش پابرجاست: کاربر باید **قبل** از تایپ
+          بداند ۰ و O شبیه‌اند، وگرنه یکی از پنج تلاشش را می‌سوزاند و به
+          قفلِ سه‌ساعته نزدیک‌تر می‌شود.
+
+          `<details>` بومیِ HTML و نه state ری‌اکت: کمتر کد، و باز/بسته
+          شدن و اعلامِ صفحه‌خوان را مرورگر رایگان می‌دهد. */}
+      <details className="pcCodeHint">
+        <summary>صفر و <code>O</code>، و یک با <code>I</code> و <code>L</code> را اشتباه نگیر</summary>
+        <div className="pcCodeHintBody">
+          صفر <code>0</code> و حرف <code>O</code> شبیه‌اند، و عدد یک{' '}
+          <code>1</code> با حروف <code>I</code> و <code>L</code>.
+          بزرگ یا کوچک بودنِ حروف مهم نیست.
+          {/* بدونِ این جمله، کاربری که پنج نسخهٔ یک کارت دارد فکر می‌کند
+              باید پنج بار عکس بگیرد — یا بدتر، فکر می‌کند فقط یکی‌شان
+              قابل ثبت است و چهار کد را دور می‌ریزد. */}
+          <span className="pcHintAccent">
+            چند نسخه از یک کارت داری؟ یک بار عکس بگیر و کدها را پشت‌سرهم
+            وارد کن — عکس بعد از هر ثبت سرِ جایش می‌ماند.
+          </span>
+        </div>
+      </details>
 
       <button className="main" onClick={submit}
         disabled={busy || locked || !file || !code.trim()}>
@@ -492,12 +537,10 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
         </div>
       )}
 
-      {!file && (
-        <small className="pcTip">
-          راهنما: کل کارت داخل کادر باشد و نور کافی باشد. عکس تار هم
-          معمولاً شناسایی می‌شود.
-        </small>
-      )}
+      {/* ── راهنمای عکس‌گرفتن به `title` جایگاهِ عکس منتقل شد ──
+          به‌عنوان یک خطِ جدا زیرِ فرم فقط ارتفاع می‌گرفت. حالا با
+          نگه‌داشتنِ اشاره‌گر روی کادرِ عکس دیده می‌شود، و روی موبایل
+          هم متنِ خودِ کادر («عکس کارت») گویاست. */}
     </div>
   );
 }

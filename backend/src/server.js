@@ -758,9 +758,32 @@ app.post('/api/cards/redeem', auth, cardRedeemLimiter, asyncHandler(async (req, 
     // کمیسیون ۵٪ معرف. روی همان تراکنش، تا اگر ثبت کارت برگشت، کمیسیون
     // هم برگردد و امتیازی از هوا ساخته نشود.
     await referrals.payCommission(client, req.user.id, card.point_value, 'card');
+    // ── طرحِ نمایشی: رو یا پشت، تصادفی ──
+    //
+    // ⚠️ چرا مسیرِ «فقط کد» هم این کار را می‌کند
+    //
+    // این مسیرِ قدیمی است (کاربر فقط کد را وارد می‌کند، بدونِ عکس) و
+    // وسوسه‌کننده بود که دست‌نخورده بماند. ولی هر دو مسیر در **یک**
+    // جدولِ اینونتوری می‌نویسند و کاربر همان یک صفحه را می‌بیند. اگر
+    // فقط یکی از دو مسیر قرعه بیندازد، نصفِ کارت‌های کاربر تصادفی و
+    // نصفِ دیگر همیشه تصویرِ پیش‌فرض می‌شوند — که بدتر از نداشتنِ
+    // قابلیت است چون بی‌قاعده به نظر می‌رسد.
+    //
+    // اگر برای این نوعِ کارت هیچ طرحِ تصویری آپلود نشده باشد (که در
+    // سیستمِ قدیمی عادی است) نتیجه NULL می‌ماند و همان
+    // `card_types.image_url` نمایش داده می‌شود — رفتارِ قبلی، بدونِ
+    // تغییر. توضیحِ کاملِ چراییِ این طراحی در `photoCardService.js`.
+    const pickDesign = await client.query(
+      `SELECT id FROM photo_card_designs
+        WHERE card_type_id=$1 AND is_active=true ORDER BY random() LIMIT 1`,
+      [card.card_type_id]);
+    const displayDesignId = pickDesign.rows[0]?.id ?? null;
+
     const inv = await client.query('SELECT id FROM user_card_inventory WHERE user_id=$1 AND card_type_id=$2 AND consumed_in_reward=false', [req.user.id, card.card_type_id]);
-    if (inv.rows[0]) await client.query('UPDATE user_card_inventory SET quantity=quantity+1, updated_at=NOW() WHERE id=$1', [inv.rows[0].id]);
-    else await client.query('INSERT INTO user_card_inventory(user_id, card_type_id, quantity, consumed_in_reward) VALUES($1,$2,1,false)', [req.user.id, card.card_type_id]);
+    // COALESCE: نسخهٔ دوم طرحِ انتخاب‌شده را عوض نمی‌کند تا خانهٔ
+    // اینونتوری جلوی چشمِ کاربر ورق نخورد و کشِ گوشی باطل نشود.
+    if (inv.rows[0]) await client.query('UPDATE user_card_inventory SET quantity=quantity+1, display_design_id=COALESCE(display_design_id,$2), updated_at=NOW() WHERE id=$1', [inv.rows[0].id, displayDesignId]);
+    else await client.query('INSERT INTO user_card_inventory(user_id, card_type_id, quantity, consumed_in_reward, display_design_id) VALUES($1,$2,1,false,$3)', [req.user.id, card.card_type_id, displayDesignId]);
     await addLeaguePoints(client, req.user.id, card.point_value);
 
     // جایزهٔ نقدی کارت → کیف پول، در همان تراکنش مصرف کد.
@@ -898,7 +921,16 @@ app.get('/api/games/:gameId/solo', auth, asyncHandler(async (req, res) => {
 
 app.get('/api/profile', auth, asyncHandler(async (req, res) => {
   // همان ستون‌های bootstrap تا دو مسیر هرگز از هم جدا نیفتند.
-  const inv = await pool.query(`SELECT i.*, t.name, t.image_url, t.point_value, t.cash_amount FROM user_card_inventory i JOIN card_types t ON t.id=i.card_type_id WHERE i.user_id=$1 AND i.consumed_in_reward=false ORDER BY t.name`, [req.user.id]);
+  // COALESCE(d.image_url, t.image_url): طرحِ تصادفیِ انتخاب‌شده در لحظهٔ
+  // ثبت، و اگر نبود تصویرِ پیش‌فرضِ نوعِ کارت. توضیح در مایگریشن ۰۴۴.
+  const inv = await pool.query(
+    `SELECT i.*, t.name, COALESCE(d.image_url, t.image_url) AS image_url,
+            t.point_value, t.cash_amount
+       FROM user_card_inventory i
+       JOIN card_types t ON t.id = i.card_type_id
+       LEFT JOIN photo_card_designs d ON d.id = i.display_design_id
+      WHERE i.user_id=$1 AND i.consumed_in_reward=false ORDER BY t.name`,
+    [req.user.id]);
   const leaguePayouts = await pool.query(`SELECT p.*, s.month_year FROM league_payouts p JOIN league_seasons s ON s.id=p.league_season_id WHERE p.user_id=$1 ORDER BY p.created_at DESC LIMIT 20`, [req.user.id]);
   res.json({ user: safeUser(req.user), inventory: inv.rows, leaguePayouts: leaguePayouts.rows });
 }));
@@ -932,10 +964,15 @@ app.get('/api/bootstrap', auth, asyncHandler(async (req, res) => {
     // `i.updated_at` آخرین بار که تعدادش زیاد شده. برای «تازه‌ترین»
     // دومی درست است — کاربر می‌خواهد کارتی را ببیند که همین حالا ثبت
     // کرده، حتی اگر نسخهٔ اولش را ماه‌ها پیش گرفته باشد.
+    // COALESCE(d.image_url, …): طرحِ رو/پشتِ تصادفی که در لحظهٔ ثبت
+    // قرعه خورده. LEFT JOIN چون کارتِ بدونِ طرح (سیستمِ قدیمی) باید
+    // همچنان تصویرِ پیش‌فرضِ نوعِ کارت را بگیرد نه هیچ.
     pool.query(
-      `SELECT i.*, t.name, t.image_url, t.point_value, t.cash_amount
+      `SELECT i.*, t.name, COALESCE(d.image_url, t.image_url) AS image_url,
+              t.point_value, t.cash_amount
          FROM user_card_inventory i
          JOIN card_types t ON t.id = i.card_type_id
+         LEFT JOIN photo_card_designs d ON d.id = i.display_design_id
         WHERE i.user_id = $1 AND i.consumed_in_reward = false
         ORDER BY t.name`, [req.user.id]),
     pool.query(
@@ -1141,12 +1178,19 @@ app.get('/api/users/:id/public', auth, validateUuid('id'), asyncHandler(async (r
   //
   // `consumed_in_reward=false`: کارتی که خرجِ جایزه شده دیگر در
   // مجموعهٔ کاربر نیست.
+  // همان COALESCE مسیرهای دیگر: پروفایلِ عمومی باید **دقیقاً** همان
+  // تصویری را نشان دهد که خودِ کاربر در «کارت‌های من» می‌بیند. اگر این
+  // یکی به‌روز نمی‌شد، کارتی که کاربر «پشت» می‌بیند برای حریفش «رو»
+  // دیده می‌شد — همان دسته ناهماهنگی که قبلاً باعث شد کارتِ عکسی اصلاً
+  // در پروفایلِ عمومی دیده نشود.
   const cards = await pool.query(
-    `SELECT t.id AS card_type_id, t.name, t.image_url, t.point_value,
+    `SELECT t.id AS card_type_id, t.name,
+            COALESCE(d.image_url, t.image_url) AS image_url, t.point_value,
             i.quantity::int AS registered_count,
             i.updated_at AS last_registered_at
        FROM user_card_inventory i
        JOIN card_types t ON t.id = i.card_type_id
+       LEFT JOIN photo_card_designs d ON d.id = i.display_design_id
       WHERE i.user_id = $1 AND i.consumed_in_reward = false AND i.quantity > 0
       ORDER BY i.quantity DESC, t.name
       LIMIT 50`, [req.params.id]);

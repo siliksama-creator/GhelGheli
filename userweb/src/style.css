@@ -2674,13 +2674,101 @@ a:focus-visible {
    دقیقاً از همین‌جا آمد: رنگی که برای پس‌زمینهٔ تیره انتخاب شده بود روی
    کارت سفیدِ تم روشن محو می‌شد. */
 
+/* ══════════════════════════════════════════════════════════════════════
+   ثبت کارت با عکس — چیدمانِ جمع‌وجور
+   ══════════════════════════════════════════════════════════════════════
+
+   شکایتِ مالک: «نوارش خیلی دراز شده، یکم جمع و جور تر و کوتاه تر بشه».
+
+   فرمِ قبلی بیش از ۵۰۰ پیکسل بود، فقط برای دو ورودی. مقصرها: دو
+   پاراگرافِ توضیح، دو دکمهٔ ۷۶ پیکسلیِ عمودی، پیش‌نمایشِ تا ۲۶۰ پیکسلیِ
+   تمام‌عرض، و جعبهٔ راهنمای همیشه‌بازِ حروفِ مبهم.
+
+   هیچ‌کدام حذف نشدند — فشرده و تاشو شدند. */
 .photoCardBox {
-  margin-top: 22px;
-  padding-top: 18px;
+  margin-top: 16px;
+  padding-top: 14px;
   border-top: 1px dashed var(--veil-6);
   text-align: start;
 }
-.photoCardBox h2 { margin: 0 0 6px; font-size: 20px; }
+.pcHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.photoCardBox h2 { margin: 0 0 2px; font-size: 17px; }
+
+/* نشانِ «در بررسی» کنارِ عنوان، جایگزینِ بنرِ سه‌خطی (~۷۵ پیکسل).
+   متنِ کامل در `title` است، پس نه اطلاعاتی گم شده نه صفحه‌خوان چیزی
+   از دست داده. */
+.pcPendingChip {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: 99px;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #ffcf6b;
+  background: #ffcf6b1f;
+  border: 1px solid #ffcf6b55;
+  cursor: help;
+}
+
+/* ── عکس و کد کنارِ هم ──
+   بزرگ‌ترین صرفه‌جوییِ ارتفاع: دو عنصری که هر کدام یک ردیفِ کامل
+   می‌گرفتند حالا یک ردیف‌اند. */
+.pcRow {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+  margin: 10px 0 8px;
+}
+.pcFields {
+  flex: 1;
+  min-width: 0;            /* وگرنه فیلد از ظرفِ فلکس بیرون می‌زند */
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* جایگاهِ عکس. اندازه در حالتِ خالی و پر **یکسان** است، پس انتخابِ عکس
+   چیدمان را نمی‌پراند — همان پرشی که قبلاً با ظاهر شدنِ پیش‌نمایشِ ۲۶۰
+   پیکسلی رخ می‌داد.
+
+   نسبتِ ۹۰×۱۱۶ نزدیک به نسبتِ خودِ کارتِ فوتبالی است. */
+.pcSlot {
+  position: relative;
+  flex: none;
+  width: 90px;
+  height: 116px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: 14px;
+  border: 1px dashed var(--veil-6);
+  background: var(--veil-2);
+  color: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  overflow: hidden;
+  transition: background .15s ease, border-color .15s ease;
+}
+.pcSlot:hover { background: var(--veil-3); border-color: var(--brand-ink); }
+.pcSlotIcon { font-size: 20px; line-height: 1; }
+.pcSlotFilled { border-style: solid; cursor: default; padding: 0; }
+.pcSlotFilled img {
+  width: 100%;
+  height: 100%;
+  /* cover و نه contain: در کادرِ کوچک contain حاشیهٔ خالیِ زیادی
+     می‌گذارد. کاربر این تصویر را برای **تأیید انتخاب** نگاه می‌کند نه
+     برای بررسیِ جزئیات. */
+  object-fit: cover;
+  display: block;
+}
 
 /* ══════════════════════════════════════════════════════════════════════
    نوارِ پیشرفتِ آنالیز
@@ -2738,56 +2826,48 @@ a:focus-visible {
   margin: 4px 0 0;
 }
 
-/* دو دکمهٔ هم‌عرض: دوربین و گالری. هدف لمس ۴۴ پیکسلی طبق راهنمای
-   دسترس‌پذیری — روی موبایل این‌ها اصلی‌ترین کنش صفحه‌اند. */
-.pcPickRow { display: flex; gap: 10px; margin: 12px 0; }
+/* دو دکمهٔ هم‌عرض: دوربین و گالری.
+   ارتفاع از ۷۶ به ۴۸ آمد و آیکون کنارِ متن نشست به‌جای بالای آن — پس
+   ارتفاعِ کمتر هیچ چیزی را فشرده نمی‌کند. همچنان بالاتر از حداقلِ ۴۴
+   پیکسلیِ راهنمای دسترس‌پذیری، که روی موبایل مهم است چون این‌ها
+   اصلی‌ترین کنشِ صفحه‌اند. */
+.pcPickRow { display: flex; gap: 8px; margin: 0; }
 .pcPick {
   flex: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  min-height: 76px;
-  padding: 12px;
-  border-radius: 18px;
+  gap: 5px;
+  min-height: 48px;
+  padding: 8px;
+  border-radius: 12px;
   border: 1px solid var(--veil-6);
   background: var(--veil-2);
   color: inherit;
   font-weight: 800;
-  font-size: 13px;
+  font-size: 12.5px;
   cursor: pointer;
-  transition: transform .15s ease, background .15s ease, border-color .15s ease;
+  transition: background .15s ease, border-color .15s ease;
 }
 .pcPick:hover {
-  transform: translateY(-2px);
   background: var(--veil-3);
   border-color: var(--brand-ink);
 }
-.pcPickIcon { font-size: 24px; line-height: 1; }
+.pcPickIcon { font-size: 16px; line-height: 1; }
 
-.pcPreview { position: relative; margin: 10px 0; }
-.pcPreview img {
-  width: 100%;
-  max-height: 260px;
-  object-fit: contain;
-  border-radius: 18px;
-  background: var(--veil-2);
-  border: 1px solid var(--veil-5);
-}
 /* دکمهٔ حذف روی خودِ عکس. `inset-inline-start` نه `left`: صفحه RTL است
    و left در دو جهت جای متفاوتی می‌افتد. */
 .pcClear {
   position: absolute;
-  top: 8px;
-  inset-inline-start: 8px;
-  width: 32px;
-  height: 32px;
+  top: 4px;
+  inset-inline-start: 4px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border-radius: 50%;
   background: #000000b3;
   color: #fff;
-  font-size: 19px;
+  font-size: 15px;
   line-height: 1;
 }
 
@@ -2801,13 +2881,8 @@ a:focus-visible {
   font-family: monospace;
 }
 
-.pcTip {
-  display: block;
-  margin-top: 8px;
-  color: var(--text-muted);
-  font-size: 12px;
-  line-height: 1.7;
-}
+/* `.pcTip` و `.pcPreview` حذف شدند: راهنمای عکس‌گرفتن به `title` کادرِ
+   عکس رفت و پیش‌نمایش در `.pcSlotFilled` ادغام شد. */
 
 /* ── نتیجه ── */
 .pcResult {
@@ -2854,15 +2929,44 @@ a:focus-visible {
 /* ── راهنمای حروفِ مبهم زیر فیلد کد ──
    همیشه دیده می‌شود، نه فقط بعد از خطا: کاربر باید قبل از تایپ بداند
    به چه چیزی دقت کند، وگرنه یکی از پنج تلاشش را بی‌دلیل می‌سوزاند. */
+/* ── راهنمای حروفِ مبهم: خلاصه همیشه، جزئیات تاشو ──
+
+   قبلاً یک جعبهٔ همیشه‌بازِ سه‌خطی بود (~۶۰ پیکسل). حذفش وسوسه‌کننده بود
+   ولی دلیلِ وجودی‌اش پابرجاست: کاربر باید **قبل** از تایپ بداند ۰ و O
+   شبیه‌اند، وگرنه یکی از پنج تلاشش را می‌سوزاند و به قفلِ سه‌ساعته
+   نزدیک‌تر می‌شود.
+
+   `<details>` بومیِ HTML: باز/بسته شدن و اعلامِ صفحه‌خوان رایگان. */
 .pcCodeHint {
-  margin-top: 6px;
-  padding: 9px 11px;
-  border-radius: 12px;
-  background: var(--veil-2);
-  border: 1px solid var(--veil-5);
+  margin-top: 2px;
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.9;
+}
+.pcCodeHint > summary {
+  cursor: pointer;
+  padding: 3px 2px;
+  font-size: 11.5px;
+  list-style: none;         /* مثلثِ پیش‌فرضِ وبکیت */
+}
+.pcCodeHint > summary::-webkit-details-marker { display: none; }
+/* نشانگرِ خودمان: در RTL باید سمتِ چپ باشد، پس `::after` نه `::before`. */
+.pcCodeHint > summary::after {
+  content: ' ▾';
+  opacity: .6;
+}
+.pcCodeHint[open] > summary::after { content: ' ▴'; }
+.pcCodeHintBody {
+  padding: 8px 11px;
+  border-radius: 12px;
+  background: var(--veil-2);
+  border: 1px solid var(--veil-5);
+}
+.pcHintAccent {
+  display: block;
+  margin-top: 6px;
+  color: var(--brand-ink);
+  font-weight: 700;
 }
 .pcCodeHint b { color: var(--page-fg); }
 .pcCodeHint code {

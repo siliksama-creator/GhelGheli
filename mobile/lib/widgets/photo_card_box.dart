@@ -158,6 +158,12 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
   /// بی‌جهت تلاش نکند و پیام را بخواند.
   bool _locked = false;
 
+  /// آیا جزئیاتِ راهنمای حروفِ مبهم باز است؟
+  ///
+  /// بسته پیش‌فرض است تا فرم کوتاه بماند (شکایتِ مالک: «نوارش خیلی دراز
+  /// شده»). خلاصهٔ یک‌خطی همیشه دیده می‌شود، پس هشدار از دست نمی‌رود.
+  bool _hintOpen = false;
+
   @override
   void initState() {
     super.initState();
@@ -421,38 +427,68 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
       );
     }
 
+    // ═══════════════════════════════════════════════════════════════════
+    // چیدمانِ جمع‌وجور
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    // ── شکایتِ مالک ──
+    //
+    //   «حالا قسمت ثبت کد کاربر رو بهینه کن هم گوشی و هم وب اپ چون
+    //    نوارش خیلی دراز شده، یکم جمع و جور تر و کوتاه تر بشه»
+    //
+    // ── چه چیزی نوار را دراز کرده بود ──
+    //
+    // چهار چیز، که هر کدام جداگانه توجیه داشتند ولی رویِ هم فاجعه شدند:
+    //
+    //   ۱. دو پاراگرافِ توضیح، مجموعاً چهار خط (~۷۰ پیکسل)
+    //   ۲. دو دکمهٔ ۷۶ پیکسلی برای دوربین و گالری
+    //   ۳. پیش‌نمایشِ ۲۰۰ پیکسلیِ عکس
+    //   ۴. جعبهٔ راهنمای حروفِ مبهم، سه خطِ همیشه‌باز (~۶۰ پیکسل)
+    //
+    // جمعاً بیش از ۵۰۰ پیکسل — روی گوشیِ معمولی بیشتر از یک صفحهٔ کامل،
+    // فقط برای فرمی که دو ورودی دارد.
+    //
+    // ── چه تغییر کرد ──
+    //
+    //   • دو پاراگراف → یک جملهٔ کوتاه. جملهٔ «چند نسخه» به راهنمای
+    //     زیرِ فیلدِ کد منتقل شد، جایی که واقعاً به آن نیاز است.
+    //   • دکمه‌های ۷۶ → ۵۲ پیکسل، افقی به‌جای عمودی (آیکون کنارِ متن).
+    //     هدفِ لمس همچنان بالاتر از حداقلِ ۴۴ پیکسلیِ دسترس‌پذیری است.
+    //   • پیش‌نمایش ۲۰۰ → ۱۱۰ پیکسل، و **کنارِ** فیلدِ کد نه بالایش.
+    //     دو عنصر که با هم یک ردیف می‌شوند، ۱۶۰ پیکسل صرفه‌جویی.
+    //   • راهنمای حروف تاشو شد؛ بسته یک خط است.
+    //
+    // ⚠️ هیچ اطلاعاتی حذف نشد — فقط جابه‌جا و تاشو شد. راهنمای حروفِ
+    //    مبهم دلیلِ وجودیِ روشنی داشت (کاربر باید **قبل** از تایپ بداند
+    //    که ۰ و O شبیه‌اند، وگرنه یکی از پنج تلاشش را می‌سوزاند) پس
+    //    حذف نشد؛ خلاصه‌اش همیشه دیده می‌شود و جزئیاتش یک ضربه فاصله
+    //    دارد.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Gaps.vLg,
-        Divider(color: theme.colorScheme.outline.withValues(alpha: 0.3)),
         Gaps.vMd,
-        Text('📸 ثبت کارت با عکس', style: theme.textTheme.titleLarge),
+        Divider(color: theme.colorScheme.outline.withValues(alpha: 0.3)),
+        Gaps.vSm,
+        Row(
+          children: [
+            Expanded(
+              child: Text('📸 ثبت کارت با عکس',
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w900)),
+            ),
+            // شمارِ در انتظار به‌صورت یک نشانِ کوچک کنارِ عنوان، به‌جای
+            // بنرِ سه‌خطی. بنر فقط وقتی باز می‌شود که کاربر رویش بزند.
+            if (_pendingCount > 0 && _result == null)
+              _pendingChip(context),
+          ],
+        ),
         Gaps.vXxs,
         Text(
-          'از کارت عکس بگیر و کدش را وارد کن. عکس ثابت می‌کند کارت را داری، '
-          'پس کسی نمی‌تواند فقط با دانستن کد امتیاز بگیرد.',
+          'از کارت عکس بگیر و کدش را وارد کن.',
           style: theme.textTheme.bodySmall,
         ),
-        Gaps.vXxs,
-        // ── چرا این جمله لازم است ──
-        //
-        // بدونِ آن، کاربری که پنج نسخهٔ یک کارت دارد فکر می‌کند باید
-        // پنج بار عکس بگیرد — یا بدتر، فکر می‌کند فقط یکی‌شان قابل
-        // ثبت است و چهار کد را دور می‌ریزد.
-        Text(
-          'چند نسخه از یک کارت داری؟ یک بار عکس بگیر و کدها را '
-          'پشت‌سرهم وارد کن — عکس بعد از هر ثبت سرِ جایش می‌ماند.',
-          style: theme.textTheme.bodySmall
-              ?.copyWith(color: theme.colorScheme.primary),
-        ),
-        Gaps.vMd,
+        Gaps.vSm,
 
-        // ── نوارِ وضعیت، از سرور نه از حافظهٔ محلی ──
-        // وقتی مدیر تأیید یا رد کند، این عدد صفر می‌شود و نوار خودش
-        // محو می‌شود.
-        if (_pendingCount > 0 && _result == null)
-          _pendingBanner(context),
         if (_result != null) _resultView(context, _result!),
         if (_error != null) ...[
           Container(
@@ -479,81 +515,95 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
           Gaps.vSm,
         ],
 
-        // دو دکمهٔ هم‌عرض. دوربین اول است چون حالتِ اصلی همان است:
-        // کاربر کارت را در دست دارد.
+        // ── عکس و کد در یک ردیف ──
+        //
+        // این بزرگ‌ترین صرفه‌جوییِ ارتفاع است. قبلاً پیش‌نمایشِ ۲۰۰
+        // پیکسلی تمامِ عرض را می‌گرفت و فیلدِ کد زیرش می‌آمد؛ حالا
+        // پیش‌نمایشِ ۱۱۰ پیکسلی سمتِ راست و فیلدِ کد سمتِ چپ، در یک
+        // ردیف. حدود ۱۶۰ پیکسل کمتر.
+        //
+        // نسبتِ ۱۱۰×۸۰ عمداً نزدیک به نسبتِ خودِ کارتِ فوتبالی است، پس
+        // عکس با BoxFit.cover بدونِ تحریفِ محسوس جا می‌شود.
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: _pickButton(context, Icons.photo_camera_rounded, 'دوربین',
-                  () => _pick(ImageSource.camera)),
-            ),
+            // کلید برای تستِ چیدمان: تستی که مطمئن می‌شود این جایگاه
+            // **کنارِ** فیلدِ کد می‌ماند نه بالایش، چون همین یک تصمیم
+            // ~۱۶۰ پیکسل از ارتفاعِ فرم کم کرد.
+            SizedBox(
+                key: const ValueKey('pcPhotoSlot'),
+                width: 80,
+                child: _photoSlot(context)),
             const SizedBox(width: Gaps.sm),
             Expanded(
-              child: _pickButton(context, Icons.photo_library_rounded, 'گالری',
-                  () => _pick(ImageSource.gallery)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: _code,
+                    focusNode: _codeFocus,
+                    enabled: !_locked,
+                    textCapitalization: TextCapitalization.characters,
+                    // کد لاتین است و در فیلدِ راست‌به‌چپ کاراکترهایش
+                    // جابه‌جا دیده می‌شود.
+                    textDirection: TextDirection.ltr,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 2),
+                    decoration: InputDecoration(
+                      labelText: 'کد روی کارت',
+                      // `isDense` + padding کوچک‌تر: ارتفاعِ پیش‌فرضِ
+                      // TextField در متریال ۵۶ پیکسل است که اینجا
+                      // بی‌دلیل بلند است.
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: Gaps.sm, vertical: 12),
+                      prefixIcon: const Icon(Icons.vpn_key_rounded, size: 18),
+                      prefixIconConstraints:
+                          const BoxConstraints(minWidth: 34, minHeight: 34),
+                      // پاک کردنِ سریعِ کدِ اشتباه، بدونِ نگه‌داشتنِ
+                      // دکمهٔ بک‌اسپیس.
+                      suffixIcon: _code.text.isEmpty
+                          ? null
+                          : IconButton(
+                              icon: const Icon(Icons.backspace_outlined,
+                                  size: 16),
+                              tooltip: 'پاک کردن',
+                              visualDensity: VisualDensity.compact,
+                              onPressed: () => setState(_code.clear),
+                            ),
+                    ),
+                    onSubmitted: (_) {
+                      if (!_busy && !_locked && _imagePath != null
+                          && _code.text.trim().isNotEmpty) {
+                        _submit();
+                      }
+                    },
+                    onChanged: (_) => setState(() {}),
+                  ),
+                  Gaps.vXs,
+                  // دو دکمهٔ باریک، آیکون کنارِ متن به‌جای بالای آن.
+                  // ۵۲ پیکسل ارتفاع — همچنان بالاتر از حداقلِ ۴۴
+                  // پیکسلیِ دسترس‌پذیری.
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _pickButton(context, Icons.photo_camera_rounded,
+                            'دوربین', () => _pick(ImageSource.camera)),
+                      ),
+                      const SizedBox(width: Gaps.xs),
+                      Expanded(
+                        child: _pickButton(context, Icons.photo_library_rounded,
+                            'گالری', () => _pick(ImageSource.gallery)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ],
-        ),
-
-        if (_imagePath != null) ...[
-          Gaps.vSm,
-          Stack(
-            alignment: AlignmentDirectional.topStart,
-            children: [
-              ClipRRect(
-                borderRadius: Corners.rLg,
-                child: Image.file(
-                  File(_imagePath!),
-                  height: 200,
-                  width: double.infinity,
-                  fit: BoxFit.contain,
-                  // اگر فایل بین انتخاب و رندر پاک شود، نباید کل صفحه
-                  // با استثنا بشکند.
-                  errorBuilder: (_, __, ___) => const SizedBox(
-                    height: 200,
-                    child: Center(child: Icon(Icons.broken_image_outlined)),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(6),
-                child: Material(
-                  color: Colors.black54,
-                  shape: const CircleBorder(),
-                  child: InkWell(
-                    customBorder: const CircleBorder(),
-                    onTap: () => setState(() => _imagePath = null),
-                    child: const Padding(
-                      padding: EdgeInsets.all(5),
-                      child: Icon(Icons.close_rounded,
-                          size: 18, color: Colors.white),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-
-        Gaps.vSm,
-        TextField(
-          controller: _code,
-          focusNode: _codeFocus,
-          enabled: !_locked,
-          textCapitalization: TextCapitalization.characters,
-          // کد لاتین است و در فیلدِ راست‌به‌چپ کاراکترهایش جابه‌جا دیده
-          // می‌شود.
-          textDirection: TextDirection.ltr,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-              fontFamily: 'monospace',
-              fontWeight: FontWeight.w800,
-              letterSpacing: 2),
-          decoration: const InputDecoration(
-            prefixIcon: Icon(Icons.vpn_key_rounded),
-            labelText: 'کد روی کارت',
-          ),
-          onChanged: (_) => setState(() {}),
         ),
         Gaps.vXs,
         _codeHint(context),
@@ -594,14 +644,94 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
             style: theme.textTheme.bodySmall,
           ),
         ],
-        if (_imagePath == null) ...[
-          Gaps.vXs,
-          Text(
-            'راهنما: کل کارت داخل کادر باشد و نور کافی باشد. '
-            'عکس تار هم معمولاً شناسایی می‌شود.',
-            style: theme.textTheme.labelSmall,
+        // ── راهنمای عکس‌گرفتن حذف شد، جای بهتری پیدا کرد ──
+        //
+        // این متن قبلاً وقتی عکسی انتخاب نشده بود زیرِ فرم می‌نشست.
+        // حذفش برای کوتاه کردنِ فرم اطلاعات را از بین نمی‌برد: همان
+        // راهنما در `showCardFrameGuide` هست که **قبل از باز شدنِ
+        // دوربین** نشان داده می‌شود — یعنی دقیقاً لحظه‌ای که به درد
+        // می‌خورد، نه وقتی کاربر دارد فرم را نگاه می‌کند.
+      ],
+    );
+  }
+
+  /// جایگاهِ عکس — هم پیش‌نمایش، هم دکمهٔ انتخاب وقتی خالی است.
+  ///
+  /// ── چرا یک عنصر و نه دو ──
+  ///
+  /// قبلاً وقتی عکسی نبود این فضا کاملاً خالی می‌ماند و فقط دو دکمه
+  /// دیده می‌شد؛ وقتی عکس می‌آمد، ناگهان ۲۰۰ پیکسل به ارتفاعِ فرم
+  /// اضافه می‌شد و همه‌چیز می‌پرید. حالا جایگاه **همیشه** همان اندازه
+  /// است: خالی یک کادرِ نقطه‌چین است، پر عکس. هیچ پرشی رخ نمی‌دهد.
+  Widget _photoSlot(BuildContext context) {
+    final theme = Theme.of(context);
+    const h = 110.0;
+
+    if (_imagePath == null) {
+      return InkWell(
+        onTap: _busy ? null : () => _pick(ImageSource.camera),
+        borderRadius: Corners.rMd,
+        child: Container(
+          height: h,
+          decoration: BoxDecoration(
+            borderRadius: Corners.rMd,
+            color: theme.colorScheme.surfaceContainerHighest
+                .withValues(alpha: 0.3),
+            border: Border.all(
+                color: theme.colorScheme.outline.withValues(alpha: 0.45)),
           ),
-        ],
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.add_a_photo_outlined,
+                  size: 22, color: theme.colorScheme.primary),
+              const SizedBox(height: 4),
+              Text('عکس کارت',
+                  style: theme.textTheme.labelSmall
+                      ?.copyWith(fontWeight: FontWeight.w700)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Stack(
+      alignment: AlignmentDirectional.topEnd,
+      children: [
+        ClipRRect(
+          borderRadius: Corners.rMd,
+          child: Image.file(
+            File(_imagePath!),
+            height: h,
+            width: double.infinity,
+            // cover و نه contain: در کادرِ کوچک، contain حاشیهٔ خالیِ
+            // زیادی می‌گذارد. کاربر عکس را برای **تأیید انتخاب** نگاه
+            // می‌کند نه برای بررسیِ جزئیات.
+            fit: BoxFit.cover,
+            // اگر فایل بین انتخاب و رندر پاک شود، نباید کل صفحه با
+            // استثنا بشکند.
+            errorBuilder: (_, __, ___) => const SizedBox(
+              height: h,
+              child: Center(child: Icon(Icons.broken_image_outlined)),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(3),
+          child: Material(
+            color: Colors.black54,
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: () => setState(() => _imagePath = null),
+              child: const Padding(
+                padding: EdgeInsets.all(3),
+                child:
+                    Icon(Icons.close_rounded, size: 15, color: Colors.white),
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -611,36 +741,92 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
     final theme = Theme.of(context);
     return InkWell(
       onTap: _busy ? null : onTap,
-      borderRadius: Corners.rLg,
+      borderRadius: Corners.rMd,
       child: Container(
-        // هدف لمسِ ۴۴ پیکسلی طبق راهنمای دسترس‌پذیری؛ روی موبایل این‌ها
-        // اصلی‌ترین کنشِ صفحه‌اند.
-        height: 76,
+        // ۵۲ به‌جای ۷۶. آیکون کنارِ متن است نه بالایش، پس ارتفاعِ کمتر
+        // هیچ چیزی را فشرده نمی‌کند. همچنان بالاتر از حداقلِ ۴۴
+        // پیکسلیِ راهنمای دسترس‌پذیری.
+        height: 52,
         decoration: BoxDecoration(
-          borderRadius: Corners.rLg,
+          borderRadius: Corners.rMd,
           border:
               Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.5)),
           color: theme.colorScheme.surfaceContainerHighest
               .withValues(alpha: 0.35),
         ),
-        child: Column(
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 24, color: theme.colorScheme.primary),
-            const SizedBox(height: 3),
-            Text(label,
-                style: theme.textTheme.labelLarge
-                    ?.copyWith(fontWeight: FontWeight.w800)),
+            Icon(icon, size: 18, color: theme.colorScheme.primary),
+            const SizedBox(width: 5),
+            // Flexible: نامِ دکمه در فونتِ بزرگِ سیستم نباید سرریز کند.
+            Flexible(
+              child: Text(label,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelMedium
+                      ?.copyWith(fontWeight: FontWeight.w800)),
+            ),
           ],
         ),
       ),
     );
   }
 
-  /// راهنمای حروفِ مبهم — **همیشه** دیده می‌شود، نه فقط بعد از خطا.
+  /// نشانِ کوچکِ «در انتظار بررسی» کنارِ عنوان.
   ///
-  /// کاربر باید قبل از تایپ بداند به چه چیزی دقت کند. نشان دادنِ این
-  /// راهنما بعد از شکست یعنی یکی از پنج تلاشش را بی‌دلیل سوزانده.
+  /// جایگزینِ بنرِ سه‌خطیِ قبلی که ~۷۵ پیکسل می‌گرفت. متنِ کامل با یک
+  /// ضربه در یک SnackBar نشان داده می‌شود — اطلاعات حذف نشده، فقط
+  /// وقتی نمایش داده می‌شود که کاربر بخواهد.
+  Widget _pendingChip(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      borderRadius: Corners.rPill,
+      onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${faNum(_pendingCount)} عکس در حال بررسی است. کیفیت عکس کامل '
+            'نبود؛ کارشناس بررسی می‌کند و ممکن است تا ۲۴ ساعت طول بکشد. '
+            'کد شما محفوظ است و می‌توانید کارت‌های دیگرتان را ثبت کنید.',
+          ),
+          duration: const Duration(seconds: 6),
+        ),
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          borderRadius: Corners.rPill,
+          color: BrandColors.warningOnLight.withValues(alpha: 0.15),
+          border: Border.all(
+              color: BrandColors.warningOnLight.withValues(alpha: 0.45)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.hourglass_top_rounded,
+                size: 13, color: BrandColors.warningOnLight),
+            const SizedBox(width: 3),
+            Text('${faNum(_pendingCount)} در بررسی',
+                style: theme.textTheme.labelSmall?.copyWith(
+                    color: BrandColors.warningOnLight,
+                    fontWeight: FontWeight.w800)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// راهنمای حروفِ مبهم — خلاصه همیشه دیده می‌شود، جزئیات تاشو.
+  ///
+  /// ── چرا حذف نشد، فقط تا شد ──
+  ///
+  /// وسوسه‌کننده بود که برای کوتاه کردنِ فرم کلاً حذفش کنیم. ولی دلیلِ
+  /// وجودی‌اش هنوز پابرجاست: کاربر باید **قبل** از تایپ بداند که ۰ و O
+  /// شبیه‌اند. نشان دادنِ این راهنما بعد از خطا یعنی یکی از پنج تلاشش
+  /// را بی‌دلیل سوزانده و به قفلِ سه‌ساعته نزدیک‌تر شده.
+  ///
+  /// راه‌حل: خلاصهٔ یک‌خطی همیشه دیده می‌شود («۰ و O، ۱ و I و L را
+  /// اشتباه نگیر») که خودش هشدار را می‌رساند، و مثال‌های چشمی یک ضربه
+  /// فاصله دارند. از سه خطِ همیشه‌باز به یک خط. ~۴۰ پیکسل صرفه‌جویی.
   Widget _codeHint(BuildContext context) {
     final theme = Theme.of(context);
     Widget chip(String t) => Container(
@@ -658,74 +844,72 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
                   fontSize: 12.5)),
         );
 
-    return Container(
-      padding: const EdgeInsets.all(Gaps.xs),
-      decoration: BoxDecoration(
-        borderRadius: Corners.rMd,
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-        border: Border.all(
-            color: theme.colorScheme.outline.withValues(alpha: 0.25)),
-      ),
-      child: DefaultTextStyle.merge(
-        style: theme.textTheme.bodySmall ?? const TextStyle(),
-        child: Wrap(
-          crossAxisAlignment: WrapCrossAlignment.center,
+    return InkWell(
+      borderRadius: Corners.rSm,
+      onTap: () => setState(() => _hintOpen = !_hintOpen),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('دقت کنید: ',
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(fontWeight: FontWeight.w800)),
-            const Text('صفر '),
-            chip('0'),
-            const Text(' و حرف '),
-            chip('O'),
-            const Text(' شبیه‌اند، و عدد یک '),
-            chip('1'),
-            const Text(' با حروف '),
-            chip('I'),
-            const Text(' و '),
-            chip('L'),
-            const Text('. بزرگ یا کوچک بودنِ حروف مهم نیست.'),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _pendingBanner(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      margin: const EdgeInsets.only(bottom: Gaps.sm),
-      padding: const EdgeInsets.all(Gaps.sm),
-      decoration: BoxDecoration(
-        borderRadius: Corners.rMd,
-        color: BrandColors.warningOnLight.withValues(alpha: 0.12),
-        border: Border.all(
-            color: BrandColors.warningOnLight.withValues(alpha: 0.4)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.hourglass_top_rounded,
-              color: BrandColors.warningOnLight, size: 20),
-          const SizedBox(width: Gaps.xs),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Row(
               children: [
-                Text('${faNum(_pendingCount)} عکس در حال بررسی',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                        color: BrandColors.warningOnLight,
-                        fontWeight: FontWeight.w900)),
-                Text(
-                  'کیفیت عکس کامل نبود؛ کارشناس بررسی می‌کند و ممکن است '
-                  'تا ۲۴ ساعت طول بکشد. کد شما محفوظ است و می‌توانید '
-                  'کارت‌های دیگرتان را ثبت کنید.',
-                  style: theme.textTheme.bodySmall,
+                Icon(Icons.info_outline_rounded,
+                    size: 14, color: theme.colorScheme.outline),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    'صفر و O، و یک با I و L را اشتباه نگیر',
+                    style: theme.textTheme.labelSmall,
+                  ),
                 ),
+                Icon(
+                    _hintOpen
+                        ? Icons.expand_less_rounded
+                        : Icons.expand_more_rounded,
+                    size: 16,
+                    color: theme.colorScheme.outline),
               ],
             ),
-          ),
-        ],
+            // AnimatedCrossFade و نه if ساده: باز و بسته شدنِ ناگهانی
+            // بقیهٔ صفحه را می‌پراند.
+            AnimatedCrossFade(
+              duration: const Duration(milliseconds: 160),
+              crossFadeState: _hintOpen
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
+              firstChild: const SizedBox(width: double.infinity, height: 0),
+              secondChild: Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: DefaultTextStyle.merge(
+                  style: theme.textTheme.bodySmall ?? const TextStyle(),
+                  child: Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      const Text('صفر '),
+                      chip('0'),
+                      const Text(' و حرف '),
+                      chip('O'),
+                      const Text(' شبیه‌اند، و عدد یک '),
+                      chip('1'),
+                      const Text(' با حروف '),
+                      chip('I'),
+                      const Text(' و '),
+                      chip('L'),
+                      const Text('. بزرگ یا کوچک بودنِ حروف مهم نیست. '),
+                      Text(
+                        'چند نسخه از یک کارت داری؟ یک بار عکس بگیر و کدها '
+                        'را پشت‌سرهم وارد کن — عکس سرِ جایش می‌ماند.',
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: theme.colorScheme.primary),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -39,6 +39,7 @@ import 'package:flutter/material.dart';
 import '../../api_client.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
+import '../../widgets/cached_card_image.dart';
 import '../../widgets/state_views.dart';
 import '../shared/card_detail_sheet.dart';
 
@@ -359,28 +360,30 @@ class InventoryTile extends StatelessWidget {
                       borderRadius: Corners.rMd,
                       child: ColoredBox(
                         color: Colors.black.withValues(alpha: 0.14),
+                        // ── چرا CachedCardImage و نه Image.network ──
+                        //
+                        // خواستهٔ مالک: «وقتی کاربر کارتی به اینونتوریش
+                        // انتقال پیدا کرد ازون به بعد دیگه تصویر کارت از
+                        // گوشیش کش بشه که برای نمایش کارت در اینونتوری
+                        // هر بار درخواست به سرور ارسال نشه».
+                        //
+                        // `Image.network` فقط کشِ **حافظه** دارد که با
+                        // بستنِ اپ پاک می‌شود. کاربری با ۳۰ کارت هر بار
+                        // ۳۰ درخواست می‌زد. حالا بارِ اول دانلود، از آن
+                        // به بعد از دیسکِ گوشی.
                         child: img.isEmpty
                             ? const Center(
                                 child:
                                     Text('⚽', style: TextStyle(fontSize: 34)))
-                            : Image.network(
-                                img,
+                            : CachedCardImage(
+                                url: img,
                                 fit: BoxFit.contain,
-                                // کش را به اندازهٔ نمایش محدود می‌کنیم.
-                                // بدون این، ۵۰ تصویرِ تمام‌اندازه در حافظه
-                                // می‌نشیند و روی گوشیِ ضعیف اپ کشته می‌شود.
+                                // رمزگشایی به اندازهٔ نمایش. بدون این،
+                                // ۵۰ تصویرِ تمام‌اندازه در حافظه می‌نشیند
+                                // و روی گوشیِ ضعیف اپ کشته می‌شود.
                                 cacheWidth: 320,
-                                loadingBuilder: (_, child, p) => p == null
-                                    ? child
-                                    : const Center(
-                                        child: SizedBox(
-                                            width: 18,
-                                            height: 18,
-                                            child: CircularProgressIndicator(
-                                                strokeWidth: 2))),
-                                errorBuilder: (_, __, ___) => const Center(
-                                    child: Text('⚽',
-                                        style: TextStyle(fontSize: 34))),
+                                placeholder: const Text('⚽',
+                                    style: TextStyle(fontSize: 34)),
                               ),
                       ),
                     ),

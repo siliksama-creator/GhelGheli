@@ -132,26 +132,102 @@ void main() {
   group('راهنمای حروفِ مبهم', () {
     // خواستهٔ صریح مالک: کاربر باید بداند 0/O و 1/I/L شبیه‌اند و
     // بزرگ/کوچک بودن مهم نیست.
-    testWidgets('راهنما بدون نیاز به خطا دیده می‌شود', (t) async {
+    //
+    // ═════════════════════════════════════════════════════════════════
+    // چرا این تست‌ها بازنویسی شدند
+    // ═════════════════════════════════════════════════════════════════
+    //
+    // فرم برای شکایتِ مالک («نوارش خیلی دراز شده») جمع‌وجور شد و این
+    // راهنما از سه خطِ همیشه‌باز به یک خلاصهٔ یک‌خطی + جزئیاتِ تاشو
+    // تبدیل شد.
+    //
+    // ⚠️ نکتهٔ مهمی که هنگام بازنویسی معلوم شد: از سه تستِ قبلی فقط
+    //    **یکی** شکست. دو تای دیگر سبز ماندند — نه چون درست بودند،
+    //    بلکه چون `AnimatedCrossFade` فرزندِ پنهان را در درختِ ویجت
+    //    نگه می‌دارد. یعنی `find.text('0')` چیزی را پیدا می‌کرد که
+    //    کاربر اصلاً نمی‌دید.
+    //
+    //    این همان دسته تستی است که «سبز بودنش هیچ چیزی را ثابت
+    //    نمی‌کند». حالا با `hitTestable()` بررسی می‌شود که واقعاً
+    //    قابلِ دیدن و لمس باشد.
+    testWidgets('خلاصهٔ راهنما بدون نیاز به خطا دیده می‌شود', (t) async {
       // اگر فقط بعد از شکست نشان داده می‌شد، کاربر یکی از پنج تلاشش را
-      // بی‌دلیل سوزانده بود.
+      // بی‌دلیل سوزانده بود و به قفلِ سه‌ساعته نزدیک‌تر شده بود.
       await t.pumpWidget(_wrap(_api({'/api/photo-cards/status': (200, _on)})));
       await t.pumpAndSettle();
-      expect(find.textContaining('دقت کنید'), findsOneWidget);
+      expect(find.textContaining('صفر و O'), findsOneWidget,
+          reason: 'خلاصهٔ هشدار باید همیشه دیده شود، نه فقط بعد از خطا');
     });
 
-    testWidgets('هر پنج نویسهٔ مبهم نام برده شده‌اند', (t) async {
+    testWidgets('جزئیات پیش‌فرض بسته است — فرم باید کوتاه بماند', (t) async {
       await t.pumpWidget(_wrap(_api({'/api/photo-cards/status': (200, _on)})));
       await t.pumpAndSettle();
+      // `hitTestable` و نه صرفاً `findsNothing`: AnimatedCrossFade
+      // فرزندِ پنهان را در درخت نگه می‌دارد، پس تنها راهِ صادقانهٔ
+      // پرسیدنِ «کاربر می‌بیندش؟» همین است.
+      expect(find.text('بزرگ یا کوچک بودنِ حروف مهم نیست. ').hitTestable(),
+          findsNothing);
+    });
+
+    testWidgets('با ضربه باز می‌شود و هر پنج نویسه دیده می‌شود', (t) async {
+      await t.pumpWidget(_wrap(_api({'/api/photo-cards/status': (200, _on)})));
+      await t.pumpAndSettle();
+      await t.tap(find.textContaining('صفر و O'));
+      await t.pumpAndSettle();
       for (final ch in ['0', 'O', '1', 'I', 'L']) {
-        expect(find.text(ch), findsWidgets, reason: 'نویسهٔ $ch نام برده نشده');
+        expect(find.text(ch).hitTestable(), findsWidgets,
+            reason: 'نویسهٔ $ch بعد از باز شدن دیده نمی‌شود');
       }
     });
 
-    testWidgets('گفته شده بزرگ/کوچک بودن مهم نیست', (t) async {
+    testWidgets('بعد از باز شدن، بزرگ/کوچک بودن هم گفته می‌شود', (t) async {
       await t.pumpWidget(_wrap(_api({'/api/photo-cards/status': (200, _on)})));
       await t.pumpAndSettle();
-      expect(find.textContaining('بزرگ یا کوچک'), findsOneWidget);
+      await t.tap(find.textContaining('صفر و O'));
+      await t.pumpAndSettle();
+      expect(find.textContaining('بزرگ یا کوچک').hitTestable(), findsOneWidget);
+    });
+
+    testWidgets('دوباره زدن می‌بنددش', (t) async {
+      await t.pumpWidget(_wrap(_api({'/api/photo-cards/status': (200, _on)})));
+      await t.pumpAndSettle();
+      await t.tap(find.textContaining('صفر و O'));
+      await t.pumpAndSettle();
+      await t.tap(find.textContaining('صفر و O'));
+      await t.pumpAndSettle();
+      expect(find.textContaining('بزرگ یا کوچک').hitTestable(), findsNothing);
+    });
+  });
+
+  group('جمع‌وجور بودنِ فرم', () {
+    // ── چرا ارتفاع تست می‌شود ──
+    //
+    // شکایتِ مالک عددی نبود («نوارش خیلی دراز شده») ولی اگر تستی نگذاریم،
+    // اولین قابلیتِ بعدی دوباره درازش می‌کند و کسی متوجه نمی‌شود. این
+    // تست سقفی می‌گذارد که رد شدن از آن باید تصمیمِ آگاهانه باشد.
+    testWidgets('فرمِ خالی از ۴۲۰ پیکسل بلندتر نیست', (t) async {
+      await t.pumpWidget(_wrap(_api({'/api/photo-cards/status': (200, _on)})));
+      await t.pumpAndSettle();
+      final h = t.getSize(find.byType(PhotoCardBox)).height;
+      expect(h, lessThan(420),
+          reason: 'فرم دوباره دراز شده — ارتفاع $h پیکسل');
+    });
+
+    testWidgets('جایگاهِ عکس و فیلدِ کد در یک ردیف‌اند', (t) async {
+      // این چیدمان بزرگ‌ترین صرفه‌جوییِ ارتفاع است (~۱۶۰ پیکسل). اگر
+      // کسی دوباره عمودی‌شان کند، فرم بی‌صدا بلند می‌شود.
+      await t.pumpWidget(_wrap(_api({'/api/photo-cards/status': (200, _on)})));
+      await t.pumpAndSettle();
+      // ⚠️ روی خودِ `SizedBox` کلیددار و نه روی متنِ «عکس کارت».
+      //    نسخهٔ اولِ این تست متن را می‌گرفت و شکست — چون آن متن در
+      //    مرکزِ عمودیِ جایگاهِ ۱۱۰ پیکسلی است و پایین‌تر از فیلدِ کد
+      //    می‌افتد، حتی وقتی چیدمان کاملاً درست است. تست باید مرزِ
+      //    خودِ عنصر را بسنجد نه محتوایش.
+      final slot = t.getRect(find.byKey(const ValueKey('pcPhotoSlot')));
+      final field = t.getRect(find.byType(TextField));
+      // هم‌پوشانیِ عمودی یعنی کنارِ هم‌اند، نه زیرِ هم.
+      expect(slot.top < field.bottom && field.top < slot.bottom, isTrue,
+          reason: 'عکس و فیلدِ کد دیگر در یک ردیف نیستند');
     });
   });
 

@@ -34,10 +34,27 @@ dependencies:
   firebase_messaging: ^15.1.0
   image_picker: ^1.1.2
   audioplayers: ^6.1.0
-  # Used to sign tap-game batches (HMAC-SHA256). Already present transitively
-  # via firebase/shared_preferences; declared explicitly because we import it
+  # Used to sign tap-game batches (HMAC-SHA256) and to name disk-cache files
+  # (SHA-1 of the URL). Already present transitively via
+  # firebase/shared_preferences; declared explicitly because we import it
   # directly and an implicit dependency can vanish on any upstream bump.
   crypto: ^3.0.3
+  # ═══════════════════════════════════════════════════════════════════════
+  # چرا path_provider حالا صریح اعلام می‌شود
+  # ═══════════════════════════════════════════════════════════════════════
+  #
+  # کشِ دیسکیِ تصویرِ کارت (lib/services/image_disk_cache.dart) به آن
+  # نیاز دارد تا پوشهٔ موقتِ اپ را پیدا کند.
+  #
+  # قبلاً فقط تراگذر بود (از مسیر shared_preferences و image_picker) و
+  # کامنتِ پایینِ همین فایل صریحاً می‌گوید «مستقیماً استفاده نمی‌شود».
+  # آن جمله دیگر درست نیست. وابستگیِ تراگذری که مستقیم import شود، در
+  # هر ارتقای بالادست می‌تواند ناپدید شود و بیلد را بی‌هیچ تغییری در
+  # کدِ ما بشکند — همان دسته مشکلی که با path_provider_android رخ داد.
+  #
+  # ⚠️ `dependency_overrides` پایین‌ترِ همین فایل نسخهٔ پیاده‌سازیِ
+  #    اندرویدش را روی ۲.۲.۲۳ پین نگه می‌دارد. آن قید باید بماند.
+  path_provider: ^2.1.5
   # ═══════════════════════════════════════════════════════════════════════
   # چرا url_launcher و نه share_plus
   # ═══════════════════════════════════════════════════════════════════════
@@ -81,9 +98,10 @@ dev_dependencies:
 # می‌کند و به ۲.۳.۱ ارتقا می‌داد؛ برای همین قفل به‌تنهایی جلوی خرابی را
 # نمی‌گرفت. dependency_overrides در هر بار حل وابستگی اعمال می‌شود.
 #
-# path_provider مستقیماً در کد استفاده نمی‌شود؛ به‌صورت غیرمستقیم از
-# مسیر shared_preferences / image_picker می‌آید. وقتی `jni` با Gradle
-# پروژه سازگار شد، این قید را بردارید.
+# path_provider حالا **مستقیماً** استفاده می‌شود (کشِ دیسکیِ تصویرِ کارت)
+# و بالاتر در dependencies اعلام شده. این override فقط نسخهٔ پیاده‌سازیِ
+# اندرویدش را پین می‌کند. وقتی `jni` با Gradle پروژه سازگار شد، این قید
+# را بردارید — ولی خودِ path_provider باید در dependencies بماند.
 dependency_overrides:
   path_provider_android: 2.2.23
 
