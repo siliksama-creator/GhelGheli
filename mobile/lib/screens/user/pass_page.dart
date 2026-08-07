@@ -451,7 +451,7 @@ class _ScrollRail extends StatelessWidget {
                     child: Text(
                       faNum((fraction * tierCount).round().clamp(1, tierCount)),
                       style: const TextStyle(
-                        fontSize: 9,
+                        fontSize: 11,
                         fontWeight: FontWeight.w900,
                         color: Color(0xFF06301A),
                       ),
@@ -677,14 +677,14 @@ class _TierMedal extends StatelessWidget {
         children: [
           Text(faNum(tier),
               style: const TextStyle(
-                fontSize: 24,
+                fontSize: 30,
                 height: 1,
                 fontWeight: FontWeight.w900,
                 color: Color(0xFF07240F),
               )),
           Text('از ${faNum(tierCount)}',
               style: const TextStyle(
-                fontSize: 9,
+                fontSize: 10.5,
                 height: 1.3,
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF0B3A16),
@@ -975,25 +975,43 @@ class _TierRow extends StatelessWidget {
     final tier = NumberParser.toInt(row['tier']);
     final unlocked = row['unlocked'] == true;
     final isCurrent = tier == currentTier + 1;
+    // ── نشانهٔ مایلستون هر ۵ پله ──
+    //
+    // ۵۰ ردیفِ کاملاً یکسان هیچ نقطهٔ اتکایی برای چشم نداشت — کاربر
+    // موقعِ اسکرول نمی‌فهمید کجای مسیر است. هر پنجمین پله شمارهٔ
+    // درشتِ طلایی می‌گیرد و مثلِ تابلوی کیلومترشمار کار می‌کند.
+    //
+    // همین تغییر در نسخهٔ وب هم اعمال شد تا دو کلاینت یک‌شکل بمانند.
+    final isMilestone = tier % 5 == 0;
+    final gold = context.gold;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      margin: const EdgeInsets.only(bottom: 9),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 9),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         color: isCurrent
-            ? _readyColor.withValues(alpha: 0.07)
-            : Colors.white.withValues(alpha: unlocked ? 0.035 : 0.015),
+            ? _readyColor.withValues(alpha: 0.10)
+            : Colors.white.withValues(alpha: unlocked ? 0.05 : 0.02),
         border: Border.all(
           color: isCurrent
-              ? _readyColor.withValues(alpha: 0.5)
-              : Colors.white.withValues(alpha: 0.06),
-          width: isCurrent ? 1.5 : 1,
+              ? _readyColor
+              : isMilestone
+                  ? gold.withValues(alpha: 0.28)
+                  : Colors.white.withValues(alpha: 0.08),
+          width: isCurrent ? 1.6 : 1,
         ),
+        // پلهٔ فعلی باید در یک نگاه پیدا شود — مهم‌ترین ردیفِ صفحه.
+        boxShadow: isCurrent
+            ? [BoxShadow(
+                color: _readyColor.withValues(alpha: 0.14),
+                blurRadius: 18, offset: const Offset(0, 6))]
+            : null,
       ),
       child: Row(
         children: [
-          _TierNumber(tier: tier, unlocked: unlocked),
+          _TierNumber(
+              tier: tier, unlocked: unlocked, milestone: isMilestone),
           Gaps.hXs,
           Expanded(
             child: _RewardTile(
@@ -1023,38 +1041,55 @@ class _TierRow extends StatelessWidget {
 }
 
 class _TierNumber extends StatelessWidget {
-  const _TierNumber({required this.tier, required this.unlocked});
+  const _TierNumber({
+    required this.tier,
+    required this.unlocked,
+    this.milestone = false,
+  });
   final int tier;
   final bool unlocked;
+  final bool milestone;
 
   @override
   Widget build(BuildContext context) {
+    final gold = context.gold;
     return Container(
-      width: 38,
-      height: 80,
+      width: 44,
+      height: 96,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         color: unlocked
-            ? _readyColor.withValues(alpha: 0.16)
-            : Colors.white.withValues(alpha: 0.05),
+            ? _readyColor.withValues(alpha: 0.18)
+            : milestone
+                ? gold.withValues(alpha: 0.14)
+                : Colors.white.withValues(alpha: 0.05),
+        border: milestone && !unlocked
+            ? Border.all(color: gold.withValues(alpha: 0.35))
+            : null,
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(unlocked ? Icons.lock_open_rounded : Icons.lock_rounded,
-              size: 11,
+              size: 13,
               color: unlocked
                   ? _readyColor
-                  : Colors.white.withValues(alpha: 0.3)),
-          const SizedBox(height: 2),
+                  : milestone
+                      ? gold.withValues(alpha: 0.7)
+                      : Colors.white.withValues(alpha: 0.32)),
+          const SizedBox(height: 3),
           Text(faNum(tier),
               style: TextStyle(
-                fontSize: 15,
+                // ۱۵ → ۱۹ (و ۲۱ برای مایلستون): شمارهٔ پله مهم‌ترین
+                // عددِ ردیف است و باید بی‌زحمت خوانده شود.
+                fontSize: milestone ? 21 : 19,
                 fontWeight: FontWeight.w900,
                 color: unlocked
                     ? _readyColor
-                    : Colors.white.withValues(alpha: 0.45),
+                    : milestone
+                        ? gold
+                        : Colors.white.withValues(alpha: 0.55),
               )),
         ],
       ),
@@ -1113,7 +1148,7 @@ class _RewardTile extends StatelessWidget {
 
     if (m == null) {
       return Container(
-        height: 80,
+        height: 96,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
@@ -1130,11 +1165,22 @@ class _RewardTile extends StatelessWidget {
     final kind = '${m['kind']}';
 
     final tile = Container(
-      // ۷۶ نه ۶۲: وقتی برچسب دو خطی می‌شود (مثل «اسم آبی آسمانی») و
+      // ── تاریخچهٔ این عدد ──
+      //
+      // ۶۲ → ۸۰: وقتی برچسب دو خطی می‌شود (مثل «اسم آبی آسمانی») و
       // زیرش هم یک خط وضعیت («⭐ فقط پلاس») می‌آید، ۶۲ پیکسل ۱۴ پیکسل
       // کم می‌آورد و فلاتر نوار زرد-مشکیِ سرریز می‌کشد.
-      // با pass_layout_test.dart گرفته شد.
-      height: 80,
+      //
+      // ۸۰ → ۹۶: بزرگ کردنِ فونت‌ها (۱۱.۵→۱۴ برای برچسب و ۹.۵→۱۱.۵
+      // برای وضعیت) **دقیقاً همان سرریز را برگرداند** — این بار ۱۵
+      // پیکسل. یعنی همان تستی که یک بار این باگ را گرفته بود، دوباره
+      // گرفتش.
+      //
+      // ⚠️ درس: هر تغییرِ اندازهٔ فونت در این ویجت باید با ارتفاع
+      //    هماهنگ شود. دو خطِ ۱۴px با height 1.35 = ۳۸، به‌علاوهٔ یک
+      //    خطِ ۱۱.۵ = ۱۶، به‌علاوهٔ فاصله‌ها ≈ ۶۰. با پدینگ و حاشیهٔ
+      //    امن برای فونتِ بزرگِ سیستم، ۹۶.
+      height: 96,
       padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
@@ -1181,9 +1227,15 @@ class _RewardTile extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 11.5,
-                    height: 1.25,
-                    fontWeight: FontWeight.w800,
+                    // ── ۱۱.۵ → ۱۴ ──
+                    //
+                    // خواستهٔ مالک: «فونت ها هم واضح تر باشه». این
+                    // متنِ اصلیِ خانه است (نامِ جایزه) و روی موبایلِ
+                    // واقعی در ۱۱.۵ پیکسل تقریباً ناخوانا بود.
+                    // نسخهٔ وب هم دقیقاً همین تغییر را گرفت.
+                    fontSize: 14,
+                    height: 1.35,
+                    fontWeight: FontWeight.w900,
                     color: claimed
                         ? Colors.white.withValues(alpha: 0.4)
                         : Colors.white,
@@ -1191,14 +1243,20 @@ class _RewardTile extends StatelessWidget {
                 ),
                 if (claimed)
                   const Text('✓ گرفتی',
-                      style: TextStyle(fontSize: 9.5, color: _readyColor))
+                      style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                          color: _readyColor))
                 else if (locked)
                   Text('⭐ فقط پلاس',
-                      style: TextStyle(fontSize: 9.5, color: context.gold))
+                      style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                          color: context.gold))
                 else if (ready)
                   const Text('برای گرفتن بزن',
                       style: TextStyle(
-                          fontSize: 9.5,
+                          fontSize: 11.5,
                           fontWeight: FontWeight.w900,
                           color: _readyColor)),
               ],
