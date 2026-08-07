@@ -155,9 +155,9 @@ b2 = threading.Barrier(6)
 def mix(i):
     b2.wait()
     delta = 30 if i % 2 == 0 else -30
-    s, _ = req('POST', f'/api/admin/users/{uid}/points', at,
+    s, r = req('POST', f'/api/admin/users/{uid}/points', at,
                {'points': delta, 'reason': f'ترکیبی {i}'})
-    mixed[i] = s
+    mixed[i] = (s, delta, str(r.get('message') or r)[:60])
 
 
 ths = [threading.Thread(target=mix, args=(i,)) for i in range(6)]
@@ -170,6 +170,13 @@ time.sleep(1.5)
 after = points_now()
 ck(f'خالص صفر ماند ({before} → {after})', after == before,
    f'انتظار {before}، شد {after}')
+print('   پاسخ‌ها:', mixed)
+mixed_rows = [e for e in ledger() if 'ترکیبی' in str(e.get('description') or '')]
+pos = [e for e in mixed_rows if int(e['delta']) > 0]
+neg = [e for e in mixed_rows if int(e['delta']) < 0]
+ck(f'هر ۶ ردیفِ ترکیبی در دفتر هست ({len(pos)}+ / {len(neg)}-)',
+   len(mixed_rows) == 6,
+   'ردیفی گم شده — کسر روی users اعمال شده ولی در دفتر ثبت نشده')
 
 # ═══════════════════════════════════════════════════════════════════════════
 print('\n══ ۳. کسرِ بیش از موجودی، موجودی را منفی نمی‌کند ══')

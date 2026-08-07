@@ -116,27 +116,75 @@ async function debit(client, {
   //
   // خواندنِ موجودی و بعد کم کردنش، همان الگوی SELECT-سپس-UPDATE است که
   // در اینونتوری باگ ساخت. اینجا `GREATEST` کارِ محدودسازی را داخلِ
-  // خودِ دستور انجام می‌دهد و `RETURNING` هر دو مقدار را می‌دهد، پس
-  // هیچ پنجره‌ای برای مسابقه نمی‌ماند.
+  // خودِ دستور انجام می‌دهد، پس هیچ پنجره‌ای برای مسابقه نمی‌ماند.
+  //
+  // ═══════════════════════════════════════════════════════════════════════
+  // ⚠️ باگی که اینجا بود و رفع شد — «کسرِ گم‌شده»
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // نسخهٔ قبلی مقدارِ قبل را با **زیرکوئری** می‌گرفت:
+  //
+  //     RETURNING current_points,
+  //               (SELECT current_points FROM users WHERE id=$1) AS before_val
+  //
+  // و کامنتش ادعا می‌کرد «در Postgres مقدارِ قبل از UPDATE را می‌دهد».
+  // آن ادعا فقط در حالتِ **تک‌کاربره** درست است.
+  //
+  // زیرکوئری از snapshotِ ابتدای تراکنش می‌خواند. اگر تراکنشِ دیگری
+  // (مثلاً یک افزایشِ هم‌زمان) وسطِ کار commit کند، `before_val` کهنه
+  // است. آن‌وقت:
+  //
+  //     actual = before_val - after   →  صفر یا **منفی**
+  //     if (actual <= 0) return ...   →  خروجِ زودهنگام
+  //
+  // یعنی امتیاز از `users` کم می‌شد ولی **هیچ ردیفی در دفتر ثبت
+  // نمی‌شد**. دفتر بی‌صدا ناقص می‌ماند — دقیقاً همان چیزی که این جدول
+  // برای جلوگیری‌اش ساخته شده بود.
+  //
+  // ⚠️ بازتولید شد، حدس نبود. شش درخواستِ هم‌زمان (۳ کسر + ۳ افزایش)
+  //    روی سرورِ زنده: دو کسر پاسخِ «کاربر امتیازی برای کسر نداشت»
+  //    گرفتند در حالی که کاربر ۲۰۰ امتیاز داشت. دفتر ۵ ردیف داشت
+  //    به‌جای ۶، و جمعش با موجودی نمی‌خواند.
+  //
+  // ── رفع ──
+  //
+  // ⚠️ تلاشِ اول (`FROM users AS old`) هم **کافی نبود** و این را باید
+  //    صریح گفت: آن هم از snapshot می‌خواند، فقط پنجرهٔ خطا را
+  //    کوچک‌تر می‌کرد. تستِ زنده از ۱ ردیفِ گم‌شده به ۱ رسید — یعنی
+  //    بهتر شد ولی درست نشد. «بهتر» در یک دفترِ مالی کافی نیست.
+  //
+  // راهِ قطعی: مقدارِ کسرشده را **داخلِ خودِ SQL** حساب کن، نه در
+  // جاوااسکریپت از تفاضلِ دو عدد. عبارتِ `LEAST(want, current_points)`
+  // در همان لحظه‌ای ارزیابی می‌شود که ردیف قفل است، پس هیچ تراکنشِ
+  // دیگری نمی‌تواند بینشان بیفتد.
+  //
+  // حالا `actual_deducted` مستقیم از دیتابیس می‌آید و هیچ محاسبه‌ای
+  // در سمتِ برنامه لازم نیست — یعنی هیچ پنجره‌ای هم برای اشتباه.
+  // CTE با `FOR UPDATE`: ردیف **قفل** می‌شود، مقدارِ کسرشدنی همان‌جا
+  // حساب می‌شود، و بعد UPDATE از همان عدد استفاده می‌کند. هر سه گام
+  // در یک دستور و زیرِ یک قفل.
   const { rows } = await client.query(
-    `UPDATE users
-        SET current_points = GREATEST(0, current_points - $2),
+    `WITH locked AS (
+       SELECT id, LEAST($2::int, current_points) AS take
+         FROM users WHERE id = $1 FOR UPDATE
+     )
+     UPDATE users u
+        SET current_points = u.current_points - l.take,
             monthly_league_points = CASE WHEN $3
-              THEN GREATEST(0, monthly_league_points - $2)
-              ELSE monthly_league_points END,
+              THEN GREATEST(0, u.monthly_league_points - l.take)
+              ELSE u.monthly_league_points END,
             updated_at = NOW()
-      WHERE id = $1
-      RETURNING current_points, (SELECT current_points FROM users WHERE id=$1) AS before_val`,
+       FROM locked l
+      WHERE u.id = l.id
+      RETURNING u.current_points, l.take AS actual_taken`,
     [userId, want, league],
   );
   if (!rows[0]) return null;
 
   const after = Number(rows[0].current_points);
-  // ⚠️ `before_val` در همان دستور خوانده می‌شود و در Postgres مقدارِ
-  //    **قبل** از UPDATE را می‌دهد (snapshot تراکنش). پس کسرِ واقعی
-  //    قابل محاسبه است بدونِ کوئریِ دوم.
-  const before = Number(rows[0].before_val);
-  const actual = before - after;      // ≥ 0، و ≤ want
+  // مقدارِ واقعاً کسرشده **از خودِ دیتابیس** می‌آید، نه از تفاضلِ دو
+  // عددی که ممکن است از snapshotهای متفاوت خوانده شده باشند.
+  const actual = Number(rows[0].actual_taken);   // ≥ 0، و ≤ want
   if (actual <= 0) {
     // کاربر صفر امتیاز داشت. ردیفِ صفر مجاز نیست (CHECK) و بی‌معنی هم
     // هست، ولی فراخوان باید بداند چیزی کم نشد.
