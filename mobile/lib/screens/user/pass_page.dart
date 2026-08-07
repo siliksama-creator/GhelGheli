@@ -305,7 +305,8 @@ class _PassPageState extends State<PassPage> with TickerProviderStateMixin {
           child: ListView.builder(
             controller: _scroll,
             padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.md, 26, Gaps.xxl),
-            // ۰ = سربرگ، ۱ = راهنمای مسیرها، بعد پله‌ها، آخر = راهنمای XP
+            // ۰ = سربرگ، ۱ = راهنمای «چطور جلو بروم»، ۲ = راهنمای مسیرها،
+            // بعد پله‌ها.
             itemCount: tiers.length + 3,
             itemBuilder: (context, i) {
               if (i == 0) {
@@ -328,8 +329,14 @@ class _PassPageState extends State<PassPage> with TickerProviderStateMixin {
                   pulse: _pulse,
                 );
               }
-              if (i == 1) return _TrackLegend(tierCount: tierCount);
-              if (i == tiers.length + 2) {
+              if (i == 1) {
+                // ═══════════════════════════════════════════════════════
+                // راهنمای «چطور جلو بروم» را به بالای مسیر آوردم.
+                // نسخهٔ قبلی آن را در انتهای ۵۰ پله می‌گذاشت؛ کاربر باید
+                // تا ته صفحه اسکرول می‌کرد تا بفهمد این صفحه دربارهٔ چیست
+                // و چطور پله باز کند. حالا درست زیر سربرگ می‌آید تا در
+                // نگاه اول روشن باشد — همان الگوی گذرنبردهای مدرن.
+                // ═══════════════════════════════════════════════════════
                 return _HowTo(
                   sources: (d['sources'] as List? ?? const [])
                       .whereType<Map>()
@@ -338,8 +345,9 @@ class _PassPageState extends State<PassPage> with TickerProviderStateMixin {
                   maxToday: NumberParser.toInt(d['maxTiersPerDay']),
                 );
               }
+              if (i == 2) return _TrackLegend(tierCount: tierCount);
               return _TierRow(
-                row: tiers[i - 2],
+                row: tiers[i - 3],
                 currentTier: tier,
                 busy: _busy,
                 pulse: _pulse,

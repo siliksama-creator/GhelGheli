@@ -438,7 +438,101 @@ class _PenaltyBoardState extends State<_PenaltyBoard>
           animating: _kick.isAnimating,
           hasSweet: _sweet != null,
         ),
+        // ── نتیجهٔ نهایی ──
+        // درخواست مالک: وقتی بازی پنالتی تمام می‌شود نتیجه باید روی صفحه
+        // دیده شود. نسخهٔ قبلی فقط در انتهای اسکرول یک پنل کوچک داشت که
+        // روی موبایل زیرِ خطِ دید می‌ماند. حالا یک بنرِ پررنگِ سرتاسری
+        // درست زیر زمینِ بازی نشان داده می‌شود — بدونِ نیاز به اسکرول.
+        if (widget.session.phase == GamePhase.over &&
+            widget.session.winner != null) ...[
+          Gaps.vSm,
+          _PenaltyResultBanner(
+            text: widget.session.resultText,
+            won: widget.session.iWon,
+            draw: widget.session.winner == 'DRAW',
+            accent: _accent,
+          ),
+        ],
       ],
+    );
+  }
+}
+
+/// بنرِ نتیجهٔ پایان بازی پنالتی — پررنگ، بدونِ نیاز به اسکرول.
+class _PenaltyResultBanner extends StatelessWidget {
+  const _PenaltyResultBanner({
+    required this.text,
+    required this.won,
+    required this.draw,
+    required this.accent,
+  });
+
+  final String text;
+  final bool won;
+  final bool draw;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final base = won
+        ? accent
+        : draw
+            ? const Color(0xFF94A3B8)
+            : const Color(0xFFEF4444);
+    // تصویرِ نتیجه به‌جای ایموجی (بستهٔ تولیدشدهٔ ۲۰۲۶ بازی‌ها).
+    final art = won
+        ? 'assets/games/result_victory.webp'
+        : draw
+            ? 'assets/games/result_draw.webp'
+            : 'assets/games/result_defeat.webp';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: Gaps.md, vertical: Gaps.md),
+      decoration: BoxDecoration(
+        borderRadius: Corners.rLg,
+        gradient: LinearGradient(
+          colors: [
+            base.withValues(alpha: 0.22),
+            Colors.black.withValues(alpha: 0.35),
+          ],
+        ),
+        border: Border.all(color: base.withValues(alpha: 0.6), width: 1.4),
+        boxShadow: [
+          BoxShadow(
+            color: base.withValues(alpha: 0.25),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Image.asset(
+            art,
+            width: 40,
+            height: 40,
+            fit: BoxFit.contain,
+            cacheWidth: 96,
+            errorBuilder: (_, __, ___) => Text(
+              won ? '🏆' : (draw ? '🤝' : '💔'),
+              style: const TextStyle(fontSize: 30),
+            ),
+          ),
+          Gaps.hSm,
+          Flexible(
+            child: Text(
+              text,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w900,
+                color: base,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

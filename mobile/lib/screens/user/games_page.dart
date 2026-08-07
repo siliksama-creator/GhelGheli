@@ -177,21 +177,31 @@ class _GameTileState extends State<_GameTile> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final entry = widget.entry;
+    // ═══════════════════════════════════════════════════════════════════
+    // چرا یک GestureDetectorِ تنها، نه AppCard(onTap) + GestureDetector
+    // ═══════════════════════════════════════════════════════════════════
+    // نسخهٔ قبلی هم `onTap` به `AppCard` (که داخلش یک `InkWell` با
+    // `TapGestureRecognizer` می‌سازد) می‌داد و هم این‌جا یک `GestureDetector`
+    // (با `TapGestureRecognizer` دیگر) روی کلِ کارت. دو رکگنایزرِ ضربه در
+    // گسچرآرنا با هم رقابت می‌کردند و تا تکلیفِ برنده روشن نشود، ضربهٔ
+    // کاربر «دیر» به‌نظر می‌رسید — همان تأخیرِ ورود به بازی که گزارش شد.
+    //
+    // حالا فقط یک رکگنایزرِ ضربه روی کارت هست و `onTap` را خودش صدا می‌زند؛
+    // `AppCard` بی‌`onTap` می‌ماند (فقط قابِ بصری). نتیجه: ورودِ فوری به بازی.
     return AnimatedScale(
       scale: _pressed ? 0.97 : 1.0,
       duration: Motion.fast,
       curve: Motion.standard,
-      // AnimatedScale اینجا یک transform سبک روی همان لایه است و هزینهٔ
-      // layout ندارد؛ فقط وقتی فشار/رها رخ می‌دهد دوباره می‌کشد.
-      child: AppCard(
-        onTap: widget.onTap,
-        padding: EdgeInsets.zero,
-        child: GestureDetector(
-          // حسِ لمسیِ ۲۰۲۶: کارت در لحظهٔ فشار کمی جمع می‌شود و رها که
-          // می‌شود برمی‌گردد — بدونِ دست‌زدن به هیچ چیدمان یا امکانی.
-          onTapDown: (_) => setState(() => _pressed = true),
-          onTapUp: (_) => setState(() => _pressed = false),
-          onTapCancel: () => setState(() => _pressed = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) {
+          setState(() => _pressed = false);
+          widget.onTap();
+        },
+        onTapCancel: () => setState(() => _pressed = false),
+        child: AppCard(
+          padding: EdgeInsets.zero,
           child: ClipRRect(
             borderRadius: Corners.rXl,
             child: Column(

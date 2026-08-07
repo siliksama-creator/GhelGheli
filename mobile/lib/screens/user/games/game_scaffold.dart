@@ -353,12 +353,28 @@ class _ResultPanel extends StatelessWidget {
     final theme = Theme.of(context);
     final won = session.iWon;
     final draw = session.winner == 'DRAW';
+    // تصویرِ نتیجه به‌جای ایموجی — بستهٔ ۲۰۲۶ِ تولیدشده برای بازی‌ها.
+    // `assets/games/` در pubspec ثبت شده، پس این فایل‌ها داخل APK می‌آیند.
+    final art = won
+        ? 'assets/games/result_victory.webp'
+        : draw
+            ? 'assets/games/result_draw.webp'
+            : 'assets/games/result_defeat.webp';
     return AppCard(
       child: Column(
         children: [
-          Text(
-            won ? '🏆' : (draw ? '🤝' : '💪'),
-            style: const TextStyle(fontSize: 40),
+          Image.asset(
+            art,
+            width: 88,
+            height: 88,
+            fit: BoxFit.contain,
+            // دروازه‌بانِ پایین‌حجم: تصویر در یک بومِ ۵۱۲ رندر و به‌همان
+            // نسبتِ منطقیِ ۸۸ پیکسل در دستگاه‌های ۲-۳x دیکد می‌شود.
+            cacheWidth: 176,
+            errorBuilder: (_, __, ___) => Text(
+              won ? '🏆' : (draw ? '🤝' : '💪'),
+              style: const TextStyle(fontSize: 40),
+            ),
           ),
           Gaps.vXs,
           Text(session.resultText,

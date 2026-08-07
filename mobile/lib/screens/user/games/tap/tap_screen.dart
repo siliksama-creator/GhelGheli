@@ -882,7 +882,16 @@ class _LevelUpDialogContentState extends State<_LevelUpDialogContent> with Singl
             Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('🎉', style: TextStyle(fontSize: 64)),
+                // تصویرِ لول‌آپ به‌جای ایموجی (بستهٔ ۲۰۲۶ بازی‌ها).
+                Image.asset(
+                  'assets/games/levelup_badge.webp',
+                  width: 88,
+                  height: 88,
+                  fit: BoxFit.contain,
+                  cacheWidth: 176,
+                  errorBuilder: (_, __, ___) =>
+                      const Text('🎉', style: TextStyle(fontSize: 64)),
+                ),
                 Gaps.vSm,
                 Text(
                   'تبریک! لول آپ شدی',
@@ -997,7 +1006,15 @@ class _SkinUnlockedDialogContentState extends State<_SkinUnlockedDialogContent> 
               children: [
                 ScaleTransition(
                   scale: _pulse,
-                  child: const Text('👑', style: TextStyle(fontSize: 72)),
+                  child: Image.asset(
+                    'assets/games/skin_unlock.webp',
+                    width: 96,
+                    height: 96,
+                    fit: BoxFit.contain,
+                    cacheWidth: 192,
+                    errorBuilder: (_, __, ___) =>
+                        const Text('👑', style: TextStyle(fontSize: 72)),
+                  ),
                 ),
                 Gaps.vSm,
                 const Text(
