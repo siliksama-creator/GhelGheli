@@ -122,17 +122,30 @@ step "زمان‌بندی روزانه"
 cat > /etc/cron.d/ghelgheli-telegram-backup << 'CRON'
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-# Full off-site backup to Telegram, TWICE a day — 03:35 and 15:35.
+# Full off-site backup to Telegram, ONCE a day — 03:35.
 #
-# Twelve-hour spacing halves the worst-case data loss window: an image an
-# admin uploads at 14:00 is safely off-server by 15:35 instead of waiting
-# until the following night. At ~750 KB per run the extra cost is about
-# 22 MB/year of bandwidth, which is nothing.
-35 3,15 * * * root /usr/local/bin/ghelgheli-backup-telegram.sh >> /var/log/ghelgheli-backup.log 2>&1
+# ── چرا از دو بار در روز به یک بار برگشت ──
+#
+# زمان‌بندیِ دوباره‌درروز وقتی نوشته شد که آرشیو ~۷۵۰ کیلوبایت بود و
+# استدلالش هم درست بود: «۲۲ مگابایت در سال، هیچ است».
+#
+# آن استدلال دیگر صادق نیست. با آپلودِ عکسِ کارت‌ها، آرشیو به **۲۸
+# مگابایت** رسید (اندازه‌گیریِ ۷ آگوست) — یعنی سالی ۲۰ گیگابایت آپلود
+# به تلگرام، روی VPSی که با Invoicle شریک است. و چون هر عکسِ کارت
+# برای همیشه در uploads/ می‌ماند، این عدد فقط بالا می‌رود؛ اسکریپت
+# خودش در ۸ تکه (۳۶۰ مگابایت) دست از کار می‌کشد.
+#
+# درخواستِ صریحِ مالک هم همین بود: روزی یک بار.
+#
+# پنجرهٔ بدترین‌حالتِ از‌دست‌رفتنِ داده ۲۴ ساعت می‌شود به‌جای ۱۲. این
+# قابل قبول است چون بک‌آپِ محلیِ `ghelgheli-backup-latest.sh` هر شب
+# ۳:۳۰ (پنج دقیقه زودتر) روی همین سرور اجرا می‌شود و برای برگرداندنِ
+# سریع کافی است؛ نسخهٔ تلگرام برای فاجعه (از دست رفتنِ کلِ VPS) است.
+35 3 * * * root /usr/local/bin/ghelgheli-backup-telegram.sh >> /var/log/ghelgheli-backup.log 2>&1
 CRON
 chmod 644 /etc/cron.d/ghelgheli-telegram-backup
 systemctl restart cron >/dev/null 2>&1 || true
-ok "روزی دو بار: ۳:۳۵ بامداد و ۱۵:۳۵ بعدازظهر"
+ok "روزی یک بار: ۳:۳۵ بامداد"
 
 # Rotate our own log so it can never fill the disk.
 cat > /etc/logrotate.d/ghelgheli-backup << 'LOGR'

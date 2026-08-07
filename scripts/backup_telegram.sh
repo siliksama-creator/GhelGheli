@@ -310,6 +310,10 @@ CONTENTS
   db/ghelgheli.sql         full database dump (--clean --if-exists)
   db/TABLE_COUNTS.txt      row count per table, to verify the dump is not empty
   db/FINANCIAL_STATEMENT.txt  موجودی کیف پول‌ها، دفتر کل و برداشت‌ها + بررسی صحت
+  source/source_at_commit.tar.gz  کدِ کاملِ برنامه در همین کامیت (بدون
+                           دارایی‌های دوتایی). بیمهٔ در‌دسترس‌نبودنِ گیت‌هاب:
+                           restore.sh اول از گیت‌هاب می‌گیرد و اگر نشد از
+                           همین فایل. باز کردنش: tar xzf source/*.tar.gz
   uploads/                 user-uploaded images
   config/backend.env       API secrets: DB password, JWT_SECRET, Firebase
   config/db_password       PostgreSQL password for the ghelgheli role
@@ -344,10 +348,103 @@ MANIFEST
 
 # ── 5. The restore script travels INSIDE the archive ─────────────────────
 # Deliberate: a restore script that lives only on the dead server is useless.
-cp "$(dirname "$0")/restore_from_backup.sh" "$STAGE/restore.sh" 2>/dev/null \
-  || cp /usr/local/bin/ghelgheli-restore.sh "$STAGE/restore.sh" 2>/dev/null \
-  || echo "WARNING: restore script not found, archive will lack restore.sh" >&2
-chmod +x "$STAGE/restore.sh" 2>/dev/null || true
+#
+# ⚠️ باگی که اینجا بود و رفع شد (۷ آگوست ۲۰۲۶)
+#
+# ترتیبِ قبلی این بود:
+#     cp "$(dirname "$0")/restore_from_backup.sh"  ← اول
+#     || cp /usr/local/bin/ghelgheli-restore.sh    ← دوم
+#
+# استدلالش این بود که «نسخهٔ کنارِ خودم تازه‌ترین است». ولی این اسکریپت
+# در عمل از `/usr/local/bin/ghelgheli-backup-telegram.sh` اجرا می‌شود
+# (کرون همان را صدا می‌زند)، پس `dirname $0` می‌شود `/usr/local/bin` —
+# و آنجا فایلی به نامِ `restore_from_backup.sh` وجود ندارد. یعنی شاخهٔ
+# اول **همیشه** شکست می‌خورد و شاخهٔ دوم اجرا می‌شد: نسخهٔ نصب‌شده.
+#
+# نسخهٔ نصب‌شده فقط وقتی به‌روز می‌شود که کسی دستی
+# `setup_telegram_backup.sh` را دوباره اجرا کند — که ماه‌ها اتفاق
+# نیفتاده بود. نتیجهٔ اندازه‌گیری‌شده: `restore.sh` داخلِ آرشیوِ
+# ۷ آگوست، **۴۳ خط کمتر** از نسخهٔ مخزن داشت و کلِ بخشِ «بررسی صحت
+# مالی پس از بازیابی» را نداشت.
+#
+# چرا این خطرناک است: آن ۴۳ خط دقیقاً برای این نوشته شده بودند که
+# بعد از بازیابی، قبل از باز کردنِ برداشت برای کاربران، بخوانند که
+# دفترِ کل و موجودی‌ها با هم می‌خوانند یا نه. یعنی نگهبانی که ساخته
+# شد، هرگز داخلِ بک‌آپی که قرار بود از آن استفاده کند نرفت.
+#
+# رفع: اول از **مخزن** بردار (تنها منبعی که با هر deploy تازه می‌شود)،
+# و فقط اگر مخزن نبود سراغِ نسخهٔ نصب‌شده برو.
+RESTORE_SRC=""
+for cand in \
+  "$APP_DIR/scripts/restore_from_backup.sh" \
+  "$(dirname "$0")/restore_from_backup.sh" \
+  "/usr/local/bin/ghelgheli-restore.sh"
+do
+  [ -f "$cand" ] && { RESTORE_SRC="$cand"; break; }
+done
+if [ -n "$RESTORE_SRC" ]; then
+  cp "$RESTORE_SRC" "$STAGE/restore.sh"
+  chmod +x "$STAGE/restore.sh"
+  log "restore.sh from $RESTORE_SRC ($(wc -l < "$STAGE/restore.sh") lines)"
+else
+  echo "WARNING: restore script not found, archive will lack restore.sh" >&2
+fi
+
+# ── 5b. کدِ برنامه — تصویرِ لحظه‌ایِ منبع ─────────────────────────────────
+#
+# ── چرا اضافه شد ──
+#
+# سؤالِ مالک: «آیا واقعاً از بک‌اند و دیتابیس جدید بک‌آپ می‌فرستد؟»
+# پاسخِ صادقانه تا قبل از این تغییر: **از دیتابیس بله، از بک‌اند نه.**
+#
+# آرشیو کدِ برنامه را حمل نمی‌کرد. استدلالش هم منطقی بود — `restore.sh`
+# از گیت‌هاب clone می‌کند و روی همان کامیتی که در MANIFEST نوشته شده
+# قفل می‌شود، پس کد «گم نمی‌شود».
+#
+# ولی آن استدلال به یک فرض تکیه دارد: **گیت‌هاب در دسترس باشد.** اگر
+# مخزن حذف/خصوصی شود، حساب معلق شود، یا (که در ایران عادی است) در
+# لحظهٔ فاجعه گیت‌هاب فیلتر یا قطع باشد، بازیابی متوقف می‌شود —
+# دیتابیس را داری ولی هیچ کدی برای اجرایش نداری. همین دیشب Actions
+# چند ساعت major_outage داشت.
+#
+# ── چرا فقط منبع و نه همه‌چیز ──
+#
+# `git archive HEAD` بدونِ دارایی‌های دوتایی **۱.۲ مگابایت** است
+# (اندازه‌گیری‌شده). با آن‌ها ۱۴ مگابایت می‌شود — یعنی آرشیوِ روزانه
+# دو برابر، برای فایل‌هایی که هر بار بایت‌به‌بایت یکسان‌اند.
+#
+# پس تصمیم: **کدِ منبع همیشه، دارایی‌ها هرگز.** اگر گیت‌هاب در دسترس
+# نباشد، با این تصویر می‌شود سرویس را بالا آورد؛ لوگو و آیکون بعداً
+# هم می‌شود برگرداند. این تفاوتِ «سایتِ بی‌لوگو» با «سایتِ خاموش» است.
+#
+# ⚠️ `git archive HEAD` فقط چیزی را می‌گیرد که **کامیت شده**. تغییرِ
+#    کامیت‌نشده روی سرور در بخشِ «untracked» بالاتر گرفته می‌شود، و
+#    `git status --porcelain` هم در MANIFEST گزارش می‌شود تا اگر
+#    سرور از مخزن جلو زده باشد، معلوم شود.
+log "snapshotting source code"
+if [ -d "$APP_DIR/.git" ] && command -v git >/dev/null; then
+  mkdir -p "$STAGE/source"
+  git -C "$APP_DIR" archive HEAD \
+    ':(exclude)mobile/assets' ':(exclude)backend/public' \
+    ':(exclude)userweb/public' ':(exclude)admin/public' \
+    ':(exclude)*.png' ':(exclude)*.jpg' ':(exclude)*.webp' \
+    ':(exclude)*.ttf' ':(exclude)*.mp3' ':(exclude)*.wav' \
+    2>/dev/null | gzip -9 > "$STAGE/source/source_at_commit.tar.gz" || true
+
+  if [ -s "$STAGE/source/source_at_commit.tar.gz" ]; then
+    log "source snapshot $(du -h "$STAGE/source/source_at_commit.tar.gz" | cut -f1)"
+  else
+    # شکستِ بی‌صدا اینجا یعنی بازیابیِ آفلاین ممکن نیست — ارزشِ هشدار
+    # دارد، ولی نه به قیمتِ نفرستادنِ بک‌آپ.
+    log "WARNING: source snapshot failed"
+    rm -f "$STAGE/source/source_at_commit.tar.gz"
+  fi
+
+  # اگر سرور تغییرِ کامیت‌نشده دارد، بازیابی از روی کامیت آن را
+  # برنمی‌گرداند. بهتر است بدانیم.
+  DIRTY=$(git -C "$APP_DIR" status --porcelain 2>/dev/null | wc -l)
+  [ "${DIRTY:-0}" -gt 0 ] && log "WARNING: $DIRTY uncommitted change(s) on server"
+fi
 
 # ── 6. Pack ───────────────────────────────────────────────────────────────
 log "packing"

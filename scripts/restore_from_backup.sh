@@ -85,24 +85,70 @@ sudo -u postgres psql -qc "GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_USER
 ok "دیتابیس $DB_NAME آماده است"
 
 # ── 3. Application code ───────────────────────────────────────────────────
+#
+# ── دو مسیر، به این ترتیب ──
+#
+#   ۱. گیت‌هاب — ترجیح داده می‌شود چون تاریخچهٔ کامل می‌آید و به‌روزرسانیِ
+#      بعدی با `git pull` انجام می‌شود.
+#   ۲. `source/source_at_commit.tar.gz` داخلِ همین بک‌آپ — اگر گیت‌هاب
+#      در دسترس نباشد.
+#
+# ⚠️ چرا مسیر دوم لازم است: نسخهٔ قبلی فقط گیت‌هاب را می‌شناخت و اگر
+#    clone شکست می‌خورد با `die` می‌مرد. یعنی بازیابی به در دسترس بودنِ
+#    یک سرویسِ بیرونی گره خورده بود — سرویسی که در ایران مرتب قطع
+#    می‌شود و دقیقاً در روزِ فاجعه ممکن است نباشد. دیتابیس را داشتی و
+#    هیچ کدی برای اجرایش نداشتی.
 step "دریافت کد برنامه"
+CODE_OK=0
+COMMIT="$(grep '^git_commit' "$HERE/MANIFEST.txt" | awk '{print $3}')"
+
 if [ -d "$APP_DIR/.git" ]; then
-  git -C "$APP_DIR" fetch --all -q && git -C "$APP_DIR" reset --hard origin/main -q
-  ok "مخزن موجود به‌روز شد"
+  if git -C "$APP_DIR" fetch --all -q && git -C "$APP_DIR" reset --hard origin/main -q; then
+    ok "مخزن موجود به‌روز شد"
+    CODE_OK=1
+  else
+    warn "به‌روزرسانی مخزن موجود نشد؛ از تصویرِ داخلِ بکاپ استفاده می‌شود"
+  fi
 else
   mkdir -p "$(dirname "$APP_DIR")"
-  git clone -q "$REPO" "$APP_DIR" || die "clone نشد. اگر مخزن خصوصی است، کلید SSH را اول نصب کن."
-  ok "کد از GitHub گرفته شد"
+  if git clone -q "$REPO" "$APP_DIR" 2>/dev/null; then
+    ok "کد از GitHub گرفته شد"
+    CODE_OK=1
+  else
+    warn "clone از GitHub نشد (قطعی، فیلترینگ، یا مخزنِ خصوصی)"
+  fi
 fi
 
 # Pin to the exact commit the backup was taken from, so the schema in the
 # dump and the code that reads it can never disagree.
-COMMIT="$(grep '^git_commit' "$HERE/MANIFEST.txt" | awk '{print $3}')"
-if [ -n "$COMMIT" ] && [ "$COMMIT" != "unknown" ]; then
+if [ "$CODE_OK" = "1" ] && [ -n "$COMMIT" ] && [ "$COMMIT" != "unknown" ]; then
   git -C "$APP_DIR" checkout -q "$COMMIT" 2>/dev/null \
     && ok "روی همان کامیت بکاپ (${COMMIT:0:7}) قفل شد" \
     || warn "کامیت ${COMMIT:0:7} پیدا نشد؛ روی آخرین نسخه main ماند"
 fi
+
+# ── مسیر دوم: تصویرِ کد از داخلِ همین آرشیو ──
+#
+# `--skip-old-files` عمدی است: اگر گیت‌هاب کار کرده، فایل‌هایش
+# دست‌نخورده می‌مانند و این فقط چیزی را پر می‌کند که کم است. اگر
+# گیت‌هاب کار نکرده، پوشه خالی است و همه‌چیز از اینجا می‌آید.
+if [ -f "$HERE/source/source_at_commit.tar.gz" ]; then
+  mkdir -p "$APP_DIR"
+  if [ "$CODE_OK" = "1" ]; then
+    ok "تصویرِ کد داخلِ بکاپ هم موجود است (استفاده نشد — گیت‌هاب جواب داد)"
+  else
+    tar xzf "$HERE/source/source_at_commit.tar.gz" -C "$APP_DIR" --skip-old-files \
+      && { ok "کد از تصویرِ داخلِ بکاپ باز شد (کامیت ${COMMIT:0:7})"; CODE_OK=1; } \
+      || warn "باز کردنِ تصویرِ کد شکست خورد"
+    # ⚠️ دارایی‌های دوتایی (لوگو، آیکون، فونت، صدا) عمداً در تصویر
+    #    نیستند — روزی ۱۴ مگابایت تکراری می‌شدند. سرویس بدونشان بالا
+    #    می‌آید؛ فقط ظاهرش ناقص است.
+    warn "لوگو/آیکون/فونت در تصویر نیستند. بعداً از گیت‌هاب بگیرید:"
+    echo "      git -C $APP_DIR init && git remote add origin $REPO && git fetch && git checkout -f $COMMIT"
+  fi
+fi
+
+[ "$CODE_OK" = "1" ] || die "هیچ منبعی برای کدِ برنامه پیدا نشد — نه گیت‌هاب، نه تصویرِ داخلِ بکاپ"
 
 # ── 4. Secrets ────────────────────────────────────────────────────────────
 step "بازگرداندن تنظیمات و کلیدها"
