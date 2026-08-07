@@ -119,15 +119,41 @@ async function recordMatch({ gameId, vsBot, winner, players }) {
       if (delta !== 0) {
         // GREATEST(...,0) keeps a balance from going negative after a penalty.
         // lifetime_points only ever grows, so a loss must not reduce it.
-        await client.query(
+        const { rows: bal } = await client.query(
           `UPDATE users SET
              current_points = GREATEST(current_points + $1, 0),
              lifetime_points = lifetime_points + GREATEST($1, 0),
              monthly_league_points = GREATEST(monthly_league_points + $1, 0),
              updated_at = NOW()
-           WHERE id = $2`,
+           WHERE id = $2
+           RETURNING current_points,
+                     (SELECT current_points FROM users WHERE id=$2) AS before_val`,
           [delta, userId],
         );
+        // ── ثبت در دفترِ امتیاز ──
+        //
+        // این تنها مسیری است که `delta` می‌تواند **منفی** باشد (جریمهٔ
+        // باخت). پس نمی‌شود از `credit` استفاده کرد.
+        //
+        // ⚠️ مقدارِ ثبت‌شده تفاضلِ واقعیِ موجودی است نه `delta` خام:
+        //    اگر کاربر ۱۰ امتیاز داشته و جریمه ۵۰ باشد، GREATEST آن را
+        //    به ۱۰ محدود می‌کند و دفتر هم باید ۱۰- بگوید. وگرنه
+        //    SUM(delta) با موجودی نمی‌خواند و ابزارِ ممیزی هشدارِ
+        //    دروغین می‌دهد.
+        if (bal[0]) {
+          const actual = Number(bal[0].current_points) - Number(bal[0].before_val);
+          if (actual !== 0) {
+            await client.query(
+              `INSERT INTO point_transactions
+                 (user_id, delta, balance_after, source, reference_type,
+                  description)
+               VALUES ($1,$2,$3,'game','game_results',$4)`,
+              [userId, actual, bal[0].current_points,
+                outcome === 'win' ? `برد در بازی ${gameId}`
+                  : outcome === 'loss' ? `باخت در بازی ${gameId}`
+                    : `بازی ${gameId}`]);
+          }
+        }
         // NO REFERRAL COMMISSION HERE — deliberately.
         //
         // The owner narrowed the rule: "این ۵ درصد فقط از امتیازهایی بدست

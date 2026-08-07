@@ -27,6 +27,12 @@
 
 const walletService = require('./walletService');
 const referrals = require('./referralService');
+// ⚠️ نامِ `pointLedger` و نه `points`: در `creditSubmission` یک متغیرِ
+//    محلی به نامِ `points` هست (مقدارِ امتیازِ کارت). هم‌نامی، متغیرِ
+//    محلی را روی ماژول سایه می‌انداخت و `points.credit is not a
+//    function` می‌داد — همان جنسِ خطای ساکتی که فقط در زمانِ اجرا و
+//    فقط در مسیرِ موفق معلوم می‌شود.
+const pointLedger = require('./pointService');
 
 /**
  * کد را به شکل متعارف در می‌آورد.
@@ -220,15 +226,23 @@ async function creditSubmission(
   );
 
   if (points > 0) {
-    await client.query(
-      `UPDATE users
-          SET current_points = current_points + $1,
-              lifetime_points = lifetime_points + $1,
-              monthly_league_points = monthly_league_points + $1,
-              updated_at = NOW()
-        WHERE id = $2`,
-      [points, userId],
-    );
+    // ── چرا از `pointLedger` و نه UPDATE مستقیم ──
+    //
+    // تا مایگریشنِ ۰۴۵، هفت مسیرِ جدا مستقیماً امتیاز را زیاد می‌کردند و
+    // هیچ‌کدام ردی نمی‌گذاشتند. وقتی کاربری می‌پرسید «این امتیاز از کجا
+    // آمد؟» هیچ پاسخی نبود.
+    //
+    // ⚠️ نامِ ماژول عمداً `pointLedger` است نه `points`: در همین تابع یک
+    //    متغیرِ محلی به نامِ `points` وجود دارد (مقدارِ امتیازِ کارت) و
+    //    هم‌نامی، خطای ساکتی می‌ساخت که فقط در زمانِ اجرا معلوم می‌شد.
+    await pointLedger.credit(client, {
+      userId,
+      points,
+      source: 'photo_card',
+      referenceType: 'photo_card_codes',
+      referenceId: codeId,
+      description: `ثبت کارت «${type.name}» با عکس`,
+    });
     // کمیسیون ۵٪ معرف — همان قاعدهٔ مسیر ثبت کد، روی همین تراکنش تا اگر
     // چیزی برگشت، امتیازی از هوا ساخته نشود.
     await referrals.payCommission(client, userId, points, 'card');

@@ -17,7 +17,7 @@ const { Server } = require('socket.io');
 const { pool } = require('./config/db');
 const { audit } = require('./services/auditService');
 const { createNotification } = require('./services/notificationService');
-const { ensureActiveSeason, addLeaguePoints, getLeaderboard, closeActiveSeason } = require('./services/leagueService');
+const { ensureActiveSeason, addLeaguePoints, getLeaderboard, closeActiveSeason, approvePayouts: leagueApprove } = require('./services/leagueService');
 const { optimizeUpload, kb } = require('./services/imageService');
 const { getGameRewardSettings, saveGameRewardSettings } = require('./services/gameRewardService');
 const walletService = require('./services/walletService');
@@ -35,6 +35,9 @@ const level = require('./services/levelService');
 // someone wear a crest, and it is defined above the club routes.
 const clubs = require('./services/clubService');
 const withdrawalService = require('./services/withdrawalService');
+// دفترِ ریزِ امتیازات — تنها نقطهٔ مجازِ تغییرِ امتیاز. توضیحِ کامل در
+// `services/pointService.js` و مایگریشنِ ۰۴۵.
+const points = require('./services/pointService');
 
 // Fail fast in production if the JWT secret was never configured — running
 // with the 'dev-secret' fallback would let anyone forge valid user/admin
@@ -754,7 +757,16 @@ app.post('/api/cards/redeem', auth, cardRedeemLimiter, asyncHandler(async (req, 
     if (card.status !== 'unused') throw Object.assign(new Error('این کد دیگر معتبر نیست'), { status: 409 });
     if (!card.is_active) throw Object.assign(new Error('نوع این کارت غیرفعال است'), { status: 400 });
     await client.query("UPDATE card_codes SET status='used', used_by_user_id=$1, used_at=NOW(), updated_at=NOW() WHERE id=$2", [req.user.id, card.id]);
-    await client.query('UPDATE users SET current_points=current_points+$1, lifetime_points=lifetime_points+$1, monthly_league_points=monthly_league_points+$1, updated_at=NOW() WHERE id=$2', [card.point_value, req.user.id]);
+    // از دفترِ امتیاز می‌گذرد تا کاربر و مدیر بتوانند بعداً بفهمند این
+    // امتیاز از کدام کارت آمده. توضیح در مایگریشنِ ۰۴۵.
+    await points.credit(client, {
+      userId: req.user.id,
+      points: card.point_value,
+      source: 'card_code',
+      referenceType: 'card_codes',
+      referenceId: card.id,
+      description: `ثبت کارت «${card.name || 'کارت'}» با کد`,
+    });
     // کمیسیون ۵٪ معرف. روی همان تراکنش، تا اگر ثبت کارت برگشت، کمیسیون
     // هم برگردد و امتیازی از هوا ساخته نشود.
     await referrals.payCommission(client, req.user.id, card.point_value, 'card');
@@ -903,13 +915,19 @@ app.post('/api/games/tap/progress', auth, tapBatchLimiter, asyncHandler(async (r
     // دو برمی‌گردند، وگرنه یک کرش وسط کار یا دوبار پول می‌دهد یا لول را
     // بالا می‌برد بدون پرداخت.
     async (client, userId, points) => {
-      await client.query(
-        `UPDATE users SET
-           current_points        = current_points + $2,
-           lifetime_points       = lifetime_points + $2,
-           monthly_league_points = monthly_league_points + $2,
-           updated_at = NOW()
-         WHERE id = $1`, [userId, points]);
+      // نامِ پارامتر اینجا `points` است و ماژولِ دفتر را سایه می‌اندازد،
+      // پس با مسیرِ کاملش صدا زده می‌شود. (تغییرِ نامِ پارامتر، امضای
+      // callback را می‌شکست.)
+      await require('./services/pointService').credit(client, {
+        userId,
+        points,
+        source: 'game',
+        referenceType: 'tap_game',
+        description: 'بازی ضربه‌زن',
+        // `league:false` چون `addLeaguePoints` پایین‌تر خودش این کار را
+        // می‌کند؛ دوباره‌شمردن یعنی رتبهٔ لیگ دو برابر بالا می‌رود.
+        league: false,
+      });
       await addLeaguePoints(client, userId, points);
       // کمیسیون ۵٪ معرف. مالک صریح گفت این کمیسیون فقط از دو منبع می‌آید:
       // ثبت کد کارت، و بازی ضربه‌زن. این نقطهٔ دوم است.
@@ -1521,13 +1539,15 @@ app.post('/api/wheel/spin', auth, wheelLimiter, asyncHandler(async (req, res) =>
     // هیچ‌کدام نیست — و اگر بود، هر چرخش رایگانِ دعوت‌شونده برای معرف هم
     // پول می‌ساخت، یعنی دقیقاً همان حلقهٔ خودتغذیه‌ای که باید بسته بماند.
     addPoints: async (client, userId, amount, source) => {
-      await client.query(
-        `UPDATE users SET
-           current_points        = current_points + $2,
-           lifetime_points       = lifetime_points + $2,
-           monthly_league_points = monthly_league_points + $2,
-           updated_at = NOW()
-         WHERE id = $1`, [userId, amount]);
+      await points.credit(client, {
+        userId,
+        points: amount,
+        source: 'wheel',
+        referenceType: 'wheel_spins',
+        description: source ? `گردونهٔ شانس — ${source}` : 'گردونهٔ شانس',
+        // `addLeaguePoints` پایین خودش امتیازِ لیگ را اضافه می‌کند.
+        league: false,
+      });
       await addLeaguePoints(client, userId, amount);
     },
   });
@@ -2582,9 +2602,23 @@ app.patch('/api/admin/reward-claims/:id', adminAuth, validateUuid('id'), require
         [claim.reward_tier_id]);
       const cost = Number(tierRows[0]?.required_points || 0);
       if (cost > 0) {
-        await client.query(
-          'UPDATE users SET current_points = current_points + $2, updated_at=NOW() WHERE id=$1',
+        // ── چرا `league:false` و چرا `lifetime` دست نمی‌خورد ──
+        //
+        // این برگشتِ امتیازِ خرج‌شده است، نه کسبِ تازه. `credit` خودش
+        // `lifetime_points` را زیاد می‌کند که اینجا **غلط** است: کاربر
+        // این امتیاز را قبلاً یک بار کسب کرده و در lifetime هست.
+        // پس مستقیم می‌نویسیم و فقط ردیفِ دفتر را از سرویس می‌گیریم.
+        const { rows: back } = await client.query(
+          `UPDATE users SET current_points = current_points + $2, updated_at=NOW()
+            WHERE id=$1 RETURNING current_points`,
           [claim.user_id, cost]);
+        await client.query(
+          `INSERT INTO point_transactions
+             (user_id, delta, balance_after, source, reference_type,
+              reference_id, description)
+           VALUES ($1,$2,$3,'reward_claim','user_reward_claims',$4,$5)`,
+          [claim.user_id, cost, back[0].current_points, claim.id,
+            'برگشت امتیاز — درخواست جایزه رد شد']);
         // Stamped so a second rejection (or a re-save) cannot refund twice.
         await client.query(
           'UPDATE user_reward_claims SET refunded_at=NOW() WHERE id=$1',
@@ -2798,7 +2832,85 @@ app.patch('/api/admin/league/current/prizes', adminAuth, requireRole(), asyncHan
   await pool.query(`INSERT INTO app_settings(key,value,updated_by_admin_id,updated_at) VALUES('league_winner_count',$1,$2,NOW()) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value, updated_by_admin_id=EXCLUDED.updated_by_admin_id, updated_at=NOW()`, [JSON.stringify(winnerCount), req.admin.id]);
   await audit(req.admin.id,'update_league_prizes','league_seasons',season.id,null,{...req.body,winnerCount}); res.json({ message: 'جدول جوایز لیگ ذخیره شد', winnerCount });
 }));
-app.post('/api/admin/league/close', adminAuth, requireRole(), asyncHandler(async (req, res) => res.json(await closeActiveSeason())));
+app.post('/api/admin/league/close', adminAuth, requireRole(), asyncHandler(async (req, res) => res.json(await closeActiveSeason({ force: req.body?.force === true }))));
+
+// ═══════════════════════════════════════════════════════════════════════════
+// تاریخِ شروع و پایانِ لیگ — به‌دستِ مدیر
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// خواستهٔ مالک: «تاریخ و پایان لیگ توسط مدیر مشخص میشه در پنل های
+// مدیریت کل پلتفرم».
+//
+// ⚠️ `manual_dates=true` حیاتی است: بدونِ آن `repairSeasonBounds` در
+//    اولین درخواستِ بعدی تاریخ‌ها را از تقویمِ شمسی بازمی‌سازد و کارِ
+//    مدیر بی‌صدا برمی‌گردد.
+app.patch('/api/admin/league/current/dates', adminAuth, requireRole(), asyncHandler(async (req, res) => {
+  const season = await ensureActiveSeason();
+  const startsAt = req.body.startsAt ? new Date(req.body.startsAt) : null;
+  const endsAt = req.body.endsAt ? new Date(req.body.endsAt) : null;
+
+  if (!startsAt || Number.isNaN(startsAt.getTime())) {
+    return res.status(400).json({ message: 'تاریخ شروع معتبر نیست' });
+  }
+  if (!endsAt || Number.isNaN(endsAt.getTime())) {
+    return res.status(400).json({ message: 'تاریخ پایان معتبر نیست' });
+  }
+  if (endsAt <= startsAt) {
+    return res.status(400).json({ message: 'تاریخ پایان باید بعد از تاریخ شروع باشد' });
+  }
+  // ── چرا سقفِ دو سال ──
+  //
+  // یک اشتباهِ تایپی در سال (۲۰۲۶ → ۲۲۰۲۶) فصلی می‌سازد که هرگز تمام
+  // نمی‌شود و هیچ‌کس جایزه نمی‌گیرد — بدونِ هیچ خطایی.
+  const maxSpan = 2 * 365 * 24 * 3600 * 1000;
+  if (endsAt - startsAt > maxSpan) {
+    return res.status(400).json({ message: 'طول فصل نمی‌تواند بیش از دو سال باشد' });
+  }
+  if (season.status === 'closed') {
+    return res.status(409).json({ message: 'این فصل بسته شده و تاریخش قابل تغییر نیست' });
+  }
+
+  const { rows } = await pool.query(
+    `UPDATE league_seasons
+        SET starts_at=$2, ends_at=$3, manual_dates=TRUE, updated_at=NOW()
+      WHERE id=$1 RETURNING *`,
+    [season.id, startsAt, endsAt]);
+  await audit(req.admin.id, 'league_dates', 'league_seasons', season.id,
+    req.body.reason || null,
+    { startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString() });
+  res.json({ message: 'تاریخ لیگ به‌روز شد', season: rows[0] });
+}));
+
+// ═══════════════════════════════════════════════════════════════════════════
+// تأییدِ واریزِ جوایزِ لیگ
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// خواستهٔ مالک: «جوایز لیگ بعد از تایید مدیریت به کیف پول ها داده میشه».
+//
+// `requireRole()` بدونِ آرگومان یعنی فقط super_admin — پشتیبانی نباید
+// بتواند پول آزاد کند.
+app.post('/api/admin/league/payouts/:id/approve', adminAuth, validateUuid('id'), requireRole(), asyncHandler(async (req, res) => {
+  const r = await leagueApprove(req.params.id, req.admin.id);
+  await audit(req.admin.id, 'league_payout_approve', 'league_payouts',
+    req.params.id, req.body.reason || null, r);
+  res.json({
+    message: r.paid ? `${r.amount.toLocaleString('fa-IR')} تومان واریز شد`
+      : 'این جایزه قبلاً واریز شده بود',
+    ...r,
+  });
+}));
+
+app.post('/api/admin/league/payouts/approve-all', adminAuth, requireRole(), asyncHandler(async (req, res) => {
+  const r = await leagueApprove(null, req.admin.id);
+  await audit(req.admin.id, 'league_payout_approve_all', 'league_payouts',
+    null, req.body.reason || null, r);
+  res.json({
+    message: r.paid
+      ? `${r.paid} جایزه به مجموع ${r.amount.toLocaleString('fa-IR')} تومان واریز شد`
+      : 'جایزهٔ تأییدنشده‌ای وجود نداشت',
+    ...r,
+  });
+}));
 app.get('/api/admin/league/payouts', adminAuth, asyncHandler(async (req, res) => res.json((await pool.query('SELECT p.*, u.mobile,u.first_name,u.last_name,u.nickname,u.bank_account FROM league_payouts p JOIN users u ON u.id=p.user_id ORDER BY p.created_at DESC')).rows)));
 app.patch('/api/admin/league/payouts/:id', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
   const status = req.body.status;
@@ -2878,29 +2990,74 @@ app.get('/api/admin/users/:id', adminAuth, validateUuid('id'), asyncHandler(asyn
   res.json({ user: safeUser(user.rows[0]), codes: codes.rows });
 }));
 app.patch('/api/admin/users/:id/status', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => { await pool.query('UPDATE users SET status=$1 WHERE id=$2', [req.body.status, req.params.id]); await audit(req.admin.id,'update_user_status','users',req.params.id,req.body.reason,{status:req.body.status}); res.json({message:'ثبت شد'}); }));
+// ═══════════════════════════════════════════════════════════════════════════
+// تنظیمِ امتیاز توسطِ مدیر — با دفتر و دلیلِ اجباری
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ── خواستهٔ مالک ──
+//
+//   «ادمین امتیاز کاربر رو در صورت نیاز بتونه کم کنه و دلیلیشو بگه به
+//    کاربر و دلیلش به کاربر بصورت نوتیفیکشن در زنگوله بره»
+//
+// ── سه چیزی که نسخهٔ قبلی نداشت ──
+//
+//   ۱. **ردی در دفتر نمی‌گذاشت.** امتیاز عوض می‌شد و هیچ‌جا نوشته
+//      نمی‌شد چه کسی، کِی و چرا. حالا `pointService` ثبتش می‌کند.
+//
+//   ۲. **دلیل اختیاری بود.** پیامِ کاربر می‌شد «امتیاز شما به مقدار
+//      -۵۰۰ تغییر کرد. » — با یک فاصلهٔ خالی به‌جای توضیح. کاربری که
+//      دلیل نداند مستقیم به پشتیبانی می‌رود. حالا برای **کسر** اجباری
+//      است.
+//
+//   ۳. **پیام گیج‌کننده بود.** «به مقدار -۵۰۰ تغییر کرد» را کاربر
+//      فارسی‌زبان باید در ذهنش ترجمه کند. حالا «۵۰۰ امتیاز کسر شد».
 app.post('/api/admin/users/:id/points', adminAuth, validateUuid('id'), requireRole(), asyncHandler(async (req, res) => {
-  const p = Number(req.body.points || 0);
-  // lifetime_points is a permanent record of everything a user has ever
-  // earned, so a deduction must not rewrite it — only additions count.
-  // Otherwise correcting a mistake with -100 would erase history the user
-  // legitimately built up, and the profile would under-report their total.
-  // در یک تراکنش، چون کمیسیون معرف هم باید همراهش برود یا اصلاً نرود.
+  const p = Math.trunc(Number(req.body.points || 0));
+  if (!Number.isFinite(p) || p === 0) {
+    return res.status(400).json({ message: 'مقدار امتیاز باید عددی غیر صفر باشد' });
+  }
+  // سقفِ سلامتِ عقل. یک اشتباهِ تایپی (۵۰۰۰۰۰۰ به‌جای ۵۰۰) نباید
+  // بی‌سروصدا کاربری را به صدرِ جدولِ لیگ ببرد.
+  if (Math.abs(p) > 1000000) {
+    return res.status(400).json({ message: 'مقدار امتیاز خارج از محدودهٔ مجاز است (حداکثر ۱٬۰۰۰٬۰۰۰)' });
+  }
+  const reason = String(req.body.reason || '').trim();
+  // ── چرا دلیل فقط برای کسر اجباری است ──
+  //
+  // اضافه کردنِ امتیاز خبرِ خوبی است و کاربر سؤالی نمی‌پرسد. کسر کردن
+  // شکایت می‌سازد، و شکایتی که پاسخِ آماده نداشته باشد به پشتیبانی
+  // می‌رسد. پس دلیل دقیقاً جایی اجباری است که لازم است.
+  if (p < 0 && reason.length < 3) {
+    return res.status(400).json({
+      message: 'برای کسر امتیاز باید دلیل بنویسید — این متن برای کاربر ارسال می‌شود',
+    });
+  }
+
+  const u = await pool.query('SELECT id, current_points FROM users WHERE id=$1', [req.params.id]);
+  if (!u.rows[0]) return res.status(404).json({ message: 'کاربر پیدا نشد' });
+
   const pointsClient = await pool.connect();
+  let outcome;
   try {
     await pointsClient.query('BEGIN');
-    await pointsClient.query(
-      `UPDATE users SET
-         current_points        = GREATEST(0, current_points + $1),
-         lifetime_points       = lifetime_points + GREATEST($1, 0),
-         monthly_league_points = GREATEST(0, monthly_league_points + $1),
-         updated_at = NOW()
-       WHERE id = $2`,
-      [p, req.params.id]);
     // بدون کمیسیون معرف — عمدی.
     //
-    // مالک دامنه را محدود کرد: کمیسیون فقط از «ثبت کارت» و «بازی ضربه‌زن».
-    // امتیاز دستی مدیر هیچ‌کدام نیست، و منطقی هم هست: یک اصلاح دستی
-    // نباید به شخص سومی پول بدهد.
+    // مالک دامنه را محدود کرد: کمیسیون فقط از «ثبت کارت» و «بازی
+    // ضربه‌زن». امتیاز دستی مدیر هیچ‌کدام نیست، و منطقی هم هست: یک
+    // اصلاح دستی نباید به شخص سومی پول بدهد.
+    //
+    // `league: false` — تنظیمِ دستی نباید رتبهٔ لیگ را تکان بدهد،
+    // وگرنه مدیر ناخواسته نتیجهٔ مسابقه را عوض می‌کند.
+    outcome = p > 0
+      ? await points.credit(pointsClient, {
+        userId: req.params.id, points: p, source: 'admin_adjust',
+        description: reason || 'تنظیم امتیاز توسط مدیریت',
+        adminId: req.admin.id, league: false,
+      })
+      : await points.debit(pointsClient, {
+        userId: req.params.id, points: -p, source: 'admin_deduct',
+        description: reason, adminId: req.admin.id, league: false,
+      });
     await pointsClient.query('COMMIT');
   } catch (e) {
     await pointsClient.query('ROLLBACK').catch(() => {});
@@ -2908,7 +3065,127 @@ app.post('/api/admin/users/:id/points', adminAuth, validateUuid('id'), requireRo
   } finally {
     pointsClient.release();
   }
-  await audit(req.admin.id,'manual_points','users',req.params.id,req.body.reason,{points:p}); await createNotification(req.params.id, 'admin_points', 'تغییر امتیاز توسط مدیریت', `امتیاز شما به مقدار ${p} تغییر کرد. ${req.body.reason||''}`); res.json({message:'امتیاز تغییر کرد'}); }));
+
+  const applied = outcome?.delta ?? 0;
+  await audit(req.admin.id, 'manual_points', 'users', req.params.id, reason,
+    { requested: p, applied });
+
+  // ── پیامِ زنگوله ──
+  //
+  // ⚠️ اگر موجودیِ کاربر کمتر از مقدارِ درخواستی بود، عددی که به او
+  //    گفته می‌شود باید **کسرِ واقعی** باشد نه درخواست. گفتن «۵۰۰
+  //    امتیاز کسر شد» به کسی که فقط ۱۰۰ داشت، دروغ است و در اولین
+  //    نگاه به موجودی لو می‌رود.
+  if (applied !== 0) {
+    const n = Math.abs(applied).toLocaleString('fa-IR');
+    await createNotification(
+      req.params.id,
+      applied < 0 ? 'points_deducted' : 'points_added',
+      applied < 0 ? 'کسر امتیاز' : 'امتیاز جدید',
+      applied < 0
+        ? `${n} امتیاز از حساب شما کسر شد.\nدلیل: ${reason}`
+        : `${n} امتیاز به حساب شما اضافه شد.${reason ? `\n${reason}` : ''}`,
+    );
+  }
+  res.json({
+    message: applied === 0
+      ? 'کاربر امتیازی برای کسر نداشت'
+      : (applied < 0
+        ? `${Math.abs(applied)} امتیاز کسر شد و به کاربر اطلاع داده شد`
+        : `${applied} امتیاز اضافه شد`),
+    requested: p,
+    applied,
+    balanceAfter: outcome?.balanceAfter ?? u.rows[0].current_points,
+  });
+}));
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ریزِ امتیازات — سه مسیرِ تازه
+// ═══════════════════════════════════════════════════════════════════════════
+
+// جست‌وجوی کاربر با شمارهٔ موبایل (یا نام/لقب).
+//
+// خواستهٔ مالک: «کاربر هارو میتونه از شماره موبایلی که ثبت کردن
+// جستجوکنه و ریز امتیازات کاملشون رو ببینه».
+app.get('/api/admin/points/search', adminAuth, asyncHandler(async (req, res) => {
+  const q = String(req.query.q || '');
+  if (q.trim().length < 3) {
+    return res.json({ users: [], message: 'حداقل ۳ نویسه وارد کنید' });
+  }
+  res.json({ users: await points.searchUsers(q, { limit: req.query.limit }) });
+}));
+
+// ریزِ کاملِ امتیازاتِ یک کاربر + خلاصهٔ منابع.
+app.get('/api/admin/points/user/:id', adminAuth, validateUuid('id'), asyncHandler(async (req, res) => {
+  const u = await pool.query(
+    `SELECT id, mobile, nickname, first_name, last_name, status,
+            current_points, lifetime_points, monthly_league_points, joined_at
+       FROM users WHERE id=$1`, [req.params.id]);
+  if (!u.rows[0]) return res.status(404).json({ message: 'کاربر پیدا نشد' });
+  const [hist, sum] = await Promise.all([
+    points.history(req.params.id, {
+      limit: req.query.limit, offset: req.query.offset, source: req.query.source,
+    }),
+    points.summary(req.params.id),
+  ]);
+  // ── اختلافِ دفتر با موجودی، صریح گزارش می‌شود ──
+  //
+  // برای کاربرانِ قبل از مایگریشنِ ۰۴۵ این اختلاف طبیعی است (backfill
+  // عمداً انجام نشد). ولی مدیر باید بداند عدد را با احتیاط بخواند،
+  // نه اینکه فکر کند دفتر کامل است.
+  const ledgerSum = sum.totals.net;
+  res.json({
+    user: u.rows[0],
+    ...hist,
+    summary: sum,
+    ledgerSum,
+    ledgerMatches: ledgerSum === Number(u.rows[0].current_points),
+  });
+}));
+
+// جدولِ «بیشترین امتیازگیرندگان» با پنجرهٔ زمانی و تفکیکِ منبع.
+//
+// خواستهٔ مالک: «کاربرایی که بیشترین امتیاز رو از کار در اپلیکیشن و وب
+// بدست آوردن قابل دیدنه».
+app.get('/api/admin/points/top', adminAuth, asyncHandler(async (req, res) => {
+  const [top, bySource, biggest] = await Promise.all([
+    points.topEarners({
+      limit: req.query.limit,
+      windowDays: req.query.days,
+      source: req.query.source,
+    }),
+    pool.query(
+      `SELECT source, count(*)::int AS n, SUM(delta)::int AS total
+         FROM point_transactions WHERE delta > 0
+         GROUP BY source ORDER BY SUM(delta) DESC`),
+    // بزرگ‌ترین دریافت‌های تک‌بارهٔ کلِ پلتفرم — برای پیدا کردنِ
+    // ناهنجاری: اگر کسی یک‌باره ۵۰ هزار امتیاز گرفته، اینجا اول
+    // فهرست است.
+    pool.query(
+      `SELECT t.delta, t.source, t.description, t.created_at,
+              u.id AS user_id, u.mobile, u.nickname
+         FROM point_transactions t JOIN users u ON u.id = t.user_id
+        WHERE t.delta > 0 ORDER BY t.delta DESC LIMIT 20`),
+  ]);
+  res.json({
+    top,
+    bySource: bySource.rows,
+    biggestSingle: biggest.rows,
+    drift: await points.drift(),
+  });
+}));
+
+// ریزِ امتیازاتِ خودِ کاربر — همان دفتر، از دیدِ کاربر.
+//
+// چرا لازم است: کاربری که می‌بیند امتیازش کم شده باید بتواند خودش
+// بفهمد چرا، بدونِ تماس با پشتیبانی. نوتیفیکیشن یک بار دیده می‌شود و
+// گم می‌شود؛ این فهرست می‌ماند.
+app.get('/api/points/history', auth, asyncHandler(async (req, res) => {
+  const h = await points.history(req.user.id, {
+    limit: req.query.limit, offset: req.query.offset,
+  });
+  res.json({ ...h, summary: await points.summary(req.user.id) });
+}));
 app.post('/api/admin/users/:id/notify', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => { await createNotification(req.params.id, 'admin_private', req.body.title || 'پیام اختصاصی مدیریت', req.body.body || req.body.message || ''); await audit(req.admin.id,'private_message_user','users',req.params.id,null,{title:req.body.title}); res.json({message:'پیام اختصاصی ارسال شد'}); }));
 // SMS OTP is not wired up yet, so the self-service "forgot password" flow
 // cannot deliver a reset code to the user. Until a real SMS provider is

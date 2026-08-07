@@ -99,6 +99,18 @@ function defaultPrizeTable() {
  * touched: rewriting settled history would be worse than a wrong label.
  */
 async function repairSeasonBounds(client, season) {
+  // ── تاریخِ دستیِ مدیر دست‌نخورده می‌ماند ──
+  //
+  // خواستهٔ مالک: «تاریخ و پایان لیگ توسط مدیر مشخص میشه در پنل های
+  // مدیریت کل پلتفرم».
+  //
+  // ⚠️ بدونِ این نگهبان، هر تاریخی که مدیر بگذارد در **اولین درخواستِ
+  //    بعدی** بازنویسی می‌شد: این تابع تاریخ‌ها را از تقویمِ شمسی
+  //    دوباره می‌سازد. یعنی قابلیت ظاهراً کار می‌کرد (پنل ذخیره
+  //    می‌کرد، پیامِ موفقیت می‌آمد) ولی چند ثانیه بعد بی‌صدا برمی‌گشت
+  //    — بدترین نوعِ باگ چون کاربر فکر می‌کند دیوانه شده.
+  if (season.manual_dates) return season;
+
   const looksGregorian = /^20\d\d-/.test(season.month_year || '');
   if (!looksGregorian || season.paid_at) return season;
 
@@ -253,29 +265,42 @@ async function closeActiveSeason({ force = false } = {}) {
       // walletService.credit is idempotent on (source, reference_id), so a
       // re-run of the close job — or a retry after a crash mid-transaction —
       // cannot pay the same rank twice.
-      if (amount > 0 && !payout.rows[0].paid_at) {
-        const res = await walletService.credit(client, {
+      // ═══════════════════════════════════════════════════════════════
+      // ⚠️ واریزِ خودکار **حذف شد** — حالا تأییدِ مدیر لازم است
+      // ═══════════════════════════════════════════════════════════════
+      //
+      // ── خواستهٔ مالک ──
+      //
+      //   «جوایز لیگ بعد از تایید مدیریت به کیف پول ها داده میشه»
+      //
+      // ── چرا این تغییر درست است ──
+      //
+      // بستنِ فصل ممکن است با تقلب، باگ، یا دادهٔ خرابِ جدولِ رتبه‌بندی
+      // همراه باشد. تا امروز پول **در همان لحظه** به کیف پول می‌رفت و
+      // چون کاربر می‌توانست فوراً درخواستِ برداشت بدهد، عملاً
+      // برگشت‌ناپذیر بود.
+      //
+      // حالا فصل بسته می‌شود، رتبه‌ها و مبالغ ثبت می‌شوند، ولی پول
+      // منتظرِ تأییدِ مدیر می‌ماند. مدیر جدول را می‌بیند، اگر چیزی
+      // مشکوک بود اصلاحش می‌کند، و بعد آزاد می‌کند.
+      //
+      // مسیرِ تأیید: POST /api/admin/league/payouts/:id/approve
+      //              POST /api/admin/league/payouts/approve-all
+      //
+      // ⚠️ `winnersToNotify` هم اینجا پر **نمی‌شود**. اعلانِ «جایزه به
+      //    کیف پولت واریز شد» باید در لحظهٔ واریزِ واقعی برود، نه در
+      //    لحظهٔ بستنِ فصل — وگرنه کاربر کیف پولش را باز می‌کند و
+      //    چیزی نمی‌بیند.
+      //
+      //    به‌جایش یک اعلانِ متفاوت می‌رود: «رتبه‌ات مشخص شد».
+      if (amount > 0) {
+        winnersToNotify.push({
           userId: entry.user_id,
+          rank: entry.rank,
           amount,
-          source: 'league',
-          referenceType: 'league_payout',
-          referenceId: payout.rows[0].id,
-          description: `جایزهٔ لیگ ${season.month_year} — رتبهٔ ${entry.rank}`,
+          monthYear: season.month_year,
+          pendingApproval: true,
         });
-        if (!res.duplicate) {
-          credited += amount;
-          creditedUsers += 1;
-          // برای اعلانِ بعد از COMMIT جمع می‌شود — توضیح پایین‌تر.
-          winnersToNotify.push({
-            userId: entry.user_id,
-            rank: entry.rank,
-            amount,
-            monthYear: season.month_year,
-          });
-        }
-        await client.query(
-          'UPDATE league_payouts SET paid_at=NOW() WHERE id=$1',
-          [payout.rows[0].id]);
       }
     }
     await client.query(
@@ -310,11 +335,21 @@ async function closeActiveSeason({ force = false } = {}) {
     // خطاها عمداً بلعیده می‌شوند: پول از قبل واریز شده و آن مهم‌تر
     // است؛ یک اعلانِ از‌دست‌رفته آزاردهنده است، نه فاجعه.
     for (const w of winnersToNotify) {
+      // ⚠️ متنِ اعلان با تغییرِ «تأییدِ مدیر» عوض شد.
+      //
+      // قبلاً می‌گفت «به کیف پول واریز شد» — که حالا **دروغ** است، چون
+      // پول منتظرِ تأییدِ مدیر می‌ماند. کاربری که این پیام را ببیند و
+      // کیف پولش خالی باشد، مستقیم به پشتیبانی می‌رود.
       createNotification(
         w.userId,
         'league',
         `🏆 رتبهٔ ${w.rank} لیگ ${w.monthYear}`,
-        `تبریک! جایزهٔ ${w.amount.toLocaleString('en-US')} تومانی شما به کیف پول واریز شد.`,
+        w.pendingApproval
+          ? `تبریک! رتبهٔ ${w.rank} را گرفتی. جایزهٔ `
+            + `${w.amount.toLocaleString('fa-IR')} تومانی پس از بررسی و `
+            + 'تأیید نهایی به کیف پولت واریز می‌شود.'
+          : `تبریک! جایزهٔ ${w.amount.toLocaleString('fa-IR')} تومانی شما `
+            + 'به کیف پول واریز شد.',
       ).catch((e) => console.error('[league] notify failed:', e.message));
     }
 
@@ -323,10 +358,110 @@ async function closeActiveSeason({ force = false } = {}) {
       winners: leaders.length,
       credited,
       creditedUsers,
+      // برای پنل: چند جایزه منتظرِ تأیید است.
+      pendingApproval: winnersToNotify.length,
     };
   } catch (e) {
     await client.query('ROLLBACK');
     throw e;
   } finally { client.release(); }
 }
-module.exports = { ensureActiveSeason, addLeaguePoints, getLeaderboard, closeActiveSeason, defaultPrizeTable };
+/**
+ * جایزهٔ لیگ را پس از تأییدِ مدیر به کیف پول واریز می‌کند.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * چرا این تابع وجود دارد
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * خواستهٔ مالک: «جوایز لیگ بعد از تایید مدیریت به کیف پول ها داده میشه».
+ *
+ * `closeActiveSeason` دیگر پول نمی‌دهد؛ فقط رتبه و مبلغ را ثبت می‌کند.
+ * پول از اینجا آزاد می‌شود.
+ *
+ * ── سه محافظ ──
+ *
+ *   ۱. **قفلِ ردیف** (`FOR UPDATE`): دو مدیر که هم‌زمان دکمه بزنند
+ *      نباید دو بار واریز کنند.
+ *   ۲. **بررسیِ `paid_at`**: حتی با قفل، اگر یکی قبلاً پرداخته باشد
+ *      دومی باید بی‌صدا رد شود نه اینکه خطا بدهد.
+ *   ۳. **بی‌اثریِ `walletService.credit`** روی
+ *      `(source, reference_id)`: لایهٔ سومِ دفاع، در خودِ دفترِ کل.
+ *
+ * سه لایه برای یک چیز زیاد به نظر می‌رسد، ولی این پولِ واقعی است و
+ * برگشتش از کیفِ کاربری که برداشت کرده عملاً ناممکن است.
+ *
+ * @param {string|null} payoutId  یک جایزه، یا null برای همهٔ تأییدنشده‌ها
+ * @param {string} adminId
+ * @returns {Promise<{paid:number, amount:number, skipped:number}>}
+ */
+async function approvePayouts(payoutId, adminId) {
+  const client = await pool.connect();
+  const notify = [];
+  let paid = 0;
+  let total = 0;
+  let skipped = 0;
+  try {
+    await client.query('BEGIN');
+    const { rows } = payoutId
+      ? await client.query(
+        `SELECT p.*, s.month_year FROM league_payouts p
+           JOIN league_seasons s ON s.id = p.league_season_id
+          WHERE p.id = $1 FOR UPDATE OF p`, [payoutId])
+      : await client.query(
+        `SELECT p.*, s.month_year FROM league_payouts p
+           JOIN league_seasons s ON s.id = p.league_season_id
+          WHERE p.paid_at IS NULL AND p.amount > 0
+          ORDER BY p.created_at FOR UPDATE OF p`);
+
+    for (const p of rows) {
+      if (p.paid_at) { skipped += 1; continue; }
+      const amount = Number(p.amount || 0);
+      if (amount <= 0) { skipped += 1; continue; }
+
+      const res = await walletService.credit(client, {
+        userId: p.user_id,
+        amount,
+        source: 'league',
+        referenceType: 'league_payout',
+        referenceId: p.id,
+        description: `جایزهٔ لیگ ${p.month_year} — رتبهٔ ${p.rank}`,
+      });
+      await client.query(
+        `UPDATE league_payouts
+            SET paid_at = NOW(), payment_status = 'paid',
+                approved_by = $2, approved_at = NOW()
+          WHERE id = $1`, [p.id, adminId]);
+      if (!res.duplicate) {
+        paid += 1;
+        total += amount;
+        notify.push({ userId: p.user_id, amount, rank: p.rank,
+          monthYear: p.month_year });
+      } else {
+        skipped += 1;
+      }
+    }
+    await client.query('COMMIT');
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+
+  // اعلان **بعد از** COMMIT: اگر تراکنش برگردد، کاربر نباید پیامِ
+  // واریزی بگیرد که رخ نداده.
+  for (const n of notify) {
+    createNotification(
+      n.userId, 'league',
+      `💰 جایزهٔ لیگ ${n.monthYear} واریز شد`,
+      `جایزهٔ رتبهٔ ${n.rank} به مبلغ ${n.amount.toLocaleString('fa-IR')} `
+      + 'تومان به کیف پول شما واریز شد.',
+    ).catch((e) => console.error('[league] payout notify failed:', e.message));
+  }
+  return { paid, amount: total, skipped };
+}
+
+module.exports = {
+  ensureActiveSeason, addLeaguePoints, getLeaderboard, closeActiveSeason,
+  defaultPrizeTable, approvePayouts,
+};

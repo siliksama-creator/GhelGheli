@@ -350,12 +350,36 @@ async function claim(userId, tierId) {
     //   * monthly_league_points decides this month's ranking. Spending a
     //     reward must not cost the user their league position, or claiming
     //     anything mid-month would be a self-inflicted penalty.
-    await client.query(
+    // ── ثبت در دفترِ امتیاز ──
+    //
+    // `pointService.debit` عمداً اینجا استفاده **نمی‌شود**: آن تابع
+    // پیش‌فرضِ منبعش `admin_deduct` است و رفتارِ `lifetime` را هم
+    // مدیریت می‌کند. اینجا خرجِ خودِ کاربر است، پس ردیف را مستقیم
+    // می‌نویسیم با منبعِ درست.
+    //
+    // مقدارِ ثبت‌شده **کسرِ واقعی** است نه هزینهٔ اسمی — اگر موجودی
+    // کمتر بود، GREATEST آن را محدود می‌کند و دفتر باید همان را
+    // بگوید، وگرنه SUM(delta) با موجودی نمی‌خواند.
+    const { rows: spent } = await client.query(
       `UPDATE users
           SET current_points = GREATEST(0, current_points - $2),
               updated_at = NOW()
-        WHERE id = $1`,
+        WHERE id = $1
+        RETURNING current_points,
+                  (SELECT current_points FROM users WHERE id=$1) AS before_val`,
       [userId, tier.required_points]);
+    if (spent[0]) {
+      const actual = Number(spent[0].before_val) - Number(spent[0].current_points);
+      if (actual > 0) {
+        await client.query(
+          `INSERT INTO point_transactions
+             (user_id, delta, balance_after, source, reference_type,
+              reference_id, description)
+           VALUES ($1,$2,$3,'reward_claim','reward_tiers',$4,$5)`,
+          [userId, -actual, spent[0].current_points, tier.id,
+            `دریافت جایزه «${tier.name || tier.title || 'جایزه'}»`]);
+      }
+    }
 
     if (groupId) {
       // History only — the bar itself now reads current_points.

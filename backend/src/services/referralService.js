@@ -29,6 +29,7 @@
 //    دوستش اشتباه است.
 const crypto = require('crypto');
 const { pool } = require('../config/db');
+const pointLedger = require('./pointService');
 
 /** درصد کمیسیون. */
 const COMMISSION_PERCENT = 5;
@@ -237,13 +238,20 @@ async function payCommission(client, userId, basePoints, source) {
     `SELECT 1 FROM users WHERE id = $1 AND status = 'active'`, [referrerId]);
   if (!active.rows[0]) return null;
 
-  await client.query(
-    `UPDATE users SET
-       current_points        = current_points + $2,
-       lifetime_points       = lifetime_points + $2,
-       monthly_league_points = monthly_league_points + $2,
-       updated_at = NOW()
-     WHERE id = $1`, [referrerId, earned]);
+  // کمیسیون هم در دفتر ثبت می‌شود: مالک باید بتواند ببیند چه کسی از
+  // معرفی چقدر گرفته — هم برای پاسخ به سؤال، هم برای کشفِ حلقه‌های
+  // تقلبیِ دعوت.
+  await pointLedger.credit(client, {
+    userId: referrerId,
+    points: earned,
+    source: 'referral',
+    referenceType: 'users',
+    referenceId: userId,
+    description: 'کمیسیون ۵٪ معرفی',
+    // `addLeaguePoints` پایین‌تر جدولِ لیگ را جدا به‌روز می‌کند، ولی
+    // `users.monthly_league_points` را همین‌جا باید زیاد کنیم چون
+    // صفحهٔ پروفایل از آن می‌خواند.
+  });
 
   // THE LEADERBOARD IS A SEPARATE TABLE, AND IT IS WHAT THE LEAGUE READS.
   //

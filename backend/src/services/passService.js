@@ -31,6 +31,7 @@
 //    یکجا قابل دریافت‌اند؛ این خودش انگیزهٔ خرید است.
 const { pool } = require('../config/db');
 const walletService = require('./walletService');
+const pointLedger = require('./pointService');
 
 // ── XP و پله‌ها ────────────────────────────────────────────────────────
 //
@@ -493,12 +494,16 @@ async function claim(userId, tierId) {
     let granted = { kind: tier.kind, amount, label: tier.label };
 
     if (tier.kind === 'points' && amount > 0) {
-      await client.query(
-        `UPDATE users SET current_points = current_points + $2,
-                          lifetime_points = lifetime_points + $2,
-                          monthly_league_points = monthly_league_points + $2,
-                          updated_at = NOW()
-          WHERE id = $1`, [userId, amount]);
+      // از دفترِ امتیاز می‌گذرد تا در «ریز امتیازات» با برچسبِ پلهٔ
+      // گذر نبرد دیده شود. توضیح در مایگریشنِ ۰۴۵.
+      await pointLedger.credit(client, {
+        userId,
+        points: amount,
+        source: 'pass_reward',
+        referenceType: 'pass_tiers',
+        referenceId: tier.id || null,
+        description: `پاداش گذر نبرد — ${tier.label || `پله ${tier.tier_index ?? ''}`}`,
+      });
     } else if (tier.kind === 'spins' && amount > 0) {
       await client.query(
         'UPDATE users SET bonus_spins = bonus_spins + $2, updated_at=NOW() WHERE id=$1',
