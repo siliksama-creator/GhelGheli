@@ -481,11 +481,78 @@ test('کمیسیون به جدول لیگ هم اضافه می‌شود', () => 
     'utf8');
   assert.ok(/addLeaguePoints\(client, referrerId, earned\)/.test(src),
     'کمیسیون باید به league_leaderboard_entries هم برود');
-  // و باید *بعد* از به‌روزرسانی users باشد، روی همان تراکنش.
-  const iUsers = src.indexOf('monthly_league_points = monthly_league_points + $2');
+
+  // ── چرا این بررسی بازنویسی شد ──
+  //
+  // نسخهٔ قبلی دنبالِ رشتهٔ خامِ
+  // `monthly_league_points = monthly_league_points + $2` می‌گشت. با
+  // انتقالِ همهٔ مسیرهای امتیاز به دفترِ `pointService` (مایگریشن ۰۴۵)
+  // آن SQL از این فایل رفت و داخلِ سرویس نشست — پس تست قرمز شد در
+  // حالی که **رفتار دقیقاً همان بود**.
+  //
+  // ⚠️ درسِ این مورد: تستی که به شکلِ ظاهریِ کد گره بخورد، با هر
+  //    بازآراییِ بی‌خطر می‌شکند و کم‌کم آدم یاد می‌گیرد نادیده‌اش
+  //    بگیرد. معیارِ درست «چه اتفاقی می‌افتد» است نه «چطور نوشته شده».
+  //
+  // دو چیزی که واقعاً اهمیت دارند:
+  //   ۱. امتیازِ ماهانهٔ کاربر زیاد شود (حالا از راهِ `credit`، که
+  //      پیش‌فرضِ `league` در آن `true` است).
+  //   ۲. جدولِ رتبه‌بندی هم جدا به‌روز شود، **بعد** از آن و روی همان
+  //      تراکنش.
+  const iCredit = src.indexOf('pointLedger.credit(client');
   const iLeague = src.indexOf('addLeaguePoints(client, referrerId, earned)');
-  assert.ok(iUsers > 0 && iLeague > iUsers,
-    'هر دو باید روی همان تراکنش و به ترتیب باشند');
+  assert.ok(iCredit > 0,
+    'کمیسیون باید از دفترِ امتیاز عبور کند تا در «ریز امتیازات» دیده شود');
+  assert.ok(iLeague > iCredit,
+    'به‌روزرسانیِ جدولِ لیگ باید بعد از ثبتِ امتیاز و روی همان تراکنش باشد');
+
+  // و مطمئن شو `league:false` پاس داده نشده — وگرنه امتیازِ ماهانهٔ
+  // کاربر بالا نمی‌رود و پروفایل با جدولِ لیگ اختلاف پیدا می‌کند.
+  const creditBlock = src.slice(iCredit, iLeague);
+  assert.ok(!/league:\s*false/.test(creditBlock),
+    'کمیسیون باید monthly_league_points را هم زیاد کند');
+});
+
+test('همهٔ مسیرهای امتیاز از دفتر عبور می‌کنند', () => {
+  // ── نگهبانِ «امتیازِ بی‌رد» ──
+  //
+  // دفترِ ریزِ امتیازات فقط وقتی معنی دارد که **هیچ** مسیری دورش نزند.
+  // اگر کسی مسیرِ تازه‌ای اضافه کند و مستقیم `UPDATE users SET
+  // current_points` بنویسد، دفتر بی‌صدا ناقص می‌شود و
+  // `SUM(delta) == current_points` می‌شکند — بدونِ هیچ خطایی.
+  const fs = require('fs');
+  const path = require('path');
+  const dir = path.join(__dirname, '../src');
+  const files = [];
+  (function walk(d) {
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (e.name.endsWith('.js')) files.push(p);
+    }
+  }(dir));
+
+  const offenders = [];
+  for (const f of files) {
+    if (f.endsWith('pointService.js')) continue;   // خودِ دفتر
+    const src = fs.readFileSync(f, 'utf8');
+    // هر UPDATE که current_points را زیاد یا کم کند.
+    const re = /current_points\s*=\s*(?:GREATEST\()?\s*(?:0\s*,\s*)?current_points\s*[+-]/g;
+    let m;
+    while ((m = re.exec(src)) !== null) {
+      // اگر در همان ناحیه ردیفِ دفتر هم نوشته می‌شود، مجاز است:
+      // چند مسیر عمداً مستقیم می‌نویسند (برگشتِ امتیاز، جریمهٔ بازی)
+      // چون `credit`/`debit` رفتارِ `lifetime` را جور دیگری مدیریت
+      // می‌کنند — ولی همه‌شان `point_transactions` را پر می‌کنند.
+      const around = src.slice(Math.max(0, m.index - 200), m.index + 1400);
+      if (!/point_transactions/.test(around)) {
+        offenders.push(`${path.basename(f)} @${m.index}`);
+      }
+    }
+  }
+  assert.deepStrictEqual(offenders, [],
+    'این مسیرها امتیاز را بدونِ ثبت در دفتر عوض می‌کنند: '
+    + offenders.join(', '));
 });
 
 console.log('\nگردونه — چرخش نامحدود (ابزار تست مالک)');
