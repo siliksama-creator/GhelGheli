@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BarChart3, Bell, Gift, MessageCircle, LifeBuoy, ScanLine, Settings, Shield, Sigma, Trophy, Users, Gamepad2, Wallet } from 'lucide-react';
+import { BarChart3, Bell, Gift, MessageCircle, LifeBuoy, ScanLine, Settings, Shield, Sigma, Trophy, Users, Gamepad2, Wallet, Activity } from 'lucide-react';
 
 import './theme.css';
 import './styles.css';
@@ -24,6 +24,7 @@ import { NotificationsPage } from './pages/notifications.jsx';
 import { GameRewardsPage } from './pages/game-rewards.jsx';
 import { SettingsPage } from './pages/settings.jsx';
 import { AdminsPage } from './pages/admins.jsx';
+import { MetricsPage } from './pages/metrics.jsx';
 
 const NAV = [
   ['dashboard', 'داشبورد', BarChart3, Dashboard],
@@ -70,6 +71,7 @@ const NAV = [
   ['notifications', 'اطلاعیه‌ها', Bell, NotificationsPage],
   ['settings', 'تنظیمات', Settings, SettingsPage],
   ['admins', 'ادمین‌ها', Shield, AdminsPage],
+  ['metrics', 'مانیتورینگ سرور', Activity, MetricsPage],
 ];
 
 function App() {

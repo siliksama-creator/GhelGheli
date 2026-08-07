@@ -1968,6 +1968,56 @@ app.get('/api/admin/dashboard', adminAuth, asyncHandler(async (req, res) => {
   res.json({ users: q[0].rows[0].count, usedCodesToday: q[1].rows[0].count, usedCodesThisMonth: q[2].rows[0].count, pendingClaims: q[3].rows[0].count, league: q[4] });
 }));
 
+app.get('/api/admin/metrics', adminAuth, asyncHandler(async (req, res) => {
+  const { execSync } = require('child_process');
+  const fs = require('fs');
+  const attachGames = require('./games/engine');
+
+  let redisMemory = '—';
+  try {
+    const raw = execSync('redis-cli info memory', { encoding: 'utf8' });
+    const match = raw.match(/used_memory_human:([^\r\n]+)/);
+    const matchRss = raw.match(/used_memory_rss_human:([^\r\n]+)/);
+    if (match) {
+      redisMemory = `${match[1]} (RSS: ${matchRss ? matchRss[1] : '—'})`;
+    }
+  } catch (e) {
+    redisMemory = 'در دسترس نیست';
+  }
+
+  let pm2Logs = '—';
+  try {
+    let logPath = '/root/.pm2/logs/ghelgheli-api-error-3.log';
+    try {
+      const jlist = JSON.parse(execSync('pm2 jlist', { encoding: 'utf8' }));
+      const app = jlist.find(x => x.name === 'ghelgheli-api');
+      if (app?.pm2_env?.pm_err_log_path) {
+        logPath = app.pm2_env.pm_err_log_path;
+      }
+    } catch (_) {}
+
+    if (fs.existsSync(logPath)) {
+      pm2Logs = execSync(`tail -n 100 ${logPath}`, { encoding: 'utf8' });
+    } else {
+      pm2Logs = 'فایل لاگ پیدا نشد';
+    }
+  } catch (e) {
+    pm2Logs = `خطا در خواندن لاگ: ${e.message}`;
+  }
+
+  res.json({
+    socketCount: io.engine.clientsCount || 0,
+    activeRooms: attachGames.rooms ? attachGames.rooms.size : 0,
+    postgresConnections: {
+      total: pool.totalCount,
+      idle: pool.idleCount,
+      waiting: pool.waitingCount
+    },
+    redisMemory,
+    pm2Logs
+  });
+}));
+
 app.post('/api/admin/uploads/image', adminAuth, requireRole('support'), imageUpload.single('image'), asyncHandler(async (req, res) => {
   // fileFilter drops anything that isn't png/jpg/webp/gif without raising,
   // so a missing req.file here means "wrong type" rather than "no file".

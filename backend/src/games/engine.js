@@ -403,7 +403,7 @@ function startRoom(io, rules, gameId, a, b) {
   return room;
 }
 
-module.exports = function attachGames(io, rulesById) {
+const attachGames = function attachGames(io, rulesById) {
   io.on('connection', socket => {
     if (!socket.user) return;
 
@@ -564,3 +564,6 @@ module.exports = function attachGames(io, rulesById) {
     });
   });
 };
+
+attachGames.rooms = rooms;
+module.exports = attachGames;
