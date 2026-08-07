@@ -120,22 +120,66 @@ export function DataRow({ title, subtitle, thumb, selected, onClick, actions, tr
   );
 }
 
-export function Table({ rows, cols }) {
+/**
+ * جدولِ داده.
+ *
+ * ═══════════════════════════════════════════════════════════════════════
+ * ⚠️ قراردادِ این کامپوننت عوض شد — و دلیلش مهم است
+ * ═══════════════════════════════════════════════════════════════════════
+ *
+ * نسخهٔ قبلی `cols` را آرایه‌ای از جفتِ `[کلید, برچسب]` می‌خواست و
+ * `rows` را آرایه‌ای از **شیء**. هیچ صفحه‌ای از آن استفاده نمی‌کرد —
+ * کدِ مرده بود، پس قراردادش هرگز آزموده نشده بود.
+ *
+ * وقتی صفحهٔ «ریز امتیازات» اولین کاربرش شد، شکلِ طبیعی‌تر (آرایهٔ
+ * رشته برای سرآیند، آرایهٔ آرایه برای ردیف‌ها) پاس داده شد. نتیجه در
+ * مرورگر: `c[1]` روی رشتهٔ «کاربر» یعنی **حرفِ دوم**، پس هر سرآیند
+ * یک نویسه شد — `'ا'`، `'و'`، `'س'`.
+ *
+ * ممیزیِ مرورگر گرفتش. هیچ خطایی پرتاب نشد و React هم شکایتی نکرد:
+ * جدول رندر می‌شد، فقط سرآیندهایش بی‌معنی بودند.
+ *
+ * حالا **هر دو شکل** پشتیبانی می‌شوند تا اگر روزی کسی شکلِ قدیمی را
+ * استفاده کند نشکند، ولی شکلِ ساده پیش‌فرض است:
+ *
+ *     cols={['نام', 'امتیاز']}          rows={[['علی', 10]]}
+ *     cols={[['name','نام']]}           rows={[{name:'علی'}]}
+ */
+export function Table({ rows = [], cols = [] }) {
+  // اگر عضوِ اول رشته باشد، شکلِ ساده است.
+  const simple = cols.length === 0 || typeof cols[0] === 'string';
+  const headers = simple ? cols : cols.map((c) => c[1]);
+
+  const cellsOf = (r, i) => {
+    if (simple) return Array.isArray(r) ? r : [r];
+    return cols.map((c) => {
+      const v = r[c[0]];
+      if (typeof v === 'boolean') return v ? 'بله' : 'خیر';
+      return v ?? '-';
+    });
+  };
+
   return (
     <div className="table-wrap">
       <table className="data-table">
         <thead>
           <tr>
-            {cols.map((c) => (
-              <th key={c[0]}>{c[1]}</th>
+            {headers.map((h, i) => (
+              // کلید از اندیس: سرآیندها ممکن است تکراری یا خالی باشند
+              // (ستونِ دکمه سرآیند ندارد) و `key={h}` آن‌وقت تکراری
+              // می‌شود و React هشدار می‌دهد.
+              // eslint-disable-next-line react/no-array-index-key
+              <th key={i}>{h}</th>
             ))}
           </tr>
         </thead>
         <tbody>
           {rows.map((r, i) => (
-            <tr key={r.id || i}>
-              {cols.map((c) => (
-                <td key={c[0]}>{typeof r[c[0]] === 'boolean' ? (r[c[0]] ? 'بله' : 'خیر') : (r[c[0]] ?? '-')}</td>
+            // eslint-disable-next-line react/no-array-index-key
+            <tr key={r?.id || i}>
+              {cellsOf(r, i).map((cell, j) => (
+                // eslint-disable-next-line react/no-array-index-key
+                <td key={j}>{cell}</td>
               ))}
             </tr>
           ))}
