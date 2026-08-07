@@ -787,6 +787,14 @@ table.data-table {
   .sidebar.open {
     transform: translateX(0);
   }
+  /* ⚠️ باگِ کشوی موبایل در RTL: قاعدهٔ بالا اختصاصیتِ (0,2,1) دارد و بر
+     `.sidebar.open` با (0,2,0) غلبه می‌کرد — یعنی در یک صفحهٔ RTL حتی با
+     کلاسِ `open`، `translateX(110%)` برنده می‌ماند و منو آف‌اسکرین بود.
+     در نتیجه ناوبریِ پنل روی گوشی باز نمی‌شد. این قاعدهٔ (0,3,1) هر دو را
+     خنثی می‌کند تا منو واقعاً به داخل بیاید. */
+  html[dir='rtl'] .sidebar.open {
+    transform: translateX(0);
+  }
   .sidebar-scrim {
     position: fixed;
     inset: 0;

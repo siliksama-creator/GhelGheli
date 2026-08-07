@@ -340,65 +340,94 @@ class _PenaltyBoardState extends State<_PenaltyBoard>
         ),
         Gaps.vSm,
         Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 430),
-            child: AspectRatio(
-              aspectRatio: 1.30,
-              child: AnimatedBuilder(
-                animation: Listenable.merge([_kick, _power]),
-                builder: (context, _) => Stack(
-                  children: [
-                    Positioned.fill(
-                      child: GestureDetector(
-                        onTapUp: (_) => _charging ? _release() : null,
-                        child: CustomPaint(
-                          painter: _PitchPainter(
-                            kick: _kick.value,
-                            animating: _kick.isAnimating,
-                            lastKick: lastKick is Map
-                                ? Map<String, dynamic>.from(lastKick)
-                                : null,
-                            hoverZone: _pickedZone,
-                            amShooter: _amShooter,
-                            power: _charging
-                                ? 0.35 + _power.value * 0.65
-                                : _lockedPower,
-                            charging: _charging,
-                            sweet: _sweet,
-                            net: _net,
-                            netEpoch: _net.peakDepth,
-                          ),
-                          child: _ZoneGrid(
-                            enabled: !_alreadyChose && !_kick.isAnimating,
-                            amShooter: _amShooter,
-                            picked: _pickedZone,
-                            onDown: _amShooter ? _startCharge : null,
-                            onTap: _amShooter ? null : _dive,
-                            onUp: _amShooter ? _release : null,
+          // ── ارتفاع‌محور (نه فقط عرض‌محور): رفعِ «برای بازی باید اسکرول کنم» ──
+          // زمینِ پنالتی (بخشِ قابل لمس) قبلاً فقط با `AspectRatio(1.30)`
+          // و `maxWidth:430` اندازه می‌گرفت. یعنی ارتفاعش تابعِ عرضِ صفحه
+          // بود: هرچه گوشی پهن‌تر، زمین بلندتر — بدونِ هیچ اتصالی به ارتفاعِ
+          // واقعیِ در دسترس. وقتی ارتفاعِ زمین + نوار بالا + تابلوی امتیاز +
+          // راهنمای پایین از ارتفاعِ صفحهٔ موبایل بیشتر می‌شد، زمین به زیرِ
+          // خطِ پیمایش می‌افتاد و کاربر مجبور بود برای ضربه زدن اسکرول کند.
+          //
+          // حالا زمین روی یک بومِ ۱.۳۰ سوار است و کلِ آن داخل یک
+          // `FittedBox(fit: contain)` با یک `maxHeight` واقعی قرار دارد.
+          // FittedBox زمین را **مقیاس می‌کند** تا هم در عرض و هم در ارتفاعِ
+          // در دسترس جا شود و نسبت ۱.۳۰ دست‌نخورده بماند. روی گوشیِ کوچک
+          // زمین جمع‌وجورتر می‌شود و کلِ صفحه (نوار بالا + زمین + تابلوی
+          // امتیاز + راهنما) در یک نگاه جا می‌شود — بدون اسکرول.
+          child: LayoutBuilder(builder: (context, c) {
+            final media = MediaQuery.sizeOf(context);
+            // کلِ قدِ صفحه، منهای آنچه بالای/پایینِ زمین مصرف می‌شود:
+            // هدر اسکافولد (~۷۲)، نوار رقابت (~۵۶)، بنر نوبت (~۴۰)،
+            // تابلوی امتیاز (~۹۶) و راهنمای پایین (~۶۴). عددِ محافظه‌کارانه
+            // برای فضای ناامنِ iOS/اندروید هم در نظر گرفته شده.
+            final chrome = media.height * 0.40;
+            final avail = (media.height - chrome).clamp(180.0, 430.0);
+            final pitchH = (c.maxWidth / 1.30).clamp(0.0, avail);
+            return ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: 430, maxHeight: avail),
+              child: FittedBox(
+                fit: BoxFit.contain,
+                child: SizedBox(
+                  width: pitchH * 1.30,
+                  height: pitchH,
+                  child: AnimatedBuilder(
+                    animation: Listenable.merge([_kick, _power]),
+                    builder: (context, _) => Stack(
+                      children: [
+                        Positioned.fill(
+                          child: GestureDetector(
+                            onTapUp: (_) => _charging ? _release() : null,
+                            child: CustomPaint(
+                              painter: _PitchPainter(
+                                kick: _kick.value,
+                                animating: _kick.isAnimating,
+                                lastKick: lastKick is Map
+                                    ? Map<String, dynamic>.from(lastKick)
+                                    : null,
+                                hoverZone: _pickedZone,
+                                amShooter: _amShooter,
+                                power: _charging
+                                    ? 0.35 + _power.value * 0.65
+                                    : _lockedPower,
+                                charging: _charging,
+                                sweet: _sweet,
+                                net: _net,
+                                netEpoch: _net.peakDepth,
+                              ),
+                              child: _ZoneGrid(
+                                enabled: !_alreadyChose && !_kick.isAnimating,
+                                amShooter: _amShooter,
+                                picked: _pickedZone,
+                                onDown: _amShooter ? _startCharge : null,
+                                onTap: _amShooter ? null : _dive,
+                                onUp: _amShooter ? _release : null,
+                              ),
+                            ),
                           ),
                         ),
-                      ),
+                        // ── پرچمِ نتیجه، وسطِ دروازه ──
+                        //
+                        // درخواست مالک: «هر نوشته‌ای که میاد باید تو دید باشه
+                        // و تو چشم باشه». متنِ ریزِ پایین صفحه دیده نمی‌شد.
+                        if (showOutcome)
+                          Positioned.fill(
+                            child: IgnorePointer(
+                              child: _OutcomeFlag(
+                                outcome: '${lastKick['outcome']}',
+                                clean: lastKick['clean'] == true,
+                                mine: lastKick['shooter'] == me,
+                                t: ((_kick.value - 0.60) / 0.40)
+                                    .clamp(0.0, 1.0),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
-                    // ── پرچمِ نتیجه، وسطِ دروازه ──
-                    //
-                    // درخواست مالک: «هر نوشته‌ای که میاد باید تو دید باشه
-                    // و تو چشم باشه». متنِ ریزِ پایین صفحه دیده نمی‌شد.
-                    if (showOutcome)
-                      Positioned.fill(
-                        child: IgnorePointer(
-                          child: _OutcomeFlag(
-                            outcome: '${lastKick['outcome']}',
-                            clean: lastKick['clean'] == true,
-                            mine: lastKick['shooter'] == me,
-                            t: ((_kick.value - 0.60) / 0.40).clamp(0.0, 1.0),
-                          ),
-                        ),
-                      ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ),
+            );
+          }),
         ),
         Gaps.vSm,
         _Prompt(

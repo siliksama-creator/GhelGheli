@@ -1968,41 +1968,71 @@ app.get('/api/admin/dashboard', adminAuth, asyncHandler(async (req, res) => {
   res.json({ users: q[0].rows[0].count, usedCodesToday: q[1].rows[0].count, usedCodesThisMonth: q[2].rows[0].count, pendingClaims: q[3].rows[0].count, league: q[4] });
 }));
 
-app.get('/api/admin/metrics', adminAuth, asyncHandler(async (req, res) => {
-  const { execSync } = require('child_process');
-  const fs = require('fs');
-  const attachGames = require('./games/engine');
+// ── حافظهٔ کشِ مانیتورینگ سرور ───────────────────────────────────────────
+// صفحهٔ «مانیتورینگ سرور» هر ۴ ثانیه این اندپوینت را صدا می‌زند. قبلاً هر
+// فراخوانی سه پروسهٔ زیرسیستمی را **هم‌زمان** (`execSync`) اجرا می‌کرد:
+// `redis-cli`، `pm2 jlist` و `tail`. در Node تک‌رشته‌ای هر `execSync` کلِ
+// حلقهٔ رویداد را می‌بندد؛ یعنی وقتی یک مدیر صفحهٔ مانیتورینگ را باز
+// می‌گذاشت، هر ۴ ثانیه حلقهٔ رویداد صدها میلی‌ثانیه قفل می‌شد و بازی‌های
+// زنده و درخواست‌های بقیهٔ کاربران تأخیر می‌گرفتند.
+//
+// دو اصلاح:
+//   1. `execSync` → `exec` (غیرهم‌زمان، پشتِ Promise) تا انسدادِ حلقهٔ
+//      رویداد از بین برود.
+//   2. نتیجه هر دو فراخوانیِ گران (redis + pm2 log) **کش** می‌شود و هر
+//      ~۱۰ ثانیه یک‌بار تازه می‌شود. داده‌های پرتابی (تعداد سوکت، اتاق،
+//      کانکشنِ پستگرس) همیشه تازه‌اند؛ فقط آن‌چه واقعاً هر ۴ ثانیه لازم
+//      نیست، کش می‌گیرد. (۱۰ ثانیه برای نوارِ مانیتورینگ بیش از اندازه
+//      کافی است.)
+const { exec } = require('child_process');
+const { promisify } = require('util');
+const execP = promisify(exec);
+let _metricsCache = null;
+let _metricsCachedAt = 0;
+const METRICS_CACHE_TTL_MS = 10_000;
 
-  let redisMemory = '—';
+async function readRedisMemory() {
   try {
-    const raw = execSync('redis-cli info memory', { encoding: 'utf8' });
-    const match = raw.match(/used_memory_human:([^\r\n]+)/);
-    const matchRss = raw.match(/used_memory_rss_human:([^\r\n]+)/);
-    if (match) {
-      redisMemory = `${match[1]} (RSS: ${matchRss ? matchRss[1] : '—'})`;
-    }
-  } catch (e) {
-    redisMemory = 'در دسترس نیست';
+    const { stdout } = await execP('redis-cli info memory', { timeout: 3000 });
+    const match = stdout.match(/used_memory_human:([^\r\n]+)/);
+    const matchRss = stdout.match(/used_memory_rss_human:([^\r\n]+)/);
+    if (match) return `${match[1]} (RSS: ${matchRss ? matchRss[1] : '—'})`;
+    return '—';
+  } catch (_) {
+    return 'در دسترس نیست';
   }
+}
 
-  let pm2Logs = '—';
+async function readPm2Logs() {
   try {
     let logPath = '/root/.pm2/logs/ghelgheli-api-error-3.log';
     try {
-      const jlist = JSON.parse(execSync('pm2 jlist', { encoding: 'utf8' }));
+      const { stdout } = await execP('pm2 jlist', { timeout: 3000 });
+      const jlist = JSON.parse(stdout);
       const app = jlist.find(x => x.name === 'ghelgheli-api');
-      if (app?.pm2_env?.pm_err_log_path) {
-        logPath = app.pm2_env.pm_err_log_path;
-      }
-    } catch (_) {}
+      if (app?.pm2_env?.pm_err_log_path) logPath = app.pm2_env.pm_err_log_path;
+    } catch (_) { /* keep default path */ }
 
-    if (fs.existsSync(logPath)) {
-      pm2Logs = execSync(`tail -n 100 ${logPath}`, { encoding: 'utf8' });
-    } else {
-      pm2Logs = 'فایل لاگ پیدا نشد';
-    }
+    if (!fs.existsSync(logPath)) return 'فایل لاگ پیدا نشد';
+    const { stdout } = await execP(`tail -n 100 ${logPath}`, { timeout: 3000 });
+    return stdout;
   } catch (e) {
-    pm2Logs = `خطا در خواندن لاگ: ${e.message}`;
+    return `خطا در خواندن لاگ: ${e.message}`;
+  }
+}
+
+app.get('/api/admin/metrics', adminAuth, asyncHandler(async (req, res) => {
+  const attachGames = require('./games/engine');
+
+  // TTL check — skip the expensive subprocess reads when recently cached.
+  let redisMemory;
+  let pm2Logs;
+  if (_metricsCache && Date.now() - _metricsCachedAt < METRICS_CACHE_TTL_MS) {
+    ({ redisMemory, pm2Logs } = _metricsCache);
+  } else {
+    [redisMemory, pm2Logs] = await Promise.all([readRedisMemory(), readPm2Logs()]);
+    _metricsCache = { redisMemory, pm2Logs };
+    _metricsCachedAt = Date.now();
   }
 
   res.json({

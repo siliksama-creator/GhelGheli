@@ -161,125 +161,156 @@ class _GamesHubPageState extends State<GamesHubPage> {
   }
 }
 
-class _GameTile extends StatelessWidget {
+class _GameTile extends StatefulWidget {
   const _GameTile({required this.entry, required this.onTap});
   final _GameEntry entry;
   final VoidCallback onTap;
 
   @override
+  State<_GameTile> createState() => _GameTileState();
+}
+
+class _GameTileState extends State<_GameTile> {
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return AppCard(
-      onTap: onTap,
-      padding: EdgeInsets.zero,
-      child: ClipRRect(
-        borderRadius: Corners.rXl,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
+    final entry = widget.entry;
+    return AnimatedScale(
+      scale: _pressed ? 0.97 : 1.0,
+      duration: Motion.fast,
+      curve: Motion.standard,
+      // AnimatedScale اینجا یک transform سبک روی همان لایه است و هزینهٔ
+      // layout ندارد؛ فقط وقتی فشار/رها رخ می‌دهد دوباره می‌کشد.
+      child: AppCard(
+        onTap: widget.onTap,
+        padding: EdgeInsets.zero,
+        child: GestureDetector(
+          // حسِ لمسیِ ۲۰۲۶: کارت در لحظهٔ فشار کمی جمع می‌شود و رها که
+          // می‌شود برمی‌گردد — بدونِ دست‌زدن به هیچ چیدمان یا امکانی.
+          onTapDown: (_) => setState(() => _pressed = true),
+          onTapUp: (_) => setState(() => _pressed = false),
+          onTapCancel: () => setState(() => _pressed = false),
+          child: ClipRRect(
+            borderRadius: Corners.rXl,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                AspectRatio(
-                  aspectRatio: 16 / 7,
-                  child: Image.asset(
-                    entry.art,
-                    fit: BoxFit.cover,
-                    // PERF: هر سه بنر بازی ۷۲۰ پیکسل عرض دارند و هر کدام
-                    // ~۱.۱ مگابایت رم موقع دیکد می‌گیرند — یعنی ۳.۳
-                    // مگابایت فقط برای صفحهٔ فهرست بازی‌ها. کارت‌ها روی
-                    // موبایل حدود ۳۴۰ پیکسل منطقی عرض دارند، پس ۷۲۰ کف
-                    // یک نمایشگر ۲x را هم پوشش می‌دهد و بالاترش هدر است.
-                    // بقیهٔ بنرهای اپ این راهنما را داشتند؛ همین یکی جا
-                    // افتاده بود.
-                    cacheWidth: 720,
-                    // Never let a missing/corrupt asset blank the whole hub.
-                    errorBuilder: (_, __, ___) => Container(
-                      color: entry.accent.withValues(alpha: 0.18),
-                      alignment: Alignment.center,
-                      child: Text(entry.emoji,
-                          style: const TextStyle(fontSize: 40)),
-                    ),
-                  ),
-                ),
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.72),
-                        ],
+                Stack(
+                  children: [
+                    AspectRatio(
+                      aspectRatio: 16 / 7,
+                      child: Image.asset(
+                        entry.art,
+                        fit: BoxFit.cover,
+                        // PERF: هر سه بنر بازی ۷۲۰ پیکسل عرض دارند و هر کدام
+                        // ~۱.۱ مگابایت رم موقع دیکد می‌گیرند — یعنی ۳.۳
+                        // مگابایت فقط برای صفحهٔ فهرست بازی‌ها. کارت‌ها روی
+                        // موبایل حدود ۳۴۰ پیکسل منطقی عرض دارند، پس ۷۲۰ کف
+                        // یک نمایشگر ۲x را هم پوشش می‌دهد و بالاترش هدر است.
+                        // بقیهٔ بنرهای اپ این راهنما را داشتند؛ همین یکی جا
+                        // افتاده بود.
+                        cacheWidth: 720,
+                        // Never let a missing/corrupt asset blank the whole hub.
+                        errorBuilder: (_, __, ___) => Container(
+                          color: entry.accent.withValues(alpha: 0.18),
+                          alignment: Alignment.center,
+                          child: Text(entry.emoji,
+                              style: const TextStyle(fontSize: 40)),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-                Positioned(
-                  right: Gaps.md,
-                  bottom: Gaps.xs,
-                  left: Gaps.md,
-                  child: Row(
-                    children: [
-                      Text(entry.emoji, style: const TextStyle(fontSize: 22)),
-                      Gaps.hXs,
-                      Expanded(
-                        child: Text(
-                          entry.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withValues(alpha: 0.72),
+                            ],
                           ),
                         ),
                       ),
+                    ),
+                    Positioned(
+                      right: Gaps.md,
+                      bottom: Gaps.xs,
+                      left: Gaps.md,
+                      child: Row(
+                        children: [
+                          Text(entry.emoji,
+                              style: const TextStyle(fontSize: 22)),
+                          Gaps.hXs,
+                          Expanded(
+                            child: Text(
+                              entry.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(Gaps.md),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(entry.subtitle,
+                                style: theme.textTheme.bodySmall),
+                            Gaps.vXs,
+                            Wrap(spacing: Gaps.xxs,
+                                runSpacing: Gaps.xxs,
+                                children: [
+                                  if (entry.singlePlayer) ...[
+                                    _Tag(label: 'تک‌نفره', color: entry.accent),
+                                    const _Tag(
+                                        label: '۵۰ لول',
+                                        color: Color(0xFFF59E0B)),
+                                    const _Tag(
+                                        label: 'ذخیرهٔ خودکار',
+                                        color: Color(0xFF34D399)),
+                                  ] else ...[
+                                    _Tag(
+                                        label: 'دو نفره آنلاین',
+                                        color: entry.accent),
+                                    if (entry.bot)
+                                      _Tag(
+                                          label: 'بازی با ربات',
+                                          color: entry.accent)
+                                    else
+                                      const _Tag(
+                                          label: 'فقط حریف واقعی',
+                                          color: Color(0xFF38BDF8)),
+                                    if (entry.solo)
+                                      const _Tag(
+                                          label: 'بازی تنها · رکوردی',
+                                          color: Color(0xFF34D399)),
+                                  ],
+                                ]),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.play_circle_fill_rounded,
+                          size: 34, color: entry.accent),
                     ],
                   ),
                 ),
               ],
             ),
-            Padding(
-              padding: const EdgeInsets.all(Gaps.md),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(entry.subtitle, style: theme.textTheme.bodySmall),
-                        Gaps.vXs,
-                        Wrap(spacing: Gaps.xxs, runSpacing: Gaps.xxs, children: [
-                          if (entry.singlePlayer) ...[
-                            _Tag(label: 'تک‌نفره', color: entry.accent),
-                            const _Tag(
-                                label: '۵۰ لول', color: Color(0xFFF59E0B)),
-                            const _Tag(
-                                label: 'ذخیرهٔ خودکار',
-                                color: Color(0xFF34D399)),
-                          ] else ...[
-                            _Tag(label: 'دو نفره آنلاین', color: entry.accent),
-                            if (entry.bot)
-                              _Tag(label: 'بازی با ربات', color: entry.accent)
-                            else
-                              const _Tag(
-                                  label: 'فقط حریف واقعی',
-                                  color: Color(0xFF38BDF8)),
-                            if (entry.solo)
-                              const _Tag(
-                                  label: 'بازی تنها · رکوردی',
-                                  color: Color(0xFF34D399)),
-                          ],
-                        ]),
-                      ],
-                    ),
-                  ),
-                  Icon(Icons.play_circle_fill_rounded,
-                      size: 34, color: entry.accent),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

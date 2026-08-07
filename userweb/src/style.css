@@ -92,16 +92,6 @@ button:hover {
 .ttt-cell:disabled { cursor: default; }
 .ttt-cell:hover:not(:disabled) { background: var(--surface); }
 
-/* چهار در یک ردیف */
-.c4-board { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; background: linear-gradient(135deg,#1D4ED8,#1E3A8A); padding: 8px; border-radius: 14px; max-width: 380px; margin: 18px auto; }
-.c4-col { display: flex; flex-direction: column; gap: 4px; background: transparent; border: none; padding: 0; cursor: pointer; }
-.c4-col:disabled { cursor: default; }
-.c4-col:hover:not(:disabled) { background: rgba(255,255,255,.10); border-radius: 8px; }
-.c4-disc { aspect-ratio: 1; border-radius: 50%; background: rgba(15,23,42,.6); display: block; }
-.c4-disc.red { background: #EF4444; box-shadow: 0 0 8px rgba(239,68,68,.6); }
-.c4-disc.yellow { background: #FACC15; box-shadow: 0 0 8px rgba(250,204,21,.6); }
-.c4-disc.win { outline: 2px solid #fff; }
-
 /* اتللو */
 .rv-board { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; background: #14532D; padding: 6px; border-radius: 12px; max-width: 360px; margin: 18px auto; }
 .rv-cell { aspect-ratio: 1; background: rgba(22,163,74,.85); border: none; border-radius: 3px; cursor: pointer; padding: 2px; display: flex; align-items: center; justify-content: center; }

@@ -47,6 +47,28 @@ class _TapGameScreenState extends State<TapGameScreen>
   int _seenEventSerial = 0;
 
   // ═══════════════════════════════════════════════════════════════════════
+  // گلوگاهِ «بعد ۶۰ ثانیه کل گوشی کند می‌شود»
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // موتور روی **هر** ضربهٔ پذیرفته‌شده notify می‌دهد و این متد روی هر
+  // notify، صدا + هپتیک را پخش می‌کند. با سقف ۱۲ ضربه بر ثانیه و یک
+  // دقیقهٔ ضربه زدن یعنی ~۷۲۰ بار فراخوانیِ صوتی/ارتعاشیِ پشت‌سرهم در
+  // بازه‌ای کوتاه. `audioplayers` در حالت low-latency برای هر پخشِ سریع
+  // یک session صوتی نیتیو باز نگه می‌دارد؛ صدها مورد از این‌ها در یک
+  // دقیقه، زیرسیستمِ صدا/ارتعاشِ گوشی را اشباع می‌کند و این فشار روی
+  // کلِ اپ می‌ماند — همان «بعد از مدتی گوشی کند می‌شود» که گزارش شده.
+  //
+  // راهِ اصولی: **محدودکردنِ نرخِ بازخورد**، نه حذفش. بازخورد باید در
+  // ضرباتِ کم‌تراکم یکی‌به‌یکی حس شود ولی وقتی کاربر دارد با ۱۲ ضربه بر
+  // ثانیه می‌زند، پخشِ صدای مجزا برای هر ضربه اصلاً قابل تشخیص نیست
+  // (آستانهٔ شنیداری انسان ~۵-۶ صدای مجزا در ثانیه است). سقفِ ~۷۰ms
+  // یعنی حداکثر ~۱۴ رویدادِ صوتی/ارتعاشی در ثانیه — تقریباً ۸۰٪ کاهشِ
+  // بارِ نیتیو در بدترین حالت، بدونِ هیچ تغییری در احساسِ بازی برای
+  // کاربرِ عادی. حسِ «لمسی» می‌ماند، فشارِ زیرساختی از بین می‌رود.
+  final Stopwatch _feedbackClock = Stopwatch()..start();
+  static const Duration _tapFeedbackMinGap = Duration(milliseconds: 70);
+
+  // ═══════════════════════════════════════════════════════════════════════
   // چرا شمارنده‌ها ValueNotifier شدند و نه setState
   // ═══════════════════════════════════════════════════════════════════════
   //
@@ -103,6 +125,7 @@ class _TapGameScreenState extends State<TapGameScreen>
     // Must be cancelled: a pending rebuild firing after dispose would call
     // setState on a defunct State.
     _rebuildTimer?.cancel();
+    _feedbackClock.stop();
     _uiTick.dispose();
     WidgetsBinding.instance.removeObserver(this);
     _engine.removeListener(_onEngineChanged);
@@ -135,8 +158,18 @@ class _TapGameScreenState extends State<TapGameScreen>
       _seenEventSerial = _engine.eventSerial;
       switch (_engine.lastEvent) {
         case TapEvent.tap:
-          GameAudio.instance.play(Sfx.tap, volume: 0.55);
-          HapticFeedback.selectionClick();
+          // Throttled: at the 12/s ceiling a 70ms gap means a sound/haptic at
+          // most every other tap — indistinguishable to the player, but ~half
+          // the native audio/vibrate calls a full minute of hammering used to
+          // make. Level-ups/skins/game-complete are NOT throttled: they are
+          // rare, deliberate celebrations and must always fire.
+          if (_feedbackClock.elapsed > _tapFeedbackMinGap) {
+            _feedbackClock
+              ..reset()
+              ..start();
+            GameAudio.instance.play(Sfx.tap, volume: 0.55);
+            HapticFeedback.selectionClick();
+          }
           break;
         case TapEvent.levelUp:
           GameAudio.instance.play(Sfx.matchFound);
