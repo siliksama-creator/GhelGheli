@@ -127,12 +127,18 @@ class _Board extends StatelessWidget {
                       child: v == null
                           ? (hint
                               ? Container(
-                                  width: 9,
-                                  height: 9,
+                                  width: 13,
+                                  height: 13,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color:
-                                        Colors.white.withValues(alpha: 0.55),
+                                    color: _accent.withValues(alpha: 0.25),
+                                    border: Border.all(color: _accent.withValues(alpha: 0.85), width: 1.8),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: _accent.withValues(alpha: 0.3),
+                                        blurRadius: 4,
+                                      ),
+                                    ],
                                   ),
                                 )
                               : const SizedBox.shrink())
@@ -140,18 +146,25 @@ class _Board extends StatelessWidget {
                               duration: Motion.fast,
                               scale: 1,
                               child: Container(
-                                margin: const EdgeInsets.all(2),
+                                margin: const EdgeInsets.all(2.5),
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: v == 'X'
-                                      ? const Color(0xFF111827)
-                                      : Colors.white,
+                                  gradient: v == 'X'
+                                      ? const LinearGradient(
+                                          colors: [Color(0xFF4B5563), Color(0xFF111827)],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        )
+                                      : const LinearGradient(
+                                          colors: [Colors.white, Color(0xFFE5E7EB)],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black
-                                          .withValues(alpha: 0.35),
-                                      blurRadius: 3,
-                                      offset: const Offset(0, 1),
+                                      color: Colors.black.withValues(alpha: 0.4),
+                                      blurRadius: 5,
+                                      offset: const Offset(0, 2),
                                     ),
                                   ],
                                 ),
