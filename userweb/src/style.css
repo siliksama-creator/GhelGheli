@@ -2477,19 +2477,39 @@ a:focus-visible {
 
 .pWrap { position: relative; display: flex; flex-direction: column; gap: 14px; }
 
-/* ── ریلِ پیشرفتِ اسکرول ── */
+/* ── ریلِ پیشرفتِ اسکرول ──
+ *
+ * ⚠️ باگی که ممیزیِ پیکسلی گرفت: نشانگر از لبهٔ صفحه بیرون می‌زد
+ *    (R419 در ویوپورتِ ۴۱۲) و روی بنر می‌افتاد.
+ *
+ *    علت ترکیبِ دو چیز بود:
+ *      • در RTL، `inset-inline-start` یعنی **راست**. ریل ۶ پیکسل از
+ *        راست فاصله داشت، یعنی درست روی محتوا.
+ *      • `transform: translate(50%)` نشانگرِ ۳۰ پیکسلی را نصفش را
+ *        بیرون از ریل می‌برد.
+ *
+ *    حالا ریل صریحاً به **چپ** چسبیده (`left` نه `inset-inline-start`)
+ *    چون در صفحهٔ راست‌به‌چپ، سمتِ چپ فضای خالیِ کنارِ محتواست، و
+ *    نشانگر داخلِ ریل مرکز می‌شود نه بیرونش. */
 .pRail {
-  position: fixed; inset-inline-start: 6px; top: 22vh; bottom: 22vh;
+  position: fixed; left: 4px; top: 22vh; bottom: 22vh;
   width: 5px; border-radius: 99px; background: #ffffff14; z-index: 6;
+  pointer-events: none;
 }
 .pRailThumb {
-  position: absolute; inset-inline-start: 50%; transform: translate(50%, -50%);
+  position: absolute; left: 50%; transform: translate(-50%, -50%);
   min-width: 30px; height: 30px; padding: 0 7px;
   display: grid; place-items: center;
   border-radius: 99px; font-size: 13px; font-weight: 900;
   color: #07240f; background: linear-gradient(135deg, #d7f97a, #57d9a3);
   box-shadow: 0 4px 14px #00000070, 0 0 0 3px #0b1a2c;
   transition: top .12s linear;
+}
+/* روی صفحهٔ باریک، فضای کناری نیست: ریل پنهان می‌شود چون نوارِ
+   پیشرفتِ خودِ کارت همان اطلاعات را می‌دهد. بهتر از نشانگری است که
+   روی متن بیفتد. */
+@media (max-width: 420px) {
+  .pRail { display: none; }
 }
 
 /* ── بنرِ فصل ── */
@@ -2574,7 +2594,17 @@ a:focus-visible {
 .pUpsellStar { font-size: 30px; flex: none; }
 .pUpsell > div { flex: 1; min-width: 0; }
 .pUpsell b { display: block; color: #ffd36b; font-size: 16px; font-weight: 900; }
-.pUpsell span { font-size: 13.5px; color: #dbeafe; line-height: 1.7; }
+/* ۱۳.۵ → ۱۳px و line-height کمتر: در عرضِ ۴۱۲ پیکسل، متن سه‌خطی
+   می‌شد و «دو برابر» تنها روی خطِ سوم می‌افتاد — که شبیهِ خرابیِ
+   چیدمان به نظر می‌رسید نه جمله. */
+.pUpsell span { font-size: 13px; color: #dbeafe; line-height: 1.65; }
+/* دکمه نباید زیرِ فشارِ متن له شود. */
+.pUpsell > .btn { flex: none; white-space: nowrap; }
+@media (max-width: 400px) {
+  /* روی باریک‌ترین گوشی، ستونی — سه عنصر در یک ردیف جا نمی‌شوند. */
+  .pUpsell { flex-wrap: wrap; }
+  .pUpsell > .btn { width: 100%; }
+}
 
 /* ── راهنمای مسیرها ── */
 .pLegend { display: flex; align-items: center; gap: 9px; padding: 2px; }
