@@ -1358,3 +1358,165 @@ table.data-table {
 /* روی موبایل ستونی می‌شود تا انتخابگر و دکمه له نشوند. */
 .assignRow { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .assignRow > select { flex: 1 1 220px; min-width: 0; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   ریز امتیازات
+   ══════════════════════════════════════════════════════════════════════
+
+   خواستهٔ مالک: «رو این بخش خیلی کار بشه که بدون نقص باشه».
+
+   دو ستون: جست‌وجو سمتِ راست می‌ماند، جزئیات سمتِ چپ عوض می‌شود. اگر
+   دو صفحهٔ جدا بودند، هر بار برگشتن یعنی از دست دادنِ نتیجهٔ جست‌وجو. */
+.tabRow { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+
+.ptGrid {
+  display: grid;
+  /* ستونِ جست‌وجو ثابت می‌ماند و جزئیات بقیهٔ فضا را می‌گیرد؛ جدولِ
+     تراکنش‌ها به عرضِ بیشتری نیاز دارد. */
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: var(--gg-space-4, 16px);
+  align-items: start;
+}
+@media (max-width: 1000px) {
+  /* روی صفحهٔ باریک، ستونی. `minmax(0,1fr)` بالا لازم است وگرنه جدول
+     گرید را پهن می‌کند و کلِ صفحه اسکرولِ افقی می‌گیرد — همان باگی که
+     در وب‌اپ روی ۳۲۰ پیکسل پیدا شد. */
+  .ptGrid { grid-template-columns: 1fr; }
+}
+
+.ptSearchRow { display: flex; gap: 8px; align-items: center; }
+.ptSearchRow > input { flex: 1; min-width: 0; }
+
+.ptList { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+.ptUser {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 10px; width: 100%; text-align: start;
+  padding: 10px 12px; border-radius: var(--gg-radius-md, 12px);
+  border: 1px solid var(--gg-border-soft, #ffffff18);
+  background: var(--gg-surface-high, #ffffff0a);
+  color: inherit; cursor: pointer; font-family: inherit;
+  transition: background .15s, border-color .15s;
+}
+.ptUser:hover { background: var(--gg-surface-highest, #ffffff14); }
+.ptUser.on {
+  border-color: var(--gg-primary, #00d49a);
+  background: color-mix(in srgb, var(--gg-primary, #00d49a) 12%, transparent);
+}
+.ptUserMain { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ptUserMain > b { font-size: 13.5px; }
+/* شمارهٔ موبایل لاتین است و در متنِ راست‌به‌چپ جابه‌جا دیده می‌شود. */
+.ptMobile {
+  font-size: 12px; color: var(--gg-text-muted, #9fb3c8);
+  direction: ltr; unicode-bidi: isolate; font-family: ui-monospace, monospace;
+}
+.ptUserSide {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 1px;
+  flex: none;
+}
+.ptUserSide > b { font-size: 14px; color: var(--gg-primary, #00d49a); }
+.ptUserSide > span { font-size: 10.5px; color: var(--gg-text-faint, #7d8ea0); }
+
+/* ── آمارِ بالای صفحهٔ کاربر ── */
+.ptStats {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px; margin-bottom: 12px;
+}
+.ptStat {
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 10px 12px; border-radius: var(--gg-radius-md, 12px);
+  background: var(--gg-surface-high, #ffffff0a);
+  border: 1px solid var(--gg-border-soft, #ffffff18);
+}
+.ptStat > span { font-size: 11.5px; color: var(--gg-text-muted, #9fb3c8); }
+.ptStat > b { font-size: 17px; }
+
+/* ── هشدارِ ناسازگاریِ دفتر ── */
+.ptWarn {
+  display: flex; gap: 8px; align-items: flex-start;
+  padding: 10px 12px; margin-bottom: 12px;
+  border-radius: var(--gg-radius-md, 12px);
+  background: color-mix(in srgb, var(--gg-warning, #ffcf6b) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--gg-warning, #ffcf6b) 40%, transparent);
+  color: var(--gg-warning, #ffcf6b);
+}
+.ptWarn > svg { flex: none; margin-top: 2px; }
+.ptWarn div { display: flex; flex-direction: column; gap: 2px; }
+.ptWarn span { color: var(--gg-text-muted, #9fb3c8); font-size: 12.5px; }
+
+/* ── بیشترین دریافت‌های یک‌باره ── */
+.ptBig {
+  margin-bottom: 12px; padding: 10px 12px;
+  border-radius: var(--gg-radius-md, 12px);
+  background: var(--gg-surface-high, #ffffff0a);
+  border: 1px solid var(--gg-border-soft, #ffffff18);
+}
+.ptBigTitle {
+  display: block; font-size: 12px; font-weight: 800;
+  color: var(--gg-text-muted, #9fb3c8); margin-bottom: 6px;
+}
+.ptBigRow {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  gap: 8px; align-items: baseline; padding: 4px 0;
+  border-top: 1px solid var(--gg-border-soft, #ffffff12);
+  font-size: 12.5px;
+}
+.ptBigRow:first-of-type { border-top: 0; }
+.ptBigRow > b { color: var(--gg-success, #57d9a3); }
+.ptBigRow > small { color: var(--gg-text-faint, #7d8ea0); min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ptBigRow > time { color: var(--gg-text-faint, #7d8ea0); font-size: 11px; }
+
+/* ── تفکیکِ منبع ── */
+.ptSrc { display: flex; flex-wrap: wrap; gap: 8px; }
+.ptSrcChip {
+  display: flex; flex-direction: column; gap: 1px;
+  padding: 8px 12px; border-radius: var(--gg-radius-md, 12px);
+  background: var(--gg-surface-high, #ffffff0a);
+  border: 1px solid var(--gg-border-soft, #ffffff18);
+}
+.ptSrcChip > b { font-size: 12px; }
+.ptSrcChip > span { font-size: 15px; font-weight: 900; }
+.ptSrcChip > small { font-size: 10.5px; color: var(--gg-text-faint, #7d8ea0); }
+
+.pos { color: var(--gg-success, #57d9a3); }
+.neg { color: var(--gg-danger, #ff5f7a); }
+
+/* ── فرمِ تغییرِ امتیاز ── */
+.ptForm {
+  display: grid; grid-template-columns: minmax(0, 200px) minmax(0, 1fr);
+  gap: 10px; margin-bottom: 10px;
+}
+@media (max-width: 620px) { .ptForm { grid-template-columns: 1fr; } }
+.ptFormMsg {
+  padding: 8px 11px; border-radius: var(--gg-radius-sm, 8px);
+  font-size: 12.5px; margin-bottom: 10px;
+}
+/* خطای مسدودکننده قرمز، اخطارِ صرف کهربایی — کاربر باید در یک نگاه
+   بفهمد کدام جلوی ارسال را می‌گیرد. */
+.ptFormMsg.err {
+  background: color-mix(in srgb, var(--gg-danger, #ff5f7a) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--gg-danger, #ff5f7a) 40%, transparent);
+  color: var(--gg-danger, #ff5f7a);
+}
+.ptFormMsg.warn {
+  background: color-mix(in srgb, var(--gg-warning, #ffcf6b) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--gg-warning, #ffcf6b) 35%, transparent);
+  color: var(--gg-warning, #ffcf6b);
+}
+
+.ptPager {
+  display: flex; align-items: center; justify-content: center;
+  gap: 12px; margin-top: 10px; font-size: 12.5px;
+  color: var(--gg-text-muted, #9fb3c8);
+}
+
+/* ── تاریخ‌های لیگ ── */
+.lgDates {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+.lgHint {
+  margin: 8px 0 12px; font-size: 12.5px; line-height: 1.9;
+  color: var(--gg-text-muted, #9fb3c8);
+}

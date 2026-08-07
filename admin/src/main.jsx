@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BarChart3, Bell, Gift, MessageCircle, LifeBuoy, ScanLine, Settings, Shield, Trophy, Users, Gamepad2, Wallet } from 'lucide-react';
+import { BarChart3, Bell, Gift, MessageCircle, LifeBuoy, ScanLine, Settings, Shield, Sigma, Trophy, Users, Gamepad2, Wallet } from 'lucide-react';
 
 import './theme.css';
 import './styles.css';
@@ -13,6 +13,7 @@ import { AppShell } from './components/app-shell.jsx';
 import { LoginScreen } from './pages/login.jsx';
 import { Dashboard } from './pages/dashboard.jsx';
 import { PhotoCardsPage } from './pages/photo-cards.jsx';
+import { PointsPage } from './pages/points.jsx';
 import { RewardsPage } from './pages/rewards.jsx';
 import { LeaguePage } from './pages/league.jsx';
 import { WalletPage } from './pages/wallet.jsx';
@@ -60,6 +61,9 @@ const NAV = [
   ['wallet', 'کیف پول', Wallet, WalletPage],
   ['league', 'لیگ ماهانه', Trophy, LeaguePage],
   ['users', 'کاربران', Users, UsersPage],
+  // «ریز امتیازات» کنارِ «کاربران» می‌نشیند: هر دو دربارهٔ یک نفرند و
+  // مدیر معمولاً از یکی به دیگری می‌رود.
+  ['points', 'ریز امتیازات', Sigma, PointsPage],
   ['chat', 'چت', MessageCircle, ChatModerationPage],
   ['game-rewards', 'امتیاز بازی', Gamepad2, GameRewardsPage],
   ['support', 'پشتیبانی', LifeBuoy, SupportPage],
