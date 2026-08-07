@@ -1046,18 +1046,26 @@ button:hover {
 /* THE BLACK BOX FIX: these two rules had no background at all. */
 .cannedPopover{
   position:absolute;bottom:calc(100% + 10px);inset-inline:0;
-  display:flex;flex-direction:column;gap:6px;
-  max-height:min(300px,44vh);overflow-y:auto;
-  background:#0c2138;border:1px solid #ffffff22;border-radius:18px;
-  padding:10px;box-shadow:0 18px 60px #000b;z-index:40;
+  display:flex;flex-flow:row wrap;gap:6px;
+  max-height:min(260px,40vh);overflow-y:auto;
+  background:rgba(12, 33, 56, 0.95);border:1px solid rgba(255, 255, 255, 0.16);border-radius:20px;
+  padding:12px;box-shadow:0 18px 60px rgba(0,0,0,0.6);z-index:40;
+  backdrop-filter:blur(15px);
+  -webkit-backdrop-filter:blur(15px);
 }
 .cannedPopover button{
-  background:#ffffff12;color:#eef8ff;border:1px solid #ffffff14;
-  padding:10px 12px;border-radius:12px;cursor:pointer;
-  text-align:start;font-family:inherit;font-size:13px;font-weight:600;
-  transition:background .18s;
+  background:rgba(255,255,255,0.06);color:#eef8ff;border:1px solid rgba(255,255,255,0.08);
+  padding:6px 12px;border-radius:20px;cursor:pointer;
+  text-align:center;font-family:inherit;font-size:12.5px;font-weight:700;
+  transition:all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display:inline-flex;align-items:center;
+  white-space:nowrap;
 }
-.cannedPopover button:hover{background:#ffffff22;transform:none}
+.cannedPopover button:hover{
+  background:rgba(181, 239, 88, 0.2);
+  border-color:#b5ef58;
+  transform:scale(1.03) !important;
+}
 
 .pinnedBanner{
   display:flex;gap:10px;align-items:flex-start;

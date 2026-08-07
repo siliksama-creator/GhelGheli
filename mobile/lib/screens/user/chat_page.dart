@@ -230,30 +230,37 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
       isScrollControlled: true,
       builder: (_) => SafeArea(
         child: FractionallySizedBox(
-          heightFactor: 0.6,
+          heightFactor: 0.5,
           child: Padding(
             padding: const EdgeInsets.all(Gaps.lg),
-            child: ListView.separated(
-              itemCount: _cannedMessages.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (_, i) {
-                final msg = _cannedMessages[i];
-                return InkWell(
-                  onTap: () => Navigator.pop(context, msg),
-                  borderRadius: Corners.rMd,
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: textColor.withValues(alpha: 0.2)),
-                      borderRadius: Corners.rMd,
+            child: SingleChildScrollView(
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final msg in _cannedMessages)
+                    InkWell(
+                      onTap: () => Navigator.pop(context, msg),
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: textColor.withValues(alpha: 0.25)),
+                          borderRadius: BorderRadius.circular(20),
+                          color: textColor.withValues(alpha: 0.05),
+                        ),
+                        child: Text(
+                          msg,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: textColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
                     ),
-                    child: Text(
-                      msg,
-                      style: TextStyle(fontSize: 16, color: textColor, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                );
-              },
+                ],
+              ),
             ),
           ),
         ),
