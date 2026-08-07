@@ -65,49 +65,88 @@ class _AdminUsersState extends State<AdminUsers> {
 
   Future<void> _adjustPoints(String id) async {
     final controller = TextEditingController();
-    final value = await showDialog<String>(
+    final reasonController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    final value = await showDialog<Map<String, String>>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('امتیاز دستی'),
-        content: TextField(
-          controller: controller,
-          keyboardType: const TextInputType.numberWithOptions(signed: true),
-          decoration: const InputDecoration(
-              labelText: 'مثبت یا منفی',
-              prefixIcon: Icon(Icons.exposure_rounded)),
-          autofocus: true,
+        title: const Text('تغییر امتیاز کاربر'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: controller,
+                keyboardType: const TextInputType.numberWithOptions(signed: true),
+                decoration: const InputDecoration(
+                    labelText: 'مقدار امتیاز (منفی برای کسر)',
+                    prefixIcon: Icon(Icons.exposure_rounded)),
+                autofocus: true,
+                validator: (v) {
+                  final n = int.tryParse(v ?? '');
+                  if (n == null || n == 0) return 'مقدار نامعتبر است';
+                  if (n.abs() > 1000000) return 'حداکثر ۱٬۰۰۰٬۰۰۰ امتیاز';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: reasonController,
+                decoration: const InputDecoration(
+                    labelText: 'دلیل تغییر (برای کسر اجباری است)',
+                    prefixIcon: Icon(Icons.comment_rounded)),
+                validator: (v) {
+                  final n = int.tryParse(controller.text);
+                  if (n != null && n < 0 && (v == null || v.trim().length < 3)) {
+                    return 'برای کسر امتیاز باید دلیل (حداقل ۳ حرف) بنویسید';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(dialogContext),
               child: const Text('لغو')),
           FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, controller.text),
+              onPressed: () {
+                if (formKey.currentState?.validate() == true) {
+                  Navigator.pop(dialogContext, {
+                    'points': controller.text,
+                    'reason': reasonController.text,
+                  });
+                }
+              },
               child: const Text('ثبت')),
         ],
       ),
     );
-    // Dialog-scoped controller: never disposed before, so every points
-    // adjustment leaked one. try/finally also covers the error path.
+
     try {
       if (value == null) return;
-      final delta = int.tryParse(value.trim());
+      final delta = int.tryParse(value['points']!.trim());
+      final reasonText = value['reason']!.trim();
       if (delta == null || delta == 0) {
         _snack('عدد وارد‌شده معتبر نیست');
         return;
       }
       try {
-        await widget.api.post('/api/admin/users/$id/points',
-            {'points': delta, 'reason': 'تغییر از اپ مدیریت'});
+        await widget.api.post('/api/admin/users/$id/points', {
+          'points': delta,
+          'reason': reasonText.isNotEmpty ? reasonText : 'تغییر امتیاز از اپ مدیریت',
+        });
         await _load();
         _snack('امتیاز ثبت شد');
       } catch (e) {
-        // A failed adjustment used to vanish silently, leaving the admin
-        // convinced the points had been applied.
         _snack(apiError(e));
       }
     } finally {
       controller.dispose();
+      reasonController.dispose();
     }
   }
 

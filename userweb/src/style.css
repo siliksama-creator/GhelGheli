@@ -2617,31 +2617,62 @@ a:focus-visible {
 .pLegend .muted { margin-inline-start: auto; font-size: 13px; color: #b8cce4; }
 
 /* ── پله‌ها ── */
-.pTiers { display: flex; flex-direction: column; gap: 9px; }
+.pTiers { display: flex; flex-direction: column; gap: 10px; }
 .pRow {
-  display: grid; grid-template-columns: 58px 1fr 1fr; gap: 9px;
-  padding: 9px; border-radius: 18px;
-  background: #ffffff07; border: 1px solid #ffffff12;
-  transition: background .2s, border-color .2s;
+  display: grid; grid-template-columns: 58px 1fr 1fr; gap: 10px;
+  padding: 10px; border-radius: 20px;
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 }
-.pRow.is-unlocked { background: #ffffff10; border-color: #ffffff1f; }
+.pRow.is-unlocked {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.15);
+}
 
-/* پلهٔ فعلی باید در یک نگاه پیدا شود — مهم‌ترین ردیفِ صفحه. */
+/* پلهٔ فعلی باید در یک نگاه پیدا شود — مهم‌ترین ردیفِ صفحه. طراحی فوق‌العاده چشم‌نواز و درخشان */
 .pRow.is-current {
-  background: linear-gradient(135deg, #b5ef581f, #57d9a314);
-  border-color: #b5ef58; box-shadow: 0 0 0 1px #b5ef5855, 0 8px 26px #b5ef5820;
+  background: linear-gradient(135deg, rgba(181, 239, 88, 0.16), rgba(87, 217, 163, 0.1));
+  border-color: #b5ef58;
+  box-shadow: 0 0 15px rgba(181, 239, 88, 0.25), 0 8px 32px rgba(181, 239, 88, 0.12);
+  transform: scale(1.01) translateY(-2px);
+  position: relative;
+}
+
+.pRow.is-current::before {
+  content: '';
+  position: absolute;
+  top: 15px;
+  bottom: 15px;
+  inset-inline-start: -2px;
+  width: 4px;
+  background: #b5ef58;
+  border-radius: 99px;
+  box-shadow: 0 0 10px #b5ef58;
 }
 
 /* ── نشانهٔ مایلستون هر ۵ پله ──
    ۵۰ ردیفِ یکسان هیچ نقطهٔ اتکایی برای چشم نداشت. حالا هر پنجمین
    ردیف یک برچسبِ شمارهٔ درشت دارد که موقعِ اسکرول به‌عنوان علامتِ راه
-   کار می‌کند. */
-.pRow.is-milestone { border-color: #ffd36b40; }
-.pRow.is-milestone .pNum {
-  background: linear-gradient(140deg, #ffd36b2e, #ffffff08);
-  border: 1px solid #ffd36b55;
+   کار می‌کند. طراحی متالیک طلایی مایلستون برای جلوه ممتاز. */
+.pRow.is-milestone {
+  border-color: rgba(255, 211, 107, 0.35);
+  background: rgba(255, 211, 107, 0.03);
+  box-shadow: inset 0 0 12px rgba(255, 211, 107, 0.05), 0 4px 20px rgba(0, 0, 0, 0.2);
 }
-.pRow.is-milestone .pNum b { color: #ffd36b; font-size: 21px; }
+.pRow.is-milestone .pNum {
+  background: linear-gradient(140deg, rgba(255, 211, 107, 0.22), rgba(255, 255, 255, 0.04));
+  border: 1px solid rgba(255, 211, 107, 0.45);
+  box-shadow: 0 0 8px rgba(255, 211, 107, 0.15);
+}
+.pRow.is-milestone .pNum b {
+  color: #ffd36b;
+  font-size: 22px;
+  text-shadow: 0 0 8px rgba(255, 211, 107, 0.3);
+}
 
 .pNum {
   display: grid; place-items: center; align-content: center; gap: 2px;
@@ -2659,22 +2690,38 @@ a:focus-visible {
 
 /* ── خانهٔ جایزه ── */
 .pTile {
-  display: flex; align-items: center; gap: 9px; min-height: 74px;
-  padding: 9px 11px; border-radius: 14px; text-align: start;
-  font-family: inherit; color: #eaf3ff; cursor: default;
-  background: #38bdf818; border: 1px solid #38bdf855;
+  display: flex; align-items: center; gap: 10px; min-height: 74px;
+  padding: 10px 12px; border-radius: 16px; text-align: start;
+  font-family: inherit; color: #f3f8ff; cursor: default;
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  transition: all 0.25s ease;
 }
-.pTile-plus { background: #ffd36b18; border-color: #ffd36b55; }
+.pTile-plus { 
+  background: rgba(255, 211, 107, 0.1); 
+  border-color: rgba(255, 211, 107, 0.35); 
+}
 .pTileEmpty {
-  justify-content: center; opacity: .35; background: #ffffff05;
-  border-color: #ffffff12; color: #b8cce4; font-size: 15px;
+  justify-content: center; opacity: .35; background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08); color: #b8cce4; font-size: 15px;
 }
 .pTileArt { flex: 0 0 auto; width: 36px; height: 36px; display: grid; place-items: center; }
 .pTileArt img { width: 36px; height: 36px; object-fit: contain; }
 .pTileEmoji { font-size: 23px; }
 .pTileBody { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-/* ۱۱.۵ → ۱۴ پیکسل. این متنِ اصلیِ خانه است و باید بی‌زحمت خوانده شود. */
-.pTileBody b { font-size: 14px; font-weight: 900; line-height: 1.35; }
+/* ۱۱.۵ → ۱۴ پیکسل. این متنِ اصلیِ خانه است و باید بی‌زحمت خوانده شود. طراحی واضح و شارپ. */
+.pTileBody b { 
+  font-size: 14.5px; 
+  font-weight: 800; 
+  line-height: 1.35;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  -webkit-font-smoothing: antialiased;
+}
 /* ۹.۵ → ۱۱.۵ و رنگِ پررنگ‌تر. */
 .pTileBody small { font-size: 11.5px; font-weight: 800; }
 .pTileBody .ok { color: var(--brand-ink); }

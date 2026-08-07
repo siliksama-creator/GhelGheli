@@ -8,6 +8,7 @@ import 'admin_photo_cards.dart';
 import 'admin_chat.dart';
 import 'admin_dashboard.dart';
 import 'admin_league.dart';
+import 'admin_points.dart';
 import 'admin_notifications.dart';
 import 'admin_rewards.dart';
 import 'admin_game_rewards.dart';
@@ -55,6 +56,7 @@ class _AdminShellState extends State<AdminShell> {
     AdminRewards(api: widget.api),
     AdminWallet(api: widget.api),
     AdminLeague(api: widget.api),
+    AdminPoints(api: widget.api),
     AdminUsers(api: widget.api),
     AdminChat(api: widget.api),
     AdminGameRewards(api: widget.api),
@@ -70,6 +72,7 @@ class _AdminShellState extends State<AdminShell> {
     'جوایز',
     'کیف پول',
     'لیگ',
+    'ریز امتیازات',
     'کاربران',
     'چت',
     'امتیاز بازی',
@@ -84,6 +87,7 @@ class _AdminShellState extends State<AdminShell> {
     Icons.card_giftcard_rounded,
     Icons.account_balance_wallet_rounded,
     Icons.emoji_events_rounded,
+    Icons.trending_up_rounded,
     Icons.people_alt_rounded,
     Icons.chat_bubble_rounded,
     Icons.sports_esports_rounded,
