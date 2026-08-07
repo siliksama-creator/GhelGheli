@@ -647,30 +647,102 @@ async function readText(buf) {
   if (process.env.GG_DISABLE_OCR === '1') return [];
   if (!(await ocrAvailable())) return [];
 
-  // فایلِ موقت لازم است: tesseract از stdin تصویر نمی‌گیرد.
-  const tmp = path.join(os.tmpdir(),
-    `gg-ocr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`);
+  // ══════════════════════════════════════════════════════════════════════
+  // OCR روی **چند ناحیه**، نه فقط کلِ تصویر
+  // ══════════════════════════════════════════════════════════════════════
+  //
+  // ── باگی که این را لازم کرد ──
+  //
+  // مالک اسکرین‌شات فرستاد: عکسِ کارتِ Hakimi، حدسِ سیستم «Haaland».
+  //
+  // بررسیِ تصاویر نشان داد پشتِ هر دو کارت **تقریباً یکسان طراحی شده**:
+  // پیراهنِ قرمز، بازیکن از پشت، همان ژست، همان چیدمانِ طلایی، همان
+  // استادیوم. تنها تفاوتِ واقعی نامِ چاپ‌شده است.
+  //
+  // ولی OCR روی پشتِ Haaland **هیچ چیزی نمی‌خواند** با اینکه «HAALAND»
+  // با حروفِ درشتِ طلایی نوشته شده. سه پیش‌پردازشِ متفاوت امتحان شد
+  // (normalise، threshold، negate) و هر سه صفر دادند.
+  //
+  // علت: وقتی کلِ کارت به ۱۴۰۰ پیکسل کوچک می‌شود، نوارِ نامِ بازیکن
+  // فقط ~۱۵٪ ارتفاع را می‌گیرد و در انبوهِ جزئیاتِ پس‌زمینه (شعله،
+  // استادیوم، پرچم) گم می‌شود. tesseract با `--psm 11` دنبالِ متنِ
+  // پراکنده می‌گردد و آن ناحیه را نادیده می‌گیرد.
+  //
+  // ── راه‌حل: نوارِ پایین جداگانه هم اسکن می‌شود ──
+  //
+  // نامِ بازیکن روی کارتِ فوتبالی تقریباً همیشه در نیمهٔ پایین است.
+  // وقتی همان نوار به‌تنهایی به ۱۶۰۰ پیکسل بزرگ شود، حروف چند برابر
+  // بزرگ‌تر می‌شوند و tesseract می‌بیندشان.
+  //
+  // اندازه‌گیری روی همان کارت‌ها:
+  //
+  //     پشتِ Haaland — کلِ تصویر : []
+  //     پشتِ Haaland — نوارِ ۷۰–۱۰۰٪ : ["PNORWAY"]   ← پیدا شد
+  //     پشتِ Hakimi  — نوارِ ۵۵–۹۵٪  : ["WORLD","MOROCCO"]
+  //
+  // ⚠️ هزینه: سه اجرای tesseract به‌جای یکی (~۸۵۰ms → ~۲.۲s). روی
+  //    آپلودِ ادمین قابل قبول است چون یک‌بار در عمرِ کارت رخ می‌دهد، و
+  //    برای کاربر هم لودینگِ مرحله‌ای همین را نشان می‌دهد.
+  //
+  // ⚠️ ناحیه‌ها **هم‌پوشان**اند (۵۵–۹۵ و ۷۰–۱۰۰): متنی که دقیقاً روی
+  //    مرز بیفتد در یکی از دو ناحیه کامل دیده می‌شود.
+  const REGIONS = [
+    null,           // کلِ تصویر — برای متنِ بالا و آمارِ کناری
+    [0.55, 0.95],   // نیمهٔ پایین — جایی که نامِ بازیکن است
+    [0.70, 1.00],   // نوارِ انتهایی — نامِ تیم و کشور
+  ];
+  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const temps = [];
   try {
-    // ── چرا این پیش‌پردازش ──
-    //
-    // خاکستری + بزرگ‌نمایی تا ۱۴۰۰ پیکسل + نرمال‌سازیِ کنتراست + تیزی.
-    // روی عکسِ گوشی این ترکیب تفاوتِ «هیچ» و «DEMBELE» را می‌سازد:
-    // tesseract روی متنِ کم‌کنتراستِ فشرده‌شده عملاً کور است.
-    await sharp(buf, { failOn: 'none' })
-      .rotate().removeAlpha().greyscale()
-      .resize(1400, null, { fit: 'inside', withoutEnlargement: false })
-      .normalise()
-      .sharpen()
-      .png()
-      .toFile(tmp);
+    const meta = await sharp(buf, { failOn: 'none' }).metadata();
+    const H = meta.height || 0;
+    let raw = '';
 
-    const raw = await new Promise((resolve) => {
-      execFile('tesseract',
-        [tmp, '-', '--psm', '11', '-c',
-          'tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'],
-        { timeout: 20000, maxBuffer: 1 << 20 },
-        (err, stdout) => resolve(err ? '' : String(stdout || '')));
-    });
+    for (let i = 0; i < REGIONS.length; i++) {
+      const region = REGIONS[i];
+      // ناحیهٔ نامعتبر روی تصویرِ خیلی کوتاه رد می‌شود.
+      if (region && H < 200) continue;
+
+      const tmpI = path.join(os.tmpdir(), `gg-ocr-${stamp}-${i}.png`);
+      temps.push(tmpI);
+      try {
+        let pipe = sharp(buf, { failOn: 'none' }).rotate().removeAlpha();
+        if (region) {
+          const top = Math.round(H * region[0]);
+          const h = Math.min(H - top, Math.round(H * (region[1] - region[0])));
+          if (h < 40) continue;
+          pipe = pipe.extract({ left: 0, top, width: meta.width, height: h });
+        }
+        // ── چرا این پیش‌پردازش ──
+        //
+        // خاکستری + بزرگ‌نمایی + نرمال‌سازیِ کنتراست + تیزی. روی عکسِ
+        // گوشی این ترکیب تفاوتِ «هیچ» و «DEMBELE» را می‌سازد:
+        // tesseract روی متنِ کم‌کنتراستِ فشرده‌شده عملاً کور است.
+        //
+        // نوارها به ۱۶۰۰ بزرگ می‌شوند نه ۱۴۰۰: چون ارتفاعشان کمتر است،
+        // همان عرض یعنی حروفِ درشت‌تر.
+        await pipe
+          .greyscale()
+          .resize(region ? 1600 : 1400, null,
+            { fit: 'inside', withoutEnlargement: false })
+          .normalise()
+          .sharpen()
+          .png()
+          .toFile(tmpI);
+
+        // eslint-disable-next-line no-await-in-loop
+        const part = await new Promise((resolve) => {
+          execFile('tesseract',
+            [tmpI, '-', '--psm', '11', '-c',
+              'tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'],
+            { timeout: 20000, maxBuffer: 1 << 20 },
+            (err, stdout) => resolve(err ? '' : String(stdout || '')));
+        });
+        raw += `\n${part}`;
+      } catch {
+        // یک ناحیهٔ خراب نباید بقیه را از کار بیندازد.
+      }
+    }
 
     // ══════════════════════════════════════════════════════════════════
     // دو جنسِ توکن: کلمه و عدد
@@ -750,7 +822,7 @@ async function readText(buf) {
   } catch {
     return [];
   } finally {
-    fs.promises.unlink(tmp).catch(() => {});
+    for (const t of temps) fs.promises.unlink(t).catch(() => {});
   }
 }
 
