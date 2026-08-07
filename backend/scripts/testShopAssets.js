@@ -162,5 +162,34 @@ ck('userweb/public در .gitignore نیست',
 ck('mobile/assets در .gitignore نیست',
   !/^\s*mobile\/assets/m.test(gitignore));
 
+console.log('\n══ ۷. ابزارِ پاکسازی جدولِ تازه‌ای جا نگذاشته ══');
+// ⚠️ چرا این بررسی به این فایل اضافه شد
+//
+// `reset_for_launch.py` فهرستِ **دستیِ** جدول‌ها دارد. هر مایگریشنی که
+// جدولِ وابسته به کاربر بسازد باید به آن اضافه شود، وگرنه بعد از
+// پاکسازی ردیفِ یتیم می‌ماند.
+//
+// این واقعاً رخ داد: مایگریشنِ ۰۴۵ سه جدول آورد و ابزار نمی‌شناختشان،
+// پس بعد از پاکسازیِ کامل یک ردیفِ `point_transactions` با کاربرِ
+// حذف‌شده باقی ماند. عددِ کوچکی بود ولی همان دستهٔ خطای «۴۵۷ فایلِ
+// یتیم» است: ابزارِ پاکسازی بی‌صدا ناقص می‌شود و کسی نمی‌فهمد.
+// `resetTool` بالاتر در همین فایل تعریف شده (بررسیِ بخشِ ۵).
+if (fs.existsSync(resetTool)) {
+  const tool = fs.readFileSync(resetTool, 'utf8');
+  const userTables = new Set();
+  for (const m of migrations.matchAll(
+    /CREATE TABLE IF NOT EXISTS (\w+)([\s\S]{0,1600}?);/g)) {
+    if (/REFERENCES\s+users\(id\)/i.test(m[2])) userTables.add(m[1]);
+  }
+  // `users` خودش جدا پاک می‌شود (با شرطِ نگه‌داشتنِ Admin) پس در
+  // فهرستِ DELETE ساده نیست.
+  userTables.delete('users');
+  const missed = [...userTables].filter(
+    t => !new RegExp(`DELETE FROM ${t}\\b`).test(tool));
+  ck(`${userTables.size} جدولِ وابسته به کاربر، همه در ابزارِ پاکسازی`,
+    missed.length === 0,
+    `جا مانده: ${missed.join(', ')} — ردیفِ یتیم باقی می‌ماند`);
+}
+
 console.log(`\n${fail ? '✗' : '✓'} ${pass} موفق، ${fail} ناموفق\n`);
 process.exit(fail ? 1 : 0);

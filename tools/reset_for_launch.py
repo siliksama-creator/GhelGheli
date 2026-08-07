@@ -151,6 +151,15 @@ DELETE FROM photo_card_attempts;
 DELETE FROM wallet_transactions;
 DELETE FROM otp_codes;
 DELETE FROM audit_log;
+-- ⚠️ جدول‌های تازه (مایگریشن ۰۴۵) — بدونِ این‌ها ردیفِ یتیم می‌ماند.
+--
+-- بعد از پاکسازی، یک ردیفِ `point_transactions` باقی مانده بود که
+-- کاربرش حذف شده بود. عددِ کوچکی بود ولی همان دسته خطاست که در
+-- «۴۵۷ فایلِ یتیم» هم دیده شد: ابزارِ پاکسازی باید همراهِ هر مایگریشنِ
+-- تازه به‌روز شود، وگرنه بی‌صدا ناقص می‌شود.
+DELETE FROM point_transactions;
+DELETE FROM league_payouts;
+DELETE FROM league_leaderboard_entries;
 
 -- ── ۳) کاربران، بجز حسابِ اصلیِ مدیر ──
 DELETE FROM users WHERE mobile <> '{ADMIN_MOBILE}';
