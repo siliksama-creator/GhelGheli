@@ -9,6 +9,14 @@ import '../../widgets/state_views.dart';
 import '../shared/rank_tile.dart';
 import 'widgets/form_section.dart';
 
+/// تبدیلِ امنِ مقدارِ JSON به عدد صحیح.
+///
+/// ⚠️ سرور گاهی عدد و گاهی رشته برمی‌گرداند (`amount` در JSON می‌تواند
+///    `"25000"` باشد). `as int` روی رشته کرش می‌کند و کلِ صفحه سفید
+///    می‌شود — همان الگویی که `audit_casts.py` برای گرفتنش نوشته شد.
+int _asInt(dynamic v) =>
+    v is int ? v : (v is num ? v.toInt() : int.tryParse('$v') ?? 0);
+
 /// League prize-table editor, dynamic winner count, start/end dates selection,
 /// pending payouts approval panel, and live leaderboard.
 /// Same contract and features as league.jsx in React.
@@ -173,9 +181,9 @@ class _AdminLeagueState extends State<AdminLeague> {
   }
 
   Future<void> _approveAllPayouts() async {
-    final pending = _payouts.where((p) => p['paid_at'] == null && NumberParser.toInt(p['amount']) > 0).toList();
+    final pending = _payouts.where((p) => p['paid_at'] == null && _asInt(p['amount']) > 0).toList();
     if (pending.isEmpty) return;
-    final totalSum = pending.fold<int>(0, (sum, p) => sum + NumberParser.toInt(p['amount']));
+    final totalSum = pending.fold<int>(0, (sum, p) => sum + _asInt(p['amount']));
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -225,9 +233,8 @@ class _AdminLeagueState extends State<AdminLeague> {
       );
     }
 
-    final theme = Theme.of(context);
-    final pendingPayouts = _payouts.where((p) => p['paid_at'] == null && NumberParser.toInt(p['amount']) > 0).toList();
-    final pendingSum = pendingPayouts.fold<int>(0, (sum, p) => sum + NumberParser.toInt(p['amount']));
+    final pendingPayouts = _payouts.where((p) => p['paid_at'] == null && _asInt(p['amount']) > 0).toList();
+    final pendingSum = pendingPayouts.fold<int>(0, (sum, p) => sum + _asInt(p['amount']));
 
     final season = _data?['season'] ?? {};
     final isManual = season['manual_dates'] == true;
@@ -237,22 +244,40 @@ class _AdminLeagueState extends State<AdminLeague> {
       children: [
         // ── جوایز در انتظار تأیید ──
         if (pendingPayouts.isNotEmpty) ...[
+          // ⚠️ `AppCard` فقط `child` می‌گیرد — نه `title`/`subtitle`/`action`.
+          //    نسخهٔ اولِ این صفحه آن سه را پاس می‌داد و اصلاً کامپایل
+          //    نمی‌شد. سرآیند اینجا داخلِ خودِ `child` ساخته می‌شود.
           AppCard(
-            title: '${faNum(pendingPayouts.length)} جایزه منتظر تأیید شماست',
-            subtitle: 'مجموع ${Money.withUnit(pendingSum)} — تا تأیید نکنید به کیف پول واریز نمی‌شود',
-            action: FilledButton.icon(
-              onPressed: _approvingId == 'all' ? null : _approveAllPayouts,
-              icon: _approvingId == 'all'
-                  ? const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Icon(Icons.check_circle_outline_rounded, size: 16),
-              label: const Text('واریز همه', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                Text(
+                  '${faNum(pendingPayouts.length)} جایزه منتظر تأیید شماست',
+                  style: const TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w900),
+                ),
+                Gaps.vXxs,
+                Text(
+                  'مجموع ${Money.withUnit(pendingSum)} — تا تأیید نکنید '
+                  'به کیف پول واریز نمی‌شود',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.white.withValues(alpha: 0.7)),
+                ),
+                Gaps.vSm,
+                FilledButton.icon(
+                  onPressed: _approvingId == 'all' ? null : _approveAllPayouts,
+                  icon: _approvingId == 'all'
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.check_circle_outline_rounded, size: 16),
+                  label: const Text('واریز همه',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
                 for (final p in pendingPayouts) ...[
                   const Divider(height: 1),
                   ListTile(
@@ -314,7 +339,7 @@ class _AdminLeagueState extends State<AdminLeague> {
             Gaps.vSm,
             ListTile(
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(Corners.rMd),
+                borderRadius: Corners.rMd,
                 side: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
               ),
               leading: const Icon(Icons.calendar_month_rounded),
@@ -328,7 +353,7 @@ class _AdminLeagueState extends State<AdminLeague> {
             Gaps.vXs,
             ListTile(
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(Corners.rMd),
+                borderRadius: Corners.rMd,
                 side: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
               ),
               leading: const Icon(Icons.event_busy_rounded),
@@ -348,7 +373,7 @@ class _AdminLeagueState extends State<AdminLeague> {
                       height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
                     )
-                  : const Icon(Icons.calendar_clock_rounded),
+                  : const Icon(Icons.event_available_rounded),
               label: const Text('ذخیره تاریخ‌های لیگ'),
             ),
           ],

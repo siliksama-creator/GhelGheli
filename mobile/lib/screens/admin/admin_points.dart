@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
-import '../../core/money.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/badges.dart';
@@ -253,7 +252,6 @@ class _AdminPointsState extends State<AdminPoints> with SingleTickerProviderStat
   }
 
   Widget _buildSearchTab() {
-    final theme = Theme.of(context);
     return ListView(
       padding: const EdgeInsets.all(Gaps.md),
       children: [
@@ -403,7 +401,7 @@ class _AdminPointsState extends State<AdminPoints> with SingleTickerProviderStat
               padding: const EdgeInsets.all(Gaps.sm),
               decoration: BoxDecoration(
                 color: theme.colorScheme.errorContainer.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(Corners.rMd),
+                borderRadius: Corners.rMd,
                 border: Border.all(color: theme.colorScheme.error.withValues(alpha: 0.3)),
               ),
               child: Row(
