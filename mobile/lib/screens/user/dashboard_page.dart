@@ -289,7 +289,8 @@ class _DashboardPageState extends State<DashboardPage> {
                   icon: Icons.style_outlined,
                   title: 'هنوز کارتی در کلکسیون شما نیست',
                   message: 'یک کد کارت را ثبت کن یا از کارتت عکس بگیر '
-                      'تا اینجا نمایش داده شود.'),
+                      'تا اینجا نمایش داده شود.',
+                  image: 'assets/games/empty_collection.webp'),
             )
           else
             Builder(builder: (_) {

@@ -47,6 +47,19 @@ String avatarAsset(Object? key) {
 /// Asset path for a club crest, by slug.
 String clubAssetOf(String slug) => 'assets/shop/club_$slug.webp';
 
+/// Asset path for a league/trophy medal by rank.
+///
+/// رتبهٔ ۱-۳ جامِ طلا/نقره/برنز می‌گیرد؛ بقیه مدالِ آبیِ «حضور». این‌ها
+/// به‌جای ایموجیِ 🥇🥈🥉🏅 هستند — تصاویرِ WebPِ تولیدشدهٔ ۲۰۲۶ با
+/// پس‌زمینهٔ شفاف (۱۳-۱۵KB). در لیگ و پروفایل یکسان استفاده می‌شوند تا
+/// دو صفحه همیشه هم‌نظر باشند.
+String medalAsset(int rank) {
+  if (rank == 1) return 'assets/games/medals/medal_gold.webp';
+  if (rank == 2) return 'assets/games/medals/medal_silver.webp';
+  if (rank == 3) return 'assets/games/medals/medal_bronze.webp';
+  return 'assets/games/medals/medal_participation.webp';
+}
+
 class NumberParser {
   NumberParser._();
   static int toInt(Object? v) => int.tryParse('$v') ?? 0;

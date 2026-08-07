@@ -10,12 +10,17 @@ class EmptyState extends StatelessWidget {
   final String? message;
   final Widget? action;
 
+  /// Optional premium illustration (a bundled asset path) shown instead of
+  /// the generic Material icon — e.g. a friendly empty-collection graphic.
+  final String? image;
+
   const EmptyState(
       {super.key,
       required this.icon,
       required this.title,
       this.message,
-      this.action});
+      this.action,
+      this.image});
 
   @override
   Widget build(BuildContext context) {
@@ -26,16 +31,30 @@ class EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: theme.colorScheme.surfaceContainerHighest,
+          if (image != null)
+            Image.asset(
+              image!,
+              width: 150,
+              height: 150,
+              fit: BoxFit.contain,
+              // تصویرِ خالی‌حالت‌ها در ۴۸۰ رندر می‌شود؛ در یک قابِ ۱۵۰
+              // منطقی، ۳۰۰ فیزیکی برای نمایشگر ۲x کافی است و حافظهٔ دیکد
+              // کم می‌ماند.
+              cacheWidth: 300,
+              errorBuilder: (_, __, ___) => Icon(icon,
+                  size: 40, color: theme.colorScheme.onSurfaceVariant),
+            )
+          else
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: theme.colorScheme.surfaceContainerHighest,
+              ),
+              child: Icon(icon,
+                  size: 30, color: theme.colorScheme.onSurfaceVariant),
             ),
-            child:
-                Icon(icon, size: 30, color: theme.colorScheme.onSurfaceVariant),
-          ),
           Gaps.vMd,
           Text(title,
               textAlign: TextAlign.center, style: theme.textTheme.titleSmall),

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
+import '../../core/assets.dart';
 import '../../core/cosmetics.dart';
 import '../../theme/brand_theme.dart';
 import '../../theme/tokens.dart';
@@ -253,8 +254,17 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(['🥇', '🥈', '🥉'][i],
-                              style: const TextStyle(fontSize: 30)),
+                          // مدالِ تصویری به‌جای ایموجی — بستهٔ ۲۰۲۶.
+                          Image.asset(
+                            medalAsset(i + 1),
+                            width: 34,
+                            height: 34,
+                            fit: BoxFit.contain,
+                            cacheWidth: 68,
+                            errorBuilder: (_, __, ___) => Text(
+                                ['🥇', '🥈', '🥉'][i],
+                                style: const TextStyle(fontSize: 30)),
+                          ),
                           const SizedBox(height: 4),
                           DisplayName(
                             name: r['nickname'] ?? r['first_name'] ?? 'کاربر',

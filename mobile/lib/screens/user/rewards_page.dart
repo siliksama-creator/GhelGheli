@@ -167,7 +167,8 @@ class _RewardsPageState extends State<RewardsPage> {
               children: const [
                 EmptyState(
                     icon: Icons.card_giftcard_outlined,
-                    title: 'هنوز جایزه‌ای تعریف نشده است'),
+                    title: 'هنوز جایزه‌ای تعریف نشده است',
+                    image: 'assets/games/empty_rewards.webp'),
               ],
             );
           }

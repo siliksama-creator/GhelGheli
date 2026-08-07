@@ -257,7 +257,15 @@ class _ProfilePageState extends State<ProfilePage> {
                       padding: const EdgeInsets.only(bottom: Gaps.xs),
                       child: Row(
                         children: [
-                          Text(medal, style: const TextStyle(fontSize: 19)),
+                          Image.asset(
+                            medalAsset(rank),
+                            width: 22,
+                            height: 22,
+                            fit: BoxFit.contain,
+                            cacheWidth: 44,
+                            errorBuilder: (_, __, ___) =>
+                                Text(medal, style: const TextStyle(fontSize: 19)),
+                          ),
                           Gaps.hXs,
                           Expanded(
                             child: Column(
