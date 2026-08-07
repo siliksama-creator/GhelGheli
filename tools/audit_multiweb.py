@@ -177,8 +177,38 @@ async def main():
                 bad += 1
                 return 1
 
-            ck('راهنمای «چند نسخه» دیده می‌شود',
-               await pg.locator('text=چند نسخه از یک کارت').count() > 0)
+            # ── راهنمای «چند نسخه» ──
+            #
+            # ⚠️ این بررسی بازنویسی شد و دلیلش مهم است.
+            #
+            # نسخهٔ قبلی فقط `count() > 0` را می‌سنجید. بعد از جمع‌وجور
+            # شدنِ فرم، این متن داخلِ `<details>`ِ **بسته** رفت — و تست
+            # همچنان سبز می‌ماند، چون `<details>` فرزندِ پنهانش را در
+            # DOM نگه می‌دارد. یعنی تست چیزی را «دیده» گزارش می‌کرد که
+            # کاربر اصلاً نمی‌دید.
+            #
+            # همان دام در تست‌های فلاتر هم بود (AnimatedCrossFade) و
+            # آنجا با `hitTestable()` رفع شد. اینجا معادلش
+            # `is_visible()` است.
+            #
+            # حالا هر دو چیز سنجیده می‌شود: خلاصه باید **همیشه** دیده
+            # شود (هشدارِ ۰/O باید قبل از تایپ به چشم بیاید)، و متنِ
+            # کامل باید با یک کلیک در دسترس باشد.
+            summary = pg.locator('.pcCodeHint > summary')
+            ck('خلاصهٔ راهنما بدونِ کلیک دیده می‌شود',
+               await summary.count() > 0 and await summary.first.is_visible())
+
+            body = pg.locator('.pcCodeHintBody')
+            ck('جزئیات پیش‌فرض پنهان است (فرم کوتاه بماند)',
+               not await body.first.is_visible()
+               if await body.count() else False)
+
+            await summary.first.click()
+            await pg.wait_for_timeout(400)
+            ck('راهنمای «چند نسخه» بعد از باز کردن واقعاً دیده می‌شود',
+               await pg.locator('text=چند نسخه از یک کارت').first.is_visible())
+            await summary.first.click()
+            await pg.wait_for_timeout(300)
 
             # ── ثبتِ اول ──
             #
