@@ -440,4 +440,56 @@ void main() {
       expect(_clean(), isTrue);
     });
   });
+
+  _narrowTests();
+}
+
+// ── تستِ صفحهٔ باریک، اضافه‌شده بعد از پیدا شدنِ همان باگ در وب‌اپ ──
+//
+// ممیزیِ پیکسلیِ وب‌اپ روی ۳۲۰ پیکسل نشان داد دکمهٔ دومِ «گالری» از
+// والدش بیرون می‌زند، چون `flex:1` کفِ `min-width:auto` را برنمی‌دارد.
+//
+// نسخهٔ فلاتر از `Flexible` + `TextOverflow.ellipsis` استفاده می‌کند که
+// **باید** ایمن باشد — ولی «باید» کافی نیست. این تست روی باریک‌ترین
+// گوشیِ رایج اجرا می‌شود و هر سرریزی را به‌صورت استثنا می‌گیرد.
+void _narrowTests() {
+  group('صفحهٔ باریک (۳۲۰ پیکسل)', () {
+    testWidgets('فرم روی ۳۲۰ پیکسل سرریز نمی‌کند', (t) async {
+      t.view.physicalSize = const Size(320, 900);
+      t.view.devicePixelRatio = 1.0;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(_wrap(_api({'/api/photo-cards/status': (200, _on)})));
+      await t.pumpAndSettle();
+      // RenderFlex overflow خودش را به‌صورت استثنا نشان می‌دهد.
+      expect(TestWidgetsFlutterBinding.instance.takeException(), isNull,
+          reason: 'سرریزِ چیدمان روی صفحهٔ باریک');
+    });
+
+    testWidgets('با فونتِ بزرگِ سیستم هم سرریز نمی‌کند', (t) async {
+      // کاربری که فونتِ سیستم را بزرگ کرده — حالتی که معمولاً فراموش
+      // می‌شود و دقیقاً همان‌جا دکمه‌ها می‌ترکند.
+      t.view.physicalSize = const Size(320, 900);
+      t.view.devicePixelRatio = 1.0;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(MediaQuery(
+        data: const MediaQueryData(textScaler: TextScaler.linear(1.5)),
+        child: _wrap(_api({'/api/photo-cards/status': (200, _on)})),
+      ));
+      await t.pumpAndSettle();
+      expect(TestWidgetsFlutterBinding.instance.takeException(), isNull,
+          reason: 'با فونتِ ۱.۵ برابر چیدمان می‌ترکد');
+    });
+
+    testWidgets('عکس و کد روی صفحهٔ باریک هم کنارِ هم می‌مانند', (t) async {
+      t.view.physicalSize = const Size(320, 900);
+      t.view.devicePixelRatio = 1.0;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(_wrap(_api({'/api/photo-cards/status': (200, _on)})));
+      await t.pumpAndSettle();
+      final slot = t.getRect(find.byKey(const ValueKey('pcPhotoSlot')));
+      final field = t.getRect(find.byType(TextField));
+      expect(slot.top < field.bottom && field.top < slot.bottom, isTrue,
+          reason: 'روی صفحهٔ باریک عمودی شده‌اند');
+    });
+  });
 }

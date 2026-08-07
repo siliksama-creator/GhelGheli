@@ -2831,9 +2831,25 @@ a:focus-visible {
    ارتفاعِ کمتر هیچ چیزی را فشرده نمی‌کند. همچنان بالاتر از حداقلِ ۴۴
    پیکسلیِ راهنمای دسترس‌پذیری، که روی موبایل مهم است چون این‌ها
    اصلی‌ترین کنشِ صفحه‌اند. */
-.pcPickRow { display: flex; gap: 8px; margin: 0; }
+/* ⚠️ `min-width: 0` روی ردیف و `flex: 1 1 0` روی دکمه‌ها — نه `flex: 1` ──
+ *
+ * ممیزیِ ۳۲۰ پیکسلی گرفتش: دکمهٔ دوم از والدش بیرون می‌زد.
+ *
+ *     pcFields  L37  R183  W146
+ *     pcPick    L103 R183  W80
+ *     pcPick    L23  R95   W72   ← بیرونِ والد (۳۷ تا ۱۸۳)
+ *
+ * علت: `flex: 1` یعنی `flex-basis: 0%` ولی `min-width` همچنان `auto`
+ * می‌ماند، پس دکمه زیرِ عرضِ محتوایش (آیکون + متنِ «دوربین») کوچک
+ * نمی‌شود. دو دکمه با کفِ ~۸۰ پیکسل به‌علاوهٔ فاصله، از ۱۴۶ پیکسل
+ * بیشتر می‌شوند و فلکس‌باکس سرریز را بیرون می‌ریزد.
+ *
+ * صفحه اسکرولِ افقی نمی‌گرفت چون والد `overflow` را می‌برید — یعنی
+ * باگ **بی‌صدا** بود: بخشی از دکمه زیرِ لبه پنهان می‌شد. */
+.pcPickRow { display: flex; gap: 8px; margin: 0; min-width: 0; }
 .pcPick {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2853,7 +2869,9 @@ a:focus-visible {
   background: var(--veil-3);
   border-color: var(--brand-ink);
 }
-.pcPickIcon { font-size: 16px; line-height: 1; }
+.pcPickIcon { font-size: 16px; line-height: 1; flex: none; }
+/* متنِ دکمه در باریک‌ترین حالت کوتاه می‌شود به‌جای اینکه دکمه را پهن کند. */
+.pcPick { overflow: hidden; white-space: nowrap; }
 
 /* دکمهٔ حذف روی خودِ عکس. `inset-inline-start` نه `left`: صفحه RTL است
    و left در دو جهت جای متفاوتی می‌افتد. */
