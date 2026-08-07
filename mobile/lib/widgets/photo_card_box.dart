@@ -348,8 +348,78 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
 
   @override
   Widget build(BuildContext context) {
-    if (_checking || !_available) return const SizedBox.shrink();
     final theme = Theme.of(context);
+
+    // ── تا وقتی پاسخِ سرور نیامده، جای خالی ──
+    //
+    // این حالت کسری از ثانیه طول می‌کشد و نشان دادنِ «چیزی نیست» در آن
+    // لحظه فقط پرشِ چشمی می‌سازد.
+    if (_checking) return const SizedBox.shrink();
+
+    // ══════════════════════════════════════════════════════════════════
+    // کاتالوگِ خالی: پیامِ روشن، نه سکوت
+    // ══════════════════════════════════════════════════════════════════
+    //
+    // ── باگی که مالک با اسکرین‌شات نشان داد ──
+    //
+    // نسخهٔ قبلی وقتی `available == false` بود **کلِ بخش را پنهان
+    // می‌کرد**. ولی بنرِ «ثبت کارت‌های قلقلی» و متنِ زیرش در
+    // `dashboard_page` هستند نه اینجا — پس آن‌ها می‌ماندند و این بخش
+    // ناپدید می‌شد.
+    //
+    // نتیجه‌ای که کاربر می‌دید: یک بنرِ تبلیغاتیِ بزرگ با عنوان «ثبت
+    // کارت‌های قلقلی» و توضیحِ اینکه کارت‌ها در فروشگاه‌ها فروخته
+    // می‌شوند — و **هیچ دکمه، فرم یا راهی برای ثبت**. مالک پرسید
+    // «الان کاربر چطوری کارت ثبت کنه؟!» و حق داشت.
+    //
+    // ⚠️ سکوت بدترین پاسخِ ممکن است: کاربر نمی‌داند اپ خراب است، یا
+    //    اینترنتش قطع است، یا هنوز کارتی تعریف نشده. هر سه حدس او را
+    //    به پشتیبانی می‌فرستد.
+    //
+    // حالا پیامِ صریح می‌بیند که می‌گوید مشکل از او نیست و چه باید
+    // بکند.
+    if (!_available) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Gaps.vMd,
+          Container(
+            padding: const EdgeInsets.all(Gaps.sm),
+            decoration: BoxDecoration(
+              borderRadius: Corners.rMd,
+              color: theme.colorScheme.surfaceContainerHighest
+                  .withValues(alpha: 0.35),
+              border: Border.all(
+                  color: theme.colorScheme.outline.withValues(alpha: 0.35)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.hourglass_empty_rounded, size: 20),
+                const SizedBox(width: Gaps.xs),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('ثبت کارت هنوز فعال نشده',
+                          style: theme.textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w900)),
+                      Gaps.vXxs,
+                      Text(
+                        'هنوز کارتی در سیستم تعریف نشده است. به‌محض اینکه '
+                        'اولین سری کارت‌ها اضافه شود، همین‌جا می‌توانی از '
+                        'کارتت عکس بگیری و کدش را وارد کنی.',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
