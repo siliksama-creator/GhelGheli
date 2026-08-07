@@ -510,7 +510,7 @@ class _ConfettiOverlayState extends State<_ConfettiOverlay> with SingleTickerPro
       duration: const Duration(seconds: 4),
     )..repeat();
 
-    // Spawn 65 colorful confetti particles
+    // Spawn 65 colorful confetti particles with different shapes
     final colors = [
       const Color(0xFFB5EF58), // Green
       const Color(0xFF38BDF8), // Blue
@@ -525,9 +525,10 @@ class _ConfettiOverlayState extends State<_ConfettiOverlay> with SingleTickerPro
         y: _random.nextDouble() * -0.5, // Start slightly above screen
         speed: 0.05 + _random.nextDouble() * 0.1,
         angle: _random.nextDouble() * math.pi * 2,
-        rotationSpeed: _random.nextDouble() * 4,
-        size: 6.0 + _random.nextDouble() * 8.0,
+        rotationSpeed: _random.nextDouble() * 4 + 1.0,
+        size: 8.0 + _random.nextDouble() * 10.0,
         color: colors[_random.nextInt(colors.length)],
+        shape: _random.nextInt(4), // 4 distinct shapes!
       ));
     }
   }
@@ -566,6 +567,7 @@ class _Particle {
     required this.rotationSpeed,
     required this.size,
     required this.color,
+    required this.shape,
   });
 
   double x; // 0.0 to 1.0 (screen width fraction)
@@ -575,6 +577,7 @@ class _Particle {
   final double rotationSpeed;
   final double size;
   final Color color;
+  final int shape; // 0 = rect, 1 = circle, 2 = triangle, 3 = star
 }
 
 class _ConfettiPainter extends CustomPainter {
@@ -595,7 +598,7 @@ class _ConfettiPainter extends CustomPainter {
     for (final p in particles) {
       // Move particles downwards based on speed and frame tick
       p.y += p.speed * 0.05;
-      p.x += math.sin(p.y * 10 + p.angle) * 0.005; // zigzag path
+      p.x += math.sin(p.y * 8 + p.angle) * 0.004; // zigzag path
 
       // Reset when particle goes off screen bottom
       if (p.y > 1.2) {
@@ -610,13 +613,58 @@ class _ConfettiPainter extends CustomPainter {
 
       canvas.save();
       canvas.translate(px, py);
-      canvas.rotate(p.y * p.rotationSpeed * math.pi);
+
+      // Simulate highly advanced 3D rotation by scaling width/scale!
+      final rotationAngle = p.y * p.rotationSpeed * math.pi;
+      final scale3d = math.cos(rotationAngle).abs();
+      canvas.scale(scale3d, 1.0);
+      canvas.rotate(rotationAngle);
+
+      // Dynamic shiny metallic glint reflection!
+      if (scale3d < 0.15) {
+        paint.color = Colors.white.withValues(alpha: 0.85);
+      } else {
+        paint.color = p.color;
+      }
+
+      if (p.shape == 0) {
+        // Rectangle Confetti
+        canvas.drawRect(
+          Rect.fromCenter(center: Offset.zero, width: p.size, height: p.size * 0.5),
+          paint,
+        );
+      } else if (p.shape == 1) {
+        // Circular Confetti
+        canvas.drawCircle(Offset.zero, p.size * 0.4, paint);
+      } else if (p.shape == 2) {
+        // Triangular Confetti
+        final path = Path()
+          ..moveTo(0, -p.size * 0.5)
+          ..lineTo(p.size * 0.5, p.size * 0.5)
+          ..lineTo(-p.size * 0.5, p.size * 0.5)
+          ..close();
+        canvas.drawPath(path, paint);
+      } else {
+        // Shimmering Star Confetti
+        final path = Path();
+        const points = 5;
+        final outerRadius = p.size * 0.55;
+        final innerRadius = p.size * 0.25;
+        for (var i = 0; i < points * 2; i++) {
+          final r = i % 2 == 0 ? outerRadius : innerRadius;
+          final angle = (i * math.pi) / points;
+          final x = r * math.cos(angle);
+          final y = r * math.sin(angle);
+          if (i == 0) {
+            path.moveTo(x, y);
+          } else {
+            path.lineTo(x, y);
+          }
+        }
+        path.close();
+        canvas.drawPath(path, paint);
+      }
       
-      // Draw rectangular confetti piece
-      canvas.drawRect(
-        Rect.fromCenter(center: Offset.zero, width: p.size, height: p.size * 0.6),
-        paint,
-      );
       canvas.restore();
     }
   }

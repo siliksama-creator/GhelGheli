@@ -205,62 +205,10 @@ class _TapGameScreenState extends State<TapGameScreen>
   void _showLevelUpDialog(int newLevel) {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (dialogContext) => Dialog(
         backgroundColor: Colors.transparent,
-        child: Container(
-          padding: const EdgeInsets.all(Gaps.lg),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
-            gradient: const LinearGradient(
-              colors: [Color(0xFF1E1B4B), Color(0xFF090514)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-            border: Border.all(color: _accent, width: 2),
-            boxShadow: [
-              BoxShadow(
-                color: _accent.withValues(alpha: 0.35),
-                blurRadius: 20,
-                spreadRadius: 2,
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('🎉', style: TextStyle(fontSize: 54)),
-              Gaps.vSm,
-              Text(
-                'تبریک! لول آپ شدی',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  color: _accent,
-                ),
-              ),
-              Gaps.vXs,
-              Text(
-                'شما به لول ${faNum(newLevel)} رسیدی!',
-                style: const TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold),
-              ),
-              Gaps.vMd,
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  style: FilledButton.styleFrom(backgroundColor: _accent),
-                  child: Text(
-                    'ادامه بازی 💪',
-                    style: TextStyle(
-                      color: Colors.black.withValues(alpha: 0.85),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+        child: _LevelUpDialogContent(level: newLevel, accent: _accent),
       ),
     );
   }
@@ -268,63 +216,10 @@ class _TapGameScreenState extends State<TapGameScreen>
   void _showSkinDialog() {
     showDialog(
       context: context,
-      builder: (dialogContext) => Dialog(
+      barrierDismissible: false,
+      builder: (dialogContext) => const Dialog(
         backgroundColor: Colors.transparent,
-        child: Container(
-          padding: const EdgeInsets.all(Gaps.lg),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
-            gradient: const LinearGradient(
-              colors: [Color(0xFF581C87), Color(0xFF0F052D)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-            border: Border.all(color: Colors.amber, width: 2),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.amber.withValues(alpha: 0.35),
-                blurRadius: 24,
-                spreadRadius: 2,
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('👑', style: TextStyle(fontSize: 64)),
-              Gaps.vSm,
-              const Text(
-                'شخصیت جدید باز شد!',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.amber,
-                ),
-              ),
-              Gaps.vXs,
-              const Text(
-                'یک بازیکن کلکسیونی فوتبالی جدید به جمع شما پیوست!',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: Colors.white70),
-              ),
-              Gaps.vMd,
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  style: FilledButton.styleFrom(backgroundColor: Colors.amber),
-                  child: const Text(
-                    'ایول! دمت گرم 🔥',
-                    style: TextStyle(
-                      color: Color(0xFF3A2A00),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+        child: _SkinUnlockedDialogContent(),
       ),
     );
   }
@@ -879,4 +774,262 @@ class _CompletionView extends StatelessWidget {
       ),
     );
   }
+}
+
+class _LevelUpDialogContent extends StatefulWidget {
+  final int level;
+  final Color accent;
+  const _LevelUpDialogContent({required this.level, required this.accent});
+
+  @override
+  State<_LevelUpDialogContent> createState() => _LevelUpDialogContentState();
+}
+
+class _LevelUpDialogContentState extends State<_LevelUpDialogContent> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _scale;
+  late final Animation<double> _rotate;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3500),
+    )..repeat();
+
+    _scale = Tween<double>(begin: 0.2, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(0.0, 0.4, curve: Curves.elasticOut)),
+    );
+    _rotate = Tween<double>(begin: 0.0, end: 1.0).animate(_controller);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScaleTransition(
+      scale: _scale,
+      child: Container(
+        padding: const EdgeInsets.all(Gaps.lg),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(28),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF1E1B4B), Color(0xFF090514)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+          border: Border.all(color: widget.accent, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: widget.accent.withValues(alpha: 0.45),
+              blurRadius: 24,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Positioned(
+              width: 220,
+              height: 220,
+              child: RotationTransition(
+                turns: _rotate,
+                child: CustomPaint(
+                  painter: _SunburstPainter(color: widget.accent.withValues(alpha: 0.15)),
+                ),
+              ),
+            ),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('🎉', style: TextStyle(fontSize: 64)),
+                Gaps.vSm,
+                Text(
+                  'تبریک! لول آپ شدی',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: widget.accent,
+                  ),
+                ),
+                Gaps.vXs,
+                Text(
+                  'شما به لول ${faNum(widget.level)} رسیدی!',
+                  style: const TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+                Gaps.vMd,
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: FilledButton.styleFrom(backgroundColor: widget.accent),
+                    child: const Text(
+                      'ادامه بازی 💪',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SkinUnlockedDialogContent extends StatefulWidget {
+  const _SkinUnlockedDialogContent();
+
+  @override
+  State<_SkinUnlockedDialogContent> createState() => _SkinUnlockedDialogContentState();
+}
+
+class _SkinUnlockedDialogContentState extends State<_SkinUnlockedDialogContent> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _scale;
+  late final Animation<double> _rotate;
+  late final Animation<double> _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 4000),
+    )..repeat();
+
+    _scale = Tween<double>(begin: 0.1, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(0.0, 0.45, curve: Curves.elasticOut)),
+    );
+    _rotate = Tween<double>(begin: 0.0, end: 1.0).animate(_controller);
+    _pulse = Tween<double>(begin: 0.92, end: 1.08).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(0.45, 1.0, curve: Curves.bounceIn)),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScaleTransition(
+      scale: _scale,
+      child: Container(
+        padding: const EdgeInsets.all(Gaps.lg),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(28),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF581C87), Color(0xFF0F052D)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+          border: Border.all(color: Colors.amber, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.amber.withValues(alpha: 0.45),
+              blurRadius: 28,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Positioned(
+              width: 240,
+              height: 240,
+              child: RotationTransition(
+                turns: _rotate,
+                child: const CustomPaint(
+                  painter: _SunburstPainter(color: Color(0x22FFD36B)),
+                ),
+              ),
+            ),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ScaleTransition(
+                  scale: _pulse,
+                  child: const Text('👑', style: TextStyle(fontSize: 72)),
+                ),
+                Gaps.vSm,
+                const Text(
+                  'شخصیت جدید باز شد!',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.amber,
+                  ),
+                ),
+                Gaps.vXs,
+                const Text(
+                  'یک بازیکن کلکسیونی فوتبالی جدید به جمع شما پیوست!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, color: Colors.white70, fontWeight: FontWeight.bold),
+                ),
+                Gaps.vMd,
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: FilledButton.styleFrom(backgroundColor: Colors.amber),
+                    child: const Text(
+                      'ایول! دمت گرم 🔥',
+                      style: TextStyle(
+                        color: Color(0xFF3A2A00),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SunburstPainter extends CustomPainter {
+  final Color color;
+  const _SunburstPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = math.max(size.width, size.height);
+    const rays = 16;
+    const angleWidth = (math.pi * 2) / (rays * 2);
+
+    for (var i = 0; i < rays; i++) {
+      final startAngle = i * (math.pi * 2) / rays;
+      final path = Path()
+        ..moveTo(center.dx, center.dy)
+        ..lineTo(center.dx + radius * math.cos(startAngle), center.dy + radius * math.sin(startAngle))
+        ..lineTo(center.dx + radius * math.cos(startAngle + angleWidth), center.dy + radius * math.sin(startAngle + angleWidth))
+        ..close();
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
