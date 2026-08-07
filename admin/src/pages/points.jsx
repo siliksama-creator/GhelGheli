@@ -188,9 +188,14 @@ export function PointsPage({ request }) {
   return (
     <div className="stack">
       <div className="tabRow">
+        {/* ⚠️ نامِ تب عمداً با دکمهٔ «جست‌وجو»ی داخلِ فرم فرق دارد.
+            ممیزیِ مرورگر نشان داد وقتی هر دو «جست‌وجو» نام داشتند،
+            `get_by_role('button', name='جست‌وجو')` دو نتیجه می‌داد و
+            ابزار تبِ اشتباه را کلیک می‌کرد. برای صفحه‌خوان هم همان
+            ابهام وجود دارد. */}
         <Button variant={tab === 'search' ? 'primary' : 'secondary'}
           icon={Search} onClick={() => setTab('search')}>
-          جست‌وجو و ریز امتیازات
+          کاربران و ریز امتیازات
         </Button>
         <Button variant={tab === 'top' ? 'primary' : 'secondary'}
           icon={TrendingUp} onClick={() => setTab('top')}>

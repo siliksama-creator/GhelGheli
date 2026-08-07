@@ -3,11 +3,30 @@
 // a compact, reusable design-system layer instead of ad-hoc markup per page.
 import { Loader2 } from 'lucide-react';
 
-export function Button({ variant = 'primary', size = 'md', loading, icon: Icon, children, className = '', ...rest }) {
+export function Button({ variant = 'primary', size = 'md', loading, icon: Icon, children, className = '', type = 'button', ...rest }) {
   const variantClass = { primary: 'btn-primary', secondary: 'btn-secondary', ghost: 'btn-ghost', danger: 'btn-danger' }[variant];
   const sizeClass = size === 'sm' ? 'btn-sm' : '';
   return (
-    <button className={`btn ${variantClass} ${sizeClass} ${className}`} disabled={loading || rest.disabled} {...rest}>
+    // ── چرا `type` صریح است ──
+    //
+    // ⚠️ باگی که ممیزیِ مرورگر پیدا کرد.
+    //
+    // `<button>` بدونِ `type`، پیش‌فرض `submit` است. تا امروز بی‌ضرر بود
+    // چون هیچ دکمه‌ای داخلِ `<form>` نبود. با اضافه شدنِ فرمِ جست‌وجو در
+    // صفحهٔ «ریز امتیازات»، **هر** دکمهٔ داخلِ فرم ناخواسته فرم را ارسال
+    // می‌کرد و صفحه رفرش می‌شد.
+    //
+    // پیش‌فرضِ `button` امن است: دکمه‌ای که واقعاً باید فرم را ارسال کند
+    // صریحاً `type="submit"` می‌گیرد.
+    //
+    // ترتیب هم مهم است: `{...rest}` **بعد** از `type` می‌آید تا
+    // `type="submit"`ی که فراخوان می‌دهد بتواند پیش‌فرض را بازنویسی کند.
+    <button
+      className={`btn ${variantClass} ${sizeClass} ${className}`}
+      type={type}
+      disabled={loading || rest.disabled}
+      {...rest}
+    >
       {loading ? <Loader2 size={16} className="spin" /> : Icon ? <Icon size={16} /> : null}
       {children}
     </button>
