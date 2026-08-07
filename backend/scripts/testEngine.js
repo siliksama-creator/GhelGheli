@@ -91,12 +91,12 @@ function makeIo() {
     ok(a.rooms.size === 0 && b.rooms.size === 0, 'room cleaned up');
   }
 
-  // جفت‌یاب no longer has a bot, so the fallback is exercised on connect4.
-  console.log('\n== bot fallback (15s, connect4) ==');
+  // جفت‌یاب no longer has a bot, so the fallback is exercised on reversi.
+  console.log('\n== bot fallback (15s, reversi) ==');
   {
     const io = makeIo(); attach(io, RULES);
     const a = io.connect(new FakeSocket('lonely', 'تنها'));
-    a.fire('game:join', { gameId: 'connect4' });
+    a.fire('game:join', { gameId: 'reversi' });
     ok(a.has('game:waiting'), 'waits for a human first');
     ok(a.last('game:waiting').botFallback === true, 'a bot IS promised');
     ok(!a.has('game:start'), 'no instant bot game');
@@ -105,11 +105,11 @@ function makeIo() {
     ok(!!st && st.vsBot === true, 'falls back to the bot');
     ok(st.players.O.id === 'bot', 'bot occupies the second seat');
 
-    a.fire('game:move', { roomId: st.roomId, move: 0 });
+    a.fire('game:move', { roomId: st.roomId, move: 19 });
     await wait(1400);
     const upd = a.last('game:update');
     ok(!!upd, 'bot game produced an update');
-    ok(upd.state.board.some(c => c !== null), 'the board changed');
+    ok(upd.state.board.filter(Boolean).length > 4, 'the board changed');
     ok(['X', 'O'].includes(upd.turn), 'a valid player is on move');
   }
 
@@ -150,18 +150,6 @@ function makeIo() {
     const up = b.last('game:update');
     ok(up.state.board[27] === 'X', 'flip applied and broadcast');
     ok(up.state.scores.X === 4, 'score updated after flip');
-  }
-
-  console.log('\n== connect4 over the engine ==');
-  {
-    const io = makeIo(); attach(io, RULES);
-    const a = io.connect(new FakeSocket('c1', 'الف'));
-    const b = io.connect(new FakeSocket('c2', 'ب'));
-    a.fire('game:join', { gameId: 'connect4' });
-    b.fire('game:join', { gameId: 'connect4' });
-    const sa = a.last('game:start');
-    a.fire('game:move', { roomId: sa.roomId, move: 3 });
-    ok(a.last('game:update').state.board[38] === 'X', 'disc lands on the bottom row');
   }
 
   console.log('\n== leaving and disconnecting ==');
@@ -220,7 +208,7 @@ function makeIo() {
   console.log('\n== per-game turn budgets & match countdown ==');
   {
     const io = makeIo(); attach(io, RULES);
-    const budgets = { memory: 20000, connect4: 20000, reversi: 30000 };
+    const budgets = { memory: 20000, reversi: 30000 };
     for (const [gid, want] of Object.entries(budgets)) {
       const p1 = io.connect(new FakeSocket(`b-${gid}-1`, 'الف'));
       const p2 = io.connect(new FakeSocket(`b-${gid}-2`, 'ب'));
@@ -246,7 +234,7 @@ function makeIo() {
     b.fire('game:join', { gameId: 'memory' });
     ok(!!a.last('game:start'), 'match started');
     // Switching games mid-match must not strand the opponent in a dead room.
-    a.fire('game:join', { gameId: 'connect4' });
+    a.fire('game:join', { gameId: 'reversi' });
     ok(b.last('game:over')?.winner === 'DISCONNECT', 'opponent released from abandoned room');
     ok(b.rooms.size === 0, 'abandoned room cleaned up');
 

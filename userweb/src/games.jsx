@@ -13,15 +13,13 @@ const GAMES = [
   // Single-player: no lobby, no opponent, no bot. Mirrors the Flutter hub.
   { id: 'tap', title: 'ضربه‌زن', emoji: '👊', desc: '۵۰ لول ضربه بزن و شخصیت‌ها را باز کن', accent: '#84CC16', singlePlayer: true },
   { id: 'memory', title: 'جفت‌یاب', emoji: '🃏', desc: 'جفت‌ها را به خاطر بسپار و ببر', accent: '#A855F7', bot: false, solo: true },
-  { id: 'connect4', title: 'چهار در یک ردیف', emoji: '🔴', desc: 'چهارتا رو ردیف کن', accent: '#F59E0B', bot: true },
   { id: 'reversi', title: 'اتللو', emoji: '⚫', desc: 'مهره‌ها را برگردان', accent: '#34D399', bot: true },
 ];
 
-const MOVE_SFX = { memory: 'flip', connect4: 'drop', reversi: 'flip' };
+const MOVE_SFX = { memory: 'flip', reversi: 'flip' };
 
 const SYMBOLS = {
   memory: { X: '🟣', O: '🔵' },
-  connect4: { X: '🔴', O: '🟡' },
   reversi: { X: '⚫', O: '⚪' },
 };
 
@@ -223,24 +221,6 @@ function MemoryBoard({ g }) {
   );
 }
 
-function Connect4Board({ g }) {
-  const board = g.state.board || Array(42).fill(null);
-  const win = g.state.winLine || [];
-  return (
-    <div className="c4-board">
-      {Array.from({ length: 7 }, (_, c) => (
-        <button key={c} className="c4-col" disabled={!g.myTurn} onClick={() => g.move(c)}>
-          {Array.from({ length: 6 }, (_, r) => {
-            const i = r * 7 + c;
-            const v = board[i];
-            return <span key={r} className={`c4-disc ${v === 'X' ? 'red' : v === 'O' ? 'yellow' : ''} ${win.includes(i) ? 'win' : ''}`} />;
-          })}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 function ReversiBoard({ g }) {
   const board = g.state.board || Array(64).fill(null);
   const legal = g.state.legal || [];
@@ -258,7 +238,7 @@ function ReversiBoard({ g }) {
   );
 }
 
-const BOARDS = { memory: MemoryBoard, connect4: Connect4Board, reversi: ReversiBoard };
+const BOARDS = { memory: MemoryBoard, reversi: ReversiBoard };
 
 function Seat({ g, sym, symbol, openProfile }) {
   const info = g.players?.[symbol];

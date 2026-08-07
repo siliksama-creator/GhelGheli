@@ -493,7 +493,7 @@ class _ConfettiOverlay extends StatefulWidget {
 
 class _ConfettiOverlayState extends State<_ConfettiOverlay> with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
-  final List<_Particle> _particles = [];
+  late final List<_Particle> _particles;
   final _random = math.Random();
 
   @override
@@ -510,7 +510,15 @@ class _ConfettiOverlayState extends State<_ConfettiOverlay> with SingleTickerPro
       duration: const Duration(seconds: 4),
     )..repeat();
 
-    // Spawn 65 colorful confetti particles with different shapes
+    // ── حافظه و کیفیت ──
+    // تعداد ذرات به‌جای عددِ ثابت ۶۵، به مساحت صفحه مقیاس می‌شود: یک
+    // گوشی کوچک به ۴۵ ذره نیاز دارد نه ۶۵ — و ۶۵ ذرهٔ بیهوده یعنی یک
+    // حلقهٔ ترسیمِ تمام‌صفحهٔ اضافه در هر فریم. روی صفحات بزرگ هم
+    // طبیعی‌تر دیده می‌شود (تراکم یکسان). به همین ترتیب اندازهٔ ذره
+    // به عرض صفحه گره می‌خورد تا در موبایل‌های بزرگ‌تر شناورِ کوچکی
+    // به نظر نرسد.
+    final count = (45 + (MediaQuery.sizeOf(context).width / 18)).round()
+        .clamp(45, 90);
     final colors = [
       const Color(0xFFB5EF58), // Green
       const Color(0xFF38BDF8), // Blue
@@ -519,18 +527,16 @@ class _ConfettiOverlayState extends State<_ConfettiOverlay> with SingleTickerPro
       const Color(0xFFEC4899), // Pink
     ];
 
-    for (var i = 0; i < 65; i++) {
-      _particles.add(_Particle(
-        x: _random.nextDouble(),
-        y: _random.nextDouble() * -0.5, // Start slightly above screen
-        speed: 0.05 + _random.nextDouble() * 0.1,
-        angle: _random.nextDouble() * math.pi * 2,
-        rotationSpeed: _random.nextDouble() * 4 + 1.0,
-        size: 8.0 + _random.nextDouble() * 10.0,
-        color: colors[_random.nextInt(colors.length)],
-        shape: _random.nextInt(4), // 4 distinct shapes!
-      ));
-    }
+    _particles = List.generate(count, (_) => _Particle(
+      x: _random.nextDouble(),
+      y: _random.nextDouble() * -0.5, // Start slightly above screen
+      speed: 0.05 + _random.nextDouble() * 0.1,
+      angle: _random.nextDouble() * math.pi * 2,
+      rotationSpeed: _random.nextDouble() * 4 + 1.0,
+      size: 7.0 + _random.nextDouble() * 9.0,
+      color: colors[_random.nextInt(colors.length)],
+      shape: _random.nextInt(4), // 4 distinct shapes!
+    ));
   }
 
   @override
@@ -541,19 +547,25 @@ class _ConfettiOverlayState extends State<_ConfettiOverlay> with SingleTickerPro
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, _) {
-        final size = MediaQuery.sizeOf(context);
-        return CustomPaint(
+    // `size` را یک بار بیرون از AnimatedBuilder می‌گیریم: اندازهٔ صفحه در
+    // طولِ انیمیشنِ ۴ ثانیه‌ای عوض نمی‌شود و گرفتنِ MediaQuery در هر فریم
+    // فقط هزینهٔ re-layout/rebuild بی‌مورد است.
+    final size = MediaQuery.sizeOf(context);
+    return RepaintBoundary(
+      // RepaintBoundary انیمیشنِ ذرات را از بقیهٔ صفحه جدا می‌کند؛ وقتی
+      // هر ذره canvas را لمس می‌کند، لایه‌ی شناورها را دوباره نمی‌کشد —
+      // فقط همین لایه. این بزرگ‌ترین تک‌قدمِ حافظه/عملکرد در این صفحه است.
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) => CustomPaint(
           size: size,
           painter: _ConfettiPainter(
             particles: _particles,
             progress: _controller.value,
             screenSize: size,
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
@@ -591,11 +603,44 @@ class _ConfettiPainter extends CustomPainter {
   final double progress;
   final Size screenSize;
 
+  // مسیرهای ستاره و مثلث را یک بار می‌سازیم و با transform (translate +
+  // scale + rotate روی canvas) هر ذره را بدونِ ساخت Path تازه رسم می‌کنیم.
+  static final Path _starUnit = _unitStar();
+  static final Path _triangleUnit = _unitTriangle();
+
+  static Path _unitStar() {
+    final path = Path();
+    const points = 5;
+    const outer = 1.0;
+    const inner = 0.45;
+    for (var i = 0; i < points * 2; i++) {
+      final r = i % 2 == 0 ? outer : inner;
+      final angle = (i * math.pi) / points;
+      final x = r * math.cos(angle);
+      final y = r * math.sin(angle);
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+    return path..close();
+  }
+
+  static Path _unitTriangle() {
+    return Path()
+      ..moveTo(0, -0.5)
+      ..lineTo(0.5, 0.5)
+      ..lineTo(-0.5, 0.5)
+      ..close();
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..style = PaintingStyle.fill;
 
-    for (final p in particles) {
+    for (var i = 0; i < particles.length; i++) {
+      final p = particles[i];
       // Move particles downwards based on speed and frame tick
       p.y += p.speed * 0.05;
       p.x += math.sin(p.y * 8 + p.angle) * 0.004; // zigzag path
@@ -603,13 +648,13 @@ class _ConfettiPainter extends CustomPainter {
       // Reset when particle goes off screen bottom
       if (p.y > 1.2) {
         p.y = -0.1;
-        p.x = math.Random().nextDouble();
+        // یک PRNG تازه نمی‌سازیم؛ از seedِ ثابتِ خودِ ذره (تعیین‌شده در
+        // سازنده) برای یک xِ تازه ولی ارزان استفاده می‌کنیم.
+        p.x = _pseudoRandom(i);
       }
 
       final px = p.x * size.width;
       final py = p.y * size.height;
-
-      paint.color = p.color;
 
       canvas.save();
       canvas.translate(px, py);
@@ -637,37 +682,25 @@ class _ConfettiPainter extends CustomPainter {
         // Circular Confetti
         canvas.drawCircle(Offset.zero, p.size * 0.4, paint);
       } else if (p.shape == 2) {
-        // Triangular Confetti
-        final path = Path()
-          ..moveTo(0, -p.size * 0.5)
-          ..lineTo(p.size * 0.5, p.size * 0.5)
-          ..lineTo(-p.size * 0.5, p.size * 0.5)
-          ..close();
-        canvas.drawPath(path, paint);
+        // Triangular Confetti — ترسیمِ واحدِ کشیده‌شده، نه Path تازه
+        canvas.save();
+        canvas.scale(p.size, p.size);
+        canvas.drawPath(_triangleUnit, paint);
+        canvas.restore();
       } else {
-        // Shimmering Star Confetti
-        final path = Path();
-        const points = 5;
-        final outerRadius = p.size * 0.55;
-        final innerRadius = p.size * 0.25;
-        for (var i = 0; i < points * 2; i++) {
-          final r = i % 2 == 0 ? outerRadius : innerRadius;
-          final angle = (i * math.pi) / points;
-          final x = r * math.cos(angle);
-          final y = r * math.sin(angle);
-          if (i == 0) {
-            path.moveTo(x, y);
-          } else {
-            path.lineTo(x, y);
-          }
-        }
-        path.close();
-        canvas.drawPath(path, paint);
+        // Shimmering Star Confetti — unit-path با مقیاسِ p.size
+        canvas.save();
+        canvas.scale(p.size, p.size);
+        canvas.drawPath(_starUnit, paint);
+        canvas.restore();
       }
-      
+
       canvas.restore();
     }
   }
+
+  /// یک مقدارِ شبه‌تصادفیِ ارزان بین ۰ و ۱ از اندیسِ ذره (بدون تخصیص).
+  double _pseudoRandom(int i) => ((i * 2654435761) % 1000000) / 1000000;
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;

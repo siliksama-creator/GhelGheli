@@ -31,8 +31,18 @@ export function RewardsPage({ request }) {
 
   async function add(e) {
     e.preventDefault();
-    if (rewards.length >= 30) {
-      notify('حداکثر ۳۰ جایزه قابل تعریف است', 'error');
+    // ═══════════════════════════════════════════════════════════════════
+    // باگِ «ثبت جوایز از کار افتاده»: سقفِ کلاینت ۳۰ بود ولی سرور اجازهٔ
+    // ۵۰۰ جایزه می‌دهد و دیتابیسِ زنده از ۳۰ گذشته بود. نتیجه: دکمهٔ
+    // «ذخیره جایزه» برای همیشه غیرفعال می‌ماند و مدیر نمی‌توانست
+    // جایزهٔ تازه ثبت کند — بدون هیچ پیامی، فقط دکمه قفل.
+    //
+    // حالا کلاینت با سرور هم‌راستاست (۵۰۰) و فقط بالای همان سقفِ واقعیِ
+    // سرور پیام می‌دهد. دکمه هم به‌جای قفل مطلق، فقط وقتی بالای ۵۰۰ باشد
+    // غیرفعال است — سرور هنوز معتبرترین مرجعِ سقف است و همین‌جا هم بازتولید
+    // واریانسِ کلاینت/سرور نمی‌شود.
+    if (rewards.length >= 500) {
+      notify('حداکثر ۵۰۰ جایزه فعال قابل تعریف است', 'error');
       return;
     }
     setSaving(true);
@@ -190,7 +200,7 @@ export function RewardsPage({ request }) {
           </div>
         </Card>
 
-        <Card title={`سطح جایزه جدید (${fmtNumber(rewards.length)}/۳۰)`}>
+        <Card title={`سطح جایزه جدید (${fmtNumber(rewards.length)}/۵۰۰)`}>
           <form onSubmit={add}>
             <Field label="نام جایزه">
               <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
@@ -247,7 +257,7 @@ export function RewardsPage({ request }) {
             <Field label="توضیحات">
               <Textarea value={form.desc} onChange={(e) => setForm({ ...form, desc: e.target.value })} rows={3} />
             </Field>
-            <Button type="submit" loading={saving} disabled={rewards.length >= 30} className="btn-block">
+            <Button type="submit" loading={saving} disabled={rewards.length >= 500} className="btn-block">
               ذخیره جایزه
             </Button>
           </form>

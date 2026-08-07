@@ -168,6 +168,11 @@ class MemoryCard extends StatelessWidget {
                     art,
                     fit: BoxFit.contain,
                     filterQuality: FilterQuality.medium,
+                    // PERF: هر کارتِ جفت‌یاب هرگز بزرگ‌تر از ~۱/۴ صفحه رسم
+                    // نمی‌شود (~۱۲۰ پیکسل منطقی). بدون cacheWidth هر آیکنِ
+                    // ۵۱۲×۵۱۲ کارت ~۱MB رم می‌گرفت؛ با سقف ۲۵۶، ~۲۶۰KB —
+                    // و در یک تختهٔ ۱۶ کارتی یعنی چند مگابایت کمتر در حافظه.
+                    cacheWidth: 256,
                     errorBuilder: (_, __, ___) => const Center(
                       child: Text(_fallback, style: TextStyle(fontSize: 26)),
                     ),

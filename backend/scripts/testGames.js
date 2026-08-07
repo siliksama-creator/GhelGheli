@@ -184,38 +184,7 @@ console.log('\n== memory (جفت‌یاب) ==');
   }
 }
 
-console.log('\n== connect4 ==');
-{
-  const r = RULES.connect4;
-  let s = r.create();
-  ok(s.board.length === 42, 'board is 7x6');
-  r.applyMove(s, 0, 'X');
-  ok(s.board[35] === 'X', 'disc falls to the bottom');
-  r.applyMove(s, 0, 'O');
-  ok(s.board[28] === 'O', 'stacks on top');
-
-  s = r.create();
-  play(r, s, [0, 1, 0, 1, 0, 1, 0]);
-  ok(r.result(s) === 'X', 'detects vertical win');
-
-  s = r.create();
-  play(r, s, [0, 0, 1, 1, 2, 2, 3]);
-  ok(r.result(s) === 'X', 'detects horizontal win');
-
-  s = r.create();
-  for (let i = 0; i < 6; i++) r.applyMove(s, 0, 'X');
-  ok(!r.isValidMove(s, 0), 'full column rejected');
-
-  s = r.create();
-  [0, 1, 2].forEach(c => r.applyMove(s, c, 'O'));
-  ok(r.botMove(s, 'O') === 3, 'bot completes four');
-
-  s = r.create();
-  [0, 1, 2].forEach(c => r.applyMove(s, c, 'X'));
-  ok(r.botMove(s, 'O') === 3, 'bot blocks four');
-
-  ok(r.botMove(r.create(), 'X') === 3, 'bot opens in the centre');
-}
+// Connect Four (چهار در یک ردیف) was retired — see src/games/index.js.
 
 console.log('\n== reversi ==');
 {

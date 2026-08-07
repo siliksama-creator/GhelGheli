@@ -4,16 +4,17 @@ const attachGames = require('./engine');
 const { attachSolo } = require('./solo');
 
 const memory = require('./rules/memory');
-const connect4 = require('./rules/connect4');
 const reversi = require('./rules/reversi');
 const penalty = require('./rules/penalty');
 
 // Snakes & Ladders was retired: keeping the board legible needed constant
-// artwork tuning, and it was ultimately dice-driven. جفت‌یاب (memory) puts
+// artwork tuning, and it was ultimately dice-driven. Connect Four (چهار در
+// یک ردیف) was also retired on the owner's request — it contributed little
+// and duplicated Reversi's two-player-tactics slot. جفت‌یاب (memory) puts
 // purpose-made 3D football icons on a 3D card-flip and rewards real skill
 // (a match keeps your turn). It is the one game with NO bot: you either meet
 // a real opponent or play solo time-attack.
-const RULES = { memory, connect4, reversi, penalty };
+const RULES = { memory, reversi, penalty };
 
 // Public catalogue served over REST so the app never hardcodes the list.
 const CATALOG = [
@@ -22,11 +23,6 @@ const CATALOG = [
     subtitle: 'جفت‌ها را به خاطر بسپار و ببر', accent: '#A855F7', minutes: 4,
     // No computer opponent here — real rival, or solo against the clock.
     noBot: true, solo: true,
-  },
-  {
-    id: 'connect4', title: 'چهار در یک ردیف', emoji: '🔴',
-    subtitle: 'چهارتا رو ردیف کن', accent: '#F59E0B', minutes: 5,
-    noBot: false, solo: false,
   },
   {
     id: 'reversi', title: 'اتللو', emoji: '⚫',

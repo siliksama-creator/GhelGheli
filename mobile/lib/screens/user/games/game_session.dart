@@ -364,8 +364,6 @@ class GameSession extends ChangeNotifier {
   /// Piece-placement sound, chosen per game so each board feels distinct.
   Sfx get moveSound {
     switch (gameId) {
-      case 'connect4':
-        return Sfx.drop;
       case 'reversi':
         return Sfx.flip;
       case 'memory':

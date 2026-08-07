@@ -7,7 +7,6 @@ import '../../api_client.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/level_badge.dart';
-import 'games/connect4_board.dart';
 import 'games/reversi_board.dart';
 import 'games/memory_board.dart';
 import 'games/penalty_board.dart';
@@ -60,8 +59,6 @@ const _games = <_GameEntry>[
   _GameEntry('memory', 'جفت‌یاب', 'جفت‌ها را به خاطر بسپار و ببر', '🃏',
       Color(0xFFA855F7), 'assets/games/memory.webp',
       bot: false, solo: true),
-  _GameEntry('connect4', 'چهار در یک ردیف', 'چهارتا رو ردیف کن', '🔴',
-      Color(0xFFF59E0B), 'assets/games/connect4.webp'),
   _GameEntry('reversi', 'اتللو', 'مهره‌ها را برگردان', '⚫', Color(0xFF34D399),
       'assets/games/reversi.webp'),
 ];
@@ -125,8 +122,6 @@ class _GamesHubPageState extends State<GamesHubPage> {
         return TapGameScreen(api: widget.api, onBack: _back);
       case 'memory':
         return MemoryScreen(api: widget.api, onBack: _back);
-      case 'connect4':
-        return Connect4Screen(api: widget.api, onBack: _back);
       case 'reversi':
         return ReversiScreen(api: widget.api, onBack: _back);
       case 'penalty':

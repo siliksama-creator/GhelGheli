@@ -64,7 +64,7 @@ const WAIT_MS = 15_000;
     ok(mem.solo === true, 'memory is advertised as solo-capable');
     ok(RULES.memory.noBot === true, 'memory rules carry noBot');
     ok(RULES.memory.solo === true, 'memory rules carry solo');
-    ok(!RULES.connect4.noBot && !RULES.reversi.noBot,
+    ok(!RULES.reversi.noBot && !RULES.penalty.noBot,
       'the other games keep their bot');
   }
 
@@ -121,11 +121,11 @@ const WAIT_MS = 15_000;
   console.log('\n== other games keep their bot ==');
   {
     const c = io.connect({ id: 'u3', nickname: 'حسن' });
-    c.fire('game:join', { gameId: 'connect4' });
-    ok(c.last('game:waiting').botFallback === true, 'connect4 still advertises the bot');
+    c.fire('game:join', { gameId: 'reversi' });
+    ok(c.last('game:waiting').botFallback === true, 'reversi still advertises the bot');
     await sleep(WAIT_MS + 700);
     const st = c.last('game:start');
-    ok(!!st && st.vsBot === true, 'connect4 falls back to the bot as before');
+    ok(!!st && st.vsBot === true, 'reversi falls back to the bot as before');
     c.fire('game:leave', {});
   }
 
@@ -142,7 +142,7 @@ const WAIT_MS = 15_000;
 
     // A non-solo game must be refused.
     const s2 = io.connect({ id: 'u5' });
-    s2.fire('solo:start', { gameId: 'connect4' });
+    s2.fire('solo:start', { gameId: 'reversi' });
     ok(!!s2.last('solo:error'), 'solo is refused for a game that does not support it');
     s2.fire('solo:start', { gameId: 'nope' });
     ok(s2.count('solo:error') === 2, 'unknown game id is refused');

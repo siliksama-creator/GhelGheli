@@ -5,6 +5,7 @@
 // `{Game}Screen(api, onBack)` contract as the other games so the hub can
 // launch it identically.
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

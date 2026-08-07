@@ -56,8 +56,14 @@ void main() {
       )));
       await t.pump(const Duration(milliseconds: 600));
       final img = t.widget<Image>(find.byType(Image));
-      expect((img.image as AssetImage).assetName,
-          'assets/games/memory/trophy.webp');
+      // The card decodes the face at a capped size (cacheWidth) to keep a
+      // 16-card board light on RAM. That wraps the provider in a ResizeImage,
+      // so we unwrap it before checking which asset it really points at.
+      final provider = img.image;
+      final asset = provider is ResizeImage
+          ? provider.imageProvider as AssetImage
+          : provider as AssetImage;
+      expect(asset.assetName, 'assets/games/memory/trophy.webp');
     });
 
     testWidgets('a disabled card does not fire onTap', (t) async {
