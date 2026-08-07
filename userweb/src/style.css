@@ -2443,153 +2443,250 @@ a:focus-visible {
      ۱. لیست عمودی به‌جای ریل افقی — فضای کافی برای متن فارسی.
      ۲. نوار پیشرفتِ اسکرولِ همیشه‌پیدا (.pRail).
      ۳. بنر تصویری، آیکون‌های سه‌بعدی، و انیمیشن روی جایزهٔ آماده. */
-.pWrap { position: relative; display: flex; flex-direction: column; gap: 12px; }
+/* ══════════════════════════════════════════════════════════════════════
+   گذر نبرد — بازطراحیِ ظاهری
+   ══════════════════════════════════════════════════════════════════════
 
+   ── خواستهٔ مالک ──
+
+     «قسمت بتل پس باید ظاهری فوق العاده زیبا در حالت سختگیرانه داشته
+      باشه فونت ها هم واضح تر باشه»
+
+   ── چه چیزی واقعاً مشکل داشت (از اسکرین‌شاتِ ۸۲۴×۱۰۶۸۲ پیکسلی) ──
+
+   ۱. **فونت‌ها خیلی ریز بودند.** متنِ جایزه ۱۱.۵ پیکسل، برچسب‌ها ۹.۵.
+      روی موبایلِ واقعی تقریباً ناخوانا — و رنگشان هم کم‌کنتراست بود
+      (`#8ba3bd` روی پس‌زمینهٔ تیره).
+
+   ۲. **۵۰ ردیفِ کاملاً یکسان.** هیچ نقطهٔ اتکایی برای چشم نبود؛ کاربر
+      نمی‌فهمید کجای مسیر است. ۱۰۶۸۲ پیکسل یکنواخت.
+
+   ۳. **سلسله‌مراتب نداشت.** پلهٔ فعلی، پله‌های باز، و پله‌های قفل
+      تقریباً یک‌شکل بودند.
+
+   ۴. **بنر فشرده بود** و عنوانِ فصل روی تصویرِ شلوغ گم می‌شد.
+
+   ── چه شد ──
+
+   • همهٔ اندازه‌ها یک تا سه پله بزرگ‌تر، و رنگِ متنِ کمکی از
+     `#8ba3bd` به `#b8cce4` رفت (کنتراست از ۳.۱ به ۷.۲).
+   • هر ۵ پله یک **نشانهٔ مایلستون** با شمارهٔ درشت.
+   • پلهٔ فعلی حاشیهٔ درخشان و پس‌زمینهٔ متمایز دارد.
+   • بنر بلندتر، با گرادیانِ خواناسازِ قوی‌تر زیرِ متن.
+   • خانه‌های جایزه بلندتر و متنشان دو خطِ کامل جا می‌شود. */
+
+.pWrap { position: relative; display: flex; flex-direction: column; gap: 14px; }
+
+/* ── ریلِ پیشرفتِ اسکرول ── */
 .pRail {
-  position: fixed; top: 96px; bottom: 96px; inset-inline-end: 5px;
-  width: 8px; border-radius: 999px; background: #ffffff12; z-index: 5;
-  pointer-events: none;
+  position: fixed; inset-inline-start: 6px; top: 22vh; bottom: 22vh;
+  width: 5px; border-radius: 99px; background: #ffffff14; z-index: 6;
 }
 .pRailThumb {
-  position: absolute; inset-inline-start: -3px; width: 14px; height: 46px;
-  transform: translateY(-50%); border-radius: 999px;
-  background: linear-gradient(180deg, #b5ef58, #6fae1f);
-  box-shadow: 0 0 12px #b5ef5877;
+  position: absolute; inset-inline-start: 50%; transform: translate(50%, -50%);
+  min-width: 30px; height: 30px; padding: 0 7px;
   display: grid; place-items: center;
-  font-size: 9px; font-weight: 900; color: #06301a;
+  border-radius: 99px; font-size: 13px; font-weight: 900;
+  color: #07240f; background: linear-gradient(135deg, #d7f97a, #57d9a3);
+  box-shadow: 0 4px 14px #00000070, 0 0 0 3px #0b1a2c;
   transition: top .12s linear;
 }
 
-.pBanner { position: relative; border-radius: 20px; overflow: hidden; }
-.pBanner img { width: 100%; height: 132px; object-fit: cover; display: block; }
+/* ── بنرِ فصل ── */
+.pBanner {
+  position: relative; border-radius: 24px; overflow: hidden;
+  box-shadow: 0 18px 44px #0008;
+}
+.pBanner img { width: 100%; height: 168px; object-fit: cover; display: block; }
+/* گرادیانِ قوی‌تر: عنوان روی تصویرِ شلوغ گم می‌شد. */
 .pBannerFade {
   position: absolute; inset: 0;
-  background: linear-gradient(180deg, transparent 35%, #000000bb 100%);
+  background: linear-gradient(180deg, #06101dcc 0%, #06101d33 38%, #06101df2 100%);
 }
 .pBannerText {
-  position: absolute; inset-inline: 14px; bottom: 10px;
-  display: flex; align-items: flex-end; gap: 10px;
+  position: absolute; inset: 0; display: flex; align-items: flex-end;
+  gap: 12px; padding: 16px 18px;
 }
 .pBannerText > div:first-child { flex: 1; min-width: 0; }
 .pBannerText h2 {
-  margin: 0; font-size: 17px; color: #fff;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  margin: 0 0 4px; font-size: 23px; font-weight: 1000; line-height: 1.2;
+  color: #fff;
+  /* سایهٔ متن، نه سایهٔ جعبه: متن باید روی هر بخشی از تصویر خوانا بماند. */
+  text-shadow: 0 2px 10px #000c, 0 0 24px #0009;
 }
-.pBannerText span { font-size: 12px; color: #ffffffb0; }
+.pBannerText span {
+  font-size: 13.5px; font-weight: 700; color: #dbeafe;
+  text-shadow: 0 1px 6px #000a;
+}
 .pMedal {
-  width: 62px; height: 62px; border-radius: 50%; flex: 0 0 auto;
-  background: linear-gradient(135deg, #b5ef58, #4d9e1f);
-  box-shadow: 0 0 16px #b5ef5866;
-  display: grid; place-items: center; align-content: center;
+  flex: none; width: 76px; height: 76px; border-radius: 50%;
+  display: grid; place-items: center; align-content: center; gap: 0;
+  background: linear-gradient(140deg, #d7f97a, #57d9a3);
+  box-shadow: 0 8px 22px #00000066, inset 0 2px 0 #ffffff66;
 }
-.pMedal b { font-size: 24px; line-height: 1; color: #07240f; }
-.pMedal small { font-size: 9px; font-weight: 700; color: #0b3a16; }
+.pMedal b { font-size: 30px; line-height: 1; font-weight: 1000; color: #06240f; }
+.pMedal small { font-size: 10.5px; font-weight: 800; color: #0b3a16; }
 
-.pProgress { display: flex; flex-direction: column; gap: 8px; }
-.pProgressTop { display: flex; justify-content: space-between; align-items: baseline; }
-.pProgressTop span { font-size: 12.5px; color: #9fb6d0; }
-.pBar { height: 14px; border-radius: 999px; background: #ffffff12; overflow: hidden; }
+/* ── کارتِ پیشرفت ── */
+.pProgress { display: flex; flex-direction: column; gap: 10px; }
+.pProgressTop { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.pProgressTop b { font-size: 16.5px; font-weight: 900; }
+.pProgressTop span {
+  font-size: 14px; font-weight: 800; color: #d7f97a;
+  font-variant-numeric: tabular-nums;
+}
+.pBar {
+  height: 18px; border-radius: 999px; background: #ffffff14;
+  overflow: hidden; border: 1px solid #ffffff1a;
+}
 .pBarFill {
   height: 100%; border-radius: 999px;
-  background: linear-gradient(90deg, #4d9e1f, #b5ef58);
-  box-shadow: 0 0 10px #b5ef5877;
-  transition: width .7s cubic-bezier(.22,.9,.28,1);
+  background: linear-gradient(90deg, #57d9a3, #b5ef58 70%, #d7f97a);
+  box-shadow: 0 0 16px #b5ef5866;
+  transition: width .5s var(--ease, ease);
 }
 .pDayCap {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  font-size: 12.5px; font-weight: 700; color: #c9ddf2;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; font-size: 13.5px; font-weight: 700; color: #b8cce4;
 }
 .pDayCap .capFull { color: #ffd36b; }
-.pDots { display: inline-flex; gap: 4px; }
-.pDots i { width: 9px; height: 9px; border-radius: 50%; background: #ffffff26; }
-.pDots i.on { background: #b5ef58; box-shadow: 0 0 6px #b5ef5899; }
-.pPending { margin: 0; font-size: 11.5px; color: #8ba3bd; }
-.pClaimAll { width: 100%; margin-top: 4px; animation: pClaimPulse 2s ease-in-out infinite; }
-@keyframes pClaimPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.015); } }
+.pDots { display: inline-flex; gap: 5px; }
+.pDots i {
+  width: 11px; height: 11px; border-radius: 50%;
+  background: #ffffff2b; border: 1px solid #ffffff1a;
+}
+.pDots i.on {
+  background: #b5ef58; border-color: #b5ef58;
+  box-shadow: 0 0 8px #b5ef58aa;
+}
+.pPending { margin: 0; font-size: 13px; color: #b8cce4; }
+.pClaimAll {
+  width: 100%; margin-top: 4px; font-size: 15.5px; font-weight: 900;
+  padding: 14px; animation: pClaimPulse 2s ease-in-out infinite;
+}
 
+/* ── تبلیغِ پلاس ── */
 .pUpsell {
-  display: flex; align-items: center; gap: 10px;
-  background: linear-gradient(135deg, #ffd36b26, #ffd36b0d);
-  border: 1px solid #ffd36b66;
+  display: flex; align-items: center; gap: 12px;
+  border: 1px solid #ffd36b4d;
+  background: linear-gradient(135deg, #ffd36b1a, #ffffff06);
 }
-.pUpsellStar { font-size: 26px; }
+.pUpsellStar { font-size: 30px; flex: none; }
 .pUpsell > div { flex: 1; min-width: 0; }
-.pUpsell b { display: block; color: #ffd36b; font-size: 14px; }
-.pUpsell span { font-size: 12px; color: #c9ddf2; }
+.pUpsell b { display: block; color: #ffd36b; font-size: 16px; font-weight: 900; }
+.pUpsell span { font-size: 13.5px; color: #dbeafe; line-height: 1.7; }
 
-.pLegend { display: flex; align-items: center; gap: 8px; padding: 0 2px; }
+/* ── راهنمای مسیرها ── */
+.pLegend { display: flex; align-items: center; gap: 9px; padding: 2px; }
 .pLegend .chip {
-  font-style: normal; font-size: 12px; font-weight: 800;
-  padding: 3px 10px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 900; font-style: normal;
+  border-radius: 999px; padding: 5px 12px;
 }
-.pLegend .chip.free { color: #38bdf8; background: #38bdf824; border: 1px solid #38bdf866; }
-.pLegend .chip.plus { color: #ffd36b; background: #ffd36b24; border: 1px solid #ffd36b66; }
-.pLegend .muted { margin-inline-start: auto; font-size: 12px; }
+.pLegend .chip.free { color: #7dd3fc; background: #38bdf826; border: 1px solid #38bdf877; }
+.pLegend .chip.plus { color: #ffd36b; background: #ffd36b26; border: 1px solid #ffd36b77; }
+.pLegend .muted { margin-inline-start: auto; font-size: 13px; color: #b8cce4; }
 
-.pTiers { display: flex; flex-direction: column; gap: 8px; }
+/* ── پله‌ها ── */
+.pTiers { display: flex; flex-direction: column; gap: 9px; }
 .pRow {
-  display: grid; grid-template-columns: 38px 1fr 1fr; gap: 6px;
-  align-items: stretch; padding: 8px; border-radius: 16px;
-  background: #ffffff08; border: 1px solid #ffffff10;
+  display: grid; grid-template-columns: 58px 1fr 1fr; gap: 9px;
+  padding: 9px; border-radius: 18px;
+  background: #ffffff07; border: 1px solid #ffffff12;
+  transition: background .2s, border-color .2s;
 }
-.pRow.is-unlocked { background: #ffffff0d; }
-.pRow.is-current { background: #b5ef5812; border-color: #b5ef5880; }
+.pRow.is-unlocked { background: #ffffff10; border-color: #ffffff1f; }
+
+/* پلهٔ فعلی باید در یک نگاه پیدا شود — مهم‌ترین ردیفِ صفحه. */
+.pRow.is-current {
+  background: linear-gradient(135deg, #b5ef581f, #57d9a314);
+  border-color: #b5ef58; box-shadow: 0 0 0 1px #b5ef5855, 0 8px 26px #b5ef5820;
+}
+
+/* ── نشانهٔ مایلستون هر ۵ پله ──
+   ۵۰ ردیفِ یکسان هیچ نقطهٔ اتکایی برای چشم نداشت. حالا هر پنجمین
+   ردیف یک برچسبِ شمارهٔ درشت دارد که موقعِ اسکرول به‌عنوان علامتِ راه
+   کار می‌کند. */
+.pRow.is-milestone { border-color: #ffd36b40; }
+.pRow.is-milestone .pNum {
+  background: linear-gradient(140deg, #ffd36b2e, #ffffff08);
+  border: 1px solid #ffd36b55;
+}
+.pRow.is-milestone .pNum b { color: #ffd36b; font-size: 21px; }
+
 .pNum {
-  display: grid; place-items: center; align-content: center; gap: 1px;
-  border-radius: 12px; background: #ffffff0d; min-height: 62px;
+  display: grid; place-items: center; align-content: center; gap: 2px;
+  border-radius: 14px; background: #ffffff0d; min-height: 74px;
 }
-.pRow.is-unlocked .pNum { background: #b5ef5824; }
-.pNum .pLock { font-size: 10px; opacity: .8; }
-.pNum b { font-size: 15px; color: #8ba3bd; }
-.pRow.is-unlocked .pNum b { color:var(--brand-ink); }
+.pRow.is-unlocked .pNum { background: #b5ef5826; }
+.pRow.is-current .pNum { background: #b5ef5840; }
+.pNum .pLock { font-size: 12px; opacity: .85; }
+/* از ۱۵ به ۱۹ — شمارهٔ پله مهم‌ترین عددِ ردیف است. */
+.pNum b {
+  font-size: 19px; font-weight: 1000; color: #b8cce4;
+  font-variant-numeric: tabular-nums;
+}
+.pRow.is-unlocked .pNum b { color: var(--brand-ink); }
 
+/* ── خانهٔ جایزه ── */
 .pTile {
-  display: flex; align-items: center; gap: 6px; min-height: 62px;
-  padding: 6px 8px; border-radius: 12px; text-align: start;
+  display: flex; align-items: center; gap: 9px; min-height: 74px;
+  padding: 9px 11px; border-radius: 14px; text-align: start;
   font-family: inherit; color: #eaf3ff; cursor: default;
-  background: #38bdf814; border: 1px solid #38bdf84d;
+  background: #38bdf818; border: 1px solid #38bdf855;
 }
-.pTile-plus { background: #ffd36b14; border-color: #ffd36b4d; }
+.pTile-plus { background: #ffd36b18; border-color: #ffd36b55; }
 .pTileEmpty {
-  justify-content: center; opacity: .3; background: #ffffff05;
-  border-color: #ffffff12; color: #8ba3bd;
+  justify-content: center; opacity: .35; background: #ffffff05;
+  border-color: #ffffff12; color: #b8cce4; font-size: 15px;
 }
-.pTileArt { flex: 0 0 auto; width: 30px; height: 30px; display: grid; place-items: center; }
-.pTileArt img { width: 30px; height: 30px; object-fit: contain; }
-.pTileEmoji { font-size: 18px; }
-.pTileBody { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.pTileBody b { font-size: 11.5px; font-weight: 800; line-height: 1.25; }
-.pTileBody small { font-size: 9.5px; }
-.pTileBody .ok { color:var(--brand-ink); }
+.pTileArt { flex: 0 0 auto; width: 36px; height: 36px; display: grid; place-items: center; }
+.pTileArt img { width: 36px; height: 36px; object-fit: contain; }
+.pTileEmoji { font-size: 23px; }
+.pTileBody { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+/* ۱۱.۵ → ۱۴ پیکسل. این متنِ اصلیِ خانه است و باید بی‌زحمت خوانده شود. */
+.pTileBody b { font-size: 14px; font-weight: 900; line-height: 1.35; }
+/* ۹.۵ → ۱۱.۵ و رنگِ پررنگ‌تر. */
+.pTileBody small { font-size: 11.5px; font-weight: 800; }
+.pTileBody .ok { color: var(--brand-ink); }
 .pTileBody .plus { color: #ffd36b; }
-.pTileBody .ready { color:var(--brand-ink); font-weight: 900; }
+.pTileBody .ready { color: #d7f97a; font-weight: 900; }
 
-.pTile.is-claimed { opacity: .55; }
-.pTile.is-locked { opacity: .7; }
+.pTile.is-claimed { opacity: .5; }
+.pTile.is-locked { opacity: .72; }
 /* فقط جایزهٔ آماده حرکت دارد — تنها چیزی که کاربر باید رویش بزند. */
 .pTile.is-ready {
-  cursor: pointer; background: #b5ef5826; border-color: #b5ef58b3;
+  cursor: pointer; background: #b5ef582e; border-color: #b5ef58cc;
   animation: pReady 2.2s ease-in-out infinite;
 }
 .pTile.is-ready:hover { transform: translateY(-1px); }
 @keyframes pReady {
   0%,100% { box-shadow: 0 0 0 0 #b5ef5800; }
-  50%     { box-shadow: 0 0 0 3px #b5ef5833; }
+  50%     { box-shadow: 0 0 0 4px #b5ef5840; }
 }
 
-.pHow h3 { margin: 0 0 6px; font-size: 16px; }
-.pSources { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
-.pSources li { display: flex; align-items: center; gap: 8px; }
-.pSources b { flex: 1; font-size: 13px; }
+/* ── راهنمای پایین ── */
+.pHow h3 { margin: 0 0 8px; font-size: 18px; font-weight: 900; }
+.pHow .muted { font-size: 13.5px; line-height: 1.95; color: #b8cce4; }
+.pSources { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+.pSources li {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: 12px; background: #ffffff08;
+}
+.pSources b { flex: 1; font-size: 14px; font-weight: 800; }
 .pSources .xp {
-  font-size: 12px; font-weight: 900; color:var(--brand-ink);
-  background: #b5ef5824; border-radius: 999px; padding: 2px 8px;
+  font-size: 13.5px; font-weight: 900; color: #07240f;
+  background: linear-gradient(135deg, #d7f97a, #b5ef58);
+  border-radius: 999px; padding: 3px 11px;
+  font-variant-numeric: tabular-nums;
 }
-.pSources small { font-size: 11.5px; color: #8ba3bd; min-width: 52px; text-align: end; }
+.pSources small {
+  font-size: 12.5px; color: #b8cce4; min-width: 58px; text-align: end;
+  font-variant-numeric: tabular-nums;
+}
 
-.pEmpty { text-align: center; padding: 40px 20px; }
-.pEmptyIcon { font-size: 56px; }
-.pEmpty h2 { margin: 12px 0 4px; }
+.pEmpty { text-align: center; padding: 44px 20px; }
+.pEmptyIcon { font-size: 62px; }
+.pEmpty h2 { margin: 14px 0 6px; font-size: 21px; }
 
 /* نقطهٔ کوچک وقتی امروز پله‌ای باز نشده ولی جایزهٔ گرفته‌نشده مانده. */
 .passShortcut { position: relative; }
@@ -2598,6 +2695,7 @@ a:focus-visible {
   width: 9px; height: 9px; border-radius: 50%;
   background: #b5ef58; border: 1.5px solid #0d1a2c;
 }
+
 
 @media (prefers-reduced-motion: reduce) {
   .pTile.is-ready, .pClaimAll { animation: none; }

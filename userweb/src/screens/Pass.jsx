@@ -215,9 +215,18 @@ export default function Pass({ token, setMsg, openShop }) {
             <div className="pTiers">
               {d.tiers.map((row) => {
                 const isCurrent = row.tier === d.tier + 1;
+                // ── نشانهٔ مایلستون هر ۵ پله ──
+                //
+                // ۵۰ ردیفِ کاملاً یکسان هیچ نقطهٔ اتکایی برای چشم
+                // نداشت: در اسکرین‌شاتِ تمام‌صفحه، ۱۰٬۶۸۲ پیکسل یکنواخت
+                // بود و کاربر موقعِ اسکرول نمی‌فهمید کجای مسیر است.
+                //
+                // هر پنجمین ردیف شمارهٔ درشتِ طلایی می‌گیرد و مثلِ
+                // تابلوی کیلومترشمار کار می‌کند.
+                const isMilestone = row.tier % 5 === 0;
                 return (
                   <div key={row.tier} id={`pass-tier-${row.tier}`}
-                    className={`pRow${isCurrent ? ' is-current' : ''}${row.unlocked ? ' is-unlocked' : ''}`}>
+                    className={`pRow${isCurrent ? ' is-current' : ''}${row.unlocked ? ' is-unlocked' : ''}${isMilestone ? ' is-milestone' : ''}`}>
                     <div className="pNum">
                       <span className="pLock">{row.unlocked ? '🔓' : '🔒'}</span>
                       <b>{fa(row.tier)}</b>
