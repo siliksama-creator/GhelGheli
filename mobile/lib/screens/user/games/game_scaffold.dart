@@ -297,7 +297,20 @@ class _TurnBanner extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: Corners.rPill,
         color: (mine ? accent : theme.colorScheme.outline)
-            .withValues(alpha: 0.14),
+            .withValues(alpha: 0.16),
+        border: Border.all(
+          color: (mine ? accent : theme.colorScheme.outline).withValues(alpha: 0.65),
+          width: 1.5,
+        ),
+        boxShadow: mine
+            ? [
+                BoxShadow(
+                  color: accent.withValues(alpha: 0.35),
+                  blurRadius: 10,
+                  spreadRadius: 1,
+                )
+              ]
+            : null,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

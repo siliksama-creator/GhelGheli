@@ -3373,3 +3373,72 @@ a:focus-visible {
   .iconBtn { width: 34px; height: 34px; font-size: 15px; }
   .appLogo { width: 28px; height: 28px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   حلقه سوم زیباسازی فوق‌العاده سختگیرانه و لوکس ۲۰۲۶
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ارتقای کارت‌های پاداش فروشگاه */
+.rewardCard {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+.rewardCard:hover {
+  transform: translateY(-4px) scale(1.03) !important;
+  border-color: rgba(181, 239, 88, 0.45) !important;
+  box-shadow: 0 15px 40px rgba(181, 239, 88, 0.12), 0 12px 35px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* ارتقای ردیف‌های لیست */
+.row {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1) !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+.row.clickable:hover {
+  background: rgba(255, 255, 255, 0.07) !important;
+  border-color: rgba(181, 239, 88, 0.35) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2) !important;
+  transform: translateX(-4px) !important;
+}
+
+/* درگاه ارسال پیام چت لوکس نئونی */
+.sendDock {
+  background: rgba(7, 17, 31, 0.92) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.45), 0 0 20px rgba(181, 239, 88, 0.06) !important;
+  transition: all 0.3s ease !important;
+}
+.sendDock:focus-within {
+  border-color: #b5ef58 !important;
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.5), 0 0 24px rgba(181, 239, 88, 0.2) !important;
+}
+
+/* استایل ورودی‌های متن */
+input, textarea {
+  background: rgba(7, 17, 31, 0.8) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  backdrop-filter: blur(8px) !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+input:focus, textarea:focus {
+  border-color: #b5ef58 !important;
+  box-shadow: 0 0 0 4px rgba(181, 239, 88, 0.18) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* استایل سایدبار ناوبری موبایل */
+.mobileNav {
+  background: rgba(7, 17, 31, 0.85) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  box-shadow: 0 15px 45px rgba(0,0,0,0.4) !important;
+}
