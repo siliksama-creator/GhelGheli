@@ -779,11 +779,30 @@ app.post('/api/cards/redeem', auth, cardRedeemLimiter, asyncHandler(async (req, 
       [card.card_type_id]);
     const displayDesignId = pickDesign.rows[0]?.id ?? null;
 
-    const inv = await client.query('SELECT id FROM user_card_inventory WHERE user_id=$1 AND card_type_id=$2 AND consumed_in_reward=false', [req.user.id, card.card_type_id]);
+    // ── UPSERT اتمیک، نه SELECT-سپس-INSERT ──
+    //
+    // الگوی قبلی با دو درخواستِ هم‌زمان روی **اولین** نسخهٔ یک کارت
+    // می‌شکست: هر دو SELECT خالی می‌دیدند، هر دو INSERT می‌زدند، و دومی
+    // به `uq_inventory_active` می‌خورد. بازتولید شد، حدس نبود.
+    //
+    // شرطِ `WHERE consumed_in_reward = false` در ON CONFLICT لازم است تا
+    // Postgres بداند کدام ایندکسِ **جزئی** را هدف بگیرد.
+    //
     // COALESCE: نسخهٔ دوم طرحِ انتخاب‌شده را عوض نمی‌کند تا خانهٔ
     // اینونتوری جلوی چشمِ کاربر ورق نخورد و کشِ گوشی باطل نشود.
-    if (inv.rows[0]) await client.query('UPDATE user_card_inventory SET quantity=quantity+1, display_design_id=COALESCE(display_design_id,$2), updated_at=NOW() WHERE id=$1', [inv.rows[0].id, displayDesignId]);
-    else await client.query('INSERT INTO user_card_inventory(user_id, card_type_id, quantity, consumed_in_reward, display_design_id) VALUES($1,$2,1,false,$3)', [req.user.id, card.card_type_id, displayDesignId]);
+    //
+    // توضیحِ کاملِ باگ در `photoCardService.creditSubmission`.
+    await client.query(
+      `INSERT INTO user_card_inventory
+         (user_id, card_type_id, quantity, consumed_in_reward, display_design_id)
+       VALUES($1,$2,1,false,$3)
+       ON CONFLICT (user_id, card_type_id) WHERE consumed_in_reward = false
+       DO UPDATE SET
+         quantity = user_card_inventory.quantity + 1,
+         display_design_id = COALESCE(
+           user_card_inventory.display_design_id, EXCLUDED.display_design_id),
+         updated_at = NOW()`,
+      [req.user.id, card.card_type_id, displayDesignId]);
     await addLeaguePoints(client, req.user.id, card.point_value);
 
     // جایزهٔ نقدی کارت → کیف پول، در همان تراکنش مصرف کد.

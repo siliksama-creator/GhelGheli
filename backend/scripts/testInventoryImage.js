@@ -90,11 +90,37 @@ for (const [label, src] of [
       .test(src),
     'طرحِ غیرفعال نباید در اینونتوری ظاهر شود');
   ck(`${label}: مقدار را در INSERT می‌نویسد`,
-    new RegExp(`INSERT INTO user_card_inventory[\\s\\S]{0,260}${COL}`, 'i')
+    new RegExp(`INSERT INTO user_card_inventory[\\s\\S]{0,300}${COL}`, 'i')
       .test(src));
   ck(`${label}: با نسخهٔ دوم عوضش نمی‌کند (COALESCE)`,
-    new RegExp(`${COL}\\s*=\\s*COALESCE\\(${COL}`, 'i').test(src),
+    new RegExp(`COALESCE\\(\\s*user_card_inventory\\.${COL}`, 'i').test(src),
     'وگرنه خانهٔ اینونتوری با هر ثبت ورق می‌خورد و کشِ گوشی باطل می‌شود');
+
+  // ── نگهبانِ باگِ مسابقه ──
+  //
+  // الگوی `SELECT ... if(found) UPDATE else INSERT` با دو درخواستِ
+  // هم‌زمان روی **اولین** نسخهٔ یک کارت می‌شکند: هر دو SELECT خالی
+  // می‌بینند، هر دو INSERT می‌زنند، دومی به `uq_inventory_active`
+  // می‌خورد و تراکنش برمی‌گردد.
+  //
+  // ⚠️ این حدس نبود. با دو `psql` هم‌زمان بازتولید شد:
+  //      ERROR: duplicate key value violates unique constraint
+  //    و بعد از تبدیل به ON CONFLICT، شش تراکنشِ هم‌زمان → یک ردیف با
+  //    quantity=6 و صفر خطا.
+  //
+  // تستِ سرتاسری این را نگرفت چون قفلِ ردیفِ کد دو درخواست را **گاهی**
+  // سریال می‌کند. تکیه بر آن سریال‌سازیِ تصادفی درست نیست.
+  ck(`${label}: UPSERT اتمیک است (ON CONFLICT)`,
+    /INSERT INTO user_card_inventory[\s\S]{0,400}ON CONFLICT/i.test(src),
+    'الگوی SELECT-سپس-INSERT با درخواستِ هم‌زمان کد را می‌سوزاند');
+  ck(`${label}: ON CONFLICT ایندکسِ جزئی را هدف می‌گیرد`,
+    /ON CONFLICT \(user_id, card_type_id\)\s*WHERE consumed_in_reward = false/i
+      .test(src),
+    'بدونِ شرطِ WHERE، Postgres نمی‌داند کدام ایندکسِ جزئی را هدف بگیرد');
+  ck(`${label}: دیگر SELECT-سپس-INSERT ندارد`,
+    !/SELECT id(?:, display_design_id)? FROM user_card_inventory[\s\S]{0,200}(?:if \(inv\.rows|inv\.rows\[0\])/i
+      .test(src),
+    'الگوی قدیمی برگشته — باگِ مسابقه هم با آن برمی‌گردد');
 }
 
 console.log('\n══ ۳. هر سه خوانندهٔ اینونتوری به‌روزند ══');

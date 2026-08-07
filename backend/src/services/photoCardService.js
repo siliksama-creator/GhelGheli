@@ -277,38 +277,63 @@ async function creditSubmission(
   );
   const displayDesignId = pick.rows[0]?.id ?? null;
 
-  const inv = await client.query(
-    `SELECT id, display_design_id FROM user_card_inventory
-      WHERE user_id = $1 AND card_type_id = $2 AND consumed_in_reward = false`,
-    [userId, typeId],
+  // ═══════════════════════════════════════════════════════════════════════
+  // UPSERT اتمیک — و باگی که جایگزینش شد
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // ── الگوی قبلی و چرا خراب بود ──
+  //
+  //     SELECT id FROM user_card_inventory WHERE user_id=.. AND card_type_id=..
+  //     if (found) UPDATE ... else INSERT ...
+  //
+  // این الگو با دو درخواستِ هم‌زمان روی **اولین** نسخهٔ یک کارت می‌شکند:
+  // هر دو تراکنش SELECT می‌زنند و هیچ ردیفی نمی‌بینند، پس هر دو شاخهٔ
+  // INSERT را می‌گیرند و دومی به ایندکسِ یکتای `uq_inventory_active`
+  // می‌خورد:
+  //
+  //     ERROR: duplicate key value violates unique constraint
+  //            "uq_inventory_active"
+  //
+  // ⚠️ این **بازتولید شد**، نه حدس زده: دو `psql` هم‌زمان با همان الگو
+  //    روی جدولی با همان ایندکس، دقیقاً همین خطا را دادند.
+  //
+  // نتیجه‌اش برای کاربر: تراکنش برمی‌گردد، کد مصرف‌نشده می‌ماند ولی او
+  // پیامِ خطای مبهم می‌بیند و فکر می‌کند کدش سوخته.
+  //
+  // ── چرا تستِ سرتاسری آن را نگرفت ──
+  //
+  // `SELECT ... FOR UPDATE` روی ردیفِ کد (بالاتر در همین تابع) عملاً دو
+  // درخواست را پشت‌سرِهم می‌کند، چون هر کدام کدِ خودشان را قفل می‌کنند
+  // ولی زمان‌بندی‌شان به‌هم می‌ریزد. یعنی باگ **گاهی** رخ می‌دهد، نه
+  // همیشه — بدترین نوعِ باگ. تکیه بر آن سریال‌سازیِ تصادفی درست نیست:
+  // اتفاقی است، نه تضمین‌شده.
+  //
+  // ── راه‌حل ──
+  //
+  // `ON CONFLICT` کارِ اتمیکی است که دیتابیس تضمینش می‌کند. شرطِ ایندکس
+  // (`WHERE consumed_in_reward = false`) باید در `ON CONFLICT` هم بیاید،
+  // وگرنه Postgres نمی‌داند کدام ایندکسِ جزئی را هدف بگیرد.
+  //
+  // `COALESCE(display_design_id, EXCLUDED...)`: نسخهٔ دوم طرحِ نمایشی را
+  // عوض نمی‌کند. کاربری که پنج نسخه دارد یک خانه با «×۵» می‌بیند؛ اگر
+  // هر ثبت دوباره قرعه بیندازد، آن خانه جلوی چشمش ورق می‌خورد و کشِ
+  // گوشی هم باطل می‌شود.
+  //
+  // استثنا: ردیفی که هنوز طرحی ندارد (قبل از مایگریشنِ ۰۴۴ ساخته شده،
+  // یا آن موقع طرحی آپلود نشده بود) همین حالا یکی می‌گیرد — پس
+  // کارت‌های قدیمی بدونِ backfill جداگانه به‌مرور زیبا می‌شوند.
+  await client.query(
+    `INSERT INTO user_card_inventory
+       (user_id, card_type_id, quantity, consumed_in_reward, display_design_id)
+     VALUES($1, $2, 1, false, $3)
+     ON CONFLICT (user_id, card_type_id) WHERE consumed_in_reward = false
+     DO UPDATE SET
+       quantity = user_card_inventory.quantity + 1,
+       display_design_id = COALESCE(
+         user_card_inventory.display_design_id, EXCLUDED.display_design_id),
+       updated_at = NOW()`,
+    [userId, typeId, displayDesignId],
   );
-  if (inv.rows[0]) {
-    // ── چرا نسخهٔ دوم طرحِ نمایشی را عوض **نمی‌کند** ──
-    //
-    // کاربری که پنج نسخه از یک کارت دارد، یک خانه در اینونتوری می‌بیند
-    // با «×۵». اگر هر ثبت دوباره قرعه بیندازد، آن خانه جلوی چشمش ورق
-    // می‌خورد و کشِ گوشی هم هر بار باطل می‌شود.
-    //
-    // استثنا: اگر ردیفِ قدیمی هنوز طرحی ندارد (قبل از مایگریشنِ ۰۴۴
-    // ساخته شده، یا آن موقع هیچ طرحی آپلود نشده بود) همین حالا یکی
-    // می‌گیرد. این باعث می‌شود کارت‌های قدیمی هم به‌مرور زیبا شوند
-    // بدونِ اینکه backfill جداگانه لازم باشد.
-    await client.query(
-      `UPDATE user_card_inventory
-          SET quantity = quantity + 1,
-              display_design_id = COALESCE(display_design_id, $2),
-              updated_at = NOW()
-        WHERE id = $1`,
-      [inv.rows[0].id, displayDesignId],
-    );
-  } else {
-    await client.query(
-      `INSERT INTO user_card_inventory
-         (user_id, card_type_id, quantity, consumed_in_reward, display_design_id)
-       VALUES($1, $2, 1, false, $3)`,
-      [userId, typeId, displayDesignId],
-    );
-  }
 
   if (cash > 0) {
     // مرجع = شناسهٔ کد. ایندکس یکتای دفتر کل مانع واریز دوم می‌شود حتی
