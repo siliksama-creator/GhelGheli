@@ -136,7 +136,24 @@ jobs:
             ARGS="$ARGS --obfuscate --split-debug-info=build/symbols"
           fi
           echo "flutter build apk $ARGS"
+          # Keep only real-phone ABIs; x86_64 is emulator-only.
+          ARGS="$ARGS --target-platform=android-arm,android-arm64"
           flutter build apk $ARGS
+      - name: Enforce APK size budget
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          apks=(mobile/build/app/outputs/flutter-apk/*.apk)
+          [ "${#apks[@]}" -gt 0 ] || { echo "::error::هیچ APKی تولید نشد"; exit 1; }
+          for apk in "${apks[@]}"; do
+            bytes=$(stat -c%s "$apk")
+            mb=$(( (bytes + 1048575) / 1048576 ))
+            echo "$apk: ${mb}MiB"
+            if [ "$bytes" -gt 20971520 ]; then
+              echo "::error::$apk بزرگ‌تر از ۲۰ مگابایت است"
+              exit 1
+            fi
+          done
       # ثابت کن خروجی با کلیدِ خودمان امضا شده، پیش از اینکه کسی
       # آپلودش کند. APKِ دیباگ‌ساین تا لحظهٔ ردشدن از کافه‌بازار
       # قابل تشخیص نیست.

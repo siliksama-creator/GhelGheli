@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
 import '../../core/assets.dart';
-import '../../theme/brand_theme.dart';
 import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
 
@@ -133,10 +132,11 @@ class _LoginStreakCardState extends State<LoginStreakCard>
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return _StreakSkeleton(loop: _loop);
+      return widget.compact ? _CompactStreakLoading(loop: _loop) : _StreakSkeleton(loop: _loop);
     }
 
     if (_error != null || _data == null || _data!['active'] != true) {
+      if (widget.compact) return _CompactStreakUnavailable(onRetry: _load);
       return _ErrorStreakCard(loop: _loop, onRetry: _load, error: _error ?? 'استریک در دسترس نیست');
     }
 
@@ -239,7 +239,7 @@ class _StunningStreakCard extends StatelessWidget {
                       // Animated Particles
                       Positioned.fill(
                         child: CustomPaint(
-                          painter: _ParticlesPainter(progress: t, celebrate: justClaimed),
+                          painter: _StreakParticlesPainter(progress: t, celebrate: justClaimed),
                         ),
                       ),
                       
@@ -307,9 +307,9 @@ class _StunningStreakCard extends StatelessWidget {
                               Transform.translate(
                                 offset: Offset(0, floatY),
                                 child: Image.asset(
-                                  'assets/pass/streak_hero_2026.png',
+                                  'assets/pass/streak_hero.webp',
                                   width: 80,
-                                  height: 80,
+                                  height: 80, cacheWidth: 200,
                                 ),
                               ),
                             ],
@@ -321,8 +321,8 @@ class _StunningStreakCard extends StatelessWidget {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: days.map((dayData) {
-                              final d = _int(dayData['day']);
-                              final r = _int(dayData['amount']);
+                              final d = NumberParser.toInt(dayData['day']);
+                              final r = NumberParser.toInt(dayData['amount']);
                               final c = dayData['claimed'] == true;
                               final cur = dayData['current'] == true;
                               return _DayPill(day: d, reward: r, claimed: c, current: cur, tick: t);
@@ -467,10 +467,28 @@ class _ClaimBtn extends StatelessWidget {
                     fontSize: 14,
                   ),
                 ),
+              ]),
         ),
       ),
     );
   }
+}
+
+class _CompactStreakLoading extends StatelessWidget {
+  const _CompactStreakLoading({required this.loop}); final Animation<double> loop;
+  @override Widget build(BuildContext context) => AnimatedBuilder(animation: loop, builder: (context, _) => Container(
+    margin: const EdgeInsets.symmetric(vertical: 4), padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+    decoration: BoxDecoration(borderRadius: BorderRadius.circular(24), gradient: LinearGradient(colors: [BrandColors.emerald.withValues(alpha: .22), BrandColors.blue.withValues(alpha: .12)]), border: Border.all(color: BrandColors.emerald.withValues(alpha: .35))),
+    child: Row(children: [Transform.rotate(angle: loop.value * math.pi * 2, child: const Icon(Icons.local_fire_department_rounded, color: BrandColors.amber, size: 30)), Gaps.hSm, const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('استریک روزانه', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900)), SizedBox(height: 3), Text('در حال آماده‌سازی چرخه ۷ روزه…', style: TextStyle(color: Colors.white70, fontSize: 12))]))]),
+  ));
+}
+class _CompactStreakUnavailable extends StatelessWidget {
+  const _CompactStreakUnavailable({required this.onRetry}); final VoidCallback onRetry;
+  @override Widget build(BuildContext context) => InkWell(onTap: onRetry, borderRadius: BorderRadius.circular(24), child: Container(
+    margin: const EdgeInsets.symmetric(vertical: 4), padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
+    decoration: BoxDecoration(borderRadius: BorderRadius.circular(24), color: const Color(0xFF132B35), border: Border.all(color: BrandColors.amber.withValues(alpha: .45))),
+    child: const Row(children: [Icon(Icons.local_fire_department_rounded, color: BrandColors.amber, size: 30), Gaps.hSm, Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('استریک روزانه', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900)), SizedBox(height: 3), Text('برای دریافت پاداش، دوباره تلاش کنید', style: TextStyle(color: Colors.white70, fontSize: 12))])), Icon(Icons.refresh_rounded, color: Colors.white70)]),
+  ));
 }
 
 class _ErrorStreakCard extends StatelessWidget {
@@ -536,8 +554,8 @@ class _StreakSkeleton extends StatelessWidget {
   }
 }
 
-class _ParticlesPainter extends CustomPainter {
-  const _ParticlesPainter({required this.progress, required this.celebrate});
+class _StreakParticlesPainter extends CustomPainter {
+  const _StreakParticlesPainter({required this.progress, required this.celebrate});
   final double progress;
   final bool celebrate;
 
