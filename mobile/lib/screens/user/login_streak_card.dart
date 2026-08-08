@@ -393,7 +393,7 @@ class _CompactStreakLoading extends StatelessWidget {
       builder: (context, _) {
         final glow = (math.sin(loop.value * math.pi * 2) + 1) / 2;
         return Container(
-          height: 82,
+          height: 96,
           padding: const EdgeInsets.all(Gaps.sm),
           decoration: BoxDecoration(
             borderRadius: Corners.rXl,
@@ -401,20 +401,29 @@ class _CompactStreakLoading extends StatelessWidget {
               begin: Alignment.topRight,
               end: Alignment.bottomLeft,
               colors: [
-                Color.lerp(const Color(0xFF132A4E), BrandColors.emerald, glow * 0.06)!,
+                Color.lerp(const Color(0xFF17325B), BrandColors.emerald, glow * 0.08)!,
                 const Color(0xFF0B1729),
               ],
             ),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+            border: Border.all(color: BrandColors.amber.withValues(alpha: 0.34 + glow * 0.10)),
+            boxShadow: [
+              BoxShadow(
+                color: BrandColors.emerald.withValues(alpha: 0.10 + glow * 0.05),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
           child: Row(
             children: [
-              Container(
-                width: 58,
-                height: 58,
-                decoration: BoxDecoration(
-                  borderRadius: Corners.rLg,
-                  color: Colors.white.withValues(alpha: 0.08 + glow * 0.04),
+              ClipRRect(
+                borderRadius: Corners.rLg,
+                child: Image.asset(
+                  'assets/pass/streak_hero.webp',
+                  width: 64,
+                  height: 64,
+                  fit: BoxFit.cover,
+                  cacheWidth: 170,
                 ),
               ),
               Gaps.hSm,
@@ -424,18 +433,27 @@ class _CompactStreakLoading extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('استریک روزانه',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.82),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: Colors.white,
                           fontWeight: FontWeight.w900,
+                          height: 1.05,
                         )),
-                    const SizedBox(height: 9),
-                    Container(height: 8, decoration: BoxDecoration(
-                      borderRadius: Corners.rPill,
-                      color: Colors.white.withValues(alpha: 0.09),
-                    )),
+                    const SizedBox(height: 5),
+                    Text('چرخه ۷ روزه در حال آماده‌سازی است…',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.72),
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                        )),
                   ],
                 ),
               ),
+              Icon(Icons.hourglass_top_rounded,
+                  color: BrandColors.amber.withValues(alpha: 0.92), size: 22),
             ],
           ),
         );
@@ -541,6 +559,7 @@ class _CompactStreakSurface extends StatelessWidget {
       builder: (context, _) {
         final glow = (math.sin(loop.value * math.pi * 2) + 1) / 2;
         return Container(
+          constraints: const BoxConstraints(minHeight: 96),
           padding: const EdgeInsets.all(Gaps.sm),
           decoration: BoxDecoration(
             borderRadius: Corners.rXl,

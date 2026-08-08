@@ -86,6 +86,9 @@ console.log('\n== اندروید: ظاهر و رفتار ۲۰۲۶ ==');
     'کارت اندروید با bootstrap شروع می‌شود و بعد از claim امتیاز هدر را تازه می‌کند');
   ok(/_CompactStreakUnavailable/.test(mobileCard) && /widget\.compact\) return _CompactStreakUnavailable/.test(mobileCard),
     'در حالت فشرده، استریک هرگز از داشبورد غیب نمی‌شود و fallback دارد');
+  ok(/_CompactStreakLoading/.test(mobileCard) && /در حال آماده‌سازی/.test(mobileCard)
+     && !/_CompactStreakLoading[\s\S]{0,2200}CircularProgressIndicator/.test(mobileCard),
+    'حالت لودینگ فشرده هم عنوان واضح دارد و چرخندهٔ سراسری تست‌ها را آلوده نمی‌کند');
   ok(/استریک روزانه/.test(mobileCard) && /چرخه ۷ روزه/.test(mobileCard),
     'عنوان استریک روزانه و چرخهٔ هفت‌روزه در کارت فشرده واضح است');
   ok(/LoginStreakCard\([\s\S]*initialData:[\s\S]*loginStreak[\s\S]*onClaimed/.test(dashboard),
