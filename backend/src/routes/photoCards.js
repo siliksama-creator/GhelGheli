@@ -23,6 +23,7 @@ const rateLimit = require('express-rate-limit');
 
 const fpEngine = require('../services/imageFingerprint');
 const photoCards = require('../services/photoCardService');
+const cardDuel = require('../services/cardDuelService');
 const cardCrop = require('../services/cardCrop');
 const lockout = require('../services/photoCardLockout');
 
@@ -155,6 +156,8 @@ module.exports = function createPhotoCardRoutes(deps) {
       `SELECT d.id, d.image_url, d.width, d.height, d.is_active, d.created_at,
               t.id AS card_type_id, t.name AS card_type_name,
               t.point_value, t.cash_amount,
+              t.duel_attack, t.duel_defense, t.duel_speed, t.duel_technique,
+              t.duel_goal_chance, t.duel_energy, t.duel_rarity, t.duel_effect,
               (SELECT count(*)::int FROM photo_card_codes c
                 WHERE c.bound_design_id = d.id AND c.status = 'used') AS redeemed_count
          FROM photo_card_designs d
@@ -221,6 +224,7 @@ module.exports = function createPhotoCardRoutes(deps) {
         const name = String(req.body.name || '').trim();
         const points = Math.max(0, Math.floor(Number(req.body.pointValue || 0)));
         const cash = Math.max(0, Math.floor(Number(req.body.cashAmount || 0)));
+        const duel = cardDuel.duelFieldsFromBody(req.body);
         const existingTypeId = req.body.cardTypeId;
 
         if (!name && !existingTypeId) {
@@ -434,11 +438,16 @@ module.exports = function createPhotoCardRoutes(deps) {
             if (!ok.rows[0]) {
               throw Object.assign(new Error('نوع کارت پیدا نشد'), { status: 404 });
             }
-            // امتیاز فقط وقتی به‌روز می‌شود که مدیر صریحاً فرستاده باشد.
-            if (req.body.pointValue !== undefined) {
+            // امتیاز/استات فقط وقتی به‌روز می‌شود که مدیر صریحاً فرستاده باشد.
+            if (req.body.pointValue !== undefined || req.body.duelAttack !== undefined) {
               await client.query(
-                'UPDATE card_types SET point_value=$1, updated_at=NOW() WHERE id=$2',
-                [points, cardTypeId],
+                `UPDATE card_types SET point_value=$1,
+                    duel_attack=$2, duel_defense=$3, duel_speed=$4,
+                    duel_technique=$5, duel_goal_chance=$6, duel_energy=$7,
+                    duel_rarity=$8, duel_effect=$9, updated_at=NOW()
+                  WHERE id=$10`,
+                [points, duel.attack, duel.defense, duel.speed, duel.technique,
+                  duel.goalChance, duel.energy, duel.rarity, duel.effect, cardTypeId],
               );
             }
           } else {
@@ -500,18 +509,28 @@ module.exports = function createPhotoCardRoutes(deps) {
                   || req.body.cashAmount !== undefined) {
                 await client.query(
                   `UPDATE card_types
-                      SET point_value = $1, cash_amount = $2, updated_at = NOW()
-                    WHERE id = $3`,
-                  [points, cash, cardTypeId],
+                      SET point_value = $1, cash_amount = $2,
+                          duel_attack=$3, duel_defense=$4, duel_speed=$5,
+                          duel_technique=$6, duel_goal_chance=$7, duel_energy=$8,
+                          duel_rarity=$9, duel_effect=$10, updated_at = NOW()
+                    WHERE id = $11`,
+                  [points, cash, duel.attack, duel.defense, duel.speed,
+                    duel.technique, duel.goalChance, duel.energy,
+                    duel.rarity, duel.effect, cardTypeId],
                 );
               }
             } else {
               // نوع کارت تازه در همان کاتالوگ موجود ساخته می‌شود، پس
               // اینونتوری و جوایز پلکانی بدون هیچ تغییری کار می‌کنند.
               const ins = await client.query(
-                `INSERT INTO card_types(name, image_url, point_value, cash_amount, is_active)
-                 VALUES($1, $2, $3, $4, true) RETURNING id`,
-                [name, imageUrl, points, cash],
+                `INSERT INTO card_types(name, image_url, point_value, cash_amount, is_active,
+                    duel_attack, duel_defense, duel_speed, duel_technique,
+                    duel_goal_chance, duel_energy, duel_rarity, duel_effect)
+                 VALUES($1, $2, $3, $4, true, $5,$6,$7,$8,$9,$10,$11,$12)
+                 RETURNING id`,
+                [name, imageUrl, points, cash, duel.attack, duel.defense,
+                  duel.speed, duel.technique, duel.goalChance, duel.energy,
+                  duel.rarity, duel.effect],
               );
               cardTypeId = ins.rows[0].id;
             }

@@ -49,6 +49,12 @@ const CATALOG = [
     subtitle: 'یکی می‌زند، یکی می‌گیرد', accent: '#38BDF8', minutes: 4,
     noBot: false, solo: false,
   },
+  {
+    id: 'card_duel', title: 'دوئل کارت‌ها', emoji: '🃏',
+    subtitle: 'سه کارت آماده کن؛ Ghost خودکار امتیاز می‌گیرد',
+    accent: '#FFD166', minutes: 1,
+    noBot: false, solo: true, singlePlayer: true,
+  },
 ];
 
 module.exports = {

@@ -26,6 +26,7 @@ const wheel = require('./services/wheelService');
 const pass = require('./services/passService');
 const loginStreak = require('./services/loginStreakService');
 const wheelReminder = require('./services/wheelReminderService');
+const cardDuel = require('./services/cardDuelService');
 // Hoisted with the other services: /api/users/:id/public uses it and sits
 // above the shop routes, so a require next to those would read as a
 // temporal-dead-zone bug even though route handlers run after startup.
@@ -954,6 +955,40 @@ app.post('/api/games/tap/progress', auth, tapBatchLimiter, asyncHandler(async (r
 
 app.get('/api/games/tap/leaderboard', auth, asyncHandler(async (req, res) => {
   res.json({ entries: await tapGame.leaderboard(req.query.limit) });
+}));
+
+// ── دوئل سه‌کارتی قلقلی ─────────────────────────────────────────────────
+// Bot mode is practice only and NEVER moves points. Ghost mode uses the
+// user's saved three-card team, transfers a small fixed stake, and does not
+// touch the existing league score.
+const cardDuelLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 24,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: perUserKey,
+  message: { message: 'تعداد دوئل زیاد است؛ کمی صبر کن' },
+});
+
+app.get('/api/card-duel', auth, asyncHandler(async (req, res) => {
+  res.json(await cardDuel.status(req.user.id));
+}));
+
+app.post('/api/card-duel/deck', auth, cardDuelLimiter, asyncHandler(async (req, res) => {
+  res.json(await cardDuel.saveDeck(
+    req.user.id,
+    req.body?.cardTypeIds || req.body?.cards || [],
+    req.body?.ghostEnabled !== false,
+  ));
+}));
+
+app.post('/api/card-duel/bot', auth, cardDuelLimiter, asyncHandler(async (req, res) => {
+  res.json(await cardDuel.botBattle(req.user.id,
+    Array.isArray(req.body?.cardTypeIds) ? req.body.cardTypeIds : null));
+}));
+
+app.post('/api/card-duel/ghost', auth, cardDuelLimiter, asyncHandler(async (req, res) => {
+  res.json(await cardDuel.ghostBattle(req.user.id));
 }));
 
 // Solo (time-attack) records: my personal best + the public leaderboard, in
@@ -3513,6 +3548,14 @@ cron.schedule('17 * * * *', () => {
     .then(n => { if (n > 0) console.log(`[tap] pruned ${n} expired nonces`); })
     .catch(e => console.error('[tap] nonce prune failed:', e.message));
 });
+
+// Ghost card duels: every prepared team can receive up to 10 automatic
+// matches per Tehran day. Runs hourly, small batch, silent on empty pool.
+cron.schedule('11 * * * *', () => {
+  cardDuel.runAutoGhostBattles({ limit: 60 })
+    .then(r => { if (r.ok > 0) console.log(`[card-duel] auto ${r.ok}, skipped ${r.skipped}`); })
+    .catch(e => console.error('[card-duel] auto failed:', e.message));
+}, { timezone: 'Asia/Tehran' });
 
 // Centralized error handler. Previously this forwarded err.message straight
 // to the client, which meant raw PostgreSQL errors (unique/foreign-key

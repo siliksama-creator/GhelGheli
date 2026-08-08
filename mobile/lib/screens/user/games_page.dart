@@ -12,6 +12,7 @@ import 'games/reversi_board.dart';
 import 'games/memory_board.dart';
 import 'games/penalty_board.dart';
 import 'games/tap/tap_screen.dart';
+import 'games/card_duel_page.dart';
 
 class _GameEntry {
   const _GameEntry(
@@ -57,6 +58,9 @@ const _games = <_GameEntry>[
   // **قابل دسترس نبود**.
   _GameEntry('penalty', 'ضربات پنالتی', 'یکی می‌زند، یکی می‌گیرد', 'assets/pass/football_icon.webp',
       Color(0xFF38BDF8), 'assets/games/penalty.webp'),
+  _GameEntry('card_duel', 'دوئل کارت‌ها', 'سه کارت آماده کن؛ Ghost خودکار امتیاز می‌گیرد',
+      'assets/games/card_duel_glow.png', Color(0xFFFFD166), 'assets/games/card_duel_glow.png',
+      bot: true, solo: true),
   _GameEntry('memory', 'جفت‌یاب', 'جفت‌ها را به خاطر بسپار و ببر', 'assets/games/memory/medal.webp',
       Color(0xFFA855F7), 'assets/games/memory.webp',
       bot: false, solo: true),
@@ -127,6 +131,8 @@ class _GamesHubPageState extends State<GamesHubPage> {
         return ReversiScreen(api: widget.api, onBack: _back);
       case 'penalty':
         return PenaltyScreen(api: widget.api, onBack: _back);
+      case 'card_duel':
+        return CardDuelPage(api: widget.api, onBack: _back);
     }
 
     final theme = Theme.of(context);

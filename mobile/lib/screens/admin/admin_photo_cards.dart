@@ -93,6 +93,14 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
   final _name = TextEditingController();
   final _points = TextEditingController();
   final _cash = TextEditingController();
+  final _attack = TextEditingController(text: '50');
+  final _defense = TextEditingController(text: '50');
+  final _speed = TextEditingController(text: '50');
+  final _technique = TextEditingController(text: '50');
+  final _goal = TextEditingController(text: '50');
+  final _energy = TextEditingController(text: '100');
+  String _rarity = 'normal';
+  String _effect = 'none';
   bool _uploading = false;
 
   // فرم کد — مدیر خودش وارد می‌کند
@@ -149,6 +157,12 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
     _name.dispose();
     _points.dispose();
     _cash.dispose();
+    _attack.dispose();
+    _defense.dispose();
+    _speed.dispose();
+    _technique.dispose();
+    _goal.dispose();
+    _energy.dispose();
     _ownCodes.dispose();
     _codes.dispose();
     _batch.dispose();
@@ -231,6 +245,14 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
           'name': _name.text.trim(),
           'pointValue': _points.text.trim().isEmpty ? '0' : _points.text.trim(),
           'cashAmount': _cash.text.trim().isEmpty ? '0' : _cash.text.trim(),
+          'duelAttack': _attack.text.trim().isEmpty ? '50' : _attack.text.trim(),
+          'duelDefense': _defense.text.trim().isEmpty ? '50' : _defense.text.trim(),
+          'duelSpeed': _speed.text.trim().isEmpty ? '50' : _speed.text.trim(),
+          'duelTechnique': _technique.text.trim().isEmpty ? '50' : _technique.text.trim(),
+          'duelGoalChance': _goal.text.trim().isEmpty ? '50' : _goal.text.trim(),
+          'duelEnergy': _energy.text.trim().isEmpty ? '100' : _energy.text.trim(),
+          'duelRarity': _rarity,
+          'duelEffect': _effect,
           if (_ownCodes.text.trim().isNotEmpty) 'rawCodes': _ownCodes.text.trim(),
         },
       );
@@ -252,6 +274,14 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
         _name.clear();
         _points.clear();
         _cash.clear();
+        _attack.text = '50';
+        _defense.text = '50';
+        _speed.text = '50';
+        _technique.text = '50';
+        _goal.text = '50';
+        _energy.text = '100';
+        _rarity = 'normal';
+        _effect = 'none';
       });
       await _load();
     } catch (e) {
@@ -542,6 +572,13 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
     );
   }
 
+  Widget _duelStatField(String label, TextEditingController c) => TextField(
+        controller: c,
+        keyboardType: TextInputType.number,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        decoration: InputDecoration(labelText: label, hintText: '0 تا 100'),
+      );
+
   // ── ۱. آپلود عکس خام ──
   Widget _designForm(BuildContext context) {
     final theme = Theme.of(context);
@@ -592,6 +629,63 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           decoration: const InputDecoration(
               labelText: 'جایزهٔ نقدی (تومان، اختیاری)', hintText: '0'),
+        ),
+        const SizedBox(height: 10),
+        ExpansionTile(
+          tilePadding: EdgeInsets.zero,
+          initiallyExpanded: true,
+          leading: const Icon(Icons.sports_esports_rounded),
+          title: const Text('استات دوئل کارت'),
+          subtitle: const Text('این اعداد در نبرد سه‌کارتی و Ghost اثر مستقیم دارند'),
+          children: [
+            Row(children: [
+              Expanded(child: _duelStatField('حمله', _attack)),
+              Gaps.hXs,
+              Expanded(child: _duelStatField('دفاع', _defense)),
+            ]),
+            Row(children: [
+              Expanded(child: _duelStatField('سرعت', _speed)),
+              Gaps.hXs,
+              Expanded(child: _duelStatField('تکنیک', _technique)),
+            ]),
+            Row(children: [
+              Expanded(child: _duelStatField('شانس گل', _goal)),
+              Gaps.hXs,
+              Expanded(child: _duelStatField('انرژی', _energy)),
+            ]),
+            Row(children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  initialValue: _rarity,
+                  decoration: const InputDecoration(labelText: 'کلاس کارت'),
+                  items: const [
+                    DropdownMenuItem(value: 'normal', child: Text('معمولی')),
+                    DropdownMenuItem(value: 'silver', child: Text('نقره‌ای')),
+                    DropdownMenuItem(value: 'gold', child: Text('طلایی')),
+                    DropdownMenuItem(value: 'premium', child: Text('پرمیوم')),
+                    DropdownMenuItem(value: 'legend', child: Text('لجند')),
+                  ],
+                  onChanged: (v) => setState(() => _rarity = v ?? 'normal'),
+                ),
+              ),
+              Gaps.hXs,
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  initialValue: _effect,
+                  decoration: const InputDecoration(labelText: 'افکت خاص'),
+                  items: const [
+                    DropdownMenuItem(value: 'none', child: Text('بدون افکت')),
+                    DropdownMenuItem(value: 'finisher', child: Text('فینیشر')),
+                    DropdownMenuItem(value: 'wall', child: Text('دیوار دفاعی')),
+                    DropdownMenuItem(value: 'speedster', child: Text('سرعتی')),
+                    DropdownMenuItem(value: 'playmaker', child: Text('بازی‌ساز')),
+                    DropdownMenuItem(value: 'lucky_star', child: Text('ستاره خوش‌شانس')),
+                  ],
+                  onChanged: (v) => setState(() => _effect = v ?? 'none'),
+                ),
+              ),
+            ]),
+          ],
         ),
         const SizedBox(height: 10),
         // ── کدهای اختصاصیِ همین کارت ──

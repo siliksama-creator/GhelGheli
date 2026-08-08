@@ -72,6 +72,10 @@ export function PhotoCardsPage({ request }) {
   const [name, setName] = useState('');
   const [points, setPoints] = useState('');
   const [cash, setCash] = useState('');
+  const [duel, setDuel] = useState({
+    attack: '50', defense: '50', speed: '50', technique: '50',
+    goalChance: '50', energy: '100', rarity: 'normal', effect: 'none',
+  });
   const [uploading, setUploading] = useState(false);
 
   // ── مرحلهٔ آنالیزِ آپلود ──
@@ -201,6 +205,14 @@ export function PhotoCardsPage({ request }) {
           name: name.trim(),
           pointValue: points || 0,
           cashAmount: cash || 0,
+          duelAttack: duel.attack || 50,
+          duelDefense: duel.defense || 50,
+          duelSpeed: duel.speed || 50,
+          duelTechnique: duel.technique || 50,
+          duelGoalChance: duel.goalChance || 50,
+          duelEnergy: duel.energy || 100,
+          duelRarity: duel.rarity || 'normal',
+          duelEffect: duel.effect || 'none',
           // اگر مدیر کد نوشته باشد، در **همان تراکنش** به این کارت گره
           // می‌خورد. درخواستِ دوم یعنی احتمالِ کارتِ بدونِ کد.
           ...(ownCodes.trim() ? { rawCodes: ownCodes } : {}),
@@ -211,6 +223,8 @@ export function PhotoCardsPage({ request }) {
       pickFile(null);
       pickBack(null);
       setName(''); setPoints(''); setCash('');
+      setDuel({ attack: '50', defense: '50', speed: '50', technique: '50',
+        goalChance: '50', energy: '100', rarity: 'normal', effect: 'none' });
       setOwnCodes(''); setOwnBatch('');
       loadCodes();
       loadDesigns();
@@ -472,6 +486,45 @@ export function PhotoCardsPage({ request }) {
               <Input type="number" min="0" value={cash}
                 onChange={e => setCash(e.target.value)} placeholder="0" />
             </Field>
+
+            <div className="card" style={{ padding: 12 }}>
+              <b>استات دوئل کارت</b>
+              <p className="topbar-sub">برای بازی سه‌کارتی Ghost؛ ۰ تا ۱۰۰.</p>
+              <div className="card-grid cols-2">
+                {[
+                  ['attack', 'حمله'], ['defense', 'دفاع'], ['speed', 'سرعت'],
+                  ['technique', 'تکنیک'], ['goalChance', 'شانس گل'], ['energy', 'انرژی'],
+                ].map(([k, label]) => (
+                  <Field key={k} label={label}>
+                    <Input type="number" min="0" max="100" value={duel[k]}
+                      onChange={e => setDuel(d => ({ ...d, [k]: e.target.value }))} />
+                  </Field>
+                ))}
+              </div>
+              <div className="card-grid cols-2">
+                <Field label="کلاس کارت">
+                  <select value={duel.rarity}
+                    onChange={e => setDuel(d => ({ ...d, rarity: e.target.value }))}>
+                    <option value="normal">معمولی</option>
+                    <option value="silver">نقره‌ای</option>
+                    <option value="gold">طلایی</option>
+                    <option value="premium">پرمیوم</option>
+                    <option value="legend">لجند</option>
+                  </select>
+                </Field>
+                <Field label="افکت خاص">
+                  <select value={duel.effect}
+                    onChange={e => setDuel(d => ({ ...d, effect: e.target.value }))}>
+                    <option value="none">بدون افکت</option>
+                    <option value="finisher">فینیشر</option>
+                    <option value="wall">دیوار دفاعی</option>
+                    <option value="speedster">سرعتی</option>
+                    <option value="playmaker">بازی‌ساز</option>
+                    <option value="lucky_star">ستاره خوش‌شانس</option>
+                  </select>
+                </Field>
+              </div>
+            </div>
 
             {/* ══════════════════════════════════════════════════════════
                 کدهای اختصاصیِ همین کارت — اختیاری
