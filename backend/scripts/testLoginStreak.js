@@ -35,6 +35,8 @@ console.log('\n== قرارداد سرور استریک روزانه ==');
     'روز هفتم جایزهٔ بزرگ‌تر دارد');
   ok(/const CYCLE_DAYS = REWARDS\.length/.test(svc),
     'طول چرخه از خود لیست جوایز می‌آید، نه عددِ جدا');
+  ok(/day >= CYCLE_DAYS \? 1 : day \+ 1/.test(svc),
+    'بعد از روز هفتم، چرخهٔ هفتگی از روز اول ریست می‌شود');
   ok(/timeZone:\s*'Asia\/Tehran'/.test(svc),
     'محاسبهٔ روز با منطقهٔ زمانی تهران انجام می‌شود');
   ok(!/toISOString\(\)\.slice\(0, 10\)/.test(svc),
@@ -84,6 +86,8 @@ console.log('\n== اندروید: ظاهر و رفتار ۲۰۲۶ ==');
     'کارت اندروید با bootstrap شروع می‌شود و بعد از claim امتیاز هدر را تازه می‌کند');
   ok(/_CompactStreakUnavailable/.test(mobileCard) && /widget\.compact\) return _CompactStreakUnavailable/.test(mobileCard),
     'در حالت فشرده، استریک هرگز از داشبورد غیب نمی‌شود و fallback دارد');
+  ok(/استریک روزانه/.test(mobileCard) && /چرخه ۷ روزه/.test(mobileCard),
+    'عنوان استریک روزانه و چرخهٔ هفت‌روزه در کارت فشرده واضح است');
   ok(/LoginStreakCard\([\s\S]*initialData:[\s\S]*loginStreak[\s\S]*onClaimed/.test(dashboard),
     'داشبورد اندروید دادهٔ bootstrap را به کارت استریک پاس می‌دهد');
   ok(/RadialGradient/.test(read('mobile/lib/screens/user/home_shell.dart')),

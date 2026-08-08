@@ -387,6 +387,7 @@ class _CompactStreakLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return AnimatedBuilder(
       animation: loop,
       builder: (context, _) {
@@ -422,10 +423,11 @@ class _CompactStreakLoading extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(height: 13, width: 132, decoration: BoxDecoration(
-                      borderRadius: Corners.rPill,
-                      color: Colors.white.withValues(alpha: 0.12),
-                    )),
+                    Text('استریک روزانه',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.82),
+                          fontWeight: FontWeight.w900,
+                        )),
                     const SizedBox(height: 9),
                     Container(height: 8, decoration: BoxDecoration(
                       borderRadius: Corners.rPill,
@@ -584,21 +586,34 @@ class _CompactStreakSurface extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            claimedToday ? 'استریک امروز امن شد' : 'استریک آماده دریافت',
+                            'استریک روزانه',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleSmall?.copyWith(
+                            style: theme.textTheme.titleMedium?.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.w900,
+                              height: 1.05,
                             ),
                           ),
                         ),
-                        Text(
-                          '${faNum(totalClaims)} بار',
-                          style: const TextStyle(
-                            color: Color(0xFFFFD166),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w900,
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            borderRadius: Corners.rPill,
+                            color: (claimedToday ? BrandColors.success : BrandColors.amber)
+                                .withValues(alpha: 0.16),
+                            border: Border.all(
+                              color: (claimedToday ? BrandColors.success : BrandColors.amber)
+                                  .withValues(alpha: 0.42),
+                            ),
+                          ),
+                          child: Text(
+                            claimedToday ? 'گرفته شد' : 'آماده',
+                            style: TextStyle(
+                              color: claimedToday ? BrandColors.success : BrandColors.amber,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                            ),
                           ),
                         ),
                       ],
@@ -628,8 +643,8 @@ class _CompactStreakSurface extends StatelessWidget {
                         Expanded(
                           child: Text(
                             claimedToday
-                                ? 'روز ${faNum(currentDay)} از ۷'
-                                : 'روز ${faNum(nextDay)} · ${faNum(nextReward)} امتیاز',
+                                ? 'چرخه ۷ روزه · امروز روز ${faNum(currentDay)} تکمیل شد'
+                                : 'چرخه ۷ روزه · روز ${faNum(nextDay)} · ${faNum(nextReward)} امتیاز',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -664,7 +679,7 @@ class _CompactStreakSurface extends StatelessWidget {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : Text(
-                          claimedToday ? 'شد' : 'بگیر',
+                          claimedToday ? 'دریافت شد' : 'دریافت',
                           style: const TextStyle(fontWeight: FontWeight.w900),
                         ),
                 ),

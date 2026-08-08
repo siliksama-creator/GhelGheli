@@ -178,6 +178,21 @@ class _DashboardPageState extends State<DashboardPage> {
             onOpenWallet: widget.onOpenWallet,
           ),
           Gaps.vSm,
+          // استریک باید بالاترین آیتمِ روزانه باشد، نه زیرِ میان‌برها. مالک
+          // صریح گفت در اندروید مشخص نیست؛ پس قبل از ریلِ عملیات می‌آید و
+          // در حالت خطا/لود هم سطحِ خودش را نگه می‌دارد.
+          LoginStreakCard(
+            api: widget.api,
+            compact: true,
+            initialData: _data?['loginStreak'] is Map
+                ? Map<String, dynamic>.from(_data!['loginStreak'] as Map)
+                : null,
+            onClaimed: () {
+              _load();
+              widget.reloadProfile();
+            },
+          ),
+          Gaps.vSm,
           // ریلِ عملیاتِ روزانه: همهٔ قابلیت‌های داشبورد در همان قابِ اول
           // دیده می‌شوند، اما هیچ‌کدام حذف نشده‌اند. ثبت کارت بلافاصله بعد
           // از این ریل می‌آید؛ کارت استریک هم dense شده تا فرم را پایین
@@ -214,18 +229,6 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               ),
             ],
-          ),
-          Gaps.vSm,
-          LoginStreakCard(
-            api: widget.api,
-            compact: true,
-            initialData: _data?['loginStreak'] is Map
-                ? Map<String, dynamic>.from(_data!['loginStreak'] as Map)
-                : null,
-            onClaimed: () {
-              _load();
-              widget.reloadProfile();
-            },
           ),
           Gaps.vSm,
           AppCard(
