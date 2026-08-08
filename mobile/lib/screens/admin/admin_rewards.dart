@@ -252,7 +252,7 @@ class _AdminRewardsState extends State<AdminRewards> {
             Row(children: [
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: _groupType,
+                  initialValue: _groupType,
                   decoration: const InputDecoration(labelText: 'نوع گروه'),
                   items: const [
                     DropdownMenuItem(value: 'mixed', child: Text('ترکیبی')),
@@ -265,7 +265,7 @@ class _AdminRewardsState extends State<AdminRewards> {
               Gaps.hXs,
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: _groupAccent,
+                  initialValue: _groupAccent,
                   decoration: const InputDecoration(labelText: 'رنگ'),
                   items: const [
                     DropdownMenuItem(value: 'emerald', child: Text('زمردی')),
@@ -310,7 +310,7 @@ class _AdminRewardsState extends State<AdminRewards> {
           title: 'جایزه جدید (${faNum(_rewards.length)}/۳۰)',
           children: [
             DropdownButtonFormField<String?>(
-              value: _groupId,
+              initialValue: _groupId,
               decoration: const InputDecoration(labelText: 'گروه جایزه'),
               items: [
                 const DropdownMenuItem<String?>(
@@ -342,7 +342,7 @@ class _AdminRewardsState extends State<AdminRewards> {
                 error: _imageError,
                 label: 'عکس جایزه / آدرس آپلودشده'),
             DropdownButtonFormField<String>(
-              value: _type,
+              initialValue: _type,
               decoration: const InputDecoration(labelText: 'نوع جایزه'),
               items: const [
                 DropdownMenuItem(value: 'cash', child: Text('نقدی')),
@@ -421,7 +421,7 @@ class _AdminRewardsState extends State<AdminRewards> {
                         trailing: SizedBox(
                           width: 132,
                           child: DropdownButtonFormField<String?>(
-                            value: r['group_id'] as String?,
+                            initialValue: r['group_id'] as String?,
                             isDense: true,
                             decoration: const InputDecoration(
                                 labelText: 'گروه', isDense: true),

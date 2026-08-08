@@ -42,7 +42,6 @@
 // باز هم `launchUrl` را امتحان می‌کند و فقط در صورت پرتاب کردن، به
 // گزینهٔ بعدی می‌رود. اینطور حتی با مانیفستِ ناقص هم کار می‌کند.
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 

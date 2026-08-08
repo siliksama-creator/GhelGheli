@@ -130,7 +130,7 @@ class _AdminAdminsState extends State<AdminAdmins> {
                     labelText: 'رمز عبور',
                     prefixIcon: Icon(Icons.lock_outline_rounded))),
             DropdownButtonFormField<String>(
-              value: _role,
+              initialValue: _role,
               decoration: const InputDecoration(labelText: 'نقش'),
               items: const [
                 DropdownMenuItem(value: 'super_admin', child: Text('مدیر کل')),

@@ -747,7 +747,7 @@ class _DayPill extends StatelessWidget {
             Icon(claimed ? Icons.check_rounded : (current ? Icons.local_fire_department_rounded : Icons.calendar_today_rounded),
                  size: 14, color: color),
             const SizedBox(height: 4),
-            Text(faNum(day), style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900)),
+            Text(faNum(day), style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900)),
             const SizedBox(height: 2),
             Text('+${faNum(reward)}', style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w800)),
           ],
@@ -805,7 +805,7 @@ class _ClaimBtn extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           gradient: enabled
-              ? LinearGradient(colors: [BrandColors.amber, Color(0xFFFF7A45)])
+              ? const LinearGradient(colors: [BrandColors.amber, Color(0xFFFF7A45)])
               : null,
           color: enabled ? null : Colors.white.withValues(alpha: 0.1),
           boxShadow: enabled ? [BoxShadow(color: BrandColors.amber.withValues(alpha: 0.4 + glow * 0.2), blurRadius: 20, offset: const Offset(0, 8))] : null,
@@ -877,10 +877,10 @@ class _ErrorStreakCard extends StatelessWidget {
           color: BrandColors.danger.withValues(alpha: 0.1),
           border: Border.all(color: BrandColors.danger.withValues(alpha: 0.3), width: 1.5),
         ),
-        child: Row(
+        child: const Row(
           children: [
             Icon(Icons.error_outline_rounded, color: BrandColors.danger, size: 32),
-            const SizedBox(width: 16),
+            SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
