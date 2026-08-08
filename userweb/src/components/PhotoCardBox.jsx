@@ -530,7 +530,7 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
             {ANALYSIS_STEPS.map((st, i) => (
               <span key={st.label}
                 className={i < phase ? 'done' : (i === phase ? 'now' : '')}>
-                {i < phase ? '' : '●'}
+                {i < phase ? <SvgIcon name="check" size={12} /> : <span className="phaseDot" />}
               </span>
             ))}
           </div>
