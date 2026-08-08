@@ -82,6 +82,8 @@ console.log('\n== اندروید: ظاهر و رفتار ۲۰۲۶ ==');
     'دکمهٔ دریافت اندروید از آیکون شفاف اختصاصی استفاده می‌کند');
   ok(/initialData/.test(mobileCard) && /onClaimed/.test(mobileCard),
     'کارت اندروید با bootstrap شروع می‌شود و بعد از claim امتیاز هدر را تازه می‌کند');
+  ok(/_CompactStreakUnavailable/.test(mobileCard) && /widget\.compact\) return _CompactStreakUnavailable/.test(mobileCard),
+    'در حالت فشرده، استریک هرگز از داشبورد غیب نمی‌شود و fallback دارد');
   ok(/LoginStreakCard\([\s\S]*initialData:[\s\S]*loginStreak[\s\S]*onClaimed/.test(dashboard),
     'داشبورد اندروید دادهٔ bootstrap را به کارت استریک پاس می‌دهد');
   ok(/RadialGradient/.test(read('mobile/lib/screens/user/home_shell.dart')),

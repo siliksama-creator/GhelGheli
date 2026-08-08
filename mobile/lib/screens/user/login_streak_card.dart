@@ -145,9 +145,18 @@ class _LoginStreakCardState extends State<LoginStreakCard>
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return _StreakSkeleton(loop: _loop);
+    if (_loading) {
+      return widget.compact
+          ? _CompactStreakLoading(loop: _loop)
+          : _StreakSkeleton(loop: _loop);
+    }
 
     if (_error != null || _data == null || _data!['active'] != true) {
+      // روی داشبوردِ فشرده، استریک نباید «غیب» شود. اگر bootstrap یا
+      // درخواست جدا شکست بخورد، یک سطح کوچک و قابل لمس می‌ماند تا کاربر
+      // بفهمد این قابلیت وجود دارد و بتواند دوباره تلاش کند. نسخهٔ بزرگ
+      // همان رفتار قبلی را نگه می‌دارد تا صفحات دیگر بی‌دلیل شلوغ نشوند.
+      if (widget.compact) return _CompactStreakUnavailable(onRetry: _load);
       return const SizedBox.shrink();
     }
 
@@ -367,6 +376,132 @@ class _LoginStreakCardState extends State<LoginStreakCard>
           ),
         );
       },
+    );
+  }
+}
+
+class _CompactStreakLoading extends StatelessWidget {
+  const _CompactStreakLoading({required this.loop});
+
+  final Animation<double> loop;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: loop,
+      builder: (context, _) {
+        final glow = (math.sin(loop.value * math.pi * 2) + 1) / 2;
+        return Container(
+          height: 82,
+          padding: const EdgeInsets.all(Gaps.sm),
+          decoration: BoxDecoration(
+            borderRadius: Corners.rXl,
+            gradient: LinearGradient(
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+              colors: [
+                Color.lerp(const Color(0xFF132A4E), BrandColors.emerald, glow * 0.06)!,
+                const Color(0xFF0B1729),
+              ],
+            ),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  borderRadius: Corners.rLg,
+                  color: Colors.white.withValues(alpha: 0.08 + glow * 0.04),
+                ),
+              ),
+              Gaps.hSm,
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(height: 13, width: 132, decoration: BoxDecoration(
+                      borderRadius: Corners.rPill,
+                      color: Colors.white.withValues(alpha: 0.12),
+                    )),
+                    const SizedBox(height: 9),
+                    Container(height: 8, decoration: BoxDecoration(
+                      borderRadius: Corners.rPill,
+                      color: Colors.white.withValues(alpha: 0.09),
+                    )),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _CompactStreakUnavailable extends StatelessWidget {
+  const _CompactStreakUnavailable({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: Colors.transparent,
+      borderRadius: Corners.rXl,
+      child: InkWell(
+        onTap: onRetry,
+        borderRadius: Corners.rXl,
+        child: Container(
+          height: 82,
+          padding: const EdgeInsets.all(Gaps.sm),
+          decoration: BoxDecoration(
+            borderRadius: Corners.rXl,
+            gradient: const LinearGradient(
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+              colors: [Color(0xFF132A4E), Color(0xFF0B1729)],
+            ),
+            border: Border.all(color: BrandColors.amber.withValues(alpha: 0.22)),
+          ),
+          child: Row(
+            children: [
+              Image.asset('assets/pass/streak_hero.webp',
+                  width: 56, height: 56, fit: BoxFit.cover, cacheWidth: 150),
+              Gaps.hSm,
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('استریک روزانه',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                        )),
+                    const SizedBox(height: 4),
+                    Text('برای آماده‌سازی دوباره لمس کن',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.62),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        )),
+                  ],
+                ),
+              ),
+              const Icon(Icons.refresh_rounded, color: Color(0xFFFFD166)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
