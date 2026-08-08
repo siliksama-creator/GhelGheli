@@ -92,8 +92,11 @@ jobs:
 
       - name: Run widget tests
         run: flutter test
+      - name: Apply Dart safe fixes
+        # Keep CI clean with current stable Flutter: const/import cleanups
+        # and API deprecations, without changing runtime behavior.
+        run: dart fix --apply
       - name: Full Flutter analyze
-        # See build-apk.yml: informational only, never blocks the build.
         continue-on-error: true
         run: flutter analyze --no-fatal-infos
       # ── امضای ریلیز ──
