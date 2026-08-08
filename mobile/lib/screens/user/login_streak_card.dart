@@ -459,13 +459,28 @@ class _ClaimBtn extends StatelessWidget {
         child: Center(
           child: busy
               ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-              : Text(
-                  claimedToday ? 'دریافت شد' : 'دریافت پاداش',
-                  style: TextStyle(
-                    color: enabled ? Colors.black : Colors.white54,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 14,
-                  ),
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Opacity(
+                      opacity: enabled ? 1 : 0.45,
+                      child: Image.asset(
+                        'assets/pass/cta_spark.png',
+                        width: 22,
+                        height: 22,
+                        cacheWidth: 64,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      claimedToday ? 'دریافت شد' : 'دریافت پاداش',
+                      style: TextStyle(
+                        color: enabled ? Colors.black : Colors.white54,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
                 ),
         ),
       ),

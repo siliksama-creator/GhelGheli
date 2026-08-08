@@ -146,7 +146,7 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          apks=(mobile/build/app/outputs/flutter-apk/*.apk)
+          apks=(build/app/outputs/flutter-apk/*.apk)
           [ "${#apks[@]}" -gt 0 ] || { echo "::error::هیچ APKی تولید نشد"; exit 1; }
           for apk in "${apks[@]}"; do
             bytes=$(stat -c%s "$apk")
