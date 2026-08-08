@@ -278,7 +278,7 @@ class _CompactStreakCard extends StatelessWidget {
                             'assets/pass/streak_hero.webp',
                             width: expanded ? 82 : 66,
                             height: expanded ? 82 : 66,
-                            cacheWidth: expanded ? 190 : 150,
+                            cacheWidth: 190,
                           ),
                         ),
                       ),
