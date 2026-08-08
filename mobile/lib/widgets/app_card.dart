@@ -45,7 +45,7 @@ class AppCard extends StatelessWidget {
   const AppCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(Gaps.lg),
+    this.padding = const EdgeInsets.all(Gaps.md),
     this.maxWidth,
     this.color,
     this.onTap,
@@ -127,8 +127,8 @@ class AppCard extends StatelessWidget {
                 ...brand.softShadow,
                 BoxShadow(
                   color: BrandColors.emerald.withValues(alpha: 0.055),
-                  blurRadius: 32,
-                  offset: const Offset(0, 18),
+                  blurRadius: 26,
+                  offset: const Offset(0, 14),
                 ),
               ]
             : null,

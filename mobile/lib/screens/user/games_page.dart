@@ -137,7 +137,7 @@ class _GamesHubPageState extends State<GamesHubPage> {
 
     final theme = Theme.of(context);
     return ListView(
-      padding: const EdgeInsets.all(Gaps.lg),
+      padding: const EdgeInsets.all(Gaps.md),
       children: [
         Container(
           padding: const EdgeInsets.all(Gaps.md),

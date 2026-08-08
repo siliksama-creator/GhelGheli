@@ -76,7 +76,7 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
   /// in exactly the same place whichever is showing — moving them would read
   /// as the page jumping.
   Widget _tabs() => Padding(
-        padding: const EdgeInsets.fromLTRB(Gaps.lg, Gaps.md, Gaps.lg, 0),
+        padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, 0),
         child: SegmentedButton<int>(
           segments: const [
             ButtonSegment(value: 0, label: Text('جدول لیگ')),
@@ -96,7 +96,7 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
           _tabs(),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: Gaps.lg),
+              padding: const EdgeInsets.symmetric(horizontal: Gaps.md),
               child: ClubsTab(api: widget.api),
             ),
           ),
@@ -120,7 +120,7 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
           _tabs(),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.all(Gaps.lg),
+              padding: const EdgeInsets.all(Gaps.md),
               child: ErrorBanner(message: _error!, onRetry: _load),
             ),
           ),
@@ -147,7 +147,7 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
           child: RefreshIndicator(
       onRefresh: _load,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(Gaps.lg, Gaps.md, Gaps.lg, Gaps.xxl),
+        padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, Gaps.xxl),
         children: [
           Container(
             padding: const EdgeInsets.all(Gaps.xl),

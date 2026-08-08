@@ -163,7 +163,7 @@ class _RewardsPageState extends State<RewardsPage> {
 
           if (groups.isEmpty) {
             return ListView(
-              padding: const EdgeInsets.all(Gaps.lg),
+              padding: const EdgeInsets.all(Gaps.md),
               children: const [
                 EmptyState(
                     icon: Icons.card_giftcard_outlined,
@@ -175,7 +175,7 @@ class _RewardsPageState extends State<RewardsPage> {
 
           return ListView(
             padding:
-                const EdgeInsets.fromLTRB(Gaps.lg, Gaps.md, Gaps.lg, Gaps.xxl),
+                const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, Gaps.xxl),
             children: [
               for (final g in groups) ...[
                 _GroupCard(
@@ -228,8 +228,8 @@ class _GroupCard extends StatelessWidget {
                   borderRadius: Corners.rMd,
                   child: SafeImage(
                       url: fullAssetUrl(group['imageUrl']),
-                      width: 46,
-                      height: 46),
+                      width: 42,
+                      height: 42),
                 ),
               if (group['imageUrl'] != null) Gaps.hSm,
               Expanded(
@@ -264,11 +264,11 @@ class _GroupCard extends StatelessWidget {
               ),
             ],
           ),
-          Gaps.vMd,
+          Gaps.vSm,
 
           // ── progress bar ────────────────────────────────────────────────
           Container(
-            padding: const EdgeInsets.all(Gaps.sm),
+            padding: const EdgeInsets.all(Gaps.xs),
             decoration: BoxDecoration(
               color: theme.colorScheme.onSurface.withValues(alpha: 0.04),
               borderRadius: Corners.rLg,
@@ -282,8 +282,8 @@ class _GroupCard extends StatelessWidget {
                         borderRadius: Corners.rSm,
                         child: SafeImage(
                             url: fullAssetUrl(next!['imageUrl']),
-                            width: 50,
-                            height: 50),
+                            width: 42,
+                            height: 42),
                       ),
                     if (next?['imageUrl'] != null) Gaps.hXs,
                     Expanded(
@@ -321,7 +321,7 @@ class _GroupCard extends StatelessWidget {
                     curve: Motion.emphasized,
                     builder: (_, v, __) => LinearProgressIndicator(
                       value: v,
-                      minHeight: 13,
+                      minHeight: 10,
                       backgroundColor:
                           theme.colorScheme.onSurface.withValues(alpha: 0.08),
                       valueColor: AlwaysStoppedAnimation(accent),
@@ -353,7 +353,7 @@ class _GroupCard extends StatelessWidget {
                   ),
                   Gaps.vXxs,
                   SizedBox(
-                    height: 76,
+                    height: 66,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
                       // `as List` threw whenever the key was absent, which
@@ -388,8 +388,8 @@ class _GroupCard extends StatelessWidget {
                                   borderRadius: Corners.rSm,
                                   child: SafeImage(
                                       url: fullAssetUrl(c['imageUrl']),
-                                      width: 50,
-                                      height: 50),
+                                      width: 44,
+                                      height: 44),
                                 ),
                               ),
                               Text('${faNum(c['have'])}/${faNum(c['quantity'])}',
@@ -407,7 +407,7 @@ class _GroupCard extends StatelessWidget {
               ],
             ),
           ),
-          Gaps.vMd,
+          Gaps.vSm,
 
           // ── tiers ───────────────────────────────────────────────────────
           for (final t in tiers) ...[
@@ -445,7 +445,7 @@ class _TierRow extends StatelessWidget {
     final isCash = tier['rewardType'] == 'cash';
 
     return Container(
-      padding: const EdgeInsets.all(Gaps.sm),
+      padding: const EdgeInsets.all(Gaps.xs),
       decoration: BoxDecoration(
         color: theme.colorScheme.onSurface.withValues(alpha: 0.03),
         borderRadius: Corners.rLg,
@@ -459,7 +459,7 @@ class _TierRow extends StatelessWidget {
           ClipRRect(
             borderRadius: Corners.rSm,
             child: SafeImage(
-                url: fullAssetUrl(tier['imageUrl']), width: 54, height: 54),
+                url: fullAssetUrl(tier['imageUrl']), width: 46, height: 46),
           ),
           Gaps.hSm,
           Expanded(

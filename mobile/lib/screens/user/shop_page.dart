@@ -244,7 +244,7 @@ class _ShopPageState extends State<ShopPage> {
 
           return ListView(
             padding:
-                const EdgeInsets.fromLTRB(Gaps.lg, Gaps.md, Gaps.lg, Gaps.xxl),
+                const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, Gaps.xxl),
             children: [
               _IntroCard(balance: balance),
               Gaps.vMd,

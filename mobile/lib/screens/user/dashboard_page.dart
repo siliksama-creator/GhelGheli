@@ -136,7 +136,7 @@ class _DashboardPageState extends State<DashboardPage> {
       return RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.all(Gaps.lg),
+          padding: const EdgeInsets.all(Gaps.md),
           children: [
             const SizedBox(height: 40),
             ErrorBanner(message: _error!, onRetry: _load),
@@ -166,7 +166,7 @@ class _DashboardPageState extends State<DashboardPage> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(Gaps.lg, Gaps.md, Gaps.lg, Gaps.xxl),
+        padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, Gaps.xxl),
         children: [
           HeroHeader(
             points: points,

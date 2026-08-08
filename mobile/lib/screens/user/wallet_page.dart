@@ -215,7 +215,7 @@ class _WalletPageState extends State<WalletPage>
     if (_error != null) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(Gaps.lg),
+          padding: const EdgeInsets.all(Gaps.md),
           child: ErrorBanner(message: _error!, onRetry: _load),
         ),
       );
@@ -227,7 +227,7 @@ class _WalletPageState extends State<WalletPage>
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(Gaps.lg, Gaps.md, Gaps.lg, Gaps.xxl),
+        padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, Gaps.xxl),
         children: [
           WalletBalanceCard(
             balance: (w['balance'] as num).toInt(),

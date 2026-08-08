@@ -211,7 +211,7 @@ class _InventoryPageState extends State<InventoryPage> {
           SliverFillRemaining(
             hasScrollBody: false,
             child: Padding(
-              padding: const EdgeInsets.all(Gaps.lg),
+              padding: const EdgeInsets.all(Gaps.md),
               child: AppCard(
                 child: EmptyState(
                   icon: widget.items.isEmpty

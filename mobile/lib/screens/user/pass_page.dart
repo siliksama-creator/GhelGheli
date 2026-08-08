@@ -259,7 +259,7 @@ class _PassPageState extends State<PassPage> with TickerProviderStateMixin {
       return RefreshIndicator(
         onRefresh: () async => _load(),
         child: ListView(
-          padding: const EdgeInsets.all(Gaps.lg),
+          padding: const EdgeInsets.all(Gaps.md),
           children: [
             const SizedBox(height: 40),
             ErrorBanner(message: _error!, onRetry: _load),
@@ -383,7 +383,7 @@ class _NoSeason extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.all(Gaps.lg),
+      padding: const EdgeInsets.all(Gaps.md),
       children: [
         const SizedBox(height: 60),
         Center(

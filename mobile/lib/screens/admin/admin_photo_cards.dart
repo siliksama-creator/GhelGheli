@@ -656,7 +656,7 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
             Row(children: [
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: _rarity,
+                  initialValue: _rarity,
                   decoration: const InputDecoration(labelText: 'کلاس کارت'),
                   items: const [
                     DropdownMenuItem(value: 'normal', child: Text('معمولی')),
@@ -671,7 +671,7 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
               Gaps.hXs,
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: _effect,
+                  initialValue: _effect,
                   decoration: const InputDecoration(labelText: 'افکت خاص'),
                   items: const [
                     DropdownMenuItem(value: 'none', child: Text('بدون افکت')),
@@ -771,7 +771,7 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
         // پیش‌فرض عمداً «نمی‌دانم» است: انتخابِ اشتباهِ یک کارت بدتر از
         // انتخاب نکردن است، چون کاربر امتیازِ کارتِ دیگری می‌گیرد.
         DropdownButtonFormField<String?>(
-          value: _codeType,
+          initialValue: _codeType,
           isExpanded: true,
           decoration: const InputDecoration(
               labelText: 'این کدها روی کدام کارت چاپ می‌شوند؟'),
@@ -1258,7 +1258,7 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
           // انتخابِ دستیِ طرح. پیش‌فرض حدسِ موتور است تا در حالتِ
           // کم‌اطمینان مدیر مجبور به انتخاب دوباره نشود.
           DropdownButtonFormField<String>(
-            value: _picks['${s['id']}'],
+            initialValue: _picks['${s['id']}'],
             isExpanded: true,
             decoration: const InputDecoration(
               isDense: true,

@@ -336,7 +336,7 @@ class _WheelPageState extends State<WheelPage>
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
-        padding: const EdgeInsets.all(Gaps.lg),
+        padding: const EdgeInsets.all(Gaps.md),
         children: [
           Text(' گردونهٔ شانس',
               textAlign: TextAlign.center,

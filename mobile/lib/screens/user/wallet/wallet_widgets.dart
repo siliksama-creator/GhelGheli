@@ -96,7 +96,7 @@ class _WalletBalanceCardState extends State<WalletBalanceCard>
             child: CustomPaint(painter: _WaveDecorPainter()),
           ),
           Padding(
-            padding: const EdgeInsets.all(Gaps.xl),
+            padding: const EdgeInsets.all(Gaps.lg),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -114,7 +114,7 @@ class _WalletBalanceCardState extends State<WalletBalanceCard>
                         color: Colors.white.withValues(alpha: 0.85), size: 22),
                   ],
                 ),
-                Gaps.vLg,
+                Gaps.vMd,
                 Text('موجودی قابل برداشت',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: Colors.white.withValues(alpha: 0.75),
@@ -154,7 +154,7 @@ class _WalletBalanceCardState extends State<WalletBalanceCard>
                     color: BrandColors.amber,
                   ),
                 ],
-                Gaps.vLg,
+                Gaps.vMd,
                 Row(
                   children: [
                     Expanded(
@@ -167,7 +167,7 @@ class _WalletBalanceCardState extends State<WalletBalanceCard>
                     ),
                     Container(
                       width: 1,
-                      height: 34,
+                      height: 30,
                       color: Colors.white.withValues(alpha: 0.18),
                     ),
                     Expanded(
@@ -180,14 +180,14 @@ class _WalletBalanceCardState extends State<WalletBalanceCard>
                     ),
                   ],
                 ),
-                Gaps.vLg,
+                Gaps.vMd,
                 // نوار کارت بانکی
                 InkWell(
                   onTap: widget.onTapCard,
                   borderRadius: Corners.rMd,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: Gaps.md, vertical: Gaps.sm),
+                        horizontal: Gaps.sm, vertical: Gaps.xs),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.12),
                       borderRadius: Corners.rMd,

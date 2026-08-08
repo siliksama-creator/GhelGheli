@@ -233,7 +233,7 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
         child: FractionallySizedBox(
           heightFactor: 0.5,
           child: Padding(
-            padding: const EdgeInsets.all(Gaps.lg),
+            padding: const EdgeInsets.all(Gaps.md),
             child: SingleChildScrollView(
               child: Wrap(
                 spacing: 8,

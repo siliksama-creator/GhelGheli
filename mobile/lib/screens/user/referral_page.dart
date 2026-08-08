@@ -108,7 +108,7 @@ class _ReferralPageState extends State<ReferralPage> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
-        padding: const EdgeInsets.all(Gaps.lg),
+        padding: const EdgeInsets.all(Gaps.md),
         children: [
           Text(' دعوت دوستان',
               style: theme.textTheme.titleLarge
@@ -133,7 +133,7 @@ class _ReferralPageState extends State<ReferralPage> {
 
           // ── کد ──────────────────────────────────────────────────────────
           Container(
-            padding: const EdgeInsets.all(Gaps.lg),
+            padding: const EdgeInsets.all(Gaps.md),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
@@ -247,7 +247,7 @@ class _ReferralPageState extends State<ReferralPage> {
 
           if (friends.isEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: Gaps.lg),
+              padding: const EdgeInsets.symmetric(vertical: Gaps.md),
               child: Text(
                 'هنوز کسی با کد تو عضو نشده. اولین نفر را دعوت کن!',
                 textAlign: TextAlign.center,

@@ -216,7 +216,7 @@ class _ProfilePageState extends State<ProfilePage> {
       return RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.all(Gaps.lg),
+          padding: const EdgeInsets.all(Gaps.md),
           children: [
             const SizedBox(height: 40),
             ErrorBanner(message: _loadError!, onRetry: _load),
@@ -226,7 +226,7 @@ class _ProfilePageState extends State<ProfilePage> {
     }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(Gaps.lg, Gaps.md, Gaps.lg, Gaps.xxl),
+      padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, Gaps.xxl),
       children: [
         if (_leagueHistory.isNotEmpty) ...[
           AppCard(
