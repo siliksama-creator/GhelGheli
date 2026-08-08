@@ -269,17 +269,13 @@ class _CompactStreakCard extends StatelessWidget {
                       ),
                     ),
                     Positioned(
-                      left: -10,
-                      top: expanded ? 7 + heroShift : 0 + heroShift,
+                      left: -4,
+                      top: expanded ? 9 + heroShift : 2 + heroShift,
                       child: IgnorePointer(
-                        child: Opacity(
-                          opacity: 0.92,
-                          child: Image.asset(
-                            'assets/pass/streak_hero.webp',
-                            width: expanded ? 82 : 66,
-                            height: expanded ? 82 : 66,
-                            cacheWidth: 190,
-                          ),
+                        child: _StreakPulseBadge(
+                          progress: t,
+                          active: !claimedToday,
+                          size: expanded ? 72 : 58,
                         ),
                       ),
                     ),
@@ -520,6 +516,105 @@ class _CompactClaimButton extends StatelessWidget {
       ),
     );
   }
+}
+
+
+class _StreakPulseBadge extends StatelessWidget {
+  const _StreakPulseBadge({
+    required this.progress,
+    required this.active,
+    required this.size,
+  });
+
+  final double progress;
+  final bool active;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final pulse = (math.sin(progress * math.pi * 2) + 1) / 2;
+    final color = active ? BrandColors.amber : BrandColors.success;
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(
+        painter: _StreakPulsePainter(
+          progress: progress,
+          color: color,
+          pulse: pulse,
+          active: active,
+        ),
+        child: Center(
+          child: Transform.scale(
+            scale: 1 + pulse * .08,
+            child: Icon(
+              active
+                  ? Icons.local_fire_department_rounded
+                  : Icons.check_circle_rounded,
+              size: size * .46,
+              color: color,
+              shadows: [Shadow(color: color.withValues(alpha: .70), blurRadius: 14)],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StreakPulsePainter extends CustomPainter {
+  const _StreakPulsePainter({
+    required this.progress,
+    required this.color,
+    required this.pulse,
+    required this.active,
+  });
+
+  final double progress;
+  final Color color;
+  final double pulse;
+  final bool active;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = Offset(size.width / 2, size.height / 2);
+    final r = math.min(size.width, size.height) / 2;
+    final bg = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          color.withValues(alpha: .24 + pulse * .08),
+          color.withValues(alpha: .06),
+          Colors.transparent,
+        ],
+      ).createShader(Offset.zero & size);
+    canvas.drawCircle(c, r, bg);
+
+    final ring = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2
+      ..strokeCap = StrokeCap.round
+      ..color = color.withValues(alpha: .55 + pulse * .30);
+    canvas.drawArc(
+      Rect.fromCircle(center: c, radius: r * .72),
+      -math.pi / 2 + progress * math.pi * 2,
+      math.pi * (active ? 1.45 : 1.95),
+      false,
+      ring,
+    );
+
+    final dotPaint = Paint()..color = color.withValues(alpha: .70);
+    for (var i = 0; i < 7; i++) {
+      final a = progress * math.pi * 2 + i * math.pi * 2 / 7;
+      final d = r * (.42 + (i % 2) * .18);
+      canvas.drawCircle(c + Offset(math.cos(a) * d, math.sin(a) * d), 1.3 + pulse, dotPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _StreakPulsePainter oldDelegate) =>
+      oldDelegate.progress != progress ||
+      oldDelegate.color != color ||
+      oldDelegate.active != active;
 }
 
 class _StunningStreakCard extends StatelessWidget {

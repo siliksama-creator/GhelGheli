@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../api_client.dart';
 import '../../../theme/tokens.dart';
-import '../../../widgets/app_card.dart';
 import 'game_audio.dart';
 import 'game_session.dart';
 import 'versus_bar.dart';
@@ -236,43 +235,62 @@ class GameScaffold extends StatelessWidget {
 
       case GamePhase.playing:
       case GamePhase.over:
-        return SingleChildScrollView(
-          child: Column(
-            children: [
-              VersusBar(
-                  session: session,
-                  api: api,
-                  symbols: symbols,
-                  accent: accent),
-              Gaps.vSm,
-              if (scoreboard != null) ...[scoreboard!, Gaps.vSm],
+        return Column(
+          children: [
+            VersusBar(
+                session: session,
+                api: api,
+                symbols: symbols,
+                accent: accent),
+            Gaps.vXxs,
+            if (scoreboard != null) ...[scoreboard!, Gaps.vXxs],
+            if (session.phase == GamePhase.over)
+              _ResultStrip(session: session, accent: accent)
+            else
               _TurnBanner(session: session, accent: accent),
-              if (session.timedOutSymbol != null &&
-                  session.phase == GamePhase.playing) ...[
-                Gaps.vXxs,
-                Text(
-                  session.timedOutSymbol == session.mySymbol
-                      ? 'وقت شما تمام شد؛ یک حرکت خودکار انجام شد'
-                      : 'وقت حریف تمام شد',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: const Color(0xFFEF4444),
-                      fontWeight: FontWeight.w700),
-                ),
-              ],
-              Gaps.vSm,
-              boardBuilder(context),
-              Gaps.vMd,
-              if (session.phase == GamePhase.over)
-                _ResultPanel(session: session, accent: accent)
-              else
-                OutlinedButton.icon(
-                  onPressed: session.leave,
-                  icon: const Icon(Icons.flag_outlined),
-                  label: const Text('خروج از بازی'),
-                ),
-              Gaps.vMd,
+            if (session.timedOutSymbol != null &&
+                session.phase == GamePhase.playing) ...[
+              Gaps.vXxs,
+              Text(
+                session.timedOutSymbol == session.mySymbol
+                    ? 'وقت شما تمام شد؛ حرکت خودکار انجام شد'
+                    : 'وقت حریف تمام شد',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: const Color(0xFFEF4444),
+                    fontWeight: FontWeight.w800),
+              ),
             ],
-          ),
+            Gaps.vXxs,
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, box) => ClipRect(
+                  child: Center(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.topCenter,
+                      child: SizedBox(
+                        width: box.maxWidth,
+                        child: boardBuilder(context),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Gaps.vXxs,
+            SizedBox(
+              height: 40,
+              child: session.phase == GamePhase.over
+                  ? _ResultActions(session: session, accent: accent)
+                  : OutlinedButton.icon(
+                      onPressed: session.leave,
+                      icon: const Icon(Icons.flag_outlined, size: 18),
+                      label: const Text('خروج از بازی'),
+                    ),
+            ),
+          ],
         );
     }
   }
@@ -343,8 +361,9 @@ class _TurnBanner extends StatelessWidget {
   }
 }
 
-class _ResultPanel extends StatelessWidget {
-  const _ResultPanel({required this.session, required this.accent});
+
+class _ResultStrip extends StatelessWidget {
+  const _ResultStrip({required this.session, required this.accent});
   final GameSession session;
   final Color accent;
 
@@ -353,61 +372,74 @@ class _ResultPanel extends StatelessWidget {
     final theme = Theme.of(context);
     final won = session.iWon;
     final draw = session.winner == 'DRAW';
-    // تصویرِ نتیجه به‌جای ایموجی — بستهٔ ۲۰۲۶ِ تولیدشده برای بازی‌ها.
-    // `assets/games/` در pubspec ثبت شده، پس این فایل‌ها داخل APK می‌آیند.
-    final art = won
-        ? 'assets/games/result_victory.webp'
+    final color = won
+        ? accent
         : draw
-            ? 'assets/games/result_draw.webp'
-            : 'assets/games/result_defeat.webp';
-    return AppCard(
-      child: Column(
+            ? theme.colorScheme.outline
+            : const Color(0xFFEF4444);
+    final icon = won
+        ? Icons.emoji_events_rounded
+        : draw
+            ? Icons.handshake_rounded
+            : Icons.close_rounded;
+    return AnimatedContainer(
+      duration: Motion.fast,
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: Gaps.sm, vertical: 7),
+      decoration: BoxDecoration(
+        borderRadius: Corners.rPill,
+        color: color.withValues(alpha: 0.16),
+        border: Border.all(color: color.withValues(alpha: 0.70), width: 1.2),
+        boxShadow: [BoxShadow(color: color.withValues(alpha: 0.20), blurRadius: 12)],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Image.asset(
-            art,
-            width: 88,
-            height: 88,
-            fit: BoxFit.contain,
-            // دروازه‌بانِ پایین‌حجم: تصویر در یک بومِ ۵۱۲ رندر و به‌همان
-            // نسبتِ منطقیِ ۸۸ پیکسل در دستگاه‌های ۲-۳x دیکد می‌شود.
-            cacheWidth: 176,
-            errorBuilder: (_, __, ___) => Icon(
-              won
-                  ? Icons.emoji_events_rounded
-                  : (draw ? Icons.handshake_rounded : Icons.fitness_center_rounded),
-              size: 40,
-              color: won ? accent : theme.colorScheme.onSurface,
-            ),
-          ),
-          Gaps.vXs,
-          Text(session.resultText,
+          Icon(icon, size: 18, color: color),
+          Gaps.hXs,
+          Flexible(
+            child: Text(
+              session.resultText,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: won ? accent : theme.colorScheme.onSurface,
-              )),
-          Gaps.vMd,
-          Row(
-            children: [
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: session.join,
-                  style: FilledButton.styleFrom(backgroundColor: accent),
-                  icon: const Icon(Icons.replay_rounded),
-                  label: const Text('بازی دوباره'),
-                ),
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w900,
+                color: color,
               ),
-              Gaps.hXs,
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: session.leave,
-                  child: const Text('پایان'),
-                ),
-              ),
-            ],
+            ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ResultActions extends StatelessWidget {
+  const _ResultActions({required this.session, required this.accent});
+  final GameSession session;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: FilledButton.icon(
+            onPressed: session.join,
+            style: FilledButton.styleFrom(backgroundColor: accent),
+            icon: const Icon(Icons.replay_rounded, size: 18),
+            label: const Text('بازی دوباره'),
+          ),
+        ),
+        Gaps.hXs,
+        Expanded(
+          child: OutlinedButton(
+            onPressed: session.leave,
+            child: const Text('پایان'),
+          ),
+        ),
+      ],
     );
   }
 }

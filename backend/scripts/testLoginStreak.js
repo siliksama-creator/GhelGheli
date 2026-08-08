@@ -78,8 +78,8 @@ console.log('\n== اندروید: ظاهر و رفتار ۲۰۲۶ ==');
     'کارت اندروید انیمیشن دائمی سبک دارد');
   ok(/CustomPaint/.test(mobileCard) && /_StreakParticlesPainter/.test(mobileCard),
     'ذرات و گلوهای پس‌زمینه با painter ارزان کشیده می‌شوند');
-  ok(/assets\/pass\/streak_hero\.webp/.test(mobileCard),
-    'کارت اندروید از تصویر قهرمان جدید استفاده می‌کند');
+  ok(/_StreakPulseBadge/.test(mobileCard) && /_StreakPulsePainter/.test(mobileCard),
+    'کارت فشردهٔ اندروید به‌جای تصویر سنگین، انیمیشن سبک جلب‌توجه دارد');
   ok(/assets\/pass\/cta_spark\.png/.test(mobileCard),
     'دکمهٔ دریافت اندروید از آیکون شفاف اختصاصی استفاده می‌کند');
   ok(/initialData/.test(mobileCard) && /onClaimed/.test(mobileCard),

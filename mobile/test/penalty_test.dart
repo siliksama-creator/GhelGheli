@@ -14,6 +14,7 @@
 // سرور یکی بمانند. اگر این دو از هم جدا بیفتند، کاربر انیمیشنی می‌بیند
 // که با نتیجهٔ واقعی نمی‌خواند — بدترین نوع باگ چون شبیه تقلب به‌نظر
 // می‌رسد.
+import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter_test/flutter_test.dart';
 
@@ -121,4 +122,30 @@ void main() {
           reason: 'سرور برای دروازه‌بان قدرت لازم ندارد');
     });
   });
+
+  group('گاردهای سختگیرانهٔ UI پنالتی', () {
+    test('بعد از پایان بازی دیگر لمس شبکه حرکت نمی‌فرستد', () {
+      final src = File('lib/screens/user/games/penalty_board.dart').readAsStringSync();
+      expect(src.contains('widget.session.phase != GamePhase.playing'), isTrue,
+          reason: 'شوت/شیرجه بعد از game over باید در همان ورودی UI قفل شود');
+      expect(src.contains('enabled: widget.session.phase == GamePhase.playing'), isTrue,
+          reason: 'شبکهٔ لمسی پس از پایان بازی نباید فعال بماند');
+    });
+
+    test('در مهار، دروازه‌بان جلوی توپ کشیده می‌شود نه پشت آن', () {
+      final src = File('lib/screens/user/games/penalty_board.dart').readAsStringSync();
+      expect(src.contains("outcome == 'save' && kick > 0.38"), isTrue,
+          reason: 'توپ نباید از داخل بدن دروازه‌بان رد شود؛ در فریم مهار، keeper جلو می‌آید');
+      expect(src.contains('if (keeperInFront) _drawKeeper'), isTrue);
+    });
+
+    test('نتیجهٔ بازی در کروم ثابت بازی است، نه پایینِ اسکرول', () {
+      final scaffold = File('lib/screens/user/games/game_scaffold.dart').readAsStringSync();
+      expect(scaffold.contains('SingleChildScrollView(\n          child: Column'), isFalse,
+          reason: 'حالت playing/over نباید کل بازی را اسکرول‌دار کند');
+      expect(scaffold.contains('_ResultStrip(session: session'), isTrue,
+          reason: 'نتیجه باید بالای زمین و همیشه در دید باشد');
+    });
+  });
+
 }
