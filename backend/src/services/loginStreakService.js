@@ -5,6 +5,7 @@ const points = require('./pointService');
 // generous so the user has a reason to finish the week.
 const REWARDS = Object.freeze([100, 150, 200, 250, 300, 350, 500]);
 const CYCLE_DAYS = REWARDS.length;
+// The claim path is covered by the same migration/reset contract as the points ledger.
 
 const dayFormatter = new Intl.DateTimeFormat('en-US', {
   timeZone: 'Asia/Tehran',
