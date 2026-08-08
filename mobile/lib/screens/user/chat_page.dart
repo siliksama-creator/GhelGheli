@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
 import '../../core/cosmetics.dart';
+import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/avatar_image.dart';
@@ -296,16 +297,22 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
             padding: const EdgeInsets.all(Gaps.md),
             child: Row(
               children: [
-                ClipRRect(
-                  borderRadius: Corners.rMd,
-                  // Shown at 64px but the source is 700px wide: without
-                  // cacheWidth Flutter decodes and stores the full bitmap,
-                  // ~40x the memory actually needed. 192 = 64 at 3x density.
-                  child: Image.asset('assets/brand/chat_banner.webp',
-                      width: 64, height: 56, fit: BoxFit.cover,
-                      cacheWidth: 192),
+                Container(
+                  width: 56,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    borderRadius: Corners.rLg,
+                    gradient: LinearGradient(
+                      colors: [
+                        BrandColors.emerald.withValues(alpha: 0.16),
+                        BrandColors.blue.withValues(alpha: 0.10),
+                      ],
+                    ),
+                    border: Border.all(color: BrandColors.emerald.withValues(alpha: 0.22)),
+                  ),
+                  child: Image.asset('assets/brand/chat_glow.png', cacheWidth: 150),
                 ),
-                Gaps.hMd,
+                Gaps.hSm,
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -316,7 +323,7 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
                       // only send predefined messages now, so it warned about
                       // something that is no longer possible. The slot below
                       // is an admin-pinned announcement instead.
-                      Text('با هواداران دیگر گفتگو کن ⚽',
+                      Text('پیام آماده، استیکر، ریپلای و لایک',
                           style: theme.textTheme.bodySmall,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis),
@@ -380,8 +387,24 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
                             width: 66,
                             padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(
-                                color: theme.colorScheme.surfaceContainerHigh,
-                                borderRadius: Corners.rLg),
+                              borderRadius: Corners.rLg,
+                              gradient: LinearGradient(
+                                begin: Alignment.topRight,
+                                end: Alignment.bottomLeft,
+                                colors: [
+                                  theme.colorScheme.surfaceContainerHigh,
+                                  BrandColors.emerald.withValues(alpha: 0.10),
+                                ],
+                              ),
+                              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: BrandColors.emerald.withValues(alpha: 0.07),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
+                            ),
                             child: SafeImage(
                                 url: st['image_url'],
                                 fit: BoxFit.contain,
@@ -442,10 +465,12 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
             child: Row(
               children: [
                 Expanded(
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.all(16),
-                      shape: RoundedRectangleBorder(borderRadius: Corners.rMd),
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: Gaps.md, vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: Corners.rLg),
+                      backgroundColor: BrandColors.emerald,
+                      foregroundColor: const Color(0xFF00281D),
                     ),
                     // Disabled during the server-side cooldown, with the
                     // remaining seconds shown so the wait is explained rather

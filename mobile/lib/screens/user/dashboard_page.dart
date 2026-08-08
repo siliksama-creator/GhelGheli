@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
 import '../../core/assets.dart';
+import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/section_header.dart';
@@ -176,17 +177,18 @@ class _DashboardPageState extends State<DashboardPage> {
             onOpenProfile: widget.onOpenProfile,
             onOpenWallet: widget.onOpenWallet,
           ),
-          Gaps.vMd,
-          // دو میان‌بر: گردونهٔ روزانه و دعوت دوستان. روی داشبورد هستند چون
-          // هر دو کاری‌اند که کاربر باید هر روز انجام دهد؛ اگر فقط از نوار
-          // بالا باز می‌شدند، بیشترِ کاربرها هیچ‌وقت پیدایشان نمی‌کردند.
+          Gaps.vSm,
+          // ریلِ عملیاتِ روزانه: همهٔ قابلیت‌های داشبورد در همان قابِ اول
+          // دیده می‌شوند، اما هیچ‌کدام حذف نشده‌اند. ثبت کارت بلافاصله بعد
+          // از این ریل می‌آید؛ کارت استریک هم dense شده تا فرم را پایین
+          // هل ندهد.
           Row(
             children: [
               Expanded(
                 child: _QuickTile(
-                  icon: Image.asset('assets/pass/wheel_icon.webp', width: 30, height: 30),
-                  title: 'گردونهٔ شانس',
-                  subtitle: 'هر روز یک چرخش رایگان',
+                  icon: Image.asset('assets/pass/wheel_icon.webp', width: 24, height: 24),
+                  title: 'گردونه',
+                  subtitle: 'چرخش امروز',
                   tint: const Color(0xFFF59E0B),
                   onTap: widget.onOpenWheel,
                 ),
@@ -194,18 +196,29 @@ class _DashboardPageState extends State<DashboardPage> {
               Gaps.hXs,
               Expanded(
                 child: _QuickTile(
-                  icon: const Icon(Icons.group_add_rounded, size: 30),
-                  title: 'دعوت دوستان',
-                  subtitle: '۵٪ امتیازشان + ۳ چرخش',
+                  icon: const Icon(Icons.group_add_rounded, size: 24),
+                  title: 'دعوت',
+                  subtitle: 'دوستان',
                   tint: const Color(0xFF84CC16),
                   onTap: widget.onOpenReferral,
                 ),
               ),
+              Gaps.hXs,
+              Expanded(
+                child: _QuickTile(
+                  icon: const Icon(Icons.style_rounded, size: 24),
+                  title: 'کلکسیون',
+                  subtitle: '${faNum(inventory.length)} نوع',
+                  tint: const Color(0xFF38BDF8),
+                  onTap: widget.onOpenInventory,
+                ),
+              ),
             ],
           ),
-          Gaps.vMd,
+          Gaps.vSm,
           LoginStreakCard(
             api: widget.api,
+            compact: true,
             initialData: _data?['loginStreak'] is Map
                 ? Map<String, dynamic>.from(_data!['loginStreak'] as Map)
                 : null,
@@ -214,61 +227,67 @@ class _DashboardPageState extends State<DashboardPage> {
               widget.reloadProfile();
             },
           ),
-          Gaps.vMd,
+          Gaps.vSm,
           AppCard(
+            padding: const EdgeInsets.all(Gaps.md),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                ClipRRect(
-                  borderRadius: Corners.rLg,
-                  // cacheWidth, not cacheHeight. With BoxFit.cover in a box
-                  // WIDER than the source, the scale is set by WIDTH and the
-                  // height is cropped — so the old `cacheHeight: 390`
-                  // constrained the axis that does not bind. It produced a
-                  // 700px-wide bitmap for a box needing ~1050px on a 412dp
-                  // screen at 3x: softer than necessary AND still carrying
-                  // the cropped-away rows.
-                  //
-                  // The asset itself is now pre-cropped to the displayed
-                  // aspect (see tools/crop_banners.py), so decoding at its
-                  // native 820 width costs less than the old hint did while
-                  // being sharp instead of upscaled.
-                  child: Image.asset('assets/brand/card_pack_banner.webp',
-                      height: 130, fit: BoxFit.cover, cacheWidth: 820),
+                Row(
+                  children: [
+                    Container(
+                      width: 62,
+                      height: 58,
+                      decoration: BoxDecoration(
+                        borderRadius: Corners.rLg,
+                        gradient: LinearGradient(
+                          colors: [
+                            BrandColors.emerald.withValues(alpha: 0.18),
+                            BrandColors.blue.withValues(alpha: 0.10),
+                          ],
+                        ),
+                        border: Border.all(color: BrandColors.emerald.withValues(alpha: 0.25)),
+                      ),
+                      child: Image.asset('assets/brand/card_scan_glow.png', cacheWidth: 150),
+                    ),
+                    Gaps.hSm,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('ثبت کارت‌های قلقلی',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w900)),
+                          const SizedBox(height: 3),
+                          Text(
+                            'عکس + کد کارت؛ مسیر ضدتقلب کامل همین‌جاست.',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                      decoration: BoxDecoration(
+                        borderRadius: Corners.rPill,
+                        color: BrandColors.amber.withValues(alpha: 0.13),
+                        border: Border.all(color: BrandColors.amber.withValues(alpha: 0.34)),
+                      ),
+                      child: const Text('اولویت امروز',
+                          style: TextStyle(
+                              color: BrandColors.amber,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900)),
+                    ),
+                  ],
                 ),
-                Gaps.vMd,
-                Text('ثبت کارت‌های قلقلی',
-                    style: theme.textTheme.titleLarge),
-                Gaps.vXxs,
-                Text(
-                  'پک کارت‌های قلقلی به‌صورت فیزیکی در فروشگاه‌ها و '
-                  'سوپرمارکت‌ها به فروش می‌رسند.',
-                  style: theme.textTheme.bodySmall,
-                ),
-
-                // ═══════════════════════════════════════════════════════
-                // چرا فرمِ «فقط کد» حذف شد
-                // ═══════════════════════════════════════════════════════
-                //
-                // خواستهٔ صریح مالک: «در هر صورت کاربر باید عکس و کد رو
-                // باهم بفرسته».
-                //
-                // دو مسیرِ موازی دو مشکل داشت:
-                //
-                //   ۱. کاربر نمی‌دانست کدامش را بزند. دو کادرِ «کد» پشت
-                //      سر هم روی یک صفحه، با دو دکمهٔ متفاوت.
-                //
-                //   ۲. مهم‌تر: مسیرِ «فقط کد» عکس نمی‌خواست، پس هیچ
-                //      مدرکی نبود که کاربر کارتِ فیزیکی را دارد. کسی که
-                //      فقط رشتهٔ کد را از دوستش گرفته بود امتیاز
-                //      می‌گرفت — و آن مسیر بانکِ کدِ جدا داشت که هرگز
-                //      با تشخیصِ تصویر بررسی نمی‌شد.
-                //
-                // حالا یک مسیر: همیشه عکس + کد. مسیرِ `/api/cards/redeem`
-                // در سرور دست‌نخورده باقی مانده (کدهای قدیمیِ در گردش)
-                // ولی دیگر از اپ صدا زده نمی‌شود.
                 PhotoCardBox(
                   api: widget.api,
+                  embedded: true,
                   // همان دو کاری که مسیر «ثبت کد» بعد از موفقیت می‌کند:
                   // اینونتوریِ این صفحه و امتیازِ نوارِ بالا. اگر فقط
                   // یکی صدا زده شود، کارت اضافه می‌شود ولی امتیاز قدیمی
@@ -281,6 +300,7 @@ class _DashboardPageState extends State<DashboardPage> {
               ],
             ),
           ),
+
           Gaps.vXl,
           // ── چرا داشبورد فقط پیش‌نمایش می‌دهد ──
           //
@@ -361,9 +381,9 @@ class _QuickTile extends StatelessWidget {
         borderRadius: Corners.rLg,
         child: Container(
           // ۴۸ کف اندازهٔ هدف لمسی طبق راهنمای دسترس‌پذیری متریال.
-          constraints: const BoxConstraints(minHeight: 48),
+          constraints: const BoxConstraints(minHeight: 58),
           padding: const EdgeInsets.symmetric(
-              horizontal: Gaps.sm, vertical: Gaps.md),
+              horizontal: Gaps.xs, vertical: Gaps.xs),
           decoration: BoxDecoration(
             borderRadius: Corners.rLg,
             gradient: LinearGradient(
@@ -387,19 +407,22 @@ class _QuickTile extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              icon,
-              Gaps.vXxs,
+              SizedBox(width: 26, height: 26, child: Center(child: icon)),
+              const SizedBox(height: 3),
               Text(title,
                   textAlign: TextAlign.center,
-                  style: theme.textTheme.labelLarge
-                      ?.copyWith(fontWeight: FontWeight.w800)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelMedium
+                      ?.copyWith(fontWeight: FontWeight.w900)),
               Text(subtitle,
                   textAlign: TextAlign.center,
-                  maxLines: 2,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.labelSmall?.copyWith(
+                    fontSize: 10,
                     color:
-                        theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                        theme.colorScheme.onSurface.withValues(alpha: 0.62),
                   )),
             ],
           ),

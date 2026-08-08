@@ -78,9 +78,18 @@ const List<(String, String)> _kAnalysisSteps = [
 ];
 
 class PhotoCardBox extends StatefulWidget {
-  const PhotoCardBox({super.key, required this.api, this.onRegistered});
+  const PhotoCardBox({
+    super.key,
+    required this.api,
+    this.onRegistered,
+    this.embedded = false,
+  });
 
   final ApiClient api;
+
+  /// Dashboard-embedded mode removes the duplicated divider/title so the real
+  /// form sits above the fold while keeping every input and anti-fraud hint.
+  final bool embedded;
 
   /// بعد از ثبتِ موفق صدا زده می‌شود تا صفحهٔ والد امتیاز و اینونتوری
   /// را تازه کند.
@@ -466,28 +475,34 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Gaps.vMd,
-        Divider(color: theme.colorScheme.outline.withValues(alpha: 0.3)),
-        Gaps.vSm,
-        Row(
-          children: [
-            Expanded(
-              child: Text('ثبت کارت با عکس',
-                  style: theme.textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w900)),
-            ),
-            // شمارِ در انتظار به‌صورت یک نشانِ کوچک کنارِ عنوان، به‌جای
-            // بنرِ سه‌خطی. بنر فقط وقتی باز می‌شود که کاربر رویش بزند.
-            if (_pendingCount > 0 && _result == null)
-              _pendingChip(context),
-          ],
-        ),
-        Gaps.vXxs,
-        Text(
-          'از کارت عکس بگیر و کدش را وارد کن.',
-          style: theme.textTheme.bodySmall,
-        ),
-        Gaps.vSm,
+        if (!widget.embedded) ...[
+          Gaps.vMd,
+          Divider(color: theme.colorScheme.outline.withValues(alpha: 0.3)),
+          Gaps.vSm,
+          Row(
+            children: [
+              Expanded(
+                child: Text('ثبت کارت با عکس',
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w900)),
+              ),
+              // شمارِ در انتظار به‌صورت یک نشانِ کوچک کنارِ عنوان، به‌جای
+              // بنرِ سه‌خطی. بنر فقط وقتی باز می‌شود که کاربر رویش بزند.
+              if (_pendingCount > 0 && _result == null)
+                _pendingChip(context),
+            ],
+          ),
+          Gaps.vXxs,
+          Text(
+            'از کارت عکس بگیر و کدش را وارد کن.',
+            style: theme.textTheme.bodySmall,
+          ),
+          Gaps.vSm,
+        ] else ...[
+          if (_pendingCount > 0 && _result == null)
+            Align(alignment: AlignmentDirectional.centerStart, child: _pendingChip(context)),
+          if (_pendingCount > 0 && _result == null) Gaps.vXs,
+        ],
 
         if (_result != null) _resultView(context, _result!),
         if (_error != null) ...[

@@ -4,6 +4,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import '../../api_client.dart';
+import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/level_badge.dart';
@@ -132,14 +133,51 @@ class _GamesHubPageState extends State<GamesHubPage> {
     return ListView(
       padding: const EdgeInsets.all(Gaps.lg),
       children: [
-        Text('بخش بازی‌ها',
-            style: theme.textTheme.headlineSmall
-                ?.copyWith(fontWeight: FontWeight.w800)),
-        Gaps.vXxs,
-        Text(
-          'با کاربران دیگر آنلاین رقابت کن و امتیاز بگیر. جفت‌یاب را می‌توانی '
-          'تنها هم بازی کنی و رکورد بزنی.',
-          style: theme.textTheme.bodyMedium,
+        Container(
+          padding: const EdgeInsets.all(Gaps.md),
+          decoration: BoxDecoration(
+            borderRadius: Corners.rXl,
+            gradient: const LinearGradient(
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+              colors: [Color(0xFF16345F), Color(0xFF071521)],
+            ),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+            boxShadow: [
+              BoxShadow(
+                color: BrandColors.blue.withValues(alpha: 0.12),
+                blurRadius: 26,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Image.asset('assets/games/play_glow.png', width: 58, height: 58, cacheWidth: 150),
+              Gaps.hSm,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('باشگاه بازی قلقلی',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                        )),
+                    const SizedBox(height: 3),
+                    Text(
+                      'رقابت آنلاین، رکورد تنها و XP لول در یک مسیر جمع‌وجور.',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.72),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
         Gaps.vMd,
         if (_level != null)
@@ -210,7 +248,7 @@ class _GameTileState extends State<_GameTile> {
                 Stack(
                   children: [
                     AspectRatio(
-                      aspectRatio: 16 / 7,
+                      aspectRatio: 16 / 5.8,
                       child: Image.asset(
                         entry.art,
                         fit: BoxFit.cover,
@@ -269,7 +307,7 @@ class _GameTileState extends State<_GameTile> {
                   ],
                 ),
                 Padding(
-                  padding: const EdgeInsets.all(Gaps.md),
+                  padding: const EdgeInsets.all(Gaps.sm),
                   child: Row(
                     children: [
                       Expanded(
@@ -311,8 +349,8 @@ class _GameTileState extends State<_GameTile> {
                           ],
                         ),
                       ),
-                      Icon(Icons.play_circle_fill_rounded,
-                          size: 34, color: entry.accent),
+                      Image.asset('assets/games/play_glow.png',
+                          width: 38, height: 38, cacheWidth: 96),
                     ],
                   ),
                 ),

@@ -8,6 +8,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
+import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
 import 'chat_page.dart';
 import 'games_page.dart';
@@ -69,8 +70,23 @@ class _Switcher extends StatelessWidget {
       height: 42,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest.withValues(alpha: 0.6),
+        gradient: LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [
+            scheme.surfaceContainerHighest.withValues(alpha: 0.78),
+            Color.lerp(scheme.surfaceContainer, BrandColors.blue, 0.08)!,
+          ],
+        ),
         borderRadius: Corners.rPill,
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        boxShadow: [
+          BoxShadow(
+            color: BrandColors.emerald.withValues(alpha: 0.08),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: LayoutBuilder(
         builder: (context, box) {
@@ -87,7 +103,9 @@ class _Switcher extends StatelessWidget {
                   width: w,
                   height: double.infinity,
                   decoration: BoxDecoration(
-                    color: scheme.primary,
+                    gradient: const LinearGradient(
+                      colors: [BrandColors.emerald, BrandColors.blue],
+                    ),
                     borderRadius: Corners.rPill,
                     boxShadow: [
                       BoxShadow(
