@@ -83,6 +83,8 @@ UNION ALL SELECT 'اینونتوری'    , count(*)::text FROM user_card_invento
 UNION ALL SELECT 'کاربر'        , count(*)::text FROM users
 UNION ALL SELECT 'پیام چت'      , count(*)::text FROM chat_messages
 UNION ALL SELECT 'چرخشِ گردونه' , count(*)::text FROM wheel_spins
+UNION ALL SELECT 'تیم دوئل'     , count(*)::text FROM card_duel_decks
+UNION ALL SELECT 'نبرد دوئل'    , count(*)::text FROM card_duel_battles
 UNION ALL SELECT 'تراکنش کیف'   , count(*)::text FROM wallet_transactions
 UNION ALL SELECT 'لاگ ممیزی'    , count(*)::text FROM audit_log
 UNION ALL SELECT 'تلاشِ ناموفق' , count(*)::text FROM photo_card_attempts
@@ -126,6 +128,8 @@ DELETE FROM card_types;
 DELETE FROM chat_message_likes;
 DELETE FROM chat_messages;
 DELETE FROM wheel_spins;
+DELETE FROM card_duel_battles;
+DELETE FROM card_duel_decks;
 DELETE FROM game_results;
 DELETE FROM game_xp_log;
 DELETE FROM solo_records;
