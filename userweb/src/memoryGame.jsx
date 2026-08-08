@@ -42,7 +42,7 @@ export function runTime(ms) {
   return m > 0 ? `${faNum(m)}:${two(s)}٫${two(c)}` : `${faNum(s)}٫${two(c)}`;
 }
 
-const EVENT_TEXT = { match: '✅ جفت شد!', miss: '❌ جفت نشد' };
+const EVENT_TEXT = { match: ' جفت شد!', miss: ' جفت نشد' };
 
 /** The 4x4 grid. Shared by the versus board and the solo board. */
 export function MemoryGrid({ cards = [], playable = [], cols = 4, lastResult,

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { SvgIcon } from './components/IconAsset.jsx';
 
 /**
  * کیف پول تومانی — نسخهٔ وب.
@@ -129,14 +130,14 @@ export default function Wallet({ token, req, reloadProfile, setMsg }) {
         <p className="walletLabel">موجودی قابل برداشت</p>
         <h1 className="walletBalance">{fa(w.balance)} <small>تومان</small></h1>
         {w.pendingAmount > 0 && (
-          <span className="walletPill">⏳ {fa(w.pendingAmount)} تومان در حال بررسی</span>
+          <span className="walletPill"><SvgIcon name="support" size={16} /> {fa(w.pendingAmount)} تومان در حال بررسی</span>
         )}
         <div className="walletStats">
           <div><span>کل دریافتی</span><b>{fa(w.totalIn)}</b></div>
           <div><span>کل برداشتی</span><b>{fa(w.totalOut)}</b></div>
         </div>
         <button className="walletCardRow" onClick={() => setShowCard(true)}>
-          <span className="wcIcon">💳</span>
+          <span className="wcIcon"></span>
           <span className="wcBody">
             <b>{w.card ? w.card.maskedNumber : 'کارت بانکی ثبت نشده'}</b>
             <small>{w.card ? (w.card.bank || w.card.holder || '') : 'برای برداشت لازم است'}</small>
@@ -153,7 +154,7 @@ export default function Wallet({ token, req, reloadProfile, setMsg }) {
       </div>
 
       {!canWithdraw && w.blockReason && (
-        <p className="walletNote">ℹ️ {w.blockReason}</p>
+        <p className="walletNote">ℹ {w.blockReason}</p>
       )}
 
       {/* ── راهنمای کسب درآمد وقتی کیف پول خالی است ── */}
@@ -161,12 +162,12 @@ export default function Wallet({ token, req, reloadProfile, setMsg }) {
         <div className="walletGuide">
           <h3>چطور کیف پولم پر می‌شود؟</h3>
           <ul>
-            <li>💳 ثبت کارت‌هایی که جایزهٔ نقدی دارند</li>
+            <li> ثبت کارت‌هایی که جایزهٔ نقدی دارند</li>
             {/* گردونه فعال است و نقدی به کیف پول واریز می‌کند — برچسب
                 «به‌زودی» قدیمی و گمراه‌کننده بود. */}
-            <li>🎡 گردونهٔ شانس — جایزهٔ نقدی مستقیم به کیف پول</li>
-            <li>🎁 جوایز نقدی با امتیازهایت</li>
-            <li>🏆 جایزهٔ لیگ ماهانه</li>
+            <li> گردونهٔ شانس — جایزهٔ نقدی مستقیم به کیف پول</li>
+            <li> جوایز نقدی با امتیازهایت</li>
+            <li> جایزهٔ لیگ ماهانه</li>
           </ul>
         </div>
       )}
@@ -211,7 +212,7 @@ export default function Wallet({ token, req, reloadProfile, setMsg }) {
                   <b>{fa(r.amount)} تومان</b>
                   <span className={`wdBadge ${STATUS_CLASS[r.status] || ''}`}>{r.statusLabel}</span>
                 </div>
-                <small>💳 <bdi dir="ltr">{r.cardMasked}</bdi>{r.cardBank ? ` — ${r.cardBank}` : ''}</small>
+                <small> <bdi dir="ltr">{r.cardMasked}</bdi>{r.cardBank ? ` — ${r.cardBank}` : ''}</small>
                 <small className="txDate">{new Date(r.createdAt).toLocaleString('fa-IR')}</small>
                 {r.trackingCode && <small className="wdOk">کد پیگیری: {r.trackingCode}</small>}
                 {r.adminNote && <small className="wdNote">پیام مدیریت: {r.adminNote}</small>}

@@ -36,7 +36,7 @@ export default function Referral({ token, setMsg }) {
         document.execCommand('copy');
         document.body.removeChild(ta);
       }
-      setMsg?.('کد کپی شد ✅');
+      setMsg?.('کد کپی شد ');
     } catch {
       setMsg?.('کپی نشد — کد را دستی بردار');
     }
@@ -56,7 +56,7 @@ export default function Referral({ token, setMsg }) {
 
   return (
     <section className="card wide refPage">
-      <h2>🤝 دعوت دوستان</h2>
+      <h2> دعوت دوستان</h2>
       <p className="hint">
         کدت را به دوستانت بده. هر کس موقع ثبت‌نام آن را وارد کند،
         {' '}<b>هر دوی شما {fa(d.spinsPerReferral)} چرخش گردونه</b> می‌گیرید.
@@ -112,13 +112,13 @@ export default function Referral({ token, setMsg }) {
           </div>
           <small>
             {fa(d.invitesToNextDailySpin)} دوست دیگر تا
-            {' '}{fa(d.dailySpins + 1)} چرخش روزانه 🎯
+            {' '}{fa(d.dailySpins + 1)} چرخش روزانه
           </small>
         </div>
       )}
       {d.atDailyCap && (
         <p className="hint refCapped">
-          🏆 به سقف {fa(d.maxInvitesForDaily)} دوست رسیدی — هر روز
+           به سقف {fa(d.maxInvitesForDaily)} دوست رسیدی — هر روز
           {' '}{fa(d.dailySpins)} چرخش رایگان داری!
         </p>
       )}

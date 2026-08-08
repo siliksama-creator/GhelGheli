@@ -32,7 +32,7 @@ function Roster({ token, club, back, openProfile }) {
 
       <AsyncSection state={state} loadingLabel="در حال بارگذاری هواداران...">
         {d => (!d.members.length ? (
-          <EmptyView icon="🏟️">
+          <EmptyView icon="group">
             هنوز کسی عضو این باشگاه نشده. اولین نفر باش!
           </EmptyView>
         ) : (

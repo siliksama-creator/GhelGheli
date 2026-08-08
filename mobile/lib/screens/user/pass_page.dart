@@ -854,7 +854,7 @@ class _PlusUpsell extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Text('⭐', style: TextStyle(fontSize: 26)),
+          const Icon(Icons.star_rounded, size: 27, color: Colors.amber),
           Gaps.hSm,
           // ═══════════════════════════════════════════════════════════
           // چرا این متن‌ها رنگِ ثابت ندارند
@@ -937,7 +937,7 @@ class _TrackLegend extends StatelessWidget {
         children: [
           _chip('رایگان', _freeColor),
           Gaps.hSm,
-          _chip('پلاس ⭐', context.gold),
+          _chip('پلاس', context.gold),
           const Spacer(),
           Text('${faNum(tierCount)} پله',
               style: Theme.of(context).textTheme.labelMedium),
@@ -1176,7 +1176,7 @@ class _RewardTile extends StatelessWidget {
       // ── تاریخچهٔ این عدد ──
       //
       // ۶۲ → ۸۰: وقتی برچسب دو خطی می‌شود (مثل «اسم آبی آسمانی») و
-      // زیرش هم یک خط وضعیت («⭐ فقط پلاس») می‌آید، ۶۲ پیکسل ۱۴ پیکسل
+      // زیرش هم یک خط وضعیت («فقط پلاس») می‌آید، ۶۲ پیکسل ۱۴ پیکسل
       // کم می‌آورد و فلاتر نوار زرد-مشکیِ سرریز می‌کشد.
       //
       // ۸۰ → ۹۶: بزرگ کردنِ فونت‌ها (۱۱.۵→۱۴ برای برچسب و ۹.۵→۱۱.۵
@@ -1254,7 +1254,7 @@ class _RewardTile extends StatelessWidget {
                           fontWeight: FontWeight.w800,
                           color: _readyColor))
                 else if (locked)
-                  Text('⭐ فقط پلاس',
+                  Text('فقط پلاس',
                       style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w800,

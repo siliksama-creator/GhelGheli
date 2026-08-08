@@ -465,7 +465,7 @@ class _PlusCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Text('⭐', style: TextStyle(fontSize: 26)),
+              const Icon(Icons.star_rounded, size: 27, color: Colors.amber),
               Gaps.hXs,
               Expanded(
                 child: Column(
@@ -512,7 +512,7 @@ class _PlusCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('⏳ بعد از پایان اشتراک چه می‌شود؟',
+                Text('بعد از پایان اشتراک چه می‌شود؟',
                     style: theme.textTheme.labelMedium?.copyWith(
                         fontWeight: FontWeight.w800,
                         color: const Color(0xFFC79415))),

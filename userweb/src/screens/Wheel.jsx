@@ -13,6 +13,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { req } from '../lib/api.js';
 import { play as playSfx } from '../gameAudio.js';
+import { SvgIcon, AssetIcon } from '../components/IconAsset.jsx';
 
 const fa = n => new Intl.NumberFormat('fa-IR').format(Number(n || 0));
 
@@ -130,7 +131,7 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
 
   return (
     <section className="card wide wheelPage">
-      <h2 className="wheelTitle">🎡 گردونهٔ شانس</h2>
+      <h2 className="wheelTitle"><AssetIcon name="wheel" size={30} /> گردونهٔ شانس</h2>
 
       <div className={`wheelStage${spinning ? ' spinning' : ''}`}>
         <img className="wheelPointer" src="/wheel/pointer.svg" alt="" />
@@ -175,19 +176,19 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
         </button>
         {state.spinsLeft <= 0 && !state.unlimited && (
           <p className="wheelReset">
-            ⏳ شانس بعدی تا {countdown(state.resetInMs)} دیگر
+            <SvgIcon name="support" size={16} /> شانس بعدی تا {countdown(state.resetInMs)} دیگر
           </p>
         )}
         {state.bonusSpins > 0 && (
           <p className="hint wheelBonus">
-            {fa(state.bonusSpins)} چرخش جایزه از دعوت دوستان داری 🎁
+            {fa(state.bonusSpins)} چرخش جایزه از دعوت دوستان داری
           </p>
         )}
       </div>
 
       {result && (
         <div className={`wheelResult ${result.kind}`}>
-          <b>{result.kind === 'cash' ? '🎉 برنده شدی!' : '✨ گرفتی!'}</b>
+          <b>{result.kind === 'cash' ? ' برنده شدی!' : ' گرفتی!'}</b>
           <span>{result.label}</span>
         </div>
       )}

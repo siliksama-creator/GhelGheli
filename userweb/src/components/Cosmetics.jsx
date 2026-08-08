@@ -4,6 +4,7 @@
 // club badge or a name colour looks like. The server decides WHETHER an item
 // applies (ownership vs an active Plus); this only draws it.
 import React from 'react';
+import { SvgIcon } from './IconAsset.jsx';
 
 // Every crest lives at /shop/club_<slug>.webp, so derive the path instead of
 // maintaining a map. The hand-written map went stale the moment eleven world
@@ -111,7 +112,7 @@ export function DisplayName({
       {!avatarIsSameCrest && <ClubBadge club={c.club} />}
       <LevelBadge level={level} />
       {name}
-      {c.plus && <span className="plusStarSm" title="عضو پلاس">⭐</span>}
+      {c.plus && <SvgIcon className="plusStarSm" title="عضو پلاس" name="trophy" size={14} />}
     </b>
   );
 }

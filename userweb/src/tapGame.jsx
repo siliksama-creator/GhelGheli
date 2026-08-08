@@ -8,6 +8,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { play as playSfx } from './gameAudio.js';
 import { req } from './lib/api.js';
+import { SvgIcon } from './components/IconAsset.jsx';
 
 // ── config (mirrors TapGameConfig in Dart) ─────────────────────────────────
 export const TAP_CONFIG = {
@@ -616,7 +617,7 @@ export default function TapGame({ token, onBack }) {
         later(() => setPulse(false), 450);
         if (skinIndexForLevel(lv) !== prevSkin) {
           playSfx('win');
-          setNotice('شخصیت جدید باز شد! 🎉');
+          setNotice('شخصیت جدید باز شد! ');
           later(() => setNotice(''), 2500);
         }
         // A level boundary is a natural checkpoint.
@@ -651,7 +652,7 @@ export default function TapGame({ token, onBack }) {
             ))}
           </span>
         )}
-        <span className="tapTotal">⚡ {fa(points)} امتیاز</span>
+        <span className="tapTotal"> {fa(points)} امتیاز</span>
       </div>
 
       <div className="tapProgress">
@@ -663,7 +664,7 @@ export default function TapGame({ token, onBack }) {
         </div>
         <div className="tapBar"><span style={{ width: pct + '%' }} /></div>
         <div className="tapMeta">
-          <small className={nearLimit ? 'warn' : ''}>⚡ {fa(rate)} ضربه بر ثانیه</small>
+          <small className={nearLimit ? 'warn' : ''}> {fa(rate)} ضربه بر ثانیه</small>
           {progress.pendingTaps > 0 && <small>در حال ثبت: {fa(progress.pendingTaps)}</small>}
         </div>
       </div>
@@ -673,7 +674,7 @@ export default function TapGame({ token, onBack }) {
       {isComplete ? (
         <div className="tapDone">
           <img src={skinForLevel(TAP_CONFIG.levelCount)} alt="" />
-          <h2>🏆 تبریک! همهٔ لول‌ها را تمام کردی</h2>
+          <h2> تبریک! همهٔ لول‌ها را تمام کردی</h2>
           <p>مجموع امتیاز: {fa(points)}</p>
         </div>
       ) : capped ? (
@@ -682,9 +683,9 @@ export default function TapGame({ token, onBack }) {
         // limit — the player assumes the game is broken.
         <div className="tapDone tapCapped">
           <img src={skin} alt="" />
-          <h2>😴 سهمیهٔ امروز تمام شد</h2>
+          <h2> سهمیهٔ امروز تمام شد</h2>
           <p>هر روز {fa(TAP_CONFIG.levelsPerDay)} لول می‌توانی بالا بروی.</p>
-          <p className="tapResetIn">⏳ باز شدن تا {formatCountdown(resetIn)} دیگر</p>
+          <p className="tapResetIn"><SvgIcon name="support" size={16} /> باز شدن تا {formatCountdown(resetIn)} دیگر</p>
         </div>
       ) : (
         <div

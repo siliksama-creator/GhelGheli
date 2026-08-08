@@ -75,7 +75,7 @@ function TierCard({ tier, accent, onClaim, busy }) {
         <img src={asset(tier.imageUrl) || avatarUrl('avatar_2_trophy.png')}
           alt={tier.name} />
         <span className={`rgKind ${tier.rewardType}`}>
-          {tier.rewardType === 'cash' ? '💰 نقدی' : '🎁 فیزیکی'}
+          {tier.rewardType === 'cash' ? ' نقدی' : ' فیزیکی'}
         </span>
       </div>
       <b>{tier.name}</b>
@@ -142,7 +142,7 @@ export default function Rewards({ token, setMsg, reloadProfile }) {
           return (
             <section className="card wide">
               <h2>جوایز</h2>
-              <EmptyView icon="🎁">هنوز جایزه‌ای تعریف نشده است.</EmptyView>
+              <EmptyView icon="gift">هنوز جایزه‌ای تعریف نشده است.</EmptyView>
             </section>
           );
         }
@@ -203,7 +203,7 @@ export default function Rewards({ token, setMsg, reloadProfile }) {
                       (points spent, bar reset) are easy to miss in prose. */}
                   <ul className="ccList">
                     <li>
-                      <span className="ccIcon">📉</span>
+                      <span className="ccIcon"></span>
                       <span>
                         <b>{fa(confirm.tier.requiredPoints)} امتیاز</b> از
                         امتیازت کم می‌شه
@@ -216,7 +216,7 @@ export default function Rewards({ token, setMsg, reloadProfile }) {
                       </span>
                     </li>
                     <li>
-                      <span className="ccIcon">🔄</span>
+                      <span className="ccIcon"></span>
                       <span>
                         نوار پیشرفت <b>«{confirm.group.name}»</b> از صفر شروع
                         می‌شه
@@ -227,7 +227,7 @@ export default function Rewards({ token, setMsg, reloadProfile }) {
                     </li>
                     <li>
                       <span className="ccIcon">
-                        {confirm.tier.rewardType === 'cash' ? '💰' : '🎁'}
+                        {confirm.tier.rewardType === 'cash' ? '' : ''}
                       </span>
                       <span>
                         {confirm.tier.rewardType === 'cash' ? (

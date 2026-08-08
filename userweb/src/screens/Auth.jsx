@@ -36,7 +36,7 @@ export default function Auth({ mode, setMode, done }) {
       // اگر کد دعوت گرفت، قبل از ورود بگو چه چیزی برنده شد. یک «ثبت شد»
       // خالی، جایزه را نامرئی می‌کند.
       if (d.referralApplied) {
-        setMsg(`🎉 ${faNum(d.referralSpins)} چرخش گردونه گرفتی!`);
+        setMsg(` ${faNum(d.referralSpins)} چرخش گردونه گرفتی!`);
       }
       done(d.token);
     } catch (x) {
@@ -82,7 +82,7 @@ export default function Auth({ mode, setMode, done }) {
             dir="ltr"
             onChange={e => setF({ ...f, referralCode: e.target.value })} />
           <p className="hint refPromo">
-            🎁 اگر کد دعوت یکی از دوستانت را وارد کنی،
+             اگر کد دعوت یکی از دوستانت را وارد کنی،
             {' '}<b>هر دوی شما ۳ چرخش گردونهٔ شانس</b> می‌گیرید.
           </p>
           <p className="hint">

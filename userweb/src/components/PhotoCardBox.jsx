@@ -55,6 +55,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 
 import { API } from '../lib/api.js';
+import { SvgIcon } from './IconAsset.jsx';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // مراحلِ واقعیِ آنالیز
@@ -125,7 +126,7 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
   // خواستهٔ مالک: «یه لودینگ دقیقا به اندازه زمان مورد نیاز انجین …
   // که واقعا اینکار انجام شه و یه آنالیز حرفه‌ای رخ بده».
   //
-  // ⚠️ این مراحل **ساختگی نیستند**. هر کدام کارِ واقعیِ سرور را نشان
+  //  این مراحل **ساختگی نیستند**. هر کدام کارِ واقعیِ سرور را نشان
   //    می‌دهند و زمان‌بندی‌شان از اندازه‌گیریِ واقعی آمده:
   //
   //      فشرده‌سازیِ سمتِ مرورگر  ~۳۰۰ms
@@ -223,7 +224,7 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
     // ۲۰۰ طرح)، ولی سرور با کاتالوگِ بزرگ‌تر ردیف‌های بیشتری از
     // دیتابیس می‌خواند و در ساعتِ شلوغ کندتر پاسخ می‌دهد.
     //
-    // ⚠️ سقفِ ۱.۵ ثانیه: بدونِ آن با ۵۰۰ کارت مرحلهٔ آخر دیر ظاهر
+    //  سقفِ ۱.۵ ثانیه: بدونِ آن با ۵۰۰ کارت مرحلهٔ آخر دیر ظاهر
     //    می‌شد و کاربر نوارِ متوقف می‌دید — دقیقاً همان حسِ «هنگ کرده»
     //    که این لودینگ برای رفعش ساخته شده.
     const slack = Math.min(1500, Math.round(designCount * 3));
@@ -270,7 +271,7 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
       if (d.status === 'pending') {
         // کد درست بوده ولی عکس شناخته نشد → بررسی دستی.
         //
-        // ⚠️ عکس عمداً پاک **نمی‌شود** و فقط کد خالی می‌شود. اگر کاربر
+        //  عکس عمداً پاک **نمی‌شود** و فقط کد خالی می‌شود. اگر کاربر
         //    پنج نسخهٔ همین کارت را دارد، همان عکس برای چهار کدِ بعدی
         //    هم درست است — مجبور کردنش به عکس‌گرفتنِ دوباره فقط او را
         //    خسته می‌کند و نتیجه‌اش هم دقیقاً همان است.
@@ -289,7 +290,7 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
         cash: d.addedCash,
         imageUrl: d.imageUrl,
       });
-      // ⚠️ فقط کد پاک می‌شود، نه عکس — توضیح کامل در سربرگِ فایل.
+      //  فقط کد پاک می‌شود، نه عکس — توضیح کامل در سربرگِ فایل.
       //
       // فوکوس هم به فیلدِ کد برمی‌گردد تا کاربری که ده کد دارد بتواند
       // بدونِ لمسِ اضافه پشت‌سرهم واردشان کند. در ثبتِ ده‌تایی این
@@ -323,7 +324,7 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
   // چیزی که کاربر می‌دید: بنرِ بزرگِ «ثبت کارت‌های قلقلی»، توضیحِ اینکه
   // کارت‌ها در فروشگاه‌ها فروخته می‌شوند، و **هیچ راهی برای ثبت**.
   //
-  // ⚠️ سکوت بدترین پاسخ است: کاربر نمی‌داند اپ خراب است، اینترنتش قطع
+  //  سکوت بدترین پاسخ است: کاربر نمی‌داند اپ خراب است، اینترنتش قطع
   //    است، یا هنوز کارتی تعریف نشده. هر سه حدس او را به پشتیبانی
   //    می‌فرستد — و دو تای اولش تقصیر را گردنِ محصول می‌اندازد.
   if (!available) {
@@ -331,7 +332,7 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
       <div className="photoCardBox">
         <div className="pcResult pending">
           <div>
-            <b>⏳ ثبت کارت هنوز فعال نشده</b>
+            <b><SvgIcon name="support" size={16} /> ثبت کارت هنوز فعال نشده</b>
             <span>
               هنوز کارتی در سیستم تعریف نشده است. به‌محض اینکه اولین سری
               کارت‌ها اضافه شود، همین‌جا می‌توانی از کارتت عکس بگیری و کدش
@@ -370,20 +371,20 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
   //   • راهنمای حروف با `<details>` تاشو شد — عنصرِ بومیِ HTML، بدونِ
   //     هیچ state اضافه‌ای و با دسترس‌پذیریِ صفحه‌خوان به‌صورت رایگان.
   //
-  // ⚠️ هیچ اطلاعاتی حذف نشد، فقط جابه‌جا و تاشو. هشدارِ ۰/O یک خطِ
+  //  هیچ اطلاعاتی حذف نشد، فقط جابه‌جا و تاشو. هشدارِ ۰/O یک خطِ
   //    همیشه‌دیده‌شده دارد چون کاربر باید **قبل** از تایپ بداند، وگرنه
   //    یکی از پنج تلاشش را می‌سوزاند.
   return (
     <div className="photoCardBox">
       <div className="pcHead">
-        <h2>📸 ثبت کارت با عکس</h2>
+        <h2> ثبت کارت با عکس</h2>
         {/* شمارِ در انتظار به‌صورت نشانِ کوچک کنارِ عنوان، به‌جای بنرِ
             سه‌خطی. متنِ کامل در `title` است، پس با نگه‌داشتنِ اشاره‌گر
             دیده می‌شود و صفحه‌خوان هم می‌خواندش. */}
         {pendingCount > 0 && !result && (
           <span className="pcPendingChip"
             title="کیفیت عکس کامل نبود؛ کارشناس بررسی می‌کند و ممکن است تا ۲۴ ساعت طول بکشد. کد شما محفوظ است و می‌توانید کارت‌های دیگرتان را ثبت کنید.">
-            ⏳ {pendingCount} در بررسی
+            <SvgIcon name="support" size={16} /> {pendingCount} در بررسی
           </span>
         )}
       </div>
@@ -404,7 +405,7 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
         </div>
       )}
       {result?.kind === 'pending' && (
-        <div className="pcResult pending">⏳ {result.message}</div>
+        <div className="pcResult pending"><SvgIcon name="support" size={18} /> {result.message}</div>
       )}
       {result?.kind === 'badcode' && (
         <div className="pcResult err">
@@ -417,7 +418,7 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
       {result?.kind === 'locked' && (
         <div className="pcResult locked">
           <div>
-            <b>🔒 ثبت کارت موقتاً بسته است</b>
+            <b><SvgIcon name="lock" size={17} /> ثبت کارت موقتاً بسته است</b>
             <span>{result.message}</span>
           </div>
         </div>
@@ -444,7 +445,7 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
         ) : (
           <label className="pcSlot"
             title="کل کارت داخل کادر باشد و نور کافی باشد. عکس تار هم معمولاً شناسایی می‌شود.">
-            <span className="pcSlotIcon">📷</span>
+            <span className="pcSlotIcon"><SvgIcon name="camera" size={21} /></span>
             <span>عکس کارت</span>
             <input type="file" accept="image/*" capture="environment" hidden
               onChange={e => pick(e.target.files?.[0])} />
@@ -465,13 +466,13 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
           />
           <div className="pcPickRow">
             <label className="pcPick">
-              <span className="pcPickIcon">📷</span>
+              <span className="pcPickIcon"><SvgIcon name="camera" size={18} /></span>
               دوربین
               <input type="file" accept="image/*" capture="environment" hidden
                 onChange={e => pick(e.target.files?.[0])} />
             </label>
             <label className="pcPick">
-              <span className="pcPickIcon">🖼️</span>
+              <span className="pcPickIcon"></span>
               گالری
               <input type="file" accept="image/*" hidden
                 onChange={e => pick(e.target.files?.[0])} />
@@ -516,7 +517,7 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
           چهار نقطه که یکی‌یکی روشن می‌شوند، هر کدام یک مرحلهٔ **واقعی**
           از کارِ موتور.
 
-          ⚠️ نوار روی مرحلهٔ آخر متوقف می‌ماند تا پاسخ برسد. هرگز خودش
+           نوار روی مرحلهٔ آخر متوقف می‌ماند تا پاسخ برسد. هرگز خودش
              به ۱۰۰٪ نمی‌رسد. لودینگی که زودتر از کارِ واقعی تمام شود
              بدتر از نبودنش است: کاربر فکر می‌کند سیستم هنگ کرده و
              دکمه را دوباره می‌زند. */}
@@ -529,7 +530,7 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
             {ANALYSIS_STEPS.map((st, i) => (
               <span key={st.label}
                 className={i < phase ? 'done' : (i === phase ? 'now' : '')}>
-                {i < phase ? '✓' : '●'}
+                {i < phase ? '' : '●'}
               </span>
             ))}
           </div>

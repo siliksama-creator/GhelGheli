@@ -6,22 +6,30 @@ import { io } from 'socket.io-client';
 import { play, isEnabled, setEnabled } from './gameAudio.js';
 import MemorySolo, { MemoryGrid, runTime } from './memoryGame.jsx';
 import TapGame from './tapGame.jsx';
+import { AssetIcon, SvgIcon } from './components/IconAsset.jsx';
 
 // `bot: false` = جفت‌یاب never falls back to a computer opponent; the player
 // stays queued for a human, or plays the solo time-attack mode instead.
 const GAMES = [
   // Single-player: no lobby, no opponent, no bot. Mirrors the Flutter hub.
-  { id: 'tap', title: 'ضربه‌زن', emoji: '👊', desc: '۵۰ لول ضربه بزن و شخصیت‌ها را باز کن', accent: '#84CC16', singlePlayer: true },
-  { id: 'memory', title: 'جفت‌یاب', emoji: '🃏', desc: 'جفت‌ها را به خاطر بسپار و ببر', accent: '#A855F7', bot: false, solo: true },
-  { id: 'reversi', title: 'اتللو', emoji: '⚫', desc: 'مهره‌ها را برگردان', accent: '#34D399', bot: true },
+  { id: 'tap', title: 'ضربه‌زن', emoji: 'football', desc: '۵۰ لول ضربه بزن و شخصیت‌ها را باز کن', accent: '#84CC16', singlePlayer: true },
+  { id: 'memory', title: 'جفت‌یاب', emoji: 'gift', desc: 'جفت‌ها را به خاطر بسپار و ببر', accent: '#A855F7', bot: false, solo: true },
+  { id: 'reversi', title: 'اتللو', emoji: 'football', desc: 'مهره‌ها را برگردان', accent: '#34D399', bot: true },
 ];
 
 const MOVE_SFX = { memory: 'flip', reversi: 'flip' };
 
 const SYMBOLS = {
-  memory: { X: '🟣', O: '🔵' },
-  reversi: { X: '⚫', O: '⚪' },
+  memory: { X: 'football', O: 'glove' },
+  reversi: { X: 'circle', O: 'circle' },
 };
+
+function GameSymbol({ gameId, symbol }) {
+  if (gameId === 'reversi') {
+    return <SvgIcon name="circle" size={22} className={symbol === 'X' ? 'disc darkDisc' : 'disc lightDisc'} />;
+  }
+  return <AssetIcon name={SYMBOLS[gameId]?.[symbol] || 'item'} size={25} />;
+}
 
 // One hook drives every game; boards below are pure rendering.
 function useGame(api, token, gameId) {
@@ -204,7 +212,7 @@ function resultText(winner, me) {
   if (winner === 'DISCONNECT') return 'حریف بازی را ترک کرد';
   if (!winner) return 'پایان بازی';
   if (!me) return `برنده: ${winner}`;
-  return winner === me ? 'شما بردید! 🎉' : 'شما باختید';
+  return winner === me ? 'شما بردید!' : 'شما باختید';
 }
 
 function MemoryBoard({ g }) {
@@ -240,7 +248,7 @@ function ReversiBoard({ g }) {
 
 const BOARDS = { memory: MemoryBoard, reversi: ReversiBoard };
 
-function Seat({ g, sym, symbol, openProfile }) {
+function Seat({ g, sym, symbol, gameId, openProfile }) {
   const info = g.players?.[symbol];
   const isMe = g.me === symbol;
   const isBot = info?.isBot;
@@ -253,7 +261,7 @@ function Seat({ g, sym, symbol, openProfile }) {
     <div className={`player ${active ? 'on' : ''} ${canOpen ? 'clickable' : ''}`}
       onClick={canOpen ? () => openProfile(info.id) : undefined}
       title={canOpen ? 'مشاهده پروفایل' : undefined}>
-      <span>{isBot ? '🤖' : sym[symbol]}</span>
+      <span>{isBot ? <SvgIcon name="robot" size={20} /> : <GameSymbol gameId={gameId} symbol={symbol} />}</span>
       <b>{isMe ? 'شما' : info?.nickname || 'حریف'}{canOpen ? ' ⓘ' : ''}</b>
       {g.state.scores && <i>{g.state.scores[symbol]}</i>}
       {active && (
@@ -276,7 +284,7 @@ function GameRoom({ api, token, game, onBack, openProfile, onSolo, records }) {
   const solo = game.solo ? (
     <div className="soloOffer">
       <div>
-        <b>⏱ بازی تنها (رکوردی)</b>
+        <b><SvgIcon name="support" size={16} /> بازی تنها (رکوردی)</b>
         <small>
           {records?.best
             ? `رکورد فعلی تو: ${runTime(records.best.durationMs)}`
@@ -293,10 +301,10 @@ function GameRoom({ api, token, game, onBack, openProfile, onSolo, records }) {
     <section className="card wide gamePage">
       <div className="gameHead">
         <button className="ghost" onClick={() => { g.leave(); onBack(); }}>‹ بازگشت</button>
-        <h2>{game.emoji} {game.title}</h2>
-        {g.vsBot && g.phase === 'playing' && <span className="botTag">🤖 با ربات</span>}
+        <h2><AssetIcon name={game.emoji} size={30} /> {game.title}</h2>
+        {g.vsBot && g.phase === 'playing' && <span className="botTag"><SvgIcon name="robot" size={16} /> با ربات</span>}
         <button className="ghost" title={muted ? 'وصل صدا' : 'قطع صدا'}
-          onClick={() => setMuted(!setEnabled(muted))}>{muted ? '🔇' : '🔊'}</button>
+          onClick={() => setMuted(!setEnabled(muted))}><SvgIcon name={muted ? 'close' : 'support'} size={18} /></button>
       </div>
 
       {!g.online && <p className="offlineBar">اتصال قطع شد؛ در حال تلاش دوباره...</p>}
@@ -322,7 +330,7 @@ function GameRoom({ api, token, game, onBack, openProfile, onSolo, records }) {
           <div className="gameCenter">
             <div className={`searchRing${open ? ' open' : ''}`}
               style={{ '--pct': `${((g.searchLeft / (g.searchSecs || 15)) * 100).toFixed(0)}%` }}>
-              <span>{open ? '🔎' : g.searchLeft}</span>
+              <span>{open ? <SvgIcon name="search" size={24} /> : g.searchLeft}</span>
             </div>
             <p><b>{open ? 'هنوز در صف حریف واقعی هستی' : 'در حال جستجوی حریف واقعی...'}</b></p>
             <p className="hint">
@@ -343,11 +351,11 @@ function GameRoom({ api, token, game, onBack, openProfile, onSolo, records }) {
       {(g.phase === 'playing' || g.phase === 'over') && (
         <>
           <div className="scoreboard">
-            <Seat g={g} sym={sym} symbol="X" openProfile={openProfile} />
+            <Seat g={g} sym={sym} symbol="X" gameId={game.id} openProfile={openProfile} />
             <div className="turn-indicator">
               {g.phase === 'over' ? 'پایان' : g.myTurn ? 'نوبت شماست' : 'نوبت حریف'}
             </div>
-            <Seat g={g} sym={sym} symbol="O" openProfile={openProfile} />
+            <Seat g={g} sym={sym} symbol="O" gameId={game.id} openProfile={openProfile} />
           </div>
 
           {g.timedOut && g.phase === 'playing' && (
@@ -410,7 +418,7 @@ export default function GamesHub({ api, token, openProfile = () => {} }) {
 
   return (
     <section className="card wide">
-      <h2>بخش بازی‌ها 🎮</h2>
+      <h2>بخش بازی‌ها</h2>
       <p className="hint">
         با کاربران دیگر آنلاین رقابت کن و امتیاز بگیر.
         جفت‌یاب را می‌توانی تنها هم بازی کنی و رکورد بزنی.
@@ -419,7 +427,7 @@ export default function GamesHub({ api, token, openProfile = () => {} }) {
         {GAMES.map(g => (
           <button key={g.id} className="gameTile" style={{ '--accent': g.accent }}
             onClick={() => { play('tap'); setMode('versus'); setActive(g); }}>
-            <span className="gEmoji">{g.emoji}</span>
+            <span className="gEmoji"><AssetIcon name={g.emoji} size={48} /></span>
             <b>{g.title}</b>
             <small>{g.desc}</small>
             <i>

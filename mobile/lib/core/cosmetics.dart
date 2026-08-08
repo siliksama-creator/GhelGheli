@@ -222,7 +222,7 @@ class DisplayName extends StatelessWidget {
         if (c['plus'] == true)
           const Padding(
             padding: EdgeInsetsDirectional.only(start: 3),
-            child: Text('⭐', style: TextStyle(fontSize: 11)),
+            child: Icon(Icons.star_rounded, size: 13, color: Colors.amber),
           ),
       ],
     );

@@ -323,7 +323,7 @@ button:hover {
 .soloChase.ahead { color: #34D399; font-weight: 700; }
 
 .soloIntro, .soloResult { gap: 8px; }
-/* Hero icons drawn in CSS. They used to be ⏱️🏅🎯👏 — all four are among the
+/* Hero icons drawn in CSS. They used to be ⏱ — all four are among the
    glyphs missing on systems with no emoji font, so the panel opened with a
    row of empty boxes. */
 .soloIcon {
@@ -387,7 +387,7 @@ button:hover {
   text-align: center; font-weight: 900; font-size: var(--fs-sm);
   display: grid; place-items: center;
 }
-/* Medals drawn in CSS, not as 🥇🥈🥉. Those three emoji are missing from a
+/* Medals drawn in CSS, not as . Those three emoji are missing from a
    surprising number of systems (verified headless: they measured as tofu),
    and an empty box next to the top scorer looked broken. */
 .soloRow:nth-child(2) .rk, .soloRow:nth-child(3) .rk, .soloRow:nth-child(4) .rk {
@@ -408,7 +408,7 @@ button:hover {
   border: 3px solid transparent; border-top-color: var(--accent, #A855F7);
   animation: soloSpin 1.1s linear infinite;
 }
-/* A three-dot pulse instead of 🔎. That glyph is missing on a lot of
+/* A three-dot pulse instead of . That glyph is missing on a lot of
    systems (verified headless: it measures as tofu), and one element with two
    box-shadow copies gives three dots with no extra markup and no font. */
 .searchRing.open span { font-size: 0; }
@@ -608,7 +608,7 @@ button:hover {
    رویش زیرِ حدِ WCAG بودند:
 
      «موجودی قابل برداشت» ۳.۸۲ · «تومان» ۳.۸۴ · «کل دریافتی» ۲.۵۲
-     «کارت بانکی ثبت نشده» ۲.۸۳ · «برای برداشت لازم است» ۱.۹۷ · 💳 ۲.۳۷
+     «کارت بانکی ثبت نشده» ۲.۸۳ · «برای برداشت لازم است» ۱.۹۷ ·  ۲.۳۷
 
    این بدترین جای ممکن برای متنِ ناخوانا است: تنها صفحه‌ای که پولِ
    واقعی را نشان می‌دهد. کاربر باید موجودی‌اش را بی‌زحمت بخواند.
@@ -2529,7 +2529,7 @@ a:focus-visible {
 
 /* ── ریلِ پیشرفتِ اسکرول ──
  *
- * ⚠️ باگی که ممیزیِ پیکسلی گرفت: نشانگر از لبهٔ صفحه بیرون می‌زد
+ *  باگی که ممیزیِ پیکسلی گرفت: نشانگر از لبهٔ صفحه بیرون می‌زد
  *    (R419 در ویوپورتِ ۴۱۲) و روی بنر می‌افتاد.
  *
  *    علت ترکیبِ دو چیز بود:
@@ -3056,7 +3056,7 @@ a:focus-visible {
    ارتفاعِ کمتر هیچ چیزی را فشرده نمی‌کند. همچنان بالاتر از حداقلِ ۴۴
    پیکسلیِ راهنمای دسترس‌پذیری، که روی موبایل مهم است چون این‌ها
    اصلی‌ترین کنشِ صفحه‌اند. */
-/* ⚠️ `min-width: 0` روی ردیف و `flex: 1 1 0` روی دکمه‌ها — نه `flex: 1` ──
+/*  `min-width: 0` روی ردیف و `flex: 1 1 0` روی دکمه‌ها — نه `flex: 1` ──
  *
  * ممیزیِ ۳۲۰ پیکسلی گرفتش: دکمهٔ دوم از والدش بیرون می‌زد.
  *

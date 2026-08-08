@@ -20,13 +20,13 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { req, fa } from '../lib/api.js';
 import { useAsync } from '../lib/useAsync.js';
 import { AsyncSection } from '../components/states.jsx';
+import { AssetIcon, SvgIcon, UiIcon } from '../components/IconAsset.jsx';
 
 const ART = {
   points: '/icon_points.png',
   spins: '/icon_spins.png',
   shop_item: '/icon_item.png',
 };
-const EMOJI = { points: '🎯', spins: '🎡', cash: '💰', shop_item: '🎨' };
 
 function rewardText(r) {
   if (!r) return '—';
@@ -52,12 +52,12 @@ function RewardTile({ r, unlocked, track, onClaim, busy }) {
       <span className="pTileArt">
         {ART[r.kind]
           ? <img src={ART[r.kind]} alt="" width="30" height="30" loading="lazy" />
-          : <span className="pTileEmoji">{EMOJI[r.kind] || '🎁'}</span>}
+          : <AssetIcon name={r.kind === 'cash' ? 'points' : 'gift'} size={30} />}
       </span>
       <span className="pTileBody">
         <b>{rewardText(r)}</b>
-        {claimed && <small className="ok">✓ گرفتی</small>}
-        {locked && <small className="plus">⭐ فقط پلاس</small>}
+        {claimed && <small className="ok"><SvgIcon name="check" size={13} /> گرفتی</small>}
+        {locked && <small className="plus"><SvgIcon name="trophy" size={13} /> فقط پلاس</small>}
         {ready && <small className="ready">برای گرفتن بزن</small>}
       </span>
     </button>
@@ -125,7 +125,7 @@ export default function Pass({ token, setMsg, openShop }) {
         if (!d?.active) {
           return (
             <div className="card pEmpty">
-              <div className="pEmptyIcon">🏅</div>
+              <div className="pEmptyIcon"><UiIcon name="trophy" size={56} /></div>
               <h2>فصلی در جریان نیست</h2>
               <p className="muted">فصل بعدی به‌زودی شروع می‌شود</p>
             </div>
@@ -163,7 +163,7 @@ export default function Pass({ token, setMsg, openShop }) {
             {/* ── پیشرفت ── */}
             <div className="card pProgress">
               <div className="pProgressTop">
-                <b>{done ? '🎉 کل مسیر را تمام کردی!' : `تا پلهٔ ${fa(d.tier + 1)}`}</b>
+                <b>{done ? 'کل مسیر را تمام کردی!' : `تا پلهٔ ${fa(d.tier + 1)}`}</b>
                 {!done && <span>{fa(d.intoTier)} / {fa(d.tierNeeds)}</span>}
               </div>
               <div className="pBar"><div className="pBarFill" style={{ width: `${pct}%` }} /></div>
@@ -171,8 +171,8 @@ export default function Pass({ token, setMsg, openShop }) {
               <div className="pDayCap">
                 <span className={d.dayCapReached ? 'capFull' : ''}>
                   {d.dayCapReached
-                    ? `🔒 سقف امروز پر شد — فردا ${fa(d.maxTiersPerDay)} پلهٔ دیگر`
-                    : `⚡ امروز ${fa(d.tiersToday)} از ${fa(d.maxTiersPerDay)} پله`}
+                    ? `سقف امروز پر شد — فردا ${fa(d.maxTiersPerDay)} پلهٔ دیگر`
+                    : `امروز ${fa(d.tiersToday)} از ${fa(d.maxTiersPerDay)} پله`}
                 </span>
                 <span className="pDots">
                   {Array.from({ length: d.maxTiersPerDay }).map((_, i) => (
@@ -188,14 +188,14 @@ export default function Pass({ token, setMsg, openShop }) {
 
               {d.claimable > 0 && (
                 <button className="btn primary pClaimAll" disabled={busy} onClick={claimAll}>
-                  🎁 دریافت {fa(d.claimable)} جایزهٔ آماده
+                  دریافت {fa(d.claimable)} جایزهٔ آماده
                 </button>
               )}
             </div>
 
             {!d.hasPlus && (
               <div className="card pUpsell">
-                <span className="pUpsellStar">⭐</span>
+                <span className="pUpsellStar"><UiIcon name="trophy" size={24} /></span>
                 <div>
                   <b>مسیر طلایی قفل است</b>
                   <span>چرخش گردونه، آیتم‌های ویژه و امتیاز دو برابر</span>
@@ -207,7 +207,7 @@ export default function Pass({ token, setMsg, openShop }) {
             {/* ── راهنمای مسیرها ── */}
             <div className="pLegend">
               <i className="chip free">رایگان</i>
-              <i className="chip plus">پلاس ⭐</i>
+              <i className="chip plus"><UiIcon name="trophy" size={15} /> پلاس</i>
               <span className="muted">{fa(d.tierCount)} پله</span>
             </div>
 
@@ -228,7 +228,7 @@ export default function Pass({ token, setMsg, openShop }) {
                   <div key={row.tier} id={`pass-tier-${row.tier}`}
                     className={`pRow${isCurrent ? ' is-current' : ''}${row.unlocked ? ' is-unlocked' : ''}${isMilestone ? ' is-milestone' : ''}`}>
                     <div className="pNum">
-                      <span className="pLock">{row.unlocked ? '🔓' : '🔒'}</span>
+                      <span className="pLock"><SvgIcon name={row.unlocked ? 'unlock' : 'lock'} size={16} /></span>
                       <b>{fa(row.tier)}</b>
                     </div>
                     <RewardTile r={row.free} unlocked={row.unlocked}
@@ -242,7 +242,7 @@ export default function Pass({ token, setMsg, openShop }) {
 
             {/* ── راهنما ── */}
             <div className="card pHow">
-              <h3>💡 چطور جلو بروم؟</h3>
+              <h3><SvgIcon name="bulb" size={21} /> چطور جلو بروم؟</h3>
               <p className="muted">
                 با بازی کردن تجربه می‌گیری —
                 هر روز حداکثر {fa(d.maxTiersPerDay)} پله باز می‌شود، پس هر روز سر بزن.

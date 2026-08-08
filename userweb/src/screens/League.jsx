@@ -64,7 +64,7 @@ export default function League({ token, openProfile }) {
               {top.map((e, i) => (
                 <div className={`podiumCard p${i + 1}`} key={e.user_id}
                   onClick={() => openProfile(e.user_id)}>
-                  <span className="medal">{['🥇', '🥈', '🥉'][i]}</span>
+                  <span className="medal">{['', '', ''][i]}</span>
                   <DisplayName name={e.nickname || e.first_name || 'کاربر'}
                     cosmetics={e.cosmetics} level={e.level} />
                   <strong>{fa(e.points)} امتیاز</strong>
@@ -85,19 +85,19 @@ export default function League({ token, openProfile }) {
             </div>
 
             {!entries.length &&
-              <EmptyView icon="🏆">هنوز امتیازی در لیگ ثبت نشده است.</EmptyView>}
+              <EmptyView icon="trophy">هنوز امتیازی در لیگ ثبت نشده است.</EmptyView>}
 
             {/* Last month's winners. Without this the previous season simply
                 vanishes when the points reset. */}
             {d.previousSeason?.winners?.length > 0 && (
               <div className="prevSeason">
-                <h3>🏅 برندگان ماه گذشته ({d.previousSeason.monthYear})</h3>
+                <h3> برندگان ماه گذشته ({d.previousSeason.monthYear})</h3>
                 <div className="prevList">
                   {d.previousSeason.winners.map(w => (
                     <div className="prevRow" key={w.userId}
                       onClick={() => openProfile(w.userId)}>
                       <span className="prevMedal">
-                        {['🥇', '🥈', '🥉'][w.rank - 1] || '🏅'}
+                        {['', '', ''][w.rank - 1] || ''}
                       </span>
                       <img src={w.profileImageUrl
                         ? asset(w.profileImageUrl)

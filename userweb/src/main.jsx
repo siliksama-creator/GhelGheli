@@ -26,6 +26,7 @@ import GamesHub from './games.jsx';
 import Support from './support.jsx';
 import Wallet from './wallet.jsx';
 import { LoadingView, ErrorView } from './components/states.jsx';
+import { UiIcon } from './components/IconAsset.jsx';
 
 import './style.css';
 // AFTER style.css on purpose: style.css is full of `font-weight:900` (and one
@@ -47,19 +48,19 @@ import './theme.css';
 //
 // اپ اندروید از قبل همین کار را می‌کرد؛ این وب را با آن هم‌شکل می‌کند.
 const NAV_TABS = [
-  ['home', 'خانه', '🏠'],
-  ['rewards', 'جوایز', '🎁'],
-  ['league', 'لیگ', '🏆'],
-  ['club', 'چت و بازی', '🎮'],
+  ['home', 'خانه', 'home'],
+  ['rewards', 'جوایز', 'gift'],
+  ['league', 'لیگ', 'trophy'],
+  ['club', 'چت و بازی', 'game'],
 ];
 
 const MORE_TABS = [
-  ['wallet', 'کیف پول', '👛'],
+  ['wallet', 'کیف پول', 'wallet'],
   // دعوت دوستان قبلاً فقط از میان‌بر داشبورد باز می‌شد؛ اگر کاربر آن
   // کارت را رد می‌کرد، صفحه عملاً گم می‌شد.
-  ['invite', 'دعوت دوستان', '🤝'],
-  ['support', 'پشتیبانی', '🎧'],
-  ['profile', 'پروفایل', '👤'],
+  ['invite', 'دعوت دوستان', 'group'],
+  ['support', 'پشتیبانی', 'support'],
+  ['profile', 'پروفایل', 'profile'],
 ];
 
 
@@ -223,7 +224,7 @@ function Portal({ token, logout }) {
             بدون باز کردن صفحه بفهمد چیزی منتظرش است. */}
         <button className={`iconBtn passShortcut${tab === 'pass' ? ' on' : ''}`}
           onClick={() => setTab('pass')} title="گذر نبرد فصلی">
-          🏅
+          <UiIcon name="trophy" size={21} />
           {/* عددِ نشان = پله‌های باز شدهٔ **امروز** (۱ یا ۲)، نه کل
               جوایز. مالک همین را خواست: عددی که هر روز از صفر شروع
               می‌شود حس پیشرفت روزانه می‌سازد. */}
@@ -239,13 +240,13 @@ function Portal({ token, logout }) {
             کاربری که هر دو را استفاده می‌کند دنبال دکمه نگردد. */}
         <button className={`iconBtn${tab === 'shop' ? ' on' : ''}`}
           onClick={() => setTab('shop')} title="فروشگاه">
-          🛍️
+          <UiIcon name="shop" size={21} />
         </button>
         <button className={`iconBtn wheelShortcut${tab === 'wheel' ? ' on' : ''}`}
           onClick={() => setTab('wheel')}
           title={spins === '∞' ? 'چرخش نامحدود (حساب تست)'
             : spins > 0 ? `${spins} چرخش گردونه داری` : 'گردونهٔ شانس'}>
-          🎡
+          <UiIcon name="wheel" size={24} />
           {(spins === '∞' || spins > 0) && (
             <span className="wheelBadge">
               {spins === '∞' ? '∞' : fa(spins)}
@@ -260,7 +261,7 @@ function Portal({ token, logout }) {
           <button key={id} className={tab === id ? 'on' : ''}
             aria-current={tab === id ? 'page' : undefined}
             onClick={() => setTab(id)}>
-            <span className="navIcon">{icon}</span>
+            <span className="navIcon"><UiIcon name={icon} size={20} /></span>
             <span className="navLabel">{label}</span>
           </button>
         ))}
@@ -285,12 +286,12 @@ function Portal({ token, logout }) {
               <button key={id} role="menuitem"
                 className={tab === id ? 'on' : ''}
                 onClick={() => { setTab(id); setMoreOpen(false); }}>
-                <span>{icon}</span>{label}
+                <span><UiIcon name={icon} size={20} /></span>{label}
               </button>
             ))}
             <button role="menuitem" className="sheetDanger"
               onClick={() => { setMoreOpen(false); logout(); }}>
-              <span>⏻</span>خروج از حساب
+              <span><UiIcon name="close" size={20} /></span>خروج از حساب
             </button>
           </div>
         </>
@@ -353,9 +354,9 @@ function Club({ token, openProfile, meId }) {
     <div className="clubWrap">
       <div className="clubTabs">
         <button className={sub === 'chat' ? 'on' : ''}
-          onClick={() => setSub('chat')}>💬 چت روم</button>
+          onClick={() => setSub('chat')}><UiIcon name="support" size={17} /> چت روم</button>
         <button className={sub === 'games' ? 'on' : ''}
-          onClick={() => setSub('games')}>🎮 بازی‌ها</button>
+          onClick={() => setSub('games')}><UiIcon name="game" size={17} /> بازی‌ها</button>
       </div>
       {sub === 'chat'
         ? <Chat token={token} openProfile={openProfile} meId={meId} />

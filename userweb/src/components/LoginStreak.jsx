@@ -60,7 +60,7 @@ export default function LoginStreak({ token, setMsg }) {
             className={`streakDay${day.claimed ? ' is-claimed' : ''}${day.current ? ' is-current' : ''}`}
             title={`${fa(day.amount)} امتیاز`}
           >
-            <span className="streakDayMark">{day.claimed ? '✓' : day.day}</span>
+            <span className="streakDayMark">{day.claimed ? '' : day.day}</span>
             <small>روز {fa(day.day)}</small>
           </div>
         ))}

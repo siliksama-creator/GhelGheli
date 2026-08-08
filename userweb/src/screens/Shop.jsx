@@ -14,13 +14,14 @@ import { req, fa } from '../lib/api.js';
 import { useAsync } from '../lib/useAsync.js';
 import { AsyncSection } from '../components/states.jsx';
 import { FRAME_STYLE, clubImg } from '../components/Cosmetics.jsx';
+import { SvgIcon } from '../components/IconAsset.jsx';
 
 const KINDS = [
-  ['club_badge', 'باشگاه‌ها', '🛡️',
+  ['club_badge', 'باشگاه‌ها', '',
     'با خرید نشان، عضو دائمی باشگاه می‌شوی؛ اسمت در فهرست هواداران آن باشگاه '
     + 'می‌آید و می‌توانی نشان را عکس پروفایلت کنی.'],
-  ['card_frame', 'قاب کارت', '🖼️', 'دور کارت‌های داخل پروفایلت'],
-  ['name_color', 'رنگ اسم', '🎨', 'رنگ اسمت در جدول لیگ و چت'],
+  ['card_frame', 'قاب کارت', '', 'دور کارت‌های داخل پروفایلت'],
+  ['name_color', 'رنگ اسم', '', 'رنگ اسمت در جدول لیگ و چت'],
 ];
 
 export default function Shop({ token, setMsg, reloadProfile }) {
@@ -76,7 +77,7 @@ export default function Shop({ token, setMsg, reloadProfile }) {
           <div className="shopWrap">
             {/* ── How the shop works ───────────────────────────────── */}
             <section className="card wide shopIntro">
-              <h2>🛒 فروشگاه قلقلی</h2>
+              <h2> فروشگاه قلقلی</h2>
               <p>
                 هر آیتمی که <b>جداگانه</b> بخری، برای همیشه مال توست — با تمام
                 شدن اشتراک هم از بین نمی‌رود. آیتم‌ها فقط ظاهر بازی را عوض
@@ -90,7 +91,7 @@ export default function Shop({ token, setMsg, reloadProfile }) {
             {/* ── Plus ─────────────────────────────────────────────── */}
             <section className={`card wide plusCard${d.plus.active ? ' on' : ''}`}>
               <div className="plusHead">
-                <span className="plusStar">⭐</span>
+                <span className="plusStar"><SvgIcon name="trophy" size={25} /></span>
                 <div>
                   <h2>قلقلی پلاس</h2>
                   <p className="hint">
@@ -103,12 +104,12 @@ export default function Shop({ token, setMsg, reloadProfile }) {
               </div>
 
               <ul className="plusList">
-                {(d.plus.perks || []).map(p => <li key={p}>✅ {p}</li>)}
+                {(d.plus.perks || []).map(p => <li key={p}> {p}</li>)}
               </ul>
 
               {/* The honest small print, before the money leaves. */}
               <div className="plusNote">
-                <b>⏳ بعد از پایان اشتراک چه می‌شود؟</b>
+                <b>بعد از پایان اشتراک چه می‌شود؟</b>
                 <p>{d.plus.expiryNote}</p>
               </div>
 
@@ -128,7 +129,7 @@ export default function Shop({ token, setMsg, reloadProfile }) {
             {/* ── My clubs ─────────────────────────────────────────── */}
             {d.clubs?.length > 0 && (
               <section className="card wide myClubs">
-                <h2>🏟️ باشگاه‌های من</h2>
+                <h2> باشگاه‌های من</h2>
                 <div className="myClubGrid">
                   {d.clubs.map(c => (
                     <div className="myClub" key={c.slug}>
@@ -148,7 +149,7 @@ export default function Shop({ token, setMsg, reloadProfile }) {
                 </div>
                 {d.clubs.some(c => !c.permanent) && !d.plus.active && (
                   <p className="hint clubWarn">
-                    ⚠️ باشگاه‌هایی که با پلاس عضو شده‌ای، بدون اشتراک فعال فقط
+                     باشگاه‌هایی که با پلاس عضو شده‌ای، بدون اشتراک فعال فقط
                     تا آخرین انتخابت باقی می‌مانند. برای دائمی‌شدن، نشانشان را
                     جداگانه بخر.
                   </p>
@@ -251,12 +252,12 @@ export default function Shop({ token, setMsg, reloadProfile }) {
                   <p>
                     <b>{fa(confirm.price)} تومان</b> از کیف پولت کم می‌شود.
                     <br />
-                    ✅ این آیتم <b>برای همیشه</b> مال تو می‌شود — حتی اگر
+                     این آیتم <b>برای همیشه</b> مال تو می‌شود — حتی اگر
                     اشتراک پلاس نداشته باشی یا تمام شود.
                     {confirm.kind === 'club_badge' && (
                       <>
                         <br />
-                        🏟️ هم‌زمان <b>عضو دائمی</b> این باشگاه می‌شوی و اسمت در
+                         هم‌زمان <b>عضو دائمی</b> این باشگاه می‌شوی و اسمت در
                         فهرست هوادارانش می‌آید.
                       </>
                     )}
@@ -266,7 +267,7 @@ export default function Shop({ token, setMsg, reloadProfile }) {
                       <>
                         <br />
                         <small className="short">
-                          ⚠️ موجودی‌ات {fa(confirm.price - d.balance)} تومان کم است.
+                           موجودی‌ات {fa(confirm.price - d.balance)} تومان کم است.
                         </small>
                       </>
                     )}
@@ -301,7 +302,7 @@ export default function Shop({ token, setMsg, reloadProfile }) {
                       <>
                         <br />
                         <small className="short">
-                          ⚠️ موجودی‌ات {fa(d.plus.price - d.balance)} تومان کم است.
+                           موجودی‌ات {fa(d.plus.price - d.balance)} تومان کم است.
                         </small>
                       </>
                     )}

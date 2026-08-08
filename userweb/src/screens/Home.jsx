@@ -237,13 +237,13 @@ export default function Home({ token, p, rewards, load, setMsg, openWallet,
                 ))}
               </div>
             ) : (
-              <EmptyView icon="🔍">
+              <EmptyView icon="search">
                 کارتی با این نام پیدا نشد.
               </EmptyView>
             )}
           </>
         ) : (
-          <EmptyView icon="🃏">
+          <EmptyView icon="football">
             هنوز کارتی ثبت نکرده‌ای. کد پشت کارت را بالا وارد کن.
           </EmptyView>
         )}

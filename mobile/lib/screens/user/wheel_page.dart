@@ -450,7 +450,7 @@ class _WheelPageState extends State<WheelPage>
                   borderRadius: Corners.rPill,
                 ),
                 child: Text(
-                  '⏳ شانس بعدی تا ${_countdown(_resetInMs)} دیگر',
+                  'شانس بعدی تا ${_countdown(_resetInMs)} دیگر',
                   style: theme.textTheme.labelLarge?.copyWith(
                     color: const Color(0xFFA3E635),
                     fontWeight: FontWeight.w800,

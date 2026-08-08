@@ -10,6 +10,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { req, fa } from '../lib/api.js';
 import { EmptyView } from './states.jsx';
+import { SvgIcon } from './IconAsset.jsx';
 
 const POLL_MS = 60000;
 
@@ -64,7 +65,7 @@ export default function Notifications({ token }) {
       <button className="iconBtn bell" title="اعلان‌ها"
         aria-label={unread > 0 ? `اعلان‌ها، ${unread} خوانده‌نشده` : 'اعلان‌ها'}
         onClick={() => setOpen(o => !o)}>
-        🔔{unread > 0 && <i className="badge">{fa(unread)}</i>}
+        <SvgIcon name="bell" size={19} />{unread > 0 && <i className="badge">{fa(unread)}</i>}
       </button>
 
       {open && (
@@ -90,7 +91,7 @@ export default function Notifications({ token }) {
                 ))}
               </div>
             ) : (
-              <EmptyView>اعلانی نداری.</EmptyView>
+              <EmptyView icon="bell">اعلانی نداری.</EmptyView>
             )}
           </div>
         </div>

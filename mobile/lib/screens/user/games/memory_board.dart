@@ -263,7 +263,7 @@ class _SoloView extends StatelessWidget {
           AppCard(
             child: Column(
               children: [
-                const Text('⏱', style: TextStyle(fontSize: 38)),
+                const Icon(Icons.timer_rounded, size: 38),
                 Gaps.vXs,
                 Text('مسابقه با ساعت',
                     style: theme.textTheme.titleMedium

@@ -143,7 +143,7 @@ class _AdminMetricsState extends State<AdminMetrics> {
               if (_autoRefresh)
                 const StatusBadge(
                   status: 'live',
-                  labels: {'live': '● لایو'},
+                  labels: {'live': 'لایو'},
                 ),
             ],
           ),

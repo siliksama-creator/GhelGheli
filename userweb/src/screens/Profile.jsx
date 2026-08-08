@@ -102,7 +102,7 @@ export default function Profile({ token, p, load, setMsg }) {
       </div>
       {(clubs.data || []).length > 0 && (
         <p className="hint avatarNote">
-          🛡️ نشان باشگاه‌هایی که عضوشان هستی هم می‌تواند عکس پروفایلت باشد.
+           نشان باشگاه‌هایی که عضوشان هستی هم می‌تواند عکس پروفایلت باشد.
         </p>
       )}
 
@@ -161,11 +161,11 @@ function LeagueHistory({ token }) {
   // Decorative: never push an error above the profile form.
   if (state.loading || state.error || !seasons.length) return null;
 
-  const medal = r => (r === 1 ? '🥇' : r === 2 ? '🥈' : r === 3 ? '🥉' : '🏅');
+  const medal = r => (r === 1 ? '' : r === 2 ? '' : r === 3 ? '' : '');
 
   return (
     <section className="card wide">
-      <h2>سابقهٔ لیگ 🏆</h2>
+      <h2>سابقهٔ لیگ </h2>
       <p className="hint">
         امتیاز لیگ آخر هر ماه صفر می‌شود، ولی رتبه و جایزه‌ات اینجا می‌ماند.
       </p>
@@ -196,7 +196,7 @@ function Trophies({ token }) {
 
   return (
     <section className="card wide trophyCard">
-      <h2>جوایز دریافتی 🏆</h2>
+      <h2>جوایز دریافتی </h2>
       <div className="trophyShelf">
         {list.map(t => (
           <div className="trophy" key={t.id}>

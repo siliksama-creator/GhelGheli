@@ -8,13 +8,14 @@ import { req, asset, fa, avatarUrl } from '../lib/api.js';
 import { clubImg, FRAME_STYLE, nameColorStyle } from '../components/Cosmetics.jsx';
 import { useAsync } from '../lib/useAsync.js';
 import { LoadingView, ErrorView } from '../components/states.jsx';
+import { SvgIcon } from '../components/IconAsset.jsx';
 
 // Cosmetics render identically wherever they appear, so the crest path, the
 // frame gradients and the name colour all come from one module. This file
 // used to redefine all three — and its club map still listed only the five
 // original Iranian clubs, so the eleven new crests rendered nothing here even
 // though chat and the league table showed them.
-const medal = r => (r === 1 ? '🥇' : r === 2 ? '🥈' : r === 3 ? '🥉' : '🏅');
+const medal = r => (r === 1 ? '' : r === 2 ? '' : r === 3 ? '' : '');
 
 export default function PublicProfile({ token, userId, close }) {
   const load = useCallback(
@@ -65,7 +66,7 @@ export default function PublicProfile({ token, userId, close }) {
               <div className="ppWho">
                 <h2 style={nameColorStyle(cos.color)}>
                   {u.nickname || 'کاربر'}
-                  {cos.plus && <span className="ppPlus" title="عضو پلاس">⭐</span>}
+                  {cos.plus && <SvgIcon className="ppPlus" title="عضو پلاس" name="trophy" size={15} />}
                 </h2>
                 <small>
                   عضویت {new Date(u.joined_at).toLocaleDateString('fa-IR')}
@@ -94,15 +95,15 @@ export default function PublicProfile({ token, userId, close }) {
             <div className="ppTabs">
               <button className={tab === 'prizes' ? 'on' : ''}
                 onClick={() => setTab('prizes')}>
-                🎁 جوایز ({fa((u.trophies?.length || 0) + (u.rewards?.length || 0))})
+                 جوایز ({fa((u.trophies?.length || 0) + (u.rewards?.length || 0))})
               </button>
               <button className={tab === 'league' ? 'on' : ''}
                 onClick={() => setTab('league')}>
-                🏆 لیگ ({fa(u.leagueHistory?.length || 0)})
+                 لیگ ({fa(u.leagueHistory?.length || 0)})
               </button>
               <button className={tab === 'cards' ? 'on' : ''}
                 onClick={() => setTab('cards')}>
-                🃏 کارت‌ها ({fa(u.cards?.length || 0)})
+                 کارت‌ها ({fa(u.cards?.length || 0)})
               </button>
             </div>
 
@@ -127,7 +128,7 @@ export default function PublicProfile({ token, userId, close }) {
                             || avatarUrl('avatar_2_trophy.png')} alt={r.name}
                             loading="lazy" />
                           <b>{r.name}</b>
-                          <em>💰 نقدی</em>
+                          <em> نقدی</em>
                         </div>
                       ))}
                   </div>

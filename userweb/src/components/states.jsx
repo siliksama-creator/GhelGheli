@@ -5,6 +5,7 @@
 // a spinner forever). One implementation keeps them consistent and makes the
 // error state impossible to forget, because AsyncSection demands it.
 import React from 'react';
+import { SvgIcon, UiIcon } from './IconAsset.jsx';
 
 export function LoadingView({ label = 'در حال بارگذاری...' }) {
   return (
@@ -19,7 +20,7 @@ export function ErrorView({ error, onRetry }) {
   const offline = error?.offline;
   return (
     <div className="card errorCard">
-      <span className="errIcon">{offline ? '📡' : '⚠️'}</span>
+      <span className="errIcon"><SvgIcon name={offline ? 'support' : 'warning'} size={32} /></span>
       <b>{offline ? 'اتصال اینترنت برقرار نیست' : 'مشکلی پیش آمد'}</b>
       <p>{error?.message || 'دوباره تلاش کن'}</p>
       {onRetry && (
@@ -29,8 +30,8 @@ export function ErrorView({ error, onRetry }) {
   );
 }
 
-export function EmptyView({ icon = '📭', children }) {
-  return <div className="empty">{icon} {children}</div>;
+export function EmptyView({ icon = 'search', children }) {
+  return <div className="empty"><UiIcon name={icon || 'search'} size={30} /> {children}</div>;
 }
 
 /**
