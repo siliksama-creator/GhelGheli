@@ -999,7 +999,7 @@ app.get('/api/profile', auth, asyncHandler(async (req, res) => {
 // Promise.all و نه await پشت سر هم: سه کوئری مستقل‌اند و سریالی کردنشان
 // همان اشتباهی است که این endpoint قرار است حل کند.
 app.get('/api/bootstrap', auth, asyncHandler(async (req, res) => {
-  const [inv, payouts, rewards, wheelState] = await Promise.all([
+  const [inv, payouts, rewards, wheelState, streakState] = await Promise.all([
     // ── چرا `cash_amount` و `created_at` هم برمی‌گردند ──
     //
     // اینونتوری بازطراحی شد: کاربر می‌تواند نزدیک به ۵۰ نوع کارت داشته
@@ -1032,6 +1032,10 @@ app.get('/api/bootstrap', auth, asyncHandler(async (req, res) => {
     // شکست گردونه نباید کل بوت‌استرپ را ببرد: نشانِ چرخش یک زینت است،
     // پروفایل نیست.
     wheel.status(req.user.id).catch(() => null),
+    // استریک روزانه باید در اولین فریم داشبورد حاضر باشد. جدا خواندنش
+    // باعث می‌شد کارت بعد از بقیهٔ صفحه بپرد و روی اینترنت موبایل حس
+    // «وصله‌ای» بدهد؛ شکستش هم نباید بوت‌استرپ را خراب کند.
+    loginStreak.status(req.user.id).catch(() => null),
   ]);
 
   // XP ورود روزانه. سقف منبع ۲۰ است، پس هر بار باز کردن اپ در یک روز
@@ -1080,6 +1084,7 @@ app.get('/api/bootstrap', auth, asyncHandler(async (req, res) => {
     leaguePayouts: payouts.rows,
     rewards: rewards.rows,
     wheel: wheelState,
+    loginStreak: streakState,
     pass: passBrief,
     cosmetics: myCosmetics,
     // لولِ خودِ کاربر — صفحهٔ بازی‌ها و هدرِ داشبورد از همین می‌خوانند،

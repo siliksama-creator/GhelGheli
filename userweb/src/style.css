@@ -3441,45 +3441,179 @@ input:focus, textarea:focus {
   box-shadow: 0 15px 45px rgba(0,0,0,0.4) !important;
 }
 
-/* Seven-day login streak: a compact, high-contrast reward surface. */
+/* Seven-day login streak: premium 2026 reward surface. */
 .streakCard {
+  position: relative; overflow: hidden;
   width: min(1120px, 100%); margin: 0 auto;
-  padding: 18px; border-radius: 24px;
-  background: linear-gradient(135deg, #271746 0%, #102441 52%, #071521 100%);
-  border: 1px solid #ffb84d55;
-  box-shadow: 0 22px 55px #0008, inset 0 1px 0 #ffffff1c;
+  padding: 20px; border-radius: 30px;
+  background:
+    radial-gradient(circle at 86% 8%, rgba(0, 212, 154, .22), transparent 34%),
+    radial-gradient(circle at 5% 98%, rgba(28, 120, 255, .24), transparent 38%),
+    linear-gradient(135deg, #142b56 0%, #151638 52%, #06111f 100%);
+  border: 1px solid rgba(255, 209, 102, .34);
+  box-shadow: 0 28px 70px rgba(0,0,0,.52), 0 0 44px rgba(0,212,154,.12), inset 0 1px 0 rgba(255,255,255,.16);
+  isolation: isolate;
 }
-.streakHead { display: flex; align-items: center; gap: 12px; }
-.streakArt { width: 62px; height: 62px; object-fit: contain; flex: 0 0 auto; }
-.streakCopy { flex: 1; min-width: 0; }
-.streakCopy h3 { margin: 0; color: #fff; font-size: 20px; }
-.streakCopy p { margin: 4px 0 0; color: #ffffffb8; font-size: 13px; line-height: 1.5; }
-.streakHead > strong { color: #ffcf70; font-size: 22px; }
-.streakDays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 7px; margin: 14px 0; }
+.streakCard::before {
+  content: ""; position: absolute; inset: -45% -20%; z-index: 0;
+  background: conic-gradient(from 40deg, transparent, rgba(34,231,166,.28), transparent, rgba(78,161,255,.24), transparent, rgba(255,209,102,.25), transparent);
+  opacity: .55; filter: blur(28px); animation: streakSpin 12s linear infinite;
+}
+.streakCard::after {
+  content: ""; position: absolute; inset: 1px; pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(120deg, rgba(255,255,255,.22), transparent 22%, transparent 72%, rgba(255,209,102,.18));
+  opacity: .42;
+}
+.streakAura { position: absolute; border-radius: 999px; pointer-events: none; filter: blur(8px); opacity: .65; }
+.streakAura.one { width: 138px; height: 138px; top: -58px; right: -34px; background: rgba(0,212,154,.28); box-shadow: 0 0 90px rgba(0,212,154,.32); }
+.streakAura.two { width: 178px; height: 178px; bottom: -88px; left: -44px; background: rgba(28,120,255,.24); box-shadow: 0 0 100px rgba(28,120,255,.30); }
+.streakOrbit { position: absolute; inset: 12px 8%; border-radius: 50%; border: 1px solid rgba(0,212,154,.18); transform: rotate(-8deg); pointer-events: none; opacity: .7; }
+.streakOrbit::before, .streakOrbit::after {
+  content: ""; position: absolute; width: 7px; height: 7px; border-radius: 50%;
+  background: #ffd166; box-shadow: 0 0 16px #ffd166;
+  animation: streakPulse 1.8s ease-in-out infinite alternate;
+}
+.streakOrbit::before { top: 10%; right: 18%; }
+.streakOrbit::after { bottom: 16%; left: 22%; animation-delay: .6s; }
+.streakHead { position: relative; display: flex; align-items: flex-start; gap: 18px; }
+.streakCopy { flex: 1; min-width: 0; padding-top: 3px; }
+.streakKicker {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 11px; border-radius: 999px;
+  color: #ffd166; background: rgba(255, 209, 102, .14);
+  border: 1px solid rgba(255, 209, 102, .32);
+  font-size: 12px; font-weight: 900;
+}
+.streakKicker::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 14px currentColor; }
+.streakCard.is-done .streakKicker { color: #53e0a4; background: rgba(83,224,164,.14); border-color: rgba(83,224,164,.34); }
+.streakCopy h3 { margin: 12px 0 5px; color: #fff; font-size: clamp(22px, 3vw, 30px); line-height: 1.15; letter-spacing: -.02em; }
+.streakCopy p { margin: 0; color: rgba(255,255,255,.76); font-size: 14px; line-height: 1.75; max-width: 620px; }
+.streakHeroArt {
+  position: relative; flex: 0 0 116px; width: 116px; height: 116px; border-radius: 30px; overflow: hidden;
+  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15);
+  box-shadow: 0 18px 38px rgba(0,0,0,.35), 0 0 34px rgba(0,212,154,.18);
+  transform-origin: center; animation: streakFloat 4.8s ease-in-out infinite;
+}
+.streakHeroArt img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.streakHeroArt b {
+  position: absolute; top: 8px; right: 8px; padding: 5px 9px; border-radius: 999px;
+  color: #ffd166; background: rgba(7,21,33,.74); border: 1px solid rgba(255,209,102,.48);
+  font-size: 11px; line-height: 1; box-shadow: 0 8px 18px rgba(0,0,0,.28);
+}
+.streakStats { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 16px 0 12px; }
+.streakStats span {
+  display: grid; gap: 2px; padding: 10px 12px; border-radius: 18px;
+  background: rgba(255,255,255,.075); border: 1px solid rgba(255,255,255,.11);
+}
+.streakStats b { color: #fff; font-size: 16px; line-height: 1.1; }
+.streakStats small { color: rgba(255,255,255,.58); font-size: 11px; }
+.streakProgress { position: relative; height: 10px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.07); }
+.streakProgress span {
+  display: block; height: 100%; border-radius: inherit;
+  background: linear-gradient(90deg, #4ea1ff, #22e7a6, #ffd166);
+  box-shadow: 0 0 18px rgba(34,231,166,.45);
+  transition: width .45s cubic-bezier(.2,.8,.2,1);
+}
+.streakDays { position: relative; display: grid; grid-template-columns: repeat(7, 1fr); gap: 7px; margin: 15px 0; }
 .streakDay {
-  min-height: 54px; display: grid; place-items: center; align-content: center; gap: 2px;
-  border-radius: 13px; color: #ffffffb8; background: #ffffff0d; border: 1px solid #ffffff18;
+  min-height: 72px; display: grid; place-items: center; align-content: center; gap: 3px;
+  border-radius: 18px; color: rgba(255,255,255,.66); background: rgba(255,255,255,.075); border: 1px solid rgba(255,255,255,.13);
+  transition: transform .22s ease, background .22s ease, border-color .22s ease, color .22s ease;
 }
-.streakDay.is-current { color: #ffcf70; background: #ffb84d26; border-color: #ffcf7099; }
-.streakDay.is-claimed { color: #53e0a4; background: #53e0a41f; border-color: #53e0a466; }
-.streakDayMark { font-size: 14px; font-weight: 900; }
-.streakDay small { font-size: 10px; }
-.streakFoot { display: flex; align-items: center; gap: 12px; color: #ffffffc7; font-size: 13px; }
-.streakFoot > span { flex: 1; }
-.streakClaim { margin: 0; padding: 10px 14px; border-radius: 13px; background: #ffb84d; color: #25110a; font-weight: 900; }
-.streakClaim:disabled { opacity: .55; cursor: not-allowed; }
+.streakDayIcon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 12px; background: rgba(255,255,255,.08); font-size: 14px; font-weight: 950; }
+.streakDay small { font-size: 10px; color: inherit; }
+.streakDay b { font-size: 10px; color: currentColor; }
+.streakDay.is-current { color: #ffd166; background: rgba(255,209,102,.18); border-color: rgba(255,209,102,.66); box-shadow: 0 12px 28px rgba(255,184,77,.14); transform: translateY(-2px); }
+.streakDay.is-current .streakDayIcon { background: rgba(255,209,102,.20); box-shadow: 0 0 18px rgba(255,209,102,.28); }
+.streakDay.is-claimed { color: #53e0a4; background: rgba(83,224,164,.14); border-color: rgba(83,224,164,.42); }
+.streakFoot { position: relative; display: flex; align-items: center; gap: 12px; color: rgba(255,255,255,.80); font-size: 13px; line-height: 1.6; }
+.streakFoot > span { flex: 1; min-width: 0; }
+.streakClaim {
+  position: relative; margin: 0; min-width: 132px; padding: 12px 16px; border: 0; border-radius: 16px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  background: linear-gradient(135deg, #ffe08a, #ffb84d 52%, #ff7a45); color: #25110a; font-weight: 950;
+  box-shadow: 0 14px 30px rgba(255,184,77,.24); overflow: hidden;
+}
+.streakClaim img { position: relative; z-index: 1; width: 21px; height: 21px; object-fit: contain; filter: drop-shadow(0 4px 9px rgba(255,255,255,.30)); }
+.streakClaim span { position: relative; z-index: 1; }
+.streakClaim::before { content: ""; position: absolute; inset: -60% -40%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.42), transparent); transform: translateX(-70%) rotate(18deg); animation: streakSweep 3.2s ease-in-out infinite; }
+.streakClaim:disabled { opacity: .58; cursor: not-allowed; box-shadow: none; background: rgba(255,255,255,.13); color: rgba(255,255,255,.70); }
+.streakClaim:disabled::before { display: none; }
+@keyframes streakSpin { to { transform: rotate(1turn); } }
+@keyframes streakPulse { to { transform: scale(1.8); opacity: .35; } }
+@keyframes streakFloat { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-5px) scale(1.025); } }
+@keyframes streakSweep { 0%, 45% { transform: translateX(-80%) rotate(18deg); } 72%, 100% { transform: translateX(80%) rotate(18deg); } }
+@media(max-width:560px){
+  .streakCard { padding: 15px; border-radius: 26px; }
+  .streakHead { gap: 12px; }
+  .streakHeroArt { flex-basis: 92px; width: 92px; height: 92px; border-radius: 24px; }
+  .streakCopy h3 { font-size: 21px; }
+  .streakCopy p { font-size: 12px; line-height: 1.55; }
+  .streakStats { grid-template-columns: 1fr 1fr; }
+  .streakStats span:last-child { grid-column: 1 / -1; }
+  .streakDays { gap: 4px; }
+  .streakDay { min-height: 58px; border-radius: 14px; }
+  .streakDayIcon { width: 23px; height: 23px; border-radius: 10px; font-size: 12px; }
+  .streakDay b { display: none; }
+  .streakFoot { align-items: stretch; flex-direction: column; gap: 9px; }
+  .streakClaim { width: 100%; }
+}
+
 .weIcon { width: 36px; height: 36px; object-fit: contain; flex: 0 0 auto; }
 .quickIcon { width: 40px; height: 40px; object-fit: contain; display: block; margin: 0 auto 4px; }
 .quickIcon.inviteIcon { fill: none; stroke: #d8ff9b; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
-@media(max-width:560px){
-  .streakCard { padding: 14px; }
-  .streakHead { align-items: flex-start; }
-  .streakArt { width: 54px; height: 54px; }
-  .streakDays { gap: 4px; }
-  .streakDay { min-height: 48px; }
-  .streakFoot { align-items: stretch; flex-direction: column; gap: 8px; }
-  .streakClaim { width: 100%; }
+/* Strict 2026 button polish loop: glass, motion and touch feedback. */
+button { -webkit-tap-highlight-color: transparent; }
+button:not(:disabled) { cursor: pointer; transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease, filter .18s ease; }
+button:not(:disabled):active { transform: translateY(1px) scale(.985); }
+.iconBtn,
+.mobileNav button,
+.quickTile,
+.walletEntry,
+.clubTabs button,
+.invSorts button,
+.tabs button,
+.moreSheet button,
+.streakClaim {
+  position: relative;
 }
+.iconBtn,
+.mobileNav button,
+.clubTabs button,
+.invSorts button,
+.tabs button,
+.moreSheet button {
+  background-image: radial-gradient(circle at 85% 12%, rgba(0,212,154,.16), transparent 38%), linear-gradient(135deg, rgba(255,255,255,.075), rgba(255,255,255,.025));
+  border: 1px solid rgba(255,255,255,.10);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.10), 0 10px 24px rgba(0,0,0,.16);
+}
+.iconBtn:not(:disabled):hover,
+.mobileNav button:not(:disabled):hover,
+.clubTabs button:not(:disabled):hover,
+.invSorts button:not(:disabled):hover,
+.tabs button:not(:disabled):hover,
+.moreSheet button:not(:disabled):hover {
+  border-color: rgba(34,231,166,.30);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 14px 30px rgba(0,212,154,.12), 0 10px 24px rgba(0,0,0,.18);
+  filter: saturate(1.08);
+}
+.quickTile,
+.walletEntry {
+  overflow: hidden;
+  background-image: radial-gradient(circle at 90% 0%, rgba(255,209,102,.16), transparent 35%), linear-gradient(135deg, rgba(255,255,255,.09), rgba(255,255,255,.035));
+  border: 1px solid rgba(255,255,255,.12);
+  box-shadow: 0 18px 45px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.13);
+}
+.quickTile::after,
+.walletEntry::after {
+  content: ""; position: absolute; inset: -80% -35%; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.18), transparent);
+  transform: translateX(-62%) rotate(18deg);
+  transition: transform .55s ease;
+}
+.quickTile:hover::after,
+.walletEntry:hover::after { transform: translateX(62%) rotate(18deg); }
 
 /* Icon system polish: assets and vectors share one baseline, scale and glow. */
 .assetIcon, .svgIcon { display: inline-block; vertical-align: middle; flex: 0 0 auto; }

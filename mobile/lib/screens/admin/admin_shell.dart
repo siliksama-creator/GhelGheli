@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
+import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/hero_logo.dart';
 import 'admin_admins.dart';
@@ -133,9 +134,11 @@ class _AdminShellState extends State<AdminShell> {
                 ),
               ),
             ),
-      body: AnimatedSwitcher(
-        duration: Motion.normal,
-        child: KeyedSubtree(key: ValueKey(_index), child: _pages[_index]),
+      body: _AdminBackdrop(
+        child: AnimatedSwitcher(
+          duration: Motion.normal,
+          child: KeyedSubtree(key: ValueKey(_index), child: _pages[_index]),
+        ),
       ),
     );
 
@@ -165,15 +168,41 @@ class _AdminShellState extends State<AdminShell> {
                 title: Text('مدیریت قلقلی — ${_titles[_index]}'),
                 actions: const [SizedBox(width: 8)],
               ),
-              body: AnimatedSwitcher(
-                duration: Motion.normal,
-                child:
-                    KeyedSubtree(key: ValueKey(_index), child: _pages[_index]),
+              body: _AdminBackdrop(
+                child: AnimatedSwitcher(
+                  duration: Motion.normal,
+                  child: KeyedSubtree(
+                      key: ValueKey(_index), child: _pages[_index]),
+                ),
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _AdminBackdrop extends StatelessWidget {
+  const _AdminBackdrop({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      // همان حس بصریِ اپ کاربر، ولی کمی رسمی‌تر برای پنل مدیریت: سطح
+      // تیرهٔ تخت نبود، اما به خاطر گرادیان‌های ارزان هیچ هزینهٔ رندر
+      // قابل‌توجهی هم اضافه نمی‌شود.
+      decoration: const BoxDecoration(
+        color: BrandColors.darkBg,
+        gradient: RadialGradient(
+          center: Alignment(0.86, -0.98),
+          radius: 1.18,
+          colors: [Color(0x2522C58B), Color(0x00060D18)],
+        ),
+      ),
+      child: child,
     );
   }
 }
@@ -197,9 +226,35 @@ class _AdminNavList extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(Gaps.md),
       children: [
-        const Padding(
-            padding: EdgeInsets.symmetric(vertical: Gaps.md),
-            child: HeroLogo(logoWidth: 96, logoHeight: 80, titleSize: 18)),
+        Container(
+          margin: const EdgeInsets.only(bottom: Gaps.sm),
+          padding: const EdgeInsets.symmetric(
+              horizontal: Gaps.md, vertical: Gaps.lg),
+          decoration: BoxDecoration(
+            borderRadius: Corners.rXl,
+            gradient: const LinearGradient(
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+              colors: [Color(0xFF12345F), Color(0xFF0B1B31)],
+            ),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+            boxShadow: [
+              BoxShadow(
+                color: BrandColors.emerald.withValues(alpha: 0.10),
+                blurRadius: 24,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
+          child: const Column(
+            children: [
+              HeroLogo(logoWidth: 96, logoHeight: 80, titleSize: 18),
+              SizedBox(height: 8),
+              Text('پنل مدیریت ۲۰۲۶',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+            ],
+          ),
+        ),
         const Divider(),
         for (var i = 0; i < titles.length; i++)
           Padding(
@@ -207,7 +262,8 @@ class _AdminNavList extends StatelessWidget {
             child: ListTile(
               selected: index == i,
               selectedTileColor:
-                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.14),
+              selectedColor: BrandColors.emerald,
               shape: RoundedRectangleBorder(borderRadius: Corners.rMd),
               leading: Icon(icons[i]),
               title: Text(titles[i]),

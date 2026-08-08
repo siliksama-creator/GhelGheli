@@ -188,7 +188,12 @@ export default function Home({ token, p, rewards, load, setMsg, openWallet,
         </button>
       </section>
 
-      <LoginStreak token={token} setMsg={setMsg} />
+      <LoginStreak
+        token={token}
+        initialData={p.loginStreak}
+        setMsg={setMsg}
+        onClaimed={load}
+      />
 
       <section className="card">
         <h2>کلکسیون من</h2>

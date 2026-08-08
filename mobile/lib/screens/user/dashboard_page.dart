@@ -103,6 +103,9 @@ class _DashboardPageState extends State<DashboardPage> {
           'user': m['user'],
           'inventory': m['inventory'] ?? const [],
           'leaguePayouts': m['leaguePayouts'] ?? const [],
+          // وضعیت استریک هم از bootstrap می‌آید تا کارتِ روزانه با یک
+          // درخواست اضافه و دیرتر از بقیهٔ داشبورد روی صفحه نپرد.
+          if (m['loginStreak'] != null) 'loginStreak': m['loginStreak'],
           // ظاهرِ خودِ کاربر (ستارهٔ پلاس، رنگ اسم) — تا هدر داشبورد هم
           // نشانِ اشتراکش را نشان دهد، نه فقط چت و لیگ.
           if (m['cosmetics'] != null) 'cosmetics': m['cosmetics'],
@@ -201,7 +204,16 @@ class _DashboardPageState extends State<DashboardPage> {
             ],
           ),
           Gaps.vMd,
-          LoginStreakCard(api: widget.api),
+          LoginStreakCard(
+            api: widget.api,
+            initialData: _data?['loginStreak'] is Map
+                ? Map<String, dynamic>.from(_data!['loginStreak'] as Map)
+                : null,
+            onClaimed: () {
+              _load();
+              widget.reloadProfile();
+            },
+          ),
           Gaps.vMd,
           AppCard(
             child: Column(
@@ -342,7 +354,7 @@ class _QuickTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Material(
-      color: tint.withValues(alpha: 0.10),
+      color: Colors.transparent,
       borderRadius: Corners.rLg,
       child: InkWell(
         onTap: onTap,
@@ -352,6 +364,26 @@ class _QuickTile extends StatelessWidget {
           constraints: const BoxConstraints(minHeight: 48),
           padding: const EdgeInsets.symmetric(
               horizontal: Gaps.sm, vertical: Gaps.md),
+          decoration: BoxDecoration(
+            borderRadius: Corners.rLg,
+            gradient: LinearGradient(
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+              colors: [
+                tint.withValues(alpha: 0.22),
+                Theme.of(context).colorScheme.surfaceContainerHigh
+                    .withValues(alpha: 0.72),
+              ],
+            ),
+            border: Border.all(color: tint.withValues(alpha: 0.28)),
+            boxShadow: [
+              BoxShadow(
+                color: tint.withValues(alpha: 0.10),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [

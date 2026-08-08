@@ -4,6 +4,7 @@
 // automatically between light and dark mode.
 import 'package:flutter/material.dart';
 import '../theme/brand_theme.dart';
+import '../theme/colors.dart';
 import '../theme/tokens.dart';
 
 class AppCard extends StatelessWidget {
@@ -98,6 +99,17 @@ class AppCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final brand = context.brand;
+    final cardGradient = color == null
+        ? LinearGradient(
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: [
+              Color.lerp(scheme.surfaceContainerHigh, BrandColors.emerald, 0.055)!,
+              Color.lerp(scheme.surfaceContainer, BrandColors.blue, 0.030)!,
+              scheme.surfaceContainerLow,
+            ],
+          )
+        : null;
     final content = AnimatedContainer(
       duration: Motion.fast,
       constraints:
@@ -105,9 +117,21 @@ class AppCard extends StatelessWidget {
       padding: padding,
       decoration: BoxDecoration(
         borderRadius: Corners.rXl,
-        color: color ?? scheme.surfaceContainer,
-        border: Border.all(color: brand.subtleBorder),
-        boxShadow: elevated ? brand.softShadow : null,
+        color: color,
+        gradient: cardGradient,
+        border: Border.all(
+          color: color == null ? brand.glassBorder : brand.subtleBorder,
+        ),
+        boxShadow: elevated
+            ? [
+                ...brand.softShadow,
+                BoxShadow(
+                  color: BrandColors.emerald.withValues(alpha: 0.055),
+                  blurRadius: 32,
+                  offset: const Offset(0, 18),
+                ),
+              ]
+            : null,
       ),
       child: _withHeader(context),
     );

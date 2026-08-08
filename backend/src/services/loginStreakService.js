@@ -143,4 +143,4 @@ async function claim(userId) {
   }
 }
 
-module.exports = { REWARDS, CYCLE_DAYS, status, claim, tehranDay };
+module.exports = { REWARDS, CYCLE_DAYS, status, claim, tehranDay, publicStatus };

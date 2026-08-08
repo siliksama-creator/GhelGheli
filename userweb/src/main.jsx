@@ -180,6 +180,9 @@ function Portal({ token, logout }) {
         user: boot.user,
         inventory: boot.inventory || [],
         leaguePayouts: boot.leaguePayouts || [],
+        // استریک از bootstrap می‌آید؛ دیگر برای کارت روزانه یک درخواست
+        // جدا نمی‌زنیم و بعد از claim هم همین load امتیاز هدر را تازه می‌کند.
+        loginStreak: boot.loginStreak || null,
       });
       setRewards(boot.rewards || []);
       const wheel = boot.wheel;

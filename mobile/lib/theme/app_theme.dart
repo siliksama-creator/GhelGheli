@@ -160,17 +160,49 @@ class AppTheme {
         style: FilledButton.styleFrom(
           minimumSize: const Size.fromHeight(TouchTarget.comfortable),
           padding: const EdgeInsets.symmetric(horizontal: Gaps.lg),
-          shape: RoundedRectangleBorder(borderRadius: Corners.rMd),
+          shape: RoundedRectangleBorder(borderRadius: Corners.rLg),
+          backgroundColor: colorScheme.primary,
+          foregroundColor: colorScheme.onPrimary,
+          disabledBackgroundColor:
+              colorScheme.onSurface.withValues(alpha: 0.12),
+          disabledForegroundColor:
+              colorScheme.onSurface.withValues(alpha: 0.46),
+          elevation: 0,
+          shadowColor: colorScheme.primary.withValues(alpha: 0.28),
           textStyle: textTheme.labelLarge?.copyWith(fontSize: 15),
+        ).copyWith(
+          overlayColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.pressed)) {
+              return Colors.white.withValues(alpha: 0.18);
+            }
+            if (states.contains(WidgetState.hovered) ||
+                states.contains(WidgetState.focused)) {
+              return Colors.white.withValues(alpha: 0.10);
+            }
+            return null;
+          }),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           minimumSize: const Size.fromHeight(TouchTarget.comfortable),
           padding: const EdgeInsets.symmetric(horizontal: Gaps.lg),
-          shape: RoundedRectangleBorder(borderRadius: Corners.rMd),
-          side: BorderSide(color: colorScheme.outline),
+          shape: RoundedRectangleBorder(borderRadius: Corners.rLg),
+          side: BorderSide(color: colorScheme.outline.withValues(alpha: 0.78)),
+          foregroundColor: colorScheme.onSurface,
+          backgroundColor: Colors.white.withValues(alpha: 0.035),
           textStyle: textTheme.labelLarge?.copyWith(fontSize: 15),
+        ).copyWith(
+          overlayColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.pressed)) {
+              return colorScheme.primary.withValues(alpha: 0.12);
+            }
+            if (states.contains(WidgetState.hovered) ||
+                states.contains(WidgetState.focused)) {
+              return colorScheme.primary.withValues(alpha: 0.08);
+            }
+            return null;
+          }),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -185,7 +217,21 @@ class AppTheme {
       iconButtonTheme: IconButtonThemeData(
         style: IconButton.styleFrom(
           minimumSize: const Size(TouchTarget.min, TouchTarget.min),
-          shape: RoundedRectangleBorder(borderRadius: Corners.rMd),
+          shape: RoundedRectangleBorder(borderRadius: Corners.rLg),
+          backgroundColor: Colors.white.withValues(alpha: 0.045),
+          foregroundColor: colorScheme.onSurface,
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.075)),
+        ).copyWith(
+          overlayColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.pressed)) {
+              return colorScheme.primary.withValues(alpha: 0.16);
+            }
+            if (states.contains(WidgetState.hovered) ||
+                states.contains(WidgetState.focused)) {
+              return colorScheme.primary.withValues(alpha: 0.10);
+            }
+            return null;
+          }),
         ),
       ),
       chipTheme: ChipThemeData(

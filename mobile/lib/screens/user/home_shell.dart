@@ -520,9 +520,20 @@ class _HomeShellState extends State<HomeShell>
           const SizedBox(width: 4),
         ],
       ),
-      body: FadeTransition(
-        opacity: _entranceFade,
-        child: SlideTransition(
+      body: DecoratedBox(
+        // Subtle always-on aurora: the Android app no longer feels like raw
+        // dark cards on a flat black sheet. It is cheap (pure gradients),
+        // consistent across pages, and stays behind every scrollable child.
+        decoration: const BoxDecoration(
+          gradient: RadialGradient(
+            center: Alignment(0.78, -0.92),
+            radius: 1.12,
+            colors: [Color(0x331C78FF), Color(0x00060D18)],
+          ),
+        ),
+        child: FadeTransition(
+          opacity: _entranceFade,
+          child: SlideTransition(
           position: _entranceSlide,
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 260),
@@ -563,6 +574,7 @@ class _HomeShellState extends State<HomeShell>
             ),
           ),
         ),
+      ),
       ),
       bottomNavigationBar: NavigationBar(
         // Taller bar + always-visible labels: the default height with seven
