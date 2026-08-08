@@ -92,7 +92,7 @@ class _LoginStreakCardState extends State<LoginStreakCard> {
           borderRadius: BorderRadius.circular(24),
           color: theme.colorScheme.surface.withValues(alpha: 0.42),
         ),
-        child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+        child: Center(child: Text('استریک ورود در حال آماده‌سازی است…', style: TextStyle(color: Colors.white54))),
       );
     }
 
