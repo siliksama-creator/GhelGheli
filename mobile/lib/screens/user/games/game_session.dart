@@ -422,7 +422,7 @@ class GameSession extends ChangeNotifier {
         return 'پایان بازی';
       default:
         if (mySymbol == null) return 'برنده: $winner';
-        return winner == mySymbol ? 'شما بردید! 🎉' : 'شما باختید';
+        return winner == mySymbol ? 'شما بردید! ' : 'شما باختید';
     }
   }
 

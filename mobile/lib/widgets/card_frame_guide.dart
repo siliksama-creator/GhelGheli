@@ -87,7 +87,7 @@ class _GuideSheet extends StatelessWidget {
                   ),
                 ),
               ),
-              Text('📸 عکسِ خوب چطور گرفته می‌شود؟',
+              Text(' عکسِ خوب چطور گرفته می‌شود؟',
                   style: theme.textTheme.titleLarge,
                   textAlign: TextAlign.center),
               Gaps.vXxs,
@@ -117,7 +117,7 @@ class _GuideSheet extends StatelessWidget {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(t.$1, style: const TextStyle(fontSize: 15)),
+                        Icon(t.$1, size: 19, color: theme.colorScheme.primary),
                         const SizedBox(width: Gaps.xs),
                         Expanded(
                           child: Text(t.$2, style: theme.textTheme.bodyMedium),
@@ -146,17 +146,17 @@ class _GuideSheet extends StatelessWidget {
 
   /// نکته‌ها به ترتیبِ اهمیت — بر پایهٔ اینکه کدام‌یک بیشترین اثر را روی
   /// نمرهٔ تطبیق دارد (اندازه‌گیری‌شده روی عکس‌های واقعی).
-  static const List<(String, String)> _tips = [
-    ('🖼️', 'کارت تمامِ کادر را پر کند — میز و زمین در عکس نباشد.'),
-    ('📐', 'مستقیم از بالا عکس بگیر، نه از زاویه.'),
-    ('💡', 'نورِ کافی باشد ولی فلاش مستقیم روی کارت نیفتد.'),
-    ('✋', 'دست تکان نخورد تا عکس تار نشود.'),
+  static const List<(IconData, String)> _tips = [
+    (Icons.crop_portrait_rounded, 'کارت تمامِ کادر را پر کند — میز و زمین در عکس نباشد.'),
+    (Icons.straighten_rounded, 'مستقیم از بالا عکس بگیر، نه از زاویه.'),
+    (Icons.lightbulb_outline_rounded, 'نورِ کافی باشد ولی فلاش مستقیم روی کارت نیفتد.'),
+    (Icons.pan_tool_alt_rounded, 'دست تکان نخورد تا عکس تار نشود.'),
   ];
 }
 
 /// یک نمونهٔ تصویری: کادرِ درست در برابرِ کادرِ غلط.
 ///
-/// ⚠️ اینجا عمداً از تصویرِ واقعی استفاده **نمی‌شود**. طرحِ ساده با
+///  اینجا عمداً از تصویرِ واقعی استفاده **نمی‌شود**. طرحِ ساده با
 ///    `CustomPaint` سه مزیت دارد: حجمِ APK بالا نمی‌رود، در هر تمی درست
 ///    دیده می‌شود، و اگر روزی طرحِ کارت‌ها عوض شد این راهنما کهنه
 ///    نمی‌شود.

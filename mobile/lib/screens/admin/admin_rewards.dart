@@ -410,7 +410,7 @@ class _AdminRewardsState extends State<AdminRewards> {
                                     url: r['image_url'],
                                     width: 48,
                                     height: 48,
-                                    fallbackEmoji: '🎁'))
+                                    fallbackAsset: 'assets/pass/reward_gift_icon.webp'))
                             : const Icon(Icons.card_giftcard_rounded),
                         title: Text(r['name']),
                         subtitle: Text(

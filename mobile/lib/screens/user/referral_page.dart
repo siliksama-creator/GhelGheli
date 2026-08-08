@@ -49,7 +49,7 @@ class _ReferralPageState extends State<ReferralPage> {
   Future<void> _copy(String code) async {
     final ok = await copyCode(code);
     if (!mounted) return;
-    _toast(ok ? 'کد کپی شد ✅' : 'کپی نشد؛ کد را دستی بردارید');
+    _toast(ok ? 'کد کپی شد ' : 'کپی نشد؛ کد را دستی بردارید');
   }
 
   /// اشتراک‌گذاری در یک پیام‌رسان.
@@ -65,9 +65,9 @@ class _ReferralPageState extends State<ReferralPage> {
         // اپ باز شد و متن آماده است؛ پیام لازم نیست و فقط مزاحم است.
         break;
       case ShareOutcome.openedWithClipboard:
-        _toast('متن دعوت کپی شد — در ${t.label} بچسبانید 📋');
+        _toast('متن دعوت کپی شد — در ${t.label} بچسبانید ');
       case ShareOutcome.copiedOnly:
-        _toast('${t.label} باز نشد؛ متن دعوت کپی شد 📋');
+        _toast('${t.label} باز نشد؛ متن دعوت کپی شد ');
     }
   }
 
@@ -110,7 +110,7 @@ class _ReferralPageState extends State<ReferralPage> {
       child: ListView(
         padding: const EdgeInsets.all(Gaps.lg),
         children: [
-          Text('🤝 دعوت دوستان',
+          Text(' دعوت دوستان',
               style: theme.textTheme.titleLarge
                   ?.copyWith(fontWeight: FontWeight.w900)),
           Gaps.vXs,
@@ -235,7 +235,7 @@ class _ReferralPageState extends State<ReferralPage> {
             )
           else if (d['atDailyCap'] == true)
             Text(
-              '🏆 به سقف ${faNum(_int(d['maxInvitesForDaily']))} دوست رسیدی — '
+              ' به سقف ${faNum(_int(d['maxInvitesForDaily']))} دوست رسیدی — '
               'هر روز ${faNum(_int(d['dailySpins']))} چرخش رایگان داری!',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodySmall?.copyWith(
@@ -439,7 +439,7 @@ class _NextSpinProgress extends StatelessWidget {
         ),
         Gaps.vXxs,
         Text(
-          '${faNum(toNext)} دوست دیگر تا ${faNum(nextTotal)} چرخش روزانه 🎯',
+          '${faNum(toNext)} دوست دیگر تا ${faNum(nextTotal)} چرخش روزانه ',
           style: theme.textTheme.labelSmall?.copyWith(
             color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
           ),
@@ -485,7 +485,7 @@ class _ShareChip extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(target.emoji, style: const TextStyle(fontSize: 15)),
+              Icon(target.icon, size: 18, color: brand),
               Gaps.hXxs,
               Text(
                 target.label,

@@ -94,7 +94,7 @@ class _TapGameScreenState extends State<TapGameScreen>
   // حالا فقط دو تکهٔ کوچک — هدر و پنلِ پیشرفت — به تغییرات گوش می‌دهند.
   // بقیهٔ درخت، از جمله `TapCharacter`، **اصلاً بازسازی نمی‌شود**.
   //
-  // ⚠️ `_uiTick` عمداً یک شمارنده است و نه خودِ داده: موتور منبعِ حقیقت
+  //  `_uiTick` عمداً یک شمارنده است و نه خودِ داده: موتور منبعِ حقیقت
   //    است و این فقط می‌گوید «چیزی عوض شد، دوباره بخوان».
   final ValueNotifier<int> _uiTick = ValueNotifier<int>(0);
 
@@ -573,11 +573,11 @@ class _DailyCapViewState extends State<_DailyCapView> {
               // Dimmed and at 150px; a small decode is more than enough.
               cacheWidth: 220,
               errorBuilder: (_, __, ___) =>
-                  const Text('😴', style: TextStyle(fontSize: 72)),
+                  Icon(Icons.bedtime_rounded, size: 72, color: widget.accent),
             ),
           ),
           Gaps.vLg,
-          Text('😴', style: theme.textTheme.headlineMedium),
+          Icon(Icons.bedtime_rounded, size: 44, color: theme.colorScheme.outline),
           Gaps.vXs,
           Text(
             'سهمیهٔ امروز تمام شد',
@@ -787,11 +787,11 @@ class _CompletionView extends StatelessWidget {
               fit: BoxFit.contain,
               cacheWidth: 600,
               errorBuilder: (_, __, ___) =>
-                  const Text('🏆', style: TextStyle(fontSize: 90)),
+                  const Icon(Icons.emoji_events_rounded, size: 90, color: Color(0xFFFFD166)),
             ),
           ),
           Gaps.vLg,
-          Text('🏆', style: theme.textTheme.displaySmall),
+          Icon(Icons.emoji_events_rounded, size: 56, color: theme.colorScheme.primary),
           Gaps.vXs,
           Text(
             'تبریک! همهٔ لول‌ها را تمام کردی',
@@ -890,7 +890,7 @@ class _LevelUpDialogContentState extends State<_LevelUpDialogContent> with Singl
                   fit: BoxFit.contain,
                   cacheWidth: 176,
                   errorBuilder: (_, __, ___) =>
-                      const Text('🎉', style: TextStyle(fontSize: 64)),
+                      Icon(Icons.celebration_rounded, size: 64, color: widget.accent),
                 ),
                 Gaps.vSm,
                 Text(
@@ -913,7 +913,7 @@ class _LevelUpDialogContentState extends State<_LevelUpDialogContent> with Singl
                     onPressed: () => Navigator.pop(context),
                     style: FilledButton.styleFrom(backgroundColor: widget.accent),
                     child: const Text(
-                      'ادامه بازی 💪',
+                      'ادامه بازی',
                       style: TextStyle(
                         color: Colors.black,
                         fontWeight: FontWeight.bold,
@@ -1013,7 +1013,7 @@ class _SkinUnlockedDialogContentState extends State<_SkinUnlockedDialogContent> 
                     fit: BoxFit.contain,
                     cacheWidth: 192,
                     errorBuilder: (_, __, ___) =>
-                        const Text('👑', style: TextStyle(fontSize: 72)),
+                        const Icon(Icons.workspace_premium_rounded, size: 72, color: Colors.amber),
                   ),
                 ),
                 Gaps.vSm,
@@ -1038,7 +1038,7 @@ class _SkinUnlockedDialogContentState extends State<_SkinUnlockedDialogContent> 
                     onPressed: () => Navigator.pop(context),
                     style: FilledButton.styleFrom(backgroundColor: Colors.amber),
                     child: const Text(
-                      'ایول! دمت گرم 🔥',
+                      'ایول! دمت گرم',
                       style: TextStyle(
                         color: Color(0xFF3A2A00),
                         fontWeight: FontWeight.bold,

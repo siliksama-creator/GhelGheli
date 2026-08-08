@@ -3440,3 +3440,43 @@ input:focus, textarea:focus {
   border: 1px solid rgba(255, 255, 255, 0.14) !important;
   box-shadow: 0 15px 45px rgba(0,0,0,0.4) !important;
 }
+
+/* Seven-day login streak: a compact, high-contrast reward surface. */
+.streakCard {
+  width: min(1120px, 100%); margin: 0 auto;
+  padding: 18px; border-radius: 24px;
+  background: linear-gradient(135deg, #271746 0%, #102441 52%, #071521 100%);
+  border: 1px solid #ffb84d55;
+  box-shadow: 0 22px 55px #0008, inset 0 1px 0 #ffffff1c;
+}
+.streakHead { display: flex; align-items: center; gap: 12px; }
+.streakArt { width: 62px; height: 62px; object-fit: contain; flex: 0 0 auto; }
+.streakCopy { flex: 1; min-width: 0; }
+.streakCopy h3 { margin: 0; color: #fff; font-size: 20px; }
+.streakCopy p { margin: 4px 0 0; color: #ffffffb8; font-size: 13px; line-height: 1.5; }
+.streakHead > strong { color: #ffcf70; font-size: 22px; }
+.streakDays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 7px; margin: 14px 0; }
+.streakDay {
+  min-height: 54px; display: grid; place-items: center; align-content: center; gap: 2px;
+  border-radius: 13px; color: #ffffffb8; background: #ffffff0d; border: 1px solid #ffffff18;
+}
+.streakDay.is-current { color: #ffcf70; background: #ffb84d26; border-color: #ffcf7099; }
+.streakDay.is-claimed { color: #53e0a4; background: #53e0a41f; border-color: #53e0a466; }
+.streakDayMark { font-size: 14px; font-weight: 900; }
+.streakDay small { font-size: 10px; }
+.streakFoot { display: flex; align-items: center; gap: 12px; color: #ffffffc7; font-size: 13px; }
+.streakFoot > span { flex: 1; }
+.streakClaim { margin: 0; padding: 10px 14px; border-radius: 13px; background: #ffb84d; color: #25110a; font-weight: 900; }
+.streakClaim:disabled { opacity: .55; cursor: not-allowed; }
+.weIcon { width: 36px; height: 36px; object-fit: contain; flex: 0 0 auto; }
+.quickIcon { width: 40px; height: 40px; object-fit: contain; display: block; margin: 0 auto 4px; }
+.quickIcon.inviteIcon { fill: none; stroke: #d8ff9b; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+@media(max-width:560px){
+  .streakCard { padding: 14px; }
+  .streakHead { align-items: flex-start; }
+  .streakArt { width: 54px; height: 54px; }
+  .streakDays { gap: 4px; }
+  .streakDay { min-height: 48px; }
+  .streakFoot { align-items: stretch; flex-direction: column; gap: 8px; }
+  .streakClaim { width: 100%; }
+}

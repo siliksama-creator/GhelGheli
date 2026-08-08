@@ -374,7 +374,7 @@ class InventoryTile extends StatelessWidget {
                         child: img.isEmpty
                             ? const Center(
                                 child:
-                                    Text('⚽', style: TextStyle(fontSize: 34)))
+                                    Image.asset('assets/pass/football_icon.webp', width: 42, height: 42, fit: BoxFit.contain))
                             : CachedCardImage(
                                 url: img,
                                 fit: BoxFit.contain,
@@ -382,8 +382,7 @@ class InventoryTile extends StatelessWidget {
                                 // ۵۰ تصویرِ تمام‌اندازه در حافظه می‌نشیند
                                 // و روی گوشیِ ضعیف اپ کشته می‌شود.
                                 cacheWidth: 320,
-                                placeholder: const Text('⚽',
-                                    style: TextStyle(fontSize: 34)),
+                                placeholder: Image.asset('assets/pass/football_icon.webp', width: 42, height: 42, fit: BoxFit.contain),
                               ),
                       ),
                     ),

@@ -124,7 +124,7 @@ class _HomeShellState extends State<HomeShell>
   // است، پس صفحه‌ای که کاربر هرگز باز نکند هیچ هزینه‌ای ندارد — این
   // مهم است چون قبلاً هر ۱۲ تا از لحظهٔ اول ساخته می‌شدند.
   //
-  // ⚠️ نکتهٔ ظریف: `InventoryPage` به `_inventory` وابسته است که با
+  //  نکتهٔ ظریف: `InventoryPage` به `_inventory` وابسته است که با
   //    هر bootstrap عوض می‌شود. برای همین **عمداً کش نمی‌شود** —
   //    توضیح در `_buildPage`.
   final Map<int, Widget> _pageCache = {};
@@ -469,7 +469,7 @@ class _HomeShellState extends State<HomeShell>
         // درخواست مالک: «اون بالای بالا که سلام نوشته رو کلا حذف کن و
         // لوگو درخشان قلقلی رو قرار بده».
         //
-        // «سلام hotcat 👋» حذف شد. دلیلش فقط سلیقه نیست: همان نام دقیقاً
+        // «سلام hotcat » حذف شد. دلیلش فقط سلیقه نیست: همان نام دقیقاً
         // چند پیکسل پایین‌تر در هدر داشبورد هم بود، پس دو بار تکرار
         // می‌شد و جای نوار بالا را — که پنج آیکون مهم دارد — بی‌دلیل
         // تنگ می‌کرد. روی گوشی‌های باریک عنوان با «...» بریده می‌شد،
@@ -623,7 +623,7 @@ class _WheelButton extends StatelessWidget {
                   backgroundColor:
                       Theme.of(context).colorScheme.primary.withValues(alpha: 0.18))
               : null,
-          icon: const Text('🎡', style: TextStyle(fontSize: 20)),
+          icon: Image.asset('assets/pass/wheel_icon.webp', width: 24, height: 24),
         ),
         if (n > 0)
           Positioned(
@@ -698,8 +698,8 @@ class _ShopButton extends StatelessWidget {
               backgroundColor:
                   Theme.of(context).colorScheme.primary.withValues(alpha: 0.18))
           : null,
-      // آیکون متریال به‌جای اموجی: اموجیِ 🛒 روی بعضی گوشی‌های اندروید
-      // با رنگ و اندازهٔ متفاوت رندر می‌شود و کنار 🎡 ناهماهنگ می‌افتد.
+      // آیکون متریال به‌جای اموجی: اموجیِ  روی بعضی گوشی‌های اندروید
+      // با رنگ و اندازهٔ متفاوت رندر می‌شود و کنار  ناهماهنگ می‌افتد.
       icon: const Icon(Icons.storefront_rounded, size: 22),
     );
   }
@@ -796,7 +796,7 @@ class _PassButtonState extends State<_PassButton>
                       .primary
                       .withValues(alpha: 0.18))
               : null,
-          icon: const Text('🏅', style: TextStyle(fontSize: 20)),
+          icon: Image.asset('assets/games/medals/medal_participation.webp', width: 24, height: 24),
         ),
         if (n > 0)
           Positioned(

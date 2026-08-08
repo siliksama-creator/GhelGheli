@@ -57,7 +57,7 @@ class ImageUrlField extends StatelessWidget {
                       prefixIcon: const Icon(Icons.link_rounded),
                       helperText: uploading
                           ? 'در حال آپلود عکس...'
-                          : (hasImage ? 'عکس آماده است ✓' : 'هنوز عکسی انتخاب نشده'),
+                          : (hasImage ? 'عکس آماده است ' : 'هنوز عکسی انتخاب نشده'),
                       helperStyle: TextStyle(
                         color: uploading
                             ? theme.colorScheme.primary

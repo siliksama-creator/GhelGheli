@@ -133,7 +133,7 @@ class _PinnedEditorState extends State<PinnedEditor> {
             onChanged: (_) => setState(() {}),
             decoration: const InputDecoration(
               labelText: 'متن اعلان',
-              hintText: 'مثال: مسابقه ویژه این هفته آغاز شد 🎉',
+              hintText: 'مثال: مسابقه ویژه این هفته آغاز شد ',
               alignLabelWithHint: true,
             ),
           ),

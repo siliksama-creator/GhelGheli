@@ -44,7 +44,7 @@ class _GameEntry {
 }
 
 const _games = <_GameEntry>[
-  _GameEntry('tap', 'ضربه‌زن', '۵۰ لول ضربه بزن و شخصیت‌ها را باز کن', '👊',
+  _GameEntry('tap', 'ضربه‌زن', '۵۰ لول ضربه بزن و شخصیت‌ها را باز کن', 'assets/games/tap/skin_1.webp',
       Color(0xFF84CC16), 'assets/games/tap/skin_1.webp',
       bot: false, singlePlayer: true),
   // پنالتی دقیقاً **بعد از** ضربه‌زن — درخواست مالک: «بازی پنالتی باید
@@ -54,12 +54,12 @@ const _games = <_GameEntry>[
   // اینجا اثر ندارد و باید جداگانه هماهنگ بماند. پنالتی اصلاً در این
   // فهرست نبود — یعنی با وجود آماده بودن سرور و صفحهٔ بازی، از اپ
   // **قابل دسترس نبود**.
-  _GameEntry('penalty', 'ضربات پنالتی', 'یکی می‌زند، یکی می‌گیرد', '⚽',
+  _GameEntry('penalty', 'ضربات پنالتی', 'یکی می‌زند، یکی می‌گیرد', 'assets/pass/football_icon.webp',
       Color(0xFF38BDF8), 'assets/games/penalty.webp'),
-  _GameEntry('memory', 'جفت‌یاب', 'جفت‌ها را به خاطر بسپار و ببر', '🃏',
+  _GameEntry('memory', 'جفت‌یاب', 'جفت‌ها را به خاطر بسپار و ببر', 'assets/games/memory/medal.webp',
       Color(0xFFA855F7), 'assets/games/memory.webp',
       bot: false, solo: true),
-  _GameEntry('reversi', 'اتللو', 'مهره‌ها را برگردان', '⚫', Color(0xFF34D399),
+  _GameEntry('reversi', 'اتللو', 'مهره‌ها را برگردان', 'assets/games/reversi.webp', Color(0xFF34D399),
       'assets/games/reversi.webp'),
 ];
 
@@ -132,7 +132,7 @@ class _GamesHubPageState extends State<GamesHubPage> {
     return ListView(
       padding: const EdgeInsets.all(Gaps.lg),
       children: [
-        Text('بخش بازی‌ها 🎮',
+        Text('بخش بازی‌ها',
             style: theme.textTheme.headlineSmall
                 ?.copyWith(fontWeight: FontWeight.w800)),
         Gaps.vXxs,
@@ -226,8 +226,7 @@ class _GameTileState extends State<_GameTile> {
                         errorBuilder: (_, __, ___) => Container(
                           color: entry.accent.withValues(alpha: 0.18),
                           alignment: Alignment.center,
-                          child: Text(entry.emoji,
-                              style: const TextStyle(fontSize: 40)),
+                          child: Image.asset(entry.emoji, width: 64, height: 64, fit: BoxFit.contain),
                         ),
                       ),
                     ),
@@ -251,8 +250,7 @@ class _GameTileState extends State<_GameTile> {
                       left: Gaps.md,
                       child: Row(
                         children: [
-                          Text(entry.emoji,
-                              style: const TextStyle(fontSize: 22)),
+                          Image.asset(entry.emoji, width: 28, height: 28, fit: BoxFit.contain),
                           Gaps.hXs,
                           Expanded(
                             child: Text(

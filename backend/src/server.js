@@ -12,7 +12,7 @@ const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const cron = require('node-cron');
 const swaggerUi = require('swagger-ui-express');
-const YAML = require('yamljs');
+const YAML = require('yaml');
 const { Server } = require('socket.io');
 const { pool } = require('./config/db');
 const { audit } = require('./services/auditService');
@@ -24,6 +24,7 @@ const walletService = require('./services/walletService');
 const referrals = require('./services/referralService');
 const wheel = require('./services/wheelService');
 const pass = require('./services/passService');
+const loginStreak = require('./services/loginStreakService');
 const wheelReminder = require('./services/wheelReminderService');
 // Hoisted with the other services: /api/users/:id/public uses it and sits
 // above the shop routes, so a require next to those would read as a
@@ -107,7 +108,7 @@ const docsGuard = (req, res, next) => {
   if (given === key) return next();
   return res.status(404).json({ message: 'یافت نشد' });
 };
-app.use('/docs', docsGuard, swaggerUi.serve, swaggerUi.setup(YAML.load(__dirname + '/../docs/openapi.yaml')));
+app.use('/docs', docsGuard, swaggerUi.serve, swaggerUi.setup(YAML.parse(fs.readFileSync(path.join(__dirname, '..', 'docs/openapi.yaml'), 'utf8'))));
 const imageUpload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => cb(null, imageUploadDir),
@@ -394,6 +395,14 @@ const userLoginLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req) => `${req.ip}:${normalizeMobile(req.body?.mobile)}`,
   message: { message: 'تعداد تلاش ورود زیاد است؛ چند دقیقه دیگر دوباره امتحان کنید' },
+});
+const loginStreakLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 8,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: perUserKey,
+  message: { message: 'کمی صبر کن و دوباره تلاش کن' },
 });
 
 app.get('/health', (req, res) => res.json({ ok: true, name: 'GhelGheli API' }));
@@ -1573,6 +1582,17 @@ app.get('/api/wheel/count', auth, asyncHandler(async (req, res) => {
 app.get('/api/pass', auth, asyncHandler(async (req, res) => {
   res.json(await pass.status(req.user.id));
 }));
+
+// Login streak is a separate, explicit claim from Battle Pass XP. Opening
+// the app only reads the status; points are awarded exactly once after the
+// user taps the button, inside a row-locked transaction.
+app.get('/api/login-streak', auth, asyncHandler(async (req, res) => {
+  res.json(await loginStreak.status(req.user.id));
+}));
+app.post('/api/login-streak/claim', auth, loginStreakLimiter,
+  asyncHandler(async (req, res) => {
+    res.json(await loginStreak.claim(req.user.id));
+  }));
 
 app.post('/api/pass/claim/:tierId', auth, validateUuid('tierId'),
   asyncHandler(async (req, res) => {

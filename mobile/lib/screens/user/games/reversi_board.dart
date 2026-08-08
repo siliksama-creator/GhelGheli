@@ -37,7 +37,7 @@ class _ReversiScreenState extends State<ReversiScreen> {
       api: widget.api,
       title: 'اتللو',
       accent: _accent,
-      symbols: const {'X': '⚫', 'O': '⚪'},
+      symbols: const {'X': 'assets/pass/football_icon.webp', 'O': 'assets/games/reversi.webp'},
       onBack: widget.onBack,
       scoreboard: _Score(session: _s),
       boardBuilder: (_) => _Board(session: _s),
@@ -54,10 +54,10 @@ class _Score extends StatelessWidget {
     final scores = session.state['scores'];
     if (scores is! Map) return const SizedBox.shrink();
     final theme = Theme.of(context);
-    Widget tile(String emoji, Object? n) => Row(
+    Widget tile(Color color, Object? n) => Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(emoji, style: const TextStyle(fontSize: 20)),
+            Icon(Icons.circle_rounded, size: 20, color: color),
             Gaps.hXxs,
             Text(faNum(n ?? 0),
                 style: theme.textTheme.titleMedium
@@ -68,7 +68,7 @@ class _Score extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: Gaps.xs),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [tile('⚫', scores['X']), tile('⚪', scores['O'])],
+        children: [tile(Colors.black87, scores['X']), tile(Colors.white, scores['O'])],
       ),
     );
   }

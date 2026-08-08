@@ -73,20 +73,20 @@ class _RewardsPageState extends State<RewardsPage> {
                     color: const Color(0xFF84CC16))),
             Gaps.vSm,
             _ConfirmLine(
-              icon: '📉',
+              icon: Icons.remove_circle_outline_rounded,
               title: '${faNum(cost)} امتیاز از امتیازت کم می‌شه',
               note: 'الان ${faNum(have)} امتیاز داری، '
                   'بعدش ${faNum(left)} امتیاز می‌مونه',
             ),
             Gaps.vXs,
             _ConfirmLine(
-              icon: '🔄',
+              icon: Icons.refresh_rounded,
               title: 'نوار پیشرفت «${group['name']}» از صفر شروع می‌شه',
               note: 'برای جایزهٔ بعدی این گروه باید دوباره امتیاز جمع کنی',
             ),
             Gaps.vXs,
             _ConfirmLine(
-              icon: isCash ? '💰' : '🎁',
+              icon: isCash ? Icons.account_balance_wallet_rounded : Icons.card_giftcard_rounded,
               title: isCash
                   ? '${faNum(tier['cashAmount'])} تومان همین الان به کیف پولت اضافه می‌شه'
                   : 'جایزه بعد از تایید مدیر برات فرستاده می‌شه',
@@ -475,8 +475,7 @@ class _TierRow extends StatelessWidget {
                               ?.copyWith(fontWeight: FontWeight.w800)),
                     ),
                     Gaps.hXxs,
-                    Text(isCash ? '💰' : '🎁',
-                        style: const TextStyle(fontSize: 13)),
+                    Icon(isCash ? Icons.account_balance_wallet_rounded : Icons.card_giftcard_rounded, size: 16, color: theme.colorScheme.primary),
                   ],
                 ),
                 Text(
@@ -537,7 +536,7 @@ class _ConfirmLine extends StatelessWidget {
     required this.note,
   });
 
-  final String icon;
+  final IconData icon;
   final String title;
   final String note;
 
@@ -547,7 +546,7 @@ class _ConfirmLine extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(icon, style: const TextStyle(fontSize: 17)),
+        Icon(icon, size: 20, color: theme.colorScheme.primary),
         Gaps.hXs,
         Expanded(
           child: Column(

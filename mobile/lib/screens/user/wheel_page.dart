@@ -338,7 +338,7 @@ class _WheelPageState extends State<WheelPage>
       child: ListView(
         padding: const EdgeInsets.all(Gaps.lg),
         children: [
-          Text('🎡 گردونهٔ شانس',
+          Text(' گردونهٔ شانس',
               textAlign: TextAlign.center,
               style: theme.textTheme.titleLarge
                   ?.copyWith(fontWeight: FontWeight.w900)),
@@ -463,7 +463,7 @@ class _WheelPageState extends State<WheelPage>
             Gaps.vXs,
             Center(
               child: Text(
-                '${faNum(_bonusSpins)} چرخش جایزه از دعوت دوستان داری 🎁',
+                '${faNum(_bonusSpins)} چرخش جایزه از دعوت دوستان داری ',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
                 ),
@@ -849,7 +849,7 @@ class _ResultCardState extends State<_ResultCard>
       ),
       child: Column(
         children: [
-          Text(isCash ? '🎉 برنده شدی!' : '✨ گرفتی!',
+          Text(isCash ? ' برنده شدی!' : ' گرفتی!',
               style: theme.textTheme.titleMedium
                   ?.copyWith(color: tint, fontWeight: FontWeight.w800)),
           Gaps.vXxs,

@@ -20,6 +20,7 @@ class SafeImage extends StatelessWidget {
     this.borderRadius,
     this.fallbackIcon = Icons.image_outlined,
     this.fallbackEmoji,
+    this.fallbackAsset,
   });
 
   /// Absolute URL, or a `/uploads/...` path resolved against the API base.
@@ -30,6 +31,7 @@ class SafeImage extends StatelessWidget {
   final BorderRadius? borderRadius;
   final IconData fallbackIcon;
   final String? fallbackEmoji;
+  final String? fallbackAsset;
 
   @override
   Widget build(BuildContext context) {
@@ -85,10 +87,20 @@ class SafeImage extends StatelessWidget {
             .surfaceContainerHighest
             .withValues(alpha: 0.6),
         alignment: Alignment.center,
-        child: fallbackEmoji != null
-            ? Text(fallbackEmoji!,
-                style: TextStyle(fontSize: (height ?? 40) * 0.45))
-            : Icon(fallbackIcon,
+        child: fallbackAsset != null
+            ? Image.asset(
+                fallbackAsset!,
+                width: width,
+                height: height,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => Icon(fallbackIcon,
+                    size: ((height ?? 40) * 0.4).clamp(14.0, 40.0),
+                    color: Theme.of(context).colorScheme.outline),
+              )
+            : fallbackEmoji != null
+                ? Text(fallbackEmoji!,
+                    style: TextStyle(fontSize: (height ?? 40) * 0.45))
+                : Icon(fallbackIcon,
                 size: ((height ?? 40) * 0.4).clamp(14.0, 40.0),
                 color: Theme.of(context).colorScheme.outline),
       );

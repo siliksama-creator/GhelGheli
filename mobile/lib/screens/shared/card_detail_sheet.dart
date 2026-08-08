@@ -152,7 +152,7 @@ class _Fallback extends StatelessWidget {
   @override
   Widget build(BuildContext context) => const SizedBox(
         height: 220,
-        child: Center(child: Text('⚽', style: TextStyle(fontSize: 76))),
+        child: Center(child: Image.asset('assets/pass/football_icon.webp', width: 110, height: 110, fit: BoxFit.contain)),
       );
 }
 

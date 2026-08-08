@@ -261,9 +261,7 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
                             height: 34,
                             fit: BoxFit.contain,
                             cacheWidth: 68,
-                            errorBuilder: (_, __, ___) => Text(
-                                ['🥇', '🥈', '🥉'][i],
-                                style: const TextStyle(fontSize: 30)),
+                            errorBuilder: (_, __, ___) => const Icon(Icons.military_tech_rounded, size: 30),
                           ),
                           const SizedBox(height: 4),
                           DisplayName(

@@ -39,7 +39,7 @@ const memoryAccent = Color(0xFFA855F7);
 
 /// Fallback glyph if an asset ever fails to decode, so a broken file can
 /// never blank the whole board.
-const _fallback = '🎴';
+const _fallback = 'assets/games/memory/medal.webp';
 
 /// One card: face-down crest, face-up illustration, real Y-axis flip.
 class MemoryCard extends StatelessWidget {
@@ -162,8 +162,7 @@ class MemoryCard extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(6),
             child: art == null
-                ? const Center(
-                    child: Text(_fallback, style: TextStyle(fontSize: 26)))
+                ? const Center(child: Image(image: AssetImage(_fallback), width: 32, height: 32, fit: BoxFit.contain))
                 : Image.asset(
                     art,
                     fit: BoxFit.contain,
@@ -173,9 +172,7 @@ class MemoryCard extends StatelessWidget {
                     // ۵۱۲×۵۱۲ کارت ~۱MB رم می‌گرفت؛ با سقف ۲۵۶، ~۲۶۰KB —
                     // و در یک تختهٔ ۱۶ کارتی یعنی چند مگابایت کمتر در حافظه.
                     cacheWidth: 256,
-                    errorBuilder: (_, __, ___) => const Center(
-                      child: Text(_fallback, style: TextStyle(fontSize: 26)),
-                    ),
+                    errorBuilder: (_, __, ___) => const Center(child: Image(image: AssetImage(_fallback), width: 32, height: 32, fit: BoxFit.contain)),
                   ),
           ),
           // Claimed badge: whose pair it is (multiplayer) or a simple tick.

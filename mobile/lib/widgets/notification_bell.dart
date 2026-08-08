@@ -98,7 +98,7 @@ class _NotificationBellState extends State<NotificationBell>
               ),
               Expanded(
                 child: _items.isEmpty
-                    ? const Center(child: Text('📭 اعلانی نداری.'))
+                    ? const Center(child: Text('اعلانی نداری.'))
                     : ListView.separated(
                         controller: controller,
                         padding: const EdgeInsets.fromLTRB(

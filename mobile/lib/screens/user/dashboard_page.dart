@@ -8,6 +8,7 @@ import '../../widgets/section_header.dart';
 import '../../widgets/state_views.dart';
 import '../shared/hero_header.dart';
 import 'inventory_page.dart';
+import 'login_streak_card.dart';
 import '../../widgets/photo_card_box.dart';
 
 /// Home / dashboard tab: points header, card-code redemption and card
@@ -180,7 +181,7 @@ class _DashboardPageState extends State<DashboardPage> {
             children: [
               Expanded(
                 child: _QuickTile(
-                  icon: '🎡',
+                  icon: Image.asset('assets/pass/wheel_icon.webp', width: 30, height: 30),
                   title: 'گردونهٔ شانس',
                   subtitle: 'هر روز یک چرخش رایگان',
                   tint: const Color(0xFFF59E0B),
@@ -190,7 +191,7 @@ class _DashboardPageState extends State<DashboardPage> {
               Gaps.hXs,
               Expanded(
                 child: _QuickTile(
-                  icon: '🤝',
+                  icon: const Icon(Icons.group_add_rounded, size: 30),
                   title: 'دعوت دوستان',
                   subtitle: '۵٪ امتیازشان + ۳ چرخش',
                   tint: const Color(0xFF84CC16),
@@ -199,6 +200,8 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
             ],
           ),
+          Gaps.vMd,
+          LoginStreakCard(api: widget.api),
           Gaps.vMd,
           AppCard(
             child: Column(
@@ -329,7 +332,7 @@ class _QuickTile extends StatelessWidget {
     this.onTap,
   });
 
-  final String icon;
+  final Widget icon;
   final String title;
   final String subtitle;
   final Color tint;
@@ -352,7 +355,7 @@ class _QuickTile extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(icon, style: const TextStyle(fontSize: 26)),
+              icon,
               Gaps.vXxs,
               Text(title,
                   textAlign: TextAlign.center,

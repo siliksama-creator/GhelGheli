@@ -233,9 +233,9 @@ class _ProfilePageState extends State<ProfilePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('سابقهٔ لیگ 🏆',
+                Row(children: [const Icon(Icons.emoji_events_rounded, size: 20), Gaps.hXs, Text('سابقهٔ لیگ',
                     style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w800)),
+                        ?.copyWith(fontWeight: FontWeight.w800))]),
                 Text(
                     'امتیاز لیگ آخر هر ماه صفر می‌شود، ولی رتبه و جایزه‌ات '
                     'اینجا می‌ماند.',
@@ -245,13 +245,6 @@ class _ProfilePageState extends State<ProfilePage> {
                   Builder(builder: (ctx) {
                     final h = Map<String, dynamic>.from(raw as Map);
                     final rank = h['rank'] as int? ?? 0;
-                    final medal = rank == 1
-                        ? '🥇'
-                        : rank == 2
-                            ? '🥈'
-                            : rank == 3
-                                ? '🥉'
-                                : '🏅';
                     final prize = (h['prizeAmount'] as num?) ?? 0;
                     return Padding(
                       padding: const EdgeInsets.only(bottom: Gaps.xs),
@@ -263,8 +256,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             height: 22,
                             fit: BoxFit.contain,
                             cacheWidth: 44,
-                            errorBuilder: (_, __, ___) =>
-                                Text(medal, style: const TextStyle(fontSize: 19)),
+                            errorBuilder: (_, __, ___) => const Icon(Icons.military_tech_rounded, size: 22),
                           ),
                           Gaps.hXs,
                           Expanded(
@@ -307,9 +299,9 @@ class _ProfilePageState extends State<ProfilePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('جوایز دریافتی 🏆',
+                Row(children: [const Icon(Icons.emoji_events_rounded, size: 20), Gaps.hXs, Text('جوایز دریافتی',
                     style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w800)),
+                        ?.copyWith(fontWeight: FontWeight.w800))]),
                 Gaps.vXs,
                 SizedBox(
                   height: 118,
@@ -332,7 +324,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                       url: fullAssetUrl(t['image_url']),
                                       width: 92,
                                       height: 78,
-                                      fallbackEmoji: '🎁'),
+                                      fallbackAsset: 'assets/pass/reward_gift_icon.webp'),
                                 ),
                                 if (pending)
                                   Positioned(
@@ -447,7 +439,7 @@ class _ProfilePageState extends State<ProfilePage> {
               if (_myClubs.isNotEmpty) ...[
                 Gaps.vXs,
                 Text(
-                  '🛡️ نشان باشگاه‌هایی که عضوشان هستی هم می‌تواند عکس '
+                  ' نشان باشگاه‌هایی که عضوشان هستی هم می‌تواند عکس '
                   'پروفایلت باشد.',
                   style: theme.textTheme.labelSmall,
                 ),

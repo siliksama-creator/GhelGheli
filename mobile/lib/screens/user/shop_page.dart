@@ -82,18 +82,18 @@ class _ShopPageState extends State<ShopPage> {
           children: [
             Text('${Money.withUnit(price)} از کیف پولت کم می‌شود.'),
             Gaps.vXs,
-            const Text('✅ این آیتم برای همیشه مال تو می‌شود — حتی اگر اشتراک '
+            const Text(' این آیتم برای همیشه مال تو می‌شود — حتی اگر اشتراک '
                 'پلاس نداشته باشی یا تمام شود.'),
             if (isClub) ...[
               Gaps.vXxs,
-              const Text('🏟️ هم‌زمان عضو دائمی این باشگاه می‌شوی و اسمت در '
+              const Text(' هم‌زمان عضو دائمی این باشگاه می‌شوی و اسمت در '
                   'فهرست هوادارانش می‌آید.'),
             ],
             Gaps.vXs,
             Text('موجودی فعلی: ${Money.withUnit(balance)}',
                 style: Theme.of(ctx).textTheme.bodySmall),
             if (short)
-              Text('⚠️ موجودی‌ات ${Money.withUnit(price - balance)} کم است.',
+              Text(' موجودی‌ات ${Money.withUnit(price - balance)} کم است.',
                   style: Theme.of(ctx)
                       .textTheme
                       .bodySmall
@@ -147,7 +147,7 @@ class _ShopPageState extends State<ShopPage> {
               Text('موجودی فعلی: ${Money.withUnit(balance)}',
                   style: Theme.of(ctx).textTheme.bodySmall),
               if (short)
-                Text('⚠️ موجودی‌ات ${Money.withUnit(price - balance)} کم است.',
+                Text(' موجودی‌ات ${Money.withUnit(price - balance)} کم است.',
                     style: Theme.of(ctx)
                         .textTheme
                         .bodySmall
@@ -270,12 +270,12 @@ class _ShopPageState extends State<ShopPage> {
                 [
                   'club_badge',
                   'باشگاه‌ها',
-                  '🛡️',
+                  Icons.shield_rounded,
                   'با خرید نشان، عضو دائمی باشگاه می‌شوی و می‌توانی نشان را '
                       'عکس پروفایلت کنی.'
                 ],
-                ['card_frame', 'قاب کارت', '🖼️', 'دور کارت‌های پروفایلت'],
-                ['name_color', 'رنگ اسم', '🎨', 'رنگ اسمت در جدول لیگ و چت'],
+                ['card_frame', 'قاب کارت', Icons.crop_portrait_rounded, 'دور کارت‌های پروفایلت'],
+                ['name_color', 'رنگ اسم', Icons.palette_rounded, 'رنگ اسمت در جدول لیگ و چت'],
               ])
                 if (of(group[0]).isNotEmpty) ...[
                   _KindSection(
@@ -322,7 +322,7 @@ class _IntroCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('🛒 فروشگاه قلقلی',
+          Text(' فروشگاه قلقلی',
               style: theme.textTheme.titleSmall
                   ?.copyWith(fontWeight: FontWeight.w900)),
           Gaps.vXxs,
@@ -366,7 +366,7 @@ class _MyClubsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('🏟️ باشگاه‌های من',
+          Text(' باشگاه‌های من',
               style: theme.textTheme.titleSmall
                   ?.copyWith(fontWeight: FontWeight.w900)),
           Gaps.vXs,
@@ -436,7 +436,7 @@ class _MyClubsCard extends StatelessWidget {
           if (anyTemporary && !plusActive) ...[
             Gaps.vXs,
             Text(
-              '⚠️ باشگاه‌هایی که با پلاس عضو شده‌ای، بدون اشتراک فعال فقط تا '
+              ' باشگاه‌هایی که با پلاس عضو شده‌ای، بدون اشتراک فعال فقط تا '
               'آخرین انتخابت باقی می‌مانند. برای دائمی‌شدن، نشانشان را '
               'جداگانه بخر.',
               style: theme.textTheme.labelSmall,
@@ -495,7 +495,7 @@ class _PlusCard extends StatelessWidget {
           for (final perk in (plus['perks'] as List? ?? const []))
             Padding(
               padding: const EdgeInsets.only(bottom: 3),
-              child: Text('✅ $perk', style: theme.textTheme.bodySmall),
+              child: Text(' $perk', style: theme.textTheme.bodySmall),
             ),
           Gaps.vXs,
           // The honest small print, before the money leaves. A subscription
@@ -560,7 +560,8 @@ class _KindSection extends StatelessWidget {
     this.busy,
   });
 
-  final String title, icon, note, kind;
+  final String title, note, kind;
+  final IconData icon;
   final List<Map<String, dynamic>> items;
   final String? equipped;
   final int balance;
@@ -578,7 +579,7 @@ class _KindSection extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text(icon, style: const TextStyle(fontSize: 20)),
+              Icon(icon, size: 20, color: theme.colorScheme.primary),
               Gaps.hXs,
               Expanded(
                 child: Column(

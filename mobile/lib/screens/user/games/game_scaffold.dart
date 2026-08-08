@@ -28,7 +28,7 @@ class GameScaffold extends StatelessWidget {
   final ApiClient api;
   final String title;
   final Color accent;
-  final Map<String, String> symbols; // 'X' -> '❌'
+  final Map<String, String> symbols; // X/O -> transparent asset path
   final VoidCallback onBack;
   final WidgetBuilder boardBuilder;
   final Widget? scoreboard;
@@ -371,9 +371,12 @@ class _ResultPanel extends StatelessWidget {
             // دروازه‌بانِ پایین‌حجم: تصویر در یک بومِ ۵۱۲ رندر و به‌همان
             // نسبتِ منطقیِ ۸۸ پیکسل در دستگاه‌های ۲-۳x دیکد می‌شود.
             cacheWidth: 176,
-            errorBuilder: (_, __, ___) => Text(
-              won ? '🏆' : (draw ? '🤝' : '💪'),
-              style: const TextStyle(fontSize: 40),
+            errorBuilder: (_, __, ___) => Icon(
+              won
+                  ? Icons.emoji_events_rounded
+                  : (draw ? Icons.handshake_rounded : Icons.fitness_center_rounded),
+              size: 40,
+              color: won ? accent : theme.colorScheme.onSurface,
             ),
           ),
           Gaps.vXs,
@@ -464,7 +467,7 @@ class _Chip extends StatelessWidget {
         borderRadius: Corners.rPill,
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        const Text('🤖', style: TextStyle(fontSize: 12)),
+        Icon(Icons.smart_toy_rounded, size: 14, color: color),
         Gaps.hXxs,
         Text(label,
             style: Theme.of(context)

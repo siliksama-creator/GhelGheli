@@ -389,7 +389,7 @@ class _NoSeason extends StatelessWidget {
         Center(
           child: Column(
             children: [
-              const Text('🏅', style: TextStyle(fontSize: 56)),
+              Image.asset('assets/games/medals/medal_participation.webp', width: 64, height: 64),
               Gaps.vMd,
               Text('فصلی در جریان نیست',
                   style: Theme.of(context).textTheme.titleLarge),
@@ -556,7 +556,7 @@ class _Header extends StatelessWidget {
                   height: 132,
                   color: const Color(0xFF10233A),
                   alignment: Alignment.center,
-                  child: const Text('🏅', style: TextStyle(fontSize: 40)),
+                  child: Image.asset('assets/games/medals/medal_participation.webp', width: 48, height: 48),
                 ),
               ),
               // گرادیان تیره، تا متن روی هر تصویری خوانا بماند
@@ -638,7 +638,7 @@ class _Header extends StatelessWidget {
                   backgroundColor: _readyColor,
                   foregroundColor: const Color(0xFF07240F),
                 ),
-                icon: const Text('🎁', style: TextStyle(fontSize: 18)),
+                icon: Image.asset('assets/pass/reward_gift_icon.webp', width: 24, height: 24),
                 label: Text('دریافت ${faNum(claimable)} جایزهٔ آماده',
                     style: const TextStyle(fontWeight: FontWeight.w900)),
               ),
@@ -742,7 +742,7 @@ class _ProgressCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  done ? '🎉 کل مسیر را تمام کردی!' : 'تا پلهٔ ${faNum(tier + 1)}',
+                  done ? 'کل مسیر را تمام کردی!' : 'تا پلهٔ ${faNum(tier + 1)}',
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
               ),
@@ -1127,11 +1127,11 @@ class _RewardTile extends StatelessWidget {
     'spins': 'assets/pass/icon_spins.png',
     'shop_item': 'assets/pass/icon_item.png',
   };
-  static const _emoji = {
-    'points': '🎯',
-    'spins': '🎡',
-    'cash': '💰',
-    'shop_item': '🎨',
+  static const _fallbackArt = {
+    'points': 'assets/pass/icon_points.png',
+    'spins': 'assets/pass/wheel_icon.webp',
+    'cash': 'assets/pass/icon_points.png',
+    'shop_item': 'assets/pass/reward_gift_icon.webp',
   };
 
   String _label(Map m) {
@@ -1184,7 +1184,7 @@ class _RewardTile extends StatelessWidget {
       // پیکسل. یعنی همان تستی که یک بار این باگ را گرفته بود، دوباره
       // گرفتش.
       //
-      // ⚠️ درس: هر تغییرِ اندازهٔ فونت در این ویجت باید با ارتفاع
+      //  درس: هر تغییرِ اندازهٔ فونت در این ویجت باید با ارتفاع
       //    هماهنگ شود. دو خطِ ۱۴px با height 1.35 = ۳۸، به‌علاوهٔ یک
       //    خطِ ۱۱.۵ = ۱۶، به‌علاوهٔ فاصله‌ها ≈ ۶۰. با پدینگ و حاشیهٔ
       //    امن برای فونتِ بزرگِ سیستم، ۹۶.
@@ -1213,12 +1213,10 @@ class _RewardTile extends StatelessWidget {
                     // ۳۰ پیکسل روی صفحه از منبع ۱۲۸ — بدون این راهنما
                     // ۵۰ ردیف × ۲ آیکون حافظهٔ زیادی هدر می‌دهد.
                     cacheWidth: 90,
-                    errorBuilder: (_, __, ___) => Text(_emoji[kind] ?? '🎁',
-                        style: const TextStyle(fontSize: 18)),
+                    errorBuilder: (_, __, ___) => Image.asset(_fallbackArt[kind] ?? 'assets/pass/reward_gift_icon.webp', width: 24, height: 24),
                   )
                 : Center(
-                    child: Text(_emoji[kind] ?? '🎁',
-                        style: const TextStyle(fontSize: 18))),
+                    child: Image.asset(_fallbackArt[kind] ?? 'assets/pass/reward_gift_icon.webp', width: 24, height: 24)),
           ),
           const SizedBox(width: 6),
           Expanded(
@@ -1250,7 +1248,7 @@ class _RewardTile extends StatelessWidget {
                   ),
                 ),
                 if (claimed)
-                  const Text('✓ گرفتی',
+                  const Text(' گرفتی',
                       style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w800,
@@ -1317,7 +1315,7 @@ class _HowTo extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Text('💡', style: TextStyle(fontSize: 18)),
+              const Icon(Icons.lightbulb_outline_rounded, size: 18),
               Gaps.hXs,
               Text('چطور جلو بروم؟',
                   style: theme.textTheme.titleMedium
@@ -1326,7 +1324,7 @@ class _HowTo extends StatelessWidget {
           ),
           Gaps.vXs,
           Text(
-            'با بازی کردن تجربه می‌گیری — خریدنی نیست. '
+            'با بازی کردن تجربه می‌گیری — '
             'هر روز حداکثر ${faNum(maxToday)} پله باز می‌شود، پس هر روز سر بزن.',
             style: theme.textTheme.bodySmall,
           ),

@@ -84,7 +84,7 @@ class _AppErrorViewState extends State<AppErrorView> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('😔', style: TextStyle(fontSize: 56)),
+                  const Icon(Icons.sentiment_dissatisfied_rounded, size: 56),
                   const SizedBox(height: 16),
                   const Text(
                     'یک مشکل پیش آمد',

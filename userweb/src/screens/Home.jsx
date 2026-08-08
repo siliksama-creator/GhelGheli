@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { req, asset, fa, avatars, avatarUrl } from '../lib/api.js';
 import { EmptyView } from '../components/states.jsx';
 import PhotoCardBox from '../components/PhotoCardBox.jsx';
+import LoginStreak from '../components/LoginStreak.jsx';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // منطقِ کلکسیون — آینهٔ inventory_page.dart در اندروید
@@ -129,7 +130,7 @@ export default function Home({ token, p, rewards, load, setMsg, openWallet,
         <button
           className={`walletEntry${Number(u.wallet_balance) > 0 ? ' hasMoney' : ''}`}
           onClick={openWallet}>
-          <span className="weIcon">👛</span>
+          <img className="weIcon" src="/pass/icon_points.png" alt="" />
           <span className="weBody">
             <small>کیف پول من</small>
             <b>{fa(u.wallet_balance)} <i>تومان</i></b>
@@ -171,16 +172,23 @@ export default function Home({ token, p, rewards, load, setMsg, openWallet,
           خودشان بودند، بیشترِ کاربرها هیچ‌وقت پیدایشان نمی‌کردند. */}
       <section className="card quickRow">
         <button className="quickTile wheelTile" onClick={openWheel}>
-          <span className="quickIcon">🎡</span>
+          <img className="quickIcon" src="/pass/wheel_icon.webp" alt="" />
           <b>گردونهٔ شانس</b>
           <small>هر روز یک چرخش رایگان</small>
         </button>
         <button className="quickTile inviteTile" onClick={openInvite}>
-          <span className="quickIcon">🤝</span>
+          <svg className="quickIcon inviteIcon" viewBox="0 0 64 64" aria-hidden="true">
+            <circle cx="23" cy="22" r="9" />
+            <circle cx="43" cy="22" r="9" />
+            <path d="M8 52c1-11 8-17 15-17s14 6 15 17M26 52c1-8 6-13 13-13s12 5 14 13" />
+            <path d="M32 31v14M25 38h14" />
+          </svg>
           <b>دعوت دوستان</b>
           <small>۵٪ امتیازشان + ۳ چرخش</small>
         </button>
       </section>
+
+      <LoginStreak token={token} setMsg={setMsg} />
 
       <section className="card">
         <h2>کلکسیون من</h2>

@@ -107,7 +107,7 @@ class _AuthScreenState extends State<AuthScreen> {
           if (r is Map && r['referralApplied'] == true && mounted) {
             final n = (r['referralSpins'] as num?)?.toInt() ?? 3;
             ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
-              content: Text('🎉 ${faNum(n)} چرخش گردونهٔ شانس گرفتی!'),
+              content: Text(' ${faNum(n)} چرخش گردونهٔ شانس گرفتی!'),
               behavior: SnackBarBehavior.floating,
             ));
           }
@@ -385,7 +385,7 @@ class _AuthGlassCard extends StatelessWidget {
                         ),
                       ),
                       child: Text(
-                        '🎁 اگر کد دعوت یکی از دوستانت را وارد کنی، '
+                        ' اگر کد دعوت یکی از دوستانت را وارد کنی، '
                         'هر دوی شما ۳ چرخش گردونهٔ شانس می‌گیرید.',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(

@@ -99,7 +99,7 @@ class _PenaltyScreenState extends State<PenaltyScreen> {
       api: widget.api,
       title: 'ضربات پنالتی',
       accent: _accent,
-      symbols: const {'X': '⚽', 'O': '🧤'},
+      symbols: const {'X': 'assets/pass/football_icon.webp', 'O': 'assets/pass/glove_icon.webp'},
       onBack: widget.onBack,
       boardBuilder: (_) => _PenaltyBoard(session: _s),
     );
@@ -516,7 +516,7 @@ class _PenaltyResultBanner extends StatelessWidget {
             fit: BoxFit.contain,
             cacheWidth: 96,
             errorBuilder: (_, __, ___) => Text(
-              won ? '🏆' : (draw ? '🤝' : '💔'),
+              won ? 'بردی' : (draw ? 'مساوی' : 'باختی'),
               style: const TextStyle(fontSize: 30),
             ),
           ),
@@ -620,7 +620,7 @@ class _Scoreboard extends StatelessWidget {
                   color: _gold.withValues(alpha: 0.22),
                   border: Border.all(color: _gold),
                 ),
-                child: const Text('⚡ مرگ ناگهانی',
+                child: const Text('مرگ ناگهانی',
                     style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w900,
@@ -714,15 +714,15 @@ class _OutcomeFlag extends StatelessWidget {
     late final Color color;
     switch (outcome) {
       case 'goal':
-        text = mine ? '⚽ گل زدی!' : '⚽ گل خوردی';
+        text = mine ? 'گل زدی!' : 'گل خوردی';
         color = mine ? _goalGreen : _missRed;
         break;
       case 'save':
-        text = mine ? '🧤 مهار شد' : '🧤 مهارش کردی!';
+        text = mine ? 'مهار شد' : 'مهارش کردی!';
         color = mine ? _missRed : _saveBlue;
         break;
       default:
-        text = mine ? '❌ بیرون رفت' : '❌ بیرون زد';
+        text = mine ? 'بیرون رفت' : 'بیرون زد';
         color = mine ? _missRed : _goalGreen;
     }
 
@@ -773,7 +773,7 @@ class _OutcomeFlag extends StatelessWidget {
                     borderRadius: Corners.rPill,
                     color: _gold.withValues(alpha: 0.92),
                   ),
-                  child: const Text('✨ ضربهٔ تمیز',
+                  child: const Text('ضربهٔ تمیز',
                       style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w900,
@@ -1361,16 +1361,16 @@ class _Prompt extends StatelessWidget {
       text = '...';
     } else if (charging) {
       text = hasSweet
-          ? '⚡ داخل نوار طلایی رها کن — ضربهٔ تمیز!'
+          ? 'داخل نوار طلایی رها کن — ضربهٔ تمیز!'
           : 'رها کن تا شوت بزنی — هرچه بالاتر، محکم‌تر';
       color = _gold;
     } else if (chose || waiting) {
       text = 'منتظر حریف...';
     } else if (amShooter) {
-      text = '⚽ تو می‌زنی — انگشتت را روی یک گوشه نگه دار';
+      text = 'تو می‌زنی — انگشتت را روی یک گوشه نگه دار';
       color = _gold;
     } else {
-      text = '🧤 تو دروازه‌بانی — حدس بزن کجا می‌زند';
+      text = 'تو دروازه‌بانی — حدس بزن کجا می‌زند';
       color = _saveBlue;
     }
 

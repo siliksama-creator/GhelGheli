@@ -11,7 +11,7 @@ import 'widgets/form_section.dart';
 
 /// تبدیلِ امنِ مقدارِ JSON به عدد صحیح.
 ///
-/// ⚠️ سرور گاهی عدد و گاهی رشته برمی‌گرداند (`amount` در JSON می‌تواند
+///  سرور گاهی عدد و گاهی رشته برمی‌گرداند (`amount` در JSON می‌تواند
 ///    `"25000"` باشد). `as int` روی رشته کرش می‌کند و کلِ صفحه سفید
 ///    می‌شود — همان الگویی که `audit_casts.py` برای گرفتنش نوشته شد.
 int _asInt(dynamic v) =>
@@ -244,7 +244,7 @@ class _AdminLeagueState extends State<AdminLeague> {
       children: [
         // ── جوایز در انتظار تأیید ──
         if (pendingPayouts.isNotEmpty) ...[
-          // ⚠️ `AppCard` فقط `child` می‌گیرد — نه `title`/`subtitle`/`action`.
+          //  `AppCard` فقط `child` می‌گیرد — نه `title`/`subtitle`/`action`.
           //    نسخهٔ اولِ این صفحه آن سه را پاس می‌داد و اصلاً کامپایل
           //    نمی‌شد. سرآیند اینجا داخلِ خودِ `child` ساخته می‌شود.
           AppCard(

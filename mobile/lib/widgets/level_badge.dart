@@ -160,7 +160,7 @@ class LevelCard extends StatelessWidget {
                 ),
               ),
               if (isMax)
-                Text('🏆', style: theme.textTheme.titleMedium)
+                Icon(Icons.emoji_events_rounded, size: 22, color: color)
               else
                 Text(
                   // «۱۲۳ / ۴۵۶» — پیشرفت تا لولِ بعد.
@@ -209,7 +209,7 @@ class LevelCard extends StatelessWidget {
           Gaps.vXs,
           Text(
             isMax
-                ? 'به بالاترین لول رسیدی! 🏆'
+                ? 'به بالاترین لول رسیدی!'
                 : 'با هر بازی آنلاین امتیاز می‌گیری — برد امتیاز بیشتری دارد',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurface.withValues(alpha: 0.65),

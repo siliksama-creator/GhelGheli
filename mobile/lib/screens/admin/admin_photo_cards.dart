@@ -564,9 +564,9 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
             onTap: () => _pickImage(back: true)),
         Text(
           _pickedBack != null
-              ? '✅ هر دو عکس آنالیز می‌شوند — کاربر از هر طرف عکس بگیرد '
+              ? ' هر دو عکس آنالیز می‌شوند — کاربر از هر طرف عکس بگیرد '
                   'شناخته می‌شود.'
-              : 'ℹ️ اگر پشتِ کارت هم طرح دارد اضافه‌اش کنید، وگرنه کاربری '
+              : 'ℹ اگر پشتِ کارت هم طرح دارد اضافه‌اش کنید، وگرنه کاربری '
                   'که از پشت عکس بگیرد شناخته نمی‌شود.',
           style: theme.textTheme.bodySmall?.copyWith(
             color: _pickedBack != null
@@ -614,9 +614,9 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
           padding: const EdgeInsets.only(top: 6, bottom: 4),
           child: Text(
             _ownCodes.text.trim().isNotEmpty
-                ? '✅ این کدها به همین کارت گره می‌خورند — ثبتِ کاربر با '
+                ? ' این کدها به همین کارت گره می‌خورند — ثبتِ کاربر با '
                     'شباهت ۲۰٪ هم خودکار تأیید می‌شود.'
-                : 'ℹ️ بدون کد اختصاصی، تشخیص از روی عکس است (آستانهٔ ۴۰٪).',
+                : 'ℹ بدون کد اختصاصی، تشخیص از روی عکس است (آستانهٔ ۴۰٪).',
             style: theme.textTheme.bodySmall,
           ),
         ),
@@ -694,9 +694,9 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
           padding: const EdgeInsets.only(top: 6, bottom: 4),
           child: Text(
             _codeType != null
-                ? '✅ ثبتِ این کدها تقریباً همیشه خودکار تأیید می‌شود — '
+                ? ' ثبتِ این کدها تقریباً همیشه خودکار تأیید می‌شود — '
                     'کاربر فقط باید عکسی از کارت بفرستد، حتی با کیفیت پایین.'
-                : 'ℹ️ بدون انتخاب کارت، تشخیص فقط از روی عکس است و '
+                : 'ℹ بدون انتخاب کارت، تشخیص فقط از روی عکس است و '
                     'عکس‌های نامفهوم به صف بررسی شما می‌روند.',
             style: theme.textTheme.bodySmall,
           ),
@@ -902,14 +902,14 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
         // بازشده کدهایش را نشان می‌دهد.
         for (final g in _namedGroups)
           _codeGroup(context, theme,
-              key: g.key, title: '🔗 ${g.key}', list: g.value),
+              key: g.key, title: ' ${g.key}', list: g.value),
         // کدهای بی‌نام بخشِ جدای خودشان را دارند: جنسشان فرق می‌کند
         // (تشخیص کاملاً از روی عکس، آستانهٔ ۴۰٪ به‌جای ۲۰٪) و قاطی
         // کردنشان باعث می‌شد مدیر نفهمد کدام‌یک کدام است.
         if (_freeCodes.isNotEmpty)
           _codeGroup(context, theme,
               key: '__free__',
-              title: '❓ بدون کارتِ مشخص — تشخیص از روی عکس',
+              title: ' بدون کارتِ مشخص — تشخیص از روی عکس',
               list: _freeCodes,
               accent: BrandColors.warningOnLight),
       ],
@@ -945,7 +945,7 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
                               fontFamily: 'monospace',
                               fontWeight: FontWeight.w800,
                               fontSize: 13)),
-                      // 🔗 = کارتی که کد **از پیش** به آن گره خورده.
+                      //  = کارتی که کد **از پیش** به آن گره خورده.
                       // با `card_type_name` فرق دارد: آن نتیجهٔ تطبیقِ
                       // عکس بعد از مصرف است، این تصمیمِ مدیر پیش از
                       // توزیع. نشان تفکیکشان را در یک نگاه ممکن می‌کند.
@@ -955,7 +955,7 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
                         Text(
                           [
                             if (c['expected_card_type_name'] != null)
-                              '🔗 ${c['expected_card_type_name']}',
+                              ' ${c['expected_card_type_name']}',
                             if (c['card_type_name'] != null)
                               '${c['card_type_name']}',
                             if (c['batch_label'] != null) '${c['batch_label']}',
@@ -1147,7 +1147,7 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('✅ کد معتبر است',
+                  Text(' کد معتبر است',
                       style: theme.textTheme.bodySmall?.copyWith(
                           fontWeight: FontWeight.w800,
                           color: BrandColors.infoOnLight)),

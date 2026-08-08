@@ -244,7 +244,7 @@ export default function Pass({ token, setMsg, openShop }) {
             <div className="card pHow">
               <h3>💡 چطور جلو بروم؟</h3>
               <p className="muted">
-                با بازی کردن تجربه می‌گیری — خریدنی نیست.
+                با بازی کردن تجربه می‌گیری —
                 هر روز حداکثر {fa(d.maxTiersPerDay)} پله باز می‌شود، پس هر روز سر بزن.
               </p>
               <ul className="pSources">

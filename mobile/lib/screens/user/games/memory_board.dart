@@ -115,7 +115,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
       api: widget.api,
       title: 'جفت‌یاب',
       accent: memoryAccent,
-      symbols: const {'X': '🟣', 'O': '🔵'},
+      symbols: const {'X': 'assets/games/memory/ball.webp', 'O': 'assets/games/memory/boot.webp'},
       onBack: widget.onBack,
       scoreboard: _Scoreboard(session: _versus),
       boardBuilder: (_) => _VersusBoard(session: _versus),
@@ -263,7 +263,7 @@ class _SoloView extends StatelessWidget {
           AppCard(
             child: Column(
               children: [
-                const Text('⏱️', style: TextStyle(fontSize: 38)),
+                const Text('⏱', style: TextStyle(fontSize: 38)),
                 Gaps.vXs,
                 Text('مسابقه با ساعت',
                     style: theme.textTheme.titleMedium
@@ -385,8 +385,8 @@ class _MemoryGrid extends StatelessWidget {
             opacity: (lastResult == 'match' || lastResult == 'miss') ? 1 : 0,
             child: Text(
               lastResult == 'match'
-                  ? (soloMode ? '✅ جفت شد!' : '✅ جفت شد! دوباره بزن')
-                  : '❌ جفت نشد',
+                  ? (soloMode ? ' جفت شد!' : ' جفت شد! دوباره بزن')
+                  : ' جفت نشد',
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
                     fontWeight: FontWeight.w800,
                     color: lastResult == 'match'

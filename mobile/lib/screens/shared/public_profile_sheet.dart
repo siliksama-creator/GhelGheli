@@ -110,7 +110,7 @@ class _PublicProfileBody extends StatelessWidget {
                           borderRadius: Corners.rSm,
                           child: SafeImage(
                               url: card['image_url'],
-                              width: 40, height: 40, fallbackEmoji: '🃏'))
+                              width: 40, height: 40, fallbackAsset: 'assets/games/memory/medal.webp'))
                       : const Icon(Icons.credit_card_rounded),
                   title: Text(card['name'] ?? ''),
                   subtitle:
@@ -133,7 +133,7 @@ class _PublicProfileBody extends StatelessWidget {
                           borderRadius: Corners.rSm,
                           child: SafeImage(
                               url: r['image_url'],
-                              width: 40, height: 40, fallbackEmoji: '🎁'))
+                              width: 40, height: 40, fallbackAsset: 'assets/pass/reward_gift_icon.webp'))
                       : const Icon(Icons.card_giftcard_rounded),
                   title: Text(r['name'] ?? ''),
                   subtitle: Text(r['status'] ?? ''),

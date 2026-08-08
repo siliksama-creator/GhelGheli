@@ -209,7 +209,7 @@ class _Portrait extends StatelessWidget {
               ),
             ),
           if (isBot)
-            const Text('🤖', style: TextStyle(fontSize: 26))
+            Icon(Icons.smart_toy_rounded, size: 26, color: accent)
           else if (info?['profileImageUrl'] != null ||
               info?['profileAvatarKey'] != null)
             AvatarImage(
@@ -218,7 +218,13 @@ class _Portrait extends StatelessWidget {
               radius: (size - 8) / 2,
             )
           else
-            Text(fallback, style: const TextStyle(fontSize: 24)),
+            Image.asset(
+                fallback,
+                width: 34,
+                height: 34,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => Icon(Icons.person_rounded, size: 24, color: accent),
+              ),
           if (active)
             Positioned(
               bottom: 0,

@@ -126,7 +126,7 @@ class HeroHeader extends StatelessWidget {
                           // DisplayName به‌جای Text خام: ستارهٔ پلاس و
                           // رنگ اسم را هم می‌آورد.
                           DisplayName(
-                            name: 'سلام $nickname 👋',
+                            name: 'سلام $nickname ',
                             cosmetics: cosmetics,
                             avatarKey: user?['profile_avatar_key'],
                             maxLines: 1,
@@ -195,7 +195,7 @@ class HeroHeader extends StatelessWidget {
             nextReward == null
                 ? 'هنوز جایزه‌ای تعریف نشده است'
                 : remaining == 0
-                    ? 'به جایزه ${nextReward!['name']} رسیدی 🎉'
+                    ? 'به جایزه ${nextReward!['name']} رسیدی '
                     : 'تا ${nextReward!['name']}: ${faNum(remaining)} امتیاز',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,

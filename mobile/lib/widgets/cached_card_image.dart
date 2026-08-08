@@ -138,7 +138,7 @@ class _CachedCardImageState extends State<CachedCardImage> {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    // ⚠️ چرا URL در متغیرِ محلی گرفته می‌شود — باگی که اینجا بود
+    //  چرا URL در متغیرِ محلی گرفته می‌شود — باگی که اینجا بود
     // ═══════════════════════════════════════════════════════════════════
     //
     // نسخهٔ اول داخلِ callback از `_resolved` (فیلدِ کلاس) استفاده
@@ -177,7 +177,7 @@ class _CachedCardImageState extends State<CachedCardImage> {
           _rememberHit(requested, f);
           _file = f;
         } else {
-          // ⚠️ شکستِ کش پایانِ کار نیست: به `Image.network` عقب
+          //  شکستِ کش پایانِ کار نیست: به `Image.network` عقب
           //    می‌نشینیم. رفتارِ بدترین‌حالت باید «مثلِ قبل از این
           //    ویجت» باشد، نه «تصویرِ خالی».
           _failed = true;
@@ -254,6 +254,6 @@ class _CachedCardImageState extends State<CachedCardImage> {
       SizedBox(
         width: widget.width,
         height: widget.height,
-        child: const Center(child: Text('⚽', style: TextStyle(fontSize: 34))),
+        child: const Center(child: Image(image: AssetImage('assets/pass/football_icon.webp'), width: 42, height: 42, fit: BoxFit.contain)),
       );
 }

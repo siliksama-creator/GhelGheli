@@ -50,7 +50,7 @@ class ShareTarget {
   const ShareTarget({
     required this.id,
     required this.label,
-    required this.emoji,
+    required this.icon,
     required this.color,
     this.appUri,
     this.webUri,
@@ -66,7 +66,7 @@ class ShareTarget {
   /// ثبت‌شده است و بسته‌بندی‌اش در APK بدون مجوز، هم مسئلهٔ حقوقی دارد
   /// و هم برای چهار اپ حدود ۴۰ کیلوبایت تصویر اضافه می‌کند. ایموجی
   /// از فونتِ سیستم می‌آید: صفر بایت و بدون مسئلهٔ حقوقی.
-  final String emoji;
+  final IconData icon;
 
   /// رنگِ برند، فقط برای حاشیه و پس‌زمینهٔ کم‌رنگ.
   final int color;
@@ -88,7 +88,7 @@ const shareTargets = <ShareTarget>[
   ShareTarget(
     id: 'telegram',
     label: 'تلگرام',
-    emoji: '✈️',
+    icon: Icons.send_rounded,
     color: 0xFF29A9EB,
     // `msg_url` رسمی‌ترین راه است: پنجرهٔ «فرستادن به…» تلگرام را باز
     // می‌کند با متن از پیش پر شده.
@@ -98,7 +98,7 @@ const shareTargets = <ShareTarget>[
   ShareTarget(
     id: 'whatsapp',
     label: 'واتس‌اپ',
-    emoji: '💬',
+    icon: Icons.chat_bubble_rounded,
     color: 0xFF25D366,
     appUri: 'whatsapp://send?text={text}',
     webUri: 'https://wa.me/?text={text}',
@@ -106,7 +106,7 @@ const shareTargets = <ShareTarget>[
   ShareTarget(
     id: 'rubika',
     label: 'روبیکا',
-    emoji: '🟠',
+    icon: Icons.circle_rounded,
     color: 0xFFF5643C,
     // روبیکا لینکِ «اشتراک‌گذاری متن» عمومی ندارد؛ فقط بازش می‌کنیم و
     // متن از قبل در کلیپ‌بورد است.
@@ -117,7 +117,7 @@ const shareTargets = <ShareTarget>[
   ShareTarget(
     id: 'bale',
     label: 'بله',
-    emoji: '🔵',
+    icon: Icons.circle_rounded,
     color: 0xFF1B8FE3,
     appUri: 'bale://',
     webUri: 'https://web.bale.ai',
@@ -143,7 +143,7 @@ enum ShareOutcome {
 /// تنها چیزِ واقعاً مهم است — پایین می‌افتد. کد در **خطِ اول** می‌آید.
 String inviteMessage(String code) =>
     'کد دعوت من به قلقلی: $code\n'
-    'با این کد ثبت‌نام کن، هر دومون چرخش هدیه می‌گیریم 🎁\n'
+    'با این کد ثبت‌نام کن، هر دومون چرخش هدیه می‌گیریم \n'
     'https://ghelghelishop.ir';
 
 /// تلاش برای باز کردن [target] با متنِ دعوتِ [code].

@@ -114,7 +114,7 @@ class TapGameConfig {
   ///   ۹  کت‌وشلوارِ مشکیِ رسمی        → رئیس
   ///   ۱۰ تاکسیدوی طلایی و جواهر      → میلیاردر
   ///
-  /// ⚠️ اگر روزی این فهرست کوتاه‌تر شد، `skinIndexForLevel` خودش clamp
+  ///  اگر روزی این فهرست کوتاه‌تر شد، `skinIndexForLevel` خودش clamp
   ///    می‌کند و کرش نمی‌دهد — ولی چند لولِ آخر ظاهرِ تکراری می‌گیرند.
   static const List<String> defaultSkins = [
     'assets/games/tap/skin_1.webp',

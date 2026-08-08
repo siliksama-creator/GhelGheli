@@ -126,7 +126,7 @@ class _AppBarLogoState extends State<AppBarLogo>
           height: s,
           color: scheme.surface,
           alignment: Alignment.center,
-          child: Text('⚽', style: TextStyle(fontSize: s * 0.5)),
+          child: Icon(Icons.sports_soccer_rounded, size: s * 0.5, color: scheme.onSurface),
         ),
       ),
     );

@@ -124,8 +124,13 @@ class SoloResult extends StatelessWidget {
       color: record ? memoryAccent.withValues(alpha: 0.10) : null,
       child: Column(
         children: [
-          Text(record ? '🏅' : (session.perfect ? '🎯' : '👏'),
-              style: const TextStyle(fontSize: 38)),
+          Icon(
+            record
+                ? Icons.military_tech_rounded
+                : (session.perfect ? Icons.gps_fixed_rounded : Icons.celebration_rounded),
+            size: 38,
+            color: record ? memoryAccent : theme.colorScheme.primary,
+          ),
           Gaps.vXxs,
           Text(
             record ? 'رکورد جدید شخصی!' : 'آفرین، تمام شد',
@@ -287,7 +292,7 @@ class _Row extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final id = row['userId'];
-    // Medal colours drawn as a gradient disc rather than 🥇🥈🥉. Those three
+    // Medal colours drawn as a gradient disc rather than . Those three
     // emoji are missing from a surprising number of systems, and an empty
     // box beside the top scorer looked broken. Same reasoning as the card
     // faces: never let a font decide whether the UI is readable.
