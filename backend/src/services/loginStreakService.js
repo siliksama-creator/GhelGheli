@@ -51,9 +51,12 @@ function publicStatus(row, today = tehranDay()) {
   const claimedToday = last === today;
   const savedDay = Math.min(CYCLE_DAYS, Math.max(0, Number(row?.streak_day) || 0));
   const claimDay = claimedToday ? savedDay : nextClaimDay(row, today);
+  // A completed day-seven cycle starts a fresh visual cycle tomorrow.
+  // Keep the next claim on day one instead of showing all seven old pills
+  // as already claimed while day one is waiting.
   const currentDay = claimedToday
     ? savedDay
-    : (last === previousDay(today) ? savedDay : 0);
+    : (last === previousDay(today) && savedDay < CYCLE_DAYS ? savedDay : 0);
 
   return {
     active: true,
