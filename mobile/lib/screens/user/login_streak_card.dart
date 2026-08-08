@@ -467,7 +467,6 @@ class _ClaimBtn extends StatelessWidget {
                     fontSize: 14,
                   ),
                 ),
-              ]),
         ),
       ),
     );
@@ -574,5 +573,5 @@ class _StreakParticlesPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _ParticlesPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _StreakParticlesPainter oldDelegate) => true;
 }
