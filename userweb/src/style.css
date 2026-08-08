@@ -3480,3 +3480,15 @@ input:focus, textarea:focus {
   .streakFoot { align-items: stretch; flex-direction: column; gap: 8px; }
   .streakClaim { width: 100%; }
 }
+
+/* Icon system polish: assets and vectors share one baseline, scale and glow. */
+.assetIcon, .svgIcon { display: inline-block; vertical-align: middle; flex: 0 0 auto; }
+.assetIcon { object-fit: contain; }
+.navIcon .assetIcon, .navIcon .svgIcon, .iconBtn > .assetIcon, .iconBtn > .svgIcon {
+  filter: drop-shadow(0 4px 10px #00d49a22);
+}
+.moreSheet button > span:first-child { display: inline-grid; place-items: center; width: 28px; }
+.pTileArt .assetIcon, .pTileArt .svgIcon { filter: drop-shadow(0 6px 12px #00d49a2e); }
+.pcPendingChip, .pcResult.pending { display: inline-flex; align-items: center; gap: 5px; }
+.phaseDot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ffffff42; }
+.streakHead .assetIcon { filter: drop-shadow(0 8px 16px #ff9c3d44); }
