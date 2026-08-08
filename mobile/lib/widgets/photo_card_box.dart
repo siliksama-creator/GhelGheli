@@ -472,7 +472,7 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
         Row(
           children: [
             Expanded(
-              child: const Text('ثبت کارت با عکس',
+              child: Text('ثبت کارت با عکس',
                   style: theme.textTheme.titleMedium
                       ?.copyWith(fontWeight: FontWeight.w900)),
             ),

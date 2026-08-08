@@ -71,7 +71,7 @@ void main() {
     test('همه برچسبِ فارسی و نماد دارند', () {
       for (final t in shareTargets) {
         expect(t.label.trim(), isNotEmpty, reason: '${t.id} برچسب ندارد');
-        expect(t.emoji.trim(), isNotEmpty, reason: '${t.id} نماد ندارد');
+        expect(t.icon, isNotNull, reason: '${t.id} نماد ندارد');
       }
     });
 

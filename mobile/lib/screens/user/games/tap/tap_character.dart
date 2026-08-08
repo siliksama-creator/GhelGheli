@@ -512,7 +512,7 @@ class _SkinImage extends StatelessWidget {
       cacheWidth: 320,
       // A missing skin must never blank the game area.
       errorBuilder: (_, __, ___) => const Center(
-        child: const Icon(Icons.circle_rounded, size: 120, color: Color(0xFF22C55E)),
+        child: Icon(Icons.circle_rounded, size: 120, color: const Color(0xFF22C55E)),
       ),
     );
   }

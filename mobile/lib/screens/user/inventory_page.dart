@@ -372,7 +372,7 @@ class InventoryTile extends StatelessWidget {
                         // ۳۰ درخواست می‌زد. حالا بارِ اول دانلود، از آن
                         // به بعد از دیسکِ گوشی.
                         child: img.isEmpty
-                            ? const Center(
+                            ? Center(
                                 child:
                                     Image.asset('assets/pass/football_icon.webp', width: 42, height: 42, fit: BoxFit.contain))
                             : CachedCardImage(

@@ -277,14 +277,14 @@ class _ShopPageState extends State<ShopPage> {
                 ['card_frame', 'قاب کارت', Icons.crop_portrait_rounded, 'دور کارت‌های پروفایلت'],
                 ['name_color', 'رنگ اسم', Icons.palette_rounded, 'رنگ اسمت در جدول لیگ و چت'],
               ])
-                if (of(group[0]).isNotEmpty) ...[
+                if (of(group[0] as String).isNotEmpty) ...[
                   _KindSection(
-                    title: group[1],
-                    icon: group[2],
-                    note: group[3],
-                    kind: group[0],
-                    items: of(group[0]),
-                    equipped: equippedFor(group[0]),
+                    title: group[1] as String,
+                    icon: group[2] as IconData,
+                    note: group[3] as String,
+                    kind: group[0] as String,
+                    items: of(group[0] as String),
+                    equipped: equippedFor(group[0] as String),
                     busy: _busy,
                     balance: balance,
                     onBuy: _confirmBuy,
