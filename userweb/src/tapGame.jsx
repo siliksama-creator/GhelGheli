@@ -17,7 +17,7 @@ export const TAP_CONFIG = {
   // TOTAL_POINTS در tapGameService.js.
   totalPoints: 50000,
   growthFactor: 1.05,
-  levelsPerSkin: 10,
+  levelsPerSkin: 5,
   // Levels clearable per calendar day (Asia/Tehran). MIRRORS
   // MAX_LEVELS_PER_DAY in tapGameService.js, which is the authority — this
   // copy exists so the UI can explain the rule and stop counting locally
@@ -29,6 +29,11 @@ export const TAP_CONFIG = {
     '/games/tap/skin_3.webp',
     '/games/tap/skin_4.webp',
     '/games/tap/skin_5.webp',
+    '/games/tap/skin_6.webp',
+    '/games/tap/skin_7.webp',
+    '/games/tap/skin_8.webp',
+    '/games/tap/skin_9.webp',
+    '/games/tap/skin_10.webp',
   ],
   maxTapsPerSecond: 12,
   burstWindowMs: 1000,
@@ -279,6 +284,10 @@ export default function TapGame({ token, onBack }) {
   const floaterId = useRef(0);
   const syncingRef = useRef(false);
   const areaRef = useRef(null);
+  // Remaining slowdown guard: accepted taps are capped, but rejected bursts
+  // can be far denser. Keep telemetry exact while limiting UI/audio churn.
+  const lastRejectedUi = useRef(-1000000);
+  const lastTapFeedback = useRef(-1000000);
   // performance.now() is monotonic: changing the device clock cannot reset
   // the rate-limit window, which Date.now() would allow.
   const clock = useCallback(() => Math.round(performance.now()), []);
@@ -544,8 +553,16 @@ export default function TapGame({ token, onBack }) {
 
     if (verdict !== 'accepted') {
       batchRef.current.flagged++;
-      setProgress(p => ({ ...p, flaggedTaps: p.flaggedTaps + 1 }));
-      if (verdict === 'rateLimited') setNotice('یواش‌تر! سرعت ضربه‌ها بیش از حد مجاز است');
+      const now = clock();
+      const message = verdict === 'rateLimited'
+        ? 'یواش‌تر! سرعت ضربه‌ها بیش از حد مجاز است'
+        : '';
+      const shouldPaint = now - lastRejectedUi.current >= 250 || (message && message !== notice);
+      if (shouldPaint) {
+        lastRejectedUi.current = now;
+        setProgress(p => ({ ...p, flaggedTaps: p.flaggedTaps + 1 }));
+        if (message) setNotice(message);
+      }
       return;
     }
 
@@ -623,12 +640,16 @@ export default function TapGame({ token, onBack }) {
         // A level boundary is a natural checkpoint.
         later(() => flush(true), 0);
       } else {
-        playSfx('tap', 0.5);
+        const now = clock();
+        if (now - lastTapFeedback.current >= 70) {
+          lastTapFeedback.current = now;
+          playSfx('tap', 0.5);
+        }
         if (batchRef.current.taps >= TAP_CONFIG.maxBatchTaps) later(() => flush(), 0);
       }
       return next;
     });
-  }, [isComplete, clock, flush]);
+  }, [isComplete, capped, notice, clock, flush, later]);
 
   const nearLimit = rate >= TAP_CONFIG.maxTapsPerSecond - 2;
 

@@ -75,7 +75,7 @@ function Avatar({ u, size = 72 }) {
     : avatarUrl(u.profile_avatar_key);
   return (
     <img className="avatar" src={src} alt="آواتار"
-      style={{ width: size, height: size }} />
+      decoding="async" style={{ width: size, height: size }} />
   );
 }
 
@@ -230,7 +230,7 @@ export default function Home({ token, p, rewards, load, setMsg, openWallet,
                     onClick={() => setBigCard(i)}>
                     <span className="invArt">
                       <img src={asset(i.image_url) || avatarUrl('avatar_1_football.png')}
-                        alt={i.name || 'کارت'} loading="lazy" />
+                        alt={i.name || 'کارت'} loading="lazy" decoding="async" />
                       {isNewCard(i) && <em className="invNew">جدید</em>}
                       {/* «×۱» روی هر کارت فقط نویز است. */}
                       {asInt(i.quantity) > 1 &&

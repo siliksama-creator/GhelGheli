@@ -376,6 +376,18 @@ void main() {
       engine.dispose();
     });
 
+    test('rejected tap bursts do not repaint on every rejected input', () async {
+      final engine = await freshEngine();
+      for (var i = 0; i < 160; i++) {
+        engine.tap();
+      }
+      expect(engine.flaggedTaps, greaterThan(120));
+      expect(engine.eventSerial, lessThan(8),
+          reason: 'Rejected taps are telemetry, not a reason to repaint the '
+              'tap screen hundreds of times per second.');
+      engine.dispose();
+    });
+
     test('levelsUntilNextSkin counts down to the boundary', () async {
       final engine = await freshEngine();
       // از لول ۱ تا اولین مرز. عدد از config مشتق می‌شود نه هاردکد،

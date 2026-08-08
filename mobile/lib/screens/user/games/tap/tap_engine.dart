@@ -73,6 +73,14 @@ class TapEngine extends ChangeNotifier {
 
   String? _notice;
 
+  // Rejected taps can arrive much faster than accepted taps (autoclickers or
+  // a player drumming two fingers on the screen). Counting them for telemetry
+  // is cheap; rebuilding the UI for every rejected tap is not. The old path
+  // emitted an event on every rejection, so a bad input stream could keep the
+  // whole tap screen repainting even though the visible state did not change.
+  int _lastRejectedNotifyMs = -1000000;
+  static const int _rejectedUiNotifyGapMs = 250;
+
   // ── public read-only surface ─────────────────────────────────────────────
 
   bool get loaded => _loaded;
@@ -258,10 +266,21 @@ class TapEngine extends ChangeNotifier {
     if (verdict != TapVerdict.accepted) {
       _batchFlagged++;
       _progress = _progress.copyWith(flaggedTaps: _progress.flaggedTaps + 1);
-      _notice = verdict == TapVerdict.rateLimited
+      final nextNotice = verdict == TapVerdict.rateLimited
           ? 'یواش‌تر! سرعت ضربه‌ها بیش از حد مجاز است'
           : null;
-      _emit(TapEvent.rejected);
+      final noticeChanged = nextNotice != _notice;
+      _notice = nextNotice;
+
+      // UI throttle for rejected taps. The telemetry counters still update on
+      // every rejection, but the screen only repaints at most four times per
+      // second while a burst is being rejected. This closes the remaining
+      // slowdown path in the tap game: accepted taps were already capped at
+      // 12/s, rejected taps were not.
+      if (noticeChanged || nowMs - _lastRejectedNotifyMs >= _rejectedUiNotifyGapMs) {
+        _lastRejectedNotifyMs = nowMs;
+        _emit(TapEvent.rejected);
+      }
       return false;
     }
 
@@ -529,6 +548,7 @@ class TapEngine extends ChangeNotifier {
     _guard.reset();
     _batchTaps = 0;
     _batchFlagged = 0;
+    _lastRejectedNotifyMs = -1000000;
     _batchStartMs = _clock.elapsedMilliseconds;
     await _storage.clear();
     _safeNotify();
