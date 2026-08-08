@@ -285,7 +285,7 @@ class _SoloView extends StatelessWidget {
                       borderRadius: Corners.rPill,
                     ),
                     child: Text('بهترین رکورد تو: ${formatRunTime(bestMs)}',
-                        style: theme.textTheme.labelLarge?.copyWith(
+                        style: theme.textTheme.labelMedium?.copyWith(
                             color: memoryAccent, fontWeight: FontWeight.w800)),
                   ),
                 ],
@@ -379,7 +379,7 @@ class _MemoryGrid extends StatelessWidget {
         // Reserve the row so the whole grid doesn't jump up and down each
         // time the hit/miss line appears.
         SizedBox(
-          height: 20,
+          height: 16,
           child: AnimatedOpacity(
             duration: Motion.fast,
             opacity: (lastResult == 'match' || lastResult == 'miss') ? 1 : 0,
@@ -398,16 +398,16 @@ class _MemoryGrid extends StatelessWidget {
         ),
         Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 380),
+            constraints: const BoxConstraints(maxWidth: 340),
             child: GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               padding: EdgeInsets.zero,
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: cols,
-                mainAxisSpacing: Gaps.xs,
-                crossAxisSpacing: Gaps.xs,
-                childAspectRatio: 0.82,
+                mainAxisSpacing: 6,
+                crossAxisSpacing: 6,
+                childAspectRatio: 1.0,
               ),
               itemCount: cards.length,
               itemBuilder: (context, i) {

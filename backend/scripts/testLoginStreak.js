@@ -107,14 +107,15 @@ console.log('\n== وب: هم‌تراز با اندروید ==');
     'آیکون شفاف CTA برای وب هم منتشر می‌شود');
   ok(/initialData/.test(webCard) && /onClaimed/.test(webCard),
     'کارت وب با bootstrap شروع می‌شود و بعد از claim reload می‌کند');
-  ok(/streak_hero\.webp/.test(webCard), 'کارت وب از تصویر قهرمان جدید استفاده می‌کند');
+  ok(/streakOrb/.test(webCard) && /streakOrbIcon/.test(webCard),
+    'کارت وب هم مثل اندروید به‌جای تصویر سنگین، orb انیمیشنی دارد');
   ok(/cta_spark\.png/.test(webCard), 'دکمهٔ دریافت وب از آیکون شفاف CTA استفاده می‌کند');
   ok(/loginStreak:\s*boot\.loginStreak/.test(webMain),
     'وب loginStreak را در state بوت‌استرپ نگه می‌دارد');
   ok(/initialData=\{p\.loginStreak\}/.test(webHome) && /onClaimed=\{load\}/.test(webHome),
     'صفحهٔ خانهٔ وب دادهٔ استریک و refresh را وصل کرده است');
-  ok(/streakSpin/.test(webCss) && /streakHeroArt/.test(webCss) && /streakProgress/.test(webCss),
-    'CSS وب کارت استریک را با گلو، تصویر و نوار پیشرفت جدید رندر می‌کند');
+  ok(/streakSpin/.test(webCss) && /streakOrb/.test(webCss) && /streakProgress/.test(webCss),
+    'CSS وب کارت استریک را با گلو، orb انیمیشنی و نوار پیشرفت جدید رندر می‌کند');
 }
 
 console.log(`\n${fail === 0 ? '✓' : '✗'} ${pass} تست موفق، ${fail} ناموفق`);

@@ -4,6 +4,8 @@
 // from a font that not every device ships — two different cards could draw
 // the same empty box. A test that asserts real image assets makes that
 // regression impossible to reintroduce silently.
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -120,6 +122,19 @@ void main() {
       expect(formatRunTime(12340), isNot(matches(RegExp(r'[0-9]'))));
     });
   });
+
+  group('memory board density', () {
+    test('versus board is compact enough to live inside the fixed game viewport', () {
+      final src = File('lib/screens/user/games/memory_board.dart').readAsStringSync();
+      expect(src.contains('maxWidth: 340'), isTrue,
+          reason: 'جفت‌یاب نباید با بورد ۳۸۰px صفحهٔ بازی را اسکرول‌دار کند');
+      expect(src.contains('childAspectRatio: 1.0'), isTrue,
+          reason: 'کارت‌های بسیار بلند، نتیجه و دکمه‌ها را از صفحه بیرون می‌برند');
+      expect(src.contains('mainAxisSpacing: 6'), isTrue,
+          reason: 'فاصلهٔ شبکه باید کنترل‌شده باشد، نه اسکرول‌ساز');
+    });
+  });
+
 }
 
 void _noop() {}

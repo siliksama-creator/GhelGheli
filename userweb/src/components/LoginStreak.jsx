@@ -73,8 +73,12 @@ export default function LoginStreak({ token, initialData, setMsg, onClaimed }) {
           </p>
         </div>
 
-        <div className="streakHeroArt" aria-hidden="true">
-          <img src="/pass/streak_hero.webp" alt="" />
+        <div className="streakOrb" aria-hidden="true">
+          <span className="streakOrbRing" />
+          <span className="streakOrbDot d1" />
+          <span className="streakOrbDot d2" />
+          <span className="streakOrbDot d3" />
+          <span className="streakOrbIcon">{data.claimedToday ? '✓' : '🔥'}</span>
           <b>روز {fa(nextDay)}</b>
         </div>
       </div>
