@@ -158,6 +158,7 @@ DELETE FROM audit_log;
 -- «۴۵۷ فایلِ یتیم» هم دیده شد: ابزارِ پاکسازی باید همراهِ هر مایگریشنِ
 -- تازه به‌روز شود، وگرنه بی‌صدا ناقص می‌شود.
 DELETE FROM point_transactions;
+DELETE FROM login_streaks;
 DELETE FROM league_payouts;
 DELETE FROM league_leaderboard_entries;
 
