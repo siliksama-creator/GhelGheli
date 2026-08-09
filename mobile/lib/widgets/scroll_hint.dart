@@ -253,24 +253,25 @@ class _ScrollHintState extends State<ScrollHint>
             // ── قرص راهنما ──
             if (showPill)
               Positioned(
-                left: 0,
-                right: 0,
+                // از وسط صفحه برداشته شد: اسکرین‌شات‌ها نشان دادند قرص
+                // بزرگِ وسط، روی فرم‌ها و کارت‌ها می‌افتد و کلاس کار را
+                // پایین می‌آورد. ریل کناری همچنان راهنمای اصلی است؛ این
+                // فقط یک نشانِ کوچکِ گوشه‌ای است.
+                right: 18,
                 bottom: 12 + widget.padBottom,
                 child: IgnorePointer(
                   child: RepaintBoundary(
-                    child: Center(
-                      child: AnimatedBuilder(
-                        animation: _bob,
-                        builder: (context, child) => Transform.translate(
-                          offset: Offset(
-                              0, math.sin(_bob.value * math.pi * 2) * 3.5),
-                          child: child,
-                        ),
-                        child: _HintPill(
-                          label: widget.hintLabel,
-                          color: rail,
-                          onSurface: scheme.onSurface,
-                        ),
+                    child: AnimatedBuilder(
+                      animation: _bob,
+                      builder: (context, child) => Transform.translate(
+                        offset: Offset(
+                            0, math.sin(_bob.value * math.pi * 2) * 2.4),
+                        child: child,
+                      ),
+                      child: _HintPill(
+                        label: widget.hintLabel,
+                        color: rail,
+                        onSurface: scheme.onSurface,
                       ),
                     ),
                   ),
@@ -356,35 +357,43 @@ class _HintPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(999),
-        color: color.withValues(alpha: 0.92),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.28),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-              height: 1.2,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 148),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(999),
+          color: color.withValues(alpha: 0.82),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.22),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
-          ),
-          const SizedBox(width: 5),
-          const Icon(Icons.keyboard_double_arrow_down_rounded,
-              size: 17, color: Colors.white),
-        ],
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                label.length > 16 ? 'ادامه پایین‌تر' : label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  height: 1.15,
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.keyboard_double_arrow_down_rounded,
+                size: 15, color: Colors.white),
+          ],
+        ),
       ),
     );
   }

@@ -3489,38 +3489,17 @@ input:focus, textarea:focus {
 .streakCard.is-done .streakKicker { color: #53e0a4; background: rgba(83,224,164,.14); border-color: rgba(83,224,164,.34); }
 .streakCopy h3 { margin: 12px 0 5px; color: #fff; font-size: clamp(22px, 3vw, 30px); line-height: 1.15; letter-spacing: -.02em; }
 .streakCopy p { margin: 0; color: rgba(255,255,255,.76); font-size: 14px; line-height: 1.75; max-width: 620px; }
-.streakOrb {
-  position: relative; flex: 0 0 116px; width: 116px; height: 116px; border-radius: 999px;
-  display: grid; place-items: center; overflow: visible;
-  background:
-    radial-gradient(circle, rgba(255,209,102,.24) 0 24%, rgba(34,231,166,.12) 48%, transparent 72%);
-  filter: drop-shadow(0 18px 38px rgba(0,0,0,.32));
+.streakHeroArt {
+  position: relative; flex: 0 0 116px; width: 116px; height: 116px; border-radius: 30px; overflow: hidden;
+  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15);
+  box-shadow: 0 18px 38px rgba(0,0,0,.35), 0 0 34px rgba(0,212,154,.18);
   transform-origin: center; animation: streakFloat 4.8s ease-in-out infinite;
 }
-.streakOrb::before {
-  content: ""; position: absolute; inset: 10px; border-radius: inherit;
-  background: radial-gradient(circle, rgba(255,209,102,.26), rgba(34,231,166,.08) 58%, transparent 70%);
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.16), 0 0 34px rgba(255,209,102,.20), 0 0 54px rgba(34,231,166,.14);
-}
-.streakOrbRing {
-  position: absolute; inset: 16px; border-radius: inherit; border: 2px solid rgba(255,209,102,.62);
-  border-inline-start-color: rgba(34,231,166,.18); border-block-end-color: rgba(78,161,255,.22);
-  animation: streakSpin 5.8s linear infinite;
-}
-.streakOrbRing::after {
-  content: ""; position: absolute; inset: 9px; border-radius: inherit;
-  border: 1px solid rgba(34,231,166,.35); animation: streakSpin 8s linear infinite reverse;
-}
-.streakOrbIcon { position: relative; z-index: 2; font-size: 38px; line-height: 1; filter: drop-shadow(0 0 18px rgba(255,209,102,.66)); animation: streakPulse 1.35s ease-in-out infinite alternate; }
-.streakOrbDot { position: absolute; z-index: 1; width: 7px; height: 7px; border-radius: 50%; background: #ffd166; box-shadow: 0 0 16px #ffd166; }
-.streakOrbDot.d1 { top: 18px; right: 26px; animation: streakPulse 1.6s ease-in-out infinite alternate; }
-.streakOrbDot.d2 { left: 21px; top: 54px; background: #22e7a6; box-shadow: 0 0 16px #22e7a6; animation: streakPulse 1.8s ease-in-out .35s infinite alternate; }
-.streakOrbDot.d3 { right: 36px; bottom: 18px; background: #4ea1ff; box-shadow: 0 0 16px #4ea1ff; animation: streakPulse 2s ease-in-out .65s infinite alternate; }
-.streakOrb b {
-  position: absolute; z-index: 3; bottom: 5px; right: 50%; transform: translateX(50%);
-  padding: 5px 10px; border-radius: 999px;
-  color: #ffd166; background: rgba(7,21,33,.78); border: 1px solid rgba(255,209,102,.48);
-  font-size: 11px; line-height: 1; box-shadow: 0 8px 18px rgba(0,0,0,.28); white-space: nowrap;
+.streakHeroArt img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.streakHeroArt b {
+  position: absolute; top: 8px; right: 8px; padding: 5px 9px; border-radius: 999px;
+  color: #ffd166; background: rgba(7,21,33,.74); border: 1px solid rgba(255,209,102,.48);
+  font-size: 11px; line-height: 1; box-shadow: 0 8px 18px rgba(0,0,0,.28);
 }
 .streakStats { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 16px 0 12px; }
 .streakStats span {
@@ -3568,8 +3547,7 @@ input:focus, textarea:focus {
 @media(max-width:560px){
   .streakCard { padding: 15px; border-radius: 26px; }
   .streakHead { gap: 12px; }
-  .streakOrb { flex-basis: 92px; width: 92px; height: 92px; }
-  .streakOrbIcon { font-size: 31px; }
+  .streakHeroArt { flex-basis: 92px; width: 92px; height: 92px; border-radius: 24px; }
   .streakCopy h3 { font-size: 21px; }
   .streakCopy p { font-size: 12px; line-height: 1.55; }
   .streakStats { grid-template-columns: 1fr 1fr; }

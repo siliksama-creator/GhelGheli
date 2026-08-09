@@ -15,6 +15,8 @@ const tapChar = read('mobile/lib/screens/user/games/tap/tap_character.dart');
 const webTap = read('userweb/src/tapGame.jsx');
 const home = read('userweb/src/screens/Home.jsx');
 const css = read('userweb/src/style.css');
+const homeShell = read('mobile/lib/screens/user/home_shell.dart');
+const scrollHint = read('mobile/lib/widgets/scroll_hint.dart');
 
 console.log('\n== ۱. ضربه‌زن اندروید: مسیر داغ کم‌هزینه ==');
 ok(/ValueNotifier<int> _uiTick/.test(tapScreen), 'صفحه با ValueNotifier تیک می‌خورد، نه setState سراسری');
@@ -29,11 +31,13 @@ ok(/skin_10\.webp/.test(webTap), 'وب همهٔ ۱۰ اسکین را می‌شن
 ok(/lastRejectedUi/.test(webTap) && />= 250/.test(webTap), 'وب هم ضربهٔ ردشده را throttle می‌کند');
 ok(/lastTapFeedback/.test(webTap) && />= 70/.test(webTap), 'وب صدا را برای ضربه‌های سریع throttle می‌کند');
 
-console.log('\n== ۳. وب یوزر: رندر سبک‌تر ==');
+console.log('\n== ۳. وب یوزر و پوستهٔ اندروید: رندر سبک‌تر و کلاس کاری ==');
 ok(/loading="lazy" decoding="async"/.test(home), 'تصاویر کارت‌های کلکسیون lazy + async هستند');
 ok(/decoding="async"/.test(home), 'آواتار/تصاویر خانه async decode دارند');
 ok(/button:not\(:disabled\):active/.test(css), 'دکمه‌های وب feedback حرکتی دارند');
 ok(/quickTile::after/.test(css), 'کاشی‌های اصلی وب شاین/پولیش دارند');
+ok(/حذفِ دکمهٔ تکراری/.test(homeShell), 'دکمهٔ خروج تکراری از اپ‌بار کاربر حذف شده تا عنوان‌ها بریده نشوند');
+ok(/right:\s*18/.test(scrollHint) && /maxWidth:\s*148/.test(scrollHint), 'قرص راهنمای اسکرول از مرکز محتوا به گوشهٔ کم‌مزاحمت منتقل شده');
 
 console.log('\n== ۴. دوئل کارت: مستقل از لیگ اصلی ==');
 const duel = read('backend/src/services/cardDuelService.js');

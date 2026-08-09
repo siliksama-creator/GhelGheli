@@ -1,13 +1,20 @@
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
 import '../../core/assets.dart';
+import '../../theme/brand_theme.dart';
 import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/gradient_panel.dart';
 
+/// Premium seven-day login streak card for the user dashboard.
+///
+/// Claiming stays explicit: opening the dashboard only loads status; points are
+/// awarded once after the user taps the button. The card now accepts the
+/// bootstrap copy of the status so the dashboard does not need an extra round
+/// trip just to draw the first frame.
 class LoginStreakCard extends StatefulWidget {
   const LoginStreakCard({
     super.key,
@@ -19,7 +26,14 @@ class LoginStreakCard extends StatefulWidget {
 
   final ApiClient api;
   final Map<String, dynamic>? initialData;
+
+  /// Dense dashboard mode: keeps the claim button, progress and seven-day
+  /// state visible above the fold instead of pushing card registration down.
   final bool compact;
+
+  /// Called after a successful claim so the dashboard header/point balance can
+  /// refresh immediately. The old card updated only itself; the visible points
+  /// total above it stayed stale until a manual refresh.
   final VoidCallback? onClaimed;
 
   @override
@@ -32,12 +46,11 @@ class _LoginStreakCardState extends State<LoginStreakCard>
   bool _loading = true;
   bool _busy = false;
   bool _justClaimed = false;
-  bool _compactExpanded = false;
   String? _error;
 
   late final AnimationController _loop = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 6000),
+    duration: const Duration(milliseconds: 5200),
   )..repeat();
 
   @override
@@ -72,15 +85,13 @@ class _LoginStreakCardState extends State<LoginStreakCard>
   int _int(dynamic value) => NumberParser.toInt(value);
 
   Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
     try {
       final response = await widget.api.get('/api/login-streak', fresh: true);
       if (!mounted) return;
       setState(() {
-        _data = response is Map ? Map<String, dynamic>.from(response) : <String, dynamic>{};
+        _data = response is Map
+            ? Map<String, dynamic>.from(response)
+            : <String, dynamic>{};
         _error = null;
         _loading = false;
       });
@@ -99,21 +110,23 @@ class _LoginStreakCardState extends State<LoginStreakCard>
     try {
       final response = await widget.api.post('/api/login-streak/claim', {});
       if (!mounted) return;
-      final data = response is Map ? Map<String, dynamic>.from(response) : <String, dynamic>{};
+      final data = response is Map
+          ? Map<String, dynamic>.from(response)
+          : <String, dynamic>{};
       setState(() {
         _data = data;
         _justClaimed = data['claimedNow'] == true;
       });
       widget.onClaimed?.call();
-      final message = data['message']?.toString() ?? '${faNum(_int(data['claimedReward']))} امتیاز دریافت شد';
+      final message = data['message']?.toString() ??
+          '${faNum(_int(data['claimedReward']))} امتیاز دریافت شد';
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
-        content: Text(message, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800)),
+        content: Text(message, textAlign: TextAlign.center),
         behavior: SnackBarBehavior.floating,
-        backgroundColor: BrandColors.success,
-        shape: RoundedRectangleBorder(borderRadius: Corners.rXl),
+        backgroundColor: const Color(0xFF1C8B67),
       ));
       if (_justClaimed) {
-        Future<void>.delayed(const Duration(milliseconds: 2500), () {
+        Future<void>.delayed(const Duration(milliseconds: 1500), () {
           if (mounted) setState(() => _justClaimed = false);
         });
       }
@@ -122,7 +135,7 @@ class _LoginStreakCardState extends State<LoginStreakCard>
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
         content: Text(apiError(error), textAlign: TextAlign.center),
         behavior: SnackBarBehavior.floating,
-        backgroundColor: BrandColors.danger,
+        backgroundColor: Theme.of(context).colorScheme.error,
       ));
       await _load();
     } finally {
@@ -133,14 +146,22 @@ class _LoginStreakCardState extends State<LoginStreakCard>
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return widget.compact ? _CompactStreakLoading(loop: _loop) : _StreakSkeleton(loop: _loop);
+      return widget.compact
+          ? _CompactStreakLoading(loop: _loop)
+          : _StreakSkeleton(loop: _loop);
     }
 
     if (_error != null || _data == null || _data!['active'] != true) {
+      // روی داشبوردِ فشرده، استریک نباید «غیب» شود. اگر bootstrap یا
+      // درخواست جدا شکست بخورد، یک سطح کوچک و قابل لمس می‌ماند تا کاربر
+      // بفهمد این قابلیت وجود دارد و بتواند دوباره تلاش کند. نسخهٔ بزرگ
+      // همان رفتار قبلی را نگه می‌دارد تا صفحات دیگر بی‌دلیل شلوغ نشوند.
       if (widget.compact) return _CompactStreakUnavailable(onRetry: _load);
-      return _ErrorStreakCard(loop: _loop, onRetry: _load, error: _error ?? 'استریک در دسترس نیست');
+      return const SizedBox.shrink();
     }
 
+    final theme = Theme.of(context);
+    final brand = context.brand;
     final days = (_data!['rewards'] as List? ?? const [])
         .whereType<Map>()
         .map((item) => Map<String, dynamic>.from(item))
@@ -152,9 +173,11 @@ class _LoginStreakCardState extends State<LoginStreakCard>
     final claimedToday = _data!['claimedToday'] == true;
     final progressDay = claimedToday ? currentDay : math.max(0, nextDay - 1);
     final progress = (progressDay / 7).clamp(0.0, 1.0).toDouble();
+    final width = MediaQuery.sizeOf(context).width;
+    final compact = width < 390;
 
     if (widget.compact) {
-      return _CompactStreakCard(
+      return _CompactStreakSurface(
         loop: _loop,
         days: days,
         currentDay: currentDay,
@@ -164,262 +187,192 @@ class _LoginStreakCardState extends State<LoginStreakCard>
         claimedToday: claimedToday,
         progress: progress,
         busy: _busy,
-        justClaimed: _justClaimed,
-        expanded: _compactExpanded,
-        onToggle: () => setState(() => _compactExpanded = !_compactExpanded),
         onClaim: claimedToday || _busy ? null : _claim,
       );
     }
 
-    return _StunningStreakCard(
-      loop: _loop,
-      days: days,
-      currentDay: currentDay,
-      nextDay: nextDay,
-      nextReward: nextReward,
-      totalClaims: totalClaims,
-      claimedToday: claimedToday,
-      progress: progress,
-      busy: _busy,
-      justClaimed: _justClaimed,
-      onClaim: claimedToday || _busy ? null : _claim,
-    );
-  }
-}
-
-
-class _CompactStreakCard extends StatelessWidget {
-  const _CompactStreakCard({
-    required this.loop,
-    required this.days,
-    required this.currentDay,
-    required this.nextDay,
-    required this.nextReward,
-    required this.totalClaims,
-    required this.claimedToday,
-    required this.progress,
-    required this.busy,
-    required this.justClaimed,
-    required this.expanded,
-    required this.onToggle,
-    required this.onClaim,
-  });
-
-  final Animation<double> loop;
-  final List<Map<String, dynamic>> days;
-  final int currentDay, nextDay, nextReward, totalClaims;
-  final bool claimedToday, busy, justClaimed, expanded;
-  final double progress;
-  final VoidCallback onToggle;
-  final VoidCallback? onClaim;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return AnimatedBuilder(
-      animation: loop,
+      animation: _loop,
       builder: (context, _) {
-        final t = loop.value;
+        final t = _loop.value;
+        final breathe = 1 + math.sin(t * math.pi * 2) * 0.025;
         final glow = (math.sin(t * math.pi * 2) + 1) / 2;
-        final heroShift = math.sin(t * math.pi * 2) * 2.5;
-        final status = claimedToday ? 'محفوظ شد' : '+${faNum(nextReward)} آماده دریافت';
-        final title = claimedToday
-            ? 'روز ${faNum(currentDay)} از ۷ تکمیل شد'
-            : 'استریک ورود؛ روز ${faNum(nextDay)}';
-
-        return RepaintBoundary(
-          child: InkWell(
-            onTap: onToggle,
-            borderRadius: BorderRadius.circular(26),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 320),
-              curve: Curves.easeOutCubic,
-              margin: const EdgeInsets.symmetric(vertical: 3),
-              padding: EdgeInsets.fromLTRB(12, 11, 12, expanded ? 13 : 11),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(26),
-                gradient: const LinearGradient(
-                  begin: Alignment.topRight,
-                  end: Alignment.bottomLeft,
-                  colors: [Color(0xFF071827), Color(0xFF0A302A), Color(0xFF07111F)],
-                ),
-                border: Border.all(
-                  color: Color.lerp(
-                    BrandColors.amber.withValues(alpha: 0.38),
-                    BrandColors.emerald.withValues(alpha: 0.62),
-                    glow,
-                  )!,
-                  width: 1.2,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: BrandColors.emerald.withValues(alpha: 0.10 + glow * 0.06),
-                    blurRadius: 24,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
+        return Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(30),
+            gradient: const LinearGradient(
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+              colors: [
+                Color(0xFF142B56),
+                Color(0xFF151638),
+                Color(0xFF06111F),
+              ],
+              stops: [0.0, 0.52, 1.0],
+            ),
+            border: Border.all(
+              color: Color.lerp(
+                const Color(0xFFFFD166).withValues(alpha: 0.36),
+                BrandColors.emerald.withValues(alpha: 0.46),
+                glow,
+              )!,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFFFB84D).withValues(alpha: 0.12 + glow * 0.06),
+                blurRadius: 36,
+                offset: const Offset(0, 18),
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(22),
-                child: Stack(
+              BoxShadow(
+                color: BrandColors.emerald.withValues(alpha: 0.09),
+                blurRadius: 44,
+                offset: const Offset(0, 24),
+              ),
+            ],
+          ),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: _StreakParticlesPainter(
+                    progress: t,
+                    celebrate: _justClaimed,
+                  ),
+                ),
+              ),
+              Positioned(
+                top: -64,
+                right: -36,
+                child: GlowOrb(
+                  color: BrandColors.emerald.withValues(alpha: 0.72),
+                  size: 150,
+                ),
+              ),
+              Positioned(
+                bottom: -74,
+                left: -44,
+                child: GlowOrb(
+                  color: BrandColors.blue.withValues(alpha: 0.70),
+                  size: 170,
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  compact ? Gaps.md : Gaps.lg,
+                  compact ? Gaps.md : Gaps.lg,
+                  compact ? Gaps.md : Gaps.lg,
+                  Gaps.md,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Positioned.fill(
-                      child: CustomPaint(
-                        painter: _StreakParticlesPainter(progress: t, celebrate: justClaimed),
-                      ),
-                    ),
-                    Positioned(
-                      left: -4,
-                      top: expanded ? 9 + heroShift : 2 + heroShift,
-                      child: IgnorePointer(
-                        child: _StreakPulseBadge(
-                          progress: t,
-                          active: !claimedToday,
-                          size: expanded ? 72 : 58,
-                        ),
-                      ),
-                    ),
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 38,
-                              height: 38,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: (claimedToday ? BrandColors.success : BrandColors.amber)
-                                    .withValues(alpha: 0.16),
-                                border: Border.all(
-                                  color: (claimedToday ? BrandColors.success : BrandColors.amber)
-                                      .withValues(alpha: 0.48),
-                                ),
-                              ),
-                              child: Icon(
-                                claimedToday
-                                    ? Icons.check_circle_rounded
-                                    : Icons.local_fire_department_rounded,
-                                color: claimedToday ? BrandColors.success : BrandColors.amber,
-                                size: 22,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 7,
+                                runSpacing: 7,
+                                crossAxisAlignment: WrapCrossAlignment.center,
                                 children: [
-                                  Text(
-                                    title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: theme.textTheme.titleSmall?.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w900,
-                                      height: 1.05,
-                                    ),
+                                  _StatusChip(
+                                    claimedToday: claimedToday,
+                                    canClaim: !claimedToday,
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '$status • ${faNum(totalClaims)} دریافت موفق',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: Colors.white.withValues(alpha: 0.68),
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w700,
-                                    ),
+                                  _TinyMetric(
+                                    icon: Icons.local_fire_department_rounded,
+                                    text: '${faNum(totalClaims)} دریافت',
                                   ),
                                 ],
                               ),
-                            ),
-                            _CompactClaimButton(
-                              busy: busy,
-                              claimedToday: claimedToday,
-                              onPressed: onClaim,
-                            ),
-                            const SizedBox(width: 6),
-                            AnimatedRotation(
-                              turns: expanded ? .5 : 0,
-                              duration: const Duration(milliseconds: 260),
-                              curve: Curves.easeOutCubic,
-                              child: const Icon(Icons.keyboard_arrow_down_rounded,
-                                  color: Colors.white70, size: 24),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        ClipRRect(
-                          borderRadius: Corners.rPill,
-                          child: LinearProgressIndicator(
-                            value: progress,
-                            minHeight: 5,
-                            backgroundColor: Colors.white.withValues(alpha: 0.09),
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              claimedToday ? BrandColors.success : BrandColors.amber,
-                            ),
+                              Gaps.vSm,
+                              Text(
+                                'استریک ورود ۷ روزه',
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w900,
+                                  height: 1.1,
+                                ),
+                              ),
+                              Gaps.vXxs,
+                              Text(
+                                claimedToday
+                                    ? 'امروز ذخیره شد؛ فردا زنجیره را ادامه بده و جایزهٔ بزرگ‌تر بگیر.'
+                                    : 'زنجیره‌ات آماده است؛ امروز را قفل کن و امتیاز فوری بگیر.',
+                                maxLines: compact ? 3 : 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.76),
+                                  height: 1.55,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        AnimatedSize(
-                          duration: const Duration(milliseconds: 320),
-                          curve: Curves.easeOutCubic,
-                          alignment: Alignment.topCenter,
-                          child: expanded
-                              ? Padding(
-                                  padding: const EdgeInsets.only(top: 12),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: days.map((dayData) {
-                                          final d = NumberParser.toInt(dayData['day']);
-                                          final r = NumberParser.toInt(dayData['amount']);
-                                          final c = dayData['claimed'] == true;
-                                          final cur = dayData['current'] == true;
-                                          return _MiniDayPill(
-                                            day: d,
-                                            reward: r,
-                                            claimed: c,
-                                            current: cur,
-                                            tick: t,
-                                          );
-                                        }).toList(),
-                                      ),
-                                      const SizedBox(height: 10),
-                                      Row(
-                                        children: [
-                                          Icon(Icons.touch_app_rounded,
-                                              color: Colors.white.withValues(alpha: .58), size: 16),
-                                          const SizedBox(width: 6),
-                                          Expanded(
-                                            child: Text(
-                                              claimedToday
-                                                  ? 'فردا دوباره سر بزن تا زنجیره ادامه پیدا کند.'
-                                                  : 'روی دریافت بزن؛ این کارت جمع‌وجور می‌ماند و داشبورد را پایین نمی‌برد.',
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                color: Colors.white.withValues(alpha: .62),
-                                                fontSize: 11.2,
-                                                height: 1.45,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                )
-                              : const SizedBox.shrink(),
+                        Gaps.hSm,
+                        Transform.scale(
+                          scale: breathe,
+                          child: _HeroArt(
+                            compact: compact,
+                            nextDay: nextDay,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Gaps.vMd,
+                    _ProgressRail(
+                      progress: progress,
+                      label: claimedToday
+                          ? 'پیشرفت هفته: ${faNum(progressDay)} از ۷'
+                          : 'امروز روز ${faNum(nextDay)} است',
+                    ),
+                    Gaps.vMd,
+                    Row(
+                      children: [
+                        for (var i = 0; i < 7; i++) ...[
+                          Expanded(
+                            child: _DayNode(
+                              day: i + 1,
+                              reward: days.length > i ? _int(days[i]['amount']) : 0,
+                              claimed: days.length > i && days[i]['claimed'] == true,
+                              current: days.length > i && days[i]['current'] == true,
+                              compact: compact,
+                              tick: t,
+                            ),
+                          ),
+                          if (i != 6) SizedBox(width: compact ? 4 : 6),
+                        ],
+                      ],
+                    ),
+                    Gaps.vMd,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _RewardPreview(
+                            claimedToday: claimedToday,
+                            currentDay: currentDay,
+                            nextDay: nextDay,
+                            nextReward: nextReward,
+                          ),
+                        ),
+                        Gaps.hSm,
+                        _ClaimButton(
+                          busy: _busy,
+                          claimedToday: claimedToday,
+                          onPressed: claimedToday || _busy ? null : _claim,
+                          accent: brand.accent,
                         ),
                       ],
                     ),
                   ],
                 ),
               ),
-            ),
+            ],
           ),
         );
       },
@@ -427,134 +380,145 @@ class _CompactStreakCard extends StatelessWidget {
   }
 }
 
-class _MiniDayPill extends StatelessWidget {
-  const _MiniDayPill({
-    required this.day,
-    required this.reward,
-    required this.claimed,
-    required this.current,
-    required this.tick,
-  });
+class _CompactStreakLoading extends StatelessWidget {
+  const _CompactStreakLoading({required this.loop});
 
-  final int day, reward;
-  final bool claimed, current;
-  final double tick;
+  final Animation<double> loop;
 
   @override
   Widget build(BuildContext context) {
-    final color = claimed ? BrandColors.success : (current ? BrandColors.amber : Colors.white54);
-    final scale = current ? 1.0 + math.sin(tick * math.pi * 2) * 0.035 : 1.0;
-    return Transform.scale(
-      scale: scale,
-      child: Container(
-        width: 35,
-        height: 46,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          color: color.withValues(alpha: current ? .18 : claimed ? .11 : .045),
-          border: Border.all(color: color.withValues(alpha: current ? .70 : claimed ? .42 : .14)),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              claimed ? Icons.check_rounded : (current ? Icons.local_fire_department_rounded : Icons.calendar_today_rounded),
-              size: 12,
-              color: color,
+    final theme = Theme.of(context);
+    return AnimatedBuilder(
+      animation: loop,
+      builder: (context, _) {
+        final glow = (math.sin(loop.value * math.pi * 2) + 1) / 2;
+        return Container(
+          height: 96,
+          padding: const EdgeInsets.all(Gaps.sm),
+          decoration: BoxDecoration(
+            borderRadius: Corners.rXl,
+            gradient: LinearGradient(
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+              colors: [
+                Color.lerp(const Color(0xFF17325B), BrandColors.emerald, glow * 0.08)!,
+                const Color(0xFF0B1729),
+              ],
             ),
-            const SizedBox(height: 2),
-            Text(faNum(day), style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)),
-            Text('+${faNum(reward)}', style: TextStyle(color: color, fontSize: 8, fontWeight: FontWeight.w800)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CompactClaimButton extends StatelessWidget {
-  const _CompactClaimButton({required this.busy, required this.claimedToday, required this.onPressed});
-  final bool busy, claimedToday;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final enabled = onPressed != null;
-    return GestureDetector(
-      onTap: onPressed,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 240),
-        height: 36,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
-          gradient: enabled
-              ? const LinearGradient(colors: [BrandColors.amber, Color(0xFFFF7A45)])
-              : null,
-          color: enabled ? null : Colors.white.withValues(alpha: .09),
-          border: enabled ? null : Border.all(color: Colors.white.withValues(alpha: .10)),
-        ),
-        child: Center(
-          child: busy
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.2))
-              : Row(
-                  mainAxisSize: MainAxisSize.min,
+            border: Border.all(color: BrandColors.amber.withValues(alpha: 0.34 + glow * 0.10)),
+            boxShadow: [
+              BoxShadow(
+                color: BrandColors.emerald.withValues(alpha: 0.10 + glow * 0.05),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: Corners.rLg,
+                child: Image.asset(
+                  'assets/pass/streak_hero.webp',
+                  width: 64,
+                  height: 64,
+                  fit: BoxFit.cover,
+                  cacheWidth: 170,
+                ),
+              ),
+              Gaps.hSm,
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Image.asset('assets/pass/cta_spark.png', width: 17, height: 17, cacheWidth: 48),
-                    const SizedBox(width: 5),
-                    Text(
-                      claimedToday ? 'شد' : 'دریافت',
-                      style: TextStyle(
-                        color: enabled ? Colors.black : Colors.white54,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
+                    Text('استریک روزانه',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          height: 1.05,
+                        )),
+                    const SizedBox(height: 5),
+                    Text('چرخه ۷ روزه در حال آماده‌سازی است…',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.72),
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                        )),
                   ],
                 ),
-        ),
-      ),
+              ),
+              Icon(Icons.hourglass_top_rounded,
+                  color: BrandColors.amber.withValues(alpha: 0.92), size: 22),
+            ],
+          ),
+        );
+      },
     );
   }
 }
 
+class _CompactStreakUnavailable extends StatelessWidget {
+  const _CompactStreakUnavailable({required this.onRetry});
 
-class _StreakPulseBadge extends StatelessWidget {
-  const _StreakPulseBadge({
-    required this.progress,
-    required this.active,
-    required this.size,
-  });
-
-  final double progress;
-  final bool active;
-  final double size;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
-    final pulse = (math.sin(progress * math.pi * 2) + 1) / 2;
-    final color = active ? BrandColors.amber : BrandColors.success;
-    return SizedBox(
-      width: size,
-      height: size,
-      child: CustomPaint(
-        painter: _StreakPulsePainter(
-          progress: progress,
-          color: color,
-          pulse: pulse,
-          active: active,
-        ),
-        child: Center(
-          child: Transform.scale(
-            scale: 1 + pulse * .08,
-            child: Icon(
-              active
-                  ? Icons.local_fire_department_rounded
-                  : Icons.check_circle_rounded,
-              size: size * .46,
-              color: color,
-              shadows: [Shadow(color: color.withValues(alpha: .70), blurRadius: 14)],
+    final theme = Theme.of(context);
+    return Material(
+      color: Colors.transparent,
+      borderRadius: Corners.rXl,
+      child: InkWell(
+        onTap: onRetry,
+        borderRadius: Corners.rXl,
+        child: Container(
+          height: 82,
+          padding: const EdgeInsets.all(Gaps.sm),
+          decoration: BoxDecoration(
+            borderRadius: Corners.rXl,
+            gradient: const LinearGradient(
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+              colors: [Color(0xFF132A4E), Color(0xFF0B1729)],
             ),
+            border: Border.all(color: BrandColors.amber.withValues(alpha: 0.22)),
+          ),
+          child: Row(
+            children: [
+              Image.asset('assets/pass/streak_hero.webp',
+                  width: 56, height: 56, fit: BoxFit.cover, cacheWidth: 150),
+              Gaps.hSm,
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('استریک روزانه',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                        )),
+                    const SizedBox(height: 4),
+                    Text('برای آماده‌سازی دوباره لمس کن',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.62),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        )),
+                  ],
+                ),
+              ),
+              const Icon(Icons.refresh_rounded, color: Color(0xFFFFD166)),
+            ],
           ),
         ),
       ),
@@ -562,63 +526,8 @@ class _StreakPulseBadge extends StatelessWidget {
   }
 }
 
-class _StreakPulsePainter extends CustomPainter {
-  const _StreakPulsePainter({
-    required this.progress,
-    required this.color,
-    required this.pulse,
-    required this.active,
-  });
-
-  final double progress;
-  final Color color;
-  final double pulse;
-  final bool active;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final c = Offset(size.width / 2, size.height / 2);
-    final r = math.min(size.width, size.height) / 2;
-    final bg = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          color.withValues(alpha: .24 + pulse * .08),
-          color.withValues(alpha: .06),
-          Colors.transparent,
-        ],
-      ).createShader(Offset.zero & size);
-    canvas.drawCircle(c, r, bg);
-
-    final ring = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.2
-      ..strokeCap = StrokeCap.round
-      ..color = color.withValues(alpha: .55 + pulse * .30);
-    canvas.drawArc(
-      Rect.fromCircle(center: c, radius: r * .72),
-      -math.pi / 2 + progress * math.pi * 2,
-      math.pi * (active ? 1.45 : 1.95),
-      false,
-      ring,
-    );
-
-    final dotPaint = Paint()..color = color.withValues(alpha: .70);
-    for (var i = 0; i < 7; i++) {
-      final a = progress * math.pi * 2 + i * math.pi * 2 / 7;
-      final d = r * (.42 + (i % 2) * .18);
-      canvas.drawCircle(c + Offset(math.cos(a) * d, math.sin(a) * d), 1.3 + pulse, dotPaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _StreakPulsePainter oldDelegate) =>
-      oldDelegate.progress != progress ||
-      oldDelegate.color != color ||
-      oldDelegate.active != active;
-}
-
-class _StunningStreakCard extends StatelessWidget {
-  const _StunningStreakCard({
+class _CompactStreakSurface extends StatelessWidget {
+  const _CompactStreakSurface({
     required this.loop,
     required this.days,
     required this.currentDay,
@@ -628,15 +537,18 @@ class _StunningStreakCard extends StatelessWidget {
     required this.claimedToday,
     required this.progress,
     required this.busy,
-    required this.justClaimed,
     required this.onClaim,
   });
 
   final Animation<double> loop;
   final List<Map<String, dynamic>> days;
-  final int currentDay, nextDay, nextReward, totalClaims;
-  final bool claimedToday, busy, justClaimed;
+  final int currentDay;
+  final int nextDay;
+  final int nextReward;
+  final int totalClaims;
+  final bool claimedToday;
   final double progress;
+  final bool busy;
   final VoidCallback? onClaim;
 
   @override
@@ -645,168 +557,153 @@ class _StunningStreakCard extends StatelessWidget {
     return AnimatedBuilder(
       animation: loop,
       builder: (context, _) {
-        final t = loop.value;
-        final floatY = math.sin(t * math.pi * 2) * 6;
-        final glow = (math.sin(t * math.pi * 2) + 1) / 2;
-        
-        return RepaintBoundary(
-          child: Container(
-            margin: const EdgeInsets.symmetric(vertical: 4),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(32),
-              image: const DecorationImage(
-                image: AssetImage('assets/pass/streak_bg_2026.png'),
-                fit: BoxFit.cover,
-                opacity: 0.85,
-              ),
-              border: Border.all(
-                color: Color.lerp(
-                  BrandColors.amber.withValues(alpha: 0.4),
-                  BrandColors.emerald.withValues(alpha: 0.6),
-                  glow,
-                )!,
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: BrandColors.emerald.withValues(alpha: 0.15 + glow * 0.1),
-                  blurRadius: 40,
-                  offset: const Offset(0, 15),
-                ),
-              ],
+        final glow = (math.sin(loop.value * math.pi * 2) + 1) / 2;
+        return Container(
+          constraints: const BoxConstraints(minHeight: 96),
+          padding: const EdgeInsets.all(Gaps.sm),
+          decoration: BoxDecoration(
+            borderRadius: Corners.rXl,
+            gradient: const LinearGradient(
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+              colors: [Color(0xFF132A4E), Color(0xFF0B1729)],
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(32),
-              child: BackdropFilter(
-                filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                child: Container(
-                  color: Colors.black.withValues(alpha: 0.3),
-                  padding: const EdgeInsets.all(20),
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      // Animated Particles
-                      Positioned.fill(
-                        child: CustomPaint(
-                          painter: _StreakParticlesPainter(progress: t, celebrate: justClaimed),
+            border: Border.all(
+              color: Color.lerp(
+                BrandColors.amber.withValues(alpha: 0.30),
+                BrandColors.emerald.withValues(alpha: 0.42),
+                glow,
+              )!,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: BrandColors.emerald.withValues(alpha: 0.08 + glow * 0.04),
+                blurRadius: 22,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: Corners.rLg,
+                child: Image.asset(
+                  'assets/pass/streak_hero.webp',
+                  width: 58,
+                  height: 58,
+                  fit: BoxFit.cover,
+                  cacheWidth: 160,
+                ),
+              ),
+              Gaps.hSm,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'استریک روزانه',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              height: 1.05,
+                            ),
+                          ),
                         ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            borderRadius: Corners.rPill,
+                            color: (claimedToday ? BrandColors.success : BrandColors.amber)
+                                .withValues(alpha: 0.16),
+                            border: Border.all(
+                              color: (claimedToday ? BrandColors.success : BrandColors.amber)
+                                  .withValues(alpha: 0.42),
+                            ),
+                          ),
+                          child: Text(
+                            claimedToday ? 'گرفته شد' : 'آماده',
+                            style: TextStyle(
+                              color: claimedToday ? BrandColors.success : BrandColors.amber,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 5),
+                    ClipRRect(
+                      borderRadius: Corners.rPill,
+                      child: LinearProgressIndicator(
+                        minHeight: 6,
+                        value: progress.clamp(0.03, 1).toDouble(),
+                        color: const Color(0xFF22E7A6),
+                        backgroundColor: Colors.white.withValues(alpha: 0.12),
                       ),
-                      
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                      decoration: BoxDecoration(
-                                        borderRadius: Corners.rPill,
-                                        gradient: LinearGradient(
-                                          colors: claimedToday
-                                              ? [BrandColors.success.withValues(alpha: 0.2), BrandColors.success.withValues(alpha: 0.05)]
-                                              : [BrandColors.amber.withValues(alpha: 0.2), BrandColors.amber.withValues(alpha: 0.05)],
-                                        ),
-                                        border: Border.all(
-                                          color: claimedToday ? BrandColors.success.withValues(alpha: 0.5) : BrandColors.amber.withValues(alpha: 0.5),
-                                        ),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            claimedToday ? Icons.check_circle : Icons.local_fire_department,
-                                            color: claimedToday ? BrandColors.success : BrandColors.amber,
-                                            size: 14,
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            claimedToday ? 'محفوظ شد' : 'آماده دریافت',
-                                            style: TextStyle(
-                                              color: claimedToday ? BrandColors.success : BrandColors.amber,
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w900,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Text(
-                                      'استریک ورود ۷ روزه',
-                                      style: theme.textTheme.titleLarge?.copyWith(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: -0.5,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      '${faNum(totalClaims)} بار دریافت موفق داشته‌اید.',
-                                      style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              
-                              Transform.translate(
-                                offset: Offset(0, floatY),
-                                child: Image.asset(
-                                  'assets/pass/streak_hero.webp',
-                                  width: 80,
-                                  height: 80, cacheWidth: 200,
-                                ),
-                              ),
-                            ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        for (var i = 0; i < 7; i++) ...[
+                          _MiniDayDot(
+                            day: i + 1,
+                            claimed: days.length > i && days[i]['claimed'] == true,
+                            current: days.length > i && days[i]['current'] == true,
                           ),
-                          
-                          const SizedBox(height: 24),
-                          
-                          // Days Rail
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: days.map((dayData) {
-                              final d = NumberParser.toInt(dayData['day']);
-                              final r = NumberParser.toInt(dayData['amount']);
-                              final c = dayData['claimed'] == true;
-                              final cur = dayData['current'] == true;
-                              return _DayPill(day: d, reward: r, claimed: c, current: cur, tick: t);
-                            }).toList(),
-                          ),
-                          
-                          const SizedBox(height: 24),
-                          
-                          // Bottom Actions
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _RewardInfo(
-                                  claimedToday: claimedToday,
-                                  currentDay: currentDay,
-                                  nextDay: nextDay,
-                                  nextReward: nextReward,
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              _ClaimBtn(
-                                busy: busy,
-                                claimedToday: claimedToday,
-                                onPressed: onClaim,
-                                glow: glow,
-                              ),
-                            ],
-                          ),
+                          if (i != 6) const SizedBox(width: 3),
                         ],
-                      ),
-                    ],
-                  ),
+                        const SizedBox(width: 7),
+                        Expanded(
+                          child: Text(
+                            claimedToday
+                                ? 'چرخه ۷ روزه · امروز روز ${faNum(currentDay)} تکمیل شد'
+                                : 'چرخه ۷ روزه · روز ${faNum(nextDay)} · ${faNum(nextReward)} امتیاز',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.72),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-            ),
+              Gaps.hXs,
+              SizedBox(
+                height: 42,
+                child: FilledButton(
+                  onPressed: onClaim,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFB84D),
+                    foregroundColor: const Color(0xFF25110A),
+                    disabledBackgroundColor: Colors.white.withValues(alpha: 0.12),
+                    disabledForegroundColor: Colors.white54,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    shape: RoundedRectangleBorder(borderRadius: Corners.rMd),
+                  ),
+                  child: busy
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(
+                          claimedToday ? 'دریافت شد' : 'دریافت',
+                          style: const TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -814,66 +711,105 @@ class _StunningStreakCard extends StatelessWidget {
   }
 }
 
-class _DayPill extends StatelessWidget {
-  const _DayPill({required this.day, required this.reward, required this.claimed, required this.current, required this.tick});
-  final int day, reward;
-  final bool claimed, current;
-  final double tick;
+class _MiniDayDot extends StatelessWidget {
+  const _MiniDayDot({required this.day, required this.claimed, required this.current});
+
+  final int day;
+  final bool claimed;
+  final bool current;
 
   @override
   Widget build(BuildContext context) {
-    final color = claimed ? BrandColors.success : (current ? BrandColors.amber : Colors.white54);
-    final scale = current ? 1.05 + math.sin(tick * math.pi * 2) * 0.05 : 1.0;
-    
-    return Transform.scale(
-      scale: scale,
-      child: Container(
-        width: 42,
-        height: 60,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
-          color: color.withValues(alpha: current ? 0.2 : claimed ? 0.1 : 0.05),
-          border: Border.all(color: color.withValues(alpha: current ? 0.8 : claimed ? 0.4 : 0.1), width: current ? 1.5 : 1),
-          boxShadow: current ? [BoxShadow(color: color.withValues(alpha: 0.3), blurRadius: 12)] : null,
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(claimed ? Icons.check_rounded : (current ? Icons.local_fire_department_rounded : Icons.calendar_today_rounded),
-                 size: 14, color: color),
-            const SizedBox(height: 4),
-            Text(faNum(day), style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 2),
-            Text('+${faNum(reward)}', style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w800)),
-          ],
+    final color = claimed
+        ? BrandColors.success
+        : current
+            ? BrandColors.amber
+            : Colors.white.withValues(alpha: 0.34);
+    return AnimatedContainer(
+      duration: Motion.fast,
+      width: current ? 18 : 14,
+      height: 18,
+      decoration: BoxDecoration(
+        borderRadius: Corners.rPill,
+        color: color.withValues(alpha: current ? 0.24 : 0.13),
+        border: Border.all(color: color.withValues(alpha: current ? 0.8 : 0.35)),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        claimed ? '✓' : faNum(day),
+        style: TextStyle(
+          color: color,
+          fontSize: 8,
+          fontWeight: FontWeight.w900,
+          height: 1,
         ),
       ),
     );
   }
 }
 
-class _RewardInfo extends StatelessWidget {
-  const _RewardInfo({required this.claimedToday, required this.currentDay, required this.nextDay, required this.nextReward});
-  final bool claimedToday;
-  final int currentDay, nextDay, nextReward;
+class _HeroArt extends StatelessWidget {
+  const _HeroArt({required this.compact, required this.nextDay});
+
+  final bool compact;
+  final int nextDay;
 
   @override
   Widget build(BuildContext context) {
+    final size = compact ? 86.0 : 104.0;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      width: size,
+      height: size,
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        borderRadius: BorderRadius.circular(compact ? 24 : 28),
+        gradient: LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [
+            Colors.white.withValues(alpha: 0.12),
+            BrandColors.emerald.withValues(alpha: 0.12),
+            Colors.black.withValues(alpha: 0.08),
+          ],
+        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+        boxShadow: [
+          BoxShadow(
+            color: BrandColors.emerald.withValues(alpha: 0.22),
+            blurRadius: 26,
+            offset: const Offset(0, 12),
+          ),
+        ],
       ),
-      child: Row(
+      child: Stack(
+        fit: StackFit.expand,
         children: [
-          Icon(Icons.auto_awesome, color: BrandColors.amber, size: 18),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              claimedToday ? 'روز ${faNum(currentDay)} از ۷ تکمیل شد' : 'فردا: ${faNum(nextReward)} امتیاز ویژه',
-              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w800),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(compact ? 22 : 26),
+            child: Image.asset(
+              'assets/pass/streak_hero.webp',
+              fit: BoxFit.cover,
+              cacheWidth: 360,
+            ),
+          ),
+          Positioned(
+            top: 7,
+            right: 7,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                borderRadius: Corners.rPill,
+                color: const Color(0xFF071521).withValues(alpha: 0.72),
+                border: Border.all(color: const Color(0xFFFFD166).withValues(alpha: 0.55)),
+              ),
+              child: Text(
+                'روز ${faNum(nextDay)}',
+                style: const TextStyle(
+                  color: Color(0xFFFFD166),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  height: 1.1,
+                ),
+              ),
             ),
           ),
         ],
@@ -882,110 +818,368 @@ class _RewardInfo extends StatelessWidget {
   }
 }
 
-class _ClaimBtn extends StatelessWidget {
-  const _ClaimBtn({required this.busy, required this.claimedToday, required this.onPressed, required this.glow});
-  final bool busy, claimedToday;
-  final VoidCallback? onPressed;
-  final double glow;
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.claimedToday, required this.canClaim});
+
+  final bool claimedToday;
+  final bool canClaim;
 
   @override
   Widget build(BuildContext context) {
-    final enabled = onPressed != null;
-    return GestureDetector(
-      onTap: onPressed,
+    final color = claimedToday ? BrandColors.success : BrandColors.amber;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        borderRadius: Corners.rPill,
+        color: color.withValues(alpha: 0.16),
+        border: Border.all(color: color.withValues(alpha: 0.42)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            claimedToday ? Icons.verified_rounded : Icons.bolt_rounded,
+            size: 15,
+            color: color,
+          ),
+          const SizedBox(width: 5),
+          Text(
+            claimedToday ? 'امروز دریافت شد' : 'آمادهٔ دریافت',
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TinyMetric extends StatelessWidget {
+  const _TinyMetric({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        borderRadius: Corners.rPill,
+        color: Colors.white.withValues(alpha: 0.07),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: Colors.white.withValues(alpha: 0.82)),
+          const SizedBox(width: 5),
+          Text(
+            text,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.82),
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProgressRail extends StatelessWidget {
+  const _ProgressRail({required this.progress, required this.label});
+
+  final double progress;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.78),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            Text(
+              '${faNum((progress * 100).round())}٪',
+              style: const TextStyle(
+                color: Color(0xFFFFD166),
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+        Gaps.vXs,
+        Container(
+          height: 9,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            borderRadius: Corners.rPill,
+            color: Colors.white.withValues(alpha: 0.10),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+          ),
+          child: FractionallySizedBox(
+            alignment: Alignment.centerRight,
+            widthFactor: progress.clamp(0.02, 1.0).toDouble(),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: Corners.rPill,
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFFFD166), Color(0xFF22E7A6), Color(0xFF4EA1FF)],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: BrandColors.emerald.withValues(alpha: 0.34),
+                    blurRadius: 12,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DayNode extends StatelessWidget {
+  const _DayNode({
+    required this.day,
+    required this.reward,
+    required this.claimed,
+    required this.current,
+    required this.compact,
+    required this.tick,
+  });
+
+  final int day;
+  final int reward;
+  final bool claimed;
+  final bool current;
+  final bool compact;
+  final double tick;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = claimed
+        ? BrandColors.success
+        : current
+            ? BrandColors.amber
+            : Colors.white.withValues(alpha: 0.54);
+    final pulse = current ? 1 + math.sin(tick * math.pi * 2) * 0.055 : 1.0;
+    return Transform.scale(
+      scale: pulse,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        height: 48,
-        padding: const EdgeInsets.symmetric(horizontal: 24),
+        duration: Motion.fast,
+        height: compact ? 58 : 64,
+        padding: EdgeInsets.symmetric(vertical: compact ? 5 : 6, horizontal: 2),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          gradient: enabled
-              ? const LinearGradient(colors: [BrandColors.amber, Color(0xFFFF7A45)])
+          color: color.withValues(alpha: current ? 0.18 : claimed ? 0.14 : 0.08),
+          border: Border.all(
+            color: color.withValues(alpha: current ? 0.72 : claimed ? 0.45 : 0.18),
+            width: current ? 1.35 : 1,
+          ),
+          boxShadow: current
+              ? [
+                  BoxShadow(
+                    color: BrandColors.amber.withValues(alpha: 0.18),
+                    blurRadius: 16,
+                    offset: const Offset(0, 8),
+                  )
+                ]
               : null,
-          color: enabled ? null : Colors.white.withValues(alpha: 0.1),
-          boxShadow: enabled ? [BoxShadow(color: BrandColors.amber.withValues(alpha: 0.4 + glow * 0.2), blurRadius: 20, offset: const Offset(0, 8))] : null,
         ),
-        child: Center(
-          child: busy
-              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-              : Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Opacity(
-                      opacity: enabled ? 1 : 0.45,
-                      child: Image.asset(
-                        'assets/pass/cta_spark.png',
-                        width: 22,
-                        height: 22,
-                        cacheWidth: 64,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      claimedToday ? 'دریافت شد' : 'دریافت پاداش',
-                      style: TextStyle(
-                        color: enabled ? Colors.black : Colors.white54,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              claimed
+                  ? Icons.check_circle_rounded
+                  : current
+                      ? Icons.local_fire_department_rounded
+                      : Icons.calendar_today_rounded,
+              size: compact ? 15 : 17,
+              color: color,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              faNum(day),
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.94),
+                fontSize: compact ? 11 : 12,
+                fontWeight: FontWeight.w900,
+                height: 1.0,
+              ),
+            ),
+            if (!compact && reward > 0) ...[
+              const SizedBox(height: 2),
+              Text(
+                '+${faNum(reward)}',
+                maxLines: 1,
+                overflow: TextOverflow.fade,
+                style: TextStyle(
+                  color: color.withValues(alpha: 0.95),
+                  fontSize: 9,
+                  fontWeight: FontWeight.w900,
+                  height: 1.0,
                 ),
+              ),
+            ],
+          ],
         ),
       ),
     );
   }
 }
 
-class _CompactStreakLoading extends StatelessWidget {
-  const _CompactStreakLoading({required this.loop}); final Animation<double> loop;
-  @override Widget build(BuildContext context) => AnimatedBuilder(animation: loop, builder: (context, _) => Container(
-    margin: const EdgeInsets.symmetric(vertical: 4), padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-    decoration: BoxDecoration(borderRadius: BorderRadius.circular(24), gradient: LinearGradient(colors: [BrandColors.emerald.withValues(alpha: .22), BrandColors.blue.withValues(alpha: .12)]), border: Border.all(color: BrandColors.emerald.withValues(alpha: .35))),
-    child: Row(children: [Transform.rotate(angle: loop.value * math.pi * 2, child: const Icon(Icons.local_fire_department_rounded, color: BrandColors.amber, size: 30)), Gaps.hSm, const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('استریک روزانه', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900)), SizedBox(height: 3), Text('در حال آماده‌سازی چرخه ۷ روزه…', style: TextStyle(color: Colors.white70, fontSize: 12))]))]),
-  ));
-}
-class _CompactStreakUnavailable extends StatelessWidget {
-  const _CompactStreakUnavailable({required this.onRetry}); final VoidCallback onRetry;
-  @override Widget build(BuildContext context) => InkWell(onTap: onRetry, borderRadius: BorderRadius.circular(24), child: Container(
-    margin: const EdgeInsets.symmetric(vertical: 4), padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
-    decoration: BoxDecoration(borderRadius: BorderRadius.circular(24), color: const Color(0xFF132B35), border: Border.all(color: BrandColors.amber.withValues(alpha: .45))),
-    child: const Row(children: [Icon(Icons.local_fire_department_rounded, color: BrandColors.amber, size: 30), Gaps.hSm, Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('استریک روزانه', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900)), SizedBox(height: 3), Text('برای دریافت پاداش، دوباره تلاش کنید', style: TextStyle(color: Colors.white70, fontSize: 12))])), Icon(Icons.refresh_rounded, color: Colors.white70)]),
-  ));
-}
+class _RewardPreview extends StatelessWidget {
+  const _RewardPreview({
+    required this.claimedToday,
+    required this.currentDay,
+    required this.nextDay,
+    required this.nextReward,
+  });
 
-class _ErrorStreakCard extends StatelessWidget {
-  const _ErrorStreakCard({required this.loop, required this.onRetry, required this.error});
-  final Animation<double> loop;
-  final VoidCallback onRetry;
-  final String error;
+  final bool claimedToday;
+  final int currentDay;
+  final int nextDay;
+  final int nextReward;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onRetry,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(32),
-          color: BrandColors.danger.withValues(alpha: 0.1),
-          border: Border.all(color: BrandColors.danger.withValues(alpha: 0.3), width: 1.5),
-        ),
-        child: const Row(
-          children: [
-            Icon(Icons.error_outline_rounded, color: BrandColors.danger, size: 32),
-            SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('استریک در دسترس نیست', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  Text('برای تلاش مجدد ضربه بزنید', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                ],
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: Gaps.sm, vertical: Gaps.sm),
+      decoration: BoxDecoration(
+        borderRadius: Corners.rLg,
+        color: Colors.white.withValues(alpha: 0.07),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.redeem_rounded, color: Color(0xFFFFD166), size: 20),
+          Gaps.hXs,
+          Expanded(
+            child: Text(
+              claimedToday
+                  ? 'روز ${faNum(currentDay)} از ۷ محفوظ شد'
+                  : 'روز ${faNum(nextDay)}: ${faNum(nextReward)} امتیاز',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.86),
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                height: 1.35,
               ),
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ClaimButton extends StatelessWidget {
+  const _ClaimButton({
+    required this.busy,
+    required this.claimedToday,
+    required this.accent,
+    required this.onPressed,
+  });
+
+  final bool busy;
+  final bool claimedToday;
+  final Color accent;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onPressed != null;
+    return Material(
+      color: Colors.transparent,
+      borderRadius: Corners.rLg,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: Corners.rLg,
+        child: AnimatedContainer(
+          duration: Motion.fast,
+          height: 50,
+          constraints: const BoxConstraints(minWidth: 118),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            borderRadius: Corners.rLg,
+            gradient: enabled
+                ? const LinearGradient(
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                    colors: [Color(0xFFFFE08A), Color(0xFFFFB84D), Color(0xFFFF7A45)],
+                  )
+                : null,
+            color: enabled ? null : Colors.white.withValues(alpha: 0.11),
+            border: Border.all(
+              color: enabled
+                  ? Colors.white.withValues(alpha: 0.24)
+                  : Colors.white.withValues(alpha: 0.08),
+            ),
+            boxShadow: enabled
+                ? [
+                    BoxShadow(
+                      color: accent.withValues(alpha: 0.24),
+                      blurRadius: 18,
+                      offset: const Offset(0, 9),
+                    )
+                  ]
+                : null,
+          ),
+          child: Center(
+            child: busy
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.3,
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF25110A)),
+                    ),
+                  )
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (enabled) ...[
+                        Image.asset(
+                          'assets/pass/cta_spark.png',
+                          width: 20,
+                          height: 20,
+                          cacheWidth: 64,
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      Text(
+                        claimedToday ? 'دریافت شد' : 'دریافت',
+                        style: TextStyle(
+                          color: enabled ? const Color(0xFF25110A) : Colors.white54,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
         ),
       ),
     );
@@ -994,6 +1188,7 @@ class _ErrorStreakCard extends StatelessWidget {
 
 class _StreakSkeleton extends StatelessWidget {
   const _StreakSkeleton({required this.loop});
+
   final Animation<double> loop;
 
   @override
@@ -1001,16 +1196,25 @@ class _StreakSkeleton extends StatelessWidget {
     return AnimatedBuilder(
       animation: loop,
       builder: (context, _) {
-        final shimmer = (math.sin(loop.value * math.pi * 2) + 1) / 2;
+        final shine = (math.sin(loop.value * math.pi * 2) + 1) / 2;
+        final fill = Color.lerp(
+          Theme.of(context).colorScheme.surface.withValues(alpha: 0.48),
+          Theme.of(context).colorScheme.surfaceContainerHigh.withValues(alpha: 0.72),
+          shine,
+        )!;
         return Container(
-          height: 200,
-          margin: const EdgeInsets.symmetric(vertical: 4),
+          height: 224,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(32),
-            color: Colors.white.withValues(alpha: 0.05 + shimmer * 0.05),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+            borderRadius: BorderRadius.circular(30),
+            color: fill,
+            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
           ),
-          child: const Center(child: CircularProgressIndicator(color: Colors.white24)),
+          child: Center(
+            child: Text(
+              'استریک ورود در حال آماده‌سازی است…',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.62)),
+            ),
+          ),
         );
       },
     );
@@ -1019,23 +1223,29 @@ class _StreakSkeleton extends StatelessWidget {
 
 class _StreakParticlesPainter extends CustomPainter {
   const _StreakParticlesPainter({required this.progress, required this.celebrate});
+
   final double progress;
   final bool celebrate;
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..style = PaintingStyle.fill;
-    final center = Offset(size.width * 0.8, size.height * 0.2);
-    final radius = math.min(size.width, size.height) * (celebrate ? 0.6 : 0.4);
-    for (var i = 0; i < 20; i++) {
-      final angle = i * 2.4 + progress * math.pi * 2;
-      final r = radius * (0.3 + (i % 5) * 0.1);
-      final p = center + Offset(math.cos(angle) * r, math.sin(angle) * r * 0.8);
-      paint.color = BrandColors.amber.withValues(alpha: (0.1 + (i % 3) * 0.1) * (celebrate ? 2.0 : 1.0));
-      canvas.drawCircle(p, celebrate ? 3.0 : 1.5, paint);
+    final center = Offset(size.width * 0.55, size.height * 0.38);
+    final radius = math.min(size.width, size.height) * (celebrate ? 0.44 : 0.34);
+    for (var i = 0; i < 24; i++) {
+      final speed = i.isEven ? 1.0 : -0.72;
+      final angle = i * 2.399 + progress * math.pi * 2 * speed;
+      final wobble = math.sin(progress * math.pi * 2 + i) * 0.08;
+      final r = radius * (0.35 + (i % 7) * 0.085 + wobble);
+      final p = center + Offset(math.cos(angle) * r, math.sin(angle) * r * 0.58);
+      final a = (0.10 + (i % 5) * 0.035) * (celebrate ? 1.75 : 1.0);
+      paint.color = (i % 3 == 0 ? BrandColors.amber : BrandColors.emerald)
+          .withValues(alpha: a.clamp(0.06, 0.34).toDouble());
+      canvas.drawCircle(p, celebrate && i % 4 == 0 ? 2.2 : 1.35, paint);
     }
   }
 
   @override
-  bool shouldRepaint(covariant _StreakParticlesPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _StreakParticlesPainter oldDelegate) =>
+      oldDelegate.progress != progress || oldDelegate.celebrate != celebrate;
 }

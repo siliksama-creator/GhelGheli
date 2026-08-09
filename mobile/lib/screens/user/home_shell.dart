@@ -463,7 +463,7 @@ class _HomeShellState extends State<HomeShell>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        titleSpacing: 20,
+        titleSpacing: 10,
         // ── نوار بالا: فقط لوگوی درخشان و عنوان صفحه ──
         //
         // درخواست مالک: «اون بالای بالا که سلام نوشته رو کلا حذف کن و
@@ -477,11 +477,21 @@ class _HomeShellState extends State<HomeShell>
         title: Row(
           children: [
             const AppBarLogo(),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Expanded(
-              child: Text(
-                _titles[_index],
-                overflow: TextOverflow.ellipsis,
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(
+                    _titles[_index],
+                    maxLines: 1,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
@@ -513,10 +523,9 @@ class _HomeShellState extends State<HomeShell>
             onPressed: () => setState(() => _index = wheelIndex),
           ),
           NotificationBell(api: widget.api),
-          IconButton(
-              tooltip: 'خروج',
-              onPressed: widget.onLogout,
-              icon: const Icon(Icons.logout_rounded)),
+          // خروج از شیت «بیشتر» هم در دسترس است؛ حذفِ دکمهٔ تکراری از
+          // نوار بالا، عنوان صفحه را از حالت «چت و...» و «پشتی...» نجات
+          // می‌دهد بدون اینکه هیچ قابلیتی کم شود.
           const SizedBox(width: 4),
         ],
       ),

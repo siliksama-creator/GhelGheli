@@ -78,8 +78,8 @@ console.log('\n== اندروید: ظاهر و رفتار ۲۰۲۶ ==');
     'کارت اندروید انیمیشن دائمی سبک دارد');
   ok(/CustomPaint/.test(mobileCard) && /_StreakParticlesPainter/.test(mobileCard),
     'ذرات و گلوهای پس‌زمینه با painter ارزان کشیده می‌شوند');
-  ok(/_StreakPulseBadge/.test(mobileCard) && /_StreakPulsePainter/.test(mobileCard),
-    'کارت فشردهٔ اندروید به‌جای تصویر سنگین، انیمیشن سبک جلب‌توجه دارد');
+  ok(/assets\/pass\/streak_hero\.webp/.test(mobileCard),
+    'کارت اندروید از تصویر قهرمان جدید استفاده می‌کند');
   ok(/assets\/pass\/cta_spark\.png/.test(mobileCard),
     'دکمهٔ دریافت اندروید از آیکون شفاف اختصاصی استفاده می‌کند');
   ok(/initialData/.test(mobileCard) && /onClaimed/.test(mobileCard),
@@ -107,15 +107,14 @@ console.log('\n== وب: هم‌تراز با اندروید ==');
     'آیکون شفاف CTA برای وب هم منتشر می‌شود');
   ok(/initialData/.test(webCard) && /onClaimed/.test(webCard),
     'کارت وب با bootstrap شروع می‌شود و بعد از claim reload می‌کند');
-  ok(/streakOrb/.test(webCard) && /streakOrbIcon/.test(webCard),
-    'کارت وب هم مثل اندروید به‌جای تصویر سنگین، orb انیمیشنی دارد');
+  ok(/streak_hero\.webp/.test(webCard), 'کارت وب از تصویر قهرمان جدید استفاده می‌کند');
   ok(/cta_spark\.png/.test(webCard), 'دکمهٔ دریافت وب از آیکون شفاف CTA استفاده می‌کند');
   ok(/loginStreak:\s*boot\.loginStreak/.test(webMain),
     'وب loginStreak را در state بوت‌استرپ نگه می‌دارد');
   ok(/initialData=\{p\.loginStreak\}/.test(webHome) && /onClaimed=\{load\}/.test(webHome),
     'صفحهٔ خانهٔ وب دادهٔ استریک و refresh را وصل کرده است');
-  ok(/streakSpin/.test(webCss) && /streakOrb/.test(webCss) && /streakProgress/.test(webCss),
-    'CSS وب کارت استریک را با گلو، orb انیمیشنی و نوار پیشرفت جدید رندر می‌کند');
+  ok(/streakSpin/.test(webCss) && /streakHeroArt/.test(webCss) && /streakProgress/.test(webCss),
+    'CSS وب کارت استریک را با گلو، تصویر و نوار پیشرفت جدید رندر می‌کند');
 }
 
 console.log(`\n${fail === 0 ? '✓' : '✗'} ${pass} تست موفق، ${fail} ناموفق`);
