@@ -276,18 +276,18 @@ class _WalletStrip extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            color: Colors.black.withValues(alpha: 0.3),
+            color: Colors.black.withValues(alpha: 0.28),
             border: Border.all(
-              color: gold.withValues(alpha: hasMoney ? 0.5 : 0.2),
+              color: gold.withValues(alpha: hasMoney ? 0.5 : 0.22),
               width: 1.0,
             ),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
           child: Row(
             children: [
               Container(
-                width: 28,
-                height: 28,
+                width: 26,
+                height: 26,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
@@ -301,30 +301,36 @@ class _WalletStrip extends StatelessWidget {
                 ),
                 child: Icon(
                   Icons.account_balance_wallet_rounded,
-                  size: 15,
+                  size: 14,
                   color: hasMoney ? const Color(0xFF6B4E00) : Colors.white70,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Expanded(
-                child: Row(
-                  children: [
-                    const Text('کیف پول: ', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600)),
-                    Text(
-                      Money.format(balance),
-                      style: TextStyle(
-                        color: hasMoney ? gold : Colors.white,
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w900,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('کیف پول: ', style: TextStyle(color: Colors.white70, fontSize: 10.5, fontWeight: FontWeight.w600)),
+                      Text(
+                        Money.format(balance),
+                        style: TextStyle(
+                          color: hasMoney ? gold : Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 3),
-                    Text('تومان', style: TextStyle(color: gold.withValues(alpha: 0.8), fontSize: 10, fontWeight: FontWeight.w600)),
-                  ],
+                      const SizedBox(width: 3),
+                      Text('تومان', style: TextStyle(color: gold.withValues(alpha: 0.8), fontSize: 9.5, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
                 ),
               ),
+              const SizedBox(width: 4),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                 decoration: BoxDecoration(
                   color: gold.withValues(alpha: 0.18),
                   borderRadius: Corners.rPill,
@@ -333,8 +339,8 @@ class _WalletStrip extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(hasMoney ? 'برداشت' : 'مشاهده',
-                        style: const TextStyle(color: gold, fontSize: 10, fontWeight: FontWeight.w800)),
-                    const Icon(Icons.chevron_left_rounded, size: 13, color: gold),
+                        style: const TextStyle(color: gold, fontSize: 9.5, fontWeight: FontWeight.w800)),
+                    const Icon(Icons.chevron_left_rounded, size: 12, color: gold),
                   ],
                 ),
               ),
