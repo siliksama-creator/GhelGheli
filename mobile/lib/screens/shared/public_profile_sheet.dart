@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
-import '../../core/assets.dart';
 import '../../core/cosmetics.dart';
-import '../../theme/colors.dart';
-import '../../theme/tokens.dart';
 import '../../widgets/async_section.dart';
 import '../../widgets/avatar_image.dart';
 import '../../widgets/safe_image.dart';
-import '../../widgets/state_views.dart';
 
 /// Shows a user's comprehensive public profile (points, league rank, club, plus, prizes, cards).
 Future<void> showPublicProfile(
@@ -55,7 +51,6 @@ class _PublicProfileBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final rewards = List<Map<String, dynamic>>.from(data['rewards'] ?? []);
     final trophies = List<Map<String, dynamic>>.from(data['trophies'] ?? []);
     final cards = List<Map<String, dynamic>>.from(data['cards'] ?? []);
