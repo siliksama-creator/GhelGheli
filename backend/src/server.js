@@ -3164,7 +3164,7 @@ app.post('/api/admin/users/:id/grant-plus', adminAuth, validateUuid('id'), requi
   await audit(req.admin.id, 'grant_plus', 'user_subscriptions', r.rows[0].id, req.body.reason || 'اعطای دستی اشتراک پلاس', { days });
   await createNotification(req.params.id, 'plus_granted', 'اشتراک قلقلی پلاس فعال شد!', `اشتراک قلقلی پلاس به مدت ${days} روز توسط مدیریت برای شما فعال شد.`);
   res.json({ message: `اشتراک پلاس به مدت ${days} روز برای کاربر با موفقیت فعال شد`, expiresAt: r.rows[0].expires_at });
-});
+}));
 
 app.post('/api/admin/users/:id/points', adminAuth, validateUuid('id'), requireRole(), asyncHandler(async (req, res) => {
   const p = Math.trunc(Number(req.body.points || 0));

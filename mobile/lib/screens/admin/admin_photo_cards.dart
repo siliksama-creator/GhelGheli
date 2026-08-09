@@ -91,8 +91,7 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
       final m = r is Map ? Map<String, dynamic>.from(r) : <String, dynamic>{};
       setState(() => _quickResult = m);
       _snack(m['message']?.toString() ?? 'وضعیت کد تغییر کرد');
-      await _loadCodes();
-      await _loadStats();
+      await _load();
     } catch (e) {
       _snack(apiError(e));
     } finally {
@@ -985,6 +984,63 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
       subtitle: 'ویرایش یا حذف فقط برای کدهای استفاده‌نشده ممکن است — '
           'کدِ مصرف‌شده امتیاز داده و در مجموعهٔ کاربر نشسته.',
       children: [
+        // ── جستجوی سریع و فعال/غیرفعال‌سازی کد ──
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            color: Colors.white.withValues(alpha: 0.04),
+            border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.3)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.qr_code_scanner_rounded, size: 16, color: Color(0xFF38BDF8)),
+                  SizedBox(width: 6),
+                  Text('فعال / غیرفعال‌سازی سریع کد (از میان ۱۵٬۰۰۰+ کد)',
+                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: TextField(
+                        controller: _quickCodeCtrl,
+                        decoration: const InputDecoration(
+                          hintText: 'GHP-A2B3-C4D5',
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    onPressed: _quickToggling ? null : _toggleQuickCode,
+                    child: Text(_quickToggling ? '...' : 'تغییر وضعیت'),
+                  ),
+                ],
+              ),
+              if (_quickResult != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  'کد ${_quickResult!['code']} -> ${_quickResult!['status'] == 'unused' ? 'فعال (آماده مصرف)' : 'غیرفعال (باطل)'}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: _quickResult!['status'] == 'unused' ? const Color(0xFF34D399) : const Color(0xFFFF6B6B),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
