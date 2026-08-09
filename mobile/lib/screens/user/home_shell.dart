@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+import '../../theme/tokens.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -742,6 +744,63 @@ class _WheelButtonState extends State<_WheelButton>
             ),
           ),
       ],
+    );
+  }
+}
+
+class _PassButton extends StatelessWidget {
+  const _PassButton({
+    required this.claimable,
+    required this.tiersToday,
+    required this.selected,
+    required this.onPressed,
+  });
+
+  final int claimable, tiersToday;
+  final bool selected;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: 'گذر نبرد فصلی',
+      onPressed: onPressed,
+      style: selected
+          ? IconButton.styleFrom(
+              backgroundColor:
+                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.18))
+          : null,
+      icon: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Image.asset('assets/pass/trophy_icon.webp',
+              width: 26, height: 26, cacheWidth: 80, fit: BoxFit.contain),
+          if (claimable > 0)
+            Positioned(
+              top: -3,
+              right: -3,
+              child: Container(
+                width: 14,
+                height: 14,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFEF4444),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    faNum(math.min(claimable, 2)),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w900,
+                      height: 1.1,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

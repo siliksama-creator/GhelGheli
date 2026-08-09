@@ -954,6 +954,12 @@ class _PitchPainter extends CustomPainter {
     canvas.drawLine(Offset(gl + gw, gt + gh), Offset(gl + gw, gt), _post);
     canvas.drawLine(Offset(gl, gt), Offset(gl + gw, gt), _post);
 
+    /// مرکز یک ناحیه روی دهانهٔ دروازه.
+    Offset zoneCenter(int z) {
+      final c = z % 3, r = z ~/ 3;
+      return Offset(gl + gw * (c + 0.5) / 3, gt + gh * (r + 0.5) / 3);
+    }
+
     // ── مانع / مدافع ──
     final obst = (lk != null && lk['obstacleZone'] != null)
         ? NumberParser.toInt(lk['obstacleZone'])
@@ -966,12 +972,6 @@ class _PitchPainter extends CustomPainter {
     final spot = Offset(w / 2, h * 0.88);
     canvas.drawCircle(
         spot, 3.5, Paint()..color = Colors.white.withValues(alpha: 0.55));
-
-    /// مرکز یک ناحیه روی دهانهٔ دروازه.
-    Offset zoneCenter(int z) {
-      final c = z % 3, r = z ~/ 3;
-      return Offset(gl + gw * (c + 0.5) / 3, gt + gh * (r + 0.5) / 3);
-    }
 
     // ── دروازه‌بان ──
     //

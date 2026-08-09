@@ -617,7 +617,7 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
                     setModalState(() => saving = true);
                     try {
                       // 1. Update card type
-                      await widget.api.patch('/api/admin/photo-cards/card-types/' + typeId, {
+                      await widget.api.patch('/api/admin/photo-cards/card-types/$typeId', {
                         'name': nameCtrl.text.trim(),
                         'pointValue': int.tryParse(pointsCtrl.text) ?? 0,
                         'cashAmount': int.tryParse(cashCtrl.text) ?? 0,
@@ -631,7 +631,7 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
 
                       // 2. Add codes if typed
                       if (newCodesCtrl.text.trim().isNotEmpty) {
-                        await widget.api.post('/api/admin/photo-cards/card-types/' + typeId + '/add-codes', {
+                        await widget.api.post('/api/admin/photo-cards/card-types/$typeId' + '/add-codes', {
                           'rawCodes': newCodesCtrl.text.trim(),
                           'batchLabel': newBatchCtrl.text.trim().isNotEmpty ? newBatchCtrl.text.trim() : null,
                         });
