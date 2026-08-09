@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
 import '../../core/assets.dart';
+import '../../theme/brand_theme.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/state_views.dart';
 
@@ -159,7 +160,6 @@ class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin
     final hasPlus = d['hasPlus'] == true;
     final claimable = NumberParser.toInt(d['claimable']);
 
-    // Determine folded claimed tiers
     bool isTierDone(Map row) {
       final tNum = NumberParser.toInt(row['tier']);
       final free = row['free'] is Map ? row['free'] as Map : null;
@@ -180,9 +180,9 @@ class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin
         children: [
           // ── Compact Season Hero ──
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(18),
               gradient: const LinearGradient(
                 begin: Alignment.topRight,
                 end: Alignment.bottomLeft,
@@ -191,44 +191,36 @@ class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin
               border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
             ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Row(
                   children: [
-                    Image.asset('assets/pass/streak_icon.webp', width: 44, height: 44, cacheWidth: 120,
-                        errorBuilder: (_, __, ___) => const Icon(Icons.emoji_events_rounded, color: _plusGold, size: 36)),
-                    const SizedBox(width: 10),
+                    Image.asset('assets/pass/streak_icon.webp', width: 40, height: 40, cacheWidth: 100,
+                        errorBuilder: (_, __, ___) => const Icon(Icons.emoji_events_rounded, color: _plusGold, size: 32)),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '${season['name'] ?? 'گذر نبرد فصلی'}',
-                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.white),
+                            '${season['name'] ?? 'فصل اول — شروع قلقلی'}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Colors.white),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             '${faNum(season['daysLeft'])} روز تا پایان فصل · پله ${faNum(tier)} از ${faNum(tierCount)}',
-                            style: TextStyle(color: Colors.white.withValues(alpha: 0.70), fontSize: 11.5),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.70), fontSize: 11),
                           ),
                         ],
                       ),
                     ),
-                    if (claimable > 0)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: _readyColor.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: _readyColor),
-                        ),
-                        child: Text(
-                          '${faNum(claimable)} جایزه آماده',
-                          style: const TextStyle(color: _readyColor, fontWeight: FontWeight.w900, fontSize: 11),
-                        ),
-                      ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
 
                 // ── XP Progress Bar ──
                 ClipRRect(
@@ -237,7 +229,7 @@ class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin
                     value: (d['tierNeeds'] as num? ?? 0) > 0
                         ? ((d['intoTier'] as num? ?? 0) / (d['tierNeeds'] as num)).clamp(0.0, 1.0)
                         : 1.0,
-                    minHeight: 8,
+                    minHeight: 7,
                     backgroundColor: Colors.white.withValues(alpha: 0.10),
                     valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF22E7A6)),
                   ),
@@ -248,29 +240,29 @@ class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin
                   children: [
                     Text(
                       'امروز ${faNum(d['tiersToday'])} از ${faNum(d['maxTiersPerDay'])} پله باز شد',
-                      style: const TextStyle(fontSize: 11, color: Colors.white70, fontWeight: FontWeight.w700),
+                      style: const TextStyle(fontSize: 10.5, color: Colors.white70, fontWeight: FontWeight.w700),
                     ),
                     Text(
                       '${faNum(d['intoTier'])} / ${faNum(d['tierNeeds'])} XP تا پله بعد',
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF38BDF8), fontWeight: FontWeight.w800),
+                      style: const TextStyle(fontSize: 10.5, color: Color(0xFF38BDF8), fontWeight: FontWeight.w800),
                     ),
                   ],
                 ),
 
                 if (claimable > 0) ...[
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   SizedBox(
                     width: double.infinity,
-                    height: 38,
+                    height: 36,
                     child: ElevatedButton(
                       onPressed: _busy ? null : _claimAll,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF22E7A6),
                         foregroundColor: const Color(0xFF04291D),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
-                      child: Text('دریافت همه جوایز آماده (${faNum(claimable)})',
-                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12.5)),
+                      child: Text('دریافت ${faNum(claimable)} جایزه آماده',
+                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
                     ),
                   ),
                 ],
@@ -278,13 +270,13 @@ class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin
             ),
           ),
 
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
 
-          // ── Visual XP Infographic (One Glance Overview) ──
+          // ── Visual XP Infographic ──
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(14),
               color: Colors.white.withValues(alpha: 0.04),
               border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
             ),
@@ -293,16 +285,16 @@ class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin
               children: [
                 const Row(
                   children: [
-                    Icon(Icons.bolt_rounded, color: Color(0xFFFFD166), size: 16),
+                    Icon(Icons.bolt_rounded, color: Color(0xFFFFD166), size: 15),
                     SizedBox(width: 4),
                     Text('راه‌های سریع کسب تجربه (XP):',
-                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11.5, color: Colors.white)),
+                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: Colors.white)),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
+                  spacing: 5,
+                  runSpacing: 5,
                   children: const [
                     _XpPill(label: 'بازی آنلاین', xp: '+۱۵/۲۵'),
                     _XpPill(label: 'ضربه‌زن', xp: '+۳۰'),
@@ -316,11 +308,11 @@ class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin
           ),
 
           if (!hasPlus) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(12),
                 gradient: const LinearGradient(
                   colors: [Color(0xFF2E2407), Color(0xFF141A29)],
                 ),
@@ -328,16 +320,18 @@ class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin
               ),
               child: Row(
                 children: [
-                  const Text('★', style: TextStyle(color: _plusGold, fontSize: 22)),
-                  const SizedBox(width: 10),
+                  const Text('★', style: TextStyle(color: _plusGold, fontSize: 20)),
+                  const SizedBox(width: 8),
                   const Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('مسیر طلایی قلقلی پلاس',
-                            style: TextStyle(color: _plusGold, fontWeight: FontWeight.w900, fontSize: 13)),
-                        Text('جوایز نقدی، شانس گردونه و آیتم‌های ویژه',
-                            style: TextStyle(color: Colors.white70, fontSize: 11)),
+                        Text('مسیر طلایی قفل است',
+                            style: TextStyle(color: _plusGold, fontWeight: FontWeight.w900, fontSize: 12.5)),
+                        Text('چرخش گردونه، آیتم‌های ویژه و امتیاز دو برابر',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: Colors.white70, fontSize: 10.5)),
                       ],
                     ),
                   ),
@@ -346,58 +340,67 @@ class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _plusGold,
                       foregroundColor: const Color(0xFF291B00),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                     ),
-                    child: const Text('خرید پلاس', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11.5)),
+                    child: const Text('بازکردن', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11)),
                   ),
                 ],
               ),
             ),
           ],
 
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
 
-          // ── Track Legend & Fold Button ──
+          // ── Track Legend & Fold Button (Wrap ensures zero overflow) ──
           Wrap(
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 8,
+            spacing: 6,
             runSpacing: 4,
             children: [
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                     decoration: BoxDecoration(
                       color: _freeColor.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: _freeColor.withValues(alpha: 0.4)),
                     ),
-                    child: const Text('مسیر رایگان',
-                        style: TextStyle(color: _freeColor, fontSize: 10.5, fontWeight: FontWeight.w800)),
+                    child: const Text('رایگان',
+                        style: TextStyle(color: _freeColor, fontSize: 10, fontWeight: FontWeight.w800)),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 5),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                     decoration: BoxDecoration(
                       color: _plusGold.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: _plusGold.withValues(alpha: 0.4)),
                     ),
-                    child: const Text('★ مسیر پلاس',
-                        style: TextStyle(color: _plusGold, fontSize: 10.5, fontWeight: FontWeight.w800)),
+                    child: const Text('★ پلاس',
+                        style: TextStyle(color: _plusGold, fontSize: 10, fontWeight: FontWeight.w800)),
                   ),
                 ],
               ),
               if (claimedCount > 0)
-                TextButton.icon(
-                  onPressed: () => setState(() => _showClaimed = !_showClaimed),
-                  icon: Icon(_showClaimed ? Icons.expand_less_rounded : Icons.expand_more_rounded, size: 18),
-                  label: Text(
-                    _showClaimed ? 'بستن پله‌های قبلی' : 'پله‌های تکمیل‌شده (${faNum(claimedCount)})',
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                InkWell(
+                  onTap: () => setState(() => _showClaimed = !_showClaimed),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(_showClaimed ? Icons.expand_less_rounded : Icons.expand_more_rounded, size: 16, color: Colors.white70),
+                        const SizedBox(width: 2),
+                        Text(
+                          _showClaimed ? 'بستن قبلی‌ها' : 'پله‌های قبل (${faNum(claimedCount)})',
+                          style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Colors.white70),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
             ],
@@ -429,17 +432,17 @@ class _XpPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(label, style: const TextStyle(fontSize: 11, color: Colors.white70, fontWeight: FontWeight.w600)),
-          const SizedBox(width: 4),
-          Text(xp, style: const TextStyle(fontSize: 11, color: Color(0xFF22E7A6), fontWeight: FontWeight.w900)),
+          Text(label, style: const TextStyle(fontSize: 10.5, color: Colors.white70, fontWeight: FontWeight.w600)),
+          const SizedBox(width: 3),
+          Text(xp, style: const TextStyle(fontSize: 10.5, color: Color(0xFF22E7A6), fontWeight: FontWeight.w900)),
         ],
       ),
     );
@@ -469,9 +472,9 @@ class _PassRow extends StatelessWidget {
     final plus = data['plus'] is Map ? data['plus'] as Map : null;
 
     return Container(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         color: isMilestone ? const Color(0xFF1E293B).withValues(alpha: 0.7) : Colors.white.withValues(alpha: 0.03),
         border: Border.all(
           color: isMilestone
@@ -481,10 +484,9 @@ class _PassRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Tier Number Pill
           Container(
-            width: 36,
-            height: 54,
+            width: 34,
+            height: 64,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(8),
               color: unlocked ? _readyColor.withValues(alpha: 0.15) : Colors.white.withValues(alpha: 0.05),
@@ -500,14 +502,13 @@ class _PassRow extends StatelessWidget {
                     style: TextStyle(
                       color: unlocked ? Colors.white : Colors.white60,
                       fontWeight: FontWeight.w900,
-                      fontSize: 14,
+                      fontSize: 13,
                     )),
               ],
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
 
-          // Free Track Tile
           Expanded(
             child: _CompactRewardTile(
               data: free,
@@ -518,9 +519,8 @@ class _PassRow extends StatelessWidget {
               onClaim: onClaim,
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
 
-          // Plus Track Tile
           Expanded(
             child: _CompactRewardTile(
               data: plus,
@@ -564,7 +564,7 @@ class _CompactRewardTile extends StatelessWidget {
   Widget build(BuildContext context) {
     if (data == null) {
       return Container(
-        height: 54,
+        height: 64,
         alignment: Alignment.center,
         child: const Text('—', style: TextStyle(color: Colors.white24)),
       );
@@ -586,12 +586,12 @@ class _CompactRewardTile extends StatelessWidget {
     } else if (kind == 'cash') {
       label = '${faNum(amount)} تومان';
     } else {
-      label = '${m['label'] ?? 'آیتم'}';
+      label = '${m['label'] ?? 'آیتم ویژه'}';
     }
 
     final tile = Container(
-      height: 54,
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      height: 64,
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
         color: ready
@@ -608,37 +608,38 @@ class _CompactRewardTile extends StatelessWidget {
         children: [
           Image.asset(
             _art[kind] ?? 'assets/pass/reward_gift_icon.webp',
-            width: 24,
-            height: 24,
+            width: 22,
+            height: 22,
             cacheWidth: 64,
             errorBuilder: (_, __, ___) => Icon(
               isPlus ? Icons.star_rounded : Icons.card_giftcard_rounded,
-              size: 20,
+              size: 18,
               color: isPlus ? _plusGold : _freeColor,
             ),
           ),
-          const SizedBox(width: 5),
+          const SizedBox(width: 4),
           Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 11.5,
+                    fontSize: 11,
                     fontWeight: FontWeight.w900,
                     color: claimed ? Colors.white38 : Colors.white,
                   ),
                 ),
                 if (claimed)
-                  const Text('✓ دریافت شد', style: TextStyle(fontSize: 9.5, color: _readyColor, fontWeight: FontWeight.w800))
+                  const Text('✓ گرفتی', style: TextStyle(fontSize: 9, color: _readyColor, fontWeight: FontWeight.w800))
                 else if (locked)
-                  const Text('★ فقط پلاس', style: TextStyle(fontSize: 9.5, color: _plusGold, fontWeight: FontWeight.w800))
+                  Text('فقط پلاس', style: TextStyle(fontSize: 9, color: context.gold, fontWeight: FontWeight.w800))
                 else if (ready)
-                  const Text('لمس برای دریافت', style: TextStyle(fontSize: 9.5, color: _readyColor, fontWeight: FontWeight.w900)),
+                  const Text('برای گرفتن بزن', style: TextStyle(fontSize: 9, color: _readyColor, fontWeight: FontWeight.w900)),
               ],
             ),
           ),
