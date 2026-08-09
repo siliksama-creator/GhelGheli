@@ -631,7 +631,7 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
 
                       // 2. Add codes if typed
                       if (newCodesCtrl.text.trim().isNotEmpty) {
-                        await widget.api.post('/api/admin/photo-cards/card-types/$typeId' + '/add-codes', {
+                        await widget.api.post('/api/admin/photo-cards/card-types/$typeId/add-codes', {
                           'rawCodes': newCodesCtrl.text.trim(),
                           'batchLabel': newBatchCtrl.text.trim().isNotEmpty ? newBatchCtrl.text.trim() : null,
                         });

@@ -55,23 +55,28 @@ class HeroHeader extends StatelessWidget {
     final done = _required.length - missing.length;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+      padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF14345F),
-            Color(0xFF0C203B),
-            Color(0xFF071220),
+            Color(0xFF1A2B45),
+            Color(0xFF111D30),
+            Color(0xFF0A1220),
           ],
         ),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        border: Border.all(color: const Color(0xFFFFD700).withValues(alpha: 0.28), width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF14345F).withValues(alpha: 0.35),
+            color: const Color(0xFFFFD700).withValues(alpha: 0.08),
             blurRadius: 18,
+            offset: const Offset(0, 4),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.40),
+            blurRadius: 16,
             offset: const Offset(0, 8),
           ),
         ],
@@ -79,7 +84,7 @@ class HeroHeader extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── greeting + points Row (Expanded to prevent any overflow) ──
+          // ── greeting + golden points Box Row ──
           Row(
             children: [
               Expanded(
@@ -91,7 +96,7 @@ class HeroHeader extends StatelessWidget {
                       AvatarImage(
                         imageUrl: user?['profile_image_url'],
                         keyName: user?['profile_avatar_key'],
-                        radius: 19,
+                        radius: 20,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
@@ -99,36 +104,17 @@ class HeroHeader extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                ShaderMask(
-                                  shaderCallback: (bounds) => const LinearGradient(
-                                    colors: [Color(0xFFFFE57F), Color(0xFFFFD54F), Color(0xFFFFB300)],
-                                  ).createShader(bounds),
-                                  child: const Text(
-                                    'سلام ',
-                                    style: TextStyle(
-                                      fontSize: 14.5,
-                                      fontWeight: FontWeight.w900,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                                Flexible(
-                                  child: DisplayName(
-                                    name: nickname,
-                                    cosmetics: cosmetics,
-                                    avatarKey: user?['profile_avatar_key'],
-                                    maxLines: 1,
-                                    style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w900,
-                                        color: Colors.white),
-                                  ),
-                                ),
-                              ],
+                            DisplayName(
+                              name: 'سلام $nickname ',
+                              cosmetics: cosmetics,
+                              avatarKey: user?['profile_avatar_key'],
+                              maxLines: 1,
+                              style: const TextStyle(
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white),
                             ),
+                            const SizedBox(height: 2),
                             const Row(
                               children: [
                                 Text('پروفایل من',
@@ -149,22 +135,62 @@ class HeroHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(faNum(points),
-                      style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                          height: 1.1)),
-                  const Text('امتیاز',
+              // ── باکس طلایی درخشان امتیاز ──
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(13),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0x38FFD700),
+                      Color(0x14FF9F43),
+                      Color(0x24000000),
+                    ],
+                  ),
+                  border: Border.all(color: const Color(0xFFFFD700).withValues(alpha: 0.50), width: 1.2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFFFD700).withValues(alpha: 0.16),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          faNum(points),
+                          style: const TextStyle(
+                            fontSize: 19,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFFFFDF70),
+                            height: 1.1,
+                            shadows: [
+                              Shadow(color: Color(0x66FFB300), blurRadius: 6),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.stars_rounded, size: 14, color: Color(0xFFFFDF70)),
+                      ],
+                    ),
+                    const Text(
+                      'امتیاز کل',
                       style: TextStyle(
-                          color: Colors.white70,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 10)),
-                ],
+                        color: Color(0xFFFFE599),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 9.5,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

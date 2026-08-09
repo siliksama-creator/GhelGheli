@@ -889,8 +889,8 @@ class _ShopButtonState extends State<_ShopButton>
                     angle: starRot * 0.5,
                     child: Transform.scale(
                       scale: starScale,
-                      child: Container(
-                        decoration: const BoxDecoration(
+                      child: const DecoratedBox(
+                        decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
@@ -899,7 +899,7 @@ class _ShopButtonState extends State<_ShopButton>
                             ),
                           ],
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.star_rounded,
                           size: 15,
                           color: Color(0xFFFFF7C2),
