@@ -312,7 +312,7 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
             SizedBox(
               height: 280,
               child: GridView.builder(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisExtent(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 4,
                   mainAxisSpacing: 10,
                   crossAxisSpacing: 10,

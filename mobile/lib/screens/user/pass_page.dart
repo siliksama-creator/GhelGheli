@@ -421,7 +421,8 @@ class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin
               data: row,
               busy: _busy,
               pulse: _pulse,
-              onClaim: _claim,
+              onClaim: (tr) => _claim(row, tr),
+              onOpenShop: widget.onOpenShop,
             ),
             const SizedBox(height: 6),
           ],
@@ -470,53 +471,6 @@ class _PassRow extends StatelessWidget {
   final Animation<double> pulse;
   final void Function(String) onClaim;
   final VoidCallback onOpenShop;
-  final VoidCallback onOpenShop;
-  void _showPlusUnlockDialog(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF0E1826),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.stars_rounded, size: 26, color: Color(0xFFFFD166)),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    'جایزه طلایی قلقلی پلاس',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Colors.white),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded, color: Colors.white70),
-                  onPressed: () => Navigator.pop(ctx),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'این جایزه مربوط به مسیر طلایی بتل پس است. با فعال‌سازی اشتراک پلاس، تمام جوایز طلایی این فصل فوراً برای شما باز می‌شود و می‌توانید آن‌ها را دریافت کنید!',
-              style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 13, height: 1.5),
-            ),
-            const SizedBox(height: 20),
-            AnimePlusButton(
-              label: 'ورود به فروشگاه و فعال‌سازی پلاس ⚡',
-              onPressed: () {
-                Navigator.pop(ctx);
-                onOpenShop();
-              },
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -613,7 +567,7 @@ class _CompactRewardTile extends StatelessWidget {
   final Animation<double> pulse;
   final void Function(String) onClaim;
   final VoidCallback onOpenShop;
-  final VoidCallback onOpenShop;
+
   void _showPlusUnlockDialog(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -756,17 +710,31 @@ class _CompactRewardTile extends StatelessWidget {
       ),
     );
 
-    if (!ready) {
-      return Opacity(opacity: claimed ? 0.5 : (locked ? 0.75 : 1.0), child: tile);
+    if (claimed) {
+      return Opacity(opacity: 0.5, child: tile);
     }
 
-    return AnimatedBuilder(
-      animation: pulse,
-      builder: (context, child) => Transform.scale(scale: 1.0 + pulse.value * 0.02, child: child),
-      child: InkWell(
+    if (locked) {
+      return InkWell(
+        onTap: () => _showPlusUnlockDialog(context),
         borderRadius: BorderRadius.circular(10),
-        onTap: busy ? null : () => onClaim('${m['id']}'),
-        child: tile,
+        child: Opacity(opacity: 0.85, child: tile),
+      );
+    }
+
+    if (!ready) {
+      return Opacity(opacity: 0.75, child: tile);
+    }
+
+    return InkWell(
+      onTap: busy ? null : () => onClaim(track),
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedBuilder(
+        animation: pulse,
+        builder: (context, _) => Transform.scale(
+          scale: 1.0 + 0.04 * pulse.value,
+          child: tile,
+        ),
       ),
     );
   }
@@ -774,17 +742,29 @@ class _CompactRewardTile extends StatelessWidget {
 
 class _NoSeason extends StatelessWidget {
   const _NoSeason();
+
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Padding(
-        padding: EdgeInsets.all(Gaps.xl),
-        child: Text('در حال حاضر فصلی فعال نیست. به‌زودی فصل جدید شروع می‌شود.', textAlign: TextAlign.center),
+        padding: const EdgeInsets.all(Gaps.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.shield_outlined, size: 48, color: Colors.white24),
+            Gaps.vMd,
+            Text('فصلی فعال نیست',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+            Gaps.vXs,
+            Text('فصل جدید به‌زودی آغاز می‌شود.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall),
+          ],
+        ),
       ),
     );
   }
 }
-
 
 class AnimePlusButton extends StatefulWidget {
   const AnimePlusButton({
@@ -847,7 +827,6 @@ class _AnimePlusButtonState extends State<AnimePlusButton>
             ),
             child: Stack(
               children: [
-                // Shimmer sweep
                 Positioned.fill(
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),

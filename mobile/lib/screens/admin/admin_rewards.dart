@@ -197,7 +197,7 @@ class _AdminRewardsState extends State<AdminRewards> {
 
     setState(() => _saving = true);
     try {
-      final r = await widget.api.post('/api/admin/rewards', {
+      await widget.api.post('/api/admin/rewards', {
         'name': name,
         'requiredPoints': points,
         'rewardType': _type,

@@ -735,7 +735,6 @@ class _WheelButtonState extends State<_WheelButton>
 
 class _PassButton extends StatefulWidget {
   const _PassButton({
-    super.key,
     required this.claimable,
     required this.tiersToday,
     required this.selected,
