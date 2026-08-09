@@ -1,7 +1,4 @@
-// Another player's profile, opened from chat, the league table or a game.
-//
-// Shows the whole picture in one compact sheet: cosmetics, league finishes,
-// every prize won, and the card collection — without becoming a long scroll.
+// Another player's comprehensive profile, opened from chat, the league table or a game.
 import React, { useCallback, useEffect, useState } from 'react';
 
 import { req, asset, fa, avatarUrl } from '../lib/api.js';
@@ -10,12 +7,7 @@ import { useAsync } from '../lib/useAsync.js';
 import { LoadingView, ErrorView } from '../components/states.jsx';
 import { SvgIcon } from '../components/IconAsset.jsx';
 
-// Cosmetics render identically wherever they appear, so the crest path, the
-// frame gradients and the name colour all come from one module. This file
-// used to redefine all three — and its club map still listed only the five
-// original Iranian clubs, so the eleven new crests rendered nothing here even
-// though chat and the league table showed them.
-const medal = r => (r === 1 ? '' : r === 2 ? '' : r === 3 ? '' : '');
+const medal = r => (r === 1 ? '🥇' : r === 2 ? '🥈' : r === 3 ? '🥉' : '');
 
 export default function PublicProfile({ token, userId, close }) {
   const load = useCallback(
@@ -44,7 +36,7 @@ export default function PublicProfile({ token, userId, close }) {
 
         {u && (
           <>
-            {/* ── header ───────────────────────────────────────────── */}
+            {/* ── Header ── */}
             <div className="ppHead">
               <div className="ppAvatarWrap"
                 style={cos.frame
@@ -54,8 +46,6 @@ export default function PublicProfile({ token, userId, close }) {
                   src={u.profile_image_url
                     ? asset(u.profile_image_url)
                     : avatarUrl(u.profile_avatar_key)} />
-                {/* Not when the avatar IS that crest: the corner badge
-                    would be the same picture overlapping itself. */}
                 {cos.club && u.profile_avatar_key !== `club:${cos.club}` && (
                   <img className="ppClub" src={clubImg(cos.club)}
                     alt="نشان باشگاه" width="30" height="30"
@@ -66,44 +56,47 @@ export default function PublicProfile({ token, userId, close }) {
               <div className="ppWho">
                 <h2 style={nameColorStyle(cos.color)}>
                   {u.nickname || 'کاربر'}
-                  {cos.plus && <SvgIcon className="ppPlus" title="عضو پلاس" name="trophy" size={15} />}
+                  {cos.plus && <span className="plusStarSm" title="عضو طلایی قلقلی پلاس" style={{ color: '#FFD166', marginInlineStart: '4px' }}>★</span>}
                 </h2>
-                <small>
-                  عضویت {new Date(u.joined_at).toLocaleDateString('fa-IR')}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                  {cos.club && (
+                    <span style={{ fontSize: '11px', color: '#ffd166', fontWeight: '700' }}>
+                      هوادار باشگاه
+                    </span>
+                  )}
+                  {cos.plus && (
+                    <span style={{ fontSize: '10px', background: 'rgba(255,209,102,0.16)', color: '#ffd166', padding: '2px 6px', borderRadius: '6px', fontWeight: '800' }}>
+                      عضو قلقلی پلاس
+                    </span>
+                  )}
+                </div>
+                <small style={{ marginTop: '4px', display: 'block' }}>
+                  عضویت: {new Date(u.joined_at).toLocaleDateString('fa-IR')}
                 </small>
-                {u.bestRank && (
-                  <span className="ppBest">
-                    {medal(u.bestRank)} بهترین رتبهٔ لیگ: {fa(u.bestRank)}
-                  </span>
-                )}
               </div>
             </div>
 
-            {/* ── headline stats ───────────────────────────────────── */}
-            <div className="ppStats">
-              <div><b>{fa(u.lifetime_points)}</b><span>امتیاز کل</span></div>
-              <div><b>{fa(u.current_points)}</b><span>امتیاز فعلی</span></div>
-              <div><b>{fa(u.monthly_league_points)}</b><span>امتیاز این ماه</span></div>
-              {u.totalPrizeAmount > 0 && (
-                <div className="ppMoney">
-                  <b>{fa(u.totalPrizeAmount)}</b><span>مجموع جوایز لیگ</span>
-                </div>
-              )}
+            {/* ── Key Stats 4-Grid ── */}
+            <div className="ppStats" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', margin: '14px 0' }}>
+              <div><b>{u.bestRank ? `رتبه ${fa(u.bestRank)}` : 'در حال رقابت'}</b><span>رتبه لیگ این ماه</span></div>
+              <div><b>{fa(u.lifetime_points)}</b><span>مجموع امتیازات کل</span></div>
+              <div><b>{fa(u.totalPrizeAmount || 0)} تومان</b><span>جوایز نقدی کسب‌شده</span></div>
+              <div><b>{fa((u.trophies?.length || 0) + (u.rewards?.length || 0))} جایزه</b><span>کل جوایز و تندیس‌ها</span></div>
             </div>
 
-            {/* ── tabs keep the sheet short ────────────────────────── */}
+            {/* ── Tabs ── */}
             <div className="ppTabs">
               <button className={tab === 'prizes' ? 'on' : ''}
                 onClick={() => setTab('prizes')}>
-                 جوایز ({fa((u.trophies?.length || 0) + (u.rewards?.length || 0))})
-              </button>
-              <button className={tab === 'league' ? 'on' : ''}
-                onClick={() => setTab('league')}>
-                 لیگ ({fa(u.leagueHistory?.length || 0)})
+                جوایز ({fa((u.trophies?.length || 0) + (u.rewards?.length || 0))})
               </button>
               <button className={tab === 'cards' ? 'on' : ''}
                 onClick={() => setTab('cards')}>
-                 کارت‌ها ({fa(u.cards?.length || 0)})
+                کارت‌ها ({fa(u.cards?.length || 0)})
+              </button>
+              <button className={tab === 'league' ? 'on' : ''}
+                onClick={() => setTab('league')}>
+                لیگ ({fa(u.leagueHistory?.length || 0)})
               </button>
             </div>
 
@@ -121,18 +114,33 @@ export default function PublicProfile({ token, userId, close }) {
                       </div>
                     ))}
                     {(u.rewards || [])
-                      .filter(r => r.reward_type === 'cash')
                       .map((r, i) => (
-                        <div className="ppPrize cash" key={'r' + i}>
+                        <div className="ppPrize" key={'r' + i}>
                           <img src={asset(r.image_url)
                             || avatarUrl('avatar_2_trophy.png')} alt={r.name}
                             loading="lazy" />
                           <b>{r.name}</b>
-                          <em> نقدی</em>
+                          <em>{r.reward_type === 'cash' ? 'نقدی' : 'تندیس'}</em>
                         </div>
                       ))}
                   </div>
-                ) : <p className="hint">هنوز جایزه‌ای نگرفته است.</p>
+                ) : <p className="hint">هنوز جایزه‌ای دریافت نکرده است.</p>
+              )}
+
+              {tab === 'cards' && (
+                u.cards?.length ? (
+                  <div className="ppGrid">
+                    {u.cards.map(c => (
+                      <div className="ppPrize" key={c.card_type_id}>
+                        <img src={asset(c.image_url)
+                          || avatarUrl('avatar_1_football.png')} alt={c.name}
+                          loading="lazy" />
+                        <b>{c.name}</b>
+                        <em>{fa(c.registered_count)}× · {fa(c.point_value)} امتیاز</em>
+                      </div>
+                    ))}
+                  </div>
+                ) : <p className="hint">هنوز کارتی در کلکسیون ثبت نکرده است.</p>
               )}
 
               {tab === 'league' && (
@@ -153,22 +161,6 @@ export default function PublicProfile({ token, userId, close }) {
                     ))}
                   </div>
                 ) : <p className="hint">هنوز در لیگی رتبه نگرفته است.</p>
-              )}
-
-              {tab === 'cards' && (
-                u.cards?.length ? (
-                  <div className="ppGrid">
-                    {u.cards.map(c => (
-                      <div className="ppPrize" key={c.card_type_id}>
-                        <img src={asset(c.image_url)
-                          || avatarUrl('avatar_1_football.png')} alt={c.name}
-                          loading="lazy" />
-                        <b>{c.name}</b>
-                        <em>{fa(c.registered_count)}× · {fa(c.point_value)} امتیاز</em>
-                      </div>
-                    ))}
-                  </div>
-                ) : <p className="hint">هنوز کارتی ثبت نکرده است.</p>
               )}
             </div>
           </>

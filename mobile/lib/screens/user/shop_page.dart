@@ -181,8 +181,7 @@ class _ShopPageState extends State<ShopPage> {
                 cacheWidth: 252,
                 errorBuilder: (_, __, ___) => const SizedBox.shrink()),
             Gaps.vXs,
-            Text('نشان «$name» می‌تواند عکس پروفایلت شود. '
-                'هر وقت خواستی از صفحهٔ پروفایل عوضش کن.'),
+            Text('نشان باشگاه «$name» به آواتارهای پروفایل شما اضافه شد.\nمی‌توانید همین حالا آن را عکس پروفایل خود کنید یا بعداً از بخش پروفایل انتخاب نمایید.'),
           ],
         ),
         actions: [
@@ -374,8 +373,8 @@ class _MyClubsCard extends StatelessWidget {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 132,
-              mainAxisExtent: 150,
+              maxCrossAxisExtent: 112,
+              mainAxisExtent: 138,
               crossAxisSpacing: Gaps.xs,
               mainAxisSpacing: Gaps.xs,
             ),
@@ -601,8 +600,8 @@ class _KindSection extends StatelessWidget {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 128,
-              mainAxisExtent: 168,
+              maxCrossAxisExtent: 112,
+              mainAxisExtent: 138,
               crossAxisSpacing: Gaps.xs,
               mainAxisSpacing: Gaps.xs,
             ),
@@ -689,9 +688,9 @@ class _ShopTile extends StatelessWidget {
     } else {
       art = Image.asset(
         clubAsset(payload),
-        width: 56,
-        height: 56,
-        cacheWidth: 168,
+        width: 44,
+        height: 44,
+        cacheWidth: 120,
         // contain, not cover: a crest is not a photo and cropping its corners
         // mangles the shield shapes.
         fit: BoxFit.contain,

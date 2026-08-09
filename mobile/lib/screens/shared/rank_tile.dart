@@ -4,8 +4,7 @@ import '../../api_client.dart';
 import '../../core/cosmetics.dart';
 import '../../theme/tokens.dart';
 
-/// Leaderboard row for ranks beyond the podium (used by both the user
-/// league page and the admin dashboard/league views).
+/// Dense leaderboard row for ranks beyond the podium.
 class RankTile extends StatelessWidget {
   final int rank;
   final Map row;
@@ -19,52 +18,58 @@ class RankTile extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final isTop = rank <= 3;
     return Padding(
-      padding: const EdgeInsets.only(bottom: Gaps.xs),
+      padding: const EdgeInsets.only(bottom: 4),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: Corners.rLg,
+          borderRadius: BorderRadius.circular(12),
           child: Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: Gaps.md, vertical: Gaps.sm + 2),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
             decoration: BoxDecoration(
-              borderRadius: Corners.rLg,
+              borderRadius: BorderRadius.circular(12),
               color: isTop
                   ? const Color(0xFFFFC94D).withValues(alpha: 0.16)
-                  : scheme.surfaceContainerHigh,
+                  : scheme.surfaceContainerHigh.withValues(alpha: 0.65),
+              border: Border.all(
+                color: isTop
+                    ? const Color(0xFFFFC94D).withValues(alpha: 0.35)
+                    : Colors.white.withValues(alpha: 0.05),
+              ),
             ),
             child: Row(
               children: [
                 CircleAvatar(
-                  radius: 16,
+                  radius: 13,
                   backgroundColor: isTop
                       ? const Color(0xFFFFC94D)
                       : scheme.surfaceContainerHighest,
                   child: Text(
                     faNum(rank),
                     style: TextStyle(
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w900,
                       color: isTop ? const Color(0xFF241900) : scheme.onSurface,
-                      fontSize: 13,
+                      fontSize: 11,
                     ),
                   ),
                 ),
                 Gaps.hSm,
                 Expanded(
-                  // PARITY FIX: the web league table drew the club badge,
-                  // name colour and Plus star; the app drew a plain name, so
-                  // a paying user's cosmetics were invisible on the client
-                  // most of them actually use.
                   child: DisplayName(
                     name: row['nickname'] ?? row['first_name'] ?? 'کاربر',
                     cosmetics: row['cosmetics'] as Map?,
                     level: (row['level'] as num?)?.toInt(),
-                    style: Theme.of(context).textTheme.titleSmall,
+                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Colors.white),
                   ),
                 ),
-                Text('${faNum(row['points'])} امتیاز',
-                    style: Theme.of(context).textTheme.labelMedium),
+                Text(
+                  '${faNum(row['points'])} امتیاز',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                    color: isTop ? const Color(0xFFFFD166) : const Color(0xFF38BDF8),
+                  ),
+                ),
               ],
             ),
           ),

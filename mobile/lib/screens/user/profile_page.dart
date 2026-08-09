@@ -8,7 +8,7 @@ import '../../widgets/app_card.dart';
 import '../../widgets/avatar_image.dart';
 import '../../widgets/state_views.dart';
 
-/// Private profile editor: dense and compact 2-column layout to minimize scrolling.
+/// Private profile editor: dense 2-column layout + full avatar grid showing all 10 avatars and club crests.
 class ProfilePage extends StatefulWidget {
   final ApiClient api;
   final Future<void> Function() reloadProfile;
@@ -120,7 +120,7 @@ class _ProfilePageState extends State<ProfilePage> {
       await widget.reloadProfile();
       if (!mounted) return;
       setState(() {
-        _message = 'پروفایل با موفقیت ذخیره شد ✓';
+        _message = 'پروفایل با موفقیت ذخیره شد';
         _messageIsError = false;
       });
     } catch (e) {
@@ -147,7 +147,7 @@ class _ProfilePageState extends State<ProfilePage> {
       _newPassword.clear();
       if (!mounted) return;
       setState(() {
-        _passwordMessage = 'رمز عبور با موفقیت تغییر کرد ✓';
+        _passwordMessage = 'رمز عبور با موفقیت تغییر کرد';
         _passwordMessageIsError = false;
       });
     } catch (e) {
@@ -222,7 +222,7 @@ class _ProfilePageState extends State<ProfilePage> {
           Gaps.vSm,
         ],
 
-        // ── Main Profile Form (Compact & Dense) ──
+        // ── Main Profile Form ──
         AppCard(
           padding: const EdgeInsets.all(14),
           child: Column(
@@ -248,43 +248,54 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               const SizedBox(height: 12),
 
-              // ── Avatar Choices (Compact Horizontal Row) ──
-              const Text('انتخاب آواتار یا نشان باشگاه:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 6),
-              SizedBox(
-                height: 52,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  children: [
-                    for (final a in avatarFiles)
-                      _AvatarChoice(
-                        selected: _selectedAvatar == a,
-                        onTap: () => setState(() => _selectedAvatar = a),
-                        child: CircleAvatar(
-                          radius: 20,
-                          backgroundImage: ResizeImage(AssetImage(avatarAsset(a)), width: 100),
-                        ),
+              // ── All 10 Avatars Grid (100% visible & selectable) ──
+              const Text('انتخاب آواتار پروفایل (۱۰ مدل اختصاصی):', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                alignment: WrapAlignment.start,
+                children: [
+                  for (final a in avatarFiles)
+                    _AvatarChoice(
+                      selected: _selectedAvatar == a,
+                      onTap: () => setState(() => _selectedAvatar = a),
+                      child: CircleAvatar(
+                        radius: 21,
+                        backgroundImage: ResizeImage(AssetImage(avatarAsset(a)), width: 90),
                       ),
+                    ),
+                ],
+              ),
+
+              if (_myClubs.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                const Text('نشان باشگاه‌های فعال شما:', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: Color(0xFFFFD166))),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
                     for (final c in _myClubs)
                       _AvatarChoice(
                         selected: _selectedAvatar == 'club:${c['slug']}',
                         onTap: () => setState(() => _selectedAvatar = 'club:${c['slug']}'),
                         child: CircleAvatar(
-                          radius: 20,
+                          radius: 21,
                           backgroundColor: Colors.white.withValues(alpha: 0.1),
                           child: Padding(
-                            padding: const EdgeInsets.all(4),
-                            child: Image.asset(clubAsset('${c['slug']}'), fit: BoxFit.contain, cacheWidth: 80),
+                            padding: const EdgeInsets.all(3),
+                            child: Image.asset(clubAsset('${c['slug']}'), fit: BoxFit.contain, cacheWidth: 90),
                           ),
                         ),
                       ),
                   ],
                 ),
-              ),
+              ],
 
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
 
-              // ── 2-Column Fields Grid (Dramatically Reduced Height) ──
+              // ── 2-Column Fields Grid ──
               Row(
                 children: [
                   Expanded(
@@ -375,7 +386,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
         Gaps.vSm,
 
-        // ── Password Change Section (Collapsible / Compact) ──
+        // ── Password Change Section ──
         AppCard(
           padding: const EdgeInsets.all(12),
           child: Column(
@@ -449,22 +460,19 @@ class _AvatarChoice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 6),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(30),
-        child: Container(
-          padding: const EdgeInsets.all(2),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: selected ? const Color(0xFF22E7A6) : Colors.transparent,
-              width: 2,
-            ),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(30),
+      child: Container(
+        padding: const EdgeInsets.all(2),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: selected ? const Color(0xFF22E7A6) : Colors.transparent,
+            width: 2.2,
           ),
-          child: child,
         ),
+        child: child,
       ),
     );
   }

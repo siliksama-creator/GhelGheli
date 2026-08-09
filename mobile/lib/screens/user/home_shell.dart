@@ -613,7 +613,7 @@ class _HomeShellState extends State<HomeShell>
 ///
 /// نشان روی خود دکمه می‌نشیند تا در نگاه اول دیده شود؛ اگر فقط داخل صفحهٔ
 /// گردونه بود، کاربر باید وارد می‌شد تا بفهمد اصلاً چرخشی دارد یا نه.
-class _WheelButton extends StatelessWidget {
+class _WheelButton extends StatefulWidget {
   const _WheelButton({
     required this.spins,
     required this.unlimited,
@@ -627,24 +627,41 @@ class _WheelButton extends StatelessWidget {
   final VoidCallback onPressed;
 
   @override
+  State<_WheelButton> createState() => _WheelButtonState();
+}
+
+class _WheelButtonState extends State<_WheelButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _spinCtrl = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 12),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _spinCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final n = spins ?? 0;
-    final label = unlimited ? '∞' : faNum(n);
+    final n = widget.spins ?? 0;
+    final label = widget.unlimited ? '∞' : faNum(n);
     return Stack(
       clipBehavior: Clip.none,
       children: [
         IconButton(
           tooltip: n > 0 ? '$n چرخش گردونه داری' : 'گردونهٔ شانس',
-          onPressed: onPressed,
-          // حالت انتخاب‌شده: بدون این، کاربر که روی صفحهٔ گردونه است هیچ
-          // نشانه‌ای نمی‌بیند که کدام میان‌بر فعال است — چون این دو صفحه
-          // در نوار پایین هایلایت نمی‌شوند.
-          style: selected
+          onPressed: widget.onPressed,
+          style: widget.selected
               ? IconButton.styleFrom(
                   backgroundColor:
                       Theme.of(context).colorScheme.primary.withValues(alpha: 0.18))
               : null,
-          icon: Image.asset('assets/pass/wheel_icon.webp', width: 24, height: 24),
+          icon: RotationTransition(
+            turns: _spinCtrl,
+            child: Image.asset('assets/pass/wheel_icon.webp', width: 24, height: 24),
+          ),
         ),
         if (n > 0)
           Positioned(
@@ -657,8 +674,6 @@ class _WheelButton extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: const Color(0xFFF43F5E),
                   borderRadius: BorderRadius.circular(999),
-                  // حلقهٔ هم‌رنگ نوار بالا: بدون آن، نشان روی لبهٔ آیکون
-                  // محو می‌شود.
                   border: Border.all(
                     color: Theme.of(context).appBarTheme.backgroundColor
                         ?? Theme.of(context).colorScheme.surface,
@@ -684,62 +699,88 @@ class _WheelButton extends StatelessWidget {
   }
 }
 
-/// آیکون فروشگاه در نوار بالا، کنار گردونه.
-///
-/// ═══════════════════════════════════════════════════════════════════════
-/// چرا فروشگاه از زیرتب به نوار بالا منتقل شد
-/// ═══════════════════════════════════════════════════════════════════════
-///
-/// قبلاً فروشگاه یک `SegmentedButton` داخل تبِ «جوایز» بود. یعنی مسیر
-/// رسیدن به تنها صفحه‌ای که کاربر در آن خرج می‌کند این بود:
-///
-///     نوار پایین → «جوایز» → دیدنِ دکمهٔ دوم بالای صفحه → «فروشگاه»
-///
-/// دو مشکل داشت. اول اینکه یک قدم اضافه روی درآمدزاترین مسیر اپ بود.
-/// دوم و مهم‌تر: فروشگاه **از بیرون دیده نمی‌شد** — کاربری که روی تبِ
-/// جوایز نرفته بود، اصلاً نمی‌دانست فروشگاهی وجود دارد.
-///
-/// حالا یک آیکون همیشه‌حاضر کنار گردونه است: هر دو میان‌بر به صفحه‌هایی
-/// می‌روند که در نوار پایین جا نمی‌شوند (متریال حداکثر پنج مقصد را
-/// توصیه می‌کند) ولی مهم‌ترین‌اند — یکی جایی که کاربر جایزه می‌گیرد،
-/// یکی جایی که خرج می‌کند.
-class _ShopButton extends StatelessWidget {
+class _ShopButton extends StatefulWidget {
   const _ShopButton({required this.selected, required this.onPressed});
 
   final bool selected;
   final VoidCallback onPressed;
 
   @override
+  State<_ShopButton> createState() => _ShopButtonState();
+}
+
+class _ShopButtonState extends State<_ShopButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulseCtrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2200),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _pulseCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return IconButton(
       tooltip: 'فروشگاه',
-      onPressed: onPressed,
-      style: selected
+      onPressed: widget.onPressed,
+      style: widget.selected
           ? IconButton.styleFrom(
               backgroundColor:
                   Theme.of(context).colorScheme.primary.withValues(alpha: 0.18))
           : null,
-      icon: Container(
-        width: 30,
-        height: 30,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(9),
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFFFFE08A), Color(0xFFFF9F43), Color(0xFFFF5252)],
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFFFF9F43).withValues(alpha: 0.40),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
+      icon: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(9),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFFFFE08A), Color(0xFFFF9F43), Color(0xFFFF5252)],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFFF9F43).withValues(alpha: 0.40),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: const Center(
-          child: Icon(Icons.shopping_bag_rounded, size: 18, color: Color(0xFF25110A)),
-        ),
+            child: const Center(
+              child: Icon(Icons.shopping_bag_rounded, size: 17, color: Color(0xFF25110A)),
+            ),
+          ),
+          // Animated shimmering star in top corner
+          Positioned(
+            top: -4,
+            right: -4,
+            child: AnimatedBuilder(
+              animation: _pulseCtrl,
+              builder: (context, _) => Transform.scale(
+                scale: 0.85 + _pulseCtrl.value * 0.35,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF25110A),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.star_rounded,
+                    size: 11,
+                    color: Color(0xFFFFD166),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

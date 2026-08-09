@@ -330,8 +330,8 @@ export default function Shop({ token, setMsg, reloadProfile }) {
                   <img className="offerCrest" src={clubImg(avatarOffer.slug)}
                     alt={avatarOffer.name} width="96" height="96" />
                   <p>
-                    نشان «{avatarOffer.name}» می‌تواند عکس پروفایلت شود.
-                    هر وقت خواستی از صفحهٔ پروفایل عوضش کن.
+                    نشان باشگاه «{avatarOffer.name}» به آواتارهای پروفایل شما اضافه شد.
+                    می‌توانید همین حالا آن را عکس پروفایل خود کنید یا بعداً از صفحه پروفایل انتخاب نمایید.
                   </p>
                   <div className="confirmActions">
                     <button className="ghost" onClick={() => setAvatarOffer(null)}>

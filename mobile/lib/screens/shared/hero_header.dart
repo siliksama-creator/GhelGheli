@@ -3,47 +3,19 @@ import 'package:flutter/material.dart';
 import '../../api_client.dart';
 import '../../core/assets.dart';
 import '../../core/money.dart';
-import '../../theme/brand_theme.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/avatar_image.dart';
 import '../../core/cosmetics.dart';
 
-/// Compact dashboard hero: greeting, avatar, points and reward progress.
-///
-/// Rewritten to be much denser than the original (which used xl padding, a
-/// 34pt number and a 68px thumbnail, eating most of the first screen). The
-/// avatar/greeting is now a tap target that opens the profile, and an
-/// inline "complete your profile" nudge appears while required fields are
-/// still missing — so the user can finish their details without hunting
-/// through the navigation.
+/// Compact and ultra-sleek dashboard hero header: greeting, avatar, points, wallet strip.
 class HeroHeader extends StatelessWidget {
   final int points;
   final String nickname;
   final Map<String, dynamic>? nextReward;
-
-  /// Full user object, used for the avatar and completeness check.
   final Map<String, dynamic>? user;
-
-  /// ظاهرِ خودِ کاربر — ستارهٔ پلاس، نشان باشگاه، رنگ اسم.
-  ///
-  /// درخواست مالک: «افرادی که اشتراک پلاس گرفتن در همه جای پلتفرم برای
-  /// **خودشون** و افراد دیگه ستارشون مشخص باشه».
-  ///
-  /// «برای خودشون» بخش فراموش‌شده بود: چت و جدول لیگ ستارهٔ بقیه را نشان
-  /// می‌دادند، ولی داشبورد نام را خام چاپ می‌کرد — یعنی کسی که پول داده
-  /// بود، در اولین صفحه‌ای که بعد از ورود می‌بیند هیچ نشانی از خریدش
-  /// نداشت.
   final Map<String, dynamic>? cosmetics;
-
-  /// Opens the profile tab.
   final VoidCallback? onOpenProfile;
-
-  /// باز کردن کیف پول. کیف پول از نوار پایین به «بیشتر» منتقل شد، پس این
-  /// ورودی در هدر تنها راه سریع رسیدن به آن است و باید واضح دیده شود.
   final VoidCallback? onOpenWallet;
-
-  // `onToggleTheme` و `isDark` حذف شدند — اپ تک‌تم (تیره) است.
-  // توضیحِ کاملِ چراییِ حذفِ تمِ روشن در main.dart.
 
   const HeroHeader({
     super.key,
@@ -56,7 +28,6 @@ class HeroHeader extends StatelessWidget {
     this.onOpenWallet,
   });
 
-  /// Profile fields we consider essential for payouts/prizes.
   static const _required = <String, String>{
     'first_name': 'نام',
     'last_name': 'نام خانوادگی',
@@ -80,29 +51,35 @@ class HeroHeader extends StatelessWidget {
     final required = NumberParser.toInt(nextReward?['required_points']);
     final remaining = required > points ? required - points : 0;
     final progress = required > 0 ? (points / required).clamp(0.0, 1.0) : 0.0;
-    final brand = context.brand;
     final missing = _missing;
     final done = _required.length - missing.length;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, Gaps.sm),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
       decoration: BoxDecoration(
-        borderRadius: Corners.rXl,
-        gradient: LinearGradient(
-            colors: brand.heroGradient,
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight),
+        borderRadius: BorderRadius.circular(20),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF14345F),
+            Color(0xFF0C203B),
+            Color(0xFF071220),
+          ],
+        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
         boxShadow: [
           BoxShadow(
-              color: brand.heroGradient.last.withValues(alpha: 0.28),
-              blurRadius: 22,
-              offset: const Offset(0, 10))
+            color: const Color(0xFF14345F).withValues(alpha: 0.35),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── greeting + points + theme switch, all on one line ──
+          // ── greeting + points Row ──
           Row(
             children: [
               InkWell(
@@ -114,33 +91,31 @@ class HeroHeader extends StatelessWidget {
                     AvatarImage(
                       imageUrl: user?['profile_image_url'],
                       keyName: user?['profile_avatar_key'],
-                      radius: 19,
+                      radius: 20,
                     ),
-                    Gaps.hXs,
+                    const SizedBox(width: 8),
                     ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 130),
+                      constraints: const BoxConstraints(maxWidth: 150),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // DisplayName به‌جای Text خام: ستارهٔ پلاس و
-                          // رنگ اسم را هم می‌آورد.
                           DisplayName(
-                            name: 'سلام $nickname ',
+                            name: 'سلام $nickname',
                             cosmetics: cosmetics,
                             avatarKey: user?['profile_avatar_key'],
                             maxLines: 1,
                             style: const TextStyle(
                                 fontSize: 14.5,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w900,
                                 color: Colors.white),
                           ),
                           const Row(
                             children: [
-                              Text('پروفایل من',
+                              Text('پروفایل کاربری',
                                   style: TextStyle(
                                       color: Colors.white70,
-                                      fontSize: 11,
+                                      fontSize: 10.5,
                                       fontWeight: FontWeight.w600)),
                               SizedBox(width: 2),
                               Icon(Icons.chevron_left_rounded,
@@ -158,65 +133,68 @@ class HeroHeader extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(faNum(points),
-                      style: const TextStyle(
-                          fontSize: 23,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                          height: 1.1)),
-                  const Text('امتیاز',
-                      style: TextStyle(
-                          color: Colors.white70,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 10.5)),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(faNum(points),
+                          style: const TextStyle(
+                              fontSize: 21,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF22E7A6),
+                              height: 1.1)),
+                      const SizedBox(width: 4),
+                      const Text('امتیاز',
+                          style: TextStyle(
+                              color: Colors.white70,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 10)),
+                    ],
+                  ),
                 ],
               ),
             ],
           ),
 
           // ── reward progress ──
-          Gaps.vXs,
+          const SizedBox(height: 6),
           ClipRRect(
             borderRadius: Corners.rPill,
-            child: TweenAnimationBuilder<double>(
-              duration: Motion.hero,
-              curve: Motion.emphasized,
-              tween: Tween(begin: 0, end: progress),
-              builder: (_, v, __) => LinearProgressIndicator(
-                value: v,
-                minHeight: 6,
-                color: Colors.white,
-                backgroundColor: Colors.white.withValues(alpha: 0.22),
-              ),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 5,
+              color: const Color(0xFF22E7A6),
+              backgroundColor: Colors.white.withValues(alpha: 0.12),
             ),
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 4),
           Text(
             nextReward == null
                 ? 'هنوز جایزه‌ای تعریف نشده است'
                 : remaining == 0
-                    ? 'به جایزه ${nextReward!['name']} رسیدی '
-                    : 'تا ${nextReward!['name']}: ${faNum(remaining)} امتیاز',
+                    ? 'به جایزه ${nextReward!['name']} رسیدی!'
+                    : 'تا جایزه ${nextReward!['name']}: ${faNum(remaining)} امتیاز',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-                color: Colors.white,
+                color: Colors.white70,
                 fontWeight: FontWeight.w700,
-                fontSize: 11.5),
+                fontSize: 10.5),
           ),
 
           // ── ورودی کیف پول ──
           if (onOpenWallet != null) ...[
-            const SizedBox(height: 9),
+            const SizedBox(height: 7),
             _WalletStrip(
               balance: NumberParser.toInt(user?['wallet_balance']),
               onTap: onOpenWallet!,
             ),
           ],
 
-          // ── profile completion nudge (only while something is missing) ──
+          // ── profile completion nudge ──
           if (missing.isNotEmpty) ...[
-            const SizedBox(height: 7),
+            const SizedBox(height: 6),
             _CompletionBar(
               done: done,
               total: _required.length,
@@ -245,42 +223,31 @@ class _CompletionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Show at most two field names inline; the rest become "+N مورد".
     final shown = missing.take(2).join('، ');
     final extra = missing.length - 2;
     return Material(
-      color: Colors.black.withValues(alpha: 0.22),
+      color: Colors.black.withValues(alpha: 0.25),
       borderRadius: Corners.rMd,
       child: InkWell(
         onTap: onTap,
         borderRadius: Corners.rMd,
         child: Padding(
-          padding: const EdgeInsets.symmetric(
-              horizontal: Gaps.xs, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: Row(
             children: [
-              const Icon(Icons.badge_outlined,
-                  size: 15, color: Color(0xFFFFD36B)),
-              Gaps.hXxs,
+              const Icon(Icons.badge_outlined, size: 14, color: Color(0xFFFFD36B)),
+              const SizedBox(width: 4),
               Expanded(
                 child: Text(
-                  'تکمیل پروفایل ($done از $total): $shown'
-                  '${extra > 0 ? ' +$extra مورد' : ''}',
+                  'تکمیل پروفایل ($done از $total): $shown${extra > 0 ? ' +$extra مورد' : ''}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700),
+                  style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w700),
                 ),
               ),
               const Text('تکمیل',
-                  style: TextStyle(
-                      color: Color(0xFFFFD36B),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800)),
-              const Icon(Icons.chevron_left_rounded,
-                  size: 15, color: Color(0xFFFFD36B)),
+                  style: TextStyle(color: Color(0xFFFFD36B), fontSize: 10.5, fontWeight: FontWeight.w800)),
+              const Icon(Icons.chevron_left_rounded, size: 14, color: Color(0xFFFFD36B)),
             ],
           ),
         ),
@@ -289,12 +256,6 @@ class _CompletionBar extends StatelessWidget {
   }
 }
 
-/// نوار ورود به کیف پول در هدر داشبورد.
-///
-/// طراحی عمداً «طلایی» است تا از سبز/آبی خود هدر جدا شود و چشم فوراً پیدایش
-/// کند — کیف پول تنها جای اپ است که پول واقعی در آن است و نباید مثل بقیهٔ
-/// بخش‌ها دیده شود. موجودی همین‌جا نمایش داده می‌شود، پس کاربر برای دانستن
-/// «چقدر پول دارم» لازم نیست هیچ‌جا برود.
 class _WalletStrip extends StatelessWidget {
   const _WalletStrip({required this.balance, required this.onTap});
 
@@ -308,123 +269,76 @@ class _WalletStrip extends StatelessWidget {
 
     return Material(
       color: Colors.transparent,
-      borderRadius: Corners.rLg,
+      borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
-        borderRadius: Corners.rLg,
-        child: Ink(
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
           decoration: BoxDecoration(
-            borderRadius: Corners.rLg,
-            // لایهٔ تیرهٔ نیمه‌شفاف روی گرادیان هدر + حاشیهٔ طلایی
-            color: Colors.black.withValues(alpha: 0.24),
+            borderRadius: BorderRadius.circular(12),
+            color: Colors.black.withValues(alpha: 0.3),
             border: Border.all(
-              color: gold.withValues(alpha: hasMoney ? 0.55 : 0.28),
-              width: 1.1,
+              color: gold.withValues(alpha: hasMoney ? 0.5 : 0.2),
+              width: 1.0,
             ),
           ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: Gaps.sm, vertical: Gaps.xs),
-            child: Row(
-              children: [
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: hasMoney
-                          ? const [Color(0xFFFFE9A8), Color(0xFFD4A227)]
-                          : [
-                              Colors.white.withValues(alpha: 0.22),
-                              Colors.white.withValues(alpha: 0.10),
-                            ],
-                    ),
-                  ),
-                  child: Icon(
-                    Icons.account_balance_wallet_rounded,
-                    size: 18,
-                    color: hasMoney
-                        ? const Color(0xFF6B4E00)
-                        : Colors.white.withValues(alpha: 0.85),
-                  ),
-                ),
-                Gaps.hSm,
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text(
-                        'کیف پول من',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 1),
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: AlignmentDirectional.centerStart,
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
-                          children: [
-                            Text(
-                              Money.format(balance),
-                              style: TextStyle(
-                                color: hasMoney ? gold : Colors.white,
-                                fontSize: 17,
-                                fontWeight: FontWeight.w900,
-                                height: 1.1,
-                              ),
-                            ),
-                            const SizedBox(width: 3),
-                            Text(
-                              'تومان',
-                              style: TextStyle(
-                                color: (hasMoney ? gold : Colors.white)
-                                    .withValues(alpha: 0.75),
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          child: Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: hasMoney
+                        ? const [Color(0xFFFFE9A8), Color(0xFFD4A227)]
+                        : [
+                            Colors.white.withValues(alpha: 0.2),
+                            Colors.white.withValues(alpha: 0.1),
                           ],
-                        ),
-                      ),
-                    ],
                   ),
                 ),
-                Gaps.hXs,
-                // وقتی پول دارد، دعوت به برداشت؛ وقتی ندارد، راهنمای ورود.
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: Gaps.xs, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: hasMoney
-                        ? gold.withValues(alpha: 0.20)
-                        : Colors.white.withValues(alpha: 0.12),
-                    borderRadius: Corners.rPill,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        hasMoney ? 'برداشت' : 'مشاهده',
-                        style: TextStyle(
-                          color: hasMoney ? gold : Colors.white,
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      Icon(Icons.chevron_left_rounded,
-                          size: 15, color: hasMoney ? gold : Colors.white),
-                    ],
-                  ),
+                child: Icon(
+                  Icons.account_balance_wallet_rounded,
+                  size: 15,
+                  color: hasMoney ? const Color(0xFF6B4E00) : Colors.white70,
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Row(
+                  children: [
+                    const Text('کیف پول: ', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600)),
+                    Text(
+                      Money.format(balance),
+                      style: TextStyle(
+                        color: hasMoney ? gold : Colors.white,
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(width: 3),
+                    Text('تومان', style: TextStyle(color: gold.withValues(alpha: 0.8), fontSize: 10, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: gold.withValues(alpha: 0.18),
+                  borderRadius: Corners.rPill,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(hasMoney ? 'برداشت' : 'مشاهده',
+                        style: const TextStyle(color: gold, fontSize: 10, fontWeight: FontWeight.w800)),
+                    const Icon(Icons.chevron_left_rounded, size: 13, color: gold),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
