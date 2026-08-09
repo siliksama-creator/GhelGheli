@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../api_client.dart';
 
-import '../../../theme/tokens.dart';
 
 /// دیالوگ چالش مستقیم ۱ به ۱ با دوستان
 class PrivateMatchDialog extends StatefulWidget {

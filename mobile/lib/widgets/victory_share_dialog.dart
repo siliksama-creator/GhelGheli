@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/assets.dart';
 
-import '../theme/tokens.dart';
 import '../widgets/avatar_image.dart';
 
 /// کارت گرافیکی فوق‌العاده شیک استوری برای اشتراک‌گذاری پیروزی و جذب کاربر

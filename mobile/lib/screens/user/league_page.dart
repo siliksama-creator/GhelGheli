@@ -29,9 +29,8 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
   Map? _data;
   bool _loading = true;
   String? _error;
-  // 0 = standings, 1 = club rosters. The rosters are their own screen so the
-  // table does not pay for a request nobody looked at.
   int _tab = 0;
+  String? _selectedLeagueId;
 
   @override
   void initState() {
@@ -55,10 +54,11 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
     // روی چرخنده می‌ماند بدون هیچ پیام یا راه خروجی. این دقیقاً همان
     // «صفحات لود نمیشن» بود که کاربر گزارش داد.
     try {
-      final x = await widget.api.get('/api/league/current');
+      final url = _selectedLeagueId != null ? '/api/league/current?seasonId=$_selectedLeagueId' : '/api/league/current';
+      final x = await widget.api.get(url);
       if (!mounted) return;
       setState(() {
-        _data = x;
+        _data = x is Map ? x : null;
         _error = null;
         _loading = false;
       });
