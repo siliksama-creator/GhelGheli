@@ -305,7 +305,7 @@ class _WalletStrip extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text('کیف پول: ', style: TextStyle(color: Colors.white70, fontSize: 10.5, fontWeight: FontWeight.w600)),
+                      const Text('کیف پول من', , style: TextStyle(color: Colors.white70, fontSize: 10.5, fontWeight: FontWeight.w600)),
                       Text(
                         Money.format(balance),
                         style: TextStyle(
