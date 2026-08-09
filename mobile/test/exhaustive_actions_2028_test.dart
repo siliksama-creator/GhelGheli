@@ -69,18 +69,13 @@ class _MockUniversalAdapter implements HttpClientAdapter {
   }
 }
 
-Widget _wrap(Widget child, {double width = 380}) => MaterialApp(
+Widget _wrap(Widget child) => MaterialApp(
       theme: AppTheme.dark(),
       locale: const Locale('fa'),
       home: Directionality(
         textDirection: TextDirection.rtl,
         child: Scaffold(
-          body: Center(
-            child: SizedBox(
-              width: width,
-              child: child,
-            ),
-          ),
+          body: child,
         ),
       ),
     );
