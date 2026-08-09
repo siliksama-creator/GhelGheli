@@ -333,7 +333,7 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
                       _text.text = em;
                       unawaited(_send());
                     },
-                    child: Container(
+                    child: DecoratedBox(
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(10),
                         color: Colors.white.withValues(alpha: 0.06),

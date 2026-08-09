@@ -1,4 +1,3 @@
-import '../../theme/colors.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -130,9 +129,7 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
     }
 
     final entries = List<Map>.from(_data?['entries'] ?? []);
-    final activeLeagues = List<Map>.from(_data?['activeLeagues'] ?? []);
     final season = _data?['season'];
-    final currentSeasonId = season?['id']?.toString();
     final end =
         season?['ends_at'] == null ? null : DateTime.parse(season['ends_at']);
     final daysLeft = end == null
