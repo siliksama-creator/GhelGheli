@@ -1,7 +1,5 @@
-// Multi-image attachment picker for support messages (1..5 images).
-//
-// Uploads happen immediately on pick so the send button never has to wait on
-// the network, and each thumbnail shows its own progress/failure state.
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -19,8 +17,6 @@ class AttachmentPicker extends StatefulWidget {
   });
 
   final ApiClient api;
-
-  /// Uploaded URLs collected so far (owned by the parent).
   final List<String> urls;
   final ValueChanged<List<String>> onChanged;
   final int max;
@@ -36,30 +32,31 @@ class _AttachmentPickerState extends State<AttachmentPicker> {
 
   bool get _busy => _uploading > 0;
 
-  Future<void> _pick() async {
+  Future<void> _pick(ImageSource source) async {
     final remaining = widget.max - widget.urls.length;
     if (remaining <= 0) return;
 
-    final picked = await ImagePicker().pickMultiImage(imageQuality: 78);
-    // The picker is a full-screen system UI; the user can navigate away
-    // from the ticket while it is open, so this widget may be gone by the
-    // time it returns.
-    if (!mounted || picked.isEmpty) return;
+    final picker = ImagePicker();
+    List<XFile> files = [];
 
-    // Silently trim rather than failing the whole batch when the user picks
-    // more than the remaining slots.
-    final files = picked.take(remaining).toList();
-    final skipped = picked.length - files.length;
+    if (source == ImageSource.gallery) {
+      final picked = await picker.pickMultiImage(imageQuality: 80);
+      files = picked;
+    } else {
+      final photo = await picker.pickImage(source: ImageSource.camera, imageQuality: 80);
+      if (photo != null) files = [photo];
+    }
 
+    if (!mounted || files.isEmpty) return;
+
+    final toUpload = files.take(remaining).toList();
     setState(() {
-      _uploading = files.length;
-      _error = skipped > 0
-          ? 'حداکثر ${widget.max} عکس؛ $skipped مورد اضافه نادیده گرفته شد'
-          : null;
+      _uploading = toUpload.length;
+      _error = null;
     });
 
     final next = List<String>.from(widget.urls);
-    for (final f in files) {
+    for (final f in toUpload) {
       try {
         final url = await widget.api.uploadSupportImage(f.path);
         next.add(url);
@@ -78,50 +75,102 @@ class _AttachmentPickerState extends State<AttachmentPicker> {
     widget.onChanged(next);
   }
 
+  void _showPickerSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0F1E36),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('انتخاب تصویر پیوست', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Colors.white)),
+              const SizedBox(height: 12),
+              ListTile(
+                leading: const Icon(Icons.photo_library_rounded, color: Color(0xFF38BDF8)),
+                title: const Text('انتخاب از گالری تصاویر', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pick(ImageSource.gallery);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.camera_alt_rounded, color: Color(0xFF22E7A6)),
+                title: const Text('گرفتن عکس با دوربین', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pick(ImageSource.camera);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final full = widget.urls.length >= widget.max;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            OutlinedButton.icon(
-              onPressed: (!widget.enabled || _busy || full) ? null : _pick,
-              icon: _busy
-                  ? const SizedBox(
-                      width: 15,
-                      height: 15,
-                      child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.add_photo_alternate_outlined, size: 18),
-              label: Text(_busy ? 'در حال آپلود...' : 'افزودن عکس'),
-            ),
-            Gaps.hXs,
-            Text(
-              '${faNum(widget.urls.length)} از ${faNum(widget.max)}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: full ? theme.colorScheme.primary : null,
-                fontWeight: FontWeight.w700,
+        // Prominent Upload Target Box
+        InkWell(
+          onTap: (!widget.enabled || _busy || full) ? null : _showPickerSheet,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              color: const Color(0xFF38BDF8).withValues(alpha: 0.08),
+              border: Border.all(
+                color: const Color(0xFF38BDF8).withValues(alpha: full ? 0.2 : 0.55),
+                width: 1.2,
               ),
             ),
-          ],
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _busy
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF38BDF8)),
+                      )
+                    : const Icon(Icons.add_a_photo_rounded, size: 20, color: Color(0xFF38BDF8)),
+                const SizedBox(width: 8),
+                Text(
+                  _busy
+                      ? 'در حال آپلود تصویر…'
+                      : full
+                          ? 'تکمیل سقف ۵ تصویر'
+                          : 'افزودن عکس / اسکرین‌شات پیوست (${faNum(widget.urls.length)} از ${faNum(widget.max)})',
+                  style: const TextStyle(
+                    color: Color(0xFF38BDF8),
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
         if (_error != null) ...[
-          Gaps.vXxs,
-          Text(_error!,
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: theme.colorScheme.error)),
+          const SizedBox(height: 6),
+          Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 11)),
         ],
         if (widget.urls.isNotEmpty) ...[
-          Gaps.vXs,
+          const SizedBox(height: 8),
           SizedBox(
-            height: 72,
+            height: 74,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: widget.urls.length,
-              separatorBuilder: (_, __) => Gaps.hXs,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
               itemBuilder: (_, i) => _Thumb(
                 url: widget.urls[i],
                 onRemove: widget.enabled ? () => _remove(i) : null,
@@ -153,7 +202,7 @@ class _Thumb extends StatelessWidget {
             errorBuilder: (_, __, ___) => Container(
               width: 72,
               height: 72,
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              color: Colors.white12,
               child: const Icon(Icons.broken_image_outlined, size: 20),
             ),
           ),
@@ -166,14 +215,14 @@ class _Thumb extends StatelessWidget {
               onTap: onRemove,
               child: Container(
                 decoration: const BoxDecoration(
-                  color: Colors.black54,
+                  color: Colors.black87,
                   borderRadius: BorderRadius.only(
-                      bottomRight: Radius.circular(10),
-                      topLeft: Radius.circular(10)),
+                    bottomRight: Radius.circular(8),
+                    topLeft: Radius.circular(6),
+                  ),
                 ),
                 padding: const EdgeInsets.all(3),
-                child: const Icon(Icons.close_rounded,
-                    size: 14, color: Colors.white),
+                child: const Icon(Icons.close_rounded, size: 14, color: Colors.white),
               ),
             ),
           ),
@@ -182,7 +231,6 @@ class _Thumb extends StatelessWidget {
   }
 }
 
-/// Read-only gallery for attachments already on a message.
 class AttachmentGallery extends StatelessWidget {
   const AttachmentGallery({super.key, required this.attachments});
   final List attachments;
@@ -191,25 +239,22 @@ class AttachmentGallery extends StatelessWidget {
   Widget build(BuildContext context) {
     if (attachments.isEmpty) return const SizedBox.shrink();
     return Padding(
-      padding: const EdgeInsets.only(top: Gaps.xs),
+      padding: const EdgeInsets.only(top: 6),
       child: Wrap(
-        spacing: Gaps.xs,
-        runSpacing: Gaps.xs,
+        spacing: 6,
+        runSpacing: 6,
         children: [
           for (final a in attachments)
             InkWell(
               onTap: () => _open(context, '$a'),
               child: ClipRRect(
-                borderRadius: Corners.rSm,
+                borderRadius: BorderRadius.circular(8),
                 child: Image.network(
                   fullAssetUrl(a),
-                  width: 76,
-                  height: 76,
+                  width: 72,
+                  height: 72,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const SizedBox(
-                      width: 76,
-                      height: 76,
-                      child: Icon(Icons.broken_image_outlined)),
+                  errorBuilder: (_, __, ___) => const SizedBox(width: 72, height: 72, child: Icon(Icons.broken_image_outlined)),
                 ),
               ),
             ),
@@ -224,7 +269,7 @@ class AttachmentGallery extends StatelessWidget {
       barrierColor: Colors.black87,
       builder: (c) => Dialog(
         backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.all(Gaps.md),
+        insetPadding: const EdgeInsets.all(16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -234,7 +279,7 @@ class AttachmentGallery extends StatelessWidget {
                 child: Image.network(fullAssetUrl(url), fit: BoxFit.contain),
               ),
             ),
-            Gaps.vSm,
+            const SizedBox(height: 8),
             FilledButton.icon(
               onPressed: () => Navigator.pop(c),
               icon: const Icon(Icons.close_rounded),

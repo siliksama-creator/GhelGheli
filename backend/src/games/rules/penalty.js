@@ -166,10 +166,14 @@ function saveChance(shotZone, diveZone, power, clean = false) {
  * `rand` تزریق می‌شود تا تست بتواند قطعی باشد. بدون این، تست‌های احتمالی
  * گاهی سبز و گاهی قرمز می‌شدند — بدترین نوع تست.
  */
-function resolveKick(shotZone, power, diveZone, rand = Math.random, sweet = null) {
+function resolveKick(shotZone, power, diveZone, rand = Math.random, sweet = null, obstacleZone = null) {
   const clean = isClean(power, sweet);
   if (missChance(shotZone, power, clean) > rand()) {
     return { outcome: 'miss', shotZone, diveZone, power, clean };
+  }
+  // Obstacle / Defender block if not clean shot
+  if (obstacleZone !== null && shotZone === obstacleZone && !clean && rand() < 0.75) {
+    return { outcome: 'save', shotZone, diveZone, power, clean, blockedByObstacle: true };
   }
   if (saveChance(shotZone, diveZone, power, clean) > rand()) {
     return { outcome: 'save', shotZone, diveZone, power, clean };
@@ -179,22 +183,16 @@ function resolveKick(shotZone, power, diveZone, rand = Math.random, sweet = null
 
 // ── وضعیت بازی ────────────────────────────────────────────────────────────
 const create = (rand = Math.random) => ({
-  // امتیاز هر بازیکن
   score: { X: 0, O: 0 },
-  // چند ضربه هر کدام زده‌اند
   taken: { X: 0, O: 0 },
-  // چه کسی الان می‌زند. زنندهٔ اول همیشه X.
   shooter: 'X',
-  // تاریخچه، برای نمایش ردیف توپ‌ها در UI
   history: [],
-  // انتخاب‌های قفل‌نشده — هرگز به کلاینت نمی‌رود (publicState حذفش می‌کند)
   pending: {},
   round: 1,
   suddenDeath: false,
   lastKick: null,
-  // پنجرهٔ «ضربهٔ تمیز» برای ضربهٔ جاری. هر ضربه یک پنجرهٔ تازه دارد،
-  // وگرنه بعد از دو ضربه جایش حفظ می‌شود و چالشِ زمان‌بندی می‌میرد.
   sweet: makeSweet(rand),
+  obstacleZone: rand() > 0.4 ? Math.floor(rand() * ZONES) : null,
 });
 
 /**
@@ -231,7 +229,7 @@ function applyMove(state, move, player, rand = Math.random) {
 
   const shot = state.pending[state.shooter];
   const dive = state.pending[keeper];
-  const res = resolveKick(shot.zone, shot.power, dive.zone, rand, state.sweet);
+  const res = resolveKick(shot.zone, shot.power, dive.zone, rand, state.sweet, state.obstacleZone);
 
   if (res.outcome === 'goal') state.score[state.shooter] += 1;
   state.taken[state.shooter] += 1;
@@ -248,6 +246,7 @@ function applyMove(state, move, player, rand = Math.random) {
   // پنجرهٔ تازه برای ضربهٔ بعد — همان‌طور که بالا توضیح داده شد، ثابت
   // ماندنش یعنی حفظ کردنِ یک عدد و پایانِ چالش.
   state.sweet = makeSweet(rand);
+  state.obstacleZone = rand() > 0.4 ? Math.floor(rand() * ZONES) : null;
   // نقش‌ها عوض می‌شوند.
   state.shooter = keeper;
   // یک دور کامل = هر دو زده‌اند.

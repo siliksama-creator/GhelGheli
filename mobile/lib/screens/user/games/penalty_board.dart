@@ -398,6 +398,7 @@ class _PenaltyBoardState extends State<_PenaltyBoard>
                                 enabled: widget.session.phase == GamePhase.playing && !_alreadyChose && !_kick.isAnimating,
                                 amShooter: _amShooter,
                                 picked: _pickedZone,
+                                obstacleZone: st['obstacleZone'] as int?,
                                 onDown: _amShooter ? _startCharge : null,
                                 onTap: _amShooter ? null : _dive,
                                 onUp: _amShooter ? _release : null,
@@ -700,6 +701,7 @@ class _ZoneGrid extends StatelessWidget {
     required this.enabled,
     required this.amShooter,
     required this.picked,
+    this.obstacleZone,
     this.onDown,
     this.onTap,
     this.onUp,
@@ -707,6 +709,7 @@ class _ZoneGrid extends StatelessWidget {
 
   final bool enabled, amShooter;
   final int? picked;
+  final int? obstacleZone;
   final void Function(int)? onDown;
   final void Function(int)? onTap;
   final VoidCallback? onUp;
@@ -761,6 +764,7 @@ class _ZoneGrid extends StatelessWidget {
                                 enabled: enabled,
                                 selected: picked == r * 3 + col,
                                 amShooter: amShooter,
+                                isObstacle: obstacleZone == r * 3 + col,
                                 onDown: onDown,
                                 onTap: onTap,
                                 onUp: onUp,
@@ -785,13 +789,14 @@ class _ZoneCell extends StatelessWidget {
     required this.enabled,
     required this.selected,
     required this.amShooter,
+    this.isObstacle = false,
     this.onDown,
     this.onTap,
     this.onUp,
   });
 
   final int zone;
-  final bool enabled, selected, amShooter;
+  final bool enabled, selected, amShooter, isObstacle;
   final void Function(int)? onDown;
   final void Function(int)? onTap;
   final VoidCallback? onUp;
@@ -800,11 +805,9 @@ class _ZoneCell extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      // زننده: نگه‌داشتن → شارژ قدرت، رها کردن → شوت.
       onTapDown: enabled && amShooter ? (_) => onDown?.call(zone) : null,
       onTapUp: enabled && amShooter ? (_) => onUp?.call() : null,
       onTapCancel: enabled && amShooter ? () => onUp?.call() : null,
-      // دروازه‌بان: یک ضربه کافی است.
       onTap: enabled && !amShooter ? () => onTap?.call(zone) : null,
       child: Container(
         margin: const EdgeInsets.all(1.5),
@@ -812,14 +815,23 @@ class _ZoneCell extends StatelessWidget {
           borderRadius: BorderRadius.circular(6),
           color: selected
               ? _accent.withValues(alpha: 0.30)
-              : Colors.white.withValues(alpha: enabled ? 0.045 : 0.015),
+              : isObstacle
+                  ? const Color(0xFFFF9F43).withValues(alpha: 0.22)
+                  : Colors.white.withValues(alpha: enabled ? 0.045 : 0.015),
           border: Border.all(
             color: selected
                 ? _accent
-                : Colors.white.withValues(alpha: enabled ? 0.16 : 0.06),
-            width: selected ? 2 : 1,
+                : isObstacle
+                    ? const Color(0xFFFF9F43).withValues(alpha: 0.65)
+                    : Colors.white.withValues(alpha: enabled ? 0.16 : 0.06),
+            width: (selected || isObstacle) ? 2 : 1,
           ),
         ),
+        child: isObstacle
+            ? const Center(
+                child: Icon(Icons.shield_rounded, size: 16, color: Color(0xFFFF9F43)),
+              )
+            : null,
       ),
     );
   }

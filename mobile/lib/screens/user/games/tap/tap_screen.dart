@@ -66,7 +66,7 @@ class _TapGameScreenState extends State<TapGameScreen>
   // بارِ نیتیو در بدترین حالت، بدونِ هیچ تغییری در احساسِ بازی برای
   // کاربرِ عادی. حسِ «لمسی» می‌ماند، فشارِ زیرساختی از بین می‌رود.
   final Stopwatch _feedbackClock = Stopwatch()..start();
-  static const Duration _tapFeedbackMinGap = Duration(milliseconds: 70);
+  static const Duration _tapFeedbackMinGap = Duration(milliseconds: 100);
 
   // ═══════════════════════════════════════════════════════════════════════
   // چرا شمارنده‌ها ValueNotifier شدند و نه setState
