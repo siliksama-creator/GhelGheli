@@ -712,7 +712,7 @@ class _ShopButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconButton(
-      tooltip: 'فروشگاه و امکانات پلاس',
+      tooltip: 'فروشگاه',
       onPressed: onPressed,
       style: selected
           ? IconButton.styleFrom(

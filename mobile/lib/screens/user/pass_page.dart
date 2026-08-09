@@ -359,10 +359,14 @@ class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin
           const SizedBox(height: 10),
 
           // ── Track Legend & Fold Button ──
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 4,
             children: [
               Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -392,7 +396,7 @@ class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin
                   onPressed: () => setState(() => _showClaimed = !_showClaimed),
                   icon: Icon(_showClaimed ? Icons.expand_less_rounded : Icons.expand_more_rounded, size: 18),
                   label: Text(
-                    _showClaimed ? 'بستن پله‌های قبلی' : 'مشاهده ${faNum(claimedCount)} پله تکمیل‌شده',
+                    _showClaimed ? 'بستن پله‌های قبلی' : 'پله‌های تکمیل‌شده (${faNum(claimedCount)})',
                     style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
                   ),
                 ),
