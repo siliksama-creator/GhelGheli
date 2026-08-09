@@ -177,8 +177,10 @@ class VictoryShareDialog extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                FilledButton.icon(
+                Expanded(
+                child: FilledButton.icon(
                   style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 48),
                     backgroundColor: const Color(0xFF22E7A6),
                     foregroundColor: const Color(0xFF00281D),
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -192,6 +194,7 @@ class VictoryShareDialog extends StatelessWidget {
                     Navigator.pop(context);
                   },
                 ),
+              ),
                 const SizedBox(width: 8),
                 IconButton.filled(
                   style: IconButton.styleFrom(backgroundColor: Colors.white12),

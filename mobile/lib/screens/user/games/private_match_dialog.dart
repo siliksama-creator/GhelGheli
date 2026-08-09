@@ -110,7 +110,7 @@ class _PrivateMatchDialogState extends State<PrivateMatchDialog> {
 
               if (_createdCode == null) ...[
                 FilledButton.icon(
-                  style: FilledButton.styleFrom(backgroundColor: const Color(0xFF38BDF8), foregroundColor: const Color(0xFF002033)),
+                  style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48), backgroundColor: const Color(0xFF38BDF8), foregroundColor: const Color(0xFF002033)),
                   icon: const Icon(Icons.add_circle_outline_rounded),
                   label: const Text('ساخت اتاق بازی و دریافت کد', style: TextStyle(fontWeight: FontWeight.w900)),
                   onPressed: _createRoom,
@@ -130,7 +130,7 @@ class _PrivateMatchDialogState extends State<PrivateMatchDialog> {
                       Text(_createdCode!, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Color(0xFF38BDF8), letterSpacing: 4)),
                       const SizedBox(height: 8),
                       FilledButton.icon(
-                        style: FilledButton.styleFrom(backgroundColor: const Color(0xFF22E7A6), foregroundColor: const Color(0xFF00281D)),
+                        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(44), backgroundColor: const Color(0xFF22E7A6), foregroundColor: const Color(0xFF00281D)),
                         icon: const Icon(Icons.share_rounded, size: 16),
                         label: const Text('ارسال لینک دعوت برای دوست', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
                         onPressed: () {
