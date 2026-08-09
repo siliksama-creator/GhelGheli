@@ -528,6 +528,7 @@ class _HomeShellState extends State<HomeShell>
             icon: const Icon(Icons.logout_rounded, size: 20, color: Color(0xFFFF6B6B)),
             onPressed: () => _confirmLogout(context),
           ),
+          // حذفِ دکمهٔ تکراری
           const SizedBox(width: 4),
         ],
       ),
