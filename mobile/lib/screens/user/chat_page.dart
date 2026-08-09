@@ -283,8 +283,14 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
   }
 
 
+  static const _popularEmojis = [
+    '⚽', '🏆', '🥇', '🥈', '🥉', '🥅', '👟', '🧤',
+    '🔥', '⚡', '🌟', '✨', '💥', '💯', '👑', '💎',
+    '🎉', '🎊', '👏', '🤝', '🙌', '✌️', '💪', '🎯',
+    '😎', '😂', '🤣', '😅', '🤩', '😍', '🥳', '🫡',
+  ];
+
   Future<void> _openStickersSheet() async {
-    if (_stickers.isEmpty) return;
     await showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF0E1826),
@@ -297,9 +303,9 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
           children: [
             Row(
               children: [
-                const Icon(Icons.stars_rounded, size: 24, color: Color(0xFFFFD166)),
+                const Icon(Icons.emoji_emotions_rounded, size: 24, color: Color(0xFFFFD166)),
                 const SizedBox(width: 8),
-                const Text('ایموجی‌ها و استیکرهای بزرگ قلقلی',
+                const Text('ایموجی‌های محبوب و فوتبالی',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.white)),
                 const Spacer(),
                 IconButton(
@@ -310,48 +316,30 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
             ),
             const SizedBox(height: 14),
             SizedBox(
-              height: 280,
+              height: 220,
               child: GridView.builder(
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 4,
-                  mainAxisSpacing: 10,
-                  crossAxisSpacing: 10,
-                  childAspectRatio: 0.88,
+                  crossAxisCount: 8,
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8,
                 ),
-                itemCount: _stickers.length,
+                itemCount: _popularEmojis.length,
                 itemBuilder: (ctx, i) {
-                  final st = _stickers[i];
+                  final em = _popularEmojis[i];
                   return InkWell(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(10),
                     onTap: () {
                       Navigator.pop(ctx);
-                      _send(stickerId: st['id']);
+                      _text.text = em;
+                      unawaited(_send());
                     },
                     child: Container(
-                      padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
-                        color: Colors.white.withValues(alpha: 0.05),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+                        borderRadius: BorderRadius.circular(10),
+                        color: Colors.white.withValues(alpha: 0.06),
                       ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Expanded(
-                            child: SafeImage(
-                              url: st['image_url'],
-                              fit: BoxFit.contain,
-                              fallbackEmoji: '⚽',
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            st['title'] ?? '',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFFE2E8F0)),
-                          ),
-                        ],
+                      child: Center(
+                        child: Text(em, style: const TextStyle(fontSize: 22)),
                       ),
                     ),
                   );
@@ -649,13 +637,7 @@ class _ChatBubble extends StatelessWidget {
                           style: theme.textTheme.titleSmall,
                         ),
                       ),
-                      IconButton(
-                        visualDensity: VisualDensity.compact,
-                        icon: Icon(Icons.flag_outlined,
-                            size: 17,
-                            color: theme.colorScheme.onSurfaceVariant),
-                        onPressed: onReport,
-                      ),
+
                     ],
                   ),
                   if (message['reply_text'] != null)

@@ -3118,19 +3118,21 @@ app.patch('/api/admin/league/payouts/:id', adminAuth, validateUuid('id'), requir
 }));
 
 app.get('/api/admin/users', adminAuth, asyncHandler(async (req, res) => {
-  const search = `%${req.query.search || ''}%`;
-  // ═══════════════════════════════════════════════════════════════════════
-  // چرا game_xp اینجا خوانده و به لول تبدیل می‌شود
-  // ═══════════════════════════════════════════════════════════════════════
-  //
-  // مدیر باید همان چیزی را ببیند که کاربر می‌بیند. بدون لول در این
-  // فهرست، پشتیبانی نمی‌تواند به سؤالِ «چرا لولم بالا نرفت» جواب دهد
-  // و هیچ راهی برای تشخیصِ حسابِ مشکوک (لولِ خیلی بالا در چند روز)
-  // ندارد.
-  //
-  // تبدیل سمتِ سرور انجام می‌شود نه در پنل: منحنی یک منبعِ حقیقت
-  // دارد و تغییرش نباید نیازمندِ انتشارِ نسخهٔ تازهٔ پنل باشد.
-  const rows = (await pool.query('SELECT id,mobile,first_name,last_name,nickname,age,city,province,bank_account,profile_image_url,profile_avatar_key,current_points,lifetime_points,monthly_league_points,status,joined_at,game_xp FROM users WHERE mobile ILIKE $1 OR nickname ILIKE $1 ORDER BY joined_at DESC LIMIT 300', [search])).rows;
+  const rawQ = String(req.query.search || req.query.q || req.query.query || '').trim();
+  const search = `%${rawQ}%`;
+  const normalizedDigits = rawQ.replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+  const searchDigits = `%${normalizedDigits}%`;
+
+  const rows = (await pool.query(
+    `SELECT id,mobile,first_name,last_name,nickname,age,city,province,bank_account,
+            profile_image_url,profile_avatar_key,current_points,lifetime_points,
+            monthly_league_points,status,joined_at,game_xp 
+       FROM users 
+      WHERE mobile ILIKE $1 OR mobile ILIKE $2 OR nickname ILIKE $1 OR first_name ILIKE $1 
+         OR last_name ILIKE $1 OR (first_name || ' ' || last_name) ILIKE $1
+      ORDER BY joined_at DESC LIMIT 300`,
+    [search, searchDigits]
+  )).rows;
   res.json(rows.map((u) => ({
     ...u,
     level: level.levelFromXp(u.game_xp).level,

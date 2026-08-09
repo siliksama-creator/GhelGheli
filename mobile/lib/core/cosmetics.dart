@@ -220,9 +220,25 @@ class DisplayName extends StatelessWidget {
         ],
         Flexible(child: text),
         if (c['plus'] == true)
-          const Padding(
-            padding: EdgeInsetsDirectional.only(start: 3),
-            child: Icon(Icons.star_rounded, size: 13, color: Colors.amber),
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 4),
+            child: Container(
+              padding: const EdgeInsets.all(1.5),
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Color(0x99FFD700),
+                    blurRadius: 8,
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.star_rounded,
+                size: 15,
+                color: Color(0xFFFFDF70),
+              ),
+            ),
           ),
       ],
     );

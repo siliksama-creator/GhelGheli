@@ -137,7 +137,7 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
         season?['ends_at'] == null ? null : DateTime.parse(season['ends_at']);
     final daysLeft = end == null
         ? ''
-        : '${faNum(end.difference(DateTime.now()).inDays)} روز تا پایان ماه';
+        : '${faNum(end.difference(DateTime.now()).inDays)} روز تا پایان این دوره لیگ';
     final top = entries.take(3).toList();
     final rest = entries.skip(3).toList();
     final brand = context.brand;
