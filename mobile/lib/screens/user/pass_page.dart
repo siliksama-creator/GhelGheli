@@ -290,8 +290,12 @@ class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin
                   children: [
                     Icon(Icons.bolt_rounded, color: Color(0xFFFFD166), size: 15),
                     SizedBox(width: 4),
-                    Text('راه‌های سریع کسب تجربه (XP):',
-                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: Colors.white)),
+                    Expanded(
+                      child: Text('راه‌های سریع کسب تجربه (XP):',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: Colors.white)),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 6),

@@ -1,7 +1,6 @@
 name: Flutter Check
 
 env:
-  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 # Runs on every change to the app: analyze + unit tests, no packaging.
