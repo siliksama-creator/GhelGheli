@@ -1,5 +1,8 @@
 name: Flutter Check
 
+env:
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
+
 # Runs on every change to the app: analyze + unit tests, no packaging.
 #
 # This is what now guards the mobile code on each push — "Build APK" was

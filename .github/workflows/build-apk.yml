@@ -1,5 +1,8 @@
 name: Build APK
 
+env:
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
+
 # MANUAL ONLY.
 #
 # This used to run on every push to main, which meant an APK was produced for
