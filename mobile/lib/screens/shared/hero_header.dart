@@ -55,7 +55,7 @@ class HeroHeader extends StatelessWidget {
     final done = _required.length - missing.length;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
         gradient: const LinearGradient(
@@ -137,7 +137,7 @@ class HeroHeader extends StatelessWidget {
               const SizedBox(width: 8),
               // ── باکس طلایی درخشان امتیاز ──
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(13),
                   gradient: const LinearGradient(
@@ -168,7 +168,7 @@ class HeroHeader extends StatelessWidget {
                         Text(
                           faNum(points),
                           style: const TextStyle(
-                            fontSize: 19,
+                            fontSize: 18,
                             fontWeight: FontWeight.w900,
                             color: Color(0xFFFFDF70),
                             height: 1.1,
