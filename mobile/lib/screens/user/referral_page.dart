@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
-import '../../core/assets.dart';
 import '../../core/share_invite.dart';
-import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
 
 class ReferralPage extends StatefulWidget {

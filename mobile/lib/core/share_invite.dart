@@ -17,6 +17,7 @@ class ShareTarget {
     required this.app,
     required this.label,
     required this.color,
+    required this.icon,
     this.appUri,
     this.webUri,
     this.copyFirst = false,
@@ -26,6 +27,7 @@ class ShareTarget {
   final ShareAppId app;
   final String label;
   final int color;
+  final IconData icon;
   final String? appUri;
   final String? webUri;
   final bool copyFirst;
@@ -37,6 +39,7 @@ const shareTargets = <ShareTarget>[
     app: ShareAppId.telegram,
     label: 'تلگرام',
     color: 0xFF29A9EB,
+    icon: Icons.send_rounded,
     appUri: 'tg://msg_url?url={text}',
     webUri: 'https://t.me/share/url?url={text}',
   ),
@@ -45,6 +48,7 @@ const shareTargets = <ShareTarget>[
     app: ShareAppId.whatsapp,
     label: 'واتس‌اپ',
     color: 0xFF25D366,
+    icon: Icons.chat_bubble_rounded,
     appUri: 'whatsapp://send?text={text}',
     webUri: 'https://wa.me/?text={text}',
   ),
@@ -53,6 +57,7 @@ const shareTargets = <ShareTarget>[
     app: ShareAppId.rubika,
     label: 'روبیکا',
     color: 0xFF8A2BE2,
+    icon: Icons.circle_rounded,
     appUri: 'rubika://',
     webUri: 'https://rubika.ir',
     copyFirst: true,
@@ -62,6 +67,7 @@ const shareTargets = <ShareTarget>[
     app: ShareAppId.bale,
     label: 'بله',
     color: 0xFF00BFA5,
+    icon: Icons.circle_rounded,
     appUri: 'bale://',
     webUri: 'https://web.bale.ai',
     copyFirst: true,

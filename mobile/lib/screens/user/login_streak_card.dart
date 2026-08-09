@@ -152,7 +152,6 @@ class _LoginStreakCardState extends State<LoginStreakCard>
     final currentDay = _int(_data!['currentDay']).clamp(0, 7).toInt();
     final nextDay = _int(_data!['nextDay']).clamp(1, 7).toInt();
     final nextReward = _int(_data!['nextReward']);
-    final totalClaims = _int(_data!['totalClaims']);
     final claimedToday = _data!['claimedToday'] == true;
     final progressDay = claimedToday ? currentDay : math.max(0, nextDay - 1);
     final progress = (progressDay / 7.0).clamp(0.0, 1.0);

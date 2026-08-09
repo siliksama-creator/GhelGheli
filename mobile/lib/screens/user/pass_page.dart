@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
@@ -173,8 +171,6 @@ class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin
 
     final claimedCount = allTiers.where(isTierDone).length;
     final displayTiers = allTiers.where((r) => _showClaimed || !isTierDone(r)).toList();
-
-    final theme = Theme.of(context);
 
     return RefreshIndicator(
       onRefresh: () => _load(jump: false),
@@ -437,7 +433,7 @@ class _XpPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(label, style: const TextStyle(fontSize: 11, color: Colors.white80, fontWeight: FontWeight.w600)),
+          Text(label, style: const TextStyle(fontSize: 11, color: Colors.white70, fontWeight: FontWeight.w600)),
           const SizedBox(width: 4),
           Text(xp, style: const TextStyle(fontSize: 11, color: Color(0xFF22E7A6), fontWeight: FontWeight.w900)),
         ],

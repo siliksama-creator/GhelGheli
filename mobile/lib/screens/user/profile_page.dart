@@ -6,7 +6,6 @@ import '../../core/cosmetics.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/avatar_image.dart';
-import '../../widgets/safe_image.dart';
 import '../../widgets/state_views.dart';
 
 /// Private profile editor: dense and compact 2-column layout to minimize scrolling.
@@ -39,7 +38,6 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _messageIsError = false;
   String? _passwordMessage;
   bool _passwordMessageIsError = false;
-  List<Map<String, dynamic>> _trophies = const [];
   List _myClubs = const [];
   List _leagueHistory = const [];
 
@@ -47,7 +45,6 @@ class _ProfilePageState extends State<ProfilePage> {
   void initState() {
     super.initState();
     _load();
-    _loadTrophies();
     _loadLeagueHistory();
   }
 
@@ -63,19 +60,6 @@ class _ProfilePageState extends State<ProfilePage> {
     _currentPassword.dispose();
     _newPassword.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadTrophies() async {
-    try {
-      final res = await widget.api.get('/api/profile/trophies');
-      if (!mounted) return;
-      setState(() {
-        _trophies = (res is List ? res : const [])
-            .whereType<Map>()
-            .map((e) => Map<String, dynamic>.from(e))
-            .toList();
-      });
-    } catch (_) {}
   }
 
   Future<void> _loadLeagueHistory() async {
