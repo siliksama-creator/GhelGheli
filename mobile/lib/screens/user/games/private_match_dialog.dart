@@ -162,6 +162,7 @@ class _PrivateMatchDialogState extends State<PrivateMatchDialog> {
                   ),
                   const SizedBox(width: 8),
                   FilledButton(
+                    style: FilledButton.styleFrom(minimumSize: const Size(64, 48)),
                     onPressed: () {
                       final code = _joinCodeCtrl.text.trim();
                       if (code.isNotEmpty) {

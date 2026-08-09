@@ -267,6 +267,7 @@ class _AdminRewardsState extends State<AdminRewards> {
             Row(children: [
               Expanded(
                 child: DropdownButtonFormField<String>(
+                  isExpanded: true,
                   initialValue: _groupType,
                   decoration: const InputDecoration(labelText: 'نوع گروه'),
                   items: const [
@@ -280,6 +281,7 @@ class _AdminRewardsState extends State<AdminRewards> {
               Gaps.hXs,
               Expanded(
                 child: DropdownButtonFormField<String>(
+                  isExpanded: true,
                   initialValue: _groupAccent,
                   decoration: const InputDecoration(labelText: 'رنگ'),
                   items: const [
