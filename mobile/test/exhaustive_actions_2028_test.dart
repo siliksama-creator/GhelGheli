@@ -136,8 +136,8 @@ void main() {
     });
   });
 
-  group('[2028 Battery] ۳. چک اجرای چند لیگ هم‌زمان در صفحه لیگ', () {
-    testWidgets('نوار چندلیگی نمایش داده شده و سوییچ بین لیگ‌ها بدون ارور کار می‌کند', (tester) async {
+  group('[2028 Battery] ۳. چک اجرای لیگ پویا با مدت زمان منعطف', () {
+    testWidgets('جدول لیگ قلقلی با امتیازات و روزهای باقی‌مانده بدون ارور رندر می‌شود', (tester) async {
       final api = ApiClient();
       api.dio.httpClientAdapter = _MockUniversalAdapter();
 
@@ -145,10 +145,11 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
-      expect(find.text('لیگ برتر ماهانه'), findsWidgets);
-      expect(find.text('لیگ هفتگی قهرمانان'), findsWidgets);
+      expect(find.text('جدول لیگ'), findsWidgets);
+      expect(find.text('علی'), findsWidgets);
+      expect(find.text('باشگاه‌ها'), findsWidgets);
 
-      await tester.tap(find.text('لیگ هفتگی قهرمانان').first);
+      await tester.tap(find.text('باشگاه‌ها').first);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
     });
