@@ -694,7 +694,7 @@ class _WheelButtonState extends State<_WheelButton>
               : null,
           icon: RotationTransition(
             turns: _spinCtrl,
-            child: Image.asset('assets/pass/wheel_icon.webp', width: 24, height: 24),
+            child: Image.asset('assets/pass/wheel_icon.webp', width: 24, height: 24, cacheWidth: 72),
           ),
         ),
         if (n > 0)

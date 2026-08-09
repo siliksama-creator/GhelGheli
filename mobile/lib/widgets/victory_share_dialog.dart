@@ -95,7 +95,7 @@ class VictoryShareDialog extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Image.asset('assets/brand/logo.webp', width: 36, height: 36, fit: BoxFit.contain),
+                      Image.asset('assets/brand/logo.webp', width: 36, height: 36, cacheWidth: 108, fit: BoxFit.contain),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
