@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../api_client.dart';
-import '../core/share_invite.dart';
-import '../theme/tokens.dart';
+import '../../../api_client.dart';
+
+import '../../../theme/tokens.dart';
 
 /// دیالوگ چالش مستقیم ۱ به ۱ با دوستان
 class PrivateMatchDialog extends StatefulWidget {
@@ -136,7 +136,7 @@ class _PrivateMatchDialogState extends State<PrivateMatchDialog> {
                         label: const Text('ارسال لینک دعوت برای دوست', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
                         onPressed: () {
                           final msg = 'بیا در بازی قلقلی با هم دوئل کنیم! 🎮\nکد اتاق: $_createdCode\n$_shareUrl';
-                          ShareInvite.shareText(msg);
+                          Clipboard.setData(ClipboardData(text: msg)); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لینک و کد اتاق در کلیپ‌بورد کپی شد')));
                         },
                       ),
                     ],

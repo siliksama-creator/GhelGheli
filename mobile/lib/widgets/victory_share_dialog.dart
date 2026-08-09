@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/assets.dart';
-import '../core/share_invite.dart';
+
 import '../theme/tokens.dart';
 import '../widgets/avatar_image.dart';
 
@@ -146,7 +146,7 @@ class VictoryShareDialog extends StatelessWidget {
                       children: [
                         Text(scoreText, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: Color(0xFF22E7A6))),
                         const SizedBox(height: 4),
-                        Text('+${faNum(pointsEarned)} امتیاز لیگ دریافت شد',
+                        Text('+${NumberParser.toInt(pointsEarned)} امتیاز لیگ دریافت شد',
                             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFFFD166))),
                       ],
                     ),
@@ -189,7 +189,7 @@ class VictoryShareDialog extends StatelessWidget {
                   label: const Text('اشتراک‌گذاری در استوری و شبکه‌ها', style: TextStyle(fontWeight: FontWeight.w900)),
                   onPressed: () {
                     Clipboard.setData(ClipboardData(text: shareMsg));
-                    ShareInvite.shareText(shareMsg);
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('متن افتخار و کد معرف در کلیپ‌بورد کپی شد')));
                     Navigator.pop(context);
                   },
                 ),

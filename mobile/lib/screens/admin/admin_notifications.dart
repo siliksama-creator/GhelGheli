@@ -76,7 +76,7 @@ class _AdminNotificationsState extends State<AdminNotifications> {
           subtitle: 'ارسال نوتیفیکیشن با رعایت ساعت تهران (۱۰:۰۰ تا ۲۲:۰۰) جهت عدم مزاحمت شبانه.',
           children: [
             DropdownButtonFormField<String>(
-              value: _segment,
+              initialValue: _segment,
               decoration: const InputDecoration(labelText: 'گروه هدف (سگمنت)'),
               items: _segments.map((s) => DropdownMenuItem(value: s.$1, child: Text(s.$2, style: const TextStyle(fontSize: 12.5)))).toList(),
               onChanged: (v) => setState(() => _segment = v ?? 'all'),
