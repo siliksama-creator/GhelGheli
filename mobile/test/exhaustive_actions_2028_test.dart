@@ -37,9 +37,25 @@ class _MockUniversalAdapter implements HttpClientAdapter {
       );
     }
 
-    if (path.contains('/api/admin/rewards') || path.contains('/api/admin/reward-claims') || path.contains('/api/admin/reward-groups')) {
+    if (path == '/api/admin/rewards') {
       return ResponseBody.fromString(
-        '{"rewards":[],"claims":[],"groups":[]}',
+        '[]',
+        200,
+        headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
+      );
+    }
+
+    if (path == '/api/admin/reward-claims') {
+      return ResponseBody.fromString(
+        '[]',
+        200,
+        headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
+      );
+    }
+
+    if (path == '/api/admin/reward-groups') {
+      return ResponseBody.fromString(
+        '{"groups":[]}',
         200,
         headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
       );
@@ -53,12 +69,19 @@ class _MockUniversalAdapter implements HttpClientAdapter {
   }
 }
 
-Widget _wrap(Widget child) => MaterialApp(
+Widget _wrap(Widget child, {double width = 380}) => MaterialApp(
       theme: AppTheme.dark(),
       locale: const Locale('fa'),
       home: Directionality(
         textDirection: TextDirection.rtl,
-        child: Scaffold(body: child),
+        child: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: width,
+              child: child,
+            ),
+          ),
+        ),
       ),
     );
 
@@ -76,7 +99,8 @@ void main() {
         referralCode: '4291',
         pointsEarned: 25,
       )));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('قهرمان قلقلی'), findsOneWidget);
       expect(find.text('۵ - ۳'), findsOneWidget);
@@ -84,7 +108,8 @@ void main() {
       expect(find.text('اشتراک‌گذاری در استوری و شبکه‌ها'), findsOneWidget);
 
       await tester.tap(find.text('اشتراک‌گذاری در استوری و شبکه‌ها'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
     });
   });
 
@@ -97,13 +122,15 @@ void main() {
         api: api,
         onJoinRoom: (g, r) {},
       )));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('دوئل مستقیم با دوستان (۱v۱)'), findsOneWidget);
       expect(find.text('ساخت اتاق بازی و دریافت کد'), findsOneWidget);
 
       await tester.tap(find.text('ساخت اتاق بازی و دریافت کد'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('کد اتاق شما:'), findsOneWidget);
     });
@@ -116,15 +143,14 @@ void main() {
 
       await tester.pumpWidget(_wrap(LeaguePage(api: api)));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 400));
 
       expect(find.text('لیگ برتر ماهانه'), findsWidgets);
       expect(find.text('لیگ هفتگی قهرمانان'), findsWidgets);
 
       await tester.tap(find.text('لیگ هفتگی قهرمانان').first);
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 400));
     });
   });
 
@@ -139,18 +165,19 @@ void main() {
         onOpenShop: () => shopOpened = true,
       )));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 400));
 
       expect(find.text('فقط پلاس'), findsWidgets);
       await tester.tap(find.text('فقط پلاس').first);
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
 
       expect(find.text('جایزه طلایی قلقلی پلاس'), findsOneWidget);
       expect(find.text('ورود به فروشگاه و فعال‌سازی پلاس ⚡'), findsOneWidget);
 
       await tester.tap(find.text('ورود به فروشگاه و فعال‌سازی پلاس ⚡'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
       expect(shopOpened, true, reason: 'هدایت به فروشگاه با موفقیت انجام شد');
     });
   });
@@ -161,7 +188,8 @@ void main() {
       api.dio.httpClientAdapter = _MockUniversalAdapter();
 
       await tester.pumpWidget(_wrap(AdminNotifications(api: api)));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('استودیوی اعلان‌های هدفمند'), findsOneWidget);
       expect(find.text('همه کاربران فعال'), findsOneWidget);
@@ -173,8 +201,7 @@ void main() {
 
       await tester.pumpWidget(_wrap(AdminRewards(api: api)));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 400));
 
       expect(find.text('گروه‌های جایزه'), findsOneWidget);
     });
