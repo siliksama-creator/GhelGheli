@@ -19,13 +19,13 @@ const RULES = { memory, reversi, penalty };
 // Public catalogue served over REST so the app never hardcodes the list.
 const CATALOG = [
   {
-    id: 'memory', title: 'جفت‌یاب', emoji: '🃏',
+    id: 'memory', title: 'جفت‌یاب', emoji: 'card',
     subtitle: 'جفت‌ها را به خاطر بسپار و ببر', accent: '#A855F7', minutes: 4,
     // No computer opponent here — real rival, or solo against the clock.
-    noBot: true, solo: true,
+    noBot: false, solo: true,
   },
   {
-    id: 'reversi', title: 'اتللو', emoji: '⚫',
+    id: 'reversi', title: 'اتللو', emoji: 'disc',
     subtitle: 'مهره‌ها را برگردان', accent: '#34D399', minutes: 8,
     noBot: false, solo: false,
   },
@@ -34,10 +34,10 @@ const CATALOG = [
     // entirely in the clients plus the signed-progress endpoint. Listed here
     // anyway so the catalogue stays the ONE description of what is playable;
     // a hub that hardcodes its own list drifts the moment a game is added.
-    id: 'tap', title: 'ضربه‌زن', emoji: '👊',
+    id: 'tap', title: 'ضربه‌زن', emoji: 'fist',
     subtitle: '۵۰ لول ضربه بزن و شخصیت‌ها را باز کن', accent: '#84CC16',
     minutes: 3,
-    noBot: true, solo: true, singlePlayer: true,
+    noBot: false, solo: true, singlePlayer: true,
   },
   {
     // پنالتی عمداً **بعد از** ضربه‌زن است — درخواست مالک: «بازی پنالتی
@@ -45,12 +45,12 @@ const CATALOG = [
     // کاربر در فهرست بازی‌ها می‌بیند؛ هر دو کلاینت از همین می‌خوانند و
     // فهرست خودشان را هاردکد نمی‌کنند، پس جای درستِ تغییر چیدمان
     // همین‌جاست.
-    id: 'penalty', title: 'ضربات پنالتی', emoji: '⚽',
+    id: 'penalty', title: 'ضربات پنالتی', emoji: 'football',
     subtitle: 'یکی می‌زند، یکی می‌گیرد', accent: '#38BDF8', minutes: 4,
     noBot: false, solo: false,
   },
   {
-    id: 'card_duel', title: 'دوئل کارت‌ها', emoji: '🃏',
+    id: 'card_duel', title: 'دوئل کارت‌ها', emoji: 'card',
     subtitle: 'سه کارت آماده کن؛ Ghost خودکار امتیاز می‌گیرد',
     accent: '#FFD166', minutes: 1,
     noBot: false, solo: true, singlePlayer: true,

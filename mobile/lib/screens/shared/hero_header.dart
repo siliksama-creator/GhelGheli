@@ -99,26 +99,46 @@ class HeroHeader extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            DisplayName(
-                              name: 'سلام $nickname ',
-                              cosmetics: cosmetics,
-                              avatarKey: user?['profile_avatar_key'],
-                              maxLines: 1,
-                              style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.white),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                ShaderMask(
+                                  shaderCallback: (bounds) => const LinearGradient(
+                                    colors: [Color(0xFFFFE57F), Color(0xFFFFD54F), Color(0xFFFFB300)],
+                                  ).createShader(bounds),
+                                  child: const Text(
+                                    'سلام ',
+                                    style: TextStyle(
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                                Flexible(
+                                  child: DisplayName(
+                                    name: nickname,
+                                    cosmetics: cosmetics,
+                                    avatarKey: user?['profile_avatar_key'],
+                                    maxLines: 1,
+                                    style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w900,
+                                        color: Colors.white),
+                                  ),
+                                ),
+                              ],
                             ),
                             const Row(
                               children: [
                                 Text('پروفایل من',
                                     style: TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 10.5,
-                                        fontWeight: FontWeight.w600)),
+                                        color: Color(0xFFCBD5E1),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700)),
                                 SizedBox(width: 2),
                                 Icon(Icons.chevron_left_rounded,
-                                    size: 13, color: Colors.white70),
+                                    size: 13, color: Color(0xFFCBD5E1)),
                               ],
                             ),
                           ],

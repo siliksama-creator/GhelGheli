@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 // Games hub. Each board lives in its own file under ./games/ so this screen
 // stays a thin launcher rather than growing every time a game is added.
 import 'dart:async';
@@ -195,7 +196,9 @@ class _GamesHubPageState extends State<GamesHubPage> {
             isMax: _level!['isMax'] == true,
             xp: (_level!['xp'] as num?)?.toInt() ?? 0,
           ),
-        Gaps.vLg,
+        Gaps.vSm,
+        const _ScrollDownHint(),
+        Gaps.vMd,
         for (final g in _games) ...[
           _GameTile(entry: g, onTap: () => setState(() => _active = g.id)),
           Gaps.vSm,
@@ -389,6 +392,71 @@ class _Tag extends StatelessWidget {
             .labelSmall
             ?.copyWith(color: color, fontWeight: FontWeight.w700),
       ),
+    );
+  }
+}
+
+class _ScrollDownHint extends StatefulWidget {
+  const _ScrollDownHint();
+
+  @override
+  State<_ScrollDownHint> createState() => _ScrollDownHintState();
+}
+
+class _ScrollDownHintState extends State<_ScrollDownHint>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (context, _) {
+        final bounce = math.sin(_ctrl.value * math.pi) * 3.5;
+        return Transform.translate(
+          offset: Offset(0, bounce),
+          child: Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(
+                borderRadius: Corners.rPill,
+                color: const Color(0xFF16253B).withValues(alpha: 0.90),
+                border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.50)),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF38BDF8).withValues(alpha: 0.22),
+                    blurRadius: 10,
+                  ),
+                ],
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.keyboard_double_arrow_down_rounded, size: 16, color: Color(0xFF38BDF8)),
+                  SizedBox(width: 6),
+                  Text(
+                    'برای بازی‌های بیشتر به پایین بکشید',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFF1F5F9),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

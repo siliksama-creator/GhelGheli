@@ -507,7 +507,155 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
       .where((s) => s.trim().isNotEmpty)
       .length;
 
-  @override
+  Future<void> _showEditCardSheet(BuildContext context, Map d) async {
+    final typeId = d['card_type_id']?.toString() ?? '';
+    final nameCtrl = TextEditingController(text: d['card_type_name']?.toString() ?? '');
+    final pointsCtrl = TextEditingController(text: (d['point_value'] ?? 0).toString());
+    final cashCtrl = TextEditingController(text: (d['cash_amount'] ?? 0).toString());
+    final atkCtrl = TextEditingController(text: (d['duel_attack'] ?? 50).toString());
+    final defCtrl = TextEditingController(text: (d['duel_defense'] ?? 50).toString());
+    final spdCtrl = TextEditingController(text: (d['duel_speed'] ?? 50).toString());
+    final tecCtrl = TextEditingController(text: (d['duel_technique'] ?? 50).toString());
+    final goalCtrl = TextEditingController(text: (d['duel_goal_chance'] ?? 50).toString());
+    final energyCtrl = TextEditingController(text: (d['duel_energy'] ?? 100).toString());
+    final newCodesCtrl = TextEditingController();
+    final newBatchCtrl = TextEditingController();
+    bool saving = false;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0E1826),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Padding(
+          padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(ctx).viewInsets.bottom + 16),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text('ویرایش کارت «${d['card_type_name']}»',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.white)),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: 'نام کارت'),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: pointsCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: 'امتیاز کارت'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: cashCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: 'جایزه نقدی (تومان)'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Text('استات دوئل کارت (۰ تا ۱۰۰)',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF38BDF8))),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(child: TextField(controller: atkCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'حمله'))),
+                    const SizedBox(width: 6),
+                    Expanded(child: TextField(controller: defCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'دفاع'))),
+                    const SizedBox(width: 6),
+                    Expanded(child: TextField(controller: spdCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'سرعت'))),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(child: TextField(controller: tecCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'تکنیک'))),
+                    const SizedBox(width: 6),
+                    Expanded(child: TextField(controller: goalCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'شانس گل'))),
+                    const SizedBox(width: 6),
+                    Expanded(child: TextField(controller: energyCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'انرژی'))),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: newCodesCtrl,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'افزودن کدهای جدید برای این کارت (اختیاری)',
+                    hintText: 'هر خط یک کد\nGHP-A2B3-C4D5\n…',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: newBatchCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'برچسب دسته کدهای جدید (اختیاری)',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: saving ? null : () async {
+                    setModalState(() => saving = true);
+                    try {
+                      // 1. Update card type
+                      await widget.api.patch('/api/admin/photo-cards/card-types/' + typeId, {
+                        'name': nameCtrl.text.trim(),
+                        'pointValue': int.tryParse(pointsCtrl.text) ?? 0,
+                        'cashAmount': int.tryParse(cashCtrl.text) ?? 0,
+                        'duelAttack': int.tryParse(atkCtrl.text) ?? 50,
+                        'duelDefense': int.tryParse(defCtrl.text) ?? 50,
+                        'duelSpeed': int.tryParse(spdCtrl.text) ?? 50,
+                        'duelTechnique': int.tryParse(tecCtrl.text) ?? 50,
+                        'duelGoalChance': int.tryParse(goalCtrl.text) ?? 50,
+                        'duelEnergy': int.tryParse(energyCtrl.text) ?? 100,
+                      });
+
+                      // 2. Add codes if typed
+                      if (newCodesCtrl.text.trim().isNotEmpty) {
+                        await widget.api.post('/api/admin/photo-cards/card-types/' + typeId + '/add-codes', {
+                          'rawCodes': newCodesCtrl.text.trim(),
+                          'batchLabel': newBatchCtrl.text.trim().isNotEmpty ? newBatchCtrl.text.trim() : null,
+                        });
+                      }
+                      if (context.mounted) Navigator.pop(ctx);
+                      _snack('مشخصات کارت با موفقیت به‌روزرسانی شد');
+                      await _load();
+                    } catch (e) {
+                      _snack(apiError(e));
+                    } finally {
+                      setModalState(() => saving = false);
+                    }
+                  },
+                  child: Text(saving ? 'در حال ذخیره...' : 'ذخیره تغییرات'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+    @override
   Widget build(BuildContext context) {
     if (_loading) return const LoadingView();
     if (_loadError != null) {
@@ -1455,10 +1603,34 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
                       ],
                     ),
                   ),
-                  TextButton(
-                    onPressed: () => _toggleDesign(d),
-                    child:
-                        Text(d['is_active'] == true ? 'غیرفعال' : 'فعال کن'),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          minimumSize: const Size(0, 32),
+                        ),
+                        icon: const Icon(Icons.edit_rounded, size: 14),
+                        label: const Text('ویرایش', style: TextStyle(fontSize: 11)),
+                        onPressed: () => _showEditCardSheet(context, d),
+                      ),
+                      const SizedBox(height: 4),
+                      TextButton(
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(0, 24),
+                        ),
+                        onPressed: () => _toggleDesign(d),
+                        child: Text(
+                          d['is_active'] == true ? 'غیرفعال' : 'فعال کن',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: d['is_active'] == true ? const Color(0xFFEF4444) : const Color(0xFF22C58B),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

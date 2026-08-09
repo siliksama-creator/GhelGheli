@@ -189,12 +189,15 @@ function useGame(api, token, gameId) {
     phase, error, online, left, turnSecs, searchLeft, searchSecs,
     botFallback, stillSearching, ...g,
     myTurn: phase === 'playing' && g.turn && g.turn === g.me,
-    join: () => {
+    join: (vsBot = false) => {
       setError('');
       setStillSearching(false);
       tickedAt.current = -1;
-      ref.current?.emit('game:join', { gameId });
+      ref.current?.emit('game:join', { gameId, vsBot });
       setPhase('waiting');
+    },
+    playBotImmediately: () => {
+      ref.current?.emit('game:play_bot', { gameId });
     },
     move: i => { play(MOVE_SFX[gameId] || 'move'); ref.current?.emit('game:move', { roomId: room.current, move: i }); },
     leave: () => {

@@ -374,7 +374,7 @@ class _MyClubsCard extends StatelessWidget {
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
               maxCrossAxisExtent: 112,
-              mainAxisExtent: 138,
+              mainAxisExtent: 104,
               crossAxisSpacing: Gaps.xs,
               mainAxisSpacing: Gaps.xs,
             ),
@@ -601,7 +601,7 @@ class _KindSection extends StatelessWidget {
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
               maxCrossAxisExtent: 112,
-              mainAxisExtent: 138,
+              mainAxisExtent: 104,
               crossAxisSpacing: Gaps.xs,
               mainAxisSpacing: Gaps.xs,
             ),
@@ -657,8 +657,8 @@ class _ShopTile extends StatelessWidget {
       // نشان دهیم، کاربر رنگی را می‌خرد که در ویترین ندیده است.
       final c = nameColorOf(payload);
       art = Container(
-        width: 48,
-        height: 48,
+        width: 34,
+        height: 34,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: c,
@@ -675,8 +675,8 @@ class _ShopTile extends StatelessWidget {
       );
     } else if (kind == 'card_frame') {
       art = Container(
-        width: 52,
-        height: 52,
+        width: 36,
+        height: 36,
         decoration: BoxDecoration(
           borderRadius: Corners.rMd,
           gradient: LinearGradient(
@@ -688,8 +688,8 @@ class _ShopTile extends StatelessWidget {
     } else {
       art = Image.asset(
         clubAsset(payload),
-        width: 44,
-        height: 44,
+        width: 34,
+        height: 34,
         cacheWidth: 120,
         // contain, not cover: a crest is not a photo and cropping its corners
         // mangles the shield shapes.
@@ -718,19 +718,17 @@ class _ShopTile extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             art,
-            Gaps.vXxs,
+            const SizedBox(height: 3),
             Text('${item['name']}',
-                maxLines: 2,
+                maxLines: 1,
                 textAlign: TextAlign.center,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.labelSmall
-                    ?.copyWith(fontWeight: FontWeight.w700)),
-            const Spacer(),
+                    ?.copyWith(fontWeight: FontWeight.w700, fontSize: 11)),
+            const SizedBox(height: 3),
             if (selected)
               const _Chip(text: 'انتخاب‌شده', color: Color(0xFFB5EF58))
             else if (item['owned'] == true)
-              // "دائمی" not "خریداری‌شده": the point the user needs to see is
-              // that it cannot be taken away, not that money changed hands.
               const _Chip(text: 'دائمی', color: Color(0xFFB5EF58))
             else if (item['member'] == true)
               const _Chip(text: 'عضوی', color: Color(0xFFFFD36B))
@@ -738,8 +736,9 @@ class _ShopTile extends StatelessWidget {
               const _Chip(text: 'با پلاس', color: Color(0xFFFFD36B))
             else
               Text(Money.withUnit(item['price']),
-                  style: theme.textTheme.labelSmall?.copyWith(
-                      color: const Color(0xFFFFD36B),
+                  style: const TextStyle(
+                      color: Color(0xFFFFD36B),
+                      fontSize: 11,
                       fontWeight: FontWeight.w800)),
           ],
         ),

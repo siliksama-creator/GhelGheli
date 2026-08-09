@@ -44,7 +44,7 @@ class AppTheme {
       tertiary: BrandColors.amber,
       onTertiary: Color(0xFF241900),
       surface: BrandColors.darkSurface,
-      onSurface: Color(0xFFEAF1FB),
+      onSurface: Color(0xFFF8FAFC),
       surfaceContainerLowest: BrandColors.darkBg,
       surfaceContainerLow: BrandColors.darkSurface,
       surfaceContainer: BrandColors.darkSurfaceAlt,
@@ -69,7 +69,7 @@ class AppTheme {
       onError: Color(0xFF2A0206),
     );
 
-    const onSurfaceMuted = Color(0xFF9FB0C8);
+    const onSurfaceMuted = Color(0xFFCBD5E1);
     final textTheme =
         AppTypography.textTheme(colorScheme.onSurface, onSurfaceMuted);
     final brandExt = BrandTheme.dark();

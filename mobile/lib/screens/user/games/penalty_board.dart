@@ -393,6 +393,9 @@ class _PenaltyBoardState extends State<_PenaltyBoard>
                                 sweet: _sweet,
                                 net: _net,
                                 netEpoch: _net.peakDepth,
+                                obstacleZone: (lastKick is Map && lastKick['obstacleZone'] != null)
+                                    ? NumberParser.toInt(lastKick['obstacleZone'])
+                                    : (st['obstacleZone'] as int?),
                               ),
                               child: _ZoneGrid(
                                 enabled: widget.session.phase == GamePhase.playing && !_alreadyChose && !_kick.isAnimating,
@@ -850,6 +853,7 @@ class _PitchPainter extends CustomPainter {
     required this.sweet,
     required this.net,
     required this.netEpoch,
+    this.obstacleZone,
   });
 
   final double kick;
@@ -859,6 +863,7 @@ class _PitchPainter extends CustomPainter {
   final double power;
   final ({double min, double max})? sweet;
   final NetSim net;
+  final int? obstacleZone;
 
   /// یک عددِ نماینده از حالتِ تور.
   ///
@@ -949,6 +954,14 @@ class _PitchPainter extends CustomPainter {
     canvas.drawLine(Offset(gl + gw, gt + gh), Offset(gl + gw, gt), _post);
     canvas.drawLine(Offset(gl, gt), Offset(gl + gw, gt), _post);
 
+    // ── مانع / مدافع ──
+    final obst = (lk != null && lk['obstacleZone'] != null)
+        ? NumberParser.toInt(lk['obstacleZone'])
+        : obstacleZone;
+    if (obst != null && obst >= 0 && obst < 9) {
+      _drawObstacle(canvas, zoneCenter(obst), gw / 3.0, gh / 3.0);
+    }
+
     // ── نقطهٔ پنالتی ──
     final spot = Offset(w / 2, h * 0.88);
     canvas.drawCircle(
@@ -1036,6 +1049,45 @@ class _PitchPainter extends CustomPainter {
 
     // ── نوار قدرت ──
     if (charging) _drawPowerBar(canvas, w, h);
+  }
+
+  void _drawObstacle(Canvas canvas, Offset center, double w, double h) {
+    final rect = Rect.fromCenter(center: center, width: w * 0.76, height: h * 0.76);
+    // Glowing defensive aura
+    canvas.drawCircle(
+      center,
+      w * 0.42,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            const Color(0xFFFF9F43).withValues(alpha: 0.55),
+            const Color(0xFFFF9F43).withValues(alpha: 0.12),
+            Colors.transparent,
+          ],
+        ).createShader(Rect.fromCircle(center: center, radius: w * 0.42)),
+    );
+    // Barrier shield
+    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(8));
+    canvas.drawRRect(
+      rrect,
+      Paint()..color = const Color(0xFFFF9F43).withValues(alpha: 0.32),
+    );
+    canvas.drawRRect(
+      rrect,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.2
+        ..color = const Color(0xFFFF9F43),
+    );
+    final p = Paint()
+      ..color = const Color(0xFFFFEAA7)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.4
+      ..strokeCap = StrokeCap.round;
+    final r = w * 0.18;
+    canvas.drawLine(Offset(center.dx - r, center.dy), Offset(center.dx + r, center.dy), p);
+    canvas.drawLine(Offset(center.dx, center.dy - r), Offset(center.dx, center.dy + r), p);
+    canvas.drawCircle(center, r * 0.4, Paint()..color = const Color(0xFFFF9F43));
   }
 
   /// تورِ زنده.

@@ -2069,5 +2069,115 @@ module.exports = function createPhotoCardRoutes(deps) {
     res.json({ submissions: rows });
   }));
 
+  
+  // ── ویرایش مستقیم نوع کارت و استات‌های آن ──
+  router.patch(
+    '/admin/photo-cards/card-types/:id',
+    adminAuth, requireRole('support'),
+    asyncHandler(async (req, res) => {
+      if (!UUID_RE.test(String(req.params.id))) {
+        return res.status(400).json({ message: 'شناسه معتبر نیست' });
+      }
+      const name = req.body.name ? String(req.body.name).trim() : null;
+      const pointValue = req.body.pointValue !== undefined ? Math.max(0, Math.floor(Number(req.body.pointValue || 0))) : null;
+      const cashAmount = req.body.cashAmount !== undefined ? Math.max(0, Math.floor(Number(req.body.cashAmount || 0))) : null;
+      const isActive = req.body.isActive !== undefined ? (req.body.isActive === true || req.body.isActive === 'true') : null;
+      const duelAttack = req.body.duelAttack != null ? Number(req.body.duelAttack) : null;
+      const duelDefense = req.body.duelDefense != null ? Number(req.body.duelDefense) : null;
+      const duelSpeed = req.body.duelSpeed != null ? Number(req.body.duelSpeed) : null;
+      const duelTechnique = req.body.duelTechnique != null ? Number(req.body.duelTechnique) : null;
+      const duelGoalChance = req.body.duelGoalChance != null ? Number(req.body.duelGoalChance) : null;
+      const duelEnergy = req.body.duelEnergy != null ? Number(req.body.duelEnergy) : null;
+      const duelRarity = req.body.duelRarity || null;
+      const duelEffect = req.body.duelEffect || null;
+
+      const { rows } = await pool.query(
+        `UPDATE card_types
+            SET name = COALESCE($1, name),
+                point_value = COALESCE($2, point_value),
+                cash_amount = COALESCE($3, cash_amount),
+                is_active = COALESCE($4, is_active),
+                duel_attack = COALESCE($6, duel_attack),
+                duel_defense = COALESCE($7, duel_defense),
+                duel_speed = COALESCE($8, duel_speed),
+                duel_technique = COALESCE($9, duel_technique),
+                duel_goal_chance = COALESCE($10, duel_goal_chance),
+                duel_energy = COALESCE($11, duel_energy),
+                duel_rarity = COALESCE($12, duel_rarity),
+                duel_effect = COALESCE($13, duel_effect),
+                updated_at = NOW()
+          WHERE id = $5
+        RETURNING *`,
+        [name, pointValue, cashAmount, isActive, req.params.id,
+         duelAttack, duelDefense, duelSpeed, duelTechnique, duelGoalChance, duelEnergy,
+         duelRarity, duelEffect]
+      );
+      if (!rows[0]) return res.status(404).json({ message: 'کارت پیدا نشد' });
+      await audit(req.admin.id, 'update_photo_card_type', 'card_types', req.params.id, null, req.body);
+      res.json({ cardType: rows[0], message: 'مشخصات کارت با موفقیت به‌روزرسانی شد' });
+    })
+  );
+
+  // ── افزودن کد به کارت موجود (در زمان ویرایش یا افزودن بعدی کد) ──
+  router.post(
+    '/admin/photo-cards/card-types/:id/add-codes',
+    adminAuth, requireRole('support'),
+    asyncHandler(async (req, res) => {
+      if (!UUID_RE.test(String(req.params.id))) {
+        return res.status(400).json({ message: 'شناسه معتبر نیست' });
+      }
+      const t = await pool.query('SELECT id, name FROM card_types WHERE id=$1', [req.params.id]);
+      if (!t.rows[0]) return res.status(404).json({ message: 'کارت یافت نشد' });
+
+      const raw = String(req.body.rawCodes || '').trim();
+      const label = req.body.batchLabel ? String(req.body.batchLabel).trim() : null;
+      if (!raw) return res.status(400).json({ message: 'کدها را وارد کنید' });
+
+      const input = photoCards.parsePhotoCodesInput(raw);
+      if (!input.length) return res.status(400).json({ message: 'هیچ کدی خوانده نشد' });
+
+      const seen = new Set();
+      const candidates = [];
+      const invalid = [];
+      const duplicateInFile = [];
+      for (const tok of input) {
+        if (!photoCards.isValidPhotoCode(tok.norm)) { invalid.push(tok.raw); continue; }
+        const key = photoCards.foldPhotoCode(tok.norm);
+        if (seen.has(key)) { duplicateInFile.push(tok.norm); continue; }
+        seen.add(key);
+        candidates.push(tok.norm);
+      }
+
+      let inserted = [];
+      let duplicateInDb = [];
+      if (candidates.length) {
+        const r = await pool.query(
+          `INSERT INTO photo_card_codes(code, batch_label, expected_card_type_id)
+           SELECT unnest($1::citext[]), $2, $3
+           ON CONFLICT (code_fold) DO NOTHING
+           RETURNING code`,
+          [candidates, label, req.params.id],
+        );
+        inserted = r.rows.map(x => String(x.code));
+        const okSet = new Set(inserted.map(c => c.toUpperCase()));
+        duplicateInDb = candidates.filter(c => !okSet.has(c.toUpperCase()));
+      }
+
+      await audit(req.admin.id, 'add_codes_to_card_type', 'photo_card_codes', null, null, {
+        cardTypeId: req.params.id,
+        inserted: inserted.length,
+        duplicateInDb: duplicateInDb.length,
+        batchLabel: label,
+      });
+
+      res.json({
+        insertedCount: inserted.length,
+        duplicateInDbCount: duplicateInDb.length,
+        invalidCount: invalid.length,
+        message: `${inserted.length.toLocaleString('en-US')} کد به کارت «${t.rows[0].name}» اضافه شد`,
+      });
+    })
+  );
+
   return router;
 };

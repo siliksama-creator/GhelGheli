@@ -349,14 +349,26 @@ class GameSession extends ChangeNotifier {
     _tickClock();
   }
 
-  void join() {
+  void join({bool vsBot = false}) {
     connect();
     error = null;
     winner = null;
     lastMove = null;
     timedOutSymbol = null;
     stillSearching = false;
-    _socket?.emit('game:join', {'gameId': gameId});
+    _socket?.emit('game:join', {'gameId': gameId, 'vsBot': vsBot});
+    phase = GamePhase.waiting;
+    notifyListeners();
+  }
+
+  void playWithBotImmediately() {
+    connect();
+    error = null;
+    winner = null;
+    lastMove = null;
+    timedOutSymbol = null;
+    stillSearching = false;
+    _socket?.emit('game:play_bot', {'gameId': gameId});
     phase = GamePhase.waiting;
     notifyListeners();
   }

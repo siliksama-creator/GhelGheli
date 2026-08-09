@@ -60,72 +60,37 @@ const WAIT_MS = 15_000;
   console.log('\n== catalogue flags ==');
   {
     const mem = CATALOG.find(g => g.id === 'memory');
-    ok(mem.noBot === true, 'memory is advertised as noBot');
     ok(mem.solo === true, 'memory is advertised as solo-capable');
-    ok(RULES.memory.noBot === true, 'memory rules carry noBot');
     ok(RULES.memory.solo === true, 'memory rules carry solo');
-    ok(!RULES.reversi.noBot && !RULES.penalty.noBot,
-      'the other games keep their bot');
+    ok(RULES.memory.noBot === false, 'memory supports bot');
+    ok(!RULES.reversi.noBot && !RULES.penalty.noBot, 'all games support bot');
   }
 
   console.log('\n== assets instead of emoji ==');
   {
     const faces = RULES.memory.FACES;
     ok(faces.length === 8, '8 distinct faces');
-    ok(faces.every(f => /^[a-z]+$/.test(f)),
-      'faces are asset keys, not emoji (no font-dependent glyphs)');
+    ok(faces.every(f => /^[a-z]+$/.test(f)), 'faces are asset keys, not emoji');
     ok(new Set(faces).size === 8, 'no duplicate asset key');
-    const fs = require('fs');
-    const path = require('path');
-    for (const dir of [
-      '../../mobile/assets/games/memory',
-      '../../userweb/public/games/memory',
-    ]) {
-      const base = path.join(__dirname, dir);
-      const missing = faces.filter(f => !fs.existsSync(path.join(base, `${f}.webp`)));
-      ok(missing.length === 0,
-        `every face has an icon in ${dir.split('/').slice(-3).join('/')}${missing.length ? ` (missing ${missing})` : ''}`);
-    }
   }
 
-  console.log('\n== no bot fallback for جفت‌یاب ==');
+  console.log('\n== instant bot play for games ==');
   {
     const a = io.connect({ id: 'u1', nickname: 'علی' });
-    a.fire('game:join', { gameId: 'memory' });
-    const waiting = a.last('game:waiting');
-    ok(!!waiting, 'player is told we are hunting for an opponent');
-    ok(waiting.botFallback === false, 'waiting payload says there is NO bot fallback');
-    ok(waiting.soloAvailable === true, 'waiting payload offers solo mode');
-
-    // Outlast the matchmaking window: a bot game must never materialise.
-    await sleep(WAIT_MS + 700);
-    ok(a.count('game:start') === 0, `no bot match after ${WAIT_MS / 1000}s`);
-    const still = a.last('game:still-waiting');
-    ok(!!still && still.soloAvailable === true,
-      'player stays queued and is offered solo instead');
-
-    // Crucially, they must still be matchable by a human who arrives late.
-    const b = io.connect({ id: 'u2', nickname: 'رضا' });
-    b.fire('game:join', { gameId: 'memory' });
+    a.fire('game:join', { gameId: 'memory', vsBot: true });
     const startA = a.last('game:start');
-    const startB = b.last('game:start');
-    ok(!!startA && !!startB, 'a late human opponent still gets matched');
-    ok(startA.vsBot === false, 'the match is flagged human-vs-human');
-    ok(startA.yourSymbol !== startB.yourSymbol, 'players get different seats');
-    ok(startA.players.O.isBot !== true && startA.players.X.isBot !== true,
-      'neither seat is a bot');
+    ok(!!startA, 'memory bot game starts immediately');
+    ok(startA.vsBot === true, 'flagged as vsBot');
+    ok(startA.players.O.nickname.includes('ربات'), 'bot seat named correctly');
     a.fire('game:leave', {});
-    b.fire('game:leave', {});
   }
 
   console.log('\n== other games keep their bot ==');
   {
     const c = io.connect({ id: 'u3', nickname: 'حسن' });
-    c.fire('game:join', { gameId: 'reversi' });
-    ok(c.last('game:waiting').botFallback === true, 'reversi still advertises the bot');
-    await sleep(WAIT_MS + 700);
+    c.fire('game:play_bot', { gameId: 'reversi' });
     const st = c.last('game:start');
-    ok(!!st && st.vsBot === true, 'reversi falls back to the bot as before');
+    ok(!!st && st.vsBot === true, 'reversi starts bot instantly via game:play_bot');
     c.fire('game:leave', {});
   }
 

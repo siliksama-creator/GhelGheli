@@ -384,7 +384,7 @@ function startRoom(io, rules, gameId, a, b) {
 
   const players = {
     X: infoOf(a.user),
-    O: b ? infoOf(b.user) : { id: 'bot', nickname: 'ربات هوشمند 🤖', isBot: true },
+    O: b ? infoOf(b.user) : { id: 'bot', nickname: 'ربات هوشمند', isBot: true },
   };
   // Kept on the room so finish() can attribute points to the right accounts.
   room.players = players;
@@ -408,21 +408,20 @@ const attachGames = function attachGames(io, rulesById) {
     if (!socket.user) return;
 
     socket.on('game:join', payload => {
-      // Default to the first registered game. This used to say 'tictactoe',
-      // which no longer exists — an older client that omitted gameId got a
-      // silent "game unavailable" instead of a playable match.
       const gameId = (payload && typeof payload === 'object' && payload.gameId)
         || Object.keys(rulesById)[0];
       const rules = rulesById[gameId];
       if (!rules) return safeEmit(socket, 'game:error', { message: 'این بازی در دسترس نیست' });
 
       dropFromQueue(socket); // never sit in two queues at once
-      // Abandon any room we're already in. Without this, tapping a different
-      // game (or re-tapping "play") while a match is live left a GHOST ROOM:
-      // the opponent kept staring at a board waiting for a player who had
-      // already walked away, until they gave up or disconnected.
       const previous = rooms.get(roomOfSocket(socket));
       if (previous) finish(previous, 'DISCONNECT');
+
+      const wantBot = (payload && typeof payload === 'object' && payload.vsBot === true);
+      if (wantBot) {
+        startRoom(io, rules, gameId, socket, null);
+        return;
+      }
 
       const q = queueFor(gameId);
       // Discard queued sockets that have since gone away, otherwise a player
@@ -516,6 +515,18 @@ const attachGames = function attachGames(io, rulesById) {
           console.error(`[games:${gameId}] bot fallback failed:`, e.message);
         }
       }, MATCH_WAIT_MS);
+    });
+
+    socket.on('game:play_bot', payload => {
+      const gameId = (payload && typeof payload === 'object' && payload.gameId)
+        || (typeof payload === 'string' ? payload : null)
+        || Object.keys(rulesById)[0];
+      const rules = rulesById[gameId];
+      if (!rules) return safeEmit(socket, 'game:error', { message: 'این بازی در دسترس نیست' });
+      dropFromQueue(socket);
+      const previous = rooms.get(roomOfSocket(socket));
+      if (previous) finish(previous, 'DISCONNECT');
+      startRoom(io, rules, gameId, socket, null);
     });
 
     socket.on('game:move', payload => {

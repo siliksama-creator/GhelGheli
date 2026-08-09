@@ -204,7 +204,7 @@ module.exports = {
   turnMs: 20000,
   // Never fall back to a computer opponent: the engine keeps the player in
   // the matchmaking queue and offers solo time-attack instead.
-  noBot: true,
+  noBot: false,
   // Playable alone against the clock (backend/src/games/solo.js).
   solo: true,
   create, result, isValidMove, applyMove, nextTurn, botMove, decorate,

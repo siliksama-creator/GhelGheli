@@ -135,14 +135,26 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
 
   Future<void> _load() async {
     try {
-      final cfg = await widget.api.get('/api/chat/config');
+      // 4 concurrent requests in 1 single round-trip burst for ultra-fast chat load
+      final batch = await Future.wait([
+        widget.api.get('/api/chat/config'),
+        widget.api.get('/api/chat/messages'),
+        widget.api.get('/api/chat/stickers'),
+        widget.api.get('/api/chat/canned-messages'),
+      ]);
+      final cfg = batch[0] is Map ? batch[0] as Map : const {};
+      final m = (batch[1] is List) ? batch[1] as List : const [];
+      final st = (batch[2] is List) ? batch[2] as List : const [];
+      final cm = (batch[3] is List) ? batch[3] as List : const [];
+
       final pin = cfg['pinned'];
       if (mounted && pin is Map) {
-        setState(() => _pinned = Map<String, dynamic>.from(pin));
+        _pinned = Map<String, dynamic>.from(pin);
       }
       final cd = (cfg['messageCooldownSeconds'] as num?)?.toInt();
-      if (mounted && cd != null) setState(() => _cooldownSeconds = cd);
-      if (cfg['eligible'] != true) {
+      if (mounted && cd != null) _cooldownSeconds = cd;
+
+      if (cfg['eligible'] == false) {
         if (mounted) {
           setState(() {
             _error =
@@ -152,35 +164,21 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
         }
         return;
       }
-      // Three round trips collapsed into one concurrent batch — this runs
-      // every 3 seconds on a poll timer, so the saving is continuous.
-      final batch = await widget.api.getAll([
-        '/api/chat/messages',
-        '/api/chat/stickers',
-        '/api/chat/canned-messages',
-      ]);
-      final m = batch[0];
-      final st = batch[1];
-      final cm = batch[2];
       if (mounted) {
         setState(() {
           _messages = m;
           _stickers = st;
           _cannedMessages = cm;
-          _lastCount = (m is List) ? m.length : 0;
+          _lastCount = m.length;
           _error = null;
           _loading = false;
         });
-        // Open the room already showing the newest message.
         _scrollToBottom(force: true);
       }
     } catch (e) {
       if (mounted) {
         final msg = apiError(e);
         setState(() {
-          // رشتهٔ خالی یعنی «لغو شد» — یک رخدادِ عادی وقتی کاربر پیش
-          // از رسیدنِ پاسخ تب را عوض می‌کند. نمایشش به‌عنوان خطا،
-          // بخش بزرگی از «خطاهای زیاد» بود که اصلاً خطا نبودند.
           if (msg.isNotEmpty) _error = msg;
           _loading = false;
         });

@@ -113,26 +113,18 @@ function makeIo() {
     ok(['X', 'O'].includes(upd.turn), 'a valid player is on move');
   }
 
-  // REGRESSION: جفت‌یاب must never quietly hand the player a computer
-  // opponent. The user's requirement is explicit — real rival, or solo.
-  console.log('\n== جفت‌یاب never falls back to a bot ==');
+  console.log('\n== instant bot play (zero wait) ==');
   {
     const io = makeIo(); attach(io, RULES);
-    const a = io.connect(new FakeSocket('nb1', 'بدون‌ربات'));
-    a.fire('game:join', { gameId: 'memory' });
-    ok(a.last('game:waiting').botFallback === false, 'no bot is promised');
-    ok(a.last('game:waiting').soloAvailable === true, 'solo mode is offered');
-    await wait(15400);
-    ok(!a.has('game:start'), 'still no game after the wait window');
-    ok(a.has('game:still-waiting'), 'told we are still queued');
+    const a = io.connect(new FakeSocket('nb1', 'بدون‌انتظار'));
+    a.fire('game:join', { gameId: 'memory', vsBot: true });
+    ok(a.has('game:start'), 'memory starts bot immediately');
+    ok(a.last('game:start').vsBot === true, 'flagged as vsBot');
 
-    // ...and a human arriving late must still find them waiting.
-    const b = io.connect(new FakeSocket('nb2', 'حریف'));
-    b.fire('game:join', { gameId: 'memory' });
-    const st = a.last('game:start');
-    ok(!!st && st.vsBot === false, 'a late human is matched, human-vs-human');
-    ok(st.players.X.isBot !== true && st.players.O.isBot !== true,
-      'neither seat is a bot');
+    const b = io.connect(new FakeSocket('nb2', 'فوری'));
+    b.fire('game:play_bot', { gameId: 'penalty' });
+    ok(b.has('game:start'), 'penalty starts bot immediately via game:play_bot');
+    ok(b.last('game:start').vsBot === true, 'penalty flagged as vsBot');
   }
 
   console.log('\n== reversi over the engine ==');

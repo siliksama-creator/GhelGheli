@@ -140,18 +140,29 @@ class GameScaffold extends StatelessWidget {
               _Centered(
                 icon: Icons.sports_esports_rounded,
                 title: 'آماده‌ای شروع کنیم؟',
-                subtitle: soloOffer != null
-                    // No bot here: be honest about what "start" means.
-                    ? 'با یک حریف واقعی بازی می‌کنی و امتیاز می‌گیری.'
-                    : 'اگر حریفی پیدا نشود، با ربات بازی می‌کنی.',
-                action: FilledButton.icon(
-                  onPressed: session.join,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: accent,
-                    minimumSize: const Size(220, 52),
-                  ),
-                  icon: const Icon(Icons.play_arrow_rounded),
-                  label: const Text('پیدا کردن حریف'),
+                subtitle: 'می‌توانی آنلاین با حریف واقعی رقابت کنی یا بلافاصله با ربات بازی کنی.',
+                action: Column(
+                  children: [
+                    FilledButton.icon(
+                      onPressed: () => session.join(vsBot: false),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: accent,
+                        minimumSize: const Size(240, 50),
+                      ),
+                      icon: const Icon(Icons.people_rounded),
+                      label: const Text('پیدا کردن حریف آنلاین'),
+                    ),
+                    Gaps.vSm,
+                    OutlinedButton.icon(
+                      onPressed: () => session.join(vsBot: true),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(240, 48),
+                        side: BorderSide(color: accent.withValues(alpha: 0.65)),
+                      ),
+                      icon: const Icon(Icons.smart_toy_rounded),
+                      label: const Text('بازی فوری با ربات (بدون انتظار)'),
+                    ),
+                  ],
                 ),
               ),
               if (soloOffer != null) ...[
@@ -223,10 +234,26 @@ class GameScaffold extends StatelessWidget {
                 ),
                 if (soloOffer != null) ...[Gaps.vMd, soloOffer!],
                 Gaps.vLg,
-                OutlinedButton.icon(
-                  onPressed: session.leave,
-                  icon: const Icon(Icons.close_rounded),
-                  label: const Text('لغو'),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: session.playWithBotImmediately,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: accent,
+                        minimumSize: const Size(160, 46),
+                      ),
+                      icon: const Icon(Icons.smart_toy_rounded, size: 20),
+                      label: const Text('شروع با ربات'),
+                    ),
+                    Gaps.hSm,
+                    OutlinedButton.icon(
+                      onPressed: session.leave,
+                      style: OutlinedButton.styleFrom(minimumSize: const Size(100, 46)),
+                      icon: const Icon(Icons.close_rounded, size: 18),
+                      label: const Text('لغو'),
+                    ),
+                  ],
                 ),
               ],
             ),

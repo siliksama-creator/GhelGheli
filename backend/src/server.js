@@ -1742,34 +1742,34 @@ app.get('/api/chat/config', auth, asyncHandler(async (req, res) => {
 }));
 
 const CANNED_MESSAGES = [
-  "سلام بچه‌ها! 👋",
-  "من اومدم! 😎",
-  "بازی خیلی باحال بود! 🎮",
-  "خوشبختم دوستان! 🤝",
-  "کی پایه بازیه؟ 🙋‍♂️",
-  "عالی بود! ✨",
-  "خیلی خفن بود! 🔥",
-  "موفق باشی! 🌟",
-  "چه خبر بچه‌ها؟ 🎈",
-  "خداحافظ تا بعد! 👋",
-  "مواظب خودتون باشید! 🛡️",
-  "کسی کد جدید داره؟ 🎁",
-  "وای چقدر خنده‌دار بود! 😂",
-  "تبریک میگم! 🎉",
-  "میشه کمکم کنید؟ 🤔",
-  "ممنون از شما! 🙏",
-  "شما تو کدوم لیگ هستید؟ 🏅",
-  "چقدر امتیازم بالا رفت! 📈",
-  "کارت جدید پیدا کردم! 🃏",
-  "امروز روز منه! 🎯",
-  "ایول به همگی! ✌️",
-  "دوباره امتحان می‌کنم! 💪",
-  "شگفت‌انگیز بود! 😲",
-  "کجا زندگی می‌کنید؟ 🌍",
-  "امروز چیکار کردید؟ 🌞",
-  "من عاشق این بازی‌ام! ❤️",
-  "بریم برای برد! 🏆",
-  "منم می‌خوام بازی کنم! 🕹️"
+  "سلام بچه‌ها!",
+  "من اومدم!",
+  "بازی خیلی باحال بود!",
+  "خوشبختم دوستان!",
+  "کی پایه بازیه؟",
+  "عالی بود!",
+  "خیلی خفن بود!",
+  "موفق باشی!",
+  "چه خبر بچه‌ها؟",
+  "خداحافظ تا بعد!",
+  "مواظب خودتون باشید!",
+  "کسی کد جدید داره؟",
+  "وای چقدر خنده‌دار بود!",
+  "تبریک میگم!",
+  "میشه کمکم کنید؟",
+  "ممنون از شما!",
+  "شما تو کدوم لیگ هستید؟",
+  "چقدر امتیازم بالا رفت!",
+  "کارت جدید پیدا کردم!",
+  "امروز روز منه!",
+  "ایول به همگی!",
+  "دوباره امتحان می‌کنم!",
+  "شگفت‌انگیز بود!",
+  "کجا زندگی می‌کنید؟",
+  "امروز چیکار کردید؟",
+  "من عاشق این بازی‌ام!",
+  "بریم برای برد!",
+  "منم می‌خوام بازی کنم!"
 ];
 
 app.get('/api/chat/canned-messages', asyncHandler(async (req, res) => {
@@ -1794,10 +1794,10 @@ app.get('/api/chat/messages', auth, asyncHandler(async (req, res) => {
   // message. Resolved server-side because an equipped item stops applying the
   // moment Plus lapses unless the user actually bought it.
   const ids = [...new Set(rows.map(r => r.user_id))];
-  const cos = await shop.cosmeticsFor(ids);
-  // لولِ فرستندهٔ هر پیام — یک کوئریِ دسته‌ای برای کل صفحه، نه یکی
-  // به‌ازای هر پیام.
-  const lvl = await level.levelsFor(ids);
+  const [cos, lvl] = await Promise.all([
+    shop.cosmeticsFor(ids),
+    level.levelsFor(ids),
+  ]);
   res.json(rows.reverse().map(r => ({
     ...r,
     cosmetics: cos.get(r.user_id) || null,
@@ -2292,8 +2292,40 @@ app.patch('/api/admin/card-types/:id', adminAuth, validateUuid('id'), requireRol
   const { name, description, pointValue, isActive } = req.body;
   const imageUrl = keepImage(req.body.imageUrl);
   const cashAmount = cashAmountInput(req.body.cashAmount);
-  const { rows } = await pool.query('UPDATE card_types SET name=COALESCE($1,name), image_url=COALESCE($2,image_url), description=COALESCE($3,description), point_value=COALESCE($4,point_value), cash_amount=COALESCE($5,cash_amount), is_active=COALESCE($6,is_active), updated_at=NOW() WHERE id=$7 RETURNING *', [name,imageUrl,description,pointValue,cashAmount,isActive,req.params.id]);
-  await audit(req.admin.id, 'update_card_type', 'card_types', req.params.id, null, req.body); res.json(rows[0]);
+  const duelAttack = req.body.duelAttack != null ? Number(req.body.duelAttack) : null;
+  const duelDefense = req.body.duelDefense != null ? Number(req.body.duelDefense) : null;
+  const duelSpeed = req.body.duelSpeed != null ? Number(req.body.duelSpeed) : null;
+  const duelTechnique = req.body.duelTechnique != null ? Number(req.body.duelTechnique) : null;
+  const duelGoalChance = req.body.duelGoalChance != null ? Number(req.body.duelGoalChance) : null;
+  const duelEnergy = req.body.duelEnergy != null ? Number(req.body.duelEnergy) : null;
+  const duelRarity = req.body.duelRarity || null;
+  const duelEffect = req.body.duelEffect || null;
+
+  const { rows } = await pool.query(
+    `UPDATE card_types
+        SET name = COALESCE($1, name),
+            image_url = COALESCE($2, image_url),
+            description = COALESCE($3, description),
+            point_value = COALESCE($4, point_value),
+            cash_amount = COALESCE($5, cash_amount),
+            is_active = COALESCE($6, is_active),
+            duel_attack = COALESCE($8, duel_attack),
+            duel_defense = COALESCE($9, duel_defense),
+            duel_speed = COALESCE($10, duel_speed),
+            duel_technique = COALESCE($11, duel_technique),
+            duel_goal_chance = COALESCE($12, duel_goal_chance),
+            duel_energy = COALESCE($13, duel_energy),
+            duel_rarity = COALESCE($14, duel_rarity),
+            duel_effect = COALESCE($15, duel_effect),
+            updated_at = NOW()
+      WHERE id = $7
+    RETURNING *`,
+    [name, imageUrl, description, pointValue, cashAmount, isActive, req.params.id,
+     duelAttack, duelDefense, duelSpeed, duelTechnique, duelGoalChance, duelEnergy,
+     duelRarity, duelEffect]
+  );
+  await audit(req.admin.id, 'update_card_type', 'card_types', req.params.id, null, req.body);
+  res.json(rows[0]);
 }));
 
 /**

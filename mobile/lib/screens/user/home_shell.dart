@@ -43,12 +43,34 @@ class _HomeShellState extends State<HomeShell>
       builder: (ctx) => AlertDialog(
         title: const Text('خروج از حساب کاربری'),
         content: const Text('آیا مطمئن هستید که می‌خواهید از حساب خود خارج شوید؟'),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('خروج'),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(46),
+                    shape: RoundedRectangleBorder(borderRadius: Corners.rLg),
+                  ),
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('انصراف', style: TextStyle(fontWeight: FontWeight.w700)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFEF4444),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(46),
+                    shape: RoundedRectangleBorder(borderRadius: Corners.rLg),
+                  ),
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('خروج', style: TextStyle(fontWeight: FontWeight.w700)),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -736,14 +758,14 @@ class _ShopButton extends StatefulWidget {
 
 class _ShopButtonState extends State<_ShopButton>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _pulseCtrl = AnimationController(
+  late final AnimationController _animCtrl = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 2200),
-  )..repeat(reverse: true);
+    duration: const Duration(milliseconds: 2400),
+  )..repeat();
 
   @override
   void dispose() {
-    _pulseCtrl.dispose();
+    _animCtrl.dispose();
     super.dispose();
   }
 
@@ -757,206 +779,98 @@ class _ShopButtonState extends State<_ShopButton>
               backgroundColor:
                   Theme.of(context).colorScheme.primary.withValues(alpha: 0.18))
           : null,
-      icon: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(9),
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFFFFE08A), Color(0xFFFF9F43), Color(0xFFFF5252)],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFFFF9F43).withValues(alpha: 0.40),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
+      icon: AnimatedBuilder(
+        animation: _animCtrl,
+        builder: (context, _) {
+          final t = _animCtrl.value;
+          final basketOffset = math.sin(t * 2 * math.pi) * 1.5;
+          final starFloat = -math.sin(t * 2 * math.pi) * 3.5;
+          final starScale = 0.85 + 0.25 * math.sin(t * 2 * math.pi).abs();
+          final starRot = t * 2 * math.pi;
+
+          return SizedBox(
+            width: 36,
+            height: 36,
+            child: Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
+              children: [
+                // Glowing background aura
+                Positioned(
+                  child: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFFFB300).withValues(alpha: 0.35 + 0.20 * math.sin(t * 2 * math.pi).abs()),
+                          blurRadius: 12,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // Animated Basket container
+                Transform.translate(
+                  offset: Offset(0, basketOffset),
+                  child: Container(
+                    width: 32,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(9),
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFFFFDF70), Color(0xFFFF9F43), Color(0xFFFF5252)],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFFF9F43).withValues(alpha: 0.45),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: const Center(
+                      child: Icon(Icons.shopping_basket_rounded, size: 18, color: Color(0xFF230E00)),
+                    ),
+                  ),
+                ),
+                // Animated Star inside/above the basket
+                Positioned(
+                  top: 2 + starFloat,
+                  child: Transform.rotate(
+                    angle: starRot * 0.5,
+                    child: Transform.scale(
+                      scale: starScale,
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Color(0xFFFFE08A),
+                              blurRadius: 8,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.star_rounded,
+                          size: 15,
+                          color: Color(0xFFFFF7C2),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
-            child: const Center(
-              child: Icon(Icons.shopping_bag_rounded, size: 17, color: Color(0xFF25110A)),
-            ),
-          ),
-          // Animated shimmering star in top corner
-          Positioned(
-            top: -4,
-            right: -4,
-            child: AnimatedBuilder(
-              animation: _pulseCtrl,
-              builder: (context, _) => Transform.scale(
-                scale: 0.85 + _pulseCtrl.value * 0.35,
-                child: Container(
-                  padding: const EdgeInsets.all(2),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF25110A),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.star_rounded,
-                    size: 11,
-                    color: Color(0xFFFFD166),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
 }
 
-/// آیکون گذر نبرد با نشانِ «پله‌های امروز».
-///
-/// ═══════════════════════════════════════════════════════════════════════
-/// چه چیزی روی نشان نوشته می‌شود و چرا
-/// ═══════════════════════════════════════════════════════════════════════
-///
-/// درخواست مالک: «وقتی بتل پس کاربر باز میشه کنار آیکون بتل پس ۱ قرمز
-/// میاد اگه دوتا باز شده ۲ میاد ولی سقف باز شدن ۲ هستش».
-///
-/// پس نشان **تعداد پلهٔ باز شدهٔ امروز** را نشان می‌دهد (۱ یا ۲)، نه
-/// تعداد کل جوایز. این تفاوت مهم است: عددی که هر روز از صفر شروع می‌شود
-/// و به ۲ می‌رسد، حس پیشرفتِ روزانه می‌سازد و کاربر را فردا برمی‌گرداند.
-///
-/// اگر امروز هنوز پله‌ای باز نشده ولی جایزهٔ گرفته‌نشده‌ای مانده، یک
-/// نقطهٔ کوچک نشان داده می‌شود — بی‌سروصدا ولی قابل تشخیص.
-class _PassButton extends StatefulWidget {
-  const _PassButton({
-    required this.claimable,
-    required this.tiersToday,
-    required this.selected,
-    required this.onPressed,
-  });
 
-  final int claimable;
-  final int tiersToday;
-  final bool selected;
-  final VoidCallback onPressed;
-
-  @override
-  State<_PassButton> createState() => _PassButtonState();
-}
-
-class _PassButtonState extends State<_PassButton>
-    with SingleTickerProviderStateMixin {
-  /// در initState ساخته می‌شود، نه به‌صورت مقداردهیِ `late final` روی
-  /// فیلد.
-  ///
-  /// یک `late final` تا اولین دسترسی مقداردهی نمی‌شود. اگر ویجت پیش از
-  /// آن حذف شود، `dispose()` اولین جایی است که به آن دست می‌زند — یعنی
-  /// `createTicker` روی عنصرِ غیرفعال صدا زده می‌شود و فلاتر پرتاب
-  /// می‌کند: «Looking up a deactivated widget's ancestor is unsafe».
-  /// روی گوشی واقعی هم رخ می‌دهد: کاربری که اپ را باز و فوراً می‌بندد.
-  late final AnimationController _pop;
-
-  @override
-  void initState() {
-    super.initState();
-    _pop = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 620),
-    );
-  }
-
-  @override
-  void didUpdateWidget(covariant _PassButton old) {
-    super.didUpdateWidget(old);
-    // وقتی پلهٔ جدیدی باز می‌شود نشان یک «پاپ» کوچک می‌زند تا دیده شود؛
-    // بدون آن عدد بی‌صدا عوض می‌شود و کسی متوجه نمی‌شود.
-    if (widget.tiersToday > old.tiersToday) _pop.forward(from: 0);
-  }
-
-  @override
-  void dispose() {
-    _pop.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final n = widget.tiersToday;
-    final showDot = n == 0 && widget.claimable > 0;
-    final ringColor = Theme.of(context).appBarTheme.backgroundColor ??
-        Theme.of(context).colorScheme.surface;
-
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        IconButton(
-          tooltip: n > 0
-              ? '$n پلهٔ گذر نبرد امروز باز شد'
-              : (widget.claimable > 0
-                  ? '${widget.claimable} جایزهٔ گذر نبرد آماده است'
-                  : 'گذر نبرد فصلی'),
-          onPressed: widget.onPressed,
-          style: widget.selected
-              ? IconButton.styleFrom(
-                  backgroundColor: Theme.of(context)
-                      .colorScheme
-                      .primary
-                      .withValues(alpha: 0.18))
-              : null,
-          icon: Image.asset('assets/games/medals/medal_participation.webp', width: 24, height: 24),
-        ),
-        if (n > 0)
-          Positioned(
-            top: 4,
-            right: 2,
-            child: IgnorePointer(
-              child: ScaleTransition(
-                scale: TweenSequence<double>([
-                  TweenSequenceItem(
-                      tween: Tween(begin: 1.0, end: 1.55), weight: 40),
-                  TweenSequenceItem(
-                      tween: Tween(begin: 1.55, end: 1.0), weight: 60),
-                ]).animate(_pop),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  constraints:
-                      const BoxConstraints(minWidth: 17, minHeight: 17),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF43F5E),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: ringColor, width: 2),
-                  ),
-                  child: Center(
-                    child: Text(
-                      faNum(n),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                        height: 1.1,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          )
-        else if (showDot)
-          Positioned(
-            top: 7,
-            right: 6,
-            child: IgnorePointer(
-              child: Container(
-                width: 9,
-                height: 9,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFB5EF58),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: ringColor, width: 1.5),
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}

@@ -171,13 +171,19 @@ function resolveKick(shotZone, power, diveZone, rand = Math.random, sweet = null
   if (missChance(shotZone, power, clean) > rand()) {
     return { outcome: 'miss', shotZone, diveZone, power, clean };
   }
-  // Obstacle / Defender block if not clean shot
-  if (obstacleZone !== null && shotZone === obstacleZone && !clean && rand() < 0.75) {
-    return { outcome: 'save', shotZone, diveZone, power, clean, blockedByObstacle: true };
+  // Obstacle / Defender block if aimed at obstacleZone and not clean sweet shot
+  if (obstacleZone !== null && shotZone === obstacleZone) {
+    const blockChance = clean ? 0.25 : 0.75;
+    if (rand() < blockChance) {
+      return { outcome: 'save', shotZone, diveZone, power, clean, blockedByObstacle: true, obstacleZone };
+    }
   }
-  if (saveChance(shotZone, diveZone, power, clean) > rand()) {
-    return { outcome: 'save', shotZone, diveZone, power, clean };
+  // 100% Visual Consistency:
+  // If the goalkeeper dived to the exact shot zone, keeper saves!
+  if (shotZone === diveZone) {
+    return { outcome: 'save', shotZone, diveZone, power, clean, blockedByKeeper: true };
   }
+  // If goalkeeper dived to another zone and shot was on target (and not blocked by obstacle), it is 100% GOAL!
   return { outcome: 'goal', shotZone, diveZone, power, clean };
 }
 
@@ -307,6 +313,8 @@ function publicState(state, forPlayer) {
   const { pending, ...rest } = state;
   return {
     ...rest,
+    obstacleZone: state.obstacleZone,
+    sweet: state.sweet,
     // فقط خبر می‌دهد که آیا خودش انتخاب کرده یا نه — نه اینکه چه چیزی.
     iChose: forPlayer ? !!pending[forPlayer] : false,
     waitingForOpponent: forPlayer
