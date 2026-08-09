@@ -1,56 +1,21 @@
-// اشتراک‌گذاری کد دعوت در پیام‌رسان‌ها.
-//
-// ═══════════════════════════════════════════════════════════════════════════
-// چرا deep link مستقیم و نه برگهٔ اشتراک‌گذاریِ سیستم
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// درخواست مالک: «در قسمت دعوت قابلیت کپی کد و ارسال کد در تلگرام و
-// واتس اپ و روبیکا و بله امکان پذیر باشه بای کاربرها».
-//
-// راهِ ساده‌تر `share_plus` بود که برگهٔ سیستم را باز می‌کند. رد شد چون
-// کاربر باید از میان ده‌ها اپ، تلگرام را پیدا کند — و مالک صریحاً
-// **دکمهٔ جدا برای هر اپ** خواست. یک تپ به‌جای سه تپ.
-//
-// ═══════════════════════════════════════════════════════════════════════════
-// دو schemeی که هر اپ دارد، و چرا هر دو لازم است
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// هر پیام‌رسان دو راه ورودی دارد:
-//
-//   ۱. **scheme اختصاصی** (`tg://`, `whatsapp://`) — اگر اپ نصب باشد
-//      مستقیم بازش می‌کند، سریع و بدون واسطه.
-//   ۲. **لینک وب** (`https://t.me/share/...`) — اگر اپ نصب نباشد،
-//      مرورگر باز می‌شود و کاربر می‌تواند از نسخهٔ وب استفاده کند.
-//
-// اول اولی امتحان می‌شود و اگر شکست خورد دومی. بدون این زنجیره، تپ روی
-// دکمهٔ یک اپِ نصب‌نشده هیچ اتفاقی نمی‌افتاد — بدترین حالت، چون کاربر
-// فکر می‌کند دکمه خراب است.
-//
-// روبیکا و بله لینکِ «اشتراک‌گذاری متن» عمومی ندارند؛ برایشان متن در
-// کلیپ‌بورد گذاشته می‌شود و بعد خودِ اپ باز می‌شود، با یک پیام که
-// می‌گوید متن کپی شده. صادقانه‌تر از یک دکمهٔ بی‌اثر است.
-//
-// ═══════════════════════════════════════════════════════════════════════════
-// اندروید ۱۱ و بالاتر — تلهٔ <queries>
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// از اندروید ۱۱، `canLaunchUrl` برای هر schemeی که در `<queries>`
-// مانیفست اعلام نشده باشد **همیشه false** برمی‌گرداند، حتی اگر اپ نصب
-// باشد. این در tool/patch_android.sh اعلام می‌شود.
-//
-// ولی به آن هم تکیه نمی‌کنیم: منطقِ زیر اگر `canLaunchUrl` منفی بگوید
-// باز هم `launchUrl` را امتحان می‌کند و فقط در صورت پرتاب کردن، به
-// گزینهٔ بعدی می‌رود. اینطور حتی با مانیفستِ ناقص هم کار می‌کند.
+// اشتراک‌گذاری کد دعوت در پیام‌رسان‌ها با آیکون‌های وکتوری اختصاصی و زیبا.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+enum ShareAppId {
+  telegram,
+  whatsapp,
+  rubika,
+  bale,
+}
 
 /// یک مقصدِ اشتراک‌گذاری.
 class ShareTarget {
   const ShareTarget({
     required this.id,
+    required this.app,
     required this.label,
-    required this.icon,
     required this.color,
     this.appUri,
     this.webUri,
@@ -58,158 +23,253 @@ class ShareTarget {
   });
 
   final String id;
+  final ShareAppId app;
   final String label;
-
-  /// نماد به‌جای آیکونِ برند.
-  ///
-  /// چرا ایموجی و نه لوگوی واقعی: لوگوی هر پیام‌رسان علامتِ تجاریِ
-  /// ثبت‌شده است و بسته‌بندی‌اش در APK بدون مجوز، هم مسئلهٔ حقوقی دارد
-  /// و هم برای چهار اپ حدود ۴۰ کیلوبایت تصویر اضافه می‌کند. ایموجی
-  /// از فونتِ سیستم می‌آید: صفر بایت و بدون مسئلهٔ حقوقی.
-  final IconData icon;
-
-  /// رنگِ برند، فقط برای حاشیه و پس‌زمینهٔ کم‌رنگ.
   final int color;
-
-  /// scheme اختصاصیِ اپ. `{text}` با متنِ کدگذاری‌شده جایگزین می‌شود.
   final String? appUri;
-
-  /// جایگزینِ وب، وقتی اپ نصب نیست.
   final String? webUri;
-
-  /// اگر true، متن پیش از باز کردن اپ در کلیپ‌بورد گذاشته می‌شود.
-  ///
-  /// برای اپ‌هایی که راهِ «اشتراک‌گذاری متن» ندارند (روبیکا، بله).
   final bool copyFirst;
 }
 
-/// مقصدهای پشتیبانی‌شده، به ترتیبِ محبوبیت در ایران.
 const shareTargets = <ShareTarget>[
   ShareTarget(
     id: 'telegram',
+    app: ShareAppId.telegram,
     label: 'تلگرام',
-    icon: Icons.send_rounded,
     color: 0xFF29A9EB,
-    // `msg_url` رسمی‌ترین راه است: پنجرهٔ «فرستادن به…» تلگرام را باز
-    // می‌کند با متن از پیش پر شده.
     appUri: 'tg://msg_url?url={text}',
     webUri: 'https://t.me/share/url?url={text}',
   ),
   ShareTarget(
     id: 'whatsapp',
+    app: ShareAppId.whatsapp,
     label: 'واتس‌اپ',
-    icon: Icons.chat_bubble_rounded,
     color: 0xFF25D366,
     appUri: 'whatsapp://send?text={text}',
     webUri: 'https://wa.me/?text={text}',
   ),
   ShareTarget(
     id: 'rubika',
+    app: ShareAppId.rubika,
     label: 'روبیکا',
-    icon: Icons.circle_rounded,
-    color: 0xFFF5643C,
-    // روبیکا لینکِ «اشتراک‌گذاری متن» عمومی ندارد؛ فقط بازش می‌کنیم و
-    // متن از قبل در کلیپ‌بورد است.
+    color: 0xFF8A2BE2,
     appUri: 'rubika://',
     webUri: 'https://rubika.ir',
     copyFirst: true,
   ),
   ShareTarget(
     id: 'bale',
+    app: ShareAppId.bale,
     label: 'بله',
-    icon: Icons.circle_rounded,
-    color: 0xFF1B8FE3,
+    color: 0xFF00BFA5,
     appUri: 'bale://',
     webUri: 'https://web.bale.ai',
     copyFirst: true,
   ),
 ];
 
-/// نتیجهٔ یک تلاشِ اشتراک‌گذاری، برای پیام دادن به کاربر.
 enum ShareOutcome {
-  /// اپ باز شد.
   opened,
-
-  /// اپ باز شد ولی متن باید دستی چسبانده شود (روبیکا/بله).
   openedWithClipboard,
-
-  /// هیچ‌کدام باز نشد؛ متن در کلیپ‌بورد است.
   copiedOnly,
 }
 
-/// متنِ دعوتی که فرستاده می‌شود.
-///
-/// عمداً کوتاه است: پیامِ بلند در پیام‌رسان بریده می‌شود و کد — که
-/// تنها چیزِ واقعاً مهم است — پایین می‌افتد. کد در **خطِ اول** می‌آید.
 String inviteMessage(String code) =>
     'کد دعوت من به قلقلی: $code\n'
-    'با این کد ثبت‌نام کن، هر دومون چرخش هدیه می‌گیریم \n'
+    'با این کد ثبت‌نام کن، هر دومون ۳ چرخش گردونه هدیه می‌گیریم!\n'
     'https://ghelghelishop.ir';
 
-/// تلاش برای باز کردن [target] با متنِ دعوتِ [code].
-///
-/// هرگز پرتاب نمی‌کند: بدترین حالت `copiedOnly` است، یعنی کاربر متن را
-/// دارد و می‌تواند دستی بفرستد.
 Future<ShareOutcome> shareInvite(ShareTarget target, String code) async {
   final text = inviteMessage(code);
   final encoded = Uri.encodeComponent(text);
 
-  // برای اپ‌هایی که راهِ ارسالِ متن ندارند، اول کپی می‌کنیم تا وقتی
-  // اپ باز شد کاربر فقط بچسباند.
   if (target.copyFirst) {
-    await _copy(text);
+    await copyText(text);
   }
 
   for (final template in [target.appUri, target.webUri]) {
     if (template == null) continue;
     final uri = Uri.parse(template.replaceAll('{text}', encoded));
     try {
-      // ═══════════════════════════════════════════════════════════════
-      // چرا نتیجهٔ canLaunchUrl را نادیده می‌گیریم و مستقیم امتحان
-      // می‌کنیم
-      // ═══════════════════════════════════════════════════════════════
-      //
-      // از اندروید ۱۱، `canLaunchUrl` برای هر schemeی که در
-      // `<queries>` مانیفست نباشد **همیشه false** می‌دهد — حتی اگر اپ
-      // نصب باشد. اگر به آن تکیه می‌کردیم، یک مانیفستِ ناقص یعنی
-      // همهٔ دکمه‌ها بی‌اثر.
-      //
-      // `launchUrl` خودش در صورتِ نبودِ اپ پرتاب می‌کند، که همان
-      // سیگنالی است که لازم داریم — و روی مانیفستِ درست هم بدون
-      // فراخوانیِ اضافه کار می‌کند.
       final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (ok) {
         return target.copyFirst
             ? ShareOutcome.openedWithClipboard
             : ShareOutcome.opened;
       }
-    } catch (e) {
-      debugPrint('اشتراک‌گذاری با ${target.id} از مسیر $uri نشد: $e');
-      // به گزینهٔ بعدی برو.
-    }
+    } catch (_) {}
   }
 
-  // هیچ‌کدام نشد — دست‌کم متن را به کاربر بده.
-  if (!target.copyFirst) await _copy(text);
+  if (!target.copyFirst) await copyText(text);
   return ShareOutcome.copiedOnly;
 }
 
-/// کپیِ امنِ متن. شکستِ کلیپ‌بورد نباید جریان را بشکند.
-Future<void> _copy(String text) async {
+Future<void> copyText(String text) async {
   try {
     await Clipboard.setData(ClipboardData(text: text));
-  } catch (e) {
-    debugPrint('کپی در کلیپ‌بورد نشد: $e');
-  }
+  } catch (_) {}
 }
 
-/// فقط کدِ خام را کپی می‌کند (دکمهٔ «کپی کد»).
 Future<bool> copyCode(String code) async {
   try {
     await Clipboard.setData(ClipboardData(text: code));
     return true;
-  } catch (e) {
-    debugPrint('کپی کد نشد: $e');
+  } catch (_) {
     return false;
   }
+}
+
+/// آیکون وکتوری تمیز برای هر پیام‌رسان بدون وابستگی به ایموجی
+class MessengerIcon extends StatelessWidget {
+  const MessengerIcon({super.key, required this.app, this.size = 20});
+
+  final ShareAppId app;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    switch (app) {
+      case ShareAppId.telegram:
+        return CustomPaint(
+          size: Size(size, size),
+          painter: _TelegramPainter(),
+        );
+      case ShareAppId.whatsapp:
+        return CustomPaint(
+          size: Size(size, size),
+          painter: _WhatsAppPainter(),
+        );
+      case ShareAppId.rubika:
+        return CustomPaint(
+          size: Size(size, size),
+          painter: _RubikaPainter(),
+        );
+      case ShareAppId.bale:
+        return CustomPaint(
+          size: Size(size, size),
+          painter: _BalePainter(),
+        );
+    }
+  }
+}
+
+class _TelegramPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width, h = size.height;
+    final paint = Paint()
+      ..color = const Color(0xFF29A9EB)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(w / 2, h / 2), w / 2, paint);
+
+    final plane = Path()
+      ..moveTo(w * 0.22, h * 0.50)
+      ..lineTo(w * 0.78, h * 0.26)
+      ..lineTo(w * 0.65, h * 0.74)
+      ..lineTo(w * 0.48, h * 0.62)
+      ..lineTo(w * 0.40, h * 0.72)
+      ..lineTo(w * 0.40, h * 0.58)
+      ..close();
+
+    final planePaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    canvas.drawPath(plane, planePaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _WhatsAppPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width, h = size.height;
+    final bgPaint = Paint()
+      ..color = const Color(0xFF25D366)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(w / 2, h / 2), w / 2, bgPaint);
+
+    final phonePaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = w * 0.12
+      ..strokeCap = StrokeCap.round;
+
+    final arc = Path()
+      ..arcTo(
+        Rect.fromCircle(center: Offset(w * 0.5, h * 0.5), radius: w * 0.26),
+        0.5,
+        4.8,
+        false,
+      );
+    canvas.drawPath(arc, phonePaint);
+
+    final dotPaint = Paint()..color = Colors.white;
+    canvas.drawCircle(Offset(w * 0.5, h * 0.5), w * 0.08, dotPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _RubikaPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width, h = size.height;
+    final bgPaint = Paint()
+      ..shader = const LinearGradient(
+        colors: [Color(0xFF8A2BE2), Color(0xFFF5643C)],
+      ).createShader(Rect.fromLTWH(0, 0, w, h))
+      ..style = PaintingStyle.fill;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Rect.fromLTWH(0, 0, w, h), Radius.circular(w * 0.28)),
+      bgPaint,
+    );
+
+    final diamondPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+
+    final path = Path()
+      ..moveTo(w * 0.50, h * 0.22)
+      ..lineTo(w * 0.78, h * 0.50)
+      ..lineTo(w * 0.50, h * 0.78)
+      ..lineTo(w * 0.22, h * 0.50)
+      ..close();
+    canvas.drawPath(path, diamondPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _BalePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width, h = size.height;
+    final bgPaint = Paint()
+      ..color = const Color(0xFF00BFA5)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(w / 2, h / 2), w / 2, bgPaint);
+
+    final innerPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+
+    final bubble = Path()
+      ..addRRect(RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset(w * 0.5, h * 0.48), width: w * 0.52, height: h * 0.42),
+        Radius.circular(w * 0.12),
+      ))
+      ..moveTo(w * 0.38, h * 0.68)
+      ..lineTo(w * 0.28, h * 0.78)
+      ..lineTo(w * 0.48, h * 0.68)
+      ..close();
+
+    canvas.drawPath(bubble, innerPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

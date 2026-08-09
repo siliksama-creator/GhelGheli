@@ -231,12 +231,10 @@ function Portal({ token, logout }) {
           {/* عددِ نشان = پله‌های باز شدهٔ **امروز** (۱ یا ۲)، نه کل
               جوایز. مالک همین را خواست: عددی که هر روز از صفر شروع
               می‌شود حس پیشرفت روزانه می‌سازد. */}
-          {passBrief?.tiersToday > 0 ? (
+          {passBrief?.claimable > 0 ? (
             <span className="wheelBadge">
-              {fa(Math.min(passBrief.tiersToday, passBrief.maxTiersPerDay || 2))}
+              {fa(Math.min(passBrief.claimable, 2))}
             </span>
-          ) : passBrief?.claimable > 0 ? (
-            <span className="passDot" />
           ) : null}
         </button>
         {/* فروشگاه کنار گردونه — همان چیدمانی که در اپ اندروید هست، تا

@@ -1,9 +1,4 @@
-// Support tickets for the web app.
-//
-// Mirrors the mobile rules: one open ticket at a time, one new ticket per
-// day, only an admin can close it, and every message may carry up to five
-// images. Moved out of main.jsx (where it was a single cramped line) so the
-// user area stops feeling thrown together.
+// Support tickets, FAQ, and Privacy / Fair-Play Terms for the web app.
 import React, { useCallback, useEffect, useState } from 'react';
 
 const MAX_SHOTS = 5;
@@ -16,12 +11,33 @@ const STATUS_LABEL = {
   closed: 'بسته‌شده',
 };
 
+const FAQ = [
+  {
+    q: 'چگونه در قلقلی امتیاز کسب کنم؟',
+    a: 'با ثبت کد و عکس فوتوکارت‌ها، برنده شدن در بازی‌های آنلاین (اتللو، جفت‌یاب)، پیشرفت در بازی ضربه‌زن، استریک ورود روزانه و چرخاندن گردونه شانس.',
+  },
+  {
+    q: 'جوایز و درآمد کیف پول چگونه تسویه می‌شوند؟',
+    a: 'در بخش کیف پول با ثبت شماره کارت و شبا معتبر به نام خودتان، درخواست تسویه ثبت کنید تا در سیکل پایا واریز شود.',
+  },
+  {
+    q: 'اشتراک قلقلی پلاس چه امکاناتی می‌دهد؟',
+    a: 'عضویت دائمی در ۱ باشگاه فوتبال، جوایز مسیر ویژه گذر نبرد به مدت ۱ ماه، ستاره طلایی درخشان کنار نام در همه بخش‌ها و دسترسی به تمام قاب‌ها و رنگ‌ها.',
+  },
+  {
+    q: 'آیا این اپلیکیشن شرط‌بندی یا قمار است؟',
+    a: 'خیر؛ قلقلی کاملاً بازی مهارت‌محور، ورزشی و سرگرمی است و هیچ‌گونه فعالیت شرط‌بندی یا بخت‌آزمایی در آن وجود ندارد.',
+  },
+];
+
 export default function Support({ token, api, req, asset }) {
   const [tickets, setTickets] = useState([]);
   const [quota, setQuota] = useState(null);
   const [active, setActive] = useState(null);
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(true);
+  const [faqOpen, setFaqOpen] = useState(null);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -55,13 +71,51 @@ export default function Support({ token, api, req, asset }) {
   return (
     <section className="card wide">
       <div className="sectionHead">
-        <div><h2>پشتیبانی</h2><p>در هر روز یک تیکت می‌توانید ثبت کنید</p></div>
+        <div><h2>پشتیبانی و راهنمایی</h2><p>پاسخ به سوالات متداول و ثبت تیکت</p></div>
       </div>
       {msg && <p className="msg">{msg}</p>}
 
+      {/* ── FAQ Section ── */}
+      <div className="faqSection">
+        <h3>پرسش‌های متداول (FAQ)</h3>
+        <div className="faqList">
+          {FAQ.map((item, idx) => (
+            <div key={idx} className={`faqItem ${faqOpen === idx ? 'open' : ''}`}>
+              <button className="faqQ" onClick={() => setFaqOpen(faqOpen === idx ? null : idx)}>
+                <span>{item.q}</span>
+                <i>{faqOpen === idx ? '▲' : '▼'}</i>
+              </button>
+              {faqOpen === idx && <p className="faqA">{item.a}</p>}
+            </div>
+          ))}
+        </div>
+        <button className="ghost privacyLink" onClick={() => setPrivacyOpen(true)}>
+          🛡️ منشور حریم خصوصی و شفافیت بازی جوانمردانه
+        </button>
+      </div>
+
+      {privacyOpen && (
+        <div className="modalShade" onClick={() => setPrivacyOpen(false)}>
+          <div className="confirmBox" onClick={e => e.stopPropagation()}>
+            <h3>حریم خصوصی و شفافیت بازی</h3>
+            <p>
+              <b>۱. ماهیت پلتفرم سرگرمی و بازی مهارت‌محور:</b><br />
+              اپلیکیشن قلقلی یک محیط سرگرمی، مسابقات مهارتی و کلکسیون فوتوکارت است. این پلتفرم هیچ‌گونه فعالیت شرط‌بندی یا قمار نداشته و تمامی پاداش‌ها بر مبنای مهارت بازیکنان محاسبه می‌شود.<br /><br />
+              <b>۲. حفظ اطلاعات کاربری:</b><br />
+              شماره تماس و اطلاعات هویتی شما کاملاً محفوظ بوده و به هیچ شخص ثالثی واگذار نمی‌شود.<br /><br />
+              <b>۳. شفافیت مالی و تسویه‌حساب:</b><br />
+              جوایز کیف پول طبق قوانین شاپرک و پایا به نام صاحب حساب واریز می‌گردد.
+            </p>
+            <button className="main" onClick={() => setPrivacyOpen(false)}>متوجه شدم</button>
+          </div>
+        </div>
+      )}
+
+      <hr className="divider" />
+
       {quota?.canCreate
         ? <NewTicket token={token} api={api} req={req} asset={asset}
-            onDone={() => { setMsg('تیکت ثبت شد'); load(); }}
+            onDone={() => { setMsg('تیکت با موفقیت ثبت شد ✓'); load(); }}
             onError={setMsg} />
         : <div className="quotaBox">
             <b>{quota?.reason === 'open_ticket' ? 'یک تیکت باز دارید' : 'سقف روزانه تکمیل شد'}</b>
@@ -74,7 +128,7 @@ export default function Support({ token, api, req, asset }) {
           </div>}
 
       <hr className="divider" />
-      <h3>تیکت‌های من</h3>
+      <h3>تیکت‌های من ({tickets.length})</h3>
       {tickets.length === 0 && <p className="hint">هنوز تیکتی ثبت نکرده‌اید.</p>}
       {tickets.map((t) => (
         <div className="row clickable" key={t.id} onClick={() => setActive(t)}>
@@ -102,7 +156,6 @@ function Shots({ urls, asset, onRemove }) {
   );
 }
 
-/// Shared upload button used by both the new-ticket form and the reply box.
 function ShotPicker({ urls, setUrls, api, token, disabled }) {
   const [busy, setBusy] = useState(false);
   const room = MAX_SHOTS - urls.length;
@@ -165,8 +218,8 @@ function NewTicket({ token, api, req, asset, onDone, onError }) {
 
   return (
     <div className="ticketForm">
-      <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="موضوع" />
-      <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="شرح مشکل" />
+      <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="موضوع تیکت" />
+      <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="شرح مشکل یا پیام شما" />
       <Shots urls={shots} asset={asset} onRemove={(i) => setShots(shots.filter((_, j) => j !== i))} />
       <div className="ticketActions">
         <ShotPicker urls={shots} setUrls={setShots} api={api} token={token} disabled={sending} />

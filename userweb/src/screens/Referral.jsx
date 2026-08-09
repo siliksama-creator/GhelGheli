@@ -1,6 +1,7 @@
-// دعوت دوستان — کد اختصاصی، آمار، و فهرست دوستان.
+// دعوت دوستان — کد اختصاصی، آمار، و اشتراک مستقیم در پیام‌رسان‌ها
 import React, { useCallback, useEffect, useState } from 'react';
 import { req } from '../lib/api.js';
+import { SvgIcon } from '../components/IconAsset.jsx';
 
 const fa = n => new Intl.NumberFormat('fa-IR').format(Number(n || 0));
 
@@ -21,9 +22,6 @@ export default function Referral({ token, setMsg }) {
 
   const copy = async () => {
     try {
-      // navigator.clipboard فقط روی HTTPS یا localhost کار می‌کند و در
-      // وب‌ویوهای قدیمی اصلاً وجود ندارد؛ پس fallback لازم است وگرنه دکمه
-      // روی همان دستگاه‌هایی که بیشترین کاربر را دارند بی‌صدا کار نمی‌کند.
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(d.code);
       } else {
@@ -36,19 +34,24 @@ export default function Referral({ token, setMsg }) {
         document.execCommand('copy');
         document.body.removeChild(ta);
       }
-      setMsg?.('کد کپی شد ');
+      setMsg?.('کد دعوت کپی شد ✓');
     } catch {
-      setMsg?.('کپی نشد — کد را دستی بردار');
+      setMsg?.('کپی نشد — کد را دستی کپی کنید');
     }
   };
 
-  const share = async () => {
-    const text = `با کد دعوت من توی قلقلی عضو شو و ${fa(d.spinsPerReferral)}`
-      + ` چرخش گردونهٔ شانس بگیر! کد: ${d.code}`;
-    if (navigator.share) {
-      try { await navigator.share({ text }); return; } catch { /* لغو شد */ }
-    }
-    copy();
+  const inviteMsg = (code) =>
+    `کد دعوت من به قلقلی: ${code}\nبا این کد ثبت‌نام کن، هر دومون ۳ چرخش گردونه هدیه می‌گیریم!\nhttps://ghelghelishop.ir`;
+
+  const shareTo = (target) => {
+    const text = encodeURIComponent(inviteMsg(d.code));
+    let url = '';
+    if (target === 'telegram') url = `https://t.me/share/url?url=${text}`;
+    else if (target === 'whatsapp') url = `https://wa.me/?text=${text}`;
+    else if (target === 'rubika') { copy(); url = 'https://rubika.ir'; }
+    else if (target === 'bale') { copy(); url = 'https://web.bale.ai'; }
+
+    if (url) window.open(url, '_blank');
   };
 
   if (err && !d) return <section className="card wide"><p className="hint">{err}</p></section>;
@@ -56,41 +59,37 @@ export default function Referral({ token, setMsg }) {
 
   return (
     <section className="card wide refPage">
-      <h2> دعوت دوستان</h2>
-      <p className="hint">
-        کدت را به دوستانت بده. هر کس موقع ثبت‌نام آن را وارد کند،
-        {' '}<b>هر دوی شما {fa(d.spinsPerReferral)} چرخش گردونه</b> می‌گیرید.
-      </p>
-
-      {/* توضیح کامل قوانین — خواستهٔ مالک. بدون این، کاربر نمی‌فهمد چرا
-          امتیازی به حسابش اضافه شده یا چرا سهمیهٔ گردونه‌اش بالا رفته. */}
-      <ul className="refRules">
-        <li>
-          <b>{fa(d.commissionPercent)}٪ کمیسیون دائمی</b> — از امتیازی که
-          دوستت با <b>ثبت کد کارت</b> یا <b>بازی ضربه‌زن</b> به دست می‌آورد،
-          {' '}{fa(d.commissionPercent)}٪ به تو هم می‌رسد. از امتیاز او
-          چیزی کم نمی‌شود؛ این را ما اضافه می‌کنیم.
-        </li>
-        <li>
-          <b>هر {fa(d.invitesPerDailySpin)} دعوت = یک چرخش روزانهٔ دائمی</b>
-          {' '}— با {fa(d.invitesPerDailySpin)} دوست، هر روز
-          {' '}{fa(2)} چرخش داری به‌جای یکی. تا سقف
-          {' '}{fa(d.maxInvitesForDaily)} دوست ادامه دارد.
-        </li>
-        <li>
-          <b>دعوت نامحدود است</b> — هر چند نفر که بخواهی می‌توانی دعوت کنی.
-        </li>
-        <li>
-          جایزهٔ {fa(d.spinsPerReferral)} چرخش فقط <b>یک بار</b> برای هر
-          دوست داده می‌شود.
-        </li>
-      </ul>
+      <div className="refHead">
+        <h2>دعوت از دوستان</h2>
+        <p className="hint">
+          کدت را به دوستانت بده. هر کس موقع ثبت‌نام آن را وارد کند،
+          {' '}<b>هر دوی شما {fa(d.spinsPerReferral)} چرخش گردونه</b> هدیه می‌گیرید.
+        </p>
+      </div>
 
       <div className="refCodeBox">
-        <span className="refCode" dir="ltr">{d.code}</span>
-        <div className="refCodeBtns">
-          <button className="ghost" onClick={copy}>کپی</button>
-          <button className="primary" onClick={share}>ارسال برای دوستان</button>
+        <div className="refCodeInner">
+          <span className="refLabel">کد اختصاصی شما:</span>
+          <span className="refCode" dir="ltr">{d.code}</span>
+        </div>
+        <button className="btn primary" onClick={copy}>کپی کد</button>
+      </div>
+
+      <div className="refMessengers">
+        <span>ارسال مستقیم برای دوستان:</span>
+        <div className="refBtnGroup">
+          <button className="msgBtn tg" onClick={() => shareTo('telegram')}>
+            <span className="msgDot" /> تلگرام
+          </button>
+          <button className="msgBtn wa" onClick={() => shareTo('whatsapp')}>
+            <span className="msgDot" /> واتس‌اپ
+          </button>
+          <button className="msgBtn rb" onClick={() => shareTo('rubika')}>
+            <span className="msgDot" /> روبیکا
+          </button>
+          <button className="msgBtn bl" onClick={() => shareTo('bale')}>
+            <span className="msgDot" /> بله
+          </button>
         </div>
       </div>
 
@@ -100,37 +99,23 @@ export default function Referral({ token, setMsg }) {
         <div><b>{fa(d.dailySpins)}</b><span>چرخش روزانه</span></div>
       </div>
 
-      {/* پیشرفت تا چرخش روزانهٔ بعدی. یک هدف نزدیک و قابل دیدن، خیلی
-          مؤثرتر از یک قانون نوشته‌شده در متن است. */}
-      {!d.atDailyCap && d.invitesToNextDailySpin != null && (
-        <div className="refProgress">
-          <div className="refProgressBar">
-            <span style={{
-              width: `${((d.invitesPerDailySpin - d.invitesToNextDailySpin)
-                / d.invitesPerDailySpin) * 100}%`,
-            }} />
-          </div>
-          <small>
-            {fa(d.invitesToNextDailySpin)} دوست دیگر تا
-            {' '}{fa(d.dailySpins + 1)} چرخش روزانه
-          </small>
-        </div>
-      )}
-      {d.atDailyCap && (
-        <p className="hint refCapped">
-           به سقف {fa(d.maxInvitesForDaily)} دوست رسیدی — هر روز
-          {' '}{fa(d.dailySpins)} چرخش رایگان داری!
-        </p>
-      )}
+      <div className="refRulesBox">
+        <b>مزایای معرفی دوستان:</b>
+        <ul>
+          <li><b>{fa(d.commissionPercent)}٪ کمیسیون دائمی</b> از امتیازات حاصل از ثبت کارت و بازی ضربه‌زن دوست شما.</li>
+          <li><b>هر {fa(d.invitesPerDailySpin)} دعوت</b> = ۱ چرخش روزانه دائمی به گردونه شانس (تا سقف {fa(d.maxInvitesForDaily)} نفر).</li>
+          <li><b>دعوت نامحدود</b> برای دریافت چرخش‌های هدیه و جوایز.</li>
+        </ul>
+      </div>
 
       {d.friends.length > 0 ? (
         <div className="refList">
-          <h3>دوستان تو</h3>
+          <h3>دوستان تو ({fa(d.friends.length)})</h3>
           <ul>
             {d.friends.map((f, i) => (
               <li key={i}>
                 <span>{f.nickname}</span>
-                <b>{fa(f.earnedFromThem)} امتیاز</b>
+                <b>+{fa(f.earnedFromThem)} امتیاز</b>
               </li>
             ))}
           </ul>

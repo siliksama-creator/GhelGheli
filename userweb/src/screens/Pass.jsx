@@ -1,20 +1,4 @@
 // گذر نبرد فصلی — «مسیر قلقلی»
-//
-// ═══════════════════════════════════════════════════════════════════════════
-// چرا این صفحه از صفر بازنویسی شد
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// بازخورد مالک روی نسخهٔ اول: «ظاهرش خیلی زشت و غیر قابل مفهوم هستش ...
-// یه اسکرول بار هم باید طراحی کنی که کاربرها بفهمن بعضی چیزا تو صفحه
-// پایین تر قرار داده شده».
-//
-// سه اشکال ریشه‌ای داشت و هر سه اینجا حل شده:
-//
-// ۱. **اسکرول افقی برای ۵۰ پله** — کاربر نمی‌فهمید مسیر ادامه دارد و
-//    خانه‌های کوچک متن فارسی را می‌بریدند. حالا لیست عمودی است.
-// ۲. **هیچ نشانه‌ای از ادامهٔ صفحه نبود** — حالا یک نوار پیشرفتِ اسکرول
-//    همیشه‌پیدا در لبه هست که شمارهٔ پله را هم نشان می‌دهد.
-// ۳. **مسطح و بی‌روح** — حالا بنر تصویری، آیکون‌های سه‌بعدی و انیمیشن.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { req, fa } from '../lib/api.js';
@@ -51,13 +35,13 @@ function RewardTile({ r, unlocked, track, onClaim, busy }) {
       title={locked ? 'مخصوص اعضای قلقلی پلاس' : rewardText(r)}>
       <span className="pTileArt">
         {ART[r.kind]
-          ? <img src={ART[r.kind]} alt="" width="30" height="30" loading="lazy" />
-          : <AssetIcon name={r.kind === 'cash' ? 'points' : 'gift'} size={30} />}
+          ? <img src={ART[r.kind]} alt="" width="28" height="28" loading="lazy" />
+          : <AssetIcon name={r.kind === 'cash' ? 'points' : 'gift'} size={28} />}
       </span>
       <span className="pTileBody">
         <b>{rewardText(r)}</b>
-        {claimed && <small className="ok"><SvgIcon name="check" size={13} /> گرفتی</small>}
-        {locked && <small className="plus"><SvgIcon name="trophy" size={13} /> فقط پلاس</small>}
+        {claimed && <small className="ok">✓ گرفتی</small>}
+        {locked && <small className="plus">★ پلاس</small>}
         {ready && <small className="ready">برای گرفتن بزن</small>}
       </span>
     </button>
@@ -68,36 +52,8 @@ export default function Pass({ token, setMsg, openShop }) {
   const load = useCallback(() => req('/api/pass', 'GET', null, token), [token]);
   const st = useAsync(load);
   const [busy, setBusy] = useState(false);
-  const [frac, setFrac] = useState(0);
-  const listRef = useRef(null);
+  const [showClaimed, setShowClaimed] = useState(false);
   const jumped = useRef(false);
-
-  // نوار پیشرفتِ اسکرول — روی کل پنجره، چون لیست داخل جریان صفحه است.
-  useEffect(() => {
-    const onScroll = () => {
-      const h = document.documentElement;
-      const max = h.scrollHeight - h.clientHeight;
-      setFrac(max <= 0 ? 0 : Math.min(1, Math.max(0, h.scrollTop / max)));
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  // پرش خودکار به پلهٔ فعلی: کاربری که در پلهٔ ۲۰ است نباید از ۱ شروع کند.
-  useEffect(() => {
-    if (jumped.current || !st.data?.active) return;
-    const t = st.data.tier;
-    if (t > 1) {
-      const el = document.getElementById(`pass-tier-${Math.max(1, t - 1)}`);
-      if (el) {
-        jumped.current = true;
-        setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 250);
-      }
-    } else {
-      jumped.current = true;
-    }
-  }, [st.data]);
 
   const claim = async (tierId) => {
     setBusy(true);
@@ -113,7 +69,7 @@ export default function Pass({ token, setMsg, openShop }) {
     setBusy(true);
     try {
       const r = await req('/api/pass/claim-all', 'POST', {}, token);
-      setMsg?.(r.message);
+      setMsg?.(r.message || 'جوایز دریافت شد');
       st.reload();
     } catch (e) { setMsg?.(e.message || 'ناموفق'); }
     finally { setBusy(false); }
@@ -135,16 +91,19 @@ export default function Pass({ token, setMsg, openShop }) {
           ? Math.round((d.intoTier / d.tierNeeds) * 100) : 100;
         const done = d.tier >= d.tierCount;
 
-        return (
-          <div className="pWrap" ref={listRef}>
-            {/* نوار پیشرفتِ اسکرول — همیشه پیدا */}
-            <div className="pRail" aria-hidden="true">
-              <div className="pRailThumb" style={{ top: `${frac * 100}%` }}>
-                {fa(Math.max(1, Math.round(frac * d.tierCount)))}
-              </div>
-            </div>
+        // Fold already-completed tiers
+        const isTierDone = (row) => {
+          const freeDone = !row.free || row.free.claimed;
+          const plusDone = !row.plus || row.plus.claimed || row.plus.locked;
+          return row.unlocked && freeDone && plusDone && row.tier < d.tier;
+        };
 
-            {/* ── بنر ── */}
+        const claimedTiers = d.tiers.filter(isTierDone);
+        const activeTiers = d.tiers.filter(r => showClaimed || !isTierDone(r));
+
+        return (
+          <div className="pWrap">
+            {/* ── بنر فشرده ── */}
             <div className="pBanner">
               <img src="/pass_banner.webp" alt="" loading="eager" />
               <div className="pBannerFade" />
@@ -164,7 +123,7 @@ export default function Pass({ token, setMsg, openShop }) {
             <div className="card pProgress">
               <div className="pProgressTop">
                 <b>{done ? 'کل مسیر را تمام کردی!' : `تا پلهٔ ${fa(d.tier + 1)}`}</b>
-                {!done && <span>{fa(d.intoTier)} / {fa(d.tierNeeds)}</span>}
+                {!done && <span>{fa(d.intoTier)} / {fa(d.tierNeeds)} XP</span>}
               </div>
               <div className="pBar"><div className="pBarFill" style={{ width: `${pct}%` }} /></div>
 
@@ -172,7 +131,7 @@ export default function Pass({ token, setMsg, openShop }) {
                 <span className={d.dayCapReached ? 'capFull' : ''}>
                   {d.dayCapReached
                     ? `سقف امروز پر شد — فردا ${fa(d.maxTiersPerDay)} پلهٔ دیگر`
-                    : `امروز ${fa(d.tiersToday)} از ${fa(d.maxTiersPerDay)} پله`}
+                    : `امروز ${fa(d.tiersToday)} از ${fa(d.maxTiersPerDay)} پله باز شد`}
                 </span>
                 <span className="pDots">
                   {Array.from({ length: d.maxTiersPerDay }).map((_, i) => (
@@ -180,11 +139,6 @@ export default function Pass({ token, setMsg, openShop }) {
                   ))}
                 </span>
               </div>
-              {d.pendingTiers > 0 && (
-                <p className="pPending">
-                  {fa(d.pendingTiers)} پله ذخیره شده — به‌محض باز شدن سقف آزاد می‌شود
-                </p>
-              )}
 
               {d.claimable > 0 && (
                 <button className="btn primary pClaimAll" disabled={busy} onClick={claimAll}>
@@ -193,42 +147,57 @@ export default function Pass({ token, setMsg, openShop }) {
               )}
             </div>
 
+            {/* ── اینفوگرافیک سریع کسب تجربه (Visual XP Infographic) ── */}
+            <div className="card pXpInfographic">
+              <div className="pXpTitle">
+                <span>چطور پله‌های گذر نبرد را سریع‌تر باز کنم؟</span>
+                <small>حداکثر {fa(d.maxTiersPerDay)} پله در هر روز</small>
+              </div>
+              <div className="pSourcesPills">
+                <span className="xpPill">🎮 بازی آنلاین <b>+۱۵/۲۵</b></span>
+                <span className="xpPill">⚡ ضربه‌زن <b>+۳۰</b></span>
+                <span className="xpPill">🎡 گردونه <b>+۲۰</b></span>
+                <span className="xpPill">👥 دعوت دوست <b>+۱۰۰</b></span>
+                <span className="xpPill">📅 ورود روزانه <b>+۲۰</b></span>
+              </div>
+            </div>
+
             {!d.hasPlus && (
               <div className="card pUpsell">
-                <span className="pUpsellStar"><UiIcon name="trophy" size={24} /></span>
+                <span className="pUpsellStar" style={{ color: '#FFD166' }}>★</span>
                 <div>
-                  <b>مسیر طلایی قفل است</b>
-                  <span>چرخش گردونه، آیتم‌های ویژه و امتیاز دو برابر</span>
+                  <b>مسیر طلایی پلاس</b>
+                  <span>جوایز نقدی، چرخش گردونه و آیتم‌های اختصاصی</span>
                 </div>
-                <button className="btn" onClick={openShop}>بازکردن</button>
+                <button className="btn" onClick={openShop}>خرید پلاس</button>
               </div>
             )}
 
             {/* ── راهنمای مسیرها ── */}
             <div className="pLegend">
-              <i className="chip free">رایگان</i>
-              <i className="chip plus"><UiIcon name="trophy" size={15} /> پلاس</i>
+              <i className="chip free">مسیر رایگان</i>
+              <i className="chip plus" style={{ color: '#FFD166' }}>★ مسیر پلاس</i>
               <span className="muted">{fa(d.tierCount)} پله</span>
             </div>
 
+            {/* دکمه باز/بستن پله‌های قبلی */}
+            {claimedTiers.length > 0 && (
+              <button className="btn ghost pFoldBtn" onClick={() => setShowClaimed(!showClaimed)}>
+                {showClaimed
+                  ? `▲ بستن پله‌های قبلی`
+                  : `▼ مشاهده ${fa(claimedTiers.length)} پله تکمیل‌شده قبلی`}
+              </button>
+            )}
+
             {/* ── پله‌ها ── */}
             <div className="pTiers">
-              {d.tiers.map((row) => {
+              {activeTiers.map((row) => {
                 const isCurrent = row.tier === d.tier + 1;
-                // ── نشانهٔ مایلستون هر ۵ پله ──
-                //
-                // ۵۰ ردیفِ کاملاً یکسان هیچ نقطهٔ اتکایی برای چشم
-                // نداشت: در اسکرین‌شاتِ تمام‌صفحه، ۱۰٬۶۸۲ پیکسل یکنواخت
-                // بود و کاربر موقعِ اسکرول نمی‌فهمید کجای مسیر است.
-                //
-                // هر پنجمین ردیف شمارهٔ درشتِ طلایی می‌گیرد و مثلِ
-                // تابلوی کیلومترشمار کار می‌کند.
                 const isMilestone = row.tier % 5 === 0;
                 return (
                   <div key={row.tier} id={`pass-tier-${row.tier}`}
                     className={`pRow${isCurrent ? ' is-current' : ''}${row.unlocked ? ' is-unlocked' : ''}${isMilestone ? ' is-milestone' : ''}`}>
                     <div className="pNum">
-                      <span className="pLock"><SvgIcon name={row.unlocked ? 'unlock' : 'lock'} size={16} /></span>
                       <b>{fa(row.tier)}</b>
                     </div>
                     <RewardTile r={row.free} unlocked={row.unlocked}
@@ -238,24 +207,6 @@ export default function Pass({ token, setMsg, openShop }) {
                   </div>
                 );
               })}
-            </div>
-
-            {/* ── راهنما ── */}
-            <div className="card pHow">
-              <h3><SvgIcon name="bulb" size={21} /> چطور جلو بروم؟</h3>
-              <p className="muted">
-                با بازی کردن تجربه می‌گیری —
-                هر روز حداکثر {fa(d.maxTiersPerDay)} پله باز می‌شود، پس هر روز سر بزن.
-              </p>
-              <ul className="pSources">
-                {d.sources.map((s) => (
-                  <li key={s.source}>
-                    <b>{s.label}</b>
-                    <span className="xp">+{fa(s.xp)}</span>
-                    <small>تا {fa(s.dailyCap)}</small>
-                  </li>
-                ))}
-              </ul>
             </div>
           </div>
         );

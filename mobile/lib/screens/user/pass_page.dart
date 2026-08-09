@@ -1,61 +1,14 @@
-// گذر نبرد فصلی — «مسیر قلقلی»
-//
-// ═══════════════════════════════════════════════════════════════════════════
-// چرا این صفحه از صفر بازنویسی شد
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// بازخورد صریح مالک روی نسخهٔ اول: «ظاهرش خیلی زشت و غیر قابل مفهوم
-// هستش اصلا کل صفحش زشت طراحی شده ... یه اسکرول بار هم باید طراحی کنی
-// که کاربرها بفهمن بعضی چیزا تو صفحه پایین تر قرار داده شده».
-//
-// سه اشکال ریشه‌ای داشت:
-//
-// ۱. **اسکرول افقی برای ۵۰ پله.** کاربر نمی‌دانست چند پله هست، کجای
-//    مسیر است، و اصلاً که می‌شود اسکرول کرد. خانه‌های ۷۸ پیکسلی هم
-//    آن‌قدر تنگ بودند که متن فارسی بریده می‌شد.
-//
-// ۲. **هیچ نشانه‌ای از ادامه داشتن صفحه نبود** — دقیقاً همان چیزی که
-//    مالک گفت. حالا یک نوار پیشرفتِ اسکرول در لبه هست که همیشه دیده
-//    می‌شود و شمارهٔ پله را هم نشان می‌دهد.
-//
-// ۳. **همه‌چیز مسطح و بی‌روح بود** — بدون تصویر، بدون انیمیشن، بدون
-//    سلسله‌مراتب بصری.
-//
-// طراحی جدید:
-//   • لیست **عمودی** — الگوی طبیعی موبایل. هر پله یک ردیف کامل با فضای
-//     کافی برای متن فارسی.
-//   • بنر تصویری بالای صفحه + آیکون‌های سه‌بعدی برای هر نوع جایزه.
-//   • نوار پیشرفتِ اسکرول در لبه، همیشه پیدا.
-//   • پرش خودکار به پلهٔ فعلی هنگام باز شدن — کاربر از جایی شروع می‌کند
-//     که واقعاً آنجاست، نه از پلهٔ ۱.
-//   • انیمیشن: نبض روی جایزهٔ آماده، درخشش نوار پیشرفت.
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
 import '../../core/assets.dart';
-import '../../theme/brand_theme.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/state_views.dart';
 
-/// رنگ دو مسیر — همه‌جای صفحه از همین‌ها استفاده می‌شود تا «رایگان» و
-/// «پلاس» با یک نگاه از هم جدا شوند.
 const _freeColor = Color(0xFF38BDF8);
-// ═══════════════════════════════════════════════════════════════════════════
-// چرا این ثابت با یک تابعِ تم‌آگاه جایگزین شد
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// طلاییِ پلاس (#FFD36B) روی سطحِ سفیدِ تم روشن کنتراستِ **۱.۴۲:۱**
-// دارد — بدترین موردِ کل پالت. متن‌های «فقط پلاس»، «سقف امروز پر شد»
-// و برچسبِ مسیرِ پلاس در تم روشن عملاً نامرئی بودند.
-//
-// `context.gold` نسخهٔ درستِ تم را می‌دهد: همان hue، روشناییِ کمتر در
-// تم روشن، و همان طلاییِ درخشان در تم تیره.
-//
-// ثابتِ زیر فقط برای گرادیان‌ها می‌ماند، جایی که پس‌زمینه همیشه تیره
-// است و رنگِ ثابت درست‌تر از رنگِ تم است.
-const _plusGradient = Color(0xFFFFD36B);
+const _plusGold = Color(0xFFFFD166);
 const _readyColor = Color(0xFFB5EF58);
 
 class PassPage extends StatefulWidget {
@@ -74,91 +27,43 @@ class PassPage extends StatefulWidget {
   State<PassPage> createState() => _PassPageState();
 }
 
-class _PassPageState extends State<PassPage> with TickerProviderStateMixin {
+class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin {
   Map<String, dynamic>? _data;
   bool _loading = true;
   bool _busy = false;
+  bool _showClaimed = false;
   String? _error;
 
   final _scroll = ScrollController();
-  double _scrollFrac = 0;
-
-  /// نبضِ ملایم روی جایزه‌های آمادهٔ دریافت.
-  ///
-  /// در initState ساخته می‌شود، نه به‌صورت مقداردهیِ `late final` روی
-  /// فیلد. یک `late final` تا اولین دسترسی مقداردهی نمی‌شود؛ اگر ویجت
-  /// پیش از اولین build حذف شود، `dispose()` اولین جایی است که به آن
-  /// دست می‌زند و `createTicker` روی عنصرِ غیرفعال صدا زده می‌شود:
-  /// «Looking up a deactivated widget's ancestor is unsafe». روی گوشی
-  /// واقعی هم رخ می‌دهد — کاربری که اپ را باز و فوراً بسته.
   late final AnimationController _pulse;
 
   @override
   void initState() {
     super.initState();
-    // ═══════════════════════════════════════════════════════════════════
-    // چرا اینجا repeat() صدا زده نمی‌شود
-    // ═══════════════════════════════════════════════════════════════════
-    //
-    // این نبض فقط روی جایزه‌های **آمادهٔ دریافت** کشیده می‌شود. ولی
-    // کنترلر قبلاً از همان initState بی‌قید می‌چرخید — یعنی حتی برای
-    // کاربری که هیچ جایزهٔ آماده‌ای ندارد (حالت معمول: بیشتر روزها
-    // هیچ پله‌ای باز نشده)، یک Ticker در هر ۱۶ میلی‌ثانیه بیدار
-    // می‌شد و فریم می‌خواست.
-    //
-    // یک AnimationControllerِ در حال چرخش هرگز «رایگان» نیست: حتی
-    // اگر هیچ AnimatedBuilderی به آن گوش ندهد، خودِ Ticker باعث
-    // می‌شود موتور فلاتر برای هر فریم بیدار بماند به‌جای اینکه صفحه
-    // را ساکن اعلام کند.
-    //
-    // حالا `_syncPulse` بعد از هر بارگذاری تصمیم می‌گیرد: اگر چیزی
-    // برای گرفتن هست بچرخد، وگرنه بایستد.
     _pulse = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1600),
+      duration: const Duration(milliseconds: 1400),
     );
-    _scroll.addListener(_onScroll);
     _load();
   }
 
-  /// نبض را فقط وقتی روشن نگه می‌دارد که چیزی برای گرفتن باشد.
-  ///
-  /// دو مصرف‌کنندهٔ نبض هر دو شرط دارند (`claimable > 0` در سربرگ و
-  /// `ready` در هر کاشی)، پس وقتی هیچ‌کدام برقرار نیست، چرخیدنِ کنترلر
-  /// خالص هدر دادنِ فریم و باتری است.
   void _syncPulse() {
     final claimable = NumberParser.toInt(_data?['claimable']);
-    final anyReady = (_data?['tiers'] as List? ?? const [])
-        .whereType<Map>()
-        .any((t) => t['ready'] == true || t['claimable'] == true);
-    final want = claimable > 0 || anyReady;
+    final want = claimable > 0;
     if (want && !_pulse.isAnimating) {
       _pulse.repeat(reverse: true);
     } else if (!want && _pulse.isAnimating) {
       _pulse.stop();
-      // به حالتِ خنثی برگرد تا کاشی‌ها در اندازهٔ درست بمانند؛
-      // ایستادن روی یک مقدارِ میانی، همه را کمی بزرگ رها می‌کرد.
       _pulse.value = 0;
     }
   }
 
   @override
   void dispose() {
-    _scroll.removeListener(_onScroll);
-    // انیمیشنِ در حال اجرا را قبل از نابودی کنترلر متوقف کن، وگرنه
-    // «An animation is still running even after the widget tree was
-    // disposed» — روی گوشی هم نشتِ فریم است نه فقط هشدار تست.
     if (_scroll.hasClients) _scroll.jumpTo(_scroll.offset);
     _scroll.dispose();
     _pulse.dispose();
     super.dispose();
-  }
-
-  void _onScroll() {
-    if (!_scroll.hasClients) return;
-    final max = _scroll.position.maxScrollExtent;
-    final f = max <= 0 ? 0.0 : (_scroll.offset / max).clamp(0.0, 1.0);
-    if ((f - _scrollFrac).abs() > 0.004) setState(() => _scrollFrac = f);
   }
 
   Future<void> _load({bool jump = true}) async {
@@ -178,13 +83,6 @@ class _PassPageState extends State<PassPage> with TickerProviderStateMixin {
         _loading = false;
       });
       _syncPulse();
-      if (jump) {
-        // گارد mounted داخل callback لازم است، نه فقط بیرونش: بین این
-        // فریم و فریم بعد، کاربر می‌تواند صفحه را ببندد.
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _jumpToCurrent();
-        });
-      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -194,30 +92,12 @@ class _PassPageState extends State<PassPage> with TickerProviderStateMixin {
     }
   }
 
-  /// پرش به پلهٔ فعلی.
-  ///
-  /// کاربری که در پلهٔ ۲۰ است نباید از پلهٔ ۱ شروع کند و بیست بار
-  /// اسکرول کند تا خودش را پیدا کند.
-  void _jumpToCurrent() {
-    if (!mounted || !_scroll.hasClients || _data == null) return;
-    final tier = NumberParser.toInt(_data!['tier']);
-    if (tier <= 1) return;
-    // هر ردیف ~۹۶ پیکسل؛ کمی بالاتر می‌ایستیم تا پله‌های قبلی هم دیده
-    // شوند و کاربر بفهمد کجای مسیر است.
-    final target = math.max(0.0, (tier - 1.6) * 96.0);
-    _scroll.animateTo(
-      math.min(target, _scroll.position.maxScrollExtent),
-      duration: const Duration(milliseconds: 700),
-      curve: Curves.easeOutCubic,
-    );
-  }
-
   Future<void> _claim(String tierId) async {
     setState(() => _busy = true);
     try {
       final r = await widget.api.post('/api/pass/claim/$tierId', {});
       if (!mounted) return;
-      _toast(r is Map ? '${r['message'] ?? 'جایزه گرفتی!'}' : 'جایزه گرفتی!');
+      _toast(r is Map ? '${r['message'] ?? 'جایزه دریافت شد!'}' : 'جایزه دریافت شد!');
       widget.onChanged?.call();
       await _load(jump: false);
     } catch (e) {
@@ -232,7 +112,7 @@ class _PassPageState extends State<PassPage> with TickerProviderStateMixin {
     try {
       final r = await widget.api.post('/api/pass/claim-all', {});
       if (!mounted) return;
-      _toast(r is Map ? '${r['message'] ?? 'دریافت شد'}' : 'دریافت شد');
+      _toast(r is Map ? '${r['message'] ?? 'جوایز دریافت شد'}' : 'جوایز دریافت شد');
       widget.onChanged?.call();
       await _load(jump: false);
     } catch (e) {
@@ -245,10 +125,10 @@ class _PassPageState extends State<PassPage> with TickerProviderStateMixin {
   void _toast(String text, {bool error = false}) {
     if (!mounted) return;
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
-      content: Text(text, textAlign: TextAlign.center),
+      content: Text(text, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800)),
       behavior: SnackBarBehavior.floating,
-      backgroundColor: error ? Theme.of(context).colorScheme.error : null,
-      duration: const Duration(milliseconds: 1800),
+      backgroundColor: error ? Theme.of(context).colorScheme.error : const Color(0xFF10B981),
+      duration: const Duration(milliseconds: 2000),
     ));
   }
 
@@ -272,559 +152,268 @@ class _PassPageState extends State<PassPage> with TickerProviderStateMixin {
     if (d['active'] != true) return const _NoSeason();
 
     final season = Map<String, dynamic>.from(d['season'] as Map? ?? {});
-    final tiers = (d['tiers'] as List? ?? const [])
+    final allTiers = (d['tiers'] as List? ?? const [])
         .whereType<Map>()
         .map((e) => Map<String, dynamic>.from(e))
         .toList();
     final tier = NumberParser.toInt(d['tier']);
     final tierCount = NumberParser.toInt(d['tierCount']);
+    final hasPlus = d['hasPlus'] == true;
+    final claimable = NumberParser.toInt(d['claimable']);
 
-    // ═══════════════════════════════════════════════════════════════════
-    // چرا fit: StackFit.expand — ریشهٔ باگِ «کادر خالی بزرگ»
-    // ═══════════════════════════════════════════════════════════════════
-    //
-    // یک `Stack` به فرزندِ **غیرPositioned** خود constraints شُل (loose)
-    // می‌دهد: «هر عرضی می‌خواهی بگیر». ListView آن را به فرزندانش پاس
-    // می‌دهد و در نهایت هر FilledButton پرتاب می‌کند:
-    //
-    //     BoxConstraints forces an infinite width
-    //
-    // آن خطا رندرِ کل سربرگ را می‌شکند. روی گوشیِ ریلیز خطاها پنهان‌اند،
-    // پس فقط یک کادرِ خالیِ بلند با حاشیهٔ طلایی باقی می‌ماند — دقیقاً
-    // همان چیزی که مالک در اسکرین‌شات فرستاد.
-    //
-    // `StackFit.expand` فرزند غیرPositioned را مجبور می‌کند اندازهٔ
-    // Stack شود، پس عرض همیشه متناهی است. مشکل از ریشه حل می‌شود، نه با
-    // وصله زدن به تک‌تک دکمه‌ها.
-    return SizedBox.expand(
-      child: Stack(
-      fit: StackFit.expand,
-      children: [
-        RefreshIndicator(
-          onRefresh: () async => _load(jump: false),
-          child: ListView.builder(
-            controller: _scroll,
-            padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.md, 26, Gaps.xxl),
-            // ۰ = سربرگ، ۱ = راهنمای «چطور جلو بروم»، ۲ = راهنمای مسیرها،
-            // بعد پله‌ها.
-            itemCount: tiers.length + 3,
-            itemBuilder: (context, i) {
-              if (i == 0) {
-                return _Header(
-                  title: '${season['name'] ?? 'فصل جاری'}',
-                  daysLeft: NumberParser.toInt(season['daysLeft']),
-                  tier: tier,
-                  tierCount: tierCount,
-                  into: NumberParser.toInt(d['intoTier']),
-                  needs: NumberParser.toInt(d['tierNeeds']),
-                  hasPlus: d['hasPlus'] == true,
-                  claimable: NumberParser.toInt(d['claimable']),
-                  tiersToday: NumberParser.toInt(d['tiersToday']),
-                  maxToday: NumberParser.toInt(d['maxTiersPerDay']),
-                  capReached: d['dayCapReached'] == true,
-                  pending: NumberParser.toInt(d['pendingTiers']),
-                  busy: _busy,
-                  onOpenShop: widget.onOpenShop,
-                  onClaimAll: _claimAll,
-                  pulse: _pulse,
-                );
-              }
-              if (i == 1) {
-                // ═══════════════════════════════════════════════════════
-                // راهنمای «چطور جلو بروم» را به بالای مسیر آوردم.
-                // نسخهٔ قبلی آن را در انتهای ۵۰ پله می‌گذاشت؛ کاربر باید
-                // تا ته صفحه اسکرول می‌کرد تا بفهمد این صفحه دربارهٔ چیست
-                // و چطور پله باز کند. حالا درست زیر سربرگ می‌آید تا در
-                // نگاه اول روشن باشد — همان الگوی گذرنبردهای مدرن.
-                // ═══════════════════════════════════════════════════════
-                return _HowTo(
-                  sources: (d['sources'] as List? ?? const [])
-                      .whereType<Map>()
-                      .map((e) => Map<String, dynamic>.from(e))
-                      .toList(),
-                  maxToday: NumberParser.toInt(d['maxTiersPerDay']),
-                );
-              }
-              if (i == 2) return _TrackLegend(tierCount: tierCount);
-              return _TierRow(
-                row: tiers[i - 3],
-                currentTier: tier,
-                busy: _busy,
-                pulse: _pulse,
-                onClaim: _claim,
-              );
-            },
-          ),
-        ),
-        // ── نوار پیشرفتِ اسکرول ──
-        //
-        // درخواست صریح مالک: «یه اسکرول بار هم باید طراحی کنی که کاربرها
-        // بفهمن بعضی چیزا تو صفحه پایین تر قرار داده شده».
-        //
-        // نوار پیش‌فرض فلاتر فقط هنگام اسکرول ظاهر می‌شود و روی اندروید
-        // نازک و کم‌رنگ است. این یکی همیشه دیده می‌شود و شمارهٔ پله را
-        // هم نشان می‌دهد.
-        Positioned(
-          top: 0,
-          bottom: 0,
-          right: 6,
-          child: _ScrollRail(fraction: _scrollFrac, tierCount: tierCount),
-        ),
-      ],
-      ),
-    );
-  }
-}
+    // Determine folded claimed tiers
+    bool isTierDone(Map row) {
+      final tNum = NumberParser.toInt(row['tier']);
+      final free = row['free'] is Map ? row['free'] as Map : null;
+      final plus = row['plus'] is Map ? row['plus'] as Map : null;
+      final freeDone = free == null || free['claimed'] == true;
+      final plusDone = plus == null || plus['claimed'] == true || plus['locked'] == true;
+      return row['unlocked'] == true && freeDone && plusDone && tNum < tier;
+    }
 
-// ── هیچ فصلی فعال نیست ────────────────────────────────────────────────────
-class _NoSeason extends StatelessWidget {
-  const _NoSeason();
+    final claimedCount = allTiers.where(isTierDone).length;
+    final displayTiers = allTiers.where((r) => _showClaimed || !isTierDone(r)).toList();
 
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(Gaps.md),
-      children: [
-        const SizedBox(height: 60),
-        Center(
-          child: Column(
-            children: [
-              Image.asset('assets/games/medals/medal_participation.webp', width: 64, height: 64),
-              Gaps.vMd,
-              Text('فصلی در جریان نیست',
-                  style: Theme.of(context).textTheme.titleLarge),
-              Gaps.vXs,
-              Text('فصل بعدی به‌زودی شروع می‌شود',
-                  style: Theme.of(context).textTheme.bodyMedium),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
+    final theme = Theme.of(context);
 
-// ── نوار پیشرفت اسکرول ────────────────────────────────────────────────────
-class _ScrollRail extends StatelessWidget {
-  const _ScrollRail({required this.fraction, required this.tierCount});
-  final double fraction;
-  final int tierCount;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (context, c) {
-      final trackH = c.maxHeight - 40;
-      const thumbH = 54.0;
-      final top = 20 + (trackH - thumbH) * fraction;
-      return SizedBox(
-        width: 14,
-        child: Stack(
-          children: [
-            Positioned(
-              top: 20,
-              bottom: 20,
-              left: 4,
-              width: 6,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(999),
-                  color: Colors.white.withValues(alpha: 0.07),
-                ),
+    return RefreshIndicator(
+      onRefresh: () => _load(jump: false),
+      child: ListView(
+        controller: _scroll,
+        padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, Gaps.xxl),
+        children: [
+          // ── Compact Season Hero ──
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: const LinearGradient(
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
+                colors: [Color(0xFF16325C), Color(0xFF0A1526)],
               ),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
             ),
-            Positioned(
-              top: top,
-              left: 0,
-              width: 14,
-              height: thumbH,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(999),
-                  gradient: const LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [_readyColor, Color(0xFF84CC16)],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: _readyColor.withValues(alpha: 0.45),
-                      blurRadius: 10,
-                      spreadRadius: 1,
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: RotatedBox(
-                    quarterTurns: 3,
-                    child: Text(
-                      faNum((fraction * tierCount).round().clamp(1, tierCount)),
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF06301A),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    });
-  }
-}
-
-// ── سربرگ ─────────────────────────────────────────────────────────────────
-class _Header extends StatelessWidget {
-  const _Header({
-    required this.title,
-    required this.daysLeft,
-    required this.tier,
-    required this.tierCount,
-    required this.into,
-    required this.needs,
-    required this.hasPlus,
-    required this.claimable,
-    required this.tiersToday,
-    required this.maxToday,
-    required this.capReached,
-    required this.pending,
-    required this.busy,
-    required this.onOpenShop,
-    required this.onClaimAll,
-    required this.pulse,
-  });
-
-  final String title;
-  final int daysLeft, tier, tierCount, into, needs;
-  final int claimable, tiersToday, maxToday, pending;
-  final bool hasPlus, capReached, busy;
-  final VoidCallback onOpenShop, onClaimAll;
-  final Animation<double> pulse;
-
-  @override
-  Widget build(BuildContext context) {
-    // ═══════════════════════════════════════════════════════════════════
-    // چرا stretch حذف شد و عرض‌ها صریح‌اند — باگِ «کادر خالی بزرگ»
-    // ═══════════════════════════════════════════════════════════════════
-    //
-    // این Column داخل ListView است که خودش داخل Stack است. Stack به
-    // فرزندِ غیرPositioned، constraints شُل می‌دهد، پس عرض تا اینجا
-    // **بی‌کران** می‌رسد. با `crossAxisAlignment: stretch` همان بی‌کران
-    // مستقیم به فرزندان می‌رفت و هر FilledButton پرتاب می‌کرد:
-    //
-    //     BoxConstraints forces an infinite width
-    //
-    // آن خطا رندرِ کل سربرگ را می‌شکند. روی گوشیِ ریلیز خطاها پنهان‌اند،
-    // پس فقط یک کادرِ خالیِ بلند با حاشیهٔ طلایی باقی می‌ماند — دقیقاً
-    // همان چیزی که مالک در اسکرین‌شات فرستاد.
-    //
-    // `MediaQuery.sizeOf(context).width` همیشه عرضِ **واقعیِ صفحه** را
-    // می‌دهد و هرگز بی‌کران نیست، پس هر کارتی که باید تمام‌عرض باشد از
-    // آن استفاده می‌کند و دکمه‌ها اندازهٔ طبیعی‌شان را می‌گیرند.
-    //
-    // عرض از LayoutBuilder می‌آید نه MediaQuery: ListView یک padding
-    // افقی ۴۲ پیکسلی دارد، پس عرضِ واقعیِ آیتم ۳۱۸ است نه ۳۶۰. با
-    // MediaQuery کارت‌ها ۴۲ پیکسل از کادر بیرون می‌زدند.
-    //
-    // با pass_layout_test.dart قفل شد.
-    return LayoutBuilder(builder: (context, cons) {
-      final w = cons.maxWidth;
-      return _headerBody(context, w);
-    });
-  }
-
-  Widget _headerBody(BuildContext context, double w) {
-    return Column(
-      children: [
-        SizedBox(
-          width: w,
-          child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: Stack(
-            children: [
-              Image.asset(
-                'assets/pass/pass_banner.webp',
-                height: 132,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                // منبع ۸۲۰ پیکسل است و همان‌جا نمایش داده می‌شود؛ بدون
-                // این راهنما فلاتر تمام بیت‌مپ را رزیدنت نگه می‌دارد.
-                cacheWidth: 820,
-                errorBuilder: (_, __, ___) => Container(
-                  height: 132,
-                  color: const Color(0xFF10233A),
-                  alignment: Alignment.center,
-                  child: Image.asset('assets/games/medals/medal_participation.webp', width: 48, height: 48),
-                ),
-              ),
-              // گرادیان تیره، تا متن روی هر تصویری خوانا بماند
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withValues(alpha: 0.72),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                right: 14,
-                left: 14,
-                bottom: 10,
-                child: Row(
+            child: Column(
+              children: [
+                Row(
                   children: [
+                    Image.asset('assets/pass/streak_icon.webp', width: 44, height: 44, cacheWidth: 120,
+                        errorBuilder: (_, __, ___) => const Icon(Icons.emoji_events_rounded, color: _plusGold, size: 36)),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                            ),
+                            '${season['name'] ?? 'گذر نبرد فصلی'}',
+                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: Colors.white),
                           ),
+                          const SizedBox(height: 2),
                           Text(
-                            '${faNum(daysLeft)} روز تا پایان فصل',
-                            style: const TextStyle(
-                                fontSize: 12, color: Colors.white70),
+                            '${faNum(season['daysLeft'])} روز تا پایان فصل · پله ${faNum(tier)} از ${faNum(tierCount)}',
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.70), fontSize: 11.5),
                           ),
                         ],
                       ),
                     ),
-                    _TierMedal(tier: tier, tierCount: tierCount),
+                    if (claimable > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _readyColor.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: _readyColor),
+                        ),
+                        child: Text(
+                          '${faNum(claimable)} جایزه آماده',
+                          style: const TextStyle(color: _readyColor, fontWeight: FontWeight.w900, fontSize: 11),
+                        ),
+                      ),
                   ],
                 ),
-              ),
-            ],
-          ),
-          ),
-        ),
-        Gaps.vMd,
-        _ProgressCard(
-          pct: needs > 0 ? (into / needs).clamp(0.0, 1.0) : 1.0,
-          into: into,
-          needs: needs,
-          tier: tier,
-          tierCount: tierCount,
-          tiersToday: tiersToday,
-          maxToday: maxToday,
-          capReached: capReached,
-          pending: pending,
-        ),
-        if (claimable > 0) ...[
-          Gaps.vSm,
-          AnimatedBuilder(
-            animation: pulse,
-            builder: (context, child) =>
-                Transform.scale(scale: 1 + pulse.value * 0.015, child: child),
-            child: SizedBox(
-              // عرضِ متناهی — والد بی‌کران است (توضیح بالا).
-              width: w,
-              height: 48,
-              child: FilledButton.icon(
-                onPressed: busy ? null : onClaimAll,
-                style: FilledButton.styleFrom(
-                  backgroundColor: _readyColor,
-                  foregroundColor: const Color(0xFF07240F),
+                const SizedBox(height: 12),
+
+                // ── XP Progress Bar ──
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: (d['tierNeeds'] as num? ?? 0) > 0
+                        ? ((d['intoTier'] as num? ?? 0) / (d['tierNeeds'] as num)).clamp(0.0, 1.0)
+                        : 1.0,
+                    minHeight: 8,
+                    backgroundColor: Colors.white.withValues(alpha: 0.10),
+                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF22E7A6)),
+                  ),
                 ),
-                icon: Image.asset('assets/pass/reward_gift_icon.webp', width: 24, height: 24),
-                label: Text('دریافت ${faNum(claimable)} جایزهٔ آماده',
-                    style: const TextStyle(fontWeight: FontWeight.w900)),
-              ),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'امروز ${faNum(d['tiersToday'])} از ${faNum(d['maxTiersPerDay'])} پله باز شد',
+                      style: const TextStyle(fontSize: 11, color: Colors.white70, fontWeight: FontWeight.w700),
+                    ),
+                    Text(
+                      '${faNum(d['intoTier'])} / ${faNum(d['tierNeeds'])} XP تا پله بعد',
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF38BDF8), fontWeight: FontWeight.w800),
+                    ),
+                  ],
+                ),
+
+                if (claimable > 0) ...[
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 38,
+                    child: ElevatedButton(
+                      onPressed: _busy ? null : _claimAll,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF22E7A6),
+                        foregroundColor: const Color(0xFF04291D),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: Text('دریافت همه جوایز آماده (${faNum(claimable)})',
+                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12.5)),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-        ],
-        if (!hasPlus) ...[
-          Gaps.vSm,
-          _PlusUpsell(onOpenShop: onOpenShop),
-        ],
-      ],
-    );
-  }
-}
 
-/// مدال پلهٔ فعلی — بزرگ‌ترین عدد صفحه، چون اولین چیزی است که کاربر
-/// می‌خواهد بداند.
-class _TierMedal extends StatelessWidget {
-  const _TierMedal({required this.tier, required this.tierCount});
-  final int tier, tierCount;
+          const SizedBox(height: 10),
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 62,
-      height: 62,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFB5EF58), Color(0xFF4D9E1F)],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: _readyColor.withValues(alpha: 0.35),
-            blurRadius: 14,
-            spreadRadius: 1,
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(faNum(tier),
-              style: const TextStyle(
-                fontSize: 30,
-                height: 1,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF07240F),
-              )),
-          Text('از ${faNum(tierCount)}',
-              style: const TextStyle(
-                fontSize: 10.5,
-                height: 1.3,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF0B3A16),
-              )),
-        ],
-      ),
-    );
-  }
-}
-
-class _ProgressCard extends StatelessWidget {
-  const _ProgressCard({
-    required this.pct,
-    required this.into,
-    required this.needs,
-    required this.tier,
-    required this.tierCount,
-    required this.tiersToday,
-    required this.maxToday,
-    required this.capReached,
-    required this.pending,
-  });
-
-  final double pct;
-  final int into, needs, tier, tierCount, tiersToday, maxToday, pending;
-  final bool capReached;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final done = tier >= tierCount;
-
-    return Container(
-      // عرض صریح از LayoutBuilder — نه MediaQuery، چون ListView حاشیهٔ
-      // افقی دارد و عرضِ صفحه ۴۲ پیکسل بزرگ‌تر از عرضِ آیتم است.
-      width: double.infinity,
-      padding: const EdgeInsets.all(Gaps.md),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        color: theme.colorScheme.surface.withValues(alpha: 0.55),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  done ? 'کل مسیر را تمام کردی!' : 'تا پلهٔ ${faNum(tier + 1)}',
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+          // ── Visual XP Infographic (One Glance Overview) ──
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: Colors.white.withValues(alpha: 0.04),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.bolt_rounded, color: Color(0xFFFFD166), size: 16),
+                    SizedBox(width: 4),
+                    Text('راه‌های سریع کسب تجربه (XP):',
+                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11.5, color: Colors.white)),
+                  ],
                 ),
-              ),
-              if (!done)
-                Text('${faNum(into)} / ${faNum(needs)}',
-                    style: theme.textTheme.labelMedium),
-            ],
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: const [
+                    _XpPill(label: 'بازی آنلاین', xp: '+۱۵/۲۵'),
+                    _XpPill(label: 'ضربه‌زن', xp: '+۳۰'),
+                    _XpPill(label: 'گردونه', xp: '+۲۰'),
+                    _XpPill(label: 'دعوت دوست', xp: '+۱۰۰'),
+                    _XpPill(label: 'ورود روزانه', xp: '+۲۰'),
+                  ],
+                ),
+              ],
+            ),
           ),
-          Gaps.vXs,
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0, end: pct),
-              duration: const Duration(milliseconds: 750),
-              curve: Curves.easeOutCubic,
-              builder: (_, v, __) => Stack(
+
+          if (!hasPlus) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF2E2407), Color(0xFF141A29)],
+                ),
+                border: Border.all(color: _plusGold.withValues(alpha: 0.4)),
+              ),
+              child: Row(
                 children: [
-                  Container(
-                      height: 14, color: Colors.white.withValues(alpha: 0.07)),
-                  FractionallySizedBox(
-                    widthFactor: v,
-                    child: Container(
-                      height: 14,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                            colors: [Color(0xFF4D9E1F), _readyColor]),
-                        boxShadow: [
-                          BoxShadow(
-                              color: _readyColor.withValues(alpha: 0.5),
-                              blurRadius: 8),
-                        ],
-                      ),
+                  const Text('★', style: TextStyle(color: _plusGold, fontSize: 22)),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('مسیر طلایی قلقلی پلاس',
+                            style: TextStyle(color: _plusGold, fontWeight: FontWeight.w900, fontSize: 13)),
+                        Text('جوایز نقدی، شانس گردونه و آیتم‌های ویژه',
+                            style: TextStyle(color: Colors.white70, fontSize: 11)),
+                      ],
                     ),
+                  ),
+                  ElevatedButton(
+                    onPressed: widget.onOpenShop,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _plusGold,
+                      foregroundColor: const Color(0xFF291B00),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: const Text('خرید پلاس', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11.5)),
                   ),
                 ],
               ),
             ),
-          ),
-          Gaps.vSm,
-          // ── سقف روزانه ──
-          //
-          // تنها جایی که کاربر می‌فهمد چرا با وجود بازی کردن پله‌اش بالا
-          // نمی‌رود. بدون آن، سقف شبیه باگ به‌نظر می‌رسد.
+          ],
+
+          const SizedBox(height: 10),
+
+          // ── Track Legend & Fold Button ──
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(capReached ? Icons.lock_clock_rounded : Icons.bolt_rounded,
-                  size: 16, color: capReached ? context.gold : _readyColor),
-              Gaps.hXs,
-              Expanded(
-                child: Text(
-                  capReached
-                      ? 'سقف امروز پر شد — فردا ${faNum(maxToday)} پلهٔ دیگر'
-                      : 'امروز ${faNum(tiersToday)} از ${faNum(maxToday)} پله',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: capReached ? context.gold : null,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              for (var i = 0; i < maxToday; i++)
-                Padding(
-                  padding: const EdgeInsets.only(left: 3),
-                  child: Container(
-                    width: 9,
-                    height: 9,
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: i < tiersToday
-                          ? _readyColor
-                          : Colors.white.withValues(alpha: 0.15),
+                      color: _freeColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: _freeColor.withValues(alpha: 0.4)),
                     ),
+                    child: const Text('مسیر رایگان',
+                        style: TextStyle(color: _freeColor, fontSize: 10.5, fontWeight: FontWeight.w800)),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: _plusGold.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: _plusGold.withValues(alpha: 0.4)),
+                    ),
+                    child: const Text('★ مسیر پلاس',
+                        style: TextStyle(color: _plusGold, fontSize: 10.5, fontWeight: FontWeight.w800)),
+                  ),
+                ],
+              ),
+              if (claimedCount > 0)
+                TextButton.icon(
+                  onPressed: () => setState(() => _showClaimed = !_showClaimed),
+                  icon: Icon(_showClaimed ? Icons.expand_less_rounded : Icons.expand_more_rounded, size: 18),
+                  label: Text(
+                    _showClaimed ? 'بستن پله‌های قبلی' : 'مشاهده ${faNum(claimedCount)} پله تکمیل‌شده',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
                   ),
                 ),
             ],
           ),
-          if (pending > 0) ...[
-            Gaps.vXxs,
-            Text(
-              '${faNum(pending)} پله ذخیره شده — به‌محض باز شدن سقف آزاد می‌شود',
-              style:
-                  theme.textTheme.labelSmall?.copyWith(color: Colors.white54),
+
+          const SizedBox(height: 6),
+
+          // ── Tiers List ──
+          for (final row in displayTiers) ...[
+            _PassRow(
+              data: row,
+              busy: _busy,
+              pulse: _pulse,
+              onClaim: _claim,
             ),
+            const SizedBox(height: 6),
           ],
         ],
       ),
@@ -832,198 +421,96 @@ class _ProgressCard extends StatelessWidget {
   }
 }
 
-class _PlusUpsell extends StatelessWidget {
-  const _PlusUpsell({required this.onOpenShop});
-  final VoidCallback onOpenShop;
+class _XpPill extends StatelessWidget {
+  const _XpPill({required this.label, required this.xp});
+  final String label;
+  final String xp;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      // بدون عرضِ صریح، Row داخلی بی‌کران می‌گیرد و FilledButton کرش
-      // می‌کند — همان کادر خالیِ اسکرین‌شات. حالا والد (LayoutBuilder
-      // در _Header) عرضِ متناهی می‌دهد، پس infinity اینجا امن است.
-      width: double.infinity,
-      padding: const EdgeInsets.all(Gaps.sm),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        gradient: LinearGradient(colors: [
-          _plusGradient.withValues(alpha: 0.16),
-          _plusGradient.withValues(alpha: 0.05),
-        ]),
-        border: Border.all(color: _plusGradient.withValues(alpha: 0.4)),
+        color: Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.star_rounded, size: 27, color: Colors.amber),
-          Gaps.hSm,
-          // ═══════════════════════════════════════════════════════════
-          // چرا این متن‌ها رنگِ ثابت ندارند
-          // ═══════════════════════════════════════════════════════════
-          //
-          // گرادیانِ بالا **نیمه‌شفاف** است (alpha ۰.۱۶ و ۰.۰۵)، پس
-          // سطحِ تم از پشتش دیده می‌شود. در تم تیره نتیجه تیره است و
-          // متنِ سفید کار می‌کرد؛ در تم روشن نتیجه تقریباً سفید است و
-          // `Colors.white70` روی آن محو می‌شد.
-          //
-          // این تلهٔ رایجی است: یک گرادیانِ نیمه‌شفاف، سطحِ زیرش را
-          // نمی‌پوشاند و نمی‌شود مثل یک پس‌زمینهٔ تیرهٔ قطعی با آن
-          // رفتار کرد.
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('مسیر طلایی قفل است',
-                    style: TextStyle(
-                        fontWeight: FontWeight.w900, color: context.gold)),
-                const SizedBox(height: 2),
-                Text('چرخش گردونه، آیتم‌های ویژه و امتیاز دو برابر',
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withValues(alpha: 0.75))),
-              ],
-            ),
-          ),
-          Gaps.hXs,
-          // ═══════════════════════════════════════════════════════════
-          // چرا دکمه داخل SizedBox با عرض ثابت است
-          // ═══════════════════════════════════════════════════════════
-          //
-          // این Row داخل زنجیره‌ای است که در نهایت از AnimatedSwitcher
-          // در HomeShell عرضِ شُل (unbounded) می‌گیرد. یک Material
-          // button با عرض بی‌کران پرتاب می‌کند:
-          //
-          //     BoxConstraints forces an infinite width
-          //
-          // و آن خطا رندرِ کل سربرگ را می‌شکند؛ روی گوشیِ ریلیز فقط یک
-          // کادرِ خالیِ بلند با حاشیهٔ طلایی باقی می‌ماند — دقیقاً همان
-          // اسکرین‌شاتی که مالک فرستاد.
-          //
-          // عرض ثابت ۹۶ برای «بازکردن» کافی است و مشکل را قطعی حل
-          // می‌کند: دکمه دیگر هرگز بی‌کران نمی‌بیند.
-          // با pass_layout_test.dart قفل شد.
-          SizedBox(
-            width: 96,
-            height: 40,
-            child: FilledButton(
-              onPressed: onOpenShop,
-              style: FilledButton.styleFrom(
-                backgroundColor: _plusGradient,
-                foregroundColor: const Color(0xFF3A2A00),
-                padding: EdgeInsets.zero,
-              ),
-              child: const Text('بازکردن',
-                  style: TextStyle(fontWeight: FontWeight.w900)),
-            ),
-          ),
+          Text(label, style: const TextStyle(fontSize: 11, color: Colors.white80, fontWeight: FontWeight.w600)),
+          const SizedBox(width: 4),
+          Text(xp, style: const TextStyle(fontSize: 11, color: Color(0xFF22E7A6), fontWeight: FontWeight.w900)),
         ],
       ),
     );
   }
 }
 
-// ── راهنمای دو مسیر ───────────────────────────────────────────────────────
-class _TrackLegend extends StatelessWidget {
-  const _TrackLegend({required this.tierCount});
-  final int tierCount;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: Gaps.md, bottom: Gaps.xs),
-      child: Row(
-        children: [
-          _chip('رایگان', _freeColor),
-          Gaps.hSm,
-          _chip('پلاس', context.gold),
-          const Spacer(),
-          Text('${faNum(tierCount)} پله',
-              style: Theme.of(context).textTheme.labelMedium),
-        ],
-      ),
-    );
-  }
-
-  Widget _chip(String label, Color c) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(999),
-          color: c.withValues(alpha: 0.14),
-          border: Border.all(color: c.withValues(alpha: 0.4)),
-        ),
-        child: Text(label,
-            style: TextStyle(
-                fontSize: 12, fontWeight: FontWeight.w800, color: c)),
-      );
-}
-
-// ── یک ردیف پله ───────────────────────────────────────────────────────────
-//
-// چیدمان عمودی: شمارهٔ پله سمت راست (RTL)، بعد دو جایزه کنار هم. هر
-// جایزه فضای کافی برای متن فارسی دارد — مشکل اصلی نسخهٔ افقی.
-class _TierRow extends StatelessWidget {
-  const _TierRow({
-    required this.row,
-    required this.currentTier,
+class _PassRow extends StatelessWidget {
+  const _PassRow({
+    required this.data,
     required this.busy,
     required this.pulse,
     required this.onClaim,
   });
 
-  final Map<String, dynamic> row;
-  final int currentTier;
+  final Map data;
   final bool busy;
   final Animation<double> pulse;
   final void Function(String) onClaim;
 
   @override
   Widget build(BuildContext context) {
-    final tier = NumberParser.toInt(row['tier']);
-    final unlocked = row['unlocked'] == true;
-    final isCurrent = tier == currentTier + 1;
-    // ── نشانهٔ مایلستون هر ۵ پله ──
-    //
-    // ۵۰ ردیفِ کاملاً یکسان هیچ نقطهٔ اتکایی برای چشم نداشت — کاربر
-    // موقعِ اسکرول نمی‌فهمید کجای مسیر است. هر پنجمین پله شمارهٔ
-    // درشتِ طلایی می‌گیرد و مثلِ تابلوی کیلومترشمار کار می‌کند.
-    //
-    // همین تغییر در نسخهٔ وب هم اعمال شد تا دو کلاینت یک‌شکل بمانند.
-    final isMilestone = tier % 5 == 0;
-    final gold = context.gold;
+    final tNum = NumberParser.toInt(data['tier']);
+    final unlocked = data['unlocked'] == true;
+    final isMilestone = tNum % 5 == 0;
+
+    final free = data['free'] is Map ? data['free'] as Map : null;
+    final plus = data['plus'] is Map ? data['plus'] as Map : null;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 9),
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 9),
+      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        color: isCurrent
-            ? _readyColor.withValues(alpha: 0.10)
-            : Colors.white.withValues(alpha: unlocked ? 0.05 : 0.02),
+        borderRadius: BorderRadius.circular(14),
+        color: isMilestone ? const Color(0xFF1E293B).withValues(alpha: 0.7) : Colors.white.withValues(alpha: 0.03),
         border: Border.all(
-          color: isCurrent
-              ? _readyColor
-              : isMilestone
-                  ? gold.withValues(alpha: 0.28)
-                  : Colors.white.withValues(alpha: 0.08),
-          width: isCurrent ? 1.6 : 1,
+          color: isMilestone
+              ? _plusGold.withValues(alpha: 0.3)
+              : Colors.white.withValues(alpha: unlocked ? 0.15 : 0.06),
         ),
-        // پلهٔ فعلی باید در یک نگاه پیدا شود — مهم‌ترین ردیفِ صفحه.
-        boxShadow: isCurrent
-            ? [BoxShadow(
-                color: _readyColor.withValues(alpha: 0.14),
-                blurRadius: 18, offset: const Offset(0, 6))]
-            : null,
       ),
       child: Row(
         children: [
-          _TierNumber(
-              tier: tier, unlocked: unlocked, milestone: isMilestone),
-          Gaps.hXs,
+          // Tier Number Pill
+          Container(
+            width: 36,
+            height: 54,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              color: unlocked ? _readyColor.withValues(alpha: 0.15) : Colors.white.withValues(alpha: 0.05),
+              border: Border.all(color: unlocked ? _readyColor : Colors.white24),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(unlocked ? Icons.lock_open_rounded : Icons.lock_outline_rounded,
+                    size: 13, color: unlocked ? _readyColor : Colors.white38),
+                const SizedBox(height: 2),
+                Text(faNum(tNum),
+                    style: TextStyle(
+                      color: unlocked ? Colors.white : Colors.white60,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 14,
+                    )),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // Free Track Tile
           Expanded(
-            child: _RewardTile(
-              data: row['free'] as Map?,
+            child: _CompactRewardTile(
+              data: free,
               unlocked: unlocked,
               track: 'free',
               busy: busy,
@@ -1031,10 +518,12 @@ class _TierRow extends StatelessWidget {
               onClaim: onClaim,
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
+
+          // Plus Track Tile
           Expanded(
-            child: _RewardTile(
-              data: row['plus'] as Map?,
+            child: _CompactRewardTile(
+              data: plus,
               unlocked: unlocked,
               track: 'plus',
               busy: busy,
@@ -1048,66 +537,8 @@ class _TierRow extends StatelessWidget {
   }
 }
 
-class _TierNumber extends StatelessWidget {
-  const _TierNumber({
-    required this.tier,
-    required this.unlocked,
-    this.milestone = false,
-  });
-  final int tier;
-  final bool unlocked;
-  final bool milestone;
-
-  @override
-  Widget build(BuildContext context) {
-    final gold = context.gold;
-    return Container(
-      width: 44,
-      height: 96,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        color: unlocked
-            ? _readyColor.withValues(alpha: 0.18)
-            : milestone
-                ? gold.withValues(alpha: 0.14)
-                : Colors.white.withValues(alpha: 0.05),
-        border: milestone && !unlocked
-            ? Border.all(color: gold.withValues(alpha: 0.35))
-            : null,
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(unlocked ? Icons.lock_open_rounded : Icons.lock_rounded,
-              size: 13,
-              color: unlocked
-                  ? _readyColor
-                  : milestone
-                      ? gold.withValues(alpha: 0.7)
-                      : Colors.white.withValues(alpha: 0.32)),
-          const SizedBox(height: 3),
-          Text(faNum(tier),
-              style: TextStyle(
-                // ۱۵ → ۱۹ (و ۲۱ برای مایلستون): شمارهٔ پله مهم‌ترین
-                // عددِ ردیف است و باید بی‌زحمت خوانده شود.
-                fontSize: milestone ? 21 : 19,
-                fontWeight: FontWeight.w900,
-                color: unlocked
-                    ? _readyColor
-                    : milestone
-                        ? gold
-                        : Colors.white.withValues(alpha: 0.55),
-              )),
-        ],
-      ),
-    );
-  }
-}
-
-/// یک جایزه.
-class _RewardTile extends StatelessWidget {
-  const _RewardTile({
+class _CompactRewardTile extends StatelessWidget {
+  const _CompactRewardTile({
     required this.data,
     required this.unlocked,
     required this.track,
@@ -1117,8 +548,9 @@ class _RewardTile extends StatelessWidget {
   });
 
   final Map? data;
-  final bool unlocked, busy;
+  final bool unlocked;
   final String track;
+  final bool busy;
   final Animation<double> pulse;
   final void Function(String) onClaim;
 
@@ -1127,144 +559,86 @@ class _RewardTile extends StatelessWidget {
     'spins': 'assets/pass/icon_spins.png',
     'shop_item': 'assets/pass/icon_item.png',
   };
-  static const _fallbackArt = {
-    'points': 'assets/pass/icon_points.png',
-    'spins': 'assets/pass/wheel_icon.webp',
-    'cash': 'assets/pass/icon_points.png',
-    'shop_item': 'assets/pass/reward_gift_icon.webp',
-  };
-
-  String _label(Map m) {
-    final kind = '${m['kind']}';
-    final amount = NumberParser.toInt(m['amount']);
-    switch (kind) {
-      case 'points':
-        return '${faNum(amount)} امتیاز';
-      case 'spins':
-        return '${faNum(amount)} چرخش';
-      case 'cash':
-        return '${faNum(amount)} تومان';
-      default:
-        return '${m['label'] ?? 'آیتم ویژه'}';
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
-    final color = track == 'plus' ? context.gold : _freeColor;
-    final m = data;
-
-    if (m == null) {
+    if (data == null) {
       return Container(
-        height: 96,
+        height: 54,
         alignment: Alignment.center,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          color: Colors.white.withValues(alpha: 0.02),
-        ),
-        child: Text('—',
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.2))),
+        child: const Text('—', style: TextStyle(color: Colors.white24)),
       );
     }
 
+    final m = data!;
     final claimed = m['claimed'] == true;
     final locked = m['locked'] == true;
     final ready = unlocked && !claimed && !locked;
+    final isPlus = track == 'plus';
+    final amount = NumberParser.toInt(m['amount']);
     final kind = '${m['kind']}';
 
+    String label;
+    if (kind == 'points') {
+      label = '${faNum(amount)} امتیاز';
+    } else if (kind == 'spins') {
+      label = '${faNum(amount)} چرخش';
+    } else if (kind == 'cash') {
+      label = '${faNum(amount)} تومان';
+    } else {
+      label = '${m['label'] ?? 'آیتم'}';
+    }
+
     final tile = Container(
-      // ── تاریخچهٔ این عدد ──
-      //
-      // ۶۲ → ۸۰: وقتی برچسب دو خطی می‌شود (مثل «اسم آبی آسمانی») و
-      // زیرش هم یک خط وضعیت («فقط پلاس») می‌آید، ۶۲ پیکسل ۱۴ پیکسل
-      // کم می‌آورد و فلاتر نوار زرد-مشکیِ سرریز می‌کشد.
-      //
-      // ۸۰ → ۹۶: بزرگ کردنِ فونت‌ها (۱۱.۵→۱۴ برای برچسب و ۹.۵→۱۱.۵
-      // برای وضعیت) **دقیقاً همان سرریز را برگرداند** — این بار ۱۵
-      // پیکسل. یعنی همان تستی که یک بار این باگ را گرفته بود، دوباره
-      // گرفتش.
-      //
-      //  درس: هر تغییرِ اندازهٔ فونت در این ویجت باید با ارتفاع
-      //    هماهنگ شود. دو خطِ ۱۴px با height 1.35 = ۳۸، به‌علاوهٔ یک
-      //    خطِ ۱۱.۵ = ۱۶، به‌علاوهٔ فاصله‌ها ≈ ۶۰. با پدینگ و حاشیهٔ
-      //    امن برای فونتِ بزرگِ سیستم، ۹۶.
-      height: 96,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      height: 54,
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         color: ready
-            ? _readyColor.withValues(alpha: 0.16)
-            : color.withValues(alpha: claimed ? 0.04 : 0.08),
+            ? _readyColor.withValues(alpha: 0.18)
+            : (isPlus ? _plusGold : _freeColor).withValues(alpha: claimed ? 0.04 : 0.08),
         border: Border.all(
           color: ready
-              ? _readyColor.withValues(alpha: 0.7)
-              : color.withValues(alpha: claimed ? 0.15 : 0.3),
-          width: ready ? 1.6 : 1,
+              ? _readyColor
+              : (isPlus ? _plusGold : _freeColor).withValues(alpha: claimed ? 0.15 : 0.35),
+          width: ready ? 1.4 : 1,
         ),
       ),
       child: Row(
         children: [
-          SizedBox(
-            width: 30,
-            height: 30,
-            child: _art.containsKey(kind)
-                ? Image.asset(
-                    _art[kind]!,
-                    // ۳۰ پیکسل روی صفحه از منبع ۱۲۸ — بدون این راهنما
-                    // ۵۰ ردیف × ۲ آیکون حافظهٔ زیادی هدر می‌دهد.
-                    cacheWidth: 90,
-                    errorBuilder: (_, __, ___) => Image.asset(_fallbackArt[kind] ?? 'assets/pass/reward_gift_icon.webp', width: 24, height: 24),
-                  )
-                : Center(
-                    child: Image.asset(_fallbackArt[kind] ?? 'assets/pass/reward_gift_icon.webp', width: 24, height: 24)),
+          Image.asset(
+            _art[kind] ?? 'assets/pass/reward_gift_icon.webp',
+            width: 24,
+            height: 24,
+            cacheWidth: 64,
+            errorBuilder: (_, __, ___) => Icon(
+              isPlus ? Icons.star_rounded : Icons.card_giftcard_rounded,
+              size: 20,
+              color: isPlus ? _plusGold : _freeColor,
+            ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 5),
           Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  // `_label` خودش `Map` می‌گیرد؛ کپیِ اضافه هم یک
-                  // تخصیصِ بی‌فایده در هر build بود و هم روی یک `m`
-                  // بدشکل پرتاب می‌کرد — داخل build که هیچ catchی
-                  // ندارد.
-                  _label(m),
-                  maxLines: 2,
+                  label,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    // ── ۱۱.۵ → ۱۴ ──
-                    //
-                    // خواستهٔ مالک: «فونت ها هم واضح تر باشه». این
-                    // متنِ اصلیِ خانه است (نامِ جایزه) و روی موبایلِ
-                    // واقعی در ۱۱.۵ پیکسل تقریباً ناخوانا بود.
-                    // نسخهٔ وب هم دقیقاً همین تغییر را گرفت.
-                    fontSize: 14,
-                    height: 1.35,
+                    fontSize: 11.5,
                     fontWeight: FontWeight.w900,
-                    color: claimed
-                        ? Colors.white.withValues(alpha: 0.4)
-                        : Colors.white,
+                    color: claimed ? Colors.white38 : Colors.white,
                   ),
                 ),
                 if (claimed)
-                  const Text(' گرفتی',
-                      style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w800,
-                          color: _readyColor))
+                  const Text('✓ دریافت شد', style: TextStyle(fontSize: 9.5, color: _readyColor, fontWeight: FontWeight.w800))
                 else if (locked)
-                  Text('فقط پلاس',
-                      style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w800,
-                          color: context.gold))
+                  const Text('★ فقط پلاس', style: TextStyle(fontSize: 9.5, color: _plusGold, fontWeight: FontWeight.w800))
                 else if (ready)
-                  const Text('برای گرفتن بزن',
-                      style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w900,
-                          color: _readyColor)),
+                  const Text('لمس برای دریافت', style: TextStyle(fontSize: 9.5, color: _readyColor, fontWeight: FontWeight.w900)),
               ],
             ),
           ),
@@ -1273,100 +647,29 @@ class _RewardTile extends StatelessWidget {
     );
 
     if (!ready) {
-      return Opacity(opacity: claimed ? 0.55 : (locked ? 0.7 : 1), child: tile);
+      return Opacity(opacity: claimed ? 0.5 : (locked ? 0.75 : 1.0), child: tile);
     }
 
-    // فقط جایزهٔ آماده نبض دارد — تنها چیزی که کاربر باید رویش بزند.
     return AnimatedBuilder(
       animation: pulse,
-      builder: (context, child) =>
-          Transform.scale(scale: 1 + pulse.value * 0.02, child: child),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: busy ? null : () => onClaim('${m['id']}'),
-          child: tile,
-        ),
+      builder: (context, child) => Transform.scale(scale: 1.0 + pulse.value * 0.02, child: child),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: busy ? null : () => onClaim('${m['id']}'),
+        child: tile,
       ),
     );
   }
 }
 
-// ── راهنمای کسب تجربه ─────────────────────────────────────────────────────
-class _HowTo extends StatelessWidget {
-  const _HowTo({required this.sources, required this.maxToday});
-  final List<Map<String, dynamic>> sources;
-  final int maxToday;
-
+class _NoSeason extends StatelessWidget {
+  const _NoSeason();
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      margin: const EdgeInsets.only(top: Gaps.md),
-      padding: const EdgeInsets.all(Gaps.md),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        color: theme.colorScheme.surface.withValues(alpha: 0.5),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.lightbulb_outline_rounded, size: 18),
-              Gaps.hXs,
-              Text('چطور جلو بروم؟',
-                  style: theme.textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w900)),
-            ],
-          ),
-          Gaps.vXs,
-          Text(
-            'با بازی کردن تجربه می‌گیری — '
-            'هر روز حداکثر ${faNum(maxToday)} پله باز می‌شود، پس هر روز سر بزن.',
-            style: theme.textTheme.bodySmall,
-          ),
-          Gaps.vSm,
-          for (final s in sources)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text('${s['label']}',
-                        style: const TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w700)),
-                  ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(999),
-                      color: _readyColor.withValues(alpha: 0.14),
-                    ),
-                    child: Text(
-                      '+${faNum(NumberParser.toInt(s['xp']))}',
-                      style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w900,
-                          color: _readyColor),
-                    ),
-                  ),
-                  Gaps.hXs,
-                  SizedBox(
-                    width: 62,
-                    child: Text(
-                      'تا ${faNum(NumberParser.toInt(s['dailyCap']))}',
-                      textAlign: TextAlign.end,
-                      style: theme.textTheme.labelSmall,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.all(Gaps.xl),
+        child: Text('در حال حاضر فصلی فعال نیست. به‌زودی فصل جدید شروع می‌شود.', textAlign: TextAlign.center),
       ),
     );
   }

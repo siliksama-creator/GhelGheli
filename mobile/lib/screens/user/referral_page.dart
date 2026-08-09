@@ -1,8 +1,9 @@
-// دعوت دوستان — کد اختصاصی، آمار، و فهرست دوستان.
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
+import '../../core/assets.dart';
 import '../../core/share_invite.dart';
+import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
 
 class ReferralPage extends StatefulWidget {
@@ -49,34 +50,28 @@ class _ReferralPageState extends State<ReferralPage> {
   Future<void> _copy(String code) async {
     final ok = await copyCode(code);
     if (!mounted) return;
-    _toast(ok ? 'کد کپی شد ' : 'کپی نشد؛ کد را دستی بردارید');
+    _toast(ok ? 'کد دعوت کپی شد ✓' : 'کپی نشد؛ لطفاً دستی کپی کنید');
   }
 
-  /// اشتراک‌گذاری در یک پیام‌رسان.
-  ///
-  /// پیامِ بازخورد به نتیجه بستگی دارد و این عمدی است: اگر روبیکا باز
-  /// شود ولی متن خودکار پر نشود، کاربر باید بداند که باید بچسباند —
-  /// وگرنه فکر می‌کند اپ خراب است.
   Future<void> _share(ShareTarget t, String code) async {
     final outcome = await shareInvite(t, code);
     if (!mounted) return;
     switch (outcome) {
       case ShareOutcome.opened:
-        // اپ باز شد و متن آماده است؛ پیام لازم نیست و فقط مزاحم است.
         break;
       case ShareOutcome.openedWithClipboard:
-        _toast('متن دعوت کپی شد — در ${t.label} بچسبانید ');
+        _toast('متن دعوت کپی شد — در ${t.label} بچسبانید');
       case ShareOutcome.copiedOnly:
-        _toast('${t.label} باز نشد؛ متن دعوت کپی شد ');
+        _toast('${t.label} باز نشد؛ متن دعوت کپی شد');
     }
   }
 
   void _toast(String text) {
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
       SnackBar(
-        content: Text(text, textAlign: TextAlign.center),
+        content: Text(text, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800)),
         behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 3),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -91,7 +86,7 @@ class _ReferralPageState extends State<ReferralPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(_error ?? 'خطا', style: theme.textTheme.bodyMedium),
+            Text(_error ?? 'خطا در بارگذاری', style: theme.textTheme.bodyMedium),
             Gaps.vSm,
             TextButton(onPressed: _load, child: const Text('تلاش دوباره')),
           ],
@@ -108,190 +103,199 @@ class _ReferralPageState extends State<ReferralPage> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
-        padding: const EdgeInsets.all(Gaps.md),
+        padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, Gaps.xxl),
         children: [
-          Text(' دعوت دوستان',
-              style: theme.textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w900)),
-          Gaps.vXs,
-          Text(
-            'کدت را به دوستانت بده. هر کس موقع ثبت‌نام آن را وارد کند، '
-            'هر دوی شما ${faNum(spins)} چرخش گردونه می‌گیرید.',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-              height: 1.7,
+          // ── Header Card ──
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: const LinearGradient(
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
+                colors: [Color(0xFF142B52), Color(0xFF091424)],
+              ),
+              border: Border.all(color: const Color(0xFF84CC16).withValues(alpha: 0.35)),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFF84CC16).withValues(alpha: 0.18),
+                      ),
+                      child: const Icon(Icons.group_add_rounded, color: Color(0xFFA3E635), size: 24),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('دعوت از دوستان',
+                              style: theme.textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w900, color: Colors.white)),
+                          const SizedBox(height: 2),
+                          Text(
+                            'به ازای هر دوست، هر دوی شما ${faNum(spins)} چرخش گردونه هدیه می‌گیرید!',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.72),
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // ── Unique Referral Code Box ──
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFA3E635).withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('کد اختصاصی شما:',
+                              style: TextStyle(color: Colors.white60, fontSize: 10.5, fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Directionality(
+                          textDirection: TextDirection.ltr,
+                          child: SelectableText(
+                            code,
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 4,
+                              color: Color(0xFFA3E635),
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: code.isEmpty ? null : () => _copy(code),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF84CC16),
+                          foregroundColor: const Color(0xFF132B04),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        icon: const Icon(Icons.copy_rounded, size: 16),
+                        label: const Text('کپی کد', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // ── Messenger Share Buttons ──
+                const Text('ارسال مستقیم با پیام‌رسان‌ها:',
+                    style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final t in shareTargets)
+                      _ShareChip(
+                        target: t,
+                        onTap: () => _share(t, code),
+                      ),
+                  ],
+                ),
+              ],
             ),
           ),
+
           Gaps.vSm,
-          _Rules(
+
+          // ── Stats Row ──
+          Row(
+            children: [
+              _Stat(value: _int(d['invitedCount']), label: 'دوست دعوت‌شده'),
+              Gaps.hXs,
+              _Stat(value: _int(d['totalEarned']), label: 'امتیاز از کمیسیون'),
+              Gaps.hXs,
+              _Stat(value: _int(d['dailySpins']), label: 'چرخش روزانه'),
+            ],
+          ),
+
+          Gaps.vSm,
+
+          // ── Rules (Compact Accordion/Box) ──
+          _CompactRules(
             percent: percent,
             spins: spins,
             perDaily: _int(d['invitesPerDailySpin']),
             maxDaily: _int(d['maxInvitesForDaily']),
           ),
+
           Gaps.vMd,
 
-          // ── کد ──────────────────────────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.all(Gaps.md),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  const Color(0xFF84CC16).withValues(alpha: 0.14),
-                  const Color(0xFF22D3EE).withValues(alpha: 0.10),
-                ],
+          // ── Friends List ──
+          Text('دوستان دعوت‌شده (${faNum(friends.length)})',
+              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900)),
+          Gaps.vXs,
+          if (friends.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(Gaps.lg),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                color: theme.colorScheme.surface.withValues(alpha: 0.3),
               ),
-              borderRadius: Corners.rLg,
-              border: Border.all(
-                  color: const Color(0xFF84CC16).withValues(alpha: 0.4)),
-            ),
-            child: Column(
-              children: [
-                // Directionality صریح: کد لاتین داخل رابط راست‌به‌چپ
-                // وگرنه کاراکترهایش جابه‌جا خوانده می‌شود.
-                const Directionality(
-                  textDirection: TextDirection.ltr,
-                  child: SizedBox.shrink(),
-                ),
-                Directionality(
-                  textDirection: TextDirection.ltr,
-                  child: SelectableText(
-                    code,
-                    style: const TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 5,
-                      color: Color(0xFFA3E635),
-                      fontFamily: 'monospace',
-                    ),
+              child: Text(
+                'هنوز دوستی با کد شما عضو نشده است. کد را برای دوستانتان بفرستید!',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(color: Colors.white60),
+              ),
+            )
+          else
+            ...friends.map((f) => Container(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: Gaps.md, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.04),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
                   ),
-                ),
-                Gaps.vSm,
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    OutlinedButton.icon(
-                      onPressed: code.isEmpty ? null : () => _copy(code),
-                      icon: const Icon(Icons.copy_rounded, size: 18),
-                      label: const Text('کپی کد'),
-                    ),
-                  ],
-                ),
-                if (code.isNotEmpty) ...[
-                  Gaps.vSm,
-                  Divider(
-                      height: 1,
-                      color: theme.colorScheme.outline.withValues(alpha: 0.3)),
-                  Gaps.vSm,
-                  Text('ارسال برای دوستان',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: theme.colorScheme.onSurface
-                            .withValues(alpha: 0.75),
-                      )),
-                  Gaps.vXs,
-                  // ═══════════════════════════════════════════════════
-                  // چرا Wrap و نه Row
-                  // ═══════════════════════════════════════════════════
-                  //
-                  // چهار دکمه روی یک گوشیِ باریک (۳۲۰dp) سرریز
-                  // می‌کند و فلاتر نوارِ زرد-مشکی می‌کشد. Wrap خودش
-                  // به خطِ دوم می‌رود.
-                  Wrap(
-                    alignment: WrapAlignment.center,
-                    spacing: Gaps.xs,
-                    runSpacing: Gaps.xs,
+                  child: Row(
                     children: [
-                      for (final t in shareTargets)
-                        _ShareChip(
-                          target: t,
-                          onTap: () => _share(t, code),
+                      const Icon(Icons.person_rounded, size: 18, color: Color(0xFFA3E635)),
+                      Gaps.hXs,
+                      Expanded(
+                        child: Text(
+                          (f['nickname'] ?? 'کاربر').toString(),
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
                         ),
+                      ),
+                      Text(
+                        '+${faNum(f['earnedFromThem'] ?? 0)} امتیاز',
+                        style: const TextStyle(
+                          color: Color(0xFF34D399),
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12,
+                        ),
+                      ),
                     ],
                   ),
-                ],
-              ],
-            ),
-          ),
-          Gaps.vMd,
-
-          // ── آمار ────────────────────────────────────────────────────────
-          Row(
-            children: [
-              _Stat(value: _int(d['invitedCount']), label: 'دوست دعوت‌شده'),
-              Gaps.hXs,
-              _Stat(value: _int(d['totalEarned']), label: 'امتیاز از دوستان'),
-              Gaps.hXs,
-              _Stat(value: _int(d['dailySpins']), label: 'چرخش روزانه'),
-            ],
-          ),
-          Gaps.vSm,
-          // پیشرفت تا چرخش روزانهٔ بعدی. یک هدف نزدیک و دیدنی، خیلی
-          // مؤثرتر از یک قانون نوشته‌شده در متن است.
-          if (d['atDailyCap'] != true && d['invitesToNextDailySpin'] != null)
-            _NextSpinProgress(
-              toNext: _int(d['invitesToNextDailySpin']),
-              perDaily: _int(d['invitesPerDailySpin']),
-              nextTotal: _int(d['dailySpins']) + 1,
-            )
-          else if (d['atDailyCap'] == true)
-            Text(
-              ' به سقف ${faNum(_int(d['maxInvitesForDaily']))} دوست رسیدی — '
-              'هر روز ${faNum(_int(d['dailySpins']))} چرخش رایگان داری!',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: const Color(0xFFA3E635),
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          Gaps.vLg,
-
-          if (friends.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: Gaps.md),
-              child: Text(
-                'هنوز کسی با کد تو عضو نشده. اولین نفر را دعوت کن!',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
-              ),
-            )
-          else ...[
-            Text('دوستان تو',
-                style: theme.textTheme.titleSmall
-                    ?.copyWith(fontWeight: FontWeight.w800)),
-            Gaps.vXs,
-            // ListView.builder داخل ListView کار نمی‌کند و اینجا هم لازم
-            // نیست: سرور حداکثر ۵۰ ردیف می‌فرستد.
-            for (final f in friends)
-              Container(
-                margin: const EdgeInsets.only(bottom: 6),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: Gaps.md, vertical: Gaps.sm),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.04),
-                  borderRadius: Corners.rMd,
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        (f['nickname'] ?? 'کاربر').toString(),
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium,
-                      ),
-                    ),
-                    Text(
-                      '${faNum(_int(f['earnedFromThem']))} امتیاز',
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: const Color(0xFFA3E635),
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
+                )),
         ],
       ),
     );
@@ -300,33 +304,27 @@ class _ReferralPageState extends State<ReferralPage> {
 
 class _Stat extends StatelessWidget {
   const _Stat({required this.value, required this.label});
-
   final int value;
   final String label;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: Gaps.md),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
         decoration: BoxDecoration(
-          color: theme.colorScheme.onSurface.withValues(alpha: 0.04),
-          borderRadius: Corners.rMd,
+          color: Colors.white.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         ),
         child: Column(
           children: [
             Text(faNum(value),
-                style: theme.textTheme.titleLarge?.copyWith(
-                  color: const Color(0xFFA3E635),
-                  fontWeight: FontWeight.w900,
-                )),
-            Gaps.vXxs,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.white)),
+            const SizedBox(height: 2),
             Text(label,
                 textAlign: TextAlign.center,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
-                )),
+                style: const TextStyle(fontSize: 9.5, color: Colors.white60, fontWeight: FontWeight.w600)),
           ],
         ),
       ),
@@ -334,10 +332,8 @@ class _Stat extends StatelessWidget {
   }
 }
 
-
-/// توضیح قوانین دعوت.
-class _Rules extends StatelessWidget {
-  const _Rules({
+class _CompactRules extends StatelessWidget {
+  const _CompactRules({
     required this.percent,
     required this.spins,
     required this.perDaily,
@@ -351,149 +347,76 @@ class _Rules extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final dim = theme.colorScheme.onSurface.withValues(alpha: 0.72);
-
-    Widget row(String bold, String rest) => Padding(
-          padding: const EdgeInsets.only(bottom: Gaps.xs),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('•  ', style: TextStyle(color: dim, height: 1.75)),
-              Expanded(
-                child: Text.rich(
-                  TextSpan(children: [
-                    TextSpan(
-                      text: bold,
-                      style: const TextStyle(
-                        color: Color(0xFFA3E635),
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    TextSpan(text: rest),
-                  ]),
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: dim, height: 1.75),
-                ),
-              ),
-            ],
-          ),
-        );
-
     return Container(
-      padding: const EdgeInsets.all(Gaps.md),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: theme.colorScheme.onSurface.withValues(alpha: 0.04),
-        borderRadius: Corners.rLg,
+        color: Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          row('${faNum(percent)}٪ کمیسیون دائمی',
-              ' — از امتیازی که دوستت با ثبت کد کارت یا بازی ضربه‌زن به دست '
-              'می‌آورد، ${faNum(percent)}٪ به تو هم می‌رسد. از امتیاز او '
-              'چیزی کم نمی‌شود؛ این را ما اضافه می‌کنیم.'),
-          row('هر ${faNum(perDaily)} دعوت = یک چرخش روزانهٔ دائمی',
-              ' — با ${faNum(perDaily)} دوست، هر روز ${faNum(2)} چرخش داری '
-              'به‌جای یکی. تا سقف ${faNum(maxDaily)} دوست ادامه دارد.'),
-          row('دعوت نامحدود است',
-              ' — هر چند نفر که بخواهی می‌توانی دعوت کنی.'),
-          row('یک بار برای هر دوست',
-              ' — جایزهٔ ${faNum(spins)} چرخش فقط یک بار داده می‌شود.'),
+          Row(
+            children: [
+              const Icon(Icons.verified_user_rounded, color: Color(0xFFA3E635), size: 16),
+              const SizedBox(width: 6),
+              const Text('مزایای سیستم دعوت:', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          _bullet('۳ شانس رایگان گردونه برای هر دو نفر بلافاصله پس از ثبت کد.'),
+          _bullet('${faNum(percent)}٪ کمیسیون دائمی از امتیازات کارت و بازی ضربه‌زن دوست شما.'),
+          _bullet('هر ${faNum(perDaily)} دعوت = ۱ چرخش روزانه اضافه به گردونه شانس (تا سقف ${faNum(maxDaily)} نفر).'),
+        ],
+      ),
+    );
+  }
+
+  Widget _bullet(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('• ', style: TextStyle(color: Color(0xFFA3E635), fontWeight: FontWeight.w900)),
+          Expanded(
+            child: Text(text, style: const TextStyle(fontSize: 11, color: Colors.white70, height: 1.4)),
+          ),
         ],
       ),
     );
   }
 }
 
-/// نوار پیشرفت تا چرخش روزانهٔ بعدی.
-class _NextSpinProgress extends StatelessWidget {
-  const _NextSpinProgress({
-    required this.toNext,
-    required this.perDaily,
-    required this.nextTotal,
-  });
-
-  final int toNext;
-  final int perDaily;
-  final int nextTotal;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    // perDaily صفر نمی‌شود، ولی تقسیم بر صفر یک NaN می‌سازد که فلاتر
-    // موقع رسم نوار پرتاب می‌کند.
-    final done = perDaily > 0 ? (perDaily - toNext) / perDaily : 0.0;
-    return Column(
-      children: [
-        ClipRRect(
-          borderRadius: Corners.rPill,
-          child: LinearProgressIndicator(
-            value: done.clamp(0.0, 1.0),
-            minHeight: 8,
-            backgroundColor:
-                theme.colorScheme.onSurface.withValues(alpha: 0.08),
-            valueColor:
-                const AlwaysStoppedAnimation(Color(0xFF84CC16)),
-          ),
-        ),
-        Gaps.vXxs,
-        Text(
-          '${faNum(toNext)} دوست دیگر تا ${faNum(nextTotal)} چرخش روزانه ',
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// دکمهٔ کوچکِ یک پیام‌رسان.
-///
-/// ═══════════════════════════════════════════════════════════════════════════
-/// چرا رنگِ برند فقط در حاشیه و پس‌زمینهٔ کم‌رنگ استفاده می‌شود
-/// ═══════════════════════════════════════════════════════════════════════════
-///
-/// رنگِ سبزِ واتس‌اپ (#25D366) روی سطحِ روشن کنتراستِ ۱.۹:۱ دارد —
-/// همان دسته مشکلی که در رنگ‌های معنایی رفع شد. پس رنگِ برند فقط برای
-/// **شناسایی** به‌کار می‌رود (حاشیه و ته‌رنگ) و خودِ متن از تم می‌آید،
-/// که در هر دو حالت خوانا است.
 class _ShareChip extends StatelessWidget {
   const _ShareChip({required this.target, required this.onTap});
-
   final ShareTarget target;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final brand = Color(target.color);
     return Material(
-      color: brand.withValues(alpha: 0.10),
-      borderRadius: Corners.rPill,
+      color: Colors.transparent,
       child: InkWell(
-        borderRadius: Corners.rPill,
+        borderRadius: BorderRadius.circular(10),
         onTap: onTap,
         child: Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: Gaps.sm, vertical: Gaps.xs),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            borderRadius: Corners.rPill,
-            border: Border.all(color: brand.withValues(alpha: 0.55)),
+            borderRadius: BorderRadius.circular(10),
+            color: brand.withValues(alpha: 0.14),
+            border: Border.all(color: brand.withValues(alpha: 0.50)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(target.icon, size: 18, color: brand),
-              Gaps.hXxs,
+              MessengerIcon(app: target.app, size: 18),
+              const SizedBox(width: 6),
               Text(
                 target.label,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  // رنگِ متن از تم، نه از برند — توضیح بالای کلاس.
-                  color: theme.colorScheme.onSurface,
-                ),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white),
               ),
             ],
           ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
+import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/badges.dart';
@@ -8,12 +9,7 @@ import '../../widgets/state_views.dart';
 import 'support/attachment_picker.dart';
 import 'support/ticket_thread.dart';
 
-/// Support tickets.
-///
-/// Rules enforced by the server and mirrored here so the UI can explain
-/// them: one open ticket at a time, at most one new ticket per day, and only
-/// an admin can close a ticket. While a ticket is open the user keeps the
-/// conversation going inside that thread instead of filing new ones.
+/// Support tickets, FAQ and Privacy / Fair-Play Terms.
 class SupportPage extends StatefulWidget {
   final ApiClient api;
   const SupportPage({super.key, required this.api});
@@ -26,8 +22,6 @@ class _SupportPageState extends State<SupportPage> {
   final _subject = TextEditingController();
   final _message = TextEditingController();
   List<String> _attachments = [];
-  // نوعِ دقیق: جزئیات در ticket_thread.dart — یک تیکتِ بدشکل نباید
-  // کل فهرست را از دسترس خارج کند.
   List<Map<String, dynamic>> _tickets = [];
   Map<String, dynamic>? _quota;
   bool _loading = true;
@@ -101,11 +95,11 @@ class _SupportPageState extends State<SupportPage> {
       _message.clear();
       if (!mounted) return;
       setState(() => _attachments = []);
-      _toast('تیکت ثبت شد');
+      _toast('تیکت با موفقیت ثبت شد ✓');
       await _load();
     } catch (e) {
       _toast(apiError(e));
-      await _load(); // refresh the quota so the banner reflects reality
+      await _load();
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -123,26 +117,67 @@ class _SupportPageState extends State<SupportPage> {
         ticket: Map<String, dynamic>.from(ticket),
       ),
     ));
-    // ═══════════════════════════════════════════════════════════════════
-    // چرا `await` + بررسی mounted، به‌جای `.then()`
-    // ═══════════════════════════════════════════════════════════════════
-    //
-    // شکل قبلی `.then((_) => _load())` بود که دو مشکل داشت:
-    //
-    //   ۱. کاربر می‌تواند داخل صفحهٔ تیکت باشد و از آنجا کل اپ را به
-    //      عقب برگرداند؛ آن‌وقت `_load` روی یک State مرده صدا زده
-    //      می‌شد. `_load` خودش `mounted` را بررسی می‌کند، ولی تکیه
-    //      کردن به آن یک قرارداد نانوشته است.
-    //   ۲. خطای `_load` هیچ‌جا گرفته نمی‌شد و به یک استثنای
-    //      مدیریت‌نشده تبدیل می‌شد — این تازه‌سازی بعد از بازگشت از
-    //      صفحهٔ تیکت است و شکستنش نباید به کاربر خطا نشان دهد.
     if (!mounted) return;
     try {
       await _load();
-    } catch (_) {
-      // تازه‌سازیِ پس‌زمینه؛ خودِ `_load` وضعیت خطا را در UI منعکس
-      // می‌کند و پیام دومی لازم نیست.
-    }
+    } catch (_) {}
+  }
+
+  void _showPrivacyDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.security_rounded, color: Color(0xFF34D399), size: 22),
+            SizedBox(width: 8),
+            Text('حریم خصوصی و شفافیت بازی', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Text(
+                '۱. ماهیت پلتفرم سرگرمی و بازی مهارت‌محور:',
+                style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFFFFD166), fontSize: 13),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'اپلیکیشن قلقلی یک محیط سرگرمی، مسابقات مهارتی و کلکسیون فوتوکارت است. این پلتفرم هیچ‌گونه فعالیت شرط‌بندی، بخت‌آزمایی یا قمار نداشته و تمامی پاداش‌ها و امتیازات بر مبنای فعالیت، هوش و مهارت بازیکنان در بازی‌ها محاسبه می‌شود.',
+                style: TextStyle(fontSize: 12, height: 1.5, color: Colors.white70),
+              ),
+              SizedBox(height: 12),
+              Text(
+                '۲. حفظ اطلاعات کاربری:',
+                style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFFFFD166), fontSize: 13),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'شماره تماس و اطلاعات هویتی شما کاملاً محفوظ بوده و به هیچ شخص ثالثی واگذار نمی‌شود. در محیط‌های عمومی (چت و لیگ) صرفاً نام مستعار و عکس انتخابی شما نمایش داده می‌شود.',
+                style: TextStyle(fontSize: 12, height: 1.5, color: Colors.white70),
+              ),
+              SizedBox(height: 12),
+              Text(
+                '۳. شفافیت مالی و تسویه‌حساب:',
+                style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFFFFD166), fontSize: 13),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'جوایز و موجودی کیف پول کاربران طبق قوانین رسمی بانک مرکزی و از طریق شماره شبا به نام صاحب حساب تاییدشده تسویه می‌گردد.',
+                style: TextStyle(fontSize: 12, height: 1.5, color: Colors.white70),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('متوجه شدم'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -162,7 +197,54 @@ class _SupportPageState extends State<SupportPage> {
             Gaps.vMd,
           ],
 
-          // ── new ticket, or an explanation of why not ──
+          // ── FAQ Accordion Section ──
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.help_outline_rounded, color: Color(0xFF38BDF8), size: 20),
+                    Gaps.hXs,
+                    Text('پرسش‌های متداول (FAQ)',
+                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const _FaqItem(
+                  question: 'چگونه در قلقلی امتیاز کسب کنم؟',
+                  answer: 'با ثبت کد و عکس فوتوکارت‌ها، برنده شدن در بازی‌های آنلاین (اتللو، جفت‌یاب، پنالتی)، پیشرفت در بازی ضربه‌زن، استریک ورود روزانه و چرخاندن گردونه شانس.',
+                ),
+                const _FaqItem(
+                  question: 'جوایز و درآمد کیف پول چگونه تسویه می‌شوند؟',
+                  answer: 'در بخش کیف پول با ثبت شماره شبا بانکی معتبر به نام خودتان، درخواست برداشت ثبت کنید تا در سیکل پایا واریز شود.',
+                ),
+                const _FaqItem(
+                  question: 'اشتراک قلقلی پلاس چه امکاناتی می‌دهد؟',
+                  answer: 'عضویت دائمی در ۱ باشگاه فوتبال، جوایز مسیر ویژه گذر نبرد به مدت ۱ ماه، ستاره طلایی درخشان کنار نام در همه بخش‌ها و دسترسی به تمام قاب‌ها و رنگ‌ها.',
+                ),
+                const _FaqItem(
+                  question: 'آیا این اپلیکیشن شرط‌بندی یا قمار است؟',
+                  answer: 'خیر؛ قلقلی کاملاً بازی مهارت‌محور، ورزشی و سرگرمی است و هیچ‌گونه فعالیت شرط‌بندی در آن وجود ندارد.',
+                ),
+                const SizedBox(height: 6),
+                Center(
+                  child: TextButton.icon(
+                    onPressed: _showPrivacyDialog,
+                    icon: const Icon(Icons.shield_outlined, size: 16, color: Color(0xFF34D399)),
+                    label: const Text(
+                      'مشاهده منشور حریم خصوصی و قوانین بازی جوانمردانه',
+                      style: TextStyle(fontSize: 11.5, color: Color(0xFF34D399), fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          Gaps.vMd,
+
+          // ── New Ticket Form / Quota Notice ──
           if (canCreate)
             AppCard(
               child: Column(
@@ -170,28 +252,30 @@ class _SupportPageState extends State<SupportPage> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.support_agent_rounded,
-                          color: theme.colorScheme.primary, size: 20),
+                      Icon(Icons.support_agent_rounded, color: theme.colorScheme.primary, size: 20),
                       Gaps.hXs,
-                      Text('تیکت جدید', style: theme.textTheme.titleSmall),
+                      Text('ارسال تیکت به پشتیبانی',
+                          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900)),
                     ],
                   ),
                   Gaps.vXxs,
-                  Text('در هر روز یک تیکت می‌توانید ثبت کنید.',
-                      style: theme.textTheme.bodySmall),
+                  Text('در هر روز می‌توانید ۱ تیکت جدید ثبت کنید.', style: theme.textTheme.bodySmall),
                   Gaps.vSm,
                   TextField(
                     controller: _subject,
                     decoration: const InputDecoration(
-                        labelText: 'موضوع',
-                        prefixIcon: Icon(Icons.label_outline_rounded)),
+                      labelText: 'موضوع تیکت',
+                      prefixIcon: Icon(Icons.label_outline_rounded),
+                    ),
                   ),
                   Gaps.vSm,
                   TextField(
                     controller: _message,
-                    maxLines: 4,
+                    maxLines: 3,
                     decoration: const InputDecoration(
-                        labelText: 'شرح مشکل', alignLabelWithHint: true),
+                      labelText: 'شرح مشکل یا سوال شما',
+                      alignLabelWithHint: true,
+                    ),
                   ),
                   Gaps.vSm,
                   AttachmentPicker(
@@ -208,8 +292,7 @@ class _SupportPageState extends State<SupportPage> {
                         ? const SizedBox(
                             width: 16,
                             height: 16,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2.2, color: Colors.white))
+                            child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white))
                         : const Icon(Icons.send_rounded),
                     label: Text(_sending ? 'در حال ارسال...' : 'ارسال تیکت'),
                   ),
@@ -225,13 +308,15 @@ class _SupportPageState extends State<SupportPage> {
               },
             ),
 
-          Gaps.vXl,
-          Text('تیکت‌های من', style: theme.textTheme.titleSmall),
+          Gaps.vLg,
+
+          // ── My Tickets List ──
+          Text('تیکت‌های من (${faNum(_tickets.length)})',
+              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
           Gaps.vXs,
           if (_tickets.isEmpty)
             const AppCard(
-              child: EmptyState(
-                  icon: Icons.inbox_outlined, title: 'هنوز تیکتی ثبت نکرده‌اید'),
+              child: EmptyState(icon: Icons.inbox_outlined, title: 'هنوز تیکتی ثبت نکرده‌اید'),
             )
           else
             ..._tickets.map((t) {
@@ -251,20 +336,18 @@ class _SupportPageState extends State<SupportPage> {
                             Text('${t['subject']}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.titleSmall),
+                                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
                             const SizedBox(height: 3),
                             Text(
-                              closed
-                                  ? 'گفتگو بسته شده است'
-                                  : 'برای ادامه گفتگو لمس کنید',
-                              style: theme.textTheme.bodySmall,
+                              closed ? 'گفتگو بسته‌شده است' : 'برای مشاهده و ادامه گفتگو لمس کنید',
+                              style: theme.textTheme.bodySmall?.copyWith(color: Colors.white60),
                             ),
                           ],
                         ),
                       ),
                       StatusBadge(status: status, labels: _statusLabels),
-                      Icon(Icons.chevron_left_rounded,
-                          color: theme.colorScheme.outline),
+                      const SizedBox(width: 4),
+                      Icon(Icons.chevron_left_rounded, color: theme.colorScheme.outline),
                     ],
                   ),
                 ),
@@ -276,8 +359,38 @@ class _SupportPageState extends State<SupportPage> {
   }
 }
 
-/// Explains why the "new ticket" form is unavailable, and offers the right
-/// next action instead of a dead end.
+class _FaqItem extends StatelessWidget {
+  const _FaqItem({required this.question, required this.answer});
+  final String question;
+  final String answer;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+      ),
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+        childrenPadding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+        title: Text(
+          question,
+          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Colors.white),
+        ),
+        children: [
+          Text(
+            answer,
+            style: const TextStyle(fontSize: 11.5, color: Colors.white70, height: 1.5),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _QuotaNotice extends StatelessWidget {
   const _QuotaNotice({required this.quota, required this.onOpenTicket});
   final Map<String, dynamic>? quota;
@@ -294,15 +407,14 @@ class _QuotaNotice extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(hasOpen ? Icons.forum_rounded : Icons.timelapse_rounded,
-              color: color, size: 22),
+          Icon(hasOpen ? Icons.forum_rounded : Icons.timelapse_rounded, color: color, size: 22),
           Gaps.hSm,
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(hasOpen ? 'یک تیکت باز دارید' : 'سقف روزانه تکمیل شد',
-                    style: theme.textTheme.titleSmall),
+                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
                 const SizedBox(height: 3),
                 Text(
                   '${quota?['message'] ?? ''}',

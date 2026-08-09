@@ -9,8 +9,7 @@ import '../../widgets/avatar_image.dart';
 import '../../widgets/safe_image.dart';
 import '../../widgets/state_views.dart';
 
-/// Private profile editor: same fields & PATCH /api/profile payload as the
-/// legacy `ProfilePage`.
+/// Private profile editor: dense and compact 2-column layout to minimize scrolling.
 class ProfilePage extends StatefulWidget {
   final ApiClient api;
   final Future<void> Function() reloadProfile;
@@ -40,15 +39,7 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _messageIsError = false;
   String? _passwordMessage;
   bool _passwordMessageIsError = false;
-  // Physical prizes the user has won. Cash rewards go straight to the wallet;
-  // physical ones are displayed here so there is a visible record of them.
-  // نوعِ دقیق: جامِ بدشکل نباید نوارِ افقیِ جام‌ها را بترکاند.
   List<Map<String, dynamic>> _trophies = const [];
-  // Past league finishes. monthly_league_points is wiped each month, so this
-  // is the only lasting record of "I came 3rd in Mordad and won 250,000".
-  // Crests of clubs the user belongs to. They can be worn as an avatar, so
-  // they live in the SAME picker as the bundled ones — to the user they are
-  // just more avatars, and splitting them would feel like two settings.
   List _myClubs = const [];
   List _leagueHistory = const [];
 
@@ -58,41 +49,6 @@ class _ProfilePageState extends State<ProfilePage> {
     _load();
     _loadTrophies();
     _loadLeagueHistory();
-    _loadClubs();
-  }
-
-  Future<void> _loadLeagueHistory() async {
-    try {
-      final r = await widget.api.get('/api/profile/league-history');
-      if (!mounted) return;
-      setState(() => _leagueHistory = (r['seasons'] as List?) ?? const []);
-    } catch (_) {
-      // Decorative; must not block the profile form.
-    }
-  }
-
-  Future<void> _loadClubs() async {
-    try {
-      final r = await widget.api.get('/api/clubs');
-      if (!mounted) return;
-      setState(() => _myClubs = (r['mine'] as List?) ?? const []);
-    } catch (_) {
-      // Optional: a user in no club, or a failed call, just sees the ten
-      // bundled avatars. It must never block the profile form.
-    }
-  }
-
-  Future<void> _loadTrophies() async {
-    try {
-      final r = await widget.api.get('/api/profile/trophies');
-      if (!mounted) return;
-      setState(() => _trophies = ((r['trophies'] as List?) ?? const [])
-          .whereType<Map>()
-          .map((e) => Map<String, dynamic>.from(e))
-          .toList());
-    } catch (_) {
-      // The shelf is decorative; a failure must not block the profile form.
-    }
   }
 
   @override
@@ -109,31 +65,54 @@ class _ProfilePageState extends State<ProfilePage> {
     super.dispose();
   }
 
-
-  Future<void> _load() async {
-    // بدون try، هر شکست شبکه‌ای `_loaded` را برای همیشه false نگه می‌داشت
-    // و صفحهٔ پروفایل تا ابد چرخنده نشان می‌داد — بدون پیام و بدون راه خروج.
+  Future<void> _loadTrophies() async {
     try {
-      final d = await widget.api.get('/api/profile');
-      final u = Map<String, dynamic>.from(d['user']);
-      _first.text = u['first_name'] ?? '';
-      _last.text = u['last_name'] ?? '';
-      _nick.text = u['nickname'] ?? '';
-      _bank.text = u['bank_account'] ?? '';
-      _age.text = '${u['age'] ?? ''}';
-      _city.text = u['city'] ?? '';
-      _province.text = u['province'] ?? '';
-      _selectedAvatar = u['profile_avatar_key'] ?? avatarFiles.first;
+      final res = await widget.api.get('/api/profile/trophies');
       if (!mounted) return;
       setState(() {
-        _loadError = null;
+        _trophies = (res is List ? res : const [])
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _loadLeagueHistory() async {
+    try {
+      final res = await widget.api.get('/api/profile/league-history');
+      if (!mounted) return;
+      setState(() {
+        _leagueHistory = res is List ? res : const [];
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _load() async {
+    try {
+      final batch =
+          await widget.api.getAll(['/api/profile', '/api/clubs']);
+      if (!mounted) return;
+      final u = (batch[0] is Map ? batch[0]['user'] : null) ?? {};
+      final clubs = (batch[1] is Map ? batch[1]['mine'] : null) ?? [];
+      setState(() {
+        _first.text = '${u['first_name'] ?? ''}';
+        _last.text = '${u['last_name'] ?? ''}';
+        _nick.text = '${u['nickname'] ?? ''}';
+        _bank.text = '${u['bank_account'] ?? ''}';
+        _age.text = u['age'] != null ? '${u['age']}' : '';
+        _city.text = '${u['city'] ?? ''}';
+        _province.text = '${u['province'] ?? ''}';
+        final key = '${u['profile_avatar_key'] ?? ''}';
+        if (key.isNotEmpty) _selectedAvatar = key;
+        _myClubs = clubs is List ? clubs : const [];
         _loaded = true;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _loadError = apiError(e);
-        _loaded = true; // فرم نشان داده می‌شود، با یک نوار خطا بالایش
+        _loaded = true;
       });
     }
   }
@@ -157,7 +136,7 @@ class _ProfilePageState extends State<ProfilePage> {
       await widget.reloadProfile();
       if (!mounted) return;
       setState(() {
-        _message = 'پروفایل ذخیره شد';
+        _message = 'پروفایل با موفقیت ذخیره شد ✓';
         _messageIsError = false;
       });
     } catch (e) {
@@ -170,11 +149,6 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  // Self-service password change. Since the SMS gateway isn't wired up yet,
-  // there is no "forgot password" flow that can text a reset code — this is
-  // the only safe way a signed-in user can change their password (support
-  // can also set a temporary one from the admin panel if the user is
-  // locked out entirely).
   Future<void> _changePassword() async {
     setState(() {
       _changingPassword = true;
@@ -187,12 +161,9 @@ class _ProfilePageState extends State<ProfilePage> {
       });
       _currentPassword.clear();
       _newPassword.clear();
-      // The request can outlive this screen — the user may go back while it
-      // is in flight. setState() after dispose() throws, and in a release
-      // build that is a red error screen rather than a caught exception.
       if (!mounted) return;
       setState(() {
-        _passwordMessage = 'رمز عبور با موفقیت تغییر کرد';
+        _passwordMessage = 'رمز عبور با موفقیت تغییر کرد ✓';
         _passwordMessageIsError = false;
       });
     } catch (e) {
@@ -211,8 +182,6 @@ class _ProfilePageState extends State<ProfilePage> {
     final theme = Theme.of(context);
 
     if (_loadError != null) {
-      // فرم خالی به کاربر نشان نمی‌دهیم — ذخیره کردنش اطلاعات واقعی‌اش را
-      // پاک می‌کرد. اول باید بارگذاری موفق شود.
       return RefreshIndicator(
         onRefresh: _load,
         child: ListView(
@@ -228,63 +197,37 @@ class _ProfilePageState extends State<ProfilePage> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, Gaps.xxl),
       children: [
+        // ── League History ──
         if (_leagueHistory.isNotEmpty) ...[
           AppCard(
+            padding: const EdgeInsets.all(12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(children: [const Icon(Icons.emoji_events_rounded, size: 20), Gaps.hXs, Text('سابقهٔ لیگ',
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w800))]),
-                Text(
-                    'امتیاز لیگ آخر هر ماه صفر می‌شود، ولی رتبه و جایزه‌ات '
-                    'اینجا می‌ماند.',
-                    style: theme.textTheme.bodySmall),
-                Gaps.vXs,
+                Row(children: [
+                  const Icon(Icons.emoji_events_rounded, color: Color(0xFFFFD166), size: 18),
+                  Gaps.hXs,
+                  Text('سابقه رتبه‌های لیگ ماهانه', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
+                ]),
+                const SizedBox(height: 6),
                 for (final raw in _leagueHistory)
                   Builder(builder: (ctx) {
                     final h = Map<String, dynamic>.from(raw as Map);
                     final rank = h['rank'] as int? ?? 0;
                     final prize = (h['prizeAmount'] as num?) ?? 0;
                     return Padding(
-                      padding: const EdgeInsets.only(bottom: Gaps.xs),
+                      padding: const EdgeInsets.only(bottom: 4),
                       child: Row(
                         children: [
-                          Image.asset(
-                            medalAsset(rank),
-                            width: 22,
-                            height: 22,
-                            fit: BoxFit.contain,
-                            cacheWidth: 44,
-                            errorBuilder: (_, __, ___) => const Icon(Icons.military_tech_rounded, size: 22),
-                          ),
+                          Image.asset(medalAsset(rank), width: 18, height: 18, fit: BoxFit.contain, cacheWidth: 40),
                           Gaps.hXs,
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('${h['monthYear']} · رتبهٔ ${faNum(rank)}',
-                                    style: theme.textTheme.titleSmall),
-                                Text('${faNum(h['points'])} امتیاز',
-                                    style: theme.textTheme.labelSmall),
-                              ],
-                            ),
+                            child: Text('${h['monthYear']} · رتبه ${faNum(rank)} (${faNum(h['points'])} امتیاز)',
+                                style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
                           ),
                           if (prize > 0)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: Gaps.xs, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFB5EF58)
-                                    .withValues(alpha: 0.14),
-                                borderRadius: Corners.rPill,
-                              ),
-                              child: Text('${faNum(prize)} تومان',
-                                  style: const TextStyle(
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w800,
-                                      color: Color(0xFF84CC16))),
-                            ),
+                            Text('${faNum(prize)} تومان',
+                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Color(0xFF84CC16))),
                         ],
                       ),
                     );
@@ -292,290 +235,214 @@ class _ProfilePageState extends State<ProfilePage> {
               ],
             ),
           ),
-          Gaps.vMd,
+          Gaps.vSm,
         ],
-        if (_trophies.isNotEmpty) ...[
-          AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: [const Icon(Icons.emoji_events_rounded, size: 20), Gaps.hXs, Text('جوایز دریافتی',
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w800))]),
-                Gaps.vXs,
-                SizedBox(
-                  height: 118,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _trophies.length,
-                    separatorBuilder: (_, __) => Gaps.hXs,
-                    itemBuilder: (_, i) {
-                      final t = _trophies[i];
-                      final pending = t['status'] == 'pending';
-                      return SizedBox(
-                        width: 92,
-                        child: Column(
-                          children: [
-                            Stack(
-                              children: [
-                                ClipRRect(
-                                  borderRadius: Corners.rMd,
-                                  child: SafeImage(
-                                      url: fullAssetUrl(t['image_url']),
-                                      width: 92,
-                                      height: 78,
-                                      fallbackAsset: 'assets/pass/reward_gift_icon.webp'),
-                                ),
-                                if (pending)
-                                  Positioned(
-                                    top: 4,
-                                    right: 4,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFF2A93B),
-                                        borderRadius: Corners.rPill,
-                                      ),
-                                      child: const Text('در انتظار',
-                                          style: TextStyle(
-                                              fontSize: 9,
-                                              fontWeight: FontWeight.w800,
-                                              color: Color(0xFF2A1A00))),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            Gaps.vXxs,
-                            Text('${t['name'] ?? 'جایزه'}',
-                                maxLines: 2,
-                                textAlign: TextAlign.center,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.labelSmall),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Gaps.vMd,
-        ],
+
+        // ── Main Profile Form (Compact & Dense) ──
         AppCard(
+          padding: const EdgeInsets.all(14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              ClipRRect(
-                  borderRadius: Corners.rLg,
-                  // cacheWidth, not cacheHeight: BoxFit.cover in a box wider
-                  // than the source scales by WIDTH, so a height hint
-                  // constrains the axis that does not bind. The asset is
-                  // pre-cropped to the displayed aspect, so its native 820
-                  // width is both cheaper and sharper than the old hint.
-                  child: Image.asset('assets/brand/profile_banner.webp',
-                      height: 128, fit: BoxFit.cover, cacheWidth: 820)),
-              Gaps.vMd,
-              Text('تکمیل پروفایل خصوصی', style: theme.textTheme.headlineSmall),
-              Gaps.vXxs,
-              Text(
-                'این اطلاعات فقط برای مدیر قابل مشاهده است؛ در چت فقط نام مستعار و عکس پروفایل دیده می‌شود.',
-                style: theme.textTheme.bodySmall,
-              ),
-              Gaps.vLg,
-              Center(
-                  child: AvatarImage(
-                      keyName: _selectedAvatar, radius: 46, ring: true)),
-              Gaps.vLg,
-              Text('انتخاب آواتار', style: theme.textTheme.titleSmall),
-              Gaps.vSm,
-              Wrap(
-                spacing: Gaps.sm,
-                runSpacing: Gaps.sm,
+              Row(
                 children: [
-                  for (final a in avatarFiles)
-                    _AvatarChoice(
-                      selected: _selectedAvatar == a,
-                      onTap: () => setState(() => _selectedAvatar = a),
-                      // PERF: بدون ResizeImage، انتخابگرِ آواتار هر ۱۰
-                      // تصویر ۳۸۴×۳۸۴ را با اندازهٔ کامل دیکد می‌کرد —
-                      // حدود ۶ مگابایت رم برای دایره‌هایی به قطر ۴۸ پیکسل.
-                      // روی گوشی ضعیف همین یک صفحه کش حافظه را پر می‌کرد و
-                      // باعث GC و پرش انیمیشن می‌شد. AvatarImage جای دیگر
-                      // اپ این کار را درست انجام می‌داد؛ فقط همین‌جا جا
-                      // افتاده بود.
-                      child: CircleAvatar(
-                          radius: 24,
-                          backgroundImage: ResizeImage(
-                              AssetImage(avatarAsset(a)),
-                              width: 144)),
+                  AvatarImage(keyName: _selectedAvatar, radius: 26, ring: true),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('اطلاعات کاربری و پروفایل',
+                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
+                        const SizedBox(height: 2),
+                        const Text('اطلاعات شخصی فقط برای مدیریت جهت واریز جوایز محفوظ است.',
+                            style: TextStyle(fontSize: 10.5, color: Colors.white60)),
+                      ],
                     ),
-                  // Club crests the user has joined, in the same picker.
-                  for (final c in _myClubs)
-                    _AvatarChoice(
-                      selected: _selectedAvatar == 'club:${c['slug']}',
-                      onTap: () => setState(
-                          () => _selectedAvatar = 'club:${c['slug']}'),
-                      child: CircleAvatar(
-                        radius: 24,
-                        backgroundColor:
-                            theme.colorScheme.onSurface.withValues(alpha: 0.06),
-                        // A crest is not a photo: pad it inside the circle
-                        // instead of letting a round clip eat the shield's
-                        // corners.
-                        child: Padding(
-                          padding: const EdgeInsets.all(5),
-                          child: Image.asset(clubAsset('${c['slug']}'),
-                              fit: BoxFit.contain,
-                              cacheWidth: 150,
-                              errorBuilder: (_, __, ___) =>
-                                  const Icon(Icons.shield_outlined, size: 22)),
-                        ),
-                      ),
-                    ),
+                  ),
                 ],
               ),
-              if (_myClubs.isNotEmpty) ...[
-                Gaps.vXs,
-                Text(
-                  ' نشان باشگاه‌هایی که عضوشان هستی هم می‌تواند عکس '
-                  'پروفایلت باشد.',
-                  style: theme.textTheme.labelSmall,
+              const SizedBox(height: 12),
+
+              // ── Avatar Choices (Compact Horizontal Row) ──
+              const Text('انتخاب آواتار یا نشان باشگاه:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 6),
+              SizedBox(
+                height: 52,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    for (final a in avatarFiles)
+                      _AvatarChoice(
+                        selected: _selectedAvatar == a,
+                        onTap: () => setState(() => _selectedAvatar = a),
+                        child: CircleAvatar(
+                          radius: 20,
+                          backgroundImage: ResizeImage(AssetImage(avatarAsset(a)), width: 100),
+                        ),
+                      ),
+                    for (final c in _myClubs)
+                      _AvatarChoice(
+                        selected: _selectedAvatar == 'club:${c['slug']}',
+                        onTap: () => setState(() => _selectedAvatar = 'club:${c['slug']}'),
+                        child: CircleAvatar(
+                          radius: 20,
+                          backgroundColor: Colors.white.withValues(alpha: 0.1),
+                          child: Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: Image.asset(clubAsset('${c['slug']}'), fit: BoxFit.contain, cacheWidth: 80),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-              ],
-              Gaps.vXl,
-              _FieldGroup(children: [
-                TextField(
-                    controller: _first,
-                    decoration: const InputDecoration(
-                        labelText: 'نام',
-                        prefixIcon: Icon(Icons.badge_outlined))),
-                TextField(
-                    controller: _last,
-                    decoration: const InputDecoration(
-                        labelText: 'نام خانوادگی',
-                        prefixIcon: Icon(Icons.badge_outlined))),
-                TextField(
-                    controller: _nick,
-                    decoration: const InputDecoration(
-                        labelText: 'نام مستعار عمومی',
-                        prefixIcon: Icon(Icons.face_rounded))),
-                TextField(
-                    controller: _age,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                        labelText: 'سن',
-                        prefixIcon: Icon(Icons.cake_outlined))),
-                TextField(
-                    controller: _province,
-                    decoration: const InputDecoration(
-                        labelText: 'استان',
-                        prefixIcon: Icon(Icons.map_outlined))),
-                TextField(
-                    controller: _city,
-                    decoration: const InputDecoration(
-                        labelText: 'محل زندگی / شهر',
-                        prefixIcon: Icon(Icons.location_city_rounded))),
-                TextField(
-                    controller: _bank,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                        labelText: 'شماره کارت بانکی / شبا',
-                        prefixIcon: Icon(Icons.account_balance_outlined))),
-              ]),
-              Gaps.vLg,
+              ),
+
+              const SizedBox(height: 12),
+
+              // ── 2-Column Fields Grid (Dramatically Reduced Height) ──
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _first,
+                      decoration: const InputDecoration(labelText: 'نام', isDense: true),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: _last,
+                      decoration: const InputDecoration(labelText: 'نام خانوادگی', isDense: true),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: TextField(
+                      controller: _nick,
+                      decoration: const InputDecoration(labelText: 'نام مستعار چت و بازی', isDense: true),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 1,
+                    child: TextField(
+                      controller: _age,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'سن', isDense: true),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _province,
+                      decoration: const InputDecoration(labelText: 'استان', isDense: true),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: _city,
+                      decoration: const InputDecoration(labelText: 'شهر', isDense: true),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _bank,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'شماره کارت یا شبا بانکی (جهت واریز جوایز نقدی)',
+                  prefixIcon: Icon(Icons.credit_card_rounded, size: 20),
+                  isDense: true,
+                ),
+              ),
+
+              const SizedBox(height: 12),
               FilledButton.icon(
                 onPressed: _saving ? null : _save,
                 icon: _saving
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2.2, color: Colors.white))
-                    : const Icon(Icons.save_rounded),
-                label: const Text('ذخیره پروفایل'),
+                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.save_rounded, size: 18),
+                label: const Text('ذخیره تغییرات پروفایل', style: TextStyle(fontWeight: FontWeight.w900)),
               ),
               if (_message != null) ...[
-                Gaps.vSm,
-                _messageIsError
-                    ? ErrorBanner(message: _message!)
-                    : Container(
-                        padding: const EdgeInsets.all(Gaps.sm),
-                        decoration: BoxDecoration(
-                            color: theme.colorScheme.primary
-                                .withValues(alpha: 0.12),
-                            borderRadius: Corners.rMd),
-                        child: Row(children: [
-                          Icon(Icons.check_circle_rounded,
-                              color: theme.colorScheme.primary, size: 18),
-                          Gaps.hXs,
-                          Expanded(
-                              child: Text(_message!,
-                                  style: theme.textTheme.bodySmall)),
-                        ]),
-                      ),
+                const SizedBox(height: 6),
+                Text(_message!,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: _messageIsError ? theme.colorScheme.error : const Color(0xFF34D399))),
               ],
             ],
           ),
         ),
-        Gaps.vMd,
+
+        Gaps.vSm,
+
+        // ── Password Change Section (Collapsible / Compact) ──
         AppCard(
+          padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('تغییر رمز عبور', style: theme.textTheme.headlineSmall),
-              Gaps.vXxs,
-              Text(
-                'چون فعلاً سامانه پیامک فعال نیست، بازیابی خودکار رمز در دسترس نیست. رمز را فقط با وارد کردن رمز فعلی می‌توانید عوض کنید. اگر رمز را فراموش کرده‌اید، از پشتیبانی بخواهید یک رمز موقت برایتان تنظیم کند.',
-                style: theme.textTheme.bodySmall,
+              Row(
+                children: [
+                  const Icon(Icons.lock_reset_rounded, size: 18, color: Color(0xFF38BDF8)),
+                  Gaps.hXs,
+                  Text('تغییر رمز عبور', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
+                ],
               ),
-              Gaps.vLg,
-              _FieldGroup(children: [
-                TextField(
-                    controller: _currentPassword,
-                    obscureText: true,
-                    decoration: const InputDecoration(
-                        labelText: 'رمز فعلی',
-                        prefixIcon: Icon(Icons.lock_outline_rounded))),
-                TextField(
-                    controller: _newPassword,
-                    obscureText: true,
-                    decoration: const InputDecoration(
-                        labelText: 'رمز جدید (حداقل ۶ کاراکتر)',
-                        prefixIcon: Icon(Icons.lock_reset_rounded))),
-              ]),
-              Gaps.vLg,
-              FilledButton.icon(
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _currentPassword,
+                      obscureText: true,
+                      decoration: const InputDecoration(labelText: 'رمز فعلی', isDense: true),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: _newPassword,
+                      obscureText: true,
+                      decoration: const InputDecoration(labelText: 'رمز جدید', isDense: true),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ElevatedButton(
                 onPressed: _changingPassword ? null : _changePassword,
-                icon: _changingPassword
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2.2, color: Colors.white))
-                    : const Icon(Icons.key_rounded),
-                label: const Text('تغییر رمز عبور'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white.withValues(alpha: 0.12),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: Text(_changingPassword ? 'در حال تغییر...' : 'ثبت رمز عبور جدید',
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
               ),
               if (_passwordMessage != null) ...[
-                Gaps.vSm,
-                _passwordMessageIsError
-                    ? ErrorBanner(message: _passwordMessage!)
-                    : Container(
-                        padding: const EdgeInsets.all(Gaps.sm),
-                        decoration: BoxDecoration(
-                            color: theme.colorScheme.primary
-                                .withValues(alpha: 0.12),
-                            borderRadius: Corners.rMd),
-                        child: Row(children: [
-                          Icon(Icons.check_circle_rounded,
-                              color: theme.colorScheme.primary, size: 18),
-                          Gaps.hXs,
-                          Expanded(
-                              child: Text(_passwordMessage!,
-                                  style: theme.textTheme.bodySmall)),
-                        ]),
-                      ),
+                const SizedBox(height: 4),
+                Text(_passwordMessage!,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: _passwordMessageIsError ? theme.colorScheme.error : const Color(0xFF34D399))),
               ],
             ],
           ),
@@ -585,12 +452,12 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 }
 
-/// Selection ring around one avatar option. Extracted so a bundled avatar
-/// and a club crest get identical selection affordance rather than two
-/// near-copies drifting apart.
 class _AvatarChoice extends StatelessWidget {
-  const _AvatarChoice(
-      {required this.selected, required this.onTap, required this.child});
+  const _AvatarChoice({
+    required this.selected,
+    required this.onTap,
+    required this.child,
+  });
 
   final bool selected;
   final VoidCallback onTap;
@@ -598,39 +465,23 @@ class _AvatarChoice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: Motion.fast,
-        padding: const EdgeInsets.all(3),
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: selected
-                ? Theme.of(context).colorScheme.primary
-                : Colors.transparent,
-            width: 3,
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(30),
+        child: Container(
+          padding: const EdgeInsets.all(2),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: selected ? const Color(0xFF22E7A6) : Colors.transparent,
+              width: 2,
+            ),
           ),
+          child: child,
         ),
-        child: child,
       ),
-    );
-  }
-}
-
-class _FieldGroup extends StatelessWidget {
-  final List<Widget> children;
-  const _FieldGroup({required this.children});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        for (var i = 0; i < children.length; i++) ...[
-          if (i > 0) Gaps.vSm,
-          children[i],
-        ],
-      ],
     );
   }
 }

@@ -712,16 +712,35 @@ class _ShopButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconButton(
-      tooltip: 'فروشگاه',
+      tooltip: 'فروشگاه و امکانات پلاس',
       onPressed: onPressed,
       style: selected
           ? IconButton.styleFrom(
               backgroundColor:
                   Theme.of(context).colorScheme.primary.withValues(alpha: 0.18))
           : null,
-      // آیکون متریال به‌جای اموجی: اموجیِ  روی بعضی گوشی‌های اندروید
-      // با رنگ و اندازهٔ متفاوت رندر می‌شود و کنار  ناهماهنگ می‌افتد.
-      icon: const Icon(Icons.storefront_rounded, size: 22),
+      icon: Container(
+        width: 30,
+        height: 30,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(9),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFFFE08A), Color(0xFFFF9F43), Color(0xFFFF5252)],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFFF9F43).withValues(alpha: 0.40),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: const Center(
+          child: Icon(Icons.shopping_bag_rounded, size: 18, color: Color(0xFF25110A)),
+        ),
+      ),
     );
   }
 }

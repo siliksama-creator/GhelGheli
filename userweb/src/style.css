@@ -3626,3 +3626,45 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 .pcPendingChip, .pcResult.pending { display: inline-flex; align-items: center; gap: 5px; }
 .phaseDot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ffffff42; }
 .streakHead .assetIcon { filter: drop-shadow(0 8px 16px #ff9c3d44); }
+
+
+/* ── FAQ & Privacy Section ── */
+.faqSection { margin-top: 10px; margin-bottom: 12px; }
+.faqSection h3 { margin: 0 0 10px; font-size: 16px; color: #38bdf8; }
+.faqList { display: flex; flex-direction: column; gap: 6px; }
+.faqItem { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; overflow: hidden; }
+.faqQ { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: transparent; border: none; color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; text-align: right; }
+.faqQ i { font-style: normal; font-size: 10px; color: rgba(255,255,255,0.5); }
+.faqA { margin: 0; padding: 0 14px 12px; font-size: 12px; color: rgba(255,255,255,0.72); line-height: 1.6; }
+.privacyLink { width: 100%; margin-top: 10px; text-align: center; color: #34d399 !important; font-size: 12px; font-weight: 700; }
+
+/* ── Pass Visual Infographic ── */
+.pXpInfographic { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 12px; margin-top: 12px; }
+.pXpTitle { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: #ffd166; }
+.pXpTitle small { color: rgba(255,255,255,0.55); }
+.pSourcesPills { display: flex; flex-wrap: wrap; gap: 6px; }
+.xpPill { display: inline-flex; align-items: center; gap: 5px; background: rgba(255,255,255,0.06); padding: 4px 9px; border-radius: 8px; font-size: 11px; color: rgba(255,255,255,0.85); }
+.xpPill b { color: #22e7a6; font-weight: 800; }
+.pFoldBtn { width: 100%; margin: 8px 0; font-size: 12px; color: rgba(255,255,255,0.65); text-align: center; }
+
+/* ── Referral Messengers ── */
+.refMessengers { margin: 12px 0; }
+.refMessengers span { font-size: 12px; color: rgba(255,255,255,0.7); display: block; margin-bottom: 6px; }
+.refBtnGroup { display: flex; flex-wrap: wrap; gap: 8px; }
+.msgBtn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 700; color: #fff; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); cursor: pointer; }
+.msgBtn.tg { border-color: rgba(41,169,235,0.6); background: rgba(41,169,235,0.12); }
+.msgBtn.wa { border-color: rgba(37,211,102,0.6); background: rgba(37,211,102,0.12); }
+.msgBtn.rb { border-color: rgba(138,43,226,0.6); background: rgba(138,43,226,0.12); }
+.msgBtn.bl { border-color: rgba(0,191,165,0.6); background: rgba(0,191,165,0.12); }
+.msgDot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.msgBtn.tg .msgDot { background: #29a9eb; }
+.msgBtn.wa .msgDot { background: #25d366; }
+.msgBtn.rb .msgDot { background: #8a2be2; }
+.msgBtn.bl .msgDot { background: #00bfa5; }
+.refCodeBox { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); border: 1px solid rgba(132,204,22,0.4); border-radius: 14px; padding: 10px 16px; margin: 12px 0; }
+.refCodeInner { display: flex; align-items: center; gap: 10px; }
+.refLabel { font-size: 12px; color: rgba(255,255,255,0.6); }
+.refCode { font-size: 22px; font-weight: 900; color: #a3e635; font-family: monospace; letter-spacing: 3px; }
+.refRulesBox { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 12px; margin-top: 12px; }
+.refRulesBox b { color: #a3e635; font-size: 12px; }
+.refRulesBox ul { margin: 6px 0 0; padding-right: 18px; font-size: 11.5px; color: rgba(255,255,255,0.72); line-height: 1.6; }
