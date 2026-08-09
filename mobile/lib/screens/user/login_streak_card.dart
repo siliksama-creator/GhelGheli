@@ -146,7 +146,6 @@ class _LoginStreakCardState extends State<LoginStreakCard>
     }
 
     final theme = Theme.of(context);
-    final brand = context.brand;
     final days = (_data!['rewards'] as List? ?? const [])
         .whereType<Map>()
         .map((item) => Map<String, dynamic>.from(item))
@@ -449,7 +448,7 @@ class _LoginStreakCardState extends State<LoginStreakCard>
                               padding: const EdgeInsets.symmetric(horizontal: 16),
                               shape: RoundedRectangleBorder(
                                 borderRadius: Corners.rLg,
-                                side: Border.all(
+                                side: BorderSide(
                                   color: claimedToday ? Colors.transparent : Colors.white.withValues(alpha: 0.3),
                                   width: 1,
                                 ),
