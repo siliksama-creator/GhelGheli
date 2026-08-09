@@ -65,10 +65,10 @@ export default function Auth({ mode, setMode, done }) {
         padding: '24px 20px'
       }}>
         <div style={{ textAlign: 'center', marginBottom: 16 }}>
-          <h2 style={{ fontSize: 22, fontWeight: 900, color: '#FFFFFF', margin: 0 }}>
+          <h2 style={{ fontSize: 22, fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
             {mode === 'register' ? 'ثبت‌نام در قلقلی ⚽' : 'ورود به حساب قلقلی 🚀'}
           </h2>
-          <p style={{ color: '#94A3B8', fontSize: 12.5, marginTop: 4 }}>
+          <p style={{ color: '#94A3B8', fontSize: 13, marginTop: 4 }}>
             {mode === 'register' ? 'کارت‌ها را ثبت کن، بازی کن و جایزه ببر' : 'به دنیای هیجان و فوتبال خوش آمدید'}
           </p>
         </div>
@@ -158,7 +158,7 @@ export default function Auth({ mode, setMode, done }) {
               background: msg.includes('چرخش') ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
               border: `1px solid ${msg.includes('چرخش') ? '#22C55E' : '#EF4444'}`,
               color: msg.includes('چرخش') ? '#22C55E' : '#EF4444',
-              fontSize: 12.5,
+              fontSize: 13,
               fontWeight: 700,
               textAlign: 'center'
             }}>
@@ -177,7 +177,7 @@ export default function Auth({ mode, setMode, done }) {
               background: 'linear-gradient(90deg, #00D49A, #1C78FF)',
               color: '#FFFFFF',
               fontSize: 15.5,
-              fontWeight: 900,
+              fontWeight: 800,
               cursor: 'pointer',
               boxShadow: '0 8px 20px rgba(0, 212, 154, 0.35)',
               display: 'flex',
