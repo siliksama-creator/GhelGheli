@@ -509,34 +509,19 @@ class _HomeShellState extends State<HomeShell>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        titleSpacing: 10,
-        // ── نوار بالا: فقط لوگوی درخشان و عنوان صفحه ──
-        //
-        // درخواست مالک: «اون بالای بالا که سلام نوشته رو کلا حذف کن و
-        // لوگو درخشان قلقلی رو قرار بده».
-        //
-        // «سلام hotcat » حذف شد. دلیلش فقط سلیقه نیست: همان نام دقیقاً
-        // چند پیکسل پایین‌تر در هدر داشبورد هم بود، پس دو بار تکرار
-        // می‌شد و جای نوار بالا را — که پنج آیکون مهم دارد — بی‌دلیل
-        // تنگ می‌کرد. روی گوشی‌های باریک عنوان با «...» بریده می‌شد،
-        // که در اسکرین‌شات مالک هم دیده می‌شود («سلام h...»).
+        titleSpacing: 4,
         title: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             const AppBarLogo(),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: AlignmentDirectional.centerStart,
-                  child: Text(
-                    _titles[_index],
-                    maxLines: 1,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                _titles[_index],
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
                 ),
               ),
             ),
@@ -773,7 +758,7 @@ class _PassButton extends StatelessWidget {
       icon: Stack(
         clipBehavior: Clip.none,
         children: [
-          Image.asset('assets/pass/trophy_icon.webp',
+          Image.asset('assets/games/memory/trophy.webp',
               width: 26, height: 26, cacheWidth: 80, fit: BoxFit.contain),
           if (claimable > 0)
             Positioned(
