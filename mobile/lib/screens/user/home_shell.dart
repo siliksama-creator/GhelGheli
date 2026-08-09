@@ -523,9 +523,11 @@ class _HomeShellState extends State<HomeShell>
             onPressed: () => setState(() => _index = wheelIndex),
           ),
           NotificationBell(api: widget.api),
-          // خروج از شیت «بیشتر» هم در دسترس است؛ حذفِ دکمهٔ تکراری از
-          // نوار بالا، عنوان صفحه را از حالت «چت و...» و «پشتی...» نجات
-          // می‌دهد بدون اینکه هیچ قابلیتی کم شود.
+          IconButton(
+            tooltip: 'خروج از حساب',
+            icon: const Icon(Icons.logout_rounded, size: 20, color: Color(0xFFFF6B6B)),
+            onPressed: () => _confirmLogout(context),
+          ),
           const SizedBox(width: 4),
         ],
       ),

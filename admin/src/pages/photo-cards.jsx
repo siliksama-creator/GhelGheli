@@ -59,6 +59,29 @@ export function PhotoCardsPage({ request }) {
   // می‌دهد. `null` یعنی همه بسته.
   const [openGroup, setOpenGroup] = useState(null);
   const [subFilter, setSubFilter] = useState('pending');
+  const [quickCode, setQuickCode] = useState('');
+  const [quickResult, setQuickResult] = useState(null);
+  const [quickBusy, setQuickBusy] = useState(false);
+
+  async function toggleQuickCode() {
+    if (!quickCode.trim()) return notify('کد را وارد کنید', 'error');
+    setQuickBusy(true);
+    try {
+      const r = await request('/api/admin/photo-cards/codes/toggle-by-code', {
+        method: 'POST',
+        body: { code: quickCode.trim() },
+      });
+      notify(r.message || 'وضعیت کد تغییر کرد', 'success');
+      setQuickResult(r);
+      loadCodes();
+      loadStats();
+    } catch (e) {
+      notify(e.message, 'error');
+    } finally {
+      setQuickBusy(false);
+    }
+  }
+
 
   // ── فرم آپلود: دو عکس، رو و پشت ──
   //

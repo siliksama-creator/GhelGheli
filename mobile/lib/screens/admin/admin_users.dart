@@ -159,6 +159,43 @@ class _AdminUsersState extends State<AdminUsers> {
   // password. Support can set a temporary one here after verifying the
   // user's identity by phone/in person — the action is written to the
   // audit log on the backend.
+  
+  Future<void> _grantPlus(String id) async {
+    final controller = TextEditingController(text: '30');
+    final value = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('اعطای اشتراک قلقلی پلاس'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('مدت زمان اشتراک پلاس را بر حسب روز وارد کنید:', style: TextStyle(fontSize: 12.5)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'تعداد روز', prefixIcon: Icon(Icons.star_rounded)),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('لغو')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, controller.text), child: const Text('اعطا')),
+        ],
+      ),
+    );
+    if (value == null) return;
+    final days = int.tryParse(value) ?? 30;
+    try {
+      final r = await widget.api.post('/api/admin/users/$id/grant-plus', {'days': days});
+      _snack(r is Map ? '${r['message'] ?? 'پلاس فعال شد'}' : 'اشتراک پلاس فعال شد');
+      await _load();
+    } catch (e) {
+      _snack(apiError(e));
+    }
+  }
+
   Future<void> _resetPassword(String id) async {
     final controller = TextEditingController();
     final value = await showDialog<String>(
@@ -378,7 +415,9 @@ class _AdminUsersState extends State<AdminUsers> {
                       ),
                       PopupMenuButton<String>(
                         onSelected: (s) async {
-                          if (s == 'points') {
+                          if (s == 'grant_plus') {
+                            await _grantPlus(u['id']);
+                          } else if (s == 'points') {
                             await _adjustPoints(u['id']);
                           } else if (s == 'reset_password') {
                             await _resetPassword(u['id']);
@@ -390,6 +429,8 @@ class _AdminUsersState extends State<AdminUsers> {
                           }
                         },
                         itemBuilder: (_) => [
+                          const PopupMenuItem(
+                              value: 'grant_plus', child: Text('اعطای اشتراک پلاس')),
                           const PopupMenuItem(
                               value: 'points', child: Text('تغییر امتیاز')),
                           const PopupMenuItem(

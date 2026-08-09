@@ -3151,6 +3151,21 @@ app.patch('/api/admin/users/:id/status', adminAuth, validateUuid('id'), requireR
 //
 //   ۳. **پیام گیج‌کننده بود.** «به مقدار -۵۰۰ تغییر کرد» را کاربر
 //      فارسی‌زبان باید در ذهنش ترجمه کند. حالا «۵۰۰ امتیاز کسر شد».
+
+app.post('/api/admin/users/:id/grant-plus', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
+  const days = Math.max(1, Math.min(365, Number(req.body.days) || 30));
+  const until = new Date(Date.now() + days * 86400000);
+  const r = await pool.query(
+    `INSERT INTO user_subscriptions(user_id, plan, price_paid, starts_at, expires_at)
+     VALUES($1, 'plus', 0, NOW(), $2)
+     RETURNING id, expires_at`,
+    [req.params.id, until]
+  );
+  await audit(req.admin.id, 'grant_plus', 'user_subscriptions', r.rows[0].id, req.body.reason || 'اعطای دستی اشتراک پلاس', { days });
+  await createNotification(req.params.id, 'plus_granted', 'اشتراک قلقلی پلاس فعال شد!', `اشتراک قلقلی پلاس به مدت ${days} روز توسط مدیریت برای شما فعال شد.`);
+  res.json({ message: `اشتراک پلاس به مدت ${days} روز برای کاربر با موفقیت فعال شد`, expiresAt: r.rows[0].expires_at });
+});
+
 app.post('/api/admin/users/:id/points', adminAuth, validateUuid('id'), requireRole(), asyncHandler(async (req, res) => {
   const p = Math.trunc(Number(req.body.points || 0));
   if (!Number.isFinite(p) || p === 0) {

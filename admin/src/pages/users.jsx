@@ -20,6 +20,22 @@ export function UsersPage({ request }) {
   };
   useEffect(load, [request]);
 
+    async function grantPlus(id) {
+    const days = await promptText({
+      title: 'اعطای اشتراک قلقلی پلاس',
+      description: 'مدت زمان اشتراک پلاس بر حسب روز را وارد کنید.',
+      placeholder: 'تعداد روز (مثلاً ۳۰ یا ۹۰)',
+      type: 'number',
+    });
+    if (!days) return;
+    const r = await request(`/api/admin/users/${id}/grant-plus`, {
+      method: 'POST',
+      body: { days: Number(days) || 30, reason: 'اعطای دستی توسط مدیریت' },
+    });
+    notify(r?.message || 'اشتراک پلاس برای کاربر فعال شد');
+    load();
+  }
+
   async function block(id, status) {
     await request(`/api/admin/users/${id}/status`, { method: 'PATCH', body: { status, reason: 'مدیریت پنل' } });
     notify('وضعیت کاربر ثبت شد');
@@ -105,6 +121,9 @@ export function UsersPage({ request }) {
               <>
                 <Button size="sm" variant="secondary" icon={Coins} onClick={() => changePoints(u.id)}>
                   امتیاز
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => grantPlus(u.id)}>
+                  اعطای پلاس
                 </Button>
                 <Button size="sm" variant="secondary" icon={MessageSquareText} onClick={() => privateMessage(u.id)}>
                   پیام

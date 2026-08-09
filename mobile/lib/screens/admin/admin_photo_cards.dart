@@ -74,6 +74,32 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
       .where((c) => c['expected_card_type_name'] == null)
       .toList();
   String _codeFilter = 'unused';
+
+  final _quickCodeCtrl = TextEditingController();
+  bool _quickToggling = false;
+  Map<String, dynamic>? _quickResult;
+
+  Future<void> _toggleQuickCode() async {
+    final code = _quickCodeCtrl.text.trim();
+    if (code.isEmpty) {
+      _snack('کد کارت را وارد کنید');
+      return;
+    }
+    setState(() => _quickToggling = true);
+    try {
+      final r = await widget.api.post('/api/admin/photo-cards/codes/toggle-by-code', {'code': code});
+      final m = r is Map ? Map<String, dynamic>.from(r) : <String, dynamic>{};
+      setState(() => _quickResult = m);
+      _snack(m['message']?.toString() ?? 'وضعیت کد تغییر کرد');
+      await _loadCodes();
+      await _loadStats();
+    } catch (e) {
+      _snack(apiError(e));
+    } finally {
+      if (mounted) setState(() => _quickToggling = false);
+    }
+  }
+
   bool _loading = true;
   String? _loadError;
 

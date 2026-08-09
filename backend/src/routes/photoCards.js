@@ -937,6 +937,46 @@ module.exports = function createPhotoCardRoutes(deps) {
   );
 
   /** ابطال یک کد پیش از آنکه کسی مصرفش کند. */
+  
+  /** جستجو و فعال/غیرفعال‌سازی سریع یک کد بر اساس رشته کد (از میان ۱۵٬۰۰۰+ کد) */
+  router.post(
+    '/admin/photo-cards/codes/toggle-by-code',
+    adminAuth, requireRole('support'),
+    asyncHandler(async (req, res) => {
+      const raw = String(req.body.code || '').trim();
+      if (!raw) return res.status(400).json({ message: 'کد را وارد کنید' });
+      const code = photoCards.normalizePhotoCode(raw);
+      const fold = photoCards.foldPhotoCode(code);
+      const cur = await pool.query(
+        `SELECT c.id, c.code, c.status, c.batch_label, c.expected_card_type_id,
+                t.name AS card_type_name
+           FROM photo_card_codes c
+           LEFT JOIN card_types t ON t.id = c.expected_card_type_id
+          WHERE c.code_fold = $1 OR c.code = $2`,
+        [fold, code],
+      );
+      if (!cur.rows[0]) return res.status(404).json({ message: 'کدی با این مشخصات یافت نشد' });
+      const row = cur.rows[0];
+      if (row.status === 'used') {
+        return res.status(409).json({ message: 'این کد قبلاً توسط کاربر مصرف شده و قابل تغییر وضعیت نیست' });
+      }
+      if (row.status === 'reserved') {
+        return res.status(409).json({ message: 'این کد در صف بررسی است و قابل تغییر وضعیت نیست' });
+      }
+      const nextStatus = row.status === 'voided' ? 'unused' : 'voided';
+      await pool.query('UPDATE photo_card_codes SET status=$1, updated_at=NOW() WHERE id=$2', [nextStatus, row.id]);
+      await audit(req.admin.id, 'toggle_photo_card_code', 'photo_card_codes', row.id, req.body.reason || 'تغییر وضعیت کد دستی', { from: row.status, to: nextStatus, code: row.code });
+      res.json({
+        message: nextStatus === 'voided' ? `کد ${row.code} با موفقیت غیرفعال (باطل) شد` : `کد ${row.code} با موفقیت فعال (آماده مصرف) شد`,
+        code: row.code,
+        status: nextStatus,
+        id: row.id,
+        cardName: row.card_type_name,
+        batchLabel: row.batch_label,
+      });
+    }),
+  );
+
   router.patch(
     '/admin/photo-cards/codes/:id/void',
     adminAuth, requireRole('support'),
