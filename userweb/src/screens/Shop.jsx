@@ -91,7 +91,7 @@ export default function Shop({ token, setMsg, reloadProfile }) {
             {/* ── Plus ─────────────────────────────────────────────── */}
             <section className={`card wide plusCard${d.plus.active ? ' on' : ''}`}>
               <div className="plusHead">
-                <span className="plusStar"><SvgIcon name="trophy" size={25} /></span>
+                <span className="plusStar" style={{ color: '#FFD166', fontSize: '28px', textShadow: '0 0 14px rgba(255,209,102,0.8)' }}>★</span>
                 <div>
                   <h2>قلقلی پلاس</h2>
                   <p className="hint">

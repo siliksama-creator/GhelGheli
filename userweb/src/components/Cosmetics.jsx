@@ -6,9 +6,6 @@
 import React from 'react';
 import { SvgIcon } from './IconAsset.jsx';
 
-// Every crest lives at /shop/club_<slug>.webp, so derive the path instead of
-// maintaining a map. The hand-written map went stale the moment eleven world
-// clubs were added: unlisted slugs rendered no badge at all, silently.
 export const clubImg = slug => (slug ? `/shop/club_${slug}.webp` : null);
 
 export const FRAME_STYLE = {
@@ -19,17 +16,10 @@ export const FRAME_STYLE = {
   holo: 'linear-gradient(135deg,#F472B6,#A855F7,#38BDF8,#34D399)',
 };
 
-// نگاشتِ `NAME_COLOR_LIGHT` و `lightSafeName()` حذف شدند — با تک‌تم شدنِ
-// اپ دیگر سطحِ روشنی وجود ندارد که رنگ‌ها رویش محو شوند.
-
 const RAINBOW_DARK = 'linear-gradient(90deg,#F472B6,#A855F7,#38BDF8,#34D399)';
 
 /**
  * استایلِ درون‌خطی برای نامِ رنگی.
- *
- * متغیرهای `--nc-light` و `--nc-grad-light` حذف شدند: با تک‌تم شدنِ اپ
- * هیچ قانونِ CSSی مصرفشان نمی‌کرد و فقط دو ویژگیِ مرده روی هر نامِ
- * چت بودند.
  */
 export function nameColorStyle(color) {
   if (!color) return undefined;
@@ -50,34 +40,10 @@ export function ClubBadge({ club }) {
   return (
     <img className="nameClub" src={clubImg(club)} alt=""
       width="16" height="16" loading="lazy" decoding="async"
-      // A crest that 404s (a club retired from the catalogue) should vanish,
-      // not leave a broken-image glyph next to someone's name.
       onError={e => { e.currentTarget.style.display = 'none'; }} />
   );
 }
 
-/**
- * A display name with its badge, colour and Plus star.
- *
- * `avatarKey` lets the caller say what picture is already shown next to this
- * name. If the user set their crest AS their profile picture, drawing the
- * same crest again beside their name shows it twice in a row — which is what
- * chat did, and it read as a rendering glitch rather than a flourish. The
- * badge is a way to say "I support this club"; once the avatar says it, the
- * badge is redundant.
- */
-// ═══════════════════════════════════════════════════════════════════════════
-// نشانِ لول — آینهٔ LevelBadge در اپ اندروید
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// سرور لول را کنارِ cosmetics در همان کوئریِ دسته‌ای می‌فرستد، ولی
-// وب‌اپ آن را نادیده می‌گرفت. نتیجه: کاربرِ اندروید لولِ همه را
-// می‌دید و کاربرِ وب هیچ‌کدام را — یک ناهماهنگیِ آشکار بین دو کلاینتِ
-// یک محصول.
-//
-// رده‌بندی و مرزها **دقیقاً** با نسخهٔ فلاتر یکی است
-// (mobile/lib/widgets/level_badge.dart). اگر یکی عوض شود و دیگری نه،
-// همان کاربر در دو کلاینت رنگِ متفاوت می‌بیند.
 export function levelTier(level) {
   if (level >= 90) return 'legend';
   if (level >= 60) return 'gold';
@@ -86,11 +52,6 @@ export function levelTier(level) {
   return 'rookie';
 }
 
-/// نشانِ فشردهٔ لول.
-///
-/// `null`/`undefined` یعنی «سرور نفرستاده» و چیزی رسم نمی‌شود.
-/// **صفر یک لولِ معتبر است** (کاربر تازه) و باید دیده شود — همان
-/// تفکیکی که در اپ اندروید هم رعایت شده.
 export function LevelBadge({ level }) {
   if (level === null || level === undefined) return null;
   const n = Number(level);
@@ -112,7 +73,19 @@ export function DisplayName({
       {!avatarIsSameCrest && <ClubBadge club={c.club} />}
       <LevelBadge level={level} />
       {name}
-      {c.plus && <SvgIcon className="plusStarSm" title="عضو پلاس" name="trophy" size={14} />}
+      {c.plus && (
+        <span className="plusStarSm" title="عضو طلایی قلقli پلاس" style={{
+          color: '#FFD166',
+          textShadow: '0 0 10px rgba(255,209,102,0.85)',
+          fontSize: '13px',
+          marginInlineStart: '4px',
+          display: 'inline-block',
+          verticalAlign: 'middle',
+          lineHeight: '1',
+        }}>
+          ★
+        </span>
+      )}
     </b>
   );
 }

@@ -220,7 +220,7 @@ function Portal({ token, logout }) {
             یک حس بدهند. درخشش با CSS (کلاس .appLogo) ساخته می‌شود. */}
         <img className="appLogo glow" src="/logo.webp" alt="" width="32" height="32" />
         <div className="appWho">
-          <b>{u.nickname || 'کاربر'}</b>
+          <b>{u.nickname || 'کاربر'}{(u.has_plus || p?.cosmetics?.plus) ? <span className="plusStarSm" title="عضو طلایی قلقلی پلاس" style={{ color: '#FFD166', textShadow: '0 0 10px rgba(255,209,102,0.85)', fontSize: '13px', marginInlineStart: '4px' }}>★</span> : null}</b>
           <span>{fa(u.current_points)} امتیاز</span>
         </div>
         {/* گذر نبرد — نشانِ «جایزهٔ آماده» مهم‌ترین بخشش است: کاربر باید
