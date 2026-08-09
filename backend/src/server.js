@@ -1634,9 +1634,13 @@ app.post('/api/login-streak/claim', auth, loginStreakLimiter,
     res.json(await loginStreak.claim(req.user.id));
   }));
 
-app.post('/api/pass/claim/:tierId', auth, validateUuid('tierId'),
+app.post('/api/pass/claim/:tierId?', auth,
   asyncHandler(async (req, res) => {
-    const granted = await pass.claim(req.user.id, req.params.tierId);
+    const tierId = req.params.tierId || req.body.tierId;
+    if (!tierId || !UUID_RE.test(String(tierId))) {
+      return res.status(400).json({ message: 'شناسه پله نامعتبر است' });
+    }
+    const granted = await pass.claim(req.user.id, tierId);
     res.json({ message: 'جایزه دریافت شد', granted });
   }));
 

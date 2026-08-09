@@ -129,7 +129,9 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
     }
 
     final entries = List<Map>.from(_data?['entries'] ?? []);
+    final activeLeagues = List<Map>.from(_data?['activeLeagues'] ?? []);
     final season = _data?['season'];
+    final currentSeasonId = season?['id']?.toString();
     final end =
         season?['ends_at'] == null ? null : DateTime.parse(season['ends_at']);
     final daysLeft = end == null
@@ -149,6 +151,70 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, Gaps.xxl),
         children: [
+          if (activeLeagues.length > 1) ...[
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (final l in activeLeagues)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () {
+                          setState(() {
+                            _selectedLeagueId = l['id']?.toString();
+                            _loading = true;
+                          });
+                          _load();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            color: (currentSeasonId == l['id']?.toString())
+                                ? BrandColors.emerald.withValues(alpha: 0.22)
+                                : Colors.white.withValues(alpha: 0.05),
+                            border: Border.all(
+                              color: (currentSeasonId == l['id']?.toString())
+                                  ? BrandColors.emerald
+                                  : Colors.white12,
+                              width: 1.4,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                l['league_type'] == 'weekly'
+                                    ? Icons.bolt_rounded
+                                    : Icons.military_tech_rounded,
+                                size: 16,
+                                color: (currentSeasonId == l['id']?.toString())
+                                    ? BrandColors.emerald
+                                    : Colors.white70,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                '${l['title'] ?? l['month_year'] ?? 'لیگ'}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                  color: (currentSeasonId == l['id']?.toString())
+                                      ? Colors.white
+                                      : Colors.white70,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Gaps.vSm,
+          ],
           Container(
             padding: const EdgeInsets.all(Gaps.xl),
             decoration: BoxDecoration(

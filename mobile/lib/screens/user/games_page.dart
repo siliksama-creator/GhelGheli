@@ -1,3 +1,4 @@
+import 'games/private_match_dialog.dart';
 import 'dart:math' as math;
 // Games hub. Each board lives in its own file under ./games/ so this screen
 // stays a thin launcher rather than growing every time a game is added.
@@ -198,6 +199,45 @@ class _GamesHubPageState extends State<GamesHubPage> {
           ),
         Gaps.vSm,
         const _ScrollDownHint(),
+        Gaps.vSm,
+        InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => PrivateMatchDialog.show(
+            context,
+            api: widget.api,
+            onJoinRoom: (gameId, roomCode) {
+              setState(() => _active = gameId);
+            },
+          ),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF064E3B), Color(0xFF0F172A)],
+              ),
+              border: Border.all(color: const Color(0xFF22E7A6).withValues(alpha: 0.5)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.person_add_alt_1_rounded, color: Color(0xFF22E7A6), size: 24),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('دوئل مستقیم با دوست (کد اتاق / لینک)',
+                          style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 13)),
+                      Text('اتاق خصوصی بساز و دوستانت را به چالش بکش',
+                          style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 10.5)),
+                    ],
+                  ),
+                ),
+                Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF22E7A6)),
+              ],
+            ),
+          ),
+        ),
         Gaps.vMd,
         for (final g in _games) ...[
           _GameTile(entry: g, onTap: () => setState(() => _active = g.id)),

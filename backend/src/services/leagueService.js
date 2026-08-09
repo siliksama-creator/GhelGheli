@@ -159,18 +159,36 @@ async function addLeaguePoints(client, userId, points) {
     [season.id, userId, points]
   );
 }
-async function getLeaderboard(limit = 100) {
-  const season = await ensureActiveSeason();
+async function getLeaderboard(limit = 100, seasonId = null) {
+  const { rows: activeSeasons } = await pool.query(
+    "SELECT id, title, league_type, month_year, starts_at, ends_at, status, prize_table, min_points_entry, plus_only FROM league_seasons WHERE status='active' ORDER BY starts_at ASC"
+  );
+  let season = null;
+  if (seasonId) {
+    season = activeSeasons.find(s => s.id === seasonId);
+    if (!season) {
+      const sRow = await pool.query("SELECT id, title, league_type, month_year, starts_at, ends_at, status, prize_table, min_points_entry, plus_only FROM league_seasons WHERE id=$1", [seasonId]);
+      season = sRow.rows[0] || null;
+    }
+  }
+  if (!season) {
+    season = activeSeasons[0] || (await ensureActiveSeason(pool));
+  }
   const { rows } = await pool.query(
-    `SELECT e.user_id, e.points, DENSE_RANK() OVER(ORDER BY e.points DESC) AS rank,
-            u.nickname, u.first_name, u.last_name, u.profile_image_url
-     FROM league_leaderboard_entries e
-     JOIN users u ON u.id=e.user_id
-     WHERE e.league_season_id=$1 AND u.status='active'
-     ORDER BY e.points DESC, e.updated_at ASC LIMIT $2`,
+    `SELECT e.user_id, e.points,
+            u.nickname, u.first_name, u.last_name, u.profile_image_url, u.profile_avatar_key,
+            DENSE_RANK() OVER(ORDER BY e.points DESC) AS rank
+       FROM league_leaderboard_entries e
+       JOIN users u ON u.id=e.user_id
+      WHERE e.league_season_id=$1 AND u.status='active'
+      ORDER BY e.points DESC LIMIT $2`,
     [season.id, limit]
   );
-  return { season, entries: rows };
+  return {
+    season,
+    activeLeagues: activeSeasons.length ? activeSeasons : [season],
+    entries: rows,
+  };
 }
 async function closeActiveSeason({ force = false } = {}) {
   const client = await pool.connect();

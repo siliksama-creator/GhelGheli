@@ -216,20 +216,26 @@ class _PenaltyBoardState extends State<_PenaltyBoard>
     final outcome = '${last['outcome']}';
     // فقط گل به تور می‌خورد. مهار یعنی توپ در دستکش مانده، و بیرون یعنی
     // اصلاً وارد چارچوب نشده.
-    if (outcome != 'goal') {
-      _netHit = true;
-      return;
-    }
-    final z = NumberParser.toInt(last['shotZone']);
-    final power = (last['power'] as num?)?.toDouble() ?? 0.7;
-    // مختصات نسبیِ ناحیه روی دهانهٔ دروازه (۰..۱).
-    final u = ((z % 3) + 0.5) / 3;
-    final v = ((z ~/ 3) + 0.5) / 3;
-    _net.hit(u, v, power);
     _netHit = true;
-    if (!_netTicker.isActive) {
-      _lastTick = Duration.zero;
-      _netTicker.start();
+    if (outcome == 'goal') {
+      // Goal impact at 62% of animation timeline
+      GameAudio.instance.play(Sfx.win, volume: 1.0);
+      HapticFeedback.heavyImpact();
+      final z = NumberParser.toInt(last['shotZone']);
+      final power = (last['power'] as num?)?.toDouble() ?? 0.7;
+      final u = ((z % 3) + 0.5) / 3;
+      final v = ((z ~/ 3) + 0.5) / 3;
+      _net.hit(u, v, power);
+      if (!_netTicker.isActive) {
+        _lastTick = Duration.zero;
+        _netTicker.start();
+      }
+    } else if (outcome == 'save') {
+      GameAudio.instance.play(Sfx.drop, volume: 0.9);
+      HapticFeedback.mediumImpact();
+    } else {
+      GameAudio.instance.play(Sfx.timeout, volume: 0.8);
+      HapticFeedback.selectionClick();
     }
   }
 
@@ -243,11 +249,9 @@ class _PenaltyBoardState extends State<_PenaltyBoard>
       _netHit = false;
       _power.stop();
       _kick.forward(from: 0);
-      final last = widget.session.state['lastKick'];
-      if (last is Map) {
-        final o = '${last['outcome']}';
-        GameAudio.instance.play(o == 'goal' ? Sfx.win : Sfx.move);
-      }
+      // Play kick strike sound at start of animation
+      GameAudio.instance.play(Sfx.tap, volume: 0.9);
+      HapticFeedback.lightImpact();
     } else if (hist.isEmpty && _playedKicks != -1) {
       _playedKicks = -1;
       _net.reset();

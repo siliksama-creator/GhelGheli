@@ -727,7 +727,7 @@ class _CompactRewardTile extends StatelessWidget {
     }
 
     return InkWell(
-      onTap: busy ? null : () => onClaim(track),
+      onTap: busy ? null : () => onClaim(m['id']?.toString() ?? ''),
       borderRadius: BorderRadius.circular(10),
       child: AnimatedBuilder(
         animation: pulse,

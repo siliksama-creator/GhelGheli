@@ -670,10 +670,24 @@ class _ChatBubble extends StatelessWidget {
                       ),
                     ),
                   isSticker
-                      ? SafeImage(
-                          url: message['sticker_url'],
-                          width: 100, height: 100,
-                          fit: BoxFit.contain, fallbackEmoji: '🙂')
+                      ? Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: (message['sticker_url']?.toString().startsWith('assets/') ?? false)
+                              ? Image.asset(
+                                  message['sticker_url'],
+                                  width: 84,
+                                  height: 84,
+                                  cacheWidth: 250,
+                                  fit: BoxFit.contain,
+                                )
+                              : SafeImage(
+                                  url: message['sticker_url'],
+                                  width: 84,
+                                  height: 84,
+                                  fit: BoxFit.contain,
+                                  fallbackEmoji: '⚽',
+                                ),
+                        )
                       : Text(message['message_text'] ?? '',
                           style: theme.textTheme.bodyMedium),
                   Gaps.vXxs,

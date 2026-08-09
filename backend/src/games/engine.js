@@ -407,6 +407,46 @@ const attachGames = function attachGames(io, rulesById) {
   io.on('connection', socket => {
     if (!socket.user) return;
 
+    
+    // ── چالش ۱ به ۱ مستقیم با لینک / کد اتاق ──
+    socket.on('game:create_room', payload => {
+      const gameId = (payload && typeof payload === 'object' && payload.gameId) || Object.keys(rulesById)[0];
+      const rules = rulesById[gameId];
+      if (!rules) return safeEmit(socket, 'game:error', { message: 'بازی یافت نشد' });
+      dropFromQueue(socket);
+      const code = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const roomId = `room-${code}`;
+      socket.privateRoomCode = code;
+      socket.privateGameId = gameId;
+      socket.join(roomId);
+      safeEmit(socket, 'game:room_created', {
+        roomCode: code,
+        gameId,
+        shareUrl: `https://user.ghelghelishop.ir/?game=${gameId}&room=${code}`,
+        message: 'اتاق ساخته شد — کد یا لینک را برای دوستت بفرست',
+      });
+    });
+
+    socket.on('game:join_room', payload => {
+      const code = String(payload?.roomCode || '').trim().toUpperCase();
+      if (!code) return safeEmit(socket, 'game:error', { message: 'کد اتاق را وارد کنید' });
+      const roomId = `room-${code}`;
+      const roomSockets = io.sockets.adapter.rooms.get(roomId);
+      if (!roomSockets || roomSockets.size === 0) {
+        return safeEmit(socket, 'game:error', { message: 'اتاقی با این کد یافت نشد یا منقضی شده است' });
+      }
+      const hostSocketId = Array.from(roomSockets)[0];
+      const hostSocket = io.sockets.sockets.get(hostSocketId);
+      if (!hostSocket || hostSocket.id === socket.id) {
+        return safeEmit(socket, 'game:error', { message: 'نمی‌توانی به اتاق خودت متصل شوی' });
+      }
+      const gameId = hostSocket.privateGameId || Object.keys(rulesById)[0];
+      const rules = rulesById[gameId];
+      dropFromQueue(hostSocket);
+      dropFromQueue(socket);
+      startRoom(io, rules, gameId, hostSocket, socket);
+    });
+
     socket.on('game:join', payload => {
       const gameId = (payload && typeof payload === 'object' && payload.gameId)
         || Object.keys(rulesById)[0];

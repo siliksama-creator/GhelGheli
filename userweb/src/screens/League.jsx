@@ -11,8 +11,9 @@ import { AsyncSection, EmptyView } from '../components/states.jsx';
 import Clubs from './Clubs.jsx';
 
 export default function League({ token, openProfile }) {
+  const [selectedLeagueId, setSelectedLeagueId] = useState(null);
   const load = useCallback(
-    () => req('/api/league/current', 'GET', null, token), [token]);
+    () => req(selectedLeagueId ? `/api/league/current?seasonId=${selectedLeagueId}` : '/api/league/current', 'GET', null, token), [token, selectedLeagueId]);
   const state = useAsync(load, [load]);
   const [tab, setTab] = useState('table');
 
@@ -48,6 +49,31 @@ export default function League({ token, openProfile }) {
               <button className="on">جدول لیگ</button>
               <button onClick={() => setTab('clubs')}>باشگاه‌ها</button>
             </div>
+
+            {(d.activeLeagues || []).length > 1 && (
+              <div style={{ display: 'flex', gap: '8px', margin: '12px 0', overflowX: 'auto', paddingBottom: '4px' }}>
+                {d.activeLeagues.map(l => (
+                  <button
+                    key={l.id}
+                    type="button"
+                    style={{
+                      padding: '8px 14px',
+                      borderRadius: '12px',
+                      background: (season.id === l.id) ? 'rgba(0, 212, 154, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                      border: `1px solid ${(season.id === l.id) ? '#00D49A' : 'rgba(255, 255, 255, 0.1)'}`,
+                      color: (season.id === l.id) ? '#00D49A' : '#CBD5E1',
+                      fontWeight: '700',
+                      fontSize: '12.5px',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap'
+                    }}
+                    onClick={() => setSelectedLeagueId(l.id)}
+                  >
+                    {l.league_type === 'weekly' ? '⚡ ' : '🏆 '}{l.title || l.month_year || 'لیگ'}
+                  </button>
+                ))}
+              </div>
+            )}
 
             <div className="sectionHead">
               <div>
