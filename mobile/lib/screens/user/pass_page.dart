@@ -195,8 +195,8 @@ class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin
               children: [
                 Row(
                   children: [
-                    Image.asset('assets/pass/streak_icon.webp', width: 40, height: 40, cacheWidth: 100,
-                        errorBuilder: (_, __, ___) => const Icon(Icons.emoji_events_rounded, color: _plusGold, size: 32)),
+                    Image.asset('assets/pass/streak_icon.webp', width: 38, height: 38, cacheWidth: 100,
+                        errorBuilder: (_, __, ___) => const Icon(Icons.emoji_events_rounded, color: _plusGold, size: 30)),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Column(
@@ -206,7 +206,7 @@ class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin
                             '${season['name'] ?? 'فصل اول — شروع قلقلی'}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Colors.white),
+                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14.5, color: Colors.white),
                           ),
                           const SizedBox(height: 2),
                           Text(
@@ -236,14 +236,17 @@ class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin
                 ),
                 const SizedBox(height: 6),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'امروز ${faNum(d['tiersToday'])} از ${faNum(d['maxTiersPerDay'])} پله باز شد',
-                      style: const TextStyle(fontSize: 10.5, color: Colors.white70, fontWeight: FontWeight.w700),
+                    Expanded(
+                      child: Text(
+                        'امروز ${faNum(d['tiersToday'])} از ${faNum(d['maxTiersPerDay'])} پله باز شد',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 10.5, color: Colors.white70, fontWeight: FontWeight.w700),
+                      ),
                     ),
                     Text(
-                      '${faNum(d['intoTier'])} / ${faNum(d['tierNeeds'])} XP تا پله بعد',
+                      '${faNum(d['intoTier'])} / ${faNum(d['tierNeeds'])} XP',
                       style: const TextStyle(fontSize: 10.5, color: Color(0xFF38BDF8), fontWeight: FontWeight.w800),
                     ),
                   ],
@@ -352,7 +355,7 @@ class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin
 
           const SizedBox(height: 8),
 
-          // ── Track Legend & Fold Button (Wrap ensures zero overflow) ──
+          // ── Track Legend & Fold Button ──
           Wrap(
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
@@ -485,8 +488,8 @@ class _PassRow extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 34,
-            height: 64,
+            width: 32,
+            height: 52,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(8),
               color: unlocked ? _readyColor.withValues(alpha: 0.15) : Colors.white.withValues(alpha: 0.05),
@@ -496,18 +499,18 @@ class _PassRow extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(unlocked ? Icons.lock_open_rounded : Icons.lock_outline_rounded,
-                    size: 13, color: unlocked ? _readyColor : Colors.white38),
+                    size: 12, color: unlocked ? _readyColor : Colors.white38),
                 const SizedBox(height: 2),
                 Text(faNum(tNum),
                     style: TextStyle(
                       color: unlocked ? Colors.white : Colors.white60,
                       fontWeight: FontWeight.w900,
-                      fontSize: 13,
+                      fontSize: 12.5,
                     )),
               ],
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 5),
 
           Expanded(
             child: _CompactRewardTile(
@@ -519,7 +522,7 @@ class _PassRow extends StatelessWidget {
               onClaim: onClaim,
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 5),
 
           Expanded(
             child: _CompactRewardTile(
@@ -564,7 +567,7 @@ class _CompactRewardTile extends StatelessWidget {
   Widget build(BuildContext context) {
     if (data == null) {
       return Container(
-        height: 64,
+        height: 52,
         alignment: Alignment.center,
         child: const Text('—', style: TextStyle(color: Colors.white24)),
       );
@@ -590,8 +593,8 @@ class _CompactRewardTile extends StatelessWidget {
     }
 
     final tile = Container(
-      height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      height: 52,
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
         color: ready
@@ -608,39 +611,41 @@ class _CompactRewardTile extends StatelessWidget {
         children: [
           Image.asset(
             _art[kind] ?? 'assets/pass/reward_gift_icon.webp',
-            width: 22,
-            height: 22,
+            width: 20,
+            height: 20,
             cacheWidth: 64,
             errorBuilder: (_, __, ___) => Icon(
               isPlus ? Icons.star_rounded : Icons.card_giftcard_rounded,
-              size: 18,
+              size: 16,
               color: isPlus ? _plusGold : _freeColor,
             ),
           ),
           const SizedBox(width: 4),
           Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                    color: claimed ? Colors.white38 : Colors.white,
+            child: SingleChildScrollView(
+              physics: const NeverScrollableScrollPhysics(),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w900,
+                      color: claimed ? Colors.white38 : Colors.white,
+                    ),
                   ),
-                ),
-                if (claimed)
-                  const Text('✓ گرفتی', style: TextStyle(fontSize: 9, color: _readyColor, fontWeight: FontWeight.w800))
-                else if (locked)
-                  Text('فقط پلاس', style: TextStyle(fontSize: 9, color: context.gold, fontWeight: FontWeight.w800))
-                else if (ready)
-                  const Text('برای گرفتن بزن', style: TextStyle(fontSize: 9, color: _readyColor, fontWeight: FontWeight.w900)),
-              ],
+                  if (claimed)
+                    const Text('✓ گرفتی', style: TextStyle(fontSize: 8.5, color: _readyColor, fontWeight: FontWeight.w800))
+                  else if (locked)
+                    Text('فقط پلاس', style: TextStyle(fontSize: 8.5, color: context.gold, fontWeight: FontWeight.w800))
+                  else if (ready)
+                    const Text('برای گرفتن بزن', style: TextStyle(fontSize: 8.5, color: _readyColor, fontWeight: FontWeight.w900)),
+                ],
+              ),
             ),
           ),
         ],
