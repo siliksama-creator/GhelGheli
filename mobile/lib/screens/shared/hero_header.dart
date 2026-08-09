@@ -79,79 +79,71 @@ class HeroHeader extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── greeting + points Row ──
+          // ── greeting + points Row (Expanded to prevent any overflow) ──
           Row(
             children: [
-              InkWell(
-                onTap: onOpenProfile,
-                borderRadius: Corners.rPill,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    AvatarImage(
-                      imageUrl: user?['profile_image_url'],
-                      keyName: user?['profile_avatar_key'],
-                      radius: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 150),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          DisplayName(
-                            name: 'سلام $nickname',
-                            cosmetics: cosmetics,
-                            avatarKey: user?['profile_avatar_key'],
-                            maxLines: 1,
-                            style: const TextStyle(
-                                fontSize: 14.5,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white),
-                          ),
-                          const Row(
-                            children: [
-                              Text('پروفایل کاربری',
-                                  style: TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w600)),
-                              SizedBox(width: 2),
-                              Icon(Icons.chevron_left_rounded,
-                                  size: 13, color: Colors.white70),
-                            ],
-                          ),
-                        ],
+              Expanded(
+                child: InkWell(
+                  onTap: onOpenProfile,
+                  borderRadius: Corners.rPill,
+                  child: Row(
+                    children: [
+                      AvatarImage(
+                        imageUrl: user?['profile_image_url'],
+                        keyName: user?['profile_avatar_key'],
+                        radius: 19,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            DisplayName(
+                              name: 'سلام $nickname ',
+                              cosmetics: cosmetics,
+                              avatarKey: user?['profile_avatar_key'],
+                              maxLines: 1,
+                              style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white),
+                            ),
+                            const Row(
+                              children: [
+                                Text('پروفایل من',
+                                    style: TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w600)),
+                                SizedBox(width: 2),
+                                Icon(Icons.chevron_left_rounded,
+                                    size: 13, color: Colors.white70),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: [
-                      Text(faNum(points),
-                          style: const TextStyle(
-                              fontSize: 21,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF22E7A6),
-                              height: 1.1)),
-                      const SizedBox(width: 4),
-                      const Text('امتیاز',
-                          style: TextStyle(
-                              color: Colors.white70,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 10)),
-                    ],
-                  ),
+                  Text(faNum(points),
+                      style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          height: 1.1)),
+                  const Text('امتیاز',
+                      style: TextStyle(
+                          color: Colors.white70,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 10)),
                 ],
               ),
             ],
