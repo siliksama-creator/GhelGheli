@@ -421,7 +421,7 @@ class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin
               data: row,
               busy: _busy,
               pulse: _pulse,
-              onClaim: (tr) => _claim(row, tr),
+              onClaim: _claim,
               onOpenShop: widget.onOpenShop,
             ),
             const SizedBox(height: 6),

@@ -551,9 +551,6 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
                       backgroundColor: BrandColors.emerald,
                       foregroundColor: const Color(0xFF00281D),
                     ),
-                    // Disabled during the server-side cooldown, with the
-                    // remaining seconds shown so the wait is explained rather
-                    // than the send silently failing.
                     onPressed: (_error != null || _cooldownLeft > 0)
                         ? null
                         : _pickCanned,
@@ -564,6 +561,21 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
                         ? 'کمی صبر کن... ${faNum(_cooldownLeft)} ثانیه'
                         : 'انتخاب پیام آماده...'),
                   ),
+                ),
+                const SizedBox(width: 8),
+                IconButton.filled(
+                  style: IconButton.styleFrom(
+                    backgroundColor: const Color(0xFF1E293B),
+                    foregroundColor: const Color(0xFFFFD166),
+                    minimumSize: const Size(50, 50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: Corners.rLg,
+                      side: BorderSide(color: const Color(0xFFFFD166).withValues(alpha: 0.35)),
+                    ),
+                  ),
+                  tooltip: 'ایموجی و استیکرهای بزرگ',
+                  icon: const Icon(Icons.emoji_emotions_rounded, size: 24),
+                  onPressed: _openStickersSheet,
                 ),
               ],
             ),
