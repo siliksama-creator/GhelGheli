@@ -355,11 +355,11 @@ class _CompactRules extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          const Row(
             children: [
-              const Icon(Icons.verified_user_rounded, color: Color(0xFFA3E635), size: 16),
-              const SizedBox(width: 6),
-              const Text('مزایای سیستم دعوت:', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+              Icon(Icons.verified_user_rounded, color: Color(0xFFA3E635), size: 16),
+              SizedBox(width: 6),
+              Text('مزایای سیستم دعوت:', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
             ],
           ),
           const SizedBox(height: 6),

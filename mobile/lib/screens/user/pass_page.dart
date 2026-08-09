@@ -283,10 +283,10 @@ class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin
               color: Colors.white.withValues(alpha: 0.04),
               border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
             ),
-            child: Column(
+            child: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
                     Icon(Icons.bolt_rounded, color: Color(0xFFFFD166), size: 15),
                     SizedBox(width: 4),
@@ -298,11 +298,11 @@ class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: 6),
                 Wrap(
                   spacing: 5,
                   runSpacing: 5,
-                  children: const [
+                  children: [
                     _XpPill(label: 'بازی آنلاین', xp: '+۱۵/۲۵'),
                     _XpPill(label: 'ضربه‌زن', xp: '+۳۰'),
                     _XpPill(label: 'گردونه', xp: '+۲۰'),

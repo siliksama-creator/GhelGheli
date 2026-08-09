@@ -154,11 +154,11 @@ export default function Pass({ token, setMsg, openShop }) {
                 <small>حداکثر {fa(d.maxTiersPerDay)} پله در هر روز</small>
               </div>
               <div className="pSourcesPills">
-                <span className="xpPill">🎮 بازی آنلاین <b>+۱۵/۲۵</b></span>
-                <span className="xpPill">⚡ ضربه‌زن <b>+۳۰</b></span>
-                <span className="xpPill">🎡 گردونه <b>+۲۰</b></span>
-                <span className="xpPill">👥 دعوت دوست <b>+۱۰۰</b></span>
-                <span className="xpPill">📅 ورود روزانه <b>+۲۰</b></span>
+                <span className="xpPill"><UiIcon name="game" size={14} /> بازی آنلاین <b>+۱۵/۲۵</b></span>
+                <span className="xpPill"><UiIcon name="bolt" size={14} /> ضربه‌زن <b>+۳۰</b></span>
+                <span className="xpPill"><UiIcon name="wheel" size={14} /> گردونه <b>+۲۰</b></span>
+                <span className="xpPill"><UiIcon name="group" size={14} /> دعوت دوست <b>+۱۰۰</b></span>
+                <span className="xpPill"><UiIcon name="calendar" size={14} /> ورود روزانه <b>+۲۰</b></span>
               </div>
             </div>
 

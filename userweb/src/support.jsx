@@ -90,7 +90,7 @@ export default function Support({ token, api, req, asset }) {
           ))}
         </div>
         <button className="ghost privacyLink" onClick={() => setPrivacyOpen(true)}>
-          🛡️ منشور حریم خصوصی و شفافیت بازی جوانمردانه
+          منشور حریم خصوصی و شفافیت بازی جوانمردانه
         </button>
       </div>
 

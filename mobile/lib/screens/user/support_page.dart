@@ -133,10 +133,10 @@ class _SupportPageState extends State<SupportPage> {
             Text('حریم خصوصی و شفافیت بازی', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
           ],
         ),
-        content: SingleChildScrollView(
+        content: const SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
+            children: [
               Text(
                 '۱. ماهیت پلتفرم سرگرمی و بازی مهارت‌محور:',
                 style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFFFFD166), fontSize: 13),

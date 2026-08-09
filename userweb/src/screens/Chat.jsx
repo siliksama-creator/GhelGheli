@@ -144,7 +144,7 @@ export default function Chat({ token, openProfile, meId }) {
       <div className="sectionHead">
         <div>
           <h2>چت روم قلقلی</h2>
-          <p>با هواداران دیگر گفتگو کن ⚽</p>
+          <p>با هواداران دیگر گفتگو کن</p>
         </div>
         <span className="liveBadge">زنده</span>
       </div>
@@ -158,7 +158,7 @@ export default function Chat({ token, openProfile, meId }) {
           style={{
             '--pin-dark': PIN_COLORS[pinned.accent] || PIN_COLORS.gold,
           }}>
-          <span className="pinIcon">📌</span>
+          <span className="pinIcon"></span>
           <div><b>اعلان مدیریت</b><p>{pinned.text}</p></div>
         </div>
       )}
@@ -192,7 +192,7 @@ export default function Chat({ token, openProfile, meId }) {
 
       <div className="sendDock">
         <button className="emojiBtn" onClick={() => setCannedOpen(!cannedOpen)}>
-          💬 انتخاب پیام
+          انتخاب پیام
         </button>
         {cannedOpen && (
           <div className="cannedPopover">
@@ -257,7 +257,7 @@ const Message = memo(function Message({ m, mine, onProfile, onReply, onLike, onR
         )}
         <div className="chatActions">
           <button onClick={() => onReply(m)}>ریپلای</button>
-          <button onClick={() => onLike(m)}>❤ {fa(m.like_count)}</button>
+          <button onClick={() => onLike(m)}>پسند {fa(m.like_count)}</button>
           <button onClick={() => onReport(m)}>گزارش</button>
         </div>
       </div>

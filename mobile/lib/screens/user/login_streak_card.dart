@@ -265,7 +265,7 @@ class _LoginStreakCardState extends State<LoginStreakCard>
                                       ),
                                     ),
                                     child: Text(
-                                      claimedToday ? '✓ ثبت شد' : '🔥 هدیه آماده',
+                                      claimedToday ? '✓ ثبت شد' : 'هدیه آماده',
                                       style: TextStyle(
                                         color: claimedToday ? const Color(0xFF34D399) : const Color(0xFFFFD166),
                                         fontSize: 9.5,
