@@ -20,7 +20,7 @@ function rewardText(r) {
   return r.label || 'آیتم ویژه';
 }
 
-function RewardTile({ r, unlocked, track, onClaim, busy }) {
+function RewardTile({ r, unlocked, track, onClaim, onOpenShop, busy }) {
   if (!r) return <div className="pTile pTileEmpty">—</div>;
   const claimed = r.claimed;
   const locked = r.locked;
@@ -30,9 +30,12 @@ function RewardTile({ r, unlocked, track, onClaim, busy }) {
     ready ? 'is-ready' : ''].filter(Boolean).join(' ');
 
   return (
-    <button className={cls} disabled={!ready || busy}
-      onClick={() => ready && onClaim(r.id)}
-      title={locked ? 'مخصوص اعضای قلقلی پلاس' : rewardText(r)}>
+    <button className={cls} disabled={claimed || busy}
+      onClick={() => {
+        if (ready) onClaim(r.id);
+        else if (locked && onOpenShop) onOpenShop();
+      }}
+      title={locked ? 'مخصوص اعضای قلقلی پلاس — برای فعال‌سازی کلیک کنید' : rewardText(r)}>
       <span className="pTileArt">
         {ART[r.kind]
           ? <img src={ART[r.kind]} alt="" width="28" height="28" loading="lazy" />

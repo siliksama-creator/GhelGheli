@@ -522,13 +522,10 @@ class _PlusCard extends StatelessWidget {
             ),
           ),
           Gaps.vXs,
-          FilledButton(
-            onPressed: busy ? null : onBuy,
-            child: Text(busy
-                ? 'در حال خرید...'
-                : active
-                    ? 'تمدید یک ماه دیگر'
-                    : 'فعال‌سازی پلاس'),
+          AnimePlusButton(
+            busy: busy,
+            onPressed: onBuy,
+            label: active ? 'تمدید قلقلی پلاس ⚡' : 'فعال‌سازی قلقلی پلاس ⚡',
           ),
           if (active)
             Padding(
@@ -763,6 +760,114 @@ class _Chip extends StatelessWidget {
       child: Text(text,
           style: TextStyle(
               fontSize: 9.5, fontWeight: FontWeight.w800, color: color)),
+    );
+  }
+}
+
+
+class AnimePlusButton extends StatefulWidget {
+  const AnimePlusButton({
+    super.key,
+    required this.onPressed,
+    this.label = 'فعال‌سازی قلقلی پلاس',
+    this.busy = false,
+  });
+
+  final VoidCallback? onPressed;
+  final String label;
+  final bool busy;
+
+  @override
+  State<AnimePlusButton> createState() => _AnimePlusButtonState();
+}
+
+class _AnimePlusButtonState extends State<AnimePlusButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _shimmer = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2000),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _shimmer.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _shimmer,
+      builder: (context, _) {
+        final t = _shimmer.value;
+        return InkWell(
+          onTap: widget.busy ? null : widget.onPressed,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            height: 52,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFFFFD700),
+                  Color(0xFFFF9F43),
+                  Color(0xFFFF007A),
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFFF9F43).withValues(alpha: 0.50),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Stack(
+              children: [
+                // Shimmer sweep
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment(-2.0 + t * 4.0, -1.0),
+                          end: Alignment(-1.0 + t * 4.0, 1.0),
+                          colors: [
+                            Colors.transparent,
+                            Colors.white.withValues(alpha: 0.35),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.auto_awesome_rounded, size: 20, color: Color(0xFF1E0A00)),
+                      const SizedBox(width: 8),
+                      Text(
+                        widget.busy ? 'در حال باز کردن فروشگاه...' : widget.label,
+                        style: const TextStyle(
+                          color: Color(0xFF1E0A00),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -2609,54 +2609,30 @@ app.put('/api/admin/rewards/:id/cards', adminAuth, validateUuid('id'), requireRo
 
 app.post('/api/admin/rewards', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
   const r = req.body;
-  // No practical cap: the admin owns the catalogue. A sanity ceiling stays
-  // only to catch a runaway script, not to constrain real use.
-  const count = await pool.query(
-    'SELECT count(*)::int AS count FROM reward_tiers WHERE is_active = true');
+  const count = await pool.query('SELECT count(*)::int AS count FROM reward_tiers WHERE is_active = true');
   if (count.rows[0].count >= 500) {
-    return res.status(400).json({
-      message: 'تعداد جوایز فعال بیش از حد است (۵۰۰)؛ چند مورد را غیرفعال کنید',
-    });
+    return res.status(400).json({ message: 'تعداد جوایز فعال بیش از حد است (۵۰۰)؛ چند مورد را غیرفعال کنید' });
   }
   const requiredPoints = Number(r.requiredPoints);
-  if (!r.name || !Number.isFinite(requiredPoints) || requiredPoints <= 0) return res.status(400).json({ message: 'نام جایزه و امتیاز معتبر الزامی است' });
-  // reward_value is NOT NULL in the schema but was never validated here, so
-  // omitting it produced a 500 with the generic 'اطلاعات لازم کامل نیست' —
-  // which named no field and looked like a server fault rather than a form
-  // mistake. Reproduced against production.
-  if (!r.rewardValue || !String(r.rewardValue).trim()) {
-    return res.status(400).json({ message: 'شرح جایزه (مثلاً نام کالا یا مبلغ) الزامی است' });
+  if (!r.name || !Number.isFinite(requiredPoints) || requiredPoints <= 0) {
+    return res.status(400).json({ message: 'نام جایزه و امتیاز معتبر الزامی است' });
   }
-  if (!['cash', 'physical'].includes(r.rewardType)) {
-    return res.status(400).json({ message: 'نوع جایزه باید «cash» یا «physical» باشد' });
+  const rewardType = r.rewardType === 'physical' ? 'physical' : 'cash';
+  const cashAmount = cashAmountInput(r.cashAmount) ?? (rewardType === 'cash' ? 10000 : 0);
+  let rewardValue = String(r.rewardValue || '').trim();
+  if (!rewardValue) {
+    rewardValue = rewardType === 'cash' ? `${cashAmount.toLocaleString('en-US')} تومان` : String(r.name).trim();
   }
-  const cashAmount = cashAmountInput(r.cashAmount) ?? 0;
-  // A cash reward with no amount would silently pay nothing on claim.
-  if (r.rewardType === 'cash' && cashAmount <= 0) {
-    return res.status(400).json({ message: 'برای جایزهٔ نقدی، مبلغ باید بیشتر از صفر باشد' });
+  let maxClaims = Math.max(0, Number(r.maxClaimsPerUser) || 0);
+  if (rewardType === 'cash' && maxClaims <= 0) {
+    maxClaims = 1;
   }
-  // ═══════════════════════════════════════════════════════════════════════
-  // جایزهٔ نقدی بدون سقف دریافت = بدهی نامحدود
-  // ═══════════════════════════════════════════════════════════════════════
-  //
-  // `max_claims_per_user = 0` یعنی «نامحدود» (rewardGroupService خط ۲۵۵).
-  // این پیش‌فرض برای جایزهٔ فیزیکی منطقی است، ولی برای جایزهٔ نقدی یک
-  // تلهٔ واقعی است که یک بار روی همین سرور فعال بود:
-  //
-  //   «کارت هدیه ۱۰۰ هزار تومانی» با required_points=100 و بدون سقف.
-  //   کاربری با ۱۶٬۱۲۲ امتیاز می‌توانست ۱۶۱ بار پشت سر هم بگیرد
-  //   → ۱۶٬۱۰۰٬۰۰۰ تومان از یک ردیفِ جامانده از تست.
-  //
-  // هر claim به‌تنهایی معتبر بود؛ فقط جمعشان فاجعه بود. حالا برای
-  // جایزهٔ نقدی، سقف اجباری است تا چنین ردیفی اصلاً ساخته نشود.
-  const maxClaims = Math.max(0, Number(r.maxClaimsPerUser) || 0);
-  if (r.rewardType === 'cash' && maxClaims <= 0) {
-    return res.status(400).json({
-      message: 'برای جایزهٔ نقدی، سقف دریافت هر کاربر باید مشخص و بیشتر از صفر باشد',
-    });
-  }
-  const { rows } = await pool.query('INSERT INTO reward_tiers(name,description,image_url,required_points,reward_type,reward_value,cash_amount,display_order,is_active,group_id,max_claims_per_user) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *', [r.name,r.description,safeImageUrl(r.imageUrl),requiredPoints,r.rewardType,r.rewardValue,cashAmount,r.displayOrder||0,r.isActive!==false,r.groupId||null,maxClaims]);
-  await audit(req.admin.id,'create_reward','reward_tiers',rows[0].id,null,r); res.json(rows[0]);
+  const { rows } = await pool.query(
+    'INSERT INTO reward_tiers(name,description,image_url,required_points,reward_type,reward_value,cash_amount,display_order,is_active,group_id,max_claims_per_user) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *',
+    [r.name, r.description || null, safeImageUrl(r.imageUrl), requiredPoints, rewardType, rewardValue, cashAmount, r.displayOrder || 0, r.isActive !== false, r.groupId || null, maxClaims]
+  );
+  await audit(req.admin.id, 'create_reward', 'reward_tiers', rows[0].id, null, r);
+  res.json(rows[0]);
 }));
 app.patch('/api/admin/rewards/:id', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
   const r = req.body;

@@ -393,15 +393,13 @@ class _PenaltyBoardState extends State<_PenaltyBoard>
                                 sweet: _sweet,
                                 net: _net,
                                 netEpoch: _net.peakDepth,
-                                obstacleZone: (lastKick is Map && lastKick['obstacleZone'] != null)
-                                    ? NumberParser.toInt(lastKick['obstacleZone'])
-                                    : (st['obstacleZone'] as int?),
+                                
                               ),
                               child: _ZoneGrid(
                                 enabled: widget.session.phase == GamePhase.playing && !_alreadyChose && !_kick.isAnimating,
                                 amShooter: _amShooter,
                                 picked: _pickedZone,
-                                obstacleZone: st['obstacleZone'] as int?,
+                                
                                 onDown: _amShooter ? _startCharge : null,
                                 onTap: _amShooter ? null : _dive,
                                 onUp: _amShooter ? _release : null,
@@ -704,7 +702,7 @@ class _ZoneGrid extends StatelessWidget {
     required this.enabled,
     required this.amShooter,
     required this.picked,
-    this.obstacleZone,
+    
     this.onDown,
     this.onTap,
     this.onUp,
@@ -712,7 +710,7 @@ class _ZoneGrid extends StatelessWidget {
 
   final bool enabled, amShooter;
   final int? picked;
-  final int? obstacleZone;
+  
   final void Function(int)? onDown;
   final void Function(int)? onTap;
   final VoidCallback? onUp;
@@ -767,7 +765,7 @@ class _ZoneGrid extends StatelessWidget {
                                 enabled: enabled,
                                 selected: picked == r * 3 + col,
                                 amShooter: amShooter,
-                                isObstacle: obstacleZone == r * 3 + col,
+                                
                                 onDown: onDown,
                                 onTap: onTap,
                                 onUp: onUp,
@@ -792,14 +790,13 @@ class _ZoneCell extends StatelessWidget {
     required this.enabled,
     required this.selected,
     required this.amShooter,
-    this.isObstacle = false,
     this.onDown,
     this.onTap,
     this.onUp,
   });
 
   final int zone;
-  final bool enabled, selected, amShooter, isObstacle;
+  final bool enabled, selected, amShooter;
   final void Function(int)? onDown;
   final void Function(int)? onTap;
   final VoidCallback? onUp;
@@ -813,26 +810,34 @@ class _ZoneCell extends StatelessWidget {
       onTapCancel: enabled && amShooter ? () => onUp?.call() : null,
       onTap: enabled && !amShooter ? () => onTap?.call(zone) : null,
       child: Container(
-        margin: const EdgeInsets.all(1.5),
+        margin: const EdgeInsets.all(2.0),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(8),
           color: selected
-              ? _accent.withValues(alpha: 0.30)
-              : isObstacle
-                  ? const Color(0xFFFF9F43).withValues(alpha: 0.22)
-                  : Colors.white.withValues(alpha: enabled ? 0.045 : 0.015),
+              ? (amShooter ? const Color(0xFF38BDF8).withValues(alpha: 0.35) : const Color(0xFFFFD166).withValues(alpha: 0.35))
+              : Colors.white.withValues(alpha: enabled ? 0.04 : 0.01),
           border: Border.all(
             color: selected
-                ? _accent
-                : isObstacle
-                    ? const Color(0xFFFF9F43).withValues(alpha: 0.65)
-                    : Colors.white.withValues(alpha: enabled ? 0.16 : 0.06),
-            width: (selected || isObstacle) ? 2 : 1,
+                ? (amShooter ? const Color(0xFF38BDF8) : const Color(0xFFFFD166))
+                : Colors.white.withValues(alpha: enabled ? 0.20 : 0.06),
+            width: selected ? 2.2 : 1,
           ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: (amShooter ? const Color(0xFF38BDF8) : const Color(0xFFFFD166)).withValues(alpha: 0.40),
+                    blurRadius: 10,
+                  ),
+                ]
+              : null,
         ),
-        child: isObstacle
-            ? const Center(
-                child: Icon(Icons.shield_rounded, size: 16, color: Color(0xFFFF9F43)),
+        child: selected
+            ? Center(
+                child: Icon(
+                  amShooter ? Icons.gps_fixed_rounded : Icons.pan_tool_rounded,
+                  size: 24,
+                  color: amShooter ? const Color(0xFF38BDF8) : const Color(0xFFFFD166),
+                ),
               )
             : null,
       ),
@@ -853,7 +858,7 @@ class _PitchPainter extends CustomPainter {
     required this.sweet,
     required this.net,
     required this.netEpoch,
-    this.obstacleZone,
+    
   });
 
   final double kick;
@@ -863,7 +868,7 @@ class _PitchPainter extends CustomPainter {
   final double power;
   final ({double min, double max})? sweet;
   final NetSim net;
-  final int? obstacleZone;
+  
 
   /// یک عددِ نماینده از حالتِ تور.
   ///
@@ -960,13 +965,7 @@ class _PitchPainter extends CustomPainter {
       return Offset(gl + gw * (c + 0.5) / 3, gt + gh * (r + 0.5) / 3);
     }
 
-    // ── مانع / مدافع ──
-    final obst = (lk != null && lk['obstacleZone'] != null)
-        ? NumberParser.toInt(lk['obstacleZone'])
-        : obstacleZone;
-    if (obst != null && obst >= 0 && obst < 9) {
-      _drawObstacle(canvas, zoneCenter(obst), gw / 3.0, gh / 3.0);
-    }
+
 
     // ── نقطهٔ پنالتی ──
     final spot = Offset(w / 2, h * 0.88);

@@ -39,7 +39,7 @@ class _AdminRewardsState extends State<AdminRewards> {
   final _value = TextEditingController();
   final _cash = TextEditingController();
   final _desc = TextEditingController();
-  final _maxClaims = TextEditingController(text: '0');
+  final _maxClaims = TextEditingController(text: '1');
   final _imageUrl = TextEditingController();
   bool _uploadingImage = false;
   String? _imageError;
@@ -183,19 +183,31 @@ class _AdminRewardsState extends State<AdminRewards> {
           const SnackBar(content: Text('حداکثر ۳۰ جایزه قابل تعریف است')));
       return;
     }
+    final name = _name.text.trim();
+    final points = int.tryParse(_points.text) ?? 0;
+    if (name.isEmpty || points <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('نام جایزه و امتیاز معتبر را وارد کنید')));
+      return;
+    }
+    final cash = _type == 'cash' ? (Money.parse(_cash.text) ?? 10000) : 0;
+    final rewardVal = _value.text.trim().isNotEmpty
+        ? _value.text.trim()
+        : (_type == 'cash' ? '${Money.format(cash)} تومان' : name);
+    final maxClaims = int.tryParse(_maxClaims.text) ?? (_type == 'cash' ? 1 : 0);
+
     setState(() => _saving = true);
     try {
-      await widget.api.post('/api/admin/rewards', {
-        'name': _name.text,
-        'requiredPoints': int.tryParse(_points.text) ?? 0,
+      final r = await widget.api.post('/api/admin/rewards', {
+        'name': name,
+        'requiredPoints': points,
         'rewardType': _type,
-        'rewardValue': _value.text,
-        'cashAmount': _type == 'cash' ? (Money.parse(_cash.text) ?? 0) : 0,
-        'description': _desc.text,
-        'imageUrl': _imageUrl.text,
+        'rewardValue': rewardVal,
+        'cashAmount': cash,
+        'description': _desc.text.trim(),
+        'imageUrl': _imageUrl.text.trim(),
         'displayOrder': _rewards.length + 1,
         'groupId': _groupId,
-        'maxClaimsPerUser': int.tryParse(_maxClaims.text) ?? 0,
+        'maxClaimsPerUser': maxClaims,
       });
       _name.clear();
       _points.clear();
@@ -203,7 +215,10 @@ class _AdminRewardsState extends State<AdminRewards> {
       _cash.clear();
       _desc.clear();
       _imageUrl.clear();
-      _maxClaims.text = '0';
+      _maxClaims.text = '1';
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('جایزه با موفقیت ثبت شد')));
+      }
       await _load();
     } catch (e) {
       if (mounted) {

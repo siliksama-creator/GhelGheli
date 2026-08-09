@@ -283,6 +283,87 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
   }
 
 
+  Future<void> _openStickersSheet() async {
+    if (_stickers.isEmpty) return;
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0E1826),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.stars_rounded, size: 24, color: Color(0xFFFFD166)),
+                const SizedBox(width: 8),
+                const Text('ایموجی‌ها و استیکرهای بزرگ قلقلی',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.white)),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              height: 280,
+              child: GridView.builder(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisExtent(
+                  crossAxisCount: 4,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                  childAspectRatio: 0.88,
+                ),
+                itemCount: _stickers.length,
+                itemBuilder: (ctx, i) {
+                  final st = _stickers[i];
+                  return InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _send(stickerId: st['id']);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        color: Colors.white.withValues(alpha: 0.05),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            child: SafeImage(
+                              url: st['image_url'],
+                              fit: BoxFit.contain,
+                              fallbackEmoji: '⚽',
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            st['title'] ?? '',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFFE2E8F0)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);

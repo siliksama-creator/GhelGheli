@@ -462,12 +462,61 @@ class _PassRow extends StatelessWidget {
     required this.busy,
     required this.pulse,
     required this.onClaim,
+    required this.onOpenShop,
   });
 
   final Map data;
   final bool busy;
   final Animation<double> pulse;
   final void Function(String) onClaim;
+  final VoidCallback onOpenShop;
+  final VoidCallback onOpenShop;
+  void _showPlusUnlockDialog(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0E1826),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.stars_rounded, size: 26, color: Color(0xFFFFD166)),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'جایزه طلایی قلقلی پلاس',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Colors.white),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'این جایزه مربوط به مسیر طلایی بتل پس است. با فعال‌سازی اشتراک پلاس، تمام جوایز طلایی این فصل فوراً برای شما باز می‌شود و می‌توانید آن‌ها را دریافت کنید!',
+              style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 13, height: 1.5),
+            ),
+            const SizedBox(height: 20),
+            AnimePlusButton(
+              label: 'ورود به فروشگاه و فعال‌سازی پلاس ⚡',
+              onPressed: () {
+                Navigator.pop(ctx);
+                onOpenShop();
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -524,6 +573,7 @@ class _PassRow extends StatelessWidget {
               busy: busy,
               pulse: pulse,
               onClaim: onClaim,
+              onOpenShop: onOpenShop,
             ),
           ),
           const SizedBox(width: 5),
@@ -536,6 +586,7 @@ class _PassRow extends StatelessWidget {
               busy: busy,
               pulse: pulse,
               onClaim: onClaim,
+              onOpenShop: onOpenShop,
             ),
           ),
         ],
@@ -552,6 +603,7 @@ class _CompactRewardTile extends StatelessWidget {
     required this.busy,
     required this.pulse,
     required this.onClaim,
+    required this.onOpenShop,
   });
 
   final Map? data;
@@ -560,6 +612,54 @@ class _CompactRewardTile extends StatelessWidget {
   final bool busy;
   final Animation<double> pulse;
   final void Function(String) onClaim;
+  final VoidCallback onOpenShop;
+  final VoidCallback onOpenShop;
+  void _showPlusUnlockDialog(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0E1826),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.stars_rounded, size: 26, color: Color(0xFFFFD166)),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'جایزه طلایی قلقلی پلاس',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Colors.white),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'این جایزه مربوط به مسیر طلایی بتل پس است. با فعال‌سازی اشتراک پلاس، تمام جوایز طلایی این فصل فوراً برای شما باز می‌شود و می‌توانید آن‌ها را دریافت کنید!',
+              style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 13, height: 1.5),
+            ),
+            const SizedBox(height: 20),
+            AnimePlusButton(
+              label: 'ورود به فروشگاه و فعال‌سازی پلاس ⚡',
+              onPressed: () {
+                Navigator.pop(ctx);
+                onOpenShop();
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
 
   static const _art = {
     'points': 'assets/pass/icon_points.png',
@@ -681,6 +781,114 @@ class _NoSeason extends StatelessWidget {
         padding: EdgeInsets.all(Gaps.xl),
         child: Text('در حال حاضر فصلی فعال نیست. به‌زودی فصل جدید شروع می‌شود.', textAlign: TextAlign.center),
       ),
+    );
+  }
+}
+
+
+class AnimePlusButton extends StatefulWidget {
+  const AnimePlusButton({
+    super.key,
+    required this.onPressed,
+    this.label = 'فعال‌سازی قلقلی پلاس',
+    this.busy = false,
+  });
+
+  final VoidCallback? onPressed;
+  final String label;
+  final bool busy;
+
+  @override
+  State<AnimePlusButton> createState() => _AnimePlusButtonState();
+}
+
+class _AnimePlusButtonState extends State<AnimePlusButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _shimmer = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2000),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _shimmer.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _shimmer,
+      builder: (context, _) {
+        final t = _shimmer.value;
+        return InkWell(
+          onTap: widget.busy ? null : widget.onPressed,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            height: 52,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFFFFD700),
+                  Color(0xFFFF9F43),
+                  Color(0xFFFF007A),
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFFF9F43).withValues(alpha: 0.50),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Stack(
+              children: [
+                // Shimmer sweep
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment(-2.0 + t * 4.0, -1.0),
+                          end: Alignment(-1.0 + t * 4.0, 1.0),
+                          colors: [
+                            Colors.transparent,
+                            Colors.white.withValues(alpha: 0.35),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.auto_awesome_rounded, size: 20, color: Color(0xFF1E0A00)),
+                      const SizedBox(width: 8),
+                      Text(
+                        widget.busy ? 'در حال باز کردن فروشگاه...' : widget.label,
+                        style: const TextStyle(
+                          color: Color(0xFF1E0A00),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

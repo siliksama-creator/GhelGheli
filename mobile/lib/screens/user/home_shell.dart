@@ -733,8 +733,9 @@ class _WheelButtonState extends State<_WheelButton>
   }
 }
 
-class _PassButton extends StatelessWidget {
+class _PassButton extends StatefulWidget {
   const _PassButton({
+    super.key,
     required this.claimable,
     required this.tiersToday,
     required this.selected,
@@ -746,46 +747,114 @@ class _PassButton extends StatelessWidget {
   final VoidCallback onPressed;
 
   @override
+  State<_PassButton> createState() => _PassButtonState();
+}
+
+class _PassButtonState extends State<_PassButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1800),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return IconButton(
-      tooltip: 'گذر نبرد فصلی',
-      onPressed: onPressed,
-      style: selected
-          ? IconButton.styleFrom(
-              backgroundColor:
-                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.18))
-          : null,
-      icon: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Image.asset('assets/games/memory/trophy.webp',
-              width: 26, height: 26, cacheWidth: 80, fit: BoxFit.contain),
-          if (claimable > 0)
-            Positioned(
-              top: -3,
-              right: -3,
-              child: Container(
-                width: 14,
-                height: 14,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFEF4444),
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Text(
-                    faNum(math.min(claimable, 2)),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w900,
-                      height: 1.1,
+    final claimable = widget.claimable;
+    final badgeNum = math.min(claimable > 0 ? (widget.tiersToday > 0 ? widget.tiersToday : claimable) : 0, 2);
+
+    return AnimatedBuilder(
+      animation: _pulse,
+      builder: (context, _) {
+        final floatY = math.sin(_pulse.value * 2 * math.pi) * 1.5;
+        final glowAlpha = 0.35 + 0.25 * _pulse.value;
+
+        return IconButton(
+          tooltip: 'گذر نبرد فصلی',
+          onPressed: widget.onPressed,
+          style: widget.selected
+              ? IconButton.styleFrom(
+                  backgroundColor:
+                      Theme.of(context).colorScheme.primary.withValues(alpha: 0.18))
+              : null,
+          icon: SizedBox(
+            width: 34,
+            height: 34,
+            child: Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
+              children: [
+                // Glowing Cyber Aura
+                Positioned(
+                  child: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF38BDF8).withValues(alpha: glowAlpha),
+                          blurRadius: 10,
+                          spreadRadius: 1,
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              ),
+                // Transparent floating trophy emblem
+                Transform.translate(
+                  offset: Offset(0, floatY),
+                  child: Image.asset(
+                    'assets/games/memory/trophy.webp',
+                    width: 26,
+                    height: 26,
+                    cacheWidth: 80,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+                // Pulsing Red/Coral Badge (1 or 2)
+                if (badgeNum > 0)
+                  Positioned(
+                    top: -4,
+                    right: -4,
+                    child: Container(
+                      width: 17,
+                      height: 17,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFF2A4B),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1.2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFFF2A4B).withValues(alpha: 0.65),
+                            blurRadius: 8,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Text(
+                          faNum(badgeNum),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            height: 1.1,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
-        ],
-      ),
+          ),
+        );
+      },
     );
   }
 }
