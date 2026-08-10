@@ -34,6 +34,7 @@ const turnMsFor = rules => Number(rules.turnMs) || DEFAULT_TURN_MS;
 
 const queues = new Map(); // gameId -> [socket]
 const rooms = new Map();  // roomId -> room
+const lobbies = new Map(); // lobbyId -> {host, gameId, stake, createdAt}
 
 const nameOf = u => u.nickname || u.first_name || 'کاربر';
 // Enough for the client to render an avatar + open the public profile sheet.
@@ -394,7 +395,8 @@ function advance(room, lastMove, extra = {}) {
   scheduleBot(room);
 }
 
-function startRoom(io, rules, gameId, a, b) {
+function startRoom(io, rules, gameId, a, b, stake) {
+  const s = Number(stake) || 0;
   const id = crypto.randomUUID();
   const vsBot = !b;
   const room = {
@@ -403,6 +405,8 @@ function startRoom(io, rules, gameId, a, b) {
     turn: 'X',
     turnMs: turnMsFor(rules),
     seats: { X: a, O: b || 'BOT' },
+    stake: s,
+    netPot: Math.floor(s * 2 * 0.9), // 10% commission
   };
   rooms.set(id, room);
   a.join(id);
@@ -471,6 +475,67 @@ const attachGames = function attachGames(io, rulesById) {
       dropFromQueue(hostSocket);
       dropFromQueue(socket);
       startRoom(io, rules, gameId, hostSocket, socket);
+    });
+
+
+
+    // -- LOBBY SYSTEM --
+    socket.on('game:create_lobby', payload => {
+      const gameId = String(payload?.gameId || Object.keys(rulesById)[0]);
+      const rules = rulesById[gameId];
+      if (!rules) return safeEmit(socket, 'game:error', { message: 'game not found' });
+      const stake = Math.min(Math.max(Number(payload?.stake) || 100, 50), 10000);
+      dropFromQueue(socket);
+      const lobbyId = 'lobby-' + Math.random().toString(36).substring(2, 8);
+      lobbies.set(lobbyId, {
+        host: socket, gameId, stake,
+        hostName: nameOf(socket.user),
+        createdAt: Date.now(),
+      });
+      safeEmit(socket, 'game:lobby_created', {
+        lobbyId, gameId, stake,
+        message: 'Private room created - waiting for opponent',
+      });
+      io.emit('game:lobby_updated', { action: 'created', lobby: { lobbyId, gameId, stake, hostName: nameOf(socket.user) } });
+    });
+
+    socket.on('game:lobby_list', () => {
+      const list = [];
+      for (const [id, l] of lobbies.entries()) {
+        if (l.host && l.host.connected) {
+          list.push({ lobbyId: id, gameId: l.gameId, stake: l.stake, hostName: l.hostName });
+        } else { lobbies.delete(id); }
+      }
+      safeEmit(socket, 'game:lobby_list', list);
+    });
+
+    socket.on('game:join_lobby', payload => {
+      const lobbyId = String(payload?.lobbyId || '');
+      const lobby = lobbies.get(lobbyId);
+      if (!lobby || !lobby.host || !lobby.host.connected) {
+        lobbies.delete(lobbyId);
+        return safeEmit(socket, 'game:error', { message: 'room no longer available' });
+      }
+      if (lobby.host.user.id === socket.user.id) {
+        return safeEmit(socket, 'game:error', { message: 'cannot join your own room' });
+      }
+      const rules = rulesById[lobby.gameId];
+      lobbies.delete(lobbyId);
+      dropFromQueue(lobby.host);
+      dropFromQueue(socket);
+      startRoom(io, rules, lobby.gameId, lobby.host, socket, lobby.stake);
+      io.emit('game:lobby_updated', { action: 'joined', lobbyId });
+    });
+
+    socket.on('game:cancel_lobby', () => {
+      for (const [id, l] of lobbies.entries()) {
+        if (l.host && l.host.user && l.host.user.id === socket.user.id) {
+          lobbies.delete(id);
+          io.emit('game:lobby_updated', { action: 'removed', lobbyId: id });
+          safeEmit(socket, 'game:lobby_cancelled', { message: 'room cancelled' });
+          return;
+        }
+      }
     });
 
     socket.on('game:join', payload => {

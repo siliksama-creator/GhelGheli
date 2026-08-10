@@ -126,7 +126,7 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
         children: [
           _tabs(),
           const Expanded(
-            child: Center(child: Text('برندگان دوره قبل در این تب نمایش داده می‌شوند')),
+            child: _PreviousWinnersView(data: _data),
           ),
         ],
       );

@@ -223,14 +223,16 @@ class _GamesHubPageState extends State<GamesHubPage> {
           child: Row(
             children: [
               Icon(
-                _selectedStake == 0 ? Icons.info_outline_rounded : Icons.timer_outlined,
+                _selectedStake == -1 ? Icons.meeting_room_rounded : (_selectedStake == 0 ? Icons.info_outline_rounded : Icons.timer_outlined),
                 size: 16,
-                color: _selectedStake == 1000 ? const Color(0xFFFFD166) : (_selectedStake == 100 ? const Color(0xFF38BDF8) : const Color(0xFF22E7A6)),
+                color: _selectedStake == -1 ? const Color(0xFFA855F7) : (_selectedStake == 1000 ? const Color(0xFFFFD166) : (_selectedStake == 100 ? const Color(0xFF38BDF8) : const Color(0xFF22E7A6))),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  _selectedStake == 0
+                  _selectedStake == -1
+                      ? 'بازی خصوصی با دوستان — انتخاب امتیاز دلخواه در اتاق'
+                      : _selectedStake == 0
                       ? 'تمرین رایگان با هوش مصنوعی بدون کسر امتیاز (آماده‌سازی برای مسابقات)'
                       : '۳۰ ثانیه جستجوی حریف آنلاین · ۱۰٪ کارمزد مسابقه کسر و برنده تمام پات را می‌برد!',
                   style: const TextStyle(fontSize: 11, color: Color(0xFFCBD5E1), fontWeight: FontWeight.w600),
