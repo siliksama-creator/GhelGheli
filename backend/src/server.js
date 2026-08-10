@@ -1792,7 +1792,7 @@ app.get('/api/chat/bootstrap', auth, asyncHandler(async (req, res) => {
   const [cooldownSec, pinned, stickersRes] = await Promise.all([
     getChatCooldownSeconds(),
     getChatPinnedMessage(),
-    pool.query('SELECT * FROM chat_stickers WHERE is_active=true ORDER BY sort_order, title'),
+    pool.query('SELECT id,title,image_url,sticker_type FROM chat_stickers WHERE is_active=true ORDER BY created_at DESC'),
   ]);
 
   const config = {
