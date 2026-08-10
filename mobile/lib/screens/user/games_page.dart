@@ -35,7 +35,9 @@ class _GameEntry {
   final bool solo;
 }
 
-const _multiplayerGames = <_GameEntry>[
+const _games = <_GameEntry>[
+  _GameEntry('tap', 'ضربه‌زن', '۵۰ لول ضربه بزن و شخصیت‌ها را باز کن', 'assets/games/tap/skin_1.webp',
+      Color(0xFF84CC16), 'assets/games/tap/skin_1.webp'),
   _GameEntry('penalty', 'ضربات پنالتی', 'شوت دقیق و مهار دروازه‌بان ۲۰۲۸', 'assets/pass/football_icon.webp',
       Color(0xFF38BDF8), 'assets/games/penalty.webp'),
   _GameEntry('card_duel', 'دوئل کارت‌ها', 'نبرد سه‌کارتی و استات‌های Ghost',
@@ -47,6 +49,8 @@ const _multiplayerGames = <_GameEntry>[
   _GameEntry('reversi', 'اتللو', 'مهره‌ها را برگردان و تخته را فتح کن', 'assets/games/reversi.webp', Color(0xFF34D399),
       'assets/games/reversi.webp'),
 ];
+
+List<_GameEntry> get _multiplayerGames => _games.where((g) => g.id != 'tap').toList();
 
 class GamesHubPage extends StatefulWidget {
   const GamesHubPage({super.key, required this.api});
