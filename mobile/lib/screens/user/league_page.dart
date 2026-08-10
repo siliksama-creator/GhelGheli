@@ -229,18 +229,45 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
                                 vertical: isFirst ? Gaps.lg : Gaps.md,
                                 horizontal: Gaps.xs),
                             decoration: BoxDecoration(
-                              color: isFirst
-                                  ? const Color(0xFFFFD700)
-                                  : theme.colorScheme.surfaceContainerHigh,
+                              color: theme.colorScheme.surfaceContainerHigh,
                               borderRadius: Corners.rXl,
                               border: Border.all(
                                   color: isFirst
-                                      ? const Color(0xFFFFF3B0)
-                                      : theme.colorScheme.outlineVariant),
+                                      ? const Color(0xFFFFD700)
+                                      : rank == 2
+                                          ? const Color(0xFFCBD5E1)
+                                          : const Color(0xFFCD7F32),
+                                  width: isFirst ? 1.8 : 1.4),
+                              boxShadow: isFirst
+                                  ? [BoxShadow(color: const Color(0xFFFFD700).withValues(alpha: 0.28), blurRadius: 14, offset: const Offset(0, 4))]
+                                  : rank == 2
+                                      ? [BoxShadow(color: const Color(0xFFCBD5E1).withValues(alpha: 0.18), blurRadius: 10)]
+                                      : [BoxShadow(color: const Color(0xFFCD7F32).withValues(alpha: 0.16), blurRadius: 10)],
                             ),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(999),
+                                    color: isFirst
+                                        ? const Color(0xFFFFD700)
+                                        : rank == 2
+                                            ? const Color(0xFFCBD5E1)
+                                            : const Color(0xFFCD7F32),
+                                    boxShadow: isFirst ? [BoxShadow(color: const Color(0xFFFFD700).withValues(alpha: 0.4), blurRadius: 8)] : null,
+                                  ),
+                                  child: Text(
+                                    rank == 1 ? 'رتبه ۱' : rank == 2 ? 'رتبه ۲' : 'رتبه ۳',
+                                    style: TextStyle(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w900,
+                                      color: isFirst ? const Color(0xFF241900) : rank == 2 ? const Color(0xFF1E293B) : Colors.white,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
                                 Text(
                                   rank == 1 ? '🥇' : (rank == 2 ? '🥈' : '🥉'),
                                   style: const TextStyle(fontSize: 22),
@@ -254,19 +281,14 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
                                   style: TextStyle(
                                       fontWeight: FontWeight.w700,
                                       fontSize: 12.5,
-                                      color: isFirst
-                                          ? const Color(0xFF241900)
-                                          : theme.colorScheme.onSurface),
+                                      color: theme.colorScheme.onSurface),
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
                                   '${faNum(r['points'])} امتیاز',
                                   style: TextStyle(
                                       fontSize: 11.5,
-                                      color: isFirst
-                                          ? const Color(0xFF241900)
-                                              .withValues(alpha: 0.75)
-                                          : theme.colorScheme.onSurfaceVariant),
+                                      color: theme.colorScheme.onSurfaceVariant),
                                 ),
                               ],
                             ),

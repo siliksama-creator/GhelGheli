@@ -178,13 +178,8 @@ class GameScaffold extends StatelessWidget {
 
       case GamePhase.waiting:
         if (session.vsBot) {
-          return const Center(
-            child: SizedBox(
-              width: 36,
-              height: 36,
-              child: CircularProgressIndicator(strokeWidth: 3),
-            ),
-          );
+          // تمرین با ربات: مستقیم به بازی بدون صفحه انتظار
+          return const SizedBox.shrink();
         }
         final left = session.searchSecondsLeft;
         final total = session.searchSeconds <= 0 ? 15 : session.searchSeconds;
@@ -228,42 +223,67 @@ class GameScaffold extends StatelessWidget {
                   ),
                 ),
                 Gaps.vLg,
-                Text(
-                    open
-                        ? 'هنوز در صف حریف واقعی هستی'
-                        : 'در حال جستجوی حریف واقعی...',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w700)),
-                Gaps.vXxs,
-                Text(
-                  _waitHint(session, left),
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodySmall,
-                ),
+                Builder(builder: (_) {
+                  final isOnlineMatch = session.stake == 100 || session.stake == 1000;
+                  if (isOnlineMatch) {
+                    return const Text(
+                      'در جستجوی حریف ....',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                    );
+                  }
+                  return Column(
+                    children: [
+                      Text(
+                          open
+                              ? 'هنوز در صف حریف واقعی هستی'
+                              : 'در حال جستجوی حریف واقعی...',
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700)),
+                      Gaps.vXxs,
+                      Text(
+                        _waitHint(session, left),
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  );
+                }),
                 if (soloOffer != null) ...[Gaps.vMd, soloOffer!],
                 Gaps.vLg,
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    FilledButton.icon(
-                      onPressed: session.playWithBotImmediately,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: accent,
-                        minimumSize: const Size(160, 46),
-                      ),
-                      icon: const Icon(Icons.smart_toy_rounded, size: 20),
-                      label: const Text('شروع با ربات'),
-                    ),
-                    Gaps.hSm,
-                    OutlinedButton.icon(
+                Builder(builder: (_) {
+                  final isOnlineMatch = session.stake == 100 || session.stake == 1000;
+                  if (isOnlineMatch) {
+                    return OutlinedButton.icon(
                       onPressed: session.leave,
-                      style: OutlinedButton.styleFrom(minimumSize: const Size(100, 46)),
+                      style: OutlinedButton.styleFrom(minimumSize: const Size(140, 46)),
                       icon: const Icon(Icons.close_rounded, size: 18),
                       label: const Text('لغو'),
-                    ),
-                  ],
-                ),
+                    );
+                  }
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      FilledButton.icon(
+                        onPressed: session.playWithBotImmediately,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: accent,
+                          minimumSize: const Size(160, 46),
+                        ),
+                        icon: const Icon(Icons.smart_toy_rounded, size: 20),
+                        label: const Text('شروع با ربات'),
+                      ),
+                      Gaps.hSm,
+                      OutlinedButton.icon(
+                        onPressed: session.leave,
+                        style: OutlinedButton.styleFrom(minimumSize: const Size(100, 46)),
+                        icon: const Icon(Icons.close_rounded, size: 18),
+                        label: const Text('لغو'),
+                      ),
+                    ],
+                  );
+                }),
               ],
             ),
           ),

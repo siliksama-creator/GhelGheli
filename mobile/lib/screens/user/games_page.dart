@@ -144,7 +144,7 @@ class _GamesHubPageState extends State<GamesHubPage> {
     return ListView(
       padding: const EdgeInsets.all(Gaps.md),
       children: [
-        // Header با نمایش عکس پروفایل، نام، لول و موجودی امتیاز کل
+        // Header ترکیبی: پروفایل + توضیح XP + نوار لول (۲ باکس قبلی ترکیب شدند)
         Container(
           padding: const EdgeInsets.all(Gaps.md),
           decoration: BoxDecoration(
@@ -163,78 +163,144 @@ class _GamesHubPageState extends State<GamesHubPage> {
               ),
             ],
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              AvatarImage(
-                keyName: _user?['profile_avatar_key'],
-                imageUrl: _user?['profile_image_url'],
-                radius: 26,
-                ring: true,
-              ),
-              Gaps.hSm,
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+              Row(
+                children: [
+                  AvatarImage(
+                    keyName: _user?['profile_avatar_key'],
+                    imageUrl: _user?['profile_image_url'],
+                    radius: 26,
+                    ring: true,
+                  ),
+                  Gaps.hSm,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Text(
-                            _user?['nickname'] ?? 'قهرمان قلقلی',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w900,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _user?['nickname'] ?? 'قهرمان قلقلی',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                borderRadius: Corners.rPill,
+                                color: const Color(0xFFFFD166).withValues(alpha: 0.18),
+                                border: Border.all(color: const Color(0xFFFFD166).withValues(alpha: 0.6)),
+                              ),
+                              child: Text(
+                                '${faNum(_user?['current_points'] ?? 0)} امتیاز',
+                                style: const TextStyle(
+                                  color: Color(0xFFFFD166),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        if (_level != null) LevelBadge(level: (_level!['level'] as num?)?.toInt() ?? 0),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            borderRadius: Corners.rPill,
-                            color: const Color(0xFFFFD166).withValues(alpha: 0.18),
-                            border: Border.all(color: const Color(0xFFFFD166).withValues(alpha: 0.6)),
-                          ),
-                          child: Text(
-                            '${faNum(_user?['current_points'] ?? 0)} امتیاز',
-                            style: const TextStyle(
-                              color: Color(0xFFFFD166),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w900,
-                            ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'با هر بازی آنلاین XP میگیری',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: const Color(0xFFE2E8F0),
+                            fontSize: 11,
+                            height: 1.4,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 5),
-                    Text(
-                      'با هر بازی آنلاین XP میگیری و با برنده شدن امتیاز میگیری و با باخت امتیازت کم میشه پس دقت کن!',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: const Color(0xFFE2E8F0),
-                        fontSize: 11,
-                        height: 1.4,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
+              if (_level != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.white.withValues(alpha: 0.05),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                  ),
+                  child: Builder(builder: (_) {
+                    final lvl = (_level!['level'] as num?)?.toInt() ?? 0;
+                    final into = (_level!['into'] as num?)?.toInt() ?? 0;
+                    final needed = (_level!['needed'] as num?)?.toInt() ?? 0;
+                    final progress = (_level!['progress'] as num?)?.toDouble() ?? 0;
+                    final isMax = _level!['isMax'] == true;
+                    String tierLabel = 'تازه‌کار';
+                    Color tierColor = theme.colorScheme.primary;
+                    if (lvl >= 90) { tierLabel = 'افسانه‌ای'; tierColor = const Color(0xFFA855F7); }
+                    else if (lvl >= 60) { tierLabel = 'طلایی'; tierColor = const Color(0xFFFFD166); }
+                    else if (lvl >= 30) { tierLabel = 'نقره‌ای'; tierColor = const Color(0xFF38BDF8); }
+                    else if (lvl >= 10) { tierLabel = 'برنزی'; tierColor = const Color(0xFF22E7A6); }
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            LevelBadge(level: lvl, compact: false),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                tierLabel,
+                                style: theme.textTheme.labelLarge?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: tierColor,
+                                ),
+                              ),
+                            ),
+                            if (isMax)
+                              Icon(Icons.emoji_events_rounded, size: 18, color: tierColor)
+                            else
+                              Text(
+                                '${faNum(into)} / ${faNum(needed)}',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.7),
+                                  fontFeatures: const [FontFeature.tabularFigures()],
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(999),
+                          child: Stack(
+                            children: [
+                              Container(height: 7, color: Colors.white.withValues(alpha: 0.10)),
+                              FractionallySizedBox(
+                                widthFactor: isMax ? 1.0 : progress.clamp(0.0, 1.0),
+                                child: Container(
+                                  height: 7,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(colors: [tierColor.withValues(alpha: 0.65), tierColor]),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
+                ),
+              ],
             ],
           ),
         ),
-        Gaps.vSm,
-        if (_level != null)
-          LevelCard(
-            level: (_level!['level'] as num?)?.toInt() ?? 0,
-            into: (_level!['into'] as num?)?.toInt() ?? 0,
-            needed: (_level!['needed'] as num?)?.toInt() ?? 0,
-            progress: (_level!['progress'] as num?)?.toDouble() ?? 0,
-            isMax: _level!['isMax'] == true,
-            xp: (_level!['xp'] as num?)?.toInt() ?? 0,
-          ),
         Gaps.vSm,
 
         // ── ۱. بازی ضربه‌زن: بالای صفحه و مستقل ──
@@ -816,7 +882,7 @@ class _PrivateLobbyHubState extends State<_PrivateLobbyHub> {
               TextField(
                 controller: _passCtrl,
                 decoration: const InputDecoration(
-                  hintText: 'رمز عبور اتاق (اختیاری — در صورت خالی بودن عمومی است)',
+                  hintText: 'رمز عبور اتاق (اختیاری)',
                   prefixIcon: Icon(Icons.lock_outline_rounded, size: 18),
                   contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 ),
