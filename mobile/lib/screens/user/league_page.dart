@@ -81,6 +81,7 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
           segments: const [
             ButtonSegment(value: 0, label: Text('جدول لیگ')),
             ButtonSegment(value: 1, label: Text('باشگاه‌ها')),
+            ButtonSegment(value: 2, label: Text('برندگان قبل')),
           ],
           selected: {_tab},
           showSelectedIcon: false,
@@ -99,6 +100,17 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
               padding: const EdgeInsets.symmetric(horizontal: Gaps.md),
               child: ClubsTab(api: widget.api),
             ),
+          ),
+        ],
+      );
+    }
+
+    if (_tab == 2) {
+      return Column(
+        children: [
+          _tabs(),
+          Expanded(
+            child: _PreviousWinnersView(data: _data),
           ),
         ],
       );
@@ -177,14 +189,14 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
                       cacheWidth: 820),
                 ),
                 Gaps.vMd,
-                const Text('لیگ ماهانه قلقلی',
+                const Text('لیگ قلقلی',
                     style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w800,
                         fontSize: 22)),
                 Gaps.vXxs,
                 Text(
-                  'برترین کاربران تا پایان ماه؛ امتیاز لیگ آخر ماه ریست می‌شود اما امتیاز کلی دست نمی‌خورد.',
+                  'برترین کاربران تا پایان زمان اعلام شده؛ جوایز پس از پایان لیگ پرداخت و لیگ بعدی توسط ادمین آغاز می‌شود.',
                   style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.88),
                       fontSize: 12.5,
@@ -315,15 +327,155 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
               ),
             ),
           if (entries.isEmpty)
-            const AppCard(
-                child: EmptyState(
-                    icon: Icons.emoji_events_outlined,
-                    title: 'هنوز امتیازی در لیگ ثبت نشده است')),
+            AppCard(
+                child: _data?['previousSeason'] != null
+                    ? Column(
+                        children: [
+                          const EmptyState(
+                              icon: Icons.emoji_events_outlined,
+                              title: 'این دوره لیگ به پایان رسیده است',
+                              message: 'برندگان دوره قبل در تب «برندگان قبل» قابل مشاهده هستند.'),
+                          Gaps.vMd,
+                          FilledButton.icon(
+                            onPressed: () => setState(() => _tab = 2),
+                            icon: const Icon(Icons.arrow_back_rounded, size: 16),
+                            label: const Text('مشاهده برندگان'),
+                          ),
+                        ],
+                      )
+                    : const EmptyState(
+                        icon: Icons.emoji_events_outlined,
+                        title: 'هنوز امتیازی در لیگ ثبت نشده است')),
         ],
       ),
           ),
         ),
       ],
+    );
+  }
+}
+
+
+/// نمایش برندگان دورهٔ قبلی لیگ.
+class _PreviousWinnersView extends StatelessWidget {
+  const _PreviousWinnersView({required this.data});
+  final Map? data;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final prev = data?['previousSeason'];
+    if (prev == null) {
+      return const AppCard(
+        child: EmptyState(
+          icon: Icons.emoji_events_outlined,
+          title: 'هنوز دورهٔ قبلی لیگ برگزار نشده است',
+        ),
+      );
+    }
+
+    final winners = List<Map>.from(prev['winners'] ?? []);
+    return RefreshIndicator(
+      onRefresh: () async {},
+      child: ListView(
+        padding: const EdgeInsets.all(Gaps.md),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(Gaps.xl),
+            decoration: BoxDecoration(
+              borderRadius: Corners.rXxl,
+              gradient: const LinearGradient(
+                colors: [Color(0xFF3D2E00), Color(0xFF1A1400)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 26),
+              ],
+            ),
+            child: Column(
+              children: [
+                const Icon(Icons.emoji_events_rounded, size: 48, color: Color(0xFFFFD700)),
+                Gaps.vSm,
+                Text(
+                  'برندگان لیگ قبلی',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: const Color(0xFFFFD700),
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Gaps.vXxs,
+                Text(
+                  prev['monthYear'] ?? '',
+                  style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                ),
+              ],
+            ),
+          ),
+          Gaps.vLg,
+          for (final w in winners) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: Gaps.sm),
+              child: AppCard(
+                padding: const EdgeInsets.all(Gaps.md),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: w['rank'] == 1
+                              ? [const Color(0xFFFFD700), const Color(0xFFB8860B)]
+                              : w['rank'] == 2
+                                  ? [const Color(0xFFC0C0C0), const Color(0xFF808080)]
+                                  : [const Color(0xFFCD7F32), const Color(0xFF8B4513)],
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '${w['rank']}',
+                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                    Gaps.hSm,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(w['nickname'] ?? 'کاربر',
+                              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                          Text('${w['points']} امتیاز',
+                              style: theme.textTheme.bodySmall),
+                        ],
+                      ),
+                    ),
+                    if (w['prizeAmount'] != null && w['prizeAmount'] > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          borderRadius: Corners.rPill,
+                          color: const Color(0xFF22E7A6).withValues(alpha: 0.15),
+                          border: Border.all(color: const Color(0xFF22E7A6).withValues(alpha: 0.4)),
+                        ),
+                        child: Text(
+                          '${w['prizeAmount']} تومان',
+                          style: const TextStyle(
+                            color: Color(0xFF22E7A6),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

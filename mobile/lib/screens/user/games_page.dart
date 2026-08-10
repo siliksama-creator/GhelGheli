@@ -170,7 +170,7 @@ class _GamesHubPageState extends State<GamesHubPage> {
 
         // ── ۲. سه دسته‌بندی مسابقات (۱۰۰ امتیاز، ۱۰۰۰ امتیاز، تمرین با ربات) ──
         const Text(
-          'انتخاب سطح مسابقه آنلاین:',
+          'سطح مسابقه:',
           style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900, color: Color(0xFFF1F5F9)),
         ),
         Gaps.vXs,
@@ -178,8 +178,8 @@ class _GamesHubPageState extends State<GamesHubPage> {
           children: [
             Expanded(
               child: _ModePill(
-                title: '۱۰۰ امتیاز',
-                subtitle: 'جایزه ۱۸۰',
+                title: '۱۰۰',
+                subtitle: 'برد ۱۸۰',
                 icon: Icons.bolt_rounded,
                 selected: _selectedStake == 100,
                 color: const Color(0xFF38BDF8),
@@ -189,8 +189,8 @@ class _GamesHubPageState extends State<GamesHubPage> {
             Gaps.hXs,
             Expanded(
               child: _ModePill(
-                title: '۱۰۰۰ امتیاز',
-                subtitle: 'جایزه ۱۸۰۰',
+                title: '۱۰۰۰',
+                subtitle: 'برد ۱۸۰۰',
                 icon: Icons.stars_rounded,
                 selected: _selectedStake == 1000,
                 color: const Color(0xFFFFD166),
@@ -200,8 +200,8 @@ class _GamesHubPageState extends State<GamesHubPage> {
             Gaps.hXs,
             Expanded(
               child: _ModePill(
-                title: 'تمرین با ربات',
-                subtitle: 'شروع فوری',
+                title: 'ربات',
+                subtitle: 'تمرین',
                 icon: Icons.smart_toy_rounded,
                 selected: _selectedStake == 0,
                 color: const Color(0xFF22E7A6),
@@ -231,8 +231,8 @@ class _GamesHubPageState extends State<GamesHubPage> {
               Expanded(
                 child: Text(
                   _selectedStake == 0
-                      ? 'تمرین رایگان با هوش مصنوعی بدون کسر امتیاز (آماده‌سازی برای مسابقات)'
-                      : '۳۰ ثانیه جستجوی حریف آنلاین · ۱۰٪ کارمزد مسابقه کسر و برنده تمام پات را می‌برد!',
+                      ? 'تمرین رایگان بدون کسر امتیاز — آماده‌سازی برای مسابقات'
+                      : 'جستجوی حریف آنلاین (۳۰ ثانیه) | کارمزد ۱۰٪ | برنده تمام پات را می‌برد!',
                   style: const TextStyle(fontSize: 11, color: Color(0xFFCBD5E1), fontWeight: FontWeight.w600),
                 ),
               ),

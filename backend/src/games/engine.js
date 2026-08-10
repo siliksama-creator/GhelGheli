@@ -20,7 +20,7 @@ function rewardService() {
 // How long we hunt for a REAL opponent before falling back to the bot. The
 // client shows this as a visible countdown so waiting feels intentional
 // rather than broken.
-const MATCH_WAIT_MS = 15_000;
+const MATCH_WAIT_MS = 30_000;
 const BOT_MOVE_MS = 650;    // small delay so the bot feels like it "thinks"
 // Per-turn time limit, enforced HERE (not on the client) so a tampered or
 // frozen client can't stall the game forever. Each game overrides this with

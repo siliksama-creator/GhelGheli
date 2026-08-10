@@ -1750,7 +1750,7 @@ function isAllowedChatMessage(text) {
   const clean = String(text).trim();
   if (CANNED_MESSAGES.includes(clean)) return true;
   // Allow single emoji or emoji sequences (up to 16 emoji chars)
-  const emojiRegex = /^[\\p{Extended_Pictographic}\\p{Emoji}\\p{Emoji_Component}\\p{Emoji_Modifier}\\p{Emoji_Modifier_Base}\\p{Emoji_Presentation}\\s]+$/u;
+  const emojiRegex = /^[\p{Extended_Pictographic}\p{Emoji}\p{Emoji_Component}\p{Emoji_Modifier}\p{Emoji_Modifier_Base}\p{Emoji_Presentation}\u2600-\u27BF\u2B50\u2764\uFE0F\u200D\s]+$/u;
   if (emojiRegex.test(clean) && clean.length <= 20) return true;
   return false;
 }

@@ -203,7 +203,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 child: _QuickTile(
                   icon: Image.asset('assets/pass/wheel_icon.webp', width: 24, height: 24),
                   title: 'گردونه',
-                  subtitle: 'چرخش روزانه',
+                  subtitle: 'گردونه چرخش روزانه',
                   tint: const Color(0xFFF59E0B),
                   onTap: widget.onOpenWheel,
                 ),
@@ -265,7 +265,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                   ?.copyWith(fontWeight: FontWeight.w900)),
                           const SizedBox(height: 3),
                           Text(
-                            'تهیه کارت‌های فیزیکی فوتبالی و کلکسیونی قلقلی در فروشگاه‌ها و سوپرمارکت‌های سراسر کشور',
+                            'کارت‌های فوتبالی و غیرفوتبالی قلقلی، اکنون به‌صورت فیزیکی در فروشگاه‌ها و سوپرمارکت‌های سراسر کشور',
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.bodySmall,
@@ -358,7 +358,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
 
 /// کاشی میان‌بر روی داشبورد.
-class _QuickTile extends StatelessWidget {
+class _QuickTile extends StatefulWidget {
   const _QuickTile({
     required this.icon,
     required this.title,
@@ -374,63 +374,118 @@ class _QuickTile extends StatelessWidget {
   final VoidCallback? onTap;
 
   @override
+  State<_QuickTile> createState() => _QuickTileState();
+}
+
+class _QuickTileState extends State<_QuickTile> with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
+    _scale = Tween<double>(begin: 1.0, end: 1.05).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut),
+    );
+    // Auto-pulse every 3 seconds for eye-catching effect
+    _startPulse();
+  }
+
+  void _startPulse() {
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      _ctrl.forward().then((_) => _ctrl.reverse());
+      _startPulse();
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Material(
-      color: Colors.transparent,
-      borderRadius: Corners.rLg,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: Corners.rLg,
-        child: Container(
-          // ۴۸ کف اندازهٔ هدف لمسی طبق راهنمای دسترس‌پذیری متریال.
-          constraints: const BoxConstraints(minHeight: 58),
-          padding: const EdgeInsets.symmetric(
-              horizontal: Gaps.xs, vertical: Gaps.xs),
-          decoration: BoxDecoration(
+    return AnimatedBuilder(
+      animation: _scale,
+      builder: (context, child) => Transform.scale(
+        scale: _scale.value,
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: Corners.rLg,
+          child: InkWell(
+            onTap: () {
+              _ctrl.forward().then((_) => _ctrl.reverse());
+              widget.onTap?.call();
+            },
             borderRadius: Corners.rLg,
-            gradient: LinearGradient(
-              begin: Alignment.topRight,
-              end: Alignment.bottomLeft,
-              colors: [
-                tint.withValues(alpha: 0.22),
-                Theme.of(context).colorScheme.surfaceContainerHigh
-                    .withValues(alpha: 0.72),
-              ],
-            ),
-            border: Border.all(color: tint.withValues(alpha: 0.28)),
-            boxShadow: [
-              BoxShadow(
-                color: tint.withValues(alpha: 0.10),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 58),
+              padding: const EdgeInsets.symmetric(horizontal: Gaps.xs, vertical: Gaps.xs),
+              decoration: BoxDecoration(
+                borderRadius: Corners.rLg,
+                gradient: LinearGradient(
+                  begin: Alignment.topRight,
+                  end: Alignment.bottomLeft,
+                  colors: [
+                    widget.tint.withValues(alpha: 0.28),
+                    Theme.of(context).colorScheme.surfaceContainerHigh.withValues(alpha: 0.80),
+                  ],
+                ),
+                border: Border.all(color: widget.tint.withValues(alpha: 0.40), width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: widget.tint.withValues(alpha: 0.18),
+                    blurRadius: 24,
+                    offset: const Offset(0, 12),
+                  ),
+                  BoxShadow(
+                    color: widget.tint.withValues(alpha: 0.06),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(width: 26, height: 26, child: Center(child: icon)),
-              const SizedBox(height: 3),
-              Text(title,
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelMedium
-                      ?.copyWith(fontWeight: FontWeight.w900)),
-              Text(subtitle,
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    fontSize: 10,
-                    color:
-                        theme.colorScheme.onSurface.withValues(alpha: 0.62),
-                  )),
-            ],
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [widget.tint.withValues(alpha: 0.35), Colors.transparent],
+                      ),
+                    ),
+                    child: Center(child: widget.icon),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(widget.title,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w900)),
+                  Text(widget.subtitle,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        fontSize: 10,
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.62),
+                      )),
+                ],
+              ),
+            ),
           ),
         ),
       ),
     );
   }
 }
+
+// Alias for AnimatedBuilder compatibility
+
