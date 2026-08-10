@@ -1745,6 +1745,16 @@ app.get('/api/chat/config', auth, asyncHandler(async (req, res) => {
   });
 }));
 
+function isAllowedChatMessage(text) {
+  if (!text || !String(text).trim()) return false;
+  const clean = String(text).trim();
+  if (CANNED_MESSAGES.includes(clean)) return true;
+  // Allow single emoji or emoji sequences (up to 16 emoji chars)
+  const emojiRegex = /^[\\p{Extended_Pictographic}\\p{Emoji}\\p{Emoji_Component}\\p{Emoji_Modifier}\\p{Emoji_Modifier_Base}\\p{Emoji_Presentation}\\s]+$/u;
+  if (emojiRegex.test(clean) && clean.length <= 20) return true;
+  return false;
+}
+
 const CANNED_MESSAGES = [
   "سلام بچه‌ها!",
   "من اومدم!",
@@ -1831,7 +1841,7 @@ app.post('/api/chat/messages', auth, chatLimiter, asyncHandler(async (req, res) 
     const rm = await pool.query('SELECT id FROM chat_messages WHERE id=$1 AND is_deleted=false', [replyTo]);
     if (!rm.rows[0]) return res.status(400).json({ message: 'پیام موردنظر برای پاسخ پیدا نشد' });
   }
-  if (messageType === 'text' && !CANNED_MESSAGES.includes(clean)) return res.status(400).json({ message: 'فقط پیام‌های آماده مجاز هستند.' });
+  if (messageType === 'text' && !isAllowedChatMessage(clean)) return res.status(400).json({ message: 'فقط پیام‌های آماده و ایموجی‌ها مجاز هستند.' });
   if (clean) await assertNoBadWords(clean);
   const { rows } = await pool.query('INSERT INTO chat_messages(user_id,message_text,reply_to_message_id,sticker_id,message_type) VALUES($1,$2,$3,$4,$5) RETURNING *', [req.user.id, clean, replyTo, stickerId, messageType]);
   // BUG: the message BROADCAST carried no cosmetics, while GET /api/chat
@@ -3533,7 +3543,7 @@ io.on('connection', socket => {
         const rm = await pool.query('SELECT id FROM chat_messages WHERE id=$1 AND is_deleted=false', [replyTo]);
         if (!rm.rows[0]) throw new Error('پیام موردنظر برای پاسخ پیدا نشد');
       }
-      if (messageType === 'text' && !CANNED_MESSAGES.includes(clean)) throw new Error('فقط پیام‌های آماده مجاز هستند.');
+      if (messageType === 'text' && !isAllowedChatMessage(clean)) throw new Error('فقط پیام‌های آماده و ایموجی‌ها مجاز هستند.');
       if (clean) await assertNoBadWords(clean);
       arr.push(now); socketMessageTimes.set(socket.user.id, arr);
       const { rows } = await pool.query('INSERT INTO chat_messages(user_id,message_text,reply_to_message_id,sticker_id,message_type) VALUES($1,$2,$3,$4,$5) RETURNING *', [socket.user.id, clean, replyTo, stickerId, messageType]);

@@ -233,6 +233,32 @@ function finish(room, winner) {
     })
     .catch(e => console.error(`[games:${room.gameId}] reward failed:`, e.message));
 
+  // ── پرداخت پات مسابقه استیک‌دار (۱۰۰ و ۱۰۰۰ امتیاز با کسر ۱۰٪ کارمزد) ──
+  if (room.stake > 0 && !room.vsBot) {
+    try {
+      const { pool } = require('../config/db');
+      if (winner === 'X' || winner === 'O' || winner === 'DISCONNECT') {
+        const winningSym = (winner === 'DISCONNECT')
+          ? (room.seats.X && room.seats.X.connected ? 'X' : 'O')
+          : winner;
+        const winnerUid = room.players?.[winningSym]?.id;
+        if (winnerUid && winnerUid !== 'bot') {
+          pool.query('UPDATE users SET current_points = current_points + $2, lifetime_points = lifetime_points + $2 WHERE id=$1', [winnerUid, room.netPot]).catch(() => {});
+          const winSock = room.seats[winningSym];
+          if (winSock) safeEmit(winSock, 'game:stake_win', { netPot: room.netPot, stake: room.stake });
+        }
+      } else if (winner === 'DRAW') {
+        // بازگشت ۱۰۰٪ امتیاز ورودی به هر دو بازیکن در تساوی
+        for (const s of ['X', 'O']) {
+          const uid = room.players?.[s]?.id;
+          if (uid && uid !== 'bot') {
+            pool.query('UPDATE users SET current_points = current_points + $2 WHERE id=$1', [uid, room.stake]).catch(() => {});
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
   // ── XP گذر نبرد ────────────────────────────────────────────────────
   //
   // هر بازیکنِ واقعی (نه ربات) بابت انجام بازی XP می‌گیرد، و برنده
@@ -453,50 +479,44 @@ const attachGames = function attachGames(io, rulesById) {
       const rules = rulesById[gameId];
       if (!rules) return safeEmit(socket, 'game:error', { message: 'این بازی در دسترس نیست' });
 
-      dropFromQueue(socket); // never sit in two queues at once
+      dropFromQueue(socket);
       const previous = rooms.get(roomOfSocket(socket));
       if (previous) finish(previous, 'DISCONNECT');
 
-      const wantBot = (payload && typeof payload === 'object' && payload.vsBot === true);
+      const stake = Number(payload?.stake || 0);
+      const wantBot = (payload && typeof payload === 'object' && (payload.vsBot === true || stake === 0 && payload.mode === 'bot'));
       if (wantBot) {
-        startRoom(io, rules, gameId, socket, null);
+        startRoom(io, rules, gameId, socket, null, 0);
         return;
       }
 
-      const q = queueFor(gameId);
-      // Discard queued sockets that have since gone away, otherwise a player
-      // gets matched against a ghost and the game never starts.
+      const qKey = stake > 0 ? `${gameId}:${stake}` : gameId;
+      const q = queueFor(qKey);
       while (q.length && q[0] && q[0].connected === false) q.shift();
       const opponent = q.shift();
 
       if (opponent && opponent.connected && opponent.user.id !== socket.user.id) {
         clearTimeout(opponent.botTimeout);
-        // The waiting player may have been parked in the open-ended queue.
         if (opponent.queuePing) {
           clearInterval(opponent.queuePing);
           opponent.queuePing = null;
         }
-        startRoom(io, rules, gameId, opponent, socket);
+        startRoom(io, rules, gameId, opponent, socket, stake);
         return;
       }
 
       q.push(socket);
-      // Games flagged `noBot` (جفت‌یاب) never fall back to a computer
-      // opponent. The player simply STAYS in the queue until a human shows
-      // up — the client turns the countdown into an open invitation and
-      // offers the solo time-attack mode instead. Silently starting a bot
-      // match there made the whole "play a real person" promise a lie.
-      const botAllowed = !rules.noBot;
-      // Tell the client exactly how long the hunt lasts so it can render a
-      // real countdown instead of an open-ended spinner.
+      const isStaked = stake > 0;
+      const waitTime = isStaked ? 30_000 : 15_000;
+      const botAllowed = !isStaked && !rules.noBot;
+
       safeEmit(socket, 'game:waiting', {
         gameId,
-        message: 'در حال جستجوی حریف واقعی...',
-        waitMs: MATCH_WAIT_MS,
-        deadline: Date.now() + MATCH_WAIT_MS,
-        remainingMs: MATCH_WAIT_MS,
-        // Drives the UI: with a bot the countdown means "then we start with
-        // the bot", without one it means "then we suggest solo mode".
+        stake,
+        message: isStaked ? `در حال جستجوی حریف آنلاین برای مسابقه ${stake} امتیازی (۳۰ ثانیه)...` : 'در حال جستجوی حریف واقعی...',
+        waitMs: waitTime,
+        deadline: Date.now() + waitTime,
+        remainingMs: waitTime,
         botFallback: botAllowed,
         soloAvailable: Boolean(rules.solo),
       });

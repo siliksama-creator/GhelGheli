@@ -223,20 +223,24 @@ class DisplayName extends StatelessWidget {
           Padding(
             padding: const EdgeInsetsDirectional.only(start: 4),
             child: Container(
-              padding: const EdgeInsets.all(1.5),
-              decoration: const BoxDecoration(
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                boxShadow: [
+                gradient: const RadialGradient(
+                  colors: [Color(0x66FFD700), Colors.transparent],
+                ),
+                boxShadow: const [
                   BoxShadow(
-                    color: Color(0x99FFD700),
-                    blurRadius: 8,
+                    color: Color(0xAAFFD700),
+                    blurRadius: 10,
+                    spreadRadius: 1,
                   ),
                 ],
               ),
               child: const Icon(
                 Icons.star_rounded,
-                size: 15,
-                color: Color(0xFFFFDF70),
+                size: 17,
+                color: Color(0xFFFFD700),
               ),
             ),
           ),

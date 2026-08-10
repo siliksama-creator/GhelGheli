@@ -174,6 +174,20 @@ async function getLeaderboard(limit = 100, seasonId = null) {
   if (!season) {
     season = activeSeasons[0] || (await ensureActiveSeason(pool));
   }
+
+  // برندگان دوره قبلی لیگ
+  const { rows: prevWinners } = await pool.query(`
+    SELECT p.rank, p.amount AS prize_amount, p.paid_at,
+           u.id AS user_id, u.nickname, u.first_name, u.last_name, u.profile_image_url, u.profile_avatar_key,
+           s.title AS season_title, s.month_year
+      FROM league_payouts p
+      JOIN users u ON u.id = p.user_id
+      JOIN league_seasons s ON s.id = p.league_season_id
+     WHERE s.status = 'closed' OR s.id <> $1
+     ORDER BY p.paid_at DESC NULLS LAST, p.created_at DESC, p.rank ASC
+     LIMIT 10
+  `, [season.id]);
+
   const { rows } = await pool.query(
     `SELECT e.user_id, e.points,
             u.nickname, u.first_name, u.last_name, u.profile_image_url, u.profile_avatar_key,
@@ -188,6 +202,7 @@ async function getLeaderboard(limit = 100, seasonId = null) {
     season,
     activeLeagues: activeSeasons.length ? activeSeasons : [season],
     entries: rows,
+    previousWinners: prevWinners,
   };
 }
 async function closeActiveSeason({ force = false } = {}) {

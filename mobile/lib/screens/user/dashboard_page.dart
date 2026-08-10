@@ -203,7 +203,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 child: _QuickTile(
                   icon: Image.asset('assets/pass/wheel_icon.webp', width: 24, height: 24),
                   title: 'گردونه',
-                  subtitle: 'چرخش امروز',
+                  subtitle: 'چرخش روزانه',
                   tint: const Color(0xFFF59E0B),
                   onTap: widget.onOpenWheel,
                 ),
@@ -265,7 +265,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                   ?.copyWith(fontWeight: FontWeight.w900)),
                           const SizedBox(height: 3),
                           Text(
-                            'عکس + کد کارت؛ مسیر ضدتقلب کامل همین‌جاست.',
+                            'تهیه کارت‌های فیزیکی فوتبالی و کلکسیونی قلقلی در فروشگاه‌ها و سوپرمارکت‌های سراسر کشور',
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.bodySmall,
@@ -280,7 +280,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         color: BrandColors.amber.withValues(alpha: 0.13),
                         border: Border.all(color: BrandColors.amber.withValues(alpha: 0.34)),
                       ),
-                      child: const Text('اولویت امروز',
+                      child: const Text('کارت داری؟ اینجا ثبت کن',
                           style: TextStyle(
                               color: BrandColors.amber,
                               fontSize: 10,

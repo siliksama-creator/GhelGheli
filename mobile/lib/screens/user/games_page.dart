@@ -1,10 +1,8 @@
-import 'games/private_match_dialog.dart';
-import 'dart:math' as math;
-// Games hub. Each board lives in its own file under ./games/ so this screen
-// stays a thin launcher rather than growing every time a game is added.
+// Games hub with 3 Stake Categories + Tap Game Standalone on Top
 import 'dart:async';
+import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:flutter/material';
 import '../../api_client.dart';
 import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
@@ -15,6 +13,7 @@ import 'games/memory_board.dart';
 import 'games/penalty_board.dart';
 import 'games/tap/tap_screen.dart';
 import 'games/card_duel_page.dart';
+import 'games/private_match_dialog.dart';
 
 class _GameEntry {
   const _GameEntry(
@@ -26,7 +25,6 @@ class _GameEntry {
     this.art, {
     this.bot = true,
     this.solo = false,
-    this.singlePlayer = false,
   });
   final String id;
   final String title;
@@ -34,39 +32,20 @@ class _GameEntry {
   final String emoji;
   final Color accent;
   final String art;
-
-  /// Whether an empty lobby falls back to a computer opponent. جفت‌یاب says
-  /// no — the tile must not advertise a bot that will never appear.
   final bool bot;
-
-  /// Playable alone against the clock (records only, no points).
   final bool solo;
-
-  /// Purely single-player: no lobby, no opponent, no bot. The tile must not
-  /// advertise any multiplayer affordance for these.
-  final bool singlePlayer;
 }
 
-const _games = <_GameEntry>[
-  _GameEntry('tap', 'ضربه‌زن', '۵۰ لول ضربه بزن و شخصیت‌ها را باز کن', 'assets/games/tap/skin_1.webp',
-      Color(0xFF84CC16), 'assets/games/tap/skin_1.webp',
-      bot: false, singlePlayer: true),
-  // پنالتی دقیقاً **بعد از** ضربه‌زن — درخواست مالک: «بازی پنالتی باید
-  // پایین ضربه زن باشه».
-  //
-  // این فهرست در کلاینت هاردکد است (نه از /api/games)، پس ترتیب سرور
-  // اینجا اثر ندارد و باید جداگانه هماهنگ بماند. پنالتی اصلاً در این
-  // فهرست نبود — یعنی با وجود آماده بودن سرور و صفحهٔ بازی، از اپ
-  // **قابل دسترس نبود**.
-  _GameEntry('penalty', 'ضربات پنالتی', 'یکی می‌زند، یکی می‌گیرد', 'assets/pass/football_icon.webp',
+const _multiplayerGames = <_GameEntry>[
+  _GameEntry('penalty', 'ضربات پنالتی', 'شوت دقیق و مهار دروازه‌بان ۲۰۲۸', 'assets/pass/football_icon.webp',
       Color(0xFF38BDF8), 'assets/games/penalty.webp'),
-  _GameEntry('card_duel', 'دوئل کارت‌ها', 'سه کارت آماده کن؛ Ghost خودکار امتیاز می‌گیرد',
+  _GameEntry('card_duel', 'دوئل کارت‌ها', 'نبرد سه‌کارتی و استات‌های Ghost',
       'assets/games/card_duel_glow.png', Color(0xFFFFD166), 'assets/games/card_duel_glow.png',
       bot: true, solo: true),
-  _GameEntry('memory', 'جفت‌یاب', 'جفت‌ها را به خاطر بسپار و ببر', 'assets/games/memory/medal.webp',
+  _GameEntry('memory', 'جفت‌یاب', 'جفت‌های فوتبالی را به خاطر بسپار', 'assets/games/memory/medal.webp',
       Color(0xFFA855F7), 'assets/games/memory.webp',
-      bot: false, solo: true),
-  _GameEntry('reversi', 'اتللو', 'مهره‌ها را برگردان', 'assets/games/reversi.webp', Color(0xFF34D399),
+      bot: true, solo: true),
+  _GameEntry('reversi', 'اتللو', 'مهره‌ها را برگردان و تخته را فتح کن', 'assets/games/reversi.webp', Color(0xFF34D399),
       'assets/games/reversi.webp'),
 ];
 
@@ -80,18 +59,7 @@ class GamesHubPage extends StatefulWidget {
 
 class _GamesHubPageState extends State<GamesHubPage> {
   String? _active;
-
-  /// وضعیتِ لولِ کاربر.
-  ///
-  /// ═══════════════════════════════════════════════════════════════════════
-  /// چرا اینجا و نه در داشبورد
-  /// ═══════════════════════════════════════════════════════════════════════
-  ///
-  /// درخواست مالک: «یک سیستم لول بندی هم **در قسمت بازی ها** اضافه کن».
-  ///
-  /// جای درستش هم همین‌جاست: لول فقط از بازیِ آنلاین می‌آید، پس باید
-  /// کنارِ همان کاری باشد که می‌سازدش. گذاشتنش در داشبورد، رابطهٔ
-  /// علت-و-معلول را پنهان می‌کرد.
+  int _selectedStake = 100; // 100, 1000, or 0 (تمرین با ربات)
   Map<String, dynamic>? _level;
 
   @override
@@ -100,25 +68,16 @@ class _GamesHubPageState extends State<GamesHubPage> {
     unawaited(_loadLevel());
   }
 
-  /// لول را می‌خواند. شکستش صفحه را نمی‌شکند.
-  ///
-  /// کارتِ لول یک زینت است، نه چیزی که بازی به آن وابسته باشد — اگر
-  /// نیامد، صفحه بدونِ آن رندر می‌شود و کاربر همچنان می‌تواند بازی
-  /// کند. نمایشِ یک پیامِ خطا برای این، فقط سروصدای بی‌مورد بود.
   Future<void> _loadLevel() async {
     try {
       final d = await widget.api.get('/api/level');
       if (!mounted || d is! Map) return;
       setState(() => _level = Map<String, dynamic>.from(d));
-    } catch (_) {
-      // بی‌صدا: کارتِ لول اختیاری است.
-    }
+    } catch (_) {}
   }
 
   void _back() {
     setState(() => _active = null);
-    // برگشتن از یک بازی یعنی احتمالاً XP تازه گرفته شده — عددِ کارت
-    // باید تازه شود، وگرنه کاربر بازی می‌کند و هیچ تغییری نمی‌بیند.
     unawaited(_loadLevel());
   }
 
@@ -141,6 +100,7 @@ class _GamesHubPageState extends State<GamesHubPage> {
     return ListView(
       padding: const EdgeInsets.all(Gaps.md),
       children: [
+        // Header
         Container(
           padding: const EdgeInsets.all(Gaps.md),
           decoration: BoxDecoration(
@@ -167,14 +127,14 @@ class _GamesHubPageState extends State<GamesHubPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('باشگاه بازی قلقلی',
+                    Text('باشگاه بازی‌های قلقلی',
                         style: theme.textTheme.titleLarge?.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.w900,
                         )),
                     const SizedBox(height: 3),
                     Text(
-                      'رقابت آنلاین، رکورد تنها و XP لول در یک مسیر جمع‌وجور.',
+                      'مسابقات آنلاین با امتیاز، نبرد با دوستان و ارتقای لول',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodySmall?.copyWith(
@@ -187,7 +147,7 @@ class _GamesHubPageState extends State<GamesHubPage> {
             ],
           ),
         ),
-        Gaps.vMd,
+        Gaps.vSm,
         if (_level != null)
           LevelCard(
             level: (_level!['level'] as num?)?.toInt() ?? 0,
@@ -198,8 +158,98 @@ class _GamesHubPageState extends State<GamesHubPage> {
             xp: (_level!['xp'] as num?)?.toInt() ?? 0,
           ),
         Gaps.vSm,
-        const _ScrollDownHint(),
+
+        // ── ۱. بازی ضربه‌زن: بالای صفحه و مستقل ──
+        _TapGameHeroCard(
+          onTap: () => setState(() => _active = 'tap'),
+        ),
+        Gaps.vMd,
+
+        // ── ۲. سه دسته‌بندی مسابقات (۱۰۰ امتیاز، ۱۰۰۰ امتیاز، تمرین با ربات) ──
+        const Text(
+          'انتخاب سطح مسابقه آنلاین:',
+          style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900, color: Color(0xFFF1F5F9)),
+        ),
+        Gaps.vXs,
+        Row(
+          children: [
+            Expanded(
+              child: _ModePill(
+                title: '۱۰۰ امتیاز',
+                subtitle: 'جایزه ۱۸۰',
+                icon: Icons.bolt_rounded,
+                selected: _selectedStake == 100,
+                color: const Color(0xFF38BDF8),
+                onTap: () => setState(() => _selectedStake = 100),
+              ),
+            ),
+            Gaps.hXs,
+            Expanded(
+              child: _ModePill(
+                title: '۱۰۰۰ امتیاز',
+                subtitle: 'جایزه ۱۸۰۰',
+                icon: Icons.stars_rounded,
+                selected: _selectedStake == 1000,
+                color: const Color(0xFFFFD166),
+                onTap: () => setState(() => _selectedStake = 1000),
+              ),
+            ),
+            Gaps.hXs,
+            Expanded(
+              child: _ModePill(
+                title: 'تمرین با ربات',
+                subtitle: 'شروع فوری',
+                icon: Icons.smart_toy_rounded,
+                selected: _selectedStake == 0,
+                color: const Color(0xFF22E7A6),
+                onTap: () => setState(() => _selectedStake = 0),
+              ),
+            ),
+          ],
+        ),
         Gaps.vSm,
+
+        // Info Banner
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            color: Colors.white.withValues(alpha: 0.04),
+            border: Border.all(color: Colors.white12),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                _selectedStake == 0 ? Icons.info_outline_rounded : Icons.timer_outlined,
+                size: 16,
+                color: _selectedStake == 1000 ? const Color(0xFFFFD166) : (_selectedStake == 100 ? const Color(0xFF38BDF8) : const Color(0xFF22E7A6)),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _selectedStake == 0
+                      ? 'تمرین رایگان با هوش مصنوعی بدون کسر امتیاز (آماده‌سازی برای مسابقات)'
+                      : '۳۰ ثانیه جستجوی حریف آنلاین · ۱۰٪ کارمزد مسابقه کسر و برنده تمام پات را می‌برد!',
+                  style: const TextStyle(fontSize: 11, color: Color(0xFFCBD5E1), fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Gaps.vMd,
+
+        // ── ۳. فهرست بازی‌های مسابقه‌ای ──
+        for (final g in _multiplayerGames) ...[
+          _StakedGameTile(
+            entry: g,
+            stake: _selectedStake,
+            onTap: () => setState(() => _active = g.id),
+          ),
+          Gaps.vSm,
+        ],
+
+        Gaps.vSm,
+        // ── ۴. دوئل ۱ به ۱ با دوستان ──
         InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () => PrivateMatchDialog.show(
@@ -238,265 +288,227 @@ class _GamesHubPageState extends State<GamesHubPage> {
             ),
           ),
         ),
-        Gaps.vMd,
-        for (final g in _games) ...[
-          _GameTile(entry: g, onTap: () => setState(() => _active = g.id)),
-          Gaps.vSm,
-        ],
+        Gaps.vLg,
       ],
     );
   }
 }
 
-class _GameTile extends StatefulWidget {
-  const _GameTile({required this.entry, required this.onTap});
-  final _GameEntry entry;
+class _ModePill extends StatelessWidget {
+  const _ModePill({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.selected,
+    required this.color,
+    required this.onTap,
+  });
+
+  final String title, subtitle;
+  final IconData icon;
+  final bool selected;
+  final Color color;
   final VoidCallback onTap;
 
   @override
-  State<_GameTile> createState() => _GameTileState();
-}
-
-class _GameTileState extends State<_GameTile> {
-  bool _pressed = false;
-
-  @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final entry = widget.entry;
-    // ═══════════════════════════════════════════════════════════════════
-    // چرا یک GestureDetectorِ تنها، نه AppCard(onTap) + GestureDetector
-    // ═══════════════════════════════════════════════════════════════════
-    // نسخهٔ قبلی هم `onTap` به `AppCard` (که داخلش یک `InkWell` با
-    // `TapGestureRecognizer` می‌سازد) می‌داد و هم این‌جا یک `GestureDetector`
-    // (با `TapGestureRecognizer` دیگر) روی کلِ کارت. دو رکگنایزرِ ضربه در
-    // گسچرآرنا با هم رقابت می‌کردند و تا تکلیفِ برنده روشن نشود، ضربهٔ
-    // کاربر «دیر» به‌نظر می‌رسید — همان تأخیرِ ورود به بازی که گزارش شد.
-    //
-    // حالا فقط یک رکگنایزرِ ضربه روی کارت هست و `onTap` را خودش صدا می‌زند؛
-    // `AppCard` بی‌`onTap` می‌ماند (فقط قابِ بصری). نتیجه: ورودِ فوری به بازی.
-    return AnimatedScale(
-      scale: _pressed ? 0.97 : 1.0,
-      duration: Motion.fast,
-      curve: Motion.standard,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapDown: (_) => setState(() => _pressed = true),
-        onTapUp: (_) {
-          setState(() => _pressed = false);
-          widget.onTap();
-        },
-        onTapCancel: () => setState(() => _pressed = false),
-        child: AppCard(
-          padding: EdgeInsets.zero,
-          child: ClipRRect(
-            borderRadius: Corners.rXl,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Stack(
-                  children: [
-                    AspectRatio(
-                      aspectRatio: 16 / 5.8,
-                      child: Image.asset(
-                        entry.art,
-                        fit: BoxFit.cover,
-                        // PERF: هر سه بنر بازی ۷۲۰ پیکسل عرض دارند و هر کدام
-                        // ~۱.۱ مگابایت رم موقع دیکد می‌گیرند — یعنی ۳.۳
-                        // مگابایت فقط برای صفحهٔ فهرست بازی‌ها. کارت‌ها روی
-                        // موبایل حدود ۳۴۰ پیکسل منطقی عرض دارند، پس ۷۲۰ کف
-                        // یک نمایشگر ۲x را هم پوشش می‌دهد و بالاترش هدر است.
-                        // بقیهٔ بنرهای اپ این راهنما را داشتند؛ همین یکی جا
-                        // افتاده بود.
-                        cacheWidth: 720,
-                        // Never let a missing/corrupt asset blank the whole hub.
-                        errorBuilder: (_, __, ___) => Container(
-                          color: entry.accent.withValues(alpha: 0.18),
-                          alignment: Alignment.center,
-                          child: Image.asset(entry.emoji, width: 64, height: 64, fit: BoxFit.contain),
-                        ),
-                      ),
-                    ),
-                    Positioned.fill(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.transparent,
-                              Colors.black.withValues(alpha: 0.72),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      right: Gaps.md,
-                      bottom: Gaps.xs,
-                      left: Gaps.md,
-                      child: Row(
-                        children: [
-                          Image.asset(entry.emoji, width: 28, height: 28, fit: BoxFit.contain),
-                          Gaps.hXs,
-                          Expanded(
-                            child: Text(
-                              entry.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(Gaps.sm),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(entry.subtitle,
-                                style: theme.textTheme.bodySmall),
-                            Gaps.vXs,
-                            Wrap(spacing: Gaps.xxs,
-                                runSpacing: Gaps.xxs,
-                                children: [
-                                  if (entry.singlePlayer) ...[
-                                    _Tag(label: 'تک‌نفره', color: entry.accent),
-                                    const _Tag(
-                                        label: '۵۰ لول',
-                                        color: Color(0xFFF59E0B)),
-                                    const _Tag(
-                                        label: 'ذخیرهٔ خودکار',
-                                        color: Color(0xFF34D399)),
-                                  ] else ...[
-                                    _Tag(
-                                        label: 'دو نفره آنلاین',
-                                        color: entry.accent),
-                                    if (entry.bot)
-                                      _Tag(
-                                          label: 'بازی با ربات',
-                                          color: entry.accent)
-                                    else
-                                      const _Tag(
-                                          label: 'فقط حریف واقعی',
-                                          color: Color(0xFF38BDF8)),
-                                    if (entry.solo)
-                                      const _Tag(
-                                          label: 'بازی تنها · رکوردی',
-                                          color: Color(0xFF34D399)),
-                                  ],
-                                ]),
-                          ],
-                        ),
-                      ),
-                      Image.asset('assets/games/play_glow.png',
-                          width: 38, height: 38, cacheWidth: 96),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          color: selected ? color.withValues(alpha: 0.20) : Colors.white.withValues(alpha: 0.04),
+          border: Border.all(color: selected ? color : Colors.white12, width: selected ? 1.8 : 1),
+          boxShadow: selected ? [BoxShadow(color: color.withValues(alpha: 0.25), blurRadius: 10)] : null,
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 18, color: selected ? color : Colors.white70),
+            const SizedBox(height: 3),
+            Text(title, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, color: selected ? Colors.white : Colors.white70)),
+            Text(subtitle, style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: selected ? color : Colors.white54)),
+          ],
         ),
       ),
     );
   }
 }
 
-class _Tag extends StatelessWidget {
-  const _Tag({required this.label, required this.color});
-  final String label;
-  final Color color;
+class _TapGameHeroCard extends StatelessWidget {
+  const _TapGameHeroCard({required this.onTap});
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: Gaps.xs, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.14),
-        borderRadius: Corners.rPill,
-      ),
-      child: Text(
-        label,
-        style: Theme.of(context)
-            .textTheme
-            .labelSmall
-            ?.copyWith(color: color, fontWeight: FontWeight.w700),
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          gradient: const LinearGradient(
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: [Color(0xFF2E5B09), Color(0xFF132A04), Color(0xFF0B1702)],
+          ),
+          border: Border.all(color: const Color(0xFF84CC16).withValues(alpha: 0.6), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF84CC16).withValues(alpha: 0.25),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Image.asset('assets/games/tap/skin_1.webp', width: 56, height: 56, cacheWidth: 150),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text('بازی ضربه‌زن (تک‌نفره)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.white)),
+                      SizedBox(width: 6),
+                      DecoratedBox(
+                        decoration: BoxDecoration(color: Color(0xFF84CC16), borderRadius: BorderRadius.all(Radius.circular(6))),
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          child: Text('۵۰ لول', style: TextStyle(color: Color(0xFF1E0A00), fontSize: 9.5, fontWeight: FontWeight.w900)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 3),
+                  Text('ضربه بزن، شخصیت‌های مخفی را باز کن و امتیاز بگیر', style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 11)),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Color(0xFF84CC16)),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _ScrollDownHint extends StatefulWidget {
-  const _ScrollDownHint();
-
-  @override
-  State<_ScrollDownHint> createState() => _ScrollDownHintState();
-}
-
-class _ScrollDownHintState extends State<_ScrollDownHint>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1400),
-  )..repeat(reverse: true);
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
+class _StakedGameTile extends StatelessWidget {
+  const _StakedGameTile({required this.entry, required this.stake, required this.onTap});
+  final _GameEntry entry;
+  final int stake;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _ctrl,
-      builder: (context, _) {
-        final bounce = math.sin(_ctrl.value * math.pi) * 3.5;
-        return Transform.translate(
-          offset: Offset(0, bounce),
-          child: Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                borderRadius: Corners.rPill,
-                color: const Color(0xFF16253B).withValues(alpha: 0.90),
-                border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.50)),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF38BDF8).withValues(alpha: 0.22),
-                    blurRadius: 10,
-                  ),
-                ],
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
+    final theme = Theme.of(context);
+    final winPoints = stake == 1000 ? 1800 : (stake == 100 ? 180 : 0);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: AppCard(
+        padding: EdgeInsets.zero,
+        child: ClipRRect(
+          borderRadius: Corners.rXl,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Stack(
                 children: [
-                  Icon(Icons.keyboard_double_arrow_down_rounded, size: 16, color: Color(0xFF38BDF8)),
-                  SizedBox(width: 6),
-                  Text(
-                    'برای بازی‌های بیشتر به پایین بکشید',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFFF1F5F9),
+                  AspectRatio(
+                    aspectRatio: 16 / 5.6,
+                    child: Image.asset(
+                      entry.art,
+                      fit: BoxFit.cover,
+                      cacheWidth: 720,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: entry.accent.withValues(alpha: 0.18),
+                        alignment: Alignment.center,
+                        child: Image.asset(entry.emoji, width: 56, height: 56, fit: BoxFit.contain),
+                      ),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Colors.transparent, Colors.black.withValues(alpha: 0.75)],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    right: Gaps.md,
+                    bottom: Gaps.xs,
+                    left: Gaps.md,
+                    child: Row(
+                      children: [
+                        Image.asset(entry.emoji, width: 26, height: 26, fit: BoxFit.contain),
+                        Gaps.hXs,
+                        Expanded(
+                          child: Text(
+                            entry.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
-            ),
+              Padding(
+                padding: const EdgeInsets.all(Gaps.sm),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(entry.subtitle, style: theme.textTheme.bodySmall),
+                          Gaps.vXs,
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  borderRadius: Corners.rPill,
+                                  color: stake == 0 ? const Color(0xFF22E7A6).withValues(alpha: 0.15) : const Color(0xFFFFD166).withValues(alpha: 0.18),
+                                  border: Border.all(color: stake == 0 ? const Color(0xFF22E7A6) : const Color(0xFFFFD166)),
+                                ),
+                                child: Text(
+                                  stake == 0 ? 'تمرین با هوش مصنوعی' : 'جایزه برنده: ${faNum(winPoints)} امتیاز',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w900,
+                                    color: stake == 0 ? const Color(0xFF22E7A6) : const Color(0xFFFFD166),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Image.asset('assets/games/play_glow.png', width: 36, height: 36, cacheWidth: 96),
+                  ],
+                ),
+              ),
+            ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }

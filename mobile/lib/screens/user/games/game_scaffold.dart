@@ -1,3 +1,4 @@
+import '../../../widgets/victory_share_dialog.dart';
 // Shared chrome for every game screen: header, versus bar, status banners
 // and the end-of-game panel. Each individual board only supplies its grid.
 import 'dart:math' as math;
@@ -269,6 +270,31 @@ class GameScaffold extends StatelessWidget {
                 api: api,
                 symbols: symbols,
                 accent: accent),
+            if (session.stake > 0) ...[
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                decoration: BoxDecoration(
+                  borderRadius: Corners.rPill,
+                  gradient: const LinearGradient(colors: [Color(0x3DFFD700), Color(0x1AFF9F43)]),
+                  border: Border.all(color: const Color(0xFFFFD166), width: 1.2),
+                  boxShadow: [
+                    BoxShadow(color: const Color(0xFFFFD166).withValues(alpha: 0.25), blurRadius: 10),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.emoji_events_rounded, size: 14, color: Color(0xFFFFD166)),
+                    const SizedBox(width: 5),
+                    Text(
+                      'پات مسابقه: ${faNum(session.netPot > 0 ? session.netPot : session.stake * 2 * 0.9)} امتیاز (۱۰٪ کارمزد)',
+                      style: const TextStyle(color: Color(0xFFFFD166), fontSize: 11.5, fontWeight: FontWeight.w900),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             Gaps.vXxs,
             if (scoreboard != null) ...[scoreboard!, Gaps.vXxs],
             if (session.phase == GamePhase.over)

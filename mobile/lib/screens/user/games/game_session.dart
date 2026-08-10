@@ -13,6 +13,10 @@ import 'game_audio.dart';
 enum GamePhase { idle, waiting, playing, over }
 
 class GameSession extends ChangeNotifier {
+  int stake = 0;
+  int totalPot = 0;
+  int netPot = 0;
+  int commission = 0;
   GameSession({required this.api, required this.gameId});
 
   final ApiClient api;
@@ -349,14 +353,15 @@ class GameSession extends ChangeNotifier {
     _tickClock();
   }
 
-  void join({bool vsBot = false}) {
+  void join({bool vsBot = false, int stake = 0}) {
+    this.stake = stake;
     connect();
     error = null;
     winner = null;
     lastMove = null;
     timedOutSymbol = null;
     stillSearching = false;
-    _socket?.emit('game:join', {'gameId': gameId, 'vsBot': vsBot});
+    _socket?.emit('game:join', {'gameId': gameId, 'vsBot': vsBot, 'stake': stake});
     phase = GamePhase.waiting;
     notifyListeners();
   }
