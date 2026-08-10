@@ -175,11 +175,13 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
       });
       _scrollToBottom(force: true);
     } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = apiError(e);
-        _loading = false;
-      });
+      if (mounted) {
+        final msg = apiError(e);
+        setState(() {
+          if (msg.isNotEmpty) _error = msg;
+          _loading = false;
+        });
+      }
     }
   }
 

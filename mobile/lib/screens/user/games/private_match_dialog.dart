@@ -78,7 +78,7 @@ class _PrivateMatchDialogState extends State<PrivateMatchDialog> {
                   const Icon(Icons.sports_esports_rounded, size: 24, color: Color(0xFF38BDF8)),
                   const SizedBox(width: 8),
                   const Expanded(
-                    child: Text('دوئل مستقیم و اتاق خصوصی',
+                    child: Text('دوئل مستقیم با دوستان (۱v۱)',
                         style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.white)),
                   ),
                   IconButton(

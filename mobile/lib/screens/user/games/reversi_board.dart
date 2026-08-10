@@ -128,7 +128,7 @@ class _Board extends StatelessWidget {
                   child: cell == 'X'
                       ? Image.asset('assets/pass/football_icon.webp', width: 24, height: 24)
                       : (cell == 'O'
-                          ? Image.asset('assets/games/reversi.webp', width: 24, height: 24)
+                          ? Image.asset('assets/games/reversi.webp', width: 24, height: 24, cacheWidth: 80)
                           : (isLegal
                               ? Container(width: 8, height: 8, decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white60))
                               : null)),
