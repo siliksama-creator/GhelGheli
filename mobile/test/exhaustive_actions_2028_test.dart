@@ -120,7 +120,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
-      expect(find.text('دوئل مستقیم با دوستان (۱v۱)'), findsOneWidget);
+      expect(find.text('دوئل مستقیم با دوستان'), findsOneWidget);
       expect(find.text('ساخت اتاق بازی و دریافت کد'), findsOneWidget);
 
       await tester.tap(find.text('ساخت اتاق بازی و دریافت کد'));

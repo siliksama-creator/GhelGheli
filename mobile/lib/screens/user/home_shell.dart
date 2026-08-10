@@ -753,7 +753,7 @@ class _PassButtonState extends State<_PassButton>
     with SingleTickerProviderStateMixin {
   late final AnimationController _anim = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 2800),
+    duration: const Duration(milliseconds: 3000),
   )..repeat();
 
   @override
@@ -771,8 +771,8 @@ class _PassButtonState extends State<_PassButton>
       animation: _anim,
       builder: (context, _) {
         final t = _anim.value;
-        final floatY = math.sin(t * 2 * math.pi) * 1.5;
-        final glowAlpha = 0.35 + 0.20 * math.sin(t * 2 * math.pi).abs();
+        final floatY = math.sin(t * 2 * math.pi) * 1.2;
+        final glowPulse = 0.40 + 0.25 * math.sin(t * 2 * math.pi).abs();
 
         return IconButton(
           tooltip: 'گذر نبرد فصلی',
@@ -789,16 +789,23 @@ class _PassButtonState extends State<_PassButton>
               clipBehavior: Clip.none,
               alignment: Alignment.center,
               children: [
-                // Glowing Cyber Aura
+                // هاله درخشش سایبری بسیار شیک و ملایم
                 Positioned(
                   child: Container(
                     width: 28,
                     height: 28,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          const Color(0xFF00E5FF).withValues(alpha: 0.35 * glowPulse),
+                          const Color(0xFF38BDF8).withValues(alpha: 0.15 * glowPulse),
+                          Colors.transparent,
+                        ],
+                      ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF00E5FF).withValues(alpha: glowAlpha),
+                          color: const Color(0xFF00E5FF).withValues(alpha: 0.30 * glowPulse),
                           blurRadius: 10,
                           spreadRadius: 1,
                         ),
@@ -806,7 +813,7 @@ class _PassButtonState extends State<_PassButton>
                     ),
                   ),
                 ),
-                // Floating high-quality Battle Pass Shield Icon
+                // شیلد گذر نبرد با حرکت شناور آرام
                 Transform.translate(
                   offset: Offset(0, floatY),
                   child: Image.asset(
@@ -817,7 +824,7 @@ class _PassButtonState extends State<_PassButton>
                     fit: BoxFit.contain,
                   ),
                 ),
-                // Pulsing Notification Badge (1 or 2)
+                // نشانگر قرمز تعداد پله‌های بازشده روزانه (۱ یا ۲)
                 if (badgeNum > 0)
                   Positioned(
                     top: -3,

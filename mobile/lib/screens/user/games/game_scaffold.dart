@@ -177,6 +177,15 @@ class GameScaffold extends StatelessWidget {
         );
 
       case GamePhase.waiting:
+        if (session.vsBot) {
+          return const Center(
+            child: SizedBox(
+              width: 36,
+              height: 36,
+              child: CircularProgressIndicator(strokeWidth: 3),
+            ),
+          );
+        }
         final left = session.searchSecondsLeft;
         final total = session.searchSeconds <= 0 ? 15 : session.searchSeconds;
         // With no bot to fall back on the countdown is meaningless once it
