@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import '../../../api_client.dart';
 import '../../../theme/tokens.dart';
-import '../../../widgets/app_card.dart';
 import 'game_scaffold.dart';
 import 'game_session.dart';
 

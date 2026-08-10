@@ -230,12 +230,12 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
                                 horizontal: Gaps.xs),
                             decoration: BoxDecoration(
                               color: isFirst
-                                  ? brand.gold
+                                  ? const Color(0xFFFFD700)
                                   : theme.colorScheme.surfaceContainerHigh,
                               borderRadius: Corners.rXl,
                               border: Border.all(
                                   color: isFirst
-                                      ? brand.goldLight
+                                      ? const Color(0xFFFFF3B0)
                                       : theme.colorScheme.outlineVariant),
                             ),
                             child: Column(

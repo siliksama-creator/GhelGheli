@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../api_client.dart';
-import '../../../core/assets.dart';
-import '../../../theme/tokens.dart';
 
 /// دیالوگ ساخت اتاق خصوصی و دوئل مستقیم ۱v۱ با دوست (با تعیین امتیاز و کسر ۱۰٪ کارمزد)
 class PrivateMatchDialog extends StatefulWidget {
@@ -13,12 +11,12 @@ class PrivateMatchDialog extends StatefulWidget {
   });
 
   final ApiClient api;
-  final void Function(String gameId, String roomCode, int stake) onJoinRoom;
+  final Function onJoinRoom;
 
   static Future<void> show(
     BuildContext context, {
     required ApiClient api,
-    required void Function(String gameId, String roomCode, int stake) onJoinRoom,
+    required Function onJoinRoom,
   }) {
     return showDialog(
       context: context,
@@ -203,7 +201,7 @@ class _PrivateMatchDialogState extends State<PrivateMatchDialog> {
                         icon: const Icon(Icons.share_rounded, size: 16),
                         label: const Text('ارسال لینک دعوت برای دوست', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
                         onPressed: () {
-                          final msg = 'بیا در بازی قلقلی با هم دوئل کنیم! 🎮\nبازی: ${_selectedGame}\nامتیاز مسابقه: ${faNum(_selectedStake)}\nکد اتاق: $_createdCode\n$_shareUrl';
+                          final msg = 'بیا در بازی قلقلی با هم دوئل کنیم! 🎮\nبازی: $_selectedGame\nامتیاز مسابقه: ${faNum(_selectedStake)}\nکد اتاق: $_createdCode\n$_shareUrl';
                           Clipboard.setData(ClipboardData(text: msg));
                           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لینک و کد اتاق در کلیپ‌بورد کپی شد')));
                         },
@@ -213,7 +211,7 @@ class _PrivateMatchDialogState extends State<PrivateMatchDialog> {
                         style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(40)),
                         onPressed: () {
                           Navigator.pop(context);
-                          widget.onJoinRoom(_selectedGame, _createdCode!, _selectedStake);
+                          if (widget.onJoinRoom is void Function(String, String, int)) { (widget.onJoinRoom as dynamic)(_selectedGame, _createdCode!, _selectedStake); } else { (widget.onJoinRoom as dynamic)(_selectedGame, _createdCode!); }
                         },
                         child: const Text('ورود به اتاق و انتظار برای حریف'),
                       ),
@@ -246,7 +244,7 @@ class _PrivateMatchDialogState extends State<PrivateMatchDialog> {
                       final code = _joinCodeCtrl.text.trim();
                       if (code.isNotEmpty) {
                         Navigator.pop(context);
-                        widget.onJoinRoom(_selectedGame, code, _selectedStake);
+                        if (widget.onJoinRoom is void Function(String, String, int)) { (widget.onJoinRoom as dynamic)(_selectedGame, code, _selectedStake); } else { (widget.onJoinRoom as dynamic)(_selectedGame, code); }
                       }
                     },
                     child: const Text('ورود'),

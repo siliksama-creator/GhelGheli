@@ -6,7 +6,6 @@ import '../../api_client.dart';
 import '../../core/cosmetics.dart';
 import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
-import '../../widgets/app_card.dart';
 import '../../widgets/avatar_image.dart';
 import '../../widgets/safe_image.dart';
 import '../../widgets/state_views.dart';
@@ -246,7 +245,6 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
         if (_pinned != null)
           PinnedBanner(
             pinned: _pinned!,
-            onDismiss: () => setState(() => _pinned = null),
           ),
         Expanded(
           child: ListView.builder(
@@ -338,9 +336,9 @@ class _MessageBubble extends StatelessWidget {
             onTap: onOpenProfile,
             borderRadius: BorderRadius.circular(16),
             child: AvatarImage(
-              avatarKey: message['profile_avatar_key'],
+              keyName: message['profile_avatar_key'],
               imageUrl: message['profile_image_url'],
-              size: 32,
+              radius: 16,
             ),
           ),
           const SizedBox(width: 8),
