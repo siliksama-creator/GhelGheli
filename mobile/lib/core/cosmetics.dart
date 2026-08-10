@@ -6,6 +6,7 @@
 /// membership); this only draws it.
 library;
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../widgets/level_badge.dart';
@@ -245,6 +246,60 @@ class DisplayName extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+
+class _AnimatedPlusStar extends StatefulWidget {
+  const _AnimatedPlusStar();
+  @override
+  State<_AnimatedPlusStar> createState() => _AnimatedPlusStarState();
+}
+
+class _AnimatedPlusStarState extends State<_AnimatedPlusStar> {
+  Timer? _timer;
+  double _glow = 0.7;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(milliseconds: 60), (_) {
+      if (!mounted) return;
+      setState(() {
+        _glow += 0.025;
+        if (_glow > 1.0) _glow = 0.7;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(
+          colors: [
+            const Color(0xFFFFD700).withValues(alpha: _glow * 0.6),
+            Colors.transparent,
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFFD700).withValues(alpha: _glow * 0.9),
+            blurRadius: 16 * _glow,
+            spreadRadius: 3 * _glow,
+          ),
+        ],
+      ),
+      child: const Icon(Icons.star_rounded, size: 21, color: Color(0xFFFFD700)),
     );
   }
 }

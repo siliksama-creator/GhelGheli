@@ -265,7 +265,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                   ?.copyWith(fontWeight: FontWeight.w900)),
                           const SizedBox(height: 3),
                           Text(
-                            'کارت‌های فوتبالی و غیرفوتبالی قلقلی، اکنون به‌صورت فیزیکی در فروشگاه‌ها و سوپرمارکت‌های سراسر کشور',
+                            'کارت‌های فیزیکی قلقلی رو می‌تونی از فروشگاه‌ها و سوپرمارکت‌های سراسر کشور تهیه کنی',
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.bodySmall,
@@ -280,7 +280,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         color: BrandColors.amber.withValues(alpha: 0.13),
                         border: Border.all(color: BrandColors.amber.withValues(alpha: 0.34)),
                       ),
-                      child: const Text('کارت داری؟ اینجا ثبت کن',
+                      child: const Text('کارت داری؟ اینجا ثبت کن !',
                           style: TextStyle(
                               color: BrandColors.amber,
                               fontSize: 10,
@@ -358,7 +358,8 @@ class _DashboardPageState extends State<DashboardPage> {
 
 
 /// کاشی میان‌بر روی داشبورد.
-class _QuickTile extends StatelessWidget {
+/// کاشی میان‌بر روی داشبورد.
+class _QuickTile extends StatefulWidget {
   const _QuickTile({
     required this.icon,
     required this.title,
@@ -374,60 +375,88 @@ class _QuickTile extends StatelessWidget {
   final VoidCallback? onTap;
 
   @override
+  State<_QuickTile> createState() => _QuickTileState();
+}
+
+class _QuickTileState extends State<_QuickTile> with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1800));
+    _pulse = Tween<double>(begin: 0.92, end: 1.06).animate(
+      CurvedAnimation(parent: _ctrl, curve: const Interval(0.0, 0.5, curve: Curves.easeInOut)),
+    );
+    _loop();
+  }
+
+  void _loop() {
+    if (!mounted) return;
+    _ctrl.forward().then((_) {
+      if (mounted) _ctrl.reverse().then((_) => _loop());
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Material(
-      color: Colors.transparent,
-      borderRadius: Corners.rLg,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: Corners.rLg,
-        child: Container(
-          // ۴۸ کف اندازهٔ هدف لمسی طبق راهنمای دسترس‌پذیری متریال.
-          constraints: const BoxConstraints(minHeight: 58),
-          padding: const EdgeInsets.symmetric(
-              horizontal: Gaps.xs, vertical: Gaps.xs),
-          decoration: BoxDecoration(
+    return FadeTransition(
+      opacity: _pulse,
+      child: ScaleTransition(
+        scale: _pulse,
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: Corners.rLg,
+          child: InkWell(
+            onTap: widget.onTap,
             borderRadius: Corners.rLg,
-            gradient: LinearGradient(
-              begin: Alignment.topRight,
-              end: Alignment.bottomLeft,
-              colors: [
-                tint.withValues(alpha: 0.22),
-                Theme.of(context).colorScheme.surfaceContainerHigh
-                    .withValues(alpha: 0.72),
-              ],
-            ),
-            border: Border.all(color: tint.withValues(alpha: 0.28)),
-            boxShadow: [
-              BoxShadow(
-                color: tint.withValues(alpha: 0.10),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 58),
+              padding: const EdgeInsets.symmetric(horizontal: Gaps.xs, vertical: Gaps.xs),
+              decoration: BoxDecoration(
+                borderRadius: Corners.rLg,
+                gradient: LinearGradient(
+                  begin: Alignment.topRight,
+                  end: Alignment.bottomLeft,
+                  colors: [
+                    widget.tint.withValues(alpha: 0.28),
+                    Theme.of(context).colorScheme.surfaceContainerHigh.withValues(alpha: 0.80),
+                  ],
+                ),
+                border: Border.all(color: widget.tint.withValues(alpha: 0.40), width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: widget.tint.withValues(alpha: 0.16),
+                    blurRadius: 22,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(width: 26, height: 26, child: Center(child: icon)),
-              const SizedBox(height: 3),
-              Text(title,
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelMedium
-                      ?.copyWith(fontWeight: FontWeight.w900)),
-              Text(subtitle,
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    fontSize: 10,
-                    color:
-                        theme.colorScheme.onSurface.withValues(alpha: 0.62),
-                  )),
-            ],
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(width: 26, height: 26, child: Center(child: widget.icon)),
+                  const SizedBox(height: 3),
+                  Text(widget.title,
+                      textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w900)),
+                  Text(widget.subtitle,
+                      textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        fontSize: 10,
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.62),
+                      )),
+                ],
+              ),
+            ),
           ),
         ),
       ),

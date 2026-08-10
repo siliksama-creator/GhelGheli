@@ -347,8 +347,8 @@ class _HomeShellState extends State<HomeShell>
         selectedIcon: Icon(Icons.storefront_rounded),
         label: 'فروشگاه'),
     NavigationDestination(
-        icon: Icon(Icons.military_tech_outlined),
-        selectedIcon: Icon(Icons.military_tech_rounded),
+        icon: Icon(Icons.rocket_launch_outlined),
+        selectedIcon: Icon(Icons.rocket_launch_rounded),
         label: 'گذر نبرد'),
     NavigationDestination(
         icon: Icon(Icons.style_outlined),

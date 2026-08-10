@@ -279,9 +279,9 @@ class _GamesHubPageState extends State<GamesHubPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('دوئل مستقیم با دوست (کد اتاق / لینک)',
+                      Text('دوئل مستقیم با دوستان',
                           style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 13)),
-                      Text('اتاق خصوصی بساز و دوستانت را به چالش بکش',
+                      Text('ساخت اتاق خصوصی با امتیاز دلخواه',
                           style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 10.5)),
                     ],
                   ),

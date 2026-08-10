@@ -81,6 +81,7 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
           segments: const [
             ButtonSegment(value: 0, label: Text('جدول لیگ')),
             ButtonSegment(value: 1, label: Text('باشگاه‌ها')),
+            ButtonSegment(value: 2, label: Text('برندگان قبل')),
           ],
           selected: {_tab},
           showSelectedIcon: false,
@@ -99,6 +100,22 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
               padding: const EdgeInsets.symmetric(horizontal: Gaps.md),
               child: ClubsTab(api: widget.api),
             ),
+          ),
+        ],
+      );
+    }
+
+    if (_tab == 2) {
+      return Column(
+        children: [
+          _tabs(),
+          Expanded(
+            child: _data?['previousSeason'] != null
+                ? _PreviousWinnersView(data: _data)
+                : const Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Center(child: Text('هنوز دوره قبلی برگزار نشده است')),
+                  ),
           ),
         ],
       );
@@ -403,6 +420,69 @@ class _PreviousWinnersView extends StatelessWidget {
                         border: Border.all(color: const Color(0xFF22E7A6).withValues(alpha: 0.4)),
                       ),
                       child: Text('${w['prizeAmount']} تومان', style: const TextStyle(color: Color(0xFF22E7A6), fontWeight: FontWeight.w900, fontSize: 12)),
+                    ),
+                ]),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+
+class _PreviousWinnersView extends StatelessWidget {
+  const _PreviousWinnersView({required this.data});
+  final Map? data;
+  @override
+  Widget build(BuildContext context) {
+    final prev = data?['previousSeason'];
+    if (prev == null) return const Center(child: Text('اطلاعات در دسترس نیست'));
+    final winners = List<Map>.from(prev['winners'] ?? []);
+    final theme = Theme.of(context);
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: const LinearGradient(colors: [Color(0xFF3D2E00), Color(0xFF1A1400)]),
+          ),
+          child: Column(children: [
+            const Icon(Icons.emoji_events_rounded, size: 48, color: Color(0xFFFFD700)),
+            const SizedBox(height: 8),
+            Text('برندگان لیگ قبلی', style: theme.textTheme.titleLarge?.copyWith(color: const Color(0xFFFFD700), fontWeight: FontWeight.w900)),
+            Text(prev['monthYear'] ?? '', style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70)),
+          ]),
+        ),
+        const SizedBox(height: 16),
+        for (final w in winners)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: w['rank'] == 1 ? const Color(0xFFFFD700) : w['rank'] == 2 ? const Color(0xFFC0C0C0) : const Color(0xFFCD7F32),
+                    child: Text('\${w['rank']}', style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white)),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(w['nickname'] ?? 'کاربر', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                    Text('\${w['points']} امتیاز', style: theme.textTheme.bodySmall),
+                  ])),
+                  if (w['prizeAmount'] != null && w['prizeAmount'] > 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        color: const Color(0xFF22E7A6).withValues(alpha: 0.15),
+                        border: Border.all(color: const Color(0xFF22E7A6).withValues(alpha: 0.4)),
+                      ),
+                      child: Text('\${w['prizeAmount']} تومان', style: const TextStyle(color: Color(0xFF22E7A6), fontWeight: FontWeight.w900, fontSize: 12)),
                     ),
                 ]),
               ),
