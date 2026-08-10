@@ -2,7 +2,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/material';
+import 'package:flutter/material.dart';
 import '../../api_client.dart';
 import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
