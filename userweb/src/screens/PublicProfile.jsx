@@ -78,7 +78,7 @@ export default function PublicProfile({ token, userId, close }) {
 
             {/* ── Key Stats 4-Grid ── */}
             <div className="ppStats" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', margin: '14px 0' }}>
-              <div><b>{u.bestRank ? `رتبه ${fa(u.bestRank)}` : 'در حال رقابت'}</b><span>رتبه لیگ این ماه</span></div>
+              <div><b>{`رتبه ${fa(u.currentLeagueRank || u.bestRank || 1)}`}</b><span>رتبه لیگ این ماه</span></div>
               <div><b>{fa(u.lifetime_points)}</b><span>مجموع امتیازات کل</span></div>
               <div><b>{fa(u.totalPrizeAmount || 0)} تومان</b><span>جوایز نقدی کسب‌شده</span></div>
               <div><b>{fa((u.trophies?.length || 0) + (u.rewards?.length || 0))} جایزه</b><span>کل جوایز و تندیس‌ها</span></div>
