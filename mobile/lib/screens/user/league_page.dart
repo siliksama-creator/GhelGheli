@@ -125,9 +125,7 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
       return Column(
         children: [
           _tabs(),
-          const Expanded(
-            child: _PreviousWinnersView(data: _data),
-          ),
+          Expanded(child: _PreviousWinnersView(data: _data)),
         ],
       );
     }
