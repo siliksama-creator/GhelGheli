@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../api_client.dart';
+import '../../../core/assets.dart';
+import '../../../theme/tokens.dart';
 
-/// دیالوگ ساخت اتاق خصوصی و دوئل مستقیم ۱v۱ با دوست (با تعیین امتیاز و کسر ۱۰٪ کارمزد)
+/// دیالوگ ساخت اتاق خصوصی و دوئل مستقیم با دوست
 class PrivateMatchDialog extends StatefulWidget {
   const PrivateMatchDialog({
     super.key,
@@ -44,14 +46,11 @@ class _PrivateMatchDialogState extends State<PrivateMatchDialog> {
 
   final _presetStakes = const [100, 200, 500, 1000, 2000, 5000, 10000];
 
-  int get _netPot => (_selectedStake * 2 * 0.9).floor();
-  int get _commission => (_selectedStake * 2 * 0.1).ceil();
-
   void _createRoom() {
     final code = (1000 + (DateTime.now().millisecondsSinceEpoch % 9000)).toString();
     setState(() {
       _createdCode = code;
-      _shareUrl = 'https://user.ghelghelishop.ir/?game=$_selectedGame&room=$code&stake=$_selectedStake';
+      _shareUrl = 'https://user.ghelghelishop.ir/?game=$_selectedGame&room=$code';
     });
   }
 
@@ -123,8 +122,8 @@ class _PrivateMatchDialogState extends State<PrivateMatchDialog> {
               ),
               const SizedBox(height: 14),
 
-              // Stake Selector (Up to 10,000 points, 10% commission)
-              const Text('۲. تعیین امتیاز مسابقه (تا سقف ۱۰,۰۰۰):', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w700)),
+              // Stake Selector (Up to 10,000 points)
+              const Text('۲. تعیین امتیاز مسابقه:', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w700)),
               const SizedBox(height: 6),
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
@@ -142,26 +141,6 @@ class _PrivateMatchDialogState extends State<PrivateMatchDialog> {
                           },
                         ),
                       ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
-
-              // Live calculation card (10% commission)
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  color: Colors.white.withValues(alpha: 0.05),
-                  border: Border.all(color: Colors.white12),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('جایزه برنده: ${faNum(_netPot)} امتیاز',
-                        style: const TextStyle(color: Color(0xFF22E7A6), fontWeight: FontWeight.w900, fontSize: 12)),
-                    Text('۱۰٪ کارمزد: ${faNum(_commission)}',
-                        style: const TextStyle(color: Colors.white54, fontSize: 11)),
                   ],
                 ),
               ),
@@ -201,7 +180,7 @@ class _PrivateMatchDialogState extends State<PrivateMatchDialog> {
                         icon: const Icon(Icons.share_rounded, size: 16),
                         label: const Text('ارسال لینک دعوت برای دوست', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
                         onPressed: () {
-                          final msg = 'بیا در بازی قلقلی با هم دوئل کنیم! 🎮\nبازی: $_selectedGame\nامتیاز مسابقه: ${faNum(_selectedStake)}\nکد اتاق: $_createdCode\n$_shareUrl';
+                          final msg = 'بیا در بازی قلقلی با هم مسابقه بدیم! 🎮\nبازی: $_selectedGame\nکد اتاق: $_createdCode\n$_shareUrl';
                           Clipboard.setData(ClipboardData(text: msg));
                           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لینک و کد اتاق در کلیپ‌بورد کپی شد')));
                         },
@@ -211,7 +190,11 @@ class _PrivateMatchDialogState extends State<PrivateMatchDialog> {
                         style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(40)),
                         onPressed: () {
                           Navigator.pop(context);
-                          if (widget.onJoinRoom is void Function(String, String, int)) { (widget.onJoinRoom as dynamic)(_selectedGame, _createdCode!, _selectedStake); } else { (widget.onJoinRoom as dynamic)(_selectedGame, _createdCode!); }
+                          if (widget.onJoinRoom is void Function(String, String, int)) {
+                            (widget.onJoinRoom as dynamic)(_selectedGame, _createdCode!, _selectedStake);
+                          } else {
+                            (widget.onJoinRoom as dynamic)(_selectedGame, _createdCode!);
+                          }
                         },
                         child: const Text('ورود به اتاق و انتظار برای حریف'),
                       ),
@@ -244,7 +227,11 @@ class _PrivateMatchDialogState extends State<PrivateMatchDialog> {
                       final code = _joinCodeCtrl.text.trim();
                       if (code.isNotEmpty) {
                         Navigator.pop(context);
-                        if (widget.onJoinRoom is void Function(String, String, int)) { (widget.onJoinRoom as dynamic)(_selectedGame, code, _selectedStake); } else { (widget.onJoinRoom as dynamic)(_selectedGame, code); }
+                        if (widget.onJoinRoom is void Function(String, String, int)) {
+                          (widget.onJoinRoom as dynamic)(_selectedGame, code, _selectedStake);
+                        } else {
+                          (widget.onJoinRoom as dynamic)(_selectedGame, code);
+                        }
                       }
                     },
                     child: const Text('ورود'),

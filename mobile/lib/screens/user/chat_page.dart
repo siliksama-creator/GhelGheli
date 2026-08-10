@@ -13,7 +13,6 @@ import '../shared/public_profile_sheet.dart';
 import 'games/pinned_banner.dart';
 
 /// Group chat room: Canned messages only (no custom typing, no stickers).
-/// Fast bootstrap & polling.
 class ChatPage extends StatefulWidget {
   final ApiClient api;
   const ChatPage({super.key, required this.api});
@@ -241,7 +240,7 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
             ),
           ),
 
-        // ── پنل انتخاب پیام‌های آماده (بدون نوشتن دستی، بدون استیکر) ──
+        // ── پنل زیبا و مدرن پیام‌های آماده ──
         _CannedMessagesPanel(
           cannedMessages: _cannedMessages,
           cooldownLeft: _cooldownLeft,
@@ -380,7 +379,7 @@ class _MessageBubble extends StatelessWidget {
   }
 }
 
-/// پنل مدرن و زیبای پیام‌های آماده
+/// پنل مدرن، زیبا و بدون تایپ پیام‌های آماده
 class _CannedMessagesPanel extends StatelessWidget {
   const _CannedMessagesPanel({
     required this.cannedMessages,
