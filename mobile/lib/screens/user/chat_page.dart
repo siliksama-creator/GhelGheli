@@ -3,12 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
-import '../../core/assets.dart';
 import '../../core/cosmetics.dart';
 import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/avatar_image.dart';
-import '../../widgets/safe_image.dart';
 import '../../widgets/state_views.dart';
 import '../../widgets/lifecycle_poller.dart';
 import '../shared/public_profile_sheet.dart';
