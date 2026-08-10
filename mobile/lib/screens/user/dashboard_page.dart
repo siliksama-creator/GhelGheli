@@ -409,9 +409,11 @@ class _QuickTileState extends State<_QuickTile> with SingleTickerProviderStateMi
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return ScaleTransition(
-      scale: _scale,
-      child: Material(
+    return AnimatedBuilder(
+      animation: _scale,
+      builder: (context, child) => Transform.scale(
+        scale: _scale.value,
+        child: Material(
           color: Colors.transparent,
           borderRadius: Corners.rLg,
           child: InkWell(
