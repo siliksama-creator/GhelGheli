@@ -753,8 +753,8 @@ class _PassButtonState extends State<_PassButton>
     with SingleTickerProviderStateMixin {
   late final AnimationController _pulse = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1800),
-  )..repeat(reverse: true);
+    duration: const Duration(milliseconds: 2400),
+  )..repeat();
 
   @override
   void dispose() {
@@ -770,8 +770,10 @@ class _PassButtonState extends State<_PassButton>
     return AnimatedBuilder(
       animation: _pulse,
       builder: (context, _) {
-        final floatY = math.sin(_pulse.value * 2 * math.pi) * 1.5;
-        final glowAlpha = 0.35 + 0.25 * _pulse.value;
+        final t = _pulse.value;
+        final floatY = math.sin(t * 2 * math.pi) * 2.0;
+        final glowPulse = 0.40 + 0.35 * math.sin(t * 2 * math.pi).abs();
+        final rot = t * 2 * math.pi;
 
         return IconButton(
           tooltip: 'گذر نبرد فصلی',
@@ -782,37 +784,53 @@ class _PassButtonState extends State<_PassButton>
                       Theme.of(context).colorScheme.primary.withValues(alpha: 0.18))
               : null,
           icon: SizedBox(
-            width: 34,
-            height: 34,
+            width: 36,
+            height: 36,
             child: Stack(
               clipBehavior: Clip.none,
               alignment: Alignment.center,
               children: [
-                // Glowing Cyber Aura
+                // Glowing Cyber Neon Aura
                 Positioned(
                   child: Container(
-                    width: 28,
-                    height: 28,
+                    width: 30,
+                    height: 30,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          const Color(0xFF00E5FF).withValues(alpha: 0.45 * glowPulse),
+                          const Color(0xFF7C3AED).withValues(alpha: 0.20 * glowPulse),
+                          Colors.transparent,
+                        ],
+                      ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF38BDF8).withValues(alpha: glowAlpha),
-                          blurRadius: 10,
-                          spreadRadius: 1,
+                          color: const Color(0xFF00E5FF).withValues(alpha: 0.35 * glowPulse),
+                          blurRadius: 12,
+                          spreadRadius: 2,
                         ),
                       ],
                     ),
                   ),
                 ),
-                // Transparent floating trophy emblem
+                // Rotating subtle energy sparkle behind
+                Transform.rotate(
+                  angle: rot * 0.4,
+                  child: const Icon(
+                    Icons.auto_awesome,
+                    size: 14,
+                    color: Color(0xFF67E8F9),
+                  ),
+                ),
+                // Transparent floating Battle Pass shield emblem
                 Transform.translate(
                   offset: Offset(0, floatY),
                   child: Image.asset(
-                    'assets/games/memory/trophy.webp',
-                    width: 26,
-                    height: 26,
-                    cacheWidth: 80,
+                    'assets/pass/pass_shield.png',
+                    width: 28,
+                    height: 28,
+                    cacheWidth: 96,
                     fit: BoxFit.contain,
                   ),
                 ),
@@ -830,7 +848,7 @@ class _PassButtonState extends State<_PassButton>
                         border: Border.all(color: Colors.white, width: 1.2),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFFFF2A4B).withValues(alpha: 0.65),
+                            color: const Color(0xFFFF2A4B).withValues(alpha: 0.75),
                             blurRadius: 8,
                             spreadRadius: 1,
                           ),

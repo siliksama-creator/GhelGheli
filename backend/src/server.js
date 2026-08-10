@@ -1786,6 +1786,64 @@ const CANNED_MESSAGES = [
   "منم می‌خوام بازی کنم!"
 ];
 
+app.get('/api/chat/bootstrap', auth, asyncHandler(async (req, res) => {
+  const minLifetimePoints = await getChatMinLifetimePoints();
+  const eligible = Number(req.user.lifetime_points || 0) >= minLifetimePoints;
+  const [cooldownSec, pinned, stickersRes] = await Promise.all([
+    getChatCooldownSeconds(),
+    getChatPinnedMessage(),
+    pool.query('SELECT * FROM chat_stickers WHERE is_active=true ORDER BY sort_order, title'),
+  ]);
+
+  const config = {
+    minLifetimePoints,
+    messageCooldownSeconds: cooldownSec,
+    eligible,
+    userLifetimePoints: req.user.lifetime_points,
+    pinned,
+  };
+
+  if (!eligible) {
+    return res.json({
+      config,
+      messages: [],
+      stickers: stickersRes.rows,
+      cannedMessages: CANNED_MESSAGES,
+    });
+  }
+
+  const { rows } = await pool.query(`SELECT m.*, u.nickname,u.first_name,u.last_name,u.profile_image_url,u.profile_avatar_key,
+      s.title AS sticker_title, s.image_url AS sticker_url, s.sticker_type,
+      rm.message_text AS reply_text, rm.message_type AS reply_type, ru.nickname AS reply_nickname,
+      (SELECT count(*)::int FROM chat_message_likes l WHERE l.message_id=m.id) AS like_count,
+      EXISTS(SELECT 1 FROM chat_message_likes l WHERE l.message_id=m.id AND l.user_id=$1) AS liked_by_me
+    FROM chat_messages m
+    JOIN users u ON u.id=m.user_id
+    LEFT JOIN chat_stickers s ON s.id=m.sticker_id
+    LEFT JOIN chat_messages rm ON rm.id=m.reply_to_message_id
+    LEFT JOIN users ru ON ru.id=rm.user_id
+    WHERE m.is_deleted=false ORDER BY m.sent_at DESC LIMIT 60`, [req.user.id]);
+
+  const ids = [...new Set(rows.map(r => r.user_id))];
+  const [cos, lvl] = await Promise.all([
+    shop.cosmeticsFor(ids),
+    level.levelsFor(ids),
+  ]);
+
+  const messages = rows.reverse().map(r => ({
+    ...r,
+    cosmetics: cos.get(r.user_id) || null,
+    level: lvl[r.user_id]?.level ?? 0,
+  }));
+
+  res.json({
+    config,
+    messages,
+    stickers: stickersRes.rows,
+    cannedMessages: CANNED_MESSAGES,
+  });
+}));
+
 app.get('/api/chat/canned-messages', asyncHandler(async (req, res) => {
   res.json(CANNED_MESSAGES);
 }));

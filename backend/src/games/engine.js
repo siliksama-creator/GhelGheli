@@ -234,7 +234,7 @@ function finish(room, winner) {
     })
     .catch(e => console.error(`[games:${room.gameId}] reward failed:`, e.message));
 
-  // ── پرداخت پات مسابقه استیک‌دار (۱۰۰ و ۱۰۰۰ امتیاز با کسر ۱۰٪ کارمزد) ──
+  // ── پرداخت پات مسابقه استیک‌دار (۱۰۰ و ۱۰۰۰ امتیاز یا لابی با کسر ۱۰٪ کارمزد) ──
   if (room.stake > 0 && !room.vsBot) {
     try {
       const { pool } = require('../config/db');
@@ -244,7 +244,27 @@ function finish(room, winner) {
           : winner;
         const winnerUid = room.players?.[winningSym]?.id;
         if (winnerUid && winnerUid !== 'bot') {
-          pool.query('UPDATE users SET current_points = current_points + $2, lifetime_points = lifetime_points + $2 WHERE id=$1', [winnerUid, room.netPot]).catch(() => {});
+          (async () => {
+            const client = await pool.connect();
+            try {
+              await client.query('BEGIN');
+              const { rows } = await client.query(
+                'UPDATE users SET current_points = current_points + $2, lifetime_points = lifetime_points + $2 WHERE id=$1 RETURNING current_points',
+                [winnerUid, room.netPot]
+              );
+              if (rows[0]) {
+                await client.query(
+                  'INSERT INTO point_transactions (user_id, delta, balance_after, source, reference_type, description) VALUES ($1,$2,$3,$4,$5,$6)',
+                  [winnerUid, room.netPot, rows[0].current_points, 'game', 'staked_match', `پات بازی مسابقه‌ای (${room.stake} امتیازی)`]
+                );
+              }
+              await client.query('COMMIT');
+            } catch (e) {
+              await client.query('ROLLBACK');
+            } finally {
+              client.release();
+            }
+          })().catch(() => {});
           const winSock = room.seats[winningSym];
           if (winSock) safeEmit(winSock, 'game:stake_win', { netPot: room.netPot, stake: room.stake });
         }
@@ -253,7 +273,27 @@ function finish(room, winner) {
         for (const s of ['X', 'O']) {
           const uid = room.players?.[s]?.id;
           if (uid && uid !== 'bot') {
-            pool.query('UPDATE users SET current_points = current_points + $2 WHERE id=$1', [uid, room.stake]).catch(() => {});
+            (async () => {
+              const client = await pool.connect();
+              try {
+                await client.query('BEGIN');
+                const { rows } = await client.query(
+                  'UPDATE users SET current_points = current_points + $2 WHERE id=$1 RETURNING current_points',
+                  [uid, room.stake]
+                );
+                if (rows[0]) {
+                  await client.query(
+                    'INSERT INTO point_transactions (user_id, delta, balance_after, source, reference_type, description) VALUES ($1,$2,$3,$4,$5,$6)',
+                    [uid, room.stake, rows[0].current_points, 'game', 'staked_draw', `بازگشت استیک در تساوی (${room.stake} امتیازی)`]
+                  );
+                }
+                await client.query('COMMIT');
+              } catch (e) {
+                await client.query('ROLLBACK');
+              } finally {
+                client.release();
+              }
+            })().catch(() => {});
           }
         }
       }

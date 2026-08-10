@@ -366,6 +366,18 @@ class GameSession extends ChangeNotifier {
     notifyListeners();
   }
 
+    void joinRoom(String roomCode) {
+    connect();
+    error = null;
+    winner = null;
+    lastMove = null;
+    timedOutSymbol = null;
+    stillSearching = false;
+    _socket?.emit('game:join_room', {'roomCode': roomCode});
+    phase = GamePhase.waiting;
+    notifyListeners();
+  }
+
   void playWithBotImmediately() {
     connect();
     error = null;

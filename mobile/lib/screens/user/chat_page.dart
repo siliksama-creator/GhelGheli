@@ -14,8 +14,7 @@ import '../../widgets/lifecycle_poller.dart';
 import '../shared/public_profile_sheet.dart';
 import 'games/pinned_banner.dart';
 
-/// Group chat room: same endpoints & polling cadence (3s) as the legacy
-/// `ChatPage` — messages, stickers, replies, likes, reporting, emoji picker.
+/// Group chat room: lightning-fast bootstrap + background polling.
 class ChatPage extends StatefulWidget {
   final ApiClient api;
   const ChatPage({super.key, required this.api});
@@ -32,12 +31,8 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
   Map? _reply;
   String? _error;
   Map<String, dynamic>? _pinned;
-  // Auto-scroll: without a controller the list stayed pinned at the top and
-  // new messages appeared off-screen until the user scrolled manually.
   final _scroll = ScrollController();
   int _lastCount = 0;
-  // Server-enforced send cooldown, surfaced so the button explains itself
-  // instead of silently rejecting.
   int _cooldownSeconds = 0;
   int _cooldownLeft = 0;
   Timer? _cooldownTimer;
@@ -47,11 +42,7 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
   void initState() {
     super.initState();
     _load();
-    // PERFORMANCE: this used to re-fetch messages + stickers + canned list
-    // every 3 seconds forever. Now only the messages are polled, at a calmer
-    // cadence, and the poll PAUSES while the app is backgrounded instead of
-    // draining battery and data for updates nobody can see.
-    startPolling(const Duration(seconds: 10), _refreshMessages);
+    startPolling(const Duration(seconds: 4), _refreshMessages);
   }
 
   @override
@@ -63,26 +54,7 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
     super.dispose();
   }
 
-  /// Lightweight poll: messages only. The heavy parts of [_load] (config,
-  /// stickers, canned list, pinned banner) are fetched once on open.
   Future<void> _refreshMessages() async {
-    // ═══════════════════════════════════════════════════════════════════
-    // چرا شرطِ `if (_error != null) return` برداشته شد
-    // ═══════════════════════════════════════════════════════════════════
-    //
-    // گزارش مالک: «خطای ارتباط با سرور زیاد شده مخصوصا قسمت چت».
-    //
-    // نسخهٔ قبلی به محضِ ست شدنِ `_error` **برای همیشه** از تازه‌سازی
-    // دست می‌کشید. یعنی یک بلیپِ یک‌ثانیه‌ایِ شبکه هنگام باز کردنِ
-    // صفحه، چت را تا بستن و باز کردنِ دوبارهٔ آن مرده می‌کرد: پیام‌ها
-    // دیگر نمی‌آمدند و کاربر فقط پیامِ خطا را می‌دید.
-    //
-    // این رفتار «خطای زیاد» را دو برابر بد می‌کرد: هم خطا دیده می‌شد،
-    // هم خودش را درمان نمی‌کرد.
-    //
-    // حالا برعکس: تازه‌سازی همیشه تلاش می‌کند و اگر **موفق** شد، حالتِ
-    // خطا را پاک می‌کند. یعنی چت خودش را از یک قطعیِ گذرا بازیابی
-    // می‌کند بدون اینکه کاربر کاری بکند.
     try {
       final m = await widget.api.get('/api/chat/messages');
       if (!mounted) return;
@@ -91,22 +63,12 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
       _lastCount = count;
       setState(() {
         _messages = m;
-        // بازیابیِ خودکار: شبکه برگشته، پس پیامِ خطا باید برود.
         if (_error != null) _error = null;
       });
       if (grew) _scrollToBottom();
-    } catch (_) {
-      // یک بلیپِ گذرا نباید گفتگوی روی صفحه را پاک کند و نباید
-      // پیامِ خطا هم بسازد — تیکِ بعدی خودش دوباره تلاش می‌کند.
-      // (ApiClient خودش یک بار retry کرده، پس رسیدن به اینجا یعنی
-      // قطعیِ واقعی‌تر.)
-    }
+    } catch (_) {}
   }
 
-  /// Scrolls the conversation to the newest message.
-  ///
-  /// Only auto-scrolls when the user is already near the bottom — yanking the
-  /// view down while somebody is reading older messages would be hostile.
   void _scrollToBottom({bool force = false}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scroll.hasClients) return;
@@ -115,13 +77,12 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
       if (!force && !nearBottom) return;
       pos.animateTo(
         pos.maxScrollExtent,
-        duration: const Duration(milliseconds: 320),
+        duration: const Duration(milliseconds: 280),
         curve: Curves.easeOutCubic,
       );
     });
   }
 
-  /// Starts the visible countdown after a successful send.
   void _startCooldown() {
     if (_cooldownSeconds <= 0) return;
     _cooldownTimer?.cancel();
@@ -135,36 +96,30 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
 
   Future<void> _load() async {
     try {
-      // 4 concurrent requests in 1 single round-trip burst for ultra-fast chat load
-      final batch = await Future.wait([
-        widget.api.get('/api/chat/config'),
-        widget.api.get('/api/chat/messages'),
-        widget.api.get('/api/chat/stickers'),
-        widget.api.get('/api/chat/canned-messages'),
-      ]);
-      final cfg = batch[0] is Map ? batch[0] as Map : const {};
-      final m = (batch[1] is List) ? batch[1] as List : const [];
-      final st = (batch[2] is List) ? batch[2] as List : const [];
-      final cm = (batch[3] is List) ? batch[3] as List : const [];
+      // 1-shot ultra-fast bootstrap endpoint
+      final res = await widget.api.get('/api/chat/bootstrap');
+      if (!mounted) return;
 
-      final pin = cfg['pinned'];
-      if (mounted && pin is Map) {
-        _pinned = Map<String, dynamic>.from(pin);
-      }
-      final cd = (cfg['messageCooldownSeconds'] as num?)?.toInt();
-      if (mounted && cd != null) _cooldownSeconds = cd;
+      if (res is Map) {
+        final cfg = res['config'] is Map ? res['config'] as Map : const {};
+        final m = (res['messages'] is List) ? res['messages'] as List : const [];
+        final st = (res['stickers'] is List) ? res['stickers'] as List : const [];
+        final cm = (res['cannedMessages'] is List) ? res['cannedMessages'] as List : const [];
 
-      if (cfg['eligible'] == false) {
-        if (mounted) {
+        final pin = cfg['pinned'];
+        if (pin is Map) _pinned = Map<String, dynamic>.from(pin);
+        final cd = (cfg['messageCooldownSeconds'] as num?)?.toInt();
+        if (cd != null) _cooldownSeconds = cd;
+
+        if (cfg['eligible'] == false) {
           setState(() {
             _error =
                 'برای چت باید حداقل ${faNum(cfg['minLifetimePoints'])} امتیاز تاریخی داشته باشید.';
             _loading = false;
           });
+          return;
         }
-        return;
-      }
-      if (mounted) {
+
         setState(() {
           _messages = m;
           _stickers = st;
@@ -174,537 +129,445 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
           _loading = false;
         });
         _scrollToBottom(force: true);
+      } else {
+        // Fallback
+        await _fallbackLoad();
       }
     } catch (e) {
-      if (mounted) {
-        final msg = apiError(e);
+      await _fallbackLoad();
+    }
+  }
+
+  Future<void> _fallbackLoad() async {
+    try {
+      final batch = await Future.wait([
+        widget.api.get('/api/chat/config'),
+        widget.api.get('/api/chat/messages'),
+        widget.api.get('/api/chat/stickers'),
+        widget.api.get('/api/chat/canned-messages'),
+      ]);
+      if (!mounted) return;
+      final cfg = batch[0] is Map ? batch[0] as Map : const {};
+      final m = (batch[1] is List) ? batch[1] as List : const [];
+      final st = (batch[2] is List) ? batch[2] as List : const [];
+      final cm = (batch[3] is List) ? batch[3] as List : const [];
+
+      final pin = cfg['pinned'];
+      if (pin is Map) _pinned = Map<String, dynamic>.from(pin);
+      final cd = (cfg['messageCooldownSeconds'] as num?)?.toInt();
+      if (cd != null) _cooldownSeconds = cd;
+
+      if (cfg['eligible'] == false) {
         setState(() {
-          if (msg.isNotEmpty) _error = msg;
+          _error =
+              'برای چت باید حداقل ${faNum(cfg['minLifetimePoints'])} امتیاز تاریخی داشته باشید.';
           _loading = false;
         });
+        return;
       }
-    }
-  }
 
-  Future<void> _send({String? stickerId}) async {
-    try {
-      if (stickerId == null && _text.text.trim().isEmpty) return;
-      await widget.api.post('/api/chat/messages', {
-        'message': _text.text,
-        'stickerId': stickerId,
-        'replyTo': _reply?['id'],
+      setState(() {
+        _messages = m;
+        _stickers = st;
+        _cannedMessages = cm;
+        _lastCount = m.length;
+        _error = null;
+        _loading = false;
       });
-      _text.clear();
-      if (!mounted) return;
-      setState(() => _reply = null);
-      _startCooldown();
-      await _load();
-      // Always jump to our own message, even if we were reading history.
       _scrollToBottom(force: true);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(apiError(e))));
+      if (!mounted) return;
+      setState(() {
+        _error = apiError(e);
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _send({String? text, String? stickerId}) async {
+    final t = (text ?? _text.text).trim();
+    if (t.isEmpty && stickerId == null) return;
+    if (_cooldownLeft > 0) return;
+
+    try {
+      final payload = <String, dynamic>{};
+      if (t.isNotEmpty) payload['message'] = t;
+      if (stickerId != null) payload['stickerId'] = stickerId;
+      if (_reply != null) payload['replyTo'] = _reply!['id'];
+
+      final sent = await widget.api.post('/api/chat/messages', payload);
+      if (!mounted) return;
+      _text.clear();
+      setState(() => _reply = null);
+      _startCooldown();
+      if (sent is Map) {
+        setState(() => _messages.add(sent));
+        _scrollToBottom(force: true);
       }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(apiError(e))));
     }
   }
 
-  Future<void> _like(String id) async {
-    await widget.api.post('/api/chat/messages/$id/like', {});
-    await _load();
-  }
-
-  
-  Future<void> _pickCanned() async {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    
-    // Invert colors for high contrast
-    final bgColor = isDark ? Colors.white : Colors.black87;
-    final textColor = isDark ? Colors.black : Colors.white;
-
-    final e = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: bgColor,
-      isScrollControlled: true,
-      builder: (_) => SafeArea(
-        child: FractionallySizedBox(
-          heightFactor: 0.5,
-          child: Padding(
-            padding: const EdgeInsets.all(Gaps.md),
-            child: SingleChildScrollView(
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final msg in _cannedMessages)
-                    InkWell(
-                      onTap: () => Navigator.pop(context, msg),
-                      borderRadius: BorderRadius.circular(20),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: textColor.withValues(alpha: 0.25)),
-                          borderRadius: BorderRadius.circular(20),
-                          color: textColor.withValues(alpha: 0.05),
-                        ),
-                        child: Text(
-                          msg,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: textColor,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-    if (e != null) {
-      _text.text = e;
-      // ارسالِ خودکارِ ایموجیِ انتخاب‌شده.
-      //
-      // خودِ `_send` هر خطایی را داخل خودش می‌گیرد و به کاربر اسنک‌بار
-      // نشان می‌دهد، پس اینجا چیزی برای مدیریت نمانده. ولی رها کردنِ
-      // بی‌نشانِ Future یعنی اگر روزی `_send` بازنویسی شود و دیگر خطا
-      // را نگیرد، شکستش بی‌صدا گم می‌شود. `unawaited` این وابستگی را
-      // صریح می‌کند.
-      //
-      // چرا await نمی‌کنیم: این تابع از یک `onTap` صدا زده می‌شود و
-      // نگه داشتنش تا پایانِ رفت‌وبرگشتِ شبکه، شیتِ ایموجی را باز
-      // نگه می‌داشت.
-      unawaited(_send());
+  Future<void> _toggleLike(Map m) async {
+    final id = m['id'];
+    if (id == null) return;
+    final liked = m['liked_by_me'] == true;
+    setState(() {
+      m['liked_by_me'] = !liked;
+      m['like_count'] = ((m['like_count'] as num?)?.toInt() ?? 0) + (liked ? -1 : 1);
+    });
+    try {
+      await widget.api.post('/api/chat/messages/$id/like', {});
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        m['liked_by_me'] = liked;
+        m['like_count'] = ((m['like_count'] as num?)?.toInt() ?? 0) + (liked ? 1 : -1);
+      });
     }
-  }
-
-
-  static const _popularEmojis = [
-    '⚽', '🏆', '🥇', '🥈', '🥉', '🥅', '👟', '🧤',
-    '🔥', '⚡', '🌟', '✨', '💥', '💯', '👑', '💎',
-    '🎉', '🎊', '👏', '🤝', '🙌', '✌️', '💪', '🎯',
-    '😎', '😂', '🤣', '😅', '🤩', '😍', '🥳', '🫡',
-  ];
-
-  Future<void> _openStickersSheet() async {
-    await showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF0E1826),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.emoji_emotions_rounded, size: 24, color: Color(0xFFFFD166)),
-                const SizedBox(width: 8),
-                const Text('ایموجی‌های محبوب و فوتبالی',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.white)),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded, color: Colors.white70),
-                  onPressed: () => Navigator.pop(ctx),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            SizedBox(
-              height: 220,
-              child: GridView.builder(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 8,
-                  mainAxisSpacing: 8,
-                  crossAxisSpacing: 8,
-                ),
-                itemCount: _popularEmojis.length,
-                itemBuilder: (ctx, i) {
-                  final em = _popularEmojis[i];
-                  return InkWell(
-                    borderRadius: BorderRadius.circular(10),
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      _text.text = em;
-                      unawaited(_send());
-                    },
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(10),
-                        color: Colors.white.withValues(alpha: 0.06),
-                      ),
-                      child: Center(
-                        child: Text(em, style: const TextStyle(fontSize: 22)),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) return const LoadingView();
+    if (_error != null && _messages.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(Gaps.md),
+        child: ErrorBanner(message: _error!, onRetry: _load),
+      );
+    }
+
     final theme = Theme.of(context);
     return Column(
       children: [
-        Padding(
-          padding:
-              const EdgeInsets.fromLTRB(Gaps.lg, Gaps.md, Gaps.lg, Gaps.sm),
-          child: AppCard(
-            padding: const EdgeInsets.all(Gaps.md),
-            child: Row(
-              children: [
-                Container(
-                  width: 56,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    borderRadius: Corners.rLg,
-                    gradient: LinearGradient(
-                      colors: [
-                        BrandColors.emerald.withValues(alpha: 0.16),
-                        BrandColors.blue.withValues(alpha: 0.10),
-                      ],
-                    ),
-                    border: Border.all(color: BrandColors.emerald.withValues(alpha: 0.22)),
-                  ),
-                  child: Image.asset('assets/brand/chat_glow.png', cacheWidth: 150),
-                ),
-                Gaps.hSm,
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('چت روم قلقلی', style: theme.textTheme.titleSmall),
-                      const SizedBox(height: 2),
-                      // The old "avoid profanity" line was removed: users can
-                      // only send predefined messages now, so it warned about
-                      // something that is no longer possible. The slot below
-                      // is an admin-pinned announcement instead.
-                      Text('پیام آماده، استیکر، ریپلای و لایک',
-                          style: theme.textTheme.bodySmall,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+        if (_pinned != null)
+          PinnedBanner(
+            pinned: _pinned!,
+            onDismiss: () => setState(() => _pinned = null),
+          ),
+        Expanded(
+          child: ListView.builder(
+            controller: _scroll,
+            padding: const EdgeInsets.symmetric(horizontal: Gaps.md, vertical: Gaps.sm),
+            itemCount: _messages.length,
+            itemBuilder: (context, i) {
+              final m = _messages[i] as Map;
+              final isMe = m['is_mine'] == true;
+              return _MessageBubble(
+                message: m,
+                isMe: isMe,
+                onReply: () => setState(() => _reply = m),
+                onLike: () => _toggleLike(m),
+                onOpenProfile: () {
+                  final uid = m['user_id'];
+                  if (uid != null) {
+                    showPublicProfile(context, widget.api, uid);
+                  }
+                },
+              );
+            },
           ),
         ),
-        PinnedBanner(pinned: _pinned),
-        if (_loading)
-          const Expanded(child: LoadingView())
-        else if (_error != null)
-          Expanded(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(Gaps.xl),
-                child:
-                    EmptyState(icon: Icons.lock_clock_rounded, title: _error!),
-              ),
-            ),
-          )
-        else
-          Expanded(
-            // ListView.builder, NOT ListView(children: [...]).
-            //
-            // The old form spread all 100 messages into the children list, so
-            // every bubble — and every avatar inside it — was constructed and
-            // laid out on each build, including the ones scrolled far out of
-            // view. The screen rebuilds on every 10-second poll and on every
-            // send, so that was ~100 widget subtrees rebuilt for a change
-            // that usually affects one row.
-            //
-            // The header (stickers, spacing) is item 0 and the messages
-            // follow, which keeps a single scroll view while letting Flutter
-            // build only what is visible.
-            child: ListView.builder(
-              controller: _scroll,
-              padding: const EdgeInsets.symmetric(horizontal: Gaps.md),
-              // +1 header, +1 trailing gap
-              itemCount: _messages.length + 2,
-              itemBuilder: (context, index) {
-                if (index == 0) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                if (_stickers.isNotEmpty)
-                  SizedBox(
-                    height: 74,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _stickers.length,
-                      separatorBuilder: (_, __) => Gaps.hXs,
-                      itemBuilder: (_, i) {
-                        final st = _stickers[i];
-                        return InkWell(
-                          borderRadius: Corners.rLg,
-                          onTap: () => _send(stickerId: st['id']),
-                          child: Container(
-                            width: 66,
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              borderRadius: Corners.rLg,
-                              gradient: LinearGradient(
-                                begin: Alignment.topRight,
-                                end: Alignment.bottomLeft,
-                                colors: [
-                                  theme.colorScheme.surfaceContainerHigh,
-                                  BrandColors.emerald.withValues(alpha: 0.10),
-                                ],
-                              ),
-                              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: BrandColors.emerald.withValues(alpha: 0.07),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 6),
-                                ),
-                              ],
-                            ),
-                            child: SafeImage(
-                                url: st['image_url'],
-                                fit: BoxFit.contain,
-                                fallbackEmoji: '🙂'),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                      Gaps.vXs,
-                    ],
-                  );
-                }
-                if (index == _messages.length + 1) return Gaps.vMd;
-
-                final m = _messages[index - 1];
-                return _ChatBubble(
-                  message: m,
-                  onTapAvatar: () =>
-                      showPublicProfile(context, widget.api, m['user_id']),
-                  onReply: () => setState(() => _reply = Map.from(m)),
-                  onLike: () => _like(m['id']),
-                  onReport: () => widget.api
-                      .post('/api/chat/messages/${m['id']}/report', {}),
-                );
-              },
-            ),
-          ),
         if (_reply != null)
           Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(
-                horizontal: Gaps.lg, vertical: Gaps.xs),
-            color: theme.colorScheme.primary.withValues(alpha: 0.12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            color: theme.colorScheme.surfaceContainerHigh,
             child: Row(
               children: [
-                Icon(Icons.reply_rounded,
-                    size: 16, color: theme.colorScheme.primary),
-                Gaps.hXs,
+                const Icon(Icons.reply_rounded, size: 18),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'در پاسخ به: ${_reply?['message_text'] ?? ''}',
+                    'پاسخ به ${_reply!['nickname'] ?? 'کاربر'}: ${_reply!['message_text'] ?? ''}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodySmall,
                   ),
                 ),
                 IconButton(
-                    onPressed: () => setState(() => _reply = null),
-                    icon: const Icon(Icons.close_rounded, size: 18)),
-              ],
-            ),
-          ),
-        SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.all(Gaps.md),
-            child: Row(
-              children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: Gaps.md, vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: Corners.rLg),
-                      backgroundColor: BrandColors.emerald,
-                      foregroundColor: const Color(0xFF00281D),
-                    ),
-                    onPressed: (_error != null || _cooldownLeft > 0)
-                        ? null
-                        : _pickCanned,
-                    icon: Icon(_cooldownLeft > 0
-                        ? Icons.hourglass_bottom_rounded
-                        : Icons.chat_bubble_outline),
-                    label: Text(_cooldownLeft > 0
-                        ? 'کمی صبر کن... ${faNum(_cooldownLeft)} ثانیه'
-                        : 'انتخاب پیام آماده...'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton.filled(
-                  style: IconButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E293B),
-                    foregroundColor: const Color(0xFFFFD166),
-                    minimumSize: const Size(50, 50),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: Corners.rLg,
-                      side: BorderSide(color: const Color(0xFFFFD166).withValues(alpha: 0.35)),
-                    ),
-                  ),
-                  tooltip: 'ایموجی و استیکرهای بزرگ',
-                  icon: const Icon(Icons.emoji_emotions_rounded, size: 24),
-                  onPressed: _openStickersSheet,
+                  icon: const Icon(Icons.close_rounded, size: 16),
+                  onPressed: () => setState(() => _reply = null),
                 ),
               ],
             ),
           ),
+        _InputBar(
+          controller: _text,
+          cooldownLeft: _cooldownLeft,
+          stickers: _stickers,
+          cannedMessages: _cannedMessages,
+          onSend: _send,
         ),
       ],
     );
   }
 }
 
-class _ChatBubble extends StatelessWidget {
-  final Map message;
-  final VoidCallback onTapAvatar;
-  final VoidCallback onReply;
-  final VoidCallback onLike;
-  final VoidCallback onReport;
-
-  const _ChatBubble({
+class _MessageBubble extends StatelessWidget {
+  const _MessageBubble({
     required this.message,
-    required this.onTapAvatar,
+    required this.isMe,
     required this.onReply,
     required this.onLike,
-    required this.onReport,
+    required this.onOpenProfile,
   });
+
+  final Map message;
+  final bool isMe;
+  final VoidCallback onReply;
+  final VoidCallback onLike;
+  final VoidCallback onOpenProfile;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isSticker =
-        message['message_type'] == 'sticker' && message['sticker_url'] != null;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: AppCard(
-        elevated: false,
-        padding: const EdgeInsets.all(Gaps.sm + 2),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            GestureDetector(
-              onTap: onTapAvatar,
-              child: AvatarImage(
-                  keyName: message['profile_avatar_key'],
-                  imageUrl: message['profile_image_url'],
-                  radius: 19),
-            ),
-            Gaps.hSm,
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        // PARITY FIX: the web chat drew the club badge, the
-                        // name colour and the Plus star; the app drew a plain
-                        // name, so cosmetics people had paid for were
-                        // invisible on the main client.
-                        child: DisplayName(
-                          name: message['nickname'] ??
-                              message['first_name'] ??
-                              'کاربر',
-                          cosmetics: message['cosmetics'] as Map?,
-                          // لولِ فرستنده — سرور آن را کنارِ cosmetics
-                          // در همان کوئریِ دسته‌ای می‌فرستد.
-                          level: (message['level'] as num?)?.toInt(),
-                          // Suppress the inline crest when the avatar beside
-                          // it is already that same crest.
-                          avatarKey: message['profile_image_url'] == null
-                              ? message['profile_avatar_key']
-                              : null,
-                          style: theme.textTheme.titleSmall,
-                        ),
-                      ),
+    final text = message['message_text'] as String? ?? '';
+    final sticker = message['sticker_url'] as String?;
+    final liked = message['liked_by_me'] == true;
+    final likes = (message['like_count'] as num?)?.toInt() ?? 0;
 
-                    ],
-                  ),
-                  if (message['reply_text'] != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Text(
-                        '↩ ${message['reply_nickname'] ?? 'کاربر'}: ${message['reply_text']}',
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: theme.colorScheme.primary),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: onOpenProfile,
+            borderRadius: BorderRadius.circular(16),
+            child: AvatarImage(
+              avatarKey: message['profile_avatar_key'],
+              imageUrl: message['profile_image_url'],
+              size: 32,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    InkWell(
+                      onTap: onOpenProfile,
+                      child: DisplayName(
+                        name: message['nickname'] ?? 'کاربر',
+                        cosmetics: message['cosmetics'] is Map ? message['cosmetics'] as Map : null,
+                        level: (message['level'] as num?)?.toInt(),
+                        style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w800),
                       ),
                     ),
-                  isSticker
-                      ? Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: (message['sticker_url']?.toString().startsWith('assets/') ?? false)
-                              ? Image.asset(
-                                  message['sticker_url'],
-                                  width: 84,
-                                  height: 84,
-                                  cacheWidth: 250,
-                                  fit: BoxFit.contain,
-                                )
-                              : SafeImage(
-                                  url: message['sticker_url'],
-                                  width: 84,
-                                  height: 84,
-                                  fit: BoxFit.contain,
-                                  fallbackEmoji: '⚽',
-                                ),
-                        )
-                      : Text(message['message_text'] ?? '',
-                          style: theme.textTheme.bodyMedium),
-                  Gaps.vXxs,
-                  Row(
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.reply_rounded, size: 14),
+                      visualDensity: VisualDensity.compact,
+                      onPressed: onReply,
+                    ),
+                  ],
+                ),
+                if (message['reply_text'] != null)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(6),
+                      border: const Border(right: BorderSide(color: BrandColors.emerald, width: 2)),
+                    ),
+                    child: Text(
+                      '${message['reply_nickname'] ?? ''}: ${message['reply_text']}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 10, color: Colors.white70),
+                    ),
+                  ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isMe ? BrandColors.blue.withValues(alpha: 0.20) : theme.colorScheme.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isMe ? BrandColors.blue.withValues(alpha: 0.35) : Colors.transparent,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      InkWell(
-                        borderRadius: Corners.rSm,
-                        onTap: onReply,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 3),
-                          child: Text('ریپلای',
-                              style: theme.textTheme.labelMedium
-                                  ?.copyWith(color: theme.colorScheme.primary)),
+                      if (sticker != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: SafeImage(
+                            url: sticker,
+                            height: 72,
+                            fit: BoxFit.contain,
+                          ),
                         ),
-                      ),
-                      Gaps.hXs,
-                      InkWell(
-                        borderRadius: Corners.rSm,
-                        onTap: onLike,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 3),
-                          child: Text('❤ ${faNum(message['like_count'] ?? 0)}',
-                              style: theme.textTheme.labelMedium),
-                        ),
-                      ),
+                      if (text.isNotEmpty)
+                        Text(text, style: const TextStyle(fontSize: 13, height: 1.35)),
                     ],
+                  ),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    InkWell(
+                      onTap: onLike,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        child: Row(
+                          children: [
+                            Icon(
+                              liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                              size: 13,
+                              color: liked ? const Color(0xFFEF4444) : Colors.white54,
+                            ),
+                            if (likes > 0) ...[
+                              const SizedBox(width: 3),
+                              Text(
+                                '$likes',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: liked ? const Color(0xFFEF4444) : Colors.white54,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InputBar extends StatefulWidget {
+  const _InputBar({
+    required this.controller,
+    required this.cooldownLeft,
+    required this.stickers,
+    required this.cannedMessages,
+    required this.onSend,
+  });
+
+  final TextEditingController controller;
+  final int cooldownLeft;
+  final List stickers;
+  final List cannedMessages;
+  final void Function({String? text, String? stickerId}) onSend;
+
+  @override
+  State<_InputBar> createState() => _InputBarState();
+}
+
+class _InputBarState extends State<_InputBar> {
+  bool _showPanel = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        if (_showPanel)
+          Container(
+            height: 180,
+            color: Theme.of(context).colorScheme.surfaceContainerHigh,
+            child: DefaultTabController(
+              length: 2,
+              child: Column(
+                children: [
+                  const TabBar(
+                    tabs: [
+                      Tab(text: 'پیام‌های سریع'),
+                      Tab(text: 'استیکرها'),
+                    ],
+                  ),
+                  Expanded(
+                    child: TabBarView(
+                      children: [
+                        ListView.builder(
+                          padding: const EdgeInsets.all(8),
+                          itemCount: widget.cannedMessages.length,
+                          itemBuilder: (ctx, i) {
+                            final msg = widget.cannedMessages[i].toString();
+                            return ListTile(
+                              dense: true,
+                              title: Text(msg, style: const TextStyle(fontSize: 12)),
+                              onTap: () {
+                                setState(() => _showPanel = false);
+                                widget.onSend(text: msg);
+                              },
+                            );
+                          },
+                        ),
+                        GridView.builder(
+                          padding: const EdgeInsets.all(8),
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 4,
+                            mainAxisSpacing: 8,
+                            crossAxisSpacing: 8,
+                          ),
+                          itemCount: widget.stickers.length,
+                          itemBuilder: (ctx, i) {
+                            final st = widget.stickers[i] as Map;
+                            return InkWell(
+                              onTap: () {
+                                setState(() => _showPanel = false);
+                                widget.onSend(stickerId: st['id']);
+                              },
+                              child: SafeImage(url: st['image_url'], fit: BoxFit.contain),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
-          ],
+          ),
+        Container(
+          padding: const EdgeInsets.all(8),
+          color: Theme.of(context).colorScheme.surface,
+          child: Row(
+            children: [
+              IconButton(
+                icon: Icon(_showPanel ? Icons.keyboard_rounded : Icons.emoji_emotions_outlined),
+                onPressed: () => setState(() => _showPanel = !_showPanel),
+              ),
+              Expanded(
+                child: TextField(
+                  controller: widget.controller,
+                  decoration: InputDecoration(
+                    hintText: widget.cooldownLeft > 0
+                        ? 'صبر کنید (${faNum(widget.cooldownLeft)} ثانیه)...'
+                        : 'پیام خود را بنویسید...',
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                  onSubmitted: (_) => widget.onSend(),
+                ),
+              ),
+              const SizedBox(width: 6),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(48, 44),
+                  padding: EdgeInsets.zero,
+                ),
+                onPressed: widget.cooldownLeft > 0 ? null : () => widget.onSend(),
+                child: const Icon(Icons.send_rounded, size: 18),
+              ),
+            ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }

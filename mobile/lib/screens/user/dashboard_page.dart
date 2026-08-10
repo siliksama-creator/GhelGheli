@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
@@ -13,25 +16,16 @@ import 'login_streak_card.dart';
 import '../../widgets/photo_card_box.dart';
 
 /// Home / dashboard tab: points header, card-code redemption and card
-/// inventory carousel. Same three API calls as the legacy `DashboardPage`.
+/// inventory carousel.
 class DashboardPage extends StatefulWidget {
   final ApiClient api;
   final Future<void> Function() reloadProfile;
 
-  /// Jumps to the profile tab (used by the hero header + completion nudge).
   final VoidCallback? onOpenProfile;
-
-  /// پرش مستقیم به کیف پول از هدر داشبورد.
   final VoidCallback? onOpenWallet;
-
-  /// میان‌برهای گردونه و دعوت دوستان روی داشبورد.
   final VoidCallback? onOpenWheel;
   final VoidCallback? onOpenReferral;
-
-  /// رفتن به تبِ «کلکسیون». داشبورد فقط پیش‌نمایش نشان می‌دهد.
   final VoidCallback? onOpenInventory;
-
-  // `onToggleTheme` و `isDark` حذف شدند — اپ تک‌تم است (توضیح در main.dart).
 
   const DashboardPage({
     super.key,
@@ -51,10 +45,6 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   Map<String, dynamic>? _data;
   List<Map<String, dynamic>> _rewards = [];
-  // `_code`/`_message`/`_messageIsError`/`_sending` همگی حذف شدند:
-  // فرمِ «فقط کد» برداشته شد و ثبتِ کارت کاملاً به PhotoCardBox منتقل
-  // شد (عکس + کد با هم). آن ویجت بازخوردِ خودش را نشان می‌دهد، پس
-  // بنرِ پیامِ این صفحه هم بی‌مصرف شده بود.
   bool _loading = true;
   String? _error;
 
@@ -64,34 +54,13 @@ class _DashboardPageState extends State<DashboardPage> {
     _load();
   }
 
-
   Future<void> _load() async {
-    // try/catch لازم است، نه یک احتیاط اضافه.
-    //
-    // این متد قبلاً هیچ محافظتی نداشت. هر شکستی — توکن منقضی، شبکهٔ لرزان،
-    // یک ۵۰۰ گذرا، حتی تایم‌اوت — استثنا پرتاب می‌کرد و خط `_loading =
-    // false` **هرگز** اجرا نمی‌شد. داشبورد صفحهٔ اول بعد از ورود است، پس
-    // کاربر تا ابد روی چرخنده می‌ماند بدون پیام و بدون دکمهٔ تلاش دوباره.
-    // این همان «صفحات اپ بعد ورود لود نمیشن» است.
-    //
-    // یک درخواست به‌جای دو تا.
-    //
-    // موازی کردنشان قبلاً کمک کرد، ولی کف همچنان یک رفت‌وبرگشت کامل بود —
-    // و تا ایران آن کف حدود نیم ثانیه است. /api/bootstrap همان داده را در
-    // یک پاسخ می‌دهد.
     try {
       final boot = await widget.api.get('/api/bootstrap');
       if (!mounted) return;
       final m = boot is Map
           ? Map<String, dynamic>.from(boot)
           : <String, dynamic>{};
-      // اگر پاسخ شکل درستی ندارد، آن را «موفق» حساب نکن.
-      //
-      // بدون این، یک پاسخ ناقص (پراکسی که body را بُرید، استقرار
-      // نیمه‌کاره، پاسخ کش‌شدهٔ غلط) `_data` را غیرnull می‌کرد و شرط
-      // «خطا و دادهٔ خالی» رد می‌شد — نتیجه یک صفحهٔ نیمه‌خالی بدون هیچ
-      // راه خروجی. بهتر است صریحاً خطا بدهیم و دکمهٔ تلاش دوباره نشان
-      // دهیم.
       if (m['user'] is! Map) {
         setState(() {
           _error = 'پاسخ سرور ناقص بود';
@@ -104,11 +73,7 @@ class _DashboardPageState extends State<DashboardPage> {
           'user': m['user'],
           'inventory': m['inventory'] ?? const [],
           'leaguePayouts': m['leaguePayouts'] ?? const [],
-          // وضعیت استریک هم از bootstrap می‌آید تا کارتِ روزانه با یک
-          // درخواست اضافه و دیرتر از بقیهٔ داشبورد روی صفحه نپرد.
           if (m['loginStreak'] != null) 'loginStreak': m['loginStreak'],
-          // ظاهرِ خودِ کاربر (ستارهٔ پلاس، رنگ اسم) — تا هدر داشبورد هم
-          // نشانِ اشتراکش را نشان دهد، نه فقط چت و لیگ.
           if (m['cosmetics'] != null) 'cosmetics': m['cosmetics'],
         };
         _rewards = List<Map<String, dynamic>>.from(
@@ -131,7 +96,6 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget build(BuildContext context) {
     if (_loading) return const LoadingView();
 
-    // خطا و هیچ دادهٔ قبلی: راه خروج بده، نه صفحهٔ خالی یا چرخندهٔ ابدی.
     if (_error != null && _data == null) {
       return RefreshIndicator(
         onRefresh: _load,
@@ -178,9 +142,6 @@ class _DashboardPageState extends State<DashboardPage> {
             onOpenWallet: widget.onOpenWallet,
           ),
           Gaps.vSm,
-          // استریک باید بالاترین آیتمِ روزانه باشد، نه زیرِ میان‌برها. مالک
-          // صریح گفت در اندروید مشخص نیست؛ پس قبل از ریلِ عملیات می‌آید و
-          // در حالت خطا/لود هم سطحِ خودش را نگه می‌دارد.
           LoginStreakCard(
             api: widget.api,
             compact: true,
@@ -193,63 +154,69 @@ class _DashboardPageState extends State<DashboardPage> {
             },
           ),
           Gaps.vSm,
-          // ریلِ عملیاتِ روزانه: همهٔ قابلیت‌های داشبورد در همان قابِ اول
-          // دیده می‌شوند، اما هیچ‌کدام حذف نشده‌اند. ثبت کارت بلافاصله بعد
-          // از این ریل می‌آید؛ کارت استریک هم dense شده تا فرم را پایین
-          // هل ندهد.
+          // ── ۳ کاشی جذاب متحرک وسط داشبورد ──
           Row(
             children: [
               Expanded(
-                child: _QuickTile(
-                  icon: Image.asset('assets/pass/wheel_icon.webp', width: 24, height: 24),
+                child: _AnimatedQuickTile(
+                  icon: Image.asset('assets/pass/wheel_icon.webp', width: 26, height: 26),
                   title: 'گردونه',
-                  subtitle: 'گردونه چرخش روزانه',
+                  subtitle: 'گردونه شانس',
                   tint: const Color(0xFFF59E0B),
+                  glowColor: const Color(0xFFFFB300),
+                  animOffset: 0.0,
                   onTap: widget.onOpenWheel,
                 ),
               ),
               Gaps.hXs,
               Expanded(
-                child: _QuickTile(
-                  icon: const Icon(Icons.group_add_rounded, size: 24),
+                child: _AnimatedQuickTile(
+                  icon: const Icon(Icons.group_add_rounded, size: 24, color: Color(0xFF84CC16)),
                   title: 'دعوت',
                   subtitle: 'دوستان',
                   tint: const Color(0xFF84CC16),
+                  glowColor: const Color(0xFFA3E635),
+                  animOffset: 0.33,
                   onTap: widget.onOpenReferral,
                 ),
               ),
               Gaps.hXs,
               Expanded(
-                child: _QuickTile(
-                  icon: const Icon(Icons.style_rounded, size: 24),
+                child: _AnimatedQuickTile(
+                  icon: const Icon(Icons.style_rounded, size: 24, color: Color(0xFF38BDF8)),
                   title: 'کلکسیون',
                   subtitle: '${faNum(inventory.length)} نوع',
                   tint: const Color(0xFF38BDF8),
+                  glowColor: const Color(0xFF60A5FA),
+                  animOffset: 0.66,
                   onTap: widget.onOpenInventory,
                 ),
               ),
             ],
           ),
           Gaps.vSm,
+
+          // ── بخش ثبت کارت‌های قلقلی ──
           AppCard(
             padding: const EdgeInsets.all(Gaps.md),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      width: 62,
+                      width: 58,
                       height: 58,
                       decoration: BoxDecoration(
                         borderRadius: Corners.rLg,
                         gradient: LinearGradient(
                           colors: [
-                            BrandColors.emerald.withValues(alpha: 0.18),
-                            BrandColors.blue.withValues(alpha: 0.10),
+                            BrandColors.emerald.withValues(alpha: 0.22),
+                            BrandColors.blue.withValues(alpha: 0.12),
                           ],
                         ),
-                        border: Border.all(color: BrandColors.emerald.withValues(alpha: 0.25)),
+                        border: Border.all(color: BrandColors.emerald.withValues(alpha: 0.35)),
                       ),
                       child: Image.asset('assets/brand/card_scan_glow.png', cacheWidth: 150),
                     ),
@@ -258,43 +225,47 @@ class _DashboardPageState extends State<DashboardPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('ثبت کارت‌های قلقلی',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.w900)),
-                          const SizedBox(height: 3),
-                          Text(
-                            'کارت‌های فوتبالی و غیرفوتبالی قلقلی، اکنون به‌صورت فیزیکی در فروشگاه‌ها و سوپرمارکت‌های سراسر کشور',
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodySmall,
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text('ثبت کارت‌های قلقلی',
+                                    style: theme.textTheme.titleMedium
+                                        ?.copyWith(fontWeight: FontWeight.w900, fontSize: 14)),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  borderRadius: Corners.rPill,
+                                  color: BrandColors.amber.withValues(alpha: 0.16),
+                                  border: Border.all(color: BrandColors.amber.withValues(alpha: 0.45)),
+                                ),
+                                child: const Text('کارت داری اینجا ثبت کن !',
+                                    style: TextStyle(
+                                        color: BrandColors.amber,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w900)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'کارت‌های فیزیکی قلقلی را می‌توانید از فروشگاه‌ها و سوپرمارکت‌ها تهیه کنید',
+                            style: TextStyle(
+                              color: Color(0xFFCBD5E1),
+                              fontSize: 11.5,
+                              height: 1.45,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ],
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                      decoration: BoxDecoration(
-                        borderRadius: Corners.rPill,
-                        color: BrandColors.amber.withValues(alpha: 0.13),
-                        border: Border.all(color: BrandColors.amber.withValues(alpha: 0.34)),
-                      ),
-                      child: const Text('کارت داری؟ اینجا ثبت کن !',
-                          style: TextStyle(
-                              color: BrandColors.amber,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900)),
-                    ),
                   ],
                 ),
+                Gaps.vSm,
                 PhotoCardBox(
                   api: widget.api,
                   embedded: true,
-                  // همان دو کاری که مسیر «ثبت کد» بعد از موفقیت می‌کند:
-                  // اینونتوریِ این صفحه و امتیازِ نوارِ بالا. اگر فقط
-                  // یکی صدا زده شود، کارت اضافه می‌شود ولی امتیاز قدیمی
-                  // می‌ماند و کاربر فکر می‌کند چیزی نگرفته.
                   onRegistered: () {
                     _load();
                     widget.reloadProfile();
@@ -305,13 +276,6 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
 
           Gaps.vXl,
-          // ── چرا داشبورد فقط پیش‌نمایش می‌دهد ──
-          //
-          // قبلاً کلِ اینونتوری اینجا در یک نوارِ افقی بود. با ۵۰ کارت
-          // یعنی ۵۰ تصویرِ شبکه‌ای که همگی روی صفحهٔ **اصلی** بارگذاری
-          // می‌شدند — هم کند، هم پرمصرف، و هم عملاً غیرقابل‌مرور.
-          //
-          // حالا شش کارتِ تازه به‌عنوان طعمه و یک دکمه به صفحهٔ کامل.
           SectionHeader(
             title: 'کلکسیون من',
             trailing: inventory.length > 6 && widget.onOpenInventory != null
@@ -332,7 +296,6 @@ class _DashboardPageState extends State<DashboardPage> {
             )
           else
             Builder(builder: (_) {
-              // همان مرتب‌سازیِ صفحهٔ کلکسیون تا ترتیب بینشان نپرد.
               final recent =
                   filterAndSort(inventory, sort: InvSort.recent).take(6).toList();
               return GridView.builder(
@@ -356,14 +319,15 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 }
 
-
-/// کاشی میان‌بر روی داشبورد.
-class _QuickTile extends StatelessWidget {
-  const _QuickTile({
+/// کاشی میان‌بر جذاب با انیمیشن ملایم شناور و درخشش نور
+class _AnimatedQuickTile extends StatefulWidget {
+  const _AnimatedQuickTile({
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.tint,
+    required this.glowColor,
+    required this.animOffset,
     this.onTap,
   });
 
@@ -371,66 +335,111 @@ class _QuickTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final Color tint;
+  final Color glowColor;
+  final double animOffset;
   final VoidCallback? onTap;
 
   @override
+  State<_AnimatedQuickTile> createState() => _AnimatedQuickTileState();
+}
+
+class _AnimatedQuickTileState extends State<_AnimatedQuickTile>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2600),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Material(
-      color: Colors.transparent,
-      borderRadius: Corners.rLg,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: Corners.rLg,
-        child: Container(
-          // ۴۸ کف اندازهٔ هدف لمسی طبق راهنمای دسترس‌پذیری متریال.
-          constraints: const BoxConstraints(minHeight: 58),
-          padding: const EdgeInsets.symmetric(
-              horizontal: Gaps.xs, vertical: Gaps.xs),
-          decoration: BoxDecoration(
-            borderRadius: Corners.rLg,
-            gradient: LinearGradient(
-              begin: Alignment.topRight,
-              end: Alignment.bottomLeft,
-              colors: [
-                tint.withValues(alpha: 0.22),
-                Theme.of(context).colorScheme.surfaceContainerHigh
-                    .withValues(alpha: 0.72),
-              ],
-            ),
-            border: Border.all(color: tint.withValues(alpha: 0.28)),
-            boxShadow: [
-              BoxShadow(
-                color: tint.withValues(alpha: 0.10),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (context, _) {
+        final phase = (_ctrl.value + widget.animOffset) % 1.0;
+        final floatY = math.sin(phase * 2 * math.pi) * 2.0;
+        final glowPulse = 0.4 + 0.35 * math.sin(phase * 2 * math.pi).abs();
+
+        return Transform.translate(
+          offset: Offset(0, floatY),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: widget.onTap,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    widget.tint.withValues(alpha: 0.18),
+                    widget.tint.withValues(alpha: 0.05),
+                  ],
+                ),
+                border: Border.all(
+                  color: widget.tint.withValues(alpha: 0.35 + 0.25 * glowPulse),
+                  width: 1.2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: widget.glowColor.withValues(alpha: 0.18 * glowPulse),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-            ],
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: widget.tint.withValues(alpha: 0.18),
+                      boxShadow: [
+                        BoxShadow(
+                          color: widget.glowColor.withValues(alpha: 0.35 * glowPulse),
+                          blurRadius: 8,
+                        ),
+                      ],
+                    ),
+                    child: Center(child: widget.icon),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    widget.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 12,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    widget.subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: widget.tint,
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(width: 26, height: 26, child: Center(child: icon)),
-              const SizedBox(height: 3),
-              Text(title,
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelMedium
-                      ?.copyWith(fontWeight: FontWeight.w900)),
-              Text(subtitle,
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    fontSize: 10,
-                    color:
-                        theme.colorScheme.onSurface.withValues(alpha: 0.62),
-                  )),
-            ],
-          ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

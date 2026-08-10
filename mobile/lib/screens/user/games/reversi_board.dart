@@ -1,5 +1,4 @@
-// اتللو — 8x8. The server sends this player's legal squares, which we
-// render as hint dots so the rules stay discoverable.
+// اتللو — 8x8.
 import 'package:flutter/material.dart';
 import '../../../api_client.dart';
 import '../../../theme/tokens.dart';
@@ -12,9 +11,20 @@ const _felt = Color(0xFF15803D);
 const _n = 8;
 
 class ReversiScreen extends StatefulWidget {
-  const ReversiScreen({super.key, required this.api, required this.onBack});
+  const ReversiScreen({
+    super.key,
+    required this.api,
+    required this.onBack,
+    this.stake = 0,
+    this.vsBot = false,
+    this.roomCode,
+  });
+
   final ApiClient api;
   final VoidCallback onBack;
+  final int stake;
+  final bool vsBot;
+  final String? roomCode;
 
   @override
   State<ReversiScreen> createState() => _ReversiScreenState();
@@ -23,6 +33,18 @@ class ReversiScreen extends StatefulWidget {
 class _ReversiScreenState extends State<ReversiScreen> {
   late final GameSession _s =
       GameSession(api: widget.api, gameId: 'reversi')..connect();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.vsBot) {
+      _s.playWithBotImmediately();
+    } else if (widget.roomCode != null && widget.roomCode!.isNotEmpty) {
+      _s.joinRoom(widget.roomCode!);
+    } else if (widget.stake > 0) {
+      _s.join(stake: widget.stake, vsBot: false);
+    }
+  }
 
   @override
   void dispose() {
@@ -51,25 +73,17 @@ class _Score extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scores = session.state['scores'];
-    if (scores is! Map) return const SizedBox.shrink();
-    final theme = Theme.of(context);
-    Widget tile(Color color, Object? n) => Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.circle_rounded, size: 20, color: color),
-            Gaps.hXxs,
-            Text(faNum(n ?? 0),
-                style: theme.textTheme.titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w800)),
-          ],
-        );
-    return AppCard(
-      padding: const EdgeInsets.symmetric(vertical: Gaps.xs),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [tile(Colors.black87, scores['X']), tile(Colors.white, scores['O'])],
-      ),
+    final s = session.state;
+    final scores = s['scores'] as Map?;
+    final x = (scores?['X'] as num?)?.toInt() ?? 2;
+    final o = (scores?['O'] as num?)?.toInt() ?? 2;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text('توپ: $x', style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white)),
+        const SizedBox(width: 20),
+        Text('مهره: $o', style: const TextStyle(fontWeight: FontWeight.w900, color: _accent)),
+      ],
     );
   }
 }
@@ -80,102 +94,49 @@ class _Board extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final board = (session.state['board'] as List?) ?? List.filled(64, null);
-    final legal = (session.state['legal'] as List?)?.cast<int>() ?? const [];
-    final canPlay = session.myTurn;
+    final s = session.state;
+    final board = (s['board'] as List?) ?? List.filled(_n * _n, null);
+    final legal = List<int>.from(s['legalMoves'] ?? []);
 
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 360),
-        child: AspectRatio(
-          aspectRatio: 1,
-          child: Container(
-            padding: const EdgeInsets.all(5),
-            decoration: BoxDecoration(
-              color: _felt,
-              borderRadius: Corners.rLg,
-              border: Border.all(color: const Color(0xFF14532D), width: 3),
-            ),
-            child: GridView.builder(
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: _n,
-                mainAxisSpacing: 1.5,
-                crossAxisSpacing: 1.5,
-              ),
-              itemCount: _n * _n,
-              itemBuilder: (context, i) {
-                final v = board.length > i ? board[i] as String? : null;
-                final hint = canPlay && legal.contains(i);
-                return GestureDetector(
-                  onTap: hint ? () => session.move(i) : null,
-                  // DecoratedBox و نه Container: این ویجت در یک شبکهٔ ۸×۸
-                  // (۶۴ خانه) ساخته می‌شود و هر بار که حریف حرکت می‌کند
-                  // کل شبکه دوباره ساخته می‌شود. Container خودش یک
-                  // ویجتِ ترکیبی است که برای هر خانه چند لایهٔ اضافه
-                  // می‌سازد؛ وقتی فقط decoration می‌خواهیم، آن لایه‌ها
-                  // خالص هزینه‌اند.
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF16A34A).withValues(alpha: 0.55),
-                      borderRadius: BorderRadius.circular(3),
-                      border: session.lastMove == i
-                          ? Border.all(color: _accent, width: 1.6)
-                          : null,
-                    ),
-                    child: Center(
-                      child: v == null
-                          ? (hint
-                              ? Container(
-                                  width: 13,
-                                  height: 13,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: _accent.withValues(alpha: 0.25),
-                                    border: Border.all(color: _accent.withValues(alpha: 0.85), width: 1.8),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: _accent.withValues(alpha: 0.3),
-                                        blurRadius: 4,
-                                      ),
-                                    ],
-                                  ),
-                                )
-                              : const SizedBox.shrink())
-                          : AnimatedScale(
-                              duration: Motion.fast,
-                              scale: 1,
-                              child: Container(
-                                margin: const EdgeInsets.all(2.5),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  gradient: v == 'X'
-                                      ? const LinearGradient(
-                                          colors: [Color(0xFF4B5563), Color(0xFF111827)],
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                        )
-                                      : const LinearGradient(
-                                          colors: [Colors.white, Color(0xFFE5E7EB)],
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                        ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.4),
-                                      blurRadius: 5,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                    ),
-                  ),
-                );
-              },
-            ),
+    return AspectRatio(
+      aspectRatio: 1,
+      child: Container(
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: _felt,
+          borderRadius: Corners.rLg,
+          border: Border.all(color: Colors.black45, width: 4),
+        ),
+        child: GridView.builder(
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: _n,
+            mainAxisSpacing: 2,
+            crossAxisSpacing: 2,
           ),
+          itemCount: _n * _n,
+          itemBuilder: (ctx, i) {
+            final cell = board[i];
+            final isLegal = legal.contains(i) && session.myTurn;
+            return InkWell(
+              onTap: isLegal ? () => session.move(i) : null,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF166534),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+                child: Center(
+                  child: cell == 'X'
+                      ? Image.asset('assets/pass/football_icon.webp', width: 24, height: 24)
+                      : (cell == 'O'
+                          ? Image.asset('assets/games/reversi.webp', width: 24, height: 24)
+                          : (isLegal
+                              ? Container(width: 8, height: 8, decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white60))
+                              : null)),
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
