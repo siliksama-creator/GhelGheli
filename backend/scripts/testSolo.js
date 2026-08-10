@@ -63,7 +63,7 @@ const WAIT_MS = 15_000;
     ok(mem.solo === true, 'memory is advertised as solo-capable');
     ok(RULES.memory.solo === true, 'memory rules carry solo');
     ok(RULES.memory.noBot === false, 'memory supports bot');
-    ok(!RULES.reversi.noBot && !RULES.penalty.noBot, 'all games support bot');
+    ok(!RULES.penalty.noBot && !RULES.penalty.noBot, 'all games support bot');
   }
 
   console.log('\n== assets instead of emoji ==');
@@ -88,9 +88,9 @@ const WAIT_MS = 15_000;
   console.log('\n== other games keep their bot ==');
   {
     const c = io.connect({ id: 'u3', nickname: 'حسن' });
-    c.fire('game:play_bot', { gameId: 'reversi' });
+    c.fire('game:play_bot', { gameId: 'penalty' });
     const st = c.last('game:start');
-    ok(!!st && st.vsBot === true, 'reversi starts bot instantly via game:play_bot');
+    ok(!!st && st.vsBot === true, 'penalty starts bot instantly via game:play_bot');
     c.fire('game:leave', {});
   }
 
@@ -107,7 +107,7 @@ const WAIT_MS = 15_000;
 
     // A non-solo game must be refused.
     const s2 = io.connect({ id: 'u5' });
-    s2.fire('solo:start', { gameId: 'reversi' });
+    s2.fire('solo:start', { gameId: 'penalty' });
     ok(!!s2.last('solo:error'), 'solo is refused for a game that does not support it');
     s2.fire('solo:start', { gameId: 'nope' });
     ok(s2.count('solo:error') === 2, 'unknown game id is refused');

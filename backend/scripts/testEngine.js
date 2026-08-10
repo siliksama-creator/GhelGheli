@@ -91,12 +91,12 @@ function makeIo() {
     ok(a.rooms.size === 0 && b.rooms.size === 0, 'room cleaned up');
   }
 
-  // جفت‌یاب no longer has a bot, so the fallback is exercised on reversi.
-  console.log('\n== bot fallback (15s, reversi) ==');
+  // جفت‌یاب no longer has a bot, so the fallback is exercised on penalty.
+  console.log('\n== bot fallback (15s, penalty) ==');
   {
     const io = makeIo(); attach(io, RULES);
     const a = io.connect(new FakeSocket('lonely', 'تنها'));
-    a.fire('game:join', { gameId: 'reversi' });
+    a.fire('game:join', { gameId: 'penalty' });
     ok(a.has('game:waiting'), 'waits for a human first');
     ok(a.last('game:waiting').botFallback === true, 'a bot IS promised');
     ok(!a.has('game:start'), 'no instant bot game');
@@ -127,13 +127,13 @@ function makeIo() {
     ok(b.last('game:start').vsBot === true, 'penalty flagged as vsBot');
   }
 
-  console.log('\n== reversi over the engine ==');
+  console.log('\n== penalty over the engine ==');
   {
     const io = makeIo(); attach(io, RULES);
     const a = io.connect(new FakeSocket('r1', 'الف'));
     const b = io.connect(new FakeSocket('r2', 'ب'));
-    a.fire('game:join', { gameId: 'reversi' });
-    b.fire('game:join', { gameId: 'reversi' });
+    a.fire('game:join', { gameId: 'penalty' });
+    b.fire('game:join', { gameId: 'penalty' });
     const sa = a.last('game:start');
     ok(sa.state.board.filter(Boolean).length === 4, 'opening position dealt');
     ok(Array.isArray(sa.state.legal) && sa.state.legal.length === 4, 'legal hints sent');
@@ -200,7 +200,7 @@ function makeIo() {
   console.log('\n== per-game turn budgets & match countdown ==');
   {
     const io = makeIo(); attach(io, RULES);
-    const budgets = { memory: 20000, reversi: 30000 };
+    const budgets = { memory: 20000, penalty: 30000 };
     for (const [gid, want] of Object.entries(budgets)) {
       const p1 = io.connect(new FakeSocket(`b-${gid}-1`, 'الف'));
       const p2 = io.connect(new FakeSocket(`b-${gid}-2`, 'ب'));
@@ -226,16 +226,16 @@ function makeIo() {
     b.fire('game:join', { gameId: 'memory' });
     ok(!!a.last('game:start'), 'match started');
     // Switching games mid-match must not strand the opponent in a dead room.
-    a.fire('game:join', { gameId: 'reversi' });
+    a.fire('game:join', { gameId: 'penalty' });
     ok(b.last('game:over')?.winner === 'DISCONNECT', 'opponent released from abandoned room');
     ok(b.rooms.size === 0, 'abandoned room cleaned up');
 
     // Re-tapping the same game while queued must not duplicate the queue slot.
     const c = io.connect(new FakeSocket('g3', 'ج'));
-    c.fire('game:join', { gameId: 'reversi' });
-    c.fire('game:join', { gameId: 'reversi' });
+    c.fire('game:join', { gameId: 'penalty' });
+    c.fire('game:join', { gameId: 'penalty' });
     const d = io.connect(new FakeSocket('g4', 'د'));
-    d.fire('game:join', { gameId: 'reversi' });
+    d.fire('game:join', { gameId: 'penalty' });
     ok(!!c.last('game:start') && !!d.last('game:start'), 'no duplicate queue entry');
     ok(c.last('game:start').roomId === d.last('game:start').roomId, 'paired correctly after re-join');
     c.fire('game:leave'); d.fire('game:leave');
@@ -269,10 +269,10 @@ function makeIo() {
 
     // A queued socket that vanished must not be matched against.
     const c = io.connect(new FakeSocket('d3', 'ج'));
-    c.fire('game:join', { gameId: 'reversi' });
+    c.fire('game:join', { gameId: 'penalty' });
     c.connected = false;
     const d = io.connect(new FakeSocket('d4', 'د'));
-    d.fire('game:join', { gameId: 'reversi' });
+    d.fire('game:join', { gameId: 'penalty' });
     ok(!d.has('game:start'), 'not matched against a ghost in the queue');
     ok(d.has('game:waiting'), 'live player keeps waiting for a real opponent');
     d.fire('game:leave');

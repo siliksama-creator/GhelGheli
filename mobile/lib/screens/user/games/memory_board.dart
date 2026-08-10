@@ -95,6 +95,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
   }
 
   void _switchTo(_Mode m) {
+    if (widget.stake == 100 || widget.stake == 1000) return;
     if (_mode == m) return;
     // Leaving one mode must actually release it server-side, otherwise the
     // player sits in the matchmaking queue while playing solo (and a real
@@ -117,6 +118,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if ((widget.stake == 100 || widget.stake == 1000) && _mode == _Mode.solo) _mode = _Mode.versus;
     if (_mode == _Mode.solo) {
       return _SoloView(
         session: _solo,
@@ -139,7 +141,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
       boardBuilder: (_) => _VersusBoard(session: _versus),
       // Shown on the lobby AND while hunting for an opponent: the escape
       // hatch that replaced the old silent bot fallback.
-      soloOffer: _SoloOffer(bestMs: _bestMs, onPlaySolo: () => _switchTo(_Mode.solo)),
+      soloOffer: (widget.stake == 100 || widget.stake == 1000) ? null : _SoloOffer(bestMs: _bestMs, onPlaySolo: () => _switchTo(_Mode.solo)),
     );
   }
 }

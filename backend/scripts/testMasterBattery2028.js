@@ -29,7 +29,7 @@ const leagueService = require('../src/services/leagueService');
 const cardDuel = require('../src/services/cardDuelService');
 const penalty = require('../src/games/rules/penalty');
 const memory = require('../src/games/rules/memory');
-const reversi = require('../src/games/rules/reversi');
+const penalty = require('../src/games/rules/penalty');
 
 let passCount = 0, failCount = 0;
 function assert(condition, message) {
@@ -197,15 +197,15 @@ function assert(condition, message) {
     failCount++; console.error(e);
   }
 
-  // ── ۱۱. تست بازی‌های تخته‌ای (جفت‌یاب و اتللو) ──
-  console.log('\n[11/12] چک منطق بازی‌های جفت‌یاب و اتللو:');
+  // ── ۱۱. تست بازی‌های تخته‌ای (جفت‌یاب و پنالتی) ──
+  console.log('\n[11/12] چک منطق بازی‌های جفت‌یاب و پنالتی:');
   try {
     const memBoard = memory.create();
     assert(memBoard.size === 16, 'تخته جفت‌یاب ۱۶ کارت دارد');
     assert(memory.FACES.length === 8, 'جفت‌یاب دارای ۸ جفت طرح فوتبالی است');
 
-    const revBoard = reversi.create();
-    assert(reversi.isValidMove(revBoard, 19, 'X'), 'حرکت اول اتللو معتبر است');
+    const revBoard = penalty.create();
+    assert(penalty.isValidMove(revBoard, 19, 'X'), 'حرکت اول پنالتی معتبر است');
   } catch (e) {
     failCount++; console.error(e);
   }

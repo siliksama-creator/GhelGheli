@@ -9,7 +9,6 @@ import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/level_badge.dart';
-import 'games/reversi_board.dart';
 import 'games/memory_board.dart';
 import 'games/penalty_board.dart';
 import 'games/tap/tap_screen.dart';
@@ -41,8 +40,6 @@ const _games = <_GameEntry>[
       'assets/games/card_duel_glow.png', Color(0xFFFFD166), 'assets/games/card_duel_glow.png'),
   _GameEntry('memory', 'جفت‌یاب', 'جفت‌های فوتبالی را به خاطر بسپار', 'assets/games/memory/medal.webp',
       Color(0xFFA855F7), 'assets/games/memory.webp'),
-  _GameEntry('reversi', 'اتللو', 'مهره‌ها را برگردان و تخته را فتح کن', 'assets/games/reversi.webp', Color(0xFF34D399),
-      'assets/games/reversi.webp'),
 ];
 
 List<_GameEntry> get _multiplayerGames => _games.where((g) => g.id != 'tap').toList();
@@ -113,14 +110,6 @@ class _GamesHubPageState extends State<GamesHubPage> {
           return TapGameScreen(api: widget.api, onBack: _back);
         case 'memory':
           return MemoryScreen(
-            api: widget.api,
-            onBack: _back,
-            stake: _activeStake,
-            vsBot: _activeVsBot,
-            roomCode: _activeRoomCode,
-          );
-        case 'reversi':
-          return ReversiScreen(
             api: widget.api,
             onBack: _back,
             stake: _activeStake,
@@ -663,10 +652,9 @@ class _PrivateLobbyHubState extends State<_PrivateLobbyHub> {
     ('penalty', 'ضربات پنالتی', 'assets/pass/football_icon.webp'),
     ('card_duel', 'دوئل کارت‌ها', 'assets/games/card_duel_glow.png'),
     ('memory', 'جفت‌یاب', 'assets/games/memory/medal.webp'),
-    ('reversi', 'اتللو', 'assets/games/reversi.webp'),
   ];
 
-  final _presetStakes = const [100, 200, 500, 1000, 2000, 5000, 10000];
+  final _presetStakes = const [0, 100, 1000, 5000];
 
   @override
   void initState() {
@@ -865,7 +853,7 @@ class _PrivateLobbyHubState extends State<_PrivateLobbyHub> {
                       Padding(
                         padding: const EdgeInsets.only(left: 6),
                         child: ChoiceChip(
-                          label: Text('${faNum(s)}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900)),
+                          label: Text(s == 0 ? 'رایگان' : '${faNum(s)}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900)),
                           selected: _stake == s,
                           selectedColor: const Color(0xFFA855F7),
                           onSelected: (val) {
@@ -986,7 +974,7 @@ class _PrivateLobbyHubState extends State<_PrivateLobbyHub> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'بازی: ${l['gameId']} · ${faNum(l['stake'] ?? 100)} امتیاز',
+                          'بازی: ${l['gameId']} · ${l['stake'] == 0 ? 'رایگان' : '${faNum(l['stake'] ?? 100)} امتیاز'}',
                           style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
                         ),
                       ],

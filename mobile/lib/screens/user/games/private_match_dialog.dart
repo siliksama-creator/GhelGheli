@@ -39,7 +39,6 @@ class _PrivateMatchDialogState extends State<PrivateMatchDialog> {
     ('penalty', 'ضربات پنالتی', Icons.sports_soccer_rounded),
     ('card_duel', 'دوئل کارت‌ها', Icons.style_rounded),
     ('memory', 'جفت‌یاب', Icons.grid_view_rounded),
-    ('reversi', 'اتللو', Icons.circle_outlined),
   ];
 
   final _presetStakes = const [100, 200, 500, 1000, 2000, 5000, 10000];

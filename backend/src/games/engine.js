@@ -331,7 +331,7 @@ function finish(room, winner) {
     //
     // `room.vsBot` را خودِ موتور موقع ساختن اتاق تعیین می‌کند (وقتی
     // حریف دوم پیدا نشود)، پس قابل جعل از سمت کلاینت نیست.
-    if (!room.vsBot) {
+    if (!room.vsBot && room.stake > 0) {
       for (const sym of ['X', 'O']) {
         const info = room.players?.[sym];
         if (!info?.id || info.isBot) continue;
@@ -524,7 +524,9 @@ const attachGames = function attachGames(io, rulesById) {
       const gameId = String(payload?.gameId || Object.keys(rulesById)[0]);
       const rules = rulesById[gameId];
       if (!rules) return safeEmit(socket, 'game:error', { message: 'بازی مورد نظر یافت نشد' });
-      const stake = Math.min(Math.max(Number(payload?.stake) || 100, 50), 10000);
+      let stake = Number(payload?.stake);
+      if (Number.isNaN(stake)) stake = 100;
+      stake = Math.min(Math.max(stake, 0), 10000);
       const password = String(payload?.password || '').trim();
       dropFromQueue(socket);
       const lobbyId = 'lobby-' + Math.random().toString(36).substring(2, 8);

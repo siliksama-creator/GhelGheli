@@ -186,9 +186,9 @@ console.log('\n== memory (جفت‌یاب) ==');
 
 // Connect Four (چهار در یک ردیف) was retired — see src/games/index.js.
 
-console.log('\n== reversi ==');
+console.log('\n== penalty ==');
 {
-  const r = RULES.reversi;
+  const r = RULES.penalty;
   const s = r.create();
   ok(s.board.filter(Boolean).length === 4, 'four starting discs');
   ok(r.decorate(s, 'X').legal.sort().join() === [19, 26, 37, 44].join(), 'opening legal moves');

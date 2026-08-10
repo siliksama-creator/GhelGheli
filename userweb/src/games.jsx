@@ -4,7 +4,6 @@ import { io } from 'socket.io-client';
 import { play, isEnabled, setEnabled } from './gameAudio.js';
 import MemorySolo, { MemoryGrid } from './memoryGame.jsx';
 import PenaltyGame from './penaltyGame.jsx';
-import ReversiGame from './reversiGame.jsx';
 import TapGame from './tapGame.jsx';
 import { LevelBadge, DisplayName } from './components/Cosmetics.jsx';
 import { fa, asset, avatarUrl, req } from './lib/api.js';
@@ -14,7 +13,6 @@ const GAMES = [
   { id: 'penalty', title: 'ضربات پنالتی', emoji: '🥅', desc: 'شوت دقیق و مهار دروازه‌بان', accent: '#38BDF8', art: '/games/penalty.webp' },
   { id: 'card_duel', title: 'دوئل کارت‌ها', emoji: '🃏', desc: 'نبرد سه‌کارتی و کارت‌های کلکسیونی', accent: '#FFD166', art: '/games/card_duel.webp' },
   { id: 'memory', title: 'جفت‌یاب', emoji: '🎁', desc: 'جفت‌های فوتبالی را به خاطر بسپار', accent: '#A855F7', art: '/games/memory.webp' },
-  { id: 'reversi', title: 'اتللو', emoji: '⚪', desc: 'مهره‌ها را برگردان و تخته را فتح کن', accent: '#34D399', art: '/games/reversi.webp' },
 ];
 
 function useGameSession(api, token, gameId, stake = 0, vsBot = false, roomCode = null) {
@@ -364,7 +362,7 @@ export default function Games({ api, token }) {
             </div>
 
             <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', marginBottom: '12px' }}>
-              {[100, 200, 500, 1000, 2000, 5000, 10000].map(s => (
+              {[0, 100, 1000, 5000].map(s => (
                 <button
                   key={s}
                   type="button"
@@ -381,7 +379,7 @@ export default function Games({ api, token }) {
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  {fa(s)} امتیاز
+                  {s===0 ? 'رایگان' : fa(s)+' امتیاز'}
                 </button>
               ))}
             </div>
@@ -421,7 +419,7 @@ export default function Games({ api, token }) {
                         <span>{l.hostName}</span>
                         {l.hasPassword && <span title="دارای رمز عبور">🔒</span>}
                       </div>
-                      <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '2px' }}>بازی: {l.gameId} · {fa(l.stake)} امتیاز</div>
+                      <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '2px' }}>بازی: {l.gameId} · {l.stake===0 ? 'رایگان' : fa(l.stake)+' امتیاز'}</div>
                     </div>
                     <button
                       type="button"
@@ -562,7 +560,7 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, soundOn, onT
           ← بازگشت
         </button>
         <span style={{ fontWeight: '900', color: '#38BDF8', fontSize: '16px' }}>
-          {gameId === 'penalty' ? 'ضربات پنالتی' : (gameId === 'memory' ? 'جفت‌یاب' : gameId==='card_duel' ? 'دوئل کارت‌ها' : 'اتللو')}
+          {gameId === 'penalty' ? 'ضربات پنالتی' : (gameId === 'memory' ? 'جفت‌یاب' : 'دوئل کارت‌ها')}
         </span>
         <button type="button" onClick={onToggleSound} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer' }}>
           {soundOn ? '🔊' : '🔇'}
@@ -624,9 +622,6 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, soundOn, onT
           )}
           {gameId === 'memory' && (
             <MemoryGrid cards={g.state?.cards || []} playable={g.state?.playable || []} onMove={move} />
-          )}
-          {gameId === 'reversi' && (
-            <ReversiGame state={g.state} mySymbol={g.me} turn={g.turn} onMove={move} />
           )}
         </div>
       )}
