@@ -6,6 +6,7 @@
 /// membership); this only draws it.
 library;
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../widgets/level_badge.dart';
@@ -237,53 +238,54 @@ class _PlusStar extends StatefulWidget {
   State<_PlusStar> createState() => _PlusStarState();
 }
 
-class _PlusStarState extends State<_PlusStar> with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _glow;
+class _PlusStarState extends State<_PlusStar> {
+  Timer? _timer;
+  double _glow = 0.6;
+  double _direction = 1.0;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))
-      ..repeat(reverse: true);
-    _glow = Tween<double>(begin: 0.6, end: 1.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
-    );
+    _timer = Timer.periodic(const Duration(milliseconds: 50), (_) {
+      if (!mounted) return;
+      setState(() {
+        _glow += _direction * 0.03;
+        if (_glow >= 1.0) { _glow = 1.0; _direction = -1.0; }
+        if (_glow <= 0.6) { _glow = 0.6; _direction = 1.0; }
+      });
+    });
   }
 
   @override
   void dispose() {
-    _ctrl.dispose();
+    _timer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _glow,
-      builder: (context, child) => Container(
-        padding: const EdgeInsets.all(2),
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: RadialGradient(
-            colors: [
-              const Color(0xFFFFD700).withValues(alpha: _glow.value * 0.5),
-              Colors.transparent,
-            ],
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFFFFD700).withValues(alpha: _glow.value * 0.8),
-              blurRadius: 14 * _glow.value,
-              spreadRadius: 2 * _glow.value,
-            ),
+    return Container(
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(
+          colors: [
+            const Color(0xFFFFD700).withValues(alpha: _glow * 0.5),
+            Colors.transparent,
           ],
         ),
-        child: const Icon(
-          Icons.star_rounded,
-          size: 21,
-          color: Color(0xFFFFD700),
-        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFFD700).withValues(alpha: _glow * 0.8),
+            blurRadius: 14 * _glow,
+            spreadRadius: 2 * _glow,
+          ),
+        ],
+      ),
+      child: const Icon(
+        Icons.star_rounded,
+        size: 21,
+        color: Color(0xFFFFD700),
       ),
     );
   }
