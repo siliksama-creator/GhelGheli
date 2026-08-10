@@ -1,29 +1,30 @@
-// Multiplayer games for the web app (4 Modes: 100, 1000, Bot Practice, Private Rooms & Lobbies).
+// Full-Fidelity Games Hub for Web (VersusBar, Penalty with Goalkeeper, Memory, Reversi, Tap, 4 Modes)
 import React, { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
-import { play } from './gameAudio.js';
+import { play, isEnabled, setEnabled } from './gameAudio.js';
 import MemorySolo, { MemoryGrid } from './memoryGame.jsx';
 import PenaltyGame from './penaltyGame.jsx';
+import ReversiGame from './reversiGame.jsx';
 import TapGame from './tapGame.jsx';
-import { AssetIcon, SvgIcon } from './components/IconAsset.jsx';
 import { LevelBadge, DisplayName } from './components/Cosmetics.jsx';
 import { fa, asset, avatarUrl, req } from './lib/api.js';
 
 const GAMES = [
-  { id: 'tap', title: 'ضربه‌زن', emoji: '⚽', desc: '۵۰ لول ضربه بزن و شخصیت‌ها را باز کن', accent: '#84CC16', singlePlayer: true },
-  { id: 'penalty', title: 'ضربات پنالتی', emoji: '🥅', desc: 'شوت دقیق و مهار دروازه‌بان', accent: '#38BDF8' },
-  { id: 'memory', title: 'جفت‌یاب', emoji: '🎁', desc: 'جفت‌های فوتبالی را به خاطر بسپار', accent: '#A855F7' },
-  { id: 'reversi', title: 'اتللو', emoji: '⚪', desc: 'مهره‌ها را برگردان و تخته را فتح کن', accent: '#34D399' },
+  { id: 'tap', title: 'ضربه‌زن', emoji: '⚽', desc: '۵۰ لول ضربه بزن و شخصیت‌ها را باز کن', accent: '#84CC16', singlePlayer: true, art: '/games/tap/skin_1.webp' },
+  { id: 'penalty', title: 'ضربات پنالتی', emoji: '🥅', desc: 'شوت دقیق و مهار دروازه‌بان', accent: '#38BDF8', art: '/games/penalty.webp' },
+  { id: 'memory', title: 'جفت‌یاب', emoji: '🎁', desc: 'جفت‌های فوتبالی را به خاطر بسپار', accent: '#A855F7', art: '/games/memory.webp' },
+  { id: 'reversi', title: 'اتللو', emoji: '⚪', desc: 'مهره‌ها را برگردان و تخته را فتح کن', accent: '#34D399', art: '/games/reversi.webp' },
 ];
 
-function useGame(api, token, gameId, stake = 0, vsBot = false, roomCode = null) {
+function useGameSession(api, token, gameId, stake = 0, vsBot = false, roomCode = null) {
   const ref = useRef(null);
   const [phase, setPhase] = useState('idle');
   const [g, setG] = useState({
     state: {}, players: null, me: null, turn: null, winner: null,
-    vsBot: false, timedOut: null,
+    vsBot: false, timedOut: null, deadline: null,
   });
   const [error, setError] = useState('');
+  const [secondsLeft, setSecondsLeft] = useState(15);
   const [online, setOnline] = useState(true);
 
   useEffect(() => {
@@ -34,11 +35,12 @@ function useGame(api, token, gameId, stake = 0, vsBot = false, roomCode = null) 
       reconnection: true,
     });
     ref.current = s;
+
     s.on('connect', () => {
       setOnline(true);
       if (vsBot) {
         s.emit('game:play_bot', { gameId });
-        setPhase('waiting');
+        setPhase('playing');
       } else if (roomCode) {
         s.emit('game:join_room', { roomCode });
         setPhase('waiting');
@@ -47,11 +49,14 @@ function useGame(api, token, gameId, stake = 0, vsBot = false, roomCode = null) 
         setPhase('waiting');
       }
     });
+
     s.on('disconnect', () => setOnline(false));
     s.on('connect_error', () => setError('اتصال برقرار نشد'));
 
     s.on('game:waiting', () => setPhase('waiting'));
+
     s.on('game:start', d => {
+      play('match_found');
       setG({
         state: d.state || {},
         players: d.players || null,
@@ -60,25 +65,38 @@ function useGame(api, token, gameId, stake = 0, vsBot = false, roomCode = null) 
         winner: null,
         vsBot: Boolean(d.vsBot),
         timedOut: null,
+        deadline: d.deadline,
       });
       setPhase('playing');
+      if (d.turn === d.yourSymbol) play('your_turn');
     });
 
     s.on('game:update', d => {
-      setG(prev => ({
-        ...prev,
-        state: d.state || prev.state,
-        turn: d.turn || prev.turn,
-        timedOut: d.timedOut || null,
-      }));
+      setG(prev => {
+        const wasMyTurn = prev.turn === prev.me;
+        const isMyTurn = d.turn === prev.me;
+        if (!wasMyTurn && isMyTurn) play('your_turn');
+        else if (wasMyTurn && !isMyTurn) play('move');
+        return {
+          ...prev,
+          state: d.state || prev.state,
+          turn: d.turn || prev.turn,
+          timedOut: d.timedOut || null,
+          deadline: d.deadline,
+        };
+      });
     });
 
     s.on('game:over', d => {
-      setG(prev => ({
-        ...prev,
-        state: d.state || prev.state,
-        winner: d.winner || null,
-      }));
+      setG(prev => {
+        const iWon = d.winner === prev.me;
+        play(d.winner === 'DRAW' ? 'draw' : (iWon ? 'win' : 'lose'));
+        return {
+          ...prev,
+          state: d.state || prev.state,
+          winner: d.winner || null,
+        };
+      });
       setPhase('over');
     });
 
@@ -90,6 +108,20 @@ function useGame(api, token, gameId, stake = 0, vsBot = false, roomCode = null) 
     };
   }, [api, token, gameId, stake, vsBot, roomCode]);
 
+  // Turn timer countdown
+  useEffect(() => {
+    if (phase !== 'playing') return;
+    setSecondsLeft(15);
+    const timer = setInterval(() => {
+      setSecondsLeft(prev => {
+        if (prev <= 1) return 0;
+        if (prev <= 4) play('tick');
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [g.turn, phase]);
+
   const move = payload => {
     if (phase !== 'playing') return;
     ref.current?.emit('game:move', { move: payload });
@@ -100,7 +132,7 @@ function useGame(api, token, gameId, stake = 0, vsBot = false, roomCode = null) 
     setPhase('idle');
   };
 
-  return { phase, g, error, online, move, leave };
+  return { phase, g, error, online, secondsLeft, move, leave };
 }
 
 export default function Games({ api, token }) {
@@ -113,6 +145,12 @@ export default function Games({ api, token }) {
   const [joinCode, setJoinCode] = useState('');
   const [user, setUser] = useState(null);
   const [level, setLevel] = useState(null);
+  const [soundOn, setSoundOn] = useState(() => isEnabled());
+
+  const toggleSound = () => {
+    const next = setEnabled(!soundOn);
+    setSoundOn(next);
+  };
 
   useEffect(() => {
     req('/api/bootstrap', 'GET', null, token).then(d => {
@@ -137,7 +175,19 @@ export default function Games({ api, token }) {
   }
 
   if (active) {
-    return <GamePlay api={api} token={token} gameId={active.id} stake={active.stake} vsBot={active.vsBot} roomCode={active.roomCode} onBack={() => setActive(null)} />;
+    return (
+      <GameScaffold
+        api={api}
+        token={token}
+        gameId={active.id}
+        stake={active.stake}
+        vsBot={active.vsBot}
+        roomCode={active.roomCode}
+        soundOn={soundOn}
+        onToggleSound={toggleSound}
+        onBack={() => setActive(null)}
+      />
+    );
   }
 
   return (
@@ -153,6 +203,7 @@ export default function Games({ api, token }) {
           display: 'flex',
           gap: '14px',
           alignItems: 'center',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
         }}
       >
         <img
@@ -189,6 +240,7 @@ export default function Games({ api, token }) {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          boxShadow: '0 8px 24px rgba(132, 204, 22, 0.25)',
         }}
       >
         <div>
@@ -410,29 +462,58 @@ export default function Games({ api, token }) {
   );
 }
 
-function GamePlay({ api, token, gameId, stake, vsBot, roomCode, onBack }) {
-  const { phase, g, error, move, leave } = useGame(api, token, gameId, stake, vsBot, roomCode);
+function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, soundOn, onToggleSound, onBack }) {
+  const { phase, g, error, secondsLeft, move, leave } = useGameSession(api, token, gameId, stake, vsBot, roomCode);
+
+  const pX = g.players?.X || { nickname: 'کاربر ۱' };
+  const pO = g.players?.O || (g.vsBot ? { nickname: 'هوش مصنوعی (ربات)', isBot: true } : { nickname: 'کاربر ۲' });
 
   return (
-    <div className="card wide" style={{ padding: '20px', textAlign: 'center' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-        <button type="button" onClick={() => { leave(); onBack(); }} style={{ background: 'rgba(255,255,255,0.1)', color: '#FFF', border: 'none', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer' }}>
+    <div className="card wide" style={{ padding: '20px', textAlign: 'center', maxWidth: '640px', margin: '0 auto' }}>
+      {/* Chrome Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+        <button type="button" onClick={() => { leave(); onBack(); }} style={{ background: 'rgba(255,255,255,0.1)', color: '#FFF', border: 'none', padding: '6px 14px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>
           ← بازگشت
         </button>
-        <span style={{ fontWeight: 'bold', color: '#38BDF8' }}>
+        <span style={{ fontWeight: '900', color: '#38BDF8', fontSize: '16px' }}>
           {gameId === 'penalty' ? 'ضربات پنالتی' : (gameId === 'memory' ? 'جفت‌یاب' : 'اتللو')}
         </span>
+        <button type="button" onClick={onToggleSound} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer' }}>
+          {soundOn ? '🔊' : '🔇'}
+        </button>
       </div>
 
       {error && <div className="err" style={{ marginBottom: '12px' }}>{error}</div>}
 
-      {phase === 'waiting' && (
-        <div style={{ padding: '30px' }}>
-          <div style={{ fontSize: '32px', marginBottom: '10px' }}>⏳</div>
-          <h3>در حال اتصال به مسابقه...</h3>
+      {/* Versus Bar */}
+      {phase === 'playing' && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.35)', padding: '10px 16px', borderRadius: '16px', marginBottom: '16px', border: '1px solid rgba(255,255,255,0.1)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: g.turn === 'X' ? '2px solid #38BDF8' : 'none', paddingBottom: '4px' }}>
+            <span style={{ fontWeight: '900', color: '#FFF' }}>{pX.nickname}</span>
+            {g.turn === 'X' && <span style={{ background: '#38BDF8', color: '#000', padding: '2px 6px', borderRadius: '6px', fontSize: '10px', fontWeight: 'bold' }}>نوبت ({fa(secondsLeft)}s)</span>}
+          </div>
+
+          <span style={{ color: '#94A3B8', fontWeight: '900', fontSize: '14px' }}>VS</span>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: g.turn === 'O' ? '2px solid #F59E0B' : 'none', paddingBottom: '4px' }}>
+            {g.turn === 'O' && <span style={{ background: '#F59E0B', color: '#000', padding: '2px 6px', borderRadius: '6px', fontSize: '10px', fontWeight: 'bold' }}>نوبت ({fa(secondsLeft)}s)</span>}
+            <span style={{ fontWeight: '900', color: '#FFF' }}>{pO.nickname}</span>
+          </div>
         </div>
       )}
 
+      {/* Waiting screen for human match */}
+      {phase === 'waiting' && !vsBot && (
+        <div style={{ padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+          <div style={{ fontSize: '40px' }}>⏳</div>
+          <h3 style={{ color: '#FFF', fontWeight: '900', margin: 0 }}>در حال جستجوی حریف آنلاین...</h3>
+          <p style={{ color: '#94A3B8', fontSize: '12.5px', maxWidth: '380px', lineHeight: 1.5 }}>
+            می‌توانی منتظر بمانی یا از قسمت تمرین با ربات تنها بازی کنی و یا از قسمت اتاق خصوصی لابی بسازی و با دوست خودت بازی کنی.
+          </p>
+        </div>
+      )}
+
+      {/* Boards */}
       {phase === 'playing' && (
         <div>
           {gameId === 'penalty' && (
@@ -440,61 +521,28 @@ function GamePlay({ api, token, gameId, stake, vsBot, roomCode, onBack }) {
           )}
 
           {gameId === 'memory' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', maxWidth: '360px', margin: '0 auto' }}>
-              {((g.state?.board) || Array(16).fill({})).map((c, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  disabled={g.turn !== g.me || c.claimed}
-                  onClick={() => move(i)}
-                  style={{
-                    height: '70px',
-                    borderRadius: '10px',
-                    background: c.claimed ? 'rgba(255,255,255,0.05)' : (c.face ? '#A855F7' : '#1E1B4B'),
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    fontSize: '20px',
-                    color: '#FFF',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {c.claimed ? '' : (c.face || '❓')}
-                </button>
-              ))}
-            </div>
+            <MemoryGrid cards={g.state?.cards || []} playable={g.state?.playable || []} onMove={move} />
           )}
 
           {gameId === 'reversi' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: '2px', maxWidth: '360px', margin: '0 auto', background: '#15803D', padding: '4px', borderRadius: '8px' }}>
-              {((g.state?.board) || Array(64).fill(null)).map((cell, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => move(i)}
-                  style={{
-                    height: '40px',
-                    background: '#166534',
-                    border: 'none',
-                    borderRadius: '2px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {cell === 'X' && <span style={{ width: '22px', height: '22px', background: '#000', borderRadius: '50%', display: 'inline-block' }} />}
-                  {cell === 'O' && <span style={{ width: '22px', height: '22px', background: '#FFF', borderRadius: '50%', display: 'inline-block' }} />}
-                </button>
-              ))}
-            </div>
+            <ReversiGame state={g.state} mySymbol={g.me} turn={g.turn} onMove={move} />
           )}
         </div>
       )}
 
+      {/* End of game modal */}
       {phase === 'over' && (
-        <div style={{ padding: '30px' }}>
-          <h2>{g.winner === 'DRAW' ? 'مساوی!' : (g.winner === g.me ? '🎉 شما بردید!' : 'باختید!')}</h2>
-          <button type="button" onClick={() => { leave(); onBack(); }} style={{ background: '#38BDF8', color: '#000', border: 'none', padding: '10px 20px', borderRadius: '12px', fontWeight: 'bold', marginTop: '16px', cursor: 'pointer' }}>
-            بازگشت به منوی بازی‌ها
+        <div style={{ padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
+          <div style={{ fontSize: '48px' }}>{g.winner === 'DRAW' ? '🤝' : (g.winner === g.me ? '🎉' : '💔')}</div>
+          <h2 style={{ color: g.winner === g.me ? '#22E7A6' : '#FFF', fontWeight: '900', margin: 0 }}>
+            {g.winner === 'DRAW' ? 'مسابقه مساوی شد!' : (g.winner === g.me ? 'تبریک! شما برنده شدید' : 'متاسفانه باختید!')}
+          </h2>
+          <button
+            type="button"
+            onClick={() => { leave(); onBack(); }}
+            style={{ background: 'linear-gradient(135deg, #38BDF8, #0284C7)', color: '#FFF', border: 'none', padding: '12px 28px', borderRadius: '16px', fontWeight: '900', fontSize: '14px', cursor: 'pointer', marginTop: '10px' }}
+          >
+            بازگشت به باشگاه بازی‌ها
           </button>
         </div>
       )}
