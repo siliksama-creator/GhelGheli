@@ -1,3 +1,4 @@
+import '../../widgets/avatar_image.dart';
 // Games hub with 4 Categories: 100 Points, 1000 Points, Bot Practice (Instant), and Private Rooms / Lobbies (Password & Stake up to 10,000)
 import 'dart:async';
 
@@ -63,6 +64,7 @@ class _GamesHubPageState extends State<GamesHubPage> {
   // 4 Modes: 100, 1000, 0 (تمرین با ربات), -1 (اتاق خصوصی)
   int _selectedMode = 100;
   Map<String, dynamic>? _level;
+  Map<String, dynamic>? _user;
 
   @override
   void initState() {
@@ -72,6 +74,12 @@ class _GamesHubPageState extends State<GamesHubPage> {
 
   Future<void> _loadLevel() async {
     try {
+      final boot = await widget.api.get('/api/bootstrap');
+      if (!mounted || boot is! Map) return;
+      final m = Map<String, dynamic>.from(boot);
+      setState(() {
+        if (m['user'] is Map) _user = Map<String, dynamic>.from(m['user']);
+      });
       final d = await widget.api.get('/api/level');
       if (!mounted || d is! Map) return;
       setState(() => _level = Map<String, dynamic>.from(d));
@@ -136,7 +144,7 @@ class _GamesHubPageState extends State<GamesHubPage> {
     return ListView(
       padding: const EdgeInsets.all(Gaps.md),
       children: [
-        // Header
+        // Header با نمایش عکس پروفایل، نام، لول و موجودی امتیاز کل
         Container(
           padding: const EdgeInsets.all(Gaps.md),
           decoration: BoxDecoration(
@@ -146,35 +154,69 @@ class _GamesHubPageState extends State<GamesHubPage> {
               end: Alignment.bottomLeft,
               colors: [Color(0xFF16345F), Color(0xFF071521)],
             ),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+            border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.35)),
             boxShadow: [
               BoxShadow(
-                color: BrandColors.blue.withValues(alpha: 0.12),
+                color: BrandColors.blue.withValues(alpha: 0.16),
                 blurRadius: 26,
-                offset: const Offset(0, 12),
+                offset: const Offset(0, 10),
               ),
             ],
           ),
           child: Row(
             children: [
-              Image.asset('assets/games/play_glow.png', width: 58, height: 58, cacheWidth: 150),
+              AvatarImage(
+                keyName: _user?['profile_avatar_key'],
+                imageUrl: _user?['profile_image_url'],
+                radius: 26,
+                ring: true,
+              ),
               Gaps.hSm,
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('باشگاه بازی‌های قلقلی',
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                        )),
-                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _user?['nickname'] ?? 'قهرمان قلقلی',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        if (_level != null) LevelBadge(level: (_level!['level'] as num?)?.toInt() ?? 0),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            borderRadius: Corners.rPill,
+                            color: const Color(0xFFFFD166).withValues(alpha: 0.18),
+                            border: Border.all(color: const Color(0xFFFFD166).withValues(alpha: 0.6)),
+                          ),
+                          child: Text(
+                            '${faNum(_user?['current_points'] ?? 0)} امتیاز',
+                            style: const TextStyle(
+                              color: Color(0xFFFFD166),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 5),
                     Text(
-                      'مسابقات آنلاین، تمرین با ربات و ساخت اتاق اختصاصی',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                      'با هر بازی آنلاین XP میگیری و با برنده شدن امتیاز میگیری و با باخت امتیازت کم میشه پس دقت کن!',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.72),
+                        color: const Color(0xFFE2E8F0),
+                        fontSize: 11,
+                        height: 1.4,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],

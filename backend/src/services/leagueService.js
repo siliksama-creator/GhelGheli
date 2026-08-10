@@ -159,7 +159,7 @@ async function addLeaguePoints(client, userId, points) {
     [season.id, userId, points]
   );
 }
-async function getLeaderboard(limit = 100, seasonId = null) {
+async function getLeaderboard(limit = 100, seasonId = null, userId = null) {
   const { rows: activeSeasons } = await pool.query(
     "SELECT id, title, league_type, month_year, starts_at, ends_at, status, prize_table, min_points_entry, plus_only FROM league_seasons WHERE status='active' ORDER BY starts_at ASC"
   );
@@ -198,11 +198,27 @@ async function getLeaderboard(limit = 100, seasonId = null) {
       ORDER BY e.points DESC LIMIT $2`,
     [season.id, limit]
   );
+  let myEntry = null;
+  if (userId) {
+    const myRow = await pool.query(
+      `SELECT sub.rank, sub.points FROM (
+         SELECT e.user_id, e.points, DENSE_RANK() OVER(ORDER BY e.points DESC) AS rank
+           FROM league_leaderboard_entries e
+          WHERE e.league_season_id=$1
+       ) sub WHERE sub.user_id=$2`,
+      [season.id, userId]
+    );
+    if (myRow.rows[0]) {
+      myEntry = { rank: Number(myRow.rows[0].rank), points: Number(myRow.rows[0].points) };
+    }
+  }
+
   return {
     season,
     activeLeagues: activeSeasons.length ? activeSeasons : [season],
     entries: rows,
     previousWinners: prevWinners,
+    myEntry,
   };
 }
 async function closeActiveSeason({ force = false } = {}) {

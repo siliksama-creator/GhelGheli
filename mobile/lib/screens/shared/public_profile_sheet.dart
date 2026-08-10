@@ -148,7 +148,10 @@ class _PublicProfileBody extends StatelessWidget {
               icon: Icons.emoji_events_rounded,
               iconColor: const Color(0xFFFFD166),
               title: 'رتبه لیگ این ماه',
-              value: bestRank != null ? 'رتبه ${faNum(bestRank)}' : 'در حال رقابت',
+              value: () {
+                final r = data['currentLeagueRank'] ?? bestRank;
+                return r != null ? 'رتبه ${faNum(r)}' : 'رتبه ۱';
+              }(),
             ),
             _StatCard(
               icon: Icons.star_rounded,

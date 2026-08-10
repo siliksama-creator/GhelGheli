@@ -1307,7 +1307,18 @@ app.get('/api/users/:id/public', auth, validateUuid('id'), asyncHandler(async (r
   const best = leagueHistory.rows.reduce(
     (acc, r) => (acc === null || r.rank < acc ? r.rank : acc), null);
 
+  const currentRankRow = await pool.query(
+    `SELECT sub.rank FROM (
+       SELECT user_id, DENSE_RANK() OVER(ORDER BY points DESC) AS rank
+         FROM league_leaderboard_entries
+        WHERE league_season_id = (SELECT id FROM league_seasons WHERE status='active' ORDER BY starts_at DESC LIMIT 1)
+     ) sub WHERE sub.user_id = $1`,
+    [req.params.id]
+  );
+  const currentRank = currentRankRow.rows[0]?.rank ? Number(currentRankRow.rows[0].rank) : null;
+
   res.json({
+    currentLeagueRank: currentRank,
     ...rows[0],
     rewards: rewards.rows,
     cards: cards.rows,
@@ -1685,7 +1696,7 @@ app.post('/api/admin/users/:id/unlimited-spins', adminAuth, validateUuid('id'),
   }));
 
 app.get('/api/league/current', auth, asyncHandler(async (req, res) => {
-  const data = await getLeaderboard(Number(req.query.limit || 100));
+  const data = await getLeaderboard(Number(req.query.limit || 100), req.query.seasonId || null, req.user?.id);
 
   // Cosmetics for the standings (club badge, name colour).
   const cos = await shop.cosmeticsFor(data.entries.map(e => e.user_id));

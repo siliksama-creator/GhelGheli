@@ -423,20 +423,11 @@ class _WheelPageState extends State<WheelPage>
           ),
           Gaps.vLg,
           Center(
-            child: FilledButton(
+            child: _AnimeSpinButton(
+              spinning: _spinning,
+              spinsLeft: _spinsLeft,
+              unlimited: _unlimited,
               onPressed: (_spinsLeft > 0 && !_spinning) ? _spin : null,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(220, 48),
-                textStyle: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w800),
-              ),
-              child: Text(_spinning
-                  ? 'در حال چرخش…'
-                  : _spinsLeft > 0
-                      ? (_unlimited
-                          ? 'بچرخان (نامحدود)'
-                          : 'بچرخان — ${faNum(_spinsLeft)} شانس')
-                      : 'شانس امروزت تمام شد'),
             ),
           ),
           if (_spinsLeft <= 0) ...[
@@ -920,6 +911,115 @@ class _RulesCard extends StatelessWidget {
               'می‌دهند. جایزه را سرور انتخاب می‌کند، نه گوشی تو.'),
         ],
       ),
+    );
+  }
+}
+
+/// دکمه انیمه‌ای و درخشان گردونه شانس با پالس نوری و گرادیان طلایی
+class _AnimeSpinButton extends StatefulWidget {
+  const _AnimeSpinButton({
+    required this.spinning,
+    required this.spinsLeft,
+    required this.unlimited,
+    required this.onPressed,
+  });
+
+  final bool spinning;
+  final int spinsLeft;
+  final bool unlimited;
+  final VoidCallback? onPressed;
+
+  @override
+  State<_AnimeSpinButton> createState() => _AnimeSpinButtonState();
+}
+
+class _AnimeSpinButtonState extends State<_AnimeSpinButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2000),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = widget.onPressed != null;
+
+    final label = widget.spinning
+        ? 'در حال چرخش…'
+        : widget.spinsLeft > 0
+            ? (widget.unlimited
+                ? 'بچرخان (نامحدود)'
+                : 'بچرخان — ${faNum(widget.spinsLeft)} شانس')
+            : 'شانس امروزت تمام شد';
+
+    if (!enabled) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          color: Colors.white.withValues(alpha: 0.08),
+          border: Border.all(color: Colors.white12),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(color: Colors.white38, fontSize: 15, fontWeight: FontWeight.w800),
+        ),
+      );
+    }
+
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (context, _) {
+        final t = _ctrl.value;
+        final pulse = 0.88 + 0.24 * (t < 0.5 ? t * 2 : (1 - t) * 2);
+
+        return InkWell(
+          borderRadius: BorderRadius.circular(26),
+          onTap: widget.onPressed,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 15),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(26),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFFFFDF70), Color(0xFFFF9F43), Color(0xFFFF5252)],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFFF9F43).withValues(alpha: 0.55 * pulse),
+                  blurRadius: 18 * pulse,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+              border: Border.all(color: const Color(0xFFFFF7C2), width: 1.5),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.auto_awesome, color: Color(0xFF230E00), size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Color(0xFF230E00),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

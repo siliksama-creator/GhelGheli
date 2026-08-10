@@ -1,17 +1,30 @@
-// Public chat room: Canned messages only (no custom typing, no stickers).
+// Public chat room: Categorized Canned Messages & Emoji Palette (no custom text typing, no stickers).
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 
 import { req, asset, fa, avatarUrl } from '../lib/api.js';
 import { DisplayName } from '../components/Cosmetics.jsx';
 
+const EMOJIS = [
+  '🔥', '⚽', '🏆', '😎', '😂', '👏', '🤝', '💪',
+  '🎯', '⭐', '❤️', '🚀', '👑', '🥳', '🥇', '💯',
+  '🧤', '⚡', '🤩', '👍', '🎮', '🍿', '🎩', '💎',
+];
+
+const CATEGORIES = [
+  { title: '💬 گفتگو', items: ['سلام بچه‌ها!', 'من اومدم!', 'چه خبر بچه‌ها؟', 'خداحافظ تا بعد!', 'مواظب خودتون باشید!', 'خوشبختم دوستان!', 'کجا زندگی می‌کنید؟', 'امروز چیکار کردید؟'] },
+  { title: '⚽ بازی', items: ['کی پایه بازیه؟', 'بریم برای برد!', 'من عاشق این بازی‌ام!', 'منم می‌خوام بازی کنم!', 'دوباره امتحان می‌کنم!'] },
+  { title: '🏆 کل‌کل', items: ['عالی بود!', 'خیلی خفن بود!', 'تبریک میگم!', 'شگفت‌انگیز بود!', 'چقدر امتیازم بالا رفت!', 'کارت جدید پیدا کردم!', 'امروز روز منه!', 'ایول به همگی!'] },
+  { title: '😀 ایموجی', items: [] },
+];
+
 export default function Chat({ token, openProfile, meId }) {
   const [messages, setMessages] = useState([]);
-  const [canned, setCanned] = useState([]);
   const [pinned, setPinned] = useState(null);
   const [err, setErr] = useState('');
   const [reply, setReply] = useState(null);
   const [cdLeft, setCdLeft] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState(0);
 
   const boxRef = useRef(null);
   const lastCount = useRef(0);
@@ -37,7 +50,6 @@ export default function Chat({ token, openProfile, meId }) {
       if (!alive.current) return;
       if (res) {
         setPinned(res.config?.pinned || null);
-        setCanned(res.cannedMessages || []);
         const msgs = res.messages || [];
         const grew = msgs.length > lastCount.current;
         lastCount.current = msgs.length;
@@ -104,7 +116,7 @@ export default function Chat({ token, openProfile, meId }) {
   if (loading) return <div className="card pad center muted">در حال بارگذاری چت...</div>;
 
   return (
-    <section className="card wide chatPage" style={{ display: 'flex', flexDirection: 'column', height: '620px', padding: 0 }}>
+    <section className="card wide chatPage" style={{ display: 'flex', flexDirection: 'column', height: '640px', padding: 0 }}>
       {pinned && pinned.active && (
         <div style={{ background: 'rgba(255, 197, 61, 0.12)', borderBottom: '1px solid rgba(255, 197, 61, 0.35)', padding: '10px 16px', display: 'flex', gap: '8px' }}>
           <span style={{ fontSize: '18px' }}>📌</span>
@@ -162,33 +174,75 @@ export default function Chat({ token, openProfile, meId }) {
         </div>
       )}
 
-      {/* Canned messages bar */}
+      {/* Categorized Canned Messages & Emoji bar */}
       <div style={{ background: '#0F172A', borderTop: '1px solid rgba(255,255,255,0.12)', padding: '12px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '12px', fontWeight: 'bold', color: '#38BDF8' }}>
-          <span>ارسال پیام آماده:</span>
-          {cdLeft > 0 && <span style={{ color: '#EF4444' }}>صبر کنید ({fa(cdLeft)} ثانیه)</span>}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            {CATEGORIES.map((cat, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setTab(i)}
+                style={{
+                  background: tab === i ? 'rgba(56, 189, 248, 0.25)' : 'rgba(255,255,255,0.05)',
+                  border: tab === i ? '1px solid #38BDF8' : '1px solid rgba(255,255,255,0.1)',
+                  color: tab === i ? '#38BDF8' : '#CBD5E1',
+                  padding: '4px 10px',
+                  borderRadius: '10px',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                }}
+              >
+                {cat.title}
+              </button>
+            ))}
+          </div>
+          {cdLeft > 0 && <span style={{ color: '#EF4444', fontSize: '11px', fontWeight: 'bold' }}>صبر کنید ({fa(cdLeft)} ثانیه)</span>}
         </div>
+
         <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
-          {canned.map((txt, idx) => (
-            <button
-              key={idx}
-              type="button"
-              disabled={cdLeft > 0}
-              onClick={() => sendCanned(txt)}
-              style={{
-                background: cdLeft > 0 ? 'rgba(255,255,255,0.04)' : '#1E293B',
-                border: '1px solid rgba(56, 189, 248, 0.35)',
-                color: cdLeft > 0 ? '#64748B' : '#FFF',
-                padding: '8px 12px',
-                borderRadius: '12px',
-                fontSize: '12px',
-                whiteSpace: 'nowrap',
-                cursor: cdLeft > 0 ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {txt}
-            </button>
-          ))}
+          {tab === 3 ? (
+            EMOJIS.map((em, idx) => (
+              <button
+                key={idx}
+                type="button"
+                disabled={cdLeft > 0}
+                onClick={() => sendCanned(em)}
+                style={{
+                  background: '#1E293B',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  padding: '6px 12px',
+                  borderRadius: '10px',
+                  fontSize: '20px',
+                  cursor: cdLeft > 0 ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {em}
+              </button>
+            ))
+          ) : (
+            CATEGORIES[tab].items.map((txt, idx) => (
+              <button
+                key={idx}
+                type="button"
+                disabled={cdLeft > 0}
+                onClick={() => sendCanned(txt)}
+                style={{
+                  background: cdLeft > 0 ? 'rgba(255,255,255,0.04)' : '#1E293B',
+                  border: '1px solid rgba(56, 189, 248, 0.35)',
+                  color: cdLeft > 0 ? '#64748B' : '#FFF',
+                  padding: '8px 12px',
+                  borderRadius: '12px',
+                  fontSize: '12px',
+                  whiteSpace: 'nowrap',
+                  cursor: cdLeft > 0 ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {txt}
+              </button>
+            ))
+          )}
         </div>
       </div>
     </section>

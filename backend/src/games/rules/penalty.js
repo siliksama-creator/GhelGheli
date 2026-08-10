@@ -42,14 +42,10 @@ function missChance(zone, power, clean = false) {
 
 function resolveKick(shotZone, power, diveZone, rand = Math.random, sweet = null) {
   const clean = isClean(power, sweet);
-  if (missChance(shotZone, power, clean) > rand()) {
-    return { outcome: 'miss', shotZone, diveZone, power, clean };
-  }
-  // مهار دروازه‌بان: اگر دروازه‌بان به همان جهت شوت شیرجه زده باشد
+  // منطق ساده، زیبا و جوانمردانه: اگر دروازه‌بان درست حدس بزند مهار، در غیر این صورت گل قطعی
   if (shotZone === diveZone) {
     return { outcome: 'save', shotZone, diveZone, power, clean, blockedByKeeper: true };
   }
-  // گل: دروازه‌بان جهت دیگری رفته و شوت در چارچوب است
   return { outcome: 'goal', shotZone, diveZone, power, clean };
 }
 

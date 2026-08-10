@@ -275,7 +275,61 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
                       );
                     }).toList(),
                   ),
-                Gaps.vMd,
+                Gaps.vSm,
+                // کارت جایگاه کاربر در جدول لیگ
+                if (_data?['myEntry'] != null || entries.isNotEmpty)
+                  Builder(builder: (ctx) {
+                    final myEntry = _data?['myEntry'] as Map?;
+                    final rankNum = myEntry?['rank'] ?? 1;
+                    final pts = myEntry?['points'] ?? (_data?['season']?['current_points'] ?? 0);
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
+                        ),
+                        border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.4)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF38BDF8).withValues(alpha: 0.15),
+                            blurRadius: 10,
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: const Color(0xFF38BDF8).withValues(alpha: 0.15),
+                            ),
+                            child: const Icon(Icons.person_pin_rounded, color: Color(0xFF38BDF8), size: 22),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'جایگاه شما در این دوره لیگ:',
+                                  style: TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8), fontWeight: FontWeight.w700),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'رتبه ${faNum(rankNum)} · ${faNum(pts)} امتیاز',
+                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.white),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                Gaps.vSm,
                 if (rest.isNotEmpty)
                   ListView.builder(
                     shrinkWrap: true,

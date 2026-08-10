@@ -379,8 +379,8 @@ class _MessageBubble extends StatelessWidget {
   }
 }
 
-/// پنل مدرن، زیبا و بدون تایپ پیام‌های آماده
-class _CannedMessagesPanel extends StatelessWidget {
+/// پنل مدرن، دسته‌بندی‌شده و زیبای پیام‌های آماده و ایموجی‌ها
+class _CannedMessagesPanel extends StatefulWidget {
   const _CannedMessagesPanel({
     required this.cannedMessages,
     required this.cooldownLeft,
@@ -392,7 +392,29 @@ class _CannedMessagesPanel extends StatelessWidget {
   final void Function(String text) onSend;
 
   @override
+  State<_CannedMessagesPanel> createState() => _CannedMessagesPanelState();
+}
+
+class _CannedMessagesPanelState extends State<_CannedMessagesPanel> {
+  int _tab = 0;
+
+  final _emojis = const [
+    '🔥', '⚽', '🏆', '😎', '😂', '👏', '🤝', '💪',
+    '🎯', '⭐', '❤️', '🚀', '👑', '🥳', '🥇', '💯',
+    '🧤', '⚡', '🤩', '👍', '🎮', '🍿', '🎩', '💎',
+  ];
+
+  final _categories = const [
+    ('💬 گفتگو', ['سلام بچه‌ها!', 'من اومدم!', 'چه خبر بچه‌ها؟', 'خداحافظ تا بعد!', 'مواظب خودتون باشید!', 'خوشبختم دوستان!', 'کجا زندگی می‌کنید؟', 'امروز چیکار کردید؟']),
+    ('⚽ بازی', ['کی پایه بازیه؟', 'بریم برای برد!', 'من عاشق این بازی‌ام!', 'منم می‌خوام بازی کنم!', 'دوباره امتحان می‌کنم!']),
+    ('🏆 کل‌کل', ['عالی بود!', 'خیلی خفن بود!', 'تبریک میگم!', 'شگفت‌انگیز بود!', 'چقدر امتیازم بالا رفت!', 'کارت جدید پیدا کردم!', 'امروز روز منه!', 'ایول به همگی!']),
+    ('😀 ایموجی', []),
+  ];
+
+  @override
   Widget build(BuildContext context) {
+    final disabled = widget.cooldownLeft > 0;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
       decoration: BoxDecoration(
@@ -400,9 +422,9 @@ class _CannedMessagesPanel extends StatelessWidget {
         border: const Border(top: BorderSide(color: Colors.white12)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.35),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
+            color: Colors.black.withValues(alpha: 0.40),
+            blurRadius: 12,
+            offset: const Offset(0, -3),
           ),
         ],
       ),
@@ -410,72 +432,120 @@ class _CannedMessagesPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
+          // تب‌های دسته‌بندی
           Row(
             children: [
-              const Icon(Icons.forum_outlined, size: 16, color: Color(0xFF38BDF8)),
-              const SizedBox(width: 6),
-              const Text(
-                'ارسال پیام آماده:',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFFCBD5E1)),
-              ),
+              for (int i = 0; i < _categories.length; i++)
+                Padding(
+                  padding: const EdgeInsets.only(left: 6),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () => setState(() => _tab = i),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        color: _tab == i ? const Color(0xFF38BDF8).withValues(alpha: 0.22) : Colors.white.withValues(alpha: 0.04),
+                        border: Border.all(
+                          color: _tab == i ? const Color(0xFF38BDF8) : Colors.white12,
+                        ),
+                      ),
+                      child: Text(
+                        _categories[i].$1,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: _tab == i ? const Color(0xFF38BDF8) : Colors.white70,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               const Spacer(),
-              if (cooldownLeft > 0)
+              if (disabled)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(10),
                     color: const Color(0xFFEF4444).withValues(alpha: 0.15),
                     border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.4)),
                   ),
                   child: Text(
-                    'صبر کنید (${faNum(cooldownLeft)} ثانیه)',
+                    'صبر کنید (${faNum(widget.cooldownLeft)})',
                     style: const TextStyle(color: Color(0xFFEF4444), fontSize: 10, fontWeight: FontWeight.w800),
                   ),
                 ),
             ],
           ),
           const SizedBox(height: 8),
+
+          // لیست پیام‌ها یا ایموجی‌ها
           SizedBox(
             height: 96,
-            child: GridView.builder(
-              scrollDirection: Axis.horizontal,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: 8,
-                crossAxisSpacing: 8,
-                childAspectRatio: 0.32,
-              ),
-              itemCount: cannedMessages.length,
-              itemBuilder: (ctx, i) {
-                final text = cannedMessages[i].toString();
-                final disabled = cooldownLeft > 0;
-                return InkWell(
-                  onTap: disabled ? null : () => onSend(text),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      color: disabled ? Colors.white.withValues(alpha: 0.03) : const Color(0xFF1E293B),
-                      border: Border.all(
-                        color: disabled ? Colors.white10 : const Color(0xFF38BDF8).withValues(alpha: 0.35),
-                      ),
+            child: _tab == 3
+                ? GridView.builder(
+                    scrollDirection: Axis.horizontal,
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 6,
+                      crossAxisSpacing: 6,
                     ),
-                    child: Text(
-                      text,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        color: disabled ? Colors.white38 : Colors.white,
-                      ),
+                    itemCount: _emojis.length,
+                    itemBuilder: (ctx, i) {
+                      final em = _emojis[i];
+                      return InkWell(
+                        onTap: disabled ? null : () => widget.onSend(em),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            color: disabled ? Colors.white.withValues(alpha: 0.02) : const Color(0xFF1E293B),
+                            border: Border.all(color: Colors.white10),
+                          ),
+                          child: Text(em, style: const TextStyle(fontSize: 22)),
+                        ),
+                      );
+                    },
+                  )
+                : GridView.builder(
+                    scrollDirection: Axis.horizontal,
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 8,
+                      crossAxisSpacing: 8,
+                      childAspectRatio: 0.30,
                     ),
+                    itemCount: _categories[_tab].$2.length,
+                    itemBuilder: (ctx, i) {
+                      final text = _categories[_tab].$2[i];
+                      return InkWell(
+                        onTap: disabled ? null : () => widget.onSend(text),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            color: disabled ? Colors.white.withValues(alpha: 0.03) : const Color(0xFF1E293B),
+                            border: Border.all(
+                              color: disabled ? Colors.white10 : const Color(0xFF38BDF8).withValues(alpha: 0.35),
+                            ),
+                          ),
+                          child: Text(
+                            text,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: disabled ? Colors.white38 : Colors.white,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           ),
         ],
       ),
