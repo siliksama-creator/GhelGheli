@@ -23,7 +23,7 @@ class _MockUniversalAdapter implements HttpClientAdapter {
 
     if (path.contains('/api/league')) {
       return ResponseBody.fromString(
-        '{"season":{"id":"s1","month_year":"1405-05","title":"لیگ برتر ماهانه","ends_at":"2026-08-23T00:00:00.000Z"},"activeLeagues":[{"id":"s1","title":"لیگ برتر ماهانه","league_type":"monthly"},{"id":"s2","title":"لیگ هفتگی قهرمانان","league_type":"weekly"}],"entries":[{"user_id":"u1","nickname":"علی","points":500,"rank":1}]}',
+        '{"season":{"id":"s1","month_year":"1405-05","title":"لیگ برتر ماهانه","ends_at":"2026-08-23T00:00:00.000Z"},"activeLeagues":[{"id":"s1","title":"لیگ برتر ماهانه","league_type":"monthly"},{"id":"s2","title":"لیگ هفتگی قهرمانان","league_type":"weekly"}],"previousSeason":null,"entries":[{"user_id":"u1","nickname":"علی","points":500,"rank":1}]}',
         200,
         headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
       );
