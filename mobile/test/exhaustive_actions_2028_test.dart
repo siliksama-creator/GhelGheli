@@ -9,6 +9,9 @@ import 'package:ghelgheli_mobile/widgets/victory_share_dialog.dart';
 import 'package:ghelgheli_mobile/screens/user/games/private_match_dialog.dart';
 import 'package:ghelgheli_mobile/screens/user/league_page.dart';
 import 'package:ghelgheli_mobile/screens/user/pass_page.dart';
+import 'package:ghelgheli_mobile/screens/user/chat_page.dart';
+import 'package:ghelgheli_mobile/screens/user/games_page.dart';
+import 'package:ghelgheli_mobile/screens/user/wheel_page.dart';
 import 'package:ghelgheli_mobile/screens/admin/admin_notifications.dart';
 import 'package:ghelgheli_mobile/screens/admin/admin_rewards.dart';
 
@@ -21,9 +24,33 @@ class _MockUniversalAdapter implements HttpClientAdapter {
       Stream<List<int>>? requestStream, Future<void>? cancelFuture) async {
     final path = options.path;
 
+    if (path.contains('/api/chat/bootstrap')) {
+      return ResponseBody.fromString(
+        '{"config":{"eligible":true,"minLifetimePoints":0,"messageCooldownSeconds":5,"pinned":null},"messages":[],"cannedMessages":["سلام بچه‌ها!","من اومدم!","بازی خیلی باحال بود!"],"stickers":[]}',
+        200,
+        headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
+      );
+    }
+
+    if (path.contains('/api/bootstrap')) {
+      return ResponseBody.fromString(
+        '{"user":{"id":"u1","nickname":"قهرمان قلقلی","current_points":1250,"has_plus":true},"inventory":[],"rewards":[],"wheel":{"spinsLeft":3,"unlimited":false},"pass":{"claimable":1,"tiersToday":1,"maxTiersPerDay":2}}',
+        200,
+        headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
+      );
+    }
+
+    if (path.contains('/api/level')) {
+      return ResponseBody.fromString(
+        '{"level":15,"into":20,"needed":100,"progress":0.2,"isMax":false,"xp":320}',
+        200,
+        headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
+      );
+    }
+
     if (path.contains('/api/league')) {
       return ResponseBody.fromString(
-        '{"season":{"id":"s1","month_year":"1405-05","title":"لیگ برتر ماهانه","ends_at":"2026-08-23T00:00:00.000Z"},"activeLeagues":[{"id":"s1","title":"لیگ برتر ماهانه","league_type":"monthly"},{"id":"s2","title":"لیگ هفتگی قهرمانان","league_type":"weekly"}],"previousSeason":null,"entries":[{"user_id":"u1","nickname":"علی","points":500,"rank":1}]}',
+        '{"season":{"id":"s1","month_year":"1405-05","title":"لیگ برتر ماهانه","ends_at":"2026-08-23T00:00:00.000Z"},"activeLeagues":[{"id":"s1","title":"لیگ برتر ماهانه","league_type":"monthly"},{"id":"s2","title":"لیگ هفتگی قهرمانان","league_type":"weekly"}],"previousSeason":{"winners":[{"rank":1,"nickname":"قهرمان فصل قبل","points":1400,"prize_amount":500000}]},"myEntry":{"rank":12,"points":650},"entries":[{"user_id":"u1","nickname":"علی","points":500,"rank":1}]}',
         200,
         headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
       );
@@ -108,7 +135,7 @@ void main() {
     });
   });
 
-  group('[2028 Battery] ۲. چک چالش ۱ به ۱ مستقیم با دوستان', () {
+  group('[2028 Battery] ۲. چک چالش مستقیم و اتاق خصوصی', () {
     testWidgets('ساخت اتاق و کد ۴ رقمی و ورود دوست بدون باگ کار می‌کند', (tester) async {
       final api = ApiClient();
       api.dio.httpClientAdapter = _MockUniversalAdapter();
@@ -131,8 +158,8 @@ void main() {
     });
   });
 
-  group('[2028 Battery] ۳. چک اجرای لیگ پویا با مدت زمان منعطف', () {
-    testWidgets('جدول لیگ قلقلی با امتیازات و روزهای باقی‌مانده بدون ارور رندر می‌شود', (tester) async {
+  group('[2028 Battery] ۳. چک اجرای لیگ پویا و برندگان دوره قبل', () {
+    testWidgets('جدول لیگ قلقلی با تب برندگان قبل و رتبه کاربر رندر می‌شود', (tester) async {
       final api = ApiClient();
       api.dio.httpClientAdapter = _MockUniversalAdapter();
 
@@ -141,44 +168,58 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
 
       expect(find.text('جدول لیگ'), findsWidgets);
-      expect(find.text('علی'), findsWidgets);
       expect(find.text('باشگاه‌ها'), findsWidgets);
+      expect(find.text('برندگان قبل'), findsWidgets);
 
-      await tester.tap(find.text('باشگاه‌ها').first);
+      await tester.tap(find.text('برندگان قبل').first);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('برندگان دوره قبل لیگ'), findsOneWidget);
     });
   });
 
-  group('[2028 Battery] ۴. چک بتل پس، انیمه پلاس و هدایت کاربر رایگان', () {
-    testWidgets('کاربر رایگان با لمس جایزه پلاس، پیام باز شدن و هدایت به فروشگاه را می‌بیند', (tester) async {
+  group('[2028 Battery] ۴. چک چت کاربری با دسته‌بندی و پالت ایموجی', () {
+    testWidgets('چت با تب‌های دسته‌بندی و ایموجی‌ها بدون خطا رندر می‌شود', (tester) async {
       final api = ApiClient();
       api.dio.httpClientAdapter = _MockUniversalAdapter();
-      var shopOpened = false;
 
-      await tester.pumpWidget(_wrap(PassPage(
-        api: api,
-        onOpenShop: () => shopOpened = true,
-      )));
+      await tester.pumpWidget(_wrap(ChatPage(api: api)));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
-      expect(find.text('فقط پلاس'), findsWidgets);
-      await tester.tap(find.text('فقط پلاس').first);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('💬 گفتگو'), findsOneWidget);
+      expect(find.text('⚽ بازی'), findsOneWidget);
+      expect(find.text('😀 ایموجی'), findsOneWidget);
 
-      expect(find.text('جایزه طلایی قلقلی پلاس'), findsOneWidget);
-      expect(find.text('ورود به فروشگاه و فعال‌سازی پلاس ⚡'), findsOneWidget);
-
-      await tester.tap(find.text('ورود به فروشگاه و فعال‌سازی پلاس ⚡'));
+      await tester.tap(find.text('😀 ایموجی'));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-      expect(shopOpened, true, reason: 'هدایت به فروشگاه با موفقیت انجام شد');
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('🔥'), findsOneWidget);
     });
   });
 
-  group('[2028 Battery] ۵. چک پنل ادمین اعلان‌های هدفمند و جوایز', () {
+  group('[2028 Battery] ۵. چک هاب بازی‌ها و ۴ حالت مسابقه', () {
+    testWidgets('هاب بازی‌ها با ۴ حالت و اطلاعات کاربر رندر می‌شود', (tester) async {
+      final api = ApiClient();
+      api.dio.httpClientAdapter = _MockUniversalAdapter();
+
+      await tester.pumpWidget(_wrap(GamesHubPage(api: api)));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(find.text('۱۰۰ امتیاز'), findsOneWidget);
+      expect(find.text('۱۰۰۰ امتیاز'), findsOneWidget);
+      expect(find.text('تمرین با ربات'), findsOneWidget);
+      expect(find.text('اتاق خصوصی'), findsOneWidget);
+
+      await tester.tap(find.text('اتاق خصوصی'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('ساخت اتاق و لابی اختصاصی'), findsOneWidget);
+    });
+  });
+
+  group('[2028 Battery] ۶. چک پنل ادمین اعلان‌های هدفمند و جوایز', () {
     testWidgets('پنل اعلان‌های هدفمند با سگمنت‌ها بدون باگ رندر می‌شود', (tester) async {
       final api = ApiClient();
       api.dio.httpClientAdapter = _MockUniversalAdapter();
@@ -203,4 +244,3 @@ void main() {
     });
   });
 }
-

@@ -226,8 +226,9 @@ function Portal({ token, logout }) {
         {/* گذر نبرد — نشانِ «جایزهٔ آماده» مهم‌ترین بخشش است: کاربر باید
             بدون باز کردن صفحه بفهمد چیزی منتظرش است. */}
         <button className={`iconBtn passShortcut${tab === 'pass' ? ' on' : ''}`}
-          onClick={() => setTab('pass')} title="گذر نبرد فصلی">
-          <UiIcon name="trophy" size={21} />
+          onClick={() => setTab('pass')} title="گذر نبرد فصلی"
+          style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+          <img src="/pass/pass_shield.png" alt="" width="26" height="26" style={{ filter: 'drop-shadow(0 0 8px #00E5FF)', objectFit: 'contain' }} />
           {/* عددِ نشان = پله‌های باز شدهٔ **امروز** (۱ یا ۲)، نه کل
               جوایز. مالک همین را خواست: عددی که هر روز از صفر شروع
               می‌شود حس پیشرفت روزانه می‌سازد. */}

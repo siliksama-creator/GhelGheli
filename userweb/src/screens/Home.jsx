@@ -140,10 +140,12 @@ export default function Home({ token, p, rewards, load, setMsg, openWallet,
           </span>
         </button>
 
-        <h2>ثبت کارت‌های قلقلی</h2>
-        <p className="hint">
-          (پک کارت های قلقلی بصورت فیزیکی در فروشگاه ها و سوپرمارکت ها به فروش
-          می رسند.)
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '14px 0 6px' }}>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '900' }}>ثبت کارت‌های قلقلی</h2>
+          <span style={{ background: 'rgba(245, 158, 11, 0.16)', border: '1px solid rgba(245, 158, 11, 0.45)', color: '#F59E0B', padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '900' }}>کارت داری اینجا ثبت کن !</span>
+        </div>
+        <p className="hint" style={{ color: '#CBD5E1', fontSize: '12px', lineHeight: 1.45, margin: '0 0 10px' }}>
+          کارت‌های فیزیکی قلقلی را می‌توانید از فروشگاه‌ها و سوپرمارکت‌ها تهیه کنید
         </p>
 
         {/* ══════════════════════════════════════════════════════════════
