@@ -178,8 +178,8 @@ class _GamesHubPageState extends State<GamesHubPage> {
           children: [
             Expanded(
               child: _ModePill(
-                title: '۱۰۰ امتیاز',
-                subtitle: 'جایزه ۱۸۰',
+                title: '۱۰۰',
+                subtitle: '۱۰٪ کارمزد',
                 icon: Icons.bolt_rounded,
                 selected: _selectedStake == 100,
                 color: const Color(0xFF38BDF8),
@@ -189,8 +189,8 @@ class _GamesHubPageState extends State<GamesHubPage> {
             Gaps.hXs,
             Expanded(
               child: _ModePill(
-                title: '۱۰۰۰ امتیاز',
-                subtitle: 'جایزه ۱۸۰۰',
+                title: '۱۰۰۰',
+                subtitle: '۱۰٪ کارمزد',
                 icon: Icons.stars_rounded,
                 selected: _selectedStake == 1000,
                 color: const Color(0xFFFFD166),
@@ -200,8 +200,8 @@ class _GamesHubPageState extends State<GamesHubPage> {
             Gaps.hXs,
             Expanded(
               child: _ModePill(
-                title: 'تمرین با ربات',
-                subtitle: 'شروع فوری',
+                title: 'ربات',
+                subtitle: 'تمرین',
                 icon: Icons.smart_toy_rounded,
                 selected: _selectedStake == 0,
                 color: const Color(0xFF22E7A6),
@@ -279,9 +279,9 @@ class _GamesHubPageState extends State<GamesHubPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('دوئل مستقیم با دوستان',
+                      Text('دوئل مستقیم با دوست (کد اتاق / لینک)',
                           style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 13)),
-                      Text('ساخت اتاق خصوصی با امتیاز دلخواه',
+                      Text('اتاق خصوصی بساز و دوستانت را به چالش بکش',
                           style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 10.5)),
                     ],
                   ),
