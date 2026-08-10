@@ -222,69 +222,29 @@ class DisplayName extends StatelessWidget {
         if (c['plus'] == true)
           Padding(
             padding: const EdgeInsetsDirectional.only(start: 4),
-            child: _PlusStar(),
+            child: Container(
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: const RadialGradient(
+                  colors: [Color(0x80FFD700), Colors.transparent],
+                ),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0xBBFFD700),
+                    blurRadius: 14,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.star_rounded,
+                size: 21,
+                color: Color(0xFFFFD700),
+              ),
+            ),
           ),
       ],
-    );
-  }
-}
-
-/// Animated radiant Plus star — bigger, bolder, with a continuous golden shimmer.
-class _PlusStar extends StatefulWidget {
-  const _PlusStar();
-
-  @override
-  State<_PlusStar> createState() => _PlusStarState();
-}
-
-class _PlusStarState extends State<_PlusStar> with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _glow;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))
-      ..repeat(reverse: true);
-    _glow = Tween<double>(begin: 0.6, end: 1.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _glow,
-      builder: (context, child) => Container(
-        padding: const EdgeInsets.all(2),
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: RadialGradient(
-            colors: [
-              const Color(0xFFFFD700).withValues(alpha: _glow.value * 0.5),
-              Colors.transparent,
-            ],
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFFFFD700).withValues(alpha: _glow.value * 0.8),
-              blurRadius: 14 * _glow.value,
-              spreadRadius: 2 * _glow.value,
-            ),
-          ],
-        ),
-        child: const Icon(
-          Icons.star_rounded,
-          size: 21,
-          color: Color(0xFFFFD700),
-        ),
-      ),
     );
   }
 }
