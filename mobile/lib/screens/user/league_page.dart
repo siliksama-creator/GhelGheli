@@ -193,14 +193,14 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
                       cacheWidth: 820),
                 ),
                 Gaps.vMd,
-                const Text('لیگ ماهانه قلقلی',
+                const Text('لیگ قلقلی',
                     style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w800,
                         fontSize: 22)),
                 Gaps.vXxs,
                 Text(
-                  'برترین کاربران تا پایان ماه؛ امتیاز لیگ آخر ماه ریست می‌شود اما امتیاز کلی دست نمی‌خورد.',
+                  'برترین کاربران تا پایان زمان اعلام شده؛ جوایز پس از پایان لیگ پرداخت و لیگ بعدی توسط ادمین آغاز می‌شود.',
                   style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.88),
                       fontSize: 12.5,

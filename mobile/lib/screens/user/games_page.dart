@@ -170,7 +170,7 @@ class _GamesHubPageState extends State<GamesHubPage> {
 
         // ── ۲. سه دسته‌بندی مسابقات (۱۰۰ امتیاز، ۱۰۰۰ امتیاز، تمرین با ربات) ──
         const Text(
-          'انتخاب سطح مسابقه آنلاین:',
+          'سطح مسابقه:',
           style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900, color: Color(0xFFF1F5F9)),
         ),
         Gaps.vXs,

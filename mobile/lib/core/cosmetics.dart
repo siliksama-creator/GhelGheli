@@ -232,14 +232,14 @@ class DisplayName extends StatelessWidget {
                 boxShadow: const [
                   BoxShadow(
                     color: Color(0xAAFFD700),
-                    blurRadius: 10,
-                    spreadRadius: 1,
+                    blurRadius: 14,
+                    spreadRadius: 2,
                   ),
                 ],
               ),
               child: const Icon(
                 Icons.star_rounded,
-                size: 17,
+                size: 21,
                 color: Color(0xFFFFD700),
               ),
             ),
