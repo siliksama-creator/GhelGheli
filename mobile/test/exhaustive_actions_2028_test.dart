@@ -8,10 +8,8 @@ import 'package:ghelgheli_mobile/theme/app_theme.dart';
 import 'package:ghelgheli_mobile/widgets/victory_share_dialog.dart';
 import 'package:ghelgheli_mobile/screens/user/games/private_match_dialog.dart';
 import 'package:ghelgheli_mobile/screens/user/league_page.dart';
-import 'package:ghelgheli_mobile/screens/user/pass_page.dart';
 import 'package:ghelgheli_mobile/screens/user/chat_page.dart';
 import 'package:ghelgheli_mobile/screens/user/games_page.dart';
-import 'package:ghelgheli_mobile/screens/user/wheel_page.dart';
 import 'package:ghelgheli_mobile/screens/admin/admin_notifications.dart';
 import 'package:ghelgheli_mobile/screens/admin/admin_rewards.dart';
 
