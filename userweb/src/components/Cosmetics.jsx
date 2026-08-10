@@ -1,8 +1,4 @@
-// Rendering for purchased cosmetics.
-//
-// One place so chat, the league table and the profile always agree on what a
-// club badge or a name colour looks like. The server decides WHETHER an item
-// applies (ownership vs an active Plus); this only draws it.
+// Rendering for purchased cosmetics with Anime Plus Star.
 import React from 'react';
 import { SvgIcon } from './IconAsset.jsx';
 
@@ -18,9 +14,6 @@ export const FRAME_STYLE = {
 
 const RAINBOW_DARK = 'linear-gradient(90deg,#F472B6,#A855F7,#38BDF8,#34D399)';
 
-/**
- * استایلِ درون‌خطی برای نامِ رنگی.
- */
 export function nameColorStyle(color) {
   if (!color) return undefined;
   if (color === 'rainbow') {
@@ -34,7 +27,6 @@ export function nameColorStyle(color) {
   return { color };
 }
 
-/** Small club badge shown before a name. */
 export function ClubBadge({ club }) {
   if (!club) return null;
   return (
@@ -63,29 +55,36 @@ export function LevelBadge({ level }) {
   );
 }
 
-export function DisplayName({
-  name, cosmetics, className, onClick, avatarKey, level,
-}) {
-  const c = cosmetics || {};
-  const avatarIsSameCrest = c.club && avatarKey === `club:${c.club}`;
+export function PlusStar() {
   return (
-    <b className={className} onClick={onClick} style={nameColorStyle(c.color)}>
-      {!avatarIsSameCrest && <ClubBadge club={c.club} />}
+    <span
+      className="plusStar"
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: '4px',
+        color: '#FFD700',
+        textShadow: '0 0 8px #FFD700, 0 0 14px rgba(255, 215, 0, 0.6)',
+        fontSize: '15px',
+      }}
+      title="کاربر پلاس"
+    >
+      ★
+    </span>
+  );
+}
+
+export function DisplayName({ name, cosmetics, level }) {
+  const c = cosmetics || {};
+  const isPlus = Boolean(c.plus);
+  const style = nameColorStyle(c.color);
+  return (
+    <span className="displayName" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+      {c.club && <ClubBadge club={c.club} />}
       <LevelBadge level={level} />
-      {name}
-      {c.plus && (
-        <span className="plusStarSm" title="عضو طلایی قلقli پلاس" style={{
-          color: '#FFD166',
-          textShadow: '0 0 10px rgba(255,209,102,0.85)',
-          fontSize: '13px',
-          marginInlineStart: '4px',
-          display: 'inline-block',
-          verticalAlign: 'middle',
-          lineHeight: '1',
-        }}>
-          ★
-        </span>
-      )}
-    </b>
+      <span style={style}>{name || 'کاربر'}</span>
+      {isPlus && <PlusStar />}
+    </span>
   );
 }

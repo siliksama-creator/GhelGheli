@@ -519,45 +519,76 @@ const attachGames = function attachGames(io, rulesById) {
 
 
 
-    // -- LOBBY SYSTEM --
+    // -- LOBBY SYSTEM (WITH PASSWORD & STAKE UP TO 10,000) --
     socket.on('game:create_lobby', payload => {
       const gameId = String(payload?.gameId || Object.keys(rulesById)[0]);
       const rules = rulesById[gameId];
-      if (!rules) return safeEmit(socket, 'game:error', { message: 'game not found' });
+      if (!rules) return safeEmit(socket, 'game:error', { message: 'بازی مورد نظر یافت نشد' });
       const stake = Math.min(Math.max(Number(payload?.stake) || 100, 50), 10000);
+      const password = String(payload?.password || '').trim();
       dropFromQueue(socket);
       const lobbyId = 'lobby-' + Math.random().toString(36).substring(2, 8);
       lobbies.set(lobbyId, {
-        host: socket, gameId, stake,
+        host: socket,
+        gameId,
+        stake,
+        hasPassword: password.length > 0,
+        password: password,
         hostName: nameOf(socket.user),
         createdAt: Date.now(),
       });
       safeEmit(socket, 'game:lobby_created', {
-        lobbyId, gameId, stake,
-        message: 'Private room created - waiting for opponent',
+        lobbyId,
+        gameId,
+        stake,
+        hasPassword: password.length > 0,
+        message: 'اتاق اختصاصی ساخته شد — در انتظار حریف',
       });
-      io.emit('game:lobby_updated', { action: 'created', lobby: { lobbyId, gameId, stake, hostName: nameOf(socket.user) } });
+      io.emit('game:lobby_updated', {
+        action: 'created',
+        lobby: {
+          lobbyId,
+          gameId,
+          stake,
+          hostName: nameOf(socket.user),
+          hasPassword: password.length > 0,
+          createdAt: Date.now(),
+        },
+      });
     });
 
     socket.on('game:lobby_list', () => {
       const list = [];
       for (const [id, l] of lobbies.entries()) {
         if (l.host && l.host.connected) {
-          list.push({ lobbyId: id, gameId: l.gameId, stake: l.stake, hostName: l.hostName });
-        } else { lobbies.delete(id); }
+          list.push({
+            lobbyId: id,
+            gameId: l.gameId,
+            stake: l.stake,
+            hostName: l.hostName,
+            hasPassword: Boolean(l.hasPassword),
+            createdAt: l.createdAt,
+          });
+        } else {
+          lobbies.delete(id);
+        }
       }
       safeEmit(socket, 'game:lobby_list', list);
     });
 
     socket.on('game:join_lobby', payload => {
       const lobbyId = String(payload?.lobbyId || '');
+      const pass = String(payload?.password || '').trim();
       const lobby = lobbies.get(lobbyId);
       if (!lobby || !lobby.host || !lobby.host.connected) {
         lobbies.delete(lobbyId);
-        return safeEmit(socket, 'game:error', { message: 'room no longer available' });
+        return safeEmit(socket, 'game:error', { message: 'اتاق دیگر در دسترس نیست یا منقضی شده است' });
       }
       if (lobby.host.user.id === socket.user.id) {
-        return safeEmit(socket, 'game:error', { message: 'cannot join your own room' });
+        return safeEmit(socket, 'game:error', { message: 'نمی‌توانی به اتاق خودت متصل شوی' });
+      }
+      if (lobby.hasPassword && lobby.password && lobby.password !== pass) {
+        return safeEmit(socket, 'game:error', { message: 'رمز عبور اتاق اشتباه است' });
       }
       const rules = rulesById[lobby.gameId];
       lobbies.delete(lobbyId);

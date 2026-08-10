@@ -1,8 +1,10 @@
-// Games hub with 4 Categories: 100 Points, 1000 Points, Bot Practice, and Private Room / Custom Lobby
+// Games hub with 4 Categories: 100 Points, 1000 Points, Bot Practice (Instant), and Private Rooms / Lobbies (Password & Stake up to 10,000)
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../../api_client.dart';
+import '../../core/assets.dart';
 import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
@@ -12,7 +14,6 @@ import 'games/memory_board.dart';
 import 'games/penalty_board.dart';
 import 'games/tap/tap_screen.dart';
 import 'games/card_duel_page.dart';
-import 'games/private_match_dialog.dart';
 
 class _GameEntry {
   const _GameEntry(
@@ -60,21 +61,14 @@ class _GamesHubPageState extends State<GamesHubPage> {
   bool _activeVsBot = false;
   String? _activeRoomCode;
 
-  // 4 Modes: 100, 1000, 0 (Bot), -1 (Private Room / Lobby)
+  // 4 Modes: 100, 1000, 0 (تمرین با ربات), -1 (اتاق خصوصی)
   int _selectedMode = 100;
   Map<String, dynamic>? _level;
-  final _quickCodeCtrl = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     unawaited(_loadLevel());
-  }
-
-  @override
-  void dispose() {
-    _quickCodeCtrl.dispose();
-    super.dispose();
   }
 
   Future<void> _loadLevel() async {
@@ -261,11 +255,11 @@ class _GamesHubPageState extends State<GamesHubPage> {
 
         // ── ۳. محتوای حالت انتخاب شده ──
         if (_selectedMode == -1) ...[
-          // ── بخش اتاق خصوصی و دوئل سفارشی ──
-          _PrivateLobbySection(
+          // ── بخش اتاق خصوصی و لابی‌ها (بدون نیاز به اشتراک، با قفل و پسورد) ──
+          _PrivateLobbyHub(
             api: widget.api,
-            onJoinRoom: (gameId, code, stake) {
-              _launchGame(gameId, stake: stake, vsBot: false, roomCode: code);
+            onJoinGame: (gameId, stake, roomCode) {
+              _launchGame(gameId, stake: stake, vsBot: false, roomCode: roomCode);
             },
           ),
         ] else ...[
@@ -276,7 +270,7 @@ class _GamesHubPageState extends State<GamesHubPage> {
               mode: _selectedMode,
               onTap: () {
                 if (_selectedMode == 0) {
-                  // تمرین با هوش مصنوعی (بدون آنلاین، بدون کسر امتیاز)
+                  // تمرین فوری با هوش مصنوعی (بدون شمارنده، بدون معطلی، بدون آنلاین)
                   _launchGame(g.id, stake: 0, vsBot: true);
                 } else {
                   // مسابقه آنلاین با بازیکن واقعی (بدون ربات)
@@ -406,7 +400,7 @@ class _TapGameHeroCard extends StatelessWidget {
   }
 }
 
-/// کارت تمیز بازی‌های ۱۰۰ و ۱۰۰۰ و ربات (بدون زیرنویس‌های شلوغ)
+/// کارت تمیز بازی‌های ۱۰۰، ۱۰۰۰ و تمرین با ربات (بدون زیرنویس‌های شلوغ)
 class _CleanGameTile extends StatelessWidget {
   const _CleanGameTile({
     required this.entry,
@@ -509,7 +503,7 @@ class _CleanGameTile extends StatelessWidget {
                               ),
                             ),
                             child: Text(
-                              isBot ? 'تمرین با هوش مصنوعی (رایگان)' : 'مسابقه آنلاین (${faNum(mode)} امتیازی)',
+                              isBot ? 'تمرین فوری با هوش مصنوعی' : 'مسابقه آنلاین (${faNum(mode)} امتیاز)',
                               style: TextStyle(
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.w900,
@@ -534,24 +528,29 @@ class _CleanGameTile extends StatelessWidget {
   }
 }
 
-/// بخش جامع لابی و اتاق اختصاصی (تا سقف ۱۰,۰۰۰ امتیاز با ۱۰٪ کمیسیون)
-class _PrivateLobbySection extends StatefulWidget {
-  const _PrivateLobbySection({
+/// هاب جامع اتاق خصوصی و لابی‌ها (ساخت لابی، پسورد، نمایش لابی‌ها با قفل)
+class _PrivateLobbyHub extends StatefulWidget {
+  const _PrivateLobbyHub({
     required this.api,
-    required this.onJoinRoom,
+    required this.onJoinGame,
   });
 
   final ApiClient api;
-  final void Function(String gameId, String roomCode, int stake) onJoinRoom;
+  final void Function(String gameId, int stake, String? roomCode) onJoinGame;
 
   @override
-  State<_PrivateLobbySection> createState() => _PrivateLobbySectionState();
+  State<_PrivateLobbyHub> createState() => _PrivateLobbyHubState();
 }
 
-class _PrivateLobbySectionState extends State<_PrivateLobbySection> {
-  final _codeCtrl = TextEditingController();
-  int _customStake = 500;
+class _PrivateLobbyHubState extends State<_PrivateLobbyHub> {
+  io.Socket? _socket;
+  List<Map<String, dynamic>> _lobbies = [];
+  bool _loadingLobbies = true;
+
   String _selectedGame = 'penalty';
+  int _stake = 500;
+  final _passCtrl = TextEditingController();
+  final _joinCodeCtrl = TextEditingController();
 
   final _games = const [
     ('penalty', 'ضربات پنالتی', 'assets/pass/football_icon.webp'),
@@ -560,15 +559,109 @@ class _PrivateLobbySectionState extends State<_PrivateLobbySection> {
     ('reversi', 'اتللو', 'assets/games/reversi.webp'),
   ];
 
-  final _stakePresets = const [100, 200, 500, 1000, 2000, 5000, 10000];
+  final _presetStakes = const [100, 200, 500, 1000, 2000, 5000, 10000];
 
-  int get _netPot => (_customStake * 2 * 0.9).floor();
-  int get _commission => (_customStake * 2 * 0.1).ceil();
+  @override
+  void initState() {
+    super.initState();
+    _initSocket();
+  }
+
+  void _initSocket() {
+    try {
+      final s = io.io(
+        widget.api.baseUrl,
+        io.OptionBuilder()
+            .setTransports(['websocket', 'polling'])
+            .setAuth({'token': widget.api.token})
+            .enableForceNew()
+            .build(),
+      );
+      _socket = s;
+
+      s.onConnect((_) {
+        s.emit('game:lobby_list');
+      });
+
+      s.on('game:lobby_list', (data) {
+        if (!mounted || data is! List) return;
+        setState(() {
+          _lobbies = data.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+          _loadingLobbies = false;
+        });
+      });
+
+      s.on('game:lobby_updated', (_) {
+        s.emit('game:lobby_list');
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingLobbies = false);
+    }
+  }
 
   @override
   void dispose() {
-    _codeCtrl.dispose();
+    _socket?.dispose();
+    _passCtrl.dispose();
+    _joinCodeCtrl.dispose();
     super.dispose();
+  }
+
+  void _createLobby() {
+    final pass = _passCtrl.text.trim();
+    _socket?.emit('game:create_lobby', {
+      'gameId': _selectedGame,
+      'stake': _stake,
+      'password': pass,
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('لابی شما ساخته شد و در لیست اتاق‌ها قرار گرفت')),
+    );
+  }
+
+  void _promptPasswordAndJoin(Map<String, dynamic> lobby) {
+    final hasPass = lobby['hasPassword'] == true;
+    final lobbyId = lobby['lobbyId'] as String? ?? '';
+    final gameId = lobby['gameId'] as String? ?? 'penalty';
+    final stake = (lobby['stake'] as num?)?.toInt() ?? 100;
+
+    if (!hasPass) {
+      _socket?.emit('game:join_lobby', {'lobbyId': lobbyId});
+      widget.onJoinGame(gameId, stake, null);
+      return;
+    }
+
+    final passCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0F172A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.lock_rounded, color: Color(0xFFFFD166), size: 20),
+            SizedBox(width: 8),
+            Text('اتاق دارای رمز عبور است', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900)),
+          ],
+        ),
+        content: TextField(
+          controller: passCtrl,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'رمز عبور اتاق را وارد کنید'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('انصراف')),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _socket?.emit('game:join_lobby', {'lobbyId': lobbyId, 'password': passCtrl.text.trim()});
+              widget.onJoinGame(gameId, stake, null);
+            },
+            child: const Text('ورود به اتاق'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -576,7 +669,7 @@ class _PrivateLobbySectionState extends State<_PrivateLobbySection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // ── ۱. کارت ساخت اتاق اختصاصی ──
+        // ── ۱. فرم ساخت لابی جدید ──
         Container(
           padding: const EdgeInsets.all(Gaps.md),
           decoration: BoxDecoration(
@@ -599,7 +692,7 @@ class _PrivateLobbySectionState extends State<_PrivateLobbySection> {
             children: [
               const Row(
                 children: [
-                  Icon(Icons.add_circle_outline_rounded, color: Color(0xFFA855F7), size: 24),
+                  Icon(Icons.add_circle_outline_rounded, color: Color(0xFFA855F7), size: 22),
                   SizedBox(width: 8),
                   Text(
                     'ساخت اتاق و لابی اختصاصی',
@@ -607,12 +700,7 @@ class _PrivateLobbySectionState extends State<_PrivateLobbySection> {
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
-              const Text(
-                'امتیاز مسابقه را تا سقف ۱۰,۰۰۰ امتیاز انتخاب کن؛ ۱۰٪ کارمزد از کل پات کسر و برنده تمام جایزه را می‌برد.',
-                style: TextStyle(fontSize: 11, color: Color(0xFFCBD5E1), height: 1.4),
-              ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
 
               // Game picker
               Row(
@@ -660,21 +748,21 @@ class _PrivateLobbySectionState extends State<_PrivateLobbySection> {
               const SizedBox(height: 12),
 
               // Stake presets (Up to 10,000)
-              const Text('تعیین استیک امتیاز:', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11.5, fontWeight: FontWeight.w700)),
+              const Text('تعیین امتیاز مسابقه:', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11.5, fontWeight: FontWeight.w700)),
               const SizedBox(height: 4),
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    for (final s in _stakePresets)
+                    for (final s in _presetStakes)
                       Padding(
                         padding: const EdgeInsets.only(left: 6),
                         child: ChoiceChip(
                           label: Text('${faNum(s)}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900)),
-                          selected: _customStake == s,
+                          selected: _stake == s,
                           selectedColor: const Color(0xFFA855F7),
                           onSelected: (val) {
-                            if (val) setState(() => _customStake = s);
+                            if (val) setState(() => _stake = s);
                           },
                         ),
                       ),
@@ -683,22 +771,13 @@ class _PrivateLobbySectionState extends State<_PrivateLobbySection> {
               ),
               const SizedBox(height: 10),
 
-              // Pot calculation banner
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  color: Colors.white.withValues(alpha: 0.06),
-                  border: Border.all(color: Colors.white12),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('جایزه برنده: ${faNum(_netPot)} امتیاز',
-                        style: const TextStyle(color: Color(0xFF22E7A6), fontWeight: FontWeight.w900, fontSize: 12)),
-                    Text('۱۰٪ کارمزد: ${faNum(_commission)} امتیاز',
-                        style: const TextStyle(color: Colors.white54, fontSize: 11)),
-                  ],
+              // Password field (Optional)
+              TextField(
+                controller: _passCtrl,
+                decoration: const InputDecoration(
+                  hintText: 'رمز عبور اتاق (اختیاری — در صورت خالی بودن عمومی است)',
+                  prefixIcon: Icon(Icons.lock_outline_rounded, size: 18),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 ),
               ),
               const SizedBox(height: 12),
@@ -709,13 +788,9 @@ class _PrivateLobbySectionState extends State<_PrivateLobbySection> {
                   backgroundColor: const Color(0xFFA855F7),
                   foregroundColor: Colors.white,
                 ),
-                icon: const Icon(Icons.share_rounded, size: 18),
-                label: const Text('ساخت اتاق و دعوت دوست', style: TextStyle(fontWeight: FontWeight.w900)),
-                onPressed: () => PrivateMatchDialog.show(
-                  context,
-                  api: widget.api,
-                  onJoinRoom: (gId, code, st) => widget.onJoinRoom(gId, code, st),
-                ),
+                icon: const Icon(Icons.rocket_launch_rounded, size: 18),
+                label: const Text('ساخت لابی و ثبت در لیست اتاق‌ها', style: TextStyle(fontWeight: FontWeight.w900)),
+                onPressed: _createLobby,
               ),
             ],
           ),
@@ -723,7 +798,111 @@ class _PrivateLobbySectionState extends State<_PrivateLobbySection> {
 
         Gaps.vMd,
 
-        // ── ۲. کارت ورود مستقیم با کد اتاق ──
+        // ── ۲. لیست لابی‌های فعال ──
+        Row(
+          children: [
+            const Icon(Icons.format_list_bulleted_rounded, size: 18, color: Color(0xFF38BDF8)),
+            const SizedBox(width: 6),
+            const Text(
+              'اتاق‌ها و لابی‌های آماده بازی:',
+              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Colors.white),
+            ),
+            const Spacer(),
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              onPressed: () => _socket?.emit('game:lobby_list'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+
+        if (_loadingLobbies)
+          const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
+        else if (_lobbies.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: Colors.white.withValues(alpha: 0.04),
+              border: Border.all(color: Colors.white12),
+            ),
+            child: const Center(
+              child: Text(
+                'در حال حاضر اتاقی وجود ندارد. اولین لابی را بسازید!',
+                style: TextStyle(color: Colors.white60, fontSize: 12),
+              ),
+            ),
+          )
+        else
+          for (final l in _lobbies) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                color: const Color(0xFF1E293B),
+                border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withValues(alpha: 0.06),
+                    ),
+                    child: Center(
+                      child: Icon(
+                        l['hasPassword'] == true ? Icons.lock_rounded : Icons.sports_esports_rounded,
+                        color: l['hasPassword'] == true ? const Color(0xFFFFD166) : const Color(0xFF38BDF8),
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              l['hostName'] ?? 'کاربر',
+                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Colors.white),
+                            ),
+                            if (l['hasPassword'] == true) ...[
+                              const SizedBox(width: 4),
+                              const Icon(Icons.lock_rounded, size: 13, color: Color(0xFFFFD166)),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'بازی: ${l['gameId']} · ${faNum(l['stake'] ?? 100)} امتیاز',
+                          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF22E7A6),
+                      foregroundColor: const Color(0xFF00281D),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      minimumSize: Size.zero,
+                    ),
+                    onPressed: () => _promptPasswordAndJoin(l),
+                    child: const Text('پیوستن', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+        Gaps.vMd,
+
+        // ── ۳. ورود مستقیم با کد اتاق ──
         Container(
           padding: const EdgeInsets.all(Gaps.md),
           decoration: BoxDecoration(
@@ -735,7 +914,7 @@ class _PrivateLobbySectionState extends State<_PrivateLobbySection> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'ورود با کد اتاق دوست:',
+                'ورود مستقیم با کد اتاق دوست:',
                 style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Colors.white),
               ),
               const SizedBox(height: 8),
@@ -743,11 +922,11 @@ class _PrivateLobbySectionState extends State<_PrivateLobbySection> {
                 children: [
                   Expanded(
                     child: TextField(
-                      controller: _codeCtrl,
+                      controller: _joinCodeCtrl,
                       textAlign: TextAlign.center,
                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 3),
                       decoration: const InputDecoration(
-                        hintText: 'کد ۴ رقمی اتاق',
+                        hintText: 'کد ۴ رقمی',
                         contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       ),
                     ),
@@ -756,9 +935,9 @@ class _PrivateLobbySectionState extends State<_PrivateLobbySection> {
                   FilledButton(
                     style: FilledButton.styleFrom(minimumSize: const Size(80, 46)),
                     onPressed: () {
-                      final code = _codeCtrl.text.trim();
+                      final code = _joinCodeCtrl.text.trim();
                       if (code.isNotEmpty) {
-                        widget.onJoinRoom(_selectedGame, code, _customStake);
+                        widget.onJoinGame(_selectedGame, _stake, code);
                       }
                     },
                     child: const Text('ورود'),

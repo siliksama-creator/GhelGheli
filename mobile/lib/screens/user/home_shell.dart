@@ -751,14 +751,14 @@ class _PassButton extends StatefulWidget {
 
 class _PassButtonState extends State<_PassButton>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _pulse = AnimationController(
+  late final AnimationController _anim = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 2400),
+    duration: const Duration(milliseconds: 2800),
   )..repeat();
 
   @override
   void dispose() {
-    _pulse.dispose();
+    _anim.dispose();
     super.dispose();
   }
 
@@ -768,12 +768,11 @@ class _PassButtonState extends State<_PassButton>
     final badgeNum = math.min(claimable > 0 ? (widget.tiersToday > 0 ? widget.tiersToday : claimable) : 0, 2);
 
     return AnimatedBuilder(
-      animation: _pulse,
+      animation: _anim,
       builder: (context, _) {
-        final t = _pulse.value;
-        final floatY = math.sin(t * 2 * math.pi) * 2.0;
-        final glowPulse = 0.40 + 0.35 * math.sin(t * 2 * math.pi).abs();
-        final rot = t * 2 * math.pi;
+        final t = _anim.value;
+        final floatY = math.sin(t * 2 * math.pi) * 1.5;
+        final glowAlpha = 0.35 + 0.20 * math.sin(t * 2 * math.pi).abs();
 
         return IconButton(
           tooltip: 'گذر نبرد فصلی',
@@ -790,55 +789,39 @@ class _PassButtonState extends State<_PassButton>
               clipBehavior: Clip.none,
               alignment: Alignment.center,
               children: [
-                // Glowing Cyber Neon Aura
+                // Glowing Cyber Aura
                 Positioned(
                   child: Container(
-                    width: 30,
-                    height: 30,
+                    width: 28,
+                    height: 28,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          const Color(0xFF00E5FF).withValues(alpha: 0.45 * glowPulse),
-                          const Color(0xFF7C3AED).withValues(alpha: 0.20 * glowPulse),
-                          Colors.transparent,
-                        ],
-                      ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF00E5FF).withValues(alpha: 0.35 * glowPulse),
-                          blurRadius: 12,
-                          spreadRadius: 2,
+                          color: const Color(0xFF00E5FF).withValues(alpha: glowAlpha),
+                          blurRadius: 10,
+                          spreadRadius: 1,
                         ),
                       ],
                     ),
                   ),
                 ),
-                // Rotating subtle energy sparkle behind
-                Transform.rotate(
-                  angle: rot * 0.4,
-                  child: const Icon(
-                    Icons.auto_awesome,
-                    size: 14,
-                    color: Color(0xFF67E8F9),
-                  ),
-                ),
-                // Transparent floating Battle Pass shield emblem
+                // Floating high-quality Battle Pass Shield Icon
                 Transform.translate(
                   offset: Offset(0, floatY),
                   child: Image.asset(
                     'assets/pass/pass_shield.png',
-                    width: 28,
-                    height: 28,
-                    cacheWidth: 96,
+                    width: 26,
+                    height: 26,
+                    cacheWidth: 80,
                     fit: BoxFit.contain,
                   ),
                 ),
-                // Pulsing Red/Coral Badge (1 or 2)
+                // Pulsing Notification Badge (1 or 2)
                 if (badgeNum > 0)
                   Positioned(
-                    top: -4,
-                    right: -4,
+                    top: -3,
+                    right: -3,
                     child: Container(
                       width: 17,
                       height: 17,

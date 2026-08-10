@@ -1,7 +1,4 @@
-// Monthly league standings.
-//
-// Previously this had no error branch: `req(...).then(setD)` with no
-// `.catch`, so any failure left the user on "در حال بارگذاری لیگ..." forever.
+// Monthly league standings with Previous Season Winners Tab.
 import React, { useCallback, useState } from 'react';
 
 import { req, fa, asset, avatarUrl } from '../lib/api.js';
@@ -17,14 +14,13 @@ export default function League({ token, openProfile }) {
   const state = useAsync(load, [load]);
   const [tab, setTab] = useState('table');
 
-  // The club rosters are their own screen; mounting them only when selected
-  // means the league table does not pay for a request nobody looked at.
   if (tab === 'clubs') {
     return (
       <section className="card wide leaguePage">
         <div className="leagueTabs">
           <button onClick={() => setTab('table')}>جدول لیگ</button>
           <button className="on">باشگاه‌ها</button>
+          <button onClick={() => setTab('prev')}>برندگان قبل</button>
         </div>
         <Clubs token={token} openProfile={openProfile} />
       </section>
@@ -36,111 +32,96 @@ export default function League({ token, openProfile }) {
       {d => {
         const entries = d.entries || [];
         const season = d.season || {};
+        const prevWinners = d.previousSeason?.winners || d.previousWinners || [];
         const end = season.ends_at ? new Date(season.ends_at) : null;
-        const days = end
-          ? Math.max(0, Math.ceil((end - Date.now()) / 86400000))
-          : 0;
+        const days = end ? Math.max(0, Math.ceil((end - Date.now()) / 86400000)) : 0;
         const top = entries.slice(0, 3);
         const rest = entries.slice(3);
+
+        if (tab === 'prev') {
+          return (
+            <section className="card wide leaguePage">
+              <div className="leagueTabs">
+                <button onClick={() => setTab('table')}>جدول لیگ</button>
+                <button onClick={() => setTab('clubs')}>باشگاه‌ها</button>
+                <button className="on">برندگان قبل</button>
+              </div>
+
+              <div className="leagueBanner" style={{ margin: '16px 0', background: 'linear-gradient(135deg, #3D2E00, #1A1400)', border: '1px solid rgba(255, 215, 0, 0.3)', padding: '20px', borderRadius: '16px', textAlign: 'center' }}>
+                <div style={{ fontSize: '32px' }}>🏆</div>
+                <h3 style={{ color: '#FFD700', fontWeight: '900', margin: '8px 0 4px' }}>برندگان دوره قبل لیگ</h3>
+                <p style={{ color: '#CBD5E1', fontSize: '12px' }}>جوایز پس از پایان لیگ پرداخت و این برندگان تا پایان لیگ بعدی اینجا نمایش داده می‌شوند.</p>
+              </div>
+
+              {prevWinners.length === 0 ? (
+                <EmptyView title="هنوز دوره قبلی برگزار نشده است" message="به محض پایان دوره لیگ، اسامی برندگان در این قسمت ثبت می‌شود." />
+              ) : (
+                <div className="leagueList">
+                  {prevWinners.map((w, idx) => (
+                    <div key={idx} className="leagueRow" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', background: 'rgba(255,255,255,0.04)', borderRadius: '12px', marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span style={{ fontSize: '18px', fontWeight: '900', width: '28px', textAlign: 'center' }}>
+                          {w.rank === 1 ? '🥇' : w.rank === 2 ? '🥈' : w.rank === 3 ? '🥉' : fa(w.rank)}
+                        </span>
+                        <div>
+                          <div style={{ fontWeight: 'bold', color: '#FFF' }}>{w.nickname || w.first_name || 'کاربر'}</div>
+                          {w.points && <div style={{ fontSize: '11px', color: '#94A3B8' }}>{fa(w.points)} امتیاز</div>}
+                        </div>
+                      </div>
+                      {w.prize_amount > 0 && (
+                        <div style={{ background: 'rgba(34, 231, 166, 0.15)', color: '#22E7A6', border: '1px solid rgba(34, 231, 166, 0.4)', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' }}>
+                          {fa(w.prize_amount)} تومان
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          );
+        }
 
         return (
           <section className="card wide leaguePage">
             <div className="leagueTabs">
               <button className="on">جدول لیگ</button>
               <button onClick={() => setTab('clubs')}>باشگاه‌ها</button>
+              <button onClick={() => setTab('prev')}>برندگان قبل</button>
             </div>
 
-            {(d.activeLeagues || []).length > 1 && (
-              <div style={{ display: 'flex', gap: '8px', margin: '12px 0', overflowX: 'auto', paddingBottom: '4px' }}>
-                {d.activeLeagues.map(l => (
-                  <button
-                    key={l.id}
-                    type="button"
-                    style={{
-                      padding: '8px 14px',
-                      borderRadius: '12px',
-                      background: (season.id === l.id) ? 'rgba(0, 212, 154, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                      border: `1px solid ${(season.id === l.id) ? '#00D49A' : 'rgba(255, 255, 255, 0.1)'}`,
-                      color: (season.id === l.id) ? '#00D49A' : '#CBD5E1',
-                      fontWeight: '700',
-                      fontSize: '12.5px',
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap'
-                    }}
-                    onClick={() => setSelectedLeagueId(l.id)}
-                  >
-                    {l.league_type === 'weekly' ? '⚡ ' : '🏆 '}{l.title || l.month_year || 'لیگ'}
-                  </button>
+            <div className="leagueBanner" style={{ margin: '16px 0', background: 'linear-gradient(135deg, #16345F, #071521)', border: '1px solid rgba(56, 189, 248, 0.3)', padding: '20px', borderRadius: '16px' }}>
+              <h2 style={{ color: '#FFF', fontWeight: '900', margin: '0 0 6px' }}>لیگ قلقلی</h2>
+              <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '13px', lineHeight: 1.5 }}>
+                برترین کاربران تا پایان زمان اعلام شده؛ جوایز پس از پایان لیگ پرداخت و لیگ بعدی آغاز می‌شود.
+              </p>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.15)', padding: '6px 12px', borderRadius: '20px', marginTop: '10px', fontSize: '12px', color: '#FFF', fontWeight: 'bold' }}>
+                ⏱ {days > 0 ? `${fa(days)} روز تا پایان این دوره لیگ` : 'در حال محاسبه'}
+              </div>
+            </div>
+
+            {top.length > 0 && (
+              <div className="podium" style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                {top.map((r, i) => (
+                  <div key={r.user_id} className={`podiumItem podium-${i + 1}`} style={{ flex: 1, textAlign: 'center', background: i === 0 ? 'rgba(255, 215, 0, 0.15)' : 'rgba(255,255,255,0.05)', border: i === 0 ? '1px solid #FFD700' : '1px solid rgba(255,255,255,0.1)', padding: '14px', borderRadius: '16px' }}>
+                    <div style={{ fontSize: '24px' }}>{i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}</div>
+                    <div style={{ margin: '6px 0' }}><DisplayName name={r.nickname || 'کاربر'} cosmetics={r.cosmetics} level={r.level} /></div>
+                    <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#38BDF8' }}>{fa(r.points)} امتیاز</div>
+                  </div>
                 ))}
               </div>
             )}
 
-            <div className="sectionHead">
-              <div>
-                <h2>لیگ ماهانه قلقلی</h2>
-                <p>
-                  رتبه‌بندی زنده کاربران تا پایان ماه؛ امتیاز لیگ آخر ماه ریست
-                  می‌شود، امتیاز کلی دست نمی‌خورد.
-                </p>
-              </div>
-              <b className="countdown">{fa(days)} روز مانده</b>
-            </div>
-
-            <div className="podium">
-              {top.map((e, i) => (
-                <div className={`podiumCard p${i + 1}`} key={e.user_id}
-                  onClick={() => openProfile(e.user_id)}>
-                  <span className="medal">{['', '', ''][i]}</span>
-                  <DisplayName name={e.nickname || e.first_name || 'کاربر'}
-                    cosmetics={e.cosmetics} level={e.level} />
-                  <strong>{fa(e.points)} امتیاز</strong>
-                </div>
-              ))}
-            </div>
-
             <div className="leagueList">
-              {rest.map((e, i) => (
-                <div className="row clickable leagueRow" key={e.user_id}
-                  onClick={() => openProfile(e.user_id)}>
-                  <b>#{fa(i + 4)}</b>
-                  <DisplayName name={e.nickname || e.first_name || 'کاربر'}
-                    cosmetics={e.cosmetics} level={e.level} />
-                  <strong>{fa(e.points)} امتیاز</strong>
+              {rest.map((r, idx) => (
+                <div key={r.user_id} className="leagueRow" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', marginBottom: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontWeight: 'bold', width: '24px' }}>{fa(idx + 4)}</span>
+                    <DisplayName name={r.nickname || 'کاربر'} cosmetics={r.cosmetics} level={r.level} />
+                  </div>
+                  <span style={{ fontWeight: 'bold', color: '#38BDF8' }}>{fa(r.points)} امتیاز</span>
                 </div>
               ))}
             </div>
-
-            {!entries.length &&
-              <EmptyView icon="trophy">هنوز امتیازی در لیگ ثبت نشده است.</EmptyView>}
-
-            {/* Last month's winners. Without this the previous season simply
-                vanishes when the points reset. */}
-            {d.previousSeason?.winners?.length > 0 && (
-              <div className="prevSeason">
-                <h3> برندگان ماه گذشته ({d.previousSeason.monthYear})</h3>
-                <div className="prevList">
-                  {d.previousSeason.winners.map(w => (
-                    <div className="prevRow" key={w.userId}
-                      onClick={() => openProfile(w.userId)}>
-                      <span className="prevMedal">
-                        {['', '', ''][w.rank - 1] || ''}
-                      </span>
-                      <img src={w.profileImageUrl
-                        ? asset(w.profileImageUrl)
-                        : avatarUrl(w.profileAvatarKey)}
-                        alt="" width="32" height="32" loading="lazy" />
-                      <b>{w.nickname}</b>
-                      <span className="prevPts">{fa(w.points)} امتیاز</span>
-                      {w.prizeAmount > 0 && (
-                        <span className="prevPrize">
-                          {fa(w.prizeAmount)} تومان
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </section>
         );
       }}

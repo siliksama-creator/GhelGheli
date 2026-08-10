@@ -1,9 +1,4 @@
 /// Shared rendering rules for purchased cosmetics.
-///
-/// One place so the shop, chat, the league table, the club roster and the
-/// profile always agree on what a crest, a frame or a name colour looks like.
-/// The server decides WHETHER an item applies (ownership, Plus, or club
-/// membership); this only draws it.
 library;
 
 import 'dart:math' as math;
@@ -81,7 +76,7 @@ class ClubBadge extends StatelessWidget {
   }
 }
 
-/// ستاره پلاس با درخشش انیمه‌ای (Anime Glow & Sparkle)
+/// ستاره پلاس با هاله درخشش طلایی انیمه‌ای (بدون ستاره‌های ریز چرخان)
 class AnimePlusStar extends StatefulWidget {
   const AnimePlusStar({super.key, this.size = 20});
   final double size;
@@ -94,7 +89,7 @@ class _AnimePlusStarState extends State<AnimePlusStar>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 2200),
+    duration: const Duration(milliseconds: 2400),
   )..repeat();
 
   @override
@@ -110,16 +105,15 @@ class _AnimePlusStarState extends State<AnimePlusStar>
       animation: _ctrl,
       builder: (context, _) {
         final t = _ctrl.value;
-        final pulse = 0.85 + 0.30 * math.sin(t * 2 * math.pi);
-        final rot = t * 2 * math.pi;
+        final pulse = 0.85 + 0.30 * math.sin(t * 2 * math.pi).abs();
 
         return SizedBox(
-          width: sz + 8,
-          height: sz + 8,
+          width: sz + 6,
+          height: sz + 6,
           child: Stack(
             alignment: Alignment.center,
             children: [
-              // Radial anime energy aura
+              // هاله درخشش ملایم و باکلاس طلایی
               Container(
                 width: sz * 1.35 * pulse,
                 height: sz * 1.35 * pulse,
@@ -127,39 +121,21 @@ class _AnimePlusStarState extends State<AnimePlusStar>
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      const Color(0xFFFFE066).withValues(alpha: 0.65 * pulse),
-                      const Color(0xFFFFB300).withValues(alpha: 0.25 * pulse),
+                      const Color(0xFFFFD700).withValues(alpha: 0.65 * pulse),
+                      const Color(0xFFF59E0B).withValues(alpha: 0.20 * pulse),
                       Colors.transparent,
                     ],
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFFFFD700).withValues(alpha: 0.55 * pulse),
+                      color: const Color(0xFFFFD700).withValues(alpha: 0.45 * pulse),
                       blurRadius: 10 * pulse,
                       spreadRadius: 2,
                     ),
                   ],
                 ),
               ),
-              // Rotating 4-point anime cross sparkle
-              Transform.rotate(
-                angle: rot,
-                child: Container(
-                  width: sz * 0.95,
-                  height: sz * 0.95,
-                  decoration: const BoxDecoration(
-                    gradient: RadialGradient(
-                      colors: [Color(0xFFFFFFFF), Colors.transparent],
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.auto_awesome,
-                    size: 13,
-                    color: Color(0xFFFFF9DB),
-                  ),
-                ),
-              ),
-              // Golden core star
+              // ستاره طلایی اصلی با سایه گرم
               Icon(
                 Icons.star_rounded,
                 size: sz,
@@ -167,7 +143,7 @@ class _AnimePlusStarState extends State<AnimePlusStar>
                 shadows: const [
                   Shadow(
                     color: Color(0xFFFFEA7A),
-                    blurRadius: 8,
+                    blurRadius: 6,
                   ),
                 ],
               ),
