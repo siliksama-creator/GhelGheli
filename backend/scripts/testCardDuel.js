@@ -10,7 +10,8 @@ const read = p => fs.readFileSync(path.join(root, p), 'utf8');
 const mig = read('backend/migrations/047_card_duel.sql');
 const svc = read('backend/src/services/cardDuelService.js');
 const server = read('backend/src/server.js');
-const photo = read('backend/src/routes/photoCards.js');
+const photo = read('backend/src/routes/photoCards.js')
+  + read('backend/src/routes/photoCards/adminUpload.js');
 const mobile = read('mobile/lib/screens/user/games/card_duel_page.dart');
 const games = read('mobile/lib/screens/user/games_page.dart');
 const admin = read('mobile/lib/screens/admin/admin_photo_cards.dart');

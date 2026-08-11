@@ -19,6 +19,7 @@ class _AdminNotificationsState extends State<AdminNotifications> {
   String _segment = 'all';
   bool _force = false;
   bool _sending = false;
+  bool? _fcmConfigured;
 
   final _segments = const [
     ('all', 'همه کاربران فعال'),
@@ -28,6 +29,17 @@ class _AdminNotificationsState extends State<AdminNotifications> {
     ('plus_users', 'کاربران دارای اشتراک پلاس'),
     ('free_users', 'کاربران بدون اشتراک پلاس'),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    widget.api.get('/api/admin/notifications/status').then((result) {
+      if (!mounted) return;
+      setState(() => _fcmConfigured = result is Map && result['fcmConfigured'] == true);
+    }).catchError((_) {
+      if (mounted) setState(() => _fcmConfigured = false);
+    });
+  }
 
   @override
   void dispose() {
@@ -75,6 +87,26 @@ class _AdminNotificationsState extends State<AdminNotifications> {
           title: 'استودیوی اعلان‌های هدفمند',
           subtitle: 'ارسال نوتیفیکیشن با رعایت ساعت تهران (۱۰:۰۰ تا ۲۲:۰۰) جهت عدم مزاحمت شبانه.',
           children: [
+            if (_fcmConfigured != null)
+              Container(
+                padding: const EdgeInsets.all(Gaps.sm),
+                decoration: BoxDecoration(
+                  borderRadius: Corners.rMd,
+                  color: (_fcmConfigured! ? const Color(0xFF22C55E) : const Color(0xFFF59E0B))
+                      .withValues(alpha: 0.12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.notifications_active_outlined, size: 18),
+                    const SizedBox(width: Gaps.xs),
+                    Expanded(
+                      child: Text(_fcmConfigured!
+                          ? 'Firebase فعال است: اعلان درون‌برنامه‌ای و پوش ارسال می‌شود.'
+                          : 'Firebase فعال نیست: فقط اعلان درون‌برنامه‌ای ثبت می‌شود.'),
+                    ),
+                  ],
+                ),
+              ),
             DropdownButtonFormField<String>(
               isExpanded: true,
               initialValue: _segment,

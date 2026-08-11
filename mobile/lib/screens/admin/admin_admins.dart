@@ -98,6 +98,46 @@ class _AdminAdminsState extends State<AdminAdmins> {
     }
   }
 
+  Future<void> _toggleActive(Map admin) async {
+    final activating = admin['is_active'] != true;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(activating ? 'فعال‌سازی ادمین' : 'غیرفعال‌سازی ادمین'),
+        content: Text(activating
+            ? '${admin['username']} دوباره می‌تواند وارد پنل شود.'
+            : '${admin['username']} دیگر نمی‌تواند وارد پنل شود و نشست فعلی او هم در اولین درخواست رد می‌شود.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('انصراف'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(activating ? 'فعال کن' : 'غیرفعال کن'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await widget.api.patch('/api/admin/admins/${admin['id']}/status', {
+        'isActive': activating,
+      });
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(activating ? 'ادمین فعال شد' : 'ادمین غیرفعال شد'),
+        ));
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(apiError(error))));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) return const LoadingView();
@@ -164,9 +204,22 @@ class _AdminAdminsState extends State<AdminAdmins> {
               : _admins
                   .map<Widget>((a) => ListTile(
                         contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.shield_rounded),
+                        leading: Icon(
+                          Icons.shield_rounded,
+                          color: a['is_active'] == true
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.outline,
+                        ),
                         title: Text(a['username']),
-                        subtitle: Text(_roleLabels[a['role']] ?? a['role']),
+                        subtitle: Text('${_roleLabels[a['role']] ?? a['role']} · '
+                            '${a['is_active'] == true ? 'فعال' : 'غیرفعال'}'),
+                        trailing: IconButton(
+                          tooltip: a['is_active'] == true ? 'غیرفعال‌سازی' : 'فعال‌سازی',
+                          onPressed: () => _toggleActive(a),
+                          icon: Icon(a['is_active'] == true
+                              ? Icons.person_off_outlined
+                              : Icons.person_add_alt_rounded),
+                        ),
                       ))
                   .toList(),
         ),

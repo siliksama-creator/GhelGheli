@@ -12,7 +12,6 @@ import 'package:flutter/services.dart';
 
 import '../../../../api_client.dart';
 import '../../../../theme/tokens.dart';
-import '../game_audio.dart';
 import 'tap_character.dart';
 import 'tap_config.dart';
 import 'tap_day.dart';
@@ -46,27 +45,15 @@ class _TapGameScreenState extends State<TapGameScreen>
 
   int _seenEventSerial = 0;
 
-  // ═══════════════════════════════════════════════════════════════════════
-  // گلوگاهِ «بعد ۶۰ ثانیه کل گوشی کند می‌شود»
-  // ═══════════════════════════════════════════════════════════════════════
+  // Tap intentionally has no audio. Rapid sound-effect playback was the only
+  // native resource opened on every accepted tap and could saturate the
+  // phone audio stack during a long session. Other games keep their audio;
+  // this screen never imports or initializes GameAudio.
   //
-  // موتور روی **هر** ضربهٔ پذیرفته‌شده notify می‌دهد و این متد روی هر
-  // notify، صدا + هپتیک را پخش می‌کند. با سقف ۱۲ ضربه بر ثانیه و یک
-  // دقیقهٔ ضربه زدن یعنی ~۷۲۰ بار فراخوانیِ صوتی/ارتعاشیِ پشت‌سرهم در
-  // بازه‌ای کوتاه. `audioplayers` در حالت low-latency برای هر پخشِ سریع
-  // یک session صوتی نیتیو باز نگه می‌دارد؛ صدها مورد از این‌ها در یک
-  // دقیقه، زیرسیستمِ صدا/ارتعاشِ گوشی را اشباع می‌کند و این فشار روی
-  // کلِ اپ می‌ماند — همان «بعد از مدتی گوشی کند می‌شود» که گزارش شده.
-  //
-  // راهِ اصولی: **محدودکردنِ نرخِ بازخورد**، نه حذفش. بازخورد باید در
-  // ضرباتِ کم‌تراکم یکی‌به‌یکی حس شود ولی وقتی کاربر دارد با ۱۲ ضربه بر
-  // ثانیه می‌زند، پخشِ صدای مجزا برای هر ضربه اصلاً قابل تشخیص نیست
-  // (آستانهٔ شنیداری انسان ~۵-۶ صدای مجزا در ثانیه است). سقفِ ~۷۰ms
-  // یعنی حداکثر ~۱۴ رویدادِ صوتی/ارتعاشی در ثانیه — تقریباً ۸۰٪ کاهشِ
-  // بارِ نیتیو در بدترین حالت، بدونِ هیچ تغییری در احساسِ بازی برای
-  // کاربرِ عادی. حسِ «لمسی» می‌ماند، فشارِ زیرساختی از بین می‌رود.
-  final Stopwatch _feedbackClock = Stopwatch()..start();
-  static const Duration _tapFeedbackMinGap = Duration(milliseconds: 70);
+  // Haptics are retained as lightweight feedback, but are capped at 8/s.
+  // Milestone haptics are rare and are never throttled.
+  final Stopwatch _hapticClock = Stopwatch()..start();
+  static const Duration _tapHapticMinGap = Duration(milliseconds: 125);
 
   // ═══════════════════════════════════════════════════════════════════════
   // چرا شمارنده‌ها ValueNotifier شدند و نه setState
@@ -125,7 +112,7 @@ class _TapGameScreenState extends State<TapGameScreen>
     // Must be cancelled: a pending rebuild firing after dispose would call
     // setState on a defunct State.
     _rebuildTimer?.cancel();
-    _feedbackClock.stop();
+    _hapticClock.stop();
     _uiTick.dispose();
     WidgetsBinding.instance.removeObserver(this);
     _engine.removeListener(_onEngineChanged);
@@ -158,39 +145,28 @@ class _TapGameScreenState extends State<TapGameScreen>
       _seenEventSerial = _engine.eventSerial;
       switch (_engine.lastEvent) {
         case TapEvent.tap:
-          // Throttled: at the 12/s ceiling a 70ms gap means a sound/haptic at
-          // most every other tap — indistinguishable to the player, but ~half
-          // the native audio/vibrate calls a full minute of hammering used to
-          // make. Level-ups/skins/game-complete are NOT throttled: they are
-          // rare, deliberate celebrations and must always fire.
-          if (_feedbackClock.elapsed > _tapFeedbackMinGap) {
-            _feedbackClock
+          if (_hapticClock.elapsed >= _tapHapticMinGap) {
+            _hapticClock
               ..reset()
               ..start();
-            GameAudio.instance.play(Sfx.tap, volume: 0.55);
             HapticFeedback.selectionClick();
           }
           break;
         case TapEvent.levelUp:
-          GameAudio.instance.play(Sfx.matchFound);
           HapticFeedback.mediumImpact();
           _characterKey.currentState?.pulse();
           _showLevelUpDialog(_engine.level);
           break;
         case TapEvent.skinChanged:
-          GameAudio.instance.play(Sfx.win);
           HapticFeedback.heavyImpact();
           _showSkinDialog();
           break;
         case TapEvent.gameCompleted:
-          GameAudio.instance.play(Sfx.win);
           HapticFeedback.heavyImpact();
           break;
         case TapEvent.dailyCapHit:
           // Fires once, on the level-up that spends the last of today's
-          // allowance — not on every tap afterwards. The panel below carries
-          // the standing explanation; this is the moment it arrives.
-          GameAudio.instance.play(Sfx.win);
+          // allowance — not on every tap afterwards.
           HapticFeedback.heavyImpact();
           break;
         case TapEvent.rejected:

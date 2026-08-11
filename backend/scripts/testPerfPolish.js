@@ -21,7 +21,9 @@ const scrollHint = read('mobile/lib/widgets/scroll_hint.dart');
 console.log('\n== ۱. ضربه‌زن اندروید: مسیر داغ کم‌هزینه ==');
 ok(/ValueNotifier<int> _uiTick/.test(tapScreen), 'صفحه با ValueNotifier تیک می‌خورد، نه setState سراسری');
 ok(/_rejectedUiNotifyGapMs = 250/.test(tapEngine), 'ضربه‌های ردشده repaint نامحدود نمی‌سازند');
-ok(/_tapFeedbackMinGap = Duration\(milliseconds: 70\)/.test(tapScreen), 'صدا و هپتیک ضربه throttle شده‌اند');
+ok(!/GameAudio\.instance|Sfx\./.test(tapScreen)
+  && /_tapHapticMinGap = Duration\(milliseconds: 125\)/.test(tapScreen),
+  'صدای Tap کاملاً حذف و هپتیک ضربه محدود شده است');
 ok(/CustomPainter[\s\S]*_FloaterPainter/.test(tapChar), 'شناورهای +۱ با Painter واحد هستند، نه ویجت/تیکر جدا');
 ok(/cacheWidth: 320/.test(tapChar), 'تصویر کاراکتر با decode کوچک‌تر رندر می‌شود');
 
@@ -29,7 +31,8 @@ console.log('\n== ۲. ضربه‌زن وب: پاریتی و کاهش رندر ==
 ok(/levelsPerSkin:\s*5/.test(webTap), 'وب با اندروید: هر ۵ لول یک اسکین');
 ok(/skin_10\.webp/.test(webTap), 'وب همهٔ ۱۰ اسکین را می‌شناسد');
 ok(/lastRejectedUi/.test(webTap) && />= 250/.test(webTap), 'وب هم ضربهٔ ردشده را throttle می‌کند');
-ok(/lastTapFeedback/.test(webTap) && />= 70/.test(webTap), 'وب صدا را برای ضربه‌های سریع throttle می‌کند');
+ok(!/playSfx|gameAudio/.test(webTap) && /areaRef\.current\?\.animate/.test(webTap),
+  'وب Tap بدون صدا و بدون setState انیمیشن ضربه را اجرا می‌کند');
 
 console.log('\n== ۳. وب یوزر و پوستهٔ اندروید: رندر سبک‌تر و کلاس کاری ==');
 ok(/loading="lazy" decoding="async"/.test(home), 'تصاویر کارت‌های کلکسیون lazy + async هستند');

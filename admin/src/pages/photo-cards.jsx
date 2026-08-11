@@ -24,6 +24,9 @@ import {
 } from '../components/ui.jsx';
 import { useDialog } from '../components/dialog.jsx';
 import { useToast } from '../lib/toast.jsx';
+import { groupPhotoCardDesigns } from '../lib/photoCardGroups.js';
+import { GroupedCardTile } from '../components/photoCards/GroupedCardTile.jsx';
+import { EditGroupedCardModal } from '../components/photoCards/EditGroupedCardModal.jsx';
 
 // مراحلِ واقعیِ آنالیزِ آپلود — هر کدام کارِ واقعیِ سرور.
 const UPLOAD_STEPS = [
@@ -36,7 +39,8 @@ export function PhotoCardsPage({ request }) {
   const notify = useToast();
   const { confirmAction } = useDialog();
 
-  const [designs, setDesigns] = useState(null);
+  const [cards, setCards] = useState(null);
+  const [deletingCardId, setDeletingCardId] = useState(null);
   const [stats, setStats] = useState(null);
   const [batches, setBatches] = useState([]);
   const [subs, setSubs] = useState(null);
@@ -100,78 +104,10 @@ export function PhotoCardsPage({ request }) {
     goalChance: '50', energy: '100', rarity: 'normal', effect: 'none',
   });
   const [uploading, setUploading] = useState(false);
-  const [editingCard, setEditingCard] = useState(null); // card object for edit modal
-  const [editForm, setEditForm] = useState({ name: '', points: '', cash: '', duel: {}, newCodes: '', newBatch: '', isActive: true });
-  const [editSaving, setEditSaving] = useState(false);
+  const [editingCard, setEditingCard] = useState(null);
 
-  function openEditCard(d) {
-    setEditingCard(d);
-    setEditForm({
-      name: d.card_type_name || '',
-      points: String(d.point_value || 0),
-      cash: String(d.cash_amount || 0),
-      duel: {
-        attack: String(d.duel_attack ?? 50),
-        defense: String(d.duel_defense ?? 50),
-        speed: String(d.duel_speed ?? 50),
-        technique: String(d.duel_technique ?? 50),
-        goalChance: String(d.duel_goal_chance ?? 50),
-        energy: String(d.duel_energy ?? 100),
-        rarity: d.duel_rarity || 'normal',
-        effect: d.duel_effect || 'none',
-      },
-      newCodes: '',
-      newBatch: '',
-      isActive: d.is_active !== false,
-    });
-  }
-
-  async function saveCardEdit() {
-    if (!editingCard) return;
-    setEditSaving(true);
-    try {
-      const typeId = editingCard.card_type_id;
-      // 1. Update metadata & duel stats
-      await request(`/api/admin/photo-cards/card-types/${typeId}`, {
-        method: 'PATCH',
-        body: {
-          name: editForm.name.trim(),
-          pointValue: Number(editForm.points || 0),
-          cashAmount: Number(editForm.cash || 0),
-          isActive: editForm.isActive,
-          duelAttack: Number(editForm.duel.attack || 50),
-          duelDefense: Number(editForm.duel.defense || 50),
-          duelSpeed: Number(editForm.duel.speed || 50),
-          duelTechnique: Number(editForm.duel.technique || 50),
-          duelGoalChance: Number(editForm.duel.goalChance || 50),
-          duelEnergy: Number(editForm.duel.energy || 100),
-          duelRarity: editForm.duel.rarity,
-          duelEffect: editForm.duel.effect,
-        },
-      });
-
-      // 2. If new codes entered, add them
-      if (editForm.newCodes.trim()) {
-        const r = await request(`/api/admin/photo-cards/card-types/${typeId}/add-codes`, {
-          method: 'POST',
-          body: {
-            rawCodes: editForm.newCodes.trim(),
-            batchLabel: editForm.newBatch.trim() || undefined,
-          },
-        });
-        notify(r.message || 'کدها اضافه شدند', 'success');
-      } else {
-        notify('مشخصات کارت با موفقیت به‌روزرسانی شد', 'success');
-      }
-
-      setEditingCard(null);
-      loadDesigns();
-      loadCodes();
-    } catch (e) {
-      notify(e.message, 'error');
-    } finally {
-      setEditSaving(false);
-    }
+  function openEditCard(card) {
+    setEditingCard(card);
   }
 
   // ── مرحلهٔ آنالیزِ آپلود ──
@@ -197,8 +133,14 @@ export function PhotoCardsPage({ request }) {
 
   const loadDesigns = useCallback(
     () => request('/api/admin/photo-cards/designs')
-      .then(r => setDesigns(r.designs || []))
-      .catch(e => { setDesigns([]); notify(e.message, 'error'); }),
+      .then(r => {
+        const flat = r.designs || [];
+        setCards(Array.isArray(r.cards) ? r.cards : groupPhotoCardDesigns(flat));
+      })
+      .catch(e => {
+        setCards([]);
+        notify(e.message, 'error');
+      }),
     [request, notify],
   );
 
@@ -333,32 +275,52 @@ export function PhotoCardsPage({ request }) {
     }
   }
 
-  async function toggleDesign(d) {
+  async function toggleCard(card) {
     try {
-      await request(`/api/admin/photo-cards/designs/${d.id}`, {
-        method: 'PATCH', body: { isActive: !d.is_active },
+      await request(`/api/admin/photo-cards/card-types/${card.card_type_id}`, {
+        method: 'PATCH', body: { isActive: !card.is_active },
       });
+      notify(card.is_active ? 'کارت و همهٔ تصاویرش غیرفعال شدند' : 'کارت و همهٔ تصاویرش فعال شدند', 'success');
       loadDesigns();
     } catch (e) { notify(e.message, 'error'); }
+  }
+
+  async function deleteCard(card) {
+    const ok = await confirmAction({
+      title: `حذف کارت «${card.card_type_name}»`,
+      description: 'روی کارت، پشت کارت و کدهای هرگز مصرف‌نشده با هم حذف می‌شوند. اگر این کارت سابقهٔ کاربر یا کد مصرف‌شده داشته باشد، سرور برای حفظ سابقه اجازهٔ حذف نمی‌دهد.',
+      confirmLabel: 'حذف کامل کارت',
+      danger: true,
+    });
+    if (!ok) return;
+    setDeletingCardId(card.card_type_id);
+    try {
+      const result = await request(`/api/admin/photo-cards/card-types/${card.card_type_id}`, {
+        method: 'DELETE',
+      });
+      notify(result.message || 'کارت حذف شد', 'success');
+      if (editingCard?.card_type_id === card.card_type_id) setEditingCard(null);
+      await Promise.all([loadDesigns(), loadCodes(), loadCodeList(), loadOptions()]);
+    } catch (e) {
+      notify(e.message, 'error');
+    } finally {
+      setDeletingCardId(null);
+    }
   }
 
 
   /**
    * فهرستِ نوعِ کارت‌ها برای منویِ انتخاب.
    *
-   * از `designs` مشتق می‌شود و نه یک درخواستِ جدا: همان داده را دارد
-   * (`card_type_id` و `card_type_name`) و یک رفت‌وبرگشتِ اضافه فقط
-   * صفحه را کندتر می‌کرد.
-   *
-   * یکتاسازی لازم است چون یک نوع کارت می‌تواند چند طرح داشته باشد
-   * (نسخه‌های مختلفِ همان کارت) و منو نباید نامِ تکراری نشان دهد.
+   * از کارت‌های گروه‌بندی‌شده مشتق می‌شود و نه یک درخواستِ جدا: همان
+   * `card_type_id` و نام را دارد و هر کارت دقیقاً یک گزینه می‌شود.
    */
   const cardTypeOptions = (() => {
     const seen = new Map();
-    for (const d of designs || []) {
-      if (d.card_type_id && !seen.has(d.card_type_id)) {
-        seen.set(d.card_type_id, {
-          id: d.card_type_id, name: d.card_type_name || '—',
+    for (const card of cards || []) {
+      if (card.card_type_id && !seen.has(card.card_type_id)) {
+        seen.set(card.card_type_id, {
+          id: card.card_type_id, name: card.card_type_name || '—',
         });
       }
     }
@@ -675,96 +637,40 @@ export function PhotoCardsPage({ request }) {
 
       {/* ───────── طرح‌ها و کارت‌های ثبت‌شده ───────── */}
       <Card
-        title={`کارت‌ها و طرح‌های ثبت‌شده (${designs ? designs.length : 0})`}
-        subtitle="مشاهده و ویرایش مشخصات کارت‌ها، آمار ثبت، و افزودن کدهای جدید به کارت‌های ثبت‌شده."
+        title={`کارت‌های ثبت‌شده (${cards ? cards.length : 0})`}
+        subtitle="هر ردیف یک کارت است؛ تصاویر رو و پشت فقط نمونه‌های مستقل تشخیص همان کارت‌اند. ویرایش، کدها، وضعیت و حذف روی کل کارت اعمال می‌شود."
       >
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
-          {(designs || []).map(d => (
-            <div key={d.id} className="card" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8, opacity: d.is_active ? 1 : 0.6 }}>
-              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                <img src={assetUrl(d.image_url)} alt={d.card_type_name} style={{ width: 48, height: 64, objectFit: 'cover', borderRadius: 6 }} />
-                <div style={{ flex: 1 }}>
-                  <b style={{ fontSize: 14 }}>{d.card_type_name || 'نامشخص'}</b>
-                  <div style={{ fontSize: 12, color: '#94A3B8' }}>{fmtNumber(d.point_value || 0)} امتیاز</div>
-                  <div style={{ fontSize: 11, color: '#64748B' }}>{fmtNumber(d.redeemed_count || 0)} بار ثبت شده</div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 6, marginTop: 'auto' }}>
-                <Button size="sm" icon={Pencil} onClick={() => openEditCard(d)}>
-                  ویرایش کارت و افزودن کد
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => toggleDesign(d)}>
-                  {d.is_active ? 'غیرفعال' : 'فعال کن'}
-                </Button>
-              </div>
-            </div>
+        {cards === null && <Skeleton height={90} />}
+        {cards && cards.length === 0 && (
+          <EmptyState icon={ImageIcon} title="هنوز کارتی ثبت نشده"
+            message="اولین کارت را با عکس رو و در صورت وجود عکس پشت، از بالا ثبت کنید." />
+        )}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
+          {(cards || []).map(card => (
+            <GroupedCardTile
+              key={card.card_type_id}
+              card={card}
+              deleting={deletingCardId === card.card_type_id}
+              onEdit={openEditCard}
+              onToggle={toggleCard}
+              onDelete={deleteCard}
+            />
           ))}
         </div>
       </Card>
 
-      {/* ───────── مودال ویرایش کارت ───────── */}
       {editingCard && (
-        <div className="modalShade" onClick={() => !editSaving && setEditingCard(null)}>
-          <div className="publicModal" style={{ maxWidth: 540 }} onClick={e => e.stopPropagation()}>
-            <button className="close" onClick={() => !editSaving && setEditingCard(null)}>×</button>
-            <h2>ویرایش کارت «{editingCard.card_type_name}»</h2>
-            <p className="topbar-sub">تغییر امتیاز، استات دوئل، یا افزودن کدهای جدید به این کارت</p>
-
-            <div className="stack" style={{ marginTop: 14 }}>
-              <Field label="نام کارت">
-                <Input value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} />
-              </Field>
-              <div className="card-grid cols-2">
-                <Field label="امتیاز کارت">
-                  <Input type="number" min="0" value={editForm.points} onChange={e => setEditForm({ ...editForm, points: e.target.value })} />
-                </Field>
-                <Field label="جایزه نقدی (تومان)">
-                  <Input type="number" min="0" value={editForm.cash} onChange={e => setEditForm({ ...editForm, cash: e.target.value })} />
-                </Field>
-              </div>
-
-              <div className="card" style={{ padding: 10 }}>
-                <b>استات دوئل کارت (Ghost)</b>
-                <div className="card-grid cols-3" style={{ marginTop: 6 }}>
-                  {[
-                    ['attack', 'حمله'], ['defense', 'دفاع'], ['speed', 'سرعت'],
-                    ['technique', 'تکنیک'], ['goalChance', 'شانس گل'], ['energy', 'انرژی'],
-                  ].map(([k, label]) => (
-                    <Field key={k} label={label}>
-                      <Input type="number" min="0" max="100" value={editForm.duel[k] ?? 50}
-                        onChange={e => setEditForm({ ...editForm, duel: { ...editForm.duel, [k]: e.target.value } })} />
-                    </Field>
-                  ))}
-                </div>
-              </div>
-
-              <Field label="افزودن کدهای جدید برای این کارت (اختیاری — هر خط یک کد)">
-                <Textarea
-                  rows={4}
-                  dir="ltr"
-                  className="codeInput"
-                  value={editForm.newCodes}
-                  onChange={e => setEditForm({ ...editForm, newCodes: e.target.value })}
-                  placeholder={"GHP-A2B3-C4D5\nGHP-X7K9-M1N2\n…"}
-                />
-              </Field>
-              {editForm.newCodes.trim() && (
-                <Field label="برچسب دسته کدهای جدید">
-                  <Input value={editForm.newBatch} onChange={e => setEditForm({ ...editForm, newBatch: e.target.value })} placeholder="مثلاً: چاپ مجدد آذر" />
-                </Field>
-              )}
-
-              <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
-                <Button loading={editSaving} onClick={saveCardEdit}>
-                  ذخیره تغییرات
-                </Button>
-                <Button variant="secondary" disabled={editSaving} onClick={() => setEditingCard(null)}>
-                  انصراف
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <EditGroupedCardModal
+          card={editingCard}
+          request={request}
+          notify={notify}
+          onClose={() => setEditingCard(null)}
+          onSaved={() => {
+            loadDesigns();
+            loadCodes();
+            loadCodeList();
+          }}
+        />
       )}
 
       {/* ───────── ۲. بانک کد ───────── */}
@@ -1284,32 +1190,9 @@ export function PhotoCardsPage({ request }) {
         ))}
       </Card>
 
-      {/* ───────── فهرست طرح‌ها ───────── */}
-      <Card title="طرح‌های ثبت‌شده"
-        subtitle="کارت غیرفعال دیگر با عکس کاربران تطبیق داده نمی‌شود.">
-        {designs === null && <Skeleton height={90} />}
-        {designs && designs.length === 0 && (
-          <EmptyState icon={ImageIcon} title="هنوز طرحی نیست"
-            message="اولین عکس خام را از بالا آپلود کنید." />
-        )}
-        <div className="designGrid">
-          {designs && designs.map(d => (
-            <div key={d.id} className={`designTile${d.is_active ? '' : ' off'}`}>
-              <img src={assetUrl(d.image_url)} alt={d.card_type_name} loading="lazy" />
-              <div className="designInfo">
-                <b>{d.card_type_name}</b>
-                <span>{fmtNumber(d.point_value)} امتیاز</span>
-                <small>
-                  <Clock size={11} /> {fmtNumber(d.redeemed_count)} بار ثبت شده
-                </small>
-              </div>
-              <Button size="sm" variant="secondary" onClick={() => toggleDesign(d)}>
-                {d.is_active ? 'غیرفعال کن' : 'فعال کن'}
-              </Button>
-            </div>
-          ))}
-        </div>
-      </Card>
+      {/* The old flat per-image list was intentionally removed: showing front
+          and back as separate editable cards caused duplicate counts and
+          half-active cards. The grouped list above contains every action. */}
     </div>
   );
 }

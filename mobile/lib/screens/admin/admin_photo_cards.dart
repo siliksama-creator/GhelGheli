@@ -26,6 +26,9 @@ import '../../theme/tokens.dart';
 import '../../widgets/safe_image.dart';
 import '../../widgets/state_views.dart';
 import 'widgets/form_section.dart';
+import 'photo_cards/card_group.dart';
+import 'photo_cards/grouped_card_tile.dart';
+import 'photo_cards/edit_grouped_card_sheet.dart';
 
 class AdminPhotoCards extends StatefulWidget {
   final ApiClient api;
@@ -36,7 +39,7 @@ class AdminPhotoCards extends StatefulWidget {
 }
 
 class _AdminPhotoCardsState extends State<AdminPhotoCards> {
-  List _designs = [];
+  List<Map<String, dynamic>> _cards = [];
   Map _stats = const {};
   List _submissions = [];
   List _options = [];
@@ -149,17 +152,15 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
 
   /// (شناسهٔ نوعِ کارت، نام) — برای منویِ انتخاب.
   ///
-  /// از `_designs` مشتق می‌شود و نه یک درخواستِ جدا: همان داده را دارد.
-  /// یکتاسازی لازم است چون یک نوع کارت می‌تواند چند طرح داشته باشد و
-  /// منو نباید نامِ تکراری نشان دهد.
+  /// کارت‌های گروه‌بندی‌شده مستقیماً یک گزینه به‌ازای هر نوع می‌دهند.
   List<(String, String)> get _cardTypeOptions {
-    final seen = <String, String>{};
-    for (final d in _designs) {
-      final id = d is Map ? d['card_type_id']?.toString() : null;
-      if (id == null || id.isEmpty || seen.containsKey(id)) continue;
-      seen[id] = (d['card_type_name'] ?? '—').toString();
-    }
-    final out = seen.entries.map((e) => (e.key, e.value)).toList()
+    final out = _cards
+        .map((card) => (
+              card['card_type_id']?.toString() ?? '',
+              (card['card_type_name'] ?? '—').toString(),
+            ))
+        .where((entry) => entry.$1.isNotEmpty)
+        .toList()
       ..sort((a, b) => a.$2.compareTo(b.$2));
     return out;
   }
@@ -211,7 +212,7 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
       ]);
       if (!mounted) return;
       setState(() {
-        _designs = (r[0]['designs'] as List?) ?? const [];
+        _cards = groupedPhotoCards(Map.from(r[0] as Map));
         _stats = (r[1]['stats'] as Map?) ?? const {};
         _submissions = (r[2]['submissions'] as List?) ?? const [];
         _options = (r[3]['options'] as List?) ?? const [];
@@ -441,12 +442,54 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
     }
   }
 
-  Future<void> _toggleDesign(Map d) async {
+  Future<void> _toggleCard(Map card) async {
     try {
       await widget.api.patch(
-        '/api/admin/photo-cards/designs/${d['id']}',
-        {'isActive': !(d['is_active'] == true)},
+        '/api/admin/photo-cards/card-types/${card['card_type_id']}',
+        {'isActive': !(card['is_active'] == true)},
       );
+      _snack(card['is_active'] == true
+          ? 'کارت و همهٔ تصاویرش غیرفعال شدند'
+          : 'کارت و همهٔ تصاویرش فعال شدند');
+      await _load();
+    } catch (e) {
+      _snack(apiError(e));
+    }
+  }
+
+  Future<void> _deleteCard(Map card) async {
+    final name = '${card['card_type_name'] ?? 'این کارت'}';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('حذف کارت «$name»'),
+        content: const Text(
+          'روی کارت، پشت کارت و کدهای هرگز مصرف‌نشده با هم حذف می‌شوند. '
+          'اگر سابقهٔ کاربر یا کد مصرف‌شده وجود داشته باشد، سرور برای '
+          'حفظ سابقه اجازهٔ حذف نمی‌دهد.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('انصراف'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('حذف کامل کارت'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      final result = await widget.api.delete(
+          '/api/admin/photo-cards/card-types/${card['card_type_id']}');
+      _snack(result is Map && result['message'] != null
+          ? result['message'].toString()
+          : 'کارت حذف شد');
       await _load();
     } catch (e) {
       _snack(apiError(e));
@@ -507,154 +550,6 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
       .where((s) => s.trim().isNotEmpty)
       .length;
 
-  Future<void> _showEditCardSheet(BuildContext context, Map d) async {
-    final typeId = d['card_type_id']?.toString() ?? '';
-    final nameCtrl = TextEditingController(text: d['card_type_name']?.toString() ?? '');
-    final pointsCtrl = TextEditingController(text: (d['point_value'] ?? 0).toString());
-    final cashCtrl = TextEditingController(text: (d['cash_amount'] ?? 0).toString());
-    final atkCtrl = TextEditingController(text: (d['duel_attack'] ?? 50).toString());
-    final defCtrl = TextEditingController(text: (d['duel_defense'] ?? 50).toString());
-    final spdCtrl = TextEditingController(text: (d['duel_speed'] ?? 50).toString());
-    final tecCtrl = TextEditingController(text: (d['duel_technique'] ?? 50).toString());
-    final goalCtrl = TextEditingController(text: (d['duel_goal_chance'] ?? 50).toString());
-    final energyCtrl = TextEditingController(text: (d['duel_energy'] ?? 100).toString());
-    final newCodesCtrl = TextEditingController();
-    final newBatchCtrl = TextEditingController();
-    bool saving = false;
-
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF0E1826),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) => Padding(
-          padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(ctx).viewInsets.bottom + 16),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text('ویرایش کارت «${d['card_type_name']}»',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.white)),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close_rounded, color: Colors.white70),
-                      onPressed: () => Navigator.pop(ctx),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(labelText: 'نام کارت'),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: pointsCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'امتیاز کارت'),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: cashCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'جایزه نقدی (تومان)'),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                const Text('استات دوئل کارت (۰ تا ۱۰۰)',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF38BDF8))),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Expanded(child: TextField(controller: atkCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'حمله'))),
-                    const SizedBox(width: 6),
-                    Expanded(child: TextField(controller: defCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'دفاع'))),
-                    const SizedBox(width: 6),
-                    Expanded(child: TextField(controller: spdCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'سرعت'))),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Expanded(child: TextField(controller: tecCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'تکنیک'))),
-                    const SizedBox(width: 6),
-                    Expanded(child: TextField(controller: goalCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'شانس گل'))),
-                    const SizedBox(width: 6),
-                    Expanded(child: TextField(controller: energyCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'انرژی'))),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: newCodesCtrl,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'افزودن کدهای جدید برای این کارت (اختیاری)',
-                    hintText: 'هر خط یک کد\nGHP-A2B3-C4D5\n…',
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: newBatchCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'برچسب دسته کدهای جدید (اختیاری)',
-                  ),
-                ),
-                const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: saving ? null : () async {
-                    setModalState(() => saving = true);
-                    try {
-                      // 1. Update card type
-                      await widget.api.patch('/api/admin/photo-cards/card-types/$typeId', {
-                        'name': nameCtrl.text.trim(),
-                        'pointValue': int.tryParse(pointsCtrl.text) ?? 0,
-                        'cashAmount': int.tryParse(cashCtrl.text) ?? 0,
-                        'duelAttack': int.tryParse(atkCtrl.text) ?? 50,
-                        'duelDefense': int.tryParse(defCtrl.text) ?? 50,
-                        'duelSpeed': int.tryParse(spdCtrl.text) ?? 50,
-                        'duelTechnique': int.tryParse(tecCtrl.text) ?? 50,
-                        'duelGoalChance': int.tryParse(goalCtrl.text) ?? 50,
-                        'duelEnergy': int.tryParse(energyCtrl.text) ?? 100,
-                      });
-
-                      // 2. Add codes if typed
-                      if (newCodesCtrl.text.trim().isNotEmpty) {
-                        await widget.api.post('/api/admin/photo-cards/card-types/$typeId/add-codes', {
-                          'rawCodes': newCodesCtrl.text.trim(),
-                          'batchLabel': newBatchCtrl.text.trim().isNotEmpty ? newBatchCtrl.text.trim() : null,
-                        });
-                      }
-                      if (context.mounted) Navigator.pop(ctx);
-                      _snack('مشخصات کارت با موفقیت به‌روزرسانی شد');
-                      await _load();
-                    } catch (e) {
-                      _snack(apiError(e));
-                    } finally {
-                      setModalState(() => saving = false);
-                    }
-                  },
-                  child: Text(saving ? 'در حال ذخیره...' : 'ذخیره تغییرات'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
     @override
   Widget build(BuildContext context) {
     if (_loading) return const LoadingView();
@@ -674,7 +569,7 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
           const SizedBox(height: Gaps.md),
           _reviewQueue(context),
           const SizedBox(height: Gaps.md),
-          _designList(context),
+          _cardList(context),
           const SizedBox(height: Gaps.xl),
         ],
       ),
@@ -1554,89 +1449,34 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
     );
   }
 
-  // ── ۴. فهرست طرح‌ها ──
-  Widget _designList(BuildContext context) {
-    final theme = Theme.of(context);
+  // ── ۴. فهرست کارت‌های گروه‌بندی‌شده ──
+  Widget _cardList(BuildContext context) {
     return FormSection(
-      title: 'طرح‌های ثبت‌شده',
-      subtitle: 'کارت غیرفعال دیگر با عکس کاربران تطبیق داده نمی‌شود.',
+      title: 'کارت‌های ثبت‌شده (${faNum(_cards.length)})',
+      subtitle: 'هر ردیف یک کارت است. تصاویر رو و پشت مستقل تشخیص داده '
+          'می‌شوند، اما ویرایش، کد، وضعیت و حذف برای کل کارت است.',
       children: [
-        if (_designs.isEmpty)
+        if (_cards.isEmpty)
           const EmptyState(
             icon: Icons.image_outlined,
-            title: 'هنوز طرحی نیست',
-            message: 'اولین عکس خام را از بالا آپلود کنید.',
+            title: 'هنوز کارتی نیست',
+            message: 'اولین کارت را با عکس رو و در صورت وجود پشت ثبت کنید.',
           ),
-        for (final d in _designs.cast<Map>())
-          Container(
-            margin: const EdgeInsets.only(bottom: Gaps.xs),
-            padding: const EdgeInsets.all(Gaps.xs),
-            decoration: BoxDecoration(
-              borderRadius: Corners.rMd,
-              color:
-                  theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        for (final card in _cards)
+          GroupedPhotoCardTile(
+            card: card,
+            onEdit: () => showEditGroupedPhotoCardSheet(
+              context: context,
+              api: widget.api,
+              card: card,
+              onSaved: _load,
+              showMessage: _snack,
             ),
-            child: Opacity(
-              // غیرفعال کم‌رنگ می‌شود ولی نه آن‌قدر که خوانده نشود.
-              opacity: d['is_active'] == true ? 1 : 0.55,
-              child: Row(
-                children: [
-                  ClipRRect(
-                    borderRadius: Corners.rSm,
-                    child: SafeImage(
-                        url: '${d['image_url'] ?? ''}',
-                        width: 46,
-                        height: 62,
-                        fit: BoxFit.cover),
-                  ),
-                  const SizedBox(width: Gaps.sm),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('${d['card_type_name'] ?? '—'}',
-                            style: theme.textTheme.titleSmall),
-                        Text('${faNum(d['point_value'] ?? 0)} امتیاز',
-                            style: theme.textTheme.bodySmall),
-                        Text('${faNum(d['redeemed_count'] ?? 0)} بار ثبت شده',
-                            style: theme.textTheme.labelSmall),
-                      ],
-                    ),
-                  ),
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          minimumSize: const Size(0, 32),
-                        ),
-                        icon: const Icon(Icons.edit_rounded, size: 14),
-                        label: const Text('ویرایش', style: TextStyle(fontSize: 11)),
-                        onPressed: () => _showEditCardSheet(context, d),
-                      ),
-                      const SizedBox(height: 4),
-                      TextButton(
-                        style: TextButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          minimumSize: const Size(0, 24),
-                        ),
-                        onPressed: () => _toggleDesign(d),
-                        child: Text(
-                          d['is_active'] == true ? 'غیرفعال' : 'فعال کن',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: d['is_active'] == true ? const Color(0xFFEF4444) : const Color(0xFF22C58B),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+            onToggle: () => _toggleCard(card),
+            onDelete: () => _deleteCard(card),
           ),
       ],
     );
   }
+
 }

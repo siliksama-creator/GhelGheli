@@ -6,7 +6,6 @@
 // backend/src/services/tapGameService.js, so a drift between the two clients
 // shows up as one platform silently losing taps.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { play as playSfx } from './gameAudio.js';
 import { req } from './lib/api.js';
 import { SvgIcon } from './components/IconAsset.jsx';
 
@@ -275,7 +274,6 @@ export default function TapGame({ token, onBack }) {
   const [rate, setRate] = useState(0);
   const [floaters, setFloaters] = useState([]);
   const [pulse, setPulse] = useState(false);
-  const [squash, setSquash] = useState(false);
 
   const guardRef = useRef(createGuard());
   const seqRef = useRef(0);
@@ -287,7 +285,6 @@ export default function TapGame({ token, onBack }) {
   // Remaining slowdown guard: accepted taps are capped, but rejected bursts
   // can be far denser. Keep telemetry exact while limiting UI/audio churn.
   const lastRejectedUi = useRef(-1000000);
-  const lastTapFeedback = useRef(-1000000);
   // performance.now() is monotonic: changing the device clock cannot reset
   // the rate-limit window, which Date.now() would allow.
   const clock = useCallback(() => Math.round(performance.now()), []);
@@ -548,8 +545,17 @@ export default function TapGame({ token, onBack }) {
     if (e && e.isTrusted === false) return;
 
     const verdict = registerTap(guardRef.current, clock());
-    setSquash(true);
-    later(() => setSquash(false), 110);
+    // Use the compositor directly instead of two React state changes and a
+    // timer per tap. Restarting the tiny transform animation is allocation-
+    // bounded even during a long burst and does not rebuild the game tree.
+    areaRef.current?.animate(
+      [
+        { transform: 'scale(1, 1)' },
+        { transform: 'scale(1.05, .94)', offset: 0.42 },
+        { transform: 'scale(1, 1)' },
+      ],
+      { duration: 170, easing: 'ease-out' },
+    );
 
     if (verdict !== 'accepted') {
       batchRef.current.flagged++;
@@ -629,23 +635,16 @@ export default function TapGame({ token, onBack }) {
       saveProgress(next);
 
       if (leveled) {
-        playSfx('match_found');
         setPulse(true);
         later(() => setPulse(false), 450);
         if (skinIndexForLevel(lv) !== prevSkin) {
-          playSfx('win');
           setNotice('شخصیت جدید باز شد! ');
           later(() => setNotice(''), 2500);
         }
         // A level boundary is a natural checkpoint.
         later(() => flush(true), 0);
-      } else {
-        const now = clock();
-        if (now - lastTapFeedback.current >= 70) {
-          lastTapFeedback.current = now;
-          playSfx('tap', 0.5);
-        }
-        if (batchRef.current.taps >= TAP_CONFIG.maxBatchTaps) later(() => flush(), 0);
+      } else if (batchRef.current.taps >= TAP_CONFIG.maxBatchTaps) {
+        later(() => flush(), 0);
       }
       return next;
     });
@@ -710,7 +709,7 @@ export default function TapGame({ token, onBack }) {
         </div>
       ) : (
         <div
-          className={`tapArea${squash ? ' squash' : ''}${pulse ? ' pulse' : ''}`}
+          className={`tapArea${pulse ? ' pulse' : ''}`}
           ref={areaRef}
           onPointerDown={handleTap}
           role="button"

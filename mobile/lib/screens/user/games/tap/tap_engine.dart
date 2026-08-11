@@ -19,7 +19,7 @@ import 'tap_guard.dart';
 import 'tap_storage.dart';
 import 'tap_sync.dart';
 
-/// Emitted for one-shot UI reactions (sound, haptics, confetti).
+/// Emitted for one-shot UI reactions (haptics, dialogs, animation).
 enum TapEvent {
   tap,
   rejected,

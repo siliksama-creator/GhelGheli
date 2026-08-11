@@ -10,9 +10,23 @@ const path = require('path');
 const YAML = require('yaml');
 
 const root = path.join(__dirname, '..');
+function routeFiles(dir) {
+  const found = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) found.push(...routeFiles(full));
+    else if (entry.isFile() && entry.name.endsWith('.js')) found.push(full);
+  }
+  return found;
+}
+
+// server.js owns the unprefixed health route. Every focused router is mounted
+// at /api, including nested photo-card route modules. Discovering recursively
+// keeps documentation generation compatible with modularizing server.js.
 const files = [
   ['src/server.js', false],
-  ['src/routes/photoCards.js', true],
+  ...routeFiles(path.join(root, 'src', 'routes'))
+    .map(full => [path.relative(root, full), true]),
 ];
 const routeRe = /\b(app|router)\.(get|post|put|patch|delete)\s*\(\s*['"`]([^'"`]+)['"`]/g;
 const publicRoutes = new Set([

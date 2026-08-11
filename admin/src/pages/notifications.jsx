@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Megaphone, Users, Clock, ShieldAlert } from 'lucide-react';
+import { Megaphone, Clock, ShieldAlert } from 'lucide-react';
 import { Button, Card, Field, Input, Textarea } from '../components/ui.jsx';
 import { useToast } from '../lib/toast.jsx';
 
@@ -11,13 +11,17 @@ export function NotificationsPage({ request }) {
   const [force, setForce] = useState(false);
   const [sending, setSending] = useState(false);
   const [tehranHour, setTehranHour] = useState(new Date().getHours());
+  const [pushStatus, setPushStatus] = useState(null);
 
   useEffect(() => {
     try {
       const h = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Tehran', hour: 'numeric', hour12: false }).format(new Date()));
       setTehranHour(h);
     } catch {}
-  }, []);
+    request('/api/admin/notifications/status')
+      .then(setPushStatus)
+      .catch(() => setPushStatus({ fcmConfigured: false }));
+  }, [request]);
 
   const isDaytime = tehranHour >= 10 && tehranHour < 22;
 
@@ -61,6 +65,19 @@ export function NotificationsPage({ request }) {
             <b>ساعت فعلی تهران: {tehranHour}:00</b> — {isDaytime ? 'ساعت مجاز ارسال روزانه (۱۰ تا ۲۲) ✅' : 'ساعت شبانه (ارسال در صورت لزوم نیاز به تیک اجباری دارد) ⚠️'}
           </div>
         </div>
+
+        {pushStatus && (
+          <div style={{
+            padding: '9px 12px', marginBottom: 14, borderRadius: 12,
+            background: pushStatus.fcmConfigured ? 'rgba(34,197,94,.12)' : 'rgba(245,158,11,.14)',
+            display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5,
+          }}>
+            <ShieldAlert size={17} />
+            {pushStatus.fcmConfigured
+              ? 'Firebase فعال است: اعلان درون‌برنامه‌ای و پوش ارسال می‌شود.'
+              : 'Firebase فعال نیست: فقط اعلان درون‌برنامه‌ای ثبت می‌شود.'}
+          </div>
+        )}
 
         <form onSubmit={send} className="stack">
           <Field label="گروه هدف (سگمنت کاربران)">

@@ -12,7 +12,8 @@ import 'widgets/form_section.dart';
 import 'widgets/image_url_field.dart';
 
 /// Reward-tier + claims administration. Same endpoints as legacy
-/// `AdminRewards` (max 30 tiers, cash/physical types, claim status updates).
+/// `AdminRewards` (max 500 active tiers, card requirements, cash/physical
+/// types, grouping, and claim status updates).
 class AdminRewards extends StatefulWidget {
   final ApiClient api;
   const AdminRewards({super.key, required this.api});
@@ -25,6 +26,7 @@ class _AdminRewardsState extends State<AdminRewards> {
   List _rewards = [];
   List _claims = [];
   List _groups = [];
+  List _cardTypes = [];
   String? _groupId;          // group for the tier being created
   final _groupName = TextEditingController();
   String _groupType = 'mixed';
@@ -83,6 +85,7 @@ class _AdminRewardsState extends State<AdminRewards> {
         widget.api.get('/api/admin/rewards'),
         widget.api.get('/api/admin/reward-claims'),
         widget.api.get('/api/admin/reward-groups'),
+        widget.api.get('/api/admin/card-types'),
       ]);
       final rewards = results[0];
       final claims = results[1];
@@ -92,6 +95,7 @@ class _AdminRewardsState extends State<AdminRewards> {
           _rewards = rewards;
           _claims = claims;
           _groups = groups.where((g) => g['id'] != null).toList();
+          _cardTypes = results[3] is List ? results[3] as List : const [];
           _loading = false;
         });
       }
@@ -178,9 +182,9 @@ class _AdminRewardsState extends State<AdminRewards> {
   }
 
   Future<void> _add() async {
-    if (_rewards.length >= 30) {
+    if (_rewards.length >= 500) {
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('حداکثر ۳۰ جایزه قابل تعریف است')));
+          const SnackBar(content: Text('حداکثر ۵۰۰ جایزهٔ فعال قابل تعریف است')));
       return;
     }
     final name = _name.text.trim();
@@ -227,6 +231,123 @@ class _AdminRewardsState extends State<AdminRewards> {
       }
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _editRequiredCards(Map reward) async {
+    final rows = ((reward['required_cards'] as List?) ?? const [])
+        .whereType<Map>()
+        .map((item) => <String, dynamic>{
+              'cardTypeId': item['cardTypeId']?.toString() ?? '',
+              'quantity': (item['quantity'] as num?)?.toInt() ?? 1,
+            })
+        .toList();
+    final result = await showDialog<List<Map<String, dynamic>>>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text('کارت‌های لازم برای «${reward['name']}»'),
+          content: SizedBox(
+            width: 520,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'کاربر علاوه بر امتیاز باید این کارت‌ها را داشته باشد. '
+                    'هنگام دریافت جایزه همین تعداد از موجودی کم می‌شود.',
+                  ),
+                  const SizedBox(height: Gaps.sm),
+                  for (var index = 0; index < rows.length; index++)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: Gaps.xs),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              initialValue: rows[index]['cardTypeId'] as String,
+                              decoration: const InputDecoration(labelText: 'کارت'),
+                              items: [
+                                const DropdownMenuItem(value: '', child: Text('انتخاب کارت...')),
+                                for (final card in _cardTypes.whereType<Map>())
+                                  DropdownMenuItem(
+                                    value: '${card['id']}',
+                                    child: Text('${card['name']}', overflow: TextOverflow.ellipsis),
+                                  ),
+                              ],
+                              onChanged: (value) => rows[index]['cardTypeId'] = value ?? '',
+                            ),
+                          ),
+                          const SizedBox(width: Gaps.xs),
+                          SizedBox(
+                            width: 90,
+                            child: TextFormField(
+                              initialValue: '${rows[index]['quantity']}',
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(labelText: 'تعداد'),
+                              onChanged: (value) => rows[index]['quantity'] = int.tryParse(value) ?? 1,
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'حذف',
+                            onPressed: () => setDialogState(() => rows.removeAt(index)),
+                            icon: const Icon(Icons.delete_outline_rounded),
+                          ),
+                        ],
+                      ),
+                    ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: rows.length >= 20
+                          ? null
+                          : () => setDialogState(() => rows.add({
+                                'cardTypeId': '', 'quantity': 1,
+                              })),
+                      icon: const Icon(Icons.add_rounded),
+                      label: const Text('افزودن کارت'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('انصراف'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final valid = rows.every((row) =>
+                    (row['cardTypeId'] as String).isNotEmpty &&
+                    (row['quantity'] as int) >= 1 &&
+                    (row['quantity'] as int) <= 999);
+                final ids = rows.map((row) => row['cardTypeId']).toSet();
+                if (!valid || ids.length != rows.length) return;
+                Navigator.pop(dialogContext, rows);
+              },
+              child: const Text('ذخیره'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result == null) return;
+    try {
+      await widget.api.put('/api/admin/rewards/${reward['id']}/cards', {
+        'cards': result,
+      });
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('کارت‌های موردنیاز ذخیره شد')));
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(apiError(error))));
+      }
     }
   }
 
@@ -395,7 +516,7 @@ class _AdminRewardsState extends State<AdminRewards> {
                 controller: _desc,
                 decoration: const InputDecoration(labelText: 'توضیحات')),
             FilledButton.icon(
-              onPressed: (_saving || _rewards.length >= 30) ? null : _add,
+              onPressed: (_saving || _rewards.length >= 500) ? null : _add,
               icon: _saving
                   ? const SizedBox(
                       width: 16,
@@ -436,25 +557,35 @@ class _AdminRewardsState extends State<AdminRewards> {
                               : '${faNum(r['required_points'])} امتیاز — ${r['reward_value']}',
                         ),
                         trailing: SizedBox(
-                          width: 132,
-                          child: DropdownButtonFormField<String?>(
-                            initialValue: r['group_id'] as String?,
-                            isDense: true,
-                            decoration: const InputDecoration(
-                                labelText: 'گروه', isDense: true),
-                            items: [
-                              const DropdownMenuItem<String?>(
-                                  value: null, child: Text('بدون گروه')),
-                              for (final g
-                                  in _groups.where((g) => g['id'] != null))
-                                DropdownMenuItem<String?>(
-                                    value: '${g['id']}',
-                                    child: Text('${g['name']}',
-                                        overflow: TextOverflow.ellipsis)),
+                          width: 190,
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: DropdownButtonFormField<String?>(
+                                  initialValue: r['group_id'] as String?,
+                                  isDense: true,
+                                  decoration: const InputDecoration(
+                                      labelText: 'گروه', isDense: true),
+                                  items: [
+                                    const DropdownMenuItem<String?>(
+                                        value: null, child: Text('بدون گروه')),
+                                    for (final g in _groups.where((g) => g['id'] != null))
+                                      DropdownMenuItem<String?>(
+                                          value: '${g['id']}',
+                                          child: Text('${g['name']}',
+                                              overflow: TextOverflow.ellipsis)),
+                                  ],
+                                  onChanged: r['id'] == null
+                                      ? null
+                                      : (v) => _moveTier('${r['id']}', v),
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: 'کارت‌های لازم',
+                                onPressed: () => _editRequiredCards(r),
+                                icon: const Icon(Icons.style_rounded),
+                              ),
                             ],
-                            onChanged: r['id'] == null
-                                ? null
-                                : (v) => _moveTier('${r['id']}', v),
                           ),
                         ),
                       ))

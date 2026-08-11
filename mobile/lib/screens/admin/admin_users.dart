@@ -196,6 +196,46 @@ class _AdminUsersState extends State<AdminUsers> {
     }
   }
 
+  Future<void> _notifyUser(String id) async {
+    final controller = TextEditingController();
+    final message = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('پیام اختصاصی مدیریت'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLines: 4,
+          decoration: const InputDecoration(
+            labelText: 'متن پیام',
+            hintText: 'این پیام در زنگولهٔ کاربر نمایش داده می‌شود',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('انصراف'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, controller.text.trim()),
+            child: const Text('ارسال'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (message == null || message.isEmpty) return;
+    try {
+      await widget.api.post('/api/admin/users/$id/notify', {
+        'title': 'پیام اختصاصی مدیریت',
+        'body': message,
+      });
+      _snack('پیام اختصاصی ارسال شد');
+    } catch (error) {
+      _snack(apiError(error));
+    }
+  }
+
   Future<void> _resetPassword(String id) async {
     final controller = TextEditingController();
     final value = await showDialog<String>(
@@ -421,6 +461,8 @@ class _AdminUsersState extends State<AdminUsers> {
                             await _adjustPoints(u['id']);
                           } else if (s == 'reset_password') {
                             await _resetPassword(u['id']);
+                          } else if (s == 'notify') {
+                            await _notifyUser(u['id']);
                           } else {
                             await widget.api.patch(
                                 '/api/admin/users/${u['id']}/status',
@@ -436,6 +478,9 @@ class _AdminUsersState extends State<AdminUsers> {
                           const PopupMenuItem(
                               value: 'reset_password',
                               child: Text('بازیابی رمز عبور')),
+                          const PopupMenuItem(
+                              value: 'notify',
+                              child: Text('ارسال پیام اختصاصی')),
                           PopupMenuItem(
                               value: u['status'] == 'active'
                                   ? 'blocked'

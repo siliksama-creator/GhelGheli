@@ -154,21 +154,38 @@ console.log('\n== queue keep-alive (bot-less games) ==');
 
 console.log('\n== JSON / 404 handling ==');
 {
-  const src = require('fs').readFileSync(
-    require('path').join(__dirname, '../src/server.js'), 'utf8');
+  const fs = require('fs');
+  const path = require('path');
+  const serverSrc = fs.readFileSync(path.join(__dirname, '../src/server.js'), 'utf8');
   // BUG: malformed JSON produced the raw English parser message, and an
   // unknown /api path returned an HTML error page to a JSON-only client.
-  ok(/entity\.parse\.failed/.test(src), 'malformed JSON returns a Persian message');
-  ok(/entity\.too\.large/.test(src), 'oversized bodies return 413, not 500');
-  ok(/این آدرس در سرور وجود ندارد/.test(src), 'unknown /api paths return JSON 404');
-  ok(/validateUuid/.test(src), 'the UUID guard is wired into the app');
+  ok(/entity\.parse\.failed/.test(serverSrc), 'malformed JSON returns a Persian message');
+  ok(/entity\.too\.large/.test(serverSrc), 'oversized bodies return 413, not 500');
+  ok(/این آدرس در سرور وجود ندارد/.test(serverSrc), 'unknown /api paths return JSON 404');
+  ok(/validateUuid/.test(serverSrc), 'the UUID guard is wired into the app');
 
-  // Every :id route must carry the guard — a new route added without it is
-  // exactly how this class of bug comes back.
-  const routes = [...src.matchAll(
-    /app\.(?:get|post|patch|put|delete)\('(\/api\/[^']*:id[^']*)',([^\n]{0,140})/g)];
-  const unguarded = routes.filter(m => !m[2].includes('validateUuid')).map(m => m[1]);
-  ok(routes.length > 20, `found ${routes.length} :id routes to check`);
+  // Every :id route in server.js OR a focused router must carry the guard.
+  // Recursive discovery is intentional: modularizing server.js must never
+  // make this security regression test blind to newly extracted routes.
+  const walkJs = dir => fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+    const full = path.join(dir, entry.name);
+    return entry.isDirectory() ? walkJs(full)
+      : (entry.isFile() && entry.name.endsWith('.js') ? [full] : []);
+  });
+  const routeFiles = [path.join(__dirname, '../src/server.js'),
+    ...walkJs(path.join(__dirname, '../src/routes'))];
+  const routeRe = /\b(?:app|router)\.(?:get|post|patch|put|delete)\s*\(\s*(['"`])([^'"`]*:id[^'"`]*)\1\s*,([\s\S]{0,260})/g;
+  const routes = [];
+  for (const file of routeFiles) {
+    const source = fs.readFileSync(file, 'utf8');
+    for (const match of source.matchAll(routeRe)) {
+      routes.push({ path: match[2], middleware: match[3] });
+    }
+  }
+  const unguarded = routes
+    .filter(route => !route.middleware.includes('validateUuid'))
+    .map(route => route.path);
+  ok(routes.length > 40, `found ${routes.length} :id routes to check`);
   ok(unguarded.length === 0,
     `every :id route validates its id${unguarded.length ? ` (missing: ${unguarded.join(', ')})` : ''}`);
 }

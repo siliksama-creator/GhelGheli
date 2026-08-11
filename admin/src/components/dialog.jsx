@@ -49,7 +49,9 @@ function DialogModal({ state, onClose, setState }) {
     <div className="modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose(isPrompt ? null : false)}>
       <div className="modal-card">
         <div className="modal-title">{state.title}</div>
-        {state.description && <p style={{ marginBottom: 12 }}>{state.description}</p>}
+        {(state.description || state.message) && (
+          <p style={{ marginBottom: 12 }}>{state.description || state.message}</p>
+        )}
         {isPrompt &&
           (state.multiline ? (
             <Textarea
@@ -74,7 +76,7 @@ function DialogModal({ state, onClose, setState }) {
             انصراف
           </Button>
           <Button variant={state.danger ? 'danger' : 'primary'} onClick={() => onClose(isPrompt ? state.value : true)}>
-            {state.confirmLabel || (isPrompt ? 'ثبت' : 'تایید')}
+            {state.confirmLabel || state.confirmText || (isPrompt ? 'ثبت' : 'تایید')}
           </Button>
         </div>
       </div>

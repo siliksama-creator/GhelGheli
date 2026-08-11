@@ -386,6 +386,12 @@ class ApiClient {
     return r.data;
   }
 
+  Future<dynamic> put(String path, Map<String, dynamic> body) async {
+    final r = await dio.put(path, data: body);
+    invalidateCache();
+    return r.data;
+  }
+
   Future<dynamic> patch(String path, Map<String, dynamic> body) async {
     final r = await dio.patch(path, data: body);
     invalidateCache();
@@ -400,6 +406,7 @@ class ApiClient {
   /// استثنا تبدیل می‌شود و پیامش به کاربر می‌رسد.
   Future<dynamic> delete(String path) async {
     final res = await dio.delete(path);
+    invalidateCache();
     return res.data;
   }
 

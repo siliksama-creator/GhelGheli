@@ -43,7 +43,14 @@ const strip = (src) => src
   .replace(/^\s*\/\/.*$/gm, '')
   .replace(/\/\*[\s\S]*?\*\//g, '');
 
-const server = strip(read('src', 'server.js'));
+const serverRaw = [
+  read('src', 'server.js'),
+  read('src', 'routes', 'adminCommunications.js'),
+  read('src', 'routes', 'adminWallet.js'),
+  read('src', 'routes', 'adminRewards.js'),
+  read('src', 'routes', 'adminLeague.js'),
+].join('\n');
+const server = strip(serverRaw);
 const league = strip(read('src', 'services', 'leagueService.js'));
 
 console.log('\n== ۱. پاسخ پشتیبانی ==');
@@ -58,7 +65,7 @@ console.log('\n== ۲. برداشت از کیف پول ==');
 {
   // این مسیر کاملاً بی‌صدا بود: مدیر تأیید می‌کرد، پول می‌رفت، و
   // کاربر هیچ خبری نداشت.
-  const idx = server.indexOf("app.patch('/api/admin/wallet/withdrawals/:id'");
+  const idx = server.indexOf("router.patch('/admin/wallet/withdrawals/:id'");
   ok(idx > 0, 'endpoint تصمیمِ برداشت پیدا شد');
   const block = server.slice(idx, idx + 3000);
 
@@ -80,9 +87,9 @@ console.log('\n== ۳. رسیدن به جایزهٔ فردی ==');
 {
   ok(/reward_threshold/.test(server), 'اعلانِ رسیدن به سطحِ جایزه هست');
   // و تصمیمِ مدیر روی درخواستِ جایزه هم باید خبر بدهد.
-  ok(/درخواست جایزه رد شد/.test(read('src', 'server.js')),
+  ok(/درخواست جایزه رد شد/.test(serverRaw),
     'ردِ درخواستِ جایزه اعلان دارد');
-  ok(/جایزهٔ نقدی به کیف پول اضافه شد/.test(read('src', 'server.js')),
+  ok(/جایزهٔ نقدی به کیف پول اضافه شد/.test(serverRaw),
     'واریزِ جایزهٔ نقدی اعلان دارد');
 }
 
@@ -123,7 +130,7 @@ console.log('\n== ۴. برندهٔ لیگ در پایان ماه ==');
 console.log('\n== ۵. اعلان هدفمند واقعاً به backend وصل است ==');
 {
   const notifications = strip(read('src', 'services', 'notificationService.js'));
-  ok(/\/api\/admin\/notifications\/send-segmented/.test(server),
+  ok(/\/admin\/notifications\/send-segmented/.test(server),
     'endpoint اعلان هدفمند روی سرور وجود دارد');
   ok(/sendSegmented/.test(server) && /sendSegmented/.test(notifications),
     'route به سرویس واقعی بخش‌بندی وصل است');
@@ -164,7 +171,7 @@ console.log('\n== هیچ اعلانی تراکنش را نمی‌شکند ==');
   // بدترین حالت rollback شدنِ یک عملیاتِ مالی است.
   //
   // قرارداد: هر فراخوانی یا `await` با try دارد، یا `.catch()`.
-  const raw = read('src', 'server.js');
+  const raw = serverRaw;
   const calls = raw.split('createNotification(').length - 1;
   ok(calls >= 10, `${calls} فراخوانیِ اعلان در سرور هست`);
 

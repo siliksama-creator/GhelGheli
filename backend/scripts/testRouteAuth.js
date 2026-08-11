@@ -38,7 +38,7 @@ function ck(name, cond, detail = '') {
 }
 
 const ROOT = path.join(__dirname, '..');
-const src = fs.readFileSync(path.join(ROOT, 'src/server.js'), 'utf8');
+const serverSource = fs.readFileSync(path.join(ROOT, 'src/server.js'), 'utf8');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // مسیرهایی که **عمداً** بدونِ احراز هویت‌اند
@@ -95,19 +95,38 @@ const PUBLIC_OK = new Map([
 // بدونِ این‌ها، یک تغییرِ قالب‌بندی می‌تواند ابزار را کور کند و ما
 // «صفر مشکل» ببینیم چون هیچ‌چیز بررسی نشده.
 const routeRe =
-  /app\.(get|post|patch|put|delete)\(\s*(['"`])([^'"`]+)\2\s*,?\s*([^)]{0,120})/g;
+  /\b(?:app|router)\.(get|post|patch|put|delete)\(\s*(['"`])([^'"`]+)\2\s*,?\s*([^)]{0,160})/g;
 
-const routes = [];
-let m;
-while ((m = routeRe.exec(src)) !== null) {
-  routes.push({
-    verb: m[1].toUpperCase(),
-    p: m[3],
-    tail: m[4].replace(/\s+/g, ' '),
+function walkJs(dir) {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+    const full = path.join(dir, entry.name);
+    return entry.isDirectory() ? walkJs(full)
+      : (entry.isFile() && entry.name.endsWith('.js') ? [full] : []);
   });
 }
 
-const declared = (src.match(/app\.(get|post|patch|put|delete)\(/g) || []).length;
+// Focused routers are all mounted at /api. Recursively scanning them is a
+// security requirement: splitting server.js must not make this guard blind.
+const sources = [
+  { source: serverSource, prefix: '' },
+  ...walkJs(path.join(ROOT, 'src/routes')).map(file => ({
+    source: fs.readFileSync(file, 'utf8'), prefix: '/api',
+  })),
+];
+const routes = [];
+let declared = 0;
+for (const item of sources) {
+  declared += (item.source.match(/\b(?:app|router)\.(get|post|patch|put|delete)\(/g) || []).length;
+  routeRe.lastIndex = 0;
+  let match;
+  while ((match = routeRe.exec(item.source)) !== null) {
+    routes.push({
+      verb: match[1].toUpperCase(),
+      p: item.prefix + match[3],
+      tail: match[4].replace(/\s+/g, ' '),
+    });
+  }
+}
 
 console.log('\n══ ۱. خودِ ابزار سالم است ══');
 ck(`${routes.length} مسیر استخراج شد`, routes.length >= 100,
