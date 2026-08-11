@@ -136,6 +136,10 @@ console.log('\n== ۵. اعلان هدفمند واقعاً به backend وصل �
     'محافظ ساعت تهران سمت سرور است، نه فقط UI');
   ok(/req\.admin\.role !== 'super_admin'/.test(server),
     'دورزدن شبانه فقط برای super-admin است');
+  ok(/firebase-admin\/app/.test(notifications)
+      && /firebase-admin\/messaging/.test(notifications)
+      && !/admin\.credential\.cert/.test(notifications),
+    'Firebase Admin v14 از API ماژولار استفاده می‌کند');
 }
 
 console.log('\n== زنگوله شمارنده دارد ==');

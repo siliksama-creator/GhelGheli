@@ -1,148 +1,380 @@
- // 1:1 با اندروید penalty_board.dart — پنالتی دقیقاً مثل اپ با تور فیزیکی و دروازه‌بان ۳بعدی
-import React, { useState, useEffect, useRef } from 'react';
+// Web penalty board, behaviorally and visually ported from Android's
+// penalty_board.dart + penalty_net.dart. Both clients consume the exact same
+// server state and emit the same {zone,power} moves, so a web player and an
+// Android player can share one Socket.IO room without translation.
+import React, { useEffect, useRef, useState } from 'react';
 import { fa } from './lib/api.js';
+import PenaltyNet from './penaltyNet.js';
+import { penaltyPowerAt, penaltyView, zoneCenter } from './penaltyModel.js';
 
-export default function PenaltyGame({ state, mySymbol, turn, onMove }) {
-  const [selectedZone, setSelectedZone] = useState(null);
-  const [power, setPower] = useState(0.7);
-  const [isHolding, setIsHolding] = useState(false);
-  const [animating, setAnimating] = useState(false);
-  const [sweetWindow, setSweetWindow] = useState({ min: 0.62, max: 0.78 });
+const GOAL = '#84CC16';
+const SAVE = '#38BDF8';
+const MISS = '#EF4444';
+const GOLD = '#FFD36B';
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const easeOutQuad = t => 1 - (1 - t) * (1 - t);
+const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
 
-  const isShooter = mySymbol === 'X';
-  const pending = state.pending || {};
-  const haveIChosen = Boolean(pending[mySymbol]);
-  const lastKick = state.lastKick;
-  const score = state.score || { X: 0, O: 0 };
-  const history = state.history || [];
-  const round = state.round || 1;
-
-  useEffect(() => {
-    // هر ضربه پنجره طلایی تصادفی جدید
-    setSweetWindow({ min: 0.45 + Math.random()*0.25, max: 0.65 + Math.random()*0.2 });
-  }, [history.length]);
-
-  useEffect(() => {
-    if (!isHolding) return;
-    let dir = 1;
-    const interval = setInterval(() => {
-      setPower(prev => {
-        let next = prev + dir * 0.035;
-        if (next >= 1.0) { next = 1.0; dir = -1; }
-        if (next <= 0.35) { next = 0.35; dir = 1; }
-        return next;
-      });
-    }, 28);
-    return () => clearInterval(interval);
-  }, [isHolding]);
-
-  useEffect(() => {
-    if (lastKick) {
-      setAnimating(true);
-      const t = setTimeout(() => setAnimating(false), 1900);
-      return () => clearTimeout(t);
+function drawNet(ctx, net, left, top, width, height) {
+  const cols = PenaltyNet.cols;
+  const rows = PenaltyNet.rows;
+  const x = (c, r) => left + width * c / (cols - 1) + net.offX(c, r, width);
+  const y = (c, r) => top + height * r / (rows - 1) + net.offY(c, r, height);
+  const line = (hot) => {
+    ctx.beginPath();
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols - 1; c++) {
+        const isHot = Math.max(Math.abs(net.depth(c, r)),
+          Math.abs(net.depth(c + 1, r))) > 0.25;
+        if (isHot !== hot) continue;
+        ctx.moveTo(x(c, r), y(c, r)); ctx.lineTo(x(c + 1, r), y(c + 1, r));
+      }
     }
-  }, [lastKick?.shotZone, lastKick?.diveZone, lastKick?.outcome]);
+    for (let c = 0; c < cols; c++) {
+      for (let r = 0; r < rows - 1; r++) {
+        const isHot = Math.max(Math.abs(net.depth(c, r)),
+          Math.abs(net.depth(c, r + 1))) > 0.25;
+        if (isHot !== hot) continue;
+        ctx.moveTo(x(c, r), y(c, r)); ctx.lineTo(x(c, r + 1), y(c, r + 1));
+      }
+    }
+    ctx.strokeStyle = hot ? 'rgba(255,255,255,.60)' : 'rgba(255,255,255,.18)';
+    ctx.lineWidth = hot ? 1.6 : 1;
+    ctx.stroke();
+  };
+  line(false); line(true);
+}
 
-  const handleShoot = () => {
-    if (selectedZone === null || haveIChosen) return;
-    onMove({ zone: selectedZone, power });
-    setSelectedZone(null);
-    setIsHolding(false);
+function drawBall(ctx, x, y, radius, spin) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(spin);
+  ctx.fillStyle = 'rgba(0,0,0,.28)';
+  ctx.beginPath(); ctx.ellipse(0, radius * 1.25, radius * .85, radius * .25, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#16202C'; ctx.beginPath(); ctx.arc(0, 0, radius * .34, 0, Math.PI * 2); ctx.fill();
+  for (let i = 0; i < 5; i++) {
+    const a = i * Math.PI * 2 / 5 - Math.PI / 2;
+    ctx.beginPath(); ctx.arc(Math.cos(a) * radius * .66,
+      Math.sin(a) * radius * .66, radius * .19, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawKeeper(ctx, x, y, tilt, size) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(tilt);
+  ctx.fillStyle = '#F59E0B';
+  ctx.beginPath(); ctx.roundRect(-size * .25, -size * .5, size * .5, size, size * .18); ctx.fill();
+  ctx.fillStyle = '#FFDBAC'; ctx.beginPath(); ctx.arc(0, -size * .68, size * .22, 0, Math.PI * 2); ctx.fill();
+  const spread = size * (.55 + Math.abs(tilt) * .5);
+  ctx.strokeStyle = '#F59E0B'; ctx.lineWidth = size * .16; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-size * .2, -size * .25); ctx.lineTo(-spread, -size * .55);
+  ctx.moveTo(size * .2, -size * .25); ctx.lineTo(spread, -size * .55); ctx.stroke();
+  ctx.fillStyle = '#22D3EE';
+  ctx.beginPath(); ctx.arc(-spread, -size * .55, size * .13, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(spread, -size * .55, size * .13, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+function drawConfetti(ctx, origin, t, scale) {
+  const fade = 1 - t;
+  if (fade <= 0) return;
+  for (let i = 0; i < 14; i++) {
+    const a = (i * 2.39996) % (Math.PI * 2);
+    const speed = .45 + ((i * 37) % 100) / 100 * .75;
+    const d = t * scale * .42 * speed;
+    const gy = t * t * scale * .30;
+    const x = origin.x + Math.cos(a) * d;
+    const y = origin.y + Math.sin(a) * d * .7 + gy;
+    const r = scale * .011 * (.6 + (i % 3) * .25) * fade;
+    ctx.fillStyle = i % 2 === 0
+      ? `rgba(132,204,22,${fade * .85})` : `rgba(255,255,255,${fade * .85})`;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
+function drawPower(ctx, power, sweet, width, height) {
+  const barW = width * .075, barH = height * .46;
+  const x = width * .03, y = height * .28;
+  const yFor = p => y + barH * (1 - clamp((p - .35) / .65));
+  ctx.fillStyle = 'rgba(0,0,0,.58)';
+  ctx.beginPath(); ctx.roundRect(x, y, barW, barH, 9); ctx.fill();
+  if (sweet) {
+    const top = yFor(sweet.max), bottom = yFor(sweet.min);
+    ctx.fillStyle = 'rgba(255,211,107,.45)';
+    ctx.strokeStyle = GOLD; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(x - 2, top, barW + 4, bottom - top, 6); ctx.fill(); ctx.stroke();
+  }
+  const fraction = clamp((power - .35) / .65);
+  const fillH = barH * fraction;
+  const inSweet = sweet && power >= sweet.min && power <= sweet.max;
+  const red = clamp((power - .5) * 2);
+  const r = Math.round(132 + (239 - 132) * red);
+  const g = Math.round(204 + (68 - 204) * red);
+  const b = Math.round(22 + (68 - 22) * red);
+  ctx.fillStyle = inSweet ? GOLD : `rgba(${r},${g},${b},.85)`;
+  ctx.beginPath(); ctx.roundRect(x, y + barH - fillH, barW, fillH, 9); ctx.fill();
+  const marker = y + barH - fillH;
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x - 3, marker); ctx.lineTo(x + barW + 3, marker); ctx.stroke();
+  ctx.strokeStyle = inSweet ? '#fff' : 'rgba(255,255,255,.55)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.roundRect(x, y, barW, barH, 9); ctx.stroke();
+}
+
+function PenaltyCanvas({ kick, animating, lastKick, selected, power, charging,
+  sweet, net }) {
+  const canvasRef = useRef(null);
+  const [sizeEpoch, setSizeEpoch] = useState(0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return undefined;
+    const observer = new ResizeObserver(() => setSizeEpoch(v => v + 1));
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const ratio = Math.min(2, window.devicePixelRatio || 1);
+    const pxW = Math.round(rect.width * ratio), pxH = Math.round(rect.height * ratio);
+    if (canvas.width !== pxW || canvas.height !== pxH) {
+      canvas.width = pxW; canvas.height = pxH;
+    }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    const w = rect.width, h = rect.height;
+    ctx.clearRect(0, 0, w, h);
+
+    ctx.fillStyle = '#0E3B1E'; ctx.fillRect(0, 0, w, h);
+    for (let i = 0; i < 8; i += 2) {
+      ctx.fillStyle = 'rgba(255,255,255,.025)';
+      ctx.fillRect(0, h * (.52 + i * .06), w, h * .06);
+    }
+    ctx.strokeStyle = 'rgba(255,255,255,.24)'; ctx.lineWidth = 2;
+    ctx.strokeRect(w * .10, h * .03, w * .80, h * .62);
+
+    const goalW = w * .78, goalH = h * .46;
+    const left = (w - goalW) / 2, top = h * .06;
+    const outcome = lastKick?.outcome;
+    const shot = lastKick?.shotZone;
+    const dive = lastKick?.diveZone;
+    const isGoal = animating && outcome === 'goal';
+    if (isGoal && kick > .60) {
+      const t = clamp((kick - .60) / .40);
+      const alpha = t < .15 ? t / .15 : (1 - (t - .15) / .85) * .75;
+      const center = shot == null ? { x: w / 2, y: top + goalH / 2 } : zoneCenter(shot, w, h);
+      const grad = ctx.createRadialGradient(center.x, center.y, 0, center.x, center.y, goalW * .7);
+      grad.addColorStop(0, `rgba(132,204,22,${.42 * alpha})`);
+      grad.addColorStop(.55, `rgba(132,204,22,${.06 * alpha})`);
+      grad.addColorStop(1, 'rgba(132,204,22,0)');
+      ctx.fillStyle = grad; ctx.fillRect(left, top, goalW, goalH);
+    }
+    drawNet(ctx, net, left, top, goalW, goalH);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(left, top + goalH); ctx.lineTo(left, top);
+    ctx.lineTo(left + goalW, top); ctx.lineTo(left + goalW, top + goalH); ctx.stroke();
+
+    const spot = { x: w / 2, y: h * .88 };
+    ctx.fillStyle = 'rgba(255,255,255,.58)'; ctx.beginPath(); ctx.arc(spot.x, spot.y, 3.5, 0, Math.PI * 2); ctx.fill();
+
+    let keeper = { x: w / 2, y: top + goalH * .72 };
+    let tilt = 0;
+    if (animating && dive != null) {
+      const target = zoneCenter(dive, w, h);
+      const t = easeOutCubic(clamp(kick / .55));
+      keeper = { x: lerp(keeper.x, target.x, t), y: lerp(keeper.y, target.y, t) };
+      tilt = (target.x - w / 2) / (goalW / 2) * .9 * t;
+    }
+    const keeperFront = animating && outcome === 'save' && kick > .38;
+    if (!keeperFront) drawKeeper(ctx, keeper.x, keeper.y, tilt, goalH * .30);
+
+    let ball = { ...spot };
+    let radius = Math.min(w, h) * .033;
+    let visible = true;
+    if (animating && shot != null) {
+      const target = zoneCenter(shot, w, h);
+      const t = clamp(kick / .62);
+      const e = easeOutQuad(t);
+      const arc = Math.sin(e * Math.PI) * h * .10 * (.5 + Number(lastKick?.power || .7) * .5);
+      ball = { x: lerp(spot.x, target.x, e), y: lerp(spot.y, target.y, e) - arc };
+      radius = lerp(radius, radius * .55, e);
+      if (outcome === 'goal' && kick > .62) {
+        const settle = easeOutCubic(clamp((kick - .62) / .38));
+        ball.y += goalH * .30 * settle; radius *= 1 - .15 * settle;
+      } else if (outcome === 'save' && kick > .62) {
+        const back = clamp((kick - .62) / .38);
+        ball = { x: lerp(ball.x, spot.x, back), y: lerp(ball.y, spot.y - h * .10, back) };
+      } else if (outcome === 'miss') {
+        const side = shot % 3 === 0 ? -1 : shot % 3 === 2 ? 1 : 0;
+        const up = Math.floor(shot / 3) === 0 ? -1 : 0;
+        const over = Math.max(0, (kick - .62) / .38);
+        ball.x += side * goalW * (.16 * e + .55 * over);
+        ball.y += up * goalH * (.28 * e + .9 * over);
+        if (over > .85) visible = false;
+      }
+    }
+    if (visible) drawBall(ctx, ball.x, ball.y, radius, animating ? kick * 14 : 0);
+    if (keeperFront) drawKeeper(ctx, keeper.x, keeper.y, tilt, goalH * .30);
+    if (isGoal && kick > .62 && shot != null) {
+      drawConfetti(ctx, zoneCenter(shot, w, h), clamp((kick - .62) / .38), Math.min(w, h));
+    }
+    if (charging) drawPower(ctx, power, sweet, w, h);
+  }, [kick, animating, lastKick, selected, power, charging, sweet, net, sizeEpoch]);
+
+  return <canvas ref={canvasRef} className="penCanvas" aria-hidden="true" />;
+}
+
+function Scoreboard({ view }) {
+  const marker = (h, i) => <i key={`${h.shooter}-${i}`}
+    className={`${h.outcome === 'goal' ? 'goal' : 'save'}${h.clean ? ' clean' : ''}`} />;
+  return (
+    <section className="penScore">
+      <div className={view.myScore > view.foeScore ? 'leading' : ''}>تو</div>
+      <strong>{fa(view.myScore)} - {fa(view.foeScore)}</strong>
+      <div className={view.foeScore > view.myScore ? 'leading' : ''}>حریف</div>
+      {view.suddenDeath && <b>مرگ ناگهانی</b>}
+      <div className="penMarkers mine">
+        {view.history.filter(h => h.shooter === view.me).map(marker)}
+      </div>
+      <div className="penMarkers foe">
+        {view.history.filter(h => h.shooter === view.foe).map(marker)}
+      </div>
+    </section>
+  );
+}
+
+function Outcome({ lastKick, me, kick }) {
+  if (!lastKick || kick <= .60) return null;
+  const mine = lastKick.shooter === me;
+  const text = lastKick.outcome === 'goal'
+    ? (mine ? 'گل زدی!' : 'گل خوردی')
+    : lastKick.outcome === 'save'
+      ? (mine ? 'مهار شد' : 'مهارش کردی!')
+      : (mine ? 'بیرون رفت' : 'بیرون زد');
+  const color = lastKick.outcome === 'goal' ? (mine ? GOAL : MISS)
+    : lastKick.outcome === 'save' ? (mine ? MISS : SAVE) : (mine ? MISS : GOAL);
+  return (
+    <div className="penOutcome" style={{ '--outcome': color }}>
+      <strong>{text}</strong>
+      {lastKick.clean && <small>ضربهٔ تمیز</small>}
+    </div>
+  );
+}
+
+export default function PenaltyGame({ state, mySymbol, onMove }) {
+  const view = penaltyView(state, mySymbol);
+  const [selected, setSelected] = useState(null);
+  const [charging, setCharging] = useState(false);
+  const [power, setPower] = useState(.7);
+  const [kick, setKick] = useState(0);
+  const [animating, setAnimating] = useState(false);
+  const [, setFrame] = useState(0);
+  const powerRef = useRef(.7);
+  const chargeStart = useRef(0);
+  const kickStart = useRef(0);
+  const played = useRef(0);
+  const netHit = useRef(false);
+  const net = useRef(new PenaltyNet());
+
+  useEffect(() => {
+    if (view.history.length > played.current && view.lastKick) {
+      played.current = view.history.length;
+      setSelected(null); setCharging(false); setKick(0); setAnimating(true);
+      kickStart.current = performance.now();
+      netHit.current = false;
+    } else if (view.history.length === 0 && played.current !== 0) {
+      played.current = 0; net.current.reset(); setKick(0); setAnimating(false);
+    }
+  }, [view.history.length, view.lastKick]);
+
+  useEffect(() => {
+    let raf = 0;
+    let previous = performance.now();
+    const tick = now => {
+      const dt = Math.min(.05, Math.max(0, (now - previous) / 1000));
+      previous = now;
+      let active = false;
+      if (charging) {
+        const p = penaltyPowerAt(now - chargeStart.current);
+        powerRef.current = p; setPower(p); active = true;
+      }
+      if (animating) {
+        const value = clamp((now - kickStart.current) / 1900);
+        setKick(value); active = value < 1;
+        if (view.lastKick?.outcome === 'goal' && value >= .62 && !netHit.current) {
+          const z = Number(view.lastKick.shotZone || 0);
+          net.current.hit(((z % 3) + .5) / 3,
+            (Math.floor(z / 3) + .5) / 3, Number(view.lastKick.power || .7));
+          netHit.current = true;
+        }
+        if (value >= 1) setAnimating(false);
+      }
+      if (!net.current.settled) { net.current.step(dt); active = true; }
+      if (active) { setFrame(v => v + 1); raf = requestAnimationFrame(tick); }
+    };
+    if (charging || animating || !net.current.settled) raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [charging, animating, view.lastKick]);
+
+  const enabled = !view.alreadyChose && !animating;
+  const startShot = (zone, event) => {
+    if (!enabled || !view.amShooter) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    setSelected(zone); setCharging(true);
+    chargeStart.current = performance.now();
+    powerRef.current = .35; setPower(.35);
   };
-  const handleDive = (zone) => {
-    if (haveIChosen) return;
-    onMove({ zone, power: 0.8 });
+  const releaseShot = event => {
+    if (!charging || selected == null || !view.amShooter) return;
+    event?.preventDefault();
+    setCharging(false);
+    onMove({ zone: selected, power: powerRef.current });
   };
-  const getZoneCoords = (zone) => {
-    if (zone==null) return { x:50, y:50 };
-    const row = Math.floor(zone/3), col = zone%3;
-    return { x: 18 + col*32, y: 20 + row*30 };
+  const dive = zone => {
+    if (!enabled || view.amShooter) return;
+    setSelected(zone);
+    onMove({ zone });
   };
-  const diveCoords = lastKick ? getZoneCoords(lastKick.diveZone) : { x:50, y:55 };
-  const ballCoords = lastKick ? getZoneCoords(lastKick.shotZone) : { x:50, y:92 };
-  const inSweet = power >= sweetWindow.min && power <= sweetWindow.max;
+
+  const inSweet = view.sweet && power >= view.sweet.min && power <= view.sweet.max;
+  const prompt = animating ? '...'
+    : charging ? (view.sweet
+      ? 'داخل نوار طلایی رها کن — ضربهٔ تمیز!'
+      : 'رها کن تا شوت بزنی — هرچه بالاتر، محکم‌تر')
+      : view.alreadyChose || view.waiting ? 'منتظر حریف...'
+        : view.amShooter ? 'تو می‌زنی — انگشتت را روی یک گوشه نگه دار'
+          : 'تو دروازه‌بانی — حدس بزن کجا می‌زند';
 
   return (
-    <div style={{ maxWidth:'520px', margin:'0 auto', display:'flex', flexDirection:'column', gap:'12px', userSelect:'none' }}>
-      <div style={{ background:'linear-gradient(135deg, #1E293B, #0F172A)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:'20px', padding:'10px 16px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-        <div style={{ textAlign:'center' }}>
-          <div style={{ fontSize:'11px', color:'#38BDF8', fontWeight:'900' }}>{isShooter?'شما (زننده)':'حریف (زننده)'}</div>
-          <div style={{ fontSize:'26px', fontWeight:'900', color:'#FFF' }}>{fa(score.X)}</div>
-        </div>
-        <div style={{ textAlign:'center' }}>
-          <div style={{ fontSize:'11px', color:'#94A3B8', fontWeight:'bold' }}>دور {fa(round)} از ۵</div>
-          <div style={{ display:'flex', gap:'4px', marginTop:'4px' }}>
-            {Array.from({length:5}).map((_,i)=>{
-              const h=history[i*2]; const isGoal=h&&h.outcome==='goal', isSave=h&&h.outcome==='save';
-              return <span key={i} style={{ width:'12px', height:'12px', borderRadius:'50%', background: isGoal?'#22E7A6':isSave?'#EF4444':'rgba(255,255,255,0.15)', border:'1px solid rgba(255,255,255,0.2)', boxShadow: isGoal?'0 0 6px #22E7A6':'' }} />;
-            })}
-          </div>
-        </div>
-        <div style={{ textAlign:'center' }}>
-          <div style={{ fontSize:'11px', color:'#F59E0B', fontWeight:'900' }}>{!isShooter?'شما (دروازه‌بان)':'حریف (دروازه‌بان)'}</div>
-          <div style={{ fontSize:'26px', fontWeight:'900', color:'#FFF' }}>{fa(score.O)}</div>
-        </div>
-      </div>
-
-      <div style={{ position:'relative', height:'320px', background:'radial-gradient(ellipse at center bottom, #15803D 0%, #064E3B 60%, #022c22 100%)', borderRadius:'24px', border:'4px solid #F1F5F9', overflow:'hidden', padding:'12px', boxShadow:'inset 0 0 40px rgba(0,0,0,0.85), 0 12px 36px rgba(0,0,0,0.6)' }}>
-        <div style={{ position:'absolute', bottom:0, left:'10%', right:'10%', height:'50px', borderTop:'2px solid rgba(255,255,255,0.15)', borderRadius:'50% 50% 0 0' }} />
-        <div style={{ position:'absolute', inset:'16px 20px 50px 20px', border:'3px solid #FFF', borderRadius:'8px 8px 0 0', background:'repeating-linear-gradient(0deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 1px, transparent 1px, transparent 18px), repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 1px, transparent 1px, transparent 18px)', display:'grid', gridTemplateColumns:'repeat(3,1fr)', gridTemplateRows:'repeat(3,1fr)', gap:'6px', padding:'6px', zIndex:2 }}>
-          {Array.from({length:9}).map((_,i)=>{
-            const sel = selectedZone===i;
-            return (
-              <button key={i} disabled={haveIChosen} onClick={()=>isShooter?setSelectedZone(i):handleDive(i)} style={{ background: sel?'rgba(255,215,0,0.35)':'rgba(255,255,255,0.03)', border: sel?'2px solid #FFD700':'1px dashed rgba(255,255,255,0.15)', borderRadius:'10px', color: sel?'#FFD700':'rgba(255,255,255,0.5)', fontSize:'18px', fontWeight:'900', cursor: haveIChosen?'not-allowed':'pointer', transform: sel?'scale(1.03)':'scale(1)', boxShadow: sel?'0 0 12px rgba(255,215,0,0.5)':'none' }}>
-                {i+1}
-              </button>
-            );
-          })}
-        </div>
-        <div style={{ position:'absolute', left:`${diveCoords.x}%`, top:`${diveCoords.y}%`, transform:'translate(-50%,-50%)', transition:'all 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)', zIndex:4, display:'flex', flexDirection:'column', alignItems:'center' }}>
-          <div style={{ display:'flex', gap:'20px', alignItems:'center' }}>
-            <img src="/pass/glove_icon.webp" alt="" style={{ width:'26px', height:'26px', transform:'rotate(-25deg)', filter:'drop-shadow(0 4px 8px rgba(0,0,0,0.6))' }} />
-            <div style={{ width:'40px', height:'46px', background:'linear-gradient(180deg, #F59E0B, #B45309)', borderRadius:'12px', border:'2px solid #FEF08A', display:'flex', alignItems:'center', justifyContent:'center', color:'#FFF', fontWeight:'900', fontSize:'10px', boxShadow:'0 6px 16px rgba(0,0,0,0.7)' }}>GK</div>
-            <img src="/pass/glove_icon.webp" alt="" style={{ width:'26px', height:'26px', transform:'rotate(25deg)', filter:'drop-shadow(0 4px 8px rgba(0,0,0,0.6))' }} />
-          </div>
-        </div>
-        <div style={{ position:'absolute', left:`${animating?ballCoords.x:50}%`, top:`${animating?ballCoords.y:88}%`, transform:'translate(-50%,-50%)', transition: animating?'all 0.42s cubic-bezier(0.25,1,0.5,1)':'none', zIndex:5 }}>
-          <img src="/pass/football_icon.webp" alt="" style={{ width: animating?'30px':'36px', height: animating?'30px':'36px', transform: animating?'rotate(360deg)':'none', transition:'transform 0.42s', filter:'drop-shadow(0 6px 12px rgba(0,0,0,0.8))' }} />
-        </div>
-        {animating && lastKick && (
-          <div style={{ position:'absolute', inset:'auto 16px 16px 16px', padding:'10px', borderRadius:'14px', background: lastKick.outcome==='goal'?'linear-gradient(135deg, #22E7A6, #00D49A)':'linear-gradient(135deg, #EF4444, #DC2626)', color:'#000', fontWeight:'900', textAlign:'center', zIndex:10 }}>
-            {lastKick.outcome==='goal'?'⚽ گللللل!':'🧤 مهار تماشایی!'}
-          </div>
-        )}
-        {/* تور موج‌دار ساده برای وب - نمایش موج در گل */}
-        {animating && lastKick?.outcome==='goal' && (
-          <div style={{ position:'absolute', inset:'16px 20px 50px 20px', borderRadius:'8px 8px 0 0', background:'rgba(34,231,166,0.08)', animation:'pulse 0.4s ease-out 2', pointerEvents:'none' }} />
-        )}
-      </div>
-
-      {isShooter ? (
-        <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
-            <span style={{ fontSize:'11px', color:'#94A3B8', fontWeight:'bold', width:'70px' }}>قدرت:</span>
-            <div style={{ flex:1, height:'14px', background:'rgba(255,255,255,0.1)', borderRadius:'99px', overflow:'hidden', border:'1px solid rgba(255,255,255,0.1)', position:'relative' }}>
-              <div style={{ position:'absolute', left:`${sweetWindow.min*100}%`, width:`${(sweetWindow.max-sweetWindow.min)*100}%`, top:0, bottom:0, background:'rgba(255,215,0,0.4)', border:'1px solid #FFD700' }} />
-              <div style={{ height:'100%', width:`${power*100}%`, background: inSweet?'#FFD700':power>0.85?'#EF4444':power>0.5?'#22E7A6':'#38BDF8', borderRadius:'99px', transition: isHolding?'none':'width 0.08s' }} />
-              <div style={{ position:'absolute', left:`${power*100}%`, top:'-2px', bottom:'-2px', width:'3px', background:'#FFF', borderRadius:'99px', transform:'translateX(-50%)', boxShadow:'0 0 6px #FFF' }} />
-            </div>
-          </div>
-          <div style={{ display:'flex', gap:'8px' }}>
-            <button disabled={selectedZone===null||haveIChosen} onMouseDown={()=>setIsHolding(true)} onMouseUp={handleShoot} onTouchStart={()=>setIsHolding(true)} onTouchEnd={handleShoot} style={{ flex:1, padding:'14px', borderRadius:'14px', border:'none', background: selectedZone===null||haveIChosen?'#334155':'linear-gradient(135deg, #38BDF8, #0284C7)', color:'#FFF', fontWeight:'900', fontSize:'15px', cursor:'pointer', boxShadow: selectedZone===null?'none':'0 6px 16px rgba(56,189,248,0.4)' }}>
-              {haveIChosen?'منتظر حریف...': isHolding ? 'رها کن!' : 'نگه دار و رها کن'}
+    <div className="penaltyExact">
+      <Scoreboard view={view} />
+      <div className="penPitch">
+        <PenaltyCanvas kick={kick} animating={animating} lastKick={view.lastKick}
+          selected={selected} power={power} charging={charging} sweet={view.sweet}
+          net={net.current} />
+        <div className="penZones" dir="ltr">
+          {Array.from({ length: 9 }, (_, zone) => (
+            <button key={zone} type="button"
+              className={selected === zone ? (view.amShooter ? 'aim' : 'dive') : ''}
+              disabled={!enabled}
+              aria-label={`ناحیه ${zone + 1}`}
+              onPointerDown={e => startShot(zone, e)}
+              onPointerUp={releaseShot}
+              onPointerCancel={releaseShot}
+              onClick={() => dive(zone)}>
+              {selected === zone ? (view.amShooter ? '◎' : '✋') : ''}
             </button>
-          </div>
-          <div style={{ textAlign:'center', color: inSweet?'#FFD700':'#94A3B8', fontSize:'11px', fontWeight:'700' }}>
-            {haveIChosen?'منتظر انتخاب دروازه‌بان...': selectedZone===null?'یک گوشه را انتخاب کن (۱-۹)': isHolding ? (inSweet?'داخل نوار طلایی — ضربه تمیز!':'رها کن تا شوت بزنی') : 'نگه دار تا قدرت تنظیم شود'}
-          </div>
+          ))}
         </div>
-      ) : (
-        <div style={{ textAlign:'center', padding:'12px', background:'rgba(56,189,248,0.08)', border:'1px solid rgba(56,189,248,0.2)', borderRadius:'12px' }}>
-          <div style={{ color:'#38BDF8', fontWeight:'900', fontSize:'13px' }}>{haveIChosen?'منتظر ضربه زننده...':'تو دروازه‌بانی — حدس بزن کجا می‌زند'}</div>
-          <div style={{ color:'#64748B', fontSize:'11px', marginTop:'4px' }}>یک خانه (۱-۹) را بزن تا شیرجه بزنی</div>
-        </div>
-      )}
+        <Outcome lastKick={view.lastKick} me={view.me} kick={kick} />
+      </div>
+      <div className={`penPrompt${charging && inSweet ? ' sweet' : view.amShooter ? ' shooter' : ' keeper'}`}>
+        {prompt}
+      </div>
     </div>
   );
 }

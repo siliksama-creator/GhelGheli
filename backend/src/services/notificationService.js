@@ -18,10 +18,15 @@ function getFirebase() {
   const raw = serviceAccountRaw();
   if (!raw) return null;
   try {
-    const admin = require('firebase-admin');
-    const credential = admin.credential.cert(JSON.parse(raw));
-    if (!admin.apps.length) admin.initializeApp({ credential });
-    firebase = admin;
+    // firebase-admin v14 removed the old namespace API
+    // (`admin.credential.cert`, `admin.apps`, `admin.messaging()`). Use the
+    // modular entry points and keep a tiny wrapper so the delivery code and
+    // its transport mock have one stable interface.
+    const { cert, getApps, initializeApp } = require('firebase-admin/app');
+    const { getMessaging } = require('firebase-admin/messaging');
+    const apps = getApps();
+    const app = apps[0] || initializeApp({ credential: cert(JSON.parse(raw)) });
+    firebase = { app, messaging: () => getMessaging(app) };
     return firebase;
   } catch (e) {
     console.warn('FCM disabled:', e.message);

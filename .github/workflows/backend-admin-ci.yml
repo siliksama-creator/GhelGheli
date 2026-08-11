@@ -49,6 +49,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 24 }
       - run: npm install
+      - run: npm run test:game-parity
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - name: Serve the built app
