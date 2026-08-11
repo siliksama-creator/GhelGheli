@@ -23,21 +23,32 @@ APP_DIR="${APP_DIR:-/var/www/GhelGheli}"
 BRANCH="${BRANCH:-main}"
 API_URL="${API_URL:-http://127.0.0.1:4000/health}"
 PM2_APP="${PM2_APP:-ghelgheli-api}"
+SERVICE_USER="${SERVICE_USER:-ghelgheli}"
+PM2_HOME="${PM2_HOME:-/home/$SERVICE_USER/.pm2}"
+PM2_BIN="${PM2_BIN:-$(command -v pm2)}"
 BACKUP_SCRIPT="${BACKUP_SCRIPT:-/usr/local/bin/ghelgheli-backup-latest.sh}"
 
 log() { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
 die() { printf '\n\033[1;31mERROR: %s\033[0m\n' "$*" >&2; exit 1; }
+pm2_user() {
+  runuser -u "$SERVICE_USER" -- env \
+    HOME="/home/$SERVICE_USER" USER="$SERVICE_USER" LOGNAME="$SERVICE_USER" \
+    PM2_HOME="$PM2_HOME" \
+    PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+    "$PM2_BIN" "$@"
+}
 
+[ "$(id -u)" -eq 0 ] || die "deploy must run as root"
+id "$SERVICE_USER" >/dev/null 2>&1 || die "service user $SERVICE_USER does not exist"
 [ -d "$APP_DIR/.git" ] || die "$APP_DIR is not a git checkout"
 cd "$APP_DIR"
 
 PREVIOUS_SHA="$(git rev-parse HEAD)"
 log "Current commit: $PREVIOUS_SHA"
 
-if [ -x "$BACKUP_SCRIPT" ]; then
-  log "Backing up database before deploying"
-  "$BACKUP_SCRIPT" || echo "WARNING: backup failed, continuing anyway"
-fi
+[ -x "$BACKUP_SCRIPT" ] || die "backup script is missing or not executable: $BACKUP_SCRIPT"
+log "Backing up database before deploying"
+"$BACKUP_SCRIPT" || die "pre-deploy backup failed; deployment aborted"
 
 log "Fetching origin/$BRANCH"
 git fetch origin "$BRANCH"
@@ -66,14 +77,21 @@ cd "$APP_DIR/userweb"
 npm install --no-audit --no-fund
 npm run build
 
-log "Reloading API"
+log "Reloading API as unprivileged user $SERVICE_USER"
 cd "$APP_DIR/backend"
-if pm2 describe "$PM2_APP" >/dev/null 2>&1; then
-  pm2 reload "$PM2_APP" --update-env
+# Root performs deploy/migrations, but the network-facing Node process must
+# never inherit root. Preserve only the two runtime-writable locations.
+chown "$SERVICE_USER:$SERVICE_USER" .env
+chmod 600 .env
+chown -R "$SERVICE_USER:$SERVICE_USER" uploads
+find uploads -type d -exec chmod 750 {} +
+find uploads -type f -exec chmod 640 {} +
+if pm2_user describe "$PM2_APP" >/dev/null 2>&1; then
+  pm2_user reload "$PM2_APP" --update-env
 else
-  pm2 start ecosystem.config.cjs
+  pm2_user start ecosystem.config.cjs
 fi
-pm2 save
+pm2_user save
 
 log "Waiting for API health check"
 HEALTHY=0
@@ -86,8 +104,9 @@ if [ "$HEALTHY" -ne 1 ]; then
   log "Health check FAILED — rolling back to $PREVIOUS_SHA"
   git reset --hard "$PREVIOUS_SHA"
   cd "$APP_DIR/backend" && npm install --omit=dev --no-audit --no-fund
-  pm2 reload "$PM2_APP" --update-env || pm2 start ecosystem.config.cjs
-  die "Deploy rolled back. Check: pm2 logs $PM2_APP --err"
+  pm2_user reload "$PM2_APP" --update-env || pm2_user start ecosystem.config.cjs
+  pm2_user save
+  die "Deploy rolled back. Check the $SERVICE_USER PM2 logs for $PM2_APP"
 fi
 
 log "Reloading nginx"
