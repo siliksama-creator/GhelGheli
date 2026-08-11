@@ -12,6 +12,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
 
 class FakeSocket {
   constructor(id, nickname) {
+    this.id = `socket-${id}`;
     this.user = { id, nickname };
     this.connected = true;
     this.events = [];
@@ -20,8 +21,20 @@ class FakeSocket {
   }
   on(ev, fn) { (this.handlers[ev] ||= []).push(fn); }
   emit(ev, data) { this.events.push({ ev, data }); }
-  join(r) { this.rooms.add(r); }
-  leave(r) { this.rooms.delete(r); }
+  join(r) {
+    this.rooms.add(r);
+    if (this._io) {
+      const set = this._io.sockets.adapter.rooms.get(r) || new Set();
+      set.add(this.id);
+      this._io.sockets.adapter.rooms.set(r, set);
+    }
+  }
+  leave(r) {
+    this.rooms.delete(r);
+    const set = this._io?.sockets.adapter.rooms.get(r);
+    set?.delete(this.id);
+    if (set?.size === 0) this._io.sockets.adapter.rooms.delete(r);
+  }
   fire(ev, data) { (this.handlers[ev] || []).forEach(fn => fn(data)); }
   last(ev) { return [...this.events].reverse().find(e => e.ev === ev)?.data; }
   has(ev) { return this.events.some(e => e.ev === ev); }
@@ -29,10 +42,23 @@ class FakeSocket {
 
 function makeIo() {
   const conns = [];
-  return {
+  const io = {
+    sockets: {
+      sockets: new Map(),
+      adapter: { rooms: new Map() },
+    },
     on: (ev, fn) => { if (ev === 'connection') conns.push(fn); },
-    connect(sock) { conns.forEach(fn => fn(sock)); return sock; },
+    emit(ev, data) {
+      for (const socket of this.sockets.sockets.values()) socket.emit(ev, data);
+    },
+    connect(sock) {
+      sock._io = this;
+      this.sockets.sockets.set(sock.id, sock);
+      conns.forEach(fn => fn(sock));
+      return sock;
+    },
   };
+  return io;
 }
 
 (async () => {
@@ -105,12 +131,13 @@ function makeIo() {
     ok(!!st && st.vsBot === true, 'falls back to the bot');
     ok(st.players.O.id === 'bot', 'bot occupies the second seat');
 
-    a.fire('game:move', { roomId: st.roomId, move: 19 });
+    a.fire('game:move', { roomId: st.roomId, move: { zone: 0, power: 0.6 } });
     await wait(1400);
     const upd = a.last('game:update');
     ok(!!upd, 'bot game produced an update');
-    ok(upd.state.board.filter(Boolean).length > 4, 'the board changed');
-    ok(['X', 'O'].includes(upd.turn), 'a valid player is on move');
+    ok(upd.state.history.length === 1, 'one complete penalty kick was recorded');
+    ok(['goal', 'save'].includes(upd.state.lastKick.outcome), 'kick has a valid outcome');
+    ok(upd.state.pending === undefined, 'opponent choice is never serialized');
   }
 
   console.log('\n== instant bot play (zero wait) ==');
@@ -127,6 +154,40 @@ function makeIo() {
     ok(b.last('game:start').vsBot === true, 'penalty flagged as vsBot');
   }
 
+  console.log('\n== private lobby and direct-room ownership ==');
+  {
+    const io = makeIo(); attach(io, RULES);
+    const host = io.connect(new FakeSocket('private-host', 'میزبان'));
+    const guest = io.connect(new FakeSocket('private-guest', 'مهمان'));
+
+    host.fire('game:create_lobby', {
+      gameId: 'memory', stake: 0, password: '1234',
+    });
+    const created = host.last('game:lobby_created');
+    ok(created?.gameId === 'memory', 'host creates a real memory lobby');
+    guest.fire('game:lobby_list');
+    ok(guest.last('game:lobby_list')?.some(l => l.lobbyId === created.lobbyId),
+      'lobby is discoverable on the same socket namespace');
+    guest.fire('game:join_lobby', { lobbyId: created.lobbyId, password: '1234' });
+    const hs = host.last('game:start');
+    const gs = guest.last('game:start');
+    ok(hs?.roomId && hs.roomId === gs?.roomId,
+      'host and guest receive game:start on their retained lobby sockets');
+    ok(hs?.gameId === 'memory' && hs?.stake === 0,
+      'game:start carries authoritative game id and stake');
+    host.fire('game:leave', { roomId: hs?.roomId });
+
+    const codeHost = io.connect(new FakeSocket('code-host', 'کدساز'));
+    const codeGuest = io.connect(new FakeSocket('code-guest', 'کدگیر'));
+    codeHost.fire('game:create_room', { gameId: 'penalty' });
+    const room = codeHost.last('game:room_created');
+    codeGuest.fire('game:join_room', { roomCode: room?.roomCode });
+    ok(codeHost.last('game:start')?.gameId === 'penalty'
+      && codeGuest.last('game:start')?.gameId === 'penalty',
+    'direct code join uses the host game instead of a client-side guess');
+    codeHost.fire('game:leave');
+  }
+
   console.log('\n== penalty over the engine ==');
   {
     const io = makeIo(); attach(io, RULES);
@@ -135,13 +196,15 @@ function makeIo() {
     a.fire('game:join', { gameId: 'penalty' });
     b.fire('game:join', { gameId: 'penalty' });
     const sa = a.last('game:start');
-    ok(sa.state.board.filter(Boolean).length === 4, 'opening position dealt');
-    ok(Array.isArray(sa.state.legal) && sa.state.legal.length === 4, 'legal hints sent');
-    ok(sa.state.scores.X === 2, 'scores included');
-    a.fire('game:move', { roomId: sa.roomId, move: 19 });
+    ok(sa.state.score.X === 0 && sa.state.score.O === 0, 'penalty score starts at zero');
+    ok(sa.state.role === 'shooter', 'first player starts as shooter');
+    ok(sa.state.pending === undefined, 'private choices are hidden at start');
+    a.fire('game:move', { roomId: sa.roomId, move: { zone: 0, power: 0.6 } });
+    b.fire('game:move', { roomId: sa.roomId, move: { zone: 0, power: 0 } });
     const up = b.last('game:update');
-    ok(up.state.board[27] === 'X', 'flip applied and broadcast');
-    ok(up.state.scores.X === 4, 'score updated after flip');
+    ok(up.state.history.length === 1, 'kick is resolved and broadcast');
+    ok(up.state.lastKick.outcome === 'save', 'same-zone human dive saves');
+    ok(up.state.pending === undefined, 'resolved state leaks no pending choice');
   }
 
   console.log('\n== leaving and disconnecting ==');
@@ -200,7 +263,7 @@ function makeIo() {
   console.log('\n== per-game turn budgets & match countdown ==');
   {
     const io = makeIo(); attach(io, RULES);
-    const budgets = { memory: 20000, penalty: 30000 };
+    const budgets = { memory: 20000, penalty: 12000 };
     for (const [gid, want] of Object.entries(budgets)) {
       const p1 = io.connect(new FakeSocket(`b-${gid}-1`, 'الف'));
       const p2 = io.connect(new FakeSocket(`b-${gid}-2`, 'ب'));

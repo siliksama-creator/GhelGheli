@@ -17,10 +17,18 @@ class GameSession extends ChangeNotifier {
   int totalPot = 0;
   int netPot = 0;
   int commission = 0;
-  GameSession({required this.api, required this.gameId});
+  GameSession({
+    required this.api,
+    required this.gameId,
+    io.Socket? existingSocket,
+    Map<String, dynamic>? initialStart,
+  })  : _existingSocket = existingSocket,
+        _initialStart = initialStart;
 
   final ApiClient api;
   final String gameId;
+  final io.Socket? _existingSocket;
+  final Map<String, dynamic>? _initialStart;
 
   io.Socket? _socket;
   GamePhase phase = GamePhase.idle;
@@ -136,7 +144,7 @@ class GameSession extends ChangeNotifier {
 
   void connect() {
     if (_socket != null) return;
-    final s = io.io(
+    final s = _existingSocket ?? io.io(
       api.baseUrl,
       io.OptionBuilder()
           // Allow the polling fallback: some mobile carriers and captive
@@ -210,7 +218,7 @@ class GameSession extends ChangeNotifier {
       notifyListeners();
     });
 
-    s.on('game:start', (d) {
+    void handleStart(dynamic d) {
       final m = _asMap(d);
       _roomId = m['roomId'] as String?;
       players = m['players'] as Map?;
@@ -218,6 +226,10 @@ class GameSession extends ChangeNotifier {
       vsBot = m['vsBot'] == true;
       turn = m['turn'] as String?;
       state = _asMap(m['state']);
+      stake = (m['stake'] as num?)?.toInt() ?? stake;
+      totalPot = stake * 2;
+      netPot = (m['netPot'] as num?)?.toInt() ?? 0;
+      commission = (m['commission'] as num?)?.toInt() ?? 0;
       winner = null;
       timedOutSymbol = null;
       stillSearching = false;
@@ -227,7 +239,9 @@ class GameSession extends ChangeNotifier {
       _stopSearchClock();
       _startClock(m['deadline'], m['turnMs'], m['remainingMs']);
       notifyListeners();
-    });
+    }
+
+    s.on('game:start', handleStart);
 
     s.on('game:update', (d) {
       final m = _asMap(d);
@@ -260,6 +274,11 @@ class GameSession extends ChangeNotifier {
       );
       notifyListeners();
     });
+
+    // The lobby socket may have received game:start before the board widget
+    // was mounted. Replaying that captured payload initializes this session
+    // without creating a second socket or joining an unrelated public queue.
+    if (_initialStart != null) handleStart(_initialStart);
   }
 
   void _startClock(dynamic deadline, dynamic turnMs, dynamic remainingMs) {

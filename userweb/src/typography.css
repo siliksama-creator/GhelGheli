@@ -246,3 +246,55 @@ code {
     scroll-behavior: auto !important;
   }
 }
+
+/* ── Hard floors for legacy inline styles ────────────────────────────────
+   Several parity screens still carry pixel values copied from Flutter. JSX
+   inline styles outrank the type scale above, so authenticated pages were
+   silently rendering 9–11px Persian and synthetic 900-weight text even while
+   the unauthenticated typography test stayed green. These selectors target
+   only the out-of-contract legacy values and are intentionally !important. */
+[style*="font-size: 9px"],
+[style*="font-size: 9.5px"],
+[style*="font-size: 10px"],
+[style*="font-size: 10.5px"],
+[style*="font-size: 11px"],
+.wheelBadge,
+.lvlBadge,
+.streakDayIcon,
+.streakKicker,
+.duelMini {
+  font-size: var(--fs-xs) !important;
+}
+
+[style*="font-weight: 900"],
+[style*="font-weight:900"],
+[style*="font-weight: 950"],
+[style*="font-weight:950"],
+[style*="font-weight: 1000"],
+[style*="font-weight:1000"],
+.wheelBadge,
+.lvlBadge,
+.streakDayIcon,
+.streakKicker {
+  font-weight: 800 !important;
+}
+
+/* The parent shortcut deliberately uses an emoji-first stack for its icon;
+   the numeric badge itself is language content and must switch back. */
+.wheelBadge { font-family: var(--gg-font) !important; }
+
+/* Component selectors with higher specificity than the base `small/b` rules. */
+.streakCard small,
+.streakCard .streakHeroArt b,
+.streakCard .streakStats b,
+.streakCard .streakClaim span,
+.invStats span,
+.walletStats > div span,
+.walletStats > div small {
+  font-size: var(--fs-xs) !important;
+}
+.streakCard .streakClaim span,
+.invStats b {
+  font-weight: 800 !important;
+}
+.wcBody small { font-size: var(--fs-xs) !important; }

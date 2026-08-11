@@ -85,6 +85,7 @@ UNION ALL SELECT 'پیام چت'      , count(*)::text FROM chat_messages
 UNION ALL SELECT 'چرخشِ گردونه' , count(*)::text FROM wheel_spins
 UNION ALL SELECT 'تیم دوئل'     , count(*)::text FROM card_duel_decks
 UNION ALL SELECT 'نبرد دوئل'    , count(*)::text FROM card_duel_battles
+UNION ALL SELECT 'escrow بازی'   , count(*)::text FROM game_stake_matches
 UNION ALL SELECT 'تراکنش کیف'   , count(*)::text FROM wallet_transactions
 UNION ALL SELECT 'لاگ ممیزی'    , count(*)::text FROM audit_log
 UNION ALL SELECT 'تلاشِ ناموفق' , count(*)::text FROM photo_card_attempts
@@ -128,6 +129,7 @@ DELETE FROM card_types;
 DELETE FROM chat_message_likes;
 DELETE FROM chat_messages;
 DELETE FROM wheel_spins;
+DELETE FROM game_stake_matches;
 DELETE FROM card_duel_battles;
 DELETE FROM card_duel_decks;
 DELETE FROM game_results;

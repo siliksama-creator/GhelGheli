@@ -53,7 +53,7 @@ const SOURCES = Object.freeze([
  */
 async function credit(client, {
   userId, points, source, referenceType = null, referenceId = null,
-  description = null, adminId = null, league = true,
+  description = null, adminId = null, league = true, lifetimeGain = null,
 }) {
   const amount = Math.floor(Number(points) || 0);
   // صفر یا منفی یعنی «کاری نکن». پرتابِ خطا اینجا اشتباه است: خیلی از
@@ -61,6 +61,12 @@ async function credit(client, {
   // نباید تراکنش را بشکنند.
   if (amount <= 0) return null;
   assertSource(source);
+  // بعضی واریزها برگشتِ اصل موجودی‌اند، نه کسب تازه. نمونهٔ مهمش تسویهٔ
+  // مسابقهٔ stakeدار است: برنده اصل stake خودش را هم پس می‌گیرد، اما فقط
+  // سود خالص باید lifetime را زیاد کند. null رفتار تاریخی را نگه می‌دارد.
+  const life = lifetimeGain === null
+    ? amount
+    : Math.min(amount, Math.max(0, Math.floor(Number(lifetimeGain) || 0)));
 
   // ── چرا `monthly_league_points` شرطی است ──
   //
@@ -70,12 +76,12 @@ async function credit(client, {
   const { rows } = await client.query(
     `UPDATE users
         SET current_points  = current_points + $2,
-            lifetime_points = lifetime_points + $2,
+            lifetime_points = lifetime_points + $4,
             monthly_league_points = monthly_league_points + $3,
             updated_at = NOW()
       WHERE id = $1
       RETURNING current_points`,
-    [userId, amount, league ? amount : 0],
+    [userId, amount, league ? amount : 0, life],
   );
   if (!rows[0]) return null;   // کاربر حذف شده
 

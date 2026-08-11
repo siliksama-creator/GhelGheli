@@ -16,7 +16,12 @@ const YAML = require('yaml');
 const { Server } = require('socket.io');
 const { pool } = require('./config/db');
 const { audit } = require('./services/auditService');
-const { createNotification } = require('./services/notificationService');
+const {
+  createNotification,
+  sendSegmented,
+  isFirebaseConfigured,
+} = require('./services/notificationService');
+const gameStakes = require('./services/gameStakeService');
 const { ensureActiveSeason, addLeaguePoints, getLeaderboard, closeActiveSeason, approvePayouts: leagueApprove } = require('./services/leagueService');
 const { optimizeUpload, kb } = require('./services/imageService');
 const { getGameRewardSettings, saveGameRewardSettings } = require('./services/gameRewardService');
@@ -1808,10 +1813,9 @@ const CANNED_MESSAGES = [
 app.get('/api/chat/bootstrap', auth, asyncHandler(async (req, res) => {
   const minLifetimePoints = await getChatMinLifetimePoints();
   const eligible = Number(req.user.lifetime_points || 0) >= minLifetimePoints;
-  const [cooldownSec, pinned, stickersRes] = await Promise.all([
+  const [cooldownSec, pinned] = await Promise.all([
     getChatCooldownSeconds(),
     getChatPinnedMessage(),
-    pool.query('SELECT id,title,image_url,sticker_type FROM chat_stickers WHERE is_active=true ORDER BY created_at DESC'),
   ]);
 
   const config = {
@@ -1826,19 +1830,17 @@ app.get('/api/chat/bootstrap', auth, asyncHandler(async (req, res) => {
     return res.json({
       config,
       messages: [],
-      stickers: stickersRes.rows,
+      stickers: [],
       cannedMessages: CANNED_MESSAGES,
     });
   }
 
   const { rows } = await pool.query(`SELECT m.*, u.nickname,u.first_name,u.last_name,u.profile_image_url,u.profile_avatar_key,
-      s.title AS sticker_title, s.image_url AS sticker_url, s.sticker_type,
       rm.message_text AS reply_text, rm.message_type AS reply_type, ru.nickname AS reply_nickname,
       (SELECT count(*)::int FROM chat_message_likes l WHERE l.message_id=m.id) AS like_count,
       EXISTS(SELECT 1 FROM chat_message_likes l WHERE l.message_id=m.id AND l.user_id=$1) AS liked_by_me
     FROM chat_messages m
     JOIN users u ON u.id=m.user_id
-    LEFT JOIN chat_stickers s ON s.id=m.sticker_id
     LEFT JOIN chat_messages rm ON rm.id=m.reply_to_message_id
     LEFT JOIN users ru ON ru.id=rm.user_id
     WHERE m.is_deleted=false ORDER BY m.sent_at DESC LIMIT 60`, [req.user.id]);
@@ -1858,7 +1860,7 @@ app.get('/api/chat/bootstrap', auth, asyncHandler(async (req, res) => {
   res.json({
     config,
     messages,
-    stickers: stickersRes.rows,
+    stickers: [],
     cannedMessages: CANNED_MESSAGES,
   });
 }));
@@ -1871,13 +1873,11 @@ app.get('/api/chat/messages', auth, asyncHandler(async (req, res) => {
   const minLifetimePoints = await getChatMinLifetimePoints();
   if (Number(req.user.lifetime_points || 0) < minLifetimePoints) return res.status(403).json({ message: `برای ورود به چت باید حداقل ${minLifetimePoints} امتیاز تاریخی داشته باشید`, minLifetimePoints });
   const { rows } = await pool.query(`SELECT m.*, u.nickname,u.first_name,u.last_name,u.profile_image_url,u.profile_avatar_key,
-      s.title AS sticker_title, s.image_url AS sticker_url, s.sticker_type,
       rm.message_text AS reply_text, rm.message_type AS reply_type, ru.nickname AS reply_nickname,
       (SELECT count(*)::int FROM chat_message_likes l WHERE l.message_id=m.id) AS like_count,
       EXISTS(SELECT 1 FROM chat_message_likes l WHERE l.message_id=m.id AND l.user_id=$1) AS liked_by_me
     FROM chat_messages m
     JOIN users u ON u.id=m.user_id
-    LEFT JOIN chat_stickers s ON s.id=m.sticker_id
     LEFT JOIN chat_messages rm ON rm.id=m.reply_to_message_id
     LEFT JOIN users ru ON ru.id=rm.user_id
     WHERE m.is_deleted=false ORDER BY m.sent_at DESC LIMIT 100`, [req.user.id]);
@@ -1902,15 +1902,12 @@ app.post('/api/chat/messages', auth, chatLimiter, asyncHandler(async (req, res) 
   const cd = await ensureChatCooldown(req.user.id);
   if (cd.remaining > 0) return res.status(429).json({ message: `برای جلوگیری از اسپم، ${cd.remaining} ثانیه دیگر پیام بدهید`, cooldownSeconds: cd.cooldown, remainingSeconds: cd.remaining });
   const stickerId = req.body.stickerId || req.body.sticker_id || null;
-  const replyTo = req.body.replyTo || req.body.reply_to_message_id || null;
-  let clean = String(req.body.message || req.body.text || '').trim();
-  let messageType = 'text';
   if (stickerId) {
-    const st = await pool.query('SELECT * FROM chat_stickers WHERE id=$1 AND is_active=true', [stickerId]);
-    if (!st.rows[0]) return res.status(400).json({ message: 'استیکر معتبر نیست' });
-    messageType = 'sticker';
-    clean = clean || st.rows[0].title;
+    return res.status(400).json({ message: 'استیکر تصویری دیگر پشتیبانی نمی‌شود' });
   }
+  const replyTo = req.body.replyTo || req.body.reply_to_message_id || null;
+  const clean = String(req.body.message || req.body.text || '').trim();
+  const messageType = 'text';
   // Validate reply target up front instead of letting a bad/deleted id hit
   // the DB's foreign key constraint, which previously bubbled up as a raw
   // Postgres error message to the client (see friendlyDbError note above).
@@ -1936,10 +1933,6 @@ app.post('/api/chat/messages/:id/report', auth, validateUuid('id'), asyncHandler
   res.json({ message: 'گزارش ثبت شد' });
 }));
 
-app.get('/api/chat/stickers', auth, asyncHandler(async (req, res) => {
-  const { rows } = await pool.query('SELECT id,title,image_url,sticker_type FROM chat_stickers WHERE is_active=true ORDER BY created_at DESC');
-  res.json(rows);
-}));
 app.post('/api/chat/messages/:id/like', auth, validateUuid('id'), asyncHandler(async (req, res) => {
   await pool.query('INSERT INTO chat_message_likes(message_id,user_id) VALUES($1,$2) ON CONFLICT DO NOTHING', [req.params.id, req.user.id]);
   const c = await pool.query('SELECT count(*)::int AS count FROM chat_message_likes WHERE message_id=$1', [req.params.id]);
@@ -2208,27 +2201,10 @@ app.post('/api/admin/uploads/image', adminAuth, requireRole('support'), imageUpl
   res.json({ url: `/uploads/images/${r.filename}`, bytes: r.bytesAfter });
 }));
 
-app.get('/api/admin/chat/stickers', adminAuth, asyncHandler(async (req, res) => {
-  const { rows } = await pool.query('SELECT * FROM chat_stickers ORDER BY created_at DESC');
-  res.json(rows);
-}));
-app.post('/api/admin/chat/stickers', adminAuth, requireRole('support'), imageUpload.single('sticker'), asyncHandler(async (req, res) => {
-  const title = req.body.title || 'استیکر';
-  let imageUrl = req.body.imageUrl;
-  if (req.file) imageUrl = `/uploads/images/${req.file.filename}`;
-  if (!imageUrl) return res.status(400).json({ message: 'فایل یا آدرس استیکر لازم است' });
-  const stickerType = req.body.stickerType || req.body.sticker_type || (/\.(gif|webp)$/i.test(imageUrl) ? 'animated' : 'static');
-  const { rows } = await pool.query('INSERT INTO chat_stickers(title,image_url,sticker_type,is_active,created_by_admin_id) VALUES($1,$2,$3,$4,$5) RETURNING *', [title, imageUrl, stickerType, req.body.isActive !== 'false', req.admin.id]);
-  await audit(req.admin.id,'create_chat_sticker','chat_stickers',rows[0].id,null,{ title, stickerType });
-  res.json(rows[0]);
-}));
-app.patch('/api/admin/chat/stickers/:id', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
-  const { title, stickerType, isActive } = req.body;
-  const imageUrl = keepImage(req.body.imageUrl);
-  const { rows } = await pool.query('UPDATE chat_stickers SET title=COALESCE($1,title), image_url=COALESCE($2,image_url), sticker_type=COALESCE($3,sticker_type), is_active=COALESCE($4,is_active), updated_at=NOW() WHERE id=$5 RETURNING *', [title,imageUrl,stickerType,isActive,req.params.id]);
-  await audit(req.admin.id,'update_chat_sticker','chat_stickers',req.params.id,null,req.body);
-  res.json(rows[0]);
-}));
+// ساخت/آپلود استیکر تصویری عمداً حذف شد. چت محصول فقط پیام آماده و emoji
+// است؛ endpointهای مدیریتی قبلی asset خراب می‌ساختند و قابلیتی را نشان
+// می‌دادند که هیچ کلاینت کاربری مصرف نمی‌کرد. جدول تاریخی برای پیام‌های
+// قدیمی می‌ماند، اما دیگر APIای برای تولید تصویر استیکر وجود ندارد.
 
 app.get('/api/admin/settings/chat', adminAuth, asyncHandler(async (req, res) => {
   const minLifetimePoints = await getChatMinLifetimePoints();
@@ -3500,12 +3476,59 @@ app.patch('/api/admin/support/tickets/:id/reopen', adminAuth, validateUuid('id')
   res.json({ message: 'تیکت دوباره باز شد' });
 }));
 
-app.post('/api/admin/notifications/broadcast', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
-  const { title, body } = req.body;
-  await createNotification(null, 'broadcast', title, body);
-  await audit(req.admin.id,'broadcast_notification','notifications',null,null,{title});
-  res.json({ message: 'اطلاعیه همگانی ثبت شد' });
-}));
+const adminNotificationLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: req => req.admin?.id || req.ip,
+  message: { message: 'تعداد ارسال اعلان زیاد است؛ کمی صبر کنید' },
+});
+
+app.get('/api/admin/notifications/status', adminAuth, requireRole('support'),
+  asyncHandler(async (req, res) => {
+    res.json({ fcmConfigured: isFirebaseConfigured(), timezone: 'Asia/Tehran' });
+  }));
+
+app.post('/api/admin/notifications/send-segmented', adminAuth, requireRole('support'),
+  adminNotificationLimiter, asyncHandler(async (req, res) => {
+    const segment = String(req.body.segment || 'all');
+    const force = req.body.force === true;
+    const hour = Number(new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Tehran', hour: 'numeric', hour12: false,
+    }).format(new Date())) % 24;
+    const daytime = hour >= 10 && hour < 22;
+    if (!daytime && !force) {
+      return res.status(409).json({
+        message: 'برای جلوگیری از مزاحمت، ارسال هدفمند بین ساعت ۲۲ تا ۱۰ تهران متوقف است',
+        tehranHour: hour,
+      });
+    }
+    if (force && req.admin.role !== 'super_admin') {
+      return res.status(403).json({ message: 'ارسال اجباری شبانه فقط برای مدیر اصلی مجاز است' });
+    }
+    const result = await sendSegmented({
+      segment,
+      title: req.body.title,
+      body: req.body.body,
+    });
+    await audit(req.admin.id, 'segmented_notification', 'notifications', null,
+      req.body.reason || null, { ...result, force, tehranHour: hour });
+    res.json({
+      ...result,
+      message: result.fcmConfigured
+        ? `اعلان برای ${result.targetCount} کاربر ثبت شد؛ ${result.pushSent} پوش ارسال شد`
+        : `اعلان درون‌برنامه‌ای برای ${result.targetCount} کاربر ثبت شد؛ Firebase هنوز پیکربندی نشده است`,
+    });
+  }));
+
+app.post('/api/admin/notifications/broadcast', adminAuth, requireRole('support'),
+  adminNotificationLimiter, asyncHandler(async (req, res) => {
+    const { title, body } = req.body;
+    await createNotification(null, 'broadcast', title, body);
+    await audit(req.admin.id,'broadcast_notification','notifications',null,null,{title});
+    res.json({ message: 'اطلاعیه همگانی ثبت شد' });
+  }));
 app.get('/api/admin/admins', adminAuth, requireRole(), asyncHandler(async (req, res) => res.json((await pool.query('SELECT id,username,role,is_active,created_at FROM admin_users ORDER BY created_at DESC')).rows)));
 app.post('/api/admin/admins', adminAuth, requireRole(), asyncHandler(async (req, res) => { const hash=await bcrypt.hash(req.body.password,12); const r=await pool.query('INSERT INTO admin_users(username,password_hash,role) VALUES($1,$2,$3) RETURNING id,username,role,is_active,created_at',[req.body.username,hash,req.body.role]); await audit(req.admin.id,'create_admin','admin_users',r.rows[0].id,null,{username:req.body.username,role:req.body.role}); res.json(r.rows[0]); }));
 // There was previously no way to revoke an admin/support account once
@@ -3608,14 +3631,10 @@ io.on('connection', socket => {
       if (socket.user.chat_banned_until && new Date(socket.user.chat_banned_until) > new Date()) throw new Error('شما موقتاً از چت محروم هستید');
       const body = typeof payload === 'object' && payload ? payload : { text: payload };
       const stickerId = body.stickerId || null;
+      if (stickerId) throw new Error('استیکر تصویری دیگر پشتیبانی نمی‌شود');
       const replyTo = body.replyTo || null;
-      let clean = String(body.text || '').trim();
-      let messageType = stickerId ? 'sticker' : 'text';
-      if (stickerId) {
-        const st = await pool.query('SELECT * FROM chat_stickers WHERE id=$1 AND is_active=true', [stickerId]);
-        if (!st.rows[0]) throw new Error('استیکر معتبر نیست');
-        clean = clean || st.rows[0].title;
-      }
+      const clean = String(body.text || '').trim();
+      const messageType = 'text';
       if (replyTo) {
         const rm = await pool.query('SELECT id FROM chat_messages WHERE id=$1 AND is_deleted=false', [replyTo]);
         if (!rm.rows[0]) throw new Error('پیام موردنظر برای پاسخ پیدا نشد');
@@ -3638,6 +3657,18 @@ io.on('connection', socket => {
 // (backend/src/games/), so adding a game never touches this file.
 const games = require('./games');
 games.attach(io);
+
+// اگر process بعد از کسر stake و قبل از تسویه خاموش شود، سند reserved در
+// دیتابیس می‌ماند. startup و sweep ساعتی اصل امتیاز را برمی‌گردانند؛ در
+// نتیجه crash/reboot هرگز ورودی کاربر را برای همیشه قفل نمی‌کند.
+gameStakes.refundStaleMatches(60)
+  .then(n => { if (n) console.log(`[games:stake] startup refunded ${n} stale match(es)`); })
+  .catch(e => console.error('[games:stake] startup recovery failed:', e.message));
+cron.schedule('29 * * * *', () => {
+  gameStakes.refundStaleMatches(60)
+    .then(n => { if (n) console.log(`[games:stake] refunded ${n} stale match(es)`); })
+    .catch(e => console.error('[games:stake] recovery failed:', e.message));
+});
 
 cron.schedule('5 0 1 * *', () => closeActiveSeason().catch(e => console.error('monthly close failed', e)));
 

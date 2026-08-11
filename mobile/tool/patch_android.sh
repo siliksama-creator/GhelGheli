@@ -124,6 +124,38 @@ with open(path, 'w', encoding='utf-8') as f:
 print(f'added permissions: {missing or "none (already present)"}')
 PY
 
+# ── Firebase / Google Services ─────────────────────────────────────────────
+# فایل از GitHub Secret در CI بازسازی می‌شود و هرگز وارد git نمی‌شود. بدون
+# plugin گوگل، وجودِ google-services.json به‌تنهایی هیچ resourceای برای
+# Firebase.initializeApp تولید نمی‌کند و push بی‌صدا خاموش می‌ماند.
+if [ -f android/app/google-services.json ]; then
+  python3 - <<'PY'
+from pathlib import Path
+
+settings = Path('android/settings.gradle.kts')
+app = Path('android/app/build.gradle.kts')
+if settings.exists() and app.exists():
+    s = settings.read_text()
+    marker = 'id("com.android.application")'
+    if 'com.google.gms.google-services' not in s:
+        pos = s.find(marker)
+        if pos < 0:
+            raise SystemExit('ERROR: Android application plugin marker not found')
+        line_end = s.find('\n', pos)
+        s = s[:line_end + 1] + '    id("com.google.gms.google-services") version "4.4.3" apply false\n' + s[line_end + 1:]
+        settings.write_text(s)
+    a = app.read_text()
+    if 'com.google.gms.google-services' not in a:
+        a = a.replace('plugins {', 'plugins {\n    id("com.google.gms.google-services")', 1)
+        app.write_text(a)
+else:
+    raise SystemExit('ERROR: Gradle Kotlin files not found')
+PY
+  echo "  OK   Firebase google-services plugin"
+else
+  echo "  WARN google-services.json نیست؛ اپ ساخته می‌شود ولی Push غیرفعال می‌ماند"
+fi
+
 echo "--- verifying ---"
 for p in INTERNET ACCESS_NETWORK_STATE POST_NOTIFICATIONS; do
   if grep -q "android.permission.$p" "$MANIFEST"; then

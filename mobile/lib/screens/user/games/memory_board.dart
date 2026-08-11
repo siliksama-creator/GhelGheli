@@ -11,6 +11,7 @@
 // solo_session.dart / solo_panels.dart, so this file stays a thin composer.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../../api_client.dart';
 import '../../../theme/tokens.dart';
@@ -31,6 +32,8 @@ class MemoryScreen extends StatefulWidget {
     this.stake = 0,
     this.vsBot = false,
     this.roomCode,
+    this.existingSocket,
+    this.initialStart,
   });
 
   final ApiClient api;
@@ -38,14 +41,20 @@ class MemoryScreen extends StatefulWidget {
   final int stake;
   final bool vsBot;
   final String? roomCode;
+  final io.Socket? existingSocket;
+  final Map<String, dynamic>? initialStart;
 
   @override
   State<MemoryScreen> createState() => _MemoryScreenState();
 }
 
 class _MemoryScreenState extends State<MemoryScreen> {
-  late final GameSession _versus =
-      GameSession(api: widget.api, gameId: 'memory')..connect();
+  late final GameSession _versus = GameSession(
+    api: widget.api,
+    gameId: 'memory',
+    existingSocket: widget.existingSocket,
+    initialStart: widget.initialStart,
+  )..connect();
   late final SoloSession _solo = SoloSession(api: widget.api, gameId: 'memory');
 
   _Mode _mode = _Mode.versus;
@@ -59,6 +68,9 @@ class _MemoryScreenState extends State<MemoryScreen> {
     super.initState();
     _solo.addListener(_onSolo);
     _loadRecords();
+    if (widget.initialStart != null) {
+      return;
+    }
     if (widget.vsBot) {
       _versus.playWithBotImmediately();
     } else if (widget.roomCode != null && widget.roomCode!.isNotEmpty) {

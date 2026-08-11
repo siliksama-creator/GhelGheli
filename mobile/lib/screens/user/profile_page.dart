@@ -67,7 +67,11 @@ class _ProfilePageState extends State<ProfilePage> {
       final res = await widget.api.get('/api/profile/league-history');
       if (!mounted) return;
       setState(() {
-        _leagueHistory = res is List ? res : const [];
+        _leagueHistory = res is List
+            ? res
+            : (res is Map && res['seasons'] is List
+                ? res['seasons'] as List
+                : const []);
       });
     } catch (_) {}
   }

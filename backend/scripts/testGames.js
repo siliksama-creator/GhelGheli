@@ -189,53 +189,46 @@ console.log('\n== memory (جفت‌یاب) ==');
 console.log('\n== penalty ==');
 {
   const r = RULES.penalty;
-  const s = r.create();
-  ok(s.board.filter(Boolean).length === 4, 'four starting discs');
-  ok(r.decorate(s, 'X').legal.sort().join() === [19, 26, 37, 44].join(), 'opening legal moves');
-  ok(!r.isValidMove(s, 0, 'X'), 'non-flipping move rejected');
+  const s = r.create(() => 0.5);
+  ok(s.score.X === 0 && s.score.O === 0, 'score starts at zero');
+  ok(s.taken.X === 0 && s.taken.O === 0, 'no kick taken initially');
+  ok(s.shooter === 'X' && s.round === 1, 'X opens round one');
+  ok(r.isValidMove(s, { zone: 0, power: 0.6 }, 'X'), 'shooter move is valid');
+  ok(!r.isValidMove(s, 19, 'X'), 'old numeric/Reversi move is rejected');
 
-  r.applyMove(s, 19, 'X');
-  ok(s.board[19] === 'X' && s.board[27] === 'X', 'flips the captured disc');
-  ok(r.decorate(s, 'X').scores.X === 4, 'score tracks flips');
+  r.applyMove(s, { zone: 0, power: 0.6 }, 'X', () => 0.5);
+  const hidden = r.publicState(s, 'O');
+  ok(hidden.pending === undefined, 'opponent cannot read the chosen shot');
+  ok(hidden.waitingForOpponent === false, 'keeper has not chosen yet');
+  r.applyMove(s, { zone: 0, power: 0 }, 'O', () => 0.5);
+  ok(s.lastKick.outcome === 'save', 'same-zone dive saves with certainty');
+  ok(s.taken.X === 1 && s.history.length === 1, 'kick is recorded once');
+  ok(s.shooter === 'O', 'roles swap after the kick');
 
-  // Board where O has no legal reply: the turn must pass BACK to X rather
-  // than ending the game. All-X except one empty cell means O can never
-  // bracket anything, while X can still play.
-  const t = { board: Array(64).fill('X'), size: 8 };
-  t.board[1] = 'O'; t.board[2] = null;
-  ok(r.decorate(t, 'O').legal.length === 0, 'blocked player has no legal move');
-  ok(r.decorate(t, 'X').legal.length > 0, 'the other player still can move');
-  ok(r.nextTurn(t, 'X') === 'X', 'skips a blocked opponent');
+  const goal = r.resolveKick(0, 0.6, 8, () => 0.99, s.sweet);
+  ok(goal.outcome === 'goal', 'different-zone dive is a goal');
+  const save = r.resolveKick(4, 0.6, 4, () => 0.99, s.sweet);
+  ok(save.outcome === 'save', 'matching dive is a save');
 
-  // Neither side can move -> nextTurn returns null so the engine ends it.
-  const dead = { board: Array(64).fill('X'), size: 8 };
-  ok(r.nextTurn(dead, 'X') === null, 'ends when nobody can move');
-
-  const full = { board: Array(64).fill('X'), size: 8 };
-  full.board[0] = 'O';
-  ok(r.result(full) === 'X', 'majority wins when board is full');
-
-  // Full random self-play: must always terminate cleanly.
+  // Full deterministic self-play: X always scores, O is always saved.
   let crashed = 0, finished = 0;
   for (let g = 0; g < 40; g++) {
-    const st = r.create();
-    let turn = 'X', guard = 0;
+    const st = r.create(() => 0.5);
+    let guard = 0;
     try {
-      while (guard++ < 200) {
-        const mv = r.botMove(st, turn);
-        if (mv === null) break;
-        st.lastValid = r.isValidMove(st, mv, turn);
-        if (!st.lastValid) throw new Error('bot produced an illegal move');
-        r.applyMove(st, mv, turn);
-        if (r.result(st)) break;
-        const nx = r.nextTurn(st, turn);
-        if (!nx) break;
-        turn = nx;
+      while (!r.result(st) && guard++ < 30) {
+        const shooter = st.shooter;
+        const keeper = shooter === 'X' ? 'O' : 'X';
+        const shotZone = 0;
+        const diveZone = shooter === 'X' ? 1 : 0;
+        r.applyMove(st, { zone: shotZone, power: 0.6 }, shooter, () => 0.5);
+        r.applyMove(st, { zone: diveZone, power: 0 }, keeper, () => 0.5);
       }
-      finished++;
+      if (r.result(st) === 'X') finished++;
     } catch { crashed++; }
   }
-  ok(crashed === 0 && finished === 40, `40 self-play games completed (${crashed} crashes)`);
+  ok(crashed === 0 && finished === 40,
+    `40 penalty self-play games completed (${crashed} crashes)`);
 }
 
 console.log('\n== engine contract ==');

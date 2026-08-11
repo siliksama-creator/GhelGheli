@@ -26,7 +26,9 @@ import { chromium } from 'playwright';
 
 const BASE = process.argv[2] || 'http://localhost:4173';
 const TOKEN = process.argv[3] || '';
-const TABS = ['home', 'rewards', 'league', 'club', 'support', 'profile'];
+const DIRECT = { home: 'خانه', rewards: 'جوایز', league: 'لیگ', club: 'چت و بازی' };
+const MORE = { inventory: 'کلکسیون کارت‌ها', wallet: 'کیف پول', support: 'پشتیبانی', profile: 'پروفایل' };
+const TABS = [...Object.keys(DIRECT), ...Object.keys(MORE)];
 
 /** Vazirmatn's heaviest real cut. Above this the browser fakes it. */
 const MAX_REAL_WEIGHT = 800;
@@ -41,6 +43,26 @@ const ok = (cond, name) => {
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 430, height: 950 } });
 const errors = [];
+
+if (/^https?:\/\/(localhost|127\.0\.0\.1)(:|\/)/.test(BASE)) {
+  await page.route('https://api.ghelghelishop.ir/**', async route => {
+    try {
+      await route.fulfill({ response: await route.fetch() });
+    } catch {
+      await route.abort();
+    }
+  });
+}
+
+async function openTab(id) {
+  if (DIRECT[id]) {
+    await page.locator('.mobileNav button', { hasText: DIRECT[id] }).click();
+  } else {
+    await page.locator('.mobileNav button', { hasText: 'بیشتر' }).click();
+    await page.locator('.moreSheet button', { hasText: MORE[id] }).click();
+  }
+  await page.waitForTimeout(900);
+}
 page.on('pageerror', e => errors.push(String(e)));
 page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
 
@@ -53,9 +75,16 @@ const audit = () => page.evaluate(([maxW, minPx]) => {
     if (el.children.length || !(el.textContent || '').trim()) continue;
     if (getComputedStyle(el).display === 'none') continue;
     const cs = getComputedStyle(el);
-    if (!/Vazirmatn/.test(cs.fontFamily)) bad.notVazir.push(`${label(el)}→${cs.fontFamily.split(',')[0]}`);
+    // Icon-only leaves (ellipsis/emoji) intentionally use an emoji fallback;
+    // only actual letters or digits must render in Vazirmatn.
+    const hasLanguageGlyph = /[\p{L}\p{N}]/u.test((el.textContent || '').trim());
+    if (hasLanguageGlyph && !/Vazirmatn/.test(cs.fontFamily)) {
+      bad.notVazir.push(`${label(el)}→${cs.fontFamily.split(',')[0]}`);
+    }
     if (parseInt(cs.fontWeight, 10) > maxW) bad.synthBold.push(`${label(el)}:${cs.fontWeight}`);
-    if (parseFloat(cs.fontSize) < minPx) bad.tiny.push(`${label(el)}:${cs.fontSize}`);
+    if (hasLanguageGlyph && parseFloat(cs.fontSize) < minPx) {
+      bad.tiny.push(`${label(el)}:${cs.fontSize}`);
+    }
   }
   bad.overflow = document.documentElement.scrollWidth > window.innerWidth + 1
     ? `${document.documentElement.scrollWidth}px > ${window.innerWidth}px` : null;
@@ -92,31 +121,19 @@ try {
     await page.evaluate(() => document.fonts.ready);
     await page.waitForTimeout(2200);
 
-    for (let i = 0; i < TABS.length; i++) {
-      await page.locator('.mobileNav button').nth(i).click();
-      await page.waitForTimeout(900);
-      check(`tab "${TABS[i]}"`, await audit());
+    for (const id of TABS) {
+      await openTab(id);
+      check(`tab "${id}"`, await audit());
     }
 
-    // The games hub lives behind a sub-tab of «چت و بازی», so we have to get
-    // back onto that top-level tab first — the loop above left us on
-    // "profile". Selecting by LABEL rather than index keeps this working if
-    // the nav is ever reordered.
-    for (const t of await page.locator('.mobileNav button').all()) {
-      if ((await t.innerText()).includes('بازی')) { await t.click(); break; }
-    }
-    await page.waitForTimeout(1000);
-    for (const t of await page.locator('.clubTabs button').all()) {
-      if ((await t.innerText()).includes('بازی')) { await t.click(); break; }
-    }
+    // The games hub is nested under «چت و بازی».
+    await openTab('club');
+    await page.locator('.clubTabs button', { hasText: 'بازی‌ها' }).click();
     await page.waitForTimeout(1600);
     check('games hub', await audit());
-
-    const tiles = await page.locator('.gameTile').count();
-    ok(tiles >= 3, `games hub lists its tiles (${tiles})`);
-
-    const hubText = await page.innerText('.gameGrid');
-    ok(hubText.includes('جفت') || hubText.includes('بازی'), 'games hub renders game tiles correctly');
+    const hubText = await page.innerText('.tabPane');
+    ok(hubText.includes('۱۰۰ امتیاز') && hubText.includes('جفت‌یاب'),
+      'games hub renders all game controls');
   }
 
   ok(errors.length === 0, `no runtime errors${errors[0] ? ` — ${errors[0].slice(0, 100)}` : ''}`);

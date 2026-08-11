@@ -38,6 +38,19 @@ jobs:
       - name: Recreate Platform Folders
         run: cd mobile && flutter create --platforms=android .
 
+      - name: Restore Firebase Android config
+        env:
+          GOOGLE_SERVICES_B64: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_B64" ]; then
+            mkdir -p mobile/android/app
+            echo "$GOOGLE_SERVICES_B64" | base64 -d > mobile/android/app/google-services.json
+            python3 -m json.tool mobile/android/app/google-services.json >/dev/null
+            echo "Firebase Android config restored"
+          else
+            echo "::warning::FIREBASE_GOOGLE_SERVICES_JSON_BASE64 تنظیم نشده؛ Push در APK غیرفعال خواهد بود"
+          fi
+
       - name: Ensure Firebase compatible minSdk
         run: |
           cd mobile
@@ -213,7 +226,7 @@ jobs:
       # The signing material must not survive the job, even on a failure.
       - name: Scrub signing material
         if: always()
-        run: rm -f mobile/android/app/release.jks mobile/android/key.properties
+        run: rm -f mobile/android/app/release.jks mobile/android/key.properties mobile/android/app/google-services.json
 
       - name: Upload APK
         uses: actions/upload-artifact@v6

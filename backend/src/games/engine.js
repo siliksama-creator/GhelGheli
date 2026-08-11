@@ -17,6 +17,19 @@ function rewardService() {
   }
 }
 
+// جدا نگه داشتنِ سرویس مالی از قوانین خالص بازی باعث می‌شود testهای منطق
+// بدون PostgreSQL اجرا شوند. در production، هر بازی stakeدار بدون این سرویس
+// fail-closed است: اتاقی ساخته نمی‌شود و هیچ راهِ fallback به «بازی کن، بعداً
+// حساب می‌کنیم» وجود ندارد.
+function stakeService() {
+  try {
+    return require('../services/gameStakeService');
+  } catch (e) {
+    console.error('[games:stake] service unavailable:', e.message);
+    return null;
+  }
+}
+
 // How long we hunt for a REAL opponent before falling back to the bot. The
 // client shows this as a visible countdown so waiting feels intentional
 // rather than broken.
@@ -141,7 +154,7 @@ function emitState(room, event, extra = {}) {
   }
   if (lost && !room.done && event !== 'game:over') {
     // Tell whoever is still there, then close the room.
-    finish(room, 'DISCONNECT');
+    finish(room, 'DISCONNECT', lost);
   }
 }
 
@@ -203,7 +216,7 @@ function armTurnClock(room) {
   }, room.turnMs);
 }
 
-function finish(room, winner) {
+function finish(room, winner, disconnectedSym = null) {
   if (room.done) return;
   room.done = true;
   clearTimeout(room.botTimer);
@@ -234,70 +247,54 @@ function finish(room, winner) {
     })
     .catch(e => console.error(`[games:${room.gameId}] reward failed:`, e.message));
 
-  // ── پرداخت پات مسابقه استیک‌دار (۱۰۰ و ۱۰۰۰ امتیاز یا لابی با کسر ۱۰٪ کارمزد) ──
+  // ── تسویهٔ escrow مسابقهٔ امتیازی ────────────────────────────────
+  // stake هر دو بازیکن پیش از game:start و داخل یک transaction کم شده است.
+  // اینجا فقط سند reserved همان room تسویه می‌شود؛ قفل دیتابیس و قیدهای
+  // یکتا اجازه نمی‌دهند finish تکراری یا reconnect دوباره پرداخت کند.
   if (room.stake > 0 && !room.vsBot) {
-    try {
-      const { pool } = require('../config/db');
-      if (winner === 'X' || winner === 'O' || winner === 'DISCONNECT') {
-        const winningSym = (winner === 'DISCONNECT')
-          ? (room.seats.X && room.seats.X.connected ? 'X' : 'O')
-          : winner;
-        const winnerUid = room.players?.[winningSym]?.id;
-        if (winnerUid && winnerUid !== 'bot') {
-          (async () => {
-            const client = await pool.connect();
-            try {
-              await client.query('BEGIN');
-              const { rows } = await client.query(
-                'UPDATE users SET current_points = current_points + $2, lifetime_points = lifetime_points + $2 WHERE id=$1 RETURNING current_points',
-                [winnerUid, room.netPot]
-              );
-              if (rows[0]) {
-                await client.query(
-                  'INSERT INTO point_transactions (user_id, delta, balance_after, source, reference_type, description) VALUES ($1,$2,$3,$4,$5,$6)',
-                  [winnerUid, room.netPot, rows[0].current_points, 'game', 'staked_match', `پات بازی مسابقه‌ای (${room.stake} امتیازی)`]
-                );
-              }
-              await client.query('COMMIT');
-            } catch (e) {
-              await client.query('ROLLBACK');
-            } finally {
-              client.release();
+    const stakes = stakeService();
+    if (!stakes) {
+      console.error(`[games:${room.gameId}] stake settlement unavailable for ${room.id}`);
+    } else {
+      const winnerSym = winner === 'DISCONNECT'
+        ? (disconnectedSym === 'X' ? 'O'
+          : disconnectedSym === 'O' ? 'X'
+            : (room.seats.X && room.seats.X.connected ? 'X' : 'O'))
+        : winner;
+      const draw = winner === 'DRAW';
+      const winnerUserId = draw ? null : room.players?.[winnerSym]?.id;
+      stakes.settleMatch({ matchId: room.id, winnerUserId, draw })
+        .then(result => {
+          if (result.duplicate) return;
+          if (draw) {
+            for (const sym of ['X', 'O']) {
+              const sock = room.seats[sym];
+              if (sock?.emit) safeEmit(sock, 'game:stake_refund', {
+                stake: room.stake,
+                message: 'مسابقه مساوی شد؛ ورودی کامل برگشت.',
+              }, room);
             }
-          })().catch(() => {});
-          const winSock = room.seats[winningSym];
-          if (winSock) safeEmit(winSock, 'game:stake_win', { netPot: room.netPot, stake: room.stake });
-        }
-      } else if (winner === 'DRAW') {
-        // بازگشت ۱۰۰٪ امتیاز ورودی به هر دو بازیکن در تساوی
-        for (const s of ['X', 'O']) {
-          const uid = room.players?.[s]?.id;
-          if (uid && uid !== 'bot') {
-            (async () => {
-              const client = await pool.connect();
-              try {
-                await client.query('BEGIN');
-                const { rows } = await client.query(
-                  'UPDATE users SET current_points = current_points + $2 WHERE id=$1 RETURNING current_points',
-                  [uid, room.stake]
-                );
-                if (rows[0]) {
-                  await client.query(
-                    'INSERT INTO point_transactions (user_id, delta, balance_after, source, reference_type, description) VALUES ($1,$2,$3,$4,$5,$6)',
-                    [uid, room.stake, rows[0].current_points, 'game', 'staked_draw', `بازگشت استیک در تساوی (${room.stake} امتیازی)`]
-                  );
-                }
-                await client.query('COMMIT');
-              } catch (e) {
-                await client.query('ROLLBACK');
-              } finally {
-                client.release();
-              }
-            })().catch(() => {});
+          } else {
+            const winSock = room.seats[winnerSym];
+            if (winSock?.emit) safeEmit(winSock, 'game:stake_win', {
+              netPot: result.netPot,
+              stake: result.stake,
+              commission: result.commission,
+            }, room);
           }
-        }
-      }
-    } catch (_) {}
+        })
+        .catch(e => {
+          // امتیازها در escrow می‌مانند و recovery ساعتی آن‌ها را برمی‌گرداند؛
+          // هرگز با UPDATE دستی از این catch پول/امتیاز ساخته نمی‌شود.
+          console.error(`[games:${room.gameId}] stake settlement failed:`, e.message);
+          for (const sym of ['X', 'O']) {
+            const sock = room.seats[sym];
+            if (sock?.emit) safeEmit(sock, 'game:stake_pending', {
+              message: 'تسویه در حال بررسی است؛ امتیاز ورودی محفوظ می‌ماند.',
+            }, room);
+          }
+        });
+    }
   }
 
   // ── XP گذر نبرد ────────────────────────────────────────────────────
@@ -435,10 +432,35 @@ function advance(room, lastMove, extra = {}) {
   scheduleBot(room);
 }
 
-function startRoom(io, rules, gameId, a, b, stake) {
+async function startRoom(io, rules, gameId, a, b, stake) {
   const s = Number(stake) || 0;
   const id = crypto.randomUUID();
   const vsBot = !b;
+
+  // بازی با ربات همیشه رایگان است. برای بازی انسان‌باانسانِ امتیازی،
+  // game:start فقط بعد از COMMIT رزرو هر دو ورودی صادر می‌شود.
+  let reservation = null;
+  if (s > 0) {
+    if (vsBot) throw new Error('بازی با ربات ورودی امتیازی ندارد');
+    const stakes = stakeService();
+    if (!stakes) throw new Error('سرویس امن مسابقه موقتاً در دسترس نیست');
+    reservation = await stakes.reserveMatch({
+      matchId: id,
+      gameId,
+      stake: s,
+      playerXId: a.user.id,
+      playerOId: b.user.id,
+    });
+    // snapshot اتصال باید موجودیِ بعد از رزرو را بداند؛ وگرنه هدر کلاینت
+    // تا refresh عدد قدیمی نشان می‌دهد.
+    if (reservation.balances[a.user.id] !== undefined) {
+      a.user.current_points = reservation.balances[a.user.id];
+    }
+    if (reservation.balances[b.user.id] !== undefined) {
+      b.user.current_points = reservation.balances[b.user.id];
+    }
+  }
+
   const room = {
     id, gameId, rules, vsBot, done: false,
     state: rules.create(),
@@ -446,7 +468,8 @@ function startRoom(io, rules, gameId, a, b, stake) {
     turnMs: turnMsFor(rules),
     seats: { X: a, O: b || 'BOT' },
     stake: s,
-    netPot: Math.floor(s * 2 * 0.9), // 10% commission
+    netPot: reservation?.netPot || 0,
+    commission: reservation?.commission || 0,
   };
   rooms.set(id, room);
   a.join(id);
@@ -456,7 +479,6 @@ function startRoom(io, rules, gameId, a, b, stake) {
     X: infoOf(a.user),
     O: b ? infoOf(b.user) : { id: 'bot', nickname: 'ربات هوشمند', isBot: true },
   };
-  // Kept on the room so finish() can attribute points to the right accounts.
   room.players = players;
   armTurnClock(room);
   for (const sym of ['X', 'O']) {
@@ -467,10 +489,24 @@ function startRoom(io, rules, gameId, a, b, stake) {
         yourSymbol: sym, vsBot, state: snapshot(room, sym),
         turnMs: room.turnMs, deadline: room.deadline,
         remainingMs: room.deadline ? Math.max(0, room.deadline - Date.now()) : null,
+        stake: room.stake,
+        netPot: room.netPot,
+        commission: room.commission,
       }, room);
     }
   }
   return room;
+}
+
+async function startRoomOrError(io, rules, gameId, a, b, stake) {
+  try {
+    return await startRoom(io, rules, gameId, a, b, stake);
+  } catch (e) {
+    const message = e?.message || 'شروع مسابقه ناموفق بود';
+    safeEmit(a, 'game:error', { message });
+    if (b?.emit) safeEmit(b, 'game:error', { message });
+    return null;
+  }
 }
 
 const attachGames = function attachGames(io, rulesById) {
@@ -497,7 +533,7 @@ const attachGames = function attachGames(io, rulesById) {
       });
     });
 
-    socket.on('game:join_room', payload => {
+    socket.on('game:join_room', async payload => {
       const code = String(payload?.roomCode || '').trim().toUpperCase();
       if (!code) return safeEmit(socket, 'game:error', { message: 'کد اتاق را وارد کنید' });
       const roomId = `room-${code}`;
@@ -514,20 +550,35 @@ const attachGames = function attachGames(io, rulesById) {
       const rules = rulesById[gameId];
       dropFromQueue(hostSocket);
       dropFromQueue(socket);
-      startRoom(io, rules, gameId, hostSocket, socket);
+      await startRoomOrError(io, rules, gameId, hostSocket, socket, 0);
     });
 
 
 
     // -- LOBBY SYSTEM (WITH PASSWORD & STAKE UP TO 10,000) --
-    socket.on('game:create_lobby', payload => {
+    socket.on('game:create_lobby', async payload => {
       const gameId = String(payload?.gameId || Object.keys(rulesById)[0]);
       const rules = rulesById[gameId];
       if (!rules) return safeEmit(socket, 'game:error', { message: 'بازی مورد نظر یافت نشد' });
-      let stake = Number(payload?.stake);
-      if (Number.isNaN(stake)) stake = 100;
-      stake = Math.min(Math.max(stake, 0), 10000);
-      const password = String(payload?.password || '').trim();
+      const stakes = stakeService();
+      if (!stakes) return safeEmit(socket, 'game:error', { message: 'سرویس امن مسابقه در دسترس نیست' });
+      let stake;
+      try {
+        stake = stakes.parseLobbyStake(payload?.stake);
+        if (stake > 0) {
+          const afford = await stakes.canAfford(socket.user.id, stake);
+          if (!afford.ok) {
+            return safeEmit(socket, 'game:error', {
+              message: `برای ساخت این لابی حداقل ${stake} امتیاز لازم داری`,
+              required: stake,
+              balance: afford.balance,
+            });
+          }
+        }
+      } catch (e) {
+        return safeEmit(socket, 'game:error', { message: e.message || 'امتیاز مسابقه معتبر نیست' });
+      }
+      const password = String(payload?.password || '').trim().slice(0, 32);
       dropFromQueue(socket);
       const lobbyId = 'lobby-' + Math.random().toString(36).substring(2, 8);
       lobbies.set(lobbyId, {
@@ -578,7 +629,7 @@ const attachGames = function attachGames(io, rulesById) {
       safeEmit(socket, 'game:lobby_list', list);
     });
 
-    socket.on('game:join_lobby', payload => {
+    socket.on('game:join_lobby', async payload => {
       const lobbyId = String(payload?.lobbyId || '');
       const pass = String(payload?.password || '').trim();
       const lobby = lobbies.get(lobbyId);
@@ -593,10 +644,12 @@ const attachGames = function attachGames(io, rulesById) {
         return safeEmit(socket, 'game:error', { message: 'رمز عبور اتاق اشتباه است' });
       }
       const rules = rulesById[lobby.gameId];
-      lobbies.delete(lobbyId);
       dropFromQueue(lobby.host);
       dropFromQueue(socket);
-      startRoom(io, rules, lobby.gameId, lobby.host, socket, lobby.stake);
+      const started = await startRoomOrError(
+        io, rules, lobby.gameId, lobby.host, socket, lobby.stake);
+      if (!started) return;
+      lobbies.delete(lobbyId);
       io.emit('game:lobby_updated', { action: 'joined', lobbyId });
     });
 
@@ -611,111 +664,128 @@ const attachGames = function attachGames(io, rulesById) {
       }
     });
 
-    socket.on('game:join', payload => {
-      const gameId = (payload && typeof payload === 'object' && payload.gameId)
-        || Object.keys(rulesById)[0];
-      const rules = rulesById[gameId];
-      if (!rules) return safeEmit(socket, 'game:error', { message: 'این بازی در دسترس نیست' });
+    socket.on('game:join', async payload => {
+      try {
+        const gameId = (payload && typeof payload === 'object' && payload.gameId)
+          || Object.keys(rulesById)[0];
+        const rules = rulesById[gameId];
+        if (!rules) return safeEmit(socket, 'game:error', { message: 'این بازی در دسترس نیست' });
 
-      dropFromQueue(socket);
-      const previous = rooms.get(roomOfSocket(socket));
-      if (previous) finish(previous, 'DISCONNECT');
-
-      const stake = Number(payload?.stake || 0);
-      const wantBot = (payload && typeof payload === 'object' && (payload.vsBot === true || stake === 0 && payload.mode === 'bot'));
-      if (wantBot) {
-        startRoom(io, rules, gameId, socket, null, 0);
-        return;
-      }
-
-      const qKey = stake > 0 ? `${gameId}:${stake}` : gameId;
-      const q = queueFor(qKey);
-      while (q.length && q[0] && q[0].connected === false) q.shift();
-      const opponent = q.shift();
-
-      if (opponent && opponent.connected && opponent.user.id !== socket.user.id) {
-        clearTimeout(opponent.botTimeout);
-        if (opponent.queuePing) {
-          clearInterval(opponent.queuePing);
-          opponent.queuePing = null;
-        }
-        startRoom(io, rules, gameId, opponent, socket, stake);
-        return;
-      }
-
-      q.push(socket);
-      const isStaked = stake > 0;
-      const waitTime = isStaked ? 30_000 : 15_000;
-      const botAllowed = !isStaked && !rules.noBot;
-
-      safeEmit(socket, 'game:waiting', {
-        gameId,
-        stake,
-        message: isStaked ? `در حال جستجوی حریف آنلاین برای مسابقه ${stake} امتیازی (۳۰ ثانیه)...` : 'در حال جستجوی حریف واقعی...',
-        waitMs: waitTime,
-        deadline: Date.now() + waitTime,
-        remainingMs: waitTime,
-        botFallback: botAllowed,
-        soloAvailable: Boolean(rules.solo),
-      });
-      socket.botTimeout = setTimeout(() => {
+        const stakes = stakeService();
+        if (!stakes) return safeEmit(socket, 'game:error', { message: 'سرویس امن مسابقه در دسترس نیست' });
+        let stake;
         try {
-          const i = q.findIndex(s => s.user?.id === socket.user?.id);
-          if (i === -1) return;
-          if (!botAllowed) {
-            // Stay queued; just let the client know the first window closed
-            // so it can surface the solo option.
-            safeEmit(socket, 'game:still-waiting', {
-              gameId,
-              soloAvailable: Boolean(rules.solo),
-              message: 'هنوز حریفی پیدا نشده — می‌توانی منتظر بمانی یا تنها بازی کنی',
+          stake = stakes.parsePublicStake(payload?.stake);
+        } catch (e) {
+          return safeEmit(socket, 'game:error', { message: e.message });
+        }
+
+        dropFromQueue(socket);
+        const previous = rooms.get(roomOfSocket(socket));
+        if (previous) {
+          const loser = previous.seats.X === socket ? 'X' : 'O';
+          finish(previous, 'DISCONNECT', loser);
+        }
+
+        const wantBot = (payload && typeof payload === 'object'
+          && (payload.vsBot === true || stake === 0 && payload.mode === 'bot'));
+        if (wantBot) {
+          await startRoomOrError(io, rules, gameId, socket, null, 0);
+          return;
+        }
+
+        // بررسی سریع پیش از صف برای تجربهٔ درست؛ بررسی قطعی دوباره در
+        // reserveMatch و زیر FOR UPDATE انجام می‌شود تا خرج هم‌زمان نتواند
+        // موجودی را بین انتظار و شروع بازی کم کند.
+        if (stake > 0) {
+          const afford = await stakes.canAfford(socket.user.id, stake);
+          if (!afford.ok) {
+            return safeEmit(socket, 'game:error', {
+              message: `برای این مسابقه حداقل ${stake} امتیاز لازم داری`,
+              required: stake,
+              balance: afford.balance,
             });
-            // KEEP-ALIVE FOR AN OPEN-ENDED QUEUE.
-            // Without this the player sat in the queue in total silence.
-            // Two things went wrong in practice:
-            //   1. an idle websocket behind a mobile carrier NAT gets
-            //      reaped after a few minutes, so the player was silently
-            //      dropped from matchmaking while their screen still said
-            //      "looking for an opponent" — forever;
-            //   2. if the socket died without firing 'disconnect', the dead
-            //      entry stayed in the queue and the next real player was
-            //      paired with a ghost.
-            // A periodic ping both keeps the connection warm and prunes the
-            // queue when the emit fails.
-            clearInterval(socket.queuePing);
-            socket.queuePing = setInterval(() => {
-              const stillQueued = q.findIndex(x => x.user?.id === socket.user?.id);
-              if (stillQueued === -1 || socket.connected === false) {
-                clearInterval(socket.queuePing);
-                socket.queuePing = null;
-                if (stillQueued > -1) q.splice(stillQueued, 1);
-                return;
-              }
-              const alive = safeEmit(socket, 'game:still-waiting', {
+          }
+        }
+
+        const qKey = stake > 0 ? `${gameId}:${stake}` : gameId;
+        const q = queueFor(qKey);
+        while (q.length && q[0] && q[0].connected === false) q.shift();
+        const opponent = q.shift();
+
+        if (opponent && opponent.connected && opponent.user.id !== socket.user.id) {
+          clearTimeout(opponent.botTimeout);
+          if (opponent.queuePing) {
+            clearInterval(opponent.queuePing);
+            opponent.queuePing = null;
+          }
+          await startRoomOrError(io, rules, gameId, opponent, socket, stake);
+          return;
+        }
+
+        q.push(socket);
+        const isStaked = stake > 0;
+        const waitTime = isStaked ? 30_000 : 15_000;
+        const botAllowed = !isStaked && !rules.noBot;
+
+        safeEmit(socket, 'game:waiting', {
+          gameId,
+          stake,
+          message: isStaked
+            ? `در حال جستجوی حریف آنلاین برای مسابقه ${stake} امتیازی (۳۰ ثانیه)...`
+            : 'در حال جستجوی حریف واقعی...',
+          waitMs: waitTime,
+          deadline: Date.now() + waitTime,
+          remainingMs: waitTime,
+          botFallback: botAllowed,
+          soloAvailable: Boolean(rules.solo),
+        });
+        socket.botTimeout = setTimeout(() => {
+          try {
+            const i = q.findIndex(s => s.user?.id === socket.user?.id);
+            if (i === -1) return;
+            if (!botAllowed) {
+              safeEmit(socket, 'game:still-waiting', {
                 gameId,
                 soloAvailable: Boolean(rules.solo),
-                queued: q.length,
-                message: 'هنوز در صف حریف واقعی هستی',
+                message: 'هنوز حریفی پیدا نشده — می‌توانی منتظر بمانی یا تنها بازی کنی',
               });
-              if (!alive) {
-                // Emit failed => the socket is gone. Remove it so nobody is
-                // matched against a corpse.
-                q.splice(stillQueued, 1);
-                clearInterval(socket.queuePing);
-                socket.queuePing = null;
-              }
-            }, QUEUE_PING_MS);
-            return;
+              clearInterval(socket.queuePing);
+              socket.queuePing = setInterval(() => {
+                const stillQueued = q.findIndex(x => x.user?.id === socket.user?.id);
+                if (stillQueued === -1 || socket.connected === false) {
+                  clearInterval(socket.queuePing);
+                  socket.queuePing = null;
+                  if (stillQueued > -1) q.splice(stillQueued, 1);
+                  return;
+                }
+                const alive = safeEmit(socket, 'game:still-waiting', {
+                  gameId,
+                  soloAvailable: Boolean(rules.solo),
+                  queued: q.length,
+                  message: 'هنوز در صف حریف واقعی هستی',
+                });
+                if (!alive) {
+                  q.splice(stillQueued, 1);
+                  clearInterval(socket.queuePing);
+                  socket.queuePing = null;
+                }
+              }, QUEUE_PING_MS);
+              return;
+            }
+            q.splice(i, 1);
+            void startRoomOrError(io, rules, gameId, socket, null, 0);
+          } catch (e) {
+            console.error(`[games:${gameId}] bot fallback failed:`, e.message);
           }
-          q.splice(i, 1);
-          startRoom(io, rules, gameId, socket, null);
-        } catch (e) {
-          console.error(`[games:${gameId}] bot fallback failed:`, e.message);
-        }
-      }, waitTime);
+        }, waitTime);
+      } catch (e) {
+        console.error('[games] join failed:', e.message);
+        safeEmit(socket, 'game:error', { message: e.message || 'ورود به مسابقه ناموفق بود' });
+      }
     });
 
-    socket.on('game:play_bot', payload => {
+    socket.on('game:play_bot', async payload => {
       const gameId = (payload && typeof payload === 'object' && payload.gameId)
         || (typeof payload === 'string' ? payload : null)
         || Object.keys(rulesById)[0];
@@ -723,8 +793,11 @@ const attachGames = function attachGames(io, rulesById) {
       if (!rules) return safeEmit(socket, 'game:error', { message: 'این بازی در دسترس نیست' });
       dropFromQueue(socket);
       const previous = rooms.get(roomOfSocket(socket));
-      if (previous) finish(previous, 'DISCONNECT');
-      startRoom(io, rules, gameId, socket, null);
+      if (previous) {
+        const loser = previous.seats.X === socket ? 'X' : 'O';
+        finish(previous, 'DISCONNECT', loser);
+      }
+      await startRoomOrError(io, rules, gameId, socket, null, 0);
     });
 
     socket.on('game:move', payload => {
@@ -762,14 +835,20 @@ const attachGames = function attachGames(io, rulesById) {
     socket.on('game:leave', payload => {
       const roomId = (payload && typeof payload === 'object' && payload.roomId) || roomOfSocket(socket);
       const room = rooms.get(roomId);
-      if (room) finish(room, 'DISCONNECT');
+      if (room) {
+        const loser = room.seats.X === socket ? 'X' : room.seats.O === socket ? 'O' : null;
+        finish(room, 'DISCONNECT', loser);
+      }
       dropFromQueue(socket);
     });
 
     socket.on('disconnect', () => {
       dropFromQueue(socket);
       const room = rooms.get(roomOfSocket(socket));
-      if (room) finish(room, 'DISCONNECT');
+      if (room) {
+        const loser = room.seats.X === socket ? 'X' : room.seats.O === socket ? 'O' : null;
+        finish(room, 'DISCONNECT', loser);
+      }
     });
   });
 };

@@ -5,6 +5,7 @@ import { play, isEnabled, setEnabled } from './gameAudio.js';
 import MemorySolo, { MemoryGrid } from './memoryGame.jsx';
 import PenaltyGame from './penaltyGame.jsx';
 import TapGame from './tapGame.jsx';
+import CardDuelWeb from './cardDuelGame.jsx';
 import { LevelBadge, DisplayName } from './components/Cosmetics.jsx';
 import { fa, asset, avatarUrl, req } from './lib/api.js';
 
@@ -15,57 +16,67 @@ const GAMES = [
   { id: 'memory', title: 'جفت‌یاب', emoji: '🎁', desc: 'جفت‌های فوتبالی را به خاطر بسپار', accent: '#A855F7', art: '/games/memory.webp' },
 ];
 
-function useGameSession(api, token, gameId, stake = 0, vsBot = false, roomCode = null) {
-  const ref = useRef(null);
-  const [phase, setPhase] = useState('idle');
-  const [g, setG] = useState({
+function useGameSession(api, token, gameId, stake = 0, vsBot = false, roomCode = null,
+  externalSocket = null, initialStart = null) {
+  const socketRef = useRef(null);
+  const [phase, setPhase] = useState(initialStart ? 'playing' : 'waiting');
+  const [g, setG] = useState(() => initialStart ? {
+    state: initialStart.state || {},
+    players: initialStart.players || null,
+    me: initialStart.yourSymbol || null,
+    turn: initialStart.turn || null,
+    winner: null,
+    gameId: initialStart.gameId || gameId,
+    stake: Number(initialStart.stake ?? stake ?? 0),
+    netPot: Number(initialStart.netPot || 0),
+    commission: Number(initialStart.commission || 0),
+    vsBot: Boolean(initialStart.vsBot),
+    roomId: initialStart.roomId,
+    timedOut: null,
+  } : {
     state: {}, players: null, me: null, turn: null, winner: null,
-    vsBot: false, timedOut: null, deadline: null,
+    gameId, stake, netPot: 0, commission: 0, vsBot: false,
+    roomId: null, timedOut: null,
   });
   const [error, setError] = useState('');
-  const [secondsLeft, setSecondsLeft] = useState(15);
-  const [online, setOnline] = useState(true);
-  const [searchLeft, setSearchLeft] = useState(15);
-  const [botFallback, setBotFallback] = useState(true);
+  const [secondsLeft, setSecondsLeft] = useState(0);
   const [stillSearching, setStillSearching] = useState(false);
+  const deadlineRef = useRef(null);
 
   useEffect(() => {
-    const s = io(api, {
+    let disposed = false;
+    const s = externalSocket || io(api, {
       auth: { token },
       transports: ['websocket', 'polling'],
       forceNew: true,
       reconnection: true,
     });
-    ref.current = s;
+    socketRef.current = s;
 
-    s.on('connect', () => {
-      setOnline(true);
-      if (vsBot) {
-        s.emit('game:play_bot', { gameId });
-        setPhase('waiting');
-      } else if (roomCode) {
-        s.emit('game:join_room', { roomCode });
-        setPhase('waiting');
-      } else if (stake > 0) {
-        s.emit('game:join', { gameId, stake, vsBot: false });
-        setPhase('waiting');
+    const setClock = d => {
+      const remaining = Number(d?.remainingMs);
+      deadlineRef.current = Number.isFinite(remaining)
+        ? Date.now() + Math.max(0, remaining)
+        : (Number(d?.deadline) || null);
+      if (deadlineRef.current) {
+        setSecondsLeft(Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000)));
       }
-    });
-
-    s.on('disconnect', () => setOnline(false));
-    s.on('connect_error', () => setError('اتصال برقرار نشد'));
-
-    s.on('game:waiting', d => {
-      setBotFallback(d?.botFallback !== false);
-      setStillSearching(false);
+    };
+    const onWaiting = d => {
+      if (disposed) return;
       setPhase('waiting');
-    });
-    s.on('game:still-waiting', () => {
-      setBotFallback(false);
+      setError('');
+      setStillSearching(false);
+      if (d?.deadline || d?.remainingMs != null) setClock(d);
+    };
+    const onStillWaiting = () => {
+      if (disposed) return;
       setStillSearching(true);
-    });
-
-    s.on('game:start', d => {
+      deadlineRef.current = null;
+      setSecondsLeft(0);
+    };
+    const onStart = d => {
+      if (disposed || !d) return;
       play('match_found');
       setG({
         state: d.state || {},
@@ -73,75 +84,131 @@ function useGameSession(api, token, gameId, stake = 0, vsBot = false, roomCode =
         me: d.yourSymbol || null,
         turn: d.turn || null,
         winner: null,
+        gameId: d.gameId || gameId,
+        stake: Number(d.stake ?? stake ?? 0),
+        netPot: Number(d.netPot || 0),
+        commission: Number(d.commission || 0),
         vsBot: Boolean(d.vsBot),
+        roomId: d.roomId,
         timedOut: null,
-        deadline: d.deadline,
       });
       setPhase('playing');
+      setError('');
+      setStillSearching(false);
+      setClock(d);
       if (d.turn === d.yourSymbol) play('your_turn');
-    });
-
-    s.on('game:update', d => {
+    };
+    const onUpdate = d => {
+      if (disposed) return;
       setG(prev => {
         const wasMyTurn = prev.turn === prev.me;
-        const isMyTurn = d.turn === prev.me;
+        const isMyTurn = d?.turn === prev.me;
         if (!wasMyTurn && isMyTurn) play('your_turn');
         else if (wasMyTurn && !isMyTurn) play('move');
         return {
           ...prev,
-          state: d.state || prev.state,
-          turn: d.turn || prev.turn,
-          timedOut: d.timedOut || null,
-          deadline: d.deadline,
+          state: d?.state ?? prev.state,
+          turn: d?.turn ?? prev.turn,
+          timedOut: d?.timedOut || null,
         };
       });
-    });
-
-    s.on('game:over', d => {
+      setClock(d || {});
+    };
+    const onOver = d => {
+      if (disposed) return;
+      deadlineRef.current = null;
+      setSecondsLeft(0);
       setG(prev => {
-        const iWon = d.winner === prev.me;
-        play(d.winner === 'DRAW' ? 'draw' : (iWon ? 'win' : 'lose'));
-        return {
-          ...prev,
-          state: d.state || prev.state,
-          winner: d.winner || null,
-        };
+        const winner = d?.winner || null;
+        play(winner === 'DRAW' ? 'draw' : (winner === prev.me ? 'win' : 'lose'));
+        return { ...prev, state: d?.state ?? prev.state, winner };
       });
       setPhase('over');
-    });
+    };
+    const onError = d => {
+      if (disposed) return;
+      setError(d?.message || 'خطا در بازی');
+      setPhase('error');
+      deadlineRef.current = null;
+      setSecondsLeft(0);
+    };
+    const onConnectError = () => {
+      if (!disposed) setError('اتصال برقرار نشد');
+    };
+    const requestStart = () => {
+      // A lobby/private-room socket already emitted its create/join request.
+      if (externalSocket || initialStart) return;
+      if (vsBot) s.emit('game:play_bot', { gameId });
+      else if (roomCode) s.emit('game:join_room', { roomCode });
+      else s.emit('game:join', { gameId, stake, vsBot: false });
+      setPhase('waiting');
+    };
 
-    s.on('game:error', d => setError(d.message || 'خطا در بازی'));
+    s.on('connect', requestStart);
+    s.on('connect_error', onConnectError);
+    s.on('game:waiting', onWaiting);
+    s.on('game:still-waiting', onStillWaiting);
+    s.on('game:start', onStart);
+    s.on('game:update', onUpdate);
+    s.on('game:over', onOver);
+    s.on('game:error', onError);
+    if (s.connected) requestStart();
+    if (initialStart) onStart(initialStart);
+
+    const timer = window.setInterval(() => {
+      if (!deadlineRef.current) return;
+      setSecondsLeft(Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000)));
+    }, 250);
 
     return () => {
+      disposed = true;
+      window.clearInterval(timer);
+      s.off('connect', requestStart);
+      s.off('connect_error', onConnectError);
+      s.off('game:waiting', onWaiting);
+      s.off('game:still-waiting', onStillWaiting);
+      s.off('game:start', onStart);
+      s.off('game:update', onUpdate);
+      s.off('game:over', onOver);
+      s.off('game:error', onError);
       s.emit('game:leave');
       s.disconnect();
+      if (socketRef.current === s) socketRef.current = null;
     };
-  }, [api, token, gameId, stake, vsBot, roomCode]);
-
-  useEffect(() => {
-    if (phase !== 'playing') return;
-    setSecondsLeft(15);
-    const timer = setInterval(() => {
-      setSecondsLeft(prev => {
-        if (prev <= 1) return 0;
-        if (prev <= 4) play('tick');
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [g.turn, phase]);
+  }, [api, token, gameId, stake, vsBot, roomCode, externalSocket, initialStart]);
 
   const move = payload => {
     if (phase !== 'playing') return;
-    ref.current?.emit('game:move', { move: payload });
+    socketRef.current?.emit('game:move', { roomId: g.roomId, move: payload });
   };
-
+  const playBot = () => {
+    const socket = socketRef.current;
+    if (!socket) return;
+    socket.emit('game:leave', { roomId: g.roomId });
+    setError('');
+    setStillSearching(false);
+    setPhase('waiting');
+    socket.emit('game:play_bot', { gameId: g.gameId || gameId });
+  };
+  const joinOnline = () => {
+    const socket = socketRef.current;
+    if (!socket) return;
+    socket.emit('game:leave', { roomId: g.roomId });
+    setError('');
+    setStillSearching(false);
+    setPhase('waiting');
+    socket.emit('game:join', { gameId: g.gameId || gameId, stake, vsBot: false });
+  };
   const leave = () => {
-    ref.current?.emit('game:leave');
+    socketRef.current?.emit('game:leave', { roomId: g.roomId });
+    socketRef.current?.disconnect();
     setPhase('idle');
   };
 
-  return { phase, g, error, online, secondsLeft, move, leave, searchLeft, botFallback, stillSearching };
+  return {
+    phase, g, error, secondsLeft, move, leave, playBot, joinOnline,
+    stillSearching,
+  };
 }
 
 function tierLabel(level){
@@ -164,11 +231,80 @@ export default function Games({ api, token }) {
   const [user, setUser] = useState(null);
   const [level, setLevel] = useState(null);
   const [soundOn, setSoundOn] = useState(() => isEnabled());
+  const lobbySocketRef = useRef(null);
+  const [lobbyNotice, setLobbyNotice] = useState('');
+  const [memoryRecords, setMemoryRecords] = useState(null);
+
+  const loadMemoryRecords = async () => {
+    try {
+      const data = await req('/api/games/memory/solo', 'GET', null, token);
+      setMemoryRecords(data || null);
+    } catch {
+      // Leaderboard failure must not block solo play.
+      setMemoryRecords(null);
+    }
+  };
+
+  const openMemorySolo = () => {
+    setActive({ id: 'memory_solo' });
+    loadMemoryRecords();
+  };
 
   const toggleSound = () => {
     const next = setEnabled(!soundOn);
     setSoundOn(next);
   };
+
+  const prepareLobbySocket = (onConnect) => {
+    lobbySocketRef.current?.disconnect();
+    const s = io(api, {
+      auth: { token }, transports: ['websocket', 'polling'],
+      forceNew: true, reconnection: true,
+    });
+    lobbySocketRef.current = s;
+    const handleConnect = () => onConnect(s);
+    const handleLobbyError = d =>
+      setLobbyNotice(d?.message || 'عملیات اتاق ناموفق بود');
+    const handleStart = d => {
+      // همین socket عضو اتاق است؛ ساختنِ socket دوم کاربر را به صف دیگری
+      // می‌فرستاد و صفحه‌ای نشان می‌داد که هیچ event بازی را نمی‌شنید.
+      // listenerهای راه‌اندازی هم باید برداشته شوند تا reconnect وسط مسابقه
+      // درخواست ساخت/عضویت لابی را دوباره نفرستد.
+      s.off('connect', handleConnect);
+      s.off('game:error', handleLobbyError);
+      s.off('game:start', handleStart);
+      setActive({
+        id: d.gameId || customGame,
+        stake: Number(d.stake || 0),
+        externalSocket: s,
+        initialStart: d,
+      });
+    };
+    s.on('connect', handleConnect);
+    s.on('game:error', handleLobbyError);
+    s.on('game:start', handleStart);
+    return s;
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const roomCode = String(params.get('room') || '').trim();
+    if (!roomCode) return;
+    setMode(-1);
+    setJoinCode(roomCode);
+    setLobbyNotice('در حال ورود از لینک دعوت…');
+    prepareLobbySocket(s => s.emit('game:join_room', { roomCode }));
+    // Prevent an ordinary refresh/back-navigation from joining the room a
+    // second time after the one-shot invite has been consumed.
+    params.delete('room');
+    params.delete('game');
+    const query = params.toString();
+    window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
+    // The invite URL is intentionally a one-shot mount action.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [api, token]);
+
+  useEffect(() => () => lobbySocketRef.current?.disconnect(), [token]);
 
   useEffect(() => {
     req('/api/bootstrap', 'GET', null, token).then(d => {
@@ -194,7 +330,17 @@ export default function Games({ api, token }) {
 
   if (active) {
     if (active.id === 'card_duel') {
-      return <CardDuelWeb api={api} token={token} onBack={() => setActive(null)} />;
+      return <CardDuelWeb token={token} onBack={() => setActive(null)} />;
+    }
+    if (active.id === 'memory_solo') {
+      return <MemorySolo
+        api={api}
+        token={token}
+        records={memoryRecords}
+        reload={loadMemoryRecords}
+        onBack={() => setActive(null)}
+        onVersus={() => setActive({ id: 'memory', vsBot: true })}
+      />;
     }
     return (
       <GameScaffold
@@ -204,6 +350,10 @@ export default function Games({ api, token }) {
         stake={active.stake}
         vsBot={active.vsBot}
         roomCode={active.roomCode}
+        externalSocket={active.externalSocket}
+        initialStart={active.initialStart}
+        onSolo={active.id === 'memory' && Number(active.stake || 0) === 0
+          ? openMemorySolo : null}
         soundOn={soundOn}
         onToggleSound={toggleSound}
         onBack={() => setActive(null)}
@@ -339,7 +489,7 @@ export default function Games({ api, token }) {
           <div className="card" style={{ background: 'linear-gradient(135deg, #2E1065, #0F172A)', border: '1px solid rgba(168, 85, 247, 0.4)', padding: '18px', borderRadius: '18px' }}>
             <h3 style={{ color: '#FFF', fontWeight: '900', margin: '0 0 10px', fontSize: '15px' }}>ساخت اتاق و لابی اختصاصی</h3>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-              {GAMES.filter(g => !g.singlePlayer).map(g => (
+              {GAMES.filter(g => !g.singlePlayer && g.id !== 'card_duel').map(g => (
                 <button
                   key={g.id}
                   type="button"
@@ -395,14 +545,22 @@ export default function Games({ api, token }) {
             <button
               type="button"
               onClick={() => {
-                const s = io(api, { auth: { token }, transports: ['websocket', 'polling'] });
-                s.emit('game:create_lobby', { gameId: customGame, stake: customStake, password: customPass });
-                alert('لابی شما با موفقیت ساخته شد و در لیست قرار گرفت');
+                if (customStake > Number(user?.current_points || 0)) {
+                  alert(`برای این لابی حداقل ${fa(customStake)} امتیاز لازم داری`);
+                  return;
+                }
+                setLobbyNotice('در حال ساخت لابی…');
+                const s = prepareLobbySocket(sock => sock.emit('game:create_lobby', {
+                  gameId: customGame, stake: customStake, password: customPass,
+                }));
+                s.once('game:lobby_created', d =>
+                  setLobbyNotice(`${d?.message || 'لابی ساخته شد'}؛ منتظر حریف بمان`));
               }}
               style={{ width: '100%', padding: '12px', borderRadius: '12px', background: '#A855F7', color: '#FFF', fontWeight: '900', border: 'none', cursor: 'pointer' }}
             >
               ساخت لابی و ثبت در لیست
             </button>
+            {lobbyNotice && <div className="hint" style={{ marginTop:8, textAlign:'center' }}>{lobbyNotice}</div>}
           </div>
 
           {/* Active Lobbies List */}
@@ -428,9 +586,14 @@ export default function Games({ api, token }) {
                         if (l.hasPassword) {
                           pass = prompt('رمز عبور اتاق را وارد کنید:') || '';
                         }
-                        const s = io(api, { auth: { token }, transports: ['websocket', 'polling'] });
-                        s.emit('game:join_lobby', { lobbyId: l.lobbyId, password: pass });
-                        setActive({ id: l.gameId, stake: l.stake });
+                        if (Number(l.stake || 0) > Number(user?.current_points || 0)) {
+                          alert(`برای این مسابقه حداقل ${fa(l.stake)} امتیاز لازم داری`);
+                          return;
+                        }
+                        setLobbyNotice('در حال ورود به لابی…');
+                        prepareLobbySocket(s => s.emit('game:join_lobby', {
+                          lobbyId: l.lobbyId, password: pass,
+                        }));
                       }}
                       style={{ background: '#22E7A6', color: '#000', padding: '6px 14px', borderRadius: '16px', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}
                     >
@@ -455,10 +618,12 @@ export default function Games({ api, token }) {
               type="button"
               onClick={() => {
                 if (joinCode.trim()) {
-                  // مثل اندروید: کد عمومی است، بازی را سرور از روی هاست می‌فهمد
-                  const s = io(api, { auth: { token }, transports: ['websocket', 'polling'] });
-                  s.emit('game:join_room', { roomCode: joinCode.trim() });
-                  setActive({ id: 'penalty', roomCode: joinCode.trim() });
+                  // بازی واقعی از game:start خوانده می‌شود؛ حدسِ «همیشه
+                  // پنالتی» باعث می‌شد اتاق جفت‌یاب با UI پنالتی باز شود.
+                  setLobbyNotice('در حال ورود با کد اتاق…');
+                  prepareLobbySocket(s => s.emit('game:join_room', {
+                    roomCode: joinCode.trim(),
+                  }));
                 }
               }}
               style={{ padding: '10px 20px', background: '#38BDF8', color: '#000', borderRadius: '10px', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}
@@ -476,6 +641,10 @@ export default function Games({ api, token }) {
               onClick={() => {
                 if (g.id === 'card_duel') {
                   setActive({ id: 'card_duel' });
+                  return;
+                }
+                if (mode > 0 && Number(user?.current_points || 0) < mode) {
+                  alert(`برای این مسابقه حداقل ${fa(mode)} امتیاز لازم داری`);
                   return;
                 }
                 if (mode === 0) {
@@ -499,11 +668,22 @@ export default function Games({ api, token }) {
                   <p style={{ color: '#94A3B8', fontSize: '11px', margin: 0 }}>{g.desc}</p>
                 </div>
                 <span style={{ fontSize: '11px', fontWeight: '900', color: mode === 0 ? '#22E7A6' : (mode===1000 ? '#FFD166' : '#38BDF8'), background: 'rgba(255,255,255,0.06)', padding: '4px 8px', borderRadius: '10px', border: `1px solid ${mode===0 ? '#22E7A6' : (mode===1000 ? '#FFD166' : '#38BDF8')}66` }}>
-                  {mode === 0 ? 'تمرین فوری با هوش مصنوعی' : `مسابقه آنلاین (${fa(mode)} امتیاز)`}
+                  {g.id === 'card_duel'
+                    ? 'بازی مستقل با کارت‌های کلکسیونی'
+                    : mode === 0
+                      ? 'تمرین فوری با هوش مصنوعی'
+                      : `مسابقه آنلاین (${fa(mode)} امتیاز)`}
                 </span>
               </div>
-              <div style={{ padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background:'rgba(0,0,0,0.2)' }}>
-                <span style={{ color: '#64748B', fontSize: '11px' }}>برای شروع ضربه بزنید</span>
+              <div style={{ padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap:'8px', background:'rgba(0,0,0,0.2)' }}>
+                {g.id === 'memory' && mode === 0 ? (
+                  <button type="button" onClick={e => { e.stopPropagation(); openMemorySolo(); }}
+                    style={{ color:'#A855F7', border:'1px solid #A855F777', background:'#A855F71A', borderRadius:'10px', padding:'6px 10px', fontSize:'11px', fontWeight:'800', cursor:'pointer' }}>
+                    رکوردی با ساعت
+                  </button>
+                ) : (
+                  <span style={{ color: '#64748B', fontSize: '11px' }}>برای شروع ضربه بزنید</span>
+                )}
                 <span style={{ background: g.accent, color: '#000', padding: '6px 14px', borderRadius: '10px', fontWeight: '900', fontSize: '12px' }}>شروع</span>
               </div>
             </div>
@@ -514,44 +694,18 @@ export default function Games({ api, token }) {
   );
 }
 
-function CardDuelWeb({ api, token, onBack }){
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [msg, setMsg] = useState('');
-  const load = async()=>{
-    try{
-      setLoading(true);
-      const d = await req('/api/card-duel', 'GET', null, token);
-      setData(d);
-    }catch(e){ setMsg(e.message); } finally{ setLoading(false); }
-  };
-  useEffect(()=>{ load(); }, [token]);
-  if(loading) return <div className="card" style={{padding:'40px', textAlign:'center'}}>در حال بارگذاری...</div>;
-  return (
-    <div className="card" style={{padding:'20px', maxWidth:'640px', margin:'0 auto'}}>
-      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px'}}>
-        <button onClick={onBack} style={{background:'rgba(255,255,255,0.1)', color:'#FFF', border:'none', padding:'6px 14px', borderRadius:'10px', cursor:'pointer'}}>← بازگشت</button>
-        <h3 style={{color:'#FFD166', fontWeight:'900'}}>دوئل کارت‌ها</h3>
-        <span>🃏</span>
-      </div>
-      {msg && <div style={{background:'rgba(239,68,68,0.15)', border:'1px solid #EF4444', color:'#FCA5A5', padding:'8px', borderRadius:'8px', marginBottom:'12px'}}>{msg}</div>}
-      <p style={{color:'#94A3B8', fontSize:'12px', lineHeight:'1.6'}}>این بخش دقیقا مثل اپ اندروید است — تیم سه‌کارتی خود را انتخاب کنید و با حریف Ghost یا ربات بازی کنید. برای تجربه کامل، از اپ اندروید استفاده کنید.</p>
-      <div style={{marginTop:'16px', display:'flex', gap:'8px'}}>
-        <button onClick={load} style={{flex:1, padding:'10px', background:'#38BDF8', color:'#000', border:'none', borderRadius:'10px', fontWeight:'900', cursor:'pointer'}}>بروزرسانی</button>
-        <button onClick={onBack} style={{flex:1, padding:'10px', background:'rgba(255,255,255,0.08)', color:'#FFF', border:'1px solid rgba(255,255,255,0.12)', borderRadius:'10px', fontWeight:'900', cursor:'pointer'}}>بازگشت به بازی‌ها</button>
-      </div>
-      {data && (
-        <pre style={{marginTop:'16px', background:'rgba(0,0,0,0.3)', padding:'12px', borderRadius:'10px', color:'#94A3B8', fontSize:'11px', overflow:'auto', maxHeight:'300px', direction:'ltr'}}>{JSON.stringify(data, null, 2)}</pre>
-      )}
-    </div>
-  );
-}
 
-function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, soundOn, onToggleSound, onBack }) {
-  const { phase, g, error, secondsLeft, move, leave, stillSearching } = useGameSession(api, token, gameId, stake, vsBot, roomCode);
+function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSocket, initialStart, onSolo, soundOn, onToggleSound, onBack }) {
+  const {
+    phase, g, error, secondsLeft, move, leave, playBot, joinOnline,
+    stillSearching,
+  } = useGameSession(
+    api, token, gameId, stake, vsBot, roomCode, externalSocket, initialStart);
+  const activeGameId = g.gameId || gameId;
+  const activeStake = Number(g.stake ?? stake ?? 0);
   const pX = g.players?.X || { nickname: 'کاربر ۱' };
   const pO = g.players?.O || (g.vsBot ? { nickname: 'هوش مصنوعی (ربات)', isBot: true } : { nickname: 'کاربر ۲' });
-  const isOnlineMatch = stake === 100 || stake === 1000;
+  const isOnlineMatch = activeStake === 100 || activeStake === 1000;
 
   return (
     <div className="card wide" style={{ padding: '20px', textAlign: 'center', maxWidth: '640px', margin: '0 auto' }}>
@@ -560,7 +714,7 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, soundOn, onT
           ← بازگشت
         </button>
         <span style={{ fontWeight: '900', color: '#38BDF8', fontSize: '16px' }}>
-          {gameId === 'penalty' ? 'ضربات پنالتی' : (gameId === 'memory' ? 'جفت‌یاب' : 'دوئل کارت‌ها')}
+          {activeGameId === 'penalty' ? 'ضربات پنالتی' : (activeGameId === 'memory' ? 'جفت‌یاب' : 'دوئل کارت‌ها')}
         </span>
         <button type="button" onClick={onToggleSound} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer' }}>
           {soundOn ? '🔊' : '🔇'}
@@ -583,9 +737,29 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, soundOn, onT
         </div>
       )}
 
-      {stake>0 && !g.vsBot && phase==='playing' && (
+      {activeStake>0 && !g.vsBot && phase==='playing' && (
         <div style={{ margin:'0 auto 10px', display:'inline-flex', alignItems:'center', gap:'6px', background:'linear-gradient(90deg, #FFD70022, #FF9F4322)', border:'1px solid #FFD166', color:'#FFD166', padding:'4px 12px', borderRadius:'99px', fontSize:'11px', fontWeight:'900' }}>
-          <span>🏆</span> پات مسابقه: {fa(g.netPot||stake*2*0.9)} امتیاز (۱۰٪ کارمزد)
+          <span>🏆</span> پات مسابقه: {fa(g.netPot||activeStake*2*0.9)} امتیاز (۱۰٪ کارمزد)
+        </div>
+      )}
+
+      {phase === 'idle' && (
+        <div style={{ padding:'36px 18px', display:'flex', flexDirection:'column', alignItems:'center', gap:'12px' }}>
+          <div style={{ fontSize:'42px' }}>🎮</div>
+          <h3 style={{ margin:0, color:'#FFF' }}>آماده‌ای شروع کنیم؟</h3>
+          <p className="hint">آنلاین با حریف واقعی رقابت کن یا فوری با ربات تمرین کن.</p>
+          <div style={{ display:'flex', flexWrap:'wrap', justifyContent:'center', gap:'8px' }}>
+            <button className="main" type="button" onClick={joinOnline}>پیدا کردن حریف آنلاین</button>
+            <button type="button" onClick={playBot}>بازی فوری با ربات</button>
+            {onSolo && <button type="button" onClick={onSolo}>بازی رکوردی با ساعت</button>}
+          </div>
+        </div>
+      )}
+
+      {phase === 'error' && (
+        <div style={{ padding:'28px 18px', display:'flex', justifyContent:'center', gap:'8px', flexWrap:'wrap' }}>
+          <button type="button" className="main" onClick={stake > 0 ? joinOnline : playBot}>تلاش دوباره</button>
+          <button type="button" onClick={() => { leave(); onBack(); }}>بازگشت</button>
         </div>
       )}
 
@@ -607,7 +781,7 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, soundOn, onT
                 می‌توانی منتظر بمانی یا از قسمت تمرین با ربات تنها بازی کنی و یا از قسمت اتاق خصوصی لابی بسازی و با دوست خودت بازی کنی.
               </p>
               <div style={{ display:'flex', gap:'8px', marginTop:'8px' }}>
-                <button type="button" onClick={() => { leave(); window.location.reload(); }} style={{ background:'#38BDF8', color:'#000', border:'none', padding:'10px 20px', borderRadius:'12px', fontWeight:'900', cursor:'pointer' }}>شروع با ربات</button>
+                <button type="button" onClick={playBot} style={{ background:'#38BDF8', color:'#000', border:'none', padding:'10px 20px', borderRadius:'12px', fontWeight:'900', cursor:'pointer' }}>شروع با ربات</button>
                 <button type="button" onClick={() => { leave(); onBack(); }} style={{ background:'rgba(255,255,255,0.06)', color:'#FFF', border:'1px solid rgba(255,255,255,0.12)', padding:'10px 20px', borderRadius:'12px', fontWeight:'900', cursor:'pointer' }}>لغو</button>
               </div>
             </div>
@@ -617,10 +791,10 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, soundOn, onT
 
       {phase === 'playing' && (
         <div>
-          {gameId === 'penalty' && (
+          {activeGameId === 'penalty' && (
             <PenaltyGame state={g.state} mySymbol={g.me} turn={g.turn} onMove={move} />
           )}
-          {gameId === 'memory' && (
+          {activeGameId === 'memory' && (
             <MemoryGrid cards={g.state?.cards || []} playable={g.state?.playable || []} onMove={move} />
           )}
         </div>

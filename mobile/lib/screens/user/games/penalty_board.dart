@@ -59,6 +59,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../../api_client.dart';
 import '../../../core/assets.dart';
@@ -82,6 +83,8 @@ class PenaltyScreen extends StatefulWidget {
     this.stake = 0,
     this.vsBot = false,
     this.roomCode,
+    this.existingSocket,
+    this.initialStart,
   });
 
   final ApiClient api;
@@ -89,18 +92,27 @@ class PenaltyScreen extends StatefulWidget {
   final int stake;
   final bool vsBot;
   final String? roomCode;
+  final io.Socket? existingSocket;
+  final Map<String, dynamic>? initialStart;
 
   @override
   State<PenaltyScreen> createState() => _PenaltyScreenState();
 }
 
 class _PenaltyScreenState extends State<PenaltyScreen> {
-  late final GameSession _s =
-      GameSession(api: widget.api, gameId: 'penalty')..connect();
+  late final GameSession _s = GameSession(
+    api: widget.api,
+    gameId: 'penalty',
+    existingSocket: widget.existingSocket,
+    initialStart: widget.initialStart,
+  )..connect();
 
   @override
   void initState() {
     super.initState();
+    if (widget.initialStart != null) {
+      return;
+    }
     if (widget.vsBot) {
       _s.playWithBotImmediately();
     } else if (widget.roomCode != null && widget.roomCode!.isNotEmpty) {

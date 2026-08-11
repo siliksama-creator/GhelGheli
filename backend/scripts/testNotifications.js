@@ -120,6 +120,24 @@ console.log('\n== ۴. برندهٔ لیگ در پایان ماه ==');
     'متنِ اعلان رتبه و مبلغ را دارد');
 }
 
+console.log('\n== ۵. اعلان هدفمند واقعاً به backend وصل است ==');
+{
+  const notifications = strip(read('src', 'services', 'notificationService.js'));
+  ok(/\/api\/admin\/notifications\/send-segmented/.test(server),
+    'endpoint اعلان هدفمند روی سرور وجود دارد');
+  ok(/sendSegmented/.test(server) && /sendSegmented/.test(notifications),
+    'route به سرویس واقعی بخش‌بندی وصل است');
+  for (const segment of ['inactive_3d', 'top20_league', 'near_cash_reward',
+    'plus_users', 'free_users']) {
+    ok(notifications.includes(`case '${segment}'`),
+      `کوئری segment ${segment} تعریف شده است`);
+  }
+  ok(/Asia\/Tehran/.test(server) && /hour >= 10 && hour < 22/.test(server),
+    'محافظ ساعت تهران سمت سرور است، نه فقط UI');
+  ok(/req\.admin\.role !== 'super_admin'/.test(server),
+    'دورزدن شبانه فقط برای super-admin است');
+}
+
 console.log('\n== زنگوله شمارنده دارد ==');
 {
   const bell = strip(read('..', 'mobile', 'lib', 'widgets',

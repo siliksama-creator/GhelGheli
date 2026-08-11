@@ -57,6 +57,8 @@ class _GamesHubPageState extends State<GamesHubPage> {
   int _activeStake = 0;
   bool _activeVsBot = false;
   String? _activeRoomCode;
+  io.Socket? _activeSocket;
+  Map<String, dynamic>? _activeInitialStart;
 
   // 4 Modes: 100, 1000, 0 (تمرین با ربات), -1 (اتاق خصوصی)
   int _selectedMode = 100;
@@ -89,16 +91,26 @@ class _GamesHubPageState extends State<GamesHubPage> {
       _activeStake = 0;
       _activeVsBot = false;
       _activeRoomCode = null;
+      _activeSocket = null;
+      _activeInitialStart = null;
     });
     unawaited(_loadLevel());
   }
 
-  void _launchGame(String gameId, {int stake = 0, bool vsBot = false, String? roomCode}) {
+  void _launchGame(String gameId, {
+    int stake = 0,
+    bool vsBot = false,
+    String? roomCode,
+    io.Socket? existingSocket,
+    Map<String, dynamic>? initialStart,
+  }) {
     setState(() {
       _active = gameId;
       _activeStake = stake;
       _activeVsBot = vsBot;
       _activeRoomCode = roomCode;
+      _activeSocket = existingSocket;
+      _activeInitialStart = initialStart;
     });
   }
 
@@ -115,6 +127,8 @@ class _GamesHubPageState extends State<GamesHubPage> {
             stake: _activeStake,
             vsBot: _activeVsBot,
             roomCode: _activeRoomCode,
+            existingSocket: _activeSocket,
+            initialStart: _activeInitialStart,
           );
         case 'penalty':
           return PenaltyScreen(
@@ -123,6 +137,8 @@ class _GamesHubPageState extends State<GamesHubPage> {
             stake: _activeStake,
             vsBot: _activeVsBot,
             roomCode: _activeRoomCode,
+            existingSocket: _activeSocket,
+            initialStart: _activeInitialStart,
           );
         case 'card_duel':
           return CardDuelPage(api: widget.api, onBack: _back);
@@ -354,8 +370,16 @@ class _GamesHubPageState extends State<GamesHubPage> {
           // ── بخش اتاق خصوصی و لابی‌ها (بدون نیاز به اشتراک، با قفل و پسورد) ──
           _PrivateLobbyHub(
             api: widget.api,
-            onJoinGame: (gameId, stake, roomCode) {
-              _launchGame(gameId, stake: stake, vsBot: false, roomCode: roomCode);
+            currentPoints: (_user?['current_points'] as num?)?.toInt() ?? 0,
+            onJoinGame: (gameId, stake, roomCode, existingSocket, initialStart) {
+              _launchGame(
+                gameId,
+                stake: stake,
+                vsBot: false,
+                roomCode: roomCode,
+                existingSocket: existingSocket,
+                initialStart: initialStart,
+              );
             },
           ),
         ] else ...[
@@ -365,6 +389,22 @@ class _GamesHubPageState extends State<GamesHubPage> {
               entry: g,
               mode: _selectedMode,
               onTap: () {
+                // دوئل کارت یک بازی مستقل Ghost/بات است؛ حالت ۱۰۰/۱۰۰۰
+                // هاب برای آن معنا ندارد و نباید مثل مسابقه stakeدار نشان
+                // داده یا وارد صف موتور تخته‌ای شود.
+                if (g.id == 'card_duel') {
+                  _launchGame(g.id);
+                  return;
+                }
+                if (_selectedMode > 0 &&
+                    ((_user?['current_points'] as num?)?.toInt() ?? 0) < _selectedMode) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(
+                      'برای این مسابقه حداقل ${faNum(_selectedMode)} امتیاز لازم داری',
+                    ),
+                  ));
+                  return;
+                }
                 if (_selectedMode == 0) {
                   // تمرین فوری با هوش مصنوعی (بدون شمارنده، بدون معطلی، بدون آنلاین)
                   _launchGame(g.id, stake: 0, vsBot: true);
@@ -512,6 +552,7 @@ class _CleanGameTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isBot = mode == 0;
+    final isStandalone = entry.id == 'card_duel';
 
     return InkWell(
       borderRadius: BorderRadius.circular(16),
@@ -599,7 +640,11 @@ class _CleanGameTile extends StatelessWidget {
                               ),
                             ),
                             child: Text(
-                              isBot ? 'تمرین فوری با هوش مصنوعی' : 'مسابقه آنلاین (${faNum(mode)} امتیاز)',
+                              isStandalone
+                                  ? 'بازی مستقل با کارت‌های کلکسیونی'
+                                  : isBot
+                                      ? 'تمرین فوری با هوش مصنوعی'
+                                      : 'مسابقه آنلاین (${faNum(mode)} امتیاز)',
                               style: TextStyle(
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.w900,
@@ -628,11 +673,19 @@ class _CleanGameTile extends StatelessWidget {
 class _PrivateLobbyHub extends StatefulWidget {
   const _PrivateLobbyHub({
     required this.api,
+    required this.currentPoints,
     required this.onJoinGame,
   });
 
   final ApiClient api;
-  final void Function(String gameId, int stake, String? roomCode) onJoinGame;
+  final int currentPoints;
+  final void Function(
+    String gameId,
+    int stake,
+    String? roomCode,
+    io.Socket? existingSocket,
+    Map<String, dynamic>? initialStart,
+  ) onJoinGame;
 
   @override
   State<_PrivateLobbyHub> createState() => _PrivateLobbyHubState();
@@ -642,15 +695,17 @@ class _PrivateLobbyHubState extends State<_PrivateLobbyHub> {
   io.Socket? _socket;
   List<Map<String, dynamic>> _lobbies = [];
   bool _loadingLobbies = true;
+  bool _socketTransferred = false;
 
   String _selectedGame = 'penalty';
   int _stake = 500;
   final _passCtrl = TextEditingController();
   final _joinCodeCtrl = TextEditingController();
 
+  // Card Duel is a separate Ghost/bot game and has no multiplayer rules in
+  // the socket engine, so presenting it as a private lobby was a dead button.
   final _games = const [
     ('penalty', 'ضربات پنالتی', 'assets/pass/football_icon.webp'),
-    ('card_duel', 'دوئل کارت‌ها', 'assets/games/card_duel_glow.png'),
     ('memory', 'جفت‌یاب', 'assets/games/memory/medal.webp'),
   ];
 
@@ -689,6 +744,43 @@ class _PrivateLobbyHubState extends State<_PrivateLobbyHub> {
       s.on('game:lobby_updated', (_) {
         s.emit('game:lobby_list');
       });
+
+      s.on('game:error', (data) {
+        if (!mounted) return;
+        final message = data is Map && data['message'] != null
+            ? '${data['message']}'
+            : 'عملیات اتاق ناموفق بود';
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(message)));
+      });
+
+      s.on('game:lobby_created', (data) {
+        if (!mounted) return;
+        final message = data is Map && data['message'] != null
+            ? '${data['message']}'
+            : 'لابی ساخته شد؛ منتظر حریف بمان';
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(message)));
+      });
+
+      s.on('game:start', (data) {
+        if (!mounted || data is! Map) return;
+        final start = Map<String, dynamic>.from(data);
+        final gameId = '${start['gameId'] ?? _selectedGame}';
+        final stake = (start['stake'] as num?)?.toInt() ?? 0;
+
+        // Ownership now moves to GameSession. Remove bootstrap/list listeners
+        // first, otherwise a reconnect during play would request lobby data or
+        // repeat create/join on the same game socket.
+        for (final event in [
+          'connect', 'game:lobby_list', 'game:lobby_updated',
+          'game:error', 'game:lobby_created', 'game:start',
+        ]) {
+          s.off(event);
+        }
+        _socketTransferred = true;
+        widget.onJoinGame(gameId, stake, null, s, start);
+      });
     } catch (_) {
       if (mounted) setState(() => _loadingLobbies = false);
     }
@@ -696,13 +788,19 @@ class _PrivateLobbyHubState extends State<_PrivateLobbyHub> {
 
   @override
   void dispose() {
-    _socket?.dispose();
+    if (!_socketTransferred) _socket?.dispose();
     _passCtrl.dispose();
     _joinCodeCtrl.dispose();
     super.dispose();
   }
 
   void _createLobby() {
+    if (_stake > widget.currentPoints) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('برای این لابی حداقل ${faNum(_stake)} امتیاز لازم داری'),
+      ));
+      return;
+    }
     final pass = _passCtrl.text.trim();
     _socket?.emit('game:create_lobby', {
       'gameId': _selectedGame,
@@ -717,12 +815,17 @@ class _PrivateLobbyHubState extends State<_PrivateLobbyHub> {
   void _promptPasswordAndJoin(Map<String, dynamic> lobby) {
     final hasPass = lobby['hasPassword'] == true;
     final lobbyId = lobby['lobbyId'] as String? ?? '';
-    final gameId = lobby['gameId'] as String? ?? 'penalty';
     final stake = (lobby['stake'] as num?)?.toInt() ?? 100;
+
+    if (stake > widget.currentPoints) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('برای این مسابقه حداقل ${faNum(stake)} امتیاز لازم داری'),
+      ));
+      return;
+    }
 
     if (!hasPass) {
       _socket?.emit('game:join_lobby', {'lobbyId': lobbyId});
-      widget.onJoinGame(gameId, stake, null);
       return;
     }
 
@@ -749,8 +852,10 @@ class _PrivateLobbyHubState extends State<_PrivateLobbyHub> {
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
-              _socket?.emit('game:join_lobby', {'lobbyId': lobbyId, 'password': passCtrl.text.trim()});
-              widget.onJoinGame(gameId, stake, null);
+              _socket?.emit('game:join_lobby', {
+                'lobbyId': lobbyId,
+                'password': passCtrl.text.trim(),
+              });
             },
             child: const Text('ورود به اتاق'),
           ),
@@ -1032,7 +1137,9 @@ class _PrivateLobbyHubState extends State<_PrivateLobbyHub> {
                     onPressed: () {
                       final code = _joinCodeCtrl.text.trim();
                       if (code.isNotEmpty) {
-                        widget.onJoinGame(_selectedGame, _stake, code);
+                        // gameId واقعی را از game:start می‌گیریم؛ انتخابِ
+                        // محلی ممکن است با اتاق دوست فرق داشته باشد.
+                        _socket?.emit('game:join_room', {'roomCode': code});
                       }
                     },
                     child: const Text('ورود'),

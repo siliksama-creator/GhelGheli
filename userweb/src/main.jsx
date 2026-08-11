@@ -25,6 +25,7 @@ import Pass from './screens/Pass.jsx';
 import GamesHub from './games.jsx';
 import Support from './support.jsx';
 import Wallet from './wallet.jsx';
+import Inventory from './screens/Inventory.jsx';
 import { LoadingView, ErrorView } from './components/states.jsx';
 import { UiIcon } from './components/IconAsset.jsx';
 
@@ -55,6 +56,7 @@ const NAV_TABS = [
 ];
 
 const MORE_TABS = [
+  ['inventory', 'کلکسیون کارت‌ها', 'card'],
   ['wallet', 'کیف پول', 'wallet'],
   // دعوت دوستان قبلاً فقط از میان‌بر داشبورد باز می‌شد؛ اگر کاربر آن
   // کارت را رد می‌کرد، صفحه عملاً گم می‌شد.
@@ -152,7 +154,8 @@ function App() {
 }
 
 function Portal({ token, logout }) {
-  const [tab, setTab] = useState('home');
+  const sharedRoom = new URLSearchParams(window.location.search).get('room');
+  const [tab, setTab] = useState(sharedRoom ? 'club' : 'home');
   const [p, setP] = useState(null);
   const [rewards, setRewards] = useState([]);
   const [msg, setMsg] = useState('');
@@ -183,6 +186,8 @@ function Portal({ token, logout }) {
         // استریک از bootstrap می‌آید؛ دیگر برای کارت روزانه یک درخواست
         // جدا نمی‌زنیم و بعد از claim هم همین load امتیاز هدر را تازه می‌کند.
         loginStreak: boot.loginStreak || null,
+        cosmetics: boot.cosmetics || null,
+        level: boot.level || null,
       });
       setRewards(boot.rewards || []);
       const wheel = boot.wheel;
@@ -304,9 +309,14 @@ function Portal({ token, logout }) {
       <main className="tabPane" key={tab}>
         {tab === 'home' && (
           <Home token={token} p={p} rewards={rewards} load={load}
-            setMsg={setMsg} openWallet={() => setTab('wallet')}
+            setMsg={setMsg} openProfile={() => setTab('profile')}
+            openWallet={() => setTab('wallet')}
             openWheel={() => setTab('wheel')}
-            openInvite={() => setTab('invite')} />
+            openInvite={() => setTab('invite')}
+            openInventory={() => setTab('inventory')} />
+        )}
+        {tab === 'inventory' && (
+          <Inventory items={p.inventory || []} reload={load} />
         )}
         {tab === 'profile' && (
           <Profile token={token} p={p} load={load} setMsg={setMsg} />
@@ -327,7 +337,8 @@ function Portal({ token, logout }) {
           <League token={token} openProfile={setPublicUser} />
         )}
         {tab === 'club' && (
-          <Club token={token} openProfile={setPublicUser} meId={u.id} />
+          <Club token={token} openProfile={setPublicUser} meId={u.id}
+            openGames={Boolean(sharedRoom)} />
         )}
         {tab === 'wheel' && (
           <Wheel token={token} setMsg={setMsg} reloadProfile={load}
@@ -350,8 +361,8 @@ function Portal({ token, logout }) {
   );
 }
 
-function Club({ token, openProfile, meId }) {
-  const [sub, setSub] = useState('chat');
+function Club({ token, openProfile, meId, openGames = false }) {
+  const [sub, setSub] = useState(openGames ? 'games' : 'chat');
   return (
     <div className="clubWrap">
       <div className="clubTabs">

@@ -192,16 +192,17 @@ console.log('\n== فقط بازیِ آنلاین XP می‌دهد ==');
   const eng = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'games', 'engine.js'), 'utf8');
 
-  // فراخوانیِ لول باید **داخل** همان بلوکِ `if (!room.vsBot)` باشد.
-  const guard = eng.indexOf('if (!room.vsBot)');
+  // بازی رایگانِ خصوصی هم طبق تصمیم محصول XP ندارد؛ بنابراین نگهبان
+  // کامل حالا هم انسان‌بودن حریف و هم stake مثبت را می‌سنجد.
+  const guardMatch = eng.match(/if\s*\(\s*!room\.vsBot\s*&&\s*room\.stake\s*>\s*0\s*\)/);
+  const guard = guardMatch?.index ?? -1;
   const call = eng.indexOf('grantGameXp');
-  ok(guard > 0, 'نگهبانِ vsBot در موتور هست');
+  ok(guard > 0, 'نگهبانِ انسان‌بودن + stake مثبت در موتور هست');
   ok(call > guard, 'فراخوانیِ XP لول بعد از نگهبان است');
 
-  // و باید در همان بلوک بماند: تا بستهٔ آکولاد نباید بیرون بیفتد.
   const block = eng.slice(guard, eng.indexOf('} catch', guard));
   ok(block.includes('grantGameXp'),
-    'XP لول داخلِ بلوکِ vsBot است، نه بیرونش');
+    'XP لول داخلِ بلوکِ مسابقهٔ آنلاین امتیازی است');
 }
 
 console.log('\n== مسیرهای require واقعاً وجود دارند ==');

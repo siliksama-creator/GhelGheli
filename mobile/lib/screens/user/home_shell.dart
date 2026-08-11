@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import '../../theme/tokens.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -38,6 +39,7 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell>
     with SingleTickerProviderStateMixin {
   int _index = 0;
+  StreamSubscription<String>? _fcmRefreshSubscription;
 
   Future<void> _confirmLogout(BuildContext context) async {
     final ok = await showDialog<bool>(
@@ -367,6 +369,7 @@ class _HomeShellState extends State<HomeShell>
 
   @override
   void dispose() {
+    _fcmRefreshSubscription?.cancel();
     _entrance.dispose();
     super.dispose();
   }
@@ -411,14 +414,26 @@ class _HomeShellState extends State<HomeShell>
     }
   }
 
+  Future<void> _saveFcmToken(String token) async {
+    if (token.trim().isEmpty) return;
+    await widget.api.patch('/api/profile', {'fcmToken': token});
+  }
+
   Future<void> _registerFcm() async {
     try {
       await Firebase.initializeApp();
-      await FirebaseMessaging.instance.requestPermission();
-      final token = await FirebaseMessaging.instance.getToken();
-      if (token != null) {
-        await widget.api.patch('/api/profile', {'fcmToken': token});
-      }
+      final messaging = FirebaseMessaging.instance;
+      await messaging.requestPermission();
+
+      // FCM may rotate a registration token after restore, reinstall, or an
+      // app-data reset. Register both the current value and every rotation;
+      // otherwise pushes work only until the first token refresh.
+      _fcmRefreshSubscription ??= messaging.onTokenRefresh.listen(
+        (token) => _saveFcmToken(token).catchError((_) {}),
+        onError: (_) {},
+      );
+      final token = await messaging.getToken();
+      if (token != null) await _saveFcmToken(token);
     } catch (_) {
       // Push notifications are optional; ignore failures (e.g. no Firebase config).
     }

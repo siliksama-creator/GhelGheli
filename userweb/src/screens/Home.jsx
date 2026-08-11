@@ -45,7 +45,7 @@ function HeroHeader({ points, nickname, nextReward, user, cosmetics, onOpenProfi
     <div style={{ padding:'10px 10px 10px', borderRadius:'20px', background:'linear-gradient(135deg, #1A2B45, #111D30, #0A1220)', border:'1.2px solid rgba(255,215,0,0.28)', boxShadow:'0 8px 18px rgba(255,215,0,0.08), 0 8px 16px rgba(0,0,0,0.4)' }}>
       <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>
         <div onClick={onOpenProfile} style={{ flex:1, display:'flex', gap:'8px', alignItems:'center', cursor:'pointer' }}>
-          <img src={user?.profile_image_url ? asset(user.profile_image_url) : avatarUrl(user?.profile_avatar_key)} alt="" style={{ width:'40px', height:'40px', borderRadius:'50%', objectFit:'cover' }} />
+          <img src={user?.profile_image_url ? asset(user.profile_image_url) : avatarUrl(user?.profile_avatar_key)} alt="" decoding="async" style={{ width:'40px', height:'40px', borderRadius:'50%', objectFit:'cover' }} />
           <div>
             <div style={{ color:'#FFF', fontWeight:'900', fontSize:'14.5px', display:'flex', alignItems:'center', gap:'4px' }}>
               سلام {nickname} {cosmetics?.plus && <span style={{ color:'#FFD700', textShadow:'0 0 8px #FFD700', fontSize:'13px' }}>★</span>}
@@ -65,7 +65,7 @@ function HeroHeader({ points, nickname, nextReward, user, cosmetics, onOpenProfi
         {nextReward ? (remaining===0 ? `به جایزه ${nextReward.name} رسیدی!` : `تا جایزه ${nextReward.name}: ${fa(remaining)} امتیاز`) : 'هنوز جایزه‌ای تعریف نشده است'}
       </div>
       {onOpenWallet && (
-        <div onClick={onOpenWallet} style={{ marginTop:'8px', background:'rgba(0,0,0,0.28)', border:`1px solid ${asInt(user?.wallet_balance)>0?'rgba(255,211,107,0.5)':'rgba(255,255,255,0.15)'}`, borderRadius:'12px', padding:'6px 10px', display:'flex', alignItems:'center', gap:'8px', cursor:'pointer' }}>
+        <div className="walletEntry" onClick={onOpenWallet} style={{ marginTop:'8px', background:'rgba(0,0,0,0.28)', border:`1px solid ${asInt(user?.wallet_balance)>0?'rgba(255,211,107,0.5)':'rgba(255,255,255,0.15)'}`, borderRadius:'12px', padding:'6px 10px', display:'flex', alignItems:'center', gap:'8px', cursor:'pointer' }}>
           <span style={{ width:'26px', height:'26px', borderRadius:'50%', background: asInt(user?.wallet_balance)>0 ? 'linear-gradient(135deg, #FFE9A8, #D4A227)' : 'rgba(255,255,255,0.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'14px' }}>💰</span>
           <span style={{ flex:1, color:'rgba(255,255,255,0.7)', fontSize:'10.5px', fontWeight:'600' }}>کیف پول من</span>
           <span style={{ color: asInt(user?.wallet_balance)>0 ? '#FFD36B' : '#FFF', fontWeight:'900', fontSize:'14px' }}>{fa(user?.wallet_balance||0)} <span style={{ fontSize:'9.5px', color:'rgba(255,211,107,0.8)' }}>تومان</span></span>
@@ -97,20 +97,20 @@ function CardLightbox({ item, close }) {
   );
 }
 
-export default function Home({ token, p, rewards, load, setMsg, openWallet, openWheel, openInvite }) {
+export default function Home({ token, p, rewards, load, setMsg, openProfile, openWallet, openWheel, openInvite, openInventory }) {
   const [bigCard, setBigCard] = useState(null);
-  const [invQuery, setInvQuery] = useState('');
-  const [invSort, setInvSort] = useState('recent');
   const u = p.user;
   const sorted = [...rewards].sort((a,b)=>a.required_points-b.required_points);
   const next = sorted.find(r=>u.current_points < r.required_points) || sorted.at(-1);
   const inventory = p.inventory || [];
-  const invStats = useMemo(()=>collectionStats(inventory),[inventory]);
-  const invShown = useMemo(()=>filterAndSort(inventory, invQuery, invSort),[inventory, invQuery, invSort]);
+  const recentInventory = useMemo(
+    () => filterAndSort(inventory, '', 'recent').slice(0, 6),
+    [inventory],
+  );
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:'12px', padding:'0 12px 80px' }}>
-      <HeroHeader points={asInt(u.current_points)} nickname={u.nickname||u.mobile||'قهرمان'} nextReward={next} user={u} cosmetics={p.cosmetics} onOpenProfile={()=>window.dispatchEvent(new CustomEvent('openProfile'))} onOpenWallet={openWallet} />
+      <HeroHeader points={asInt(u.current_points)} nickname={u.nickname||u.mobile||'قهرمان'} nextReward={next} user={u} cosmetics={p.cosmetics} onOpenProfile={openProfile} onOpenWallet={openWallet} />
 
       <LoginStreak token={token} initialData={p.loginStreak} setMsg={setMsg} onClaimed={load} />
 
@@ -125,7 +125,7 @@ export default function Home({ token, p, rewards, load, setMsg, openWallet, open
           <b style={{ color:'#FFF', fontSize:'12px', fontWeight:'900' }}>دعوت</b>
           <small style={{ color:'#84CC16', fontSize:'10px', fontWeight:'700' }}>دوستان</small>
         </button>
-        <button onClick={()=>window.scrollTo(0, document.body.scrollHeight)} style={{ background:'linear-gradient(135deg, #38BDF822, #38BDF80A)', border:'1px solid #38BDF855', borderRadius:'16px', padding:'12px 6px', display:'flex', flexDirection:'column', alignItems:'center', gap:'6px', cursor:'pointer', boxShadow:'0 4px 12px #38BDF822' }}>
+        <button onClick={openInventory} style={{ background:'linear-gradient(135deg, #38BDF822, #38BDF80A)', border:'1px solid #38BDF855', borderRadius:'16px', padding:'12px 6px', display:'flex', flexDirection:'column', alignItems:'center', gap:'6px', cursor:'pointer', boxShadow:'0 4px 12px #38BDF822' }}>
           <span style={{ width:'40px', height:'40px', borderRadius:'50%', background:'#38BDF822', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'20px' }}>🃏</span>
           <b style={{ color:'#FFF', fontSize:'12px', fontWeight:'900' }}>کلکسیون</b>
           <small style={{ color:'#38BDF8', fontSize:'10px', fontWeight:'700' }}>{fa(inventory.length)} نوع</small>
@@ -151,41 +151,25 @@ export default function Home({ token, p, rewards, load, setMsg, openWallet, open
       <div style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'16px', padding:'12px' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px' }}>
           <h2 style={{ color:'#FFF', fontSize:'16px', fontWeight:'900', margin:0 }}>کلکسیون من</h2>
-          {inventory.length>6 && <span style={{ color:'#38BDF8', fontSize:'12px', fontWeight:'700' }}>همه ({fa(inventory.length)})</span>}
+          {inventory.length>6 && <button className="ghost" onClick={openInventory}
+            style={{ color:'#38BDF8', fontSize:'12px', fontWeight:'700', margin:0, padding:'4px 8px' }}>
+            همه ({fa(inventory.length)})
+          </button>}
         </div>
         {inventory.length ? (
-          <>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'8px', marginBottom:'8px', background:'rgba(255,255,255,0.04)', borderRadius:'12px', padding:'8px' }}>
-              <div style={{ textAlign:'center' }}><b style={{ color:'#FFF', display:'block' }}>{fa(invStats.kinds)}</b><span style={{ color:'#94A3B8', fontSize:'11px' }}>نوع کارت</span></div>
-              <div style={{ textAlign:'center' }}><b style={{ color:'#FFF', display:'block' }}>{fa(invStats.total)}</b><span style={{ color:'#94A3B8', fontSize:'11px' }}>کل کارت‌ها</span></div>
-              <div style={{ textAlign:'center' }}><b style={{ color:'#FFF', display:'block' }}>{fa(invStats.points)}</b><span style={{ color:'#94A3B8', fontSize:'11px' }}>ارزش</span></div>
-            </div>
-            {inventory.length>=8 && <input type="search" placeholder="جست‌وجو در کارت‌ها…" value={invQuery} onChange={e=>setInvQuery(e.target.value)} style={{ width:'100%', padding:'8px 12px', borderRadius:'10px', border:'1px solid rgba(255,255,255,0.1)', background:'rgba(0,0,0,0.2)', color:'#FFF', marginBottom:'8px' }} />}
-            {inventory.length>=2 && (
-              <div style={{ display:'flex', gap:'6px', marginBottom:'8px' }}>
-                {SORTS.map(([k,label])=>(
-                  <button key={k} onClick={()=>setInvSort(k)} style={{ padding:'6px 12px', borderRadius:'99px', border: invSort===k?'1px solid #38BDF8':'1px solid rgba(255,255,255,0.1)', background: invSort===k?'rgba(56,189,248,0.15)':'rgba(255,255,255,0.05)', color: invSort===k?'#38BDF8':'#94A3B8', fontSize:'11px', fontWeight:'700', cursor:'pointer' }}>{label}</button>
-                ))}
-              </div>
-            )}
-            {invShown.length ? (
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'8px' }}>
-                {invShown.slice(0,12).map(i=>(
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'8px' }}>
+            {recentInventory.map(i=>(
                   <button key={i.id} onClick={()=>setBigCard(i)} style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:'12px', padding:'6px', cursor:'pointer', textAlign:'center' }}>
                     <div style={{ position:'relative', aspectRatio:'0.66', background:'rgba(0,0,0,0.2)', borderRadius:'8px', overflow:'hidden', marginBottom:'6px' }}>
-                      <img src={asset(i.image_url) || avatarUrl('avatar_1_football.png')} alt={i.name||'کارت'} loading="lazy" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                      <img src={asset(i.image_url) || avatarUrl('avatar_1_football.png')} alt={i.name||'کارت'} loading="lazy" decoding="async" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
                       {isNewCard(i) && <span style={{ position:'absolute', top:'4px', right:'4px', background:'#22E7A6', color:'#000', padding:'2px 6px', borderRadius:'6px', fontSize:'9px', fontWeight:'900' }}>جدید</span>}
                       {asInt(i.quantity)>1 && <span style={{ position:'absolute', bottom:'4px', left:'4px', background:'rgba(0,0,0,0.6)', color:'#FFF', padding:'2px 6px', borderRadius:'6px', fontSize:'10px' }}>×{fa(i.quantity)}</span>}
                     </div>
                     <b style={{ color:'#FFF', fontSize:'11px', display:'block', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{i.name}</b>
                     <small style={{ color:'#94A3B8', fontSize:'10px' }}>{fa(i.point_value)} امتیاز</small>
                   </button>
-                ))}
-              </div>
-            ) : (
-              <div style={{ textAlign:'center', padding:'20px', color:'#64748B' }}>کارتی با این نام پیدا نشد.</div>
-            )}
-          </>
+            ))}
+          </div>
         ) : (
           <div style={{ textAlign:'center', padding:'20px' }}>
             <div style={{ fontSize:'40px', marginBottom:'8px' }}>🃏</div>
