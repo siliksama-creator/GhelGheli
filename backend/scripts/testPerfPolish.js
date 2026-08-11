@@ -44,8 +44,10 @@ ok(/right:\s*18/.test(scrollHint) && /maxWidth:\s*148/.test(scrollHint), 'قرص
 
 console.log('\n== ۴. دوئل کارت: مستقل از لیگ اصلی ==');
 const duel = read('backend/src/services/cardDuelService.js');
-ok(/mode='auto_ghost'/.test(duel), 'نبرد خودکار Ghost ثبت می‌شود');
-ok(/league:\s*false/.test(duel), 'انتقال امتیاز دوئل، لیگ اصلی را تکان نمی‌دهد');
+const duelRule = read('backend/src/games/rules/cardDuel.js');
+const stakeLedger = read('backend/src/services/gameStakeService.js');
+ok(/recordEngineBattle/.test(duel) && /onFinish/.test(duelRule), 'نبرد زندهٔ کارت در تاریخچه ثبت می‌شود');
+ok(/league:\s*false/.test(stakeLedger), 'تسویه دوئل کارت، لیگ اصلی را تکان نمی‌دهد');
 ok(/botBattle/.test(duel) && /VALUES\('bot'/.test(duel), 'بات تمرینی بدون امتیاز است');
 
 console.log('\n== ۵. دارایی‌ها و حجم ==');

@@ -141,7 +141,15 @@ class _GamesHubPageState extends State<GamesHubPage> {
             initialStart: _activeInitialStart,
           );
         case 'card_duel':
-          return CardDuelPage(api: widget.api, onBack: _back);
+          return CardDuelPage(
+            api: widget.api,
+            onBack: _back,
+            stake: _activeStake,
+            vsBot: _activeVsBot,
+            roomCode: _activeRoomCode,
+            existingSocket: _activeSocket,
+            initialStart: _activeInitialStart,
+          );
       }
     }
 
@@ -363,6 +371,8 @@ class _GamesHubPageState extends State<GamesHubPage> {
             ),
           ],
         ),
+        Gaps.vSm,
+        _StakeRulesBanner(mode: _selectedMode),
         Gaps.vMd,
 
         // ── ۳. محتوای حالت انتخاب شده ──
@@ -389,13 +399,6 @@ class _GamesHubPageState extends State<GamesHubPage> {
               entry: g,
               mode: _selectedMode,
               onTap: () {
-                // دوئل کارت یک بازی مستقل Ghost/بات است؛ حالت ۱۰۰/۱۰۰۰
-                // هاب برای آن معنا ندارد و نباید مثل مسابقه stakeدار نشان
-                // داده یا وارد صف موتور تخته‌ای شود.
-                if (g.id == 'card_duel') {
-                  _launchGame(g.id);
-                  return;
-                }
                 if (_selectedMode > 0 &&
                     ((_user?['current_points'] as num?)?.toInt() ?? 0) < _selectedMode) {
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -420,6 +423,90 @@ class _GamesHubPageState extends State<GamesHubPage> {
 
         Gaps.vLg,
       ],
+    );
+  }
+}
+
+/// قانون مالی هر حالت، درست کنار انتخاب حالت؛ کاربر قبل از ورود دقیقاً
+/// می‌فهمد چه مقدار لازم دارد و در صورت باخت چه اتفاقی می‌افتد.
+class _StakeRulesBanner extends StatelessWidget {
+  const _StakeRulesBanner({required this.mode});
+  final int mode;
+
+  @override
+  Widget build(BuildContext context) {
+    final isPractice = mode == 0;
+    final isLobby = mode == -1;
+    final color = isPractice
+        ? const Color(0xFF22E7A6)
+        : isLobby
+            ? const Color(0xFFA855F7)
+            : mode == 1000
+                ? const Color(0xFFFFD166)
+                : const Color(0xFF38BDF8);
+    final title = isPractice
+        ? 'تمرین رایگان؛ بدون ریسک امتیاز'
+        : isLobby
+            ? 'در لابی، سازنده مقدار ورودی را انتخاب می‌کند'
+            : 'برای ورود حداقل ${faNum(mode)} امتیاز لازم داری';
+    final description = isPractice
+        ? 'نتیجه تمرین روی موجودی و رتبه لیگ اثر ندارد.'
+        : isLobby
+            ? 'در لابی امتیازی، ورودی هر دو نفر امن قفل و بعد از نتیجه تسویه می‌شود.'
+            : 'در صورت باخت ${faNum(mode)} امتیاز کم می‌شود؛ برنده پات را پس از کسر ۱۰٪ کارمزد می‌گیرد.';
+    return Container(
+      padding: const EdgeInsets.all(Gaps.sm),
+      decoration: BoxDecoration(
+        borderRadius: Corners.rLg,
+        gradient: LinearGradient(colors: [
+          color.withValues(alpha: 0.16),
+          Theme.of(context).colorScheme.surfaceContainer.withValues(alpha: 0.72),
+        ]),
+        border: Border.all(color: color.withValues(alpha: 0.45)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: color.withValues(alpha: 0.15),
+            ),
+            child: Icon(
+              isPractice
+                  ? Icons.smart_toy_rounded
+                  : isLobby
+                      ? Icons.lock_rounded
+                      : Icons.warning_amber_rounded,
+              color: color,
+              size: 21,
+            ),
+          ),
+          Gaps.hSm,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: color,
+                          fontWeight: FontWeight.w900,
+                        )),
+                const SizedBox(height: 2),
+                Text(description,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          height: 1.55,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.68),
+                        )),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -552,7 +639,6 @@ class _CleanGameTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isBot = mode == 0;
-    final isStandalone = entry.id == 'card_duel';
 
     return InkWell(
       borderRadius: BorderRadius.circular(16),
@@ -640,11 +726,9 @@ class _CleanGameTile extends StatelessWidget {
                               ),
                             ),
                             child: Text(
-                              isStandalone
-                                  ? 'بازی مستقل با کارت‌های کلکسیونی'
-                                  : isBot
-                                      ? 'تمرین فوری با هوش مصنوعی'
-                                      : 'مسابقه آنلاین (${faNum(mode)} امتیاز)',
+                              isBot
+                                  ? 'تمرین فوری با هوش مصنوعی'
+                                  : 'مسابقه آنلاین (${faNum(mode)} امتیاز)',
                               style: TextStyle(
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.w900,
@@ -702,10 +786,9 @@ class _PrivateLobbyHubState extends State<_PrivateLobbyHub> {
   final _passCtrl = TextEditingController();
   final _joinCodeCtrl = TextEditingController();
 
-  // Card Duel is a separate Ghost/bot game and has no multiplayer rules in
-  // the socket engine, so presenting it as a private lobby was a dead button.
   final _games = const [
     ('penalty', 'ضربات پنالتی', 'assets/pass/football_icon.webp'),
+    ('card_duel', 'دوئل کارت‌ها', 'assets/games/card_duel_glow.png'),
     ('memory', 'جفت‌یاب', 'assets/games/memory/medal.webp'),
   ];
 

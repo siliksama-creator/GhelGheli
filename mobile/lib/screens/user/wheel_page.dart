@@ -954,8 +954,8 @@ class _AnimeSpinButtonState extends State<_AnimeSpinButton>
         ? 'در حال چرخش…'
         : widget.spinsLeft > 0
             ? (widget.unlimited
-                ? 'بچرخان (نامحدود)'
-                : 'بچرخان — ${faNum(widget.spinsLeft)} شانس')
+                ? 'بچرخون (نامحدود)'
+                : 'بچرخون — ${faNum(widget.spinsLeft)} شانس')
             : 'شانس امروزت تمام شد';
 
     if (!enabled) {

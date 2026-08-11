@@ -39,6 +39,7 @@ class GameSession extends ChangeNotifier {
   String? winner;
   String? error;
   bool vsBot = false;
+  String? matchMode;
   String? _roomId;
   int? lastMove;
 
@@ -224,6 +225,7 @@ class GameSession extends ChangeNotifier {
       players = m['players'] as Map?;
       mySymbol = m['yourSymbol'] as String?;
       vsBot = m['vsBot'] == true;
+      matchMode = m['matchMode'] as String?;
       turn = m['turn'] as String?;
       state = _asMap(m['state']);
       stake = (m['stake'] as num?)?.toInt() ?? stake;

@@ -5,6 +5,7 @@ const { attachSolo } = require('./solo');
 
 const memory = require('./rules/memory');
 const penalty = require('./rules/penalty');
+const cardDuel = require('./rules/cardDuel');
 
 // Snakes & Ladders was retired: keeping the board legible needed constant
 // artwork tuning, and it was ultimately dice-driven. Connect Four (چهار در
@@ -13,7 +14,7 @@ const penalty = require('./rules/penalty');
 // purpose-made 3D football icons on a 3D card-flip and rewards real skill
 // (a match keeps your turn). It is the one game with NO bot: you either meet
 // a real opponent or play solo time-attack.
-const RULES = { memory, penalty };
+const RULES = { memory, penalty, card_duel: cardDuel };
 
 // Public catalogue served over REST so the app never hardcodes the list.
 const CATALOG = [
@@ -45,9 +46,9 @@ const CATALOG = [
   },
   {
     id: 'card_duel', title: 'دوئل کارت‌ها', emoji: 'card',
-    subtitle: 'سه کارت آماده کن؛ Ghost خودکار امتیاز می‌گیرد',
-    accent: '#FFD166', minutes: 1,
-    noBot: false, solo: true, singlePlayer: true,
+    subtitle: 'سه کارت انتخاب کن؛ آنلاین، لابی یا تمرین با ربات',
+    accent: '#FFD166', minutes: 2,
+    noBot: false, solo: false,
   },
 ];
 

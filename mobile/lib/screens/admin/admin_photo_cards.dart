@@ -704,7 +704,7 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
           initiallyExpanded: true,
           leading: const Icon(Icons.sports_esports_rounded),
           title: const Text('استات دوئل کارت'),
-          subtitle: const Text('این اعداد در نبرد سه‌کارتی و Ghost اثر مستقیم دارند'),
+          subtitle: const Text('این اعداد در نبرد زندهٔ سه‌کارتی اثر مستقیم دارند'),
           children: [
             Row(children: [
               Expanded(child: _duelStatField('حمله', _attack)),

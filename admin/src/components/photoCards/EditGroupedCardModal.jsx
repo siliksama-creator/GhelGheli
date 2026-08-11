@@ -89,7 +89,7 @@ export function EditGroupedCardModal({ card, request, notify, onClose, onSaved }
           </div>
 
           <div className="card" style={{ padding: 10 }}>
-            <b>استات دوئل کارت (Ghost)</b>
+            <b>استات دوئل زندهٔ کارت</b>
             <div className="card-grid cols-3" style={{ marginTop: 6 }}>
               {[
                 ['attack', 'حمله'], ['defense', 'دفاع'], ['speed', 'سرعت'],

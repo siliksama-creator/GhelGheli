@@ -1,11 +1,12 @@
 // Full-Fidelity Games Hub for Web — 1:1 with Android (games_page.dart + game_scaffold.dart)
 import React, { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
-import { play, isEnabled, setEnabled } from './gameAudio.js';
+import { isEnabled, setEnabled } from './gameAudio.js';
 import MemorySolo, { MemoryGrid } from './memoryGame.jsx';
 import PenaltyGame from './penaltyGame.jsx';
 import TapGame from './tapGame.jsx';
 import CardDuelWeb from './cardDuelGame.jsx';
+import { useGameSession } from './gameSession.js';
 import { LevelBadge, DisplayName } from './components/Cosmetics.jsx';
 import { fa, asset, avatarUrl, req } from './lib/api.js';
 
@@ -15,201 +16,6 @@ const GAMES = [
   { id: 'card_duel', title: 'دوئل کارت‌ها', emoji: '🃏', desc: 'نبرد سه‌کارتی و کارت‌های کلکسیونی', accent: '#FFD166', art: '/games/card_duel.webp' },
   { id: 'memory', title: 'جفت‌یاب', emoji: '🎁', desc: 'جفت‌های فوتبالی را به خاطر بسپار', accent: '#A855F7', art: '/games/memory.webp' },
 ];
-
-function useGameSession(api, token, gameId, stake = 0, vsBot = false, roomCode = null,
-  externalSocket = null, initialStart = null) {
-  const socketRef = useRef(null);
-  const [phase, setPhase] = useState(initialStart ? 'playing' : 'waiting');
-  const [g, setG] = useState(() => initialStart ? {
-    state: initialStart.state || {},
-    players: initialStart.players || null,
-    me: initialStart.yourSymbol || null,
-    turn: initialStart.turn || null,
-    winner: null,
-    gameId: initialStart.gameId || gameId,
-    stake: Number(initialStart.stake ?? stake ?? 0),
-    netPot: Number(initialStart.netPot || 0),
-    commission: Number(initialStart.commission || 0),
-    vsBot: Boolean(initialStart.vsBot),
-    roomId: initialStart.roomId,
-    timedOut: null,
-  } : {
-    state: {}, players: null, me: null, turn: null, winner: null,
-    gameId, stake, netPot: 0, commission: 0, vsBot: false,
-    roomId: null, timedOut: null,
-  });
-  const [error, setError] = useState('');
-  const [secondsLeft, setSecondsLeft] = useState(0);
-  const [stillSearching, setStillSearching] = useState(false);
-  const deadlineRef = useRef(null);
-
-  useEffect(() => {
-    let disposed = false;
-    const s = externalSocket || io(api, {
-      auth: { token },
-      transports: ['websocket', 'polling'],
-      forceNew: true,
-      reconnection: true,
-    });
-    socketRef.current = s;
-
-    const setClock = d => {
-      const remaining = Number(d?.remainingMs);
-      deadlineRef.current = Number.isFinite(remaining)
-        ? Date.now() + Math.max(0, remaining)
-        : (Number(d?.deadline) || null);
-      if (deadlineRef.current) {
-        setSecondsLeft(Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000)));
-      }
-    };
-    const onWaiting = d => {
-      if (disposed) return;
-      setPhase('waiting');
-      setError('');
-      setStillSearching(false);
-      if (d?.deadline || d?.remainingMs != null) setClock(d);
-    };
-    const onStillWaiting = () => {
-      if (disposed) return;
-      setStillSearching(true);
-      deadlineRef.current = null;
-      setSecondsLeft(0);
-    };
-    const onStart = d => {
-      if (disposed || !d) return;
-      play('match_found');
-      setG({
-        state: d.state || {},
-        players: d.players || null,
-        me: d.yourSymbol || null,
-        turn: d.turn || null,
-        winner: null,
-        gameId: d.gameId || gameId,
-        stake: Number(d.stake ?? stake ?? 0),
-        netPot: Number(d.netPot || 0),
-        commission: Number(d.commission || 0),
-        vsBot: Boolean(d.vsBot),
-        roomId: d.roomId,
-        timedOut: null,
-      });
-      setPhase('playing');
-      setError('');
-      setStillSearching(false);
-      setClock(d);
-      if (d.turn === d.yourSymbol) play('your_turn');
-    };
-    const onUpdate = d => {
-      if (disposed) return;
-      setG(prev => {
-        const wasMyTurn = prev.turn === prev.me;
-        const isMyTurn = d?.turn === prev.me;
-        if (!wasMyTurn && isMyTurn) play('your_turn');
-        else if (wasMyTurn && !isMyTurn) play('move');
-        return {
-          ...prev,
-          state: d?.state ?? prev.state,
-          turn: d?.turn ?? prev.turn,
-          timedOut: d?.timedOut || null,
-        };
-      });
-      setClock(d || {});
-    };
-    const onOver = d => {
-      if (disposed) return;
-      deadlineRef.current = null;
-      setSecondsLeft(0);
-      setG(prev => {
-        const winner = d?.winner || null;
-        play(winner === 'DRAW' ? 'draw' : (winner === prev.me ? 'win' : 'lose'));
-        return { ...prev, state: d?.state ?? prev.state, winner };
-      });
-      setPhase('over');
-    };
-    const onError = d => {
-      if (disposed) return;
-      setError(d?.message || 'خطا در بازی');
-      setPhase('error');
-      deadlineRef.current = null;
-      setSecondsLeft(0);
-    };
-    const onConnectError = () => {
-      if (!disposed) setError('اتصال برقرار نشد');
-    };
-    const requestStart = () => {
-      // A lobby/private-room socket already emitted its create/join request.
-      if (externalSocket || initialStart) return;
-      if (vsBot) s.emit('game:play_bot', { gameId });
-      else if (roomCode) s.emit('game:join_room', { roomCode });
-      else s.emit('game:join', { gameId, stake, vsBot: false });
-      setPhase('waiting');
-    };
-
-    s.on('connect', requestStart);
-    s.on('connect_error', onConnectError);
-    s.on('game:waiting', onWaiting);
-    s.on('game:still-waiting', onStillWaiting);
-    s.on('game:start', onStart);
-    s.on('game:update', onUpdate);
-    s.on('game:over', onOver);
-    s.on('game:error', onError);
-    if (s.connected) requestStart();
-    if (initialStart) onStart(initialStart);
-
-    const timer = window.setInterval(() => {
-      if (!deadlineRef.current) return;
-      setSecondsLeft(Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000)));
-    }, 250);
-
-    return () => {
-      disposed = true;
-      window.clearInterval(timer);
-      s.off('connect', requestStart);
-      s.off('connect_error', onConnectError);
-      s.off('game:waiting', onWaiting);
-      s.off('game:still-waiting', onStillWaiting);
-      s.off('game:start', onStart);
-      s.off('game:update', onUpdate);
-      s.off('game:over', onOver);
-      s.off('game:error', onError);
-      s.emit('game:leave');
-      s.disconnect();
-      if (socketRef.current === s) socketRef.current = null;
-    };
-  }, [api, token, gameId, stake, vsBot, roomCode, externalSocket, initialStart]);
-
-  const move = payload => {
-    if (phase !== 'playing') return;
-    socketRef.current?.emit('game:move', { roomId: g.roomId, move: payload });
-  };
-  const playBot = () => {
-    const socket = socketRef.current;
-    if (!socket) return;
-    socket.emit('game:leave', { roomId: g.roomId });
-    setError('');
-    setStillSearching(false);
-    setPhase('waiting');
-    socket.emit('game:play_bot', { gameId: g.gameId || gameId });
-  };
-  const joinOnline = () => {
-    const socket = socketRef.current;
-    if (!socket) return;
-    socket.emit('game:leave', { roomId: g.roomId });
-    setError('');
-    setStillSearching(false);
-    setPhase('waiting');
-    socket.emit('game:join', { gameId: g.gameId || gameId, stake, vsBot: false });
-  };
-  const leave = () => {
-    socketRef.current?.emit('game:leave', { roomId: g.roomId });
-    socketRef.current?.disconnect();
-    setPhase('idle');
-  };
-
-  return {
-    phase, g, error, secondsLeft, move, leave, playBot, joinOnline,
-    stillSearching,
-  };
-}
 
 function tierLabel(level){
   const n=Number(level||0);
@@ -330,7 +136,16 @@ export default function Games({ api, token }) {
 
   if (active) {
     if (active.id === 'card_duel') {
-      return <CardDuelWeb token={token} onBack={() => setActive(null)} />;
+      return <CardDuelWeb
+        api={api}
+        token={token}
+        stake={Number(active.stake || 0)}
+        vsBot={Boolean(active.vsBot)}
+        roomCode={active.roomCode || null}
+        externalSocket={active.externalSocket || null}
+        initialStart={active.initialStart || null}
+        onBack={() => setActive(null)}
+      />;
     }
     if (active.id === 'memory_solo') {
       return <MemorySolo
@@ -482,6 +297,22 @@ export default function Games({ api, token }) {
         ))}
       </div>
 
+      <div className={`gameStakeNotice ${mode === 0 ? 'practice' : mode === -1 ? 'lobby' : 'competitive'}`}>
+        <span>{mode === 0 ? '🤖' : mode === -1 ? '🔐' : '⚠️'}</span>
+        <div>
+          <b>{mode === 0
+            ? 'تمرین رایگان؛ بدون ریسک امتیاز'
+            : mode === -1
+              ? 'در لابی، سازنده مقدار ورودی را انتخاب می‌کند'
+              : `برای ورود حداقل ${fa(mode)} امتیاز لازم داری`}</b>
+          <small>{mode === 0
+            ? 'نتیجه تمرین روی موجودی و رتبه لیگ اثر ندارد.'
+            : mode === -1
+              ? 'اگر لابی امتیازی باشد، ورودی هر دو نفر قفل و پس از نتیجه امن تسویه می‌شود.'
+              : `در صورت باخت ${fa(mode)} امتیاز از دست می‌دهی؛ برنده پات را پس از کسر ۱۰٪ کارمزد می‌گیرد.`}</small>
+        </div>
+      </div>
+
       {/* Mode Content */}
       {mode === -1 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -489,7 +320,7 @@ export default function Games({ api, token }) {
           <div className="card" style={{ background: 'linear-gradient(135deg, #2E1065, #0F172A)', border: '1px solid rgba(168, 85, 247, 0.4)', padding: '18px', borderRadius: '18px' }}>
             <h3 style={{ color: '#FFF', fontWeight: '900', margin: '0 0 10px', fontSize: '15px' }}>ساخت اتاق و لابی اختصاصی</h3>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-              {GAMES.filter(g => !g.singlePlayer && g.id !== 'card_duel').map(g => (
+              {GAMES.filter(g => !g.singlePlayer).map(g => (
                 <button
                   key={g.id}
                   type="button"
@@ -639,10 +470,6 @@ export default function Games({ api, token }) {
               key={g.id}
               className="card"
               onClick={() => {
-                if (g.id === 'card_duel') {
-                  setActive({ id: 'card_duel' });
-                  return;
-                }
                 if (mode > 0 && Number(user?.current_points || 0) < mode) {
                   alert(`برای این مسابقه حداقل ${fa(mode)} امتیاز لازم داری`);
                   return;
@@ -668,11 +495,9 @@ export default function Games({ api, token }) {
                   <p style={{ color: '#94A3B8', fontSize: '11px', margin: 0 }}>{g.desc}</p>
                 </div>
                 <span style={{ fontSize: '11px', fontWeight: '900', color: mode === 0 ? '#22E7A6' : (mode===1000 ? '#FFD166' : '#38BDF8'), background: 'rgba(255,255,255,0.06)', padding: '4px 8px', borderRadius: '10px', border: `1px solid ${mode===0 ? '#22E7A6' : (mode===1000 ? '#FFD166' : '#38BDF8')}66` }}>
-                  {g.id === 'card_duel'
-                    ? 'بازی مستقل با کارت‌های کلکسیونی'
-                    : mode === 0
-                      ? 'تمرین فوری با هوش مصنوعی'
-                      : `مسابقه آنلاین (${fa(mode)} امتیاز)`}
+                  {mode === 0
+                    ? 'تمرین فوری با هوش مصنوعی'
+                    : `مسابقه آنلاین (${fa(mode)} امتیاز)`}
                 </span>
               </div>
               <div style={{ padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap:'8px', background:'rgba(0,0,0,0.2)' }}>

@@ -8,7 +8,8 @@ import PenaltyNet from '../src/penaltyNet.js';
 const root = path.resolve(import.meta.dirname, '..', '..');
 const web = fs.readFileSync(path.join(root, 'userweb/src/penaltyGame.jsx'), 'utf8');
 const webModel = fs.readFileSync(path.join(root, 'userweb/src/penaltyModel.js'), 'utf8');
-const webSession = fs.readFileSync(path.join(root, 'userweb/src/games.jsx'), 'utf8');
+const webSession = fs.readFileSync(path.join(root, 'userweb/src/games.jsx'), 'utf8')
+  + fs.readFileSync(path.join(root, 'userweb/src/gameSession.js'), 'utf8');
 const android = fs.readFileSync(
   path.join(root, 'mobile/lib/screens/user/games/penalty_board.dart'), 'utf8');
 const androidSession = fs.readFileSync(

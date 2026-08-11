@@ -222,6 +222,28 @@ function finish(room, winner, disconnectedSym = null) {
   clearTimeout(room.botTimer);
   clearTimeout(room.turnTimer);
 
+  const resolvedWinner = winner === 'DISCONNECT'
+    ? (disconnectedSym === 'X' ? 'O'
+      : disconnectedSym === 'O' ? 'X'
+        : (room.seats.X && room.seats.X.connected ? 'X' : 'O'))
+    : winner;
+
+  // Game-specific history is non-financial and must never block settlement
+  // or game:over. Card duel uses this hook to persist the three revealed
+  // rounds while the generic engine remains unaware of card rules.
+  if (room.rules.onFinish) {
+    Promise.resolve(room.rules.onFinish({
+      players: room.players,
+      state: room.state,
+      winner: resolvedWinner,
+      stake: room.stake,
+      netPot: room.netPot,
+      commission: room.commission,
+      vsBot: room.vsBot,
+      matchMode: room.matchMode,
+    })).catch(e => console.error(`[games:${room.gameId}] history failed:`, e.message));
+  }
+
   // Award points for a completed ONLINE match, then tell both players what
   // they earned. Fire-and-forget with its own catch: a scoring hiccup must
   // never stop the game from ending cleanly.
@@ -256,12 +278,8 @@ function finish(room, winner, disconnectedSym = null) {
     if (!stakes) {
       console.error(`[games:${room.gameId}] stake settlement unavailable for ${room.id}`);
     } else {
-      const winnerSym = winner === 'DISCONNECT'
-        ? (disconnectedSym === 'X' ? 'O'
-          : disconnectedSym === 'O' ? 'X'
-            : (room.seats.X && room.seats.X.connected ? 'X' : 'O'))
-        : winner;
-      const draw = winner === 'DRAW';
+      const winnerSym = resolvedWinner;
+      const draw = resolvedWinner === 'DRAW';
       const winnerUserId = draw ? null : room.players?.[winnerSym]?.id;
       stakes.settleMatch({ matchId: room.id, winnerUserId, draw })
         .then(result => {
@@ -432,10 +450,23 @@ function advance(room, lastMove, extra = {}) {
   scheduleBot(room);
 }
 
-async function startRoom(io, rules, gameId, a, b, stake) {
+async function startRoom(io, rules, gameId, a, b, stake, matchMode = null) {
   const s = Number(stake) || 0;
   const id = crypto.randomUUID();
   const vsBot = !b;
+
+  // Personalized games (currently card duel) validate and snapshot both
+  // decks BEFORE reserving stake. If a deck is invalid, no points have moved.
+  // Existing pure board rules continue to use their zero-argument create().
+  const initialState = rules.createWithContext
+    ? await rules.createWithContext({
+      playerX: a.user,
+      playerO: b?.user || null,
+      vsBot,
+      stake: s,
+      matchMode,
+    })
+    : rules.create();
 
   // بازی با ربات همیشه رایگان است. برای بازی انسان‌باانسانِ امتیازی،
   // game:start فقط بعد از COMMIT رزرو هر دو ورودی صادر می‌شود.
@@ -463,7 +494,8 @@ async function startRoom(io, rules, gameId, a, b, stake) {
 
   const room = {
     id, gameId, rules, vsBot, done: false,
-    state: rules.create(),
+    state: initialState,
+    matchMode: matchMode || (vsBot ? 'bot' : 'online'),
     turn: 'X',
     turnMs: turnMsFor(rules),
     seats: { X: a, O: b || 'BOT' },
@@ -486,7 +518,8 @@ async function startRoom(io, rules, gameId, a, b, stake) {
     if (sock && sock.emit) {
       safeEmit(sock, 'game:start', {
         roomId: id, gameId, players, turn: 'X',
-        yourSymbol: sym, vsBot, state: snapshot(room, sym),
+        yourSymbol: sym, vsBot, matchMode: room.matchMode,
+        state: snapshot(room, sym),
         turnMs: room.turnMs, deadline: room.deadline,
         remainingMs: room.deadline ? Math.max(0, room.deadline - Date.now()) : null,
         stake: room.stake,
@@ -498,9 +531,15 @@ async function startRoom(io, rules, gameId, a, b, stake) {
   return room;
 }
 
-async function startRoomOrError(io, rules, gameId, a, b, stake) {
+async function ensurePlayerReady(rules, socket) {
+  if (!rules?.validatePlayer) return true;
+  await rules.validatePlayer(socket?.user);
+  return true;
+}
+
+async function startRoomOrError(io, rules, gameId, a, b, stake, matchMode = null) {
   try {
-    return await startRoom(io, rules, gameId, a, b, stake);
+    return await startRoom(io, rules, gameId, a, b, stake, matchMode);
   } catch (e) {
     const message = e?.message || 'شروع مسابقه ناموفق بود';
     safeEmit(a, 'game:error', { message });
@@ -515,10 +554,15 @@ const attachGames = function attachGames(io, rulesById) {
 
     
     // ── چالش ۱ به ۱ مستقیم با لینک / کد اتاق ──
-    socket.on('game:create_room', payload => {
+    socket.on('game:create_room', async payload => {
       const gameId = (payload && typeof payload === 'object' && payload.gameId) || Object.keys(rulesById)[0];
       const rules = rulesById[gameId];
       if (!rules) return safeEmit(socket, 'game:error', { message: 'بازی یافت نشد' });
+      try {
+        if (rules.validatePlayer) await ensurePlayerReady(rules, socket);
+      } catch (e) {
+        return safeEmit(socket, 'game:error', { message: e.message || 'ترکیب بازی آماده نیست' });
+      }
       dropFromQueue(socket);
       const code = Math.random().toString(36).substring(2, 6).toUpperCase();
       const roomId = `room-${code}`;
@@ -548,9 +592,14 @@ const attachGames = function attachGames(io, rulesById) {
       }
       const gameId = hostSocket.privateGameId || Object.keys(rulesById)[0];
       const rules = rulesById[gameId];
+      try {
+        if (rules.validatePlayer) await ensurePlayerReady(rules, socket);
+      } catch (e) {
+        return safeEmit(socket, 'game:error', { message: e.message || 'ترکیب بازی آماده نیست' });
+      }
       dropFromQueue(hostSocket);
       dropFromQueue(socket);
-      await startRoomOrError(io, rules, gameId, hostSocket, socket, 0);
+      await startRoomOrError(io, rules, gameId, hostSocket, socket, 0, 'lobby');
     });
 
 
@@ -560,6 +609,11 @@ const attachGames = function attachGames(io, rulesById) {
       const gameId = String(payload?.gameId || Object.keys(rulesById)[0]);
       const rules = rulesById[gameId];
       if (!rules) return safeEmit(socket, 'game:error', { message: 'بازی مورد نظر یافت نشد' });
+      try {
+        if (rules.validatePlayer) await ensurePlayerReady(rules, socket);
+      } catch (e) {
+        return safeEmit(socket, 'game:error', { message: e.message || 'ترکیب بازی آماده نیست' });
+      }
       const stakes = stakeService();
       if (!stakes) return safeEmit(socket, 'game:error', { message: 'سرویس امن مسابقه در دسترس نیست' });
       let stake;
@@ -644,10 +698,15 @@ const attachGames = function attachGames(io, rulesById) {
         return safeEmit(socket, 'game:error', { message: 'رمز عبور اتاق اشتباه است' });
       }
       const rules = rulesById[lobby.gameId];
+      try {
+        if (rules.validatePlayer) await ensurePlayerReady(rules, socket);
+      } catch (e) {
+        return safeEmit(socket, 'game:error', { message: e.message || 'ترکیب بازی آماده نیست' });
+      }
       dropFromQueue(lobby.host);
       dropFromQueue(socket);
       const started = await startRoomOrError(
-        io, rules, lobby.gameId, lobby.host, socket, lobby.stake);
+        io, rules, lobby.gameId, lobby.host, socket, lobby.stake, 'lobby');
       if (!started) return;
       lobbies.delete(lobbyId);
       io.emit('game:lobby_updated', { action: 'joined', lobbyId });
@@ -670,6 +729,11 @@ const attachGames = function attachGames(io, rulesById) {
           || Object.keys(rulesById)[0];
         const rules = rulesById[gameId];
         if (!rules) return safeEmit(socket, 'game:error', { message: 'این بازی در دسترس نیست' });
+        try {
+          if (rules.validatePlayer) await ensurePlayerReady(rules, socket);
+        } catch (e) {
+          return safeEmit(socket, 'game:error', { message: e.message || 'ترکیب بازی آماده نیست' });
+        }
 
         const stakes = stakeService();
         if (!stakes) return safeEmit(socket, 'game:error', { message: 'سرویس امن مسابقه در دسترس نیست' });
@@ -690,7 +754,7 @@ const attachGames = function attachGames(io, rulesById) {
         const wantBot = (payload && typeof payload === 'object'
           && (payload.vsBot === true || stake === 0 && payload.mode === 'bot'));
         if (wantBot) {
-          await startRoomOrError(io, rules, gameId, socket, null, 0);
+          await startRoomOrError(io, rules, gameId, socket, null, 0, 'bot');
           return;
         }
 
@@ -719,7 +783,7 @@ const attachGames = function attachGames(io, rulesById) {
             clearInterval(opponent.queuePing);
             opponent.queuePing = null;
           }
-          await startRoomOrError(io, rules, gameId, opponent, socket, stake);
+          await startRoomOrError(io, rules, gameId, opponent, socket, stake, 'online');
           return;
         }
 
@@ -774,7 +838,7 @@ const attachGames = function attachGames(io, rulesById) {
               return;
             }
             q.splice(i, 1);
-            void startRoomOrError(io, rules, gameId, socket, null, 0);
+            void startRoomOrError(io, rules, gameId, socket, null, 0, 'bot');
           } catch (e) {
             console.error(`[games:${gameId}] bot fallback failed:`, e.message);
           }
@@ -791,13 +855,18 @@ const attachGames = function attachGames(io, rulesById) {
         || Object.keys(rulesById)[0];
       const rules = rulesById[gameId];
       if (!rules) return safeEmit(socket, 'game:error', { message: 'این بازی در دسترس نیست' });
+      try {
+        if (rules.validatePlayer) await ensurePlayerReady(rules, socket);
+      } catch (e) {
+        return safeEmit(socket, 'game:error', { message: e.message || 'ترکیب بازی آماده نیست' });
+      }
       dropFromQueue(socket);
       const previous = rooms.get(roomOfSocket(socket));
       if (previous) {
         const loser = previous.seats.X === socket ? 'X' : 'O';
         finish(previous, 'DISCONNECT', loser);
       }
-      await startRoomOrError(io, rules, gameId, socket, null, 0);
+      await startRoomOrError(io, rules, gameId, socket, null, 0, 'bot');
     });
 
     socket.on('game:move', payload => {

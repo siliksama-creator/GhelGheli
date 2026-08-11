@@ -170,8 +170,8 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
       <div className="wheelActions">
         <button className="primary wheelBtn" onClick={spin} disabled={!canSpin}>
           {spinning ? 'در حال چرخش…'
-            : state.unlimited ? 'بچرخان (نامحدود)'
-              : state.spinsLeft > 0 ? `بچرخان — ${fa(state.spinsLeft)} شانس`
+            : state.unlimited ? 'بچرخون (نامحدود)'
+              : state.spinsLeft > 0 ? `بچرخون — ${fa(state.spinsLeft)} شانس`
                 : 'شانس امروزت تمام شد'}
         </button>
         {state.spinsLeft <= 0 && !state.unlimited && (

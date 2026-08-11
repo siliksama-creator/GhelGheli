@@ -547,7 +547,7 @@ export function PhotoCardsPage({ request }) {
 
             <div className="card" style={{ padding: 12 }}>
               <b>استات دوئل کارت</b>
-              <p className="topbar-sub">برای بازی سه‌کارتی Ghost؛ ۰ تا ۱۰۰.</p>
+              <p className="topbar-sub">برای بازی زندهٔ سه‌کارتی؛ ۰ تا ۱۰۰.</p>
               <div className="card-grid cols-2">
                 {[
                   ['attack', 'حمله'], ['defense', 'دفاع'], ['speed', 'سرعت'],
