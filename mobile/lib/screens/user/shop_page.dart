@@ -21,7 +21,7 @@ class _ShopPageState extends State<ShopPage> {
   late Future<dynamic> _future = widget.api.get('/api/shop');
   String? _busy;
   String _kind = 'card_frame';
-  bool _showPlans = true;
+  bool _showPlans = false;
 
   static const _categories = <(String, String, IconData)>[
     ('club_badge', 'باشگاه‌ها', Icons.shield_rounded),
@@ -318,7 +318,7 @@ class _ShopHero extends StatelessWidget {
                 Text(
                   active
                       ? 'پلاس ${plus['tier'] == 'annual' ? 'سالانه' : 'ماهانه'} فعال است'
-                      : 'ظاهر حرفه‌ای، رقابت کاملاً منصفانه',
+                      : 'نمونه واقعی آیتم‌ها · پلاس ماهانه ۵۹ هزار تومان',
                   style: const TextStyle(fontSize: 10.5, color: Colors.white60),
                 ),
                 Text('کیف پول: ${Money.withUnit(balance)}',
@@ -495,7 +495,7 @@ class _CategoryShelf extends StatelessWidget {
           ]),
           Gaps.vXs,
           SizedBox(
-            height: 300,
+            height: 280,
             child: items.isEmpty
                 ? const Center(child: Text('آیتمی در این دسته نیست.'))
                 : ListView.separated(
@@ -652,7 +652,7 @@ class _ProductArt extends StatelessWidget {
           color: const Color(0xFF03070D),
           child: Padding(
             padding: kind == 'club_badge'
-                ? const EdgeInsets.all(25)
+                ? const EdgeInsets.all(10)
                 : EdgeInsets.zero,
             child: ClipRect(
               child: Transform.scale(

@@ -101,7 +101,7 @@ export default function Referral({ token, setMsg }) {
             {d.cashWithdrawReady ? 'آماده درخواست برداشت' : `تا برداشت: حداقل ${fa(d.withdrawalThreshold)} تومان`}
           </span>
         </div>
-        <p style={{margin:'9px 0 0',fontSize:'10px',color:'#B8C5D4'}}>۵٪ هر خرید دوست مستقیم، اتمیک و قابل رهگیری به کیف پولت واریز می‌شود. سطح دوم و کمیسیون زنجیره‌ای نداریم.</p>
+        <p style={{margin:'9px 0 0',fontSize:'10px',color:'#B8C5D4'}}>{fa(d.purchaseCommissionPercent)}٪ هر خرید دوست مستقیم، اتمیک و قابل رهگیری به کیف پولت واریز می‌شود. سطح دوم و کمیسیون زنجیره‌ای نداریم.</p>
       </div>
 
       <div className="refStats">
