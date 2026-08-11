@@ -1,264 +1,202 @@
-// Dashboard: points, next reward, wallet shortcut, card redemption, inventory.
-import React, { useMemo, useState } from 'react';
-
+// 1:1 با اندروید dashboard_page.dart — داشبورد دقیقاً مثل اپ
+import React, { useMemo, useState, useEffect } from 'react';
 import { req, asset, fa, avatars, avatarUrl } from '../lib/api.js';
 import { EmptyView } from '../components/states.jsx';
 import PhotoCardBox from '../components/PhotoCardBox.jsx';
 import LoginStreak from '../components/LoginStreak.jsx';
 
-// ═══════════════════════════════════════════════════════════════════════════
-// منطقِ کلکسیون — آینهٔ inventory_page.dart در اندروید
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// گزارش مالک: کاربر ممکن است ~۵۰ نوع کارت داشته باشد و «ترتیب خوبی
-// ندارد». گرید از قبل بود ولی ترتیب همیشه الفبایی و بدون جست‌وجو —
-// یعنی کارتی که همین حالا ثبت شده وسطِ لیست گم می‌شد.
-//
-// این توابع عمداً با نسخهٔ دارت یکی‌اند (همان ترتیب‌ها، همان شکستنِ
-// تساوی) تا کاربری که هم اپ و هم وب را باز می‌کند دو ترتیبِ متفاوت
-// نبیند.
 const asInt = v => {
   const n = parseInt(String(v ?? 0).split('.')[0], 10);
   return Number.isFinite(n) ? n : 0;
 };
-
 const sortDate = m => {
   const t = Date.parse(m.updated_at || m.created_at || '');
   return Number.isFinite(t) ? t : 0;
 };
-
 export function filterAndSort(items, query = '', sort = 'recent') {
   const q = String(query).trim().toLowerCase();
-  const out = q
-    ? items.filter(m => String(m.name || '').toLowerCase().includes(q))
-    : [...items];
+  const out = q ? items.filter(m => String(m.name || '').toLowerCase().includes(q)) : [...items];
   const byName = (a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'fa');
-  if (sort === 'recent') {
-    // شکستنِ تساوی با نام: چند کارت می‌توانند دقیقاً یک زمان داشته
-    // باشند و بدون این، ترتیبشان بین دو بارگذاری می‌پرد.
-    out.sort((a, b) => (sortDate(b) - sortDate(a)) || byName(a, b));
-  } else if (sort === 'value') {
-    out.sort((a, b) => (asInt(b.point_value) - asInt(a.point_value)) || byName(a, b));
-  } else {
-    out.sort(byName);
-  }
+  if (sort === 'recent') out.sort((a, b) => (sortDate(b) - sortDate(a)) || byName(a, b));
+  else if (sort === 'value') out.sort((a, b) => (asInt(b.point_value) - asInt(a.point_value)) || byName(a, b));
+  else out.sort(byName);
   return out;
 }
-
 export function collectionStats(items) {
   let total = 0; let points = 0;
-  for (const m of items) {
-    const q = asInt(m.quantity);
-    total += q;
-    // ضرب در تعداد: کسی که سه نسخه دارد سه برابر امتیاز گرفته.
-    points += q * asInt(m.point_value);
-  }
+  for (const m of items) { const q = asInt(m.quantity); total += q; points += q * asInt(m.point_value); }
   return { kinds: items.length, total, points };
 }
-
-/** کارت در ۴۸ ساعت گذشته اضافه شده؟ */
 export function isNewCard(item) {
   const t = Date.parse(item.updated_at || item.created_at || '');
   if (!Number.isFinite(t)) return false;
   return Date.now() - t < 48 * 3600 * 1000;
 }
+const SORTS = [['recent', 'تازه‌ترین'], ['value', 'باارزش‌ترین'], ['name', 'الفبا']];
 
-const SORTS = [
-  ['recent', 'تازه‌ترین'],
-  ['value', 'باارزش‌ترین'],
-  ['name', 'الفبا'],
-];
-
-function Avatar({ u, size = 72 }) {
-  const src = u.profile_image_url
-    ? asset(u.profile_image_url)
-    : avatarUrl(u.profile_avatar_key);
+function HeroHeader({ points, nickname, nextReward, user, cosmetics, onOpenProfile, onOpenWallet }) {
+  const required = asInt(nextReward?.required_points);
+  const remaining = required > points ? required - points : 0;
+  const progress = required > 0 ? Math.min(1, points / required) : 0;
+  const requiredFields = { first_name:'نام', last_name:'نام خانوادگی', age:'سن', province:'استان', city:'شهر', bank_account:'شماره کارت' };
+  const missing = user ? Object.entries(requiredFields).filter(([k]) => !String(user[k]||'').trim()).map(([,v])=>v) : [];
+  const done = Object.keys(requiredFields).length - missing.length;
   return (
-    <img className="avatar" src={src} alt="آواتار"
-      decoding="async" style={{ width: size, height: size }} />
+    <div style={{ padding:'10px 10px 10px', borderRadius:'20px', background:'linear-gradient(135deg, #1A2B45, #111D30, #0A1220)', border:'1.2px solid rgba(255,215,0,0.28)', boxShadow:'0 8px 18px rgba(255,215,0,0.08), 0 8px 16px rgba(0,0,0,0.4)' }}>
+      <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>
+        <div onClick={onOpenProfile} style={{ flex:1, display:'flex', gap:'8px', alignItems:'center', cursor:'pointer' }}>
+          <img src={user?.profile_image_url ? asset(user.profile_image_url) : avatarUrl(user?.profile_avatar_key)} alt="" style={{ width:'40px', height:'40px', borderRadius:'50%', objectFit:'cover' }} />
+          <div>
+            <div style={{ color:'#FFF', fontWeight:'900', fontSize:'14.5px', display:'flex', alignItems:'center', gap:'4px' }}>
+              سلام {nickname} {cosmetics?.plus && <span style={{ color:'#FFD700', textShadow:'0 0 8px #FFD700', fontSize:'13px' }}>★</span>}
+            </div>
+            <div style={{ color:'#CBD5E1', fontSize:'11px', fontWeight:'700', display:'flex', alignItems:'center', gap:'2px' }}>پروفایل من ‹</div>
+          </div>
+        </div>
+        <div style={{ padding:'6px 10px', borderRadius:'13px', background:'linear-gradient(135deg, rgba(255,215,0,0.22), rgba(255,159,67,0.08), rgba(0,0,0,0.14))', border:'1.2px solid rgba(255,215,0,0.5)', boxShadow:'0 4px 10px rgba(255,215,0,0.16)', textAlign:'right' }}>
+          <div style={{ color:'#FFDF70', fontWeight:'900', fontSize:'18px', display:'flex', alignItems:'center', gap:'4px', justifyContent:'flex-end', textShadow:'0 0 6px rgba(255,179,0,0.4)' }}>{fa(points)} <span style={{ fontSize:'14px' }}>★</span></div>
+          <div style={{ color:'#FFE599', fontWeight:'700', fontSize:'9.5px', textAlign:'right' }}>امتیاز کل</div>
+        </div>
+      </div>
+      <div style={{ height:'5px', background:'rgba(255,255,255,0.12)', borderRadius:'99px', overflow:'hidden', marginTop:'8px' }}>
+        <div style={{ width: `${progress*100}%`, height:'100%', background:'#22E7A6', transition:'width 0.5s' }} />
+      </div>
+      <div style={{ color:'rgba(255,255,255,0.7)', fontWeight:'700', fontSize:'10.5px', marginTop:'4px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+        {nextReward ? (remaining===0 ? `به جایزه ${nextReward.name} رسیدی!` : `تا جایزه ${nextReward.name}: ${fa(remaining)} امتیاز`) : 'هنوز جایزه‌ای تعریف نشده است'}
+      </div>
+      {onOpenWallet && (
+        <div onClick={onOpenWallet} style={{ marginTop:'8px', background:'rgba(0,0,0,0.28)', border:`1px solid ${asInt(user?.wallet_balance)>0?'rgba(255,211,107,0.5)':'rgba(255,255,255,0.15)'}`, borderRadius:'12px', padding:'6px 10px', display:'flex', alignItems:'center', gap:'8px', cursor:'pointer' }}>
+          <span style={{ width:'26px', height:'26px', borderRadius:'50%', background: asInt(user?.wallet_balance)>0 ? 'linear-gradient(135deg, #FFE9A8, #D4A227)' : 'rgba(255,255,255,0.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'14px' }}>💰</span>
+          <span style={{ flex:1, color:'rgba(255,255,255,0.7)', fontSize:'10.5px', fontWeight:'600' }}>کیف پول من</span>
+          <span style={{ color: asInt(user?.wallet_balance)>0 ? '#FFD36B' : '#FFF', fontWeight:'900', fontSize:'14px' }}>{fa(user?.wallet_balance||0)} <span style={{ fontSize:'9.5px', color:'rgba(255,211,107,0.8)' }}>تومان</span></span>
+          <span style={{ background:'rgba(255,211,107,0.18)', color:'#FFD36B', padding:'2px 8px', borderRadius:'99px', fontSize:'9.5px', fontWeight:'800' }}>{asInt(user?.wallet_balance)>0?'برداشت':'مشاهده'} ‹</span>
+        </div>
+      )}
+      {missing.length>0 && (
+        <div onClick={onOpenProfile} style={{ marginTop:'6px', background:'rgba(0,0,0,0.25)', borderRadius:'8px', padding:'6px 8px', display:'flex', alignItems:'center', gap:'6px', cursor:'pointer' }}>
+          <span style={{ color:'#FFD36B', fontSize:'12px' }}>🪪</span>
+          <span style={{ flex:1, color:'#FFF', fontSize:'10.5px', fontWeight:'700', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>تکمیل پروفایل ({done} از {Object.keys(requiredFields).length}): {missing.slice(0,2).join('، ')}{missing.length>2?` +${missing.length-2} مورد`:''}</span>
+          <span style={{ color:'#FFD36B', fontSize:'10.5px', fontWeight:'800' }}>تکمیل ‹</span>
+        </div>
+      )}
+    </div>
   );
 }
 
 function CardLightbox({ item, close }) {
   return (
-    <div className="modalShade" onClick={close}>
-      <div className="cardBig" onClick={e => e.stopPropagation()}>
-        <button className="close" onClick={close}>×</button>
-        <img src={asset(item.image_url) || avatarUrl('avatar_1_football.png')}
-          alt={item.name || 'کارت'} />
-        <h2>{item.name || 'کارت'}</h2>
-        <p>تعداد: {fa(item.quantity)} — {fa(item.point_value)} امتیاز</p>
-        {item.description && <p className="hint">{item.description}</p>}
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999 }} onClick={close}>
+      <div style={{ background:'#0F172A', border:'1px solid rgba(255,255,255,0.12)', borderRadius:'16px', padding:'16px', maxWidth:'90%', textAlign:'center' }} onClick={e=>e.stopPropagation()}>
+        <button onClick={close} style={{ position:'absolute', top:'8px', right:'8px', background:'none', border:'none', color:'#FFF', fontSize:'20px', cursor:'pointer' }}>×</button>
+        <img src={asset(item.image_url) || avatarUrl('avatar_1_football.png')} alt={item.name||'کارت'} style={{ maxWidth:'300px', borderRadius:'12px' }} />
+        <h2 style={{ color:'#FFF', margin:'8px 0 4px' }}>{item.name||'کارت'}</h2>
+        <p style={{ color:'#94A3B8' }}>تعداد: {fa(item.quantity)} — {fa(item.point_value)} امتیاز</p>
+        {item.description && <p style={{ color:'#64748B', fontSize:'12px' }}>{item.description}</p>}
       </div>
     </div>
   );
 }
 
-export default function Home({ token, p, rewards, load, setMsg, openWallet,
-  openWheel, openInvite }) {
+export default function Home({ token, p, rewards, load, setMsg, openWallet, openWheel, openInvite }) {
   const [bigCard, setBigCard] = useState(null);
   const [invQuery, setInvQuery] = useState('');
   const [invSort, setInvSort] = useState('recent');
-
   const u = p.user;
-  const sorted = [...rewards].sort(
-    (a, b) => a.required_points - b.required_points);
-  const next = sorted.find(r => u.current_points < r.required_points)
-    || sorted.at(-1);
-  const progress = next
-    ? Math.min(1, u.current_points / next.required_points) : 0;
-
+  const sorted = [...rewards].sort((a,b)=>a.required_points-b.required_points);
+  const next = sorted.find(r=>u.current_points < r.required_points) || sorted.at(-1);
   const inventory = p.inventory || [];
-  const invStats = useMemo(() => collectionStats(inventory), [inventory]);
-  const invShown = useMemo(
-    () => filterAndSort(inventory, invQuery, invSort),
-    [inventory, invQuery, invSort]);
+  const invStats = useMemo(()=>collectionStats(inventory),[inventory]);
+  const invShown = useMemo(()=>filterAndSort(inventory, invQuery, invSort),[inventory, invQuery, invSort]);
 
   return (
-    <div className="grid">
-      <section className="card heroCard">
-        <Avatar u={u} />
-        <h2>{u.nickname || u.mobile}</h2>
-        <h1>{fa(u.current_points)} امتیاز</h1>
-        <div className="bar"><span style={{ width: progress * 100 + '%' }} /></div>
-        <p>
-          {next
-            ? `تا جایزه ${next.name}: ${fa(Math.max(0, next.required_points - u.current_points))} امتیاز مانده`
-            : 'هنوز جایزه‌ای تعریف نشده'}
-        </p>
+    <div style={{ display:'flex', flexDirection:'column', gap:'12px', padding:'0 12px 80px' }}>
+      <HeroHeader points={asInt(u.current_points)} nickname={u.nickname||u.mobile||'قهرمان'} nextReward={next} user={u} cosmetics={p.cosmetics} onOpenProfile={()=>window.dispatchEvent(new CustomEvent('openProfile'))} onOpenWallet={openWallet} />
 
-        <button
-          className={`walletEntry${Number(u.wallet_balance) > 0 ? ' hasMoney' : ''}`}
-          onClick={openWallet}>
-          <img className="weIcon" src="/pass/icon_points.png" alt="" />
-          <span className="weBody">
-            <small>کیف پول من</small>
-            <b>{fa(u.wallet_balance)} <i>تومان</i></b>
-          </span>
-          <span className="weCta">
-            {Number(u.wallet_balance) > 0 ? 'برداشت' : 'مشاهده'} ‹
-          </span>
+      <LoginStreak token={token} initialData={p.loginStreak} setMsg={setMsg} onClaimed={load} />
+
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'8px' }}>
+        <button onClick={openWheel} style={{ background:'linear-gradient(135deg, #F59E0B22, #F59E0B0A)', border:'1px solid #F59E0B55', borderRadius:'16px', padding:'12px 6px', display:'flex', flexDirection:'column', alignItems:'center', gap:'6px', cursor:'pointer', boxShadow:'0 4px 12px #F59E0B22' }}>
+          <span style={{ width:'40px', height:'40px', borderRadius:'50%', background:'#F59E0B22', display:'flex', alignItems:'center', justifyContent:'center' }}><img src="/pass/wheel_icon.webp" alt="" style={{ width:'26px', height:'26px' }} /></span>
+          <b style={{ color:'#FFF', fontSize:'12px', fontWeight:'900' }}>گردونه</b>
+          <small style={{ color:'#F59E0B', fontSize:'10px', fontWeight:'700' }}>گردونه شانس</small>
         </button>
+        <button onClick={openInvite} style={{ background:'linear-gradient(135deg, #84CC1622, #84CC160A)', border:'1px solid #84CC1655', borderRadius:'16px', padding:'12px 6px', display:'flex', flexDirection:'column', alignItems:'center', gap:'6px', cursor:'pointer', boxShadow:'0 4px 12px #84CC1622' }}>
+          <span style={{ width:'40px', height:'40px', borderRadius:'50%', background:'#84CC1622', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'22px' }}>👥</span>
+          <b style={{ color:'#FFF', fontSize:'12px', fontWeight:'900' }}>دعوت</b>
+          <small style={{ color:'#84CC16', fontSize:'10px', fontWeight:'700' }}>دوستان</small>
+        </button>
+        <button onClick={()=>window.scrollTo(0, document.body.scrollHeight)} style={{ background:'linear-gradient(135deg, #38BDF822, #38BDF80A)', border:'1px solid #38BDF855', borderRadius:'16px', padding:'12px 6px', display:'flex', flexDirection:'column', alignItems:'center', gap:'6px', cursor:'pointer', boxShadow:'0 4px 12px #38BDF822' }}>
+          <span style={{ width:'40px', height:'40px', borderRadius:'50%', background:'#38BDF822', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'20px' }}>🃏</span>
+          <b style={{ color:'#FFF', fontSize:'12px', fontWeight:'900' }}>کلکسیون</b>
+          <small style={{ color:'#38BDF8', fontSize:'10px', fontWeight:'700' }}>{fa(inventory.length)} نوع</small>
+        </button>
+      </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '14px 0 6px' }}>
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '900' }}>ثبت کارت‌های قلقلی</h2>
-          <span style={{ background: 'rgba(245, 158, 11, 0.16)', border: '1px solid rgba(245, 158, 11, 0.45)', color: '#F59E0B', padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '900' }}>کارت داری اینجا ثبت کن !</span>
+      <div style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'16px', padding:'12px' }}>
+        <div style={{ display:'flex', gap:'8px', alignItems:'flex-start', marginBottom:'8px' }}>
+          <div style={{ width:'58px', height:'58px', borderRadius:'12px', background:'linear-gradient(135deg, rgba(16,185,129,0.22), rgba(56,189,248,0.12))', border:'1px solid rgba(16,185,129,0.35)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <img src="/brand/card_scan_glow.png" alt="" style={{ width:'40px', height:'40px' }} onError={e=>e.currentTarget.style.display='none'} />
+          </div>
+          <div style={{ flex:1 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <b style={{ color:'#FFF', fontSize:'14px', fontWeight:'900' }}>ثبت کارت‌های قلقلی</b>
+              <span style={{ background:'rgba(245,158,11,0.16)', border:'1px solid rgba(245,158,11,0.45)', color:'#F59E0B', padding:'3px 8px', borderRadius:'99px', fontSize:'10px', fontWeight:'900' }}>کارت داری اینجا ثبت کن !</span>
+            </div>
+            <p style={{ color:'#CBD5E1', fontSize:'11.5px', margin:'4px 0 0', lineHeight:1.45, fontWeight:'600' }}>کارت‌های فیزیکی قلقلی را می‌توانید از فروشگاه‌ها و سوپرمارکت‌ها تهیه کنید</p>
+          </div>
         </div>
-        <p className="hint" style={{ color: '#CBD5E1', fontSize: '12px', lineHeight: 1.45, margin: '0 0 10px' }}>
-          کارت‌های فیزیکی قلقلی را می‌توانید از فروشگاه‌ها و سوپرمارکت‌ها تهیه کنید
-        </p>
-
-        {/* ══════════════════════════════════════════════════════════════
-            چرا فرمِ «فقط کد» حذف شد
-            ══════════════════════════════════════════════════════════════
-
-            خواستهٔ صریح مالک: «در هر صورت کاربر باید عکس و کد رو باهم
-            بفرسته».
-
-            دو مسیرِ موازی دو مشکل داشت:
-
-              ۱. دو کادرِ «کد» پشتِ سرِ هم روی یک صفحه با دو دکمهٔ
-                 متفاوت — کاربر نمی‌دانست کدام را بزند.
-
-              ۲. مهم‌تر: مسیرِ «فقط کد» عکس نمی‌خواست، پس هیچ مدرکی نبود
-                 که کاربر کارتِ فیزیکی را دارد. کسی که فقط رشتهٔ کد را
-                 از دوستش گرفته بود امتیاز می‌گرفت.
-
-            مسیرِ `/api/cards/redeem` در سرور دست‌نخورده ماند (کدهای
-            قدیمیِ در گردش) ولی دیگر از رابط صدا زده نمی‌شود. */}
         <PhotoCardBox token={token} setMsg={setMsg} onDone={load} />
-      </section>
+      </div>
 
-      {/* دو میان‌بر: گردونهٔ روزانه و دعوت دوستان. روی صفحهٔ اصلی‌اند چون
-          هر دو کاری هستند که کاربر باید هر روز انجام دهد؛ اگر فقط در تب
-          خودشان بودند، بیشترِ کاربرها هیچ‌وقت پیدایشان نمی‌کردند. */}
-      <section className="card quickRow">
-        <button className="quickTile wheelTile" onClick={openWheel}>
-          <img className="quickIcon" src="/pass/wheel_icon.webp" alt="" />
-          <b>گردونهٔ شانس</b>
-          <small>هر روز یک چرخش رایگان</small>
-        </button>
-        <button className="quickTile inviteTile" onClick={openInvite}>
-          <svg className="quickIcon inviteIcon" viewBox="0 0 64 64" aria-hidden="true">
-            <circle cx="23" cy="22" r="9" />
-            <circle cx="43" cy="22" r="9" />
-            <path d="M8 52c1-11 8-17 15-17s14 6 15 17M26 52c1-8 6-13 13-13s12 5 14 13" />
-            <path d="M32 31v14M25 38h14" />
-          </svg>
-          <b>دعوت دوستان</b>
-          <small>۵٪ امتیازشان + ۳ چرخش</small>
-        </button>
-      </section>
-
-      <LoginStreak
-        token={token}
-        initialData={p.loginStreak}
-        setMsg={setMsg}
-        onClaimed={load}
-      />
-
-      <section className="card">
-        <h2>کلکسیون من</h2>
+      <div style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'16px', padding:'12px' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px' }}>
+          <h2 style={{ color:'#FFF', fontSize:'16px', fontWeight:'900', margin:0 }}>کلکسیون من</h2>
+          {inventory.length>6 && <span style={{ color:'#38BDF8', fontSize:'12px', fontWeight:'700' }}>همه ({fa(inventory.length)})</span>}
+        </div>
         {inventory.length ? (
           <>
-            {/* نوارِ آمار: کلکسیون وقتی جذاب است که کاربر رشدش را ببیند. */}
-            <div className="invStats">
-              <div><b>{fa(invStats.kinds)}</b><span>نوع کارت</span></div>
-              <div><b>{fa(invStats.total)}</b><span>کل کارت‌ها</span></div>
-              <div><b>{fa(invStats.points)}</b><span>ارزش</span></div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'8px', marginBottom:'8px', background:'rgba(255,255,255,0.04)', borderRadius:'12px', padding:'8px' }}>
+              <div style={{ textAlign:'center' }}><b style={{ color:'#FFF', display:'block' }}>{fa(invStats.kinds)}</b><span style={{ color:'#94A3B8', fontSize:'11px' }}>نوع کارت</span></div>
+              <div style={{ textAlign:'center' }}><b style={{ color:'#FFF', display:'block' }}>{fa(invStats.total)}</b><span style={{ color:'#94A3B8', fontSize:'11px' }}>کل کارت‌ها</span></div>
+              <div style={{ textAlign:'center' }}><b style={{ color:'#FFF', display:'block' }}>{fa(invStats.points)}</b><span style={{ color:'#94A3B8', fontSize:'11px' }}>ارزش</span></div>
             </div>
-
-            {/* جست‌وجو فقط وقتی معنا دارد که چیزی برای گشتن باشد. */}
-            {inventory.length >= 8 && (
-              <input className="invSearch" type="search"
-                placeholder="جست‌وجو در کارت‌ها…"
-                value={invQuery} onChange={e => setInvQuery(e.target.value)} />
-            )}
-
-            {inventory.length >= 2 && (
-              <div className="invSorts">
-                {SORTS.map(([k, label]) => (
-                  <button key={k} type="button"
-                    className={invSort === k ? 'on' : ''}
-                    onClick={() => setInvSort(k)}>{label}</button>
+            {inventory.length>=8 && <input type="search" placeholder="جست‌وجو در کارت‌ها…" value={invQuery} onChange={e=>setInvQuery(e.target.value)} style={{ width:'100%', padding:'8px 12px', borderRadius:'10px', border:'1px solid rgba(255,255,255,0.1)', background:'rgba(0,0,0,0.2)', color:'#FFF', marginBottom:'8px' }} />}
+            {inventory.length>=2 && (
+              <div style={{ display:'flex', gap:'6px', marginBottom:'8px' }}>
+                {SORTS.map(([k,label])=>(
+                  <button key={k} onClick={()=>setInvSort(k)} style={{ padding:'6px 12px', borderRadius:'99px', border: invSort===k?'1px solid #38BDF8':'1px solid rgba(255,255,255,0.1)', background: invSort===k?'rgba(56,189,248,0.15)':'rgba(255,255,255,0.05)', color: invSort===k?'#38BDF8':'#94A3B8', fontSize:'11px', fontWeight:'700', cursor:'pointer' }}>{label}</button>
                 ))}
               </div>
             )}
-
             {invShown.length ? (
-              <div className="invGrid">
-                {invShown.map(i => (
-                  <button className="invCard" key={i.id} title="نمایش بزرگ کارت"
-                    onClick={() => setBigCard(i)}>
-                    <span className="invArt">
-                      <img src={asset(i.image_url) || avatarUrl('avatar_1_football.png')}
-                        alt={i.name || 'کارت'} loading="lazy" decoding="async" />
-                      {isNewCard(i) && <em className="invNew">جدید</em>}
-                      {/* «×۱» روی هر کارت فقط نویز است. */}
-                      {asInt(i.quantity) > 1 &&
-                        <em className="invQty">×{fa(i.quantity)}</em>}
-                    </span>
-                    <b>{i.name}</b>
-                    <small>{fa(i.point_value)} امتیاز</small>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'8px' }}>
+                {invShown.slice(0,12).map(i=>(
+                  <button key={i.id} onClick={()=>setBigCard(i)} style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:'12px', padding:'6px', cursor:'pointer', textAlign:'center' }}>
+                    <div style={{ position:'relative', aspectRatio:'0.66', background:'rgba(0,0,0,0.2)', borderRadius:'8px', overflow:'hidden', marginBottom:'6px' }}>
+                      <img src={asset(i.image_url) || avatarUrl('avatar_1_football.png')} alt={i.name||'کارت'} loading="lazy" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                      {isNewCard(i) && <span style={{ position:'absolute', top:'4px', right:'4px', background:'#22E7A6', color:'#000', padding:'2px 6px', borderRadius:'6px', fontSize:'9px', fontWeight:'900' }}>جدید</span>}
+                      {asInt(i.quantity)>1 && <span style={{ position:'absolute', bottom:'4px', left:'4px', background:'rgba(0,0,0,0.6)', color:'#FFF', padding:'2px 6px', borderRadius:'6px', fontSize:'10px' }}>×{fa(i.quantity)}</span>}
+                    </div>
+                    <b style={{ color:'#FFF', fontSize:'11px', display:'block', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{i.name}</b>
+                    <small style={{ color:'#94A3B8', fontSize:'10px' }}>{fa(i.point_value)} امتیاز</small>
                   </button>
                 ))}
               </div>
             ) : (
-              <EmptyView icon="search">
-                کارتی با این نام پیدا نشد.
-              </EmptyView>
+              <div style={{ textAlign:'center', padding:'20px', color:'#64748B' }}>کارتی با این نام پیدا نشد.</div>
             )}
           </>
         ) : (
-          <EmptyView icon="football">
-            هنوز کارتی ثبت نکرده‌ای. کد پشت کارت را بالا وارد کن.
-          </EmptyView>
+          <div style={{ textAlign:'center', padding:'20px' }}>
+            <div style={{ fontSize:'40px', marginBottom:'8px' }}>🃏</div>
+            <b style={{ color:'#FFF' }}>هنوز کارتی در کلکسیون شما نیست</b>
+            <p style={{ color:'#94A3B8', fontSize:'12px', marginTop:'4px' }}>یک کد کارت را ثبت کن یا از کارتت عکس بگیر تا اینجا نمایش داده شود.</p>
+            <img src="/games/empty_collection.webp" alt="" style={{ width:'120px', opacity:0.6, marginTop:'12px' }} onError={e=>e.currentTarget.style.display='none'} />
+          </div>
         )}
-      </section>
-
-      {bigCard && <CardLightbox item={bigCard} close={() => setBigCard(null)} />}
+      </div>
+      {bigCard && <CardLightbox item={bigCard} close={()=>setBigCard(null)} />}
     </div>
   );
 }
 
-export { Avatar };

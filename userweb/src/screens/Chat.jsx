@@ -13,7 +13,7 @@ const EMOJIS = [
 const CATEGORIES = [
   { title: '💬 گفتگو', items: ['سلام بچه‌ها!', 'من اومدم!', 'چه خبر بچه‌ها؟', 'خداحافظ تا بعد!', 'مواظب خودتون باشید!', 'خوشبختم دوستان!', 'کجا زندگی می‌کنید؟', 'امروز چیکار کردید؟'] },
   { title: '⚽ بازی', items: ['کی پایه بازیه؟', 'بریم برای برد!', 'من عاشق این بازی‌ام!', 'منم می‌خوام بازی کنم!', 'دوباره امتحان می‌کنم!'] },
-  { title: '🏆 کل‌کل', items: ['عالی بود!', 'خیلی خفن بود!', 'تبریک میگم!', 'شگفت‌انگیز بود!', 'چقدر امتیازم بالا رفت!', 'کارت جدید پیدا کردم!', 'امروز روز منه!', 'ایول به همگی!'] },
+  { title: '🎮 بازی', items: ['بزن بریم بازی!', 'آماده‌ای برای مسابقه؟', 'این دست من می‌برم!', 'بازی عالی بود!', 'دوباره بازی کنیم؟', 'کارت خفن گرفتم!', 'حریف قوی می‌خوام!', 'پنالتی رو دریبل کردم!'] },
   { title: '😀 ایموجی', items: [] },
 ];
 
@@ -152,7 +152,7 @@ export default function Chat({ token, openProfile, meId }) {
                   </div>
                 )}
 
-                <div style={{ background: isMe ? 'rgba(56, 189, 248, 0.18)' : 'rgba(255,255,255,0.05)', border: isMe ? '1px solid rgba(56, 189, 248, 0.35)' : '1px solid rgba(255,255,255,0.08)', padding: '8px 12px', borderRadius: '12px', color: '#FFF', fontSize: '13px' }}>
+                <div style={{ background: isMe ? 'rgba(56, 189, 248, 0.18)' : 'rgba(255,255,255,0.05)', border: isMe ? '1px solid rgba(56, 189, 248, 0.35)' : '1px solid rgba(255,255,255,0.08)', padding: '8px 12px', borderRadius: '12px', color: '#FFF', fontSize: '13px', userSelect: 'text', WebkitUserSelect: 'text', cursor: 'text' }}>
                   {m.message_text}
                 </div>
 
@@ -201,47 +201,55 @@ export default function Chat({ token, openProfile, meId }) {
           {cdLeft > 0 && <span style={{ color: '#EF4444', fontSize: '11px', fontWeight: 'bold' }}>صبر کنید ({fa(cdLeft)} ثانیه)</span>}
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+        <div style={{ height: '96px', overflowX: 'auto', overflowY: 'hidden', paddingBottom: '4px' }}>
           {tab === 3 ? (
-            EMOJIS.map((em, idx) => (
-              <button
-                key={idx}
-                type="button"
-                disabled={cdLeft > 0}
-                onClick={() => sendCanned(em)}
-                style={{
-                  background: '#1E293B',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  padding: '6px 12px',
-                  borderRadius: '10px',
-                  fontSize: '20px',
-                  cursor: cdLeft > 0 ? 'not-allowed' : 'pointer',
-                }}
-              >
-                {em}
-              </button>
-            ))
+            <div style={{ display: 'grid', gridTemplateRows: 'repeat(2, 1fr)', gridAutoFlow: 'column', gap: '6px', height: '100%', gridAutoColumns: 'minmax(60px, auto)' }}>
+              {EMOJIS.map((em, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  disabled={cdLeft > 0}
+                  onClick={() => sendCanned(em)}
+                  style={{
+                    background: cdLeft > 0 ? 'rgba(255,255,255,0.02)' : '#1E293B',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '12px',
+                    fontSize: '22px',
+                    cursor: cdLeft > 0 ? 'not-allowed' : 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    userSelect: 'text',
+                  }}
+                >
+                  {em}
+                </button>
+              ))}
+            </div>
           ) : (
-            CATEGORIES[tab].items.map((txt, idx) => (
-              <button
-                key={idx}
-                type="button"
-                disabled={cdLeft > 0}
-                onClick={() => sendCanned(txt)}
-                style={{
-                  background: cdLeft > 0 ? 'rgba(255,255,255,0.04)' : '#1E293B',
-                  border: '1px solid rgba(56, 189, 248, 0.35)',
-                  color: cdLeft > 0 ? '#64748B' : '#FFF',
-                  padding: '8px 12px',
-                  borderRadius: '12px',
-                  fontSize: '12px',
-                  whiteSpace: 'nowrap',
-                  cursor: cdLeft > 0 ? 'not-allowed' : 'pointer',
-                }}
-              >
-                {txt}
-              </button>
-            ))
+            <div style={{ display: 'grid', gridTemplateRows: 'repeat(2, 1fr)', gridAutoFlow: 'column', gap: '8px', height: '100%', gridAutoColumns: 'max-content' }}>
+              {CATEGORIES[tab].items.map((txt, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  disabled={cdLeft > 0}
+                  onClick={() => sendCanned(txt)}
+                  style={{
+                    background: cdLeft > 0 ? 'rgba(255,255,255,0.03)' : '#1E293B',
+                    border: cdLeft > 0 ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(56, 189, 248, 0.35)',
+                    color: cdLeft > 0 ? '#64748B' : '#FFF',
+                    padding: '8px 12px',
+                    borderRadius: '12px',
+                    fontSize: '11.5px',
+                    fontWeight: '700',
+                    whiteSpace: 'nowrap',
+                    cursor: cdLeft > 0 ? 'not-allowed' : 'pointer',
+                    userSelect: 'text',
+                    WebkitUserSelect: 'text',
+                  }}
+                >
+                  {txt}
+                </button>
+              ))}
+            </div>
           )}
         </div>
       </div>
