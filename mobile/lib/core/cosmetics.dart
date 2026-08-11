@@ -63,9 +63,18 @@ BoxDecoration? profileBackgroundDecoration(String? slug) {
   };
   if (colors == null) return null;
   return BoxDecoration(
-    gradient: LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: colors),
+    gradient: LinearGradient(
+      begin: Alignment.topRight,
+      end: Alignment.bottomLeft,
+      colors: [colors.first.withValues(alpha: .78), const Color(0xE6030712)],
+    ),
+    image: DecorationImage(
+      image: AssetImage('assets/shop/cosmetics/$slug.webp'),
+      fit: BoxFit.cover,
+      opacity: .46,
+    ),
     borderRadius: BorderRadius.circular(22),
-    border: Border.all(color: colors.last.withValues(alpha: .42)),
+    border: Border.all(color: colors.last.withValues(alpha: .52)),
   );
 }
 

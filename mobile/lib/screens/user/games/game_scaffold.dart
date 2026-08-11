@@ -497,6 +497,11 @@ class _ResultStrip extends StatelessWidget {
         gradient: palette == null ? null : LinearGradient(
           colors: [palette.first.withValues(alpha: .82), palette.last.withValues(alpha: .46)],
         ),
+        image: template == null ? null : DecorationImage(
+          image: AssetImage('assets/shop/cosmetics/$template.webp'),
+          fit: BoxFit.cover,
+          opacity: .18,
+        ),
         border: Border.all(color: (palette?.last ?? color).withValues(alpha: 0.70), width: 1.2),
         boxShadow: [BoxShadow(color: color.withValues(alpha: 0.20), blurRadius: 12)],
       ),
@@ -610,19 +615,6 @@ class _CosmeticEffectOverlayState extends State<_CosmeticEffectOverlay>
 
   @override
   Widget build(BuildContext context) {
-    final icon = switch (widget.slug) {
-      'stadium_spotlight' => '🔦',
-      'colored_smoke' => '🌈',
-      'card_side_fire' => '🔥',
-      'victory_confetti' => '🎊',
-      'golden_cup' => '🏆',
-      'tunnel_entry' => '🚇',
-      'goal_celebration' => '⚽',
-      'win_streak' => '🔥',
-      'mvp_effect' => '⭐',
-      'rematch_effect' => '↻',
-      _ => '✨',
-    };
     return AnimatedBuilder(
       animation: _controller,
       builder: (_, __) {
@@ -635,10 +627,22 @@ class _CosmeticEffectOverlayState extends State<_CosmeticEffectOverlay>
               angle: (t - .5) * .28,
               child: Transform.scale(
                 scale: widget.finish ? .9 + t * .65 : .3 + t * 1.9,
-                child: Text(icon, style: const TextStyle(fontSize: 72, shadows: [
-                  Shadow(color: Color(0xFFFFD166), blurRadius: 28),
-                  Shadow(color: Color(0xFF38BDF8), blurRadius: 18),
-                ])),
+                child: Container(
+                  width: 300,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: const [
+                      BoxShadow(color: Color(0x5538BDF8), blurRadius: 28),
+                      BoxShadow(color: Color(0x33FFD166), blurRadius: 18),
+                    ],
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Image.asset(
+                    'assets/shop/cosmetics/${widget.slug}.webp',
+                    fit: BoxFit.cover,
+                    filterQuality: FilterQuality.medium,
+                  ),
+                ),
               ),
             ),
           ),

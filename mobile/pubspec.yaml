@@ -171,6 +171,7 @@ flutter:
     - assets/games/medals/
     - assets/games/tap/
     - assets/shop/
+    - assets/shop/cosmetics/
     - assets/sfx/
     - assets/avatars/
     - assets/wheel/

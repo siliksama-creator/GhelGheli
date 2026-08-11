@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
@@ -241,11 +242,31 @@ class _CardDuelPageState extends State<CardDuelPage> {
     final canvas = Canvas(recorder);
     final template = _myCosmetics['resultTemplate'] as String?;
     final palette = resultTemplateColors[template] ?? const [Color(0xFF071522), Color(0xFF35105D)];
-    final paint = Paint()..shader = LinearGradient(
-      begin: Alignment.topLeft, end: Alignment.bottomRight,
-      colors: [palette.first, const Color(0xFF17304C), palette.last],
-    ).createShader(Offset.zero & size);
-    canvas.drawRect(Offset.zero & size, paint);
+    var drewArtwork = false;
+    if (template != null) {
+      try {
+        final data = await rootBundle.load('assets/shop/cosmetics/$template.webp');
+        final codec = await ui.instantiateImageCodec(
+          data.buffer.asUint8List(), targetWidth: 1080, targetHeight: 1080);
+        final frame = await codec.getNextFrame();
+        canvas.drawImageRect(frame.image,
+            Rect.fromLTWH(0, 0, frame.image.width.toDouble(), frame.image.height.toDouble()),
+            Offset.zero & size, Paint());
+        canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0x99020617));
+        frame.image.dispose();
+        codec.dispose();
+        drewArtwork = true;
+      } catch (_) {
+        // Fall through to the deterministic palette if an old bundle lacks art.
+      }
+    }
+    if (!drewArtwork) {
+      final paint = Paint()..shader = LinearGradient(
+        begin: Alignment.topLeft, end: Alignment.bottomRight,
+        colors: [palette.first, const Color(0xFF17304C), palette.last],
+      ).createShader(Offset.zero & size);
+      canvas.drawRect(Offset.zero & size, paint);
+    }
     canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(34, 34, 1012, 1012), const Radius.circular(38)),
         Paint()..style = PaintingStyle.stroke..strokeWidth = 10..color = _gold);
     void text(String value, double y, double fontSize, Color color, {FontWeight weight = FontWeight.w700}) {
@@ -309,6 +330,13 @@ class _CardDuelPageState extends State<CardDuelPage> {
                 borderRadius: Corners.rXl,
                 gradient: LinearGradient(colors: resultTemplateColors[_myCosmetics['resultTemplate']]
                     ?? const [Color(0xFF17304C), Color(0xFF35105D)]),
+                image: _myCosmetics['resultTemplate'] == null
+                    ? null
+                    : DecorationImage(
+                        image: AssetImage('assets/shop/cosmetics/${_myCosmetics['resultTemplate']}.webp'),
+                        fit: BoxFit.cover,
+                        opacity: .26,
+                      ),
                 border: Border.all(color: _gold, width: 1.5),
               ),
               child: Column(children: [
@@ -571,6 +599,7 @@ class _CardDuelPageState extends State<CardDuelPage> {
                 session: _session,
                 color: _modeColor,
                 resultColors: resultTemplateColors[_myCosmetics['resultTemplate']],
+                resultTemplate: _myCosmetics['resultTemplate'] as String?,
                 onAgain: _playAgain,
                 onEdit: _editLineup,
                 onShare: _shareResult,
@@ -622,19 +651,6 @@ class _DuelCosmeticEffectState extends State<_DuelCosmeticEffect>
 
   @override
   Widget build(BuildContext context) {
-    final icon = switch (widget.slug) {
-      'stadium_spotlight' => '🔦',
-      'colored_smoke' => '🌈',
-      'card_side_fire' => '🔥',
-      'victory_confetti' => '🎊',
-      'golden_cup' => '🏆',
-      'tunnel_entry' => '🚇',
-      'goal_celebration' => '⚽',
-      'win_streak' => '🔥',
-      'mvp_effect' => '⭐',
-      'rematch_effect' => '↻',
-      _ => '✨',
-    };
     return AnimatedBuilder(
       animation: _controller,
       builder: (_, __) {
@@ -644,10 +660,22 @@ class _DuelCosmeticEffectState extends State<_DuelCosmeticEffect>
             opacity: (widget.repeat ? .22 + t * .55 : 1 - t).clamp(0.0, 1.0).toDouble(),
             child: Transform.scale(
               scale: .45 + t * 1.45,
-              child: Text(icon, style: const TextStyle(fontSize: 70, shadows: [
-                Shadow(color: Color(0xFFFFD166), blurRadius: 28),
-                Shadow(color: Color(0xFF38BDF8), blurRadius: 18),
-              ])),
+              child: Container(
+                width: 300,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: const [
+                    BoxShadow(color: Color(0x55FFD166), blurRadius: 28),
+                    BoxShadow(color: Color(0x3338BDF8), blurRadius: 18),
+                  ],
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Image.asset(
+                  'assets/shop/cosmetics/${widget.slug}.webp',
+                  fit: BoxFit.cover,
+                  filterQuality: FilterQuality.medium,
+                ),
+              ),
             ),
           ),
         );

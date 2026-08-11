@@ -206,7 +206,7 @@ class _ShopPageState extends State<ShopPage> {
               if (_showPlans && plans.isNotEmpty) ...[
                 Gaps.vSm,
                 SizedBox(
-                  height: MediaQuery.sizeOf(context).width < 390 ? 330 : 302,
+                  height: MediaQuery.sizeOf(context).width < 390 ? 380 : 354,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     itemCount: plans.length,
@@ -380,6 +380,8 @@ class _PlanCard extends StatelessWidget {
               Text('به‌جای ${Money.withUnit(59000 * 12)} پرداخت ماهانه',
                   style: const TextStyle(fontSize: 9, color: Colors.white54)),
             Gaps.vXs,
+            _PlanVisuals(annual: annual),
+            Gaps.vXs,
             Expanded(
               child: SingleChildScrollView(
                 physics: const NeverScrollableScrollPhysics(),
@@ -410,6 +412,49 @@ class _PlanCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _PlanVisuals extends StatelessWidget {
+  const _PlanVisuals({required this.annual});
+  final bool annual;
+
+  @override
+  Widget build(BuildContext context) {
+    final slugs = annual
+        ? const ['annual_royal_frame', 'annual_royal_result']
+        : const ['blue_fire', 'gold_gradient'];
+    return Container(
+      height: 56,
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .045),
+        borderRadius: Corners.rMd,
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Row(children: [
+        for (final slug in slugs) ...[
+          ClipRRect(
+            borderRadius: Corners.rSm,
+            child: Image.asset(
+              'assets/shop/cosmetics/$slug.webp',
+              width: 68,
+              height: 42,
+              fit: BoxFit.cover,
+              cacheWidth: 210,
+            ),
+          ),
+          const SizedBox(width: 5),
+        ],
+        Expanded(
+          child: Text(
+            annual ? 'قاب، نتیجه و عنوان دائمی سالانه' : 'نمونه واقعی قاب و افکت نام',
+            maxLines: 2,
+            style: const TextStyle(fontSize: 8.5, height: 1.35, color: Colors.white70, fontWeight: FontWeight.w800),
+          ),
+        ),
+      ]),
     );
   }
 }
@@ -493,7 +538,7 @@ class _ProductCard extends StatelessWidget {
     final owned = item['owned'] == true;
     final annualGift = item['access_tier'] == 'annual';
     return SizedBox(
-      width: 235,
+      width: MediaQuery.sizeOf(context).width < 500 ? 276 : 235,
       child: Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
@@ -575,70 +620,75 @@ class _ProductArt extends StatelessWidget {
   const _ProductArt({required this.item});
   final Map<String, dynamic> item;
 
-  List<Color> get colors {
-    final metadata = item['metadata'];
-    final palette = metadata is Map && metadata['palette'] is List
-        ? metadata['palette'] as List
-        : const [];
-    final parsed = palette.map((raw) => _hex('$raw')).whereType<Color>().toList();
-    if (parsed.length >= 2) return parsed;
-    return const [Color(0xFF38BDF8), Color(0xFF7C3AED)];
-  }
-
-  Color? _hex(String raw) {
-    final clean = raw.replaceAll('#', '');
-    if (clean.length != 6) return null;
-    return Color(int.parse('FF$clean', radix: 16));
-  }
+  IconData _kindIcon(String kind) => switch (kind) {
+    'club_badge' => Icons.shield_outlined,
+    'card_frame' => Icons.crop_portrait_rounded,
+    'name_color' => Icons.title_rounded,
+    'profile_background' => Icons.wallpaper_rounded,
+    'result_template' => Icons.scoreboard_rounded,
+    'match_effect' => Icons.flare_rounded,
+    'emote_pack' => Icons.chat_bubble_outline_rounded,
+    _ => Icons.auto_awesome_rounded,
+  };
 
   @override
   Widget build(BuildContext context) {
     final kind = '${item['kind']}';
-    final value = '${item['payload'] ?? item['slug'] ?? ''}';
-    Widget content;
-    if (kind == 'club_badge') {
-      content = Image.asset(
-        clubAsset(value), width: 78, height: 78, fit: BoxFit.contain, cacheWidth: 220,
-        errorBuilder: (_, __, ___) => const Icon(Icons.shield_rounded, size: 58),
-      );
-    } else if (kind == 'name_color') {
-      content = ShaderMask(
-        shaderCallback: (bounds) => LinearGradient(colors: colors).createShader(bounds),
-        child: const Text('قلقلی', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900)),
-      );
-    } else {
-      final icon = switch (kind) {
-        'card_frame' => Icons.shield_rounded,
-        'profile_background' => Icons.person_rounded,
-        'result_template' => Icons.emoji_events_rounded,
-        'match_effect' => Icons.celebration_rounded,
-        'emote_pack' => Icons.forum_rounded,
-        _ => Icons.auto_awesome_rounded,
-      };
-      content = Icon(icon, size: 58, color: Colors.white);
-    }
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: RadialGradient(
-          center: const Alignment(.55, -.6),
-          radius: 1.25,
-          colors: [colors.last.withValues(alpha: .62), colors.first.withValues(alpha: .18), const Color(0xFF071522)],
-        ),
-        border: Border(bottom: BorderSide(color: colors.first.withValues(alpha: .42))),
-      ),
-      child: Center(
-        child: Container(
-          width: 112,
-          height: 92,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(26),
-            border: Border.all(color: colors.first.withValues(alpha: .72), width: 2.5),
-            boxShadow: [BoxShadow(color: colors.last.withValues(alpha: .25), blurRadius: 20)],
+    final slug = '${item['slug'] ?? ''}';
+    final club = '${item['payload'] ?? ''}';
+    final path = kind == 'club_badge'
+        ? clubAsset(club)
+        : 'assets/shop/cosmetics/$slug.webp';
+    final artScale = switch (kind) {
+      'card_frame' => 1.12,
+      'match_effect' => 1.05,
+      'result_template' => 1.02,
+      _ => 1.0,
+    };
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        ColoredBox(
+          color: const Color(0xFF03070D),
+          child: Padding(
+            padding: kind == 'club_badge'
+                ? const EdgeInsets.all(25)
+                : EdgeInsets.zero,
+            child: ClipRect(
+              child: Transform.scale(
+                scale: artScale,
+                child: Image.asset(
+                  path,
+                  fit: kind == 'club_badge' ? BoxFit.contain : BoxFit.cover,
+                  cacheWidth: 640,
+                  filterQuality: FilterQuality.medium,
+                  errorBuilder: (_, __, ___) => Center(
+                    child: Icon(_kindIcon(kind), size: 42, color: Colors.white38),
+                  ),
+                ),
+              ),
+            ),
           ),
-          child: content,
         ),
-      ),
+        PositionedDirectional(
+          start: 8,
+          bottom: 7,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xD9020617),
+              borderRadius: Corners.rPill,
+              border: Border.all(color: Colors.white.withValues(alpha: .16)),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(_kindIcon(kind), size: 11, color: const Color(0xFFBAE6FD)),
+              const SizedBox(width: 4),
+              const Text('پیش‌نمایش واقعی',
+                  style: TextStyle(fontSize: 7.8, color: Colors.white70, fontWeight: FontWeight.w800)),
+            ]),
+          ),
+        ),
+      ],
     );
   }
 }

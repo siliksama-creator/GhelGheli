@@ -5,7 +5,12 @@ import { RESULT_PALETTES } from './components/Cosmetics.jsx';
 
 const idOf = card => String(card?.cardTypeId || card?.id || '');
 const num = value => Number(value || 0);
-const MATCH_EFFECT_ICON = { stadium_spotlight:'🔦', colored_smoke:'🌈', card_side_fire:'🔥', victory_confetti:'🎊', golden_cup:'🏆', tunnel_entry:'🚇', goal_celebration:'⚽', win_streak:'🔥', mvp_effect:'⭐', rematch_effect:'↻' };
+
+function DuelEffectVisual({ slug }) {
+  return <div aria-hidden="true" style={{position:'absolute',zIndex:20,inset:0,display:'grid',placeItems:'center',pointerEvents:'none',animation:'duelCosmeticBurst 2s ease-out forwards'}}>
+    <img src={`/shop/cosmetics/${slug}.webp`} alt="" style={{width:'min(84%,460px)',aspectRatio:'16/9',objectFit:'cover',borderRadius:'24px',mixBlendMode:'screen',filter:'saturate(1.35) drop-shadow(0 0 26px rgba(255,209,102,.42))'}} />
+  </div>;
+}
 const rarityColor = rarity => ({
   legend: '#FF6B35', premium: '#FFD166', gold: '#F7C948',
   silver: '#C7D2FE', normal: '#22E7A6',
@@ -148,14 +153,30 @@ function resultMvp(state) {
   return candidates.sort((a, b) => num(b.power) - num(a.power))[0] || null;
 }
 
+function loadShopArtwork(slug) {
+  if (!slug) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => resolve(null);
+    image.src = `/shop/cosmetics/${slug}.webp`;
+  });
+}
+
 async function renderResultCard({ result, score, mvp, opponent, url, template }) {
   const canvas = document.createElement('canvas');
   canvas.width = 1080; canvas.height = 1080;
   const ctx = canvas.getContext('2d');
   const colors = RESULT_PALETTES[template] || ['#071522', '#35105D'];
-  const gradient = ctx.createLinearGradient(0, 0, 1080, 1080);
-  gradient.addColorStop(0, colors[0]); gradient.addColorStop(0.55, '#17304C'); gradient.addColorStop(1, colors[1]);
-  ctx.fillStyle = gradient; ctx.fillRect(0, 0, 1080, 1080);
+  const artwork = await loadShopArtwork(template);
+  if (artwork) {
+    ctx.drawImage(artwork, 0, 0, 1080, 1080);
+    ctx.fillStyle = 'rgba(2,6,23,.60)'; ctx.fillRect(0, 0, 1080, 1080);
+  } else {
+    const gradient = ctx.createLinearGradient(0, 0, 1080, 1080);
+    gradient.addColorStop(0, colors[0]); gradient.addColorStop(0.55, '#17304C'); gradient.addColorStop(1, colors[1]);
+    ctx.fillStyle = gradient; ctx.fillRect(0, 0, 1080, 1080);
+  }
   ctx.strokeStyle = '#FFD166'; ctx.lineWidth = 10; ctx.strokeRect(35, 35, 1010, 1010);
   ctx.textAlign = 'center'; ctx.direction = 'rtl';
   ctx.fillStyle = '#38BDF8'; ctx.font = '700 34px sans-serif'; ctx.fillText('GHELGHELI CARD ARENA', 540, 135);
@@ -294,7 +315,7 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
 
   return <main className="duelPageV2" style={{ '--mode-color': mode.color, position:'relative', overflow:'hidden' }}>
     <style>{`@keyframes duelCosmeticBurst{0%{opacity:0;transform:scale(.3) rotate(-15deg)}35%{opacity:1}100%{opacity:0;transform:scale(2.2) rotate(12deg)}}`}</style>
-    {enabled && (session.phase === 'playing' || (session.phase === 'over' && iWon)) && myCosmetics.matchEffect && <div aria-hidden="true" style={{position:'absolute',zIndex:20,left:'50%',top:'32%',fontSize:'72px',pointerEvents:'none',animation:'duelCosmeticBurst 2s ease-out forwards',filter:'drop-shadow(0 0 22px #FFD166)'}}>{MATCH_EFFECT_ICON[myCosmetics.matchEffect] || '✨'}</div>}
+    {enabled && (session.phase === 'playing' || (session.phase === 'over' && iWon)) && myCosmetics.matchEffect && <DuelEffectVisual slug={myCosmetics.matchEffect} />}
     <header className="duelHeroV2">
       <button type="button" className="ghost" onClick={() => { session.leave(); onBack(); }}>← بازگشت</button>
       <div className="duelHeroIcon"><img src="/games/card_duel_glow.png" alt="" /></div>
@@ -336,7 +357,9 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
     {enabled && session.phase === 'playing' && <LiveArena session={session} />}
 
     {enabled && session.phase === 'over' && <section className={`duelFinale ${winner === 'DRAW' ? 'draw' : iWon ? 'won' : 'lost'}`}
-      style={{'--duel-result-a':resultPalette[0],'--duel-result-b':resultPalette[1],background:`radial-gradient(circle at 50% 15%,${resultPalette[1]}44,transparent 42%),${resultPalette[0]}`}}>
+      style={{'--duel-result-a':resultPalette[0],'--duel-result-b':resultPalette[1],background:myCosmetics.resultTemplate
+        ? `linear-gradient(rgba(2,6,23,.38),rgba(2,6,23,.76)),url('/shop/cosmetics/${myCosmetics.resultTemplate}.webp') center/cover,${resultPalette[0]}`
+        : `radial-gradient(circle at 50% 15%,${resultPalette[1]}44,transparent 42%),${resultPalette[0]}`}}>
       <LiveArena session={session} />
       <div className="duelFinalePanel">
         <span>{winner === 'DRAW' ? '🤝' : iWon ? '🏆' : '🛡️'}</span>
