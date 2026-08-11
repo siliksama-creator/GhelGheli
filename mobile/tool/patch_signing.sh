@@ -152,7 +152,12 @@ grep -q 'ghelgheliRelease' "$TARGET" \
 # The release build type must actually USE it. If this check fails the build
 # would still succeed and silently ship a debug-signed APK, which is the whole
 # failure mode this script exists to prevent.
-if grep -A6 -E 'release\s*\{' "$TARGET" | grep -q 'ghelgheliRelease'; then
+# Flutter 3.44 expanded the generated release block enough that the assignment
+# can sit more than six lines after `release {`. Checking a fixed context
+# window produced a false failure even though the exact assignment had been
+# injected. Match the assignment itself instead — this cannot be satisfied by
+# the signingConfigs declaration above.
+if grep -Eq 'signingConfig[[:space:]]*=[[:space:]]*signingConfigs\.getByName\("ghelgheliRelease"\)|signingConfig[[:space:]]+signingConfigs\.ghelgheliRelease' "$TARGET"; then
   echo "  OK   release build type uses it"
 else
   echo "  FAIL release build type is not using the release signing config"
