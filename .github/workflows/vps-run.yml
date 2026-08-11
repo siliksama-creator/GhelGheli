@@ -1,0 +1,66 @@
+# اجرای دستور روی VPS از طریق runner خودمیزبان
+#
+# چرا این فایل هست: محیط دستیار به سرور SSH ندارد. این ورک‌فلو روی
+# خودِ VPS اجرا می‌شود (runner خودمیزبان با برچسب `ghelgheli-vps`) و
+# خروجی دستور را هم در Summary و هم به‌صورت Artifact برمی‌گرداند.
+#
+# اجرا فقط دستی است. هیچ trigger خودکاری ندارد تا چیزی ناخواسته روی
+# سرور اجرا نشود.
+#
+# نصب runner روی سرور:
+#   Settings → Actions → Runners → New self-hosted runner (Linux x64)
+#   موقع ./config.sh وقتی برچسب پرسید بنویس: ghelgheli-vps
+#   بعد: sudo ./svc.sh install && sudo ./svc.sh start
+
+name: VPS Run
+
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        description: 'دستوری که روی VPS اجرا شود'
+        required: true
+        default: 'pm2 list'
+      timeout:
+        description: 'سقف زمان اجرا (ثانیه)'
+        required: false
+        default: '180'
+
+jobs:
+  run:
+    runs-on: [self-hosted, ghelgheli-vps]
+    timeout-minutes: 15
+    steps:
+      - name: اجرای دستور
+        shell: bash
+        run: |
+          set +e
+          mkdir -p "$RUNNER_TEMP/out"
+          OUT="$RUNNER_TEMP/out/result.txt"
+          {
+            echo "### میزبان"
+            hostname; date -Is; uptime
+            echo
+            echo "### دستور"
+            echo "${{ github.event.inputs.command }}"
+            echo
+            echo "### خروجی"
+          } > "$OUT"
+          timeout "${{ github.event.inputs.timeout }}" bash -lc "${{ github.event.inputs.command }}" >> "$OUT" 2>&1
+          CODE=$?
+          echo >> "$OUT"
+          echo "### کد خروج: $CODE" >> "$OUT"
+          # خروجی طولانی Summary را می‌ترکاند؛ ۹۰۰ خط آخر کافی است.
+          {
+            echo '```'
+            tail -n 900 "$OUT"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+
+      - name: بارگذاری خروجی کامل
+        uses: actions/upload-artifact@v4
+        with:
+          name: vps-output
+          path: ${{ runner.temp }}/out/result.txt
+          retention-days: 7
