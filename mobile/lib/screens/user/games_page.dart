@@ -316,16 +316,6 @@ class _GamesHubPageState extends State<GamesHubPage> {
           ),
         ),
         Gaps.vSm,
-        GrowthPanel(
-          api: widget.api,
-          onJoinGame: (socket, start) => _launchGame(
-            '${start['gameId'] ?? 'card_duel'}',
-            stake: (start['stake'] as num?)?.toInt() ?? 0,
-            existingSocket: socket,
-            initialStart: start,
-          ),
-        ),
-        Gaps.vMd,
 
         // ── ۱. بازی ضربه‌زن: بالای صفحه و مستقل ──
         _TapGameHeroCard(
@@ -432,6 +422,16 @@ class _GamesHubPageState extends State<GamesHubPage> {
           ],
         ],
 
+        Gaps.vMd,
+        GrowthPanel(
+          api: widget.api,
+          onJoinGame: (socket, start) => _launchGame(
+            '${start['gameId'] ?? 'card_duel'}',
+            stake: (start['stake'] as num?)?.toInt() ?? 0,
+            existingSocket: socket,
+            initialStart: start,
+          ),
+        ),
         Gaps.vLg,
       ],
     );
