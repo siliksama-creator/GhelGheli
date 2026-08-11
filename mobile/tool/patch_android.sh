@@ -124,6 +124,61 @@ with open(path, 'w', encoding='utf-8') as f:
 print(f'added permissions: {missing or "none (already present)"}')
 PY
 
+# ── Stable production application id ───────────────────────────────────────
+# Flutter generates com.example.ghelgheli_mobile on every clean CI runner.
+# That placeholder cannot be published safely and Firebase binds its Android
+# app permanently to the package id. Patch every generated location to the
+# final id selected by the owner before Google Services is evaluated.
+python3 - <<'PY'
+from pathlib import Path
+import re
+
+package = 'ir.ghelghelishop.ghelgheli'
+app = Path('android/app/build.gradle.kts')
+groovy = Path('android/app/build.gradle')
+if app.exists():
+    src = app.read_text()
+    src, n1 = re.subn(r'(namespace\s*=\s*)["\'][^"\']+["\']',
+                      rf'\1"{package}"', src, count=1)
+    src, n2 = re.subn(r'(applicationId\s*=\s*)["\'][^"\']+["\']',
+                      rf'\1"{package}"', src, count=1)
+    if not (n1 and n2):
+        raise SystemExit('ERROR: namespace/applicationId not found in Kotlin Gradle')
+    app.write_text(src)
+elif groovy.exists():
+    src = groovy.read_text()
+    src, n1 = re.subn(r'(namespace\s+)["\'][^"\']+["\']',
+                      rf'\1"{package}"', src, count=1)
+    src, n2 = re.subn(r'(applicationId\s+)["\'][^"\']+["\']',
+                      rf'\1"{package}"', src, count=1)
+    if not (n1 and n2):
+        raise SystemExit('ERROR: namespace/applicationId not found in Gradle')
+    groovy.write_text(src)
+else:
+    raise SystemExit('ERROR: Android app Gradle file not found')
+
+activities = list(Path('android/app/src/main').rglob('MainActivity.kt'))
+activities += list(Path('android/app/src/main').rglob('MainActivity.java'))
+if len(activities) != 1:
+    raise SystemExit(f'ERROR: expected one MainActivity, found {len(activities)}')
+old = activities[0]
+text = re.sub(r'^package\s+[\w.]+', f'package {package}', old.read_text(), count=1,
+              flags=re.MULTILINE)
+new = Path('android/app/src/main') / ('kotlin' if old.suffix == '.kt' else 'java')
+new = new.joinpath(*package.split('.'), old.name)
+new.parent.mkdir(parents=True, exist_ok=True)
+new.write_text(text)
+if new != old:
+    old.unlink()
+
+manifest = Path('android/app/src/main/AndroidManifest.xml')
+ms = manifest.read_text()
+ms = ms.replace('android:name=".MainActivity"',
+                f'android:name="{package}.MainActivity"')
+manifest.write_text(ms)
+print(f'production package id: {package}')
+PY
+
 # ── Firebase / Google Services ─────────────────────────────────────────────
 # فایل از GitHub Secret در CI بازسازی می‌شود و هرگز وارد git نمی‌شود. بدون
 # plugin گوگل، وجودِ google-services.json به‌تنهایی هیچ resourceای برای
@@ -150,8 +205,20 @@ if settings.exists() and app.exists():
         app.write_text(a)
 else:
     raise SystemExit('ERROR: Gradle Kotlin files not found')
+
+# A valid JSON for a different Android package builds surprisingly far and
+# then Firebase.initializeApp fails at runtime. Fail CI at the source instead.
+import json
+cfg = json.loads(Path('android/app/google-services.json').read_text())
+packages = {
+    c.get('client_info', {}).get('android_client_info', {}).get('package_name')
+    for c in cfg.get('client', [])
+}
+expected = 'ir.ghelghelishop.ghelgheli'
+if expected not in packages:
+    raise SystemExit(f'ERROR: google-services.json has {sorted(packages)}, expected {expected}')
 PY
-  echo "  OK   Firebase google-services plugin"
+  echo "  OK   Firebase google-services plugin and package id"
 else
   echo "  WARN google-services.json نیست؛ اپ ساخته می‌شود ولی Push غیرفعال می‌ماند"
 fi
@@ -166,6 +233,10 @@ for p in INTERNET ACCESS_NETWORK_STATE POST_NOTIFICATIONS; do
   fi
 done
 grep -q 'android:label="GhelGheli"' "$MANIFEST" && echo "  OK   app label" || echo "  WARN app label unchanged"
+grep -Rqs 'ir.ghelghelishop.ghelgheli' android/app/build.gradle* \
+  && grep -Rqs '^package ir.ghelghelishop.ghelgheli' android/app/src/main \
+  && echo "  OK   production package id" \
+  || { echo "  FAIL production package id"; exit 1; }
 
 # بدون <queries> صفحهٔ دعوت چهار دکمهٔ بی‌اثر دارد و هیچ خطایی هم
 # دیده نمی‌شود — پس اینجا سخت‌گیرانه بررسی می‌شود.
