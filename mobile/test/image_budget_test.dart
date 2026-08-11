@@ -94,6 +94,10 @@ List<ImageUse> collectUses() {
     if (e is! File || !e.path.endsWith('.dart')) continue;
     final src = e.readAsStringSync();
     for (final m in assetRe.allMatches(src)) {
+      // مسیرهای interpolated یک فایل واقعی نیستند و با File همان رشته قابل
+      // سنجش نیستند. هر خانوادهٔ پویا (Tap و Shop) پایین‌تر با خواندن کل
+      // پوشه و سورس سازندهٔ مسیر، جداگانه و کامل بررسی می‌شود.
+      if (m.group(1)!.contains(r'$')) continue;
       // پنجره تا انتهای همان فراخوانی: با شمردن پرانتزها جلو می‌رویم تا
       // آرگومان‌ها تمام شوند. بریدن کورِ ۷۰۰ کاراکتری، هینتی را که بعد از
       // چند خط توضیح می‌آمد از دست می‌داد و تست بی‌خود قرمز می‌شد.
@@ -228,6 +232,30 @@ void main() {
       expect(total, lessThan(15),
           reason: 'مجموع ${total.toStringAsFixed(1)}MB — قبلاً حدود ۹ بود؛ '
               'یعنی یک هینت برداشته شده یا asset تازهٔ بزرگی اضافه شده');
+    });
+
+    test('۵۵ تصویر پویای فروشگاه کامل، هم‌اندازه و کم‌هزینه‌اند', () {
+      final source = File('lib/screens/user/shop_page.dart').readAsStringSync();
+      expect(source.contains("'assets/shop/cosmetics/\$slug.webp'"), isTrue,
+          reason: 'مسیر تصویر باید مستقیماً از slug سرور ساخته شود');
+      expect(source.contains('cacheWidth: 640'), isTrue,
+          reason: 'پیش‌نمایش فروشگاه باید سقف decode صریح داشته باشد');
+      expect(source.contains('scrollDirection: Axis.horizontal'), isTrue,
+          reason: 'فقط تصاویر نزدیک viewport باید ساخته شوند');
+
+      final files = Directory('assets/shop/cosmetics')
+          .listSync().whereType<File>().where((f) => f.path.endsWith('.webp')).toList();
+      expect(files.length, 55,
+          reason: 'هر SKU غیر باشگاهی باید تصویر مستقل داشته باشد');
+      for (final file in files) {
+        final size = imageSize(file);
+        expect(size, isNotNull, reason: '${file.path} هدر WebP معتبر ندارد');
+        expect(size!.w, 640, reason: '${file.path} عرض استاندارد ندارد');
+        expect(size.h, 360, reason: '${file.path} ارتفاع استاندارد ندارد');
+        final mb = 640 * 360 * 4 / 1048576;
+        expect(mb, lessThan(1.0),
+            reason: '${file.path} بیش از بودجهٔ decode هر پیش‌نمایش است');
+      }
     });
 
     test('اسکین‌های بازی ضربه‌زن کوچک decode می‌شوند', () {
