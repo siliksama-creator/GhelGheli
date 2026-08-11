@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../api_client.dart';
 import '../../../theme/tokens.dart';
 import '../../../widgets/safe_image.dart';
-import '../../../widgets/state_views.dart';
 
 const _sideLabels = <String, String>{
   'front': 'روی کارت',
