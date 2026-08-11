@@ -59,11 +59,23 @@ class _CardDuelPageState extends State<CardDuelPage> {
   Map<String, dynamic>? _data;
   final List<String> _selected = [];
 
-  List<Map<String, dynamic>> get _cards =>
+  List<Map<String, dynamic>> get _ownedCards =>
       ((_data?['playableCards'] as List?) ?? const [])
           .whereType<Map>()
           .map((card) => Map<String, dynamic>.from(card))
           .toList(growable: false);
+
+  bool get _practiceFallback => widget.vsBot && _ownedCards.length < 3;
+
+  List<Map<String, dynamic>> get _cards {
+    final source = _practiceFallback
+        ? ((_data?['practiceCards'] as List?) ?? const [])
+        : _ownedCards;
+    return source
+        .whereType<Map>()
+        .map((card) => Map<String, dynamic>.from(card))
+        .toList(growable: false);
+  }
 
   Color get _modeColor => widget.vsBot
       ? _emerald
@@ -102,8 +114,12 @@ class _CardDuelPageState extends State<CardDuelPage> {
       final map = response is Map
           ? Map<String, dynamic>.from(response)
           : <String, dynamic>{};
-      final activeCards = ((map['activeDeck'] as Map?)?['cards'] as List?)
-          ?.whereType<Map>()
+      final owned = (map['playableCards'] as List?) ?? const [];
+      final prepared = widget.vsBot && owned.length < 3
+          ? (map['practiceCards'] as List? ?? const [])
+          : ((map['activeDeck'] as Map?)?['cards'] as List? ?? const []);
+      final activeCards = prepared
+          .whereType<Map>()
           .map((card) => '${card['cardTypeId'] ?? card['id'] ?? ''}')
           .where((id) => id.isNotEmpty)
           .take(3)
@@ -134,9 +150,11 @@ class _CardDuelPageState extends State<CardDuelPage> {
       _error = null;
     });
     try {
-      await widget.api.post('/api/card-duel/deck', {
-        'cardTypeIds': _selected,
-      });
+      if (!_practiceFallback) {
+        await widget.api.post('/api/card-duel/deck', {
+          'cardTypeIds': _selected,
+        });
+      }
       if (!mounted) return;
       setState(() => _started = true);
       if (widget.vsBot) {
@@ -287,7 +305,28 @@ class _CardDuelPageState extends State<CardDuelPage> {
               style: TextStyle(color: Theme.of(context).colorScheme.error)),
         ],
         Gaps.vLg,
-        Text('کلکسیون آماده نبرد',
+        if (_practiceFallback) ...[
+          Container(
+            padding: const EdgeInsets.all(Gaps.sm),
+            decoration: BoxDecoration(
+              borderRadius: Corners.rLg,
+              color: _emerald.withValues(alpha: 0.10),
+              border: Border.all(color: _emerald.withValues(alpha: 0.42)),
+            ),
+            child: const Row(children: [
+              Text('🎁', style: TextStyle(fontSize: 24)),
+              SizedBox(width: Gaps.sm),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('دستهٔ تمرینی رایگان برای شروع سریع',
+                    style: TextStyle(color: _emerald, fontWeight: FontWeight.w900)),
+                Text('این کارت‌ها فقط مقابل ربات فعال‌اند؛ برای آنلاین باید سه کارت واقعی جمع کنی.',
+                    style: TextStyle(fontSize: 9.5, color: Colors.white60)),
+              ])),
+            ]),
+          ),
+          Gaps.vSm,
+        ],
+        Text(_practiceFallback ? 'کارت‌های قرضی تمرین' : 'کلکسیون آماده نبرد',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.w900,

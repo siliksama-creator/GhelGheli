@@ -174,7 +174,10 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
       const response = await req('/api/card-duel', 'GET', null, token);
       setData(response);
       if (!enabled) {
-        setSelected((response?.activeDeck?.cards || []).map(idOf).filter(Boolean).slice(0, 3));
+        const owned = response?.playableCards || [];
+        const prepared = response?.activeDeck?.cards || [];
+        const initial = vsBot && owned.length < 3 ? (response?.practiceCards || []) : prepared;
+        setSelected(initial.map(idOf).filter(Boolean).slice(0, 3));
       }
       setError('');
     } catch (requestError) {
@@ -186,7 +189,9 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
   useEffect(() => { load(); }, [token]);
   useEffect(() => { if (session.phase === 'over') load(); }, [session.phase]);
 
-  const cards = data?.playableCards || [];
+  const ownedCards = data?.playableCards || [];
+  const practiceFallback = vsBot && ownedCards.length < 3;
+  const cards = practiceFallback ? (data?.practiceCards || []) : ownedCards;
   const toggle = id => setSelected(previous => previous.includes(id)
     ? previous.filter(value => value !== id)
     : previous.length < 3 ? [...previous, id] : previous);
@@ -195,8 +200,10 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
     if (selected.length !== 3 || busy) return;
     setBusy(true); setError('');
     try {
-      await req('/api/card-duel/deck', 'POST', { cardTypeIds: selected }, token);
-      await load();
+      if (!practiceFallback) {
+        await req('/api/card-duel/deck', 'POST', { cardTypeIds: selected }, token);
+        await load();
+      }
       setEnabled(true);
     } catch (requestError) {
       setError(requestError.message);
@@ -230,7 +237,11 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
         <small>{vsBot ? 'بدون ریسک امتیاز' : stake ? `ورودی ${fa(stake)} امتیاز` : 'مسابقه خصوصی'}</small>
       </button>
       {error && <div className="err duelMessage">{error}</div>}
-      <h3 className="duelSectionTitle">کلکسیون آماده نبرد</h3>
+      {practiceFallback && <div className="gameStakeNotice practice"><span>🎁</span><div>
+        <b>دستهٔ تمرینی رایگان برای شروع سریع</b>
+        <small>این کارت‌ها فقط مقابل ربات فعال‌اند؛ برای آنلاین باید سه کارت واقعی جمع کنی.</small>
+      </div></div>}
+      <h3 className="duelSectionTitle">{practiceFallback ? 'کارت‌های قرضی تمرین' : 'کلکسیون آماده نبرد'}</h3>
       {cards.length < 3 ? <div className="card pad center muted">برای بازی حداقل سه کارت فعال در کلکسیون لازم داری.</div>
         : <div className="duelGridV2">{cards.map(card => <HoloCard key={idOf(card)} card={card}
           selected={selected.includes(idOf(card))} onClick={() => toggle(idOf(card))} />)}</div>}

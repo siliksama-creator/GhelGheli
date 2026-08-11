@@ -50,8 +50,9 @@ function createFromDecks(deckX, deckO) {
   };
 }
 
-async function validatePlayer(user) {
+async function validatePlayer(user, { vsBot = false } = {}) {
   const prepared = await duel.deckCards(user?.id);
+  if (vsBot && prepared.cards.length !== duel.DECK_SIZE) return duel.starterDeck();
   if (prepared.cards.length !== duel.DECK_SIZE) {
     const error = new Error('اول از صفحه دوئل کارت‌ها ترکیب سه‌کارتی خودت را ذخیره کن');
     error.status = 400;
@@ -62,12 +63,15 @@ async function validatePlayer(user) {
 
 async function createWithContext({ playerX, playerO, vsBot }) {
   const own = await duel.deckCards(playerX?.id);
-  if (own.cards.length !== duel.DECK_SIZE) {
+  const ownCards = own.cards.length === duel.DECK_SIZE
+    ? own.cards
+    : (vsBot ? duel.starterDeck() : []);
+  if (ownCards.length !== duel.DECK_SIZE) {
     const error = new Error('اول ترکیب سه‌کارتی خودت را ذخیره کن');
     error.status = 400;
     throw error;
   }
-  if (vsBot) return createFromDecks(own.cards, duel.botDeck(own.cards));
+  if (vsBot) return createFromDecks(ownCards, duel.botDeck(ownCards));
 
   const opponent = await duel.deckCards(playerO?.id);
   if (opponent.cards.length !== duel.DECK_SIZE) {

@@ -61,6 +61,9 @@ const botState = rules.createFromDecks(
   [card('o1', 70), card('o2', 71), card('o3', 72)],
 );
 ok(rules.isValidMove(botState, rules.botMove(botState, 'O'), 'O'), 'ربات حرکت قانونی و بدون تقلب می‌سازد');
+const starters = require('../src/services/cardDuelService').starterDeck();
+ok(starters.length === 3 && starters.every(item => item.practiceOnly),
+  'کاربر تازه برای تمرین یک دستهٔ قرضی سه‌کارتی دارد');
 
 console.log('\n== سرور، اقتصاد و حذف Ghost ==');
 ok(/card_duel: cardDuel/.test(registry), 'دوئل کارت داخل موتور مشترک آنلاین ثبت شده است');
@@ -85,6 +88,7 @@ console.log('\n== تجربهٔ Web و Android ==');
 for (const [source, platform] of [[mobile, 'Android'], [web, 'Web']]) {
   ok(!/Ghost|دوئل Ghost/.test(source), `${platform}: هیچ حالت Ghost در UI نمانده است`);
   ok(/تمرین با ربات/.test(source), `${platform}: تمرین با ربات وجود دارد`);
+  ok(/تمرینی رایگان|قرضی تمرین/.test(source), `${platform}: کاربر تازه بدون کارت هم می‌تواند تمرین کند`);
   ok(/انتخاب.*مخفی|مخفی.*انتخاب/.test(source), `${platform}: انتخاب مخفی هم‌زمان توضیح داده شده است`);
   ok(/راند/.test(source) && /ترکیب/.test(source), `${platform}: راند و ترکیب سه‌کارتی طراحی شده‌اند`);
 }

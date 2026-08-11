@@ -69,6 +69,7 @@ function publicCard(row) {
     rarityLabel: RARITY_LABEL[rarityInput(row.duel_rarity ?? row.rarity)],
     effect: effectInput(row.duel_effect ?? row.effect),
     effectLabel: EFFECT_LABEL[effectInput(row.duel_effect ?? row.effect)],
+    practiceOnly: row.practiceOnly === true,
   };
   c.duel_attack = c.attack;
   c.duel_defense = c.defense;
@@ -219,6 +220,29 @@ function simulate(userCards, opponentCards, { opponentName = 'حریف', random 
   };
 }
 
+function starterDeck() {
+  return [
+    { id: 'practice-speed', name: 'مهاجم تمرینی', stat: 64, rarity: 'normal', effect: 'speedster' },
+    { id: 'practice-play', name: 'بازی‌ساز تمرینی', stat: 68, rarity: 'silver', effect: 'playmaker' },
+    { id: 'practice-finish', name: 'فینیشر تمرینی', stat: 72, rarity: 'gold', effect: 'finisher' },
+  ].map((item, index) => publicCard({
+    card_type_id: item.id,
+    name: item.name,
+    image_url: null,
+    point_value: 100 + index * 50,
+    quantity: 1,
+    duel_attack: item.stat + (index === 2 ? 8 : 0),
+    duel_defense: item.stat - 4,
+    duel_speed: item.stat + (index === 0 ? 10 : 0),
+    duel_technique: item.stat + (index === 1 ? 10 : 0),
+    duel_goal_chance: item.stat + (index === 2 ? 10 : 0),
+    duel_energy: 100,
+    duel_rarity: item.rarity,
+    duel_effect: item.effect,
+    practiceOnly: true,
+  }));
+}
+
 function botDeck(userCards) {
   const avg = userCards.reduce((sum, card) => sum + totalPower(card), 0) / userCards.length;
   const rarities = ['normal', 'silver', avg > 92 ? 'gold' : 'silver'];
@@ -270,6 +294,7 @@ async function status(userId) {
     deckSize: DECK_SIZE,
     onlineStakes: ONLINE_STAKES,
     playableCards: cards,
+    practiceCards: starterDeck(),
     activeDeck: dc.deck ? { ...dc.deck, cards: dc.cards } : null,
     recentBattles: recent,
     rarities: RARITIES.map(id => ({ id, label: RARITY_LABEL[id], bonus: RARITY_BONUS[id] })),
@@ -318,5 +343,5 @@ module.exports = {
   DECK_SIZE, ONLINE_STAKES, RARITIES, EFFECTS, ROUND_FOCUS,
   RARITY_LABEL, EFFECT_LABEL, duelFieldsFromBody, publicCard, totalPower,
   playableCards, validateDeck, deckCards, status, saveDeck, botBattle,
-  botDeck, resolveRound, simulate, recentBattles, recordEngineBattle,
+  starterDeck, botDeck, resolveRound, simulate, recentBattles, recordEngineBattle,
 };

@@ -531,9 +531,9 @@ async function startRoom(io, rules, gameId, a, b, stake, matchMode = null) {
   return room;
 }
 
-async function ensurePlayerReady(rules, socket) {
+async function ensurePlayerReady(rules, socket, context = {}) {
   if (!rules?.validatePlayer) return true;
-  await rules.validatePlayer(socket?.user);
+  await rules.validatePlayer(socket?.user, context);
   return true;
 }
 
@@ -856,7 +856,7 @@ const attachGames = function attachGames(io, rulesById) {
       const rules = rulesById[gameId];
       if (!rules) return safeEmit(socket, 'game:error', { message: 'این بازی در دسترس نیست' });
       try {
-        if (rules.validatePlayer) await ensurePlayerReady(rules, socket);
+        if (rules.validatePlayer) await ensurePlayerReady(rules, socket, { vsBot: true });
       } catch (e) {
         return safeEmit(socket, 'game:error', { message: e.message || 'ترکیب بازی آماده نیست' });
       }
