@@ -45,6 +45,8 @@ const withdrawalService = require('./services/withdrawalService');
 // دفترِ ریزِ امتیازات — تنها نقطهٔ مجازِ تغییرِ امتیاز. توضیحِ کامل در
 // `services/pointService.js` و مایگریشنِ ۰۴۵.
 const points = require('./services/pointService');
+const analytics = require('./services/analyticsService');
+const { createPresenceService } = require('./services/presenceService');
 
 // Fail fast in production if the JWT secret was never configured — running
 // with the 'dev-secret' fallback would let anyone forge valid user/admin
@@ -1113,6 +1115,13 @@ app.get('/api/shop', auth, asyncHandler(async (req, res) => {
   res.json(await shop.catalogue(req.user.id));
 }));
 
+app.get('/api/shop/history', auth, asyncHandler(async (req, res) => {
+  res.json(await shop.purchaseHistory(req.user.id, {
+    limit: req.query.limit,
+    offset: req.query.offset,
+  }));
+}));
+
 // Buying spends from the wallet, so it is rate-limited like other money paths.
 const shopLimiter = rateLimit({
   windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false,
@@ -1937,6 +1946,7 @@ app.get('/api/admin/metrics', adminAuth, asyncHandler(async (req, res) => {
 
   res.json({
     socketCount: io.engine.clientsCount || 0,
+    onlineUsers: presence.onlineUsers(),
     activeRooms: attachGames.rooms ? attachGames.rooms.size : 0,
     postgresConnections: {
       total: pool.totalCount,
@@ -2125,6 +2135,11 @@ app.use('/api', require('./routes/adminSecurity')({
   pool, adminAuth, requireRole, asyncHandler, audit, validateUuid, bcrypt,
 }));
 
+const presence = createPresenceService(pool);
+app.use('/api', require('./routes/growth')({
+  auth, adminAuth, requireRole, asyncHandler, validateUuid, presence, rateLimit,
+}));
+
 io.use(async (socket, next) => {
   try {
     const token = socket.handshake.auth?.token;
@@ -2142,6 +2157,7 @@ io.use(async (socket, next) => {
     socket.user = rows[0]; next();
   } catch(e){ next(new Error('unauthorized')); }
 });
+presence.attach(io);
 const socketMessageTimes = new Map();
 io.on('connection', socket => {
   socket.on('chat:send', async (payload, cb) => {
@@ -2275,6 +2291,14 @@ app.use((err, req, res, next) => {
   const status = err.status || 500;
   if (status >= 500) {
     console.error(err);
+    analytics.reportCrash({
+      platform: 'backend',
+      source: `${req.method} ${req.route?.path || req.path}`,
+      release: process.env.APP_RELEASE || process.env.GIT_SHA || null,
+      message: err.message,
+      stack: err.stack,
+      context: { requestId: req.headers['x-request-id'] || null },
+    }).catch(reportError => console.error('[crash-report] failed:', reportError.message));
   } else {
     console.warn(`[${status}] ${req.method} ${req.originalUrl} — ${err.message}`);
   }

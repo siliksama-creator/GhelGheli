@@ -157,8 +157,9 @@ function botMove(state, player) {
   return pick ? { cardId: idOf(pick) } : null;
 }
 
-async function onFinish({ players, state, winner, stake, netPot, vsBot, matchMode }) {
+async function onFinish({ matchId, players, state, winner, stake, netPot, vsBot, matchMode }) {
   return duel.recordEngineBattle({
+    matchId,
     playerX: players?.X,
     playerO: players?.O,
     state,

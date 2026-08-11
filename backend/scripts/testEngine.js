@@ -222,7 +222,12 @@ function makeIo() {
     c.fire('game:join', { gameId: 'memory' });
     d.fire('game:join', { gameId: 'memory' });
     c.fire('disconnect');
-    ok(d.last('game:over')?.winner === 'DISCONNECT', 'opponent told on disconnect');
+    ok(d.has('game:opponent_reconnecting') && !d.has('game:over'),
+      'disconnect opens reconnect window instead of deciding the match');
+    const c2 = io.connect(new FakeSocket('l3', 'ج'));
+    ok(c2.has('game:resume'), 'same authenticated user reclaims the suspended seat');
+    ok(d.has('game:opponent_reconnected'), 'opponent is told when the player returns');
+    c2.fire('game:leave');
 
     // The original crash: 'game:leave' with NO payload at all.
     const e = io.connect(new FakeSocket('l5', 'ه'));
@@ -327,8 +332,12 @@ function makeIo() {
       a.fire('game:move', { roomId: st.roomId, move: (st.state.playable || [0])[0] });
     } catch { threw = true; }
     ok(!threw, 'a dead peer socket does not crash the mover');
-    ok(a.last('game:over')?.winner === 'DISCONNECT', 'survivor is told the game ended');
-    ok(a.rooms.size === 0, 'room released instead of retrying forever');
+    ok(a.has('game:opponent_reconnecting') && !a.has('game:over'),
+      'silent dead socket starts the bounded reconnect window');
+    ok(a.rooms.size > 0, 'authoritative room is preserved during reconnect');
+    const b2 = io.connect(new FakeSocket('d2', 'ب'));
+    ok(b2.has('game:resume'), 'silent dead socket can resume on a fresh connection');
+    b2.fire('game:leave');
 
     // A queued socket that vanished must not be matched against.
     const c = io.connect(new FakeSocket('d3', 'ج'));

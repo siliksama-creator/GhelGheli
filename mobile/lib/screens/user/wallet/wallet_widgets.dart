@@ -621,6 +621,33 @@ class WithdrawalTile extends StatelessWidget {
                   style: theme.textTheme.bodySmall),
             ),
           ],
+          if (request['timeline'] is List && (request['timeline'] as List).isNotEmpty) ...[
+            Gaps.vXs,
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(Gaps.xs),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.onSurface.withValues(alpha: .025),
+                borderRadius: Corners.rSm,
+              ),
+              child: Column(children: [
+                for (final step in (request['timeline'] as List).whereType<Map>())
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Container(width: 8, height: 8, margin: const EdgeInsets.only(top: 4),
+                        decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF22E7A6))),
+                      Gaps.hXs,
+                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text('${step['statusLabel'] ?? step['toStatus']}', style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800)),
+                        Text('${_faDate(step['createdAt'])}${step['note'] != null ? ' · ${step['note']}' : ''}',
+                            style: const TextStyle(fontSize: 8.5, color: Colors.white54)),
+                      ])),
+                    ]),
+                  ),
+              ]),
+            ),
+          ],
           if (status == 'pending' && onCancel != null) ...[
             Gaps.vXs,
             Align(

@@ -216,6 +216,10 @@ export default function Wallet({ token, req, reloadProfile, setMsg }) {
                 <small className="txDate">{new Date(r.createdAt).toLocaleString('fa-IR')}</small>
                 {r.trackingCode && <small className="wdOk">کد پیگیری: {r.trackingCode}</small>}
                 {r.adminNote && <small className="wdNote">پیام مدیریت: {r.adminNote}</small>}
+                {!!r.timeline?.length && <div className="withdrawalTimeline">{r.timeline.map((step, index) => <div key={`${step.toStatus}-${index}`}>
+                  <i className={index === r.timeline.length - 1 ? 'active' : ''} />
+                  <span><b>{step.statusLabel}</b><small>{new Date(step.createdAt).toLocaleString('fa-IR')}{step.note ? ` · ${step.note}` : ''}</small></span>
+                </div>)}</div>}
                 {r.status === 'pending' && (
                   <button className="wdCancel" onClick={() => cancel(r)}>لغو درخواست</button>
                 )}

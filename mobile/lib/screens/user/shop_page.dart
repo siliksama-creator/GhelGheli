@@ -230,6 +230,10 @@ class _ShopPageState extends State<ShopPage> {
           final myClubs = List<Map<String, dynamic>>.from(
               ((d['clubs'] as List?) ?? const [])
                   .map((e) => Map<String, dynamic>.from(e)));
+          final purchaseHistory = List<Map<String, dynamic>>.from(
+              ((d['purchaseHistory'] as List?) ?? const [])
+                  .whereType<Map>()
+                  .map((e) => Map<String, dynamic>.from(e)));
           final balance = (d['balance'] as num?)?.toInt() ?? 0;
 
           List<Map<String, dynamic>> of(String kind) =>
@@ -300,6 +304,7 @@ class _ShopPageState extends State<ShopPage> {
                   ),
                   Gaps.vMd,
                 ],
+              _PurchaseHistory(receipts: purchaseHistory),
             ],
           );
         },
@@ -339,6 +344,43 @@ class _IntroCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _PurchaseHistory extends StatelessWidget {
+  const _PurchaseHistory({required this.receipts});
+  final List<Map<String, dynamic>> receipts;
+
+  String _date(Object? raw) {
+    final d = DateTime.tryParse('$raw')?.toLocal();
+    if (d == null) return '—';
+    return '${faNum(d.year)}/${faNum(d.month)}/${faNum(d.day)}';
+  }
+
+  @override
+  Widget build(BuildContext context) => AppCard(child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Text('تاریخچه خرید و اشتراک', style: TextStyle(fontWeight: FontWeight.w900)),
+      const Text('رسید کامل آیتم‌های دائمی و همه دوره‌های پلاس', style: TextStyle(fontSize: 9.5, color: Colors.white54)),
+      Gaps.vXs,
+      if (receipts.isEmpty) const Text('هنوز خریدی ثبت نشده است.', style: TextStyle(fontSize: 11, color: Colors.white54)),
+      for (final receipt in receipts) ...[
+        const Divider(height: 12),
+        Row(children: [
+          Icon(receipt['type'] == 'subscription' ? Icons.auto_awesome_rounded : Icons.shopping_bag_rounded,
+              color: const Color(0xFFFFD36B), size: 20),
+          Gaps.hXs,
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('${receipt['name']}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+            Text('${_date(receipt['purchasedAt'])}${receipt['expiresAt'] != null ? ' · پایان ${_date(receipt['expiresAt'])}' : ' · مالکیت دائمی'}',
+                style: const TextStyle(fontSize: 8.5, color: Colors.white54)),
+          ])),
+          Text(Money.withUnit((receipt['pricePaid'] as num?)?.toInt() ?? 0),
+              style: const TextStyle(color: Color(0xFFFFD36B), fontSize: 10, fontWeight: FontWeight.w900)),
+        ]),
+      ],
+    ],
+  ));
 }
 
 /// The clubs this user belongs to, with an honest label for which of them

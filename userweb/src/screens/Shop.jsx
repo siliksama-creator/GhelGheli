@@ -130,6 +130,16 @@ export default function Shop({ token, setMsg, reloadProfile }) {
               );
             })}
 
+            <div style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'16px', padding:'16px' }}>
+              <h2 style={{ color:'#FFF', fontWeight:'900', margin:'0 0 4px', fontSize:'15px' }}>تاریخچه خرید و اشتراک</h2>
+              <p style={{ color:'#94A3B8', fontSize:'10.5px', margin:'0 0 10px' }}>رسید کامل آیتم‌های دائمی و همه دوره‌های پلاس</p>
+              {(d.purchaseHistory||[]).length ? (d.purchaseHistory||[]).map(receipt => <div key={receipt.id} style={{ display:'flex', gap:'10px', alignItems:'center', padding:'9px 0', borderTop:'1px solid rgba(255,255,255,.06)' }}>
+                <span style={{ fontSize:'20px' }}>{receipt.type==='subscription'?'★':''}</span>
+                <div style={{ flex:1 }}><b style={{ color:'#FFF', fontSize:'11.5px' }}>{receipt.name}</b><small style={{ display:'block', color:'#94A3B8', fontSize:'9.5px' }}>{new Date(receipt.purchasedAt).toLocaleDateString('fa-IR')}{receipt.expiresAt?` · پایان ${new Date(receipt.expiresAt).toLocaleDateString('fa-IR')}`:' · مالکیت دائمی'}</small></div>
+                <strong style={{ color:'#FFD36B', fontSize:'11px' }}>{fa(receipt.pricePaid)} تومان</strong>
+              </div>) : <p style={{ color:'#64748B', fontSize:'11px' }}>هنوز خریدی ثبت نشده است.</p>}
+            </div>
+
             {confirm && (
               <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999 }} onClick={()=>setConfirm(null)}>
                 <div style={{ background:'#1E293B', border:'1px solid rgba(255,255,255,0.12)', borderRadius:'16px', padding:'20px', maxWidth:'90%', width:'400px' }} onClick={e=>e.stopPropagation()}>

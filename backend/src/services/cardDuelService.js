@@ -261,10 +261,12 @@ function botDeck(userCards) {
 
 async function recentBattles(userId, limit = 10, client = pool) {
   const { rows } = await client.query(
-    `SELECT b.*, u.nickname AS user_nickname, o.nickname AS opponent_nickname
+    `SELECT b.*, u.nickname AS user_nickname, o.nickname AS opponent_nickname,
+            s.status AS stake_status
        FROM card_duel_battles b
        JOIN users u ON u.id=b.user_id
        LEFT JOIN users o ON o.id=b.opponent_user_id
+       LEFT JOIN game_stake_matches s ON s.id=b.match_id
       WHERE (b.user_id=$1 OR b.opponent_user_id=$1)
         AND b.mode IN ('bot','online','lobby')
       ORDER BY b.created_at DESC LIMIT $2`,
@@ -281,6 +283,11 @@ async function recentBattles(userId, limit = 10, client = pool) {
       winnerUserId: r.winner_user_id, stakePoints: r.stake_points,
       userDelta: primary ? r.user_delta : r.opponent_delta,
       opponentDelta: primary ? r.opponent_delta : r.user_delta,
+      matchId: r.match_id,
+      settlementStatus: Number(r.stake_points) === 0
+        ? 'settled'
+        : r.stake_status === 'reserved' ? 'pending'
+          : r.stake_status === 'refunded' ? 'refunded' : 'settled',
       battleLog: r.battle_log, createdAt: r.created_at,
     };
   });
@@ -317,7 +324,7 @@ async function botBattle(userId, ids = null) {
   return { battle: rows[0], result: sim, message: 'تمرین با ربات رایگان است و امتیازی جابه‌جا نمی‌شود' };
 }
 
-async function recordEngineBattle({ playerX, playerO, state, winner, stake = 0, netPot = 0, vsBot = false, matchMode = null }) {
+async function recordEngineBattle({ matchId = null, playerX, playerO, state, winner, stake = 0, netPot = 0, vsBot = false, matchMode = null }) {
   if (!playerX?.id || !state?.decks?.X?.length) return null;
   const draw = winner === 'DRAW';
   const winnerId = draw ? null : winner === 'X' ? playerX.id : (vsBot ? null : playerO?.id || null);
@@ -325,11 +332,11 @@ async function recordEngineBattle({ playerX, playerO, state, winner, stake = 0, 
   const xDelta = draw || !stake ? 0 : winner === 'X' ? Math.max(0, Number(netPot) - Number(stake)) : -Number(stake);
   const oDelta = draw || !stake || vsBot ? 0 : winner === 'O' ? Math.max(0, Number(netPot) - Number(stake)) : -Number(stake);
   const { rows } = await pool.query(
-    `INSERT INTO card_duel_battles(mode,user_id,opponent_user_id,
+    `INSERT INTO card_duel_battles(match_id,mode,user_id,opponent_user_id,
        user_card_type_ids,opponent_card_type_ids,user_score,opponent_score,
        winner_user_id,stake_points,user_delta,opponent_delta,battle_log)
-     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-    [mode, playerX.id, vsBot ? null : playerO?.id || null,
+     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+    [matchId, mode, playerX.id, vsBot ? null : playerO?.id || null,
       state.decks.X.map(c => c.cardTypeId),
       vsBot ? null : state.decks.O.map(c => c.cardTypeId),
       Number(state.score?.X || 0), Number(state.score?.O || 0), winnerId,

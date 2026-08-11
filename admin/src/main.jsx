@@ -25,6 +25,7 @@ import { GameRewardsPage } from './pages/game-rewards.jsx';
 import { SettingsPage } from './pages/settings.jsx';
 import { AdminsPage } from './pages/admins.jsx';
 import { MetricsPage } from './pages/metrics.jsx';
+import { AnalyticsPage } from './pages/analytics.jsx';
 
 const NAV = [
   ['dashboard', 'داشبورد', BarChart3, Dashboard],
@@ -71,6 +72,7 @@ const NAV = [
   ['notifications', 'اطلاعیه‌ها', Bell, NotificationsPage],
   ['settings', 'تنظیمات', Settings, SettingsPage],
   ['admins', 'ادمین‌ها', Shield, AdminsPage],
+  ['analytics', 'تحلیل رشد و خطا', BarChart3, AnalyticsPage],
   ['metrics', 'مانیتورینگ سرور', Activity, MetricsPage],
 ];
 

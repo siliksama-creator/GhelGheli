@@ -1,10 +1,15 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../../api_client.dart';
 import '../../../core/assets.dart';
+import '../../../core/share_invite.dart';
 import '../../../theme/colors.dart';
 import '../../../theme/tokens.dart';
 import '../../../widgets/app_card.dart';
@@ -55,6 +60,7 @@ class _CardDuelPageState extends State<CardDuelPage> {
   bool _loading = true;
   bool _busy = false;
   bool _started = false;
+  bool _sharing = false;
   String? _error;
   Map<String, dynamic>? _data;
   final List<String> _selected = [];
@@ -196,12 +202,165 @@ class _CardDuelPageState extends State<CardDuelPage> {
   }
 
   void _playAgain() {
-    if (widget.vsBot) {
+    if (_session.rematchAvailable) {
+      _session.rematch();
+    } else if (widget.vsBot) {
       _session.playWithBotImmediately();
     } else if (widget.stake > 0) {
       _session.join(stake: widget.stake, vsBot: false);
     } else {
       widget.onBack();
+    }
+  }
+
+  Map<String, dynamic>? _resultMvp() {
+    final history = (_session.state['history'] as List?) ?? const [];
+    final cards = <Map<String, dynamic>>[];
+    for (final raw in history.whereType<Map>()) {
+      for (final key in const ['cardX', 'cardO']) {
+        if (raw[key] is Map) cards.add(Map<String, dynamic>.from(raw[key] as Map));
+      }
+    }
+    cards.sort((a, b) => NumberParser.toInt(b['power']).compareTo(NumberParser.toInt(a['power'])));
+    return cards.isEmpty ? null : cards.first;
+  }
+
+  Future<XFile> _renderResultCard({required String title, required String score, required Map<String, dynamic>? mvp, required String url}) async {
+    const size = Size(1080, 1080);
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    final paint = Paint()..shader = const LinearGradient(
+      begin: Alignment.topLeft, end: Alignment.bottomRight,
+      colors: [Color(0xFF071522), Color(0xFF17304C), Color(0xFF35105D)],
+    ).createShader(Offset.zero & size);
+    canvas.drawRect(Offset.zero & size, paint);
+    canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(34, 34, 1012, 1012), const Radius.circular(38)),
+        Paint()..style = PaintingStyle.stroke..strokeWidth = 10..color = _gold);
+    void text(String value, double y, double fontSize, Color color, {FontWeight weight = FontWeight.w700}) {
+      final painter = TextPainter(
+        text: TextSpan(text: value, style: TextStyle(fontSize: fontSize, color: color, fontWeight: weight)),
+        textDirection: TextDirection.rtl, textAlign: TextAlign.center, maxLines: 2,
+      )..layout(maxWidth: 900);
+      painter.paint(canvas, Offset((1080 - painter.width) / 2, y));
+    }
+    text('GHELGHELI CARD ARENA', 120, 34, _cyan, weight: FontWeight.w900);
+    text(title, 240, 76, Colors.white, weight: FontWeight.w900);
+    text(score, 380, 120, _gold, weight: FontWeight.w900);
+    canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(135, 590, 810, 200), const Radius.circular(28)),
+        Paint()..color = _gold.withValues(alpha: .12));
+    text('MVP مسابقه', 625, 32, _gold, weight: FontWeight.w900);
+    text('${mvp?['name'] ?? 'ستاره آرنا'} · قدرت ${faNum(mvp?['power'])}', 690, 46, Colors.white, weight: FontWeight.w900);
+    text('جرأت داری؟ مستقیم به چالشم بیا', 850, 34, _emerald, weight: FontWeight.w900);
+    text(url, 925, 23, const Color(0xFFCBD5E1));
+    final image = await recorder.endRecording().toImage(1080, 1080);
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    final directory = await getTemporaryDirectory();
+    final file = File('${directory.path}/ghelgheli-result-${DateTime.now().millisecondsSinceEpoch}.png');
+    await file.writeAsBytes(bytes!.buffer.asUint8List(), flush: true);
+    return XFile(file.path, mimeType: 'image/png');
+  }
+
+  Future<void> _shareResult() async {
+    if (_sharing) return;
+    setState(() => _sharing = true);
+    try {
+      final invite = await _session.createChallenge();
+      final score = _session.state['score'] is Map ? _session.state['score'] as Map : const {};
+      final me = _session.mySymbol ?? 'X';
+      final other = me == 'X' ? 'O' : 'X';
+      final mvp = _resultMvp();
+      final title = _session.winner == 'DRAW'
+          ? 'نبرد برابر!'
+          : _session.iWon ? 'من آرنا را بردم!' : 'این بار حریف برد!';
+      final message = '$title\n'
+          'نتیجه ${faNum(score[me])} - ${faNum(score[other])}\n'
+          'MVP: ${mvp?['name'] ?? 'ستاره آرنا'} (قدرت ${faNum(mvp?['power'])})\n'
+          'جرأت داری؟ مستقیم به چالشم بیا:\n${invite['shareUrl']}';
+      final card = await _renderResultCard(
+        title: title,
+        score: '${faNum(score[me])} - ${faNum(score[other])}',
+        mvp: mvp,
+        url: '${invite['shareUrl']}',
+      );
+      if (!mounted) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        backgroundColor: const Color(0xFF071522),
+        isScrollControlled: true,
+        builder: (ctx) => SafeArea(child: Padding(
+          padding: const EdgeInsets.all(Gaps.md),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(Gaps.lg),
+              decoration: BoxDecoration(
+                borderRadius: Corners.rXl,
+                gradient: const LinearGradient(colors: [Color(0xFF17304C), Color(0xFF35105D)]),
+                border: Border.all(color: _gold, width: 1.5),
+              ),
+              child: Column(children: [
+                const Text('GHELGHELI CARD ARENA', style: TextStyle(color: _cyan, fontSize: 10, fontWeight: FontWeight.w900)),
+                Gaps.vSm,
+                Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+                Text('${faNum(score[me])} - ${faNum(score[other])}', style: const TextStyle(color: _gold, fontSize: 40, fontWeight: FontWeight.w900)),
+                Gaps.vSm,
+                Text('MVP · ${mvp?['name'] ?? 'ستاره آرنا'}', style: const TextStyle(fontWeight: FontWeight.w900)),
+                Text('قدرت ${faNum(mvp?['power'])}', style: const TextStyle(color: Colors.white60, fontSize: 11)),
+                Gaps.vSm,
+                const Text('از لینک چالش مستقیم وارد آرنا شو', style: TextStyle(color: _emerald, fontSize: 11, fontWeight: FontWeight.w800)),
+              ]),
+            ),
+            Gaps.vMd,
+            FilledButton.icon(
+              onPressed: () async {
+                await Share.shareXFiles([card], text: message, subject: 'نتیجه دوئل قلقلی');
+                widget.api.post('/api/analytics/events', {
+                  'event': 'share', 'platform': 'android', 'gameId': 'card_duel',
+                  'matchId': _session.matchId, 'target': 'system_share_image',
+                }).catchError((_) => <String, dynamic>{});
+              },
+              icon: const Icon(Icons.image_rounded),
+              label: const Text('اشتراک کارت تصویری نتیجه'),
+            ),
+            Gaps.vSm,
+            Row(children: [for (final target in shareTargets) Expanded(child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 3),
+              child: InkWell(
+                onTap: () async {
+                  await shareText(target, message);
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  widget.api.post('/api/analytics/events', {
+                    'event': 'share', 'platform': 'android', 'gameId': 'card_duel',
+                    'matchId': _session.matchId, 'target': target.id,
+                  }).catchError((_) => <String, dynamic>{});
+                },
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  MessengerIcon(app: target.app, size: 34),
+                  const SizedBox(height: 4),
+                  Text(target.label, style: const TextStyle(fontSize: 9.5)),
+                ]),
+              ),
+            )))],),
+            Gaps.vSm,
+            OutlinedButton.icon(
+              onPressed: () async {
+                await copyText(message);
+                if (ctx.mounted) Navigator.pop(ctx);
+                widget.api.post('/api/analytics/events', {
+                  'event': 'share', 'platform': 'android', 'gameId': 'card_duel',
+                  'matchId': _session.matchId, 'target': 'clipboard',
+                }).catchError((_) => <String, dynamic>{});
+              },
+              icon: const Icon(Icons.copy_rounded),
+              label: const Text('کپی کارت نتیجه و لینک'),
+            ),
+          ]),
+        )),
+      );
+    } catch (error) {
+      _snack(apiError(error));
+    } finally {
+      if (mounted) setState(() => _sharing = false);
     }
   }
 
@@ -372,7 +531,19 @@ class _CardDuelPageState extends State<CardDuelPage> {
           onCancel: _editLineup,
         );
       case GamePhase.playing:
-        return _LiveBattle(session: _session, color: _modeColor);
+        return Column(children: [
+          if (_session.connectionNotice != null || !_session.connected) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(Gaps.sm),
+              margin: const EdgeInsets.only(bottom: Gaps.sm),
+              decoration: BoxDecoration(color: const Color(0xFFF59E0B).withValues(alpha: .16), borderRadius: Corners.rMd),
+              child: Text(_session.connectionNotice ?? 'در حال بازیابی اتصال مسابقه…', textAlign: TextAlign.center,
+                  style: const TextStyle(color: Color(0xFFF59E0B), fontWeight: FontWeight.w900)),
+            ),
+          ],
+          _LiveBattle(session: _session, color: _modeColor),
+        ]);
       case GamePhase.over:
         return Column(
           children: [
@@ -383,6 +554,9 @@ class _CardDuelPageState extends State<CardDuelPage> {
               color: _modeColor,
               onAgain: _playAgain,
               onEdit: _editLineup,
+              onShare: _shareResult,
+              sharing: _sharing,
+              mvp: _resultMvp(),
               privateLobby: _session.matchMode == 'lobby',
             ),
           ],

@@ -98,6 +98,28 @@ function App() {
     try { return localStorage.token || ''; } catch { return ''; }
   });
   useDarkOnly();
+  useEffect(() => {
+    if (!token) return undefined;
+    let reporting = false;
+    const report = (source, message, stack) => {
+      if (reporting) return;
+      reporting = true;
+      req('/api/telemetry/crash', 'POST', {
+        platform: 'web', source, release: import.meta.env.VITE_APP_RELEASE || 'web',
+        message: String(message || 'Unknown browser error').slice(0, 2000),
+        stack: String(stack || '').slice(0, 10000),
+        context: { path: location.pathname },
+      }, token).catch(() => {}).finally(() => { reporting = false; });
+    };
+    const onError = event => report('window.error', event.message || event.error, event.error?.stack);
+    const onRejection = event => report('unhandledrejection', event.reason?.message || event.reason, event.reason?.stack);
+    window.addEventListener('error', onError);
+    window.addEventListener('unhandledrejection', onRejection);
+    return () => {
+      window.removeEventListener('error', onError);
+      window.removeEventListener('unhandledrejection', onRejection);
+    };
+  }, [token]);
   const [mode, setMode] = useState(
     location.hostname.startsWith('register.') ? 'register' : 'login');
 

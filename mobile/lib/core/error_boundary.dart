@@ -35,8 +35,18 @@
 // خروج دادهٔ کاربر. وقتی واقعاً لازم شد، `onError` تنها جایی است که
 // باید عوض شود.
 
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
+typedef CrashReportSink = Future<void> Function(
+    String source, String message, String? stack);
+CrashReportSink? _crashReportSink;
+
+void configureCrashReporter(CrashReportSink sink) {
+  _crashReportSink = sink;
+}
 
 /// یک صفحهٔ خطای فارسی و آبرومند، به‌جای مستطیلِ خاکستریِ فلاتر.
 ///
@@ -181,6 +191,10 @@ void _report(String source, Object error, StackTrace? stack) {
   debugPrint('[$source] خطای مدیریت‌نشده: $error');
   if (stack != null && kDebugMode) {
     debugPrintStack(stackTrace: stack, maxFrames: 12);
+  }
+  final sink = _crashReportSink;
+  if (sink != null) {
+    unawaited(sink(source, '$error', stack?.toString()).catchError((_) {}));
   }
 }
 

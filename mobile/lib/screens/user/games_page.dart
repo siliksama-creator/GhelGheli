@@ -13,6 +13,7 @@ import 'games/memory_board.dart';
 import 'games/penalty_board.dart';
 import 'games/tap/tap_screen.dart';
 import 'games/card_duel_page.dart';
+import 'games/growth_panel.dart';
 
 class _GameEntry {
   const _GameEntry(
@@ -315,6 +316,16 @@ class _GamesHubPageState extends State<GamesHubPage> {
           ),
         ),
         Gaps.vSm,
+        GrowthPanel(
+          api: widget.api,
+          onJoinGame: (socket, start) => _launchGame(
+            '${start['gameId'] ?? 'card_duel'}',
+            stake: (start['stake'] as num?)?.toInt() ?? 0,
+            existingSocket: socket,
+            initialStart: start,
+          ),
+        ),
+        Gaps.vMd,
 
         // ── ۱. بازی ضربه‌زن: بالای صفحه و مستقل ──
         _TapGameHeroCard(

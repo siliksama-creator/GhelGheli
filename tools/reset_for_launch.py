@@ -128,6 +128,10 @@ DELETE FROM card_types;
 -- روزی کلیدِ خارجی عوض شد این اسکریپت بی‌صدا ناقص نمی‌شود.
 DELETE FROM chat_message_likes;
 DELETE FROM chat_messages;
+DELETE FROM friendships;
+DELETE FROM user_mission_progress;
+DELETE FROM analytics_events;
+DELETE FROM app_crash_reports;
 DELETE FROM wheel_spins;
 DELETE FROM game_stake_matches;
 DELETE FROM card_duel_battles;
@@ -149,6 +153,7 @@ DELETE FROM referral_earnings;
 DELETE FROM league_leaderboard_entries;
 DELETE FROM league_payouts;
 DELETE FROM user_league_history;
+DELETE FROM withdrawal_status_history;
 DELETE FROM withdrawal_requests;
 DELETE FROM support_ticket_messages;
 DELETE FROM support_tickets;

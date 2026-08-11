@@ -11,6 +11,7 @@ import 'admin_dashboard.dart';
 import 'admin_league.dart';
 import 'admin_points.dart';
 import 'admin_metrics.dart';
+import 'admin_analytics.dart';
 import 'admin_notifications.dart';
 import 'admin_rewards.dart';
 import 'admin_game_rewards.dart';
@@ -66,6 +67,7 @@ class _AdminShellState extends State<AdminShell> {
     AdminNotifications(api: widget.api),
     AdminSettings(api: widget.api),
     AdminAdmins(api: widget.api),
+    AdminAnalytics(api: widget.api),
     AdminMetrics(api: widget.api),
   ];
 
@@ -83,6 +85,7 @@ class _AdminShellState extends State<AdminShell> {
     'اطلاعیه‌ها',
     'تنظیمات',
     'ادمین‌ها',
+    'تحلیل رشد و خطا',
     'مانیتورینگ'
   ];
   static const _icons = [
@@ -99,6 +102,7 @@ class _AdminShellState extends State<AdminShell> {
     Icons.campaign_rounded,
     Icons.settings_rounded,
     Icons.admin_panel_settings_rounded,
+    Icons.insights_rounded,
     Icons.analytics_rounded,
   ];
 

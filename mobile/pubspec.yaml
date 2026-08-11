@@ -75,6 +75,9 @@ dependencies:
   # در tool/patch_android.sh انجام می‌شود. بدون آن، همهٔ اپ‌ها
   # «نصب‌نشده» گزارش می‌شدند.
   url_launcher: ^6.3.1
+  # Result cards are real PNG files shared through Android's secure chooser.
+  # Direct messenger buttons for referral/result text still use url_launcher.
+  share_plus: ^10.1.4
 
 dev_dependencies:
   flutter_test:

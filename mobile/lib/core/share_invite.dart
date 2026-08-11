@@ -85,8 +85,10 @@ String inviteMessage(String code) =>
     'با این کد ثبت‌نام کن، هر دومون ۳ چرخش گردونه هدیه می‌گیریم!\n'
     'https://ghelghelishop.ir';
 
-Future<ShareOutcome> shareInvite(ShareTarget target, String code) async {
-  final text = inviteMessage(code);
+Future<ShareOutcome> shareInvite(ShareTarget target, String code) =>
+    shareText(target, inviteMessage(code));
+
+Future<ShareOutcome> shareText(ShareTarget target, String text) async {
   final encoded = Uri.encodeComponent(text);
 
   if (target.copyFirst) {

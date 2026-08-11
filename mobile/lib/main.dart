@@ -76,6 +76,20 @@ class _GhelGheliAppState extends State<GhelGheliApp> {
   @override
   void initState() {
     super.initState();
+    configureCrashReporter((source, message, stack) async {
+      // Authenticated, privacy-minimised first-party crash inbox. Reporting
+      // failure is intentionally ignored by error_boundary so it can never
+      // create a recursive crash loop.
+      if (api.token == null) return;
+      await api.post('/api/telemetry/crash', {
+        'platform': 'android',
+        'source': source,
+        'release': '1.0.0+1',
+        'message': message,
+        'stack': stack,
+        'context': {'screen': 'flutter'},
+      });
+    });
     // Restore the saved mute preference before any game can play a sound.
     GameAudio.instance.load();
     // توکنِ منقضی نباید کاربر را در پوستهٔ خالی حبس کند.

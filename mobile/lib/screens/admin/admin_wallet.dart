@@ -609,6 +609,23 @@ class _RequestCard extends StatelessWidget {
                 label: 'یادداشت',
                 value: '${request['adminNote']}'),
           ],
+          if (request['timeline'] is List && (request['timeline'] as List).isNotEmpty) ...[
+            Gaps.vXs,
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(Gaps.xs),
+              decoration: BoxDecoration(color: Colors.white.withValues(alpha: .035), borderRadius: Corners.rMd),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('مسیر کامل وضعیت', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900)),
+                for (final step in (request['timeline'] as List).whereType<Map>())
+                  Padding(padding: const EdgeInsets.only(top: 4), child: Row(children: [
+                    Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF34D399), shape: BoxShape.circle)),
+                    Gaps.hXs,
+                    Expanded(child: Text('${step['statusLabel']} · ${step['createdAt'] ?? ''}', style: const TextStyle(fontSize: 9, color: Colors.white60))),
+                  ])),
+              ]),
+            ),
+          ],
 
           // اقدامات
           if (status == 'pending' || status == 'approved') ...[

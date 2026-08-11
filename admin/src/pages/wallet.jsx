@@ -306,6 +306,13 @@ function RequestCard({ row, busy, onCopy, onDecide }) {
       {row.adminNote && (
         <div style={{ fontSize: 13 }}><span className="topbar-sub">یادداشت: </span>{row.adminNote}</div>
       )}
+      {!!row.timeline?.length && <div style={{ display:'grid', gap:6, padding:10, borderRadius:12, background:'rgba(255,255,255,.035)' }}>
+        <b style={{ fontSize:12 }}>مسیر کامل وضعیت</b>
+        {row.timeline.map((step,index)=><div key={`${step.toStatus}-${index}`} style={{ display:'flex', gap:8, alignItems:'center', fontSize:11 }}>
+          <span style={{ width:8,height:8,borderRadius:'50%',background:index===row.timeline.length-1?'#34d399':'#64748b' }} />
+          <strong>{step.statusLabel}</strong><span className="topbar-sub">{new Date(step.createdAt).toLocaleString('fa-IR')}{step.note?` · ${step.note}`:''}</span>
+        </div>)}
+      </div>}
 
       {actionable && (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

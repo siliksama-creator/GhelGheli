@@ -6,9 +6,11 @@ import MemorySolo, { MemoryGrid } from './memoryGame.jsx';
 import PenaltyGame from './penaltyGame.jsx';
 import TapGame from './tapGame.jsx';
 import CardDuelWeb from './cardDuelGame.jsx';
+import GrowthHub from './GrowthHub.jsx';
 import { useGameSession } from './gameSession.js';
 import { LevelBadge, DisplayName } from './components/Cosmetics.jsx';
 import { fa, asset, avatarUrl, req } from './lib/api.js';
+import './growth.css';
 
 const GAMES = [
   { id: 'tap', title: 'ضربه‌زن', emoji: '⚽', desc: '۵۰ لول ضربه بزن و شخصیت‌ها را باز کن', accent: '#84CC16', singlePlayer: true, art: '/games/tap/skin_1.webp' },
@@ -236,6 +238,13 @@ export default function Games({ api, token }) {
           </div>
         )}
       </div>
+
+      <GrowthHub api={api} token={token} onSocketGame={(socket, start) => setActive({
+        id: start.gameId || 'card_duel',
+        stake: Number(start.stake || 0),
+        externalSocket: socket,
+        initialStart: start,
+      })} />
 
       {/* Tap Game Hero Banner */}
       <div
@@ -522,8 +531,8 @@ export default function Games({ api, token }) {
 
 function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSocket, initialStart, onSolo, soundOn, onToggleSound, onBack }) {
   const {
-    phase, g, error, secondsLeft, move, leave, playBot, joinOnline,
-    stillSearching,
+    phase, g, error, secondsLeft, move, leave, playBot, joinOnline, rematch,
+    stillSearching, connectionNotice, rematchWaiting,
   } = useGameSession(
     api, token, gameId, stake, vsBot, roomCode, externalSocket, initialStart);
   const activeGameId = g.gameId || gameId;
@@ -547,6 +556,7 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
       </div>
 
       {error && <div className="err" style={{ marginBottom: '12px', background:'#EF444422', border:'1px solid #EF4444', color:'#FCA5A5', padding:'8px', borderRadius:'8px' }}>{error}</div>}
+      {connectionNotice && <div className="gameReconnectBanner">{connectionNotice}</div>}
 
       {phase === 'playing' && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.35)', padding: '10px 16px', borderRadius: '16px', marginBottom: '16px', border: '1px solid rgba(255,255,255,0.1)' }}>
@@ -631,13 +641,17 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
           <h2 style={{ color: g.winner === g.me ? '#22E7A6' : '#FFF', fontWeight: '900', margin: 0 }}>
             {g.winner === 'DRAW' ? 'مسابقه مساوی شد!' : (g.winner === g.me ? 'تبریک! شما برنده شدید' : 'متاسفانه باختید!')}
           </h2>
-          <button
-            type="button"
-            onClick={() => { leave(); onBack(); }}
-            style={{ background: 'linear-gradient(135deg, #38BDF8, #0284C7)', color: '#FFF', border: 'none', padding: '12px 28px', borderRadius: '16px', fontWeight: '900', fontSize: '14px', cursor: 'pointer', marginTop: '10px' }}
-          >
-            بازگشت به باشگاه بازی‌ها
-          </button>
+          <div style={{ display:'flex',gap:8,flexWrap:'wrap',justifyContent:'center' }}>
+            <button type="button" disabled={rematchWaiting || !g.rematchAvailable} onClick={rematch}
+              style={{ background:'linear-gradient(135deg,#22E7A6,#38BDF8)',color:'#03121f',border:0,padding:'12px 20px',borderRadius:16,fontWeight:900 }}>
+              {rematchWaiting ? 'منتظر قبول حریف…' : 'دوباره با همین حریف'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { leave(); onBack(); }}
+              style={{ background: 'linear-gradient(135deg, #38BDF8, #0284C7)', color: '#FFF', border: 'none', padding: '12px 28px', borderRadius: '16px', fontWeight: '900', fontSize: '14px', cursor: 'pointer' }}
+            >بازگشت به باشگاه بازی‌ها</button>
+          </div>
         </div>
       )}
     </div>

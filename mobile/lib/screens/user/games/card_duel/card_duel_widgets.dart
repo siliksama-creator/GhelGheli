@@ -419,8 +419,10 @@ class _RoundReveal extends StatelessWidget {
 }
 
 class _Finale extends StatelessWidget {
-  const _Finale({required this.session, required this.color, required this.onAgain, required this.onEdit, required this.privateLobby});
-  final GameSession session; final Color color; final VoidCallback onAgain; final VoidCallback onEdit; final bool privateLobby;
+  const _Finale({required this.session, required this.color, required this.onAgain, required this.onEdit,
+    required this.onShare, required this.sharing, required this.mvp, required this.privateLobby});
+  final GameSession session; final Color color; final VoidCallback onAgain; final VoidCallback onEdit;
+  final VoidCallback onShare; final bool sharing; final Map<String, dynamic>? mvp; final bool privateLobby;
   @override
   Widget build(BuildContext context) {
     final won = session.iWon;
@@ -441,8 +443,38 @@ class _Finale extends StatelessWidget {
             : '${faNum(session.stake)} امتیاز ورودی از دست رفت.',
             textAlign: TextAlign.center, style: const TextStyle(fontSize: 10.5, color: Colors.white60)),
         Gaps.vSm,
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            borderRadius: Corners.rPill,
+            color: (session.settlementStatus == 'pending' ? _gold : _emerald).withValues(alpha: .13),
+          ),
+          child: Text(const {'pending': ' در حال تسویه امن', 'settled': ' تسویه کامل شد', 'refunded': ' ورودی برگشت خورد'}[session.settlementStatus] ?? ' تسویه کامل شد',
+              style: TextStyle(color: session.settlementStatus == 'pending' ? _gold : _emerald, fontSize: 10.5, fontWeight: FontWeight.w900)),
+        ),
+        Gaps.vSm,
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(Gaps.sm),
+          decoration: BoxDecoration(
+            borderRadius: Corners.rLg,
+            gradient: const LinearGradient(colors: [Color(0x25FFD166), Color(0x25A855F7)]),
+            border: Border.all(color: _gold.withValues(alpha: .38)),
+          ),
+          child: Column(children: [
+            const Text('کارت نتیجه + لینک چالش مستقیم', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900)),
+            Text('MVP · ${mvp?['name'] ?? 'ستاره آرنا'} · قدرت ${faNum(mvp?['power'])}',
+                style: const TextStyle(fontSize: 9.5, color: Colors.white60)),
+            Gaps.vXs,
+            OutlinedButton.icon(onPressed: sharing ? null : onShare,
+              icon: const Icon(Icons.ios_share_rounded, size: 17),
+              label: Text(sharing ? 'در حال ساخت لینک…' : 'اشتراک نتیجه و دعوت به چالش')),
+          ]),
+        ),
+        Gaps.vSm,
         Row(children: [
-          Expanded(child: FilledButton(onPressed: onAgain, child: Text(privateLobby ? 'بازگشت به لابی' : 'نبرد دوباره'))),
+          Expanded(child: FilledButton(onPressed: session.rematchWaiting ? null : onAgain,
+              child: Text(session.rematchWaiting ? 'منتظر قبول حریف…' : session.rematchAvailable ? 'دوباره با همین حریف' : privateLobby ? 'بازگشت به لابی' : 'نبرد دوباره'))),
           Gaps.hXs,
           Expanded(child: OutlinedButton(onPressed: onEdit, child: const Text('تغییر ترکیب'))),
         ]),
@@ -484,7 +516,9 @@ class _History extends StatelessWidget {
             Gaps.hSm,
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(labels['${raw['mode']}'] ?? 'دوئل کارت', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900)),
-              Text('${faNum(raw['userScore'])} - ${faNum(raw['opponentScore'])}', style: const TextStyle(fontSize: 9, color: Colors.white54)),
+              Text('${faNum(raw['userScore'])} - ${faNum(raw['opponentScore'])} · '
+                  '${const {'pending': 'تسویه در انتظار', 'settled': 'تسویه‌شده', 'refunded': 'برگشت‌خورده'}['${raw['settlementStatus'] ?? 'settled'}']}',
+                  style: const TextStyle(fontSize: 9, color: Colors.white54)),
             ])),
             Text(NumberParser.toInt(raw['userDelta']) > 0 ? '+${faNum(raw['userDelta'])}' : faNum(raw['userDelta']),
                 style: TextStyle(color: NumberParser.toInt(raw['userDelta']) >= 0 ? _emerald : BrandColors.danger,

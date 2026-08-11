@@ -199,6 +199,63 @@ paths:
               additionalProperties: true
       security:
         - bearerAuth: []
+  /api/admin/analytics:
+    get:
+      tags:
+        - Admin
+      summary: دریافت /api/admin/analytics
+      operationId: get_api_admin_analytics
+      responses:
+        "200":
+          description: موفق
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "400":
+          description: درخواست نامعتبر
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "401":
+          description: نیازمند ورود
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "403":
+          description: دسترسی غیرمجاز
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "404":
+          description: یافت نشد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "409":
+          description: تعارض وضعیت
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "429":
+          description: تعداد درخواست بیش از حد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "500":
+          description: خطای داخلی سرور
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+      security:
+        - bearerAuth: []
   /api/admin/audit-log:
     get:
       tags:
@@ -1193,6 +1250,76 @@ paths:
                 $ref: "#/components/schemas/JsonResponse"
       parameters:
         - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      security:
+        - bearerAuth: []
+  /api/admin/crashes/{reportId}:
+    patch:
+      tags:
+        - Admin
+      summary: ویرایش /api/admin/crashes/{reportId}
+      operationId: patch_api_admin_crashes_reportId
+      responses:
+        "200":
+          description: موفق
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "400":
+          description: درخواست نامعتبر
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "401":
+          description: نیازمند ورود
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "403":
+          description: دسترسی غیرمجاز
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "404":
+          description: یافت نشد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "409":
+          description: تعارض وضعیت
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "429":
+          description: تعداد درخواست بیش از حد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "500":
+          description: خطای داخلی سرور
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+      parameters:
+        - name: reportId
           in: path
           required: true
           schema:
@@ -6003,6 +6130,70 @@ paths:
                 $ref: "#/components/schemas/JsonResponse"
       security:
         - bearerAuth: []
+  /api/analytics/events:
+    post:
+      tags:
+        - API
+      summary: ایجاد/ارسال /api/analytics/events
+      operationId: post_api_analytics_events
+      responses:
+        "200":
+          description: موفق
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "400":
+          description: درخواست نامعتبر
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "401":
+          description: نیازمند ورود
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "403":
+          description: دسترسی غیرمجاز
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "404":
+          description: یافت نشد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "409":
+          description: تعارض وضعیت
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "429":
+          description: تعداد درخواست بیش از حد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "500":
+          description: خطای داخلی سرور
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      security:
+        - bearerAuth: []
   /api/auth/forgot-password/reset:
     post:
       tags:
@@ -7292,6 +7483,393 @@ paths:
             type: string
       security:
         - bearerAuth: []
+  /api/friends:
+    get:
+      tags:
+        - API
+      summary: دریافت /api/friends
+      operationId: get_api_friends
+      responses:
+        "200":
+          description: موفق
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "400":
+          description: درخواست نامعتبر
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "401":
+          description: نیازمند ورود
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "403":
+          description: دسترسی غیرمجاز
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "404":
+          description: یافت نشد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "409":
+          description: تعارض وضعیت
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "429":
+          description: تعداد درخواست بیش از حد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "500":
+          description: خطای داخلی سرور
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+      security:
+        - bearerAuth: []
+  /api/friends/{id}:
+    delete:
+      tags:
+        - API
+      summary: حذف /api/friends/{id}
+      operationId: delete_api_friends_id
+      responses:
+        "200":
+          description: موفق
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "400":
+          description: درخواست نامعتبر
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "401":
+          description: نیازمند ورود
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "403":
+          description: دسترسی غیرمجاز
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "404":
+          description: یافت نشد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "409":
+          description: تعارض وضعیت
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "429":
+          description: تعداد درخواست بیش از حد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "500":
+          description: خطای داخلی سرور
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+  /api/friends/{id}/request:
+    post:
+      tags:
+        - API
+      summary: ایجاد/ارسال /api/friends/{id}/request
+      operationId: post_api_friends_id_request
+      responses:
+        "200":
+          description: موفق
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "400":
+          description: درخواست نامعتبر
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "401":
+          description: نیازمند ورود
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "403":
+          description: دسترسی غیرمجاز
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "404":
+          description: یافت نشد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "409":
+          description: تعارض وضعیت
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "429":
+          description: تعداد درخواست بیش از حد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "500":
+          description: خطای داخلی سرور
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      security:
+        - bearerAuth: []
+  /api/friends/requests/{id}/accept:
+    post:
+      tags:
+        - API
+      summary: ایجاد/ارسال /api/friends/requests/{id}/accept
+      operationId: post_api_friends_requests_id_accept
+      responses:
+        "200":
+          description: موفق
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "400":
+          description: درخواست نامعتبر
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "401":
+          description: نیازمند ورود
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "403":
+          description: دسترسی غیرمجاز
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "404":
+          description: یافت نشد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "409":
+          description: تعارض وضعیت
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "429":
+          description: تعداد درخواست بیش از حد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "500":
+          description: خطای داخلی سرور
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      security:
+        - bearerAuth: []
+  /api/friends/search:
+    get:
+      tags:
+        - API
+      summary: دریافت /api/friends/search
+      operationId: get_api_friends_search
+      responses:
+        "200":
+          description: موفق
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "400":
+          description: درخواست نامعتبر
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "401":
+          description: نیازمند ورود
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "403":
+          description: دسترسی غیرمجاز
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "404":
+          description: یافت نشد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "409":
+          description: تعارض وضعیت
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "429":
+          description: تعداد درخواست بیش از حد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "500":
+          description: خطای داخلی سرور
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+      security:
+        - bearerAuth: []
+  /api/friends/users/{id}/block:
+    post:
+      tags:
+        - Users
+      summary: ایجاد/ارسال /api/friends/users/{id}/block
+      operationId: post_api_friends_users_id_block
+      responses:
+        "200":
+          description: موفق
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "400":
+          description: درخواست نامعتبر
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "401":
+          description: نیازمند ورود
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "403":
+          description: دسترسی غیرمجاز
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "404":
+          description: یافت نشد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "409":
+          description: تعارض وضعیت
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "429":
+          description: تعداد درخواست بیش از حد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "500":
+          description: خطای داخلی سرور
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      security:
+        - bearerAuth: []
   /api/games:
     get:
       tags:
@@ -7587,6 +8165,63 @@ paths:
               additionalProperties: true
       security:
         - bearerAuth: []
+  /api/growth/overview:
+    get:
+      tags:
+        - API
+      summary: دریافت /api/growth/overview
+      operationId: get_api_growth_overview
+      responses:
+        "200":
+          description: موفق
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "400":
+          description: درخواست نامعتبر
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "401":
+          description: نیازمند ورود
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "403":
+          description: دسترسی غیرمجاز
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "404":
+          description: یافت نشد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "409":
+          description: تعارض وضعیت
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "429":
+          description: تعداد درخواست بیش از حد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "500":
+          description: خطای داخلی سرور
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+      security:
+        - bearerAuth: []
   /api/league/current:
     get:
       tags:
@@ -7813,6 +8448,133 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/JsonResponse"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      security:
+        - bearerAuth: []
+  /api/missions:
+    get:
+      tags:
+        - API
+      summary: دریافت /api/missions
+      operationId: get_api_missions
+      responses:
+        "200":
+          description: موفق
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "400":
+          description: درخواست نامعتبر
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "401":
+          description: نیازمند ورود
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "403":
+          description: دسترسی غیرمجاز
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "404":
+          description: یافت نشد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "409":
+          description: تعارض وضعیت
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "429":
+          description: تعداد درخواست بیش از حد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "500":
+          description: خطای داخلی سرور
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+      security:
+        - bearerAuth: []
+  /api/missions/{key}/claim:
+    post:
+      tags:
+        - API
+      summary: ایجاد/ارسال /api/missions/{key}/claim
+      operationId: post_api_missions_key_claim
+      responses:
+        "200":
+          description: موفق
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "400":
+          description: درخواست نامعتبر
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "401":
+          description: نیازمند ورود
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "403":
+          description: دسترسی غیرمجاز
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "404":
+          description: یافت نشد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "409":
+          description: تعارض وضعیت
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "429":
+          description: تعداد درخواست بیش از حد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "500":
+          description: خطای داخلی سرور
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
       requestBody:
         required: false
         content:
@@ -9220,6 +9982,63 @@ paths:
               additionalProperties: true
       security:
         - bearerAuth: []
+  /api/shop/history:
+    get:
+      tags:
+        - Shop
+      summary: دریافت /api/shop/history
+      operationId: get_api_shop_history
+      responses:
+        "200":
+          description: موفق
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "400":
+          description: درخواست نامعتبر
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "401":
+          description: نیازمند ورود
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "403":
+          description: دسترسی غیرمجاز
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "404":
+          description: یافت نشد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "409":
+          description: تعارض وضعیت
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "429":
+          description: تعداد درخواست بیش از حد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "500":
+          description: خطای داخلی سرور
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+      security:
+        - bearerAuth: []
   /api/shop/items/{id}/buy:
     post:
       tags:
@@ -9669,6 +10488,70 @@ paths:
         - Support
       summary: ایجاد/ارسال /api/support/uploads/image
       operationId: post_api_support_uploads_image
+      responses:
+        "200":
+          description: موفق
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "400":
+          description: درخواست نامعتبر
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "401":
+          description: نیازمند ورود
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "403":
+          description: دسترسی غیرمجاز
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "404":
+          description: یافت نشد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "409":
+          description: تعارض وضعیت
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "429":
+          description: تعداد درخواست بیش از حد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "500":
+          description: خطای داخلی سرور
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      security:
+        - bearerAuth: []
+  /api/telemetry/crash:
+    post:
+      tags:
+        - API
+      summary: ایجاد/ارسال /api/telemetry/crash
+      operationId: post_api_telemetry_crash
       responses:
         "200":
           description: موفق

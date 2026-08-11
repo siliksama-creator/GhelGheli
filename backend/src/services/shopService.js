@@ -49,12 +49,46 @@ async function plusStatus(userId, client = pool) {
   return { active: true, expiresAt, daysLeft };
 }
 
+/** Unified, immutable receipts for permanent items and Plus periods. */
+async function purchaseHistory(userId, { limit = 100, offset = 0 } = {}) {
+  const lim = Math.min(200, Math.max(1, Number(limit) || 100));
+  const off = Math.max(0, Number(offset) || 0);
+  const { rows } = await pool.query(
+    `SELECT * FROM (
+       SELECT usi.purchase_id AS id,'item'::text AS type,si.name,
+              si.kind,usi.price_paid,usi.bought_at AS purchased_at,
+              NULL::timestamptz AS starts_at,NULL::timestamptz AS expires_at,
+              'permanent'::text AS status
+         FROM user_shop_items usi
+         JOIN shop_items si ON si.id=usi.item_id
+        WHERE usi.user_id=$1
+       UNION ALL
+       SELECT s.id,'subscription'::text,'قلقلی پلاس'::text,s.plan,
+              s.price_paid,s.created_at,s.starts_at,s.expires_at,
+              CASE WHEN s.expires_at>NOW() THEN 'active' ELSE 'expired' END
+         FROM user_subscriptions s WHERE s.user_id=$1
+     ) receipts ORDER BY purchased_at DESC LIMIT $2 OFFSET $3`,
+    [userId, lim, off],
+  );
+  return rows.map(row => ({
+    id: row.id,
+    type: row.type,
+    name: row.name,
+    kind: row.kind,
+    pricePaid: Number(row.price_paid),
+    purchasedAt: row.purchased_at,
+    startsAt: row.starts_at,
+    expiresAt: row.expires_at,
+    status: row.status,
+  }));
+}
+
 /**
  * The whole shop from one user's point of view: every item, whether they own
  * it, whether Plus is unlocking it, and what they currently have equipped.
  */
 async function catalogue(userId) {
-  const [{ rows: items }, { rows: owned }, { rows: userRows }, plus, myClubs] =
+  const [{ rows: items }, { rows: owned }, { rows: userRows }, plus, myClubs, history] =
     await Promise.all([
       pool.query(
         `SELECT id, slug, kind, name, description, image_url, payload, price
@@ -67,6 +101,7 @@ async function catalogue(userId) {
            FROM users WHERE id=$1`, [userId]),
       plusStatus(userId),
       clubService.myClubs(userId),
+      purchaseHistory(userId, { limit: 20 }),
     ]);
 
   const ownedIds = new Set(owned.map(o => o.item_id));
@@ -89,6 +124,7 @@ async function catalogue(userId) {
       avatarKey: u.profile_avatar_key || null,
     },
     clubs: myClubs,
+    purchaseHistory: history,
     items: items.map(i => ({
       id: i.id,
       slug: i.slug,
@@ -344,6 +380,6 @@ async function cosmeticsFor(userIds) {
 }
 
 module.exports = {
-  catalogue, buyItem, buyPlus, equip, plusStatus, cosmeticsFor, useClubAvatar,
+  catalogue, purchaseHistory, buyItem, buyPlus, equip, plusStatus, cosmeticsFor, useClubAvatar,
   PLUS_PRICE, PLUS_DAYS, PLUS_PERKS, PLUS_EXPIRY_NOTE,
 };

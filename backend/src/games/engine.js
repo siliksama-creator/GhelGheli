@@ -30,6 +30,18 @@ function stakeService() {
   }
 }
 
+function growthServices() {
+  try {
+    return {
+      analytics: require('../services/analyticsService'),
+      missions: require('../services/missionService'),
+    };
+  } catch (e) {
+    console.error('[games:growth] service unavailable:', e.message);
+    return null;
+  }
+}
+
 // How long we hunt for a REAL opponent before falling back to the bot. The
 // client shows this as a visible countdown so waiting feels intentional
 // rather than broken.
@@ -43,11 +55,16 @@ const DEFAULT_TURN_MS = 20_000;
 // How often we ping a player parked in an open-ended (bot-less) queue.
 // Short enough to keep a carrier NAT mapping alive, long enough to be free.
 const QUEUE_PING_MS = 25_000;
+// A short carrier/Wi-Fi handoff must not decide a real match. The room is
+// paused and the same authenticated user can claim the seat on a new socket.
+const RECONNECT_WINDOW_MS = 25_000;
+const REMATCH_WINDOW_MS = 90_000;
 const turnMsFor = rules => Number(rules.turnMs) || DEFAULT_TURN_MS;
 
 const queues = new Map(); // gameId -> [socket]
 const rooms = new Map();  // roomId -> room
 const lobbies = new Map(); // lobbyId -> {host, gameId, stake, createdAt}
+const completedMatches = new Map(); // roomId -> short-lived rematch contract
 
 const nameOf = u => u.nickname || u.first_name || 'کاربر';
 // Enough for the client to render an avatar + open the public profile sheet.
@@ -100,6 +117,36 @@ function roomOfSocket(socket) {
   return null;
 }
 
+function roomSeatForUser(userId) {
+  for (const room of rooms.values()) {
+    for (const symbol of ['X', 'O']) {
+      if (String(room.players?.[symbol]?.id || '') === String(userId || '')) {
+        return { room, symbol };
+      }
+    }
+  }
+  return null;
+}
+
+function startPayload(room, symbol) {
+  return {
+    roomId: room.id,
+    gameId: room.gameId,
+    players: room.players,
+    turn: room.turn,
+    yourSymbol: symbol,
+    vsBot: room.vsBot,
+    matchMode: room.matchMode,
+    state: snapshot(room, symbol),
+    turnMs: room.turnMs,
+    deadline: room.deadline || null,
+    remainingMs: room.deadline ? Math.max(0, room.deadline - Date.now()) : null,
+    stake: room.stake,
+    netPot: room.netPot,
+    commission: room.commission,
+  };
+}
+
 // Snapshot sent to the client. `decorate` lets a game expose per-player hints
 // (e.g. Reversi's legal squares) without the engine knowing the rules.
 function snapshot(room, symbol) {
@@ -130,31 +177,25 @@ function safeEmit(sock, event, payload, room) {
 }
 
 function emitState(room, event, extra = {}) {
-  // A seat whose socket is gone means the match cannot continue; end it once
-  // rather than retrying every turn forever (which spammed the logs and left
-  // the surviving player staring at a board nobody was answering).
-  let lost = null;
   for (const sym of ['X', 'O']) {
     const sock = room.seats[sym];
-    if (sock && sock.emit) {
-      const ok = safeEmit(sock, event, {
-        state: snapshot(room, sym),
-        turn: room.turn,
-        turnMs: room.turnMs,
-        deadline: room.deadline || null,
-        // CLOCK-SKEW FIX: never make the client subtract our timestamp from
-        // its own Date.now(). Phones with a wrong clock produced a garbage
-        // difference that clamped to the max, freezing the countdown. This
-        // is a plain "you have N ms left from the moment you receive this".
-        remainingMs: room.deadline ? Math.max(0, room.deadline - Date.now()) : null,
-        ...extra,
-      }, room);
-      if (!ok) lost = sym;
-    }
-  }
-  if (lost && !room.done && event !== 'game:over') {
-    // Tell whoever is still there, then close the room.
-    finish(room, 'DISCONNECT', lost);
+    // The missing seat is inside its explicit reconnect window. Emitting to
+    // the dead Socket.IO object can buffer stale snapshots and must not be
+    // interpreted as a forfeit; the disconnect handler owns that lifecycle.
+    if (room.reconnecting?.[sym] || !sock || sock === 'BOT' || !sock.emit) continue;
+    const delivered = safeEmit(sock, event, {
+      state: snapshot(room, sym),
+      turn: room.turn,
+      turnMs: room.turnMs,
+      deadline: room.deadline || null,
+      // CLOCK-SKEW FIX: never make the client subtract our timestamp from
+      // its own Date.now(). Phones with a wrong clock produced a garbage
+      // difference that clamped to the max, freezing the countdown. This
+      // is a plain "you have N ms left from the moment you receive this".
+      remainingMs: room.deadline ? Math.max(0, room.deadline - Date.now()) : null,
+      ...extra,
+    }, room);
+    if (!delivered && !room.done) suspendForReconnect(room, sym);
   }
 }
 
@@ -164,6 +205,10 @@ function emitState(room, event, extra = {}) {
 function armTurnClock(room) {
   clearTimeout(room.turnTimer);
   if (room.done) return;
+  if (room.reconnecting && (room.reconnecting.X || room.reconnecting.O)) {
+    room.deadline = null;
+    return;
+  }
   const sim = !!room.rules.simultaneous;
   // The bot moves on its own schedule; no clock needed for its seat.
   // در حالت هم‌زمان، ساعت برای هر دو صندلی است چون هر دو باید انتخاب
@@ -221,6 +266,7 @@ function finish(room, winner, disconnectedSym = null) {
   room.done = true;
   clearTimeout(room.botTimer);
   clearTimeout(room.turnTimer);
+  for (const symbol of ['X', 'O']) clearTimeout(room.reconnectTimers?.[symbol]);
 
   const resolvedWinner = winner === 'DISCONNECT'
     ? (disconnectedSym === 'X' ? 'O'
@@ -233,6 +279,7 @@ function finish(room, winner, disconnectedSym = null) {
   // rounds while the generic engine remains unaware of card rules.
   if (room.rules.onFinish) {
     Promise.resolve(room.rules.onFinish({
+      matchId: room.id,
       players: room.players,
       state: room.state,
       winner: resolvedWinner,
@@ -242,6 +289,28 @@ function finish(room, winner, disconnectedSym = null) {
       vsBot: room.vsBot,
       matchMode: room.matchMode,
     })).catch(e => console.error(`[games:${room.gameId}] history failed:`, e.message));
+  }
+
+  // Authoritative funnel + mission progress. Clients cannot forge starts,
+  // completions or wins; only the engine writes these events.
+  const growth = growthServices();
+  if (growth) {
+    for (const symbol of ['X', 'O']) {
+      const player = room.players?.[symbol];
+      if (!player?.id || player.isBot) continue;
+      growth.analytics.record(player.id, 'match_completed', {
+        platform: 'server', gameId: room.gameId, matchId: room.id,
+        metadata: {
+          vsBot: room.vsBot, stake: room.stake, mode: room.matchMode,
+          outcome: resolvedWinner === 'DRAW' ? 'draw' : resolvedWinner === symbol ? 'win' : 'loss',
+          disconnected: Boolean(disconnectedSym),
+        },
+      }).catch(() => {});
+      growth.missions.record(player.id, 'match_completed').catch(() => {});
+      if (!room.vsBot && resolvedWinner === symbol) {
+        growth.missions.record(player.id, 'online_win').catch(() => {});
+      }
+    }
   }
 
   // Award points for a completed ONLINE match, then tell both players what
@@ -283,6 +352,13 @@ function finish(room, winner, disconnectedSym = null) {
       const winnerUserId = draw ? null : room.players?.[winnerSym]?.id;
       stakes.settleMatch({ matchId: room.id, winnerUserId, draw })
         .then(result => {
+          for (const sym of ['X', 'O']) {
+            const sock = room.seats[sym];
+            if (sock?.emit) safeEmit(sock, 'game:settlement', {
+              matchId: room.id,
+              status: result.status === 'refunded' ? 'refunded' : 'settled',
+            }, room);
+          }
           if (result.duplicate) return;
           if (draw) {
             for (const sym of ['X', 'O']) {
@@ -378,7 +454,33 @@ function finish(room, winner, disconnectedSym = null) {
     console.error('[games] pass xp failed:', e.message);
   }
 
-  emitState(room, 'game:over', { winner });
+  const rematchAvailable = !disconnectedSym;
+  if (rematchAvailable) {
+    const contract = {
+      roomId: room.id,
+      gameId: room.gameId,
+      rules: room.rules,
+      seats: { ...room.seats },
+      players: room.players,
+      stake: room.stake,
+      vsBot: room.vsBot,
+      matchMode: room.matchMode,
+      votes: new Set(),
+      expiresAt: Date.now() + REMATCH_WINDOW_MS,
+    };
+    contract.timer = setTimeout(() => completedMatches.delete(room.id), REMATCH_WINDOW_MS);
+    completedMatches.set(room.id, contract);
+  }
+
+  emitState(room, 'game:over', {
+    winner,
+    resolvedWinner,
+    roomId: room.id,
+    matchId: room.id,
+    settlementStatus: room.stake > 0 && !room.vsBot ? 'pending' : 'settled',
+    rematchAvailable,
+    rematchWindowMs: rematchAvailable ? REMATCH_WINDOW_MS : 0,
+  });
   for (const sym of ['X', 'O']) {
     const s = room.seats[sym];
     if (s && s.leave) {
@@ -499,6 +601,8 @@ async function startRoom(io, rules, gameId, a, b, stake, matchMode = null) {
     turn: 'X',
     turnMs: turnMsFor(rules),
     seats: { X: a, O: b || 'BOT' },
+    reconnecting: { X: false, O: false },
+    reconnectTimers: { X: null, O: null },
     stake: s,
     netPot: reservation?.netPot || 0,
     commission: reservation?.commission || 0,
@@ -516,16 +620,18 @@ async function startRoom(io, rules, gameId, a, b, stake, matchMode = null) {
   for (const sym of ['X', 'O']) {
     const sock = room.seats[sym];
     if (sock && sock.emit) {
-      safeEmit(sock, 'game:start', {
-        roomId: id, gameId, players, turn: 'X',
-        yourSymbol: sym, vsBot, matchMode: room.matchMode,
-        state: snapshot(room, sym),
-        turnMs: room.turnMs, deadline: room.deadline,
-        remainingMs: room.deadline ? Math.max(0, room.deadline - Date.now()) : null,
-        stake: room.stake,
-        netPot: room.netPot,
-        commission: room.commission,
-      }, room);
+      safeEmit(sock, 'game:start', startPayload(room, sym), room);
+    }
+  }
+  const growth = growthServices();
+  if (growth) {
+    for (const symbol of ['X', 'O']) {
+      const player = room.players?.[symbol];
+      if (!player?.id || player.isBot) continue;
+      growth.analytics.record(player.id, 'match_started', {
+        platform: 'server', gameId, matchId: id,
+        metadata: { vsBot, stake: s, mode: room.matchMode },
+      }).catch(() => {});
     }
   }
   return room;
@@ -548,13 +654,117 @@ async function startRoomOrError(io, rules, gameId, a, b, stake, matchMode = null
   }
 }
 
+function suspendForReconnect(room, symbol) {
+  if (!room || room.done || room.vsBot && symbol === 'O' || room.reconnecting[symbol]) return;
+  room.reconnecting[symbol] = true;
+  clearTimeout(room.turnTimer);
+  clearTimeout(room.botTimer);
+  room.deadline = null;
+  const opponent = symbol === 'X' ? 'O' : 'X';
+  const opponentSocket = room.seats[opponent];
+  if (opponentSocket?.emit) safeEmit(opponentSocket, 'game:opponent_reconnecting', {
+    roomId: room.id,
+    userId: room.players?.[symbol]?.id,
+    reconnectWindowMs: RECONNECT_WINDOW_MS,
+    message: 'اتصال حریف ناپایدار شده؛ تا ۲۵ ثانیه منتظر بازگشتش می‌مانیم.',
+  }, room);
+  room.reconnectTimers[symbol] = setTimeout(() => {
+    if (!room.done && room.reconnecting[symbol]) finish(room, 'DISCONNECT', symbol);
+  }, RECONNECT_WINDOW_MS);
+}
+
+function resumeSeat(socket) {
+  const found = roomSeatForUser(socket.user?.id);
+  if (!found || !found.room.reconnecting?.[found.symbol]) return false;
+  const { room, symbol } = found;
+  clearTimeout(room.reconnectTimers[symbol]);
+  room.reconnectTimers[symbol] = null;
+  room.reconnecting[symbol] = false;
+  room.seats[symbol] = socket;
+  socket.join(room.id);
+  armTurnClock(room);
+  safeEmit(socket, 'game:resume', startPayload(room, symbol), room);
+  const opponent = symbol === 'X' ? 'O' : 'X';
+  const opponentSocket = room.seats[opponent];
+  if (opponentSocket?.emit && !room.reconnecting[opponent]) {
+    safeEmit(opponentSocket, 'game:opponent_reconnected', {
+      roomId: room.id,
+      message: 'حریف برگشت؛ مسابقه ادامه دارد.',
+    }, room);
+    safeEmit(opponentSocket, 'game:update', {
+      state: snapshot(room, opponent), turn: room.turn, turnMs: room.turnMs,
+      deadline: room.deadline,
+      remainingMs: room.deadline ? Math.max(0, room.deadline - Date.now()) : null,
+      resumed: true,
+    }, room);
+  }
+  scheduleBot(room);
+  return true;
+}
+
+async function requestRematch(io, socket, roomId) {
+  const contract = completedMatches.get(String(roomId || ''));
+  if (!contract || contract.expiresAt <= Date.now()) {
+    throw Object.assign(new Error('زمان نبرد دوباره تمام شده است'), { status: 410 });
+  }
+  let symbol = null;
+  for (const candidate of ['X', 'O']) {
+    if (String(contract.players?.[candidate]?.id || '') === String(socket.user?.id || '')) symbol = candidate;
+  }
+  if (!symbol) throw Object.assign(new Error('این مسابقه متعلق به شما نیست'), { status: 403 });
+  contract.seats[symbol] = socket;
+  contract.votes.add(symbol);
+
+  if (!contract.vsBot) {
+    for (const candidate of ['X', 'O']) {
+      const target = contract.seats[candidate];
+      if (target?.emit) safeEmit(target, 'game:rematch_status', {
+        roomId: contract.roomId,
+        accepted: [...contract.votes],
+        waitingForOpponent: contract.votes.size < 2,
+        expiresAt: contract.expiresAt,
+      });
+    }
+    if (contract.votes.size < 2) return null;
+    if (!contract.seats.X?.connected || !contract.seats.O?.connected) {
+      contract.votes.clear();
+      throw Object.assign(new Error('حریف دیگر آنلاین نیست'), { status: 409 });
+    }
+  }
+
+  const started = await startRoomOrError(
+    io, contract.rules, contract.gameId, contract.seats.X,
+    contract.vsBot ? null : contract.seats.O, contract.stake, contract.matchMode,
+  );
+  if (!started) {
+    contract.votes.clear();
+    return null;
+  }
+  clearTimeout(contract.timer);
+  completedMatches.delete(contract.roomId);
+  const growth = growthServices();
+  if (growth) {
+    for (const player of Object.values(contract.players || {})) {
+      if (!player?.id || player.isBot) continue;
+      growth.analytics.record(player.id, 'rematch', {
+        platform: 'server', gameId: contract.gameId, matchId: started.id,
+        metadata: { previousMatchId: contract.roomId, stake: contract.stake },
+      }).catch(() => {});
+      growth.missions.record(player.id, 'rematch').catch(() => {});
+    }
+  }
+  return started;
+}
+
 const attachGames = function attachGames(io, rulesById) {
   io.on('connection', socket => {
     if (!socket.user) return;
+    // If this authenticated user owns a suspended seat, reclaim it before
+    // accepting queue/lobby actions on the fresh Socket.IO connection.
+    resumeSeat(socket);
 
-    
     // ── چالش ۱ به ۱ مستقیم با لینک / کد اتاق ──
-    socket.on('game:create_room', async payload => {
+    socket.on('game:create_room', async (payload, callback) => {
       const gameId = (payload && typeof payload === 'object' && payload.gameId) || Object.keys(rulesById)[0];
       const rules = rulesById[gameId];
       if (!rules) return safeEmit(socket, 'game:error', { message: 'بازی یافت نشد' });
@@ -569,12 +779,14 @@ const attachGames = function attachGames(io, rulesById) {
       socket.privateRoomCode = code;
       socket.privateGameId = gameId;
       socket.join(roomId);
-      safeEmit(socket, 'game:room_created', {
+      const response = {
         roomCode: code,
         gameId,
         shareUrl: `https://user.ghelghelishop.ir/?game=${gameId}&room=${code}`,
         message: 'اتاق ساخته شد — کد یا لینک را برای دوستت بفرست',
-      });
+      };
+      safeEmit(socket, 'game:room_created', response);
+      callback?.({ ok: true, ...response });
     });
 
     socket.on('game:join_room', async payload => {
@@ -901,12 +1113,36 @@ const attachGames = function attachGames(io, rulesById) {
       advance(room, move);
     });
 
+    socket.on('game:rematch', async (payload, callback) => {
+      try {
+        const started = await requestRematch(io, socket, payload?.roomId);
+        callback?.({ ok: true, started: Boolean(started) });
+      } catch (error) {
+        const response = { ok: false, error: error.message || 'نبرد دوباره ناموفق بود' };
+        callback?.(response);
+        if (!callback) safeEmit(socket, 'game:error', { message: response.error });
+      }
+    });
+
     socket.on('game:leave', payload => {
       const roomId = (payload && typeof payload === 'object' && payload.roomId) || roomOfSocket(socket);
       const room = rooms.get(roomId);
       if (room) {
         const loser = room.seats.X === socket ? 'X' : room.seats.O === socket ? 'O' : null;
         finish(room, 'DISCONNECT', loser);
+      } else {
+        for (const [completedId, contract] of completedMatches.entries()) {
+          const mine = Object.values(contract.players || {})
+            .some(player => String(player?.id || '') === String(socket.user.id));
+          if (!mine) continue;
+          clearTimeout(contract.timer);
+          completedMatches.delete(completedId);
+          for (const target of Object.values(contract.seats || {})) {
+            if (target?.emit && target !== socket) safeEmit(target, 'game:rematch_unavailable', {
+              roomId: completedId, message: 'حریف از صفحه مسابقه خارج شد.',
+            });
+          }
+        }
       }
       dropFromQueue(socket);
     });
@@ -916,11 +1152,14 @@ const attachGames = function attachGames(io, rulesById) {
       const room = rooms.get(roomOfSocket(socket));
       if (room) {
         const loser = room.seats.X === socket ? 'X' : room.seats.O === socket ? 'O' : null;
-        finish(room, 'DISCONNECT', loser);
+        suspendForReconnect(room, loser);
       }
     });
   });
 };
 
 attachGames.rooms = rooms;
+attachGames.completedMatches = completedMatches;
+attachGames.RECONNECT_WINDOW_MS = RECONNECT_WINDOW_MS;
+attachGames.REMATCH_WINDOW_MS = REMATCH_WINDOW_MS;
 module.exports = attachGames;

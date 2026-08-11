@@ -69,7 +69,7 @@ class GameScaffold extends StatelessWidget {
                       const _SoundToggle(),
                     ],
                   ),
-                  if (!session.connected)
+                  if (!session.connected || session.connectionNotice != null)
                     Padding(
                       padding: const EdgeInsets.only(top: Gaps.xs),
                       child: Container(
@@ -82,20 +82,21 @@ class GameScaffold extends StatelessWidget {
                           border: Border.all(
                               color: const Color(0xFFF59E0B).withValues(alpha: 0.6)),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            SizedBox(
+                            const SizedBox(
                                 width: 13,
                                 height: 13,
                                 child: CircularProgressIndicator(
                                     strokeWidth: 2, color: Color(0xFFF59E0B))),
-                            SizedBox(width: 8),
-                            Text('اتصال قطع شد؛ در حال تلاش دوباره...',
-                                style: TextStyle(
+                            const SizedBox(width: 8),
+                            Flexible(child: Text(
+                                session.connectionNotice ?? 'اتصال قطع شد؛ در حال بازیابی مسابقه…',
+                                style: const TextStyle(
                                     color: Color(0xFFF59E0B),
                                     fontSize: 12,
-                                    fontWeight: FontWeight.w700)),
+                                    fontWeight: FontWeight.w700))),
                           ],
                         ),
                       ),
@@ -507,10 +508,12 @@ class _ResultActions extends StatelessWidget {
       children: [
         Expanded(
           child: FilledButton.icon(
-            onPressed: session.join,
+            onPressed: session.rematchAvailable ? session.rematch : session.join,
             style: FilledButton.styleFrom(backgroundColor: accent),
             icon: const Icon(Icons.replay_rounded, size: 18),
-            label: const Text('بازی دوباره'),
+            label: Text(session.rematchWaiting
+                ? 'منتظر حریف…'
+                : session.rematchAvailable ? 'دوباره با همین حریف' : 'بازی دوباره'),
           ),
         ),
         Gaps.hXs,

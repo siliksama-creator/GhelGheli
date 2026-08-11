@@ -41,6 +41,11 @@ class GameSession extends ChangeNotifier {
   bool vsBot = false;
   String? matchMode;
   String? _roomId;
+  String? matchId;
+  String settlementStatus = 'settled';
+  bool rematchAvailable = false;
+  bool rematchWaiting = false;
+  String? connectionNotice;
   int? lastMove;
 
   /// Countdown for the player currently on move. Driven by the server's
@@ -179,20 +184,18 @@ class GameSession extends ChangeNotifier {
     // board simply froze with no explanation and no recovery.
     s.onDisconnect((_) {
       _setConnected(false);
+      if (phase == GamePhase.playing) {
+        connectionNotice = 'شبکه قطع شد؛ ۲۵ ثانیه برای بازگشت فرصت داری…';
+      }
       _stopClock();
     });
-    s.onConnect((_) => _setConnected(true));
-    s.on('reconnect', (_) {
+    s.onConnect((_) {
       _setConnected(true);
-      // Our room is gone server-side after a real disconnect, so drop back
-      // to the lobby rather than showing a stale board.
-      if (phase == GamePhase.playing) {
-        error = 'اتصال قطع شد؛ لطفاً دوباره شروع کنید';
-        phase = GamePhase.idle;
-        _stopClock();
-        notifyListeners();
-      }
+      // The server reclaims the suspended seat by authenticated user id and
+      // answers with game:resume. Never emit a fresh join here: that would
+      // forfeit the preserved match and enter an unrelated queue.
     });
+    s.on('reconnect', (_) => _setConnected(true));
 
     s.on('game:error', (d) => _fail(_msg(d) ?? 'خطا در بازی'));
 
@@ -222,6 +225,7 @@ class GameSession extends ChangeNotifier {
     void handleStart(dynamic d) {
       final m = _asMap(d);
       _roomId = m['roomId'] as String?;
+      matchId = _roomId;
       players = m['players'] as Map?;
       mySymbol = m['yourSymbol'] as String?;
       vsBot = m['vsBot'] == true;
@@ -235,6 +239,11 @@ class GameSession extends ChangeNotifier {
       winner = null;
       timedOutSymbol = null;
       stillSearching = false;
+      settlementStatus = 'settled';
+      rematchAvailable = false;
+      rematchWaiting = false;
+      connectionNotice = null;
+      connected = true;
       phase = GamePhase.playing;
       error = null;
       GameAudio.instance.play(Sfx.matchFound);
@@ -244,6 +253,7 @@ class GameSession extends ChangeNotifier {
     }
 
     s.on('game:start', handleStart);
+    s.on('game:resume', handleStart);
 
     s.on('game:update', (d) {
       final m = _asMap(d);
@@ -269,11 +279,47 @@ class GameSession extends ChangeNotifier {
       final m = _asMap(d);
       if (m['state'] != null) state = _asMap(m['state']);
       winner = m['winner'] as String?;
+      matchId = '${m['matchId'] ?? _roomId ?? ''}';
+      settlementStatus = '${m['settlementStatus'] ?? (stake > 0 ? 'pending' : 'settled')}';
+      rematchAvailable = m['rematchAvailable'] != false;
+      rematchWaiting = false;
+      connectionNotice = null;
       phase = GamePhase.over;
       _stopClock();
       GameAudio.instance.play(
         winner == 'DRAW' ? Sfx.draw : (iWon ? Sfx.win : Sfx.lose),
       );
+      notifyListeners();
+    });
+
+    s.on('game:settlement', (d) {
+      final m = _asMap(d);
+      if (m['matchId'] != null && matchId != null && '${m['matchId']}' != matchId) return;
+      settlementStatus = '${m['status'] ?? settlementStatus}';
+      notifyListeners();
+    });
+    s.on('game:opponent_reconnecting', (d) {
+      connectionNotice = _msg(d) ?? 'منتظر بازگشت حریف…';
+      _stopClock();
+      notifyListeners();
+    });
+    s.on('game:opponent_reconnected', (d) {
+      connectionNotice = _msg(d) ?? 'حریف برگشت؛ مسابقه ادامه دارد.';
+      notifyListeners();
+      Future<void>.delayed(const Duration(seconds: 2), () {
+        if (_disposed) return;
+        connectionNotice = null;
+        notifyListeners();
+      });
+    });
+    s.on('game:rematch_status', (d) {
+      rematchWaiting = _asMap(d)['waitingForOpponent'] == true;
+      notifyListeners();
+    });
+    s.on('game:rematch_unavailable', (d) {
+      rematchWaiting = false;
+      rematchAvailable = false;
+      error = _msg(d) ?? 'حریف از صفحه مسابقه خارج شد';
       notifyListeners();
     });
 
@@ -422,7 +468,7 @@ class GameSession extends ChangeNotifier {
   }
 
   void move(int index) {
-    if (!myTurn) return;
+    if (!myTurn || !connected) return;
     GameAudio.instance.play(moveSound);
     _socket?.emit('game:move', {'roomId': _roomId, 'move': index});
   }
@@ -439,9 +485,44 @@ class GameSession extends ChangeNotifier {
   /// جلوگیری از انتخاب دوباره روی سرور است (isValidMove)، نه اینجا —
   /// کلاینت هیچ‌وقت منبع حقیقت نیست.
   void moveObject(Map<String, dynamic> payload) {
-    if (phase != GamePhase.playing) return;
+    if (phase != GamePhase.playing || !connected) return;
     GameAudio.instance.play(moveSound);
     _socket?.emit('game:move', {'roomId': _roomId, 'move': payload});
+  }
+
+  void rematch() {
+    if (!rematchAvailable || matchId == null || matchId!.isEmpty) return;
+    rematchWaiting = !vsBot;
+    error = null;
+    notifyListeners();
+    _socket?.emitWithAck('game:rematch', {'roomId': matchId}, ack: (dynamic response) {
+      final m = _asMap(response);
+      if (m['ok'] == false && !_disposed) {
+        rematchWaiting = false;
+        error = '${m['error'] ?? 'نبرد دوباره ناموفق بود'}';
+        notifyListeners();
+      }
+    });
+  }
+
+  Future<Map<String, dynamic>> createChallenge() {
+    final completer = Completer<Map<String, dynamic>>();
+    final socket = _socket;
+    if (socket == null || socket.connected != true) {
+      completer.completeError(Exception('اتصال بازی برقرار نیست'));
+      return completer.future;
+    }
+    final timer = Timer(const Duration(seconds: 8), () {
+      if (!completer.isCompleted) completer.completeError(Exception('ساخت لینک چالش طول کشید'));
+    });
+    socket.emitWithAck('game:create_room', {'gameId': gameId}, ack: (dynamic response) {
+      if (completer.isCompleted) return;
+      timer.cancel();
+      final m = _asMap(response);
+      if (m['ok'] == true) completer.complete(m);
+      else completer.completeError(Exception('${m['error'] ?? 'ساخت لینک چالش ناموفق بود'}'));
+    });
+    return completer.future;
   }
 
   void leave() {
@@ -454,6 +535,9 @@ class GameSession extends ChangeNotifier {
     state = const {};
     timedOutSymbol = null;
     stillSearching = false;
+    rematchAvailable = false;
+    rematchWaiting = false;
+    connectionNotice = null;
     _stopClock();
     _stopSearchClock();
     notifyListeners();

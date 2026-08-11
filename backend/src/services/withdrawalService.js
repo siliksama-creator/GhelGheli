@@ -17,6 +17,17 @@ const wallet = require('./walletService');
 const { validateCardInput } = require('./bankCardService');
 const { createNotification } = require('./notificationService');
 
+async function appendStatus(client, requestId, fromStatus, toStatus, {
+  actorType, actorUserId = null, actorAdminId = null, note = null, trackingCode = null,
+}) {
+  await client.query(
+    `INSERT INTO withdrawal_status_history
+       (request_id,from_status,to_status,actor_type,actor_user_id,actor_admin_id,note,tracking_code)
+     VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
+    [requestId, fromStatus, toStatus, actorType, actorUserId, actorAdminId, note, trackingCode],
+  );
+}
+
 /** ذخیره یا به‌روزرسانی کارت بانکی کاربر. */
 async function saveBankCard(userId, body) {
   const v = validateCardInput(body);
@@ -155,6 +166,9 @@ async function createRequest(userId, rawAmount) {
       referenceId: request.id,
       description: `بلوکه شدن مبلغ برای درخواست برداشت`,
     });
+    await appendStatus(client, request.id, null, 'pending', {
+      actorType: 'user', actorUserId: userId,
+    });
 
     await client.query('COMMIT');
     return publicRequest(request);
@@ -191,6 +205,10 @@ async function cancelRequest(userId, requestId) {
       referenceType: 'withdrawal_requests',
       referenceId: req.id,
       description: 'برگشت مبلغ به دلیل لغو درخواست توسط کاربر',
+    });
+    await appendStatus(client, req.id, 'pending', 'canceled', {
+      actorType: 'user', actorUserId: userId,
+      note: 'لغو توسط کاربر و بازگشت کامل مبلغ',
     });
     await client.query('COMMIT');
     return { message: 'درخواست برداشت لغو شد و مبلغ به کیف پول برگشت' };
@@ -273,6 +291,9 @@ async function decide(adminId, requestId, { status, adminNote, trackingCode }) {
         WHERE id=$5 RETURNING *`,
       [status, note, tracking, adminId, requestId],
     );
+    await appendStatus(client, req.id, req.status, status, {
+      actorType: 'admin', actorAdminId: adminId, note, trackingCode: tracking,
+    });
 
     await client.query('COMMIT');
 
@@ -323,12 +344,29 @@ function publicRequest(row) {
     createdAt: row.created_at,
     decidedAt: row.decided_at,
     paidAt: row.paid_at,
+    timeline: (row.timeline || []).map(item => ({
+      fromStatus: item.fromStatus || null,
+      toStatus: item.toStatus,
+      statusLabel: faStatus(item.toStatus),
+      actorType: item.actorType,
+      note: item.note || null,
+      trackingCode: item.trackingCode || null,
+      createdAt: item.createdAt,
+    })),
   };
 }
 
 async function listForUser(userId) {
   const { rows } = await pool.query(
-    'SELECT * FROM withdrawal_requests WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100',
+    `SELECT w.*,COALESCE((
+       SELECT jsonb_agg(jsonb_build_object(
+         'fromStatus',h.from_status,'toStatus',h.to_status,'actorType',h.actor_type,
+         'note',h.note,'trackingCode',h.tracking_code,'createdAt',h.created_at
+       ) ORDER BY h.created_at)
+       FROM withdrawal_status_history h WHERE h.request_id=w.id
+     ),'[]'::jsonb) AS timeline
+       FROM withdrawal_requests w WHERE w.user_id=$1
+      ORDER BY w.created_at DESC LIMIT 100`,
     [userId],
   );
   return rows.map(publicRequest);
@@ -352,7 +390,12 @@ async function listForAdmin({ status, search, limit = 200 } = {}) {
   }
   params.push(Math.min(500, Math.max(1, Number(limit) || 200)));
   const { rows } = await pool.query(
-    `SELECT w.*, u.mobile, u.nickname, u.first_name, u.last_name, u.wallet_balance
+    `SELECT w.*, u.mobile, u.nickname, u.first_name, u.last_name, u.wallet_balance,
+            COALESCE((SELECT jsonb_agg(jsonb_build_object(
+              'fromStatus',h.from_status,'toStatus',h.to_status,'actorType',h.actor_type,
+              'note',h.note,'trackingCode',h.tracking_code,'createdAt',h.created_at
+            ) ORDER BY h.created_at)
+              FROM withdrawal_status_history h WHERE h.request_id=w.id),'[]'::jsonb) AS timeline
        FROM withdrawal_requests w
        JOIN users u ON u.id = w.user_id
       ${where.length ? 'WHERE ' + where.join(' AND ') : ''}

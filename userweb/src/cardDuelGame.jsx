@@ -141,6 +141,34 @@ function LiveArena({ session }) {
   </div>;
 }
 
+function resultMvp(state) {
+  const candidates = (state?.history || []).flatMap(round => [round?.cardX, round?.cardO]).filter(Boolean);
+  return candidates.sort((a, b) => num(b.power) - num(a.power))[0] || null;
+}
+
+async function renderResultCard({ result, score, mvp, opponent, url }) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1080; canvas.height = 1080;
+  const ctx = canvas.getContext('2d');
+  const gradient = ctx.createLinearGradient(0, 0, 1080, 1080);
+  gradient.addColorStop(0, '#071522'); gradient.addColorStop(0.55, '#17304C'); gradient.addColorStop(1, '#35105D');
+  ctx.fillStyle = gradient; ctx.fillRect(0, 0, 1080, 1080);
+  ctx.strokeStyle = '#FFD166'; ctx.lineWidth = 10; ctx.strokeRect(35, 35, 1010, 1010);
+  ctx.textAlign = 'center'; ctx.direction = 'rtl';
+  ctx.fillStyle = '#38BDF8'; ctx.font = '700 34px sans-serif'; ctx.fillText('GHELGHELI CARD ARENA', 540, 135);
+  ctx.fillStyle = '#FFFFFF'; ctx.font = '900 78px sans-serif'; ctx.fillText(result, 540, 265);
+  ctx.fillStyle = '#FFD166'; ctx.font = '900 122px sans-serif'; ctx.fillText(score, 540, 440);
+  ctx.fillStyle = '#E2E8F0'; ctx.font = '700 36px sans-serif'; ctx.fillText(`مقابل ${opponent}`, 540, 520);
+  ctx.fillStyle = 'rgba(255,209,102,.15)'; ctx.fillRect(135, 600, 810, 190);
+  ctx.strokeStyle = 'rgba(255,209,102,.65)'; ctx.lineWidth = 3; ctx.strokeRect(135, 600, 810, 190);
+  ctx.fillStyle = '#FFD166'; ctx.font = '900 34px sans-serif'; ctx.fillText('MVP مسابقه', 540, 655);
+  ctx.fillStyle = '#FFFFFF'; ctx.font = '900 50px sans-serif'; ctx.fillText(mvp?.name || 'ستاره آرنا', 540, 725);
+  ctx.fillStyle = '#94A3B8'; ctx.font = '600 26px sans-serif'; ctx.fillText(`قدرت ${fa(mvp?.power || 0)}`, 540, 767);
+  ctx.fillStyle = '#22E7A6'; ctx.font = '900 34px sans-serif'; ctx.fillText('جرأت داری؟ از لینک زیر مستقیم به چالشم بیا', 540, 885);
+  ctx.fillStyle = '#CBD5E1'; ctx.font = '500 23px sans-serif'; ctx.direction = 'ltr'; ctx.fillText(url, 540, 940);
+  return new Promise(resolve => canvas.toBlob(resolve, 'image/png', 0.94));
+}
+
 function History({ battles }) {
   const labels = { bot: 'تمرین با ربات', online: 'نبرد آنلاین', lobby: 'لابی خصوصی' };
   return <section className="duelHistoryV2">
@@ -148,9 +176,11 @@ function History({ battles }) {
     {(battles || []).length ? (battles || []).slice(0, 6).map(battle => {
       const delta = num(battle.userDelta);
       const won = delta > 0 || !battle.stakePoints && num(battle.userScore) > num(battle.opponentScore);
+      const settlement = battle.settlementStatus || 'settled';
+      const settlementLabel = { pending: 'تسویه در انتظار', settled: 'تسویه‌شده', refunded: 'برگشت‌خورده' }[settlement];
       return <div className="duelHistoryRow card" key={battle.id}>
         <span className={won ? 'up' : delta < 0 ? 'down' : ''}>{won ? '▲' : delta < 0 ? '▼' : '◆'}</span>
-        <div><b>{labels[battle.mode] || 'دوئل کارت'}</b><small>{fa(battle.userScore)} - {fa(battle.opponentScore)}</small></div>
+        <div><b>{labels[battle.mode] || 'دوئل کارت'}</b><small>{fa(battle.userScore)} - {fa(battle.opponentScore)} · {settlementLabel}</small></div>
         <strong className={delta >= 0 ? 'up' : 'down'}>{delta > 0 ? `+${fa(delta)}` : fa(delta)}</strong>
       </div>;
     }) : <div className="card pad center muted">اولین نبردت را شروع کن؛ تاریخچه اینجا ساخته می‌شود.</div>}
@@ -168,6 +198,45 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
   const mode = modeCopy({ stake, vsBot, roomCode, initialStart });
   const session = useGameSession(api, token, 'card_duel', stake, vsBot,
     roomCode, externalSocket, initialStart, enabled);
+  const [sharing, setSharing] = useState(false);
+  const [shareNotice, setShareNotice] = useState('');
+
+  const shareResult = async () => {
+    if (sharing) return;
+    setSharing(true); setShareNotice('در حال ساخت لینک چالش…');
+    try {
+      const invite = await session.createChallenge();
+      const scoreState = session.g.state?.score || {};
+      const mine = session.g.me || 'X';
+      const other = mine === 'X' ? 'O' : 'X';
+      const myScore = num(scoreState[mine]);
+      const theirScore = num(scoreState[other]);
+      const title = session.g.winner === 'DRAW' ? 'نبرد برابر!' : session.g.winner === mine ? 'من آرنا را بردم!' : 'این بار حریف برد!';
+      const mvp = resultMvp(session.g.state);
+      const opponent = session.g.players?.[other]?.nickname || 'حریف';
+      const text = `${title}\nنتیجه ${fa(myScore)} - ${fa(theirScore)}\nMVP: ${mvp?.name || 'ستاره آرنا'}\nمستقیم به چالشم بیا:`;
+      const blob = await renderResultCard({ result: title, score: `${fa(myScore)} - ${fa(theirScore)}`, mvp, opponent, url: invite.shareUrl });
+      const file = blob ? new File([blob], 'ghelgheli-result.png', { type: 'image/png' }) : null;
+      if (navigator.share && (!file || !navigator.canShare || navigator.canShare({ files: [file] }))) {
+        await navigator.share({ title: 'نتیجه دوئل قلقلی', text, url: invite.shareUrl, ...(file ? { files: [file] } : {}) });
+        setShareNotice('کارت نتیجه آماده و ارسال شد ');
+      } else {
+        await navigator.clipboard.writeText(`${text}\n${invite.shareUrl}`);
+        if (blob) {
+          const href = URL.createObjectURL(blob);
+          const anchor = document.createElement('a'); anchor.href = href; anchor.download = 'ghelgheli-result.png'; anchor.click();
+          window.setTimeout(() => URL.revokeObjectURL(href), 2000);
+        }
+        setShareNotice('متن چالش کپی و کارت نتیجه دانلود شد');
+      }
+      req('/api/analytics/events', 'POST', {
+        event: 'share', platform: 'web', gameId: 'card_duel',
+        matchId: session.g.matchId, target: navigator.share ? 'system_share' : 'clipboard',
+      }, token).catch(() => {});
+    } catch (shareError) {
+      if (shareError?.name !== 'AbortError') setShareNotice(shareError.message || 'اشتراک‌گذاری ناموفق بود');
+    } finally { setSharing(false); }
+  };
 
   const load = async () => {
     try {
@@ -255,6 +324,7 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
       <button type="button" onClick={() => { session.leave(); setEnabled(false); }}>لغو و ویرایش ترکیب</button>
     </section>}
 
+    {enabled && session.connectionNotice && <div className="gameReconnectBanner">{session.connectionNotice}</div>}
     {enabled && session.phase === 'playing' && <LiveArena session={session} />}
 
     {enabled && session.phase === 'over' && <section className={`duelFinale ${winner === 'DRAW' ? 'draw' : iWon ? 'won' : 'lost'}`}>
@@ -266,9 +336,18 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
           : winner === 'DRAW' ? 'ورودی کامل هر دو نفر برمی‌گردد.'
             : iWon ? `پات مسابقه پس از کسر کارمزد برایت تسویه می‌شود.`
               : `${fa(session.g.stake || stake)} امتیاز ورودی از دست رفت.`}</p>
-        <div><button className="main" type="button" onClick={() => {
-          if (session.g.matchMode === 'lobby') onBack(); else if (vsBot) session.playBot(); else if (stake > 0) session.joinOnline(); else onBack();
-        }}>{session.g.matchMode === 'lobby' ? 'بازگشت به لابی' : 'نبرد دوباره'}</button>
+        <div className={`duelSettlement ${session.g.settlementStatus || 'settled'}`}>
+          {{ pending: ' در حال تسویه امن', settled: ' تسویه کامل شد', refunded: ' ورودی برگشت خورد' }[session.g.settlementStatus || 'settled']}
+        </div>
+        <div className="duelSharePreview">
+          <b>کارت نتیجه + لینک چالش مستقیم</b>
+          <small>MVP: {resultMvp(session.g.state)?.name || 'ستاره آرنا'}</small>
+          <button type="button" onClick={shareResult} disabled={sharing}>{sharing ? 'در حال ساخت…' : ' اشتراک نتیجه و دعوت به چالش'}</button>
+          {shareNotice && <i>{shareNotice}</i>}
+        </div>
+        <div><button className="main" type="button" disabled={session.rematchWaiting || !session.g.rematchAvailable} onClick={session.rematch}>
+          {session.rematchWaiting ? 'منتظر قبول حریف…' : session.g.vsBot ? 'نبرد دوباره فوری' : 'نبرد دوباره با همین حریف'}
+        </button>
           <button type="button" onClick={() => { session.leave(); setEnabled(false); }}>تغییر ترکیب</button></div>
       </div>
     </section>}
