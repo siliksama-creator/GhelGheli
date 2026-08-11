@@ -62,19 +62,19 @@ log "Deploying commit: $NEW_SHA"
 
 log "Installing backend dependencies"
 cd "$APP_DIR/backend"
-npm install --omit=dev --no-audit --no-fund
+npm ci --omit=dev --no-audit --no-fund
 
 log "Running database migrations"
 npm run migrate
 
 log "Building admin panel"
 cd "$APP_DIR/admin"
-npm install --no-audit --no-fund
+npm ci --no-audit --no-fund
 npm run build
 
 log "Building user web app"
 cd "$APP_DIR/userweb"
-npm install --no-audit --no-fund
+npm ci --no-audit --no-fund
 npm run build
 
 log "Reloading API as unprivileged user $SERVICE_USER"
@@ -103,7 +103,7 @@ done
 if [ "$HEALTHY" -ne 1 ]; then
   log "Health check FAILED — rolling back to $PREVIOUS_SHA"
   git reset --hard "$PREVIOUS_SHA"
-  cd "$APP_DIR/backend" && npm install --omit=dev --no-audit --no-fund
+  cd "$APP_DIR/backend" && npm ci --omit=dev --no-audit --no-fund
   pm2_user reload "$PM2_APP" --update-env || pm2_user start ecosystem.config.cjs
   pm2_user save
   die "Deploy rolled back. Check the $SERVICE_USER PM2 logs for $PM2_APP"
