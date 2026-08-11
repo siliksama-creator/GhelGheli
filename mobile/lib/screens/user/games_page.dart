@@ -35,7 +35,7 @@ class _GameEntry {
 const _games = <_GameEntry>[
   _GameEntry('tap', 'ضربه‌زن', '۵۰ لول ضربه بزن و شخصیت‌ها را باز کن', 'assets/games/tap/skin_1.webp',
       Color(0xFF84CC16), 'assets/games/tap/skin_1.webp'),
-  _GameEntry('penalty', 'ضربات پنالتی', 'شوت دقیق و مهار دروازه‌بان', 'assets/pass/football_icon.webp',
+  _GameEntry('penalty', 'ضربات پنالتی', 'شوت دقیق و مهار دروازه‌بان', 'assets/games/penalty_icon.png',
       Color(0xFF38BDF8), 'assets/games/penalty.webp'),
   _GameEntry('card_duel', 'دوئل کارت‌ها', 'نبرد سه‌کارتی و کارت‌های کلکسیونی',
       'assets/games/card_duel_glow.png', Color(0xFFFFD166), 'assets/games/card_duel_glow.png'),
@@ -227,7 +227,7 @@ class _GamesHubPageState extends State<GamesHubPage> {
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          'با هر بازی آنلاین XP میگیری',
+                          'آنلاین بازی کن، XP بگیر',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: const Color(0xFFE2E8F0),
                             fontSize: 11,
@@ -410,7 +410,7 @@ class _GamesHubPageState extends State<GamesHubPage> {
                   return;
                 }
                 if (_selectedMode == 0) {
-                  // تمرین فوری با هوش مصنوعی (بدون شمارنده، بدون معطلی، بدون آنلاین)
+                  // تمرین مستقیم با ربات؛ بدون صف و بدون جابه‌جایی امتیاز.
                   _launchGame(g.id, stake: 0, vsBot: true);
                 } else {
                   // مسابقه آنلاین با بازیکن واقعی (بدون ربات)
@@ -461,10 +461,10 @@ class _StakeRulesBanner extends StatelessWidget {
             ? 'در لابی، سازنده مقدار ورودی را انتخاب می‌کند'
             : 'برای ورود حداقل ${faNum(mode)} امتیاز لازم داری';
     final description = isPractice
-        ? 'نتیجه تمرین روی موجودی و رتبه لیگ اثر ندارد.'
+        ? 'بدون اثر روی موجودی و لیگ.'
         : isLobby
-            ? 'در لابی امتیازی، ورودی هر دو نفر امن قفل و بعد از نتیجه تسویه می‌شود.'
-            : 'در صورت باخت ${faNum(mode)} امتیاز کم می‌شود؛ برنده پات را پس از کسر ۱۰٪ کارمزد می‌گیرد.';
+            ? 'ورودی امتیازی تا پایان بازی امن می‌ماند.'
+            : 'باخت: −${faNum(mode)} · برد: پات پس از ۱۰٪ کارمزد.';
     return Container(
       padding: const EdgeInsets.all(Gaps.sm),
       decoration: BoxDecoration(
@@ -738,8 +738,8 @@ class _CleanGameTile extends StatelessWidget {
                             ),
                             child: Text(
                               isBot
-                                  ? 'تمرین فوری با هوش مصنوعی'
-                                  : 'مسابقه آنلاین (${faNum(mode)} امتیاز)',
+                                  ? 'تمرین فوری'
+                                  : 'آنلاین · ${faNum(mode)} امتیاز',
                               style: TextStyle(
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.w900,
@@ -1052,7 +1052,7 @@ class _PrivateLobbyHubState extends State<_PrivateLobbyHub> {
                       Padding(
                         padding: const EdgeInsets.only(left: 6),
                         child: ChoiceChip(
-                          label: Text(s == 0 ? 'رایگان' : '${faNum(s)}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900)),
+                          label: Text(s == 0 ? 'رایگان' : faNum(s), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900)),
                           selected: _stake == s,
                           selectedColor: const Color(0xFFA855F7),
                           onSelected: (val) {

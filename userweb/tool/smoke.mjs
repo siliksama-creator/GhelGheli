@@ -111,7 +111,8 @@ try {
     pageErrors.length = 0;
     await page.locator('.card', { hasText: 'دوئل کارت‌ها' }).last().click();
     await page.waitForTimeout(1200);
-    ok((await page.innerText('body')).includes('دوئل ۳ کارتی'),
+    const duelText = await page.innerText('body');
+    ok(duelText.includes('دوئل کارت‌ها') && duelText.includes('سه راند'),
       'card duel full screen renders');
     ok(pageErrors.length === 0, 'card duel has no runtime error');
     await page.getByRole('button', { name: /بازگشت/ }).first().click();

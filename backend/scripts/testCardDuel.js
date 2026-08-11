@@ -98,7 +98,7 @@ ok(/stake=\{Number\(active\.stake/.test(webHub) && !/بازی مستقل با ک
   'Web دوئل کارت را با حالت انتخاب‌شده ۱۰۰/۱۰۰۰ اجرا می‌کند');
 ok(/card_duel.*دوئل کارت‌ها/.test(mobileHub) && /card_duel.*دوئل کارت‌ها/.test(webHub),
   'دوئل کارت در لابی هر دو کلاینت قابل انتخاب است');
-ok(/در صورت باخت/.test(mobileHub) && /در صورت باخت/.test(webHub),
+ok(/در صورت باخت|باخت:/.test(mobileHub) && /در صورت باخت|باخت:/.test(webHub),
   'ریسک کسر امتیاز قبل از ورود در هر دو کلاینت روشن است');
 ok(/بچرخون/.test(mobileWheel) && !/بچرخان/.test(mobileWheel), 'Android: متن دکمه گردونه «بچرخون» است');
 ok(/بچرخون/.test(webWheel) && !/بچرخان/.test(webWheel), 'Web: متن دکمه گردونه «بچرخون» است');

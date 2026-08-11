@@ -38,14 +38,14 @@ export default function Shop({ token, setMsg, reloadProfile }) {
         const equippedFor = k => k==='club_badge'?d.equipped.club : k==='card_frame'?d.equipped.frame : d.equipped.color;
         const KINDS = [
           ['club_badge','باشگاه‌ها','با خرید نشان، عضو دائمی باشگاه می‌شوی؛ اسمت در فهرست هواداران آن باشگاه می‌آید و می‌توانی نشان را عکس پروفایلت کنی.'],
-          ['card_frame','قاب کارت','دور کارت‌های داخل پروفایلت'],
+          ['card_frame','قاب کارت','قاب کارت‌های پروفایل'],
           ['name_color','رنگ اسم','رنگ اسمت در جدول لیگ و چت'],
         ];
         return (
           <div style={{ display:'flex', flexDirection:'column', gap:'16px', maxWidth:'820px', margin:'0 auto', padding:'0 12px 80px' }}>
             <div style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'16px', padding:'16px' }}>
               <h2 style={{ color:'#FFF', fontWeight:'900', margin:'0 0 6px' }}> فروشگاه قلقلی</h2>
-              <p style={{ color:'#CBD5E1', fontSize:'12.5px', lineHeight:1.6 }}>هر آیتمی که <b>جداگانه</b> بخری، برای همیشه مال توست — با تمام شدن اشتراک هم از بین نمی‌رود. آیتم‌ها فقط ظاهر بازی را عوض می‌کنند.</p>
+              <p style={{ color:'#CBD5E1', fontSize:'12.5px', lineHeight:1.6 }}>خرید مستقیم <b>دائمی</b> است؛ پلاس دسترسی ۳۰روزه می‌دهد. همهٔ آیتم‌ها صرفاً ظاهری‌اند.</p>
               <p style={{ color:'#94A3B8', fontSize:'11px', marginTop:'6px' }}>موجودی کیف پول: <b style={{ color:'#FFD36B' }}>{fa(d.balance)} تومان</b></p>
             </div>
 
@@ -58,13 +58,14 @@ export default function Shop({ token, setMsg, reloadProfile }) {
                 </div>
                 <b style={{ color:'#FFD700', fontSize:'15px' }}>{fa(d.plus.price)} <i style={{ fontSize:'11px' }}>تومان</i></b>
               </div>
-              <ul style={{ background:'rgba(0,0,0,0.2)', borderRadius:'12px', padding:'10px 16px', margin:'0 0 10px' }}>
-                {(d.plus.perks||[]).map(p=><li key={p} style={{ color:'#E2E8F0', fontSize:'11.5px', margin:'4px 0' }}>• {p}</li>)}
-              </ul>
-              <div style={{ background:'rgba(255,211,107,0.08)', border:'1px solid rgba(255,211,107,0.2)', borderRadius:'10px', padding:'8px 10px', marginBottom:'10px' }}>
-                <b style={{ color:'#FFD36B', fontSize:'11px' }}>بعد از پایان اشتراک چه می‌شود؟</b>
-                <p style={{ color:'#CBD5E1', fontSize:'11px', margin:'4px 0 0' }}>{d.plus.expiryNote}</p>
+              <div className="plusHighlights">
+                <span> باشگاه دائمی</span><span> همه قاب‌ها</span><span> ستاره پروفایل</span>
               </div>
+              <details className="plusDetails">
+                <summary>جزئیات و شرایط پلاس</summary>
+                <ul>{(d.plus.perks||[]).map(p=><li key={p}>{p}</li>)}</ul>
+                <p>{d.plus.expiryNote}</p>
+              </details>
               <button disabled={busy==='plus'} onClick={()=>setPlusConfirm(true)} style={{ width:'100%', padding:'12px', borderRadius:'12px', border:'none', background:'linear-gradient(135deg, #FFD700, #FF9F43, #FF007A)', color:'#1E0A00', fontWeight:'900', fontSize:'14px', cursor:'pointer', boxShadow:'0 4px 16px rgba(255,159,67,0.4)' }}>
                 {busy==='plus' ? 'در حال خرید...' : d.plus.active ? 'تمدید یک ماه دیگر' : 'فعال‌سازی پلاس'}
               </button>

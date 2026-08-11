@@ -126,7 +126,7 @@ export default function Home({ token, p, rewards, load, setMsg, openProfile, ope
           <small style={{ color:'#84CC16', fontSize:'10px', fontWeight:'700' }}>دوستان</small>
         </button>
         <button onClick={openInventory} style={{ background:'linear-gradient(135deg, #38BDF822, #38BDF80A)', border:'1px solid #38BDF855', borderRadius:'16px', padding:'12px 6px', display:'flex', flexDirection:'column', alignItems:'center', gap:'6px', cursor:'pointer', boxShadow:'0 4px 12px #38BDF822' }}>
-          <span style={{ width:'40px', height:'40px', borderRadius:'50%', background:'#38BDF822', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'20px' }}>🃏</span>
+          <span style={{ width:'40px', height:'40px', borderRadius:'50%', background:'#38BDF822', display:'flex', alignItems:'center', justifyContent:'center' }}><img src="/games/card_duel_glow.png" alt="" width="30" height="30" style={{ objectFit:'contain' }} /></span>
           <b style={{ color:'#FFF', fontSize:'12px', fontWeight:'900' }}>کلکسیون</b>
           <small style={{ color:'#38BDF8', fontSize:'10px', fontWeight:'700' }}>{fa(inventory.length)} نوع</small>
         </button>
@@ -140,9 +140,9 @@ export default function Home({ token, p, rewards, load, setMsg, openProfile, ope
           <div style={{ flex:1 }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
               <b style={{ color:'#FFF', fontSize:'14px', fontWeight:'900' }}>ثبت کارت‌های قلقلی</b>
-              <span style={{ background:'rgba(245,158,11,0.16)', border:'1px solid rgba(245,158,11,0.45)', color:'#F59E0B', padding:'3px 8px', borderRadius:'99px', fontSize:'10px', fontWeight:'900' }}>کارت داری اینجا ثبت کن !</span>
+              <span style={{ background:'rgba(245,158,11,0.16)', border:'1px solid rgba(245,158,11,0.45)', color:'#F59E0B', padding:'3px 8px', borderRadius:'99px', fontSize:'10px', fontWeight:'900' }}>ثبت سریع</span>
             </div>
-            <p style={{ color:'#CBD5E1', fontSize:'11.5px', margin:'4px 0 0', lineHeight:1.45, fontWeight:'600' }}>کارت‌های فیزیکی قلقلی را می‌توانید از فروشگاه‌ها و سوپرمارکت‌ها تهیه کنید</p>
+            <p style={{ color:'#CBD5E1', fontSize:'11.5px', margin:'4px 0 0', lineHeight:1.45, fontWeight:'600' }}>عکس کارت و کدش را همین‌جا ثبت کن.</p>
           </div>
         </div>
         <PhotoCardBox token={token} setMsg={setMsg} onDone={load} />
@@ -174,7 +174,7 @@ export default function Home({ token, p, rewards, load, setMsg, openProfile, ope
           <div style={{ textAlign:'center', padding:'20px' }}>
             <div style={{ fontSize:'40px', marginBottom:'8px' }}>🃏</div>
             <b style={{ color:'#FFF' }}>هنوز کارتی در کلکسیون شما نیست</b>
-            <p style={{ color:'#94A3B8', fontSize:'12px', marginTop:'4px' }}>یک کد کارت را ثبت کن یا از کارتت عکس بگیر تا اینجا نمایش داده شود.</p>
+            <p style={{ color:'#94A3B8', fontSize:'12px', marginTop:'4px' }}>بعد از ثبت، کارت‌ها اینجا دیده می‌شوند.</p>
             <img src="/games/empty_collection.webp" alt="" style={{ width:'120px', opacity:0.6, marginTop:'12px' }} onError={e=>e.currentTarget.style.display='none'} />
           </div>
         )}

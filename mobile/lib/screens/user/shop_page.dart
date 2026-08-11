@@ -274,10 +274,9 @@ class _ShopPageState extends State<ShopPage> {
                   'club_badge',
                   'باشگاه‌ها',
                   Icons.shield_rounded,
-                  'با خرید نشان، عضو دائمی باشگاه می‌شوی و می‌توانی نشان را '
-                      'عکس پروفایلت کنی.'
+                  'عضویت دائمی و نشان پروفایل'
                 ],
-                ['card_frame', 'قاب کارت', Icons.crop_portrait_rounded, 'دور کارت‌های پروفایلت'],
+                ['card_frame', 'قاب کارت', Icons.crop_portrait_rounded, 'قاب کارت‌های پروفایل'],
                 ['name_color', 'رنگ اسم', Icons.palette_rounded, 'رنگ اسمت در جدول لیگ و چت'],
               ])
                 if (of(group[0] as String).isNotEmpty) ...[
@@ -331,9 +330,8 @@ class _IntroCard extends StatelessWidget {
                   ?.copyWith(fontWeight: FontWeight.w900)),
           Gaps.vXxs,
           Text(
-            'هر آیتمی که جداگانه بخری، برای همیشه مال توست — با تمام شدن '
-            'اشتراک هم از بین نمی‌رود. آیتم‌ها فقط ظاهر را عوض می‌کنند و هیچ '
-            'تأثیری روی امتیاز، جایزه یا رتبهٔ لیگ ندارند.',
+            'خرید مستقیم دائمی است؛ پلاس دسترسی ۳۰روزه می‌دهد. '
+            'همهٔ آیتم‌ها صرفاً ظاهری‌اند.',
             style: theme.textTheme.bodySmall,
           ),
           Gaps.vXxs,
@@ -489,6 +487,26 @@ class _MyClubsCard extends StatelessWidget {
   }
 }
 
+class _PlusHighlight extends StatelessWidget {
+  const _PlusHighlight({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFD36B).withValues(alpha: 0.08),
+          borderRadius: Corners.rSm,
+          border: Border.all(color: const Color(0xFFFFD36B).withValues(alpha: 0.18)),
+        ),
+        alignment: Alignment.center,
+        child: Text(label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Color(0xFFFFE099), fontSize: 10.5, fontWeight: FontWeight.w800)),
+      );
+}
+
 class _PlusCard extends StatelessWidget {
   const _PlusCard(
       {required this.plus, required this.onBuy, required this.busy});
@@ -531,35 +549,40 @@ class _PlusCard extends StatelessWidget {
             ],
           ),
           Gaps.vXs,
-          // The perk list comes from the server so the app, the web app and
-          // the store listing can never describe Plus differently.
-          for (final perk in (plus['perks'] as List? ?? const []))
-            Padding(
-              padding: const EdgeInsets.only(bottom: 3),
-              child: Text(' $perk', style: theme.textTheme.bodySmall),
-            ),
+          const Row(children: [
+            Expanded(child: _PlusHighlight(label: 'باشگاه دائمی')),
+            Gaps.hXxs,
+            Expanded(child: _PlusHighlight(label: 'همه قاب‌ها')),
+            Gaps.hXxs,
+            Expanded(child: _PlusHighlight(label: 'ستاره پروفایل')),
+          ]),
           Gaps.vXs,
-          // The honest small print, before the money leaves. A subscription
-          // that quietly takes things back is the fastest way to lose a
-          // paying user's trust.
-          Container(
-            padding: const EdgeInsets.all(Gaps.sm),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFD36B).withValues(alpha: 0.10),
-              borderRadius: Corners.rMd,
-              border: Border.all(
-                  color: const Color(0xFFFFD36B).withValues(alpha: 0.28)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          Theme(
+            data: theme.copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              childrenPadding: const EdgeInsets.only(bottom: Gaps.xs),
+              dense: true,
+              title: const Text('جزئیات و شرایط پلاس',
+                  style: TextStyle(color: Color(0xFFFFD36B), fontSize: 11, fontWeight: FontWeight.w800)),
               children: [
-                Text('بعد از پایان اشتراک چه می‌شود؟',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFFC79415))),
-                Gaps.vXxs,
-                Text('${plus['expiryNote'] ?? ''}',
-                    style: theme.textTheme.bodySmall),
+                for (final perk in (plus['perks'] as List? ?? const []))
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 3),
+                    child: Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Text('• $perk', style: theme.textTheme.bodySmall),
+                    ),
+                  ),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(Gaps.xs),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFD36B).withValues(alpha: 0.08),
+                    borderRadius: Corners.rSm,
+                  ),
+                  child: Text('${plus['expiryNote'] ?? ''}', style: theme.textTheme.bodySmall),
+                ),
               ],
             ),
           ),

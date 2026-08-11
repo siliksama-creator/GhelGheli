@@ -88,10 +88,10 @@ class _ArenaHero extends StatelessWidget {
 class _RuleStrip extends StatelessWidget {
   const _RuleStrip();
   @override
-  Widget build(BuildContext context) => AppCard(
-        padding: const EdgeInsets.all(Gaps.sm),
+  Widget build(BuildContext context) => const AppCard(
+        padding: EdgeInsets.all(Gaps.sm),
         child: Row(
-          children: const [
+          children: [
             Expanded(child: _RuleStep(number: '۱', title: 'تیم بچین', subtitle: 'سه نقش مکمل')),
             Icon(Icons.chevron_left_rounded, color: Colors.white24),
             Expanded(child: _RuleStep(number: '۲', title: 'مخفی انتخاب کن', subtitle: 'هم‌زمان با حریف')),

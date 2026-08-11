@@ -13,10 +13,10 @@ import { fa, asset, avatarUrl, req } from './lib/api.js';
 import './growth.css';
 
 const GAMES = [
-  { id: 'tap', title: 'ضربه‌زن', emoji: '⚽', desc: '۵۰ لول ضربه بزن و شخصیت‌ها را باز کن', accent: '#84CC16', singlePlayer: true, art: '/games/tap/skin_1.webp' },
-  { id: 'penalty', title: 'ضربات پنالتی', emoji: '🥅', desc: 'شوت دقیق و مهار دروازه‌بان', accent: '#38BDF8', art: '/games/penalty.webp' },
-  { id: 'card_duel', title: 'دوئل کارت‌ها', emoji: '🃏', desc: 'نبرد سه‌کارتی و کارت‌های کلکسیونی', accent: '#FFD166', art: '/games/card_duel.webp' },
-  { id: 'memory', title: 'جفت‌یاب', emoji: '🎁', desc: 'جفت‌های فوتبالی را به خاطر بسپار', accent: '#A855F7', art: '/games/memory.webp' },
+  { id: 'tap', title: 'ضربه‌زن', icon: '/games/tap/skin_1.webp', desc: '۵۰ لول ضربه بزن و شخصیت‌ها را باز کن', accent: '#84CC16', singlePlayer: true, art: '/games/tap/skin_1.webp' },
+  { id: 'penalty', title: 'ضربات پنالتی', icon: '/games/penalty_icon.png', desc: 'شوت دقیق و مهار دروازه‌بان', accent: '#38BDF8', art: '/games/penalty.webp' },
+  { id: 'card_duel', title: 'دوئل کارت‌ها', icon: '/games/card_duel_glow.png', desc: 'نبرد سه‌کارتی و کارت‌های کلکسیونی', accent: '#FFD166', art: '/games/card_duel_glow.png' },
+  { id: 'memory', title: 'جفت‌یاب', icon: '/games/memory/medal.webp', desc: 'جفت‌های فوتبالی را به خاطر بسپار', accent: '#A855F7', art: '/games/memory.webp' },
 ];
 
 function tierLabel(level){
@@ -186,7 +186,7 @@ export default function Games({ api, token }) {
   const t = tierLabel(lvl);
 
   return (
-    <div style={{ maxWidth: '820px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div style={{ width: '100%', minWidth: 0, maxWidth: '820px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* ── Header ترکیبی: پروفایل + XP + لول (۲ باکس قبلی ترکیب شدند) ── */}
       <div
         className="card"
@@ -217,7 +217,7 @@ export default function Games({ api, token }) {
               </div>
             </div>
             <p style={{ color: '#E2E8F0', fontSize: '11px', margin: 0, lineHeight: 1.4, fontWeight: '600' }}>
-              با هر بازی آنلاین XP میگیری
+              آنلاین بازی کن، XP بگیر
             </p>
           </div>
         </div>
@@ -238,13 +238,6 @@ export default function Games({ api, token }) {
           </div>
         )}
       </div>
-
-      <GrowthHub api={api} token={token} onSocketGame={(socket, start) => setActive({
-        id: start.gameId || 'card_duel',
-        stake: Number(start.stake || 0),
-        externalSocket: socket,
-        initialStart: start,
-      })} />
 
       {/* Tap Game Hero Banner */}
       <div
@@ -267,7 +260,7 @@ export default function Games({ api, token }) {
             <h3 style={{ color: '#FFF', fontWeight: '900', margin: 0, fontSize: '15px' }}>بازی ضربه‌زن (تک‌نفره)</h3>
             <span style={{ background: '#84CC16', color: '#000', padding: '2px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold' }}>۵۰ لول</span>
           </div>
-          <p style={{ color: '#CBD5E1', fontSize: '12px', margin: 0 }}>ضربه بزن، شخصیت‌های مخفی را باز کن و امتیاز بگیر</p>
+          <p style={{ color: '#CBD5E1', fontSize: '12px', margin: 0 }}>ضربه بزن، شخصیت باز کن، امتیاز بگیر</p>
         </div>
         <span style={{ fontSize: '28px' }}>⚽</span>
       </div>
@@ -315,10 +308,10 @@ export default function Games({ api, token }) {
               ? 'در لابی، سازنده مقدار ورودی را انتخاب می‌کند'
               : `برای ورود حداقل ${fa(mode)} امتیاز لازم داری`}</b>
           <small>{mode === 0
-            ? 'نتیجه تمرین روی موجودی و رتبه لیگ اثر ندارد.'
+            ? 'بدون اثر روی موجودی و لیگ.'
             : mode === -1
-              ? 'اگر لابی امتیازی باشد، ورودی هر دو نفر قفل و پس از نتیجه امن تسویه می‌شود.'
-              : `در صورت باخت ${fa(mode)} امتیاز از دست می‌دهی؛ برنده پات را پس از کسر ۱۰٪ کارمزد می‌گیرد.`}</small>
+              ? 'ورودی امتیازی تا پایان بازی امن می‌ماند.'
+              : `باخت: −${fa(mode)} · برد: پات پس از ۱۰٪ کارمزد.`}</small>
         </div>
       </div>
 
@@ -498,15 +491,15 @@ export default function Games({ api, token }) {
               }}
             >
               <div style={{ height: '86px', background: `linear-gradient(135deg, ${g.accent}22, transparent)`, display: 'flex', alignItems: 'center', padding: '0 16px', gap: '12px', position:'relative' }}>
-                <span style={{ fontSize: '32px' }}>{g.emoji}</span>
+                <img src={g.icon} alt="" className="gameTileIcon" />
                 <div style={{ flex:1 }}>
                   <h4 style={{ color: '#FFF', fontWeight: '900', margin: '0 0 2px', fontSize: '14px' }}>{g.title}</h4>
                   <p style={{ color: '#94A3B8', fontSize: '11px', margin: 0 }}>{g.desc}</p>
                 </div>
                 <span style={{ fontSize: '11px', fontWeight: '900', color: mode === 0 ? '#22E7A6' : (mode===1000 ? '#FFD166' : '#38BDF8'), background: 'rgba(255,255,255,0.06)', padding: '4px 8px', borderRadius: '10px', border: `1px solid ${mode===0 ? '#22E7A6' : (mode===1000 ? '#FFD166' : '#38BDF8')}66` }}>
                   {mode === 0
-                    ? 'تمرین فوری با هوش مصنوعی'
-                    : `مسابقه آنلاین (${fa(mode)} امتیاز)`}
+                    ? 'تمرین فوری'
+                    : `آنلاین · ${fa(mode)} امتیاز`}
                 </span>
               </div>
               <div style={{ padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap:'8px', background:'rgba(0,0,0,0.2)' }}>
@@ -515,15 +508,20 @@ export default function Games({ api, token }) {
                     style={{ color:'#A855F7', border:'1px solid #A855F777', background:'#A855F71A', borderRadius:'10px', padding:'6px 10px', fontSize:'11px', fontWeight:'800', cursor:'pointer' }}>
                     رکوردی با ساعت
                   </button>
-                ) : (
-                  <span style={{ color: '#64748B', fontSize: '11px' }}>برای شروع ضربه بزنید</span>
-                )}
-                <span style={{ background: g.accent, color: '#000', padding: '6px 14px', borderRadius: '10px', fontWeight: '900', fontSize: '12px' }}>شروع</span>
+                ) : <span />}
+                <span style={{ background: g.accent, color: '#000', padding: '7px 16px', borderRadius: '10px', fontWeight: '900', fontSize: '12px' }}>شروع</span>
               </div>
             </div>
           ))}
         </div>
       )}
+
+      <GrowthHub api={api} token={token} onSocketGame={(socket, start) => setActive({
+        id: start.gameId || 'card_duel',
+        stake: Number(start.stake || 0),
+        externalSocket: socket,
+        initialStart: start,
+      })} />
     </div>
   );
 }
@@ -603,7 +601,7 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
           isOnlineMatch ? (
             <div style={{ padding: '50px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
               <div style={{ width:'96px', height:'96px', border:'6px solid rgba(255,255,255,0.12)', borderTopColor:'#38BDF8', borderRadius:'50%', animation:'spin 1s linear infinite' }} />
-              <h3 style={{ color: '#FFF', fontWeight: '900', margin: 0, fontSize:'16px' }}>در جستجوی حریف ....</h3>
+              <h3 style={{ color: '#FFF', fontWeight: '900', margin: 0, fontSize:'16px' }}>در جستجوی حریف…</h3>
               <button type="button" onClick={() => { leave(); onBack(); }} style={{ padding:'10px 28px', borderRadius:'12px', border:'1px solid rgba(255,255,255,0.2)', background:'rgba(255,255,255,0.06)', color:'#FFF', fontWeight:'900', cursor:'pointer' }}>
                 لغو
               </button>
@@ -613,7 +611,7 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
               <div style={{ fontSize: '40px' }}>⏳</div>
               <h3 style={{ color: '#FFF', fontWeight: '900', margin: 0 }}>{stillSearching ? 'هنوز در صف حریف واقعی هستی' : 'در حال جستجوی حریف آنلاین...'}</h3>
               <p style={{ color: '#94A3B8', fontSize: '12.5px', maxWidth: '380px', lineHeight: 1.5 }}>
-                می‌توانی منتظر بمانی یا از قسمت تمرین با ربات تنها بازی کنی و یا از قسمت اتاق خصوصی لابی بسازی و با دوست خودت بازی کنی.
+                منتظر بمان یا با ربات تمرین کن.
               </p>
               <div style={{ display:'flex', gap:'8px', marginTop:'8px' }}>
                 <button type="button" onClick={playBot} style={{ background:'#38BDF8', color:'#000', border:'none', padding:'10px 20px', borderRadius:'12px', fontWeight:'900', cursor:'pointer' }}>شروع با ربات</button>

@@ -21,6 +21,7 @@ class _GrowthPanelState extends State<GrowthPanel> {
   final _search = TextEditingController();
   io.Socket? _socket;
   bool _socketTransferred = false;
+  bool _searchOpen = false;
   String? _busy;
   String? _notice;
 
@@ -121,7 +122,7 @@ class _GrowthPanelState extends State<GrowthPanel> {
           setState(() {
             _busy = null;
             _notice = answer['ok'] == true
-                ? 'دعوت برای ${friend['nickname']} ارسال شد؛ همین‌جا منتظر بمان'
+                ? 'دعوت برای ${friend['nickname']} ارسال شد'
                 : '${answer['error'] ?? 'ارسال دعوت ناموفق بود'}';
           });
         }
@@ -138,7 +139,8 @@ class _GrowthPanelState extends State<GrowthPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final missions = ((_data?['missions'] as List?) ?? const []).whereType<Map>().toList();
+    final missions = ((_data?['missions'] as List?) ?? const []).whereType<Map>().toList()
+      ..sort((a, b) => (a['claimed'] == true ? 1 : 0).compareTo(b['claimed'] == true ? 1 : 0));
     final friends = ((_data?['friends'] as List?) ?? const []).whereType<Map>().toList();
     final incoming = ((_data?['incoming'] as List?) ?? const []).whereType<Map>().toList();
     return Container(
@@ -150,9 +152,17 @@ class _GrowthPanelState extends State<GrowthPanel> {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
+          Image.asset(
+            'assets/games/social_mission_badge.png',
+            width: 54,
+            height: 54,
+            cacheWidth: 162,
+            filterQuality: FilterQuality.medium,
+          ),
+          Gaps.hXs,
           const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('ماموریت و دوستان', style: TextStyle(fontWeight: FontWeight.w900)),
-            Text('یک کار کوتاه، یک حریف واقعی، یک دلیل برای برگشتن', style: TextStyle(fontSize: 9.5, color: Colors.white54)),
+            Text('پاداش بگیر؛ حریف آنلاین پیدا کن', style: TextStyle(fontSize: 9.5, color: Colors.white54)),
           ])),
           Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
             decoration: BoxDecoration(color: const Color(0xFF22E7A6).withValues(alpha: .13), borderRadius: Corners.rPill),
@@ -169,28 +179,42 @@ class _GrowthPanelState extends State<GrowthPanel> {
               color: Colors.white.withValues(alpha: .045), borderRadius: Corners.rMd,
               border: Border.all(color: complete ? const Color(0xFFFFD166) : Colors.white12)),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(m['period'] == 'daily' ? 'روزانه' : 'هفتگی', style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 8.5)),
-                Text('${m['title']}', maxLines: 1, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900)),
-                Text('${m['description']}', maxLines: 1, style: const TextStyle(fontSize: 8.5, color: Colors.white54)),
+                Row(children: [
+                  Text(m['period'] == 'daily' ? 'روزانه' : 'هفتگی', style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 9.5)),
+                  const Spacer(),
+                  Text('+${faNum(m['reward'])}', style: const TextStyle(color: Color(0xFFFFD166), fontSize: 9.5, fontWeight: FontWeight.w900)),
+                ]),
+                Text('${m['title']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900)),
+                Text('${m['description']}', maxLines: 1, style: const TextStyle(fontSize: 9.5, color: Colors.white54)),
                 const Spacer(), LinearProgressIndicator(value: (progress / goal).clamp(0.0, 1.0), minHeight: 5),
                 const SizedBox(height: 5), Row(children: [
-                  Expanded(child: Text('${m['progress']}/${m['goal']} · ${m['reward']} امتیاز', style: const TextStyle(fontSize: 8.5))),
+                  Expanded(child: Text('${m['progress']}/${m['goal']}', style: const TextStyle(fontSize: 9.5))),
                   SizedBox(height: 27, child: FilledButton(onPressed: !complete || claimed ? null : () => _run('${m['key']}', () => widget.api.post('/api/missions/${m['key']}/claim', {})),
-                    child: Text(claimed ? 'گرفته شد' : complete ? 'دریافت' : 'ادامه', style: const TextStyle(fontSize: 8.5)))),
+                    child: Text(claimed ? 'گرفته شد' : complete ? 'دریافت' : 'ادامه', style: const TextStyle(fontSize: 9.5)))),
                 ]),
               ]),
             );
           })),
         Gaps.vSm,
         for (final friend in incoming) _friendRow(friend, incoming: true),
-        for (final friend in friends.take(5)) _friendRow(friend),
-        if (friends.isEmpty && incoming.isEmpty) const Text('هنوز دوستی اضافه نکرده‌ای؛ با نام قلقلی جستجو کن.', style: TextStyle(fontSize: 9.5, color: Colors.white54)),
-        Gaps.vXs,
-        Row(children: [
-          Expanded(child: TextField(controller: _search, textInputAction: TextInputAction.search, onSubmitted: (_) => _find(), decoration: const InputDecoration(isDense: true, hintText: 'جستجوی نام دوست…'))),
-          Gaps.hXs, IconButton.filled(onPressed: _find, icon: const Icon(Icons.person_search_rounded)),
-        ]),
-        for (final user in _results.take(5)) _searchRow(user),
+        for (final friend in friends.take(3)) _friendRow(friend),
+        SizedBox(
+          height: 36,
+          child: OutlinedButton.icon(
+            onPressed: () => setState(() => _searchOpen = !_searchOpen),
+            icon: Icon(_searchOpen ? Icons.close_rounded : Icons.person_add_alt_1_rounded, size: 17),
+            label: Text(_searchOpen ? 'بستن جستجو' : friends.isEmpty ? 'پیدا کردن دوست' : 'افزودن دوست'),
+          ),
+        ),
+        if (_searchOpen) ...[
+          Gaps.vXs,
+          Row(children: [
+            Expanded(child: TextField(controller: _search, textInputAction: TextInputAction.search, onSubmitted: (_) => _find(), decoration: const InputDecoration(isDense: true, hintText: 'نام قلقلی دوست…'))),
+            Gaps.hXs,
+            IconButton.filled(onPressed: _find, icon: const Icon(Icons.search_rounded)),
+          ]),
+          for (final user in _results.take(5)) _searchRow(user),
+        ],
         if (_notice != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text(_notice!, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFFFFD166), fontSize: 9.5))),
       ]),
     );
@@ -200,15 +224,15 @@ class _GrowthPanelState extends State<GrowthPanel> {
     padding: const EdgeInsets.only(bottom: 5),
     child: Row(children: [
       Container(width: 9, height: 9, decoration: BoxDecoration(shape: BoxShape.circle, color: friend['online'] == true ? const Color(0xFF22E7A6) : Colors.blueGrey)),
-      Gaps.hXs, Expanded(child: Text('${friend['nickname'] ?? 'کاربر'}', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800))),
-      if (incoming) SizedBox(height: 29, child: FilledButton(onPressed: () => _run('${friend['friendshipId']}', () => widget.api.post('/api/friends/requests/${friend['friendshipId']}/accept', {})), child: const Text('قبول', style: TextStyle(fontSize: 9))))
-      else SizedBox(height: 29, child: OutlinedButton(onPressed: friend['online'] == true ? () => _challenge(friend) : null, child: const Text('چالش', style: TextStyle(fontSize: 9)))),
+      Gaps.hXs, Expanded(child: Text('${friend['nickname'] ?? 'کاربر'}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800))),
+      if (incoming) SizedBox(height: 29, child: FilledButton(onPressed: () => _run('${friend['friendshipId']}', () => widget.api.post('/api/friends/requests/${friend['friendshipId']}/accept', {})), child: const Text('قبول', style: TextStyle(fontSize: 9.5))))
+      else SizedBox(height: 29, child: OutlinedButton(onPressed: friend['online'] == true ? () => _challenge(friend) : null, child: const Text('چالش', style: TextStyle(fontSize: 9.5)))),
     ]),
   );
 
   Widget _searchRow(Map user) => Padding(padding: const EdgeInsets.only(top: 5), child: Row(children: [
     Expanded(child: Text('${user['nickname'] ?? 'کاربر'}', style: const TextStyle(fontSize: 10))),
     SizedBox(height: 28, child: OutlinedButton(onPressed: user['relation'] == 'none' ? () => _run('${user['id']}', () => widget.api.post('/api/friends/${user['id']}/request', {})) : null,
-      child: Text(user['relation'] == 'none' ? 'افزودن' : 'در انتظار', style: const TextStyle(fontSize: 8.5)))),
+      child: Text(user['relation'] == 'none' ? 'افزودن' : 'در انتظار', style: const TextStyle(fontSize: 9.5)))),
   ]));
 }

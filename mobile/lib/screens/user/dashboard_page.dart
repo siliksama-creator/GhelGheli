@@ -171,7 +171,12 @@ class _DashboardPageState extends State<DashboardPage> {
               Gaps.hXs,
               Expanded(
                 child: _AnimatedQuickTile(
-                  icon: const Icon(Icons.group_add_rounded, size: 24, color: Color(0xFF84CC16)),
+                  icon: Image.asset(
+                    'assets/games/social_mission_badge.png',
+                    width: 30,
+                    height: 30,
+                    cacheWidth: 90,
+                  ),
                   title: 'دعوت',
                   subtitle: 'دوستان',
                   tint: const Color(0xFF84CC16),
@@ -183,7 +188,12 @@ class _DashboardPageState extends State<DashboardPage> {
               Gaps.hXs,
               Expanded(
                 child: _AnimatedQuickTile(
-                  icon: const Icon(Icons.style_rounded, size: 24, color: Color(0xFF38BDF8)),
+                  icon: Image.asset(
+                    'assets/games/card_duel_glow.png',
+                    width: 29,
+                    height: 29,
+                    cacheWidth: 87,
+                  ),
                   title: 'کلکسیون',
                   subtitle: '${faNum(inventory.length)} نوع',
                   tint: const Color(0xFF38BDF8),
@@ -239,7 +249,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                   color: BrandColors.amber.withValues(alpha: 0.16),
                                   border: Border.all(color: BrandColors.amber.withValues(alpha: 0.45)),
                                 ),
-                                child: const Text('کارت داری اینجا ثبت کن !',
+                                child: const Text('ثبت سریع',
                                     style: TextStyle(
                                         color: BrandColors.amber,
                                         fontSize: 10,
@@ -249,7 +259,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           ),
                           const SizedBox(height: 4),
                           const Text(
-                            'کارت‌های فیزیکی قلقلی را می‌توانید از فروشگاه‌ها و سوپرمارکت‌ها تهیه کنید',
+                            'عکس کارت و کدش را همین‌جا ثبت کن.',
                             style: TextStyle(
                               color: Color(0xFFCBD5E1),
                               fontSize: 11.5,
@@ -290,8 +300,7 @@ class _DashboardPageState extends State<DashboardPage> {
               child: EmptyState(
                   icon: Icons.style_outlined,
                   title: 'هنوز کارتی در کلکسیون شما نیست',
-                  message: 'یک کد کارت را ثبت کن یا از کارتت عکس بگیر '
-                      'تا اینجا نمایش داده شود.',
+                  message: 'بعد از ثبت، کارت‌ها اینجا دیده می‌شوند.',
                   image: 'assets/games/empty_collection.webp'),
             )
           else
