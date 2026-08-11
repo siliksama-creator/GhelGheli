@@ -8,7 +8,7 @@ const num = value => Number(value || 0);
 
 function DuelEffectVisual({ slug }) {
   return <div aria-hidden="true" style={{position:'absolute',zIndex:20,inset:0,display:'grid',placeItems:'center',pointerEvents:'none',animation:'duelCosmeticBurst 2s ease-out forwards'}}>
-    <img src={`/shop/cosmetics/${slug}.webp`} alt="" style={{width:'min(84%,460px)',aspectRatio:'16/9',objectFit:'cover',borderRadius:'24px',mixBlendMode:'screen',filter:'saturate(1.35) drop-shadow(0 0 26px rgba(255,209,102,.42))'}} />
+    <img src={`/shop/cosmetics-v3/${slug}.webp`} alt="" style={{width:'min(84%,460px)',aspectRatio:'16/9',objectFit:'cover',borderRadius:'24px',mixBlendMode:'screen',filter:'saturate(1.35) drop-shadow(0 0 26px rgba(255,209,102,.42))'}} />
   </div>;
 }
 const rarityColor = rarity => ({
@@ -159,7 +159,7 @@ function loadShopArtwork(slug) {
     const image = new Image();
     image.onload = () => resolve(image);
     image.onerror = () => resolve(null);
-    image.src = `/shop/cosmetics/${slug}.webp`;
+    image.src = `/shop/cosmetics-v3/${slug}.webp`;
   });
 }
 
@@ -358,7 +358,7 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
 
     {enabled && session.phase === 'over' && <section className={`duelFinale ${winner === 'DRAW' ? 'draw' : iWon ? 'won' : 'lost'}`}
       style={{'--duel-result-a':resultPalette[0],'--duel-result-b':resultPalette[1],background:myCosmetics.resultTemplate
-        ? `linear-gradient(rgba(2,6,23,.38),rgba(2,6,23,.76)),url('/shop/cosmetics/${myCosmetics.resultTemplate}.webp') center/cover,${resultPalette[0]}`
+        ? `linear-gradient(rgba(2,6,23,.38),rgba(2,6,23,.76)),url('/shop/cosmetics-v3/${myCosmetics.resultTemplate}.webp') center/cover,${resultPalette[0]}`
         : `radial-gradient(circle at 50% 15%,${resultPalette[1]}44,transparent 42%),${resultPalette[0]}`}}>
       <LiveArena session={session} />
       <div className="duelFinalePanel">

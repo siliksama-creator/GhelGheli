@@ -670,27 +670,112 @@ class _ProductArt extends StatelessWidget {
             ),
           ),
         ),
-        PositionedDirectional(
-          start: 8,
-          bottom: 7,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xD9020617),
-              borderRadius: Corners.rPill,
-              border: Border.all(color: Colors.white.withValues(alpha: .16)),
-            ),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(_kindIcon(kind), size: 11, color: const Color(0xFFBAE6FD)),
-              const SizedBox(width: 4),
-              const Text('پیش‌نمایش واقعی',
-                  style: TextStyle(fontSize: 7.8, color: Colors.white70, fontWeight: FontWeight.w800)),
-            ]),
-          ),
-        ),
+        if (kind == 'name_color')
+          Positioned.fill(child: _ShopNameArtwork(value: item['payload'] ?? slug)),
+        if (kind == 'result_template')
+          const Positioned.fill(child: _ShopResultArtwork()),
+        if (kind == 'emote_pack')
+          Positioned.fill(child: _ShopEmoteArtwork(slug: slug, metadata: item['metadata'])),
+
       ],
     );
   }
+}
+
+class _ShopNameArtwork extends StatelessWidget {
+  const _ShopNameArtwork({required this.value});
+  final Object? value;
+
+  @override
+  Widget build(BuildContext context) {
+    final key = '$value';
+    final gradient = nameGradientColors[key];
+    final style = const TextStyle(
+      fontSize: 24,
+      fontWeight: FontWeight.w900,
+      shadows: [Shadow(color: Colors.black, blurRadius: 12, offset: Offset(0, 3))],
+    );
+    final text = Text('قلقلی', style: style.copyWith(
+      color: gradient == null ? nameColorOf(key) ?? Colors.white : Colors.white,
+    ));
+    return IgnorePointer(
+      child: Center(
+        child: gradient == null
+            ? text
+            : ShaderMask(
+                shaderCallback: (bounds) => LinearGradient(colors: gradient).createShader(bounds),
+                blendMode: BlendMode.srcIn,
+                child: text,
+              ),
+      ),
+    );
+  }
+}
+
+class _ShopResultArtwork extends StatelessWidget {
+  const _ShopResultArtwork();
+  @override
+  Widget build(BuildContext context) => const IgnorePointer(
+    child: Center(
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Text('پایان بازی', style: TextStyle(fontSize: 7.5, color: Colors.white70, fontWeight: FontWeight.w800)),
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Text('۳  –  ۲', style: TextStyle(fontSize: 30, height: 1.05, color: Colors.white, fontWeight: FontWeight.w900,
+            shadows: [Shadow(color: Colors.black, blurRadius: 12)])),
+        ),
+        Text('MVP', style: TextStyle(fontSize: 7, color: Color(0xFFFFD166), fontWeight: FontWeight.w900, letterSpacing: 2)),
+      ]),
+    ),
+  );
+}
+
+class _ShopEmoteArtwork extends StatelessWidget {
+  const _ShopEmoteArtwork({required this.slug, required this.metadata});
+  final String slug;
+  final Object? metadata;
+
+  List<String> get messages {
+    if (metadata is Map && (metadata as Map)['messages'] is List) {
+      return ((metadata as Map)['messages'] as List).take(2).map((e) => '$e').toList();
+    }
+    return switch (slug) {
+      'emote_respect' => const ['بازی خوبی بود', 'دوباره؟'],
+      'emote_comeback' => const ['این یکی شانسی بود!', 'آماده جبران باش'],
+      _ => const ['گوووول! ⚽', 'باشگاه من همیشه آماده‌ست!'],
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) => IgnorePointer(
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 44, vertical: 20),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          for (int i = 0; i < messages.length; i++)
+            Align(
+              alignment: i == 0 ? Alignment.centerRight : Alignment.centerLeft,
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 160),
+                margin: const EdgeInsets.only(bottom: 7),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: i == 0 ? const Color(0xFFF8FAFC) : const Color(0xFFFFD166),
+                  borderRadius: BorderRadius.only(
+                    topLeft: const Radius.circular(13), topRight: const Radius.circular(13),
+                    bottomLeft: Radius.circular(i == 0 ? 13 : 3), bottomRight: Radius.circular(i == 0 ? 3 : 13),
+                  ),
+                  boxShadow: const [BoxShadow(color: Color(0x88000000), blurRadius: 12, offset: Offset(0, 5))],
+                ),
+                child: Text(messages[i], maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 8.5, color: Color(0xFF0F172A), fontWeight: FontWeight.w900)),
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _Pill extends StatelessWidget {

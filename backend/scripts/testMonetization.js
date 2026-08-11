@@ -6,6 +6,7 @@ const path = require('path');
 const root = path.join(__dirname, '..', '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 const migration = read('backend/migrations/052_monetization_catalogue.sql');
+const rateMigration = read('backend/migrations/054_referral_purchase_commission_5_percent.sql');
 const shop = read('backend/src/services/shopService.js');
 const referrals = read('backend/src/services/referralService.js');
 const wallet = read('backend/src/services/walletService.js');
@@ -64,7 +65,10 @@ for (const [kind, slugs] of Object.entries(required)) {
 
 // Commission is direct-only, atomic, auditable and idempotent.
 assert.strictEqual((referrals.match(/async function payPurchaseCommission/g) || []).length, 1);
-assert(referrals.includes('PURCHASE_COMMISSION_PERCENT = 10'));
+assert(referrals.includes('PURCHASE_COMMISSION_PERCENT = 5'));
+assert(referrals.includes('VALUES($1,$2,$3,$4,$5,0.0500,$6)'));
+assert(rateMigration.includes('SET DEFAULT 0.0500'));
+assert(rateMigration.includes('0.1000'), 'historical 10% audit rows must remain valid');
 assert(referrals.includes('purchase_referral_commissions'));
 assert(referrals.includes('ON CONFLICT(purchase_type, purchase_reference_id) DO NOTHING'));
 assert(referrals.includes("source: 'purchase_referral'"));

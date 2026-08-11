@@ -35,7 +35,7 @@ const wallet = require('./walletService');
 /** درصد کمیسیون امتیازی قدیمی (ثبت کارت و Tap). */
 const COMMISSION_PERCENT = 5;
 /** سهم نقدی معرف از هر خرید مستقیم دوست، به تومان. */
-const PURCHASE_COMMISSION_PERCENT = 10;
+const PURCHASE_COMMISSION_PERCENT = 5;
 /** آستانهٔ برداشت کیف پول. تنظیمات کیف پول نیز همین مقدار را enforce می‌کند. */
 const REFERRAL_WITHDRAWAL_THRESHOLD = 50000;
 
@@ -285,7 +285,7 @@ async function payCommission(client, userId, basePoints, source) {
 }
 
 /**
- * ۱۰٪ یک خرید واقعی را همان داخل تراکنش خرید به کیف پول معرف مستقیم واریز
+ * ۵٪ یک خرید واقعی را همان داخل تراکنش خرید به کیف پول معرف مستقیم واریز
  * می‌کند. ابتدا سند یکتای کمیسیون رزرو می‌شود و بعد wallet credit می‌خورد؛
  * بنابراین retry همان purchase هیچ‌وقت دوباره پول تولید نمی‌کند و rollback
  * هر کدام، خرید/کمیسیون/دفترکل را با هم برمی‌گرداند.
@@ -320,7 +320,7 @@ async function payPurchaseCommission(
     `INSERT INTO purchase_referral_commissions
        (referrer_id, referred_user_id, purchase_type, purchase_reference_id,
         purchase_amount, commission_rate, commission_amount)
-     VALUES($1,$2,$3,$4,$5,0.1000,$6)
+     VALUES($1,$2,$3,$4,$5,0.0500,$6)
      ON CONFLICT(purchase_type, purchase_reference_id) DO NOTHING
      RETURNING id`,
     [referrerId, buyerId, purchaseType, purchaseReferenceId, amount, earned],
@@ -333,7 +333,7 @@ async function payPurchaseCommission(
     source: 'purchase_referral',
     referenceType: purchaseType,
     referenceId: purchaseReferenceId,
-    description: `کمیسیون ۱۰٪ خرید مستقیم دوست (${purchaseType})`,
+    description: `کمیسیون ۵٪ خرید مستقیم دوست (${purchaseType})`,
   });
   if (credited.duplicate) {
     // The ledger is the final idempotency guard. Backfill the audit link if a

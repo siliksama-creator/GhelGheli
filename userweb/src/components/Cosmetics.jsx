@@ -33,12 +33,12 @@ const NAME_GRADIENTS = {
 };
 
 export const PROFILE_BACKGROUNDS = {
-  locker_room: 'linear-gradient(rgba(3,7,18,.38),rgba(3,7,18,.64)),url("/shop/cosmetics/locker_room.webp") center/cover no-repeat',
-  night_stadium: 'linear-gradient(rgba(2,6,23,.22),rgba(2,6,23,.58)),url("/shop/cosmetics/night_stadium.webp") center/cover no-repeat',
-  player_tunnel: 'linear-gradient(rgba(3,7,18,.28),rgba(3,7,18,.66)),url("/shop/cosmetics/player_tunnel.webp") center/cover no-repeat',
-  champion_podium: 'linear-gradient(rgba(3,7,18,.28),rgba(3,7,18,.62)),url("/shop/cosmetics/champion_podium.webp") center/cover no-repeat',
-  training_ground: 'linear-gradient(rgba(3,20,15,.28),rgba(3,7,18,.64)),url("/shop/cosmetics/training_ground.webp") center/cover no-repeat',
-  collection_room: 'linear-gradient(rgba(8,5,30,.25),rgba(3,7,18,.66)),url("/shop/cosmetics/collection_room.webp") center/cover no-repeat',
+  locker_room: 'linear-gradient(rgba(3,7,18,.38),rgba(3,7,18,.64)),url("/shop/cosmetics-v3/locker_room.webp") center/cover no-repeat',
+  night_stadium: 'linear-gradient(rgba(2,6,23,.22),rgba(2,6,23,.58)),url("/shop/cosmetics-v3/night_stadium.webp") center/cover no-repeat',
+  player_tunnel: 'linear-gradient(rgba(3,7,18,.28),rgba(3,7,18,.66)),url("/shop/cosmetics-v3/player_tunnel.webp") center/cover no-repeat',
+  champion_podium: 'linear-gradient(rgba(3,7,18,.28),rgba(3,7,18,.62)),url("/shop/cosmetics-v3/champion_podium.webp") center/cover no-repeat',
+  training_ground: 'linear-gradient(rgba(3,20,15,.28),rgba(3,7,18,.64)),url("/shop/cosmetics-v3/training_ground.webp") center/cover no-repeat',
+  collection_room: 'linear-gradient(rgba(8,5,30,.25),rgba(3,7,18,.66)),url("/shop/cosmetics-v3/collection_room.webp") center/cover no-repeat',
 };
 
 export const RESULT_PALETTES = {

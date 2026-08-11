@@ -82,7 +82,7 @@ enum ShareOutcome {
 
 String inviteMessage(String code) =>
     'کد دعوت من به قلقلی: $code\n'
-    'با این کد ثبت‌نام کن؛ هر دومون ۳ چرخش هدیه می‌گیریم و من از خریدهای مستقیم تو ۱۰٪ درآمد معرفی می‌گیرم.\n'
+    'با این کد ثبت‌نام کن؛ هر دومون ۳ چرخش هدیه می‌گیریم و من از خریدهای مستقیم تو ۵٪ درآمد معرفی می‌گیرم.\n'
     'https://ghelghelishop.ir';
 
 Future<ShareOutcome> shareInvite(ShareTarget target, String code) =>

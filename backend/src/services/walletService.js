@@ -72,7 +72,7 @@ const VALID_SOURCES = new Set([
   // filterable in the ledger and can never collide with an admin adjustment
   // on the shared UNIQUE (source, reference_id) index.
   'shop', 'subscription',
-  // ۱۰٪ خرید دوست مستقیماً و به‌صورت قابل برداشت وارد کیف پول معرف می‌شود.
+  // ۵٪ خرید دوست مستقیماً و به‌صورت قابل برداشت وارد کیف پول معرف می‌شود.
   // این منبع فقط از referralService و داخل همان تراکنش خرید صادر می‌شود.
   'purchase_referral',
   // جوایز نقدیِ گذر نبرد. منبع جدا لازم است چون UNIQUE (source,

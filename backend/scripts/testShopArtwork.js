@@ -6,9 +6,10 @@ const path = require('path');
 const sharp = require('sharp');
 
 const root = path.join(__dirname, '..', '..');
-const webDir = path.join(root, 'userweb', 'public', 'shop', 'cosmetics');
+const webDir = path.join(root, 'userweb', 'public', 'shop', 'cosmetics-v3');
 const mobileDir = path.join(root, 'mobile', 'assets', 'shop', 'cosmetics');
 const migration = fs.readFileSync(path.join(root, 'backend', 'migrations', '053_shop_semantic_artwork.sql'), 'utf8');
+const cinematicMigration = fs.readFileSync(path.join(root, 'backend', 'migrations', '055_shop_cinematic_artwork_v3.sql'), 'utf8');
 const webShop = fs.readFileSync(path.join(root, 'userweb', 'src', 'screens', 'Shop.jsx'), 'utf8');
 const mobileShop = fs.readFileSync(path.join(root, 'mobile', 'lib', 'screens', 'user', 'shop_page.dart'), 'utf8');
 const pubspec = fs.readFileSync(path.join(root, 'mobile', 'pubspec.yaml'), 'utf8');
@@ -35,27 +36,33 @@ assert.strictEqual(new Set(slugs).size, slugs.length, 'artwork slug list must be
     assert(fs.existsSync(mobile), `Android artwork missing: ${slug}`);
     const a = fs.readFileSync(web); const b = fs.readFileSync(mobile);
     assert(a.equals(b), `Web/Android artwork differs: ${slug}`);
-    assert(a.length > 1200 && a.length < 60000, `artwork size unreasonable: ${slug} (${a.length})`);
+    assert(a.length > 5000 && a.length < 90000, `artwork size/quality unreasonable: ${slug} (${a.length})`);
     assert.strictEqual(a.subarray(0, 4).toString(), 'RIFF', `${slug} is not WebP/RIFF`);
     const meta = await sharp(a).metadata();
     assert.strictEqual(meta.width, 640, `${slug} width`);
     assert.strictEqual(meta.height, 360, `${slug} height`);
     const stats = await sharp(a).stats();
-    assert(stats.entropy > 0.35, `${slug} is visually empty`);
+    assert(stats.entropy > 3.2, `${slug} lacks professional visual detail`);
     hashes.add(crypto.createHash('sha256').update(a).digest('hex'));
   }
   assert.strictEqual(hashes.size, slugs.length, 'each SKU must have distinct artwork bytes');
-  assert(webShop.includes('/shop/cosmetics/${item.slug}.webp'));
-  assert(webShop.includes('پیش‌نمایش واقعی') && !webShop.includes('KIND_PREVIEW'));
+  assert(cinematicMigration.includes("'/shop/cosmetics-v3/'"));
+  assert(cinematicMigration.includes('"artworkVersion":3'));
+  assert(webShop.includes('/shop/cosmetics-v3/${item.slug}.webp'));
+  assert(webShop.includes('shopNameSample') && webShop.includes('shopResultSample')
+    && webShop.includes('shopEmoteSample') && !webShop.includes('KIND_PREVIEW'));
+  assert(!webShop.includes('پیش‌نمایش آیتم'), 'generic preview badge must not cover artwork');
   assert(mobileShop.includes("'assets/shop/cosmetics/$slug.webp'"));
-  assert(mobileShop.includes('پیش‌نمایش واقعی'));
+  assert(mobileShop.includes('_ShopNameArtwork') && mobileShop.includes('_ShopResultArtwork')
+    && mobileShop.includes('_ShopEmoteArtwork'));
+  assert(!mobileShop.includes('پیش‌نمایش واقعی'), 'generic Android preview badge must be removed');
   assert(pubspec.includes('- assets/shop/cosmetics/'));
   const webGames = fs.readFileSync(path.join(root, 'userweb', 'src', 'games.jsx'), 'utf8');
   const mobileGames = fs.readFileSync(path.join(root, 'mobile', 'lib', 'screens', 'user', 'games', 'game_scaffold.dart'), 'utf8');
-  assert(webGames.includes('/shop/cosmetics/${slug}.webp') && webGames.includes('mixBlendMode'));
+  assert(webGames.includes('/shop/cosmetics-v3/${slug}.webp') && webGames.includes('mixBlendMode'));
   assert(mobileGames.includes("'assets/shop/cosmetics/${widget.slug}.webp'"));
   assert(!webGames.includes('EFFECT_ICON') && !mobileGames.includes("'golden_cup' => '🏆'"));
-  console.log(`✓ ${slugs.length} semantic Shop artworks are distinct, non-empty and byte-identical on Web/Android`);
+  console.log(`✓ ${slugs.length} cinematic Shop artworks are detailed, distinct and byte-identical on Web/Android`);
 })().catch((error) => {
   console.error(error.stack || error);
   process.exit(1);

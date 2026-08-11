@@ -529,7 +529,7 @@ export default function Games({ api, token }) {
 
 function MatchEffectVisual({ slug, finish = false }) {
   return <div aria-hidden="true" style={{ position:'absolute', zIndex:4, inset:0, display:'grid', placeItems:'center', pointerEvents:'none', animation:`${finish ? 'cosmeticFinish 2.8s ease-out infinite' : 'cosmeticEntry 1.8s ease-out forwards'}` }}>
-    <img src={`/shop/cosmetics/${slug}.webp`} alt="" style={{ width:'min(82%,430px)', aspectRatio:'16/9', objectFit:'cover', borderRadius:'24px', mixBlendMode:'screen', opacity:.9, filter:'saturate(1.35) drop-shadow(0 0 28px rgba(56,189,248,.45))' }} />
+    <img src={`/shop/cosmetics-v3/${slug}.webp`} alt="" style={{ width:'min(82%,430px)', aspectRatio:'16/9', objectFit:'cover', borderRadius:'24px', mixBlendMode:'screen', opacity:.9, filter:'saturate(1.35) drop-shadow(0 0 28px rgba(56,189,248,.45))' }} />
   </div>;
 }
 
@@ -540,7 +540,7 @@ async function makeGenericResultCard({ title, gameTitle, players, template }) {
   let artwork = null;
   if (template) artwork = await new Promise((resolve) => {
     const image = new Image(); image.onload = () => resolve(image); image.onerror = () => resolve(null);
-    image.src = `/shop/cosmetics/${template}.webp`;
+    image.src = `/shop/cosmetics-v3/${template}.webp`;
   });
   if (artwork) {
     ctx.drawImage(artwork, 0, 0, 1080, 1080);
@@ -697,7 +697,7 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
 
       {phase === 'over' && (
         <div style={{ padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', position:'relative', zIndex:5, borderRadius:'20px', border:`1px solid ${resultColors[1]}99`, background:myCosmetics.resultTemplate
-          ? `linear-gradient(rgba(2,6,23,.42),rgba(2,6,23,.78)),url('/shop/cosmetics/${myCosmetics.resultTemplate}.webp') center/cover,${resultColors[0]}`
+          ? `linear-gradient(rgba(2,6,23,.42),rgba(2,6,23,.78)),url('/shop/cosmetics-v3/${myCosmetics.resultTemplate}.webp') center/cover,${resultColors[0]}`
           : `radial-gradient(circle at 50% 0,${resultColors[1]}55,transparent 48%),linear-gradient(145deg,${resultColors[0]}DD,#071522)` }}>
           <div style={{ fontSize: '48px' }}>{g.winner === 'DRAW' ? '🤝' : (g.winner === g.me ? '🎉' : '💔')}</div>
           <h2 style={{ color: g.winner === g.me ? '#22E7A6' : '#FFF', fontWeight: '900', margin: 0 }}>
