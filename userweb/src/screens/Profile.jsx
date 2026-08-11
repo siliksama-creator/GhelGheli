@@ -2,7 +2,7 @@
 import React, { useCallback, useState } from 'react';
 import { req, avatars, asset, avatarUrl, fa } from '../lib/api.js';
 import { useAsync } from '../lib/useAsync.js';
-import { clubImg } from '../components/Cosmetics.jsx';
+import { clubImg, DisplayName, profileBackgroundStyle } from '../components/Cosmetics.jsx';
 import Field from '../components/Field.jsx';
 
 export default function Profile({ token, p, load, setMsg }) {
@@ -52,7 +52,7 @@ export default function Profile({ token, p, load, setMsg }) {
   }
 
   return (
-    <div style={{ maxWidth:'820px', margin:'0 auto', display:'flex', flexDirection:'column', gap:'16px', padding:'0 12px 80px' }}>
+    <div style={{ maxWidth:'820px', margin:'0 auto', display:'flex', flexDirection:'column', gap:'16px', padding:'14px 12px 80px', borderRadius:'22px', ...profileBackgroundStyle(p.cosmetics?.profileBackground) }}>
       {(leagueHistory.data || []).length > 0 && (
         <section style={{ background:'linear-gradient(135deg, rgba(255,209,102,0.12), rgba(56,189,248,0.08))', border:'1px solid rgba(255,209,102,0.28)', borderRadius:'16px', padding:'14px' }}>
           <h3 style={{ color:'#FFD166', fontWeight:'900', margin:'0 0 10px' }}>سابقه لیگ من</h3>
@@ -73,6 +73,7 @@ export default function Profile({ token, p, load, setMsg }) {
       )}
       <div style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'16px', padding:'16px' }}>
         <h2 style={{ color:'#FFF', fontWeight:'900', margin:'0 0 4px' }}>پروفایل من</h2>
+        <div style={{ marginBottom:'7px' }}><DisplayName name={u.nickname || u.first_name || 'کاربر'} cosmetics={p.cosmetics} level={p.level?.level} showTitle /></div>
         <p style={{ color:'#94A3B8', fontSize:'11px', margin:'0 0 12px' }}>این اطلاعات فقط برای مدیر است. در چت فقط نام مستعار و عکس دیده می‌شود.</p>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:'10px' }}>
           <Field label="نام" value={edit.firstName} onChange={v=>setEdit({...edit, firstName:v})} />

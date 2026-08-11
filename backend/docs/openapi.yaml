@@ -3642,6 +3642,63 @@ paths:
             type: string
       security:
         - bearerAuth: []
+  /api/admin/referrals/purchase-commissions:
+    get:
+      tags:
+        - Admin
+      summary: دریافت /api/admin/referrals/purchase-commissions
+      operationId: get_api_admin_referrals_purchase_commissions
+      responses:
+        "200":
+          description: موفق
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "400":
+          description: درخواست نامعتبر
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "401":
+          description: نیازمند ورود
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "403":
+          description: دسترسی غیرمجاز
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "404":
+          description: یافت نشد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "409":
+          description: تعارض وضعیت
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "429":
+          description: تعداد درخواست بیش از حد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "500":
+          description: خطای داخلی سرور
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+      security:
+        - bearerAuth: []
   /api/admin/reward-claims:
     get:
       tags:

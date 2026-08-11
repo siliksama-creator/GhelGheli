@@ -41,7 +41,7 @@ export default function Referral({ token, setMsg }) {
   };
 
   const inviteMsg = (code) =>
-    `کد دعوت من به قلقلی: ${code}\nبا این کد ثبت‌نام کن، هر دومون ۳ چرخش گردونه هدیه می‌گیریم!\nhttps://ghelghelishop.ir`;
+    `کد دعوت من به قلقلی: ${code}\nبا این کد ثبت‌نام کن؛ هر دومون ۳ چرخش هدیه می‌گیریم و من از خریدهای مستقیم تو ۱۰٪ درآمد معرفی می‌گیرم.\nhttps://ghelghelishop.ir`;
 
   const shareTo = (target) => {
     const text = encodeURIComponent(inviteMsg(d.code));
@@ -93,6 +93,17 @@ export default function Referral({ token, setMsg }) {
         </div>
       </div>
 
+      <div style={{ margin:'12px 0', padding:'14px', borderRadius:'16px', border:'1px solid rgba(34,231,166,.38)', background:'linear-gradient(135deg,rgba(34,231,166,.12),rgba(56,189,248,.08))' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', gap:'12px', alignItems:'center', flexWrap:'wrap' }}>
+          <div><small style={{color:'#9FB0C3'}}>درآمد نقدی معرفی از خریدها</small><div style={{fontSize:'24px',fontWeight:950,color:'#22E7A6'}}>{fa(d.cashCommissionEarned)} تومان</div></div>
+          <div style={{textAlign:'left'}}><small style={{color:'#9FB0C3'}}>موجودی کیف پول</small><div style={{fontWeight:900}}>{fa(d.walletBalance)} تومان</div></div>
+          <span style={{padding:'6px 9px',borderRadius:'999px',fontSize:'10px',fontWeight:900,background:d.cashWithdrawReady?'rgba(34,197,94,.18)':'rgba(255,209,102,.14)',color:d.cashWithdrawReady?'#4ADE80':'#FFD166'}}>
+            {d.cashWithdrawReady ? 'آماده درخواست برداشت' : `تا برداشت: حداقل ${fa(d.withdrawalThreshold)} تومان`}
+          </span>
+        </div>
+        <p style={{margin:'9px 0 0',fontSize:'10px',color:'#B8C5D4'}}>۱۰٪ هر خرید دوست مستقیم، اتمیک و قابل رهگیری به کیف پولت واریز می‌شود. سطح دوم و کمیسیون زنجیره‌ای نداریم.</p>
+      </div>
+
       <div className="refStats">
         <div><b>{fa(d.invitedCount)}</b><span>دوست دعوت‌شده</span></div>
         <div><b>{fa(d.totalEarned)}</b><span>امتیاز از دوستان</span></div>
@@ -102,7 +113,8 @@ export default function Referral({ token, setMsg }) {
       <div className="refRulesBox">
         <b>مزایای معرفی دوستان:</b>
         <ul>
-          <li><b>{fa(d.commissionPercent)}٪ کمیسیون دائمی</b> از امتیازات حاصل از ثبت کارت و بازی ضربه‌زن دوست شما.</li>
+          <li><b>{fa(d.purchaseCommissionPercent)}٪ درآمد نقدی</b> از تمام خریدهای دوستان مستقیم، با آستانه برداشت {fa(d.withdrawalThreshold)} تومان.</li>
+          <li><b>{fa(d.commissionPercent)}٪ کمیسیون امتیازی</b> از امتیازات حاصل از ثبت کارت و بازی ضربه‌زن دوست شما.</li>
           <li><b>هر {fa(d.invitesPerDailySpin)} دعوت</b> = ۱ چرخش روزانه دائمی به گردونه شانس (تا سقف {fa(d.maxInvitesForDaily)} نفر).</li>
           <li><b>دعوت نامحدود</b> برای دریافت چرخش‌های هدیه و جوایز.</li>
         </ul>
@@ -115,7 +127,7 @@ export default function Referral({ token, setMsg }) {
             {d.friends.map((f, i) => (
               <li key={i}>
                 <span>{f.nickname}</span>
-                <b>+{fa(f.earnedFromThem)} امتیاز</b>
+                <b style={{display:'flex',gap:'8px',flexWrap:'wrap',justifyContent:'flex-end'}}><span>+{fa(f.earnedFromThem)} امتیاز</span><span style={{color:'#22E7A6'}}>+{fa(f.cashEarnedFromThem)} تومان</span></b>
               </li>
             ))}
           </ul>

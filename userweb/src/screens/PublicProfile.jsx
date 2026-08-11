@@ -2,7 +2,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 
 import { req, asset, fa, avatarUrl } from '../lib/api.js';
-import { clubImg, FRAME_STYLE, nameColorStyle } from '../components/Cosmetics.jsx';
+import { clubImg, FRAME_STYLE, nameColorStyle, profileBackgroundStyle } from '../components/Cosmetics.jsx';
 import { useAsync } from '../lib/useAsync.js';
 import { LoadingView, ErrorView } from '../components/states.jsx';
 import { SvgIcon } from '../components/IconAsset.jsx';
@@ -28,6 +28,7 @@ export default function PublicProfile({ token, userId, close }) {
   return (
     <div className="modalShade" onClick={close}>
       <div className="publicModal pp" onClick={e => e.stopPropagation()}
+        style={profileBackgroundStyle(cos.profileBackground)}
         role="dialog" aria-label="پروفایل کاربر">
         <button className="close" onClick={close}>×</button>
 
@@ -56,8 +57,9 @@ export default function PublicProfile({ token, userId, close }) {
               <div className="ppWho">
                 <h2 style={nameColorStyle(cos.color)}>
                   {u.nickname || 'کاربر'}
-                  {cos.plus && <span className="plusStarSm" title="عضو طلایی قلقلی پلاس" style={{ color: '#FFD166', marginInlineStart: '4px' }}>★</span>}
+                  {cos.plus && <span className="plusStarSm" title={cos.annual ? 'عضو پلاس سالانه' : 'عضو قلقلی پلاس'} style={{ color: cos.annual ? '#E9D5FF' : '#FFD166', marginInlineStart: '4px' }}>{cos.annual ? '✦' : '★'}</span>}
                 </h2>
+                {cos.title && <strong style={{ display:'inline-block', marginTop:'4px', fontSize:'9px', color:'#FFD166', border:'1px solid rgba(255,209,102,.38)', background:'rgba(0,0,0,.24)', padding:'2px 7px', borderRadius:'999px' }}>{cos.title}</strong>}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
                   {cos.club && (
                     <span style={{ fontSize: '11px', color: '#ffd166', fontWeight: '700' }}>

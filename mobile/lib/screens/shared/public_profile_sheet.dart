@@ -60,7 +60,10 @@ class _PublicProfileBody extends StatelessWidget {
     final bestRank = data['bestRank'];
     final totalPrize = (data['totalPrizeAmount'] as num?)?.toInt() ?? 0;
 
-    return ListView(
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: profileBackgroundDecoration(cos['profileBackground'] as String?),
+      child: ListView(
       controller: controller,
       children: [
         // Handle bar
@@ -79,11 +82,20 @@ class _PublicProfileBody extends StatelessWidget {
         // ── User Header ──
         Row(
           children: [
-            AvatarImage(
-              keyName: data['profile_avatar_key'],
-              imageUrl: data['profile_image_url'],
-              radius: 30,
-              ring: true,
+            Container(
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: frameColors[cos['frame']] == null
+                    ? null
+                    : LinearGradient(colors: frameColors[cos['frame']]!),
+              ),
+              child: AvatarImage(
+                keyName: data['profile_avatar_key'],
+                imageUrl: data['profile_image_url'],
+                radius: 30,
+                ring: true,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -93,6 +105,7 @@ class _PublicProfileBody extends StatelessWidget {
                   DisplayName(
                     name: data['nickname'] ?? 'کاربر',
                     cosmetics: cos,
+                    showTitle: true,
                     level: (data['level'] is Map)
                         ? ((data['level'] as Map)['level'] as num?)?.toInt()
                         : null,
@@ -289,7 +302,7 @@ class _PublicProfileBody extends StatelessWidget {
           ),
         ],
       ],
-    );
+    ));
   }
 }
 

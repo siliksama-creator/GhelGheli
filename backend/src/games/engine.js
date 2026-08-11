@@ -74,6 +74,9 @@ const infoOf = u => ({
   profileImageUrl: u.profile_image_url || null,
   profileAvatarKey: u.profile_avatar_key || null,
   lifetimePoints: Number(u.lifetime_points || 0),
+  // Server-resolved entitlements: clients may animate these slugs but cannot
+  // claim an unowned effect by mutating their local payload.
+  cosmetics: u.cosmetics || null,
   // ═══════════════════════════════════════════════════════════════════════
   // چرا لول همین‌جا و نه با یک درخواستِ جدا
   // ═══════════════════════════════════════════════════════════════════════

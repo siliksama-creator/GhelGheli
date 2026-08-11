@@ -146,6 +146,8 @@ DELETE FROM user_pass_claims;
 DELETE FROM user_pass_progress;
 DELETE FROM user_reward_claims;
 DELETE FROM user_group_progress;
+DELETE FROM user_entitlements;
+DELETE FROM purchase_referral_commissions;
 DELETE FROM user_shop_items;
 DELETE FROM user_subscriptions;
 DELETE FROM user_clubs;

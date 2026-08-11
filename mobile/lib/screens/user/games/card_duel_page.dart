@@ -9,6 +9,7 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../../api_client.dart';
 import '../../../core/assets.dart';
+import '../../../core/cosmetics.dart';
 import '../../../core/share_invite.dart';
 import '../../../theme/colors.dart';
 import '../../../theme/tokens.dart';
@@ -213,6 +214,15 @@ class _CardDuelPageState extends State<CardDuelPage> {
     }
   }
 
+  Map<String, dynamic> get _myCosmetics {
+    final me = _session.mySymbol;
+    final player = me == null ? null : _session.players?[me];
+    final cosmetics = player is Map ? player['cosmetics'] : null;
+    return cosmetics is Map
+        ? Map<String, dynamic>.from(cosmetics)
+        : <String, dynamic>{};
+  }
+
   Map<String, dynamic>? _resultMvp() {
     final history = (_session.state['history'] as List?) ?? const [];
     final cards = <Map<String, dynamic>>[];
@@ -229,9 +239,11 @@ class _CardDuelPageState extends State<CardDuelPage> {
     const size = Size(1080, 1080);
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
-    final paint = Paint()..shader = const LinearGradient(
+    final template = _myCosmetics['resultTemplate'] as String?;
+    final palette = resultTemplateColors[template] ?? const [Color(0xFF071522), Color(0xFF35105D)];
+    final paint = Paint()..shader = LinearGradient(
       begin: Alignment.topLeft, end: Alignment.bottomRight,
-      colors: [Color(0xFF071522), Color(0xFF17304C), Color(0xFF35105D)],
+      colors: [palette.first, const Color(0xFF17304C), palette.last],
     ).createShader(Offset.zero & size);
     canvas.drawRect(Offset.zero & size, paint);
     canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(34, 34, 1012, 1012), const Radius.circular(38)),
@@ -295,7 +307,8 @@ class _CardDuelPageState extends State<CardDuelPage> {
               padding: const EdgeInsets.all(Gaps.lg),
               decoration: BoxDecoration(
                 borderRadius: Corners.rXl,
-                gradient: const LinearGradient(colors: [Color(0xFF17304C), Color(0xFF35105D)]),
+                gradient: LinearGradient(colors: resultTemplateColors[_myCosmetics['resultTemplate']]
+                    ?? const [Color(0xFF17304C), Color(0xFF35105D)]),
                 border: Border.all(color: _gold, width: 1.5),
               ),
               child: Column(children: [
@@ -531,41 +544,114 @@ class _CardDuelPageState extends State<CardDuelPage> {
           onCancel: _editLineup,
         );
       case GamePhase.playing:
-        return Column(children: [
-          if (_session.connectionNotice != null || !_session.connected) ...[
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(Gaps.sm),
-              margin: const EdgeInsets.only(bottom: Gaps.sm),
-              decoration: BoxDecoration(color: const Color(0xFFF59E0B).withValues(alpha: .16), borderRadius: Corners.rMd),
-              child: Text(_session.connectionNotice ?? 'در حال بازیابی اتصال مسابقه…', textAlign: TextAlign.center,
-                  style: const TextStyle(color: Color(0xFFF59E0B), fontWeight: FontWeight.w900)),
-            ),
-          ],
-          _LiveBattle(session: _session, color: _modeColor),
+        return Stack(children: [
+          Column(children: [
+            if (_session.connectionNotice != null || !_session.connected) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(Gaps.sm),
+                margin: const EdgeInsets.only(bottom: Gaps.sm),
+                decoration: BoxDecoration(color: const Color(0xFFF59E0B).withValues(alpha: .16), borderRadius: Corners.rMd),
+                child: Text(_session.connectionNotice ?? 'در حال بازیابی اتصال مسابقه…', textAlign: TextAlign.center,
+                    style: const TextStyle(color: Color(0xFFF59E0B), fontWeight: FontWeight.w900)),
+              ),
+            ],
+            _LiveBattle(session: _session, color: _modeColor),
+          ]),
+          if (_myCosmetics['matchEffect'] != null)
+            Positioned.fill(child: IgnorePointer(child: _DuelCosmeticEffect(slug: '${_myCosmetics['matchEffect']}'))),
         ]);
       case GamePhase.over:
-        return Column(
-          children: [
-            _LiveBattle(session: _session, color: _modeColor),
-            Gaps.vMd,
-            _Finale(
-              session: _session,
-              color: _modeColor,
-              onAgain: _playAgain,
-              onEdit: _editLineup,
-              onShare: _shareResult,
-              sharing: _sharing,
-              mvp: _resultMvp(),
-              privateLobby: _session.matchMode == 'lobby',
-            ),
-          ],
-        );
+        return Stack(children: [
+          Column(
+            children: [
+              _LiveBattle(session: _session, color: _modeColor),
+              Gaps.vMd,
+              _Finale(
+                session: _session,
+                color: _modeColor,
+                resultColors: resultTemplateColors[_myCosmetics['resultTemplate']],
+                onAgain: _playAgain,
+                onEdit: _editLineup,
+                onShare: _shareResult,
+                sharing: _sharing,
+                mvp: _resultMvp(),
+                privateLobby: _session.matchMode == 'lobby',
+              ),
+            ],
+          ),
+          if (_session.iWon && _myCosmetics['matchEffect'] != null)
+            Positioned.fill(child: IgnorePointer(child: _DuelCosmeticEffect(slug: '${_myCosmetics['matchEffect']}', repeat: true))),
+        ]);
       case GamePhase.idle:
         return _ErrorPanel(
           message: _session.error ?? _error ?? 'بازی آماده شروع نیست',
           onBack: _editLineup,
         );
     }
+  }
+}
+
+class _DuelCosmeticEffect extends StatefulWidget {
+  const _DuelCosmeticEffect({required this.slug, this.repeat = false});
+  final String slug;
+  final bool repeat;
+
+  @override
+  State<_DuelCosmeticEffect> createState() => _DuelCosmeticEffectState();
+}
+
+class _DuelCosmeticEffectState extends State<_DuelCosmeticEffect>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1800),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    widget.repeat ? _controller.repeat(reverse: true) : _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = switch (widget.slug) {
+      'stadium_spotlight' => '🔦',
+      'colored_smoke' => '🌈',
+      'card_side_fire' => '🔥',
+      'victory_confetti' => '🎊',
+      'golden_cup' => '🏆',
+      'tunnel_entry' => '🚇',
+      'goal_celebration' => '⚽',
+      'win_streak' => '🔥',
+      'mvp_effect' => '⭐',
+      'rematch_effect' => '↻',
+      _ => '✨',
+    };
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (_, __) {
+        final t = Curves.easeOut.transform(_controller.value);
+        return Center(
+          child: Opacity(
+            opacity: (widget.repeat ? .22 + t * .55 : 1 - t).clamp(0.0, 1.0).toDouble(),
+            child: Transform.scale(
+              scale: .45 + t * 1.45,
+              child: Text(icon, style: const TextStyle(fontSize: 70, shadows: [
+                Shadow(color: Color(0xFFFFD166), blurRadius: 28),
+                Shadow(color: Color(0xFF38BDF8), blurRadius: 18),
+              ])),
+            ),
+          ),
+        );
+      },
+    );
   }
 }

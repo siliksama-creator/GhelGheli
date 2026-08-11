@@ -776,7 +776,13 @@ app.get('/api/profile', auth, asyncHandler(async (req, res) => {
       WHERE i.user_id=$1 AND i.consumed_in_reward=false ORDER BY t.name`,
     [req.user.id]);
   const leaguePayouts = await pool.query(`SELECT p.*, s.month_year FROM league_payouts p JOIN league_seasons s ON s.id=p.league_season_id WHERE p.user_id=$1 ORDER BY p.created_at DESC LIMIT 20`, [req.user.id]);
-  res.json({ user: safeUser(req.user), inventory: inv.rows, leaguePayouts: leaguePayouts.rows });
+  const profileCosmetics = await shop.cosmeticsFor([req.user.id]);
+  res.json({
+    user: safeUser(req.user),
+    inventory: inv.rows,
+    leaguePayouts: leaguePayouts.rows,
+    cosmetics: profileCosmetics.get(req.user.id) || null,
+  });
 }));
 // ── بوت‌استرپ: هر چیزی که اپ بلافاصله بعد از ورود لازم دارد ──────────────
 //
@@ -1139,7 +1145,10 @@ app.post('/api/shop/items/:id/buy', auth, validateUuid('id'), shopLimiter, async
 
 app.post('/api/shop/plus', auth, shopLimiter, asyncHandler(async (req, res) => {
   try {
-    res.json(await shop.buyPlus(req.user.id));
+    res.json(await shop.buyPlus(
+      req.user.id,
+      req.body?.billingCycle || req.body?.cycle || 'monthly',
+    ));
   } catch (e) {
     res.status(e.status || 500).json({ message: e.message || 'خطا در خرید اشتراک' });
   }
@@ -1439,6 +1448,14 @@ app.get('/api/referrals', auth, asyncHandler(async (req, res) => {
   res.json(await referrals.summary(req.user.id));
 }));
 
+app.get('/api/admin/referrals/purchase-commissions', adminAuth,
+  requireRole('support'), asyncHandler(async (req, res) => {
+    res.json(await referrals.purchaseCommissionAudit({
+      limit: req.query.limit,
+      offset: req.query.offset,
+    }));
+  }));
+
 // آمار گردونه برای مدیر — بدون این هیچ راهی نیست بفهمیم نرخ واقعی جوایز با
 // نرخ طراحی‌شده می‌خواند یا نه.
 app.get('/api/admin/wheel/stats', adminAuth, requireRole('support'),
@@ -1517,23 +1534,31 @@ app.get('/api/league/current', auth, asyncHandler(async (req, res) => {
 
 app.get('/api/chat/config', auth, asyncHandler(async (req, res) => {
   const minLifetimePoints = await getChatMinLifetimePoints();
+  const [cooldown, pinned, emotePacks] = await Promise.all([
+    getChatCooldownSeconds(),
+    getChatPinnedMessage(),
+    shop.emotePacksFor(req.user.id),
+  ]);
   res.json({
     minLifetimePoints,
-    messageCooldownSeconds: await getChatCooldownSeconds(),
+    messageCooldownSeconds: cooldown,
     eligible: Number(req.user.lifetime_points || 0) >= minLifetimePoints,
     userLifetimePoints: req.user.lifetime_points,
-    pinned: await getChatPinnedMessage(),
+    pinned,
+    emotePacks,
   });
 }));
 
-function isAllowedChatMessage(text) {
+async function isAllowedChatMessage(text, userId) {
   if (!text || !String(text).trim()) return false;
   const clean = String(text).trim();
   if (CANNED_MESSAGES.includes(clean)) return true;
   // Allow single emoji or emoji sequences (up to 16 emoji chars)
   const emojiRegex = /^[\p{Extended_Pictographic}\p{Emoji}\p{Emoji_Component}\p{Emoji_Modifier}\p{Emoji_Modifier_Base}\p{Emoji_Presentation}\u2600-\u27BF\u2B50\u2764\uFE0F\u200D\s]+$/u;
   if (emojiRegex.test(clean) && clean.length <= 20) return true;
-  return false;
+  // Paid packs remain controlled: only exact server-seeded phrases owned by
+  // this user are accepted. Purchasing never enables arbitrary free text.
+  return Boolean(userId && await shop.isEmoteAllowed(userId, clean));
 }
 
 const CANNED_MESSAGES = [
@@ -1578,9 +1603,10 @@ const CANNED_MESSAGES = [
 app.get('/api/chat/bootstrap', auth, asyncHandler(async (req, res) => {
   const minLifetimePoints = await getChatMinLifetimePoints();
   const eligible = Number(req.user.lifetime_points || 0) >= minLifetimePoints;
-  const [cooldownSec, pinned] = await Promise.all([
+  const [cooldownSec, pinned, emotePacks] = await Promise.all([
     getChatCooldownSeconds(),
     getChatPinnedMessage(),
+    shop.emotePacksFor(req.user.id),
   ]);
 
   const config = {
@@ -1589,6 +1615,7 @@ app.get('/api/chat/bootstrap', auth, asyncHandler(async (req, res) => {
     eligible,
     userLifetimePoints: req.user.lifetime_points,
     pinned,
+    emotePacks,
   };
 
   if (!eligible) {
@@ -1680,7 +1707,7 @@ app.post('/api/chat/messages', auth, chatLimiter, asyncHandler(async (req, res) 
     const rm = await pool.query('SELECT id FROM chat_messages WHERE id=$1 AND is_deleted=false', [replyTo]);
     if (!rm.rows[0]) return res.status(400).json({ message: 'پیام موردنظر برای پاسخ پیدا نشد' });
   }
-  if (messageType === 'text' && !isAllowedChatMessage(clean)) return res.status(400).json({ message: 'فقط پیام‌های آماده و ایموجی‌ها مجاز هستند.' });
+  if (messageType === 'text' && !await isAllowedChatMessage(clean, req.user.id)) return res.status(400).json({ message: 'فقط پیام‌های آماده و ایموجی‌ها مجاز هستند.' });
   if (clean) await assertNoBadWords(clean);
   const { rows } = await pool.query('INSERT INTO chat_messages(user_id,message_text,reply_to_message_id,sticker_id,message_type) VALUES($1,$2,$3,$4,$5) RETURNING *', [req.user.id, clean, replyTo, stickerId, messageType]);
   // BUG: the message BROADCAST carried no cosmetics, while GET /api/chat
@@ -2152,9 +2179,19 @@ io.use(async (socket, next) => {
     // چرا در همین کوئری و نه یک درخواستِ جدا: این تنها جایی است که
     // کاربرِ سوکت بارگذاری می‌شود و یک ستونِ اضافه هزینه‌ای ندارد؛
     // یک کوئریِ دوم در مسیرِ اتصال، تأخیرِ شروعِ بازی را زیاد می‌کرد.
-    const { rows } = await pool.query('SELECT id,nickname,first_name,last_name,profile_image_url,profile_avatar_key,chat_banned_until,status,lifetime_points,current_points,game_xp FROM users WHERE id=$1', [payload.sub]);
+    const { rows } = await pool.query(`SELECT id,nickname,first_name,last_name,
+      profile_image_url,profile_avatar_key,chat_banned_until,status,
+      lifetime_points,current_points,game_xp, equipped_club,equipped_frame,
+      equipped_color,equipped_profile_background,equipped_result_template,
+      equipped_match_effect,equipped_emote_pack,profile_title
+      FROM users WHERE id=$1`, [payload.sub]);
     if (!rows[0] || rows[0].status !== 'active') throw new Error('inactive');
-    socket.user = rows[0]; next();
+    const socketCosmetics = await shop.cosmeticsFor([rows[0].id]);
+    socket.user = {
+      ...rows[0],
+      cosmetics: socketCosmetics.get(rows[0].id) || null,
+    };
+    next();
   } catch(e){ next(new Error('unauthorized')); }
 });
 presence.attach(io);
@@ -2180,7 +2217,7 @@ io.on('connection', socket => {
         const rm = await pool.query('SELECT id FROM chat_messages WHERE id=$1 AND is_deleted=false', [replyTo]);
         if (!rm.rows[0]) throw new Error('پیام موردنظر برای پاسخ پیدا نشد');
       }
-      if (messageType === 'text' && !isAllowedChatMessage(clean)) throw new Error('فقط پیام‌های آماده و ایموجی‌ها مجاز هستند.');
+      if (messageType === 'text' && !await isAllowedChatMessage(clean, socket.user.id)) throw new Error('فقط پیام‌های آماده و ایموجی‌ها مجاز هستند.');
       if (clean) await assertNoBadWords(clean);
       arr.push(now); socketMessageTimes.set(socket.user.id, arr);
       const { rows } = await pool.query('INSERT INTO chat_messages(user_id,message_text,reply_to_message_id,sticker_id,message_type) VALUES($1,$2,$3,$4,$5) RETURNING *', [socket.user.id, clean, replyTo, stickerId, messageType]);

@@ -162,7 +162,7 @@ async function reconcileLapsed() {
         WHERE uc.source = 'plus'
           AND NOT EXISTS (SELECT 1 FROM user_subscriptions s
                            WHERE s.user_id = uc.user_id
-                             AND s.plan = 'plus' AND s.expires_at > NOW())
+                             AND s.plan IN ('plus','plus_annual') AND s.expires_at > NOW())
      ),
      keep AS (
        SELECT DISTINCT ON (uc.user_id) uc.id

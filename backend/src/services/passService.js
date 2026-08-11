@@ -166,7 +166,7 @@ async function activeSeason(client = pool) {
 async function hasPlus(userId, client = pool) {
   const { rows } = await client.query(
     `SELECT 1 FROM user_subscriptions
-      WHERE user_id=$1 AND plan='plus' AND expires_at > NOW() LIMIT 1`,
+      WHERE user_id=$1 AND plan IN ('plus','plus_annual') AND expires_at > NOW() LIMIT 1`,
     [userId]);
   return rows.length > 0;
 }

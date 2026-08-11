@@ -30,9 +30,14 @@
 const crypto = require('crypto');
 const { pool } = require('../config/db');
 const pointLedger = require('./pointService');
+const wallet = require('./walletService');
 
-/** درصد کمیسیون. */
+/** درصد کمیسیون امتیازی قدیمی (ثبت کارت و Tap). */
 const COMMISSION_PERCENT = 5;
+/** سهم نقدی معرف از هر خرید مستقیم دوست، به تومان. */
+const PURCHASE_COMMISSION_PERCENT = 10;
+/** آستانهٔ برداشت کیف پول. تنظیمات کیف پول نیز همین مقدار را enforce می‌کند. */
+const REFERRAL_WITHDRAWAL_THRESHOLD = 50000;
 
 /** چرخش گردونه برای *هر یک* از دو طرف، به ازای یک معرفی موفق. */
 const SPINS_PER_REFERRAL = 3;
@@ -279,24 +284,139 @@ async function payCommission(client, userId, basePoints, source) {
   return { referrerId, earned };
 }
 
+/**
+ * ۱۰٪ یک خرید واقعی را همان داخل تراکنش خرید به کیف پول معرف مستقیم واریز
+ * می‌کند. ابتدا سند یکتای کمیسیون رزرو می‌شود و بعد wallet credit می‌خورد؛
+ * بنابراین retry همان purchase هیچ‌وقت دوباره پول تولید نمی‌کند و rollback
+ * هر کدام، خرید/کمیسیون/دفترکل را با هم برمی‌گرداند.
+ */
+async function payPurchaseCommission(
+  client,
+  { buyerId, purchaseType, purchaseReferenceId, purchaseAmount },
+) {
+  const amount = Math.floor(Number(purchaseAmount) || 0);
+  if (amount <= 0 || !purchaseReferenceId) return null;
+  if (!['shop_item', 'plus_monthly', 'plus_annual'].includes(purchaseType)) {
+    throw new Error('نوع خرید برای کمیسیون معرفی معتبر نیست');
+  }
+
+  const buyer = await client.query(
+    `SELECT u.referred_by
+       FROM users u
+      WHERE u.id=$1 AND u.status='active'`,
+    [buyerId],
+  );
+  const referrerId = buyer.rows[0]?.referred_by;
+  if (!referrerId || String(referrerId) === String(buyerId)) return null;
+
+  const active = await client.query(
+    `SELECT 1 FROM users WHERE id=$1 AND status='active'`, [referrerId]);
+  if (!active.rows[0]) return null;
+
+  const earned = Math.floor(amount * PURCHASE_COMMISSION_PERCENT / 100);
+  if (earned <= 0) return null;
+
+  const reserved = await client.query(
+    `INSERT INTO purchase_referral_commissions
+       (referrer_id, referred_user_id, purchase_type, purchase_reference_id,
+        purchase_amount, commission_rate, commission_amount)
+     VALUES($1,$2,$3,$4,$5,0.1000,$6)
+     ON CONFLICT(purchase_type, purchase_reference_id) DO NOTHING
+     RETURNING id`,
+    [referrerId, buyerId, purchaseType, purchaseReferenceId, amount, earned],
+  );
+  if (!reserved.rows[0]) return { duplicate: true, referrerId, earned: 0 };
+
+  const credited = await wallet.credit(client, {
+    userId: referrerId,
+    amount: earned,
+    source: 'purchase_referral',
+    referenceType: purchaseType,
+    referenceId: purchaseReferenceId,
+    description: `کمیسیون ۱۰٪ خرید مستقیم دوست (${purchaseType})`,
+  });
+  if (credited.duplicate) {
+    // The ledger is the final idempotency guard. Backfill the audit link if a
+    // legacy/manual repair had created the wallet row first.
+    await client.query(
+      `UPDATE purchase_referral_commissions
+          SET wallet_transaction_id=$2 WHERE id=$1`,
+      [reserved.rows[0].id, credited.transaction.id],
+    );
+    return { duplicate: true, referrerId, earned: 0 };
+  }
+  await client.query(
+    `UPDATE purchase_referral_commissions
+        SET wallet_transaction_id=$2 WHERE id=$1`,
+    [reserved.rows[0].id, credited.transaction.id],
+  );
+  return {
+    duplicate: false,
+    referrerId,
+    earned,
+    walletTransactionId: credited.transaction.id,
+  };
+}
+
+/** ریزسندهای نقدی برای حسابرسی مدیر؛ هیچ تغییری در دفترکل نمی‌دهد. */
+async function purchaseCommissionAudit({ limit = 100, offset = 0 } = {}) {
+  const n = Math.max(1, Math.min(500, Math.floor(Number(limit) || 100)));
+  const o = Math.max(0, Math.floor(Number(offset) || 0));
+  const { rows } = await pool.query(
+    `SELECT c.id, c.purchase_type, c.purchase_reference_id,
+            c.purchase_amount, c.commission_rate, c.commission_amount,
+            c.wallet_transaction_id, c.created_at,
+            r.nickname AS referrer_nickname, r.mobile AS referrer_mobile,
+            b.nickname AS buyer_nickname, b.mobile AS buyer_mobile
+       FROM purchase_referral_commissions c
+       JOIN users r ON r.id=c.referrer_id
+       JOIN users b ON b.id=c.referred_user_id
+      ORDER BY c.created_at DESC LIMIT $1 OFFSET $2`,
+    [n, o],
+  );
+  const total = await pool.query(
+    `SELECT COUNT(*)::int AS count,
+            COALESCE(SUM(commission_amount),0)::bigint AS amount
+       FROM purchase_referral_commissions`,
+  );
+  return {
+    rows: rows.map((row) => ({
+      ...row,
+      purchase_amount: Number(row.purchase_amount),
+      commission_amount: Number(row.commission_amount),
+      commission_rate: Number(row.commission_rate),
+    })),
+    totalCount: Number(total.rows[0]?.count || 0),
+    totalCommission: Number(total.rows[0]?.amount || 0),
+  };
+}
+
 /** خلاصهٔ معرفی برای صفحهٔ کاربر. */
 async function summary(userId) {
   const code = await ensureCode(userId);
-  const [invited, earnings, spins, recent] = await Promise.all([
+  const [invited, earnings, cashEarnings, spins, recent, walletRow, walletSettings] = await Promise.all([
     invitedCount(userId),
     pool.query(
       `SELECT COALESCE(SUM(earned_points),0)::int AS total
          FROM referral_earnings WHERE referrer_id = $1`, [userId]),
+    pool.query(
+      `SELECT COALESCE(SUM(commission_amount),0)::bigint AS total,
+              COUNT(*)::int AS purchase_count
+         FROM purchase_referral_commissions WHERE referrer_id=$1`, [userId]),
     pool.query('SELECT bonus_spins FROM users WHERE id = $1', [userId]),
     pool.query(
       `SELECT u.nickname, u.first_name, u.joined_at,
-              COALESCE(SUM(e.earned_points),0)::int AS earned
+              COALESCE((SELECT SUM(e.earned_points)
+                          FROM referral_earnings e
+                         WHERE e.referred_id=u.id AND e.referrer_id=$1),0)::int AS earned,
+              COALESCE((SELECT SUM(c.commission_amount)
+                          FROM purchase_referral_commissions c
+                         WHERE c.referred_user_id=u.id AND c.referrer_id=$1),0)::bigint AS cash_earned
          FROM users u
-         LEFT JOIN referral_earnings e
-                ON e.referred_id = u.id AND e.referrer_id = $1
         WHERE u.referred_by = $1 AND u.status = 'active'
-        GROUP BY u.id, u.nickname, u.first_name, u.joined_at
         ORDER BY u.joined_at DESC LIMIT 50`, [userId]),
+    pool.query('SELECT wallet_balance FROM users WHERE id=$1', [userId]),
+    wallet.getWalletSettings(),
   ]);
 
   const daily = dailySpinsFor(invited);
@@ -310,6 +430,13 @@ async function summary(userId) {
   return {
     code,
     commissionPercent: COMMISSION_PERCENT,
+    purchaseCommissionPercent: PURCHASE_COMMISSION_PERCENT,
+    withdrawalThreshold: Number(walletSettings.minWithdrawal || REFERRAL_WITHDRAWAL_THRESHOLD),
+    walletBalance: Number(walletRow.rows[0]?.wallet_balance || 0),
+    cashCommissionEarned: Number(cashEarnings.rows[0]?.total || 0),
+    commissionedPurchases: Number(cashEarnings.rows[0]?.purchase_count || 0),
+    cashWithdrawReady: Number(walletRow.rows[0]?.wallet_balance || 0)
+      >= Number(walletSettings.minWithdrawal || REFERRAL_WITHDRAWAL_THRESHOLD),
     spinsPerReferral: SPINS_PER_REFERRAL,
     invitesPerDailySpin: INVITES_PER_DAILY_SPIN,
     maxInvitesForDaily: MAX_INVITES_FOR_DAILY,
@@ -323,14 +450,17 @@ async function summary(userId) {
       nickname: r.nickname || r.first_name || 'کاربر',
       joinedAt: r.joined_at,
       earnedFromThem: r.earned,
+      cashEarnedFromThem: Number(r.cash_earned || 0),
     })),
   };
 }
 
 module.exports = {
-  ensureCode, attachReferrer, payCommission, summary,
+  ensureCode, attachReferrer, payCommission, payPurchaseCommission,
+  purchaseCommissionAudit, summary,
   generateCode, normalizeDigits, dailySpinsFor, invitedCount,
-  COMMISSION_PERCENT, SPINS_PER_REFERRAL,
+  COMMISSION_PERCENT, PURCHASE_COMMISSION_PERCENT,
+  REFERRAL_WITHDRAWAL_THRESHOLD, SPINS_PER_REFERRAL,
   INVITES_PER_DAILY_SPIN, MAX_INVITES_FOR_DAILY, BASE_DAILY_SPINS,
   COMMISSIONABLE,
 };

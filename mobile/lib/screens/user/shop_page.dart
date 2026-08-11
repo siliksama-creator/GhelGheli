@@ -1,12 +1,5 @@
-// Cosmetic shop + GhelGheli Plus.
-//
-// Mirrors userweb/src/screens/Shop.jsx: same endpoints, same rules, same
-// wording. Sells appearance and club membership only — nothing here affects
-// points, prizes or league standing.
-//
-// EVERY PURCHASE IS PERMANENT, and the UI says so on the tile, in the confirm
-// dialog and in the receipt. A user who only finds out the terms afterwards
-// is a refund request.
+// Compact category-based Shop. Web parity: monthly/annual Plus and every
+// deterministic cosmetic use the same server catalogue and wallet ledger.
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
@@ -15,10 +8,6 @@ import '../../core/money.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/async_section.dart';
-
-// Crest paths, frame gradients and name colours all live in
-// core/cosmetics.dart now — this file used to own them, which meant the
-// league table and chat had to import the SHOP to draw a badge.
 
 class ShopPage extends StatefulWidget {
   final ApiClient api;
@@ -31,47 +20,97 @@ class ShopPage extends StatefulWidget {
 class _ShopPageState extends State<ShopPage> {
   late Future<dynamic> _future = widget.api.get('/api/shop');
   String? _busy;
+  String _kind = 'card_frame';
+  bool _showPlans = true;
+
+  static const _categories = <(String, String, IconData)>[
+    ('club_badge', 'باشگاه‌ها', Icons.shield_rounded),
+    ('card_frame', 'قاب‌ها', Icons.crop_portrait_rounded),
+    ('name_color', 'افکت نام', Icons.auto_awesome_rounded),
+    ('profile_background', 'پس‌زمینه', Icons.wallpaper_rounded),
+    ('result_template', 'نتیجه', Icons.emoji_events_rounded),
+    ('match_effect', 'ورود و پایان', Icons.celebration_rounded),
+    ('emote_pack', 'پیام‌ها', Icons.forum_rounded),
+  ];
 
   Future<void> _reload() async {
     setState(() => _future = widget.api.get('/api/shop'));
-    // خطا اینجا بلعیده می‌شود، عمداً.
-    //
-    // AsyncSection دقیقاً همین future را می‌خواند و خودش حالت خطا را با
-    // دکمهٔ تلاش دوباره رندر می‌کند. اگر اینجا هم rethrow شود،
-    // RefreshIndicator آن را به یک خطای مدیریت‌نشدهٔ فریم‌ورک تبدیل می‌کند
-    // — یعنی یک خطا، دو بار گزارش، یکی‌شان به شکل کرش.
     try {
       await _future;
     } catch (_) {
-      // AsyncSection نمایشش می‌دهد.
+      // AsyncSection owns the visible error state.
     }
   }
 
-  Future<dynamic> _run(Future<dynamic> Function() fn, String key) async {
+  Future<dynamic> _run(
+    Future<dynamic> Function() action,
+    String key,
+    String success,
+  ) async {
     if (_busy != null) return null;
     setState(() => _busy = key);
     try {
-      final r = await fn();
-      if (!mounted) return r;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('${r['message'] ?? 'انجام شد'}')));
+      final result = await action();
+      if (!mounted) return result;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(success)));
       await _reload();
-      return r;
-    } catch (e) {
-      if (!mounted) return null;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(apiError(e))));
+      return result;
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(apiError(error))));
+      }
       return null;
     } finally {
       if (mounted) setState(() => _busy = null);
     }
   }
 
-  Future<void> _confirmBuy(Map<String, dynamic> item, int balance) async {
-    final price = (item['price'] as num?)?.toInt() ?? 0;
-    final short = balance < price;
-    final isClub = item['kind'] == 'club_badge';
+  Future<void> _buyPlan(Map<String, dynamic> plan, int balance) async {
+    final price = (plan['price'] as num?)?.toInt() ?? 0;
+    final annual = plan['billingCycle'] == 'annual';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('خرید ${plan['label']}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${Money.withUnit(price)} از کیف پول کم می‌شود.'),
+            Gaps.vXs,
+            Text(annual
+                ? 'قاب، عنوان پروفایل و قالب نتیجهٔ سالانه دائمی هستند؛ یک فرصت تغییر باشگاه هم می‌گیری.'
+                : 'دسترسی قاب‌ها و افکت نام، ستاره پلاس، Premium Pass و حذف تبلیغات برای ۳۰ روز فعال می‌شود.'),
+            Gaps.vXs,
+            Text('موجودی: ${Money.withUnit(balance)}',
+                style: Theme.of(ctx).textTheme.bodySmall),
+            if (balance < price)
+              Text('موجودی ${Money.withUnit(price - balance)} کم است.',
+                  style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+          FilledButton(
+            onPressed: balance < price ? null : () => Navigator.pop(ctx, true),
+            child: const Text('تأیید خرید'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await _run(
+      () => widget.api.post('/api/shop/plus', {
+        'billingCycle': plan['billingCycle'],
+      }),
+      'plus-${plan['billingCycle']}',
+      annual ? 'پلاس سالانه و هدیه‌های دائمی فعال شد' : 'پلاس ماهانه فعال شد',
+    );
+  }
 
+  Future<void> _buyItem(Map<String, dynamic> item, int balance) async {
+    final price = (item['price'] as num?)?.toInt() ?? 0;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -80,124 +119,46 @@ class _ShopPageState extends State<ShopPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${Money.withUnit(price)} از کیف پولت کم می‌شود.'),
+            Text('${Money.withUnit(price)} از کیف پول کم می‌شود.'),
             Gaps.vXs,
-            const Text(' این آیتم برای همیشه مال تو می‌شود — حتی اگر اشتراک '
-                'پلاس نداشته باشی یا تمام شود.'),
-            if (isClub) ...[
-              Gaps.vXxs,
-              const Text(' هم‌زمان عضو دائمی این باشگاه می‌شوی و اسمت در '
-                  'فهرست هوادارانش می‌آید.'),
+            const Text('این آیتم ظاهری برای همیشه در کلکسیونت می‌ماند و هیچ قدرت رقابتی نمی‌دهد.'),
+            if (item['kind'] == 'club_badge') ...[
+              Gaps.vXs,
+              const Text('خرید نشان، عضویت دائمی همان باشگاه را هم فعال می‌کند.'),
             ],
-            Gaps.vXs,
-            Text('موجودی فعلی: ${Money.withUnit(balance)}',
-                style: Theme.of(ctx).textTheme.bodySmall),
-            if (short)
-              Text(' موجودی‌ات ${Money.withUnit(price - balance)} کم است.',
-                  style: Theme.of(ctx)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: Theme.of(ctx).colorScheme.error)),
+            if (balance < price) ...[
+              Gaps.vXs,
+              Text('موجودی ${Money.withUnit(price - balance)} کم است.',
+                  style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
+            ],
           ],
         ),
         actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('انصراف')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
           FilledButton(
-              // Blocking here rather than letting the server 400 keeps the
-              // failure honest: the user sees exactly how much they are short.
-              onPressed: short ? null : () => Navigator.pop(ctx, true),
-              child: const Text('بله، بخر')),
-        ],
-      ),
-    );
-    if (ok != true) return;
-
-    final r = await _run(
-        () => widget.api.post('/api/shop/items/${item['id']}/buy', {}),
-        '${item['id']}');
-
-    // Buying a crest does not silently replace the user's face; it offers.
-    final joined = r is Map ? r['joinedClub'] as String? : null;
-    if (joined != null && mounted) {
-      await _offerAvatar(joined, '${item['name']}');
-    }
-  }
-
-  Future<void> _confirmPlus(Map<String, dynamic> plus, int balance) async {
-    final price = (plus['price'] as num?)?.toInt() ?? 0;
-    final short = balance < price;
-    final active = plus['active'] == true;
-
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(active ? 'تمدید قلقلی پلاس' : 'فعال‌سازی قلقلی پلاس'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('${Money.withUnit(price)} برای '
-                  '${faNum(plus['days'])} روز.'),
-              Gaps.vXs,
-              Text('${plus['expiryNote'] ?? ''}'),
-              Gaps.vXs,
-              Text('موجودی فعلی: ${Money.withUnit(balance)}',
-                  style: Theme.of(ctx).textTheme.bodySmall),
-              if (short)
-                Text(' موجودی‌ات ${Money.withUnit(price - balance)} کم است.',
-                    style: Theme.of(ctx)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: Theme.of(ctx).colorScheme.error)),
-            ],
+            onPressed: balance < price ? null : () => Navigator.pop(ctx, true),
+            child: const Text('بله، بخر'),
           ),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('انصراف')),
-          FilledButton(
-              onPressed: short ? null : () => Navigator.pop(ctx, true),
-              child: const Text('بله، فعال کن')),
-        ],
-      ),
-    );
-    if (ok != true) return;
-    await _run(() => widget.api.post('/api/shop/plus', {}), 'plus');
-  }
-
-  Future<void> _offerAvatar(String slug, String name) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('عکس پروفایلت را عوض کنیم؟'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset(clubAsset(slug), width: 84, height: 84,
-                cacheWidth: 252,
-                errorBuilder: (_, __, ___) => const SizedBox.shrink()),
-            Gaps.vXs,
-            Text('نشان باشگاه «$name» به آواتارهای پروفایل شما اضافه شد.\nمی‌توانید همین حالا آن را عکس پروفایل خود کنید یا بعداً از بخش پروفایل انتخاب نمایید.'),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('نه، فعلاً نه')),
-          FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('بله، عوض کن')),
         ],
       ),
     );
     if (ok != true) return;
     await _run(
-        () => widget.api.post('/api/shop/club-avatar', {'club': slug}),
-        'avatar');
+      () => widget.api.post('/api/shop/items/${item['id']}/buy', {}),
+      'buy-${item['id']}',
+      '${item['name']} به کلکسیون اضافه شد',
+    );
+  }
+
+  Future<void> _equip(Map<String, dynamic> item) async {
+    await _run(
+      () => widget.api.post('/api/shop/equip', {
+        'slug': item['slug'],
+        'kind': item['kind'],
+      }),
+      'equip-${item['id']}',
+      '${item['name']} فعال شد',
+    );
   }
 
   @override
@@ -207,103 +168,99 @@ class _ShopPageState extends State<ShopPage> {
       child: AsyncSection<dynamic>(
         future: _future,
         onRetry: _reload,
-        builder: (context, data) {
-          // castهای دفاعی.
-          //
-          // اگر سرور روزی یکی از این کلیدها را نفرستد — یک استقرار نیمه‌کاره،
-          // یک پراکسی که پاسخ را می‌بُرد، یا یک نسخهٔ قدیمی‌تر — یک
-          // `as Map` روی null کل صفحهٔ فروشگاه را با صفحهٔ قرمز می‌ترکاند.
-          // فروشگاه خالی خیلی بهتر از کرش است.
-          final d = data is Map
-              ? Map<String, dynamic>.from(data)
+        builder: (context, raw) {
+          final data = raw is Map
+              ? Map<String, dynamic>.from(raw)
               : <String, dynamic>{};
-          final plus = d['plus'] is Map
-              ? Map<String, dynamic>.from(d['plus'] as Map)
+          final plus = data['plus'] is Map
+              ? Map<String, dynamic>.from(data['plus'] as Map)
               : <String, dynamic>{};
-          final equipped = d['equipped'] is Map
-              ? Map<String, dynamic>.from(d['equipped'] as Map)
-              : <String, dynamic>{};
-          final items = List<Map<String, dynamic>>.from(
-              ((d['items'] as List?) ?? const [])
-                  .whereType<Map>()
-                  .map((e) => Map<String, dynamic>.from(e)));
-          final myClubs = List<Map<String, dynamic>>.from(
-              ((d['clubs'] as List?) ?? const [])
-                  .map((e) => Map<String, dynamic>.from(e)));
-          final purchaseHistory = List<Map<String, dynamic>>.from(
-              ((d['purchaseHistory'] as List?) ?? const [])
-                  .whereType<Map>()
-                  .map((e) => Map<String, dynamic>.from(e)));
-          final balance = (d['balance'] as num?)?.toInt() ?? 0;
-
-          List<Map<String, dynamic>> of(String kind) =>
-              items.where((i) => i['kind'] == kind).toList();
-
-          String? equippedFor(String kind) => kind == 'club_badge'
-              ? equipped['club'] as String?
-              : kind == 'card_frame'
-                  ? equipped['frame'] as String?
-                  : equipped['color'] as String?;
+          final plans = ((data['plans'] as List?) ?? const [])
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+          final items = ((data['items'] as List?) ?? const [])
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+          final balance = (data['walletBalance'] as num?)?.toInt() ?? 0;
+          final available = _categories
+              .where((c) => items.any((item) => item['kind'] == c.$1))
+              .toList();
+          if (!available.any((c) => c.$1 == _kind) && available.isNotEmpty) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) setState(() => _kind = available.first.$1);
+            });
+          }
+          final visible = items.where((item) => item['kind'] == _kind).toList();
 
           return ListView(
-            padding:
-                const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, Gaps.xxl),
+            padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, Gaps.xxl),
             children: [
-              _IntroCard(balance: balance),
-              Gaps.vMd,
-              _PlusCard(
+              _ShopHero(
+                balance: balance,
                 plus: plus,
-                busy: _busy == 'plus',
-                onBuy: () => _confirmPlus(plus, balance),
+                expanded: _showPlans,
+                onToggle: () => setState(() => _showPlans = !_showPlans),
               ),
-              Gaps.vMd,
-              if (myClubs.isNotEmpty) ...[
-                _MyClubsCard(
-                  clubs: myClubs,
-                  plusActive: plus['active'] == true,
-                  busy: _busy == 'avatar',
-                  onUseAvatar: (slug) => _run(
-                      () =>
-                          widget.api.post('/api/shop/club-avatar', {'club': slug}),
-                      'avatar'),
-                ),
-                Gaps.vMd,
-              ],
-              for (final group in const [
-                [
-                  'club_badge',
-                  'باشگاه‌ها',
-                  Icons.shield_rounded,
-                  'عضویت دائمی و نشان پروفایل'
-                ],
-                ['card_frame', 'قاب کارت', Icons.crop_portrait_rounded, 'قاب کارت‌های پروفایل'],
-                ['name_color', 'رنگ اسم', Icons.palette_rounded, 'رنگ اسمت در جدول لیگ و چت'],
-              ])
-                if (of(group[0] as String).isNotEmpty) ...[
-                  _KindSection(
-                    title: group[1] as String,
-                    icon: group[2] as IconData,
-                    note: group[3] as String,
-                    kind: group[0] as String,
-                    items: of(group[0] as String),
-                    equipped: equippedFor(group[0] as String),
-                    busy: _busy,
-                    balance: balance,
-                    onBuy: _confirmBuy,
-                    onEquip: (slug) => _run(
-                        () => widget.api.post('/api/shop/equip', {'slug': slug}),
-                        'equip$slug'),
-                    // BUG: every section's "برداشتن" sent slug:null with no
-                    // kind, and the server then cleared ALL THREE slots — so
-                    // taking off a badge also wiped the frame and name colour.
-                    onClear: () => _run(
-                        () => widget.api.post(
-                            '/api/shop/equip', {'slug': null, 'kind': group[0]}),
-                        'clear${group[0]}'),
+              if (_showPlans && plans.isNotEmpty) ...[
+                Gaps.vSm,
+                SizedBox(
+                  height: MediaQuery.sizeOf(context).width < 390 ? 330 : 302,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: plans.length,
+                    separatorBuilder: (_, __) => Gaps.hSm,
+                    itemBuilder: (_, index) {
+                      final plan = plans[index];
+                      return _PlanCard(
+                        plan: plan,
+                        activeTier: '${plus['tier'] ?? ''}',
+                        busy: _busy == 'plus-${plan['billingCycle']}',
+                        onBuy: () => _buyPlan(plan, balance),
+                      );
+                    },
                   ),
-                  Gaps.vMd,
-                ],
-              _PurchaseHistory(receipts: purchaseHistory),
+                ),
+              ],
+              Gaps.vSm,
+              SizedBox(
+                height: 44,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: available.length,
+                  separatorBuilder: (_, __) => Gaps.hXxs,
+                  itemBuilder: (_, index) {
+                    final category = available[index];
+                    return ChoiceChip(
+                      selected: _kind == category.$1,
+                      avatar: Icon(category.$3, size: 17),
+                      label: Text(category.$2),
+                      onSelected: (_) => setState(() => _kind = category.$1),
+                    );
+                  },
+                ),
+              ),
+              Gaps.vSm,
+              _CategoryShelf(
+                title: available.any((c) => c.$1 == _kind)
+                    ? available.firstWhere((c) => c.$1 == _kind).$2
+                    : 'فروشگاه',
+                items: visible,
+                balance: balance,
+                busy: _busy,
+                onBuy: _buyItem,
+                onEquip: _equip,
+              ),
+              Gaps.vSm,
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 5),
+                child: Text(
+                  'همه قیمت‌ها تومان است. خریدهای مستقیم دائمی‌اند؛ آیتم‌ها فقط ظاهری‌اند و شانس برد یا امتیاز را تغییر نمی‌دهند.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 9.5, color: Colors.white54, height: 1.5),
+                ),
+              ),
             ],
           );
         },
@@ -312,496 +269,144 @@ class _ShopPageState extends State<ShopPage> {
   }
 }
 
-/// Sets expectations before anyone spends: purchases are permanent, and
-/// nothing sold here touches points or prizes.
-class _IntroCard extends StatelessWidget {
-  const _IntroCard({required this.balance});
-  final int balance;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(' فروشگاه قلقلی',
-              style: theme.textTheme.titleSmall
-                  ?.copyWith(fontWeight: FontWeight.w900)),
-          Gaps.vXxs,
-          Text(
-            'خرید مستقیم دائمی است؛ پلاس دسترسی ۳۰روزه می‌دهد. '
-            'همهٔ آیتم‌ها صرفاً ظاهری‌اند.',
-            style: theme.textTheme.bodySmall,
-          ),
-          Gaps.vXxs,
-          Text('موجودی کیف پول: ${Money.withUnit(balance)}',
-              style: theme.textTheme.labelMedium
-                  ?.copyWith(fontWeight: FontWeight.w800)),
-        ],
-      ),
-    );
-  }
-}
-
-class _PurchaseHistory extends StatelessWidget {
-  const _PurchaseHistory({required this.receipts});
-  final List<Map<String, dynamic>> receipts;
-
-  String _date(Object? raw) {
-    final d = DateTime.tryParse('$raw')?.toLocal();
-    if (d == null) return '—';
-    return '${faNum(d.year)}/${faNum(d.month)}/${faNum(d.day)}';
-  }
-
-  @override
-  Widget build(BuildContext context) => AppCard(child: Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const Text('تاریخچه خرید و اشتراک', style: TextStyle(fontWeight: FontWeight.w900)),
-      const Text('رسید کامل آیتم‌های دائمی و همه دوره‌های پلاس', style: TextStyle(fontSize: 9.5, color: Colors.white54)),
-      Gaps.vXs,
-      if (receipts.isEmpty) const Text('هنوز خریدی ثبت نشده است.', style: TextStyle(fontSize: 11, color: Colors.white54)),
-      for (final receipt in receipts) ...[
-        const Divider(height: 12),
-        Row(children: [
-          Icon(receipt['type'] == 'subscription' ? Icons.auto_awesome_rounded : Icons.shopping_bag_rounded,
-              color: const Color(0xFFFFD36B), size: 20),
-          Gaps.hXs,
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('${receipt['name']}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
-            Text('${_date(receipt['purchasedAt'])}${receipt['expiresAt'] != null ? ' · پایان ${_date(receipt['expiresAt'])}' : ' · مالکیت دائمی'}',
-                style: const TextStyle(fontSize: 8.5, color: Colors.white54)),
-          ])),
-          Text(Money.withUnit((receipt['pricePaid'] as num?)?.toInt() ?? 0),
-              style: const TextStyle(color: Color(0xFFFFD36B), fontSize: 10, fontWeight: FontWeight.w900)),
-        ]),
-      ],
-    ],
-  ));
-}
-
-/// The clubs this user belongs to, with an honest label for which of them
-/// survive a lapsed subscription.
-class _MyClubsCard extends StatelessWidget {
-  const _MyClubsCard({
-    required this.clubs,
-    required this.plusActive,
-    required this.busy,
-    required this.onUseAvatar,
+class _ShopHero extends StatelessWidget {
+  const _ShopHero({
+    required this.balance,
+    required this.plus,
+    required this.expanded,
+    required this.onToggle,
   });
-
-  final List<Map<String, dynamic>> clubs;
-  final bool plusActive;
-  final bool busy;
-  final void Function(String slug) onUseAvatar;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final anyTemporary = clubs.any((c) => c['permanent'] != true);
-
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(' باشگاه‌های من',
-              style: theme.textTheme.titleSmall
-                  ?.copyWith(fontWeight: FontWeight.w900)),
-          Gaps.vXs,
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 112,
-              mainAxisExtent: 104,
-              crossAxisSpacing: Gaps.xs,
-              mainAxisSpacing: Gaps.xs,
-            ),
-            itemCount: clubs.length,
-            itemBuilder: (_, i) {
-              final c = clubs[i];
-              final permanent = c['permanent'] == true;
-              return Container(
-                padding: const EdgeInsets.all(Gaps.xs),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.03),
-                  borderRadius: Corners.rLg,
-                  border: Border.all(
-                      color:
-                          theme.colorScheme.onSurface.withValues(alpha: 0.08)),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Image.asset(clubAsset('${c['slug']}'),
-                        width: 42,
-                        height: 42,
-                        cacheWidth: 126,
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) =>
-                            const Icon(Icons.shield_outlined, size: 42)),
-                    Gaps.vXxs,
-                    Text('${c['name']}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.labelSmall
-                            ?.copyWith(fontWeight: FontWeight.w800)),
-                    Gaps.vXxs,
-                    _Chip(
-                        text: permanent ? 'دائمی' : 'با پلاس',
-                        color: permanent
-                            ? const Color(0xFFB5EF58)
-                            : const Color(0xFFFFD36B)),
-                    const Spacer(),
-                    SizedBox(
-                      width: double.infinity,
-                      child: TextButton(
-                        onPressed:
-                            busy ? null : () => onUseAvatar('${c['slug']}'),
-                        style: TextButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            minimumSize: const Size(0, 28),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-                        child: const Text('عکس پروفایلم شود',
-                            style: TextStyle(fontSize: 10.5)),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-          if (anyTemporary && !plusActive) ...[
-            Gaps.vXs,
-            Text(
-              ' باشگاه‌هایی که با پلاس عضو شده‌ای، بدون اشتراک فعال فقط تا '
-              'آخرین انتخابت باقی می‌مانند. برای دائمی‌شدن، نشانشان را '
-              'جداگانه بخر.',
-              style: theme.textTheme.labelSmall,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _PlusHighlight extends StatelessWidget {
-  const _PlusHighlight({required this.label});
-  final String label;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFD36B).withValues(alpha: 0.08),
-          borderRadius: Corners.rSm,
-          border: Border.all(color: const Color(0xFFFFD36B).withValues(alpha: 0.18)),
-        ),
-        alignment: Alignment.center,
-        child: Text(label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Color(0xFFFFE099), fontSize: 10.5, fontWeight: FontWeight.w800)),
-      );
-}
-
-class _PlusCard extends StatelessWidget {
-  const _PlusCard(
-      {required this.plus, required this.onBuy, required this.busy});
+  final int balance;
   final Map<String, dynamic> plus;
-  final VoidCallback onBuy;
-  final bool busy;
+  final bool expanded;
+  final VoidCallback onToggle;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final active = plus['active'] == true;
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        borderRadius: Corners.rXl,
+        gradient: const LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [Color(0xFF102A43), Color(0xFF11172E), Color(0xFF35154C)],
+        ),
+        border: Border.all(color: const Color(0xFFFFD166).withValues(alpha: .35)),
+        boxShadow: const [BoxShadow(color: Color(0x55000000), blurRadius: 24, offset: Offset(0, 10))],
+      ),
+      child: Row(
         children: [
-          Row(
-            children: [
-              const Icon(Icons.star_rounded, size: 27, color: Colors.amber),
-              Gaps.hXs,
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('قلقلی پلاس',
-                        style: theme.textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w900)),
-                    Text(
-                      active
-                          ? 'فعال — ${faNum(plus['daysLeft'])} روز باقی مانده'
-                          : '${faNum(plus['days'])} روز دسترسی به همهٔ آیتم‌ها',
-                      style: theme.textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-              ),
-              Text(Money.withUnit(plus['price']),
-                  style: theme.textTheme.titleSmall?.copyWith(
-                      color: const Color(0xFFFFD36B),
-                      fontWeight: FontWeight.w900)),
-            ],
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFFFFD166).withValues(alpha: .14),
+            ),
+            child: Icon(active ? Icons.star_rounded : Icons.storefront_rounded,
+                color: const Color(0xFFFFD166)),
           ),
-          Gaps.vXs,
-          const Row(children: [
-            Expanded(child: _PlusHighlight(label: 'باشگاه دائمی')),
-            Gaps.hXxs,
-            Expanded(child: _PlusHighlight(label: 'همه قاب‌ها')),
-            Gaps.hXxs,
-            Expanded(child: _PlusHighlight(label: 'ستاره پروفایل')),
-          ]),
-          Gaps.vXs,
-          Theme(
-            data: theme.copyWith(dividerColor: Colors.transparent),
-            child: ExpansionTile(
-              tilePadding: EdgeInsets.zero,
-              childrenPadding: const EdgeInsets.only(bottom: Gaps.xs),
-              dense: true,
-              title: const Text('جزئیات و شرایط پلاس',
-                  style: TextStyle(color: Color(0xFFFFD36B), fontSize: 11, fontWeight: FontWeight.w800)),
+          Gaps.hSm,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (final perk in (plus['perks'] as List? ?? const []))
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 3),
-                    child: Align(
-                      alignment: AlignmentDirectional.centerStart,
-                      child: Text('• $perk', style: theme.textTheme.bodySmall),
-                    ),
-                  ),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(Gaps.xs),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFD36B).withValues(alpha: 0.08),
-                    borderRadius: Corners.rSm,
-                  ),
-                  child: Text('${plus['expiryNote'] ?? ''}', style: theme.textTheme.bodySmall),
+                const Text('فروشگاه قلقلی پلاس',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
+                Text(
+                  active
+                      ? 'پلاس ${plus['tier'] == 'annual' ? 'سالانه' : 'ماهانه'} فعال است'
+                      : 'ظاهر حرفه‌ای، رقابت کاملاً منصفانه',
+                  style: const TextStyle(fontSize: 10.5, color: Colors.white60),
                 ),
+                Text('کیف پول: ${Money.withUnit(balance)}',
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF22E7A6), fontWeight: FontWeight.w900)),
               ],
             ),
           ),
-          Gaps.vXs,
-          AnimePlusButton(
-            busy: busy,
-            onPressed: onBuy,
-            label: active ? 'تمدید قلقلی پلاس ⚡' : 'فعال‌سازی قلقلی پلاس ⚡',
+          IconButton(
+            tooltip: expanded ? 'جمع کردن پلن‌ها' : 'نمایش پلن‌ها',
+            onPressed: onToggle,
+            icon: Icon(expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded),
           ),
-          if (active)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(
-                  'اگر زودتر تمدید کنی، روزهای باقی‌مانده از بین نمی‌رود و '
-                  '۳۰ روز به آن اضافه می‌شود.',
-                  style: theme.textTheme.labelSmall),
-            ),
         ],
       ),
     );
   }
 }
 
-class _KindSection extends StatelessWidget {
-  const _KindSection({
-    required this.title,
-    required this.icon,
-    required this.note,
-    required this.kind,
-    required this.items,
-    required this.equipped,
-    required this.balance,
+class _PlanCard extends StatelessWidget {
+  const _PlanCard({
+    required this.plan,
+    required this.activeTier,
+    required this.busy,
     required this.onBuy,
-    required this.onEquip,
-    required this.onClear,
-    this.busy,
   });
-
-  final String title, note, kind;
-  final IconData icon;
-  final List<Map<String, dynamic>> items;
-  final String? equipped;
-  final int balance;
-  final String? busy;
-  final void Function(Map<String, dynamic>, int) onBuy;
-  final void Function(String slug) onEquip;
-  final VoidCallback onClear;
+  final Map<String, dynamic> plan;
+  final String activeTier;
+  final bool busy;
+  final VoidCallback onBuy;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 20, color: theme.colorScheme.primary),
-              Gaps.hXs,
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    final annual = plan['billingCycle'] == 'annual';
+    final active = activeTier == plan['billingCycle'];
+    final benefits = ((plan['benefits'] as List?) ?? const []).take(annual ? 9 : 5);
+    return SizedBox(
+      width: 300,
+      child: AppCard(
+        color: annual ? const Color(0xFF2D2340) : const Color(0xFF101D2B),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(children: [
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(annual ? 'بیشترین ارزش' : 'انعطاف ماهانه',
+                    style: const TextStyle(fontSize: 9, color: Colors.white54)),
+                Text('${plan['label']}',
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
+              ])),
+              if (annual)
+                const _Pill(text: 'حدود ۳۰٪ تخفیف', color: Color(0xFFFFD166))
+              else if (active)
+                const _Pill(text: 'فعال', color: Color(0xFF22E7A6)),
+            ]),
+            Gaps.vXs,
+            Text(Money.withUnit(plan['price']),
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFFFFD166))),
+            if (annual)
+              Text('به‌جای ${Money.withUnit(59000 * 12)} پرداخت ماهانه',
+                  style: const TextStyle(fontSize: 9, color: Colors.white54)),
+            Gaps.vXs,
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const NeverScrollableScrollPhysics(),
+                child: Wrap(
+                  runSpacing: 4,
                   children: [
-                    Text(title,
-                        style: theme.textTheme.titleSmall
-                            ?.copyWith(fontWeight: FontWeight.w800)),
-                    Text(note, style: theme.textTheme.labelSmall),
+                    for (final benefit in benefits)
+                      SizedBox(
+                        width: double.infinity,
+                        child: Text('✓ $benefit',
+                            style: const TextStyle(fontSize: 9.5, height: 1.35, color: Colors.white70)),
+                      ),
                   ],
                 ),
               ),
-              if (equipped != null)
-                TextButton(onPressed: onClear, child: const Text('برداشتن')),
-            ],
-          ),
-          Gaps.vXs,
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 112,
-              mainAxisExtent: 104,
-              crossAxisSpacing: Gaps.xs,
-              mainAxisSpacing: Gaps.xs,
             ),
-            itemCount: items.length,
-            itemBuilder: (_, i) {
-              final it = items[i];
-              final on = equipped != null && equipped == it['payload'];
-              // A lapsed subscriber keeps ONE club: they own no shop row and
-              // hold no Plus, but they are still a member and must still be
-              // able to wear that crest. `usable` alone would lock them out.
-              final usable = it['usable'] == true || it['member'] == true;
-              return _ShopTile(
-                item: it,
-                selected: on,
-                usable: usable,
-                busy: busy == '${it['id']}' || busy == 'equip${it['slug']}',
-                onTap: () => usable
-                    ? (on ? null : onEquip('${it['slug']}'))
-                    : onBuy(it, balance),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ShopTile extends StatelessWidget {
-  const _ShopTile({
-    required this.item,
-    required this.selected,
-    required this.usable,
-    required this.busy,
-    required this.onTap,
-  });
-
-  final Map<String, dynamic> item;
-  final bool selected, usable, busy;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final kind = item['kind'];
-    final payload = item['payload'] as String?;
-
-    Widget art;
-    if (kind == 'name_color') {
-      // عمداً `onLight` نمی‌دهیم. اینجا رنگ **متن** نیست، پُرکنندهٔ یک
-      // دایرهٔ ۴۸ پیکسلی است — نمونهٔ رنگی که کاربر می‌خرد. دوقلوی
-      // تیره‌شده برای خوانا ماندنِ متن ساخته شده؛ اگر نمونه را هم با آن
-      // نشان دهیم، کاربر رنگی را می‌خرد که در ویترین ندیده است.
-      final c = nameColorOf(payload);
-      art = Container(
-        width: 34,
-        height: 34,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: c,
-          gradient: c == null
-              ? const LinearGradient(colors: [
-                  Color(0xFFF472B6), Color(0xFFA855F7),
-                  Color(0xFF38BDF8), Color(0xFF34D399),
-                ])
-              : null,
-          border: Border.all(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.15),
-              width: 2),
-        ),
-      );
-    } else if (kind == 'card_frame') {
-      art = Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          borderRadius: Corners.rMd,
-          gradient: LinearGradient(
-              colors: frameColors[payload] ?? const [
-                Color(0xFF334155), Color(0xFF1E293B),
-              ]),
-        ),
-      );
-    } else {
-      art = Image.asset(
-        clubAsset(payload),
-        width: 34,
-        height: 34,
-        cacheWidth: 120,
-        // contain, not cover: a crest is not a photo and cropping its corners
-        // mangles the shield shapes.
-        fit: BoxFit.contain,
-        errorBuilder: (_, __, ___) => const SizedBox(
-            width: 56, height: 56, child: Icon(Icons.shield_outlined)),
-      );
-    }
-
-    return InkWell(
-      onTap: busy ? null : onTap,
-      borderRadius: Corners.rLg,
-      child: Container(
-        padding: const EdgeInsets.all(Gaps.xs),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.onSurface.withValues(alpha: 0.03),
-          borderRadius: Corners.rLg,
-          border: Border.all(
-            color: selected
-                ? const Color(0xFFB5EF58)
-                : theme.colorScheme.onSurface.withValues(alpha: 0.08),
-            width: selected ? 2 : 1,
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            art,
-            const SizedBox(height: 3),
-            Text('${item['name']}',
-                maxLines: 1,
-                textAlign: TextAlign.center,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelSmall
-                    ?.copyWith(fontWeight: FontWeight.w700, fontSize: 11)),
-            const SizedBox(height: 3),
-            if (selected)
-              const _Chip(text: 'انتخاب‌شده', color: Color(0xFFB5EF58))
-            else if (item['owned'] == true)
-              const _Chip(text: 'دائمی', color: Color(0xFFB5EF58))
-            else if (item['member'] == true)
-              const _Chip(text: 'عضوی', color: Color(0xFFFFD36B))
-            else if (item['unlockedByPlus'] == true)
-              const _Chip(text: 'با پلاس', color: Color(0xFFFFD36B))
-            else
-              Text(Money.withUnit(item['price']),
-                  style: const TextStyle(
-                      color: Color(0xFFFFD36B),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800)),
+            FilledButton.icon(
+              onPressed: busy ? null : onBuy,
+              icon: busy
+                  ? const SizedBox.square(dimension: 15, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.auto_awesome_rounded, size: 17),
+              label: Text(active ? 'تمدید همین پلن' : 'خرید ${plan['label']}'),
+              style: FilledButton.styleFrom(
+                backgroundColor: annual ? const Color(0xFFFFD166) : const Color(0xFF38BDF8),
+                foregroundColor: const Color(0xFF071522),
+              ),
+            ),
           ],
         ),
       ),
@@ -809,130 +414,249 @@ class _ShopTile extends StatelessWidget {
   }
 }
 
-class _Chip extends StatelessWidget {
-  const _Chip({required this.text, required this.color});
-  final String text;
-  final Color color;
+class _CategoryShelf extends StatelessWidget {
+  const _CategoryShelf({
+    required this.title,
+    required this.items,
+    required this.balance,
+    required this.busy,
+    required this.onBuy,
+    required this.onEquip,
+  });
+  final String title;
+  final List<Map<String, dynamic>> items;
+  final int balance;
+  final String? busy;
+  final void Function(Map<String, dynamic>, int) onBuy;
+  final void Function(Map<String, dynamic>) onEquip;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      padding: const EdgeInsets.all(11),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.16),
-        borderRadius: Corners.rPill,
+        borderRadius: Corners.rXl,
+        color: const Color(0xAA071522),
+        border: Border.all(color: Colors.white10),
       ),
-      child: Text(text,
-          style: TextStyle(
-              fontSize: 9.5, fontWeight: FontWeight.w800, color: color)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Expanded(child: Text(title,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900))),
+            Text('${faNum(items.length)} انتخاب · ورق بزن',
+                style: const TextStyle(fontSize: 9.5, color: Colors.white54)),
+          ]),
+          Gaps.vXs,
+          SizedBox(
+            height: 300,
+            child: items.isEmpty
+                ? const Center(child: Text('آیتمی در این دسته نیست.'))
+                : ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: items.length,
+                    separatorBuilder: (_, __) => Gaps.hSm,
+                    itemBuilder: (_, index) {
+                      final item = items[index];
+                      return _ProductCard(
+                        item: item,
+                        busy: busy == 'buy-${item['id']}' || busy == 'equip-${item['id']}',
+                        onBuy: () => onBuy(item, balance),
+                        onEquip: () => onEquip(item),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-
-class AnimePlusButton extends StatefulWidget {
-  const AnimePlusButton({
-    super.key,
-    required this.onPressed,
-    this.label = 'فعال‌سازی قلقلی پلاس',
-    this.busy = false,
+class _ProductCard extends StatelessWidget {
+  const _ProductCard({
+    required this.item,
+    required this.busy,
+    required this.onBuy,
+    required this.onEquip,
   });
-
-  final VoidCallback? onPressed;
-  final String label;
+  final Map<String, dynamic> item;
   final bool busy;
+  final VoidCallback onBuy;
+  final VoidCallback onEquip;
 
   @override
-  State<AnimePlusButton> createState() => _AnimePlusButtonState();
+  Widget build(BuildContext context) {
+    final usable = item['usable'] == true;
+    final selected = item['equipped'] == true;
+    final owned = item['owned'] == true;
+    final annualGift = item['access_tier'] == 'annual';
+    return SizedBox(
+      width: 235,
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          borderRadius: Corners.rXl,
+          gradient: const LinearGradient(
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: [Color(0xFF17273A), Color(0xFF0B1522)],
+          ),
+          border: Border.all(
+            color: selected ? const Color(0xFF22E7A6) : Colors.white12,
+            width: selected ? 1.8 : 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(child: _ProductArt(item: item)),
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(children: [
+                    Expanded(child: Text('${item['name']}',
+                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900))),
+                    if (selected) const _Pill(text: 'فعال', color: Color(0xFF22E7A6)),
+                  ]),
+                  const SizedBox(height: 3),
+                  Text('${item['description'] ?? ''}',
+                      maxLines: 2, overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 9.5, height: 1.35, color: Colors.white54)),
+                  Gaps.vXs,
+                  Row(children: [
+                    Expanded(child: Text(
+                      annualGift ? 'هدیه سالانه' : owned ? 'خریداری‌شده' : Money.withUnit(item['price']),
+                      style: const TextStyle(fontSize: 10.5, color: Color(0xFFFFD166), fontWeight: FontWeight.w900),
+                    )),
+                    if (usable)
+                      FilledButton(
+                        onPressed: busy || selected ? null : onEquip,
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(68, 34),
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        child: Text(selected ? 'فعال' : 'انتخاب', style: const TextStyle(fontSize: 10)),
+                      )
+                    else if (!annualGift)
+                      FilledButton(
+                        onPressed: busy ? null : onBuy,
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(60, 34),
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        child: busy
+                            ? const SizedBox.square(dimension: 13, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Text('خرید', style: TextStyle(fontSize: 10)),
+                      )
+                    else
+                      const Icon(Icons.lock_rounded, size: 17, color: Colors.white38),
+                  ]),
+                  if (item['unlockedByPlus'] == true && !owned)
+                    const Text('با پلاس در دسترس است',
+                        style: TextStyle(fontSize: 8.5, color: Color(0xFF38BDF8))),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-class _AnimePlusButtonState extends State<AnimePlusButton>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _shimmer = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 2000),
-  )..repeat();
+class _ProductArt extends StatelessWidget {
+  const _ProductArt({required this.item});
+  final Map<String, dynamic> item;
 
-  @override
-  void dispose() {
-    _shimmer.dispose();
-    super.dispose();
+  List<Color> get colors {
+    final metadata = item['metadata'];
+    final palette = metadata is Map && metadata['palette'] is List
+        ? metadata['palette'] as List
+        : const [];
+    final parsed = palette.map((raw) => _hex('$raw')).whereType<Color>().toList();
+    if (parsed.length >= 2) return parsed;
+    return const [Color(0xFF38BDF8), Color(0xFF7C3AED)];
+  }
+
+  Color? _hex(String raw) {
+    final clean = raw.replaceAll('#', '');
+    if (clean.length != 6) return null;
+    return Color(int.parse('FF$clean', radix: 16));
   }
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _shimmer,
-      builder: (context, _) {
-        final t = _shimmer.value;
-        return InkWell(
-          onTap: widget.busy ? null : widget.onPressed,
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            height: 52,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFFFFD700),
-                  Color(0xFFFF9F43),
-                  Color(0xFFFF007A),
-                ],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFFFF9F43).withValues(alpha: 0.50),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Stack(
-              children: [
-                // Shimmer sweep
-                Positioned.fill(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment(-2.0 + t * 4.0, -1.0),
-                          end: Alignment(-1.0 + t * 4.0, 1.0),
-                          colors: [
-                            Colors.transparent,
-                            Colors.white.withValues(alpha: 0.35),
-                            Colors.transparent,
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                Center(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.auto_awesome_rounded, size: 20, color: Color(0xFF1E0A00)),
-                      const SizedBox(width: 8),
-                      Text(
-                        widget.busy ? 'در حال باز کردن فروشگاه...' : widget.label,
-                        style: const TextStyle(
-                          color: Color(0xFF1E0A00),
-                          fontSize: 15,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.2,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+    final kind = '${item['kind']}';
+    final value = '${item['payload'] ?? item['slug'] ?? ''}';
+    Widget content;
+    if (kind == 'club_badge') {
+      content = Image.asset(
+        clubAsset(value), width: 78, height: 78, fit: BoxFit.contain, cacheWidth: 220,
+        errorBuilder: (_, __, ___) => const Icon(Icons.shield_rounded, size: 58),
+      );
+    } else if (kind == 'name_color') {
+      content = ShaderMask(
+        shaderCallback: (bounds) => LinearGradient(colors: colors).createShader(bounds),
+        child: const Text('قلقلی', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900)),
+      );
+    } else {
+      final icon = switch (kind) {
+        'card_frame' => Icons.shield_rounded,
+        'profile_background' => Icons.person_rounded,
+        'result_template' => Icons.emoji_events_rounded,
+        'match_effect' => Icons.celebration_rounded,
+        'emote_pack' => Icons.forum_rounded,
+        _ => Icons.auto_awesome_rounded,
+      };
+      content = Icon(icon, size: 58, color: Colors.white);
+    }
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: RadialGradient(
+          center: const Alignment(.55, -.6),
+          radius: 1.25,
+          colors: [colors.last.withValues(alpha: .62), colors.first.withValues(alpha: .18), const Color(0xFF071522)],
+        ),
+        border: Border(bottom: BorderSide(color: colors.first.withValues(alpha: .42))),
+      ),
+      child: Center(
+        child: Container(
+          width: 112,
+          height: 92,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(color: colors.first.withValues(alpha: .72), width: 2.5),
+            boxShadow: [BoxShadow(color: colors.last.withValues(alpha: .25), blurRadius: 20)],
           ),
-        );
-      },
+          child: content,
+        ),
+      ),
     );
   }
+}
+
+class _Pill extends StatelessWidget {
+  const _Pill({required this.text, required this.color});
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: .15),
+      borderRadius: Corners.rPill,
+      border: Border.all(color: color.withValues(alpha: .35)),
+    ),
+    child: Text(text,
+        style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w900, color: color)),
+  );
 }

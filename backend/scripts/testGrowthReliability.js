@@ -36,7 +36,8 @@ const withdrawal = read('backend/src/services/withdrawalService.js');
 ok(withdrawal.includes('appendStatus') && withdrawal.includes('timeline'),
   'withdrawal lifecycle is immutable and user-visible');
 const shop = read('backend/src/services/shopService.js');
-ok(shop.includes('purchaseHistory') && shop.includes("'subscription'::text"),
+ok(shop.includes('purchaseHistory')
+  && (shop.includes("'subscription'::text") || shop.includes("'subscription' AS type")),
   'item and subscription receipts share one history');
 
 const web = read('userweb/src/cardDuelGame.jsx');

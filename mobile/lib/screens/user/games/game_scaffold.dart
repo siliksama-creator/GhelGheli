@@ -3,11 +3,21 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../api_client.dart';
+import '../../../core/cosmetics.dart';
 import '../../../theme/tokens.dart';
 import 'game_audio.dart';
 import 'game_session.dart';
 import 'versus_bar.dart';
+
+Map<String, dynamic> _playerCosmetics(GameSession session, String? symbol) {
+  final player = symbol == null ? null : session.players?[symbol];
+  final cosmetics = player is Map ? player['cosmetics'] : null;
+  return cosmetics is Map
+      ? Map<String, dynamic>.from(cosmetics)
+      : <String, dynamic>{};
+}
 
 class GameScaffold extends StatelessWidget {
   const GameScaffold({
@@ -112,6 +122,16 @@ class GameScaffold extends StatelessWidget {
           const Positioned.fill(
             child: IgnorePointer(
               child: _ConfettiOverlay(),
+            ),
+          ),
+        if ((session.phase == GamePhase.playing || (session.phase == GamePhase.over && session.iWon))
+            && _playerCosmetics(session, session.mySymbol)['matchEffect'] != null)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: _CosmeticEffectOverlay(
+                slug: '${_playerCosmetics(session, session.mySymbol)['matchEffect']}',
+                finish: session.phase == GamePhase.over,
+              ),
             ),
           ),
       ],
@@ -464,14 +484,20 @@ class _ResultStrip extends StatelessWidget {
         : draw
             ? Icons.handshake_rounded
             : Icons.close_rounded;
+    final cosmetics = _playerCosmetics(session, session.mySymbol);
+    final template = cosmetics['resultTemplate'] as String?;
+    final palette = resultTemplateColors[template];
     return AnimatedContainer(
       duration: Motion.fast,
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: Gaps.sm, vertical: 7),
       decoration: BoxDecoration(
         borderRadius: Corners.rPill,
-        color: color.withValues(alpha: 0.16),
-        border: Border.all(color: color.withValues(alpha: 0.70), width: 1.2),
+        color: palette == null ? color.withValues(alpha: 0.16) : null,
+        gradient: palette == null ? null : LinearGradient(
+          colors: [palette.first.withValues(alpha: .82), palette.last.withValues(alpha: .46)],
+        ),
+        border: Border.all(color: (palette?.last ?? color).withValues(alpha: 0.70), width: 1.2),
         boxShadow: [BoxShadow(color: color.withValues(alpha: 0.20), blurRadius: 12)],
       ),
       child: Row(
@@ -517,6 +543,16 @@ class _ResultActions extends StatelessWidget {
           ),
         ),
         Gaps.hXs,
+        IconButton.filledTonal(
+          tooltip: 'اشتراک نتیجه در تلگرام/اینستاگرام',
+          onPressed: () => Share.share(
+            '${session.resultText}\n${session.nameOf('X')} مقابل ${session.nameOf('O')}\n'
+            'تو هم به باشگاه بازی‌های قلقلی بیا: https://ghelghelishop.ir',
+            subject: 'نتیجه بازی قلقلی',
+          ),
+          icon: const Icon(Icons.ios_share_rounded, size: 18),
+        ),
+        Gaps.hXs,
         Expanded(
           child: OutlinedButton(
             onPressed: session.leave,
@@ -524,6 +560,90 @@ class _ResultActions extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _CosmeticEffectOverlay extends StatefulWidget {
+  const _CosmeticEffectOverlay({required this.slug, required this.finish});
+  final String slug;
+  final bool finish;
+
+  @override
+  State<_CosmeticEffectOverlay> createState() => _CosmeticEffectOverlayState();
+}
+
+class _CosmeticEffectOverlayState extends State<_CosmeticEffectOverlay>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1900),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _run();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CosmeticEffectOverlay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.finish != widget.finish || oldWidget.slug != widget.slug) _run();
+  }
+
+  void _run() {
+    _controller.stop();
+    _controller.reset();
+    if (widget.finish) {
+      _controller.repeat(reverse: true);
+    } else {
+      _controller.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = switch (widget.slug) {
+      'stadium_spotlight' => '🔦',
+      'colored_smoke' => '🌈',
+      'card_side_fire' => '🔥',
+      'victory_confetti' => '🎊',
+      'golden_cup' => '🏆',
+      'tunnel_entry' => '🚇',
+      'goal_celebration' => '⚽',
+      'win_streak' => '🔥',
+      'mvp_effect' => '⭐',
+      'rematch_effect' => '↻',
+      _ => '✨',
+    };
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (_, __) {
+        final t = Curves.easeOutCubic.transform(_controller.value);
+        final opacity = widget.finish ? .25 + .65 * (1 - (t - .5).abs() * 2) : (1 - t).clamp(0.0, 1.0);
+        return Center(
+          child: Opacity(
+            opacity: opacity.clamp(0.0, 1.0).toDouble(),
+            child: Transform.rotate(
+              angle: (t - .5) * .28,
+              child: Transform.scale(
+                scale: widget.finish ? .9 + t * .65 : .3 + t * 1.9,
+                child: Text(icon, style: const TextStyle(fontSize: 72, shadows: [
+                  Shadow(color: Color(0xFFFFD166), blurRadius: 28),
+                  Shadow(color: Color(0xFF38BDF8), blurRadius: 18),
+                ])),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

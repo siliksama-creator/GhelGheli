@@ -40,6 +40,7 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _passwordMessageIsError = false;
   List _myClubs = const [];
   List _leagueHistory = const [];
+  Map<String, dynamic> _cosmetics = const {};
 
   @override
   void initState() {
@@ -81,7 +82,8 @@ class _ProfilePageState extends State<ProfilePage> {
       final batch =
           await widget.api.getAll(['/api/profile', '/api/clubs']);
       if (!mounted) return;
-      final u = (batch[0] is Map ? batch[0]['user'] : null) ?? {};
+      final profile = batch[0] is Map ? batch[0] as Map : const {};
+      final u = profile['user'] ?? {};
       final clubs = (batch[1] is Map ? batch[1]['mine'] : null) ?? [];
       setState(() {
         _first.text = '${u['first_name'] ?? ''}';
@@ -94,6 +96,9 @@ class _ProfilePageState extends State<ProfilePage> {
         final key = '${u['profile_avatar_key'] ?? ''}';
         if (key.isNotEmpty) _selectedAvatar = key;
         _myClubs = clubs is List ? clubs : const [];
+        _cosmetics = profile['cosmetics'] is Map
+            ? Map<String, dynamic>.from(profile['cosmetics'] as Map)
+            : <String, dynamic>{};
         _loaded = true;
       });
     } catch (e) {
@@ -182,7 +187,9 @@ class _ProfilePageState extends State<ProfilePage> {
       );
     }
 
-    return ListView(
+    return Container(
+      decoration: profileBackgroundDecoration(_cosmetics['profileBackground'] as String?),
+      child: ListView(
       padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, Gaps.xxl),
       children: [
         // ── League History ──
@@ -242,6 +249,13 @@ class _ProfilePageState extends State<ProfilePage> {
                       children: [
                         Text('اطلاعات کاربری و پروفایل',
                             style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
+                        const SizedBox(height: 2),
+                        DisplayName(
+                          name: _nick.text.isEmpty ? 'کاربر' : _nick.text,
+                          cosmetics: _cosmetics,
+                          showTitle: true,
+                          style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900),
+                        ),
                         const SizedBox(height: 2),
                         const Text('اطلاعات شخصی فقط برای مدیریت جهت واریز جوایز محفوظ است.',
                             style: TextStyle(fontSize: 10.5, color: Colors.white60)),
@@ -447,7 +461,7 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ),
       ],
-    );
+    ));
   }
 }
 

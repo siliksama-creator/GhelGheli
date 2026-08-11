@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { asset, fa, req } from './lib/api.js';
 import { useGameSession } from './gameSession.js';
+import { RESULT_PALETTES } from './components/Cosmetics.jsx';
 
 const idOf = card => String(card?.cardTypeId || card?.id || '');
 const num = value => Number(value || 0);
+const MATCH_EFFECT_ICON = { stadium_spotlight:'🔦', colored_smoke:'🌈', card_side_fire:'🔥', victory_confetti:'🎊', golden_cup:'🏆', tunnel_entry:'🚇', goal_celebration:'⚽', win_streak:'🔥', mvp_effect:'⭐', rematch_effect:'↻' };
 const rarityColor = rarity => ({
   legend: '#FF6B35', premium: '#FFD166', gold: '#F7C948',
   silver: '#C7D2FE', normal: '#22E7A6',
@@ -146,12 +148,13 @@ function resultMvp(state) {
   return candidates.sort((a, b) => num(b.power) - num(a.power))[0] || null;
 }
 
-async function renderResultCard({ result, score, mvp, opponent, url }) {
+async function renderResultCard({ result, score, mvp, opponent, url, template }) {
   const canvas = document.createElement('canvas');
   canvas.width = 1080; canvas.height = 1080;
   const ctx = canvas.getContext('2d');
+  const colors = RESULT_PALETTES[template] || ['#071522', '#35105D'];
   const gradient = ctx.createLinearGradient(0, 0, 1080, 1080);
-  gradient.addColorStop(0, '#071522'); gradient.addColorStop(0.55, '#17304C'); gradient.addColorStop(1, '#35105D');
+  gradient.addColorStop(0, colors[0]); gradient.addColorStop(0.55, '#17304C'); gradient.addColorStop(1, colors[1]);
   ctx.fillStyle = gradient; ctx.fillRect(0, 0, 1080, 1080);
   ctx.strokeStyle = '#FFD166'; ctx.lineWidth = 10; ctx.strokeRect(35, 35, 1010, 1010);
   ctx.textAlign = 'center'; ctx.direction = 'rtl';
@@ -215,7 +218,8 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
       const mvp = resultMvp(session.g.state);
       const opponent = session.g.players?.[other]?.nickname || 'حریف';
       const text = `${title}\nنتیجه ${fa(myScore)} - ${fa(theirScore)}\nMVP: ${mvp?.name || 'ستاره آرنا'}\nمستقیم به چالشم بیا:`;
-      const blob = await renderResultCard({ result: title, score: `${fa(myScore)} - ${fa(theirScore)}`, mvp, opponent, url: invite.shareUrl });
+      const myCosmetics = session.g.players?.[mine]?.cosmetics || {};
+      const blob = await renderResultCard({ result: title, score: `${fa(myScore)} - ${fa(theirScore)}`, mvp, opponent, url: invite.shareUrl, template: myCosmetics.resultTemplate });
       const file = blob ? new File([blob], 'ghelgheli-result.png', { type: 'image/png' }) : null;
       if (navigator.share && (!file || !navigator.canShare || navigator.canShare({ files: [file] }))) {
         await navigator.share({ title: 'نتیجه دوئل قلقلی', text, url: invite.shareUrl, ...(file ? { files: [file] } : {}) });
@@ -285,8 +289,12 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
   const activeGame = enabled && ['waiting', 'playing', 'over', 'error'].includes(session.phase);
   const winner = session.g.winner;
   const iWon = winner && winner === session.g.me;
+  const myCosmetics = session.g.players?.[session.g.me]?.cosmetics || {};
+  const resultPalette = RESULT_PALETTES[myCosmetics.resultTemplate] || ['#071522', '#FFD166'];
 
-  return <main className="duelPageV2" style={{ '--mode-color': mode.color }}>
+  return <main className="duelPageV2" style={{ '--mode-color': mode.color, position:'relative', overflow:'hidden' }}>
+    <style>{`@keyframes duelCosmeticBurst{0%{opacity:0;transform:scale(.3) rotate(-15deg)}35%{opacity:1}100%{opacity:0;transform:scale(2.2) rotate(12deg)}}`}</style>
+    {enabled && (session.phase === 'playing' || (session.phase === 'over' && iWon)) && myCosmetics.matchEffect && <div aria-hidden="true" style={{position:'absolute',zIndex:20,left:'50%',top:'32%',fontSize:'72px',pointerEvents:'none',animation:'duelCosmeticBurst 2s ease-out forwards',filter:'drop-shadow(0 0 22px #FFD166)'}}>{MATCH_EFFECT_ICON[myCosmetics.matchEffect] || '✨'}</div>}
     <header className="duelHeroV2">
       <button type="button" className="ghost" onClick={() => { session.leave(); onBack(); }}>← بازگشت</button>
       <div className="duelHeroIcon"><img src="/games/card_duel_glow.png" alt="" /></div>
@@ -327,7 +335,8 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
     {enabled && session.connectionNotice && <div className="gameReconnectBanner">{session.connectionNotice}</div>}
     {enabled && session.phase === 'playing' && <LiveArena session={session} />}
 
-    {enabled && session.phase === 'over' && <section className={`duelFinale ${winner === 'DRAW' ? 'draw' : iWon ? 'won' : 'lost'}`}>
+    {enabled && session.phase === 'over' && <section className={`duelFinale ${winner === 'DRAW' ? 'draw' : iWon ? 'won' : 'lost'}`}
+      style={{'--duel-result-a':resultPalette[0],'--duel-result-b':resultPalette[1],background:`radial-gradient(circle at 50% 15%,${resultPalette[1]}44,transparent 42%),${resultPalette[0]}`}}>
       <LiveArena session={session} />
       <div className="duelFinalePanel">
         <span>{winner === 'DRAW' ? '🤝' : iWon ? '🏆' : '🛡️'}</span>

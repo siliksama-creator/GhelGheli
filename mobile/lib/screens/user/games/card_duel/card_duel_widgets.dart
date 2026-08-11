@@ -419,9 +419,9 @@ class _RoundReveal extends StatelessWidget {
 }
 
 class _Finale extends StatelessWidget {
-  const _Finale({required this.session, required this.color, required this.onAgain, required this.onEdit,
+  const _Finale({required this.session, required this.color, required this.resultColors, required this.onAgain, required this.onEdit,
     required this.onShare, required this.sharing, required this.mvp, required this.privateLobby});
-  final GameSession session; final Color color; final VoidCallback onAgain; final VoidCallback onEdit;
+  final GameSession session; final Color color; final List<Color>? resultColors; final VoidCallback onAgain; final VoidCallback onEdit;
   final VoidCallback onShare; final bool sharing; final Map<String, dynamic>? mvp; final bool privateLobby;
   @override
   Widget build(BuildContext context) {
@@ -430,7 +430,7 @@ class _Finale extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(Gaps.md),
       decoration: BoxDecoration(borderRadius: Corners.rXl,
-        gradient: const LinearGradient(colors: [Color(0xFF17304C), Color(0xFF050A12)]),
+        gradient: LinearGradient(colors: resultColors ?? const [Color(0xFF17304C), Color(0xFF050A12)]),
         border: Border.all(color: color)),
       child: Column(children: [
         Text(draw ? '🤝' : won ? '🏆' : '🛡️', style: const TextStyle(fontSize: 44)),

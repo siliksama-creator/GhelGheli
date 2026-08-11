@@ -24,6 +24,7 @@ class ChatPage extends StatefulWidget {
 class _ChatPageState extends State<ChatPage> with LifecyclePoller {
   List _messages = [];
   List _cannedMessages = [];
+  List _emotePacks = [];
   Map? _reply;
   String? _error;
   Map<String, dynamic>? _pinned;
@@ -116,6 +117,7 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
         setState(() {
           _messages = m;
           _cannedMessages = cm;
+          _emotePacks = cfg['emotePacks'] is List ? cfg['emotePacks'] as List : const [];
           _lastCount = m.length;
           _error = null;
           _loading = false;
@@ -243,6 +245,7 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
         // ── پنل زیبا و مدرن پیام‌های آماده ──
         _CannedMessagesPanel(
           cannedMessages: _cannedMessages,
+          emotePacks: _emotePacks,
           cooldownLeft: _cooldownLeft,
           onSend: _sendCannedMessage,
         ),
@@ -383,11 +386,13 @@ class _MessageBubble extends StatelessWidget {
 class _CannedMessagesPanel extends StatefulWidget {
   const _CannedMessagesPanel({
     required this.cannedMessages,
+    required this.emotePacks,
     required this.cooldownLeft,
     required this.onSend,
   });
 
   final List cannedMessages;
+  final List emotePacks;
   final int cooldownLeft;
   final void Function(String text) onSend;
 
@@ -404,16 +409,25 @@ class _CannedMessagesPanelState extends State<_CannedMessagesPanel> {
     '🧤', '⚡', '🤩', '👍', '🎮', '🍿', '🎩', '💎',
   ];
 
-  final _categories = const [
-    ('💬 گفتگو', ['سلام بچه‌ها!', 'من اومدم!', 'چه خبر بچه‌ها؟', 'خداحافظ تا بعد!', 'مواظب خودتون باشید!', 'خوشبختم دوستان!', 'کجا زندگی می‌کنید؟', 'امروز چیکار کردید؟']),
-    ('⚽ بازی', ['کی پایه بازیه؟', 'بریم برای برد!', 'من عاشق این بازی‌ام!', 'منم می‌خوام بازی کنم!', 'دوباره امتحان می‌کنم!']),
-    ('🎮 بازی', ['بزن بریم بازی!', 'آماده‌ای برای مسابقه؟', 'این دست من می‌برم!', 'بازی عالی بود!', 'دوباره بازی کنیم؟', 'کارت خفن گرفتم!', 'حریف قوی می‌خوام!', 'پنالتی رو دریبل کردم!']),
-    ('😀 ایموجی', []),
-  ];
+  List<(String, List<String>)> get _categories {
+    final premium = widget.emotePacks.whereType<Map>().map((raw) {
+      final messages = (raw['messages'] as List? ?? const []).map((e) => '$e').toList();
+      return ('${raw['icon'] ?? '✨'} ${raw['name'] ?? 'پک ویژه'}', messages);
+    });
+    return [
+      ('💬 گفتگو', const ['سلام بچه‌ها!', 'من اومدم!', 'چه خبر بچه‌ها؟', 'خداحافظ تا بعد!', 'مواظب خودتون باشید!', 'خوشبختم دوستان!', 'کجا زندگی می‌کنید؟', 'امروز چیکار کردید؟']),
+      ('⚽ بازی', const ['کی پایه بازیه؟', 'بریم برای برد!', 'من عاشق این بازی‌ام!', 'منم می‌خوام بازی کنم!', 'دوباره امتحان می‌کنم!']),
+      ('🎮 رقابت', const ['بزن بریم بازی!', 'آماده‌ای برای مسابقه؟', 'این دست من می‌برم!', 'بازی عالی بود!', 'دوباره بازی کنیم؟', 'کارت خفن گرفتم!', 'حریف قوی می‌خوام!', 'پنالتی رو دریبل کردم!']),
+      ...premium,
+      ('😀 ایموجی', const <String>[]),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
     final disabled = widget.cooldownLeft > 0;
+    final categories = _categories;
+    if (_tab >= categories.length) _tab = 0;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
@@ -435,33 +449,32 @@ class _CannedMessagesPanelState extends State<_CannedMessagesPanel> {
           // تب‌های دسته‌بندی
           Row(
             children: [
-              for (int i = 0; i < _categories.length; i++)
-                Padding(
-                  padding: const EdgeInsets.only(left: 6),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(10),
-                    onTap: () => setState(() => _tab = i),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(10),
-                        color: _tab == i ? const Color(0xFF38BDF8).withValues(alpha: 0.22) : Colors.white.withValues(alpha: 0.04),
-                        border: Border.all(
-                          color: _tab == i ? const Color(0xFF38BDF8) : Colors.white12,
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(children: [
+                    for (int i = 0; i < categories.length; i++)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 6),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(10),
+                          onTap: () => setState(() => _tab = i),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(10),
+                              color: _tab == i ? const Color(0xFF38BDF8).withValues(alpha: 0.22) : Colors.white.withValues(alpha: 0.04),
+                              border: Border.all(color: _tab == i ? const Color(0xFF38BDF8) : Colors.white12),
+                            ),
+                            child: Text(categories[i].$1,
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800,
+                                color: _tab == i ? const Color(0xFF38BDF8) : Colors.white70)),
+                          ),
                         ),
                       ),
-                      child: Text(
-                        _categories[i].$1,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: _tab == i ? const Color(0xFF38BDF8) : Colors.white70,
-                        ),
-                      ),
-                    ),
-                  ),
+                  ]),
                 ),
-              const Spacer(),
+              ),
               if (disabled)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -482,7 +495,7 @@ class _CannedMessagesPanelState extends State<_CannedMessagesPanel> {
           // لیست پیام‌ها یا ایموجی‌ها
           SizedBox(
             height: 96,
-            child: _tab == 3
+            child: _tab == categories.length - 1
                 ? GridView.builder(
                     scrollDirection: Axis.horizontal,
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -516,9 +529,9 @@ class _CannedMessagesPanelState extends State<_CannedMessagesPanel> {
                       crossAxisSpacing: 8,
                       childAspectRatio: 0.30,
                     ),
-                    itemCount: _categories[_tab].$2.length,
+                    itemCount: categories[_tab].$2.length,
                     itemBuilder: (ctx, i) {
-                      final text = _categories[_tab].$2[i];
+                      final text = categories[_tab].$2[i];
                       return InkWell(
                         onTap: disabled ? null : () => widget.onSend(text),
                         borderRadius: BorderRadius.circular(12),

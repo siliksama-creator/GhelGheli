@@ -1,186 +1,173 @@
-// 1:1 با اندروید shop_page.dart — فروشگاه دقیقاً مثل اپ
-import React, { useCallback, useState } from 'react';
-import { req, fa } from '../lib/api.js';
-import { useAsync } from '../lib/useAsync.js';
-import { AsyncSection } from '../components/states.jsx';
-import { FRAME_STYLE, clubImg } from '../components/Cosmetics.jsx';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { req, asset, fa } from '../lib/api.js';
 
-export default function Shop({ token, setMsg, reloadProfile }) {
-  const load = useCallback(() => req('/api/shop', 'GET', null, token), [token]);
-  const state = useAsync(load, [load]);
-  const [busy, setBusy] = useState(null);
-  const [confirm, setConfirm] = useState(null);
-  const [plusConfirm, setPlusConfirm] = useState(false);
-  const [avatarOffer, setAvatarOffer] = useState(null);
+const KINDS = [
+  ['club_badge', 'باشگاه‌ها', '⚽'],
+  ['card_frame', 'قاب‌ها', '🪄'],
+  ['name_color', 'افکت نام', '✨'],
+  ['profile_background', 'پس‌زمینه', '🌃'],
+  ['result_template', 'نتیجه', '🏆'],
+  ['match_effect', 'ورود و پایان', '🎉'],
+  ['emote_pack', 'پیام‌ها', '💬'],
+];
 
-  async function run(fn, key) {
-    if (busy) return;
-    setBusy(key);
-    try {
-      const d = await fn();
-      setMsg?.(d.message);
-      state.reload();
-      reloadProfile?.();
-      return d;
-    } catch (e) { setMsg?.(e.message); } finally { setBusy(null); setConfirm(null); setPlusConfirm(false); }
+const FRAME_STYLES = {
+  gold: ['#FFD166', '#F59E0B'], neon: ['#22E7A6', '#06B6D4'], fire: ['#F97316', '#EF4444'],
+  ice: ['#BAE6FD', '#0284C7'], holo: ['#22D3EE', '#F472B6'], blue_fire: ['#38BDF8', '#1D4ED8'],
+  stadium_frame: ['#22C55E', '#0EA5E9'], animated_gold: ['#FFF0A3', '#D97706'], club_neon: ['#C026D3', '#22D3EE'],
+  season_champion: ['#FFD166', '#DC2626'], champions_night: ['#1D4ED8', '#A78BFA'],
+  pro_holographic: ['#22D3EE', '#F472B6'], annual_royal_frame: ['#FFD166', '#7C3AED'],
+};
+
+const KIND_PREVIEW = {
+  card_frame: '🛡️', name_color: 'قلقلی', profile_background: '👤',
+  result_template: '۳ - ۲', match_effect: 'VS', emote_pack: '💬', club_badge: '⚽',
+};
+
+function money(value) { return `${fa(Number(value || 0))} تومان`; }
+
+function palette(item) {
+  const meta = item.metadata || {};
+  if (Array.isArray(meta.palette) && meta.palette.length) return meta.palette;
+  return FRAME_STYLES[item.payload || item.slug] || ['#38BDF8', '#7C3AED'];
+}
+
+function CosmeticPreview({ item }) {
+  if (item.kind === 'club_badge' && item.image_url) {
+    return <div className="shopArt"><img src={asset(item.image_url)} alt="" loading="lazy" /></div>;
   }
-  const buy = async (it) => {
-    const d = await run(() => req(`/api/shop/items/${it.id}/buy`, 'POST', {}, token), it.id);
-    if (d?.joinedClub) setAvatarOffer({ slug: d.joinedClub, name: it.name });
+  const colors = palette(item);
+  const icon = item.kind === 'emote_pack' ? (item.metadata?.icon || '💬') : KIND_PREVIEW[item.kind];
+  return <div className={`shopArt art-${item.kind}`} style={{
+    '--shopA': colors[0], '--shopB': colors[1] || colors[0],
+    background: `radial-gradient(circle at 72% 22%, ${colors[1] || colors[0]}66, transparent 38%), linear-gradient(145deg, ${colors[0]}33, #071522 68%)`,
+    borderColor: `${colors[0]}AA`, boxShadow: `inset 0 0 24px ${colors[0]}20, 0 8px 28px ${colors[1] || colors[0]}18`,
+  }}><span>{icon}</span><i /></div>;
+}
+
+function PlanCard({ plan, activeTier, busy, onBuy }) {
+  const annual = plan.billingCycle === 'annual';
+  const active = activeTier === plan.billingCycle;
+  return <article className={`shopPlan ${annual ? 'annual' : ''} ${active ? 'active' : ''}`}>
+    <div className="shopPlanHead">
+      <div><small>{annual ? 'بیشترین ارزش' : 'انعطاف ماهانه'}</small><h3>{plan.label}</h3></div>
+      {annual ? <b className="saveBadge">حدود ۳۰٪ صرفه‌جویی</b> : <b>۳۰ روز</b>}
+    </div>
+    <strong className="planPrice">{money(plan.price)} <small>/ {annual ? 'سال' : 'ماه'}</small></strong>
+    {annual && <div className="annualCompare">به‌جای {money(59000 * 12)} پرداخت ماهانه</div>}
+    <ul>{(plan.benefits || []).slice(0, annual ? 9 : 5).map((b) => <li key={b}>✓ {b}</li>)}</ul>
+    <button type="button" disabled={busy} onClick={() => onBuy(plan.billingCycle)}>
+      {busy ? 'در حال ثبت…' : active ? 'تمدید همین پلن' : `خرید ${plan.label}`}
+    </button>
+  </article>;
+}
+
+function ShopItem({ item, busy, onBuy, onEquip }) {
+  const canEquip = item.usable;
+  const annualGift = item.access_tier === 'annual';
+  return <article className={`shopProduct ${item.equipped ? 'equipped' : ''}`}>
+    <CosmeticPreview item={item} />
+    <div className="shopProductBody">
+      <div className="shopProductTitle"><h3>{item.name}</h3>{item.equipped && <span>فعال</span>}</div>
+      <p>{item.description}</p>
+      <div className="shopProductFoot">
+        <strong>{annualGift ? 'هدیه سالانه' : item.owned ? 'خریداری شده' : money(item.price)}</strong>
+        {canEquip ? (
+          <button type="button" className={item.equipped ? 'secondary' : ''} disabled={busy || item.equipped}
+            onClick={() => onEquip(item)}>{item.equipped ? 'انتخاب‌شده' : 'انتخاب'}</button>
+        ) : annualGift ? <span className="lockedGift">🔒 اختصاصی</span> : (
+          <button type="button" disabled={busy} onClick={() => onBuy(item)}>{busy ? '…' : 'خرید'}</button>
+        )}
+      </div>
+      {item.unlockedByPlus && !item.owned && <small className="plusAccess">با پلاس در دسترس است</small>}
+    </div>
+  </article>;
+}
+
+export default function Shop({ token, reloadProfile }) {
+  const [data, setData] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [activeKind, setActiveKind] = useState('card_frame');
+  const [busy, setBusy] = useState('');
+  const [notice, setNotice] = useState('');
+  const [error, setError] = useState('');
+  const [showPlans, setShowPlans] = useState(true);
+  const [showHistory, setShowHistory] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const [catalogue, purchases] = await Promise.all([
+        req('/api/shop', 'GET', null, token),
+        req('/api/shop/history?limit=24', 'GET', null, token),
+      ]);
+      setData(catalogue); setHistory(Array.isArray(purchases) ? purchases : []); setError('');
+    } catch (e) { setError(e.message || 'فروشگاه در دسترس نیست'); }
+  }, [token]);
+
+  useEffect(() => { load(); }, [load]);
+  const availableKinds = useMemo(() => KINDS.filter(([key]) => (data?.groups?.[key] || []).length), [data]);
+  useEffect(() => {
+    if (data && !(data.groups?.[activeKind] || []).length && availableKinds[0]) setActiveKind(availableKinds[0][0]);
+  }, [data, activeKind, availableKinds]);
+
+  const act = async (key, request, success) => {
+    if (busy) return;
+    setBusy(key); setNotice('');
+    try {
+      await request(); setNotice(success); await load(); await reloadProfile?.();
+    } catch (e) { setNotice(e.message || 'عملیات انجام نشد'); }
+    finally { setBusy(''); }
   };
-  const equip = (slug, kind) => run(() => req('/api/shop/equip', 'POST', { slug, kind }, token), 'equip' + (slug||kind));
-  const buyPlus = () => run(() => req('/api/shop/plus', 'POST', {}, token), 'plus');
-  const useAsAvatar = club => run(() => req('/api/shop/club-avatar', 'POST', { club }, token), 'avatar');
 
-  return (
-    <AsyncSection state={state} loadingLabel="در حال بارگذاری فروشگاه...">
-      {d => {
-        const equippedFor = k => k==='club_badge'?d.equipped.club : k==='card_frame'?d.equipped.frame : d.equipped.color;
-        const KINDS = [
-          ['club_badge','باشگاه‌ها','با خرید نشان، عضو دائمی باشگاه می‌شوی؛ اسمت در فهرست هواداران آن باشگاه می‌آید و می‌توانی نشان را عکس پروفایلت کنی.'],
-          ['card_frame','قاب کارت','قاب کارت‌های پروفایل'],
-          ['name_color','رنگ اسم','رنگ اسمت در جدول لیگ و چت'],
-        ];
-        return (
-          <div style={{ display:'flex', flexDirection:'column', gap:'16px', maxWidth:'820px', margin:'0 auto', padding:'0 12px 80px' }}>
-            <div style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'16px', padding:'16px' }}>
-              <h2 style={{ color:'#FFF', fontWeight:'900', margin:'0 0 6px' }}> فروشگاه قلقلی</h2>
-              <p style={{ color:'#CBD5E1', fontSize:'12.5px', lineHeight:1.6 }}>خرید مستقیم <b>دائمی</b> است؛ پلاس دسترسی ۳۰روزه می‌دهد. همهٔ آیتم‌ها صرفاً ظاهری‌اند.</p>
-              <p style={{ color:'#94A3B8', fontSize:'11px', marginTop:'6px' }}>موجودی کیف پول: <b style={{ color:'#FFD36B' }}>{fa(d.balance)} تومان</b></p>
-            </div>
+  const buyPlan = (billingCycle) => act(`plus-${billingCycle}`,
+    () => req('/api/shop/plus', 'POST', { billingCycle }, token),
+    billingCycle === 'annual' ? 'پلاس سالانه و هدیه‌های دائمی فعال شد' : 'پلاس ماهانه فعال شد');
+  const buyItem = (item) => act(`buy-${item.id}`,
+    () => req(`/api/shop/items/${item.id}/buy`, 'POST', {}, token), `${item.name} به کلکسیونت اضافه شد`);
+  const equipItem = (item) => act(`equip-${item.id}`,
+    () => req('/api/shop/equip', 'POST', { slug: item.slug, kind: item.kind }, token), `${item.name} فعال شد`);
 
-            <div style={{ background: d.plus.active ? 'linear-gradient(135deg, #FFD70022, #FF9F4322)' : 'rgba(255,255,255,0.04)', border: d.plus.active ? '1.5px solid #FFD700' : '1px solid rgba(255,255,255,0.08)', borderRadius:'16px', padding:'16px' }}>
-              <div style={{ display:'flex', alignItems:'center', gap:'12px', marginBottom:'12px' }}>
-                <span style={{ fontSize:'28px', textShadow:'0 0 14px rgba(255,209,102,0.8)' }}>★</span>
-                <div style={{ flex:1 }}>
-                  <h2 style={{ color:'#FFF', fontWeight:'900', margin:0, fontSize:'16px' }}>قلقلی پلاس</h2>
-                  <p style={{ color:'#94A3B8', fontSize:'11px', margin:0 }}>{d.plus.active ? `فعال — ${fa(d.plus.daysLeft)} روز باقی مانده` : `${fa(d.plus.days)} روز دسترسی به همهٔ آیتم‌ها`}</p>
-                </div>
-                <b style={{ color:'#FFD700', fontSize:'15px' }}>{fa(d.plus.price)} <i style={{ fontSize:'11px' }}>تومان</i></b>
-              </div>
-              <div className="plusHighlights">
-                <span> باشگاه دائمی</span><span> همه قاب‌ها</span><span> ستاره پروفایل</span>
-              </div>
-              <details className="plusDetails">
-                <summary>جزئیات و شرایط پلاس</summary>
-                <ul>{(d.plus.perks||[]).map(p=><li key={p}>{p}</li>)}</ul>
-                <p>{d.plus.expiryNote}</p>
-              </details>
-              <button disabled={busy==='plus'} onClick={()=>setPlusConfirm(true)} style={{ width:'100%', padding:'12px', borderRadius:'12px', border:'none', background:'linear-gradient(135deg, #FFD700, #FF9F43, #FF007A)', color:'#1E0A00', fontWeight:'900', fontSize:'14px', cursor:'pointer', boxShadow:'0 4px 16px rgba(255,159,67,0.4)' }}>
-                {busy==='plus' ? 'در حال خرید...' : d.plus.active ? 'تمدید یک ماه دیگر' : 'فعال‌سازی پلاس'}
-              </button>
-              {d.plus.active && <p style={{ color:'#94A3B8', fontSize:'10.5px', textAlign:'center', marginTop:'6px' }}>اگر زودتر تمدید کنی، روزهای باقی‌مانده از بین نمی‌رود و ۳۰ روز به آن اضافه می‌شود.</p>}
-            </div>
+  if (!data && !error) return <div className="card pad center muted">در حال چیدن ویترین…</div>;
+  if (!data) return <div className="card pad center"><p className="err">{error}</p><button onClick={load}>تلاش دوباره</button></div>;
+  const current = data.groups?.[activeKind] || [];
 
-            {d.clubs?.length>0 && (
-              <div style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'16px', padding:'16px' }}>
-                <h2 style={{ color:'#FFF', fontWeight:'900', margin:'0 0 10px' }}>باشگاه‌های من</h2>
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(110px,1fr))', gap:'10px' }}>
-                  {d.clubs.map(c=>(
-                    <div key={c.slug} style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:'12px', padding:'10px', textAlign:'center' }}>
-                      <img src={clubImg(c.slug)} alt={c.name} width="46" height="46" style={{ objectFit:'contain' }} />
-                      <b style={{ display:'block', color:'#FFF', fontSize:'11px', margin:'6px 0 2px' }}>{c.name}</b>
-                      <span style={{ background: c.permanent?'rgba(181,239,88,0.15)':'rgba(255,211,107,0.15)', color: c.permanent?'#B5EF58':'#FFD36B', padding:'2px 8px', borderRadius:'99px', fontSize:'9.5px', fontWeight:'800' }}>{c.permanent?'دائمی':'با پلاس'}</span>
-                      <button disabled={busy==='avatar'} onClick={()=>useAsAvatar(c.slug)} style={{ marginTop:'6px', width:'100%', padding:'6px', borderRadius:'8px', border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'#FFF', fontSize:'10px', cursor:'pointer' }}>عکس پروفایلم شود</button>
-                    </div>
-                  ))}
-                </div>
-                {d.clubs.some(c=>!c.permanent) && !d.plus.active && <p style={{ color:'#F59E0B', fontSize:'11px', marginTop:'8px', background:'rgba(245,158,11,0.08)', padding:'8px', borderRadius:'8px' }}>باشگاه‌هایی که با پلاس عضو شده‌ای، بدون اشتراک فعال فقط تا آخرین انتخابت باقی می‌مانند.</p>}
-              </div>
-            )}
+  return <div className="shopCompact" dir="rtl">
+    <style>{`
+      .shopCompact{max-width:1040px;margin:0 auto;padding:0 12px 90px;color:#fff;display:grid;gap:12px}
+      .shopHero{position:relative;overflow:hidden;border:1px solid rgba(255,209,102,.3);border-radius:22px;padding:17px;background:radial-gradient(circle at 10% 0,rgba(124,58,237,.3),transparent 38%),linear-gradient(135deg,#0b1c2d,#10172e 60%,#26123b);box-shadow:0 18px 55px rgba(0,0,0,.24)}
+      .shopHero:after{content:'+';position:absolute;left:28px;top:-48px;font:900 180px/1 sans-serif;color:rgba(255,209,102,.06);transform:rotate(10deg)}
+      .shopHeroTop{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:12px}.shopHero h2{margin:0;font-weight:950;font-size:23px}.shopHero p{margin:4px 0 0;color:#b9c5d5;font-size:11.5px}.shopWallet{white-space:nowrap;background:rgba(0,0,0,.28);border:1px solid rgba(34,231,166,.35);padding:8px 12px;border-radius:14px;color:#22E7A6;font-weight:900}.shopToggle{border:0;background:rgba(255,255,255,.08);color:#fff;border-radius:11px;padding:7px 10px;cursor:pointer}
+      .shopPlans{position:relative;z-index:1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:13px}.shopPlan{border:1px solid rgba(255,255,255,.12);border-radius:17px;padding:13px;background:rgba(5,14,26,.78);min-height:224px;display:flex;flex-direction:column}.shopPlan.annual{border-color:rgba(255,209,102,.54);background:linear-gradient(145deg,rgba(64,38,9,.78),rgba(30,20,67,.82))}.shopPlan.active{box-shadow:0 0 0 2px rgba(34,231,166,.28)}.shopPlanHead{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.shopPlanHead small{color:#94a3b8;font-size:9.5px}.shopPlanHead h3{margin:1px 0;font-size:16px}.shopPlanHead>b{font-size:10px;color:#94a3b8}.saveBadge{color:#071522!important;background:#FFD166;padding:5px 7px;border-radius:999px}.planPrice{color:#FFD166;font-size:20px;margin:7px 0}.planPrice small{font-size:10px;color:#cbd5e1}.annualCompare{font-size:9.5px;color:#cbd5e1;margin-top:-5px}.shopPlan ul{list-style:none;padding:0;margin:8px 0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 9px;font-size:9.7px;color:#dbe6f2;flex:1}.shopPlan li{line-height:1.55}.shopPlan li::first-letter{color:#22E7A6}.shopPlan button,.shopProduct button{border:0;border-radius:11px;padding:9px 12px;background:linear-gradient(135deg,#22E7A6,#38BDF8);color:#071522;font-weight:950;cursor:pointer}.shopPlan button:disabled,.shopProduct button:disabled{opacity:.55;cursor:default}
+      .shopNotice{border-radius:12px;padding:9px 12px;background:rgba(56,189,248,.11);border:1px solid rgba(56,189,248,.28);font-size:11.5px;text-align:center}.shopNav{display:flex;gap:7px;overflow-x:auto;padding:3px 1px 7px;scrollbar-width:thin}.shopNav button{flex:0 0 auto;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.045);color:#aebed0;border-radius:13px;padding:8px 11px;font-size:11px;font-weight:850;cursor:pointer}.shopNav button.active{color:#071522;border-color:#38BDF8;background:#38BDF8;box-shadow:0 6px 18px rgba(56,189,248,.24)}
+      .shopShelf{border:1px solid rgba(255,255,255,.09);background:rgba(7,21,34,.6);border-radius:20px;padding:13px;overflow:hidden}.shopShelfHead{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}.shopShelfHead h3{margin:0;font-size:14px}.shopShelfHead span{font-size:10px;color:#94a3b8}.shopCarousel{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(250px,31%);gap:10px;overflow-x:auto;scroll-snap-type:x proximity;padding:2px 1px 9px;scrollbar-color:#334155 transparent}.shopProduct{scroll-snap-align:start;overflow:hidden;border-radius:17px;border:1px solid rgba(255,255,255,.1);background:linear-gradient(155deg,rgba(255,255,255,.065),rgba(255,255,255,.025));min-height:296px;display:flex;flex-direction:column}.shopProduct.equipped{border-color:rgba(34,231,166,.65);box-shadow:inset 0 0 22px rgba(34,231,166,.07)}.shopArt{height:122px;position:relative;display:grid;place-items:center;border-bottom:1px solid rgba(255,255,255,.08);overflow:hidden}.shopArt img{width:82px;height:82px;object-fit:contain;filter:drop-shadow(0 8px 16px rgba(0,0,0,.5))}.shopArt>span{position:relative;z-index:1;font-size:39px;font-weight:950;text-shadow:0 5px 19px rgba(0,0,0,.65)}.art-name_color>span{font-size:22px;background:linear-gradient(90deg,var(--shopA),var(--shopB));color:transparent;background-clip:text;-webkit-background-clip:text}.shopArt>i{position:absolute;width:80px;height:80px;border:3px solid var(--shopA);border-radius:24px;transform:rotate(10deg);opacity:.45;filter:drop-shadow(0 0 8px var(--shopB))}.art-profile_background>i{width:150px;height:80px;border-radius:50% 50% 16px 16px}.art-emote_pack>i{border-radius:50%}.shopProductBody{padding:11px;display:flex;flex-direction:column;flex:1}.shopProductTitle{display:flex;align-items:center;justify-content:space-between;gap:6px}.shopProduct h3{margin:0;font-size:13.5px}.shopProductTitle span{font-size:9px;background:rgba(34,231,166,.15);color:#22E7A6;border-radius:999px;padding:3px 7px}.shopProduct p{color:#9cabbc;font-size:10px;line-height:1.6;margin:6px 0;min-height:32px}.shopProductFoot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto}.shopProductFoot strong{color:#FFD166;font-size:11px}.shopProduct button{font-size:10px;padding:7px 11px}.shopProduct button.secondary{background:#1e293b;color:#94a3b8}.plusAccess{display:block;color:#38BDF8;font-size:9px;margin-top:6px}.lockedGift{font-size:9px;color:#c4b5fd}.shopDisclosure{display:flex;justify-content:space-between;align-items:center;gap:10px;color:#94a3b8;font-size:10.5px;padding:3px 5px}.shopDisclosure button{border:0;background:none;color:#38BDF8;cursor:pointer}.historyPanel{border:1px solid rgba(255,255,255,.08);border-radius:15px;padding:10px;background:rgba(255,255,255,.025);display:grid;gap:5px}.historyRow{display:flex;justify-content:space-between;gap:8px;padding:6px 8px;border-radius:9px;background:rgba(255,255,255,.035);font-size:10px}.historyRow span{color:#94a3b8}
+      @media(max-width:720px){.shopHeroTop{align-items:flex-start;flex-wrap:wrap}.shopHero h2{font-size:19px}.shopPlans{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:96%;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:5px}.shopPlan{min-height:285px;scroll-snap-align:center}.shopPlan ul{grid-template-columns:1fr 1fr}.shopCarousel{grid-auto-columns:minmax(245px,84%)}.shopWallet{font-size:11px}.shopHero{padding:13px}.shopShelf{padding:10px}}
+      @media(max-width:410px){.shopPlan ul{grid-template-columns:1fr}.shopCarousel{grid-auto-columns:91%}}
+    `}</style>
 
-            {KINDS.map(([kind,label,note])=>{
-              const items = d.items.filter(i=>i.kind===kind);
-              if(!items.length) return null;
-              const active = equippedFor(kind);
-              return (
-                <div key={kind} style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'16px', padding:'16px' }}>
-                  <div style={{ display:'flex', gap:'10px', alignItems:'center', marginBottom:'12px' }}>
-                    <div style={{ flex:1 }}>
-                      <h2 style={{ color:'#FFF', fontWeight:'900', margin:0, fontSize:'15px' }}>{label}</h2>
-                      <p style={{ color:'#94A3B8', fontSize:'11px', margin:'2px 0 0' }}>{note}</p>
-                    </div>
-                    {active && <button onClick={()=>equip(null,kind)} style={{ padding:'6px 12px', borderRadius:'99px', border:'1px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.06)', color:'#FFF', fontSize:'11px', cursor:'pointer' }}>برداشتن</button>}
-                  </div>
-                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(110px,1fr))', gap:'8px' }}>
-                    {items.map(it=>{
-                      const on = active===it.payload;
-                      const usable = it.usable || it.member;
-                      return (
-                        <div key={it.id} style={{ background: on?'rgba(181,239,88,0.08)':'rgba(255,255,255,0.03)', border: on?'2px solid #B5EF58':'1px solid rgba(255,255,255,0.08)', borderRadius:'12px', padding:'10px', textAlign:'center' }}>
-                          <div style={{ height:'48px', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:'6px' }}>
-                            {kind==='name_color' ? <span style={{ width:'34px', height:'34px', borderRadius:'50%', background: it.payload==='rainbow'?'linear-gradient(90deg,#F472B6,#A855F7,#38BDF8,#34D399)':it.payload, border:'2px solid rgba(255,255,255,0.15)' }} /> :
-                             kind==='card_frame' ? <span style={{ width:'36px', height:'36px', borderRadius:'8px', background: FRAME_STYLE[it.payload]||'#334155' }} /> :
-                             <img src={it.imageUrl} alt={it.name} width="56" height="56" style={{ objectFit:'contain' }} />}
-                          </div>
-                          <b style={{ color:'#FFF', fontSize:'11px', display:'block', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{it.name}</b>
-                          <div style={{ margin:'4px 0' }}>
-                            {on ? <span style={{ background:'rgba(181,239,88,0.15)', color:'#B5EF58', padding:'2px 8px', borderRadius:'99px', fontSize:'9.5px', fontWeight:'800' }}>انتخاب‌شده</span> :
-                             it.owned ? <span style={{ background:'rgba(181,239,88,0.15)', color:'#B5EF58', padding:'2px 8px', borderRadius:'99px', fontSize:'9.5px' }}>دائمی</span> :
-                             it.member ? <span style={{ background:'rgba(255,211,107,0.15)', color:'#FFD36B', padding:'2px 8px', borderRadius:'99px', fontSize:'9.5px' }}>عضوی</span> :
-                             it.unlockedByPlus ? <span style={{ background:'rgba(255,211,107,0.15)', color:'#FFD36B', padding:'2px 8px', borderRadius:'99px', fontSize:'9.5px' }}>با پلاس</span> :
-                             <span style={{ color:'#FFD36B', fontSize:'11px', fontWeight:'800' }}>{fa(it.price)} تومان</span>}
-                          </div>
-                          {usable ? <button disabled={on || busy==='equip'+it.slug} onClick={()=>equip(it.slug,kind)} style={{ width:'100%', padding:'6px', borderRadius:'8px', border:'none', background: on?'#334155':'#38BDF8', color: on?'#94A3B8':'#000', fontSize:'11px', fontWeight:'800', cursor:'pointer' }}>{on?'فعال':'انتخاب'}</button> :
-                           <button disabled={busy===it.id} onClick={()=>setConfirm(it)} style={{ width:'100%', padding:'6px', borderRadius:'8px', border:'none', background:'#FFD700', color:'#1E0A00', fontSize:'11px', fontWeight:'900', cursor:'pointer' }}>{busy===it.id?'...':'خرید'}</button>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
+    <section className="shopHero">
+      <div className="shopHeroTop">
+        <div><h2>فروشگاه قلقلی پلاس</h2><p>ظاهر حرفه‌ای، بدون قدرت رقابتی؛ خریدها دائمی‌اند مگر مزیت اشتراک.</p></div>
+        <div className="shopWallet">کیف پول: {money(data.walletBalance)}</div>
+        <button type="button" className="shopToggle" onClick={() => setShowPlans((v) => !v)}>{showPlans ? 'جمع کردن پلن‌ها' : 'دیدن پلن‌های پلاس'}</button>
+      </div>
+      {showPlans && <div className="shopPlans">{(data.plans || []).map((plan) => <PlanCard key={plan.billingCycle} plan={plan}
+        activeTier={data.plus?.tier} busy={busy === `plus-${plan.billingCycle}`} onBuy={buyPlan} />)}</div>}
+    </section>
 
-            <div style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'16px', padding:'16px' }}>
-              <h2 style={{ color:'#FFF', fontWeight:'900', margin:'0 0 4px', fontSize:'15px' }}>تاریخچه خرید و اشتراک</h2>
-              <p style={{ color:'#94A3B8', fontSize:'10.5px', margin:'0 0 10px' }}>رسید کامل آیتم‌های دائمی و همه دوره‌های پلاس</p>
-              {(d.purchaseHistory||[]).length ? (d.purchaseHistory||[]).map(receipt => <div key={receipt.id} style={{ display:'flex', gap:'10px', alignItems:'center', padding:'9px 0', borderTop:'1px solid rgba(255,255,255,.06)' }}>
-                <span style={{ fontSize:'20px' }}>{receipt.type==='subscription'?'★':''}</span>
-                <div style={{ flex:1 }}><b style={{ color:'#FFF', fontSize:'11.5px' }}>{receipt.name}</b><small style={{ display:'block', color:'#94A3B8', fontSize:'9.5px' }}>{new Date(receipt.purchasedAt).toLocaleDateString('fa-IR')}{receipt.expiresAt?` · پایان ${new Date(receipt.expiresAt).toLocaleDateString('fa-IR')}`:' · مالکیت دائمی'}</small></div>
-                <strong style={{ color:'#FFD36B', fontSize:'11px' }}>{fa(receipt.pricePaid)} تومان</strong>
-              </div>) : <p style={{ color:'#64748B', fontSize:'11px' }}>هنوز خریدی ثبت نشده است.</p>}
-            </div>
+    {notice && <div className="shopNotice">{notice}</div>}
+    <nav className="shopNav" aria-label="دسته‌های فروشگاه">{availableKinds.map(([key, label, icon]) => <button key={key}
+      type="button" className={activeKind === key ? 'active' : ''} onClick={() => setActiveKind(key)}>{icon} {label}</button>)}</nav>
 
-            {confirm && (
-              <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999 }} onClick={()=>setConfirm(null)}>
-                <div style={{ background:'#1E293B', border:'1px solid rgba(255,255,255,0.12)', borderRadius:'16px', padding:'20px', maxWidth:'90%', width:'400px' }} onClick={e=>e.stopPropagation()}>
-                  <h3 style={{ color:'#FFF', fontWeight:'900', margin:'0 0 8px' }}>خرید «{confirm.name}»</h3>
-                  <p style={{ color:'#CBD5E1', fontSize:'12.5px', lineHeight:1.6 }}><b style={{ color:'#FFD36B' }}>{fa(confirm.price)} تومان</b> از کیف پولت کم می‌شود.<br/>این آیتم <b>برای همیشه</b> مال تو می‌شود.<br/><small style={{ color:'#94A3B8' }}>موجودی فعلی: {fa(d.balance)} تومان</small>{d.balance < confirm.price && <><br/><small style={{ color:'#EF4444' }}>موجودی‌ات {fa(confirm.price-d.balance)} تومان کم است.</small></>}</p>
-                  <div style={{ display:'flex', gap:'8px', marginTop:'16px' }}>
-                    <button onClick={()=>setConfirm(null)} style={{ flex:1, padding:'10px', borderRadius:'10px', border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'#FFF', cursor:'pointer' }}>انصراف</button>
-                    <button disabled={d.balance < confirm.price} onClick={()=>buy(confirm)} style={{ flex:1, padding:'10px', borderRadius:'10px', border:'none', background: d.balance < confirm.price ? '#334155' : '#FFD700', color: d.balance < confirm.price ? '#64748B' : '#1E0A00', fontWeight:'900', cursor:'pointer' }}>بله، بخر</button>
-                  </div>
-                </div>
-              </div>
-            )}
-            {plusConfirm && (
-              <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999 }} onClick={()=>setPlusConfirm(false)}>
-                <div style={{ background:'#1E293B', border:'1px solid rgba(255,255,255,0.12)', borderRadius:'16px', padding:'20px', maxWidth:'90%', width:'400px' }} onClick={e=>e.stopPropagation()}>
-                  <h3 style={{ color:'#FFF', fontWeight:'900' }}>{d.plus.active?'تمدید قلقلی پلاس':'فعال‌سازی قلقلی پلاس'}</h3>
-                  <p style={{ color:'#CBD5E1', fontSize:'12px', marginTop:'8px' }}><b>{fa(d.plus.price)} تومان</b> برای <b>{fa(d.plus.days)} روز</b>.<br/>{d.plus.expiryNote}<br/><small>موجودی فعلی: {fa(d.balance)} تومان</small></p>
-                  <div style={{ display:'flex', gap:'8px', marginTop:'16px' }}>
-                    <button onClick={()=>setPlusConfirm(false)} style={{ flex:1, padding:'10px', borderRadius:'10px', border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'#FFF', cursor:'pointer' }}>انصراف</button>
-                    <button disabled={d.balance < d.plus.price} onClick={buyPlus} style={{ flex:1, padding:'10px', borderRadius:'10px', border:'none', background:'#FFD700', color:'#1E0A00', fontWeight:'900', cursor:'pointer' }}>بله، فعال کن</button>
-                  </div>
-                </div>
-              </div>
-            )}
-            {avatarOffer && (
-              <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999 }} onClick={()=>setAvatarOffer(null)}>
-                <div style={{ background:'#1E293B', borderRadius:'16px', padding:'20px', textAlign:'center', maxWidth:'90%', width:'380px' }} onClick={e=>e.stopPropagation()}>
-                  <h3 style={{ color:'#FFF', fontWeight:'900' }}>عکس پروفایلت را عوض کنیم؟</h3>
-                  <img src={clubImg(avatarOffer.slug)} alt="" width="84" height="84" style={{ margin:'12px 0' }} />
-                  <p style={{ color:'#CBD5E1', fontSize:'12px' }}>نشان باشگاه «{avatarOffer.name}» به آواتارهای پروفایل شما اضافه شد.<br/>می‌توانید همین حالا آن را عکس پروفایل خود کنید.</p>
-                  <div style={{ display:'flex', gap:'8px', marginTop:'16px' }}>
-                    <button onClick={()=>setAvatarOffer(null)} style={{ flex:1, padding:'10px', borderRadius:'10px', border:'1px solid rgba(255,255,255,0.12)', background:'transparent', color:'#FFF', cursor:'pointer' }}>نه، فعلاً نه</button>
-                    <button onClick={()=>{ const s=avatarOffer.slug; setAvatarOffer(null); useAsAvatar(s); }} style={{ flex:1, padding:'10px', borderRadius:'10px', border:'none', background:'#38BDF8', color:'#000', fontWeight:'900', cursor:'pointer' }}>بله، عوض کن</button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      }}
-    </AsyncSection>
-  );
+    <section className="shopShelf">
+      <div className="shopShelfHead"><h3>{KINDS.find(([k]) => k === activeKind)?.[1]}</h3><span>{fa(current.length)} انتخاب در این دسته</span></div>
+      <div className="shopCarousel">{current.map((item) => <ShopItem key={item.id} item={item}
+        busy={busy === `buy-${item.id}` || busy === `equip-${item.id}`} onBuy={buyItem} onEquip={equipItem} />)}</div>
+    </section>
+
+    <div className="shopDisclosure">
+      <span>همه قیمت‌ها تومان است. آیتم‌ها فقط ظاهری‌اند و شانس برد یا امتیاز را تغییر نمی‌دهند.</span>
+      <button type="button" onClick={() => setShowHistory((v) => !v)}>{showHistory ? 'بستن سوابق' : `سوابق خرید (${fa(history.length)})`}</button>
+    </div>
+    {showHistory && <section className="historyPanel">{history.length ? history.map((h) => <div className="historyRow" key={`${h.type}-${h.id}`}><b>{h.name}</b><span>{money(h.price_paid)} · {new Date(h.purchased_at).toLocaleDateString('fa-IR')}</span></div>) : <span className="muted">هنوز خریدی ثبت نشده است.</span>}</section>}
+  </div>;
 }

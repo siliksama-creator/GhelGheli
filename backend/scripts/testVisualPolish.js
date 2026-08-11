@@ -45,8 +45,9 @@ for (const obsolete of ['کارت داری اینجا ثبت کن !', 'کارت�
 }
 const webShop = text('userweb/src/screens/Shop.jsx');
 const mobileShop = text('mobile/lib/screens/user/shop_page.dart');
-check(webShop.includes('<details className="plusDetails">') && mobileShop.includes('ExpansionTile('),
-  'Plus fine print is progressive disclosure on Web and Android');
+check(webShop.includes('showPlans') && webShop.includes('جمع کردن پلن‌ها')
+  && mobileShop.includes('_showPlans') && mobileShop.includes('جمع کردن پلن‌ها'),
+  'Plus plans use compact progressive disclosure on Web and Android');
 
 const duelWidgets = text('mobile/lib/screens/user/games/card_duel/card_duel_widgets.dart');
 const mobileGames = text('mobile/lib/screens/user/games_page.dart');

@@ -17,7 +17,57 @@ const frameColors = <String, List<Color>>{
   'fire': [Color(0xFFFF8A3D), Color(0xFFF43F5E)],
   'ice': [Color(0xFF7DD3FC), Color(0xFF2563EB)],
   'holo': [Color(0xFFF472B6), Color(0xFFA855F7), Color(0xFF38BDF8)],
+  'blue_fire': [Color(0xFFBAE6FD), Color(0xFF2563EB), Color(0xFF38BDF8)],
+  'stadium_frame': [Color(0xFF22C55E), Color(0xFF0EA5E9)],
+  'animated_gold': [Color(0xFFB45309), Color(0xFFFFF0A3), Color(0xFFD97706)],
+  'club_neon': [Color(0xFFC026D3), Color(0xFF22D3EE)],
+  'season_champion': [Color(0xFFFFD166), Color(0xFFDC2626)],
+  'champions_night': [Color(0xFF172554), Color(0xFFA78BFA)],
+  'pro_holographic': [Color(0xFF22D3EE), Color(0xFFF472B6), Color(0xFFA3E635)],
+  'annual_royal_frame': [Color(0xFFFFD166), Color(0xFF7C3AED)],
 };
+
+const nameGradientColors = <String, List<Color>>{
+  'rainbow': rainbowColors,
+  'gold_gradient': [Color(0xFFFFF0A3), Color(0xFFF59E0B)],
+  'green_neon': [Color(0xFFD9F99D), Color(0xFF10B981)],
+  'animated_fire': [Color(0xFFFDE047), Color(0xFFF97316), Color(0xFFEF4444)],
+  'calm_rainbow': [Color(0xFF60A5FA), Color(0xFFC084FC), Color(0xFFF9A8D4)],
+  'icy_glow': [Color(0xFFE0F2FE), Color(0xFF38BDF8)],
+  'digital_typing': [Color(0xFF67E8F9), Color(0xFF22C55E)],
+  'mvp_name': [Color(0xFFFFFFFF), Color(0xFFFFD166)],
+  'social_team': [Color(0xFFFB7185), Color(0xFF8B5CF6)],
+};
+
+const resultTemplateColors = <String, List<Color>>{
+  'result_stadium': [Color(0xFF052E16), Color(0xFF0EA5E9)],
+  'result_champions': [Color(0xFF172554), Color(0xFF7C3AED)],
+  'result_fire': [Color(0xFF450A0A), Color(0xFFF97316)],
+  'result_ice': [Color(0xFF082F49), Color(0xFF7DD3FC)],
+  'result_gold_mvp': [Color(0xFF422006), Color(0xFFFFD166)],
+  'result_friendly': [Color(0xFF312E81), Color(0xFFFB7185)],
+  'result_derby': [Color(0xFFB91C1C), Color(0xFF1D4ED8)],
+  'result_world_cup': [Color(0xFF064E3B), Color(0xFFFACC15)],
+  'annual_royal_result': [Color(0xFF1E1B4B), Color(0xFFFFD166)],
+};
+
+BoxDecoration? profileBackgroundDecoration(String? slug) {
+  final colors = switch (slug) {
+    'locker_room' => const [Color(0xFF3F2A1D), Color(0xFF0F172A)],
+    'night_stadium' => const [Color(0xFF020617), Color(0xFF1D4ED8)],
+    'player_tunnel' => const [Color(0xFF111827), Color(0xFFF59E0B)],
+    'champion_podium' => const [Color(0xFF422006), Color(0xFFFFD166)],
+    'training_ground' => const [Color(0xFF052E16), Color(0xFF22C55E)],
+    'collection_room' => const [Color(0xFF1E1B4B), Color(0xFFA78BFA)],
+    _ => null,
+  };
+  if (colors == null) return null;
+  return BoxDecoration(
+    gradient: LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: colors),
+    borderRadius: BorderRadius.circular(22),
+    border: Border.all(color: colors.last.withValues(alpha: .42)),
+  );
+}
 
 const rainbowColors = <Color>[
   Color(0xFFF472B6),
@@ -42,7 +92,7 @@ const _nameColorOnLight = <int, Color>{
 };
 
 Color? nameColorOf(String? payload, {bool onLight = false}) {
-  if (payload == null || payload == 'rainbow') return null;
+  if (payload == null || nameGradientColors.containsKey(payload)) return null;
   if (!payload.startsWith('#')) return null;
   final hex = payload.replaceFirst('#', '');
   final v = int.tryParse(hex, radix: 16);
@@ -78,8 +128,9 @@ class ClubBadge extends StatelessWidget {
 
 /// ستاره پلاس با هاله درخشش طلایی انیمه‌ای (بدون ستاره‌های ریز چرخان)
 class AnimePlusStar extends StatefulWidget {
-  const AnimePlusStar({super.key, this.size = 20});
+  const AnimePlusStar({super.key, this.size = 20, this.annual = false});
   final double size;
+  final bool annual;
 
   @override
   State<AnimePlusStar> createState() => _AnimePlusStarState();
@@ -137,9 +188,9 @@ class _AnimePlusStarState extends State<AnimePlusStar>
               ),
               // ستاره طلایی اصلی با سایه گرم
               Icon(
-                Icons.star_rounded,
+                widget.annual ? Icons.auto_awesome_rounded : Icons.star_rounded,
                 size: sz,
-                color: const Color(0xFFFFD700),
+                color: widget.annual ? const Color(0xFFE9D5FF) : const Color(0xFFFFD700),
                 shadows: const [
                   Shadow(
                     color: Color(0xFFFFEA7A),
@@ -165,6 +216,7 @@ class DisplayName extends StatelessWidget {
     this.maxLines = 1,
     this.avatarKey,
     this.level,
+    this.showTitle = false,
   });
 
   final String name;
@@ -173,13 +225,15 @@ class DisplayName extends StatelessWidget {
   final int maxLines;
   final Object? avatarKey;
   final int? level;
+  final bool showTitle;
 
   @override
   Widget build(BuildContext context) {
     final c = cosmetics ?? const {};
     final onLight = Theme.of(context).brightness == Brightness.light;
-    final colour = nameColorOf(c['color'] as String?, onLight: onLight);
-    final rainbow = c['color'] == 'rainbow';
+    final colorKey = (c['color'] ?? c['nameColor']) as String?;
+    final colour = nameColorOf(colorKey, onLight: onLight);
+    final gradient = nameGradientColors[colorKey];
 
     Widget text = Text(
       name,
@@ -188,10 +242,10 @@ class DisplayName extends StatelessWidget {
       style: (style ?? const TextStyle()).copyWith(color: colour),
     );
 
-    if (rainbow) {
+    if (gradient != null) {
       text = ShaderMask(
         shaderCallback: (r) => LinearGradient(
-          colors: onLight ? rainbowColorsOnLight : rainbowColors,
+          colors: onLight && colorKey == 'rainbow' ? rainbowColorsOnLight : gradient,
         ).createShader(r),
         blendMode: BlendMode.srcIn,
         child: Text(
@@ -203,7 +257,7 @@ class DisplayName extends StatelessWidget {
       );
     }
 
-    final club = c['club'] as String?;
+    final club = (c['club'] ?? c['clubBadge']) as String?;
     final avatarIsSameCrest =
         club != null && avatarKey?.toString() == 'club:$club';
 
@@ -217,9 +271,23 @@ class DisplayName extends StatelessWidget {
         ],
         Flexible(child: text),
         if (c['plus'] == true)
-          const Padding(
-            padding: EdgeInsetsDirectional.only(start: 2),
-            child: AnimePlusStar(size: 19),
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 2),
+            child: AnimePlusStar(size: 19, annual: c['annual'] == true),
+          ),
+        if (showTitle && c['title'] != null)
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 4),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFD166).withValues(alpha: .12),
+                borderRadius: BorderRadius.circular(99),
+                border: Border.all(color: const Color(0xFFFFD166).withValues(alpha: .35)),
+              ),
+              child: Text('${c['title']}',
+                  style: const TextStyle(fontSize: 7.5, color: Color(0xFFFFD166), fontWeight: FontWeight.w800)),
+            ),
           ),
       ],
     );

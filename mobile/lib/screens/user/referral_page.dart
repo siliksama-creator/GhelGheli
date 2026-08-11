@@ -95,6 +95,8 @@ class _ReferralPageState extends State<ReferralPage> {
     final d = _data!;
     final code = (d['code'] ?? '').toString();
     final percent = _int(d['commissionPercent']);
+    final purchasePercent = _int(d['purchaseCommissionPercent']);
+    final threshold = _int(d['withdrawalThreshold']);
     final spins = _int(d['spinsPerReferral']);
     final friends = (d['friends'] as List? ?? []).whereType<Map>().toList();
 
@@ -236,9 +238,21 @@ class _ReferralPageState extends State<ReferralPage> {
 
           Gaps.vSm,
 
+          _CashIncomeCard(
+            earned: _int(d['cashCommissionEarned']),
+            walletBalance: _int(d['walletBalance']),
+            threshold: threshold,
+            ready: d['cashWithdrawReady'] == true,
+            percent: purchasePercent,
+          ),
+
+          Gaps.vSm,
+
           // ── Rules (Compact Accordion/Box) ──
           _CompactRules(
             percent: percent,
+            purchasePercent: purchasePercent,
+            threshold: threshold,
             spins: spins,
             perDaily: _int(d['invitesPerDailySpin']),
             maxDaily: _int(d['maxInvitesForDaily']),
@@ -283,13 +297,18 @@ class _ReferralPageState extends State<ReferralPage> {
                           style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
                         ),
                       ),
-                      Text(
-                        '+${faNum(f['earnedFromThem'] ?? 0)} امتیاز',
-                        style: const TextStyle(
-                          color: Color(0xFF34D399),
-                          fontWeight: FontWeight.w800,
-                          fontSize: 12,
-                        ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '+${faNum(f['cashEarnedFromThem'] ?? 0)} تومان',
+                            style: const TextStyle(color: Color(0xFF22E7A6), fontWeight: FontWeight.w900, fontSize: 11.5),
+                          ),
+                          Text(
+                            '+${faNum(f['earnedFromThem'] ?? 0)} امتیاز',
+                            style: const TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.w800, fontSize: 9.5),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -298,6 +317,62 @@ class _ReferralPageState extends State<ReferralPage> {
       ),
     );
   }
+}
+
+class _CashIncomeCard extends StatelessWidget {
+  const _CashIncomeCard({
+    required this.earned,
+    required this.walletBalance,
+    required this.threshold,
+    required this.ready,
+    required this.percent,
+  });
+  final int earned;
+  final int walletBalance;
+  final int threshold;
+  final bool ready;
+  final int percent;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(13),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(16),
+      gradient: const LinearGradient(colors: [Color(0x3322E7A6), Color(0x2238BDF8)]),
+      border: Border.all(color: const Color(0xFF22E7A6).withValues(alpha: .38)),
+    ),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        const Icon(Icons.account_balance_wallet_rounded, color: Color(0xFF22E7A6)),
+        Gaps.hXs,
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('درآمد نقدی معرفی از خریدها', style: TextStyle(fontSize: 10.5, color: Colors.white60)),
+          Text('${faNum(earned)} تومان',
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF22E7A6))),
+        ])),
+        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          const Text('موجودی کیف پول', style: TextStyle(fontSize: 9, color: Colors.white54)),
+          Text('${faNum(walletBalance)} تومان', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900)),
+        ]),
+      ]),
+      Gaps.vXs,
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(99),
+          color: (ready ? const Color(0xFF22C55E) : const Color(0xFFFFD166)).withValues(alpha: .14),
+        ),
+        child: Text(
+          ready ? 'آماده درخواست برداشت' : 'حداقل برداشت: ${faNum(threshold)} تومان',
+          style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900,
+              color: ready ? const Color(0xFF4ADE80) : const Color(0xFFFFD166)),
+        ),
+      ),
+      Gaps.vXs,
+      Text('$percent٪ هر خرید دوست مستقیم، اتمیک و قابل رهگیری وارد کیف پول می‌شود. کمیسیون سطح دوم نداریم.',
+          style: const TextStyle(fontSize: 9.5, height: 1.45, color: Colors.white60)),
+    ]),
+  );
 }
 
 class _Stat extends StatelessWidget {
@@ -333,12 +408,16 @@ class _Stat extends StatelessWidget {
 class _CompactRules extends StatelessWidget {
   const _CompactRules({
     required this.percent,
+    required this.purchasePercent,
+    required this.threshold,
     required this.spins,
     required this.perDaily,
     required this.maxDaily,
   });
 
   final int percent;
+  final int purchasePercent;
+  final int threshold;
   final int spins;
   final int perDaily;
   final int maxDaily;
@@ -363,8 +442,9 @@ class _CompactRules extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 6),
-          _bullet('۳ شانس رایگان گردونه برای هر دو نفر بلافاصله پس از ثبت کد.'),
-          _bullet('${faNum(percent)}٪ کمیسیون دائمی از امتیازات کارت و بازی ضربه‌زن دوست شما.'),
+          _bullet('${faNum(spins)} شانس رایگان گردونه برای هر دو نفر بلافاصله پس از ثبت کد.'),
+          _bullet('${faNum(purchasePercent)}٪ درآمد نقدی از خریدهای دوست مستقیم؛ برداشت از ${faNum(threshold)} تومان.'),
+          _bullet('${faNum(percent)}٪ کمیسیون امتیازی از امتیازات کارت و بازی ضربه‌زن دوست شما.'),
           _bullet('هر ${faNum(perDaily)} دعوت = ۱ چرخش روزانه اضافه به گردونه شانس (تا سقف ${faNum(maxDaily)} نفر).'),
         ],
       ),

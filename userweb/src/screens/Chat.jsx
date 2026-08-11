@@ -1,5 +1,5 @@
 // Public chat room: Categorized Canned Messages & Emoji Palette (no custom text typing, no stickers).
-import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { req, asset, fa, avatarUrl } from '../lib/api.js';
 import { DisplayName } from '../components/Cosmetics.jsx';
@@ -10,11 +10,10 @@ const EMOJIS = [
   '🧤', '⚡', '🤩', '👍', '🎮', '🍿', '🎩', '💎',
 ];
 
-const CATEGORIES = [
+const BASE_CATEGORIES = [
   { title: '💬 گفتگو', items: ['سلام بچه‌ها!', 'من اومدم!', 'چه خبر بچه‌ها؟', 'خداحافظ تا بعد!', 'مواظب خودتون باشید!', 'خوشبختم دوستان!', 'کجا زندگی می‌کنید؟', 'امروز چیکار کردید؟'] },
   { title: '⚽ بازی', items: ['کی پایه بازیه؟', 'بریم برای برد!', 'من عاشق این بازی‌ام!', 'منم می‌خوام بازی کنم!', 'دوباره امتحان می‌کنم!'] },
-  { title: '🎮 بازی', items: ['بزن بریم بازی!', 'آماده‌ای برای مسابقه؟', 'این دست من می‌برم!', 'بازی عالی بود!', 'دوباره بازی کنیم؟', 'کارت خفن گرفتم!', 'حریف قوی می‌خوام!', 'پنالتی رو دریبل کردم!'] },
-  { title: '😀 ایموجی', items: [] },
+  { title: '🎮 رقابت', items: ['بزن بریم بازی!', 'آماده‌ای برای مسابقه؟', 'این دست من می‌برم!', 'بازی عالی بود!', 'دوباره بازی کنیم؟', 'کارت خفن گرفتم!', 'حریف قوی می‌خوام!', 'پنالتی رو دریبل کردم!'] },
 ];
 
 export default function Chat({ token, openProfile, meId }) {
@@ -25,6 +24,16 @@ export default function Chat({ token, openProfile, meId }) {
   const [cdLeft, setCdLeft] = useState(0);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState(0);
+  const [emotePacks, setEmotePacks] = useState([]);
+  const categories = useMemo(() => [
+    ...BASE_CATEGORIES,
+    ...emotePacks.map((pack) => ({
+      title: `${pack.icon || '✨'} ${pack.name}`,
+      items: Array.isArray(pack.messages) ? pack.messages : [],
+      premium: true,
+    })),
+    { title: '😀 ایموجی', items: [], isEmoji: true },
+  ], [emotePacks]);
 
   const boxRef = useRef(null);
   const lastCount = useRef(0);
@@ -50,6 +59,7 @@ export default function Chat({ token, openProfile, meId }) {
       if (!alive.current) return;
       if (res) {
         setPinned(res.config?.pinned || null);
+        setEmotePacks(Array.isArray(res.config?.emotePacks) ? res.config.emotePacks : []);
         const msgs = res.messages || [];
         const grew = msgs.length > lastCount.current;
         lastCount.current = msgs.length;
@@ -177,8 +187,8 @@ export default function Chat({ token, openProfile, meId }) {
       {/* Categorized Canned Messages & Emoji bar */}
       <div style={{ background: '#0F172A', borderTop: '1px solid rgba(255,255,255,0.12)', padding: '12px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-          <div style={{ display: 'flex', gap: '6px' }}>
-            {CATEGORIES.map((cat, i) => (
+          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', flex: 1, paddingBottom: '2px' }}>
+            {categories.map((cat, i) => (
               <button
                 key={i}
                 type="button"
@@ -191,6 +201,7 @@ export default function Chat({ token, openProfile, meId }) {
                   borderRadius: '10px',
                   fontSize: '11px',
                   fontWeight: 'bold',
+                  whiteSpace: 'nowrap',
                   cursor: 'pointer',
                 }}
               >
@@ -202,7 +213,7 @@ export default function Chat({ token, openProfile, meId }) {
         </div>
 
         <div style={{ height: '96px', overflowX: 'auto', overflowY: 'hidden', paddingBottom: '4px' }}>
-          {tab === 3 ? (
+          {categories[tab]?.isEmoji ? (
             <div style={{ display: 'grid', gridTemplateRows: 'repeat(2, 1fr)', gridAutoFlow: 'column', gap: '6px', height: '100%', gridAutoColumns: 'minmax(60px, auto)' }}>
               {EMOJIS.map((em, idx) => (
                 <button
@@ -226,7 +237,7 @@ export default function Chat({ token, openProfile, meId }) {
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateRows: 'repeat(2, 1fr)', gridAutoFlow: 'column', gap: '8px', height: '100%', gridAutoColumns: 'max-content' }}>
-              {CATEGORIES[tab].items.map((txt, idx) => (
+              {(categories[tab]?.items || []).map((txt, idx) => (
                 <button
                   key={idx}
                   type="button"

@@ -8,7 +8,7 @@ import TapGame from './tapGame.jsx';
 import CardDuelWeb from './cardDuelGame.jsx';
 import GrowthHub from './GrowthHub.jsx';
 import { useGameSession } from './gameSession.js';
-import { LevelBadge, DisplayName } from './components/Cosmetics.jsx';
+import { LevelBadge, DisplayName, RESULT_PALETTES } from './components/Cosmetics.jsx';
 import { fa, asset, avatarUrl, req } from './lib/api.js';
 import './growth.css';
 
@@ -527,6 +527,32 @@ export default function Games({ api, token }) {
 }
 
 
+const EFFECT_ICON = {
+  stadium_spotlight: '🔦', colored_smoke: '🌈', card_side_fire: '🔥',
+  victory_confetti: '🎊', golden_cup: '🏆', tunnel_entry: '🚇',
+  goal_celebration: '⚽', win_streak: '🔥', mvp_effect: '⭐', rematch_effect: '↻',
+};
+
+async function makeGenericResultCard({ title, gameTitle, players, template }) {
+  const colors = RESULT_PALETTES[template] || ['#071522', '#38BDF8'];
+  const canvas = document.createElement('canvas'); canvas.width = 1080; canvas.height = 1080;
+  const ctx = canvas.getContext('2d');
+  const gradient = ctx.createLinearGradient(0, 0, 1080, 1080);
+  gradient.addColorStop(0, colors[0]); gradient.addColorStop(1, colors[1]);
+  ctx.fillStyle = gradient; ctx.fillRect(0, 0, 1080, 1080);
+  ctx.fillStyle = 'rgba(3,12,25,.58)'; ctx.fillRect(55, 55, 970, 970);
+  ctx.strokeStyle = colors[1]; ctx.lineWidth = 12; ctx.strokeRect(55, 55, 970, 970);
+  ctx.textAlign = 'center'; ctx.direction = 'rtl';
+  ctx.fillStyle = '#FFD166'; ctx.font = '900 38px sans-serif'; ctx.fillText('GHELGHELI GAME CLUB', 540, 155);
+  ctx.fillStyle = '#fff'; ctx.font = '900 78px sans-serif'; ctx.fillText(gameTitle, 540, 290);
+  ctx.fillStyle = '#fff'; ctx.font = '900 88px sans-serif'; ctx.fillText(title, 540, 475);
+  ctx.fillStyle = 'rgba(255,255,255,.1)'; ctx.fillRect(130, 570, 820, 170);
+  ctx.fillStyle = '#E2E8F0'; ctx.font = '800 44px sans-serif'; ctx.fillText(`${players[0]}  VS  ${players[1]}`, 540, 670);
+  ctx.fillStyle = '#22E7A6'; ctx.font = '900 36px sans-serif'; ctx.fillText('تو هم بیا به چالش قلقلی!', 540, 850);
+  ctx.fillStyle = '#CBD5E1'; ctx.font = '500 28px sans-serif'; ctx.direction = 'ltr'; ctx.fillText(window.location.origin, 540, 920);
+  return new Promise((resolve) => canvas.toBlob(resolve, 'image/png', .94));
+}
+
 function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSocket, initialStart, onSolo, soundOn, onToggleSound, onBack }) {
   const {
     phase, g, error, secondsLeft, move, leave, playBot, joinOnline, rematch,
@@ -538,10 +564,36 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
   const pX = g.players?.X || { nickname: 'کاربر ۱' };
   const pO = g.players?.O || (g.vsBot ? { nickname: 'هوش مصنوعی (ربات)', isBot: true } : { nickname: 'کاربر ۲' });
   const isOnlineMatch = activeStake === 100 || activeStake === 1000;
+  const myCosmetics = g.players?.[g.me]?.cosmetics || {};
+  const winnerCosmetics = g.winner && g.winner !== 'DRAW' ? (g.players?.[g.winner]?.cosmetics || {}) : myCosmetics;
+  const resultColors = RESULT_PALETTES[myCosmetics.resultTemplate] || ['#071522', '#38BDF8'];
+  const gameTitle = activeGameId === 'penalty' ? 'ضربات پنالتی' : activeGameId === 'memory' ? 'جفت‌یاب' : 'دوئل کارت‌ها';
+
+  const shareResult = async () => {
+    const title = g.winner === 'DRAW' ? 'مسابقه مساوی شد!' : g.winner === g.me ? 'من برنده شدم!' : 'این بار حریف برد!';
+    try {
+      const blob = await makeGenericResultCard({ title, gameTitle,
+        players: [pX.nickname || 'بازیکن یک', pO.nickname || 'بازیکن دو'], template: myCosmetics.resultTemplate });
+      const file = blob ? new File([blob], 'ghelgheli-result.png', { type: 'image/png' }) : null;
+      const text = `${title}\n${gameTitle}: ${pX.nickname || 'بازیکن یک'} مقابل ${pO.nickname || 'بازیکن دو'}\nتو هم به چالش قلقلی بیا:`;
+      if (navigator.share && (!file || !navigator.canShare || navigator.canShare({ files: [file] }))) {
+        await navigator.share({ title: 'نتیجه قلقلی', text, url: window.location.origin, ...(file ? { files: [file] } : {}) });
+      } else if (blob) {
+        const href = URL.createObjectURL(blob); const a = document.createElement('a');
+        a.href = href; a.download = 'ghelgheli-result.png'; a.click(); setTimeout(() => URL.revokeObjectURL(href), 1500);
+        await navigator.clipboard?.writeText(`${text}\n${window.location.origin}`);
+      }
+      req('/api/analytics/events', 'POST', { event:'share', platform:'web', gameId:activeGameId,
+        matchId:g.matchId, target:navigator.share?'system_share_image':'download' }, token).catch(() => {});
+    } catch (e) { if (e?.name !== 'AbortError') alert(e.message || 'اشتراک‌گذاری ناموفق بود'); }
+  };
 
   return (
-    <div className="card wide" style={{ padding: '20px', textAlign: 'center', maxWidth: '640px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+    <div className="card wide" style={{ padding: '20px', textAlign: 'center', maxWidth: '640px', margin: '0 auto', position:'relative', overflow:'hidden' }}>
+      <style>{`@keyframes cosmeticEntry{0%{opacity:0;transform:scale(.35) rotate(-18deg)}45%{opacity:.9}100%{opacity:0;transform:scale(2.1) rotate(9deg)}}@keyframes cosmeticFinish{0%{opacity:0;transform:translateY(20px) scale(.6)}30%{opacity:1}100%{opacity:.18;transform:translateY(-45px) scale(1.45)}}`}</style>
+      {phase === 'playing' && myCosmetics.matchEffect && <div aria-hidden="true" style={{position:'absolute',zIndex:4,inset:0,display:'grid',placeItems:'center',pointerEvents:'none',fontSize:'72px',animation:'cosmeticEntry 1.7s ease-out forwards',textShadow:'0 0 28px #38BDF8'}}>{EFFECT_ICON[myCosmetics.matchEffect] || '✨'}</div>}
+      {phase === 'over' && g.winner === g.me && winnerCosmetics.matchEffect && <div aria-hidden="true" style={{position:'absolute',zIndex:4,left:'50%',top:'35%',pointerEvents:'none',fontSize:'68px',animation:'cosmeticFinish 2.8s ease-out infinite',textShadow:'0 0 30px #FFD166'}}>{EFFECT_ICON[winnerCosmetics.matchEffect] || '🎊'}</div>}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', position:'relative', zIndex:5 }}>
         <button type="button" onClick={() => { leave(); onBack(); }} style={{ background: 'rgba(255,255,255,0.1)', color: '#FFF', border: 'none', padding: '6px 14px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>
           ← بازگشت
         </button>
@@ -559,13 +611,13 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
       {phase === 'playing' && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.35)', padding: '10px 16px', borderRadius: '16px', marginBottom: '16px', border: '1px solid rgba(255,255,255,0.1)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: g.turn === 'X' ? '2px solid #38BDF8' : 'none', paddingBottom: '4px' }}>
-            <span style={{ fontWeight: '900', color: '#FFF' }}>{pX.nickname}</span>
+            <DisplayName name={pX.nickname} cosmetics={pX.cosmetics} level={pX.level} />
             {g.turn === 'X' && <span style={{ background: '#38BDF8', color: '#000', padding: '2px 6px', borderRadius: '6px', fontSize: '10px', fontWeight: 'bold' }}>نوبت ({fa(secondsLeft)}s)</span>}
           </div>
           <span style={{ color: '#94A3B8', fontWeight: '900', fontSize: '14px' }}>VS</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: g.turn === 'O' ? '2px solid #F59E0B' : 'none', paddingBottom: '4px' }}>
             {g.turn === 'O' && <span style={{ background: '#F59E0B', color: '#000', padding: '2px 6px', borderRadius: '6px', fontSize: '10px', fontWeight: 'bold' }}>نوبت ({fa(secondsLeft)}s)</span>}
-            <span style={{ fontWeight: '900', color: '#FFF' }}>{pO.nickname}</span>
+            <DisplayName name={pO.nickname} cosmetics={pO.cosmetics} level={pO.level} />
           </div>
         </div>
       )}
@@ -634,7 +686,7 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
       )}
 
       {phase === 'over' && (
-        <div style={{ padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
+        <div style={{ padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', position:'relative', zIndex:5, borderRadius:'20px', border:`1px solid ${resultColors[1]}99`, background:`radial-gradient(circle at 50% 0,${resultColors[1]}55,transparent 48%),linear-gradient(145deg,${resultColors[0]}DD,#071522)` }}>
           <div style={{ fontSize: '48px' }}>{g.winner === 'DRAW' ? '🤝' : (g.winner === g.me ? '🎉' : '💔')}</div>
           <h2 style={{ color: g.winner === g.me ? '#22E7A6' : '#FFF', fontWeight: '900', margin: 0 }}>
             {g.winner === 'DRAW' ? 'مسابقه مساوی شد!' : (g.winner === g.me ? 'تبریک! شما برنده شدید' : 'متاسفانه باختید!')}
@@ -643,6 +695,10 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
             <button type="button" disabled={rematchWaiting || !g.rematchAvailable} onClick={rematch}
               style={{ background:'linear-gradient(135deg,#22E7A6,#38BDF8)',color:'#03121f',border:0,padding:'12px 20px',borderRadius:16,fontWeight:900 }}>
               {rematchWaiting ? 'منتظر قبول حریف…' : 'دوباره با همین حریف'}
+            </button>
+            <button type="button" onClick={shareResult}
+              style={{background:'linear-gradient(135deg,#7C3AED,#EC4899)',color:'#fff',border:0,padding:'12px 18px',borderRadius:16,fontWeight:900}}>
+              اشتراک کارت نتیجه · تلگرام/اینستاگرام
             </button>
             <button
               type="button"
