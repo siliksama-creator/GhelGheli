@@ -519,8 +519,11 @@ class GameSession extends ChangeNotifier {
       if (completer.isCompleted) return;
       timer.cancel();
       final m = _asMap(response);
-      if (m['ok'] == true) completer.complete(m);
-      else completer.completeError(Exception('${m['error'] ?? 'ساخت لینک چالش ناموفق بود'}'));
+      if (m['ok'] == true) {
+        completer.complete(m);
+      } else {
+        completer.completeError(Exception('${m['error'] ?? 'ساخت لینک چالش ناموفق بود'}'));
+      }
     });
     return completer.future;
   }

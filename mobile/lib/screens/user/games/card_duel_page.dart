@@ -135,7 +135,7 @@ class _CardDuelPageState extends State<CardDuelPage> {
         if (refreshSelection && !_started) {
           _selected
             ..clear()
-            ..addAll(activeCards ?? const []);
+            ..addAll(activeCards);
         }
         _error = null;
         _loading = false;
@@ -314,10 +314,10 @@ class _CardDuelPageState extends State<CardDuelPage> {
             FilledButton.icon(
               onPressed: () async {
                 await Share.shareXFiles([card], text: message, subject: 'نتیجه دوئل قلقلی');
-                widget.api.post('/api/analytics/events', {
+                unawaited(widget.api.post('/api/analytics/events', {
                   'event': 'share', 'platform': 'android', 'gameId': 'card_duel',
                   'matchId': _session.matchId, 'target': 'system_share_image',
-                }).catchError((_) => <String, dynamic>{});
+                }).catchError((_) => <String, dynamic>{}));
               },
               icon: const Icon(Icons.image_rounded),
               label: const Text('اشتراک کارت تصویری نتیجه'),
@@ -329,10 +329,10 @@ class _CardDuelPageState extends State<CardDuelPage> {
                 onTap: () async {
                   await shareText(target, message);
                   if (ctx.mounted) Navigator.pop(ctx);
-                  widget.api.post('/api/analytics/events', {
+                  unawaited(widget.api.post('/api/analytics/events', {
                     'event': 'share', 'platform': 'android', 'gameId': 'card_duel',
                     'matchId': _session.matchId, 'target': target.id,
-                  }).catchError((_) => <String, dynamic>{});
+                  }).catchError((_) => <String, dynamic>{}));
                 },
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
                   MessengerIcon(app: target.app, size: 34),
@@ -340,16 +340,16 @@ class _CardDuelPageState extends State<CardDuelPage> {
                   Text(target.label, style: const TextStyle(fontSize: 9.5)),
                 ]),
               ),
-            )))],),
+            ))],),
             Gaps.vSm,
             OutlinedButton.icon(
               onPressed: () async {
                 await copyText(message);
                 if (ctx.mounted) Navigator.pop(ctx);
-                widget.api.post('/api/analytics/events', {
+                unawaited(widget.api.post('/api/analytics/events', {
                   'event': 'share', 'platform': 'android', 'gameId': 'card_duel',
                   'matchId': _session.matchId, 'target': 'clipboard',
-                }).catchError((_) => <String, dynamic>{});
+                }).catchError((_) => <String, dynamic>{}));
               },
               icon: const Icon(Icons.copy_rounded),
               label: const Text('کپی کارت نتیجه و لینک'),

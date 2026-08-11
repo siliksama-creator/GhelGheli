@@ -117,12 +117,14 @@ class _GrowthPanelState extends State<GrowthPanel> {
         'gameId': 'card_duel', 'platform': 'android',
       }, ack: (dynamic answerRaw) {
         final answer = answerRaw is Map ? answerRaw : const {};
-        if (mounted) setState(() {
-          _busy = null;
-          _notice = answer['ok'] == true
-              ? 'دعوت برای ${friend['nickname']} ارسال شد؛ همین‌جا منتظر بمان'
-              : '${answer['error'] ?? 'ارسال دعوت ناموفق بود'}';
-        });
+        if (mounted) {
+          setState(() {
+            _busy = null;
+            _notice = answer['ok'] == true
+                ? 'دعوت برای ${friend['nickname']} ارسال شد؛ همین‌جا منتظر بمان'
+                : '${answer['error'] ?? 'ارسال دعوت ناموفق بود'}';
+          });
+        }
       });
     });
   }
