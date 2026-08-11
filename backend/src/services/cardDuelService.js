@@ -222,9 +222,9 @@ function simulate(userCards, opponentCards, { opponentName = 'حریف', random 
 
 function starterDeck() {
   return [
-    { id: 'practice-speed', name: 'مهاجم تمرینی', stat: 64, rarity: 'normal', effect: 'speedster' },
-    { id: 'practice-play', name: 'بازی‌ساز تمرینی', stat: 68, rarity: 'silver', effect: 'playmaker' },
-    { id: 'practice-finish', name: 'فینیشر تمرینی', stat: 72, rarity: 'gold', effect: 'finisher' },
+    { id: '00000000-0000-4000-8000-000000000001', name: 'مهاجم تمرینی', stat: 64, rarity: 'normal', effect: 'speedster' },
+    { id: '00000000-0000-4000-8000-000000000002', name: 'بازی‌ساز تمرینی', stat: 68, rarity: 'silver', effect: 'playmaker' },
+    { id: '00000000-0000-4000-8000-000000000003', name: 'فینیشر تمرینی', stat: 72, rarity: 'gold', effect: 'finisher' },
   ].map((item, index) => publicCard({
     card_type_id: item.id,
     name: item.name,
