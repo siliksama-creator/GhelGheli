@@ -1,11 +1,6 @@
 part of '../card_duel_page.dart';
 // RarityCardFrame is applied by PlayerCard so inventory, detail and duel share one frame.
 
-const _gold = Color(0xFFFFD166);
-const _cyan = Color(0xFF38BDF8);
-const _emerald = Color(0xFF22E7A6);
-const _rose = Color(0xFFFB7185);
-
 class _ArenaHero extends StatelessWidget {
   const _ArenaHero({
     required this.onBack,
@@ -603,6 +598,17 @@ class _ErrorPanel extends StatelessWidget {
       ]));
 }
 
+String _settlementLabel(String status) {
+  switch (status) {
+    case 'pending':
+      return 'تسویه در انتظار';
+    case 'refunded':
+      return 'برگشت‌خورده';
+    default:
+      return 'تسویه‌شده';
+  }
+}
+
 class _History extends StatelessWidget {
   const _History({required this.battles});
   final List battles;
@@ -633,7 +639,7 @@ class _History extends StatelessWidget {
                   Text(labels['${raw['mode']}'] ?? 'دوئل کارت', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900)),
                   Text(
                       '${faNum(raw['userScore'])} - ${faNum(raw['opponentScore'])} · '
-                      '${const {'pending': 'تسویه در انتظار', 'settled': 'تسویه‌شده', 'refunded': 'برگشت‌خورده'}['${raw['settlementStatus'] ?? 'settled']}']}',
+                      '${_settlementLabel('${raw['settlementStatus'] ?? 'settled'}')}',
                       style: const TextStyle(fontSize: 9, color: Colors.white54)),
                 ])),
                 Text(NumberParser.toInt(raw['userDelta']) > 0 ? '+${faNum(raw['userDelta'])}' : faNum(raw['userDelta']),

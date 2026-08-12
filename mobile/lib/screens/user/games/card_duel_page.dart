@@ -26,6 +26,7 @@ const _gold = Color(0xFFFFD166);
 const _cyan = Color(0xFF38BDF8);
 const _emerald = Color(0xFF22E7A6);
 const _purple = Color(0xFFA855F7);
+const _rose = Color(0xFFFB7185);
 
 /// Live three-card arena: bot practice, 100/1000 online, and private lobby.
 /// Card choices are simultaneous and hidden until both players lock a card.
