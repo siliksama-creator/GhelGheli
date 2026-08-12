@@ -81,20 +81,22 @@ check((server.match(/t\.description/g) || []).length >= 3,
 const webFrame = read('userweb/src/components/CardRarityFrame.jsx');
 const webInventory = read('userweb/src/screens/Inventory.jsx');
 const webDuel = read('userweb/src/cardDuelGame.jsx');
+const webPlayerCard = read('userweb/src/components/PlayerCard.jsx');
+const webCardsLib = read('userweb/src/lib/cards.js');
 const webCss = read('userweb/src/style.css');
 check(['معمولی','نقره‌ای','طلایی','پرمیوم','لجند'].every(label => webFrame.includes(label)),
   'Web rarity frame has small readable Persian labels for every tier');
-check((webInventory.match(/<CardRarityFrame/g) || []).length >= 2
-  && /<DuelStats item=\{item\}/.test(webInventory),
-  'Web inventory grid and detail use real rarity frames and compact stats');
-check(/duelRarityFrame/.test(webDuel) && /rarityCardShine/.test(webCss),
-  'Web duel uses the same animated rarity treatment');
+check(/<PlayerCard/.test(webInventory) && /ggCardStats/.test(webPlayerCard)
+  && /showStats/.test(webPlayerCard),
+  'Web inventory grid and detail use the shared rarity card with compact stats');
+check(/<PlayerCard/.test(webDuel) && /rarityCardShine/.test(webCss) && /duelCardShell/.test(webCss),
+  'Web duel uses the same animated shared card treatment');
 check(['rarity-normal','rarity-silver','rarity-gold','rarity-premium','rarity-legend']
   .every(name => webCss.includes(`.rarityCardFrame.${name}`)),
   'Web tiers use five materially distinct frame treatments, not color aliases');
-check(/item\.image_url \|\| item\.imageUrl/.test(webInventory)
+check(/imageUrl/.test(webCardsLib) && /image_url/.test(webCardsLib)
   && !/avatar_1_football/.test(webInventory),
-  'Web collection renders the real design URL and never substitutes a football avatar');
+  'Web collection resolves the real design URL and never substitutes a football avatar');
 
 const mobileFrame = read('mobile/lib/widgets/rarity_card_frame.dart');
 const mobileInventory = read('mobile/lib/screens/user/inventory_page.dart');
