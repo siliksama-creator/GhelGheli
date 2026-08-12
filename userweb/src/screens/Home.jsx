@@ -163,6 +163,8 @@ export default function Home({ token, p, rewards, load, setMsg, openProfile, ope
         </div>
         {inventory.length ? (
           <div className="homeInventoryPreview">
+            {/* کارت‌ها داخل PlayerCard با CachedImg رندر می‌شوند؛ همان قرارداد قبلیِ
+                loading="lazy" decoding="async" برای preview حفظ شده است. */}
             {recentInventory.map(i => (
               <PlayerCard
                 key={i.id || i.card_type_id}
