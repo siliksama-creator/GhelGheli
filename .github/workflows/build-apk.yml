@@ -190,9 +190,33 @@ jobs:
           # `--split-per-abi` علاوه بر حجم، یک سودِ حافظه‌ای هم دارد:
           # اندروید کتابخانهٔ بومی را mmap می‌کند و یک APK کوچک‌تر یعنی
           # فشارِ کمترِ صفحه‌بندی روی گوشیِ کم‌رم.
-          flutter build apk --release --split-per-abi \
-            --target-platform=android-arm,android-arm64 \
-            --dart-define=API_BASE_URL=${{ vars.API_BASE_URL || 'https://api.ghelghelishop.ir' }}
+          #
+          # services.gradle.org گاهی وسط دانلود distribution قطع می‌شود
+          # (SocketException: Unexpected end of file). تست و آنالیز سبز
+          # می‌مانند و فقط همین مرحله می‌ترکد. چند بار تلاش + پیش‌دانلود
+          # با curl --retry همان فایل را پایدارتر می‌گیرد.
+          WRAPPER=android/gradle/wrapper/gradle-wrapper.properties
+          if [ -f "$WRAPPER" ]; then
+            DIST=$(sed -n 's/^distributionUrl=//p' "$WRAPPER" | sed 's#\\:#:#g')
+            if [ -n "$DIST" ]; then
+              echo "prefetch $DIST"
+              mkdir -p "$HOME/.gradle/wrapper/dists"
+              curl -fL --retry 6 --retry-all-errors --retry-delay 8 -o /tmp/gradle-dist.zip "$DIST" \
+                || echo "prefetch failed; flutter build will retry the wrapper download"
+            fi
+          fi
+          ok=0
+          for attempt in 1 2 3 4; do
+            echo "── flutter build attempt $attempt ──"
+            if flutter build apk --release --split-per-abi \
+              --target-platform=android-arm,android-arm64 \
+              --dart-define=API_BASE_URL=${{ vars.API_BASE_URL || 'https://api.ghelghelishop.ir' }}; then
+              ok=1
+              break
+            fi
+            sleep $((attempt * 20))
+          done
+          [ "$ok" = 1 ] || { echo "::error::flutter build apk after 4 attempts failed"; exit 1; }
           echo "── خروجی‌ها ──"
           ls -lh build/app/outputs/flutter-apk/*.apk
 
