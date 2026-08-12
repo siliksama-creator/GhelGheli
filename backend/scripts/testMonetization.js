@@ -7,6 +7,7 @@ const root = path.join(__dirname, '..', '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 const migration = read('backend/migrations/052_monetization_catalogue.sql');
 const rateMigration = read('backend/migrations/054_referral_purchase_commission_5_percent.sql');
+const motionMigration = read('backend/migrations/057_animated_cosmetics_and_profile_badges.sql');
 const shop = read('backend/src/services/shopService.js');
 const referrals = read('backend/src/services/referralService.js');
 const wallet = read('backend/src/services/walletService.js');
@@ -16,6 +17,7 @@ const webShop = read('userweb/src/screens/Shop.jsx');
 const mobileShop = read('mobile/lib/screens/user/shop_page.dart');
 const webCosmetics = read('userweb/src/components/Cosmetics.jsx');
 const mobileCosmetics = read('mobile/lib/core/cosmetics.dart');
+const mobilePalette = read('mobile/lib/core/cosmetic_palette.dart');
 
 // Exact commercial terms.
 assert.match(shop, /const PLUS_PRICE = 59000/);
@@ -52,6 +54,15 @@ const bands = {
   result_template: [15000, 39000], match_effect: [19000, 59000],
   emote_pack: [9000, 25000], profile_background: [29000, 69000],
 };
+const profileBadges = ['badge_cr7','badge_goat','badge_captain','badge_legend','badge_king','badge_ace'];
+for (const slug of profileBadges) {
+  assert(motionMigration.includes(`'${slug}'`), `missing profile badge ${slug}`);
+  const hit = motionMigration.match(new RegExp(`'${slug}'[^\\n]*?,(\\d+),7`));
+  assert(hit, `price not found for ${slug}`);
+  assert(Number(hit[1]) >= 15000 && Number(hit[1]) <= 49000, `${slug} price outside 15K-49K`);
+}
+assert(shop.includes("profile_badge: 'equipped_profile_badge'"));
+
 for (const [kind, slugs] of Object.entries(required)) {
   const [min, max] = bands[kind];
   for (const slug of slugs) {
@@ -97,9 +108,9 @@ assert(webShop.includes("billingCycle === 'annual'"));
 assert(mobileShop.includes('ChoiceChip') && mobileShop.includes('Axis.horizontal'));
 assert(mobileShop.includes("'billingCycle': plan['billingCycle']"));
 for (const slug of ['result_world_cup', 'annual_royal_result']) {
-  assert(webCosmetics.includes(slug) && mobileCosmetics.includes(slug), `rendering missing ${slug}`);
+  assert(webCosmetics.includes(slug) && mobilePalette.includes(slug), `rendering missing ${slug}`);
 }
 assert(webCosmetics.includes('profileBackgroundStyle'));
-assert(mobileCosmetics.includes('profileBackgroundDecoration'));
+assert(mobilePalette.includes('profileBackgroundDecoration'));
 
 console.log('✓ monetization catalogue, annual Plus, direct cash referral and Web/Android parity checks passed');

@@ -60,10 +60,11 @@ class _PublicProfileBody extends StatelessWidget {
     final bestRank = data['bestRank'];
     final totalPrize = (data['totalPrizeAmount'] as num?)?.toInt() ?? 0;
 
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: profileBackgroundDecoration(cos['profileBackground'] as String?),
-      child: ListView(
+    return AnimatedProfileBackground(
+      slug: cos['profileBackground'] as String?,
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: ListView(
       controller: controller,
       children: [
         // Handle bar
@@ -296,7 +297,7 @@ class _PublicProfileBody extends StatelessWidget {
           ),
         ],
       ],
-    ));
+    )));
   }
 }
 

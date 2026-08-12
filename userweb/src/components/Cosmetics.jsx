@@ -1,6 +1,7 @@
 // Shared rendering for server-resolved cosmetics. Slugs are visual only; the
 // backend has already checked ownership/Plus before including them.
 import React from 'react';
+import './cosmeticsMotion.css';
 
 export const clubImg = slug => (slug ? `/shop/club_${slug}.webp` : null);
 
@@ -22,6 +23,11 @@ export const FRAME_STYLE = {
 
 const NAME_GRADIENTS = {
   rainbow: ['#F472B6', '#A855F7', '#38BDF8', '#34D399'],
+  '#FFC53D': ['#FFF0A3', '#FFC53D', '#B77900'],
+  '#00D49A': ['#D9F99D', '#00D49A', '#047857'],
+  '#F87171': ['#FECACA', '#F87171', '#BE123C'],
+  '#60A5FA': ['#E0F2FE', '#60A5FA', '#2563EB'],
+  '#A855F7': ['#F3E8FF', '#A855F7', '#6D28D9'],
   gold_gradient: ['#FFF0A3', '#F59E0B'],
   green_neon: ['#D9F99D', '#10B981'],
   animated_fire: ['#FDE047', '#F97316', '#EF4444'],
@@ -30,6 +36,25 @@ const NAME_GRADIENTS = {
   digital_typing: ['#67E8F9', '#22C55E'],
   mvp_name: ['#FFFFFF', '#FFD166'],
   social_team: ['#FB7185', '#8B5CF6'],
+};
+
+const NAME_MOTION_CLASS = {
+  '#FFC53D':'name-gold-shimmer', '#00D49A':'name-emerald-breathe',
+  '#F87171':'name-rose-heartbeat', '#60A5FA':'name-sky-wave',
+  '#A855F7':'name-violet-aura', rainbow:'name-rainbow-flow',
+  gold_gradient:'name-gold-shimmer', green_neon:'name-neon-flicker',
+  animated_fire:'name-fire-flow', calm_rainbow:'name-aurora-drift',
+  icy_glow:'name-ice-glint', digital_typing:'name-digital-cursor',
+  mvp_name:'name-mvp-crown', social_team:'name-team-wave',
+};
+
+export const PROFILE_BADGES = {
+  cr7: { label:'CR7', icon:'7', colors:['#F8FAFC','#38BDF8'] },
+  goat: { label:'GOAT', icon:'♛', colors:['#FFD166','#F97316'] },
+  captain: { label:'CAP', icon:'C', colors:['#22E7A6','#0EA5E9'] },
+  legend: { label:'LEGEND', icon:'★', colors:['#C084FC','#FFD166'] },
+  king: { label:'KING', icon:'♚', colors:['#FFD166','#EF4444'] },
+  ace: { label:'ACE', icon:'A', colors:['#E0F2FE','#8B5CF6'] },
 };
 
 export const PROFILE_BACKGROUNDS = {
@@ -53,6 +78,12 @@ export function profileBackgroundStyle(slug) {
   return slug ? { background: PROFILE_BACKGROUNDS[slug] || undefined } : {};
 }
 
+export function profileBackgroundClass(slug) {
+  return slug && PROFILE_BACKGROUNDS[slug]
+    ? `profileBackgroundSurface profile-bg-${slug}`
+    : '';
+}
+
 export function nameColorStyle(color) {
   if (!color) return undefined;
   const colors = NAME_GRADIENTS[color];
@@ -60,12 +91,28 @@ export function nameColorStyle(color) {
   const special = color === 'green_neon' || color === 'icy_glow'
     ? { filter: `drop-shadow(0 0 5px ${colors[1]})` } : {};
   return {
-    background: `linear-gradient(90deg,${colors.join(',')})`,
+    background: `linear-gradient(90deg,${colors.join(',')},${colors[0]})`,
+    backgroundSize: '240% 100%',
     WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
     fontWeight: 900,
     ...(color === 'digital_typing' ? { borderLeft: '1px solid #67E8F9', paddingLeft: '2px' } : {}),
     ...special,
   };
+}
+
+export function AnimatedName({ name, effect, className = '', style }) {
+  return <span className={`animatedName ${NAME_MOTION_CLASS[effect] || ''} ${className}`}
+    style={{ ...nameColorStyle(effect), ...style }} data-effect={effect || ''}>
+    {name || 'کاربر'}
+  </span>;
+}
+
+export function ProfileBadge({ badge, compact = false }) {
+  const cfg = PROFILE_BADGES[badge];
+  if (!cfg) return null;
+  return <span className={`profileSignature badge-${badge} ${compact ? 'compact' : ''}`}
+    style={{ '--badge-a':cfg.colors[0], '--badge-b':cfg.colors[1] }}
+    title={`نشان ${cfg.label}`}><i>{cfg.icon}</i><b>{cfg.label}</b></span>;
 }
 
 export function ClubBadge({ club }) {
@@ -99,8 +146,10 @@ export function PlusStar({ annual = false }) {
 export function CosmeticAvatarFrame({ frame, children, style, className = '' }) {
   const gradient = FRAME_STYLE[frame];
   return <div className={`cosmeticAvatarFrame ${frame ? `frame-${frame}` : ''} ${className}`}
+    data-frame={frame || ''}
     style={{ display:'inline-grid', placeItems:'center', flex:'0 0 auto', borderRadius:'50%',
       padding: gradient ? 4 : 0, background: gradient || 'transparent',
+      backgroundSize: gradient ? '300% 300%' : undefined,
       boxShadow: gradient ? '0 0 18px rgba(56,189,248,.22)' : 'none', ...style }}>
     {children}
   </div>;
@@ -109,8 +158,8 @@ export function CosmeticAvatarFrame({ frame, children, style, className = '' }) 
 export function CosmeticFrame({ cosmetics, children, style, className = '' }) {
   const frame = cosmetics?.frame;
   const gradient = FRAME_STYLE[frame];
-  return <div className={`cosmeticFrame ${className}`} style={{ position: 'relative', borderRadius: 18,
-    ...(gradient ? { border: '2px solid transparent', background: `${gradient} border-box`, boxShadow: '0 0 18px rgba(56,189,248,.15)' } : {}), ...style }}>
+  return <div className={`cosmeticFrame ${frame ? `frame-${frame}` : ''} ${className}`} style={{ position: 'relative', borderRadius: 18,
+    ...(gradient ? { border: '2px solid transparent', background: `${gradient} border-box`, backgroundSize:'300% 300%', boxShadow: '0 0 18px rgba(56,189,248,.15)' } : {}), ...style }}>
     <div style={{ borderRadius: 'inherit', height: '100%', background: 'rgba(7,21,34,.88)' }}>{children}</div>
   </div>;
 }
@@ -122,7 +171,8 @@ export function DisplayName({ name, cosmetics, level, showTitle = false }) {
   return <span className="displayName" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
     {club && <ClubBadge club={club} />}
     <LevelBadge level={level} />
-    <span style={nameColorStyle(color)}>{name || 'کاربر'}</span>
+    <AnimatedName name={name || 'کاربر'} effect={color} />
+    {c.profileBadge && <ProfileBadge badge={c.profileBadge} compact />}
     {c.plus && <PlusStar annual={Boolean(c.annual)} />}
     {showTitle && c.title && <small style={{ color: '#FFD166', fontSize: 8, border: '1px solid rgba(255,209,102,.35)', borderRadius: 999, padding: '1px 5px' }}>{c.title}</small>}
   </span>;

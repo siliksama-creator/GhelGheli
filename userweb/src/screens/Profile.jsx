@@ -2,7 +2,7 @@
 import React, { useCallback, useState } from 'react';
 import { req, avatars, asset, avatarUrl, fa } from '../lib/api.js';
 import { useAsync } from '../lib/useAsync.js';
-import { clubImg, CosmeticAvatarFrame, DisplayName, profileBackgroundStyle } from '../components/Cosmetics.jsx';
+import { clubImg, CosmeticAvatarFrame, DisplayName, profileBackgroundClass, profileBackgroundStyle } from '../components/Cosmetics.jsx';
 import Field from '../components/Field.jsx';
 
 export default function Profile({ token, p, load, setMsg }) {
@@ -52,7 +52,7 @@ export default function Profile({ token, p, load, setMsg }) {
   }
 
   return (
-    <div style={{ maxWidth:'820px', margin:'0 auto', display:'flex', flexDirection:'column', gap:'16px', padding:'14px 12px 80px', borderRadius:'22px', ...profileBackgroundStyle(p.cosmetics?.profileBackground) }}>
+    <div className={profileBackgroundClass(p.cosmetics?.profileBackground)} style={{ maxWidth:'820px', margin:'0 auto', display:'flex', flexDirection:'column', gap:'16px', padding:'14px 12px 80px', borderRadius:'22px', ...profileBackgroundStyle(p.cosmetics?.profileBackground) }}>
       {(leagueHistory.data || []).length > 0 && (
         <section style={{ background:'linear-gradient(135deg, rgba(255,209,102,0.12), rgba(56,189,248,0.08))', border:'1px solid rgba(255,209,102,0.28)', borderRadius:'16px', padding:'14px' }}>
           <h3 style={{ color:'#FFD166', fontWeight:'900', margin:'0 0 10px' }}>سابقه لیگ من</h3>

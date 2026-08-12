@@ -93,10 +93,14 @@ class HeroHeader extends StatelessWidget {
                   borderRadius: Corners.rPill,
                   child: Row(
                     children: [
-                      AvatarImage(
-                        imageUrl: user?['profile_image_url'],
-                        keyName: user?['profile_avatar_key'],
-                        radius: 20,
+                      CosmeticAvatarFrame(
+                        frame: cosmetics?['frame'] as String?,
+                        padding: 2.5,
+                        child: AvatarImage(
+                          imageUrl: user?['profile_image_url'],
+                          keyName: user?['profile_avatar_key'],
+                          radius: 20,
+                        ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(

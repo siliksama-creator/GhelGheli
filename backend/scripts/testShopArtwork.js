@@ -7,9 +7,16 @@ const root = path.join(__dirname, '..', '..');
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8');
 
 const migration = read('backend', 'migrations', '056_shop_truthful_live_previews.sql');
+const motionMigration = read('backend', 'migrations', '057_animated_cosmetics_and_profile_badges.sql');
+const shopService = read('backend', 'src', 'services', 'shopService.js');
 const webShop = read('userweb', 'src', 'screens', 'Shop.jsx');
 const webEffect = read('userweb', 'src', 'components', 'MatchEffectVisual.jsx');
 const webEffectCss = read('userweb', 'src', 'components', 'matchEffectVisual.css');
+const webMotionCss = read('userweb', 'src', 'components', 'cosmeticsMotion.css');
+const webChat = read('userweb', 'src', 'screens', 'Chat.jsx');
+const webHome = read('userweb', 'src', 'screens', 'Home.jsx');
+const mobileHero = read('mobile', 'lib', 'screens', 'shared', 'hero_header.dart');
+const mobileChat = read('mobile', 'lib', 'screens', 'user', 'chat_page.dart');
 const webGames = read('userweb', 'src', 'games.jsx');
 const webDuel = read('userweb', 'src', 'cardDuelGame.jsx');
 const mobileShop = read('mobile', 'lib', 'screens', 'user', 'shop_page.dart');
@@ -21,6 +28,7 @@ const webCosmetics = read('userweb', 'src', 'components', 'Cosmetics.jsx');
 const webProfile = read('userweb', 'src', 'screens', 'Profile.jsx');
 const webPublicProfile = read('userweb', 'src', 'screens', 'PublicProfile.jsx');
 const mobileCosmetics = read('mobile', 'lib', 'core', 'cosmetics.dart');
+const mobileMotion = read('mobile', 'lib', 'widgets', 'cosmetic_motion.dart');
 const mobileProfile = read('mobile', 'lib', 'screens', 'user', 'profile_page.dart');
 const mobilePublicProfile = read('mobile', 'lib', 'screens', 'shared', 'public_profile_sheet.dart');
 const mobileVersus = read('mobile', 'lib', 'screens', 'user', 'games', 'versus_bar.dart');
@@ -38,6 +46,15 @@ for (const kind of ['card_frame', 'name_color', 'match_effect', 'emote_pack']) {
 }
 assert(migration.includes('"previewMode":"live-runtime"'));
 assert(migration.includes("- 'motion'"), 'stale motion promises must be removed');
+assert(motionMigration.includes("'profile_badge'"));
+assert(motionMigration.includes('equipped_profile_badge'));
+assert(motionMigration.includes("'artworkVersion',5"));
+for (const badge of ['badge_cr7','badge_goat','badge_captain','badge_legend','badge_king','badge_ace']) {
+  assert(motionMigration.includes(`'${badge}'`), `missing real profile signature ${badge}`);
+}
+for (const slotWire of ["profile_badge: 'equipped_profile_badge'", 'profileBadge: user.equipped_profile_badge', "can('profile_badge', row.equipped_profile_badge)"]) {
+  assert(shopService.includes(slotWire), `profile badge backend wiring missing: ${slotWire}`);
+}
 
 // Frames are not Shop-only decoration: the shared exact renderer is used on
 // owned/public profiles and in the live Android versus bar.
@@ -46,16 +63,26 @@ assert(webProfile.includes('<CosmeticAvatarFrame frame={p.cosmetics?.frame}'));
 assert(webPublicProfile.includes('<CosmeticAvatarFrame frame={cos.frame}'));
 assert(webGames.includes('<CosmeticAvatarFrame frame={p.cosmetics?.frame}'));
 assert(webDuel.includes('<CosmeticAvatarFrame frame={p.cosmetics?.frame}'));
-assert(mobileCosmetics.includes('class CosmeticAvatarFrame'));
+assert(mobileMotion.includes('class CosmeticAvatarFrame'));
 for (const surface of [mobileProfile, mobilePublicProfile, mobileVersus, mobileDuelWidgets, mobileShop]) {
   assert(surface.includes('CosmeticAvatarFrame('));
 }
+assert(webMotionCss.includes('.frame-pro_holographic') && webMotionCss.includes('.name-fire-flow'));
+assert(webCosmetics.includes('function AnimatedName') && webCosmetics.includes('function ProfileBadge'));
+assert(mobileMotion.includes('class AnimatedNameText') && mobileMotion.includes('class ProfileBadgeVisual'));
+assert(webDuel.includes('<CosmeticFrame cosmetics={{frame}}'));
+assert(mobileDuelWidgets.includes('CosmeticCardFrame('));
+assert(webChat.includes('<CosmeticAvatarFrame frame={m.cosmetics?.frame}'));
+assert(webHome.includes('<CosmeticAvatarFrame frame={cosmetics?.frame}'));
+assert(mobileChat.includes('CosmeticAvatarFrame('));
+assert(mobileHero.includes('CosmeticAvatarFrame('));
 
 // Web Shop renders the entitlement itself. Images remain legitimate only for
 // real club marks and the profile background that is actually equipped.
 assert(webShop.includes("item.kind === 'club_badge'"));
 assert(webShop.includes("item.kind === 'card_frame'") && webShop.includes('<CosmeticAvatarFrame frame={value}'));
-assert(webShop.includes("item.kind === 'name_color'") && webShop.includes('nameColorStyle(value)'));
+assert(webShop.includes("item.kind === 'name_color'") && webShop.includes('<AnimatedName name="hotcat" effect={value}'));
+assert(webShop.includes("item.kind === 'profile_badge'") && webShop.includes('profileBadge:value'));
 assert(webShop.includes("item.kind === 'profile_background'") && webShop.includes('profileBackgroundStyle(value)'));
 assert(webShop.includes("item.kind === 'result_template'") && webShop.includes('RESULT_PALETTES[value]'));
 assert(webShop.includes("item.kind === 'match_effect'") && webShop.includes('<MatchEffectVisual slug={item.slug}'));
@@ -93,7 +120,8 @@ assert(!webGameEffectBlock.includes('<img') && !webDuelEffectBlock.includes('<im
 // game runtime. It may still load club marks/profile backgrounds, because in
 // those two categories the purchased image really is what gets equipped.
 assert(mobileShop.includes('_ShopFrameArtwork') && mobileShop.includes('CosmeticAvatarFrame('));
-assert(mobileShop.includes('_ShopNameArtwork') && mobileShop.includes('nameGradientColors'));
+assert(mobileShop.includes('_ShopNameArtwork') && mobileShop.includes('AnimatedNameText('));
+assert(mobileShop.includes('_ShopBadgeArtwork') && mobileShop.includes("'profileBadge': value"));
 assert(mobileShop.includes('_ShopResultArtwork') && mobileShop.includes('resultTemplateColors[value]'));
 assert(mobileShop.includes('_ShopMatchEffectArtwork(slug: slug)'));
 assert(mobileShop.includes('MatchEffectVisual('));

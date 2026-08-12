@@ -20,7 +20,7 @@ const PLUS_PLANS = Object.freeze({
 });
 
 const PLUS_BENEFITS = Object.freeze([
-  'دسترسی به قاب‌ها و افکت‌های نام در مدت اشتراک',
+  'دسترسی به قاب‌ها و افکت‌های نام متحرک در مدت اشتراک',
   'ستاره پلاس در پروفایل، چت، لیگ و بازی',
   'عضویت دائمی در یک باشگاه منتخب',
   'مسیر ویژه گذر نبرد (Premium Pass)',
@@ -42,6 +42,7 @@ const SLOT_FOR_KIND = Object.freeze({
   result_template: 'equipped_result_template',
   match_effect: 'equipped_match_effect',
   emote_pack: 'equipped_emote_pack',
+  profile_badge: 'equipped_profile_badge',
 });
 const PLUS_UNLOCK_KINDS = new Set(['club_badge', 'card_frame', 'name_color']);
 
@@ -114,8 +115,8 @@ async function catalogue(userId) {
     pool.query(
       `SELECT equipped_club, equipped_frame, equipped_color,
               equipped_profile_background, equipped_result_template,
-              equipped_match_effect, equipped_emote_pack, profile_title,
-              annual_club_switches
+              equipped_match_effect, equipped_emote_pack,
+              equipped_profile_badge, profile_title, annual_club_switches
          FROM users WHERE id=$1`, [userId]),
     pool.query('SELECT wallet_balance FROM users WHERE id=$1', [userId]),
     plusStatus(userId),
@@ -192,6 +193,7 @@ async function catalogue(userId) {
       resultTemplate: user.equipped_result_template || null,
       matchEffect: user.equipped_match_effect || null,
       emotePack: user.equipped_emote_pack || null,
+      profileBadge: user.equipped_profile_badge || null,
       title: user.profile_title || null,
     },
   };
@@ -522,7 +524,8 @@ async function cosmeticsFor(userIds) {
   const { rows } = await pool.query(
     `SELECT u.id, u.equipped_club, u.equipped_frame, u.equipped_color,
             u.equipped_profile_background, u.equipped_result_template,
-            u.equipped_match_effect, u.equipped_emote_pack, u.profile_title,
+            u.equipped_match_effect, u.equipped_emote_pack,
+            u.equipped_profile_badge, u.profile_title,
             EXISTS(SELECT 1 FROM user_subscriptions s
                     WHERE s.user_id=u.id AND s.plan IN ('plus','plus_annual')
                       AND s.expires_at>NOW()) AS plus,
@@ -568,6 +571,7 @@ async function cosmeticsFor(userIds) {
       resultTemplate: can('result_template', row.equipped_result_template),
       matchEffect: can('match_effect', row.equipped_match_effect),
       emotePack: can('emote_pack', row.equipped_emote_pack),
+      profileBadge: can('profile_badge', row.equipped_profile_badge),
       title: row.profile_title || null,
     });
   }

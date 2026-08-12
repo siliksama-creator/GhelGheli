@@ -192,8 +192,9 @@ class _LineupSlot extends StatelessWidget {
 }
 
 class _HoloCard extends StatelessWidget {
-  const _HoloCard({required this.card, this.selected = false, this.compact = false, this.enabled = true, this.onTap});
+  const _HoloCard({required this.card, this.selected = false, this.compact = false, this.enabled = true, this.onTap, this.frame});
   final Map card;
+  final String? frame;
   final bool selected;
   final bool compact;
   final bool enabled;
@@ -207,10 +208,14 @@ class _HoloCard extends StatelessWidget {
       };
 
   @override
-  Widget build(BuildContext context) => Opacity(
+  Widget build(BuildContext context) {
+    final cardView = Opacity(
         opacity: enabled ? 1 : 0.34,
         child: InkWell(
-          onTap: enabled ? onTap : null,
+          onTap: enabled && onTap != null ? () {
+            HapticFeedback.selectionClick();
+            onTap!();
+          } : null,
           borderRadius: Corners.rXl,
           child: AnimatedContainer(
             duration: Motion.fast,
@@ -229,6 +234,7 @@ class _HoloCard extends StatelessWidget {
               Expanded(child: Stack(fit: StackFit.expand, children: [
                 ClipRRect(borderRadius: Corners.rLg,
                     child: SafeImage(url: card['imageUrl'], fit: BoxFit.cover, fallbackEmoji: '${card['id']}'.startsWith('bot-') ? '🤖' : '🃏')),
+                Positioned.fill(child: _CardEnergyLayer(color: rarity, active: enabled)),
                 const DecoratedBox(decoration: BoxDecoration(
                   gradient: LinearGradient(begin: Alignment.center, end: Alignment.bottomCenter,
                       colors: [Colors.transparent, Color(0xD902050A)]),
@@ -256,6 +262,76 @@ class _HoloCard extends StatelessWidget {
           ),
         ),
       );
+    return CosmeticCardFrame(
+      frame: frame,
+      borderRadius: compact ? 20 : 24,
+      padding: frame == null ? 0 : 3,
+      child: cardView,
+    );
+  }
+}
+
+class _CardEnergyLayer extends StatefulWidget {
+  const _CardEnergyLayer({required this.color, required this.active});
+  final Color color;
+  final bool active;
+
+  @override
+  State<_CardEnergyLayer> createState() => _CardEnergyLayerState();
+}
+
+class _CardEnergyLayerState extends State<_CardEnergyLayer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1900),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.active) _controller.repeat();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CardEnergyLayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.active == widget.active) return;
+    widget.active ? _controller.repeat() : _controller.stop();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.active || (MediaQuery.maybeOf(context)?.disableAnimations ?? false)) {
+      return const SizedBox.shrink();
+    }
+    return IgnorePointer(
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (_, __) {
+          final t = _controller.value;
+          return DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment(-2 + t * 4, -1),
+                end: Alignment(-1 + t * 4, 1),
+                colors: [Colors.transparent, widget.color.withValues(alpha: .24), Colors.transparent],
+                stops: const [0, .5, 1],
+              ),
+              border: Border.all(color: widget.color.withValues(alpha: .18 + .20 * math.sin(t * math.pi).abs())),
+              borderRadius: Corners.rLg,
+            ),
+          );
+        },
+      ),
+    );
+  }
 }
 
 class _Stat extends StatelessWidget {
@@ -310,6 +386,12 @@ class _LiveBattle extends StatelessWidget {
     final state = session.state;
     final mine = session.mySymbol ?? 'X';
     final opponent = mine == 'X' ? 'O' : 'X';
+    final myPlayer = session.playerInfo(mine);
+    final opponentPlayer = session.playerInfo(opponent);
+    final myCosmetics = myPlayer?['cosmetics'] is Map ? myPlayer!['cosmetics'] as Map : const {};
+    final opponentCosmetics = opponentPlayer?['cosmetics'] is Map ? opponentPlayer!['cosmetics'] as Map : const {};
+    final myFrame = myCosmetics['frame'] as String?;
+    final opponentFrame = opponentCosmetics['frame'] as String?;
     final score = state['score'] is Map ? state['score'] as Map : const {};
     final deck = (state['myDeck'] as List? ?? const []).whereType<Map>().toList();
     final remaining = (state['myRemainingCardIds'] as List? ?? const []).map((id) => '$id').toSet();
@@ -345,7 +427,10 @@ class _LiveBattle extends StatelessWidget {
                 border: Border.all(color: _gold.withValues(alpha: 0.55))),
               child: Image.asset('assets/games/card_duel_glow.png', width: 42))),
       ]),
-      if (lastRound != null) ...[Gaps.vSm, _RoundReveal(round: lastRound, mine: mine)],
+      if (lastRound != null) ...[
+        Gaps.vSm,
+        _RoundReveal(round: lastRound, mine: mine, myFrame: myFrame, opponentFrame: opponentFrame),
+      ],
       if (session.phase == GamePhase.playing) ...[
         Gaps.vSm,
         AppCard(child: Column(children: [
@@ -366,7 +451,7 @@ class _LiveBattle extends StatelessWidget {
           Row(children: [
             for (var i = 0; i < deck.length; i++) ...[
               Expanded(child: AspectRatio(aspectRatio: 0.72,
-                child: _HoloCard(card: deck[i], compact: true,
+                child: _HoloCard(card: deck[i], compact: true, frame: myFrame,
                   enabled: !iChose && remaining.contains('${deck[i]['cardTypeId'] ?? deck[i]['id']}'),
                   onTap: () => session.moveObject({'cardId': '${deck[i]['cardTypeId'] ?? deck[i]['id']}'})))),
               if (i < deck.length - 1) Gaps.hXs,
@@ -399,7 +484,12 @@ class _Score extends StatelessWidget {
             radius: 14,
           ),
         ),
-      Flexible(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800))),
+      Flexible(child: DisplayName(
+        name: name,
+        cosmetics: cosmetics,
+        level: (player?['level'] as num?)?.toInt(),
+        style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800),
+      )),
     ];
     return Row(mainAxisAlignment: reverse ? MainAxisAlignment.end : MainAxisAlignment.start,
       children: reverse ? parts.reversed.toList() : parts);
@@ -407,8 +497,8 @@ class _Score extends StatelessWidget {
 }
 
 class _RoundReveal extends StatelessWidget {
-  const _RoundReveal({required this.round, required this.mine});
-  final Map round; final String mine;
+  const _RoundReveal({required this.round, required this.mine, required this.myFrame, required this.opponentFrame});
+  final Map round; final String mine; final String? myFrame; final String? opponentFrame;
   @override
   Widget build(BuildContext context) {
     final myCard = (mine == 'O' ? round['cardO'] : round['cardX']) as Map? ?? const {};
@@ -416,8 +506,17 @@ class _RoundReveal extends StatelessWidget {
     final myPower = mine == 'O' ? round['powerO'] : round['powerX'];
     final otherPower = mine == 'O' ? round['powerX'] : round['powerO'];
     final winner = '${round['winner']}';
-    return AppCard(child: Row(children: [
-      Expanded(child: AspectRatio(aspectRatio: 0.72, child: _HoloCard(card: myCard, compact: true))),
+    return TweenAnimationBuilder<double>(
+      key: ValueKey(round['round']),
+      tween: Tween(begin: .82, end: 1),
+      duration: const Duration(milliseconds: 620),
+      curve: Curves.easeOutBack,
+      builder: (_, value, child) => Opacity(
+        opacity: ((value - .82) / .18).clamp(0.0, 1.0).toDouble(),
+        child: Transform.scale(scale: value, child: child),
+      ),
+      child: AppCard(child: Row(children: [
+      Expanded(child: AspectRatio(aspectRatio: 0.72, child: _HoloCard(card: myCard, compact: true, frame: myFrame))),
       Gaps.hXs,
       Expanded(child: Column(children: [
         Text('راند ${faNum(round['round'])}', style: const TextStyle(fontSize: 9, color: Colors.white54)),
@@ -428,8 +527,9 @@ class _RoundReveal extends StatelessWidget {
             textAlign: TextAlign.center, style: const TextStyle(fontSize: 9.5, color: Colors.white60)),
       ])),
       Gaps.hXs,
-      Expanded(child: AspectRatio(aspectRatio: 0.72, child: _HoloCard(card: otherCard, compact: true))),
-    ]));
+      Expanded(child: AspectRatio(aspectRatio: 0.72, child: _HoloCard(card: otherCard, compact: true, frame: opponentFrame))),
+    ])),
+    );
   }
 }
 

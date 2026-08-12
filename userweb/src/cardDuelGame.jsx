@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { asset, avatarUrl, fa, req } from './lib/api.js';
 import { useGameSession } from './gameSession.js';
-import { CosmeticAvatarFrame, RESULT_PALETTES } from './components/Cosmetics.jsx';
+import { CosmeticAvatarFrame, CosmeticFrame, DisplayName, RESULT_PALETTES } from './components/Cosmetics.jsx';
 import CosmeticMatchEffect, { matchEffectSupports } from './components/MatchEffectVisual.jsx';
 
 const idOf = card => String(card?.cardTypeId || card?.id || '');
@@ -29,34 +29,37 @@ function MiniStat({ label, value }) {
   return <span className="duelMini"><i>{label}</i>{fa(value)}</span>;
 }
 
-function HoloCard({ card, selected, disabled, compact = false, onClick }) {
+function HoloCard({ card, selected, disabled, compact = false, onClick, frame }) {
   const color = rarityColor(card?.rarity);
-  return (
-    <button type="button"
-      className={`duelCardV2${selected ? ' selected' : ''}${compact ? ' compact' : ''}`}
-      style={{ '--duel-rarity': color }} disabled={disabled} onClick={onClick}>
-      <span className="duelHolo" />
-      <div className="duelArtV2">
-        {card?.imageUrl
-          ? <img src={asset(card.imageUrl)} alt={card.name || 'کارت'} loading="lazy" decoding="async" />
-          : <span className="duelBotFace">{card?.id?.startsWith('bot-') ? '🤖' : '🃏'}</span>}
-        <span className="duelPower">{fa(card?.power)}</span>
-        {selected && <i className="duelPicked">✓</i>}
-      </div>
-      <b>{card?.name || 'کارت ناشناس'}</b>
-      <div className="duelMeta">
-        <span style={{ color }}>{card?.rarityLabel || card?.rarity}</span>
-        <small>{card?.effectLabel || 'بدون افکت'}</small>
-      </div>
-      {!compact && <div className="duelStats">
-        <MiniStat label="حمله" value={card?.attack} />
-        <MiniStat label="دفاع" value={card?.defense} />
-        <MiniStat label="سرعت" value={card?.speed} />
-        <MiniStat label="تکنیک" value={card?.technique} />
-        <MiniStat label="گل" value={card?.goalChance} />
-      </div>}
-    </button>
-  );
+  const activate = event => { if (!disabled) navigator.vibrate?.(18); onClick?.(event); };
+  const cardView = <button type="button"
+    className={`duelCardV2${selected ? ' selected' : ''}${compact ? ' compact' : ''}`}
+    style={{ '--duel-rarity': color }} disabled={disabled} onClick={activate}>
+    <span className="duelHolo" />
+    <span className="duelEnergyRail" aria-hidden="true" />
+    <div className="duelArtV2">
+      {card?.imageUrl
+        ? <img src={asset(card.imageUrl)} alt={card.name || 'کارت'} loading="lazy" decoding="async" />
+        : <span className="duelBotFace">{card?.id?.startsWith('bot-') ? '🤖' : '🃏'}</span>}
+      <span className="duelPower">{fa(card?.power)}</span>
+      {selected && <i className="duelPicked">✓</i>}
+    </div>
+    <b>{card?.name || 'کارت ناشناس'}</b>
+    <div className="duelMeta">
+      <span style={{ color }}>{card?.rarityLabel || card?.rarity}</span>
+      <small>{card?.effectLabel || 'بدون افکت'}</small>
+    </div>
+    {!compact && <div className="duelStats">
+      <MiniStat label="حمله" value={card?.attack} />
+      <MiniStat label="دفاع" value={card?.defense} />
+      <MiniStat label="سرعت" value={card?.speed} />
+      <MiniStat label="تکنیک" value={card?.technique} />
+      <MiniStat label="گل" value={card?.goalChance} />
+    </div>}
+  </button>;
+  return frame
+    ? <CosmeticFrame cosmetics={{frame}} className={`duelEquippedFrame${compact?' compact':''}`}>{cardView}</CosmeticFrame>
+    : cardView;
 }
 
 function Lineup({ selected, cards, toggle }) {
@@ -85,7 +88,7 @@ function Lineup({ selected, cards, toggle }) {
   );
 }
 
-function RoundReveal({ round, me }) {
+function RoundReveal({ round, me, myFrame, opponentFrame }) {
   if (!round) return null;
   const mine = me === 'O' ? round.cardO : round.cardX;
   const theirs = me === 'O' ? round.cardX : round.cardO;
@@ -94,14 +97,14 @@ function RoundReveal({ round, me }) {
   const mineWon = round.winner === me;
   return (
     <section className={`duelClash ${round.winner === 'DRAW' ? 'draw' : mineWon ? 'won' : 'lost'}`} key={round.round}>
-      <HoloCard card={mine} compact disabled />
+      <HoloCard card={mine} compact disabled frame={myFrame} />
       <div className="duelClashCore">
         <span>راند {fa(round.round)}</span>
         <b>{round.title}</b>
         <strong>{fa(myPower)} <i>VS</i> {fa(theirPower)}</strong>
         <small>{round.winner === 'DRAW' ? 'برخورد برابر!' : mineWon ? 'این راند مال تو شد!' : 'حریف این راند را برد'}</small>
       </div>
-      <HoloCard card={theirs} compact disabled />
+      <HoloCard card={theirs} compact disabled frame={opponentFrame} />
     </section>
   );
 }
@@ -116,7 +119,7 @@ function DuelIdentity({ player, fallback }) {
         <img src={imageUrl ? asset(imageUrl) : avatarUrl(avatarKey)} alt="" />
       </CosmeticAvatarFrame>
     )}
-    <small>{p.nickname || fallback}</small>
+    <small><DisplayName name={p.nickname || fallback} cosmetics={p.cosmetics} level={p.level}/></small>
   </span>;
 }
 
@@ -130,6 +133,8 @@ function LiveArena({ session }) {
   const remaining = new Set((state.myRemainingCardIds || []).map(String));
   const myName = g.players?.[mine]?.nickname || 'تو';
   const opponentName = g.players?.[opponent]?.nickname || (g.vsBot ? 'ربات تاکتیکی' : 'حریف');
+  const myFrame = g.players?.[mine]?.cosmetics?.frame;
+  const opponentFrame = g.players?.[opponent]?.cosmetics?.frame;
 
   return <div className="duelLiveArena">
     <header className="duelScoreV2">
@@ -146,7 +151,7 @@ function LiveArena({ session }) {
         <span key={index}><img src="/games/card_duel_glow.png" alt="پشت کارت حریف" /></span>)}
     </div>
 
-    <RoundReveal round={state.lastRound} me={mine} />
+    <RoundReveal round={state.lastRound} me={mine} myFrame={myFrame} opponentFrame={opponentFrame} />
 
     {phase === 'playing' && <section className="duelChoicePanel">
       <div className="duelChoicePrompt">
@@ -155,7 +160,7 @@ function LiveArena({ session }) {
         <strong>{fa(secondsLeft)}<small>ثانیه</small></strong>
       </div>
       <div className="duelHandV2">
-        {myCards.map(card => <HoloCard key={idOf(card)} card={card} compact
+        {myCards.map(card => <HoloCard key={idOf(card)} card={card} compact frame={myFrame}
           disabled={state.iChose || !remaining.has(idOf(card))}
           onClick={() => move({ cardId: idOf(card) })} />)}
       </div>

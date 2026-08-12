@@ -187,8 +187,8 @@ class _ProfilePageState extends State<ProfilePage> {
       );
     }
 
-    return Container(
-      decoration: profileBackgroundDecoration(_cosmetics['profileBackground'] as String?),
+    return AnimatedProfileBackground(
+      slug: _cosmetics['profileBackground'] as String?,
       child: ListView(
       padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, Gaps.xxl),
       children: [

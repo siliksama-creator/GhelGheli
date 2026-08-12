@@ -28,6 +28,7 @@ class _ShopPageState extends State<ShopPage> {
     ('club_badge', 'باشگاه‌ها', Icons.shield_rounded),
     ('card_frame', 'قاب‌ها', Icons.crop_portrait_rounded),
     ('name_color', 'افکت نام', Icons.auto_awesome_rounded),
+    ('profile_badge', 'امضای پروفایل', Icons.workspace_premium_rounded),
     ('profile_background', 'پس‌زمینه', Icons.wallpaper_rounded),
     ('result_template', 'نتیجه', Icons.emoji_events_rounded),
     ('match_effect', 'ورود و پایان', Icons.celebration_rounded),
@@ -425,11 +426,6 @@ class _PlanVisuals extends StatelessWidget {
   Widget build(BuildContext context) {
     final frameKey = annual ? 'annual_royal_frame' : 'blue_fire';
     final nameKey = annual ? 'mvp_name' : 'gold_gradient';
-    final nameText = Text(annual ? 'MVP' : 'hotcat', style: TextStyle(
-      fontSize: 13,
-      fontWeight: FontWeight.w900,
-      color: nameColorOf(nameKey) ?? Colors.white,
-    ));
     return Container(
       height: 56,
       padding: const EdgeInsets.all(6),
@@ -451,13 +447,11 @@ class _PlanVisuals extends StatelessWidget {
         const SizedBox(width: 7),
         SizedBox(
           width: 56,
-          child: nameGradientColors[nameKey] == null
-              ? nameText
-              : ShaderMask(
-                  shaderCallback: (bounds) => LinearGradient(colors: nameGradientColors[nameKey]!).createShader(bounds),
-                  blendMode: BlendMode.srcIn,
-                  child: nameText,
-                ),
+          child: AnimatedNameText(
+            name: annual ? 'MVP' : 'hotcat',
+            effect: nameKey,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+          ),
         ),
         const SizedBox(width: 7),
         Expanded(
@@ -637,6 +631,7 @@ class _ProductArt extends StatelessWidget {
     'club_badge' => Icons.shield_outlined,
     'card_frame' => Icons.crop_portrait_rounded,
     'name_color' => Icons.title_rounded,
+    'profile_badge' => Icons.workspace_premium_rounded,
     'profile_background' => Icons.wallpaper_rounded,
     'result_template' => Icons.scoreboard_rounded,
     'match_effect' => Icons.flare_rounded,
@@ -654,6 +649,13 @@ class _ProductArt extends StatelessWidget {
       exactPreview = _ShopFrameArtwork(value: value);
     } else if (kind == 'name_color') {
       exactPreview = _ShopPreviewSurface(child: _ShopNameArtwork(value: value));
+    } else if (kind == 'profile_badge') {
+      exactPreview = _ShopPreviewSurface(child: _ShopBadgeArtwork(value: value));
+    } else if (kind == 'profile_background') {
+      exactPreview = AnimatedProfileBackground(
+        slug: value,
+        child: const _ShopProfileArtwork(),
+      );
     } else if (kind == 'result_template') {
       exactPreview = Stack(fit: StackFit.expand, children: [
         Image.asset(
@@ -677,8 +679,7 @@ class _ProductArt extends StatelessWidget {
         child: _ShopEmoteArtwork(slug: slug, metadata: item['metadata']),
       );
     } else {
-      // Club marks and profile backgrounds are the only product images that
-      // are themselves the delivered entitlement.
+      // Club marks are real purchased marks, never generated promo art.
       final path = kind == 'club_badge'
           ? clubAsset(value)
           : 'assets/shop/cosmetics/$slug.webp';
@@ -794,29 +795,73 @@ class _ShopNameArtwork extends StatelessWidget {
   final Object? value;
 
   @override
-  Widget build(BuildContext context) {
-    final key = '$value';
-    final gradient = nameGradientColors[key];
-    final style = const TextStyle(
-      fontSize: 24,
-      fontWeight: FontWeight.w900,
-      shadows: [Shadow(color: Colors.black, blurRadius: 12, offset: Offset(0, 3))],
-    );
-    final text = Text('قلقلی', style: style.copyWith(
-      color: gradient == null ? nameColorOf(key) ?? Colors.white : Colors.white,
-    ));
-    return IgnorePointer(
-      child: Center(
-        child: gradient == null
-            ? text
-            : ShaderMask(
-                shaderCallback: (bounds) => LinearGradient(colors: gradient).createShader(bounds),
-                blendMode: BlendMode.srcIn,
-                child: text,
-              ),
+  Widget build(BuildContext context) => IgnorePointer(
+    child: Center(
+      child: AnimatedNameText(
+        name: 'hotcat',
+        effect: '$value',
+        style: const TextStyle(
+          fontSize: 24,
+          fontWeight: FontWeight.w900,
+          shadows: [Shadow(color: Colors.black, blurRadius: 12, offset: Offset(0, 3))],
+        ),
       ),
-    );
-  }
+    ),
+  );
+}
+
+class _ShopBadgeArtwork extends StatelessWidget {
+  const _ShopBadgeArtwork({required this.value});
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Column(mainAxisSize: MainAxisSize.min, children: [
+      SizedBox(
+        width: 58,
+        height: 58,
+        child: CosmeticAvatarFrame(
+          frame: 'pro_holographic',
+          padding: 3,
+          child: ClipOval(child: Image.asset('assets/avatars/avatar_10_crown.webp', fit: BoxFit.cover)),
+        ),
+      ),
+      const SizedBox(height: 6),
+      DisplayName(
+        name: 'hotcat',
+        cosmetics: {'profileBadge': value, 'color': 'gold_gradient'},
+        level: 72,
+        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+      ),
+      const SizedBox(height: 3),
+      const Text('همین امضا در پروفایل، چت، لیگ و بازی',
+          style: TextStyle(fontSize: 7.5, color: Colors.white54)),
+    ]),
+  );
+}
+
+class _ShopProfileArtwork extends StatelessWidget {
+  const _ShopProfileArtwork();
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+      decoration: BoxDecoration(
+        color: const Color(0x99020617),
+        borderRadius: Corners.rLg,
+        border: Border.all(color: Colors.white24),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        ClipOval(child: Image.asset('assets/avatars/avatar_10_crown.webp', width: 52, height: 52, fit: BoxFit.cover)),
+        Gaps.hSm,
+        const Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('hotcat', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
+          Text('پروفایل بازیکن', style: TextStyle(fontSize: 8, color: Colors.white60)),
+        ]),
+      ]),
+    ),
+  );
 }
 
 class _ShopResultArtwork extends StatelessWidget {

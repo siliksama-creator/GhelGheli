@@ -4,6 +4,7 @@ import { req, asset, fa, avatars, avatarUrl } from '../lib/api.js';
 import { EmptyView } from '../components/states.jsx';
 import PhotoCardBox from '../components/PhotoCardBox.jsx';
 import LoginStreak from '../components/LoginStreak.jsx';
+import { CosmeticAvatarFrame, DisplayName } from '../components/Cosmetics.jsx';
 
 const asInt = v => {
   const n = parseInt(String(v ?? 0).split('.')[0], 10);
@@ -45,10 +46,12 @@ function HeroHeader({ points, nickname, nextReward, user, cosmetics, onOpenProfi
     <div style={{ padding:'10px 10px 10px', borderRadius:'20px', background:'linear-gradient(135deg, #1A2B45, #111D30, #0A1220)', border:'1.2px solid rgba(255,215,0,0.28)', boxShadow:'0 8px 18px rgba(255,215,0,0.08), 0 8px 16px rgba(0,0,0,0.4)' }}>
       <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>
         <div onClick={onOpenProfile} style={{ flex:1, display:'flex', gap:'8px', alignItems:'center', cursor:'pointer' }}>
-          <img src={user?.profile_image_url ? asset(user.profile_image_url) : avatarUrl(user?.profile_avatar_key)} alt="" decoding="async" style={{ width:'40px', height:'40px', borderRadius:'50%', objectFit:'cover' }} />
+          <CosmeticAvatarFrame frame={cosmetics?.frame} style={{width:46,height:46,padding:cosmetics?.frame?3:0}}>
+            <img src={user?.profile_image_url ? asset(user.profile_image_url) : avatarUrl(user?.profile_avatar_key)} alt="" decoding="async" style={{width:'100%',height:'100%',borderRadius:'50%',objectFit:'cover',border:'1px solid #071522'}} />
+          </CosmeticAvatarFrame>
           <div>
             <div style={{ color:'#FFF', fontWeight:'900', fontSize:'14.5px', display:'flex', alignItems:'center', gap:'4px' }}>
-              سلام {nickname} {cosmetics?.plus && <span style={{ color:'#FFD700', textShadow:'0 0 8px #FFD700', fontSize:'13px' }}>★</span>}
+              سلام <DisplayName name={nickname} cosmetics={cosmetics} level={user?.level?.level ?? user?.level} />
             </div>
             <div style={{ color:'#CBD5E1', fontSize:'11px', fontWeight:'700', display:'flex', alignItems:'center', gap:'2px' }}>پروفایل من ‹</div>
           </div>

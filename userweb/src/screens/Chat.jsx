@@ -2,7 +2,7 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { req, asset, fa, avatarUrl } from '../lib/api.js';
-import { DisplayName } from '../components/Cosmetics.jsx';
+import { CosmeticAvatarFrame, DisplayName } from '../components/Cosmetics.jsx';
 
 const EMOJIS = [
   '🔥', '⚽', '🏆', '😎', '😂', '👏', '🤝', '💪',
@@ -144,12 +144,14 @@ export default function Chat({ token, openProfile, meId }) {
           const isMe = String(m.user_id) === String(meId);
           return (
             <div key={m.id} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-              <img
-                src={m.profile_image_url ? asset(m.profile_image_url) : avatarUrl(m.profile_avatar_key)}
-                alt=""
-                style={{ width: '36px', height: '36px', borderRadius: '50%', cursor: 'pointer' }}
-                onClick={() => openProfile && openProfile(m.user_id)}
-              />
+              <CosmeticAvatarFrame frame={m.cosmetics?.frame} style={{width:42,height:42,padding:m.cosmetics?.frame?3:0}}>
+                <img
+                  src={m.profile_image_url ? asset(m.profile_image_url) : avatarUrl(m.profile_avatar_key)}
+                  alt=""
+                  style={{width:'100%',height:'100%',borderRadius:'50%',objectFit:'cover',cursor:'pointer',border:'1px solid #071522'}}
+                  onClick={() => openProfile && openProfile(m.user_id)}
+                />
+              </CosmeticAvatarFrame>
               <div style={{ flex: 1, maxWidth: '85%' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
                   <DisplayName name={m.nickname || m.first_name || 'کاربر'} cosmetics={m.cosmetics} level={m.level} />

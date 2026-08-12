@@ -275,6 +275,7 @@ class _MessageBubble extends StatelessWidget {
     final text = message['message_text'] as String? ?? '';
     final liked = message['liked_by_me'] == true;
     final likes = (message['like_count'] as num?)?.toInt() ?? 0;
+    final cosmetics = message['cosmetics'] is Map ? message['cosmetics'] as Map : const {};
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -284,10 +285,14 @@ class _MessageBubble extends StatelessWidget {
           InkWell(
             onTap: onOpenProfile,
             borderRadius: BorderRadius.circular(16),
-            child: AvatarImage(
-              keyName: message['profile_avatar_key'],
-              imageUrl: message['profile_image_url'],
-              radius: 16,
+            child: CosmeticAvatarFrame(
+              frame: cosmetics['frame'] as String?,
+              padding: 2,
+              child: AvatarImage(
+                keyName: message['profile_avatar_key'],
+                imageUrl: message['profile_image_url'],
+                radius: 16,
+              ),
             ),
           ),
           const SizedBox(width: 8),
@@ -301,7 +306,7 @@ class _MessageBubble extends StatelessWidget {
                       onTap: onOpenProfile,
                       child: DisplayName(
                         name: message['nickname'] ?? 'کاربر',
-                        cosmetics: message['cosmetics'] is Map ? message['cosmetics'] as Map : null,
+                        cosmetics: cosmetics,
                         level: (message['level'] as num?)?.toInt(),
                         style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w800),
                       ),
