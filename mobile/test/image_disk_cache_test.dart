@@ -242,20 +242,17 @@ void main() {
           reason: 'بیشتر از ۲۰۰ مگابایت روی گوشیِ ارزان بی‌ادبی است');
     });
 
-    test('از پوشهٔ موقت استفاده می‌کند نه Documents', () {
-      // Documents در بکاپِ خودکارِ گوگل می‌رود و در «حجمِ اشغال‌شده»
-      // به‌عنوان دادهٔ کاربر شمرده می‌شود. این داده قابلِ بازسازی است.
+    test('از Application Support استفاده می‌کند نه Documents', () {
+      // خواستهٔ جدید مالک «بعد از بستن و باز کردن دوباره هم از کش لود کن»
+      // بود. temporary قراردادِ ماندگاری ندارد و هر لحظه ممکن است پاک
+      // شود؛ Application Support برای همین دادهٔ داخلیِ پایدار ساخته شده.
       //
-      // ⚠️ نسخهٔ اولِ این تست کلِ فایل را جست‌وجو می‌کرد و شکست —
-      //    چون نامِ `getApplicationDocumentsDirectory` در **کامنتِ**
-      //    توضیحی آمده بود، نه در کد. تستی که کامنت را کد بشمارد،
-      //    هر بار که کسی توضیح بنویسد قرمز می‌شود.
-      //
-      //    پس اول کامنت‌ها حذف می‌شوند، بعد جست‌وجو.
+      // Documents همچنان ممنوع است چون در بکاپِ کاربر می‌رود و برای
+      // دادهٔ بازتولیدپذیرِ کش، جای درستی نیست.
       final code = src
           .replaceAll(RegExp(r'//.*'), '')
           .replaceAll(RegExp(r'/\*[\s\S]*?\*/'), '');
-      expect(code.contains('getTemporaryDirectory'), isTrue);
+      expect(code.contains('getApplicationSupportDirectory'), isTrue);
       expect(code.contains('getApplicationDocumentsDirectory'), isFalse,
           reason: 'کشِ قابلِ بازسازی نباید در بکاپِ گوگل برود');
     });
