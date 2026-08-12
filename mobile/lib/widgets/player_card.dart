@@ -80,114 +80,129 @@ class PlayerCard extends StatelessWidget {
     final art = cardArtOf(card);
     final qty = cardQtyOf(card);
     final radius = compact ? 16.0 : 20.0;
-    final child = AnimatedScale(
-      scale: selected ? 1.035 : 1,
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOutBack,
-      child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 180),
-        opacity: enabled ? 1 : 0.38,
-        child: RarityCardFrame(
-          rarity: rarity,
-          borderRadius: radius,
-          padding: compact ? 3 : 4,
-          child: Material(
-            color: const Color(0xFF050A12),
-            child: InkWell(
-              onTap: enabled && onTap != null
-                  ? () {
-                      HapticFeedback.selectionClick();
-                      onTap!();
-                    }
-                  : null,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  ColoredBox(
-                    color: const Color(0xFF02070D),
-                    child: art == null
-                        ? _PaintedFace(card: card)
-                        : CachedCardImage(
-                            url: art,
-                            fit: BoxFit.contain,
-                            cacheWidth: compact ? 280 : 420,
-                            placeholder: _PaintedFace(card: card, loading: true),
-                          ),
-                  ),
-                  const DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Color(0x00000000), Color(0xCC02060C)],
-                        stops: [0.45, 0.68, 1],
-                      ),
-                    ),
-                  ),
-                  if (winner)
-                    const DecoratedBox(
-                      decoration: BoxDecoration(
-                        border: Border.fromBorderSide(
-                          BorderSide(color: Color(0xFFFFD166), width: 2),
-                        ),
-                        color: Color(0x33FFD166),
-                      ),
-                    ),
-                  if (loser)
-                    const ColoredBox(color: Color(0x66020810)),
-                  if (selected)
-                    const Align(
-                      alignment: Alignment.topRight,
-                      child: Padding(
-                        padding: EdgeInsets.all(6),
-                        child: CircleAvatar(
-                          radius: 12,
-                          backgroundColor: Color(0xFFFFD166),
-                          child: Icon(Icons.check_rounded, size: 16, color: Color(0xFF07111B)),
-                        ),
-                      ),
-                    ),
-                  if (qty > 1)
-                    Align(
-                      alignment: Alignment.topLeft,
-                      child: Padding(
-                        padding: const EdgeInsets.all(6),
-                        child: _MiniChip(text: '×${faNum(qty)}'),
-                      ),
-                    ),
-                  if (winner)
-                    const Align(
-                      alignment: Alignment.center,
-                      child: _WinnerStamp(),
-                    ),
-                  Positioned(
-                    left: 6,
-                    right: 6,
-                    bottom: 6,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
+    final child = AnimatedSlide(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      offset: selected ? const Offset(0, -0.015) : winner ? const Offset(0, -0.01) : Offset.zero,
+      child: AnimatedRotation(
+        turns: selected ? -0.004 : 0,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutBack,
+        child: AnimatedScale(
+          scale: winner ? 1.02 : selected ? 1.035 : 1,
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutBack,
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 180),
+            opacity: enabled ? 1 : 0.38,
+              child: RarityCardFrame(
+                rarity: rarity,
+                borderRadius: radius,
+                padding: compact ? 3 : 4,
+                child: Material(
+                  color: const Color(0xFF050A12),
+                  child: InkWell(
+                    onTap: enabled && onTap != null
+                        ? () {
+                            HapticFeedback.selectionClick();
+                            onTap!();
+                          }
+                        : null,
+                    child: Stack(
+                      fit: StackFit.expand,
                       children: [
-                        if (showName)
-                          Text(
-                            cardNameOf(card),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w900,
-                              fontSize: compact ? 10 : 12.5,
-                              shadows: const [Shadow(color: Colors.black87, blurRadius: 8)],
+                        ColoredBox(
+                          color: const Color(0xFF02070D),
+                          child: art == null
+                              ? _PaintedFace(card: card)
+                              : CachedCardImage(
+                                  url: art,
+                                  fit: BoxFit.contain,
+                                  cacheWidth: compact ? 280 : 420,
+                                  placeholder: _PaintedFace(card: card, loading: true),
+                                ),
+                        ),
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                rarityColors[rarity]!.first.withValues(alpha: winner ? .18 : .10),
+                                Colors.transparent,
+                                const Color(0xCC02060C),
+                              ],
+                              stops: const [0.0, 0.42, 1],
                             ),
                           ),
-                        if (showStats && !compact) ...[
-                          const SizedBox(height: 4),
-                          CardDuelStatsMini(item: card),
-                        ],
+                        ),
+                        if (winner)
+                          const DecoratedBox(
+                            decoration: BoxDecoration(
+                              border: Border.fromBorderSide(
+                                BorderSide(color: Color(0xFFFFD166), width: 2),
+                              ),
+                              color: Color(0x33FFD166),
+                            ),
+                          ),
+                        if (loser)
+                          const ColoredBox(color: Color(0x66020810)),
+                        if (selected)
+                          const Align(
+                            alignment: Alignment.topRight,
+                            child: Padding(
+                              padding: EdgeInsets.all(6),
+                              child: CircleAvatar(
+                                radius: 12,
+                                backgroundColor: Color(0xFFFFD166),
+                                child: Icon(Icons.check_rounded, size: 16, color: Color(0xFF07111B)),
+                              ),
+                            ),
+                          ),
+                        if (qty > 1)
+                          Align(
+                            alignment: Alignment.topLeft,
+                            child: Padding(
+                              padding: const EdgeInsets.all(6),
+                              child: _MiniChip(text: '×${faNum(qty)}'),
+                            ),
+                          ),
+                        if (winner)
+                          const Align(
+                            alignment: Alignment.center,
+                            child: _WinnerStamp(),
+                          ),
+                        Positioned(
+                          left: 6,
+                          right: 6,
+                          bottom: 6,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (showName)
+                                Text(
+                                  cardNameOf(card),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: compact ? 10 : 12.5,
+                                    shadows: const [Shadow(color: Colors.black87, blurRadius: 8)],
+                                  ),
+                                ),
+                              if (showStats && !compact) ...[
+                                const SizedBox(height: 4),
+                                CardDuelStatsMini(item: card),
+                              ],
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                ],
+                ),
               ),
             ),
           ),
