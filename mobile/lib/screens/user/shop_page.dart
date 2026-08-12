@@ -8,6 +8,7 @@ import '../../core/money.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/async_section.dart';
+import '../../widgets/match_effect_visual.dart';
 
 class ShopPage extends StatefulWidget {
   final ApiClient api;
@@ -422,9 +423,13 @@ class _PlanVisuals extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final slugs = annual
-        ? const ['annual_royal_frame', 'annual_royal_result']
-        : const ['blue_fire', 'gold_gradient'];
+    final frameKey = annual ? 'annual_royal_frame' : 'blue_fire';
+    final nameKey = annual ? 'mvp_name' : 'gold_gradient';
+    final nameText = Text(annual ? 'MVP' : 'hotcat', style: TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.w900,
+      color: nameColorOf(nameKey) ?? Colors.white,
+    ));
     return Container(
       height: 56,
       padding: const EdgeInsets.all(6),
@@ -434,22 +439,30 @@ class _PlanVisuals extends StatelessWidget {
         border: Border.all(color: Colors.white10),
       ),
       child: Row(children: [
-        for (final slug in slugs) ...[
-          ClipRRect(
-            borderRadius: Corners.rSm,
-            child: Image.asset(
-              'assets/shop/cosmetics/$slug.webp',
-              width: 68,
-              height: 42,
-              fit: BoxFit.cover,
-              cacheWidth: 210,
-            ),
+        SizedBox(
+          width: 42,
+          height: 42,
+          child: CosmeticAvatarFrame(
+            frame: frameKey,
+            padding: 2.5,
+            child: ClipOval(child: Image.asset('assets/avatars/avatar_10_crown.webp', fit: BoxFit.cover)),
           ),
-          const SizedBox(width: 5),
-        ],
+        ),
+        const SizedBox(width: 7),
+        SizedBox(
+          width: 56,
+          child: nameGradientColors[nameKey] == null
+              ? nameText
+              : ShaderMask(
+                  shaderCallback: (bounds) => LinearGradient(colors: nameGradientColors[nameKey]!).createShader(bounds),
+                  blendMode: BlendMode.srcIn,
+                  child: nameText,
+                ),
+        ),
+        const SizedBox(width: 7),
         Expanded(
           child: Text(
-            annual ? 'قاب، نتیجه و عنوان دائمی سالانه' : 'نمونه واقعی قاب و افکت نام',
+            annual ? 'قاب، نتیجه و عنوان دائمی' : 'قاب و افکت نام واقعی',
             maxLines: 2,
             style: const TextStyle(fontSize: 8.5, height: 1.35, color: Colors.white70, fontWeight: FontWeight.w800),
           ),
@@ -635,51 +648,145 @@ class _ProductArt extends StatelessWidget {
   Widget build(BuildContext context) {
     final kind = '${item['kind']}';
     final slug = '${item['slug'] ?? ''}';
-    final club = '${item['payload'] ?? ''}';
-    final path = kind == 'club_badge'
-        ? clubAsset(club)
-        : 'assets/shop/cosmetics/$slug.webp';
-    final artScale = switch (kind) {
-      'card_frame' => 1.12,
-      'match_effect' => 1.05,
-      'result_template' => 1.02,
-      _ => 1.0,
-    };
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        ColoredBox(
-          color: const Color(0xFF03070D),
-          child: Padding(
-            padding: kind == 'club_badge'
-                ? const EdgeInsets.all(10)
-                : EdgeInsets.zero,
-            child: ClipRect(
-              child: Transform.scale(
-                scale: artScale,
-                child: Image.asset(
-                  path,
-                  fit: kind == 'club_badge' ? BoxFit.contain : BoxFit.cover,
-                  cacheWidth: 640,
-                  filterQuality: FilterQuality.medium,
-                  errorBuilder: (_, __, ___) => Center(
-                    child: Icon(_kindIcon(kind), size: 42, color: Colors.white38),
-                  ),
-                ),
-              ),
-            ),
+    final value = '${item['payload'] ?? slug}';
+    Widget exactPreview;
+    if (kind == 'card_frame') {
+      exactPreview = _ShopFrameArtwork(value: value);
+    } else if (kind == 'name_color') {
+      exactPreview = _ShopPreviewSurface(child: _ShopNameArtwork(value: value));
+    } else if (kind == 'result_template') {
+      exactPreview = Stack(fit: StackFit.expand, children: [
+        Image.asset(
+          'assets/shop/cosmetics/$slug.webp',
+          fit: BoxFit.cover,
+          cacheWidth: 640,
+          filterQuality: FilterQuality.medium,
+          errorBuilder: (_, __, ___) => DecoratedBox(
+            decoration: BoxDecoration(gradient: LinearGradient(
+              colors: resultTemplateColors[value] ?? const [Color(0xFF071522), Color(0xFF38BDF8)],
+            )),
           ),
         ),
-        if (kind == 'name_color')
-          Positioned.fill(child: _ShopNameArtwork(value: item['payload'] ?? slug)),
-        if (kind == 'result_template')
-          const Positioned.fill(child: _ShopResultArtwork()),
-        if (kind == 'emote_pack')
-          Positioned.fill(child: _ShopEmoteArtwork(slug: slug, metadata: item['metadata'])),
+        const ColoredBox(color: Color(0x33020617)),
+        const _ShopResultArtwork(),
+      ]);
+    } else if (kind == 'match_effect') {
+      exactPreview = _ShopMatchEffectArtwork(slug: slug);
+    } else if (kind == 'emote_pack') {
+      exactPreview = _ShopPreviewSurface(
+        child: _ShopEmoteArtwork(slug: slug, metadata: item['metadata']),
+      );
+    } else {
+      // Club marks and profile backgrounds are the only product images that
+      // are themselves the delivered entitlement.
+      final path = kind == 'club_badge'
+          ? clubAsset(value)
+          : 'assets/shop/cosmetics/$slug.webp';
+      exactPreview = Padding(
+        padding: kind == 'club_badge' ? const EdgeInsets.all(10) : EdgeInsets.zero,
+        child: Image.asset(
+          path,
+          fit: kind == 'club_badge' ? BoxFit.contain : BoxFit.cover,
+          cacheWidth: 640,
+          filterQuality: FilterQuality.medium,
+          errorBuilder: (_, __, ___) => Center(
+            child: Icon(_kindIcon(kind), size: 42, color: Colors.white38),
+          ),
+        ),
+      );
+    }
+    return ColoredBox(color: const Color(0xFF03070D), child: exactPreview);
+  }
+}
 
-      ],
+class _ShopMatchEffectArtwork extends StatefulWidget {
+  const _ShopMatchEffectArtwork({required this.slug});
+  final String slug;
+
+  @override
+  State<_ShopMatchEffectArtwork> createState() => _ShopMatchEffectArtworkState();
+}
+
+class _ShopMatchEffectArtworkState extends State<_ShopMatchEffectArtwork>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2200),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    return ColoredBox(
+      color: const Color(0xFF020617),
+      child: Padding(
+        padding: const EdgeInsets.all(7),
+        child: Center(
+          child: reduceMotion
+              ? MatchEffectVisual(slug: widget.slug, progress: .56, compact: true)
+              : AnimatedBuilder(
+                  animation: _controller,
+                  builder: (_, __) => MatchEffectVisual(
+                    slug: widget.slug,
+                    progress: _controller.value,
+                    compact: true,
+                  ),
+                ),
+        ),
+      ),
     );
   }
+}
+
+class _ShopPreviewSurface extends StatelessWidget {
+  const _ShopPreviewSurface({required this.child});
+  final Widget child;
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: const BoxDecoration(gradient: LinearGradient(
+      begin: Alignment.topRight,
+      end: Alignment.bottomLeft,
+      colors: [Color(0xFF13243A), Color(0xFF030712)],
+    )),
+    child: child,
+  );
+}
+
+class _ShopFrameArtwork extends StatelessWidget {
+  const _ShopFrameArtwork({required this.value});
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => _ShopPreviewSurface(
+    child: Center(
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        SizedBox(
+          width: 82,
+          height: 82,
+          child: CosmeticAvatarFrame(
+            frame: value,
+            padding: 4,
+            child: ClipOval(child: Image.asset(
+              'assets/avatars/avatar_10_crown.webp',
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const ColoredBox(color: Color(0xFF10243A), child: Icon(Icons.person_rounded)),
+            )),
+          ),
+        ),
+        Gaps.hSm,
+        const Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('hotcat', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+          Text('همین قاب روی پروفایل و بازی', style: TextStyle(fontSize: 8, color: Colors.white54)),
+        ]),
+      ]),
+    ),
+  );
 }
 
 class _ShopNameArtwork extends StatelessWidget {

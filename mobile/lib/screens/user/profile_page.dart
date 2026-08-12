@@ -241,7 +241,10 @@ class _ProfilePageState extends State<ProfilePage> {
             children: [
               Row(
                 children: [
-                  AvatarImage(keyName: _selectedAvatar, radius: 26, ring: true),
+                  CosmeticAvatarFrame(
+                    frame: _cosmetics['frame'] as String?,
+                    child: AvatarImage(keyName: _selectedAvatar, radius: 26, ring: true),
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(

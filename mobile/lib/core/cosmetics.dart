@@ -27,6 +27,39 @@ const frameColors = <String, List<Color>>{
   'annual_royal_frame': [Color(0xFFFFD166), Color(0xFF7C3AED)],
 };
 
+/// Authoritative avatar-frame renderer shared by Shop, profiles and games.
+class CosmeticAvatarFrame extends StatelessWidget {
+  const CosmeticAvatarFrame({
+    super.key,
+    required this.frame,
+    required this.child,
+    this.padding = 3,
+  });
+
+  final String? frame;
+  final Widget child;
+  final double padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = frameColors[frame];
+    if (colors == null) return child;
+    return Container(
+      padding: EdgeInsets.all(padding),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: colors,
+        ),
+        boxShadow: [BoxShadow(color: colors.last.withValues(alpha: .32), blurRadius: 14)],
+      ),
+      child: child,
+    );
+  }
+}
+
 const nameGradientColors = <String, List<Color>>{
   'rainbow': rainbowColors,
   'gold_gradient': [Color(0xFFFFF0A3), Color(0xFFF59E0B)],

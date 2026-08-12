@@ -8,7 +8,8 @@ import TapGame from './tapGame.jsx';
 import CardDuelWeb from './cardDuelGame.jsx';
 import GrowthHub from './GrowthHub.jsx';
 import { useGameSession } from './gameSession.js';
-import { LevelBadge, DisplayName, RESULT_PALETTES } from './components/Cosmetics.jsx';
+import { CosmeticAvatarFrame, LevelBadge, DisplayName, RESULT_PALETTES } from './components/Cosmetics.jsx';
+import CosmeticMatchEffect, { matchEffectSupports } from './components/MatchEffectVisual.jsx';
 import { fa, asset, avatarUrl, req } from './lib/api.js';
 import './growth.css';
 
@@ -202,11 +203,13 @@ export default function Games({ api, token }) {
         }}
       >
         <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-          <img
-            src={user?.profile_image_url ? asset(user.profile_image_url) : avatarUrl(user?.profile_avatar_key)}
-            alt=""
-            style={{ width: '52px', height: '52px', borderRadius: '50%', border: '2px solid #38BDF8', objectFit: 'cover' }}
-          />
+          <CosmeticAvatarFrame frame={user?.cosmetics?.frame} style={{ width:60, height:60 }}>
+            <img
+              src={user?.profile_image_url ? asset(user.profile_image_url) : avatarUrl(user?.profile_avatar_key)}
+              alt=""
+              style={{ width:'100%', height:'100%', borderRadius:'50%', border:'2px solid #071522', objectFit:'cover' }}
+            />
+          </CosmeticAvatarFrame>
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px' }}>
               <h3 style={{ color: '#FFF', fontWeight: '900', margin: 0, fontSize: '15px', display:'flex', alignItems:'center', gap:'6px' }}>
@@ -528,8 +531,8 @@ export default function Games({ api, token }) {
 
 
 function MatchEffectVisual({ slug, finish = false }) {
-  return <div aria-hidden="true" style={{ position:'absolute', zIndex:4, inset:0, display:'grid', placeItems:'center', pointerEvents:'none', animation:`${finish ? 'cosmeticFinish 2.8s ease-out infinite' : 'cosmeticEntry 1.8s ease-out forwards'}` }}>
-    <img src={`/shop/cosmetics-v3/${slug}.webp`} alt="" style={{ width:'min(82%,430px)', aspectRatio:'16/9', objectFit:'cover', borderRadius:'24px', mixBlendMode:'screen', opacity:.9, filter:'saturate(1.35) drop-shadow(0 0 28px rgba(56,189,248,.45))' }} />
+  return <div aria-hidden="true" style={{ position:'absolute', zIndex:4, inset:0, display:'grid', placeItems:'center', pointerEvents:'none' }}>
+    <CosmeticMatchEffect slug={slug} mode={finish ? 'finish' : 'entry'} />
   </div>;
 }
 
@@ -561,6 +564,20 @@ async function makeGenericResultCard({ title, gameTitle, players, template }) {
   ctx.fillStyle = '#22E7A6'; ctx.font = '900 36px sans-serif'; ctx.fillText('تو هم بیا به چالش قلقلی!', 540, 850);
   ctx.fillStyle = '#CBD5E1'; ctx.font = '500 28px sans-serif'; ctx.direction = 'ltr'; ctx.fillText(window.location.origin, 540, 920);
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png', .94));
+}
+
+function GamePlayerIdentity({ player, fallback }) {
+  const p = player || {};
+  const imageUrl = p.profileImageUrl || p.profile_image_url;
+  const avatarKey = p.profileAvatarKey || p.profile_avatar_key;
+  return <span style={{ display:'inline-flex', alignItems:'center', gap:6, minWidth:0, maxWidth:'100%' }}>
+    {p.isBot ? <span aria-hidden="true" style={{fontSize:22}}>🤖</span> : (
+      <CosmeticAvatarFrame frame={p.cosmetics?.frame} style={{width:34,height:34,padding:p.cosmetics?.frame?2:0}}>
+        <img src={imageUrl ? asset(imageUrl) : avatarUrl(avatarKey)} alt="" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%',border:'1px solid #071522'}}/>
+      </CosmeticAvatarFrame>
+    )}
+    <span style={{minWidth:0,overflow:'hidden'}}><DisplayName name={p.nickname || fallback} cosmetics={p.cosmetics} level={p.level} /></span>
+  </span>;
 }
 
 function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSocket, initialStart, onSolo, soundOn, onToggleSound, onBack }) {
@@ -600,9 +617,8 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
 
   return (
     <div className="card wide" style={{ padding: '20px', textAlign: 'center', maxWidth: '640px', margin: '0 auto', position:'relative', overflow:'hidden' }}>
-      <style>{`@keyframes cosmeticEntry{0%{opacity:0;transform:scale(.35) rotate(-18deg)}45%{opacity:.9}100%{opacity:0;transform:scale(2.1) rotate(9deg)}}@keyframes cosmeticFinish{0%{opacity:0;transform:translateY(20px) scale(.6)}30%{opacity:1}100%{opacity:.18;transform:translateY(-45px) scale(1.45)}}`}</style>
-      {phase === 'playing' && myCosmetics.matchEffect && <MatchEffectVisual slug={myCosmetics.matchEffect} />}
-      {phase === 'over' && g.winner === g.me && winnerCosmetics.matchEffect && <MatchEffectVisual slug={winnerCosmetics.matchEffect} finish />}
+      {phase === 'playing' && myCosmetics.matchEffect && matchEffectSupports(myCosmetics.matchEffect, 'entry') && <MatchEffectVisual slug={myCosmetics.matchEffect} />}
+      {phase === 'over' && g.winner === g.me && winnerCosmetics.matchEffect && matchEffectSupports(winnerCosmetics.matchEffect, 'finish') && <MatchEffectVisual slug={winnerCosmetics.matchEffect} finish />}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', position:'relative', zIndex:5 }}>
         <button type="button" onClick={() => { leave(); onBack(); }} style={{ background: 'rgba(255,255,255,0.1)', color: '#FFF', border: 'none', padding: '6px 14px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>
           ← بازگشت
@@ -620,14 +636,14 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
 
       {phase === 'playing' && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.35)', padding: '10px 16px', borderRadius: '16px', marginBottom: '16px', border: '1px solid rgba(255,255,255,0.1)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: g.turn === 'X' ? '2px solid #38BDF8' : 'none', paddingBottom: '4px' }}>
-            <DisplayName name={pX.nickname} cosmetics={pX.cosmetics} level={pX.level} />
+          <div style={{ display:'flex', flex:'1 1 0', minWidth:0, alignItems:'center', gap:'8px', borderBottom:g.turn==='X'?'2px solid #38BDF8':'none', paddingBottom:'4px' }}>
+            <GamePlayerIdentity player={pX} fallback="کاربر ۱" />
             {g.turn === 'X' && <span style={{ background: '#38BDF8', color: '#000', padding: '2px 6px', borderRadius: '6px', fontSize: '10px', fontWeight: 'bold' }}>نوبت ({fa(secondsLeft)}s)</span>}
           </div>
           <span style={{ color: '#94A3B8', fontWeight: '900', fontSize: '14px' }}>VS</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: g.turn === 'O' ? '2px solid #F59E0B' : 'none', paddingBottom: '4px' }}>
+          <div style={{ display:'flex', flex:'1 1 0', minWidth:0, justifyContent:'flex-end', alignItems:'center', gap:'8px', borderBottom:g.turn==='O'?'2px solid #F59E0B':'none', paddingBottom:'4px' }}>
             {g.turn === 'O' && <span style={{ background: '#F59E0B', color: '#000', padding: '2px 6px', borderRadius: '6px', fontSize: '10px', fontWeight: 'bold' }}>نوبت ({fa(secondsLeft)}s)</span>}
-            <DisplayName name={pO.nickname} cosmetics={pO.cosmetics} level={pO.level} />
+            <GamePlayerIdentity player={pO} fallback="کاربر ۲" />
           </div>
         </div>
       )}

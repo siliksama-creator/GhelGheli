@@ -1,14 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { asset, fa, req } from './lib/api.js';
+import { asset, avatarUrl, fa, req } from './lib/api.js';
 import { useGameSession } from './gameSession.js';
-import { RESULT_PALETTES } from './components/Cosmetics.jsx';
+import { CosmeticAvatarFrame, RESULT_PALETTES } from './components/Cosmetics.jsx';
+import CosmeticMatchEffect, { matchEffectSupports } from './components/MatchEffectVisual.jsx';
 
 const idOf = card => String(card?.cardTypeId || card?.id || '');
 const num = value => Number(value || 0);
 
-function DuelEffectVisual({ slug }) {
-  return <div aria-hidden="true" style={{position:'absolute',zIndex:20,inset:0,display:'grid',placeItems:'center',pointerEvents:'none',animation:'duelCosmeticBurst 2s ease-out forwards'}}>
-    <img src={`/shop/cosmetics-v3/${slug}.webp`} alt="" style={{width:'min(84%,460px)',aspectRatio:'16/9',objectFit:'cover',borderRadius:'24px',mixBlendMode:'screen',filter:'saturate(1.35) drop-shadow(0 0 26px rgba(255,209,102,.42))'}} />
+function DuelEffectVisual({ slug, finish = false }) {
+  return <div aria-hidden="true" style={{position:'absolute',zIndex:20,inset:0,display:'grid',placeItems:'center',pointerEvents:'none'}}>
+    <CosmeticMatchEffect slug={slug} mode={finish ? 'finish' : 'entry'} />
   </div>;
 }
 const rarityColor = rarity => ({
@@ -105,6 +106,20 @@ function RoundReveal({ round, me }) {
   );
 }
 
+function DuelIdentity({ player, fallback }) {
+  const p = player || {};
+  const imageUrl = p.profileImageUrl || p.profile_image_url;
+  const avatarKey = p.profileAvatarKey || p.profile_avatar_key;
+  return <span className="duelIdentity">
+    {p.isBot ? <span aria-hidden="true">🤖</span> : (
+      <CosmeticAvatarFrame frame={p.cosmetics?.frame} style={{width:30,height:30,padding:p.cosmetics?.frame?2:0}}>
+        <img src={imageUrl ? asset(imageUrl) : avatarUrl(avatarKey)} alt="" />
+      </CosmeticAvatarFrame>
+    )}
+    <small>{p.nickname || fallback}</small>
+  </span>;
+}
+
 function LiveArena({ session }) {
   const { phase, g, secondsLeft, move } = session;
   const state = g.state || {};
@@ -118,9 +133,9 @@ function LiveArena({ session }) {
 
   return <div className="duelLiveArena">
     <header className="duelScoreV2">
-      <div><small>{myName}</small><b>{fa(score[mine])}</b></div>
+      <div><DuelIdentity player={g.players?.[mine]} fallback={myName}/><b>{fa(score[mine])}</b></div>
       <span><i>راند {fa(Math.min(3, num(state.roundIndex) + 1))} از ۳</i><strong>{state.roundTitle || 'پایان نبرد'}</strong></span>
-      <div><small>{opponentName}</small><b>{fa(score[opponent])}</b></div>
+      <div><DuelIdentity player={g.players?.[opponent]} fallback={opponentName}/><b>{fa(score[opponent])}</b></div>
     </header>
 
     <div className="duelRoundPips">{[0, 1, 2].map(index => <i key={index}
@@ -314,8 +329,8 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
   const resultPalette = RESULT_PALETTES[myCosmetics.resultTemplate] || ['#071522', '#FFD166'];
 
   return <main className="duelPageV2" style={{ '--mode-color': mode.color, position:'relative', overflow:'hidden' }}>
-    <style>{`@keyframes duelCosmeticBurst{0%{opacity:0;transform:scale(.3) rotate(-15deg)}35%{opacity:1}100%{opacity:0;transform:scale(2.2) rotate(12deg)}}`}</style>
-    {enabled && (session.phase === 'playing' || (session.phase === 'over' && iWon)) && myCosmetics.matchEffect && <DuelEffectVisual slug={myCosmetics.matchEffect} />}
+    {enabled && session.phase === 'playing' && myCosmetics.matchEffect && matchEffectSupports(myCosmetics.matchEffect, 'entry') && <DuelEffectVisual key={`${myCosmetics.matchEffect}-entry`} slug={myCosmetics.matchEffect} />}
+    {enabled && session.phase === 'over' && iWon && myCosmetics.matchEffect && matchEffectSupports(myCosmetics.matchEffect, 'finish') && <DuelEffectVisual key={`${myCosmetics.matchEffect}-finish`} slug={myCosmetics.matchEffect} finish />}
     <header className="duelHeroV2">
       <button type="button" className="ghost" onClick={() => { session.leave(); onBack(); }}>← بازگشت</button>
       <div className="duelHeroIcon"><img src="/games/card_duel_glow.png" alt="" /></div>

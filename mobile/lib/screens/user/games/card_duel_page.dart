@@ -15,6 +15,8 @@ import '../../../core/share_invite.dart';
 import '../../../theme/colors.dart';
 import '../../../theme/tokens.dart';
 import '../../../widgets/app_card.dart';
+import '../../../widgets/avatar_image.dart';
+import '../../../widgets/match_effect_visual.dart';
 import '../../../widgets/safe_image.dart';
 import 'game_session.dart';
 
@@ -586,7 +588,8 @@ class _CardDuelPageState extends State<CardDuelPage> {
             ],
             _LiveBattle(session: _session, color: _modeColor),
           ]),
-          if (_myCosmetics['matchEffect'] != null)
+          if (_myCosmetics['matchEffect'] != null
+              && matchEffectSupports('${_myCosmetics['matchEffect']}', 'entry'))
             Positioned.fill(child: IgnorePointer(child: _DuelCosmeticEffect(slug: '${_myCosmetics['matchEffect']}'))),
         ]);
       case GamePhase.over:
@@ -609,7 +612,8 @@ class _CardDuelPageState extends State<CardDuelPage> {
               ),
             ],
           ),
-          if (_session.iWon && _myCosmetics['matchEffect'] != null)
+          if (_session.iWon && _myCosmetics['matchEffect'] != null
+              && matchEffectSupports('${_myCosmetics['matchEffect']}', 'finish'))
             Positioned.fill(child: IgnorePointer(child: _DuelCosmeticEffect(slug: '${_myCosmetics['matchEffect']}', repeat: true))),
         ]);
       case GamePhase.idle:
@@ -660,21 +664,9 @@ class _DuelCosmeticEffectState extends State<_DuelCosmeticEffect>
             opacity: (widget.repeat ? .22 + t * .55 : 1 - t).clamp(0.0, 1.0).toDouble(),
             child: Transform.scale(
               scale: .45 + t * 1.45,
-              child: Container(
+              child: SizedBox(
                 width: 300,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: const [
-                    BoxShadow(color: Color(0x55FFD166), blurRadius: 28),
-                    BoxShadow(color: Color(0x3338BDF8), blurRadius: 18),
-                  ],
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Image.asset(
-                  'assets/shop/cosmetics/${widget.slug}.webp',
-                  fit: BoxFit.cover,
-                  filterQuality: FilterQuality.medium,
-                ),
+                child: MatchEffectVisual(slug: widget.slug, progress: t),
               ),
             ),
           ),

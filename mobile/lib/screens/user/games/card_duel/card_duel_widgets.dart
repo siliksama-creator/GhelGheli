@@ -317,13 +317,14 @@ class _LiveBattle extends StatelessWidget {
     final iChose = state['iChose'] == true;
     return Column(children: [
       AppCard(child: Row(children: [
-        Expanded(child: _Score(name: session.nameOf(mine), score: NumberParser.toInt(score[mine]), color: color)),
+        Expanded(child: _Score(name: session.nameOf(mine), score: NumberParser.toInt(score[mine]), color: color, player: session.playerInfo(mine))),
         Column(children: [
           Text('راند ${faNum((NumberParser.toInt(state['roundIndex']) + 1).clamp(1, 3))} از ۳',
               style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w900)),
           Text('${state['roundTitle'] ?? 'پایان نبرد'}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
         ]),
-        Expanded(child: _Score(name: session.nameOf(opponent), score: NumberParser.toInt(score[opponent]), color: _gold, reverse: true)),
+        Expanded(child: _Score(name: session.nameOf(opponent), score: NumberParser.toInt(score[opponent]), color: _gold, player: session.playerInfo(opponent), reverse: true)),
+
       ])),
       Gaps.vXs,
       Row(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -378,12 +379,26 @@ class _LiveBattle extends StatelessWidget {
 }
 
 class _Score extends StatelessWidget {
-  const _Score({required this.name, required this.score, required this.color, this.reverse = false});
-  final String name; final int score; final Color color; final bool reverse;
+  const _Score({required this.name, required this.score, required this.color, required this.player, this.reverse = false});
+  final String name; final int score; final Color color; final Map? player; final bool reverse;
   @override
   Widget build(BuildContext context) {
+    final cosmetics = player?['cosmetics'] is Map ? player!['cosmetics'] as Map : const {};
+    final isBot = player?['isBot'] == true;
     final parts = [
       CircleAvatar(radius: 19, backgroundColor: const Color(0xFF02060C), child: Text(faNum(score), style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.w900))),
+      if (isBot)
+        Icon(Icons.smart_toy_rounded, size: 24, color: color)
+      else
+        CosmeticAvatarFrame(
+          frame: cosmetics['frame'] as String?,
+          padding: 2,
+          child: AvatarImage(
+            imageUrl: player?['profileImageUrl'],
+            keyName: player?['profileAvatarKey'],
+            radius: 14,
+          ),
+        ),
       Flexible(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800))),
     ];
     return Row(mainAxisAlignment: reverse ? MainAxisAlignment.end : MainAxisAlignment.start,

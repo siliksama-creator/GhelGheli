@@ -2,7 +2,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 
 import { req, asset, fa, avatarUrl } from '../lib/api.js';
-import { clubImg, FRAME_STYLE, nameColorStyle, profileBackgroundStyle } from '../components/Cosmetics.jsx';
+import { clubImg, CosmeticAvatarFrame, nameColorStyle, profileBackgroundStyle } from '../components/Cosmetics.jsx';
 import { useAsync } from '../lib/useAsync.js';
 import { LoadingView, ErrorView } from '../components/states.jsx';
 import { SvgIcon } from '../components/IconAsset.jsx';
@@ -39,10 +39,7 @@ export default function PublicProfile({ token, userId, close }) {
           <>
             {/* ── Header ── */}
             <div className="ppHead">
-              <div className="ppAvatarWrap"
-                style={cos.frame
-                  ? { background: FRAME_STYLE[cos.frame] || undefined }
-                  : undefined}>
+              <CosmeticAvatarFrame frame={cos.frame} className="ppAvatarWrap">
                 <img className="ppAvatar" alt="آواتار"
                   src={u.profile_image_url
                     ? asset(u.profile_image_url)
@@ -52,7 +49,7 @@ export default function PublicProfile({ token, userId, close }) {
                     alt="نشان باشگاه" width="30" height="30"
                     onError={e => { e.currentTarget.style.display = 'none'; }} />
                 )}
-              </div>
+              </CosmeticAvatarFrame>
 
               <div className="ppWho">
                 <h2 style={nameColorStyle(cos.color)}>

@@ -82,14 +82,8 @@ class _PublicProfileBody extends StatelessWidget {
         // ── User Header ──
         Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: frameColors[cos['frame']] == null
-                    ? null
-                    : LinearGradient(colors: frameColors[cos['frame']]!),
-              ),
+            CosmeticAvatarFrame(
+              frame: cos['frame'] as String?,
               child: AvatarImage(
                 keyName: data['profile_avatar_key'],
                 imageUrl: data['profile_image_url'],

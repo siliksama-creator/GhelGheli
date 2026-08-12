@@ -96,6 +96,16 @@ export function PlusStar({ annual = false }) {
     fontSize: 15 }} title={annual ? 'کاربر پلاس سالانه' : 'کاربر پلاس'}>{annual ? '✦' : '★'}</span>;
 }
 
+export function CosmeticAvatarFrame({ frame, children, style, className = '' }) {
+  const gradient = FRAME_STYLE[frame];
+  return <div className={`cosmeticAvatarFrame ${frame ? `frame-${frame}` : ''} ${className}`}
+    style={{ display:'inline-grid', placeItems:'center', flex:'0 0 auto', borderRadius:'50%',
+      padding: gradient ? 4 : 0, background: gradient || 'transparent',
+      boxShadow: gradient ? '0 0 18px rgba(56,189,248,.22)' : 'none', ...style }}>
+    {children}
+  </div>;
+}
+
 export function CosmeticFrame({ cosmetics, children, style, className = '' }) {
   const frame = cosmetics?.frame;
   const gradient = FRAME_STYLE[frame];

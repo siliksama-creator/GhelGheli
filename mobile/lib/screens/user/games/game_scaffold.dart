@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../api_client.dart';
 import '../../../core/cosmetics.dart';
 import '../../../theme/tokens.dart';
+import '../../../widgets/match_effect_visual.dart';
 import 'game_audio.dart';
 import 'game_session.dart';
 import 'versus_bar.dart';
@@ -125,7 +126,11 @@ class GameScaffold extends StatelessWidget {
             ),
           ),
         if ((session.phase == GamePhase.playing || (session.phase == GamePhase.over && session.iWon))
-            && _playerCosmetics(session, session.mySymbol)['matchEffect'] != null)
+            && _playerCosmetics(session, session.mySymbol)['matchEffect'] != null
+            && matchEffectSupports(
+              '${_playerCosmetics(session, session.mySymbol)['matchEffect']}',
+              session.phase == GamePhase.over ? 'finish' : 'entry',
+            ))
           Positioned.fill(
             child: IgnorePointer(
               child: _CosmeticEffectOverlay(
@@ -627,21 +632,9 @@ class _CosmeticEffectOverlayState extends State<_CosmeticEffectOverlay>
               angle: (t - .5) * .28,
               child: Transform.scale(
                 scale: widget.finish ? .9 + t * .65 : .3 + t * 1.9,
-                child: Container(
+                child: SizedBox(
                   width: 300,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: const [
-                      BoxShadow(color: Color(0x5538BDF8), blurRadius: 28),
-                      BoxShadow(color: Color(0x33FFD166), blurRadius: 18),
-                    ],
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Image.asset(
-                    'assets/shop/cosmetics/${widget.slug}.webp',
-                    fit: BoxFit.cover,
-                    filterQuality: FilterQuality.medium,
-                  ),
+                  child: MatchEffectVisual(slug: widget.slug, progress: t),
                 ),
               ),
             ),

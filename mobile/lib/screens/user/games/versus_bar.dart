@@ -208,10 +208,16 @@ class _Portrait extends StatelessWidget {
             Icon(Icons.smart_toy_rounded, size: 26, color: accent)
           else if (info?['profileImageUrl'] != null ||
               info?['profileAvatarKey'] != null)
-            AvatarImage(
-              imageUrl: info?['profileImageUrl'],
-              keyName: info?['profileAvatarKey'],
-              radius: (size - 8) / 2,
+            CosmeticAvatarFrame(
+              frame: info?['cosmetics'] is Map
+                  ? (info!['cosmetics'] as Map)['frame'] as String?
+                  : null,
+              padding: 2.2,
+              child: AvatarImage(
+                imageUrl: info?['profileImageUrl'],
+                keyName: info?['profileAvatarKey'],
+                radius: (size - 8) / 2,
+              ),
             )
           else
             Image.asset(

@@ -2,7 +2,7 @@
 import React, { useCallback, useState } from 'react';
 import { req, avatars, asset, avatarUrl, fa } from '../lib/api.js';
 import { useAsync } from '../lib/useAsync.js';
-import { clubImg, DisplayName, profileBackgroundStyle } from '../components/Cosmetics.jsx';
+import { clubImg, CosmeticAvatarFrame, DisplayName, profileBackgroundStyle } from '../components/Cosmetics.jsx';
 import Field from '../components/Field.jsx';
 
 export default function Profile({ token, p, load, setMsg }) {
@@ -72,8 +72,14 @@ export default function Profile({ token, p, load, setMsg }) {
         </section>
       )}
       <div style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'16px', padding:'16px' }}>
-        <h2 style={{ color:'#FFF', fontWeight:'900', margin:'0 0 4px' }}>پروفایل من</h2>
-        <div style={{ marginBottom:'7px' }}><DisplayName name={u.nickname || u.first_name || 'کاربر'} cosmetics={p.cosmetics} level={p.level?.level} showTitle /></div>
+        <div style={{ display:'flex', alignItems:'center', gap:'12px', marginBottom:'10px' }}>
+          <CosmeticAvatarFrame frame={p.cosmetics?.frame} style={{ width:62, height:62 }}>
+            <img src={avatarUrl(edit.profileAvatarKey)} alt="آواتار فعلی" style={{ width:'100%', height:'100%', borderRadius:'50%', objectFit:'cover', border:'2px solid #071522' }}/>
+          </CosmeticAvatarFrame>
+          <div><h2 style={{ color:'#FFF', fontWeight:'900', margin:'0 0 4px' }}>پروفایل من</h2>
+            <DisplayName name={u.nickname || u.first_name || 'کاربر'} cosmetics={p.cosmetics} level={p.level?.level} showTitle />
+          </div>
+        </div>
         <p style={{ color:'#94A3B8', fontSize:'11px', margin:'0 0 12px' }}>این اطلاعات فقط برای مدیر است. در چت فقط نام مستعار و عکس دیده می‌شود.</p>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:'10px' }}>
           <Field label="نام" value={edit.firstName} onChange={v=>setEdit({...edit, firstName:v})} />
