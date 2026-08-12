@@ -262,11 +262,17 @@ class _HoloCard extends StatelessWidget {
           ),
         ),
       );
+    final rarityView = RarityCardFrame(
+      rarity: '${card['rarity'] ?? card['duel_rarity'] ?? 'normal'}',
+      borderRadius: compact ? 20 : 24,
+      padding: 3,
+      child: cardView,
+    );
     return CosmeticCardFrame(
       frame: frame,
       borderRadius: compact ? 20 : 24,
       padding: frame == null ? 0 : 3,
-      child: cardView,
+      child: rarityView,
     );
   }
 }

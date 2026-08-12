@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../api_client.dart';
 import '../../../theme/tokens.dart';
+import '../../../widgets/rarity_card_frame.dart';
 import '../../../widgets/safe_image.dart';
 
 const _sideLabels = <String, String>{
@@ -31,12 +32,18 @@ class GroupedPhotoCardTile extends StatelessWidget {
     final theme = Theme.of(context);
     final sides = (card['sides'] as List? ?? const []).whereType<Map>().toList();
     final active = card['is_active'] == true;
+    final primary = sides.cast<Map?>().firstWhere(
+          (side) => side?['side'] == 'front',
+          orElse: () => sides.isEmpty ? null : sides.first,
+        );
+    final analysisComplete = card['analysis_complete'] == true;
     return Container(
-      margin: const EdgeInsets.only(bottom: Gaps.xs),
-      padding: const EdgeInsets.all(Gaps.xs),
+      margin: const EdgeInsets.only(bottom: Gaps.sm),
+      padding: const EdgeInsets.all(Gaps.sm),
       decoration: BoxDecoration(
-        borderRadius: Corners.rMd,
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        borderRadius: Corners.rLg,
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.34),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.45)),
       ),
       child: Opacity(
         opacity: active ? 1 : 0.55,
@@ -46,33 +53,69 @@ class GroupedPhotoCardTile extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 100),
-                  child: Wrap(
-                    spacing: Gaps.xxs,
-                    children: [
-                      for (var index = 0; index < sides.length; index++)
-                        _SidePreview(side: sides[index], index: index),
-                    ],
+                SizedBox(
+                  width: 100,
+                  height: 148,
+                  child: RarityCardFrame(
+                    rarity: card['duel_rarity'] as String?,
+                    borderRadius: 17,
+                    padding: 3,
+                    child: SafeImage(
+                      url: '${primary?['image_url'] ?? ''}',
+                      fit: BoxFit.cover,
+                      fallbackEmoji: '🃏',
+                    ),
                   ),
                 ),
-                const SizedBox(width: Gaps.sm),
+                Gaps.hSm,
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('${card['card_type_name'] ?? '—'}',
-                          style: theme.textTheme.titleSmall),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900)),
+                      Gaps.vXxs,
                       Text('${faNum(card['point_value'] ?? 0)} امتیاز · '
                           '${faNum(card['side_count'] ?? sides.length)} تصویر تشخیص',
-                          style: theme.textTheme.bodySmall),
+                          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary)),
                       Text('${faNum(card['redeemed_count'] ?? 0)} بار ثبت شده'
                           '${card['code_count'] == null ? '' : ' · ${faNum(card['code_count'])} کد'}',
                           style: theme.textTheme.labelSmall),
+                      Gaps.vXxs,
+                      Wrap(
+                        spacing: 4,
+                        runSpacing: 4,
+                        children: [
+                          _StatusChip(
+                            text: analysisComplete ? 'اثر انگشت کامل' : 'آنالیز ناقص',
+                            good: analysisComplete,
+                          ),
+                          _StatusChip(
+                            text: 'OCR: ${faNum(card['ocr_token_count'] ?? 0)} توکن',
+                            good: (card['ocr_token_count'] as num? ?? 0) > 0,
+                          ),
+                        ],
+                      ),
+                      Gaps.vXxs,
+                      CardDuelStatsMini(item: card),
                     ],
                   ),
                 ),
               ],
+            ),
+            Gaps.vSm,
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (var index = 0; index < sides.length; index++) ...[
+                    _SidePreview(side: sides[index], index: index),
+                    if (index + 1 < sides.length) Gaps.hXs,
+                  ],
+                ],
+              ),
             ),
             const SizedBox(height: Gaps.xs),
             Wrap(
@@ -103,6 +146,29 @@ class GroupedPhotoCardTile extends StatelessWidget {
   }
 }
 
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.text, required this.good});
+  final String text;
+  final bool good;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: (good ? Colors.greenAccent : Colors.orangeAccent).withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            color: good ? Colors.greenAccent : Colors.orangeAccent,
+            fontSize: 9,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      );
+}
+
 class _SidePreview extends StatelessWidget {
   const _SidePreview({required this.side, required this.index});
 
@@ -112,21 +178,35 @@ class _SidePreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final kind = side['side']?.toString() ?? 'alternate';
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        ClipRRect(
-          borderRadius: Corners.rSm,
-          child: SafeImage(
-            url: '${side['image_url'] ?? ''}',
-            width: 42,
-            height: 58,
-            fit: BoxFit.cover,
+    final complete = side['fingerprint_complete'] == true;
+    return Container(
+      width: 78,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        borderRadius: Corners.rSm,
+        color: Colors.black.withValues(alpha: 0.18),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ClipRRect(
+            borderRadius: Corners.rSm,
+            child: SafeImage(
+              url: '${side['image_url'] ?? ''}',
+              width: 68,
+              height: 88,
+              fit: BoxFit.cover,
+            ),
           ),
-        ),
-        Text(_sideLabels[kind] ?? 'تصویر ${faNum(index + 1)}',
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 9)),
-      ],
+          const SizedBox(height: 3),
+          Text(_sideLabels[kind] ?? 'تصویر ${faNum(index + 1)}',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 9.5)),
+          Text('${faNum(side['width'] ?? 0)}×${faNum(side['height'] ?? 0)}',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 8.5)),
+          Text(complete ? 'آنالیز کامل' : 'ناقص',
+              style: TextStyle(fontSize: 8.5, color: complete ? Colors.greenAccent : Colors.orangeAccent)),
+        ],
+      ),
     );
   }
 }

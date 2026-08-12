@@ -769,7 +769,9 @@ app.get('/api/profile', auth, asyncHandler(async (req, res) => {
   // ثبت، و اگر نبود تصویرِ پیش‌فرضِ نوعِ کارت. توضیح در مایگریشن ۰۴۴.
   const inv = await pool.query(
     `SELECT i.*, t.name, COALESCE(d.image_url, t.image_url) AS image_url,
-            t.point_value, t.cash_amount
+            t.point_value, t.cash_amount, t.description,
+            t.duel_attack, t.duel_defense, t.duel_speed, t.duel_technique,
+            t.duel_goal_chance, t.duel_energy, t.duel_rarity, t.duel_effect
        FROM user_card_inventory i
        JOIN card_types t ON t.id = i.card_type_id
        LEFT JOIN photo_card_designs d ON d.id = i.display_design_id
@@ -819,7 +821,9 @@ app.get('/api/bootstrap', auth, asyncHandler(async (req, res) => {
     // همچنان تصویرِ پیش‌فرضِ نوعِ کارت را بگیرد نه هیچ.
     pool.query(
       `SELECT i.*, t.name, COALESCE(d.image_url, t.image_url) AS image_url,
-              t.point_value, t.cash_amount
+              t.point_value, t.cash_amount, t.description,
+              t.duel_attack, t.duel_defense, t.duel_speed, t.duel_technique,
+              t.duel_goal_chance, t.duel_energy, t.duel_rarity, t.duel_effect
          FROM user_card_inventory i
          JOIN card_types t ON t.id = i.card_type_id
          LEFT JOIN photo_card_designs d ON d.id = i.display_design_id
@@ -1041,6 +1045,9 @@ app.get('/api/users/:id/public', auth, validateUuid('id'), asyncHandler(async (r
   const cards = await pool.query(
     `SELECT t.id AS card_type_id, t.name,
             COALESCE(d.image_url, t.image_url) AS image_url, t.point_value,
+            t.description, t.duel_attack, t.duel_defense, t.duel_speed,
+            t.duel_technique, t.duel_goal_chance, t.duel_energy,
+            t.duel_rarity, t.duel_effect,
             i.quantity::int AS registered_count,
             i.updated_at AS last_registered_at
        FROM user_card_inventory i

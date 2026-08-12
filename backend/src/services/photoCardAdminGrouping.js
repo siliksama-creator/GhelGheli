@@ -40,6 +40,8 @@ function groupAdminCards(rows) {
       height: row.height,
       is_active: Boolean(row.is_active),
       created_at: row.created_at,
+      text_token_count: Number(row.text_token_count || 0),
+      fingerprint_complete: Boolean(row.fingerprint_complete),
     });
     card.is_active = card.is_active && Boolean(row.is_active);
   }
@@ -48,6 +50,8 @@ function groupAdminCards(rows) {
     image_url: card.sides.find(side => side.side === 'front')?.image_url
       || card.sides[0]?.image_url || null,
     side_count: card.sides.length,
+    analysis_complete: card.sides.length > 0 && card.sides.every(side => side.fingerprint_complete),
+    ocr_token_count: card.sides.reduce((sum, side) => sum + side.text_token_count, 0),
   }));
 }
 

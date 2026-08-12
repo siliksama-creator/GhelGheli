@@ -153,7 +153,10 @@ module.exports = function createPhotoCardRoutes(deps) {
     // هر طرح که رابط کاربری هیچ استفاده‌ای از آن ندارد.
     const { rows } = await pool.query(
       `SELECT d.id, d.image_url, d.width, d.height, d.is_active, d.created_at,
-              d.side,
+              d.side, cardinality(COALESCE(d.text_tokens,'{}'::text[]))::int AS text_token_count,
+              (d.dhash IS NOT NULL AND d.phash IS NOT NULL AND d.color_sig IS NOT NULL
+               AND d.tex_sig IS NOT NULL AND d.luma_sig IS NOT NULL AND d.rgb_sig IS NOT NULL)
+                AS fingerprint_complete,
               t.id AS card_type_id, t.name AS card_type_name,
               t.is_active AS card_type_is_active,
               t.point_value, t.cash_amount,

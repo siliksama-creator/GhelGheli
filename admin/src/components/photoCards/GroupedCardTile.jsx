@@ -3,69 +3,58 @@ import { Pencil, Trash2 } from 'lucide-react';
 import { assetUrl, fmtNumber } from '../../lib/api.js';
 import { Button } from '../ui.jsx';
 
-const SIDE_LABELS = {
-  front: 'روی کارت',
-  back: 'پشت کارت',
-  alternate: 'نمای دیگر',
+const SIDE_LABELS = { front: 'روی کارت', back: 'پشت کارت', alternate: 'نمای دیگر' };
+const RARITY_LABELS = {
+  normal: 'معمولی', silver: 'نقره‌ای', gold: 'طلایی', premium: 'پرمیوم', legend: 'لجند',
 };
+const STAT_LABELS = [
+  ['duel_attack','حمله'],['duel_defense','دفاع'],['duel_speed','سرعت'],
+  ['duel_technique','تکنیک'],['duel_goal_chance','گل'],['duel_energy','انرژی'],
+];
 
 /** One administrative card, regardless of how many recognition images it has. */
 export function GroupedCardTile({ card, deleting = false, onEdit, onToggle, onDelete }) {
+  const rarity = RARITY_LABELS[card.duel_rarity] ? card.duel_rarity : 'normal';
+  const primary = card.sides?.find(side => side.side === 'front') || card.sides?.[0];
   return (
-    <article
-      className="card"
-      style={{
-        padding: 12,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 10,
-        opacity: card.is_active ? 1 : 0.6,
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'start', gap: 12 }}>
-        <div style={{ display: 'flex', gap: 6, flex: '0 0 auto' }}>
-          {(card.sides || []).map((side, index) => (
-            <figure key={side.id || index} style={{ margin: 0, textAlign: 'center' }}>
-              <img
-                src={assetUrl(side.image_url)}
-                alt={`${card.card_type_name || 'کارت'} — ${SIDE_LABELS[side.side] || SIDE_LABELS.alternate}`}
-                loading="lazy"
-                style={{ width: 48, height: 64, objectFit: 'cover', borderRadius: 6 }}
-              />
-              <figcaption style={{ color: '#94A3B8', fontSize: 9, marginTop: 2 }}>
-                {SIDE_LABELS[side.side] || `تصویر ${fmtNumber(index + 1)}`}
-              </figcaption>
-            </figure>
-          ))}
+    <article className="card adminCardShowcase" style={{ opacity: card.is_active ? 1 : 0.6 }}>
+      <div className="adminCardTop">
+        <div className={`adminRarityFrame rarity-${rarity}`}>
+          <span>{rarity === 'legend' ? '♛ ' : rarity === 'premium' ? '✦ ' : ''}{RARITY_LABELS[rarity]}</span>
+          {primary && <img src={assetUrl(primary.image_url)} alt={card.card_type_name || 'کارت'} loading="lazy" />}
+          <i aria-hidden="true" />
         </div>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <b style={{ display: 'block', fontSize: 14 }}>{card.card_type_name || 'نامشخص'}</b>
-          <div style={{ color: '#94A3B8', fontSize: 12 }}>
-            {fmtNumber(card.point_value || 0)} امتیاز · {fmtNumber(card.side_count || card.sides?.length || 0)} تصویر تشخیص
+        <div className="adminCardInfo">
+          <b>{card.card_type_name || 'نامشخص'}</b>
+          <p>{fmtNumber(card.point_value || 0)} امتیاز · {fmtNumber(card.side_count || card.sides?.length || 0)} تصویر تشخیص</p>
+          <small>{fmtNumber(card.redeemed_count || 0)} بار ثبت‌شده{card.code_count != null ? ` · ${fmtNumber(card.code_count)} کد` : ''}</small>
+          <div className="adminAnalysisState">
+            <strong className={card.analysis_complete ? 'ok' : 'bad'}>{card.analysis_complete ? '✓ اثرانگشت کامل' : '⚠ آنالیز ناقص'}</strong>
+            <span>OCR: {fmtNumber(card.ocr_token_count || 0)} توکن</span>
           </div>
-          <div style={{ color: '#64748B', fontSize: 11 }}>
-            {fmtNumber(card.redeemed_count || 0)} بار ثبت‌شده
-            {card.code_count != null ? ` · ${fmtNumber(card.code_count)} کد` : ''}
+          <div className="adminDuelStats">
+            {STAT_LABELS.map(([key,label]) => <span key={key}>{label}<b>{fmtNumber(card[key] ?? 0)}</b></span>)}
           </div>
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 'auto' }}>
-        <Button size="sm" icon={Pencil} onClick={() => onEdit(card)}>
-          ویرایش کارت و کدها
-        </Button>
-        <Button size="sm" variant="ghost" onClick={() => onToggle(card)}>
-          {card.is_active ? 'غیرفعال کردن کارت' : 'فعال کردن کارت'}
-        </Button>
-        <Button
-          size="sm"
-          variant="danger"
-          icon={Trash2}
-          loading={deleting}
-          onClick={() => onDelete(card)}
-        >
-          حذف کارت
-        </Button>
+      <div className="adminCardSides">
+        {(card.sides || []).map((side, index) => (
+          <figure key={side.id || index}>
+            <img src={assetUrl(side.image_url)} alt={`${card.card_type_name || 'کارت'} — ${SIDE_LABELS[side.side] || SIDE_LABELS.alternate}`} loading="lazy" />
+            <figcaption>
+              <b>{SIDE_LABELS[side.side] || `تصویر ${fmtNumber(index + 1)}`}</b>
+              <span>{fmtNumber(side.width)}×{fmtNumber(side.height)}</span>
+              <i className={side.fingerprint_complete ? 'ok' : 'bad'}>{side.fingerprint_complete ? 'آنالیز کامل' : 'ناقص'}</i>
+            </figcaption>
+          </figure>
+        ))}
+      </div>
+
+      <div className="adminCardActions">
+        <Button size="sm" icon={Pencil} onClick={() => onEdit(card)}>ویرایش کارت و کدها</Button>
+        <Button size="sm" variant="ghost" onClick={() => onToggle(card)}>{card.is_active ? 'غیرفعال کردن کارت' : 'فعال کردن کارت'}</Button>
+        <Button size="sm" variant="danger" icon={Trash2} loading={deleting} onClick={() => onDelete(card)}>حذف کارت</Button>
       </div>
     </article>
   );

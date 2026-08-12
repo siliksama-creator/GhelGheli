@@ -41,6 +41,7 @@ import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/cached_card_image.dart';
 import '../../widgets/state_views.dart';
+import '../../widgets/rarity_card_frame.dart';
 import '../shared/card_detail_sheet.dart';
 
 /// ترتیب‌های ممکن. پیش‌فرض `recent` است — توضیح بالا.
@@ -241,7 +242,7 @@ class _InventoryPageState extends State<InventoryPage> {
                 maxCrossAxisExtent: 200,
                 mainAxisSpacing: Gaps.sm,
                 crossAxisSpacing: Gaps.sm,
-                childAspectRatio: 0.66,
+                childAspectRatio: 0.57,
               ),
               delegate: SliverChildBuilderDelegate(
                 (_, i) => InventoryTile(item: shown[i]),
@@ -333,7 +334,9 @@ class InventoryTile extends StatelessWidget {
 
     return GestureDetector(
       onTap: () => showCardDetail(context, item),
-      child: Container(
+      child: RarityCardFrame(
+        rarity: item['duel_rarity'] as String?,
+        child: Container(
         decoration: BoxDecoration(
           borderRadius: Corners.rXl,
           gradient: const LinearGradient(
@@ -448,7 +451,10 @@ class InventoryTile extends StatelessWidget {
                     fontWeight: FontWeight.w700),
               ),
             ),
+            const SizedBox(height: 5),
+            CardDuelStatsMini(item: item),
           ],
+        ),
         ),
       ),
     );

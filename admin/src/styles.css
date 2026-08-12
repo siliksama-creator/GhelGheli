@@ -1528,3 +1528,69 @@ table.data-table {
   margin: 8px 0 12px; font-size: 12.5px; line-height: 1.9;
   color: var(--gg-text-muted, #9fb3c8);
 }
+
+/* ── کارت منطقی: قاب کمیابی، آمار و سلامت آنالایزر ─────────────── */
+@property --rarity-turn { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+.adminCardShowcase {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  background:
+    radial-gradient(circle at 100% 0, color-mix(in srgb, var(--gg-emerald) 12%, transparent), transparent 42%),
+    var(--gg-surface-alt);
+}
+.adminCardTop { display: grid; grid-template-columns: 118px minmax(0, 1fr); gap: 13px; align-items: start; }
+.adminRarityFrame {
+  --rarity-a: #22c55e;
+  --rarity-b: #334155;
+  position: relative;
+  isolation: isolate;
+  padding: 4px;
+  border-radius: 18px;
+  background: conic-gradient(from var(--rarity-turn, 0deg), var(--rarity-a), #071522, var(--rarity-b), var(--rarity-a));
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--rarity-a) 28%, transparent);
+  animation: adminRaritySpin 6s linear infinite;
+}
+.adminRarityFrame.rarity-silver { --rarity-a: #f8fafc; --rarity-b: #64748b; }
+.adminRarityFrame.rarity-gold { --rarity-a: #fff0a3; --rarity-b: #b77900; }
+.adminRarityFrame.rarity-premium { --rarity-a: #38bdf8; --rarity-b: #7c3aed; }
+.adminRarityFrame.rarity-legend { --rarity-a: #ffd166; --rarity-b: #ef4444; animation-duration: 2.7s; }
+.adminRarityFrame > img { width: 100%; aspect-ratio: 2 / 3; display: block; object-fit: cover; border-radius: 14px; background: #071522; }
+.adminRarityFrame > span {
+  position: absolute; z-index: 3; top: -8px; inset-inline-start: 7px;
+  padding: 2px 8px; border-radius: 999px; border: 1px solid #ffffff61;
+  color: #071522; font-size: 9px; font-weight: 950;
+  background: linear-gradient(135deg, var(--rarity-a), var(--rarity-b));
+  box-shadow: 0 4px 10px #0005;
+}
+.adminRarityFrame > i {
+  position: absolute; z-index: 2; inset: 4px; border-radius: 14px; pointer-events: none;
+  background: linear-gradient(112deg, transparent 28%, #fff8 45%, transparent 61%);
+  background-size: 220% 100%; mix-blend-mode: screen; animation: adminCardShine 3.1s ease-in-out infinite;
+}
+.adminCardInfo { min-width: 0; display: grid; gap: 5px; }
+.adminCardInfo > b { font-size: 15px; line-height: 1.55; }
+.adminCardInfo > p { margin: 0; color: var(--gg-emerald-ink); font-size: 12px; font-weight: 800; }
+.adminCardInfo > small { color: var(--gg-text-muted); font-size: 11px; }
+.adminAnalysisState { display: flex; flex-wrap: wrap; gap: 5px; }
+.adminAnalysisState > * { border-radius: 999px; padding: 2px 7px; background: var(--gg-surface-high); font-size: 9.5px; font-style: normal; }
+.adminAnalysisState .ok, .adminCardSides .ok { color: var(--gg-emerald-ink); }
+.adminAnalysisState .bad, .adminCardSides .bad { color: #e24949; }
+.adminDuelStats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+.adminDuelStats > span { padding: 3px 4px; border-radius: 7px; background: var(--gg-surface-high); text-align: center; color: var(--gg-text-muted); font-size: 9px; }
+.adminDuelStats b { display: block; color: var(--gg-text); font-size: 11px; }
+.adminCardSides { display: flex; gap: 7px; overflow-x: auto; padding: 3px 1px; }
+.adminCardSides figure { flex: 0 0 82px; margin: 0; padding: 4px; border-radius: 10px; background: var(--gg-surface-high); }
+.adminCardSides img { width: 100%; aspect-ratio: 2 / 3; display: block; object-fit: cover; border-radius: 7px; }
+.adminCardSides figcaption { display: grid; gap: 1px; margin-top: 4px; font-size: 9.5px; color: var(--gg-text-muted); }
+.adminCardSides figcaption b { color: var(--gg-text); font-size: 10px; }
+.adminCardSides figcaption i { font-style: normal; }
+.adminCardActions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding-top: 9px; border-top: 1px solid var(--gg-border-soft); }
+.adminCardActions > :first-child { grid-column: 1 / -1; }
+.adminCardActions .btn { width: 100%; min-height: 40px; justify-content: center; }
+@keyframes adminRaritySpin { to { --rarity-turn: 360deg; } }
+@keyframes adminCardShine { 0%, 25% { background-position: 180% 0; opacity: 0; } 45% { opacity: .8; } 65%, 100% { background-position: -90% 0; opacity: 0; } }
+@media (max-width: 410px) { .adminCardTop { grid-template-columns: 96px minmax(0, 1fr); } }
+@media (prefers-reduced-motion: reduce) { .adminRarityFrame, .adminRarityFrame > i { animation: none; } }

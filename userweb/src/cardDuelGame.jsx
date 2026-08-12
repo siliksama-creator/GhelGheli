@@ -3,6 +3,7 @@ import { asset, avatarUrl, fa, req } from './lib/api.js';
 import { useGameSession } from './gameSession.js';
 import { CosmeticAvatarFrame, CosmeticFrame, DisplayName, RESULT_PALETTES } from './components/Cosmetics.jsx';
 import CosmeticMatchEffect, { matchEffectSupports } from './components/MatchEffectVisual.jsx';
+import { CardRarityFrame } from './components/CardRarityFrame.jsx';
 
 const idOf = card => String(card?.cardTypeId || card?.id || '');
 const num = value => Number(value || 0);
@@ -57,9 +58,11 @@ function HoloCard({ card, selected, disabled, compact = false, onClick, frame })
       <MiniStat label="گل" value={card?.goalChance} />
     </div>}
   </button>;
+  const rarityView = <CardRarityFrame rarity={card?.rarity || card?.duel_rarity}
+    className={`duelRarityFrame${compact ? ' compact' : ''}`}>{cardView}</CardRarityFrame>;
   return frame
-    ? <CosmeticFrame cosmetics={{frame}} className={`duelEquippedFrame${compact?' compact':''}`}>{cardView}</CosmeticFrame>
-    : cardView;
+    ? <CosmeticFrame cosmetics={{frame}} className={`duelEquippedFrame${compact?' compact':''}`}>{rarityView}</CosmeticFrame>
+    : rarityView;
 }
 
 function Lineup({ selected, cards, toggle }) {

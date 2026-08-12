@@ -20,13 +20,21 @@ const rows = [
     id: 'front-design', card_type_id: 'card-a', card_type_name: 'Player A',
     side: 'front', image_url: '/front.webp', is_active: true,
     card_type_is_active: true, point_value: 100, redeemed_count: 2,
-    code_count: 20, unused_code_count: 18,
+    code_count: 20, unused_code_count: 18, width: 720, height: 1080,
+    text_token_count: 4, fingerprint_complete: true,
+    duel_attack: 91, duel_defense: 52, duel_speed: 94,
+    duel_technique: 90, duel_goal_chance: 93, duel_energy: 88,
+    duel_rarity: 'gold', duel_effect: 'finisher',
   },
   {
     id: 'back-design', card_type_id: 'card-a', card_type_name: 'Player A',
     side: 'back', image_url: '/back.webp', is_active: true,
     card_type_is_active: true, point_value: 100, redeemed_count: 3,
-    code_count: 20, unused_code_count: 18,
+    code_count: 20, unused_code_count: 18, width: 720, height: 1080,
+    text_token_count: 2, fingerprint_complete: true,
+    duel_attack: 91, duel_defense: 52, duel_speed: 94,
+    duel_technique: 90, duel_goal_chance: 93, duel_energy: 88,
+    duel_rarity: 'gold', duel_effect: 'finisher',
   },
   {
     id: 'other-front', card_type_id: 'card-b', card_type_name: 'Player B',
@@ -42,8 +50,16 @@ check(cardA.sides.map(side => side.side).join(',') === 'front,back', 'side ident
 check(cardA.image_url === '/front.webp', 'front is the administrative primary image');
 check(cardA.redeemed_count === 5, 'registration counts are summed once on the grouped card');
 check(cardA.code_count === 20, 'codes belong to the grouped card type, not an image side');
+check(cardA.analysis_complete === true && cardA.ocr_token_count === 6,
+  'grouped analyzer health requires every fingerprint and sums OCR tokens');
+check(cardA.sides[0].width === 720 && cardA.sides[0].height === 1080,
+  'dimensions remain visible on each recognition side');
+check(cardA.duel_rarity === 'gold' && cardA.duel_attack === 91,
+  'rarity and player-specific duel stats remain on the logical card');
 check(cards.find(card => card.card_type_id === 'card-b').is_active === false,
   'a grouped card never reports active while one of its sides is inactive');
+check(cards.find(card => card.card_type_id === 'card-b').analysis_complete === false,
+  'missing visual signatures are never reported as complete analysis');
 
 const migration = read('backend/migrations/049_photo_card_sides.sql');
 check(/side IN \('front', 'back', 'alternate'\)/.test(migration), 'migration constrains side metadata');

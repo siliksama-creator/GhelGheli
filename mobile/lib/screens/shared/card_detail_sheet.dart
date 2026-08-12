@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../api_client.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/cached_card_image.dart';
+import '../../widgets/rarity_card_frame.dart';
 
 Future<void> showCardDetail(BuildContext context, Map<String, dynamic> item) {
   return showDialog(
@@ -57,7 +58,10 @@ class _CardDetailDialog extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Flexible(
-                    child: ClipRRect(
+                    child: RarityCardFrame(
+                      rarity: item['duel_rarity'] as String?,
+                      borderRadius: 22,
+                      child: ClipRRect(
                       borderRadius: Corners.rLg,
                       child: Container(
                         color: Colors.black.withValues(alpha: 0.25),
@@ -84,6 +88,7 @@ class _CardDetailDialog extends StatelessWidget {
                                 ),
                               ),
                       ),
+                    ),
                     ),
                   ),
                   Gaps.vSm,
@@ -114,6 +119,8 @@ class _CardDetailDialog extends StatelessWidget {
                             ),
                           ],
                         ),
+                        Gaps.vXs,
+                        CardDuelStatsMini(item: item),
                         if ((item['description'] ?? '').toString().isNotEmpty) ...[
                           Gaps.vXs,
                           Text(

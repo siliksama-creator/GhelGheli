@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { asset, avatarUrl, fa } from '../lib/api.js';
+import { CardRarityFrame } from '../components/CardRarityFrame.jsx';
 
 const asInt = v => Number.parseInt(v || 0, 10) || 0;
 const dateOf = m => new Date(m.updated_at || m.created_at || 0).getTime();
@@ -14,14 +15,26 @@ function stats(items) {
   }, { kinds: items.length, total: 0, points: 0 });
 }
 
+function DuelStats({ item }) {
+  const values = [
+    ['حمله',item.duel_attack],['دفاع',item.duel_defense],['سرعت',item.duel_speed],
+    ['تکنیک',item.duel_technique],['گل',item.duel_goal_chance],['انرژی',item.duel_energy],
+  ];
+  return <div className="cardDuelStatsMini">{values.map(([label,value])=><span key={label}>{label}<b>{fa(value || 0)}</b></span>)}</div>;
+}
+
 function CardDetail({ item, close }) {
   return (
     <div className="invModalShade" onClick={close}>
       <section className="invModal card" onClick={e => e.stopPropagation()}>
         <button className="ghost invModalClose" onClick={close}>×</button>
-        <img src={item.image_url ? asset(item.image_url) : avatarUrl('avatar_1_football.png')}
-          alt={item.name || 'کارت'} />
+        <CardRarityFrame rarity={item.duel_rarity}>
+          <img src={item.image_url ? asset(item.image_url) : avatarUrl('avatar_1_football.png')}
+            alt={item.name || 'کارت'} />
+        </CardRarityFrame>
         <h2>{item.name || 'کارت'}</h2>
+        <DuelStats item={item}/>
+        {item.description && <p className="hint">{item.description}</p>}
         <div className="invDetailStats">
           <span>تعداد <b>{fa(item.quantity)}</b></span>
           <span>ارزش هر کارت <b>{fa(item.point_value)}</b></span>
@@ -73,14 +86,17 @@ export default function Inventory({ items = [], reload }) {
       ) : (
         <div className="inventoryGrid">
           {shown.map(item => <button className="inventoryTile" key={item.id} onClick={() => setOpen(item)}>
-            <div className="invArt">
-              <img src={item.image_url ? asset(item.image_url) : avatarUrl('avatar_1_football.png')}
-                alt={item.name || 'کارت'} loading="lazy" decoding="async" />
-              {fresh(item) && <i className="invNew">جدید</i>}
-              {asInt(item.quantity) > 1 && <i className="invQty">×{fa(item.quantity)}</i>}
-            </div>
+            <CardRarityFrame rarity={item.duel_rarity}>
+              <div className="invArt">
+                <img src={item.image_url ? asset(item.image_url) : avatarUrl('avatar_1_football.png')}
+                  alt={item.name || 'کارت'} loading="lazy" decoding="async" />
+                {fresh(item) && <i className="invNew">جدید</i>}
+                {asInt(item.quantity) > 1 && <i className="invQty">×{fa(item.quantity)}</i>}
+              </div>
+            </CardRarityFrame>
             <b>{item.name}</b>
             <span>{fa(item.point_value)} امتیاز</span>
+            <DuelStats item={item}/>
           </button>)}
         </div>
       )}

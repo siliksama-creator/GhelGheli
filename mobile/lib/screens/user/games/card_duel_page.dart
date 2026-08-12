@@ -18,6 +18,7 @@ import '../../../theme/tokens.dart';
 import '../../../widgets/app_card.dart';
 import '../../../widgets/avatar_image.dart';
 import '../../../widgets/match_effect_visual.dart';
+import '../../../widgets/rarity_card_frame.dart';
 import '../../../widgets/safe_image.dart';
 import 'game_session.dart';
 
