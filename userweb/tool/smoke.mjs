@@ -108,11 +108,25 @@ try {
     ok(pageErrors.length === 0, 'club: games hub has no runtime error');
 
     // Standalone games must be real routed screens, not the old placeholders.
+    // ــ چرا اول «تمرین با ربات» انتخاب می‌شود ــ
+    // حالتِ پیش‌فرضِ هاب «۱۰۰ امتیاز» است و `games.jsx` پیش از باز کردنِ
+    // بازی موجودیِ امتیاز را چک می‌کند؛ اگر کاربر کم بیاورد یک alert()
+    // می‌دهد و کلیک را رد می‌کند. Playwright به‌طور خودکار alert را
+    // می‌بندد، پس کلیک بی‌صدا بی‌اثر می‌شد و تست شکست می‌خورد بدون آنکه
+    // خطایی دیده شود — یعنی تست به موجودیِ امتیازِ حسابِ آزمایشی وابسته
+    // بود، نه به سلامتِ خودِ صفحه. این گاردِ سمتِ سرور/کلاینت درست است و
+    // نباید ضعیف شود؛ در عوض تست حالتِ رایگانِ «تمرین با ربات» را
+    // برمی‌گزیند تا مستقل از امتیاز، همیشه همان صفحه‌ی بازی را باز کند.
     pageErrors.length = 0;
+    await page.locator('button', { hasText: 'تمرین با ربات' }).first().click();
+    await page.waitForTimeout(500);
     await page.locator('.card', { hasText: 'دوئل کارت‌ها' }).last().click();
     await page.waitForTimeout(1200);
     const duelText = await page.innerText('body');
-    ok(duelText.includes('دوئل کارت‌ها') && duelText.includes('سه راند'),
+    // «سه راند» به «پنج راند» تغییر کرد (بازطراحیِ دوئل، کامیتِ 4f67a5e).
+    // به‌جای عددِ ثابت، به تیترِ صفحه و واژهٔ «راند» تکیه می‌کنیم تا تست با
+    // هر تغییرِ بعدیِ تعدادِ راندها بی‌دلیل قرمز نشود.
+    ok(duelText.includes('دوئل کارت‌ها') && duelText.includes('راند'),
       'card duel full screen renders');
     ok(pageErrors.length === 0, 'card duel has no runtime error');
     await page.getByRole('button', { name: /بازگشت/ }).first().click();

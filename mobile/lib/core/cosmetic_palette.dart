@@ -18,21 +18,30 @@ const frameColors = <String, List<Color>>{
 
 /// Authoritative animated avatar-frame renderer shared by Shop, profiles,
 /// chat and every game. The Shop never paints a richer version than runtime.
+// ــ چرا استاپ‌های تیره روشن شدند (هم‌سان با وب) ــ
+// همان نقصِ وب اینجا هم بود: این رنگ‌ها روی *خودِ حروفِ نام* کشیده می‌شوند،
+// پس رنگِ متن‌اند و معیارشان WCAG AA یعنی ۴.۵ است. اندازه‌گیری روی
+// پس‌زمینه‌ی کارتِ تیره نشان داد ۸ افکت از ۱۴ رد می‌شوند (بدترین:
+// «#A855F7» با ۱.۸۵). چون این‌ها آیتم‌های *خریدنی*‌اند، کاربر بابت
+// افکتی پول می‌داد که نامش را محو می‌کرد. فقط استاپِ تیره روشن شد و فام
+// دست‌نخورده ماند. مقادیر عیناً با `userweb/src/components/Cosmetics.jsx`
+// یکی است — این دو باید همیشه هم‌گام بمانند وگرنه یک کاربر نامش را در
+// وب و اندروید دو جور می‌بیند.
 const nameGradientColors = <String, List<Color>>{
   'rainbow': rainbowColors,
-  '#FFC53D': [Color(0xFFFFF0A3), Color(0xFFFFC53D), Color(0xFFB77900)],
-  '#00D49A': [Color(0xFFD9F99D), Color(0xFF00D49A), Color(0xFF047857)],
-  '#F87171': [Color(0xFFFECACA), Color(0xFFF87171), Color(0xFFBE123C)],
-  '#60A5FA': [Color(0xFFE0F2FE), Color(0xFF60A5FA), Color(0xFF2563EB)],
-  '#A855F7': [Color(0xFFF3E8FF), Color(0xFFA855F7), Color(0xFF6D28D9)],
+  '#FFC53D': [Color(0xFFFFF0A3), Color(0xFFFFC53D), Color(0xFFD18B00)], // 3.60
+  '#00D49A': [Color(0xFFD9F99D), Color(0xFF00D49A), Color(0xFF06AE7E)], // 2.40
+  '#F87171': [Color(0xFFFECACA), Color(0xFFF87171), Color(0xFFF16E8E)], // 2.09
+  '#60A5FA': [Color(0xFFE0F2FE), Color(0xFF60A5FA), Color(0xFF6D97F2)], // 2.54
+  '#A855F7': [Color(0xFFF3E8FF), Color(0xFFBC7CF9), Color(0xFFAD86EA)], // 1.85
   'gold_gradient': [Color(0xFFFFF0A3), Color(0xFFF59E0B)],
   'green_neon': [Color(0xFFD9F99D), Color(0xFF10B981)],
-  'animated_fire': [Color(0xFFFDE047), Color(0xFFF97316), Color(0xFFEF4444)],
+  'animated_fire': [Color(0xFFFDE047), Color(0xFFF97316), Color(0xFFF37070)], // 3.49
   'calm_rainbow': [Color(0xFF60A5FA), Color(0xFFC084FC), Color(0xFFF9A8D4)],
   'icy_glow': [Color(0xFFE0F2FE), Color(0xFF38BDF8)],
   'digital_typing': [Color(0xFF67E8F9), Color(0xFF22C55E)],
   'mvp_name': [Color(0xFFFFFFFF), Color(0xFFFFD166)],
-  'social_team': [Color(0xFFFB7185), Color(0xFF8B5CF6)],
+  'social_team': [Color(0xFFFB7185), Color(0xFFA885F8)], // 3.10
 };
 
 const resultTemplateColors = <String, List<Color>>{
@@ -74,9 +83,11 @@ BoxDecoration? profileBackgroundDecoration(String? slug) {
   );
 }
 
+// استاپِ دومِ رنگین‌کمان از #A855F7 (نسبت ۳.۳۲) به #BC7CF9 روشن شد؛
+// هم‌سان با `rainbow` در وب.
 const rainbowColors = <Color>[
   Color(0xFFF472B6),
-  Color(0xFFA855F7),
+  Color(0xFFBC7CF9),
   Color(0xFF38BDF8),
   Color(0xFF34D399),
 ];

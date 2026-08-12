@@ -78,7 +78,14 @@ const audit = () => page.evaluate(([maxW, minPx]) => {
     // Icon-only leaves (ellipsis/emoji) intentionally use an emoji fallback;
     // only actual letters or digits must render in Vazirmatn.
     const hasLanguageGlyph = /[\p{L}\p{N}]/u.test((el.textContent || '').trim());
-    if (hasLanguageGlyph && !/Vazirmatn/.test(cs.fontFamily)) {
+    // `<code>` is deliberately monospaced. In `.pcCodeHint` the whole point is
+    // to show that `0`/`O` and `1`/`I`/`L` look alike — a proportional Persian
+    // face would defeat the lesson the hint is teaching. Latin card codes in a
+    // fixed-width box are correct typography, not a regression, so an explicit
+    // monospace <code> is exempt rather than a standing false failure.
+    const isIntentionalMono = el.tagName === 'CODE'
+      && /mono/i.test(cs.fontFamily);
+    if (hasLanguageGlyph && !isIntentionalMono && !/Vazirmatn/.test(cs.fontFamily)) {
       bad.notVazir.push(`${label(el)}→${cs.fontFamily.split(',')[0]}`);
     }
     if (parseInt(cs.fontWeight, 10) > maxW) bad.synthBold.push(`${label(el)}:${cs.fontWeight}`);

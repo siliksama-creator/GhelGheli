@@ -32,10 +32,12 @@
 """
 import asyncio
 import json
+import re
 import sys
 from pathlib import Path
 
 from playwright.async_api import async_playwright
+from playwright.async_api import TimeoutError as PWTimeout
 
 OUT = Path('/home/user/shots2')
 OUT.mkdir(exist_ok=True)
@@ -84,51 +86,84 @@ CONTRAST_JS = r"""
     const p = m[1].split(',').map(x => parseFloat(x));
     return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 };
   };
-  // ── پس‌زمینهٔ مؤثر ──
-  //
-  // اولین والدی که پس‌زمینهٔ مات دارد. نکتهٔ مهم: `backgroundColor` روی
-  // عنصری که گرادیان دارد `transparent` است. نسخهٔ اولِ این تابع در آن
-  // حالت به والد می‌رفت و مثلاً دکمهٔ `.main` (گرادیانِ سبزِ روشن با
-  // متنِ تیره) را «متنِ تیره روی پس‌زمینهٔ تیره ۱:۱» گزارش می‌کرد —
-  // مثبتِ کاذبِ محض. حالا اولین رنگِ گرادیان را برمی‌داریم.
-  // ⚠️ نسخهٔ دوم: **همهٔ** رنگ‌های گرادیان بررسی می‌شوند، نه فقط اولی.
-  //
-  // نسخهٔ قبلی اولین توقفِ مات را برمی‌داشت و تمام. برای گرادیانِ
-  // `.invCard` (طلایی → سرمهٔ تیره → زمردی) یعنی همیشه «طلاییِ روشن»
-  // را پس‌زمینه فرض می‌کرد، در حالی که متنِ کارت پایینِ کارت و روی
-  // بخشِ **سرمه‌ای** می‌نشیند.
-  //
-  // نتیجه هر دو نوع خطا بود:
-  //   • مثبتِ کاذب — «سفید روی طلایی ۱.۴۲» گزارش می‌شد در حالی که
-  //     نمونه‌برداریِ واقعی از پیکسل نشان داد پشتِ متن سرمه‌ای است.
-  //   • منفیِ کاذب — اگر ترتیبِ توقف‌ها برعکس بود، یک متنِ واقعاً
-  //     ناخوانا اصلاً گزارش نمی‌شد.
-  //
-  // چون نمی‌دانیم متن دقیقاً روی کدام نقطهٔ گرادیان می‌افتد، بدترین
-  // حالت را برمی‌گردانیم: رنگی که کمترین کنتراست را با متن می‌دهد.
-  // این محافظه‌کارانه است — ممکن است گاهی سخت‌گیر باشد، ولی هرگز یک
-  // متنِ ناخوانا را از قلم نمی‌اندازد. برای ابزارِ ممیزی این جهتِ
-  // درستِ خطاست.
+  // رنگ‌های توقفِ یک گرادیان (اگر عنصر گرادیان داشته باشد).
   const gradColors = el => {
     const bi = getComputedStyle(el).backgroundImage || '';
     if (!bi.includes('gradient')) return null;
     const m = bi.match(/rgba?\([^)]+\)/g);
     if (!m) return null;
-    const cs = m.map(parse).filter(c => c && c.a > 0.5);
+    const cs = m.map(parse).filter(c => c && c.a > 0.02);
     return cs.length ? cs : null;
   };
-  // همهٔ پس‌زمینه‌های ممکن پشتِ این عنصر (برای گرادیان چند رنگ).
-  const bgCandidates = el => {
-    let n = el;
+  // ── پس‌زمینهٔ مؤثر (نسخهٔ سوم — با ترکیبِ واقعیِ آلفا) ──
+  //
+  // ⛔ باگِ نسخهٔ دوم که این نسخه درستش می‌کند:
+  // نسخهٔ دوم آلفا را فقط برای *متن* ترکیب می‌کرد و برای *پس‌زمینه*
+  // مقدارِ خامِ RGB را برمی‌داشت. یعنی اولین والدی که `a > 0.15` داشت
+  // را «پس‌زمینهٔ نهایی» فرض می‌کرد و آلفایش را دور می‌ریخت.
+  //
+  // نتیجه روی خودِ محصول (اندازه‌گیریِ واقعیِ پیکسل، ۱۴۰۴):
+  //   «ثبت سریع» → background: rgba(245,158,11,0.16) روی کارتِ سرمه‌ای.
+  //     ابزار می‌گفت متنِ #F59E0B روی پس‌زمینهٔ rgb(245,158,11) → ۱.۰۰
+  //     پیکسلِ واقعیِ رندرشده: rgb(57,61,58) → کنتراستِ حقیقی ۵.۱۴ ✅
+  //   «روز ۱» → rgba(255,209,102,.18): ادعای ۱.۰۰ / واقعیت ۷.۶۷ ✅
+  //   «مشاهده ›» → rgba(255,211,107,.18): ادعای ۱.۰۰ / واقعیت ۱۱.۷۹ ✅
+  //
+  // یعنی هر «چیپِ شفافِ هم‌رنگِ متن» — که الگوی رایجِ کلِ این UI است —
+  // ۱۰۰٪ کاذب گزارش می‌شد. ابزاری که همیشه دروغ می‌گوید بدتر از نداشتنِ
+  // ابزار است، چون آدم را دنبالِ رفعِ باگی می‌فرستد که وجود ندارد.
+  //
+  // راهِ درست: کلِ پشتهٔ لایه‌ها را از عنصر تا اولین لایهٔ کاملاً مات
+  // جمع کن و از پایین به بالا با فرمولِ `over` ترکیب کن.
+  const over = (top, bottom) => ({
+    r: top.r * top.a + bottom.r * (1 - top.a),
+    g: top.g * top.a + bottom.g * (1 - top.a),
+    b: top.b * top.a + bottom.b * (1 - top.a),
+    a: 1,
+  });
+  // `skipSelf`: وقتی متن گرادیانی است (`background-clip:text`) گرادیانِ
+  // خودِ عنصر فقط داخلِ حروف رنگ می‌شود و **پس‌زمینه نیست**؛ اگر آن را
+  // به‌عنوان پس‌زمینه حساب کنیم، رنگِ متن و پس‌زمینه یکی می‌شوند و
+  // ابزار همیشه «۱.۰۰» می‌دهد — دقیقاً همان مثبتِ کاذبی که داشتیم.
+  const bgCandidates = (el, skipSelf) => {
+    // ۱) پشتهٔ لایه‌ها را از خودِ عنصر رو به بالا جمع کن.
+    const stack = [];
+    let n = skipSelf ? el.parentElement : el;
     while (n && n !== document.documentElement) {
+      const cs = getComputedStyle(n);
       const g = gradColors(n);
-      if (g) return g;
-      const c = parse(getComputedStyle(n).backgroundColor);
-      if (c && c.a > 0.15) return [c];
+      if (g) stack.push(g);
+      else {
+        const c = parse(cs.backgroundColor);
+        if (c && c.a > 0.001) stack.push([c]);
+      }
+      // به اولین لایهٔ کاملاً مات که رسیدیم، پایین‌تر دیده نمی‌شود.
+      const last = stack[stack.length - 1];
+      if (last && last.every(c => c.a >= 0.999)) break;
       n = n.parentElement;
     }
-    const c = parse(getComputedStyle(document.body).backgroundColor);
-    return [c && c.a > 0.15 ? c : { r: 255, g: 255, b: 255, a: 1 }];
+    // ۲) کفِ پشته: اگر هیچ لایهٔ ماتی نبود، پس‌زمینهٔ body/صفحه.
+    const bodyC = parse(getComputedStyle(document.body).backgroundColor);
+    const htmlC = parse(getComputedStyle(document.documentElement).backgroundColor);
+    let base = { r: 255, g: 255, b: 255, a: 1 };
+    if (htmlC && htmlC.a >= 0.999) base = htmlC;
+    if (bodyC && bodyC.a >= 0.999) base = bodyC;
+    const bottom = stack[stack.length - 1];
+    if (!bottom || !bottom.every(c => c.a >= 0.999)) stack.push([base]);
+
+    // ۳) از پایین به بالا ترکیب کن. برای گرادیان‌ها بدترین حالت را
+    //    نگه می‌داریم، ولی برای جلوگیری از انفجارِ ترکیب‌ها در هر
+    //    مرحله فقط روشن‌ترین و تیره‌ترین نماینده را حفظ می‌کنیم
+    //    (کنتراست نسبت به روشنایی یکنواخت است، پس این کافی است).
+    let acc = [stack[stack.length - 1][0]];
+    for (let i = stack.length - 1; i >= 0; i--) {
+      const layer = stack[i];
+      const next = [];
+      for (const b of acc) for (const t of layer) next.push(over(t, b));
+      next.sort((x, y) => lum(x.r, x.g, x.b) - lum(y.r, y.g, y.b));
+      acc = next.length > 2 ? [next[0], next[next.length - 1]] : next;
+    }
+    return acc.length ? acc : [base];
   };
   const out = [];
   for (const el of document.querySelectorAll('body *')) {
@@ -143,17 +178,40 @@ CONTRAST_JS = r"""
     const rect = el.getBoundingClientRect();
     if (rect.width < 4 || rect.height < 4) continue;
     if (parseFloat(cs.opacity) < 0.25) continue;
-    const fg = parse(cs.color);
-    if (!fg || fg.a < 0.25) continue;
+    // ── متنِ گرادیانی (background-clip:text) ──
+    //
+    // ⛔ باگ: برای این متن‌ها `color` بی‌معناست چون
+    // `-webkit-text-fill-color: transparent` است و رنگِ واقعیِ حروف از
+    // گرادیانِ خودِ عنصر می‌آید. ابزار «سفید روی صورتی ۲.۶۹» گزارش
+    // می‌کرد؛ اندازه‌گیریِ پیکسل نشان داد نه متن سفید است نه پس‌زمینه
+    // صورتی. رنگِ حروف = توقف‌های گرادیان، پس‌زمینه = کارتِ پشتِ آن.
+    const fill = parse(cs.webkitTextFillColor || cs.color);
+    const clipsText = (cs.webkitBackgroundClip || cs.backgroundClip) === 'text';
+    let fgList;
+    if (clipsText && (!fill || fill.a < 0.1)) {
+      const stops = gradColors(el);
+      if (!stops) continue;
+      fgList = stops;
+    } else {
+      const f0 = parse(cs.color);
+      if (!f0 || f0.a < 0.25) continue;
+      fgList = [f0];
+    }
+    // ایموجی‌ها گلیفِ رنگیِ خودشان را دارند و از `color` پیروی نمی‌کنند؛
+    // سنجشِ کنتراستِ «مشکیِ ایموجی» بی‌معنی و همیشه کاذب است.
+    if (/^[\p{Extended_Pictographic}\s\u200d\ufe0f]+$/u.test(own)) continue;
+    const fg = fgList[0];
     // بدترین (کم‌کنتراست‌ترین) رنگِ پس‌زمینهٔ ممکن را می‌گیریم.
-    const cands = bgCandidates(el);
-    let bg = cands[0], ratio = Infinity;
+    const cands = bgCandidates(el, clipsText);
+    let bg = cands[0], ratio = Infinity, worstFg = fg;
     for (const cand of cands) {
-      const mixC = k => fg[k] * fg.a + cand[k] * (1 - fg.a);
-      const l1 = lum(mixC('r'), mixC('g'), mixC('b'));
-      const l2 = lum(cand.r, cand.g, cand.b);
-      const rr = (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
-      if (rr < ratio) { ratio = rr; bg = cand; }
+      for (const f of fgList) {
+        const mixC = k => f[k] * f.a + cand[k] * (1 - f.a);
+        const l1 = lum(mixC('r'), mixC('g'), mixC('b'));
+        const l2 = lum(cand.r, cand.g, cand.b);
+        const rr = (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+        if (rr < ratio) { ratio = rr; bg = cand; worstFg = f; }
+      }
     }
     const px = parseFloat(cs.fontSize);
     const bold = parseInt(cs.fontWeight, 10) >= 700;
@@ -162,7 +220,8 @@ CONTRAST_JS = r"""
     if (ratio < need) {
       out.push({
         text: own.slice(0, 42), ratio: +ratio.toFixed(2), need,
-        color: cs.color, bg: `rgb(${bg.r},${bg.g},${bg.b})`,
+        color: `rgb(${Math.round(worstFg.r)},${Math.round(worstFg.g)},${Math.round(worstFg.b)})`,
+        bg: `rgb(${Math.round(bg.r)},${Math.round(bg.g)},${Math.round(bg.b)})`,
         size: px, cls: (el.className || '').toString().slice(0, 40),
         tag: el.tagName.toLowerCase(),
       });
@@ -185,17 +244,46 @@ OVERFLOW_JS = r"""
 () => {
   const w = document.documentElement.clientWidth;
   const bad = [];
+  // ⛔ باگِ نسخهٔ قبلی: هر عنصری که از عرضِ صفحه بیرون می‌زد گزارش
+  // می‌شد، حتی اگر یکی از والدهایش `overflow:hidden` داشت و آن را
+  // می‌بُرید. یعنی «سرریز» اعلام می‌کرد جایی که کاربر هیچ اسکرولِ
+  // افقی‌ای نمی‌بیند.
+  //
+  // نمونهٔ واقعی: `.streakAura one/two` — دو گویِ تزئینیِ بلور(blur)
+  // که عمداً بیرونِ کارت گذاشته شده‌اند تا لبه را نورانی کنند، و
+  // `.streakCard{overflow:hidden}` دقیقاً برای همین آن‌ها را می‌بُرد.
+  // اندازه‌گیریِ واقعی: documentElement.scrollWidth == clientWidth == 412
+  // یعنی هیچ سرریزی وجود ندارد. ابزار ۲ باگِ خیالی می‌ساخت.
+  //
+  // معیارِ درست و ساده: اول ببین اصلاً صفحه اسکرولِ افقی دارد یا نه.
+  // اگر ندارد، هیچ سرریزی واقعی نیست.
+  const realOverflow = document.documentElement.scrollWidth > w + 1;
+  const clippedByAncestor = el => {
+    let p = el.parentElement;
+    while (p && p !== document.documentElement) {
+      const cs = getComputedStyle(p);
+      if (cs.overflow !== 'visible' || cs.overflowX !== 'visible'
+          || cs.overflowY !== 'visible') return true;
+      p = p.parentElement;
+    }
+    return false;
+  };
   for (const el of document.querySelectorAll('body *')) {
     const r = el.getBoundingClientRect();
-    if (r.width === 0) continue;
+    if (r.width === 0 || r.height === 0) continue;
     if (r.right > w + 2 || r.left < -2) {
       const cs = getComputedStyle(el);
       if (cs.position === 'fixed' || cs.overflowX === 'auto'
           || cs.overflowX === 'scroll') continue;
+      // عناصرِ تزئینیِ صرفاً بصری (aria-hidden، بدونِ متن) که والدشان
+      // آن‌ها را می‌بُرد، برای کاربر نامرئی‌اند.
+      if (clippedByAncestor(el)) continue;
+      if (!realOverflow) continue;
       bad.push({ tag: el.tagName.toLowerCase(),
                  cls: (el.className || '').toString().slice(0, 40),
+                 text: (el.textContent || '').trim().slice(0, 24),
                  left: Math.round(r.left), right: Math.round(r.right),
-                 vw: w });
+                 vw: w, scrollW: document.documentElement.scrollWidth });
     }
   }
   return bad.slice(0, 6);
@@ -252,6 +340,23 @@ async def goto_tab(page, tab_id, label, where):
         return f'دکمهٔ «{label}» در {sel} پیدا نشد'
 
     await page.wait_for_timeout(2000)
+
+    # ── چرا اینجا «رسیدن» را جداگانه تأیید می‌کنیم ──
+    # کلیک‌شدن دلیلِ رسیدن نیست. قبلاً این تابع بعد از کلیکِ موفق
+    # `None` برمی‌گرداند و ممیزی ادامه می‌داد؛ اگر ناوبری بی‌اثر می‌ماند
+    # (مثلاً چون شیت باز نشده بود) همان تبِ قبلی دوباره سنجیده می‌شد و
+    # نتیجه به‌نامِ تبِ جدید ثبت می‌گشت. این‌گونه یک «دکمهٔ باشگاه» گزارش
+    # شد که اصلاً وجود نداشت. حالا از `data-tab` روی `main.tabPane` که
+    # مستقیماً از استیتِ ناوبری می‌آید تأیید می‌گیریم — نه از حدسِ متنی.
+    try:
+        await page.wait_for_selector(f'main.tabPane[data-tab="{tab_id}"]',
+                                     timeout=6000)
+    except PWTimeout:
+        got = await page.evaluate(
+            "()=>document.querySelector('main.tabPane')"
+            "?.getAttribute('data-tab') || '—'")
+        return (f'ناوبری به «{label}» بی‌اثر بود — '
+                f'انتظار tab={tab_id} ولی صفحه روی tab={got} ماند')
     return None
 
 
@@ -262,13 +367,28 @@ async def run(base, mobile, password):
         ctx = await b.new_context(viewport={'width': 412, 'height': 900},
                                   locale='fa-IR')
         page = await ctx.new_page()
+
+        # ── چرا درخواست‌های API رله می‌شوند ──
+        # پیش‌نمایشِ محلی روی localhost اجرا می‌شود و allow-list درستِ
+        # CORS در سرور آن را رد می‌کند. این رفتارِ سرور صحیح است و نباید
+        # برای راحتیِ تست ضعیف شود، پس به‌جای دست‌زدن به محصول،
+        # Playwright همان درخواست‌ها را از سمتِ Node عبور می‌دهد.
+        # (همان کاری که `userweb/tool/smoke.mjs` می‌کند.)
+        if re.match(r'^https?://(localhost|127\.0\.0\.1)(:|/)', base):
+            async def _relay(route):
+                try:
+                    await route.fulfill(response=await route.fetch())
+                except Exception:
+                    await route.abort()
+            await page.route('https://api.ghelghelishop.ir/**', _relay)
+
         col = Collector(page)
 
         await page.goto(base, wait_until='networkidle', timeout=40000)
         await page.fill('input[type="tel"], input[placeholder*="موبایل"]', mobile)
         await page.fill('input[type="password"], input[placeholder*="رمز"]',
                         password)
-        await page.click('button.main')
+        await page.click('form button[type="submit"], button.main')
         await page.wait_for_timeout(4000)
         col.take()
 
@@ -279,7 +399,14 @@ async def run(base, mobile, password):
             await b.close()
             return results
 
-        for theme in ('dark', 'light'):
+        # ── چرا فقط تمِ تیره ──
+        # تمِ روشن در بازطراحی حذف شد (توضیحِ کاملش در بالای
+        # `userweb/src/theme.css`): هیچ قانونِ `[data-theme='light']`ای
+        # باقی نمانده و `main.jsx` همیشه `dark` ست می‌کند. پس حلقهٔ
+        # دو-تمی فقط دو برابر زمان می‌برد و **همان اعداد** را دو بار
+        # گزارش می‌کرد — که در خروجی به‌غلط شبیهِ «۸ صفحهٔ مشکل‌دار»
+        # به‌جای «۴ مورد» به نظر می‌رسید.
+        for theme in ('dark',):
             await page.evaluate(
                 "t => document.documentElement.setAttribute('data-theme', t)",
                 theme)

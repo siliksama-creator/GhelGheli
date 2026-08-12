@@ -631,17 +631,26 @@ button:hover {
 /* ۱۱px با آلفای ۶۷٪ روی سبزِ روشن ۲.۵۲ می‌داد — ناخواناترین متنِ کارت. */
 .walletStats>div span{display:block;font-size:11px;color:#dff3ec}
 .walletStats>div b{font-size:15px;font-weight:800}
-.walletCardRow{display:flex;align-items:center;gap:10px;width:100%;margin-top:16px;padding:10px 12px;border-radius:14px;background:#ffffff1f;border:1px solid #ffffff2e;color:#fff;cursor:pointer;text-align:start;font:inherit}
-.walletCardRow:hover{background:#ffffff2b}
+/* ── چرا آلفای پس‌زمینه کم شد (1f→14 و 2b→1f) ──
+   این ردیف روی گرادیانِ سبزِ .walletHero می‌نشیند و پوششِ سفیدِ نیمه‌شفاف
+   پس‌زمینه را *روشن‌تر* می‌کند، پس هرچه آلفا بیشتر، کنتراستِ متنِ سفید کمتر.
+   خطای قبلی این بود که فقط رنگِ متن را روشن‌تر کردیم (#f2fbf8) و حالتِ
+   hover اصلاً سنجیده نشد: با #ffffff2b نسبت به ۴.۰۵ سقوط می‌کرد — یعنی
+   کاربر با موس روی دکمه، متن را بدتر می‌دید. اینجا به‌جای متن، پس‌زمینه
+   تیره‌تر شد که هر دو حالت را با حاشیهٔ واقعی رد کند:
+   عادی ۵.۱۵ و hover ۴.۷۲ (سنجیده روی #0b7058، روشن‌ترین نقطهٔ گرادیان). */
+.walletCardRow{display:flex;align-items:center;gap:10px;width:100%;margin-top:16px;padding:10px 12px;border-radius:14px;background:#ffffff14;border:1px solid #ffffff2e;color:#fff;cursor:pointer;text-align:start;font:inherit}
+.walletCardRow:hover{background:#ffffff1f}
 .wcIcon{font-size:18px}
 .wcBody{flex:1;display:flex;flex-direction:column;min-width:0}
 .wcBody b{font-size:14px;letter-spacing:1px;direction:ltr;text-align:left;unicode-bidi:isolate}
-.wcBody small{font-size:11px;color:#f2fbf8}
-/* ── چرا این رنگ روشن‌تر شد ──
-   ممیزیِ پیکسلی نسبتِ ۴.۴۶ داد در برابرِ نیازِ WCAG یعنی ۴.۵ —
-   فاصلهٔ ۰.۰۴. مرزی است ولی واقعی: این متن روی سبزِ کارتِ بانکی
-   می‌نشیند و «برای برداشت لازم است» دقیقاً همان جمله‌ای است که
-   کاربر باید ببیند تا کارتش را ثبت کند. */
+/* ── چرا سفیدِ خالص، نه #f2fbf8 ──
+   تلاشِ قبلی #f2fbf8 بود که فقط ۴.۴۸ می‌داد: هنوز زیرِ ۴.۵ و آن‌قدر
+   مرزی که با گِردکردن «قبول» به‌نظر می‌رسید. #f2fbf8 عملاً سفید است
+   ولی سودِ کنتراستی‌اش صفر است، پس سفیدِ خالص هم روشن‌تر است هم صادق‌تر.
+   با آلفای اصلاح‌شدهٔ ردیف، نسبت به ۵.۱۵ می‌رسد — حاشیه‌ای واقعی،
+   نه بردی که از گِردکردن به‌دست آمده باشد. */
+.wcBody small{font-size:11px;color:#fff}
 .wcArrow{font-size:20px;color:#ffffffb0}
 
 .walletActions{display:flex;gap:10px;margin-bottom:10px}

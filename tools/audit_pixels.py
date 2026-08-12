@@ -304,7 +304,7 @@ async def run(base, mobile, password, only):
             await page.fill('input', mobile)
             await page.fill('input[type="password"], input[placeholder*="رمز"]',
                             password)
-            await page.click('button.main')
+            await page.click('form button[type="submit"], button.main')
             await page.wait_for_timeout(3500)
 
         await login()

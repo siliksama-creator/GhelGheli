@@ -329,7 +329,14 @@ function Portal({ token, logout }) {
 
       {msg && <div className="toast">{msg}</div>}
 
-      <main className="tabPane" key={tab}>
+      {/* `data-tab` وضعیتِ واقعیِ ناوبری را در DOM آشکار می‌کند.
+          ابزارِ ممیزی قبلاً «رسیدن به تب» را از روی امضای متنِ صفحه حدس
+          می‌زد و وقتی کلیک بی‌اثر می‌ماند، همان صفحهٔ قبلی را دوباره
+          می‌سنجید و «موفق» گزارش می‌داد — نتیجه‌اش یافته‌های ساختگی بود.
+          برای تبِ‌های داخلِ شیتِ «بیشتر» هم `aria-current` کافی نیست چون
+          شیت پس از کلیک بسته می‌شود. این یک قلابِ خواندنی و بی‌اثر روی
+          ظاهر است، نه تضعیفِ محصول برای آسان‌شدنِ تست. */}
+      <main className="tabPane" key={tab} data-tab={tab}>
         {tab === 'home' && (
           <Home token={token} p={p} rewards={rewards} load={load}
             setMsg={setMsg} openProfile={() => setTab('profile')}

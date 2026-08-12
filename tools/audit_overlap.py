@@ -107,7 +107,7 @@ async def run(base, mobile, pw):
         await pg.goto(base, wait_until='networkidle')
         await pg.fill('input', mobile)
         await pg.fill('input[type="password"], input[placeholder*="رمز"]', pw)
-        await pg.click('button.main')
+        await pg.click('form button[type="submit"], button.main')
         await pg.wait_for_timeout(3800)
         for label, where in NAV:
             if not await goto(pg, label, where):
