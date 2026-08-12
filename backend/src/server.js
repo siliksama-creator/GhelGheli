@@ -2380,6 +2380,3 @@ process.on('uncaughtException', (err) => {
 
 const port = process.env.PORT || 4000;
 server.listen(port, async () => { await ensureActiveSeason(); console.log(`GhelGheli API on :${port}`); });
-;
-log(`GhelGheli API on :${port}`); });
-;
