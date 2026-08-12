@@ -37,7 +37,7 @@ const _games = <_GameEntry>[
       Color(0xFF84CC16), 'assets/games/tap/skin_1.webp'),
   _GameEntry('penalty', 'ضربات پنالتی', 'شوت دقیق و مهار دروازه‌بان', 'assets/games/penalty_icon.png',
       Color(0xFF38BDF8), 'assets/games/penalty.webp'),
-  _GameEntry('card_duel', 'دوئل کارت‌ها', 'نبرد سه‌کارتی و کارت‌های کلکسیونی',
+  _GameEntry('card_duel', 'دوئل کارت‌ها', 'نبرد پنج‌راندی و کارت‌های کلکسیونی',
       'assets/games/card_duel_glow.png', Color(0xFFFFD166), 'assets/games/card_duel_glow.png'),
   _GameEntry('memory', 'جفت‌یاب', 'جفت‌های فوتبالی را به خاطر بسپار', 'assets/games/memory/medal.webp',
       Color(0xFFA855F7), 'assets/games/memory.webp'),

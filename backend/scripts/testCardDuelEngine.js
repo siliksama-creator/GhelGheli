@@ -4,7 +4,7 @@
 const assert = require('assert');
 const duelService = require('../src/services/cardDuelService');
 
-const makeCards = prefix => [70, 74, 78].map((stat, index) => ({
+const makeCards = prefix => [70, 74, 78, 76, 82].map((stat, index) => ({
   id: `${prefix}-${index + 1}`, cardTypeId: `${prefix}-${index + 1}`,
   name: `${prefix}-${index + 1}`, attack: stat, defense: stat,
   speed: stat, technique: stat, goalChance: stat, energy: 100,
@@ -57,11 +57,11 @@ function ioHarness() {
   const start = player.last('game:start');
   assert(start, 'bot game must start');
   assert.equal(start.matchMode, 'bot');
-  assert.equal(start.state.myDeck.length, 3);
-  assert.equal(start.state.opponentRemainingCount, 3);
+  assert.equal(start.state.myDeck.length, 5);
+  assert.equal(start.state.opponentRemainingCount, 5);
   assert(!JSON.stringify(start.state).includes('bot-1'), 'opponent deck must be hidden at start');
 
-  for (let round = 0; round < 3; round++) {
+  for (let round = 0; round < 5; round++) {
     const current = player.last(round === 0 ? 'game:start' : 'game:update');
     const available = current.state.myRemainingCardIds;
     await player.fire('game:move', {
@@ -72,16 +72,17 @@ function ioHarness() {
     assert.equal(locked.state.iChose, true, 'own choice is locked while bot thinks');
     assert(!JSON.stringify(locked.state).includes('bot-1') || round > 0,
       'unplayed bot choice is not leaked');
-    await wait(720);
+    await wait(1200);
   }
 
   const over = player.last('game:over');
-  assert(over, 'three live rounds must end the engine room');
+  assert(over, 'five live rounds must end the engine room');
   assert(['X', 'O', 'DRAW'].includes(over.winner));
-  assert.equal(over.state.history.length, 3);
+  assert.equal(over.state.history.length, 5);
   await wait(20);
   assert.equal(historyWrites, 1, 'game history hook runs exactly once');
-  console.log('✅ card duel completed three hidden-choice rounds through the real engine');
+  console.log('✅ card duel completed five hidden-choice rounds through the real engine');
+  process.exit(0);
 })().catch(error => {
   console.error(error);
   process.exit(1);

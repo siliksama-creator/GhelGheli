@@ -36,11 +36,11 @@ const webWheel = read('userweb/src/screens/Wheel.jsx');
 
 console.log('\n== منطق زندهٔ سه‌کارتی ==');
 const state = rules.createFromDecks(
-  [card('x1', 90), card('x2', 75), card('x3', 60)],
-  [card('o1', 80), card('o2', 70), card('o3', 55)],
+  [card('x1', 90), card('x2', 75), card('x3', 60), card('x4', 68), card('x5', 84)],
+  [card('o1', 80), card('o2', 70), card('o3', 55), card('o4', 66), card('o5', 78)],
 );
-ok(state.remaining.X.length === 3 && state.remaining.O.length === 3,
-  'هر بازیکن دقیقاً سه کارت آماده دارد');
+ok(state.remaining.X.length === 5 && state.remaining.O.length === 5,
+  'هر بازیکن دقیقاً پنج کارت آماده دارد');
 ok(rules.simultaneous === true, 'انتخاب دو بازیکن هم‌زمان است');
 ok(rules.isValidMove(state, { cardId: 'x1' }, 'X'), 'کارت باقی‌مانده حرکت معتبر است');
 rules.applyMove(state, { cardId: 'x1' }, 'X');
@@ -51,19 +51,20 @@ ok(!rules.isValidMove(state, { cardId: 'x2' }, 'X'), 'یک بازیکن در ه�
 rules.applyMove(state, { cardId: 'o1' }, 'O');
 ok(state.roundIndex === 1 && state.history.length === 1, 'بعد از دو انتخاب راند دقیقاً یک بار حل می‌شود');
 ok(!state.remaining.X.includes('x1') && !state.remaining.O.includes('o1'), 'کارت بازی‌شده دوباره قابل استفاده نیست');
-for (const [x, o] of [['x2', 'o2'], ['x3', 'o3']]) {
+for (const [x, o] of [['x2', 'o2'], ['x3', 'o3'], ['x4', 'o4'], ['x5', 'o5']]) {
   rules.applyMove(state, { cardId: x }, 'X');
   rules.applyMove(state, { cardId: o }, 'O');
 }
-ok(['X', 'O', 'DRAW'].includes(rules.result(state)), 'سه راند همیشه نتیجه نهایی معتبر می‌سازد');
+ok(['X', 'O', 'DRAW'].includes(rules.result(state)), 'پنج راند همیشه نتیجه نهایی معتبر می‌سازد');
+ok(state.history.every(round => round.reason), 'هر راند دلیل برنده شدن را دارد');
 const botState = rules.createFromDecks(
-  [card('x1', 70), card('x2', 71), card('x3', 72)],
-  [card('o1', 70), card('o2', 71), card('o3', 72)],
+  [card('x1', 70), card('x2', 71), card('x3', 72), card('x4', 73), card('x5', 74)],
+  [card('o1', 70), card('o2', 71), card('o3', 72), card('o4', 73), card('o5', 74)],
 );
 ok(rules.isValidMove(botState, rules.botMove(botState, 'O'), 'O'), 'ربات حرکت قانونی و بدون تقلب می‌سازد');
 const starters = require('../src/services/cardDuelService').starterDeck();
-ok(starters.length === 3 && starters.every(item => item.practiceOnly),
-  'کاربر تازه برای تمرین یک دستهٔ قرضی سه‌کارتی دارد');
+ok(starters.length === 5 && starters.every(item => item.practiceOnly),
+  'کاربر تازه برای تمرین یک دستهٔ قرضی پنج‌کارتی دارد');
 
 console.log('\n== سرور، اقتصاد و حذف Ghost ==');
 ok(/card_duel: cardDuel/.test(registry), 'دوئل کارت داخل موتور مشترک آنلاین ثبت شده است');

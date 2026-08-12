@@ -15,7 +15,7 @@ import './growth.css';
 const GAMES = [
   { id: 'tap', title: 'ضربه‌زن', icon: '/games/tap/skin_1.webp', desc: '۵۰ لول ضربه بزن و شخصیت‌ها را باز کن', accent: '#84CC16', singlePlayer: true, art: '/games/tap/skin_1.webp' },
   { id: 'penalty', title: 'ضربات پنالتی', icon: '/games/penalty_icon.png', desc: 'شوت دقیق و مهار دروازه‌بان', accent: '#38BDF8', art: '/games/penalty.webp' },
-  { id: 'card_duel', title: 'دوئل کارت‌ها', icon: '/games/card_duel_glow.png', desc: 'نبرد سه‌کارتی و کارت‌های کلکسیونی', accent: '#FFD166', art: '/games/card_duel_glow.png' },
+  { id: 'card_duel', title: 'دوئل کارت‌ها', icon: '/games/card_duel_glow.png', desc: 'نبرد پنج‌راندی و کارت‌های کلکسیونی', accent: '#FFD166', art: '/games/card_duel_glow.png' },
   { id: 'memory', title: 'جفت‌یاب', icon: '/games/memory/medal.webp', desc: 'جفت‌های فوتبالی را به خاطر بسپار', accent: '#A855F7', art: '/games/memory.webp' },
 ];
 

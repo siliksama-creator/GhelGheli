@@ -39,8 +39,8 @@ function HoloCard({ card, selected, disabled, compact = false, onClick, frame })
     <span className="duelHolo" />
     <span className="duelEnergyRail" aria-hidden="true" />
     <div className="duelArtV2">
-      {card?.imageUrl
-        ? <img src={asset(card.imageUrl)} alt={card.name || 'کارت'} loading="lazy" decoding="async" />
+      {(card?.imageUrl || card?.image_url)
+        ? <img src={asset(card.imageUrl || card.image_url)} alt={card.name || 'کارت'} loading="lazy" decoding="async" />
         : <span className="duelBotFace">{card?.id?.startsWith('bot-') ? '🤖' : '🃏'}</span>}
       <span className="duelPower">{fa(card?.power)}</span>
       {selected && <i className="duelPicked">✓</i>}
@@ -71,11 +71,11 @@ function Lineup({ selected, cards, toggle }) {
   return (
     <section className="duelLineupV2">
       <div className="duelLineupTitle">
-        <div><b>ترکیب اصلی</b><small>سه کارت با نقش‌های مکمل بچین</small></div>
+        <div><b>ترکیب اصلی</b><small>پنج کارت با نقش‌های مکمل بچین</small></div>
         <strong>{fa(power)} <small>قدرت تیم</small></strong>
       </div>
       <div className="duelSlotsV2">
-        {[0, 1, 2].map(index => {
+        {[0, 1, 2, 3, 4].map(index => {
           const id = selected[index];
           const card = id ? byId.get(id) : null;
           return <button type="button" key={index} className={card ? 'filled' : ''}
@@ -105,7 +105,8 @@ function RoundReveal({ round, me, myFrame, opponentFrame }) {
         <span>راند {fa(round.round)}</span>
         <b>{round.title}</b>
         <strong>{fa(myPower)} <i>VS</i> {fa(theirPower)}</strong>
-        <small>{round.winner === 'DRAW' ? 'برخورد برابر!' : mineWon ? 'این راند مال تو شد!' : 'حریف این راند را برد'}</small>
+        <em className="duelWinnerStamp">{round.winner === 'DRAW' ? 'DRAW' : mineWon ? 'WINNER' : 'LOSS'}</em>
+        <small>{round.reason || (round.winner === 'DRAW' ? 'برخورد برابر!' : mineWon ? 'این راند مال تو شد!' : 'حریف این راند را برد')}</small>
       </div>
       <HoloCard card={theirs} compact disabled frame={opponentFrame} />
     </section>
@@ -142,11 +143,11 @@ function LiveArena({ session }) {
   return <div className="duelLiveArena">
     <header className="duelScoreV2">
       <div><DuelIdentity player={g.players?.[mine]} fallback={myName}/><b>{fa(score[mine])}</b></div>
-      <span><i>راند {fa(Math.min(3, num(state.roundIndex) + 1))} از ۳</i><strong>{state.roundTitle || 'پایان نبرد'}</strong></span>
+      <span><i>راند {fa(Math.min(num(state.totalRounds) || 5, num(state.roundIndex) + 1))} از {fa(num(state.totalRounds) || 5)}</i><strong>{state.roundTitle || 'پایان نبرد'}</strong></span>
       <div><DuelIdentity player={g.players?.[opponent]} fallback={opponentName}/><b>{fa(score[opponent])}</b></div>
     </header>
 
-    <div className="duelRoundPips">{[0, 1, 2].map(index => <i key={index}
+    <div className="duelRoundPips">{Array.from({length: num(state.totalRounds) || 5}, (_, index) => <i key={index}
       className={index < num(state.roundIndex) ? 'done' : index === num(state.roundIndex) ? 'live' : ''} />)}</div>
 
     <div className="duelOpponentHand" aria-label={`${state.opponentRemainingCount || 0} کارت حریف باقی مانده`}>
@@ -293,8 +294,8 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
       if (!enabled) {
         const owned = response?.playableCards || [];
         const prepared = response?.activeDeck?.cards || [];
-        const initial = vsBot && owned.length < 3 ? (response?.practiceCards || []) : prepared;
-        setSelected(initial.map(idOf).filter(Boolean).slice(0, 3));
+        const initial = vsBot && owned.length < 5 ? (response?.practiceCards || []) : prepared;
+        setSelected(initial.map(idOf).filter(Boolean).slice(0, 5));
       }
       setError('');
     } catch (requestError) {
@@ -307,14 +308,14 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
   useEffect(() => { if (session.phase === 'over') load(); }, [session.phase]);
 
   const ownedCards = data?.playableCards || [];
-  const practiceFallback = vsBot && ownedCards.length < 3;
+  const practiceFallback = vsBot && ownedCards.length < 5;
   const cards = practiceFallback ? (data?.practiceCards || []) : ownedCards;
   const toggle = id => setSelected(previous => previous.includes(id)
     ? previous.filter(value => value !== id)
-    : previous.length < 3 ? [...previous, id] : previous);
+    : previous.length < 5 ? [...previous, id] : previous);
 
   const saveAndStart = async () => {
-    if (selected.length !== 3 || busy) return;
+    if (selected.length !== 5 || busy) return;
     setBusy(true); setError('');
     try {
       if (!practiceFallback) {
@@ -342,28 +343,28 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
     <header className="duelHeroV2">
       <button type="button" className="ghost" onClick={() => { session.leave(); onBack(); }}>← بازگشت</button>
       <div className="duelHeroIcon"><img src="/games/card_duel_glow.png" alt="" /></div>
-      <div><span>GHELGHELI CARD ARENA</span><h1>دوئل کارت‌ها</h1><p>انتخاب مخفی، ضدترکیب هوشمند و سه راند نفس‌گیر</p></div>
+      <div><span>GHELGHELI CARD ARENA</span><h1>دوئل کارت‌ها</h1><p>انتخاب مخفی، ضدترکیب هوشمند و پنج راند نفس‌گیر</p></div>
       <aside><span>{mode.icon}</span><b>{mode.title}</b><small>{mode.subtitle}</small></aside>
     </header>
 
     {!activeGame && <>
       <section className="duelRuleStrip">
-        <div><span>۱</span><b>سه کارت بچین</b><small>سرعت، تکنیک و گل را متعادل کن</small></div>
+        <div><span>۱</span><b>پنج کارت بچین</b><small>سرعت، تکنیک، حمله، دفاع و گل را متعادل کن</small></div>
         <i>›</i><div><span>۲</span><b>مخفی انتخاب کن</b><small>حریف کارتت را تا قفل شدن نمی‌بیند</small></div>
-        <i>›</i><div><span>۳</span><b>دو راند ببر</b><small>هر راند ویژگی متفاوتی می‌سنجد</small></div>
+        <i>›</i><div><span>۳</span><b>۳ راند ببر</b><small>هر راند ویژگی متفاوتی می‌سنجد</small></div>
       </section>
       <Lineup selected={selected} cards={cards} toggle={toggle} />
-      <button type="button" className="duelLaunch" disabled={busy || selected.length !== 3} onClick={saveAndStart}>
+      <button type="button" className="duelLaunch" disabled={busy || selected.length !== 5} onClick={saveAndStart}>
         <span>{busy ? 'در حال قفل ترکیب…' : `ورود به ${mode.title}`}</span>
         <small>{vsBot ? 'بدون ریسک امتیاز' : stake ? `ورودی ${fa(stake)} امتیاز` : 'مسابقه خصوصی'}</small>
       </button>
       {error && <div className="err duelMessage">{error}</div>}
       {practiceFallback && <div className="gameStakeNotice practice"><span>🎁</span><div>
         <b>دستهٔ تمرینی رایگان برای شروع سریع</b>
-        <small>این کارت‌ها فقط مقابل ربات فعال‌اند؛ برای آنلاین باید سه کارت واقعی جمع کنی.</small>
+        <small>این کارت‌ها فقط مقابل ربات فعال‌اند؛ برای آنلاین باید پنج کارت واقعی جمع کنی.</small>
       </div></div>}
       <h3 className="duelSectionTitle">{practiceFallback ? 'کارت‌های قرضی تمرین' : 'کلکسیون آماده نبرد'}</h3>
-      {cards.length < 3 ? <div className="card pad center muted">برای بازی حداقل سه کارت فعال در کلکسیون لازم داری.</div>
+      {cards.length < 5 ? <div className="card pad center muted">برای بازی حداقل پنج کارت فعال در کلکسیون لازم داری.</div>
         : <div className="duelGridV2">{cards.map(card => <HoloCard key={idOf(card)} card={card}
           selected={selected.includes(idOf(card))} onClick={() => toggle(idOf(card))} />)}</div>}
       <History battles={data?.recentBattles || []} />
@@ -386,7 +387,8 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
       <LiveArena session={session} />
       <div className="duelFinalePanel">
         <span>{winner === 'DRAW' ? '🤝' : iWon ? '🏆' : '🛡️'}</span>
-        <h2>{winner === 'DRAW' ? 'نبرد برابر!' : iWon ? 'فرمانروای آرنا شدی!' : 'این نبرد تمام شد؛ ترکیبت را هوشمندتر کن'}</h2>
+        <h2>{winner === 'DRAW' ? 'DRAW' : iWon ? 'VICTORY' : 'DEFEAT'}</h2>
+        <p>{winner === 'DRAW' ? 'نبرد برابر!' : iWon ? 'فرمانروای آرنا شدی!' : 'این نبرد تمام شد؛ ترکیبت را هوشمندتر کن'}</p>
         <p>{session.g.vsBot ? 'تمرین تمام شد؛ امتیازی جابه‌جا نشد.'
           : winner === 'DRAW' ? 'ورودی کامل هر دو نفر برمی‌گردد.'
             : iWon ? `پات مسابقه پس از کسر کارمزد برایت تسویه می‌شود.`

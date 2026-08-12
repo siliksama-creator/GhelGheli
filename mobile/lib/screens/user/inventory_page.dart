@@ -39,7 +39,7 @@ import 'package:flutter/material.dart';
 import '../../api_client.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
-import '../../widgets/cached_card_image.dart';
+import '../../widgets/player_card.dart'; // RarityCardFrame shared with detail/duel
 import '../../widgets/state_views.dart';
 import '../../widgets/rarity_card_frame.dart';
 import '../shared/card_detail_sheet.dart';
@@ -138,6 +138,7 @@ class InventoryPage extends StatefulWidget {
 class _InventoryPageState extends State<InventoryPage> {
   final _search = TextEditingController();
   InvSort _sort = InvSort.recent;
+  String? _rarity;
 
   @override
   void dispose() {
@@ -149,8 +150,11 @@ class _InventoryPageState extends State<InventoryPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final shown =
+    var shown =
         filterAndSort(widget.items, query: _search.text, sort: _sort);
+    if (_rarity != null) {
+      shown = shown.where((item) => cardRarityOf(item) == _rarity).toList();
+    }
     final stats = collectionStats(widget.items);
 
     final body = CustomScrollView(
@@ -201,6 +205,23 @@ class _InventoryPageState extends State<InventoryPage> {
                           ),
                           Gaps.hXs,
                         ],
+                        const SizedBox(width: 8),
+                        ChoiceChip(
+                          label: const Text('همه کلاس‌ها'),
+                          selected: _rarity == null,
+                          onSelected: (_) => setState(() => _rarity = null),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        Gaps.hXs,
+                        for (final rarity in rarityLabels.keys) ...[
+                          ChoiceChip(
+                            label: Text(rarityLabels[rarity]!),
+                            selected: _rarity == rarity,
+                            onSelected: (_) => setState(() => _rarity = rarity),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          Gaps.hXs,
+                        ],
                       ],
                     ),
                   ),
@@ -242,7 +263,7 @@ class _InventoryPageState extends State<InventoryPage> {
                 maxCrossAxisExtent: 200,
                 mainAxisSpacing: Gaps.sm,
                 crossAxisSpacing: Gaps.sm,
-                childAspectRatio: 0.57,
+                childAspectRatio: 0.62,
               ),
               delegate: SliverChildBuilderDelegate(
                 (_, i) => InventoryTile(item: shown[i]),
@@ -329,140 +350,29 @@ class InventoryTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final imageValue = item['image_url'] ?? item['imageUrl'];
-    final img = fullAssetUrl(imageValue);
-    final qty = _asInt(item['quantity']);
     final fresh = isNewCard(item);
-
-    return GestureDetector(
-      onTap: () => showCardDetail(context, item),
-      child: Container(
-        padding: const EdgeInsets.all(Gaps.xs),
-        decoration: BoxDecoration(
-          borderRadius: Corners.rXl,
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF15263A), Color(0xFF07111D)],
+    return Stack(
+      children: [
+        PlayerCard(
+          card: {
+            ...item,
+            'image_url': imageValue,
+          },
+          onTap: () => showCardDetail(context, item),
+        ),
+        if (fresh)
+          Positioned(
+            top: 10,
+            left: 10,
+            child: _Chip(
+              text: 'جدید',
+              bg: theme.colorScheme.primary,
+              fg: theme.colorScheme.onPrimary,
+            ),
           ),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.09)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.28),
-              blurRadius: 14,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: RarityCardFrame(
-                rarity: item['duel_rarity'] as String?,
-                borderRadius: 17,
-                padding: 4,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    ColoredBox(
-                      color: const Color(0xFF02070D),
-                      child: img.isEmpty
-                          ? const _CardImagePlaceholder(missing: true)
-                          : CachedCardImage(
-                              url: imageValue,
-                              fit: BoxFit.contain,
-                              cacheWidth: 320,
-                              placeholder: const _CardImagePlaceholder(),
-                            ),
-                    ),
-                    if (fresh)
-                      Positioned(
-                        top: 5,
-                        right: 5,
-                        child: _Chip(
-                          text: 'جدید',
-                          bg: theme.colorScheme.primary,
-                          fg: theme.colorScheme.onPrimary,
-                        ),
-                      ),
-                    if (qty > 1)
-                      Positioned(
-                        top: 5,
-                        left: 5,
-                        child: _Chip(
-                          text: '×${faNum(qty)}',
-                          bg: Colors.black.withValues(alpha: 0.72),
-                          fg: Colors.white,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 7),
-            Text(
-              '${item['name'] ?? 'کارت'}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-                fontSize: 13,
-              ),
-            ),
-            const SizedBox(height: 3),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.36),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                '${faNum(_asInt(item['point_value']))} امتیاز',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            const SizedBox(height: 5),
-            CardDuelStatsMini(item: item),
-          ],
-        ),
-      ),
+      ],
     );
   }
-}
-
-class _CardImagePlaceholder extends StatelessWidget {
-  const _CardImagePlaceholder({this.missing = false});
-  final bool missing;
-
-  @override
-  Widget build(BuildContext context) => DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF13253A), Color(0xFF050A11)],
-          ),
-        ),
-        child: Center(
-          child: missing
-              ? const Icon(Icons.image_not_supported_outlined,
-                  color: Colors.white38, size: 30)
-              : const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-        ),
-      );
 }
 
 class _Chip extends StatelessWidget {

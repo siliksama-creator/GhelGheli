@@ -1,7 +1,9 @@
 const crypto = require('crypto');
 const { pool } = require('../config/db');
 
-const DECK_SIZE = 3;
+// پنج راند = حس یک مسابقه واقعی، نه یک برخورد سه‌ثانیه‌ای.
+// هر راند یک ویژگی متفاوت را می‌سنجد تا قوی‌ترین کارت همیشه برنده نباشد.
+const DECK_SIZE = 5;
 const ONLINE_STAKES = Object.freeze([100, 1000]);
 const RARITIES = Object.freeze(['normal', 'silver', 'gold', 'premium', 'legend']);
 const EFFECTS = Object.freeze(['none', 'finisher', 'wall', 'speedster', 'playmaker', 'lucky_star']);
@@ -12,10 +14,23 @@ const EFFECT_LABEL = Object.freeze({
   playmaker: 'بازی‌ساز', lucky_star: 'ستاره خوش‌شانس',
 });
 const ROUND_FOCUS = Object.freeze([
-  { key: 'duel_speed', label: 'ضدحمله سرعتی', userText: 'سرعت کارت، ضدحمله را ساخت' },
-  { key: 'duel_technique', label: 'نبرد تکنیکی', userText: 'تکنیک کارت، خط میانی را شکست' },
-  { key: 'duel_goal_chance', label: 'لحظه گل', userText: 'حمله و شانس گل، ضربه نهایی را ساخت' },
+  { key: 'duel_speed', stat: 'speed', label: 'ضدحمله سرعتی', userText: 'سرعت کارت ضدحمله را ساخت' },
+  { key: 'duel_technique', stat: 'technique', label: 'نبرد تکنیکی', userText: 'تکنیک کارت خط میانی را شکست' },
+  { key: 'duel_attack', stat: 'attack', label: 'فشار حمله', userText: 'قدرت حمله خط دفاع را شکافت' },
+  { key: 'duel_defense', stat: 'defense', label: 'دیوار دفاعی', userText: 'دفاع کارت جلوی ضدحمله را گرفت' },
+  { key: 'duel_goal_chance', stat: 'goalChance', label: 'ضربه نهایی', userText: 'شانس گل ضربه آخر را ساخت' },
 ]);
+
+// تصویر نمایشی باید همیشه طرح روی کارت باشد.
+// قبلاً display_design_id گاهی پشت کارت را برمی‌داشت و کاربر به‌جای
+// عکس واقعی بازیکن یک طرح نامرتبط می‌دید. روی کارت منبع حقیقت است.
+const FRONT_IMAGE_SQL = `COALESCE(
+  (SELECT pd.image_url FROM photo_card_designs pd
+    WHERE pd.card_type_id = t.id AND pd.is_active = true
+      AND COALESCE(pd.side, 'front') = 'front'
+    ORDER BY pd.created_at DESC LIMIT 1),
+  t.image_url
+)`;
 
 function int(v, fallback = 0) {
   const n = Number(v);
@@ -85,13 +100,12 @@ function publicCard(row) {
 
 async function playableCards(userId, client = pool) {
   const { rows } = await client.query(
-    `SELECT t.id AS card_type_id, t.name, COALESCE(d.image_url, t.image_url) AS image_url,
+    `SELECT t.id AS card_type_id, t.name, ${FRONT_IMAGE_SQL} AS image_url,
             t.point_value, i.quantity,
             t.duel_attack, t.duel_defense, t.duel_speed, t.duel_technique,
             t.duel_goal_chance, t.duel_energy, t.duel_rarity, t.duel_effect
        FROM user_card_inventory i
        JOIN card_types t ON t.id = i.card_type_id
-       LEFT JOIN photo_card_designs d ON d.id = i.display_design_id
       WHERE i.user_id=$1 AND i.consumed_in_reward=false AND i.quantity > 0 AND t.is_active=true
       ORDER BY t.point_value DESC, t.name`, [userId]);
   return rows.map(publicCard);
@@ -103,7 +117,7 @@ async function validateDeck(userId, ids, client = pool) {
   }
   const clean = ids.map(x => String(x || '').trim()).filter(Boolean);
   if (clean.length !== DECK_SIZE || new Set(clean).size !== DECK_SIZE) {
-    const e = new Error('سه کارت متفاوت انتخاب کنید'); e.status = 400; throw e;
+    const e = new Error('پنج کارت متفاوت انتخاب کنید'); e.status = 400; throw e;
   }
   const cards = await playableCards(userId, client);
   const byId = new Map(cards.map(c => [String(c.cardTypeId), c]));
@@ -143,7 +157,7 @@ async function saveDeck(userId, ids) {
        ghost_enabled=false,
        updated_at=NOW()
      RETURNING user_id, card_type_ids, updated_at`, [userId, clean]);
-  return { deck: rows[0], cards, message: 'ترکیب سه‌کارتی ذخیره شد' };
+  return { deck: rows[0], cards, message: 'ترکیب پنج‌کارتی ذخیره شد' };
 }
 
 function randomInt(maxExclusive, random = null) {
@@ -155,21 +169,37 @@ function effectBonus(card, roundIndex, prevWon, random = null) {
   switch (card.duel_effect || card.effect) {
     case 'speedster': return roundIndex === 0 ? 15 : 0;
     case 'playmaker': return roundIndex > 0 && prevWon ? 10 : 0;
-    case 'finisher': return roundIndex === 2 ? 15 : 0;
+    case 'finisher': return roundIndex === DECK_SIZE - 1 ? 15 : 0;
     case 'lucky_star': return randomInt(100, random) < 18 ? 12 : 0;
     default: return 0;
   }
 }
 
+function focusValue(card, focus) {
+  const key = focus.stat || 'power';
+  return Number(card[key] ?? card[focus.key] ?? card[String(focus.key || '').replace('duel_', '')] ?? 50);
+}
+
 function roundScore(card, opp, focus, roundIndex, prevWon, random = null) {
   const base = totalPower(card) * 0.56;
-  const focusVal = Number(card[focus.key] ?? card[focus.key.replace('duel_', '')] ?? 50) * 0.36;
+  const focusVal = focusValue(card, focus) * 0.36;
   const attackMix = (Number(card.duel_attack ?? card.attack ?? 50)
     + Number(card.duel_goal_chance ?? card.goalChance ?? 50)) * 0.10;
   const defensePenalty = Number(opp.duel_defense ?? opp.defense ?? 50) * 0.10;
   return Math.round(base + focusVal + attackMix - defensePenalty
     + effectBonus(card, roundIndex, prevWon, random)
     + randomInt(13, random));
+}
+
+function winnerReason(winner, focus, cardX, cardO, powerX, powerO) {
+  if (winner === 'DRAW') {
+    return `قدرت راند نزدیک بود (${powerX} برابر ${powerO})؛ این راند مساوی شد`;
+  }
+  const champ = winner === 'X' ? cardX : cardO;
+  const champPower = winner === 'X' ? powerX : powerO;
+  const otherPower = winner === 'X' ? powerO : powerX;
+  const gap = Math.abs(champPower - otherPower);
+  return `${champ.name} با برتری ${gap} امتیاز در «${focus.label}» راند را برد`;
 }
 
 function resolveRound(cardX, cardO, roundIndex, previousWinner = null, random = null) {
@@ -186,11 +216,16 @@ function resolveRound(cardX, cardO, roundIndex, previousWinner = null, random = 
     round: roundIndex + 1,
     title: focus.label,
     text: focus.userText,
+    focusKey: focus.stat,
+    focusLabel: focus.label,
+    focusStatX: focusValue(x, focus),
+    focusStatO: focusValue(o, focus),
     cardX: x,
     cardO: o,
     powerX,
     powerO,
     winner,
+    reason: winnerReason(winner, focus, x, o, powerX, powerO),
     cinematic: winner === 'X' ? 'ضربه نهایی آبی!' : winner === 'O' ? 'پاسخ آتشین حریف!' : 'برخورد تماشایی!',
   };
 }
@@ -209,6 +244,7 @@ function simulate(userCards, opponentCards, { opponentName = 'حریف', random 
       userPower: resolved.powerX, opponentPower: resolved.powerO,
       outcome: resolved.winner === 'X' ? 'user_goal' : resolved.winner === 'O' ? 'opponent_goal' : 'draw',
       cinematic: resolved.cinematic,
+      reason: resolved.reason,
     });
   }
   const winnerSide = score.X > score.O ? 'user' : score.O > score.X ? 'opponent' : 'draw';
@@ -222,20 +258,22 @@ function simulate(userCards, opponentCards, { opponentName = 'حریف', random 
 
 function starterDeck() {
   return [
-    { id: '00000000-0000-4000-8000-000000000001', name: 'مهاجم تمرینی', stat: 64, rarity: 'normal', effect: 'speedster' },
-    { id: '00000000-0000-4000-8000-000000000002', name: 'بازی‌ساز تمرینی', stat: 68, rarity: 'silver', effect: 'playmaker' },
-    { id: '00000000-0000-4000-8000-000000000003', name: 'فینیشر تمرینی', stat: 72, rarity: 'gold', effect: 'finisher' },
+    { id: '00000000-0000-4000-8000-000000000001', name: 'مهاجم تمرینی', stat: 62, rarity: 'normal', effect: 'speedster' },
+    { id: '00000000-0000-4000-8000-000000000002', name: 'بازی‌ساز تمرینی', stat: 66, rarity: 'silver', effect: 'playmaker' },
+    { id: '00000000-0000-4000-8000-000000000003', name: 'مدافع تمرینی', stat: 68, rarity: 'silver', effect: 'wall' },
+    { id: '00000000-0000-4000-8000-000000000004', name: 'وینگر تمرینی', stat: 70, rarity: 'gold', effect: 'lucky_star' },
+    { id: '00000000-0000-4000-8000-000000000005', name: 'فینیشر تمرینی', stat: 74, rarity: 'gold', effect: 'finisher' },
   ].map((item, index) => publicCard({
     card_type_id: item.id,
     name: item.name,
     image_url: null,
-    point_value: 100 + index * 50,
+    point_value: 100 + index * 40,
     quantity: 1,
-    duel_attack: item.stat + (index === 2 ? 8 : 0),
-    duel_defense: item.stat - 4,
+    duel_attack: item.stat + (index === 4 ? 8 : 0),
+    duel_defense: item.stat + (index === 2 ? 8 : -4),
     duel_speed: item.stat + (index === 0 ? 10 : 0),
     duel_technique: item.stat + (index === 1 ? 10 : 0),
-    duel_goal_chance: item.stat + (index === 2 ? 10 : 0),
+    duel_goal_chance: item.stat + (index === 4 ? 10 : 0),
     duel_energy: 100,
     duel_rarity: item.rarity,
     duel_effect: item.effect,
@@ -244,17 +282,19 @@ function starterDeck() {
 }
 
 function botDeck(userCards) {
-  const avg = userCards.reduce((sum, card) => sum + totalPower(card), 0) / userCards.length;
-  const rarities = ['normal', 'silver', avg > 92 ? 'gold' : 'silver'];
-  return [0, 1, 2].map(i => {
-    const base = Math.max(35, Math.min(88, Math.round(avg - 16 + i * 7 + crypto.randomInt(-6, 7))));
+  const avg = userCards.reduce((sum, card) => sum + totalPower(card), 0) / Math.max(1, userCards.length);
+  const rarities = ['normal', 'silver', 'silver', avg > 92 ? 'gold' : 'silver', avg > 100 ? 'premium' : 'gold'];
+  const names = ['ربات سرعتی', 'ربات تاکتیکی', 'ربات دیوار', 'ربات وینگر', 'ربات فینیشر'];
+  const effects = ['speedster', 'playmaker', 'wall', 'lucky_star', 'finisher'];
+  return [0, 1, 2, 3, 4].map(i => {
+    const base = Math.max(35, Math.min(88, Math.round(avg - 18 + i * 6 + crypto.randomInt(-6, 7))));
     return publicCard({
-      card_type_id: `bot-${i + 1}`, name: ['ربات سرعتی', 'ربات تاکتیکی', 'ربات فینیشر'][i],
+      card_type_id: `bot-${i + 1}`, name: names[i],
       image_url: null, point_value: Math.max(100, Math.round(avg * 7)), quantity: 1,
-      duel_attack: base + (i === 2 ? 8 : 0), duel_defense: base + (i === 1 ? 5 : 0),
+      duel_attack: base + (i === 4 ? 8 : 0), duel_defense: base + (i === 2 ? 8 : 0),
       duel_speed: base + (i === 0 ? 10 : 0), duel_technique: base + (i === 1 ? 10 : 0),
-      duel_goal_chance: base + (i === 2 ? 10 : 0), duel_energy: 100,
-      duel_rarity: rarities[i], duel_effect: ['speedster', 'playmaker', 'finisher'][i],
+      duel_goal_chance: base + (i === 4 ? 10 : 0), duel_energy: 100,
+      duel_rarity: rarities[i], duel_effect: effects[i],
     });
   });
 }
@@ -299,6 +339,7 @@ async function status(userId) {
   ]);
   return {
     deckSize: DECK_SIZE,
+    totalRounds: DECK_SIZE,
     onlineStakes: ONLINE_STAKES,
     playableCards: cards,
     practiceCards: starterDeck(),
@@ -306,14 +347,13 @@ async function status(userId) {
     recentBattles: recent,
     rarities: RARITIES.map(id => ({ id, label: RARITY_LABEL[id], bonus: RARITY_BONUS[id] })),
     effects: EFFECTS.map(id => ({ id, label: EFFECT_LABEL[id] })),
+    focuses: ROUND_FOCUS,
   };
 }
 
-// Compatibility for an installed client from before the live-online release.
-// It remains a free bot practice and never moves points.
 async function botBattle(userId, ids = null) {
   const userCards = ids ? await validateDeck(userId, ids) : (await deckCards(userId)).cards;
-  if (userCards.length !== DECK_SIZE) { const e = new Error('اول ترکیب سه‌کارتی را آماده کن'); e.status = 400; throw e; }
+  if (userCards.length !== DECK_SIZE) { const e = new Error('اول ترکیب پنج‌کارتی را آماده کن'); e.status = 400; throw e; }
   const opponentCards = botDeck(userCards);
   const sim = simulate(userCards, opponentCards, { opponentName: 'ربات تمرینی' });
   const { rows } = await pool.query(
@@ -347,7 +387,7 @@ async function recordEngineBattle({ matchId = null, playerX, playerO, state, win
 }
 
 module.exports = {
-  DECK_SIZE, ONLINE_STAKES, RARITIES, EFFECTS, ROUND_FOCUS,
+  DECK_SIZE, ONLINE_STAKES, RARITIES, EFFECTS, ROUND_FOCUS, FRONT_IMAGE_SQL,
   RARITY_LABEL, EFFECT_LABEL, duelFieldsFromBody, publicCard, totalPower,
   playableCards, validateDeck, deckCards, status, saveDeck, botBattle,
   starterDeck, botDeck, resolveRound, simulate, recentBattles, recordEngineBattle,

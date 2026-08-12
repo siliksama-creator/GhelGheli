@@ -1,13 +1,13 @@
-// Live three-card duel.
+// Live five-card duel.
 //
 // Both players secretly choose one remaining card. When both choices are
-// locked, the server resolves the round from authoritative card stats. Three
-// rounds use three different focuses, so the strongest-looking card is not
+// locked, the server resolves the round from authoritative card stats. Five
+// rounds use five different focuses, so the strongest-looking card is not
 // automatically the best card to play first.
 const duel = require('../../services/cardDuelService');
 
 const idOf = card => String(card?.cardTypeId || card?.id || '');
-const FOCUS_STAT = ['speed', 'technique', 'goalChance'];
+const FOCUS_STAT = ['speed', 'technique', 'attack', 'defense', 'goalChance'];
 
 function demoCard(id, stat) {
   return {
@@ -21,15 +21,15 @@ function demoCard(id, stat) {
 // rooms always use createWithContext and authoritative inventory decks.
 function create() {
   return createFromDecks(
-    [demoCard('test-x1', 70), demoCard('test-x2', 72), demoCard('test-x3', 74)],
-    [demoCard('test-o1', 69), demoCard('test-o2', 71), demoCard('test-o3', 73)],
+    [demoCard('test-x1', 70), demoCard('test-x2', 72), demoCard('test-x3', 74), demoCard('test-x4', 76), demoCard('test-x5', 78)],
+    [demoCard('test-o1', 69), demoCard('test-o2', 71), demoCard('test-o3', 73), demoCard('test-o4', 75), demoCard('test-o5', 77)],
   );
 }
 
 function createFromDecks(deckX, deckO) {
   if (!Array.isArray(deckX) || !Array.isArray(deckO)
       || deckX.length !== duel.DECK_SIZE || deckO.length !== duel.DECK_SIZE) {
-    throw new Error('هر بازیکن باید ترکیب سه‌کارتی معتبر داشته باشد');
+    throw new Error('هر بازیکن باید ترکیب پنج‌کارتی معتبر داشته باشد');
   }
   const decks = {
     X: deckX.map(duel.publicCard),
@@ -54,7 +54,7 @@ async function validatePlayer(user, { vsBot = false } = {}) {
   const prepared = await duel.deckCards(user?.id);
   if (vsBot && prepared.cards.length !== duel.DECK_SIZE) return duel.starterDeck();
   if (prepared.cards.length !== duel.DECK_SIZE) {
-    const error = new Error('اول از صفحه دوئل کارت‌ها ترکیب سه‌کارتی خودت را ذخیره کن');
+    const error = new Error('اول از صفحه دوئل کارت‌ها ترکیب پنج‌کارتی خودت را ذخیره کن');
     error.status = 400;
     throw error;
   }
@@ -67,7 +67,7 @@ async function createWithContext({ playerX, playerO, vsBot }) {
     ? own.cards
     : (vsBot ? duel.starterDeck() : []);
   if (ownCards.length !== duel.DECK_SIZE) {
-    const error = new Error('اول ترکیب سه‌کارتی خودت را ذخیره کن');
+    const error = new Error('اول ترکیب پنج‌کارتی خودت را ذخیره کن');
     error.status = 400;
     throw error;
   }
@@ -75,7 +75,7 @@ async function createWithContext({ playerX, playerO, vsBot }) {
 
   const opponent = await duel.deckCards(playerO?.id);
   if (opponent.cards.length !== duel.DECK_SIZE) {
-    const error = new Error('حریف هنوز ترکیب سه‌کارتی معتبر ندارد');
+    const error = new Error('حریف هنوز ترکیب پنج‌کارتی معتبر ندارد');
     error.status = 409;
     throw error;
   }

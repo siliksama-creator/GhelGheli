@@ -765,16 +765,14 @@ app.get('/api/games/:gameId/solo', auth, asyncHandler(async (req, res) => {
 
 app.get('/api/profile', auth, asyncHandler(async (req, res) => {
   // همان ستون‌های bootstrap تا دو مسیر هرگز از هم جدا نیفتند.
-  // COALESCE(d.image_url, t.image_url): طرحِ تصادفیِ انتخاب‌شده در لحظهٔ
-  // ثبت، و اگر نبود تصویرِ پیش‌فرضِ نوعِ کارت. توضیح در مایگریشن ۰۴۴.
+  // FRONT_IMAGE_SQL: طرح روی کارت، نه پشت تصادفی.
   const inv = await pool.query(
-    `SELECT i.*, t.name, COALESCE(d.image_url, t.image_url) AS image_url,
+    `SELECT i.*, t.name, ${cardDuel.FRONT_IMAGE_SQL} AS image_url,
             t.point_value, t.cash_amount, t.description,
             t.duel_attack, t.duel_defense, t.duel_speed, t.duel_technique,
             t.duel_goal_chance, t.duel_energy, t.duel_rarity, t.duel_effect
        FROM user_card_inventory i
        JOIN card_types t ON t.id = i.card_type_id
-       LEFT JOIN photo_card_designs d ON d.id = i.display_design_id
       WHERE i.user_id=$1 AND i.consumed_in_reward=false ORDER BY t.name`,
     [req.user.id]);
   const leaguePayouts = await pool.query(`SELECT p.*, s.month_year FROM league_payouts p JOIN league_seasons s ON s.id=p.league_season_id WHERE p.user_id=$1 ORDER BY p.created_at DESC LIMIT 20`, [req.user.id]);
@@ -816,17 +814,16 @@ app.get('/api/bootstrap', auth, asyncHandler(async (req, res) => {
     // `i.updated_at` آخرین بار که تعدادش زیاد شده. برای «تازه‌ترین»
     // دومی درست است — کاربر می‌خواهد کارتی را ببیند که همین حالا ثبت
     // کرده، حتی اگر نسخهٔ اولش را ماه‌ها پیش گرفته باشد.
-    // COALESCE(d.image_url, …): طرحِ رو/پشتِ تصادفی که در لحظهٔ ثبت
+    // FRONT_IMAGE_SQL: همان تصویر روی کارت که در کلکسیون دیده می‌شود.
     // قرعه خورده. LEFT JOIN چون کارتِ بدونِ طرح (سیستمِ قدیمی) باید
     // همچنان تصویرِ پیش‌فرضِ نوعِ کارت را بگیرد نه هیچ.
     pool.query(
-      `SELECT i.*, t.name, COALESCE(d.image_url, t.image_url) AS image_url,
+      `SELECT i.*, t.name, ${cardDuel.FRONT_IMAGE_SQL} AS image_url,
               t.point_value, t.cash_amount, t.description,
               t.duel_attack, t.duel_defense, t.duel_speed, t.duel_technique,
               t.duel_goal_chance, t.duel_energy, t.duel_rarity, t.duel_effect
          FROM user_card_inventory i
          JOIN card_types t ON t.id = i.card_type_id
-         LEFT JOIN photo_card_designs d ON d.id = i.display_design_id
         WHERE i.user_id = $1 AND i.consumed_in_reward = false
         ORDER BY t.name`, [req.user.id]),
     pool.query(
@@ -1044,7 +1041,7 @@ app.get('/api/users/:id/public', auth, validateUuid('id'), asyncHandler(async (r
   // در پروفایلِ عمومی دیده نشود.
   const cards = await pool.query(
     `SELECT t.id AS card_type_id, t.name,
-            COALESCE(d.image_url, t.image_url) AS image_url, t.point_value,
+            ${cardDuel.FRONT_IMAGE_SQL} AS image_url, t.point_value,
             t.description, t.duel_attack, t.duel_defense, t.duel_speed,
             t.duel_technique, t.duel_goal_chance, t.duel_energy,
             t.duel_rarity, t.duel_effect,
@@ -1052,7 +1049,6 @@ app.get('/api/users/:id/public', auth, validateUuid('id'), asyncHandler(async (r
             i.updated_at AS last_registered_at
        FROM user_card_inventory i
        JOIN card_types t ON t.id = i.card_type_id
-       LEFT JOIN photo_card_designs d ON d.id = i.display_design_id
       WHERE i.user_id = $1 AND i.consumed_in_reward = false AND i.quantity > 0
       ORDER BY i.quantity DESC, t.name
       LIMIT 50`, [req.params.id]);
@@ -1113,7 +1109,7 @@ app.get('/api/users/:id/public', auth, validateUuid('id'), asyncHandler(async (r
 }));
 
 app.get('/api/rewards', auth, asyncHandler(async (req, res) => {
-  const { rows } = await pool.query('SELECT *, ($1 >= required_points) AS eligible FROM reward_tiers WHERE is_active=true ORDER BY display_order, required_points', [req.user.current_points]);
+  const { rows } = await pool.query('SELECT *, ($1 >= required_points) AS eligible FROM reward_tiers WHERErequired_points', [req.user.current_points]);
   res.json(rows);
 }));
 // Reward groups: the user-facing catalogue with per-group progress.
@@ -2384,3 +2380,6 @@ process.on('uncaughtException', (err) => {
 
 const port = process.env.PORT || 4000;
 server.listen(port, async () => { await ensureActiveSeason(); console.log(`GhelGheli API on :${port}`); });
+;
+log(`GhelGheli API on :${port}`); });
+;

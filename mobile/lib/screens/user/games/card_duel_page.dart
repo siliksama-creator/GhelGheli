@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -18,8 +17,7 @@ import '../../../theme/tokens.dart';
 import '../../../widgets/app_card.dart';
 import '../../../widgets/avatar_image.dart';
 import '../../../widgets/match_effect_visual.dart';
-import '../../../widgets/rarity_card_frame.dart';
-import '../../../widgets/safe_image.dart';
+import '../../../widgets/player_card.dart';
 import 'game_session.dart';
 
 part 'card_duel/card_duel_widgets.dart';
@@ -77,7 +75,7 @@ class _CardDuelPageState extends State<CardDuelPage> {
           .map((card) => Map<String, dynamic>.from(card))
           .toList(growable: false);
 
-  bool get _practiceFallback => widget.vsBot && _ownedCards.length < 3;
+  bool get _practiceFallback => widget.vsBot && _ownedCards.length < 5;
 
   List<Map<String, dynamic>> get _cards {
     final source = _practiceFallback
@@ -127,14 +125,14 @@ class _CardDuelPageState extends State<CardDuelPage> {
           ? Map<String, dynamic>.from(response)
           : <String, dynamic>{};
       final owned = (map['playableCards'] as List?) ?? const [];
-      final prepared = widget.vsBot && owned.length < 3
+      final prepared = widget.vsBot && owned.length < 5
           ? (map['practiceCards'] as List? ?? const [])
           : ((map['activeDeck'] as Map?)?['cards'] as List? ?? const []);
       final activeCards = prepared
           .whereType<Map>()
           .map((card) => '${card['cardTypeId'] ?? card['id'] ?? ''}')
           .where((id) => id.isNotEmpty)
-          .take(3)
+          .take(5)
           .toList();
       setState(() {
         _data = map;
@@ -156,7 +154,7 @@ class _CardDuelPageState extends State<CardDuelPage> {
   }
 
   Future<void> _saveAndStart() async {
-    if (_selected.length != 3 || _busy) return;
+    if (_selected.length != 5 || _busy) return;
     setState(() {
       _busy = true;
       _error = null;
@@ -191,10 +189,10 @@ class _CardDuelPageState extends State<CardDuelPage> {
     setState(() {
       if (_selected.contains(id)) {
         _selected.remove(id);
-      } else if (_selected.length < 3) {
+      } else if (_selected.length < 5) {
         _selected.add(id);
       } else {
-        _snack('ترکیب فقط سه کارت دارد؛ اول یکی را بردار');
+        _snack('ترکیب فقط پنج کارت دارد؛ اول یکی را بردار');
       }
     });
   }
@@ -488,7 +486,7 @@ class _CardDuelPageState extends State<CardDuelPage> {
             foregroundColor: const Color(0xFF04101A),
             shape: RoundedRectangleBorder(borderRadius: Corners.rLg),
           ),
-          onPressed: _busy || _selected.length != 3 ? null : _saveAndStart,
+          onPressed: _busy || _selected.length != 5 ? null : _saveAndStart,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -523,7 +521,7 @@ class _CardDuelPageState extends State<CardDuelPage> {
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('دستهٔ تمرینی رایگان برای شروع سریع',
                     style: TextStyle(color: _emerald, fontWeight: FontWeight.w900)),
-                Text('این کارت‌ها فقط مقابل ربات فعال‌اند؛ برای آنلاین باید سه کارت واقعی جمع کنی.',
+                Text('این کارت‌ها فقط مقابل ربات فعال‌اند؛ برای آنلاین باید پنج کارت واقعی جمع کنی.',
                     style: TextStyle(fontSize: 9.5, color: Colors.white60)),
               ])),
             ]),
@@ -536,9 +534,9 @@ class _CardDuelPageState extends State<CardDuelPage> {
                   fontWeight: FontWeight.w900,
                 )),
         Gaps.vXs,
-        if (_cards.length < 3)
+        if (_cards.length < 5)
           const AppCard(
-            child: Text('برای ورود به آرنا حداقل سه کارت فعال در کلکسیون لازم داری.'),
+            child: Text('برای ورود به آرنا حداقل پنج کارت فعال در کلکسیون لازم داری.'),
           )
         else
           GridView.builder(
@@ -554,7 +552,7 @@ class _CardDuelPageState extends State<CardDuelPage> {
             itemBuilder: (_, index) {
               final card = _cards[index];
               final id = '${card['cardTypeId'] ?? card['id']}';
-              return _HoloCard(
+              return PlayerCard(
                 card: card,
                 selected: _selected.contains(id),
                 onTap: () => _toggle(id),

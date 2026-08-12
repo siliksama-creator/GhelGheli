@@ -46,7 +46,7 @@ const CATALOG = [
   },
   {
     id: 'card_duel', title: 'دوئل کارت‌ها', emoji: 'card',
-    subtitle: 'سه کارت انتخاب کن؛ آنلاین، لابی یا تمرین با ربات',
+    subtitle: 'پنج راند زنده با کارت‌های کلکسیونی',
     accent: '#FFD166', minutes: 2,
     noBot: false, solo: false,
   },

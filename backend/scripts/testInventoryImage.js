@@ -123,51 +123,20 @@ for (const [label, src] of [
     'الگوی قدیمی برگشته — باگِ مسابقه هم با آن برمی‌گردد');
 }
 
-console.log('\n══ ۳. هر سه خوانندهٔ اینونتوری به‌روزند ══');
-// اگر یکی جا بماند، کارتی که کاربر «پشت» می‌بیند برای حریفش «رو» دیده
-// می‌شود.
-// ⚠️ نسخهٔ اولِ این تست از `FROM user_card_inventory` به **جلو** برش
-//    می‌زد و شکست — در حالی که هر سه کوئری درست بودند. دلیلش ساده است:
-//    `SELECT ... COALESCE(...)` **قبلِ** `FROM` می‌آید، پس برشِ رو به
-//    جلو هیچ‌وقت آن را نمی‌دید.
-//
-//    این دقیقاً همان دسته «تستی که سبز/قرمز بودنش چیزی را ثابت نمی‌کند»
-//    است که باید مراقبش بود. حالا از `SELECT` تا انتهای کوئری برش
-//    می‌خورد.
-const readers = serverSrc.match(
-  /SELECT[\s\S]{0,600}?FROM user_card_inventory[\s\S]{0,400}?`/g) || [];
-const selectReaders = readers.filter(r => /JOIN card_types/i.test(r));
-ck('حداقل سه کوئریِ خواننده پیدا شد',
-  selectReaders.length >= 3, `پیدا شد: ${selectReaders.length}`);
-
-let joined = 0;
-const missing = [];
-for (const r of selectReaders) {
-  if (/LEFT JOIN photo_card_designs/i.test(r)
-      && /COALESCE\(\s*d\.image_url/i.test(r)) joined += 1;
-  else missing.push(r.slice(0, 70).replace(/\s+/g, ' '));
-}
-ck('همهٔ خواننده‌ها COALESCE(d.image_url, t.image_url) دارند',
-  joined === selectReaders.length,
-  `${joined} از ${selectReaders.length} — جا مانده: ${missing.join(' | ')}`);
+console.log('\n══ ۳. هر سه خوانندهٔ اینونتوری طرحِ رو را نشان می‌دهند ══');
+const frontUses = (serverSrc.match(/cardDuel\.FRONT_IMAGE_SQL/g) || []).length;
+ck('profile و bootstrap و پروفایل عمومی از FRONT_IMAGE_SQL می‌خوانند',
+  frontUses >= 3, `پیدا شد: ${frontUses}`);
+const duelSvc = fs.readFileSync(path.join(ROOT, 'src/services/cardDuelService.js'), 'utf8');
+ck('FRONT_IMAGE_SQL فقط طرح رو را برمی‌دارد و به t.image_url برمی‌گردد',
+  /COALESCE\(pd\.side, 'front'\) = 'front'/.test(duelSvc)
+  && /ORDER BY pd\.created_at DESC LIMIT 1\),\s*t\.image_url/.test(duelSvc));
+ck('خواننده‌ها دیگر پشتِ تصادفی را تصویر اصلی نمی‌کنند',
+  !/COALESCE\(\s*d\.image_url\s*,\s*t\.image_url\s*\)/.test(serverSrc));
 
 console.log('\n══ ۴. بازگشتِ امن وقتی طرحی نیست ══');
-// کدِ نام‌دار بدونِ عکس، و کلِ سیستمِ قدیمیِ «فقط کد»، هیچ طرحی ندارند.
-// آن‌ها باید همان `card_types.image_url` را بگیرند نه هیچ.
-ck('COALESCE به t.image_url برمی‌گردد',
-  /COALESCE\(\s*d\.image_url\s*,\s*t\.image_url\s*\)/i.test(serverSrc),
-  'بدونِ این، کارتِ بدونِ طرح تصویرِ خالی نشان می‌دهد');
-// ⚠️ نسخهٔ اولِ این بررسی `[^T]\bJOIN photo_card_designs d\b` بود که
-//    روی «LEFT JOIN» هم می‌خورد (چون ` JOIN` با فاصلهٔ قبلش مطابقت
-//    می‌کرد) و بی‌دلیل قرمز می‌شد. شمردن صادقانه‌تر از regexِ منفی است:
-//    هر ارجاع باید LEFT باشد.
-const allJoins =
-  (serverSrc.match(/JOIN photo_card_designs d\b/gi) || []).length;
-const leftJoins =
-  (serverSrc.match(/LEFT JOIN photo_card_designs d\b/gi) || []).length;
-ck('همهٔ JOINها به photo_card_designs از نوعِ LEFT هستند',
-  allJoins > 0 && allJoins === leftJoins,
-  `${leftJoins} از ${allJoins} — JOIN معمولی کارتِ بدونِ طرح را کاملاً از اینونتوری حذف می‌کند`);
+ck('اگر طرح رو نباشد t.image_url نمایش داده می‌شود',
+  /t\.image_url/.test(duelSvc));
 
 console.log(`\n${fail ? '✗' : '✓'} ${pass} موفق، ${fail} ناموفق\n`);
 process.exit(fail ? 1 : 0);

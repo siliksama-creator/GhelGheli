@@ -1,4 +1,10 @@
 part of '../card_duel_page.dart';
+// RarityCardFrame is applied by PlayerCard so inventory, detail and duel share one frame.
+
+const _gold = Color(0xFFFFD166);
+const _cyan = Color(0xFF38BDF8);
+const _emerald = Color(0xFF22E7A6);
+const _rose = Color(0xFFFB7185);
 
 class _ArenaHero extends StatelessWidget {
   const _ArenaHero({
@@ -23,60 +29,23 @@ class _ArenaHero extends StatelessWidget {
             const Color(0xFF050A12),
           ]),
           border: Border.all(color: modeColor.withValues(alpha: 0.55)),
-          boxShadow: [
-            BoxShadow(color: modeColor.withValues(alpha: 0.16), blurRadius: 34, offset: const Offset(0, 15)),
-          ],
         ),
-        child: Column(
+        child: Row(
           children: [
-            Row(
-              children: [
-                IconButton(onPressed: onBack, icon: const Icon(Icons.arrow_back_rounded)),
-                Container(
-                  width: 76,
-                  height: 76,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    boxShadow: [BoxShadow(color: modeColor.withValues(alpha: 0.34), blurRadius: 26)],
-                  ),
-                  child: Image.asset('assets/games/card_duel_glow.png', cacheWidth: 190),
-                ),
-                Gaps.hSm,
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('GHELGHELI CARD ARENA',
-                          style: TextStyle(color: modeColor, fontSize: 9, letterSpacing: 1.2, fontWeight: FontWeight.w900)),
-                      Text('دوئل کارت‌ها',
-                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w900,
-                              )),
-                      Text('انتخاب مخفی، ضدترکیب هوشمند و سه راند نفس‌گیر',
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.68), fontSize: 11.5)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            Gaps.vSm,
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: Gaps.sm, vertical: Gaps.xs),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.28),
-                borderRadius: Corners.rLg,
-                border: Border.all(color: modeColor.withValues(alpha: 0.38)),
-              ),
-              child: Row(
+            IconButton(onPressed: onBack, icon: const Icon(Icons.arrow_back_rounded)),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(modeTitle.contains('ربات') ? Icons.smart_toy_rounded : Icons.bolt_rounded, color: modeColor),
-                  Gaps.hXs,
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(modeTitle, style: TextStyle(color: modeColor, fontWeight: FontWeight.w900)),
-                    Text(subtitle, style: TextStyle(color: Colors.white.withValues(alpha: 0.62), fontSize: 10)),
-                  ])),
+                  Text('GHELGHELI CARD ARENA',
+                      style: TextStyle(color: modeColor, fontSize: 9, letterSpacing: 1.2, fontWeight: FontWeight.w900)),
+                  Text('دوئل کارت‌ها',
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                          )),
+                  Text('پنج راند مخفی، برخورد زنده و برندهٔ واضح هر راند',
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.68), fontSize: 11.5)),
                 ],
               ),
             ),
@@ -92,11 +61,11 @@ class _RuleStrip extends StatelessWidget {
         padding: EdgeInsets.all(Gaps.sm),
         child: Row(
           children: [
-            Expanded(child: _RuleStep(number: '۱', title: 'تیم بچین', subtitle: 'سه نقش مکمل')),
+            Expanded(child: _RuleStep(number: '۱', title: '۵ کارت بچین', subtitle: 'نقش‌های مکمل')),
             Icon(Icons.chevron_left_rounded, color: Colors.white24),
             Expanded(child: _RuleStep(number: '۲', title: 'مخفی انتخاب کن', subtitle: 'هم‌زمان با حریف')),
             Icon(Icons.chevron_left_rounded, color: Colors.white24),
-            Expanded(child: _RuleStep(number: '۳', title: 'دو راند ببر', subtitle: 'قهرمان آرنا شو')),
+            Expanded(child: _RuleStep(number: '۳', title: '۳ راند ببر', subtitle: 'قهرمان آرنا شو')),
           ],
         ),
       );
@@ -110,7 +79,9 @@ class _RuleStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Column(
         children: [
-          CircleAvatar(radius: 13, backgroundColor: _gold.withValues(alpha: 0.15),
+          CircleAvatar(
+              radius: 13,
+              backgroundColor: _gold.withValues(alpha: 0.15),
               child: Text(number, style: const TextStyle(color: _gold, fontWeight: FontWeight.w900, fontSize: 10))),
           const SizedBox(height: 4),
           Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900)),
@@ -127,28 +98,33 @@ class _LineupPanel extends StatelessWidget {
   final ValueChanged<String> onRemove;
   @override
   Widget build(BuildContext context) {
-    final byId = {for (final card in cards) '${card['cardTypeId'] ?? card['id']}': card};
+    final byId = {for (final card in cards) cardIdOf(card): card};
     return AppCard(
       child: Column(
         children: [
           Row(children: [
-            const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('ترکیب اصلی', style: TextStyle(fontWeight: FontWeight.w900)),
-              Text('برای حذف، روی کارت ترکیب بزن', style: TextStyle(fontSize: 9, color: Colors.white54)),
+              Text('پنج کارت؛ برای حذف روی اسلات بزن', style: TextStyle(fontSize: 9, color: Colors.white54)),
             ])),
             Text('${faNum(teamPower)} قدرت', style: const TextStyle(color: _gold, fontWeight: FontWeight.w900)),
           ]),
           Gaps.vSm,
-          Row(children: [
-            for (var index = 0; index < 3; index++) ...[
-              Expanded(child: _LineupSlot(
-                index: index,
-                card: index < selected.length ? byId[selected[index]] : null,
-                onTap: index < selected.length ? () => onRemove(selected[index]) : null,
-              )),
-              if (index < 2) Gaps.hXs,
-            ],
-          ]),
+          SizedBox(
+            height: 118,
+            child: Row(children: [
+              for (var index = 0; index < 5; index++) ...[
+                Expanded(
+                    child: _LineupSlot(
+                  index: index,
+                  card: index < selected.length ? byId[selected[index]] : null,
+                  onTap: index < selected.length ? () => onRemove(selected[index]) : null,
+                )),
+                if (index < 4) const SizedBox(width: 4),
+              ],
+            ]),
+          ),
         ],
       ),
     );
@@ -164,191 +140,20 @@ class _LineupSlot extends StatelessWidget {
   Widget build(BuildContext context) => InkWell(
         onTap: onTap,
         borderRadius: Corners.rLg,
-        child: Container(
-          height: 112,
-          decoration: BoxDecoration(
-            borderRadius: Corners.rLg,
-            border: Border.all(color: card == null ? Colors.white24 : _gold.withValues(alpha: 0.55)),
-            gradient: const LinearGradient(colors: [Color(0xFF17283D), Color(0xFF050A11)]),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: card == null
-              ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        child: card == null
+            ? Container(
+                decoration: BoxDecoration(
+                  borderRadius: Corners.rLg,
+                  border: Border.all(color: Colors.white24),
+                  gradient: const LinearGradient(colors: [Color(0xFF17283D), Color(0xFF050A11)]),
+                ),
+                child: Center(
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
                   const Icon(Icons.add_rounded, color: Colors.white38),
                   Text('کارت ${faNum(index + 1)}', style: const TextStyle(fontSize: 9, color: Colors.white54)),
-                ]))
-              : Stack(fit: StackFit.expand, children: [
-                  SafeImage(url: card!['imageUrl'], fit: BoxFit.cover, fallbackEmoji: '🃏'),
-                  const DecoratedBox(decoration: BoxDecoration(
-                    gradient: LinearGradient(begin: Alignment.center, end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Color(0xF2050910)]),
-                  )),
-                  Positioned(right: 5, left: 5, bottom: 5,
-                    child: Text('${card!['name']}', maxLines: 1, overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w900))),
-                ]),
-        ),
-      );
-}
-
-class _HoloCard extends StatelessWidget {
-  const _HoloCard({required this.card, this.selected = false, this.compact = false, this.enabled = true, this.onTap, this.frame});
-  final Map card;
-  final String? frame;
-  final bool selected;
-  final bool compact;
-  final bool enabled;
-  final VoidCallback? onTap;
-
-  Color get rarity => switch ('${card['rarity']}') {
-        'legend' => const Color(0xFFFF6B35),
-        'premium' || 'gold' => _gold,
-        'silver' => const Color(0xFFC7D2FE),
-        _ => _emerald,
-      };
-
-  @override
-  Widget build(BuildContext context) {
-    final cardView = Opacity(
-        opacity: enabled ? 1 : 0.34,
-        child: InkWell(
-          onTap: enabled && onTap != null ? () {
-            HapticFeedback.selectionClick();
-            onTap!();
-          } : null,
-          borderRadius: Corners.rXl,
-          child: AnimatedContainer(
-            duration: Motion.fast,
-            padding: EdgeInsets.all(compact ? 6 : 8),
-            decoration: BoxDecoration(
-              borderRadius: Corners.rXl,
-              gradient: LinearGradient(colors: [
-                rarity.withValues(alpha: selected ? 0.26 : 0.14),
-                const Color(0xFF101C2B),
-                const Color(0xFF04080F),
-              ]),
-              border: Border.all(color: rarity.withValues(alpha: selected ? 0.95 : 0.34), width: selected ? 2 : 1),
-              boxShadow: selected ? [BoxShadow(color: rarity.withValues(alpha: 0.25), blurRadius: 25)] : null,
-            ),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Expanded(child: Stack(fit: StackFit.expand, children: [
-                ClipRRect(borderRadius: Corners.rLg,
-                    child: SafeImage(url: card['imageUrl'], fit: BoxFit.cover, fallbackEmoji: '${card['id']}'.startsWith('bot-') ? '🤖' : '🃏')),
-                Positioned.fill(child: _CardEnergyLayer(color: rarity, active: enabled)),
-                const DecoratedBox(decoration: BoxDecoration(
-                  gradient: LinearGradient(begin: Alignment.center, end: Alignment.bottomCenter,
-                      colors: [Colors.transparent, Color(0xD902050A)]),
-                )),
-                Positioned(right: 6, bottom: 6,
-                  child: CircleAvatar(radius: compact ? 14 : 18, backgroundColor: const Color(0xDD02060C),
-                    child: Text(faNum(card['power']), style: TextStyle(color: rarity, fontSize: compact ? 9 : 11, fontWeight: FontWeight.w900)))),
-                if (selected) const Positioned(right: 6, top: 6,
-                  child: CircleAvatar(radius: 13, backgroundColor: _gold,
-                    child: Icon(Icons.check_rounded, color: Color(0xFF07111B), size: 17))),
-              ])),
-              const SizedBox(height: 5),
-              Text('${card['name'] ?? 'کارت'}', maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: compact ? 10 : 12.5, fontWeight: FontWeight.w900)),
-              if (!compact) ...[
-                Text('${card['rarityLabel'] ?? ''} · ${card['effectLabel'] ?? ''}', maxLines: 1,
-                    overflow: TextOverflow.ellipsis, style: TextStyle(color: rarity, fontSize: 8.5)),
-                const SizedBox(height: 4),
-                Wrap(spacing: 3, runSpacing: 3, children: [
-                  _Stat('ح', card['attack']), _Stat('د', card['defense']), _Stat('س', card['speed']),
-                  _Stat('ت', card['technique']), _Stat('گل', card['goalChance']),
-                ]),
-              ],
-            ]),
-          ),
-        ),
-      );
-    final rarityView = RarityCardFrame(
-      rarity: '${card['rarity'] ?? card['duel_rarity'] ?? 'normal'}',
-      borderRadius: compact ? 20 : 24,
-      padding: 3,
-      child: cardView,
-    );
-    return CosmeticCardFrame(
-      frame: frame,
-      borderRadius: compact ? 20 : 24,
-      padding: frame == null ? 0 : 3,
-      child: rarityView,
-    );
-  }
-}
-
-class _CardEnergyLayer extends StatefulWidget {
-  const _CardEnergyLayer({required this.color, required this.active});
-  final Color color;
-  final bool active;
-
-  @override
-  State<_CardEnergyLayer> createState() => _CardEnergyLayerState();
-}
-
-class _CardEnergyLayerState extends State<_CardEnergyLayer>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1900),
-  );
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.active) _controller.repeat();
-  }
-
-  @override
-  void didUpdateWidget(covariant _CardEnergyLayer oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.active == widget.active) return;
-    widget.active ? _controller.repeat() : _controller.stop();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (!widget.active || (MediaQuery.maybeOf(context)?.disableAnimations ?? false)) {
-      return const SizedBox.shrink();
-    }
-    return IgnorePointer(
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (_, __) {
-          final t = _controller.value;
-          return DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment(-2 + t * 4, -1),
-                end: Alignment(-1 + t * 4, 1),
-                colors: [Colors.transparent, widget.color.withValues(alpha: .24), Colors.transparent],
-                stops: const [0, .5, 1],
-              ),
-              border: Border.all(color: widget.color.withValues(alpha: .18 + .20 * math.sin(t * math.pi).abs())),
-              borderRadius: Corners.rLg,
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _Stat extends StatelessWidget {
-  const _Stat(this.label, this.value);
-  final String label;
-  final Object? value;
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.06), borderRadius: Corners.rSm),
-        child: Text('$label ${faNum(value)}', style: const TextStyle(fontSize: 8.5, fontWeight: FontWeight.w800)),
+                ])),
+              )
+            : PlayerCard(card: Map<String, dynamic>.from(card!), compact: true, showStats: false, onTap: onTap),
       );
 }
 
@@ -360,20 +165,18 @@ class _Matchmaking extends StatelessWidget {
   @override
   Widget build(BuildContext context) => AppCard(
         child: SizedBox(
-          height: 350,
+          height: 280,
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Container(
-              width: 130, height: 130,
-              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: color),
-                boxShadow: [BoxShadow(color: color.withValues(alpha: 0.26), blurRadius: 36)]),
-              padding: const EdgeInsets.all(24),
-              child: Image.asset('assets/games/card_duel_glow.png'),
+            SizedBox(
+              width: 72,
+              height: 72,
+              child: CircularProgressIndicator(color: color, strokeWidth: 3),
             ),
             Gaps.vMd,
             Text(vsBot ? 'ربات تاکتیکی وارد آرنا می‌شود…' : 'در جستجوی حریف هم‌سطح…',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
             Gaps.vXs,
-            const Text('ترکیب تو قفل و محفوظ است؛ کارت‌ها تا لحظه برخورد مخفی می‌مانند.',
+            const Text('ترکیب تو قفل است؛ کارت‌ها تا لحظه برخورد مخفی می‌مانند.',
                 textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: Colors.white60)),
             Gaps.vMd,
             OutlinedButton(onPressed: onCancel, child: const Text('لغو و ویرایش ترکیب')),
@@ -392,94 +195,145 @@ class _LiveBattle extends StatelessWidget {
     final state = session.state;
     final mine = session.mySymbol ?? 'X';
     final opponent = mine == 'X' ? 'O' : 'X';
-    final myPlayer = session.playerInfo(mine);
-    final opponentPlayer = session.playerInfo(opponent);
-    final myCosmetics = myPlayer?['cosmetics'] is Map ? myPlayer!['cosmetics'] as Map : const {};
-    final opponentCosmetics = opponentPlayer?['cosmetics'] is Map ? opponentPlayer!['cosmetics'] as Map : const {};
-    final myFrame = myCosmetics['frame'] as String?;
-    final opponentFrame = opponentCosmetics['frame'] as String?;
     final score = state['score'] is Map ? state['score'] as Map : const {};
     final deck = (state['myDeck'] as List? ?? const []).whereType<Map>().toList();
     final remaining = (state['myRemainingCardIds'] as List? ?? const []).map((id) => '$id').toSet();
-    final lastRound = state['lastRound'] is Map ? state['lastRound'] as Map : null;
+    final lastRound = state['lastRound'] is Map ? Map<String, dynamic>.from(state['lastRound'] as Map) : null;
+    final history = (state['history'] as List? ?? const []).whereType<Map>().toList();
     final iChose = state['iChose'] == true;
+    final total = NumberParser.toInt(state['totalRounds']) == 0 ? 5 : NumberParser.toInt(state['totalRounds']);
+    final roundIndex = NumberParser.toInt(state['roundIndex']);
     return Column(children: [
-      AppCard(child: Row(children: [
-        Expanded(child: _Score(name: session.nameOf(mine), score: NumberParser.toInt(score[mine]), color: color, player: session.playerInfo(mine))),
-        Column(children: [
-          Text('راند ${faNum((NumberParser.toInt(state['roundIndex']) + 1).clamp(1, 3))} از ۳',
-              style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w900)),
-          Text('${state['roundTitle'] ?? 'پایان نبرد'}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
-        ]),
-        Expanded(child: _Score(name: session.nameOf(opponent), score: NumberParser.toInt(score[opponent]), color: _gold, player: session.playerInfo(opponent), reverse: true)),
-
-      ])),
-      Gaps.vXs,
-      Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-        for (var i = 0; i < 3; i++) Container(
-          width: 38, height: 4, margin: const EdgeInsets.symmetric(horizontal: 3),
-          decoration: BoxDecoration(borderRadius: Corners.rPill,
-            color: i < NumberParser.toInt(state['roundIndex']) ? _emerald
-                : i == NumberParser.toInt(state['roundIndex']) ? color : Colors.white12),
-        ),
-      ]),
+      _Scoreboard(
+        myName: session.nameOf(mine),
+        theirName: session.nameOf(opponent),
+        myScore: NumberParser.toInt(score[mine]),
+        theirScore: NumberParser.toInt(score[opponent]),
+        color: color,
+        myPlayer: session.playerInfo(mine),
+        theirPlayer: session.playerInfo(opponent),
+        title: '${state['roundTitle'] ?? 'پایان نبرد'}',
+        roundLabel: 'راند ${faNum((roundIndex + 1).clamp(1, total))} از ${faNum(total)}',
+      ),
+      Gaps.vSm,
+      _RoundPips(total: total, current: roundIndex, history: history, mine: mine, color: color),
       Gaps.vMd,
-      Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-        for (var i = 0; i < NumberParser.toInt(state['opponentRemainingCount']); i++)
-          Transform.rotate(angle: (i - 1) * 0.08,
-            child: Container(width: 55, height: 75, margin: const EdgeInsets.symmetric(horizontal: 2),
-              decoration: BoxDecoration(borderRadius: Corners.rMd,
-                gradient: const LinearGradient(colors: [Color(0xFF19304A), Color(0xFF050A11)]),
-                border: Border.all(color: _gold.withValues(alpha: 0.55))),
-              child: Image.asset('assets/games/card_duel_glow.png', width: 42))),
-      ]),
-      if (lastRound != null) ...[
-        Gaps.vSm,
-        _RoundReveal(round: lastRound, mine: mine, myFrame: myFrame, opponentFrame: opponentFrame),
-      ],
+      _ClashStage(round: lastRound, mine: mine, color: color),
       if (session.phase == GamePhase.playing) ...[
         Gaps.vSm,
-        AppCard(child: Column(children: [
+        AppCard(
+            child: Column(children: [
           Row(children: [
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(iChose ? 'انتخابت قفل شد' : 'کارت این راند را انتخاب کن',
                   style: const TextStyle(fontWeight: FontWeight.w900)),
-              Text(state['waitingForOpponent'] == true ? 'منتظر انتخاب حریف…'
-                  : state['opponentLocked'] == true ? 'حریف انتخاب کرده؛ تصمیم بگیر!'
-                  : 'انتخاب‌ها مخفی و هم‌زمان هستند',
+              Text(
+                  state['waitingForOpponent'] == true
+                      ? 'منتظر انتخاب حریف…'
+                      : state['opponentLocked'] == true
+                          ? 'حریف انتخاب کرده؛ تصمیم بگیر!'
+                          : 'انتخاب‌ها مخفی و هم‌زمان هستند',
                   style: const TextStyle(fontSize: 9.5, color: Colors.white54)),
             ])),
-            AnimatedBuilder(animation: session.clock, builder: (_, __) => CircleAvatar(
-              radius: 25, backgroundColor: const Color(0xFF02060C),
-              child: Text(faNum(session.secondsLeft), style: TextStyle(color: color, fontWeight: FontWeight.w900)))),
+            AnimatedBuilder(
+                animation: session.clock,
+                builder: (_, __) => CircleAvatar(
+                    radius: 24,
+                    backgroundColor: const Color(0xFF02060C),
+                    child: Text(faNum(session.secondsLeft),
+                        style: TextStyle(color: color, fontWeight: FontWeight.w900)))),
           ]),
           Gaps.vSm,
-          Row(children: [
-            for (var i = 0; i < deck.length; i++) ...[
-              Expanded(child: AspectRatio(aspectRatio: 0.72,
-                child: _HoloCard(card: deck[i], compact: true, frame: myFrame,
-                  enabled: !iChose && remaining.contains('${deck[i]['cardTypeId'] ?? deck[i]['id']}'),
-                  onTap: () => session.moveObject({'cardId': '${deck[i]['cardTypeId'] ?? deck[i]['id']}'})))),
-              if (i < deck.length - 1) Gaps.hXs,
-            ],
-          ]),
+          SizedBox(
+            height: 168,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: deck.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (_, index) {
+                final card = Map<String, dynamic>.from(deck[index]);
+                final id = cardIdOf(card);
+                final canPlay = !iChose && remaining.contains(id);
+                return SizedBox(
+                  width: 112,
+                  child: PlayerCard(
+                    card: card,
+                    compact: true,
+                    showStats: false,
+                    enabled: canPlay,
+                    onTap: canPlay ? () => session.moveObject({'cardId': id}) : null,
+                  ),
+                );
+              },
+            ),
+          ),
         ])),
       ],
     ]);
   }
 }
 
+class _Scoreboard extends StatelessWidget {
+  const _Scoreboard({
+    required this.myName,
+    required this.theirName,
+    required this.myScore,
+    required this.theirScore,
+    required this.color,
+    required this.myPlayer,
+    required this.theirPlayer,
+    required this.title,
+    required this.roundLabel,
+  });
+  final String myName;
+  final String theirName;
+  final int myScore;
+  final int theirScore;
+  final Color color;
+  final Map? myPlayer;
+  final Map? theirPlayer;
+  final String title;
+  final String roundLabel;
+
+  @override
+  Widget build(BuildContext context) => AppCard(
+        child: Row(children: [
+          Expanded(child: _Score(name: myName, score: myScore, color: color, player: myPlayer)),
+          Column(children: [
+            Text(roundLabel, style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w900)),
+            Text(title, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+            Text('${faNum(myScore)}  —  ${faNum(theirScore)}',
+                textDirection: TextDirection.ltr,
+                style: const TextStyle(color: _gold, fontSize: 22, fontWeight: FontWeight.w900)),
+          ]),
+          Expanded(child: _Score(name: theirName, score: theirScore, color: _gold, player: theirPlayer, reverse: true)),
+        ]),
+      );
+}
+
 class _Score extends StatelessWidget {
   const _Score({required this.name, required this.score, required this.color, required this.player, this.reverse = false});
-  final String name; final int score; final Color color; final Map? player; final bool reverse;
+  final String name;
+  final int score;
+  final Color color;
+  final Map? player;
+  final bool reverse;
   @override
   Widget build(BuildContext context) {
     final cosmetics = player?['cosmetics'] is Map ? player!['cosmetics'] as Map : const {};
     final isBot = player?['isBot'] == true;
     final parts = [
-      CircleAvatar(radius: 19, backgroundColor: const Color(0xFF02060C), child: Text(faNum(score), style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.w900))),
+      TweenAnimationBuilder<int>(
+        tween: IntTween(begin: 0, end: score),
+        duration: const Duration(milliseconds: 420),
+        builder: (_, value, __) => CircleAvatar(
+            radius: 18,
+            backgroundColor: const Color(0xFF02060C),
+            child: Text(faNum(value), style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.w900))),
+      ),
       if (isBot)
-        Icon(Icons.smart_toy_rounded, size: 24, color: color)
+        Icon(Icons.smart_toy_rounded, size: 22, color: color)
       else
         CosmeticAvatarFrame(
           frame: cosmetics['frame'] as String?,
@@ -487,120 +341,245 @@ class _Score extends StatelessWidget {
           child: AvatarImage(
             imageUrl: player?['profileImageUrl'],
             keyName: player?['profileAvatarKey'],
-            radius: 14,
+            radius: 13,
           ),
         ),
-      Flexible(child: DisplayName(
+      Flexible(
+          child: DisplayName(
         name: name,
         cosmetics: cosmetics,
         level: (player?['level'] as num?)?.toInt(),
         style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800),
       )),
     ];
-    return Row(mainAxisAlignment: reverse ? MainAxisAlignment.end : MainAxisAlignment.start,
-      children: reverse ? parts.reversed.toList() : parts);
+    return Row(mainAxisAlignment: reverse ? MainAxisAlignment.end : MainAxisAlignment.start, children: reverse ? parts.reversed.toList() : parts);
   }
 }
 
-class _RoundReveal extends StatelessWidget {
-  const _RoundReveal({required this.round, required this.mine, required this.myFrame, required this.opponentFrame});
-  final Map round; final String mine; final String? myFrame; final String? opponentFrame;
+class _RoundPips extends StatelessWidget {
+  const _RoundPips({required this.total, required this.current, required this.history, required this.mine, required this.color});
+  final int total;
+  final int current;
+  final List<Map> history;
+  final String mine;
+  final Color color;
+  @override
+  Widget build(BuildContext context) => Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        for (var i = 0; i < total; i++)
+          Container(
+            width: 34,
+            height: 8,
+            margin: const EdgeInsets.symmetric(horizontal: 3),
+            decoration: BoxDecoration(
+              borderRadius: Corners.rPill,
+              color: i < history.length
+                  ? ('${history[i]['winner']}' == mine
+                      ? _emerald
+                      : '${history[i]['winner']}' == 'DRAW'
+                          ? _gold
+                          : _rose)
+                  : i == current
+                      ? color
+                      : Colors.white12,
+            ),
+          ),
+      ]);
+}
+
+class _ClashStage extends StatelessWidget {
+  const _ClashStage({required this.round, required this.mine, required this.color});
+  final Map<String, dynamic>? round;
+  final String mine;
+  final Color color;
+
   @override
   Widget build(BuildContext context) {
-    final myCard = (mine == 'O' ? round['cardO'] : round['cardX']) as Map? ?? const {};
-    final otherCard = (mine == 'O' ? round['cardX'] : round['cardO']) as Map? ?? const {};
-    final myPower = mine == 'O' ? round['powerO'] : round['powerX'];
-    final otherPower = mine == 'O' ? round['powerX'] : round['powerO'];
-    final winner = '${round['winner']}';
+    if (round == null) {
+      return Container(
+        height: 210,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          borderRadius: Corners.rXl,
+          gradient: RadialGradient(colors: [color.withValues(alpha: 0.16), const Color(0xFF07111D)]),
+          border: Border.all(color: Colors.white10),
+        ),
+        child: const Text('منتظر برخورد اول…', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w800)),
+      );
+    }
+    final myCard = Map<String, dynamic>.from((mine == 'O' ? round!['cardO'] : round!['cardX']) as Map? ?? const {});
+    final otherCard = Map<String, dynamic>.from((mine == 'O' ? round!['cardX'] : round!['cardO']) as Map? ?? const {});
+    final myPower = mine == 'O' ? round!['powerO'] : round!['powerX'];
+    final otherPower = mine == 'O' ? round!['powerX'] : round!['powerO'];
+    final winner = '${round!['winner']}';
+    final iWon = winner == mine;
+    final draw = winner == 'DRAW';
     return TweenAnimationBuilder<double>(
-      key: ValueKey(round['round']),
-      tween: Tween(begin: .82, end: 1),
-      duration: const Duration(milliseconds: 620),
+      key: ValueKey(round!['round']),
+      tween: Tween(begin: 0.86, end: 1),
+      duration: const Duration(milliseconds: 520),
       curve: Curves.easeOutBack,
       builder: (_, value, child) => Opacity(
-        opacity: ((value - .82) / .18).clamp(0.0, 1.0).toDouble(),
+        opacity: ((value - 0.86) / 0.14).clamp(0.0, 1.0),
         child: Transform.scale(scale: value, child: child),
       ),
-      child: AppCard(child: Row(children: [
-      Expanded(child: AspectRatio(aspectRatio: 0.72, child: _HoloCard(card: myCard, compact: true, frame: myFrame))),
-      Gaps.hXs,
-      Expanded(child: Column(children: [
-        Text('راند ${faNum(round['round'])}', style: const TextStyle(fontSize: 9, color: Colors.white54)),
-        Text('${round['title']}', textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900)),
-        Text('${faNum(myPower)}  VS  ${faNum(otherPower)}', textDirection: TextDirection.ltr,
-            style: const TextStyle(color: _gold, fontSize: 17, fontWeight: FontWeight.w900)),
-        Text(winner == 'DRAW' ? 'برخورد برابر!' : winner == mine ? 'این راند مال تو شد!' : 'حریف راند را برد',
-            textAlign: TextAlign.center, style: const TextStyle(fontSize: 9.5, color: Colors.white60)),
-      ])),
-      Gaps.hXs,
-      Expanded(child: AspectRatio(aspectRatio: 0.72, child: _HoloCard(card: otherCard, compact: true, frame: opponentFrame))),
-    ])),
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          borderRadius: Corners.rXl,
+          gradient: LinearGradient(colors: [
+            (draw ? _gold : iWon ? _emerald : _rose).withValues(alpha: 0.16),
+            const Color(0xFF07111D),
+          ]),
+          border: Border.all(color: (draw ? _gold : iWon ? _emerald : _rose).withValues(alpha: 0.55), width: 1.4),
+        ),
+        child: Column(children: [
+          Row(children: [
+            Expanded(child: AspectRatio(aspectRatio: 0.68, child: PlayerCard(card: myCard, compact: true, showStats: false, winner: iWon, loser: !draw && !iWon))),
+            Expanded(
+                child: Column(children: [
+              Text('راند ${faNum(round!['round'])}', style: const TextStyle(fontSize: 10, color: Colors.white54)),
+              Text('${round!['title']}', textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 6),
+              Text('${faNum(myPower)}  VS  ${faNum(otherPower)}',
+                  textDirection: TextDirection.ltr, style: const TextStyle(color: _gold, fontSize: 22, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: (draw ? _gold : iWon ? _emerald : _rose).withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                child: Text(
+                  draw ? 'برخورد برابر' : iWon ? 'WINNER' : 'باخت راند',
+                  style: TextStyle(color: draw ? _gold : iWon ? _emerald : _rose, fontWeight: FontWeight.w900, letterSpacing: 0.6),
+                ),
+              ),
+            ])),
+            Expanded(child: AspectRatio(aspectRatio: 0.68, child: PlayerCard(card: otherCard, compact: true, showStats: false, winner: !draw && !iWon, loser: iWon))),
+          ]),
+          Gaps.vXs,
+          Text('${round!['reason'] ?? round!['text'] ?? ''}',
+              textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, color: Colors.white70, fontWeight: FontWeight.w700)),
+        ]),
+      ),
     );
   }
 }
 
 class _Finale extends StatelessWidget {
-  const _Finale({required this.session, required this.color, required this.resultColors, required this.resultTemplate, required this.onAgain, required this.onEdit,
-    required this.onShare, required this.sharing, required this.mvp, required this.privateLobby});
-  final GameSession session; final Color color; final List<Color>? resultColors; final String? resultTemplate; final VoidCallback onAgain; final VoidCallback onEdit;
-  final VoidCallback onShare; final bool sharing; final Map<String, dynamic>? mvp; final bool privateLobby;
+  const _Finale({
+    required this.session,
+    required this.color,
+    required this.resultColors,
+    required this.resultTemplate,
+    required this.onAgain,
+    required this.onEdit,
+    required this.onShare,
+    required this.sharing,
+    required this.mvp,
+    required this.privateLobby,
+  });
+  final GameSession session;
+  final Color color;
+  final List<Color>? resultColors;
+  final String? resultTemplate;
+  final VoidCallback onAgain;
+  final VoidCallback onEdit;
+  final VoidCallback onShare;
+  final bool sharing;
+  final Map<String, dynamic>? mvp;
+  final bool privateLobby;
+
   @override
   Widget build(BuildContext context) {
     final won = session.iWon;
     final draw = session.winner == 'DRAW';
+    final history = (session.state['history'] as List? ?? const []).whereType<Map>().toList();
+    final score = session.state['score'] is Map ? session.state['score'] as Map : const {};
+    final me = session.mySymbol ?? 'X';
+    final other = me == 'X' ? 'O' : 'X';
     return Container(
       padding: const EdgeInsets.all(Gaps.md),
-      decoration: BoxDecoration(borderRadius: Corners.rXl,
+      decoration: BoxDecoration(
+        borderRadius: Corners.rXl,
         gradient: LinearGradient(colors: resultColors ?? const [Color(0xFF17304C), Color(0xFF050A12)]),
-        image: resultTemplate == null ? null : DecorationImage(
-          image: AssetImage('assets/shop/cosmetics/$resultTemplate.webp'),
-          fit: BoxFit.cover,
-          opacity: .18,
-        ),
-        border: Border.all(color: color)),
+        image: resultTemplate == null
+            ? null
+            : DecorationImage(
+                image: AssetImage('assets/shop/cosmetics/$resultTemplate.webp'),
+                fit: BoxFit.cover,
+                opacity: .18,
+              ),
+        border: Border.all(color: color),
+      ),
       child: Column(children: [
-        Text(draw ? '🤝' : won ? '🏆' : '🛡️', style: const TextStyle(fontSize: 44)),
-        Text(draw ? 'نبرد برابر!' : won ? 'فرمانروای آرنا شدی!' : 'این نبرد تمام شد؛ ترکیبت را هوشمندتر کن',
-            textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
+        Text(draw ? 'DRAW' : won ? 'VICTORY' : 'DEFEAT',
+            style: TextStyle(
+              fontSize: 34,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 3,
+              color: draw ? _gold : won ? _emerald : _rose,
+            )),
+        Text('${faNum(score[me])}  —  ${faNum(score[other])}',
+            textDirection: TextDirection.ltr, style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900)),
         Gaps.vXs,
-        Text(session.vsBot ? 'تمرین تمام شد؛ امتیازی جابه‌جا نشد.'
-            : draw ? 'ورودی کامل هر دو نفر برمی‌گردد.'
-            : won ? 'پات مسابقه پس از کسر کارمزد تسویه می‌شود.'
-            : '${faNum(session.stake)} امتیاز ورودی از دست رفت.',
-            textAlign: TextAlign.center, style: const TextStyle(fontSize: 10.5, color: Colors.white60)),
-        Gaps.vSm,
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            borderRadius: Corners.rPill,
-            color: (session.settlementStatus == 'pending' ? _gold : _emerald).withValues(alpha: .13),
-          ),
-          child: Text(const {'pending': ' در حال تسویه امن', 'settled': ' تسویه کامل شد', 'refunded': ' ورودی برگشت خورد'}[session.settlementStatus] ?? ' تسویه کامل شد',
-              style: TextStyle(color: session.settlementStatus == 'pending' ? _gold : _emerald, fontSize: 10.5, fontWeight: FontWeight.w900)),
+        Text(
+          session.vsBot
+              ? 'تمرین تمام شد؛ امتیازی جابه‌جا نشد.'
+              : draw
+                  ? 'ورودی کامل هر دو نفر برمی‌گردد.'
+                  : won
+                      ? 'پات مسابقه پس از کسر کارمزد تسویه می‌شود.'
+                      : '${faNum(session.stake)} امتیاز ورودی از دست رفت.',
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 10.5, color: Colors.white60),
         ),
         Gaps.vSm,
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(Gaps.sm),
-          decoration: BoxDecoration(
-            borderRadius: Corners.rLg,
-            gradient: const LinearGradient(colors: [Color(0x25FFD166), Color(0x25A855F7)]),
-            border: Border.all(color: _gold.withValues(alpha: .38)),
+        if (history.isNotEmpty)
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            alignment: WrapAlignment.center,
+            children: [
+              for (final raw in history)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(99),
+                    color: ('${raw['winner']}' == me
+                            ? _emerald
+                            : '${raw['winner']}' == 'DRAW'
+                                ? _gold
+                                : _rose)
+                        .withValues(alpha: 0.18),
+                  ),
+                  child: Text('راند ${faNum(raw['round'])} · ${raw['title'] ?? ''}',
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800)),
+                ),
+            ],
           ),
-          child: Column(children: [
-            const Text('کارت نتیجه + لینک چالش مستقیم', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900)),
-            Text('MVP · ${mvp?['name'] ?? 'ستاره آرنا'} · قدرت ${faNum(mvp?['power'])}',
-                style: const TextStyle(fontSize: 9.5, color: Colors.white60)),
-            Gaps.vXs,
-            OutlinedButton.icon(onPressed: sharing ? null : onShare,
-              icon: const Icon(Icons.ios_share_rounded, size: 17),
-              label: Text(sharing ? 'در حال ساخت لینک…' : 'اشتراک نتیجه و دعوت به چالش')),
-          ]),
-        ),
+        if (mvp != null) ...[
+          Gaps.vSm,
+          SizedBox(width: 140, height: 196, child: PlayerCard(card: mvp!, compact: true, showStats: false, winner: true)),
+          Text('MVP · ${mvp!['name']}', style: const TextStyle(fontWeight: FontWeight.w900)),
+        ],
+        Gaps.vSm,
+        OutlinedButton.icon(
+            onPressed: sharing ? null : onShare,
+            icon: const Icon(Icons.ios_share_rounded, size: 17),
+            label: Text(sharing ? 'در حال ساخت لینک…' : 'اشتراک نتیجه و دعوت به چالش')),
         Gaps.vSm,
         Row(children: [
-          Expanded(child: FilledButton(onPressed: session.rematchWaiting ? null : onAgain,
-              child: Text(session.rematchWaiting ? 'منتظر قبول حریف…' : session.rematchAvailable ? 'دوباره با همین حریف' : privateLobby ? 'بازگشت به لابی' : 'نبرد دوباره'))),
+          Expanded(
+              child: FilledButton(
+                  onPressed: session.rematchWaiting ? null : onAgain,
+                  child: Text(session.rematchWaiting
+                      ? 'منتظر قبول حریف…'
+                      : session.rematchAvailable
+                          ? 'دوباره با همین حریف'
+                          : privateLobby
+                              ? 'بازگشت به لابی'
+                              : 'نبرد دوباره'))),
           Gaps.hXs,
           Expanded(child: OutlinedButton(onPressed: onEdit, child: const Text('تغییر ترکیب'))),
         ]),
@@ -611,15 +590,17 @@ class _Finale extends StatelessWidget {
 
 class _ErrorPanel extends StatelessWidget {
   const _ErrorPanel({required this.message, required this.onBack});
-  final String message; final VoidCallback onBack;
+  final String message;
+  final VoidCallback onBack;
   @override
-  Widget build(BuildContext context) => AppCard(child: Column(children: [
-    Icon(Icons.error_outline_rounded, color: Theme.of(context).colorScheme.error, size: 34),
-    Gaps.vXs,
-    Text(message, textAlign: TextAlign.center),
-    Gaps.vSm,
-    FilledButton(onPressed: onBack, child: const Text('بازگشت به ترکیب')),
-  ]));
+  Widget build(BuildContext context) => AppCard(
+          child: Column(children: [
+        Icon(Icons.error_outline_rounded, color: Theme.of(context).colorScheme.error, size: 34),
+        Gaps.vXs,
+        Text(message, textAlign: TextAlign.center),
+        Gaps.vSm,
+        FilledButton(onPressed: onBack, child: const Text('بازگشت به ترکیب')),
+      ]));
 }
 
 class _History extends StatelessWidget {
@@ -633,24 +614,33 @@ class _History extends StatelessWidget {
       Gaps.vXs,
       if (battles.isEmpty) const AppCard(child: Text('اولین نبردت را شروع کن؛ تاریخچه اینجا ساخته می‌شود.')),
       for (final raw in battles.whereType<Map>().take(6))
-        Padding(padding: const EdgeInsets.only(bottom: Gaps.xs), child: AppCard(
-          padding: const EdgeInsets.all(Gaps.sm), elevated: false,
-          child: Row(children: [
-            Icon(NumberParser.toInt(raw['userDelta']) > 0 ? Icons.trending_up_rounded
-                : NumberParser.toInt(raw['userDelta']) < 0 ? Icons.trending_down_rounded : Icons.diamond_outlined,
-                color: NumberParser.toInt(raw['userDelta']) >= 0 ? _emerald : BrandColors.danger),
-            Gaps.hSm,
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(labels['${raw['mode']}'] ?? 'دوئل کارت', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900)),
-              Text('${faNum(raw['userScore'])} - ${faNum(raw['opponentScore'])} · '
-                  '${const {'pending': 'تسویه در انتظار', 'settled': 'تسویه‌شده', 'refunded': 'برگشت‌خورده'}['${raw['settlementStatus'] ?? 'settled'}']}',
-                  style: const TextStyle(fontSize: 9, color: Colors.white54)),
-            ])),
-            Text(NumberParser.toInt(raw['userDelta']) > 0 ? '+${faNum(raw['userDelta'])}' : faNum(raw['userDelta']),
-                style: TextStyle(color: NumberParser.toInt(raw['userDelta']) >= 0 ? _emerald : BrandColors.danger,
-                    fontWeight: FontWeight.w900)),
-          ]),
-        )),
+        Padding(
+            padding: const EdgeInsets.only(bottom: Gaps.xs),
+            child: AppCard(
+              padding: const EdgeInsets.all(Gaps.sm),
+              elevated: false,
+              child: Row(children: [
+                Icon(
+                    NumberParser.toInt(raw['userDelta']) > 0
+                        ? Icons.trending_up_rounded
+                        : NumberParser.toInt(raw['userDelta']) < 0
+                            ? Icons.trending_down_rounded
+                            : Icons.diamond_outlined,
+                    color: NumberParser.toInt(raw['userDelta']) >= 0 ? _emerald : BrandColors.danger),
+                Gaps.hSm,
+                Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(labels['${raw['mode']}'] ?? 'دوئل کارت', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900)),
+                  Text(
+                      '${faNum(raw['userScore'])} - ${faNum(raw['opponentScore'])} · '
+                      '${const {'pending': 'تسویه در انتظار', 'settled': 'تسویه‌شده', 'refunded': 'برگشت‌خورده'}['${raw['settlementStatus'] ?? 'settled']}']}',
+                      style: const TextStyle(fontSize: 9, color: Colors.white54)),
+                ])),
+                Text(NumberParser.toInt(raw['userDelta']) > 0 ? '+${faNum(raw['userDelta'])}' : faNum(raw['userDelta']),
+                    style: TextStyle(
+                        color: NumberParser.toInt(raw['userDelta']) >= 0 ? _emerald : BrandColors.danger, fontWeight: FontWeight.w900)),
+              ]),
+            )),
     ]);
   }
 }
