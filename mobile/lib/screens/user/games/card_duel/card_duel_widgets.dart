@@ -148,7 +148,10 @@ class _LineupSlot extends StatelessWidget {
                   Text('کارت ${faNum(index + 1)}', style: const TextStyle(fontSize: 9, color: Colors.white54)),
                 ])),
               )
-            : PlayerCard(card: Map<String, dynamic>.from(card!), compact: true, showStats: false, onTap: onTap),
+            : CosmeticCardFrame(
+                frame: null,
+                child: PlayerCard(card: Map<String, dynamic>.from(card!), compact: true, showStats: false, onTap: onTap),
+              ),
       );
 }
 
