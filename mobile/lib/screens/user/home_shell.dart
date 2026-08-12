@@ -6,6 +6,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
+import '../../services/image_disk_cache.dart';
 import '../../widgets/app_bar_logo.dart';
 import '../../widgets/notification_bell.dart';
 import '../../widgets/scroll_hint.dart';
@@ -380,6 +381,7 @@ class _HomeShellState extends State<HomeShell>
     // می‌خواند، پس این پاسخ عملاً کش گرم را برای هر دو پر می‌کند.
     try {
       final d = await widget.api.get('/api/bootstrap');
+      unawaited(ImageDiskCache.instance.prewarmPayload(d));
       if (!mounted || d is! Map) return;
       final m = Map<String, dynamic>.from(d);
       // پاسخ ناقص را «موفق» حساب نکن — وگرنه هدر با نام خالی رندر می‌شود.

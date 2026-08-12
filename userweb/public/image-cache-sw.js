@@ -1,5 +1,5 @@
 /* کش تصویر نسخه‌دار. URL همان نسخه است؛ miss فقط وقتی نام/هش عوض شود. */
-const CACHE_NAME = 'ghelgheli-img-v1';
+const CACHE_NAME = 'ghelgheli-img-v2';
 const VERSIONED = /\/uploads\/|\/public\//;
 
 self.addEventListener('install', (event) => {

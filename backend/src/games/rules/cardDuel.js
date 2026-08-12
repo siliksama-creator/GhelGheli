@@ -7,7 +7,6 @@
 const duel = require('../../services/cardDuelService');
 
 const idOf = card => String(card?.cardTypeId || card?.id || '');
-const FOCUS_STAT = ['speed', 'technique', 'attack', 'defense', 'goalChance'];
 
 function demoCard(id, stat) {
   return {
@@ -23,10 +22,11 @@ function create() {
   return createFromDecks(
     [demoCard('test-x1', 70), demoCard('test-x2', 72), demoCard('test-x3', 74), demoCard('test-x4', 76), demoCard('test-x5', 78)],
     [demoCard('test-o1', 69), demoCard('test-o2', 71), demoCard('test-o3', 73), demoCard('test-o4', 75), demoCard('test-o5', 77)],
+    { seed: 'fixture-seed' },
   );
 }
 
-function createFromDecks(deckX, deckO) {
+function createFromDecks(deckX, deckO, { seed = 'duel-seed' } = {}) {
   if (!Array.isArray(deckX) || !Array.isArray(deckO)
       || deckX.length !== duel.DECK_SIZE || deckO.length !== duel.DECK_SIZE) {
     throw new Error('هر بازیکن باید ترکیب پنج‌کارتی معتبر داشته باشد');
@@ -47,6 +47,7 @@ function createFromDecks(deckX, deckO) {
     history: [],
     lastRound: null,
     previousWinner: null,
+    seed,
   };
 }
 
@@ -61,7 +62,7 @@ async function validatePlayer(user, { vsBot = false } = {}) {
   return prepared.cards;
 }
 
-async function createWithContext({ playerX, playerO, vsBot }) {
+async function createWithContext({ playerX, playerO, vsBot, seed = 'live-seed' }) {
   const own = await duel.deckCards(playerX?.id);
   const ownCards = own.cards.length === duel.DECK_SIZE
     ? own.cards
@@ -71,7 +72,7 @@ async function createWithContext({ playerX, playerO, vsBot }) {
     error.status = 400;
     throw error;
   }
-  if (vsBot) return createFromDecks(ownCards, duel.botDeck(ownCards));
+  if (vsBot) return createFromDecks(ownCards, duel.botDeck(ownCards), { seed });
 
   const opponent = await duel.deckCards(playerO?.id);
   if (opponent.cards.length !== duel.DECK_SIZE) {
@@ -79,7 +80,7 @@ async function createWithContext({ playerX, playerO, vsBot }) {
     error.status = 409;
     throw error;
   }
-  return createFromDecks(own.cards, opponent.cards);
+  return createFromDecks(own.cards, opponent.cards, { seed });
 }
 
 function isValidMove(state, move, player) {
@@ -101,8 +102,9 @@ function applyMove(state, move, player) {
     return state;
   }
 
+  const roundSeed = `${state.seed || 'live'}:${state.roundIndex}:${state.pending.X}:${state.pending.O}:${state.previousWinner || 'start'}`;
   const resolved = duel.resolveRound(
-    cardX, cardO, state.roundIndex, state.previousWinner,
+    cardX, cardO, state.roundIndex, state.previousWinner, null, roundSeed,
   );
   if (resolved.winner !== 'DRAW') state.score[resolved.winner] += 1;
   state.remaining.X = state.remaining.X.filter(id => id !== state.pending.X);
@@ -147,14 +149,37 @@ function botMove(state, player) {
   const remaining = state.remaining[player] || [];
   if (!remaining.length) return null;
   const cards = state.decks[player] || [];
-  const stat = FOCUS_STAT[state.roundIndex] || 'power';
+  const focus = duel.ROUND_FOCUS[state.roundIndex] || duel.ROUND_FOCUS[duel.ROUND_FOCUS.length - 1];
+  const mine = Number(state.score?.[player] || 0);
+  const other = Number(state.score?.[player === 'X' ? 'O' : 'X'] || 0);
+  const delta = mine - other;
+  const finalRound = state.roundIndex === duel.DECK_SIZE - 1;
+  const futureFocuses = duel.ROUND_FOCUS.slice(state.roundIndex + 1);
   const ranked = remaining
     .map(cardId => cards.find(card => idOf(card) === cardId))
     .filter(Boolean)
-    .sort((a, b) => Number(b[stat] || b.power || 0) - Number(a[stat] || a.power || 0));
-  // Mostly tactical, occasionally surprising. It never reads the opponent's
-  // pending choice, so the bot cannot cheat in a simultaneous round.
-  const pick = ranked.length > 1 && Math.random() < 0.22 ? ranked[1] : ranked[0];
+    .map(card => {
+      const focusNow = duel.focusStatOf(card, focus);
+      const futurePeak = futureFocuses.length
+        ? Math.max(...futureFocuses.map(next => duel.focusStatOf(card, next)))
+        : 0;
+      const conservePenalty = !finalRound && futurePeak - focusNow >= 14 ? 9 : 0;
+      const pressureBonus = delta < 0 && state.roundIndex >= 2 ? Math.max(0, Number(card.goalChance || card.power || 0) - 70) * 0.22 : 0;
+      const safetyBonus = delta > 0 && (card.effect === 'wall' || card.defense >= 78) ? 5 : 0;
+      const effectNow = ({
+        speedster: state.roundIndex === 0 ? 14 : 1,
+        playmaker: state.roundIndex === 1 ? 8 : state.roundIndex === 2 ? 6 : 2,
+        wall: state.roundIndex === 3 ? 11 : 3,
+        finisher: finalRound ? 20 : -12,
+        lucky_star: state.roundIndex >= 2 ? 4 : 1,
+      })[card.effect] || 0;
+      return {
+        card,
+        score: focusNow * 3.1 + Number(card.power || 0) * 0.75 + effectNow + pressureBonus + safetyBonus - conservePenalty,
+      };
+    })
+    .sort((a, b) => b.score - a.score);
+  const pick = ranked.length > 1 && Math.random() < 0.14 ? ranked[1].card : ranked[0].card;
   return pick ? { cardId: idOf(pick) } : null;
 }
 

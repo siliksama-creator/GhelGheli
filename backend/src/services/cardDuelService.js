@@ -101,6 +101,144 @@ function publicCard(row) {
   return c;
 }
 
+function focusStatOf(card, focus) {
+  return Number(card?.[focus.stat] ?? card?.[focus.key] ?? card?.[String(focus.key || '').replace('duel_', '')] ?? 0);
+}
+
+function createSeededRandom(seed) {
+  let turn = 0;
+  return () => {
+    const digest = crypto.createHash('sha256').update(`${seed}:${turn++}`).digest();
+    return digest.readUInt32BE(0) / 0x100000000;
+  };
+}
+
+function effectCurrentBonus(card, roundIndex, scoreDelta = 0) {
+  switch (card.duel_effect || card.effect) {
+    case 'speedster': return roundIndex === 0 ? 14 : roundIndex === 1 ? 4 : -2;
+    case 'playmaker': return roundIndex === 1 ? 8 : roundIndex === 2 ? 6 : 2;
+    case 'wall': return roundIndex === 3 ? 12 : scoreDelta > 0 ? 6 : 2;
+    case 'finisher': return roundIndex === DECK_SIZE - 1 ? 20 : -10;
+    case 'lucky_star': return roundIndex >= 2 ? 5 : 2;
+    default: return 0;
+  }
+}
+
+function effectFuturePenalty(card, roundIndex, focus) {
+  const focusNow = focusStatOf(card, focus);
+  const futureFocuses = ROUND_FOCUS.slice(roundIndex + 1);
+  if (!futureFocuses.length) return 0;
+  const futurePeak = Math.max(...futureFocuses.map(next => focusStatOf(card, next)));
+  return futurePeak - focusNow >= 14 ? 8 : 0;
+}
+
+function recommendOrderForDeck(cards, score = { X: 0, O: 0 }) {
+  const remaining = cards.map(publicCard);
+  const picks = [];
+  let delta = Number(score.X || 0) - Number(score.O || 0);
+  for (let roundIndex = 0; roundIndex < ROUND_FOCUS.length && remaining.length; roundIndex++) {
+    const focus = ROUND_FOCUS[roundIndex];
+    let best = null;
+    let bestScore = -Infinity;
+    for (const card of remaining) {
+      const focusNow = focusStatOf(card, focus);
+      const urgent = delta < 0 && roundIndex >= 2 ? 6 : 0;
+      const safe = delta > 0 && card.effect === 'wall' ? 4 : 0;
+      const rating = focusNow * 3.1 + totalPower(card) * 0.72
+        + effectCurrentBonus(card, roundIndex, delta)
+        + urgent + safe - effectFuturePenalty(card, roundIndex, focus);
+      if (rating > bestScore) {
+        bestScore = rating;
+        best = { card, rating, focusNow };
+      }
+    }
+    if (!best) break;
+    picks.push({
+      round: roundIndex + 1,
+      focus: focus.label,
+      cardTypeId: best.card.cardTypeId,
+      name: best.card.name,
+      power: best.card.power,
+      focusStat: best.focusNow,
+      effect: best.card.effect,
+      reason: `${best.card.name} برای «${focus.label}» با عدد ${best.focusNow} و افکت ${best.card.effectLabel} بهترین فشار را می‌دهد`,
+    });
+    delta += best.card.power >= 78 ? 1 : 0;
+    const index = remaining.findIndex(item => String(item.cardTypeId) === String(best.card.cardTypeId));
+    if (index > -1) remaining.splice(index, 1);
+  }
+  return picks;
+}
+
+function analyzeDeck(cards) {
+  const deck = cards.map(publicCard);
+  if (deck.length !== DECK_SIZE) {
+    return { ready: false, warnings: ['ترکیب کامل نیست'], strengths: [], recommendedOrder: [] };
+  }
+  const byFocus = Object.fromEntries(ROUND_FOCUS.map(focus => {
+    const values = deck.map(card => focusStatOf(card, focus));
+    return [focus.stat, {
+      label: focus.label,
+      average: Math.round(values.reduce((sum, value) => sum + value, 0) / values.length),
+      min: Math.min(...values),
+      max: Math.max(...values),
+    }];
+  }));
+  const effects = new Set(deck.map(card => card.effect));
+  const rarities = new Set(deck.map(card => card.rarity));
+  const strengths = [];
+  const warnings = [];
+  if (Math.min(...Object.values(byFocus).map(entry => entry.average)) >= 61) {
+    strengths.push('ترکیب متعادل است و هیچ راندی را عملاً خالی نمی‌گذارد');
+  }
+  if (byFocus.speed.max >= 82) strengths.push('شروع خیلی تیزی برای راند سرعت داری');
+  if (effects.has('finisher')) strengths.push('فینیشر واقعی برای ضربهٔ نهایی داری');
+  if (effects.has('wall') && byFocus.defense.average >= 62) strengths.push('در راند دفاع می‌توانی tempo بازی را خفه کنی');
+  if (rarities.size >= 4) strengths.push('تنوع rarity بالاست و deck حس یکنواخت ندارد');
+  if (byFocus.defense.average < 58 && !effects.has('wall')) warnings.push('میانگین دفاع پایین است؛ اگر راند چهارم عقب بیفتی سخت برمی‌گردی');
+  if (byFocus.speed.average < 58) warnings.push('شروع deck کند است و احتمال از دست دادن راند اول بالاست');
+  if (byFocus.goalChance.average < 60 && !effects.has('finisher')) warnings.push('برای ضربهٔ نهایی هم finish stat پایین است هم فینیشر نداری');
+  if (!effects.has('playmaker') && byFocus.technique.average < 60) warnings.push('راند تکنیکی بدون playmaker می‌تواند سوراخ deck شود');
+  const recommendedOrder = recommendOrderForDeck(deck);
+  const lead = recommendedOrder[0] || null;
+  return {
+    ready: true,
+    strengths,
+    warnings,
+    byFocus,
+    raritySpread: [...rarities],
+    effectSpread: [...effects],
+    recommendedLeadCardId: lead?.cardTypeId || null,
+    recommendedLeadReason: lead?.reason || '',
+    recommendedOrder,
+  };
+}
+
+function suggestDeckFromPool(cards) {
+  const pool = cards.map(publicCard);
+  if (pool.length < DECK_SIZE) return null;
+  const picked = [];
+  for (const focus of ROUND_FOCUS) {
+    const candidate = pool
+      .filter(card => !picked.find(item => String(item.cardTypeId) === String(card.cardTypeId)))
+      .sort((a, b) => (focusStatOf(b, focus) + effectCurrentBonus(b, picked.length) + totalPower(b) * 0.45)
+        - (focusStatOf(a, focus) + effectCurrentBonus(a, picked.length) + totalPower(a) * 0.45))[0];
+    if (candidate) picked.push(candidate);
+  }
+  while (picked.length < DECK_SIZE) {
+    const candidate = pool
+      .filter(card => !picked.find(item => String(item.cardTypeId) === String(card.cardTypeId)))
+      .sort((a, b) => totalPower(b) - totalPower(a))[0];
+    if (!candidate) break;
+    picked.push(candidate);
+  }
+  return {
+    cardTypeIds: picked.map(card => card.cardTypeId),
+    cards: picked,
+    insights: analyzeDeck(picked),
+  };
+}
+
 async function playableCards(userId, client = pool) {
   const { rows } = await client.query(
     `SELECT t.id AS card_type_id, t.name, ${FRONT_IMAGE_SQL} AS image_url,
@@ -179,19 +317,28 @@ function effectBonus(card, roundIndex, prevWon, random = null) {
 }
 
 function focusValue(card, focus) {
-  const key = focus.stat || 'power';
-  return Number(card[key] ?? card[focus.key] ?? card[String(focus.key || '').replace('duel_', '')] ?? 50);
+  return focusStatOf(card, focus) || 50;
 }
 
-function roundScore(card, opp, focus, roundIndex, prevWon, random = null) {
+function roundScoreBreakdown(card, opp, focus, roundIndex, prevWon, random = null) {
   const base = totalPower(card) * 0.56;
   const focusVal = focusValue(card, focus) * 0.36;
   const attackMix = (Number(card.duel_attack ?? card.attack ?? 50)
     + Number(card.duel_goal_chance ?? card.goalChance ?? 50)) * 0.10;
   const defensePenalty = Number(opp.duel_defense ?? opp.defense ?? 50) * 0.10;
-  return Math.round(base + focusVal + attackMix - defensePenalty
-    + effectBonus(card, roundIndex, prevWon, random)
-    + randomInt(13, random));
+  const effect = effectBonus(card, roundIndex, prevWon, random);
+  const luck = randomInt(13, random);
+  const total = Math.round(base + focusVal + attackMix - defensePenalty + effect + luck);
+  return {
+    base: Number(base.toFixed(2)),
+    focus: Number(focusVal.toFixed(2)),
+    attackMix: Number(attackMix.toFixed(2)),
+    defensePenalty: Number(defensePenalty.toFixed(2)),
+    effectBonus: effect,
+    luck,
+    wallAdjustment: 0,
+    total,
+  };
 }
 
 function winnerReason(winner, focus, cardX, cardO, powerX, powerO) {
@@ -210,20 +357,32 @@ function winnerReason(winner, focus, cardX, cardO, powerX, powerO) {
   return `${champ.name} در «${focus.label}» با ${champFocus} در برابر ${otherFocus} جلو افتاد و راند را با قدرت نهایی ${champPower} به ${otherPower} برد`;
 }
 
-function resolveRound(cardX, cardO, roundIndex, previousWinner = null, random = null) {
+function resolveRound(cardX, cardO, roundIndex, previousWinner = null, random = null, seed = '') {
   const x = publicCard(cardX);
   const o = publicCard(cardO);
   const focus = ROUND_FOCUS[roundIndex] || ROUND_FOCUS[ROUND_FOCUS.length - 1];
-  let powerX = roundScore(x, o, focus, roundIndex, previousWinner === 'X', random);
-  let powerO = roundScore(o, x, focus, roundIndex, previousWinner === 'O', random);
-  if (o.effect === 'wall' && powerX > powerO && randomInt(100, random) < 22) powerX -= 16;
-  if (x.effect === 'wall' && powerO > powerX && randomInt(100, random) < 22) powerO -= 16;
+  const rng = random || (seed ? createSeededRandom(seed) : null);
+  const breakdownX = roundScoreBreakdown(x, o, focus, roundIndex, previousWinner === 'X', rng);
+  const breakdownO = roundScoreBreakdown(o, x, focus, roundIndex, previousWinner === 'O', rng);
+  let powerX = breakdownX.total;
+  let powerO = breakdownO.total;
+  if (o.effect === 'wall' && powerX > powerO && randomInt(100, rng) < 22) {
+    powerX -= 16;
+    breakdownX.wallAdjustment = -16;
+    breakdownX.total = powerX;
+  }
+  if (x.effect === 'wall' && powerO > powerX && randomInt(100, rng) < 22) {
+    powerO -= 16;
+    breakdownO.wallAdjustment = -16;
+    breakdownO.total = powerO;
+  }
   const diff = powerX - powerO;
   const winner = diff >= 6 ? 'X' : diff <= -6 ? 'O' : 'DRAW';
   const focusStatX = focusValue(x, focus);
   const focusStatO = focusValue(o, focus);
   return {
     round: roundIndex + 1,
+    seed,
     title: focus.label,
     text: focus.userText,
     focusKey: focus.stat,
@@ -236,33 +395,43 @@ function resolveRound(cardX, cardO, roundIndex, previousWinner = null, random = 
     powerX,
     powerO,
     powerGap: Math.abs(powerX - powerO),
+    breakdownX,
+    breakdownO,
     winner,
     reason: winnerReason(winner, focus, x, o, powerX, powerO),
     cinematic: winner === 'X' ? 'ضربه نهایی آبی!' : winner === 'O' ? 'پاسخ آتشین حریف!' : 'برخورد تماشایی!',
   };
 }
 
-function simulate(userCards, opponentCards, { opponentName = 'حریف', random = null } = {}) {
+function simulate(userCards, opponentCards, { opponentName = 'حریف', random = null, seed = '' } = {}) {
   const score = { X: 0, O: 0 };
   let previousWinner = null;
   const rounds = [];
   for (let i = 0; i < DECK_SIZE; i++) {
-    const resolved = resolveRound(userCards[i], opponentCards[i], i, previousWinner, random);
+    const roundSeed = seed ? `${seed}:round:${i + 1}` : '';
+    const resolved = resolveRound(userCards[i], opponentCards[i], i, previousWinner, random, roundSeed);
     if (resolved.winner !== 'DRAW') score[resolved.winner] += 1;
     previousWinner = resolved.winner;
     rounds.push({
       round: resolved.round, title: resolved.title, text: resolved.text,
+      focusLabel: resolved.focusLabel,
+      focusStatX: resolved.focusStatX,
+      focusStatO: resolved.focusStatO,
       userCard: resolved.cardX, opponentCard: resolved.cardO,
       userPower: resolved.powerX, opponentPower: resolved.powerO,
       outcome: resolved.winner === 'X' ? 'user_goal' : resolved.winner === 'O' ? 'opponent_goal' : 'draw',
       cinematic: resolved.cinematic,
       reason: resolved.reason,
+      seed: resolved.seed,
+      breakdownX: resolved.breakdownX,
+      breakdownO: resolved.breakdownO,
     });
   }
   const winnerSide = score.X > score.O ? 'user' : score.O > score.X ? 'opponent' : 'draw';
   const all = [...userCards.map(c => ({ side: 'user', card: c })), ...opponentCards.map(c => ({ side: 'opponent', card: c }))];
   const mvp = all.sort((a, b) => totalPower(b.card) - totalPower(a.card))[0];
   return {
+    seed,
     userScore: score.X, opponentScore: score.O, winnerSide, opponentName,
     mvp: { side: mvp.side, card: publicCard(mvp.card) }, rounds,
   };
@@ -366,11 +535,63 @@ async function recentBattles(userId, limit = HISTORY_KEEP, client = pool) {
   });
 }
 
+async function balanceSnapshot(limit = 200, client = pool) {
+  const { rows } = await client.query(
+    `SELECT battle_log, created_at
+       FROM card_duel_battles
+      WHERE mode IN ('online','lobby')
+      ORDER BY created_at DESC
+      LIMIT $1`,
+    [Math.min(1000, Math.max(20, Number(limit) || 200))],
+  );
+  const focus = {};
+  const rarityWins = {};
+  const effectWins = {};
+  let rounds = 0;
+  for (const row of rows) {
+    let log = row.battle_log;
+    if (typeof log === 'string') {
+      try { log = JSON.parse(log); } catch { log = null; }
+    }
+    for (const round of (log?.rounds || [])) {
+      rounds += 1;
+      const key = round.focusLabel || round.title || 'unknown';
+      focus[key] ||= { rounds: 0, draws: 0, avgPowerGap: 0 };
+      focus[key].rounds += 1;
+      focus[key].avgPowerGap += Math.abs(Number(round.userPower || 0) - Number(round.opponentPower || 0));
+      if (round.outcome === 'draw') focus[key].draws += 1;
+      for (const side of ['userCard', 'opponentCard']) {
+        const card = round[side] || {};
+        const won = side === 'userCard'
+          ? round.outcome === 'user_goal'
+          : round.outcome === 'opponent_goal';
+        if (!won) continue;
+        const rarity = rarityInput(card.rarity || card.duel_rarity);
+        const effect = effectInput(card.effect || card.duel_effect);
+        rarityWins[rarity] = (rarityWins[rarity] || 0) + 1;
+        effectWins[effect] = (effectWins[effect] || 0) + 1;
+      }
+    }
+  }
+  Object.values(focus).forEach((entry) => {
+    entry.avgPowerGap = entry.rounds ? Number((entry.avgPowerGap / entry.rounds).toFixed(2)) : 0;
+  });
+  return {
+    sampledBattles: rows.length,
+    sampledRounds: rounds,
+    focus,
+    rarityWins,
+    effectWins,
+  };
+}
+
 async function status(userId) {
   await maybePruneBattleHistory();
   const [cards, dc, recent] = await Promise.all([
     playableCards(userId), deckCards(userId), recentBattles(userId, HISTORY_KEEP),
   ]);
+  const activeInsights = dc.cards.length === DECK_SIZE ? analyzeDeck(dc.cards) : null;
+  const suggestedDeck = suggestDeckFromPool(cards);
   return {
     deckSize: DECK_SIZE,
     totalRounds: DECK_SIZE,
@@ -378,6 +599,12 @@ async function status(userId) {
     playableCards: cards,
     practiceCards: starterDeck(),
     activeDeck: dc.deck ? { ...dc.deck, cards: dc.cards } : null,
+    deckInsights: activeInsights,
+    suggestedDeck: suggestedDeck ? {
+      cardTypeIds: suggestedDeck.cardTypeIds,
+      cards: suggestedDeck.cards,
+      insights: suggestedDeck.insights,
+    } : null,
     recentBattles: recent,
     rarities: RARITIES.map(id => ({ id, label: RARITY_LABEL[id], bonus: RARITY_BONUS[id] })),
     effects: EFFECTS.map(id => ({ id, label: EFFECT_LABEL[id] })),
@@ -389,9 +616,15 @@ async function botBattle(userId, ids = null) {
   const userCards = ids ? await validateDeck(userId, ids) : (await deckCards(userId)).cards;
   if (userCards.length !== DECK_SIZE) { const e = new Error('اول ترکیب پنج‌کارتی را آماده کن'); e.status = 400; throw e; }
   const opponentCards = botDeck(userCards);
-  const sim = simulate(userCards, opponentCards, { opponentName: 'ربات تمرینی' });
+  const seed = `bot:${userId}:${Date.now()}`;
+  const sim = simulate(userCards, opponentCards, { opponentName: 'ربات تمرینی', seed });
   // تمرین با ربات تاریخچه نمی‌سازد؛ جدول فقط نبرد امتیازی را نگه می‌دارد.
-  return { battle: null, result: sim, message: 'تمرین با ربات رایگان است و در تاریخچه ثبت نمی‌شود' };
+  return {
+    battle: null,
+    result: sim,
+    deckInsights: analyzeDeck(userCards),
+    message: 'تمرین با ربات رایگان است و در تاریخچه ثبت نمی‌شود',
+  };
 }
 
 async function recordEngineBattle({ matchId = null, playerX, playerO, state, winner, stake = 0, netPot = 0, vsBot = false, matchMode = null }) {
@@ -422,4 +655,5 @@ module.exports = {
   RARITY_LABEL, EFFECT_LABEL, duelFieldsFromBody, publicCard, totalPower,
   playableCards, validateDeck, deckCards, status, saveDeck, botBattle,
   starterDeck, botDeck, resolveRound, simulate, recentBattles, recordEngineBattle,
+  analyzeDeck, suggestDeckFromPool, createSeededRandom, focusStatOf, balanceSnapshot,
 };

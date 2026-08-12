@@ -754,6 +754,13 @@ app.post('/api/card-duel/bot', auth, cardDuelLimiter, asyncHandler(async (req, r
     Array.isArray(req.body?.cardTypeIds) ? req.body.cardTypeIds : null));
 }));
 
+// Snapshot for balancing: which focus, rarity and effect actually win in the
+// last real matches. Admin-only because it is a product-tuning view, not
+// player-facing data.
+app.get('/api/admin/card-duel/balance', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
+  res.json(await cardDuel.balanceSnapshot(req.query.limit));
+}));
+
 // Solo (time-attack) records: my personal best + the public leaderboard, in
 // one round trip so the solo screen never has to fan out two requests.
 // Solo awards NO points on purpose — the record IS the reward.

@@ -4,7 +4,10 @@ import { lookupCachedImage } from '../lib/imageCache.js';
 
 export default function CachedImg({ src, ...rest }) {
   const resolved = !src ? '' : String(src).startsWith('http') ? String(src) : asset(src);
-  const [href, setHref] = useState(resolved);
+  // شروع با رشتهٔ خالی: اگر از همان فریم اول resolved را روی <img> بگذاریم
+  // تگ img خودش یک درخواست مستقیم می‌فرستد و بعد lookupCachedImage هم یکی
+  // دیگر. وقتی کشِ پایدار داریم، تصویر باید اول cache.match را امتحان کند.
+  const [href, setHref] = useState('');
 
   useEffect(() => {
     let alive = true;

@@ -44,6 +44,7 @@
 // عملاً ناممکن است و ۴۰ کاراکتر کوتاه‌تر از ۶۴ است.
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
@@ -90,11 +91,21 @@ class ImageDiskCache {
 
   Future<Directory> _ensureDir() async {
     if (_dir != null) return _dir!;
-    // getTemporaryDirectory و نه getApplicationDocumentsDirectory:
-    // این داده قابلِ بازسازی است و نباید در بکاپِ خودکارِ گوگل برود یا
-    // در «حجمِ اشغال‌شدهٔ اپ» به‌عنوان دادهٔ کاربر شمرده شود.
-    final base = await getTemporaryDirectory();
-    final d = Directory('${base.path}/card_images');
+    // ═══════════════════════════════════════════════════════════════════
+    // چرا دیگر getTemporaryDirectory نیست
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    // خواستهٔ جدید مالک صریح است: «وقتی اپ را بستن و دوباره باز کردن،
+    // کارت‌ها دیگر از سرور لود نشوند». پوشهٔ temporary در بسیاری از
+    // دستگاه‌ها بینِ دو اجرای اپ می‌ماند، ولی **قراردادش این نیست**؛
+    // سیستم هر زمان که فضا کم بیاورد می‌تواند کامل خالیش کند. این برای
+    // «بهتر از هیچی» خوب بود، برای «قطعی و پایدار» نه.
+    //
+    // Application Support مخصوص همین داده‌های بازتولیدپذیرِ داخلی است:
+    // کاربر نمی‌بیندش، و با بستن اپ از بین نمی‌رود. پاکسازیِ سقفِ حجم
+    // پایین‌تر همچنان مانعِ رشد بی‌نهایت می‌شود.
+    final base = await getApplicationSupportDirectory();
+    final d = Directory('${base.path}/card_images_v2');
     // ── چرا نسخهٔ همگام ──
     //
     // `avoid_slow_async_io` درست می‌گوید: نسخهٔ async این متدها روی
@@ -107,6 +118,52 @@ class ImageDiskCache {
   }
 
   String _keyFor(String url) => sha1.convert(url.codeUnits).toString();
+
+  /// تمام URLهای نسخه‌دارِ تصویر را از یک payload دلخواه بیرون می‌کشد.
+  ///
+  /// برای prewarm روی پاسخ‌های bootstrap / card-duel / public-profile.
+  Iterable<String> collectVersionedImageUrls(Object? payload) sync* {
+    if (payload is List) {
+      for (final item in payload) {
+        yield* collectVersionedImageUrls(item);
+      }
+      return;
+    }
+    if (payload is! Map) return;
+    const imageKeys = <String>{
+      'imageUrl', 'image_url', 'frontImageUrl', 'front_image_url',
+      'profileImageUrl', 'profile_image_url',
+    };
+    for (final entry in payload.entries) {
+      if (imageKeys.contains('${entry.key}')) {
+        final url = '${entry.value}'.trim();
+        if (isVersionedImageUrl(url)) {
+          yield url;
+        }
+      }
+      yield* collectVersionedImageUrls(entry.value);
+    }
+  }
+
+  /// یک مجموعه URL را در پس‌زمینه وارد کش می‌کند.
+  ///
+  /// عمداً best-effort است: UI نباید منتظرش بماند. سقف concurrency کم است
+  /// تا ۳۰ کارتِ هم‌زمان روی اینترنت موبایل، رادیو را خفه نکنند.
+  Future<void> prewarmAll(Iterable<Object?> urls) async {
+    final unique = <String>{
+      for (final raw in urls)
+        if (raw != null && isVersionedImageUrl('$raw'.trim())) '$raw'.trim(),
+    }.toList(growable: false);
+    if (unique.isEmpty) return;
+    const chunkSize = 4;
+    for (var i = 0; i < unique.length; i += chunkSize) {
+      final chunk = unique.sublist(i, math.min(unique.length, i + chunkSize));
+      await Future.wait(chunk.map(fetch));
+    }
+  }
+
+  Future<void> prewarmPayload(Object? payload) =>
+      prewarmAll(collectVersionedImageUrls(payload));
 
   /// مسیرِ فایلِ کش‌شده اگر موجود باشد، وگرنه null. **بدونِ شبکه.**
   ///

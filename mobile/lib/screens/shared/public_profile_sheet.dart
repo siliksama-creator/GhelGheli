@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
 import '../../core/cosmetics.dart';
+import '../../services/image_disk_cache.dart';
 import '../../widgets/async_section.dart';
 import '../../widgets/avatar_image.dart';
 import '../../widgets/safe_image.dart';
@@ -34,7 +35,10 @@ Future<void> showPublicProfile(
         ),
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
         child: AsyncSection<dynamic>(
-          future: api.get('/api/users/$userId/public'),
+          future: api.get('/api/users/$userId/public').then((value) {
+            unawaited(ImageDiskCache.instance.prewarmPayload(value));
+            return value;
+          }),
           builder: (context, data) => _PublicProfileBody(
               data: Map<String, dynamic>.from(data as Map),
               controller: controller),

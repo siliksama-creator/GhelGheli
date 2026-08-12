@@ -10,7 +10,7 @@ import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { API, req, fa } from './lib/api.js';
-import { registerImageCacheWorker } from './lib/imageCache.js';
+import { primeImageCache, registerImageCacheWorker } from './lib/imageCache.js';
 import Notifications from './components/Notifications.jsx';
 import Auth from './screens/Auth.jsx';
 import Home from './screens/Home.jsx';
@@ -214,6 +214,7 @@ function Portal({ token, logout }) {
         level: boot.level || null,
       });
       setRewards(boot.rewards || []);
+      primeImageCache(boot).catch(() => {});
       const wheel = boot.wheel;
       if (wheel) setSpins(wheel.unlimited ? '∞' : (wheel.spinsLeft ?? 0));
       setPassBrief(boot.pass || null);

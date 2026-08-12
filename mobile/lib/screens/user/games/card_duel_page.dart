@@ -12,6 +12,7 @@ import '../../../api_client.dart';
 import '../../../core/assets.dart';
 import '../../../core/cosmetics.dart';
 import '../../../core/share_invite.dart';
+import '../../../services/image_disk_cache.dart';
 import '../../../theme/colors.dart';
 import '../../../theme/tokens.dart';
 import '../../../widgets/app_card.dart';
@@ -121,6 +122,7 @@ class _CardDuelPageState extends State<CardDuelPage> {
   Future<void> _load({bool refreshSelection = true}) async {
     try {
       final response = await widget.api.get('/api/card-duel', fresh: true);
+      unawaited(ImageDiskCache.instance.prewarmPayload(response));
       if (!mounted) return;
       final map = response is Map
           ? Map<String, dynamic>.from(response)
@@ -196,6 +198,26 @@ class _CardDuelPageState extends State<CardDuelPage> {
         _snack('ترکیب فقط پنج کارت دارد؛ اول یکی را بردار');
       }
     });
+  }
+
+  void _applySuggestedDeck() {
+    if (_started) return;
+    final raw = (_data?['suggestedDeck'] as Map?)?['cardTypeIds'];
+    final ids = (raw as List? ?? const [])
+        .map((value) => '$value')
+        .where((value) => value.isNotEmpty)
+        .take(5)
+        .toList(growable: false);
+    if (ids.length != 5) {
+      _snack('هنوز ترکیب پیشنهادی کامل نیست');
+      return;
+    }
+    setState(() {
+      _selected
+        ..clear()
+        ..addAll(ids);
+    });
+    _snack('ترکیب پیشنهادی روی میز چیده شد');
   }
 
   void _editLineup() {
@@ -468,6 +490,12 @@ class _CardDuelPageState extends State<CardDuelPage> {
       0,
       (sum, id) => sum + NumberParser.toInt(byId[id]?['power']),
     );
+    final activeInsights = _data?['deckInsights'] is Map
+        ? Map<String, dynamic>.from(_data!['deckInsights'] as Map)
+        : null;
+    final suggestedDeck = _data?['suggestedDeck'] is Map
+        ? Map<String, dynamic>.from(_data!['suggestedDeck'] as Map)
+        : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -478,6 +506,12 @@ class _CardDuelPageState extends State<CardDuelPage> {
           cards: _cards,
           teamPower: teamPower,
           onRemove: _toggle,
+        ),
+        Gaps.vSm,
+        _DeckIntelPanel(
+          activeInsights: activeInsights,
+          suggestedDeck: suggestedDeck,
+          onApplySuggested: _applySuggestedDeck,
         ),
         Gaps.vSm,
         FilledButton(

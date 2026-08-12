@@ -29,15 +29,16 @@ const server = read('backend/src/server.js');
 
 check(/bool isVersionedImageUrl/.test(disk) && /\/uploads\//.test(disk) && /\/public\//.test(disk),
   'اندروید URL نسخه‌دار را از روی نام فایل تشخیص می‌دهد');
-check(/sha1\.convert/.test(disk) && /\.tmp'/.test(disk) && /\.rename\(/.test(disk),
-  'کلید کش هش URL است و نوشتن اتمی است');
+check(/sha1\.convert/.test(disk) && /\.tmp'/.test(disk) && /\.rename\(/.test(disk)
+  && /getApplicationSupportDirectory/.test(disk),
+  'کلید کش هش URL است، نوشتن اتمی است، و روی دیسک پایدار ذخیره می‌شود');
 check(/CachedCardImage/.test(player),
   'کارت کلکسیونی از کش دیسک می‌خواند');
 check(/isVersionedImageUrl\(resolved\)/.test(safe) && /CachedCardImage\(/.test(safe),
   'SafeImage برای آپلود نسخه‌دار به دیسک می‌رود نه Image.network');
 check(/CachedCardImage\(/.test(avatar),
   'عکس پروفایل ریموت بعد از بار اول از دیسک خوانده می‌شود');
-check(/CACHE_NAME = 'ghelgheli-img-v1'/.test(webCache) && /caches\.open/.test(webCache),
+check(/CACHE_NAME = 'ghelgheli-img-v2'/.test(webCache) && /caches\.open/.test(webCache),
   'وب از Cache Storage با کلید URL استفاده می‌کند');
 check(/isVersionedImage/.test(webCache) && /\/uploads\//.test(webCache),
   'وب فقط تصویر نسخه‌دار را ماندگار می‌کند');

@@ -2,6 +2,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 
 import { req, fa, avatarUrl } from '../lib/api.js';
+import { primeImageCache } from '../lib/imageCache.js';
 import CachedImg from '../components/CachedImg.jsx';
 import PlayerCard from '../components/PlayerCard.jsx';
 import { clubImg, CosmeticAvatarFrame, DisplayName, profileBackgroundClass, profileBackgroundStyle } from '../components/Cosmetics.jsx';
@@ -26,6 +27,11 @@ export default function PublicProfile({ token, userId, close }) {
 
   const u = state.data;
   const cos = u?.cosmetics || {};
+
+  useEffect(() => {
+    if (!u) return;
+    primeImageCache(u).catch(() => {});
+  }, [u]);
 
   return (
     <div className="modalShade" onClick={close}>

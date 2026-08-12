@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
+import '../../services/image_disk_cache.dart';
 import '../../core/assets.dart';
 import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
@@ -57,6 +58,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Future<void> _load() async {
     try {
       final boot = await widget.api.get('/api/bootstrap');
+      unawaited(ImageDiskCache.instance.prewarmPayload(boot));
       if (!mounted) return;
       final m = boot is Map
           ? Map<String, dynamic>.from(boot)

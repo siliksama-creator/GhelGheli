@@ -58,6 +58,8 @@ for (const [x, o] of [['x2', 'o2'], ['x3', 'o3'], ['x4', 'o4'], ['x5', 'o5']]) {
 }
 ok(['X', 'O', 'DRAW'].includes(rules.result(state)), 'پنج راند همیشه نتیجه نهایی معتبر می‌سازد');
 ok(state.history.every(round => round.reason), 'هر راند دلیل برنده شدن را دارد');
+ok(state.history.every(round => round.seed && round.breakdownX && round.breakdownO),
+  'هر راند seed و breakdown برای بازبینی بالانس دارد');
 const botState = rules.createFromDecks(
   [card('x1', 70), card('x2', 71), card('x3', 72), card('x4', 73), card('x5', 74)],
   [card('o1', 70), card('o2', 71), card('o3', 72), card('o4', 73), card('o5', 74)],
@@ -91,6 +93,10 @@ ok(/if \(vsBot\) return null/.test(service) && !/VALUES\('bot'/.test(service),
   'تمرین با ربات در جدول تاریخچه نوشته نمی‌شود');
 ok(/mode IN \('online','lobby'\)/.test(service) && /HISTORY_KEEP = 5/.test(service),
   'فقط پنج نبرد آنلاین/لابی اخیر خوانده می‌شود');
+ok(/deckInsights: activeInsights/.test(service) && /suggestedDeck: suggestedDeck/.test(service),
+  'وضعیت دوئل تحلیل بالانس و ترکیب پیشنهادی را برمی‌گرداند');
+ok(/\/api\/admin\/card-duel\/balance/.test(server) && /balanceSnapshot/.test(service),
+  'اسنپ‌شات بالانس برای تنظیم حرفه‌ای دوئل وجود دارد');
 ok(/league: false/.test(read('backend/src/services/gameStakeService.js')),
   'تسویه مسابقه رتبه لیگ را دستکاری نمی‌کند');
 

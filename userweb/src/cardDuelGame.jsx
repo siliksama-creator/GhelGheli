@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { asset, avatarUrl, fa, req } from './lib/api.js';
+import { primeImageCache } from './lib/imageCache.js';
 import { useGameSession } from './gameSession.js';
 import { CosmeticAvatarFrame, CosmeticFrame, DisplayName, RESULT_PALETTES } from './components/Cosmetics.jsx';
 import CosmeticMatchEffect, { matchEffectSupports } from './components/MatchEffectVisual.jsx';
@@ -219,6 +220,23 @@ async function renderResultCard({ result, score, mvp, opponent, url, template })
   return new Promise(resolve => canvas.toBlob(resolve, 'image/png', 0.94));
 }
 
+function DeckIntel({ insights, suggestedDeck, onApply }) {
+  if (!insights && !suggestedDeck?.insights) return null;
+  const active = insights || suggestedDeck?.insights;
+  const strengths = active?.strengths || [];
+  const warnings = active?.warnings || [];
+  const order = active?.recommendedOrder || [];
+  return <section className="duelIntel card">
+    <div className="duelIntelHead">
+      <div><b>تحلیل بالانس ترکیب</b><small>هوش آرنا قبل از شروع نقاط قوت و ضعف deck را خلاصه می‌کند</small></div>
+      {suggestedDeck && <button type="button" className="ghost" onClick={onApply}>چیدن خودکار</button>}
+    </div>
+    {!!strengths.length && <div className="duelIntelFlow good">{strengths.map((item, index) => <i key={index}>{item}</i>)}</div>}
+    {!!warnings.length && <div className="duelIntelFlow bad">{warnings.map((item, index) => <i key={index}>{item}</i>)}</div>}
+    {!!order.length && <div className="duelIntelOrder">{order.map(item => <span key={`${item.round}-${item.cardTypeId}`}><b>راند {fa(item.round)}</b>{item.name}</span>)}</div>}
+  </section>;
+}
+
 function History({ battles }) {
   const labels = { online: 'نبرد آنلاین', lobby: 'لابی خصوصی' };
   const rows = (battles || []).filter(battle => battle.mode !== 'bot').slice(0, 5);
@@ -299,6 +317,7 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
     try {
       const response = await req('/api/card-duel', 'GET', null, token);
       setData(response);
+      primeImageCache(response).catch(() => {});
       if (!enabled) {
         const owned = response?.playableCards || [];
         const prepared = response?.activeDeck?.cards || [];
@@ -321,6 +340,10 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
   const toggle = id => setSelected(previous => previous.includes(id)
     ? previous.filter(value => value !== id)
     : previous.length < 5 ? [...previous, id] : previous);
+  const applySuggested = () => {
+    const ids = (data?.suggestedDeck?.cardTypeIds || []).map(String).filter(Boolean).slice(0, 5);
+    if (ids.length === 5) setSelected(ids);
+  };
 
   const saveAndStart = async () => {
     if (selected.length !== 5 || busy) return;
@@ -362,6 +385,7 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
         <i>›</i><div><span>۳</span><b>۵ راند نفس‌گیر</b><small>هر راند ویژگی متفاوتی می‌سنجد</small></div>
       </section>
       <Lineup selected={selected} cards={cards} toggle={toggle} />
+      <DeckIntel insights={data?.deckInsights} suggestedDeck={data?.suggestedDeck} onApply={applySuggested} />
       <button type="button" className="duelLaunch" disabled={busy || selected.length !== 5} onClick={saveAndStart}>
         <span>{busy ? 'در حال قفل ترکیب…' : `ورود به ${mode.title}`}</span>
         <small>{vsBot ? 'بدون ریسک امتیاز' : stake ? `ورودی ${fa(stake)} امتیاز` : 'مسابقه خصوصی'}</small>

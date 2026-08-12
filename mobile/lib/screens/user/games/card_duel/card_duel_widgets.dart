@@ -202,111 +202,81 @@ class _LiveBattle extends StatelessWidget {
     final iChose = state['iChose'] == true;
     final total = NumberParser.toInt(state['totalRounds']) == 0 ? 5 : NumberParser.toInt(state['totalRounds']);
     final roundIndex = NumberParser.toInt(state['roundIndex']);
-    return Stack(
-      children: [
-        Positioned.fill(child: IgnorePointer(child: _ArenaBackdropFx(color: color))),
-        Column(children: [
-          _Scoreboard(
-            myName: session.nameOf(mine),
-            theirName: session.nameOf(opponent),
-            myScore: NumberParser.toInt(score[mine]),
-            theirScore: NumberParser.toInt(score[opponent]),
-            color: color,
-            myPlayer: session.playerInfo(mine),
-            theirPlayer: session.playerInfo(opponent),
-            title: '${state['roundTitle'] ?? 'پایان نبرد'}',
-            roundLabel: 'راند ${faNum((roundIndex + 1).clamp(1, total))} از ${faNum(total)}',
-            lastWinner: '${lastRound?['winner'] ?? ''}',
-            mySymbol: mine,
-          ),
-          Gaps.vSm,
-          _RoundPips(total: total, current: roundIndex, history: history, mine: mine, color: color),
-          Gaps.vMd,
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 420),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeInCubic,
-            transitionBuilder: (child, animation) => FadeTransition(
-              opacity: animation,
-              child: ScaleTransition(scale: Tween<double>(begin: .96, end: 1).animate(animation), child: child),
-            ),
-            child: _ClashStage(key: ValueKey(lastRound?['round'] ?? -1), round: lastRound, mine: mine, color: color),
-          ),
-          if (session.phase == GamePhase.playing) ...[
+    return Column(children: [
+      _Scoreboard(
+        myName: session.nameOf(mine),
+        theirName: session.nameOf(opponent),
+        myScore: NumberParser.toInt(score[mine]),
+        theirScore: NumberParser.toInt(score[opponent]),
+        color: color,
+        myPlayer: session.playerInfo(mine),
+        theirPlayer: session.playerInfo(opponent),
+        title: '${state['roundTitle'] ?? 'پایان نبرد'}',
+        roundLabel: 'راند ${faNum((roundIndex + 1).clamp(1, total))} از ${faNum(total)}',
+        lastWinner: '${lastRound?['winner'] ?? ''}',
+        mySymbol: mine,
+      ),
+      Gaps.vSm,
+      _RoundPips(total: total, current: roundIndex, history: history, mine: mine, color: color),
+      Gaps.vMd,
+      _ClashStage(round: lastRound, mine: mine, color: color),
+      if (session.phase == GamePhase.playing) ...[
         Gaps.vSm,
-            AppCard(
-                child: Column(children: [
-              Row(children: [
-                Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(iChose ? 'انتخابت قفل شد' : 'کارت این راند را انتخاب کن',
-                      style: const TextStyle(fontWeight: FontWeight.w900)),
-                  Text(
-                      state['waitingForOpponent'] == true
-                          ? 'منتظر انتخاب حریف…'
-                          : state['opponentLocked'] == true
-                              ? 'حریف انتخاب کرده؛ تصمیم بگیر!'
-                              : 'انتخاب‌ها مخفی و هم‌زمان هستند',
-                      style: const TextStyle(fontSize: 9.5, color: Colors.white54)),
-                ])),
-                AnimatedBuilder(
-                    animation: session.clock,
-                    builder: (_, __) => AnimatedContainer(
-                          duration: const Duration(milliseconds: 220),
-                          padding: const EdgeInsets.all(2),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              if (session.secondsLeft <= 5 && session.secondsLeft > 0)
-                                BoxShadow(color: color.withValues(alpha: .32), blurRadius: 20),
-                            ],
-                          ),
-                          child: CircleAvatar(
-                              radius: 24,
-                              backgroundColor: const Color(0xFF02060C),
-                              child: Text(faNum(session.secondsLeft),
-                                  style: TextStyle(color: color, fontWeight: FontWeight.w900))),
-                        )),
-              ]),
-              Gaps.vSm,
-              SizedBox(
-                height: 172,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: deck.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (_, index) {
-                    final card = Map<String, dynamic>.from(deck[index]);
-                    final id = cardIdOf(card);
-                    final canPlay = !iChose && remaining.contains(id);
-                    return SizedBox(
-                      width: 112,
-                      child: TweenAnimationBuilder<double>(
-                        tween: Tween(begin: .96, end: 1),
-                        duration: Duration(milliseconds: 180 + index * 45),
-                        curve: Curves.easeOutBack,
-                        builder: (_, value, child) => Transform.translate(
-                          offset: Offset(0, (1 - value) * 18 + (pendingId == id ? -6 : 0)),
-                          child: Transform.scale(scale: value, child: child),
-                        ),
-                        child: PlayerCard(
-                          card: card,
-                          compact: true,
-                          showStats: false,
-                          enabled: canPlay,
-                          selected: pendingId == id,
-                          onTap: canPlay ? () => session.moveObject({'cardId': id}) : null,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
+        AppCard(
+            child: Column(children: [
+          Row(children: [
+            Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(iChose ? 'انتخابت قفل شد' : 'کارت این راند را انتخاب کن',
+                  style: const TextStyle(fontWeight: FontWeight.w900)),
+              Text(
+                  state['waitingForOpponent'] == true
+                      ? 'منتظر انتخاب حریف…'
+                      : state['opponentLocked'] == true
+                          ? 'حریف انتخاب کرده؛ تصمیم بگیر!'
+                          : 'انتخاب‌ها مخفی و هم‌زمان هستند',
+                  style: const TextStyle(fontSize: 9.5, color: Colors.white54)),
             ])),
-          ],
-        ]),
+            AnimatedBuilder(
+                animation: session.clock,
+                builder: (_, __) => CircleAvatar(
+                    radius: 24,
+                    backgroundColor: const Color(0xFF02060C),
+                    child: Text(faNum(session.secondsLeft),
+                        style: TextStyle(color: color, fontWeight: FontWeight.w900)))),
+          ]),
+          Gaps.vSm,
+          SizedBox(
+            height: 168,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: deck.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (_, index) {
+                final card = Map<String, dynamic>.from(deck[index]);
+                final id = cardIdOf(card);
+                final canPlay = !iChose && remaining.contains(id);
+                return SizedBox(
+                  width: 112,
+                  child: AnimatedSlide(
+                    duration: const Duration(milliseconds: 220),
+                    offset: pendingId == id ? const Offset(0, -0.05) : Offset.zero,
+                    child: PlayerCard(
+                      card: card,
+                      compact: true,
+                      showStats: false,
+                      enabled: canPlay,
+                      selected: pendingId == id,
+                      onTap: canPlay ? () => session.moveObject({'cardId': id}) : null,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ])),
       ],
-    );
+    ]);
   }
 }
 
@@ -482,28 +452,12 @@ class _RoundPips extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(mainAxisAlignment: MainAxisAlignment.center, children: [
         for (var i = 0; i < total; i++)
-          AnimatedContainer(
-            duration: Duration(milliseconds: 200 + i * 40),
-            curve: Curves.easeOutCubic,
-            width: i == current && i >= history.length ? 42 : 34,
+          Container(
+            width: 34,
             height: 8,
             margin: const EdgeInsets.symmetric(horizontal: 3),
             decoration: BoxDecoration(
               borderRadius: Corners.rPill,
-              boxShadow: [
-                if (i < history.length)
-                  BoxShadow(
-                    color: ('${history[i]['winner']}' == mine
-                            ? _emerald
-                            : '${history[i]['winner']}' == 'DRAW'
-                                ? _gold
-                                : _rose)
-                        .withValues(alpha: .22),
-                    blurRadius: 10,
-                  )
-                else if (i == current)
-                  BoxShadow(color: color.withValues(alpha: .24), blurRadius: 12),
-              ],
               color: i < history.length
                   ? ('${history[i]['winner']}' == mine
                       ? _emerald
@@ -518,69 +472,8 @@ class _RoundPips extends StatelessWidget {
       ]);
 }
 
-class _ArenaBackdropFx extends StatefulWidget {
-  const _ArenaBackdropFx({required this.color});
-  final Color color;
-
-  @override
-  State<_ArenaBackdropFx> createState() => _ArenaBackdropFxState();
-}
-
-class _ArenaBackdropFxState extends State<_ArenaBackdropFx>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 3800),
-  )..repeat(reverse: true);
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => RepaintBoundary(
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (_, __) => CustomPaint(
-            painter: _ArenaBackdropPainter(widget.color, _controller.value),
-            child: const SizedBox.expand(),
-          ),
-        ),
-      );
-}
-
-class _ArenaBackdropPainter extends CustomPainter {
-  _ArenaBackdropPainter(this.color, this.t);
-  final Color color;
-  final double t;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final glow = Paint()
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 42)
-      ..color = color.withValues(alpha: .10 + t * .05);
-    canvas.drawCircle(Offset(size.width * (.18 + .08 * t), size.height * .26), 52 + 16 * t, glow);
-    canvas.drawCircle(Offset(size.width * (.82 - .10 * t), size.height * .64), 44 + 14 * (1 - t), glow);
-    final streak = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [color.withValues(alpha: .0), color.withValues(alpha: .08), Colors.transparent],
-      ).createShader(Offset.zero & size);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(Rect.fromLTWH(size.width * .08, size.height * .34, size.width * .84, 24), const Radius.circular(999)),
-      streak,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _ArenaBackdropPainter oldDelegate) => oldDelegate.t != t || oldDelegate.color != color;
-}
-
 class _ClashStage extends StatelessWidget {
-  const _ClashStage({super.key, required this.round, required this.mine, required this.color});
+  const _ClashStage({required this.round, required this.mine, required this.color});
   final Map<String, dynamic>? round;
   final String mine;
   final Color color;
@@ -630,71 +523,39 @@ class _ClashStage extends StatelessWidget {
         ),
         child: Column(children: [
           Row(children: [
-            Expanded(
-              child: _RevealCardPod(
-                fromLeft: true,
-                child: AspectRatio(aspectRatio: 0.68, child: PlayerCard(card: myCard, compact: true, showStats: false, winner: iWon, loser: !draw && !iWon)),
-              ),
-            ),
+            Expanded(child: AspectRatio(aspectRatio: 0.68, child: PlayerCard(card: myCard, compact: true, showStats: false, winner: iWon, loser: !draw && !iWon))),
             Expanded(
               child: Column(children: [
                 Text('راند ${faNum(round!['round'])} · ${round!['focusLabel'] ?? round!['title']}', style: const TextStyle(fontSize: 10, color: Colors.white54, fontWeight: FontWeight.w800), textAlign: TextAlign.center),
                 Text('${round!['title']}', textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900)),
                 const SizedBox(height: 6),
+                Text('${faNum(myPower)}  VS  ${faNum(otherPower)}',
+                    textDirection: TextDirection.ltr, style: const TextStyle(color: _gold, fontSize: 22, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 8),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _RoundChip(label: '${round!['focusLabel'] ?? 'ویژگی'}', value: '${faNum(myFocus)} - ${faNum(otherFocus)}', tint: color),
+                    _RoundChip(label: 'اختلاف قدرت', value: faNum((round!['powerGap'] ?? (myPower - otherPower).abs())), tint: draw ? _gold : iWon ? _emerald : _rose),
+                  ],
+                ),
+                const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(18),
-                    gradient: LinearGradient(colors: [
-                      (draw ? _gold : iWon ? _emerald : _rose).withValues(alpha: .18),
-                      const Color(0xAA07111D),
-                    ]),
-                    border: Border.all(color: (draw ? _gold : iWon ? _emerald : _rose).withValues(alpha: .28)),
+                    color: (draw ? _gold : iWon ? _emerald : _rose).withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(99),
                   ),
-                  child: Column(
-                    children: [
-                      Text('${faNum(myPower)}  VS  ${faNum(otherPower)}',
-                          textDirection: TextDirection.ltr, style: const TextStyle(color: _gold, fontSize: 22, fontWeight: FontWeight.w900)),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        alignment: WrapAlignment.center,
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
-                          _RoundChip(label: '${round!['focusLabel'] ?? 'ویژگی'}', value: '${faNum(myFocus)} - ${faNum(otherFocus)}', tint: color),
-                          _RoundChip(label: 'اختلاف قدرت', value: faNum((round!['powerGap'] ?? (myPower - otherPower).abs())), tint: draw ? _gold : iWon ? _emerald : _rose),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      TweenAnimationBuilder<double>(
-                        tween: Tween(begin: .86, end: 1),
-                        duration: const Duration(milliseconds: 520),
-                        curve: Curves.easeOutBack,
-                        builder: (_, value, child) => Transform.scale(scale: value, child: child),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: (draw ? _gold : iWon ? _emerald : _rose).withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(99),
-                            boxShadow: [BoxShadow(color: (draw ? _gold : iWon ? _emerald : _rose).withValues(alpha: .22), blurRadius: 14)],
-                          ),
-                          child: Text(
-                            draw ? 'برخورد برابر' : iWon ? 'WINNER' : 'باخت راند',
-                            style: TextStyle(color: draw ? _gold : iWon ? _emerald : _rose, fontWeight: FontWeight.w900, letterSpacing: 0.6),
-                          ),
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    draw ? 'برخورد برابر' : iWon ? 'WINNER' : 'باخت راند',
+                    style: TextStyle(color: draw ? _gold : iWon ? _emerald : _rose, fontWeight: FontWeight.w900, letterSpacing: 0.6),
                   ),
                 ),
               ]),
             ),
-            Expanded(
-              child: _RevealCardPod(
-                fromLeft: false,
-                child: AspectRatio(aspectRatio: 0.68, child: PlayerCard(card: otherCard, compact: true, showStats: false, winner: !draw && !iWon, loser: iWon)),
-              ),
-            ),
+            Expanded(child: AspectRatio(aspectRatio: 0.68, child: PlayerCard(card: otherCard, compact: true, showStats: false, winner: !draw && !iWon, loser: iWon))),
           ]),
           Gaps.vXs,
           Text('${round!['reason'] ?? round!['text'] ?? ''}',
@@ -709,30 +570,6 @@ class _ClashStage extends StatelessWidget {
       ),
     );
   }
-}
-
-class _RevealCardPod extends StatelessWidget {
-  const _RevealCardPod({required this.fromLeft, required this.child});
-  final bool fromLeft;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0, end: 1),
-        duration: const Duration(milliseconds: 520),
-        curve: Curves.easeOutCubic,
-        builder: (_, value, widget) => Opacity(
-          opacity: value,
-          child: Transform.translate(
-            offset: Offset((fromLeft ? -1 : 1) * (1 - value) * 24, (1 - value) * 6),
-            child: Transform.rotate(
-              angle: (fromLeft ? -1 : 1) * (1 - value) * 0.05,
-              child: widget,
-            ),
-          ),
-        ),
-        child: child,
-      );
 }
 
 class _RoundChip extends StatelessWidget {
@@ -855,13 +692,7 @@ class _Finale extends StatelessWidget {
           ),
         if (mvp != null) ...[
           Gaps.vSm,
-          TweenAnimationBuilder<double>(
-            tween: Tween(begin: .9, end: 1),
-            duration: const Duration(milliseconds: 520),
-            curve: Curves.easeOutBack,
-            builder: (_, value, child) => Transform.scale(scale: value, child: child),
-            child: SizedBox(width: 148, height: 206, child: PlayerCard(card: mvp!, compact: true, showStats: false, winner: true)),
-          ),
+          SizedBox(width: 140, height: 196, child: PlayerCard(card: mvp!, compact: true, showStats: false, winner: true)),
           Text('MVP · ${mvp!['name']}', style: const TextStyle(fontWeight: FontWeight.w900)),
         ],
         Gaps.vSm,
@@ -913,6 +744,127 @@ String _settlementLabel(String status) {
     default:
       return 'تسویه‌شده';
   }
+}
+
+class _DeckIntelPanel extends StatelessWidget {
+  const _DeckIntelPanel({
+    required this.activeInsights,
+    required this.suggestedDeck,
+    required this.onApplySuggested,
+  });
+
+  final Map<String, dynamic>? activeInsights;
+  final Map<String, dynamic>? suggestedDeck;
+  final VoidCallback onApplySuggested;
+
+  @override
+  Widget build(BuildContext context) {
+    final insights = activeInsights ?? (suggestedDeck?['insights'] is Map
+        ? Map<String, dynamic>.from(suggestedDeck!['insights'] as Map)
+        : null);
+    if (insights == null) return const SizedBox.shrink();
+    final strengths = (insights['strengths'] as List? ?? const []).map((e) => '$e').where((e) => e.isNotEmpty).toList(growable: false);
+    final warnings = (insights['warnings'] as List? ?? const []).map((e) => '$e').where((e) => e.isNotEmpty).toList(growable: false);
+    final recommendedOrder = (insights['recommendedOrder'] as List? ?? const []).whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList(growable: false);
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('تحلیل بالانس ترکیب', style: TextStyle(fontWeight: FontWeight.w900)),
+                    Text('هوشِ آرنا قبل از شروع ضعف و قوت deck را می‌گوید', style: TextStyle(fontSize: 9.5, color: Colors.white60)),
+                  ],
+                ),
+              ),
+              if (suggestedDeck != null)
+                OutlinedButton.icon(
+                  onPressed: onApplySuggested,
+                  icon: const Icon(Icons.auto_fix_high_rounded, size: 16),
+                  label: const Text('چیدن خودکار'),
+                ),
+            ],
+          ),
+          if (strengths.isNotEmpty) ...[
+            Gaps.vXs,
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final item in strengths)
+                  _IntelChip(text: item, tint: _emerald),
+              ],
+            ),
+          ],
+          if (warnings.isNotEmpty) ...[
+            Gaps.vXs,
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final item in warnings)
+                  _IntelChip(text: item, tint: _rose),
+              ],
+            ),
+          ],
+          if (recommendedOrder.isNotEmpty) ...[
+            Gaps.vSm,
+            const Text('ترتیب پیشنهادی راندها', style: TextStyle(fontSize: 10.5, color: Colors.white70, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 6),
+            SizedBox(
+              height: 46,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemBuilder: (_, index) {
+                  final item = recommendedOrder[index];
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: .05),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.white.withValues(alpha: .10)),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('راند ${faNum(item['round'])} · ${item['focus'] ?? ''}', style: const TextStyle(fontSize: 8.5, color: Colors.white54, fontWeight: FontWeight.w800)),
+                        Text('${item['name'] ?? 'کارت'}', style: const TextStyle(fontSize: 10.5, color: Colors.white, fontWeight: FontWeight.w900)),
+                      ],
+                    ),
+                  );
+                },
+                separatorBuilder: (_, __) => const SizedBox(width: 6),
+                itemCount: recommendedOrder.length,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _IntelChip extends StatelessWidget {
+  const _IntelChip({required this.text, required this.tint});
+  final String text;
+  final Color tint;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+        decoration: BoxDecoration(
+          color: tint.withValues(alpha: .12),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: tint.withValues(alpha: .32)),
+        ),
+        child: Text(text, style: TextStyle(color: tint, fontSize: 9.8, fontWeight: FontWeight.w800)),
+      );
 }
 
 class _History extends StatelessWidget {
