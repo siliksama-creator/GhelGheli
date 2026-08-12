@@ -14,6 +14,7 @@ function check(value, message) {
 
 console.log('\n== production card curation and runtime frames ==');
 const migration = read('backend/migrations/058_curated_card_stats_and_admin_showcase.sql');
+const judeSupplement = read('backend/migrations/059_verified_jude_ocr_tokens.sql');
 const rowPattern = /^\s*\('([^']+)','([^']+)','([^']+)',(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),'([^']+)','([^']+)'\),?$/gm;
 const rows = [...migration.matchAll(rowPattern)].map(match => ({
   oldName: match[1], newName: match[2], description: match[3],
@@ -56,6 +57,11 @@ check((migration.match(/ARRAY\['(?:ETERNO|HAALAND|RAPHINHA|SALAH)'/g) || []).len
   'four visually verified zero-OCR fronts receive conservative manual tokens only when empty');
 check(!/ARRAY\[[^\]]*MARADONA/.test(migration),
   'stylised Maradona artwork does not receive invented OCR text');
+check(/ARRAY\['EMIRATES','BETTER','PREMIUM','CARD','#500'\]/.test(judeSupplement)
+  && /cardinality\(COALESCE\(text_tokens/.test(judeSupplement),
+  'post-deploy Jude audit stores only visibly printed tokens and remains idempotent');
+check(!/ARRAY\[[^\]]*BELLINGHAM/.test(judeSupplement),
+  'front-only Jude artwork does not receive an unprinted player-name token');
 
 const routes = read('backend/src/routes/photoCards.js');
 const grouping = read('backend/src/services/photoCardAdminGrouping.js');
