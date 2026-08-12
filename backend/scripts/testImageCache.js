@@ -23,6 +23,8 @@ const cachedImg = read('userweb/src/components/CachedImg.jsx');
 const sw = read('userweb/public/image-cache-sw.js');
 const main = read('userweb/src/main.jsx');
 const inventory = read('userweb/src/screens/Inventory.jsx');
+const playerCardWeb = read('userweb/src/components/PlayerCard.jsx');
+const cardsLib = read('userweb/src/lib/cards.js');
 const server = read('backend/src/server.js');
 
 check(/bool isVersionedImageUrl/.test(disk) && /\/uploads\//.test(disk) && /\/public\//.test(disk),
@@ -45,8 +47,9 @@ check(/cache\.match\(url\)/.test(sw) && /cache\.put\(url/.test(sw),
   'سرویس‌ورکر /uploads و /public را بدون درخواست تکراری برمی‌گرداند');
 check(/registerImageCacheWorker/.test(main),
   'وب سرویس‌ورکر کش تصویر را ثبت می‌کند');
-check(/<CachedImg/.test(inventory) && /item\.image_url \|\| item\.imageUrl/.test(inventory),
-  'کلکسیون وب از CachedImg و URL واقعی کارت استفاده می‌کند');
+check(/<PlayerCard/.test(inventory) && /<CachedImg/.test(playerCardWeb) && /cardArtOf/.test(playerCardWeb)
+  && /imageUrl/.test(cardsLib) && /image_url/.test(cardsLib),
+  'کلکسیون وب از کامپوننت مشترک کارت با CachedImg و URL واقعی کارت استفاده می‌کند');
 check(/max-age=31536000, immutable/.test(server),
   'سرور هنوز هدر immutable روی آپلودها می‌فرستد');
 
