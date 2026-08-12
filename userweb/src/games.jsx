@@ -6,7 +6,6 @@ import MemorySolo, { MemoryGrid } from './memoryGame.jsx';
 import PenaltyGame from './penaltyGame.jsx';
 import TapGame from './tapGame.jsx';
 import CardDuelWeb from './cardDuelGame.jsx';
-import GrowthHub from './GrowthHub.jsx';
 import { useGameSession } from './gameSession.js';
 import { CosmeticAvatarFrame, LevelBadge, DisplayName, RESULT_PALETTES } from './components/Cosmetics.jsx';
 import CosmeticMatchEffect, { matchEffectSupports } from './components/MatchEffectVisual.jsx';
@@ -29,7 +28,7 @@ function tierLabel(level){
   return {label:'تازه‌کار', color:'#94A3B8'};
 }
 
-export default function Games({ api, token }) {
+export default function Games({ api, token, externalLaunch = null }) {
   const [active, setActive] = useState(null);
   const [mode, setMode] = useState(100);
   const [customStake, setCustomStake] = useState(500);
@@ -43,6 +42,16 @@ export default function Games({ api, token }) {
   const lobbySocketRef = useRef(null);
   const [lobbyNotice, setLobbyNotice] = useState('');
   const [memoryRecords, setMemoryRecords] = useState(null);
+
+  useEffect(() => {
+    if (!externalLaunch?.start || !externalLaunch?.socket) return;
+    setActive({
+      id: externalLaunch.start.gameId || 'card_duel',
+      stake: Number(externalLaunch.start.stake || 0),
+      externalSocket: externalLaunch.socket,
+      initialStart: externalLaunch.start,
+    });
+  }, [externalLaunch]);
 
   const loadMemoryRecords = async () => {
     try {
@@ -117,7 +126,7 @@ export default function Games({ api, token }) {
 
   useEffect(() => {
     req('/api/bootstrap', 'GET', null, token).then(d => {
-      if (d?.user) setUser(d.user);
+      if (d?.user) setUser({ ...d.user, cosmetics: d.cosmetics || {} });
     }).catch(() => {});
     req('/api/level', 'GET', null, token).then(d => {
       if (d) setLevel(d);
@@ -213,7 +222,7 @@ export default function Games({ api, token }) {
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px' }}>
               <h3 style={{ color: '#FFF', fontWeight: '900', margin: 0, fontSize: '15px', display:'flex', alignItems:'center', gap:'6px' }}>
-                <span>{user?.nickname || 'قهرمان قلقلی'}</span>
+                <DisplayName name={user?.nickname || 'قهرمان قلقلی'} cosmetics={user?.cosmetics} level={level?.level} />
               </h3>
               <div style={{ background: 'rgba(255, 209, 102, 0.18)', border: '1px solid #FFD166', color: '#FFD166', padding: '3px 10px', borderRadius: '20px', fontWeight: '900', fontSize: '11px' }}>
                 {fa(user?.current_points || 0)} امتیاز
@@ -519,12 +528,6 @@ export default function Games({ api, token }) {
         </div>
       )}
 
-      <GrowthHub api={api} token={token} onSocketGame={(socket, start) => setActive({
-        id: start.gameId || 'card_duel',
-        stake: Number(start.stake || 0),
-        externalSocket: socket,
-        initialStart: start,
-      })} />
     </div>
   );
 }

@@ -47,6 +47,9 @@ module.exports = function growthRoutes({
   router.get('/missions', auth, asyncHandler(async (req, res) => {
     res.json(await missions.status(req.user.id));
   }));
+  router.post('/missions/daily-bonus/claim', auth, writeLimiter, asyncHandler(async (req, res) => {
+    res.json(await missions.claimDailyBonus(req.user.id));
+  }));
   router.post('/missions/:key/claim', auth, writeLimiter, asyncHandler(async (req, res) => {
     res.json(await missions.claim(req.user.id, String(req.params.key || '').slice(0, 64)));
   }));

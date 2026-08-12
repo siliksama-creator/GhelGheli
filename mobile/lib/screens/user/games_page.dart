@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../../api_client.dart';
+import '../../core/cosmetics.dart';
 import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
@@ -13,7 +14,6 @@ import 'games/memory_board.dart';
 import 'games/penalty_board.dart';
 import 'games/tap/tap_screen.dart';
 import 'games/card_duel_page.dart';
-import 'games/growth_panel.dart';
 
 class _GameEntry {
   const _GameEntry(
@@ -45,9 +45,17 @@ const _games = <_GameEntry>[
 
 List<_GameEntry> get _multiplayerGames => _games.where((g) => g.id != 'tap').toList();
 
+class GameExternalLaunch {
+  const GameExternalLaunch({required this.socket, required this.start, required this.nonce});
+  final io.Socket socket;
+  final Map<String, dynamic> start;
+  final int nonce;
+}
+
 class GamesHubPage extends StatefulWidget {
-  const GamesHubPage({super.key, required this.api});
+  const GamesHubPage({super.key, required this.api, this.externalLaunch});
   final ApiClient api;
+  final GameExternalLaunch? externalLaunch;
 
   @override
   State<GamesHubPage> createState() => _GamesHubPageState();
@@ -65,11 +73,36 @@ class _GamesHubPageState extends State<GamesHubPage> {
   int _selectedMode = 100;
   Map<String, dynamic>? _level;
   Map<String, dynamic>? _user;
+  Map<String, dynamic> _cosmetics = const {};
 
   @override
   void initState() {
     super.initState();
     unawaited(_loadLevel());
+    if (widget.externalLaunch != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _consumeExternal(widget.externalLaunch!));
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant GamesHubPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.externalLaunch != null &&
+        widget.externalLaunch?.nonce != oldWidget.externalLaunch?.nonce) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _consumeExternal(widget.externalLaunch!);
+      });
+    }
+  }
+
+  void _consumeExternal(GameExternalLaunch launch) {
+    if (!mounted) return;
+    _launchGame(
+      '${launch.start['gameId'] ?? 'card_duel'}',
+      stake: (launch.start['stake'] as num?)?.toInt() ?? 0,
+      existingSocket: launch.socket,
+      initialStart: launch.start,
+    );
   }
 
   Future<void> _loadLevel() async {
@@ -79,6 +112,7 @@ class _GamesHubPageState extends State<GamesHubPage> {
       final m = Map<String, dynamic>.from(boot);
       setState(() {
         if (m['user'] is Map) _user = Map<String, dynamic>.from(m['user']);
+        if (m['cosmetics'] is Map) _cosmetics = Map<String, dynamic>.from(m['cosmetics']);
       });
       final d = await widget.api.get('/api/level');
       if (!mounted || d is! Map) return;
@@ -182,11 +216,15 @@ class _GamesHubPageState extends State<GamesHubPage> {
             children: [
               Row(
                 children: [
-                  AvatarImage(
-                    keyName: _user?['profile_avatar_key'],
-                    imageUrl: _user?['profile_image_url'],
-                    radius: 26,
-                    ring: true,
+                  CosmeticAvatarFrame(
+                    frame: _cosmetics['frame'] as String?,
+                    padding: 3,
+                    child: AvatarImage(
+                      keyName: _user?['profile_avatar_key'],
+                      imageUrl: _user?['profile_image_url'],
+                      radius: 26,
+                      ring: true,
+                    ),
                   ),
                   Gaps.hSm,
                   Expanded(
@@ -196,10 +234,10 @@ class _GamesHubPageState extends State<GamesHubPage> {
                         Row(
                           children: [
                             Expanded(
-                              child: Text(
-                                _user?['nickname'] ?? 'قهرمان قلقلی',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                              child: DisplayName(
+                                name: _user?['nickname'] ?? 'قهرمان قلقلی',
+                                cosmetics: _cosmetics,
+                                level: (_level?['level'] as num?)?.toInt(),
                                 style: theme.textTheme.titleMedium?.copyWith(
                                   color: Colors.white,
                                   fontWeight: FontWeight.w900,
@@ -422,16 +460,6 @@ class _GamesHubPageState extends State<GamesHubPage> {
           ],
         ],
 
-        Gaps.vMd,
-        GrowthPanel(
-          api: widget.api,
-          onJoinGame: (socket, start) => _launchGame(
-            '${start['gameId'] ?? 'card_duel'}',
-            stake: (start['stake'] as num?)?.toInt() ?? 0,
-            existingSocket: socket,
-            initialStart: start,
-          ),
-        ),
         Gaps.vLg,
       ],
     );

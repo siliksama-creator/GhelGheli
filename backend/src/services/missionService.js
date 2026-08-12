@@ -2,13 +2,70 @@ const crypto = require('crypto');
 const { pool } = require('../config/db');
 const points = require('./pointService');
 
-const DEFINITIONS = Object.freeze([
-  { key: 'daily_match', period: 'daily', title: 'گرم‌کردن روزانه', description: 'یک مسابقه را کامل کن', goal: 1, reward: 20, event: 'match_completed' },
-  { key: 'daily_share', period: 'daily', title: 'صدای بردت را برسان', description: 'نتیجه یک دوئل را به اشتراک بگذار', goal: 1, reward: 15, event: 'share' },
-  { key: 'weekly_matches', period: 'weekly', title: 'پنج نبرد در هفته', description: '۵ مسابقه را تا پایان بازی کن', goal: 5, reward: 80, event: 'match_completed' },
-  { key: 'weekly_wins', period: 'weekly', title: 'شکارچی برد', description: '۲ مسابقه آنلاین را ببر', goal: 2, reward: 60, event: 'online_win' },
-  { key: 'weekly_rematch', period: 'weekly', title: 'فرصت جبران', description: 'یک نبرد دوباره با همان حریف شروع کن', goal: 1, reward: 30, event: 'rematch' },
+const DAILY_BONUS_KEY = 'daily_all_bonus';
+const DAILY_BONUS_REWARD = 100;
+
+const DAILY_FAMILIES = Object.freeze([
+  {
+    event: 'match_completed', icon: '⚽', baseReward: 14,
+    titles: ['شروع پرقدرت', 'گرم‌کردن قهرمان', 'نبرد روز', 'تا سوت آخر', 'بازیکن ثابت‌قدم', 'ریتم مسابقه'],
+    describe: goal => `${goal} مسابقه را تا پایان کامل کن`, goals: [1, 1, 2, 2, 3, 3, 4, 5],
+  },
+  {
+    event: 'online_win', icon: '🏆', baseReward: 22,
+    titles: ['شکارچی برد', 'فرمانروای آنلاین', 'برد تمیز', 'قهرمان امروز', 'ضربه نهایی', 'توقف‌ناپذیر'],
+    describe: goal => `${goal} مسابقه آنلاین را ببر`, goals: [1, 1, 1, 2, 2, 3],
+  },
+  {
+    event: 'share', icon: '🚀', baseReward: 12,
+    titles: ['صدای بردت را برسان', 'لحظه‌ات را منتشر کن', 'چالش عمومی', 'خبرساز شو', 'افتخار امروز', 'دعوت به رقابت'],
+    describe: goal => `${goal} نتیجه یا لینک چالش را به اشتراک بگذار`, goals: [1, 1, 1, 1, 2, 2],
+  },
+  {
+    event: 'rematch', icon: '⚡', baseReward: 16,
+    titles: ['فرصت جبران', 'دوباره روبه‌رو شو', 'حساب باز', 'نبرد برگشت', 'یک دست دیگر', 'ریمچ داغ'],
+    describe: goal => `${goal} مسابقه دوباره با همان حریف شروع کن`, goals: [1, 1, 1, 2, 2, 3],
+  },
+  {
+    event: 'friend_challenge', icon: '🤝', baseReward: 18,
+    titles: ['رفیق و رقیب', 'دوئل دوستانه', 'دوستت را صدا کن', 'چالش رفاقتی', 'حریف آشنا', 'تیم اجتماعی'],
+    describe: goal => `${goal} دوست را مستقیم به دوئل دعوت کن`, goals: [1, 1, 1, 2, 2, 3],
+  },
 ]);
+
+function buildDailyPool() {
+  const pool = [];
+  for (const family of DAILY_FAMILIES) {
+    for (let index = 0; index < 24; index += 1) {
+      const goal = family.goals[index % family.goals.length];
+      const tier = Math.floor(index / family.titles.length) + 1;
+      pool.push(Object.freeze({
+        key: `daily_${family.event}_${String(index + 1).padStart(2, '0')}`,
+        period: 'daily', event: family.event, icon: family.icon,
+        title: `${family.titles[index % family.titles.length]} · سطح ${tier}`,
+        description: family.describe(goal), goal,
+        reward: family.baseReward + goal * 4 + tier * 2,
+      }));
+    }
+  }
+  return pool;
+}
+
+const WEEKLY_POOL = Object.freeze([
+  { key:'weekly_matches_5', period:'weekly', event:'match_completed', icon:'⚽', title:'پنج نبرد هفته', description:'۵ مسابقه را کامل کن', goal:5, reward:75 },
+  { key:'weekly_matches_10', period:'weekly', event:'match_completed', icon:'🎮', title:'بازیکن پرتلاش', description:'۱۰ مسابقه را کامل کن', goal:10, reward:130 },
+  { key:'weekly_wins_2', period:'weekly', event:'online_win', icon:'🏆', title:'شکارچی برد', description:'۲ برد آنلاین ثبت کن', goal:2, reward:70 },
+  { key:'weekly_wins_5', period:'weekly', event:'online_win', icon:'👑', title:'سلطان هفته', description:'۵ برد آنلاین ثبت کن', goal:5, reward:160 },
+  { key:'weekly_share_3', period:'weekly', event:'share', icon:'🚀', title:'خبرساز هفته', description:'۳ نتیجه را به اشتراک بگذار', goal:3, reward:65 },
+  { key:'weekly_share_5', period:'weekly', event:'share', icon:'📣', title:'صدای آرنا', description:'۵ بار لینک چالش را منتشر کن', goal:5, reward:105 },
+  { key:'weekly_rematch_3', period:'weekly', event:'rematch', icon:'⚡', title:'سه فرصت جبران', description:'۳ ریمچ شروع کن', goal:3, reward:75 },
+  { key:'weekly_rematch_6', period:'weekly', event:'rematch', icon:'🔁', title:'رقابت ادامه‌دار', description:'۶ ریمچ شروع کن', goal:6, reward:130 },
+  { key:'weekly_friends_3', period:'weekly', event:'friend_challenge', icon:'🤝', title:'حلقه دوستان', description:'۳ دوست را به بازی دعوت کن', goal:3, reward:80 },
+  { key:'weekly_friends_6', period:'weekly', event:'friend_challenge', icon:'🌟', title:'ستاره اجتماعی', description:'۶ چالش دوستانه بفرست', goal:6, reward:145 },
+]);
+
+const DAILY_POOL = Object.freeze(buildDailyPool());
+const DEFINITIONS = Object.freeze([...DAILY_POOL, ...WEEKLY_POOL]);
 
 function tehranDate(now = new Date()) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -19,8 +76,6 @@ function tehranDate(now = new Date()) {
 }
 
 function isoWeek(dateString) {
-  // Noon UTC avoids DST/date-boundary movement; dateString is already the
-  // Tehran civil date which is the product's mission boundary.
   const d = new Date(`${dateString}T12:00:00Z`);
   const day = d.getUTCDay() || 7;
   d.setUTCDate(d.getUTCDate() + 4 - day);
@@ -34,6 +89,24 @@ function periodKey(period, now = new Date()) {
   return period === 'weekly' ? isoWeek(day) : day;
 }
 
+function hashRank(seed) {
+  return crypto.createHash('sha256').update(seed).digest('hex');
+}
+
+function activeDefinitions(userId, now = new Date()) {
+  const day = periodKey('daily', now);
+  // Exactly one mission from each of five actionable families. This keeps the
+  // daily set varied but balanced instead of randomly returning five shares.
+  const daily = DAILY_FAMILIES.map(family => DAILY_POOL
+    .filter(item => item.event === family.event)
+    .sort((a, b) => hashRank(`${userId}:${day}:${a.key}`).localeCompare(hashRank(`${userId}:${day}:${b.key}`)))[0]);
+  const week = periodKey('weekly', now);
+  const weekly = [...WEEKLY_POOL]
+    .sort((a, b) => hashRank(`${userId}:${week}:${a.key}`).localeCompare(hashRank(`${userId}:${week}:${b.key}`)))
+    .slice(0, 3);
+  return [...daily, ...weekly];
+}
+
 function referenceUuid(userId, missionKey, period) {
   const hex = crypto.createHash('sha256').update(`${userId}:${missionKey}:${period}`).digest('hex').slice(0, 32);
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20)}`;
@@ -41,7 +114,7 @@ function referenceUuid(userId, missionKey, period) {
 
 async function record(userId, event, amount = 1) {
   const count = Math.min(100, Math.max(1, Math.floor(Number(amount) || 1)));
-  const definitions = DEFINITIONS.filter(d => d.event === event);
+  const definitions = activeDefinitions(userId).filter(d => d.event === event);
   await Promise.all(definitions.map(d => pool.query(
     `INSERT INTO user_mission_progress(user_id,mission_key,period_key,progress,updated_at)
      VALUES($1,$2,$3,$4,NOW())
@@ -52,32 +125,45 @@ async function record(userId, event, amount = 1) {
 }
 
 async function status(userId) {
-  const keys = [...new Set(DEFINITIONS.map(d => periodKey(d.period)))];
+  const active = activeDefinitions(userId);
+  const keys = [...new Set(active.map(d => periodKey(d.period)))];
   const { rows } = await pool.query(
     `SELECT mission_key,period_key,progress,claimed_at,updated_at
        FROM user_mission_progress
       WHERE user_id=$1 AND period_key=ANY($2::varchar[])`, [userId, keys]);
   const byKey = new Map(rows.map(row => [`${row.mission_key}:${row.period_key}`, row]));
-  const missions = DEFINITIONS.map(d => {
+  const missions = active.map(d => {
     const key = periodKey(d.period);
     const row = byKey.get(`${d.key}:${key}`);
     const progress = Math.min(d.goal, Number(row?.progress || 0));
     return {
-      key: d.key, period: d.period, periodKey: key, title: d.title,
+      key: d.key, period: d.period, periodKey: key, icon: d.icon, title: d.title,
       description: d.description, goal: d.goal, reward: d.reward,
       progress, complete: progress >= d.goal, claimed: Boolean(row?.claimed_at),
     };
   });
+  const daily = missions.filter(m => m.period === 'daily');
+  const bonusRow = byKey.get(`${DAILY_BONUS_KEY}:${periodKey('daily')}`);
+  const completed = daily.filter(m => m.complete).length;
   return {
     missions,
-    daily: missions.filter(m => m.period === 'daily'),
+    daily,
     weekly: missions.filter(m => m.period === 'weekly'),
+    dailyBonus: {
+      key: DAILY_BONUS_KEY,
+      reward: DAILY_BONUS_REWARD,
+      completed,
+      goal: daily.length,
+      ready: daily.length === 5 && completed === daily.length,
+      claimed: Boolean(bonusRow?.claimed_at),
+    },
+    rotation: { dailyPoolSize: DAILY_POOL.length, shownDaily: daily.length },
   };
 }
 
 async function claim(userId, missionKey) {
-  const definition = DEFINITIONS.find(d => d.key === missionKey);
-  if (!definition) throw Object.assign(new Error('ماموریت پیدا نشد'), { status: 404 });
+  const definition = activeDefinitions(userId).find(d => d.key === missionKey);
+  if (!definition) throw Object.assign(new Error('این ماموریت امروز یا این هفته فعال نیست'), { status: 404 });
   const key = periodKey(definition.period);
   const client = await pool.connect();
   try {
@@ -96,20 +182,12 @@ async function claim(userId, missionKey) {
         WHERE user_id=$1 AND mission_key=$2 AND period_key=$3`,
       [userId, missionKey, key]);
     const credited = await points.credit(client, {
-      userId,
-      points: definition.reward,
-      source: 'mission',
-      referenceType: 'mission_reward',
-      referenceId: referenceUuid(userId, missionKey, key),
-      description: `پاداش ماموریت: ${definition.title}`,
-      league: false,
+      userId, points: definition.reward, source: 'mission',
+      referenceType: 'mission_reward', referenceId: referenceUuid(userId, missionKey, key),
+      description: `پاداش ماموریت: ${definition.title}`, league: false,
     });
     await client.query('COMMIT');
-    return {
-      message: `${definition.reward} امتیاز ماموریت دریافت شد`,
-      reward: definition.reward,
-      balance: credited?.balanceAfter,
-    };
+    return { message: `${definition.reward} امتیاز ماموریت دریافت شد`, reward: definition.reward, balance: credited?.balanceAfter };
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     throw error;
@@ -118,4 +196,44 @@ async function claim(userId, missionKey) {
   }
 }
 
-module.exports = { DEFINITIONS, tehranDate, isoWeek, periodKey, record, status, claim };
+async function claimDailyBonus(userId) {
+  const daily = activeDefinitions(userId).filter(d => d.period === 'daily');
+  const key = periodKey('daily');
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query(
+      `SELECT mission_key,progress,claimed_at FROM user_mission_progress
+        WHERE user_id=$1 AND period_key=$2 FOR UPDATE`, [userId, key]);
+    const byMission = new Map(rows.map(row => [row.mission_key, row]));
+    if (!daily.every(mission => Number(byMission.get(mission.key)?.progress || 0) >= mission.goal)) {
+      throw Object.assign(new Error('برای دریافت جایزه کامل، هر ۵ ماموریت روزانه را تمام کن'), { status: 409 });
+    }
+    if (byMission.get(DAILY_BONUS_KEY)?.claimed_at) {
+      throw Object.assign(new Error('جایزه تکمیل امروز قبلاً دریافت شده است'), { status: 409 });
+    }
+    await client.query(
+      `INSERT INTO user_mission_progress(user_id,mission_key,period_key,progress,claimed_at,updated_at)
+       VALUES($1,$2,$3,5,NOW(),NOW())
+       ON CONFLICT(user_id,mission_key,period_key) DO UPDATE SET
+         progress=5,claimed_at=COALESCE(user_mission_progress.claimed_at,NOW()),updated_at=NOW()`,
+      [userId, DAILY_BONUS_KEY, key]);
+    const credited = await points.credit(client, {
+      userId, points: DAILY_BONUS_REWARD, source: 'mission',
+      referenceType: 'daily_mission_bonus', referenceId: referenceUuid(userId, DAILY_BONUS_KEY, key),
+      description: 'جایزه تکمیل هر ۵ ماموریت روزانه', league: false,
+    });
+    await client.query('COMMIT');
+    return { message: `${DAILY_BONUS_REWARD} امتیاز جایزه تکمیل روزانه دریافت شد`, reward: DAILY_BONUS_REWARD, balance: credited?.balanceAfter };
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+module.exports = {
+  DEFINITIONS, DAILY_POOL, WEEKLY_POOL, DAILY_BONUS_REWARD,
+  tehranDate, isoWeek, periodKey, activeDefinitions, record, status, claim, claimDailyBonus,
+};

@@ -12,6 +12,7 @@ import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
 import 'chat_page.dart';
 import 'games_page.dart';
+import 'games/growth_panel.dart';
 
 class SocialPage extends StatefulWidget {
   const SocialPage({super.key, required this.api});
@@ -23,6 +24,8 @@ class SocialPage extends StatefulWidget {
 
 class _SocialPageState extends State<SocialPage> {
   int _tab = 0;
+  int _growthGeneration = 0;
+  GameExternalLaunch? _externalLaunch;
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +45,25 @@ class _SocialPageState extends State<SocialPage> {
             index: _tab,
             children: [
               ChatPage(api: widget.api),
-              GamesHubPage(api: widget.api),
+              GamesHubPage(api: widget.api, externalLaunch: _externalLaunch),
+              SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.xs, Gaps.md, Gaps.xxl),
+                child: GrowthPanel(
+                  key: ValueKey(_growthGeneration),
+                  api: widget.api,
+                  onJoinGame: (socket, start) {
+                    setState(() {
+                      _growthGeneration += 1;
+                      _externalLaunch = GameExternalLaunch(
+                        socket: socket,
+                        start: start,
+                        nonce: DateTime.now().microsecondsSinceEpoch,
+                      );
+                      _tab = 1;
+                    });
+                  },
+                ),
+              ),
             ],
           ),
         ),
@@ -59,8 +80,9 @@ class _Switcher extends StatelessWidget {
   final ValueChanged<int> onChanged;
 
   static const _items = [
-    (icon: Icons.chat_bubble_rounded, label: 'چت روم'),
+    (icon: Icons.chat_bubble_rounded, label: 'چت'),
     (icon: Icons.sports_esports_rounded, label: 'بازی‌ها'),
+    (icon: Icons.rocket_launch_rounded, label: 'ماموریت و دوستان'),
   ];
 
   @override
@@ -96,9 +118,11 @@ class _Switcher extends StatelessWidget {
               AnimatedAlign(
                 duration: Motion.normal,
                 curve: Curves.easeOutCubic,
-                alignment: index == 0
-                    ? Alignment.centerRight
-                    : Alignment.centerLeft,
+                alignment: switch (index) {
+                  0 => Alignment.centerRight,
+                  1 => Alignment.center,
+                  _ => Alignment.centerLeft,
+                },
                 child: Container(
                   width: w,
                   height: double.infinity,
@@ -139,7 +163,7 @@ class _Switcher extends StatelessWidget {
                               Text(
                                 _items[i].label,
                                 style: TextStyle(
-                                  fontSize: 13,
+                                  fontSize: 11.5,
                                   fontWeight: FontWeight.w800,
                                   color: index == i
                                       ? scheme.onPrimary

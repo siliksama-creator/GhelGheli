@@ -23,6 +23,7 @@ import Wheel from './screens/Wheel.jsx';
 import Referral from './screens/Referral.jsx';
 import Pass from './screens/Pass.jsx';
 import GamesHub from './games.jsx';
+import GrowthHub from './GrowthHub.jsx';
 import Support from './support.jsx';
 import Wallet from './wallet.jsx';
 import Inventory from './screens/Inventory.jsx';
@@ -385,17 +386,24 @@ function Portal({ token, logout }) {
 
 function Club({ token, openProfile, meId, openGames = false }) {
   const [sub, setSub] = useState(openGames ? 'games' : 'chat');
+  const [externalLaunch, setExternalLaunch] = useState(null);
   return (
     <div className="clubWrap">
-      <div className="clubTabs">
+      <div className="clubTabs socialTripleTabs">
         <button className={sub === 'chat' ? 'on' : ''}
           onClick={() => setSub('chat')}><UiIcon name="support" size={17} /> چت روم</button>
         <button className={sub === 'games' ? 'on' : ''}
           onClick={() => setSub('games')}><UiIcon name="game" size={17} /> بازی‌ها</button>
+        <button className={sub === 'growth' ? 'on' : ''}
+          onClick={() => setSub('growth')}><UiIcon name="group" size={17} /> ماموریت و دوستان</button>
       </div>
-      {sub === 'chat'
-        ? <Chat token={token} openProfile={openProfile} meId={meId} />
-        : <GamesHub api={API} token={token} openProfile={openProfile} />}
+      {sub === 'chat' && <Chat token={token} openProfile={openProfile} meId={meId} />}
+      {sub === 'games' && <GamesHub api={API} token={token} openProfile={openProfile}
+        externalLaunch={externalLaunch} />}
+      {sub === 'growth' && <GrowthHub api={API} token={token} onSocketGame={(socket, start) => {
+        setExternalLaunch({ socket, start, nonce: Date.now() });
+        setSub('games');
+      }} />}
     </div>
   );
 }

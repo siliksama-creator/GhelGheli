@@ -125,7 +125,7 @@ export default function Home({ token, p, rewards, load, setMsg, openProfile, ope
         </button>
         <button onClick={openInvite} style={{ background:'linear-gradient(135deg, #84CC1622, #84CC160A)', border:'1px solid #84CC1655', borderRadius:'16px', padding:'12px 6px', display:'flex', flexDirection:'column', alignItems:'center', gap:'6px', cursor:'pointer', boxShadow:'0 4px 12px #84CC1622' }}>
           <span style={{ width:'40px', height:'40px', borderRadius:'50%', background:'#84CC1622', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'22px' }}>👥</span>
-          <b style={{ color:'#FFF', fontSize:'12px', fontWeight:'900' }}>دعوت</b>
+          <b style={{ color:'#FFF', fontSize:'12px', fontWeight:'900' }}>دعوت و کسب درآمد</b>
           <small style={{ color:'#84CC16', fontSize:'10px', fontWeight:'700' }}>دوستان</small>
         </button>
         <button onClick={openInventory} style={{ background:'linear-gradient(135deg, #38BDF822, #38BDF80A)', border:'1px solid #38BDF855', borderRadius:'16px', padding:'12px 6px', display:'flex', flexDirection:'column', alignItems:'center', gap:'6px', cursor:'pointer', boxShadow:'0 4px 12px #38BDF822' }}>

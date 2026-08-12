@@ -69,6 +69,7 @@ function createPresenceService(pool) {
             gameId,
             metadata: { targetUserId },
           }).catch(() => {});
+          missions.record(userId, 'friend_challenge').catch(() => {});
           callback?.({ ok: true });
         } catch (error) {
           callback?.({ ok: false, error: error.message });

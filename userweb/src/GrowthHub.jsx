@@ -12,8 +12,11 @@ export default function GrowthHub({ api, token, onSocketGame }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const transferred = useRef(false);
 
-  const load = () => req('/api/growth/overview', 'GET', null, token)
-    .then(setData).catch(error => setNotice(error.message));
+  const load = () => Promise.all([
+    req('/api/growth/overview', 'GET', null, token),
+    req('/api/referrals', 'GET', null, token),
+  ]).then(([overview, referral]) => setData({ ...overview, referral }))
+    .catch(error => setNotice(error.message));
 
   useEffect(() => {
     load();
@@ -87,9 +90,20 @@ export default function GrowthHub({ api, token, onSocketGame }) {
 
   const claim = mission => run(`mission-${mission.key}`,
     () => req(`/api/missions/${mission.key}/claim`, 'POST', {}, token));
-  const missions = [...(data?.missions || [])].sort((a, b) => Number(a.claimed) - Number(b.claimed)
-    || Number(b.complete) - Number(a.complete));
-  const friends = (data?.friends || []).slice(0, 4);
+  const claimDailyBonus = () => run('daily-bonus',
+    () => req('/api/missions/daily-bonus/claim', 'POST', {}, token));
+  const inviteFriend = async () => {
+    const code = data?.referral?.code;
+    if (!code) return;
+    const text = `کد دعوت من به قلقلی: ${code}\nبا این کد ثبت‌نام کن؛ هر دومون ۳ چرخش هدیه می‌گیریم و من از خرید مستقیم تو ۵٪ درآمد معرفی می‌گیرم.\nhttps://ghelghelishop.ir`;
+    try {
+      if (navigator.share) await navigator.share({ title:'دعوت به قلقلی', text, url:'https://ghelghelishop.ir' });
+      else { await navigator.clipboard.writeText(text); setNotice('متن دعوت کپی شد'); }
+    } catch (error) { if (error?.name !== 'AbortError') setNotice('اشتراک دعوت انجام نشد'); }
+  };
+  const daily = [...(data?.daily || [])].sort((a, b) => Number(a.claimed) - Number(b.claimed));
+  const weekly = [...(data?.weekly || [])].sort((a, b) => Number(a.claimed) - Number(b.claimed));
+  const friends = data?.friends || [];
   const incoming = data?.incoming || [];
   const online = (data?.friends || []).filter(friend => friend.online).length;
 
@@ -100,8 +114,22 @@ export default function GrowthHub({ api, token, onSocketGame }) {
       <span>{online} آنلاین</span>
     </header>
 
-    <div className="missionRail" aria-label="ماموریت‌ها">
-      {missions.map(mission => <article key={mission.key}
+    <div className="growthSummary">
+      <div className="dailyQuestMeter" style={{'--daily-progress':(data?.dailyBonus?.completed || 0)/5}}><strong>{data?.dailyBonus?.completed || 0}<i>/۵</i></strong><span>ماموریت امروز</span></div>
+      <div><b>هر روز ۵ ماموریت تازه</b><small>از میان بیش از {data?.rotation?.dailyPoolSize || 120} ماموریت؛ هر پنج‌تا را تمام کن و جایزه کامل بگیر.</small></div>
+      <button className="inviteFriendCta" type="button" onClick={inviteFriend}><span>＋</span><b>دعوت از یک دوست</b><small>۳ چرخش برای هر دو + درآمد معرفی</small></button>
+    </div>
+
+    <div className={`dailyBonusCard ${data?.dailyBonus?.ready ? 'ready' : ''} ${data?.dailyBonus?.claimed ? 'claimed' : ''}`}>
+      <span>🎁</span><div><b>جایزه تکمیل هر ۵ ماموریت</b><small>امروز +{data?.dailyBonus?.reward || 100} امتیاز اضافه</small></div>
+      <button disabled={!data?.dailyBonus?.ready || data?.dailyBonus?.claimed || busy === 'daily-bonus'} onClick={claimDailyBonus}>
+        {data?.dailyBonus?.claimed ? 'گرفته شد' : data?.dailyBonus?.ready ? 'دریافت جایزه' : `${data?.dailyBonus?.completed || 0}/۵`}
+      </button>
+    </div>
+
+    <h3 className="growthSectionTitle">ماموریت‌های امروز</h3>
+    <div className="missionRail daily" aria-label="ماموریت‌های روزانه">
+      {daily.map(mission => <article key={mission.key}
         className={mission.claimed ? 'claimed' : mission.complete ? 'complete' : ''}>
         <div className="missionTop"><i>{mission.period === 'daily' ? 'روزانه' : 'هفتگی'}</i><strong>+{mission.reward}</strong></div>
         <b>{mission.title}</b>
@@ -115,6 +143,20 @@ export default function GrowthHub({ api, token, onSocketGame }) {
       </article>)}
     </div>
 
+    <details className="weeklyMissions">
+      <summary>ماموریت‌های هفتگی <span>{weekly.length} ماموریت</span></summary>
+      <div className="missionRail weekly">
+        {weekly.map(mission => <article key={mission.key} className={mission.claimed ? 'claimed' : mission.complete ? 'complete' : ''}>
+          <div className="missionTop"><i>{mission.icon || '📅'} هفتگی</i><strong>+{mission.reward}</strong></div>
+          <b>{mission.title}</b><small>{mission.description}</small>
+          <progress max={mission.goal} value={mission.progress}/>
+          <footer><span>{mission.progress}/{mission.goal}</span><button disabled={!mission.complete || mission.claimed}
+            onClick={() => claim(mission)}>{mission.claimed ? 'گرفته شد' : mission.complete ? 'دریافت' : 'ادامه'}</button></footer>
+        </article>)}
+      </div>
+    </details>
+
+    <h3 className="growthSectionTitle">دوستان و چالش مستقیم</h3>
     {(incoming.length > 0 || friends.length > 0) && <div className="friendRail">
       {incoming.map(friend => <div className="friendRow incoming" key={friend.friendshipId}>
         <span className="presence online" /><b>{friend.nickname}</b><small>درخواست دوستی</small>

@@ -177,7 +177,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     height: 30,
                     cacheWidth: 90,
                   ),
-                  title: 'دعوت',
+                  title: 'دعوت و کسب درآمد',
                   subtitle: 'دوستان',
                   tint: const Color(0xFF84CC16),
                   glowColor: const Color(0xFFA3E635),

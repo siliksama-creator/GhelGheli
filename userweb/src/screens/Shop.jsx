@@ -58,7 +58,7 @@ function CosmeticPreview({ item }) {
 
   if (item.kind === 'profile_badge') return <div className="shopArtwork shopLiveBadge">
     <CosmeticAvatarFrame frame="pro_holographic" className="shopBadgeAvatar"><img src="/avatars/avatar_10_crown.webp" alt=""/></CosmeticAvatarFrame>
-    <DisplayName name="hotcat" cosmetics={{ profileBadge:value, color:'gold_gradient' }} level={72}/>
+    <DisplayName name="hotcat" cosmetics={{ profileBadge:value, color:'gold_gradient' }}/>
     <small>همین امضا در پروفایل، چت، لیگ و بازی</small>
   </div>;
 
@@ -69,11 +69,24 @@ function CosmeticPreview({ item }) {
   if (item.kind === 'result_template') {
     const colors = RESULT_PALETTES[value] || ['#071522','#38BDF8'];
     return <div className="shopArtwork shopLiveResult" style={{ background:`linear-gradient(145deg,${colors[0]}88,${colors[1]}88),url(/shop/cosmetics-v3/${item.slug}.webp) center/cover` }}>
-      <small>پایان بازی</small><div><span>تیم من</span><b>۳ – ۲</b><span>حریف</span></div><em>MVP · hotcat</em>
+      <small>پایان بازی</small>
+      <div className="shopResultPlayers">
+        <span><img src="/avatars/avatar_10_crown.webp" alt=""/><i>hotcat</i></span>
+        <b>۳ – ۲</b>
+        <span><img src="/avatars/avatar_5_lion.webp" alt=""/><i>حریف</i></span>
+      </div>
+      <em>MVP · hotcat</em>
     </div>;
   }
 
-  if (item.kind === 'match_effect') return <div className="shopArtwork shopLiveEffect"><MatchEffectVisual slug={item.slug} mode="preview"/></div>;
+  if (item.kind === 'match_effect') {
+    const phase = item.metadata?.phase === 'finish' ? 'پایان برد' : item.metadata?.phase === 'both' ? 'ورود و پایان' : 'لحظه ورود';
+    return <div className="shopArtwork shopLiveEffect">
+      <MatchEffectVisual slug={item.slug} mode="preview"/>
+      <span className="shopEffectPhase">{phase}</span>
+      <div className="shopEffectPlayers"><i>hotcat</i><b>VS</b><i>حریف</i></div>
+    </div>;
+  }
 
   return <div className="shopArtwork shopLiveEmotes">{messages.map((message,index)=><span key={message} className={index ? 'alt' : ''}>{message}</span>)}</div>;
 }
@@ -129,7 +142,7 @@ export default function Shop({ token, reloadProfile }) {
   const [busy, setBusy] = useState('');
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
-  const [showPlans, setShowPlans] = useState(false);
+  const [showPlans, setShowPlans] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
 
   const load = useCallback(async () => {
@@ -182,8 +195,8 @@ export default function Shop({ token, reloadProfile }) {
       .shopLiveClub{display:grid;grid-template-columns:1fr 1.3fr;align-items:center;padding:16px 24px;background:radial-gradient(circle at 22% 50%,#38bdf822,transparent 35%),#071522}.shopLiveClub>img{width:88px;height:88px;object-fit:contain;justify-self:center}.shopLiveClub>div{display:grid;grid-template-columns:40px 1fr;align-items:center;gap:3px 8px;padding:9px;border-radius:14px;background:#ffffff0a;border:1px solid #ffffff16}.shopLiveClub>div img{grid-row:1/3;width:40px;height:40px;border-radius:50%;object-fit:cover}.shopLiveClub span{font-size:12px;font-weight:900}.shopLiveClub b{font-size:8px;color:#94a3b8}
       .shopLiveFrame{display:flex;align-items:center;justify-content:center;gap:14px;background:radial-gradient(circle,#1e293b,#030712)}.shopLiveFrameRing{width:92px;height:92px;box-shadow:0 0 22px #38bdf844}.shopLiveFrameRing img{width:100%;height:100%;border-radius:50%;object-fit:cover;border:3px solid #071522}.shopLiveFrame>div{display:flex;flex-direction:column}.shopLiveFrame span{font-size:18px;font-weight:950;color:#fff}.shopLiveFrame small{font-size:8px;color:#94a3b8;margin-top:3px}.shopLiveName{display:flex;align-items:center;justify-content:center;gap:14px;padding:20px;background:linear-gradient(145deg,#071522,#111827)}.shopLiveName>img{width:62px;height:62px;border-radius:50%;object-fit:cover;border:2px solid #ffffff20}.shopLiveName>div{display:flex;flex-direction:column;align-items:flex-start}.shopLiveName .animatedName{font-size:24px;font-weight:950}.shopLiveName>div>span:last-child{font-size:8px;color:#94a3b8;margin-top:5px}.shopLiveBadge{display:flex;align-items:center;justify-content:center;gap:10px;padding:17px;background:radial-gradient(circle at 50% 20%,#7c3aed44,transparent 45%),linear-gradient(145deg,#071522,#111827)}.shopBadgeAvatar{width:58px;height:58px}.shopBadgeAvatar img{width:100%;height:100%;border-radius:50%;object-fit:cover;border:2px solid #071522}.shopLiveBadge .displayName{font-size:15px}.shopLiveBadge>small{position:absolute;bottom:9px;font-size:7.5px;color:#94a3b8}
       .shopLiveProfile{display:flex;align-items:center;justify-content:center;gap:12px;padding:24px!important;background-size:cover!important;background-position:center!important}.shopLiveProfile:after{content:'';position:absolute;inset:0;background:#02061766}.shopLiveProfile>*{position:relative;z-index:2}.shopLiveProfile>img{width:66px;height:66px;border-radius:50%;object-fit:cover;border:3px solid #fff}.shopLiveProfile>div{display:flex;flex-direction:column}.shopLiveProfile b{font-size:16px}.shopLiveProfile span{font-size:8px;color:#e2e8f0}.shopLiveProfile i{font-style:normal;color:#ffd166;font-size:24px}
-      .shopLiveResult{display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;text-shadow:0 3px 10px #000}.shopLiveResult>small{font-size:8px;letter-spacing:1px}.shopLiveResult>div{display:flex;align-items:center;gap:14px}.shopLiveResult>div span{font-size:8px}.shopLiveResult b{font-size:32px;direction:ltr}.shopLiveResult em{font-style:normal;padding:3px 10px;border-radius:99px;background:#02061788;color:#ffd166;font-size:8px;font-weight:900}
-      .shopLiveEffect{display:grid;place-items:center;padding:7px;background:#020617}.shopLiveEffect .cosFx{height:100%;width:auto;max-width:100%}.shopLiveEmotes{display:flex;flex-direction:column;justify-content:center;gap:9px;padding:22px 38px;background:linear-gradient(145deg,#071522,#111827)}.shopLiveEmotes span{align-self:flex-end;max-width:85%;padding:8px 12px;border-radius:14px 14px 4px 14px;background:#f8fafc;color:#0f172a;font-size:9px;font-weight:950;box-shadow:0 7px 18px #0008}.shopLiveEmotes span.alt{align-self:flex-start;background:#ffd166;border-radius:14px 14px 14px 4px}
+      .shopLiveResult{display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;text-shadow:0 3px 10px #000}.shopLiveResult>small{font-size:8px;letter-spacing:1px}.shopResultPlayers{display:flex;align-items:center;gap:12px}.shopResultPlayers>span{display:flex;flex-direction:column;align-items:center;gap:2px}.shopResultPlayers img{width:31px;height:31px;border-radius:50%;object-fit:cover;border:1px solid #fff9}.shopResultPlayers i{font-style:normal;font-size:7px}.shopLiveResult b{font-size:29px;direction:ltr}.shopLiveResult em{font-style:normal;padding:3px 10px;border-radius:99px;background:#02061788;color:#ffd166;font-size:8px;font-weight:900}
+      .shopLiveEffect{display:grid;place-items:center;padding:7px;background:#020617}.shopLiveEffect .cosFx{height:100%;width:auto;max-width:100%}.shopEffectPhase{position:absolute;top:10px;inset-inline-start:11px;padding:3px 8px;border-radius:99px;background:#020617cc;border:1px solid #38bdf866;color:#7dd3fc;font-size:7px;font-weight:900}.shopEffectPlayers{position:absolute;bottom:8px;display:flex;align-items:center;gap:8px;padding:3px 9px;border-radius:99px;background:#020617cc;border:1px solid #ffffff20}.shopEffectPlayers i{font-style:normal;font-size:7px;color:#e2e8f0}.shopEffectPlayers b{font-size:7px;color:#ffd166}.shopLiveEmotes{display:flex;flex-direction:column;justify-content:center;gap:9px;padding:22px 38px;background:linear-gradient(145deg,#071522,#111827)}.shopLiveEmotes span{align-self:flex-end;max-width:85%;padding:8px 12px;border-radius:14px 14px 4px 14px;background:#f8fafc;color:#0f172a;font-size:9px;font-weight:950;box-shadow:0 7px 18px #0008}.shopLiveEmotes span.alt{align-self:flex-start;background:#ffd166;border-radius:14px 14px 14px 4px}
       @media(max-width:720px){.shopHeroTop{align-items:flex-start;flex-wrap:wrap}.shopHero h2{font-size:19px}.shopPlans{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:96%;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:5px}.shopPlan{min-height:285px;scroll-snap-align:center}.shopPlan ul{grid-template-columns:1fr 1fr}.shopCarousel{grid-auto-columns:minmax(245px,84%)}.shopWallet{font-size:11px}.shopHero{padding:13px}.shopShelf{padding:10px}}
       @media(max-width:410px){.shopPlan ul{grid-template-columns:1fr}.shopCarousel{grid-auto-columns:96%}}
     `}</style>

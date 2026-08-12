@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../../api_client.dart';
+import '../../../core/share_invite.dart';
 import '../../../theme/tokens.dart';
 
 class GrowthPanel extends StatefulWidget {
@@ -71,8 +72,16 @@ class _GrowthPanelState extends State<GrowthPanel> {
 
   Future<void> _load() async {
     try {
-      final response = await widget.api.get('/api/growth/overview', fresh: true);
-      if (mounted && response is Map) setState(() => _data = Map<String, dynamic>.from(response));
+      final responses = await Future.wait([
+        widget.api.get('/api/growth/overview', fresh: true),
+        widget.api.get('/api/referrals', fresh: true),
+      ]);
+      final response = responses[0];
+      if (mounted && response is Map) {
+        final merged = Map<String, dynamic>.from(response);
+        if (responses[1] is Map) merged['referral'] = Map<String, dynamic>.from(responses[1] as Map);
+        setState(() => _data = merged);
+      }
     } catch (error) {
       if (mounted) setState(() => _notice = apiError(error));
     }
@@ -101,6 +110,37 @@ class _GrowthPanelState extends State<GrowthPanel> {
     } catch (error) {
       if (mounted) setState(() => _notice = apiError(error));
     }
+  }
+
+  Future<void> _inviteFriend() async {
+    final referral = _data?['referral'];
+    final code = referral is Map ? '${referral['code'] ?? ''}' : '';
+    if (code.isEmpty) return;
+    final target = await showModalBottomSheet<ShareTarget>(
+      context: context,
+      backgroundColor: const Color(0xFF0B1725),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            const Text('دعوت از یک دوست', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+            const Text('هر دو ۳ چرخش هدیه می‌گیرید و خرید مستقیم دوستت برایت ۵٪ درآمد معرفی می‌سازد.',
+                style: TextStyle(fontSize: 10.5, color: Colors.white60, height: 1.5)),
+            Gaps.vSm,
+            for (final item in shareTargets)
+              ListTile(
+                leading: MessengerIcon(app: item.app, size: 28),
+                title: Text(item.label),
+                trailing: const Icon(Icons.chevron_left_rounded),
+                onTap: () => Navigator.pop(ctx, item),
+              ),
+          ]),
+        ),
+      ),
+    );
+    if (target == null) return;
+    final result = await shareInvite(target, code);
+    if (mounted) setState(() => _notice = result == ShareOutcome.copiedOnly ? 'متن دعوت کپی شد' : 'دعوت آماده ارسال شد');
   }
 
   void _challenge(Map friend) {
@@ -139,8 +179,10 @@ class _GrowthPanelState extends State<GrowthPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final missions = ((_data?['missions'] as List?) ?? const []).whereType<Map>().toList()
+    final daily = ((_data?['daily'] as List?) ?? const []).whereType<Map>().toList()
       ..sort((a, b) => (a['claimed'] == true ? 1 : 0).compareTo(b['claimed'] == true ? 1 : 0));
+    final weekly = ((_data?['weekly'] as List?) ?? const []).whereType<Map>().toList();
+    final bonus = _data?['dailyBonus'] is Map ? _data!['dailyBonus'] as Map : const {};
     final friends = ((_data?['friends'] as List?) ?? const []).whereType<Map>().toList();
     final incoming = ((_data?['incoming'] as List?) ?? const []).whereType<Map>().toList();
     return Container(
@@ -169,10 +211,24 @@ class _GrowthPanelState extends State<GrowthPanel> {
             child: Text('${friends.where((f) => f['online'] == true).length} آنلاین', style: const TextStyle(color: Color(0xFF22E7A6), fontSize: 9.5, fontWeight: FontWeight.w900))),
         ]),
         Gaps.vSm,
+        _DailyMissionSummary(
+          completed: (bonus['completed'] as num?)?.toInt() ?? 0,
+          poolSize: ((_data?['rotation'] as Map?)?['dailyPoolSize'] as num?)?.toInt() ?? 120,
+          onInvite: _inviteFriend,
+        ),
+        Gaps.vXs,
+        _DailyBonusCard(
+          bonus: bonus,
+          busy: _busy == 'daily-bonus',
+          onClaim: () => _run('daily-bonus', () => widget.api.post('/api/missions/daily-bonus/claim', {})),
+        ),
+        Gaps.vSm,
+        const Text('ماموریت‌های امروز', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900)),
+        Gaps.vXs,
         SizedBox(height: 132, child: ListView.separated(scrollDirection: Axis.horizontal,
-          itemCount: missions.length, separatorBuilder: (_, __) => const SizedBox(width: 8),
+          itemCount: daily.length, separatorBuilder: (_, __) => const SizedBox(width: 8),
           itemBuilder: (_, index) {
-            final m = missions[index];
+            final m = daily[index];
             final complete = m['complete'] == true; final claimed = m['claimed'] == true;
             final progress = (m['progress'] as num?)?.toDouble() ?? 0; final goal = (m['goal'] as num?)?.toDouble() ?? 1;
             return Container(width: 190, padding: const EdgeInsets.all(10), decoration: BoxDecoration(
@@ -196,16 +252,35 @@ class _GrowthPanelState extends State<GrowthPanel> {
             );
           })),
         Gaps.vSm,
-        for (final friend in incoming) _friendRow(friend, incoming: true),
-        for (final friend in friends.take(3)) _friendRow(friend),
-        SizedBox(
-          height: 36,
-          child: OutlinedButton.icon(
-            onPressed: () => setState(() => _searchOpen = !_searchOpen),
-            icon: Icon(_searchOpen ? Icons.close_rounded : Icons.person_add_alt_1_rounded, size: 17),
-            label: Text(_searchOpen ? 'بستن جستجو' : friends.isEmpty ? 'پیدا کردن دوست' : 'افزودن دوست'),
-          ),
+        _WeeklyMissions(
+          missions: weekly,
+          busy: _busy,
+          onClaim: (mission) => _run('${mission['key']}', () => widget.api.post('/api/missions/${mission['key']}/claim', {})),
         ),
+        Gaps.vSm,
+        const Text('دوستان و چالش مستقیم', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900)),
+        Gaps.vXs,
+        for (final friend in incoming) _friendRow(friend, incoming: true),
+        for (final friend in friends) _friendRow(friend),
+        Row(children: [
+          Expanded(child: SizedBox(
+            height: 38,
+            child: FilledButton.icon(
+              onPressed: _inviteFriend,
+              icon: const Icon(Icons.ios_share_rounded, size: 17),
+              label: const Text('دعوت از یک دوست', style: TextStyle(fontSize: 9.5)),
+            ),
+          )),
+          Gaps.hXs,
+          Expanded(child: SizedBox(
+            height: 38,
+            child: OutlinedButton.icon(
+              onPressed: () => setState(() => _searchOpen = !_searchOpen),
+              icon: Icon(_searchOpen ? Icons.close_rounded : Icons.person_add_alt_1_rounded, size: 17),
+              label: Text(_searchOpen ? 'بستن جستجو' : 'پیدا کردن دوست', style: const TextStyle(fontSize: 9.5)),
+            ),
+          )),
+        ]),
         if (_searchOpen) ...[
           Gaps.vXs,
           Row(children: [
@@ -235,4 +310,134 @@ class _GrowthPanelState extends State<GrowthPanel> {
     SizedBox(height: 28, child: OutlinedButton(onPressed: user['relation'] == 'none' ? () => _run('${user['id']}', () => widget.api.post('/api/friends/${user['id']}/request', {})) : null,
       child: Text(user['relation'] == 'none' ? 'افزودن' : 'در انتظار', style: const TextStyle(fontSize: 9.5)))),
   ]));
+}
+
+class _DailyMissionSummary extends StatelessWidget {
+  const _DailyMissionSummary({required this.completed, required this.poolSize, required this.onInvite});
+  final int completed;
+  final int poolSize;
+  final VoidCallback onInvite;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(11),
+    decoration: BoxDecoration(
+      borderRadius: Corners.rLg,
+      gradient: const LinearGradient(colors: [Color(0x2238BDF8), Color(0x22A855F7)]),
+      border: Border.all(color: Colors.white12),
+    ),
+    child: Row(children: [
+      SizedBox.square(
+        dimension: 58,
+        child: Stack(alignment: Alignment.center, children: [
+          CircularProgressIndicator(
+            value: (completed / 5).clamp(0.0, 1.0).toDouble(),
+            strokeWidth: 5,
+            color: const Color(0xFF22E7A6),
+            backgroundColor: Colors.white12,
+          ),
+          Text('${faNum(completed)}/۵', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900)),
+        ]),
+      ),
+      Gaps.hSm,
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('هر روز ۵ ماموریت تازه', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900)),
+        Text('از میان بیش از ${faNum(poolSize)} ماموریت؛ هر پنج‌تا را کامل کن.',
+            style: const TextStyle(fontSize: 8.7, color: Colors.white60, height: 1.45)),
+      ])),
+      IconButton.filledTonal(
+        tooltip: 'دعوت از یک دوست',
+        onPressed: onInvite,
+        icon: const Icon(Icons.person_add_alt_1_rounded, size: 19),
+      ),
+    ]),
+  );
+}
+
+class _DailyBonusCard extends StatelessWidget {
+  const _DailyBonusCard({required this.bonus, required this.busy, required this.onClaim});
+  final Map bonus;
+  final bool busy;
+  final VoidCallback onClaim;
+
+  @override
+  Widget build(BuildContext context) {
+    final ready = bonus['ready'] == true;
+    final claimed = bonus['claimed'] == true;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+      decoration: BoxDecoration(
+        borderRadius: Corners.rLg,
+        gradient: ready
+            ? const LinearGradient(colors: [Color(0x33FFD166), Color(0x22A855F7)])
+            : const LinearGradient(colors: [Color(0x0FFFFFFF), Color(0x08FFFFFF)]),
+        border: Border.all(color: ready ? const Color(0xAAFFD166) : Colors.white12),
+        boxShadow: ready ? const [BoxShadow(color: Color(0x33FFD166), blurRadius: 20)] : null,
+      ),
+      child: Row(children: [
+        const Text('🎁', style: TextStyle(fontSize: 25)),
+        Gaps.hXs,
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('جایزه تکمیل هر ۵ ماموریت', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900)),
+          Text('+${faNum(bonus['reward'] ?? 100)} امتیاز اضافه امروز',
+              style: const TextStyle(fontSize: 8.5, color: Color(0xFFFFD166))),
+        ])),
+        SizedBox(width: 82, height: 30, child: FilledButton(
+          onPressed: ready && !claimed && !busy ? onClaim : null,
+          child: Text(claimed ? 'گرفته شد' : ready ? 'دریافت' : '${faNum(bonus['completed'] ?? 0)}/۵',
+              style: const TextStyle(fontSize: 8.5)),
+        )),
+      ]),
+    );
+  }
+}
+
+class _WeeklyMissions extends StatelessWidget {
+  const _WeeklyMissions({required this.missions, required this.busy, required this.onClaim});
+  final List<Map> missions;
+  final String? busy;
+  final ValueChanged<Map> onClaim;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: .035),
+      borderRadius: Corners.rLg,
+      border: Border.all(color: Colors.white10),
+    ),
+    child: Material(
+      color: Colors.transparent,
+      borderRadius: Corners.rLg,
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+      tilePadding: const EdgeInsets.symmetric(horizontal: 11),
+      childrenPadding: const EdgeInsets.fromLTRB(9, 0, 9, 8),
+      leading: const Icon(Icons.calendar_month_rounded, color: Color(0xFFC084FC)),
+      title: const Text('ماموریت‌های هفتگی', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900)),
+      subtitle: Text('${faNum(missions.length)} ماموریت چرخشی', style: const TextStyle(fontSize: 8.5, color: Colors.white54)),
+      children: [
+        for (final mission in missions)
+          Container(
+            margin: const EdgeInsets.only(top: 5),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: .035), borderRadius: Corners.rMd),
+            child: Row(children: [
+              Text('${mission['icon'] ?? '📅'}', style: const TextStyle(fontSize: 18)),
+              Gaps.hXs,
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('${mission['title']}', style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900)),
+                Text('${mission['progress']}/${mission['goal']} · +${mission['reward']} امتیاز',
+                    style: const TextStyle(fontSize: 8, color: Colors.white54)),
+              ])),
+              SizedBox(width: 75, height: 28, child: OutlinedButton(
+                onPressed: mission['complete'] == true && mission['claimed'] != true && busy != '${mission['key']}'
+                    ? () => onClaim(mission) : null,
+                child: Text(mission['claimed'] == true ? 'گرفته شد' : 'دریافت', style: const TextStyle(fontSize: 8)),
+              )),
+            ]),
+          ),
+      ],
+      ),
+    ),
+  );
 }

@@ -22,7 +22,7 @@ class _ShopPageState extends State<ShopPage> {
   late Future<dynamic> _future = widget.api.get('/api/shop');
   String? _busy;
   String _kind = 'card_frame';
-  bool _showPlans = false;
+  bool _showPlans = true;
 
   static const _categories = <(String, String, IconData)>[
     ('club_badge', 'باشگاه‌ها', Icons.shield_rounded),
@@ -673,7 +673,8 @@ class _ProductArt extends StatelessWidget {
         const _ShopResultArtwork(),
       ]);
     } else if (kind == 'match_effect') {
-      exactPreview = _ShopMatchEffectArtwork(slug: slug);
+      final metadata = item['metadata'] is Map ? item['metadata'] as Map : const {};
+      exactPreview = _ShopMatchEffectArtwork(slug: slug, phase: '${metadata['phase'] ?? 'entry'}');
     } else if (kind == 'emote_pack') {
       exactPreview = _ShopPreviewSurface(
         child: _ShopEmoteArtwork(slug: slug, metadata: item['metadata']),
@@ -701,8 +702,9 @@ class _ProductArt extends StatelessWidget {
 }
 
 class _ShopMatchEffectArtwork extends StatefulWidget {
-  const _ShopMatchEffectArtwork({required this.slug});
+  const _ShopMatchEffectArtwork({required this.slug, required this.phase});
   final String slug;
+  final String phase;
 
   @override
   State<_ShopMatchEffectArtwork> createState() => _ShopMatchEffectArtworkState();
@@ -724,23 +726,57 @@ class _ShopMatchEffectArtworkState extends State<_ShopMatchEffectArtwork>
   @override
   Widget build(BuildContext context) {
     final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    final phaseLabel = widget.phase == 'finish'
+        ? 'پایان برد'
+        : widget.phase == 'both' ? 'ورود و پایان' : 'لحظه ورود';
     return ColoredBox(
       color: const Color(0xFF020617),
-      child: Padding(
-        padding: const EdgeInsets.all(7),
-        child: Center(
-          child: reduceMotion
-              ? MatchEffectVisual(slug: widget.slug, progress: .56, compact: true)
-              : AnimatedBuilder(
-                  animation: _controller,
-                  builder: (_, __) => MatchEffectVisual(
-                    slug: widget.slug,
-                    progress: _controller.value,
-                    compact: true,
-                  ),
-                ),
+      child: Stack(children: [
+        Positioned.fill(
+          child: Padding(
+            padding: const EdgeInsets.all(7),
+            child: Center(
+              child: reduceMotion
+                  ? MatchEffectVisual(slug: widget.slug, progress: .56, compact: true)
+                  : AnimatedBuilder(
+                      animation: _controller,
+                      builder: (_, __) => MatchEffectVisual(
+                        slug: widget.slug,
+                        progress: _controller.value,
+                        compact: true,
+                      ),
+                    ),
+            ),
+          ),
         ),
-      ),
+        PositionedDirectional(
+          top: 9,
+          start: 9,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            decoration: BoxDecoration(
+              color: const Color(0xDD020617),
+              borderRadius: Corners.rPill,
+              border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: .5)),
+            ),
+            child: Text(phaseLabel, style: const TextStyle(fontSize: 7.5, color: Color(0xFF7DD3FC), fontWeight: FontWeight.w900)),
+          ),
+        ),
+        Positioned(
+          bottom: 7,
+          left: 54,
+          right: 54,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+            decoration: BoxDecoration(color: const Color(0xDD020617), borderRadius: Corners.rPill, border: Border.all(color: Colors.white12)),
+            child: const Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              Text('hotcat', style: TextStyle(fontSize: 7.5)),
+              Text('VS', style: TextStyle(fontSize: 7, color: Color(0xFFFFD166), fontWeight: FontWeight.w900)),
+              Text('حریف', style: TextStyle(fontSize: 7.5)),
+            ]),
+          ),
+        ),
+      ]),
     );
   }
 }
@@ -830,7 +866,6 @@ class _ShopBadgeArtwork extends StatelessWidget {
       DisplayName(
         name: 'hotcat',
         cosmetics: {'profileBadge': value, 'color': 'gold_gradient'},
-        level: 72,
         style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
       ),
       const SizedBox(height: 3),
@@ -866,17 +901,31 @@ class _ShopProfileArtwork extends StatelessWidget {
 
 class _ShopResultArtwork extends StatelessWidget {
   const _ShopResultArtwork();
+
+  Widget _player(String asset, String name) => Column(mainAxisSize: MainAxisSize.min, children: [
+    ClipOval(child: Image.asset(asset, width: 32, height: 32, fit: BoxFit.cover)),
+    const SizedBox(height: 2),
+    Text(name, style: const TextStyle(fontSize: 7, color: Colors.white, fontWeight: FontWeight.w800)),
+  ]);
+
   @override
-  Widget build(BuildContext context) => const IgnorePointer(
+  Widget build(BuildContext context) => IgnorePointer(
     child: Center(
       child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Text('پایان بازی', style: TextStyle(fontSize: 7.5, color: Colors.white70, fontWeight: FontWeight.w800)),
-        Directionality(
-          textDirection: TextDirection.ltr,
-          child: Text('۳  –  ۲', style: TextStyle(fontSize: 30, height: 1.05, color: Colors.white, fontWeight: FontWeight.w900,
-            shadows: [Shadow(color: Colors.black, blurRadius: 12)])),
-        ),
-        Text('MVP', style: TextStyle(fontSize: 7, color: Color(0xFFFFD166), fontWeight: FontWeight.w900, letterSpacing: 2)),
+        const Text('پایان بازی', style: TextStyle(fontSize: 7.5, color: Colors.white70, fontWeight: FontWeight.w800)),
+        Row(mainAxisSize: MainAxisSize.min, children: [
+          _player('assets/avatars/avatar_10_crown.webp', 'hotcat'),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12),
+            child: Directionality(
+              textDirection: TextDirection.ltr,
+              child: Text('۳ – ۲', style: TextStyle(fontSize: 28, color: Colors.white, fontWeight: FontWeight.w900,
+                shadows: [Shadow(color: Colors.black, blurRadius: 12)])),
+            ),
+          ),
+          _player('assets/avatars/avatar_5_lion.webp', 'حریف'),
+        ]),
+        const Text('MVP · hotcat', style: TextStyle(fontSize: 7, color: Color(0xFFFFD166), fontWeight: FontWeight.w900)),
       ]),
     ),
   );

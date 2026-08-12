@@ -123,7 +123,7 @@ assert(mobileShop.includes('_ShopFrameArtwork') && mobileShop.includes('Cosmetic
 assert(mobileShop.includes('_ShopNameArtwork') && mobileShop.includes('AnimatedNameText('));
 assert(mobileShop.includes('_ShopBadgeArtwork') && mobileShop.includes("'profileBadge': value"));
 assert(mobileShop.includes('_ShopResultArtwork') && mobileShop.includes('resultTemplateColors[value]'));
-assert(mobileShop.includes('_ShopMatchEffectArtwork(slug: slug)'));
+assert(mobileShop.includes('_ShopMatchEffectArtwork(slug: slug, phase:'));
 assert(mobileShop.includes('MatchEffectVisual('));
 assert(mobileShop.includes('_ShopEmoteArtwork'));
 assert(!mobileShop.includes("? const ['annual_royal_frame', 'annual_royal_result']"),
