@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { fa } from '../lib/api.js';
-import { CardRarityFrame } from '../components/CardRarityFrame.jsx';
-import CachedImg from '../components/CachedImg.jsx';
+import PlayerCard from '../components/PlayerCard.jsx';
+import { cardQtyOf } from '../lib/cards.js';
 
 const asInt = v => Number.parseInt(v || 0, 10) || 0;
 const dateOf = m => new Date(m.updated_at || m.created_at || 0).getTime();
@@ -16,39 +16,17 @@ function stats(items) {
   }, { kinds: items.length, total: 0, points: 0 });
 }
 
-function CardArtwork({ item, loading }) {
-  const [failed, setFailed] = useState(false);
-  const image = item.image_url || item.imageUrl;
-  if (!image || failed) {
-    return <span className="invMissingArt" role="img" aria-label="تصویر کارت در دسترس نیست">▧</span>;
-  }
-  return <CachedImg src={image} alt={item.name || 'کارت'} loading={loading}
-    decoding="async" onError={() => setFailed(true)} />;
-}
-
-function DuelStats({ item }) {
-  const values = [
-    ['حمله',item.duel_attack],['دفاع',item.duel_defense],['سرعت',item.duel_speed],
-    ['تکنیک',item.duel_technique],['گل',item.duel_goal_chance],['انرژی',item.duel_energy],
-  ];
-  return <div className="cardDuelStatsMini">{values.map(([label,value])=><span key={label}>{label}<b>{fa(value || 0)}</b></span>)}</div>;
-}
-
 function CardDetail({ item, close }) {
   return (
     <div className="invModalShade" onClick={close}>
       <section className="invModal card" onClick={e => e.stopPropagation()}>
         <button className="ghost invModalClose" onClick={close}>×</button>
-        <CardRarityFrame rarity={item.duel_rarity}>
-          <CardArtwork item={item} />
-        </CardRarityFrame>
-        <h2>{item.name || 'کارت'}</h2>
-        <DuelStats item={item}/>
+        <PlayerCard item={item} showStats />
         {item.description && <p className="hint">{item.description}</p>}
         <div className="invDetailStats">
-          <span>تعداد <b>{fa(item.quantity)}</b></span>
+          <span>تعداد <b>{fa(cardQtyOf(item))}</b></span>
           <span>ارزش هر کارت <b>{fa(item.point_value)}</b></span>
-          <span>ارزش کل <b>{fa(asInt(item.quantity) * asInt(item.point_value))}</b></span>
+          <span>ارزش کل <b>{fa(cardQtyOf(item) * asInt(item.point_value))}</b></span>
         </div>
       </section>
     </div>
@@ -95,18 +73,12 @@ export default function Inventory({ items = [], reload }) {
         </div>
       ) : (
         <div className="inventoryGrid">
-          {shown.map(item => <button className="inventoryTile" key={item.id} onClick={() => setOpen(item)}>
-            <CardRarityFrame rarity={item.duel_rarity}>
-              <div className="invArt">
-                <CardArtwork item={item} loading="lazy" />
-                {fresh(item) && <i className="invNew">جدید</i>}
-                {asInt(item.quantity) > 1 && <i className="invQty">×{fa(item.quantity)}</i>}
-              </div>
-            </CardRarityFrame>
-            <b>{item.name}</b>
-            <span>{fa(item.point_value)} امتیاز</span>
-            <DuelStats item={item}/>
-          </button>)}
+          {shown.map(item => <PlayerCard
+            key={item.id || item.card_type_id}
+            item={item}
+            badge={fresh(item) ? 'جدید' : ''}
+            onClick={() => setOpen(item)}
+          />)}
         </div>
       )}
       {open && <CardDetail item={open} close={() => setOpen(null)} />}

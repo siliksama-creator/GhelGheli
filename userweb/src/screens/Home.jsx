@@ -6,6 +6,7 @@ import PhotoCardBox from '../components/PhotoCardBox.jsx';
 import LoginStreak from '../components/LoginStreak.jsx';
 import { CosmeticAvatarFrame, DisplayName } from '../components/Cosmetics.jsx';
 import CachedImg from '../components/CachedImg.jsx';
+import PlayerCard from '../components/PlayerCard.jsx';
 
 const asInt = v => {
   const n = parseInt(String(v ?? 0).split('.')[0], 10);
@@ -91,15 +92,11 @@ function HeroHeader({ points, nickname, nextReward, user, cosmetics, onOpenProfi
 
 function CardLightbox({ item, close }) {
   return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999 }} onClick={close}>
-      <div style={{ background:'#0F172A', border:'1px solid rgba(255,255,255,0.12)', borderRadius:'16px', padding:'16px', maxWidth:'90%', textAlign:'center' }} onClick={e=>e.stopPropagation()}>
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, padding:'14px' }} onClick={close}>
+      <div style={{ background:'#0F172A', border:'1px solid rgba(255,255,255,0.12)', borderRadius:'20px', padding:'16px', width:'min(420px,100%)', textAlign:'center', position:'relative' }} onClick={e=>e.stopPropagation()}>
         <button onClick={close} style={{ position:'absolute', top:'8px', right:'8px', background:'none', border:'none', color:'#FFF', fontSize:'20px', cursor:'pointer' }}>×</button>
-        {item.image_url
-          ? <CachedImg src={item.image_url} alt={item.name||'کارت'} style={{ maxWidth:'300px', borderRadius:'12px' }} />
-          : <img src={avatarUrl('avatar_1_football.png')} alt={item.name||'کارت'} style={{ maxWidth:'300px', borderRadius:'12px' }} />}
-        <h2 style={{ color:'#FFF', margin:'8px 0 4px' }}>{item.name||'کارت'}</h2>
-        <p style={{ color:'#94A3B8' }}>تعداد: {fa(item.quantity)} — {fa(item.point_value)} امتیاز</p>
-        {item.description && <p style={{ color:'#64748B', fontSize:'12px' }}>{item.description}</p>}
+        <PlayerCard item={item} />
+        {item.description && <p style={{ color:'#94A3B8', fontSize:'12px', lineHeight:1.8 }}>{item.description}</p>}
       </div>
     </div>
   );
@@ -165,19 +162,16 @@ export default function Home({ token, p, rewards, load, setMsg, openProfile, ope
           </button>}
         </div>
         {inventory.length ? (
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'8px' }}>
-            {recentInventory.map(i=>(
-                  <button key={i.id} onClick={()=>setBigCard(i)} style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:'12px', padding:'6px', cursor:'pointer', textAlign:'center' }}>
-                    <div style={{ position:'relative', aspectRatio:'0.66', background:'rgba(0,0,0,0.2)', borderRadius:'8px', overflow:'hidden', marginBottom:'6px' }}>
-                      {i.image_url
-                        ? <CachedImg src={i.image_url} alt={i.name||'کارت'} loading="lazy" decoding="async" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-                        : <img src={avatarUrl('avatar_1_football.png')} alt={i.name||'کارت'} loading="lazy" decoding="async" style={{ width:'100%', height:'100%', objectFit:'cover' }} />}
-                      {isNewCard(i) && <span style={{ position:'absolute', top:'4px', right:'4px', background:'#22E7A6', color:'#000', padding:'2px 6px', borderRadius:'6px', fontSize:'9px', fontWeight:'900' }}>جدید</span>}
-                      {asInt(i.quantity)>1 && <span style={{ position:'absolute', bottom:'4px', left:'4px', background:'rgba(0,0,0,0.6)', color:'#FFF', padding:'2px 6px', borderRadius:'6px', fontSize:'10px' }}>×{fa(i.quantity)}</span>}
-                    </div>
-                    <b style={{ color:'#FFF', fontSize:'11px', display:'block', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{i.name}</b>
-                    <small style={{ color:'#94A3B8', fontSize:'10px' }}>{fa(i.point_value)} امتیاز</small>
-                  </button>
+          <div className="homeInventoryPreview">
+            {recentInventory.map(i => (
+              <PlayerCard
+                key={i.id || i.card_type_id}
+                item={i}
+                compact
+                showStats={false}
+                badge={isNewCard(i) ? 'جدید' : ''}
+                onClick={() => setBigCard(i)}
+              />
             ))}
           </div>
         ) : (

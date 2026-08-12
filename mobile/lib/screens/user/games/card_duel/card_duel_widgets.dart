@@ -56,11 +56,11 @@ class _RuleStrip extends StatelessWidget {
         padding: EdgeInsets.all(Gaps.sm),
         child: Row(
           children: [
-            Expanded(child: _RuleStep(number: '۱', title: '۵ کارت بچین', subtitle: 'نقش‌های مکمل')),
+            Expanded(child: _RuleStep(number: '۱', title: '۵ کارت بچین', subtitle: 'ترکیب متوازن و حرفه‌ای')),
             Icon(Icons.chevron_left_rounded, color: Colors.white24),
             Expanded(child: _RuleStep(number: '۲', title: 'مخفی انتخاب کن', subtitle: 'هم‌زمان با حریف')),
             Icon(Icons.chevron_left_rounded, color: Colors.white24),
-            Expanded(child: _RuleStep(number: '۳', title: '۳ راند ببر', subtitle: 'قهرمان آرنا شو')),
+            Expanded(child: _RuleStep(number: '۳', title: '۵ راند نفس‌گیر', subtitle: 'هر راند یک معیار تازه')),
           ],
         ),
       );
@@ -196,6 +196,7 @@ class _LiveBattle extends StatelessWidget {
     final score = state['score'] is Map ? state['score'] as Map : const {};
     final deck = (state['myDeck'] as List? ?? const []).whereType<Map>().toList();
     final remaining = (state['myRemainingCardIds'] as List? ?? const []).map((id) => '$id').toSet();
+    final pendingId = '${state['myPendingCardId'] ?? ''}';
     final lastRound = state['lastRound'] is Map ? Map<String, dynamic>.from(state['lastRound'] as Map) : null;
     final history = (state['history'] as List? ?? const []).whereType<Map>().toList();
     final iChose = state['iChose'] == true;
@@ -212,6 +213,8 @@ class _LiveBattle extends StatelessWidget {
         theirPlayer: session.playerInfo(opponent),
         title: '${state['roundTitle'] ?? 'پایان نبرد'}',
         roundLabel: 'راند ${faNum((roundIndex + 1).clamp(1, total))} از ${faNum(total)}',
+        lastWinner: '${lastRound?['winner'] ?? ''}',
+        mySymbol: mine,
       ),
       Gaps.vSm,
       _RoundPips(total: total, current: roundIndex, history: history, mine: mine, color: color),
@@ -255,12 +258,17 @@ class _LiveBattle extends StatelessWidget {
                 final canPlay = !iChose && remaining.contains(id);
                 return SizedBox(
                   width: 112,
-                  child: PlayerCard(
-                    card: card,
-                    compact: true,
-                    showStats: false,
-                    enabled: canPlay,
-                    onTap: canPlay ? () => session.moveObject({'cardId': id}) : null,
+                  child: AnimatedSlide(
+                    duration: const Duration(milliseconds: 220),
+                    offset: pendingId == id ? const Offset(0, -0.05) : Offset.zero,
+                    child: PlayerCard(
+                      card: card,
+                      compact: true,
+                      showStats: false,
+                      enabled: canPlay,
+                      selected: pendingId == id,
+                      onTap: canPlay ? () => session.moveObject({'cardId': id}) : null,
+                    ),
                   ),
                 );
               },
@@ -283,6 +291,8 @@ class _Scoreboard extends StatelessWidget {
     required this.theirPlayer,
     required this.title,
     required this.roundLabel,
+    required this.lastWinner,
+    required this.mySymbol,
   });
   final String myName;
   final String theirName;
@@ -293,42 +303,98 @@ class _Scoreboard extends StatelessWidget {
   final Map? theirPlayer;
   final String title;
   final String roundLabel;
+  final String lastWinner;
+  final String mySymbol;
 
   @override
-  Widget build(BuildContext context) => AppCard(
-        child: Row(children: [
-          Expanded(child: _Score(name: myName, score: myScore, color: color, player: myPlayer)),
-          Column(children: [
-            Text(roundLabel, style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w900)),
-            Text(title, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
-            Text('${faNum(myScore)}  —  ${faNum(theirScore)}',
-                textDirection: TextDirection.ltr,
-                style: const TextStyle(color: _gold, fontSize: 22, fontWeight: FontWeight.w900)),
+  Widget build(BuildContext context) {
+    final myLead = myScore > theirScore;
+    final theirLead = theirScore > myScore;
+    final lastMine = lastWinner == mySymbol;
+    final lastTheir = lastWinner.isNotEmpty && lastWinner != 'DRAW' && !lastMine;
+    return AppCard(
+      child: Column(
+        children: [
+          Row(children: [
+            Expanded(child: _Score(name: myName, score: myScore, color: color, player: myPlayer, highlight: myLead, scoredLast: lastMine)),
+            Column(children: [
+              Text(roundLabel, style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w900)),
+              Text(title, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+              Text('${faNum(myScore)}  —  ${faNum(theirScore)}',
+                  textDirection: TextDirection.ltr,
+                  style: const TextStyle(color: _gold, fontSize: 22, fontWeight: FontWeight.w900)),
+              Text(
+                lastWinner == 'DRAW'
+                    ? 'راند قبلی مساوی شد'
+                    : lastMine
+                        ? 'امتیاز راند قبل برای تو بود'
+                        : lastTheir
+                            ? 'حریف راند قبل را برد'
+                            : 'امتیازها را بالا نگه دار',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 9.5, color: Colors.white60, fontWeight: FontWeight.w700),
+              ),
+            ]),
+            Expanded(child: _Score(name: theirName, score: theirScore, color: _gold, player: theirPlayer, reverse: true, highlight: theirLead, scoredLast: lastTheir)),
           ]),
-          Expanded(child: _Score(name: theirName, score: theirScore, color: _gold, player: theirPlayer, reverse: true)),
-        ]),
-      );
+        ],
+      ),
+    );
+  }
 }
 
 class _Score extends StatelessWidget {
-  const _Score({required this.name, required this.score, required this.color, required this.player, this.reverse = false});
+  const _Score({
+    required this.name,
+    required this.score,
+    required this.color,
+    required this.player,
+    this.reverse = false,
+    this.highlight = false,
+    this.scoredLast = false,
+  });
   final String name;
   final int score;
   final Color color;
   final Map? player;
   final bool reverse;
+  final bool highlight;
+  final bool scoredLast;
   @override
   Widget build(BuildContext context) {
     final cosmetics = player?['cosmetics'] is Map ? player!['cosmetics'] as Map : const {};
     final isBot = player?['isBot'] == true;
-    final parts = [
-      TweenAnimationBuilder<int>(
+    final scoreBubble = AnimatedContainer(
+      duration: const Duration(milliseconds: 260),
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(99),
+        boxShadow: highlight || scoredLast
+            ? [BoxShadow(color: color.withValues(alpha: scoredLast ? .36 : .20), blurRadius: scoredLast ? 18 : 12)]
+            : const [],
+      ),
+      child: TweenAnimationBuilder<int>(
         tween: IntTween(begin: 0, end: score),
         duration: const Duration(milliseconds: 420),
         builder: (_, value, __) => CircleAvatar(
-            radius: 18,
-            backgroundColor: const Color(0xFF02060C),
-            child: Text(faNum(value), style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.w900))),
+          radius: 18,
+          backgroundColor: const Color(0xFF02060C),
+          child: Text(faNum(value), style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.w900)),
+        ),
+      ),
+    );
+    final parts = [
+      Stack(
+        clipBehavior: Clip.none,
+        children: [
+          scoreBubble,
+          if (scoredLast)
+            const PositionedDirectional(
+              top: -7,
+              end: -7,
+              child: _PointBurst(),
+            ),
+        ],
       ),
       if (isBot)
         Icon(Icons.smart_toy_rounded, size: 22, color: color)
@@ -343,15 +409,37 @@ class _Score extends StatelessWidget {
           ),
         ),
       Flexible(
-          child: DisplayName(
-        name: name,
-        cosmetics: cosmetics,
-        level: (player?['level'] as num?)?.toInt(),
-        style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800),
-      )),
+        child: Column(
+          crossAxisAlignment: reverse ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
+            DisplayName(
+              name: name,
+              cosmetics: cosmetics,
+              level: (player?['level'] as num?)?.toInt(),
+              style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800),
+            ),
+            if (scoredLast)
+              Text('+۱ امتیاز راند', style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w900)),
+          ],
+        ),
+      ),
     ];
     return Row(mainAxisAlignment: reverse ? MainAxisAlignment.end : MainAxisAlignment.start, children: reverse ? parts.reversed.toList() : parts);
   }
+}
+
+class _PointBurst extends StatelessWidget {
+  const _PointBurst();
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: _emerald,
+          borderRadius: BorderRadius.circular(99),
+          boxShadow: const [BoxShadow(color: Color(0x6622E7A6), blurRadius: 14)],
+        ),
+        child: const Text('+1', style: TextStyle(color: Color(0xFF04101A), fontWeight: FontWeight.w900, fontSize: 9)),
+      );
 }
 
 class _RoundPips extends StatelessWidget {
@@ -408,6 +496,8 @@ class _ClashStage extends StatelessWidget {
     final otherCard = Map<String, dynamic>.from((mine == 'O' ? round!['cardX'] : round!['cardO']) as Map? ?? const {});
     final myPower = mine == 'O' ? round!['powerO'] : round!['powerX'];
     final otherPower = mine == 'O' ? round!['powerX'] : round!['powerO'];
+    final myFocus = mine == 'O' ? round!['focusStatO'] : round!['focusStatX'];
+    final otherFocus = mine == 'O' ? round!['focusStatX'] : round!['focusStatO'];
     final winner = '${round!['winner']}';
     final iWon = winner == mine;
     final draw = winner == 'DRAW';
@@ -429,39 +519,83 @@ class _ClashStage extends StatelessWidget {
             const Color(0xFF07111D),
           ]),
           border: Border.all(color: (draw ? _gold : iWon ? _emerald : _rose).withValues(alpha: 0.55), width: 1.4),
+          boxShadow: [BoxShadow(color: (draw ? _gold : iWon ? _emerald : _rose).withValues(alpha: .16), blurRadius: 22)],
         ),
         child: Column(children: [
           Row(children: [
             Expanded(child: AspectRatio(aspectRatio: 0.68, child: PlayerCard(card: myCard, compact: true, showStats: false, winner: iWon, loser: !draw && !iWon))),
             Expanded(
-                child: Column(children: [
-              Text('راند ${faNum(round!['round'])}', style: const TextStyle(fontSize: 10, color: Colors.white54)),
-              Text('${round!['title']}', textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 6),
-              Text('${faNum(myPower)}  VS  ${faNum(otherPower)}',
-                  textDirection: TextDirection.ltr, style: const TextStyle(color: _gold, fontSize: 22, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: (draw ? _gold : iWon ? _emerald : _rose).withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(99),
+              child: Column(children: [
+                Text('راند ${faNum(round!['round'])} · ${round!['focusLabel'] ?? round!['title']}', style: const TextStyle(fontSize: 10, color: Colors.white54, fontWeight: FontWeight.w800), textAlign: TextAlign.center),
+                Text('${round!['title']}', textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 6),
+                Text('${faNum(myPower)}  VS  ${faNum(otherPower)}',
+                    textDirection: TextDirection.ltr, style: const TextStyle(color: _gold, fontSize: 22, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 8),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _RoundChip(label: '${round!['focusLabel'] ?? 'ویژگی'}', value: '${faNum(myFocus)} - ${faNum(otherFocus)}', tint: color),
+                    _RoundChip(label: 'اختلاف قدرت', value: faNum((round!['powerGap'] ?? (myPower - otherPower).abs())), tint: draw ? _gold : iWon ? _emerald : _rose),
+                  ],
                 ),
-                child: Text(
-                  draw ? 'برخورد برابر' : iWon ? 'WINNER' : 'باخت راند',
-                  style: TextStyle(color: draw ? _gold : iWon ? _emerald : _rose, fontWeight: FontWeight.w900, letterSpacing: 0.6),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: (draw ? _gold : iWon ? _emerald : _rose).withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: Text(
+                    draw ? 'برخورد برابر' : iWon ? 'WINNER' : 'باخت راند',
+                    style: TextStyle(color: draw ? _gold : iWon ? _emerald : _rose, fontWeight: FontWeight.w900, letterSpacing: 0.6),
+                  ),
                 ),
-              ),
-            ])),
+              ]),
+            ),
             Expanded(child: AspectRatio(aspectRatio: 0.68, child: PlayerCard(card: otherCard, compact: true, showStats: false, winner: !draw && !iWon, loser: iWon))),
           ]),
           Gaps.vXs,
           Text('${round!['reason'] ?? round!['text'] ?? ''}',
               textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, color: Colors.white70, fontWeight: FontWeight.w700)),
+          if ('${round!['cinematic'] ?? ''}'.trim().isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text('${round!['cinematic']}',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 10, color: draw ? _gold : iWon ? _emerald : _rose, fontWeight: FontWeight.w900)),
+          ],
         ]),
       ),
     );
   }
+}
+
+class _RoundChip extends StatelessWidget {
+  const _RoundChip({required this.label, required this.value, required this.tint});
+  final String label;
+  final String value;
+  final Color tint;
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        decoration: BoxDecoration(
+          color: tint.withValues(alpha: .12),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: tint.withValues(alpha: .32)),
+        ),
+        child: RichText(
+          text: TextSpan(
+            style: const TextStyle(fontFamily: 'Vazirmatn', fontSize: 9.8, color: Colors.white70, fontWeight: FontWeight.w700),
+            children: [
+              TextSpan(text: '$label: '),
+              TextSpan(text: value, style: TextStyle(color: tint, fontWeight: FontWeight.w900)),
+            ],
+          ),
+          textAlign: TextAlign.center,
+        ),
+      );
 }
 
 class _Finale extends StatelessWidget {

@@ -6,11 +6,21 @@ import { req, fa, avatarUrl } from '../lib/api.js';
 import { useAsync } from '../lib/useAsync.js';
 import { AsyncSection, EmptyView } from '../components/states.jsx';
 import CachedImg from '../components/CachedImg.jsx';
+import { cardArtOf, cardRarityOf, CARD_RARITY_META } from '../lib/cards.js';
 
 const ACCENTS = {
   emerald: '#00D49A', gold: '#FFC53D', blue: '#60A5FA',
   purple: '#A855F7', rose: '#F87171', slate: '#94A3B8',
 };
+
+function RequiredCardArt({ card }) {
+  const art = cardArtOf(card);
+  if (art) return <CachedImg src={art} alt={card.name} />;
+  const meta = CARD_RARITY_META[cardRarityOf(card)] || CARD_RARITY_META.normal;
+  return <div className="rgCardFallback" style={{ '--card-accent': meta.accent }}>
+    <span>{Array.from(card.name || 'ک')[0] || 'ک'}</span>
+  </div>;
+}
 
 function GroupBar({ group, accent }) {
   const next = group.nextTier;
@@ -57,9 +67,7 @@ function GroupBar({ group, accent }) {
             {next.requiredCards.map(c => (
               <div className={`rgCard${c.met ? ' met' : ''}`} key={c.cardTypeId}
                 title={c.name}>
-                {c.imageUrl
-                  ? <CachedImg src={c.imageUrl} alt={c.name} />
-                  : <img src={avatarUrl('avatar_1_football.png')} alt={c.name} />}
+                <RequiredCardArt card={c} />
                 <b>{fa(c.have)}/{fa(c.quantity)}</b>
               </div>
             ))}

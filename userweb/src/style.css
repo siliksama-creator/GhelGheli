@@ -3774,3 +3774,49 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 .duelClash.lost .duelWinnerStamp{background:#fb7185;color:#2a0610}
 .inventoryTile .invArt img,.invModal img,.duelArtV2 img{object-fit:contain!important;background:#02070d}
 .duelSlotsV2{grid-template-columns:repeat(5,minmax(0,1fr))!important}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Shared card system — inventory, duel, preview, profile
+   ═══════════════════════════════════════════════════════════════════════ */
+.ggPlayerCardFrame{width:100%;height:100%;min-width:0}.ggPlayerCardFrame>.rarityCardContent{height:100%}
+.ggPlayerCard{--card-accent:#22E7A6;position:relative;width:100%;height:100%;padding:0;border:0;background:#07111d;color:#fff;text-align:right;border-radius:17px;overflow:hidden;display:grid;grid-template-rows:minmax(0,1fr) auto;box-shadow:inset 0 1px rgba(255,255,255,.06);transition:transform .22s ease,filter .22s ease,opacity .22s ease;cursor:default}
+.ggPlayerCard[data-clickable="true"]{cursor:pointer}.ggPlayerCard[data-clickable="true"]:hover{transform:translateY(-4px);filter:saturate(1.06)}
+.ggPlayerCard.disabled{opacity:.48;filter:grayscale(.08)}
+.ggPlayerCard.selected{transform:translateY(-5px) scale(1.01)}
+.ggPlayerCard.winner{box-shadow:inset 0 0 0 2px rgba(255,209,102,.5),0 0 22px color-mix(in srgb,var(--card-accent) 22%,transparent)}
+.ggPlayerCard.loser{opacity:.76}
+.ggCardArt{position:relative;min-height:0;background:radial-gradient(circle at 50% 18%,color-mix(in srgb,var(--card-accent) 15%,transparent),transparent 38%),linear-gradient(180deg,#09131f,#02070d 68%);overflow:hidden}
+.ggCardArt img{width:100%;height:100%;object-fit:contain;background:#02070d;display:block}
+.ggCardAurora{position:absolute;inset:-35%;background:radial-gradient(circle,color-mix(in srgb,var(--card-accent) 18%,transparent),transparent 62%);filter:blur(18px);animation:ggCardBreath 3.2s ease-in-out infinite;pointer-events:none}
+.ggCardSweep{position:absolute;inset:0;background:linear-gradient(112deg,transparent 36%,rgba(255,255,255,.16) 50%,transparent 64%);transform:translateX(110%);animation:ggCardSweep 3.8s ease-in-out infinite;pointer-events:none}
+.ggCardFallbackWrap,.ggCardFallback{position:absolute;inset:0}.ggCardFallback{display:grid;place-items:center;align-content:center;gap:6px;padding:12px;background:linear-gradient(145deg,color-mix(in srgb,var(--card-accent) 26%,#071522),#07111d 58%,#050a11)}
+.ggCardFallbackGlyph{width:58px;height:58px;border-radius:18px;display:grid;place-items:center;background:rgba(255,255,255,.08);box-shadow:0 0 0 1px rgba(255,255,255,.1) inset;color:var(--card-accent);font-size:28px;font-weight:900}
+.ggCardFallback b{font-size:12px;color:#fff}.ggCardFallback small{font-size:10px;color:#b8cce2;text-align:center}.ggCardFallback.bot .ggCardFallbackGlyph{font-size:26px}
+.ggCardSpinner{width:22px;height:22px;border-radius:50%;border:2px solid rgba(255,255,255,.18);border-top-color:var(--card-accent);animation:spin .8s linear infinite}
+.ggCardPower,.ggCardCheck,.ggCardQty,.ggCardBadge,.ggCardWinnerStamp{position:absolute;z-index:2;display:grid;place-items:center;font-weight:900}
+.ggCardPower{bottom:8px;inset-inline-end:8px;width:40px;height:40px;border-radius:16px;background:rgba(2,7,13,.9);border:1px solid color-mix(in srgb,var(--card-accent) 50%,transparent);color:var(--card-accent);font-size:12px;box-shadow:0 0 18px color-mix(in srgb,var(--card-accent) 16%,transparent)}
+.ggCardCheck{top:8px;inset-inline-end:8px;width:28px;height:28px;border-radius:50%;background:#FFD166;color:#07111d;font-size:15px}
+.ggCardQty,.ggCardBadge{top:8px;padding:4px 8px;border-radius:999px;background:rgba(2,7,13,.78);border:1px solid rgba(255,255,255,.1);font-size:10px}
+.ggCardQty{inset-inline-start:8px;color:#fff}
+.ggCardBadge{inset-inline-end:8px;background:#22E7A6;color:#07111d;border:0}.ggPlayerCard.selected .ggCardBadge{inset-inline-end:42px}
+.ggCardWinnerStamp{left:50%;top:50%;transform:translate(-50%,-50%);padding:5px 12px;border-radius:999px;background:#FFD166;color:#432800;letter-spacing:1.2px;font-size:11px;box-shadow:0 0 18px rgba(255,209,102,.48)}
+.ggCardLoserVeil{position:absolute;inset:0;background:rgba(2,7,13,.36);pointer-events:none}
+.ggCardBody{position:relative;padding:10px 10px 11px;background:linear-gradient(180deg,rgba(2,7,13,0),rgba(2,7,13,.2) 10%,rgba(2,7,13,.92) 70%)}
+.ggCardName{display:block;margin:0 0 5px;font-size:13px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 2px 8px rgba(0,0,0,.8)}
+.ggCardMeta{display:flex;align-items:center;justify-content:space-between;gap:6px}.ggCardMeta span{color:var(--card-accent);font-size:10.5px;font-weight:800}.ggCardMeta small{color:#b7cadf;font-size:10px}
+.ggCardStats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:7px}.ggCardStats span{padding:4px 3px;border-radius:9px;background:rgba(255,255,255,.08);font-size:9px;color:#b8cce4;text-align:center}.ggCardStats i{display:block;font-style:normal;color:#8fa5bb}.ggCardStats b{display:block;margin-top:1px;color:#fff;font-size:10.5px}
+.ggPlayerCard.compact .ggCardArt{min-height:132px}.ggPlayerCard.compact .ggCardName{font-size:10.5px;margin-bottom:0}.ggPlayerCard.compact .ggCardMeta small{font-size:9px}.ggPlayerCard.compact .ggCardBody{padding:8px}.ggPlayerCard.compact .ggCardPower{width:32px;height:32px;font-size:10.5px}.ggPlayerCard.compact .ggCardWinnerStamp{font-size:10px;padding:4px 10px}
+.homeInventoryPreview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.ppCardsGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(134px,1fr));gap:10px}
+.inventoryGrid>.ggPlayerCardFrame,.ppCardsGrid>.ggPlayerCardFrame,.homeInventoryPreview>.ggPlayerCardFrame,.duelGridV2>.ggPlayerCardFrame,.duelHandV2>.duelCardShell,.duelSlotsV2>.duelCardShell{height:100%}
+.inventoryGrid>.ggPlayerCardFrame{min-height:320px}.homeInventoryPreview>.ggPlayerCardFrame{min-height:206px}
+.invModal>.ggPlayerCardFrame{width:100%;max-height:68vh}.invModal>.ggPlayerCardFrame .ggPlayerCard{max-height:68vh}.invModal .ggCardArt{min-height:50vh}
+.rgCardFallback{width:56px;height:56px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(145deg,color-mix(in srgb,var(--card-accent) 28%,#10243c),#07111d 65%);border:1px solid rgba(255,255,255,.1)}.rgCardFallback span{color:#fff;font-size:18px;font-weight:900}
+.duelCardShell,.duelEquippedFrame{width:100%;min-width:0;display:block}.duelCardShell.compact,.duelEquippedFrame.compact{width:100%}
+.duelSlotsV2{align-items:stretch}.duelEmptySlot{height:214px;margin:0;border-radius:18px;background:linear-gradient(145deg,#ffffff08,#050a12);border:1px dashed rgba(255,255,255,.2);color:#7f95ab;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px}.duelEmptySlot span{font-size:28px}.duelEmptySlot small{font-size:10px}
+.duelScoreV2>div.lead b{box-shadow:0 0 20px color-mix(in srgb,var(--mode-color) 22%,transparent)}.duelScoreV2>div.pulse b{animation:duelScorePulse .55s ease-out}.duelScoreV2>span small{margin-top:4px;font-size:10px;color:#9bb1c6;text-align:center;max-width:180px;line-height:1.5}
+.duelRoundPips i.won{background:#22E7A6;box-shadow:0 0 14px rgba(34,231,166,.28)}.duelRoundPips i.lost{background:#FB7185;box-shadow:0 0 14px rgba(251,113,133,.22)}.duelRoundPips i.draw{background:#FFD166;box-shadow:0 0 14px rgba(255,209,102,.22)}
+.duelClash{grid-template-columns:minmax(120px,1fr) minmax(190px,.95fr) minmax(120px,1fr)}.duelReasonChips{display:flex;flex-direction:column;gap:5px;align-items:center}.duelReasonChips i{font-style:normal;font-size:10px;color:#d7e7f8;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.08);padding:4px 9px;border-radius:999px}.duelCinematic{margin:0;font-size:11px;font-weight:800;color:var(--mode-color)}
+.duelFinalePanel{background:linear-gradient(145deg,rgba(8,15,26,.92),rgba(20,40,66,.92));border-width:1.5px}.duelFinalePanel h2{font-size:32px;letter-spacing:2px}.duelFinalePanel p{max-width:38ch}.duelFinale .duelSharePreview{background:linear-gradient(135deg,rgba(255,209,102,.18),rgba(56,189,248,.12))}
+@keyframes ggCardBreath{50%{transform:scale(1.08);opacity:.8}}@keyframes ggCardSweep{0%,45%{transform:translateX(110%)}100%{transform:translateX(-110%)}}@keyframes duelScorePulse{0%{transform:scale(.82)}100%{transform:scale(1)}}
+@media(max-width:700px){.homeInventoryPreview{grid-template-columns:repeat(2,minmax(0,1fr))}.duelClash{grid-template-columns:1fr;gap:9px}.duelClashCore{order:-1}.duelReasonChips i{font-size:9.5px}.duelEmptySlot{height:178px}.duelScoreV2>span small{display:none}}
+@media(prefers-reduced-motion:reduce){.ggCardAurora,.ggCardSweep{animation:none!important}.ggPlayerCard,.ggPlayerCard:not(:disabled):hover{transform:none!important}}

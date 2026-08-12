@@ -195,14 +195,19 @@ function roundScore(card, opp, focus, roundIndex, prevWon, random = null) {
 }
 
 function winnerReason(winner, focus, cardX, cardO, powerX, powerO) {
+  const focusX = focusValue(cardX, focus);
+  const focusO = focusValue(cardO, focus);
   if (winner === 'DRAW') {
-    return `قدرت راند نزدیک بود (${powerX} برابر ${powerO})؛ این راند مساوی شد`;
+    return `در «${focus.label}» هر دو کارت خیلی نزدیک بودند: ${cardX.name} ${focusX} و ${cardO.name} ${focusO}؛ قدرت نهایی هم ${powerX} برابر ${powerO} شد`;
   }
   const champ = winner === 'X' ? cardX : cardO;
+  const other = winner === 'X' ? cardO : cardX;
   const champPower = winner === 'X' ? powerX : powerO;
   const otherPower = winner === 'X' ? powerO : powerX;
+  const champFocus = winner === 'X' ? focusX : focusO;
+  const otherFocus = winner === 'X' ? focusO : focusX;
   const gap = Math.abs(champPower - otherPower);
-  return `${champ.name} با برتری ${gap} امتیاز در «${focus.label}» راند را برد`;
+  return `${champ.name} در «${focus.label}» با ${champFocus} در برابر ${otherFocus} جلو افتاد و راند را با قدرت نهایی ${champPower} به ${otherPower} برد`;
 }
 
 function resolveRound(cardX, cardO, roundIndex, previousWinner = null, random = null) {
@@ -215,18 +220,22 @@ function resolveRound(cardX, cardO, roundIndex, previousWinner = null, random = 
   if (x.effect === 'wall' && powerO > powerX && randomInt(100, random) < 22) powerO -= 16;
   const diff = powerX - powerO;
   const winner = diff >= 6 ? 'X' : diff <= -6 ? 'O' : 'DRAW';
+  const focusStatX = focusValue(x, focus);
+  const focusStatO = focusValue(o, focus);
   return {
     round: roundIndex + 1,
     title: focus.label,
     text: focus.userText,
     focusKey: focus.stat,
     focusLabel: focus.label,
-    focusStatX: focusValue(x, focus),
-    focusStatO: focusValue(o, focus),
+    focusStatX,
+    focusStatO,
+    focusGap: Math.abs(focusStatX - focusStatO),
     cardX: x,
     cardO: o,
     powerX,
     powerO,
+    powerGap: Math.abs(powerX - powerO),
     winner,
     reason: winnerReason(winner, focus, x, o, powerX, powerO),
     cinematic: winner === 'X' ? 'ضربه نهایی آبی!' : winner === 'O' ? 'پاسخ آتشین حریف!' : 'برخورد تماشایی!',

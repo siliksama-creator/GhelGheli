@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 
 import { req, fa, avatarUrl } from '../lib/api.js';
 import CachedImg from '../components/CachedImg.jsx';
+import PlayerCard from '../components/PlayerCard.jsx';
 import { clubImg, CosmeticAvatarFrame, DisplayName, profileBackgroundClass, profileBackgroundStyle } from '../components/Cosmetics.jsx';
 import { useAsync } from '../lib/useAsync.js';
 import { LoadingView, ErrorView } from '../components/states.jsx';
@@ -126,15 +127,14 @@ export default function PublicProfile({ token, userId, close }) {
 
               {tab === 'cards' && (
                 u.cards?.length ? (
-                  <div className="ppGrid">
+                  <div className="ppCardsGrid">
                     {u.cards.map(c => (
-                      <div className="ppPrize" key={c.card_type_id}>
-                        {c.image_url
-                          ? <CachedImg src={c.image_url} alt={c.name} loading="lazy" />
-                          : <img src={avatarUrl('avatar_1_football.png')} alt={c.name} loading="lazy" />}
-                        <b>{c.name}</b>
-                        <em>{fa(c.registered_count)}× · {fa(c.point_value)} امتیاز</em>
-                      </div>
+                      <PlayerCard
+                        key={c.card_type_id}
+                        item={{ ...c, quantity: c.registered_count }}
+                        compact
+                        showStats={false}
+                      />
                     ))}
                   </div>
                 ) : <p className="hint">هنوز کارتی در کلکسیون ثبت نکرده است.</p>

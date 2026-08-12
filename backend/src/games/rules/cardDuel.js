@@ -133,6 +133,7 @@ function publicState(state, player) {
     roundTitle: duel.ROUND_FOCUS[state.roundIndex]?.label || 'پایان نبرد',
     myDeck: state.decks[mine],
     myRemainingCardIds: state.remaining[mine],
+    myPendingCardId: state.pending[mine] || null,
     opponentRemainingCount: state.remaining[opponent].length,
     iChose: Boolean(state.pending[mine]),
     waitingForOpponent: Boolean(state.pending[mine]) && !state.pending[opponent],
