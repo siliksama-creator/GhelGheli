@@ -215,7 +215,10 @@ class _RarityCardFrameState extends State<RarityCardFrame>
 
   @override
   Widget build(BuildContext context) {
-    if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) {
+    final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    // Normal is intentionally matte and static; rebuilding every visible
+    // ordinary card at 60 fps would waste battery without changing a pixel.
+    if (reduceMotion || widget.rarity == null || widget.rarity == 'normal') {
       return _paint(.25);
     }
     return RepaintBoundary(
