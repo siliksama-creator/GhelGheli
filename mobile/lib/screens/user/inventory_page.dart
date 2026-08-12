@@ -328,116 +328,94 @@ class InventoryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final img = fullAssetUrl(item['image_url']);
+    final imageValue = item['image_url'] ?? item['imageUrl'];
+    final img = fullAssetUrl(imageValue);
     final qty = _asInt(item['quantity']);
     final fresh = isNewCard(item);
 
     return GestureDetector(
       onTap: () => showCardDetail(context, item),
-      child: RarityCardFrame(
-        rarity: item['duel_rarity'] as String?,
-        child: Container(
+      child: Container(
+        padding: const EdgeInsets.all(Gaps.xs),
         decoration: BoxDecoration(
           borderRadius: Corners.rXl,
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFFFFD36B), Color(0xFF0B2B4F), Color(0xFF00D49A)],
+            colors: [Color(0xFF15263A), Color(0xFF07111D)],
           ),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.09)),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withValues(alpha: 0.25),
-                blurRadius: 14,
-                offset: const Offset(0, 6)),
+              color: Colors.black.withValues(alpha: 0.28),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
           ],
         ),
-        padding: const EdgeInsets.all(Gaps.xs),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: ClipRRect(
-                      borderRadius: Corners.rMd,
-                      child: ColoredBox(
-                        color: Colors.black.withValues(alpha: 0.14),
-                        // ── چرا CachedCardImage و نه Image.network ──
-                        //
-                        // خواستهٔ مالک: «وقتی کاربر کارتی به اینونتوریش
-                        // انتقال پیدا کرد ازون به بعد دیگه تصویر کارت از
-                        // گوشیش کش بشه که برای نمایش کارت در اینونتوری
-                        // هر بار درخواست به سرور ارسال نشه».
-                        //
-                        // `Image.network` فقط کشِ **حافظه** دارد که با
-                        // بستنِ اپ پاک می‌شود. کاربری با ۳۰ کارت هر بار
-                        // ۳۰ درخواست می‌زد. حالا بارِ اول دانلود، از آن
-                        // به بعد از دیسکِ گوشی.
-                        child: img.isEmpty
-                            ? Center(
-                                child:
-                                    Image.asset('assets/pass/football_icon.webp', width: 42, height: 42, fit: BoxFit.contain))
-                            : CachedCardImage(
-                                url: img,
-                                fit: BoxFit.contain,
-                                // رمزگشایی به اندازهٔ نمایش. بدون این،
-                                // ۵۰ تصویرِ تمام‌اندازه در حافظه می‌نشیند
-                                // و روی گوشیِ ضعیف اپ کشته می‌شود.
-                                cacheWidth: 320,
-                                placeholder: Image.asset('assets/pass/football_icon.webp', width: 42, height: 42, fit: BoxFit.contain),
-                              ),
-                      ),
+              child: RarityCardFrame(
+                rarity: item['duel_rarity'] as String?,
+                borderRadius: 17,
+                padding: 4,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ColoredBox(
+                      color: const Color(0xFF02070D),
+                      child: img.isEmpty
+                          ? const _CardImagePlaceholder(missing: true)
+                          : CachedCardImage(
+                              url: imageValue,
+                              fit: BoxFit.contain,
+                              cacheWidth: 320,
+                              placeholder: const _CardImagePlaceholder(),
+                            ),
                     ),
-                  ),
-                  if (fresh)
-                    Positioned(
-                      top: 4,
-                      right: 4,
-                      child: _Chip(
-                        text: 'جدید',
-                        bg: theme.colorScheme.primary,
-                        fg: theme.colorScheme.onPrimary,
+                    if (fresh)
+                      Positioned(
+                        top: 5,
+                        right: 5,
+                        child: _Chip(
+                          text: 'جدید',
+                          bg: theme.colorScheme.primary,
+                          fg: theme.colorScheme.onPrimary,
+                        ),
                       ),
-                    ),
-                  // تعداد فقط وقتی نشان داده می‌شود که بیش از یکی باشد؛
-                  // «×۱» روی هر کارت فقط نویز است.
-                  //
-                  // بالا-چپ و نه پایین: پایینِ تصویر درست بالای نوارِ
-                  // تیرهٔ نامِ کارت است و دو عنصرِ تیره به هم چسبیده
-                  // دیده می‌شدند. اینجا قرینهٔ نشانِ «جدید» است.
-                  if (qty > 1)
-                    Positioned(
-                      top: 4,
-                      left: 4,
-                      child: _Chip(
-                        text: '×${faNum(qty)}',
-                        bg: Colors.black.withValues(alpha: 0.62),
-                        fg: Colors.white,
+                    if (qty > 1)
+                      Positioned(
+                        top: 5,
+                        left: 5,
+                        child: _Chip(
+                          text: '×${faNum(qty)}',
+                          bg: Colors.black.withValues(alpha: 0.72),
+                          fg: Colors.white,
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 7),
             Text(
               '${item['name'] ?? 'کارت'}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
               style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 13.5),
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+              ),
             ),
             const SizedBox(height: 3),
-            // پسِ‌زمینهٔ تیره پشتِ امتیاز: متن روی نقطهٔ روشنِ گرادیان
-            // می‌افتد و بدون آن کنتراست به ۲ هم نمی‌رسد.
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.42),
+                color: Colors.black.withValues(alpha: 0.36),
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
@@ -446,19 +424,45 @@ class InventoryTile extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700),
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
             const SizedBox(height: 5),
             CardDuelStatsMini(item: item),
           ],
         ),
-        ),
       ),
     );
   }
+}
+
+class _CardImagePlaceholder extends StatelessWidget {
+  const _CardImagePlaceholder({this.missing = false});
+  final bool missing;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF13253A), Color(0xFF050A11)],
+          ),
+        ),
+        child: Center(
+          child: missing
+              ? const Icon(Icons.image_not_supported_outlined,
+                  color: Colors.white38, size: 30)
+              : const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+        ),
+      );
 }
 
 class _Chip extends StatelessWidget {

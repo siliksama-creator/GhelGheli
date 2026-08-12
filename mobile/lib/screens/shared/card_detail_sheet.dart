@@ -23,7 +23,8 @@ class _CardDetailDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final img = fullAssetUrl(item['image_url']);
+    final imageValue = item['image_url'] ?? item['imageUrl'];
+    final img = fullAssetUrl(imageValue);
     final qty = item['quantity'];
 
     return Dialog(
@@ -68,7 +69,7 @@ class _CardDetailDialog extends StatelessWidget {
                         constraints: const BoxConstraints(minHeight: 200),
                         width: double.infinity,
                         child: img.isEmpty
-                            ? const _Fallback()
+                            ? const _Fallback(missing: true)
                             // همان کشِ دیسکیِ اینونتوری. اینجا مهم‌تر هم
                             // هست: نمای بزرگ عمداً `cacheWidth` ندارد
                             // (کاربر تا ۴ برابر زوم می‌کند و باید جزئیات
@@ -82,7 +83,7 @@ class _CardDetailDialog extends StatelessWidget {
                             : InteractiveViewer(
                                 maxScale: 4,
                                 child: CachedCardImage(
-                                  url: img,
+                                  url: imageValue,
                                   fit: BoxFit.contain,
                                   placeholder: const _Fallback(),
                                 ),
@@ -154,12 +155,22 @@ class _CardDetailDialog extends StatelessWidget {
 }
 
 class _Fallback extends StatelessWidget {
-  const _Fallback();
+  const _Fallback({this.missing = false});
+  final bool missing;
 
   @override
   Widget build(BuildContext context) => SizedBox(
         height: 220,
-        child: Center(child: Image.asset('assets/pass/football_icon.webp', width: 110, height: 110, fit: BoxFit.contain)),
+        child: Center(
+          child: missing
+              ? const Icon(Icons.image_not_supported_outlined,
+                  color: Colors.white38, size: 42)
+              : const SizedBox(
+                  width: 26,
+                  height: 26,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+        ),
       );
 }
 

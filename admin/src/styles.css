@@ -1594,3 +1594,17 @@ table.data-table {
 @keyframes adminCardShine { 0%, 25% { background-position: 180% 0; opacity: 0; } 45% { opacity: .8; } 65%, 100% { background-position: -90% 0; opacity: 0; } }
 @media (max-width: 410px) { .adminCardTop { grid-template-columns: 96px minmax(0, 1fr); } }
 @media (prefers-reduced-motion: reduce) { .adminRarityFrame, .adminRarityFrame > i { animation: none; } }
+
+/* Distinct card-class materials: not one generic frame with five colours. */
+.adminRarityFrame.rarity-normal{background:linear-gradient(145deg,#34d399,#14532d 58%,#334155);animation:none;box-shadow:0 8px 18px #0007,0 0 11px #22c55e40}
+.adminRarityFrame.rarity-normal>i{display:none}
+.adminRarityFrame.rarity-silver{background:linear-gradient(115deg,#fff,#64748b 30%,#f8fafc 52%,#334155 78%,#fff);background-size:230% 100%;animation:adminSilver 4.8s ease-in-out infinite;box-shadow:0 8px 22px #e2e8f055}
+.adminRarityFrame.rarity-silver>img{outline:1px solid #ffffff9c;outline-offset:-7px}
+.adminRarityFrame.rarity-gold{padding:5px;background:conic-gradient(from var(--rarity-turn),#fff0a3,#b77900,#ffd166,#7c4a00,#fff0a3);box-shadow:0 9px 25px #ffd16666}
+.adminRarityFrame.rarity-gold:after,.adminRarityFrame.rarity-premium:after{position:absolute;z-index:4;inset-inline-end:-5px;bottom:-6px;width:20px;height:20px;display:grid;place-items:center;border:1px solid #fff8;box-shadow:0 0 13px var(--rarity-a);font-size:8px}
+.adminRarityFrame.rarity-gold:after{content:'★';border-radius:50%;background:#ffd166;color:#6b3f00}
+.adminRarityFrame.rarity-premium{background:conic-gradient(from var(--rarity-turn),#22d3ee,#7c3aed,#f472b6,#071522,#22d3ee);box-shadow:0 10px 27px #7c3aed70;animation-duration:3.1s}
+.adminRarityFrame.rarity-premium:after{content:'◆';border-radius:6px;background:linear-gradient(135deg,#22d3ee,#7c3aed);color:#fff;transform:rotate(12deg)}
+.adminRarityFrame.rarity-legend{padding:5px;background:conic-gradient(from var(--rarity-turn),#ffd166,#ef4444,#7f1d1d,#071522,#ffd166);box-shadow:0 11px 30px #ef444477;animation-duration:2.7s}
+@keyframes adminSilver{50%{background-position:100% 0;filter:brightness(1.13)}}
+@media(prefers-reduced-motion:reduce){.adminRarityFrame.rarity-silver{animation:none!important}}

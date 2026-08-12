@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { asset, avatarUrl, fa } from '../lib/api.js';
+import { asset, fa } from '../lib/api.js';
 import { CardRarityFrame } from '../components/CardRarityFrame.jsx';
 
 const asInt = v => Number.parseInt(v || 0, 10) || 0;
@@ -13,6 +13,16 @@ function stats(items) {
     a.points += q * asInt(x.point_value);
     return a;
   }, { kinds: items.length, total: 0, points: 0 });
+}
+
+function CardArtwork({ item, loading }) {
+  const [failed, setFailed] = useState(false);
+  const image = item.image_url || item.imageUrl;
+  if (!image || failed) {
+    return <span className="invMissingArt" role="img" aria-label="تصویر کارت در دسترس نیست">▧</span>;
+  }
+  return <img src={asset(image)} alt={item.name || 'کارت'} loading={loading}
+    decoding="async" onError={() => setFailed(true)} />;
 }
 
 function DuelStats({ item }) {
@@ -29,8 +39,7 @@ function CardDetail({ item, close }) {
       <section className="invModal card" onClick={e => e.stopPropagation()}>
         <button className="ghost invModalClose" onClick={close}>×</button>
         <CardRarityFrame rarity={item.duel_rarity}>
-          <img src={item.image_url ? asset(item.image_url) : avatarUrl('avatar_1_football.png')}
-            alt={item.name || 'کارت'} />
+          <CardArtwork item={item} />
         </CardRarityFrame>
         <h2>{item.name || 'کارت'}</h2>
         <DuelStats item={item}/>
@@ -88,8 +97,7 @@ export default function Inventory({ items = [], reload }) {
           {shown.map(item => <button className="inventoryTile" key={item.id} onClick={() => setOpen(item)}>
             <CardRarityFrame rarity={item.duel_rarity}>
               <div className="invArt">
-                <img src={item.image_url ? asset(item.image_url) : avatarUrl('avatar_1_football.png')}
-                  alt={item.name || 'کارت'} loading="lazy" decoding="async" />
+                <CardArtwork item={item} loading="lazy" />
                 {fresh(item) && <i className="invNew">جدید</i>}
                 {asInt(item.quantity) > 1 && <i className="invQty">×{fa(item.quantity)}</i>}
               </div>

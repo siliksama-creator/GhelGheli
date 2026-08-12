@@ -89,6 +89,12 @@ check((webInventory.match(/<CardRarityFrame/g) || []).length >= 2
   'Web inventory grid and detail use real rarity frames and compact stats');
 check(/duelRarityFrame/.test(webDuel) && /rarityCardShine/.test(webCss),
   'Web duel uses the same animated rarity treatment');
+check(['rarity-normal','rarity-silver','rarity-gold','rarity-premium','rarity-legend']
+  .every(name => webCss.includes(`.rarityCardFrame.${name}`)),
+  'Web tiers use five materially distinct frame treatments, not color aliases');
+check(/item\.image_url \|\| item\.imageUrl/.test(webInventory)
+  && !/avatar_1_football/.test(webInventory),
+  'Web collection renders the real design URL and never substitutes a football avatar');
 
 const mobileFrame = read('mobile/lib/widgets/rarity_card_frame.dart');
 const mobileInventory = read('mobile/lib/screens/user/inventory_page.dart');
@@ -97,8 +103,13 @@ const mobileDuel = read('mobile/lib/screens/user/games/card_duel/card_duel_widge
 const mobileAdmin = read('mobile/lib/screens/admin/photo_cards/grouped_card_tile.dart');
 check(['معمولی','نقره‌ای','طلایی','پرمیوم','لجند'].every(label => mobileFrame.includes(label)),
   'Android rarity frame carries the same five Persian tier labels');
-check(/AnimationController/.test(mobileFrame) && /SweepGradient/.test(mobileFrame),
-  'Android rarity borders animate without altering genuine card artwork');
+check(/AnimationController/.test(mobileFrame) && /SweepGradient/.test(mobileFrame)
+  && /case 'normal'/.test(mobileFrame) && /case 'silver'/.test(mobileFrame)
+  && /case 'gold'/.test(mobileFrame) && /case 'premium'/.test(mobileFrame),
+  'Android uses materially distinct normal, silver, gold, premium and legend frames');
+check(!/football_icon/.test(mobileInventory) && !/football_icon/.test(mobileDetail)
+  && /item\['image_url'\] \?\? item\['imageUrl'\]/.test(mobileInventory),
+  'Android collection renders the real design URL without the misleading football fallback');
 check(/RarityCardFrame/.test(mobileInventory) && /RarityCardFrame/.test(mobileDetail)
   && /RarityCardFrame/.test(mobileDuel),
   'Android inventory, detail, and duel share the runtime rarity frame');
@@ -115,5 +126,8 @@ check(/side\.width/.test(adminTile) && /fingerprint_complete/.test(adminTile)
   'Admin preview displays dimensions, side identity, OCR count, and fingerprint health');
 check(/adminCardShine/.test(adminCss) && /prefers-reduced-motion/.test(adminCss),
   'Admin rarity animation is polished and respects reduced motion');
+check(['rarity-normal','rarity-silver','rarity-gold','rarity-premium','rarity-legend']
+  .every(name => adminCss.includes(`.adminRarityFrame.${name}`)),
+  'Admin preview mirrors all five distinct physical frame classes');
 
 console.log(`\n✅ ${passed} card-curation regressions passed\n`);

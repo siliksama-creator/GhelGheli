@@ -167,7 +167,14 @@ class _CachedCardImageState extends State<CachedCardImage> {
     // رفع: URL در `requested` قفل می‌شود و callback فقط وقتی چیزی را
     // اعمال می‌کند که هنوز همان URL خواسته شده باشد.
     final requested = _resolved;
-    ImageDiskCache.instance.fetch(requested).then((f) {
+    ImageDiskCache.instance
+        .fetch(requested)
+        // The disk-cache fetch used to keep the football placeholder visible
+        // for up to 40 seconds on a weak connection. Eight seconds is enough
+        // for these ~100 KB WebP files; after that render through Flutter's
+        // proven Image.network path instead of making the card look missing.
+        .timeout(const Duration(seconds: 8), onTimeout: () => null)
+        .then((f) {
       if (!mounted) return;
       // نتیجهٔ درخواستِ کهنه دور ریخته می‌شود. `_syncHit` هم دست‌نخورده
       // می‌ماند تا خرابی ماندگار نشود.
@@ -254,6 +261,9 @@ class _CachedCardImageState extends State<CachedCardImage> {
       SizedBox(
         width: widget.width,
         height: widget.height,
-        child: const Center(child: Image(image: AssetImage('assets/pass/football_icon.webp'), width: 42, height: 42, fit: BoxFit.contain)),
+        child: const Center(
+          child: Icon(Icons.image_not_supported_outlined,
+              size: 34, color: Colors.white38),
+        ),
       );
 }

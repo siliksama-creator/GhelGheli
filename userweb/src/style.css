@@ -3742,3 +3742,20 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 /* Rare-card frame stays the outermost gameplay silhouette. */
 .duelRarityFrame{width:100%;min-width:0}.duelRarityFrame>.rarityCardContent{display:flex;height:100%}.duelRarityFrame .duelCardV2{width:100%;height:100%;border-color:transparent}.duelRarityFrame.compact{width:153px;min-width:0}.duelEquippedFrame .duelRarityFrame{border-radius:18px}.duelEquippedFrame .duelRarityFrame>.rarityCardContent{border-radius:15px}
 @media(max-width:700px){.duelRarityFrame.compact{width:100%}}
+
+/* Each card class has a genuinely different physical frame language. */
+.rarityCardFrame.rarity-normal{padding:3px;background:linear-gradient(145deg,#34d399,#14532d 56%,#334155);box-shadow:0 8px 18px #0008,0 0 10px #22c55e35}
+.rarity-normal .rarityCardShine{display:none}.rarity-normal .rarityCardContent{border:1px solid #ffffff22}
+.rarityCardFrame.rarity-silver{background:linear-gradient(115deg,#fff,#64748b 30%,#f8fafc 51%,#334155 78%,#fff);background-size:240% 100%;box-shadow:0 10px 25px #0008,0 0 18px #e2e8f055;animation:raritySilver 4.8s ease-in-out infinite}
+.rarity-silver .rarityCardContent{outline:1px solid #ffffff9c;outline-offset:-7px}
+.rarityCardFrame.rarity-gold{padding:5px;background:conic-gradient(from 25deg,#fff0a3,#b77900,#ffd166,#7c4a00,#fff0a3);box-shadow:0 12px 28px #0008,0 0 22px #ffd16666}
+.rarity-gold:after{content:'★';position:absolute;z-index:8;inset-inline-end:-5px;bottom:-6px;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:#ffd166;color:#6b3f00;border:1px solid #fff8;box-shadow:0 0 12px #ffd166aa;font-size:9px}
+.rarityCardFrame.rarity-premium{background:conic-gradient(from var(--premium-turn,0deg),#22d3ee,#7c3aed,#f472b6,#071522,#22d3ee);box-shadow:0 12px 30px #0009,0 0 25px #7c3aed70;animation:rarityPremium 3.1s linear infinite}
+.rarity-premium:after{content:'◆';position:absolute;z-index:8;inset-inline-end:-5px;bottom:-6px;width:21px;height:21px;border-radius:6px;display:grid;place-items:center;background:linear-gradient(135deg,#22d3ee,#7c3aed);color:#fff;border:1px solid #fff8;box-shadow:0 0 14px #22d3ee99;font-size:8px;transform:rotate(12deg)}
+.rarityCardFrame.rarity-legend{padding:5px;background:conic-gradient(from var(--legend-turn,0deg),#ffd166,#ef4444,#7f1d1d,#071522,#ffd166);box-shadow:0 13px 34px #0009,0 0 30px #ef444477;animation:rarityLegendSpin 2.7s linear infinite}
+@keyframes raritySilver{50%{background-position:100% 0;filter:brightness(1.13)}}
+@keyframes rarityPremium{to{--premium-turn:360deg}}
+@keyframes rarityLegendSpin{to{--legend-turn:360deg}}
+@property --premium-turn{syntax:'<angle>';inherits:false;initial-value:0deg}@property --legend-turn{syntax:'<angle>';inherits:false;initial-value:0deg}
+@media(prefers-reduced-motion:reduce){.rarityCardFrame.rarity-silver,.rarityCardFrame.rarity-premium,.rarityCardFrame.rarity-legend{animation:none!important}}
+.invMissingArt{width:100%;height:100%;min-height:150px;display:grid;place-items:center;background:linear-gradient(145deg,#13253a,#050a11);color:#ffffff52;font-size:42px}
