@@ -304,7 +304,7 @@ class _LiveBattle extends StatelessWidget {
               ),
             ])),
           ],
-        ),
+        ]),
       ],
     );
   }
