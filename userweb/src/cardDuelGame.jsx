@@ -218,10 +218,16 @@ async function renderResultCard({ result, score, mvp, opponent, url, template })
 }
 
 function History({ battles }) {
-  const labels = { bot: 'تمرین با ربات', online: 'نبرد آنلاین', lobby: 'لابی خصوصی' };
-  return <section className="duelHistoryV2">
-    <h3>آخرین نبردها</h3>
-    {(battles || []).length ? (battles || []).slice(0, 6).map(battle => {
+  const labels = { online: 'نبرد آنلاین', lobby: 'لابی خصوصی' };
+  const rows = (battles || []).filter(battle => battle.mode !== 'bot').slice(0, 5);
+  return <details className="duelHistoryV2">
+    <summary>
+      <div>
+        <h3>آخرین نبردها{rows.length ? ` (${fa(rows.length)})` : ''}</h3>
+        <small>فقط پنج بازی آنلاین اخیر؛ تمرین با ربات ثبت نمی‌شود</small>
+      </div>
+    </summary>
+    {rows.length ? rows.map(battle => {
       const delta = num(battle.userDelta);
       const won = delta > 0 || !battle.stakePoints && num(battle.userScore) > num(battle.opponentScore);
       const settlement = battle.settlementStatus || 'settled';
@@ -231,8 +237,8 @@ function History({ battles }) {
         <div><b>{labels[battle.mode] || 'دوئل کارت'}</b><small>{fa(battle.userScore)} - {fa(battle.opponentScore)} · {settlementLabel}</small></div>
         <strong className={delta >= 0 ? 'up' : 'down'}>{delta > 0 ? `+${fa(delta)}` : fa(delta)}</strong>
       </div>;
-    }) : <div className="card pad center muted">اولین نبردت را شروع کن؛ تاریخچه اینجا ساخته می‌شود.</div>}
-  </section>;
+    }) : <div className="card pad center muted">هنوز نبرد آنلاینی نداری. تاریخچه اینجا جمع نمی‌شود تا صفحه سبک بماند.</div>}
+  </details>;
 }
 
 export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,

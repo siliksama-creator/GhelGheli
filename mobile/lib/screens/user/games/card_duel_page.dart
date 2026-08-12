@@ -28,7 +28,7 @@ const _emerald = Color(0xFF22E7A6);
 const _purple = Color(0xFFA855F7);
 const _rose = Color(0xFFFB7185);
 
-/// Live three-card arena: bot practice, 100/1000 online, and private lobby.
+/// Live five-card arena: bot practice, 100/1000 online, and private lobby.
 /// Card choices are simultaneous and hidden until both players lock a card.
 class CardDuelPage extends StatefulWidget {
   const CardDuelPage({

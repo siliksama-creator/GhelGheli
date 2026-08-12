@@ -22,6 +22,7 @@ function card(id, stat, effect = 'none') {
 }
 
 const migration = read('backend/migrations/050_card_duel_live_online.sql');
+const fiveCardMigration = read('backend/migrations/060_card_duel_five_card_history.sql');
 const service = read('backend/src/services/cardDuelService.js');
 const server = read('backend/src/server.js');
 const engine = read('backend/src/games/engine.js');
@@ -34,7 +35,7 @@ const webHub = read('userweb/src/games.jsx');
 const mobileWheel = read('mobile/lib/screens/user/wheel_page.dart');
 const webWheel = read('userweb/src/screens/Wheel.jsx');
 
-console.log('\n== منطق زندهٔ سه‌کارتی ==');
+console.log('\n== منطق زندهٔ پنج‌کارتی ==');
 const state = rules.createFromDecks(
   [card('x1', 90), card('x2', 75), card('x3', 60), card('x4', 68), card('x5', 84)],
   [card('o1', 80), card('o2', 70), card('o3', 55), card('o4', 66), card('o5', 78)],
@@ -82,6 +83,14 @@ ok(engine.indexOf('const initialState = rules.createWithContext') < engine.index
   'شکست ترکیب نمی‌تواند امتیاز را در escrow گیر بیندازد');
 ok(/matchMode: room\.matchMode/.test(engine), 'نوع آنلاین/لابی به کلاینت اعلام می‌شود');
 ok(/recordEngineBattle/.test(service) && /rules\.onFinish/.test(engine), 'تاریخچهٔ نبرد زنده ثبت می‌شود');
+ok(/array_length\(card_type_ids, 1\) = 5/.test(fiveCardMigration),
+  'قید دیتابیس ترکیب را دقیقاً پنج‌کارتی می‌کند');
+ok(/DELETE FROM card_duel_battles/.test(fiveCardMigration) && /mode = 'bot'/.test(fiveCardMigration),
+  'مایگریشن ردیف‌های تمرین ربات را پاک می‌کند');
+ok(/if \(vsBot\) return null/.test(service) && !/VALUES\('bot'/.test(service),
+  'تمرین با ربات در جدول تاریخچه نوشته نمی‌شود');
+ok(/mode IN \('online','lobby'\)/.test(service) && /HISTORY_KEEP = 5/.test(service),
+  'فقط پنج نبرد آنلاین/لابی اخیر خوانده می‌شود');
 ok(/league: false/.test(read('backend/src/services/gameStakeService.js')),
   'تسویه مسابقه رتبه لیگ را دستکاری نمی‌کند');
 
@@ -91,8 +100,12 @@ for (const [source, platform] of [[mobile, 'Android'], [web, 'Web']]) {
   ok(/تمرین با ربات/.test(source), `${platform}: تمرین با ربات وجود دارد`);
   ok(/تمرینی رایگان|قرضی تمرین/.test(source), `${platform}: کاربر تازه بدون کارت هم می‌تواند تمرین کند`);
   ok(/انتخاب.*مخفی|مخفی.*انتخاب/.test(source), `${platform}: انتخاب مخفی هم‌زمان توضیح داده شده است`);
-  ok(/راند/.test(source) && /ترکیب/.test(source), `${platform}: راند و ترکیب سه‌کارتی طراحی شده‌اند`);
+  ok(/راند/.test(source) && /ترکیب/.test(source), `${platform}: راند و ترکیب پنج‌کارتی طراحی شده‌اند`);
 }
+ok(/ExpansionTile/.test(mobile) && /take\(5\)/.test(mobile),
+  'Android: لاگ بازی‌ها کشویی است و فقط پنج مورد را نشان می‌دهد');
+ok(/<details/.test(web) && /slice\(0, 5\)/.test(web),
+  'Web: لاگ بازی‌ها کشویی است و فقط پنج مورد را نشان می‌دهد');
 ok(/stake: _activeStake/.test(mobileHub) && !/بازی مستقل با کارت/.test(mobileHub),
   'Android دوئل کارت را با حالت انتخاب‌شده ۱۰۰/۱۰۰۰ اجرا می‌کند');
 ok(/stake=\{Number\(active\.stake/.test(webHub) && !/بازی مستقل با کارت/.test(webHub),

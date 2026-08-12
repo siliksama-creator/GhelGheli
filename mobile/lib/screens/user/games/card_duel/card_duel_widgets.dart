@@ -617,39 +617,68 @@ class _History extends StatelessWidget {
   final List battles;
   @override
   Widget build(BuildContext context) {
-    const labels = {'bot': 'تمرین با ربات', 'online': 'نبرد آنلاین', 'lobby': 'لابی خصوصی'};
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const Text('آخرین نبردها', style: TextStyle(fontWeight: FontWeight.w900)),
-      Gaps.vXs,
-      if (battles.isEmpty) const AppCard(child: Text('اولین نبردت را شروع کن؛ تاریخچه اینجا ساخته می‌شود.')),
-      for (final raw in battles.whereType<Map>().take(6))
-        Padding(
-            padding: const EdgeInsets.only(bottom: Gaps.xs),
-            child: AppCard(
-              padding: const EdgeInsets.all(Gaps.sm),
-              elevated: false,
-              child: Row(children: [
-                Icon(
-                    NumberParser.toInt(raw['userDelta']) > 0
-                        ? Icons.trending_up_rounded
-                        : NumberParser.toInt(raw['userDelta']) < 0
-                            ? Icons.trending_down_rounded
-                            : Icons.diamond_outlined,
-                    color: NumberParser.toInt(raw['userDelta']) >= 0 ? _emerald : BrandColors.danger),
-                Gaps.hSm,
-                Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(labels['${raw['mode']}'] ?? 'دوئل کارت', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900)),
-                  Text(
-                      '${faNum(raw['userScore'])} - ${faNum(raw['opponentScore'])} · '
-                      '${_settlementLabel('${raw['settlementStatus'] ?? 'settled'}')}',
-                      style: const TextStyle(fontSize: 9, color: Colors.white54)),
-                ])),
-                Text(NumberParser.toInt(raw['userDelta']) > 0 ? '+${faNum(raw['userDelta'])}' : faNum(raw['userDelta']),
-                    style: TextStyle(
-                        color: NumberParser.toInt(raw['userDelta']) >= 0 ? _emerald : BrandColors.danger, fontWeight: FontWeight.w900)),
-              ]),
-            )),
-    ]);
+    const labels = {'online': 'نبرد آنلاین', 'lobby': 'لابی خصوصی'};
+    final rows = battles
+        .whereType<Map>()
+        .where((raw) => raw['mode'] != 'bot')
+        .take(5)
+        .toList(growable: false);
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          initiallyExpanded: false,
+          tilePadding: const EdgeInsets.symmetric(horizontal: Gaps.sm),
+          childrenPadding: const EdgeInsets.fromLTRB(Gaps.sm, 0, Gaps.sm, Gaps.sm),
+          title: Text(
+            rows.isEmpty ? 'آخرین نبردها' : 'آخرین نبردها (${faNum(rows.length)})',
+            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+          ),
+          subtitle: const Text(
+            'فقط پنج بازی آنلاین اخیر؛ تمرین با ربات ثبت نمی‌شود',
+            style: TextStyle(fontSize: 10, color: Colors.white54),
+          ),
+          children: [
+            if (rows.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(bottom: Gaps.sm),
+                child: Text('هنوز نبرد آنلاینی نداری. تاریخچه اینجا جمع نمی‌شود تا صفحه سبک بماند.'),
+              ),
+            for (final raw in rows)
+              Padding(
+                padding: const EdgeInsets.only(bottom: Gaps.xs),
+                child: AppCard(
+                  padding: const EdgeInsets.all(Gaps.sm),
+                  elevated: false,
+                  child: Row(children: [
+                    Icon(
+                        NumberParser.toInt(raw['userDelta']) > 0
+                            ? Icons.trending_up_rounded
+                            : NumberParser.toInt(raw['userDelta']) < 0
+                                ? Icons.trending_down_rounded
+                                : Icons.diamond_outlined,
+                        color: NumberParser.toInt(raw['userDelta']) >= 0 ? _emerald : BrandColors.danger),
+                    Gaps.hSm,
+                    Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(labels['${raw['mode']}'] ?? 'دوئل کارت',
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900)),
+                      Text(
+                          '${faNum(raw['userScore'])} - ${faNum(raw['opponentScore'])} · '
+                          '${_settlementLabel('${raw['settlementStatus'] ?? 'settled'}')}',
+                          style: const TextStyle(fontSize: 9, color: Colors.white54)),
+                    ])),
+                    Text(NumberParser.toInt(raw['userDelta']) > 0 ? '+${faNum(raw['userDelta'])}' : faNum(raw['userDelta']),
+                        style: TextStyle(
+                            color: NumberParser.toInt(raw['userDelta']) >= 0 ? _emerald : BrandColors.danger,
+                            fontWeight: FontWeight.w900)),
+                  ]),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 }

@@ -4,6 +4,9 @@ const { pool } = require('../config/db');
 // پنج راند = حس یک مسابقه واقعی، نه یک برخورد سه‌ثانیه‌ای.
 // هر راند یک ویژگی متفاوت را می‌سنجد تا قوی‌ترین کارت همیشه برنده نباشد.
 const DECK_SIZE = 5;
+// فقط پنج نبرد امتیازی اخیر به کلاینت می‌رود؛ بقیه بعد از دو هفته پاک می‌شوند.
+const HISTORY_KEEP = 5;
+const HISTORY_TTL_DAYS = 14;
 const ONLINE_STAKES = Object.freeze([100, 1000]);
 const RARITIES = Object.freeze(['normal', 'silver', 'gold', 'premium', 'legend']);
 const EFFECTS = Object.freeze(['none', 'finisher', 'wall', 'speedster', 'playmaker', 'lucky_star']);
@@ -299,7 +302,28 @@ function botDeck(userCards) {
   });
 }
 
-async function recentBattles(userId, limit = 10, client = pool) {
+async function pruneBattleHistory(client = pool) {
+  // تمرین با ربات لاگ نمی‌خواهد؛ ردیف‌های کهنه هم فقط جدول را سنگین می‌کنند.
+  const bot = await client.query(`DELETE FROM card_duel_battles WHERE mode = 'bot'`);
+  const old = await client.query(
+    `DELETE FROM card_duel_battles WHERE created_at < NOW() - INTERVAL '14 days'`,
+  );
+  return (bot.rowCount || 0) + (old.rowCount || 0);
+}
+
+let lastHistoryPruneAt = 0;
+async function maybePruneBattleHistory() {
+  if (Date.now() - lastHistoryPruneAt < 30 * 60 * 1000) return;
+  lastHistoryPruneAt = Date.now();
+  try {
+    const removed = await pruneBattleHistory();
+    if (removed) console.log(`[card-duel] pruned ${removed} old battle log(s)`);
+  } catch (err) {
+    console.error('[card-duel] history prune failed:', err.message);
+  }
+}
+
+async function recentBattles(userId, limit = HISTORY_KEEP, client = pool) {
   const { rows } = await client.query(
     `SELECT b.*, u.nickname AS user_nickname, o.nickname AS opponent_nickname,
             s.status AS stake_status
@@ -308,9 +332,9 @@ async function recentBattles(userId, limit = 10, client = pool) {
        LEFT JOIN users o ON o.id=b.opponent_user_id
        LEFT JOIN game_stake_matches s ON s.id=b.match_id
       WHERE (b.user_id=$1 OR b.opponent_user_id=$1)
-        AND b.mode IN ('bot','online','lobby')
+        AND b.mode IN ('online','lobby')
       ORDER BY b.created_at DESC LIMIT $2`,
-    [userId, Math.min(50, Math.max(1, Number(limit) || 10))]);
+    [userId, Math.min(HISTORY_KEEP, Math.max(1, Number(limit) || HISTORY_KEEP))]);
   return rows.map(r => {
     const primary = String(r.user_id) === String(userId);
     return {
@@ -334,8 +358,9 @@ async function recentBattles(userId, limit = 10, client = pool) {
 }
 
 async function status(userId) {
+  await maybePruneBattleHistory();
   const [cards, dc, recent] = await Promise.all([
-    playableCards(userId), deckCards(userId), recentBattles(userId, 8),
+    playableCards(userId), deckCards(userId), recentBattles(userId, HISTORY_KEEP),
   ]);
   return {
     deckSize: DECK_SIZE,
@@ -356,15 +381,12 @@ async function botBattle(userId, ids = null) {
   if (userCards.length !== DECK_SIZE) { const e = new Error('اول ترکیب پنج‌کارتی را آماده کن'); e.status = 400; throw e; }
   const opponentCards = botDeck(userCards);
   const sim = simulate(userCards, opponentCards, { opponentName: 'ربات تمرینی' });
-  const { rows } = await pool.query(
-    `INSERT INTO card_duel_battles(mode,user_id,user_card_type_ids,opponent_card_type_ids,
-       user_score,opponent_score,winner_user_id,stake_points,battle_log)
-     VALUES('bot',$1,$2,NULL,$3,$4,NULL,0,$5) RETURNING *`,
-    [userId, userCards.map(c => c.cardTypeId), sim.userScore, sim.opponentScore, JSON.stringify(sim)]);
-  return { battle: rows[0], result: sim, message: 'تمرین با ربات رایگان است و امتیازی جابه‌جا نمی‌شود' };
+  // تمرین با ربات تاریخچه نمی‌سازد؛ جدول فقط نبرد امتیازی را نگه می‌دارد.
+  return { battle: null, result: sim, message: 'تمرین با ربات رایگان است و در تاریخچه ثبت نمی‌شود' };
 }
 
 async function recordEngineBattle({ matchId = null, playerX, playerO, state, winner, stake = 0, netPot = 0, vsBot = false, matchMode = null }) {
+  if (vsBot) return null;
   if (!playerX?.id || !state?.decks?.X?.length) return null;
   const draw = winner === 'DRAW';
   const winnerId = draw ? null : winner === 'X' ? playerX.id : (vsBot ? null : playerO?.id || null);

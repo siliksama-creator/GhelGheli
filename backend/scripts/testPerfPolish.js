@@ -48,7 +48,8 @@ const duelRule = read('backend/src/games/rules/cardDuel.js');
 const stakeLedger = read('backend/src/services/gameStakeService.js');
 ok(/recordEngineBattle/.test(duel) && /onFinish/.test(duelRule), 'نبرد زندهٔ کارت در تاریخچه ثبت می‌شود');
 ok(/league:\s*false/.test(stakeLedger), 'تسویه دوئل کارت، لیگ اصلی را تکان نمی‌دهد');
-ok(/botBattle/.test(duel) && /VALUES\('bot'/.test(duel), 'بات تمرینی بدون امتیاز است');
+ok(/botBattle/.test(duel) && /if \(vsBot\) return null/.test(duel) && !/VALUES\('bot'/.test(duel),
+  'بات تمرینی بدون امتیاز است و تاریخچه نمی‌سازد');
 
 console.log('\n== ۵. دارایی‌ها و حجم ==');
 for (let i = 1; i <= 10; i++) {

@@ -725,7 +725,7 @@ app.get('/api/games/tap/leaderboard', auth, asyncHandler(async (req, res) => {
   res.json({ entries: await tapGame.leaderboard(req.query.limit) });
 }));
 
-// ── دوئل سه‌کارتی زنده ──────────────────────────────────────────────────
+// ── دوئل پنج‌کارتی زنده ──────────────────────────────────────────────────
 // The REST surface prepares a user's authoritative deck and supports old
 // clients' free bot practice. New bot/online/lobby matches all run through the
 // shared Socket.IO engine and escrow used by the other competitive games.
@@ -2277,6 +2277,14 @@ cron.schedule('17 * * * *', () => {
     .catch(e => console.error('[tap] nonce prune failed:', e.message));
 });
 
+// تاریخچهٔ دوئل فقط پنج بازی امتیازی اخیر را نشان می‌دهد؛ ربات و ردیف‌های
+// کهنه‌تر از دو هفته اینجا پاک می‌شوند تا جدول سبک بماند.
+cron.schedule('17 4 * * *', () => {
+  cardDuel.pruneBattleHistory()
+    .then(n => { if (n) console.log(`[card-duel] pruned ${n} old battle log(s)`); })
+    .catch(e => console.error('[card-duel] history prune failed:', e.message));
+}, { timezone: 'Asia/Tehran' });
+
 // Centralized error handler. Previously this forwarded err.message straight
 // to the client, which meant raw PostgreSQL errors (unique/foreign-key
 // constraint names, column/table names, data types) leaked verbatim to
@@ -2293,6 +2301,11 @@ function friendlyDbError(err) {
     case '23505': return 'این مقدار تکراری است';
     case '23503': return 'مقدار انتخاب‌شده معتبر نیست یا حذف شده است';
     case '23502': return 'اطلاعات لازم کامل نیست';
+    case '23514':
+      if (String(err.constraint || err.message || '').includes('card_duel_decks_card_type_ids')) {
+        return 'ترکیب باید دقیقاً پنج کارت متفاوت باشد';
+      }
+      return 'مقدار واردشده با قوانین سیستم سازگار نیست';
     case '22P02': return 'فرمت اطلاعات ارسالی معتبر نیست';
     case '22001': return 'یکی از مقادیر ارسالی خیلی طولانی است';
     default: return null;
