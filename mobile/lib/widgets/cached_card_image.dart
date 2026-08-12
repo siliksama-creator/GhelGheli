@@ -28,6 +28,7 @@
 //
 // راه‌حل: `_syncHit` — نقشه‌ای در حافظه از URL به فایلی که قبلاً در همین
 // نشست پیدا شده. بارِ اول اسپینر می‌بینی، بعد از آن هرگز.
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -104,6 +105,7 @@ class _CachedCardImageState extends State<CachedCardImage> {
   File? _file;
   bool _failed = false;
   String _resolved = '';
+  Timer? _cacheDeadline;
 
   @override
   void initState() {
@@ -117,10 +119,17 @@ class _CachedCardImageState extends State<CachedCardImage> {
     // بدونِ این، بازاستفادهٔ ویجت در لیست (که فلاتر آزادانه انجام
     // می‌دهد) تصویرِ کارتِ قبلی را روی کارتِ بعدی نشان می‌داد.
     if (fullAssetUrl(widget.url) != _resolved) {
+      _cacheDeadline?.cancel();
       _file = null;
       _failed = false;
       _start();
     }
+  }
+
+  @override
+  void dispose() {
+    _cacheDeadline?.cancel();
+    super.dispose();
   }
 
   void _start() {
@@ -167,26 +176,29 @@ class _CachedCardImageState extends State<CachedCardImage> {
     // رفع: URL در `requested` قفل می‌شود و callback فقط وقتی چیزی را
     // اعمال می‌کند که هنوز همان URL خواسته شده باشد.
     final requested = _resolved;
-    ImageDiskCache.instance
-        .fetch(requested)
-        // The disk-cache fetch used to keep the football placeholder visible
-        // for up to 40 seconds on a weak connection. Eight seconds is enough
-        // for these ~100 KB WebP files; after that render through Flutter's
-        // proven Image.network path instead of making the card look missing.
-        .timeout(const Duration(seconds: 8), onTimeout: () => null)
-        .then((f) {
+    // The deadline is explicitly cancellable. Future.timeout leaves an
+    // internal Timer alive after widget disposal and made three real widget
+    // tests fail. A state-owned Timer gives the same eight-second fallback
+    // while dispose/didUpdateWidget can always cancel it.
+    _cacheDeadline = Timer(const Duration(seconds: 8), () {
+      if (!mounted || requested != _resolved || _file != null || _failed) {
+        return;
+      }
+      setState(() => _failed = true);
+    });
+    ImageDiskCache.instance.fetch(requested).then((f) {
       if (!mounted) return;
       // نتیجهٔ درخواستِ کهنه دور ریخته می‌شود. `_syncHit` هم دست‌نخورده
       // می‌ماند تا خرابی ماندگار نشود.
       if (requested != _resolved) return;
+      _cacheDeadline?.cancel();
       setState(() {
         if (f != null) {
           _rememberHit(requested, f);
           _file = f;
+          _failed = false;
         } else {
-          //  شکستِ کش پایانِ کار نیست: به `Image.network` عقب
-          //    می‌نشینیم. رفتارِ بدترین‌حالت باید «مثلِ قبل از این
-          //    ویجت» باشد، نه «تصویرِ خالی».
+          // شکستِ کش پایانِ کار نیست: به `Image.network` عقب می‌نشینیم.
           _failed = true;
         }
       });
