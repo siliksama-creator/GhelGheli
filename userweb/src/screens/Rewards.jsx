@@ -2,9 +2,10 @@
 // prize artwork and required-card strip.
 import React, { useCallback, useState } from 'react';
 
-import { req, asset, fa, avatarUrl } from '../lib/api.js';
+import { req, fa, avatarUrl } from '../lib/api.js';
 import { useAsync } from '../lib/useAsync.js';
 import { AsyncSection, EmptyView } from '../components/states.jsx';
+import CachedImg from '../components/CachedImg.jsx';
 
 const ACCENTS = {
   emerald: '#00D49A', gold: '#FFC53D', blue: '#60A5FA',
@@ -21,7 +22,7 @@ function GroupBar({ group, accent }) {
     <div className="rgBar">
       <div className="rgBarHead">
         {next?.imageUrl && (
-          <img className="rgPrizeArt" src={asset(next.imageUrl)}
+          <CachedImg className="rgPrizeArt" src={next.imageUrl}
             alt={next.name} />
         )}
         <div className="rgBarText">
@@ -56,8 +57,9 @@ function GroupBar({ group, accent }) {
             {next.requiredCards.map(c => (
               <div className={`rgCard${c.met ? ' met' : ''}`} key={c.cardTypeId}
                 title={c.name}>
-                <img src={asset(c.imageUrl) || avatarUrl('avatar_1_football.png')}
-                  alt={c.name} />
+                {c.imageUrl
+                  ? <CachedImg src={c.imageUrl} alt={c.name} />
+                  : <img src={avatarUrl('avatar_1_football.png')} alt={c.name} />}
                 <b>{fa(c.have)}/{fa(c.quantity)}</b>
               </div>
             ))}
@@ -72,8 +74,9 @@ function TierCard({ tier, accent, onClaim, busy }) {
   return (
     <div className={`rgTier${tier.eligible ? ' eligible' : ''}`}>
       <div className="rgTierArt">
-        <img src={asset(tier.imageUrl) || avatarUrl('avatar_2_trophy.png')}
-          alt={tier.name} />
+        {tier.imageUrl
+          ? <CachedImg src={tier.imageUrl} alt={tier.name} />
+          : <img src={avatarUrl('avatar_2_trophy.png')} alt={tier.name} />}
         <span className={`rgKind ${tier.rewardType}`}>
           {tier.rewardType === 'cash' ? ' نقدی' : ' فیزیکی'}
         </span>
@@ -156,7 +159,7 @@ export default function Rewards({ token, setMsg, reloadProfile }) {
                   style={{ '--accent': accent }}>
                   <div className="rgHead">
                     {g.imageUrl && (
-                      <img className="rgGroupArt" src={asset(g.imageUrl)}
+                      <CachedImg className="rgGroupArt" src={g.imageUrl}
                         alt={g.name} />
                     )}
                     <div>
@@ -188,10 +191,9 @@ export default function Rewards({ token, setMsg, reloadProfile }) {
                   onClick={e => e.stopPropagation()}
                   role="dialog" aria-label="تایید دریافت جایزه">
                   <div className="ccHead">
-                    <img
-                      src={asset(confirm.tier.imageUrl)
-                        || avatarUrl('avatar_2_trophy.png')}
-                      alt={confirm.tier.name} />
+                    {confirm.tier.imageUrl
+                      ? <CachedImg src={confirm.tier.imageUrl} alt={confirm.tier.name} />
+                      : <img src={avatarUrl('avatar_2_trophy.png')} alt={confirm.tier.name} />}
                     <div>
                       <h3>مطمئنی می‌خوای این جایزه رو بگیری؟</h3>
                       <b className="ccName">{confirm.tier.name}</b>

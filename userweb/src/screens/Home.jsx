@@ -1,10 +1,11 @@
 // 1:1 با اندروید dashboard_page.dart — داشبورد دقیقاً مثل اپ
 import React, { useMemo, useState, useEffect } from 'react';
-import { req, asset, fa, avatars, avatarUrl } from '../lib/api.js';
+import { fa, avatarUrl } from '../lib/api.js';
 import { EmptyView } from '../components/states.jsx';
 import PhotoCardBox from '../components/PhotoCardBox.jsx';
 import LoginStreak from '../components/LoginStreak.jsx';
 import { CosmeticAvatarFrame, DisplayName } from '../components/Cosmetics.jsx';
+import CachedImg from '../components/CachedImg.jsx';
 
 const asInt = v => {
   const n = parseInt(String(v ?? 0).split('.')[0], 10);
@@ -47,7 +48,9 @@ function HeroHeader({ points, nickname, nextReward, user, cosmetics, onOpenProfi
       <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>
         <div onClick={onOpenProfile} style={{ flex:1, display:'flex', gap:'8px', alignItems:'center', cursor:'pointer' }}>
           <CosmeticAvatarFrame frame={cosmetics?.frame} style={{width:46,height:46,padding:cosmetics?.frame?3:0}}>
-            <img src={user?.profile_image_url ? asset(user.profile_image_url) : avatarUrl(user?.profile_avatar_key)} alt="" decoding="async" style={{width:'100%',height:'100%',borderRadius:'50%',objectFit:'cover',border:'1px solid #071522'}} />
+            {user?.profile_image_url
+              ? <CachedImg src={user.profile_image_url} alt="" decoding="async" style={{width:'100%',height:'100%',borderRadius:'50%',objectFit:'cover',border:'1px solid #071522'}} />
+              : <img src={avatarUrl(user?.profile_avatar_key)} alt="" decoding="async" style={{width:'100%',height:'100%',borderRadius:'50%',objectFit:'cover',border:'1px solid #071522'}} />}
           </CosmeticAvatarFrame>
           <div>
             <div style={{ color:'#FFF', fontWeight:'900', fontSize:'14.5px', display:'flex', alignItems:'center', gap:'4px' }}>
@@ -91,7 +94,9 @@ function CardLightbox({ item, close }) {
     <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999 }} onClick={close}>
       <div style={{ background:'#0F172A', border:'1px solid rgba(255,255,255,0.12)', borderRadius:'16px', padding:'16px', maxWidth:'90%', textAlign:'center' }} onClick={e=>e.stopPropagation()}>
         <button onClick={close} style={{ position:'absolute', top:'8px', right:'8px', background:'none', border:'none', color:'#FFF', fontSize:'20px', cursor:'pointer' }}>×</button>
-        <img src={asset(item.image_url) || avatarUrl('avatar_1_football.png')} alt={item.name||'کارت'} style={{ maxWidth:'300px', borderRadius:'12px' }} />
+        {item.image_url
+          ? <CachedImg src={item.image_url} alt={item.name||'کارت'} style={{ maxWidth:'300px', borderRadius:'12px' }} />
+          : <img src={avatarUrl('avatar_1_football.png')} alt={item.name||'کارت'} style={{ maxWidth:'300px', borderRadius:'12px' }} />}
         <h2 style={{ color:'#FFF', margin:'8px 0 4px' }}>{item.name||'کارت'}</h2>
         <p style={{ color:'#94A3B8' }}>تعداد: {fa(item.quantity)} — {fa(item.point_value)} امتیاز</p>
         {item.description && <p style={{ color:'#64748B', fontSize:'12px' }}>{item.description}</p>}
@@ -164,7 +169,9 @@ export default function Home({ token, p, rewards, load, setMsg, openProfile, ope
             {recentInventory.map(i=>(
                   <button key={i.id} onClick={()=>setBigCard(i)} style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:'12px', padding:'6px', cursor:'pointer', textAlign:'center' }}>
                     <div style={{ position:'relative', aspectRatio:'0.66', background:'rgba(0,0,0,0.2)', borderRadius:'8px', overflow:'hidden', marginBottom:'6px' }}>
-                      <img src={asset(i.image_url) || avatarUrl('avatar_1_football.png')} alt={i.name||'کارت'} loading="lazy" decoding="async" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                      {i.image_url
+                        ? <CachedImg src={i.image_url} alt={i.name||'کارت'} loading="lazy" decoding="async" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                        : <img src={avatarUrl('avatar_1_football.png')} alt={i.name||'کارت'} loading="lazy" decoding="async" style={{ width:'100%', height:'100%', objectFit:'cover' }} />}
                       {isNewCard(i) && <span style={{ position:'absolute', top:'4px', right:'4px', background:'#22E7A6', color:'#000', padding:'2px 6px', borderRadius:'6px', fontSize:'9px', fontWeight:'900' }}>جدید</span>}
                       {asInt(i.quantity)>1 && <span style={{ position:'absolute', bottom:'4px', left:'4px', background:'rgba(0,0,0,0.6)', color:'#FFF', padding:'2px 6px', borderRadius:'6px', fontSize:'10px' }}>×{fa(i.quantity)}</span>}
                     </div>

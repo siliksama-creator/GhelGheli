@@ -220,6 +220,11 @@ void main() {
       expect(src.contains('sha1.convert'), isTrue);
     });
 
+    test('تشخیص URL نسخه‌دار در کلاس هست', () {
+      expect(src.contains('isVersionedImageUrl'), isTrue);
+      expect(src.contains('/uploads/'), isTrue);
+    });
+
     test('نوشتن اتمی است (tmp سپس rename)', () {
       expect(src.contains(".tmp'"), isTrue);
       expect(RegExp(r'\.rename\(').hasMatch(src), isTrue,

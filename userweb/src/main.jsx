@@ -10,6 +10,7 @@ import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { API, req, fa } from './lib/api.js';
+import { registerImageCacheWorker } from './lib/imageCache.js';
 import Notifications from './components/Notifications.jsx';
 import Auth from './screens/Auth.jsx';
 import Home from './screens/Home.jsx';
@@ -415,4 +416,5 @@ function Club({ token, openProfile, meId, openGames = false }) {
   );
 }
 
+registerImageCacheWorker();
 createRoot(document.getElementById('root')).render(<App />);

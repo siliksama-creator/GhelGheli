@@ -4,6 +4,7 @@ import { useGameSession } from './gameSession.js';
 import { CosmeticAvatarFrame, CosmeticFrame, DisplayName, RESULT_PALETTES } from './components/Cosmetics.jsx';
 import CosmeticMatchEffect, { matchEffectSupports } from './components/MatchEffectVisual.jsx';
 import { CardRarityFrame } from './components/CardRarityFrame.jsx';
+import CachedImg from './components/CachedImg.jsx';
 
 const idOf = card => String(card?.cardTypeId || card?.id || '');
 const num = value => Number(value || 0);
@@ -40,7 +41,7 @@ function HoloCard({ card, selected, disabled, compact = false, onClick, frame })
     <span className="duelEnergyRail" aria-hidden="true" />
     <div className="duelArtV2">
       {(card?.imageUrl || card?.image_url)
-        ? <img src={asset(card.imageUrl || card.image_url)} alt={card.name || 'کارت'} loading="lazy" decoding="async" />
+        ? <CachedImg src={card.imageUrl || card.image_url} alt={card.name || 'کارت'} loading="lazy" decoding="async" />
         : <span className="duelBotFace">{card?.id?.startsWith('bot-') ? '🤖' : '🃏'}</span>}
       <span className="duelPower">{fa(card?.power)}</span>
       {selected && <i className="duelPicked">✓</i>}
@@ -81,7 +82,7 @@ function Lineup({ selected, cards, toggle }) {
           return <button type="button" key={index} className={card ? 'filled' : ''}
             onClick={() => card && toggle(id)}>
             {card ? <>
-              {card.imageUrl ? <img src={asset(card.imageUrl)} alt="" /> : <span>🃏</span>}
+              {card.imageUrl ? <CachedImg src={card.imageUrl} alt="" /> : <span>🃏</span>}
               <b>{card.name}</b><i>{fa(card.power)}</i>
             </> : <><span>＋</span><small>کارت {fa(index + 1)}</small></>}
           </button>;

@@ -1,7 +1,8 @@
 // Another player's comprehensive profile, opened from chat, the league table or a game.
 import React, { useCallback, useEffect, useState } from 'react';
 
-import { req, asset, fa, avatarUrl } from '../lib/api.js';
+import { req, fa, avatarUrl } from '../lib/api.js';
+import CachedImg from '../components/CachedImg.jsx';
 import { clubImg, CosmeticAvatarFrame, DisplayName, profileBackgroundClass, profileBackgroundStyle } from '../components/Cosmetics.jsx';
 import { useAsync } from '../lib/useAsync.js';
 import { LoadingView, ErrorView } from '../components/states.jsx';
@@ -40,10 +41,9 @@ export default function PublicProfile({ token, userId, close }) {
             {/* ── Header ── */}
             <div className="ppHead">
               <CosmeticAvatarFrame frame={cos.frame} className="ppAvatarWrap">
-                <img className="ppAvatar" alt="آواتار"
-                  src={u.profile_image_url
-                    ? asset(u.profile_image_url)
-                    : avatarUrl(u.profile_avatar_key)} />
+                {u.profile_image_url
+                  ? <CachedImg className="ppAvatar" alt="آواتار" src={u.profile_image_url} />
+                  : <img className="ppAvatar" alt="آواتار" src={avatarUrl(u.profile_avatar_key)} />}
                 {cos.club && u.profile_avatar_key !== `club:${cos.club}` && (
                   <img className="ppClub" src={clubImg(cos.club)}
                     alt="نشان باشگاه" width="30" height="30"
@@ -103,9 +103,9 @@ export default function PublicProfile({ token, userId, close }) {
                   <div className="ppGrid">
                     {(u.trophies || []).map((t, i) => (
                       <div className="ppPrize" key={'t' + i}>
-                        <img src={asset(t.image_url)
-                          || avatarUrl('avatar_2_trophy.png')} alt={t.name}
-                          loading="lazy" />
+                        {t.image_url
+                          ? <CachedImg src={t.image_url} alt={t.name} loading="lazy" />
+                          : <img src={avatarUrl('avatar_2_trophy.png')} alt={t.name} loading="lazy" />}
                         <b>{t.name}</b>
                         {t.status === 'pending' && <em>در انتظار</em>}
                       </div>
@@ -113,9 +113,9 @@ export default function PublicProfile({ token, userId, close }) {
                     {(u.rewards || [])
                       .map((r, i) => (
                         <div className="ppPrize" key={'r' + i}>
-                          <img src={asset(r.image_url)
-                            || avatarUrl('avatar_2_trophy.png')} alt={r.name}
-                            loading="lazy" />
+                          {r.image_url
+                            ? <CachedImg src={r.image_url} alt={r.name} loading="lazy" />
+                            : <img src={avatarUrl('avatar_2_trophy.png')} alt={r.name} loading="lazy" />}
                           <b>{r.name}</b>
                           <em>{r.reward_type === 'cash' ? 'نقدی' : 'تندیس'}</em>
                         </div>
@@ -129,9 +129,9 @@ export default function PublicProfile({ token, userId, close }) {
                   <div className="ppGrid">
                     {u.cards.map(c => (
                       <div className="ppPrize" key={c.card_type_id}>
-                        <img src={asset(c.image_url)
-                          || avatarUrl('avatar_1_football.png')} alt={c.name}
-                          loading="lazy" />
+                        {c.image_url
+                          ? <CachedImg src={c.image_url} alt={c.name} loading="lazy" />
+                          : <img src={avatarUrl('avatar_1_football.png')} alt={c.name} loading="lazy" />}
                         <b>{c.name}</b>
                         <em>{fa(c.registered_count)}× · {fa(c.point_value)} امتیاز</em>
                       </div>

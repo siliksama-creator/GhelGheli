@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// کشِ دیسکیِ تصویرِ کارت‌ها
+// کشِ دیسکیِ تصویرهای نسخه‌دار
 // ═══════════════════════════════════════════════════════════════════════════
 //
 // ── خواستهٔ مالک ──
@@ -49,6 +49,17 @@ import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
+
+/// تصویری که نام فایل یا هشش عوض نشود، همان نسخه است.
+///
+/// آپلودها با `timestamp-rand.ext` ذخیره می‌شوند و هرگز بازنویسی نمی‌شوند.
+/// اگر مدیر عکس را عوض کند URL عوض می‌شود، پس کلید کش خودش باطل است.
+bool isVersionedImageUrl(String url) {
+  if (url.isEmpty) return false;
+  final lower = url.toLowerCase();
+  if (lower.startsWith('blob:') || lower.startsWith('data:')) return false;
+  return lower.contains('/uploads/') || lower.contains('/public/');
+}
 
 class ImageDiskCache {
   ImageDiskCache._();

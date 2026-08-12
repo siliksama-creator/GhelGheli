@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/assets.dart';
 import '../api_client.dart';
+import 'cached_card_image.dart';
 
 /// Circular avatar that transparently falls back from a remote profile
 /// photo to a bundled avatar illustration — same resolution logic as the
@@ -27,11 +28,27 @@ class AvatarImage extends StatelessWidget {
     // distinct avatar is pure waste multiplied by the length of the list.
     // x3 covers the densest common Android screen.
     final cacheSide = (radius * 2 * 3).round();
-    final image = url.isNotEmpty
-        ? ResizeImage(NetworkImage(url), width: cacheSide)
-        : ResizeImage(AssetImage(avatarAsset(keyName)), width: cacheSide)
-            as ImageProvider;
-    final avatar = CircleAvatar(radius: radius, backgroundImage: image);
+    final avatar = url.isNotEmpty
+        ? SizedBox(
+            width: radius * 2,
+            height: radius * 2,
+            child: ClipOval(
+              child: CachedCardImage(
+                url: url,
+                width: radius * 2,
+                height: radius * 2,
+                fit: BoxFit.cover,
+                cacheWidth: cacheSide,
+              ),
+            ),
+          )
+        : CircleAvatar(
+            radius: radius,
+            backgroundImage: ResizeImage(
+              AssetImage(avatarAsset(keyName)),
+              width: cacheSide,
+            ),
+          );
     if (!ring) return avatar;
     final scheme = Theme.of(context).colorScheme;
     return Container(

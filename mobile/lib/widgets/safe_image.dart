@@ -8,7 +8,9 @@
 import 'package:flutter/material.dart';
 
 import '../api_client.dart';
+import '../services/image_disk_cache.dart';
 import '../theme/tokens.dart';
+import 'cached_card_image.dart';
 
 class SafeImage extends StatelessWidget {
   const SafeImage({
@@ -47,18 +49,29 @@ class SafeImage extends StatelessWidget {
       final cacheW = width == null ? null : (width! * dpr).round();
       final cacheH = height == null ? null : (height! * dpr).round();
 
-      child = Image.network(
-        resolved,
-        width: width,
-        height: height,
-        fit: fit,
-        cacheWidth: cacheW,
-        cacheHeight: cacheH,
-        filterQuality: FilterQuality.medium,
-        loadingBuilder: (context, widget, progress) =>
-            progress == null ? widget : _loading(context),
-        errorBuilder: (_, __, ___) => _placeholder(context),
-      );
+      // آپلود نسخه‌دار بعد از بار اول از دیسک خوانده می‌شود.
+      // Image.network فقط کش حافظه دارد و با بستن اپ از بین می‌رود.
+      child = isVersionedImageUrl(resolved)
+          ? CachedCardImage(
+              url: resolved,
+              width: width,
+              height: height,
+              fit: fit,
+              cacheWidth: cacheW,
+              placeholder: _loading(context),
+            )
+          : Image.network(
+              resolved,
+              width: width,
+              height: height,
+              fit: fit,
+              cacheWidth: cacheW,
+              cacheHeight: cacheH,
+              filterQuality: FilterQuality.medium,
+              loadingBuilder: (context, widget, progress) =>
+                  progress == null ? widget : _loading(context),
+              errorBuilder: (_, __, ___) => _placeholder(context),
+            );
     }
 
     if (borderRadius != null) {

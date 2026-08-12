@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { asset, fa } from '../lib/api.js';
+import { fa } from '../lib/api.js';
 import { CardRarityFrame } from '../components/CardRarityFrame.jsx';
+import CachedImg from '../components/CachedImg.jsx';
 
 const asInt = v => Number.parseInt(v || 0, 10) || 0;
 const dateOf = m => new Date(m.updated_at || m.created_at || 0).getTime();
@@ -21,7 +22,7 @@ function CardArtwork({ item, loading }) {
   if (!image || failed) {
     return <span className="invMissingArt" role="img" aria-label="تصویر کارت در دسترس نیست">▧</span>;
   }
-  return <img src={asset(image)} alt={item.name || 'کارت'} loading={loading}
+  return <CachedImg src={image} alt={item.name || 'کارت'} loading={loading}
     decoding="async" onError={() => setFailed(true)} />;
 }
 
