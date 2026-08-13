@@ -4161,3 +4161,26 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 
 /* ── ۴. پنلِ تحلیل: ۲۶۷px → جمع‌شونده ── */
 .duelIntel>.duelIntelBody{margin-top:8px}
+
+/* پنل تحلیل جمع‌شونده: ۲۶۷px وقتی باز، ~۵۰px وقتی بسته. */
+.duelIntel>summary{list-style:none; cursor:pointer}
+.duelIntel>summary::-webkit-details-marker{display:none}
+.duelIntel>summary:after{content:'▾'; color:#849bb3; font-size:15px}
+.duelIntel[open]>summary:after{content:'▴'}
+
+/* سربرگ بزرگ روی موبایل کمی جمع‌تر: ۲۰۸px → ~۱۴۰px.
+   لوگوی متحرک و شعار روی صفحهٔ باریک حذف می‌شوند؛ روی دسکتاپ می‌مانند. */
+@media (max-width:560px){
+  .duelHeroV2{
+    grid-template-columns:auto 1fr auto; gap:10px;
+    min-height:0; padding:12px; border-radius:20px;
+  }
+  .duelHeroIcon{display:none}
+  .duelHeroV2 h1{font-size:20px; margin:0}
+  .duelHeroV2 p{display:none}
+  .duelHeroV2 aside{
+    flex-direction:row; gap:6px; min-width:0; padding:7px 10px; border-radius:13px;
+  }
+  .duelHeroV2 aside>span{font-size:16px}
+  .duelHeroV2 aside small{display:none}
+}

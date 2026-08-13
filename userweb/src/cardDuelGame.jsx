@@ -473,11 +473,20 @@ function DeckIntel({ insights, suggestedDeck, onApply }) {
   const strengths = active?.strengths || [];
   const warnings = active?.warnings || [];
   const order = active?.recommendedOrder || [];
-  return <section className="duelIntel card">
-    <div className="duelIntelHead">
-      <div><b>تحلیل بالانس ترکیب</b><small>هوش آرنا قبل از شروع نقاط قوت و ضعف deck را خلاصه می‌کند</small></div>
-      {suggestedDeck && <button type="button" className="ghost" onClick={onApply}>چیدن خودکار</button>}
-    </div>
+  // ── چرا کلِ پنل جمع‌شونده شد ──
+  //
+  // اندازه‌گیری روی ۳۹۰×۸۴۴: این بخش **۲۶۷px** می‌گرفت و همیشه باز
+  // بود. تحلیلِ ترکیب اطلاعاتِ مفیدی است ولی برای **شروعِ بازی لازم
+  // نیست** — کاربر اول می‌خواهد کارت بچیند و بزند برود.
+  //
+  // `open` فقط وقتی است که ترکیب مشکل دارد (هشدار وجود دارد). یعنی
+  // پنل خودش را وقتی نشان می‌دهد که واقعاً حرفی برای گفتن دارد.
+  return <details className="duelIntel card" open={!!warnings.length}>
+    <summary className="duelIntelHead">
+      <div><b>تحلیل بالانس ترکیب</b><small>نقاط قوت و ضعف ترکیب</small></div>
+      {suggestedDeck && <button type="button" className="ghost"
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onApply(); }}>چیدن خودکار</button>}
+    </summary>
     {/* ── چرا فهرست‌ها بریده شدند ──
         گزارش مالک: «قسمت تحلیل ترکیب یه اسکرول طولانی داره».
         چهار بلوک پشت سر هم (قوت‌ها، ضعف‌ها، اوپنر، ترتیب ۵ راند) روی
@@ -496,7 +505,7 @@ function DeckIntel({ insights, suggestedDeck, onApply }) {
       <summary>ترتیب پیشنهادی ۵ راند</summary>
       <div className="duelIntelOrder">{order.map(item => <span key={`${item.round}-${item.cardTypeId}`}><b>راند {fa(item.round)}</b>{item.name}<small>{item.reason || ''}</small></span>)}</div>
     </details>}
-  </section>;
+  </details>;
 }
 
 function RoundTimeline({ history, mine }) {
