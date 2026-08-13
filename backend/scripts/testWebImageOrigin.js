@@ -80,6 +80,27 @@ ck('نسخه از v2 جلوتر رفته', Number(libVersion) >= 3,
 ck('service worker کش‌های قدیمی را در activate پاک می‌کند',
   /activate[\s\S]{0,400}caches\.keys\(\)[\s\S]{0,300}caches\.delete/.test(sw));
 
+console.log('\n══ ۳ب. عکسِ کارت روی جانشین نقاشی می‌شود ══');
+{
+  const css = read('userweb/src/style.css');
+  // ── باگی که فقط با اسکرین‌شات پیدا شد ──
+  //
+  // `.ggCardFallbackWrap` (حرفِ اولِ نامِ بازیکن) `position:absolute`
+  // است و تگِ img قبلاً `static` بود. در CSS عنصرِ positioned بالاتر از
+  // staticِ هم‌رده نقاشی می‌شود، پس جانشین همیشه روی عکسِ واقعی می‌افتاد.
+  //
+  // ⚠️ هر سنجهٔ برنامه‌نویسی‌شده سبز بود: naturalWidth=996، ابعاد
+  //    ۱۶۶×۲۶۳، opacity=1، بدونِ خطای شبکه. فقط اسکرین‌شات نشان داد
+  //    کاربر حرفِ «E» می‌بیند نه عکس. «لود شد» با «دیده می‌شود» یکی
+  //    نیست — و این تنها راهِ گرفتنِ چنین باگی است.
+  const artImg = (css.match(/\.ggCardArt img\{[^}]*\}/) || [''])[0];
+  ck('تگِ img کارت position دارد', /position:\s*relative/.test(artImg),
+    'بدونِ آن، جانشینِ absolute رویش می‌افتد');
+  ck('تگِ img کارت z-index مثبت دارد', /z-index:\s*[1-9]/.test(artImg));
+  ck('جانشین همچنان absolute است (نباید جایگزین شود)',
+    /\.ggCardFallbackWrap[^{]*\{[^}]*position:\s*absolute/.test(css));
+}
+
 console.log('\n══ ۴. CachedImg مسیر را از asset می‌گذراند ══');
 ck('CachedImg برای مسیرِ نسبی asset() می‌زند',
   /asset\(src\)/.test(cachedImg));

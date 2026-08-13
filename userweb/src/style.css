@@ -3811,7 +3811,21 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 .ggPlayerCard.winner{box-shadow:inset 0 0 0 2px rgba(255,209,102,.5),0 0 22px color-mix(in srgb,var(--card-accent) 22%,transparent)}
 .ggPlayerCard.loser{opacity:.76}
 .ggCardArt{position:relative;min-height:0;background:radial-gradient(circle at 50% 18%,color-mix(in srgb,var(--card-accent) 15%,transparent),transparent 38%),linear-gradient(180deg,#09131f,#02070d 68%);overflow:hidden}
-.ggCardArt img{width:100%;height:100%;object-fit:contain;background:#02070d;display:block}
+.ggCardArt img{width:100%;height:100%;object-fit:contain;background:#02070d;display:block;
+  /* ── چرا position و z-index لازم است ──
+     `.ggCardFallbackWrap` (حرفِ اولِ نامِ بازیکن) `position:absolute`
+     است و تصویر `static` بود. در CSS عنصرِ positioned **بالاتر** از
+     staticِ هم‌رده نقاشی می‌شود، پس جانشین همیشه روی عکسِ واقعی
+     می‌افتاد.
+
+     نتیجه: عکس با موفقیت دانلود و رمزگشایی می‌شد (naturalWidth=996)،
+     ابعادش هم درست بود (۱۶۶×۲۶۳) و opacity=1 — ولی کاربر فقط حرفِ
+     «E» را می‌دید.
+
+     ⚠️ همین باعث شد اولین تلاشِ راستی‌آزمایی هم گمراه شود: چکِ
+     `naturalWidth > 0` سبز بود در حالی که اسکرین‌شات خلافش را نشان
+     می‌داد. «تصویر لود شد» با «تصویر دیده می‌شود» یکی نیست. */
+  position:relative;z-index:1}
 .ggCardAurora{position:absolute;inset:-35%;background:radial-gradient(circle,color-mix(in srgb,var(--card-accent) 18%,transparent),transparent 62%);filter:blur(18px);animation:ggCardBreath 3.2s ease-in-out infinite;pointer-events:none}
 .ggCardSweep{position:absolute;inset:0;background:linear-gradient(112deg,transparent 36%,rgba(255,255,255,.16) 50%,transparent 64%);transform:translateX(110%);animation:ggCardSweep 3.8s ease-in-out infinite;pointer-events:none}
 .ggCardFallbackWrap,.ggCardFallback{position:absolute;inset:0}.ggCardFallback{display:grid;place-items:center;align-content:center;gap:6px;padding:12px;background:linear-gradient(145deg,color-mix(in srgb,var(--card-accent) 26%,#071522),#07111d 58%,#050a11)}
