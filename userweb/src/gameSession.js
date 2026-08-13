@@ -30,7 +30,24 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
   const [connected, setConnected] = useState(true);
   const [connectionNotice, setConnectionNotice] = useState('');
   const [rematchWaiting, setRematchWaiting] = useState(false);
+  // ── مکثِ نتیجهٔ راند و اعلانِ راندِ بعد ──
+  //
+  // سرور دو مهرِ زمانی می‌فرستد:
+  //   resultUntil → تا این لحظه نتیجهٔ راندِ قبل روی صفحه بماند
+  //   introUntil  → تا این لحظه اعلانِ راندِ تازه نمایش داده شود
+  //
+  // ⚠️ نسخهٔ وب هیچ‌کدام را نمی‌خواند (فقط اندروید پیاده کرده بود).
+  //    برای همین ساعت از لحظهٔ اول می‌رفت و کاربر هم نتیجه را از دست
+  //    می‌داد هم فرصتِ خواندنِ اعلان را.
+  const [holding, setHolding] = useState(false);
+  // مکثِ مخصوصِ «نتیجهٔ راند» — جدا از مکثِ اعلانِ راندِ تازه، چون
+  // کلاینت باید بداند کدام‌یک را نشان دهد.
+  const [resultHolding, setResultHolding] = useState(false);
   const deadlineRef = useRef(null);
+  const holdUntilRef = useRef(0);
+  const holdingRef = useRef(false);
+  const resultUntilRef = useRef(0);
+  const resultHoldingRef = useRef(false);
 
   useEffect(() => {
     if (!enabled && !initialStart) {
@@ -50,8 +67,18 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
       const remaining = Number(d?.remainingMs);
       deadlineRef.current = Number.isFinite(remaining)
         ? Date.now() + Math.max(0, remaining) : (Number(d?.deadline) || null);
+      // مهلتِ مکث = دیرترین مهرِ زمانیِ سرور. تا آن لحظه عددِ ساعت
+      // یخ می‌ماند تا کاربر نتیجه و اعلان را کامل ببیند.
+      const now = Date.now();
+      const rUntil = Number(d?.resultUntil) || 0;
+      const iUntil = Number(d?.introUntil) || 0;
+      holdUntilRef.current = Math.max(rUntil, iUntil, 0);
+      resultUntilRef.current = rUntil;
+      setHolding(holdUntilRef.current > now);
+      setResultHolding(rUntil > now);
       if (deadlineRef.current) {
-        setSecondsLeft(Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000)));
+        const target = Math.max(deadlineRef.current, holdUntilRef.current);
+        setSecondsLeft(Math.max(0, Math.ceil((target - now) / 1000)));
       }
     };
     const onWaiting = d => {
@@ -170,7 +197,29 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
 
     const timer = window.setInterval(() => {
       if (!deadlineRef.current) return;
-      setSecondsLeft(Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000)));
+      const now = Date.now();
+      // ── چرا ساعت در مکث یخ می‌زند ──
+      //
+      // تا وقتی نتیجهٔ راندِ قبل یا اعلانِ راندِ تازه روی صفحه است،
+      // کاربر نمی‌تواند انتخاب کند؛ اگر عدد پایین برود یعنی «جریمهٔ
+      // تماشا کردن». عددِ ثابت هم نباید شبیهِ هنگ باشد — پرچمِ
+      // `holding` به کلاینت می‌گوید نشانِ «مکث» را نشان دهد.
+      const held = holdUntilRef.current > now;
+      if (held !== holdingRef.current) {
+        holdingRef.current = held;
+        setHolding(held);
+      }
+      const rHeld = resultUntilRef.current > now;
+      if (rHeld !== resultHoldingRef.current) {
+        resultHoldingRef.current = rHeld;
+        setResultHolding(rHeld);
+      }
+      if (held) {
+        // عددِ نمایش‌داده‌شده همان مهلتِ فکرکردن است، نه شمارشِ مکث.
+        setSecondsLeft(Math.max(0, Math.ceil((deadlineRef.current - holdUntilRef.current) / 1000)));
+        return;
+      }
+      setSecondsLeft(Math.max(0, Math.ceil((deadlineRef.current - now) / 1000)));
     }, 250);
 
     return () => {
@@ -230,7 +279,7 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
   };
 
   return {
-    phase, g, error, secondsLeft, move, leave, playBot, joinOnline, rematch,
+    phase, g, error, secondsLeft, holding, resultHolding, move, leave, playBot, joinOnline, rematch,
     createChallenge, stillSearching, connected, connectionNotice, rematchWaiting,
   };
 }

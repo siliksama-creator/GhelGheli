@@ -253,7 +253,8 @@ class GameSession extends ChangeNotifier {
       error = null;
       GameAudio.instance.play(Sfx.matchFound);
       _stopSearchClock();
-      _startClock(m['deadline'], m['turnMs'], m['remainingMs'], m['introMs']);
+      _startClock(m['deadline'], m['turnMs'], m['remainingMs'], m['introMs'],
+          m['resultHoldMs']);
       notifyListeners();
     }
 
@@ -276,7 +277,8 @@ class GameSession extends ChangeNotifier {
       }
       if (!wasMyTurn && myTurn) GameAudio.instance.play(Sfx.yourTurn);
 
-      _startClock(m['deadline'], m['turnMs'], m['remainingMs'], m['introMs']);
+      _startClock(m['deadline'], m['turnMs'], m['remainingMs'], m['introMs'],
+          m['resultHoldMs']);
       notifyListeners();
     });
 
@@ -335,7 +337,7 @@ class GameSession extends ChangeNotifier {
   }
 
   void _startClock(dynamic deadline, dynamic turnMs, dynamic remainingMs,
-      [dynamic introMs]) {
+      [dynamic introMs, dynamic resultHoldMs]) {
     _ticker?.cancel();
     final ms = (turnMs as num?)?.toInt();
     if (ms != null && ms > 0) turnSeconds = (ms / 1000).round();
@@ -348,8 +350,17 @@ class GameSession extends ChangeNotifier {
     // کاربر عددی مثل «۲۳ ثانیه» می‌بیند که از `turnMs` بیشتر است و
     // بعد ناگهان می‌پرد. به‌جایش تا پایانِ اعلان، عدد **ثابت** روی
     // مقدارِ کاملِ نوبت می‌ماند و بعد شمارش شروع می‌شود.
+    // ── مکثِ نتیجهٔ راند + اعلانِ راند ──
+    //
+    // گزارشِ مالک: «اون لحظه‌ای که مبارزه تو راندو میگه برای راند ها
+    // سریع میاد بدون اینکه لود بشه میره».
+    //
+    // سرور حالا دو مهرِ زمانی می‌فرستد؛ مجموعشان مدتی است که کاربر
+    // نمی‌تواند انتخاب کند و ساعت باید یخ بماند: اول نتیجهٔ راندِ قبل
+    // را می‌بیند، بعد اعلانِ راندِ تازه را.
     final intro = (introMs as num?)?.toInt() ?? 0;
-    _introHoldMs = intro > 0 ? intro : 0;
+    final hold = (resultHoldMs as num?)?.toInt() ?? 0;
+    _introHoldMs = (intro > 0 ? intro : 0) + (hold > 0 ? hold : 0);
 
     // Use the server's REMAINING milliseconds against a local stopwatch
     // rather than `deadline - DateTime.now()`. A device with a wrong clock

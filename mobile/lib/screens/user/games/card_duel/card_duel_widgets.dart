@@ -576,10 +576,20 @@ class _ClashStage extends StatefulWidget {
 }
 
 class _ClashStageState extends State<_ClashStage> with SingleTickerProviderStateMixin {
-  // مجموعِ فازها: ۴۵۰ + ۳۰۰ + ۵۵۰ = ۱۳۰۰ms تا حکم.
-  static const _total = Duration(milliseconds: 1300);
-  static const _chargeEnd = 450 / 1300;
-  static const _impactEnd = 750 / 1300;
+  // ── زمان‌بندیِ نمایشِ نتیجه ──
+  //
+  // مجموعِ فازها: ۶۰۰ + ۴۰۰ + ۹۰۰ = ۱۹۰۰ms تا حکم.
+  //
+  // ⚠️ باید کمتر از `resultHoldMs` سرور (۳۸۰۰ms) بماند وگرنه راندِ
+  //    بعد وسطِ انیمیشن شروع می‌شود — دقیقاً همان چیزی که مالک گزارش
+  //    کرد: «سریع میاد بدون اینکه لود بشه میره». با این عدد، فازِ
+  //    «حکم» ۱٫۹ ثانیه فرصتِ دیده‌شدن دارد.
+  //
+  //    نسخهٔ قبل ۱۳۰۰ms بود و سرور هیچ مکثی نداشت، پس نتیجه عملاً
+  //    بلافاصله با اعلانِ راندِ بعد پوشانده می‌شد.
+  static const _total = Duration(milliseconds: 1900);
+  static const _chargeEnd = 600 / 1900;
+  static const _impactEnd = 1000 / 1900;
   // ⚠️ حتماً `1.0` و نه `1`: استنتاجِ نوع آن را int می‌کرد و
   // `Curves.transform(int)` خطای کامپایل می‌داد.
   static const _numbersEnd = 1.0;

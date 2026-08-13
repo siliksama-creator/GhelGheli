@@ -96,6 +96,67 @@ const publicAssetHeaders = (res) => {
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
 };
+// ═══════════════════════════════════════════════════════════════════════════
+// بندانگشتیِ درخواستی — رفعِ کندیِ بارگذاریِ تصویر
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ── گزارشِ مالک ──
+//   «بطور کلی سرعتی لود عکس و همه چیز توی اپلیکیشن هم پایینه»
+//
+// ── اندازه‌گیریِ واقعی روی سرور ──
+//   ۱۳۱ فایل در `uploads/images`، جمعاً ۹٫۹MB، میانگین ۱۵۳KB.
+//   بزرگ‌ترین‌ها: ۳٫۷MB · ۳٫۴MB · ۲٫۵MB (PNGهای خام).
+//   نمونهٔ کارت: ۹۹۶×۱۵۷۸ پیکسل و ۱۳۷KB.
+//
+// ولی همان کارت در قفسهٔ انتخاب با عرضِ **۱۳۰px** نمایش داده می‌شود.
+// یعنی کاربر ~۹۰٪ بایت‌ها را برای پیکسل‌هایی دانلود می‌کند که هرگز
+// دیده نمی‌شوند. روی موبایلِ ایران با ۴G، صفحهٔ کلکسیون یعنی چند
+// مگابایت ترافیک.
+//
+// ── راه‌حل: پارامترِ `?w=` ──
+//   /uploads/images/x.webp        → فایلِ اصلی (دست‌نخورده)
+//   /uploads/images/x.webp?w=320  → نسخهٔ ۳۲۰px، WebP کیفیت ۷۸
+//
+// نتیجه روی دیسک کش می‌شود، پس هزینهٔ تبدیل فقط یک‌بار است.
+//
+// ⚠️ عرض‌های مجاز محدودند تا کسی با `?w=1..4000` سرور را وادار به
+//    تولیدِ هزاران فایل نکند (حملهٔ پرکردنِ دیسک).
+const THUMB_WIDTHS = new Set([160, 240, 320, 480, 640]);
+const thumbRoot = path.join(uploadRoot, '.thumbs');
+try { fs.mkdirSync(thumbRoot, { recursive: true }); } catch { /* ignore */ }
+
+app.get('/uploads/images/:file', async (req, res, next) => {
+  const width = Number(req.query.w);
+  if (!THUMB_WIDTHS.has(width)) return next();       // بدونِ ?w → فایلِ اصلی
+  const name = String(req.params.file || '');
+  // ⚠️ محافظِ پیمایشِ مسیر: بدونِ این، `?w=320` روی نامِ `../../etc/x`
+  //    می‌توانست هر فایلی را بخواند.
+  if (!/^[A-Za-z0-9._-]+$/.test(name)) return next();
+  const src = path.join(uploadRoot, 'images', name);
+  if (!src.startsWith(path.join(uploadRoot, 'images'))) return next();
+  if (!fs.existsSync(src)) return next();
+
+  const out = path.join(thumbRoot, `${width}-${name}.webp`);
+  try {
+    if (!fs.existsSync(out)) {
+      const sharp = require('sharp');
+      await sharp(src)
+        .rotate()                                   // احترام به EXIF
+        .resize({ width, withoutEnlargement: true })
+        .webp({ quality: 78 })
+        .toFile(out);
+    }
+    publicAssetHeaders(res);
+    res.type('image/webp');
+    return fs.createReadStream(out).pipe(res);
+  } catch (err) {
+    // اگر sharp نبود یا فایل خراب بود، اصلِ تصویر سرو می‌شود — هرگز
+    // خطای ۵۰۰ به کاربر نمی‌دهیم، فقط کندتر می‌شود.
+    console.error('[thumb] failed:', err.message);
+    return next();
+  }
+});
+
 app.use('/uploads', express.static(uploadRoot, { setHeaders: publicAssetHeaders }));
 app.use('/public', express.static(path.join(__dirname, '..', 'public'), { setHeaders: publicAssetHeaders }));
 // مستندات Swagger.

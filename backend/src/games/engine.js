@@ -147,7 +147,9 @@ function startPayload(room, symbol) {
     // مهلتِ خواندنِ اعلانِ راند: تا این لحظه ساعت هنوز شروع نشده.
     // کلاینت با همین عدد شمارش را نگه می‌دارد تا انیمیشن تمام شود.
     introUntil: room.introUntil || null,
+    resultUntil: room.resultUntil || null,
     introMs: Number(room.rules.introMs) || 0,
+    resultHoldMs: room.resultUntil ? Number(room.rules.resultHoldMs) || 0 : 0,
     stake: room.stake,
     netPot: room.netPot,
     commission: room.commission,
@@ -203,7 +205,9 @@ function emitState(room, event, extra = {}) {
     // مهلتِ خواندنِ اعلانِ راند: تا این لحظه ساعت هنوز شروع نشده.
     // کلاینت با همین عدد شمارش را نگه می‌دارد تا انیمیشن تمام شود.
     introUntil: room.introUntil || null,
+    resultUntil: room.resultUntil || null,
     introMs: Number(room.rules.introMs) || 0,
+    resultHoldMs: room.resultUntil ? Number(room.rules.resultHoldMs) || 0 : 0,
       ...extra,
     }, room);
     if (!delivered && !room.done) suspendForReconnect(room, sym);
@@ -245,8 +249,42 @@ function armTurnClock(room) {
   //    ولی وقتی بازی تمام شده یا کسی در حالِ اتصالِ دوباره است، اضافه
   //    نمی‌شود.
   const introMs = Number(room.rules.introMs) || 0;
-  room.introUntil = introMs ? Date.now() + introMs : null;
-  room.deadline = Date.now() + introMs + room.turnMs;
+  // ═══════════════════════════════════════════════════════════════════════
+  // مکثِ تماشای نتیجهٔ راند
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // ── گزارشِ مالک ──
+  //   «اون لحظه‌ای که مبارزه تو راندو میگه برای راند ها سریع میاد بدون
+  //    اینکه لود بشه میره»
+  //
+  // ── اندازه‌گیریِ زنده (مرورگر واقعی، ۳۰ ثانیه ضبط) ──
+  //   راند ۱: ۲۳٫۳ ثانیه   (منتظرِ انتخابِ کاربر)
+  //   راند ۲:  ۵٫۲ ثانیه   ← اینجا مشکل است
+  //   فازِ «verdict» (نمایشِ برنده): فقط ۴ ثانیه، بعد اوورلیِ راندِ
+  //   بعدی رویش می‌افتد.
+  //
+  // علت: به‌محضِ اینکه هر دو طرف کارت را قفل می‌کنند، `applyMove`
+  // راند را حل می‌کند و `advance` **بلافاصله** ساعتِ راندِ بعد را
+  // مسلح می‌کند. یعنی انیمیشنِ نتیجه (برخورد، شمارشِ اعداد، اعلامِ
+  // برنده) هنوز تمام نشده که صحنه عوض می‌شود.
+  //
+  // در نبردِ انسان‌به‌انسان بدتر است: اگر هر دو سریع انتخاب کنند،
+  // کاربر عملاً هیچ‌وقت نمی‌فهمد چرا برد یا باخت.
+  //
+  // ── راه‌حل ──
+  // `resultHoldMs` از قواعدِ بازی خوانده می‌شود و **فقط وقتی راندِ
+  // قبلی نتیجه داشته** اضافه می‌شود (نه در راندِ اول). کلاینت با
+  // `resultUntil` می‌فهمد که باید نتیجه را نگه دارد و ساعت را نبَرد.
+  //
+  // ⚠️ به `turnMs` اضافه می‌شود نه اینکه از آن کم شود — وگرنه فرصتِ
+  //    فکرکردنِ کاربر کوتاه‌تر می‌شد و یک باگ را با باگِ دیگر عوض
+  //    می‌کردیم.
+  const holdMs = room.state && room.state.lastRound
+    ? Number(room.rules.resultHoldMs) || 0
+    : 0;
+  room.resultUntil = holdMs ? Date.now() + holdMs : null;
+  room.introUntil = introMs ? Date.now() + holdMs + introMs : null;
+  room.deadline = Date.now() + holdMs + introMs + room.turnMs;
   room.turnTimer = setTimeout(() => {
     try {
     if (room.done) return;
@@ -729,7 +767,9 @@ function resumeSeat(socket) {
     // مهلتِ خواندنِ اعلانِ راند: تا این لحظه ساعت هنوز شروع نشده.
     // کلاینت با همین عدد شمارش را نگه می‌دارد تا انیمیشن تمام شود.
     introUntil: room.introUntil || null,
+    resultUntil: room.resultUntil || null,
     introMs: Number(room.rules.introMs) || 0,
+    resultHoldMs: room.resultUntil ? Number(room.rules.resultHoldMs) || 0 : 0,
       resumed: true,
     }, room);
   }

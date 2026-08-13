@@ -8,7 +8,6 @@ import '../../api_client.dart';
 import '../../core/cosmetics.dart';
 import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
-import '../../widgets/app_card.dart';
 import '../../widgets/level_badge.dart';
 import 'games/memory_board.dart';
 import 'games/penalty_board.dart';

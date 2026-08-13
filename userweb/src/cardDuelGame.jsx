@@ -107,9 +107,15 @@ function Lineup({ selected, cards, toggle }) {
  * همان دسته باگی است که «سبز به نظر می‌رسد ولی کاربر چیزی نمی‌بیند».
  */
 const REVEAL_PHASES = [
-  { key: 'charge', ms: 450 },
-  { key: 'impact', ms: 300 },
-  { key: 'numbers', ms: 550 },
+  // ── زمان‌بندیِ نمایشِ نتیجه ──
+  //
+  // جمعِ سه فازِ اول باید کمتر از `resultHoldMs` سرور (۳۸۰۰ms) باشد
+  // وگرنه راندِ بعد وسطِ انیمیشن شروع می‌شود — همان باگی که مالک
+  // گزارش کرد. با ۶۰۰+۴۰۰+۹۰۰=۱۹۰۰ms، فازِ «verdict» ۱٫۹ ثانیه
+  // فرصتِ دیده‌شدن دارد.
+  { key: 'charge', ms: 600 },
+  { key: 'impact', ms: 400 },
+  { key: 'numbers', ms: 900 },
   { key: 'verdict', ms: 0 },
 ];
 
@@ -338,7 +344,7 @@ function DuelIdentity({ player, fallback }) {
 }
 
 function LiveArena({ session }) {
-  const { phase, g, secondsLeft, move } = session;
+  const { phase, g, secondsLeft, holding, resultHolding, move } = session;
   const state = g.state || {};
   const score = state.score || { X: 0, O: 0 };
   const mine = g.me || 'X';
@@ -381,7 +387,10 @@ function LiveArena({ session }) {
         بود. اعلانِ تازه `position:fixed` است: دیده می‌شود ولی هیچ فضایی
         از چیدمان نمی‌گیرد. اطلاعاتِ ماندگار روی خودِ کارت‌ها
         (`FocusStatRibbon`) و در نوارِ انتخاب باقی است. */}
-    {phase === 'playing' && (
+    {/* ⚠️ اعلانِ راندِ تازه تا وقتی نتیجهٔ راندِ قبل روی صفحه است
+        نمایش داده نمی‌شود. قبلاً بلافاصله می‌آمد و انیمیشنِ نتیجه را
+        قطع می‌کرد — همان «سریع میاد بدون اینکه لود بشه میره». */}
+    {phase === 'playing' && !resultHolding && (
       <RoundIntroOverlay
         focus={state.roundFocus}
         roundNumber={Math.min(num(state.totalRounds) || 5, num(state.roundIndex) + 1)}
@@ -405,7 +414,12 @@ function LiveArena({ session }) {
         )}
         <div><b>{state.iChose ? 'انتخابت قفل شد' : 'کارت این راند را انتخاب کن'}</b>
           <small>{state.waitingForOpponent ? 'منتظر انتخاب حریف…' : state.opponentLocked ? 'حریف انتخاب کرده؛ تصمیم بگیر!' : 'انتخاب‌ها مخفی و هم‌زمان هستند'}</small></div>
-        <strong>{fa(secondsLeft)}<small>ثانیه</small></strong>
+        {/* عددِ یخ‌زده بدونِ نشانه شبیهِ «هنگ» است؛ آیکنِ مکث می‌گوید
+            عمدی است. */}
+        <strong className={holding ? 'isHolding' : ''}>
+          {holding ? <i className="duelHoldIcon" aria-hidden="true">⏸</i> : null}
+          {fa(secondsLeft)}<small>{holding ? 'مکث' : 'ثانیه'}</small>
+        </strong>
       </div>
       <div className="duelHandV2">
         {myCards.map(card => (

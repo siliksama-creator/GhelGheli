@@ -57,6 +57,11 @@ const serverSource = fs.readFileSync(path.join(ROOT, 'src/server.js'), 'utf8');
 //    که این فایل باید هر بار مجبور کند.
 const PUBLIC_OK = new Map([
   ['GET /health', 'بررسی سلامت برای مانیتورینگ و deploy'],
+  // تصویرهای آپلودشده از قبل هم عمومی بودند (express.static). این مسیر
+  // فقط نسخهٔ کوچکِ همان فایل را می‌سازد و هیچ دادهٔ تازه‌ای فاش نمی‌کند.
+  // نامِ فایل با regex محدود شده تا پیمایشِ مسیر ممکن نباشد و عرض هم
+  // فقط از فهرستِ ثابت پذیرفته می‌شود.
+  ['GET /uploads/images/:file', 'بندانگشتیِ تصویرِ عمومی — همان فایلِ static'],
   ['POST /api/auth/register', 'ثبت‌نام — هنوز کاربری وجود ندارد'],
   ['POST /api/auth/register-password', 'ثبت‌نام با رمز'],
   ['POST /api/auth/login', 'ورود — توکن اینجا ساخته می‌شود'],

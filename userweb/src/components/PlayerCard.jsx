@@ -89,7 +89,7 @@ export default function PlayerCard({
             <CardFallback item={item} loading={!art} />
           </div>
           {art
-            ? <CachedImg src={art} alt={cardNameOf(item)} loading="lazy" decoding="async" onError={event => {
+            ? <CachedImg src={art} w={compact ? 240 : 480} alt={cardNameOf(item)} loading="lazy" decoding="async" onError={event => {
                 event.currentTarget.style.display = 'none';
               }} />
             : null}
