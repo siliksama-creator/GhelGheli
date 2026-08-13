@@ -141,7 +141,42 @@ function useRevealPhase(roundKey) {
 }
 
 /** شمارندهٔ صعودی برای عددِ قدرت — حسِ «محاسبه شدن» می‌دهد. */
-function CountUp({ value, active }) {
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  ⚠️⚠️ باگِ لو رفتنِ نتیجه — تعلیقِ کلِ انیمیشن را از بین می‌برد
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * ── چیزی که اندازه‌گیری نشان داد ──
+ *
+ * نمونه‌برداریِ ۱۵۰ میلی‌ثانیه‌ای از یک راندِ واقعی روی سایتِ زنده:
+ *
+ *     ۰٫۹۳s  phase-charge    nums=[۹۴, ۹۰]   ← عددِ نهایی!
+ *     ۱٫۵۴s  phase-impact    nums=[۹۴, ۹۰]   ← هنوز همان
+ *     ۱٫۸۴s  phase-numbers   nums=[۱۷, ۱۶]   ← تازه شمارش شروع شد
+ *     ۲٫۳۰s  phase-numbers   nums=[۹۴, ۹۰]
+ *
+ * یعنی کاربر **۹۰۰ میلی‌ثانیه قبل از شروعِ شمارش، جوابِ نهایی را
+ * می‌دید**. بعد اعداد به ۱۷ برمی‌گشتند و دوباره تا ۹۴ بالا می‌رفتند.
+ * نه‌فقط تعلیق از بین می‌رفت، بلکه پرشِ عدد به عقب شبیهِ باگ بود.
+ *
+ * ── علت ──
+ *
+ * مقدارِ اولیه `useState(active ? 0 : target)` بود و شاخهٔ `!active`
+ * مستقیم `setShown(target)` می‌کرد. `active` فقط در فازِ `numbers`
+ * درست است، پس در `charge` و `impact` عددِ نهایی روی صفحه بود.
+ *
+ * ── اپِ اندروید همین را درست دارد ──
+ *
+ *     Opacity(opacity: visible ? 1 : 0, child: Text(...))
+ *
+ * یعنی عدد تا لحظهٔ فاشِ رسمی **اصلاً دیده نمی‌شود**. حالا وب هم همین
+ * قرارداد را دارد: پیش از فازِ اعداد، جای عدد با «؟» پر می‌شود تا
+ * چیدمان نپرد ولی جواب لو نرود.
+ *
+ * ⚠️ چرا «؟» و نه رشتهٔ خالی: اگر عرضِ عنصر صفر شود، در لحظهٔ ظاهر
+ *    شدنِ عدد کلِ ردیف جابه‌جا می‌شود و پرشِ چیدمان حس می‌شود.
+ */
+function CountUp({ value, active, revealed = true }) {
   const target = num(value);
   const [shown, setShown] = useState(active ? 0 : target);
   useEffect(() => {
@@ -159,6 +194,8 @@ function CountUp({ value, active }) {
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [target, active]);
+  // هنوز فاش نشده: جای عدد را نگه دار ولی مقدارش را نگو.
+  if (!revealed) return <span className="duelPowerHidden" aria-hidden="true">؟</span>;
   return <>{fa(shown)}</>;
 }
 
@@ -197,12 +234,15 @@ function RoundReveal({ round, me, myFrame, opponentFrame }) {
 
         {/* عددها تا فازِ numbers پنهان‌اند؛ این قلبِ تعلیق است. */}
         <strong className="duelPowerDuel" aria-live="polite">
+          {/* ⚠️ `revealed` جدا از `active` است: `active` می‌گوید «الان
+              بشمار»، `revealed` می‌گوید «اصلاً حق داری عدد را نشان
+              دهی». بدونِ دومی، جوابِ نهایی در فازِ charge لو می‌رفت. */}
           <em className={`duelPowerNum ${showVerdict && mineWon ? 'lead' : ''}`}>
-            <CountUp value={myPower} active={showNumbers} />
+            <CountUp value={myPower} active={showNumbers} revealed={showNumbers} />
           </em>
           <i>VS</i>
           <em className={`duelPowerNum ${showVerdict && !draw && !mineWon ? 'lead' : ''}`}>
-            <CountUp value={theirPower} active={showNumbers} />
+            <CountUp value={theirPower} active={showNumbers} revealed={showNumbers} />
           </em>
         </strong>
 

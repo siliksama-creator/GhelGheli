@@ -4946,3 +4946,97 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
   .duelFinale{padding-bottom:8px}
   .duelFinalePanel{padding-bottom:14px}
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   جذابیتِ صحنهٔ برخورد — بدونِ کتابخانهٔ انیمیشن
+   ═══════════════════════════════════════════════════════════════════════════
+
+   مالک دو بار «بهبود زیبایی و جذابیت انیمیشن» خواست. دور قبل صادقانه
+   گفتم دست نزدم؛ این دور انجام شد — ولی اول یک باگ که کلِ تعلیق را
+   می‌کشت رفع شد (لو رفتنِ عددِ نهایی در فازِ charge، جزئیات در
+   کامنتِ `CountUp`).
+
+   ⚠️ همه‌چیز با `transform` و `opacity` است، نه `width/top/left`. این دو
+      روی ترد کامپوزیتور اجرا می‌شوند و layout را دوباره محاسبه
+      نمی‌کنند، پس روی گوشیِ ضعیف هم فریم نمی‌افتد. انیمیشنی که باعثِ
+      لگ شود از نبودنش بدتر است.
+
+   ⚠️ هیچ کتابخانه‌ای اضافه نشد. framer-motion ~۴۰KB به باندلِ ۱۳۶KB
+      اضافه می‌کرد برای کاری که keyframes رایگان انجام می‌دهد. */
+
+/* عددِ پنهان پیش از فاشِ رسمی: جای عدد را نگه می‌دارد تا چیدمان نپرد،
+   ولی جواب را نمی‌گوید. نبضِ ملایم یعنی «در حالِ محاسبه». */
+.duelPowerHidden{
+  display:inline-block; min-width:1.6ch; text-align:center;
+  color:color-mix(in srgb,var(--mode-color) 70%,transparent);
+  animation:duelPowerWait 1s ease-in-out infinite;
+}
+@keyframes duelPowerWait{50%{opacity:.35; transform:scale(.94)}}
+
+/* لحظهٔ ظاهر شدنِ عدد: از پایین بالا می‌آید و کمی بزرگ‌تر می‌زند. */
+.phase-numbers .duelPowerNum{animation:duelNumRise .42s cubic-bezier(.2,1.6,.35,1) both}
+@keyframes duelNumRise{
+  from{opacity:0; transform:translateY(9px) scale(.82)}
+  to{opacity:1; transform:none}
+}
+
+/* عددِ برنده در فازِ حکم: یک تپشِ طلایی که چشم را می‌برد سمتِ نتیجه. */
+.phase-verdict .duelPowerNum.lead{
+  animation:duelLeadPulse 1.5s ease-in-out infinite;
+  text-shadow:0 0 14px color-mix(in srgb,#ffd166 65%,transparent);
+}
+@keyframes duelLeadPulse{50%{transform:scale(1.07); filter:brightness(1.18)}}
+
+/* بازندهٔ راند کمی عقب می‌نشیند — تضاد، خودش خوانایی می‌سازد. */
+.phase-verdict .duelClashSide:not(.win) .ggPlayerCardFrame{
+  transition:transform .45s ease, filter .45s ease;
+  transform:scale(.94); filter:saturate(.62) brightness(.82);
+}
+
+/* مهرِ برنده: از بالا می‌افتد و یک‌بار تکان می‌خورد. */
+.duelWinnerStamp{animation:duelStampDrop .5s cubic-bezier(.2,1.7,.3,1) both}
+@keyframes duelStampDrop{
+  from{opacity:0; transform:translateY(-14px) scale(1.4) rotate(-7deg)}
+  to{opacity:1; transform:none}
+}
+
+/* جملهٔ سینماتیک آخر از همه می‌آید تا ترتیبِ خواندن درست باشد. */
+.duelCinematic{animation:duelCineUp .5s ease-out .12s both}
+@keyframes duelCineUp{
+  from{opacity:0; transform:translateY(7px)}
+  to{opacity:1; transform:none}
+}
+
+/* چیپ‌های دلیل پشتِ سرِ هم می‌آیند نه همه با هم — چشم دنبالشان می‌کند. */
+.phase-verdict .duelReasonChips i{animation:duelChipIn .34s ease-out both}
+.phase-verdict .duelReasonChips i:nth-child(1){animation-delay:.04s}
+.phase-verdict .duelReasonChips i:nth-child(2){animation-delay:.12s}
+.phase-verdict .duelReasonChips i:nth-child(3){animation-delay:.2s}
+@keyframes duelChipIn{
+  from{opacity:0; transform:translateY(6px) scale(.94)}
+  to{opacity:1; transform:none}
+}
+
+/* کارتِ انتخاب‌شده در دست: بازخوردِ فوریِ لمس. */
+.duelHandV2 .ggPlayerCard.selected{
+  transition:transform .18s cubic-bezier(.2,1.6,.35,1);
+  transform:translateY(-5px);
+}
+
+/* ⚠️ احترام به prefers-reduced-motion اجباری است: کاربری که در سیستمش
+   کاهشِ حرکت را روشن کرده ممکن است سرگیجه یا میگرن داشته باشد.
+   محتوا باید کامل بماند، فقط حرکت برود. */
+@media(prefers-reduced-motion:reduce){
+  .duelPowerHidden,
+  .phase-numbers .duelPowerNum,
+  .phase-verdict .duelPowerNum.lead,
+  .duelWinnerStamp,
+  .duelCinematic,
+  .phase-verdict .duelReasonChips i,
+  .duelHandV2 .ggPlayerCard.selected{
+    animation:none!important; transform:none!important;
+  }
+  .phase-verdict .duelClashSide:not(.win) .ggPlayerCardFrame{
+    transform:none!important; filter:none!important;
+  }
+}
