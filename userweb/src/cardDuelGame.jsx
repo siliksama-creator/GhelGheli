@@ -715,7 +715,12 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
           ۱۵۲px برای متنی که کاربرِ تکراری از بر است، هزینهٔ زیادی است.
           `open` فقط وقتی است که کاربر هنوز کارتی نچیده — یعنی احتمالاً
           تازه‌وارد. کسی که ترکیب دارد، راهنما را جمع می‌بیند. */}
-      <details className="duelRuleStrip" open={!selected.length}>
+      {/* ⚠️ پیش‌فرضِ `open` برداشته شد.
+          حتی تک‌ستونه، این راهنما روی موبایل **۳۶۶px** می‌گیرد — یعنی
+          ۴۳٪ کلِ نما. کاربرِ تازه‌وارد هم اول می‌خواهد کارت‌ها را
+          ببیند، نه سه پاراگراف توضیح.
+          حالا همیشه بسته است (۵۴px) و هرکس خواست باز می‌کند. */}
+      <details className="duelRuleStrip">
         <summary><b>چطور بازی کنم؟</b><small>سه مرحله تا شروع نبرد</small></summary>
         <div className="duelRuleSteps">
           <div><span>۱</span><b>پنج کارت بچین</b><small>سرعت، تکنیک، حمله، دفاع و گل را متعادل کن</small></div>
