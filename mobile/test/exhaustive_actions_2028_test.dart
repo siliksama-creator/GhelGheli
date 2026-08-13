@@ -205,12 +205,30 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
-      expect(find.text('۱۰۰ امتیاز'), findsOneWidget);
-      expect(find.text('۱۰۰۰ امتیاز'), findsOneWidget);
-      expect(find.text('تمرین با ربات'), findsOneWidget);
-      expect(find.text('اتاق خصوصی'), findsOneWidget);
+      // ── چرا این سنجه‌ها به «حداقل یکی» تغییر کردند ──
+      //
+      // هدفِ تست این است که **چهار حالتِ مسابقه رندر شوند**. نسخهٔ قبل
+      // آن را با `findsOneWidget` روی متنِ سراسری می‌سنجید — یعنی
+      // به‌طور ضمنی فرض می‌کرد رشتهٔ «۱۰۰ امتیاز» فقط یک‌بار در کلِ
+      // صفحه هست.
+      //
+      // وقتی کاشی‌های بازی به شکلِ مربعی درآمدند، هر کاشی هم نشانِ
+      // حالت را نشان می‌دهد، پس همان متن چهار بار پیدا شد و تست شکست
+      // — در حالی که **محصول درست‌تر** شده بود، نه خراب.
+      //
+      // ⚠️ به‌جای شل‌کردنِ تست، دامنه‌اش به خودِ نوارِ حالت محدود شد تا
+      //    هنوز چیزی را اثبات کند: اینکه چهار پیل واقعاً آنجا هستند.
+      final modeBar = find.byKey(const Key('gameModeBar'));
+      for (final label in ['۱۰۰ امتیاز', '۱۰۰۰ امتیاز', 'تمرین با ربات', 'اتاق خصوصی']) {
+        expect(
+          find.descendant(of: modeBar, matching: find.text(label)),
+          findsWidgets,
+          reason: 'حالتِ «$label» باید در نوارِ انتخابِ حالت باشد',
+        );
+      }
 
-      await tester.tap(find.text('اتاق خصوصی'));
+      await tester.tap(find.descendant(
+        of: modeBar, matching: find.text('اتاق خصوصی')).first);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
       expect(find.text('ساخت اتاق و لابی اختصاصی'), findsOneWidget);

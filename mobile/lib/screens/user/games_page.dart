@@ -367,7 +367,13 @@ class _GamesHubPageState extends State<GamesHubPage> {
           style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900, color: Color(0xFFF1F5F9)),
         ),
         Gaps.vXs,
+        // ── چرا Key دارد ──
+        // نگهبانِ `exhaustive_actions_2028_test` باید بتواند «نوارِ
+        // انتخابِ حالت» را از بقیهٔ صفحه جدا کند. بدونِ کلید، تست
+        // مجبور بود متن را در کلِ صفحه بشمارد — و وقتی کاشی‌ها مربعی
+        // شدند و نشانِ حالت را هم نشان دادند، شکست.
         Row(
+          key: const Key('gameModeBar'),
           children: [
             Expanded(
               child: _ModePill(
