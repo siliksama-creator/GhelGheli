@@ -4345,3 +4345,28 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 
 /* نوار تب‌های بالای «چت و بازی»: ۳۸px → ۴۴px */
 .clubTabs button{min-height:44px}
+
+/* ═══ ریشهٔ واقعیِ سرریزِ افقی: نوارِ تب‌های «چت و بازی» ═══════════════
+   اندازه‌گیری: دکمهٔ «ماموریت و دوستان» با عرضِ ۱۶۶px در موقعیتِ
+   `left:-15` می‌نشست و `document.scrollWidth` را به ۴۰۵px می‌برد
+   (نما ۳۹۰px).
+
+   علت: `.clubTabs` مقدار `inline-flex` دارد و سه دکمه با
+   `padding:8px 20px`. مجموعِ عرضِ ذاتی از ۳۹۰px بیشتر می‌شود و چون
+   inline-flex کوچک‌تر از محتوایش نمی‌شود، از قاب بیرون می‌زند.
+
+   ⚠️ تلاشِ اولِ من `overflow-x:clip` روی `.duelPageV2` بود — که این را
+      نگرفت، چون نوارِ تب‌ها **بیرونِ** آن صفحه است. درسِ تکراری: قبل
+      از رفع، ریشه را پیدا کن؛ من فرض کرده بودم مقصر قفسهٔ کارت‌هاست.
+
+   راه‌حل: روی موبایل خودش اسکرولِ افقیِ کنترل‌شده بگیرد تا سرریزِ
+   صفحه‌ای نسازد. */
+@media (max-width:520px){
+  .clubTabs{
+    display:flex; max-width:100%;
+    overflow-x:auto; scrollbar-width:none;
+    -webkit-overflow-scrolling:touch;
+  }
+  .clubTabs::-webkit-scrollbar{display:none}
+  .clubTabs button{flex:0 0 auto; padding:8px 14px; font-size:12.5px}
+}
