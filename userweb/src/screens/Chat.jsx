@@ -155,7 +155,7 @@ export default function Chat({ token, openProfile, meId }) {
               <div style={{ flex: 1, maxWidth: '85%' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
                   <DisplayName name={m.nickname || m.first_name || 'کاربر'} cosmetics={m.cosmetics} level={m.level} />
-                  <button type="button" onClick={() => setReply(m)} style={{ background: 'none', border: 'none', color: '#94A3B8', fontSize: '11px', cursor: 'pointer' }}>↩ پاسخ</button>
+                  <button type="button" onClick={() => setReply(m)} style={{ background: 'none', border: 'none', color: '#D7DEE8', fontSize: '11px', cursor: 'pointer' }}>↩ پاسخ</button>
                 </div>
 
                 {m.reply_text && (

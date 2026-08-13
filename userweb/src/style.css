@@ -1509,7 +1509,7 @@ button:hover {
   flex:1;background:#0d2b33;color:#cbd5e1;border:1px solid #ffffff1f;
   font-size:13.5px;padding:10px;min-height:42px;font-weight:700;
 }
-.leagueTabs .on{background:#b5ef58;color:#10210a;border-color:transparent;font-weight:900}
+.leagueTabs .on{background:#b5ef58;color:#10210a;border-color:transparent;font-weight:800}
 
 .clubsIntro{margin:0 0 14px;font-size:12.5px;line-height:1.9}
 .clubGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(124px,1fr));gap:11px}
