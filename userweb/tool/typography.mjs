@@ -365,6 +365,47 @@ try {
         ok(covered === null || covered.length === 0,
           'battle: the bottom nav does not cover the hand'
           + (covered && covered.length ? ` — ${covered.join(', ')}` : ''));
+
+        // ═══════════════════════════════════════════════════════════════
+        //  ⚠️⚠️ نتیجهٔ راند نباید قبل از فازِ اعداد لو برود
+        // ═══════════════════════════════════════════════════════════════
+        //
+        // باگی که پیدا شد: عددِ نهایی در فازهای charge و impact روی
+        // صفحه بود، بعد به صفر برمی‌گشت و دوباره شمرده می‌شد. یعنی کلِ
+        // تعلیقِ انیمیشن بی‌اثر بود و پرشِ عدد به عقب شبیهِ باگ دیده
+        // می‌شد.
+        //
+        // این سنجه یک راند بازی می‌کند و **در طولِ فازهای پیش از
+        // numbers** نمونه می‌گیرد: هیچ رقمی نباید دیده شود.
+        //
+        // ⚠️ سنجه‌ای که فقط حالتِ نهایی را ببیند این باگ را نمی‌گیرد —
+        //    باید حین انیمیشن نمونه‌برداری کند. درسِ ثبت‌شدهٔ این پروژه:
+        //    سنجه باید همان چیزی را بخواند که کاربر می‌بیند، در همان
+        //    لحظه‌ای که می‌بیند.
+        const firstCard = page.locator('.duelChoicePanel button').first();
+        if (await firstCard.count()) {
+          await firstCard.click({ timeout: 2000 }).catch(() => {});
+          const leaks = [];
+          for (let t = 0; t < 12; t += 1) {
+            const snap = await page.evaluate(() => {
+              const el = document.querySelector('.duelClash');
+              if (!el) return null;
+              const phase = [...el.classList].find((c) => c.startsWith('phase-')) || '';
+              const nums = [...document.querySelectorAll('.duelPowerNum')]
+                .map((e) => (e.textContent || '').trim());
+              return { phase, nums };
+            });
+            if (snap && (snap.phase === 'phase-charge' || snap.phase === 'phase-impact')) {
+              // رقمِ فارسی یا لاتین = لو رفتن.
+              const digits = snap.nums.filter((n) => /[0-9۰-۹]/.test(n));
+              if (digits.length) leaks.push(`${snap.phase}:${digits.join('/')}`);
+            }
+            await page.waitForTimeout(130);
+          }
+          ok(leaks.length === 0,
+            'battle: the round result stays hidden until the numbers phase'
+            + (leaks.length ? ` — leaked ${[...new Set(leaks)].slice(0, 3).join(', ')}` : ''));
+        }
       }
     }
   }
