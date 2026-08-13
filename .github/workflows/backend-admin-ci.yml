@@ -26,6 +26,86 @@ jobs:
       # Rules + engine tests (matchmaking, bots, turn order, and the hostile
       # payload fuzz that guards against socket handlers crashing the API).
       - run: npm test
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # تستِ سرتاسری روی یک سرورِ واقعی
+  # ═══════════════════════════════════════════════════════════════════════
+  #
+  # ── چرا این job اضافه شد ──
+  #
+  # یک باگ واقعی در تولید زنده بود و ماه‌ها کسی نفهمید: کوئریِ
+  # `/api/rewards` به `WHERErequired_points` تبدیل شده بود (WHERE به نامِ
+  # ستون چسبیده). پستگرس خطا نمی‌دهد چون آن را نامِ مستعارِ جدول می‌خواند،
+  # پس کوئری معتبر می‌ماند و فقط بی‌صدا فیلتر و ترتیب را می‌اندازد.
+  #
+  # `node -c` نگرفت (خطا داخلِ رشته است، نه در نحو جاوااسکریپت).
+  # ESLint هم نگرفت (داخلِ رشته را پارس نمی‌کند).
+  # تنها چیزی که گرفت `testE2E.js` بود — و آن تنها تستی بود که در
+  # `npm test` فهرست نشده بود، چون فهرست دستی است و جا افتاده بود.
+  #
+  # ── چرا job جدا و نه افزودن به npm test ──
+  #
+  # این تست به دیتابیس و سرورِ در حالِ اجرا نیاز دارد. اگر داخلِ
+  # `npm test` می‌رفت، در محیط‌های بدونِ Postgres قرمز می‌شد و آدم‌ها
+  # یاد می‌گرفتند قرمزی‌اش را نادیده بگیرند — که از نبودنش هم بدتر است.
+  #
+  # اینجا سرویسِ Postgres واقعی بالا می‌آید، مایگریشن‌ها اجرا می‌شوند و
+  # سرور بوت می‌شود. یعنی همان کلاسِ باگ دفعهٔ بعد جلوی merge گرفته
+  # می‌شود، نه بعد از رسیدن به دستِ کاربر.
+  backend-e2e:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: backend } }
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ghelgheli
+          POSTGRES_PASSWORD: ci_test_password
+          POSTGRES_DB: ghelgheli_ci
+        ports: ['5432:5432']
+        # بدونِ health check، مرحلهٔ مایگریشن گاهی قبل از آمادهٔ شدنِ
+        # پستگرس اجرا می‌شد و با خطای اتصال می‌شکست — قرمزیِ گمراه‌کننده.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://ghelgheli:ci_test_password@localhost:5432/ghelgheli_ci
+      JWT_SECRET: ci-only-secret-not-used-anywhere-else
+      NODE_ENV: test
+      PORT: 4999
+      BASE: http://127.0.0.1:4999
+      ADMIN_DEFAULT_USERNAME: Admin
+      ADMIN_DEFAULT_PASSWORD: CiTestOnly@2026
+      MAIN_ADMIN_USERNAME: Admin
+      MAIN_ADMIN_PASSWORD: CiTestOnly@2026
+      ALLOW_PASSWORD_REGISTRATION: 'true'
+      OTP_DEV_MODE: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - run: npm install
+      - run: npm run migrate
+      - run: npm run seed:admin
+      - name: Boot API and wait for health
+        run: |
+          node src/server.js &
+          echo $! > /tmp/api.pid
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:4999/health >/dev/null 2>&1; then
+              echo "API is up after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::API did not become healthy in 40s"; exit 1
+      - name: End-to-end suite
+        run: npm run test:e2e
+      - name: Stop API
+        if: always()
+        run: kill "$(cat /tmp/api.pid)" 2>/dev/null || true
+
   admin-build:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: admin } }
