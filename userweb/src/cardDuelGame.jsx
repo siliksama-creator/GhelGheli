@@ -739,10 +739,24 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
         <b>دستهٔ تمرینی رایگان برای شروع سریع</b>
         <small>این کارت‌ها فقط مقابل ربات فعال‌اند؛ برای آنلاین باید پنج کارت واقعی جمع کنی.</small>
       </div></div>}
-      <h3 className="duelSectionTitle">{practiceFallback ? 'کارت‌های قرضی تمرین' : 'کلکسیون آماده نبرد'}</h3>
-      {cards.length < 5 ? <div className="card pad center muted">برای بازی حداقل پنج کارت فعال در کلکسیون لازم داری.</div>
-        : <div className="duelGridV2">{cards.map(card => <HoloCard key={idOf(card)} card={card}
-          selected={selected.includes(idOf(card))} onClick={() => toggle(idOf(card))} />)}</div>}
+      {/* ── چرا کلکسیون جمع‌شونده شد ──
+          اندازه‌گیری: این بخش ۳۸۱px می‌گرفت — بزرگ‌ترین بلوکِ صفحه — و
+          **زیرِ** دکمهٔ شروع است. یعنی کاربری که ترکیبش آماده است
+          هیچ‌وقت لازمش ندارد ولی همیشه هزینهٔ اسکرولش را می‌دهد.
+
+          `open` وقتی است که ترکیب هنوز کامل نیست؛ آن‌وقت کاربر
+          **واقعاً** باید کارت انتخاب کند و باید باز باشد. */}
+      <details className="duelCollection" open={selected.length < 5}>
+        <summary>
+          <h3 className="duelSectionTitle">
+            {practiceFallback ? 'کارت‌های قرضی تمرین' : 'کلکسیون آماده نبرد'}
+          </h3>
+          <small>{fa(cards.length)} کارت</small>
+        </summary>
+        {cards.length < 5 ? <div className="card pad center muted">برای بازی حداقل پنج کارت فعال در کلکسیون لازم داری.</div>
+          : <div className="duelGridV2">{cards.map(card => <HoloCard key={idOf(card)} card={card}
+            selected={selected.includes(idOf(card))} onClick={() => toggle(idOf(card))} />)}</div>}
+      </details>
       <History battles={data?.recentBattles || []} />
     </>}
 
