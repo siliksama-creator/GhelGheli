@@ -949,14 +949,26 @@ class _PowerNumber extends StatelessWidget {
           fontFamily: 'Vazirmatn',
           fontSize: lead ? 26 : 22,
           fontWeight: FontWeight.w900,
-          color: lead ? _gold : Colors.white,
+          color: !visible
+              ? Colors.white38          // هنوز فاش نشده
+              : lead
+                  ? _gold
+                  : Colors.white,
           shadows: lead
               ? [const Shadow(color: Color(0x88FFD166), blurRadius: 18)]
               : const <Shadow>[],
         ),
-        child: Opacity(
-          opacity: visible ? 1 : 0,
-          child: Text(faNum(value.round()), textDirection: TextDirection.ltr),
+        // ⚠️ چرا «؟» به‌جای Opacity(0)
+        //
+        // نسخهٔ قبلی عدد را نامرئی می‌کرد ولی جایش خالی می‌ماند، پس در
+        // فازهای charge/impact وسطِ صحنه یک حفرهٔ بی‌معنی بود. حالا
+        // علامتِ سؤال نشان می‌دهد «عدد هست ولی هنوز فاش نشده» — همان
+        // قراردادی که نسخهٔ وب هم دارد، تا دو پلتفرم یک حس بدهند.
+        //
+        // عرض هم ثابت می‌ماند، پس در لحظهٔ فاش شدنِ عدد ردیف نمی‌پرد.
+        child: Text(
+          visible ? faNum(value.round()) : '؟',
+          textDirection: TextDirection.ltr,
         ),
       );
 }
