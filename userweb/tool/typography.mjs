@@ -330,6 +330,39 @@ try {
           document.querySelectorAll('.duelHandV2 .ggCardSpinner').length);
         ok(spinners === 0,
           `battle: no endless spinner on art-less cards${spinners ? ` — ${spinners} found` : ''}`);
+
+        // ═══════════════════════════════════════════════════════════════
+        //  ⚠️⚠️ نوارِ ناوبریِ ثابت روی محتوای تعاملی
+        // ═══════════════════════════════════════════════════════════════
+        //
+        // ردیفِ کارت‌های دست (۶۳۷..۸۵۷) زیرِ نوارِ پایین (از ۷۶۹) می‌رفت.
+        // کاربر پایینِ کارت‌ها را نمی‌دید و روی بخشی از آن‌ها نمی‌توانست
+        // کلیک کند.
+        //
+        // ⚠️ عنصرِ `position:fixed` از جریانِ چیدمان بیرون است، پس هیچ
+        //    محاسبهٔ ارتفاعی خودش را در نظر نمی‌گیرد و باید صریح برایش
+        //    جا باز کرد. این دومین بارِ همین اشتباه در این پروژه است،
+        //    برای همین نگهبان شد.
+        const covered = await page.evaluate(() => {
+          const nav = [...document.querySelectorAll('*')].find((e) => {
+            const cs = getComputedStyle(e);
+            const r = e.getBoundingClientRect();
+            return cs.position === 'fixed' && r.bottom >= window.innerHeight - 2
+              && r.height < 130 && r.width > window.innerWidth * 0.7;
+          });
+          if (!nav) return null;
+          const navTop = nav.getBoundingClientRect().top;
+          const hits = [];
+          for (const el of document.querySelectorAll('.duelHandCard, .duelChoicePanel button')) {
+            const r = el.getBoundingClientRect();
+            if (!r.height) continue;
+            if (r.bottom > navTop + 1) hits.push(`${el.className}:${Math.round(r.bottom)}>${Math.round(navTop)}`);
+          }
+          return [...new Set(hits)].slice(0, 4);
+        });
+        ok(covered === null || covered.length === 0,
+          'battle: the bottom nav does not cover the hand'
+          + (covered && covered.length ? ` — ${covered.join(', ')}` : ''));
       }
     }
   }

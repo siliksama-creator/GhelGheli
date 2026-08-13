@@ -4888,18 +4888,37 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
       پیداست. روی صفحهٔ کوتاه کوچکش می‌کنیم به‌جای حذفِ کامل، چون
       حسِ «حریف هم دست دارد» بخشی از فضای بازی است. */
 @media (max-width:520px){
-  .duelOpponentHand{height:56px}
-  .duelOpponentHand span{width:42px;height:54px;margin:0 -5px}
-  .duelOpponentHand img{width:32px;height:32px}
+  /* ── بودجهٔ اندازه‌گیری‌شده روی ۳۹۰×۸۴۴، بدترین حالت (صحنهٔ برخورد
+       روی صفحه) ──
 
-  /* صحنهٔ برخورد: همان سقفِ اندروید. */
-  .duelClash .ggCardArt{min-height:104px;max-height:104px}
-  .duelClash .ggPlayerCardFrame{max-width:104px}
+       هدر ۴۶ · اسکوربورد ۹۱ · پیپ ۴ · دستِ حریف ۵۶ · برخورد ۲۰۸ ·
+       پنلِ انتخاب ۳۰۰  ⇒ ته محتوا ۸۶۶px
 
-  /* کارتِ دست کمی کوتاه‌تر تا ردیف در بودجه بماند. */
-  .duelHandV2>.duelHandCard{flex-basis:96px}
-  .duelHandV2 .ggCardArt{min-height:104px;max-height:104px}
+       و نوارِ ناوبریِ پایین `fixed` است با ۷۵px که از ۷۶۹ شروع می‌شود.
+       یعنی ردیفِ کارت‌ها (۶۳۷..۸۵۷) **زیرِ نوار می‌رفت** — کاربر
+       نمی‌توانست کارت‌های پایین را ببیند.
+
+       ⚠️ این دومین بارِ همین درس است: عنصرِ `position:fixed` از جریانِ
+          چیدمان بیرون است، پس هیچ محاسبهٔ ارتفاعی خودش را در نظر
+          نمی‌گیرد. باید صریح برایش جا باز کرد. */
+  .duelOpponentHand{height:44px}
+  .duelOpponentHand span{width:36px;height:44px;margin:0 -5px}
+  .duelOpponentHand img{width:26px;height:26px}
+
+  /* صحنهٔ برخورد: همان سقفِ اندروید (۲۱۰px کلِ صحنه). */
+  .duelClash .ggCardArt{min-height:86px;max-height:86px}
+  .duelClash .ggPlayerCardFrame{max-width:96px}
+  .duelClash{padding:8px;gap:6px}
+
+  /* ردیفِ دست: ۲۲۰ → ۱۷۶ */
+  .duelHandV2>.duelHandCard{flex-basis:92px}
+  .duelHandV2 .ggCardArt{min-height:92px;max-height:92px}
 
   .duelChoicePanel{padding:8px}
-  .duelLiveArena{gap:6px}
+  .duelLiveArena{gap:5px}
+  .duelScoreV2{padding:8px 12px}
+
+  /* ⚠️ جا برای نوارِ ناوبریِ ثابت. بدونِ این، هر چقدر هم محتوا را کوچک
+     کنیم آخرین ردیف زیرِ نوار می‌ماند. */
+  .duelPageV2{padding-bottom:84px}
 }
