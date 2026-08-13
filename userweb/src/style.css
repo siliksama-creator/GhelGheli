@@ -4538,3 +4538,45 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 @media (max-width:520px){
   .duelPageV2{gap:7px}
 }
+
+/* ═══ لوپ ۵: آخرین ۶۲px ══════════════════════════════════════════════
+   ── ۱) سربرگ دو ردیف می‌شد ──
+   `grid-template-columns:auto 90px 1fr auto` بود. با پنهان‌شدنِ لوگو
+   روی موبایل، ستونِ ۹۰px خالی می‌ماند و بلوکِ عنوان (۲۴۸px) با
+   `aside` (۳۵۲px) در ۳۹۰px جا نمی‌شد ⇒ به ردیفِ دوم می‌رفت و ارتفاع
+   ۱۰۵px می‌شد.
+
+   ⚠️ CSSهای قبلیِ من `padding` را کم کرد ولی علت را ندید: مشکل
+      **شکستنِ چیدمان** بود نه فاصله. اندازه‌گیریِ فرزندها نشانش داد.
+
+   سه‌ستونه با `aside` جمع‌شونده ⇒ یک ردیف، ~۵۶px. */
+@media (max-width:520px){
+  .duelHeroV2{
+    grid-template-columns:auto 1fr auto;
+    align-items:center;
+  }
+  .duelHeroV2>div:nth-of-type(2){min-width:0}
+  .duelHeroV2>div>span{display:none}      /* خطِ «GHELGHELI CARD ARENA» */
+  .duelHeroV2 aside{
+    flex-direction:row; align-items:center; gap:5px;
+    min-width:0; white-space:nowrap;
+  }
+  .duelHeroV2 aside b{font-size:11.5px}
+}
+
+/* ── ۲) عنوانِ «ترکیب اصلی» ۴۱px ──
+   دو خط است: تیتر + «پنج کارت با نقش‌های مکمل بچین». آن راهنما در
+   کشوی «چطور بازی کنم؟» هم هست ⇒ تکرار. */
+@media (max-width:520px){
+  .duelLineupTitle small{display:none}
+  .duelLineupTitle{margin-bottom:6px}
+  .duelLineupV2{padding:8px}
+}
+
+/* ── ۳) دکمهٔ شروع ۶۷px ──
+   ۶۲px `min-height` داشت. ۵۲px هنوز خیلی بالاتر از حدِ لمسِ ۴۴px است
+   و دکمه همچنان بزرگ‌ترین عنصرِ کلیک‌شدنیِ صفحه می‌ماند. */
+@media (max-width:520px){
+  .duelLaunch{min-height:52px}
+  .duelLaunch span{font-size:14.5px}
+}
