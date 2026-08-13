@@ -172,14 +172,50 @@ function duelFieldsFromBody(body, fallback = {}) {
   };
 }
 
+/**
+ * قدرتِ کلیِ کارت — برای نمایش و برای سهمِ `base` در امتیازِ راند.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * چرا وزن‌ها برابر شدند
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * وزن‌های قبلی نامتقارن بودند:
+ *
+ *     حمله ۰٫۲۸ | دفاع ۰٫۱۸ | تکنیک ۰٫۱۸ | سرعت ۰٫۱۶ | شانس گل ۰٫۱۴
+ *
+ * ولی بازی **پنج راند** دارد و هر استات دقیقاً **یک** راند را تعیین
+ * می‌کند. یعنی «حمله» دو برابرِ «شانس گل» به قدرتِ کل اضافه می‌کرد
+ * بدونِ اینکه یک راندِ بیشتر ببرد.
+ *
+ * نتیجهٔ عملی: کارتی که ۲۵ واحد در حمله سرمایه‌گذاری کرده بود
+ * totalPower=۹۹ می‌گرفت و همان کارت با سرمایه‌گذاری در شانسِ گل ۹۵.
+ * پس برای بازیکنِ باهوش، **حمله همیشه انتخابِ برتر بود** — و این یعنی
+ * چهار استاتِ دیگر تزئینی‌اند.
+ *
+ * حالا هر پنج استاتِ راندی وزنِ برابرِ ۰٫۱۹ دارند (جمعاً ۰٫۹۵).
+ *
+ * ── انرژی: از ۰٫۰۶ به ۰٫۰۵ ──
+ *
+ * ⚠️ انرژی **هیچ راندی ندارد** — یعنی استاتی است که به قدرت اضافه
+ *    می‌کند ولی هرگز مستقیماً سنجیده نمی‌شود. حذفش نکردم چون در
+ *    دیتابیس ستون دارد، مدیر تنظیمش می‌کند و روی کارت نمایش داده
+ *    می‌شود؛ حذفِ ناگهانی یعنی کارت‌های موجود بی‌صدا ضعیف شوند.
+ *    ولی سهمش کم نگه داشته شد تا استاتِ تعیین‌کننده نباشد.
+ *
+ * جمعِ کلِ وزن‌ها ۱٫۰۰ ماند تا دامنهٔ عددیِ قدرت عوض نشود و کارت‌های
+ * موجود ناگهان قوی‌تر/ضعیف‌تر به نظر نرسند.
+ */
+const STAT_WEIGHT = 0.19;   // هر پنج استاتِ راندی، برابر
+const ENERGY_WEIGHT = 0.05; // استاتِ بدونِ راند
+
 function totalPower(c) {
   const weighted =
-    Number(c.duel_attack || c.attack || 0) * 0.28 +
-    Number(c.duel_defense || c.defense || 0) * 0.18 +
-    Number(c.duel_speed || c.speed || 0) * 0.16 +
-    Number(c.duel_technique || c.technique || 0) * 0.18 +
-    Number(c.duel_goal_chance || c.goalChance || 0) * 0.14 +
-    Number(c.duel_energy || c.energy || 0) * 0.06;
+    Number(c.duel_attack || c.attack || 0) * STAT_WEIGHT +
+    Number(c.duel_defense || c.defense || 0) * STAT_WEIGHT +
+    Number(c.duel_speed || c.speed || 0) * STAT_WEIGHT +
+    Number(c.duel_technique || c.technique || 0) * STAT_WEIGHT +
+    Number(c.duel_goal_chance || c.goalChance || 0) * STAT_WEIGHT +
+    Number(c.duel_energy || c.energy || 0) * ENERGY_WEIGHT;
   const pointBoost = Math.min(22, Math.sqrt(Math.max(0, Number(c.point_value || c.pointValue || 0))) / 3.2);
   return Math.round(weighted + pointBoost + (RARITY_BONUS[c.duel_rarity || c.rarity] || 0));
 }
@@ -216,8 +252,37 @@ function publicCard(row) {
   return c;
 }
 
+/**
+ * خواندنِ خامِ ویژگیِ راند از کارت.
+ *
+ * ⚠️ پیش‌فرضِ نهایی از `0` به `NaN` عوض شد. با `0`، تشخیصِ «کارت این
+ *    ستون را ندارد» از «کارت این ستون را صفر دارد» ممکن نبود، و
+ *    `focusValue` نمی‌توانست تصمیمِ درست بگیرد.
+ *
+ *    خودِ این تابع بیرون هم استفاده می‌شود (مثلاً در `analyzeDeck`)،
+ *    پس مصرف‌کننده باید `Number.isFinite` را چک کند.
+ */
+function rawFocusStat(card, focus) {
+  return card?.[focus.stat]
+    ?? card?.[focus.key]
+    ?? card?.[String(focus.key || '').replace('duel_', '')];
+}
+
+/**
+ * خواندنِ ویژگیِ راند از کارت.
+ *
+ * ⚠️ این تابع عمداً `0` برمی‌گرداند (نه NaN) وقتی مقدار غایب است، چون
+ *    هفت مصرف‌کنندهٔ دیگر دارد که با آن `Math.max`، مرتب‌سازی و مقایسه
+ *    می‌کنند — و `NaN` همهٔ آن‌ها را بی‌صدا مسموم می‌کند
+ *    (`NaN > 5` همیشه false، `Math.max(NaN, 9)` برابر NaN).
+ *
+ *    تشخیصِ «غایب» از «صفر» کارِ `focusValue` است که برای همین از
+ *    `rawFocusStat` استفاده می‌کند.
+ */
 function focusStatOf(card, focus) {
-  return Number(card?.[focus.stat] ?? card?.[focus.key] ?? card?.[String(focus.key || '').replace('duel_', '')] ?? 0);
+  const raw = rawFocusStat(card, focus);
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : 0;
 }
 
 function createSeededRandom(seed) {
@@ -427,18 +492,71 @@ function randomInt(maxExclusive, random = null) {
   return crypto.randomInt(0, maxExclusive);
 }
 
+/**
+ * بونوسِ افکتِ کارت در یک راند.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * چرا اعداد نصف شدند
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * اندازه‌گیریِ سختگیرانه: دو کارتِ **کاملاً یکسان** که فقط یکی‌شان
+ * افکت داشت، در راندِ فعال‌شدنِ افکت:
+ *
+ *     speedster (راند ۱) → ۱۰۰٪ برد
+ *     finisher  (راند ۵) → ۱۰۰٪ برد
+ *
+ * ۱۰۰٪. نه ۷۰٪، نه ۸۵٪. یعنی در آن راند **استاتِ کارت اصلاً مهم
+ * نبود** — فقط داشتنِ افکت تعیین می‌کرد.
+ *
+ * دلیلِ ریاضی: بونوسِ ۱۵ در برابر آستانهٔ تعیینِ برنده که ۲ است. برای
+ * جبرانِ ۱۵ باید ۱۵ واحد استاتِ بیشتر داشت — یعنی کارتی با استاتِ ۹۵
+ * در برابر کارتی با استاتِ ۸۰ که افکت دارد، فقط مساوی می‌شود.
+ *
+ * افکت باید **مزیت** بدهد نه **قطعیت**. حالا:
+ *
+ *     speedster ۱۵→۷ · finisher ۱۵→۷ · playmaker ۱۰→۵ · lucky_star ۱۲→۶
+ *
+ * با ۷، کارتی که ۸ واحد استاتِ بیشتر دارد هنوز می‌برد — یعنی چیدمانِ
+ * درست بر افکت غلبه می‌کند، ولی افکت هم بی‌اثر نیست.
+ *
+ * ⚠️ `wall` اینجا نیست؛ در `resolveRound` جداگانه اعمال می‌شود.
+ */
 function effectBonus(card, roundIndex, prevWon, random = null) {
   switch (card.duel_effect || card.effect) {
-    case 'speedster': return roundIndex === 0 ? 15 : 0;
-    case 'playmaker': return roundIndex > 0 && prevWon ? 10 : 0;
-    case 'finisher': return roundIndex === DECK_SIZE - 1 ? 15 : 0;
-    case 'lucky_star': return randomInt(100, random) < 18 ? 12 : 0;
+    case 'speedster': return roundIndex === 0 ? 7 : 0;
+    case 'playmaker': return roundIndex > 0 && prevWon ? 5 : 0;
+    case 'finisher': return roundIndex === DECK_SIZE - 1 ? 7 : 0;
+    case 'lucky_star': return randomInt(100, random) < 18 ? 6 : 0;
     default: return 0;
   }
 }
 
+/**
+ * مقدارِ ویژگیِ راند.
+ *
+ * ⚠️ باگِ `|| 50` که اینجا بود:
+ *
+ *   کارتی با استاتِ **صفر** به‌جای صفر، مقدارِ ۵۰ می‌گرفت — چون در
+ *   جاوااسکریپت `0` مقدارِ falsy است. یعنی مدیر می‌توانست کارتی با
+ *   سرعتِ صفر بسازد و آن کارت در راندِ سرعت مثلِ کارتی با سرعتِ متوسط
+ *   رفتار می‌کرد.
+ *
+ *   اندازه‌گیری: کارتِ «سرعت ۰» در برابر «سرعت ۵۰» فقط ۵۷٪ می‌باخت،
+ *   در حالی که باید تقریباً همیشه ببازد.
+ *
+ *   این هم به سودِ کاربر است هم به ضررش: کارتِ ضعیفِ او تقویت می‌شود
+ *   ولی کارتِ ضعیفِ حریف هم همین‌طور. در هر صورت **عددی که روی کارت
+ *   نوشته شده با عددی که در محاسبه می‌رود فرق دارد** — و این دقیقاً
+ *   همان حسِ «منطقِ بازی درست نیست» را می‌سازد.
+ *
+ *   حالا فقط وقتی مقدار واقعاً غایب است (undefined/null/NaN) از ۵۰
+ *   استفاده می‌شود، نه وقتی صفر است.
+ */
 function focusValue(card, focus) {
-  return focusStatOf(card, focus) || 50;
+  const raw = rawFocusStat(card, focus);
+  if (raw === undefined || raw === null || raw === '') return 50;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : 50;
 }
 
 /**
@@ -546,14 +664,23 @@ function resolveRound(cardX, cardO, roundIndex, previousWinner = null, random = 
   const breakdownO = roundScoreBreakdown(o, x, focus, roundIndex, previousWinner === 'O', rng);
   let powerX = breakdownX.total;
   let powerO = breakdownO.total;
+  // ── دیوار: ۱۶ → ۸ ──
+  //
+  // به همان دلیلِ بقیهٔ افکت‌ها: ۱۶ در برابر آستانهٔ ۲ یعنی هر بار که
+  // فعال می‌شد، نتیجهٔ راند را **برمی‌گرداند** بدونِ اینکه استاتِ دو
+  // کارت اهمیتی داشته باشد. با ۸ فقط راندهای نزدیک را برمی‌گرداند —
+  // که همان کاریست که یک «دیوار دفاعی» باید بکند.
+  //
+  // احتمالِ ۲۲٪ دست‌نخورده ماند: افکتی که همیشه فعال شود، افکت نیست.
+  const WALL_PENALTY = 8;
   if (o.effect === 'wall' && powerX > powerO && randomInt(100, rng) < 22) {
-    powerX -= 16;
-    breakdownX.wallAdjustment = -16;
+    powerX -= WALL_PENALTY;
+    breakdownX.wallAdjustment = -WALL_PENALTY;
     breakdownX.total = powerX;
   }
   if (x.effect === 'wall' && powerO > powerX && randomInt(100, rng) < 22) {
-    powerO -= 16;
-    breakdownO.wallAdjustment = -16;
+    powerO -= WALL_PENALTY;
+    breakdownO.wallAdjustment = -WALL_PENALTY;
     breakdownO.total = powerO;
   }
   // ═══════════════════════════════════════════════════════════════════════

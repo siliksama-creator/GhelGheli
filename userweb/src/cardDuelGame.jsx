@@ -666,19 +666,54 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
   return <main className="duelPageV2" style={{ '--mode-color': mode.color, position:'relative', overflow:'hidden' }}>
     {enabled && session.phase === 'playing' && myCosmetics.matchEffect && matchEffectSupports(myCosmetics.matchEffect, 'entry') && <DuelEffectVisual key={`${myCosmetics.matchEffect}-entry`} slug={myCosmetics.matchEffect} />}
     {enabled && session.phase === 'over' && iWon && myCosmetics.matchEffect && matchEffectSupports(myCosmetics.matchEffect, 'finish') && <DuelEffectVisual key={`${myCosmetics.matchEffect}-finish`} slug={myCosmetics.matchEffect} finish />}
-    <header className="duelHeroV2">
-      <button type="button" className="ghost" onClick={() => { session.leave(); onBack(); }}>← بازگشت</button>
-      <div className="duelHeroIcon"><img src="/games/card_duel_glow.png" alt="" /></div>
-      <div><span>GHELGHELI CARD ARENA</span><h1>دوئل کارت‌ها</h1><p>انتخاب مخفی، ضدترکیب هوشمند و پنج راند نفس‌گیر</p></div>
-      <aside><span>{mode.icon}</span><b>{mode.title}</b><small>{mode.subtitle}</small></aside>
-    </header>
+    {/* ═══════════════════════════════════════════════════════════════════
+        سربرگ: بزرگ در چیدمان، نوارِ باریک هنگام بازی
+        ═══════════════════════════════════════════════════════════════════
+
+        ── خواستهٔ مالک ──
+        «حذف کامل نیاز به اسکرول در صفحهٔ بازی» — سه بار تکرار شده.
+
+        ── اندازه‌گیری روی گوشیِ ۳۹۰×۸۴۴ ──
+        صفحهٔ بازی ۹۹۶px بود در نمای ۸۴۴px، یعنی ۱۵۲px اضافه. و
+        `duelHeroV2` دقیقاً **۲۰۸px** از آن را می‌گرفت.
+
+        آن بنر (لوگوی متحرک ۹۰px + تیتر ۳۶px + شعار + کارتِ حالت) در
+        صفحهٔ چیدمان معنا دارد؛ ولی وقتی بازی شروع شده و کاربر باید
+        کارت انتخاب کند و تایمر را ببیند، فقط جا اشغال می‌کند.
+
+        نسخهٔ اندروید همین کار را با `_CompactMatchBar` انجام داد
+        (۹۶dp → ۳۴dp). این همان الگو در وب است تا دو کلاینت یکی باشند.
+
+        ۲۰۸px → ۴۴px یعنی **۱۶۴px آزاد** — بیشتر از ۱۵۲px کسری. */}
+    {activeGame ? (
+      <header className="duelCompactBar">
+        <button type="button" className="ghost" aria-label="بازگشت"
+          onClick={() => { session.leave(); onBack(); }}>←</button>
+        <b>دوئل کارت‌ها</b>
+        <span>{mode.icon} {mode.title}</span>
+      </header>
+    ) : (
+      <header className="duelHeroV2">
+        <button type="button" className="ghost" onClick={() => { session.leave(); onBack(); }}>← بازگشت</button>
+        <div className="duelHeroIcon"><img src="/games/card_duel_glow.png" alt="" /></div>
+        <div><span>GHELGHELI CARD ARENA</span><h1>دوئل کارت‌ها</h1><p>انتخاب مخفی، ضدترکیب هوشمند و پنج راند نفس‌گیر</p></div>
+        <aside><span>{mode.icon}</span><b>{mode.title}</b><small>{mode.subtitle}</small></aside>
+      </header>
+    )}
 
     {!activeGame && <>
-      <section className="duelRuleStrip">
-        <div><span>۱</span><b>پنج کارت بچین</b><small>سرعت، تکنیک، حمله، دفاع و گل را متعادل کن</small></div>
-        <i>›</i><div><span>۲</span><b>مخفی انتخاب کن</b><small>حریف کارتت را تا قفل شدن نمی‌بیند</small></div>
-        <i>›</i><div><span>۳</span><b>۵ راند نفس‌گیر</b><small>هر راند ویژگی متفاوتی می‌سنجد</small></div>
-      </section>
+      {/* راهنمای سه‌مرحله‌ای: بار اول باز، بعد از آن جمع.
+          ۱۵۲px برای متنی که کاربرِ تکراری از بر است، هزینهٔ زیادی است.
+          `open` فقط وقتی است که کاربر هنوز کارتی نچیده — یعنی احتمالاً
+          تازه‌وارد. کسی که ترکیب دارد، راهنما را جمع می‌بیند. */}
+      <details className="duelRuleStrip" open={!selected.length}>
+        <summary><b>چطور بازی کنم؟</b><small>سه مرحله تا شروع نبرد</small></summary>
+        <div className="duelRuleSteps">
+          <div><span>۱</span><b>پنج کارت بچین</b><small>سرعت، تکنیک، حمله، دفاع و گل را متعادل کن</small></div>
+          <i>›</i><div><span>۲</span><b>مخفی انتخاب کن</b><small>حریف کارتت را تا قفل شدن نمی‌بیند</small></div>
+          <i>›</i><div><span>۳</span><b>۵ راند نفس‌گیر</b><small>هر راند ویژگی متفاوتی می‌سنجد</small></div>
+        </div>
+      </details>
       <Lineup selected={selected} cards={cards} toggle={toggle} />
       <DeckIntel insights={data?.deckInsights} suggestedDeck={data?.suggestedDeck} onApply={applySuggested} />
       <button type="button" className="duelLaunch" disabled={busy || selected.length !== 5} onClick={saveAndStart}>
