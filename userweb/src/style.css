@@ -4700,3 +4700,36 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 .duelIntelOrder small{
   grid-column:1/-1; font-size:11.5px; color:#8aa0b7; line-height:1.55;
 }
+
+/* ═══ رفعِ صحنهٔ غول‌پیکرِ نتیجهٔ راند روی موبایل ══════════════════════
+   ── چیزی که در اسکرین‌شاتِ مالک دیده شد ──
+   کارت‌های نتیجه به‌جای کنارِ هم، عمودی روی هم چیده شده بودند و هرکدام
+   تقریباً تمامِ عرضِ صفحه را می‌گرفتند. ارتفاعِ صفحه ۱۸۷۱px شد.
+
+   علت: `.duelClash` مقدار
+       grid-template-columns: 145px minmax(130px,1fr) 145px
+   دارد ⇒ حداقل ۱۴۵+۱۳۰+۱۴۵ + دو gap ۱۴px + padding ۳۲px = ۴۹۰px.
+   روی صفحهٔ ۳۹۰px جا نمی‌شود، پس مرورگر ستون‌ها را می‌شکند و هر کارت
+   تمام‌عرض می‌شود.
+
+   ⚠️ این باگ در نمای «۵ کارت انتخابی» دیده نمی‌شد چون آنجا کارت‌ها
+      `compact` بودند؛ فقط در صحنهٔ نتیجه ظاهر می‌شد — یعنی دقیقاً
+      همان‌جا که کاربر باید تمرکز کند.
+
+   روی موبایل: سه ستونِ متناسب با عرضِ واقعی. */
+@media (max-width:520px){
+  .duelClash{
+    grid-template-columns:1fr auto 1fr;
+    gap:8px; padding:10px; border-radius:20px;
+  }
+  /* کارت‌های دو طرف کوچک و هم‌اندازه می‌مانند. */
+  .duelClash>*:first-child,
+  .duelClash>*:last-child{min-width:0; max-width:100%}
+  .duelClash .ggPlayerCardFrame{max-width:118px; margin-inline:auto}
+  .duelClash .ggCardArt{min-height:132px; max-height:132px}
+  /* آمارِ ۶تایی روی کارتِ نتیجه تکراری است: اعدادِ راند وسط نوشته شده. */
+  .duelClash .ggCardStats,
+  .duelClash .ggCardMeta{display:none}
+  .duelClash .ggCardBody{padding:5px 6px 6px}
+  .duelClash .ggCardName{font-size:11.5px}
+}
