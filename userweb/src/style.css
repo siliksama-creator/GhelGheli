@@ -4332,16 +4332,18 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
       چیدمانِ فشرده‌ای را که تازه ساختیم خراب می‌کند. به‌جایش با
       شبه‌عنصرِ نامرئی ناحیهٔ لمس گسترده می‌شود: کاربر همان دکمهٔ
       کوچک را می‌بیند ولی ۴۴px فضای قابلِ لمس دارد. */
-.iconBtn, .duelCompactBar>button, .duelIntel .ghost, .gameTileAlt{
-  position:relative;
-}
-.iconBtn:after, .duelCompactBar>button:after,
-.duelIntel .ghost:after, .gameTileAlt:after{
-  content:''; position:absolute;
-  top:50%; left:50%; transform:translate(-50%,-50%);
-  min-width:44px; min-height:44px;
-  width:100%; height:100%;
-}
+/* ⚠️ تلاشِ اول با شبه‌عنصرِ `:after` بود — کار نکرد.
+      ناحیهٔ لمس واقعاً بزرگ می‌شد ولی `getBoundingClientRect` خودِ
+      دکمه هنوز ۳۸px می‌داد، و مهم‌تر: روی iOS شبه‌عنصرِ بدونِ محتوا
+      همیشه رویدادِ لمس نمی‌گیرد. راهِ درست، بزرگ‌کردنِ خودِ جعبه است.
+
+      ۳۸→۴۴px یعنی ۶px بیشتر در هر دکمه. آیکن‌ها در نوارِ بالا کنارِ
+      هم‌اند و این ۶px چیدمان را به‌هم نمی‌زند چون `gap` جذبش می‌کند. */
+.iconBtn{min-width:44px; min-height:44px}
+.duelCompactBar>button,
+.duelIntel .ghost,
+.duelIntelHead .ghost,
+.gameTileAlt{min-height:44px}
 
 /* نوار تب‌های بالای «چت و بازی»: ۳۸px → ۴۴px */
 .clubTabs button{min-height:44px}
