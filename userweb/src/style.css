@@ -4774,44 +4774,78 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
    را برنمی‌گرداند**، یعنی کاربر هرگز نمی‌توانست رویشان کلیک کند.
 
    ⚠️ یعنی در هر راند، ۴۰٪ از دستِ کاربر عملاً وجود نداشت. این نقصِ
-      ظاهری نیست، نقصِ **عملکردی** است: بازیکن نمی‌توانست کارتی را که
-      می‌خواست بازی کند.
+      ظاهری نیست، نقصِ **عملکردی** است.
 
    ── چرا نگهبانِ typography این را ندید ──
 
-   نگهبان `document.documentElement.scrollWidth > innerWidth` را چک
-   می‌کند. ولی `overflow:hidden` روی والد سرریز را **می‌بُرد**، پس
-   scrollWidth دقیقاً ۳۹۰ می‌ماند و نگهبان سبز می‌شود در حالی که محتوا
-   بیرون است. **نگهبانی که فقط اسکرول را می‌بیند، بریدگی را نمی‌بیند.**
-   نگهبانِ تازه در tool/typography.mjs مستقیم مختصاتِ خودِ کارت‌ها را
-   می‌سنجد.
+   نگهبان `documentElement.scrollWidth > innerWidth` را چک می‌کرد، ولی
+   `overflow:hidden` روی والد سرریز را **می‌بُرد**، پس scrollWidth دقیقاً
+   ۳۹۰ می‌ماند و نگهبان سبز می‌شد. نگهبانِ تازه مستقیم مختصاتِ کارت‌ها و
+   `elementFromPoint` را می‌سنجد.
 
-   ── راه‌حل ──
+   ═══════════════════════════════════════════════════════════════════════
+   راه‌حل: همان الگویی که اپِ اندروید دارد — قفسهٔ افقیِ اسکرول‌شونده
+   ═══════════════════════════════════════════════════════════════════════
 
-   پنج کارت باید همیشه در عرضِ صفحه جا شوند. به‌جای عرضِ ثابت، سهمِ هر
-   کارت از فضای موجود محاسبه می‌شود. flex-basis صفر با flex-grow یعنی
-   «فضا را برابر تقسیم کن» و min-width:0 اجازهٔ کوچک‌شدن می‌دهد
-   (⚠️ در flexbox این ارث نمی‌رسد و باید صریح نوشته شود). */
+   اولین تلاشم این بود که پنج کارت را در عرضِ ۳۹۰px بچپانم
+   (`flex:1 1 0`). نتیجه اندازه‌گیری شد و **بد بود**: هر کارت ۵۸px
+   می‌شد در حالی که محتوایش ۱۲۱px می‌خواست، یعنی نام و برچسبِ کمیابی
+   روی هم می‌افتادند. یک باگ را با باگِ دیگر عوض می‌کردم.
+
+   اپِ اندروید این مسئله را سال‌هاست حل کرده و من باید همان را کپی
+   می‌کردم، نه اینکه راهِ سومی اختراع کنم:
+
+       SizedBox(height: 196,
+         child: ListView.separated(scrollDirection: Axis.horizontal, ...))
+       با کارت‌های SizedBox(width: 112)
+
+   یعنی موبایل هم پنج کارت را در ۳۹۰px جا نمی‌دهد؛ **قفسه را افقی
+   اسکرول می‌کند** و کارت را در اندازهٔ خوانا نگه می‌دارد. حالا وب هم
+   دقیقاً همین کار را می‌کند: عرضِ ثابتِ ۱۰۴px، اسکرولِ افقی، و
+   scroll-snap تا کارت‌ها وسطِ دید بایستند.
+
+   ⚠️ نگهبان برای ظرف‌هایی که `overflow-x:auto` دارند استثنا دارد —
+      بیرون بودن از دیدِ اولیه در یک قفسهٔ اسکرول‌شونده باگ نیست، چون
+      کاربر می‌تواند به آن برسد. تفاوتش با باگِ بالا همین است:
+      آنجا محتوا **بریده** می‌شد و راهی برای رسیدن نبود. */
 .duelHandV2{
   display:flex;
-  justify-content:center;
-  gap:5px;
+  gap:8px;
   width:100%;
-  padding-inline:2px;
+  padding:2px 2px 8px;
   box-sizing:border-box;
+  overflow-x:auto;
+  overflow-y:hidden;
+  scroll-snap-type:x proximity;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:thin;
+  scrollbar-color:color-mix(in srgb,var(--mode-color) 45%,transparent) transparent;
+  /* کارت‌های کمتر از ظرفیت وسط بمانند، بیشتر از آن از ابتدا شروع شوند. */
+  justify-content:safe center;
+}
+.duelHandV2::-webkit-scrollbar{height:5px}
+.duelHandV2::-webkit-scrollbar-thumb{
+  background:color-mix(in srgb,var(--mode-color) 45%,transparent);border-radius:99px;
 }
 .duelHandV2>.duelHandCard{
-  flex:1 1 0;
-  min-width:0;          /* ⚠️ ارثی نیست — بدونِ این کارت‌ها کوچک نمی‌شوند */
-  max-width:88px;
+  flex:0 0 104px;      /* معادلِ ۱۱۲ اندرویدی منهای حاشیه — خوانا می‌ماند */
+  min-width:0;         /* ⚠️ در flexbox ارثی نیست */
+  scroll-snap-align:center;
 }
 .duelHandV2 .duelCardShell,
 .duelHandV2 .ggPlayerCardFrame,
-.duelHandV2 .ggPlayerCard{
-  width:100%;
-  min-width:0;
-}
-/* هالهٔ کارت `inset:-35%` دارد و از قابِ کارت بیرون می‌زند. روی کارتِ
-   کناری این یعنی چند پیکسل سرریزِ افقی. چون فقط تزئین است، بریدنش
-   هیچ اطلاعاتی را از بین نمی‌برد. */
+.duelHandV2 .ggPlayerCard{width:100%;min-width:0}
+/* هالهٔ کارت `inset:-35%` دارد و بیرونِ قاب می‌زند؛ فقط تزئین است. */
 .duelHandV2 .ggPlayerCard{overflow:hidden}
+/* ⚠️ در دستِ بازی، «کمیابی + امتیاز» تکرارِ اطلاعاتی است که روی خودِ
+   قاب و در نوارِ ویژگیِ زیرِ کارت هست. اندروید هم اینجا
+   `showStats:false` می‌دهد. حذفشان جا را به نامِ کارت می‌دهد که تنها
+   چیزی است که کاربر واقعاً برای تصمیم لازم دارد. */
+.duelHandV2 .ggCardMeta,
+.duelHandV2 .ggCardStats{display:none}
+.duelHandV2 .ggCardBody{padding:5px 6px 7px}
+.duelHandV2 .ggCardName{
+  font-size:11.5px;line-height:1.35;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+  overflow:hidden;
+}

@@ -264,23 +264,52 @@ try {
         await page.waitForTimeout(4000);
         check('card duel battle', await audit());
 
-        // ⚠️ سنجهٔ اختصاصیِ باگِ «کارتِ غیرقابلِ کلیک». عمداً جدا از
-        //    چکِ عمومی است تا پیامِ شکست دقیقاً بگوید کدام کارت.
-        const hand = await page.evaluate(() => {
-          const vw = window.innerWidth;
-          return [...document.querySelectorAll('.duelHandCard')].map((c, i) => {
+        // ═══════════════════════════════════════════════════════════════
+        //  ⚠️ سنجهٔ اختصاصیِ باگِ «کارتِ غیرقابلِ کلیک»
+        // ═══════════════════════════════════════════════════════════════
+        //
+        // دستِ کارت یک قفسهٔ افقیِ اسکرول‌شونده است (همان الگوی اندروید).
+        // پس «بیرونِ دیدِ اولیه» به‌تنهایی باگ نیست — سؤالِ درست این است
+        // که آیا کاربر **می‌تواند به هر کارت برسد و رویش کلیک کند**.
+        //
+        // پس هر کارت را به وسطِ قفسه اسکرول می‌کنیم و بعد
+        // `elementFromPoint` را می‌پرسیم. این دقیقاً همان کاری است که
+        // کاربر می‌کند، و تنها راهِ تشخیصِ «بریده و غیرقابلِ دسترس» از
+        // «فعلاً بیرونِ دید ولی قابلِ اسکرول».
+        const handCount = await page.evaluate(() =>
+          document.querySelectorAll('.duelHandCard').length);
+        ok(handCount > 0, 'battle: the hand rendered');
+        const broken = [];
+        for (let i = 0; i < handCount; i += 1) {
+          const reachable = await page.evaluate((idx) => {
+            const c = document.querySelectorAll('.duelHandCard')[idx];
+            if (!c) return false;
+            c.scrollIntoView({ block: 'nearest', inline: 'center' });
             const r = c.getBoundingClientRect();
-            const cx = Math.max(0, Math.min(vw - 1, r.left + r.width / 2));
-            const hit = document.elementFromPoint(cx, r.top + r.height / 2);
-            return { i, inView: r.left >= -1 && r.right <= vw + 1,
-                     clickable: !!(hit && c.contains(hit)) };
-          });
-        });
-        ok(hand.length > 0, 'battle: the hand rendered');
-        const broken = hand.filter(c => !c.inView || !c.clickable);
+            if (r.left < -1 || r.right > window.innerWidth + 1) return false;
+            const hit = document.elementFromPoint(
+              r.left + r.width / 2, r.top + r.height / 2);
+            return !!(hit && c.contains(hit));
+          }, i);
+          if (!reachable) broken.push(i);
+        }
         ok(broken.length === 0,
-          `battle: all ${hand.length} hand cards are on-screen and clickable`
-          + (broken.length ? ` — card(s) ${broken.map(c => c.i).join(',')} unreachable` : ''));
+          `battle: all ${handCount} hand cards are reachable and clickable`
+          + (broken.length ? ` — card(s) ${broken.join(',')} unreachable` : ''));
+
+        // ⚠️ متنِ بریده در کارتِ فشرده: جعبه کوچک‌تر از محتوا یعنی نام
+        //    روی برچسب می‌افتد. این دقیقاً وقتی رخ داد که فونت‌ها را
+        //    بالا بردم بدونِ اینکه عرضِ کارت را چک کنم.
+        const squeezed = await page.evaluate(() =>
+          [...document.querySelectorAll('.duelHandV2 .ggPlayerCard')]
+            .filter((el) => {
+              const r = el.getBoundingClientRect();
+              return el.scrollWidth > Math.ceil(r.width) + 2
+                  || el.scrollHeight > Math.ceil(r.height) + 2;
+            }).length);
+        ok(squeezed === 0,
+          `battle: hand cards are wide enough for their content`
+          + (squeezed ? ` — ${squeezed} card(s) clipped` : ''));
 
         // ⚠️ کارتِ بی‌تصویر باید چهرهٔ نقاشی‌شده بگیرد نه اسپینرِ ابدی.
         //    کارت‌های تمرینی در سرور `imageUrl: null` دارند، پس این نما
