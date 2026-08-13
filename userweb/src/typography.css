@@ -415,3 +415,9 @@ code {
 .duelRuleStrip b,
 .duelPageV2 span[style*="font-weight"],
 .duelPageV2 b[style*="font-weight"] { font-weight: 800 !important; }
+
+/* دو عنصری که فقط بعد از تبدیل کلکسیون به قفسهٔ افقی نمایان شدند:
+   `.ggCardPower` (عدد قدرت روی کارت) و `.ggCardCheck` (تیک انتخاب).
+   قبلاً پایین صفحه و خارج از دسترسِ بازرسی بودند. */
+.ggCardPower{font-size:11.5px !important}
+.ggCardCheck{font-weight:800 !important}
