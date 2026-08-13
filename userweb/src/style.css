@@ -4184,3 +4184,31 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
   .duelHeroV2 aside>span{font-size:16px}
   .duelHeroV2 aside small{display:none}
 }
+
+/* ⚠️ رفع باگی که خودم ساختم.
+   `.duelRuleSteps` را با `grid-template-columns:1fr auto 1fr auto 1fr`
+   نوشتم — همان چیدمانِ افقیِ نسخهٔ قبل. ولی نسخهٔ قبل روی موبایل
+   هرگز باز نمی‌شد چون بخشی از هدر بود؛ حالا جمع‌شونده است و کاربرِ
+   تازه‌وارد بازش می‌بیند.
+
+   نتیجه: پنج ستون در عرضِ ۳۹۰px یعنی هر ستون ~۷۰px، و متنِ فارسی
+   کلمه‌به‌کلمه می‌شکند. صفحه از ۸۴۴px به **۱۸۱۸px** پرید — بدتر از
+   نقطهٔ شروع.
+
+   درس: وقتی چیزی را از «همیشه بسته» به «گاهی باز» تبدیل می‌کنی، باید
+   حالتِ بازش را هم روی کوچک‌ترین صفحه اندازه بگیری. اسکرین‌شات گرفتم
+   و دیدم، وگرنه عدد ۱۸۱۸ را به گردنِ چیز دیگری می‌انداختم. */
+@media (max-width:640px){
+  .duelRuleSteps{
+    grid-template-columns:1fr;   /* یک ستون، سه ردیف */
+    gap:8px;
+  }
+  .duelRuleSteps>i{display:none} /* فلش‌های بینِ مرحله‌ها بی‌معنی می‌شوند */
+  .duelRuleSteps>div{
+    grid-template-columns:26px 1fr;
+    align-items:center; column-gap:9px;
+  }
+  .duelRuleSteps>div>span{width:26px; height:26px; font-size:12px}
+  .duelRuleSteps>div>b{font-size:12px}
+  .duelRuleSteps>div>small{font-size:11.5px; line-height:1.5}
+}
