@@ -353,7 +353,9 @@ try {
           if (!nav) return null;
           const navTop = nav.getBoundingClientRect().top;
           const hits = [];
-          for (const el of document.querySelectorAll('.duelHandCard, .duelChoicePanel button')) {
+          // ⚠️ دکمه‌های صفحهٔ پایان هم باید چک شوند: «نبرد دوباره» آخرین
+          //    عنصرِ صفحه است و همان‌جا زیرِ نوار می‌رفت.
+          for (const el of document.querySelectorAll('.duelHandCard, .duelChoicePanel button, .duelFinalePanel button')) {
             const r = el.getBoundingClientRect();
             if (!r.height) continue;
             if (r.bottom > navTop + 1) hits.push(`${el.className}:${Math.round(r.bottom)}>${Math.round(navTop)}`);
