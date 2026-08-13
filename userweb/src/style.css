@@ -4580,3 +4580,45 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
   .duelLaunch{min-height:52px}
   .duelLaunch span{font-size:14.5px}
 }
+
+/* ═══ لوپ ۵ب: علتِ واقعیِ دو ردیف شدنِ سربرگ ═══════════════════════════
+   اندازه‌گیریِ ستون‌های محاسبه‌شده: `88.25px 248.141px 0px`
+
+   ستونِ سومِ `aside` صفر شد ولی خودِ `aside` عرضِ ۳۵۲px داشت (چون
+   `min-width:150px` و محتوای افقی‌اش). عنصری که از ستونِ صفرش بزرگ‌تر
+   است، شبکه را به ردیفِ بعد می‌برد ⇒ ۱۰۳px.
+
+   ⚠️ اشتباهِ من در لوپ قبل: فرض کردم `grid-template-columns:auto 1fr
+      auto` کافی است. نبود — چون `.duelHeroV2 aside` هنوز
+      `min-width:150px` از قاعدهٔ پایه داشت و `flex-direction:column`
+      را در قاعدهٔ دیگری خنثی کرده بودم ولی `min-width` را نه.
+
+      درس: وقتی چیدمانی می‌شکند، `gridTemplateColumns` محاسبه‌شده را
+      بخوان — نه اینکه قاعده‌های تازه روی هم بگذاری.
+
+   راهِ درست: `aside` اصلاً ستونِ جدا نگیرد. کنارِ تیتر و در همان
+   ردیف، با `min-width:0` و بدونِ رشدِ اجباری. */
+@media (max-width:520px){
+  .duelHeroV2{
+    display:flex; flex-wrap:nowrap; align-items:center; gap:8px;
+    padding:6px 9px;
+  }
+  .duelHeroV2>button{flex:0 0 auto}
+  .duelHeroV2>div:nth-of-type(2){flex:1 1 auto; min-width:0}
+  .duelHeroV2 h1{
+    font-size:15px; margin:0;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .duelHeroV2 aside{
+    flex:0 0 auto; min-width:0 !important;
+    flex-direction:row; align-items:center; gap:4px;
+    padding:4px 8px; border-radius:10px; white-space:nowrap;
+  }
+  .duelHeroV2 aside small{display:none}
+}
+
+/* دکمهٔ شروع: `min-height:52px` بود ولی padding ۱۲px بالا/پایین
+   ارتفاع را به ۶۵px می‌برد. padding کم می‌شود، نه حدِ لمس. */
+@media (max-width:520px){
+  .duelLaunch{padding:6px 14px}
+}
