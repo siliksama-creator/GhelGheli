@@ -67,6 +67,19 @@ Widget _host(Map<String, dynamic>? round) => MaterialApp(
       ),
     );
 
+/// مدتِ کاملِ انیمیشنِ نمایشِ نتیجه، با کمی حاشیه.
+///
+/// ⚠️ چرا ثابت و نه عددِ درجا:
+///   این تست‌ها `pump(1400ms)` داشتند چون انیمیشن آن‌موقع ۱۳۰۰ms بود.
+///   وقتی مدت به ۱۹۰۰ms رفت (تا نتیجهٔ راند فرصتِ دیده‌شدن پیدا کند)،
+///   هر سه تست شکستند — در حالی که **محصول درست‌تر** شده بود.
+///
+///   عددِ جادویی که در هشت جای فایل تکرار شده بود، تغییرِ درستِ محصول
+///   را به یک شکستِ گمراه‌کننده تبدیل کرد. حالا یک جا تعریف می‌شود.
+///
+///   اگر `_ClashStageState._total` عوض شد، فقط همین خط باید عوض شود.
+const _revealTotal = Duration(milliseconds: 2100);
+
 void main() {
   group('نمایش سینماتیک راند دوئل', () {
     testWidgets('در فاز اول عدد قدرت و مهر برنده هنوز دیده نمی‌شوند',
@@ -87,7 +100,7 @@ void main() {
     testWidgets('بعد از پایان فازها، حکم و عددها کامل دیده می‌شوند',
         (tester) async {
       await tester.pumpWidget(_host(_round(1, 'X')));
-      await tester.pump(const Duration(milliseconds: 1400));
+      await tester.pump(_revealTotal);
       await tester.pump(const Duration(milliseconds: 500));
 
       expect(_verdictStamp('WINNER'), findsOneWidget);
@@ -102,7 +115,7 @@ void main() {
 
     testWidgets('باخت راند مهر درست را نشان می‌دهد', (tester) async {
       await tester.pumpWidget(_host(_round(1, 'O')));
-      await tester.pump(const Duration(milliseconds: 1400));
+      await tester.pump(_revealTotal);
       await tester.pump(const Duration(milliseconds: 400));
 
       expect(_verdictStamp('باخت راند'), findsOneWidget);
@@ -115,7 +128,7 @@ void main() {
 
     testWidgets('مساوی مهر «برخورد برابر» می‌دهد', (tester) async {
       await tester.pumpWidget(_host(_round(1, 'DRAW')));
-      await tester.pump(const Duration(milliseconds: 1400));
+      await tester.pump(_revealTotal);
       await tester.pump(const Duration(milliseconds: 400));
 
       expect(_verdictStamp('برخورد برابر'), findsOneWidget);
@@ -130,7 +143,7 @@ void main() {
       // دوم بدونِ هیچ انیمیشنی و با نتیجهٔ کاملاً آشکار ظاهر می‌شد — همان
       // باگی که در نسخهٔ وب بدونِ `key` رخ می‌داد.
       await tester.pumpWidget(_host(_round(1, 'X')));
-      await tester.pump(const Duration(milliseconds: 1400));
+      await tester.pump(_revealTotal);
       expect(_verdictStamp('WINNER'), findsOneWidget);
 
       // راند دوم می‌رسد.
@@ -140,7 +153,7 @@ void main() {
       expect(_verdictStamp('باخت راند'), findsNothing,
           reason: 'راندِ دوم باید دوباره تعلیق داشته باشد، نه نتیجهٔ فوری');
 
-      await tester.pump(const Duration(milliseconds: 1400));
+      await tester.pump(_revealTotal);
       expect(_verdictStamp('باخت راند'), findsOneWidget);
       // ⚠️ اینجا عمداً pumpAndSettle نیست: قابِ کمیابیِ PlayerCard یک
       // انیمیشنِ بی‌پایان دارد (طلایی/پرمیوم می‌چرخند)، پس صحنه هرگز
