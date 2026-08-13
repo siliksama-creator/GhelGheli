@@ -183,10 +183,41 @@ class _Matchmaking extends StatelessWidget {
       );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  ⚠️ چرا _LiveBattle یک حالتِ «پایان» دارد
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ── گزارشِ مالک (با اسکرین‌شات از همین اپ) ──
+//   «اسکوربورد و متن راند ناسازگارند، دو بلوک نتیجه هم‌زمان نشان داده
+//    می‌شود، و صفحه اسکرول دارد.»
+//
+// ── علتِ ریشه‌ای ──
+//
+// صفحهٔ پایان همان `_LiveBattle`ِ نوشته‌شده برای *وسطِ بازی* را بی‌هیچ
+// تغییری بالای `_Finale` رندر می‌کرد:
+//
+//   ۱. اسکوربورد می‌گفت «راند ۵ از ۵» و زیرش «امتیاز راند قبل برای تو
+//      بود». بازی تمام شده و «راند قبل» معنایی ندارد.
+//   ۲. `_ClashStage` صحنهٔ برخوردِ راند ۵ را نشان می‌داد و بلافاصله
+//      زیرش `VICTORY ۵—۰` می‌آمد — **دو بلوکِ نتیجه هم‌زمان**.
+//   ۳. اگر برخوردی نبود، `_ClashStage` یک جعبهٔ ۲۱۰ پیکسلیِ «منتظر
+//      برخورد اول…» می‌ساخت که در پایانِ بازی کاملاً بی‌معنی است و فقط
+//      اسکرول اضافه می‌کند.
+//
+// ── چرا پراپ و نه ویجتِ جدا ──
+//
+// اسکوربورد و پیپ‌های راند باید همان‌ها بمانند وگرنه صفحهٔ نتیجه با
+// صفحهٔ بازی ناهماهنگ می‌شود و باید دو جا نگهداری شوند. فقط سه چیز
+// عوض می‌شود، پس یک پرچمِ `finalView` کافی است.
 class _LiveBattle extends StatelessWidget {
-  const _LiveBattle({required this.session, required this.color});
+  const _LiveBattle({
+    required this.session,
+    required this.color,
+    this.finalView = false,
+  });
   final GameSession session;
   final Color color;
+  final bool finalView;
 
   @override
   Widget build(BuildContext context) {
@@ -211,10 +242,17 @@ class _LiveBattle extends StatelessWidget {
         color: color,
         myPlayer: session.playerInfo(mine),
         theirPlayer: session.playerInfo(opponent),
-        title: '${state['roundTitle'] ?? 'پایان نبرد'}',
-        roundLabel: 'راند ${faNum((roundIndex + 1).clamp(1, total))} از ${faNum(total)}',
+        // ⚠️ در پایانِ بازی «راند ۵ از ۵» و «امتیاز راند قبل برای تو
+        //    بود» هر دو بی‌معنی‌اند — همان ناسازگاریِ اسکرین‌شات.
+        title: finalView
+            ? '${faNum(total)} راند تمام شد'
+            : '${state['roundTitle'] ?? 'پایان نبرد'}',
+        roundLabel: finalView
+            ? 'نتیجهٔ نهایی'
+            : 'راند ${faNum((roundIndex + 1).clamp(1, total))} از ${faNum(total)}',
         lastWinner: '${lastRound?['winner'] ?? ''}',
         mySymbol: mine,
+        finalView: finalView,
       ),
       Gaps.vXs,
       _RoundPips(total: total, current: roundIndex, history: history, mine: mine, color: color),
@@ -229,7 +267,10 @@ class _LiveBattle extends StatelessWidget {
       // اطلاعاتِ همیشگی (کدام ویژگی مهم است) از بین نرفت: روی تک‌تکِ
       // کارت‌های دست با `_FocusStatRibbon` دیده می‌شود و در نوارِ
       // فشردهٔ زیر هم خلاصه‌اش هست.
-      _ClashStage(round: lastRound, mine: mine, color: color),
+      // ⚠️ در صفحهٔ پایان این صحنه دقیقاً بالای پنلِ VICTORY می‌نشست و
+      //    «دو بلوک نتیجه هم‌زمان» می‌ساخت. جزئیاتِ راندِ پنجم از بین
+      //    نمی‌رود: در «تایم‌لاین کامل ۵ راند» همان پایین هست.
+      if (!finalView) _ClashStage(round: lastRound, mine: mine, color: color),
       if (session.phase == GamePhase.playing) ...[
         Gaps.vSm,
         AppCard(
@@ -360,6 +401,7 @@ class _Scoreboard extends StatelessWidget {
     required this.roundLabel,
     required this.lastWinner,
     required this.mySymbol,
+    this.finalView = false,
   });
   final String myName;
   final String theirName;
@@ -372,6 +414,7 @@ class _Scoreboard extends StatelessWidget {
   final String roundLabel;
   final String lastWinner;
   final String mySymbol;
+  final bool finalView;
 
   @override
   Widget build(BuildContext context) {
@@ -391,13 +434,20 @@ class _Scoreboard extends StatelessWidget {
                   textDirection: TextDirection.ltr,
                   style: const TextStyle(color: _gold, fontSize: 22, fontWeight: FontWeight.w900)),
               Text(
-                lastWinner == 'DRAW'
-                    ? 'راند قبلی مساوی شد'
-                    : lastMine
-                        ? 'امتیاز راند قبل برای تو بود'
-                        : lastTheir
-                            ? 'حریف راند قبل را برد'
-                            : 'امتیازها را بالا نگه دار',
+                finalView
+                    // بازی تمام شده؛ حرف زدن از «راند قبل» گمراه‌کننده است.
+                    ? (myScore == theirScore
+                        ? 'برابر تمام شد'
+                        : myLead
+                            ? 'تو بردی'
+                            : 'حریف برد')
+                    : lastWinner == 'DRAW'
+                        ? 'راند قبلی مساوی شد'
+                        : lastMine
+                            ? 'امتیاز راند قبل برای تو بود'
+                            : lastTheir
+                                ? 'حریف راند قبل را برد'
+                                : 'امتیازها را بالا نگه دار',
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 11.5, color: Colors.white60, fontWeight: FontWeight.w700),
               ),

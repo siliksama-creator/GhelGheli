@@ -343,7 +343,36 @@ function DuelIdentity({ player, fallback }) {
   </span>;
 }
 
-function LiveArena({ session }) {
+// ═══════════════════════════════════════════════════════════════════════════
+//  ⚠️ چرا LiveArena یک حالتِ «پایان» دارد
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ── گزارشِ مالک (با اسکرین‌شات) ──
+//   «اسکوربورد و متن راند ناسازگارند، دو بلوک نتیجه هم‌زمان نشان داده
+//    می‌شود، و صفحه اسکرول دارد.»
+//
+// ── علتِ ریشه‌ای ──
+//
+// صفحهٔ پایان همان `<LiveArena/>` را که برای *وسطِ بازی* نوشته شده بود
+// بی‌هیچ تغییری داخلِ خودش رندر می‌کرد. یعنی تمامِ چرمِ «در حالِ بازی»
+// روی صفحهٔ نتیجه می‌آمد:
+//
+//   ۱. اسکوربورد می‌گفت «راند ۵ از ۵ · پایان نبرد» و زیرش «امتیاز راند
+//      قبل برای تو بود». بازی تمام شده و «راند قبل» دیگر معنایی ندارد؛
+//      کاربر عددِ نهایی می‌خواهد نه وضعیتِ راندِ آخر.
+//   ۲. `RoundReveal` صحنهٔ برخوردِ راند ۵ را نشان می‌داد، و بلافاصله
+//      زیرش پنلِ `VICTORY ۵—۰` می‌آمد — **دو بلوکِ نتیجه هم‌زمان**،
+//      دقیقاً همان چیزی که مالک دید.
+//   ۳. `duelOpponentHand` ارتفاعِ ثابتِ ۸۴px دارد ولی در پایانِ بازی صفر
+//      کارت — یک نوارِ خالیِ ۸۴ پیکسلی وسطِ صفحه (در اسکرین‌شات دیده
+//      می‌شود) که فقط اسکرول اضافه می‌کرد.
+//
+// ── چرا پراپ و نه کامپوننتِ جدا ──
+//
+// اسکوربورد، پیپ‌های راند و هویتِ بازیکنان باید همان‌ها بمانند وگرنه
+// صفحهٔ نتیجه با صفحهٔ بازی ناهماهنگ می‌شود و باید دو جا نگهداری شوند.
+// فقط سه چیز باید عوض شود، پس یک پراپِ `final` کافی است.
+function LiveArena({ session, final = false }) {
   const { phase, g, secondsLeft, holding, resultHolding, move } = session;
   const state = g.state || {};
   const score = state.score || { X: 0, O: 0 };
@@ -365,7 +394,12 @@ function LiveArena({ session }) {
   return <div className="duelLiveArena">
     <header className="duelScoreV2">
       <div className={myAhead ? 'lead' : lastWinner === mine ? 'pulse' : ''}><DuelIdentity player={g.players?.[mine]} fallback={myName}/><b>{fa(score[mine])}</b></div>
-      <span><i>راند {fa(Math.min(num(state.totalRounds) || 5, num(state.roundIndex) + 1))} از {fa(num(state.totalRounds) || 5)}</i><strong>{state.roundTitle || 'پایان نبرد'}</strong><small>{lastWinner === 'DRAW' ? 'راند قبل مساوی شد' : lastWinner === mine ? 'امتیاز این راند برای تو بود' : lastWinner ? 'حریف راند قبل را برد' : 'امتیازها را بالا نگه دار'}</small></span>
+      {/* ⚠️ در پایانِ بازی «راند ۵ از ۵» و «امتیاز راند قبل برای تو بود»
+          هر دو بی‌معنی‌اند: بازی تمام شده و کاربر عددِ نهایی می‌خواهد.
+          همین ناسازگاری در اسکرین‌شاتِ مالک دیده می‌شد. */}
+      {final
+        ? <span><i>نتیجهٔ نهایی</i><strong>{fa(num(state.totalRounds) || 5)} راند تمام شد</strong><small>{score[mine] === score[opponent] ? 'برابر تمام شد' : num(score[mine]) > num(score[opponent]) ? 'تو بردی' : 'حریف برد'}</small></span>
+        : <span><i>راند {fa(Math.min(num(state.totalRounds) || 5, num(state.roundIndex) + 1))} از {fa(num(state.totalRounds) || 5)}</i><strong>{state.roundTitle || 'پایان نبرد'}</strong><small>{lastWinner === 'DRAW' ? 'راند قبل مساوی شد' : lastWinner === mine ? 'امتیاز این راند برای تو بود' : lastWinner ? 'حریف راند قبل را برد' : 'امتیازها را بالا نگه دار'}</small></span>}
       <div className={theirAhead ? 'lead' : lastWinner && lastWinner !== mine && lastWinner !== 'DRAW' ? 'pulse' : ''}><DuelIdentity player={g.players?.[opponent]} fallback={opponentName}/><b>{fa(score[opponent])}</b></div>
     </header>
 
@@ -377,10 +411,16 @@ function LiveArena({ session }) {
       return <i key={index} className={className} title={`راند ${fa(index + 1)}`} />;
     })}</div>
 
-    <div className="duelOpponentHand" aria-label={`${state.opponentRemainingCount || 0} کارت حریف باقی مانده`}>
-      {Array.from({ length: state.opponentRemainingCount || 0 }, (_, index) =>
-        <span key={index}><img src="/games/card_duel_glow.png" alt="پشت کارت حریف" /></span>)}
-    </div>
+    {/* ⚠️ ارتفاعِ ثابتِ ۸۴px با صفر کارت یعنی یک نوارِ خالی وسطِ صفحه.
+        در پایانِ بازی همیشه صفر است، و در راندِ آخر هم می‌تواند صفر
+        شود. شرط روی خودِ تعداد است نه روی `final`، چون قاعده باید روی
+        الگو نوشته شود نه روی یک نمونه. */}
+    {num(state.opponentRemainingCount) > 0 && (
+      <div className="duelOpponentHand" aria-label={`${state.opponentRemainingCount} کارت حریف باقی مانده`}>
+        {Array.from({ length: num(state.opponentRemainingCount) }, (_, index) =>
+          <span key={index}><img src="/games/card_duel_glow.png" alt="پشت کارت حریف" /></span>)}
+      </div>
+    )}
 
     {/* ── چرا بنرِ افقی جای خود را به اعلانِ وسطِ صفحه داد ──
         بنر ~۹۰ پیکسل ارتفاع می‌گرفت و از دلایلِ اصلیِ اسکرولِ صفحهٔ بازی
@@ -398,7 +438,10 @@ function LiveArena({ session }) {
       />
     )}
 
-    <RoundReveal round={state.lastRound} me={mine} myFrame={myFrame} opponentFrame={opponentFrame} />
+    {/* ⚠️ در صفحهٔ پایان این صحنه دقیقاً بالای پنلِ VICTORY می‌نشست و
+        «دو بلوک نتیجه هم‌زمان» می‌ساخت. جزئیاتِ راندِ پنجم از بین
+        نمی‌رود: در «تایم‌لاین کامل ۵ راند» همان پایین هست. */}
+    {!final && <RoundReveal round={state.lastRound} me={mine} myFrame={myFrame} opponentFrame={opponentFrame} />}
 
     {phase === 'playing' && <section className="duelChoicePanel">
       <div className="duelChoicePrompt">
@@ -795,7 +838,7 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
       style={{'--duel-result-a':resultPalette[0],'--duel-result-b':resultPalette[1],background:myCosmetics.resultTemplate
         ? `linear-gradient(rgba(2,6,23,.38),rgba(2,6,23,.76)),url('/shop/cosmetics-v3/${myCosmetics.resultTemplate}.webp') center/cover,${resultPalette[0]}`
         : `radial-gradient(circle at 50% 15%,${resultPalette[1]}44,transparent 42%),${resultPalette[0]}`}}>
-      <LiveArena session={session} />
+      <LiveArena session={session} final />
       <div className="duelFinalePanel">
         <span>{winner === 'DRAW' ? '🤝' : iWon ? '🏆' : '🛡️'}</span>
         <h2>{winner === 'DRAW' ? 'DRAW' : iWon ? 'VICTORY' : 'DEFEAT'}</h2>

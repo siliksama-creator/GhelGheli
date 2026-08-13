@@ -816,7 +816,11 @@ class _CardDuelPageState extends State<CardDuelPage> {
         return Stack(children: [
           Column(
             children: [
-              _LiveBattle(session: _session, color: _modeColor),
+              // ⚠️ `finalView` سه چیزِ مخصوصِ «وسطِ بازی» را خاموش
+              //    می‌کند: برچسبِ راند، جملهٔ «راند قبل»، و صحنهٔ
+              //    برخورد که بالای پنلِ VICTORY تکرار می‌شد.
+              _LiveBattle(
+                  session: _session, color: _modeColor, finalView: true),
               Gaps.vMd,
               _Finale(
                 session: _session,
