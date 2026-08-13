@@ -4911,9 +4911,14 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
      بیاید بازنده است، و چون `min-height` بر `max-height` مقدم است
      نتیجه ۱۳۲px می‌ماند و کوچک‌کردن **بی‌اثر** بود.
      یک کلاسِ اضافه در سلکتور، وزن را برابر می‌کند. */
-  .duelClash .ggPlayerCard.compact .ggCardArt{min-height:86px;max-height:86px}
-  .duelClash .ggPlayerCardFrame{max-width:96px}
-  .duelClash{padding:8px;gap:6px}
+  /* صحنهٔ برخورد بزرگ‌ترین مصرف‌کنندهٔ ارتفاع است (۲۰۴px اندازه‌گیری شد).
+     نامِ کارت و بدنه‌اش اینجا تکراری‌اند: نامِ برنده و اعداد هر دو در
+     ستونِ وسط نوشته شده‌اند. حذفشان ~۴۰px برمی‌گرداند بدونِ از دست
+     رفتنِ هیچ اطلاعاتی. */
+  .duelClash .ggPlayerCard.compact .ggCardArt{min-height:78px;max-height:78px}
+  .duelClash .ggPlayerCardFrame{max-width:92px}
+  .duelClash .ggCardBody{display:none}
+  .duelClash{padding:7px;gap:6px}
 
   /* ردیفِ دست: ۲۲۰ → ~۱۷۰ */
   .duelHandV2>.duelHandCard{flex-basis:92px}
