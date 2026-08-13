@@ -114,6 +114,49 @@ const audit = () => page.evaluate(([maxW, minPx]) => {
   }
   bad.overflow = document.documentElement.scrollWidth > window.innerWidth + 1
     ? `${document.documentElement.scrollWidth}px > ${window.innerWidth}px` : null;
+
+  // ═══════════════════════════════════════════════════════════════════════
+  //  ⚠️⚠️ چرا چکِ scrollWidth کافی نیست — باگی که این ابزار از دست داد
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // در بازیِ کارت، دو کارت از پنج کارتِ دستِ کاربر بیرونِ صفحه بودند
+  // (left=-49 و right=431 در عرضِ ۳۹۰). ولی چون والدشان `overflow:hidden`
+  // داشت، سرریز **بریده** می‌شد و `document.scrollWidth` دقیقاً ۳۹۰
+  // می‌ماند. یعنی این ابزار سبز گزارش می‌داد در حالی که کاربر
+  // نمی‌توانست روی ۴۰٪ از دستش کلیک کند.
+  //
+  // نگهبانی که فقط اسکرول را می‌بیند، **بریدگی** را نمی‌بیند. پس
+  // مستقیم سراغِ خودِ عناصرِ تعاملی می‌رویم و دو چیز را می‌پرسیم:
+  //   ۱. مستطیلش داخلِ صفحه است؟
+  //   ۲. `elementFromPoint` روی مرکزش خودش را برمی‌گرداند؟ (یعنی واقعاً
+  //      قابلِ کلیک است، نه اینکه چیزِ دیگری رویش افتاده باشد)
+  //
+  // فقط عناصرِ تعاملی، چون تزئینِ بریده‌شده اشکالی ندارد ولی دکمهٔ
+  // بریده‌شده یعنی کاربر نمی‌تواند بازی کند.
+  bad.unreachable = [];
+  for (const el of document.querySelectorAll('button,[role="button"],a[href]')) {
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) continue;                 // مخفی — کارِ ما نیست
+    if (el.disabled) continue;                           // عمداً غیرفعال
+    const cs = getComputedStyle(el);
+    if (cs.visibility === 'hidden' || cs.opacity === '0') continue;
+    const outside = r.left < -1 || r.right > window.innerWidth + 1;
+    if (!outside) continue;
+    // ⚠️ استثنای عمدی: قفسهٔ افقی. اگر عنصر داخلِ ظرفی است که خودش
+    //    اسکرولِ افقیِ عمدی دارد (`overflow-x:auto/scroll`)، بیرون بودن
+    //    از دیدِ اولیه **باگ نیست** — کاربر اسکرول می‌کند و می‌رسد.
+    //    بدونِ این استثنا، `.duelGridV2` (قفسهٔ انتخابِ کارت) قرمزِ کاذب
+    //    می‌داد و درسِ ثبت‌شدهٔ این پروژه است که قرمزِ کاذب باعث می‌شود
+    //    آدم‌ها کلِ خروجیِ ابزار را نادیده بگیرند.
+    let scrollableParent = false;
+    for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+      const ox = getComputedStyle(a).overflowX;
+      if (ox === 'auto' || ox === 'scroll') { scrollableParent = true; break; }
+    }
+    if (scrollableParent) continue;
+    bad.unreachable.push(`${label(el)}:${Math.round(r.left)}..${Math.round(r.right)}`);
+  }
+  bad.unreachable = [...new Set(bad.unreachable)].slice(0, 6);
   // Dedupe: one offending class reported once, not fifty times.
   for (const k of ['notVazir', 'synthBold', 'tiny']) bad[k] = [...new Set(bad[k])];
   return bad;
@@ -124,6 +167,10 @@ const check = (where, r) => {
   ok(r.synthBold.length === 0, `${where}: no synthetic bold (>${MAX_REAL_WEIGHT})${r.synthBold.length ? ` — ${r.synthBold.slice(0, 4).join(', ')}` : ''}`);
   ok(r.tiny.length === 0, `${where}: no text under ${MIN_READABLE_PX}px${r.tiny.length ? ` — ${r.tiny.slice(0, 4).join(', ')}` : ''}`);
   ok(!r.overflow, `${where}: no horizontal overflow${r.overflow ? ` — ${r.overflow}` : ''}`);
+  // ⚠️ جدا از overflow: این یکی بریدگیِ عناصرِ **تعاملی** را می‌گیرد که
+  //    زیرِ `overflow:hidden` پنهان می‌شود و در scrollWidth دیده نمی‌شود.
+  ok((r.unreachable || []).length === 0,
+    `${where}: every control is inside the viewport${(r.unreachable || []).length ? ` — ${r.unreachable.join(', ')}` : ''}`);
 };
 
 try {
@@ -196,6 +243,53 @@ try {
       const duelText = await page.innerText('body');
       ok(duelText.includes('دوئل کارت') || duelText.includes('ARENA'),
         'card duel arena actually rendered');
+
+      // ═══════════════════════════════════════════════════════════════
+      //  ⚠️⚠️ چرا تا **داخلِ نبرد** جلو می‌رویم و به صفحهٔ ترکیب بسنده
+      //       نمی‌کنیم
+      // ═══════════════════════════════════════════════════════════════
+      //
+      // این ابزار تا امروز روی صفحهٔ «ترکیب» می‌ایستاد و سبز می‌داد.
+      // ولی سه باگِ جدی فقط **بعد از شروعِ نبرد** دیده می‌شدند:
+      //
+      //   ۱. دو کارت از پنج کارتِ دست بیرونِ صفحه و غیرقابلِ کلیک
+      //   ۲. کارت‌های بی‌تصویر با اسپینرِ ابدی به‌جای چهرهٔ نقاشی‌شده
+      //   ۳. ده‌ها متنِ زیرِ ۱۱٫۵px در دستِ کارت و صحنهٔ برخورد
+      //
+      // «۰ شکست» فقط دربارهٔ صفحه‌ای معتبر است که ابزار واقعاً باز کرده
+      // باشد. صفحهٔ نبرد باز نمی‌شد، پس سبزیِ آن بی‌معنی بود.
+      const enter = page.locator('button', { hasText: 'ورود به تمرین با ربات' });
+      if (await enter.count()) {
+        await enter.first().click();
+        await page.waitForTimeout(4000);
+        check('card duel battle', await audit());
+
+        // ⚠️ سنجهٔ اختصاصیِ باگِ «کارتِ غیرقابلِ کلیک». عمداً جدا از
+        //    چکِ عمومی است تا پیامِ شکست دقیقاً بگوید کدام کارت.
+        const hand = await page.evaluate(() => {
+          const vw = window.innerWidth;
+          return [...document.querySelectorAll('.duelHandCard')].map((c, i) => {
+            const r = c.getBoundingClientRect();
+            const cx = Math.max(0, Math.min(vw - 1, r.left + r.width / 2));
+            const hit = document.elementFromPoint(cx, r.top + r.height / 2);
+            return { i, inView: r.left >= -1 && r.right <= vw + 1,
+                     clickable: !!(hit && c.contains(hit)) };
+          });
+        });
+        ok(hand.length > 0, 'battle: the hand rendered');
+        const broken = hand.filter(c => !c.inView || !c.clickable);
+        ok(broken.length === 0,
+          `battle: all ${hand.length} hand cards are on-screen and clickable`
+          + (broken.length ? ` — card(s) ${broken.map(c => c.i).join(',')} unreachable` : ''));
+
+        // ⚠️ کارتِ بی‌تصویر باید چهرهٔ نقاشی‌شده بگیرد نه اسپینرِ ابدی.
+        //    کارت‌های تمرینی در سرور `imageUrl: null` دارند، پس این نما
+        //    دقیقاً همان حالتِ بحرانی است.
+        const spinners = await page.evaluate(() =>
+          document.querySelectorAll('.duelHandV2 .ggCardSpinner').length);
+        ok(spinners === 0,
+          `battle: no endless spinner on art-less cards${spinners ? ` — ${spinners} found` : ''}`);
+      }
     }
   }
 

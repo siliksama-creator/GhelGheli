@@ -14,6 +14,34 @@ import {
 } from '../lib/cards.js';
 import { fa } from '../lib/api.js';
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  ⚠️⚠️ باگ: کارتِ بدونِ تصویر برای همیشه اسپینر نشان می‌داد
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ── گزارشِ مالک ──
+//   «نسخه وب کاملا بهم ریختست و اصلا کپی اپلیکیشن موبایل نشده»
+//
+// ── چیزی که واقعاً اتفاق می‌افتاد ──
+//
+// جانشین با `loading={!art}` صدا زده می‌شد. یعنی «تصویر نداری؟ پس در
+// حالِ بارگذاری‌ای». ولی این دو **اصلاً یکی نیستند**:
+//
+//   • `art` هست ولی هنوز نیامده  → واقعاً در حالِ بارگذاری
+//   • `art` اصلاً وجود ندارد      → هرگز نخواهد آمد
+//
+// کارت‌های تمرینی (`practiceCards`) در سرور `imageUrl: null` دارند —
+// تأیید شده روی API زنده. پس هر پنج کارتِ حالتِ تمرین، و هر کارتِ ربات،
+// یک **اسپینرِ ابدی** نشان می‌دادند. کاربر یک آرنای خالی می‌دید با پنج
+// دایرهٔ چرخانِ بی‌پایان.
+//
+// اپِ اندروید همین حالت را درست مدیریت می‌کند: `_PaintedFace` حرفِ اولِ
+// نام و برچسبِ کمیابی را نقاشی می‌کند و اسپینر را **فقط** وقتی نشان
+// می‌دهد که `loading: true` صریحاً پاس داده شود. وب از همان اول این
+// تفکیک را نداشت.
+//
+// ⚠️ درسِ عمومی: `!x` را به‌جای «در حالِ بارگذاری» نگذارید. نبودِ داده و
+//    نیامدنِ داده دو حالتِ متفاوت‌اند و یکی‌کردنشان انتظارِ بی‌پایان
+//    می‌سازد.
 function CardFallback({ item, loading = false }) {
   const rarity = cardRarityOf(item);
   const meta = CARD_RARITY_META[rarity] || CARD_RARITY_META.normal;
@@ -62,6 +90,10 @@ export default function PlayerCard({
   const rarity = cardRarityOf(item);
   const meta = CARD_RARITY_META[rarity] || CARD_RARITY_META.normal;
   const art = cardArtOf(item);
+  // دو حالتِ جدا: «آمد» و «شکست خورد». هر دو اسپینر را خاموش می‌کنند.
+  const [artReady, setArtReady] = React.useState(false);
+  const [artFailed, setArtFailed] = React.useState(false);
+  React.useEffect(() => { setArtReady(false); setArtFailed(false); }, [art]);
   const qty = cardQtyOf(item);
   const power = cardPowerOf(item);
   const pointValue = cardPointValueOf(item);
@@ -86,12 +118,20 @@ export default function PlayerCard({
         <span className="ggCardSweep" aria-hidden="true" />
         <div className="ggCardArt">
           <div className="ggCardFallbackWrap">
-            <CardFallback item={item} loading={!art} />
+            {/* ⚠️ `loading` فقط وقتی درست است که تصویری هست و هنوز
+                نیامده. کارتِ بی‌تصویر باید چهرهٔ نقاشی‌شده بگیرد، نه
+                اسپینرِ ابدی — دقیقاً مثلِ `_PaintedFace` در اندروید. */}
+            <CardFallback item={item} loading={Boolean(art) && !artReady && !artFailed} />
           </div>
           {art
-            ? <CachedImg src={art} w={compact ? 240 : 480} alt={cardNameOf(item)} loading="lazy" decoding="async" onError={event => {
-                event.currentTarget.style.display = 'none';
-              }} />
+            ? <CachedImg src={art} w={compact ? 240 : 480} alt={cardNameOf(item)} loading="lazy" decoding="async"
+                onLoad={() => setArtReady(true)}
+                onError={event => {
+                  // تصویری که ۴۰۴ می‌دهد هم نباید اسپینر را برای همیشه
+                  // نگه دارد؛ به همان چهرهٔ نقاشی‌شده عقب می‌نشینیم.
+                  event.currentTarget.style.display = 'none';
+                  setArtFailed(true);
+                }} />
             : null}
           {!!power && <span className="ggCardPower">{fa(power)}</span>}
           {selected && <span className="ggCardCheck">✓</span>}
