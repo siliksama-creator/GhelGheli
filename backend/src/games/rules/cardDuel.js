@@ -133,6 +133,28 @@ function publicState(state, player) {
     roundIndex: state.roundIndex,
     totalRounds: duel.DECK_SIZE,
     roundTitle: duel.ROUND_FOCUS[state.roundIndex]?.label || 'پایان نبرد',
+    // ── معیارِ راندِ جاری، صریح و کامل ──
+    //
+    // گزارشِ مالک: «هر راند نوشته میشه که اون راند سر چی مبارزه میشه ولی
+    // انقدر کوچیک بدون هیچ انیمیشنی هستش که باعث میشه اصلا دیده نشه».
+    //
+    // قبلاً فقط `roundTitle` (یک رشتهٔ کوتاه) می‌رفت. کلاینت برای اینکه
+    // بتواند بنرِ بزرگ و انیمیشنی بسازد و روی هر کارت هم «همین عدد مهم
+    // است» را نشان بدهد، به **کلیدِ ستون** هم نیاز دارد نه فقط برچسب.
+    //
+    // این همچنین سردرگمیِ دیگری را حل می‌کند که مالک گزارش کرد: «عدد ربات
+    // با اینکه پایین‌تر نشون داده میشه راند رو اون میبره». علتش این بود
+    // که کاربر عددِ «قدرتِ کلیِ کارت» را می‌دید ولی راند روی **یک ویژگیِ
+    // خاص** داوری می‌شود. حالا کلاینت می‌تواند همان ویژگی را برجسته کند.
+    roundFocus: duel.ROUND_FOCUS[state.roundIndex]
+      ? {
+        stat: duel.ROUND_FOCUS[state.roundIndex].stat,
+        key: duel.ROUND_FOCUS[state.roundIndex].key,
+        label: duel.ROUND_FOCUS[state.roundIndex].label,
+        text: duel.ROUND_FOCUS[state.roundIndex].userText,
+        index: state.roundIndex,
+      }
+      : null,
     myDeck: state.decks[mine],
     myRemainingCardIds: state.remaining[mine],
     myPendingCardId: state.pending[mine] || null,

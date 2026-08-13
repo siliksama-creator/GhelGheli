@@ -52,7 +52,38 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void initState() {
     super.initState();
+    // ── چرا اول کش، بعد شبکه ──
+    //
+    // گزارشِ مالک: «هر بار ... به اینوتوری میرم باید منتظر بمونم کارت ها
+    // لود بشن». اندازه‌گیری: سرور ۴ms، ولی رفت‌وبرگشتِ شبکه ۴۷۰ تا
+    // ۱۰۳۰ms. سرور بیکار است؛ مشکل انتظار است نه فشار.
+    //
+    // پس آخرین دادهٔ شناخته‌شده بلافاصله رسم می‌شود و تازه‌سازی در
+    // پس‌زمینه انجام می‌گیرد. اگر چیزی عوض نشده باشد سرور ۳۰۴ می‌دهد
+    // (صفر بایت) و صفحه اصلاً دوباره رسم نمی‌شود.
+    _paintCached();
     _load();
+  }
+
+  /// آخرین اسنپ‌شات را بدونِ هیچ درخواستی رسم می‌کند.
+  void _paintCached() {
+    final cached = widget.api.cachedSnapshot('/api/bootstrap');
+    if (cached is! Map || cached['user'] is! Map) return;
+    _apply(Map<String, dynamic>.from(cached));
+  }
+
+  void _apply(Map<String, dynamic> m) {
+    setState(() {
+      _data = <String, dynamic>{
+        'user': m['user'],
+        'inventory': m['inventory'] ?? const [],
+        'leaguePayouts': m['leaguePayouts'] ?? const [],
+        if (m['loginStreak'] != null) 'loginStreak': m['loginStreak'],
+        if (m['cosmetics'] != null) 'cosmetics': m['cosmetics'],
+      };
+      _error = null;
+      _loading = false;
+    });
   }
 
   Future<void> _load() async {

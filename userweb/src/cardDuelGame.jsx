@@ -222,6 +222,61 @@ function RoundReveal({ round, me, myFrame, opponentFrame }) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// بنرِ معیارِ راند — نسخهٔ وب، مو‌به‌مو مثلِ اندروید
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// گزارشِ مالک: «هر راند نوشته میشه که اون راند سر چی مبارزه میشه ولی انقدر
+// کوچیک بدون هیچ انیمیشنی هستش که باعث میشه اصلا دیده نشه».
+//
+// این فقط زیباسازی نیست: مالک شکایتِ دیگری هم داشت که «عدد ربات پایین‌تر
+// است ولی راند را می‌برد». بازتولید و اندازه‌گیری شد — در **۱۳.۴٪** راندها
+// کارتی که «قدرتِ کلیِ» بزرگ‌تری دارد راند را می‌بازد، چون هر راند روی یک
+// ویژگیِ خاص داوری می‌شود نه قدرتِ کلی. موتور درست کار می‌کند؛ ارتباط
+// خراب بود. این بنر همان معیار را بزرگ اعلام می‌کند.
+const FOCUS_META = {
+  speed: { name: 'سرعت', icon: '⚡', color: '#38BDF8' },
+  technique: { name: 'تکنیک', icon: '✨', color: '#A855F7' },
+  attack: { name: 'حمله', icon: '🔥', color: '#FB7185' },
+  defense: { name: 'دفاع', icon: '🛡️', color: '#22E7A6' },
+  goalChance: { name: 'شانس گل', icon: '⚽', color: '#FFD166' },
+};
+
+function FocusBanner({ focus, fallbackTitle, roundNumber }) {
+  const stat = focus?.stat || '';
+  const meta = FOCUS_META[stat];
+  const label = focus?.label || fallbackTitle || '';
+  if (!label) return null;
+  const color = meta?.color || '#38BDF8';
+  return (
+    <section className="duelFocusBanner" key={`${roundNumber}-${stat}`}
+      style={{ '--focus-color': color }}>
+      <span className="duelFocusIcon" aria-hidden="true">{meta?.icon || '★'}</span>
+      <div>
+        <small>راند {fa(roundNumber)} — نبرد بر سر</small>
+        <b>{meta?.name ? `${meta.name}!` : label}</b>
+        {focus?.text && <i>{focus.text}</i>}
+      </div>
+    </section>
+  );
+}
+
+/** عددِ تعیین‌کنندهٔ این راند، روی کارتِ دست. */
+function FocusStatRibbon({ card, stat }) {
+  if (!stat) return null;
+  const meta = FOCUS_META[stat] || {};
+  const fallbackKey = {
+    speed: 'duel_speed', technique: 'duel_technique', attack: 'duel_attack',
+    defense: 'duel_defense', goalChance: 'duel_goal_chance',
+  }[stat];
+  const value = num(card?.[stat] ?? card?.[fallbackKey]);
+  return (
+    <span className="duelFocusRibbon" style={{ '--focus-color': meta.color || '#38BDF8' }}>
+      <i aria-hidden="true">{meta.icon || '★'}</i>{fa(value)}
+    </span>
+  );
+}
+
 function DuelIdentity({ player, fallback }) {
   const p = player || {};
   const imageUrl = p.profileImageUrl || p.profile_image_url;
@@ -275,6 +330,14 @@ function LiveArena({ session }) {
         <span key={index}><img src="/games/card_duel_glow.png" alt="پشت کارت حریف" /></span>)}
     </div>
 
+    {phase === 'playing' && (
+      <FocusBanner
+        focus={state.roundFocus}
+        fallbackTitle={state.roundTitle}
+        roundNumber={Math.min(num(state.totalRounds) || 5, num(state.roundIndex) + 1)}
+      />
+    )}
+
     <RoundReveal round={state.lastRound} me={mine} myFrame={myFrame} opponentFrame={opponentFrame} />
 
     {phase === 'playing' && <section className="duelChoicePanel">
@@ -284,10 +347,15 @@ function LiveArena({ session }) {
         <strong>{fa(secondsLeft)}<small>ثانیه</small></strong>
       </div>
       <div className="duelHandV2">
-        {myCards.map(card => <HoloCard key={idOf(card)} card={card} compact frame={myFrame}
-          selected={pendingId === idOf(card)}
-          disabled={state.iChose || !remaining.has(idOf(card))}
-          onClick={() => move({ cardId: idOf(card) })} />)}
+        {myCards.map(card => (
+          <div className="duelHandCard" key={idOf(card)}>
+            <HoloCard card={card} compact frame={myFrame}
+              selected={pendingId === idOf(card)}
+              disabled={state.iChose || !remaining.has(idOf(card))}
+              onClick={() => move({ cardId: idOf(card) })} />
+            <FocusStatRibbon card={card} stat={state.roundFocus?.stat} />
+          </div>
+        ))}
       </div>
     </section>}
   </div>;

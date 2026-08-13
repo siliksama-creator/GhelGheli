@@ -58,6 +58,25 @@ export function clearDataCache() {
   etagCache.clear();
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// stale-while-revalidate — «اول نشان بده، بعد تازه کن»
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// همان الگویی که در اپِ اندروید پیاده شد، برای حفظِ یکپارچگیِ رفتار بینِ
+// وب و اندروید.
+//
+// اندازه‌گیریِ واقعی: سرور در ۴ میلی‌ثانیه پاسخ می‌دهد ولی رفت‌وبرگشتِ
+// شبکه ۴۷۰ تا ۱۰۳۰ میلی‌ثانیه است. یعنی «فشار روی سرور» مسئله نیست —
+// خودِ انتظار مسئله است.
+//
+// `snapshot()` آخرین دادهٔ شناخته‌شده را بدونِ هیچ درخواستی می‌دهد تا
+// صفحه فوراً چیزی نشان بدهد؛ بعد `req()` معمولی با `If-None-Match` صدا
+// زده می‌شود و اگر داده عوض نشده باشد سرور ۳۰۴ با بدنهٔ صفر می‌دهد.
+export function snapshot(path, token) {
+  const hit = etagCache.get(cacheKey(path, token));
+  return hit ? hit.data : null;
+}
+
 /**
  * One request. Throws an Error carrying `.status` and `.data` so callers can
  * branch on the HTTP code (a 409 from the tap endpoint is an answer, not a

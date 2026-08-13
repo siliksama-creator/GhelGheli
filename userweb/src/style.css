@@ -3895,3 +3895,71 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
   .duelClashCine, .duelClashCine * { animation: none !important; }
   .duelClashSide { opacity: 1 !important; transform: none !important; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   بنرِ معیارِ راند + نوارِ عدد روی کارت
+   ═══════════════════════════════════════════════════════════════════════
+
+   قبلاً معیارِ راند یک خطِ ۹پیکسلیِ خاکستری بود که کاربر هرگز نمی‌دیدش.
+   حالا یک بنرِ تمام‌عرض با آیکون، رنگِ اختصاصیِ هر ویژگی و انیمیشنِ ورود.
+
+   `key` روی کامپوننت باعث می‌شود React در هر راند دوباره mount کند، پس
+   انیمیشن هر بار اجرا می‌شود — بدونِ آن فقط راندِ اول انیمیشن داشت. */
+
+.duelFocusBanner {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 14px; border-radius: 18px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--focus-color) 26%, transparent), #07111d);
+  border: 1.5px solid color-mix(in srgb, var(--focus-color) 55%, transparent);
+  box-shadow: 0 0 26px color-mix(in srgb, var(--focus-color) 22%, transparent);
+  animation: duelFocusIn .55s cubic-bezier(.2, 1.5, .35, 1) both;
+}
+.duelFocusBanner > div { display: flex; flex-direction: column; min-width: 0; }
+.duelFocusBanner small { font-size: 11.5px; color: #ffffffb8; font-weight: 700; }
+.duelFocusBanner b {
+  font-size: 21px; font-weight: 900; line-height: 1.25;
+  color: var(--focus-color);
+  text-shadow: 0 0 14px color-mix(in srgb, var(--focus-color) 55%, transparent);
+}
+.duelFocusBanner i {
+  font-style: normal; font-size: 12px; color: #ffffffb0;
+  font-weight: 600; line-height: 1.5;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.duelFocusIcon {
+  flex: 0 0 auto; width: 44px; height: 44px; display: grid; place-items: center;
+  font-size: 22px; border-radius: 50%;
+  background: color-mix(in srgb, var(--focus-color) 18%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--focus-color) 55%, transparent);
+  animation: duelFocusPulse 2.2s ease-in-out infinite;
+}
+@keyframes duelFocusIn {
+  from { opacity: 0; transform: translateY(18px) scale(.92); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes duelFocusPulse {
+  50% { transform: scale(1.11); box-shadow: 0 0 20px color-mix(in srgb, var(--focus-color) 55%, transparent); }
+}
+
+/* عددِ تعیین‌کنندهٔ راند، زیرِ هر کارتِ دست. بدونِ این، کاربر نمی‌داند
+   کدام‌یک از شش عددِ کارت اهمیت دارد و به «قدرتِ کلی» نگاه می‌کند — که
+   در ۱۳٪ مواقع برندهٔ راند را اشتباه پیش‌بینی می‌کند. */
+.duelHandCard { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.duelFocusRibbon {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 9px; border-radius: 999px;
+  background: color-mix(in srgb, var(--focus-color) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--focus-color) 50%, transparent);
+  color: var(--focus-color); font-size: 14px; font-weight: 900;
+}
+.duelFocusRibbon i { font-style: normal; font-size: 12px; }
+
+@media (max-width: 700px) {
+  .duelFocusBanner { padding: 9px 11px; gap: 9px; }
+  .duelFocusIcon { width: 38px; height: 38px; font-size: 19px; }
+  .duelFocusBanner b { font-size: 18px; }
+  .duelFocusBanner i { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .duelFocusBanner, .duelFocusIcon { animation: none !important; }
+}

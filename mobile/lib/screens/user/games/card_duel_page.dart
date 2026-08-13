@@ -112,6 +112,8 @@ class _CardDuelPageState extends State<CardDuelPage> {
     super.initState();
     _started = widget.initialStart != null;
     _session.addListener(_onSession);
+    // اول کهنه را رسم کن (صفر انتظار)، بعد در پس‌زمینه تازه کن.
+    _paintCached();
     unawaited(_load());
   }
 
@@ -119,6 +121,41 @@ class _CardDuelPageState extends State<CardDuelPage> {
     if (!mounted) return;
     if (_session.phase == GamePhase.over) unawaited(_load(refreshSelection: false));
     setState(() {});
+  }
+
+  /// دادهٔ کهنه را فوراً رسم می‌کند تا صفحه هرگز خالی نماند.
+  ///
+  /// گزارشِ مالک: «هر بار که از صفحه بازی میرم ... باید منتظر بمونم کارت
+  /// ها لود بشن». اندازه‌گیری نشان داد سرور در ۴ms جواب می‌دهد و کلِ
+  /// تأخیر رفت‌وبرگشتِ شبکه است (۴۷۰ تا ۱۰۳۰ms). پس تنها راهِ حذفِ
+  /// انتظار، نمایشِ فوریِ آخرین دادهٔ شناخته‌شده است.
+  void _paintCached() {
+    final cached = widget.api.cachedSnapshot('/api/card-duel');
+    if (cached is! Map) return;
+    _applyDuelData(Map<String, dynamic>.from(cached), refreshSelection: true);
+  }
+
+  void _applyDuelData(Map<String, dynamic> map, {required bool refreshSelection}) {
+    final owned = (map['playableCards'] as List?) ?? const [];
+    final prepared = widget.vsBot && owned.length < 5
+        ? (map['practiceCards'] as List? ?? const [])
+        : ((map['activeDeck'] as Map?)?['cards'] as List? ?? const []);
+    final activeCards = prepared
+        .whereType<Map>()
+        .map((card) => '${card['cardTypeId'] ?? card['id'] ?? ''}')
+        .where((id) => id.isNotEmpty)
+        .take(5)
+        .toList();
+    setState(() {
+      _data = map;
+      if (refreshSelection && !_started) {
+        _selected
+          ..clear()
+          ..addAll(activeCards);
+      }
+      _error = null;
+      _loading = false;
+    });
   }
 
   Future<void> _load({bool refreshSelection = true}) async {
@@ -367,7 +404,7 @@ class _CardDuelPageState extends State<CardDuelPage> {
                 border: Border.all(color: _gold, width: 1.5),
               ),
               child: Column(children: [
-                const Text('GHELGHELI CARD ARENA', style: TextStyle(color: _cyan, fontSize: 10, fontWeight: FontWeight.w900)),
+                const Text('GHELGHELI CARD ARENA', style: TextStyle(color: _cyan, fontSize: 12, fontWeight: FontWeight.w900)),
                 Gaps.vSm,
                 Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
                 Text('${faNum(score[me])} - ${faNum(score[other])}', style: const TextStyle(color: _gold, fontSize: 40, fontWeight: FontWeight.w900)),
@@ -405,7 +442,7 @@ class _CardDuelPageState extends State<CardDuelPage> {
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
                   MessengerIcon(app: target.app, size: 34),
                   const SizedBox(height: 4),
-                  Text(target.label, style: const TextStyle(fontSize: 9.5)),
+                  Text(target.label, style: const TextStyle(fontSize: 11.5)),
                 ]),
               ),
             ))],),
@@ -458,29 +495,56 @@ class _CardDuelPageState extends State<CardDuelPage> {
           colors: [Color(0xFF071522), Color(0xFF03070D)],
         ),
       ),
-      child: RefreshIndicator(
-        onRefresh: _load,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, Gaps.xxl),
-          children: [
-            _ArenaHero(
-              onBack: () {
-                _session.leave();
-                widget.onBack();
-              },
-              modeColor: _modeColor,
-              modeTitle: _modeTitle,
-              subtitle: widget.vsBot
-                  ? 'رایگان و بدون جابه‌جایی امتیاز'
-                  : widget.stake > 0
-                      ? 'باخت یعنی کسر ${faNum(widget.stake)} امتیاز'
-                      : 'مسابقه دوستانه خصوصی',
+      // ═══════════════════════════════════════════════════════════════
+      // چیدمان: دکمهٔ شروع همیشه روی صفحه، بدونِ اسکرول
+      // ═══════════════════════════════════════════════════════════════
+      //
+      // ── گزارشِ مالک ──
+      //
+      //   «همون اولش بازی با ربات یه اسکرول طولانی باید بزنی. یکاری کن
+      //    که بازی کمترین نیاز به اسکرول کردن داشته باشه»
+      //
+      // ── چه چیزی باعثش می‌شد ──
+      //
+      // همه‌چیز در یک ListView پشتِ سر هم بود: نوارِ قوانین، ترکیب،
+      // پنلِ تحلیل، دکمهٔ شروع، کلکسیونِ کامل، تاریخچه. دکمهٔ «ورود به
+      // آرنا» جایی وسطِ این ستون دفن شده بود.
+      //
+      // ── راه‌حل ──
+      //
+      // دکمه از جریانِ اسکرول بیرون کشیده و به نوارِ پایینِ ثابت منتقل
+      // شد. حالا کاربر از لحظهٔ ورود می‌بیندش و برای شروعِ بازی هیچ
+      // اسکرولی لازم نیست. اسکرول فقط برای کارهای اختیاری می‌ماند
+      // (دیدنِ کلِ کلکسیون یا تاریخچه).
+      child: Column(children: [
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: ListView(
+              padding: EdgeInsets.fromLTRB(
+                  Gaps.md, Gaps.sm, Gaps.md, _started ? Gaps.xxl : Gaps.sm),
+              children: [
+                _ArenaHero(
+                  onBack: () {
+                    _session.leave();
+                    widget.onBack();
+                  },
+                  modeColor: _modeColor,
+                  modeTitle: _modeTitle,
+                  subtitle: widget.vsBot
+                      ? 'رایگان و بدون جابه‌جایی امتیاز'
+                      : widget.stake > 0
+                          ? 'باخت یعنی کسر ${faNum(widget.stake)} امتیاز'
+                          : 'مسابقه دوستانه خصوصی',
+                ),
+                Gaps.vSm,
+                if (!_started) _buildSetup(context) else _buildSession(context),
+              ],
             ),
-            Gaps.vMd,
-            if (!_started) _buildSetup(context) else _buildSession(context),
-          ],
+          ),
         ),
-      ),
+        if (!_started) _buildStartBar(context),
+      ]),
     );
   }
 
@@ -501,49 +565,41 @@ class _CardDuelPageState extends State<CardDuelPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const _RuleStrip(),
-        Gaps.vSm,
+        // ترکیب اول می‌آید: مهم‌ترین چیزِ این صفحه و تنها چیزی که برای
+        // شروع لازم است.
         _LineupPanel(
           selected: _selected,
           cards: _cards,
           teamPower: teamPower,
           onRemove: _toggle,
         ),
-        Gaps.vSm,
-        _DeckIntelPanel(
-          activeInsights: activeInsights,
-          suggestedDeck: suggestedDeck,
-          onApplySuggested: _applySuggestedDeck,
+        Gaps.vXs,
+        // ── چرا این دو تا حالا جمع‌شونده‌اند ──
+        //
+        // هیچ‌کدام برای شروعِ بازی لازم نیستند: قوانین را کاربر بعد از
+        // یک بازی می‌داند، و تحلیلِ ترکیب یک ابزارِ اختیاریِ پیشرفته
+        // است. ولی با هم حدود ۳۲۰ پیکسل ارتفاع می‌گرفتند و دکمهٔ شروع
+        // را از صفحه بیرون می‌انداختند.
+        //
+        // جمع‌شده پیش‌فرض‌اند و هرکس خواست بازشان می‌کند.
+        _CollapsibleSection(
+          icon: Icons.menu_book_rounded,
+          title: 'قوانین نبرد',
+          subtitle: 'پنج کارت، انتخاب مخفی، پنج راند',
+          child: const _RuleStrip(),
         ),
-        Gaps.vSm,
-        FilledButton(
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(62),
-            backgroundColor: _modeColor,
-            foregroundColor: const Color(0xFF04101A),
-            shape: RoundedRectangleBorder(borderRadius: Corners.rLg),
-          ),
-          onPressed: _busy || _selected.length != 5 ? null : _saveAndStart,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(_busy ? 'در حال قفل ترکیب…' : 'ورود به $_modeTitle',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
-              Text(widget.vsBot
-                  ? 'بدون ریسک امتیاز'
-                  : widget.stake > 0
-                      ? 'ورودی ${faNum(widget.stake)} امتیاز'
-                      : 'مسابقه خصوصی',
-                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700)),
-            ],
+        Gaps.vXs,
+        _CollapsibleSection(
+          icon: Icons.insights_rounded,
+          title: 'تحلیل ترکیب',
+          subtitle: 'نقاط قوت و پیشنهاد چیدمان',
+          child: _DeckIntelPanel(
+            activeInsights: activeInsights,
+            suggestedDeck: suggestedDeck,
+            onApplySuggested: _applySuggestedDeck,
           ),
         ),
-        if (_error != null) ...[
-          Gaps.vXs,
-          Text(_error!, textAlign: TextAlign.center,
-              style: TextStyle(color: Theme.of(context).colorScheme.error)),
-        ],
-        Gaps.vLg,
+        Gaps.vSm,
         if (_practiceFallback) ...[
           Container(
             padding: const EdgeInsets.all(Gaps.sm),
@@ -559,7 +615,7 @@ class _CardDuelPageState extends State<CardDuelPage> {
                 Text('دستهٔ تمرینی رایگان برای شروع سریع',
                     style: TextStyle(color: _emerald, fontWeight: FontWeight.w900)),
                 Text('این کارت‌ها فقط مقابل ربات فعال‌اند؛ برای آنلاین باید پنج کارت واقعی جمع کنی.',
-                    style: TextStyle(fontSize: 9.5, color: Colors.white60)),
+                    style: TextStyle(fontSize: 11.5, color: Colors.white60)),
               ])),
             ]),
           ),
@@ -596,9 +652,91 @@ class _CardDuelPageState extends State<CardDuelPage> {
               );
             },
           ),
-        Gaps.vLg,
+        Gaps.vSm,
         _History(battles: (_data?['recentBattles'] as List?) ?? const []),
+        Gaps.vSm,
       ],
+    );
+  }
+
+  /// نوارِ ثابتِ پایین با دکمهٔ شروع.
+  ///
+  /// بیرون از ListView است، پس هرچقدر هم کاربر اسکرول کند سرِ جایش
+  /// می‌ماند. وضعیتِ ترکیب («۳ از ۵») هم اینجاست تا کاربر بدونِ اسکرول
+  /// بفهمد چرا دکمه غیرفعال است — قبلاً دکمهٔ خاکستری بدونِ توضیح بود.
+  Widget _buildStartBar(BuildContext context) {
+    final ready = _selected.length == 5;
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+          Gaps.md, Gaps.sm, Gaps.md, Gaps.sm + MediaQuery.of(context).padding.bottom),
+      decoration: BoxDecoration(
+        color: const Color(0xFF050D16),
+        border: Border(top: BorderSide(color: _modeColor.withValues(alpha: 0.28))),
+        boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 18, offset: Offset(0, -6))],
+      ),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        if (_error != null) ...[
+          Text(_error!,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700)),
+          Gaps.vXs,
+        ],
+        Row(children: [
+          // شمارندهٔ ترکیب: پنج نقطه که با انتخاب پر می‌شوند.
+          for (var i = 0; i < 5; i++)
+            Padding(
+              padding: const EdgeInsets.only(left: 5),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                width: i < _selected.length ? 13 : 9,
+                height: i < _selected.length ? 13 : 9,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: i < _selected.length ? _modeColor : Colors.white24,
+                  boxShadow: i < _selected.length
+                      ? [BoxShadow(color: _modeColor.withValues(alpha: 0.55), blurRadius: 9)]
+                      : const [],
+                ),
+              ),
+            ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              ready
+                  ? 'ترکیب کامل است'
+                  : 'ترکیب: ${faNum(_selected.length)} از ${faNum(5)} کارت',
+              style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                  color: ready ? _emerald : Colors.white70),
+            ),
+          ),
+        ]),
+        Gaps.vXs,
+        FilledButton(
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(56),
+            backgroundColor: _modeColor,
+            foregroundColor: const Color(0xFF04101A),
+            shape: RoundedRectangleBorder(borderRadius: Corners.rLg),
+          ),
+          onPressed: _busy || !ready ? null : _saveAndStart,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text(_busy ? 'در حال قفل ترکیب…' : 'ورود به $_modeTitle',
+                style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.w900)),
+            Text(
+                widget.vsBot
+                    ? 'بدون ریسک امتیاز'
+                    : widget.stake > 0
+                        ? 'ورودی ${faNum(widget.stake)} امتیاز'
+                        : 'مسابقه خصوصی',
+                style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+          ]),
+        ),
+      ]),
     );
   }
 
