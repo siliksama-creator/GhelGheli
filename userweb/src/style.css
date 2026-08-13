@@ -4622,3 +4622,22 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 @media (max-width:520px){
   .duelLaunch{padding:6px 14px}
 }
+
+/* ═══ لوپ ۵ج: آخرین ۲ امتیاز — سرریزِ متنِ نشانِ حالت ══════════════════
+   `<b>تمرین با ربات</b>` داخلِ `aside` عرضِ ۳۱۸px می‌گرفت و از
+   `left:-82` شروع می‌شد.
+
+   علت: `aside` مقدار `white-space:nowrap` دارد و `min-width:0` روی
+   خودش اعمال شد، ولی **فرزندش** `<b>` هیچ محدودیتی نداشت. در
+   flexbox، `min-width:0` ارثی نیست — هر سطح باید جداگانه اجازهٔ
+   کوچک‌شدن بگیرد، وگرنه محتوای nowrap ظرف را از تو می‌شکافد.
+
+   با `overflow:hidden` + `text-overflow:ellipsis` روی خودِ `b`، متن
+   در فضای موجود جا می‌شود و در صورت نیاز «…» می‌گذارد. */
+@media (max-width:520px){
+  .duelHeroV2 aside{overflow:hidden}
+  .duelHeroV2 aside b{
+    min-width:0; overflow:hidden; text-overflow:ellipsis;
+    max-width:38vw;
+  }
+}
