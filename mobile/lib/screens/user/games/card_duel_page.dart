@@ -749,6 +749,10 @@ class _CardDuelPageState extends State<CardDuelPage> {
           onCancel: _editLineup,
         );
       case GamePhase.playing:
+        final st = _session.state;
+        final totalR = NumberParser.toInt(st['totalRounds']) == 0
+            ? 5
+            : NumberParser.toInt(st['totalRounds']);
         return Stack(children: [
           Column(children: [
             if (_session.connectionNotice != null || !_session.connected) ...[
@@ -766,6 +770,18 @@ class _CardDuelPageState extends State<CardDuelPage> {
           if (_myCosmetics['matchEffect'] != null
               && matchEffectSupports('${_myCosmetics['matchEffect']}', 'entry'))
             Positioned.fill(child: IgnorePointer(child: _DuelCosmeticEffect(slug: '${_myCosmetics['matchEffect']}'))),
+          // اعلانِ سینماییِ «این راند سرِ چیست» — آخرین لایه تا روی همه‌چیز
+          // بیاید. چون Positioned.fill است، ارتفاعی از چیدمان نمی‌گیرد.
+          Positioned.fill(
+            child: _RoundIntroOverlay(
+              focus: st['roundFocus'] is Map
+                  ? Map<String, dynamic>.from(st['roundFocus'] as Map)
+                  : null,
+              roundNumber:
+                  (NumberParser.toInt(st['roundIndex']) + 1).clamp(1, totalR),
+              totalRounds: totalR,
+            ),
+          ),
         ]);
       case GamePhase.over:
         return Stack(children: [

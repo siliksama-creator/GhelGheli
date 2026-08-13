@@ -146,12 +146,18 @@ function publicState(state, player) {
     // با اینکه پایین‌تر نشون داده میشه راند رو اون میبره». علتش این بود
     // که کاربر عددِ «قدرتِ کلیِ کارت» را می‌دید ولی راند روی **یک ویژگیِ
     // خاص** داوری می‌شود. حالا کلاینت می‌تواند همان ویژگی را برجسته کند.
+    //
+    // `cry`/`hint`/`emoji` برای اعلانِ سینمایی وسطِ صفحه و راهنمای
+    // سنِ پایین‌اند (توضیحِ کامل کنارِ ROUND_FOCUS در cardDuelService).
     roundFocus: duel.ROUND_FOCUS[state.roundIndex]
       ? {
         stat: duel.ROUND_FOCUS[state.roundIndex].stat,
         key: duel.ROUND_FOCUS[state.roundIndex].key,
         label: duel.ROUND_FOCUS[state.roundIndex].label,
         text: duel.ROUND_FOCUS[state.roundIndex].userText,
+        cry: duel.ROUND_FOCUS[state.roundIndex].cry,
+        hint: duel.ROUND_FOCUS[state.roundIndex].hint,
+        emoji: duel.ROUND_FOCUS[state.roundIndex].emoji,
         index: state.roundIndex,
       }
       : null,

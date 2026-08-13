@@ -16,18 +16,100 @@ const EFFECT_LABEL = Object.freeze({
   none: 'بدون افکت', finisher: 'فینیشر', wall: 'دیوار دفاعی', speedster: 'سرعتی',
   playmaker: 'بازی‌ساز', lucky_star: 'ستاره خوش‌شانس',
 });
+// ── چرا هر راند «شعار» و «راهنمای کودکانه» دارد ──
+//
+// خواستهٔ مالک: «بازی رو خیلی جذاب و قابل فهم برای کاربر های گروه سنی
+// کمتر هم کن».
+//
+// `label` نامِ راند است، `userText` توضیحِ بعد از نتیجه، و دو فیلدِ تازه:
+//   • `cry`  — شعارِ کوتاهِ وسطِ صفحه هنگامِ شروعِ راند (انیمیشنِ سینمایی)
+//   • `hint` — یک جملهٔ خیلی ساده که می‌گوید «کدام کارت را بازی کن»
+//
+// عمداً کوتاه و بدونِ اصطلاحِ فنی‌اند تا بچهٔ ده‌ساله هم بفهمد کدام عدد
+// روی کارت‌ها مهم است. `emoji` هم برای کسی است که هنوز روان نمی‌خواند.
 const ROUND_FOCUS = Object.freeze([
-  { key: 'duel_speed', stat: 'speed', label: 'ضدحمله سرعتی', userText: 'سرعت کارت ضدحمله را ساخت' },
-  { key: 'duel_technique', stat: 'technique', label: 'نبرد تکنیکی', userText: 'تکنیک کارت خط میانی را شکست' },
-  { key: 'duel_attack', stat: 'attack', label: 'فشار حمله', userText: 'قدرت حمله خط دفاع را شکافت' },
-  { key: 'duel_defense', stat: 'defense', label: 'دیوار دفاعی', userText: 'دفاع کارت جلوی ضدحمله را گرفت' },
-  { key: 'duel_goal_chance', stat: 'goalChance', label: 'ضربه نهایی', userText: 'شانس گل ضربه آخر را ساخت' },
+  {
+    key: 'duel_speed', stat: 'speed', label: 'ضدحمله سرعتی',
+    userText: 'سرعت کارت ضدحمله را ساخت',
+    cry: 'سریع‌ترین کارتت را بفرست!', hint: 'کارتی که عددِ سرعتش بیشتر است برنده می‌شود',
+    emoji: '⚡',
+  },
+  {
+    key: 'duel_technique', stat: 'technique', label: 'نبرد تکنیکی',
+    userText: 'تکنیک کارت خط میانی را شکست',
+    cry: 'وقتِ هنرنمایی است!', hint: 'کارتی که عددِ تکنیکش بیشتر است برنده می‌شود',
+    emoji: '✨',
+  },
+  {
+    key: 'duel_attack', stat: 'attack', label: 'فشار حمله',
+    userText: 'قدرت حمله خط دفاع را شکافت',
+    cry: 'حمله کن!', hint: 'کارتی که عددِ حمله‌اش بیشتر است برنده می‌شود',
+    emoji: '🔥',
+  },
+  {
+    key: 'duel_defense', stat: 'defense', label: 'دیوار دفاعی',
+    userText: 'دفاع کارت جلوی ضدحمله را گرفت',
+    cry: 'دروازه را ببند!', hint: 'کارتی که عددِ دفاعش بیشتر است برنده می‌شود',
+    emoji: '🛡️',
+  },
+  {
+    key: 'duel_goal_chance', stat: 'goalChance', label: 'ضربه نهایی',
+    userText: 'شانس گل ضربه آخر را ساخت',
+    cry: 'ضربهٔ آخر، گل بزن!', hint: 'کارتی که عددِ شانسِ گلش بیشتر است برنده می‌شود',
+    emoji: '⚽',
+  },
 ]);
 
-// تصویر نمایشی باید همیشه طرح روی کارت باشد.
-// قبلاً display_design_id گاهی پشت کارت را برمی‌داشت و کاربر به‌جای
-// عکس واقعی بازیکن یک طرح نامرتبط می‌دید. روی کارت منبع حقیقت است.
+// ═══════════════════════════════════════════════════════════════════════════
+// دو عبارتِ تصویر — و چرا یکی کردنشان یک باگ بود
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// در **آرنای دوئل** باید همیشه طرحِ روی کارت دیده شود: کاربر باید عکسِ
+// واقعیِ بازیکن را ببیند، نه پشتِ کارت را. `FRONT_IMAGE_SQL` برای همین است.
+//
+// ولی در **اینونتوری** قاعده فرق می‌کند: خواستهٔ صریحِ مالک این است که
+// در لحظهٔ ثبت قرعه بیفتد و رو یا پشتِ کارت انتخاب شود
+// («اینطوری زیبایی اینونتوری بیشتر میشه»). آن قرعه در ستونِ
+// `display_design_id` ثابت می‌شود.
+//
+// ⚠️ کامیت `4f67a5e` («بازسازی کامل دوئل کارت») به‌درستی آرنا را به
+//    `FRONT_IMAGE_SQL` برد، ولی همان تغییر را روی `/api/profile`،
+//    `/api/bootstrap` و پروفایلِ عمومی هم اعمال کرد — که اینونتوری‌اند،
+//    نه آرنا. نتیجه: قرعه همچنان می‌افتاد و در دیتابیس ذخیره می‌شد ولی
+//    **هیچ‌جا خوانده نمی‌شد**. قابلیت بی‌صدا مُرد.
+//
+//    نشانه‌اش این بود که کامنتِ بالای آن کوئری‌ها هنوز می‌گفت «قرعه
+//    خورده» و «LEFT JOIN» در حالی که کوئریِ جدید نه قرعه می‌خواند نه
+//    LEFT JOIN داشت. کامنتی که با کدش نمی‌خواند، نشانهٔ ویرایشِ عجولانه
+//    است.
+//
+//    هیچ تستِ واحدی این را نگرفت چون `testInventoryImage.js` نگهبانِ
+//    **ساختاری** است و بخشِ نوشتن هنوز درست بود. تنها چیزی که گرفت
+//    `tools/e2e_invside.py` بود که روی سرورِ زنده اجرا می‌شود.
 const FRONT_IMAGE_SQL = `COALESCE(
+  (SELECT pd.image_url FROM photo_card_designs pd
+    WHERE pd.card_type_id = t.id AND pd.is_active = true
+      AND COALESCE(pd.side, 'front') = 'front'
+    ORDER BY pd.created_at DESC LIMIT 1),
+  t.image_url
+)`;
+
+/**
+ * تصویرِ اینونتوری — طرحی که در لحظهٔ ثبت قرعه خورده.
+ *
+ * ترتیبِ سه‌مرحله‌ایِ COALESCE عمدی است:
+ *   ۱. `display_design_id` — قرعهٔ ثابتِ همان ردیفِ اینونتوری
+ *   ۲. طرحِ «رو» — برای ردیف‌های قدیمی که پیش از مایگریشنِ ۰۴۴ ثبت
+ *      شده‌اند و ستونشان NULL است
+ *   ۳. `t.image_url` — کارتِ سیستمِ قدیمی که اصلاً طرحِ عکسی ندارد
+ *
+ * ⚠️ این عبارت به نامِ مستعارِ `i` برای `user_card_inventory` و `t`
+ *    برای `card_types` وابسته است. هر کوئریِ تازه‌ای که از آن استفاده
+ *    می‌کند باید همین نام‌ها را داشته باشد.
+ */
+const INVENTORY_IMAGE_SQL = `COALESCE(
+  (SELECT pd.image_url FROM photo_card_designs pd
+    WHERE pd.id = i.display_design_id AND pd.is_active = true),
   (SELECT pd.image_url FROM photo_card_designs pd
     WHERE pd.card_type_id = t.id AND pd.is_active = true
       AND COALESCE(pd.side, 'front') = 'front'
@@ -491,20 +573,141 @@ function starterDeck() {
   }));
 }
 
+/**
+ * حریفِ تمرینی — هم‌تراز با کارت‌های کاربر، نه قوی‌تر.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * باگی که اینجا بود و چرا کاربر همیشه می‌باخت
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * نسخهٔ قبلی پایهٔ استاتِ بات را از `totalPower(کارتِ کاربر)` می‌ساخت.
+ * این **خلطِ واحد** است و دو بار تورم می‌سازد:
+ *
+ *   ۱. `totalPower` یک استاتِ ۰..۱۰۰ نیست. مجموعِ وزن‌دارِ استات‌ها
+ *      به‌علاوهٔ `pointBoost` (تا +۲۲ بابتِ امتیازِ کارت) و
+ *      `RARITY_BONUS` (تا +۲۴ بابتِ لجند بودن) است. کارتی با استاتِ ۵۰
+ *      ولی ۵۰۰۰ امتیاز و کمیابیِ لجند، `totalPower=99` می‌گیرد.
+ *
+ *   ۲. آن عددِ ۹۹ به‌عنوان **استاتِ خام** به بات داده می‌شد. بعد خودِ
+ *      بات دوباره از مسیرِ `publicCard` و `totalPower` عبور می‌کرد و
+ *      باز pointBoost و rarityBonus می‌گرفت — تورمِ روی تورم.
+ *
+ * نتیجهٔ اندازه‌گیری‌شده (۴۰۰۰ شبیه‌سازی برای هر ردیف):
+ *
+ *   | استاتِ کاربر | امتیاز | کمیابی  | نرخِ بردِ کاربر |
+ *   |-------------|--------|---------|---------------|
+ *   | ۵۰          | ۰      | معمولی  | **۰٫۱٪**      |
+ *   | ۵۰          | ۵۰۰۰   | لجند    | **۰٫۰٪**      |
+ *   | ۷۰          | ۱۰۰۰۰  | طلایی   | **۰٫۰٪**      |
+ *   | ۸۰          | ۲۰۰۰۰  | لجند    | ۷٫۳٪          |
+ *   | ۹۰          | ۵۰۰۰۰  | لجند    | ۹۵٫۸٪         |
+ *
+ * یعنی هرچه کارتِ کاربر **گران‌تر** بود، بات قوی‌تر می‌شد و کاربر
+ * بیشتر می‌باخت — دقیقاً برعکسِ انتظار. و چون `clamp` روی ۸۸ می‌بست،
+ * نرخِ برد بینِ استاتِ ۸۰ و ۹۰ از ۷٪ به ۹۵٪ می‌پرید: یک پرتگاه، نه یک
+ * منحنی.
+ *
+ * ── چرا کاربر «امتیاز بات کمتر است ولی می‌برد» می‌دید ──
+ *
+ * چیپِ «ویژگی» روی صفحه `focusStat` را نشان می‌دهد که استاتِ خام است
+ * (مثلاً ۵۰)، ولی برنده از روی `totalPower` تعیین می‌شد که عددِ دیگری
+ * است. پس دو عددِ ناهم‌مقیاس به کاربر نشان داده می‌شد و تصمیم با
+ * عددی گرفته می‌شد که او نمی‌دید.
+ *
+ * ── راهِ حل ──
+ *
+ * پایهٔ بات از **میانگینِ استاتِ خامِ** کارت‌های کاربر ساخته می‌شود، نه
+ * از totalPower. سپس عمداً کمی **زیرِ** کاربر تنظیم می‌شود تا تمرین
+ * حسِ پیشرفت بدهد. امتیاز و کمیابیِ بات هم با کاربر هم‌تراز می‌شود تا
+ * pointBoost و rarityBonus یک‌طرفه نباشند.
+ *
+ * هدف: نرخِ بردِ کاربر در بازهٔ ۵۵٪ تا ۷۵٪ برای همهٔ سطوحِ کارت.
+ * نگهبان: `scripts/testCardDuelBalance.js`.
+ */
 function botDeck(userCards) {
-  const avg = userCards.reduce((sum, card) => sum + totalPower(card), 0) / Math.max(1, userCards.length);
-  const rarities = ['normal', 'silver', 'silver', avg > 92 ? 'gold' : 'silver', avg > 100 ? 'premium' : 'gold'];
+  const n = Math.max(1, userCards.length);
+  // میانگینِ استاتِ خام — هم‌واحد با چیزی که بات دریافت می‌کند.
+  const avgStat = userCards.reduce((sum, card) => {
+    const c = publicCard(card);
+    return sum + (c.attack + c.defense + c.speed + c.technique + c.goalChance) / 5;
+  }, 0) / n;
+  // ── چرا امتیاز و کمیابیِ بات **دقیقاً** برابرِ کاربر است ──
+  //
+  // `totalPower` سه جزء دارد: استاتِ وزن‌دار + `pointBoost` (تا +۲۲) +
+  // `RARITY_BONUS` (تا +۲۴). اگر بات امتیاز/کمیابیِ کمتری بگیرد، آن دو
+  // جزء به‌شکلِ **نامتناسب** به سودِ کاربر می‌شوند و مقدارِ برتری به
+  // نوعِ کارتِ کاربر وابسته می‌ماند.
+  //
+  // این را اندازه گرفتم: با کمیابیِ یک‌پله‌کمتر و امتیازِ ۰٫۸ برابر،
+  // نرخِ بردِ کاربر بین ۲٪ (کارتِ ضعیف) تا ۹۳٪ (کارتِ قوی) نوسان
+  // می‌کرد — هیچ آفستی نمی‌توانست هم‌زمان هر دو سر را درست کند، چون
+  // مشکل در آفست نبود بلکه در **شیبِ** متفاوتِ دو طرف بود.
+  //
+  // با برابر کردنِ این دو جزء، تفاوتِ `totalPower` دقیقاً برابرِ
+  // تفاوتِ استاتِ خام می‌شود — یعنی یک عددِ قابلِ کنترل و مستقل از
+  // اینکه کارتِ کاربر ارزان است یا گران.
+  const points = userCards.map(c => Number(publicCard(c).pointValue) || 0).sort((a, b) => a - b);
+  const medianPoint = points[Math.floor(points.length / 2)] || 0;
+  const rarityRank = userCards.reduce((sum, card) => sum + RARITIES.indexOf(publicCard(card).rarity), 0) / n;
+
   const names = ['ربات سرعتی', 'ربات تاکتیکی', 'ربات دیوار', 'ربات وینگر', 'ربات فینیشر'];
-  const effects = ['speedster', 'playmaker', 'wall', 'lucky_star', 'finisher'];
+  // ── چرا افکتِ بات محدود شد ──
+  //
+  // قبلاً هر پنج کارتِ بات یک افکتِ فعال داشتند (speedster، playmaker،
+  // wall، lucky_star، finisher) در حالی که کارتِ واقعیِ کاربر معمولاً
+  // `none` است. اندازه‌گیری: در راندِ اول بات ۱۵ امتیازِ رایگان از
+  // `speedster` می‌گرفت — بیش از کلِ اثرِ استات‌ها. حتی وقتی استات‌ها را
+  // برابر کردم، نرخِ بردِ کاربر ۱۵٪ ماند و تنها با خنثی کردنِ افکت‌ها
+  // به بالای ۵۰٪ رسید.
+  //
+  // دو کارت افکت دارند تا مکانیزم به کاربر آموزش داده شود (تمرین باید
+  // یاد بدهد)، سه کارتِ دیگر خنثی‌اند.
+  const effects = ['none', 'playmaker', 'wall', 'none', 'none'];
+  // ── چرا ترتیبِ تخصص‌ها به‌هم می‌ریزد ──
+  //
+  // `ROUND_FOCUS` به ترتیبِ speed→technique→attack→defense→goalChance
+  // است. بونوس‌های قبلیِ بات دقیقاً روی همین ترتیب چیده شده بودند:
+  // کارتِ اولش +۱۰ سرعت داشت و راندِ اول هم سرعت بود. یعنی دستِ بات
+  // **از پیش برای ترتیبِ راندها بهینه** بود، در حالی که کارت‌های کاربر
+  // به ترتیبی است که خودش چیده — معمولاً تصادفی.
+  //
+  // این تنهایی یک سوگیریِ ساختاری بود که هیچ‌کس عمداً طراحی‌اش نکرده
+  // بود. حالا جای تخصص‌ها با seedِ تصادفی جابه‌جا می‌شود.
+  const specialty = [0, 1, 2, 3, 4];
+  for (let i = specialty.length - 1; i > 0; i--) {
+    const j = crypto.randomInt(0, i + 1);
+    [specialty[i], specialty[j]] = [specialty[j], specialty[i]];
+  }
   return [0, 1, 2, 3, 4].map(i => {
-    const base = Math.max(35, Math.min(88, Math.round(avg - 18 + i * 6 + crypto.randomInt(-6, 7))));
+    // ── چرا −۸ و شیبِ ۳ ──
+    //
+    // بات باید کمی ضعیف‌تر باشد (تمرین است، نه امتحان) ولی نه آن‌قدر که
+    // بی‌معنی شود. شیبِ ملایمِ ۳ واحد بین کارتِ اول تا پنجم یعنی راندهای
+    // آخر سخت‌تر می‌شوند و بازی قوسِ دراماتیک پیدا می‌کند.
+    //
+    // سقف ۹۶ به‌جای ۸۸: با استاتِ خام دیگر تورمی در کار نیست، پس بستنِ
+    // زودهنگام فقط همان پرتگاهِ قبلی را می‌سازد.
+    // ── چرا کفِ clamp تا ۵ پایین آمد ──
+    //
+    // کفِ قبلی ۳۰ بود. برای کاربری که کارت‌های استاتِ ۳۰ دارد، بات
+    // نمی‌توانست زیرِ ۳۰ برود و عملاً هم‌قدرتِ او می‌شد: نرخِ برد ۱۲٪.
+    // یعنی **ضعیف‌ترین کاربران بیشترین باخت را می‌خوردند** — بدترین
+    // حالتِ ممکن برای بازیکنِ تازه‌وارد.
+    const base = Math.max(5, Math.min(100, Math.round(avgStat - 10 + i * 3 + crypto.randomInt(-4, 5))));
+    // کمیابی و امتیاز آینهٔ کاربرند (توضیحِ کامل بالاتر) تا تنها متغیرِ
+    // تعیین‌کننده، استاتِ خام باشد.
+    const rarity = RARITIES[clamp(Math.round(rarityRank), 0, RARITIES.length - 1)];
+    const spec = specialty[i];
     return publicCard({
       card_type_id: `bot-${i + 1}`, name: names[i],
-      image_url: null, point_value: Math.max(100, Math.round(avg * 7)), quantity: 1,
-      duel_attack: base + (i === 4 ? 8 : 0), duel_defense: base + (i === 2 ? 8 : 0),
-      duel_speed: base + (i === 0 ? 10 : 0), duel_technique: base + (i === 1 ? 10 : 0),
-      duel_goal_chance: base + (i === 4 ? 10 : 0), duel_energy: 100,
-      duel_rarity: rarities[i], duel_effect: effects[i],
+      image_url: null, point_value: medianPoint, quantity: 1,
+      duel_attack: clamp(base + (spec === 2 ? 5 : 0), 0, 100),
+      duel_defense: clamp(base + (spec === 3 ? 5 : 0), 0, 100),
+      duel_speed: clamp(base + (spec === 0 ? 5 : 0), 0, 100),
+      duel_technique: clamp(base + (spec === 1 ? 5 : 0), 0, 100),
+      duel_goal_chance: clamp(base + (spec === 4 ? 5 : 0), 0, 100),
+      duel_energy: 100,
+      duel_rarity: rarity, duel_effect: effects[i],
     });
   });
 }
@@ -680,7 +883,8 @@ async function recordEngineBattle({ matchId = null, playerX, playerO, state, win
 }
 
 module.exports = {
-  DECK_SIZE, ONLINE_STAKES, RARITIES, EFFECTS, ROUND_FOCUS, FRONT_IMAGE_SQL,
+  DECK_SIZE, ONLINE_STAKES, RARITIES, EFFECTS, ROUND_FOCUS,
+  FRONT_IMAGE_SQL, INVENTORY_IMAGE_SQL,
   RARITY_LABEL, EFFECT_LABEL, duelFieldsFromBody, collectibleInput, publicCard, totalPower,
   playableCards, validateDeck, deckCards, status, saveDeck, botBattle,
   starterDeck, botDeck, resolveRound, simulate, recentBattles, recordEngineBattle,

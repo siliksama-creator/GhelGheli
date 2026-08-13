@@ -89,10 +89,10 @@ export default function League({ token, openProfile }) {
   if (tab === 'clubs') {
     return (
       <section className="card wide leaguePage">
-        <div style={{ display:'flex', gap:'6px', marginBottom:'12px', background:'rgba(255,255,255,0.06)', padding:'4px', borderRadius:'12px' }}>
-          <button onClick={()=>setTab('table')} style={{ flex:1, padding:'8px', borderRadius:'8px', border:'none', background:'transparent', color:'#94A3B8', fontWeight:'700', cursor:'pointer' }}>جدول لیگ</button>
-          <button style={{ flex:1, padding:'8px', borderRadius:'8px', border:'none', background:'#38BDF8', color:'#000', fontWeight:'900' }}>باشگاه‌ها</button>
-          <button onClick={()=>setTab('prev')} style={{ flex:1, padding:'8px', borderRadius:'8px', border:'none', background:'transparent', color:'#94A3B8', fontWeight:'700', cursor:'pointer' }}>برندگان قبل</button>
+        <div className="leagueTabs">
+          <button onClick={()=>setTab('table')} >جدول لیگ</button>
+          <button className="on">باشگاه‌ها</button>
+          <button onClick={()=>setTab('prev')} >برندگان قبل</button>
         </div>
         <Clubs token={token} openProfile={openProfile} />
       </section>
@@ -112,10 +112,10 @@ export default function League({ token, openProfile }) {
         if (tab === 'prev') {
           return (
             <section className="card wide leaguePage">
-              <div style={{ display:'flex', gap:'6px', marginBottom:'12px', background:'rgba(255,255,255,0.06)', padding:'4px', borderRadius:'12px' }}>
-                <button onClick={()=>setTab('table')} style={{ flex:1, padding:'8px', borderRadius:'8px', border:'none', background:'transparent', color:'#94A3B8', fontWeight:'700', cursor:'pointer' }}>جدول لیگ</button>
-                <button onClick={()=>setTab('clubs')} style={{ flex:1, padding:'8px', borderRadius:'8px', border:'none', background:'transparent', color:'#94A3B8', fontWeight:'700', cursor:'pointer' }}>باشگاه‌ها</button>
-                <button style={{ flex:1, padding:'8px', borderRadius:'8px', border:'none', background:'#38BDF8', color:'#000', fontWeight:'900' }}>برندگان قبل</button>
+              <div className="leagueTabs">
+                <button onClick={()=>setTab('table')} >جدول لیگ</button>
+                <button onClick={()=>setTab('clubs')} >باشگاه‌ها</button>
+                <button className="on">برندگان قبل</button>
               </div>
               <PreviousWinners data={d} />
             </section>
@@ -124,10 +124,10 @@ export default function League({ token, openProfile }) {
 
         return (
           <section className="card wide leaguePage" style={{ padding:'16px' }}>
-            <div style={{ display:'flex', gap:'6px', marginBottom:'12px', background:'rgba(255,255,255,0.06)', padding:'4px', borderRadius:'12px' }}>
-              <button style={{ flex:1, padding:'8px', borderRadius:'8px', border:'none', background:'#38BDF8', color:'#000', fontWeight:'900' }}>جدول لیگ</button>
-              <button onClick={()=>setTab('clubs')} style={{ flex:1, padding:'8px', borderRadius:'8px', border:'none', background:'transparent', color:'#94A3B8', fontWeight:'700', cursor:'pointer' }}>باشگاه‌ها</button>
-              <button onClick={()=>setTab('prev')} style={{ flex:1, padding:'8px', borderRadius:'8px', border:'none', background:'transparent', color:'#94A3B8', fontWeight:'700', cursor:'pointer' }}>برندگان قبل</button>
+            <div className="leagueTabs">
+              <button className="on">جدول لیگ</button>
+              <button onClick={()=>setTab('clubs')} >باشگاه‌ها</button>
+              <button onClick={()=>setTab('prev')} >برندگان قبل</button>
             </div>
 
             <div style={{ margin:'16px 0', background:'linear-gradient(135deg, #16345F, #071521)', border:'1px solid rgba(56,189,248,0.3)', padding:'20px', borderRadius:'16px' }}>

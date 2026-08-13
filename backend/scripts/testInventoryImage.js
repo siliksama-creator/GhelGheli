@@ -123,19 +123,65 @@ for (const [label, src] of [
     'الگوی قدیمی برگشته — باگِ مسابقه هم با آن برمی‌گردد');
 }
 
-console.log('\n══ ۳. هر سه خوانندهٔ اینونتوری طرحِ رو را نشان می‌دهند ══');
-const frontUses = (serverSrc.match(/cardDuel\.FRONT_IMAGE_SQL/g) || []).length;
-ck('profile و bootstrap و پروفایل عمومی از FRONT_IMAGE_SQL می‌خوانند',
-  frontUses >= 3, `پیدا شد: ${frontUses}`);
+console.log('\n══ ۳. هر سه خوانندهٔ اینونتوری قرعه را می‌خوانند ══');
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ این بخش قبلاً **خودِ باگ را تثبیت می‌کرد**
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// نسخهٔ قبلیِ همین بخش این را می‌خواست:
+//
+//     ck('profile و bootstrap و پروفایل عمومی از FRONT_IMAGE_SQL می‌خوانند',
+//        frontUses >= 3)
+//
+// یعنی تست **اصرار داشت** که هر سه خواننده طرحِ «رو» را نشان دهند — دقیقاً
+// همان چیزی که قابلیتِ قرعه را از کار انداخت. وقتی کامیت `4f67a5e` کوئری‌ها
+// را به FRONT_IMAGE_SQL برد، این تست نه‌تنها اعتراض نکرد، بلکه **سبزتر شد**.
+//
+// درسِ عملیاتی: وقتی رفتاری عوض می‌شود، تستی که با آن سبز می‌ماند را باید
+// با شک نگاه کرد. تستی که به‌جای نیازمندی، پیاده‌سازیِ فعلی را تثبیت کند،
+// بدتر از نبودنِ تست است — چون به رگرسیون مهرِ تأیید می‌زند.
+//
+// حالا سنجه این است: خواننده‌های اینونتوری باید INVENTORY_IMAGE_SQL بزنند
+// (که اول قرعه را می‌خواند) و آرنا باید FRONT_IMAGE_SQL بزند.
 const duelSvc = fs.readFileSync(path.join(ROOT, 'src/services/cardDuelService.js'), 'utf8');
-ck('FRONT_IMAGE_SQL فقط طرح رو را برمی‌دارد و به t.image_url برمی‌گردد',
-  /COALESCE\(pd\.side, 'front'\) = 'front'/.test(duelSvc)
-  && /ORDER BY pd\.created_at DESC LIMIT 1\),\s*t\.image_url/.test(duelSvc));
-ck('خواننده‌ها دیگر پشتِ تصادفی را تصویر اصلی نمی‌کنند',
-  !/COALESCE\(\s*d\.image_url\s*,\s*t\.image_url\s*\)/.test(serverSrc));
+const invUses = (serverSrc.match(/cardDuel\.INVENTORY_IMAGE_SQL/g) || []).length;
+ck('هر سه خوانندهٔ اینونتوری از INVENTORY_IMAGE_SQL استفاده می‌کنند',
+  invUses >= 3,
+  `پیدا شد: ${invUses} — profile، bootstrap و پروفایلِ عمومی هر سه لازم‌اند`);
+ck('هیچ خوانندهٔ اینونتوری‌ای به FRONT_IMAGE_SQL برنگشته',
+  !/cardDuel\.FRONT_IMAGE_SQL/.test(serverSrc),
+  'FRONT_IMAGE_SQL همیشه «رو» می‌دهد و قرعه را بی‌اثر می‌کند');
 
-console.log('\n══ ۴. بازگشتِ امن وقتی طرحی نیست ══');
-ck('اگر طرح رو نباشد t.image_url نمایش داده می‌شود',
+ck('INVENTORY_IMAGE_SQL تعریف شده و export شده',
+  /const INVENTORY_IMAGE_SQL\s*=/.test(duelSvc)
+  && /INVENTORY_IMAGE_SQL,/.test(duelSvc));
+// ترتیبِ COALESCE مهم است: اول قرعه، بعد «رو»، بعد تصویرِ نوعِ کارت.
+ck('اولین گزینهٔ INVENTORY_IMAGE_SQL همان قرعهٔ ذخیره‌شده است',
+  /INVENTORY_IMAGE_SQL = `COALESCE\(\s*\n\s*\(SELECT pd\.image_url FROM photo_card_designs pd\s*\n\s*WHERE pd\.id = i\.display_design_id/.test(duelSvc),
+  'اگر قرعه اولین گزینه نباشد، هیچ‌وقت خوانده نمی‌شود');
+ck('طرحِ غیرفعال حتی اگر قرعه خورده باشد نمایش داده نمی‌شود',
+  /WHERE pd\.id = i\.display_design_id AND pd\.is_active = true/.test(duelSvc),
+  'مدیر که طرحی را غیرفعال کند، نباید در اینونتوری بماند');
+ck('گزینهٔ دوم برای ردیف‌های قدیمیِ بدونِ قرعه، طرحِ «رو» است',
+  /display_design_id[\s\S]{0,320}COALESCE\(pd\.side, 'front'\) = 'front'/.test(duelSvc),
+  'ردیف‌های پیش از مایگریشنِ ۰۴۴ ستونشان NULL است');
+ck('گزینهٔ آخر t.image_url است (کارتِ سیستمِ قدیمی)',
+  /display_design_id[\s\S]{0,420}t\.image_url\s*\n\)`/.test(duelSvc));
+
+console.log('\n══ ۴. آرنای دوئل همچنان طرحِ «رو» را نشان می‌دهد ══');
+// تفکیکِ دو عبارت عمدی است و نباید دوباره یکی شوند: در آرنا کاربر باید
+// عکسِ واقعیِ بازیکن را ببیند، نه پشتِ کارت را.
+ck('FRONT_IMAGE_SQL هنوز وجود دارد و فقط «رو» را می‌دهد',
+  /COALESCE\(pd\.side, 'front'\) = 'front'/.test(duelSvc)
+  && /ORDER BY pd\.created_at DESC LIMIT 1\),\s*\n?\s*t\.image_url/.test(duelSvc));
+ck('استخرِ کارت‌های آرنا از FRONT_IMAGE_SQL می‌خواند',
+  /playableCards|SELECT t\.id AS card_type_id[\s\S]{0,80}\$\{FRONT_IMAGE_SQL\}/.test(duelSvc),
+  'آرنا نباید پشتِ کارت را نشان دهد');
+ck('دو عبارت با هم یکی نشده‌اند',
+  duelSvc.indexOf('const FRONT_IMAGE_SQL') !== duelSvc.indexOf('const INVENTORY_IMAGE_SQL'));
+
+console.log('\n══ ۵. بازگشتِ امن وقتی طرحی نیست ══');
+ck('اگر هیچ طرحی نباشد t.image_url نمایش داده می‌شود',
   /t\.image_url/.test(duelSvc));
 
 console.log(`\n${fail ? '✗' : '✓'} ${pass} موفق، ${fail} ناموفق\n`);

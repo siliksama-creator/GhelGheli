@@ -89,7 +89,26 @@ const audit = () => page.evaluate(([maxW, minPx]) => {
       bad.notVazir.push(`${label(el)}→${cs.fontFamily.split(',')[0]}`);
     }
     if (parseInt(cs.fontWeight, 10) > maxW) bad.synthBold.push(`${label(el)}:${cs.fontWeight}`);
-    if (hasLanguageGlyph && parseFloat(cs.fontSize) < minPx) {
+    // ── چرا نشانِ شمارشی از قاعدهٔ اندازه مستثناست ──
+    //
+    // `.badge` (شمارِ نوتیفیکیشنِ خوانده‌نشده) و `.wheelBadge` عمداً
+    // ۱۰.۵px هستند: یک دایرهٔ ۱۷ پیکسلی روی گوشهٔ آیکنِ زنگ که فقط یک
+    // یا دو رقم دارد. بزرگ‌ترکردنِ فونت یعنی یا دایره بزرگ شود و روی
+    // آیکن بیفتد، یا رقم سرریز کند.
+    //
+    // قاعدهٔ ۱۱.۵px برای **متنِ خواندنی** نوشته شده — جمله‌ای که کاربر
+    // می‌خواند — نه برای نشانِ عددیِ تک‌رقمی. خودِ `style.css` هم این را
+    // مستند کرده و به همین دلیل رنگش را به #d81e33 برده تا با کنتراستِ
+    // ۵.۰۶ در همان اندازهٔ کوچک خوانا بماند.
+    //
+    // ⚠️ بدونِ این استثنا، ابزار روی **هر ۹ تب** یک شکستِ تکراری
+    //    گزارش می‌کرد (`badge:10.5px`). نُه قرمزِ کاذب باعث می‌شود آدم‌ها
+    //    یاد بگیرند خروجیِ این ابزار را نادیده بگیرند — که از نبودنش
+    //    بدتر است.
+    const isCountBadge = /(^|\s)(badge|wheelBadge|lvlBadge)(\s|$)/
+      .test(el.className?.toString() || '')
+      && /^\s*[\u06F0-\u06F9\u0660-\u06690-9]{1,3}\s*$/.test(el.textContent || '');
+    if (hasLanguageGlyph && !isCountBadge && parseFloat(cs.fontSize) < minPx) {
       bad.tiny.push(`${label(el)}:${cs.fontSize}`);
     }
   }

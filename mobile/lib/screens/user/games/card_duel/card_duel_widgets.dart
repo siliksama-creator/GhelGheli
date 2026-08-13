@@ -219,24 +219,48 @@ class _LiveBattle extends StatelessWidget {
       Gaps.vXs,
       _RoundPips(total: total, current: roundIndex, history: history, mine: mine, color: color),
       Gaps.vXs,
-      // بنرِ «این راند سرِ چه چیزی است» — بزرگ، رنگی و انیمیشنی.
-      // قبلاً این اطلاعات فقط یک خطِ ۹پیکسلیِ خاکستری بود که کاربر
-      // هرگز نمی‌دیدش.
-      if (session.phase == GamePhase.playing)
-        _FocusBanner(
-          focus: state['roundFocus'] is Map
-              ? Map<String, dynamic>.from(state['roundFocus'] as Map)
-              : null,
-          fallbackTitle: '${state['roundTitle'] ?? ''}',
-          roundNumber: (roundIndex + 1).clamp(1, total),
-        ),
-      Gaps.vXs,
+      // ── چرا بنرِ افقی حذف شد ──
+      //
+      // `_FocusBanner` همین اطلاعات را می‌داد ولی ~۹۰ پیکسل ارتفاع
+      // می‌گرفت و باعثِ اسکرول می‌شد. جایش را `_RoundIntroOverlay`
+      // گرفته که وسطِ صفحه و روی همه‌چیز می‌آید، دو ثانیه می‌ماند و
+      // **هیچ ارتفاعی از چیدمان نمی‌گیرد**.
+      //
+      // اطلاعاتِ همیشگی (کدام ویژگی مهم است) از بین نرفت: روی تک‌تکِ
+      // کارت‌های دست با `_FocusStatRibbon` دیده می‌شود و در نوارِ
+      // فشردهٔ زیر هم خلاصه‌اش هست.
       _ClashStage(round: lastRound, mine: mine, color: color),
       if (session.phase == GamePhase.playing) ...[
         Gaps.vSm,
         AppCard(
             child: Column(children: [
           Row(children: [
+            // نشانِ همیشگیِ ویژگیِ راند — جایگزینِ فشردهٔ بنرِ حذف‌شده.
+            // اعلانِ وسطِ صفحه دو ثانیه‌ای است؛ این تا آخرِ راند می‌ماند
+            // تا کسی که اعلان را از دست داد هم بداند دنبالِ چه عددی بگردد.
+            if ('${(state['roundFocus'] as Map?)?['stat'] ?? ''}'.isNotEmpty) ...[
+              Builder(builder: (_) {
+                final fs = '${(state['roundFocus'] as Map?)?['stat'] ?? ''}';
+                final t = _FocusBannerState._statColors[fs] ?? color;
+                return Container(
+                  margin: const EdgeInsetsDirectional.only(end: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: t.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: t.withValues(alpha: 0.6)),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(_FocusBannerState._statIcons[fs] ?? Icons.stars_rounded,
+                        size: 15, color: t),
+                    const SizedBox(width: 5),
+                    Text(_FocusBannerState._statNames[fs] ?? '',
+                        style: TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w900, color: t)),
+                  ]),
+                );
+              }),
+            ],
             Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(iChose ? 'انتخابت قفل شد' : 'کارت این راند را انتخاب کن',
@@ -1702,5 +1726,235 @@ class _CollapsibleSectionState extends State<_CollapsibleSection> {
             widget.child,
           ],
         ]),
+      );
+}
+
+/// ═══════════════════════════════════════════════════════════════════════
+/// اعلانِ سینماییِ شروعِ راند — وسطِ صفحه، بزرگ، دو ثانیه
+/// ═══════════════════════════════════════════════════════════════════════
+///
+/// ── خواستهٔ مالک ──
+///
+///   «وقتی راند شروع میشه اینکه مبارزه هر راند سر چی هستش باید با
+///    انیمیشن زیبا وسط صفحه نشون داده بشه»
+///
+/// ── چرا بنرِ قبلی کافی نبود ──
+///
+/// `_FocusBanner` یک نوارِ افقی در جریانِ ستون است. سه اشکال داشت:
+///
+///   ۱. **دیده نمی‌شد.** بینِ تابلوی امتیاز و صحنهٔ برخورد گم بود و
+///      چشم مستقیم سراغِ کارت‌ها می‌رفت.
+///   ۲. **ارتفاع می‌گرفت.** حدود ۹۰ پیکسل از بودجهٔ عمودیِ صفحه را
+///      مصرف می‌کرد و همان چیزی بود که کاربر را مجبور به اسکرول می‌کرد.
+///   ۳. **حسِ رویداد نداشت.** شروعِ راند یک لحظهٔ دراماتیک است، نه یک
+///      برچسبِ ثابت.
+///
+/// ── این ویجت ──
+///
+/// یک overlay تمام‌صفحه که با شروعِ هر راند دو ثانیه می‌آید و می‌رود:
+/// پس‌زمینه تار می‌شود، آیکنِ ویژگی از دور می‌آید و می‌چرخد، شعار
+/// («سریع‌ترین کارتت را بفرست!») بزرگ نوشته می‌شود و یک راهنمای یک‌خطی
+/// برای گروهِ سنیِ پایین زیرش می‌آید.
+///
+/// چون overlay است، **هیچ ارتفاعی از چیدمان نمی‌گیرد** — یعنی هم‌زمان
+/// مشکلِ اسکرول را هم حل می‌کند.
+///
+/// `IgnorePointer`: کاربر باید بتواند وسطِ انیمیشن کارتش را بزند؛ اعلان
+/// نباید جلوی بازی را بگیرد.
+class _RoundIntroOverlay extends StatefulWidget {
+  const _RoundIntroOverlay({
+    required this.focus,
+    required this.roundNumber,
+    required this.totalRounds,
+  });
+
+  final Map<String, dynamic>? focus;
+  final int roundNumber;
+  final int totalRounds;
+
+  @override
+  State<_RoundIntroOverlay> createState() => _RoundIntroOverlayState();
+}
+
+class _RoundIntroOverlayState extends State<_RoundIntroOverlay>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2000),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (_hasFocus) _c.forward();
+  }
+
+  bool get _hasFocus => '${widget.focus?['stat'] ?? ''}'.isNotEmpty;
+
+  @override
+  void didUpdateWidget(covariant _RoundIntroOverlay old) {
+    super.didUpdateWidget(old);
+    // راندِ تازه → اعلانِ تازه. بدونِ این، فقط راندِ اول اعلان داشت.
+    if (old.roundNumber != widget.roundNumber && _hasFocus) {
+      _c
+        ..reset()
+        ..forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_hasFocus) return const SizedBox.shrink();
+    final stat = '${widget.focus?['stat'] ?? ''}';
+    final cry = '${widget.focus?['cry'] ?? widget.focus?['label'] ?? ''}';
+    final hint = '${widget.focus?['hint'] ?? ''}';
+    final emoji = '${widget.focus?['emoji'] ?? ''}';
+    final tint = _FocusBannerState._statColors[stat] ?? _cyan;
+    final icon = _FocusBannerState._statIcons[stat] ?? Icons.stars_rounded;
+    final statName = _FocusBannerState._statNames[stat] ?? '';
+
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (context, _) {
+        final v = _c.value;
+        if (v >= 1.0) return const SizedBox.shrink();
+        // سه فاز: ورود (۰–۰.۲۵)، ماندن (۰.۲۵–۰.۷۵)، خروج (۰.۷۵–۱).
+        final enter = Curves.easeOutBack.transform((v / 0.25).clamp(0.0, 1.0));
+        final exit = Curves.easeIn.transform(((v - 0.75) / 0.25).clamp(0.0, 1.0));
+        final opacity = (1 - exit).clamp(0.0, 1.0);
+        // آیکن از دور می‌آید و یک دورِ کامل می‌چرخد.
+        final spin = (1 - enter) * math.pi * 2;
+        final scale = 0.4 + 0.6 * enter;
+
+        return IgnorePointer(
+          child: Opacity(
+            opacity: opacity,
+            child: Container(
+              // پردهٔ تیره تا متن روی هر پس‌زمینه‌ای خوانا بماند.
+              color: Colors.black.withValues(alpha: 0.55 * opacity),
+              alignment: Alignment.center,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('راند ${faNum(widget.roundNumber)} از ${faNum(widget.totalRounds)}',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white.withValues(alpha: 0.75))),
+                  const SizedBox(height: 14),
+                  Transform.rotate(
+                    angle: spin,
+                    child: Transform.scale(
+                      scale: scale,
+                      child: Container(
+                        width: 104,
+                        height: 104,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(colors: [
+                            tint.withValues(alpha: 0.38),
+                            Colors.transparent,
+                          ]),
+                          border: Border.all(color: tint, width: 2.5),
+                          boxShadow: [
+                            BoxShadow(color: tint.withValues(alpha: 0.55), blurRadius: 40),
+                          ],
+                        ),
+                        child: Icon(icon, color: tint, size: 52),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // شعار: بزرگ‌ترین متنِ صفحه در این لحظه.
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 26),
+                    child: Transform.scale(
+                      scale: 0.86 + 0.14 * enter,
+                      child: Text(
+                        emoji.isEmpty ? cry : '$emoji  $cry',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 27,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          height: 1.3,
+                          shadows: [
+                            Shadow(color: tint, blurRadius: 26),
+                            const Shadow(color: Colors.black, blurRadius: 8),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (statName.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: tint.withValues(alpha: 0.20),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: tint.withValues(alpha: 0.75)),
+                      ),
+                      child: Text('بالاترین «$statName» برنده است',
+                          style: TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w900, color: tint)),
+                    ),
+                  ],
+                  // ── راهنمای گروهِ سنیِ پایین ──
+                  // یک جملهٔ ساده بدونِ اصطلاحِ فنی. بچه‌ای که تازه
+                  // خواندن یاد گرفته باید بفهمد چه کار کند.
+                  if (hint.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 34),
+                      child: Text(hint,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              fontSize: 13.5,
+                              height: 1.6,
+                              color: Colors.white70,
+                              fontWeight: FontWeight.w700)),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// ═══════════════════════════════════════════════════════════════════════
+/// درگاهِ تستِ اعلانِ راند
+/// ═══════════════════════════════════════════════════════════════════════
+///
+/// همان الگوی `CardDuelClashStageForTest`: کلاس خصوصی می‌ماند ولی تست
+/// می‌تواند بسازدش. بدونِ این، انیمیشنِ اعلان هیچ نگهبانی نداشت.
+@visibleForTesting
+class CardDuelRoundIntroForTest extends StatelessWidget {
+  const CardDuelRoundIntroForTest({
+    super.key,
+    required this.focus,
+    required this.roundNumber,
+    required this.totalRounds,
+  });
+
+  final Map<String, dynamic>? focus;
+  final int roundNumber;
+  final int totalRounds;
+
+  @override
+  Widget build(BuildContext context) => _RoundIntroOverlay(
+        focus: focus,
+        roundNumber: roundNumber,
+        totalRounds: totalRounds,
       );
 }

@@ -261,6 +261,52 @@ function FocusBanner({ focus, fallbackTitle, roundNumber }) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// اعلانِ سینماییِ شروعِ راند — وسطِ صفحه (هم‌تراز با اندروید)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// خواستهٔ مالک: «وقتی راند شروع میشه اینکه مبارزه هر راند سر چی هستش باید
+// با انیمیشن زیبا وسط صفحه نشون داده بشه».
+//
+// چرا overlay و نه بزرگ‌کردنِ همان بنر: بنر در جریانِ صفحه است و ارتفاع
+// می‌گیرد — همان چیزی که کاربر را مجبور به اسکرول می‌کرد. این نسخه
+// `position:fixed` است، دو ثانیه می‌آید و می‌رود، و صفر پیکسل از چیدمان
+// می‌گیرد.
+//
+// `pointer-events:none` در CSS: کاربر باید بتواند وسطِ انیمیشن کارتش را
+// بزند. اعلان نباید جلوی بازی را بگیرد.
+//
+// ⚠️ `key` روی شمارهٔ راند حیاتی است: بدونِ آن React همان گره را نگه
+//    می‌دارد و انیمیشن فقط یک بار در کلِ بازی اجرا می‌شود.
+function RoundIntroOverlay({ focus, roundNumber, totalRounds }) {
+  const stat = focus?.stat || '';
+  const [visible, setVisible] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!stat) return undefined;
+    setVisible(true);
+    const t = setTimeout(() => setVisible(false), 2000);
+    return () => clearTimeout(t);
+  }, [stat, roundNumber]);
+
+  if (!stat || !visible) return null;
+  const meta = FOCUS_META[stat] || {};
+  const color = meta.color || '#38BDF8';
+  return (
+    <div className="duelRoundIntro" key={`intro-${roundNumber}-${stat}`}
+      style={{ '--focus-color': color }} aria-live="polite">
+      <div className="duelRoundIntroInner">
+        <small>راند {fa(roundNumber)} از {fa(totalRounds)}</small>
+        <span className="duelRoundIntroIcon" aria-hidden="true">{meta.icon || '★'}</span>
+        <b>{focus?.cry || meta.name || ''}</b>
+        {meta.name && <em>بالاترین «{meta.name}» برنده است</em>}
+        {/* راهنمای گروهِ سنیِ پایین: یک جمله، بدونِ اصطلاحِ فنی. */}
+        {focus?.hint && <i>{focus.hint}</i>}
+      </div>
+    </div>
+  );
+}
+
 /** عددِ تعیین‌کنندهٔ این راند، روی کارتِ دست. */
 function FocusStatRibbon({ card, stat }) {
   if (!stat) return null;
@@ -330,11 +376,16 @@ function LiveArena({ session }) {
         <span key={index}><img src="/games/card_duel_glow.png" alt="پشت کارت حریف" /></span>)}
     </div>
 
+    {/* ── چرا بنرِ افقی جای خود را به اعلانِ وسطِ صفحه داد ──
+        بنر ~۹۰ پیکسل ارتفاع می‌گرفت و از دلایلِ اصلیِ اسکرولِ صفحهٔ بازی
+        بود. اعلانِ تازه `position:fixed` است: دیده می‌شود ولی هیچ فضایی
+        از چیدمان نمی‌گیرد. اطلاعاتِ ماندگار روی خودِ کارت‌ها
+        (`FocusStatRibbon`) و در نوارِ انتخاب باقی است. */}
     {phase === 'playing' && (
-      <FocusBanner
+      <RoundIntroOverlay
         focus={state.roundFocus}
-        fallbackTitle={state.roundTitle}
         roundNumber={Math.min(num(state.totalRounds) || 5, num(state.roundIndex) + 1)}
+        totalRounds={num(state.totalRounds) || 5}
       />
     )}
 
@@ -342,6 +393,16 @@ function LiveArena({ session }) {
 
     {phase === 'playing' && <section className="duelChoicePanel">
       <div className="duelChoicePrompt">
+        {/* نشانِ ماندگارِ ویژگیِ راند: اعلانِ وسطِ صفحه دو ثانیه‌ای است،
+            این تا آخرِ راند می‌ماند تا کسی که اعلان را ندید هم بداند
+            دنبالِ کدام عدد بگردد. */}
+        {state.roundFocus?.stat && FOCUS_META[state.roundFocus.stat] && (
+          <span className="duelFocusPill"
+            style={{ '--focus-color': FOCUS_META[state.roundFocus.stat].color }}>
+            <i aria-hidden="true">{FOCUS_META[state.roundFocus.stat].icon}</i>
+            {FOCUS_META[state.roundFocus.stat].name}
+          </span>
+        )}
         <div><b>{state.iChose ? 'انتخابت قفل شد' : 'کارت این راند را انتخاب کن'}</b>
           <small>{state.waitingForOpponent ? 'منتظر انتخاب حریف…' : state.opponentLocked ? 'حریف انتخاب کرده؛ تصمیم بگیر!' : 'انتخاب‌ها مخفی و هم‌زمان هستند'}</small></div>
         <strong>{fa(secondsLeft)}<small>ثانیه</small></strong>

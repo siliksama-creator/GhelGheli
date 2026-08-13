@@ -772,9 +772,11 @@ app.get('/api/games/:gameId/solo', auth, asyncHandler(async (req, res) => {
 
 app.get('/api/profile', auth, asyncHandler(async (req, res) => {
   // همان ستون‌های bootstrap تا دو مسیر هرگز از هم جدا نیفتند.
-  // FRONT_IMAGE_SQL: طرح روی کارت، نه پشت تصادفی.
+  // INVENTORY_IMAGE_SQL: طرحی که در لحظهٔ ثبت قرعه خورده (رو یا پشت).
+  // ⚠️ اینجا عمداً FRONT_IMAGE_SQL نیست — آن مالِ آرنای دوئل است.
+  // توضیحِ کاملِ تفاوت و باگی که از یکی‌کردنشان آمد در cardDuelService.
   const inv = await pool.query(
-    `SELECT i.*, t.name, ${cardDuel.FRONT_IMAGE_SQL} AS image_url,
+    `SELECT i.*, t.name, ${cardDuel.INVENTORY_IMAGE_SQL} AS image_url,
             t.point_value, t.cash_amount, t.description,
             t.duel_attack, t.duel_defense, t.duel_speed, t.duel_technique,
             t.duel_goal_chance, t.duel_energy, t.duel_rarity, t.duel_effect,
@@ -822,11 +824,11 @@ app.get('/api/bootstrap', auth, asyncHandler(async (req, res) => {
     // `i.updated_at` آخرین بار که تعدادش زیاد شده. برای «تازه‌ترین»
     // دومی درست است — کاربر می‌خواهد کارتی را ببیند که همین حالا ثبت
     // کرده، حتی اگر نسخهٔ اولش را ماه‌ها پیش گرفته باشد.
-    // FRONT_IMAGE_SQL: همان تصویر روی کارت که در کلکسیون دیده می‌شود.
-    // قرعه خورده. LEFT JOIN چون کارتِ بدونِ طرح (سیستمِ قدیمی) باید
-    // همچنان تصویرِ پیش‌فرضِ نوعِ کارت را بگیرد نه هیچ.
+    // INVENTORY_IMAGE_SQL: طرحِ رو/پشتی که در لحظهٔ ثبت قرعه خورده و در
+    // `display_design_id` ثابت شده. اگر کارت طرحی نداشته باشد (سیستمِ
+    // قدیمی) به تصویرِ پیش‌فرضِ نوعِ کارت برمی‌گردد، نه هیچ.
     pool.query(
-      `SELECT i.*, t.name, ${cardDuel.FRONT_IMAGE_SQL} AS image_url,
+      `SELECT i.*, t.name, ${cardDuel.INVENTORY_IMAGE_SQL} AS image_url,
               t.point_value, t.cash_amount, t.description,
               t.duel_attack, t.duel_defense, t.duel_speed, t.duel_technique,
               t.duel_goal_chance, t.duel_energy, t.duel_rarity, t.duel_effect,
@@ -1050,7 +1052,7 @@ app.get('/api/users/:id/public', auth, validateUuid('id'), asyncHandler(async (r
   // در پروفایلِ عمومی دیده نشود.
   const cards = await pool.query(
     `SELECT t.id AS card_type_id, t.name,
-            ${cardDuel.FRONT_IMAGE_SQL} AS image_url, t.point_value,
+            ${cardDuel.INVENTORY_IMAGE_SQL} AS image_url, t.point_value,
             t.description, t.duel_attack, t.duel_defense, t.duel_speed,
             t.duel_technique, t.duel_goal_chance, t.duel_energy,
             t.duel_rarity, t.duel_effect, t.is_collectible,

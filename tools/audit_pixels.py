@@ -194,12 +194,48 @@ RECTS = r"""
 """
 
 # همهٔ متن‌ها نامرئی می‌شوند تا پس‌زمینهٔ خالص بماند.
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# ⚠️ باگی که این تابع داشت و سه «یافتهٔ» کاذب تولید می‌کرد
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# نسخهٔ قبلی فقط `color: transparent` می‌گذاشت. برای متنِ عادی کافی است،
+# ولی نامِ کاربر با افکتِ گرادیان این‌طور رنگ می‌گیرد:
+#
+#     background: linear-gradient(...);
+#     -webkit-background-clip: text;
+#     -webkit-text-fill-color: transparent;   ← این بر color اولویت دارد
+#
+# `-webkit-text-fill-color` هر مقداری در `color` را **نادیده می‌گیرد**.
+# پس حروف بعد از «پنهان‌سازی» همچنان با گرادیانِ خودشان رسم می‌شدند و
+# ابزار **خودِ حروف** را به‌عنوان پس‌زمینه نمونه‌برداری می‌کرد.
+#
+# نتیجه: سه گزارشِ «نامِ کاربر ۲.۶۳ روی پس‌زمینهٔ صورتی». آن صورتی
+# پس‌زمینه نبود — خودِ حروف بود. با یک صفحهٔ آزمایشیِ کنترل‌شده اثبات شد:
+# بعد از HIDE، پیکسل‌های ناحیهٔ متن هنوز rgb(245,115,141) بودند.
+#
+# این دقیقاً همان دسته اشتباهی است که در مستنداتِ خودِ ابزار هشدارش
+# داده شده («background-clip:text را دو بار اشتباه خواند») ولی این مسیرِ
+# خاص پوشش داده نشده بود.
+#
+# رفع: هم `-webkit-text-fill-color` صفر می‌شود، هم گرادیانِ متنی حذف
+# می‌شود تا هیچ ردی از حروف روی اسکرین‌شات نماند.
 HIDE = r"""
 () => {
   for (const el of document.querySelectorAll('body *')) {
     const has = [...el.childNodes].some(
       n => n.nodeType === 3 && n.textContent.trim().length > 0);
-    if (has) el.style.setProperty('color', 'transparent', 'important');
+    if (has) {
+      el.style.setProperty('color', 'transparent', 'important');
+      // ⚠️ بدونِ این خط، نام‌های گرادیانی پاک نمی‌شوند (توضیح بالا).
+      el.style.setProperty('-webkit-text-fill-color', 'transparent', 'important');
+      // اگر پس‌زمینه به متن clip شده، خودِ پس‌زمینه هم باید برود وگرنه
+      // مرورگر همچنان شکلِ حروف را رنگ می‌کند.
+      const cs = getComputedStyle(el);
+      if (cs.webkitBackgroundClip === 'text' || cs.backgroundClip === 'text') {
+        el.style.setProperty('background', 'none', 'important');
+      }
+    }
     // سایهٔ متن هم باید برود وگرنه رنگش روی پس‌زمینه می‌ماند.
     el.style.setProperty('text-shadow', 'none', 'important');
   }

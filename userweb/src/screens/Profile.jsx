@@ -80,7 +80,7 @@ export default function Profile({ token, p, load, setMsg }) {
             <DisplayName name={u.nickname || u.first_name || 'کاربر'} cosmetics={p.cosmetics} level={p.level?.level} showTitle />
           </div>
         </div>
-        <p style={{ color:'#94A3B8', fontSize:'11px', margin:'0 0 12px' }}>این اطلاعات فقط برای مدیر است. در چت فقط نام مستعار و عکس دیده می‌شود.</p>
+        <p style={{ color:'#D7DEE8', fontSize:'11px', margin:'0 0 12px' }}>این اطلاعات فقط برای مدیر است. در چت فقط نام مستعار و عکس دیده می‌شود.</p>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:'10px' }}>
           <Field label="نام" value={edit.firstName} onChange={v=>setEdit({...edit, firstName:v})} />
           <Field label="نام خانوادگی" value={edit.lastName} onChange={v=>setEdit({...edit, lastName:v})} />
