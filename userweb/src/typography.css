@@ -398,3 +398,13 @@ code {
 .ggCardPower,
 .ggCardWinnerStamp,
 .ggCardStats b { font-weight: 800 !important; }
+
+/* آخرین بازمانده‌های ریزِ کامپوننتِ کارت. `.ggCardName` نامِ بازیکن است
+   و `.ggCardBadge` برچسبِ «جدید» — هر دو متنِ خواندنی‌اند، نه نشانِ
+   عددیِ تک‌رقمی، پس استثنای badge شاملشان نمی‌شود. */
+.ggCardBadge,
+.ggCardName { font-size: 11.5px !important; }
+
+/* آخرین وزنِ ۹۰۰ در آرنا: عنوانِ inline در JSX که سلکتورِ کلاسی ندارد. */
+.duelPageV2 span[style*="font-weight"],
+.duelPageV2 b[style*="font-weight"] { font-weight: 800 !important; }
