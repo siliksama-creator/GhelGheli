@@ -4490,3 +4490,51 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
      بیش از نیازِ تشخیص است. ۱۷۰px هنوز چهره و پیراهن را نشان می‌دهد. */
   .duelCollection .duelGridV2 .ggCardArt{min-height:170px; max-height:170px}
 }
+
+/* ═══ لوپ ۴: بستنِ آخرین ۲۹۰px ════════════════════════════════════════
+   تفکیکِ باقی‌مانده (۳۹۰×۸۴۴):
+       hero ۱۱۴ · rule ۷۲ · lineup ۱۶۶ · intel ۷۸ · launch ۶۶
+       · collection ۲۶۸ · history ۷۲ · فاصله ۵۴  = ۸۹۰px
+       + پوستهٔ اپ ۲۴۴px = ۱۱۳۴px  ⇒ بودجه ۶۰۰px، اضافه ۲۹۰px
+
+   ── ۱) کشوهای بسته چرا ۷۲ و ۷۸px‌اند؟ ──
+   هرکدام دو خط دارند: تیتر + توضیحِ زیرش. وقتی کشو **بسته** است آن
+   توضیح فقط جا می‌گیرد. تک‌خطی شدن ⇒ ۴۴px (همان حدِ لمس). */
+@media (max-width:520px){
+  .duelPageV2 details:not([open])>summary small{display:none}
+  .duelPageV2 details:not([open])>summary{min-height:44px; max-height:44px}
+  .duelRuleStrip:not([open]), .duelIntel:not([open]),
+  .duelHistoryV2:not([open]), .duelCollection:not([open]){padding:0 12px}
+}
+
+/* ── ۲) سربرگ: ۱۱۴ → ~۶۸px ──
+   لوگو از قبل روی موبایل پنهان است؛ حالا شعار و زیرنویسِ حالت هم. */
+@media (max-width:520px){
+  .duelHeroV2{padding:7px 10px; min-height:0}
+  .duelHeroV2 h1{font-size:15.5px}
+  .duelHeroV2>div>span{font-size:11.5px; letter-spacing:1px}
+  .duelHeroV2 aside{padding:4px 8px}
+  .duelHeroV2 aside b{font-size:11.5px}
+}
+
+/* ── ۳) خانه‌های ترکیب: ۹۶ → ۷۶px ──
+   خانهٔ خالی فقط «＋» و شمارهٔ کارت دارد؛ ۷۶px برایش کافی است و
+   کارتِ پرشده هم تصویرش را نشان می‌دهد. */
+@media (max-width:520px){
+  .duelSlotsV2 button{height:76px}
+  .duelSlotsV2 button>span{font-size:16px}
+  .duelSlotsV2 button>small{font-size:11.5px}
+}
+
+/* ── ۴) کارتِ قفسه: تصویر ۱۷۰ → ۱۱۸px ──
+   ⚠️ کفِ تشخیص. زیرِ ~۱۱۰px چهرهٔ بازیکن قابلِ تشخیص نیست و انتخاب
+      تبدیل به خواندنِ نام می‌شود. با اسکرین‌شات بررسی شد. */
+@media (max-width:520px){
+  .duelCollection .duelGridV2 .ggCardArt{min-height:118px; max-height:118px}
+  .duelCollection .duelGridV2 .ggCardBody{padding:5px 7px 7px}
+}
+
+/* ── ۵) فاصلهٔ بخش‌ها: ۹ → ۷px ── */
+@media (max-width:520px){
+  .duelPageV2{gap:7px}
+}

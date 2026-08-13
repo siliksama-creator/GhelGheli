@@ -729,7 +729,14 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
         </div>
       </details>
       <Lineup selected={selected} cards={cards} toggle={toggle} />
-      <DeckIntel insights={data?.deckInsights} suggestedDeck={data?.suggestedDeck} onApply={applySuggested} />
+      {/* ── چرا وقتی هیچ کارتی انتخاب نشده پنهان است ──
+          «تحلیل بالانس ترکیب» دربارهٔ ترکیبی حرف می‌زند که هنوز وجود
+          ندارد. با ترکیبِ خالی، محتوایش تهی است ولی ۷۸px از ارتفاعِ
+          صفحه را می‌گیرد — درست همان‌جا که کاربر باید کارت‌ها را
+          ببیند. به‌محضِ انتخابِ اولین کارت ظاهر می‌شود. */}
+      {selected.length > 0 && (
+        <DeckIntel insights={data?.deckInsights} suggestedDeck={data?.suggestedDeck} onApply={applySuggested} />
+      )}
       <button type="button" className="duelLaunch" disabled={busy || selected.length !== 5} onClick={saveAndStart}>
         <span>{busy ? 'در حال قفل ترکیب…' : `ورود به ${mode.title}`}</span>
         <small>{vsBot ? 'بدون ریسک امتیاز' : stake ? `ورودی ${fa(stake)} امتیاز` : 'مسابقه خصوصی'}</small>
