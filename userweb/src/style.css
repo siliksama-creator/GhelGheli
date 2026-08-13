@@ -4403,3 +4403,60 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 .duelCollection[open]>summary:after{content:'▴'}
 .duelCollection>summary small{color:#849bb3; font-size:11.5px}
 .duelCollection>summary .duelSectionTitle{margin:0}
+
+/* ═══ لوپ ۱: هدفِ لمسیِ همهٔ کشوهای جمع‌شونده ═════════════════════════
+   اندازه‌گیری: سه `<summary>` با ارتفاعِ ۲۶، ۲۶ و ۳۷px.
+
+   ⚠️ چرا از قلم افتادند: در دورِ قبل فقط `.duelCollection>summary` را
+      ۴۴px کردم چون تنها همان را در فهرستِ ابزار دیده بودم. ولی
+      `.duelRuleStrip`، `.duelIntel` و `.duelHistoryV2` هم `summary`
+      دارند و هر سه زیرِ حدِ لمس بودند.
+
+      درس: وقتی یک الگو (اینجا «کشوی جمع‌شونده») چند نمونه دارد، قاعده
+      را روی خودِ الگو بنویس نه روی نمونهٔ خاص — وگرنه دفعهٔ بعد که
+      نمونهٔ تازه‌ای اضافه شود، همان باگ برمی‌گردد.
+
+   ۴۴px حداقلِ استانداردِ اپل است؛ گوگل ۴۸dp می‌گوید. */
+.duelPageV2 details>summary{
+  min-height:44px;
+  display:flex; align-items:center; gap:8px;
+}
+
+/* ═══ لوپ ۲: فشرده‌سازیِ ساختاریِ صفحهٔ چیدمان ═════════════════════════
+   اندازه‌گیری (۳۹۰×۸۴۴):
+       hero ۱۳۱ · rule ۵۴ · lineup ۱۸۳ · intel ۷۸ · launch ۶۶
+       · collection ۴۲۵ · history ۶۵ · فاصله‌ها ۸۴  =  ۱۰۸۶px
+       + پوستهٔ اپ ۲۴۳px  =  ۱۳۲۹px
+
+   بودجهٔ واقعی محتوا فقط ۶۰۱px است چون پوستهٔ اپ (نوار بالا + تب‌ها +
+   ناوبریِ پایین) ۲۹٪ صفحه را می‌گیرد.
+
+   ⚠️ سه جای اضافه‌وزن که **بدونِ لطمه به خوانایی** قابلِ کم‌کردن‌اند: */
+
+/* ۱) خانه‌های ترکیب: ۳ ستون × ۱۲۰px یعنی دو ردیف. با ۵ ستون یک ردیف
+      می‌شود. عرضِ هر خانه ~۶۲px که برای تصویر و شمارهٔ کارت کافی است —
+      متنِ آمار روی خانه‌های خالی نیست، پس خوانایی قربانی نمی‌شود. */
+@media (max-width:520px){
+  .duelSlotsV2{grid-template-columns:repeat(5,1fr); gap:6px}
+  .duelSlotsV2 button{height:96px; border-radius:13px}
+  .duelSlotsV2 button>span{font-size:19px}
+  .duelSlotsV2 b{font-size:11.5px}
+  .duelLineupV2{padding:10px}
+  .duelLineupTitle{margin-bottom:7px}
+}
+
+/* ۲) فاصلهٔ بینِ بخش‌ها: ۱۴px × ۷ = ۹۸px فقط فضای خالی.
+      ۹px هنوز مرزها را جدا نگه می‌دارد. */
+@media (max-width:520px){
+  .duelPageV2{gap:9px}
+}
+
+/* ۳) سربرگِ بزرگ روی صفحهٔ چیدمان هنوز ۱۳۱px است. تیتر و نشانِ حالت
+      لازم‌اند ولی نه با این ارتفاع. */
+@media (max-width:520px){
+  .duelHeroV2{padding:9px 11px; border-radius:17px; gap:8px}
+  .duelHeroV2 h1{font-size:17px}
+  .duelHeroV2 aside{padding:5px 9px; border-radius:11px}
+  .duelHeroV2 aside>span{font-size:14px}
+  .duelHeroV2 aside b{font-size:12px}
+}
