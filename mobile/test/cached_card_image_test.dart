@@ -45,14 +45,25 @@ void main() {
       .replaceAll(RegExp(r'/\*[\s\S]*?\*/'), '');
 
   group('محافظِ مسابقه در کدِ واقعی', () {
+    // ⚠️ چرا این تست‌ها حالا `_requestUrl` را می‌بینند نه `_resolved`
+    //
+    // با آمدنِ بندانگشتیِ `?w=`، ویجت دو مفهوم پیدا کرد که قبلاً یکی
+    // بودند: `_resolved` **هویتِ** تصویر است (برای تشخیصِ بازاستفادهٔ
+    // ویجت) و `_requestUrl` **مقصدِ دانلود**.
+    //
+    // نگهبانِ مسابقه باید روی چیزی باشد که callback با آن مقایسه
+    // می‌شود، یعنی مقصدِ دانلود. اگر این تست‌ها روی نامِ قدیمی بمانند،
+    // یا قرمز می‌شوند بی‌آنکه باگی باشد، یا بدتر: سبز می‌مانند در حالی
+    // که نگهبانِ واقعی برداشته شده. **قصدِ تست همان است، فقط متغیرِ
+    // درست را می‌بیند.**
     test('URL قبل از شروعِ fetch در متغیرِ محلی قفل می‌شود', () {
-      expect(code.contains('final requested = _resolved'), isTrue,
+      expect(code.contains('final requested = _requestUrl'), isTrue,
           reason: 'بدونِ قفلِ محلی، نتیجهٔ کهنه روی URL تازه می‌نشیند');
     });
 
     test('نتیجهٔ کهنه دور ریخته می‌شود', () {
       expect(
-          RegExp(r'if \(requested != _resolved\)\s*return').hasMatch(code),
+          RegExp(r'if \(requested != _requestUrl\)\s*return').hasMatch(code),
           isTrue,
           reason: 'بدونِ این نگهبان، کارتِ ب تصویرِ کارتِ الف را می‌گیرد');
     });
@@ -60,17 +71,28 @@ void main() {
     test('نگهبان **قبل** از setState است، نه داخلش', () {
       // اگر داخلِ setState باشد، یک rebuildِ بی‌دلیل رخ می‌دهد و بدتر:
       // ممکن است شاخه‌ای مقدار را بنویسد.
-      final i = code.indexOf('requested != _resolved');
+      final i = code.indexOf('requested != _requestUrl');
       final j = code.indexOf('setState', code.indexOf('.then('));
       expect(i > 0 && j > 0 && i < j, isTrue,
           reason: 'نگهبان باید قبل از setState اجرا شود');
     });
 
+    test('هویتِ تصویر و مقصدِ دانلود دو فیلدِ جدا هستند', () {
+      // ⚠️ اگر کسی این دو را دوباره یکی کند، تغییرِ اندازهٔ ویجت
+      // (چرخشِ صفحه، چگالیِ متفاوت) به‌اشتباه «تصویر عوض شد» تفسیر
+      // می‌شود و کارت یک فریم سفید می‌پرد.
+      expect(code.contains('String _requestUrl'), isTrue);
+      expect(code.contains('_resolved = fullAssetUrl(widget.url)'), isTrue,
+          reason: 'هویت باید همچنان نشانیِ کاملِ بدونِ ?w= باشد');
+    });
+
     test('نقشهٔ مشترک با کلیدِ قفل‌شده پر می‌شود نه فیلدِ کلاس', () {
       expect(code.contains('_rememberHit(requested'), isTrue);
-      // نوشتنِ مستقیم با `_resolved` دقیقاً همان باگ بود.
+      // نوشتنِ مستقیم با فیلدِ کلاس داخلِ callback دقیقاً همان باگ بود.
       expect(RegExp(r'_syncHit\[_resolved\]\s*=').hasMatch(code), isFalse,
           reason: 'نوشتن با فیلدِ کلاس داخلِ callback = بازگشتِ باگ');
+      expect(RegExp(r'_syncHit\[_requestUrl\]\s*=').hasMatch(code), isFalse,
+          reason: 'همان باگ با نامِ تازه');
     });
 
     test('mounted هم بررسی می‌شود', () {

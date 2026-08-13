@@ -22,6 +22,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ghelgheli_mobile/services/image_disk_cache.dart';
 
 void main() {
   // ── چرا منطق اینجا بازسازی شده و خودِ کلاس import نشده ──
@@ -267,6 +268,125 @@ void main() {
       // بدترین حالتِ این کلاس باید «مثلِ قبل» باشد نه «بدتر از قبل».
       expect(RegExp(r'catch \(_\) \{').allMatches(src).length,
           greaterThanOrEqualTo(4));
+    });
+  });
+
+  // ═════════════════════════════════════════════════════════════════════
+  //  بندانگشتیِ درخواستی (`?w=`) و باگِ خاموشِ prewarm
+  // ═════════════════════════════════════════════════════════════════════
+  //
+  // ⚠️ این گروه بعد از کشفِ باگی اضافه شد که **هیچ ردی از خود نمی‌گذاشت**:
+  // `prewarmPayload` نشانیِ نسبیِ سرور (`/uploads/images/x.webp`) را
+  // مستقیم به `fetch` می‌داد، `_dio` که baseUrl ندارد استثنا می‌داد، و
+  // `catch (_)` عمدیِ کلاس آن را می‌بلعید. نتیجه: هر سه فراخوانِ prewarm
+  // بی‌صدا هیچ کاری نمی‌کردند و هیچ تستی قرمز نمی‌شد.
+  //
+  // درسش: هر جا استثنا عمداً بلعیده می‌شود، باید تستی باشد که **نتیجهٔ
+  // مثبت** را ثابت کند، نه فقط «خطا نداد».
+  group('بندانگشتی و نرمال‌سازیِ نشانی', () {
+    final src =
+        File('lib/services/image_disk_cache.dart').readAsStringSync();
+    final widgetSrc =
+        File('lib/widgets/cached_card_image.dart').readAsStringSync();
+
+    test('عرض‌های بندانگشتی با سرور یکی است', () {
+      // ⚠️ اگر عددی اینجا باشد و در THUMB_WIDTHS سرور نباشد، سرور `?w=`
+      // را نادیده می‌گیرد و فایلِ کامل می‌فرستد — یعنی بی‌صدا به حالتِ
+      // کند برمی‌گردیم. مقایسه با خودِ فایلِ سرور انجام می‌شود تا
+      // واگراییِ دو طرف ممکن نباشد.
+      final serverSrc =
+          File('../backend/src/server.js').readAsStringSync();
+      final m = RegExp(r'THUMB_WIDTHS = new Set\(\[([0-9,\s]+)\]\)')
+          .firstMatch(serverSrc);
+      expect(m, isNotNull, reason: 'THUMB_WIDTHS در سرور پیدا نشد');
+      final serverWidths = m!
+          .group(1)!
+          .split(',')
+          .map((e) => int.parse(e.trim()))
+          .toList()
+        ..sort();
+
+      final d = RegExp(r'kThumbWidths = <int>\[([0-9,\s]+)\]')
+          .firstMatch(src);
+      expect(d, isNotNull, reason: 'kThumbWidths در کلاینت پیدا نشد');
+      final clientWidths = d!
+          .group(1)!
+          .split(',')
+          .map((e) => int.parse(e.trim()))
+          .toList()
+        ..sort();
+
+      expect(clientWidths, serverWidths);
+    });
+
+    test('کوچک‌ترین عرضِ کافی انتخاب می‌شود، هرگز کوچک‌تر', () {
+      // ⚠️ انتخابِ عرضِ کمتر از نیاز یعنی تصویرِ تار — باگِ ظاهری که از
+      // کندی بدتر است. پس همیشه بالادست گرد می‌کنیم.
+      const url = 'https://api.example.com/uploads/images/a.webp';
+      expect(thumbUrlFor(url, 130), '$url?w=160');
+      expect(thumbUrlFor(url, 160), '$url?w=160');
+      expect(thumbUrlFor(url, 161), '$url?w=240');
+      expect(thumbUrlFor(url, 280), '$url?w=320');
+      expect(thumbUrlFor(url, 420), '$url?w=480');
+    });
+
+    test('فراتر از بزرگ‌ترین پله، اصلِ فایل سرو می‌شود', () {
+      const url = 'https://api.example.com/uploads/images/a.webp';
+      expect(thumbUrlFor(url, 900), url);
+    });
+
+    test('مسیرهای بدونِ بندانگشتی دست‌نخورده می‌مانند', () {
+      // سرور فقط برای `/uploads/images/` بندانگشتی می‌سازد. افزودنِ
+      // `?w=` به بقیه فقط کلیدِ کش را بی‌جهت دو تکه می‌کند.
+      expect(thumbUrlFor('https://x/public/logo.png', 200),
+          'https://x/public/logo.png');
+      expect(thumbUrlFor('https://x/uploads/tickets/a.png', 200),
+          'https://x/uploads/tickets/a.png');
+      expect(thumbUrlFor('', 200), '');
+      expect(thumbUrlFor('https://x/uploads/images/a.webp', null),
+          'https://x/uploads/images/a.webp');
+      // نشانی‌ای که از قبل کوئری دارد نباید دوباره‌نویسی شود.
+      expect(thumbUrlFor('https://x/uploads/images/a.webp?v=2', 200),
+          'https://x/uploads/images/a.webp?v=2');
+    });
+
+    test('fetch و cached نشانیِ نسبی را مطلق می‌کنند', () {
+      // ⚠️ همان باگِ خاموش. رفع باید در **دروازهٔ ورودیِ کلاس** باشد نه
+      // در فراخوان‌ها، وگرنه فراخوانِ بعدی دوباره همین اشتباه را می‌کند.
+      expect(src.contains('Future<File?> fetch(String rawUrl)'), isTrue,
+          reason: 'fetch باید ورودیِ خام بگیرد و خودش نرمال کند');
+      expect(src.contains('Future<File?> cached(String rawUrl)'), isTrue,
+          reason: 'cached باید همان نرمال‌سازی را داشته باشد');
+      // هر دو باید واقعاً fullAssetUrl صدا بزنند، نه فقط اسمِ پارامتر
+      // عوض شده باشد.
+      expect(RegExp(r'final url = fullAssetUrl\(rawUrl\);')
+          .allMatches(src).length, 2);
+    });
+
+    test('prewarm همان نشانی‌ای را گرم می‌کند که ویجت می‌خواهد', () {
+      // ⚠️ اگر prewarm فایلِ کامل را بگیرد ولی ویجت `?w=320` را بخواهد،
+      // آن دو دو کلیدِ متفاوتِ کش‌اند و بهینه‌سازی به ضدِ خودش تبدیل
+      // می‌شود: یک‌بار ۱۳۷KB در پس‌زمینه و یک‌بار ۱۳KB موقعِ نمایش.
+      expect(src.contains('yield thumbUrlFor('), isTrue);
+      expect(src.contains('_cardPrewarmPx'), isTrue);
+      expect(src.contains('_avatarPrewarmPx'), isTrue);
+    });
+
+    test('ویجت روی نشانیِ بندانگشتی کش و عقب‌نشینی می‌کند', () {
+      // هویتِ تصویر (`_resolved`) و مقصدِ دانلود (`_requestUrl`) باید جدا
+      // بمانند، وگرنه تغییرِ اندازه به‌اشتباه «تصویر عوض شد» تفسیر
+      // می‌شود و کارت یک فریم سفید می‌پرد.
+      expect(widgetSrc.contains('String _requestUrl'), isTrue);
+      expect(widgetSrc.contains('_requestUrl = thumbUrlFor('), isTrue);
+      expect(widgetSrc.contains('final requested = _requestUrl;'), isTrue);
+      // عقب‌نشینی به شبکه هم نباید کاربر را به دانلودِ چند برابری
+      // برگرداند.
+      expect(
+          widgetSrc.contains('_requestUrl.isEmpty ? _resolved : _requestUrl'),
+          isTrue);
+      // کلیدِ حافظه هم باید همان نشانیِ درخواستی باشد.
+      expect(widgetSrc.contains('_syncHit[_requestUrl]'), isTrue);
+      expect(widgetSrc.contains('_syncHit.remove(_requestUrl)'), isTrue);
     });
   });
 }

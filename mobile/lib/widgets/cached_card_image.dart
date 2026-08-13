@@ -105,6 +105,17 @@ class _CachedCardImageState extends State<CachedCardImage> {
   File? _file;
   bool _failed = false;
   String _resolved = '';
+
+  /// نشانی‌ای که واقعاً دانلود می‌شود — یعنی `_resolved` به‌علاوهٔ `?w=`
+  /// وقتی بندانگشتی مناسب وجود دارد.
+  ///
+  /// ⚠️ چرا دو فیلد و نه یکی:
+  /// `_resolved` شناسهٔ **هویتِ** تصویر است و `didUpdateWidget` با آن
+  /// تشخیص می‌دهد که ویجت بازاستفاده شده یا نه. اگر عرض بندانگشتی را
+  /// داخل همان فیلد می‌ریختیم، تغییرِ اندازهٔ ویجت (چرخشِ صفحه، تغییرِ
+  /// چگالی) به‌اشتباه «تصویرِ عوض شد» تفسیر می‌شد و کارت یک‌بار سفید
+  /// می‌پرید. حالا هویت ثابت می‌ماند و فقط مقصدِ دانلود عوض می‌شود.
+  String _requestUrl = '';
   Timer? _cacheDeadline;
 
   @override
@@ -138,9 +149,16 @@ class _CachedCardImageState extends State<CachedCardImage> {
       _failed = true;
       return;
     }
+    // ── چرا اینجا و نه در build ──
+    //
+    // انتخابِ بندانگشتی باید همان‌جایی انجام شود که کلیدِ کش ساخته
+    // می‌شود، وگرنه کش برای نشانیِ کامل پر می‌شود و `<img>` نسخهٔ کوچک
+    // را می‌خواهد — یعنی هر دو را دانلود می‌کنیم و از هیچ‌کدام سود
+    // نمی‌بریم.
+    _requestUrl = thumbUrlFor(_resolved, widget.cacheWidth);
 
     // مسیرِ سریع: در همین نشست قبلاً پیدا شده → بدونِ حتی یک فریم انتظار.
-    final hit = _syncHit[_resolved];
+    final hit = _syncHit[_requestUrl];
     if (hit != null) {
       _file = hit;
       return;
@@ -175,13 +193,13 @@ class _CachedCardImageState extends State<CachedCardImage> {
     //
     // رفع: URL در `requested` قفل می‌شود و callback فقط وقتی چیزی را
     // اعمال می‌کند که هنوز همان URL خواسته شده باشد.
-    final requested = _resolved;
+    final requested = _requestUrl;
     // The deadline is explicitly cancellable. Future.timeout leaves an
     // internal Timer alive after widget disposal and made three real widget
     // tests fail. A state-owned Timer gives the same eight-second fallback
     // while dispose/didUpdateWidget can always cancel it.
     _cacheDeadline = Timer(const Duration(seconds: 8), () {
-      if (!mounted || requested != _resolved || _file != null || _failed) {
+      if (!mounted || requested != _requestUrl || _file != null || _failed) {
         return;
       }
       setState(() => _failed = true);
@@ -190,7 +208,7 @@ class _CachedCardImageState extends State<CachedCardImage> {
       if (!mounted) return;
       // نتیجهٔ درخواستِ کهنه دور ریخته می‌شود. `_syncHit` هم دست‌نخورده
       // می‌ماند تا خرابی ماندگار نشود.
-      if (requested != _resolved) return;
+      if (requested != _requestUrl) return;
       _cacheDeadline?.cancel();
       setState(() {
         if (f != null) {
@@ -221,7 +239,7 @@ class _CachedCardImageState extends State<CachedCardImage> {
         // که پوشهٔ cache را در فشارِ فضا خالی کند) نباید جعبهٔ خطای
         // خاکستری بسازد.
         errorBuilder: (_, __, ___) {
-          _syncHit.remove(_resolved);
+          _syncHit.remove(_requestUrl);
           return _networkFallback();
         },
       );
@@ -243,9 +261,11 @@ class _CachedCardImageState extends State<CachedCardImage> {
     );
   }
 
-  /// وقتی کش در دسترس نیست، همان رفتارِ قبلی.
+  /// وقتی کش در دسترس نیست، همان رفتارِ قبلی — ولی روی نشانیِ
+  /// بندانگشتی، نه فایلِ کامل. عقب‌نشینی نباید کاربر را به دانلودِ
+  /// چند برابری برگرداند.
   Widget _networkFallback() => Image.network(
-        _resolved,
+        _requestUrl.isEmpty ? _resolved : _requestUrl,
         width: widget.width,
         height: widget.height,
         fit: widget.fit,
