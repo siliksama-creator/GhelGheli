@@ -4987,10 +4987,23 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 }
 @keyframes duelLeadPulse{50%{transform:scale(1.07); filter:brightness(1.18)}}
 
-/* بازندهٔ راند کمی عقب می‌نشیند — تضاد، خودش خوانایی می‌سازد. */
-.phase-verdict .duelClashSide:not(.win) .ggPlayerCardFrame{
+/* بازندهٔ راند کمی عقب می‌نشیند و برنده جلو می‌آید — تضاد، خودش
+   خوانایی می‌سازد.
+
+   ⚠️ اولین نسخه‌ام `.duelClashSide:not(.win)` نوشته بود. کلاسِ `win`
+      **اصلاً وجود ندارد** — در JSX فقط `mine` و `theirs` هست و
+      برنده/بازنده با پراپ‌های `winner`/`loser` روی `.ggPlayerCard`
+      علامت می‌خورند. نتیجه: `:not(.win)` روی **هر دو** طرف صدق
+      می‌کرد و هر دو کارت را محو می‌کرد.
+      درس: سلکتور را از روی خروجیِ واقعیِ DOM بنویس، نه از روی
+      حدسِ ساختار. */
+.phase-verdict .ggPlayerCard.loser{
   transition:transform .45s ease, filter .45s ease;
   transform:scale(.94); filter:saturate(.62) brightness(.82);
+}
+.phase-verdict .ggPlayerCard.winner{
+  transition:transform .45s cubic-bezier(.2,1.5,.35,1);
+  transform:scale(1.04);
 }
 
 /* مهرِ برنده: از بالا می‌افتد و یک‌بار تکان می‌خورد. */
@@ -5036,7 +5049,8 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
   .duelHandV2 .ggPlayerCard.selected{
     animation:none!important; transform:none!important;
   }
-  .phase-verdict .duelClashSide:not(.win) .ggPlayerCardFrame{
+  .phase-verdict .ggPlayerCard.loser,
+  .phase-verdict .ggPlayerCard.winner{
     transform:none!important; filter:none!important;
   }
 }
