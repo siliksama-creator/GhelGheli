@@ -405,6 +405,13 @@ code {
 .ggCardBadge,
 .ggCardName { font-size: 11.5px !important; }
 
-/* آخرین وزنِ ۹۰۰ در آرنا: عنوانِ inline در JSX که سلکتورِ کلاسی ندارد. */
+/* ── آخرین وزن‌های ۹۰۰ در آرنا ──
+   با بازرسیِ زندهٔ DOM پیدا شدند، نه با جست‌وجوی متن: هیچ‌کدام inline
+   نبودند و از قواعدِ فشردهٔ `.duelHeroV2 > div > span` و
+   `.duelRuleStrip > div > span` می‌آمدند. تلاشِ اولِ من
+   (`[style*="font-weight"]`) به همین دلیل هیچ‌کدام را نگرفت. */
+.duelHeroV2 span,
+.duelRuleStrip span,
+.duelRuleStrip b,
 .duelPageV2 span[style*="font-weight"],
 .duelPageV2 b[style*="font-weight"] { font-weight: 800 !important; }
