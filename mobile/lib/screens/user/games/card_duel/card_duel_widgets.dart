@@ -690,6 +690,23 @@ class _Finale extends StatelessWidget {
                 ),
             ],
           ),
+        if (history.isNotEmpty) ...[
+          Gaps.vSm,
+          Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              collapsedIconColor: Colors.white70,
+              iconColor: Colors.white,
+              title: const Text('تایم‌لاین کامل ۵ راند', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900, color: Colors.white)),
+              subtitle: const Text('جزئیات کامل دلیل، اختلاف قدرت و سهم هر کارت', style: TextStyle(fontSize: 10, color: Colors.white54)),
+              children: [
+                for (final raw in history)
+                  _FinalRoundBreakdown(round: Map<String, dynamic>.from(raw), mySymbol: me),
+              ],
+            ),
+          ),
+        ],
         if (mvp != null) ...[
           Gaps.vSm,
           SizedBox(width: 140, height: 196, child: PlayerCard(card: mvp!, compact: true, showStats: false, winner: true)),
@@ -812,17 +829,37 @@ class _DeckIntelPanel extends StatelessWidget {
               ],
             ),
           ],
+          if ('${insights['recommendedLeadReason'] ?? ''}'.trim().isNotEmpty) ...[
+            Gaps.vSm,
+            Container(
+              padding: const EdgeInsets.all(Gaps.sm),
+              decoration: BoxDecoration(
+                color: _cyan.withValues(alpha: .10),
+                borderRadius: Corners.rLg,
+                border: Border.all(color: _cyan.withValues(alpha: .28)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('اوپنر پیشنهادی', style: TextStyle(fontSize: 10.5, color: _cyan, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 4),
+                  Text('${insights['recommendedLeadReason']}', style: const TextStyle(fontSize: 10.2, color: Colors.white70, height: 1.5, fontWeight: FontWeight.w700)),
+                ],
+              ),
+            ),
+          ],
           if (recommendedOrder.isNotEmpty) ...[
             Gaps.vSm,
             const Text('ترتیب پیشنهادی راندها', style: TextStyle(fontSize: 10.5, color: Colors.white70, fontWeight: FontWeight.w900)),
             const SizedBox(height: 6),
             SizedBox(
-              height: 46,
+              height: 54,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemBuilder: (_, index) {
                   final item = recommendedOrder[index];
                   return Container(
+                    width: 138,
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: .05),
@@ -835,6 +872,8 @@ class _DeckIntelPanel extends StatelessWidget {
                       children: [
                         Text('راند ${faNum(item['round'])} · ${item['focus'] ?? ''}', style: const TextStyle(fontSize: 8.5, color: Colors.white54, fontWeight: FontWeight.w800)),
                         Text('${item['name'] ?? 'کارت'}', style: const TextStyle(fontSize: 10.5, color: Colors.white, fontWeight: FontWeight.w900)),
+                        if ('${item['reason'] ?? ''}'.trim().isNotEmpty)
+                          Text('${item['reason']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 8.5, color: Colors.white54, fontWeight: FontWeight.w700)),
                       ],
                     ),
                   );
@@ -864,6 +903,119 @@ class _IntelChip extends StatelessWidget {
           border: Border.all(color: tint.withValues(alpha: .32)),
         ),
         child: Text(text, style: TextStyle(color: tint, fontSize: 9.8, fontWeight: FontWeight.w800)),
+      );
+}
+
+class _FinalRoundBreakdown extends StatelessWidget {
+  const _FinalRoundBreakdown({required this.round, required this.mySymbol});
+  final Map<String, dynamic> round;
+  final String mySymbol;
+
+  @override
+  Widget build(BuildContext context) {
+    final mineWon = '${round['winner']}' == mySymbol;
+    final draw = '${round['winner']}' == 'DRAW';
+    final mine = mySymbol == 'O'
+        ? Map<String, dynamic>.from((round['cardO'] as Map?) ?? const {})
+        : Map<String, dynamic>.from((round['cardX'] as Map?) ?? const {});
+    final theirs = mySymbol == 'O'
+        ? Map<String, dynamic>.from((round['cardX'] as Map?) ?? const {})
+        : Map<String, dynamic>.from((round['cardO'] as Map?) ?? const {});
+    final breakdownMine = mySymbol == 'O'
+        ? Map<String, dynamic>.from((round['breakdownO'] as Map?) ?? const {})
+        : Map<String, dynamic>.from((round['breakdownX'] as Map?) ?? const {});
+    final breakdownTheirs = mySymbol == 'O'
+        ? Map<String, dynamic>.from((round['breakdownX'] as Map?) ?? const {})
+        : Map<String, dynamic>.from((round['breakdownO'] as Map?) ?? const {});
+    final headline = draw ? _gold : mineWon ? _emerald : _rose;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(Gaps.sm),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .04),
+        borderRadius: Corners.rLg,
+        border: Border.all(color: headline.withValues(alpha: .22)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Text('راند ${faNum(round['round'])} · ${round['focusLabel'] ?? round['title']}', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900))),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(color: headline.withValues(alpha: .16), borderRadius: BorderRadius.circular(999)),
+                child: Text(draw ? 'DRAW' : mineWon ? 'WIN' : 'LOSS', style: TextStyle(color: headline, fontSize: 9.5, fontWeight: FontWeight.w900)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text('${mine['name'] ?? 'کارت تو'} در برابر ${theirs['name'] ?? 'کارت حریف'}', style: const TextStyle(fontSize: 10.2, color: Colors.white70)),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _MiniBreakChip(label: 'ویژگی', value: '${round['focusLabel'] ?? round['title']}', tint: _cyan),
+              _MiniBreakChip(label: 'قدرت تو', value: faNum(mySymbol == 'O' ? round['powerO'] : round['powerX']), tint: mineWon ? _emerald : _cyan),
+              _MiniBreakChip(label: 'قدرت حریف', value: faNum(mySymbol == 'O' ? round['powerX'] : round['powerO']), tint: !draw && !mineWon ? _rose : _gold),
+              _MiniBreakChip(label: 'اختلاف', value: faNum(round['powerGap'] ?? 0), tint: headline),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _BreakdownRow(title: 'تو', data: breakdownMine),
+          const SizedBox(height: 6),
+          _BreakdownRow(title: 'حریف', data: breakdownTheirs),
+          const SizedBox(height: 8),
+          Text('${round['reason'] ?? ''}', style: const TextStyle(fontSize: 10.2, color: Colors.white70, height: 1.5, fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
+}
+
+class _BreakdownRow extends StatelessWidget {
+  const _BreakdownRow({required this.title, required this.data});
+  final String title;
+  final Map<String, dynamic> data;
+
+  @override
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(fontSize: 10, color: Colors.white54, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 5,
+            runSpacing: 5,
+            children: [
+              _MiniBreakChip(label: 'base', value: '${data['base'] ?? 0}', tint: Colors.white70),
+              _MiniBreakChip(label: 'focus', value: '${data['focus'] ?? 0}', tint: _cyan),
+              _MiniBreakChip(label: 'effect', value: '${data['effectBonus'] ?? 0}', tint: _emerald),
+              _MiniBreakChip(label: 'luck', value: '${data['luck'] ?? 0}', tint: _gold),
+              if ((data['wallAdjustment'] as num?) != null && (data['wallAdjustment'] as num) != 0)
+                _MiniBreakChip(label: 'wall', value: '${data['wallAdjustment']}', tint: _rose),
+            ],
+          ),
+        ],
+      );
+}
+
+class _MiniBreakChip extends StatelessWidget {
+  const _MiniBreakChip({required this.label, required this.value, required this.tint});
+  final String label;
+  final String value;
+  final Color tint;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+        decoration: BoxDecoration(
+          color: tint.withValues(alpha: .10),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: tint.withValues(alpha: .18)),
+        ),
+        child: Text('$label: $value', style: TextStyle(fontSize: 9, color: tint, fontWeight: FontWeight.w800)),
       );
 }
 

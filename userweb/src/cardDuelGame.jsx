@@ -231,10 +231,44 @@ function DeckIntel({ insights, suggestedDeck, onApply }) {
       <div><b>تحلیل بالانس ترکیب</b><small>هوش آرنا قبل از شروع نقاط قوت و ضعف deck را خلاصه می‌کند</small></div>
       {suggestedDeck && <button type="button" className="ghost" onClick={onApply}>چیدن خودکار</button>}
     </div>
+    {active?.recommendedLeadReason && <div className="duelIntelLead">{active.recommendedLeadReason}</div>}
     {!!strengths.length && <div className="duelIntelFlow good">{strengths.map((item, index) => <i key={index}>{item}</i>)}</div>}
     {!!warnings.length && <div className="duelIntelFlow bad">{warnings.map((item, index) => <i key={index}>{item}</i>)}</div>}
-    {!!order.length && <div className="duelIntelOrder">{order.map(item => <span key={`${item.round}-${item.cardTypeId}`}><b>راند {fa(item.round)}</b>{item.name}</span>)}</div>}
+    {!!order.length && <div className="duelIntelOrder">{order.map(item => <span key={`${item.round}-${item.cardTypeId}`}><b>راند {fa(item.round)}</b>{item.name}<small>{item.reason || ''}</small></span>)}</div>}
   </section>;
+}
+
+function RoundTimeline({ history, mine }) {
+  if (!history?.length) return null;
+  return <details className="duelTimelineV2">
+    <summary>
+      <div>
+        <h3>تایم‌لاین کامل ۵ راند</h3>
+        <small>جزئیات معیار، اختلاف قدرت و سهم هر کارت در نتیجه</small>
+      </div>
+    </summary>
+    {history.map((round, index) => {
+      const mineWon = round.winner === mine;
+      const draw = round.winner === 'DRAW';
+      const myPower = mine === 'O' ? round.powerO : round.powerX;
+      const theirPower = mine === 'O' ? round.powerX : round.powerO;
+      const mineBreak = mine === 'O' ? round.breakdownO : round.breakdownX;
+      const theirBreak = mine === 'O' ? round.breakdownX : round.breakdownO;
+      const accent = draw ? '#FFD166' : mineWon ? '#22E7A6' : '#FB7185';
+      return <article className="duelTimelineRow" key={round.seed || index} style={{ '--timeline-accent': accent }}>
+        <header>
+          <b>راند {fa(round.round || index + 1)} · {round.focusLabel || round.title}</b>
+          <span>{draw ? 'DRAW' : mineWon ? 'WIN' : 'LOSS'}</span>
+        </header>
+        <strong>{fa(myPower)} <i>VS</i> {fa(theirPower)}</strong>
+        <div className="duelTimelineBreaks">
+          <span><b>تو</b><small>base {mineBreak?.base ?? 0} · focus {mineBreak?.focus ?? 0} · effect {mineBreak?.effectBonus ?? 0} · luck {mineBreak?.luck ?? 0}</small></span>
+          <span><b>حریف</b><small>base {theirBreak?.base ?? 0} · focus {theirBreak?.focus ?? 0} · effect {theirBreak?.effectBonus ?? 0} · luck {theirBreak?.luck ?? 0}</small></span>
+        </div>
+        <p>{round.reason}</p>
+      </article>;
+    })}
+  </details>;
 }
 
 function History({ battles }) {
@@ -428,6 +462,7 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
         <div className={`duelSettlement ${session.g.settlementStatus || 'settled'}`}>
           {{ pending: ' در حال تسویه امن', settled: ' تسویه کامل شد', refunded: ' ورودی برگشت خورد' }[session.g.settlementStatus || 'settled']}
         </div>
+        <RoundTimeline history={session.g.state?.history || []} mine={session.g.me || 'X'} />
         <div className="duelSharePreview">
           <b>کارت نتیجه + لینک چالش مستقیم</b>
           <small>MVP: {resultMvp(session.g.state)?.name || 'ستاره آرنا'}</small>

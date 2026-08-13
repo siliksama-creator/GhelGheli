@@ -95,6 +95,8 @@ ok(/mode IN \('online','lobby'\)/.test(service) && /HISTORY_KEEP = 5/.test(servi
   'فقط پنج نبرد آنلاین/لابی اخیر خوانده می‌شود');
 ok(/deckInsights: activeInsights/.test(service) && /suggestedDeck: suggestedDeck/.test(service),
   'وضعیت دوئل تحلیل بالانس و ترکیب پیشنهادی را برمی‌گرداند');
+ok(/recommendedLeadReason/.test(service) && /recommendedOrder/.test(service),
+  'تحلیل دوئل اوپنر و ترتیب پیشنهادی راندها را هم می‌دهد');
 ok(/\/api\/admin\/card-duel\/balance/.test(server) && /balanceSnapshot/.test(service),
   'اسنپ‌شات بالانس برای تنظیم حرفه‌ای دوئل وجود دارد');
 ok(/league: false/.test(read('backend/src/services/gameStakeService.js')),
@@ -110,8 +112,12 @@ for (const [source, platform] of [[mobile, 'Android'], [web, 'Web']]) {
 }
 ok(/ExpansionTile/.test(mobile) && /take\(5\)/.test(mobile),
   'Android: لاگ بازی‌ها کشویی است و فقط پنج مورد را نشان می‌دهد');
+ok(/تایم‌لاین کامل ۵ راند/.test(mobile) && /_FinalRoundBreakdown/.test(mobile),
+  'Android: فیناله تایم‌لاین کامل راندها را دارد');
 ok(/<details/.test(web) && /slice\(0, 5\)/.test(web),
   'Web: لاگ بازی‌ها کشویی است و فقط پنج مورد را نشان می‌دهد');
+ok(/RoundTimeline/.test(web) && /تایم‌لاین کامل ۵ راند/.test(web),
+  'Web: فیناله تایم‌لاین کامل راندها را دارد');
 ok(/stake: _activeStake/.test(mobileHub) && !/بازی مستقل با کارت/.test(mobileHub),
   'Android دوئل کارت را با حالت انتخاب‌شده ۱۰۰/۱۰۰۰ اجرا می‌کند');
 ok(/stake=\{Number\(active\.stake/.test(webHub) && !/بازی مستقل با کارت/.test(webHub),
