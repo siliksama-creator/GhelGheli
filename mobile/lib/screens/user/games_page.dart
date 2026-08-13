@@ -433,31 +433,52 @@ class _GamesHubPageState extends State<GamesHubPage> {
           ),
         ] else ...[
           // ── فهرست بازی‌های مسابقه‌ای یا تمرین با ربات ──
-          for (final g in _multiplayerGames) ...[
-            _CleanGameTile(
-              entry: g,
-              mode: _selectedMode,
-              onTap: () {
-                if (_selectedMode > 0 &&
-                    ((_user?['current_points'] as num?)?.toInt() ?? 0) < _selectedMode) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text(
-                      'برای این مسابقه حداقل ${faNum(_selectedMode)} امتیاز لازم داری',
-                    ),
-                  ));
-                  return;
-                }
-                if (_selectedMode == 0) {
-                  // تمرین مستقیم با ربات؛ بدون صف و بدون جابه‌جایی امتیاز.
-                  _launchGame(g.id, stake: 0, vsBot: true);
-                } else {
-                  // مسابقه آنلاین با بازیکن واقعی (بدون ربات)
-                  _launchGame(g.id, stake: _selectedMode, vsBot: false);
-                }
-              },
-            ),
-            Gaps.vSm,
-          ],
+          //
+          // ── خواستهٔ مالک ──
+          //
+          //   «بجای اینکه بنر بازی‌ها واید باشه بهتره باکس مربعی باشن
+          //    که انقدر نیاز به اسکرول نباشه»
+          //
+          // قبلاً هر بازی یک بنرِ تمام‌عرض بود که روی هم چیده می‌شدند.
+          // با شبکهٔ دوستونیِ مربع، سه بازی در **دو ردیف** جا می‌شوند.
+          //
+          // ⚠️ `shrinkWrap` + `NeverScrollableScrollPhysics` لازم است
+          //    چون این شبکه داخلِ یک `ListView` است. بدونِ آن‌ها یا
+          //    خطای ارتفاعِ نامحدود می‌گیریم یا دو اسکرولِ تودرتو که
+          //    روی گوشی حس می‌شود.
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisSpacing: Gaps.sm,
+            mainAxisSpacing: Gaps.sm,
+            childAspectRatio: 1,
+            children: [
+              for (final g in _multiplayerGames)
+                _CleanGameTile(
+                  entry: g,
+                  mode: _selectedMode,
+                  onTap: () {
+                    if (_selectedMode > 0 &&
+                        ((_user?['current_points'] as num?)?.toInt() ?? 0) < _selectedMode) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text(
+                          'برای این مسابقه حداقل ${faNum(_selectedMode)} امتیاز لازم داری',
+                        ),
+                      ));
+                      return;
+                    }
+                    if (_selectedMode == 0) {
+                      // تمرین مستقیم با ربات؛ بدون صف و بدون جابه‌جایی امتیاز.
+                      _launchGame(g.id, stake: 0, vsBot: true);
+                    } else {
+                      // مسابقه آنلاین با بازیکن واقعی (بدون ربات)
+                      _launchGame(g.id, stake: _selectedMode, vsBot: false);
+                    }
+                  },
+                ),
+            ],
+          ),
         ],
 
         Gaps.vLg,
@@ -663,6 +684,20 @@ class _TapGameHeroCard extends StatelessWidget {
 }
 
 /// کارت تمیز بازی‌های ۱۰۰، ۱۰۰۰ و تمرین با ربات (بدون زیرنویس‌های شلوغ)
+/// کاشیِ مربعیِ بازی.
+///
+/// ── خواستهٔ مالک ──
+///
+///   «بجای اینکه بنر بازی‌ها واید باشه بهتره باکس مربعی باشن که انقدر
+///    نیاز به اسکرول نباشه»
+///
+/// نسخهٔ قبل `AspectRatio(16/5.6)` داشت — یعنی بنرِ پهن. داخلِ یک خانهٔ
+/// مربعیِ شبکه، آن نسبت یعنی تصویر فقط نوارِ باریکی از بالا را می‌گیرد و
+/// بقیهٔ مربع خالی می‌ماند.
+///
+/// حالا تصویر با `Expanded` تمامِ فضای باقی‌مانده را پر می‌کند و متن
+/// روی گرادیانِ پایینش می‌نشیند — همان چیدمانی که در وب هم پیاده شد تا
+/// دو کلاینت یکی باشند.
 class _CleanGameTile extends StatelessWidget {
   const _CleanGameTile({
     required this.entry,
@@ -678,121 +713,132 @@ class _CleanGameTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isBot = mode == 0;
+    final modeColor = isBot
+        ? const Color(0xFF22E7A6)
+        : (mode == 1000 ? const Color(0xFFFFD166) : const Color(0xFF38BDF8));
 
     return InkWell(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(18),
       onTap: onTap,
-      child: AppCard(
-        padding: EdgeInsets.zero,
-        child: ClipRRect(
-          borderRadius: Corners.rXl,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Stack(
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: entry.accent.withValues(alpha: 0.30)),
+          color: const Color(0xFF0B1622),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // تصویر، تمامِ مربع
+            Image.asset(
+              entry.art,
+              fit: BoxFit.cover,
+              cacheWidth: 460,
+              errorBuilder: (_, __, ___) => Container(
+                color: entry.accent.withValues(alpha: 0.18),
+                alignment: Alignment.center,
+                child: Image.asset(entry.emoji, width: 48, height: 48, fit: BoxFit.contain),
+              ),
+            ),
+            // گرادیانِ پایین تا متن خوانا بماند
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.transparent, Color(0xE6050B13), Color(0xF7050B13)],
+                  stops: [0.34, 0.70, 1.0],
+                ),
+              ),
+            ),
+            // نشانِ حالت، بالا
+            Positioned(
+              top: 7,
+              right: 7,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  borderRadius: Corners.rPill,
+                  color: const Color(0xCC050B13),
+                  border: Border.all(color: modeColor),
+                ),
+                child: Text(
+                  isBot ? 'تمرین' : '${faNum(mode)} امتیاز',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                    color: modeColor,
+                  ),
+                ),
+              ),
+            ),
+            // متن و دکمه، پایین
+            Positioned(
+              left: 9,
+              right: 9,
+              bottom: 9,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  AspectRatio(
-                    aspectRatio: 16 / 5.6,
-                    child: Image.asset(
-                      entry.art,
-                      fit: BoxFit.cover,
-                      cacheWidth: 720,
-                      errorBuilder: (_, __, ___) => Container(
-                        color: entry.accent.withValues(alpha: 0.18),
-                        alignment: Alignment.center,
-                        child: Image.asset(entry.emoji, width: 56, height: 56, fit: BoxFit.contain),
-                      ),
-                    ),
-                  ),
-                  Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [Colors.transparent, Colors.black.withValues(alpha: 0.75)],
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    right: Gaps.md,
-                    bottom: Gaps.xs,
-                    left: Gaps.md,
-                    child: Row(
-                      children: [
-                        Image.asset(entry.emoji, width: 26, height: 26, fit: BoxFit.contain),
-                        Gaps.hXs,
-                        Expanded(
-                          child: Text(
-                            entry.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w900,
-                            ),
+                  Row(
+                    children: [
+                      Image.asset(entry.emoji, width: 20, height: 20,
+                          fit: BoxFit.contain, cacheWidth: 60),
+                      Gaps.hXs,
+                      Expanded(
+                        child: Text(
+                          entry.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
-                      ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    entry.subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontSize: 11.5,
+                      height: 1.4,
+                      color: Colors.white.withValues(alpha: 0.72),
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      color: entry.accent,
+                    ),
+                    child: const Text(
+                      'شروع',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF04101C),
+                      ),
                     ),
                   ),
                 ],
               ),
-              Padding(
-                padding: const EdgeInsets.all(Gaps.sm),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(entry.subtitle, style: theme.textTheme.bodySmall),
-                          Gaps.vXs,
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              borderRadius: Corners.rPill,
-                              color: isBot
-                                  ? const Color(0xFF22E7A6).withValues(alpha: 0.15)
-                                  : (mode == 1000
-                                      ? const Color(0xFFFFD166).withValues(alpha: 0.18)
-                                      : const Color(0xFF38BDF8).withValues(alpha: 0.18)),
-                              border: Border.all(
-                                color: isBot
-                                    ? const Color(0xFF22E7A6)
-                                    : (mode == 1000 ? const Color(0xFFFFD166) : const Color(0xFF38BDF8)),
-                              ),
-                            ),
-                            child: Text(
-                              isBot
-                                  ? 'تمرین فوری'
-                                  : 'آنلاین · ${faNum(mode)} امتیاز',
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w900,
-                                color: isBot
-                                    ? const Color(0xFF22E7A6)
-                                    : (mode == 1000 ? const Color(0xFFFFD166) : const Color(0xFF38BDF8)),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Image.asset('assets/games/play_glow.png', width: 36, height: 36, cacheWidth: 96),
-                  ],
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-/// هاب جامع اتاق خصوصی و لابی‌ها (ساخت لابی، پسورد، نمایش لابی‌ها با قفل)
 class _PrivateLobbyHub extends StatefulWidget {
   const _PrivateLobbyHub({
     required this.api,

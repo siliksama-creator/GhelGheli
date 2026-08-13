@@ -478,11 +478,21 @@ export default function Games({ api, token, externalLaunch = null }) {
           </div>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        /* ── خواستهٔ مالک ──
+           «بجای اینکه بنر بازی‌ها واید باشه بهتره باکس مربعی باشن که
+            انقدر نیاز به اسکرول نباشه»
+
+           اندازه‌گیری روی ۳۹۰×۸۴۴: سه بنرِ ۳۷۴×۱۴۳ روی هم = ۴۴۹px و
+           کلِ صفحه ۱۱۳۴px (۲۹۰px اسکرول).
+
+           با شبکهٔ دوستونیِ مربع: دو ردیف به‌جای سه، و هر کاشی مربع
+           می‌ماند. `aspect-ratio:1` کار را به مرورگر می‌سپارد تا روی
+           هر عرضی مربع بماند. */
+        <div className="gameTileGrid">
           {GAMES.filter(g => g.id !== 'tap').map(g => (
             <div
               key={g.id}
-              className="card"
+              className="card gameTileSquare"
               onClick={() => {
                 if (mode > 0 && Number(user?.current_points || 0) < mode) {
                   alert(`برای این مسابقه حداقل ${fa(mode)} امتیاز لازم داری`);
@@ -494,34 +504,26 @@ export default function Games({ api, token, externalLaunch = null }) {
                   setActive({ id: g.id, stake: mode });
                 }
               }}
-              style={{
-                padding: '0',
-                borderRadius: '16px',
-                border: '1px solid rgba(255,255,255,0.08)',
-                cursor: 'pointer',
-                overflow: 'hidden',
-              }}
+              style={{ '--tile-accent': g.accent }}
             >
-              <div style={{ height: '86px', background: `linear-gradient(135deg, ${g.accent}22, transparent)`, display: 'flex', alignItems: 'center', padding: '0 16px', gap: '12px', position:'relative' }}>
-                <img src={g.icon} alt="" className="gameTileIcon" />
-                <div style={{ flex:1 }}>
-                  <h4 style={{ color: '#FFF', fontWeight: '900', margin: '0 0 2px', fontSize: '14px' }}>{g.title}</h4>
-                  <p style={{ color: '#94A3B8', fontSize: '11px', margin: 0 }}>{g.desc}</p>
-                </div>
-                <span style={{ fontSize: '11px', fontWeight: '900', color: mode === 0 ? '#22E7A6' : (mode===1000 ? '#FFD166' : '#38BDF8'), background: 'rgba(255,255,255,0.06)', padding: '4px 8px', borderRadius: '10px', border: `1px solid ${mode===0 ? '#22E7A6' : (mode===1000 ? '#FFD166' : '#38BDF8')}66` }}>
-                  {mode === 0
-                    ? 'تمرین فوری'
-                    : `آنلاین · ${fa(mode)} امتیاز`}
+              <div className="gameTileArt">
+                <img src={g.art} alt="" loading="lazy" decoding="async" />
+                <span className="gameTileMode">
+                  {mode === 0 ? 'تمرین' : `${fa(mode)} امتیاز`}
                 </span>
               </div>
-              <div style={{ padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap:'8px', background:'rgba(0,0,0,0.2)' }}>
-                {g.id === 'memory' && mode === 0 ? (
-                  <button type="button" onClick={e => { e.stopPropagation(); openMemorySolo(); }}
-                    style={{ color:'#A855F7', border:'1px solid #A855F777', background:'#A855F71A', borderRadius:'10px', padding:'6px 10px', fontSize:'11px', fontWeight:'800', cursor:'pointer' }}>
-                    رکوردی با ساعت
-                  </button>
-                ) : <span />}
-                <span style={{ background: g.accent, color: '#000', padding: '7px 16px', borderRadius: '10px', fontWeight: '900', fontSize: '12px' }}>شروع</span>
+              <div className="gameTileBody">
+                <h4>{g.title}</h4>
+                <p>{g.desc}</p>
+                <div className="gameTileFoot">
+                  <span className="gameTilePlay">شروع</span>
+                  {g.id === 'memory' && mode === 0 && (
+                    <button type="button" className="gameTileAlt"
+                      onClick={e => { e.stopPropagation(); openMemorySolo(); }}>
+                      رکوردی
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           ))}

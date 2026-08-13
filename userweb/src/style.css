@@ -4212,3 +4212,102 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
   .duelRuleSteps>div>b{font-size:12px}
   .duelRuleSteps>div>small{font-size:11.5px; line-height:1.5}
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   کاشی مربعی بازی‌ها — خواستهٔ مالک
+   ═══════════════════════════════════════════════════════════════════════════
+
+   «بجای اینکه بنر بازی‌ها واید باشه بهتره باکس مربعی باشن که انقدر
+    نیاز به اسکرول نباشه»
+
+   اندازه‌گیری روی ۳۹۰×۸۴۴ قبل از تغییر:
+       سه بنرِ ۳۷۴×۱۴۳ روی هم  →  کلِ صفحه ۱۱۳۴px  (۲۹۰px اسکرول)
+
+   با شبکهٔ دوستونی: سه بازی در **دو ردیف** جا می‌شوند به‌جای سه ردیف.
+
+   ⚠️ `aspect-ratio:1` روی خودِ کاشی است نه ارتفاعِ ثابت — چون عرضِ
+      ستون با اندازهٔ صفحه عوض می‌شود و ارتفاعِ px ثابت روی صفحهٔ
+      باریک کِش می‌آید و روی پهن لِه می‌شود. */
+.gameTileGrid{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:10px;
+}
+.gameTileSquare{
+  position:relative;
+  aspect-ratio:1;
+  display:flex; flex-direction:column;
+  padding:0; overflow:hidden;
+  border-radius:18px;
+  border:1px solid color-mix(in srgb,var(--tile-accent) 30%,transparent);
+  cursor:pointer;
+  transition:transform .2s cubic-bezier(.2,.8,.2,1), box-shadow .2s, border-color .2s;
+}
+.gameTileSquare:hover{
+  transform:translateY(-3px);
+  border-color:var(--tile-accent);
+  box-shadow:0 14px 30px #0007, 0 0 22px color-mix(in srgb,var(--tile-accent) 22%,transparent);
+}
+.gameTileSquare:active{transform:translateY(-1px) scale(.995)}
+
+/* تصویر: نیمهٔ بالای مربع */
+.gameTileArt{
+  position:relative; flex:1 1 auto; min-height:0;
+  background:linear-gradient(140deg,color-mix(in srgb,var(--tile-accent) 22%,transparent),#050b13);
+}
+.gameTileArt img{
+  width:100%; height:100%; object-fit:cover; display:block;
+}
+.gameTileArt:after{
+  content:''; position:absolute; inset:auto 0 0 0; height:58%;
+  background:linear-gradient(transparent,#050b13f2);
+  pointer-events:none;
+}
+.gameTileMode{
+  position:absolute; z-index:2; top:7px; inset-inline-start:7px;
+  padding:3px 8px; border-radius:99px;
+  background:#050b13cc; border:1px solid var(--tile-accent);
+  color:var(--tile-accent); font-size:11.5px; font-weight:800;
+  backdrop-filter:blur(6px);
+}
+
+/* متن: نیمهٔ پایین */
+.gameTileBody{
+  position:relative; z-index:2;
+  flex:0 0 auto; padding:8px 10px 10px;
+  display:flex; flex-direction:column; gap:2px;
+  margin-top:-26px;   /* کمی روی گرادیانِ تصویر بنشیند */
+}
+.gameTileBody h4{
+  margin:0; color:#fff; font-size:13.5px; font-weight:800;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.gameTileBody p{
+  margin:0; color:#94A3B8; font-size:11.5px; line-height:1.45;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+  overflow:hidden;
+}
+.gameTileFoot{
+  display:flex; align-items:center; gap:6px; margin-top:6px;
+}
+.gameTilePlay{
+  flex:1; text-align:center;
+  background:var(--tile-accent); color:#04101c;
+  padding:6px 10px; border-radius:10px;
+  font-size:12px; font-weight:800;
+}
+.gameTileAlt{
+  padding:6px 9px; border-radius:10px;
+  background:#ffffff10; border:1px solid #ffffff28;
+  color:#cfe0f2; font-size:11.5px; font-weight:800; cursor:pointer;
+}
+
+/* روی صفحهٔ خیلی باریک، دو ستون هنوز جواب می‌دهد ولی متن باید جا شود. */
+@media (max-width:340px){
+  .gameTileBody h4{font-size:12.5px}
+  .gameTileBody p{-webkit-line-clamp:1}
+}
+/* دسکتاپ: سه ستون، جای بیشتری هست. */
+@media (min-width:760px){
+  .gameTileGrid{grid-template-columns:repeat(3,1fr)}
+}
