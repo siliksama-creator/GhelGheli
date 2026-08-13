@@ -1608,3 +1608,13 @@ table.data-table {
 .adminRarityFrame.rarity-legend{padding:5px;background:conic-gradient(from var(--rarity-turn),#ffd166,#ef4444,#7f1d1d,#071522,#ffd166);box-shadow:0 11px 30px #ef444477;animation-duration:2.7s}
 @keyframes adminSilver{50%{background-position:100% 0;filter:brightness(1.13)}}
 @media(prefers-reduced-motion:reduce){.adminRarityFrame.rarity-silver{animation:none!important}}
+
+/* ── نوعِ کارت: بازی یا کلکسیونی ───────────────────────────────────────
+   سوییچی که بخشِ استاتس را حذف می‌کند. حاشیهٔ رنگی عمدی است: مدیر باید
+   با یک نگاه بفهمد این کارت در بازی هست یا نه، بدون خواندنِ متن. */
+.cardKindBox { border: 1px solid var(--gg-border-soft); transition: border-color .18s ease, background .18s ease; }
+.cardKindBox.isCollectible { border-color: #f59e0b88; background: linear-gradient(180deg, #f59e0b14, transparent); }
+.cardKindRow { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.cardKindRow input { margin-top: 3px; width: 17px; height: 17px; accent-color: #f59e0b; flex: 0 0 auto; cursor: pointer; }
+.cardKindRow > span { display: block; line-height: 1.7; }
+.adminCollectibleTag { margin: 4px 0 0; padding: 5px 8px; border-radius: 8px; background: #f59e0b1f; border: 1px solid #f59e0b55; color: #fbbf24; font-size: 10.5px; }

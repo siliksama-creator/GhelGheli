@@ -472,14 +472,102 @@ class _RoundPips extends StatelessWidget {
       ]);
 }
 
-class _ClashStage extends StatelessWidget {
+/// ═══════════════════════════════════════════════════════════════════════
+/// نمایشِ سینماتیکِ راند — چهار فاز، مو‌به‌مو مثلِ نسخهٔ وب
+/// ═══════════════════════════════════════════════════════════════════════
+///
+/// نسخهٔ قبلی یک `TweenAnimationBuilder` ساده بود: کلِ کارت با هم بزرگ
+/// می‌شد و همهٔ اطلاعات از فریمِ اول روی صفحه بود. کامل ولی بی‌تعلیق —
+/// کاربر نتیجه را می‌دید قبل از اینکه بفهمد چه شد.
+///
+/// حالا دقیقاً همان چهار فازِ وب:
+///   ۱. charge  (۴۵۰ms) — دو کارت از دو طرف هجوم می‌آورند
+///   ۲. impact  (۳۰۰ms) — فلاش، حلقهٔ ضربه، لرزش، و ویژگیِ راند
+///   ۳. numbers (۵۵۰ms) — دو عددِ قدرت با شمارشِ صعودی
+///   ۴. verdict          — مهرِ برنده و توضیح
+///
+/// ── چرا StatefulWidget و نه فقط TweenAnimationBuilder ──
+///
+/// فازها باید محتوا را **از درخت حذف** کنند نه فقط شفافش کنند، وگرنه
+/// TalkBack عددِ برنده را قبل از موعد می‌خواند و تعلیق بی‌معنی می‌شود.
+/// این با تویین تنها ممکن نیست.
+///
+/// ⚠️ درسِ ثبت‌شدهٔ این پروژه: `late final AnimationController` روی فیلد
+/// یک بار باگ داد. اینجا کنترلر در `initState` ساخته و در `dispose` بسته
+/// می‌شود، و `didUpdateWidget` برای راندِ تازه ریستش می‌کند — بدونِ آن،
+/// راندِ دوم به بعد اصلاً انیمیشن نداشت (همان باگی که در وب با `key` حل شد).
+enum _RevealPhase { charge, impact, numbers, verdict }
+
+class _ClashStage extends StatefulWidget {
   const _ClashStage({required this.round, required this.mine, required this.color});
   final Map<String, dynamic>? round;
   final String mine;
   final Color color;
 
   @override
-  Widget build(BuildContext context) {
+  State<_ClashStage> createState() => _ClashStageState();
+}
+
+class _ClashStageState extends State<_ClashStage> with SingleTickerProviderStateMixin {
+  // مجموعِ فازها: ۴۵۰ + ۳۰۰ + ۵۵۰ = ۱۳۰۰ms تا حکم.
+  static const _total = Duration(milliseconds: 1300);
+  static const _chargeEnd = 450 / 1300;
+  static const _impactEnd = 750 / 1300;
+  // ⚠️ حتماً `1.0` و نه `1`: استنتاجِ نوع آن را int می‌کرد و
+  // `Curves.transform(int)` خطای کامپایل می‌داد.
+  static const _numbersEnd = 1.0;
+
+  late final AnimationController _c =
+      AnimationController(vsync: this, duration: _total);
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.round != null) _c.forward();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ClashStage old) {
+    super.didUpdateWidget(old);
+    // راندِ تازه = انیمیشن از اول. بدونِ این مقایسه، هر rebuildِ بی‌ربط
+    // (مثلاً تیک ساعت) انیمیشن را ریست می‌کرد و صحنه می‌لرزید.
+    final before = old.round?['round'];
+    final now = widget.round?['round'];
+    if (before != now && widget.round != null) {
+      _c
+        ..reset()
+        ..forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  _RevealPhase get _phase {
+    final t = _c.value;
+    if (t < _chargeEnd) return _RevealPhase.charge;
+    if (t < _impactEnd) return _RevealPhase.impact;
+    if (t < _numbersEnd) return _RevealPhase.numbers;
+    return _RevealPhase.verdict;
+  }
+
+  /// پیشرفتِ ۰..۱ داخلِ یک بازهٔ مشخص — برای انیمیشنِ هر فاز جداگانه.
+  double _span(double from, double to) =>
+      ((_c.value - from) / (to - from)).clamp(0.0, 1.0);
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: _c,
+        builder: (context, _) => _build(context),
+      );
+
+  Widget _build(BuildContext context) {
+    final round = widget.round;
+    final mine = widget.mine;
+    final color = widget.color;
     if (round == null) {
       return Container(
         height: 210,
@@ -492,84 +580,258 @@ class _ClashStage extends StatelessWidget {
         child: const Text('منتظر برخورد اول…', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w800)),
       );
     }
-    final myCard = Map<String, dynamic>.from((mine == 'O' ? round!['cardO'] : round!['cardX']) as Map? ?? const {});
-    final otherCard = Map<String, dynamic>.from((mine == 'O' ? round!['cardX'] : round!['cardO']) as Map? ?? const {});
-    final myPower = mine == 'O' ? round!['powerO'] : round!['powerX'];
-    final otherPower = mine == 'O' ? round!['powerX'] : round!['powerO'];
-    final myFocus = mine == 'O' ? round!['focusStatO'] : round!['focusStatX'];
-    final otherFocus = mine == 'O' ? round!['focusStatX'] : round!['focusStatO'];
-    final winner = '${round!['winner']}';
+    final myCard = Map<String, dynamic>.from((mine == 'O' ? round['cardO'] : round['cardX']) as Map? ?? const {});
+    final otherCard = Map<String, dynamic>.from((mine == 'O' ? round['cardX'] : round['cardO']) as Map? ?? const {});
+    final myPower = mine == 'O' ? round['powerO'] : round['powerX'];
+    final otherPower = mine == 'O' ? round['powerX'] : round['powerO'];
+    final myFocus = mine == 'O' ? round['focusStatO'] : round['focusStatX'];
+    final otherFocus = mine == 'O' ? round['focusStatX'] : round['focusStatO'];
+    final winner = '${round['winner']}';
     final iWon = winner == mine;
     final draw = winner == 'DRAW';
-    return TweenAnimationBuilder<double>(
-      key: ValueKey(round!['round']),
-      tween: Tween(begin: 0.86, end: 1),
-      duration: const Duration(milliseconds: 520),
-      curve: Curves.easeOutBack,
-      builder: (_, value, child) => Opacity(
-        opacity: ((value - 0.86) / 0.14).clamp(0.0, 1.0),
-        child: Transform.scale(scale: value, child: child),
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          borderRadius: Corners.rXl,
-          gradient: LinearGradient(colors: [
-            (draw ? _gold : iWon ? _emerald : _rose).withValues(alpha: 0.16),
-            const Color(0xFF07111D),
-          ]),
-          border: Border.all(color: (draw ? _gold : iWon ? _emerald : _rose).withValues(alpha: 0.55), width: 1.4),
-          boxShadow: [BoxShadow(color: (draw ? _gold : iWon ? _emerald : _rose).withValues(alpha: .16), blurRadius: 22)],
-        ),
-        child: Column(children: [
-          Row(children: [
-            Expanded(child: AspectRatio(aspectRatio: 0.68, child: PlayerCard(card: myCard, compact: true, showStats: false, winner: iWon, loser: !draw && !iWon))),
-            Expanded(
-              child: Column(children: [
-                Text('راند ${faNum(round!['round'])} · ${round!['focusLabel'] ?? round!['title']}', style: const TextStyle(fontSize: 10, color: Colors.white54, fontWeight: FontWeight.w800), textAlign: TextAlign.center),
-                Text('${round!['title']}', textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900)),
-                const SizedBox(height: 6),
-                Text('${faNum(myPower)}  VS  ${faNum(otherPower)}',
-                    textDirection: TextDirection.ltr, style: const TextStyle(color: _gold, fontSize: 22, fontWeight: FontWeight.w900)),
-                const SizedBox(height: 8),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    _RoundChip(label: '${round!['focusLabel'] ?? 'ویژگی'}', value: '${faNum(myFocus)} - ${faNum(otherFocus)}', tint: color),
-                    _RoundChip(label: 'اختلاف قدرت', value: faNum((round!['powerGap'] ?? (myPower - otherPower).abs())), tint: draw ? _gold : iWon ? _emerald : _rose),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: (draw ? _gold : iWon ? _emerald : _rose).withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                  child: Text(
-                    draw ? 'برخورد برابر' : iWon ? 'WINNER' : 'باخت راند',
-                    style: TextStyle(color: draw ? _gold : iWon ? _emerald : _rose, fontWeight: FontWeight.w900, letterSpacing: 0.6),
+    final phase = _phase;
+    final outcome = draw ? _gold : iWon ? _emerald : _rose;
+    final showNumbers = phase == _RevealPhase.numbers || phase == _RevealPhase.verdict;
+    final showVerdict = phase == _RevealPhase.verdict;
+
+    // فاز ۱ — هجوم از دو طرف.
+    final charge = Curves.easeOutCubic.transform(_span(0, _chargeEnd));
+    // فاز ۲ — لرزش و فلاش.
+    final impactT = _span(_chargeEnd, _impactEnd);
+    // موجِ دایره‌ای که از مرکز بیرون می‌زند.
+    final ringT = Curves.easeOut.transform(impactT);
+    // لرزشِ میرا: دامنه با پیشرفتِ فاز کم می‌شود.
+    final shake = phase == _RevealPhase.impact
+        ? math.sin(impactT * math.pi * 6) * 5 * (1 - impactT)
+        : 0.0;
+    // فاز ۳ — شمارشِ صعودی عددها.
+    final countT = Curves.easeOutCubic.transform(_span(_impactEnd, _numbersEnd));
+
+    return Transform.translate(
+      offset: Offset(shake, 0),
+      child: Stack(children: [
+        // فلاشِ سفیدِ لحظهٔ برخورد + حلقهٔ ضربه.
+        if (phase == _RevealPhase.impact)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: Center(
+                child: Opacity(
+                  opacity: (1 - impactT).clamp(0.0, 1.0) * 0.9,
+                  child: Container(
+                    width: 26 + ringT * 320,
+                    height: 26 + ringT * 320,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: outcome, width: 2.5 * (1 - ringT) + 0.5),
+                      gradient: RadialGradient(colors: [
+                        Colors.white.withValues(alpha: 0.30 * (1 - impactT)),
+                        Colors.transparent,
+                      ]),
+                    ),
                   ),
                 ),
-              ]),
+              ),
             ),
-            Expanded(child: AspectRatio(aspectRatio: 0.68, child: PlayerCard(card: otherCard, compact: true, showStats: false, winner: !draw && !iWon, loser: iWon))),
+          ),
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            borderRadius: Corners.rXl,
+            gradient: LinearGradient(colors: [
+              outcome.withValues(alpha: 0.16),
+              const Color(0xFF07111D),
+            ]),
+            border: Border.all(color: outcome.withValues(alpha: 0.55), width: 1.4),
+            boxShadow: [
+              BoxShadow(
+                color: outcome.withValues(alpha: showVerdict ? .30 : .16),
+                blurRadius: showVerdict ? 34 : 22,
+              ),
+            ],
+          ),
+          child: Column(children: [
+            Row(children: [
+              // کارتِ من از راست هجوم می‌آورد.
+              Expanded(
+                child: Opacity(
+                  opacity: charge,
+                  child: Transform.translate(
+                    offset: Offset(38 * (1 - charge), 0),
+                    child: Transform.rotate(
+                      angle: 0.12 * (1 - charge),
+                      child: AspectRatio(
+                        aspectRatio: 0.68,
+                        child: PlayerCard(
+                          card: myCard, compact: true, showStats: false,
+                          winner: showVerdict && iWon,
+                          loser: showVerdict && !draw && !iWon,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Column(children: [
+                  Text('راند ${faNum(round['round'])} · ${round['focusLabel'] ?? round['title']}',
+                      style: const TextStyle(fontSize: 10, color: Colors.white54, fontWeight: FontWeight.w800),
+                      textAlign: TextAlign.center),
+                  Text('${round['title']}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 6),
+                  // ── عددها: تا فازِ numbers پنهان، بعد شمارشِ صعودی ──
+                  // برندهٔ نهایی بزرگ‌تر و طلایی می‌شود تا بدونِ خواندن هم
+                  // معلوم باشد چه شد.
+                  DefaultTextStyle(
+                    style: const TextStyle(
+                      fontFamily: 'Vazirmatn', fontSize: 22, fontWeight: FontWeight.w900,
+                    ),
+                    // ⚠️ FittedBox اجباری است. عددِ برنده در فازِ verdict به
+                    // ۲۶px بزرگ می‌شود و روی صفحهٔ باریک (یا وقتی هر دو عدد
+                    // سه‌رقمی‌اند) ردیف ۱.۶px سرریز می‌کرد — تستِ ویجت
+                    // همین را گرفت. کوچک‌کردنِ متناسب بهتر از شکستنِ چیدمان
+                    // یا کوچک نگه داشتنِ عددِ برنده است.
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      textDirection: TextDirection.ltr,
+                      children: [
+                        _PowerNumber(
+                          value: showNumbers ? (num.tryParse('$myPower') ?? 0) * countT : 0,
+                          visible: showNumbers,
+                          lead: showVerdict && iWon,
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8),
+                          child: Text('VS', style: TextStyle(fontSize: 11, color: Colors.white38)),
+                        ),
+                        _PowerNumber(
+                          value: showNumbers ? (num.tryParse('$otherPower') ?? 0) * countT : 0,
+                          visible: showNumbers,
+                          lead: showVerdict && !draw && !iWon,
+                        ),
+                      ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      _RoundChip(
+                          label: '${round['focusLabel'] ?? 'ویژگی'}',
+                          value: '${faNum(myFocus)} - ${faNum(otherFocus)}',
+                          tint: color),
+                      if (showNumbers)
+                        _RoundChip(
+                            label: 'اختلاف قدرت',
+                            value: faNum(round['powerGap'] ??
+                                ((num.tryParse('$myPower') ?? 0) - (num.tryParse('$otherPower') ?? 0)).abs()),
+                            tint: outcome),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // مهرِ برنده: از بزرگ و چرخیده می‌کوبد روی جایش.
+                  if (showVerdict)
+                    TweenAnimationBuilder<double>(
+                      key: ValueKey('stamp-${round['round']}'),
+                      tween: Tween(begin: 0, end: 1),
+                      duration: const Duration(milliseconds: 420),
+                      curve: Curves.easeOutBack,
+                      builder: (_, t, child) => Opacity(
+                        opacity: t.clamp(0.0, 1.0),
+                        child: Transform.rotate(
+                          angle: -0.22 * (1 - t),
+                          child: Transform.scale(scale: 0.6 + 0.4 * t + 1.2 * (1 - t) * (1 - t), child: child),
+                        ),
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: outcome.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(99),
+                          border: Border.all(color: outcome.withValues(alpha: 0.5)),
+                        ),
+                        child: Text(
+                          draw ? 'برخورد برابر' : iWon ? 'WINNER' : 'باخت راند',
+                          style: TextStyle(color: outcome, fontWeight: FontWeight.w900, letterSpacing: 0.6),
+                        ),
+                      ),
+                    ),
+                ]),
+              ),
+              // کارتِ حریف از چپ.
+              Expanded(
+                child: Opacity(
+                  opacity: charge,
+                  child: Transform.translate(
+                    offset: Offset(-38 * (1 - charge), 0),
+                    child: Transform.rotate(
+                      angle: -0.12 * (1 - charge),
+                      child: AspectRatio(
+                        aspectRatio: 0.68,
+                        child: PlayerCard(
+                          card: otherCard, compact: true, showStats: false,
+                          winner: showVerdict && !draw && !iWon,
+                          loser: showVerdict && iWon,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ]),
+            if (showVerdict) ...[
+              Gaps.vXs,
+              Text('${round['reason'] ?? round['text'] ?? ''}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 11, color: Colors.white70, fontWeight: FontWeight.w700)),
+              if ('${round['cinematic'] ?? ''}'.trim().isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text('${round['cinematic']}',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 10, color: outcome, fontWeight: FontWeight.w900)),
+              ],
+            ],
           ]),
-          Gaps.vXs,
-          Text('${round!['reason'] ?? round!['text'] ?? ''}',
-              textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, color: Colors.white70, fontWeight: FontWeight.w700)),
-          if ('${round!['cinematic'] ?? ''}'.trim().isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text('${round!['cinematic']}',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 10, color: draw ? _gold : iWon ? _emerald : _rose, fontWeight: FontWeight.w900)),
-          ],
-        ]),
-      ),
+        ),
+      ]),
     );
   }
+}
+
+/// عددِ قدرت با شمارشِ صعودی.
+///
+/// جدا شد چون دو بار استفاده می‌شود و منطقِ «برنده بزرگ‌تر و طلایی» نباید
+/// در دو جا کپی شود.
+class _PowerNumber extends StatelessWidget {
+  const _PowerNumber({required this.value, required this.visible, required this.lead});
+  final num value;
+  final bool visible;
+  final bool lead;
+
+  @override
+  Widget build(BuildContext context) => AnimatedDefaultTextStyle(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutBack,
+        style: TextStyle(
+          fontFamily: 'Vazirmatn',
+          fontSize: lead ? 26 : 22,
+          fontWeight: FontWeight.w900,
+          color: lead ? _gold : Colors.white,
+          shadows: lead
+              ? [const Shadow(color: Color(0x88FFD166), blurRadius: 18)]
+              : const <Shadow>[],
+        ),
+        child: Opacity(
+          opacity: visible ? 1 : 0,
+          child: Text(faNum(value.round()), textDirection: TextDirection.ltr),
+        ),
+      );
 }
 
 class _RoundChip extends StatelessWidget {

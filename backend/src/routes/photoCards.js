@@ -162,6 +162,7 @@ module.exports = function createPhotoCardRoutes(deps) {
               t.point_value, t.cash_amount,
               t.duel_attack, t.duel_defense, t.duel_speed, t.duel_technique,
               t.duel_goal_chance, t.duel_energy, t.duel_rarity, t.duel_effect,
+              t.is_collectible,
               (SELECT count(*)::int FROM photo_card_codes c
                 WHERE c.bound_design_id = d.id AND c.status = 'used') AS redeemed_count,
               (SELECT count(*)::int FROM photo_card_codes c

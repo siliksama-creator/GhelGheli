@@ -277,15 +277,18 @@ module.exports = function registerAdminPhotoCardUpload(deps) {
               throw Object.assign(new Error('نوع کارت پیدا نشد'), { status: 404 });
             }
             // امتیاز/استات فقط وقتی به‌روز می‌شود که مدیر صریحاً فرستاده باشد.
-            if (req.body.pointValue !== undefined || req.body.duelAttack !== undefined) {
+            if (req.body.pointValue !== undefined || req.body.duelAttack !== undefined
+                || req.body.isCollectible !== undefined) {
               await client.query(
                 `UPDATE card_types SET point_value=$1,
                     duel_attack=$2, duel_defense=$3, duel_speed=$4,
                     duel_technique=$5, duel_goal_chance=$6, duel_energy=$7,
-                    duel_rarity=$8, duel_effect=$9, updated_at=NOW()
-                  WHERE id=$10`,
+                    duel_rarity=$8, duel_effect=$9,
+                    is_collectible=$10, updated_at=NOW()
+                  WHERE id=$11`,
                 [points, duel.attack, duel.defense, duel.speed, duel.technique,
-                  duel.goalChance, duel.energy, duel.rarity, duel.effect, cardTypeId],
+                  duel.goalChance, duel.energy, duel.rarity, duel.effect,
+                  duel.collectible, cardTypeId],
               );
             }
           } else {
@@ -350,11 +353,12 @@ module.exports = function registerAdminPhotoCardUpload(deps) {
                       SET point_value = $1, cash_amount = $2,
                           duel_attack=$3, duel_defense=$4, duel_speed=$5,
                           duel_technique=$6, duel_goal_chance=$7, duel_energy=$8,
-                          duel_rarity=$9, duel_effect=$10, updated_at = NOW()
-                    WHERE id = $11`,
+                          duel_rarity=$9, duel_effect=$10,
+                          is_collectible=$11, updated_at = NOW()
+                    WHERE id = $12`,
                   [points, cash, duel.attack, duel.defense, duel.speed,
                     duel.technique, duel.goalChance, duel.energy,
-                    duel.rarity, duel.effect, cardTypeId],
+                    duel.rarity, duel.effect, duel.collectible, cardTypeId],
                 );
               }
             } else {
@@ -363,12 +367,13 @@ module.exports = function registerAdminPhotoCardUpload(deps) {
               const ins = await client.query(
                 `INSERT INTO card_types(name, image_url, point_value, cash_amount, is_active,
                     duel_attack, duel_defense, duel_speed, duel_technique,
-                    duel_goal_chance, duel_energy, duel_rarity, duel_effect)
-                 VALUES($1, $2, $3, $4, true, $5,$6,$7,$8,$9,$10,$11,$12)
+                    duel_goal_chance, duel_energy, duel_rarity, duel_effect,
+                    is_collectible)
+                 VALUES($1, $2, $3, $4, true, $5,$6,$7,$8,$9,$10,$11,$12,$13)
                  RETURNING id`,
                 [name, imageUrl, points, cash, duel.attack, duel.defense,
                   duel.speed, duel.technique, duel.goalChance, duel.energy,
-                  duel.rarity, duel.effect],
+                  duel.rarity, duel.effect, duel.collectible],
               );
               cardTypeId = ins.rows[0].id;
             }

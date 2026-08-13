@@ -74,7 +74,90 @@ function Lineup({ selected, cards, toggle }) {
   );
 }
 
+/**
+ * فازهای نمایشِ سینماتیکِ یک راند.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * چرا فاز، و نه نمایشِ یکبارهٔ نتیجه
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * نسخهٔ قبلی همهٔ اطلاعاتِ راند را در یک فریم روی صفحه می‌ریخت: دو کارت،
+ * دو عدد، برنده، دلیل. از نظر اطلاعاتی کامل بود ولی **هیچ لحظهٔ تعلیقی
+ * نداشت** — کاربر نتیجه را می‌دانست قبل از اینکه اصلاً بفهمد چه اتفاقی
+ * افتاده.
+ *
+ * حالا چهار فاز داریم و هر کدام دقیقاً یک چیز را فاش می‌کند:
+ *
+ *   ۱. `charge` (۴۵۰ms) — دو کارت از دو طرف وارد می‌شوند و به هم نزدیک
+ *      می‌شوند. هنوز هیچ عددی معلوم نیست.
+ *   ۲. `impact` (۳۰۰ms) — لحظهٔ برخورد: فلاش، لرزش، و آشکار شدنِ ویژگیِ
+ *      این راند (سرعت؟ تکنیک؟).
+ *   ۳. `numbers` (۵۵۰ms) — دو عددِ قدرت با شمارشِ صعودی بالا می‌روند.
+ *      اینجاست که کاربر می‌فهمد کدام جلوتر است.
+ *   ۴. `verdict` — مهرِ برنده و توضیح.
+ *
+ * ── چرا با CSS و نه یک کتابخانهٔ انیمیشن ──
+ *
+ * افزودنِ framer-motion یعنی ~۴۰KB به باندلی که الان ۱۳۴KB gzip است، برای
+ * کاری که `animation-delay` رایگان انجام می‌دهد. مهم‌تر: انیمیشنِ CSS روی
+ * ترد کامپوزیتور اجرا می‌شود، پس روی گوشیِ ضعیف هم فریم نمی‌اندازد.
+ *
+ * ⚠️ `key={round.round}` حیاتی است: بدونِ آن React همان DOM را بازاستفاده
+ * می‌کند و انیمیشن برای راندِ دوم به بعد **اصلاً اجرا نمی‌شود**. این دقیقاً
+ * همان دسته باگی است که «سبز به نظر می‌رسد ولی کاربر چیزی نمی‌بیند».
+ */
+const REVEAL_PHASES = [
+  { key: 'charge', ms: 450 },
+  { key: 'impact', ms: 300 },
+  { key: 'numbers', ms: 550 },
+  { key: 'verdict', ms: 0 },
+];
+
+function useRevealPhase(roundKey) {
+  const [phase, setPhase] = useState('charge');
+  useEffect(() => {
+    // راندِ تازه = شروع دوباره از فاز اول.
+    setPhase('charge');
+    if (roundKey == null) return undefined;
+    const timers = [];
+    let elapsed = 0;
+    for (let i = 0; i < REVEAL_PHASES.length - 1; i += 1) {
+      elapsed += REVEAL_PHASES[i].ms;
+      const next = REVEAL_PHASES[i + 1].key;
+      timers.push(setTimeout(() => setPhase(next), elapsed));
+    }
+    // پاکسازیِ تایمرها اجباری است: اگر کاربر وسطِ انیمیشن صفحه را ترک کند،
+    // setState روی کامپوننتِ unmount شده هشدار می‌دهد و در حالتِ بدتر
+    // نشتیِ حافظه می‌سازد.
+    return () => timers.forEach(clearTimeout);
+  }, [roundKey]);
+  return phase;
+}
+
+/** شمارندهٔ صعودی برای عددِ قدرت — حسِ «محاسبه شدن» می‌دهد. */
+function CountUp({ value, active }) {
+  const target = num(value);
+  const [shown, setShown] = useState(active ? 0 : target);
+  useEffect(() => {
+    if (!active) { setShown(target); return undefined; }
+    let raf = 0;
+    const started = performance.now();
+    const duration = 520;
+    const tick = (now) => {
+      const t = Math.min(1, (now - started) / duration);
+      // easeOutCubic: سریع شروع می‌شود و نرم می‌ایستد.
+      const eased = 1 - (1 - t) ** 3;
+      setShown(Math.round(target * eased));
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, active]);
+  return <>{fa(shown)}</>;
+}
+
 function RoundReveal({ round, me, myFrame, opponentFrame }) {
+  const phase = useRevealPhase(round ? round.round : null);
   if (!round) return null;
   const mine = me === 'O' ? round.cardO : round.cardX;
   const theirs = me === 'O' ? round.cardX : round.cardO;
@@ -84,22 +167,57 @@ function RoundReveal({ round, me, myFrame, opponentFrame }) {
   const theirFocus = me === 'O' ? round.focusStatX : round.focusStatO;
   const mineWon = round.winner === me;
   const draw = round.winner === 'DRAW';
+  const outcome = draw ? 'draw' : mineWon ? 'won' : 'lost';
+  const showNumbers = phase === 'numbers' || phase === 'verdict';
+  const showVerdict = phase === 'verdict';
   return (
-    <section className={`duelClash ${draw ? 'draw' : mineWon ? 'won' : 'lost'}`} key={round.round}>
-      <HoloCard card={mine} compact disabled frame={myFrame} winner={mineWon} loser={!draw && !mineWon} />
+    <section
+      className={`duelClash duelClashCine ${outcome} phase-${phase}`}
+      key={round.round}
+      data-outcome={outcome}
+    >
+      {/* موجِ برخورد — فقط در فازِ impact دیده می‌شود و خودش را پاک می‌کند */}
+      <span className="duelImpactRing" aria-hidden="true" />
+      <span className="duelImpactFlash" aria-hidden="true" />
+
+      <div className="duelClashSide mine">
+        <HoloCard card={mine} compact disabled frame={myFrame}
+          winner={showVerdict && mineWon} loser={showVerdict && !draw && !mineWon} />
+      </div>
+
       <div className="duelClashCore">
         <span>راند {fa(round.round)} · {round.focusLabel || round.title}</span>
         <b>{round.title}</b>
-        <strong>{fa(myPower)} <i>VS</i> {fa(theirPower)}</strong>
+
+        {/* عددها تا فازِ numbers پنهان‌اند؛ این قلبِ تعلیق است. */}
+        <strong className="duelPowerDuel" aria-live="polite">
+          <em className={`duelPowerNum ${showVerdict && mineWon ? 'lead' : ''}`}>
+            <CountUp value={myPower} active={showNumbers} />
+          </em>
+          <i>VS</i>
+          <em className={`duelPowerNum ${showVerdict && !draw && !mineWon ? 'lead' : ''}`}>
+            <CountUp value={theirPower} active={showNumbers} />
+          </em>
+        </strong>
+
         <div className="duelReasonChips">
           <i>{round.focusLabel || 'ویژگی راند'}: {fa(myFocus)} در برابر {fa(theirFocus)}</i>
-          <i>قدرت نهایی: {fa(Math.abs(myPower - theirPower))} اختلاف</i>
+          {showNumbers && (
+            <i>قدرت نهایی: {fa(Math.abs(myPower - theirPower))} اختلاف</i>
+          )}
         </div>
-        <em className="duelWinnerStamp">{draw ? 'DRAW' : mineWon ? 'WINNER' : 'LOSS'}</em>
-        <small>{round.reason || (draw ? 'برخورد برابر!' : mineWon ? 'این راند مال تو شد!' : 'حریف این راند را برد')}</small>
-        {round.cinematic && <p className="duelCinematic">{round.cinematic}</p>}
+
+        {showVerdict && <>
+          <em className="duelWinnerStamp">{draw ? 'DRAW' : mineWon ? 'WINNER' : 'LOSS'}</em>
+          <small>{round.reason || (draw ? 'برخورد برابر!' : mineWon ? 'این راند مال تو شد!' : 'حریف این راند را برد')}</small>
+          {round.cinematic && <p className="duelCinematic">{round.cinematic}</p>}
+        </>}
       </div>
-      <HoloCard card={theirs} compact disabled frame={opponentFrame} winner={!draw && !mineWon} loser={mineWon} />
+
+      <div className="duelClashSide theirs">
+        <HoloCard card={theirs} compact disabled frame={opponentFrame}
+          winner={showVerdict && !draw && !mineWon} loser={showVerdict && mineWon} />
+      </div>
     </section>
   );
 }

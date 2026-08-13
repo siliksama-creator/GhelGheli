@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:io';
+// برای لرزشِ میرای لحظهٔ برخورد در _ClashStage (سینوسِ میراشونده).
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -709,4 +711,32 @@ class _DuelCosmeticEffectState extends State<_DuelCosmeticEffect>
       },
     );
   }
+}
+
+/// ═══════════════════════════════════════════════════════════════════════
+/// درگاهِ تست برای صحنهٔ برخورد
+/// ═══════════════════════════════════════════════════════════════════════
+///
+/// `_ClashStage` عمداً خصوصی است — بخشی از پیاده‌سازیِ داخلیِ صفحهٔ دوئل
+/// است و نباید از جای دیگری ساخته شود. ولی انیمیشنِ فازبندی‌شده‌اش دقیقاً
+/// همان چیزی است که بی‌صدا برمی‌گردد و باید نگهبان داشته باشد.
+///
+/// این پوشش، به‌جای عمومی کردنِ خودِ کلاس، فقط یک درِ باریک برای تست باز
+/// می‌کند: نه سازندهٔ دیگری اضافه می‌شود، نه فیلدی عمومی می‌شود.
+@visibleForTesting
+class CardDuelClashStageForTest extends StatelessWidget {
+  const CardDuelClashStageForTest({
+    super.key,
+    required this.round,
+    required this.mine,
+    required this.color,
+  });
+
+  final Map<String, dynamic>? round;
+  final String mine;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) =>
+      _ClashStage(round: round, mine: mine, color: color);
 }

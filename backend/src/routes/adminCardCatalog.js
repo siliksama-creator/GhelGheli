@@ -7,6 +7,9 @@
  * the same authentication, validation, pool, and helpers as the main app.
  */
 const express = require('express');
+// فقط برای `collectibleInput` — تبدیلِ چک‌باکسِ فرم به boolean. همان تابعی
+// که مسیرِ آپلودِ عکس استفاده می‌کند، تا هر دو رابط رفتارِ یکسان داشته باشند.
+const cardDuel = require('../services/cardDuelService');
 
 module.exports = function createAdminCardCatalogRoutes(deps) {
   const {
@@ -61,7 +64,11 @@ router.post('/admin/card-types', adminAuth, requireRole('support'), asyncHandler
       cardTypeId: dupType.rows[0].id,
     });
   }
-  const { rows } = await pool.query('INSERT INTO card_types(name,image_url,description,point_value,cash_amount,is_active) VALUES($1,$2,$3,$4,$5,$6) RETURNING *', [name,imageUrl,description,pointValue,cashAmount,isActive]);
+  const { rows } = await pool.query(
+    `INSERT INTO card_types(name,image_url,description,point_value,cash_amount,is_active,is_collectible)
+     VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+    [name, imageUrl, description, pointValue, cashAmount, isActive,
+      cardDuel.collectibleInput(req.body.isCollectible)]);
   await audit(req.admin.id, 'create_card_type', 'card_types', rows[0].id, null, req.body); res.json(rows[0]);
 }));
 router.patch('/admin/card-types/:id', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
@@ -76,6 +83,11 @@ router.patch('/admin/card-types/:id', adminAuth, validateUuid('id'), requireRole
   const duelEnergy = req.body.duelEnergy != null ? Number(req.body.duelEnergy) : null;
   const duelRarity = req.body.duelRarity || null;
   const duelEffect = req.body.duelEffect || null;
+  // کارتِ کلکسیونی. `null` یعنی «مدیر نفرستاده» تا COALESCE مقدارِ فعلی
+  // را نگه دارد — بدون این، هر ویرایشِ جزئی (مثلاً فقط تغییرِ نام) کارتِ
+  // کلکسیونی را بی‌صدا به کارتِ بازی برمی‌گرداند.
+  const isCollectible = req.body.isCollectible != null
+    ? cardDuel.collectibleInput(req.body.isCollectible) : null;
 
   const { rows } = await pool.query(
     `UPDATE card_types
@@ -93,12 +105,13 @@ router.patch('/admin/card-types/:id', adminAuth, validateUuid('id'), requireRole
             duel_energy = COALESCE($13, duel_energy),
             duel_rarity = COALESCE($14, duel_rarity),
             duel_effect = COALESCE($15, duel_effect),
+            is_collectible = COALESCE($16, is_collectible),
             updated_at = NOW()
       WHERE id = $7
     RETURNING *`,
     [name, imageUrl, description, pointValue, cashAmount, isActive, req.params.id,
      duelAttack, duelDefense, duelSpeed, duelTechnique, duelGoalChance, duelEnergy,
-     duelRarity, duelEffect]
+     duelRarity, duelEffect, isCollectible]
   );
   await audit(req.admin.id, 'update_card_type', 'card_types', req.params.id, null, req.body);
   res.json(rows[0]);

@@ -99,7 +99,21 @@ class GroupedPhotoCardTile extends StatelessWidget {
                         ],
                       ),
                       Gaps.vXxs,
-                      CardDuelStatsMini(item: card),
+                      // کارتِ کلکسیونی استاتس ندارد؛ نمایشِ شش عددِ بی‌اثر
+                      // مدیر را گمراه می‌کند که انگار در بازی نقشی دارد.
+                      if (card['is_collectible'] == true)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            color: const Color(0x1FF59E0B),
+                            border: Border.all(color: const Color(0x55F59E0B)),
+                          ),
+                          child: const Text('🏅 کارت کلکسیونی — در آرنای دوئل نیست',
+                              style: TextStyle(fontSize: 10.5, color: Color(0xFFFBBF24))),
+                        )
+                      else
+                        CardDuelStatsMini(item: card),
                     ],
                   ),
                 ),

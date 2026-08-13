@@ -3820,3 +3820,78 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 @keyframes ggCardBreath{50%{transform:scale(1.08);opacity:.8}}@keyframes ggCardSweep{0%,45%{transform:translateX(110%)}100%{transform:translateX(-110%)}}@keyframes duelScorePulse{0%{transform:scale(.82)}100%{transform:scale(1)}}
 @media(max-width:700px){.homeInventoryPreview{grid-template-columns:repeat(2,minmax(0,1fr))}.duelClash{grid-template-columns:1fr;gap:9px}.duelClashCore{order:-1}.duelReasonChips i{font-size:9.5px}.duelEmptySlot{height:178px}.duelScoreV2>span small{display:none}}
 @media(prefers-reduced-motion:reduce){.ggCardAurora,.ggCardSweep{animation:none!important}.ggPlayerCard,.ggPlayerCard:not(:disabled):hover{transform:none!important}}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   دوئل کارت — نمایشِ سینماتیکِ راند
+   ═══════════════════════════════════════════════════════════════════════
+
+   چهار فاز روی `.duelClashCine` به‌صورت کلاسِ `phase-*` می‌نشیند و هر فاز
+   فقط یک چیز را فاش می‌کند. کلاسِ فاز از React می‌آید نه از
+   `animation-delay` تنها، چون بعضی چیزها باید از DOM حذف شوند (نه فقط
+   شفاف شوند) وگرنه خوانندهٔ صفحه آن‌ها را زودتر از موعد می‌خواند.
+
+   همهٔ انیمیشن‌ها روی transform/opacity هستند تا روی ترد کامپوزیتور اجرا
+   شوند: روی گوشیِ ضعیف هم ۶۰fps می‌ماند. */
+
+.duelClashCine { position: relative; overflow: hidden; }
+
+/* ── ۱. فاز charge: کارت‌ها از دو طرف هجوم می‌آورند ── */
+.duelClashSide { position: relative; z-index: 2; }
+.duelClashCine.phase-charge .duelClashSide.mine { animation: duelChargeR .45s cubic-bezier(.3,.9,.3,1) both; }
+.duelClashCine.phase-charge .duelClashSide.theirs { animation: duelChargeL .45s cubic-bezier(.3,.9,.3,1) both; }
+@keyframes duelChargeR { from { opacity:0; transform: translateX(38%) rotate(7deg) scale(.9); } to { opacity:1; transform:none; } }
+@keyframes duelChargeL { from { opacity:0; transform: translateX(-38%) rotate(-7deg) scale(.9); } to { opacity:1; transform:none; } }
+
+/* ── ۲. فاز impact: فلاش + حلقهٔ ضربه + لرزشِ کوتاه ── */
+.duelImpactRing, .duelImpactFlash { position:absolute; pointer-events:none; opacity:0; }
+.duelImpactRing {
+  z-index: 3; inset: 50% auto auto 50%; width: 26px; height: 26px; margin: -13px 0 0 -13px;
+  border-radius: 50%; border: 2.5px solid currentColor;
+}
+.duelImpactFlash { z-index: 1; inset: 0; background: radial-gradient(circle at center, #fff9 0%, transparent 58%); }
+.duelClashCine.phase-impact { animation: duelShake .3s cubic-bezier(.36,.07,.19,.97); }
+.duelClashCine.phase-impact .duelImpactRing { animation: duelRing .42s ease-out; }
+.duelClashCine.phase-impact .duelImpactFlash { animation: duelFlash .3s ease-out; }
+.duelClashCine.won  .duelImpactRing { color: #22E7A6; }
+.duelClashCine.lost .duelImpactRing { color: #FB7185; }
+.duelClashCine.draw .duelImpactRing { color: #FFD166; }
+@keyframes duelShake {
+  10%,90% { transform: translateX(-2px); } 20%,80% { transform: translateX(3px); }
+  30%,50%,70% { transform: translateX(-5px); } 40%,60% { transform: translateX(5px); }
+}
+@keyframes duelRing { from { opacity:.95; transform: scale(.2); } to { opacity:0; transform: scale(15); } }
+@keyframes duelFlash { from { opacity:.85; } to { opacity:0; } }
+
+/* ── ۳. فاز numbers: دو عدد روبه‌روی هم ── */
+.duelPowerDuel { display:flex; align-items:center; justify-content:center; gap:10px; direction:ltr; }
+.duelPowerNum {
+  font-style:normal; min-width: 2.6ch; text-align:center;
+  transition: color .3s ease, text-shadow .3s ease, transform .3s cubic-bezier(.2,1.7,.3,1);
+}
+.duelClashCine.phase-numbers .duelPowerNum,
+.duelClashCine.phase-verdict .duelPowerNum { animation: duelNumPop .45s cubic-bezier(.2,1.7,.3,1); }
+/* عددِ برنده بزرگ‌تر و روشن‌تر می‌شود — بدون خواندنِ متن هم معلوم است. */
+.duelPowerNum.lead { color:#FFD166; transform: scale(1.16); text-shadow: 0 0 18px #FFD16688; }
+@keyframes duelNumPop { from { opacity:0; transform: translateY(9px) scale(.72); } to { opacity:1; } }
+
+/* ── ۴. فاز verdict: مهرِ برنده می‌کوبد ── */
+.duelClashCine.phase-verdict .duelWinnerStamp { animation: duelStamp .42s cubic-bezier(.2,1.8,.3,1); }
+.duelClashCine.phase-verdict .duelCinematic { animation: duelCineIn .5s ease-out both; animation-delay: .1s; }
+@keyframes duelStamp {
+  from { opacity:0; transform: scale(2.6) rotate(-13deg); filter: blur(3px); }
+  70%  { opacity:1; transform: scale(.93) rotate(2deg); filter:none; }
+  to   { transform: none; }
+}
+@keyframes duelCineIn { from { opacity:0; transform: translateY(7px); } to { opacity:1; } }
+
+/* هالهٔ پیروزی/شکست دورِ کلِ صحنه، فقط بعد از حکم */
+.duelClashCine.phase-verdict.won  { box-shadow: 0 0 0 1px #22E7A655, 0 0 42px #22E7A62e; }
+.duelClashCine.phase-verdict.lost { box-shadow: 0 0 0 1px #FB718555, 0 0 42px #FB71852e; }
+.duelClashCine.phase-verdict.draw { box-shadow: 0 0 0 1px #FFD16655, 0 0 42px #FFD1662e; }
+
+/* دسترس‌پذیری: کاربری که حرکت را کم کرده، نتیجه را بی‌انیمیشن و کامل
+   می‌بیند. مهم است که محتوا حذف نشود، فقط حرکتش. */
+@media (prefers-reduced-motion: reduce) {
+  .duelClashCine, .duelClashCine * { animation: none !important; }
+  .duelClashSide { opacity: 1 !important; transform: none !important; }
+}

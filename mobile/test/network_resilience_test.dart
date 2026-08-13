@@ -234,7 +234,17 @@ void main() {
         src.indexOf('Future<dynamic> get('),
         src.indexOf('void invalidateCache('),
       );
-      expect('await dio.get(path)'.allMatches(getBody).length, 2,
+      // ⚠️ الگو عمداً `await dio.get(path` است، بدونِ پرانتزِ بسته.
+      //
+      // نسخهٔ قبلی دنبالِ `await dio.get(path)` دقیق می‌گشت. وقتی کشِ
+      // شرطیِ ETag اضافه شد، فراخوانی به
+      // `dio.get(path, options: opts)` تبدیل شد و این تست قرمز شد —
+      // در حالی که رفتار (یک تلاشِ دوباره، بدونِ حلقه) اصلاً عوض نشده
+      // بود. آن یک شکنندگیِ تست بود، نه باگِ محصول.
+      //
+      // این شکل هر دو حالت را می‌گیرد و همچنان جلوی حلقه را می‌گیرد،
+      // چون دو بررسیِ بعدی وجودِ for/while را رد می‌کنند.
+      expect('await dio.get(path'.allMatches(getBody).length, 2,
           reason: 'باید دقیقاً دو فراخوانی باشد: اصلی + یک تلاشِ دوباره');
       expect(getBody, isNot(contains('for (')),
           reason: 'نباید حلقهٔ retry باشد');

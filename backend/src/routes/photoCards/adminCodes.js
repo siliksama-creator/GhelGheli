@@ -72,10 +72,10 @@ module.exports = function registerAdminPhotoCardCodes(deps) {
       // نگه می‌داشتیم، ورودی‌ای مثل «----» که به رشتهٔ خالی تبدیل می‌شود
       // بی‌سروصدا حذف می‌شد — مدیر چیزی نوشته بود و بدون هیچ توضیحی
       // ناپدید می‌شد. حالا به‌عنوان «نامعتبر» گزارش می‌شود.
-      const tokens = raw.split(/[\n,;\t، ]+/)
-        .map(x => x.trim())
-        .filter(Boolean)
-        .map(x => ({ raw: x, norm: photoCards.normalizePhotoCode(x) }));
+      // منطقِ پارس حالا در سرویس است تا مسیرِ «افزودن کد به کارتِ موجود»
+      // (routes/photoCards.js) هم دقیقاً همین رفتار را داشته باشد. قبلاً
+      // آن مسیر تابعی صدا می‌زد که اصلاً وجود نداشت و ۵۰۰ می‌داد.
+      const tokens = photoCards.parsePhotoCodesInput(raw);
 
       if (!tokens.length) {
         return res.status(400).json({ message: 'هیچ کدی وارد نشده است' });

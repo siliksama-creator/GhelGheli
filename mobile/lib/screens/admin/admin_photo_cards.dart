@@ -129,6 +129,8 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
   final _energy = TextEditingController(text: '100');
   String _rarity = 'normal';
   String _effect = 'none';
+  // کارتِ کلکسیونی — همان قابلیتِ پنلِ وب، با همان رفتار.
+  bool _collectible = false;
   bool _uploading = false;
 
   // فرم کد — مدیر خودش وارد می‌کند
@@ -279,6 +281,9 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
           'duelEnergy': _energy.text.trim().isEmpty ? '100' : _energy.text.trim(),
           'duelRarity': _rarity,
           'duelEffect': _effect,
+          // رشته: multipart همه‌چیز را رشته می‌فرستد. سرور با
+          // collectibleInput رشته و boolean هر دو را می‌پذیرد.
+          'isCollectible': _collectible ? 'true' : 'false',
           if (_ownCodes.text.trim().isNotEmpty) 'rawCodes': _ownCodes.text.trim(),
         },
       );
@@ -308,6 +313,7 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
         _energy.text = '100';
         _rarity = 'normal';
         _effect = 'none';
+        _collectible = false;
       });
       await _load();
     } catch (e) {
@@ -699,12 +705,42 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
               labelText: 'جایزهٔ نقدی (تومان، اختیاری)', hintText: '0'),
         ),
         const SizedBox(height: 10),
+        // ── نوعِ کارت: بازی یا کلکسیونی ──
+        //
+        // بالای بخشِ استاتس، چون تیک خوردنش آن بخش را کاملاً حذف می‌کند.
+        // اگر پایین‌تر بود، مدیر اول شش عدد را پر می‌کرد و بعد می‌فهمید
+        // هیچ‌کدام اثری ندارند.
+        DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: _collectible ? const Color(0x88F59E0B) : const Color(0x22FFFFFF),
+            ),
+            color: _collectible ? const Color(0x14F59E0B) : Colors.transparent,
+          ),
+          child: CheckboxListTile(
+            value: _collectible,
+            onChanged: (v) => setState(() => _collectible = v ?? false),
+            controlAffinity: ListTileControlAffinity.leading,
+            activeColor: const Color(0xFFF59E0B),
+            title: const Text('کارت کلکسیونی است (برای بازی نیست)',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+            subtitle: Text(
+              _collectible
+                  ? '🏅 فقط جمع‌آوری: در اینونتوری و جوایز دیده می‌شود، ولی در آرنای دوئل قابل انتخاب نیست.'
+                  : '⚔️ کارت بازی: در آرنای دوئل قابل استفاده است و استاتس می‌خواهد.',
+              style: const TextStyle(fontSize: 11, height: 1.6),
+            ),
+          ),
+        ),
+        if (!_collectible) ...[
+        const SizedBox(height: 10),
         ExpansionTile(
           tilePadding: EdgeInsets.zero,
           initiallyExpanded: true,
           leading: const Icon(Icons.sports_esports_rounded),
           title: const Text('استات دوئل کارت'),
-          subtitle: const Text('این اعداد در نبرد زندهٔ سه‌کارتی اثر مستقیم دارند'),
+          subtitle: const Text('این اعداد در نبرد زندهٔ پنج‌کارتی اثر مستقیم دارند'),
           children: [
             Row(children: [
               Expanded(child: _duelStatField('حمله', _attack)),
@@ -755,6 +791,7 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
             ]),
           ],
         ),
+        ],
         const SizedBox(height: 10),
         // ── کدهای اختصاصیِ همین کارت ──
         //

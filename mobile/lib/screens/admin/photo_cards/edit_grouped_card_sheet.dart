@@ -24,6 +24,10 @@ required ValueChanged<String> showMessage,
   final newCodesCtrl = TextEditingController();
   final newBatchCtrl = TextEditingController();
   bool saving = false;
+  // کارتِ کلکسیونی — دقیقاً معادلِ چک‌باکسِ پنلِ وب.
+  // `== true` و نه `!= false`: اگر سرور فیلد را نفرستد، پیش‌فرض باید
+  // «کارتِ بازی» باشد یعنی رفتارِ قبلی، نه اینکه کارت بی‌صدا از آرنا حذف شود.
+  bool collectible = card['is_collectible'] == true;
 
   await showModalBottomSheet(
     context: context,
@@ -76,28 +80,48 @@ required ValueChanged<String> showMessage,
                 ],
               ),
               const SizedBox(height: 12),
-              const Text('استات دوئل کارت (۰ تا ۱۰۰)',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF38BDF8))),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Expanded(child: TextField(controller: atkCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'حمله'))),
-                  const SizedBox(width: 6),
-                  Expanded(child: TextField(controller: defCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'دفاع'))),
-                  const SizedBox(width: 6),
-                  Expanded(child: TextField(controller: spdCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'سرعت'))),
-                ],
+              // ── نوعِ کارت ──
+              // بالای استاتس، چون تیک خوردنش کلِ آن بخش را حذف می‌کند.
+              CheckboxListTile(
+                value: collectible,
+                onChanged: (v) => setModalState(() => collectible = v ?? false),
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                activeColor: const Color(0xFFF59E0B),
+                title: const Text('کارت کلکسیونی است (برای بازی نیست)',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.white)),
+                subtitle: Text(
+                  collectible
+                      ? '🏅 از آرنای دوئل حذف می‌شود. اگر کاربری این کارت را در ترکیبش داشته باشد، از او خواسته می‌شود دوباره بچیند.'
+                      : '⚔️ در آرنای دوئل قابل استفاده است.',
+                  style: const TextStyle(fontSize: 11, color: Colors.white60, height: 1.6),
+                ),
               ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Expanded(child: TextField(controller: tecCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'تکنیک'))),
-                  const SizedBox(width: 6),
-                  Expanded(child: TextField(controller: goalCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'شانس گل'))),
-                  const SizedBox(width: 6),
-                  Expanded(child: TextField(controller: energyCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'انرژی'))),
-                ],
-              ),
+              if (!collectible) ...[
+                const SizedBox(height: 4),
+                const Text('استات دوئل کارت (۰ تا ۱۰۰)',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF38BDF8))),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(child: TextField(controller: atkCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'حمله'))),
+                    const SizedBox(width: 6),
+                    Expanded(child: TextField(controller: defCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'دفاع'))),
+                    const SizedBox(width: 6),
+                    Expanded(child: TextField(controller: spdCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'سرعت'))),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(child: TextField(controller: tecCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'تکنیک'))),
+                    const SizedBox(width: 6),
+                    Expanded(child: TextField(controller: goalCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'شانس گل'))),
+                    const SizedBox(width: 6),
+                    Expanded(child: TextField(controller: energyCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'انرژی'))),
+                  ],
+                ),
+              ],
               const SizedBox(height: 12),
               TextField(
                 controller: newCodesCtrl,
@@ -130,6 +154,7 @@ required ValueChanged<String> showMessage,
                       'duelTechnique': int.tryParse(tecCtrl.text) ?? 50,
                       'duelGoalChance': int.tryParse(goalCtrl.text) ?? 50,
                       'duelEnergy': int.tryParse(energyCtrl.text) ?? 100,
+                      'isCollectible': collectible,
                     });
 
                     // 2. Add codes if typed

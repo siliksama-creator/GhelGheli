@@ -103,6 +103,12 @@ export function PhotoCardsPage({ request }) {
     attack: '50', defense: '50', speed: '50', technique: '50',
     goalChance: '50', energy: '100', rarity: 'normal', effect: 'none',
   });
+  // ── کارتِ کلکسیونی ──
+  //
+  // خواستهٔ مالک: «کارت هایی که برای بازی نیستن». وقتی تیک بخورد، بخشِ
+  // استاتس کاملاً از فرم محو می‌شود — نه فقط غیرفعال. نمایشِ فیلدهایی که
+  // هیچ اثری ندارند مدیر را گمراه می‌کند که انگار دارد چیزی تنظیم می‌کند.
+  const [collectible, setCollectible] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [editingCard, setEditingCard] = useState(null);
 
@@ -251,6 +257,9 @@ export function PhotoCardsPage({ request }) {
           duelEnergy: duel.energy || 100,
           duelRarity: duel.rarity || 'normal',
           duelEffect: duel.effect || 'none',
+          // رشته و نه boolean: postForm بدنه را multipart می‌سازد و آنجا
+          // همه‌چیز رشته است. سرور با collectibleInput هر دو را می‌فهمد.
+          isCollectible: collectible ? 'true' : 'false',
           // اگر مدیر کد نوشته باشد، در **همان تراکنش** به این کارت گره
           // می‌خورد. درخواستِ دوم یعنی احتمالِ کارتِ بدونِ کد.
           ...(ownCodes.trim() ? { rawCodes: ownCodes } : {}),
@@ -263,6 +272,7 @@ export function PhotoCardsPage({ request }) {
       setName(''); setPoints(''); setCash('');
       setDuel({ attack: '50', defense: '50', speed: '50', technique: '50',
         goalChance: '50', energy: '100', rarity: 'normal', effect: 'none' });
+      setCollectible(false);
       setOwnCodes(''); setOwnBatch('');
       loadCodes();
       loadDesigns();
@@ -545,9 +555,35 @@ export function PhotoCardsPage({ request }) {
                 onChange={e => setCash(e.target.value)} placeholder="0" />
             </Field>
 
+            {/* ══════════════════════════════════════════════════════════
+                نوعِ کارت: بازی یا کلکسیونی
+                ══════════════════════════════════════════════════════════
+
+                این سوییچ باید **بالای** بخشِ استاتس باشد، چون تصمیمش آن
+                بخش را حذف می‌کند. اگر پایین‌تر بود، مدیر اول استاتس را پر
+                می‌کرد و بعد می‌فهمید لازم نبوده. */}
+            <div className={`card cardKindBox${collectible ? ' isCollectible' : ''}`}
+              style={{ padding: 12 }}>
+              <label className="cardKindRow">
+                <input type="checkbox" checked={collectible}
+                  onChange={e => setCollectible(e.target.checked)} />
+                <span>
+                  <b>کارت کلکسیونی است (برای بازی نیست)</b>
+                  <span className="topbar-sub" style={{ display: 'block' }}>
+                    {collectible
+                      ? '🏅 فقط جمع‌آوری: در اینونتوری و جوایز دیده می‌شود، '
+                        + 'ولی در آرنای دوئل قابل انتخاب نیست.'
+                      : '⚔️ کارت بازی: در آرنای دوئل قابل استفاده است و '
+                        + 'استاتس می‌خواهد.'}
+                  </span>
+                </span>
+              </label>
+            </div>
+
+            {!collectible && (
             <div className="card" style={{ padding: 12 }}>
               <b>استات دوئل کارت</b>
-              <p className="topbar-sub">برای بازی زندهٔ سه‌کارتی؛ ۰ تا ۱۰۰.</p>
+              <p className="topbar-sub">برای بازی زندهٔ پنج‌کارتی؛ ۰ تا ۱۰۰.</p>
               <div className="card-grid cols-2">
                 {[
                   ['attack', 'حمله'], ['defense', 'دفاع'], ['speed', 'سرعت'],
@@ -583,6 +619,7 @@ export function PhotoCardsPage({ request }) {
                 </Field>
               </div>
             </div>
+            )}
 
             {/* ══════════════════════════════════════════════════════════
                 کدهای اختصاصیِ همین کارت — اختیاری

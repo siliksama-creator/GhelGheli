@@ -777,7 +777,8 @@ app.get('/api/profile', auth, asyncHandler(async (req, res) => {
     `SELECT i.*, t.name, ${cardDuel.FRONT_IMAGE_SQL} AS image_url,
             t.point_value, t.cash_amount, t.description,
             t.duel_attack, t.duel_defense, t.duel_speed, t.duel_technique,
-            t.duel_goal_chance, t.duel_energy, t.duel_rarity, t.duel_effect
+            t.duel_goal_chance, t.duel_energy, t.duel_rarity, t.duel_effect,
+            t.is_collectible
        FROM user_card_inventory i
        JOIN card_types t ON t.id = i.card_type_id
       WHERE i.user_id=$1 AND i.consumed_in_reward=false ORDER BY t.name`,
@@ -828,7 +829,8 @@ app.get('/api/bootstrap', auth, asyncHandler(async (req, res) => {
       `SELECT i.*, t.name, ${cardDuel.FRONT_IMAGE_SQL} AS image_url,
               t.point_value, t.cash_amount, t.description,
               t.duel_attack, t.duel_defense, t.duel_speed, t.duel_technique,
-              t.duel_goal_chance, t.duel_energy, t.duel_rarity, t.duel_effect
+              t.duel_goal_chance, t.duel_energy, t.duel_rarity, t.duel_effect,
+              t.is_collectible
          FROM user_card_inventory i
          JOIN card_types t ON t.id = i.card_type_id
         WHERE i.user_id = $1 AND i.consumed_in_reward = false
@@ -1051,7 +1053,7 @@ app.get('/api/users/:id/public', auth, validateUuid('id'), asyncHandler(async (r
             ${cardDuel.FRONT_IMAGE_SQL} AS image_url, t.point_value,
             t.description, t.duel_attack, t.duel_defense, t.duel_speed,
             t.duel_technique, t.duel_goal_chance, t.duel_energy,
-            t.duel_rarity, t.duel_effect,
+            t.duel_rarity, t.duel_effect, t.is_collectible,
             i.quantity::int AS registered_count,
             i.updated_at AS last_registered_at
        FROM user_card_inventory i
@@ -1116,7 +1118,22 @@ app.get('/api/users/:id/public', auth, validateUuid('id'), asyncHandler(async (r
 }));
 
 app.get('/api/rewards', auth, asyncHandler(async (req, res) => {
-  const { rows } = await pool.query('SELECT *, ($1 >= required_points) AS eligible FROM reward_tiers WHERErequired_points', [req.user.current_points]);
+  // ⚠️ این کوئری یک بار شکسته شد و هیچ‌کس نفهمید. کامیت 4f67a5e که دربارهٔ
+  // دوئل کارت بود، بی‌ربط این خط را به
+  //     ... FROM reward_tiers WHERErequired_points
+  // تبدیل کرد (WHERE به required_points چسبید). پستگرس **خطا نداد**، چون
+  // `WHERErequired_points` را نامِ مستعارِ جدول خواند. یعنی کوئری معتبر
+  // ماند، ۲۰۰ برگرداند، و فقط بی‌صدا شرطِ فیلتر و ترتیب را انداخت: کاربر
+  // هر ۶۳ جایزهٔ غیرفعال را می‌دید و روی هرکدام می‌زد ۴۰۴ می‌گرفت.
+  //
+  // درسِ ماندگار: خطای داخلِ رشتهٔ SQL نه از `node -c` رد می‌شود نه از
+  // ESLint. تنها نگهبانش تستِ زنده است — `testE2E.js` که حالا به
+  // `npm test` اضافه شده تا اگر دوباره شکست، جلوی deploy را بگیرد.
+  const { rows } = await pool.query(
+    'SELECT *, ($1 >= required_points) AS eligible FROM reward_tiers '
+    + 'WHERE is_active = true ORDER BY display_order, required_points',
+    [req.user.current_points],
+  );
   res.json(rows);
 }));
 // Reward groups: the user-facing catalogue with per-group progress.

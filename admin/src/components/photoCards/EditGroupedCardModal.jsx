@@ -18,6 +18,9 @@ function initialForm(card) {
     newCodes: '',
     newBatch: '',
     isActive: card.is_active !== false,
+    // سرور در فهرستِ طرح‌ها `is_collectible` را برمی‌گرداند. اگر یک روز
+    // نفرستد، `!== true` امن‌ترین پیش‌فرض است: کارتِ بازی، یعنی رفتارِ قبلی.
+    collectible: card.is_collectible === true,
   };
 }
 
@@ -43,6 +46,7 @@ export function EditGroupedCardModal({ card, request, notify, onClose, onSaved }
           duelTechnique: Number(form.duel.technique || 50),
           duelGoalChance: Number(form.duel.goalChance || 50),
           duelEnergy: Number(form.duel.energy || 100),
+          isCollectible: form.collectible,
         },
       });
       if (form.newCodes.trim()) {
@@ -88,6 +92,24 @@ export function EditGroupedCardModal({ card, request, notify, onClose, onSaved }
             </Field>
           </div>
 
+          <div className={`card cardKindBox${form.collectible ? ' isCollectible' : ''}`}
+            style={{ padding: 10 }}>
+            <label className="cardKindRow">
+              <input type="checkbox" checked={form.collectible}
+                onChange={event => setForm({ ...form, collectible: event.target.checked })} />
+              <span>
+                <b>کارت کلکسیونی است (برای بازی نیست)</b>
+                <span className="topbar-sub" style={{ display: 'block' }}>
+                  {form.collectible
+                    ? '🏅 از آرنای دوئل حذف می‌شود. اگر کاربری این کارت را در '
+                      + 'ترکیبش داشته باشد، از او خواسته می‌شود دوباره بچیند.'
+                    : '⚔️ در آرنای دوئل قابل استفاده است.'}
+                </span>
+              </span>
+            </label>
+          </div>
+
+          {!form.collectible && (
           <div className="card" style={{ padding: 10 }}>
             <b>استات دوئل زندهٔ کارت</b>
             <div className="card-grid cols-3" style={{ marginTop: 6 }}>
@@ -105,6 +127,7 @@ export function EditGroupedCardModal({ card, request, notify, onClose, onSaved }
               ))}
             </div>
           </div>
+          )}
 
           <Field label="افزودن کدهای جدید برای همین کارت (اختیاری — هر خط یک کد)">
             <Textarea rows={4} dir="ltr" className="codeInput" value={form.newCodes}

@@ -44,8 +44,31 @@ function statInput(v, fallback = 50) { return clamp(v === undefined || v === nul
 function rarityInput(v) { const s = String(v || 'normal'); return RARITIES.includes(s) ? s : 'normal'; }
 function effectInput(v) { const s = String(v || 'none'); return EFFECTS.includes(s) ? s : 'none'; }
 
+/**
+ * آیا مدیر این کارت را «کلکسیونی» علامت زده؟
+ *
+ * فرمِ HTML چک‌باکس را به‌صورت رشتهٔ `'true'`/`'on'` می‌فرستد، نه boolean —
+ * و `multipart/form-data` (آپلودِ عکس) **همه چیز را** رشته می‌کند. یک
+ * `=== true` ساده اینجا یعنی چک‌باکسِ تیک‌خورده بی‌صدا نادیده گرفته می‌شد.
+ */
+function collectibleInput(v, fallback = false) {
+  if (v === undefined || v === null || v === '') return fallback === true;
+  const s = String(v).trim().toLowerCase();
+  return s === 'true' || s === '1' || s === 'on' || s === 'yes';
+}
+
 function duelFieldsFromBody(body, fallback = {}) {
+  // ── کارتِ کلکسیونی: استاتس ذخیره می‌شود ولی معنایی ندارد ──
+  //
+  // چرا استاتس را صفر نمی‌کنیم: اگر مدیر فردا همین کارت را به کارتِ بازی
+  // تبدیل کند، مقادیرِ قبلی باید سرِ جایشان باشند. `is_collectible` تنها
+  // چیزی است که تصمیم می‌گیرد، نه مقدارِ استاتس.
+  const collectible = collectibleInput(
+    body.isCollectible ?? body.collectible,
+    fallback.is_collectible,
+  );
   return {
+    collectible,
     attack: statInput(body.duelAttack ?? body.attack, fallback.duel_attack ?? fallback.attack ?? 50),
     defense: statInput(body.duelDefense ?? body.defense, fallback.duel_defense ?? fallback.defense ?? 50),
     speed: statInput(body.duelSpeed ?? body.speed, fallback.duel_speed ?? fallback.speed ?? 50),
@@ -248,6 +271,12 @@ async function playableCards(userId, client = pool) {
        FROM user_card_inventory i
        JOIN card_types t ON t.id = i.card_type_id
       WHERE i.user_id=$1 AND i.consumed_in_reward=false AND i.quantity > 0 AND t.is_active=true
+        -- کارتِ کلکسیونی استاتس ندارد و نباید در آرنا دیده شود. این تنها
+        -- دروازهٔ ورودِ کارت به دوئل است: هم فهرستِ انتخاب و هم
+        -- validateDeck از همین تابع می‌گذرند، پس فیلتر کردن اینجا یعنی
+        -- کاربر نه می‌تواند ببیندش نه می‌تواند با دستکاریِ درخواست
+        -- واردِ ترکیبش کند.
+        AND t.is_collectible = false
       ORDER BY t.point_value DESC, t.name`, [userId]);
   return rows.map(publicCard);
 }
@@ -652,8 +681,12 @@ async function recordEngineBattle({ matchId = null, playerX, playerO, state, win
 
 module.exports = {
   DECK_SIZE, ONLINE_STAKES, RARITIES, EFFECTS, ROUND_FOCUS, FRONT_IMAGE_SQL,
-  RARITY_LABEL, EFFECT_LABEL, duelFieldsFromBody, publicCard, totalPower,
+  RARITY_LABEL, EFFECT_LABEL, duelFieldsFromBody, collectibleInput, publicCard, totalPower,
   playableCards, validateDeck, deckCards, status, saveDeck, botBattle,
   starterDeck, botDeck, resolveRound, simulate, recentBattles, recordEngineBattle,
   analyzeDeck, suggestDeckFromPool, createSeededRandom, focusStatOf, balanceSnapshot,
+  // ⚠️ این دو تا اینجا نبودند و کرونِ شبانهٔ server.js:2290 هر شب ساعت
+  // ۴:۱۷ با «cardDuel.pruneBattleHistory is not a function» می‌شکست.
+  // هر دو مسیرِ پاکسازی مرده بود، پس جدولِ نبردها هرگز هرس نمی‌شد.
+  pruneBattleHistory, maybePruneBattleHistory,
 };

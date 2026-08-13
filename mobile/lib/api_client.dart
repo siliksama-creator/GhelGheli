@@ -77,6 +77,10 @@ class ApiClient {
     token = null;
     isAdmin = false;
     _getCache.clear();
+    // ⚠️ کشِ ETag هم باید برود. اگر نرود، کاربرِ بعدی که وارد می‌شود
+    // `If-None-Match` نفرِ قبلی را می‌فرستد و سرور ۳۰۴ می‌دهد — یعنی
+    // دادهٔ حسابِ قبلی روی صفحهٔ حسابِ جدید. نشتیِ اطلاعاتِ بینِ حساب‌ها.
+    _etagCache.clear();
     SharedPreferences.getInstance().then((sp) {
       sp.remove('token');
       sp.remove('isAdmin');
@@ -246,6 +250,55 @@ class ApiClient {
   final Map<String, ({DateTime at, dynamic body})> _getCache = {};
   final Map<String, Future<dynamic>> _inFlight = {};
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // کشِ شرطی با ETag — «اگر عوض نشده، دوباره نفرست»
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // ── خواستهٔ مالک ──
+  //
+  //   «وقتی کارتی در موبایل یا وب لود میشه باید کش بشه که دیگه به سیستم
+  //    فشار نیاد ولی اگه تغییری در کارت در سرور به وجود اومد دوباره از
+  //    سیستم خودشو بروز کنه»
+  //
+  // ── تفاوتش با `_cacheWindow` بالا ──
+  //
+  // آن پنجرهٔ ۱.۲ ثانیه‌ای فقط رگبارِ درخواست‌های هم‌زمانِ یک صفحه را جمع
+  // می‌کند. بعد از ۱.۲ ثانیه، درخواست دوباره **کاملاً** از شبکه می‌آید —
+  // حتی اگر هیچ حرفی عوض نشده باشد. کاربری که بین اینونتوری و آرنا
+  // جابه‌جا می‌شود، هر بار کلِ فهرستِ کارت‌ها را دوباره دانلود می‌کرد.
+  //
+  // ── راه‌حل ──
+  //
+  // سرور (اکسپرس) از قبل `ETag` می‌فرستد؛ آزموده شد که با
+  // `If-None-Match` جوابِ `304` با بدنهٔ صفر می‌دهد. حالا هر پاسخِ GET
+  // همراه با ETagش نگه داشته می‌شود و درخواستِ بعدی آن را می‌فرستد:
+  //
+  //   • داده عوض نشده → `304`، بدنهٔ صفر بایت، دادهٔ محلی برمی‌گردد
+  //   • داده عوض شده  → `200` با بدنهٔ تازه، کش به‌روز می‌شود
+  //
+  // یعنی دقیقاً همان چیزی که خواسته شد: فشار نمی‌آید، ولی تغییر بی‌درنگ
+  // دیده می‌شود.
+  //
+  // ⚠️ `validateStatus` باید ۳۰۴ را «موفق» بداند وگرنه dio آن را استثنا
+  //    می‌کند و ما به سراغِ کشِ محلی نمی‌رویم.
+  //
+  // چرا سقف دارد: کاربری که ساعت‌ها در اپ می‌ماند نباید حافظه را
+  // بی‌نهایت بزرگ کند. ۶۰ مسیر بیش از هر جریانِ واقعیِ کاربر است.
+  static const int _etagMax = 60;
+  final Map<String, ({String etag, dynamic body})> _etagCache = {};
+
+  void _rememberEtag(String path, Response<dynamic> r) {
+    final etag = r.headers.value('etag');
+    if (etag == null || etag.isEmpty) return;
+    // درجِ مجدد کلید را به انتهای نگاشت می‌برد، پس قدیمی‌ترین همیشه اول
+    // صف است و LRU با یک خط پیاده می‌شود.
+    _etagCache.remove(path);
+    _etagCache[path] = (etag: etag, body: r.data);
+    while (_etagCache.length > _etagMax) {
+      _etagCache.remove(_etagCache.keys.first);
+    }
+  }
+
   Future<dynamic> get(String path, {bool fresh = false}) {
     if (!fresh) {
       final hit = _getCache[path];
@@ -319,13 +372,59 @@ class ApiClient {
         //   • فقط خطاهای گذرا (تایم‌اوت، قطع شبکه، ۵xx، ۴۲۹). یک ۴۰۳
         //     یا ۴۰۴ دفعهٔ دوم هم همان جواب را می‌دهد.
         Response<dynamic> r;
+        // ⚠️ `fresh` عمداً اینجا اثری ندارد و این ظریف است.
+        //
+        // `fresh: true` یعنی «دادهٔ معتبر می‌خواهم، پنجرهٔ ۱.۲ ثانیه‌ای را
+        // دور بزن». ولی ۳۰۴ **خودش** پاسخِ معتبر است: سرور دارد می‌گوید
+        // «نسخه‌ای که داری دقیقاً همان نسخهٔ فعلی است». پس اعتبارسنجی با
+        // ETag با خواستهٔ `fresh` هیچ تضادی ندارد و فقط ترافیک را حذف
+        // می‌کند.
+        //
+        // جایی که واقعاً باید ETag را دور انداخت، بعد از **نوشتن** است —
+        // و آنجا `invalidateCache()` کلِ `_etagCache` را پاک می‌کند، پس
+        // درخواستِ بعدی هرحال بدنهٔ کامل می‌گیرد.
+        //
+        // نسخهٔ اولِ همین کد `fresh ? null : ...` بود و تستِ
+        // etag_cache_test آن را گرفت: با آن، هر صفحه‌ای که `fresh: true`
+        // می‌زند (اکثرشان، هنگام pull-to-refresh) هیچ‌وقت از ۳۰۴ سود
+        // نمی‌برد و کلِ این قابلیت عملاً خاموش می‌ماند.
+        final known = _etagCache[path];
+        // ── ⚠️ چرا اینجا `validateStatus` دست نمی‌خورد ──
+        //
+        // دو بار اشتباه کردم و هر بار تست‌های موجود گرفتند. ثبت می‌کنم تا
+        // نفر بعدی همان راه را نرود:
+        //
+        //   تلاش ۱: `validateStatus: (c) => c < 400`
+        //   تلاش ۲: `validateStatus: (c) => c == 304 || c < 300`
+        //
+        // هر دو غلط بودند، چون فرض می‌کردند دیفالتِ dio (`< 300`) اینجا
+        // برقرار است. نیست: `BaseOptions` بالای همین فایل عمداً
+        // `code < 500` گذاشته تا کدهای خطا به‌جای استثنا به
+        // `onResponse` برسند — همان‌جا که اینترسپتورِ ۴۰۱ توکنِ منقضی را
+        // پاک می‌کند و کاربر را به صفحهٔ ورود می‌فرستد.
+        //
+        // با override کردنِ آن، ۴۰۱ دیگر به اینترسپتور نمی‌رسید و
+        // «انقضای جلسه» بی‌صدا از کار می‌افتاد: کاربر با توکنِ مرده گیر
+        // می‌کرد و هیچ پیامی نمی‌دید.
+        //
+        // چون `< 500` از قبل شاملِ ۳۰۴ هم هست، هیچ تنظیمی لازم نیست —
+        // فقط هدر را اضافه می‌کنیم و بس.
+        final opts = known == null
+            ? null
+            : Options(headers: {'If-None-Match': known.etag});
         try {
-          r = await dio.get(path);
+          r = await dio.get(path, options: opts);
         } catch (e) {
           if (!isTransient(e)) rethrow;
           await Future<void>.delayed(const Duration(milliseconds: 400));
-          r = await dio.get(path);
+          r = await dio.get(path, options: opts);
         }
+        if (r.statusCode == 304 && known != null) {
+          // هیچ بایتی از بدنه دانلود نشد.
+          _getCache[path] = (at: DateTime.now(), body: known.body);
+          return known.body;
+        }
+        _rememberEtag(path, r);
         _getCache[path] = (at: DateTime.now(), body: r.data);
         return r.data;
       } finally {
@@ -369,6 +468,10 @@ class ApiClient {
   /// one of them shows the user a number that contradicts what they just did.
   void invalidateCache() {
     _getCache.clear();
+    // همان استدلالِ بالا: بعد از هر نوشتن، ETagهای ذخیره‌شده کهنه‌اند.
+    // نگه داشتنشان یعنی کاربر بعد از ثبتِ کارت، اینونتوریِ قبل از ثبت را
+    // می‌بیند و فکر می‌کند ثبت نشده.
+    _etagCache.clear();
   }
 
   /// Runs several GETs concurrently over the pooled connection.
