@@ -205,6 +205,31 @@ jobs:
                 || echo "prefetch failed; flutter build will retry the wrapper download"
             fi
           fi
+          # ═══════════════════════════════════════════════════════════════
+          # چرا file-watcher گِرِیدل خاموش می‌شود
+          # ═══════════════════════════════════════════════════════════════
+          #
+          # لاگِ بیلد این را می‌داد:
+          #
+          #     Caught exception: Already watching path:
+          #     /home/runner/work/GhelGheli/GhelGheli/mobile/android
+          #
+          # `--split-per-abi` سه بیلدِ پشتِ سرِ هم اجرا می‌کند و حلقهٔ
+          # retry هم می‌تواند دوباره شروع کند. دیمنِ گِرِیدل بینِ این
+          # اجراها زنده می‌ماند و تلاش می‌کند همان مسیر را دوباره
+          # watch کند — که استثنا می‌دهد.
+          #
+          # روی CI هر بیلد از صفر است و watcher هیچ سودی ندارد (کارش
+          # تشخیصِ تغییرِ فایل بینِ بیلدهای متوالیِ محلی است). خاموش
+          # کردنش هم استثنا را حذف می‌کند هم چند ثانیه صرفه‌جویی است.
+          #
+          # `--no-daemon` هم اضافه شد: دیمنِ ماندگار روی رانرِ یک‌بارمصرف
+          # فقط حافظه می‌گیرد و همین حالتِ «قبلاً watch شده» را می‌سازد.
+          mkdir -p android
+          {
+            echo "org.gradle.vfs.watch=false"
+            echo "org.gradle.daemon=false"
+          } >> android/gradle.properties
           ok=0
           for attempt in 1 2 3 4; do
             echo "── flutter build attempt $attempt ──"
@@ -214,6 +239,9 @@ jobs:
               ok=1
               break
             fi
+            # بینِ تلاش‌ها دیمن را کاملاً بکش تا حالتِ نیمه‌مردهٔ watcher
+            # به تلاشِ بعدی ارث نرسد.
+            (cd android && ./gradlew --stop >/dev/null 2>&1) || true
             sleep $((attempt * 20))
           done
           [ "$ok" = 1 ] || { echo "::error::flutter build apk after 4 attempts failed"; exit 1; }

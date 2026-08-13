@@ -478,10 +478,24 @@ function DeckIntel({ insights, suggestedDeck, onApply }) {
       <div><b>تحلیل بالانس ترکیب</b><small>هوش آرنا قبل از شروع نقاط قوت و ضعف deck را خلاصه می‌کند</small></div>
       {suggestedDeck && <button type="button" className="ghost" onClick={onApply}>چیدن خودکار</button>}
     </div>
+    {/* ── چرا فهرست‌ها بریده شدند ──
+        گزارش مالک: «قسمت تحلیل ترکیب یه اسکرول طولانی داره».
+        چهار بلوک پشت سر هم (قوت‌ها، ضعف‌ها، اوپنر، ترتیب ۵ راند) روی
+        موبایل ~۴۲۰ پیکسل می‌شد. دو موردِ اولِ هر فهرست حاملِ اطلاعات
+        است و بقیه تکرارِ همان مضمون. */}
     {active?.recommendedLeadReason && <div className="duelIntelLead">{active.recommendedLeadReason}</div>}
-    {!!strengths.length && <div className="duelIntelFlow good">{strengths.map((item, index) => <i key={index}>{item}</i>)}</div>}
-    {!!warnings.length && <div className="duelIntelFlow bad">{warnings.map((item, index) => <i key={index}>{item}</i>)}</div>}
-    {!!order.length && <div className="duelIntelOrder">{order.map(item => <span key={`${item.round}-${item.cardTypeId}`}><b>راند {fa(item.round)}</b>{item.name}<small>{item.reason || ''}</small></span>)}</div>}
+    {(!!strengths.length || !!warnings.length) && <div className="duelIntelFlow good">
+      {strengths.slice(0, 2).map((item, index) => <i key={`s${index}`}>{item}</i>)}
+      {warnings.slice(0, 2).map((item, index) => <i key={`w${index}`} className="bad">{item}</i>)}
+      {strengths.length + warnings.length > 4
+        && <i className="muted">+{fa(strengths.length + warnings.length - 4)} نکتهٔ دیگر</i>}
+    </div>}
+    {/* ترتیب پیشنهادی پشتِ یک جمع‌شونده رفت: اطلاعاتِ خوبی است ولی برای
+        شروعِ بازی لازم نیست و پنج کارت ارتفاعِ زیادی می‌گیرد. */}
+    {!!order.length && <details className="duelIntelOrderWrap">
+      <summary>ترتیب پیشنهادی ۵ راند</summary>
+      <div className="duelIntelOrder">{order.map(item => <span key={`${item.round}-${item.cardTypeId}`}><b>راند {fa(item.round)}</b>{item.name}<small>{item.reason || ''}</small></span>)}</div>
+    </details>}
   </section>;
 }
 

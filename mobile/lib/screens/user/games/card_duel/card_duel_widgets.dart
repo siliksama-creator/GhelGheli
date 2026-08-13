@@ -136,7 +136,7 @@ class _LineupSlot extends StatelessWidget {
         onTap: onTap,
         borderRadius: Corners.rLg,
         child: card == null
-            ? Container(
+            ? DecoratedBox(
                 decoration: BoxDecoration(
                   borderRadius: Corners.rLg,
                   border: Border.all(color: Colors.white24),
@@ -278,8 +278,14 @@ class _LiveBattle extends StatelessWidget {
                 builder: (_, __) => CircleAvatar(
                     radius: 24,
                     backgroundColor: const Color(0xFF02060C),
-                    child: Text(faNum(session.secondsLeft),
-                        style: TextStyle(color: color, fontWeight: FontWeight.w900)))),
+                    // در پنجرهٔ اعلانِ راند ساعت نمی‌رود؛ به‌جای عددِ
+                    // ثابت که شبیهِ «هنگ کرده» است، آیکنِ مکث نشان
+                    // داده می‌شود تا معلوم باشد عمدی است.
+                    child: session.introHolding
+                        ? Icon(Icons.visibility_rounded, color: color, size: 20)
+                        : Text(faNum(session.secondsLeft),
+                            style: TextStyle(
+                                color: color, fontWeight: FontWeight.w900)))),
           ]),
           Gaps.vXs,
           // ── دستِ کاربر ──
@@ -1130,25 +1136,34 @@ class _DeckIntelPanel extends StatelessWidget {
                 ),
             ],
           ),
-          if (strengths.isNotEmpty) ...[
+          // ═══════════════════════════════════════════════════════════════
+          // چرا فهرست‌ها بریده می‌شوند
+          // ═══════════════════════════════════════════════════════════════
+          //
+          // گزارشِ مالک: «قسمت تحلیل ترکیب یه اسکرول طولانی داره که
+          // حذفش کن اسکرول رو».
+          //
+          // این پنل چهار بلوکِ پشتِ سرِ هم داشت: نقاطِ قوت (تا ۵ چیپ)،
+          // هشدارها (تا ۵ چیپ)، جعبهٔ اوپنر، و فهرستِ ۵ راند. روی
+          // گوشیِ معمولی مجموعاً ~۴۲۰ پیکسل می‌شد.
+          //
+          // مهم‌ترین اطلاعات دو مورد اولِ هر فهرست است؛ بقیه تکرارِ
+          // همان مضمون‌اند. حالا حداکثر دو چیپ از هر دسته نشان داده
+          // می‌شود و اگر بیشتر بود، تعدادش کنارش می‌آید.
+          if (strengths.isNotEmpty || warnings.isNotEmpty) ...[
             Gaps.vXs,
             Wrap(
               spacing: 6,
               runSpacing: 6,
               children: [
-                for (final item in strengths)
+                for (final item in strengths.take(2))
                   _IntelChip(text: item, tint: _emerald),
-              ],
-            ),
-          ],
-          if (warnings.isNotEmpty) ...[
-            Gaps.vXs,
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final item in warnings)
+                for (final item in warnings.take(2))
                   _IntelChip(text: item, tint: _rose),
+                if (strengths.length + warnings.length > 4)
+                  _IntelChip(
+                      text: '+${faNum(strengths.length + warnings.length - 4)} نکتهٔ دیگر',
+                      tint: Colors.white54),
               ],
             ),
           ],
@@ -1166,7 +1181,10 @@ class _DeckIntelPanel extends StatelessWidget {
                 children: [
                   const Text('اوپنر پیشنهادی', style: TextStyle(fontSize: 12.5, color: _cyan, fontWeight: FontWeight.w900)),
                   const SizedBox(height: 4),
-                  Text('${insights['recommendedLeadReason']}', style: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.5, fontWeight: FontWeight.w700)),
+                  // دو خط کافی است؛ متنِ بلندتر فقط ارتفاع می‌گیرد.
+                  Text('${insights['recommendedLeadReason']}',
+                      maxLines: 2, overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.5, fontWeight: FontWeight.w700)),
                 ],
               ),
             ),
@@ -1956,5 +1974,49 @@ class CardDuelRoundIntroForTest extends StatelessWidget {
         focus: focus,
         roundNumber: roundNumber,
         totalRounds: totalRounds,
+      );
+}
+
+/// نوارِ باریکِ بالای صفحه حین نبرد — جایگزینِ `_ArenaHero`.
+///
+/// `_ArenaHero` ۹۶dp ارتفاع می‌گیرد و عنوان/توضیحِ حالت را نشان می‌دهد.
+/// آن اطلاعات قبل از شروعِ بازی لازم است، نه وسطش. تنها چیزی که حین
+/// نبرد واقعاً لازم است دکمهٔ برگشت است.
+///
+/// این نوار ۳۴dp است — یعنی ۶۲dp از سرریزِ عمودیِ صفحه کم می‌کند و
+/// بخشِ بزرگی از دلیلِ اسکرول را حذف می‌کند.
+class _CompactMatchBar extends StatelessWidget {
+  const _CompactMatchBar({
+    required this.onBack,
+    required this.modeColor,
+    required this.modeTitle,
+  });
+
+  final VoidCallback onBack;
+  final Color modeColor;
+  final String modeTitle;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        height: 34,
+        child: Row(children: [
+          IconButton(
+            onPressed: onBack,
+            icon: const Icon(Icons.arrow_back_rounded, size: 20),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+            tooltip: 'خروج از نبرد',
+          ),
+          const SizedBox(width: 6),
+          Icon(Icons.sports_mma_rounded, size: 15, color: modeColor),
+          const SizedBox(width: 5),
+          Expanded(
+            child: Text(modeTitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    fontSize: 12.5, fontWeight: FontWeight.w900, color: modeColor)),
+          ),
+        ]),
       );
 }

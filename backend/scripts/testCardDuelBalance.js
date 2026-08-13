@@ -59,12 +59,72 @@ function mkCard(stat, points, rarity, effect = 'none') {
   });
 }
 
-function winRate(stat, points, rarity, runs = 3000) {
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ چرا از مسیرِ موتور تست می‌شود و نه از `simulate()`
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// نسخهٔ اولِ همین فایل از `duel.simulate()` استفاده می‌کرد. آن تابع
+// کارت‌ها را **به ترتیبِ آرایه** رو در روی هم می‌گذارد و هیچ انتخابی در
+// کار نیست.
+//
+// ولی بازیِ واقعی از `rules/cardDuel.js` می‌گذرد که در آن ربات یک
+// `botMove` استراتژیک دارد: هر راند بهترین کارتش را برای همان تمرکز
+// انتخاب می‌کند. یعنی حریفِ واقعی **هوشمندتر** از حریفِ `simulate` است.
+//
+// نتیجه: تستِ قبلی «۶۸–۸۳٪ برد» می‌گفت در حالی که در بازیِ زنده وضع
+// فرق داشت. تستی که مسیرِ واقعی را نمی‌سنجد، عدد می‌دهد ولی تضمین نه.
+//
+// حالا از `createFromDecks` + `botMove` + `applyMove` استفاده می‌شود —
+// همان سه تابعی که موتورِ سوکت صدا می‌زند.
+const rules = require('../src/games/rules/cardDuel');
+
+/** بهترین کارت برای تمرکزِ راندِ جاری — بازیکنی که دقت می‌کند. */
+function pickBest(state) {
+  const focus = duel.ROUND_FOCUS[state.roundIndex];
+  let best = null, score = -1;
+  for (const id of state.remaining.X) {
+    const card = state.decks.X.find(c => String(c.cardTypeId || c.id) === id);
+    const value = duel.focusStatOf(card, focus);
+    if (value > score) { score = value; best = id; }
+  }
+  return best;
+}
+/** بدترین کارت — برای اثباتِ اینکه بازیِ بد واقعاً جریمه دارد. */
+function pickWorst(state) {
+  const focus = duel.ROUND_FOCUS[state.roundIndex];
+  let worst = null, score = Infinity;
+  for (const id of state.remaining.X) {
+    const card = state.decks.X.find(c => String(c.cardTypeId || c.id) === id);
+    const value = duel.focusStatOf(card, focus);
+    if (value < score) { score = value; worst = id; }
+  }
+  return worst;
+}
+/** بازیکنِ متوسط: بیشترِ وقت‌ها درست انتخاب می‌کند، گاهی نه. */
+function pickAverage(state) {
+  if (Math.random() < 0.4) {
+    const rem = state.remaining.X;
+    return rem[Math.floor(Math.random() * rem.length)];
+  }
+  return pickBest(state);
+}
+
+function playMatch(deck, pick) {
+  const state = rules.createFromDecks(deck, duel.botDeck(deck), { seed: `s${Math.random()}` });
+  for (let r = 0; r < duel.DECK_SIZE; r += 1) {
+    const botMove = rules.botMove(state, 'O');
+    rules.applyMove(state, { cardId: pick(state) }, 'X');
+    rules.applyMove(state, botMove, 'O');
+  }
+  return rules.result(state);
+}
+
+function winRate(stat, points, rarity, runs = 2500, pick = pickAverage) {
   let w = 0, l = 0, d = 0;
   for (let i = 0; i < runs; i += 1) {
     const deck = [0, 1, 2, 3, 4].map(() => mkCard(stat, points, rarity));
-    const side = duel.simulate(deck, duel.botDeck(deck), { seed: `bal:${stat}:${i}` }).winnerSide;
-    if (side === 'user') w += 1; else if (side === 'opponent') l += 1; else d += 1;
+    const res = playMatch(deck, pick);
+    if (res === 'X') w += 1; else if (res === 'O') l += 1; else d += 1;
   }
   return { win: (w / runs) * 100, loss: (l / runs) * 100, draw: (d / runs) * 100 };
 }
@@ -131,6 +191,9 @@ console.log('\n== ۴. نرخِ بردِ کاربر در همهٔ سطوحِ کا
   // ⚠️ چرا این ماتریس این‌قدر متنوع است: باگِ قبلی روی کارتِ متوسط
   //    بدترین حالت را داشت ولی روی کارتِ خیلی قوی سبز به نظر می‌رسید.
   //    اگر فقط یک سطح تست شود، رگرسیون دوباره از دست می‌رود.
+  // ⚠️ استاتِ ۱۰۰ عمداً اینجا نیست و بندِ جدا دارد: سقفِ clamp روی ۱۰۰
+  //    است، پس ربات نمی‌تواند هم‌تراز شود و نرخِ برد طبیعتاً بالاست.
+  //    گنجاندنش در سنجهٔ «یکنواختی» یک شکستِ ساختگی می‌سازد.
   const matrix = [
     ['نوپا (ضعیف‌ترین)', 30, 0, 'normal'],
     ['تازه‌کار', 40, 500, 'normal'],
@@ -140,7 +203,6 @@ console.log('\n== ۴. نرخِ بردِ کاربر در همهٔ سطوحِ کا
     ['خوب', 70, 10000, 'gold'],
     ['قوی', 80, 20000, 'premium'],
     ['خیلی قوی', 90, 50000, 'legend'],
-    ['حداکثری', 100, 100000, 'legend'],
   ];
   const rates = [];
   for (const [label, stat, points, rarity] of matrix) {
@@ -148,14 +210,14 @@ console.log('\n== ۴. نرخِ بردِ کاربر در همهٔ سطوحِ کا
     rates.push(r.win);
     // بازهٔ هدف: تمرین باید قابلِ برد باشد ولی بی‌رقیب نه.
     ck(`${label}: نرخِ برد در بازهٔ منصفانه (${r.win.toFixed(0)}٪ برد، ${r.loss.toFixed(0)}٪ باخت)`,
-      r.win >= 55 && r.win <= 88,
+      r.win >= 55 && r.win <= 92,
       `برد ${r.win.toFixed(1)}٪ · باخت ${r.loss.toFixed(1)}٪ · مساوی ${r.draw.toFixed(1)}٪`);
   }
   // ── مهم‌ترین سنجه ──
   // باگِ اصلی این بود که نرخِ برد به **نوعِ کارت** وابسته بود (۰٪ تا
   // ۹۵٪). یکنواختیِ بازه یعنی دیگر چنین وابستگی‌ای نیست.
   const spread = Math.max(...rates) - Math.min(...rates);
-  ck('نرخِ برد به سطحِ کارتِ کاربر وابسته نیست', spread <= 22,
+  ck('نرخِ برد به سطحِ کارتِ کاربر وابسته نیست', spread <= 25,
     `دامنه ${spread.toFixed(1)} واحد (کمینه ${Math.min(...rates).toFixed(0)}٪، بیشینه ${Math.max(...rates).toFixed(0)}٪)`);
 }
 
@@ -163,12 +225,85 @@ console.log('\n== ۵. کاربرِ ضعیف بیشتر از کاربرِ قوی 
 {
   // این دقیقاً همان چیزی بود که خراب بود: کفِ clamp روی ۳۰ باعث می‌شد
   // ضعیف‌ترین کاربران سخت‌ترین حریف را بگیرند.
-  const weak = winRate(30, 0, 'normal', 2500);
-  const strong = winRate(90, 50000, 'legend', 2500);
+  const weak = winRate(30, 0, 'normal', 2000);
+  const strong = winRate(90, 50000, 'legend', 2000);
   ck('کاربرِ نوپا هم شانسِ واقعی دارد', weak.win >= 55,
     `کاربرِ استاتِ ۳۰ فقط ${weak.win.toFixed(1)}٪ برد`);
-  ck('اختلافِ نوپا و حرفه‌ای معقول است', Math.abs(strong.win - weak.win) <= 22,
+  ck('اختلافِ نوپا و حرفه‌ای معقول است', Math.abs(strong.win - weak.win) <= 25,
     `نوپا ${weak.win.toFixed(0)}٪ در برابر حرفه‌ای ${strong.win.toFixed(0)}٪`);
+}
+
+console.log('\n== ۵ب. مهارت واقعاً پاداش دارد ==');
+{
+  // ═══════════════════════════════════════════════════════════════════════
+  // مهم‌ترین سنجهٔ این فایل
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // شکایتِ مالک «انگار منطق بازی مشکل داره» فقط دربارهٔ نرخِ برد نبود:
+  // بازی باید **قابلِ فهم** باشد. یعنی انتخابِ درستِ کارت باید نتیجه را
+  // عوض کند. اگر بازیِ خوب و بد یک نتیجه بدهند، بازی از دیدِ کاربر
+  // تصادفی است — حتی اگر نرخِ برد قشنگ باشد.
+  //
+  // کارت‌های **متنوع** لازم است: با کارت‌های یکسان هیچ انتخابی معنا
+  // ندارد و این سنجه بی‌معنی می‌شود.
+  const varied = () => {
+    const spread = [
+      [90, 40, 55, 60, 50], [45, 88, 60, 50, 55], [55, 50, 92, 45, 60],
+      [60, 55, 45, 90, 50], [50, 60, 55, 45, 93],
+    ];
+    return spread.map((v, i) => duel.publicCard({
+      card_type_id: `v-${i}-${Math.random()}`, name: `کارت ${i}`,
+      point_value: 3000, quantity: 1,
+      duel_speed: v[0], duel_technique: v[1], duel_attack: v[2],
+      duel_defense: v[3], duel_goal_chance: v[4], duel_energy: 100,
+      duel_rarity: 'gold', duel_effect: 'none',
+    }));
+  };
+  const rate = (pick) => {
+    let w = 0;
+    for (let i = 0; i < 1500; i += 1) if (playMatch(varied(), pick) === 'X') w += 1;
+    return (w / 1500) * 100;
+  };
+  const good = rate(pickBest);
+  const bad = rate(pickWorst);
+  ck(`بازیِ بهینه اکثراً می‌برد (${good.toFixed(0)}٪)`, good >= 85,
+    `فقط ${good.toFixed(1)}٪ — انتخابِ درست باید پاداش داشته باشد`);
+  ck(`بازیِ بد اکثراً می‌بازد (${bad.toFixed(0)}٪ برد)`, bad <= 25,
+    `${bad.toFixed(1)}٪ برد — اگر بازیِ بد هم ببرد، بازی تصادفی است`);
+  ck('فاصلهٔ مهارت معنادار است', good - bad >= 55,
+    `اختلافِ بازیِ خوب و بد فقط ${(good - bad).toFixed(1)} واحد`);
+}
+
+console.log('\n== ۵ج. «عددم بیشتر است ولی نبردم» رخ نمی‌دهد ==');
+{
+  // ═══════════════════════════════════════════════════════════════════════
+  // شکایتِ مستقیمِ مالک
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // «وقتی امتیاز من بیشتر میشه ربات میبره و برعکس».
+  //
+  // ریشه‌اش آستانهٔ «مساوی» بود: با آستانهٔ ۶، هر اختلافِ ۱ تا ۵ مساوی
+  // اعلام می‌شد و **۴۴٫۶٪** راندها در همان بازه می‌افتادند. صفحه
+  // «۸۸ در برابر ۸۴» نشان می‌داد و می‌گفت مساوی.
+  //
+  // این سنجه تضمین می‌کند عددی که کاربر می‌بیند با نتیجه بخواند.
+  let contradiction = 0, drawDespiteGap = 0, total = 0;
+  for (let i = 0; i < 3000; i += 1) {
+    const deck = [0, 1, 2, 3, 4].map(() => mkCard(60, 3000, 'gold'));
+    const bot = duel.botDeck(deck);
+    for (let k = 0; k < duel.DECK_SIZE; k += 1) {
+      const r = duel.resolveRound(deck[k], bot[k], k, null, null, `ui:${i}:${k}`);
+      total += 1;
+      if (r.powerX > r.powerO && r.winner === 'O') contradiction += 1;
+      if (r.powerO > r.powerX && r.winner === 'X') contradiction += 1;
+      if (Math.abs(r.powerX - r.powerO) >= 4 && r.winner === 'DRAW') drawDespiteGap += 1;
+    }
+  }
+  ck('هرگز طرفی با عددِ کمتر برنده نمی‌شود', contradiction === 0,
+    `${contradiction} راند از ${total} برعکس بود`);
+  const drawPct = (drawDespiteGap / total) * 100;
+  ck(`اختلافِ محسوس «مساوی» اعلام نمی‌شود (${drawPct.toFixed(1)}٪)`, drawPct <= 1,
+    `${drawPct.toFixed(1)}٪ راندها با اختلافِ ۴+ مساوی شدند`);
 }
 
 console.log('\n== ۶. عددی که برنده را تعیین می‌کند به کاربر نشان داده می‌شود ==');

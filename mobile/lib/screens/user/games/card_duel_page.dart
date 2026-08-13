@@ -418,7 +418,16 @@ class _CardDuelPageState extends State<CardDuelPage> {
             Gaps.vMd,
             FilledButton.icon(
               onPressed: () async {
-                await Share.shareXFiles([card], text: message, subject: 'نتیجه دوئل قلقلی');
+                // share_plus ۱۳: `Share.*` منسوخ شده و جایش
+                // `SharePlus.instance.share(ShareParams(...))` است.
+                // ارتقا لازم بود چون نسخهٔ ۱۰ هنوز Kotlin Gradle Plugin
+                // را خودش اعمال می‌کرد و بیلد هشدارِ KGP می‌داد؛
+                // نسخه‌های آینده فلاتر آن را خطا می‌کنند.
+                await SharePlus.instance.share(ShareParams(
+                  files: [card],
+                  text: message,
+                  subject: 'نتیجه دوئل قلقلی',
+                ));
                 unawaited(widget.api.post('/api/analytics/events', {
                   'event': 'share', 'platform': 'android', 'gameId': 'card_duel',
                   'matchId': _session.matchId, 'target': 'system_share_image',
@@ -524,19 +533,39 @@ class _CardDuelPageState extends State<CardDuelPage> {
               padding: EdgeInsets.fromLTRB(
                   Gaps.md, Gaps.sm, Gaps.md, _started ? Gaps.xxl : Gaps.sm),
               children: [
-                _ArenaHero(
-                  onBack: () {
-                    _session.leave();
-                    widget.onBack();
-                  },
-                  modeColor: _modeColor,
-                  modeTitle: _modeTitle,
-                  subtitle: widget.vsBot
-                      ? 'رایگان و بدون جابه‌جایی امتیاز'
-                      : widget.stake > 0
-                          ? 'باخت یعنی کسر ${faNum(widget.stake)} امتیاز'
-                          : 'مسابقه دوستانه خصوصی',
-                ),
+                // ── چرا سربرگِ بزرگ حین بازی جمع می‌شود ──
+                //
+                // گزارشِ مالک: «بازی هنوز هم نیاز داره اسکرول شه».
+                //
+                // اندازه‌گیریِ ارتفاع‌ها روی گوشیِ ۶۴۰dp نشان داد صفحهٔ
+                // نبرد ~۷۴۰dp می‌شود؛ یعنی ~۱۰۰dp سرریز. `_ArenaHero`
+                // به‌تنهایی ۹۶dp است و حین نبرد هیچ کارِ ضروری‌ای
+                // نمی‌کند: عنوانِ حالت و توضیحِ شرط را نشان می‌دهد که
+                // کاربر قبلِ شروع خوانده. تنها چیزِ لازمش دکمهٔ برگشت
+                // است که به نوارِ باریکِ جایگزین منتقل شد.
+                if (!_started)
+                  _ArenaHero(
+                    onBack: () {
+                      _session.leave();
+                      widget.onBack();
+                    },
+                    modeColor: _modeColor,
+                    modeTitle: _modeTitle,
+                    subtitle: widget.vsBot
+                        ? 'رایگان و بدون جابه‌جایی امتیاز'
+                        : widget.stake > 0
+                            ? 'باخت یعنی کسر ${faNum(widget.stake)} امتیاز'
+                            : 'مسابقه دوستانه خصوصی',
+                  )
+                else
+                  _CompactMatchBar(
+                    onBack: () {
+                      _session.leave();
+                      widget.onBack();
+                    },
+                    modeColor: _modeColor,
+                    modeTitle: _modeTitle,
+                  ),
                 Gaps.vSm,
                 if (!_started) _buildSetup(context) else _buildSession(context),
               ],
@@ -582,11 +611,11 @@ class _CardDuelPageState extends State<CardDuelPage> {
         // را از صفحه بیرون می‌انداختند.
         //
         // جمع‌شده پیش‌فرض‌اند و هرکس خواست بازشان می‌کند.
-        _CollapsibleSection(
+        const _CollapsibleSection(
           icon: Icons.menu_book_rounded,
           title: 'قوانین نبرد',
           subtitle: 'پنج کارت، انتخاب مخفی، پنج راند',
-          child: const _RuleStrip(),
+          child: _RuleStrip(),
         ),
         Gaps.vXs,
         _CollapsibleSection(

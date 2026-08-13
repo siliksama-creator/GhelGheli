@@ -252,7 +252,7 @@ void main() {
         expect(size, isNotNull, reason: '${file.path} هدر WebP معتبر ندارد');
         expect(size!.w, 640, reason: '${file.path} عرض استاندارد ندارد');
         expect(size.h, 360, reason: '${file.path} ارتفاع استاندارد ندارد');
-        final mb = 640 * 360 * 4 / 1048576;
+        const mb = 640 * 360 * 4 / 1048576;
         expect(mb, lessThan(1.0),
             reason: '${file.path} بیش از بودجهٔ decode هر پیش‌نمایش است');
       }

@@ -117,10 +117,12 @@ class _MatchEffectPainter extends CustomPainter {
   }
 
   void _fire(Canvas c, Size s) {
-    for (var side in [0,1]) for (var i=0;i<3;i++) {
-      final x=side==0?s.width*(.05+i*.055):s.width*(.95-i*.055);
-      final h=s.height*(.25+.13*math.sin((t+i*.2)*math.pi).abs());
-      c.drawPath(Path()..moveTo(x,s.height*.76)..quadraticBezierTo(x-s.width*.06,s.height*.62,x,s.height*.76-h)..quadraticBezierTo(x+s.width*.07,s.height*.59,x,s.height*.76)..close(),Paint()..shader=const LinearGradient(begin:Alignment.bottomCenter,end:Alignment.topCenter,colors:[Color(0xFFEF4444),Color(0xFFF97316),Color(0xFFFDE047)]).createShader(rectFrom(s)));
+    for (var side in [0,1]) {
+      for (var i=0;i<3;i++) {
+        final x=side==0?s.width*(.05+i*.055):s.width*(.95-i*.055);
+        final h=s.height*(.25+.13*math.sin((t+i*.2)*math.pi).abs());
+        c.drawPath(Path()..moveTo(x,s.height*.76)..quadraticBezierTo(x-s.width*.06,s.height*.62,x,s.height*.76-h)..quadraticBezierTo(x+s.width*.07,s.height*.59,x,s.height*.76)..close(),Paint()..shader=const LinearGradient(begin:Alignment.bottomCenter,end:Alignment.topCenter,colors:[Color(0xFFEF4444),Color(0xFFF97316),Color(0xFFFDE047)]).createShader(rectFrom(s)));
+      }
     }
   }
 
@@ -150,7 +152,7 @@ class _MatchEffectPainter extends CustomPainter {
   void _goal(Canvas c, Size s) {
     final r=Rect.fromLTWH(s.width*.25,s.height*.22,s.width*.5,s.height*.48);final p=Paint()..color=Colors.white70..style=PaintingStyle.stroke..strokeWidth=3;c.drawRect(r,p);
     for(var i=1;i<6;i++){c.drawLine(Offset(r.left+r.width*i/6,r.top),Offset(r.left+r.width*i/6,r.bottom),p..color=Colors.white24);c.drawLine(Offset(r.left,r.top+r.height*i/6),Offset(r.right,r.top+r.height*i/6),p);}
-    final ball=Offset(r.left+r.width*(.22+.55*t),r.bottom-r.height*(.15+.55*math.sin(t*math.pi)));c.drawCircle(ball,s.width*.045,Paint()..color=Colors.white..maskFilter=MaskFilter.blur(BlurStyle.outer,8));
+    final ball=Offset(r.left+r.width*(.22+.55*t),r.bottom-r.height*(.15+.55*math.sin(t*math.pi)));c.drawCircle(ball,s.width*.045,Paint()..color=Colors.white..maskFilter=const MaskFilter.blur(BlurStyle.outer,8));
   }
 
   void _streak(Canvas c, Size s) {
@@ -158,7 +160,7 @@ class _MatchEffectPainter extends CustomPainter {
   }
 
   void _mvp(Canvas c, Size s) {
-    final center=Offset(s.width/2,s.height*.43),outer=s.width*.15,inner=outer*.43;final path=Path();for(var i=0;i<10;i++){final a=-math.pi/2+i*math.pi/5;final r=i.isEven?outer:inner;final p=center+Offset(math.cos(a)*r,math.sin(a)*r);i==0?path.moveTo(p.dx,p.dy):path.lineTo(p.dx,p.dy);}path.close();c.drawPath(path,Paint()..color=const Color(0xFFFFD166)..maskFilter=MaskFilter.blur(BlurStyle.outer,10));_text(c,'MVP',Offset(center.dx,s.height*.70),s.width*.055,Colors.white,FontWeight.w900);
+    final center=Offset(s.width/2,s.height*.43),outer=s.width*.15,inner=outer*.43;final path=Path();for(var i=0;i<10;i++){final a=-math.pi/2+i*math.pi/5;final r=i.isEven?outer:inner;final p=center+Offset(math.cos(a)*r,math.sin(a)*r);i==0?path.moveTo(p.dx,p.dy):path.lineTo(p.dx,p.dy);}path.close();c.drawPath(path,Paint()..color=const Color(0xFFFFD166)..maskFilter=const MaskFilter.blur(BlurStyle.outer,10));_text(c,'MVP',Offset(center.dx,s.height*.70),s.width*.055,Colors.white,FontWeight.w900);
   }
 
   void _rematch(Canvas c, Size s) {

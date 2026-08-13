@@ -51,6 +51,11 @@ class GameSession extends ChangeNotifier {
   /// Countdown for the player currently on move. Driven by the server's
   /// `deadline` so both clients agree even if one lags.
   int secondsLeft = 0;
+
+  /// تا وقتی اعلانِ راند روی صفحه است، ساعت نمی‌رود.
+  /// UI از این پرچم برای نشان دادنِ «آماده…» به‌جای عدد استفاده می‌کند.
+  bool introHolding = false;
+  int _introHoldMs = 0;
   int turnSeconds = 15;
 
   /// ═════════════════════════════════════════════════════════════════════
@@ -248,7 +253,7 @@ class GameSession extends ChangeNotifier {
       error = null;
       GameAudio.instance.play(Sfx.matchFound);
       _stopSearchClock();
-      _startClock(m['deadline'], m['turnMs'], m['remainingMs']);
+      _startClock(m['deadline'], m['turnMs'], m['remainingMs'], m['introMs']);
       notifyListeners();
     }
 
@@ -271,7 +276,7 @@ class GameSession extends ChangeNotifier {
       }
       if (!wasMyTurn && myTurn) GameAudio.instance.play(Sfx.yourTurn);
 
-      _startClock(m['deadline'], m['turnMs'], m['remainingMs']);
+      _startClock(m['deadline'], m['turnMs'], m['remainingMs'], m['introMs']);
       notifyListeners();
     });
 
@@ -329,10 +334,22 @@ class GameSession extends ChangeNotifier {
     if (_initialStart != null) handleStart(_initialStart);
   }
 
-  void _startClock(dynamic deadline, dynamic turnMs, dynamic remainingMs) {
+  void _startClock(dynamic deadline, dynamic turnMs, dynamic remainingMs,
+      [dynamic introMs]) {
     _ticker?.cancel();
     final ms = (turnMs as num?)?.toInt();
     if (ms != null && ms > 0) turnSeconds = (ms / 1000).round();
+    // ── مهلتِ خواندنِ اعلانِ راند ──
+    //
+    // خواستهٔ مالک: «انیمیشن مییاد رو چند ثانیه بدون اینکه تایمر بره نگه
+    // دار که کاربر بتونه بخونه».
+    //
+    // سرور این مدت را به `deadline` اضافه کرده، ولی اگر همین‌طور بشمریم
+    // کاربر عددی مثل «۲۳ ثانیه» می‌بیند که از `turnMs` بیشتر است و
+    // بعد ناگهان می‌پرد. به‌جایش تا پایانِ اعلان، عدد **ثابت** روی
+    // مقدارِ کاملِ نوبت می‌ماند و بعد شمارش شروع می‌شود.
+    final intro = (introMs as num?)?.toInt() ?? 0;
+    _introHoldMs = intro > 0 ? intro : 0;
 
     // Use the server's REMAINING milliseconds against a local stopwatch
     // rather than `deadline - DateTime.now()`. A device with a wrong clock
@@ -354,7 +371,21 @@ class GameSession extends ChangeNotifier {
     _lastTickPlayed = -1;
 
     void tick() {
-      final leftMs = total - watch.elapsedMilliseconds;
+      // در پنجرهٔ اعلان، ساعت روی مقدارِ کامل «یخ» می‌زند.
+      final elapsed = watch.elapsedMilliseconds;
+      if (_introHoldMs > 0 && elapsed < _introHoldMs) {
+        introHolding = true;
+        if (secondsLeft != turnSeconds) {
+          secondsLeft = turnSeconds;
+          _tickClock();
+        }
+        return;
+      }
+      if (introHolding) {
+        introHolding = false;
+        _tickClock();
+      }
+      final leftMs = total - elapsed;
       final left = (leftMs / 1000).ceil();
       final clamped = left < 0 ? 0 : (left > turnSeconds ? turnSeconds : left);
       if (clamped != secondsLeft) {
@@ -390,7 +421,21 @@ class GameSession extends ChangeNotifier {
     final watch = Stopwatch()..start();
 
     void tick() {
-      final leftMs = total - watch.elapsedMilliseconds;
+      // در پنجرهٔ اعلان، ساعت روی مقدارِ کامل «یخ» می‌زند.
+      final elapsed = watch.elapsedMilliseconds;
+      if (_introHoldMs > 0 && elapsed < _introHoldMs) {
+        introHolding = true;
+        if (secondsLeft != turnSeconds) {
+          secondsLeft = turnSeconds;
+          _tickClock();
+        }
+        return;
+      }
+      if (introHolding) {
+        introHolding = false;
+        _tickClock();
+      }
+      final leftMs = total - elapsed;
       final left = (leftMs / 1000).ceil();
       final clamped =
           left < 0 ? 0 : (left > searchSeconds ? searchSeconds : left);

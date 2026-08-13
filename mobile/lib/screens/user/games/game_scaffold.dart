@@ -555,11 +555,12 @@ class _ResultActions extends StatelessWidget {
         Gaps.hXs,
         IconButton.filledTonal(
           tooltip: 'اشتراک نتیجه در تلگرام/اینستاگرام',
-          onPressed: () => Share.share(
-            '${session.resultText}\n${session.nameOf('X')} مقابل ${session.nameOf('O')}\n'
-            'تو هم به باشگاه بازی‌های قلقلی بیا: https://ghelghelishop.ir',
+          // share_plus ۱۳: API تازه. توضیحِ چراییِ ارتقا در card_duel_page.
+          onPressed: () => SharePlus.instance.share(ShareParams(
+            text: '${session.resultText}\n${session.nameOf('X')} مقابل ${session.nameOf('O')}\n'
+                'تو هم به باشگاه بازی‌های قلقلی بیا: https://ghelghelishop.ir',
             subject: 'نتیجه بازی قلقلی',
-          ),
+          )),
           icon: const Icon(Icons.ios_share_rounded, size: 18),
         ),
         Gaps.hXs,

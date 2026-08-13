@@ -399,7 +399,7 @@ class _WeeklyMissions extends StatelessWidget {
   final ValueChanged<Map> onClaim;
 
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) => DecoratedBox(
     decoration: BoxDecoration(
       color: Colors.white.withValues(alpha: .035),
       borderRadius: Corners.rLg,

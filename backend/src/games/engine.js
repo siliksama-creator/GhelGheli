@@ -144,6 +144,10 @@ function startPayload(room, symbol) {
     turnMs: room.turnMs,
     deadline: room.deadline || null,
     remainingMs: room.deadline ? Math.max(0, room.deadline - Date.now()) : null,
+    // مهلتِ خواندنِ اعلانِ راند: تا این لحظه ساعت هنوز شروع نشده.
+    // کلاینت با همین عدد شمارش را نگه می‌دارد تا انیمیشن تمام شود.
+    introUntil: room.introUntil || null,
+    introMs: Number(room.rules.introMs) || 0,
     stake: room.stake,
     netPot: room.netPot,
     commission: room.commission,
@@ -196,6 +200,10 @@ function emitState(room, event, extra = {}) {
       // difference that clamped to the max, freezing the countdown. This
       // is a plain "you have N ms left from the moment you receive this".
       remainingMs: room.deadline ? Math.max(0, room.deadline - Date.now()) : null,
+    // مهلتِ خواندنِ اعلانِ راند: تا این لحظه ساعت هنوز شروع نشده.
+    // کلاینت با همین عدد شمارش را نگه می‌دارد تا انیمیشن تمام شود.
+    introUntil: room.introUntil || null,
+    introMs: Number(room.rules.introMs) || 0,
       ...extra,
     }, room);
     if (!delivered && !room.done) suspendForReconnect(room, sym);
@@ -218,7 +226,27 @@ function armTurnClock(room) {
   // کنند — پس فقط وقتی صرف‌نظر می‌کنیم که هر دو صندلی ربات باشند.
   const seat = room.seats[room.turn];
   if (!sim && (!seat || seat === 'BOT')) { room.deadline = null; return; }
-  room.deadline = Date.now() + room.turnMs;
+  // ═══════════════════════════════════════════════════════════════════════
+  // مهلتِ خواندنِ اعلانِ راند — تایمر بعد از انیمیشن شروع می‌شود
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // خواستهٔ مالک: «انیمیشن مییاد رو چند ثانیه بدون اینکه تایمر بره نگه
+  // دار که کاربر بتونه بخونه».
+  //
+  // قبلاً اعلانِ «این راند سرِ سرعت است» دو ثانیه روی صفحه بود ولی ساعتِ
+  // ۲۰ ثانیه‌ای هم‌زمان می‌رفت. یعنی کاربر یا اعلان را می‌خواند و وقت از
+  // دست می‌داد، یا ردش می‌کرد. عملاً جریمهٔ خواندن.
+  //
+  // `introMs` را خودِ قواعدِ بازی اعلام می‌کند (در `rules/cardDuel.js`)
+  // چون فقط آن می‌داند انیمیشنش چقدر طول می‌کشد. بازی‌های دیگر مقدارش
+  // را ندارند و رفتارشان دست‌نخورده می‌ماند.
+  //
+  // ⚠️ فقط برای راندهای بعد از اولی نیست — راندِ اول هم اعلان دارد.
+  //    ولی وقتی بازی تمام شده یا کسی در حالِ اتصالِ دوباره است، اضافه
+  //    نمی‌شود.
+  const introMs = Number(room.rules.introMs) || 0;
+  room.introUntil = introMs ? Date.now() + introMs : null;
+  room.deadline = Date.now() + introMs + room.turnMs;
   room.turnTimer = setTimeout(() => {
     try {
     if (room.done) return;
@@ -261,7 +289,7 @@ function armTurnClock(room) {
       // and would take the whole API process down.
       console.error(`[games:${room.gameId}] turn timer failed:`, e.message);
     }
-  }, room.turnMs);
+  }, room.turnMs + (Number(room.rules.introMs) || 0));
 }
 
 function finish(room, winner, disconnectedSym = null) {
@@ -698,6 +726,10 @@ function resumeSeat(socket) {
       state: snapshot(room, opponent), turn: room.turn, turnMs: room.turnMs,
       deadline: room.deadline,
       remainingMs: room.deadline ? Math.max(0, room.deadline - Date.now()) : null,
+    // مهلتِ خواندنِ اعلانِ راند: تا این لحظه ساعت هنوز شروع نشده.
+    // کلاینت با همین عدد شمارش را نگه می‌دارد تا انیمیشن تمام شود.
+    introUntil: room.introUntil || null,
+    introMs: Number(room.rules.introMs) || 0,
       resumed: true,
     }, room);
   }
