@@ -1618,3 +1618,13 @@ table.data-table {
 .cardKindRow input { margin-top: 3px; width: 17px; height: 17px; accent-color: #f59e0b; flex: 0 0 auto; cursor: pointer; }
 .cardKindRow > span { display: block; line-height: 1.7; }
 .adminCollectibleTag { margin: 4px 0 0; padding: 5px 8px; border-radius: 8px; background: #f59e0b1f; border: 1px solid #f59e0b55; color: #fbbf24; font-size: 10.5px; }
+
+/* فرمِ ساختِ لیگِ تازه — دو ستون روی دسکتاپ، یک ستون روی موبایل. */
+.lgNewLeague{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+  gap:12px; margin:14px 0;
+}
+.lgSpan{font-size:12px; line-height:1.7}
+.lgSpan span{opacity:.6; padding:0 4px}
+.lgCheck{display:flex; align-items:center; gap:8px; font-size:12.5px; cursor:pointer}
+.lgCheck input{width:16px; height:16px; cursor:pointer}

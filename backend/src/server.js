@@ -22,7 +22,7 @@ const {
   isFirebaseConfigured,
 } = require('./services/notificationService');
 const gameStakes = require('./services/gameStakeService');
-const { ensureActiveSeason, addLeaguePoints, getLeaderboard, closeActiveSeason, approvePayouts: leagueApprove } = require('./services/leagueService');
+const { ensureActiveSeason, addLeaguePoints, getLeaderboard, closeActiveSeason, approvePayouts: leagueApprove, defaultPrizeTable } = require('./services/leagueService');
 const { optimizeUpload, kb } = require('./services/imageService');
 const { getGameRewardSettings, saveGameRewardSettings } = require('./services/gameRewardService');
 const walletService = require('./services/walletService');
@@ -2171,6 +2171,7 @@ app.use('/api', require('./routes/adminLeague')({
   pool, adminAuth, requireRole, asyncHandler, audit, validateUuid,
   getLeaderboard, getLeagueWinnerCount, ensureActiveSeason,
   closeActiveSeason, leagueApprove, walletService, createNotification,
+  defaultPrizeTable,
 }));
 
 // User administration and point-ledger inspection.

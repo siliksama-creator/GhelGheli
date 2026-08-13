@@ -3,7 +3,52 @@
 // کلید = خودِ URL. آپلودها با timestamp-rand ذخیره می‌شوند و بازنویسی
 // نمی‌شوند. عوض شدن عکس یعنی URL تازه، یعنی miss، یعنی یک بار دیگر از
 // سرور. درخواست دوم و بعد از آن از Cache Storage می‌آید، نه از شبکه.
-const CACHE_NAME = 'ghelgheli-img-v2';
+//
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ باگی که باعث شد کارت‌ها در وب اصلاً دیده نشوند
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// گزارش مالک: «کارت ها در نسخه وب نمایش داده نمیشدن».
+//
+// سرور مسیرِ **نسبی** برمی‌گرداند: `/uploads/images/....webp`.
+// `primeImageCache` همان رشته را مستقیم به `fetch()` می‌داد. مرورگر آن را
+// نسبت به **مبدأ صفحه** حل می‌کند، یعنی:
+//
+//     https://user.ghelghelishop.ir/uploads/images/....webp   ← غلط
+//     https://api.ghelghelishop.ir/uploads/images/....webp    ← درست
+//
+// روی دامنهٔ user هیچ فایلی آنجا نیست، ولی nginx برای SPA این قاعده را
+// دارد: `try_files $uri /index.html`. پس به‌جای ۴۰۴، **۲۰۰ با
+// index.html** برمی‌گرداند (۱۴۷۸ بایت، `text/html`).
+//
+// `response.ok` برای آن true است، پس آن HTML به‌عنوان «تصویر» در
+// Cache Storage ذخیره می‌شد. بعد `lookupCachedImage` همان را می‌خواند،
+// از آن blob می‌ساخت و به تگ `<img>` می‌داد — و مرورگر نمی‌توانست
+// رمزگشایی کند. نتیجه: هیچ خطای شبکه‌ای، هیچ ۴۰۴، فقط کارتِ خالی.
+//
+// این بدترین نوع باگ است: همه‌چیز «موفق» گزارش می‌شود.
+//
+// دو محافظ اضافه شد:
+//   ۱. URL قبل از fetch با `asset()` مطلق می‌شود (رفع علت اصلی).
+//   ۲. فقط پاسخی کش می‌شود که واقعاً `image/*` باشد (رفع کلاسِ باگ).
+//
+// نام کش هم به v3 رفت تا کشِ مسمومِ کاربرانِ فعلی خودبه‌خود دور ریخته شود.
+import { asset } from './api.js';
+
+const CACHE_NAME = 'ghelgheli-img-v3';
+
+/**
+ * فقط پاسخی که واقعاً تصویر است ارزشِ کش شدن دارد.
+ *
+ * بدونِ این، هر پاسخِ ۲۰۰ای (از جمله index.html که nginx برای مسیرهای
+ * ناموجود می‌دهد) به‌عنوان تصویر ذخیره می‌شود و بعداً به شکلِ کارتِ
+ * خالی ظاهر می‌شود — بدونِ هیچ خطایی در کنسول.
+ */
+function isImageResponse(response) {
+  if (!response || !response.ok) return false;
+  const type = String(response.headers.get('content-type') || '').toLowerCase();
+  return type.startsWith('image/');
+}
 const IMAGE_KEYS = new Set([
   'imageUrl', 'image_url', 'frontImageUrl', 'front_image_url',
   'profileImageUrl', 'profile_image_url',
@@ -43,14 +88,17 @@ export async function primeImageCache(payload) {
     for (let i = 0; i < urls.length; i += 4) {
       const chunk = urls.slice(i, i + 4);
       await Promise.all(chunk.map(async (url) => {
-        const hit = await cache.match(url);
+        // ⚠️ `asset()` اجباری است: URLهای نسبی نسبت به دامنهٔ وب‌اپ حل
+        //    می‌شوند نه دامنهٔ API. توضیح کامل بالای فایل.
+        const absolute = asset(url);
+        const hit = await cache.match(absolute);
         if (hit) return;
-        const response = await fetch(url, {
+        const response = await fetch(absolute, {
           mode: 'cors',
           credentials: 'omit',
           cache: 'force-cache',
         });
-        if (response.ok) await cache.put(url, response.clone());
+        if (isImageResponse(response)) await cache.put(absolute, response.clone());
       }));
     }
   } catch {
@@ -61,25 +109,36 @@ export async function primeImageCache(payload) {
 export async function lookupCachedImage(url) {
   if (!url || typeof caches === 'undefined') return url;
   if (!isVersionedImage(url)) return url;
+  // همان دلیلِ primeImageCache: بدونِ مطلق‌سازی، درخواست به دامنهٔ اشتباه
+  // می‌رود و index.html می‌گیرد.
+  const absolute = asset(url);
   try {
     const cache = await caches.open(CACHE_NAME);
-    const hit = await cache.match(url);
+    const hit = await cache.match(absolute);
     if (hit) {
-      const blob = await hit.blob();
-      if (blob.size > 0) return URL.createObjectURL(blob);
+      // ⚠️ `blob.size > 0` کافی نیست — index.html هم اندازه دارد.
+      //    نوعِ محتوا باید تصویر باشد وگرنه تگ img نمی‌تواند رمزگشایی
+      //    کند و کاربر کارتِ خالی می‌بیند.
+      const type = String(hit.headers.get('content-type') || '').toLowerCase();
+      if (type.startsWith('image/')) {
+        const blob = await hit.blob();
+        if (blob.size > 0) return URL.createObjectURL(blob);
+      }
+      // ورودیِ معیوبِ به‌جامانده از نسخهٔ قبل: پاکش کن و دوباره بگیر.
+      await cache.delete(absolute);
     }
-    const response = await fetch(url, {
+    const response = await fetch(absolute, {
       mode: 'cors',
       credentials: 'omit',
       cache: 'force-cache',
     });
-    if (!response.ok) return url;
-    await cache.put(url, response.clone());
+    if (!isImageResponse(response)) return absolute;
+    await cache.put(absolute, response.clone());
     const blob = await response.blob();
-    return blob.size > 0 ? URL.createObjectURL(blob) : url;
+    return blob.size > 0 ? URL.createObjectURL(blob) : absolute;
   } catch {
     // CORS یا مرورگر بدون Cache API: خود تگ img و هدر immutable سرور.
-    return url;
+    return absolute;
   }
 }
 

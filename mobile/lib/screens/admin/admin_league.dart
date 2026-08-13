@@ -45,6 +45,24 @@ class _AdminLeagueState extends State<AdminLeague> {
   String? _approvingId;
   final _winnerCountController = TextEditingController();
 
+  // ── چند لیگِ هم‌زمان ──
+  //
+  // خواستهٔ مالک: «ادمین در پنل اندروید و وب بتونه ۲ لیگ رو هم زمان
+  // قرار بده». جدولِ سرور از قبل چند لیگِ فعال می‌پذیرفت ولی نه API
+  // ساختش بود نه رابطِ کاربری‌اش — لیگِ دوم دستی با SQL درج شده بود.
+  //
+  // این بخش با نسخهٔ وب مو‌به‌مو یکی است تا مدیر از هر دو پنل همان
+  // کار را بتواند بکند.
+  List<Map> _seasons = const [];
+  final _newTitleController = TextEditingController();
+  final _newMinPointsController = TextEditingController(text: '0');
+  String _newType = 'weekly';
+  DateTime? _newStartsAt;
+  DateTime? _newEndsAt;
+  bool _newPlusOnly = false;
+  bool _creating = false;
+  String? _closingId;
+
   @override
   void initState() {
     super.initState();
@@ -54,6 +72,8 @@ class _AdminLeagueState extends State<AdminLeague> {
   @override
   void dispose() {
     _winnerCountController.dispose();
+    _newTitleController.dispose();
+    _newMinPointsController.dispose();
     super.dispose();
   }
 
@@ -61,11 +81,21 @@ class _AdminLeagueState extends State<AdminLeague> {
     try {
       final d = await widget.api.get('/api/admin/league');
       final p = await widget.api.get('/api/admin/league/payouts');
+      // ⚠️ خطای این یکی نباید کل صفحه را قرمز کند: اگر سرور قدیمی باشد
+      //    و مسیر را نشناسد، بقیهٔ پنل باید کار کند.
+      List<Map> seasons = const [];
+      try {
+        final sres = await widget.api.get('/api/admin/league/seasons');
+        seasons = List<Map>.from(sres?['seasons'] ?? const []);
+      } catch (_) {
+        seasons = const [];
+      }
       if (mounted) {
         setState(() {
           _data = d;
           _prizes = List<Map>.from(d?['season']?['prize_table'] ?? _prizes);
           _payouts = List<Map>.from(p ?? []);
+          _seasons = seasons;
           _winnerCountController.text = '${d?['winnerCount'] ?? _prizes.length}';
 
           final sStart = d?['season']?['starts_at'];
@@ -127,6 +157,66 @@ class _AdminLeagueState extends State<AdminLeague> {
     );
     if (time == null) return null;
     return DateTime(date.year, date.month, date.day, time.hour, time.minute);
+  }
+
+  /// ساختِ لیگِ تازه — می‌تواند هم‌زمان با لیگ‌های موجود فعال باشد.
+  Future<void> _createLeague() async {
+    final title = _newTitleController.text.trim();
+    if (title.length < 3) {
+      _snack('عنوان لیگ حداقل ۳ نویسه باشد');
+      return;
+    }
+    if (_newStartsAt == null || _newEndsAt == null) {
+      _snack('تاریخ شروع و پایان را انتخاب کنید');
+      return;
+    }
+    if (!_newEndsAt!.isAfter(_newStartsAt!)) {
+      _snack('تاریخ پایان باید بعد از تاریخ شروع باشد');
+      return;
+    }
+    setState(() => _creating = true);
+    try {
+      await widget.api.post('/api/admin/league/seasons', {
+        'title': title,
+        'leagueType': _newType,
+        'startsAt': _newStartsAt!.toUtc().toIso8601String(),
+        'endsAt': _newEndsAt!.toUtc().toIso8601String(),
+        'minPointsEntry': int.tryParse(_newMinPointsController.text.trim()) ?? 0,
+        'plusOnly': _newPlusOnly,
+      });
+      if (!mounted) return;
+      _snack('لیگ تازه ساخته شد');
+      _newTitleController.clear();
+      _newMinPointsController.text = '0';
+      setState(() {
+        _newStartsAt = null;
+        _newEndsAt = null;
+        _newPlusOnly = false;
+      });
+      await _load();
+    } catch (e) {
+      if (mounted) _snack(apiError(e));
+    } finally {
+      if (mounted) setState(() => _creating = false);
+    }
+  }
+
+  /// بستنِ یک لیگِ مشخص — لیگ‌های دیگر دست‌نخورده می‌مانند.
+  ///
+  /// ⚠️ بستن **پول نمی‌دهد**؛ فقط ردیفِ در انتظار می‌سازد. تأیید واریز
+  ///    مسیر جدا دارد و این قاعده عمدی است.
+  Future<void> _closeSeason(String id) async {
+    setState(() => _closingId = id);
+    try {
+      await widget.api.post('/api/admin/league/seasons/$id/close', const {});
+      if (!mounted) return;
+      _snack('لیگ بسته شد؛ جوایز برای تأیید آماده‌اند');
+      await _load();
+    } catch (e) {
+      if (mounted) _snack(apiError(e));
+    } finally {
+      if (mounted) setState(() => _closingId = null);
+    }
   }
 
   Future<void> _saveDates() async {
@@ -313,6 +403,158 @@ class _AdminLeagueState extends State<AdminLeague> {
           ),
           Gaps.vMd,
         ],
+
+        // ── چند لیگِ هم‌زمان (هم‌تراز با پنل وب) ──
+        FormSection(
+          title: 'لیگ‌های هم‌زمان',
+          children: [
+            Text(
+              'تا سه لیگ می‌تواند هم‌زمان فعال باشد. امتیاز هر بازی به '
+              'همهٔ لیگ‌هایی می‌رود که بازهٔ زمانی‌شان باز است.',
+              style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: .70), height: 1.6),
+            ),
+            Gaps.vSm,
+            if (_seasons.isEmpty)
+              Text('هنوز لیگی ثبت نشده.',
+                  style: TextStyle(fontSize: 12.5, color: Colors.white.withValues(alpha: .55)))
+            else
+              ..._seasons.take(8).map((sn) {
+                final active = '${sn['status']}' == 'active';
+                final id = '${sn['id']}';
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: .04),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: active
+                          ? const Color(0xFF22E7A6).withValues(alpha: .45)
+                          : Colors.white24,
+                    ),
+                  ),
+                  child: Row(children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('${sn['title'] ?? 'بدون عنوان'}',
+                              style: const TextStyle(
+                                  fontSize: 13.5, fontWeight: FontWeight.w900)),
+                          const SizedBox(height: 3),
+                          Text(
+                            '${sn['league_type'] ?? '-'} · '
+                            '${_fmtDate(DateTime.tryParse('${sn['starts_at']}'))}'
+                            ' تا '
+                            '${_fmtDate(DateTime.tryParse('${sn['ends_at']}'))}',
+                            style: TextStyle(
+                                fontSize: 11,
+                                height: 1.6,
+                                color: Colors.white.withValues(alpha: .62)),
+                          ),
+                          Text('${sn['player_count'] ?? 0} بازیکن',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.white.withValues(alpha: .52))),
+                        ],
+                      ),
+                    ),
+                    StatusBadge(
+                      status: active ? 'active' : 'closed',
+                      labels: const {'active': 'فعال', 'closed': 'بسته'},
+                    ),
+                    if (active) ...[
+                      const SizedBox(width: 6),
+                      _closingId == id
+                          ? const SizedBox(
+                              width: 18, height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2))
+                          : TextButton(
+                              onPressed: () => _closeSeason(id),
+                              child: const Text('بستن', style: TextStyle(fontSize: 12)),
+                            ),
+                    ],
+                  ]),
+                );
+              }),
+            Gaps.vSm,
+            const Divider(height: 20),
+            const Text('ساخت لیگ تازه',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900)),
+            Gaps.vXs,
+            TextField(
+              controller: _newTitleController,
+              decoration: const InputDecoration(
+                labelText: 'عنوان لیگ',
+                hintText: 'مثلاً لیگ هفتگی قهرمانان',
+              ),
+            ),
+            Gaps.vXs,
+            DropdownButtonFormField<String>(
+              initialValue: _newType,
+              decoration: const InputDecoration(labelText: 'نوع لیگ'),
+              items: const [
+                DropdownMenuItem(value: 'weekly', child: Text('هفتگی')),
+                DropdownMenuItem(value: 'monthly', child: Text('ماهانه')),
+                DropdownMenuItem(value: 'seasonal', child: Text('فصلی')),
+                DropdownMenuItem(value: 'special', child: Text('ویژه')),
+              ],
+              onChanged: (v) => setState(() => _newType = v ?? 'weekly'),
+            ),
+            Gaps.vXs,
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              leading: const Icon(Icons.play_arrow_rounded, size: 20),
+              title: const Text('شروع', style: TextStyle(fontSize: 12.5)),
+              subtitle: Text(_fmtDate(_newStartsAt),
+                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
+              onTap: () async {
+                final d = await _pickDateTime(_newStartsAt);
+                if (d != null) setState(() => _newStartsAt = d);
+              },
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              leading: const Icon(Icons.flag_rounded, size: 20),
+              title: const Text('پایان', style: TextStyle(fontSize: 12.5)),
+              subtitle: Text(_fmtDate(_newEndsAt),
+                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
+              onTap: () async {
+                final d = await _pickDateTime(_newEndsAt);
+                if (d != null) setState(() => _newEndsAt = d);
+              },
+            ),
+            TextField(
+              controller: _newMinPointsController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'حداقل امتیاز ورود'),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              value: _newPlusOnly,
+              onChanged: (v) => setState(() => _newPlusOnly = v),
+              title: const Text('ویژهٔ مشترکان پلاس',
+                  style: TextStyle(fontSize: 12.5)),
+            ),
+            Gaps.vXs,
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _creating ? null : _createLeague,
+                icon: _creating
+                    ? const SizedBox(
+                        width: 16, height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.emoji_events_rounded, size: 18),
+                label: Text(_creating ? 'در حال ساخت…' : 'ساخت لیگ تازه'),
+              ),
+            ),
+          ],
+        ),
+        Gaps.vMd,
 
         // ── تنظیم تاریخ شروع و پایان فصلی ──
         FormSection(

@@ -311,3 +311,72 @@ code {
   font-weight: 800 !important;
 }
 .wcBody small { font-size: var(--fs-xs) !important; }
+
+/* ═══ خوانایی فونت‌های بازی کارت ══════════════════════════════════════════
+   خواستهٔ مالک: «فونت های بازی خوانا باشه».
+
+   ── اندازه‌گیری، نه حدس ──
+   با مرورگر واقعی وارد آرنای دوئل شدم و هر متنِ نمایانِ زیر ۱۱٫۵px را
+   شمردم: **۱۰۹ مورد**، ریزترینشان ۸٫۲px. روی گوشی این عملاً خوانده
+   نمی‌شود — مخصوصاً فارسی که نقطه و سرکش دارد.
+
+   ── چرا نگهبان typography.mjs نگرفته بود ──
+   آن ابزار فقط تب‌های اصلی را می‌گردد و هرگز **واردِ صفحهٔ دوئل**
+   نمی‌شد. «۰ شکست» یعنی «آنچه دیدم سالم بود»، نه «همه‌جا سالم است».
+   نگهبان در همین کامیت گسترش داده شد تا داخل بازی هم برود.
+
+   ── چرا !important ──
+   بیشتر این اندازه‌ها به‌صورت inline در JSX نوشته شده‌اند
+   (`style={{fontSize:'9px'}}`) و بدونِ !important جایگزین نمی‌شوند.
+   راهِ درست‌تر پاک‌کردنِ تک‌تکِ inlineها بود، ولی این فایل از قبل
+   همین الگو را برای همین دلیل دارد و ثباتِ سبک ارزشِ خودش را دارد. */
+
+/* آمار روی کارت: پرتکرارترین متنِ بازی (۶۰ نمونه در یک صفحه). */
+.ggCardStats i { font-size: 11.5px !important; }
+.ggCardStats b { font-size: 12.5px !important; }
+.ggCardMeta span,
+.ggCardMeta small,
+.ggCardFallback small,
+.ggCardArt .ggCardQty { font-size: 11.5px !important; }
+
+/* پنل تحلیل ترکیب. */
+.duelIntelOrder b { font-size: 12px !important; }
+.duelIntelOrder small,
+.duelIntelFlow i,
+.duelIntelHead small,
+.duelIntelLead { font-size: 11.5px !important; }
+
+/* سربرگ و نوارهای صفحهٔ دوئل. */
+.duelHeroV2 span,
+.duelHeroV2 small,
+.duelRuleStrip small,
+.duelEmptySlot small,
+.duelLineupTitle small,
+.duelLaunch small,
+.duelHistoryV2 small { font-size: 11.5px !important; }
+
+/* ⚠️ استثنای عمدی: نشانِ شمارشیِ نوتیفیکیشن ۱۰٫۵px می‌ماند. دایرهٔ
+   ۱۷ پیکسلیِ گوشهٔ آیکنِ زنگ است و بزرگ‌ترکردنش یا دایره را روی آیکن
+   می‌اندازد یا رقم را سرریز می‌کند. رنگش (#d81e33) برای همین اندازه
+   انتخاب شده تا کنتراست ۵٫۰۶ بدهد. `tool/typography.mjs` هم همین را
+   استثنا کرده. */
+
+/* ═══ بولدِ مصنوعی در صفحهٔ دوئل ══════════════════════════════════════════
+   وزیرمتن حداکثر وزنِ واقعیِ ۸۰۰ دارد. هر مقدارِ بالاتر یعنی مرورگر
+   حروف را الگوریتمی کلفت می‌کند («synthetic bold») و در فارسی نتیجه
+   به‌هم‌چسبیده و لکه‌ای می‌شود — همان چیزی که خوانایی را از بین می‌برد.
+
+   این فایل از قبل `.animatedName` را گرفته بود، ولی CSSِ فشردهٔ صفحهٔ
+   دوئل ده‌ها `font-weight:950` دیگر داشت که از سوراخ رد می‌شدند.
+   نگهبانِ `typography.mjs` هم آن‌ها را نمی‌دید چون هرگز واردِ آرنا
+   نمی‌شد؛ در همین کامیت گسترش داده شد و بلافاصله همه را گرفت. */
+.duelHeroV2 h1,
+.duelLaunch span,
+.duelPower,
+.duelPicked,
+.rarityCardLabel,
+.duelCardV2 b,
+.duelIntelOrder b,
+.streakDayIcon,
+.duelPageV2 [style*="font-weight: 950"],
+.duelPageV2 [style*="font-weight:950"] { font-weight: 800 !important; }

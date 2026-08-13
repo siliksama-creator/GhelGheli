@@ -257,6 +257,35 @@ console.log('\n══ ۴. نشانِ باشگاه‌ها فایلِ تصویر �
   ck('لوگوی همهٔ باشگاه‌ها در اندروید هست', missingApp.length === 0, missingApp.join('، '));
 }
 
+console.log('\n══ ۴ب. باشگاه‌های ایرانی کاملاً حذف شده‌اند ══');
+{
+  // ── خواستهٔ صریحِ مالک ──
+  //
+  //   «باشگاه های ایرانی رو کلا حذف کن، قرار نیست تو فروشگاه باشن»
+  //
+  // مایگریشنِ ۰۲۵ ردیف‌ها را DELETE کرده و فایل‌های تصویر هم پاک
+  // شده‌اند. این نگهبان تضمین می‌کند برنگردند — نه از راهِ مایگریشنِ
+  // تازه، نه با افتادنِ دوبارهٔ فایلِ asset در مخزن.
+  const IRANIAN = ['esteghlal', 'persepolis', 'sepahan', 'tractor', 'malavan'];
+  const stillListed = [...catalogue].filter(([slug]) =>
+    IRANIAN.some(k => slug.includes(k)));
+  ck('هیچ باشگاهِ ایرانی در کاتالوگِ فعال نیست', stillListed.length === 0,
+    stillListed.map(([s]) => s).join('، '));
+
+  const stray = [];
+  for (const k of IRANIAN) {
+    for (const dir of ['userweb/public/shop', 'mobile/assets/shop']) {
+      for (const ext of ['webp', 'png']) {
+        if (fs.existsSync(path.join(REPO, dir, `club_${k}.${ext}`))) {
+          stray.push(`${dir}/club_${k}.${ext}`);
+        }
+      }
+    }
+  }
+  ck('هیچ فایلِ تصویرِ باشگاهِ ایرانی در مخزن نمانده', stray.length === 0,
+    stray.join('، '));
+}
+
 console.log('\n══ ۵. دو کلاینت دقیقاً یک مجموعه را می‌شناسند ══');
 {
   // اگر یکی اسلاگی را بشناسد و دیگری نه، همان آیتم روی یک دستگاه کار

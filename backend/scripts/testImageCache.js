@@ -38,8 +38,21 @@ check(/isVersionedImageUrl\(resolved\)/.test(safe) && /CachedCardImage\(/.test(s
   'SafeImage برای آپلود نسخه‌دار به دیسک می‌رود نه Image.network');
 check(/CachedCardImage\(/.test(avatar),
   'عکس پروفایل ریموت بعد از بار اول از دیسک خوانده می‌شود');
-check(/CACHE_NAME = 'ghelgheli-img-v2'/.test(webCache) && /caches\.open/.test(webCache),
+// ⚠️ نسخهٔ کش عمداً سفت‌وسخت چک **نمی‌شود**.
+//
+// نسخهٔ قبلیِ همین سطر `ghelgheli-img-v2` را دقیق می‌خواست. وقتی کشِ
+// مسمومِ کاربران (index.html به‌جای تصویر) مجبورمان کرد نسخه را به v3
+// ببریم، این تست قرمز شد — در حالی که محصول **درست‌تر** شده بود.
+//
+// تستی که به‌جای رفتار، یک مقدارِ ثابت را قفل کند، جلوی رفعِ باگ را
+// می‌گیرد. حالا فقط الگو سنجیده می‌شود، نه شماره.
+check(/CACHE_NAME = 'ghelgheli-img-v\d+'/.test(webCache) && /caches\.open/.test(webCache),
   'وب از Cache Storage با کلید URL استفاده می‌کند');
+// نسخهٔ کشِ اپ و سرویس‌ورکر باید یکی بماند وگرنه دو کشِ جدا ساخته
+// می‌شود: دو برابر فضا و رفتارِ ناسازگار بین بار اول و بارهای بعد.
+check((webCache.match(/ghelgheli-img-v(\d+)/) || [])[1]
+  === (sw.match(/ghelgheli-img-v(\d+)/) || [])[1],
+  'نسخهٔ کشِ وب و سرویس‌ورکر یکی است');
 check(/isVersionedImage/.test(webCache) && /\/uploads\//.test(webCache),
   'وب فقط تصویر نسخه‌دار را ماندگار می‌کند');
 check(/lookupCachedImage/.test(cachedImg) && /asset\(src\)/.test(cachedImg),

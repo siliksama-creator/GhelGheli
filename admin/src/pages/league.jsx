@@ -39,6 +39,19 @@ export function LeaguePage({ request }) {
   const [payouts, setPayouts] = useState([]);
   const [approving, setApproving] = useState('');
 
+  // ── چند لیگِ هم‌زمان ──
+  //
+  // خواستهٔ مالک: «ادمین بتونه ۲ لیگ رو هم زمان قرار بده و زمان شروع و
+  // پایان رو ادمین مشخص کنه». جدول از قبل چند لیگِ فعال را می‌پذیرفت
+  // ولی هیچ رابطی برای ساختنشان نبود — لیگِ دوم دستی با SQL درج شده بود.
+  const [seasons, setSeasons] = useState([]);
+  const [newLeague, setNewLeague] = useState({
+    title: '', leagueType: 'weekly', startsAt: '', endsAt: '',
+    minPointsEntry: 0, plusOnly: false,
+  });
+  const [creating, setCreating] = useState(false);
+  const [closingId, setClosingId] = useState('');
+
   const load = () =>
     request('/api/admin/league').then((x) => {
       setData(x);
@@ -48,6 +61,11 @@ export function LeaguePage({ request }) {
       setStartsAt(toLocalInput(x.season?.starts_at));
       setEndsAt(toLocalInput(x.season?.ends_at));
     });
+
+  const loadSeasons = useCallback(() =>
+    request('/api/admin/league/seasons')
+      .then((x) => setSeasons(x.seasons || []))
+      .catch(() => setSeasons([])), [request]);
 
   const loadPayouts = useCallback(
     () => request('/api/admin/league/payouts').then(setPayouts).catch(() => {}),
@@ -67,7 +85,50 @@ export function LeaguePage({ request }) {
   //
   // پیچیدنِ فراخوانی در آکولاد یعنی effect همیشه undefined برمی‌گرداند
   // و ری‌اکت هیچ‌وقت چیزی را به‌عنوان cleanup صدا نمی‌زند.
-  useEffect(() => { load(); loadPayouts(); }, [request, loadPayouts]);
+  useEffect(() => { load(); loadPayouts(); loadSeasons(); },
+    [request, loadPayouts, loadSeasons]);
+
+  async function createLeague() {
+    const t = newLeague.title.trim();
+    if (t.length < 3) { notify('عنوان لیگ حداقل ۳ نویسه باشد', 'error'); return; }
+    if (!newLeague.startsAt || !newLeague.endsAt) {
+      notify('تاریخ شروع و پایان را کامل کنید', 'error'); return;
+    }
+    if (new Date(newLeague.endsAt) <= new Date(newLeague.startsAt)) {
+      notify('تاریخ پایان باید بعد از شروع باشد', 'error'); return;
+    }
+    setCreating(true);
+    try {
+      await request('/api/admin/league/seasons', {
+        method: 'POST',
+        body: {
+          title: t,
+          leagueType: newLeague.leagueType,
+          startsAt: new Date(newLeague.startsAt).toISOString(),
+          endsAt: new Date(newLeague.endsAt).toISOString(),
+          minPointsEntry: Number(newLeague.minPointsEntry) || 0,
+          plusOnly: newLeague.plusOnly,
+        },
+      });
+      notify('لیگ تازه ساخته شد');
+      setNewLeague({ title: '', leagueType: 'weekly', startsAt: '', endsAt: '',
+        minPointsEntry: 0, plusOnly: false });
+      loadSeasons(); load();
+    } catch (e) {
+      notify(e?.message || 'ساخت لیگ ناموفق بود', 'error');
+    } finally { setCreating(false); }
+  }
+
+  async function closeSeason(id) {
+    setClosingId(id);
+    try {
+      await request(`/api/admin/league/seasons/${id}/close`, { method: 'POST' });
+      notify('لیگ بسته شد؛ جوایز برای تأیید آماده‌اند');
+      loadSeasons(); loadPayouts(); load();
+    } catch (e) {
+      notify(e?.message || 'بستن لیگ ناموفق بود', 'error');
+    } finally { setClosingId(''); }
+  }
 
   function changeWinnerCount(n) {
     setWinnerCount(n);
@@ -204,6 +265,85 @@ export function LeaguePage({ request }) {
         </p>
         <Button icon={CalendarClock} onClick={saveDates} loading={savingDates}>
           ذخیره تاریخ‌ها
+        </Button>
+      </Card>
+
+      {/* ══ چند لیگِ هم‌زمان ══
+          خواستهٔ مالک: «ادمین بتونه ۲ لیگ رو هم زمان قرار بده».
+          امتیازِ هر بازی به **همهٔ** لیگ‌های فعالی می‌رود که بازهٔ
+          زمانی‌شان باز است و کاربر شرطِ ورودشان را دارد. */}
+      <Card title="لیگ‌های هم‌زمان"
+        subtitle="می‌توانید تا سه لیگ فعال داشته باشید؛ امتیاز هر بازی به همهٔ آن‌ها می‌رود"
+        action={<Badge tone={seasons.filter(x => x.status === 'active').length > 1 ? 'success' : 'neutral'}>
+          {fmtNumber(seasons.filter(x => x.status === 'active').length)} لیگ فعال
+        </Badge>}>
+        {seasons.length ? (
+          <Table head={['عنوان', 'نوع', 'بازه', 'بازیکن', 'وضعیت', '']}>
+            {seasons.slice(0, 10).map((sn) => (
+              <tr key={sn.id}>
+                <td>{sn.title}</td>
+                <td><Badge tone="neutral">{sn.league_type}</Badge></td>
+                <td className="lgSpan">
+                  {fmtDateTime(sn.starts_at)}
+                  <span> تا </span>
+                  {fmtDateTime(sn.ends_at)}
+                </td>
+                <td>{fmtNumber(sn.player_count || 0)}</td>
+                <td>
+                  <Badge tone={sn.status === 'active' ? 'success' : 'neutral'}>
+                    {sn.status === 'active' ? 'فعال' : 'بسته'}
+                  </Badge>
+                </td>
+                <td>
+                  {sn.status === 'active' && (
+                    <Button variant="ghost" loading={closingId === sn.id}
+                      onClick={() => closeSeason(sn.id)}>بستن</Button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </Table>
+        ) : (
+          <EmptyState title="هنوز لیگی ثبت نشده"
+            message="با فرم پایین اولین لیگ را بسازید." />
+        )}
+
+        <div className="lgNewLeague">
+          <Field label="عنوان لیگ">
+            <Input value={newLeague.title} placeholder="مثلاً لیگ هفتگی قهرمانان"
+              onChange={(e) => setNewLeague({ ...newLeague, title: e.target.value })} />
+          </Field>
+          <Field label="نوع">
+            <select className="input" value={newLeague.leagueType}
+              onChange={(e) => setNewLeague({ ...newLeague, leagueType: e.target.value })}>
+              <option value="weekly">هفتگی</option>
+              <option value="monthly">ماهانه</option>
+              <option value="seasonal">فصلی</option>
+              <option value="special">ویژه</option>
+            </select>
+          </Field>
+          <Field label="شروع">
+            <Input type="datetime-local" value={newLeague.startsAt}
+              onChange={(e) => setNewLeague({ ...newLeague, startsAt: e.target.value })} />
+          </Field>
+          <Field label="پایان">
+            <Input type="datetime-local" value={newLeague.endsAt}
+              onChange={(e) => setNewLeague({ ...newLeague, endsAt: e.target.value })} />
+          </Field>
+          <Field label="حداقل امتیاز ورود">
+            <Input type="number" min="0" value={newLeague.minPointsEntry}
+              onChange={(e) => setNewLeague({ ...newLeague, minPointsEntry: e.target.value })} />
+          </Field>
+          <Field label="ویژهٔ پلاس">
+            <label className="lgCheck">
+              <input type="checkbox" checked={newLeague.plusOnly}
+                onChange={(e) => setNewLeague({ ...newLeague, plusOnly: e.target.checked })} />
+              <span>فقط مشترکان پلاس امتیاز بگیرند</span>
+            </label>
+          </Field>
+        </div>
+        <Button icon={Trophy} onClick={createLeague} loading={creating}>
+          ساخت لیگ تازه
         </Button>
       </Card>
 

@@ -160,6 +160,43 @@ try {
     const hubText = await page.innerText('.tabPane');
     ok(hubText.includes('۱۰۰ امتیاز') && hubText.includes('جفت‌یاب'),
       'games hub renders all game controls');
+
+    // ═══════════════════════════════════════════════════════════════════
+    // چرا داخلِ خودِ بازی هم بازرسی می‌شود
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    // این ابزار تا امروز فقط تا «هابِ بازی‌ها» جلو می‌رفت و هرگز واردِ
+    // صفحهٔ دوئل نمی‌شد. نتیجه: «۰ شکست» گزارش می‌کرد در حالی که داخلِ
+    // آرنا **۱۰۹ متنِ زیرِ ۱۱٫۵px** بود (ریزترین ۸٫۲px) — دقیقاً همان
+    // چیزی که مالک گزارش کرد: «فونت های بازی خوانا باشه».
+    //
+    // درسِ ثبت‌شدهٔ همین پروژه: «۰ خطا» فقط دربارهٔ چیزی معتبر است که
+    // ابزار **واقعاً باز کرده باشد**.
+    //
+    // حالتِ «تمرین با ربات» انتخاب می‌شود چون رایگان است و امتیازِ
+    // کاربرِ تست را مصرف نمی‌کند.
+    const botMode = page.locator('button', { hasText: 'تمرین با ربات' });
+    if (await botMode.count()) {
+      await botMode.first().click();
+      await page.waitForTimeout(1200);
+    }
+    // کلیک با JS: نوارِ ناوبریِ پایین روی کاشی می‌افتد و کلیکِ معمولی
+    // را می‌دزدد — یک بار همین باعث شد تست فکر کند بازی باز نشده.
+    const opened = await page.evaluate(() => {
+      const tile = [...document.querySelectorAll('.card')]
+        .find(c => c.innerText.includes('دوئل کارت'));
+      if (!tile) return false;
+      tile.click();
+      return true;
+    });
+    ok(opened, 'card duel tile is reachable from the games hub');
+    if (opened) {
+      await page.waitForTimeout(3000);
+      check('card duel arena', await audit());
+      const duelText = await page.innerText('body');
+      ok(duelText.includes('دوئل کارت') || duelText.includes('ARENA'),
+        'card duel arena actually rendered');
+    }
   }
 
   ok(errors.length === 0, `no runtime errors${errors[0] ? ` — ${errors[0].slice(0, 100)}` : ''}`);

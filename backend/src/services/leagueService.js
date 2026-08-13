@@ -149,15 +149,89 @@ async function ensureActiveSeason(client = pool) {
   );
   return inserted.rows[0];
 }
+/**
+ * امتیازِ لیگ را به **همهٔ** لیگ‌های فعال اضافه می‌کند.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * باگی که اینجا بود
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * خواستهٔ مالک: «ادمین بتونه ۲ لیگ رو هم زمان قرار بده».
+ *
+ * زیرساختش از قبل بود — `league_seasons` چند ردیفِ `active` می‌پذیرد و
+ * `getLeaderboard` هم فهرست را می‌خواند. ولی این تابع فقط
+ * `ensureActiveSeason` را صدا می‌زد که `ORDER BY starts_at DESC LIMIT 1`
+ * دارد، یعنی **تنها تازه‌ترین لیگ** امتیاز می‌گرفت.
+ *
+ * روی دیتابیسِ زنده اندازه‌گیری شد و دقیقاً همین دیده شد:
+ *
+ *     لیگ هفتگی قهرمانان (تازه‌تر) → ۱۰۴ بازیکن، ۹۴۳۰ امتیاز
+ *     لیگ برتر ماهانه            → ۱ بازیکن،  ۲۸۲۴ امتیاز
+ *
+ * یعنی لیگِ ماهانه از لحظه‌ای که لیگِ هفتگی ساخته شد عملاً یخ زد. مدیر
+ * می‌توانست دو لیگ بسازد ولی دومی هیچ‌وقت پر نمی‌شد — قابلیت روی کاغذ
+ * بود، نه در عمل.
+ *
+ * ── چرا یک INSERT چندردیفی و نه حلقه ──
+ *
+ * حلقه یعنی n رفت‌وبرگشت به دیتابیس در مسیرِ داغِ هر امتیازگیری. با
+ * `SELECT ... FROM league_seasons` به‌عنوان منبعِ INSERT، همه‌چیز در یک
+ * کوئری و یک تراکنش انجام می‌شود.
+ *
+ * ── فیلترهای ورود ──
+ *
+ * `min_points_entry` و `plus_only` ستون‌هایی هستند که مدیر تنظیم می‌کند.
+ * لیگی که شرطِ ورودش برقرار نیست نباید امتیاز بگیرد، وگرنه «لیگ ویژهٔ
+ * پلاس» عملاً برای همه باز می‌شود.
+ *
+ * ⚠️ بازهٔ زمانی هم بررسی می‌شود: لیگی که `starts_at` آینده دارد (مدیر
+ *    از قبل ساخته) نباید زودتر از موعد امتیاز بگیرد.
+ */
 async function addLeaguePoints(client, userId, points) {
-  const season = await ensureActiveSeason(client);
-  await client.query(
-    `INSERT INTO league_leaderboard_entries(league_season_id,user_id,points)
-     VALUES($1,$2,$3)
-     ON CONFLICT(league_season_id,user_id)
-     DO UPDATE SET points=league_leaderboard_entries.points + EXCLUDED.points, updated_at=NOW()`,
-    [season.id, userId, points]
+  // اگر هیچ لیگِ فعالی نیست، یکی بساز — رفتارِ قبلی حفظ می‌شود.
+  await ensureActiveSeason(client);
+  const { rowCount } = await client.query(
+    `INSERT INTO league_leaderboard_entries(league_season_id, user_id, points)
+     SELECT s.id, $1, $2
+       FROM league_seasons s
+      WHERE s.status = 'active'
+        AND s.starts_at <= NOW()
+        AND s.ends_at   >  NOW()
+        -- ATTENTION: user_subscriptions has NO status column; an active
+        -- subscription simply means expires_at is still in the future.
+        -- A first draft used us.status='active' which is a SQL error and
+        -- would have broken every point award. Verified against the live
+        -- schema, not from memory.
+        --
+        -- NOTE: no backticks in comments inside a template literal --
+        -- they terminate the string. That exact mistake happened here.
+        AND (s.plus_only = false OR EXISTS (
+              SELECT 1 FROM user_subscriptions us
+               WHERE us.user_id = $1 AND us.expires_at > NOW()))
+        AND (s.min_points_entry = 0 OR EXISTS (
+              SELECT 1 FROM users u
+               WHERE u.id = $1 AND u.lifetime_points >= s.min_points_entry))
+     ON CONFLICT(league_season_id, user_id)
+     DO UPDATE SET points = league_leaderboard_entries.points + EXCLUDED.points,
+                   updated_at = NOW()`,
+    [userId, points],
   );
+  // ── چرا این fallback لازم است ──
+  //
+  // اگر بازهٔ زمانیِ تنها لیگِ فعال خراب باشد (مثلاً `ends_at` گذشته ولی
+  // کرونِ بستن هنوز اجرا نشده)، شرطِ بالا هیچ ردیفی برنمی‌گرداند و
+  // امتیازِ کاربر **بی‌صدا گم می‌شود**. آن بدتر از ثبت در لیگِ منقضی است.
+  if (rowCount === 0) {
+    const season = await ensureActiveSeason(client);
+    await client.query(
+      `INSERT INTO league_leaderboard_entries(league_season_id,user_id,points)
+       VALUES($1,$2,$3)
+       ON CONFLICT(league_season_id,user_id)
+       DO UPDATE SET points=league_leaderboard_entries.points + EXCLUDED.points,
+                     updated_at=NOW()`,
+      [season.id, userId, points],
+    );
+  }
 }
 async function getLeaderboard(limit = 100, seasonId = null, userId = null) {
   const { rows: activeSeasons } = await pool.query(
@@ -221,13 +295,37 @@ async function getLeaderboard(limit = 100, seasonId = null, userId = null) {
     myEntry,
   };
 }
-async function closeActiveSeason({ force = false } = {}) {
+/**
+ * بستنِ یک لیگ و ساختنِ ردیف‌های جایزه.
+ *
+ * ⚠️ `seasonId` تازه اضافه شد و اختیاری است. بدونِ آن، این تابع همیشه
+ *    «تازه‌ترین لیگِ فعال» را می‌بست — که وقتی دو لیگ هم‌زمان فعال‌اند
+ *    یعنی مدیر روی دکمهٔ بستنِ لیگِ ماهانه می‌زد و **لیگِ هفتگی بسته
+ *    می‌شد**. یک باگِ خاموشِ خطرناک: پیامِ موفقیت می‌گرفت و لیگِ اشتباهی
+ *    جایزه می‌داد.
+ *
+ *    کرونِ شبانه بدونِ آرگومان صدا می‌زند و رفتارش دست‌نخورده می‌ماند.
+ */
+async function closeActiveSeason({ force = false, seasonId = null } = {}) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     // Lock the season row so two concurrent runs (a cron overlapping a manual
     // admin trigger) cannot both pay out the same month.
-    const season = await ensureActiveSeason(client);
+    let season;
+    if (seasonId) {
+      const picked = await client.query(
+        'SELECT * FROM league_seasons WHERE id=$1', [seasonId]);
+      season = picked.rows[0];
+      if (!season) {
+        await client.query('ROLLBACK');
+        const err = new Error('لیگ پیدا نشد');
+        err.status = 404;
+        throw err;
+      }
+    } else {
+      season = await ensureActiveSeason(client);
+    }
     const locked = await client.query(
       'SELECT status, ends_at FROM league_seasons WHERE id=$1 FOR UPDATE', [season.id]);
     if (locked.rows[0]?.status === 'closed') {
