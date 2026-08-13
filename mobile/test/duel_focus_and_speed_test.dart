@@ -8,7 +8,6 @@
 // ۹پیکسلی و نامرئی بود. پس اینجا **اندازهٔ فونت** سنجیده می‌شود.
 import 'dart:io';
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghelgheli_mobile/api_client.dart';
 import 'package:dio/dio.dart';
