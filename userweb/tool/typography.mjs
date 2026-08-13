@@ -297,19 +297,31 @@ try {
           `battle: all ${handCount} hand cards are reachable and clickable`
           + (broken.length ? ` — card(s) ${broken.join(',')} unreachable` : ''));
 
-        // ⚠️ متنِ بریده در کارتِ فشرده: جعبه کوچک‌تر از محتوا یعنی نام
-        //    روی برچسب می‌افتد. این دقیقاً وقتی رخ داد که فونت‌ها را
-        //    بالا بردم بدونِ اینکه عرضِ کارت را چک کنم.
+        // ═══════════════════════════════════════════════════════════════
+        //  ⚠️ متنِ بریده در کارتِ فشرده
+        // ═══════════════════════════════════════════════════════════════
+        //
+        // وقتی فونت‌ها را به کفِ ۱۱٫۵px بردم، نامِ کارت در جعبهٔ تنگ روی
+        // برچسبِ کمیابی افتاد. این سنجه جلوی تکرارش را می‌گیرد.
+        //
+        // ⚠️ روی **خودِ عناصرِ متنی** اندازه می‌گیریم، نه روی کارت.
+        //    `scrollWidth` والد شاملِ فرزندانِ تزئینیِ absolute هم می‌شود:
+        //    `.ggCardAurora` با `inset:-35%` عمداً بیرونِ قاب می‌زند و
+        //    باعث می‌شد کارتِ سالم «۱۹۹px محتوا در ۹۶px» گزارش شود.
+        //    یک قرمزِ کاذبِ کامل — و درسِ ثبت‌شدهٔ این پروژه است که
+        //    قرمزِ کاذب کلِ ابزار را بی‌اعتبار می‌کند.
         const squeezed = await page.evaluate(() =>
-          [...document.querySelectorAll('.duelHandV2 .ggPlayerCard')]
+          [...document.querySelectorAll('.duelHandV2 .ggCardName, .duelHandV2 .ggCardBody b, .duelHandV2 .duelFocusRibbon')]
             .filter((el) => {
               const r = el.getBoundingClientRect();
-              return el.scrollWidth > Math.ceil(r.width) + 2
-                  || el.scrollHeight > Math.ceil(r.height) + 2;
-            }).length);
-        ok(squeezed === 0,
-          `battle: hand cards are wide enough for their content`
-          + (squeezed ? ` — ${squeezed} card(s) clipped` : ''));
+              if (!r.width) return false;
+              // فقط سرریزِ واقعیِ متن؛ چند پیکسل رواداری برای گردکردن.
+              return el.scrollWidth > Math.ceil(r.width) + 2;
+            })
+            .map((el) => `${el.className || el.tagName}:${(el.textContent || '').trim().slice(0, 14)}`));
+        ok(squeezed.length === 0,
+          `battle: hand card text is not clipped`
+          + (squeezed.length ? ` — ${squeezed.slice(0, 4).join(', ')}` : ''));
 
         // ⚠️ کارتِ بی‌تصویر باید چهرهٔ نقاشی‌شده بگیرد نه اسپینرِ ابدی.
         //    کارت‌های تمرینی در سرور `imageUrl: null` دارند، پس این نما

@@ -4732,6 +4732,21 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
   .duelClash .ggCardMeta{display:none}
   .duelClash .ggCardBody{padding:5px 6px 6px}
   .duelClash .ggCardName{font-size:11.5px}
+
+  /* ⚠️ کمیابی **دو بار** نوشته می‌شد و روی هم می‌افتاد:
+     یک‌بار در پیلِ قابِ کارت (`.rarityCardLabel`) و یک‌بار وسطِ چهرهٔ
+     نقاشی‌شده (`.ggCardFallback b`). روی کارتِ ۱۱۸ پیکسلی این دو با
+     نامِ کارت هم برخورد می‌کردند — در اسکرین‌شات «نقره‌ای» سه بار روی
+     هم دیده می‌شد.
+
+     پیلِ قاب می‌ماند (رنگ و آیکن دارد و همیشه بالای کارت است) و تکرارِ
+     وسط حذف می‌شود. اطلاعات از دست نمی‌رود، فقط یک‌بار گفته می‌شود. */
+  .duelClash .ggCardFallback b,
+  .duelClash .ggCardFallback small{display:none}
+
+  /* در صحنهٔ برخورد، «افکت» هم جای اضافه می‌گیرد و اعدادِ راند وسط
+     صحنه گویاترند. */
+  .duelHandV2 .ggCardFallback small{display:none}
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -4841,11 +4856,50 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
    قاب و در نوارِ ویژگیِ زیرِ کارت هست. اندروید هم اینجا
    `showStats:false` می‌دهد. حذفشان جا را به نامِ کارت می‌دهد که تنها
    چیزی است که کاربر واقعاً برای تصمیم لازم دارد. */
+/* ⚠️ همان تکرارِ کمیابی در دستِ کارت: پیلِ قاب کافی است. */
 .duelHandV2 .ggCardMeta,
+.duelHandV2 .ggCardFallback b,
 .duelHandV2 .ggCardStats{display:none}
 .duelHandV2 .ggCardBody{padding:5px 6px 7px}
 .duelHandV2 .ggCardName{
   font-size:11.5px;line-height:1.35;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
   overflow:hidden;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   حذفِ اسکرولِ صفحهٔ نبرد — خواستهٔ چندباره‌ی مالک
+   ═══════════════════════════════════════════════════════════════════════════
+
+   اندازه‌گیری روی ۳۹۰×۸۴۴ در نبردِ زنده: ارتفاعِ صفحه **۱۰۱۰px** بود،
+   یعنی ~۱۷۰px اسکرول در لحظه‌ای که کاربر باید سریع تصمیم بگیرد. هر
+   اسکرول در میانهٔ تایمرِ ۲۰ ثانیه‌ای یعنی از دست دادنِ وقت.
+
+   بودجهٔ ارتفاع در نبرد (۸۴۴ منهای هدر و نوارِ پایین ≈ ۶۴۰px قابلِ
+   استفاده) بین سه چیز تقسیم می‌شود:
+     اسکوربورد ~۹۰ · صحنهٔ برخورد ~۳۱۰ · دستِ کارت ~۲۴۰
+
+   صحنهٔ برخورد بزرگ‌ترین مصرف‌کننده است. اپِ اندروید همین صحنه را با
+   ارتفاعِ ثابتِ ۲۱۰px می‌بندد (`_ClashStage`), پس وب هم باید همان
+   بودجه را رعایت کند نه اینکه آزادانه رشد کند.
+
+   ⚠️ نمای «دستِ حریف» (`duelOpponentHand`) ۸۴px می‌گیرد و صرفاً
+      تزئینی است — تعدادِ کارتِ باقی‌ماندهٔ حریف در پیپ‌های راند هم
+      پیداست. روی صفحهٔ کوتاه کوچکش می‌کنیم به‌جای حذفِ کامل، چون
+      حسِ «حریف هم دست دارد» بخشی از فضای بازی است. */
+@media (max-width:520px){
+  .duelOpponentHand{height:56px}
+  .duelOpponentHand span{width:42px;height:54px;margin:0 -5px}
+  .duelOpponentHand img{width:32px;height:32px}
+
+  /* صحنهٔ برخورد: همان سقفِ اندروید. */
+  .duelClash .ggCardArt{min-height:104px;max-height:104px}
+  .duelClash .ggPlayerCardFrame{max-width:104px}
+
+  /* کارتِ دست کمی کوتاه‌تر تا ردیف در بودجه بماند. */
+  .duelHandV2>.duelHandCard{flex-basis:96px}
+  .duelHandV2 .ggCardArt{min-height:104px;max-height:104px}
+
+  .duelChoicePanel{padding:8px}
+  .duelLiveArena{gap:6px}
 }
