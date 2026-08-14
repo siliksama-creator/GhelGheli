@@ -5241,3 +5241,106 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
   .duelStakeFlight{opacity:1}.duelStakeFlight>strong{opacity:1;transform:none}
   .duelCoinStream{display:none}
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   دوئل کارت — حرارتِ نبرد (match tension)
+   ═══════════════════════════════════════════════════════════════════════════
+
+   مشکل: راندِ پنجم با امتیازِ ۲-۲ دقیقاً همان‌قدر آرام دیده می‌شد که راندِ
+   اول. کاربر باید خودش امتیازها را جمع می‌زد تا بفهمد لحظهٔ حساس است.
+
+   راه‌حل: `matchTension()` سطحِ حرارت را از وضعیتِ واقعیِ نبرد حساب می‌کند
+   و این‌جا فقط شدتِ زبانِ دیداری بالا می‌رود — نور، ضربان، اشباعِ رنگ.
+   ❗ هیچ متنِ تازه‌ای اضافه نمی‌شود (خواستهٔ صریحِ مالک).
+
+   چرا با متغیرِ CSS و نه کلاس‌های تکراری: هر چهار سطح یک زبان دارند و فقط
+   «شدت» فرق می‌کند. با `--heat` یک‌بار قواعد را می‌نویسیم و سطح‌ها فقط
+   عدد را عوض می‌کنند؛ افزودنِ سطحِ پنجم بعداً یک خط است.
+
+   همه‌چیز روی transform/opacity/box-shadow است تا روی کامپوزیتور اجرا شود
+   و روی گوشیِ ضعیف فریم نیندازد. */
+
+.duelLiveArena{ --heat: 0; --heat-color: var(--mode-color); }
+.duelLiveArena.tension-heated  { --heat: .45; --heat-color:#FFD166; }
+.duelLiveArena.tension-critical{ --heat: .78; --heat-color:#FB7185; }
+.duelLiveArena.tension-decider { --heat: 1;   --heat-color:#F43F5E; }
+
+/* هالهٔ زمینهٔ صحنه با حرارت تندتر و روشن‌تر نفس می‌کشد.
+   `duelArenaBreath` از قبل وجود دارد؛ فقط سرعتش را می‌گیریم. */
+.duelLiveArena.tension-critical:before,
+.duelLiveArena.tension-decider:before{
+  background: radial-gradient(circle,
+    color-mix(in srgb, var(--heat-color) calc(18% + var(--heat) * 12%), transparent),
+    transparent 65%);
+  animation-duration: calc(3s - var(--heat) * 1.4s);
+}
+
+/* نوارِ امتیاز: قابِ صحنهٔ حساس. مرز و هاله رنگِ حرارت می‌گیرد. */
+.duelLiveArena.tension-critical .duelScoreV2,
+.duelLiveArena.tension-decider .duelScoreV2{
+  border-color: color-mix(in srgb, var(--heat-color) 62%, transparent);
+  box-shadow: 0 14px 40px #0007,
+              0 0 calc(20px + var(--heat) * 26px)
+                color-mix(in srgb, var(--heat-color) calc(var(--heat) * 34%), transparent);
+  animation: duelHeatFrame calc(2.4s - var(--heat) * .9s) ease-in-out infinite;
+}
+@keyframes duelHeatFrame{
+  50%{ border-color: color-mix(in srgb, var(--heat-color) 92%, transparent); }
+}
+
+/* پیپِ راندِ جاری در لحظهٔ سرنوشت‌ساز تپش می‌گیرد — کوچک‌ترین عنصرِ صحنه
+   ولی همانی که «کجای نبردیم» را می‌گوید. */
+.duelLiveArena.tension-critical .duelRoundPips i.live,
+.duelLiveArena.tension-decider .duelRoundPips i.live{
+  background: var(--heat-color);
+  box-shadow: 0 0 calc(12px + var(--heat) * 16px) var(--heat-color);
+  animation: duelPipHeat calc(1.5s - var(--heat) * .6s) ease-in-out infinite;
+}
+@keyframes duelPipHeat{ 50%{ transform: scaleX(1.22); filter: brightness(1.35); } }
+
+/* توپِ مسابقه: طرفی که با بردِ این راند نبرد را قفل می‌کند، قابش روشن
+   می‌شود. رنگ خودش پیام است — بدونِ یک کلمه متن.
+   سبز وقتی دستِ من است، قرمز وقتی دستِ حریف. */
+.duelLiveArena[data-match-point="mine"] .duelScoreV2>div.mine b,
+.duelLiveArena[data-match-point="theirs"] .duelScoreV2>div.theirs b{
+  animation: duelMatchPoint 1.15s ease-in-out infinite;
+}
+.duelLiveArena[data-match-point="mine"] .duelScoreV2>div.mine b{
+  border-color:#22E7A6; color:#22E7A6;
+}
+.duelLiveArena[data-match-point="theirs"] .duelScoreV2>div.theirs b{
+  border-color:#FB7185; color:#FB7185;
+}
+@keyframes duelMatchPoint{
+  50%{ transform: scale(1.09); box-shadow: 0 0 26px currentColor; }
+}
+
+/* راندِ آخر با امتیازِ برابر: تنها حالتی که یک کارت همه‌چیز را تعیین
+   می‌کند. کارت‌های دست آمادهٔ شلیک نفس می‌کشند. */
+.duelLiveArena.tension-decider .duelHandV2 .ggPlayerCard:not(.disabled){
+  animation: duelDeciderReady 1.9s ease-in-out infinite;
+}
+@keyframes duelDeciderReady{
+  50%{ box-shadow: 0 0 26px color-mix(in srgb,#F43F5E 40%, transparent); }
+}
+
+/* شمارشِ معکوس در لحظهٔ حساس تندتر و قرمزتر می‌تپد. */
+.duelLiveArena.tension-critical .duelChoicePrompt>strong,
+.duelLiveArena.tension-decider .duelChoicePrompt>strong{
+  border-color: var(--heat-color); color: var(--heat-color);
+  animation-duration: calc(1s - var(--heat) * .35s);
+}
+
+@media (prefers-reduced-motion: reduce){
+  .duelLiveArena.tension-critical .duelScoreV2,
+  .duelLiveArena.tension-decider .duelScoreV2,
+  .duelLiveArena.tension-critical .duelRoundPips i.live,
+  .duelLiveArena.tension-decider .duelRoundPips i.live,
+  .duelLiveArena[data-match-point="mine"] .duelScoreV2>div.mine b,
+  .duelLiveArena[data-match-point="theirs"] .duelScoreV2>div.theirs b,
+  .duelLiveArena.tension-decider .duelHandV2 .ggPlayerCard:not(.disabled),
+  .duelLiveArena.tension-critical:before,
+  .duelLiveArena.tension-decider:before{
+    animation: none !important; transform: none !important;
+  }
+}

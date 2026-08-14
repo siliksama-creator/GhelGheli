@@ -2,6 +2,85 @@ part of '../card_duel_page.dart';
 
 // RarityCardFrame is applied by PlayerCard so inventory, detail and duel share one frame.
 
+/// ═══════════════════════════════════════════════════════════════════════
+/// حرارتِ نبرد — دوقلوی دقیقِ `matchTension()` در وب
+/// ═══════════════════════════════════════════════════════════════════════
+///
+/// مشکلی که حل می‌کند: راندِ پنجم با امتیازِ ۲-۲ دقیقاً همان‌قدر آرام دیده
+/// می‌شد که راندِ اول. کاربر باید خودش امتیازها را جمع می‌زد تا بفهمد
+/// لحظهٔ حساس است.
+///
+/// این مدل «حرارتِ» راندِ پیشِ‌رو را از وضعیتِ واقعیِ نبرد حساب می‌کند و
+/// UI فقط شدتِ نور و ضربان را بالا می‌برد. ❗ هیچ متنِ تازه‌ای اضافه
+/// نمی‌شود — خواستهٔ صریحِ مالک.
+///
+/// ⚠️ این فایل و `userweb/src/lib/cardDuelLogic.js` باید همیشه یک خروجی
+/// بدهند؛ وگرنه بازیکنِ اندروید و بازیکنِ وب در یک نبردِ مشترک دو حسِ
+/// متفاوت می‌گیرند. تستِ هر دو سمت همین جدول را می‌آزماید.
+enum DuelTensionLevel { calm, heated, critical, decider }
+
+@immutable
+class DuelTension {
+  const DuelTension._(this.level, this.matchPoint, this.decider);
+
+  /// حالتِ آرام — مقدارِ پیش‌فرضِ ویجت‌هایی که هنوز حرارت نمی‌گیرند.
+  const DuelTension.calm()
+      : level = DuelTensionLevel.calm,
+        matchPoint = null,
+        decider = false;
+
+  final DuelTensionLevel level;
+
+  /// 'mine' | 'theirs' | null — طرفی که بردِ همین راند نبرد را برایش قفل
+  /// می‌کند. فقط برای کسی که جلوتر است معنا دارد.
+  final String? matchPoint;
+
+  /// راندِ آخر با امتیازِ برابر: یک کارت همه‌چیز را تعیین می‌کند.
+  final bool decider;
+
+  /// قواعدِ واقعیِ بازی (از `backend/src/games/rules/cardDuel.js`):
+  /// ۵ راند، هر راند یک امتیاز، مساوی ممکن است، برنده = امتیاز بیشتر.
+  factory DuelTension.from({
+    required int myScore,
+    required int theirScore,
+    required int roundIndex,
+    int totalRounds = 5,
+  }) {
+    final total = totalRounds == 0 ? 5 : totalRounds;
+    final played = myScore + theirScore;
+    // راندهای بازی‌نشده، شاملِ همینی که در جریان است.
+    final remaining = math.max(0, total - math.max(roundIndex, played));
+    if (remaining <= 0) {
+      return const DuelTension._(DuelTensionLevel.calm, null, false);
+    }
+
+    final lead = (myScore - theirScore).abs();
+    // فاصله از راندهای باقی‌مانده بیشتر است: نتیجه ریاضی‌وار قفل شده.
+    if (lead > remaining) {
+      return const DuelTension._(DuelTensionLevel.calm, null, false);
+    }
+
+    if (remaining == 1 && myScore == theirScore) {
+      return const DuelTension._(DuelTensionLevel.decider, null, true);
+    }
+
+    // توپِ مسابقه: بردِ این راند → lead+1 در برابر remaining-1 راندِ مانده.
+    final leaderCanSeal = lead >= 1 && (lead + 1) > (remaining - 1);
+    if (leaderCanSeal) {
+      return DuelTension._(
+        DuelTensionLevel.critical,
+        myScore > theirScore ? 'mine' : 'theirs',
+        false,
+      );
+    }
+
+    if (remaining <= 2 || (lead == 0 && played >= 2)) {
+      return const DuelTension._(DuelTensionLevel.heated, null, false);
+    }
+    return const DuelTension._(DuelTensionLevel.calm, null, false);
+  }
+}
+
 /// تنها آداپترِ زاویهٔ دید برای نتیجهٔ راند.
 ///
 /// سرور حقیقت را با X/O می‌فرستد، اما کاربر آنلاین می‌تواند هرکدام باشد.
@@ -338,6 +417,14 @@ class _LiveBattle extends StatelessWidget {
         ? 5
         : NumberParser.toInt(state['totalRounds']);
     final roundIndex = NumberParser.toInt(state['roundIndex']);
+    // حرارتِ نبرد: راندِ سرنوشت‌ساز باید *حس* شود، نه اینکه کاربر خودش
+    // امتیازها را جمع بزند. دقیقاً همان مدلی که وب استفاده می‌کند.
+    final tension = DuelTension.from(
+      myScore: NumberParser.toInt(score[mine]),
+      theirScore: NumberParser.toInt(score[opponent]),
+      roundIndex: roundIndex,
+      totalRounds: total,
+    );
     return Column(
       children: [
         _Scoreboard(
@@ -354,6 +441,7 @@ class _LiveBattle extends StatelessWidget {
           lastWinner: '${lastRound?['winner'] ?? ''}',
           mySymbol: mine,
           opponentRole: session.vsBot ? 'ربات' : 'حریف',
+          tension: tension,
         ),
         Gaps.vXs,
         _RoundPips(
@@ -362,6 +450,7 @@ class _LiveBattle extends StatelessWidget {
           history: history,
           mine: mine,
           color: color,
+          tension: tension,
         ),
         Gaps.vXs,
         // ── چرا بنرِ افقی حذف شد ──
@@ -600,6 +689,7 @@ class _Scoreboard extends StatelessWidget {
     required this.lastWinner,
     required this.mySymbol,
     required this.opponentRole,
+    required this.tension,
   });
   final String myName;
   final String theirName;
@@ -613,6 +703,10 @@ class _Scoreboard extends StatelessWidget {
   final String lastWinner;
   final String mySymbol;
   final String opponentRole;
+
+  /// حرارتِ نبرد — فقط شدتِ نور و ضربان را تعیین می‌کند، هیچ متنی اضافه
+  /// نمی‌کند.
+  final DuelTension tension;
 
   @override
   Widget build(BuildContext context) {
@@ -629,10 +723,31 @@ class _Scoreboard extends StatelessWidget {
                 ? 'امتیاز راند قبل برای $opponentRole بود'
                 : 'هنوز راندی تمام نشده';
 
+    // ── حرارتِ نبرد روی قابِ امتیاز ──
+    //
+    // در لحظهٔ سرنوشت‌ساز، قابِ نوارِ امتیاز رنگ و هالهٔ حرارت می‌گیرد.
+    // این دقیقاً همان کاری است که `.tension-*` در CSS وب می‌کند تا هر دو
+    // پلتفرم یک حس بدهند. متن دست‌نخورده می‌ماند.
+    final heatColor = switch (tension.level) {
+      DuelTensionLevel.decider => const Color(0xFFF43F5E),
+      DuelTensionLevel.critical => _rose,
+      DuelTensionLevel.heated => _gold,
+      DuelTensionLevel.calm => color,
+    };
+    final heat = switch (tension.level) {
+      DuelTensionLevel.decider => 1.0,
+      DuelTensionLevel.critical => .78,
+      DuelTensionLevel.heated => .45,
+      DuelTensionLevel.calm => 0.0,
+    };
+
     return Semantics(
       label:
           'امتیاز تو ${faNum(myScore)}، امتیاز $opponentRole ${faNum(theirScore)}. $status',
-      child: AppCard(
+      child: _HeatFrame(
+        heat: heat,
+        color: heatColor,
+        child: AppCard(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
         child: Directionality(
           textDirection: TextDirection.rtl,
@@ -647,6 +762,7 @@ class _Scoreboard extends StatelessWidget {
                   player: myPlayer,
                   highlight: myLead,
                   scoredLast: lastMine,
+                  matchPoint: tension.matchPoint == 'mine',
                 ),
               ),
               Container(
@@ -691,12 +807,120 @@ class _Scoreboard extends StatelessWidget {
                   reverse: true,
                   highlight: theirLead,
                   scoredLast: lastTheir,
+                  matchPoint: tension.matchPoint == 'theirs',
                 ),
               ),
             ],
           ),
         ),
+        ),
       ),
+    );
+  }
+}
+
+/// قابِ حرارت — هالهٔ نفس‌کشندهٔ دورِ نوارِ امتیاز.
+///
+/// معادلِ `@keyframes duelHeatFrame` در وب. هرچه نبرد حساس‌تر، ضربان
+/// تندتر و هاله روشن‌تر. در حرارتِ صفر **هیچ ویجتی اضافه نمی‌شود** تا
+/// درختِ ویجت در حالتِ عادی سنگین‌تر نشود.
+///
+/// ⚠️ احترام به `disableAnimations` اجباری است: کاربری که در تنظیماتِ
+/// سیستم کاهشِ حرکت را روشن کرده، هاله را ثابت می‌بیند نه متحرک.
+class _HeatFrame extends StatefulWidget {
+  const _HeatFrame({
+    required this.heat,
+    required this.color,
+    required this.child,
+  });
+  final double heat;
+  final Color color;
+  final Widget child;
+
+  @override
+  State<_HeatFrame> createState() => _HeatFrameState();
+}
+
+class _HeatFrameState extends State<_HeatFrame>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2400),
+  );
+
+  bool _reduceMotion = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    _sync();
+  }
+
+  @override
+  void didUpdateWidget(covariant _HeatFrame old) {
+    super.didUpdateWidget(old);
+    if (old.heat != widget.heat) _sync();
+  }
+
+  /// سرعتِ ضربان با حرارت بالا می‌رود؛ در حرارتِ صفر — یا وقتی کاربر
+  /// کاهشِ حرکت را روشن کرده — کنترلر کلاً **متوقف** می‌شود، نه اینکه فقط
+  /// نتیجه‌اش نادیده گرفته شود. یک `repeat()` فراموش‌شده هر فریم را برای
+  /// انیمیشنی می‌سوزاند که هیچ‌کس نمی‌بیند.
+  void _sync() {
+    if (widget.heat <= 0 || _reduceMotion) {
+      _c.stop();
+      _c.value = 0;
+      return;
+    }
+    _c.duration = Duration(
+      milliseconds: (2400 - widget.heat * 900).round(),
+    );
+    if (!_c.isAnimating) _c.repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.heat <= 0) return widget.child;
+    // کاربرِ حساس به حرکت: هاله بله، ضربان نه.
+    if (_reduceMotion) {
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: widget.color.withValues(alpha: .22 * widget.heat),
+              blurRadius: 22,
+            ),
+          ],
+        ),
+        child: widget.child,
+      );
+    }
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (_, child) => DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: widget.color.withValues(
+                alpha: (.14 + .20 * _c.value) * widget.heat,
+              ),
+              blurRadius: 18 + 16 * _c.value * widget.heat,
+              spreadRadius: _c.value * widget.heat,
+            ),
+          ],
+        ),
+        child: child,
+      ),
+      child: widget.child,
     );
   }
 }
@@ -711,6 +935,7 @@ class _Score extends StatelessWidget {
     this.reverse = false,
     this.highlight = false,
     this.scoredLast = false,
+    this.matchPoint = false,
   });
   final String role;
   final String name;
@@ -720,6 +945,10 @@ class _Score extends StatelessWidget {
   final bool reverse;
   final bool highlight;
   final bool scoredLast;
+
+  /// این طرف با بردِ همین راند نبرد را قفل می‌کند. حبابِ امتیازش تپش
+  /// می‌گیرد — رنگ خودش پیام است، بدونِ یک کلمه متنِ اضافه.
+  final bool matchPoint;
   @override
   Widget build(BuildContext context) {
     final cosmetics =
@@ -730,11 +959,13 @@ class _Score extends StatelessWidget {
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(99),
-        boxShadow: highlight || scoredLast
+        boxShadow: highlight || scoredLast || matchPoint
             ? [
                 BoxShadow(
-                  color: color.withValues(alpha: scoredLast ? .36 : .20),
-                  blurRadius: scoredLast ? 18 : 12,
+                  color: color.withValues(
+                    alpha: matchPoint ? .48 : (scoredLast ? .36 : .20),
+                  ),
+                  blurRadius: matchPoint ? 24 : (scoredLast ? 18 : 12),
                 ),
               ]
             : const [],
@@ -841,36 +1072,60 @@ class _RoundPips extends StatelessWidget {
     required this.history,
     required this.mine,
     required this.color,
+    this.tension = const DuelTension.calm(),
   });
   final int total;
   final int current;
   final List<Map> history;
   final String mine;
   final Color color;
+
+  /// پیپِ راندِ جاری در لحظهٔ سرنوشت‌ساز رنگ و هالهٔ حرارت می‌گیرد.
+  /// کوچک‌ترین عنصرِ صحنه است ولی همانی که «کجای نبردیم» را می‌گوید.
+  final DuelTension tension;
+
   @override
-  Widget build(BuildContext context) => Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          for (var i = 0; i < total; i++)
-            Container(
-              width: 34,
-              height: 8,
-              margin: const EdgeInsets.symmetric(horizontal: 3),
-              decoration: BoxDecoration(
-                borderRadius: Corners.rPill,
-                color: i < history.length
-                    ? ('${history[i]['winner']}' == mine
-                        ? _emerald
-                        : '${history[i]['winner']}' == 'DRAW'
-                            ? _gold
-                            : _rose)
-                    : i == current
-                        ? color
-                        : Colors.white12,
-              ),
+  Widget build(BuildContext context) {
+    final hot = tension.level == DuelTensionLevel.critical ||
+        tension.level == DuelTensionLevel.decider;
+    final liveColor = switch (tension.level) {
+      DuelTensionLevel.decider => const Color(0xFFF43F5E),
+      DuelTensionLevel.critical => _rose,
+      _ => color,
+    };
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        for (var i = 0; i < total; i++)
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 280),
+            width: i == current && hot ? 40 : 34,
+            height: i == current && hot ? 9 : 8,
+            margin: const EdgeInsets.symmetric(horizontal: 3),
+            decoration: BoxDecoration(
+              borderRadius: Corners.rPill,
+              color: i < history.length
+                  ? ('${history[i]['winner']}' == mine
+                      ? _emerald
+                      : '${history[i]['winner']}' == 'DRAW'
+                          ? _gold
+                          : _rose)
+                  : i == current
+                      ? liveColor
+                      : Colors.white12,
+              boxShadow: i == current && hot
+                  ? [
+                      BoxShadow(
+                        color: liveColor.withValues(alpha: .55),
+                        blurRadius: 14,
+                      ),
+                    ]
+                  : const [],
             ),
-        ],
-      );
+          ),
+      ],
+    );
+  }
 }
 
 /// ═══════════════════════════════════════════════════════════════════════
@@ -3020,11 +3275,16 @@ class CardDuelScoreboardForTest extends StatelessWidget {
     required this.myScore,
     required this.theirScore,
     this.lastWinner = '',
+    this.roundIndex = 1,
   });
 
   final int myScore;
   final int theirScore;
   final String lastWinner;
+
+  /// راندِ جاری — حرارتِ نبرد از همین و امتیازها ساخته می‌شود، پس تست
+  /// می‌تواند لحظهٔ سرنوشت‌ساز را بازسازی کند.
+  final int roundIndex;
 
   @override
   Widget build(BuildContext context) => _Scoreboard(
@@ -3040,6 +3300,11 @@ class CardDuelScoreboardForTest extends StatelessWidget {
         lastWinner: lastWinner,
         mySymbol: 'X',
         opponentRole: 'ربات',
+        tension: DuelTension.from(
+          myScore: myScore,
+          theirScore: theirScore,
+          roundIndex: roundIndex,
+        ),
       );
 }
 

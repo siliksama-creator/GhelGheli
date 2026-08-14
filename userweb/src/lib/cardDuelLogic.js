@@ -66,3 +66,63 @@ export function resultMvp(state) {
   return performances.sort((a, b) => b.mvpMargin - a.mvpMargin
     || b.mvpRoundPower - a.mvpRoundPower)[0] || null;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  کشش نبرد (match tension)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// مشکلی که این حل می‌کند: راندِ پنجم وقتی امتیاز ۲-۲ است، دقیقاً همان‌قدر
+// آرام به نظر می‌رسد که راندِ اول. صحنه نمی‌داند کِی سرنوشت‌ساز است، پس
+// هیجانِ لحظهٔ حساس را به کاربر منتقل نمی‌کند.
+//
+// این تابع «حرارتِ» راندِ پیشِ‌رو را از وضعیتِ واقعیِ نبرد حساب می‌کند و
+// همان را به CSS می‌دهد تا شدتِ نور/ضربان/لرزش بالا برود. هیچ متنی اضافه
+// نمی‌کند — فقط زبانِ دیداری. (خواستهٔ مالک: بدون متنِ اضافه.)
+//
+// قواعدِ واقعیِ بازی که این‌جا مدل شده‌اند (از rules/cardDuel.js):
+//   • ۵ راند، هر راند یک امتیاز، برنده = امتیاز بیشتر در پایان.
+//   • مساوی ممکن است؛ پس «بردِ قطعی» یعنی امتیاز > نیمِ راندهای باقی‌مانده.
+//
+// سطح‌ها به ترتیبِ شدت:
+//   calm      → نبرد تازه شروع شده یا فاصله زیاد است.
+//   heated    → یک‌قدم تا تعیینِ تکلیف؛ راندهای میانیِ نزدیک.
+//   critical  → این راند می‌تواند نبرد را تمام کند (توپِ مسابقه).
+//   decider   → راندِ آخر و امتیاز برابر؛ همه‌چیز روی یک کارت.
+export function matchTension({ score, roundIndex, totalRounds = 5, me = 'X' }) {
+  const opponent = me === 'X' ? 'O' : 'X';
+  const mineScore = num(score?.[me]);
+  const theirScore = num(score?.[opponent]);
+  const played = mineScore + theirScore;
+  const total = num(totalRounds) || 5;
+  // راندهایی که هنوز بازی نشده‌اند، شاملِ همینی که در جریان است.
+  const remaining = Math.max(0, total - Math.max(num(roundIndex), played));
+
+  if (remaining <= 0) return { level: 'calm', matchPoint: null, decider: false };
+
+  const lead = Math.abs(mineScore - theirScore);
+  // اگر فاصله از راندهای باقی‌مانده بیشتر باشد، نتیجه ریاضی‌وار قفل شده.
+  if (lead > remaining) return { level: 'calm', matchPoint: null, decider: false };
+
+  // راندِ آخر با امتیازِ برابر: تنها حالتی که یک کارت همه‌چیز را می‌برد.
+  if (remaining === 1 && mineScore === theirScore) {
+    return { level: 'decider', matchPoint: null, decider: true };
+  }
+
+  // «توپِ مسابقه»: کسی که جلوست، با بردِ همین راند دیگر قابلِ جبران نیست.
+  // بردِ این راند → lead+1 در برابر remaining-1 راندِ باقی‌مانده.
+  const leaderCanSeal = lead >= 1 && (lead + 1) > (remaining - 1);
+  if (leaderCanSeal) {
+    return {
+      level: 'critical',
+      matchPoint: mineScore > theirScore ? 'mine' : 'theirs',
+      decider: false,
+    };
+  }
+
+  // نبردِ نزدیک در نیمهٔ دوم: گرم اما هنوز سرنوشت‌ساز نیست.
+  if (remaining <= 2 || (lead === 0 && played >= 2)) {
+    return { level: 'heated', matchPoint: null, decider: false };
+  }
+
+  return { level: 'calm', matchPoint: null, decider: false };
+}

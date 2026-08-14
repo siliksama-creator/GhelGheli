@@ -6,7 +6,7 @@ import { selectionClick } from './haptics.js';
 import { CosmeticAvatarFrame, CosmeticFrame, DisplayName } from './components/Cosmetics.jsx';
 import PlayerCard from './components/PlayerCard.jsx';
 import { cardIdOf, cardPowerOf } from './lib/cards.js';
-import { matchVerdictForViewer, resultMvp, roundEffectBonus, roundForViewer } from './lib/cardDuelLogic.js';
+import { matchTension, matchVerdictForViewer, resultMvp, roundEffectBonus, roundForViewer } from './lib/cardDuelLogic.js';
 
 const idOf = card => cardIdOf(card);
 const num = value => Number(value || 0);
@@ -417,7 +417,17 @@ function LiveArena({ session }) {
   const myAhead = num(score[mine]) > num(score[opponent]);
   const theirAhead = num(score[opponent]) > num(score[mine]);
 
-  return <div className="duelLiveArena">
+  // ── حرارتِ نبرد ──
+  // راندِ پنجم با امتیازِ ۲-۲ باید *حس* شود، نه اینکه کاربر خودش امتیازها
+  // را جمع بزند. سطحِ حرارت روی ریشهٔ صحنه می‌نشیند و CSS شدتِ نور، ضربان
+  // و رنگ را بالا می‌برد. هیچ متنِ تازه‌ای اضافه نمی‌شود.
+  const tension = matchTension({
+    score, roundIndex: num(state.roundIndex),
+    totalRounds: num(state.totalRounds) || 5, me: mine,
+  });
+
+  return <div className={`duelLiveArena tension-${tension.level}`}
+    data-match-point={tension.matchPoint || undefined}>
     <header className="duelScoreV2"
       aria-label={`امتیاز تو ${fa(score[mine])}، امتیاز ${opponentRole} ${fa(score[opponent])}`}>
 

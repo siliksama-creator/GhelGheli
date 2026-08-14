@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { matchVerdictForViewer, resultMvp, roundEffectBonus, roundForViewer } from '../src/lib/cardDuelLogic.js';
+import { matchTension, matchVerdictForViewer, resultMvp, roundEffectBonus, roundForViewer } from '../src/lib/cardDuelLogic.js';
 
 let pass = 0;
 const ok = (condition, label) => { assert.ok(condition, label); pass += 1; console.log(`  ✓ ${label}`); };
@@ -69,5 +69,47 @@ const mvp = resultMvp({ history: [
 ] });
 ok(mvp?.name === 'برد بزرگ' && mvp.mvpRoundPower === 90,
   'MVP از بزرگ‌ترین برد واقعی انتخاب می‌شود');
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  حرارتِ نبرد — باید با قواعدِ واقعیِ بردن هم‌خوان باشد
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// اگر این اشتباه باشد، صحنه در لحظهٔ عادی شعله می‌کشد و در لحظهٔ سرنوشت‌ساز
+// خاموش می‌ماند — بدتر از نداشتنِ افکت، چون کاربر را گمراه می‌کند.
+console.log('\n== حرارتِ نبرد ==');
+const heat = (X, O, roundIndex = X + O, me = 'X') =>
+  matchTension({ score: { X, O }, roundIndex, totalRounds: 5, me });
+
+ok(heat(0, 0).level === 'calm', 'شروعِ نبرد آرام است');
+ok(heat(2, 2).level === 'decider' && heat(2, 2).decider,
+  'راند پنجم با امتیاز ۲-۲ سطحِ decider می‌گیرد');
+ok(heat(2, 1).level === 'critical' && heat(2, 1).matchPoint === 'mine',
+  'در ۲-۱ توپِ مسابقه دستِ من است (بردِ این راند = ۳ از ۵)');
+ok(heat(1, 2).matchPoint === 'theirs',
+  'در ۱-۲ توپِ مسابقه دستِ حریف است');
+ok(heat(2, 1, 3, 'O').matchPoint === 'theirs',
+  'همان نبرد از دیدِ حریف آینه می‌شود، نه اینکه جابه‌جا بماند');
+ok(heat(3, 0).level === 'calm' && heat(3, 0).matchPoint === null,
+  'وقتی نتیجه ریاضی‌وار قفل شده دیگر حرارتی نیست');
+ok(heat(1, 1, 4).decider === true,
+  'نبردِ پرمساوی هم اگر راندِ آخر با امتیازِ برابر برسد decider است');
+ok(heat(1, 1, 2).level === 'heated' && !heat(1, 1, 2).decider,
+  'همان امتیاز در راندِ سوم فقط heated است، نه decider');
+
+// هیچ حالتِ ممکنی نباید سطحِ ناشناخته یا matchPoint متناقض بدهد.
+const LEVELS = new Set(['calm', 'heated', 'critical', 'decider']);
+let sane = true;
+for (let X = 0; X <= 5; X += 1) {
+  for (let O = 0; O + X <= 5; O += 1) {
+    const t = heat(X, O);
+    if (!LEVELS.has(t.level)) sane = false;
+    // توپِ مسابقه فقط برای کسی که جلوتر است معنا دارد.
+    if (t.matchPoint === 'mine' && X <= O) sane = false;
+    if (t.matchPoint === 'theirs' && O <= X) sane = false;
+    // decider یعنی برابری در راندِ آخر.
+    if (t.decider && X !== O) sane = false;
+  }
+}
+ok(sane, 'هیچ‌کدام از ۲۱ حالتِ ممکنِ امتیاز، سطح یا توپِ مسابقهٔ متناقض نمی‌دهد');
 
 console.log(`\n✅ ${pass} تست حقیقت دوئل Web موفق بود\n`);
