@@ -5,7 +5,6 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
@@ -19,7 +18,6 @@ import '../../../theme/colors.dart';
 import '../../../theme/tokens.dart';
 import '../../../widgets/app_card.dart';
 import '../../../widgets/avatar_image.dart';
-import '../../../widgets/match_effect_visual.dart';
 import '../../../widgets/player_card.dart';
 import 'game_session.dart';
 
@@ -296,15 +294,6 @@ class _CardDuelPageState extends State<CardDuelPage> {
     }
   }
 
-  Map<String, dynamic> get _myCosmetics {
-    final me = _session.mySymbol;
-    final player = me == null ? null : _session.players?[me];
-    final cosmetics = player is Map ? player['cosmetics'] : null;
-    return cosmetics is Map
-        ? Map<String, dynamic>.from(cosmetics)
-        : <String, dynamic>{};
-  }
-
   Map<String, dynamic>? _resultMvp() {
     final history = (_session.state['history'] as List?) ?? const [];
     final performances = <Map<String, dynamic>>[];
@@ -340,52 +329,13 @@ class _CardDuelPageState extends State<CardDuelPage> {
     const size = Size(1080, 1080);
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
-    final template = _myCosmetics['resultTemplate'] as String?;
-    final palette = resultTemplateColors[template] ??
-        const [Color(0xFF071522), Color(0xFF35105D)];
-    var drewArtwork = false;
-    if (template != null) {
-      try {
-        final data = await rootBundle.load(
-          'assets/shop/cosmetics/$template.webp',
-        );
-        final codec = await ui.instantiateImageCodec(
-          data.buffer.asUint8List(),
-          targetWidth: 1080,
-          targetHeight: 1080,
-        );
-        final frame = await codec.getNextFrame();
-        canvas.drawImageRect(
-          frame.image,
-          Rect.fromLTWH(
-            0,
-            0,
-            frame.image.width.toDouble(),
-            frame.image.height.toDouble(),
-          ),
-          Offset.zero & size,
-          Paint(),
-        );
-        canvas.drawRect(
-          Offset.zero & size,
-          Paint()..color = const Color(0x99020617),
-        );
-        frame.image.dispose();
-        codec.dispose();
-        drewArtwork = true;
-      } catch (_) {
-        // Fall through to the deterministic palette if an old bundle lacks art.
-      }
-    }
-    if (!drewArtwork) {
-      final paint = Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [palette.first, const Color(0xFF17304C), palette.last],
-        ).createShader(Offset.zero & size);
-      canvas.drawRect(Offset.zero & size, paint);
-    }
+    final paint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFF071522), Color(0xFF17304C), Color(0xFF35105D)],
+      ).createShader(Offset.zero & size);
+    canvas.drawRect(Offset.zero & size, paint);
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         const Rect.fromLTWH(34, 34, 1012, 1012),
@@ -500,20 +450,9 @@ class _CardDuelPageState extends State<CardDuelPage> {
                   padding: const EdgeInsets.all(Gaps.lg),
                   decoration: BoxDecoration(
                     borderRadius: Corners.rXl,
-                    gradient: LinearGradient(
-                      colors: resultTemplateColors[
-                              _myCosmetics['resultTemplate']] ??
-                          const [Color(0xFF17304C), Color(0xFF35105D)],
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF17304C), Color(0xFF35105D)],
                     ),
-                    image: _myCosmetics['resultTemplate'] == null
-                        ? null
-                        : DecorationImage(
-                            image: AssetImage(
-                              'assets/shop/cosmetics/${_myCosmetics['resultTemplate']}.webp',
-                            ),
-                            fit: BoxFit.cover,
-                            opacity: .26,
-                          ),
                     border: Border.all(color: _gold, width: 1.5),
                   ),
                   child: Column(
@@ -791,14 +730,8 @@ class _CardDuelPageState extends State<CardDuelPage> {
           onRemove: _toggle,
         ),
         Gaps.vXs,
-        // ── چرا این دو تا حالا جمع‌شونده‌اند ──
-        //
-        // هیچ‌کدام برای شروعِ بازی لازم نیستند: قوانین را کاربر بعد از
-        // یک بازی می‌داند، و تحلیلِ ترکیب یک ابزارِ اختیاریِ پیشرفته
-        // است. ولی با هم حدود ۳۲۰ پیکسل ارتفاع می‌گرفتند و دکمهٔ شروع
-        // را از صفحه بیرون می‌انداختند.
-        //
-        // جمع‌شده پیش‌فرض‌اند و هرکس خواست بازشان می‌کند.
+        // قوانین اختیاری جمع می‌شوند؛ تحلیل دیگر بازشدنی/اسکرولی نیست و
+        // همیشه در یک کارت ثابتِ دوخطی خلاصه می‌شود.
         const _CollapsibleSection(
           icon: Icons.menu_book_rounded,
           title: 'قوانین نبرد',
@@ -806,15 +739,10 @@ class _CardDuelPageState extends State<CardDuelPage> {
           child: _RuleStrip(),
         ),
         Gaps.vXs,
-        _CollapsibleSection(
-          icon: Icons.insights_rounded,
-          title: 'تحلیل ترکیب',
-          subtitle: 'نقاط قوت و پیشنهاد چیدمان',
-          child: _DeckIntelPanel(
-            activeInsights: activeInsights,
-            suggestedDeck: suggestedDeck,
-            onApplySuggested: _applySuggestedDeck,
-          ),
+        _DeckIntelPanel(
+          activeInsights: activeInsights,
+          suggestedDeck: suggestedDeck,
+          onApplySuggested: _applySuggestedDeck,
         ),
         Gaps.vSm,
         if (_practiceFallback) ...[
@@ -1061,29 +989,21 @@ class _CardDuelPageState extends State<CardDuelPage> {
                 _LiveBattle(session: _session, color: _modeColor),
               ],
             ),
-            if (_myCosmetics['matchEffect'] != null &&
-                matchEffectSupports('${_myCosmetics['matchEffect']}', 'entry'))
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: _DuelCosmeticEffect(
-                    slug: '${_myCosmetics['matchEffect']}',
-                  ),
-                ),
-              ),
             // اعلانِ سینماییِ «این راند سرِ چیست» — آخرین لایه تا روی همه‌چیز
             // بیاید. چون Positioned.fill است، ارتفاعی از چیدمان نمی‌گیرد.
-            Positioned.fill(
-              child: _RoundIntroOverlay(
-                focus: st['roundFocus'] is Map
-                    ? Map<String, dynamic>.from(st['roundFocus'] as Map)
-                    : null,
-                roundNumber: (NumberParser.toInt(st['roundIndex']) + 1).clamp(
-                  1,
-                  totalR,
+            if (_session.introHolding && !_session.resultHolding)
+              Positioned.fill(
+                child: _RoundIntroOverlay(
+                  focus: st['roundFocus'] is Map
+                      ? Map<String, dynamic>.from(st['roundFocus'] as Map)
+                      : null,
+                  roundNumber: (NumberParser.toInt(st['roundIndex']) + 1).clamp(
+                    1,
+                    totalR,
+                  ),
+                  totalRounds: totalR,
                 ),
-                totalRounds: totalR,
               ),
-            ),
           ],
         );
       case GamePhase.over:
@@ -1096,9 +1016,6 @@ class _CardDuelPageState extends State<CardDuelPage> {
                 _Finale(
                   session: _session,
                   color: _modeColor,
-                  resultColors:
-                      resultTemplateColors[_myCosmetics['resultTemplate']],
-                  resultTemplate: _myCosmetics['resultTemplate'] as String?,
                   onAgain: _playAgain,
                   onEdit: _editLineup,
                   onShare: _shareResult,
@@ -1108,17 +1025,6 @@ class _CardDuelPageState extends State<CardDuelPage> {
                 ),
               ],
             ),
-            if (_session.iWon &&
-                _myCosmetics['matchEffect'] != null &&
-                matchEffectSupports('${_myCosmetics['matchEffect']}', 'finish'))
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: _DuelCosmeticEffect(
-                    slug: '${_myCosmetics['matchEffect']}',
-                    repeat: true,
-                  ),
-                ),
-              ),
           ],
         );
       case GamePhase.idle:
@@ -1127,59 +1033,6 @@ class _CardDuelPageState extends State<CardDuelPage> {
           onBack: _editLineup,
         );
     }
-  }
-}
-
-class _DuelCosmeticEffect extends StatefulWidget {
-  const _DuelCosmeticEffect({required this.slug, this.repeat = false});
-  final String slug;
-  final bool repeat;
-
-  @override
-  State<_DuelCosmeticEffect> createState() => _DuelCosmeticEffectState();
-}
-
-class _DuelCosmeticEffectState extends State<_DuelCosmeticEffect>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1800),
-  );
-
-  @override
-  void initState() {
-    super.initState();
-    widget.repeat ? _controller.repeat(reverse: true) : _controller.forward();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (_, __) {
-        final t = Curves.easeOut.transform(_controller.value);
-        return Center(
-          child: Opacity(
-            opacity: (widget.repeat ? .22 + t * .55 : 1 - t)
-                .clamp(0.0, 1.0)
-                .toDouble(),
-            child: Transform.scale(
-              scale: .45 + t * 1.45,
-              child: SizedBox(
-                width: 300,
-                child: MatchEffectVisual(slug: widget.slug, progress: t),
-              ),
-            ),
-          ),
-        );
-      },
-    );
   }
 }
 

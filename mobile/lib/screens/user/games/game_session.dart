@@ -57,7 +57,9 @@ class GameSession extends ChangeNotifier {
   /// تا وقتی اعلانِ راند روی صفحه است، ساعت نمی‌رود.
   /// UI از این پرچم برای نشان دادنِ «آماده…» به‌جای عدد استفاده می‌کند.
   bool introHolding = false;
+  bool resultHolding = false;
   int _introHoldMs = 0;
+  int _resultHoldMs = 0;
   int turnSeconds = 15;
 
   /// ═════════════════════════════════════════════════════════════════════
@@ -260,7 +262,13 @@ class GameSession extends ChangeNotifier {
       connected = true;
       phase = GamePhase.playing;
       error = null;
-      GameAudio.instance.play(Sfx.matchFound);
+      if (gameId == 'card_duel') {
+        GameAudio.instance
+          ..startDuelMusic()
+          ..play(Sfx.duelIntro, volume: 0.82);
+      } else {
+        GameAudio.instance.play(Sfx.matchFound);
+      }
       _stopSearchClock();
       _startClock(m['deadline'], m['turnMs'], m['remainingMs'], m['introMs'],
           m['resultHoldMs']);
@@ -289,11 +297,11 @@ class GameSession extends ChangeNotifier {
         final roundWinner = '${last['winner'] ?? ''}';
         final mine = mySymbol;
         final sfx = roundWinner == 'DRAW'
-            ? Sfx.draw
+            ? Sfx.duelRoundDraw
             : roundWinner == mine
-                ? Sfx.win
-                : Sfx.lose;
-        GameAudio.instance.play(sfx, volume: 0.72);
+                ? Sfx.duelRoundWin
+                : Sfx.duelRoundLose;
+        GameAudio.instance.play(sfx, volume: 0.86);
         try {
           if (roundWinner == mine) {
             HapticFeedback.heavyImpact();
@@ -307,11 +315,13 @@ class GameSession extends ChangeNotifier {
 
       if (timedOutSymbol != null) {
         GameAudio.instance.play(Sfx.timeout);
-      } else if (!wasMyTurn) {
+      } else if (gameId != 'card_duel' && !wasMyTurn) {
         // The move we just received came from the opponent.
         GameAudio.instance.play(moveSound, volume: 0.9);
       }
-      if (!wasMyTurn && myTurn) GameAudio.instance.play(Sfx.yourTurn);
+      if (gameId != 'card_duel' && !wasMyTurn && myTurn) {
+        GameAudio.instance.play(Sfx.yourTurn);
+      }
 
       _startClock(m['deadline'], m['turnMs'], m['remainingMs'], m['introMs'],
           m['resultHoldMs']);
@@ -334,9 +344,18 @@ class GameSession extends ChangeNotifier {
       connectionNotice = null;
       phase = GamePhase.over;
       _stopClock();
-      GameAudio.instance.play(
-        winner == 'DRAW' ? Sfx.draw : (iWon ? Sfx.win : Sfx.lose),
-      );
+      if (gameId == 'card_duel') {
+        unawaited(GameAudio.instance.stopDuelMusic());
+        GameAudio.instance.play(
+          winner == 'DRAW'
+              ? Sfx.duelFinalDraw
+              : (iWon ? Sfx.duelVictory : Sfx.duelDefeat),
+        );
+      } else {
+        GameAudio.instance.play(
+          winner == 'DRAW' ? Sfx.draw : (iWon ? Sfx.win : Sfx.lose),
+        );
+      }
       notifyListeners();
     });
 
@@ -405,7 +424,9 @@ class GameSession extends ChangeNotifier {
     // را می‌بیند، بعد اعلانِ راندِ تازه را.
     final intro = (introMs as num?)?.toInt() ?? 0;
     final hold = (resultHoldMs as num?)?.toInt() ?? 0;
-    _introHoldMs = (intro > 0 ? intro : 0) + (hold > 0 ? hold : 0);
+    _resultHoldMs = hold > 0 ? hold : 0;
+    resultHolding = _resultHoldMs > 0;
+    _introHoldMs = (intro > 0 ? intro : 0) + _resultHoldMs;
 
     // Use the server's REMAINING milliseconds against a local stopwatch
     // rather than `deadline - DateTime.now()`. A device with a wrong clock
@@ -429,6 +450,13 @@ class GameSession extends ChangeNotifier {
     void tick() {
       // در پنجرهٔ اعلان، ساعت روی مقدارِ کامل «یخ» می‌زند.
       final elapsed = watch.elapsedMilliseconds;
+      if (resultHolding && elapsed >= _resultHoldMs) {
+        resultHolding = false;
+        if (gameId == 'card_duel' && intro > 0) {
+          GameAudio.instance.play(Sfx.duelIntro, volume: 0.82);
+        }
+        notifyListeners();
+      }
       if (_introHoldMs > 0 && elapsed < _introHoldMs) {
         introHolding = true;
         if (secondsLeft != turnSeconds) {
@@ -440,6 +468,9 @@ class GameSession extends ChangeNotifier {
       if (introHolding) {
         introHolding = false;
         _tickClock();
+        // کارت‌ها در زمان معرفی عمداً غیرفعال‌اند؛ یک rebuild در پایان
+        // صحنه لازم است تا بلافاصله قابل انتخاب شوند.
+        notifyListeners();
       }
       final leftMs = total - elapsed;
       final left = (leftMs / 1000).ceil();
@@ -520,6 +551,10 @@ class GameSession extends ChangeNotifier {
     _ticker?.cancel();
     _ticker = null;
     secondsLeft = 0;
+    introHolding = false;
+    resultHolding = false;
+    _introHoldMs = 0;
+    _resultHoldMs = 0;
     // بدون این، حلقهٔ شمارش روی آخرین عدد یخ می‌زد چون کسی به شنوندگانِ
     // ساعت نمی‌گفت که به صفر رسیده‌ایم.
     _tickClock();
@@ -591,8 +626,11 @@ class GameSession extends ChangeNotifier {
   /// جلوگیری از انتخاب دوباره روی سرور است (isValidMove)، نه اینجا —
   /// کلاینت هیچ‌وقت منبع حقیقت نیست.
   void moveObject(Map<String, dynamic> payload) {
-    if (phase != GamePhase.playing || !connected) return;
-    GameAudio.instance.play(moveSound);
+    if (phase != GamePhase.playing || !connected || introHolding) return;
+    GameAudio.instance.play(
+      gameId == 'card_duel' ? Sfx.duelLock : moveSound,
+      volume: gameId == 'card_duel' ? 0.78 : 1.0,
+    );
     _socket?.emit('game:move', {'roomId': _roomId, 'move': payload});
   }
 
@@ -655,6 +693,7 @@ class GameSession extends ChangeNotifier {
     connectionNotice = null;
     _stopClock();
     _stopSearchClock();
+    if (gameId == 'card_duel') unawaited(GameAudio.instance.stopDuelMusic());
     notifyListeners();
   }
 
@@ -695,6 +734,7 @@ class GameSession extends ChangeNotifier {
     phase = GamePhase.idle;
     _stopClock();
     _stopSearchClock();
+    if (gameId == 'card_duel') unawaited(GameAudio.instance.stopDuelMusic());
     notifyListeners();
   }
 
@@ -712,6 +752,7 @@ class GameSession extends ChangeNotifier {
     _disposed = true;
     _ticker?.cancel();
     _searchTicker?.cancel();
+    if (gameId == 'card_duel') unawaited(GameAudio.instance.stopDuelMusic());
     clock.dispose();
     _socket?.dispose();
     _socket = null;

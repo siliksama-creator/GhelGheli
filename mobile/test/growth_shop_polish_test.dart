@@ -9,14 +9,19 @@ void main() {
     expect(shop.contains("level: 72"), isFalse,
         reason: 'عدد لول نباید پیش از امضای پروفایل در ویترین نمایش داده شود');
     expect(shop.contains("avatar_10_crown.webp"), isTrue);
-    expect(shop.contains("avatar_5_lion.webp"), isTrue);
-    expect(shop.contains('phaseLabel'), isTrue);
+    expect(shop.contains('_ShopFrameArtwork'), isTrue);
+    expect(shop.contains('_ShopNameArtwork'), isTrue);
+    expect(shop.contains('_ShopBadgeArtwork'), isTrue);
+    expect(shop.contains('_ShopEmoteArtwork'), isTrue);
+    expect(shop.contains('result_template'), isFalse);
+    expect(shop.contains('match_effect'), isFalse);
   });
 
   test('ماموریت و دوستان یک تب مستقل کنار بازی است', () {
     final social = File('lib/screens/user/social_page.dart').readAsStringSync();
     final games = File('lib/screens/user/games_page.dart').readAsStringSync();
-    final growth = File('lib/screens/user/games/growth_panel.dart').readAsStringSync();
+    final growth =
+        File('lib/screens/user/games/growth_panel.dart').readAsStringSync();
     expect(social.contains("label: 'ماموریت و دوستان'"), isTrue);
     expect(social.contains('GrowthPanel('), isTrue);
     expect(games.contains('GrowthPanel('), isFalse);
@@ -32,7 +37,8 @@ void main() {
   });
 
   test('میان‌بر داشبورد نام درآمدی روشن دارد', () {
-    final dashboard = File('lib/screens/user/dashboard_page.dart').readAsStringSync();
+    final dashboard =
+        File('lib/screens/user/dashboard_page.dart').readAsStringSync();
     expect(dashboard.contains("title: 'دعوت و کسب درآمد'"), isTrue);
   });
 }

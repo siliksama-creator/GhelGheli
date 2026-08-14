@@ -2293,8 +2293,7 @@ io.use(async (socket, next) => {
     const { rows } = await pool.query(`SELECT id,nickname,first_name,last_name,
       profile_image_url,profile_avatar_key,chat_banned_until,status,
       lifetime_points,current_points,game_xp, equipped_club,equipped_frame,
-      equipped_color,equipped_profile_background,equipped_result_template,
-      equipped_match_effect,equipped_emote_pack,profile_title
+      equipped_color,equipped_profile_background,equipped_emote_pack,profile_title
       FROM users WHERE id=$1`, [payload.sub]);
     if (!rows[0] || rows[0].status !== 'active') throw new Error('inactive');
     const socketCosmetics = await shop.cosmeticsFor([rows[0].id]);

@@ -1,7 +1,7 @@
 // Shared browser Socket.IO session for every live game.
 import { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
-import { play } from './gameAudio.js';
+import { play, startDuelMusic, stopDuelMusic } from './gameAudio.js';
 
 export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roomCode = null,
   externalSocket = null, initialStart = null, enabled = true) {
@@ -94,7 +94,11 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
       if (disposed || !d) return;
       activeRoomRef.current = d.roomId;
       requestedRef.current = true;
-      play('match_found');
+      const startedGameId = d.gameId || gameId;
+      if (startedGameId === 'card_duel') {
+        startDuelMusic();
+        play('duel_intro', 0.82);
+      } else play('match_found');
       setG({
         state: d.state || {}, players: d.players || null,
         me: d.yourSymbol || null, turn: d.turn || null, winner: null,
@@ -107,15 +111,17 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
       setPhase('playing'); setError(''); setStillSearching(false);
       setConnected(true); setConnectionNotice(''); setRematchWaiting(false);
       setClock(d);
-      if (d.turn === d.yourSymbol) play('your_turn');
+      if (startedGameId !== 'card_duel' && d.turn === d.yourSymbol) play('your_turn');
     };
     const onUpdate = d => {
       if (disposed) return;
       setG(prev => {
         const wasMyTurn = prev.turn === prev.me;
         const isMyTurn = d?.turn === prev.me;
-        if (!wasMyTurn && isMyTurn) play('your_turn');
-        else if (wasMyTurn && !isMyTurn) play('move');
+        if (gameId !== 'card_duel') {
+          if (!wasMyTurn && isMyTurn) play('your_turn');
+          else if (wasMyTurn && !isMyTurn) play('move');
+        }
 
         const nextState = d?.state ?? prev.state;
         const previousRound = Number(prev.state?.roundIndex || 0);
@@ -126,7 +132,8 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
         if (gameId === 'card_duel' && currentRound > previousRound
           && currentRound < totalRounds) {
           const roundWinner = nextState?.lastRound?.winner;
-          play(roundWinner === 'DRAW' ? 'draw' : roundWinner === prev.me ? 'win' : 'lose', 0.72);
+          play(roundWinner === 'DRAW' ? 'duel_round_draw'
+            : roundWinner === prev.me ? 'duel_round_win' : 'duel_round_lose', 0.86);
           try { navigator.vibrate?.(roundWinner === prev.me ? [28, 35, 55] : 32); } catch { /* cosmetic */ }
         }
         return { ...prev, state: nextState,
@@ -142,7 +149,11 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
         const rawWinner = d?.winner || null;
         const winner = d?.resolvedWinner || rawWinner;
         const finishReason = rawWinner === 'DISCONNECT' ? 'disconnect' : null;
-        play(winner === 'DRAW' ? 'draw' : (winner === prev.me ? 'win' : 'lose'));
+        if (gameId === 'card_duel') {
+          stopDuelMusic();
+          play(winner === 'DRAW' ? 'duel_final_draw'
+            : winner === prev.me ? 'duel_victory' : 'duel_defeat');
+        } else play(winner === 'DRAW' ? 'draw' : (winner === prev.me ? 'win' : 'lose'));
         return {
           ...prev, state: d?.state ?? prev.state, winner, finishReason,
           matchId: d?.matchId || prev.roomId,
@@ -160,6 +171,7 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
       if (disposed) return;
       setError(d?.message || 'خطا در بازی'); setPhase('error');
       deadlineRef.current = null; setSecondsLeft(0); setRematchWaiting(false);
+      if (gameId === 'card_duel') stopDuelMusic();
     };
     const onConnectError = () => {
       if (disposed) return;
@@ -228,6 +240,9 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
       if (rHeld !== resultHoldingRef.current) {
         resultHoldingRef.current = rHeld;
         setResultHolding(rHeld);
+        if (!rHeld && gameId === 'card_duel' && holdUntilRef.current > now) {
+          play('duel_intro', 0.82);
+        }
       }
       if (held) {
         // عددِ نمایش‌داده‌شده همان مهلتِ فکرکردن است، نه شمارشِ مکث.
@@ -251,18 +266,21 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
       ]) s.off(event, handler);
       s.emit('game:leave', { roomId: activeRoomRef.current || undefined });
       s.disconnect();
+      if (gameId === 'card_duel') stopDuelMusic();
       if (socketRef.current === s) socketRef.current = null;
     };
   }, [api, token, gameId, stake, vsBot, roomCode, externalSocket, initialStart, enabled]);
 
   const move = payload => {
-    if (phase !== 'playing' || !connected) return;
+    if (phase !== 'playing' || !connected || holding) return;
+    if ((g.gameId || gameId) === 'card_duel') play('duel_lock', 0.78);
     socketRef.current?.emit('game:move', { roomId: g.roomId, move: payload });
   };
   const startAnother = (event, payload) => {
     const socket = socketRef.current;
     if (!socket) return;
     socket.emit('game:leave', { roomId: activeRoomRef.current || undefined });
+    if ((g.gameId || gameId) === 'card_duel') stopDuelMusic();
     requestedRef.current = true; activeRoomRef.current = null;
     setError(''); setStillSearching(false); setPhase('waiting'); setRematchWaiting(false);
     socket.emit(event, payload);
@@ -290,6 +308,7 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
   });
   const leave = () => {
     socketRef.current?.emit('game:leave', { roomId: activeRoomRef.current || undefined });
+    if ((g.gameId || gameId) === 'card_duel') stopDuelMusic();
     socketRef.current?.disconnect(); activeRoomRef.current = null; setPhase('idle');
   };
 

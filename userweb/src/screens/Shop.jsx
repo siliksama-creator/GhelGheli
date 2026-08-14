@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { req, fa } from '../lib/api.js';
-import { AnimatedName, CosmeticAvatarFrame, DisplayName, RESULT_PALETTES, profileBackgroundClass, profileBackgroundStyle } from '../components/Cosmetics.jsx';
-import MatchEffectVisual from '../components/MatchEffectVisual.jsx';
+import { AnimatedName, CosmeticAvatarFrame, DisplayName, profileBackgroundClass, profileBackgroundStyle } from '../components/Cosmetics.jsx';
 
 const KINDS = [
   ['club_badge', 'باشگاه‌ها'],
@@ -9,8 +8,6 @@ const KINDS = [
   ['name_color', 'افکت نام'],
   ['profile_badge', 'امضای پروفایل'],
   ['profile_background', 'پس‌زمینه'],
-  ['result_template', 'نتیجه'],
-  ['match_effect', 'ورود و پایان'],
   ['emote_pack', 'پیام‌ها'],
 ];
 
@@ -21,8 +18,6 @@ function CategoryMark({ kind }) {
   if (kind === 'name_color') return <svg {...common}><path d="m5 19 5.5-14h3L19 19M7 14h10"/><path d="M4 22h16"/></svg>;
   if (kind === 'profile_badge') return <svg {...common}><path d="M12 2 15 8l6 .9-4.5 4.4 1.1 6.2L12 16.6l-5.6 2.9 1.1-6.2L3 8.9 9 8Z"/><path d="M9 12h6"/></svg>;
   if (kind === 'profile_background') return <svg {...common}><rect x="2.5" y="3" width="19" height="18" rx="3"/><circle cx="12" cy="9" r="3"/><path d="M6.5 18c1.3-3 3.1-4.5 5.5-4.5s4.2 1.5 5.5 4.5"/></svg>;
-  if (kind === 'result_template') return <svg {...common}><rect x="2.5" y="4" width="19" height="16" rx="3"/><path d="M7 9h3M14 9h3M11 15h2"/><path d="M10 7v4M14 7v4"/></svg>;
-  if (kind === 'match_effect') return <svg {...common}><path d="m12 2 1.5 5.2L19 5l-2.2 5.5L22 12l-5.2 1.5L19 19l-5.5-2.2L12 22l-1.5-5.2L5 19l2.2-5.5L2 12l5.2-1.5L5 5l5.5 2.2Z"/><circle cx="12" cy="12" r="2.5"/></svg>;
   return <svg {...common}><path d="M4 4h16v12H9l-5 4Z"/><path d="M8 9h8M8 12h5"/></svg>;
 }
 
@@ -66,28 +61,6 @@ function CosmeticPreview({ item }) {
     <img src="/avatars/avatar_10_crown.webp" alt=""/><div><b>hotcat</b><span>پروفایل بازیکن</span></div><i>★</i>
   </div>;
 
-  if (item.kind === 'result_template') {
-    const colors = RESULT_PALETTES[value] || ['#071522','#38BDF8'];
-    return <div className="shopArtwork shopLiveResult" style={{ background:`linear-gradient(145deg,${colors[0]}88,${colors[1]}88),url(/shop/cosmetics-v3/${item.slug}.webp) center/cover` }}>
-      <small>پایان بازی</small>
-      <div className="shopResultPlayers">
-        <span><img src="/avatars/avatar_10_crown.webp" alt=""/><i>hotcat</i></span>
-        <b>۳ – ۲</b>
-        <span><img src="/avatars/avatar_5_lion.webp" alt=""/><i>حریف</i></span>
-      </div>
-      <em>MVP · hotcat</em>
-    </div>;
-  }
-
-  if (item.kind === 'match_effect') {
-    const phase = item.metadata?.phase === 'finish' ? 'پایان برد' : item.metadata?.phase === 'both' ? 'ورود و پایان' : 'لحظه ورود';
-    return <div className="shopArtwork shopLiveEffect">
-      <MatchEffectVisual slug={item.slug} mode="preview"/>
-      <span className="shopEffectPhase">{phase}</span>
-      <div className="shopEffectPlayers"><i>hotcat</i><b>VS</b><i>حریف</i></div>
-    </div>;
-  }
-
   return <div className="shopArtwork shopLiveEmotes">{messages.map((message,index)=><span key={message} className={index ? 'alt' : ''}>{message}</span>)}</div>;
 }
 
@@ -104,7 +77,7 @@ function PlanCard({ plan, activeTier, busy, onBuy }) {
     <div className="planVisuals" aria-label="نمونه واقعی مزایای پلن">
       <CosmeticAvatarFrame frame={annual?'annual_royal_frame':'blue_fire'} className="planFrameSwatch"><img src="/avatars/avatar_10_crown.webp" alt=""/></CosmeticAvatarFrame>
       <div className="planNameSwatch"><AnimatedName name={annual?'MVP':'hotcat'} effect={annual?'mvp_name':'gold_gradient'}/></div>
-      <span>{annual ? 'قاب، نتیجه و عنوان دائمی' : 'قاب و افکت نام واقعی'}</span>
+      <span>{annual ? 'قاب و عنوان دائمی' : 'قاب و افکت نام واقعی'}</span>
     </div>
     <ul>{(plan.benefits || []).slice(0, annual ? 9 : 5).map((b) => <li key={b}>✓ {b}</li>)}</ul>
     <button type="button" disabled={busy} onClick={() => onBuy(plan.billingCycle)}>
@@ -195,8 +168,7 @@ export default function Shop({ token, reloadProfile }) {
       .shopLiveClub{display:grid;grid-template-columns:1fr 1.3fr;align-items:center;padding:16px 24px;background:radial-gradient(circle at 22% 50%,#38bdf822,transparent 35%),#071522}.shopLiveClub>img{width:88px;height:88px;object-fit:contain;justify-self:center}.shopLiveClub>div{display:grid;grid-template-columns:40px 1fr;align-items:center;gap:3px 8px;padding:9px;border-radius:14px;background:#ffffff0a;border:1px solid #ffffff16}.shopLiveClub>div img{grid-row:1/3;width:40px;height:40px;border-radius:50%;object-fit:cover}.shopLiveClub span{font-size:12px;font-weight:900}.shopLiveClub b{font-size:8px;color:#94a3b8}
       .shopLiveFrame{display:flex;align-items:center;justify-content:center;gap:14px;background:radial-gradient(circle,#1e293b,#030712)}.shopLiveFrameRing{width:92px;height:92px;box-shadow:0 0 22px #38bdf844}.shopLiveFrameRing img{width:100%;height:100%;border-radius:50%;object-fit:cover;border:3px solid #071522}.shopLiveFrame>div{display:flex;flex-direction:column}.shopLiveFrame span{font-size:18px;font-weight:950;color:#fff}.shopLiveFrame small{font-size:8px;color:#94a3b8;margin-top:3px}.shopLiveName{display:flex;align-items:center;justify-content:center;gap:14px;padding:20px;background:linear-gradient(145deg,#071522,#111827)}.shopLiveName>img{width:62px;height:62px;border-radius:50%;object-fit:cover;border:2px solid #ffffff20}.shopLiveName>div{display:flex;flex-direction:column;align-items:flex-start}.shopLiveName .animatedName{font-size:24px;font-weight:950}.shopLiveName>div>span:last-child{font-size:8px;color:#94a3b8;margin-top:5px}.shopLiveBadge{display:flex;align-items:center;justify-content:center;gap:10px;padding:17px;background:radial-gradient(circle at 50% 20%,#7c3aed44,transparent 45%),linear-gradient(145deg,#071522,#111827)}.shopBadgeAvatar{width:58px;height:58px}.shopBadgeAvatar img{width:100%;height:100%;border-radius:50%;object-fit:cover;border:2px solid #071522}.shopLiveBadge .displayName{font-size:15px}.shopLiveBadge>small{position:absolute;bottom:9px;font-size:7.5px;color:#94a3b8}
       .shopLiveProfile{display:flex;align-items:center;justify-content:center;gap:12px;padding:24px!important;background-size:cover!important;background-position:center!important}.shopLiveProfile:after{content:'';position:absolute;inset:0;background:#02061766}.shopLiveProfile>*{position:relative;z-index:2}.shopLiveProfile>img{width:66px;height:66px;border-radius:50%;object-fit:cover;border:3px solid #fff}.shopLiveProfile>div{display:flex;flex-direction:column}.shopLiveProfile b{font-size:16px}.shopLiveProfile span{font-size:8px;color:#e2e8f0}.shopLiveProfile i{font-style:normal;color:#ffd166;font-size:24px}
-      .shopLiveResult{display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;text-shadow:0 3px 10px #000}.shopLiveResult>small{font-size:8px;letter-spacing:1px}.shopResultPlayers{display:flex;align-items:center;gap:12px}.shopResultPlayers>span{display:flex;flex-direction:column;align-items:center;gap:2px}.shopResultPlayers img{width:31px;height:31px;border-radius:50%;object-fit:cover;border:1px solid #fff9}.shopResultPlayers i{font-style:normal;font-size:7px}.shopLiveResult b{font-size:29px;direction:ltr}.shopLiveResult em{font-style:normal;padding:3px 10px;border-radius:99px;background:#02061788;color:#ffd166;font-size:8px;font-weight:900}
-      .shopLiveEffect{display:grid;place-items:center;padding:7px;background:#020617}.shopLiveEffect .cosFx{height:100%;width:auto;max-width:100%}.shopEffectPhase{position:absolute;top:10px;inset-inline-start:11px;padding:3px 8px;border-radius:99px;background:#020617cc;border:1px solid #38bdf866;color:#7dd3fc;font-size:7px;font-weight:900}.shopEffectPlayers{position:absolute;bottom:8px;display:flex;align-items:center;gap:8px;padding:3px 9px;border-radius:99px;background:#020617cc;border:1px solid #ffffff20}.shopEffectPlayers i{font-style:normal;font-size:7px;color:#e2e8f0}.shopEffectPlayers b{font-size:7px;color:#ffd166}.shopLiveEmotes{display:flex;flex-direction:column;justify-content:center;gap:9px;padding:22px 38px;background:linear-gradient(145deg,#071522,#111827)}.shopLiveEmotes span{align-self:flex-end;max-width:85%;padding:8px 12px;border-radius:14px 14px 4px 14px;background:#f8fafc;color:#0f172a;font-size:9px;font-weight:950;box-shadow:0 7px 18px #0008}.shopLiveEmotes span.alt{align-self:flex-start;background:#ffd166;border-radius:14px 14px 14px 4px}
+      .shopLiveEmotes{display:flex;flex-direction:column;justify-content:center;gap:9px;padding:22px 38px;background:linear-gradient(145deg,#071522,#111827)}.shopLiveEmotes span{align-self:flex-end;max-width:85%;padding:8px 12px;border-radius:14px 14px 4px 14px;background:#f8fafc;color:#0f172a;font-size:9px;font-weight:950;box-shadow:0 7px 18px #0008}.shopLiveEmotes span.alt{align-self:flex-start;background:#ffd166;border-radius:14px 14px 14px 4px}
       @media(max-width:720px){.shopHeroTop{align-items:flex-start;flex-wrap:wrap}.shopHero h2{font-size:19px}.shopPlans{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:96%;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:5px}.shopPlan{min-height:285px;scroll-snap-align:center}.shopPlan ul{grid-template-columns:1fr 1fr}.shopCarousel{grid-auto-columns:minmax(245px,84%)}.shopWallet{font-size:11px}.shopHero{padding:13px}.shopShelf{padding:10px}}
       @media(max-width:410px){.shopPlan ul{grid-template-columns:1fr}.shopCarousel{grid-auto-columns:96%}}
     `}</style>

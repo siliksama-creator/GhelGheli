@@ -39,14 +39,25 @@ ok(/\? '\+۱ تو'/.test(mobileClash) && /\? '\+۱ تو'/.test(webClash),
 console.log('\n== اعلانِ شروع راند ==');
 const mobileIntro = between(mobile, 'class _RoundIntroOverlayState', 'class CardDuelRoundIntroForTest');
 const webIntro = between(web, 'function RoundIntroOverlay(', '/** عددِ نهایی');
-ok(/نبرد \$statName/.test(mobileIntro) && /عدد بالاتر می‌برد/.test(mobileIntro),
-  'Android: اعلان فقط معیار و قانون یک‌خطی دارد');
+ok(/Text\(\s*statName/.test(mobileIntro) && /بالاترین عدد برنده است/.test(mobileIntro),
+  'Android: معیار و قانون یک‌خطی در صحنهٔ مستقل برجسته‌اند');
 ok(!/Text\(\s*hint/.test(mobileIntro) && /label:[\s\S]*\$hint/.test(mobileIntro),
   'Android: hint بلند فقط در Semantics مانده است');
-ok(/<b>نبرد \{meta\.name/.test(webIntro) && /<em>عدد بالاتر می‌برد<\/em>/.test(webIntro),
-  'Web: اعلان مینیمال Android را عیناً دنبال می‌کند');
+ok(/<b>\{meta\.name/.test(webIntro) && /<em>بالاترین عدد برنده است<\/em>/.test(webIntro),
+  'Web: صحنهٔ معیار Android را با همان قرارداد دنبال می‌کند');
 ok(!/focus\?\.cry/.test(webIntro) && !/\{focus\?\.hint &&/.test(webIntro),
   'Web: شعار و پاراگراف آموزشی دیداری ندارد');
+
+console.log('\n== تحلیل ترکیبِ ثابت و بدون اسکرول ==');
+const mobileIntel = between(mobile, 'class _DeckIntelPanel', 'class _FinalRoundBreakdown');
+const webIntel = between(web, 'function DeckIntel(', 'function RoundTimeline(');
+ok(!/Wrap\(/.test(mobileIntel) && !/_IntelChip/.test(mobileIntel)
+  && /maxLines: 1/.test(mobileIntel),
+  'Android: تحلیل یک کارت دوخطی ثابت است، نه چیپ‌های چندردیفه');
+ok(!/<details/.test(webIntel) && /duelIntelCompact/.test(webIntel),
+  'Web: تحلیل details یا حالت بازشونده ندارد');
+ok(!/_CollapsibleSection\([\s\S]{0,120}title: 'تحلیل ترکیب'/.test(mobilePage),
+  'Android: تحلیل داخل پنل بازشونده جاسازی نشده است');
 
 console.log('\n== HUD، انتخاب و پایان ==');
 ok(!/کارت این راند را انتخاب کن/.test(mobileClash)

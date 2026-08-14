@@ -8,7 +8,6 @@ import '../../core/money.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/async_section.dart';
-import '../../widgets/match_effect_visual.dart';
 
 class ShopPage extends StatefulWidget {
   final ApiClient api;
@@ -30,8 +29,6 @@ class _ShopPageState extends State<ShopPage> {
     ('name_color', 'افکت نام', Icons.auto_awesome_rounded),
     ('profile_badge', 'امضای پروفایل', Icons.workspace_premium_rounded),
     ('profile_background', 'پس‌زمینه', Icons.wallpaper_rounded),
-    ('result_template', 'نتیجه', Icons.emoji_events_rounded),
-    ('match_effect', 'ورود و پایان', Icons.celebration_rounded),
     ('emote_pack', 'پیام‌ها', Icons.forum_rounded),
   ];
 
@@ -54,7 +51,8 @@ class _ShopPageState extends State<ShopPage> {
     try {
       final result = await action();
       if (!mounted) return result;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(success)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(success)));
       await _reload();
       return result;
     } catch (error) {
@@ -93,7 +91,9 @@ class _ShopPageState extends State<ShopPage> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('انصراف')),
           FilledButton(
             onPressed: balance < price ? null : () => Navigator.pop(ctx, true),
             child: const Text('تأیید خرید'),
@@ -123,10 +123,12 @@ class _ShopPageState extends State<ShopPage> {
           children: [
             Text('${Money.withUnit(price)} از کیف پول کم می‌شود.'),
             Gaps.vXs,
-            const Text('این آیتم ظاهری برای همیشه در کلکسیونت می‌ماند و هیچ قدرت رقابتی نمی‌دهد.'),
+            const Text(
+                'این آیتم ظاهری برای همیشه در کلکسیونت می‌ماند و هیچ قدرت رقابتی نمی‌دهد.'),
             if (item['kind'] == 'club_badge') ...[
               Gaps.vXs,
-              const Text('خرید نشان، عضویت دائمی همان باشگاه را هم فعال می‌کند.'),
+              const Text(
+                  'خرید نشان، عضویت دائمی همان باشگاه را هم فعال می‌کند.'),
             ],
             if (balance < price) ...[
               Gaps.vXs,
@@ -136,7 +138,9 @@ class _ShopPageState extends State<ShopPage> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('انصراف')),
           FilledButton(
             onPressed: balance < price ? null : () => Navigator.pop(ctx, true),
             child: const Text('بله، بخر'),
@@ -171,9 +175,8 @@ class _ShopPageState extends State<ShopPage> {
         future: _future,
         onRetry: _reload,
         builder: (context, raw) {
-          final data = raw is Map
-              ? Map<String, dynamic>.from(raw)
-              : <String, dynamic>{};
+          final data =
+              raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
           final plus = data['plus'] is Map
               ? Map<String, dynamic>.from(data['plus'] as Map)
               : <String, dynamic>{};
@@ -197,7 +200,8 @@ class _ShopPageState extends State<ShopPage> {
           final visible = items.where((item) => item['kind'] == _kind).toList();
 
           return ListView(
-            padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, Gaps.xxl),
+            padding:
+                const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, Gaps.xxl),
             children: [
               _ShopHero(
                 balance: balance,
@@ -260,7 +264,8 @@ class _ShopPageState extends State<ShopPage> {
                 child: Text(
                   'همه قیمت‌ها تومان است. خریدهای مستقیم دائمی‌اند؛ آیتم‌ها فقط ظاهری‌اند و شانس برد یا امتیاز را تغییر نمی‌دهند.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 9.5, color: Colors.white54, height: 1.5),
+                  style: TextStyle(
+                      fontSize: 9.5, color: Colors.white54, height: 1.5),
                 ),
               ),
             ],
@@ -295,8 +300,12 @@ class _ShopHero extends StatelessWidget {
           end: Alignment.bottomLeft,
           colors: [Color(0xFF102A43), Color(0xFF11172E), Color(0xFF35154C)],
         ),
-        border: Border.all(color: const Color(0xFFFFD166).withValues(alpha: .35)),
-        boxShadow: const [BoxShadow(color: Color(0x55000000), blurRadius: 24, offset: Offset(0, 10))],
+        border:
+            Border.all(color: const Color(0xFFFFD166).withValues(alpha: .35)),
+        boxShadow: const [
+          BoxShadow(
+              color: Color(0x55000000), blurRadius: 24, offset: Offset(0, 10))
+        ],
       ),
       child: Row(
         children: [
@@ -316,7 +325,8 @@ class _ShopHero extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('فروشگاه قلقلی پلاس',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
+                    style:
+                        TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
                 Text(
                   active
                       ? 'پلاس ${plus['tier'] == 'annual' ? 'سالانه' : 'ماهانه'} فعال است'
@@ -324,14 +334,19 @@ class _ShopHero extends StatelessWidget {
                   style: const TextStyle(fontSize: 10.5, color: Colors.white60),
                 ),
                 Text('کیف پول: ${Money.withUnit(balance)}',
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF22E7A6), fontWeight: FontWeight.w900)),
+                    style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF22E7A6),
+                        fontWeight: FontWeight.w900)),
               ],
             ),
           ),
           IconButton(
             tooltip: expanded ? 'جمع کردن پلن‌ها' : 'نمایش پلن‌ها',
             onPressed: onToggle,
-            icon: Icon(expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded),
+            icon: Icon(expanded
+                ? Icons.expand_less_rounded
+                : Icons.expand_more_rounded),
           ),
         ],
       ),
@@ -355,7 +370,8 @@ class _PlanCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final annual = plan['billingCycle'] == 'annual';
     final active = activeTier == plan['billingCycle'];
-    final benefits = ((plan['benefits'] as List?) ?? const []).take(annual ? 9 : 5);
+    final benefits =
+        ((plan['benefits'] as List?) ?? const []).take(annual ? 9 : 5);
     return SizedBox(
       width: 300,
       child: AppCard(
@@ -364,12 +380,17 @@ class _PlanCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(children: [
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(annual ? 'بیشترین ارزش' : 'انعطاف ماهانه',
-                    style: const TextStyle(fontSize: 9, color: Colors.white54)),
-                Text('${plan['label']}',
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
-              ])),
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Text(annual ? 'بیشترین ارزش' : 'انعطاف ماهانه',
+                        style: const TextStyle(
+                            fontSize: 9, color: Colors.white54)),
+                    Text('${plan['label']}',
+                        style: const TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w900)),
+                  ])),
               if (annual)
                 const _Pill(text: 'حدود ۳۰٪ تخفیف', color: Color(0xFFFFD166))
               else if (active)
@@ -377,7 +398,10 @@ class _PlanCard extends StatelessWidget {
             ]),
             Gaps.vXs,
             Text(Money.withUnit(plan['price']),
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFFFFD166))),
+                style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFFFFD166))),
             if (annual)
               Text('به‌جای ${Money.withUnit(59000 * 12)} پرداخت ماهانه',
                   style: const TextStyle(fontSize: 9, color: Colors.white54)),
@@ -394,7 +418,10 @@ class _PlanCard extends StatelessWidget {
                       SizedBox(
                         width: double.infinity,
                         child: Text('✓ $benefit',
-                            style: const TextStyle(fontSize: 9.5, height: 1.35, color: Colors.white70)),
+                            style: const TextStyle(
+                                fontSize: 9.5,
+                                height: 1.35,
+                                color: Colors.white70)),
                       ),
                   ],
                 ),
@@ -403,11 +430,14 @@ class _PlanCard extends StatelessWidget {
             FilledButton.icon(
               onPressed: busy ? null : onBuy,
               icon: busy
-                  ? const SizedBox.square(dimension: 15, child: CircularProgressIndicator(strokeWidth: 2))
+                  ? const SizedBox.square(
+                      dimension: 15,
+                      child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.auto_awesome_rounded, size: 17),
               label: Text(active ? 'تمدید همین پلن' : 'خرید ${plan['label']}'),
               style: FilledButton.styleFrom(
-                backgroundColor: annual ? const Color(0xFFFFD166) : const Color(0xFF38BDF8),
+                backgroundColor:
+                    annual ? const Color(0xFFFFD166) : const Color(0xFF38BDF8),
                 foregroundColor: const Color(0xFF071522),
               ),
             ),
@@ -441,7 +471,9 @@ class _PlanVisuals extends StatelessWidget {
           child: CosmeticAvatarFrame(
             frame: frameKey,
             padding: 2.5,
-            child: ClipOval(child: Image.asset('assets/avatars/avatar_10_crown.webp', fit: BoxFit.cover)),
+            child: ClipOval(
+                child: Image.asset('assets/avatars/avatar_10_crown.webp',
+                    fit: BoxFit.cover)),
           ),
         ),
         const SizedBox(width: 7),
@@ -458,7 +490,11 @@ class _PlanVisuals extends StatelessWidget {
           child: Text(
             annual ? 'قاب، نتیجه و عنوان دائمی' : 'قاب و افکت نام واقعی',
             maxLines: 2,
-            style: const TextStyle(fontSize: 8.5, height: 1.35, color: Colors.white70, fontWeight: FontWeight.w800),
+            style: const TextStyle(
+                fontSize: 8.5,
+                height: 1.35,
+                color: Colors.white70,
+                fontWeight: FontWeight.w800),
           ),
         ),
       ]),
@@ -495,8 +531,10 @@ class _CategoryShelf extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
-            Expanded(child: Text(title,
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900))),
+            Expanded(
+                child: Text(title,
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w900))),
             Text('${faNum(items.length)} انتخاب · ورق بزن',
                 style: const TextStyle(fontSize: 9.5, color: Colors.white54)),
           ]),
@@ -513,7 +551,8 @@ class _CategoryShelf extends StatelessWidget {
                       final item = items[index];
                       return _ProductCard(
                         item: item,
-                        busy: busy == 'buy-${item['id']}' || busy == 'equip-${item['id']}',
+                        busy: busy == 'buy-${item['id']}' ||
+                            busy == 'equip-${item['id']}',
                         onBuy: () => onBuy(item, balance),
                         onEquip: () => onEquip(item),
                       );
@@ -570,20 +609,34 @@ class _ProductCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Row(children: [
-                    Expanded(child: Text('${item['name']}',
-                        maxLines: 1, overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900))),
-                    if (selected) const _Pill(text: 'فعال', color: Color(0xFF22E7A6)),
+                    Expanded(
+                        child: Text('${item['name']}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 12.5, fontWeight: FontWeight.w900))),
+                    if (selected)
+                      const _Pill(text: 'فعال', color: Color(0xFF22E7A6)),
                   ]),
                   const SizedBox(height: 3),
                   Text('${item['description'] ?? ''}',
-                      maxLines: 2, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 9.5, height: 1.35, color: Colors.white54)),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 9.5, height: 1.35, color: Colors.white54)),
                   Gaps.vXs,
                   Row(children: [
-                    Expanded(child: Text(
-                      annualGift ? 'هدیه سالانه' : owned ? 'خریداری‌شده' : Money.withUnit(item['price']),
-                      style: const TextStyle(fontSize: 10.5, color: Color(0xFFFFD166), fontWeight: FontWeight.w900),
+                    Expanded(
+                        child: Text(
+                      annualGift
+                          ? 'هدیه سالانه'
+                          : owned
+                              ? 'خریداری‌شده'
+                              : Money.withUnit(item['price']),
+                      style: const TextStyle(
+                          fontSize: 10.5,
+                          color: Color(0xFFFFD166),
+                          fontWeight: FontWeight.w900),
                     )),
                     if (usable)
                       FilledButton(
@@ -593,7 +646,8 @@ class _ProductCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(horizontal: 10),
                           visualDensity: VisualDensity.compact,
                         ),
-                        child: Text(selected ? 'فعال' : 'انتخاب', style: const TextStyle(fontSize: 10)),
+                        child: Text(selected ? 'فعال' : 'انتخاب',
+                            style: const TextStyle(fontSize: 10)),
                       )
                     else if (!annualGift)
                       FilledButton(
@@ -604,15 +658,21 @@ class _ProductCard extends StatelessWidget {
                           visualDensity: VisualDensity.compact,
                         ),
                         child: busy
-                            ? const SizedBox.square(dimension: 13, child: CircularProgressIndicator(strokeWidth: 2))
-                            : const Text('خرید', style: TextStyle(fontSize: 10)),
+                            ? const SizedBox.square(
+                                dimension: 13,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2))
+                            : const Text('خرید',
+                                style: TextStyle(fontSize: 10)),
                       )
                     else
-                      const Icon(Icons.lock_rounded, size: 17, color: Colors.white38),
+                      const Icon(Icons.lock_rounded,
+                          size: 17, color: Colors.white38),
                   ]),
                   if (item['unlockedByPlus'] == true && !owned)
                     const Text('با پلاس در دسترس است',
-                        style: TextStyle(fontSize: 8.5, color: Color(0xFF38BDF8))),
+                        style:
+                            TextStyle(fontSize: 8.5, color: Color(0xFF38BDF8))),
                 ],
               ),
             ),
@@ -628,16 +688,14 @@ class _ProductArt extends StatelessWidget {
   final Map<String, dynamic> item;
 
   IconData _kindIcon(String kind) => switch (kind) {
-    'club_badge' => Icons.shield_outlined,
-    'card_frame' => Icons.crop_portrait_rounded,
-    'name_color' => Icons.title_rounded,
-    'profile_badge' => Icons.workspace_premium_rounded,
-    'profile_background' => Icons.wallpaper_rounded,
-    'result_template' => Icons.scoreboard_rounded,
-    'match_effect' => Icons.flare_rounded,
-    'emote_pack' => Icons.chat_bubble_outline_rounded,
-    _ => Icons.auto_awesome_rounded,
-  };
+        'club_badge' => Icons.shield_outlined,
+        'card_frame' => Icons.crop_portrait_rounded,
+        'name_color' => Icons.title_rounded,
+        'profile_badge' => Icons.workspace_premium_rounded,
+        'profile_background' => Icons.wallpaper_rounded,
+        'emote_pack' => Icons.chat_bubble_outline_rounded,
+        _ => Icons.auto_awesome_rounded,
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -650,31 +708,13 @@ class _ProductArt extends StatelessWidget {
     } else if (kind == 'name_color') {
       exactPreview = _ShopPreviewSurface(child: _ShopNameArtwork(value: value));
     } else if (kind == 'profile_badge') {
-      exactPreview = _ShopPreviewSurface(child: _ShopBadgeArtwork(value: value));
+      exactPreview =
+          _ShopPreviewSurface(child: _ShopBadgeArtwork(value: value));
     } else if (kind == 'profile_background') {
       exactPreview = AnimatedProfileBackground(
         slug: value,
         child: const _ShopProfileArtwork(),
       );
-    } else if (kind == 'result_template') {
-      exactPreview = Stack(fit: StackFit.expand, children: [
-        Image.asset(
-          'assets/shop/cosmetics/$slug.webp',
-          fit: BoxFit.cover,
-          cacheWidth: 640,
-          filterQuality: FilterQuality.medium,
-          errorBuilder: (_, __, ___) => DecoratedBox(
-            decoration: BoxDecoration(gradient: LinearGradient(
-              colors: resultTemplateColors[value] ?? const [Color(0xFF071522), Color(0xFF38BDF8)],
-            )),
-          ),
-        ),
-        const ColoredBox(color: Color(0x33020617)),
-        const _ShopResultArtwork(),
-      ]);
-    } else if (kind == 'match_effect') {
-      final metadata = item['metadata'] is Map ? item['metadata'] as Map : const {};
-      exactPreview = _ShopMatchEffectArtwork(slug: slug, phase: '${metadata['phase'] ?? 'entry'}');
     } else if (kind == 'emote_pack') {
       exactPreview = _ShopPreviewSurface(
         child: _ShopEmoteArtwork(slug: slug, metadata: item['metadata']),
@@ -685,7 +725,8 @@ class _ProductArt extends StatelessWidget {
           ? clubAsset(value)
           : 'assets/shop/cosmetics/$slug.webp';
       exactPreview = Padding(
-        padding: kind == 'club_badge' ? const EdgeInsets.all(10) : EdgeInsets.zero,
+        padding:
+            kind == 'club_badge' ? const EdgeInsets.all(10) : EdgeInsets.zero,
         child: Image.asset(
           path,
           fit: kind == 'club_badge' ? BoxFit.contain : BoxFit.cover,
@@ -701,98 +742,19 @@ class _ProductArt extends StatelessWidget {
   }
 }
 
-class _ShopMatchEffectArtwork extends StatefulWidget {
-  const _ShopMatchEffectArtwork({required this.slug, required this.phase});
-  final String slug;
-  final String phase;
-
-  @override
-  State<_ShopMatchEffectArtwork> createState() => _ShopMatchEffectArtworkState();
-}
-
-class _ShopMatchEffectArtworkState extends State<_ShopMatchEffectArtwork>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 2200),
-  )..repeat();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
-    final phaseLabel = widget.phase == 'finish'
-        ? 'پایان برد'
-        : widget.phase == 'both' ? 'ورود و پایان' : 'لحظه ورود';
-    return ColoredBox(
-      color: const Color(0xFF020617),
-      child: Stack(children: [
-        Positioned.fill(
-          child: Padding(
-            padding: const EdgeInsets.all(7),
-            child: Center(
-              child: reduceMotion
-                  ? MatchEffectVisual(slug: widget.slug, progress: .56, compact: true)
-                  : AnimatedBuilder(
-                      animation: _controller,
-                      builder: (_, __) => MatchEffectVisual(
-                        slug: widget.slug,
-                        progress: _controller.value,
-                        compact: true,
-                      ),
-                    ),
-            ),
-          ),
-        ),
-        PositionedDirectional(
-          top: 9,
-          start: 9,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-            decoration: BoxDecoration(
-              color: const Color(0xDD020617),
-              borderRadius: Corners.rPill,
-              border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: .5)),
-            ),
-            child: Text(phaseLabel, style: const TextStyle(fontSize: 7.5, color: Color(0xFF7DD3FC), fontWeight: FontWeight.w900)),
-          ),
-        ),
-        Positioned(
-          bottom: 7,
-          left: 54,
-          right: 54,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-            decoration: BoxDecoration(color: const Color(0xDD020617), borderRadius: Corners.rPill, border: Border.all(color: Colors.white12)),
-            child: const Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Text('hotcat', style: TextStyle(fontSize: 7.5)),
-              Text('VS', style: TextStyle(fontSize: 7, color: Color(0xFFFFD166), fontWeight: FontWeight.w900)),
-              Text('حریف', style: TextStyle(fontSize: 7.5)),
-            ]),
-          ),
-        ),
-      ]),
-    );
-  }
-}
-
 class _ShopPreviewSurface extends StatelessWidget {
   const _ShopPreviewSurface({required this.child});
   final Widget child;
   @override
   Widget build(BuildContext context) => DecoratedBox(
-    decoration: const BoxDecoration(gradient: LinearGradient(
-      begin: Alignment.topRight,
-      end: Alignment.bottomLeft,
-      colors: [Color(0xFF13243A), Color(0xFF030712)],
-    )),
-    child: child,
-  );
+        decoration: const BoxDecoration(
+            gradient: LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [Color(0xFF13243A), Color(0xFF030712)],
+        )),
+        child: child,
+      );
 }
 
 class _ShopFrameArtwork extends StatelessWidget {
@@ -801,29 +763,38 @@ class _ShopFrameArtwork extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _ShopPreviewSurface(
-    child: Center(
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        SizedBox(
-          width: 82,
-          height: 82,
-          child: CosmeticAvatarFrame(
-            frame: value,
-            padding: 4,
-            child: ClipOval(child: Image.asset(
-              'assets/avatars/avatar_10_crown.webp',
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => const ColoredBox(color: Color(0xFF10243A), child: Icon(Icons.person_rounded)),
-            )),
-          ),
+        child: Center(
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            SizedBox(
+              width: 82,
+              height: 82,
+              child: CosmeticAvatarFrame(
+                frame: value,
+                padding: 4,
+                child: ClipOval(
+                    child: Image.asset(
+                  'assets/avatars/avatar_10_crown.webp',
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const ColoredBox(
+                      color: Color(0xFF10243A),
+                      child: Icon(Icons.person_rounded)),
+                )),
+              ),
+            ),
+            Gaps.hSm,
+            const Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('hotcat',
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                  Text('همین قاب روی پروفایل و بازی',
+                      style: TextStyle(fontSize: 8, color: Colors.white54)),
+                ]),
+          ]),
         ),
-        Gaps.hSm,
-        const Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('hotcat', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-          Text('همین قاب روی پروفایل و بازی', style: TextStyle(fontSize: 8, color: Colors.white54)),
-        ]),
-      ]),
-    ),
-  );
+      );
 }
 
 class _ShopNameArtwork extends StatelessWidget {
@@ -832,18 +803,21 @@ class _ShopNameArtwork extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => IgnorePointer(
-    child: Center(
-      child: AnimatedNameText(
-        name: 'hotcat',
-        effect: '$value',
-        style: const TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.w900,
-          shadows: [Shadow(color: Colors.black, blurRadius: 12, offset: Offset(0, 3))],
+        child: Center(
+          child: AnimatedNameText(
+            name: 'hotcat',
+            effect: '$value',
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              shadows: [
+                Shadow(
+                    color: Colors.black, blurRadius: 12, offset: Offset(0, 3))
+              ],
+            ),
+          ),
         ),
-      ),
-    ),
-  );
+      );
 }
 
 class _ShopBadgeArtwork extends StatelessWidget {
@@ -852,27 +826,29 @@ class _ShopBadgeArtwork extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-    child: Column(mainAxisSize: MainAxisSize.min, children: [
-      SizedBox(
-        width: 58,
-        height: 58,
-        child: CosmeticAvatarFrame(
-          frame: 'pro_holographic',
-          padding: 3,
-          child: ClipOval(child: Image.asset('assets/avatars/avatar_10_crown.webp', fit: BoxFit.cover)),
-        ),
-      ),
-      const SizedBox(height: 6),
-      DisplayName(
-        name: 'hotcat',
-        cosmetics: {'profileBadge': value, 'color': 'gold_gradient'},
-        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
-      ),
-      const SizedBox(height: 3),
-      const Text('همین امضا در پروفایل، چت، لیگ و بازی',
-          style: TextStyle(fontSize: 7.5, color: Colors.white54)),
-    ]),
-  );
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          SizedBox(
+            width: 58,
+            height: 58,
+            child: CosmeticAvatarFrame(
+              frame: 'pro_holographic',
+              padding: 3,
+              child: ClipOval(
+                  child: Image.asset('assets/avatars/avatar_10_crown.webp',
+                      fit: BoxFit.cover)),
+            ),
+          ),
+          const SizedBox(height: 6),
+          DisplayName(
+            name: 'hotcat',
+            cosmetics: {'profileBadge': value, 'color': 'gold_gradient'},
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 3),
+          const Text('همین امضا در پروفایل، چت، لیگ و بازی',
+              style: TextStyle(fontSize: 7.5, color: Colors.white54)),
+        ]),
+      );
 }
 
 class _ShopProfileArtwork extends StatelessWidget {
@@ -880,55 +856,31 @@ class _ShopProfileArtwork extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
-      decoration: BoxDecoration(
-        color: const Color(0x99020617),
-        borderRadius: Corners.rLg,
-        border: Border.all(color: Colors.white24),
-      ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        ClipOval(child: Image.asset('assets/avatars/avatar_10_crown.webp', width: 52, height: 52, fit: BoxFit.cover)),
-        Gaps.hSm,
-        const Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('hotcat', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
-          Text('پروفایل بازیکن', style: TextStyle(fontSize: 8, color: Colors.white60)),
-        ]),
-      ]),
-    ),
-  );
-}
-
-class _ShopResultArtwork extends StatelessWidget {
-  const _ShopResultArtwork();
-
-  Widget _player(String asset, String name) => Column(mainAxisSize: MainAxisSize.min, children: [
-    ClipOval(child: Image.asset(asset, width: 32, height: 32, fit: BoxFit.cover)),
-    const SizedBox(height: 2),
-    Text(name, style: const TextStyle(fontSize: 7, color: Colors.white, fontWeight: FontWeight.w800)),
-  ]);
-
-  @override
-  Widget build(BuildContext context) => IgnorePointer(
-    child: Center(
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        const Text('پایان بازی', style: TextStyle(fontSize: 7.5, color: Colors.white70, fontWeight: FontWeight.w800)),
-        Row(mainAxisSize: MainAxisSize.min, children: [
-          _player('assets/avatars/avatar_10_crown.webp', 'hotcat'),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 12),
-            child: Directionality(
-              textDirection: TextDirection.ltr,
-              child: Text('۳ – ۲', style: TextStyle(fontSize: 28, color: Colors.white, fontWeight: FontWeight.w900,
-                shadows: [Shadow(color: Colors.black, blurRadius: 12)])),
-            ),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+          decoration: BoxDecoration(
+            color: const Color(0x99020617),
+            borderRadius: Corners.rLg,
+            border: Border.all(color: Colors.white24),
           ),
-          _player('assets/avatars/avatar_5_lion.webp', 'حریف'),
-        ]),
-        const Text('MVP · hotcat', style: TextStyle(fontSize: 7, color: Color(0xFFFFD166), fontWeight: FontWeight.w900)),
-      ]),
-    ),
-  );
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            ClipOval(
+                child: Image.asset('assets/avatars/avatar_10_crown.webp',
+                    width: 52, height: 52, fit: BoxFit.cover)),
+            Gaps.hSm,
+            const Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('hotcat',
+                      style:
+                          TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
+                  Text('پروفایل بازیکن',
+                      style: TextStyle(fontSize: 8, color: Colors.white60)),
+                ]),
+          ]),
+        ),
+      );
 }
 
 class _ShopEmoteArtwork extends StatelessWidget {
@@ -938,7 +890,10 @@ class _ShopEmoteArtwork extends StatelessWidget {
 
   List<String> get messages {
     if (metadata is Map && (metadata as Map)['messages'] is List) {
-      return ((metadata as Map)['messages'] as List).take(2).map((e) => '$e').toList();
+      return ((metadata as Map)['messages'] as List)
+          .take(2)
+          .map((e) => '$e')
+          .toList();
     }
     return switch (slug) {
       'emote_respect' => const ['بازی خوبی بود', 'دوباره؟'],
@@ -949,34 +904,50 @@ class _ShopEmoteArtwork extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => IgnorePointer(
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 44, vertical: 20),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          for (int i = 0; i < messages.length; i++)
-            Align(
-              alignment: i == 0 ? Alignment.centerRight : Alignment.centerLeft,
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 160),
-                margin: const EdgeInsets.only(bottom: 7),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: i == 0 ? const Color(0xFFF8FAFC) : const Color(0xFFFFD166),
-                  borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(13), topRight: const Radius.circular(13),
-                    bottomLeft: Radius.circular(i == 0 ? 13 : 3), bottomRight: Radius.circular(i == 0 ? 3 : 13),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 44, vertical: 20),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              for (int i = 0; i < messages.length; i++)
+                Align(
+                  alignment:
+                      i == 0 ? Alignment.centerRight : Alignment.centerLeft,
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 160),
+                    margin: const EdgeInsets.only(bottom: 7),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: i == 0
+                          ? const Color(0xFFF8FAFC)
+                          : const Color(0xFFFFD166),
+                      borderRadius: BorderRadius.only(
+                        topLeft: const Radius.circular(13),
+                        topRight: const Radius.circular(13),
+                        bottomLeft: Radius.circular(i == 0 ? 13 : 3),
+                        bottomRight: Radius.circular(i == 0 ? 3 : 13),
+                      ),
+                      boxShadow: const [
+                        BoxShadow(
+                            color: Color(0x88000000),
+                            blurRadius: 12,
+                            offset: Offset(0, 5))
+                      ],
+                    ),
+                    child: Text(messages[i],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 8.5,
+                            color: Color(0xFF0F172A),
+                            fontWeight: FontWeight.w900)),
                   ),
-                  boxShadow: const [BoxShadow(color: Color(0x88000000), blurRadius: 12, offset: Offset(0, 5))],
                 ),
-                child: Text(messages[i], maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 8.5, color: Color(0xFF0F172A), fontWeight: FontWeight.w900)),
-              ),
-            ),
-        ],
-      ),
-    ),
-  );
+            ],
+          ),
+        ),
+      );
 }
 
 class _Pill extends StatelessWidget {
@@ -986,13 +957,14 @@ class _Pill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-    decoration: BoxDecoration(
-      color: color.withValues(alpha: .15),
-      borderRadius: Corners.rPill,
-      border: Border.all(color: color.withValues(alpha: .35)),
-    ),
-    child: Text(text,
-        style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w900, color: color)),
-  );
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: .15),
+          borderRadius: Corners.rPill,
+          border: Border.all(color: color.withValues(alpha: .35)),
+        ),
+        child: Text(text,
+            style: TextStyle(
+                fontSize: 8.5, fontWeight: FontWeight.w900, color: color)),
+      );
 }

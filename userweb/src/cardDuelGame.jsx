@@ -2,8 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { asset, avatarUrl, fa, req } from './lib/api.js';
 import { primeImageCache } from './lib/imageCache.js';
 import { useGameSession } from './gameSession.js';
-import { CosmeticAvatarFrame, CosmeticFrame, DisplayName, RESULT_PALETTES } from './components/Cosmetics.jsx';
-import CosmeticMatchEffect, { matchEffectSupports } from './components/MatchEffectVisual.jsx';
+import { CosmeticAvatarFrame, CosmeticFrame, DisplayName } from './components/Cosmetics.jsx';
 import PlayerCard from './components/PlayerCard.jsx';
 import { cardIdOf, cardPowerOf } from './lib/cards.js';
 import { matchVerdictForViewer, resultMvp, roundEffectBonus, roundForViewer } from './lib/cardDuelLogic.js';
@@ -11,11 +10,6 @@ import { matchVerdictForViewer, resultMvp, roundEffectBonus, roundForViewer } fr
 const idOf = card => cardIdOf(card);
 const num = value => Number(value || 0);
 
-function DuelEffectVisual({ slug, finish = false }) {
-  return <div aria-hidden="true" style={{position:'absolute',zIndex:20,inset:0,display:'grid',placeItems:'center',pointerEvents:'none'}}>
-    <CosmeticMatchEffect slug={slug} mode={finish ? 'finish' : 'entry'} />
-  </div>;
-}
 const rarityColor = rarity => ({
   legend: '#FF6B35', premium: '#A855F7', gold: '#F7C948',
   silver: '#C7D2FE', normal: '#22E7A6',
@@ -296,11 +290,11 @@ const FOCUS_META = {
 //
 // چرا overlay و نه بزرگ‌کردنِ همان بنر: بنر در جریانِ صفحه است و ارتفاع
 // می‌گیرد — همان چیزی که کاربر را مجبور به اسکرول می‌کرد. این نسخه
-// `position:fixed` است، دو ثانیه می‌آید و می‌رود، و صفر پیکسل از چیدمان
-// می‌گیرد.
+// `position:fixed` است، ۲.۸ ثانیه معیار و شمارش را نگه می‌دارد، و صفر
+// پیکسل از چیدمان می‌گیرد.
 //
-// `pointer-events:none` در CSS: کاربر باید بتواند وسطِ انیمیشن کارتش را
-// بزند. اعلان نباید جلوی بازی را بگیرد.
+// این صحنه تا پایان مکث ورودی را می‌بندد؛ تایمر هم از سرور یخ است، پس
+// کاربر پیش از دیدن معیار نه انتخاب گمراه‌کننده دارد و نه زمان از دست می‌دهد.
 //
 // ⚠️ `key` روی شمارهٔ راند حیاتی است: بدونِ آن React همان گره را نگه
 //    می‌دارد و انیمیشن فقط یک بار در کلِ بازی اجرا می‌شود.
@@ -311,7 +305,7 @@ function RoundIntroOverlay({ focus, roundNumber, totalRounds }) {
   React.useEffect(() => {
     if (!stat) return undefined;
     setVisible(true);
-    const t = setTimeout(() => setVisible(false), 1600);
+    const t = setTimeout(() => setVisible(false), 2800);
     return () => clearTimeout(t);
   }, [stat, roundNumber]);
 
@@ -320,13 +314,19 @@ function RoundIntroOverlay({ focus, roundNumber, totalRounds }) {
   const color = meta.color || '#38BDF8';
   return (
     <div className="duelRoundIntro" key={`intro-${roundNumber}-${stat}`}
-      style={{ '--focus-color': color }} aria-live="polite"
-      aria-label={`راند ${roundNumber} از ${totalRounds}، نبرد ${meta.name || ''}. ${focus?.hint || ''}`}>
+      style={{ '--focus-color': color }} aria-live="assertive"
+      aria-label={`راند ${roundNumber} از ${totalRounds}، معیار ${meta.name || ''}. ${focus?.hint || ''}`}>
       <div className="duelRoundIntroInner">
-        <small>{fa(roundNumber)}/{fa(totalRounds)}</small>
-        <span className="duelRoundIntroIcon" aria-hidden="true">{meta.icon || '★'}</span>
-        <b>نبرد {meta.name || ''}</b>
-        <em>عدد بالاتر می‌برد</em>
+        <small>راند {fa(roundNumber)} از {fa(totalRounds)}</small>
+        <span className="duelRoundIntroIcon" aria-hidden="true">
+          <i>{meta.icon || '★'}</i>
+        </span>
+        <label>معیار این راند</label>
+        <b>{meta.name || ''}</b>
+        <em>بالاترین عدد برنده است</em>
+        <div className="duelIntroBeats" aria-hidden="true">
+          <span>۳</span><span>۲</span><span>۱</span><strong>انتخاب!</strong>
+        </div>
       </div>
     </div>
   );
@@ -436,7 +436,7 @@ function LiveArena({ session }) {
     {/* ⚠️ اعلانِ راندِ تازه تا وقتی نتیجهٔ راندِ قبل روی صفحه است
         نمایش داده نمی‌شود. قبلاً بلافاصله می‌آمد و انیمیشنِ نتیجه را
         قطع می‌کرد — همان «سریع میاد بدون اینکه لود بشه میره». */}
-    {phase === 'playing' && !resultHolding && (
+    {phase === 'playing' && !resultHolding && holding && (
       <RoundIntroOverlay
         focus={state.roundFocus}
         roundNumber={Math.min(num(state.totalRounds) || 5, num(state.roundIndex) + 1)}
@@ -475,7 +475,7 @@ function LiveArena({ session }) {
           <div className="duelHandCard" key={idOf(card)}>
             <HoloCard card={card} compact frame={myFrame}
               selected={pendingId === idOf(card)}
-              disabled={state.iChose || !remaining.has(idOf(card))}
+              disabled={holding || state.iChose || !remaining.has(idOf(card))}
               onClick={() => move({ cardId: idOf(card) })} />
             <FocusStatRibbon card={card} stat={state.roundFocus?.stat}
               roundIndex={num(state.roundIndex)} previousRoundWon={lastWinner === mine} />
@@ -486,30 +486,15 @@ function LiveArena({ session }) {
   </div>;
 }
 
-function loadShopArtwork(slug) {
-  if (!slug) return Promise.resolve(null);
-  return new Promise((resolve) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = () => resolve(null);
-    image.src = `/shop/cosmetics-v3/${slug}.webp`;
-  });
-}
-
-async function renderResultCard({ result, score, mvp, opponent, url, template }) {
+async function renderResultCard({ result, score, mvp, opponent, url }) {
   const canvas = document.createElement('canvas');
   canvas.width = 1080; canvas.height = 1080;
   const ctx = canvas.getContext('2d');
-  const colors = RESULT_PALETTES[template] || ['#071522', '#35105D'];
-  const artwork = await loadShopArtwork(template);
-  if (artwork) {
-    ctx.drawImage(artwork, 0, 0, 1080, 1080);
-    ctx.fillStyle = 'rgba(2,6,23,.60)'; ctx.fillRect(0, 0, 1080, 1080);
-  } else {
-    const gradient = ctx.createLinearGradient(0, 0, 1080, 1080);
-    gradient.addColorStop(0, colors[0]); gradient.addColorStop(0.55, '#17304C'); gradient.addColorStop(1, colors[1]);
-    ctx.fillStyle = gradient; ctx.fillRect(0, 0, 1080, 1080);
-  }
+  const gradient = ctx.createLinearGradient(0, 0, 1080, 1080);
+  gradient.addColorStop(0, '#071522');
+  gradient.addColorStop(0.55, '#17304C');
+  gradient.addColorStop(1, '#35105D');
+  ctx.fillStyle = gradient; ctx.fillRect(0, 0, 1080, 1080);
   ctx.strokeStyle = '#FFD166'; ctx.lineWidth = 10; ctx.strokeRect(35, 35, 1010, 1010);
   ctx.textAlign = 'center'; ctx.direction = 'rtl';
   ctx.fillStyle = '#38BDF8'; ctx.font = '700 34px sans-serif'; ctx.fillText('GHELGHELI CARD ARENA', 540, 135);
@@ -528,44 +513,20 @@ async function renderResultCard({ result, score, mvp, opponent, url, template })
 
 function DeckIntel({ insights, suggestedDeck, onApply }) {
   if (!insights && !suggestedDeck?.insights) return null;
-  const active = insights || suggestedDeck?.insights;
-  const strengths = active?.strengths || [];
-  const warnings = active?.warnings || [];
-  const order = active?.recommendedOrder || [];
-  // ── چرا کلِ پنل جمع‌شونده شد ──
-  //
-  // اندازه‌گیری روی ۳۹۰×۸۴۴: این بخش **۲۶۷px** می‌گرفت و همیشه باز
-  // بود. تحلیلِ ترکیب اطلاعاتِ مفیدی است ولی برای **شروعِ بازی لازم
-  // نیست** — کاربر اول می‌خواهد کارت بچیند و بزند برود.
-  //
-  // `open` فقط وقتی است که ترکیب مشکل دارد (هشدار وجود دارد). یعنی
-  // پنل خودش را وقتی نشان می‌دهد که واقعاً حرفی برای گفتن دارد.
-  return <details className="duelIntel card" open={!!warnings.length}>
-    <summary className="duelIntelHead">
-      <div><b>تحلیل ترکیب</b></div>
-      {suggestedDeck && <button type="button" className="ghost"
-        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onApply(); }}>چیدن خودکار</button>}
-    </summary>
-    {/* ── چرا فهرست‌ها بریده شدند ──
-        گزارش مالک: «قسمت تحلیل ترکیب یه اسکرول طولانی داره».
-        چهار بلوک پشت سر هم (قوت‌ها، ضعف‌ها، اوپنر، ترتیب ۵ راند) روی
-        موبایل ~۴۲۰ پیکسل می‌شد. دو موردِ اولِ هر فهرست حاملِ اطلاعات
-        است و بقیه تکرارِ همان مضمون. */}
-    {active?.recommendedLeadReason && <div className="duelIntelLead">{active.recommendedLeadReason}</div>}
-    {(!!strengths.length || !!warnings.length) && <div className="duelIntelFlow good">
-      {strengths.slice(0, 2).map((item, index) => <i key={`s${index}`}>{item}</i>)}
-      {warnings.slice(0, 2).map((item, index) => <i key={`w${index}`} className="bad">{item}</i>)}
-      {strengths.length + warnings.length > 4
-        && <i className="muted">+{fa(strengths.length + warnings.length - 4)} نکتهٔ دیگر</i>}
-    </div>}
-    {/* پنج ردیفِ «نحوه محاسبه/ترتیب راندها» یک اسکرولِ تو در تو ساخته
-        بود. تصمیمِ لازم فقط شروع است؛ ترتیب کامل را «چیدن خودکار» اعمال
-        می‌کند و لازم نیست قبل از هر بازی خوانده شود. */}
-    {!!order.length && <div className="duelIntelFirst">
-      <b>شروع پیشنهادی</b>
-      <span>{order[0].name || 'کارت اول'} · {order[0].focus || ''}</span>
-    </div>}
-  </details>;
+  const active = insights || suggestedDeck?.insights || {};
+  const warnings = active.warnings || [];
+  const strengths = active.strengths || [];
+  const order = active.recommendedOrder || [];
+  const warning = warnings[0] || '';
+  const strength = strengths[0] || 'ترکیب متعادل';
+  const opener = order[0]?.name || '';
+  const summary = `${warning || strength}${opener ? ` • شروع: ${opener}` : ''}`;
+  return <section className={`duelIntelCompact card ${warning ? 'warn' : 'ready'}`}>
+    <span aria-hidden="true">{warning ? '⚡' : '✓'}</span>
+    <div><b>{warning ? 'یک اصلاح پیشنهادی' : 'ترکیب آماده'}</b><small>{summary}</small></div>
+    {suggestedDeck && <button type="button" className="ghost" aria-label="چیدن خودکار"
+      onClick={onApply}>✦</button>}
+  </section>;
 }
 
 function RoundTimeline({ history, mine, opponentRole = 'حریف' }) {
@@ -650,8 +611,7 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
       const opponent = session.g.players?.[other]?.nickname || opponentRole;
       const scoreLabel = `تو ${fa(myScore)} • ${opponentRole} ${fa(theirScore)}`;
       const text = `${title}\nنتیجه: ${scoreLabel}\nMVP: ${mvp?.name || 'ستاره آرنا'} (عدد راند ${fa(mvp?.mvpRoundPower || 0)})\nمستقیم به چالشم بیا:`;
-      const myCosmetics = session.g.players?.[mine]?.cosmetics || {};
-      const blob = await renderResultCard({ result: title, score: scoreLabel, mvp, opponent, url: invite.shareUrl, template: myCosmetics.resultTemplate });
+      const blob = await renderResultCard({ result: title, score: scoreLabel, mvp, opponent, url: invite.shareUrl });
       const file = blob ? new File([blob], 'ghelgheli-result.png', { type: 'image/png' }) : null;
       if (navigator.share && (!file || !navigator.canShare || navigator.canShare({ files: [file] }))) {
         await navigator.share({ title: 'نتیجه دوئل قلقلی', text, url: invite.shareUrl, ...(file ? { files: [file] } : {}) });
@@ -742,12 +702,9 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
     opponentRole: resultOpponentRole,
   });
   const iWon = finalVerdict.iWon;
-  const myCosmetics = session.g.players?.[session.g.me]?.cosmetics || {};
-  const resultPalette = RESULT_PALETTES[myCosmetics.resultTemplate] || ['#071522', '#FFD166'];
+  const resultPalette = ['#071522', '#FFD166'];
 
   return <main className="duelPageV2" style={{ '--mode-color': mode.color, position:'relative', overflow:'hidden' }}>
-    {enabled && session.phase === 'playing' && myCosmetics.matchEffect && matchEffectSupports(myCosmetics.matchEffect, 'entry') && <DuelEffectVisual key={`${myCosmetics.matchEffect}-entry`} slug={myCosmetics.matchEffect} />}
-    {enabled && session.phase === 'over' && iWon && myCosmetics.matchEffect && matchEffectSupports(myCosmetics.matchEffect, 'finish') && <DuelEffectVisual key={`${myCosmetics.matchEffect}-finish`} slug={myCosmetics.matchEffect} finish />}
     {/* ═══════════════════════════════════════════════════════════════════
         سربرگ: بزرگ در چیدمان، نوارِ باریک هنگام بازی
         ═══════════════════════════════════════════════════════════════════
@@ -849,9 +806,8 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
     {enabled && session.phase === 'playing' && <LiveArena session={session} />}
 
     {enabled && session.phase === 'over' && <section className={`duelFinale ${winner === 'DRAW' ? 'draw' : iWon ? 'won' : 'lost'}`}
-      style={{'--duel-result-a':resultPalette[0],'--duel-result-b':resultPalette[1],background:myCosmetics.resultTemplate
-        ? `linear-gradient(rgba(2,6,23,.38),rgba(2,6,23,.76)),url('/shop/cosmetics-v3/${myCosmetics.resultTemplate}.webp') center/cover,${resultPalette[0]}`
-        : `radial-gradient(circle at 50% 15%,${resultPalette[1]}44,transparent 42%),${resultPalette[0]}`}}>
+      style={{'--duel-result-a':resultPalette[0],'--duel-result-b':resultPalette[1],
+        background:`radial-gradient(circle at 50% 15%,${resultPalette[1]}44,transparent 42%),${resultPalette[0]}`}}>
       <div className="duelFinalePanel">
         <span>{winner === 'DRAW' ? '🤝' : iWon ? '🏆' : '🛡️'}</span>
         <h2>{winner === 'DRAW' ? 'DRAW' : iWon ? 'VICTORY' : 'DEFEAT'}</h2>

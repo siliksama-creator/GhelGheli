@@ -30,7 +30,6 @@ const PLUS_BENEFITS = Object.freeze([
 const ANNUAL_BENEFITS = Object.freeze([
   'قاب سلطنتی سالانه؛ هدیه دائمی و انحصاری',
   'عنوان دائمی «ستاره سالانه» روی پروفایل',
-  'قالب دائمی نتیجه سلطنتی برای اشتراک‌گذاری',
   'یک فرصت تغییر باشگاه منتخب در هر دوره سالانه',
 ]);
 
@@ -39,8 +38,6 @@ const SLOT_FOR_KIND = Object.freeze({
   card_frame: 'equipped_frame',
   name_color: 'equipped_color',
   profile_background: 'equipped_profile_background',
-  result_template: 'equipped_result_template',
-  match_effect: 'equipped_match_effect',
   emote_pack: 'equipped_emote_pack',
   profile_badge: 'equipped_profile_badge',
 });
@@ -114,8 +111,7 @@ async function catalogue(userId) {
          FROM user_shop_items WHERE user_id=$1`, [userId]),
     pool.query(
       `SELECT equipped_club, equipped_frame, equipped_color,
-              equipped_profile_background, equipped_result_template,
-              equipped_match_effect, equipped_emote_pack,
+              equipped_profile_background, equipped_emote_pack,
               equipped_profile_badge, profile_title, annual_club_switches
          FROM users WHERE id=$1`, [userId]),
     pool.query('SELECT wallet_balance FROM users WHERE id=$1', [userId]),
@@ -190,8 +186,6 @@ async function catalogue(userId) {
       frame: user.equipped_frame || null,
       nameColor: user.equipped_color || null,
       profileBackground: user.equipped_profile_background || null,
-      resultTemplate: user.equipped_result_template || null,
-      matchEffect: user.equipped_match_effect || null,
       emotePack: user.equipped_emote_pack || null,
       profileBadge: user.equipped_profile_badge || null,
       title: user.profile_title || null,
@@ -313,7 +307,7 @@ async function buyPlus(userId, billingCycle = 'monthly') {
       await client.query(
         `INSERT INTO user_shop_items(user_id,item_id,price_paid)
          SELECT $1, i.id, 0 FROM shop_items i
-          WHERE i.slug IN ('annual_royal_frame','annual_royal_result')
+          WHERE i.slug = 'annual_royal_frame'
          ON CONFLICT(user_id,item_id) DO NOTHING`,
         [userId],
       );
@@ -333,7 +327,6 @@ async function buyPlus(userId, billingCycle = 'monthly') {
         `UPDATE users SET
            profile_title=COALESCE(profile_title,'ستاره سالانه'),
            equipped_frame=COALESCE(equipped_frame,'annual_royal_frame'),
-           equipped_result_template=COALESCE(equipped_result_template,'annual_royal_result'),
            annual_club_switches=GREATEST(annual_club_switches,1),
            updated_at=NOW()
          WHERE id=$1`,
@@ -523,8 +516,7 @@ async function cosmeticsFor(userIds) {
   if (!ids.length) return new Map();
   const { rows } = await pool.query(
     `SELECT u.id, u.equipped_club, u.equipped_frame, u.equipped_color,
-            u.equipped_profile_background, u.equipped_result_template,
-            u.equipped_match_effect, u.equipped_emote_pack,
+            u.equipped_profile_background, u.equipped_emote_pack,
             u.equipped_profile_badge, u.profile_title,
             EXISTS(SELECT 1 FROM user_subscriptions s
                     WHERE s.user_id=u.id AND s.plan IN ('plus','plus_annual')
@@ -568,8 +560,6 @@ async function cosmeticsFor(userIds) {
       clubBadge: club,
       nameColor: color,
       profileBackground: can('profile_background', row.equipped_profile_background),
-      resultTemplate: can('result_template', row.equipped_result_template),
-      matchEffect: can('match_effect', row.equipped_match_effect),
       emotePack: can('emote_pack', row.equipped_emote_pack),
       profileBadge: can('profile_badge', row.equipped_profile_badge),
       title: row.profile_title || null,

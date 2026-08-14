@@ -78,14 +78,6 @@ export const PROFILE_BACKGROUNDS = {
   collection_room: 'linear-gradient(rgba(8,5,30,.25),rgba(3,7,18,.66)),url("/shop/cosmetics-v3/collection_room.webp") center/cover no-repeat',
 };
 
-export const RESULT_PALETTES = {
-  result_stadium: ['#052E16', '#0EA5E9'], result_champions: ['#172554', '#7C3AED'],
-  result_fire: ['#450A0A', '#F97316'], result_ice: ['#082F49', '#7DD3FC'],
-  result_gold_mvp: ['#422006', '#FFD166'], result_friendly: ['#312E81', '#FB7185'],
-  result_derby: ['#B91C1C', '#1D4ED8'], result_world_cup: ['#064E3B', '#FACC15'],
-  annual_royal_result: ['#1E1B4B', '#FFD166'],
-};
-
 export function profileBackgroundStyle(slug) {
   return slug ? { background: PROFILE_BACKGROUNDS[slug] || undefined } : {};
 }

@@ -8,6 +8,7 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 const migration = read('backend/migrations/052_monetization_catalogue.sql');
 const rateMigration = read('backend/migrations/054_referral_purchase_commission_5_percent.sql');
 const motionMigration = read('backend/migrations/057_animated_cosmetics_and_profile_badges.sql');
+const removalMigration = read('backend/migrations/063_remove_result_and_match_cosmetics.sql');
 const shop = read('backend/src/services/shopService.js');
 const referrals = read('backend/src/services/referralService.js');
 const wallet = read('backend/src/services/walletService.js');
@@ -28,9 +29,8 @@ assert.match(shop, /savingPercent: 30/);
 for (const benefit of ['Premium Pass', 'حذف تبلیغات عادی', 'عضویت دائمی در یک باشگاه منتخب']) {
   assert(shop.includes(benefit), `missing Plus benefit: ${benefit}`);
 }
-for (const annual of ['annual_royal_frame', 'annual_royal_result']) {
-  assert(shop.includes(annual) && migration.includes(annual), `missing annual grant: ${annual}`);
-}
+assert(shop.includes('annual_royal_frame') && migration.includes('annual_royal_frame'), 'missing annual frame grant');
+assert(!shop.includes('annual_royal_result'), 'removed annual result template must not be granted');
 for (const annual of ['ستاره سالانه', 'annual_club_switches']) {
   assert(shop.includes(annual), `missing annual entitlement: ${annual}`);
 }
@@ -40,8 +40,6 @@ assert(pass.includes("plan IN ('plus','plus_annual')"), 'annual Plus must unlock
 const required = {
   card_frame: ['blue_fire','stadium_frame','animated_gold','club_neon','season_champion','champions_night','pro_holographic'],
   name_color: ['gold_gradient','green_neon','animated_fire','calm_rainbow','icy_glow','digital_typing','mvp_name','social_team'],
-  result_template: ['result_stadium','result_champions','result_fire','result_ice','result_gold_mvp','result_friendly','result_derby','result_world_cup'],
-  match_effect: ['stadium_spotlight','colored_smoke','card_side_fire','victory_confetti','golden_cup','tunnel_entry','goal_celebration','win_streak','mvp_effect','rematch_effect'],
   emote_pack: ['emote_respect','emote_comeback','emote_goal_club'],
   profile_background: ['locker_room','night_stadium','player_tunnel','champion_podium','training_ground','collection_room'],
 };
@@ -51,7 +49,6 @@ for (const [kind, slugs] of Object.entries(required)) {
 }
 const bands = {
   card_frame: [19000, 49000], name_color: [9000, 25000],
-  result_template: [15000, 39000], match_effect: [19000, 59000],
   emote_pack: [9000, 25000], profile_background: [29000, 69000],
 };
 const profileBadges = ['badge_cr7','badge_goat','badge_captain','badge_legend','badge_king','badge_ace'];
@@ -107,9 +104,15 @@ assert(webShop.includes('shopNav') && webShop.includes('shopCarousel'));
 assert(webShop.includes("billingCycle === 'annual'"));
 assert(mobileShop.includes('ChoiceChip') && mobileShop.includes('Axis.horizontal'));
 assert(mobileShop.includes("'billingCycle': plan['billingCycle']"));
-for (const slug of ['result_world_cup', 'annual_royal_result']) {
-  assert(webCosmetics.includes(slug) && mobilePalette.includes(slug), `rendering missing ${slug}`);
+for (const removed of ['result_template', 'match_effect']) {
+  assert(removalMigration.includes(removed), `removal migration missing ${removed}`);
+  assert(!shop.includes(removed), `removed kind leaked into shop service: ${removed}`);
+  assert(!webShop.includes(removed) && !mobileShop.includes(removed), `removed category leaked into clients: ${removed}`);
 }
+assert(removalMigration.includes('equipped_result_template = NULL'));
+assert(removalMigration.includes('equipped_match_effect = NULL'));
+assert(!shop.includes('equipped_result_template') && !shop.includes('equipped_match_effect'),
+  'current service must not read legacy equip slots');
 assert(webCosmetics.includes('profileBackgroundStyle'));
 assert(mobilePalette.includes('profileBackgroundDecoration'));
 

@@ -53,7 +53,7 @@ const migrations = fs.readdirSync(path.join(ROOT, 'migrations'))
 // به‌جای پارسِ کاملِ SQL (شکننده)، جفتِ اسلاگ/نوع را با regex برمی‌داریم
 // و بعد صحتِ تعدادش را چک می‌کنیم تا اگر الگو عوض شد ساکت نماند.
 const KINDS = ['club_badge', 'card_frame', 'name_color', 'profile_background',
-  'result_template', 'match_effect', 'emote_pack', 'profile_badge'];
+  'emote_pack', 'profile_badge'];
 
 // ═══════════════════════════════════════════════════════════════════════════
 // چرا کاتالوگ با یک پارسرِ حالت‌دار خوانده می‌شود و نه با یک regex
@@ -168,20 +168,20 @@ for (const block of migrations.matchAll(
 for (const del of migrations.matchAll(
   /DELETE FROM shop_items([\s\S]*?);/gi)) {
   const clause = del[1];
-  // حذف بر اساسِ payload (الگوی مایگریشنِ ۰۲۵) یا بر اساسِ slug.
-  for (const lst of clause.matchAll(/\b(payload|slug)\s+IN\s*\(([^)]*)\)/gi)) {
+  // حذف بر اساسِ payload/slug یا یک دستهٔ کامل (مایگریشن ۰۶۳).
+  for (const lst of clause.matchAll(/\b(payload|slug|kind)\s+IN\s*\(([^)]*)\)/gi)) {
     const col = lst[1].toLowerCase();
     const values = [...lst[2].matchAll(/'([^']+)'/g)].map(v => v[1]);
-    for (const [slug] of catalogue) {
-      const key = col === 'slug' ? slug : renderKey.get(slug);
+    for (const [slug, kind] of catalogue) {
+      const key = col === 'slug' ? slug : col === 'kind' ? kind : renderKey.get(slug);
       if (values.includes(key)) { catalogue.delete(slug); renderKey.delete(slug); }
     }
   }
 }
 
 console.log('\n══ ۱. کاتالوگ از مایگریشن‌ها خوانده شد ══');
-ck('حداقل ۶۰ آیتم پیدا شد', catalogue.size >= 60,
-  `فقط ${catalogue.size} — الگوی INSERT عوض شده؟`);
+ck('حداقل ۵۰ آیتم فعال پیدا شد', catalogue.size >= 50,
+  `فقط ${catalogue.size} — الگوی INSERT یا حذف دسته‌ها عوض شده؟`);
 const byKind = {};
 for (const [, kind] of catalogue) byKind[kind] = (byKind[kind] || 0) + 1;
 for (const kind of KINDS) {
@@ -192,15 +192,13 @@ for (const kind of KINDS) {
 const webCosmetics = read(path.join(REPO, 'userweb/src/components/Cosmetics.jsx'));
 const webMotion = read(path.join(REPO, 'userweb/src/components/cosmeticsMotion.css'));
 const webStyle = read(path.join(REPO, 'userweb/src/style.css'));
-const webEffect = read(path.join(REPO, 'userweb/src/components/MatchEffectVisual.jsx'));
-const webAll = `${webCosmetics}\n${webMotion}\n${webStyle}\n${webEffect}`;
+const webAll = `${webCosmetics}\n${webMotion}\n${webStyle}`;
 
 const dartPalette = read(path.join(REPO, 'mobile/lib/core/cosmetic_palette.dart'));
 const dartCosmetics = read(path.join(REPO, 'mobile/lib/core/cosmetics.dart'));
-const dartEffect = read(path.join(REPO, 'mobile/lib/widgets/match_effect_visual.dart'));
 const dartMotion = read(path.join(REPO, 'mobile/lib/widgets/cosmetic_motion.dart'));
 const dartAssets = read(path.join(REPO, 'mobile/lib/core/assets.dart'));
-const dartAll = `${dartPalette}\n${dartCosmetics}\n${dartEffect}\n${dartMotion}\n${dartAssets}`;
+const dartAll = `${dartPalette}\n${dartCosmetics}\n${dartMotion}\n${dartAssets}`;
 
 /**
  * آیا اسلاگ در متنِ رندرکننده هست؟
@@ -303,24 +301,17 @@ console.log('\n══ ۵. دو کلاینت دقیقاً یک مجموعه را 
   ck('آیتمی نیست که فقط در اندروید کار کند', appOnly.length === 0, appOnly.join('، '));
 }
 
-console.log('\n══ ۶. افکتِ نبرد فازِ اجرا دارد ══');
+console.log('\n══ ۶. دسته‌های حذف‌شده واقعاً غایب‌اند ══');
 {
-  // یک افکت که در هیچ فازی (entry/finish) پشتیبانی نشود، خریداری
-  // می‌شود ولی هرگز اجرا نمی‌شود.
-  const effects = [...catalogue].filter(([, k]) => k === 'match_effect').map(([s]) => s);
-  const noPhaseWeb = effects.filter(s => !mentions(webEffect, s));
-  const noPhaseApp = effects.filter(s => !mentions(dartEffect, s));
-  ck(`هر ${effects.length} افکت در وب نقاشی می‌شود`, noPhaseWeb.length === 0, noPhaseWeb.join('، '));
-  ck(`هر ${effects.length} افکت در اندروید نقاشی می‌شود`, noPhaseApp.length === 0, noPhaseApp.join('، '));
-}
-
-console.log('\n══ ۷. قالبِ کارتِ نتیجه پالت دارد ══');
-{
-  const templates = [...catalogue].filter(([, k]) => k === 'result_template').map(([s]) => s);
-  const missWeb = templates.filter(s => !mentions(webCosmetics, s));
-  const missApp = templates.filter(s => !mentions(dartPalette, s));
-  ck(`هر ${templates.length} قالب در وب پالت دارد`, missWeb.length === 0, missWeb.join('، '));
-  ck(`هر ${templates.length} قالب در اندروید پالت دارد`, missApp.length === 0, missApp.join('، '));
+  const removedKinds = ['match_effect', 'result_template'];
+  for (const kind of removedKinds) {
+    ck(`نوعِ حذف‌شدهٔ «${kind}» در کاتالوگ فعال نیست`,
+      ![...catalogue.values()].includes(kind));
+  }
+  ck('رندرکنندهٔ افکت ورود/پایان وب حذف شده',
+    !fs.existsSync(path.join(REPO, 'userweb/src/components/MatchEffectVisual.jsx')));
+  ck('رندرکنندهٔ افکت ورود/پایان اندروید حذف شده',
+    !fs.existsSync(path.join(REPO, 'mobile/lib/widgets/match_effect_visual.dart')));
 }
 
 console.log('\n══ ۸. رنگِ نام: هم گرادیان هم انیمیشن ══');

@@ -21,7 +21,15 @@ enum Sfx {
   win('win.mp3'),
   lose('lose.mp3'),
   draw('draw.mp3'),
-  tap('tap.mp3');
+  tap('tap.mp3'),
+  duelLock('duel_lock.mp3'),
+  duelIntro('duel_intro.mp3'),
+  duelRoundWin('duel_round_win.mp3'),
+  duelRoundLose('duel_round_lose.mp3'),
+  duelRoundDraw('duel_round_draw.mp3'),
+  duelFinalDraw('duel_final_draw.mp3'),
+  duelVictory('duel_victory.mp3'),
+  duelDefeat('duel_defeat.mp3');
 
   const Sfx(this.file);
   final String file;
@@ -37,9 +45,12 @@ class GameAudio {
   static const _poolSize = 3;
 
   final List<AudioPlayer> _pool = [];
+  final AudioPlayer _musicPlayer = AudioPlayer();
   int _next = 0;
   bool _enabled = true;
   bool _ready = false;
+  bool _duelMusicRequested = false;
+  bool _duelMusicPlaying = false;
 
   bool get enabled => _enabled;
 
@@ -58,7 +69,11 @@ class GameAudio {
       final sp = await SharedPreferences.getInstance();
       await sp.setBool(_prefsKey, v);
     } catch (_) {/* preference is cosmetic; ignore storage failures */}
-    if (!v) await stopAll();
+    if (!v) {
+      await stopAll();
+    } else if (_duelMusicRequested) {
+      startDuelMusic();
+    }
   }
 
   void _init() {
@@ -90,7 +105,37 @@ class GameAudio {
     }
   }
 
+  /// Starts the original card-duel soundtrack at a restrained level. The
+  /// request survives a temporary mute, so unmuting during a duel resumes it.
+  void startDuelMusic() {
+    _duelMusicRequested = true;
+    if (!_enabled || _duelMusicPlaying) return;
+    _duelMusicPlaying = true;
+    () async {
+      try {
+        await _musicPlayer.setReleaseMode(ReleaseMode.loop);
+        await _musicPlayer.setVolume(0.20);
+        await _musicPlayer.play(AssetSource('sfx/duel_music.mp3'));
+      } catch (e) {
+        _duelMusicPlaying = false;
+        debugPrint('duel music failed: $e');
+      }
+    }();
+  }
+
+  Future<void> stopDuelMusic() async {
+    _duelMusicRequested = false;
+    _duelMusicPlaying = false;
+    try {
+      await _musicPlayer.stop();
+    } catch (_) {/* ignore */}
+  }
+
   Future<void> stopAll() async {
+    _duelMusicPlaying = false;
+    try {
+      await _musicPlayer.stop();
+    } catch (_) {/* ignore */}
     for (final p in _pool) {
       try {
         await p.stop();
@@ -99,6 +144,11 @@ class GameAudio {
   }
 
   Future<void> dispose() async {
+    _duelMusicRequested = false;
+    _duelMusicPlaying = false;
+    try {
+      await _musicPlayer.dispose();
+    } catch (_) {/* ignore */}
     for (final p in _pool) {
       try {
         await p.dispose();

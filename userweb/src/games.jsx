@@ -7,8 +7,7 @@ import PenaltyGame from './penaltyGame.jsx';
 import TapGame from './tapGame.jsx';
 import CardDuelWeb from './cardDuelGame.jsx';
 import { useGameSession } from './gameSession.js';
-import { CosmeticAvatarFrame, LevelBadge, DisplayName, RESULT_PALETTES } from './components/Cosmetics.jsx';
-import CosmeticMatchEffect, { matchEffectSupports } from './components/MatchEffectVisual.jsx';
+import { CosmeticAvatarFrame, LevelBadge, DisplayName } from './components/Cosmetics.jsx';
 import { fa, asset, avatarUrl, req } from './lib/api.js';
 import './growth.css';
 
@@ -535,29 +534,11 @@ export default function Games({ api, token, externalLaunch = null }) {
 }
 
 
-function MatchEffectVisual({ slug, finish = false }) {
-  return <div aria-hidden="true" style={{ position:'absolute', zIndex:4, inset:0, display:'grid', placeItems:'center', pointerEvents:'none' }}>
-    <CosmeticMatchEffect slug={slug} mode={finish ? 'finish' : 'entry'} />
-  </div>;
-}
-
-async function makeGenericResultCard({ title, gameTitle, players, template }) {
-  const colors = RESULT_PALETTES[template] || ['#071522', '#38BDF8'];
-  const canvas = document.createElement('canvas'); canvas.width = 1080; canvas.height = 1080;
-  const ctx = canvas.getContext('2d');
-  let artwork = null;
-  if (template) artwork = await new Promise((resolve) => {
-    const image = new Image(); image.onload = () => resolve(image); image.onerror = () => resolve(null);
-    image.src = `/shop/cosmetics-v3/${template}.webp`;
-  });
-  if (artwork) {
-    ctx.drawImage(artwork, 0, 0, 1080, 1080);
-    ctx.fillStyle = 'rgba(2,6,23,.62)'; ctx.fillRect(0, 0, 1080, 1080);
-  } else {
-    const gradient = ctx.createLinearGradient(0, 0, 1080, 1080);
-    gradient.addColorStop(0, colors[0]); gradient.addColorStop(1, colors[1]);
-    ctx.fillStyle = gradient; ctx.fillRect(0, 0, 1080, 1080);
-  }
+async function makeGenericResultCard({ title, gameTitle, players }) {
+  const colors = ['#071522', '#38BDF8'];
+  const gradient = ctx.createLinearGradient(0, 0, 1080, 1080);
+  gradient.addColorStop(0, colors[0]); gradient.addColorStop(1, colors[1]);
+  ctx.fillStyle = gradient; ctx.fillRect(0, 0, 1080, 1080);
   ctx.fillStyle = 'rgba(3,12,25,.58)'; ctx.fillRect(55, 55, 970, 970);
   ctx.strokeStyle = colors[1]; ctx.lineWidth = 12; ctx.strokeRect(55, 55, 970, 970);
   ctx.textAlign = 'center'; ctx.direction = 'rtl';
@@ -596,16 +577,14 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
   const pX = g.players?.X || { nickname: 'کاربر ۱' };
   const pO = g.players?.O || (g.vsBot ? { nickname: 'هوش مصنوعی (ربات)', isBot: true } : { nickname: 'کاربر ۲' });
   const isOnlineMatch = activeStake === 100 || activeStake === 1000;
-  const myCosmetics = g.players?.[g.me]?.cosmetics || {};
-  const winnerCosmetics = g.winner && g.winner !== 'DRAW' ? (g.players?.[g.winner]?.cosmetics || {}) : myCosmetics;
-  const resultColors = RESULT_PALETTES[myCosmetics.resultTemplate] || ['#071522', '#38BDF8'];
+  const resultColors = ['#071522', '#38BDF8'];
   const gameTitle = activeGameId === 'penalty' ? 'ضربات پنالتی' : activeGameId === 'memory' ? 'جفت‌یاب' : 'دوئل کارت‌ها';
 
   const shareResult = async () => {
     const title = g.winner === 'DRAW' ? 'مسابقه مساوی شد!' : g.winner === g.me ? 'من برنده شدم!' : 'این بار حریف برد!';
     try {
       const blob = await makeGenericResultCard({ title, gameTitle,
-        players: [pX.nickname || 'بازیکن یک', pO.nickname || 'بازیکن دو'], template: myCosmetics.resultTemplate });
+        players: [pX.nickname || 'بازیکن یک', pO.nickname || 'بازیکن دو'] });
       const file = blob ? new File([blob], 'ghelgheli-result.png', { type: 'image/png' }) : null;
       const text = `${title}\n${gameTitle}: ${pX.nickname || 'بازیکن یک'} مقابل ${pO.nickname || 'بازیکن دو'}\nتو هم به چالش قلقلی بیا:`;
       if (navigator.share && (!file || !navigator.canShare || navigator.canShare({ files: [file] }))) {
@@ -622,8 +601,6 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
 
   return (
     <div className="card wide" style={{ padding: '20px', textAlign: 'center', maxWidth: '640px', margin: '0 auto', position:'relative', overflow:'hidden' }}>
-      {phase === 'playing' && myCosmetics.matchEffect && matchEffectSupports(myCosmetics.matchEffect, 'entry') && <MatchEffectVisual slug={myCosmetics.matchEffect} />}
-      {phase === 'over' && g.winner === g.me && winnerCosmetics.matchEffect && matchEffectSupports(winnerCosmetics.matchEffect, 'finish') && <MatchEffectVisual slug={winnerCosmetics.matchEffect} finish />}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', position:'relative', zIndex:5 }}>
         <button type="button" onClick={() => { leave(); onBack(); }} style={{ background: 'rgba(255,255,255,0.1)', color: '#FFF', border: 'none', padding: '6px 14px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>
           ← بازگشت
@@ -717,9 +694,7 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
       )}
 
       {phase === 'over' && (
-        <div style={{ padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', position:'relative', zIndex:5, borderRadius:'20px', border:`1px solid ${resultColors[1]}99`, background:myCosmetics.resultTemplate
-          ? `linear-gradient(rgba(2,6,23,.42),rgba(2,6,23,.78)),url('/shop/cosmetics-v3/${myCosmetics.resultTemplate}.webp') center/cover,${resultColors[0]}`
-          : `radial-gradient(circle at 50% 0,${resultColors[1]}55,transparent 48%),linear-gradient(145deg,${resultColors[0]}DD,#071522)` }}>
+        <div style={{ padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', position:'relative', zIndex:5, borderRadius:'20px', border:`1px solid ${resultColors[1]}99`, background:`radial-gradient(circle at 50% 0,${resultColors[1]}55,transparent 48%),linear-gradient(145deg,${resultColors[0]}DD,#071522)` }}>
           <div style={{ fontSize: '48px' }}>{g.winner === 'DRAW' ? '🤝' : (g.winner === g.me ? '🎉' : '💔')}</div>
           <h2 style={{ color: g.winner === g.me ? '#22E7A6' : '#FFF', fontWeight: '900', margin: 0 }}>
             {g.winner === 'DRAW' ? 'مسابقه مساوی شد!' : (g.winner === g.me ? 'تبریک! شما برنده شدید' : 'متاسفانه باختید!')}

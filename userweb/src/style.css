@@ -4003,54 +4003,65 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
   .duelFocusBanner, .duelFocusIcon { animation: none !important; }
 }
 
-/* ═══ اعلانِ سینماییِ شروعِ راند ══════════════════════════════════════════
-   خواستهٔ مالک: «وقتی راند شروع میشه اینکه مبارزه هر راند سر چی هستش
-   باید با انیمیشن زیبا وسط صفحه نشون داده بشه».
-
-   ── چرا fixed و نه یک بلوک در جریانِ صفحه ──
-   بنرِ قبلی (`.duelFocusBanner`) در جریانِ صفحه بود و ~۹۰ پیکسل ارتفاع
-   می‌گرفت؛ یکی از دلایلِ اصلیِ اسکرولِ صفحهٔ بازی همین بود. این نسخه
-   هیچ فضایی از چیدمان نمی‌گیرد.
-
-   ── چرا pointer-events:none ──
-   کاربر باید بتواند وسطِ انیمیشن کارتش را انتخاب کند. اعلان اطلاع‌رسانی
-   است، نه مودال. */
+/* ═══ صحنهٔ مستقلِ معرفی راند ════════════════════════════════════════════
+   بیرون جریان چیدمان است (صفر اسکرول)، ورودی را تا پایان مکث می‌بندد و
+   در ۲.۸ ثانیه معیار را با سه ضرب خوانا به انتخاب کارت تحویل می‌دهد. */
 .duelRoundIntro{
   position:fixed; inset:0; z-index:60; display:grid; place-items:center;
-  background:rgba(3,7,13,.62); backdrop-filter:blur(3px);
-  pointer-events:none; animation:duelIntroFade 1.6s ease forwards;
+  background:radial-gradient(circle at center,
+    color-mix(in srgb,var(--focus-color) 27%,rgba(3,7,13,.92)) 0,
+    rgba(3,7,13,.96) 70%);
+  backdrop-filter:blur(5px); pointer-events:auto;
+  animation:duelIntroFade 2.8s ease forwards;
 }
+.duelRoundIntro::before,.duelRoundIntro::after{
+  content:""; position:absolute; width:210px; height:210px; border-radius:50%;
+  border:1px solid color-mix(in srgb,var(--focus-color) 38%,transparent);
+  animation:duelIntroOrbit 2.8s linear both;
+}
+.duelRoundIntro::after{width:255px;height:255px;animation-direction:reverse;opacity:.45}
 .duelRoundIntroInner{
-  display:flex; flex-direction:column; align-items:center; gap:9px;
-  text-align:center; padding:0 26px; max-width:420px;
-  animation:duelIntroPop .5s cubic-bezier(.2,1.3,.4,1) both;
+  position:relative; z-index:1; display:flex; flex-direction:column;
+  align-items:center; gap:7px; text-align:center; padding:0 26px; max-width:430px;
+  animation:duelIntroPop .58s cubic-bezier(.2,1.3,.4,1) both;
 }
-.duelRoundIntroInner small{ font-size:12.5px; color:#cbd5e1; font-weight:800 }
+.duelRoundIntroInner small{
+  font-size:13px; color:#d8e3ee; font-weight:900; padding:5px 13px;
+  border:1px solid color-mix(in srgb,var(--focus-color) 48%,transparent);
+  background:color-mix(in srgb,var(--focus-color) 12%,transparent);border-radius:999px;
+}
 .duelRoundIntroIcon{
-  display:grid; place-items:center; width:100px; height:100px; font-size:46px;
-  border-radius:50%; border:2.5px solid var(--focus-color);
-  background:radial-gradient(circle,color-mix(in srgb,var(--focus-color) 34%,transparent),transparent 70%);
-  box-shadow:0 0 42px color-mix(in srgb,var(--focus-color) 55%,transparent);
-  animation:duelIntroSpin .55s cubic-bezier(.2,1.2,.4,1) both;
+  display:grid; place-items:center; width:112px; height:112px; margin:9px 0 2px;
+  border-radius:50%; border:3px solid var(--focus-color);
+  background:radial-gradient(circle,color-mix(in srgb,var(--focus-color) 38%,transparent),transparent 72%);
+  box-shadow:0 0 50px color-mix(in srgb,var(--focus-color) 65%,transparent);
+  animation:duelIntroSpin .62s cubic-bezier(.2,1.2,.4,1) both;
 }
+.duelRoundIntroIcon i{font-style:normal;font-size:50px;filter:drop-shadow(0 0 12px var(--focus-color))}
+.duelRoundIntroInner label{font-size:12px;font-weight:900;color:var(--focus-color);margin-top:4px}
 .duelRoundIntroInner b{
-  font-size:26px; font-weight:800; color:#fff; line-height:1.32;
-  text-shadow:0 0 24px var(--focus-color), 0 2px 8px #000;
+  font-size:34px; font-weight:1000; color:#fff; line-height:1.2;
+  text-shadow:0 0 28px var(--focus-color),0 3px 9px #000;
 }
 .duelRoundIntroInner em{
-  font-style:normal; font-size:13.5px; font-weight:800;
-  color:var(--focus-color); padding:6px 14px; border-radius:999px;
-  background:color-mix(in srgb,var(--focus-color) 20%,transparent);
-  border:1px solid color-mix(in srgb,var(--focus-color) 72%,transparent);
+  font-style:normal;font-size:13px;font-weight:850;color:rgba(255,255,255,.76)
 }
-/* راهنمای گروهِ سنیِ پایین — یک جملهٔ ساده و بدونِ اصطلاح. */
-.duelRoundIntroInner i{
-  font-style:normal; font-size:13px; line-height:1.65;
-  color:rgba(255,255,255,.82); font-weight:700;
+.duelIntroBeats{position:relative;width:92px;height:34px;margin-top:10px}
+.duelIntroBeats span,.duelIntroBeats strong{
+  position:absolute;inset:0;display:grid;place-items:center;opacity:0;
+  color:var(--focus-color);font-size:25px;font-weight:1000;
+  text-shadow:0 0 18px var(--focus-color)
 }
-@keyframes duelIntroFade{ 0%,78%{opacity:1} 100%{opacity:0} }
-@keyframes duelIntroPop{ from{opacity:0;transform:translateY(16px) scale(.86)} to{opacity:1;transform:none} }
-@keyframes duelIntroSpin{ from{transform:rotate(-28deg) scale(.4)} to{transform:none} }
+.duelIntroBeats span:nth-child(1){animation:duelBeat .42s 1.15s both}
+.duelIntroBeats span:nth-child(2){animation:duelBeat .42s 1.55s both}
+.duelIntroBeats span:nth-child(3){animation:duelBeat .42s 1.95s both}
+.duelIntroBeats strong{font-size:18px;color:#22e7a6;animation:duelGo .44s 2.34s both}
+@keyframes duelIntroFade{0%,88%{opacity:1}100%{opacity:0}}
+@keyframes duelIntroPop{from{opacity:0;transform:translateY(18px) scale(.80)}to{opacity:1;transform:none}}
+@keyframes duelIntroSpin{from{transform:rotate(-34deg) scale(.38)}to{transform:none}}
+@keyframes duelIntroOrbit{from{transform:rotate(0) scale(.75);opacity:0}18%{opacity:.7}to{transform:rotate(130deg) scale(1.08);opacity:0}}
+@keyframes duelBeat{0%{opacity:0;transform:scale(1.5)}35%,70%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(.75)}}
+@keyframes duelGo{0%{opacity:0;transform:scale(.7)}45%,88%{opacity:1;transform:scale(1.08)}100%{opacity:0}}
 
 /* نشانِ فشردهٔ ویژگیِ راند، کنارِ «کارت این راند را انتخاب کن». */
 .duelFocusPill{
@@ -4063,8 +4074,10 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 .duelFocusPill i{ font-style:normal; font-size:13px }
 
 @media (prefers-reduced-motion: reduce){
-  .duelRoundIntro, .duelRoundIntroInner, .duelRoundIntroIcon{ animation-duration:.01ms !important }
-  .duelRoundIntro{ animation:duelIntroFade 1.6s steps(2) forwards }
+  .duelRoundIntroInner,.duelRoundIntroIcon,.duelRoundIntro::before,
+  .duelRoundIntro::after,.duelIntroBeats>*{animation:none !important}
+  .duelRoundIntro{animation:duelIntroFade 2.8s steps(2) forwards}
+  .duelIntroBeats strong{opacity:1}
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -5130,3 +5143,13 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
   .duelFinalScore{font-size:23px}
 }
 .duelMatchmaking{min-height:250px}
+
+/* تحلیل ترکیب: بدون details، بدون بازشدن و بدون اسکرول داخلی */
+.duelIntelCompact{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:9px;padding:10px 12px}
+.duelIntelCompact>span{width:36px;height:36px;display:grid;place-items:center;border-radius:50%;font-weight:1000}
+.duelIntelCompact.ready>span{color:#22e7a6;background:#22e7a618}
+.duelIntelCompact.warn>span{color:#ffd166;background:#ffd16618}
+.duelIntelCompact>div{min-width:0;display:flex;flex-direction:column}
+.duelIntelCompact b{font-size:12.5px}
+.duelIntelCompact small{font-size:11.5px;color:#8fa6bd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.duelIntelCompact button{width:36px;height:36px;min-height:0;padding:0;margin:0;border-radius:50%}

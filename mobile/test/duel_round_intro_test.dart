@@ -14,9 +14,9 @@
 //
 //   • اندازهٔ فونتِ شعار (باید درشت باشد، نه صرفاً موجود)
 //   • واقعاً **وسطِ صفحه** باشد، نه گوشه‌ای
-//   • بعد از دو ثانیه **برود** (وگرنه جلوی بازی را می‌گیرد)
+//   • ۲.۸ ثانیه خوانا بماند و بعد **برود**
 //   • با راندِ تازه **دوباره** بیاید
-//   • `IgnorePointer` داشته باشد تا کاربر بتواند وسطش کارت بزند
+//   • `AbsorbPointer` داشته باشد تا پیش از پایانِ مکث انتخابی ثبت نشود
 //   • راهنمای سنِ پایین نمایش داده شود
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -45,7 +45,7 @@ void main() {
         focus: _focus, roundNumber: 1, totalRounds: 5)));
     await tester.pump(const Duration(milliseconds: 500));
 
-    final cry = find.text('نبرد سرعت');
+    final cry = find.text('سرعت');
     expect(cry, findsOneWidget, reason: 'نام معیار باید دیده شود');
 
     // ── اندازه، نه صرفاً وجود ──
@@ -65,43 +65,46 @@ void main() {
         reason: 'شعار باید عمودی هم مرکزِ صفحه باشد، نه بالا/پایینِ گوشه');
   });
 
-  testWidgets('اعلان فقط سه نشانهٔ ضروری دارد و متن آموزشی را پنهان می‌کند',
+  testWidgets('اعلان معیار، قانون و شمارش را دارد و متن آموزشی را پنهان می‌کند',
       (tester) async {
     await tester.pumpWidget(_wrap(const CardDuelRoundIntroForTest(
         focus: _focus, roundNumber: 2, totalRounds: 5)));
     await tester.pump(const Duration(milliseconds: 500));
 
-    expect(find.text('نبرد سرعت'), findsOneWidget);
-    expect(find.text('عدد بالاتر می‌برد'), findsOneWidget);
-    expect(find.text('۲/۵'), findsOneWidget);
+    expect(find.text('سرعت'), findsOneWidget);
+    expect(find.text('بالاترین عدد برنده است'), findsOneWidget);
+    expect(find.text('راند ۲ از ۵'), findsOneWidget);
     expect(find.textContaining('افکت آشکار'), findsNothing,
         reason: 'جزئیات فرمول روی کارت/تایم‌لاین است، نه overlay');
     expect(find.textContaining('عدد نهایی ='), findsNothing);
   });
 
-  testWidgets('اعلان بعد از ۱.۶ ثانیه می‌رود و جلوی بازی را نمی‌گیرد',
+  testWidgets('اعلان ۲.۸ ثانیه می‌ماند و انتخاب زودهنگام را می‌بندد',
       (tester) async {
     await tester.pumpWidget(_wrap(const CardDuelRoundIntroForTest(
         focus: _focus, roundNumber: 1, totalRounds: 5)));
     await tester.pump(const Duration(milliseconds: 400));
-    expect(find.text('نبرد سرعت'), findsOneWidget);
+    expect(find.text('سرعت'), findsOneWidget);
 
     // در تمامِ مدتِ نمایش نباید ضربه‌ها را ببلعد.
-    expect(find.byType(IgnorePointer), findsWidgets,
-        reason: 'کاربر باید بتواند وسطِ انیمیشن کارتش را بزند');
+    expect(
+        find.byWidgetPredicate(
+            (widget) => widget is AbsorbPointer && widget.absorbing),
+        findsOneWidget,
+        reason: 'معیار باید پیش از فعال‌شدن انتخاب کامل دیده شود');
 
-    await tester.pump(const Duration(milliseconds: 2200));
+    await tester.pump(const Duration(milliseconds: 2700));
     await tester.pumpAndSettle();
-    expect(find.text('نبرد سرعت'), findsNothing,
+    expect(find.text('سرعت'), findsNothing,
         reason: 'اعلانِ ماندگار جلوی دیدنِ کارت‌ها را می‌گیرد');
   });
 
   testWidgets('راندِ تازه اعلانِ تازه می‌سازد', (tester) async {
     await tester.pumpWidget(_wrap(const CardDuelRoundIntroForTest(
         focus: _focus, roundNumber: 1, totalRounds: 5)));
-    await tester.pump(const Duration(milliseconds: 2400));
+    await tester.pump(const Duration(milliseconds: 3000));
     await tester.pumpAndSettle();
-    expect(find.text('نبرد سرعت'), findsNothing);
+    expect(find.text('سرعت'), findsNothing);
 
     // همان ویجت، راندِ بعدی با تمرکزِ تازه.
     const next = <String, dynamic>{
@@ -115,7 +118,7 @@ void main() {
     await tester.pumpWidget(_wrap(const CardDuelRoundIntroForTest(
         focus: next, roundNumber: 2, totalRounds: 5)));
     await tester.pump(const Duration(milliseconds: 400));
-    expect(find.text('نبرد حمله'), findsOneWidget,
+    expect(find.text('حمله'), findsOneWidget,
         reason: 'بدونِ ریست، فقط راندِ اول انیمیشن می‌گرفت');
   });
 

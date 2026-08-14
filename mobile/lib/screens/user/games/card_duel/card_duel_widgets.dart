@@ -368,7 +368,7 @@ class _LiveBattle extends StatelessWidget {
         //
         // `_FocusBanner` همین اطلاعات را می‌داد ولی ~۹۰ پیکسل ارتفاع
         // می‌گرفت و باعثِ اسکرول می‌شد. جایش را `_RoundIntroOverlay`
-        // گرفته که وسطِ صفحه و روی همه‌چیز می‌آید، دو ثانیه می‌ماند و
+        // گرفته که وسطِ صفحه و روی همه‌چیز می‌آید، ۲.۸ ثانیه می‌ماند و
         // **هیچ ارتفاعی از چیدمان نمی‌گیرد**.
         //
         // اطلاعاتِ همیشگی (کدام ویژگی مهم است) از بین نرفت: روی تک‌تکِ
@@ -391,7 +391,7 @@ class _LiveBattle extends StatelessWidget {
                 Row(
                   children: [
                     // نشانِ همیشگیِ ویژگیِ راند — جایگزینِ فشردهٔ بنرِ حذف‌شده.
-                    // اعلانِ وسطِ صفحه دو ثانیه‌ای است؛ این تا آخرِ راند می‌ماند
+                    // اعلانِ وسطِ صفحه ۲.۸ ثانیه‌ای است؛ این تا آخرِ راند می‌ماند
                     // تا کسی که اعلان را از دست داد هم بداند دنبالِ چه عددی بگردد.
                     if ('${(state['roundFocus'] as Map?)?['stat'] ?? ''}'
                         .isNotEmpty) ...[
@@ -491,7 +491,9 @@ class _LiveBattle extends StatelessWidget {
                     itemBuilder: (_, index) {
                       final card = Map<String, dynamic>.from(deck[index]);
                       final id = cardIdOf(card);
-                      final canPlay = !iChose && remaining.contains(id);
+                      final canPlay = !session.introHolding &&
+                          !iChose &&
+                          remaining.contains(id);
                       final focusStat =
                           '${(state['roundFocus'] as Map?)?['stat'] ?? ''}';
                       final focusTint =
@@ -1419,8 +1421,6 @@ class _Finale extends StatelessWidget {
   const _Finale({
     required this.session,
     required this.color,
-    required this.resultColors,
-    required this.resultTemplate,
     required this.onAgain,
     required this.onEdit,
     required this.onShare,
@@ -1430,8 +1430,6 @@ class _Finale extends StatelessWidget {
   });
   final GameSession session;
   final Color color;
-  final List<Color>? resultColors;
-  final String? resultTemplate;
   final VoidCallback onAgain;
   final VoidCallback onEdit;
   final VoidCallback onShare;
@@ -1455,16 +1453,9 @@ class _Finale extends StatelessWidget {
       padding: const EdgeInsets.all(Gaps.md),
       decoration: BoxDecoration(
         borderRadius: Corners.rXl,
-        gradient: LinearGradient(
-          colors: resultColors ?? const [Color(0xFF17304C), Color(0xFF050A12)],
+        gradient: const LinearGradient(
+          colors: [Color(0xFF17304C), Color(0xFF050A12)],
         ),
-        image: resultTemplate == null
-            ? null
-            : DecorationImage(
-                image: AssetImage('assets/shop/cosmetics/$resultTemplate.webp'),
-                fit: BoxFit.cover,
-                opacity: .18,
-              ),
         border: Border.all(color: color),
       ),
       child: Column(
@@ -1655,187 +1646,76 @@ class _DeckIntelPanel extends StatelessWidget {
             ? Map<String, dynamic>.from(suggestedDeck!['insights'] as Map)
             : null);
     if (insights == null) return const SizedBox.shrink();
-    final strengths = (insights['strengths'] as List? ?? const [])
-        .map((e) => '$e')
-        .where((e) => e.isNotEmpty)
-        .toList(growable: false);
     final warnings = (insights['warnings'] as List? ?? const [])
         .map((e) => '$e')
         .where((e) => e.isNotEmpty)
         .toList(growable: false);
-    final recommendedOrder = (insights['recommendedOrder'] as List? ?? const [])
-        .whereType<Map>()
-        .map((item) => Map<String, dynamic>.from(item))
+    final strengths = (insights['strengths'] as List? ?? const [])
+        .map((e) => '$e')
+        .where((e) => e.isNotEmpty)
         .toList(growable: false);
+    final order = (insights['recommendedOrder'] as List? ?? const [])
+        .whereType<Map>()
+        .toList(growable: false);
+    final warning = warnings.isEmpty ? null : warnings.first;
+    final strength = strengths.isEmpty ? null : strengths.first;
+    final opener = order.isEmpty ? null : '${order.first['name'] ?? ''}';
+    final tint = warning == null ? _emerald : _gold;
+    final summary = warning ?? strength ?? 'ترکیب متعادل';
 
     return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(
         children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'تحلیل بالانس ترکیب',
-                      style: TextStyle(fontWeight: FontWeight.w900),
-                    ),
-                    Text(
-                      'هوشِ آرنا قبل از شروع ضعف و قوت deck را می‌گوید',
-                      style: TextStyle(fontSize: 11.5, color: Colors.white60),
-                    ),
-                  ],
-                ),
-              ),
-              if (suggestedDeck != null)
-                OutlinedButton.icon(
-                  onPressed: onApplySuggested,
-                  icon: const Icon(Icons.auto_fix_high_rounded, size: 16),
-                  label: const Text('چیدن خودکار'),
-                ),
-            ],
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: tint.withValues(alpha: .14),
+            ),
+            child: Icon(
+              warning == null ? Icons.verified_rounded : Icons.bolt_rounded,
+              color: tint,
+              size: 20,
+            ),
           ),
-          // ═══════════════════════════════════════════════════════════════
-          // چرا فهرست‌ها بریده می‌شوند
-          // ═══════════════════════════════════════════════════════════════
-          //
-          // گزارشِ مالک: «قسمت تحلیل ترکیب یه اسکرول طولانی داره که
-          // حذفش کن اسکرول رو».
-          //
-          // این پنل چهار بلوکِ پشتِ سرِ هم داشت: نقاطِ قوت (تا ۵ چیپ)،
-          // هشدارها (تا ۵ چیپ)، جعبهٔ اوپنر، و فهرستِ ۵ راند. روی
-          // گوشیِ معمولی مجموعاً ~۴۲۰ پیکسل می‌شد.
-          //
-          // مهم‌ترین اطلاعات دو مورد اولِ هر فهرست است؛ بقیه تکرارِ
-          // همان مضمون‌اند. حالا حداکثر دو چیپ از هر دسته نشان داده
-          // می‌شود و اگر بیشتر بود، تعدادش کنارش می‌آید.
-          if (strengths.isNotEmpty || warnings.isNotEmpty) ...[
-            Gaps.vXs,
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                for (final item in strengths.take(2))
-                  _IntelChip(text: item, tint: _emerald),
-                for (final item in warnings.take(2))
-                  _IntelChip(text: item, tint: _rose),
-                if (strengths.length + warnings.length > 4)
-                  _IntelChip(
-                    text:
-                        '+${faNum(strengths.length + warnings.length - 4)} نکتهٔ دیگر',
-                    tint: Colors.white54,
+                Text(
+                  warning == null ? 'ترکیب آماده' : 'یک اصلاح پیشنهادی',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w900,
                   ),
+                ),
+                Text(
+                  opener == null ? summary : '$summary  •  شروع: $opener',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    color: Colors.white60,
+                  ),
+                ),
               ],
             ),
-          ],
-          if ('${insights['recommendedLeadReason'] ?? ''}'
-              .trim()
-              .isNotEmpty) ...[
-            Gaps.vSm,
-            Container(
-              padding: const EdgeInsets.all(Gaps.sm),
-              decoration: BoxDecoration(
-                color: _cyan.withValues(alpha: .10),
-                borderRadius: Corners.rLg,
-                border: Border.all(color: _cyan.withValues(alpha: .28)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'اوپنر پیشنهادی',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      color: _cyan,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  // دو خط کافی است؛ متنِ بلندتر فقط ارتفاع می‌گیرد.
-                  Text(
-                    '${insights['recommendedLeadReason']}',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.white70,
-                      height: 1.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
+          ),
+          if (suggestedDeck != null)
+            IconButton(
+              onPressed: onApplySuggested,
+              icon: const Icon(Icons.auto_fix_high_rounded, size: 20),
+              color: _cyan,
+              tooltip: 'چیدن خودکار',
             ),
-          ],
-          if (recommendedOrder.isNotEmpty) ...[
-            Gaps.vSm,
-            // پنج کارتِ اسکرول‌شونده داخلِ پنلِ اسکرول‌شونده همان «اسکرول
-            // طولانیِ نحوه محاسبه» بود. فقط تصمیمِ فوری لازم است: با کدام
-            // کارت شروع کنم. بقیه را دکمهٔ «چیدن خودکار» اعمال می‌کند.
-            Builder(
-              builder: (_) {
-                final first = recommendedOrder.first;
-                return Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: .05),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: .10),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.flag_rounded, size: 17, color: _cyan),
-                      const SizedBox(width: 7),
-                      Expanded(
-                        child: Text(
-                          'شروع پیشنهادی: ${first['name'] ?? 'کارت اول'} · ${first['focus'] ?? ''}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.white70,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ],
         ],
       ),
     );
   }
-}
-
-class _IntelChip extends StatelessWidget {
-  const _IntelChip({required this.text, required this.tint});
-  final String text;
-  final Color tint;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-        decoration: BoxDecoration(
-          color: tint.withValues(alpha: .12),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: tint.withValues(alpha: .32)),
-        ),
-        child: Text(
-          text,
-          style:
-              TextStyle(color: tint, fontSize: 12, fontWeight: FontWeight.w800),
-        ),
-      );
 }
 
 class _FinalRoundBreakdown extends StatelessWidget {
@@ -2565,7 +2445,7 @@ class _RoundIntroOverlayState extends State<_RoundIntroOverlay>
     with SingleTickerProviderStateMixin {
   late final AnimationController _c = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1600),
+    duration: const Duration(milliseconds: 2800),
   );
 
   @override
@@ -2611,93 +2491,161 @@ class _RoundIntroOverlayState extends State<_RoundIntroOverlay>
           final v = _c.value;
           if (v >= 1.0) return const SizedBox.shrink();
           final enter =
-              Curves.easeOutBack.transform((v / 0.28).clamp(0.0, 1.0));
-          final exit = Curves.easeIn.transform(
-            ((v - 0.76) / 0.24).clamp(0.0, 1.0),
+              Curves.easeOutBack.transform((v / 0.22).clamp(0.0, 1.0));
+          final exit = Curves.easeInCubic.transform(
+            ((v - 0.88) / 0.12).clamp(0.0, 1.0),
           );
           final opacity = (1 - exit).clamp(0.0, 1.0);
-          final spin = (1 - enter) * .45;
-          final scale = 0.55 + 0.45 * enter;
+          final spin = (1 - enter) * .55;
+          final scale = 0.48 + 0.52 * enter;
+          final beat = v < .50
+              ? '۳'
+              : v < .64
+                  ? '۲'
+                  : v < .78
+                      ? '۱'
+                      : 'انتخاب!';
+          final beatPhase = v < .50
+              ? (v / .50)
+              : v < .64
+                  ? ((v - .50) / .14)
+                  : v < .78
+                      ? ((v - .64) / .14)
+                      : ((v - .78) / .22);
+          final beatScale = 1 + .18 * (1 - beatPhase.clamp(0.0, 1.0));
 
-          return IgnorePointer(
+          return AbsorbPointer(
+            absorbing: true,
             child: Opacity(
               opacity: opacity,
               child: Container(
                 decoration: BoxDecoration(
                   gradient: RadialGradient(
                     colors: [
-                      tint.withValues(alpha: .20 * opacity),
-                      Colors.black.withValues(alpha: .72 * opacity),
+                      tint.withValues(alpha: .28 * opacity),
+                      const Color(0xF20A0F1D),
                     ],
-                    radius: .9,
+                    stops: const [.02, .82],
+                    radius: .95,
                   ),
                 ),
                 alignment: Alignment.center,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      '${faNum(widget.roundNumber)}/${faNum(widget.totalRounds)}',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white.withValues(alpha: .68),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Transform.rotate(
-                      angle: spin,
-                      child: Transform.scale(
-                        scale: scale,
-                        child: Container(
-                          width: 92,
-                          height: 92,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: tint.withValues(alpha: .16),
-                            border: Border.all(color: tint, width: 2.5),
-                            boxShadow: [
-                              BoxShadow(
-                                color: tint.withValues(alpha: .62),
-                                blurRadius: 38,
-                                spreadRadius: 2,
-                              ),
-                            ],
-                          ),
-                          child: Icon(icon, color: tint, size: 48),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 15),
-                    Transform.scale(
-                      scale: .88 + .12 * enter,
-                      child: Text(
-                        'نبرد $statName',
-                        style: TextStyle(
-                          fontSize: 29,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                          shadows: [Shadow(color: tint, blurRadius: 24)],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 13,
                         vertical: 5,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: .38),
+                        color: tint.withValues(alpha: .12),
                         borderRadius: BorderRadius.circular(99),
-                        border: Border.all(color: tint.withValues(alpha: .45)),
+                        border: Border.all(color: tint.withValues(alpha: .46)),
                       ),
                       child: Text(
-                        'عدد بالاتر می‌برد',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          color: tint,
+                        'راند ${faNum(widget.roundNumber)} از ${faNum(widget.totalRounds)}',
+                        style: const TextStyle(
+                          fontSize: 13,
                           fontWeight: FontWeight.w900,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Transform.rotate(
+                      angle: spin,
+                      child: Transform.scale(
+                        scale: scale,
+                        child: SizedBox(
+                          width: 126,
+                          height: 126,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Transform.rotate(
+                                angle: v * 3.2,
+                                child: Container(
+                                  width: 122,
+                                  height: 122,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: tint.withValues(alpha: .30),
+                                      width: 1,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                width: 96,
+                                height: 96,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: tint.withValues(alpha: .18),
+                                  border: Border.all(color: tint, width: 3),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: tint.withValues(alpha: .68),
+                                      blurRadius: 44,
+                                      spreadRadius: 4,
+                                    ),
+                                  ],
+                                ),
+                                child: Icon(icon, color: tint, size: 50),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      'معیار این راند',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: tint.withValues(alpha: .86),
+                        letterSpacing: .2,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Transform.scale(
+                      scale: .84 + .16 * enter,
+                      child: Text(
+                        statName,
+                        style: TextStyle(
+                          fontSize: 34,
+                          height: 1.15,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          shadows: [
+                            Shadow(color: tint, blurRadius: 28),
+                            const Shadow(color: Colors.black, blurRadius: 8),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 7),
+                    const Text(
+                      'بالاترین عدد برنده است',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.white70,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Transform.scale(
+                      scale: beatScale,
+                      child: Text(
+                        beat,
+                        key: ValueKey(beat),
+                        style: TextStyle(
+                          fontSize: beat == 'انتخاب!' ? 18 : 24,
+                          fontWeight: FontWeight.w900,
+                          color: beat == 'انتخاب!' ? _emerald : tint,
+                          shadows: [Shadow(color: tint, blurRadius: 18)],
                         ),
                       ),
                     ),

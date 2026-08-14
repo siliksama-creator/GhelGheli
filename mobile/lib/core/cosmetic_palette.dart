@@ -36,24 +36,16 @@ const nameGradientColors = <String, List<Color>>{
   '#A855F7': [Color(0xFFF3E8FF), Color(0xFFBC7CF9), Color(0xFFAD86EA)], // 1.85
   'gold_gradient': [Color(0xFFFFF0A3), Color(0xFFF59E0B)],
   'green_neon': [Color(0xFFD9F99D), Color(0xFF10B981)],
-  'animated_fire': [Color(0xFFFDE047), Color(0xFFF97316), Color(0xFFF37070)], // 3.49
+  'animated_fire': [
+    Color(0xFFFDE047),
+    Color(0xFFF97316),
+    Color(0xFFF37070)
+  ], // 3.49
   'calm_rainbow': [Color(0xFF60A5FA), Color(0xFFC084FC), Color(0xFFF9A8D4)],
   'icy_glow': [Color(0xFFE0F2FE), Color(0xFF38BDF8)],
   'digital_typing': [Color(0xFF67E8F9), Color(0xFF22C55E)],
   'mvp_name': [Color(0xFFFFFFFF), Color(0xFFFFD166)],
   'social_team': [Color(0xFFFB7185), Color(0xFFA885F8)], // 3.10
-};
-
-const resultTemplateColors = <String, List<Color>>{
-  'result_stadium': [Color(0xFF052E16), Color(0xFF0EA5E9)],
-  'result_champions': [Color(0xFF172554), Color(0xFF7C3AED)],
-  'result_fire': [Color(0xFF450A0A), Color(0xFFF97316)],
-  'result_ice': [Color(0xFF082F49), Color(0xFF7DD3FC)],
-  'result_gold_mvp': [Color(0xFF422006), Color(0xFFFFD166)],
-  'result_friendly': [Color(0xFF312E81), Color(0xFFFB7185)],
-  'result_derby': [Color(0xFFB91C1C), Color(0xFF1D4ED8)],
-  'result_world_cup': [Color(0xFF064E3B), Color(0xFFFACC15)],
-  'annual_royal_result': [Color(0xFF1E1B4B), Color(0xFFFFD166)],
 };
 
 BoxDecoration? profileBackgroundDecoration(String? slug) {
@@ -119,12 +111,20 @@ Color? nameColorOf(String? payload, {bool onLight = false}) {
 }
 
 const profileBadgeLabels = <String, String>{
-  'cr7': 'CR7', 'goat': 'GOAT', 'captain': 'CAP',
-  'legend': 'LEGEND', 'king': 'KING', 'ace': 'ACE',
+  'cr7': 'CR7',
+  'goat': 'GOAT',
+  'captain': 'CAP',
+  'legend': 'LEGEND',
+  'king': 'KING',
+  'ace': 'ACE',
 };
 const profileBadgeIcons = <String, String>{
-  'cr7': '7', 'goat': '♛', 'captain': 'C',
-  'legend': '★', 'king': '♚', 'ace': 'A',
+  'cr7': '7',
+  'goat': '♛',
+  'captain': 'C',
+  'legend': '★',
+  'king': '♚',
+  'ace': 'A',
 };
 const profileBadgeColors = <String, List<Color>>{
   'cr7': [Color(0xFFF8FAFC), Color(0xFF38BDF8)],

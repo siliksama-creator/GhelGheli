@@ -33,7 +33,10 @@ import 'package:flutter_test/flutter_test.dart';
 
   // PNG: امضا، بعد IHDR با عرض/ارتفاع ۳۲ بیتی big-endian.
   if (b.length > 24 &&
-      b[0] == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47) {
+      b[0] == 0x89 &&
+      b[1] == 0x50 &&
+      b[2] == 0x4E &&
+      b[3] == 0x47) {
     return (w: d.getUint32(16), h: d.getUint32(20));
   }
 
@@ -234,7 +237,7 @@ void main() {
               'یعنی یک هینت برداشته شده یا asset تازهٔ بزرگی اضافه شده');
     });
 
-    test('۵۵ تصویر پویای فروشگاه کامل، هم‌اندازه و کم‌هزینه‌اند', () {
+    test('۳۶ تصویر دسته‌های فعال فروشگاه کامل و کم‌هزینه‌اند', () {
       final source = File('lib/screens/user/shop_page.dart').readAsStringSync();
       expect(source.contains("'assets/shop/cosmetics/\$slug.webp'"), isTrue,
           reason: 'مسیر تصویر باید مستقیماً از slug سرور ساخته شود');
@@ -244,9 +247,14 @@ void main() {
           reason: 'فقط تصاویر نزدیک viewport باید ساخته شوند');
 
       final files = Directory('assets/shop/cosmetics')
-          .listSync().whereType<File>().where((f) => f.path.endsWith('.webp')).toList();
-      expect(files.length, 55,
-          reason: 'هر SKU غیر باشگاهی باید تصویر مستقل داشته باشد');
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.webp'))
+          .toList();
+      // ۱۹ فایلِ دو دستهٔ result_template/match_effect عمداً همراه
+      // کاتالوگشان حذف شده‌اند: ۵۵ − ۱۹ = ۳۶.
+      expect(files.length, 36,
+          reason: 'فقط artwork دسته‌های فعال باید در APK بماند');
       for (final file in files) {
         final size = imageSize(file);
         expect(size, isNotNull, reason: '${file.path} هدر WebP معتبر ندارد');
@@ -268,8 +276,7 @@ void main() {
       final src = File('lib/screens/user/games/tap/tap_character.dart')
           .readAsStringSync();
       final hint = RegExp(r'cacheWidth:\s*(\d+)').firstMatch(src);
-      expect(hint, isNotNull,
-          reason: '_SkinImage باید cacheWidth داشته باشد');
+      expect(hint, isNotNull, reason: '_SkinImage باید cacheWidth داشته باشد');
       final cw = int.parse(hint!.group(1)!);
 
       for (final f in Directory('assets/games/tap').listSync()) {
@@ -305,17 +312,32 @@ void main() {
     });
 
     test('باشگاه‌های ایرانی از بندل حذف شده‌اند', () {
-      for (final slug in ['esteghlal', 'persepolis', 'sepahan',
-                          'tractor', 'malavan']) {
+      for (final slug in [
+        'esteghlal',
+        'persepolis',
+        'sepahan',
+        'tractor',
+        'malavan'
+      ]) {
         expect(File('assets/shop/club_$slug.webp').existsSync(), isFalse,
             reason: 'نشان $slug باید حذف شده باشد');
       }
     });
 
     test('باشگاه‌های جهانی دست‌نخورده مانده‌اند', () {
-      for (final slug in ['real_madrid', 'barcelona', 'man_united',
-                          'man_city', 'liverpool', 'arsenal', 'bayern',
-                          'juventus', 'psg', 'inter_miami', 'alnasr']) {
+      for (final slug in [
+        'real_madrid',
+        'barcelona',
+        'man_united',
+        'man_city',
+        'liverpool',
+        'arsenal',
+        'bayern',
+        'juventus',
+        'psg',
+        'inter_miami',
+        'alnasr'
+      ]) {
         expect(File('assets/shop/club_$slug.webp').existsSync(), isTrue,
             reason: 'نشان $slug نباید حذف می‌شد');
       }

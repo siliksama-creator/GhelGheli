@@ -5,20 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../api_client.dart';
-import '../../../core/cosmetics.dart';
 import '../../../theme/tokens.dart';
-import '../../../widgets/match_effect_visual.dart';
 import 'game_audio.dart';
 import 'game_session.dart';
 import 'versus_bar.dart';
-
-Map<String, dynamic> _playerCosmetics(GameSession session, String? symbol) {
-  final player = symbol == null ? null : session.players?[symbol];
-  final cosmetics = player is Map ? player['cosmetics'] : null;
-  return cosmetics is Map
-      ? Map<String, dynamic>.from(cosmetics)
-      : <String, dynamic>{};
-}
 
 class GameScaffold extends StatelessWidget {
   const GameScaffold({
@@ -57,7 +47,8 @@ class GameScaffold extends StatelessWidget {
           animation: session,
           builder: (context, _) {
             return Padding(
-              padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.md, Gaps.md, Gaps.xs),
+              padding:
+                  const EdgeInsets.fromLTRB(Gaps.md, Gaps.md, Gaps.md, Gaps.xs),
               child: Column(
                 children: [
                   Row(
@@ -88,10 +79,12 @@ class GameScaffold extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: Gaps.sm, vertical: 6),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF59E0B).withValues(alpha: 0.16),
+                          color:
+                              const Color(0xFFF59E0B).withValues(alpha: 0.16),
                           borderRadius: Corners.rMd,
                           border: Border.all(
-                              color: const Color(0xFFF59E0B).withValues(alpha: 0.6)),
+                              color: const Color(0xFFF59E0B)
+                                  .withValues(alpha: 0.6)),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -102,12 +95,14 @@ class GameScaffold extends StatelessWidget {
                                 child: CircularProgressIndicator(
                                     strokeWidth: 2, color: Color(0xFFF59E0B))),
                             const SizedBox(width: 8),
-                            Flexible(child: Text(
-                                session.connectionNotice ?? 'اتصال قطع شد؛ در حال بازیابی مسابقه…',
-                                style: const TextStyle(
-                                    color: Color(0xFFF59E0B),
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700))),
+                            Flexible(
+                                child: Text(
+                                    session.connectionNotice ??
+                                        'اتصال قطع شد؛ در حال بازیابی مسابقه…',
+                                    style: const TextStyle(
+                                        color: Color(0xFFF59E0B),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700))),
                           ],
                         ),
                       ),
@@ -123,20 +118,6 @@ class GameScaffold extends StatelessWidget {
           const Positioned.fill(
             child: IgnorePointer(
               child: _ConfettiOverlay(),
-            ),
-          ),
-        if ((session.phase == GamePhase.playing || (session.phase == GamePhase.over && session.iWon))
-            && _playerCosmetics(session, session.mySymbol)['matchEffect'] != null
-            && matchEffectSupports(
-              '${_playerCosmetics(session, session.mySymbol)['matchEffect']}',
-              session.phase == GamePhase.over ? 'finish' : 'entry',
-            ))
-          Positioned.fill(
-            child: IgnorePointer(
-              child: _CosmeticEffectOverlay(
-                slug: '${_playerCosmetics(session, session.mySymbol)['matchEffect']}',
-                finish: session.phase == GamePhase.over,
-              ),
             ),
           ),
       ],
@@ -166,7 +147,8 @@ class GameScaffold extends StatelessWidget {
               _Centered(
                 icon: Icons.sports_esports_rounded,
                 title: 'آماده‌ای شروع کنیم؟',
-                subtitle: 'می‌توانی آنلاین با حریف واقعی رقابت کنی یا بلافاصله با ربات بازی کنی.',
+                subtitle:
+                    'می‌توانی آنلاین با حریف واقعی رقابت کنی یا بلافاصله با ربات بازی کنی.',
                 action: Column(
                   children: [
                     FilledButton.icon(
@@ -212,7 +194,8 @@ class GameScaffold extends StatelessWidget {
         // With no bot to fall back on the countdown is meaningless once it
         // hits zero — we keep looking, so show a live pulse instead of a
         // number frozen at ۰.
-        final open = session.stillSearching || !session.botFallback && left <= 0;
+        final open =
+            session.stillSearching || !session.botFallback && left <= 0;
         return SingleChildScrollView(
           child: Padding(
             padding: const EdgeInsets.all(Gaps.lg),
@@ -230,8 +213,8 @@ class GameScaffold extends StatelessWidget {
                           // Indeterminate spinner once the window is open.
                           value: open ? null : (left / total).clamp(0.0, 1.0),
                           strokeWidth: 6,
-                          backgroundColor: theme.colorScheme.outline
-                              .withValues(alpha: 0.2),
+                          backgroundColor:
+                              theme.colorScheme.outline.withValues(alpha: 0.2),
                           valueColor: AlwaysStoppedAnimation(accent),
                         ),
                       ),
@@ -250,12 +233,14 @@ class GameScaffold extends StatelessWidget {
                 ),
                 Gaps.vLg,
                 Builder(builder: (_) {
-                  final isOnlineMatch = session.stake == 100 || session.stake == 1000;
+                  final isOnlineMatch =
+                      session.stake == 100 || session.stake == 1000;
                   if (isOnlineMatch) {
                     return const Text(
                       'در جستجوی حریف ....',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                      style:
+                          TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
                     );
                   }
                   return Column(
@@ -279,11 +264,13 @@ class GameScaffold extends StatelessWidget {
                 if (soloOffer != null) ...[Gaps.vMd, soloOffer!],
                 Gaps.vLg,
                 Builder(builder: (_) {
-                  final isOnlineMatch = session.stake == 100 || session.stake == 1000;
+                  final isOnlineMatch =
+                      session.stake == 100 || session.stake == 1000;
                   if (isOnlineMatch) {
                     return OutlinedButton.icon(
                       onPressed: session.leave,
-                      style: OutlinedButton.styleFrom(minimumSize: const Size(140, 46)),
+                      style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(140, 46)),
                       icon: const Icon(Icons.close_rounded, size: 18),
                       label: const Text('لغو'),
                     );
@@ -303,7 +290,8 @@ class GameScaffold extends StatelessWidget {
                       Gaps.hSm,
                       OutlinedButton.icon(
                         onPressed: session.leave,
-                        style: OutlinedButton.styleFrom(minimumSize: const Size(100, 46)),
+                        style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(100, 46)),
                         icon: const Icon(Icons.close_rounded, size: 18),
                         label: const Text('لغو'),
                       ),
@@ -320,30 +308,36 @@ class GameScaffold extends StatelessWidget {
         return Column(
           children: [
             VersusBar(
-                session: session,
-                api: api,
-                symbols: symbols,
-                accent: accent),
+                session: session, api: api, symbols: symbols, accent: accent),
             if (session.stake > 0) ...[
               Container(
                 margin: const EdgeInsets.symmetric(vertical: 4),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                 decoration: BoxDecoration(
                   borderRadius: Corners.rPill,
-                  gradient: const LinearGradient(colors: [Color(0x3DFFD700), Color(0x1AFF9F43)]),
-                  border: Border.all(color: const Color(0xFFFFD166), width: 1.2),
+                  gradient: const LinearGradient(
+                      colors: [Color(0x3DFFD700), Color(0x1AFF9F43)]),
+                  border:
+                      Border.all(color: const Color(0xFFFFD166), width: 1.2),
                   boxShadow: [
-                    BoxShadow(color: const Color(0xFFFFD166).withValues(alpha: 0.25), blurRadius: 10),
+                    BoxShadow(
+                        color: const Color(0xFFFFD166).withValues(alpha: 0.25),
+                        blurRadius: 10),
                   ],
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.emoji_events_rounded, size: 14, color: Color(0xFFFFD166)),
+                    const Icon(Icons.emoji_events_rounded,
+                        size: 14, color: Color(0xFFFFD166)),
                     const SizedBox(width: 5),
                     Text(
                       'پات مسابقه: ${faNum(session.netPot > 0 ? session.netPot : session.stake * 2 * 0.9)} امتیاز (۱۰٪ کارمزد)',
-                      style: const TextStyle(color: Color(0xFFFFD166), fontSize: 11.5, fontWeight: FontWeight.w900),
+                      style: const TextStyle(
+                          color: Color(0xFFFFD166),
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w900),
                     ),
                   ],
                 ),
@@ -430,13 +424,15 @@ class _TurnBanner extends StatelessWidget {
     final theme = Theme.of(context);
     return AnimatedContainer(
       duration: Motion.fast,
-      padding: const EdgeInsets.symmetric(horizontal: Gaps.md, vertical: Gaps.xs),
+      padding:
+          const EdgeInsets.symmetric(horizontal: Gaps.md, vertical: Gaps.xs),
       decoration: BoxDecoration(
         borderRadius: Corners.rPill,
-        color: (mine ? accent : theme.colorScheme.outline)
-            .withValues(alpha: 0.16),
+        color:
+            (mine ? accent : theme.colorScheme.outline).withValues(alpha: 0.16),
         border: Border.all(
-          color: (mine ? accent : theme.colorScheme.outline).withValues(alpha: 0.65),
+          color: (mine ? accent : theme.colorScheme.outline)
+              .withValues(alpha: 0.65),
           width: 1.5,
         ),
         boxShadow: mine
@@ -468,7 +464,6 @@ class _TurnBanner extends StatelessWidget {
   }
 }
 
-
 class _ResultStrip extends StatelessWidget {
   const _ResultStrip({required this.session, required this.accent});
   final GameSession session;
@@ -489,26 +484,20 @@ class _ResultStrip extends StatelessWidget {
         : draw
             ? Icons.handshake_rounded
             : Icons.close_rounded;
-    final cosmetics = _playerCosmetics(session, session.mySymbol);
-    final template = cosmetics['resultTemplate'] as String?;
-    final palette = resultTemplateColors[template];
     return AnimatedContainer(
       duration: Motion.fast,
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: Gaps.sm, vertical: 7),
       decoration: BoxDecoration(
         borderRadius: Corners.rPill,
-        color: palette == null ? color.withValues(alpha: 0.16) : null,
-        gradient: palette == null ? null : LinearGradient(
-          colors: [palette.first.withValues(alpha: .82), palette.last.withValues(alpha: .46)],
+        color: color.withValues(alpha: 0.16),
+        border: Border.all(
+          color: color.withValues(alpha: 0.70),
+          width: 1.2,
         ),
-        image: template == null ? null : DecorationImage(
-          image: AssetImage('assets/shop/cosmetics/$template.webp'),
-          fit: BoxFit.cover,
-          opacity: .18,
-        ),
-        border: Border.all(color: (palette?.last ?? color).withValues(alpha: 0.70), width: 1.2),
-        boxShadow: [BoxShadow(color: color.withValues(alpha: 0.20), blurRadius: 12)],
+        boxShadow: [
+          BoxShadow(color: color.withValues(alpha: 0.20), blurRadius: 12)
+        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -544,12 +533,15 @@ class _ResultActions extends StatelessWidget {
       children: [
         Expanded(
           child: FilledButton.icon(
-            onPressed: session.rematchAvailable ? session.rematch : session.join,
+            onPressed:
+                session.rematchAvailable ? session.rematch : session.join,
             style: FilledButton.styleFrom(backgroundColor: accent),
             icon: const Icon(Icons.replay_rounded, size: 18),
             label: Text(session.rematchWaiting
                 ? 'منتظر حریف…'
-                : session.rematchAvailable ? 'دوباره با همین حریف' : 'بازی دوباره'),
+                : session.rematchAvailable
+                    ? 'دوباره با همین حریف'
+                    : 'بازی دوباره'),
           ),
         ),
         Gaps.hXs,
@@ -557,7 +549,8 @@ class _ResultActions extends StatelessWidget {
           tooltip: 'اشتراک نتیجه در تلگرام/اینستاگرام',
           // share_plus ۱۳: API تازه. توضیحِ چراییِ ارتقا در card_duel_page.
           onPressed: () => SharePlus.instance.share(ShareParams(
-            text: '${session.resultText}\n${session.nameOf('X')} مقابل ${session.nameOf('O')}\n'
+            text:
+                '${session.resultText}\n${session.nameOf('X')} مقابل ${session.nameOf('O')}\n'
                 'تو هم به باشگاه بازی‌های قلقلی بیا: https://ghelghelishop.ir',
             subject: 'نتیجه بازی قلقلی',
           )),
@@ -571,77 +564,6 @@ class _ResultActions extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _CosmeticEffectOverlay extends StatefulWidget {
-  const _CosmeticEffectOverlay({required this.slug, required this.finish});
-  final String slug;
-  final bool finish;
-
-  @override
-  State<_CosmeticEffectOverlay> createState() => _CosmeticEffectOverlayState();
-}
-
-class _CosmeticEffectOverlayState extends State<_CosmeticEffectOverlay>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1900),
-  );
-
-  @override
-  void initState() {
-    super.initState();
-    _run();
-  }
-
-  @override
-  void didUpdateWidget(covariant _CosmeticEffectOverlay oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.finish != widget.finish || oldWidget.slug != widget.slug) _run();
-  }
-
-  void _run() {
-    _controller.stop();
-    _controller.reset();
-    if (widget.finish) {
-      _controller.repeat(reverse: true);
-    } else {
-      _controller.forward();
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (_, __) {
-        final t = Curves.easeOutCubic.transform(_controller.value);
-        final opacity = widget.finish ? .25 + .65 * (1 - (t - .5).abs() * 2) : (1 - t).clamp(0.0, 1.0);
-        return Center(
-          child: Opacity(
-            opacity: opacity.clamp(0.0, 1.0).toDouble(),
-            child: Transform.rotate(
-              angle: (t - .5) * .28,
-              child: Transform.scale(
-                scale: widget.finish ? .9 + t * .65 : .3 + t * 1.9,
-                child: SizedBox(
-                  width: 300,
-                  child: MatchEffectVisual(slug: widget.slug, progress: t),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
     );
   }
 }
@@ -744,7 +666,8 @@ class _ConfettiOverlay extends StatefulWidget {
   State<_ConfettiOverlay> createState() => _ConfettiOverlayState();
 }
 
-class _ConfettiOverlayState extends State<_ConfettiOverlay> with SingleTickerProviderStateMixin {
+class _ConfettiOverlayState extends State<_ConfettiOverlay>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final List<_Particle> _particles;
   final _random = math.Random();
@@ -754,9 +677,12 @@ class _ConfettiOverlayState extends State<_ConfettiOverlay> with SingleTickerPro
     super.initState();
     // Epic victory vibrations!
     HapticFeedback.heavyImpact();
-    Future.delayed(const Duration(milliseconds: 150), () => HapticFeedback.heavyImpact());
-    Future.delayed(const Duration(milliseconds: 300), () => HapticFeedback.heavyImpact());
-    Future.delayed(const Duration(milliseconds: 450), () => HapticFeedback.heavyImpact());
+    Future.delayed(
+        const Duration(milliseconds: 150), () => HapticFeedback.heavyImpact());
+    Future.delayed(
+        const Duration(milliseconds: 300), () => HapticFeedback.heavyImpact());
+    Future.delayed(
+        const Duration(milliseconds: 450), () => HapticFeedback.heavyImpact());
 
     _controller = AnimationController(
       vsync: this,
@@ -770,8 +696,8 @@ class _ConfettiOverlayState extends State<_ConfettiOverlay> with SingleTickerPro
     // طبیعی‌تر دیده می‌شود (تراکم یکسان). به همین ترتیب اندازهٔ ذره
     // به عرض صفحه گره می‌خورد تا در موبایل‌های بزرگ‌تر شناورِ کوچکی
     // به نظر نرسد.
-    final count = (45 + (MediaQuery.sizeOf(context).width / 18)).round()
-        .clamp(45, 90);
+    final count =
+        (45 + (MediaQuery.sizeOf(context).width / 18)).round().clamp(45, 90);
     final colors = [
       const Color(0xFFB5EF58), // Green
       const Color(0xFF38BDF8), // Blue
@@ -780,16 +706,18 @@ class _ConfettiOverlayState extends State<_ConfettiOverlay> with SingleTickerPro
       const Color(0xFFEC4899), // Pink
     ];
 
-    _particles = List.generate(count, (_) => _Particle(
-      x: _random.nextDouble(),
-      y: _random.nextDouble() * -0.5, // Start slightly above screen
-      speed: 0.05 + _random.nextDouble() * 0.1,
-      angle: _random.nextDouble() * math.pi * 2,
-      rotationSpeed: _random.nextDouble() * 4 + 1.0,
-      size: 7.0 + _random.nextDouble() * 9.0,
-      color: colors[_random.nextInt(colors.length)],
-      shape: _random.nextInt(4), // 4 distinct shapes!
-    ));
+    _particles = List.generate(
+        count,
+        (_) => _Particle(
+              x: _random.nextDouble(),
+              y: _random.nextDouble() * -0.5, // Start slightly above screen
+              speed: 0.05 + _random.nextDouble() * 0.1,
+              angle: _random.nextDouble() * math.pi * 2,
+              rotationSpeed: _random.nextDouble() * 4 + 1.0,
+              size: 7.0 + _random.nextDouble() * 9.0,
+              color: colors[_random.nextInt(colors.length)],
+              shape: _random.nextInt(4), // 4 distinct shapes!
+            ));
   }
 
   @override
@@ -928,7 +856,8 @@ class _ConfettiPainter extends CustomPainter {
       if (p.shape == 0) {
         // Rectangle Confetti
         canvas.drawRect(
-          Rect.fromCenter(center: Offset.zero, width: p.size, height: p.size * 0.5),
+          Rect.fromCenter(
+              center: Offset.zero, width: p.size, height: p.size * 0.5),
           paint,
         );
       } else if (p.shape == 1) {
