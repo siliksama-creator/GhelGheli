@@ -11,13 +11,18 @@ Monorepo فارسی برای سه بخش اصلی:
 برای این پروژه API، پنل و اپ باید هم‌زمان تغییر کنند. Monorepo باعث می‌شود migrationها، مستندات API، Workflow ساخت APK و تغییرات هماهنگ در یک history قابل ردیابی باشند. همچنین GitHub Actions می‌تواند APK اندروید را مستقیم از پوشه `mobile/` بسازد و به‌صورت Artifact تحویل دهد.
 
 ## دریافت APK از GitHub
-Workflow زیر با هر push یا اجرای دستی، APK دیباگ قابل نصب می‌سازد:
+ساخت APK **فقط دستی** است، نه با هر push. صحتِ کامپایل در هر تغییر توسط
+workflow «Flutter Check» (analyze + test، بدون بسته‌بندی) بررسی می‌شود.
 
-`.github/workflows/android-apk.yml`
+`.github/workflows/build-apk.yml`
 
-در GitHub به بخش **Actions → Build Android APK → Artifacts** بروید و فایل `ghelgheli-debug-apk` را دانلود کنید.
+در GitHub به بخش **Actions → Build APK → Run workflow** بروید و پس از پایان،
+آرتیفکتِ `app-release-apks` را دانلود کنید. خروجی، APKهای **ریلیزِ امضاشده** به
+تفکیکِ معماریِ CPU است (نصبِ سبک‌تر روی دستگاه کاربر).
 
-> برای نسخه Release امضاشده باید keystore و secrets مربوطه در GitHub Actions اضافه شود.
+> امضا با keystore واقعی انجام می‌شود و workflow اگر خروجی با کلیدِ دیباگ امضا
+> شده باشد عمداً شکست می‌خورد — چون اندروید اپ را با امضایش می‌شناسد و نصبِ
+> دیباگ‌ساین نه قابل به‌روزرسانی است و نه کافه‌بازار می‌پذیردش.
 
 ## اجرای سریع توسعه
 
