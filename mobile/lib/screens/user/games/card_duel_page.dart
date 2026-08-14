@@ -740,11 +740,6 @@ class _CardDuelPageState extends State<CardDuelPage> {
                       },
                       modeColor: _modeColor,
                       modeTitle: _modeTitle,
-                      subtitle: widget.vsBot
-                          ? 'رایگان و بدون جابه‌جایی امتیاز'
-                          : widget.stake > 0
-                              ? 'باخت یعنی کسر ${faNum(widget.stake)} امتیاز'
-                              : 'مسابقه دوستانه خصوصی',
                     )
                   else
                     _CompactMatchBar(
@@ -1096,15 +1091,8 @@ class _CardDuelPageState extends State<CardDuelPage> {
           children: [
             Column(
               children: [
-                // ⚠️ `finalView` سه چیزِ مخصوصِ «وسطِ بازی» را خاموش
-                //    می‌کند: برچسبِ راند، جملهٔ «راند قبل»، و صحنهٔ
-                //    برخورد که بالای پنلِ VICTORY تکرار می‌شد.
-                _LiveBattle(
-                  session: _session,
-                  color: _modeColor,
-                  finalView: true,
-                ),
-                Gaps.vMd,
+                // پایان فقط یک صحنه دارد؛ HUD زنده بالای VICTORY تکرار
+                // نمی‌شود. امتیاز و پنج راند داخل خود Finale هستند.
                 _Finale(
                   session: _session,
                   color: _modeColor,

@@ -98,7 +98,9 @@ check(/role:\s*'تو',[\s\S]{0,120}score:\s*myScore/.test(mobileDuel)
   && /role:\s*opponentRole,[\s\S]{0,120}score:\s*theirScore/.test(mobileDuel)
   && /textDirection:\s*TextDirection\.rtl/.test(mobileDuel),
 'اسکوربورد اندروید عدد را کنار صاحب درست نمایش می‌دهد');
-check(/امتیاز تو/.test(webDuel) && /امتیاز \{opponentRole\}/.test(webDuel)
+check(/امتیاز تو/.test(webDuel) && /امتیاز \$\{opponentRole\}/.test(webDuel)
+  && /<small>تو<\/small>/.test(webDuel)
+  && /<small>\{opponentRole\}<\/small>/.test(webDuel)
   && /roundForViewer/.test(webDuel)
   && /primeImageCache\(session\.g\.state\)/.test(webDuel),
   'وب برچسب امتیاز و prewarm راند را هم‌زمان با اندروید دارد');

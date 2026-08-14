@@ -114,12 +114,12 @@ for (const [source, platform] of [[mobile, 'Android'], [web, 'Web']]) {
 }
 ok(/ExpansionTile/.test(mobile) && /take\(5\)/.test(mobile),
   'Android: لاگ بازی‌ها کشویی است و فقط پنج مورد را نشان می‌دهد');
-ok(/تایم‌لاین کامل ۵ راند/.test(mobile) && /_FinalRoundBreakdown/.test(mobile),
-  'Android: فیناله تایم‌لاین کامل راندها را دارد');
+ok(/جزئیات راندها/.test(mobile) && /_FinalRoundBreakdown/.test(mobile),
+  'Android: جزئیات پنج راند به‌صورت جمع‌شده باقی مانده است');
 ok(/<details/.test(web) && /slice\(0, 5\)/.test(web),
   'Web: لاگ بازی‌ها کشویی است و فقط پنج مورد را نشان می‌دهد');
-ok(/RoundTimeline/.test(web) && /تایم‌لاین کامل ۵ راند/.test(web),
-  'Web: فیناله تایم‌لاین کامل راندها را دارد');
+ok(/RoundTimeline/.test(web) && /جزئیات راندها/.test(web),
+  'Web: جزئیات پنج راند به‌صورت جمع‌شده باقی مانده است');
 ok(/CardDuelRoundPerspective/.test(mobile) && /roundForViewer/.test(web),
   'Android/Web: نگاشت X/O فقط از آداپتر مشترک زاویهٔ دید می‌گذرد');
 ok(/کارت تو/.test(mobile) && /کارت تو/.test(web)

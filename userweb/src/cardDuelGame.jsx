@@ -58,7 +58,7 @@ function Lineup({ selected, cards, toggle }) {
   return (
     <section className="duelLineupV2">
       <div className="duelLineupTitle">
-        <div><b>ترکیب اصلی</b><small>پنج کارت با نقش‌های مکمل بچین</small></div>
+        <div><b>ترکیب ۵ کارتی</b></div>
         <strong>{fa(power)} <small>قدرت تیم</small></strong>
       </div>
       <div className="duelSlotsV2">
@@ -207,27 +207,18 @@ function RoundReveal({ round, me, myFrame, opponentFrame, opponentRole = 'حری
   const phase = useRevealPhase(round ? round.round : null);
   if (!round) return null;
   const view = roundForViewer(round, me);
-  const {
-    mine, theirs, myPower, theirPower, myFocus, theirFocus,
-    myBreakdown, theirBreakdown, mineWon, draw, contractValid,
-  } = view;
-  const myEffect = num(myBreakdown.effectBonus);
-  const theirEffect = num(theirBreakdown.effectBonus);
+  const { mine, theirs, myPower, theirPower, mineWon, draw, contractValid } = view;
   const outcome = draw ? 'draw' : mineWon ? 'won' : 'lost';
   const showNumbers = phase === 'numbers' || phase === 'verdict';
   const showVerdict = phase === 'verdict';
   const verdict = !contractValid
-    ? 'نتیجه همگام نیست؛ در حال بررسی'
-    : draw
-      ? 'مساوی · بدون امتیاز'
-      : mineWon
-        ? '+۱ برای تو · برندهٔ راند'
-        : `+۱ برای ${opponentRole} · برندهٔ راند`;
+    ? 'خطای همگام‌سازی'
+    : draw ? 'مساوی' : mineWon ? '+۱ تو' : `+۱ ${opponentRole}`;
   const summary = draw
     ? `عدد نهایی تو و ${opponentRole} هر دو ${fa(myPower)} شد؛ امتیازی اضافه نشد.`
     : mineWon
-      ? `کارت تو «${mine?.name || 'بدون نام'}» با ${fa(myPower)} در برابر ${fa(theirPower)} برد؛ یک امتیاز به تو اضافه شد.`
-      : `کارت ${opponentRole} «${theirs?.name || 'بدون نام'}» با ${fa(theirPower)} در برابر ${fa(myPower)} برد؛ یک امتیاز به ${opponentRole} اضافه شد.`;
+      ? `کارت تو «${mine?.name || 'بدون نام'}» با ${fa(myPower)} در برابر ${fa(theirPower)} برد.`
+      : `کارت ${opponentRole} «${theirs?.name || 'بدون نام'}» با ${fa(theirPower)} در برابر ${fa(myPower)} برد.`;
   return (
     <section
       className={`duelClash duelClashCine ${outcome} phase-${phase}${contractValid ? '' : ' invalid'}`}
@@ -241,17 +232,13 @@ function RoundReveal({ round, me, myFrame, opponentFrame, opponentRole = 'حری
         && <span className={`duelPointFlight ${mineWon ? 'mine' : 'theirs'}`} aria-hidden="true">+۱</span>}
 
       <div className="duelClashSide mine">
-        <span className={`duelSideOwner${showVerdict && mineWon ? ' winner' : ''}`}>
-          کارت تو{showVerdict && mineWon ? ' · برنده' : ''}
-        </span>
+        <span className={`duelSideOwner${showVerdict && mineWon ? ' winner' : ''}`}>تو</span>
         <HoloCard card={mine} compact disabled frame={myFrame}
           winner={showVerdict && mineWon} loser={showVerdict && !draw && !mineWon} />
       </div>
 
       <div className="duelClashCore">
-        <span>راند {fa(round.round)} · {round.focusLabel || round.title}</span>
-        <b>{round.title}</b>
-
+        <span>{fa(round.round)} • {round.focusLabel || round.title}</span>
         <strong className="duelPowerDuel" aria-live="polite">
           <span className={`duelPowerOwner mine ${showVerdict && mineWon ? 'lead' : ''}`}>
             <small>تو</small>
@@ -259,7 +246,6 @@ function RoundReveal({ round, me, myFrame, opponentFrame, opponentRole = 'حری
               <CountUp value={myPower} active={showNumbers} revealed={showNumbers} />
             </em>
           </span>
-          <i>در برابر</i>
           <span className={`duelPowerOwner theirs ${showVerdict && !draw && !mineWon ? 'lead' : ''}`}>
             <small>{opponentRole}</small>
             <em className="duelPowerNum">
@@ -267,29 +253,12 @@ function RoundReveal({ round, me, myFrame, opponentFrame, opponentRole = 'حری
             </em>
           </span>
         </strong>
-
-        <div className="duelReasonChips">
-          <i>{round.focusLabel || 'ویژگی راند'}: تو {fa(myFocus)} · {opponentRole} {fa(theirFocus)}</i>
-          {showNumbers && (myEffect !== 0 || theirEffect !== 0) && (
-            <i>افکت آشکار: تو +{fa(myEffect)} · {opponentRole} +{fa(theirEffect)}</i>
-          )}
-          {showNumbers && (
-            <i>اختلاف عدد نهایی: {fa(Math.abs(myPower - theirPower))}</i>
-          )}
-        </div>
-
-        {showVerdict && <>
-          <em className="duelWinnerStamp">{verdict}</em>
-          <small>{summary}</small>
-          <p className="duelCinematic">{draw
-            ? 'هیچ امتیازی جابه‌جا نشد'
-            : mineWon ? 'ضربهٔ نهایی تو!' : `پاسخ آتشین ${opponentRole}!`}</p>
-        </>}
+        {showVerdict && <em className="duelWinnerStamp">{verdict}</em>}
       </div>
 
       <div className="duelClashSide theirs">
         <span className={`duelSideOwner${showVerdict && !draw && !mineWon ? ' winner' : ''}`}>
-          کارت {opponentRole}{showVerdict && !draw && !mineWon ? ' · برنده' : ''}
+          {opponentRole}
         </span>
         <HoloCard card={theirs} compact disabled frame={opponentFrame}
           winner={showVerdict && !draw && !mineWon} loser={showVerdict && mineWon} />
@@ -316,24 +285,7 @@ const FOCUS_META = {
   goalChance: { name: 'شانس گل', icon: '⚽', color: '#FFD166' },
 };
 
-function FocusBanner({ focus, fallbackTitle, roundNumber }) {
-  const stat = focus?.stat || '';
-  const meta = FOCUS_META[stat];
-  const label = focus?.label || fallbackTitle || '';
-  if (!label) return null;
-  const color = meta?.color || '#38BDF8';
-  return (
-    <section className="duelFocusBanner" key={`${roundNumber}-${stat}`}
-      style={{ '--focus-color': color }}>
-      <span className="duelFocusIcon" aria-hidden="true">{meta?.icon || '★'}</span>
-      <div>
-        <small>راند {fa(roundNumber)} — نبرد بر سر</small>
-        <b>{meta?.name ? `${meta.name}!` : label}</b>
-        {focus?.text && <i>{focus.text}</i>}
-      </div>
-    </section>
-  );
-}
+
 
 // ═══════════════════════════════════════════════════════════════════════════
 // اعلانِ سینماییِ شروعِ راند — وسطِ صفحه (هم‌تراز با اندروید)
@@ -359,7 +311,7 @@ function RoundIntroOverlay({ focus, roundNumber, totalRounds }) {
   React.useEffect(() => {
     if (!stat) return undefined;
     setVisible(true);
-    const t = setTimeout(() => setVisible(false), 2000);
+    const t = setTimeout(() => setVisible(false), 1600);
     return () => clearTimeout(t);
   }, [stat, roundNumber]);
 
@@ -368,14 +320,13 @@ function RoundIntroOverlay({ focus, roundNumber, totalRounds }) {
   const color = meta.color || '#38BDF8';
   return (
     <div className="duelRoundIntro" key={`intro-${roundNumber}-${stat}`}
-      style={{ '--focus-color': color }} aria-live="polite">
+      style={{ '--focus-color': color }} aria-live="polite"
+      aria-label={`راند ${roundNumber} از ${totalRounds}، نبرد ${meta.name || ''}. ${focus?.hint || ''}`}>
       <div className="duelRoundIntroInner">
-        <small>راند {fa(roundNumber)} از {fa(totalRounds)}</small>
+        <small>{fa(roundNumber)}/{fa(totalRounds)}</small>
         <span className="duelRoundIntroIcon" aria-hidden="true">{meta.icon || '★'}</span>
-        <b>{focus?.cry || meta.name || ''}</b>
-        {meta.name && <em>«{meta.name}» + افکت آشکار = عدد نهایی</em>}
-        {/* راهنمای گروهِ سنیِ پایین: یک جمله، بدونِ اصطلاحِ فنی. */}
-        {focus?.hint && <i>{focus.hint}</i>}
+        <b>نبرد {meta.name || ''}</b>
+        <em>عدد بالاتر می‌برد</em>
       </div>
     </div>
   );
@@ -415,36 +366,9 @@ function DuelIdentity({ player, fallback }) {
   </span>;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-//  ⚠️ چرا LiveArena یک حالتِ «پایان» دارد
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// ── گزارشِ مالک (با اسکرین‌شات) ──
-//   «اسکوربورد و متن راند ناسازگارند، دو بلوک نتیجه هم‌زمان نشان داده
-//    می‌شود، و صفحه اسکرول دارد.»
-//
-// ── علتِ ریشه‌ای ──
-//
-// صفحهٔ پایان همان `<LiveArena/>` را که برای *وسطِ بازی* نوشته شده بود
-// بی‌هیچ تغییری داخلِ خودش رندر می‌کرد. یعنی تمامِ چرمِ «در حالِ بازی»
-// روی صفحهٔ نتیجه می‌آمد:
-//
-//   ۱. اسکوربورد می‌گفت «راند ۵ از ۵ · پایان نبرد» و زیرش «امتیاز راند
-//      قبل برای تو بود». بازی تمام شده و «راند قبل» دیگر معنایی ندارد؛
-//      کاربر عددِ نهایی می‌خواهد نه وضعیتِ راندِ آخر.
-//   ۲. `RoundReveal` صحنهٔ برخوردِ راند ۵ را نشان می‌داد، و بلافاصله
-//      زیرش پنلِ `VICTORY ۵—۰` می‌آمد — **دو بلوکِ نتیجه هم‌زمان**،
-//      دقیقاً همان چیزی که مالک دید.
-//   ۳. `duelOpponentHand` ارتفاعِ ثابتِ ۸۴px دارد ولی در پایانِ بازی صفر
-//      کارت — یک نوارِ خالیِ ۸۴ پیکسلی وسطِ صفحه (در اسکرین‌شات دیده
-//      می‌شود) که فقط اسکرول اضافه می‌کرد.
-//
-// ── چرا پراپ و نه کامپوننتِ جدا ──
-//
-// اسکوربورد، پیپ‌های راند و هویتِ بازیکنان باید همان‌ها بمانند وگرنه
-// صفحهٔ نتیجه با صفحهٔ بازی ناهماهنگ می‌شود و باید دو جا نگهداری شوند.
-// فقط سه چیز باید عوض شود، پس یک پراپِ `final` کافی است.
-function LiveArena({ session, final = false }) {
+// HUD زنده فقط در phase=playing دیده می‌شود. نتیجه یک Finale مستقل است؛
+// هیچ اسکوربورد یا برخوردی در پایان دوباره رندر نمی‌شود.
+function LiveArena({ session }) {
   const { phase, g, secondsLeft, holding, resultHolding, move } = session;
   const state = g.state || {};
   const score = state.score || { X: 0, O: 0 };
@@ -461,34 +385,27 @@ function LiveArena({ session, final = false }) {
 
   const history = state.history || [];
   const lastWinner = state.lastRound?.winner;
-  const finalVerdict = matchVerdictForViewer({
-    winner: g.winner,
-    me: mine,
-    finishReason: g.finishReason,
-    opponentRole,
-  });
-  const myAhead = final ? finalVerdict.iWon : num(score[mine]) > num(score[opponent]);
-  const theirAhead = final
-    ? Boolean(g.winner && !finalVerdict.draw && !finalVerdict.iWon)
-    : num(score[opponent]) > num(score[mine]);
+  const myAhead = num(score[mine]) > num(score[opponent]);
+  const theirAhead = num(score[opponent]) > num(score[mine]);
 
   return <div className="duelLiveArena">
     <header className="duelScoreV2"
       aria-label={`امتیاز تو ${fa(score[mine])}، امتیاز ${opponentRole} ${fa(score[opponent])}`}>
 
-      <div className={`mine ${myAhead ? 'lead' : !final && lastWinner === mine ? 'pulse' : ''}`}>
+      <div className={`mine ${myAhead ? 'lead' : lastWinner === mine ? 'pulse' : ''}`}>
         <DuelIdentity player={g.players?.[mine]} fallback={myName}/>
-        <small>امتیاز تو</small><b>{fa(score[mine])}</b>
+        <small>تو</small><b>{fa(score[mine])}</b>
       </div>
       {/* ⚠️ در پایانِ بازی «راند ۵ از ۵» و «امتیاز راند قبل برای تو بود»
           هر دو بی‌معنی‌اند: بازی تمام شده و کاربر عددِ نهایی می‌خواهد.
           همین ناسازگاری در اسکرین‌شاتِ مالک دیده می‌شد. */}
-      {final
-        ? <span><i>نتیجهٔ نهایی</i><strong>{g.finishReason === 'disconnect' ? `پایان در راند ${fa(Math.max(1, num(state.roundIndex)))}` : `${fa(num(state.totalRounds) || 5)} راند تمام شد`}</strong><small>{finalVerdict.label}</small></span>
-        : <span><i>راند {fa(Math.min(num(state.totalRounds) || 5, num(state.roundIndex) + 1))} از {fa(num(state.totalRounds) || 5)}</i><strong>{state.roundTitle || 'پایان نبرد'}</strong><small>{lastWinner === 'DRAW' ? 'مساوی؛ بدون امتیاز' : lastWinner === mine ? '+۱ امتیاز برای تو' : lastWinner ? `+۱ امتیاز برای ${opponentRole}` : 'هنوز امتیازی ثبت نشده'}</small></span>}
-      <div className={`theirs ${theirAhead ? 'lead' : !final && lastWinner && lastWinner !== mine && lastWinner !== 'DRAW' ? 'pulse' : ''}`}>
+      <span>
+        <i>{fa(Math.min(num(state.totalRounds) || 5, num(state.roundIndex) + 1))}/{fa(num(state.totalRounds) || 5)}</i>
+        <strong>{state.roundTitle || 'پایان نبرد'}</strong>
+      </span>
+      <div className={`theirs ${theirAhead ? 'lead' : lastWinner && lastWinner !== mine && lastWinner !== 'DRAW' ? 'pulse' : ''}`}>
         <DuelIdentity player={g.players?.[opponent]} fallback={opponentName}/>
-        <small>امتیاز {opponentRole}</small><b>{fa(score[opponent])}</b>
+        <small>{opponentRole}</small><b>{fa(score[opponent])}</b>
       </div>
     </header>
 
@@ -529,9 +446,9 @@ function LiveArena({ session, final = false }) {
 
     {/* ⚠️ در صفحهٔ پایان این صحنه دقیقاً بالای پنلِ VICTORY می‌نشست و
         «دو بلوک نتیجه هم‌زمان» می‌ساخت. جزئیاتِ راندِ پنجم از بین
-        نمی‌رود: در «تایم‌لاین کامل ۵ راند» همان پایین هست. */}
-    {!final && <RoundReveal round={state.lastRound} me={mine} myFrame={myFrame}
-      opponentFrame={opponentFrame} opponentRole={opponentRole} />}
+        نمی‌رود: در «جزئیات راندها» همان پایین هست. */}
+    <RoundReveal round={state.lastRound} me={mine} myFrame={myFrame}
+      opponentFrame={opponentFrame} opponentRole={opponentRole} />
 
     {phase === 'playing' && <section className="duelChoicePanel">
       <div className="duelChoicePrompt">
@@ -545,13 +462,12 @@ function LiveArena({ session, final = false }) {
             {FOCUS_META[state.roundFocus.stat].name}
           </span>
         )}
-        <div><b>{state.iChose ? 'انتخابت قفل شد' : 'کارت این راند را انتخاب کن'}</b>
-          <small>{state.waitingForOpponent ? 'منتظر انتخاب حریف…' : state.opponentLocked ? 'حریف انتخاب کرده؛ تصمیم بگیر!' : 'انتخاب‌ها مخفی و هم‌زمان هستند'}</small></div>
+        <div><b>{state.iChose ? 'قفل شد' : state.opponentLocked ? 'حریف آماده‌ست' : 'کارت را بزن'}</b></div>
         {/* عددِ یخ‌زده بدونِ نشانه شبیهِ «هنگ» است؛ آیکنِ مکث می‌گوید
             عمدی است. */}
-        <strong className={holding ? 'isHolding' : ''}>
-          {holding ? <i className="duelHoldIcon" aria-hidden="true">⏸</i> : null}
-          {fa(secondsLeft)}<small>{holding ? 'مکث' : 'ثانیه'}</small>
+        <strong className={holding ? 'isHolding' : ''}
+          aria-label={holding ? 'مکث' : `${secondsLeft} ثانیه`}>
+          {holding ? <i className="duelHoldIcon" aria-hidden="true">⏸</i> : fa(secondsLeft)}
         </strong>
       </div>
       <div className="duelHandV2">
@@ -626,7 +542,7 @@ function DeckIntel({ insights, suggestedDeck, onApply }) {
   // پنل خودش را وقتی نشان می‌دهد که واقعاً حرفی برای گفتن دارد.
   return <details className="duelIntel card" open={!!warnings.length}>
     <summary className="duelIntelHead">
-      <div><b>تحلیل بالانس ترکیب</b><small>نقاط قوت و ضعف ترکیب</small></div>
+      <div><b>تحلیل ترکیب</b></div>
       {suggestedDeck && <button type="button" className="ghost"
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); onApply(); }}>چیدن خودکار</button>}
     </summary>
@@ -657,8 +573,7 @@ function RoundTimeline({ history, mine, opponentRole = 'حریف' }) {
   return <details className="duelTimelineV2">
     <summary>
       <div>
-        <h3>تایم‌لاین کامل ۵ راند</h3>
-        <small>جزئیات معیار، اختلاف قدرت و سهم هر کارت در نتیجه</small>
+        <h3>جزئیات راندها</h3>
       </div>
     </summary>
     {history.map((round, index) => {
@@ -689,7 +604,6 @@ function History({ battles }) {
     <summary>
       <div>
         <h3>آخرین نبردها{rows.length ? ` (${fa(rows.length)})` : ''}</h3>
-        <small>فقط پنج بازی آنلاین اخیر؛ تمرین با ربات ثبت نمی‌شود</small>
       </div>
     </summary>
     {rows.length ? rows.map(battle => {
@@ -817,7 +731,17 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
   if (loading && !initialStart) return <div className="card pad center">در حال آماده‌سازی آرنا…</div>;
   const activeGame = enabled && ['waiting', 'playing', 'over', 'error'].includes(session.phase);
   const winner = session.g.winner;
-  const iWon = winner && winner === session.g.me;
+  const resultMine = session.g.me || 'X';
+  const resultOther = resultMine === 'X' ? 'O' : 'X';
+  const resultScore = session.g.state?.score || {};
+  const resultOpponentRole = session.g.vsBot ? 'ربات' : 'حریف';
+  const finalVerdict = matchVerdictForViewer({
+    winner,
+    me: resultMine,
+    finishReason: session.g.finishReason,
+    opponentRole: resultOpponentRole,
+  });
+  const iWon = finalVerdict.iWon;
   const myCosmetics = session.g.players?.[session.g.me]?.cosmetics || {};
   const resultPalette = RESULT_PALETTES[myCosmetics.resultTemplate] || ['#071522', '#FFD166'];
 
@@ -854,7 +778,7 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
       <header className="duelHeroV2">
         <button type="button" className="ghost" onClick={() => { session.leave(); onBack(); }}>← بازگشت</button>
         <div className="duelHeroIcon"><img src="/games/card_duel_glow.png" alt="" /></div>
-        <div><span>GHELGHELI CARD ARENA</span><h1>دوئل کارت‌ها</h1><p>انتخاب مخفی، ضدترکیب هوشمند و پنج راند نفس‌گیر</p></div>
+        <div><h1>دوئل کارت‌ها</h1></div>
         <aside><span>{mode.icon}</span><b>{mode.title}</b><small>{mode.subtitle}</small></aside>
       </header>
     )}
@@ -870,11 +794,11 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
           ببیند، نه سه پاراگراف توضیح.
           حالا همیشه بسته است (۵۴px) و هرکس خواست باز می‌کند. */}
       <details className="duelRuleStrip">
-        <summary><b>چطور بازی کنم؟</b><small>سه مرحله تا شروع نبرد</small></summary>
+        <summary><b>قوانین</b></summary>
         <div className="duelRuleSteps">
-          <div><span>۱</span><b>پنج کارت بچین</b><small>سرعت، تکنیک، حمله، دفاع و گل را متعادل کن</small></div>
-          <i>›</i><div><span>۲</span><b>مخفی انتخاب کن</b><small>حریف کارتت را تا قفل شدن نمی‌بیند</small></div>
-          <i>›</i><div><span>۳</span><b>۵ راند نفس‌گیر</b><small>هر راند ویژگی متفاوتی می‌سنجد</small></div>
+          <div><span>۱</span><b>۵ کارت</b></div>
+          <i>›</i><div><span>۲</span><b>انتخاب مخفی</b></div>
+          <i>›</i><div><span>۳</span><b>۵ راند</b></div>
         </div>
       </details>
       <Lineup selected={selected} cards={cards} toggle={toggle} />
@@ -892,8 +816,7 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
       </button>
       {error && <div className="err duelMessage">{error}</div>}
       {practiceFallback && <div className="gameStakeNotice practice"><span>🎁</span><div>
-        <b>دستهٔ تمرینی رایگان برای شروع سریع</b>
-        <small>این کارت‌ها فقط مقابل ربات فعال‌اند؛ برای آنلاین باید پنج کارت واقعی جمع کنی.</small>
+        <b>کارت‌های تمرینی رایگان</b>
       </div></div>}
       {/* ── چرا کلکسیون جمع‌شونده شد ──
           اندازه‌گیری: این بخش ۳۸۱px می‌گرفت — بزرگ‌ترین بلوکِ صفحه — و
@@ -918,8 +841,7 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
 
     {enabled && session.phase === 'waiting' && <section className="duelMatchmaking card">
       <div className="duelRadar"><img src="/games/card_duel_glow.png" alt="" /></div>
-      <h2>{vsBot ? 'ربات تاکتیکی وارد آرنا می‌شود…' : 'در جستجوی حریف هم‌سطح…'}</h2>
-      <p>ترکیب تو قفل و محفوظ است؛ هیچ‌کس کارت‌ها را قبل از نبرد نمی‌بیند.</p>
+      <h2>{vsBot ? 'آماده‌سازی ربات…' : 'جستجوی حریف…'}</h2>
       <button type="button" onClick={() => { session.leave(); setEnabled(false); }}>لغو و ویرایش ترکیب</button>
     </section>}
 
@@ -930,31 +852,31 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
       style={{'--duel-result-a':resultPalette[0],'--duel-result-b':resultPalette[1],background:myCosmetics.resultTemplate
         ? `linear-gradient(rgba(2,6,23,.38),rgba(2,6,23,.76)),url('/shop/cosmetics-v3/${myCosmetics.resultTemplate}.webp') center/cover,${resultPalette[0]}`
         : `radial-gradient(circle at 50% 15%,${resultPalette[1]}44,transparent 42%),${resultPalette[0]}`}}>
-      <LiveArena session={session} final />
       <div className="duelFinalePanel">
         <span>{winner === 'DRAW' ? '🤝' : iWon ? '🏆' : '🛡️'}</span>
         <h2>{winner === 'DRAW' ? 'DRAW' : iWon ? 'VICTORY' : 'DEFEAT'}</h2>
-        <p>{winner === 'DRAW' ? 'نبرد برابر!' : iWon ? 'فرمانروای آرنا شدی!' : 'این نبرد تمام شد؛ ترکیبت را هوشمندتر کن'}</p>
-        <p>{session.g.finishReason === 'disconnect'
-          ? (iWon ? 'حریف بازی را ترک کرد؛ برد و تسویه برای تو ثبت شد.' : 'اتصال قطع شد؛ حریف برنده شد.')
-          : session.g.vsBot ? 'تمرین تمام شد؛ امتیازی جابه‌جا نشد.'
-          : winner === 'DRAW' ? 'ورودی کامل هر دو نفر برمی‌گردد.'
-            : iWon ? `پات مسابقه پس از کسر کارمزد برایت تسویه می‌شود.`
-              : `${fa(session.g.stake || stake)} امتیاز ورودی از دست رفت.`}</p>
-        <div className={`duelSettlement ${session.g.settlementStatus || 'settled'}`}>
-          {{ pending: ' در حال تسویه امن', settled: ' تسویه کامل شد', refunded: ' ورودی برگشت خورد' }[session.g.settlementStatus || 'settled']}
-        </div>
-        <RoundTimeline history={session.g.state?.history || []} mine={session.g.me || 'X'} opponentRole={session.g.vsBot ? 'ربات' : 'حریف'} />
-        <div className="duelSharePreview">
-          <b>کارت نتیجه + لینک چالش مستقیم</b>
-          <small>MVP: {resultMvp(session.g.state)?.name || 'ستاره آرنا'}</small>
-          <button type="button" onClick={shareResult} disabled={sharing}>{sharing ? 'در حال ساخت…' : ' اشتراک نتیجه و دعوت به چالش'}</button>
-          {shareNotice && <i>{shareNotice}</i>}
-        </div>
-        <div><button className="main" type="button" disabled={session.rematchWaiting || !session.g.rematchAvailable} onClick={session.rematch}>
-          {session.rematchWaiting ? 'منتظر قبول حریف…' : session.g.vsBot ? 'نبرد دوباره فوری' : 'نبرد دوباره با همین حریف'}
+        <strong className="duelFinalScore">
+          تو {fa(resultScore[resultMine])} <i>•</i> {resultOpponentRole} {fa(resultScore[resultOther])}
+        </strong>
+        {(!session.g.vsBot || session.g.finishReason === 'disconnect') && (
+          <div className={`duelSettlement ${session.g.settlementStatus || 'settled'}`}>
+            {session.g.finishReason === 'disconnect'
+              ? finalVerdict.label
+              : winner === 'DRAW' ? 'ورودی برگشت'
+                : iWon ? ({ pending: 'در حال تسویه', settled: 'تسویه شد', refunded: 'ورودی برگشت' }[session.g.settlementStatus || 'settled'])
+                  : `−${fa(session.g.stake || stake)} امتیاز`}
+          </div>
+        )}
+        <small className="duelMvpLine">MVP • {resultMvp(session.g.state)?.name || 'ستاره آرنا'}</small>
+        <RoundTimeline history={session.g.state?.history || []} mine={resultMine} opponentRole={resultOpponentRole} />
+        <button className="duelShareButton" type="button" onClick={shareResult} disabled={sharing}>
+          {sharing ? 'در حال ساخت…' : 'اشتراک'}
         </button>
-          <button type="button" onClick={() => { session.leave(); setEnabled(false); }}>تغییر ترکیب</button></div>
+        {shareNotice && <i className="duelShareNotice">{shareNotice}</i>}
+        <div><button className="main" type="button" disabled={session.rematchWaiting || !session.g.rematchAvailable} onClick={session.rematch}>
+          {session.rematchWaiting ? 'منتظر حریف…' : 'دوباره'}
+        </button>
+          <button type="button" onClick={() => { session.leave(); setEnabled(false); }}>ترکیب</button></div>
       </div>
     </section>}
 

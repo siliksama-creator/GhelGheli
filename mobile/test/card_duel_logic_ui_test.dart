@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ghelgheli_mobile/api_client.dart';
 import 'package:ghelgheli_mobile/screens/user/games/card_duel_page.dart';
+import 'package:ghelgheli_mobile/screens/user/games/game_session.dart';
 import 'package:ghelgheli_mobile/theme/app_theme.dart';
 
 void main() {
@@ -71,26 +73,18 @@ void main() {
     expect(robotScore, findsOneWidget);
     expect(tester.getCenter(myScore).dx,
         greaterThan(tester.getCenter(robotScore).dx));
-    expect(find.text('+۱ امتیاز برای تو'), findsOneWidget);
+    expect(find.text('+1'), findsOneWidget);
+    expect(find.textContaining('امتیاز راند'), findsNothing);
   });
 
-  testWidgets('برد فنی آنلاین از امتیاز ناقص راندها جدا و صریح است',
-      (tester) async {
-    await tester.pumpWidget(MaterialApp(
-      theme: AppTheme.dark(),
-      home: const Scaffold(
-        body: CardDuelScoreboardForTest(
-          myScore: 1,
-          theirScore: 3,
-          finalWinner: 'X',
-          finalView: true,
-          finishedByDisconnect: true,
-        ),
-      ),
-    ));
-    await tester.pump(const Duration(milliseconds: 400));
-    expect(find.text('برد فنی برای تو'), findsOneWidget,
-        reason: 'قطع اتصال نباید با مقایسهٔ score، برنده را برعکس کند');
+  test('برد فنی آنلاین از امتیاز ناقص راندها جدا و صریح است', () {
+    final session = GameSession(api: ApiClient(), gameId: 'card_duel')
+      ..mySymbol = 'X'
+      ..winner = 'X'
+      ..finishReason = 'disconnect';
+    addTearDown(session.dispose);
+    expect(session.iWon, isTrue);
+    expect(session.resultText, contains('برد برای تو ثبت شد'));
   });
 
   testWidgets(

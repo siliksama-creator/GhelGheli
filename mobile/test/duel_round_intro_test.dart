@@ -25,7 +25,8 @@ import 'package:ghelgheli_mobile/screens/user/games/card_duel_page.dart';
 Widget _wrap(Widget child) => MaterialApp(
       home: Directionality(
         textDirection: TextDirection.rtl,
-        child: Scaffold(body: Stack(children: [const SizedBox.expand(), child])),
+        child:
+            Scaffold(body: Stack(children: [const SizedBox.expand(), child])),
       ),
     );
 
@@ -39,19 +40,19 @@ const _focus = <String, dynamic>{
 };
 
 void main() {
-  testWidgets('شعارِ راند وسطِ صفحه و درشت نمایش داده می‌شود', (tester) async {
+  testWidgets('معیارِ راند وسطِ صفحه و درشت نمایش داده می‌شود', (tester) async {
     await tester.pumpWidget(_wrap(const CardDuelRoundIntroForTest(
-      focus: _focus, roundNumber: 1, totalRounds: 5)));
+        focus: _focus, roundNumber: 1, totalRounds: 5)));
     await tester.pump(const Duration(milliseconds: 500));
 
-    final cry = find.textContaining('سریع‌ترین کارتت را بفرست');
-    expect(cry, findsOneWidget, reason: 'شعارِ راند باید دیده شود');
+    final cry = find.text('نبرد سرعت');
+    expect(cry, findsOneWidget, reason: 'نام معیار باید دیده شود');
 
     // ── اندازه، نه صرفاً وجود ──
     // نقصِ قبلی این بود که متن وجود داشت ولی ۹پیکسلی بود.
     final style = tester.widget<Text>(cry).style!;
     expect(style.fontSize, greaterThanOrEqualTo(22),
-        reason: 'شعار باید درشت باشد وگرنه همان نقصِ قبلی تکرار می‌شود');
+        reason: 'نام معیار باید درشت و بازی‌محور باشد');
     expect(style.fontWeight, FontWeight.w900);
 
     // ── واقعاً وسطِ صفحه ──
@@ -64,24 +65,26 @@ void main() {
         reason: 'شعار باید عمودی هم مرکزِ صفحه باشد، نه بالا/پایینِ گوشه');
   });
 
-  testWidgets('راهنمای گروهِ سنیِ پایین و نامِ ویژگی نشان داده می‌شود',
+  testWidgets('اعلان فقط سه نشانهٔ ضروری دارد و متن آموزشی را پنهان می‌کند',
       (tester) async {
     await tester.pumpWidget(_wrap(const CardDuelRoundIntroForTest(
-      focus: _focus, roundNumber: 2, totalRounds: 5)));
+        focus: _focus, roundNumber: 2, totalRounds: 5)));
     await tester.pump(const Duration(milliseconds: 500));
 
-    expect(find.textContaining('عددِ سرعتش بیشتر است'), findsOneWidget,
-        reason: 'بچه‌ای که تازه خواندن یاد گرفته باید بفهمد چه کار کند');
-    expect(find.textContaining('«سرعت» + افکت آشکار = عدد نهایی'), findsOneWidget);
-    expect(find.textContaining('راند ۲ از ۵'), findsOneWidget);
+    expect(find.text('نبرد سرعت'), findsOneWidget);
+    expect(find.text('عدد بالاتر می‌برد'), findsOneWidget);
+    expect(find.text('۲/۵'), findsOneWidget);
+    expect(find.textContaining('افکت آشکار'), findsNothing,
+        reason: 'جزئیات فرمول روی کارت/تایم‌لاین است، نه overlay');
+    expect(find.textContaining('عدد نهایی ='), findsNothing);
   });
 
-  testWidgets('اعلان بعد از دو ثانیه می‌رود و جلوی بازی را نمی‌گیرد',
+  testWidgets('اعلان بعد از ۱.۶ ثانیه می‌رود و جلوی بازی را نمی‌گیرد',
       (tester) async {
     await tester.pumpWidget(_wrap(const CardDuelRoundIntroForTest(
-      focus: _focus, roundNumber: 1, totalRounds: 5)));
+        focus: _focus, roundNumber: 1, totalRounds: 5)));
     await tester.pump(const Duration(milliseconds: 400));
-    expect(find.textContaining('سریع‌ترین'), findsOneWidget);
+    expect(find.text('نبرد سرعت'), findsOneWidget);
 
     // در تمامِ مدتِ نمایش نباید ضربه‌ها را ببلعد.
     expect(find.byType(IgnorePointer), findsWidgets,
@@ -89,33 +92,36 @@ void main() {
 
     await tester.pump(const Duration(milliseconds: 2200));
     await tester.pumpAndSettle();
-    expect(find.textContaining('سریع‌ترین'), findsNothing,
+    expect(find.text('نبرد سرعت'), findsNothing,
         reason: 'اعلانِ ماندگار جلوی دیدنِ کارت‌ها را می‌گیرد');
   });
 
   testWidgets('راندِ تازه اعلانِ تازه می‌سازد', (tester) async {
     await tester.pumpWidget(_wrap(const CardDuelRoundIntroForTest(
-      focus: _focus, roundNumber: 1, totalRounds: 5)));
+        focus: _focus, roundNumber: 1, totalRounds: 5)));
     await tester.pump(const Duration(milliseconds: 2400));
     await tester.pumpAndSettle();
-    expect(find.textContaining('سریع‌ترین'), findsNothing);
+    expect(find.text('نبرد سرعت'), findsNothing);
 
     // همان ویجت، راندِ بعدی با تمرکزِ تازه.
     const next = <String, dynamic>{
-      'stat': 'attack', 'label': 'فشار حمله', 'text': '',
-      'cry': 'حمله کن!', 'hint': 'کارتی که عددِ حمله‌اش بیشتر است برنده می‌شود',
+      'stat': 'attack',
+      'label': 'فشار حمله',
+      'text': '',
+      'cry': 'حمله کن!',
+      'hint': 'کارتی که عددِ حمله‌اش بیشتر است برنده می‌شود',
       'emoji': '🔥',
     };
     await tester.pumpWidget(_wrap(const CardDuelRoundIntroForTest(
-      focus: next, roundNumber: 2, totalRounds: 5)));
+        focus: next, roundNumber: 2, totalRounds: 5)));
     await tester.pump(const Duration(milliseconds: 400));
-    expect(find.textContaining('حمله کن'), findsOneWidget,
+    expect(find.text('نبرد حمله'), findsOneWidget,
         reason: 'بدونِ ریست، فقط راندِ اول انیمیشن می‌گرفت');
   });
 
   testWidgets('بدونِ تمرکز، اعلان اصلاً رندر نمی‌شود', (tester) async {
     await tester.pumpWidget(_wrap(const CardDuelRoundIntroForTest(
-      focus: null, roundNumber: 1, totalRounds: 5)));
+        focus: null, roundNumber: 1, totalRounds: 5)));
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.textContaining('راند'), findsNothing,
         reason: 'حالتِ پایانِ بازی نباید اعلانِ خالی نشان دهد');

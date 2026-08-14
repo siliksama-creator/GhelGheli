@@ -4018,7 +4018,7 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 .duelRoundIntro{
   position:fixed; inset:0; z-index:60; display:grid; place-items:center;
   background:rgba(3,7,13,.62); backdrop-filter:blur(3px);
-  pointer-events:none; animation:duelIntroFade 2s ease forwards;
+  pointer-events:none; animation:duelIntroFade 1.6s ease forwards;
 }
 .duelRoundIntroInner{
   display:flex; flex-direction:column; align-items:center; gap:9px;
@@ -4050,7 +4050,7 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 }
 @keyframes duelIntroFade{ 0%,78%{opacity:1} 100%{opacity:0} }
 @keyframes duelIntroPop{ from{opacity:0;transform:translateY(16px) scale(.86)} to{opacity:1;transform:none} }
-@keyframes duelIntroSpin{ from{transform:rotate(-360deg) scale(.4)} to{transform:none} }
+@keyframes duelIntroSpin{ from{transform:rotate(-28deg) scale(.4)} to{transform:none} }
 
 /* نشانِ فشردهٔ ویژگیِ راند، کنارِ «کارت این راند را انتخاب کن». */
 .duelFocusPill{
@@ -4064,7 +4064,7 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 
 @media (prefers-reduced-motion: reduce){
   .duelRoundIntro, .duelRoundIntroInner, .duelRoundIntroIcon{ animation-duration:.01ms !important }
-  .duelRoundIntro{ animation:duelIntroFade 2s steps(2) forwards }
+  .duelRoundIntro{ animation:duelIntroFade 1.6s steps(2) forwards }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -5108,3 +5108,25 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 @media(prefers-reduced-motion:reduce){
   .duelSideOwner.winner,.duelPowerOwner.lead .duelPowerNum,.duelPointFlight{animation:none!important}
 }
+
+/* دوئل — نتیجهٔ استاندارد و کم‌متن */
+.duelFinale{max-width:680px;width:100%;margin-inline:auto}
+.duelFinalePanel{display:flex;flex-direction:column;align-items:center;gap:10px;padding:22px 18px}
+.duelFinalePanel>span{line-height:1}
+.duelFinalePanel h2{margin:0}
+.duelFinalScore{font-size:clamp(22px,6vw,34px);font-weight:1000;color:#fff;direction:rtl}
+.duelFinalScore i{font-style:normal;color:var(--mode-color);padding-inline:7px}
+.duelMvpLine{color:#ffd166;font-size:12px;font-weight:900}
+.duelFinalePanel>.duelSettlement{display:block;padding:5px 11px;border-radius:999px;font-size:11.5px}
+.duelShareButton{min-width:120px;margin:0}
+.duelShareNotice{font-size:11.5px;color:#9fb5ca;font-style:normal}
+.duelFinalePanel>.duelTimelineV2{width:100%}
+/* در صحنهٔ زنده، انیمیشن و عددها حرف می‌زنند؛ فاصلهٔ متن‌های حذف‌شده هم حذف شود. */
+.duelClashCore{gap:7px}
+.duelClashCore>.duelWinnerStamp{margin-top:3px}
+.duelPowerDuel{gap:8px}
+@media(max-width:520px){
+  .duelFinalePanel{padding:17px 12px;gap:8px}
+  .duelFinalScore{font-size:23px}
+}
+.duelMatchmaking{min-height:250px}

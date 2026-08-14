@@ -102,13 +102,13 @@ void main() {
       // فریم اول = فازِ charge.
       await tester.pump(const Duration(milliseconds: 60));
 
-      expect(_verdictStamp('+۱ برای تو · تو برندهٔ راندی'), findsNothing,
+      expect(_verdictStamp('+۱ تو'), findsNothing,
           reason: 'مهرِ برنده نباید قبل از فازِ verdict روی صفحه باشد');
       expect(find.textContaining('اختلاف قدرت'), findsNothing,
           reason: 'اختلافِ قدرت متعلق به فازِ numbers است');
 
       // عنوانِ راند از همان اول هست — این خودِ تعلیق را خراب نمی‌کند.
-      expect(find.textContaining('فشار حمله'), findsWidgets);
+      expect(find.text('۱ • حمله'), findsOneWidget);
 
       // ═══════════════════════════════════════════════════════════════
       //  ⚠️ عددِ قدرت نباید پیش از فازِ numbers لو برود
@@ -134,8 +134,8 @@ void main() {
       await tester.pumpWidget(_host(_round(1, 'X')));
       await tester.pump(const Duration(milliseconds: 80));
 
-      final mine = tester.getCenter(find.text('کارت تو').first);
-      final theirs = tester.getCenter(find.text('کارت حریف').first);
+      final mine = tester.getCenter(find.text('تو').first);
+      final theirs = tester.getCenter(find.text('حریف').first);
       expect(mine.dx, greaterThan(theirs.dx),
           reason: 'در RTL هم مالکیت نباید با Row/LTR جابه‌جا شود');
     });
@@ -146,9 +146,11 @@ void main() {
       await tester.pump(_revealTotal);
       await tester.pump(const Duration(milliseconds: 500));
 
-      expect(_verdictStamp('+۱ برای تو · تو برندهٔ راندی'), findsOneWidget);
-      expect(find.textContaining('یک امتیاز به تو اضافه شد'), findsOneWidget);
-      expect(find.textContaining('ضربهٔ نهایی'), findsOneWidget);
+      expect(_verdictStamp('+۱ تو'), findsOneWidget);
+      expect(find.textContaining('یک امتیاز به تو اضافه شد'), findsNothing,
+          reason: 'توضیح بلند فقط در Semantics/جزئیات می‌ماند');
+      expect(find.textContaining('ضربهٔ نهایی'), findsNothing,
+          reason: 'صحنهٔ زنده باید با انیمیشن حرف بزند، نه شعار');
 
       // ⚠️ اینجا عمداً pumpAndSettle نیست: قابِ کمیابیِ PlayerCard یک
       // انیمیشنِ بی‌پایان دارد (طلایی/پرمیوم می‌چرخند)، پس صحنه هرگز
@@ -162,9 +164,8 @@ void main() {
       await tester.pump(_revealTotal);
       await tester.pump(const Duration(milliseconds: 400));
 
-      expect(
-          _verdictStamp('+۱ برای حریف · حریف برندهٔ راند شد'), findsOneWidget);
-      expect(_verdictStamp('+۱ برای تو · تو برندهٔ راندی'), findsNothing);
+      expect(_verdictStamp('+۱ حریف'), findsOneWidget);
+      expect(_verdictStamp('+۱ تو'), findsNothing);
       // ⚠️ اینجا عمداً pumpAndSettle نیست: قابِ کمیابیِ PlayerCard یک
       // انیمیشنِ بی‌پایان دارد (طلایی/پرمیوم می‌چرخند)، پس صحنه هرگز
       // «آرام» نمی‌گیرد و pumpAndSettle همیشه timeout می‌دهد. این نبودِ
@@ -176,7 +177,7 @@ void main() {
       await tester.pump(_revealTotal);
       await tester.pump(const Duration(milliseconds: 400));
 
-      expect(_verdictStamp('مساوی؛ امتیازی اضافه نشد'), findsOneWidget);
+      expect(_verdictStamp('مساوی'), findsOneWidget);
       // ⚠️ اینجا عمداً pumpAndSettle نیست: قابِ کمیابیِ PlayerCard یک
       // انیمیشنِ بی‌پایان دارد (طلایی/پرمیوم می‌چرخند)، پس صحنه هرگز
       // «آرام» نمی‌گیرد و pumpAndSettle همیشه timeout می‌دهد. این نبودِ
@@ -189,18 +190,17 @@ void main() {
       // باگی که در نسخهٔ وب بدونِ `key` رخ می‌داد.
       await tester.pumpWidget(_host(_round(1, 'X')));
       await tester.pump(_revealTotal);
-      expect(_verdictStamp('+۱ برای تو · تو برندهٔ راندی'), findsOneWidget);
+      expect(_verdictStamp('+۱ تو'), findsOneWidget);
 
       // راند دوم می‌رسد.
       await tester.pumpWidget(_host(_round(2, 'O')));
       await tester.pump(const Duration(milliseconds: 60));
 
-      expect(_verdictStamp('+۱ برای حریف · حریف برندهٔ راند شد'), findsNothing,
+      expect(_verdictStamp('+۱ حریف'), findsNothing,
           reason: 'راندِ دوم باید دوباره تعلیق داشته باشد، نه نتیجهٔ فوری');
 
       await tester.pump(_revealTotal);
-      expect(
-          _verdictStamp('+۱ برای حریف · حریف برندهٔ راند شد'), findsOneWidget);
+      expect(_verdictStamp('+۱ حریف'), findsOneWidget);
       // ⚠️ اینجا عمداً pumpAndSettle نیست: قابِ کمیابیِ PlayerCard یک
       // انیمیشنِ بی‌پایان دارد (طلایی/پرمیوم می‌چرخند)، پس صحنه هرگز
       // «آرام» نمی‌گیرد و pumpAndSettle همیشه timeout می‌دهد. این نبودِ
@@ -232,7 +232,7 @@ void main() {
         ),
       ));
       await tester.pump(_revealTotal);
-      expect(_verdictStamp('+۱ برای تو · تو برندهٔ راندی'), findsOneWidget);
+      expect(_verdictStamp('+۱ تو'), findsOneWidget);
       expect(find.textContaining('کارت من O'), findsWidgets);
     });
 

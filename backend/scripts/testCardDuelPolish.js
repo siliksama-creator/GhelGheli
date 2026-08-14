@@ -1,0 +1,69 @@
+#!/usr/bin/env node
+/** نگهبانِ «بازی، نه صفحهٔ توضیحات» برای دوئل کارت. */
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const root = path.join(__dirname, '..', '..');
+const read = file => fs.readFileSync(path.join(root, file), 'utf8');
+
+const mobile = read('mobile/lib/screens/user/games/card_duel/card_duel_widgets.dart');
+const mobilePage = read('mobile/lib/screens/user/games/card_duel_page.dart');
+const web = read('userweb/src/cardDuelGame.jsx');
+let pass = 0;
+function ok(condition, label) {
+  assert.ok(condition, label);
+  pass += 1;
+  console.log(`  ✓ ${label}`);
+}
+function between(source, from, to) {
+  return source.slice(source.indexOf(from), source.indexOf(to, source.indexOf(from)));
+}
+
+console.log('\n== بودجهٔ متنِ صحنهٔ زنده ==');
+const mobileClash = between(mobile, 'class _ClashStageState', 'class _ClashCardOwner');
+const webClash = between(web, 'function RoundReveal(', '// ═');
+ok(!/Text\(\s*winnerSummary/.test(mobileClash),
+  'Android: توضیح بلند فقط در Semantics است، نه روی صحنه');
+ok(/label: 'نتیجه راند[^\n]*\$winnerSummary'/.test(mobileClash),
+  'Android: حذف متن دیداری، دسترس‌پذیری را حذف نکرده است');
+ok(!/_RoundChip/.test(mobileClash) && !/اختلاف عدد نهایی/.test(mobileClash),
+  'Android: چیپ‌های توضیحی از برخورد زنده حذف شده‌اند');
+ok(!/<small>\{summary\}<\/small>/.test(webClash)
+  && !/duelReasonChips/.test(webClash) && !/duelCinematic/.test(webClash),
+  'Web: پاراگراف، چیپ دلیل و شعار از برخورد زنده حذف شده‌اند');
+ok(/aria-label=\{`نتیجه راند[^`]*\$\{summary\}`\}/.test(webClash),
+  'Web: خلاصهٔ کامل همچنان برای screen reader وجود دارد');
+ok(/\? '\+۱ تو'/.test(mobileClash) && /\? '\+۱ تو'/.test(webClash),
+  'حکم دیداری هر دو کلاینت به یک عبارت کوتاه محدود است');
+
+console.log('\n== اعلانِ شروع راند ==');
+const mobileIntro = between(mobile, 'class _RoundIntroOverlayState', 'class CardDuelRoundIntroForTest');
+const webIntro = between(web, 'function RoundIntroOverlay(', '/** عددِ نهایی');
+ok(/نبرد \$statName/.test(mobileIntro) && /عدد بالاتر می‌برد/.test(mobileIntro),
+  'Android: اعلان فقط معیار و قانون یک‌خطی دارد');
+ok(!/Text\(\s*hint/.test(mobileIntro) && /label:[\s\S]*\$hint/.test(mobileIntro),
+  'Android: hint بلند فقط در Semantics مانده است');
+ok(/<b>نبرد \{meta\.name/.test(webIntro) && /<em>عدد بالاتر می‌برد<\/em>/.test(webIntro),
+  'Web: اعلان مینیمال Android را عیناً دنبال می‌کند');
+ok(!/focus\?\.cry/.test(webIntro) && !/\{focus\?\.hint &&/.test(webIntro),
+  'Web: شعار و پاراگراف آموزشی دیداری ندارد');
+
+console.log('\n== HUD، انتخاب و پایان ==');
+ok(!/کارت این راند را انتخاب کن/.test(mobileClash)
+  && !/کارت این راند را انتخاب کن/.test(web),
+  'پرامپت طولانی انتخاب از هر دو HUD حذف شده است');
+ok(/'کارت را بزن'/.test(mobile) && /'کارت را بزن'/.test(web),
+  'فراخوان انتخاب در هر دو کلاینت کوتاه است');
+ok(!/_LiveBattle\([\s\S]{0,120}finalView/.test(mobilePage),
+  'Android: HUD زنده در صفحهٔ نتیجه تکرار نمی‌شود');
+ok(!/<LiveArena[^>]*final/.test(web),
+  'Web: HUD زنده در صفحهٔ نتیجه تکرار نمی‌شود');
+ok(/className="duelFinalScore"/.test(web)
+  && /تو \$\{faNum\(score\[me\]\)\}/.test(mobile),
+  'نتیجهٔ نهایی در هر دو کلاینت یک امتیاز خوانا و مالک‌دار دارد');
+ok(!/تایم‌لاین کامل ۵ راند/.test(mobile)
+  && !/تایم‌لاین کامل ۵ راند/.test(web)
+  && /جزئیات راندها/.test(mobile) && /جزئیات راندها/.test(web),
+  'جزئیات اختیاری با عنوان کوتاه و جمع‌شده باقی مانده است');
+
+console.log(`\n✅ ${pass} نگهبانِ پولیش کم‌متن موفق بود\n`);
