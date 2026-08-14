@@ -7,6 +7,7 @@
 // shows up as one platform silently losing taps.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { req } from './lib/api.js';
+import { heavyImpact, mediumImpact, selectionClick } from './haptics.js';
 import { SvgIcon } from './components/IconAsset.jsx';
 
 // ── config (mirrors TapGameConfig in Dart) ─────────────────────────────────
@@ -40,6 +41,11 @@ export const TAP_CONFIG = {
   flushIntervalMs: 8000,
   maxBatchTaps: 400,
 };
+
+// Shortest gap between two tap buzzes. Mirrors `_tapHapticMinGap` in
+// tap_screen.dart. NOT part of TAP_CONFIG: that object is the protocol
+// contract the server re-derives, and this is presentation only.
+const TAP_HAPTIC_MIN_GAP_MS = 125;
 
 // Taps needed to clear `level`.
 //
@@ -285,6 +291,9 @@ export default function TapGame({ token, onBack }) {
   // Remaining slowdown guard: accepted taps are capped, but rejected bursts
   // can be far denser. Keep telemetry exact while limiting UI/audio churn.
   const lastRejectedUi = useRef(-1000000);
+  // Mirrors `_hapticClock` in tap_screen.dart. Same sentinel as above so the
+  // very first tap of a session always buzzes.
+  const lastTapHaptic = useRef(-1000000);
   // performance.now() is monotonic: changing the device clock cannot reset
   // the rate-limit window, which Date.now() would allow.
   const clock = useCallback(() => Math.round(performance.now()), []);
@@ -575,6 +584,17 @@ export default function TapGame({ token, onBack }) {
     setNotice('');
     batchRef.current.taps++;
 
+    // Only ACCEPTED taps buzz — a rejected tap already gets its own visible
+    // notice, and buzzing on it would reward exactly the autoclicker the
+    // guard just caught. Throttled to the same 125 ms Android uses
+    // (`_tapHapticMinGap`): without it a fast tapper drives the motor
+    // continuously, which drains battery and stops reading as feedback.
+    const hapticNow = clock();
+    if (hapticNow - lastTapHaptic.current >= TAP_HAPTIC_MIN_GAP_MS) {
+      lastTapHaptic.current = hapticNow;
+      selectionClick();
+    }
+
     // Floating +1 at the pointer.
     const box = areaRef.current?.getBoundingClientRect();
     if (box) {
@@ -640,6 +660,14 @@ export default function TapGame({ token, onBack }) {
         if (skinIndexForLevel(lv) !== prevSkin) {
           setNotice('شخصیت جدید باز شد! ');
           later(() => setNotice(''), 2500);
+          // skinChanged — the loudest thing that can happen mid-run.
+          heavyImpact();
+        } else if (lv > TAP_CONFIG.levelCount) {
+          heavyImpact();          // gameCompleted
+        } else if (left <= 0) {
+          heavyImpact();          // dailyCapHit, once, on the level that spent it
+        } else {
+          mediumImpact();         // levelUp
         }
         // A level boundary is a natural checkpoint.
         later(() => flush(true), 0);

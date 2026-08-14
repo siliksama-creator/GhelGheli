@@ -5,6 +5,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { fa } from './lib/api.js';
 import PenaltyNet from './penaltyNet.js';
+import { play } from './gameAudio.js';
+import { heavyImpact, lightImpact, mediumImpact, selectionClick } from './haptics.js';
 import { penaltyPowerAt, penaltyView, zoneCenter } from './penaltyModel.js';
 
 const GOAL = '#84CC16';
@@ -276,6 +278,10 @@ export default function PenaltyGame({ state, mySymbol, onMove }) {
   const kickStart = useRef(0);
   const played = useRef(0);
   const netHit = useRef(false);
+  // The outcome cue fires once per kick, at the same 62% of the timeline
+  // Android uses. `netHit` cannot double as the latch because it only ever
+  // trips on a goal, leaving saves and misses silent.
+  const outcomeCued = useRef(false);
   const net = useRef(new PenaltyNet());
 
   useEffect(() => {
@@ -284,8 +290,14 @@ export default function PenaltyGame({ state, mySymbol, onMove }) {
       setSelected(null); setCharging(false); setKick(0); setAnimating(true);
       kickStart.current = performance.now();
       netHit.current = false;
+      outcomeCued.current = false;
+      // The strike itself, as the ball leaves the boot — `penalty_board.dart`
+      // plays Sfx.tap at 0.9 with a light impact at exactly this point.
+      play('tap', .9);
+      lightImpact();
     } else if (view.history.length === 0 && played.current !== 0) {
       played.current = 0; net.current.reset(); setKick(0); setAnimating(false);
+      outcomeCued.current = false;
     }
   }, [view.history.length, view.lastKick]);
 
@@ -308,6 +320,16 @@ export default function PenaltyGame({ state, mySymbol, onMove }) {
           net.current.hit(((z % 3) + .5) / 3,
             (Math.floor(z / 3) + .5) / 3, Number(view.lastKick.power || .7));
           netHit.current = true;
+        }
+        // The verdict lands with the ball, not when the socket message
+        // arrived — the same 62% mark the goal-net impact uses, so sound,
+        // haptic and the on-screen `Outcome` label all agree.
+        if (value >= .62 && !outcomeCued.current && view.lastKick) {
+          outcomeCued.current = true;
+          const outcome = view.lastKick.outcome;
+          if (outcome === 'goal') { play('win', 1); heavyImpact(); }
+          else if (outcome === 'save') { play('drop', .9); mediumImpact(); }
+          else { play('timeout', .8); selectionClick(); }
         }
         if (value >= 1) setAnimating(false);
       }

@@ -13,6 +13,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { req } from '../lib/api.js';
 import { play as playSfx } from '../gameAudio.js';
+import { heavyImpact } from '../haptics.js';
 import { SvgIcon, AssetIcon } from '../components/IconAsset.jsx';
 
 const fa = n => new Intl.NumberFormat('fa-IR').format(Number(n || 0));
@@ -105,6 +106,7 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
         setState(s => ({ ...s, ...res }));
         onSpinsChange?.(res.unlimited ? '∞' : (res.spinsLeft ?? 0));
         playSfx(res.prize.kind === 'cash' ? 'win' : 'match_found');
+        heavyImpact();
         setSpinning(false);
         load();
         // موجودی/امتیاز هدر باید فوراً درست شود، وگرنه کاربر جایزه را

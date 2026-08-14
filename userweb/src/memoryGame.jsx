@@ -9,6 +9,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import { play } from './gameAudio.js';
+import { selectionClick } from './haptics.js';
 
 // Server sends asset KEYS, not emoji. Emoji were a real bug: every OS/browser
 // draws them from a different font, and on several Androids two distinct
@@ -67,7 +68,7 @@ export function MemoryGrid({ cards = [], playable = [], cols = 4, lastResult,
               style={{ '--tint': tint }}
               disabled={!can}
               aria-label={revealed ? `کارت ${c.face || ''}` : 'کارت پشت‌رو'}
-              onClick={() => onMove(i)}
+              onClick={() => { selectionClick(); onMove(i); }}
             >
               <span className="inner">
                 <span className="back" aria-hidden="true" />

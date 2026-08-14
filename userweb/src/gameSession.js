@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import { play, startDuelMusic, stopDuelMusic } from './gameAudio.js';
+import { heavyImpact, mediumImpact, victoryFanfare } from './haptics.js';
 
 export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roomCode = null,
   externalSocket = null, initialStart = null, enabled = true) {
@@ -145,7 +146,8 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
           const roundWinner = nextState?.lastRound?.winner;
           play(roundWinner === 'DRAW' ? 'duel_round_draw'
             : roundWinner === prev.me ? 'duel_round_win' : 'duel_round_lose', 0.86);
-          try { navigator.vibrate?.(roundWinner === prev.me ? [28, 35, 55] : 32); } catch { /* cosmetic */ }
+          // Android: heavy for a round I won, medium otherwise.
+          if (roundWinner === prev.me) heavyImpact(); else mediumImpact();
         }
         return { ...prev, state: nextState,
           turn: d?.turn ?? prev.turn, timedOut: d?.timedOut || null };
@@ -165,6 +167,10 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
           play(winner === 'DRAW' ? 'duel_final_draw'
             : winner === prev.me ? 'duel_victory' : 'duel_defeat');
         } else play(winner === 'DRAW' ? 'draw' : (winner === prev.me ? 'win' : 'lose'));
+        // The four-pulse celebration Android fires from the confetti overlay
+        // (`game_scaffold.dart`), here for every game and not just the duel.
+        // Losing gets nothing on purpose: Android is silent there too.
+        if (winner === prev.me) victoryFanfare();
         return {
           ...prev, state: d?.state ?? prev.state, winner, finishReason,
           matchId: d?.matchId || prev.roomId,
@@ -193,7 +199,7 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
           window.clearTimeout(payoutTimerRef.current);
           payoutTimerRef.current = window.setTimeout(() => {
             play('duel_points', 0.92);
-            try { navigator.vibrate?.([22, 28, 44, 25, 70]); } catch { /* cosmetic */ }
+            heavyImpact();
             setG(current => current.matchId !== payoutId ? current : {
               ...current,
               stakePayoutAmount: payoutAmount,

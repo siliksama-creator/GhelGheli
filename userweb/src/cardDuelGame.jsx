@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { asset, avatarUrl, fa, req } from './lib/api.js';
 import { primeImageCache } from './lib/imageCache.js';
 import { useGameSession } from './gameSession.js';
+import { selectionClick } from './haptics.js';
 import { CosmeticAvatarFrame, CosmeticFrame, DisplayName } from './components/Cosmetics.jsx';
 import PlayerCard from './components/PlayerCard.jsx';
 import { cardIdOf, cardPowerOf } from './lib/cards.js';
@@ -43,7 +44,8 @@ function modeCopy({ stake, vsBot, roomCode, initialStart }) {
 
 function HoloCard({ card, selected, disabled, compact = false, onClick, frame, winner = false, loser = false, badge = '' }) {
   const color = rarityColor(card?.rarity || card?.duel_rarity);
-  const activate = event => { if (!disabled) navigator.vibrate?.(18); onClick?.(event); };
+  // Android's `player_card.dart` uses selectionClick for the same gesture.
+  const activate = event => { if (!disabled) selectionClick(); onClick?.(event); };
   const cardView = <PlayerCard
     item={card}
     compact={compact}
