@@ -230,12 +230,14 @@ jobs:
             echo "org.gradle.vfs.watch=false"
             echo "org.gradle.daemon=false"
           } >> android/gradle.properties
+          APP_RELEASE=$(awk '/^version:/{print $2}' pubspec.yaml)
           ok=0
           for attempt in 1 2 3 4; do
             echo "── flutter build attempt $attempt ──"
             if flutter build apk --release --split-per-abi \
               --target-platform=android-arm,android-arm64 \
-              --dart-define=API_BASE_URL=${{ vars.API_BASE_URL || 'https://api.ghelghelishop.ir' }}; then
+              --dart-define=API_BASE_URL=${{ vars.API_BASE_URL || 'https://api.ghelghelishop.ir' }} \
+              --dart-define=APP_RELEASE="$APP_RELEASE"; then
               ok=1
               break
             fi

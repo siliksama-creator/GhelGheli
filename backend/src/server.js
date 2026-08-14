@@ -124,6 +124,33 @@ const publicAssetHeaders = (res) => {
 const THUMB_WIDTHS = new Set([160, 240, 320, 480, 640]);
 const thumbRoot = path.join(uploadRoot, '.thumbs');
 try { fs.mkdirSync(thumbRoot, { recursive: true }); } catch { /* ignore */ }
+// چند کلاینت که یک کارت تازه را هم‌زمان باز می‌کنند نباید چند sharp روی
+// یک خروجی راه بیندازند. job بر اساس «عرض+نام» مشترک می‌شود.
+const thumbnailJobs = new Map();
+async function ensureThumbnail(src, out, width) {
+  if (fs.existsSync(out) && fs.statSync(out).size > 0) return;
+  const key = `${width}:${path.basename(src)}`;
+  const running = thumbnailJobs.get(key);
+  if (running) return running;
+  const job = (async () => {
+    const tmp = `${out}.${process.pid}-${Math.random().toString(36).slice(2)}.tmp`;
+    try {
+      const sharp = require('sharp');
+      await sharp(src)
+        .rotate()
+        .resize({ width, withoutEnlargement: true })
+        .webp({ quality: 78 })
+        .toFile(tmp);
+      if (fs.existsSync(out)) fs.unlinkSync(tmp);
+      else fs.renameSync(tmp, out);
+    } finally {
+      try { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); } catch {/* ignore */}
+      thumbnailJobs.delete(key);
+    }
+  })();
+  thumbnailJobs.set(key, job);
+  return job;
+}
 
 app.get('/uploads/images/:file', async (req, res, next) => {
   const width = Number(req.query.w);
@@ -138,14 +165,7 @@ app.get('/uploads/images/:file', async (req, res, next) => {
 
   const out = path.join(thumbRoot, `${width}-${name}.webp`);
   try {
-    if (!fs.existsSync(out)) {
-      const sharp = require('sharp');
-      await sharp(src)
-        .rotate()                                   // احترام به EXIF
-        .resize({ width, withoutEnlargement: true })
-        .webp({ quality: 78 })
-        .toFile(out);
-    }
+    await ensureThumbnail(src, out, width);
     publicAssetHeaders(res);
     res.type('image/webp');
     return fs.createReadStream(out).pipe(res);

@@ -84,6 +84,7 @@ export default function PlayerCard({
   showName = true,
   showFooter = true,
   badge = '',
+  eager = false,
   onClick,
   className = '',
 }) {
@@ -124,7 +125,9 @@ export default function PlayerCard({
             <CardFallback item={item} loading={Boolean(art) && !artReady && !artFailed} />
           </div>
           {art
-            ? <CachedImg src={art} w={compact ? 240 : 480} alt={cardNameOf(item)} loading="lazy" decoding="async"
+            ? <CachedImg src={art} w={480} alt={cardNameOf(item)}
+                loading={eager ? 'eager' : 'lazy'}
+                fetchPriority={eager ? 'high' : 'auto'} decoding="async"
                 onLoad={() => setArtReady(true)}
                 onError={event => {
                   // تصویری که ۴۰۴ می‌دهد هم نباید اسپینر را برای همیشه

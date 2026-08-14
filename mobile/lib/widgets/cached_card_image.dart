@@ -64,7 +64,8 @@ void _rememberHit(String url, File f) {
     // قدیمی‌ترین کلیدها (ترتیبِ درجِ Map در دارت حفظ می‌شود) تا رسیدن
     // به سه‌چهارمِ سقف حذف می‌شوند — نه دقیقاً تا سقف، وگرنه هر درجِ
     // بعدی دوباره پاکسازی را راه می‌اندازد.
-    final drop = _syncHit.keys.take(_syncHit.length - (_kSyncHitMax * 3 ~/ 4))
+    final drop = _syncHit.keys
+        .take(_syncHit.length - (_kSyncHitMax * 3 ~/ 4))
         .toList();
     for (final k in drop) {
       _syncHit.remove(k);
@@ -81,6 +82,7 @@ class CachedCardImage extends StatefulWidget {
     this.height,
     this.fit = BoxFit.contain,
     this.cacheWidth,
+    this.downloadWidth,
     this.placeholder,
   });
 
@@ -93,6 +95,13 @@ class CachedCardImage extends StatefulWidget {
   /// عرضِ رمزگشایی. مثلِ `SafeImage` برای اینکه تصویرِ ۱۶۰۰ پیکسلی در
   /// خانهٔ ۱۶۸ پیکسلی حافظه هدر ندهد.
   final int? cacheWidth;
+
+  /// عرض نسخه‌ای که از سرور/دیسک گرفته می‌شود؛ مستقل از عرض decode.
+  ///
+  /// کارتِ فشرده می‌تواند فایل مشترک ۴۸۰px را از دیسک بگیرد ولی برای RAM
+  /// همان را ۲۸۰px decode کند. جدا نبودن این دو، کشِ ۳۲۰ و ۴۸۰ را برای
+  /// یک کارت دو بار پر می‌کرد.
+  final int? downloadWidth;
 
   /// چیزی که هنگامِ بارگذاری یا شکست نشان داده می‌شود.
   final Widget? placeholder;
@@ -155,11 +164,19 @@ class _CachedCardImageState extends State<CachedCardImage> {
     // می‌شود، وگرنه کش برای نشانیِ کامل پر می‌شود و `<img>` نسخهٔ کوچک
     // را می‌خواهد — یعنی هر دو را دانلود می‌کنیم و از هیچ‌کدام سود
     // نمی‌بریم.
-    _requestUrl = thumbUrlFor(_resolved, widget.cacheWidth);
+    _requestUrl = thumbUrlFor(
+      _resolved,
+      widget.downloadWidth ?? widget.cacheWidth,
+    );
 
-    // مسیرِ سریع: در همین نشست قبلاً پیدا شده → بدونِ حتی یک فریم انتظار.
-    final hit = _syncHit[_requestUrl];
+    // مسیرِ سریع: چه خودِ این ویجت قبلاً دیده باشد، چه bootstrap/card-duel
+    // آن را در prewarm گرفته باشد، همان فریم اول فایل حاضر است. نسخهٔ
+    // قبلی فقط map خصوصی ویجت را نگاه می‌کرد؛ بنابراین prewarm موفق هم
+    // به UI وصل نبود و یک اسپینر کوتاه دیده می‌شد.
+    final hit =
+        _syncHit[_requestUrl] ?? ImageDiskCache.instance.memoryHit(_requestUrl);
     if (hit != null) {
+      _rememberHit(_requestUrl, hit);
       _file = hit;
       return;
     }
@@ -251,7 +268,8 @@ class _CachedCardImageState extends State<CachedCardImage> {
       width: widget.width,
       height: widget.height,
       child: Center(
-        child: widget.placeholder ??
+        child:
+            widget.placeholder ??
             const SizedBox(
               width: 18,
               height: 18,
@@ -265,28 +283,29 @@ class _CachedCardImageState extends State<CachedCardImage> {
   /// بندانگشتی، نه فایلِ کامل. عقب‌نشینی نباید کاربر را به دانلودِ
   /// چند برابری برگرداند.
   Widget _networkFallback() => Image.network(
-        _requestUrl.isEmpty ? _resolved : _requestUrl,
-        width: widget.width,
-        height: widget.height,
-        fit: widget.fit,
-        cacheWidth: widget.cacheWidth,
-        filterQuality: FilterQuality.medium,
-        loadingBuilder: (_, child, p) => p == null
-            ? child
-            : SizedBox(
-                width: widget.width,
-                height: widget.height,
-                child: Center(
-                  child: widget.placeholder ??
-                      const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                ),
-              ),
-        errorBuilder: (_, __, ___) => _fallback(context),
-      );
+    _requestUrl.isEmpty ? _resolved : _requestUrl,
+    width: widget.width,
+    height: widget.height,
+    fit: widget.fit,
+    cacheWidth: widget.cacheWidth,
+    filterQuality: FilterQuality.medium,
+    loadingBuilder: (_, child, p) => p == null
+        ? child
+        : SizedBox(
+            width: widget.width,
+            height: widget.height,
+            child: Center(
+              child:
+                  widget.placeholder ??
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+            ),
+          ),
+    errorBuilder: (_, __, ___) => _fallback(context),
+  );
 
   Widget _fallback(BuildContext context) =>
       widget.placeholder ??
@@ -294,8 +313,11 @@ class _CachedCardImageState extends State<CachedCardImage> {
         width: widget.width,
         height: widget.height,
         child: const Center(
-          child: Icon(Icons.image_not_supported_outlined,
-              size: 34, color: Colors.white38),
+          child: Icon(
+            Icons.image_not_supported_outlined,
+            size: 34,
+            color: Colors.white38,
+          ),
         ),
       );
 }

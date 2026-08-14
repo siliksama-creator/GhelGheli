@@ -22,6 +22,7 @@
     "test:decision": "node scripts/testDecision.js && node scripts/testFingerprintWiring.js && node scripts/testCardCrop.js",
     "openapi:generate": "node scripts/generateOpenApi.js",
     "openapi:check": "node scripts/generateOpenApi.js --check",
+    "thumbs:prewarm": "node scripts/prewarmThumbnails.js",
     "test:monetization": "node scripts/testMonetization.js",
     "test:shop-artwork": "node scripts/testShopArtwork.js",
     "test:e2e": "node scripts/testE2E.js"

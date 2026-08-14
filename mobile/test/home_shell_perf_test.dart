@@ -1,136 +1,150 @@
-// پوستهٔ خانه نباید با هر setState همهٔ صفحه‌ها را از نو بسازد.
+// نگهبان واقعیِ حفظ State تب‌ها.
 //
-// ═══════════════════════════════════════════════════════════════════════════
-// گزارش مالک
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// «میریم داخل بازی ضربه زن و یکم بازی میکنیم و برمیگردیم میریم سراغ
-// قسمت های دیگه — سرعت کار با اپلیکیشن به مرور کم میشه و لودینگ هایی
-// به وجود میاد. خیلی طولانی نیستن ولی کند شدن مشخص میشه.»
-//
-// ═══════════════════════════════════════════════════════════════════════════
-// ریشه‌ای که پیدا شد
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// `_pages` یک **getter** بود که آرایه‌ای از ۱۲ ویجت برمی‌گرداند، و در
-// `build` خوانده می‌شد. یعنی هر `setState` — و پوسته ۱۳ جا دارد —
-// دوازده شیءِ ویجتِ تازه می‌ساخت که یازده‌تایشان روی صفحه نبودند.
-//
-// «به مرور بدتر می‌شود» هم توضیح دارد: فشارِ تخصیصِ مداوم، GC را مرتب
-// بیدار می‌کند و هر بیدار شدن یک وقفهٔ کوتاه است.
-//
-// ═══════════════════════════════════════════════════════════════════════════
-// چرا تست به این شکل
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// «سرعت» را نمی‌شود در تستِ واحد سنجید — به ماشین بستگی دارد. ولی
-// خودِ **علت** را می‌شود قطعی سنجید: «آیا با یک setState، ویجتِ صفحهٔ
-// دیگری ساخته می‌شود؟» یک شمارنده در سازنده جواب را می‌دهد.
+// نگه داشتنِ Widget object در Map به‌تنهایی State را حفظ نمی‌کند؛ اگر
+// AnimatedSwitcher آن را از درخت بردارد، dispose می‌شود و برگشت به تب دوباره
+// initState/API/image-load را اجرا می‌کند. این دقیقاً باگی است که کاربر دید.
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// شمارندهٔ ساخت، به‌ازای هر «صفحه».
-final Map<int, int> built = {};
+final Map<int, int> initialized = {};
+final Map<int, int> disposed = {};
 
-class _FakePage extends StatelessWidget {
-  _FakePage(this.id) {
-    built[id] = (built[id] ?? 0) + 1;
-  }
+class _FakePage extends StatefulWidget {
+  const _FakePage(this.id);
   final int id;
 
   @override
-  Widget build(BuildContext context) => Text('صفحه $id');
+  State<_FakePage> createState() => _FakePageState();
 }
 
-/// همان الگوی `_pageAt` در home_shell: ساختِ تنبل + کش.
-class _Shell extends StatefulWidget {
-  const _Shell({super.key, required this.cached});
-
-  /// true → الگوی جدید (کش)، false → الگوی قدیمی (getter)
-  final bool cached;
+class _FakePageState extends State<_FakePage> {
+  int localCounter = 0;
 
   @override
-  State<_Shell> createState() => _ShellState();
+  void initState() {
+    super.initState();
+    initialized[widget.id] = (initialized[widget.id] ?? 0) + 1;
+  }
+
+  @override
+  void dispose() {
+    disposed[widget.id] = (disposed[widget.id] ?? 0) + 1;
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => TextButton(
+    key: ValueKey('button-${widget.id}'),
+    onPressed: () => setState(() => localCounter++),
+    child: Text('صفحه ${widget.id}:$localCounter'),
+  );
 }
 
-class _ShellState extends State<_Shell> {
-  static const count = 12;
+class _PersistentShell extends StatefulWidget {
+  const _PersistentShell({super.key});
+
+  @override
+  State<_PersistentShell> createState() => _PersistentShellState();
+}
+
+class _PersistentShellState extends State<_PersistentShell> {
   int index = 0;
-  int tick = 0;
-  final Map<int, Widget> _cache = {};
+  final Map<int, Widget> pages = {};
 
-  Widget _pageAt(int i) => widget.cached
-      ? _cache.putIfAbsent(i, () => _FakePage(i))
-      : _all()[i];
+  Widget pageAt(int i) => pages.putIfAbsent(i, () => _FakePage(i));
 
-  /// الگوی قدیمی: کلِ لیست ساخته می‌شود تا یک عنصر برداشته شود.
-  List<Widget> _all() => [for (var i = 0; i < count; i++) _FakePage(i)];
-
-  void bump() => setState(() => tick++);
   void go(int i) => setState(() => index = i);
 
   @override
-  Widget build(BuildContext context) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: Column(children: [Text('$tick'), _pageAt(index)]),
-      );
+  Widget build(BuildContext context) {
+    pageAt(index); // فقط صفحهٔ دیده‌شده ساخته می‌شود.
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Stack(
+        children: [
+          for (final entry in pages.entries)
+            Offstage(
+              key: ValueKey('slot-${entry.key}'),
+              offstage: entry.key != index,
+              child: TickerMode(
+                enabled: entry.key == index,
+                child: entry.value,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 void main() {
-  setUp(built.clear);
-
-  testWidgets('الگوی قدیمی: یک setState دوازده ویجت می‌سازد (رگرسیون)',
-      (tester) async {
-    final key = GlobalKey<_ShellState>();
-    await tester.pumpWidget(MaterialApp(home: _Shell(key: key, cached: false)));
-    expect(built.length, 12, reason: 'همهٔ صفحه‌ها از ابتدا ساخته می‌شوند');
-
-    built.clear();
-    key.currentState!.bump();
-    await tester.pump();
-    // این رفتارِ خراب است؛ اینجا **ثبت** می‌شود تا اگر کسی برگردد،
-    // تفاوت با تستِ بعدی فریاد بزند.
-    expect(built.length, 12);
+  setUp(() {
+    initialized.clear();
+    disposed.clear();
   });
 
-  testWidgets('الگوی جدید: فقط صفحهٔ فعال ساخته می‌شود', (tester) async {
-    final key = GlobalKey<_ShellState>();
-    await tester.pumpWidget(MaterialApp(home: _Shell(key: key, cached: true)));
-    expect(built.keys.toList(), [0],
-        reason: 'صفحه‌ای که باز نشده نباید هزینه داشته باشد');
+  testWidgets('اول فقط صفحهٔ فعال ساخته می‌شود', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: _PersistentShell()));
+    expect(initialized, {0: 1});
+  });
 
-    // ده setState پشت سر هم — هیچ ویجتِ تازه‌ای نباید ساخته شود.
-    built.clear();
+  testWidgets('تعویض تب State قبلی را dispose نمی‌کند', (tester) async {
+    final key = GlobalKey<_PersistentShellState>();
+    await tester.pumpWidget(MaterialApp(home: _PersistentShell(key: key)));
+
+    await tester.tap(find.byKey(const ValueKey('button-0')));
+    await tester.pump();
+    expect(find.text('صفحه 0:1'), findsOneWidget);
+
+    key.currentState!.go(4);
+    await tester.pump();
+    expect(initialized, {0: 1, 4: 1});
+    expect(
+      disposed,
+      isEmpty,
+      reason: 'تب پنهان باید Offstage شود، نه از درخت حذف',
+    );
+
+    key.currentState!.go(0);
+    await tester.pump();
+    expect(
+      find.text('صفحه 0:1'),
+      findsOneWidget,
+      reason: 'counter محلی ثابت می‌کند همان State قبلی برگشته',
+    );
+    expect(
+      initialized[0],
+      1,
+      reason: 'بازگشت نباید initState/API load را تکرار کند',
+    );
+  });
+
+  testWidgets('ده جابه‌جایی فقط هر تب را یک بار init می‌کند', (tester) async {
+    final key = GlobalKey<_PersistentShellState>();
+    await tester.pumpWidget(MaterialApp(home: _PersistentShell(key: key)));
     for (var i = 0; i < 10; i++) {
-      key.currentState!.bump();
+      key.currentState!.go(i.isEven ? 1 : 0);
       await tester.pump();
     }
-    expect(built, isEmpty,
-        reason: 'setState نباید هیچ صفحه‌ای را دوباره بسازد');
+    expect(initialized, {0: 1, 1: 1});
+    expect(disposed, isEmpty);
   });
 
-  testWidgets('رفتن به تبِ تازه فقط همان را می‌سازد', (tester) async {
-    final key = GlobalKey<_ShellState>();
-    await tester.pumpWidget(MaterialApp(home: _Shell(key: key, cached: true)));
-    built.clear();
-
-    key.currentState!.go(4);
-    await tester.pump();
-    expect(built.keys.toList(), [4]);
-  });
-
-  testWidgets('بازگشت به تبِ قبلی دوباره نمی‌سازد', (tester) async {
-    // این همان سناریوی گزارشِ مالک است: رفتن به بازی و برگشتن.
-    final key = GlobalKey<_ShellState>();
-    await tester.pumpWidget(MaterialApp(home: _Shell(key: key, cached: true)));
-    key.currentState!.go(4);
-    await tester.pump();
-
-    built.clear();
-    key.currentState!.go(0); // برگشت به خانه
-    await tester.pump();
-    key.currentState!.go(4); // دوباره به بازی
-    await tester.pump();
-    expect(built, isEmpty, reason: 'هر دو صفحه از قبل در کش بودند');
-  });
+  test(
+    'source واقعی از Offstage+TickerMode استفاده می‌کند نه AnimatedSwitcher',
+    () {
+      final source = File('lib/screens/user/home_shell.dart')
+          .readAsStringSync();
+      expect(source.contains('Widget _buildPersistentPages()'), isTrue);
+      expect(source.contains('Offstage('), isTrue);
+      expect(source.contains('TickerMode('), isTrue);
+      expect(
+        source.contains('child: AnimatedSwitcher('),
+        isFalse,
+        reason: 'AnimatedSwitcher تب قبلی را dispose و دوباره load می‌کند',
+      );
+    },
+  );
 }

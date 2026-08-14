@@ -22,7 +22,10 @@ export default function CachedImg({ src, w, ...rest }) {
   useEffect(() => {
     let alive = true;
     let blobUrl = '';
-    setHref(resolved);
+    // نسخهٔ قبلی همین‌جا resolved را روی <img> می‌گذاشت و هم‌زمان
+    // lookupCachedImage هم fetch می‌کرد: دو درخواست برای یک کارت. تا جواب
+    // Cache Storage معلوم نشده، img اصلاً src نمی‌گیرد.
+    setHref('');
     if (!resolved) return undefined;
     lookupCachedImage(resolved).then((next) => {
       if (!alive) {

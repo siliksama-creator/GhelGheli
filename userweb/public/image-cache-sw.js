@@ -14,10 +14,10 @@
  *
  * حالا فقط پاسخی با `content-type: image/*` کش می‌شود.
  *
- * نام کش به v3 رفت تا ورودی‌های مسمومِ نسخهٔ قبل خودبه‌خود دور ریخته
+ * نام کش نسخه‌دار است تا ورودی‌های مسموم/variantهای قدیمی خودبه‌خود دور ریخته
  * شوند؛ `activate` هم کش‌های قدیمی را پاک می‌کند.
  */
-const CACHE_NAME = 'ghelgheli-img-v3';
+const CACHE_NAME = 'ghelgheli-img-v4';
 const VERSIONED = /\/uploads\/|\/public\//;
 
 function isImageResponse(response) {

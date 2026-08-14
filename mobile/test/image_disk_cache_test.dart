@@ -67,8 +67,7 @@ void main() {
       expect(RegExp(r'^[0-9a-f]{40}$').hasMatch(k), isTrue, reason: k);
     });
 
-    test('طولِ کلید ثابت است — سقفِ ۲۵۵ کاراکتریِ نامِ فایل هرگز نمی‌خورد',
-        () {
+    test('طولِ کلید ثابت است — سقفِ ۲۵۵ کاراکتریِ نامِ فایل هرگز نمی‌خورد', () {
       final long = 'https://x/${'a' * 5000}.webp';
       expect(keyFor(long).length, 40);
     });
@@ -110,8 +109,7 @@ void main() {
       final target = File('${dir.path}/k');
       for (var round = 0; round < 3; round++) {
         final tmp = File('${dir.path}/k.tmp');
-        await tmp.writeAsBytes(List.filled(1000 * (round + 1), 7),
-            flush: true);
+        await tmp.writeAsBytes(List.filled(1000 * (round + 1), 7), flush: true);
         await tmp.rename(target.path);
       }
       expect(await target.length(), 3000);
@@ -214,8 +212,7 @@ void main() {
     // ⚠️ این گروه پلی است بین منطقِ بازسازی‌شدهٔ بالا و کدِ واقعی.
     //    اگر کسی الگوریتمِ کلاس را عوض کند (مثلاً SHA-256 یا سقفِ
     //    متفاوت) و تست‌های بالا را نه، اینجا قرمز می‌شود.
-    final src =
-        File('lib/services/image_disk_cache.dart').readAsStringSync();
+    final src = File('lib/services/image_disk_cache.dart').readAsStringSync();
 
     test('از sha1 برای نامِ فایل استفاده می‌کند', () {
       expect(src.contains('sha1.convert'), isTrue);
@@ -284,8 +281,7 @@ void main() {
   // درسش: هر جا استثنا عمداً بلعیده می‌شود، باید تستی باشد که **نتیجهٔ
   // مثبت** را ثابت کند، نه فقط «خطا نداد».
   group('بندانگشتی و نرمال‌سازیِ نشانی', () {
-    final src =
-        File('lib/services/image_disk_cache.dart').readAsStringSync();
+    final src = File('lib/services/image_disk_cache.dart').readAsStringSync();
     final widgetSrc =
         File('lib/widgets/cached_card_image.dart').readAsStringSync();
 
@@ -294,8 +290,7 @@ void main() {
       // را نادیده می‌گیرد و فایلِ کامل می‌فرستد — یعنی بی‌صدا به حالتِ
       // کند برمی‌گردیم. مقایسه با خودِ فایلِ سرور انجام می‌شود تا
       // واگراییِ دو طرف ممکن نباشد.
-      final serverSrc =
-          File('../backend/src/server.js').readAsStringSync();
+      final serverSrc = File('../backend/src/server.js').readAsStringSync();
       final m = RegExp(r'THUMB_WIDTHS = new Set\(\[([0-9,\s]+)\]\)')
           .firstMatch(serverSrc);
       expect(m, isNotNull, reason: 'THUMB_WIDTHS در سرور پیدا نشد');
@@ -306,8 +301,7 @@ void main() {
           .toList()
         ..sort();
 
-      final d = RegExp(r'kThumbWidths = <int>\[([0-9,\s]+)\]')
-          .firstMatch(src);
+      final d = RegExp(r'kThumbWidths = <int>\[([0-9,\s]+)\]').firstMatch(src);
       expect(d, isNotNull, reason: 'kThumbWidths در کلاینت پیدا نشد');
       final clientWidths = d!
           .group(1)!
@@ -357,10 +351,11 @@ void main() {
           reason: 'fetch باید ورودیِ خام بگیرد و خودش نرمال کند');
       expect(src.contains('Future<File?> cached(String rawUrl)'), isTrue,
           reason: 'cached باید همان نرمال‌سازی را داشته باشد');
-      // هر دو باید واقعاً fullAssetUrl صدا بزنند، نه فقط اسمِ پارامتر
-      // عوض شده باشد.
-      expect(RegExp(r'final url = fullAssetUrl\(rawUrl\);')
-          .allMatches(src).length, 2);
+      // هر سه دروازه (fetch، cached و memoryHit) باید واقعاً fullAssetUrl
+      // صدا بزنند، نه فقط اسمِ پارامتر عوض شده باشد.
+      expect(
+          RegExp(r'final url = fullAssetUrl\(rawUrl\);').allMatches(src).length,
+          3);
     });
 
     test('prewarm همان نشانی‌ای را گرم می‌کند که ویجت می‌خواهد', () {

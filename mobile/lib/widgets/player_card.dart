@@ -110,8 +110,15 @@ class PlayerCard extends StatelessWidget {
                         : CachedCardImage(
                             url: art,
                             fit: BoxFit.contain,
+                            // یک فایل ۴۸۰px بین اینونتوری، چیدمان و صحنهٔ
+                            // نبرد مشترک است؛ کارت فشرده فقط decode کوچک‌تر
+                            // می‌کند تا RAM هدر نرود.
+                            downloadWidth: 420,
                             cacheWidth: compact ? 280 : 420,
-                            placeholder: _PaintedFace(card: card, loading: true),
+                            placeholder: _PaintedFace(
+                              card: card,
+                              loading: true,
+                            ),
                           ),
                   ),
                   const DecoratedBox(
@@ -119,7 +126,11 @@ class PlayerCard extends StatelessWidget {
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Color(0x00000000), Color(0xCC02060C)],
+                        colors: [
+                          Colors.transparent,
+                          Color(0x00000000),
+                          Color(0xCC02060C),
+                        ],
                         stops: [0.45, 0.68, 1],
                       ),
                     ),
@@ -133,8 +144,7 @@ class PlayerCard extends StatelessWidget {
                         color: Color(0x33FFD166),
                       ),
                     ),
-                  if (loser)
-                    const ColoredBox(color: Color(0x66020810)),
+                  if (loser) const ColoredBox(color: Color(0x66020810)),
                   if (selected)
                     const Align(
                       alignment: Alignment.topRight,
@@ -143,7 +153,11 @@ class PlayerCard extends StatelessWidget {
                         child: CircleAvatar(
                           radius: 12,
                           backgroundColor: Color(0xFFFFD166),
-                          child: Icon(Icons.check_rounded, size: 16, color: Color(0xFF07111B)),
+                          child: Icon(
+                            Icons.check_rounded,
+                            size: 16,
+                            color: Color(0xFF07111B),
+                          ),
                         ),
                       ),
                     ),
@@ -177,7 +191,9 @@ class PlayerCard extends StatelessWidget {
                               color: Colors.white,
                               fontWeight: FontWeight.w900,
                               fontSize: compact ? 10 : 12.5,
-                              shadows: const [Shadow(color: Colors.black87, blurRadius: 8)],
+                              shadows: const [
+                                Shadow(color: Colors.black87, blurRadius: 8),
+                              ],
                             ),
                           ),
                         if (showStats && !compact) ...[
@@ -204,34 +220,42 @@ class _MiniChip extends StatelessWidget {
   final String text;
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.72),
-          borderRadius: BorderRadius.circular(99),
-        ),
-        child: Text(text,
-            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+    decoration: BoxDecoration(
+      color: Colors.black.withValues(alpha: 0.72),
+      borderRadius: BorderRadius.circular(99),
+    ),
+    child: Text(
+      text,
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 10,
+        fontWeight: FontWeight.w900,
+      ),
+    ),
+  );
 }
 
 class _WinnerStamp extends StatelessWidget {
   const _WinnerStamp();
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: const Color(0xF0FFD166),
-          borderRadius: BorderRadius.circular(99),
-          boxShadow: const [BoxShadow(color: Color(0xAAFFD166), blurRadius: 18)],
-        ),
-        child: const Text('WINNER',
-            style: TextStyle(
-              color: Color(0xFF3B2500),
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.4,
-              fontSize: 12,
-            )),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    decoration: BoxDecoration(
+      color: const Color(0xF0FFD166),
+      borderRadius: BorderRadius.circular(99),
+      boxShadow: const [BoxShadow(color: Color(0xAAFFD166), blurRadius: 18)],
+    ),
+    child: const Text(
+      'WINNER',
+      style: TextStyle(
+        color: Color(0xFF3B2500),
+        fontWeight: FontWeight.w900,
+        letterSpacing: 1.4,
+        fontSize: 12,
+      ),
+    ),
+  );
 }
 
 /// وقتی تصویر شبکه نیست، یک کارت نقاشی‌شده نشان می‌دهیم — نه توپ.
@@ -245,30 +269,52 @@ class _PaintedFace extends StatelessWidget {
     final rarity = cardRarityOf(card);
     final colors = rarityColors[rarity] ?? rarityColors['normal']!;
     final name = cardNameOf(card);
-    final initial = name.isEmpty ? 'ک' : String.fromCharCodes(name.runes.take(1));
+    final initial = name.isEmpty
+        ? 'ک'
+        : String.fromCharCodes(name.runes.take(1));
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [colors.first.withValues(alpha: 0.35), const Color(0xFF07111D), colors.last.withValues(alpha: 0.45)],
+          colors: [
+            colors.first.withValues(alpha: 0.35),
+            const Color(0xFF07111D),
+            colors.last.withValues(alpha: 0.45),
+          ],
         ),
       ),
       child: Center(
         child: loading
-            ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))
+            ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
             : Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   CircleAvatar(
                     radius: 22,
                     backgroundColor: colors.first.withValues(alpha: 0.28),
-                    child: Text(initial,
-                        style: TextStyle(color: colors.first, fontWeight: FontWeight.w900, fontSize: 20)),
+                    child: Text(
+                      initial,
+                      style: TextStyle(
+                        color: colors.first,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 20,
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 6),
-                  Text(rarityLabels[rarity] ?? rarity,
-                      style: TextStyle(color: colors.first, fontSize: 10, fontWeight: FontWeight.w800)),
+                  Text(
+                    rarityLabels[rarity] ?? rarity,
+                    style: TextStyle(
+                      color: colors.first,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                 ],
               ),
       ),

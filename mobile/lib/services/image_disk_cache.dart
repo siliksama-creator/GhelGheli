@@ -131,19 +131,60 @@ class ImageDiskCache {
   static const int _maxBytes = 60 * 1024 * 1024;
 
   Directory? _dir;
+
+  // ── ایندکسِ حافظهٔ همان فایل‌های دیسک ──────────────────────────────
+  //
+  // خودِ فایل روی Application Support پایدار است، ولی نسخهٔ قبلی هر بار
+  // که صفحه/تب دوباره ساخته می‌شد باز یک Future برای stat کردنِ همان فایل
+  // راه می‌انداخت. نتیجه از شبکه نبود، اما کاربر یک فریم اسپینر می‌دید و
+  // فکر می‌کرد کارت دوباره دانلود می‌شود. مهم‌تر: prewarm فایل را روی
+  // دیسک می‌گذاشت ولی CachedCardImage از آن خبر نداشت و باز مسیر async را
+  // می‌رفت.
+  //
+  // این map منبع دومِ تصویر نیست؛ فقط URL را به File موجود وصل می‌کند.
+  // prewarm، hit دیسک و دانلود موفق هر سه آن را پر می‌کنند، پس بعد از بار
+  // اول، تعویض تب **صفر Future و صفر فریم لودینگ** دارد.
+  static const int _memoryHitMax = 500;
+  final Map<String, File> _memoryHits = {};
+
+  void _rememberMemory(String url, File file) {
+    _memoryHits.remove(url);
+    _memoryHits[url] = file;
+    while (_memoryHits.length > _memoryHitMax) {
+      _memoryHits.remove(_memoryHits.keys.first);
+    }
+  }
+
+  /// مسیر سریع و کاملاً همگام برای فریم اولِ ویجت.
+  File? memoryHit(String rawUrl) {
+    final url = fullAssetUrl(rawUrl);
+    if (url.isEmpty) return null;
+    final file = _memoryHits[url];
+    if (file == null) return null;
+    try {
+      if (file.existsSync() && file.lengthSync() > 0) return file;
+    } catch (_) {
+      /* فایل هم‌زمان پاک شده */
+    }
+    _memoryHits.remove(url);
+    return null;
+  }
+
   // درخواست‌های در جریان. بدونِ این، اگر ده خانهٔ اینونتوری هم‌زمان یک
   // تصویر بخواهند (کارتِ تکراری در دو لیست)، ده دانلودِ موازیِ یکسان
   // شروع می‌شود و هر ده روی یک فایل می‌نویسند.
   final Map<String, Future<File?>> _inFlight = {};
-  final Dio _dio = Dio(BaseOptions(
-    responseType: ResponseType.bytes,
-    // مهلتِ سخاوتمندانه: اینترنتِ موبایلِ ایران کند است و شکستِ زودهنگام
-    // یعنی برگشت به حالتِ «هر بار دانلود».
-    connectTimeout: const Duration(seconds: 20),
-    receiveTimeout: const Duration(seconds: 40),
-    // ۴۰۴ نباید استثنا پرتاب کند؛ خودمان تصمیم می‌گیریم.
-    validateStatus: (s) => s != null && s < 500,
-  ));
+  final Dio _dio = Dio(
+    BaseOptions(
+      responseType: ResponseType.bytes,
+      // مهلتِ سخاوتمندانه: اینترنتِ موبایلِ ایران کند است و شکستِ زودهنگام
+      // یعنی برگشت به حالتِ «هر بار دانلود».
+      connectTimeout: const Duration(seconds: 20),
+      receiveTimeout: const Duration(seconds: 40),
+      // ۴۰۴ نباید استثنا پرتاب کند؛ خودمان تصمیم می‌گیریم.
+      validateStatus: (s) => s != null && s < 500,
+    ),
+  );
 
   Future<Directory> _ensureDir() async {
     if (_dir != null) return _dir!;
@@ -194,7 +235,12 @@ class ImageDiskCache {
   /// گرد می‌شود، و قفسه/اینونتوری/دوئل همه همین حالت‌اند. حالتِ بزرگ
   /// (۴۸۰) فقط در برگهٔ جزئیات است که کاربر عمداً باز می‌کند و آنجا یک
   /// انتظارِ کوتاه پذیرفتنی است.
-  static const int _cardPrewarmPx = 280;
+  // همهٔ نمایش‌های کارت (قفسه، اینونتوری و صحنهٔ نبرد) یک نسخهٔ ۴۸۰px
+  // می‌خواهند. قبلاً prewarm نسخهٔ ۳۲۰ را می‌گرفت ولی کارتِ غیر فشرده
+  // بلافاصله ۴۸۰ را درخواست می‌کرد؛ یعنی «کش گرم» عملاً دو دانلود می‌شد.
+  // decode در کارتِ کوچک همچنان با cacheWidth پایین انجام می‌شود، پس این
+  // یکسان‌سازی مصرف RAM را بالا نمی‌برد؛ فقط یک فایل شبکه/دیسک داریم.
+  static const int _cardPrewarmPx = 420;
 
   /// عرضِ بندانگشتی برای آواتار.
   ///
@@ -215,11 +261,12 @@ class ImageDiskCache {
     }
     if (payload is! Map) return;
     const cardKeys = <String>{
-      'imageUrl', 'image_url', 'frontImageUrl', 'front_image_url',
+      'imageUrl',
+      'image_url',
+      'frontImageUrl',
+      'front_image_url',
     };
-    const avatarKeys = <String>{
-      'profileImageUrl', 'profile_image_url',
-    };
+    const avatarKeys = <String>{'profileImageUrl', 'profile_image_url'};
     for (final entry in payload.entries) {
       final key = '${entry.key}';
       final isCard = cardKeys.contains(key);
@@ -227,10 +274,7 @@ class ImageDiskCache {
       if (isCard || isAvatar) {
         final url = '${entry.value}'.trim();
         if (isVersionedImageUrl(url)) {
-          yield thumbUrlFor(
-            url,
-            isAvatar ? _avatarPrewarmPx : _cardPrewarmPx,
-          );
+          yield thumbUrlFor(url, isAvatar ? _avatarPrewarmPx : _cardPrewarmPx);
         }
       }
       yield* collectVersionedImageUrls(entry.value);
@@ -280,6 +324,7 @@ class ImageDiskCache {
         // زمانِ دسترسی را به‌روز می‌کنیم تا پاکسازیِ LRU تصویرِ
         // پرکاربرد را قربانی نکند. شکستش بی‌اهمیت است.
         unawaited(f.setLastAccessed(DateTime.now()).catchError((_) {}));
+        _rememberMemory(url, f);
         return f;
       }
     } catch (_) {
@@ -358,6 +403,11 @@ class ImageDiskCache {
       final target = File('${dir.path}/${_keyFor(url)}');
       await tmp.rename(target.path);
 
+      // قبل از برگرداندن در ایندکسِ حافظه ثبت می‌شود. این خط همان چیزی
+      // است که prewarm را به فریمِ اولِ UI وصل می‌کند؛ بدونش فایل دانلود
+      // شده بود ولی ویجت باز هم یک مسیر async و اسپینر می‌رفت.
+      _rememberMemory(url, target);
+
       // پاکسازی در پس‌زمینه: نباید نمایشِ تصویر را عقب بیندازد.
       unawaited(_trim());
       return target;
@@ -404,6 +454,7 @@ class ImageDiskCache {
         try {
           total -= await f.length();
           await f.delete();
+          _memoryHits.removeWhere((_, hit) => hit.path == f.path);
         } catch (_) {
           // فایلی که پاک نمی‌شود نباید حلقه را متوقف کند.
         }
@@ -419,7 +470,12 @@ class ImageDiskCache {
       final dir = await _ensureDir();
       await dir.delete(recursive: true);
       _dir = null;
-    } catch (_) {}
+      _memoryHits.clear();
+    } catch (_) {
+      // حتی اگر حذف دیسک شکست خورد، ایندکس حافظه نباید به فایل‌های
+      // احتمالاً پاک‌شده اشاره کند.
+      _memoryHits.clear();
+    }
   }
 
   /// حجمِ فعلیِ کش به بایت. برای نمایش در تنظیمات.
@@ -440,5 +496,6 @@ class ImageDiskCache {
   void resetForTest() {
     _dir = null;
     _inFlight.clear();
+    _memoryHits.clear();
   }
 }

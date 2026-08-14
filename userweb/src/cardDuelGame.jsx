@@ -40,6 +40,9 @@ function HoloCard({ card, selected, disabled, compact = false, onClick, frame, w
     loser={loser}
     badge={badge}
     showStats={!compact}
+    // کارت‌های صحنه/دست نباید lazy بمانند؛ transform و فازهای پنهان
+    // می‌توانند شروع دانلود را عقب بیندازند و انیمیشن جلوتر از عکس برسد.
+    eager={compact || winner || loser}
     onClick={activate}
     className="duelPlayerCard"
   />;
@@ -433,14 +436,20 @@ function LiveArena({ session, final = false }) {
 
   return <div className="duelLiveArena">
     <header className="duelScoreV2">
-      <div className={myAhead ? 'lead' : lastWinner === mine ? 'pulse' : ''}><DuelIdentity player={g.players?.[mine]} fallback={myName}/><b>{fa(score[mine])}</b></div>
+      <div className={`mine ${myAhead ? 'lead' : lastWinner === mine ? 'pulse' : ''}`}>
+        <DuelIdentity player={g.players?.[mine]} fallback={myName}/>
+        <small>امتیاز تو</small><b>{fa(score[mine])}</b>
+      </div>
       {/* ⚠️ در پایانِ بازی «راند ۵ از ۵» و «امتیاز راند قبل برای تو بود»
           هر دو بی‌معنی‌اند: بازی تمام شده و کاربر عددِ نهایی می‌خواهد.
           همین ناسازگاری در اسکرین‌شاتِ مالک دیده می‌شد. */}
       {final
         ? <span><i>نتیجهٔ نهایی</i><strong>{fa(num(state.totalRounds) || 5)} راند تمام شد</strong><small>{score[mine] === score[opponent] ? 'برابر تمام شد' : num(score[mine]) > num(score[opponent]) ? 'تو بردی' : 'حریف برد'}</small></span>
         : <span><i>راند {fa(Math.min(num(state.totalRounds) || 5, num(state.roundIndex) + 1))} از {fa(num(state.totalRounds) || 5)}</i><strong>{state.roundTitle || 'پایان نبرد'}</strong><small>{lastWinner === 'DRAW' ? 'راند قبل مساوی شد' : lastWinner === mine ? 'امتیاز این راند برای تو بود' : lastWinner ? 'حریف راند قبل را برد' : 'امتیازها را بالا نگه دار'}</small></span>}
-      <div className={theirAhead ? 'lead' : lastWinner && lastWinner !== mine && lastWinner !== 'DRAW' ? 'pulse' : ''}><DuelIdentity player={g.players?.[opponent]} fallback={opponentName}/><b>{fa(score[opponent])}</b></div>
+      <div className={`theirs ${theirAhead ? 'lead' : lastWinner && lastWinner !== mine && lastWinner !== 'DRAW' ? 'pulse' : ''}`}>
+        <DuelIdentity player={g.players?.[opponent]} fallback={opponentName}/>
+        <small>امتیاز حریف</small><b>{fa(score[opponent])}</b>
+      </div>
     </header>
 
     <div className="duelRoundPips">{Array.from({length: num(state.totalRounds) || 5}, (_, index) => {
@@ -596,12 +605,13 @@ function DeckIntel({ insights, suggestedDeck, onApply }) {
       {strengths.length + warnings.length > 4
         && <i className="muted">+{fa(strengths.length + warnings.length - 4)} نکتهٔ دیگر</i>}
     </div>}
-    {/* ترتیب پیشنهادی پشتِ یک جمع‌شونده رفت: اطلاعاتِ خوبی است ولی برای
-        شروعِ بازی لازم نیست و پنج کارت ارتفاعِ زیادی می‌گیرد. */}
-    {!!order.length && <details className="duelIntelOrderWrap">
-      <summary>ترتیب پیشنهادی ۵ راند</summary>
-      <div className="duelIntelOrder">{order.map(item => <span key={`${item.round}-${item.cardTypeId}`}><b>راند {fa(item.round)}</b>{item.name}<small>{item.reason || ''}</small></span>)}</div>
-    </details>}
+    {/* پنج ردیفِ «نحوه محاسبه/ترتیب راندها» یک اسکرولِ تو در تو ساخته
+        بود. تصمیمِ لازم فقط شروع است؛ ترتیب کامل را «چیدن خودکار» اعمال
+        می‌کند و لازم نیست قبل از هر بازی خوانده شود. */}
+    {!!order.length && <div className="duelIntelFirst">
+      <b>شروع پیشنهادی</b>
+      <span>{order[0].name || 'کارت اول'} · {order[0].focus || ''}</span>
+    </div>}
   </details>;
 }
 
@@ -734,6 +744,12 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
   };
   useEffect(() => { load(); }, [token]);
   useEffect(() => { if (session.phase === 'over') load(); }, [session.phase]);
+  // deck در game:start و کارت‌های revealشده در پایان هر راند می‌رسند.
+  // prewarm فقط با تغییر شماره راند اجرا می‌شود، نه با هر تیکِ ساعت.
+  const revealedRound = session.g.state?.lastRound?.round ?? -1;
+  useEffect(() => {
+    primeImageCache(session.g.state).catch(() => {});
+  }, [session.g.matchId, revealedRound]);
 
   const ownedCards = data?.playableCards || [];
   const practiceFallback = vsBot && ownedCards.length < 5;

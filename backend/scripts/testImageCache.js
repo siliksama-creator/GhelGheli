@@ -20,12 +20,18 @@ const avatar = read('mobile/lib/widgets/avatar_image.dart');
 const player = read('mobile/lib/widgets/player_card.dart');
 const webCache = read('userweb/src/lib/imageCache.js');
 const cachedImg = read('userweb/src/components/CachedImg.jsx');
+const mobileCachedImg = read('mobile/lib/widgets/cached_card_image.dart');
 const sw = read('userweb/public/image-cache-sw.js');
 const main = read('userweb/src/main.jsx');
 const inventory = read('userweb/src/screens/Inventory.jsx');
 const playerCardWeb = read('userweb/src/components/PlayerCard.jsx');
 const cardsLib = read('userweb/src/lib/cards.js');
 const server = read('backend/src/server.js');
+const imageService = read('backend/src/services/imageService.js');
+const deploy = read('scripts/deploy.sh');
+const mobileDuel = read('mobile/lib/screens/user/games/card_duel/card_duel_widgets.dart');
+const mobileShell = read('mobile/lib/screens/user/home_shell.dart');
+const webDuel = read('userweb/src/cardDuelGame.jsx');
 
 check(/bool isVersionedImageUrl/.test(disk) && /\/uploads\//.test(disk) && /\/public\//.test(disk),
   'اندروید URL نسخه‌دار را از روی نام فایل تشخیص می‌دهد');
@@ -66,5 +72,33 @@ check(/<PlayerCard/.test(inventory) && /<CachedImg/.test(playerCardWeb) && /card
   'کلکسیون وب از کامپوننت مشترک کارت با CachedImg و URL واقعی کارت استفاده می‌کند');
 check(/max-age=31536000, immutable/.test(server),
   'سرور هنوز هدر immutable روی آپلودها می‌فرستد');
+check(/memoryHit\(String rawUrl\)/.test(disk)
+  && /_rememberMemory\(url, target\)/.test(disk)
+  && /_cardPrewarmPx = 420/.test(disk),
+  'prewarm اندروید به مسیر همگام UI وصل است و همان variant ۴۸۰ را می‌گیرد');
+check(/downloadWidth: 420/.test(player)
+  && /widget\.downloadWidth \?\? widget\.cacheWidth/.test(mobileCachedImg),
+  'کارت فشرده و بزرگ یک فایل شبکهٔ مشترک دارند ولی جداگانه decode می‌شوند');
+check(/cacheVariantUrl/.test(webCache) && /\?w=\$\{width\}/.test(webCache)
+  && /const width = AVATAR_IMAGE_KEYS\.has\(key\) \? 240 : 480/.test(webCache),
+  'prewarm وب دقیقاً URL نسخهٔ مورد استفادهٔ img را کش می‌کند');
+check(/setHref\(''\)/.test(cachedImg) && !/setHref\(resolved\)/.test(cachedImg),
+  'CachedImg پیش از cache lookup درخواست مستقیم و تکراری نمی‌فرستد');
+check(/prewarmThumbnailVariants/.test(imageService)
+  && /CARD_THUMB_WIDTHS = \[320, 480\]/.test(imageService)
+  && /npm run thumbs:prewarm/.test(deploy),
+  'thumbnailهای کارت هنگام upload و deploy پیش‌ساخته می‌شوند');
+check(/thumbnailJobs = new Map/.test(server) && /ensureThumbnail/.test(server),
+  'درخواست‌های هم‌زمان thumbnail یک job مشترک دارند');
+check(/_buildPersistentPages/.test(mobileShell)
+  && /Offstage\(/.test(mobileShell) && /TickerMode\(/.test(mobileShell)
+  && !/child: AnimatedSwitcher\(/.test(mobileShell),
+  'تب‌های اندروید State زنده را نگه می‌دارند و دوباره init/load نمی‌شوند');
+check(/label:\s*'حریف',\s*value:\s*theirScore/.test(mobileDuel)
+  && /label:\s*'تو',\s*value:\s*myScore/.test(mobileDuel),
+  'اسکوربورد اندروید عدد را کنار صاحب درست نمایش می‌دهد');
+check(/امتیاز تو/.test(webDuel) && /امتیاز حریف/.test(webDuel)
+  && /primeImageCache\(session\.g\.state\)/.test(webDuel),
+  'وب برچسب امتیاز و prewarm راند را هم‌زمان با اندروید دارد');
 
 console.log(`\n✅ ${passed} تست کش تصویر موفق بود\n`);

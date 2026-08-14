@@ -26,6 +26,40 @@ try {
 // 1080px wide) while cutting a 4000px camera shot to a fraction of its size.
 const MAX_DIMENSION = 1600;
 const WEBP_QUALITY = 82;
+const CARD_THUMB_WIDTHS = [320, 480];
+
+/**
+ * نسخه‌های پرمصرف کارت را همان لحظهٔ upload می‌سازد.
+ *
+ * قبلاً اولین کاربری که کارت را می‌دید باید هزینهٔ sharp را می‌داد. در
+ * لاگ واقعی ده thumbnail هم‌زمان هرکدام حدود یک ثانیه طول کشیدند؛ بعد از
+ * ساخته‌شدن همان درخواست زیر ۱ms بود. انتقال این هزینه به upload یعنی
+ * انیمیشن/اینونتوری هیچ‌وقت منتظر ساخت تصویر نمی‌ماند.
+ */
+async function prewarmThumbnailVariants(sourcePath, filename) {
+  if (!sharp || !sourcePath || !filename || !fs.existsSync(sourcePath)) return;
+  const imageDir = path.dirname(sourcePath);
+  const thumbDir = path.join(imageDir, '..', '.thumbs');
+  fs.mkdirSync(thumbDir, { recursive: true });
+  await Promise.all(CARD_THUMB_WIDTHS.map(async (width) => {
+    const out = path.join(thumbDir, `${width}-${filename}.webp`);
+    if (fs.existsSync(out) && fs.statSync(out).size > 0) return;
+    const tmp = `${out}.${process.pid}-${Math.random().toString(36).slice(2)}.tmp`;
+    try {
+      await sharp(sourcePath, { failOn: 'none' })
+        .rotate()
+        .resize({ width, withoutEnlargement: true })
+        .webp({ quality: 78 })
+        .toFile(tmp);
+      // اگر درخواست هم‌زمان route زودتر فایل را ساخت، خروجی او معتبر است.
+      if (fs.existsSync(out)) fs.unlinkSync(tmp);
+      else fs.renameSync(tmp, out);
+    } catch (error) {
+      try { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); } catch {/* ignore */}
+      console.warn(`[thumb] prewarm ${width}px failed:`, error.message);
+    }
+  }));
+}
 
 const isAnimated = (mimetype, file) =>
   /gif/i.test(mimetype || '') || /\.gif$/i.test(file || '');
@@ -66,10 +100,12 @@ async function optimizeUpload(file) {
     // Tiny icons/screenshots can already be smaller than our re-encode.
     if (after >= before) {
       fs.unlinkSync(outPath);
+      await prewarmThumbnailVariants(original, file.filename);
       return { filename: file.filename, bytesBefore: before, bytesAfter: before };
     }
 
     fs.unlinkSync(original);
+    await prewarmThumbnailVariants(outPath, outName);
     return { filename: outName, bytesBefore: before, bytesAfter: after };
   } catch (err) {
     console.error('[images] optimisation failed, keeping original:', err.message);
@@ -82,4 +118,10 @@ async function optimizeUpload(file) {
 
 const kb = n => `${Math.round(n / 1024)}KB`;
 
-module.exports = { optimizeUpload, kb, MAX_DIMENSION };
+module.exports = {
+  optimizeUpload,
+  prewarmThumbnailVariants,
+  CARD_THUMB_WIDTHS,
+  kb,
+  MAX_DIMENSION,
+};

@@ -32,10 +32,11 @@
 //   ۱. URL قبل از fetch با `asset()` مطلق می‌شود (رفع علت اصلی).
 //   ۲. فقط پاسخی کش می‌شود که واقعاً `image/*` باشد (رفع کلاسِ باگ).
 //
-// نام کش هم به v3 رفت تا کشِ مسمومِ کاربرانِ فعلی خودبه‌خود دور ریخته شود.
+// نام کش حالا v4 است: v3 فایلِ کامل را prime می‌کرد ولی کامپوننت variant
+// ۴۸۰ را می‌خواست؛ پاک شدنش هم فضای نسخه‌های تکراری را پس می‌دهد.
 import { asset } from './api.js';
 
-const CACHE_NAME = 'ghelgheli-img-v3';
+const CACHE_NAME = 'ghelgheli-img-v4';
 
 /**
  * فقط پاسخی که واقعاً تصویر است ارزشِ کش شدن دارد.
@@ -49,10 +50,26 @@ function isImageResponse(response) {
   const type = String(response.headers.get('content-type') || '').toLowerCase();
   return type.startsWith('image/');
 }
-const IMAGE_KEYS = new Set([
+const CARD_IMAGE_KEYS = new Set([
   'imageUrl', 'image_url', 'frontImageUrl', 'front_image_url',
+]);
+const AVATAR_IMAGE_KEYS = new Set([
   'profileImageUrl', 'profile_image_url',
 ]);
+const IMAGE_KEYS = new Set([...CARD_IMAGE_KEYS, ...AVATAR_IMAGE_KEYS]);
+
+/** همان variantی که کامپوننت واقعاً می‌خواهد وارد cache می‌شود. */
+export function cacheVariantUrl(url, key = '') {
+  const value = String(url || '').trim();
+  if (!value || value.includes('?') || !value.includes('/uploads/images/')) {
+    return value;
+  }
+  // کارت در همهٔ نماها یک فایل ۴۸۰ دارد؛ CSS آن را کوچک می‌کند. آواتار
+  // کوچک‌تر است. قبل از این، prime اصل تصویر را می‌گرفت ولی <CachedImg>
+  // بلافاصله ?w=240/480 می‌خواست — یعنی prewarm کاملاً بی‌اثر و دوبرابر.
+  const width = AVATAR_IMAGE_KEYS.has(key) ? 240 : 480;
+  return `${value}?w=${width}`;
+}
 
 export function isVersionedImage(url) {
   const value = String(url || '');
@@ -72,7 +89,7 @@ export function collectVersionedImages(payload, out = new Set()) {
   for (const [key, value] of Object.entries(payload)) {
     if (IMAGE_KEYS.has(key)) {
       const url = String(value || '').trim();
-      if (isVersionedImage(url)) out.add(url);
+      if (isVersionedImage(url)) out.add(cacheVariantUrl(url, key));
     }
     collectVersionedImages(value, out);
   }

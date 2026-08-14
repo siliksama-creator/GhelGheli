@@ -1,4 +1,5 @@
 part of '../card_duel_page.dart';
+
 // RarityCardFrame is applied by PlayerCard so inventory, detail and duel share one frame.
 
 class _ArenaHero extends StatelessWidget {
@@ -18,29 +19,48 @@ class _ArenaHero extends StatelessWidget {
         padding: const EdgeInsets.all(Gaps.md),
         decoration: BoxDecoration(
           borderRadius: Corners.rXl,
-          gradient: LinearGradient(colors: [
-            modeColor.withValues(alpha: 0.24),
-            const Color(0xFF142742),
-            const Color(0xFF050A12),
-          ]),
+          gradient: LinearGradient(
+            colors: [
+              modeColor.withValues(alpha: 0.24),
+              const Color(0xFF142742),
+              const Color(0xFF050A12),
+            ],
+          ),
           border: Border.all(color: modeColor.withValues(alpha: 0.55)),
         ),
         child: Row(
           children: [
-            IconButton(onPressed: onBack, icon: const Icon(Icons.arrow_back_rounded)),
+            IconButton(
+              onPressed: onBack,
+              icon: const Icon(Icons.arrow_back_rounded),
+            ),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('GHELGHELI CARD ARENA',
-                      style: TextStyle(color: modeColor, fontSize: 11.5, letterSpacing: 1.2, fontWeight: FontWeight.w900)),
-                  Text('دوئل کارت‌ها',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w900,
-                          )),
-                  Text('پنج راند مخفی، برخورد زنده و برندهٔ واضح هر راند',
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.68), fontSize: 13)),
+                  Text(
+                    'GHELGHELI CARD ARENA',
+                    style: TextStyle(
+                      color: modeColor,
+                      fontSize: 11.5,
+                      letterSpacing: 1.2,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Text(
+                    'دوئل کارت‌ها',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                        ),
+                  ),
+                  Text(
+                    'پنج راند مخفی، برخورد زنده و برندهٔ واضح هر راند',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.68),
+                      fontSize: 13,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -56,18 +76,40 @@ class _RuleStrip extends StatelessWidget {
         padding: EdgeInsets.all(Gaps.sm),
         child: Row(
           children: [
-            Expanded(child: _RuleStep(number: '۱', title: '۵ کارت بچین', subtitle: 'ترکیب متوازن و حرفه‌ای')),
+            Expanded(
+              child: _RuleStep(
+                number: '۱',
+                title: '۵ کارت بچین',
+                subtitle: 'ترکیب متوازن و حرفه‌ای',
+              ),
+            ),
             Icon(Icons.chevron_left_rounded, color: Colors.white24),
-            Expanded(child: _RuleStep(number: '۲', title: 'مخفی انتخاب کن', subtitle: 'هم‌زمان با حریف')),
+            Expanded(
+              child: _RuleStep(
+                number: '۲',
+                title: 'مخفی انتخاب کن',
+                subtitle: 'هم‌زمان با حریف',
+              ),
+            ),
             Icon(Icons.chevron_left_rounded, color: Colors.white24),
-            Expanded(child: _RuleStep(number: '۳', title: '۵ راند نفس‌گیر', subtitle: 'هر راند یک معیار تازه')),
+            Expanded(
+              child: _RuleStep(
+                number: '۳',
+                title: '۵ راند نفس‌گیر',
+                subtitle: 'هر راند یک معیار تازه',
+              ),
+            ),
           ],
         ),
       );
 }
 
 class _RuleStep extends StatelessWidget {
-  const _RuleStep({required this.number, required this.title, required this.subtitle});
+  const _RuleStep({
+    required this.number,
+    required this.title,
+    required this.subtitle,
+  });
   final String number;
   final String title;
   final String subtitle;
@@ -75,18 +117,42 @@ class _RuleStep extends StatelessWidget {
   Widget build(BuildContext context) => Column(
         children: [
           CircleAvatar(
-              radius: 13,
-              backgroundColor: _gold.withValues(alpha: 0.15),
-              child: Text(number, style: const TextStyle(color: _gold, fontWeight: FontWeight.w900, fontSize: 12))),
+            radius: 13,
+            backgroundColor: _gold.withValues(alpha: 0.15),
+            child: Text(
+              number,
+              style: const TextStyle(
+                color: _gold,
+                fontWeight: FontWeight.w900,
+                fontSize: 12,
+              ),
+            ),
+          ),
           const SizedBox(height: 4),
-          Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900)),
-          Text(subtitle, textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.46))),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900),
+          ),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.white.withValues(alpha: 0.46),
+            ),
+          ),
         ],
       );
 }
 
 class _LineupPanel extends StatelessWidget {
-  const _LineupPanel({required this.selected, required this.cards, required this.teamPower, required this.onRemove});
+  const _LineupPanel({
+    required this.selected,
+    required this.cards,
+    required this.teamPower,
+    required this.onRemove,
+  });
   final List<String> selected;
   final List<Map<String, dynamic>> cards;
   final int teamPower;
@@ -97,28 +163,53 @@ class _LineupPanel extends StatelessWidget {
     return AppCard(
       child: Column(
         children: [
-          Row(children: [
-            const Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('ترکیب اصلی', style: TextStyle(fontWeight: FontWeight.w900)),
-              Text('پنج کارت؛ برای حذف روی اسلات بزن', style: TextStyle(fontSize: 11.5, color: Colors.white54)),
-            ])),
-            Text('${faNum(teamPower)} قدرت', style: const TextStyle(color: _gold, fontWeight: FontWeight.w900)),
-          ]),
+          Row(
+            children: [
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'ترکیب اصلی',
+                      style: TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                    Text(
+                      'پنج کارت؛ برای حذف روی اسلات بزن',
+                      style: TextStyle(fontSize: 11.5, color: Colors.white54),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                '${faNum(teamPower)} قدرت',
+                style: const TextStyle(
+                  color: _gold,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
           Gaps.vSm,
           SizedBox(
             height: 118,
-            child: Row(children: [
-              for (var index = 0; index < 5; index++) ...[
-                Expanded(
+            child: Row(
+              children: [
+                for (var index = 0; index < 5; index++) ...[
+                  Expanded(
                     child: _LineupSlot(
-                  index: index,
-                  card: index < selected.length ? byId[selected[index]] : null,
-                  onTap: index < selected.length ? () => onRemove(selected[index]) : null,
-                )),
-                if (index < 4) const SizedBox(width: 4),
+                      index: index,
+                      card: index < selected.length
+                          ? byId[selected[index]]
+                          : null,
+                      onTap: index < selected.length
+                          ? () => onRemove(selected[index])
+                          : null,
+                    ),
+                  ),
+                  if (index < 4) const SizedBox(width: 4),
+                ],
               ],
-            ]),
+            ),
           ),
         ],
       ),
@@ -140,23 +231,44 @@ class _LineupSlot extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: Corners.rLg,
                   border: Border.all(color: Colors.white24),
-                  gradient: const LinearGradient(colors: [Color(0xFF17283D), Color(0xFF050A11)]),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF17283D), Color(0xFF050A11)],
+                  ),
                 ),
                 child: Center(
-                    child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  const Icon(Icons.add_rounded, color: Colors.white38),
-                  Text('کارت ${faNum(index + 1)}', style: const TextStyle(fontSize: 11.5, color: Colors.white54)),
-                ])),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.add_rounded, color: Colors.white38),
+                      Text(
+                        'کارت ${faNum(index + 1)}',
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          color: Colors.white54,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               )
             : CosmeticCardFrame(
                 frame: null,
-                child: PlayerCard(card: Map<String, dynamic>.from(card!), compact: true, showStats: false, onTap: onTap),
+                child: PlayerCard(
+                  card: Map<String, dynamic>.from(card!),
+                  compact: true,
+                  showStats: false,
+                  onTap: onTap,
+                ),
               ),
       );
 }
 
 class _Matchmaking extends StatelessWidget {
-  const _Matchmaking({required this.color, required this.vsBot, required this.onCancel});
+  const _Matchmaking({
+    required this.color,
+    required this.vsBot,
+    required this.onCancel,
+  });
   final Color color;
   final bool vsBot;
   final VoidCallback onCancel;
@@ -164,21 +276,37 @@ class _Matchmaking extends StatelessWidget {
   Widget build(BuildContext context) => AppCard(
         child: SizedBox(
           height: 280,
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            SizedBox(
-              width: 72,
-              height: 72,
-              child: CircularProgressIndicator(color: color, strokeWidth: 3),
-            ),
-            Gaps.vMd,
-            Text(vsBot ? 'ربات تاکتیکی وارد آرنا می‌شود…' : 'در جستجوی حریف هم‌سطح…',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
-            Gaps.vXs,
-            const Text('ترکیب تو قفل است؛ کارت‌ها تا لحظه برخورد مخفی می‌مانند.',
-                textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: Colors.white60)),
-            Gaps.vMd,
-            OutlinedButton(onPressed: onCancel, child: const Text('لغو و ویرایش ترکیب')),
-          ]),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 72,
+                height: 72,
+                child: CircularProgressIndicator(color: color, strokeWidth: 3),
+              ),
+              Gaps.vMd,
+              Text(
+                vsBot
+                    ? 'ربات تاکتیکی وارد آرنا می‌شود…'
+                    : 'در جستجوی حریف هم‌سطح…',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w900),
+              ),
+              Gaps.vXs,
+              const Text(
+                'ترکیب تو قفل است؛ کارت‌ها تا لحظه برخورد مخفی می‌مانند.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: Colors.white60),
+              ),
+              Gaps.vMd,
+              OutlinedButton(
+                onPressed: onCancel,
+                child: const Text('لغو و ویرایش ترکیب'),
+              ),
+            ],
+          ),
         ),
       );
 }
@@ -225,166 +353,236 @@ class _LiveBattle extends StatelessWidget {
     final mine = session.mySymbol ?? 'X';
     final opponent = mine == 'X' ? 'O' : 'X';
     final score = state['score'] is Map ? state['score'] as Map : const {};
-    final deck = (state['myDeck'] as List? ?? const []).whereType<Map>().toList();
-    final remaining = (state['myRemainingCardIds'] as List? ?? const []).map((id) => '$id').toSet();
+    final deck =
+        (state['myDeck'] as List? ?? const []).whereType<Map>().toList();
+    final remaining = (state['myRemainingCardIds'] as List? ?? const [])
+        .map((id) => '$id')
+        .toSet();
     final pendingId = '${state['myPendingCardId'] ?? ''}';
-    final lastRound = state['lastRound'] is Map ? Map<String, dynamic>.from(state['lastRound'] as Map) : null;
-    final history = (state['history'] as List? ?? const []).whereType<Map>().toList();
+    final lastRound = state['lastRound'] is Map
+        ? Map<String, dynamic>.from(state['lastRound'] as Map)
+        : null;
+    final history =
+        (state['history'] as List? ?? const []).whereType<Map>().toList();
     final iChose = state['iChose'] == true;
-    final total = NumberParser.toInt(state['totalRounds']) == 0 ? 5 : NumberParser.toInt(state['totalRounds']);
+    final total = NumberParser.toInt(state['totalRounds']) == 0
+        ? 5
+        : NumberParser.toInt(state['totalRounds']);
     final roundIndex = NumberParser.toInt(state['roundIndex']);
-    return Column(children: [
-      _Scoreboard(
-        myName: session.nameOf(mine),
-        theirName: session.nameOf(opponent),
-        myScore: NumberParser.toInt(score[mine]),
-        theirScore: NumberParser.toInt(score[opponent]),
-        color: color,
-        myPlayer: session.playerInfo(mine),
-        theirPlayer: session.playerInfo(opponent),
-        // ⚠️ در پایانِ بازی «راند ۵ از ۵» و «امتیاز راند قبل برای تو
-        //    بود» هر دو بی‌معنی‌اند — همان ناسازگاریِ اسکرین‌شات.
-        title: finalView
-            ? '${faNum(total)} راند تمام شد'
-            : '${state['roundTitle'] ?? 'پایان نبرد'}',
-        roundLabel: finalView
-            ? 'نتیجهٔ نهایی'
-            : 'راند ${faNum((roundIndex + 1).clamp(1, total))} از ${faNum(total)}',
-        lastWinner: '${lastRound?['winner'] ?? ''}',
-        mySymbol: mine,
-        finalView: finalView,
-      ),
-      Gaps.vXs,
-      _RoundPips(total: total, current: roundIndex, history: history, mine: mine, color: color),
-      Gaps.vXs,
-      // ── چرا بنرِ افقی حذف شد ──
-      //
-      // `_FocusBanner` همین اطلاعات را می‌داد ولی ~۹۰ پیکسل ارتفاع
-      // می‌گرفت و باعثِ اسکرول می‌شد. جایش را `_RoundIntroOverlay`
-      // گرفته که وسطِ صفحه و روی همه‌چیز می‌آید، دو ثانیه می‌ماند و
-      // **هیچ ارتفاعی از چیدمان نمی‌گیرد**.
-      //
-      // اطلاعاتِ همیشگی (کدام ویژگی مهم است) از بین نرفت: روی تک‌تکِ
-      // کارت‌های دست با `_FocusStatRibbon` دیده می‌شود و در نوارِ
-      // فشردهٔ زیر هم خلاصه‌اش هست.
-      // ⚠️ در صفحهٔ پایان این صحنه دقیقاً بالای پنلِ VICTORY می‌نشست و
-      //    «دو بلوک نتیجه هم‌زمان» می‌ساخت. جزئیاتِ راندِ پنجم از بین
-      //    نمی‌رود: در «تایم‌لاین کامل ۵ راند» همان پایین هست.
-      if (!finalView) _ClashStage(round: lastRound, mine: mine, color: color),
-      if (session.phase == GamePhase.playing) ...[
-        Gaps.vSm,
-        AppCard(
-            child: Column(children: [
-          Row(children: [
-            // نشانِ همیشگیِ ویژگیِ راند — جایگزینِ فشردهٔ بنرِ حذف‌شده.
-            // اعلانِ وسطِ صفحه دو ثانیه‌ای است؛ این تا آخرِ راند می‌ماند
-            // تا کسی که اعلان را از دست داد هم بداند دنبالِ چه عددی بگردد.
-            if ('${(state['roundFocus'] as Map?)?['stat'] ?? ''}'.isNotEmpty) ...[
-              Builder(builder: (_) {
-                final fs = '${(state['roundFocus'] as Map?)?['stat'] ?? ''}';
-                final t = _FocusBannerState._statColors[fs] ?? color;
-                return Container(
-                  margin: const EdgeInsetsDirectional.only(end: 8),
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: t.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: t.withValues(alpha: 0.6)),
-                  ),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(_FocusBannerState._statIcons[fs] ?? Icons.stars_rounded,
-                        size: 15, color: t),
-                    const SizedBox(width: 5),
-                    Text(_FocusBannerState._statNames[fs] ?? '',
-                        style: TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.w900, color: t)),
-                  ]),
-                );
-              }),
-            ],
-            Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(iChose ? 'انتخابت قفل شد' : 'کارت این راند را انتخاب کن',
-                  style: const TextStyle(fontWeight: FontWeight.w900)),
-              Text(
-                  state['waitingForOpponent'] == true
-                      ? 'منتظر انتخاب حریف…'
-                      : state['opponentLocked'] == true
-                          ? 'حریف انتخاب کرده؛ تصمیم بگیر!'
-                          : 'انتخاب‌ها مخفی و هم‌زمان هستند',
-                  style: const TextStyle(fontSize: 11.5, color: Colors.white54)),
-            ])),
-            AnimatedBuilder(
-                animation: session.clock,
-                builder: (_, __) => CircleAvatar(
-                    radius: 24,
-                    backgroundColor: const Color(0xFF02060C),
-                    // در پنجرهٔ اعلانِ راند ساعت نمی‌رود؛ به‌جای عددِ
-                    // ثابت که شبیهِ «هنگ کرده» است، آیکنِ مکث نشان
-                    // داده می‌شود تا معلوم باشد عمدی است.
-                    child: session.introHolding
-                        ? Icon(Icons.visibility_rounded, color: color, size: 20)
-                        : Text(faNum(session.secondsLeft),
-                            style: TextStyle(
-                                color: color, fontWeight: FontWeight.w900)))),
-          ]),
-          Gaps.vXs,
-          // ── دستِ کاربر ──
-          //
-          // هر کارت حالا «عددِ تعیین‌کنندهٔ همین راند» را زیرِ خودش نشان
-          // می‌دهد. قبلاً کاربر شش عدد داشت و نمی‌دانست کدام مهم است، پس
-          // معمولاً به عددِ «قدرتِ کلی» نگاه می‌کرد — که در ۱۳٪ مواقع
-          // برندهٔ راند را اشتباه پیش‌بینی می‌کند.
-          SizedBox(
-            height: 196,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: deck.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (_, index) {
-                final card = Map<String, dynamic>.from(deck[index]);
-                final id = cardIdOf(card);
-                final canPlay = !iChose && remaining.contains(id);
-                final focusStat = '${(state['roundFocus'] as Map?)?['stat'] ?? ''}';
-                final focusTint =
-                    _FocusBannerState._statColors[focusStat] ?? color;
-                // بهترین عددِ این راند در میانِ کارت‌های باقی‌مانده —
-                // برای اینکه کاربر ببیند کدام انتخاب قوی‌ترین است.
-                return SizedBox(
-                  width: 112,
-                  child: AnimatedSlide(
-                    duration: const Duration(milliseconds: 220),
-                    offset: pendingId == id ? const Offset(0, -0.05) : Offset.zero,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Expanded(
-                          child: PlayerCard(
-                            card: card,
-                            compact: true,
-                            showStats: false,
-                            enabled: canPlay,
-                            selected: pendingId == id,
-                            onTap: canPlay
-                                ? () => session.moveObject({'cardId': id})
-                                : null,
+    return Column(
+      children: [
+        _Scoreboard(
+          myName: session.nameOf(mine),
+          theirName: session.nameOf(opponent),
+          myScore: NumberParser.toInt(score[mine]),
+          theirScore: NumberParser.toInt(score[opponent]),
+          color: color,
+          myPlayer: session.playerInfo(mine),
+          theirPlayer: session.playerInfo(opponent),
+          // ⚠️ در پایانِ بازی «راند ۵ از ۵» و «امتیاز راند قبل برای تو
+          //    بود» هر دو بی‌معنی‌اند — همان ناسازگاریِ اسکرین‌شات.
+          title: finalView
+              ? '${faNum(total)} راند تمام شد'
+              : '${state['roundTitle'] ?? 'پایان نبرد'}',
+          roundLabel: finalView
+              ? 'نتیجهٔ نهایی'
+              : 'راند ${faNum((roundIndex + 1).clamp(1, total))} از ${faNum(total)}',
+          lastWinner: '${lastRound?['winner'] ?? ''}',
+          mySymbol: mine,
+          finalView: finalView,
+        ),
+        Gaps.vXs,
+        _RoundPips(
+          total: total,
+          current: roundIndex,
+          history: history,
+          mine: mine,
+          color: color,
+        ),
+        Gaps.vXs,
+        // ── چرا بنرِ افقی حذف شد ──
+        //
+        // `_FocusBanner` همین اطلاعات را می‌داد ولی ~۹۰ پیکسل ارتفاع
+        // می‌گرفت و باعثِ اسکرول می‌شد. جایش را `_RoundIntroOverlay`
+        // گرفته که وسطِ صفحه و روی همه‌چیز می‌آید، دو ثانیه می‌ماند و
+        // **هیچ ارتفاعی از چیدمان نمی‌گیرد**.
+        //
+        // اطلاعاتِ همیشگی (کدام ویژگی مهم است) از بین نرفت: روی تک‌تکِ
+        // کارت‌های دست با `_FocusStatRibbon` دیده می‌شود و در نوارِ
+        // فشردهٔ زیر هم خلاصه‌اش هست.
+        // ⚠️ در صفحهٔ پایان این صحنه دقیقاً بالای پنلِ VICTORY می‌نشست و
+        //    «دو بلوک نتیجه هم‌زمان» می‌ساخت. جزئیاتِ راندِ پنجم از بین
+        //    نمی‌رود: در «تایم‌لاین کامل ۵ راند» همان پایین هست.
+        if (!finalView) _ClashStage(round: lastRound, mine: mine, color: color),
+        if (session.phase == GamePhase.playing) ...[
+          Gaps.vSm,
+          AppCard(
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    // نشانِ همیشگیِ ویژگیِ راند — جایگزینِ فشردهٔ بنرِ حذف‌شده.
+                    // اعلانِ وسطِ صفحه دو ثانیه‌ای است؛ این تا آخرِ راند می‌ماند
+                    // تا کسی که اعلان را از دست داد هم بداند دنبالِ چه عددی بگردد.
+                    if ('${(state['roundFocus'] as Map?)?['stat'] ?? ''}'
+                        .isNotEmpty) ...[
+                      Builder(
+                        builder: (_) {
+                          final fs =
+                              '${(state['roundFocus'] as Map?)?['stat'] ?? ''}';
+                          final t = _FocusBannerState._statColors[fs] ?? color;
+                          return Container(
+                            margin: const EdgeInsetsDirectional.only(end: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 9,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: t.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: t.withValues(alpha: 0.6),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _FocusBannerState._statIcons[fs] ??
+                                      Icons.stars_rounded,
+                                  size: 15,
+                                  color: t,
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  _FocusBannerState._statNames[fs] ?? '',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w900,
+                                    color: t,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            iChose
+                                ? 'انتخابت قفل شد'
+                                : 'کارت این راند را انتخاب کن',
+                            style: const TextStyle(fontWeight: FontWeight.w900),
+                          ),
+                          Text(
+                            state['waitingForOpponent'] == true
+                                ? 'منتظر انتخاب حریف…'
+                                : state['opponentLocked'] == true
+                                    ? 'حریف انتخاب کرده؛ تصمیم بگیر!'
+                                    : 'انتخاب‌ها مخفی و هم‌زمان هستند',
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              color: Colors.white54,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    AnimatedBuilder(
+                      animation: session.clock,
+                      builder: (_, __) => CircleAvatar(
+                        radius: 24,
+                        backgroundColor: const Color(0xFF02060C),
+                        // در پنجرهٔ اعلانِ راند ساعت نمی‌رود؛ به‌جای عددِ
+                        // ثابت که شبیهِ «هنگ کرده» است، آیکنِ مکث نشان
+                        // داده می‌شود تا معلوم باشد عمدی است.
+                        child: session.introHolding
+                            ? Icon(
+                                Icons.visibility_rounded,
+                                color: color,
+                                size: 20,
+                              )
+                            : Text(
+                                faNum(session.secondsLeft),
+                                style: TextStyle(
+                                  color: color,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+                Gaps.vXs,
+                // ── دستِ کاربر ──
+                //
+                // هر کارت حالا «عددِ تعیین‌کنندهٔ همین راند» را زیرِ خودش نشان
+                // می‌دهد. قبلاً کاربر شش عدد داشت و نمی‌دانست کدام مهم است، پس
+                // معمولاً به عددِ «قدرتِ کلی» نگاه می‌کرد — که در ۱۳٪ مواقع
+                // برندهٔ راند را اشتباه پیش‌بینی می‌کند.
+                SizedBox(
+                  height: 196,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: deck.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (_, index) {
+                      final card = Map<String, dynamic>.from(deck[index]);
+                      final id = cardIdOf(card);
+                      final canPlay = !iChose && remaining.contains(id);
+                      final focusStat =
+                          '${(state['roundFocus'] as Map?)?['stat'] ?? ''}';
+                      final focusTint =
+                          _FocusBannerState._statColors[focusStat] ?? color;
+                      // بهترین عددِ این راند در میانِ کارت‌های باقی‌مانده —
+                      // برای اینکه کاربر ببیند کدام انتخاب قوی‌ترین است.
+                      return SizedBox(
+                        width: 112,
+                        child: AnimatedSlide(
+                          duration: const Duration(milliseconds: 220),
+                          offset: pendingId == id
+                              ? const Offset(0, -0.05)
+                              : Offset.zero,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Expanded(
+                                child: PlayerCard(
+                                  card: card,
+                                  compact: true,
+                                  showStats: false,
+                                  enabled: canPlay,
+                                  selected: pendingId == id,
+                                  onTap: canPlay
+                                      ? () => session.moveObject({'cardId': id})
+                                      : null,
+                                ),
+                              ),
+                              Opacity(
+                                opacity: canPlay ? 1 : 0.4,
+                                child: _FocusStatRibbon(
+                                  card: card,
+                                  stat: focusStat,
+                                  tint: focusTint,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        Opacity(
-                          opacity: canPlay ? 1 : 0.4,
-                          child: _FocusStatRibbon(
-                              card: card, stat: focusStat, tint: focusTint),
-                        ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
-                );
-              },
+                ),
+              ],
             ),
           ),
-        ])),
+        ],
       ],
-    ]);
+    );
   }
 }
 
@@ -421,43 +619,157 @@ class _Scoreboard extends StatelessWidget {
     final myLead = myScore > theirScore;
     final theirLead = theirScore > myScore;
     final lastMine = lastWinner == mySymbol;
-    final lastTheir = lastWinner.isNotEmpty && lastWinner != 'DRAW' && !lastMine;
+    final lastTheir =
+        lastWinner.isNotEmpty && lastWinner != 'DRAW' && !lastMine;
     return AppCard(
       child: Column(
         children: [
-          Row(children: [
-            Expanded(child: _Score(name: myName, score: myScore, color: color, player: myPlayer, highlight: myLead, scoredLast: lastMine)),
-            Column(children: [
-              Text(roundLabel, style: TextStyle(color: color, fontSize: 11.5, fontWeight: FontWeight.w900)),
-              Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
-              Text('${faNum(myScore)}  —  ${faNum(theirScore)}',
-                  textDirection: TextDirection.ltr,
-                  style: const TextStyle(color: _gold, fontSize: 22, fontWeight: FontWeight.w900)),
-              Text(
-                finalView
-                    // بازی تمام شده؛ حرف زدن از «راند قبل» گمراه‌کننده است.
-                    ? (myScore == theirScore
-                        ? 'برابر تمام شد'
-                        : myLead
-                            ? 'تو بردی'
-                            : 'حریف برد')
-                    : lastWinner == 'DRAW'
-                        ? 'راند قبلی مساوی شد'
-                        : lastMine
-                            ? 'امتیاز راند قبل برای تو بود'
-                            : lastTheir
-                                ? 'حریف راند قبل را برد'
-                                : 'امتیازها را بالا نگه دار',
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 11.5, color: Colors.white60, fontWeight: FontWeight.w700),
+          Row(
+            children: [
+              Expanded(
+                child: _Score(
+                  name: myName,
+                  score: myScore,
+                  color: color,
+                  player: myPlayer,
+                  highlight: myLead,
+                  scoredLast: lastMine,
+                ),
               ),
-            ]),
-            Expanded(child: _Score(name: theirName, score: theirScore, color: _gold, player: theirPlayer, reverse: true, highlight: theirLead, scoredLast: lastTheir)),
-          ]),
+              Column(
+                children: [
+                  Text(
+                    roundLabel,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  // در Row راست‌به‌چپ، هویتِ «تو» سمت راست و حریف سمت چپ
+                  // است. متنِ LTR قبلی `myScore — theirScore` عددِ من را سمت
+                  // چپ، دقیقاً کنارِ ربات می‌گذاشت؛ داده درست بود ولی تصویر
+                  // می‌گفت ربات ۱ و تو ۰. عددها دیگر یک رشتهٔ bidi نیستند؛ هر
+                  // کدام یک ویجتِ برچسب‌دار در سمتِ صاحب خودش است.
+                  Semantics(
+                    label:
+                        'امتیاز شما ${faNum(myScore)}، امتیاز حریف ${faNum(theirScore)}',
+                    child: ExcludeSemantics(
+                      child: Directionality(
+                        textDirection: TextDirection.ltr,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _ScorePairValue(
+                              label: 'حریف',
+                              value: theirScore,
+                              color: _gold,
+                            ),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 5),
+                              child: Text(
+                                '—',
+                                style: TextStyle(
+                                  color: Colors.white38,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                            _ScorePairValue(
+                              label: 'تو',
+                              value: myScore,
+                              color: color,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Text(
+                    finalView
+                        // بازی تمام شده؛ حرف زدن از «راند قبل» گمراه‌کننده است.
+                        ? (myScore == theirScore
+                            ? 'برابر تمام شد'
+                            : myLead
+                                ? 'تو بردی'
+                                : 'حریف برد')
+                        : lastWinner == 'DRAW'
+                            ? 'راند قبلی مساوی شد'
+                            : lastMine
+                                ? 'امتیاز راند قبل برای تو بود'
+                                : lastTheir
+                                    ? 'حریف راند قبل را برد'
+                                    : 'امتیازها را بالا نگه دار',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      color: Colors.white60,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              Expanded(
+                child: _Score(
+                  name: theirName,
+                  score: theirScore,
+                  color: _gold,
+                  player: theirPlayer,
+                  reverse: true,
+                  highlight: theirLead,
+                  scoredLast: lastTheir,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
+}
+
+class _ScorePairValue extends StatelessWidget {
+  const _ScorePairValue({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+  final String label;
+  final int value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            faNum(value),
+            textDirection: TextDirection.ltr,
+            style: TextStyle(
+              color: color,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          Text(
+            label,
+            textDirection: TextDirection.rtl,
+            style: const TextStyle(
+              color: Colors.white54,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      );
 }
 
 class _Score extends StatelessWidget {
@@ -479,7 +791,8 @@ class _Score extends StatelessWidget {
   final bool scoredLast;
   @override
   Widget build(BuildContext context) {
-    final cosmetics = player?['cosmetics'] is Map ? player!['cosmetics'] as Map : const {};
+    final cosmetics =
+        player?['cosmetics'] is Map ? player!['cosmetics'] as Map : const {};
     final isBot = player?['isBot'] == true;
     final scoreBubble = AnimatedContainer(
       duration: const Duration(milliseconds: 260),
@@ -487,7 +800,12 @@ class _Score extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(99),
         boxShadow: highlight || scoredLast
-            ? [BoxShadow(color: color.withValues(alpha: scoredLast ? .36 : .20), blurRadius: scoredLast ? 18 : 12)]
+            ? [
+                BoxShadow(
+                  color: color.withValues(alpha: scoredLast ? .36 : .20),
+                  blurRadius: scoredLast ? 18 : 12,
+                ),
+              ]
             : const [],
       ),
       child: TweenAnimationBuilder<int>(
@@ -496,7 +814,14 @@ class _Score extends StatelessWidget {
         builder: (_, value, __) => CircleAvatar(
           radius: 18,
           backgroundColor: const Color(0xFF02060C),
-          child: Text(faNum(value), style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.w900)),
+          child: Text(
+            faNum(value),
+            style: TextStyle(
+              color: color,
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
         ),
       ),
     );
@@ -506,11 +831,7 @@ class _Score extends StatelessWidget {
         children: [
           scoreBubble,
           if (scoredLast)
-            const PositionedDirectional(
-              top: -7,
-              end: -7,
-              child: _PointBurst(),
-            ),
+            const PositionedDirectional(top: -7, end: -7, child: _PointBurst()),
         ],
       ),
       if (isBot)
@@ -527,21 +848,36 @@ class _Score extends StatelessWidget {
         ),
       Flexible(
         child: Column(
-          crossAxisAlignment: reverse ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          crossAxisAlignment:
+              reverse ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
             DisplayName(
               name: name,
               cosmetics: cosmetics,
               level: (player?['level'] as num?)?.toInt(),
-              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800),
+              style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w800,
+              ),
             ),
             if (scoredLast)
-              Text('+۱ امتیاز راند', style: TextStyle(color: color, fontSize: 11.5, fontWeight: FontWeight.w900)),
+              Text(
+                '+۱ امتیاز راند',
+                style: TextStyle(
+                  color: color,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
           ],
         ),
       ),
     ];
-    return Row(mainAxisAlignment: reverse ? MainAxisAlignment.end : MainAxisAlignment.start, children: reverse ? parts.reversed.toList() : parts);
+    return Row(
+      mainAxisAlignment:
+          reverse ? MainAxisAlignment.end : MainAxisAlignment.start,
+      children: reverse ? parts.reversed.toList() : parts,
+    );
   }
 }
 
@@ -553,40 +889,58 @@ class _PointBurst extends StatelessWidget {
         decoration: BoxDecoration(
           color: _emerald,
           borderRadius: BorderRadius.circular(99),
-          boxShadow: const [BoxShadow(color: Color(0x6622E7A6), blurRadius: 14)],
+          boxShadow: const [
+            BoxShadow(color: Color(0x6622E7A6), blurRadius: 14)
+          ],
         ),
-        child: const Text('+1', style: TextStyle(color: Color(0xFF04101A), fontWeight: FontWeight.w900, fontSize: 11.5)),
+        child: const Text(
+          '+1',
+          style: TextStyle(
+            color: Color(0xFF04101A),
+            fontWeight: FontWeight.w900,
+            fontSize: 11.5,
+          ),
+        ),
       );
 }
 
 class _RoundPips extends StatelessWidget {
-  const _RoundPips({required this.total, required this.current, required this.history, required this.mine, required this.color});
+  const _RoundPips({
+    required this.total,
+    required this.current,
+    required this.history,
+    required this.mine,
+    required this.color,
+  });
   final int total;
   final int current;
   final List<Map> history;
   final String mine;
   final Color color;
   @override
-  Widget build(BuildContext context) => Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-        for (var i = 0; i < total; i++)
-          Container(
-            width: 34,
-            height: 8,
-            margin: const EdgeInsets.symmetric(horizontal: 3),
-            decoration: BoxDecoration(
-              borderRadius: Corners.rPill,
-              color: i < history.length
-                  ? ('${history[i]['winner']}' == mine
-                      ? _emerald
-                      : '${history[i]['winner']}' == 'DRAW'
-                          ? _gold
-                          : _rose)
-                  : i == current
-                      ? color
-                      : Colors.white12,
+  Widget build(BuildContext context) => Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          for (var i = 0; i < total; i++)
+            Container(
+              width: 34,
+              height: 8,
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              decoration: BoxDecoration(
+                borderRadius: Corners.rPill,
+                color: i < history.length
+                    ? ('${history[i]['winner']}' == mine
+                        ? _emerald
+                        : '${history[i]['winner']}' == 'DRAW'
+                            ? _gold
+                            : _rose)
+                    : i == current
+                        ? color
+                        : Colors.white12,
+              ),
             ),
-          ),
-      ]);
+        ],
+      );
 }
 
 /// ═══════════════════════════════════════════════════════════════════════
@@ -616,7 +970,11 @@ class _RoundPips extends StatelessWidget {
 enum _RevealPhase { charge, impact, numbers, verdict }
 
 class _ClashStage extends StatefulWidget {
-  const _ClashStage({required this.round, required this.mine, required this.color});
+  const _ClashStage({
+    required this.round,
+    required this.mine,
+    required this.color,
+  });
   final Map<String, dynamic>? round;
   final String mine;
   final Color color;
@@ -625,7 +983,8 @@ class _ClashStage extends StatefulWidget {
   State<_ClashStage> createState() => _ClashStageState();
 }
 
-class _ClashStageState extends State<_ClashStage> with SingleTickerProviderStateMixin {
+class _ClashStageState extends State<_ClashStage>
+    with SingleTickerProviderStateMixin {
   // ── زمان‌بندیِ نمایشِ نتیجه ──
   //
   // مجموعِ فازها: ۶۰۰ + ۴۰۰ + ۹۰۰ = ۱۹۰۰ms تا حکم.
@@ -644,8 +1003,10 @@ class _ClashStageState extends State<_ClashStage> with SingleTickerProviderState
   // `Curves.transform(int)` خطای کامپایل می‌داد.
   static const _numbersEnd = 1.0;
 
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: _total);
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: _total,
+  );
 
   @override
   void initState() {
@@ -686,10 +1047,8 @@ class _ClashStageState extends State<_ClashStage> with SingleTickerProviderState
       ((_c.value - from) / (to - from)).clamp(0.0, 1.0);
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-        animation: _c,
-        builder: (context, _) => _build(context),
-      );
+  Widget build(BuildContext context) =>
+      AnimatedBuilder(animation: _c, builder: (context, _) => _build(context));
 
   Widget _build(BuildContext context) {
     final round = widget.round;
@@ -701,14 +1060,23 @@ class _ClashStageState extends State<_ClashStage> with SingleTickerProviderState
         alignment: Alignment.center,
         decoration: BoxDecoration(
           borderRadius: Corners.rXl,
-          gradient: RadialGradient(colors: [color.withValues(alpha: 0.16), const Color(0xFF07111D)]),
+          gradient: RadialGradient(
+            colors: [color.withValues(alpha: 0.16), const Color(0xFF07111D)],
+          ),
           border: Border.all(color: Colors.white10),
         ),
-        child: const Text('منتظر برخورد اول…', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w800)),
+        child: const Text(
+          'منتظر برخورد اول…',
+          style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w800),
+        ),
       );
     }
-    final myCard = Map<String, dynamic>.from((mine == 'O' ? round['cardO'] : round['cardX']) as Map? ?? const {});
-    final otherCard = Map<String, dynamic>.from((mine == 'O' ? round['cardX'] : round['cardO']) as Map? ?? const {});
+    final myCard = Map<String, dynamic>.from(
+      (mine == 'O' ? round['cardO'] : round['cardX']) as Map? ?? const {},
+    );
+    final otherCard = Map<String, dynamic>.from(
+      (mine == 'O' ? round['cardX'] : round['cardO']) as Map? ?? const {},
+    );
     final myPower = mine == 'O' ? round['powerO'] : round['powerX'];
     final otherPower = mine == 'O' ? round['powerX'] : round['powerO'];
     final myFocus = mine == 'O' ? round['focusStatO'] : round['focusStatX'];
@@ -717,8 +1085,13 @@ class _ClashStageState extends State<_ClashStage> with SingleTickerProviderState
     final iWon = winner == mine;
     final draw = winner == 'DRAW';
     final phase = _phase;
-    final outcome = draw ? _gold : iWon ? _emerald : _rose;
-    final showNumbers = phase == _RevealPhase.numbers || phase == _RevealPhase.verdict;
+    final outcome = draw
+        ? _gold
+        : iWon
+            ? _emerald
+            : _rose;
+    final showNumbers =
+        phase == _RevealPhase.numbers || phase == _RevealPhase.verdict;
     final showVerdict = phase == _RevealPhase.verdict;
 
     // فاز ۱ — هجوم از دو طرف.
@@ -732,201 +1105,291 @@ class _ClashStageState extends State<_ClashStage> with SingleTickerProviderState
         ? math.sin(impactT * math.pi * 6) * 5 * (1 - impactT)
         : 0.0;
     // فاز ۳ — شمارشِ صعودی عددها.
-    final countT = Curves.easeOutCubic.transform(_span(_impactEnd, _numbersEnd));
+    final countT = Curves.easeOutCubic.transform(
+      _span(_impactEnd, _numbersEnd),
+    );
 
     return Transform.translate(
       offset: Offset(shake, 0),
-      child: Stack(children: [
-        // فلاشِ سفیدِ لحظهٔ برخورد + حلقهٔ ضربه.
-        if (phase == _RevealPhase.impact)
-          Positioned.fill(
-            child: IgnorePointer(
-              child: Center(
-                child: Opacity(
-                  opacity: (1 - impactT).clamp(0.0, 1.0) * 0.9,
-                  child: Container(
-                    width: 26 + ringT * 320,
-                    height: 26 + ringT * 320,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: outcome, width: 2.5 * (1 - ringT) + 0.5),
-                      gradient: RadialGradient(colors: [
-                        Colors.white.withValues(alpha: 0.30 * (1 - impactT)),
-                        Colors.transparent,
-                      ]),
+      child: Stack(
+        children: [
+          // فلاشِ سفیدِ لحظهٔ برخورد + حلقهٔ ضربه.
+          if (phase == _RevealPhase.impact)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Center(
+                  child: Opacity(
+                    opacity: (1 - impactT).clamp(0.0, 1.0) * 0.9,
+                    child: Container(
+                      width: 26 + ringT * 320,
+                      height: 26 + ringT * 320,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: outcome,
+                          width: 2.5 * (1 - ringT) + 0.5,
+                        ),
+                        gradient: RadialGradient(
+                          colors: [
+                            Colors.white.withValues(
+                              alpha: 0.30 * (1 - impactT),
+                            ),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            borderRadius: Corners.rXl,
-            gradient: LinearGradient(colors: [
-              outcome.withValues(alpha: 0.16),
-              const Color(0xFF07111D),
-            ]),
-            border: Border.all(color: outcome.withValues(alpha: 0.55), width: 1.4),
-            boxShadow: [
-              BoxShadow(
-                color: outcome.withValues(alpha: showVerdict ? .30 : .16),
-                blurRadius: showVerdict ? 34 : 22,
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              borderRadius: Corners.rXl,
+              gradient: LinearGradient(
+                colors: [
+                  outcome.withValues(alpha: 0.16),
+                  const Color(0xFF07111D),
+                ],
               ),
-            ],
-          ),
-          child: Column(children: [
-            Row(children: [
-              // کارتِ من از راست هجوم می‌آورد.
-              Expanded(
-                child: Opacity(
-                  opacity: charge,
-                  child: Transform.translate(
-                    offset: Offset(38 * (1 - charge), 0),
-                    child: Transform.rotate(
-                      angle: 0.12 * (1 - charge),
-                      child: AspectRatio(
-                        aspectRatio: 0.68,
-                        child: PlayerCard(
-                          card: myCard, compact: true, showStats: false,
-                          winner: showVerdict && iWon,
-                          loser: showVerdict && !draw && !iWon,
-                        ),
-                      ),
-                    ),
-                  ),
+              border: Border.all(
+                color: outcome.withValues(alpha: 0.55),
+                width: 1.4,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: outcome.withValues(alpha: showVerdict ? .30 : .16),
+                  blurRadius: showVerdict ? 34 : 22,
                 ),
-              ),
-              Expanded(
-                child: Column(children: [
-                  Text('راند ${faNum(round['round'])} · ${round['focusLabel'] ?? round['title']}',
-                      style: const TextStyle(fontSize: 12, color: Colors.white54, fontWeight: FontWeight.w800),
-                      textAlign: TextAlign.center),
-                  Text('${round['title']}',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900)),
-                  const SizedBox(height: 6),
-                  // ── عددها: تا فازِ numbers پنهان، بعد شمارشِ صعودی ──
-                  // برندهٔ نهایی بزرگ‌تر و طلایی می‌شود تا بدونِ خواندن هم
-                  // معلوم باشد چه شد.
-                  DefaultTextStyle(
-                    style: const TextStyle(
-                      fontFamily: 'Vazirmatn', fontSize: 22, fontWeight: FontWeight.w900,
-                    ),
-                    // ⚠️ FittedBox اجباری است. عددِ برنده در فازِ verdict به
-                    // ۲۶px بزرگ می‌شود و روی صفحهٔ باریک (یا وقتی هر دو عدد
-                    // سه‌رقمی‌اند) ردیف ۱.۶px سرریز می‌کرد — تستِ ویجت
-                    // همین را گرفت. کوچک‌کردنِ متناسب بهتر از شکستنِ چیدمان
-                    // یا کوچک نگه داشتنِ عددِ برنده است.
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      textDirection: TextDirection.ltr,
-                      children: [
-                        _PowerNumber(
-                          value: showNumbers ? (num.tryParse('$myPower') ?? 0) * countT : 0,
-                          visible: showNumbers,
-                          lead: showVerdict && iWon,
-                        ),
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 8),
-                          child: Text('VS', style: TextStyle(fontSize: 13, color: Colors.white38)),
-                        ),
-                        _PowerNumber(
-                          value: showNumbers ? (num.tryParse('$otherPower') ?? 0) * countT : 0,
-                          visible: showNumbers,
-                          lead: showVerdict && !draw && !iWon,
-                        ),
-                      ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    alignment: WrapAlignment.center,
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      _RoundChip(
-                          label: '${round['focusLabel'] ?? 'ویژگی'}',
-                          value: '${faNum(myFocus)} - ${faNum(otherFocus)}',
-                          tint: color),
-                      if (showNumbers)
-                        _RoundChip(
-                            label: 'اختلاف قدرت',
-                            value: faNum(round['powerGap'] ??
-                                ((num.tryParse('$myPower') ?? 0) - (num.tryParse('$otherPower') ?? 0)).abs()),
-                            tint: outcome),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  // مهرِ برنده: از بزرگ و چرخیده می‌کوبد روی جایش.
-                  if (showVerdict)
-                    TweenAnimationBuilder<double>(
-                      key: ValueKey('stamp-${round['round']}'),
-                      tween: Tween(begin: 0, end: 1),
-                      duration: const Duration(milliseconds: 420),
-                      curve: Curves.easeOutBack,
-                      builder: (_, t, child) => Opacity(
-                        opacity: t.clamp(0.0, 1.0),
-                        child: Transform.rotate(
-                          angle: -0.22 * (1 - t),
-                          child: Transform.scale(scale: 0.6 + 0.4 * t + 1.2 * (1 - t) * (1 - t), child: child),
-                        ),
-                      ),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: outcome.withValues(alpha: 0.18),
-                          borderRadius: BorderRadius.circular(99),
-                          border: Border.all(color: outcome.withValues(alpha: 0.5)),
-                        ),
-                        child: Text(
-                          draw ? 'برخورد برابر' : iWon ? 'WINNER' : 'باخت راند',
-                          style: TextStyle(color: outcome, fontWeight: FontWeight.w900, letterSpacing: 0.6),
-                        ),
-                      ),
-                    ),
-                ]),
-              ),
-              // کارتِ حریف از چپ.
-              Expanded(
-                child: Opacity(
-                  opacity: charge,
-                  child: Transform.translate(
-                    offset: Offset(-38 * (1 - charge), 0),
-                    child: Transform.rotate(
-                      angle: -0.12 * (1 - charge),
-                      child: AspectRatio(
-                        aspectRatio: 0.68,
-                        child: PlayerCard(
-                          card: otherCard, compact: true, showStats: false,
-                          winner: showVerdict && !draw && !iWon,
-                          loser: showVerdict && iWon,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ]),
-            if (showVerdict) ...[
-              Gaps.vXs,
-              Text('${round['reason'] ?? round['text'] ?? ''}',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 13, color: Colors.white70, fontWeight: FontWeight.w700)),
-              if ('${round['cinematic'] ?? ''}'.trim().isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text('${round['cinematic']}',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12, color: outcome, fontWeight: FontWeight.w900)),
               ],
-            ],
-          ]),
-        ),
-      ]),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    // کارتِ من از راست هجوم می‌آورد.
+                    Expanded(
+                      child: Opacity(
+                        opacity: charge,
+                        child: Transform.translate(
+                          offset: Offset(38 * (1 - charge), 0),
+                          child: Transform.rotate(
+                            angle: 0.12 * (1 - charge),
+                            child: AspectRatio(
+                              aspectRatio: 0.68,
+                              child: PlayerCard(
+                                card: myCard,
+                                compact: true,
+                                showStats: false,
+                                winner: showVerdict && iWon,
+                                loser: showVerdict && !draw && !iWon,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          Text(
+                            'راند ${faNum(round['round'])} · ${round['focusLabel'] ?? round['title']}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.white54,
+                              fontWeight: FontWeight.w800,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          Text(
+                            '${round['title']}',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          // ── عددها: تا فازِ numbers پنهان، بعد شمارشِ صعودی ──
+                          // برندهٔ نهایی بزرگ‌تر و طلایی می‌شود تا بدونِ خواندن هم
+                          // معلوم باشد چه شد.
+                          DefaultTextStyle(
+                            style: const TextStyle(
+                              fontFamily: 'Vazirmatn',
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                            ),
+                            // ⚠️ FittedBox اجباری است. عددِ برنده در فازِ verdict به
+                            // ۲۶px بزرگ می‌شود و روی صفحهٔ باریک (یا وقتی هر دو عدد
+                            // سه‌رقمی‌اند) ردیف ۱.۶px سرریز می‌کرد — تستِ ویجت
+                            // همین را گرفت. کوچک‌کردنِ متناسب بهتر از شکستنِ چیدمان
+                            // یا کوچک نگه داشتنِ عددِ برنده است.
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                textDirection: TextDirection.ltr,
+                                children: [
+                                  _PowerNumber(
+                                    value: showNumbers
+                                        ? (num.tryParse('$myPower') ?? 0) *
+                                            countT
+                                        : 0,
+                                    visible: showNumbers,
+                                    lead: showVerdict && iWon,
+                                  ),
+                                  const Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                    ),
+                                    child: Text(
+                                      'VS',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.white38,
+                                      ),
+                                    ),
+                                  ),
+                                  _PowerNumber(
+                                    value: showNumbers
+                                        ? (num.tryParse('$otherPower') ?? 0) *
+                                            countT
+                                        : 0,
+                                    visible: showNumbers,
+                                    lead: showVerdict && !draw && !iWon,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            alignment: WrapAlignment.center,
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              _RoundChip(
+                                label: '${round['focusLabel'] ?? 'ویژگی'}',
+                                value:
+                                    '${faNum(myFocus)} - ${faNum(otherFocus)}',
+                                tint: color,
+                              ),
+                              if (showNumbers)
+                                _RoundChip(
+                                  label: 'اختلاف قدرت',
+                                  value: faNum(
+                                    round['powerGap'] ??
+                                        ((num.tryParse('$myPower') ?? 0) -
+                                                (num.tryParse('$otherPower') ??
+                                                    0))
+                                            .abs(),
+                                  ),
+                                  tint: outcome,
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          // مهرِ برنده: از بزرگ و چرخیده می‌کوبد روی جایش.
+                          if (showVerdict)
+                            TweenAnimationBuilder<double>(
+                              key: ValueKey('stamp-${round['round']}'),
+                              tween: Tween(begin: 0, end: 1),
+                              duration: const Duration(milliseconds: 420),
+                              curve: Curves.easeOutBack,
+                              builder: (_, t, child) => Opacity(
+                                opacity: t.clamp(0.0, 1.0),
+                                child: Transform.rotate(
+                                  angle: -0.22 * (1 - t),
+                                  child: Transform.scale(
+                                    scale:
+                                        0.6 + 0.4 * t + 1.2 * (1 - t) * (1 - t),
+                                    child: child,
+                                  ),
+                                ),
+                              ),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: outcome.withValues(alpha: 0.18),
+                                  borderRadius: BorderRadius.circular(99),
+                                  border: Border.all(
+                                    color: outcome.withValues(alpha: 0.5),
+                                  ),
+                                ),
+                                child: Text(
+                                  draw
+                                      ? 'برخورد برابر'
+                                      : iWon
+                                          ? 'WINNER'
+                                          : 'باخت راند',
+                                  style: TextStyle(
+                                    color: outcome,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.6,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    // کارتِ حریف از چپ.
+                    Expanded(
+                      child: Opacity(
+                        opacity: charge,
+                        child: Transform.translate(
+                          offset: Offset(-38 * (1 - charge), 0),
+                          child: Transform.rotate(
+                            angle: -0.12 * (1 - charge),
+                            child: AspectRatio(
+                              aspectRatio: 0.68,
+                              child: PlayerCard(
+                                card: otherCard,
+                                compact: true,
+                                showStats: false,
+                                winner: showVerdict && !draw && !iWon,
+                                loser: showVerdict && iWon,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (showVerdict) ...[
+                  Gaps.vXs,
+                  Text(
+                    '${round['reason'] ?? round['text'] ?? ''}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Colors.white70,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if ('${round['cinematic'] ?? ''}'.trim().isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      '${round['cinematic']}',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: outcome,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -936,7 +1399,11 @@ class _ClashStageState extends State<_ClashStage> with SingleTickerProviderState
 /// جدا شد چون دو بار استفاده می‌شود و منطقِ «برنده بزرگ‌تر و طلایی» نباید
 /// در دو جا کپی شود.
 class _PowerNumber extends StatelessWidget {
-  const _PowerNumber({required this.value, required this.visible, required this.lead});
+  const _PowerNumber({
+    required this.value,
+    required this.visible,
+    required this.lead,
+  });
   final num value;
   final bool visible;
   final bool lead;
@@ -950,7 +1417,7 @@ class _PowerNumber extends StatelessWidget {
           fontSize: lead ? 26 : 22,
           fontWeight: FontWeight.w900,
           color: !visible
-              ? Colors.white38          // هنوز فاش نشده
+              ? Colors.white38 // هنوز فاش نشده
               : lead
                   ? _gold
                   : Colors.white,
@@ -974,7 +1441,11 @@ class _PowerNumber extends StatelessWidget {
 }
 
 class _RoundChip extends StatelessWidget {
-  const _RoundChip({required this.label, required this.value, required this.tint});
+  const _RoundChip({
+    required this.label,
+    required this.value,
+    required this.tint,
+  });
   final String label;
   final String value;
   final Color tint;
@@ -988,10 +1459,18 @@ class _RoundChip extends StatelessWidget {
         ),
         child: RichText(
           text: TextSpan(
-            style: const TextStyle(fontFamily: 'Vazirmatn', fontSize: 12, color: Colors.white70, fontWeight: FontWeight.w700),
+            style: const TextStyle(
+              fontFamily: 'Vazirmatn',
+              fontSize: 12,
+              color: Colors.white70,
+              fontWeight: FontWeight.w700,
+            ),
             children: [
               TextSpan(text: '$label: '),
-              TextSpan(text: value, style: TextStyle(color: tint, fontWeight: FontWeight.w900)),
+              TextSpan(
+                text: value,
+                style: TextStyle(color: tint, fontWeight: FontWeight.w900),
+              ),
             ],
           ),
           textAlign: TextAlign.center,
@@ -1027,15 +1506,21 @@ class _Finale extends StatelessWidget {
   Widget build(BuildContext context) {
     final won = session.iWon;
     final draw = session.winner == 'DRAW';
-    final history = (session.state['history'] as List? ?? const []).whereType<Map>().toList();
-    final score = session.state['score'] is Map ? session.state['score'] as Map : const {};
+    final history = (session.state['history'] as List? ?? const [])
+        .whereType<Map>()
+        .toList();
+    final score = session.state['score'] is Map
+        ? session.state['score'] as Map
+        : const {};
     final me = session.mySymbol ?? 'X';
     final other = me == 'X' ? 'O' : 'X';
     return Container(
       padding: const EdgeInsets.all(Gaps.md),
       decoration: BoxDecoration(
         borderRadius: Corners.rXl,
-        gradient: LinearGradient(colors: resultColors ?? const [Color(0xFF17304C), Color(0xFF050A12)]),
+        gradient: LinearGradient(
+          colors: resultColors ?? const [Color(0xFF17304C), Color(0xFF050A12)],
+        ),
         image: resultTemplate == null
             ? null
             : DecorationImage(
@@ -1045,95 +1530,162 @@ class _Finale extends StatelessWidget {
               ),
         border: Border.all(color: color),
       ),
-      child: Column(children: [
-        Text(draw ? 'DRAW' : won ? 'VICTORY' : 'DEFEAT',
+      child: Column(
+        children: [
+          Text(
+            draw
+                ? 'DRAW'
+                : won
+                    ? 'VICTORY'
+                    : 'DEFEAT',
             style: TextStyle(
               fontSize: 34,
               fontWeight: FontWeight.w900,
               letterSpacing: 3,
-              color: draw ? _gold : won ? _emerald : _rose,
-            )),
-        Text('${faNum(score[me])}  —  ${faNum(score[other])}',
-            textDirection: TextDirection.ltr, style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900)),
-        Gaps.vXs,
-        Text(
-          session.vsBot
-              ? 'تمرین تمام شد؛ امتیازی جابه‌جا نشد.'
-              : draw
-                  ? 'ورودی کامل هر دو نفر برمی‌گردد.'
+              color: draw
+                  ? _gold
                   : won
-                      ? 'پات مسابقه پس از کسر کارمزد تسویه می‌شود.'
-                      : '${faNum(session.stake)} امتیاز ورودی از دست رفت.',
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 12.5, color: Colors.white60),
-        ),
-        Gaps.vSm,
-        if (history.isNotEmpty)
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            alignment: WrapAlignment.center,
-            children: [
-              for (final raw in history)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(99),
-                    color: ('${raw['winner']}' == me
-                            ? _emerald
-                            : '${raw['winner']}' == 'DRAW'
-                                ? _gold
-                                : _rose)
-                        .withValues(alpha: 0.18),
-                  ),
-                  child: Text('راند ${faNum(raw['round'])} · ${raw['title'] ?? ''}',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
-                ),
-            ],
-          ),
-        if (history.isNotEmpty) ...[
-          Gaps.vSm,
-          Theme(
-            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-            child: ExpansionTile(
-              tilePadding: EdgeInsets.zero,
-              collapsedIconColor: Colors.white70,
-              iconColor: Colors.white,
-              title: const Text('تایم‌لاین کامل ۵ راند', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900, color: Colors.white)),
-              subtitle: const Text('جزئیات کامل دلیل، اختلاف قدرت و سهم هر کارت', style: TextStyle(fontSize: 12, color: Colors.white54)),
-              children: [
-                for (final raw in history)
-                  _FinalRoundBreakdown(round: Map<String, dynamic>.from(raw), mySymbol: me),
-              ],
+                      ? _emerald
+                      : _rose,
             ),
           ),
-        ],
-        if (mvp != null) ...[
+          Text(
+            '${faNum(score[me])}  —  ${faNum(score[other])}',
+            textDirection: TextDirection.ltr,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 28,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          Gaps.vXs,
+          Text(
+            session.vsBot
+                ? 'تمرین تمام شد؛ امتیازی جابه‌جا نشد.'
+                : draw
+                    ? 'ورودی کامل هر دو نفر برمی‌گردد.'
+                    : won
+                        ? 'پات مسابقه پس از کسر کارمزد تسویه می‌شود.'
+                        : '${faNum(session.stake)} امتیاز ورودی از دست رفت.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 12.5, color: Colors.white60),
+          ),
           Gaps.vSm,
-          SizedBox(width: 140, height: 196, child: PlayerCard(card: mvp!, compact: true, showStats: false, winner: true)),
-          Text('MVP · ${mvp!['name']}', style: const TextStyle(fontWeight: FontWeight.w900)),
-        ],
-        Gaps.vSm,
-        OutlinedButton.icon(
+          if (history.isNotEmpty)
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              alignment: WrapAlignment.center,
+              children: [
+                for (final raw in history)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(99),
+                      color: ('${raw['winner']}' == me
+                              ? _emerald
+                              : '${raw['winner']}' == 'DRAW'
+                                  ? _gold
+                                  : _rose)
+                          .withValues(alpha: 0.18),
+                    ),
+                    child: Text(
+                      'راند ${faNum(raw['round'])} · ${raw['title'] ?? ''}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          if (history.isNotEmpty) ...[
+            Gaps.vSm,
+            Theme(
+              data:
+                  Theme.of(context).copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                collapsedIconColor: Colors.white70,
+                iconColor: Colors.white,
+                title: const Text(
+                  'تایم‌لاین کامل ۵ راند',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
+                ),
+                subtitle: const Text(
+                  'جزئیات کامل دلیل، اختلاف قدرت و سهم هر کارت',
+                  style: TextStyle(fontSize: 12, color: Colors.white54),
+                ),
+                children: [
+                  for (final raw in history)
+                    _FinalRoundBreakdown(
+                      round: Map<String, dynamic>.from(raw),
+                      mySymbol: me,
+                    ),
+                ],
+              ),
+            ),
+          ],
+          if (mvp != null) ...[
+            Gaps.vSm,
+            SizedBox(
+              width: 140,
+              height: 196,
+              child: PlayerCard(
+                card: mvp!,
+                compact: true,
+                showStats: false,
+                winner: true,
+              ),
+            ),
+            Text(
+              'MVP · ${mvp!['name']}',
+              style: const TextStyle(fontWeight: FontWeight.w900),
+            ),
+          ],
+          Gaps.vSm,
+          OutlinedButton.icon(
             onPressed: sharing ? null : onShare,
             icon: const Icon(Icons.ios_share_rounded, size: 17),
-            label: Text(sharing ? 'در حال ساخت لینک…' : 'اشتراک نتیجه و دعوت به چالش')),
-        Gaps.vSm,
-        Row(children: [
-          Expanded(
-              child: FilledButton(
+            label: Text(
+              sharing ? 'در حال ساخت لینک…' : 'اشتراک نتیجه و دعوت به چالش',
+            ),
+          ),
+          Gaps.vSm,
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton(
                   onPressed: session.rematchWaiting ? null : onAgain,
-                  child: Text(session.rematchWaiting
-                      ? 'منتظر قبول حریف…'
-                      : session.rematchAvailable
-                          ? 'دوباره با همین حریف'
-                          : privateLobby
-                              ? 'بازگشت به لابی'
-                              : 'نبرد دوباره'))),
-          Gaps.hXs,
-          Expanded(child: OutlinedButton(onPressed: onEdit, child: const Text('تغییر ترکیب'))),
-        ]),
-      ]),
+                  child: Text(
+                    session.rematchWaiting
+                        ? 'منتظر قبول حریف…'
+                        : session.rematchAvailable
+                            ? 'دوباره با همین حریف'
+                            : privateLobby
+                                ? 'بازگشت به لابی'
+                                : 'نبرد دوباره',
+                  ),
+                ),
+              ),
+              Gaps.hXs,
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: onEdit,
+                  child: const Text('تغییر ترکیب'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1144,13 +1696,21 @@ class _ErrorPanel extends StatelessWidget {
   final VoidCallback onBack;
   @override
   Widget build(BuildContext context) => AppCard(
-          child: Column(children: [
-        Icon(Icons.error_outline_rounded, color: Theme.of(context).colorScheme.error, size: 34),
-        Gaps.vXs,
-        Text(message, textAlign: TextAlign.center),
-        Gaps.vSm,
-        FilledButton(onPressed: onBack, child: const Text('بازگشت به ترکیب')),
-      ]));
+        child: Column(
+          children: [
+            Icon(
+              Icons.error_outline_rounded,
+              color: Theme.of(context).colorScheme.error,
+              size: 34,
+            ),
+            Gaps.vXs,
+            Text(message, textAlign: TextAlign.center),
+            Gaps.vSm,
+            FilledButton(
+                onPressed: onBack, child: const Text('بازگشت به ترکیب')),
+          ],
+        ),
+      );
 }
 
 String _settlementLabel(String status) {
@@ -1177,13 +1737,23 @@ class _DeckIntelPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final insights = activeInsights ?? (suggestedDeck?['insights'] is Map
-        ? Map<String, dynamic>.from(suggestedDeck!['insights'] as Map)
-        : null);
+    final insights = activeInsights ??
+        (suggestedDeck?['insights'] is Map
+            ? Map<String, dynamic>.from(suggestedDeck!['insights'] as Map)
+            : null);
     if (insights == null) return const SizedBox.shrink();
-    final strengths = (insights['strengths'] as List? ?? const []).map((e) => '$e').where((e) => e.isNotEmpty).toList(growable: false);
-    final warnings = (insights['warnings'] as List? ?? const []).map((e) => '$e').where((e) => e.isNotEmpty).toList(growable: false);
-    final recommendedOrder = (insights['recommendedOrder'] as List? ?? const []).whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList(growable: false);
+    final strengths = (insights['strengths'] as List? ?? const [])
+        .map((e) => '$e')
+        .where((e) => e.isNotEmpty)
+        .toList(growable: false);
+    final warnings = (insights['warnings'] as List? ?? const [])
+        .map((e) => '$e')
+        .where((e) => e.isNotEmpty)
+        .toList(growable: false);
+    final recommendedOrder = (insights['recommendedOrder'] as List? ?? const [])
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList(growable: false);
 
     return AppCard(
       child: Column(
@@ -1195,8 +1765,14 @@ class _DeckIntelPanel extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('تحلیل بالانس ترکیب', style: TextStyle(fontWeight: FontWeight.w900)),
-                    Text('هوشِ آرنا قبل از شروع ضعف و قوت deck را می‌گوید', style: TextStyle(fontSize: 11.5, color: Colors.white60)),
+                    Text(
+                      'تحلیل بالانس ترکیب',
+                      style: TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                    Text(
+                      'هوشِ آرنا قبل از شروع ضعف و قوت deck را می‌گوید',
+                      style: TextStyle(fontSize: 11.5, color: Colors.white60),
+                    ),
                   ],
                 ),
               ),
@@ -1234,12 +1810,16 @@ class _DeckIntelPanel extends StatelessWidget {
                   _IntelChip(text: item, tint: _rose),
                 if (strengths.length + warnings.length > 4)
                   _IntelChip(
-                      text: '+${faNum(strengths.length + warnings.length - 4)} نکتهٔ دیگر',
-                      tint: Colors.white54),
+                    text:
+                        '+${faNum(strengths.length + warnings.length - 4)} نکتهٔ دیگر',
+                    tint: Colors.white54,
+                  ),
               ],
             ),
           ],
-          if ('${insights['recommendedLeadReason'] ?? ''}'.trim().isNotEmpty) ...[
+          if ('${insights['recommendedLeadReason'] ?? ''}'
+              .trim()
+              .isNotEmpty) ...[
             Gaps.vSm,
             Container(
               padding: const EdgeInsets.all(Gaps.sm),
@@ -1251,49 +1831,71 @@ class _DeckIntelPanel extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('اوپنر پیشنهادی', style: TextStyle(fontSize: 12.5, color: _cyan, fontWeight: FontWeight.w900)),
+                  const Text(
+                    'اوپنر پیشنهادی',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: _cyan,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
                   const SizedBox(height: 4),
                   // دو خط کافی است؛ متنِ بلندتر فقط ارتفاع می‌گیرد.
-                  Text('${insights['recommendedLeadReason']}',
-                      maxLines: 2, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.5, fontWeight: FontWeight.w700)),
+                  Text(
+                    '${insights['recommendedLeadReason']}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.white70,
+                      height: 1.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ],
               ),
             ),
           ],
           if (recommendedOrder.isNotEmpty) ...[
             Gaps.vSm,
-            const Text('ترتیب پیشنهادی راندها', style: TextStyle(fontSize: 12.5, color: Colors.white70, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 6),
-            SizedBox(
-              height: 54,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemBuilder: (_, index) {
-                  final item = recommendedOrder[index];
-                  return Container(
-                    width: 138,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: .05),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: Colors.white.withValues(alpha: .10)),
+            // پنج کارتِ اسکرول‌شونده داخلِ پنلِ اسکرول‌شونده همان «اسکرول
+            // طولانیِ نحوه محاسبه» بود. فقط تصمیمِ فوری لازم است: با کدام
+            // کارت شروع کنم. بقیه را دکمهٔ «چیدن خودکار» اعمال می‌کند.
+            Builder(
+              builder: (_) {
+                final first = recommendedOrder.first;
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: .05),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: .10),
                     ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('راند ${faNum(item['round'])} · ${item['focus'] ?? ''}', style: const TextStyle(fontSize: 11, color: Colors.white54, fontWeight: FontWeight.w800)),
-                        Text('${item['name'] ?? 'کارت'}', style: const TextStyle(fontSize: 12.5, color: Colors.white, fontWeight: FontWeight.w900)),
-                        if ('${item['reason'] ?? ''}'.trim().isNotEmpty)
-                          Text('${item['reason']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: Colors.white54, fontWeight: FontWeight.w700)),
-                      ],
-                    ),
-                  );
-                },
-                separatorBuilder: (_, __) => const SizedBox(width: 6),
-                itemCount: recommendedOrder.length,
-              ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.flag_rounded, size: 17, color: _cyan),
+                      const SizedBox(width: 7),
+                      Expanded(
+                        child: Text(
+                          'شروع پیشنهادی: ${first['name'] ?? 'کارت اول'} · ${first['focus'] ?? ''}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.white70,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
           ],
         ],
@@ -1315,7 +1917,11 @@ class _IntelChip extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
           border: Border.all(color: tint.withValues(alpha: .32)),
         ),
-        child: Text(text, style: TextStyle(color: tint, fontSize: 12, fontWeight: FontWeight.w800)),
+        child: Text(
+          text,
+          style:
+              TextStyle(color: tint, fontSize: 12, fontWeight: FontWeight.w800),
+        ),
       );
 }
 
@@ -1340,7 +1946,11 @@ class _FinalRoundBreakdown extends StatelessWidget {
     final breakdownTheirs = mySymbol == 'O'
         ? Map<String, dynamic>.from((round['breakdownX'] as Map?) ?? const {})
         : Map<String, dynamic>.from((round['breakdownO'] as Map?) ?? const {});
-    final headline = draw ? _gold : mineWon ? _emerald : _rose;
+    final headline = draw
+        ? _gold
+        : mineWon
+            ? _emerald
+            : _rose;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(Gaps.sm),
@@ -1354,25 +1964,70 @@ class _FinalRoundBreakdown extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(child: Text('راند ${faNum(round['round'])} · ${round['focusLabel'] ?? round['title']}', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900))),
+              Expanded(
+                child: Text(
+                  'راند ${faNum(round['round'])} · ${round['focusLabel'] ?? round['title']}',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(color: headline.withValues(alpha: .16), borderRadius: BorderRadius.circular(999)),
-                child: Text(draw ? 'DRAW' : mineWon ? 'WIN' : 'LOSS', style: TextStyle(color: headline, fontSize: 11.5, fontWeight: FontWeight.w900)),
+                decoration: BoxDecoration(
+                  color: headline.withValues(alpha: .16),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  draw
+                      ? 'DRAW'
+                      : mineWon
+                          ? 'WIN'
+                          : 'LOSS',
+                  style: TextStyle(
+                    color: headline,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
               ),
             ],
           ),
           const SizedBox(height: 6),
-          Text('${mine['name'] ?? 'کارت تو'} در برابر ${theirs['name'] ?? 'کارت حریف'}', style: const TextStyle(fontSize: 12, color: Colors.white70)),
+          Text(
+            '${mine['name'] ?? 'کارت تو'} در برابر ${theirs['name'] ?? 'کارت حریف'}',
+            style: const TextStyle(fontSize: 12, color: Colors.white70),
+          ),
           const SizedBox(height: 6),
           Wrap(
             spacing: 6,
             runSpacing: 6,
             children: [
-              _MiniBreakChip(label: 'ویژگی', value: '${round['focusLabel'] ?? round['title']}', tint: _cyan),
-              _MiniBreakChip(label: 'قدرت تو', value: faNum(mySymbol == 'O' ? round['powerO'] : round['powerX']), tint: mineWon ? _emerald : _cyan),
-              _MiniBreakChip(label: 'قدرت حریف', value: faNum(mySymbol == 'O' ? round['powerX'] : round['powerO']), tint: !draw && !mineWon ? _rose : _gold),
-              _MiniBreakChip(label: 'اختلاف', value: faNum(round['powerGap'] ?? 0), tint: headline),
+              _MiniBreakChip(
+                label: 'ویژگی',
+                value: '${round['focusLabel'] ?? round['title']}',
+                tint: _cyan,
+              ),
+              _MiniBreakChip(
+                label: 'قدرت تو',
+                value: faNum(
+                  mySymbol == 'O' ? round['powerO'] : round['powerX'],
+                ),
+                tint: mineWon ? _emerald : _cyan,
+              ),
+              _MiniBreakChip(
+                label: 'قدرت حریف',
+                value: faNum(
+                  mySymbol == 'O' ? round['powerX'] : round['powerO'],
+                ),
+                tint: !draw && !mineWon ? _rose : _gold,
+              ),
+              _MiniBreakChip(
+                label: 'اختلاف',
+                value: faNum(round['powerGap'] ?? 0),
+                tint: headline,
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -1380,7 +2035,15 @@ class _FinalRoundBreakdown extends StatelessWidget {
           const SizedBox(height: 6),
           _BreakdownRow(title: 'حریف', data: breakdownTheirs),
           const SizedBox(height: 8),
-          Text('${round['reason'] ?? ''}', style: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.5, fontWeight: FontWeight.w700)),
+          Text(
+            '${round['reason'] ?? ''}',
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.white70,
+              height: 1.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ],
       ),
     );
@@ -1396,18 +2059,46 @@ class _BreakdownRow extends StatelessWidget {
   Widget build(BuildContext context) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(fontSize: 12, color: Colors.white54, fontWeight: FontWeight.w900)),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.white54,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
           const SizedBox(height: 4),
           Wrap(
             spacing: 5,
             runSpacing: 5,
             children: [
-              _MiniBreakChip(label: 'base', value: '${data['base'] ?? 0}', tint: Colors.white70),
-              _MiniBreakChip(label: 'focus', value: '${data['focus'] ?? 0}', tint: _cyan),
-              _MiniBreakChip(label: 'effect', value: '${data['effectBonus'] ?? 0}', tint: _emerald),
-              _MiniBreakChip(label: 'luck', value: '${data['luck'] ?? 0}', tint: _gold),
-              if ((data['wallAdjustment'] as num?) != null && (data['wallAdjustment'] as num) != 0)
-                _MiniBreakChip(label: 'wall', value: '${data['wallAdjustment']}', tint: _rose),
+              _MiniBreakChip(
+                label: 'base',
+                value: '${data['base'] ?? 0}',
+                tint: Colors.white70,
+              ),
+              _MiniBreakChip(
+                label: 'focus',
+                value: '${data['focus'] ?? 0}',
+                tint: _cyan,
+              ),
+              _MiniBreakChip(
+                label: 'effect',
+                value: '${data['effectBonus'] ?? 0}',
+                tint: _emerald,
+              ),
+              _MiniBreakChip(
+                label: 'luck',
+                value: '${data['luck'] ?? 0}',
+                tint: _gold,
+              ),
+              if ((data['wallAdjustment'] as num?) != null &&
+                  (data['wallAdjustment'] as num) != 0)
+                _MiniBreakChip(
+                  label: 'wall',
+                  value: '${data['wallAdjustment']}',
+                  tint: _rose,
+                ),
             ],
           ),
         ],
@@ -1415,7 +2106,11 @@ class _BreakdownRow extends StatelessWidget {
 }
 
 class _MiniBreakChip extends StatelessWidget {
-  const _MiniBreakChip({required this.label, required this.value, required this.tint});
+  const _MiniBreakChip({
+    required this.label,
+    required this.value,
+    required this.tint,
+  });
   final String label;
   final String value;
   final Color tint;
@@ -1428,7 +2123,14 @@ class _MiniBreakChip extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
           border: Border.all(color: tint.withValues(alpha: .18)),
         ),
-        child: Text('$label: $value', style: TextStyle(fontSize: 11.5, color: tint, fontWeight: FontWeight.w800)),
+        child: Text(
+          '$label: $value',
+          style: TextStyle(
+            fontSize: 11.5,
+            color: tint,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
       );
 }
 
@@ -1450,9 +2152,16 @@ class _History extends StatelessWidget {
         child: ExpansionTile(
           initiallyExpanded: false,
           tilePadding: const EdgeInsets.symmetric(horizontal: Gaps.sm),
-          childrenPadding: const EdgeInsets.fromLTRB(Gaps.sm, 0, Gaps.sm, Gaps.sm),
+          childrenPadding: const EdgeInsets.fromLTRB(
+            Gaps.sm,
+            0,
+            Gaps.sm,
+            Gaps.sm,
+          ),
           title: Text(
-            rows.isEmpty ? 'آخرین نبردها' : 'آخرین نبردها (${faNum(rows.length)})',
+            rows.isEmpty
+                ? 'آخرین نبردها'
+                : 'آخرین نبردها (${faNum(rows.length)})',
             style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
           ),
           subtitle: const Text(
@@ -1463,7 +2172,9 @@ class _History extends StatelessWidget {
             if (rows.isEmpty)
               const Padding(
                 padding: EdgeInsets.only(bottom: Gaps.sm),
-                child: Text('هنوز نبرد آنلاینی نداری. تاریخچه اینجا جمع نمی‌شود تا صفحه سبک بماند.'),
+                child: Text(
+                  'هنوز نبرد آنلاینی نداری. تاریخچه اینجا جمع نمی‌شود تا صفحه سبک بماند.',
+                ),
               ),
             for (final raw in rows)
               Padding(
@@ -1471,29 +2182,54 @@ class _History extends StatelessWidget {
                 child: AppCard(
                   padding: const EdgeInsets.all(Gaps.sm),
                   elevated: false,
-                  child: Row(children: [
-                    Icon(
+                  child: Row(
+                    children: [
+                      Icon(
                         NumberParser.toInt(raw['userDelta']) > 0
                             ? Icons.trending_up_rounded
                             : NumberParser.toInt(raw['userDelta']) < 0
                                 ? Icons.trending_down_rounded
                                 : Icons.diamond_outlined,
-                        color: NumberParser.toInt(raw['userDelta']) >= 0 ? _emerald : BrandColors.danger),
-                    Gaps.hSm,
-                    Expanded(
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(labels['${raw['mode']}'] ?? 'دوئل کارت',
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900)),
+                        color: NumberParser.toInt(raw['userDelta']) >= 0
+                            ? _emerald
+                            : BrandColors.danger,
+                      ),
+                      Gaps.hSm,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              labels['${raw['mode']}'] ?? 'دوئل کارت',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            Text(
+                              '${faNum(raw['userScore'])} - ${faNum(raw['opponentScore'])} · '
+                              '${_settlementLabel('${raw['settlementStatus'] ?? 'settled'}')}',
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                color: Colors.white54,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       Text(
-                          '${faNum(raw['userScore'])} - ${faNum(raw['opponentScore'])} · '
-                          '${_settlementLabel('${raw['settlementStatus'] ?? 'settled'}')}',
-                          style: const TextStyle(fontSize: 11.5, color: Colors.white54)),
-                    ])),
-                    Text(NumberParser.toInt(raw['userDelta']) > 0 ? '+${faNum(raw['userDelta'])}' : faNum(raw['userDelta']),
+                        NumberParser.toInt(raw['userDelta']) > 0
+                            ? '+${faNum(raw['userDelta'])}'
+                            : faNum(raw['userDelta']),
                         style: TextStyle(
-                            color: NumberParser.toInt(raw['userDelta']) >= 0 ? _emerald : BrandColors.danger,
-                            fontWeight: FontWeight.w900)),
-                  ]),
+                          color: NumberParser.toInt(raw['userDelta']) >= 0
+                              ? _emerald
+                              : BrandColors.danger,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
           ],
@@ -1548,9 +2284,10 @@ class _FocusBanner extends StatefulWidget {
 
 class _FocusBannerState extends State<_FocusBanner>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 900))
-        ..forward();
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  )..forward();
   // درخششِ آرامِ بی‌پایان تا وقتی کاربر انتخاب نکرده — چشم را می‌کشد
   // بدونِ اینکه آزاردهنده باشد.
   late final AnimationController _pulse = AnimationController(
@@ -1622,72 +2359,101 @@ class _FocusBannerState extends State<_FocusBanner>
               scale: 0.92 + 0.08 * t,
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 11,
+                ),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(18),
                   gradient: LinearGradient(
-                    colors: [tint.withValues(alpha: 0.26), const Color(0xFF07111D)],
+                    colors: [
+                      tint.withValues(alpha: 0.26),
+                      const Color(0xFF07111D),
+                    ],
                   ),
-                  border: Border.all(color: tint.withValues(alpha: glow + 0.25), width: 1.5),
+                  border: Border.all(
+                    color: tint.withValues(alpha: glow + 0.25),
+                    width: 1.5,
+                  ),
                   boxShadow: [
-                    BoxShadow(color: tint.withValues(alpha: glow * 0.5), blurRadius: 24),
+                    BoxShadow(
+                      color: tint.withValues(alpha: glow * 0.5),
+                      blurRadius: 24,
+                    ),
                   ],
                 ),
-                child: Row(children: [
-                  // آیکونِ ویژگی، با هالهٔ نبض‌دار.
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: tint.withValues(alpha: 0.18),
-                      border: Border.all(color: tint.withValues(alpha: 0.55), width: 1.5),
-                      boxShadow: [
-                        BoxShadow(color: tint.withValues(alpha: glow * 0.7), blurRadius: 16),
-                      ],
-                    ),
-                    child: Transform.scale(
-                      scale: 0.9 + 0.14 * _pulse.value,
-                      child: Icon(icon, color: tint, size: 24),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('راند ${faNum(widget.roundNumber)} — نبرد بر سر',
-                            style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white.withValues(alpha: 0.72))),
-                        const SizedBox(height: 1),
-                        Text(
-                          statName.isEmpty ? label : '$statName!',
-                          style: TextStyle(
-                            fontSize: 21,
-                            fontWeight: FontWeight.w900,
-                            color: tint,
-                            height: 1.25,
-                            shadows: [
-                              Shadow(color: tint.withValues(alpha: glow), blurRadius: 14),
-                            ],
-                          ),
+                child: Row(
+                  children: [
+                    // آیکونِ ویژگی، با هالهٔ نبض‌دار.
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: tint.withValues(alpha: 0.18),
+                        border: Border.all(
+                          color: tint.withValues(alpha: 0.55),
+                          width: 1.5,
                         ),
-                        if (text.isNotEmpty)
-                          Text(text,
+                        boxShadow: [
+                          BoxShadow(
+                            color: tint.withValues(alpha: glow * 0.7),
+                            blurRadius: 16,
+                          ),
+                        ],
+                      ),
+                      child: Transform.scale(
+                        scale: 0.9 + 0.14 * _pulse.value,
+                        child: Icon(icon, color: tint, size: 24),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'راند ${faNum(widget.roundNumber)} — نبرد بر سر',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white.withValues(alpha: 0.72),
+                            ),
+                          ),
+                          const SizedBox(height: 1),
+                          Text(
+                            statName.isEmpty ? label : '$statName!',
+                            style: TextStyle(
+                              fontSize: 21,
+                              fontWeight: FontWeight.w900,
+                              color: tint,
+                              height: 1.25,
+                              shadows: [
+                                Shadow(
+                                  color: tint.withValues(alpha: glow),
+                                  blurRadius: 14,
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (text.isNotEmpty)
+                            Text(
+                              text,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                  fontSize: 12,
-                                  height: 1.5,
-                                  color: Colors.white70,
-                                  fontWeight: FontWeight.w600)),
-                      ],
+                                fontSize: 12,
+                                height: 1.5,
+                                color: Colors.white70,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
-                  ),
-                ]),
+                  ],
+                ),
               ),
             ),
           ),
@@ -1702,7 +2468,11 @@ class _FocusBannerState extends State<_FocusBanner>
 /// بدونِ این، کاربر باید حدس می‌زد کدام یک از شش عددِ کارت مهم است. با
 /// این، انتخابِ کارت یک تصمیمِ آگاهانه می‌شود نه قرعه‌کشی.
 class _FocusStatRibbon extends StatelessWidget {
-  const _FocusStatRibbon({required this.card, required this.stat, required this.tint});
+  const _FocusStatRibbon({
+    required this.card,
+    required this.stat,
+    required this.tint,
+  });
   final Map card;
   final String stat;
   final Color tint;
@@ -1728,13 +2498,25 @@ class _FocusStatRibbon extends StatelessWidget {
         color: tint.withValues(alpha: 0.18),
         border: Border.all(color: tint.withValues(alpha: 0.5)),
       ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(_FocusBannerState._statIcons[stat] ?? Icons.stars_rounded,
-            size: 13, color: tint),
-        const SizedBox(width: 4),
-        Text(faNum(value),
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: tint)),
-      ]),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            _FocusBannerState._statIcons[stat] ?? Icons.stars_rounded,
+            size: 13,
+            color: tint,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            faNum(value),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+              color: tint,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1778,44 +2560,58 @@ class _CollapsibleSectionState extends State<_CollapsibleSection> {
   @override
   Widget build(BuildContext context) => AppCard(
         padding: const EdgeInsets.all(Gaps.sm),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          InkWell(
-            onTap: () => setState(() => _open = !_open),
-            borderRadius: BorderRadius.circular(10),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(children: [
-                Icon(widget.icon, size: 20, color: _gold),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(widget.title,
-                          style: const TextStyle(
-                              fontSize: 13.5, fontWeight: FontWeight.w900)),
-                      Text(widget.subtitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 11.5, color: Colors.white54)),
-                    ],
-                  ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            InkWell(
+              onTap: () => setState(() => _open = !_open),
+              borderRadius: BorderRadius.circular(10),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Icon(widget.icon, size: 20, color: _gold),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            widget.title,
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          Text(
+                            widget.subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              color: Colors.white54,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    AnimatedRotation(
+                      turns: _open ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 200),
+                      child: const Icon(
+                        Icons.expand_more_rounded,
+                        color: Colors.white54,
+                      ),
+                    ),
+                  ],
                 ),
-                AnimatedRotation(
-                  turns: _open ? 0.5 : 0,
-                  duration: const Duration(milliseconds: 200),
-                  child: const Icon(Icons.expand_more_rounded, color: Colors.white54),
-                ),
-              ]),
+              ),
             ),
-          ),
-          // فرزند فقط وقتی باز است اصلاً ساخته می‌شود.
-          if (_open) ...[
-            const SizedBox(height: Gaps.xs),
-            widget.child,
+            // فرزند فقط وقتی باز است اصلاً ساخته می‌شود.
+            if (_open) ...[const SizedBox(height: Gaps.xs), widget.child],
           ],
-        ]),
+        ),
       );
 }
 
@@ -1916,7 +2712,9 @@ class _RoundIntroOverlayState extends State<_RoundIntroOverlay>
         if (v >= 1.0) return const SizedBox.shrink();
         // سه فاز: ورود (۰–۰.۲۵)، ماندن (۰.۲۵–۰.۷۵)، خروج (۰.۷۵–۱).
         final enter = Curves.easeOutBack.transform((v / 0.25).clamp(0.0, 1.0));
-        final exit = Curves.easeIn.transform(((v - 0.75) / 0.25).clamp(0.0, 1.0));
+        final exit = Curves.easeIn.transform(
+          ((v - 0.75) / 0.25).clamp(0.0, 1.0),
+        );
         final opacity = (1 - exit).clamp(0.0, 1.0);
         // آیکن از دور می‌آید و یک دورِ کامل می‌چرخد.
         final spin = (1 - enter) * math.pi * 2;
@@ -1932,11 +2730,14 @@ class _RoundIntroOverlayState extends State<_RoundIntroOverlay>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('راند ${faNum(widget.roundNumber)} از ${faNum(widget.totalRounds)}',
-                      style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white.withValues(alpha: 0.75))),
+                  Text(
+                    'راند ${faNum(widget.roundNumber)} از ${faNum(widget.totalRounds)}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white.withValues(alpha: 0.75),
+                    ),
+                  ),
                   const SizedBox(height: 14),
                   Transform.rotate(
                     angle: spin,
@@ -1947,13 +2748,18 @@ class _RoundIntroOverlayState extends State<_RoundIntroOverlay>
                         height: 104,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          gradient: RadialGradient(colors: [
-                            tint.withValues(alpha: 0.38),
-                            Colors.transparent,
-                          ]),
+                          gradient: RadialGradient(
+                            colors: [
+                              tint.withValues(alpha: 0.38),
+                              Colors.transparent,
+                            ],
+                          ),
                           border: Border.all(color: tint, width: 2.5),
                           boxShadow: [
-                            BoxShadow(color: tint.withValues(alpha: 0.55), blurRadius: 40),
+                            BoxShadow(
+                              color: tint.withValues(alpha: 0.55),
+                              blurRadius: 40,
+                            ),
                           ],
                         ),
                         child: Icon(icon, color: tint, size: 52),
@@ -1985,15 +2791,23 @@ class _RoundIntroOverlayState extends State<_RoundIntroOverlay>
                   if (statName.isNotEmpty) ...[
                     const SizedBox(height: 12),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 7),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 15,
+                        vertical: 7,
+                      ),
                       decoration: BoxDecoration(
                         color: tint.withValues(alpha: 0.20),
                         borderRadius: BorderRadius.circular(999),
                         border: Border.all(color: tint.withValues(alpha: 0.75)),
                       ),
-                      child: Text('بالاترین «$statName» برنده است',
-                          style: TextStyle(
-                              fontSize: 14, fontWeight: FontWeight.w900, color: tint)),
+                      child: Text(
+                        'بالاترین «$statName» برنده است',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          color: tint,
+                        ),
+                      ),
                     ),
                   ],
                   // ── راهنمای گروهِ سنیِ پایین ──
@@ -2003,13 +2817,16 @@ class _RoundIntroOverlayState extends State<_RoundIntroOverlay>
                     const SizedBox(height: 10),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 34),
-                      child: Text(hint,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                              fontSize: 13.5,
-                              height: 1.6,
-                              color: Colors.white70,
-                              fontWeight: FontWeight.w700)),
+                      child: Text(
+                        hint,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          height: 1.6,
+                          color: Colors.white70,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
                   ],
                 ],
@@ -2071,24 +2888,31 @@ class _CompactMatchBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SizedBox(
         height: 34,
-        child: Row(children: [
-          IconButton(
-            onPressed: onBack,
-            icon: const Icon(Icons.arrow_back_rounded, size: 20),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
-            tooltip: 'خروج از نبرد',
-          ),
-          const SizedBox(width: 6),
-          Icon(Icons.sports_mma_rounded, size: 15, color: modeColor),
-          const SizedBox(width: 5),
-          Expanded(
-            child: Text(modeTitle,
+        child: Row(
+          children: [
+            IconButton(
+              onPressed: onBack,
+              icon: const Icon(Icons.arrow_back_rounded, size: 20),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+              tooltip: 'خروج از نبرد',
+            ),
+            const SizedBox(width: 6),
+            Icon(Icons.sports_mma_rounded, size: 15, color: modeColor),
+            const SizedBox(width: 5),
+            Expanded(
+              child: Text(
+                modeTitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                    fontSize: 12.5, fontWeight: FontWeight.w900, color: modeColor)),
-          ),
-        ]),
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w900,
+                  color: modeColor,
+                ),
+              ),
+            ),
+          ],
+        ),
       );
 }

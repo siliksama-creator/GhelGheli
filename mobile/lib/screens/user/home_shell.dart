@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:math' as math;
+
 import '../../theme/tokens.dart';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -47,7 +49,9 @@ class _HomeShellState extends State<HomeShell>
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('خروج از حساب کاربری'),
-        content: const Text('آیا مطمئن هستید که می‌خواهید از حساب خود خارج شوید؟'),
+        content: const Text(
+          'آیا مطمئن هستید که می‌خواهید از حساب خود خارج شوید؟',
+        ),
         actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         actions: [
           Row(
@@ -59,7 +63,10 @@ class _HomeShellState extends State<HomeShell>
                     shape: RoundedRectangleBorder(borderRadius: Corners.rLg),
                   ),
                   onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('انصراف', style: TextStyle(fontWeight: FontWeight.w700)),
+                  child: const Text(
+                    'انصراف',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -72,7 +79,10 @@ class _HomeShellState extends State<HomeShell>
                     shape: RoundedRectangleBorder(borderRadius: Corners.rLg),
                   ),
                   onPressed: () => Navigator.pop(ctx, true),
-                  child: const Text('خروج', style: TextStyle(fontWeight: FontWeight.w700)),
+                  child: const Text(
+                    'خروج',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
                 ),
               ),
             ],
@@ -134,8 +144,10 @@ class _HomeShellState extends State<HomeShell>
     vsync: this,
     duration: const Duration(milliseconds: 520),
   )..forward();
-  late final Animation<double> _entranceFade =
-      CurvedAnimation(parent: _entrance, curve: Curves.easeOut);
+  late final Animation<double> _entranceFade = CurvedAnimation(
+    parent: _entrance,
+    curve: Curves.easeOut,
+  );
   late final Animation<Offset> _entranceSlide = Tween(
     begin: const Offset(0, 0.04),
     end: Offset.zero,
@@ -162,32 +174,40 @@ class _HomeShellState extends State<HomeShell>
   //     هزاران شیءِ کوتاه‌عمر. فشارِ تخصیص، GC را مرتب بیدار می‌کند و
   //     هر بیدار شدن یک وقفهٔ کوچک است — همان «لودینگ‌های نه‌چندان
   //     طولانی ولی محسوس».
-  //   • بدتر: `ValueKey(_index)` در AnimatedSwitcher باعث می‌شود فلاتر
-  //     زیردرختِ صفحه را با نمونهٔ **جدید** تطبیق دهد. چون نوعِ ویجت
-  //     یکی است State بازاستفاده می‌شود، ولی کلِ زیردرخت هر بار دوباره
-  //     پیمایش و مقایسه می‌شود.
-  //   • بازی ضربه‌زن بدترین حالت است: `TapGameScreen` را می‌ساخت حتی
-  //     وقتی کاربر در تبِ کیف پول بود.
+  //   • بدتر: `ValueKey(_index)` در AnimatedSwitcher صفحهٔ قبلی را بعد
+  //     از fade از درخت حذف می‌کرد. Widget object در Map می‌ماند ولی
+  //     **State آن dispose می‌شد**؛ برگشت یعنی initState و API load تازه.
+  //   • بازی ضربه‌زن بدترین حالت بود: با خروج از تب، session محلی و
+  //     تصویرهای آماده دور ریخته می‌شدند.
   //
   // راه‌حل: هر صفحه **یک بار** ساخته و نگه داشته می‌شود. ساختِ تنبل
   // است، پس صفحه‌ای که کاربر هرگز باز نکند هیچ هزینه‌ای ندارد — این
   // مهم است چون قبلاً هر ۱۲ تا از لحظهٔ اول ساخته می‌شدند.
   //
-  //  نکتهٔ ظریف: `InventoryPage` به `_inventory` وابسته است که با
-  //    هر bootstrap عوض می‌شود. برای همین **عمداً کش نمی‌شود** —
-  //    توضیح در `_buildPage`.
+  // نکتهٔ ظریف: `InventoryPage` هم State زنده دارد، ولی config آن بعد از
+  // bootstrap با `_refreshInventoryPageConfig` عوض می‌شود تا کارت تازه را
+  // ببیند بدون اینکه search/sort/scroll کاربر از بین برود.
   final Map<int, Widget> _pageCache = {};
 
-  /// صفحهٔ [i] را می‌سازد یا از کش می‌دهد.
-  Widget _pageAt(int i) {
-    // صفحهٔ کلکسیون از کش مستثناست: ورودی‌اش (`_inventory`) داده است،
-    // نه فقط callback. اگر کش شود، کارتی که کاربر همین حالا ثبت کرده
-    // تا ری‌استارتِ اپ در کلکسیون دیده نمی‌شود.
-    //
-    // هزینه‌اش ناچیز است: یک ویجتِ سبک که فقط وقتی همین تب باز است
-    // ساخته می‌شود.
-    if (i == inventoryIndex) return _buildPage(i);
-    return _pageCache.putIfAbsent(i, () => _buildPage(i));
+  /// صفحهٔ [i] را یک بار می‌سازد و همان **State زنده** را نگه می‌دارد.
+  ///
+  /// نکتهٔ مهم: صرفاً نگه داشتن Widget object کافی نیست. نسخهٔ قبلی آن
+  /// object را داخل AnimatedSwitcher می‌گذاشت؛ با تعویض تب، subtree از
+  /// درخت حذف و State آن dispose می‌شد. وقتی برمی‌گشتیم همان Widget object
+  /// یک State تازه می‌ساخت و initState دوباره API/تصویرها را لود می‌کرد.
+  /// این همان علت واقعی «هر بار تب را عوض می‌کنم دوباره لود می‌کند» بود.
+  ///
+  /// `_buildPersistentPages` پایین همهٔ صفحه‌های بازشده را با Offstage در
+  /// درخت نگه می‌دارد و TickerMode انیمیشنِ تب پنهان را متوقف می‌کند.
+  Widget _pageAt(int i) => _pageCache.putIfAbsent(i, () => _buildPage(i));
+
+  /// وقتی bootstrap کلکسیون تازه‌ای آورد، config ویجتِ کلکسیون عوض می‌شود
+  /// ولی slot/key ثابت می‌ماند؛ بنابراین search/sort/scroll State حفظ و فقط
+  /// `widget.items` تازه می‌شود.
+  void _refreshInventoryPageConfig() {
+    if (_pageCache.containsKey(inventoryIndex)) {
+      _pageCache[inventoryIndex] = _buildPage(inventoryIndex);
+    }
   }
 
   /// تنها جایی که یک صفحه واقعاً ساخته می‌شود.
@@ -247,11 +267,11 @@ class _HomeShellState extends State<HomeShell>
           onOpenShop: () => setState(() => _index = shopIndex),
           onChanged: _loadProfile,
         );
-    // ── چرا در **انتهای** لیست ──
-    // ایندکس‌های این آرایه در چند جای دیگر ثابت‌اند (wheelIndex=7،
-    // shopIndex=9 و …) و شیتِ «بیشتر» هم با همین شماره‌ها کار می‌کند.
-    // درج در وسط یعنی جابه‌جا شدنِ همهٔ آن‌ها و — همان‌طور که
-    // navigation_test قبلاً گرفت — RangeError و کرشِ کاملِ اپ.
+      // ── چرا در **انتهای** لیست ──
+      // ایندکس‌های این آرایه در چند جای دیگر ثابت‌اند (wheelIndex=7،
+      // shopIndex=9 و …) و شیتِ «بیشتر» هم با همین شماره‌ها کار می‌کند.
+      // درج در وسط یعنی جابه‌جا شدنِ همهٔ آن‌ها و — همان‌طور که
+      // navigation_test قبلاً گرفت — RangeError و کرشِ کاملِ اپ.
       case inventoryIndex:
         return InventoryPage(items: _inventory, onRefresh: _loadProfile);
       default:
@@ -299,64 +319,82 @@ class _HomeShellState extends State<HomeShell>
   // نداشت — یعنی سیستمِ رشدِ اپ عملاً پنهان بود. کیف پول (۲)، پشتیبانی
   // (۵) و پروفایل (۶) از قبل اینجا بودند.
   static const _moreIndexes = [
-    inventoryIndex, 2, referralIndex, passIndex, 5, 6];
+    inventoryIndex,
+    2,
+    referralIndex,
+    passIndex,
+    5,
+    6,
+  ];
 
   /// شمارهٔ صفحهٔ کیف پول — از هدر داشبورد مستقیم به آن پرش می‌شود.
   static const _walletIndex = 2;
 
   static const _destinations = [
     NavigationDestination(
-        icon: Icon(Icons.home_outlined),
-        selectedIcon: Icon(Icons.home_rounded),
-        label: 'خانه'),
+      icon: Icon(Icons.home_outlined),
+      selectedIcon: Icon(Icons.home_rounded),
+      label: 'خانه',
+    ),
     NavigationDestination(
-        icon: Icon(Icons.card_giftcard_outlined),
-        selectedIcon: Icon(Icons.card_giftcard_rounded),
-        label: 'جوایز'),
+      icon: Icon(Icons.card_giftcard_outlined),
+      selectedIcon: Icon(Icons.card_giftcard_rounded),
+      label: 'جوایز',
+    ),
     NavigationDestination(
-        icon: Icon(Icons.account_balance_wallet_outlined),
-        selectedIcon: Icon(Icons.account_balance_wallet_rounded),
-        label: 'کیف پول'),
+      icon: Icon(Icons.account_balance_wallet_outlined),
+      selectedIcon: Icon(Icons.account_balance_wallet_rounded),
+      label: 'کیف پول',
+    ),
     NavigationDestination(
-        icon: Icon(Icons.emoji_events_outlined),
-        selectedIcon: Icon(Icons.emoji_events_rounded),
-        label: 'لیگ'),
+      icon: Icon(Icons.emoji_events_outlined),
+      selectedIcon: Icon(Icons.emoji_events_rounded),
+      label: 'لیگ',
+    ),
     NavigationDestination(
-        icon: Icon(Icons.sports_esports_outlined),
-        selectedIcon: Icon(Icons.sports_esports_rounded),
-        label: 'چت و بازی'),
+      icon: Icon(Icons.sports_esports_outlined),
+      selectedIcon: Icon(Icons.sports_esports_rounded),
+      label: 'چت و بازی',
+    ),
     NavigationDestination(
-        icon: Icon(Icons.support_agent_outlined),
-        selectedIcon: Icon(Icons.support_agent_rounded),
-        label: 'پشتیبانی'),
+      icon: Icon(Icons.support_agent_outlined),
+      selectedIcon: Icon(Icons.support_agent_rounded),
+      label: 'پشتیبانی',
+    ),
     NavigationDestination(
-        icon: Icon(Icons.person_outline_rounded),
-        selectedIcon: Icon(Icons.person_rounded),
-        label: 'پروفایل'),
+      icon: Icon(Icons.person_outline_rounded),
+      selectedIcon: Icon(Icons.person_rounded),
+      label: 'پروفایل',
+    ),
     // ۷، ۸ و ۹ در نوار پایین نیستند، ولی شیتِ «بیشتر» با همین ایندکسِ
     // صفحه در این لیست جست‌وجو می‌کند. تا وقتی این سه ردیف نبودند،
     // گذاشتنِ «دعوت دوستان» در شیت باعث RangeError و کرشِ کاملِ اپ
     // می‌شد — تستِ navigation_test.dart دقیقاً همین را گرفت.
     NavigationDestination(
-        icon: Icon(Icons.casino_outlined),
-        selectedIcon: Icon(Icons.casino_rounded),
-        label: 'گردونه'),
+      icon: Icon(Icons.casino_outlined),
+      selectedIcon: Icon(Icons.casino_rounded),
+      label: 'گردونه',
+    ),
     NavigationDestination(
-        icon: Icon(Icons.handshake_outlined),
-        selectedIcon: Icon(Icons.handshake_rounded),
-        label: 'دعوت دوستان'),
+      icon: Icon(Icons.handshake_outlined),
+      selectedIcon: Icon(Icons.handshake_rounded),
+      label: 'دعوت دوستان',
+    ),
     NavigationDestination(
-        icon: Icon(Icons.storefront_outlined),
-        selectedIcon: Icon(Icons.storefront_rounded),
-        label: 'فروشگاه'),
+      icon: Icon(Icons.storefront_outlined),
+      selectedIcon: Icon(Icons.storefront_rounded),
+      label: 'فروشگاه',
+    ),
     NavigationDestination(
-        icon: Icon(Icons.rocket_launch_outlined),
-        selectedIcon: Icon(Icons.rocket_launch_rounded),
-        label: 'گذر نبرد'),
+      icon: Icon(Icons.rocket_launch_outlined),
+      selectedIcon: Icon(Icons.rocket_launch_rounded),
+      label: 'گذر نبرد',
+    ),
     NavigationDestination(
-        icon: Icon(Icons.style_outlined),
-        selectedIcon: Icon(Icons.style_rounded),
-        label: 'کلکسیون'),
+      icon: Icon(Icons.style_outlined),
+      selectedIcon: Icon(Icons.style_rounded),
+      label: 'کلکسیون',
+    ),
   ];
 
   @override
@@ -400,6 +438,7 @@ class _HomeShellState extends State<HomeShell>
               .whereType<Map>()
               .map((e) => Map<String, dynamic>.from(e))
               .toList();
+          _refreshInventoryPageConfig();
         }
         final p = m['pass'];
         if (p is Map) {
@@ -407,8 +446,10 @@ class _HomeShellState extends State<HomeShell>
           final maxT = (p['maxTiersPerDay'] as num?)?.toInt() ?? 2;
           // سقف در سرور هم اعمال می‌شود؛ این clamp محافظ دوم است تا اگر
           // روزی سرور عدد بزرگ‌تری فرستاد، نشان «۷» نشان ندهد.
-          _passTiersToday =
-              ((p['tiersToday'] as num?)?.toInt() ?? 0).clamp(0, maxT);
+          _passTiersToday = ((p['tiersToday'] as num?)?.toInt() ?? 0).clamp(
+            0,
+            maxT,
+          );
         }
       });
     } catch (_) {
@@ -501,25 +542,56 @@ class _HomeShellState extends State<HomeShell>
       builder: (sheetContext) => SafeArea(
         child: SingleChildScrollView(
           child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final i in _moreIndexes)
-              ListTile(
-                leading: Icon(_index == i
-                    ? (_destinations[i].selectedIcon as Icon).icon
-                    : (_destinations[i].icon as Icon).icon),
-                title: Text(_titles[i]),
-                selected: _index == i,
-                onTap: () => Navigator.pop(sheetContext, i),
-              ),
-            // ردیفِ «حالت روشن/تیره» حذف شد — اپ تک‌تم است.
-            const SizedBox(height: 8),
-          ],
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final i in _moreIndexes)
+                ListTile(
+                  leading: Icon(
+                    _index == i
+                        ? (_destinations[i].selectedIcon as Icon).icon
+                        : (_destinations[i].icon as Icon).icon,
+                  ),
+                  title: Text(_titles[i]),
+                  selected: _index == i,
+                  onTap: () => Navigator.pop(sheetContext, i),
+                ),
+              // ردیفِ «حالت روشن/تیره» حذف شد — اپ تک‌تم است.
+              const SizedBox(height: 8),
+            ],
           ),
         ),
       ),
     );
     if (picked != null && mounted) setState(() => _index = picked);
+  }
+
+  /// تب‌های دیده‌شده را در درخت نگه می‌دارد؛ تب ندیده اصلاً ساخته نمی‌شود.
+  ///
+  /// Offstage به‌تنهایی State را حفظ می‌کند، و TickerMode تضمین می‌کند
+  /// انیمیشن‌های فروشگاه/گردونه/بازی وقتی پنهان‌اند CPU/GPU نگیرند.
+  /// نتیجه: بازگشت به تب، همان scroll و همان تصویر decodeشده را فوراً
+  /// نشان می‌دهد و هیچ initState یا درخواست تکراری اجرا نمی‌شود.
+  Widget _buildPersistentPages() {
+    _pageAt(_index); // ساختِ تنبلِ فقط صفحه‌ای که همین حالا باز شده.
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        for (final entry in _pageCache.entries)
+          Offstage(
+            key: ValueKey('page-slot-${entry.key}'),
+            offstage: entry.key != _index,
+            child: TickerMode(
+              enabled: entry.key == _index,
+              child: entry.key == passIndex
+                  ? entry.value
+                  : ScrollHint(
+                      hintLabel: _scrollHints[entry.key] ?? 'پایین‌تر هم هست',
+                      child: entry.value,
+                    ),
+            ),
+          ),
+      ],
+    );
   }
 
   @override
@@ -537,9 +609,8 @@ class _HomeShellState extends State<HomeShell>
                 _titles[_index],
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
+                style: Theme.of(context).textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w900),
               ),
             ),
           ],
@@ -573,7 +644,11 @@ class _HomeShellState extends State<HomeShell>
           NotificationBell(api: widget.api),
           IconButton(
             tooltip: 'خروج از حساب',
-            icon: const Icon(Icons.logout_rounded, size: 20, color: Color(0xFFFF6B6B)),
+            icon: const Icon(
+              Icons.logout_rounded,
+              size: 20,
+              color: Color(0xFFFF6B6B),
+            ),
             onPressed: () => _confirmLogout(context),
           ),
           // حذفِ دکمهٔ تکراری
@@ -594,47 +669,13 @@ class _HomeShellState extends State<HomeShell>
         child: FadeTransition(
           opacity: _entranceFade,
           child: SlideTransition(
-          position: _entranceSlide,
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 260),
-            switchInCurve: Curves.easeOut,
-            switchOutCurve: Curves.easeIn,
-            transitionBuilder: (child, animation) =>
-                FadeTransition(opacity: animation, child: child),
-            // ═══════════════════════════════════════════════════════════
-            // نوار اسکرول برای همهٔ صفحه‌ها، از یک نقطه
-            // ═══════════════════════════════════════════════════════════
-            //
-            // درخواست مالک: «یه اسکرول بار برای صفحاتی که بیشتر از صفحه
-            // نمایش دیده میشن باید درست کنی که کاربر متوجه بشه که برای
-            // دیدن آیتم هایی که مشخص نیستن باید تاچ کنه بره سمت پایین».
-            //
-            // چرا اینجا و نه داخل تک‌تک صفحه‌ها: ۱۱ صفحهٔ کاربر هر کدام
-            // ساختار اسکرول متفاوتی دارند (ListView، ListView.builder،
-            // RefreshIndicator، Column+Expanded، تب‌های تودرتو). وصله
-            // زدن به هر کدام یعنی ۱۱ جای متفاوت که فردا یکی‌شان یادش
-            // می‌رود. ScrollHint فقط به ScrollNotification گوش می‌دهد،
-            // پس هر اسکرولی در هر عمقی از صفحه را می‌گیرد.
-            //
-            // داخل KeyedSubtree است نه بیرونش: هر صفحه باید حالت اسکرول
-            // خودش را داشته باشد. اگر بیرون بود، رفتن از یک صفحهٔ
-            // اسکرول‌شده به یک صفحهٔ کوتاه، ریل را با موقعیتِ صفحهٔ
-            // قبلی نشان می‌داد.
-            //
-            // گذر نبرد استثناست: ریلِ اختصاصیِ خودش را دارد که شمارهٔ
-            // پله را هم نشان می‌دهد. دو ریل کنار هم فقط شلوغی است.
-            child: KeyedSubtree(
-              key: ValueKey(_index),
-              child: _index == passIndex
-                  ? _pageAt(_index)
-                  : ScrollHint(
-                      hintLabel: _scrollHints[_index] ?? 'پایین‌تر هم هست',
-                      child: _pageAt(_index),
-                    ),
-            ),
+            position: _entranceSlide,
+            // AnimatedSwitcher قبلی subtree تبِ قبلی را dispose می‌کرد؛
+            // ظاهرش fade بود ولی هزینه‌اش init/API/image load دوباره بود.
+            // جابه‌جایی حالا فوری است و State واقعی هر تب زنده می‌ماند.
+            child: _buildPersistentPages(),
           ),
         ),
-      ),
       ),
       bottomNavigationBar: NavigationBar(
         // Taller bar + always-visible labels: the default height with seven
@@ -646,9 +687,11 @@ class _HomeShellState extends State<HomeShell>
         destinations: [
           for (final i in _navIndexes) _destinations[i],
           NavigationDestination(
-            icon: Icon(_moreIndexes.contains(_index)
-                ? Icons.more_horiz_rounded
-                : Icons.more_horiz_outlined),
+            icon: Icon(
+              _moreIndexes.contains(_index)
+                  ? Icons.more_horiz_rounded
+                  : Icons.more_horiz_outlined,
+            ),
             selectedIcon: const Icon(Icons.more_horiz_rounded),
             label: 'بیشتر',
           ),
@@ -657,8 +700,6 @@ class _HomeShellState extends State<HomeShell>
     );
   }
 }
-
-
 
 /// آیکون گردونه با نشانِ تعداد چرخش.
 ///
@@ -706,12 +747,18 @@ class _WheelButtonState extends State<_WheelButton>
           onPressed: widget.onPressed,
           style: widget.selected
               ? IconButton.styleFrom(
-                  backgroundColor:
-                      Theme.of(context).colorScheme.primary.withValues(alpha: 0.18))
+                  backgroundColor: Theme.of(context).colorScheme.primary
+                      .withValues(alpha: 0.18),
+                )
               : null,
           icon: RotationTransition(
             turns: _spinCtrl,
-            child: Image.asset('assets/pass/wheel_icon.webp', width: 24, height: 24, cacheWidth: 72),
+            child: Image.asset(
+              'assets/pass/wheel_icon.webp',
+              width: 24,
+              height: 24,
+              cacheWidth: 72,
+            ),
           ),
         ),
         if (n > 0)
@@ -726,8 +773,9 @@ class _WheelButtonState extends State<_WheelButton>
                   color: const Color(0xFFF43F5E),
                   borderRadius: BorderRadius.circular(999),
                   border: Border.all(
-                    color: Theme.of(context).appBarTheme.backgroundColor
-                        ?? Theme.of(context).colorScheme.surface,
+                    color:
+                        Theme.of(context).appBarTheme.backgroundColor ??
+                        Theme.of(context).colorScheme.surface,
                     width: 2,
                   ),
                 ),
@@ -782,7 +830,12 @@ class _PassButtonState extends State<_PassButton>
   @override
   Widget build(BuildContext context) {
     final claimable = widget.claimable;
-    final badgeNum = math.min(claimable > 0 ? (widget.tiersToday > 0 ? widget.tiersToday : claimable) : 0, 2);
+    final badgeNum = math.min(
+      claimable > 0
+          ? (widget.tiersToday > 0 ? widget.tiersToday : claimable)
+          : 0,
+      2,
+    );
 
     return AnimatedBuilder(
       animation: _anim,
@@ -796,8 +849,9 @@ class _PassButtonState extends State<_PassButton>
           onPressed: widget.onPressed,
           style: widget.selected
               ? IconButton.styleFrom(
-                  backgroundColor:
-                      Theme.of(context).colorScheme.primary.withValues(alpha: 0.18))
+                  backgroundColor: Theme.of(context).colorScheme.primary
+                      .withValues(alpha: 0.18),
+                )
               : null,
           icon: SizedBox(
             width: 36,
@@ -815,14 +869,17 @@ class _PassButtonState extends State<_PassButton>
                       shape: BoxShape.circle,
                       gradient: RadialGradient(
                         colors: [
-                          const Color(0xFF00E5FF).withValues(alpha: 0.35 * glowPulse),
-                          const Color(0xFF38BDF8).withValues(alpha: 0.15 * glowPulse),
+                          const Color(0xFF00E5FF)
+                              .withValues(alpha: 0.35 * glowPulse),
+                          const Color(0xFF38BDF8)
+                              .withValues(alpha: 0.15 * glowPulse),
                           Colors.transparent,
                         ],
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF00E5FF).withValues(alpha: 0.30 * glowPulse),
+                          color: const Color(0xFF00E5FF)
+                              .withValues(alpha: 0.30 * glowPulse),
                           blurRadius: 10,
                           spreadRadius: 1,
                         ),
@@ -855,7 +912,8 @@ class _PassButtonState extends State<_PassButton>
                         border: Border.all(color: Colors.white, width: 1.2),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFFFF2A4B).withValues(alpha: 0.75),
+                            color: const Color(0xFFFF2A4B)
+                                .withValues(alpha: 0.75),
                             blurRadius: 8,
                             spreadRadius: 1,
                           ),
@@ -913,8 +971,9 @@ class _ShopButtonState extends State<_ShopButton>
       onPressed: widget.onPressed,
       style: widget.selected
           ? IconButton.styleFrom(
-              backgroundColor:
-                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.18))
+              backgroundColor: Theme.of(context).colorScheme.primary
+                  .withValues(alpha: 0.18),
+            )
           : null,
       icon: AnimatedBuilder(
         animation: _animCtrl,
@@ -941,7 +1000,10 @@ class _ShopButtonState extends State<_ShopButton>
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFFFFB300).withValues(alpha: 0.35 + 0.20 * math.sin(t * 2 * math.pi).abs()),
+                          color: const Color(0xFFFFB300).withValues(
+                            alpha:
+                                0.35 + 0.20 * math.sin(t * 2 * math.pi).abs(),
+                          ),
                           blurRadius: 12,
                           spreadRadius: 2,
                         ),
@@ -960,18 +1022,27 @@ class _ShopButtonState extends State<_ShopButton>
                       gradient: const LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [Color(0xFFFFDF70), Color(0xFFFF9F43), Color(0xFFFF5252)],
+                        colors: [
+                          Color(0xFFFFDF70),
+                          Color(0xFFFF9F43),
+                          Color(0xFFFF5252),
+                        ],
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFFFF9F43).withValues(alpha: 0.45),
+                          color: const Color(0xFFFF9F43)
+                              .withValues(alpha: 0.45),
                           blurRadius: 8,
                           offset: const Offset(0, 3),
                         ),
                       ],
                     ),
                     child: const Center(
-                      child: Icon(Icons.shopping_basket_rounded, size: 18, color: Color(0xFF230E00)),
+                      child: Icon(
+                        Icons.shopping_basket_rounded,
+                        size: 18,
+                        color: Color(0xFF230E00),
+                      ),
                     ),
                   ),
                 ),
@@ -986,10 +1057,7 @@ class _ShopButtonState extends State<_ShopButton>
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           boxShadow: [
-                            BoxShadow(
-                              color: Color(0xFFFFE08A),
-                              blurRadius: 8,
-                            ),
+                            BoxShadow(color: Color(0xFFFFE08A), blurRadius: 8),
                           ],
                         ),
                         child: Icon(
@@ -1009,5 +1077,3 @@ class _ShopButtonState extends State<_ShopButton>
     );
   }
 }
-
-

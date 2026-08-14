@@ -72,6 +72,8 @@ class _CardDuelPageState extends State<CardDuelPage> {
   String? _error;
   Map<String, dynamic>? _data;
   final List<String> _selected = [];
+  int _prewarmedRoundCount = -1;
+  bool _didReloadFinishedBattle = false;
 
   List<Map<String, dynamic>> get _ownedCards =>
       ((_data?['playableCards'] as List?) ?? const [])
@@ -93,8 +95,7 @@ class _CardDuelPageState extends State<CardDuelPage> {
 
   Color get _modeColor => widget.vsBot
       ? _emerald
-      : widget.roomCode != null ||
-              widget.initialStart?['matchMode'] == 'lobby'
+      : widget.roomCode != null || widget.initialStart?['matchMode'] == 'lobby'
           ? _purple
           : widget.stake == 1000
               ? _gold
@@ -102,8 +103,7 @@ class _CardDuelPageState extends State<CardDuelPage> {
 
   String get _modeTitle => widget.vsBot
       ? 'تمرین با ربات'
-      : widget.roomCode != null ||
-              widget.initialStart?['matchMode'] == 'lobby'
+      : widget.roomCode != null || widget.initialStart?['matchMode'] == 'lobby'
           ? 'لابی خصوصی'
           : 'نبرد آنلاین ${faNum(widget.stake)}';
 
@@ -119,7 +119,21 @@ class _CardDuelPageState extends State<CardDuelPage> {
 
   void _onSession() {
     if (!mounted) return;
-    if (_session.phase == GamePhase.over) unawaited(_load(refreshSelection: false));
+    final roundCount = (_session.state['history'] as List? ?? const []).length;
+    // GameSession برای تیکِ ساعت هم notify می‌کند. prewarm فقط وقتی deck
+    // برای اولین بار رسید یا راند تازه resolve شد اجرا می‌شود؛ نه بیست بار
+    // در ثانیه. این باعث می‌شود تصویرِ کارتِ صحنه قبل/هم‌زمان با اولین فریم
+    // آماده باشد و انیمیشن منتظر network نماند.
+    if (roundCount != _prewarmedRoundCount) {
+      _prewarmedRoundCount = roundCount;
+      unawaited(ImageDiskCache.instance.prewarmPayload(_session.state));
+    }
+    if (_session.phase == GamePhase.over && !_didReloadFinishedBattle) {
+      _didReloadFinishedBattle = true;
+      unawaited(_load(refreshSelection: false));
+    } else if (_session.phase != GamePhase.over) {
+      _didReloadFinishedBattle = false;
+    }
     setState(() {});
   }
 
@@ -135,7 +149,10 @@ class _CardDuelPageState extends State<CardDuelPage> {
     _applyDuelData(Map<String, dynamic>.from(cached), refreshSelection: true);
   }
 
-  void _applyDuelData(Map<String, dynamic> map, {required bool refreshSelection}) {
+  void _applyDuelData(
+    Map<String, dynamic> map, {
+    required bool refreshSelection,
+  }) {
     final owned = (map['playableCards'] as List?) ?? const [];
     final prepared = widget.vsBot && owned.length < 5
         ? (map['practiceCards'] as List? ?? const [])
@@ -293,30 +310,57 @@ class _CardDuelPageState extends State<CardDuelPage> {
     final cards = <Map<String, dynamic>>[];
     for (final raw in history.whereType<Map>()) {
       for (final key in const ['cardX', 'cardO']) {
-        if (raw[key] is Map) cards.add(Map<String, dynamic>.from(raw[key] as Map));
+        if (raw[key] is Map) {
+          cards.add(Map<String, dynamic>.from(raw[key] as Map));
+        }
       }
     }
-    cards.sort((a, b) => NumberParser.toInt(b['power']).compareTo(NumberParser.toInt(a['power'])));
+    cards.sort(
+      (a, b) => NumberParser.toInt(b['power'])
+          .compareTo(NumberParser.toInt(a['power'])),
+    );
     return cards.isEmpty ? null : cards.first;
   }
 
-  Future<XFile> _renderResultCard({required String title, required String score, required Map<String, dynamic>? mvp, required String url}) async {
+  Future<XFile> _renderResultCard({
+    required String title,
+    required String score,
+    required Map<String, dynamic>? mvp,
+    required String url,
+  }) async {
     const size = Size(1080, 1080);
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
     final template = _myCosmetics['resultTemplate'] as String?;
-    final palette = resultTemplateColors[template] ?? const [Color(0xFF071522), Color(0xFF35105D)];
+    final palette = resultTemplateColors[template] ??
+        const [Color(0xFF071522), Color(0xFF35105D)];
     var drewArtwork = false;
     if (template != null) {
       try {
-        final data = await rootBundle.load('assets/shop/cosmetics/$template.webp');
+        final data = await rootBundle.load(
+          'assets/shop/cosmetics/$template.webp',
+        );
         final codec = await ui.instantiateImageCodec(
-          data.buffer.asUint8List(), targetWidth: 1080, targetHeight: 1080);
+          data.buffer.asUint8List(),
+          targetWidth: 1080,
+          targetHeight: 1080,
+        );
         final frame = await codec.getNextFrame();
-        canvas.drawImageRect(frame.image,
-            Rect.fromLTWH(0, 0, frame.image.width.toDouble(), frame.image.height.toDouble()),
-            Offset.zero & size, Paint());
-        canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0x99020617));
+        canvas.drawImageRect(
+          frame.image,
+          Rect.fromLTWH(
+            0,
+            0,
+            frame.image.width.toDouble(),
+            frame.image.height.toDouble(),
+          ),
+          Offset.zero & size,
+          Paint(),
+        );
+        canvas.drawRect(
+          Offset.zero & size,
+          Paint()..color = const Color(0x99020617),
+        );
         frame.image.dispose();
         codec.dispose();
         drewArtwork = true;
@@ -325,34 +369,79 @@ class _CardDuelPageState extends State<CardDuelPage> {
       }
     }
     if (!drewArtwork) {
-      final paint = Paint()..shader = LinearGradient(
-        begin: Alignment.topLeft, end: Alignment.bottomRight,
-        colors: [palette.first, const Color(0xFF17304C), palette.last],
-      ).createShader(Offset.zero & size);
+      final paint = Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [palette.first, const Color(0xFF17304C), palette.last],
+        ).createShader(Offset.zero & size);
       canvas.drawRect(Offset.zero & size, paint);
     }
-    canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(34, 34, 1012, 1012), const Radius.circular(38)),
-        Paint()..style = PaintingStyle.stroke..strokeWidth = 10..color = _gold);
-    void text(String value, double y, double fontSize, Color color, {FontWeight weight = FontWeight.w700}) {
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        const Rect.fromLTWH(34, 34, 1012, 1012),
+        const Radius.circular(38),
+      ),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 10
+        ..color = _gold,
+    );
+    void text(
+      String value,
+      double y,
+      double fontSize,
+      Color color, {
+      FontWeight weight = FontWeight.w700,
+    }) {
       final painter = TextPainter(
-        text: TextSpan(text: value, style: TextStyle(fontSize: fontSize, color: color, fontWeight: weight)),
-        textDirection: TextDirection.rtl, textAlign: TextAlign.center, maxLines: 2,
+        text: TextSpan(
+          text: value,
+          style: TextStyle(
+            fontSize: fontSize,
+            color: color,
+            fontWeight: weight,
+          ),
+        ),
+        textDirection: TextDirection.rtl,
+        textAlign: TextAlign.center,
+        maxLines: 2,
       )..layout(maxWidth: 900);
       painter.paint(canvas, Offset((1080 - painter.width) / 2, y));
     }
+
     text('GHELGHELI CARD ARENA', 120, 34, _cyan, weight: FontWeight.w900);
     text(title, 240, 76, Colors.white, weight: FontWeight.w900);
     text(score, 380, 120, _gold, weight: FontWeight.w900);
-    canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(135, 590, 810, 200), const Radius.circular(28)),
-        Paint()..color = _gold.withValues(alpha: .12));
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        const Rect.fromLTWH(135, 590, 810, 200),
+        const Radius.circular(28),
+      ),
+      Paint()..color = _gold.withValues(alpha: .12),
+    );
     text('MVP مسابقه', 625, 32, _gold, weight: FontWeight.w900);
-    text('${mvp?['name'] ?? 'ستاره آرنا'} · قدرت ${faNum(mvp?['power'])}', 690, 46, Colors.white, weight: FontWeight.w900);
-    text('جرأت داری؟ مستقیم به چالشم بیا', 850, 34, _emerald, weight: FontWeight.w900);
+    text(
+      '${mvp?['name'] ?? 'ستاره آرنا'} · قدرت ${faNum(mvp?['power'])}',
+      690,
+      46,
+      Colors.white,
+      weight: FontWeight.w900,
+    );
+    text(
+      'جرأت داری؟ مستقیم به چالشم بیا',
+      850,
+      34,
+      _emerald,
+      weight: FontWeight.w900,
+    );
     text(url, 925, 23, const Color(0xFFCBD5E1));
     final image = await recorder.endRecording().toImage(1080, 1080);
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
     final directory = await getTemporaryDirectory();
-    final file = File('${directory.path}/ghelgheli-result-${DateTime.now().millisecondsSinceEpoch}.png');
+    final file = File(
+      '${directory.path}/ghelgheli-result-${DateTime.now().millisecondsSinceEpoch}.png',
+    );
     await file.writeAsBytes(bytes!.buffer.asUint8List(), flush: true);
     return XFile(file.path, mimeType: 'image/png');
   }
@@ -362,13 +451,17 @@ class _CardDuelPageState extends State<CardDuelPage> {
     setState(() => _sharing = true);
     try {
       final invite = await _session.createChallenge();
-      final score = _session.state['score'] is Map ? _session.state['score'] as Map : const {};
+      final score = _session.state['score'] is Map
+          ? _session.state['score'] as Map
+          : const {};
       final me = _session.mySymbol ?? 'X';
       final other = me == 'X' ? 'O' : 'X';
       final mvp = _resultMvp();
       final title = _session.winner == 'DRAW'
           ? 'نبرد برابر!'
-          : _session.iWon ? 'من آرنا را بردم!' : 'این بار حریف برد!';
+          : _session.iWon
+              ? 'من آرنا را بردم!'
+              : 'این بار حریف برد!';
       final message = '$title\n'
           'نتیجه ${faNum(score[me])} - ${faNum(score[other])}\n'
           'MVP: ${mvp?['name'] ?? 'ستاره آرنا'} (قدرت ${faNum(mvp?['power'])})\n'
@@ -384,92 +477,170 @@ class _CardDuelPageState extends State<CardDuelPage> {
         context: context,
         backgroundColor: const Color(0xFF071522),
         isScrollControlled: true,
-        builder: (ctx) => SafeArea(child: Padding(
-          padding: const EdgeInsets.all(Gaps.md),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(Gaps.lg),
-              decoration: BoxDecoration(
-                borderRadius: Corners.rXl,
-                gradient: LinearGradient(colors: resultTemplateColors[_myCosmetics['resultTemplate']]
-                    ?? const [Color(0xFF17304C), Color(0xFF35105D)]),
-                image: _myCosmetics['resultTemplate'] == null
-                    ? null
-                    : DecorationImage(
-                        image: AssetImage('assets/shop/cosmetics/${_myCosmetics['resultTemplate']}.webp'),
-                        fit: BoxFit.cover,
-                        opacity: .26,
+        builder: (ctx) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(Gaps.md),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(Gaps.lg),
+                  decoration: BoxDecoration(
+                    borderRadius: Corners.rXl,
+                    gradient: LinearGradient(
+                      colors: resultTemplateColors[
+                              _myCosmetics['resultTemplate']] ??
+                          const [Color(0xFF17304C), Color(0xFF35105D)],
+                    ),
+                    image: _myCosmetics['resultTemplate'] == null
+                        ? null
+                        : DecorationImage(
+                            image: AssetImage(
+                              'assets/shop/cosmetics/${_myCosmetics['resultTemplate']}.webp',
+                            ),
+                            fit: BoxFit.cover,
+                            opacity: .26,
+                          ),
+                    border: Border.all(color: _gold, width: 1.5),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'GHELGHELI CARD ARENA',
+                        style: TextStyle(
+                          color: _cyan,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
-                border: Border.all(color: _gold, width: 1.5),
-              ),
-              child: Column(children: [
-                const Text('GHELGHELI CARD ARENA', style: TextStyle(color: _cyan, fontSize: 12, fontWeight: FontWeight.w900)),
+                      Gaps.vSm,
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        '${faNum(score[me])} - ${faNum(score[other])}',
+                        style: const TextStyle(
+                          color: _gold,
+                          fontSize: 40,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Gaps.vSm,
+                      Text(
+                        'MVP · ${mvp?['name'] ?? 'ستاره آرنا'}',
+                        style: const TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                      Text(
+                        'قدرت ${faNum(mvp?['power'])}',
+                        style: const TextStyle(
+                          color: Colors.white60,
+                          fontSize: 11,
+                        ),
+                      ),
+                      Gaps.vSm,
+                      const Text(
+                        'از لینک چالش مستقیم وارد آرنا شو',
+                        style: TextStyle(
+                          color: _emerald,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Gaps.vMd,
+                FilledButton.icon(
+                  onPressed: () async {
+                    // share_plus ۱۳: `Share.*` منسوخ شده و جایش
+                    // `SharePlus.instance.share(ShareParams(...))` است.
+                    // ارتقا لازم بود چون نسخهٔ ۱۰ هنوز Kotlin Gradle Plugin
+                    // را خودش اعمال می‌کرد و بیلد هشدارِ KGP می‌داد؛
+                    // نسخه‌های آینده فلاتر آن را خطا می‌کنند.
+                    await SharePlus.instance.share(
+                      ShareParams(
+                        files: [card],
+                        text: message,
+                        subject: 'نتیجه دوئل قلقلی',
+                      ),
+                    );
+                    unawaited(
+                      widget.api.post('/api/analytics/events', {
+                        'event': 'share',
+                        'platform': 'android',
+                        'gameId': 'card_duel',
+                        'matchId': _session.matchId,
+                        'target': 'system_share_image',
+                      }).catchError((_) => <String, dynamic>{}),
+                    );
+                  },
+                  icon: const Icon(Icons.image_rounded),
+                  label: const Text('اشتراک کارت تصویری نتیجه'),
+                ),
                 Gaps.vSm,
-                Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-                Text('${faNum(score[me])} - ${faNum(score[other])}', style: const TextStyle(color: _gold, fontSize: 40, fontWeight: FontWeight.w900)),
+                Row(
+                  children: [
+                    for (final target in shareTargets)
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 3),
+                          child: InkWell(
+                            onTap: () async {
+                              await shareText(target, message);
+                              if (ctx.mounted) Navigator.pop(ctx);
+                              unawaited(
+                                widget.api.post('/api/analytics/events', {
+                                  'event': 'share',
+                                  'platform': 'android',
+                                  'gameId': 'card_duel',
+                                  'matchId': _session.matchId,
+                                  'target': target.id,
+                                }).catchError((_) => <String, dynamic>{}),
+                              );
+                            },
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                MessengerIcon(app: target.app, size: 34),
+                                const SizedBox(height: 4),
+                                Text(
+                                  target.label,
+                                  style: const TextStyle(fontSize: 11.5),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
                 Gaps.vSm,
-                Text('MVP · ${mvp?['name'] ?? 'ستاره آرنا'}', style: const TextStyle(fontWeight: FontWeight.w900)),
-                Text('قدرت ${faNum(mvp?['power'])}', style: const TextStyle(color: Colors.white60, fontSize: 11)),
-                Gaps.vSm,
-                const Text('از لینک چالش مستقیم وارد آرنا شو', style: TextStyle(color: _emerald, fontSize: 11, fontWeight: FontWeight.w800)),
-              ]),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    await copyText(message);
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    unawaited(
+                      widget.api.post('/api/analytics/events', {
+                        'event': 'share',
+                        'platform': 'android',
+                        'gameId': 'card_duel',
+                        'matchId': _session.matchId,
+                        'target': 'clipboard',
+                      }).catchError((_) => <String, dynamic>{}),
+                    );
+                  },
+                  icon: const Icon(Icons.copy_rounded),
+                  label: const Text('کپی کارت نتیجه و لینک'),
+                ),
+              ],
             ),
-            Gaps.vMd,
-            FilledButton.icon(
-              onPressed: () async {
-                // share_plus ۱۳: `Share.*` منسوخ شده و جایش
-                // `SharePlus.instance.share(ShareParams(...))` است.
-                // ارتقا لازم بود چون نسخهٔ ۱۰ هنوز Kotlin Gradle Plugin
-                // را خودش اعمال می‌کرد و بیلد هشدارِ KGP می‌داد؛
-                // نسخه‌های آینده فلاتر آن را خطا می‌کنند.
-                await SharePlus.instance.share(ShareParams(
-                  files: [card],
-                  text: message,
-                  subject: 'نتیجه دوئل قلقلی',
-                ));
-                unawaited(widget.api.post('/api/analytics/events', {
-                  'event': 'share', 'platform': 'android', 'gameId': 'card_duel',
-                  'matchId': _session.matchId, 'target': 'system_share_image',
-                }).catchError((_) => <String, dynamic>{}));
-              },
-              icon: const Icon(Icons.image_rounded),
-              label: const Text('اشتراک کارت تصویری نتیجه'),
-            ),
-            Gaps.vSm,
-            Row(children: [for (final target in shareTargets) Expanded(child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 3),
-              child: InkWell(
-                onTap: () async {
-                  await shareText(target, message);
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  unawaited(widget.api.post('/api/analytics/events', {
-                    'event': 'share', 'platform': 'android', 'gameId': 'card_duel',
-                    'matchId': _session.matchId, 'target': target.id,
-                  }).catchError((_) => <String, dynamic>{}));
-                },
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  MessengerIcon(app: target.app, size: 34),
-                  const SizedBox(height: 4),
-                  Text(target.label, style: const TextStyle(fontSize: 11.5)),
-                ]),
-              ),
-            ))],),
-            Gaps.vSm,
-            OutlinedButton.icon(
-              onPressed: () async {
-                await copyText(message);
-                if (ctx.mounted) Navigator.pop(ctx);
-                unawaited(widget.api.post('/api/analytics/events', {
-                  'event': 'share', 'platform': 'android', 'gameId': 'card_duel',
-                  'matchId': _session.matchId, 'target': 'clipboard',
-                }).catchError((_) => <String, dynamic>{}));
-              },
-              icon: const Icon(Icons.copy_rounded),
-              label: const Text('کپی کارت نتیجه و لینک'),
-            ),
-          ]),
-        )),
+          ),
+        ),
       );
     } catch (error) {
       _snack(apiError(error));
@@ -525,55 +696,64 @@ class _CardDuelPageState extends State<CardDuelPage> {
       // شد. حالا کاربر از لحظهٔ ورود می‌بیندش و برای شروعِ بازی هیچ
       // اسکرولی لازم نیست. اسکرول فقط برای کارهای اختیاری می‌ماند
       // (دیدنِ کلِ کلکسیون یا تاریخچه).
-      child: Column(children: [
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: _load,
-            child: ListView(
-              padding: EdgeInsets.fromLTRB(
-                  Gaps.md, Gaps.sm, Gaps.md, _started ? Gaps.xxl : Gaps.sm),
-              children: [
-                // ── چرا سربرگِ بزرگ حین بازی جمع می‌شود ──
-                //
-                // گزارشِ مالک: «بازی هنوز هم نیاز داره اسکرول شه».
-                //
-                // اندازه‌گیریِ ارتفاع‌ها روی گوشیِ ۶۴۰dp نشان داد صفحهٔ
-                // نبرد ~۷۴۰dp می‌شود؛ یعنی ~۱۰۰dp سرریز. `_ArenaHero`
-                // به‌تنهایی ۹۶dp است و حین نبرد هیچ کارِ ضروری‌ای
-                // نمی‌کند: عنوانِ حالت و توضیحِ شرط را نشان می‌دهد که
-                // کاربر قبلِ شروع خوانده. تنها چیزِ لازمش دکمهٔ برگشت
-                // است که به نوارِ باریکِ جایگزین منتقل شد.
-                if (!_started)
-                  _ArenaHero(
-                    onBack: () {
-                      _session.leave();
-                      widget.onBack();
-                    },
-                    modeColor: _modeColor,
-                    modeTitle: _modeTitle,
-                    subtitle: widget.vsBot
-                        ? 'رایگان و بدون جابه‌جایی امتیاز'
-                        : widget.stake > 0
-                            ? 'باخت یعنی کسر ${faNum(widget.stake)} امتیاز'
-                            : 'مسابقه دوستانه خصوصی',
-                  )
-                else
-                  _CompactMatchBar(
-                    onBack: () {
-                      _session.leave();
-                      widget.onBack();
-                    },
-                    modeColor: _modeColor,
-                    modeTitle: _modeTitle,
-                  ),
-                Gaps.vSm,
-                if (!_started) _buildSetup(context) else _buildSession(context),
-              ],
+      child: Column(
+        children: [
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _load,
+              child: ListView(
+                padding: EdgeInsets.fromLTRB(
+                  Gaps.md,
+                  Gaps.sm,
+                  Gaps.md,
+                  _started ? Gaps.xxl : Gaps.sm,
+                ),
+                children: [
+                  // ── چرا سربرگِ بزرگ حین بازی جمع می‌شود ──
+                  //
+                  // گزارشِ مالک: «بازی هنوز هم نیاز داره اسکرول شه».
+                  //
+                  // اندازه‌گیریِ ارتفاع‌ها روی گوشیِ ۶۴۰dp نشان داد صفحهٔ
+                  // نبرد ~۷۴۰dp می‌شود؛ یعنی ~۱۰۰dp سرریز. `_ArenaHero`
+                  // به‌تنهایی ۹۶dp است و حین نبرد هیچ کارِ ضروری‌ای
+                  // نمی‌کند: عنوانِ حالت و توضیحِ شرط را نشان می‌دهد که
+                  // کاربر قبلِ شروع خوانده. تنها چیزِ لازمش دکمهٔ برگشت
+                  // است که به نوارِ باریکِ جایگزین منتقل شد.
+                  if (!_started)
+                    _ArenaHero(
+                      onBack: () {
+                        _session.leave();
+                        widget.onBack();
+                      },
+                      modeColor: _modeColor,
+                      modeTitle: _modeTitle,
+                      subtitle: widget.vsBot
+                          ? 'رایگان و بدون جابه‌جایی امتیاز'
+                          : widget.stake > 0
+                              ? 'باخت یعنی کسر ${faNum(widget.stake)} امتیاز'
+                              : 'مسابقه دوستانه خصوصی',
+                    )
+                  else
+                    _CompactMatchBar(
+                      onBack: () {
+                        _session.leave();
+                        widget.onBack();
+                      },
+                      modeColor: _modeColor,
+                      modeTitle: _modeTitle,
+                    ),
+                  Gaps.vSm,
+                  if (!_started)
+                    _buildSetup(context)
+                  else
+                    _buildSession(context),
+                ],
+              ),
             ),
           ),
-        ),
-        if (!_started) _buildStartBar(context),
-      ]),
+          if (!_started) _buildStartBar(context),
+        ],
+      ),
     );
   }
 
@@ -637,49 +817,74 @@ class _CardDuelPageState extends State<CardDuelPage> {
               color: _emerald.withValues(alpha: 0.10),
               border: Border.all(color: _emerald.withValues(alpha: 0.42)),
             ),
-            child: const Row(children: [
-              Text('🎁', style: TextStyle(fontSize: 24)),
-              SizedBox(width: Gaps.sm),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('دستهٔ تمرینی رایگان برای شروع سریع',
-                    style: TextStyle(color: _emerald, fontWeight: FontWeight.w900)),
-                Text('این کارت‌ها فقط مقابل ربات فعال‌اند؛ برای آنلاین باید پنج کارت واقعی جمع کنی.',
-                    style: TextStyle(fontSize: 11.5, color: Colors.white60)),
-              ])),
-            ]),
+            child: const Row(
+              children: [
+                Text('🎁', style: TextStyle(fontSize: 24)),
+                SizedBox(width: Gaps.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'دستهٔ تمرینی رایگان برای شروع سریع',
+                        style: TextStyle(
+                          color: _emerald,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        'این کارت‌ها فقط مقابل ربات فعال‌اند؛ برای آنلاین باید پنج کارت واقعی جمع کنی.',
+                        style: TextStyle(fontSize: 11.5, color: Colors.white60),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
           Gaps.vSm,
         ],
-        Text(_practiceFallback ? 'کارت‌های قرضی تمرین' : 'کلکسیون آماده نبرد',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w900,
-                )),
+        Text(
+          _practiceFallback ? 'کارت‌های قرضی تمرین' : 'کلکسیون آماده نبرد',
+          style: Theme.of(context)
+              .textTheme
+              .titleMedium
+              ?.copyWith(color: Colors.white, fontWeight: FontWeight.w900),
+        ),
         Gaps.vXs,
         if (_cards.length < 5)
           const AppCard(
-            child: Text('برای ورود به آرنا حداقل پنج کارت فعال در کلکسیون لازم داری.'),
+            child: Text(
+              'برای ورود به آرنا حداقل پنج کارت فعال در کلکسیون لازم داری.',
+            ),
           )
         else
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _cards.length,
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 210,
-              mainAxisSpacing: Gaps.sm,
-              crossAxisSpacing: Gaps.sm,
-              childAspectRatio: 0.67,
+          // گریدِ عمودی برای ۳۰–۵۰ کارت صفحه را چند هزار پیکسل بلند
+          // می‌کرد و بخش «قوانین/تحلیل» را مقصر نشان می‌داد. قفسهٔ افقی
+          // یک ارتفاع ثابت دارد؛ دکمهٔ شروع هم پایین ثابت است، پس پیش از
+          // بازی دیگر اسکرول عمودیِ طولانی نداریم.
+          SizedBox(
+            height: 238,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              itemCount: _cards.length,
+              separatorBuilder: (_, __) => const SizedBox(width: Gaps.sm),
+              itemBuilder: (_, index) {
+                final card = _cards[index];
+                final id = '${card['cardTypeId'] ?? card['id']}';
+                return SizedBox(
+                  width: 158,
+                  child: RepaintBoundary(
+                    child: PlayerCard(
+                      card: card,
+                      selected: _selected.contains(id),
+                      onTap: () => _toggle(id),
+                    ),
+                  ),
+                );
+              },
             ),
-            itemBuilder: (_, index) {
-              final card = _cards[index];
-              final id = '${card['cardTypeId'] ?? card['id']}';
-              return PlayerCard(
-                card: card,
-                selected: _selected.contains(id),
-                onTap: () => _toggle(id),
-              );
-            },
           ),
         Gaps.vSm,
         _History(battles: (_data?['recentBattles'] as List?) ?? const []),
@@ -697,75 +902,113 @@ class _CardDuelPageState extends State<CardDuelPage> {
     final ready = _selected.length == 5;
     return Container(
       padding: EdgeInsets.fromLTRB(
-          Gaps.md, Gaps.sm, Gaps.md, Gaps.sm + MediaQuery.of(context).padding.bottom),
+        Gaps.md,
+        Gaps.sm,
+        Gaps.md,
+        Gaps.sm + MediaQuery.of(context).padding.bottom,
+      ),
       decoration: BoxDecoration(
         color: const Color(0xFF050D16),
-        border: Border(top: BorderSide(color: _modeColor.withValues(alpha: 0.28))),
-        boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 18, offset: Offset(0, -6))],
+        border: Border(
+          top: BorderSide(color: _modeColor.withValues(alpha: 0.28)),
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x66000000),
+            blurRadius: 18,
+            offset: Offset(0, -6),
+          ),
+        ],
       ),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        if (_error != null) ...[
-          Text(_error!,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_error != null) ...[
+            Text(
+              _error!,
               textAlign: TextAlign.center,
               style: TextStyle(
-                  color: Theme.of(context).colorScheme.error,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700)),
-          Gaps.vXs,
-        ],
-        Row(children: [
-          // شمارندهٔ ترکیب: پنج نقطه که با انتخاب پر می‌شوند.
-          for (var i = 0; i < 5; i++)
-            Padding(
-              padding: const EdgeInsets.only(left: 5),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 220),
-                width: i < _selected.length ? 13 : 9,
-                height: i < _selected.length ? 13 : 9,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: i < _selected.length ? _modeColor : Colors.white24,
-                  boxShadow: i < _selected.length
-                      ? [BoxShadow(color: _modeColor.withValues(alpha: 0.55), blurRadius: 9)]
-                      : const [],
-                ),
+                color: Theme.of(context).colorScheme.error,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
               ),
             ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              ready
-                  ? 'ترکیب کامل است'
-                  : 'ترکیب: ${faNum(_selected.length)} از ${faNum(5)} کارت',
-              style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w800,
-                  color: ready ? _emerald : Colors.white70),
+            Gaps.vXs,
+          ],
+          Row(
+            children: [
+              // شمارندهٔ ترکیب: پنج نقطه که با انتخاب پر می‌شوند.
+              for (var i = 0; i < 5; i++)
+                Padding(
+                  padding: const EdgeInsets.only(left: 5),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 220),
+                    width: i < _selected.length ? 13 : 9,
+                    height: i < _selected.length ? 13 : 9,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: i < _selected.length ? _modeColor : Colors.white24,
+                      boxShadow: i < _selected.length
+                          ? [
+                              BoxShadow(
+                                color: _modeColor.withValues(alpha: 0.55),
+                                blurRadius: 9,
+                              ),
+                            ]
+                          : const [],
+                    ),
+                  ),
+                ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  ready
+                      ? 'ترکیب کامل است'
+                      : 'ترکیب: ${faNum(_selected.length)} از ${faNum(5)} کارت',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                    color: ready ? _emerald : Colors.white70,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          Gaps.vXs,
+          FilledButton(
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(56),
+              backgroundColor: _modeColor,
+              foregroundColor: const Color(0xFF04101A),
+              shape: RoundedRectangleBorder(borderRadius: Corners.rLg),
+            ),
+            onPressed: _busy || !ready ? null : _saveAndStart,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _busy ? 'در حال قفل ترکیب…' : 'ورود به $_modeTitle',
+                  style: const TextStyle(
+                    fontSize: 16.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  widget.vsBot
+                      ? 'بدون ریسک امتیاز'
+                      : widget.stake > 0
+                          ? 'ورودی ${faNum(widget.stake)} امتیاز'
+                          : 'مسابقه خصوصی',
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ),
           ),
-        ]),
-        Gaps.vXs,
-        FilledButton(
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(56),
-            backgroundColor: _modeColor,
-            foregroundColor: const Color(0xFF04101A),
-            shape: RoundedRectangleBorder(borderRadius: Corners.rLg),
-          ),
-          onPressed: _busy || !ready ? null : _saveAndStart,
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Text(_busy ? 'در حال قفل ترکیب…' : 'ورود به $_modeTitle',
-                style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.w900)),
-            Text(
-                widget.vsBot
-                    ? 'بدون ریسک امتیاز'
-                    : widget.stake > 0
-                        ? 'ورودی ${faNum(widget.stake)} امتیاز'
-                        : 'مسابقه خصوصی',
-                style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
-          ]),
-        ),
-      ]),
+        ],
+      ),
     );
   }
 
@@ -782,64 +1025,101 @@ class _CardDuelPageState extends State<CardDuelPage> {
         final totalR = NumberParser.toInt(st['totalRounds']) == 0
             ? 5
             : NumberParser.toInt(st['totalRounds']);
-        return Stack(children: [
-          Column(children: [
-            if (_session.connectionNotice != null || !_session.connected) ...[
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(Gaps.sm),
-                margin: const EdgeInsets.only(bottom: Gaps.sm),
-                decoration: BoxDecoration(color: const Color(0xFFF59E0B).withValues(alpha: .16), borderRadius: Corners.rMd),
-                child: Text(_session.connectionNotice ?? 'در حال بازیابی اتصال مسابقه…', textAlign: TextAlign.center,
-                    style: const TextStyle(color: Color(0xFFF59E0B), fontWeight: FontWeight.w900)),
-              ),
-            ],
-            _LiveBattle(session: _session, color: _modeColor),
-          ]),
-          if (_myCosmetics['matchEffect'] != null
-              && matchEffectSupports('${_myCosmetics['matchEffect']}', 'entry'))
-            Positioned.fill(child: IgnorePointer(child: _DuelCosmeticEffect(slug: '${_myCosmetics['matchEffect']}'))),
-          // اعلانِ سینماییِ «این راند سرِ چیست» — آخرین لایه تا روی همه‌چیز
-          // بیاید. چون Positioned.fill است، ارتفاعی از چیدمان نمی‌گیرد.
-          Positioned.fill(
-            child: _RoundIntroOverlay(
-              focus: st['roundFocus'] is Map
-                  ? Map<String, dynamic>.from(st['roundFocus'] as Map)
-                  : null,
-              roundNumber:
-                  (NumberParser.toInt(st['roundIndex']) + 1).clamp(1, totalR),
-              totalRounds: totalR,
+        return Stack(
+          children: [
+            Column(
+              children: [
+                if (_session.connectionNotice != null ||
+                    !_session.connected) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(Gaps.sm),
+                    margin: const EdgeInsets.only(bottom: Gaps.sm),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF59E0B).withValues(alpha: .16),
+                      borderRadius: Corners.rMd,
+                    ),
+                    child: Text(
+                      _session.connectionNotice ??
+                          'در حال بازیابی اتصال مسابقه…',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Color(0xFFF59E0B),
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+                _LiveBattle(session: _session, color: _modeColor),
+              ],
             ),
-          ),
-        ]);
-      case GamePhase.over:
-        return Stack(children: [
-          Column(
-            children: [
-              // ⚠️ `finalView` سه چیزِ مخصوصِ «وسطِ بازی» را خاموش
-              //    می‌کند: برچسبِ راند، جملهٔ «راند قبل»، و صحنهٔ
-              //    برخورد که بالای پنلِ VICTORY تکرار می‌شد.
-              _LiveBattle(
-                  session: _session, color: _modeColor, finalView: true),
-              Gaps.vMd,
-              _Finale(
-                session: _session,
-                color: _modeColor,
-                resultColors: resultTemplateColors[_myCosmetics['resultTemplate']],
-                resultTemplate: _myCosmetics['resultTemplate'] as String?,
-                onAgain: _playAgain,
-                onEdit: _editLineup,
-                onShare: _shareResult,
-                sharing: _sharing,
-                mvp: _resultMvp(),
-                privateLobby: _session.matchMode == 'lobby',
+            if (_myCosmetics['matchEffect'] != null &&
+                matchEffectSupports('${_myCosmetics['matchEffect']}', 'entry'))
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: _DuelCosmeticEffect(
+                    slug: '${_myCosmetics['matchEffect']}',
+                  ),
+                ),
               ),
-            ],
-          ),
-          if (_session.iWon && _myCosmetics['matchEffect'] != null
-              && matchEffectSupports('${_myCosmetics['matchEffect']}', 'finish'))
-            Positioned.fill(child: IgnorePointer(child: _DuelCosmeticEffect(slug: '${_myCosmetics['matchEffect']}', repeat: true))),
-        ]);
+            // اعلانِ سینماییِ «این راند سرِ چیست» — آخرین لایه تا روی همه‌چیز
+            // بیاید. چون Positioned.fill است، ارتفاعی از چیدمان نمی‌گیرد.
+            Positioned.fill(
+              child: _RoundIntroOverlay(
+                focus: st['roundFocus'] is Map
+                    ? Map<String, dynamic>.from(st['roundFocus'] as Map)
+                    : null,
+                roundNumber: (NumberParser.toInt(st['roundIndex']) + 1).clamp(
+                  1,
+                  totalR,
+                ),
+                totalRounds: totalR,
+              ),
+            ),
+          ],
+        );
+      case GamePhase.over:
+        return Stack(
+          children: [
+            Column(
+              children: [
+                // ⚠️ `finalView` سه چیزِ مخصوصِ «وسطِ بازی» را خاموش
+                //    می‌کند: برچسبِ راند، جملهٔ «راند قبل»، و صحنهٔ
+                //    برخورد که بالای پنلِ VICTORY تکرار می‌شد.
+                _LiveBattle(
+                  session: _session,
+                  color: _modeColor,
+                  finalView: true,
+                ),
+                Gaps.vMd,
+                _Finale(
+                  session: _session,
+                  color: _modeColor,
+                  resultColors:
+                      resultTemplateColors[_myCosmetics['resultTemplate']],
+                  resultTemplate: _myCosmetics['resultTemplate'] as String?,
+                  onAgain: _playAgain,
+                  onEdit: _editLineup,
+                  onShare: _shareResult,
+                  sharing: _sharing,
+                  mvp: _resultMvp(),
+                  privateLobby: _session.matchMode == 'lobby',
+                ),
+              ],
+            ),
+            if (_session.iWon &&
+                _myCosmetics['matchEffect'] != null &&
+                matchEffectSupports('${_myCosmetics['matchEffect']}', 'finish'))
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: _DuelCosmeticEffect(
+                    slug: '${_myCosmetics['matchEffect']}',
+                    repeat: true,
+                  ),
+                ),
+              ),
+          ],
+        );
       case GamePhase.idle:
         return _ErrorPanel(
           message: _session.error ?? _error ?? 'بازی آماده شروع نیست',
@@ -885,7 +1165,9 @@ class _DuelCosmeticEffectState extends State<_DuelCosmeticEffect>
         final t = Curves.easeOut.transform(_controller.value);
         return Center(
           child: Opacity(
-            opacity: (widget.repeat ? .22 + t * .55 : 1 - t).clamp(0.0, 1.0).toDouble(),
+            opacity: (widget.repeat ? .22 + t * .55 : 1 - t)
+                .clamp(0.0, 1.0)
+                .toDouble(),
             child: Transform.scale(
               scale: .45 + t * 1.45,
               child: SizedBox(

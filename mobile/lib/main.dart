@@ -84,7 +84,12 @@ class _GhelGheliAppState extends State<GhelGheliApp> {
       await api.post('/api/telemetry/crash', {
         'platform': 'android',
         'source': source,
-        'release': '1.0.0+1',
+        // با نسخهٔ واقعی APK یکی بماند؛ مقدار قدیمی 1.0.0+1 باعث می‌شد
+        // همهٔ crashها به release اشتباه نسبت داده شوند.
+        'release': const String.fromEnvironment(
+          'APP_RELEASE',
+          defaultValue: '1.1.9+11',
+        ),
         'message': message,
         'stack': stack,
         'context': {'screen': 'flutter'},
@@ -166,10 +171,10 @@ class _GhelGheliAppState extends State<GhelGheliApp> {
       home: !_ready
           ? const SplashScreen()
           : api.token == null
-              ? AuthScreen(api: api, onDone: _refresh)
-              : api.isAdmin
-                  ? AdminShell(api: api, onLogout: _logout)
-                  : HomeShell(api: api, onLogout: _logout),
+          ? AuthScreen(api: api, onDone: _refresh)
+          : api.isAdmin
+          ? AdminShell(api: api, onLogout: _logout)
+          : HomeShell(api: api, onLogout: _logout),
     );
   }
 }

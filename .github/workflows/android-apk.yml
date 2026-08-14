@@ -152,7 +152,8 @@ jobs:
 
       - name: Build APK
         run: |
-          ARGS="--${{ inputs.build_mode }} --dart-define=API_BASE_URL=${{ inputs.api_base_url }}"
+          APP_RELEASE=$(awk '/^version:/{print $2}' pubspec.yaml)
+          ARGS="--${{ inputs.build_mode }} --dart-define=API_BASE_URL=${{ inputs.api_base_url }} --dart-define=APP_RELEASE=$APP_RELEASE"
           if [ "${{ inputs.split_per_abi }}" = "true" ]; then
             ARGS="$ARGS --split-per-abi"
           fi

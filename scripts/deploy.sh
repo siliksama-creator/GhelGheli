@@ -58,6 +58,9 @@ git fetch origin "$BRANCH"
 git reset --hard "origin/$BRANCH"
 git clean -fd -e node_modules -e .env -e uploads -e dist
 NEW_SHA="$(git rev-parse HEAD)"
+# release در health/crash inbox و build وب باید دقیقاً همان commit زنده باشد.
+export APP_RELEASE="$NEW_SHA"
+export GIT_SHA="$NEW_SHA"
 log "Deploying commit: $NEW_SHA"
 
 log "Installing backend dependencies"
@@ -67,6 +70,12 @@ npm ci --omit=dev --no-audit --no-fund
 log "Running database migrations"
 npm run migrate
 
+# ساختِ thumbnailهای گمشده قبل از reload. اسکریپت idempotent است و فقط
+# تصاویر قدیمی‌ای را لمس می‌کند که نسخهٔ ۳۲۰/۴۸۰ ندارند؛ اولین کاربر نباید
+# وسط انیمیشن هزینهٔ sharp را بدهد.
+log "Prewarming card image thumbnails"
+npm run thumbs:prewarm
+
 log "Building admin panel"
 cd "$APP_DIR/admin"
 npm ci --no-audit --no-fund
@@ -75,7 +84,7 @@ npm run build
 log "Building user web app"
 cd "$APP_DIR/userweb"
 npm ci --no-audit --no-fund
-npm run build
+VITE_APP_RELEASE="$NEW_SHA" npm run build
 
 log "Reloading API as unprivileged user $SERVICE_USER"
 cd "$APP_DIR/backend"
