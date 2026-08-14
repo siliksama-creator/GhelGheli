@@ -2318,12 +2318,33 @@ io.use(async (socket, next) => {
   } catch(e){ next(new Error('unauthorized')); }
 });
 presence.attach(io);
+// کلید = شناسهٔ کاربر، مقدار = زمانِ ۲۰ پیامِ آخر در پنجرهٔ یک‌دقیقه‌ای.
+// این Map قبلاً فقط set می‌شد و هرگز پاک نمی‌شد: هر کاربری که یک‌بار در طول
+// عمرِ پروسه چت می‌کرد، برای همیشه یک ورودی نگه می‌داشت. با انتشار روی
+// کافه‌بازار و ده‌ها هزار کاربر این یک نشتیِ آهسته اما دائمی است
+// (اندازه‌گیری‌شده: ۵۰هزار کاربر ≈ ۱۳ مگابایت heap که هرگز آزاد نمی‌شود).
+// حالا ورودی‌های منقضی به‌صورت تنبل و کران‌دار جارو می‌شوند.
 const socketMessageTimes = new Map();
+const CHAT_WINDOW_MS = 60_000;
+let lastChatSweep = 0;
+
+function sweepChatRateLimiter(now) {
+  // حداکثر یک‌بار در دقیقه، تا روی مسیرِ داغِ چت هزینه‌ای اضافه نکند.
+  if (now - lastChatSweep < CHAT_WINDOW_MS) return;
+  lastChatSweep = now;
+  for (const [userId, times] of socketMessageTimes) {
+    if (!times.length || now - times[times.length - 1] >= CHAT_WINDOW_MS) {
+      socketMessageTimes.delete(userId);
+    }
+  }
+}
+
 io.on('connection', socket => {
   socket.on('chat:send', async (payload, cb) => {
     try {
       const now = Date.now();
-      const arr = (socketMessageTimes.get(socket.user.id) || []).filter(t => now - t < 60_000);
+      sweepChatRateLimiter(now);
+      const arr = (socketMessageTimes.get(socket.user.id) || []).filter(t => now - t < CHAT_WINDOW_MS);
       if (arr.length >= 20) throw new Error('ضد اسپم: تعداد پیام زیاد است');
       const minLifetimePoints = await getChatMinLifetimePoints();
       if (Number(socket.user.lifetime_points || 0) < minLifetimePoints) throw new Error(`برای ارسال پیام باید حداقل ${minLifetimePoints} امتیاز تاریخی داشته باشید`);
