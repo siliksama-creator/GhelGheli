@@ -124,6 +124,8 @@ function fakePoints() {
       .settleMatch({ matchId: 'm3', winnerUserId: 'u1' });
     const pay = points.calls.find(x => x.kind === 'credit');
     ok(r.netPot === 1800 && pay.points === 1800, 'فقط netPot به برنده می‌رسد');
+    ok(r.winnerBalanceAfter === 11800,
+      'موجودی نهایی authoritative برای انیمیشن واریز برمی‌گردد');
     ok(pay.lifetimeGain === 800, 'lifetime فقط سود خالص را می‌گیرد');
     ok(pay.league === false, 'پات رتبه لیگ را دستکاری نمی‌کند');
   }

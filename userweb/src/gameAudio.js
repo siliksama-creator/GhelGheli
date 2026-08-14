@@ -6,7 +6,7 @@ const FILES = [
   'move', 'move_opponent', 'drop', 'flip', 'match_found', 'your_turn',
   'tick', 'tick_urgent', 'timeout', 'win', 'lose', 'draw', 'tap',
   'duel_lock', 'duel_intro', 'duel_round_win', 'duel_round_lose',
-  'duel_round_draw', 'duel_final_draw', 'duel_victory', 'duel_defeat',
+  'duel_round_draw', 'duel_points', 'duel_final_draw', 'duel_victory', 'duel_defeat',
 ];
 
 const KEY = 'game_sound_enabled';

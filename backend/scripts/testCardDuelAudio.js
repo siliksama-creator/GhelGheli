@@ -12,7 +12,8 @@ const webDir = path.join(root, 'userweb', 'public', 'sfx');
 const assets = {
   duel_music: [29, 31], duel_lock: [.30, .50], duel_intro: [1, 1.3],
   duel_round_win: [1.2, 1.5], duel_round_lose: [1.2, 1.5],
-  duel_round_draw: [1.2, 1.5], duel_final_draw: [1.9, 2.2],
+  duel_round_draw: [1.2, 1.5], duel_points: [1.6, 1.9],
+  duel_final_draw: [1.9, 2.2],
   duel_victory: [2.2, 2.5], duel_defeat: [2.2, 2.5],
 };
 
@@ -67,16 +68,19 @@ const dartAudio = read('mobile/lib/screens/user/games/game_audio.dart');
 const dartSession = read('mobile/lib/screens/user/games/game_session.dart');
 const webAudio = read('userweb/src/gameAudio.js');
 const webSession = read('userweb/src/gameSession.js');
+const engine = read('backend/src/games/engine.js');
+const mobileDuel = read('mobile/lib/screens/user/games/card_duel/card_duel_widgets.dart');
+const webDuel = read('userweb/src/cardDuelGame.jsx');
 assert(generator.includes('RNG = np.random.default_rng(20260814)'));
 assert(generator.includes('No samples or third-party music are used'));
 assert(/ReleaseMode\.loop/.test(dartAudio) && /setVolume\(0\.20\)/.test(dartAudio));
 assert(/duelMusic\.loop = true/.test(webAudio) && /duelMusic\.volume = 0\.20/.test(webAudio));
 for (const event of ['duelIntro', 'duelLock', 'duelRoundWin', 'duelRoundLose',
-  'duelRoundDraw', 'duelFinalDraw', 'duelVictory', 'duelDefeat']) {
+  'duelRoundDraw', 'duelPoints', 'duelFinalDraw', 'duelVictory', 'duelDefeat']) {
   assert(dartAudio.includes(event), `Android enum missing ${event}`);
 }
 for (const event of ['duel_intro', 'duel_lock', 'duel_round_win', 'duel_round_lose',
-  'duel_round_draw', 'duel_final_draw', 'duel_victory', 'duel_defeat']) {
+  'duel_round_draw', 'duel_points', 'duel_final_draw', 'duel_victory', 'duel_defeat']) {
   assert(webAudio.includes(`'${event}'`), `Web registry missing ${event}`);
   assert(webSession.includes(event), `Web session does not trigger ${event}`);
 }
@@ -84,5 +88,13 @@ assert(dartSession.includes('startDuelMusic()') && dartSession.includes('stopDue
 assert(webSession.includes('startDuelMusic()') && webSession.includes('stopDuelMusic()'));
 assert(dartSession.includes('currentRound < totalRounds'), 'Android final round must not double-play outcome');
 assert(webSession.includes('currentRound < totalRounds'), 'Web final round must not double-play outcome');
+assert(engine.includes("payout: !result.duplicate && !draw"), 'payout animation must follow committed settlement');
+assert(engine.includes('winner: draw ? \'DRAW\' : winnerSym') && engine.includes('netPot: result.netPot'),
+  'settlement event must carry authoritative winner and pot');
+assert(engine.includes('balanceAfter: sym === winnerSym ? result.winnerBalanceAfter : null'),
+  'winner must receive the authoritative post-payout balance');
+assert(dartSession.includes('m[\'payout\'] == true') && dartSession.includes('Sfx.duelPoints'));
+assert(webSession.includes('d?.payout === true') && webSession.includes("play('duel_points'"));
+assert(mobileDuel.includes('class _StakePayoutFlight') && webDuel.includes('function StakePayoutFlight'));
 
 console.log(`✓ ${pass} byte-identical original high-quality MP3 assets plus lifecycle/event audio wiring passed`);

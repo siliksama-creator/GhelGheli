@@ -423,7 +423,7 @@ class _CardDuelPageState extends State<CardDuelPage> {
               : 'این بار حریف برد!';
       final opponentRole = _session.vsBot ? 'ربات' : 'حریف';
       final scoreLabel =
-          'تو ${faNum(score[me])}  •  $opponentRole ${faNum(score[other])}';
+          'تو ${faNum(score[me])} — $opponentRole ${faNum(score[other])}';
       final message = '$title\n'
           'نتیجه: $scoreLabel\n'
           'MVP: ${mvp?['name'] ?? 'ستاره آرنا'} (عدد راند ${faNum(mvp?['mvpRoundPower'])})\n'

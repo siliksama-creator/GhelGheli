@@ -17,11 +17,15 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
     commission: Number(initialStart.commission || 0), vsBot: Boolean(initialStart.vsBot),
     matchMode: initialStart.matchMode || null, roomId: initialStart.roomId,
     matchId: initialStart.roomId, timedOut: null, settlementStatus: 'settled',
+    stakePayoutAmount: 0, stakePayoutWinner: null, stakeWinnerBalanceAfter: null,
+    stakePayoutSequence: 0,
     rematchAvailable: false, finishReason: null,
   } : {
     state: {}, players: null, me: null, turn: null, winner: null,
     gameId, stake, netPot: 0, commission: 0, vsBot: false, matchMode: null,
     roomId: null, matchId: null, timedOut: null, settlementStatus: 'settled',
+    stakePayoutAmount: 0, stakePayoutWinner: null, stakeWinnerBalanceAfter: null,
+    stakePayoutSequence: 0,
     rematchAvailable: false, finishReason: null,
   });
   const [error, setError] = useState('');
@@ -48,6 +52,8 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
   const holdingRef = useRef(false);
   const resultUntilRef = useRef(0);
   const resultHoldingRef = useRef(false);
+  const payoutTimerRef = useRef(null);
+  const announcedPayoutRef = useRef('');
 
   useEffect(() => {
     if (!enabled && !initialStart) {
@@ -106,8 +112,13 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
         netPot: Number(d.netPot || 0), commission: Number(d.commission || 0),
         vsBot: Boolean(d.vsBot), matchMode: d.matchMode || null,
         roomId: d.roomId, matchId: d.roomId, timedOut: null,
-        settlementStatus: 'settled', rematchAvailable: false, finishReason: null,
+        settlementStatus: 'settled',
+        stakePayoutAmount: 0, stakePayoutWinner: null, stakeWinnerBalanceAfter: null,
+    stakePayoutSequence: 0,
+        rematchAvailable: false, finishReason: null,
       });
+      window.clearTimeout(payoutTimerRef.current);
+      announcedPayoutRef.current = '';
       setPhase('playing'); setError(''); setStillSearching(false);
       setConnected(true); setConnectionNotice(''); setRematchWaiting(false);
       setClock(d);
@@ -164,8 +175,37 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
       setPhase('over'); setConnectionNotice('');
     };
     const onSettlement = d => {
-      setG(prev => d?.matchId && prev.matchId && d.matchId !== prev.matchId
-        ? prev : { ...prev, settlementStatus: d?.status || prev.settlementStatus });
+      setG(prev => {
+        if (d?.matchId && prev.matchId && d.matchId !== prev.matchId) return prev;
+        const next = {
+          ...prev,
+          settlementStatus: d?.status || prev.settlementStatus,
+          netPot: Number(d?.netPot || prev.netPot || 0),
+        };
+        const payoutId = String(d?.matchId || prev.matchId || '');
+        const payoutWinner = String(d?.winner || '');
+        const payoutAmount = Number(d?.netPot || prev.netPot || 0);
+        if (gameId === 'card_duel' && d?.payout === true && d?.status === 'settled'
+          && Number(prev.stake) > 0 && payoutAmount > 0
+          && ['X', 'O'].includes(payoutWinner) && payoutId
+          && announcedPayoutRef.current !== payoutId) {
+          announcedPayoutRef.current = payoutId;
+          window.clearTimeout(payoutTimerRef.current);
+          payoutTimerRef.current = window.setTimeout(() => {
+            play('duel_points', 0.92);
+            try { navigator.vibrate?.([22, 28, 44, 25, 70]); } catch { /* cosmetic */ }
+            setG(current => current.matchId !== payoutId ? current : {
+              ...current,
+              stakePayoutAmount: payoutAmount,
+              stakePayoutWinner: payoutWinner,
+              stakeWinnerBalanceAfter: d?.balanceAfter != null
+                && Number.isFinite(Number(d.balanceAfter)) ? Number(d.balanceAfter) : null,
+              stakePayoutSequence: Number(current.stakePayoutSequence || 0) + 1,
+            });
+          }, 900);
+        }
+        return next;
+      });
     };
     const onError = d => {
       if (disposed) return;
@@ -254,6 +294,7 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
 
     return () => {
       disposed = true; window.clearInterval(timer);
+      window.clearTimeout(payoutTimerRef.current);
       for (const [event, handler] of [
         ['connect', requestStart], ['disconnect', onDisconnect], ['connect_error', onConnectError],
         ['game:waiting', onWaiting], ['game:still-waiting', onStillWaiting],
@@ -280,6 +321,7 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
     const socket = socketRef.current;
     if (!socket) return;
     socket.emit('game:leave', { roomId: activeRoomRef.current || undefined });
+    window.clearTimeout(payoutTimerRef.current);
     if ((g.gameId || gameId) === 'card_duel') stopDuelMusic();
     requestedRef.current = true; activeRoomRef.current = null;
     setError(''); setStillSearching(false); setPhase('waiting'); setRematchWaiting(false);
@@ -308,6 +350,7 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
   });
   const leave = () => {
     socketRef.current?.emit('game:leave', { roomId: activeRoomRef.current || undefined });
+    window.clearTimeout(payoutTimerRef.current);
     if ((g.gameId || gameId) === 'card_duel') stopDuelMusic();
     socketRef.current?.disconnect(); activeRoomRef.current = null; setPhase('idle');
   };

@@ -426,6 +426,14 @@ function finish(room, winner, disconnectedSym = null) {
             if (sock?.emit) safeEmit(sock, 'game:settlement', {
               matchId: room.id,
               status: result.status === 'refunded' ? 'refunded' : 'settled',
+              // هر دو کلاینت همان واریز authoritative را انیمیت می‌کنند؛
+              // مبلغ از نتیجهٔ transaction می‌آید، نه محاسبهٔ UI.
+              winner: draw ? 'DRAW' : winnerSym,
+              netPot: result.netPot || room.netPot || 0,
+              stake: result.stake || room.stake || 0,
+              commission: result.commission || room.commission || 0,
+              payout: !result.duplicate && !draw,
+              balanceAfter: sym === winnerSym ? result.winnerBalanceAfter : null,
             }, room);
           }
           if (result.duplicate) return;

@@ -9,6 +9,7 @@ const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const mobile = read('mobile/lib/screens/user/games/card_duel/card_duel_widgets.dart');
 const mobilePage = read('mobile/lib/screens/user/games/card_duel_page.dart');
 const web = read('userweb/src/cardDuelGame.jsx');
+const webStyle = read('userweb/src/style.css');
 let pass = 0;
 function ok(condition, label) {
   assert.ok(condition, label);
@@ -58,6 +59,23 @@ ok(!/<details/.test(webIntel) && /duelIntelCompact/.test(webIntel),
   'Web: تحلیل details یا حالت بازشونده ندارد');
 ok(!/_CollapsibleSection\([\s\S]{0,120}title: 'تحلیل ترکیب'/.test(mobilePage),
   'Android: تحلیل داخل پنل بازشونده جاسازی نشده است');
+
+console.log('\n== دستِ زنده بدون اسکرول و نتیجهٔ استاندارد ==');
+const mobileLive = between(mobile, 'class _LiveBattle', 'class _Scoreboard');
+const handOverride = webStyle.slice(webStyle.lastIndexOf('دوئل ۱.۱.۱۳'));
+ok(!/ListView\.separated/.test(mobileLive) && /return Stack\(/.test(mobileLive),
+  'Android: کارت‌های باقی‌مانده در fan ثابت‌اند و اسکرول افقی ندارند');
+ok(/\.duelHandV2\{[\s\S]*display:grid;[\s\S]*overflow:visible/.test(handOverride),
+  'Web: دست زنده grid/fan ثابت است و overflow اسکرولی ندارد');
+ok(/—/.test(between(mobile, 'class _Finale', 'class _StakePayoutFlight'))
+  && /duelFinalScore[\s\S]{0,180}<i>—<\/i>/.test(web),
+  'نتیجهٔ نهایی هر دو کلاینت با خط فاصله نمایش داده می‌شود، نه نقطه');
+ok(/class _StakePayoutFlight/.test(mobile) && /function StakePayoutFlight/.test(web),
+  'واریز مسابقهٔ امتیازی در هر دو کلاینت انیمیشن مستقل دارد');
+ok(/if \(session\.resultHolding\)[\s\S]{0,100}_ClashStage/.test(mobileLive)
+  && /resultHolding && <RoundReveal/.test(web)
+  && !/duelOpponentHand/.test(web),
+  'برخورد فقط هنگام اعلام نتیجه فضا می‌گیرد و تزئین دست حریف حذف شده است');
 
 console.log('\n== HUD، انتخاب و پایان ==');
 ok(!/کارت این راند را انتخاب کن/.test(mobileClash)

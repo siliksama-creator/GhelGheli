@@ -238,6 +238,21 @@ def sfx_round(win: str) -> np.ndarray:
     return delay(bus, .16, .18)
 
 
+def sfx_points() -> np.ndarray:
+    sec = 1.75; bus = np.zeros((int(sec*SR), 2))
+    # A rising cascade of short, glassy coin notes with a soft cash-in impact.
+    for i, note in enumerate([74, 78, 81, 86, 90, 93]):
+        at = .04 + i * .13
+        ping = tone(midi(note), .38, "triangle", .002, .18, .025, .42)
+        overtone = tone(midi(note + 12), .24, "sine", .002, .12, .02, .34)
+        pan = -.72 + i * .28
+        add(bus, ping, at, .34 + i * .018, pan)
+        add(bus, overtone, at, .075, pan)
+    add(bus, impact(.52), .70, .34)
+    add(bus, shimmer(.82), .62, .16)
+    return delay(bus, .115, .21)
+
+
 def sfx_final_draw() -> np.ndarray:
     sec = 2.05; bus = np.zeros((int(sec*SR), 2))
     add(bus, impact(.8), 0, .62)
@@ -273,10 +288,13 @@ def main() -> None:
     write("duel_final_draw.mp3", sfx_final_draw())
     write("duel_victory.mp3", sfx_final(True))
     write("duel_defeat.mp3", sfx_final(False))
+    # Keep this last so adding the new noise-based cue never changes existing
+    # release assets merely by advancing the deterministic RNG stream.
+    write("duel_points.mp3", sfx_points())
     # Verify platform copies stay byte-identical.
     for name in ["duel_music.mp3", "duel_lock.mp3", "duel_intro.mp3", "duel_round_win.mp3",
-                 "duel_round_lose.mp3", "duel_round_draw.mp3", "duel_final_draw.mp3",
-                 "duel_victory.mp3", "duel_defeat.mp3"]:
+                 "duel_round_lose.mp3", "duel_round_draw.mp3", "duel_points.mp3",
+                 "duel_final_draw.mp3", "duel_victory.mp3", "duel_defeat.mp3"]:
         assert (OUTS[0] / name).read_bytes() == (OUTS[1] / name).read_bytes()
         print(name, (OUTS[0] / name).stat().st_size)
 

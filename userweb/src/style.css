@@ -5153,3 +5153,91 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 .duelIntelCompact b{font-size:12.5px}
 .duelIntelCompact small{font-size:11.5px;color:#8fa6bd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .duelIntelCompact button{width:36px;height:36px;min-height:0;padding:0;margin:0;border-radius:50%}
+
+/* دوئل ۱.۱.۱۳: دستِ بدون اسکرول، intro سینمایی‌تر و واریز پروازکنان */
+.duelHandV2{
+  display:grid;
+  grid-template-columns:repeat(var(--hand-count),minmax(0,1fr));
+  align-items:stretch;
+  gap:0;
+  width:100%;
+  padding:2px 0 5px;
+  overflow:visible;
+  scrollbar-width:none;
+}
+.duelHandV2>.duelHandCard{
+  width:min(104px,145%);
+  min-width:0;
+  max-width:104px;
+  justify-self:center;
+  position:relative;
+  z-index:calc(var(--hand-index) + 1);
+  transform:rotate(var(--hand-angle));
+  transform-origin:50% 100%;
+  transition:transform .22s ease,z-index .01s;
+}
+.duelHandV2>.duelHandCard:first-child{justify-self:start}
+.duelHandV2>.duelHandCard:last-child{justify-self:end}
+.duelHandV2>.duelHandCard:hover,
+.duelHandV2>.duelHandCard:focus-within{z-index:20;transform:translateY(-5px) scale(1.04)}
+
+.duelRoundIntro{isolation:isolate;overflow:hidden}
+.duelRoundIntro:after{
+  box-shadow:0 0 90px color-mix(in srgb,var(--focus-color) 32%,transparent),
+    inset 0 0 36px color-mix(in srgb,var(--focus-color) 18%,transparent)
+}
+.duelIntroShards{position:absolute;inset:0;z-index:0;pointer-events:none;animation:duelShardField 2.8s ease both}
+.duelIntroShards i{
+  position:absolute;left:50%;top:50%;width:3px;height:62px;border-radius:99px;
+  transform-origin:50% 0;
+  transform:rotate(var(--shard-angle)) translateY(-172px) scaleY(.18);
+  background:linear-gradient(transparent,var(--focus-color),transparent);
+  filter:drop-shadow(0 0 8px var(--focus-color));opacity:0;
+  animation:duelShard 1.05s var(--shard-delay) cubic-bezier(.2,.9,.3,1) both;
+}
+.duelRoundIntroIcon:before,.duelRoundIntroIcon:after{
+  content:"";position:absolute;border-radius:50%;pointer-events:none
+}
+.duelRoundIntroIcon:before{inset:-15px;border:2px dashed color-mix(in srgb,var(--focus-color) 62%,transparent);animation:duelEmblemOrbit 2.4s linear infinite}
+.duelRoundIntroIcon:after{inset:-28px;border:1px solid color-mix(in srgb,var(--focus-color) 28%,transparent);animation:duelEmblemOrbit 3.2s linear reverse infinite}
+@keyframes duelShard{0%{opacity:0;transform:rotate(var(--shard-angle)) translateY(-72px) scaleY(.05)}38%{opacity:.9}100%{opacity:0;transform:rotate(var(--shard-angle)) translateY(-215px) scaleY(1)}}
+@keyframes duelShardField{0%{transform:scale(.65) rotate(-12deg)}28%,75%{transform:scale(1) rotate(0)}100%{transform:scale(1.12) rotate(7deg)}}
+@keyframes duelEmblemOrbit{to{transform:rotate(1turn)}}
+
+.duelFinale{position:relative;overflow:hidden;isolation:isolate}
+.duelFinalePanel{position:relative;z-index:2}
+.duelStakeFlight{
+  position:absolute;inset:0;z-index:12;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;pointer-events:none;
+  background:radial-gradient(circle at 50% 46%,#ffd16635,transparent 43%);
+  animation:duelPayoutScene 2.65s ease both;
+}
+.duelStakeFlight>strong{
+  padding:8px 17px;border-radius:16px;background:linear-gradient(135deg,#fff2a8,#ffd166 45%,#f59e0b);
+  color:#3b2500;font-size:clamp(27px,8vw,42px);font-weight:1000;direction:ltr;
+  box-shadow:0 0 0 1px #fff8,0 0 42px #ffd166aa,0 18px 45px #0009;
+  animation:duelPayoutLabel 2.2s cubic-bezier(.2,1.4,.3,1) both;
+}
+.duelStakeFlight>small{margin-top:8px;color:#fff;font-size:13px;font-weight:950;text-shadow:0 2px 9px #000,0 0 14px #ffd166}
+.duelCoinStream{position:absolute;inset:0;overflow:hidden}
+.duelCoinStream i{
+  position:absolute;left:var(--coin-left);bottom:2%;width:24px;height:24px;
+  display:grid;place-items:center;border-radius:50%;font-style:normal;font-size:15px;font-weight:1000;
+  color:#5b3700;background:linear-gradient(145deg,#fff2a8,#f59e0b);border:1px solid #fff8;
+  box-shadow:0 0 15px #ffd166;opacity:0;
+  animation:duelCoinFly 1.55s var(--coin-delay) cubic-bezier(.16,.75,.24,1) both;
+}
+@keyframes duelPayoutScene{0%{opacity:0}9%,78%{opacity:1}100%{opacity:0}}
+@keyframes duelPayoutLabel{0%{opacity:0;transform:translateY(110px) scale(.35) rotate(-7deg)}24%{opacity:1;transform:translateY(-7px) scale(1.08) rotate(1deg)}65%{transform:translateY(-18px) scale(1)}100%{opacity:0;transform:translateY(-125px) scale(.72)}}
+@keyframes duelCoinFly{0%{opacity:0;transform:translateY(30px) rotate(0) scale(.45)}18%{opacity:1}70%{opacity:1;transform:translateY(-205px) rotate(540deg) scale(1)}100%{opacity:0;transform:translateY(-285px) rotate(760deg) scale(.45)}}
+@media(max-width:520px){
+  .duelHandV2>.duelHandCard{width:min(96px,148%)}
+  .duelHandV2 .ggPlayerCard.compact .ggCardArt{min-height:86px;max-height:86px}
+  .duelChoicePanel{padding-bottom:6px}
+}
+@media(prefers-reduced-motion:reduce){
+  .duelIntroShards,.duelIntroShards i,.duelRoundIntroIcon:before,.duelRoundIntroIcon:after,
+  .duelStakeFlight,.duelStakeFlight *{animation:none!important}
+  .duelStakeFlight{opacity:1}.duelStakeFlight>strong{opacity:1;transform:none}
+  .duelCoinStream{display:none}
+}

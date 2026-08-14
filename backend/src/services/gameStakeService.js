@@ -130,6 +130,7 @@ function createGameStakeService(db = pool, points = pointService) {
       const netPot = Number(match.net_pot);
       const players = [match.player_x_id, match.player_o_id].sort();
       let outcome;
+      let winnerBalanceAfter = null;
 
       if (draw) {
         for (const userId of players) {
@@ -150,7 +151,7 @@ function createGameStakeService(db = pool, points = pointService) {
           throw new StakeError('برنده مسابقه معتبر نیست', 'INVALID_WINNER');
         }
         // lifetime فقط سود واقعی را می‌گیرد؛ برگشت اصل stake «کسب تازه» نیست.
-        await points.credit(client, {
+        const payout = await points.credit(client, {
           userId: winnerUserId,
           points: netPot,
           source: 'game',
@@ -160,6 +161,7 @@ function createGameStakeService(db = pool, points = pointService) {
           league: false,
           lifetimeGain: Math.max(0, netPot - stake),
         });
+        winnerBalanceAfter = Number(payout?.balanceAfter ?? 0);
         outcome = 'winner';
       }
 
@@ -177,6 +179,7 @@ function createGameStakeService(db = pool, points = pointService) {
         netPot,
         commission: Number(match.commission_points),
         winnerUserId: draw ? null : winnerUserId,
+        winnerBalanceAfter: draw ? null : winnerBalanceAfter,
       };
     } catch (e) {
       await client.query('ROLLBACK').catch(() => {});

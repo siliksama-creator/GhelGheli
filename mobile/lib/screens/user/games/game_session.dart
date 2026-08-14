@@ -45,6 +45,15 @@ class GameSession extends ChangeNotifier {
   String? _roomId;
   String? matchId;
   String settlementStatus = 'settled';
+
+  /// واریز authoritative مسابقهٔ امتیازی؛ فقط پس از تأیید transaction
+  /// سرور مقدار می‌گیرد تا UI هیچ پاداشی را حدس نزند.
+  int stakePayoutAmount = 0;
+  String? stakePayoutWinner;
+  int? stakeWinnerBalanceAfter;
+  int stakePayoutSequence = 0;
+  String? _announcedPayoutMatchId;
+
   bool rematchAvailable = false;
   bool rematchWaiting = false;
   String? connectionNotice;
@@ -144,6 +153,7 @@ class GameSession extends ChangeNotifier {
   bool connected = true;
   Timer? _ticker;
   Timer? _searchTicker;
+  Timer? _payoutTimer;
   int _lastTickPlayed = -1;
 
   bool get myTurn =>
@@ -256,6 +266,12 @@ class GameSession extends ChangeNotifier {
       timedOutSymbol = null;
       stillSearching = false;
       settlementStatus = 'settled';
+      _payoutTimer?.cancel();
+      stakePayoutAmount = 0;
+      stakePayoutWinner = null;
+      stakeWinnerBalanceAfter = null;
+      stakePayoutSequence = 0;
+      _announcedPayoutMatchId = null;
       rematchAvailable = false;
       rematchWaiting = false;
       connectionNotice = null;
@@ -367,7 +383,39 @@ class GameSession extends ChangeNotifier {
         return;
       }
       settlementStatus = '${m['status'] ?? settlementStatus}';
+      netPot = (m['netPot'] as num?)?.toInt() ?? netPot;
       notifyListeners();
+
+      final payoutMatchId = '${m['matchId'] ?? matchId ?? ''}';
+      final payoutWinner = '${m['winner'] ?? ''}';
+      final payout = (m['netPot'] as num?)?.toInt() ?? netPot;
+      final balanceAfter = (m['balanceAfter'] as num?)?.toInt();
+      final shouldAnimate = gameId == 'card_duel' &&
+          m['payout'] == true &&
+          settlementStatus == 'settled' &&
+          stake > 0 &&
+          payout > 0 &&
+          (payoutWinner == 'X' || payoutWinner == 'O') &&
+          payoutMatchId.isNotEmpty &&
+          _announcedPayoutMatchId != payoutMatchId;
+      if (!shouldAnimate) return;
+
+      _announcedPayoutMatchId = payoutMatchId;
+      _payoutTimer?.cancel();
+      _payoutTimer = Timer(const Duration(milliseconds: 900), () {
+        if (_disposed || phase != GamePhase.over || matchId != payoutMatchId) {
+          return;
+        }
+        stakePayoutAmount = payout;
+        stakePayoutWinner = payoutWinner;
+        stakeWinnerBalanceAfter = balanceAfter;
+        stakePayoutSequence += 1;
+        GameAudio.instance.play(Sfx.duelPoints, volume: 0.92);
+        try {
+          HapticFeedback.heavyImpact();
+        } catch (_) {/* haptics is cosmetic */}
+        notifyListeners();
+      });
     });
     s.on('game:opponent_reconnecting', (d) {
       connectionNotice = _msg(d) ?? 'منتظر بازگشت حریف…';
@@ -693,6 +741,7 @@ class GameSession extends ChangeNotifier {
     connectionNotice = null;
     _stopClock();
     _stopSearchClock();
+    _payoutTimer?.cancel();
     if (gameId == 'card_duel') unawaited(GameAudio.instance.stopDuelMusic());
     notifyListeners();
   }
@@ -734,6 +783,7 @@ class GameSession extends ChangeNotifier {
     phase = GamePhase.idle;
     _stopClock();
     _stopSearchClock();
+    _payoutTimer?.cancel();
     if (gameId == 'card_duel') unawaited(GameAudio.instance.stopDuelMusic());
     notifyListeners();
   }
@@ -752,6 +802,7 @@ class GameSession extends ChangeNotifier {
     _disposed = true;
     _ticker?.cancel();
     _searchTicker?.cancel();
+    _payoutTimer?.cancel();
     if (gameId == 'card_duel') unawaited(GameAudio.instance.stopDuelMusic());
     clock.dispose();
     _socket?.dispose();

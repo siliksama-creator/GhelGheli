@@ -47,7 +47,11 @@ ok(state.remaining.X.length === 5 && state.remaining.O.length === 5,
 ok(rules.simultaneous === true, 'انتخاب دو بازیکن هم‌زمان است');
 ok(rules.isValidMove(state, { cardId: 'x1' }, 'X'), 'کارت باقی‌مانده حرکت معتبر است');
 rules.applyMove(state, { cardId: 'x1' }, 'X');
+const viewX = rules.publicState(state, 'X');
 const viewO = rules.publicState(state, 'O');
+ok(viewX.roundFocus.stat === 'speed'
+  && JSON.stringify(viewX.roundFocus) === JSON.stringify(viewO.roundFocus),
+  'معیار راند برای هر دو بازیکن دقیقاً یکی است؛ «سرعت» به هر دو گفته می‌شود');
 ok(!JSON.stringify(viewO).includes('x1'), 'انتخاب قفل‌نشده به حریف نشت نمی‌کند');
 ok(viewO.opponentLocked === true, 'حریف فقط می‌فهمد انتخاب انجام شده است');
 ok(!rules.isValidMove(state, { cardId: 'x2' }, 'X'), 'یک بازیکن در هر راند فقط یک انتخاب دارد');

@@ -27,6 +27,7 @@ enum Sfx {
   duelRoundWin('duel_round_win.mp3'),
   duelRoundLose('duel_round_lose.mp3'),
   duelRoundDraw('duel_round_draw.mp3'),
+  duelPoints('duel_points.mp3'),
   duelFinalDraw('duel_final_draw.mp3'),
   duelVictory('duel_victory.mp3'),
   duelDefeat('duel_defeat.mp3');

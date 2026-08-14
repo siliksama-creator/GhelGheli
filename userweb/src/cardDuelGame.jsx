@@ -10,6 +10,24 @@ import { matchVerdictForViewer, resultMvp, roundEffectBonus, roundForViewer } fr
 const idOf = card => cardIdOf(card);
 const num = value => Number(value || 0);
 
+function StakePayoutFlight({ amount, winner, mine, opponentRole, sequence, balanceAfter }) {
+  if (!amount || !winner || !sequence) return null;
+  const mineWon = winner === mine;
+  const owner = mineWon ? 'تو' : opponentRole;
+  return <div className="duelStakeFlight" key={`payout-${sequence}`}
+    aria-live="assertive" aria-label={`${fa(amount)} امتیاز به ${owner} اضافه شد`}>
+    <div className="duelCoinStream" aria-hidden="true">
+      {Array.from({ length: 14 }, (_, index) => <i key={index} style={{
+        '--coin-left': `${7 + index * 6.5}%`,
+        '--coin-delay': `${index * 42}ms`,
+      }}>＋</i>)}
+    </div>
+    <strong>+{fa(amount)}</strong>
+    <small>{mineWon && balanceAfter != null && Number.isFinite(Number(balanceAfter))
+      ? `موجودی جدید: ${fa(balanceAfter)}` : `امتیاز به ${owner} اضافه شد`}</small>
+  </div>;
+}
+
 const rarityColor = rarity => ({
   legend: '#FF6B35', premium: '#A855F7', gold: '#F7C948',
   silver: '#C7D2FE', normal: '#22E7A6',
@@ -316,6 +334,12 @@ function RoundIntroOverlay({ focus, roundNumber, totalRounds }) {
     <div className="duelRoundIntro" key={`intro-${roundNumber}-${stat}`}
       style={{ '--focus-color': color }} aria-live="assertive"
       aria-label={`راند ${roundNumber} از ${totalRounds}، معیار ${meta.name || ''}. ${focus?.hint || ''}`}>
+      <div className="duelIntroShards" aria-hidden="true">
+        {Array.from({ length: 12 }, (_, index) => <i key={index} style={{
+          '--shard-angle': `${index * 30}deg`,
+          '--shard-delay': `${index * 24}ms`,
+        }} />)}
+      </div>
       <div className="duelRoundIntroInner">
         <small>راند {fa(roundNumber)} از {fa(totalRounds)}</small>
         <span className="duelRoundIntroIcon" aria-hidden="true">
@@ -377,6 +401,9 @@ function LiveArena({ session }) {
   const myCards = state.myDeck || [];
   const remaining = new Set((state.myRemainingCardIds || []).map(String));
   const pendingId = String(state.myPendingCardId || '');
+  // کارت‌های مصرف‌شده دیگر تصمیمی در این راند نیستند. حذفشان از دستِ زنده
+  // باعث می‌شود پنج کارتِ راند اول هم بدون اسکرول در یک fan ثابت جا شوند.
+  const handCards = myCards.filter(card => remaining.has(idOf(card)) || pendingId === idOf(card));
   const myName = g.players?.[mine]?.nickname || 'تو';
   const opponentName = g.players?.[opponent]?.nickname || (g.vsBot ? 'ربات تاکتیکی' : 'حریف');
   const opponentRole = g.vsBot ? 'ربات' : 'حریف';
@@ -417,17 +444,6 @@ function LiveArena({ session }) {
       return <i key={index} className={className} title={`راند ${fa(index + 1)}`} />;
     })}</div>
 
-    {/* ⚠️ ارتفاعِ ثابتِ ۸۴px با صفر کارت یعنی یک نوارِ خالی وسطِ صفحه.
-        در پایانِ بازی همیشه صفر است، و در راندِ آخر هم می‌تواند صفر
-        شود. شرط روی خودِ تعداد است نه روی `final`، چون قاعده باید روی
-        الگو نوشته شود نه روی یک نمونه. */}
-    {num(state.opponentRemainingCount) > 0 && (
-      <div className="duelOpponentHand" aria-label={`${state.opponentRemainingCount} کارت حریف باقی مانده`}>
-        {Array.from({ length: num(state.opponentRemainingCount) }, (_, index) =>
-          <span key={index}><img src="/games/card_duel_glow.png" alt="پشت کارت حریف" /></span>)}
-      </div>
-    )}
-
     {/* ── چرا بنرِ افقی جای خود را به اعلانِ وسطِ صفحه داد ──
         بنر ~۹۰ پیکسل ارتفاع می‌گرفت و از دلایلِ اصلیِ اسکرولِ صفحهٔ بازی
         بود. اعلانِ تازه `position:fixed` است: دیده می‌شود ولی هیچ فضایی
@@ -447,8 +463,8 @@ function LiveArena({ session }) {
     {/* ⚠️ در صفحهٔ پایان این صحنه دقیقاً بالای پنلِ VICTORY می‌نشست و
         «دو بلوک نتیجه هم‌زمان» می‌ساخت. جزئیاتِ راندِ پنجم از بین
         نمی‌رود: در «جزئیات راندها» همان پایین هست. */}
-    <RoundReveal round={state.lastRound} me={mine} myFrame={myFrame}
-      opponentFrame={opponentFrame} opponentRole={opponentRole} />
+    {resultHolding && <RoundReveal round={state.lastRound} me={mine} myFrame={myFrame}
+      opponentFrame={opponentFrame} opponentRole={opponentRole} />}
 
     {phase === 'playing' && <section className="duelChoicePanel">
       <div className="duelChoicePrompt">
@@ -470,9 +486,12 @@ function LiveArena({ session }) {
           {holding ? <i className="duelHoldIcon" aria-hidden="true">⏸</i> : fa(secondsLeft)}
         </strong>
       </div>
-      <div className="duelHandV2">
-        {myCards.map(card => (
-          <div className="duelHandCard" key={idOf(card)}>
+      <div className="duelHandV2" style={{ '--hand-count': Math.max(1, handCards.length) }}>
+        {handCards.map((card, index) => (
+          <div className="duelHandCard" key={idOf(card)} style={{
+            '--hand-index': index,
+            '--hand-angle': `${(index - (handCards.length - 1) / 2) * 0.8}deg`,
+          }}>
             <HoloCard card={card} compact frame={myFrame}
               selected={pendingId === idOf(card)}
               disabled={holding || state.iChose || !remaining.has(idOf(card))}
@@ -609,7 +628,7 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
       const mvp = resultMvp(session.g.state);
       const opponentRole = session.g.vsBot ? 'ربات' : 'حریف';
       const opponent = session.g.players?.[other]?.nickname || opponentRole;
-      const scoreLabel = `تو ${fa(myScore)} • ${opponentRole} ${fa(theirScore)}`;
+      const scoreLabel = `تو ${fa(myScore)} — ${opponentRole} ${fa(theirScore)}`;
       const text = `${title}\nنتیجه: ${scoreLabel}\nMVP: ${mvp?.name || 'ستاره آرنا'} (عدد راند ${fa(mvp?.mvpRoundPower || 0)})\nمستقیم به چالشم بیا:`;
       const blob = await renderResultCard({ result: title, score: scoreLabel, mvp, opponent, url: invite.shareUrl });
       const file = blob ? new File([blob], 'ghelgheli-result.png', { type: 'image/png' }) : null;
@@ -808,11 +827,15 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
     {enabled && session.phase === 'over' && <section className={`duelFinale ${winner === 'DRAW' ? 'draw' : iWon ? 'won' : 'lost'}`}
       style={{'--duel-result-a':resultPalette[0],'--duel-result-b':resultPalette[1],
         background:`radial-gradient(circle at 50% 15%,${resultPalette[1]}44,transparent 42%),${resultPalette[0]}`}}>
+      <StakePayoutFlight amount={session.g.stakePayoutAmount}
+        winner={session.g.stakePayoutWinner} mine={resultMine}
+        opponentRole={resultOpponentRole} sequence={session.g.stakePayoutSequence}
+        balanceAfter={session.g.stakeWinnerBalanceAfter}/>
       <div className="duelFinalePanel">
         <span>{winner === 'DRAW' ? '🤝' : iWon ? '🏆' : '🛡️'}</span>
         <h2>{winner === 'DRAW' ? 'DRAW' : iWon ? 'VICTORY' : 'DEFEAT'}</h2>
         <strong className="duelFinalScore">
-          تو {fa(resultScore[resultMine])} <i>•</i> {resultOpponentRole} {fa(resultScore[resultOther])}
+          تو {fa(resultScore[resultMine])} <i>—</i> {resultOpponentRole} {fa(resultScore[resultOther])}
         </strong>
         {(!session.g.vsBot || session.g.finishReason === 'disconnect') && (
           <div className={`duelSettlement ${session.g.settlementStatus || 'settled'}`}>

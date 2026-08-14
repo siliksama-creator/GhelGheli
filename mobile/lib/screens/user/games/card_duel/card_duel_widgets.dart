@@ -377,12 +377,16 @@ class _LiveBattle extends StatelessWidget {
         // ⚠️ در صفحهٔ پایان این صحنه دقیقاً بالای پنلِ VICTORY می‌نشست و
         //    «دو بلوک نتیجه هم‌زمان» می‌ساخت. جزئیاتِ راندِ پنجم از بین
         //    نمی‌رود: در «جزئیات راندها» همان پایین هست.
-        _ClashStage(
-          round: lastRound,
-          mine: mine,
-          color: color,
-          opponentRole: session.vsBot ? 'ربات' : 'حریف',
-        ),
+        // برخورد کامل فقط در مکثِ نتیجه دیده می‌شود. بعد از آن score و
+        // پیپ‌ها حکم را نگه می‌دارند؛ نگه‌داشتن کارت‌های راند قبلی ۲۱۰dp
+        // از صفحهٔ انتخاب می‌گرفت و کاربر را دوباره مجبور به اسکرول می‌کرد.
+        if (session.resultHolding)
+          _ClashStage(
+            round: lastRound,
+            mine: mine,
+            color: color,
+            opponentRole: session.vsBot ? 'ربات' : 'حریف',
+          ),
         if (session.phase == GamePhase.playing) ...[
           Gaps.vSm,
           AppCard(
@@ -483,59 +487,92 @@ class _LiveBattle extends StatelessWidget {
                 // معمولاً به عددِ «قدرتِ کلی» نگاه می‌کرد — که در ۱۳٪ مواقع
                 // برندهٔ راند را اشتباه پیش‌بینی می‌کند.
                 SizedBox(
-                  height: 196,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: deck.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 8),
-                    itemBuilder: (_, index) {
-                      final card = Map<String, dynamic>.from(deck[index]);
-                      final id = cardIdOf(card);
-                      final canPlay = !session.introHolding &&
-                          !iChose &&
-                          remaining.contains(id);
-                      final focusStat =
-                          '${(state['roundFocus'] as Map?)?['stat'] ?? ''}';
-                      final focusTint =
-                          _FocusBannerState._statColors[focusStat] ?? color;
-                      // بهترین عددِ این راند در میانِ کارت‌های باقی‌مانده —
-                      // برای اینکه کاربر ببیند کدام انتخاب قوی‌ترین است.
-                      return SizedBox(
-                        width: 112,
-                        child: AnimatedSlide(
-                          duration: const Duration(milliseconds: 220),
-                          offset: pendingId == id
-                              ? const Offset(0, -0.05)
-                              : Offset.zero,
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Expanded(
-                                child: PlayerCard(
-                                  card: card,
-                                  compact: true,
-                                  showStats: false,
-                                  enabled: canPlay,
-                                  selected: pendingId == id,
-                                  onTap: canPlay
-                                      ? () => session.moveObject({'cardId': id})
-                                      : null,
-                                ),
+                  height: 164,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final hand = deck
+                          .where((raw) {
+                            final id = cardIdOf(raw);
+                            return remaining.contains(id) || pendingId == id;
+                          })
+                          .map((raw) => Map<String, dynamic>.from(raw))
+                          .toList();
+                      if (hand.isEmpty) return const SizedBox.shrink();
+                      final cardWidth = math.min(
+                        104.0,
+                        math.max(84.0, constraints.maxWidth * .30),
+                      );
+                      final step = hand.length == 1
+                          ? 0.0
+                          : (constraints.maxWidth - cardWidth) /
+                              (hand.length - 1);
+                      return Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          for (var index = 0; index < hand.length; index++)
+                            PositionedDirectional(
+                              start: step * index,
+                              top: 0,
+                              bottom: 0,
+                              width: cardWidth,
+                              child: Builder(
+                                builder: (_) {
+                                  final card = hand[index];
+                                  final id = cardIdOf(card);
+                                  final canPlay = !session.introHolding &&
+                                      !iChose &&
+                                      remaining.contains(id);
+                                  final focusStat =
+                                      '${(state['roundFocus'] as Map?)?['stat'] ?? ''}';
+                                  final focusTint = _FocusBannerState
+                                          ._statColors[focusStat] ??
+                                      color;
+                                  return AnimatedSlide(
+                                    duration: const Duration(milliseconds: 240),
+                                    curve: Curves.easeOutBack,
+                                    offset: pendingId == id
+                                        ? const Offset(0, -.06)
+                                        : Offset.zero,
+                                    child: Transform.rotate(
+                                      angle: (index - (hand.length - 1) / 2) *
+                                          .018,
+                                      alignment: Alignment.bottomCenter,
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Expanded(
+                                            child: PlayerCard(
+                                              card: card,
+                                              compact: true,
+                                              showStats: false,
+                                              enabled: canPlay,
+                                              selected: pendingId == id,
+                                              onTap: canPlay
+                                                  ? () => session.moveObject(
+                                                        {'cardId': id},
+                                                      )
+                                                  : null,
+                                            ),
+                                          ),
+                                          Opacity(
+                                            opacity: canPlay ? 1 : .4,
+                                            child: _FocusStatRibbon(
+                                              card: card,
+                                              stat: focusStat,
+                                              tint: focusTint,
+                                              roundIndex: roundIndex,
+                                              previousRoundWon:
+                                                  lastRound?['winner'] == mine,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
-                              Opacity(
-                                opacity: canPlay ? 1 : 0.4,
-                                child: _FocusStatRibbon(
-                                  card: card,
-                                  stat: focusStat,
-                                  tint: focusTint,
-                                  roundIndex: roundIndex,
-                                  previousRoundWon:
-                                      lastRound?['winner'] == mine,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                            ),
+                        ],
                       );
                     },
                   ),
@@ -1449,146 +1486,357 @@ class _Finale extends StatelessWidget {
         : const {};
     final me = session.mySymbol ?? 'X';
     final other = me == 'X' ? 'O' : 'X';
-    return Container(
-      padding: const EdgeInsets.all(Gaps.md),
-      decoration: BoxDecoration(
-        borderRadius: Corners.rXl,
-        gradient: const LinearGradient(
-          colors: [Color(0xFF17304C), Color(0xFF050A12)],
-        ),
-        border: Border.all(color: color),
-      ),
-      child: Column(
-        children: [
-          Text(
-            draw
-                ? 'DRAW'
-                : won
-                    ? 'VICTORY'
-                    : 'DEFEAT',
-            style: TextStyle(
-              fontSize: 34,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 3,
-              color: draw
-                  ? _gold
-                  : won
-                      ? _emerald
-                      : _rose,
+    return Stack(
+      clipBehavior: Clip.hardEdge,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(Gaps.md),
+          decoration: BoxDecoration(
+            borderRadius: Corners.rXl,
+            gradient: const LinearGradient(
+              colors: [Color(0xFF17304C), Color(0xFF050A12)],
             ),
+            border: Border.all(color: color),
           ),
-          Text(
-            'تو ${faNum(score[me])}  •  ${session.vsBot ? 'ربات' : 'حریف'} ${faNum(score[other])}',
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          if (!session.vsBot || session.finishReason == 'disconnect') ...[
-            Gaps.vXs,
-            Text(
-              session.finishReason == 'disconnect'
-                  ? session.resultText
-                  : draw
-                      ? 'ورودی برگشت خورد'
-                      : won
-                          ? 'تسویه شد'
-                          : '−${faNum(session.stake)} امتیاز',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 12, color: Colors.white60),
-            ),
-          ],
-          Gaps.vSm,
-          if (history.isNotEmpty)
-            _RoundPips(
-              total: 5,
-              current: 5,
-              history: history,
-              mine: me,
-              color: color,
-            ),
-          if (history.isNotEmpty) ...[
-            Gaps.vSm,
-            Theme(
-              data:
-                  Theme.of(context).copyWith(dividerColor: Colors.transparent),
-              child: ExpansionTile(
-                tilePadding: EdgeInsets.zero,
-                collapsedIconColor: Colors.white70,
-                iconColor: Colors.white,
-                title: const Text(
-                  'جزئیات راندها',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                  ),
-                ),
-                children: [
-                  for (final raw in history)
-                    _FinalRoundBreakdown(
-                      round: Map<String, dynamic>.from(raw),
-                      mySymbol: me,
-                      opponentRole: session.vsBot ? 'ربات' : 'حریف',
-                    ),
-                ],
-              ),
-            ),
-          ],
-          if (mvp != null) ...[
-            Gaps.vSm,
-            SizedBox(
-              width: 140,
-              height: 196,
-              child: PlayerCard(
-                card: mvp!,
-                compact: true,
-                showStats: false,
-                winner: true,
-              ),
-            ),
-            Text(
-              'MVP · ${mvp!['name']}',
-              style: const TextStyle(fontWeight: FontWeight.w900),
-            ),
-          ],
-          Gaps.vSm,
-          OutlinedButton.icon(
-            onPressed: sharing ? null : onShare,
-            icon: const Icon(Icons.ios_share_rounded, size: 17),
-            label: Text(
-              sharing ? 'در حال ساخت…' : 'اشتراک',
-            ),
-          ),
-          Gaps.vSm,
-          Row(
+          child: Column(
             children: [
-              Expanded(
-                child: FilledButton(
-                  onPressed: session.rematchWaiting ? null : onAgain,
-                  child: Text(
-                    session.rematchWaiting
-                        ? 'منتظر حریف…'
-                        : session.rematchAvailable
-                            ? 'دوباره'
-                            : privateLobby
-                                ? 'بازگشت به لابی'
-                                : 'دوباره',
-                  ),
+              Text(
+                draw
+                    ? 'DRAW'
+                    : won
+                        ? 'VICTORY'
+                        : 'DEFEAT',
+                style: TextStyle(
+                  fontSize: 34,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 3,
+                  color: draw
+                      ? _gold
+                      : won
+                          ? _emerald
+                          : _rose,
                 ),
               ),
-              Gaps.hXs,
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: onEdit,
-                  child: const Text('ترکیب'),
+              Text(
+                'تو ${faNum(score[me])} — ${session.vsBot ? 'ربات' : 'حریف'} ${faNum(score[other])}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
                 ),
+              ),
+              if (!session.vsBot || session.finishReason == 'disconnect') ...[
+                Gaps.vXs,
+                Text(
+                  session.finishReason == 'disconnect'
+                      ? session.resultText
+                      : draw
+                          ? 'ورودی برگشت خورد'
+                          : won
+                              ? 'تسویه شد'
+                              : '−${faNum(session.stake)} امتیاز',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 12, color: Colors.white60),
+                ),
+              ],
+              Gaps.vSm,
+              if (history.isNotEmpty)
+                _RoundPips(
+                  total: 5,
+                  current: 5,
+                  history: history,
+                  mine: me,
+                  color: color,
+                ),
+              if (history.isNotEmpty) ...[
+                Gaps.vSm,
+                Theme(
+                  data: Theme.of(context)
+                      .copyWith(dividerColor: Colors.transparent),
+                  child: ExpansionTile(
+                    tilePadding: EdgeInsets.zero,
+                    collapsedIconColor: Colors.white70,
+                    iconColor: Colors.white,
+                    title: const Text(
+                      'جزئیات راندها',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                      ),
+                    ),
+                    children: [
+                      for (final raw in history)
+                        _FinalRoundBreakdown(
+                          round: Map<String, dynamic>.from(raw),
+                          mySymbol: me,
+                          opponentRole: session.vsBot ? 'ربات' : 'حریف',
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+              if (mvp != null) ...[
+                Gaps.vSm,
+                SizedBox(
+                  width: 140,
+                  height: 196,
+                  child: PlayerCard(
+                    card: mvp!,
+                    compact: true,
+                    showStats: false,
+                    winner: true,
+                  ),
+                ),
+                Text(
+                  'MVP · ${mvp!['name']}',
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ],
+              Gaps.vSm,
+              OutlinedButton.icon(
+                onPressed: sharing ? null : onShare,
+                icon: const Icon(Icons.ios_share_rounded, size: 17),
+                label: Text(
+                  sharing ? 'در حال ساخت…' : 'اشتراک',
+                ),
+              ),
+              Gaps.vSm,
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: session.rematchWaiting ? null : onAgain,
+                      child: Text(
+                        session.rematchWaiting
+                            ? 'منتظر حریف…'
+                            : session.rematchAvailable
+                                ? 'دوباره'
+                                : privateLobby
+                                    ? 'بازگشت به لابی'
+                                    : 'دوباره',
+                      ),
+                    ),
+                  ),
+                  Gaps.hXs,
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: onEdit,
+                      child: const Text('ترکیب'),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
+        ),
+        if (session.stakePayoutSequence > 0)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: _StakePayoutFlight(
+                key: ValueKey(session.stakePayoutSequence),
+                amount: session.stakePayoutAmount,
+                mineWon: session.stakePayoutWinner == me,
+                balanceAfter: session.stakeWinnerBalanceAfter,
+                opponentRole: session.vsBot ? 'ربات' : 'حریف',
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _StakePayoutFlight extends StatefulWidget {
+  const _StakePayoutFlight({
+    super.key,
+    required this.amount,
+    required this.mineWon,
+    required this.balanceAfter,
+    required this.opponentRole,
+  });
+
+  final int amount;
+  final bool mineWon;
+  final int? balanceAfter;
+  final String opponentRole;
+
+  @override
+  State<_StakePayoutFlight> createState() => _StakePayoutFlightState();
+}
+
+class _StakePayoutFlightState extends State<_StakePayoutFlight>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2650),
+  )..forward();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final owner = widget.mineWon ? 'تو' : widget.opponentRole;
+    return Semantics(
+      liveRegion: true,
+      label: '${faNum(widget.amount)} امتیاز به $owner اضافه شد',
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) => LayoutBuilder(
+          builder: (context, constraints) {
+            final v = _controller.value;
+            final fade = v < .80 ? 1.0 : (1 - (v - .80) / .20).clamp(0.0, 1.0);
+            final center =
+                Offset(constraints.maxWidth / 2, constraints.maxHeight * .42);
+            return Opacity(
+              opacity: fade,
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: RadialGradient(
+                          center: const Alignment(0, -.05),
+                          colors: [
+                            _gold.withValues(alpha: .24 * fade),
+                            Colors.transparent,
+                          ],
+                          radius: .72,
+                        ),
+                      ),
+                    ),
+                  ),
+                  for (var index = 0; index < 14; index++)
+                    Builder(
+                      builder: (_) {
+                        final delay = index * .018;
+                        final p = ((v - delay) / .62).clamp(0.0, 1.0);
+                        final eased = Curves.easeOutCubic.transform(p);
+                        final start = Offset(
+                          constraints.maxWidth * (.06 + index * .068),
+                          constraints.maxHeight * .92,
+                        );
+                        final arc =
+                            math.sin(math.pi * eased) * (42 + (index % 4) * 9);
+                        final point = Offset.lerp(start, center, eased)! +
+                            Offset((index.isEven ? -1 : 1) * arc * .38, -arc);
+                        return Positioned(
+                          left: point.dx - 11,
+                          top: point.dy - 11,
+                          child: Transform.rotate(
+                            angle: eased * math.pi * (3 + index % 3),
+                            child: Transform.scale(
+                              scale: .45 + .55 * math.sin(math.pi * p).abs(),
+                              child: Container(
+                                width: 22,
+                                height: 22,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color(0xFFFFF2A8),
+                                      Color(0xFFF59E0B)
+                                    ],
+                                  ),
+                                  border: Border.all(color: Colors.white54),
+                                  boxShadow: const [
+                                    BoxShadow(color: _gold, blurRadius: 13),
+                                  ],
+                                ),
+                                alignment: Alignment.center,
+                                child: const Text(
+                                  '+',
+                                  style: TextStyle(
+                                    color: Color(0xFF5B3700),
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  Align(
+                    alignment: const Alignment(0, -.08),
+                    child: Transform.translate(
+                      offset: Offset(
+                          0,
+                          95 -
+                              Curves.easeOutBack
+                                      .transform(v.clamp(0.0, .55) / .55) *
+                                  112),
+                      child: Transform.scale(
+                        scale: .45 +
+                            .55 *
+                                Curves.easeOutBack
+                                    .transform((v / .30).clamp(0.0, 1.0)),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 17, vertical: 8),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    Color(0xFFFFF2A8),
+                                    _gold,
+                                    Color(0xFFF59E0B)
+                                  ],
+                                ),
+                                borderRadius: Corners.rLg,
+                                border: Border.all(color: Colors.white70),
+                                boxShadow: const [
+                                  BoxShadow(
+                                      color: _gold,
+                                      blurRadius: 36,
+                                      spreadRadius: 3),
+                                  BoxShadow(
+                                      color: Colors.black54,
+                                      blurRadius: 20,
+                                      offset: Offset(0, 12)),
+                                ],
+                              ),
+                              child: Text(
+                                '+${faNum(widget.amount)}',
+                                textDirection: TextDirection.ltr,
+                                style: const TextStyle(
+                                  color: Color(0xFF3B2500),
+                                  fontSize: 34,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 7),
+                            Text(
+                              widget.mineWon && widget.balanceAfter != null
+                                  ? 'موجودی جدید: ${faNum(widget.balanceAfter)}'
+                                  : 'امتیاز به $owner اضافه شد',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w900,
+                                shadows: [
+                                  Shadow(color: Colors.black, blurRadius: 9)
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -2416,16 +2664,16 @@ class _CollapsibleSectionState extends State<_CollapsibleSection> {
 ///
 /// ── این ویجت ──
 ///
-/// یک overlay تمام‌صفحه که با شروعِ هر راند دو ثانیه می‌آید و می‌رود:
-/// پس‌زمینه تار می‌شود، آیکنِ ویژگی از دور می‌آید و می‌چرخد، شعار
+/// یک overlay تمام‌صفحه که با شروعِ هر راند ۲.۸ ثانیه دیده می‌شود:
+/// پس‌زمینه تار می‌شود، آیکنِ ویژگی با مدار، پرتو و ذرات وارد می‌شود،
 /// («سریع‌ترین کارتت را بفرست!») بزرگ نوشته می‌شود و یک راهنمای یک‌خطی
 /// برای گروهِ سنیِ پایین زیرش می‌آید.
 ///
 /// چون overlay است، **هیچ ارتفاعی از چیدمان نمی‌گیرد** — یعنی هم‌زمان
 /// مشکلِ اسکرول را هم حل می‌کند.
 ///
-/// `IgnorePointer`: کاربر باید بتواند وسطِ انیمیشن کارتش را بزند؛ اعلان
-/// نباید جلوی بازی را بگیرد.
+/// `AbsorbPointer`: انتخاب تا پایان معرفی عمداً قفل است؛ تایمر هم روی
+/// سرور یخ می‌ماند، پس کاربر نه زمان از دست می‌دهد و نه اشتباهی می‌زند.
 class _RoundIntroOverlay extends StatefulWidget {
   const _RoundIntroOverlay({
     required this.focus,
@@ -2563,6 +2811,13 @@ class _RoundIntroOverlayState extends State<_RoundIntroOverlay>
                           child: Stack(
                             alignment: Alignment.center,
                             children: [
+                              CustomPaint(
+                                size: const Size.square(126),
+                                painter: _RoundIntroEmblemPainter(
+                                  progress: v,
+                                  color: tint,
+                                ),
+                              ),
                               Transform.rotate(
                                 angle: v * 3.2,
                                 child: Container(
@@ -2666,6 +2921,57 @@ class _RoundIntroOverlayState extends State<_RoundIntroOverlay>
 ///
 /// همان الگوی `CardDuelClashStageForTest`: کلاس خصوصی می‌ماند ولی تست
 /// می‌تواند بسازدش. بدونِ این، انیمیشنِ اعلان هیچ نگهبانی نداشت.
+class _RoundIntroEmblemPainter extends CustomPainter {
+  const _RoundIntroEmblemPainter({required this.progress, required this.color});
+
+  final double progress;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final pulse = math.sin(math.pi * progress).abs();
+    final rayPaint = Paint()
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 2
+      ..color = color.withValues(alpha: .18 + .48 * pulse);
+    for (var index = 0; index < 12; index++) {
+      final angle = index * math.pi / 6 + progress * .9;
+      final inner = 51.0 + 3 * math.sin(progress * math.pi * 4 + index);
+      final outer = 59.0 + 5 * pulse + (index.isEven ? 4 : 0);
+      canvas.drawLine(
+        center + Offset(math.cos(angle), math.sin(angle)) * inner,
+        center + Offset(math.cos(angle), math.sin(angle)) * outer,
+        rayPaint,
+      );
+    }
+    final arcPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 2.2
+      ..color = color.withValues(alpha: .58);
+    final rect = Rect.fromCircle(center: center, radius: 58);
+    canvas.drawArc(
+        rect, progress * math.pi * 2, math.pi * .78, false, arcPaint);
+    canvas.drawArc(
+        rect, progress * math.pi * 2 + math.pi, math.pi * .42, false, arcPaint);
+    final dotPaint = Paint()
+      ..color = Colors.white.withValues(alpha: .35 + .5 * pulse);
+    for (var index = 0; index < 6; index++) {
+      final angle = -progress * 2.2 + index * math.pi / 3;
+      canvas.drawCircle(
+        center + Offset(math.cos(angle), math.sin(angle)) * 61,
+        index.isEven ? 2.2 : 1.4,
+        dotPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RoundIntroEmblemPainter oldDelegate) =>
+      oldDelegate.progress != progress || oldDelegate.color != color;
+}
+
 @visibleForTesting
 class CardDuelRoundIntroForTest extends StatelessWidget {
   const CardDuelRoundIntroForTest({
@@ -2790,5 +3096,29 @@ class _CompactMatchBar extends StatelessWidget {
             ),
           ],
         ),
+      );
+}
+
+@visibleForTesting
+class CardDuelStakePayoutForTest extends StatelessWidget {
+  const CardDuelStakePayoutForTest({
+    super.key,
+    required this.amount,
+    required this.mineWon,
+    this.balanceAfter,
+    this.opponentRole = 'حریف',
+  });
+
+  final int amount;
+  final bool mineWon;
+  final int? balanceAfter;
+  final String opponentRole;
+
+  @override
+  Widget build(BuildContext context) => _StakePayoutFlight(
+        amount: amount,
+        mineWon: mineWon,
+        balanceAfter: balanceAfter,
+        opponentRole: opponentRole,
       );
 }
