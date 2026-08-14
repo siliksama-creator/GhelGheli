@@ -125,6 +125,42 @@ ck('صفر کردنِ monthly_league_points مشروط به نبودِ لیگِ 
   resetGuard,
   'وگرنه بستنِ لیگِ هفتگی امتیازِ نمایشیِ لیگِ ماهانه را هم صفر می‌کند');
 
+console.log('\n══ ۵. عرضِ month_year بینِ دو جدول یکسان است ══');
+
+// این باگ واقعی بود و همین کرونِ جدید لوش داد:
+//
+//     value too long for type character varying(7)
+//
+// `league_seasons.month_year` به VARCHAR(32) پهن شده بود تا `1405-W32`
+// را جا بدهد، ولی `user_league_history.month_year` روی VARCHAR(7) مانده
+// بود. `closeActiveSeason` مقدار را از اولی به دومی کپی می‌کند، پس
+// بستنِ هر لیگِ غیرماهانه با rollback شکست می‌خورد — یعنی لیگِ هفتگی
+// اصلاً قابلِ بستن نبود. تا وقتی کرونِ قدیمی فقط تازه‌ترین لیگ را
+// می‌بست، این خطا هیچ‌وقت اجرا نمی‌شد و پنهان مانده بود.
+const migDir = path.join(ROOT, 'migrations');
+const allMigrations = fs.readdirSync(migDir).sort()
+  .map((f) => fs.readFileSync(path.join(migDir, f), 'utf8')).join('\n');
+
+// آخرین عرضی که به هر ستون داده شده برنده است.
+function lastWidth(re) {
+  let m; let last = null;
+  const rx = new RegExp(re, 'gi');
+  while ((m = rx.exec(allMigrations)) !== null) last = Number(m[1]);
+  return last;
+}
+
+const histWidth = lastWidth(String.raw`user_league_history[\s\S]{0,400}?month_year\s+(?:TYPE\s+)?VARCHAR\((\d+)\)`)
+  || lastWidth(String.raw`ALTER TABLE user_league_history[\s\S]{0,200}?month_year TYPE VARCHAR\((\d+)\)`);
+const seasonWidth = lastWidth(String.raw`month_year\s+VARCHAR\((\d+)\)\s+UNIQUE`);
+
+ck('عرضِ month_year در user_league_history پیدا شد', histWidth !== null,
+  String(histWidth));
+ck('user_league_history.month_year حداقل به اندازهٔ league_seasons است',
+  histWidth !== null && histWidth >= 32,
+  `عرضِ فعلی ${histWidth} — شناسه‌هایی مثل 1405-W32 (۸ کاراکتر) و بلندتر باید جا شوند`);
+ck('مایگریشنِ پهن‌سازی وجود دارد',
+  fs.existsSync(path.join(migDir, '065_widen_user_league_history_month_year.sql')));
+
 console.log('');
 if (failures.length) {
   console.log(`✗ ${pass} موفق، ${failures.length} ناموفق`);
