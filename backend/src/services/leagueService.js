@@ -456,7 +456,26 @@ async function closeActiveSeason({ force = false, seasonId = null } = {}) {
     // Reset ONLY the monthly counter. current_points (spendable) and
     // lifetime_points (history) are untouched: a user's saved-up points and
     // their all-time total must survive the month rolling over.
-    await client.query('UPDATE users SET monthly_league_points=0, updated_at=NOW()');
+    //
+    // ── چرا حالا شرطی شد ──
+    //
+    // این ستون شمارندهٔ نمایشیِ پروفایل است و **سراسری**، نه به‌ازای
+    // فصل. تا وقتی فقط یک لیگ وجود داشت صفر کردنش موقعِ بستن درست بود.
+    //
+    // ولی حالا مدیر می‌تواند تا سه لیگِ هم‌زمان با تاریخ‌های دلخواه
+    // بسازد. در آن حالت بستنِ لیگِ کوتاه‌ترْ شمارندهٔ همه را صفر می‌کرد
+    // و کاربرانِ لیگِ بلندتر می‌دیدند امتیازِ ماهشان **وسطِ مسابقه**
+    // ناپدید شد — با اینکه رتبه‌بندیِ واقعی
+    // (`league_leaderboard_entries`) دست‌نخورده بود. یعنی یک باگِ
+    // کاملاً نمایشی ولی وحشتناک از دید کاربر.
+    //
+    // پس فقط وقتی صفر می‌کنیم که **هیچ لیگِ فعالِ دیگری نمانده باشد**.
+    const { rows: stillActive } = await client.query(
+      "SELECT 1 FROM league_seasons WHERE status='active' AND id<>$1 LIMIT 1",
+      [season.id]);
+    if (!stillActive.length) {
+      await client.query('UPDATE users SET monthly_league_points=0, updated_at=NOW()');
+    }
     await client.query('COMMIT');
 
     // ═════════════════════════════════════════════════════════════════════
@@ -513,6 +532,66 @@ async function closeActiveSeason({ force = false, seasonId = null } = {}) {
     throw e;
   } finally { client.release(); }
 }
+/**
+ * هر لیگی که زمانش تمام شده را می‌بندد — صرفِ‌نظر از نوعش.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * باگی که اینجا بود
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * تنها زمان‌بندِ خودکارِ بستنِ لیگ این بود:
+ *
+ *     cron.schedule('5 0 1 * *', () => closeActiveSeason())
+ *
+ * یعنی «اولِ هر ماهِ میلادی، ساعت ۰۰:۰۵». دو ایرادِ مستقل داشت:
+ *
+ *   ۱. **فقط یک لیگ را می‌بست.** `closeActiveSeason()` بدونِ آرگومان
+ *      سراغِ `ensureActiveSeason` می‌رود که `ORDER BY starts_at DESC
+ *      LIMIT 1` دارد — یعنی فقط **تازه‌ترین** لیگ. اگر سه لیگِ فعال
+ *      بود (که پنل اجازه می‌دهد)، دوتای دیگر برای همیشه باز می‌ماندند.
+ *
+ *   ۲. **زمانش ربطی به لیگ نداشت.** مالک تصریح کرد: «تعداد روز لیگ
+ *      فقط توسط ادمین مشخص میشه و اصلا ربطی به ماهانه و هفتگی نداره،
+ *      ساعت اتمامش هم ادمین به تاریخ ایران مشخص میکنه». لیگی که
+ *      چهارشنبه ساعت ۲۰:۰۰ تمام می‌شد، تا اولِ ماهِ بعد بسته نمی‌شد:
+ *      جایزه‌ها پرداخت نمی‌شدند و — بدتر — `addLeaguePoints` شرطِ
+ *      `ends_at > NOW()` دارد، پس امتیازها به مسیرِ fallback می‌افتادند.
+ *
+ * حالا هر ساعت اجرا می‌شود و **همهٔ** لیگ‌هایی که `ends_at`شان گذشته را
+ * می‌بندد. برای لیگِ ماهانه هیچ فرقی نمی‌کند (اولِ ماه که برسد، در
+ * اولین اجرای ساعتی بسته می‌شود)، ولی لیگِ با تاریخِ دلخواهِ مدیر هم
+ * دیگر جا نمی‌ماند.
+ *
+ * ⚠️ `force` عمداً پاس **نمی‌شود**. محافظِ «فصل هنوز در جریان است» باید
+ *    سرِ جایش بماند: اگر به هر دلیلی ردیفی اشتباهی انتخاب شود،
+ *    `closeActiveSeason` خودش تشخیص می‌دهد و رد می‌کند.
+ *
+ * @returns {Promise<{closed: number, results: object[]}>}
+ */
+async function closeExpiredSeasons() {
+  const { rows } = await pool.query(
+    `SELECT id, title, month_year FROM league_seasons
+      WHERE status='active' AND ends_at <= NOW()
+      ORDER BY ends_at ASC`);
+
+  const results = [];
+  for (const row of rows) {
+    try {
+      // هر لیگ در تراکنشِ خودش. اگر یکی بشکند، بقیه باید بسته شوند —
+      // وگرنه یک لیگِ خرابْ جایزهٔ همهٔ لیگ‌های دیگر را هم گروگان می‌گیرد.
+      const res = await closeActiveSeason({ seasonId: row.id });
+      results.push({ ...res, title: row.title, monthYear: row.month_year });
+      if (!res.skipped) {
+        console.log(`[league] فصل «${row.title || row.month_year}» بسته شد — ${res.winners} برنده`);
+      }
+    } catch (e) {
+      console.error(`[league] بستنِ فصل ${row.month_year} شکست خورد:`, e.message);
+      results.push({ seasonId: row.id, error: e.message });
+    }
+  }
+  return { closed: results.filter((r) => !r.error && !r.skipped).length, results };
+}
+
 /**
  * جایزهٔ لیگ را پس از تأییدِ مدیر به کیف پول واریز می‌کند.
  *
@@ -610,5 +689,5 @@ async function approvePayouts(payoutId, adminId) {
 
 module.exports = {
   ensureActiveSeason, addLeaguePoints, getLeaderboard, closeActiveSeason,
-  defaultPrizeTable, approvePayouts,
+  closeExpiredSeasons, defaultPrizeTable, approvePayouts,
 };

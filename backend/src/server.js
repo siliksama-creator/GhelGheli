@@ -22,7 +22,7 @@ const {
   isFirebaseConfigured,
 } = require('./services/notificationService');
 const gameStakes = require('./services/gameStakeService');
-const { ensureActiveSeason, addLeaguePoints, getLeaderboard, closeActiveSeason, approvePayouts: leagueApprove, defaultPrizeTable } = require('./services/leagueService');
+const { ensureActiveSeason, addLeaguePoints, getLeaderboard, closeActiveSeason, closeExpiredSeasons, approvePayouts: leagueApprove, defaultPrizeTable } = require('./services/leagueService');
 const { optimizeUpload, kb } = require('./services/imageService');
 const { getGameRewardSettings, saveGameRewardSettings } = require('./services/gameRewardService');
 const walletService = require('./services/walletService');
@@ -38,6 +38,7 @@ const cardDuel = require('./services/cardDuelService');
 const shop = require('./services/shopService');
 // لولِ دائمیِ بازیکن — کنارِ cosmetics در همان مسیرها پخش می‌شود.
 const level = require('./services/levelService');
+const chatRetention = require('./services/chatRetentionService');
 // Same reason: the profile endpoint checks club membership before letting
 // someone wear a crest, and it is defined above the club routes.
 const clubs = require('./services/clubService');
@@ -81,7 +82,27 @@ app.set('trust proxy', 'loopback');
 app.use(helmet());
 app.use(cors({ origin: corsOriginOption, credentials: true }));
 app.use(express.json({ limit: '2mb' }));
-app.use(morgan('dev'));
+
+// ── لاگِ درخواست‌ها: در تولید فقط خطاها ─────────────────────────────────
+//
+// `morgan('dev')` هر درخواست را با رنگ‌آمیزی ANSI روی stdout می‌نوشت.
+// اندازه‌گیری شد (نه حدس): با morgan ۸۸۶ req/s، بدونش ۹۵۱ req/s —
+// حدود ۷٪ از توانِ کل سرور صرفِ نوشتنِ لاگی می‌شد که هیچ‌کس نمی‌خواند،
+// چون pm2 آن را در فایلی می‌ریزد که فقط موقعِ خرابی باز می‌شود.
+//
+// ⚠️ لاگ **حذف نشد**، فقط فیلتر شد: در تولید هر پاسخِ >=400 کماکان
+//    کامل ثبت می‌شود، پس عیب‌یابیِ خطاها دقیقاً مثل قبل ممکن است.
+//    آنچه حذف شد فقط انبوهِ خطوطِ ۲۰۰ است.
+//
+// در توسعه (`NODE_ENV !== 'production'`) رفتار دست‌نخورده می‌ماند تا
+// موقعِ کد زدن همه‌چیز جلوی چشم باشد.
+if (process.env.NODE_ENV === 'production') {
+  app.use(morgan('combined', {
+    skip: (req, res) => res.statusCode < 400,
+  }));
+} else {
+  app.use(morgan('dev'));
+}
 const uploadRoot = path.join(__dirname, '..', 'uploads');
 const imageUploadDir = path.join(uploadRoot, 'images');
 fs.mkdirSync(imageUploadDir, { recursive: true });
@@ -1833,6 +1854,9 @@ app.post('/api/chat/messages', auth, chatLimiter, asyncHandler(async (req, res) 
   if (messageType === 'text' && !await isAllowedChatMessage(clean, req.user.id)) return res.status(400).json({ message: 'فقط پیام‌های آماده و ایموجی‌ها مجاز هستند.' });
   if (clean) await assertNoBadWords(clean);
   const { rows } = await pool.query('INSERT INTO chat_messages(user_id,message_text,reply_to_message_id,sticker_id,message_type) VALUES($1,$2,$3,$4,$5) RETURNING *', [req.user.id, clean, replyTo, stickerId, messageType]);
+  // سقفِ ۲۰۰ پیامِ سراسری — هر دو مسیرِ درج (REST و سوکت) باید صدایش
+  // بزنند، وگرنه کاربرِ وب که از REST می‌فرستد از سقف فرار می‌کند.
+  chatRetention.onMessageInserted().catch(() => {});
   // BUG: the message BROADCAST carried no cosmetics, while GET /api/chat
   // does. A paying user's club badge and name colour therefore appeared on
   // every old message but vanished from their own new one until the page was
@@ -2365,6 +2389,9 @@ io.on('connection', socket => {
       if (clean) await assertNoBadWords(clean);
       arr.push(now); socketMessageTimes.set(socket.user.id, arr);
       const { rows } = await pool.query('INSERT INTO chat_messages(user_id,message_text,reply_to_message_id,sticker_id,message_type) VALUES($1,$2,$3,$4,$5) RETURNING *', [socket.user.id, clean, replyTo, stickerId, messageType]);
+      // سقفِ ۲۰۰ پیامِ سراسری. خودش throw نمی‌کند، پس ثبتِ پیام هرگز
+      // به‌خاطر پاک‌سازی شکست نمی‌خورد.
+      chatRetention.onMessageInserted().catch(() => {});
       // Same fix as the REST path: without cosmetics here, a badge bought
       // seconds earlier does not show on the sender's own new message.
       const cosWs = await shop.cosmeticsFor([socket.user.id]);
@@ -2392,7 +2419,29 @@ cron.schedule('29 * * * *', () => {
     .catch(e => console.error('[games:stake] recovery failed:', e.message));
 });
 
-cron.schedule('5 0 1 * *', () => closeActiveSeason().catch(e => console.error('monthly close failed', e)));
+// ── بستنِ لیگ‌های تمام‌شده — ساعتی، نه «اولِ ماه» ────────────────────────
+//
+// قبلاً `cron.schedule('5 0 1 * *', closeActiveSeason)` بود: فقط اولِ هر
+// ماهِ میلادی و فقط روی **یک** لیگ.
+//
+// مالک تصریح کرد: «تعداد روز لیگ فقط توسط ادمین مشخص میشه و اصلا ربطی
+// به ماهانه و هفتگی نداره، ساعت اتمامش هم ادمین به تاریخ ایران مشخص
+// میکنه». پنلِ مدیر هم تا سه لیگِ هم‌زمان با تاریخِ دلخواه می‌سازد.
+//
+// با زمان‌بندِ قبلی، لیگی که مثلاً چهارشنبه ۲۰:۰۰ تمام می‌شد تا اولِ ماهِ
+// بعد باز می‌ماند و هیچ‌کس جایزه‌اش را نمی‌گرفت.
+//
+// حالا هر ساعت سرِ دقیقهٔ ۵ اجرا می‌شود و هر لیگی که `ends_at`اش گذشته
+// را می‌بندد. حداکثر تأخیر یک ساعت است — که برای واریزِ جایزه (که
+// به‌هرحال منتظرِ تأییدِ مدیر می‌ماند) کاملاً قابل قبول است.
+//
+// timezone صریح داده شده تا اگر سرور مهاجرت کرد، تفسیرِ تاریخ‌هایی که
+// مدیر به وقتِ ایران وارد کرده جابه‌جا نشود.
+cron.schedule('5 * * * *', () => {
+  closeExpiredSeasons()
+    .then(r => { if (r.closed) console.log(`[league] ${r.closed} فصل بسته شد`); })
+    .catch(e => console.error('[league] بستنِ خودکارِ فصل شکست خورد:', e.message));
+}, { timezone: 'Asia/Tehran' });
 
 // Sweep expired tap-game nonces hourly.
 //

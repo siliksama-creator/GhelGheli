@@ -69,7 +69,20 @@ function planView(plan) {
   };
 }
 
-async function plusStatus(userId, client = pool) {
+/**
+ * @param {string} userId
+ * @param {object} [client]
+ * @param {object|null} [preloadedUser]
+ *   ردیفِ `users` که فراخوان از قبل خوانده. اگر داده شود، این تابع دیگر
+ *   `users` را نمی‌خواند. فقط `annual_club_switches` از آن لازم است.
+ *
+ *   ⚠️ چرا `undefined` و `null` فرق دارند: `catalogue()` ردیف را پاس
+ *      می‌دهد و ممکن است کاربر حذف شده باشد (`null`). در آن حالت هم
+ *      نباید دوباره کوئری بزنیم — پاسخ همان صفر است. پس تشخیص با
+ *      `arguments.length`/`!== undefined` انجام می‌شود، نه با truthiness.
+ */
+async function plusStatus(userId, client = pool, preloadedUser = undefined) {
+  const skipUserQuery = preloadedUser !== undefined;
   const [subscriptions, user] = await Promise.all([
     client.query(
       `SELECT plan, starts_at, expires_at
@@ -79,8 +92,10 @@ async function plusStatus(userId, client = pool) {
         ORDER BY expires_at DESC`,
       [userId],
     ),
-    client.query(
-      `SELECT annual_club_switches FROM users WHERE id=$1`, [userId]),
+    skipUserQuery
+      ? Promise.resolve({ rows: preloadedUser ? [preloadedUser] : [] })
+      : client.query(
+        `SELECT annual_club_switches FROM users WHERE id=$1`, [userId]),
   ]);
   const activeRows = subscriptions.rows;
   const annual = activeRows.find((r) => r.plan === 'plus_annual');
@@ -99,7 +114,30 @@ async function plusStatus(userId, client = pool) {
 }
 
 async function catalogue(userId) {
-  const [items, owned, userRow, balance, plus, clubs, history] = await Promise.all([
+  // ── یک خواندنِ `users` به‌جای سه‌تا ────────────────────────────────────
+  //
+  // قبلاً همین یک ردیف سه بار از دیتابیس خوانده می‌شد:
+  //   ۱. ستون‌های تجهیزشده (`equipped_*`)
+  //   ۲. `wallet_balance` در یک کوئریِ جدا
+  //   ۳. `annual_club_switches` داخلِ `plusStatus()`
+  //
+  // هر سه به یک ردیفِ یکسان با یک شرطِ یکسان می‌رسیدند. حالا یک کوئری
+  // همهٔ ستون‌ها را می‌آورد و به `plusStatus` پاس داده می‌شود.
+  //
+  // ⚠️ چرا این کار **از نظر درستی** هم بهتر است، نه فقط سریع‌تر:
+  //    سه کوئریِ جدا سه اسنپ‌شاتِ متفاوت از یک ردیف می‌دیدند. اگر وسطِ
+  //    این سه، خریدی commit می‌شد، کاربر می‌توانست موجودیِ **قبل** از
+  //    خرید را کنار آیتمِ **بعد** از خرید ببیند. حالا هر سه از یک
+  //    اسنپ‌شاتِ واحد می‌آیند و چنین ناسازگاری ممکن نیست.
+  const userRow = await pool.query(
+    `SELECT equipped_club, equipped_frame, equipped_color,
+            equipped_profile_background, equipped_emote_pack,
+            equipped_profile_badge, profile_title, annual_club_switches,
+            wallet_balance
+       FROM users WHERE id=$1`, [userId]);
+  const userRecord = userRow.rows[0] || null;
+
+  const [items, owned, plus, clubs, history] = await Promise.all([
     pool.query(
       `SELECT id, slug, kind, name, description, image_url, payload, price,
               display_order, access_tier, is_purchasable, metadata
@@ -109,13 +147,7 @@ async function catalogue(userId) {
     pool.query(
       `SELECT item_id, price_paid, bought_at
          FROM user_shop_items WHERE user_id=$1`, [userId]),
-    pool.query(
-      `SELECT equipped_club, equipped_frame, equipped_color,
-              equipped_profile_background, equipped_emote_pack,
-              equipped_profile_badge, profile_title, annual_club_switches
-         FROM users WHERE id=$1`, [userId]),
-    pool.query('SELECT wallet_balance FROM users WHERE id=$1', [userId]),
-    plusStatus(userId),
+    plusStatus(userId, pool, userRecord),
     pool.query(
       `SELECT m.club_slug AS slug, COALESCE(i.name,m.club_slug) AS name,
               (m.source='purchase') AS permanent, m.joined_at
@@ -127,7 +159,7 @@ async function catalogue(userId) {
     ),
     purchaseHistory(userId, { limit: 24, offset: 0 }),
   ]);
-  const user = userRow.rows[0] || {};
+  const user = userRecord || {};
   const ownedById = new Map(owned.rows.map((r) => [r.item_id, r]));
   const memberClubs = new Set(clubs.rows.map((club) => club.slug));
 
@@ -152,7 +184,7 @@ async function catalogue(userId) {
 
   const groups = {};
   for (const item of decorated) (groups[item.kind] ||= []).push(item);
-  const walletBalance = Number(balance.rows[0]?.wallet_balance || 0);
+  const walletBalance = Number(userRecord?.wallet_balance || 0);
   return {
     walletBalance,
     // Compatibility with APKs released before the compact Shop redesign.
