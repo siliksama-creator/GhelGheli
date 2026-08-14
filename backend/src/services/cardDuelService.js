@@ -205,6 +205,83 @@ function duelFieldsFromBody(body, fallback = {}) {
  * جمعِ کلِ وزن‌ها ۱٫۰۰ ماند تا دامنهٔ عددیِ قدرت عوض نشود و کارت‌های
  * موجود ناگهان قوی‌تر/ضعیف‌تر به نظر نرسند.
  */
+// ── شانسِ راند ────────────────────────────────────────────────────────
+//
+// دامنهٔ عددِ صحیحِ شانس: [-LUCK_RANGE, +LUCK_RANGE] برای هر طرف.
+//
+// چرا اصلاً شانس؟ تا پیش از این، نتیجهٔ دوئل **کاملاً قطعی** بود: با دو
+// دکِ معلوم، برندهٔ هر پنج راند از قبل معین بود. یعنی وقتی حریفِ قوی‌تری
+// می‌دیدی، باختن حتمی بود و بازی کردن بی‌معنا. هیچ لحظهٔ «شاید ببرم»
+// وجود نداشت.
+//
+// چرا دقیقاً ۶؟ اندازه‌گیری‌شده روی هر ۲۹ کارتِ فعالِ واقعی، ۴۰٬۰۰۰ مسابقه:
+//
+//     دامنه │ برد دک قوی‌تر │ راند وارونه │ راند مساوی
+//     ──────┼───────────────┼─────────────┼────────────
+//       ۰   │     ۸۰٪       │    ۰٪       │   ۴٫۸٪
+//       ±۳  │     ۸۲٪       │    ۳٫۱٪     │   ۰٪
+//     → ±۶  │     ۸۰٪       │    ۸٫۶٪     │   ۲٫۱٪
+//       ±۱۲ │     ۸۰٪       │    ۱۳٫۴٪    │   ۰٪
+//       ±۱۵ │     ۷۹٪       │    ۱۶٪      │   ۰٪
+//
+// ±۶ نقطهٔ تعادل است: حدود یک راند از هر دوازده وارونه می‌شود (کافی برای
+// هیجان و کامبک)، ولی دکِ بهتر همچنان ۸۰٪ مسابقه‌ها را می‌برد — یعنی
+// چیدنِ دک و جمع‌کردنِ کارتِ خوب هنوز کاملاً می‌ارزد.
+//
+// چرا بیشتر نه؟ خواستهٔ صریحِ مالک: «خیلی اعصاب‌خردکن نشود». از ±۱۲ به
+// بالا کاربر شروع می‌کند به حس کردنِ اینکه استات‌ها بی‌معنی‌اند.
+//
+// نسبت به استات‌ها: انحراف معیارِ استات‌های راندی ۱۰ تا ۲۶ است، پس ±۶
+// فقط اختلاف‌های تنگ را جابه‌جا می‌کند. اختلافِ بیش از ۱۲ واحد **هرگز**
+// با شانس وارونه نمی‌شود — یعنی کارتِ آشکارا بهتر همیشه می‌برد.
+const LUCK_RANGE = 6;
+
+/**
+ * شانسِ قطعی‌شده با seed.
+ *
+ * تصادفیِ واقعی (`Math.random`) اینجا سم است: بازپخشِ یک نبرد باید همان
+ * نتیجه را بدهد، وگرنه نه تست تکرارپذیر است، نه می‌شود به کاربرِ معترض
+ * نشان داد که «همین اتفاق افتاد». پس شانس از هشِ seedِ راند مشتق می‌شود
+ * که خودش شاملِ شناسهٔ هر دو کارت و شمارهٔ راند است.
+ *
+ * FNV-1a + مرحلهٔ نهاییِ avalanche.
+ *
+ * ⚠️ چرا avalanche لازم بود (اندازه‌گیری‌شده، نه احتیاطِ نظری):
+ *
+ *   نسخهٔ اولِ این تابع فقط FNV-1a خام بود و `side` را به **انتهای**
+ *   رشته می‌چسباند. چون دو ورودی فقط در آخرین بایت فرق داشتند، آخرین
+ *   ضربِ FNV فرصتِ پخش کردنِ آن تفاوت را نداشت و بیت‌های پایین همبسته
+ *   می‌ماندند. نتیجه: در ۲۰۰٬۰۰۰ نمونه، شانسِ X و O در **۱۲٫۳٪** موارد
+ *   دقیقاً برابر می‌شد، در حالی که انتظارِ آماری ۱/۱۳ = ۷٫۷٪ است.
+ *
+ *   یعنی «هر دو طرف شانسِ یکسان گرفتند» ۶۰٪ بیشتر از حد طبیعی رخ می‌داد
+ *   — کارِ شانس دقیقاً همان راندهای تنگ است و در آن‌ها بیش از انتظار
+ *   خنثی می‌شد.
+ *
+ *   دو اصلاح: `side` به **ابتدا** منتقل شد تا از کلِ حلقه رد شود، و یک
+ *   مرحلهٔ اختلاطِ نهایی (سبکِ murmur3 fmix32) اضافه شد.
+ */
+function seededLuck(seed, side) {
+  if (!seed) return 0;
+  let h = 0x811c9dc5;
+  const str = `${side}|${seed}`;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  // fmix32 — بیت‌های بالا را در پایین پخش می‌کند تا `%` سوگیری نگیرد.
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x85ebca6b) >>> 0;
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35) >>> 0;
+  // `>>> 0` روی خطِ آخر حیاتی است: `^` نتیجهٔ **علامت‌دار** می‌دهد و اگر
+  // بیتِ ۳۱ روشن باشد h منفی می‌شود. آن‌وقت `h % 13` در جاوااسکریپت
+  // منفی برمی‌گردد و شانس تقریباً همیشه به ‎-6‎ می‌چسبد. یک بار همین
+  // اتفاق افتاد و میانگینِ شانس به‌جای ۰ شد ‎-6.0‎.
+  h = (h ^ (h >>> 16)) >>> 0;
+  return (h % (2 * LUCK_RANGE + 1)) - LUCK_RANGE;
+}
+
 const STAT_WEIGHT = 0.19;   // هر پنج استاتِ راندی، برابر
 const ENERGY_WEIGHT = 0.05; // استاتِ بدونِ راند
 
@@ -547,27 +624,31 @@ function focusValue(card, focus) {
  * چیز دیگری را داوری می‌کرد. این قرارداد عمداً کوتاه است تا هم کودک،
  * هم تست و هم کلاینت دقیقاً یک حقیقت را ببینند.
  */
-function roundScoreBreakdown(card, _opp, focus, roundIndex, prevWon) {
+function roundScoreBreakdown(card, _opp, focus, roundIndex, prevWon, luck = 0) {
   // قراردادِ ساده و قابل‌اثباتِ منطق نسخهٔ ۲:
   //
-  //   عدد نهایی راند = ویژگی اعلام‌شده + بونوس افکتِ آشکار
+  //   عدد نهایی راند = ویژگی اعلام‌شده + بونوس افکتِ آشکار + شانس
   //
-  // قدرت کلی، rarity، دفاعِ نامرتبط و شانس در نتیجهٔ راند دخالت ندارند.
-  // بنابراین هر عددی که بازیکن می‌بیند همان عددی است که برنده را تعیین
-  // می‌کند؛ نه تقریبِ آن و نه یک توضیح تزئینی.
+  // قدرت کلی، rarity و دفاعِ نامرتبط همچنان دخالت ندارند. شانس هم
+  // **پنهان نیست**: به‌عنوان جزء جداگانه در breakdown برمی‌گردد تا
+  // کلاینت بتواند «۸۴ + افکت ۶ + شانس ۳− = ۸۷» را نشان دهد. اصل
+  // تغییرناپذیر همان است: هر عددی که بازیکن می‌بیند همان عددی است که
+  // برنده را تعیین می‌کند.
   const focusVal = focusValue(card, focus);
   const effect = effectBonus(card, roundIndex, prevWon);
-  const total = focusVal + effect;
+  const total = focusVal + effect + luck;
+  const sign = luck >= 0 ? '+' : '−';
   return {
     base: 0,
     focus: Number(focusVal.toFixed(2)),
     attackMix: 0,
     defensePenalty: 0,
     effectBonus: effect,
-    luck: 0,
+    luck,
+    luckRange: LUCK_RANGE,
     wallAdjustment: 0,
     total,
-    equation: `${focusVal}+${effect}=${total}`,
+    equation: `${focusVal}+${effect}${sign}${Math.abs(luck)}=${total}`,
   };
 }
 
@@ -578,8 +659,16 @@ function winnerReason(winner, focus, cardX, cardO, breakdownX, breakdownO) {
   const effectO = Number(breakdownO.effectBonus || 0);
   const powerX = Number(breakdownX.total || 0);
   const powerO = Number(breakdownO.total || 0);
-  const formulaX = effectX ? `${focusX} + افکت ${effectX} = ${powerX}` : `${powerX}`;
-  const formulaO = effectO ? `${focusO} + افکت ${effectO} = ${powerO}` : `${powerO}`;
+  const luckX = Number(breakdownX.luck || 0);
+  const luckO = Number(breakdownO.luck || 0);
+  const part = (base, effect, luck, total) => {
+    const bits = [`${base}`];
+    if (effect) bits.push(`افکت ${effect}`);
+    if (luck) bits.push(`شانس ${luck > 0 ? '+' : '−'}${Math.abs(luck)}`);
+    return bits.length > 1 ? `${bits.join(' + ')} = ${total}` : `${total}`;
+  };
+  const formulaX = part(focusX, effectX, luckX, powerX);
+  const formulaO = part(focusO, effectO, luckO, powerO);
   if (winner === 'DRAW') {
     return `راند «${focus.label}» مساوی شد: ${cardX.name} با ${formulaX} و ${cardO.name} با ${formulaO}؛ امتیازی اضافه نشد`;
   }
@@ -595,9 +684,13 @@ function resolveRound(cardX, cardO, roundIndex, previousWinner = null, random = 
   const o = publicCard(cardO);
   const focus = ROUND_FOCUS[roundIndex] || ROUND_FOCUS[ROUND_FOCUS.length - 1];
   // `random` در امضای عمومی برای سازگاری replayهای قدیمی می‌ماند، اما
-  // منطق v2 عمداً آن را مصرف نمی‌کند: یک انتخاب یکسان همیشه یک حکم دارد.
-  const breakdownX = roundScoreBreakdown(x, o, focus, roundIndex, previousWinner === 'X');
-  const breakdownO = roundScoreBreakdown(o, x, focus, roundIndex, previousWinner === 'O');
+  // مصرف نمی‌شود: شانس از seed مشتق می‌شود، نه از یک مولدِ حالت‌دار.
+  // نتیجه همچنان تعیینی است — همان seed، همان حکم — ولی دیگر صرفاً
+  // از روی استات‌ها قابل پیش‌بینی نیست.
+  const luckX = seededLuck(seed, 'X');
+  const luckO = seededLuck(seed, 'O');
+  const breakdownX = roundScoreBreakdown(x, o, focus, roundIndex, previousWinner === 'X', luckX);
+  const breakdownO = roundScoreBreakdown(o, x, focus, roundIndex, previousWinner === 'O', luckO);
   const powerX = breakdownX.total;
   const powerO = breakdownO.total;
   // هیچ post-processing پنهانی بعد از breakdown وجود ندارد. `powerX`
@@ -621,6 +714,9 @@ function resolveRound(cardX, cardO, roundIndex, previousWinner = null, random = 
     powerX,
     powerO,
     powerGap: Math.abs(powerX - powerO),
+    luckX,
+    luckO,
+    luckRange: LUCK_RANGE,
     breakdownX,
     breakdownO,
     winner,
@@ -1064,6 +1160,7 @@ module.exports = {
   RARITY_LABEL, EFFECT_LABEL, duelFieldsFromBody, collectibleInput, publicCard, totalPower,
   playableCards, validateDeck, deckCards, status, saveDeck, botBattle,
   starterDeck, botDeck, resolveRound, simulate, scoreFromHistory, recentBattles, recordEngineBattle,
+  LUCK_RANGE, seededLuck,
   analyzeDeck, suggestDeckFromPool, createSeededRandom, focusStatOf, balanceSnapshot,
   // ⚠️ این دو تا اینجا نبودند و کرونِ شبانهٔ server.js:2290 هر شب ساعت
   // ۴:۱۷ با «cardDuel.pruneBattleHistory is not a function» می‌شکست.

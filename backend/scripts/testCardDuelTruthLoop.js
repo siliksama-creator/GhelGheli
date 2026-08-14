@@ -59,12 +59,27 @@ console.log('\n== بازسازی دقیق اسکرین‌شات Jude Bellingham 
   const jude = card('jude', { name: 'Jude Bellingham', technique: 95 });
   const robot = card('robot', { name: 'ربات وینگر', technique: 80 });
   const round = duel.resolveRound(jude, robot, 1, null, null, 'screenshot');
-  ok(round.powerX === 95 && round.powerO === 80,
-    'دو عددِ تصمیم همان تکنیک‌های ۹۵ و ۸۰ هستند');
+  // پایهٔ تصمیم همچنان همان تکنیکِ روی کارت است؛ شانس فقط جزءِ آشکارِ
+  // کوچکی روی آن است. اختلافِ ۱۵ واحد از دامنهٔ شانس (±۶) بزرگ‌تر است،
+  // پس نتیجه هنوز قطعی است — دقیقاً همان چیزی که به کاربر قول داده‌ایم.
+  ok(round.breakdownX.focus === 95 && round.breakdownO.focus === 80,
+    'دو عددِ پایهٔ تصمیم همان تکنیک‌های ۹۵ و ۸۰ هستند');
+  ok(round.powerX === 95 + round.breakdownX.luck
+    && round.powerO === 80 + round.breakdownO.luck,
+    'عددِ نهایی = تکنیک + شانسِ آشکار');
   ok(round.winner === 'X' && round.winnerCardId === 'jude',
     'Jude چون ۹۵ > ۸۰ است برنده می‌شود، نه به‌خاطر جای کارت');
-  ok(round.breakdownX.total === round.breakdownX.focus + round.breakdownX.effectBonus,
-    'فرمول Jude دقیقاً ویژگی + افکت آشکار است');
+  ok(round.breakdownX.total
+    === round.breakdownX.focus + round.breakdownX.effectBonus + round.breakdownX.luck,
+    'فرمول Jude دقیقاً ویژگی + افکت آشکار + شانس آشکار است');
+
+  // اختلافِ بزرگ‌تر از ۲×دامنهٔ شانس هرگز وارونه نمی‌شود — این را روی
+  // seedهای زیاد می‌سنجیم، نه یک نمونه.
+  let flips = 0;
+  for (let i = 0; i < 5000; i += 1) {
+    if (duel.resolveRound(jude, robot, 1, null, null, `gap-${i}`).winner !== 'X') flips += 1;
+  }
+  ok(flips === 0, `اختلافِ ۱۵ واحد در ۵۰۰۰ seed هرگز وارونه نشد (${flips} وارونگی)`);
 
   const reversed = duel.resolveRound(robot, jude, 1, null, null, 'screenshot-reversed');
   const seenByO = perspective(reversed, 'O');
@@ -72,18 +87,33 @@ console.log('\n== بازسازی دقیق اسکرین‌شات Jude Bellingham 
     'اگر کاربر O باشد هم همان Jude به‌عنوان کارتِ خودِ کاربر برنده دیده می‌شود');
 }
 
-console.log('\n== افکت‌ها عدد پنهانی یا قرعه ندارند ==');
+console.log('\n== افکت‌ها آشکارند و شانس پنهان نیست ==');
 {
   const speedy = card('speedy', { speed: 70, effect: 'speedster' });
   const plain = card('plain', { speed: 75 });
   const round = duel.resolveRound(speedy, plain, 0, null, null, 'effect');
-  ok(round.breakdownX.focus === 70 && round.breakdownX.effectBonus === 6
-      && round.powerX === 76,
-  'افکت سرعت به‌صورت ۷۰ + ۶ = ۷۶ آشکار است');
-  ok(round.winner === 'X', 'عدد نهایی ۷۶، عدد ۷۵ را می‌برد');
-  const replay = duel.resolveRound(speedy, plain, 0, null, null, 'another-seed');
-  ok(replay.powerX === round.powerX && replay.winner === round.winner,
-    'seed یا شانس نتیجهٔ یک انتخاب یکسان را عوض نمی‌کند');
+  ok(round.breakdownX.focus === 70 && round.breakdownX.effectBonus === 6,
+    'افکت سرعت به‌صورت ۷۰ + ۶ آشکار است');
+  ok(round.powerX === 70 + 6 + round.breakdownX.luck,
+    'عددِ نهایی دقیقاً ویژگی + افکت + شانسِ اعلام‌شده است');
+
+  // ⚠️ این ادعا عوض شد. قبلاً می‌گفت «seed نتیجه را عوض نمی‌کند» چون
+  // منطق کاملاً قطعی بود. حالا شانسِ seed-محور اضافه شده، پس ادعای
+  // درست این است: **همان** seed همان نتیجه را می‌دهد (بازپخش‌پذیری)،
+  // ولی seedِ دیگر می‌تواند نتیجهٔ دیگری بدهد.
+  const same = duel.resolveRound(speedy, plain, 0, null, null, 'effect');
+  ok(same.powerX === round.powerX && same.winner === round.winner,
+    'همان seed ⇒ همان نتیجه (نبرد بازپخش‌پذیر است)');
+
+  // اختلافِ پایه اینجا فقط ۱ واحد است (۷۶ در برابر ۷۵)، پس شانس باید
+  // گاهی آن را وارونه کند — همان «شاید ببرم» که هدفِ افزودنِ شانس بود.
+  let xWins = 0;
+  for (let i = 0; i < 3000; i += 1) {
+    if (duel.resolveRound(speedy, plain, 0, null, null, `tight-${i}`).winner === 'X') xWins += 1;
+  }
+  const rate = xWins / 3000;
+  ok(rate > 0.5 && rate < 0.65,
+    `در راندِ تنگ، برتریِ ۱ واحدی به ${(rate * 100).toFixed(1)}٪ برد تبدیل می‌شود، نه ۱۰۰٪`);
 }
 
 console.log('\n== ۵۰۰ مسابقه × ۵ راند؛ invariant در هر گام ==');
@@ -124,10 +154,18 @@ for (let match = 0; match < 500; match += 1) {
     assert.deepEqual(round.scoreAfter, state.score);
     assert.equal(state.roundIndex, state.history.length);
     assert.equal(round.logicVersion, 2);
-    assert.equal(round.breakdownX.total, round.breakdownX.focus + round.breakdownX.effectBonus);
-    assert.equal(round.breakdownO.total, round.breakdownO.focus + round.breakdownO.effectBonus);
-    assert.equal(round.breakdownX.luck, 0);
-    assert.equal(round.breakdownO.luck, 0);
+    // شانس جزئی **آشکار** از فرمول است، نه یک عددِ پنهان: total باید
+    // دقیقاً focus + effect + luck باشد، وگرنه عددی که کاربر می‌بیند با
+    // عددی که برنده را تعیین کرده فرق دارد.
+    assert.equal(round.breakdownX.total,
+      round.breakdownX.focus + round.breakdownX.effectBonus + round.breakdownX.luck);
+    assert.equal(round.breakdownO.total,
+      round.breakdownO.focus + round.breakdownO.effectBonus + round.breakdownO.luck);
+    for (const b of [round.breakdownX, round.breakdownO]) {
+      assert.ok(Number.isInteger(b.luck), 'شانس باید عدد صحیح باشد');
+      assert.ok(Math.abs(b.luck) <= b.luckRange,
+        `شانس ${b.luck} از دامنهٔ مجاز ±${b.luckRange} بیرون زد`);
+    }
 
     const dx = state.score.X - before.X;
     const dO = state.score.O - before.O;

@@ -282,9 +282,26 @@ function armTurnClock(room) {
   const holdMs = room.state && room.state.lastRound
     ? Number(room.rules.resultHoldMs) || 0
     : 0;
+  // ═══════════════════════════════════════════════════════════════════════
+  // یک عدد، یک منبعِ حقیقت — `deadline` و تایمر باید دقیقاً یکی باشند
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // باگِ رفع‌شده: `deadline` (که کلاینت شمارشِ معکوس را از رویش می‌سازد)
+  // شاملِ `holdMs` بود، ولی آرگومانِ `setTimeout` نبود:
+  //
+  //     deadline   = now + holdMs + introMs + turnMs     ← ۲۶۲۰۰ms
+  //     setTimeout(..., turnMs + introMs)                ← ۲۳۰۰۰ms
+  //
+  // یعنی از راندِ دوم به بعد (جایی که holdMs غیرِ صفر می‌شود) کارتِ
+  // کاربر ۳۲۰۰ms **زودتر** از چیزی که ساعتِ رویِ صفحه‌اش نشان می‌داد
+  // خودکار بازی می‌شد. کاربر فکر می‌کرد ۳٫۲ ثانیه وقت دارد ولی نداشت.
+  //
+  // حالا هر دو از همین یک متغیر می‌آیند، پس نمی‌توانند از هم جدا بیفتند.
+  // هر تغییری در فرمول باید فقط اینجا انجام شود.
+  const waitMs = holdMs + introMs + room.turnMs;
   room.resultUntil = holdMs ? Date.now() + holdMs : null;
   room.introUntil = introMs ? Date.now() + holdMs + introMs : null;
-  room.deadline = Date.now() + holdMs + introMs + room.turnMs;
+  room.deadline = Date.now() + waitMs;
   room.turnTimer = setTimeout(() => {
     try {
     if (room.done) return;
@@ -299,6 +316,11 @@ function armTurnClock(room) {
         try { m = room.rules.botMove(room.state, s2); } catch { /* ignore */ }
         if (m && room.rules.isValidMove(room.state, m, s2)) {
           room.timedOut = s2;
+          // شمارندهٔ تجمعی: `room.timedOut` با اولین حرکتِ واقعیِ همان
+          // بازیکن پاک می‌شود، پس در پایانِ مسابقه چیزی از راندهای قبل
+          // در آن نمانده. برای آنالیتیکس به آمارِ کلِ مسابقه نیاز داریم.
+          room.timeoutCounts = room.timeoutCounts || { X: 0, O: 0 };
+          room.timeoutCounts[s2] += 1;
           room.rules.applyMove(room.state, m, s2);
         }
       }
@@ -316,6 +338,8 @@ function armTurnClock(room) {
     // before the player ever saw it, leaving a piece that appeared "by
     // itself" with no explanation. Cleared on that player's next real move.
     room.timedOut = sym;
+    room.timeoutCounts = room.timeoutCounts || { X: 0, O: 0 };
+    room.timeoutCounts[sym] += 1;
     if (move === null || move === undefined) {
       // Nothing legal to play — just pass the turn along.
       return advance(room, null);
@@ -327,7 +351,7 @@ function armTurnClock(room) {
       // and would take the whole API process down.
       console.error(`[games:${room.gameId}] turn timer failed:`, e.message);
     }
-  }, room.turnMs + (Number(room.rules.introMs) || 0));
+  }, waitMs);
 }
 
 function finish(room, winner, disconnectedSym = null) {
@@ -373,6 +397,10 @@ function finish(room, winner, disconnectedSym = null) {
           vsBot: room.vsBot, stake: room.stake, mode: room.matchMode,
           outcome: resolvedWinner === 'DRAW' ? 'draw' : resolvedWinner === symbol ? 'win' : 'loss',
           disconnected: Boolean(disconnectedSym),
+          // چند بار نوبتِ این بازیکن سوخت و موتور جای او بازی کرد.
+          // بدون این عدد نمی‌شود «رهاکردنِ بازی» را از «کند بودن/گیج
+          // بودنِ رابط» تفکیک کرد: هر دو به‌صورت باخت ثبت می‌شوند.
+          timedOutRounds: (room.timeoutCounts && room.timeoutCounts[symbol]) || 0,
         },
       }).catch(() => {});
       growth.missions.record(player.id, 'match_completed').catch(() => {});

@@ -1,55 +1,57 @@
-// ضربات پنالتی — Next-Gen 2028 Penalty Shootout
+// ضربات پنالتی — شوت‌اوت ساده و صادقانه
 //
 // ۲ بازیکن، تصمیم هم‌زمان:
-//   زننده: هدف‌گیری ۹ ناحیه (۳x۳) + تنظیم قدرت و زمان‌بندی پنجره طلایی (Sweet Spot)
-//   دروازه‌بان: حدس و شیرجه به ناحیه هدف
+//   زننده: انتخاب یکی از ۹ ناحیه (۳x۳)
+//   دروازه‌بان: حدس و شیرجه به یک ناحیه
 //
 // ۵ دور مسابقه + مرگ ناگهانی در صورت تساوی + برد زودهنگام
+//
+// ── قاعدهٔ کامل بازی، بدون استثنا ──
+//
+//     ناحیهٔ شوت == ناحیهٔ شیرجه  →  مهار
+//     در غیر این صورت             →  گل
+//
+// همین. هیچ عامل پنهانی نیست: نه قدرت شوت، نه تیرک، نه شانس.
+// شانس گل برای زنندهٔ تصادفی مقابل دروازه‌بان تصادفی دقیقاً ۸/۹ است.
+//
+// ⚠️ تاریخچه — چرا «پنجرهٔ طلایی» حذف شد:
+//
+// نسخهٔ قبلی یک مدل احتمالاتی کامل داشت (`missChance`، `isClean`،
+// `SWEET_MIN`/`SWEET_WIDTH`) که در آن قدرتِ شوت و زمان‌بندی روی
+// احتمال خطا اثر می‌گذاشت. مشکل این بود که آن مدل **هرگز فراخوانی
+// نمی‌شد**: `resolveKick` فقط تطابق ناحیه را می‌سنجید. با ۲۰۰٬۰۰۰
+// شوت اندازه‌گیری شد — قدرت ۰٫۰۵ و قدرت ۰٫۴۷ هر دو ۱۰۰٪ گل می‌شدند.
+//
+// در همان حال هر دو کلاینت نوار طلایی را رندر می‌کردند و به کاربر
+// می‌گفتند «داخل نوار طلایی رها کن — ضربهٔ تمیز!». یعنی کاربر
+// مهارتی را تمرین می‌کرد که روی نتیجه هیچ اثری نداشت.
+//
+// تصمیم (به‌خواستِ مالک محصول): بازی ساده بماند و به‌جای زنده‌کردن
+// مدل، **وعده از رابط برداشته شود**. کد مرده هم حذف شد تا نفر بعدی
+// فکر نکند این مکانیک فعال است.
 
 const ZONES = 9;
 const ROUNDS = 5;
 
-const col = (z) => z % 3;       // ۰ چپ، ۱ وسط، ۲ راست
-const row = (z) => Math.floor(z / 3); // ۰ بالا، ۱ وسط، ۲ پایین
+// `col`/`row` با حذف `missChance` بلااستفاده شدند و پاک شدند.
+// ناحیه فقط یک عدد ۰..۸ است و هیچ‌جای منطق به سطر/ستونش نیاز ندارد.
 
-const SWEET_MIN = 0.35;
-const SWEET_WIDTH = 0.15;
-const _CLEAN_MISS = 0.30;
-const _CLEAN_SAVE = 0.65;
-
-function makeSweet(rand = Math.random) {
-  const span = 1 - SWEET_MIN - SWEET_WIDTH;
-  const min = SWEET_MIN + 0.04 + rand() * Math.max(0, span - 0.08);
-  return { min: round3(min), max: round3(min + SWEET_WIDTH) };
-}
-
-const round3 = (v) => Math.round(v * 1000) / 1000;
-
-function isClean(power, sweet) {
-  if (!sweet) return false;
-  return power >= sweet.min && power <= sweet.max;
-}
-
-/** احتمال خطا / اصابت به تیرک بر اساس قدرت و زمان‌بندی */
-function missChance(zone, power, clean = false) {
-  const r = row(zone), c = col(zone);
-  let base = r === 0 ? 0.12 : r === 1 ? 0.05 : 0.03;
-  if (c !== 1) base += 0.04;
-  base += Math.max(0, power - 0.8) * 0.40;
-  const capped = Math.min(0.40, base);
-  return clean ? capped * _CLEAN_MISS : capped;
-}
-
-function resolveKick(shotZone, power, diveZone, rand = Math.random, sweet = null) {
-  const clean = isClean(power, sweet);
-  // منطق ساده، زیبا و جوانمردانه: اگر دروازه‌بان درست حدس بزند مهار، در غیر این صورت گل قطعی
+/**
+ * تنها قاعدهٔ بازی: تطابق ناحیه.
+ *
+ * امضا عمداً `power` را نگه داشته چون کلاینت‌ها هنوز آن را می‌فرستند و
+ * در بازپخشِ انیمیشن (شدت ضربه) استفاده می‌شود — ولی روی **نتیجه** هیچ
+ * اثری ندارد و نباید داشته باشد. اگر روزی خواستید اثر داشته باشد،
+ * این تنها جایی است که باید عوض شود.
+ */
+function resolveKick(shotZone, power, diveZone) {
   if (shotZone === diveZone) {
-    return { outcome: 'save', shotZone, diveZone, power, clean, blockedByKeeper: true };
+    return { outcome: 'save', shotZone, diveZone, power, blockedByKeeper: true };
   }
-  return { outcome: 'goal', shotZone, diveZone, power, clean };
+  return { outcome: 'goal', shotZone, diveZone, power };
 }
 
-const create = (rand = Math.random) => ({
+const create = () => ({
   score: { X: 0, O: 0 },
   taken: { X: 0, O: 0 },
   shooter: 'X',
@@ -58,7 +60,6 @@ const create = (rand = Math.random) => ({
   round: 1,
   suddenDeath: false,
   lastKick: null,
-  sweet: makeSweet(rand),
 });
 
 function isValidMove(state, move, player) {
@@ -72,7 +73,7 @@ function isValidMove(state, move, player) {
   return !state.pending[player];
 }
 
-function applyMove(state, move, player, rand = Math.random) {
+function applyMove(state, move, player) {
   const z = Number(move.zone);
   const p = player === state.shooter
     ? Math.max(0, Math.min(1, Number(move.power) || 0.5))
@@ -84,7 +85,7 @@ function applyMove(state, move, player, rand = Math.random) {
 
   const shot = state.pending[state.shooter];
   const dive = state.pending[keeper];
-  const res = resolveKick(shot.zone, shot.power, dive.zone, rand, state.sweet);
+  const res = resolveKick(shot.zone, shot.power, dive.zone);
 
   if (res.outcome === 'goal') state.score[state.shooter] += 1;
   state.taken[state.shooter] += 1;
@@ -94,11 +95,9 @@ function applyMove(state, move, player, rand = Math.random) {
     outcome: res.outcome,
     shotZone: res.shotZone,
     diveZone: res.diveZone,
-    clean: res.clean,
   });
 
   state.pending = {};
-  state.sweet = makeSweet(rand);
   state.shooter = keeper;
 
   if (state.taken.X === state.taken.O) {
@@ -136,7 +135,6 @@ function publicState(state, forPlayer) {
   const { pending, ...rest } = state;
   return {
     ...rest,
-    sweet: state.sweet,
     iChose: forPlayer ? !!pending[forPlayer] : false,
     waitingForOpponent: forPlayer
       ? !!pending[forPlayer] && Object.keys(pending).length === 1
@@ -148,11 +146,12 @@ function publicState(state, forPlayer) {
 }
 
 function botMove(state, me) {
+  // ناحیهٔ تصادفیِ یکنواخت. چون قاعده صرفاً تطابق ناحیه است، هر
+  // الگوی غیریکنواختی قابل یادگیری می‌شود و ربات را قابل‌سوءاستفاده
+  // می‌کند: کاربر می‌فهمد ربات کجا را بیشتر می‌زند و همان‌جا می‌ایستد.
   const zone = Math.floor(Math.random() * ZONES);
-  if (state.shooter === me) {
-    return { zone, power: 0.35 + Math.random() * 0.65 };
-  }
-  return { zone, power: 0 };
+  // `power` فقط شدت انیمیشن است و در نتیجه بی‌اثر.
+  return { zone, power: state.shooter === me ? 0.5 + Math.random() * 0.4 : 0 };
 }
 
 module.exports = {
@@ -161,7 +160,6 @@ module.exports = {
   turnMs: 12000,
   simultaneous: true,
   ZONES, ROUNDS,
-  SWEET_MIN, SWEET_WIDTH,
   create, result, isValidMove, applyMove, nextTurn, botMove,
-  publicState, resolveKick, missChance, makeSweet, isClean,
+  publicState, resolveKick,
 };

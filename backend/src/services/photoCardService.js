@@ -26,7 +26,6 @@
  */
 
 const walletService = require('./walletService');
-const referrals = require('./referralService');
 // ⚠️ نامِ `pointLedger` و نه `points`: در `creditSubmission` یک متغیرِ
 //    محلی به نامِ `points` هست (مقدارِ امتیازِ کارت). هم‌نامی، متغیرِ
 //    محلی را روی ماژول سایه می‌انداخت و `points.credit is not a
@@ -243,9 +242,7 @@ async function creditSubmission(
       referenceId: codeId,
       description: `ثبت کارت «${type.name}» با عکس`,
     });
-    // کمیسیون ۵٪ معرف — همان قاعدهٔ مسیر ثبت کد، روی همین تراکنش تا اگر
-    // چیزی برگشت، امتیازی از هوا ساخته نشود.
-    await referrals.payCommission(client, userId, points, 'card');
+    // ⚠️ کمیسیونِ امتیازی برداشته شد: کمیسیون ۵٪ فقط از خریدِ شاپ است.
   }
 
   // اینونتوری: **عکس مدیر** ثبت می‌شود، نه عکس کاربر.

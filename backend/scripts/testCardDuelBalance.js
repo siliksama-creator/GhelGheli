@@ -327,9 +327,14 @@ console.log('\n== ۶. عددی که برنده را تعیین می‌کند ب�
   ck('برنده با همان powerها می‌خواند',
     round.winner === (round.powerX > round.powerO ? 'X'
       : round.powerO > round.powerX ? 'O' : 'DRAW'));
-  ck('هیچ شانس یا جزء پنهانی در حکم نیست',
-    round.breakdownX.luck === 0
-      && round.breakdownX.total === round.breakdownX.focus + round.breakdownX.effectBonus);
+  // شانس اضافه شد، ولی «پنهان» نیست: باید در breakdown دیده شود و
+  // مجموعِ اجزا دقیقاً عددِ نهایی باشد.
+  ck('شانس در حکم آشکار است و در دامنهٔ اعلام‌شده می‌ماند',
+    Number.isInteger(round.breakdownX.luck)
+      && Math.abs(round.breakdownX.luck) <= round.breakdownX.luckRange
+      && round.breakdownX.total
+        === round.breakdownX.focus + round.breakdownX.effectBonus + round.breakdownX.luck,
+    `luck=${round.breakdownX.luck} range=${round.breakdownX.luckRange}`);
 }
 
 console.log('\n== ۷. تعیینی بودن با seed (بازپخشِ نبرد) ==');

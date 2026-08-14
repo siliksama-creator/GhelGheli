@@ -245,7 +245,9 @@ class _GrowthPanelState extends State<GrowthPanel> {
                 const Spacer(), LinearProgressIndicator(value: (progress / goal).clamp(0.0, 1.0), minHeight: 5),
                 const SizedBox(height: 5), Row(children: [
                   Expanded(child: Text('${m['progress']}/${m['goal']}', style: const TextStyle(fontSize: 9.5))),
-                  SizedBox(height: 27, child: FilledButton(onPressed: !complete || claimed ? null : () => _run('${m['key']}', () => widget.api.post('/api/missions/${m['key']}/claim', {})),
+                  SizedBox(height: 27, child: FilledButton(
+                    style: _compactClaimStyle(),
+                    onPressed: !complete || claimed ? null : () => _run('${m['key']}', () => widget.api.post('/api/missions/${m['key']}/claim', {})),
                     child: Text(claimed ? 'گرفته شد' : complete ? 'دریافت' : 'ادامه', style: const TextStyle(fontSize: 9.5)))),
                 ]),
               ]),
@@ -300,14 +302,22 @@ class _GrowthPanelState extends State<GrowthPanel> {
     child: Row(children: [
       Container(width: 9, height: 9, decoration: BoxDecoration(shape: BoxShape.circle, color: friend['online'] == true ? const Color(0xFF22E7A6) : Colors.blueGrey)),
       Gaps.hXs, Expanded(child: Text('${friend['nickname'] ?? 'کاربر'}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800))),
-      if (incoming) SizedBox(height: 29, child: FilledButton(onPressed: () => _run('${friend['friendshipId']}', () => widget.api.post('/api/friends/requests/${friend['friendshipId']}/accept', {})), child: const Text('قبول', style: TextStyle(fontSize: 9.5))))
-      else SizedBox(height: 29, child: OutlinedButton(onPressed: friend['online'] == true ? () => _challenge(friend) : null, child: const Text('چالش', style: TextStyle(fontSize: 9.5)))),
+      if (incoming) SizedBox(height: 29, child: FilledButton(
+        style: _compactClaimStyle(height: 29),
+        onPressed: () => _run('${friend['friendshipId']}', () => widget.api.post('/api/friends/requests/${friend['friendshipId']}/accept', {})),
+        child: const Text('قبول', style: TextStyle(fontSize: 9.5))))
+      else SizedBox(height: 29, child: OutlinedButton(
+        style: _compactClaimStyle(height: 29),
+        onPressed: friend['online'] == true ? () => _challenge(friend) : null,
+        child: const Text('چالش', style: TextStyle(fontSize: 9.5)))),
     ]),
   );
 
   Widget _searchRow(Map user) => Padding(padding: const EdgeInsets.only(top: 5), child: Row(children: [
     Expanded(child: Text('${user['nickname'] ?? 'کاربر'}', style: const TextStyle(fontSize: 10))),
-    SizedBox(height: 28, child: OutlinedButton(onPressed: user['relation'] == 'none' ? () => _run('${user['id']}', () => widget.api.post('/api/friends/${user['id']}/request', {})) : null,
+    SizedBox(height: 28, child: OutlinedButton(
+      style: _compactClaimStyle(height: 28),
+      onPressed: user['relation'] == 'none' ? () => _run('${user['id']}', () => widget.api.post('/api/friends/${user['id']}/request', {})) : null,
       child: Text(user['relation'] == 'none' ? 'افزودن' : 'در انتظار', style: const TextStyle(fontSize: 9.5)))),
   ]));
 }
@@ -383,6 +393,7 @@ class _DailyBonusCard extends StatelessWidget {
               style: const TextStyle(fontSize: 8.5, color: Color(0xFFFFD166))),
         ])),
         SizedBox(width: 82, height: 30, child: FilledButton(
+          style: _compactClaimStyle(height: 30),
           onPressed: ready && !claimed && !busy ? onClaim : null,
           child: Text(claimed ? 'گرفته شد' : ready ? 'دریافت' : '${faNum(bonus['completed'] ?? 0)}/۵',
               style: const TextStyle(fontSize: 8.5)),
@@ -391,6 +402,51 @@ class _DailyBonusCard extends StatelessWidget {
     );
   }
 }
+
+/// استایلِ دکمه‌های ریزِ داخلِ کارت‌های ماموریت.
+///
+/// ═══════════════════════════════════════════════════════════════════
+/// چرا این استایل لازم شد — باگِ «دکمهٔ دریافت دیده نمی‌شود»
+/// ═══════════════════════════════════════════════════════════════════
+///
+/// گزارشِ مالک: دکمهٔ دریافتِ امتیازِ ماموریت‌ها در اندروید دیده نمی‌شد.
+/// دکمه در کد بود، endpoint هم بود، دادهٔ سرور هم درست بود.
+///
+/// علت در تم بود:
+///
+///     minimumSize: const Size.fromHeight(TouchTarget.comfortable)
+///
+/// ‏`Size.fromHeight(52)` معادلِ `Size(double.infinity, 52)` است — یعنی
+/// **کمینه‌عرضِ بی‌نهایت**. این دکمه‌ها در یک `Row` داخلِ کارتِ ۱۹۰
+/// پیکسلی می‌نشینند و قیدِ عرضِ بی‌نهایت آنجا معتبر نیست. نتیجه، در
+/// آزمونِ واقعیِ ویجت اندازه‌گیری شد:
+///
+///     BoxConstraints forces an infinite width.
+///     The offending constraints were: BoxConstraints(w=Infinity, h=27.0)
+///
+/// یعنی دکمه اصلاً **چیدمان نمی‌شد** و رندر نمی‌شد؛ دقیقاً همان
+/// «دیده نمی‌شود». در build نهاییِ release این خطاها بی‌صدا رد می‌شوند
+/// و فقط جای خالی می‌ماند — برای همین کسی خطایی نمی‌دید.
+///
+/// تعارضِ دوم: کمینه‌ارتفاعِ ۵۲ در برابرِ `SizedBox(height: 27)`.
+///
+/// چرا تم را سراسری عوض نکردیم: اندازه‌گیری شد که تغییرِ
+/// `Size.fromHeight(52)` به `Size(0, 52)` دکمه‌های تمام‌عرضِ برنامه را
+/// از ۸۰۰ به ۱۲۴ پیکسل جمع می‌کند (الگوهای `Center` و `Column` بدونِ
+/// stretch). آن یک رگرسیونِ بصریِ سراسری بود برای رفعِ یک باگِ محلی.
+/// پس فقط همین دکمه‌های ریز استایلِ صریح می‌گیرند.
+ButtonStyle _compactClaimStyle({double height = 27}) => ButtonStyle(
+      // کمینه‌عرضِ صفر: مهم‌ترین خط. دکمه اندازهٔ محتوایش را می‌گیرد.
+      minimumSize: WidgetStatePropertyAll(Size(0, height)),
+      // بدونِ سقفِ ارتفاع، دکمه دوباره به ۵۲ کش می‌آید.
+      maximumSize: WidgetStatePropertyAll(Size(double.infinity, height)),
+      padding: const WidgetStatePropertyAll(
+          EdgeInsets.symmetric(horizontal: 10)),
+      // ناحیهٔ لمسِ ۴۸ پیکسلیِ متریال، جعبهٔ ۲۷ پیکسلی را از داخل
+      // بزرگ می‌کند و باعثِ سرریز می‌شود.
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
+    );
 
 class _WeeklyMissions extends StatelessWidget {
   const _WeeklyMissions({required this.missions, required this.busy, required this.onClaim});
@@ -430,6 +486,7 @@ class _WeeklyMissions extends StatelessWidget {
                     style: const TextStyle(fontSize: 8, color: Colors.white54)),
               ])),
               SizedBox(width: 75, height: 28, child: OutlinedButton(
+                style: _compactClaimStyle(height: 28),
                 onPressed: mission['complete'] == true && mission['claimed'] != true && busy != '${mission['key']}'
                     ? () => onClaim(mission) : null,
                 child: Text(mission['claimed'] == true ? 'گرفته شد' : 'دریافت', style: const TextStyle(fontSize: 8)),

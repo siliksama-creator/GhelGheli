@@ -626,9 +626,12 @@ app.post('/api/cards/redeem', auth, cardRedeemLimiter, asyncHandler(async (req, 
       referenceId: card.id,
       description: `ثبت کارت «${card.name || 'کارت'}» با کد`,
     });
-    // کمیسیون ۵٪ معرف. روی همان تراکنش، تا اگر ثبت کارت برگشت، کمیسیون
-    // هم برگردد و امتیازی از هوا ساخته نشود.
-    await referrals.payCommission(client, req.user.id, card.point_value, 'card');
+    // ⚠️ کمیسیونِ امتیازی از اینجا برداشته شد.
+    //
+    // مالک دامنه را تغییر داد: «کمیسیون ۵٪ دعوت فقط از خرید کامل‌شدهٔ
+    // شاپ باشد، نه از امتیاز بازی/تپ». ثبتِ کارت هم امتیاز است، نه خرید.
+    // مسیرِ زندهٔ کمیسیون حالا فقط `payPurchaseCommission` است که روی
+    // خریدِ نهایی‌شده صدا زده می‌شود.
     // ── طرحِ نمایشی: رو یا پشت، تصادفی ──
     //
     // ⚠️ چرا مسیرِ «فقط کد» هم این کار را می‌کند
@@ -788,9 +791,8 @@ app.post('/api/games/tap/progress', auth, tapBatchLimiter, asyncHandler(async (r
         league: false,
       });
       await addLeaguePoints(client, userId, points);
-      // کمیسیون ۵٪ معرف. مالک صریح گفت این کمیسیون فقط از دو منبع می‌آید:
-      // ثبت کد کارت، و بازی ضربه‌زن. این نقطهٔ دوم است.
-      await referrals.payCommission(client, userId, points, 'tap');
+      // ⚠️ کمیسیونِ امتیازی از اینجا هم برداشته شد — به همان دلیلِ بالا:
+      // کمیسیون فقط از خریدِ شاپ می‌آید، نه از امتیازِ بازی.
     },
   );
   // XP گذر نبرد به ازای هر لولی که در همین بستهٔ ارسالی تمام شده.

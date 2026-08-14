@@ -298,6 +298,16 @@ class _LoginStreakCardState extends State<LoginStreakCard>
                           child: ElevatedButton(
                             onPressed: claimedToday || _busy ? null : _claim,
                             style: ElevatedButton.styleFrom(
+                              // ⚠️ کمینه‌عرضِ صفر لازم است. پیش‌فرضِ تم
+                              // `Size.fromHeight(52)` است که یعنی
+                              // کمینه‌عرضِ **بی‌نهایت**؛ در این Row
+                              // خطای «BoxConstraints forces an infinite
+                              // width» می‌دهد و دکمه اصلاً رندر نمی‌شود.
+                              // همان باگی که در پنلِ ماموریت‌ها بود.
+                              minimumSize: const Size(0, 34),
+                              maximumSize: const Size(double.infinity, 34),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              visualDensity: VisualDensity.compact,
                               backgroundColor: const Color(0xFFFFB84D),
                               foregroundColor: const Color(0xFF25110A),
                               disabledBackgroundColor: Colors.white.withValues(alpha: 0.10),

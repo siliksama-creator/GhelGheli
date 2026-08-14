@@ -921,7 +921,7 @@ class _ClashStageState extends State<_ClashStage>
   //
   // مجموعِ فازها: ۶۰۰ + ۴۰۰ + ۹۰۰ = ۱۹۰۰ms تا حکم.
   //
-  // ⚠️ باید کمتر از `resultHoldMs` سرور (۳۸۰۰ms) بماند وگرنه راندِ
+  // ⚠️ باید کمتر از `resultHoldMs` سرور (۳۲۰۰ms) بماند وگرنه راندِ
   //    بعد وسطِ انیمیشن شروع می‌شود — دقیقاً همان چیزی که مالک گزارش
   //    کرد: «سریع میاد بدون اینکه لود بشه میره». با این عدد، فازِ
   //    «حکم» ۱٫۹ ثانیه فرصتِ دیده‌شدن دارد.
@@ -2691,15 +2691,34 @@ class _RoundIntroOverlay extends StatefulWidget {
 
 class _RoundIntroOverlayState extends State<_RoundIntroOverlay>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 2800),
-  );
+  // ⚠️ چرا `late final` نیست:
+  //
+  // قبلاً این فیلد `late final AnimationController _c = AnimationController(...)`
+  // بود. مقداردهیِ تنبل یعنی کنترلر فقط در **اولین دسترسی** ساخته
+  // می‌شود. اگر ویجت بدونِ `focus` رندر می‌شد، `build` زودتر
+  // `SizedBox.shrink` برمی‌گرداند و هیچ‌وقت به `_c` دست نمی‌زد.
+  //
+  // بعد در `dispose()` خطِ `_c.dispose()` برای اولین بار به `_c`
+  // دسترسی می‌گرفت و **همان‌جا** کنترلر را می‌ساخت — روی یک ویجتِ
+  // از قبل غیرفعال‌شده. `AnimationController` برای `vsync: this` باید
+  // `TickerMode` را از درختِ والد بخواند و آن موقع درخت دیگر پایدار
+  // نیست:
+  //
+  //     Looking up a deactivated widget's ancestor is unsafe.
+  //
+  // یعنی «آزاد کردنِ منبع» خودش منبع می‌ساخت. کنترلر حالا مشتاقانه در
+  // `initState` ساخته می‌شود تا همیشه دقیقاً یک بار ساخته و یک بار
+  // آزاد شود.
+  AnimationController? _c;
 
   @override
   void initState() {
     super.initState();
-    if (_hasFocus) _c.forward();
+    _c = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2800),
+    );
+    if (_hasFocus) _c!.forward();
   }
 
   bool get _hasFocus => '${widget.focus?['stat'] ?? ''}'.isNotEmpty;
@@ -2710,14 +2729,15 @@ class _RoundIntroOverlayState extends State<_RoundIntroOverlay>
     // راندِ تازه → اعلانِ تازه. بدونِ این، فقط راندِ اول اعلان داشت.
     if (old.roundNumber != widget.roundNumber && _hasFocus) {
       _c
-        ..reset()
+        ?..reset()
         ..forward();
     }
   }
 
   @override
   void dispose() {
-    _c.dispose();
+    _c?.dispose();
+    _c = null;
     super.dispose();
   }
 
@@ -2734,9 +2754,9 @@ class _RoundIntroOverlayState extends State<_RoundIntroOverlay>
       label:
           'راند ${widget.roundNumber} از ${widget.totalRounds}. نبرد $statName. $hint',
       child: AnimatedBuilder(
-        animation: _c,
+        animation: _c!,
         builder: (context, _) {
-          final v = _c.value;
+          final v = _c!.value;
           if (v >= 1.0) return const SizedBox.shrink();
           final enter =
               Curves.easeOutBack.transform((v / 0.22).clamp(0.0, 1.0));

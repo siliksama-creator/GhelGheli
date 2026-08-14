@@ -18,12 +18,11 @@ const androidSession = fs.readFileSync(
 const base = {
   score: { X: 2, O: 1 }, taken: { X: 3, O: 2 },
   shooter: 'X', role: 'shooter', iChose: false,
-  waitingForOpponent: false, sweet: { min: .51, max: .66 }, history: [],
+  waitingForOpponent: false, history: [],
 };
 let view = penaltyView(base, 'X');
 assert.equal(view.amShooter, true);
 assert.equal(view.myScore, 2);
-assert.deepEqual(view.sweet, { min: .51, max: .66 });
 
 // After one kick the server swaps roles without changing the player's X/O
 // identity. This was the web-breaking bug: `mySymbol === X` stayed true.
@@ -52,8 +51,8 @@ assert(moved, 'goal impact must visibly deform the net at the hit point');
 
 assert(!web.includes("mySymbol === 'X'"), 'web role must not be fixed to X');
 assert(!web.includes('state.pending'), 'private pending choices are never sent to clients');
-assert(!web.includes('Math.random'), 'sweet spot comes from the authoritative server');
-for (const contract of ['state.iChose', 'state.role', 'state.sweet']) {
+assert(!web.includes('Math.random'), 'outcomes come from the authoritative server, never the browser');
+for (const contract of ['state.iChose', 'state.role']) {
   assert(webSession.includes(contract) || web.includes(contract) || webModel.includes(contract),
     `web consumes ${contract}`);
 }

@@ -92,36 +92,36 @@ function drawConfetti(ctx, origin, t, scale) {
   }
 }
 
-function drawPower(ctx, power, sweet, width, height) {
+// نوار قدرت — فقط شدتِ **انیمیشن** شوت را نشان می‌دهد، نه شانس گل.
+//
+// ⚠️ «پنجرهٔ طلایی» از اینجا حذف شد. قبلاً یک نوار طلایی کشیده می‌شد و
+//    به کاربر القا می‌کرد اگر داخلش رها کند شانس گلش بیشتر است — ولی
+//    سرور هرگز قدرت را در نتیجه دخالت نمی‌داد. کشیدنِ چیزی که روی
+//    نتیجه اثر ندارد، به کاربر دروغ گفتن است.
+//
+//    تنها قاعده: ناحیهٔ شوت == ناحیهٔ شیرجه → مهار، وگرنه گل.
+function drawPower(ctx, power, width, height) {
   const barW = width * .075, barH = height * .46;
   const x = width * .03, y = height * .28;
-  const yFor = p => y + barH * (1 - clamp((p - .35) / .65));
   ctx.fillStyle = 'rgba(0,0,0,.58)';
   ctx.beginPath(); ctx.roundRect(x, y, barW, barH, 9); ctx.fill();
-  if (sweet) {
-    const top = yFor(sweet.max), bottom = yFor(sweet.min);
-    ctx.fillStyle = 'rgba(255,211,107,.45)';
-    ctx.strokeStyle = GOLD; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.roundRect(x - 2, top, barW + 4, bottom - top, 6); ctx.fill(); ctx.stroke();
-  }
   const fraction = clamp((power - .35) / .65);
   const fillH = barH * fraction;
-  const inSweet = sweet && power >= sweet.min && power <= sweet.max;
   const red = clamp((power - .5) * 2);
   const r = Math.round(132 + (239 - 132) * red);
   const g = Math.round(204 + (68 - 204) * red);
   const b = Math.round(22 + (68 - 22) * red);
-  ctx.fillStyle = inSweet ? GOLD : `rgba(${r},${g},${b},.85)`;
+  ctx.fillStyle = `rgba(${r},${g},${b},.85)`;
   ctx.beginPath(); ctx.roundRect(x, y + barH - fillH, barW, fillH, 9); ctx.fill();
   const marker = y + barH - fillH;
   ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
   ctx.beginPath(); ctx.moveTo(x - 3, marker); ctx.lineTo(x + barW + 3, marker); ctx.stroke();
-  ctx.strokeStyle = inSweet ? '#fff' : 'rgba(255,255,255,.55)'; ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.roundRect(x, y, barW, barH, 9); ctx.stroke();
 }
 
 function PenaltyCanvas({ kick, animating, lastKick, selected, power, charging,
-  sweet, net }) {
+  net }) {
   const canvasRef = useRef(null);
   const [sizeEpoch, setSizeEpoch] = useState(0);
 
@@ -221,15 +221,15 @@ function PenaltyCanvas({ kick, animating, lastKick, selected, power, charging,
     if (isGoal && kick > .62 && shot != null) {
       drawConfetti(ctx, zoneCenter(shot, w, h), clamp((kick - .62) / .38), Math.min(w, h));
     }
-    if (charging) drawPower(ctx, power, sweet, w, h);
-  }, [kick, animating, lastKick, selected, power, charging, sweet, net, sizeEpoch]);
+    if (charging) drawPower(ctx, power, w, h);
+  }, [kick, animating, lastKick, selected, power, charging, net, sizeEpoch]);
 
   return <canvas ref={canvasRef} className="penCanvas" aria-hidden="true" />;
 }
 
 function Scoreboard({ view }) {
   const marker = (h, i) => <i key={`${h.shooter}-${i}`}
-    className={`${h.outcome === 'goal' ? 'goal' : 'save'}${h.clean ? ' clean' : ''}`} />;
+    className={h.outcome === 'goal' ? 'goal' : 'save'} />;
   return (
     <section className="penScore">
       <div className={view.myScore > view.foeScore ? 'leading' : ''}>تو</div>
@@ -259,7 +259,6 @@ function Outcome({ lastKick, me, kick }) {
   return (
     <div className="penOutcome" style={{ '--outcome': color }}>
       <strong>{text}</strong>
-      {lastKick.clean && <small>ضربهٔ تمیز</small>}
     </div>
   );
 }
@@ -340,11 +339,8 @@ export default function PenaltyGame({ state, mySymbol, onMove }) {
     onMove({ zone });
   };
 
-  const inSweet = view.sweet && power >= view.sweet.min && power <= view.sweet.max;
   const prompt = animating ? '...'
-    : charging ? (view.sweet
-      ? 'داخل نوار طلایی رها کن — ضربهٔ تمیز!'
-      : 'رها کن تا شوت بزنی — هرچه بالاتر، محکم‌تر')
+    : charging ? 'رها کن تا شوت بزنی'
       : view.alreadyChose || view.waiting ? 'منتظر حریف...'
         : view.amShooter ? 'تو می‌زنی — انگشتت را روی یک گوشه نگه دار'
           : 'تو دروازه‌بانی — حدس بزن کجا می‌زند';
@@ -354,7 +350,7 @@ export default function PenaltyGame({ state, mySymbol, onMove }) {
       <Scoreboard view={view} />
       <div className="penPitch">
         <PenaltyCanvas kick={kick} animating={animating} lastKick={view.lastKick}
-          selected={selected} power={power} charging={charging} sweet={view.sweet}
+          selected={selected} power={power} charging={charging}
           net={net.current} />
         <div className="penZones" dir="ltr">
           {Array.from({ length: 9 }, (_, zone) => (
@@ -372,7 +368,7 @@ export default function PenaltyGame({ state, mySymbol, onMove }) {
         </div>
         <Outcome lastKick={view.lastKick} me={view.me} kick={kick} />
       </div>
-      <div className={`penPrompt${charging && inSweet ? ' sweet' : view.amShooter ? ' shooter' : ' keeper'}`}>
+      <div className={`penPrompt${view.amShooter ? ' shooter' : ' keeper'}`}>
         {prompt}
       </div>
     </div>

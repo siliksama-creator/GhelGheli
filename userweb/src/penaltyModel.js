@@ -1,16 +1,16 @@
 // Pure state adapter shared by the web penalty renderer and its parity test.
 // The backend is authoritative; the browser must never infer a permanent role
 // from X/O because shooter and keeper swap after every kick.
+//
+// `sweet` (the golden window) was removed: the server never let shot power
+// affect the outcome, so surfacing it here made the UI promise a skill that
+// did not exist. The only rule is shot zone == dive zone -> save, else goal.
 export function penaltyView(state = {}, mySymbol = 'X') {
   const me = mySymbol || 'X';
   const foe = me === 'X' ? 'O' : 'X';
   const role = state.role || (state.shooter === me ? 'shooter' : 'keeper');
   const score = state.score || {};
   const taken = state.taken || {};
-  const sweet = state.sweet && Number.isFinite(Number(state.sweet.min))
-    && Number.isFinite(Number(state.sweet.max))
-    ? { min: Number(state.sweet.min), max: Number(state.sweet.max) }
-    : null;
   return {
     me,
     foe,
@@ -24,7 +24,6 @@ export function penaltyView(state = {}, mySymbol = 'X') {
     history: Array.isArray(state.history) ? state.history : [],
     lastKick: state.lastKick || null,
     suddenDeath: state.suddenDeath === true,
-    sweet,
   };
 }
 

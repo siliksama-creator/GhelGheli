@@ -8,9 +8,8 @@ import 'package:flutter/services.dart';
 // بقیه «تخته»‌اند: کاربر خانه‌ای را می‌زند و مهره ظاهر می‌شود. اینجا یک
 // **لحظهٔ فیزیکی** است که باید حس شود:
 //
-//   ۱. زننده جهت را انتخاب می‌کند و قدرت را با نگه داشتن انگشت تنظیم
-//      می‌کند — نوار قدرت بالا و پایین می‌رود و روی آن یک **پنجرهٔ
-//      طلایی** هست: رها کردن داخل آن پنجره «ضربهٔ تمیز» است.
+//   ۱. زننده جهت را انتخاب می‌کند و انگشتش را برمی‌دارد. نوار قدرت
+//      فقط شدتِ **انیمیشن** شوت را تعیین می‌کند، نه شانس گل را.
 //   ۲. دروازه‌بان ناحیهٔ شیرجه را می‌زند و منتظر می‌ماند.
 //   ۳. وقتی هر دو انتخاب کردند، سرور نتیجه را می‌گوید و **بعد** انیمیشن
 //      اجرا می‌شود: توپ روی یک منحنی پرتابه با چرخش حرکت می‌کند،
@@ -35,12 +34,20 @@ import 'package:flutter/services.dart';
 //      نور آفتاب ممکن است دیده نشود.
 //
 // ۲. «نگه میداره محکم تر میزنه — ایده جالبی پشتش راه انداخته نشده»
-//    → «پنجرهٔ تمیز». نوار قدرت دیگر یک شیبِ ساده نیست؛ در هر ضربه یک
-//      بازهٔ باریکِ تصادفی روی نوار روشن می‌شود که رها کردن داخلش، خطا
-//      را به یک‌سوم و شانس مهار را به ۷۰٪ می‌رساند. جای پنجره هر ضربه
-//      عوض می‌شود، پس حفظ کردنی نیست: باید نگاه کنی و به‌موقع رها کنی.
-//      منطق و قضاوتش کاملاً سمت سرور است (penalty.js) — اینجا فقط
-//      نمایش داده می‌شود.
+//    → یک بار «پنجرهٔ تمیز» ساخته شد: بازهٔ طلاییِ باریکی روی نوار که
+//      قرار بود رها کردن داخلش خطا را کم کند.
+//
+//      ⚠️ آن پنجره حذف شد. دلیل: سرور **هرگز** آن را اعمال نمی‌کرد.
+//      `resolveKick` در penalty.js فقط تطابق ناحیه را می‌سنجید؛ با
+//      شبیه‌سازی ۲۰۰٬۰۰۰ شوت تأیید شد که قدرت ۰٫۰۵ و ۰٫۴۷ هر دو ۱۰۰٪
+//      گل می‌شوند. یعنی این صفحه کاربر را وادار می‌کرد مهارتی را تمرین
+//      کند که وجود خارجی نداشت — بدترین نوع باگ، چون نامرئی است.
+//
+//      تصمیم مالک: بازی ساده بماند. پس وعده از رابط برداشته شد، نه
+//      اینکه مدل احتمالاتی زنده شود.
+//
+//      قاعدهٔ کامل بازی: ناحیهٔ شوت == ناحیهٔ شیرجه → مهار، وگرنه گل.
+//      نوار قدرت می‌ماند، ولی فقط به‌عنوان شدتِ انیمیشن.
 //
 // ۳. «همه امتیازها و اسکورها و تو بردی تو باختی باید تو دید باشه و تو
 //    چشم باشه»
@@ -302,19 +309,6 @@ class _PenaltyBoardState extends State<_PenaltyBoard>
 
   bool get _alreadyChose => widget.session.state['iChose'] == true;
 
-  /// پنجرهٔ «ضربهٔ تمیز» که سرور برای این ضربه فرستاده.
-  ///
-  /// اگر سرور نفرستاده بود (نسخهٔ قدیمی‌ترِ بک‌اند)، `null` برمی‌گردد و
-  /// نوار دقیقاً مثل قبل کار می‌کند — بدون خطا، فقط بدون پنجره.
-  ({double min, double max})? get _sweet {
-    final s = widget.session.state['sweet'];
-    if (s is! Map) return null;
-    final lo = (s['min'] as num?)?.toDouble();
-    final hi = (s['max'] as num?)?.toDouble();
-    if (lo == null || hi == null || hi <= lo) return null;
-    return (min: lo, max: hi);
-  }
-
   void _startCharge(int zone) {
     if (widget.session.phase != GamePhase.playing || _alreadyChose || _kick.isAnimating) return;
     setState(() {
@@ -334,13 +328,9 @@ class _PenaltyBoardState extends State<_PenaltyBoard>
       _charging = false;
       _lockedPower = p;
     });
-    // بازخوردِ فوریِ «تمیز زدی»: کاربر نباید تا رسیدن توپ منتظر بماند
-    // تا بفهمد زمان‌بندی‌اش درست بود. پنجره سمت سرور هم دوباره بررسی
-    // می‌شود؛ این فقط نمایش است.
-    final sw = _sweet;
-    if (sw != null && p >= sw.min && p <= sw.max) {
-      GameAudio.instance.play(Sfx.matchFound, volume: 0.7);
-    }
+    // `power` فقط شدتِ انیمیشن است؛ سرور نتیجه را صرفاً از تطابق ناحیه
+    // درمی‌آورد. عمداً هیچ بازخورد «خوب زدی» اینجا پخش نمی‌شود چون
+    // چیزی برای خوب زدن وجود ندارد.
     widget.session.moveObject({'zone': _pickedZone, 'power': p});
   }
 
@@ -430,7 +420,6 @@ class _PenaltyBoardState extends State<_PenaltyBoard>
                                     ? 0.35 + _power.value * 0.65
                                     : _lockedPower,
                                 charging: _charging,
-                                sweet: _sweet,
                                 net: _net,
                                 netEpoch: _net.peakDepth,
                                 
@@ -456,7 +445,6 @@ class _PenaltyBoardState extends State<_PenaltyBoard>
                             child: IgnorePointer(
                               child: _OutcomeFlag(
                                 outcome: '${lastKick['outcome']}',
-                                clean: lastKick['clean'] == true,
                                 mine: lastKick['shooter'] == me,
                                 t: ((_kick.value - 0.60) / 0.40)
                                     .clamp(0.0, 1.0),
@@ -478,7 +466,6 @@ class _PenaltyBoardState extends State<_PenaltyBoard>
           waiting: waiting,
           charging: _charging,
           animating: _kick.isAnimating,
-          hasSweet: _sweet != null,
         ),
       ],
     );
@@ -577,9 +564,6 @@ class _Scoreboard extends StatelessWidget {
             ),
           Gaps.vXs,
           // ردیف توپ‌ها: گل سبز، مهار/بیرون خاکستری. یک نگاه کافی است.
-          //
-          // حلقهٔ طلایی دور یک نشان یعنی آن ضربه «تمیز» بوده — بازخوردِ
-          // ماندگارِ زمان‌بندیِ خوب، نه فقط یک جلوهٔ لحظه‌ای.
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -602,10 +586,7 @@ class _Scoreboard extends StatelessWidget {
                                   ? _goalGreen
                                   : Colors.white24,
                               border: Border.all(
-                                color: h['clean'] == true
-                                    ? _gold
-                                    : Colors.white.withValues(alpha: 0.30),
-                                width: h['clean'] == true ? 2 : 1,
+                                color: Colors.white.withValues(alpha: 0.30),
                               ),
                             ),
                           ),
@@ -647,13 +628,12 @@ class _SideLabel extends StatelessWidget {
 class _OutcomeFlag extends StatelessWidget {
   const _OutcomeFlag({
     required this.outcome,
-    required this.clean,
     required this.mine,
     required this.t,
   });
 
   final String outcome;
-  final bool clean, mine;
+  final bool mine;
   final double t;
 
   @override
@@ -712,22 +692,6 @@ class _OutcomeFlag extends StatelessWidget {
                   ),
                 ),
               ),
-              if (clean) ...[
-                const SizedBox(height: 6),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
-                  decoration: BoxDecoration(
-                    borderRadius: Corners.rPill,
-                    color: _gold.withValues(alpha: 0.92),
-                  ),
-                  child: const Text('ضربهٔ تمیز',
-                      style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFF1A1206))),
-                ),
-              ],
             ],
           ),
         ),
@@ -895,7 +859,6 @@ class _PitchPainter extends CustomPainter {
     required this.amShooter,
     required this.power,
     required this.charging,
-    required this.sweet,
     required this.net,
     required this.netEpoch,
     
@@ -906,7 +869,6 @@ class _PitchPainter extends CustomPainter {
   final Map<String, dynamic>? lastKick;
   final int? hoverZone;
   final double power;
-  final ({double min, double max})? sweet;
   final NetSim net;
   
 
@@ -1138,10 +1100,9 @@ class _PitchPainter extends CustomPainter {
     canvas.drawPath(hot, _netHot);
   }
 
-  /// نوار قدرت با پنجرهٔ «ضربهٔ تمیز».
+  /// نوار قدرت — فقط شدتِ انیمیشن، نه شانس گل.
   ///
-  /// پنجره یک نوار طلاییِ روشن روی ریل است. کاربر باید همان لحظه که
-  /// نشانگر از آن رد می‌شود انگشتش را بردارد.
+  /// پنجرهٔ طلایی از اینجا حذف شد چون سرور هیچ‌وقت اعمالش نمی‌کرد.
   void _drawPowerBar(Canvas canvas, double w, double h) {
     final barW = w * 0.075, barH = h * 0.46;
     final bx = w * 0.030, by = h * 0.28;
@@ -1149,49 +1110,19 @@ class _PitchPainter extends CustomPainter {
     final bg = RRect.fromRectAndRadius(rect, const Radius.circular(9));
     canvas.drawRRect(bg, Paint()..color = Colors.black.withValues(alpha: 0.55));
 
-    /// تبدیل قدرت (۰.۳۵..۱) به موقعیت y روی نوار.
-    double yFor(double p) {
-      final f = ((p - 0.35) / 0.65).clamp(0.0, 1.0);
-      return by + barH * (1 - f);
-    }
-
-    // پنجرهٔ تمیز — پیش از پرشدگی، تا زیرِ آن دیده شود.
-    final sw = sweet;
-    if (sw != null) {
-      final top = yFor(sw.max), bottom = yFor(sw.min);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-            Rect.fromLTRB(bx - 2, top, bx + barW + 2, bottom),
-            const Radius.circular(6)),
-        Paint()..color = _gold.withValues(alpha: 0.45),
-      );
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-            Rect.fromLTRB(bx - 2, top, bx + barW + 2, bottom),
-            const Radius.circular(6)),
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2
-          ..color = _gold,
-      );
-    }
-
+    // `yFor` با حذفِ پنجرهٔ طلایی بلااستفاده شد و پاک شد؛ فقط خودِ
+    // پرشدگی می‌ماند که مستقیم از `power` حساب می‌شود.
     final fillH = barH * ((power - 0.35) / 0.65).clamp(0.0, 1.0);
-    final inSweet = sw != null && power >= sw.min && power <= sw.max;
-    // داخل پنجره طلایی، بیرونش سبز→قرمز. یعنی رنگ خودش می‌گوید «الان».
-    final col = inSweet
-        ? _gold
-        : Color.lerp(_goalGreen, _missRed,
-            ((power - 0.5) * 2).clamp(0.0, 1.0))!;
+    final col = Color.lerp(
+        _goalGreen, _missRed, ((power - 0.5) * 2).clamp(0.0, 1.0))!;
     canvas.drawRRect(
       RRect.fromRectAndRadius(
           Rect.fromLTWH(bx, by + barH - fillH, barW, fillH),
           const Radius.circular(9)),
-      Paint()..color = col.withValues(alpha: inSweet ? 0.95 : 0.80),
+      Paint()..color = col.withValues(alpha: 0.80),
     );
 
-    // نشانگرِ سطح — یک خطِ سفیدِ تیز. بدون آن، لبهٔ پرشدگی در ناحیهٔ
-    // طلایی گم می‌شود.
+    // نشانگرِ سطح — یک خطِ سفیدِ تیز روی لبهٔ پرشدگی.
     final y = by + barH - fillH;
     canvas.drawLine(
       Offset(bx - 3, y),
@@ -1207,7 +1138,7 @@ class _PitchPainter extends CustomPainter {
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2
-          ..color = Colors.white.withValues(alpha: inSweet ? 0.95 : 0.5));
+          ..color = Colors.white.withValues(alpha: 0.5));
   }
 
   /// ذراتِ جشن.
@@ -1302,7 +1233,6 @@ class _PitchPainter extends CustomPainter {
       old.hoverZone != hoverZone ||
       old.power != power ||
       old.charging != charging ||
-      old.sweet != sweet ||
       old.netEpoch != netEpoch ||
       old.lastKick != lastKick;
 }
@@ -1319,10 +1249,9 @@ class _Prompt extends StatelessWidget {
     required this.waiting,
     required this.charging,
     required this.animating,
-    required this.hasSweet,
   });
 
-  final bool amShooter, chose, waiting, charging, animating, hasSweet;
+  final bool amShooter, chose, waiting, charging, animating;
 
   @override
   Widget build(BuildContext context) {
@@ -1332,9 +1261,7 @@ class _Prompt extends StatelessWidget {
     if (animating) {
       text = '...';
     } else if (charging) {
-      text = hasSweet
-          ? 'داخل نوار طلایی رها کن — ضربهٔ تمیز!'
-          : 'رها کن تا شوت بزنی — هرچه بالاتر، محکم‌تر';
+      text = 'رها کن تا شوت بزنی';
       color = _gold;
     } else if (chose || waiting) {
       text = 'منتظر حریف...';
