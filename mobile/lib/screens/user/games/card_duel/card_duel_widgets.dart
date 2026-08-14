@@ -2,6 +2,70 @@ part of '../card_duel_page.dart';
 
 // RarityCardFrame is applied by PlayerCard so inventory, detail and duel share one frame.
 
+/// تنها آداپترِ زاویهٔ دید برای نتیجهٔ راند.
+///
+/// سرور حقیقت را با X/O می‌فرستد، اما کاربر آنلاین می‌تواند هرکدام باشد.
+/// پراکنده کردنِ ternaryهای X/O در چند ویجت علت اصلیِ جابه‌جاییِ کارت،
+/// عدد و برنده بود. همهٔ UI حالا فقط این مدلِ «من/حریف» را می‌خواند.
+@immutable
+class CardDuelRoundPerspective {
+  const CardDuelRoundPerspective._({
+    required this.mine,
+    required this.theirs,
+    required this.myPower,
+    required this.theirPower,
+    required this.myFocus,
+    required this.theirFocus,
+    required this.myBreakdown,
+    required this.theirBreakdown,
+    required this.winner,
+    required this.mySymbol,
+  });
+
+  factory CardDuelRoundPerspective.from(
+    Map<String, dynamic> round,
+    String mySymbol,
+  ) {
+    final symbol = mySymbol == 'O' ? 'O' : 'X';
+    final mineKey = symbol == 'O' ? 'O' : 'X';
+    final theirKey = symbol == 'O' ? 'X' : 'O';
+    Map<String, dynamic> map(String key) =>
+        Map<String, dynamic>.from((round[key] as Map?) ?? const {});
+    return CardDuelRoundPerspective._(
+      mine: map('card$mineKey'),
+      theirs: map('card$theirKey'),
+      myPower: NumberParser.toInt(round['power$mineKey']),
+      theirPower: NumberParser.toInt(round['power$theirKey']),
+      myFocus: NumberParser.toInt(round['focusStat$mineKey']),
+      theirFocus: NumberParser.toInt(round['focusStat$theirKey']),
+      myBreakdown: map('breakdown$mineKey'),
+      theirBreakdown: map('breakdown$theirKey'),
+      winner: '${round['winner'] ?? ''}',
+      mySymbol: symbol,
+    );
+  }
+
+  final Map<String, dynamic> mine;
+  final Map<String, dynamic> theirs;
+  final int myPower;
+  final int theirPower;
+  final int myFocus;
+  final int theirFocus;
+  final Map<String, dynamic> myBreakdown;
+  final Map<String, dynamic> theirBreakdown;
+  final String winner;
+  final String mySymbol;
+
+  bool get draw => winner == 'DRAW';
+  bool get iWon => winner == mySymbol;
+  bool get opponentWon => !draw && !iWon;
+  bool get contractValid => draw
+      ? myPower == theirPower
+      : iWon
+          ? myPower > theirPower
+          : theirPower > myPower;
+}
+
 class _ArenaHero extends StatelessWidget {
   const _ArenaHero({
     required this.onBack,
@@ -382,13 +446,19 @@ class _LiveBattle extends StatelessWidget {
           // ⚠️ در پایانِ بازی «راند ۵ از ۵» و «امتیاز راند قبل برای تو
           //    بود» هر دو بی‌معنی‌اند — همان ناسازگاریِ اسکرین‌شات.
           title: finalView
-              ? '${faNum(total)} راند تمام شد'
+              ? (session.finishReason == 'disconnect'
+                  ? 'پایان در راند ${faNum(roundIndex.clamp(1, total))}'
+                  : '${faNum(total)} راند تمام شد')
               : '${state['roundTitle'] ?? 'پایان نبرد'}',
           roundLabel: finalView
               ? 'نتیجهٔ نهایی'
               : 'راند ${faNum((roundIndex + 1).clamp(1, total))} از ${faNum(total)}',
-          lastWinner: '${lastRound?['winner'] ?? ''}',
+          lastWinner: finalView ? '' : '${lastRound?['winner'] ?? ''}',
           mySymbol: mine,
+          opponentRole: session.vsBot ? 'ربات' : 'حریف',
+          finalWinner: finalView ? session.winner : null,
+          finishedByDisconnect:
+              finalView && session.finishReason == 'disconnect',
           finalView: finalView,
         ),
         Gaps.vXs,
@@ -413,7 +483,13 @@ class _LiveBattle extends StatelessWidget {
         // ⚠️ در صفحهٔ پایان این صحنه دقیقاً بالای پنلِ VICTORY می‌نشست و
         //    «دو بلوک نتیجه هم‌زمان» می‌ساخت. جزئیاتِ راندِ پنجم از بین
         //    نمی‌رود: در «تایم‌لاین کامل ۵ راند» همان پایین هست.
-        if (!finalView) _ClashStage(round: lastRound, mine: mine, color: color),
+        if (!finalView)
+          _ClashStage(
+            round: lastRound,
+            mine: mine,
+            color: color,
+            opponentRole: session.vsBot ? 'ربات' : 'حریف',
+          ),
         if (session.phase == GamePhase.playing) ...[
           Gaps.vSm,
           AppCard(
@@ -568,6 +644,9 @@ class _LiveBattle extends StatelessWidget {
                                   card: card,
                                   stat: focusStat,
                                   tint: focusTint,
+                                  roundIndex: roundIndex,
+                                  previousRoundWon:
+                                      lastRound?['winner'] == mine,
                                 ),
                               ),
                             ],
@@ -599,6 +678,9 @@ class _Scoreboard extends StatelessWidget {
     required this.roundLabel,
     required this.lastWinner,
     required this.mySymbol,
+    required this.opponentRole,
+    required this.finalWinner,
+    required this.finishedByDisconnect,
     this.finalView = false,
   });
   final String myName;
@@ -612,116 +694,133 @@ class _Scoreboard extends StatelessWidget {
   final String roundLabel;
   final String lastWinner;
   final String mySymbol;
+  final String opponentRole;
+  final String? finalWinner;
+  final bool finishedByDisconnect;
   final bool finalView;
 
   @override
   Widget build(BuildContext context) {
-    final myLead = myScore > theirScore;
-    final theirLead = theirScore > myScore;
+    final finalDraw = finalWinner == 'DRAW';
+    final iWonFinal = finalWinner == mySymbol;
+    final myLead = finalView ? iWonFinal : myScore > theirScore;
+    final theirLead = finalView
+        ? finalWinner != null && !finalDraw && !iWonFinal
+        : theirScore > myScore;
     final lastMine = lastWinner == mySymbol;
     final lastTheir =
         lastWinner.isNotEmpty && lastWinner != 'DRAW' && !lastMine;
-    return AppCard(
-      child: Column(
-        children: [
-          Row(
+    final status = finalView
+        ? (finalDraw
+            ? 'برابر تمام شد'
+            : iWonFinal
+                ? (finishedByDisconnect ? 'برد فنی برای تو' : 'تو برنده‌ای')
+                : (finishedByDisconnect
+                    ? 'برد فنی برای $opponentRole'
+                    : '$opponentRole برنده شد'))
+        : lastWinner == 'DRAW'
+            ? 'مساوی؛ بدون امتیاز'
+            : lastMine
+                ? '+۱ امتیاز برای تو'
+                : lastTheir
+                    ? '+۱ امتیاز برای $opponentRole'
+                    : 'هنوز امتیازی ثبت نشده';
+    final statusColor = finalView
+        ? (finalDraw
+            ? _gold
+            : iWonFinal
+                ? _emerald
+                : _rose)
+        : lastWinner == 'DRAW'
+            ? _gold
+            : lastMine
+                ? _emerald
+                : lastTheir
+                    ? _rose
+                    : Colors.white54;
+
+    return Semantics(
+      label:
+          'امتیاز تو ${faNum(myScore)}، امتیاز $opponentRole ${faNum(theirScore)}. $status',
+      child: AppCard(
+        child: Directionality(
+          // مستقل از locale: کارت/امتیاز من همیشه راست و حریف همیشه چپ.
+          textDirection: TextDirection.rtl,
+          child: Row(
             children: [
               Expanded(
                 child: _Score(
+                  role: 'تو',
                   name: myName,
                   score: myScore,
-                  color: color,
+                  color: _emerald,
                   player: myPlayer,
                   highlight: myLead,
                   scoredLast: lastMine,
                 ),
               ),
-              Column(
-                children: [
-                  Text(
-                    roundLabel,
-                    style: TextStyle(
-                      color: color,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w900,
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 150),
+                child: Column(
+                  children: [
+                    Text(
+                      roundLabel,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
-                  ),
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
+                    Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                  ),
-                  // در Row راست‌به‌چپ، هویتِ «تو» سمت راست و حریف سمت چپ
-                  // است. متنِ LTR قبلی `myScore — theirScore` عددِ من را سمت
-                  // چپ، دقیقاً کنارِ ربات می‌گذاشت؛ داده درست بود ولی تصویر
-                  // می‌گفت ربات ۱ و تو ۰. عددها دیگر یک رشتهٔ bidi نیستند؛ هر
-                  // کدام یک ویجتِ برچسب‌دار در سمتِ صاحب خودش است.
-                  Semantics(
-                    label:
-                        'امتیاز شما ${faNum(myScore)}، امتیاز حریف ${faNum(theirScore)}',
-                    child: ExcludeSemantics(
-                      child: Directionality(
-                        textDirection: TextDirection.ltr,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _ScorePairValue(
-                              label: 'حریف',
-                              value: theirScore,
-                              color: _gold,
-                            ),
-                            const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 5),
-                              child: Text(
-                                '—',
-                                style: TextStyle(
-                                  color: Colors.white38,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ),
-                            _ScorePairValue(
-                              label: 'تو',
-                              value: myScore,
-                              color: color,
-                            ),
-                          ],
+                    const SizedBox(height: 5),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 320),
+                      transitionBuilder: (child, animation) =>
+                          ScaleTransition(scale: animation, child: child),
+                      child: Container(
+                        key: ValueKey(
+                            '$lastWinner-$myScore-$theirScore-$finalView'),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: .14),
+                          borderRadius: BorderRadius.circular(99),
+                          border: Border.all(
+                            color: statusColor.withValues(alpha: .38),
+                          ),
+                        ),
+                        child: Text(
+                          status,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: statusColor,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  Text(
-                    finalView
-                        // بازی تمام شده؛ حرف زدن از «راند قبل» گمراه‌کننده است.
-                        ? (myScore == theirScore
-                            ? 'برابر تمام شد'
-                            : myLead
-                                ? 'تو بردی'
-                                : 'حریف برد')
-                        : lastWinner == 'DRAW'
-                            ? 'راند قبلی مساوی شد'
-                            : lastMine
-                                ? 'امتیاز راند قبل برای تو بود'
-                                : lastTheir
-                                    ? 'حریف راند قبل را برد'
-                                    : 'امتیازها را بالا نگه دار',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      color: Colors.white60,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               Expanded(
                 child: _Score(
+                  role: opponentRole,
                   name: theirName,
                   score: theirScore,
-                  color: _gold,
+                  color: _rose,
                   player: theirPlayer,
                   reverse: true,
                   highlight: theirLead,
@@ -730,50 +829,15 @@ class _Scoreboard extends StatelessWidget {
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _ScorePairValue extends StatelessWidget {
-  const _ScorePairValue({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-  final String label;
-  final int value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            faNum(value),
-            textDirection: TextDirection.ltr,
-            style: TextStyle(
-              color: color,
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          Text(
-            label,
-            textDirection: TextDirection.rtl,
-            style: const TextStyle(
-              color: Colors.white54,
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      );
-}
-
 class _Score extends StatelessWidget {
   const _Score({
+    required this.role,
     required this.name,
     required this.score,
     required this.color,
@@ -782,6 +846,7 @@ class _Score extends StatelessWidget {
     this.highlight = false,
     this.scoredLast = false,
   });
+  final String role;
   final String name;
   final int score;
   final Color color;
@@ -851,6 +916,14 @@ class _Score extends StatelessWidget {
           crossAxisAlignment:
               reverse ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
+            Text(
+              role,
+              style: TextStyle(
+                color: color,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
             DisplayName(
               name: name,
               cosmetics: cosmetics,
@@ -974,10 +1047,12 @@ class _ClashStage extends StatefulWidget {
     required this.round,
     required this.mine,
     required this.color,
+    this.opponentRole = 'حریف',
   });
   final Map<String, dynamic>? round;
   final String mine;
   final Color color;
+  final String opponentRole;
 
   @override
   State<_ClashStage> createState() => _ClashStageState();
@@ -1071,19 +1146,30 @@ class _ClashStageState extends State<_ClashStage>
         ),
       );
     }
-    final myCard = Map<String, dynamic>.from(
-      (mine == 'O' ? round['cardO'] : round['cardX']) as Map? ?? const {},
-    );
-    final otherCard = Map<String, dynamic>.from(
-      (mine == 'O' ? round['cardX'] : round['cardO']) as Map? ?? const {},
-    );
-    final myPower = mine == 'O' ? round['powerO'] : round['powerX'];
-    final otherPower = mine == 'O' ? round['powerX'] : round['powerO'];
-    final myFocus = mine == 'O' ? round['focusStatO'] : round['focusStatX'];
-    final otherFocus = mine == 'O' ? round['focusStatX'] : round['focusStatO'];
-    final winner = '${round['winner']}';
-    final iWon = winner == mine;
-    final draw = winner == 'DRAW';
+    final view = CardDuelRoundPerspective.from(round, mine);
+    final myCard = view.mine;
+    final otherCard = view.theirs;
+    final myPower = view.myPower;
+    final otherPower = view.theirPower;
+    final myFocus = view.myFocus;
+    final otherFocus = view.theirFocus;
+    final myEffect = NumberParser.toInt(view.myBreakdown['effectBonus']);
+    final otherEffect = NumberParser.toInt(view.theirBreakdown['effectBonus']);
+    final iWon = view.iWon;
+    final draw = view.draw;
+    final opponentRole = widget.opponentRole;
+    final verdictText = !view.contractValid
+        ? 'نتیجه همگام نیست؛ راند دوباره بررسی می‌شود'
+        : draw
+            ? 'مساوی؛ امتیازی اضافه نشد'
+            : iWon
+                ? '+۱ برای تو · تو برندهٔ راندی'
+                : '+۱ برای $opponentRole · $opponentRole برندهٔ راند شد';
+    final winnerSummary = draw
+        ? 'عدد نهایی تو و $opponentRole هر دو ${faNum(myPower)} شد؛ امتیازی اضافه نشد.'
+        : iWon
+            ? 'کارت تو «${myCard['name'] ?? 'بدون نام'}» با ${faNum(myPower)} در برابر ${faNum(otherPower)} برد؛ یک امتیاز به تو اضافه شد.'
+            : 'کارت $opponentRole «${otherCard['name'] ?? 'بدون نام'}» با ${faNum(otherPower)} در برابر ${faNum(myPower)} برد؛ یک امتیاز به $opponentRole اضافه شد.';
     final phase = _phase;
     final outcome = draw
         ? _gold
@@ -1167,8 +1253,9 @@ class _ClashStageState extends State<_ClashStage>
             child: Column(
               children: [
                 Row(
+                  textDirection: TextDirection.rtl,
                   children: [
-                    // کارتِ من از راست هجوم می‌آورد.
+                    // کارتِ من همیشه سمت راست؛ حریف همیشه سمت چپ.
                     Expanded(
                       child: Opacity(
                         opacity: charge,
@@ -1176,15 +1263,12 @@ class _ClashStageState extends State<_ClashStage>
                           offset: Offset(38 * (1 - charge), 0),
                           child: Transform.rotate(
                             angle: 0.12 * (1 - charge),
-                            child: AspectRatio(
-                              aspectRatio: 0.68,
-                              child: PlayerCard(
-                                card: myCard,
-                                compact: true,
-                                showStats: false,
-                                winner: showVerdict && iWon,
-                                loser: showVerdict && !draw && !iWon,
-                              ),
+                            child: _ClashCardOwner(
+                              owner: 'کارت تو',
+                              tint: _emerald,
+                              card: myCard,
+                              winner: showVerdict && iWon,
+                              loser: showVerdict && !draw && !iWon,
                             ),
                           ),
                         ),
@@ -1214,54 +1298,31 @@ class _ClashStageState extends State<_ClashStage>
                           // ── عددها: تا فازِ numbers پنهان، بعد شمارشِ صعودی ──
                           // برندهٔ نهایی بزرگ‌تر و طلایی می‌شود تا بدونِ خواندن هم
                           // معلوم باشد چه شد.
-                          DefaultTextStyle(
-                            style: const TextStyle(
-                              fontFamily: 'Vazirmatn',
-                              fontSize: 22,
-                              fontWeight: FontWeight.w900,
-                            ),
-                            // ⚠️ FittedBox اجباری است. عددِ برنده در فازِ verdict به
-                            // ۲۶px بزرگ می‌شود و روی صفحهٔ باریک (یا وقتی هر دو عدد
-                            // سه‌رقمی‌اند) ردیف ۱.۶px سرریز می‌کرد — تستِ ویجت
-                            // همین را گرفت. کوچک‌کردنِ متناسب بهتر از شکستنِ چیدمان
-                            // یا کوچک نگه داشتنِ عددِ برنده است.
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                textDirection: TextDirection.ltr,
-                                children: [
-                                  _PowerNumber(
-                                    value: showNumbers
-                                        ? (num.tryParse('$myPower') ?? 0) *
-                                            countT
-                                        : 0,
-                                    visible: showNumbers,
-                                    lead: showVerdict && iWon,
-                                  ),
-                                  const Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                    ),
-                                    child: Text(
-                                      'VS',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: Colors.white38,
-                                      ),
-                                    ),
-                                  ),
-                                  _PowerNumber(
-                                    value: showNumbers
-                                        ? (num.tryParse('$otherPower') ?? 0) *
-                                            countT
-                                        : 0,
-                                    visible: showNumbers,
-                                    lead: showVerdict && !draw && !iWon,
-                                  ),
-                                ],
+                          Column(
+                            children: [
+                              _RoundPowerLine(
+                                owner: 'تو',
+                                value: showNumbers ? myPower * countT : 0,
+                                visible: showNumbers,
+                                lead: showVerdict && iWon,
+                                color: _emerald,
                               ),
-                            ),
+                              const Text(
+                                'در برابر',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: Colors.white38,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              _RoundPowerLine(
+                                owner: opponentRole,
+                                value: showNumbers ? otherPower * countT : 0,
+                                visible: showNumbers,
+                                lead: showVerdict && !draw && !iWon,
+                                color: _rose,
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 8),
                           Wrap(
@@ -1272,12 +1333,20 @@ class _ClashStageState extends State<_ClashStage>
                               _RoundChip(
                                 label: '${round['focusLabel'] ?? 'ویژگی'}',
                                 value:
-                                    '${faNum(myFocus)} - ${faNum(otherFocus)}',
-                                tint: color,
+                                    'تو ${faNum(myFocus)} · $opponentRole ${faNum(otherFocus)}',
+                                tint: _cyan,
                               ),
+                              if (showNumbers &&
+                                  (myEffect != 0 || otherEffect != 0))
+                                _RoundChip(
+                                  label: 'افکت آشکار',
+                                  value:
+                                      'تو +${faNum(myEffect)} · $opponentRole +${faNum(otherEffect)}',
+                                  tint: _gold,
+                                ),
                               if (showNumbers)
                                 _RoundChip(
-                                  label: 'اختلاف قدرت',
+                                  label: 'اختلاف عدد نهایی',
                                   value: faNum(
                                     round['powerGap'] ??
                                         ((num.tryParse('$myPower') ?? 0) -
@@ -1321,11 +1390,7 @@ class _ClashStageState extends State<_ClashStage>
                                   ),
                                 ),
                                 child: Text(
-                                  draw
-                                      ? 'برخورد برابر'
-                                      : iWon
-                                          ? 'WINNER'
-                                          : 'باخت راند',
+                                  verdictText,
                                   style: TextStyle(
                                     color: outcome,
                                     fontWeight: FontWeight.w900,
@@ -1345,15 +1410,12 @@ class _ClashStageState extends State<_ClashStage>
                           offset: Offset(-38 * (1 - charge), 0),
                           child: Transform.rotate(
                             angle: -0.12 * (1 - charge),
-                            child: AspectRatio(
-                              aspectRatio: 0.68,
-                              child: PlayerCard(
-                                card: otherCard,
-                                compact: true,
-                                showStats: false,
-                                winner: showVerdict && !draw && !iWon,
-                                loser: showVerdict && iWon,
-                              ),
+                            child: _ClashCardOwner(
+                              owner: 'کارت $opponentRole',
+                              tint: _rose,
+                              card: otherCard,
+                              winner: showVerdict && !draw && !iWon,
+                              loser: showVerdict && iWon,
                             ),
                           ),
                         ),
@@ -1364,7 +1426,7 @@ class _ClashStageState extends State<_ClashStage>
                 if (showVerdict) ...[
                   Gaps.vXs,
                   Text(
-                    '${round['reason'] ?? round['text'] ?? ''}',
+                    winnerSummary,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 13,
@@ -1375,7 +1437,11 @@ class _ClashStageState extends State<_ClashStage>
                   if ('${round['cinematic'] ?? ''}'.trim().isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text(
-                      '${round['cinematic']}',
+                      draw
+                          ? 'هیچ امتیازی جابه‌جا نشد'
+                          : iWon
+                              ? 'ضربهٔ نهایی تو!'
+                              : 'پاسخ آتشین $opponentRole!',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 12,
@@ -1394,6 +1460,121 @@ class _ClashStageState extends State<_ClashStage>
   }
 }
 
+class _ClashCardOwner extends StatelessWidget {
+  const _ClashCardOwner({
+    required this.owner,
+    required this.tint,
+    required this.card,
+    required this.winner,
+    required this.loser,
+  });
+  final String owner;
+  final Color tint;
+  final Map<String, dynamic> card;
+  final bool winner;
+  final bool loser;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        label:
+            '$owner، ${card['name'] ?? 'کارت بدون نام'}${winner ? '، برندهٔ این راند' : loser ? '، بازندهٔ این راند' : ''}',
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: tint.withValues(alpha: .16),
+                borderRadius: BorderRadius.circular(99),
+                border: Border.all(color: tint.withValues(alpha: .55)),
+                boxShadow: winner
+                    ? [
+                        BoxShadow(
+                            color: tint.withValues(alpha: .42), blurRadius: 18)
+                      ]
+                    : const [],
+              ),
+              child: Text(
+                winner ? '$owner · برنده' : owner,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: tint,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            const SizedBox(height: 5),
+            AspectRatio(
+              aspectRatio: 0.68,
+              child: PlayerCard(
+                card: card,
+                compact: true,
+                showStats: false,
+                winner: winner,
+                loser: loser,
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
+class _RoundPowerLine extends StatelessWidget {
+  const _RoundPowerLine({
+    required this.owner,
+    required this.value,
+    required this.visible,
+    required this.lead,
+    required this.color,
+  });
+  final String owner;
+  final num value;
+  final bool visible;
+  final bool lead;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        label: visible
+            ? 'عدد نهایی $owner ${faNum(value.round())}'
+            : 'عدد $owner پنهان است',
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: lead ? .20 : .09),
+            borderRadius: BorderRadius.circular(10),
+            border:
+                Border.all(color: color.withValues(alpha: lead ? .62 : .24)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            textDirection: TextDirection.rtl,
+            children: [
+              Text(
+                '$owner:',
+                style: TextStyle(
+                  color: color,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(width: 4),
+              _PowerNumber(
+                value: value,
+                visible: visible,
+                lead: lead,
+                color: color,
+              ),
+            ],
+          ),
+        ),
+      );
+}
+
 /// عددِ قدرت با شمارشِ صعودی.
 ///
 /// جدا شد چون دو بار استفاده می‌شود و منطقِ «برنده بزرگ‌تر و طلایی» نباید
@@ -1403,10 +1584,12 @@ class _PowerNumber extends StatelessWidget {
     required this.value,
     required this.visible,
     required this.lead,
+    required this.color,
   });
   final num value;
   final bool visible;
   final bool lead;
+  final Color color;
 
   @override
   Widget build(BuildContext context) => AnimatedDefaultTextStyle(
@@ -1416,13 +1599,9 @@ class _PowerNumber extends StatelessWidget {
           fontFamily: 'Vazirmatn',
           fontSize: lead ? 26 : 22,
           fontWeight: FontWeight.w900,
-          color: !visible
-              ? Colors.white38 // هنوز فاش نشده
-              : lead
-                  ? _gold
-                  : Colors.white,
+          color: !visible ? Colors.white38 : color,
           shadows: lead
-              ? [const Shadow(color: Color(0x88FFD166), blurRadius: 18)]
+              ? [Shadow(color: color.withValues(alpha: .70), blurRadius: 18)]
               : const <Shadow>[],
         ),
         // ⚠️ چرا «؟» به‌جای Opacity(0)
@@ -1550,23 +1729,25 @@ class _Finale extends StatelessWidget {
             ),
           ),
           Text(
-            '${faNum(score[me])}  —  ${faNum(score[other])}',
-            textDirection: TextDirection.ltr,
+            'تو ${faNum(score[me])}  •  ${session.vsBot ? 'ربات' : 'حریف'} ${faNum(score[other])}',
+            textAlign: TextAlign.center,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 28,
+              fontSize: 24,
               fontWeight: FontWeight.w900,
             ),
           ),
           Gaps.vXs,
           Text(
-            session.vsBot
-                ? 'تمرین تمام شد؛ امتیازی جابه‌جا نشد.'
-                : draw
-                    ? 'ورودی کامل هر دو نفر برمی‌گردد.'
-                    : won
-                        ? 'پات مسابقه پس از کسر کارمزد تسویه می‌شود.'
-                        : '${faNum(session.stake)} امتیاز ورودی از دست رفت.',
+            session.finishReason == 'disconnect'
+                ? session.resultText
+                : session.vsBot
+                    ? 'تمرین تمام شد؛ امتیازی جابه‌جا نشد.'
+                    : draw
+                        ? 'ورودی کامل هر دو نفر برمی‌گردد.'
+                        : won
+                            ? 'پات مسابقه پس از کسر کارمزد تسویه می‌شود.'
+                            : '${faNum(session.stake)} امتیاز ورودی از دست رفت.',
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 12.5, color: Colors.white60),
           ),
@@ -1628,6 +1809,7 @@ class _Finale extends StatelessWidget {
                     _FinalRoundBreakdown(
                       round: Map<String, dynamic>.from(raw),
                       mySymbol: me,
+                      opponentRole: session.vsBot ? 'ربات' : 'حریف',
                     ),
                 ],
               ),
@@ -1926,26 +2108,24 @@ class _IntelChip extends StatelessWidget {
 }
 
 class _FinalRoundBreakdown extends StatelessWidget {
-  const _FinalRoundBreakdown({required this.round, required this.mySymbol});
+  const _FinalRoundBreakdown({
+    required this.round,
+    required this.mySymbol,
+    required this.opponentRole,
+  });
   final Map<String, dynamic> round;
   final String mySymbol;
+  final String opponentRole;
 
   @override
   Widget build(BuildContext context) {
-    final mineWon = '${round['winner']}' == mySymbol;
-    final draw = '${round['winner']}' == 'DRAW';
-    final mine = mySymbol == 'O'
-        ? Map<String, dynamic>.from((round['cardO'] as Map?) ?? const {})
-        : Map<String, dynamic>.from((round['cardX'] as Map?) ?? const {});
-    final theirs = mySymbol == 'O'
-        ? Map<String, dynamic>.from((round['cardX'] as Map?) ?? const {})
-        : Map<String, dynamic>.from((round['cardO'] as Map?) ?? const {});
-    final breakdownMine = mySymbol == 'O'
-        ? Map<String, dynamic>.from((round['breakdownO'] as Map?) ?? const {})
-        : Map<String, dynamic>.from((round['breakdownX'] as Map?) ?? const {});
-    final breakdownTheirs = mySymbol == 'O'
-        ? Map<String, dynamic>.from((round['breakdownX'] as Map?) ?? const {})
-        : Map<String, dynamic>.from((round['breakdownO'] as Map?) ?? const {});
+    final view = CardDuelRoundPerspective.from(round, mySymbol);
+    final mineWon = view.iWon;
+    final draw = view.draw;
+    final mine = view.mine;
+    final theirs = view.theirs;
+    final breakdownMine = view.myBreakdown;
+    final breakdownTheirs = view.theirBreakdown;
     final headline = draw
         ? _gold
         : mineWon
@@ -1981,10 +2161,10 @@ class _FinalRoundBreakdown extends StatelessWidget {
                 ),
                 child: Text(
                   draw
-                      ? 'DRAW'
+                      ? 'مساوی'
                       : mineWon
-                          ? 'WIN'
-                          : 'LOSS',
+                          ? '+۱ برای تو'
+                          : '+۱ برای $opponentRole',
                   style: TextStyle(
                     color: headline,
                     fontSize: 11.5,
@@ -1996,7 +2176,7 @@ class _FinalRoundBreakdown extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            '${mine['name'] ?? 'کارت تو'} در برابر ${theirs['name'] ?? 'کارت حریف'}',
+            'کارت تو: ${mine['name'] ?? 'بدون نام'}  •  کارت $opponentRole: ${theirs['name'] ?? 'بدون نام'}',
             style: const TextStyle(fontSize: 12, color: Colors.white70),
           ),
           const SizedBox(height: 6),
@@ -2010,17 +2190,13 @@ class _FinalRoundBreakdown extends StatelessWidget {
                 tint: _cyan,
               ),
               _MiniBreakChip(
-                label: 'قدرت تو',
-                value: faNum(
-                  mySymbol == 'O' ? round['powerO'] : round['powerX'],
-                ),
+                label: 'عدد نهایی تو',
+                value: faNum(view.myPower),
                 tint: mineWon ? _emerald : _cyan,
               ),
               _MiniBreakChip(
-                label: 'قدرت حریف',
-                value: faNum(
-                  mySymbol == 'O' ? round['powerX'] : round['powerO'],
-                ),
+                label: 'عدد نهایی $opponentRole',
+                value: faNum(view.theirPower),
                 tint: !draw && !mineWon ? _rose : _gold,
               ),
               _MiniBreakChip(
@@ -2033,7 +2209,7 @@ class _FinalRoundBreakdown extends StatelessWidget {
           const SizedBox(height: 8),
           _BreakdownRow(title: 'تو', data: breakdownMine),
           const SizedBox(height: 6),
-          _BreakdownRow(title: 'حریف', data: breakdownTheirs),
+          _BreakdownRow(title: opponentRole, data: breakdownTheirs),
           const SizedBox(height: 8),
           Text(
             '${round['reason'] ?? ''}',
@@ -2056,53 +2232,24 @@ class _BreakdownRow extends StatelessWidget {
   final Map<String, dynamic> data;
 
   @override
-  Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.white54,
-              fontWeight: FontWeight.w900,
-            ),
+  Widget build(BuildContext context) {
+    final focus = NumberParser.toInt(data['focus']);
+    final effect = NumberParser.toInt(data['effectBonus']);
+    final total = NumberParser.toInt(data['total']);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$title:  ${faNum(focus)}${effect == 0 ? '' : ' + افکت ${faNum(effect)}'} = ${faNum(total)}',
+          style: const TextStyle(
+            fontSize: 12,
+            color: Colors.white70,
+            fontWeight: FontWeight.w900,
           ),
-          const SizedBox(height: 4),
-          Wrap(
-            spacing: 5,
-            runSpacing: 5,
-            children: [
-              _MiniBreakChip(
-                label: 'base',
-                value: '${data['base'] ?? 0}',
-                tint: Colors.white70,
-              ),
-              _MiniBreakChip(
-                label: 'focus',
-                value: '${data['focus'] ?? 0}',
-                tint: _cyan,
-              ),
-              _MiniBreakChip(
-                label: 'effect',
-                value: '${data['effectBonus'] ?? 0}',
-                tint: _emerald,
-              ),
-              _MiniBreakChip(
-                label: 'luck',
-                value: '${data['luck'] ?? 0}',
-                tint: _gold,
-              ),
-              if ((data['wallAdjustment'] as num?) != null &&
-                  (data['wallAdjustment'] as num) != 0)
-                _MiniBreakChip(
-                  label: 'wall',
-                  value: '${data['wallAdjustment']}',
-                  tint: _rose,
-                ),
-            ],
-          ),
-        ],
-      );
+        ),
+      ],
+    );
+  }
 }
 
 class _MiniBreakChip extends StatelessWidget {
@@ -2207,7 +2354,7 @@ class _History extends StatelessWidget {
                               ),
                             ),
                             Text(
-                              '${faNum(raw['userScore'])} - ${faNum(raw['opponentScore'])} · '
+                              'تو ${faNum(raw['userScore'])} · حریف ${faNum(raw['opponentScore'])} · '
                               '${_settlementLabel('${raw['settlementStatus'] ?? 'settled'}')}',
                               style: const TextStyle(
                                 fontSize: 11.5,
@@ -2472,10 +2619,14 @@ class _FocusStatRibbon extends StatelessWidget {
     required this.card,
     required this.stat,
     required this.tint,
+    required this.roundIndex,
+    required this.previousRoundWon,
   });
   final Map card;
   final String stat;
   final Color tint;
+  final int roundIndex;
+  final bool previousRoundWon;
 
   static const _fallbackKeys = <String, String>{
     'speed': 'duel_speed',
@@ -2490,32 +2641,49 @@ class _FocusStatRibbon extends StatelessWidget {
     if (stat.isEmpty) return const SizedBox.shrink();
     final raw = card[stat] ?? card[_fallbackKeys[stat] ?? ''] ?? 0;
     final value = NumberParser.toInt(raw);
-    return Container(
-      margin: const EdgeInsets.only(top: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(99),
-        color: tint.withValues(alpha: 0.18),
-        border: Border.all(color: tint.withValues(alpha: 0.5)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            _FocusBannerState._statIcons[stat] ?? Icons.stars_rounded,
-            size: 13,
-            color: tint,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            faNum(value),
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
+    final effect = '${card['effect'] ?? card['duel_effect'] ?? 'none'}';
+    final bonus = switch (effect) {
+      'speedster' when roundIndex == 0 => 6,
+      'playmaker' when roundIndex > 0 && previousRoundWon => 4,
+      'wall' when roundIndex == 3 => 6,
+      'finisher' when roundIndex == 4 => 6,
+      'lucky_star' when roundIndex >= 2 => 3,
+      _ => 0,
+    };
+    final finalValue = value + bonus;
+    return Semantics(
+      label: bonus == 0
+          ? 'عدد نهایی این راند ${faNum(finalValue)}'
+          : '${faNum(value)} به‌علاوه افکت ${faNum(bonus)} برابر ${faNum(finalValue)}',
+      child: Container(
+        margin: const EdgeInsets.only(top: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(99),
+          color: tint.withValues(alpha: 0.18),
+          border: Border.all(color: tint.withValues(alpha: 0.5)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              _FocusBannerState._statIcons[stat] ?? Icons.stars_rounded,
+              size: 13,
               color: tint,
             ),
-          ),
-        ],
+            const SizedBox(width: 4),
+            Text(
+              bonus == 0
+                  ? faNum(finalValue)
+                  : '${faNum(value)}+${faNum(bonus)}=${faNum(finalValue)}',
+              style: TextStyle(
+                fontSize: bonus == 0 ? 14 : 11.5,
+                fontWeight: FontWeight.w900,
+                color: tint,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -2801,7 +2969,7 @@ class _RoundIntroOverlayState extends State<_RoundIntroOverlay>
                         border: Border.all(color: tint.withValues(alpha: 0.75)),
                       ),
                       child: Text(
-                        'بالاترین «$statName» برنده است',
+                        '«$statName» + افکت آشکار = عدد نهایی',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w900,
@@ -2863,6 +3031,70 @@ class CardDuelRoundIntroForTest extends StatelessWidget {
         focus: focus,
         roundNumber: roundNumber,
         totalRounds: totalRounds,
+      );
+}
+
+@visibleForTesting
+class CardDuelScoreboardForTest extends StatelessWidget {
+  const CardDuelScoreboardForTest({
+    super.key,
+    required this.myScore,
+    required this.theirScore,
+    this.lastWinner = '',
+    this.finalWinner,
+    this.finalView = false,
+    this.finishedByDisconnect = false,
+  });
+
+  final int myScore;
+  final int theirScore;
+  final String lastWinner;
+  final String? finalWinner;
+  final bool finalView;
+  final bool finishedByDisconnect;
+
+  @override
+  Widget build(BuildContext context) => _Scoreboard(
+        myName: 'بازیکن من',
+        theirName: 'ربات تست',
+        myScore: myScore,
+        theirScore: theirScore,
+        color: _cyan,
+        myPlayer: const {},
+        theirPlayer: const {'isBot': true},
+        title: 'نبرد تکنیکی',
+        roundLabel: 'راند ۲ از ۵',
+        lastWinner: lastWinner,
+        mySymbol: 'X',
+        opponentRole: 'ربات',
+        finalWinner: finalWinner,
+        finishedByDisconnect: finishedByDisconnect,
+        finalView: finalView,
+      );
+}
+
+@visibleForTesting
+class CardDuelFocusRibbonForTest extends StatelessWidget {
+  const CardDuelFocusRibbonForTest({
+    super.key,
+    required this.card,
+    required this.stat,
+    required this.roundIndex,
+    required this.previousRoundWon,
+  });
+
+  final Map card;
+  final String stat;
+  final int roundIndex;
+  final bool previousRoundWon;
+
+  @override
+  Widget build(BuildContext context) => _FocusStatRibbon(
+        card: card,
+        stat: stat,
+        tint: _cyan,
+        roundIndex: roundIndex,
+        previousRoundWon: previousRoundWon,
       );
 }
 

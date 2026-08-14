@@ -17,12 +17,12 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
     commission: Number(initialStart.commission || 0), vsBot: Boolean(initialStart.vsBot),
     matchMode: initialStart.matchMode || null, roomId: initialStart.roomId,
     matchId: initialStart.roomId, timedOut: null, settlementStatus: 'settled',
-    rematchAvailable: false,
+    rematchAvailable: false, finishReason: null,
   } : {
     state: {}, players: null, me: null, turn: null, winner: null,
     gameId, stake, netPot: 0, commission: 0, vsBot: false, matchMode: null,
     roomId: null, matchId: null, timedOut: null, settlementStatus: 'settled',
-    rematchAvailable: false,
+    rematchAvailable: false, finishReason: null,
   });
   const [error, setError] = useState('');
   const [secondsLeft, setSecondsLeft] = useState(0);
@@ -102,7 +102,7 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
         netPot: Number(d.netPot || 0), commission: Number(d.commission || 0),
         vsBot: Boolean(d.vsBot), matchMode: d.matchMode || null,
         roomId: d.roomId, matchId: d.roomId, timedOut: null,
-        settlementStatus: 'settled', rematchAvailable: false,
+        settlementStatus: 'settled', rematchAvailable: false, finishReason: null,
       });
       setPhase('playing'); setError(''); setStillSearching(false);
       setConnected(true); setConnectionNotice(''); setRematchWaiting(false);
@@ -116,7 +116,20 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
         const isMyTurn = d?.turn === prev.me;
         if (!wasMyTurn && isMyTurn) play('your_turn');
         else if (wasMyTurn && !isMyTurn) play('move');
-        return { ...prev, state: d?.state ?? prev.state,
+
+        const nextState = d?.state ?? prev.state;
+        const previousRound = Number(prev.state?.roundIndex || 0);
+        const currentRound = Number(nextState?.roundIndex || 0);
+        const totalRounds = Number(nextState?.totalRounds || 0);
+        // راند پنجم را game:over صداگذاری می‌کند؛ ۱..۴ همین‌جا بازخورد
+        // برد/باخت و لرزش کوتاه می‌گیرند تا برخورد حسِ زنده داشته باشد.
+        if (gameId === 'card_duel' && currentRound > previousRound
+          && currentRound < totalRounds) {
+          const roundWinner = nextState?.lastRound?.winner;
+          play(roundWinner === 'DRAW' ? 'draw' : roundWinner === prev.me ? 'win' : 'lose', 0.72);
+          try { navigator.vibrate?.(roundWinner === prev.me ? [28, 35, 55] : 32); } catch { /* cosmetic */ }
+        }
+        return { ...prev, state: nextState,
           turn: d?.turn ?? prev.turn, timedOut: d?.timedOut || null };
       });
       setClock(d || {});
@@ -126,10 +139,12 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
       deadlineRef.current = null; setSecondsLeft(0);
       activeRoomRef.current = null;
       setG(prev => {
-        const winner = d?.winner || null;
+        const rawWinner = d?.winner || null;
+        const winner = d?.resolvedWinner || rawWinner;
+        const finishReason = rawWinner === 'DISCONNECT' ? 'disconnect' : null;
         play(winner === 'DRAW' ? 'draw' : (winner === prev.me ? 'win' : 'lose'));
         return {
-          ...prev, state: d?.state ?? prev.state, winner,
+          ...prev, state: d?.state ?? prev.state, winner, finishReason,
           matchId: d?.matchId || prev.roomId,
           settlementStatus: d?.settlementStatus || (prev.stake ? 'pending' : 'settled'),
           rematchAvailable: d?.rematchAvailable !== false,

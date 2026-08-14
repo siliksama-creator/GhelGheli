@@ -72,7 +72,7 @@ void main() {
 
     expect(find.textContaining('عددِ سرعتش بیشتر است'), findsOneWidget,
         reason: 'بچه‌ای که تازه خواندن یاد گرفته باید بفهمد چه کار کند');
-    expect(find.textContaining('بالاترین «سرعت»'), findsOneWidget);
+    expect(find.textContaining('«سرعت» + افکت آشکار = عدد نهایی'), findsOneWidget);
     expect(find.textContaining('راند ۲ از ۵'), findsOneWidget);
   });
 

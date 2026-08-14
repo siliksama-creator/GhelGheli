@@ -41,31 +41,31 @@ const ROUND_FOCUS = Object.freeze([
   {
     key: 'duel_speed', stat: 'speed', label: 'ضدحمله سرعتی',
     userText: 'سرعت کارت ضدحمله را ساخت',
-    cry: 'سریع‌ترین کارتت را بفرست!', hint: 'کارتی که عددِ سرعتش بیشتر است برنده می‌شود',
+    cry: 'سریع‌ترین کارتت را بفرست!', hint: 'عدد نهایی = سرعت + افکت آشکار؛ عدد بالاتر برنده است',
     emoji: '⚡',
   },
   {
     key: 'duel_technique', stat: 'technique', label: 'نبرد تکنیکی',
     userText: 'تکنیک کارت خط میانی را شکست',
-    cry: 'وقتِ هنرنمایی است!', hint: 'کارتی که عددِ تکنیکش بیشتر است برنده می‌شود',
+    cry: 'وقتِ هنرنمایی است!', hint: 'عدد نهایی = تکنیک + افکت آشکار؛ عدد بالاتر برنده است',
     emoji: '✨',
   },
   {
     key: 'duel_attack', stat: 'attack', label: 'فشار حمله',
     userText: 'قدرت حمله خط دفاع را شکافت',
-    cry: 'حمله کن!', hint: 'کارتی که عددِ حمله‌اش بیشتر است برنده می‌شود',
+    cry: 'حمله کن!', hint: 'عدد نهایی = حمله + افکت آشکار؛ عدد بالاتر برنده است',
     emoji: '🔥',
   },
   {
     key: 'duel_defense', stat: 'defense', label: 'دیوار دفاعی',
     userText: 'دفاع کارت جلوی ضدحمله را گرفت',
-    cry: 'دروازه را ببند!', hint: 'کارتی که عددِ دفاعش بیشتر است برنده می‌شود',
+    cry: 'دروازه را ببند!', hint: 'عدد نهایی = دفاع + افکت آشکار؛ عدد بالاتر برنده است',
     emoji: '🛡️',
   },
   {
     key: 'duel_goal_chance', stat: 'goalChance', label: 'ضربه نهایی',
     userText: 'شانس گل ضربه آخر را ساخت',
-    cry: 'ضربهٔ آخر، گل بزن!', hint: 'کارتی که عددِ شانسِ گلش بیشتر است برنده می‌شود',
+    cry: 'ضربهٔ آخر، گل بزن!', hint: 'عدد نهایی = شانس گل + افکت آشکار؛ عدد بالاتر برنده است',
     emoji: '⚽',
   },
 ]);
@@ -487,46 +487,24 @@ async function saveDeck(userId, ids) {
   return { deck: rows[0], cards, message: 'ترکیب پنج‌کارتی ذخیره شد' };
 }
 
-function randomInt(maxExclusive, random = null) {
-  if (random) return Math.floor(random() * maxExclusive);
-  return crypto.randomInt(0, maxExclusive);
-}
-
 /**
- * بونوسِ افکتِ کارت در یک راند.
+ * بونوسِ افکتِ کارت در منطقِ شفاف نسخهٔ ۲.
  *
- * ═══════════════════════════════════════════════════════════════════════════
- * چرا اعداد نصف شدند
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * اندازه‌گیریِ سختگیرانه: دو کارتِ **کاملاً یکسان** که فقط یکی‌شان
- * افکت داشت، در راندِ فعال‌شدنِ افکت:
- *
- *     speedster (راند ۱) → ۱۰۰٪ برد
- *     finisher  (راند ۵) → ۱۰۰٪ برد
- *
- * ۱۰۰٪. نه ۷۰٪، نه ۸۵٪. یعنی در آن راند **استاتِ کارت اصلاً مهم
- * نبود** — فقط داشتنِ افکت تعیین می‌کرد.
- *
- * دلیلِ ریاضی: بونوسِ ۱۵ در برابر آستانهٔ تعیینِ برنده که ۲ است. برای
- * جبرانِ ۱۵ باید ۱۵ واحد استاتِ بیشتر داشت — یعنی کارتی با استاتِ ۹۵
- * در برابر کارتی با استاتِ ۸۰ که افکت دارد، فقط مساوی می‌شود.
- *
- * افکت باید **مزیت** بدهد نه **قطعیت**. حالا:
- *
- *     speedster ۱۵→۷ · finisher ۱۵→۷ · playmaker ۱۰→۵ · lucky_star ۱۲→۶
- *
- * با ۷، کارتی که ۸ واحد استاتِ بیشتر دارد هنوز می‌برد — یعنی چیدمانِ
- * درست بر افکت غلبه می‌کند، ولی افکت هم بی‌اثر نیست.
- *
- * ⚠️ `wall` اینجا نیست؛ در `resolveRound` جداگانه اعمال می‌شود.
+ * افکت‌ها دیگر قرعه، post-processing یا برگرداندنِ پنهانیِ نتیجه ندارند.
+ * هر افکت در راندِ خودش یک عددِ کوچک و قطعی می‌دهد و همان عدد کنارِ
+ * ویژگیِ کارت روی Android و Web نمایش داده می‌شود. بازیکنِ با استاتِ
+ * بهتر می‌تواند با اختلافِ کافی افکت را شکست بدهد.
  */
-function effectBonus(card, roundIndex, prevWon, random = null) {
+function effectBonus(card, roundIndex, prevWon) {
+  // نسخهٔ ۲ منطق دوئل عمداً هیچ شانس یا عدد پنهانی ندارد. افکت‌ها
+  // قطعی، کوچک و فقط در راندِ مرتبط فعال‌اند؛ همان بونوسی که اینجا
+  // برمی‌گردد عیناً در breakdown و UI دیده می‌شود.
   switch (card.duel_effect || card.effect) {
-    case 'speedster': return roundIndex === 0 ? 7 : 0;
-    case 'playmaker': return roundIndex > 0 && prevWon ? 5 : 0;
-    case 'finisher': return roundIndex === DECK_SIZE - 1 ? 7 : 0;
-    case 'lucky_star': return randomInt(100, random) < 18 ? 6 : 0;
+    case 'speedster': return roundIndex === 0 ? 6 : 0;
+    case 'playmaker': return roundIndex > 0 && prevWon ? 4 : 0;
+    case 'wall': return roundIndex === 3 ? 6 : 0;
+    case 'finisher': return roundIndex === DECK_SIZE - 1 ? 6 : 0;
+    case 'lucky_star': return roundIndex >= 2 ? 3 : 0;
     default: return 0;
   }
 }
@@ -560,156 +538,72 @@ function focusValue(card, focus) {
 }
 
 /**
- * امتیازِ یک کارت در یک راند — و بازنویسیِ کاملی که لازم شد.
+ * تنها فرمولِ نتیجهٔ هر یک از پنج راند:
  *
- * ═══════════════════════════════════════════════════════════════════════════
- * چرا فرمولِ قبلی «منطقِ خراب» به نظر می‌رسید
- * ═══════════════════════════════════════════════════════════════════════════
+ *     عدد نهایی = ویژگی اعلام‌شدهٔ همان راند + افکت آشکار
  *
- * شکایتِ مالک: «وقتی امتیاز من بیشتر میشه ربات میبره و برعکس، اصلا انگار
- * منطق بازی مشکل داره».
- *
- * اندازه‌گیری شد (۲۰٬۰۰۰ راند). سه نقصِ مستقل:
- *
- * ── ۱. تمرکزِ راند تقریباً بی‌اثر بود ──
- *
- * وزنِ `focus` فقط ۰٫۳۶ بود در حالی که `base` (قدرتِ کلیِ کارت) ۰٫۵۶
- * وزن داشت. یعنی راندی که «نبردِ سرعت» نام داشت، بیشتر با قدرتِ کلی
- * داوری می‌شد تا با سرعت. کاربر کارتِ سریع‌ترش را می‌فرستاد و می‌باخت.
- * این مستقیماً به کاربر دروغ می‌گفت: اعلان می‌گفت «سرعت مهم است» ولی
- * موتور عمدتاً چیزِ دیگری می‌سنجید.
- *
- * ── ۲. شانس بزرگ‌تر از مهارت بود ──
- *
- * `luck = randomInt(13)` یعنی ۰..۱۲ امتیازِ کاملاً تصادفی. برتریِ ۱۰
- * واحدیِ استات فقط ۱۲ امتیاز می‌آورد. نتیجه: در **۱۲٪** مواردی که
- * کاربر کارتِ آشکارا بهتری داشت (۶۵ در برابر ۵۵)، شانس نتیجه را
- * برعکس می‌کرد. برای بازیکن این یعنی «منطق خراب است».
- *
- * ── ۳. `defensePenalty` دوباره‌شماریِ دفاعِ حریف بود ──
- *
- * دفاعِ حریف هم در `base`ِ خودش حساب می‌شد (از راهِ totalPower) و هم
- * به‌عنوان جریمه از امتیازِ ما کم می‌شد. یک ویژگی، دو بار.
- *
- * ── فرمولِ تازه ──
- *
- * تمرکزِ راند **غالب** است (وزن ۱٫۰)، قدرتِ کلی نقشِ پشتیبان دارد
- * (۰٫۲۵)، افکت‌ها دست‌نخورده، و شانس به ±۳ محدود شد — کافی برای اینکه
- * دو کارتِ کاملاً برابر همیشه یک نتیجه ندهند، کم‌تر از آنکه بتواند
- * برتریِ واقعی را ببلعد.
- *
- * `defensePenalty` حذف نشد ولی به دفاعِ حریف **نسبت به میانگین** تبدیل
- * شد تا دوباره‌شماری نکند و معنایش روشن باشد: «حریف دفاعِ بالای متوسطی
- * دارد».
- *
- * نگهبان: `scripts/testCardDuelBalance.js` بخشِ «انصافِ نتیجه».
+ * نسخه‌های قبلی قدرت کلی، دفاعِ حریف، شانس و آستانهٔ مساوی را هم وارد
+ * می‌کردند. در نتیجه متن می‌گفت «بالاترین تکنیک برنده است» ولی موتور
+ * چیز دیگری را داوری می‌کرد. این قرارداد عمداً کوتاه است تا هم کودک،
+ * هم تست و هم کلاینت دقیقاً یک حقیقت را ببینند.
  */
-function roundScoreBreakdown(card, opp, focus, roundIndex, prevWon, random = null) {
-  // ── تمرکزِ راند: ستونِ اصلیِ داوری ──
-  // وزن ۱٫۰ یعنی کارتی که در ویژگیِ این راند ۱۰ واحد جلوتر است،
-  // ۱۰ امتیازِ کامل جلو می‌افتد — قابلِ پیش‌بینی و قابلِ توضیح.
+function roundScoreBreakdown(card, _opp, focus, roundIndex, prevWon) {
+  // قراردادِ ساده و قابل‌اثباتِ منطق نسخهٔ ۲:
+  //
+  //   عدد نهایی راند = ویژگی اعلام‌شده + بونوس افکتِ آشکار
+  //
+  // قدرت کلی، rarity، دفاعِ نامرتبط و شانس در نتیجهٔ راند دخالت ندارند.
+  // بنابراین هر عددی که بازیکن می‌بیند همان عددی است که برنده را تعیین
+  // می‌کند؛ نه تقریبِ آن و نه یک توضیح تزئینی.
   const focusVal = focusValue(card, focus);
-  // ── قدرتِ کلی: نقشِ پشتیبان ──
-  // صفر نشد چون کارتِ همه‌جانبه باید ارزشِ خودش را داشته باشد، ولی
-  // دیگر نمی‌تواند بر تمرکزِ راند غلبه کند.
-  const base = totalPower(card) * 0.25;
-  // ── دفاعِ حریف: فقط مازادِ بالای متوسط، نه کلِ عدد ──
-  // پیش از این کلِ دفاعِ حریف ضربدر ۰٫۱ کم می‌شد که با سهمِ دفاع در
-  // `totalPower`ِ خودِ حریف هم‌پوشانی داشت.
-  const oppDefense = Number(opp.duel_defense ?? opp.defense ?? 50);
-  const defensePenalty = Math.max(0, oppDefense - 50) * 0.12;
-  const effect = effectBonus(card, roundIndex, prevWon, random);
-  // ── شانس: ±۳، نه ۰..۱۲ ──
-  // هدفِ شانس شکستنِ تساویِ محض است، نه تعیینِ برنده.
-  const luck = randomInt(7, random) - 3;
-  const total = Math.round(base + focusVal - defensePenalty + effect + luck);
+  const effect = effectBonus(card, roundIndex, prevWon);
+  const total = focusVal + effect;
   return {
-    base: Number(base.toFixed(2)),
+    base: 0,
     focus: Number(focusVal.toFixed(2)),
-    // ── چرا صفر و نه حذف ──
-    // کلاینت‌های قدیمی و تست‌ها این کلید را می‌خوانند. حذفش یعنی
-    // `undefined` در محاسبهٔ مجموعِ اجزا روی صفحهٔ تفکیک، و همان
-    // «مجموع با total نمی‌خواند»ی که خودِ نگهبان می‌گیرد.
     attackMix: 0,
-    defensePenalty: Number(defensePenalty.toFixed(2)),
+    defensePenalty: 0,
     effectBonus: effect,
-    luck,
+    luck: 0,
     wallAdjustment: 0,
     total,
+    equation: `${focusVal}+${effect}=${total}`,
   };
 }
 
-function winnerReason(winner, focus, cardX, cardO, powerX, powerO) {
+function winnerReason(winner, focus, cardX, cardO, breakdownX, breakdownO) {
   const focusX = focusValue(cardX, focus);
   const focusO = focusValue(cardO, focus);
+  const effectX = Number(breakdownX.effectBonus || 0);
+  const effectO = Number(breakdownO.effectBonus || 0);
+  const powerX = Number(breakdownX.total || 0);
+  const powerO = Number(breakdownO.total || 0);
+  const formulaX = effectX ? `${focusX} + افکت ${effectX} = ${powerX}` : `${powerX}`;
+  const formulaO = effectO ? `${focusO} + افکت ${effectO} = ${powerO}` : `${powerO}`;
   if (winner === 'DRAW') {
-    return `در «${focus.label}» هر دو کارت خیلی نزدیک بودند: ${cardX.name} ${focusX} و ${cardO.name} ${focusO}؛ قدرت نهایی هم ${powerX} برابر ${powerO} شد`;
+    return `راند «${focus.label}» مساوی شد: ${cardX.name} با ${formulaX} و ${cardO.name} با ${formulaO}؛ امتیازی اضافه نشد`;
   }
   const champ = winner === 'X' ? cardX : cardO;
   const other = winner === 'X' ? cardO : cardX;
-  const champPower = winner === 'X' ? powerX : powerO;
-  const otherPower = winner === 'X' ? powerO : powerX;
-  const champFocus = winner === 'X' ? focusX : focusO;
-  const otherFocus = winner === 'X' ? focusO : focusX;
-  const gap = Math.abs(champPower - otherPower);
-  return `${champ.name} در «${focus.label}» با ${champFocus} در برابر ${otherFocus} جلو افتاد و راند را با قدرت نهایی ${champPower} به ${otherPower} برد`;
+  const champFormula = winner === 'X' ? formulaX : formulaO;
+  const otherFormula = winner === 'X' ? formulaO : formulaX;
+  return `${champ.name} در «${focus.label}» با عدد نهایی ${champFormula} در برابر ${otherFormula} از ${other.name} برد`;
 }
 
 function resolveRound(cardX, cardO, roundIndex, previousWinner = null, random = null, seed = '') {
   const x = publicCard(cardX);
   const o = publicCard(cardO);
   const focus = ROUND_FOCUS[roundIndex] || ROUND_FOCUS[ROUND_FOCUS.length - 1];
-  const rng = random || (seed ? createSeededRandom(seed) : null);
-  const breakdownX = roundScoreBreakdown(x, o, focus, roundIndex, previousWinner === 'X', rng);
-  const breakdownO = roundScoreBreakdown(o, x, focus, roundIndex, previousWinner === 'O', rng);
-  let powerX = breakdownX.total;
-  let powerO = breakdownO.total;
-  // ── دیوار: ۱۶ → ۸ ──
-  //
-  // به همان دلیلِ بقیهٔ افکت‌ها: ۱۶ در برابر آستانهٔ ۲ یعنی هر بار که
-  // فعال می‌شد، نتیجهٔ راند را **برمی‌گرداند** بدونِ اینکه استاتِ دو
-  // کارت اهمیتی داشته باشد. با ۸ فقط راندهای نزدیک را برمی‌گرداند —
-  // که همان کاریست که یک «دیوار دفاعی» باید بکند.
-  //
-  // احتمالِ ۲۲٪ دست‌نخورده ماند: افکتی که همیشه فعال شود، افکت نیست.
-  const WALL_PENALTY = 8;
-  if (o.effect === 'wall' && powerX > powerO && randomInt(100, rng) < 22) {
-    powerX -= WALL_PENALTY;
-    breakdownX.wallAdjustment = -WALL_PENALTY;
-    breakdownX.total = powerX;
-  }
-  if (x.effect === 'wall' && powerO > powerX && randomInt(100, rng) < 22) {
-    powerO -= WALL_PENALTY;
-    breakdownO.wallAdjustment = -WALL_PENALTY;
-    breakdownO.total = powerO;
-  }
-  // ═══════════════════════════════════════════════════════════════════════
-  // چرا آستانهٔ «مساوی» از ۶ به ۱ آمد
-  // ═══════════════════════════════════════════════════════════════════════
-  //
-  // این بزرگ‌ترین منبعِ شکایتِ «عددم بیشتر است ولی نبردم» بود.
-  //
-  // با آستانهٔ ۶، هر راندی که اختلافش ۱ تا ۵ بود «مساوی» اعلام می‌شد.
-  // اندازه‌گیری: **۴۴٫۶٪** راندها در همین بازه می‌افتادند. یعنی صفحه
-  // «۸۸ در برابر ۸۴» نشان می‌داد و بعد می‌گفت مساوی — که از دیدِ
-  // بازیکن یعنی موتور خراب است، نه اینکه «اختلاف کم بود».
-  //
-  // نمونه‌های واقعیِ ثبت‌شده: ۸۸-۸۴، ۹۰-۸۷، ۸۶-۸۵، ۸۵-۸۰.
-  //
-  // ── چرا ۱ و نه صفر ──
-  //
-  // اولین تلاش «هر اختلاف، یک برنده» بود (آستانهٔ صفر). آن هم درست
-  // نبود: وقتی کارت‌های کاربر همگی استاتِ یکسان دارند — که برای
-  // تازه‌واردها **حالتِ عادی** است — دو طرف امتیازِ تقریباً برابر
-  // می‌گیرند و نتیجه با گِردکردنِ اعشارِ `base` تعیین می‌شد. یعنی
-  // برنده عملاً تصادفی بود ولی صفحه دو عددِ «۶۰ و ۶۱» نشان می‌داد که
-  // به نظر قطعی می‌آمد. اندازه‌گیری: کاربر ۹۵٪ می‌باخت.
-  //
-  // آستانهٔ ۲ تعادلِ درست است: اختلافِ واقعی (که با فرمولِ تازه یعنی
-  // برتری در ویژگیِ راند) همیشه برنده دارد، ولی تساویِ عملی به‌جای
-  // یک بردِ دروغینِ تصادفی، مساوی اعلام می‌شود.
+  // `random` در امضای عمومی برای سازگاری replayهای قدیمی می‌ماند، اما
+  // منطق v2 عمداً آن را مصرف نمی‌کند: یک انتخاب یکسان همیشه یک حکم دارد.
+  const breakdownX = roundScoreBreakdown(x, o, focus, roundIndex, previousWinner === 'X');
+  const breakdownO = roundScoreBreakdown(o, x, focus, roundIndex, previousWinner === 'O');
+  const powerX = breakdownX.total;
+  const powerO = breakdownO.total;
+  // هیچ post-processing پنهانی بعد از breakdown وجود ندارد. `powerX`
+  // و `powerO` همان عددهای روی صفحه‌اند و علامت اختلاف، حکم را می‌سازد.
   const diff = powerX - powerO;
-  const winner = diff >= 2 ? 'X' : diff <= -2 ? 'O' : 'DRAW';
+  const winner = diff > 0 ? 'X' : diff < 0 ? 'O' : 'DRAW';
   const focusStatX = focusValue(x, focus);
   const focusStatO = focusValue(o, focus);
   return {
@@ -730,20 +624,27 @@ function resolveRound(cardX, cardO, roundIndex, previousWinner = null, random = 
     breakdownX,
     breakdownO,
     winner,
-    reason: winnerReason(winner, focus, x, o, powerX, powerO),
-    cinematic: winner === 'X' ? 'ضربه نهایی آبی!' : winner === 'O' ? 'پاسخ آتشین حریف!' : 'برخورد تماشایی!',
+    logicVersion: 2,
+    winnerCardId: winner === 'X' ? x.cardTypeId : winner === 'O' ? o.cardTypeId : null,
+    reason: winnerReason(winner, focus, x, o, breakdownX, breakdownO),
+    cinematic: winner === 'DRAW' ? 'برخورد برابر!' : 'ضربهٔ برنده ثبت شد!',
   };
 }
 
+function scoreFromHistory(history = []) {
+  return history.reduce((score, round) => {
+    if (round?.winner === 'X') score.X += 1;
+    if (round?.winner === 'O') score.O += 1;
+    return score;
+  }, { X: 0, O: 0 });
+}
+
 function simulate(userCards, opponentCards, { opponentName = 'حریف', random = null, seed = '' } = {}) {
-  const score = { X: 0, O: 0 };
   let previousWinner = null;
   const rounds = [];
   for (let i = 0; i < DECK_SIZE; i++) {
     const roundSeed = seed ? `${seed}:round:${i + 1}` : '';
     const resolved = resolveRound(userCards[i], opponentCards[i], i, previousWinner, random, roundSeed);
-    if (resolved.winner !== 'DRAW') score[resolved.winner] += 1;
-    previousWinner = resolved.winner;
     rounds.push({
       round: resolved.round, title: resolved.title, text: resolved.text,
       focusLabel: resolved.focusLabel,
@@ -752,20 +653,45 @@ function simulate(userCards, opponentCards, { opponentName = 'حریف', random 
       userCard: resolved.cardX, opponentCard: resolved.cardO,
       userPower: resolved.powerX, opponentPower: resolved.powerO,
       outcome: resolved.winner === 'X' ? 'user_goal' : resolved.winner === 'O' ? 'opponent_goal' : 'draw',
+      winner: resolved.winner,
+      winnerCardId: resolved.winnerCardId,
+      logicVersion: resolved.logicVersion,
       cinematic: resolved.cinematic,
       reason: resolved.reason,
       seed: resolved.seed,
       breakdownX: resolved.breakdownX,
       breakdownO: resolved.breakdownO,
     });
+    const scoreAfter = scoreFromHistory(rounds);
+    rounds[rounds.length - 1].scoreAfter = { ...scoreAfter };
+    previousWinner = resolved.winner;
   }
+  const score = scoreFromHistory(rounds);
   const winnerSide = score.X > score.O ? 'user' : score.O > score.X ? 'opponent' : 'draw';
-  const all = [...userCards.map(c => ({ side: 'user', card: c })), ...opponentCards.map(c => ({ side: 'opponent', card: c }))];
-  const mvp = all.sort((a, b) => totalPower(b.card) - totalPower(a.card))[0];
+  const decisive = rounds
+    .filter(round => round.winner !== 'DRAW')
+    .map(round => ({
+      side: round.winner === 'X' ? 'user' : 'opponent',
+      card: round.winner === 'X' ? round.userCard : round.opponentCard,
+      margin: Math.abs(round.userPower - round.opponentPower),
+      roundPower: round.winner === 'X' ? round.userPower : round.opponentPower,
+      round: round.round,
+    }))
+    .sort((a, b) => b.margin - a.margin || b.roundPower - a.roundPower);
+  const fallback = {
+    side: 'user', card: userCards[0], margin: 0,
+    roundPower: rounds[0]?.userPower || 0, round: 1,
+  };
+  const mvp = decisive[0] || fallback;
   return {
     seed,
+    logicVersion: 2,
     userScore: score.X, opponentScore: score.O, winnerSide, opponentName,
-    mvp: { side: mvp.side, card: publicCard(mvp.card) }, rounds,
+    mvp: {
+      side: mvp.side, card: publicCard(mvp.card), round: mvp.round,
+      margin: mvp.margin, roundPower: mvp.roundPower,
+    },
+    rounds,
   };
 }
 
@@ -1137,7 +1063,7 @@ module.exports = {
   FRONT_IMAGE_SQL, INVENTORY_IMAGE_SQL,
   RARITY_LABEL, EFFECT_LABEL, duelFieldsFromBody, collectibleInput, publicCard, totalPower,
   playableCards, validateDeck, deckCards, status, saveDeck, botBattle,
-  starterDeck, botDeck, resolveRound, simulate, recentBattles, recordEngineBattle,
+  starterDeck, botDeck, resolveRound, simulate, scoreFromHistory, recentBattles, recordEngineBattle,
   analyzeDeck, suggestDeckFromPool, createSeededRandom, focusStatOf, balanceSnapshot,
   // ⚠️ این دو تا اینجا نبودند و کرونِ شبانهٔ server.js:2290 هر شب ساعت
   // ۴:۱۷ با «cardDuel.pruneBattleHistory is not a function» می‌شکست.

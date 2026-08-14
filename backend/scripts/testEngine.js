@@ -216,6 +216,8 @@ function makeIo() {
     b.fire('game:join', { gameId: 'memory' });
     a.fire('game:leave', { roomId: a.last('game:start').roomId });
     ok(b.last('game:over')?.winner === 'DISCONNECT', 'opponent told on leave');
+    ok(b.last('game:over')?.resolvedWinner === 'O',
+      'forfeit payload names the actual winner for UI and settlement');
 
     const c = io.connect(new FakeSocket('l3', 'ج'));
     const d = io.connect(new FakeSocket('l4', 'د'));
@@ -296,6 +298,8 @@ function makeIo() {
     // Switching games mid-match must not strand the opponent in a dead room.
     a.fire('game:join', { gameId: 'penalty' });
     ok(b.last('game:over')?.winner === 'DISCONNECT', 'opponent released from abandoned room');
+    ok(b.last('game:over')?.resolvedWinner === 'O',
+      'abandoned room still reports the surviving winner');
     ok(b.rooms.size === 0, 'abandoned room cleaned up');
 
     // Re-tapping the same game while queued must not duplicate the queue slot.

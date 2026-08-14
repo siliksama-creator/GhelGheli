@@ -94,10 +94,12 @@ check(/_buildPersistentPages/.test(mobileShell)
   && /Offstage\(/.test(mobileShell) && /TickerMode\(/.test(mobileShell)
   && !/child: AnimatedSwitcher\(/.test(mobileShell),
   'تب‌های اندروید State زنده را نگه می‌دارند و دوباره init/load نمی‌شوند');
-check(/label:\s*'حریف',\s*value:\s*theirScore/.test(mobileDuel)
-  && /label:\s*'تو',\s*value:\s*myScore/.test(mobileDuel),
-  'اسکوربورد اندروید عدد را کنار صاحب درست نمایش می‌دهد');
-check(/امتیاز تو/.test(webDuel) && /امتیاز حریف/.test(webDuel)
+check(/role:\s*'تو',[\s\S]{0,120}score:\s*myScore/.test(mobileDuel)
+  && /role:\s*opponentRole,[\s\S]{0,120}score:\s*theirScore/.test(mobileDuel)
+  && /textDirection:\s*TextDirection\.rtl/.test(mobileDuel),
+'اسکوربورد اندروید عدد را کنار صاحب درست نمایش می‌دهد');
+check(/امتیاز تو/.test(webDuel) && /امتیاز \{opponentRole\}/.test(webDuel)
+  && /roundForViewer/.test(webDuel)
   && /primeImageCache\(session\.g\.state\)/.test(webDuel),
   'وب برچسب امتیاز و prewarm راند را هم‌زمان با اندروید دارد');
 

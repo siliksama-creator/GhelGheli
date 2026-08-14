@@ -9,7 +9,8 @@
     "test:typography": "node tool/typography.mjs",
     "test:smoke": "node tool/smoke.mjs",
     "test:jsx": "node tool/jsx-react-import.mjs",
-    "test:game-parity": "node tool/game-parity.mjs"
+    "test:game-parity": "node tool/game-parity.mjs",
+    "test:card-duel": "node tool/card-duel-truth.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^6.0.5",

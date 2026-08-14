@@ -344,7 +344,7 @@ function finish(room, winner, disconnectedSym = null) {
     : winner;
 
   // Game-specific history is non-financial and must never block settlement
-  // or game:over. Card duel uses this hook to persist the three revealed
+  // or game:over. Card duel uses this hook to persist the five revealed
   // rounds while the generic engine remains unaware of card rules.
   if (room.rules.onFinish) {
     Promise.resolve(room.rules.onFinish({
@@ -390,7 +390,7 @@ function finish(room, winner, disconnectedSym = null) {
     ? rewards.recordMatch({
         gameId: room.gameId,
         vsBot: room.vsBot,
-        winner,
+        winner: resolvedWinner,
         players: room.players,
       })
     : Promise.resolve([]);

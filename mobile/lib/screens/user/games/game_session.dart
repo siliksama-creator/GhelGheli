@@ -6,6 +6,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../../../api_client.dart';
 import 'game_audio.dart';
@@ -37,6 +38,7 @@ class GameSession extends ChangeNotifier {
   String? mySymbol;
   String? turn;
   String? winner;
+  String? finishReason;
   String? error;
   bool vsBot = false;
   String? matchMode;
@@ -119,18 +121,22 @@ class GameSession extends ChangeNotifier {
   /// فقط برای تست: همان مسیرِ اعلانِ ساعت را صدا می‌زند.
   @visibleForTesting
   void clockTickForTest() => _tickClock();
+
   /// Countdown while hunting for a real opponent (before the bot steps in).
   int searchSecondsLeft = 0;
   int searchSeconds = 15;
+
   /// Whether the server will hand us a bot when the hunt window closes.
   /// جفت‌یاب says NO: the player stays queued and is offered solo instead,
   /// so the UI must not promise a bot that will never arrive.
   bool botFallback = true;
   bool soloAvailable = false;
+
   /// True once the first search window elapsed with no opponent found and
   /// there is no bot to fall back on — we keep looking.
   bool stillSearching = false;
   String? timedOutSymbol;
+
   /// False while the socket is down, so the UI can show a reconnect notice
   /// instead of a silently frozen board.
   bool connected = true;
@@ -138,7 +144,8 @@ class GameSession extends ChangeNotifier {
   Timer? _searchTicker;
   int _lastTickPlayed = -1;
 
-  bool get myTurn => phase == GamePhase.playing && turn != null && turn == mySymbol;
+  bool get myTurn =>
+      phase == GamePhase.playing && turn != null && turn == mySymbol;
 
   /// Opponent's user id, for opening their public profile.
   Object? get opponentId {
@@ -155,22 +162,23 @@ class GameSession extends ChangeNotifier {
 
   void connect() {
     if (_socket != null) return;
-    final s = _existingSocket ?? io.io(
-      api.baseUrl,
-      io.OptionBuilder()
-          // Allow the polling fallback: some mobile carriers and captive
-          // proxies block raw websockets, and a websocket-only client simply
-          // never connects on those networks.
-          .setTransports(['websocket', 'polling'])
-          .setAuth({'token': api.token})
-          .enableForceNew()
-          .enableReconnection()
-          .setReconnectionAttempts(20)
-          .setReconnectionDelay(800)
-          .setReconnectionDelayMax(5000)
-          .setTimeout(10000)
-          .build(),
-    );
+    final s = _existingSocket ??
+        io.io(
+          api.baseUrl,
+          io.OptionBuilder()
+              // Allow the polling fallback: some mobile carriers and captive
+              // proxies block raw websockets, and a websocket-only client simply
+              // never connects on those networks.
+              .setTransports(['websocket', 'polling'])
+              .setAuth({'token': api.token})
+              .enableForceNew()
+              .enableReconnection()
+              .setReconnectionAttempts(20)
+              .setReconnectionDelay(800)
+              .setReconnectionDelayMax(5000)
+              .setTimeout(10000)
+              .build(),
+        );
     _socket = s;
 
     s.onConnectError((e) {
@@ -242,6 +250,7 @@ class GameSession extends ChangeNotifier {
       netPot = (m['netPot'] as num?)?.toInt() ?? 0;
       commission = (m['commission'] as num?)?.toInt() ?? 0;
       winner = null;
+      finishReason = null;
       timedOutSymbol = null;
       stillSearching = false;
       settlementStatus = 'settled';
@@ -264,8 +273,35 @@ class GameSession extends ChangeNotifier {
     s.on('game:update', (d) {
       final m = _asMap(d);
       final wasMyTurn = myTurn;
+      final previousRound = (state['roundIndex'] as num?)?.toInt() ?? 0;
       state = _asMap(m['state']);
       turn = m['turn'] as String?;
+
+      // برخوردهای ۱ تا ۴ بازخوردِ فوریِ متفاوت دارند. راند پنجم را
+      // game:over با صدای نتیجهٔ نهایی پوشش می‌دهد تا دو صدا روی هم نیفتند.
+      final currentRound = (state['roundIndex'] as num?)?.toInt() ?? 0;
+      final totalRounds = (state['totalRounds'] as num?)?.toInt() ?? 0;
+      if (gameId == 'card_duel' &&
+          currentRound > previousRound &&
+          currentRound < totalRounds) {
+        final last =
+            state['lastRound'] is Map ? state['lastRound'] as Map : const {};
+        final roundWinner = '${last['winner'] ?? ''}';
+        final mine = mySymbol;
+        final sfx = roundWinner == 'DRAW'
+            ? Sfx.draw
+            : roundWinner == mine
+                ? Sfx.win
+                : Sfx.lose;
+        GameAudio.instance.play(sfx, volume: 0.72);
+        try {
+          if (roundWinner == mine) {
+            HapticFeedback.heavyImpact();
+          } else {
+            HapticFeedback.mediumImpact();
+          }
+        } catch (_) {/* haptics is cosmetic */}
+      }
       lastMove = (m['lastMove'] as num?)?.toInt();
       timedOutSymbol = m['timedOut'] as String?;
 
@@ -285,9 +321,14 @@ class GameSession extends ChangeNotifier {
     s.on('game:over', (d) {
       final m = _asMap(d);
       if (m['state'] != null) state = _asMap(m['state']);
-      winner = m['winner'] as String?;
+      final rawWinner = m['winner'] as String?;
+      finishReason = rawWinner == 'DISCONNECT' ? 'disconnect' : null;
+      // در پایان با قطع اتصال، `winner` برای سازگاری قدیمی DISCONNECT است
+      // ولی `resolvedWinner` صاحب واقعی برد و تسویه را می‌گوید.
+      winner = (m['resolvedWinner'] ?? rawWinner) as String?;
       matchId = '${m['matchId'] ?? _roomId ?? ''}';
-      settlementStatus = '${m['settlementStatus'] ?? (stake > 0 ? 'pending' : 'settled')}';
+      settlementStatus =
+          '${m['settlementStatus'] ?? (stake > 0 ? 'pending' : 'settled')}';
       rematchAvailable = m['rematchAvailable'] != false;
       rematchWaiting = false;
       connectionNotice = null;
@@ -301,7 +342,11 @@ class GameSession extends ChangeNotifier {
 
     s.on('game:settlement', (d) {
       final m = _asMap(d);
-      if (m['matchId'] != null && matchId != null && '${m['matchId']}' != matchId) return;
+      if (m['matchId'] != null &&
+          matchId != null &&
+          '${m['matchId']}' != matchId) {
+        return;
+      }
       settlementStatus = '${m['status'] ?? settlementStatus}';
       notifyListeners();
     });
@@ -401,7 +446,10 @@ class GameSession extends ChangeNotifier {
       final clamped = left < 0 ? 0 : (left > turnSeconds ? turnSeconds : left);
       if (clamped != secondsLeft) {
         secondsLeft = clamped;
-        if (myTurn && clamped <= 5 && clamped > 0 && clamped != _lastTickPlayed) {
+        if (myTurn &&
+            clamped <= 5 &&
+            clamped > 0 &&
+            clamped != _lastTickPlayed) {
           _lastTickPlayed = clamped;
           GameAudio.instance
               .play(clamped <= 3 ? Sfx.tickUrgent : Sfx.tick, volume: 0.65);
@@ -417,7 +465,8 @@ class GameSession extends ChangeNotifier {
   }
 
   /// Ticks down the "looking for a real opponent" window.
-  void _startSearchClock(dynamic deadline, dynamic waitMs, dynamic remainingMs) {
+  void _startSearchClock(
+      dynamic deadline, dynamic waitMs, dynamic remainingMs) {
     _searchTicker?.cancel();
     final ms = (waitMs as num?)?.toInt();
     if (ms != null && ms > 0) searchSeconds = (ms / 1000).round();
@@ -484,12 +533,13 @@ class GameSession extends ChangeNotifier {
     lastMove = null;
     timedOutSymbol = null;
     stillSearching = false;
-    _socket?.emit('game:join', {'gameId': gameId, 'vsBot': vsBot, 'stake': stake});
+    _socket
+        ?.emit('game:join', {'gameId': gameId, 'vsBot': vsBot, 'stake': stake});
     phase = GamePhase.waiting;
     notifyListeners();
   }
 
-    void joinRoom(String roomCode) {
+  void joinRoom(String roomCode) {
     connect();
     error = null;
     winner = null;
@@ -551,7 +601,8 @@ class GameSession extends ChangeNotifier {
     rematchWaiting = !vsBot;
     error = null;
     notifyListeners();
-    _socket?.emitWithAck('game:rematch', {'roomId': matchId}, ack: (dynamic response) {
+    _socket?.emitWithAck('game:rematch', {'roomId': matchId},
+        ack: (dynamic response) {
       final m = _asMap(response);
       if (m['ok'] == false && !_disposed) {
         rematchWaiting = false;
@@ -569,16 +620,20 @@ class GameSession extends ChangeNotifier {
       return completer.future;
     }
     final timer = Timer(const Duration(seconds: 8), () {
-      if (!completer.isCompleted) completer.completeError(Exception('ساخت لینک چالش طول کشید'));
+      if (!completer.isCompleted) {
+        completer.completeError(Exception('ساخت لینک چالش طول کشید'));
+      }
     });
-    socket.emitWithAck('game:create_room', {'gameId': gameId}, ack: (dynamic response) {
+    socket.emitWithAck('game:create_room', {'gameId': gameId},
+        ack: (dynamic response) {
       if (completer.isCompleted) return;
       timer.cancel();
       final m = _asMap(response);
       if (m['ok'] == true) {
         completer.complete(m);
       } else {
-        completer.completeError(Exception('${m['error'] ?? 'ساخت لینک چالش ناموفق بود'}'));
+        completer.completeError(
+            Exception('${m['error'] ?? 'ساخت لینک چالش ناموفق بود'}'));
       }
     });
     return completer.future;
@@ -591,6 +646,7 @@ class GameSession extends ChangeNotifier {
     _socket?.emit('game:leave', {'roomId': _roomId});
     phase = GamePhase.idle;
     winner = null;
+    finishReason = null;
     state = const {};
     timedOutSymbol = null;
     stillSearching = false;
@@ -604,11 +660,14 @@ class GameSession extends ChangeNotifier {
 
   /// Result line shown when the game ends.
   String get resultText {
+    if (finishReason == 'disconnect') {
+      return iWon
+          ? 'حریف بازی را ترک کرد؛ برد برای تو ثبت شد'
+          : 'اتصال قطع شد؛ حریف برنده شد';
+    }
     switch (winner) {
       case 'DRAW':
         return 'مساوی شد!';
-      case 'DISCONNECT':
-        return 'حریف بازی را ترک کرد';
       case null:
         return 'پایان بازی';
       default:

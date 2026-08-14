@@ -106,21 +106,30 @@ function applyMove(state, move, player) {
   const resolved = duel.resolveRound(
     cardX, cardO, state.roundIndex, state.previousWinner, null, roundSeed,
   );
-  if (resolved.winner !== 'DRAW') state.score[resolved.winner] += 1;
   state.remaining.X = state.remaining.X.filter(id => id !== state.pending.X);
   state.remaining.O = state.remaining.O.filter(id => id !== state.pending.O);
-  state.lastRound = resolved;
   state.history.push(resolved);
+
+  // اسکوربورد از همان historyِ حکم‌ها مشتق می‌شود؛ دیگر یک شمارندهٔ دوم
+  // نیست که بتواند از برندهٔ کارت جدا شود. این invariant قلبِ لوپ پنج‌گانه
+  // است: برای X/O دقیقاً تعدادِ round.winnerهای همان سمت را می‌شماریم.
+  state.score = duel.scoreFromHistory(state.history);
+  resolved.scoreAfter = { ...state.score };
+  resolved.pointAwardedTo = resolved.winner === 'DRAW' ? null : resolved.winner;
+  state.lastRound = resolved;
   state.previousWinner = resolved.winner;
-  state.roundIndex += 1;
+  state.roundIndex = state.history.length;
   state.pending = {};
   return state;
 }
 
 function result(state) {
-  if (state.roundIndex < duel.DECK_SIZE) return null;
-  if (state.score.X === state.score.O) return 'DRAW';
-  return state.score.X > state.score.O ? 'X' : 'O';
+  if (state.history.length < duel.DECK_SIZE) return null;
+  const score = duel.scoreFromHistory(state.history);
+  // همان منبعی که نتیجهٔ نهایی را می‌دهد، اسکوربورد را هم می‌سازد.
+  state.score = score;
+  if (score.X === score.O) return 'DRAW';
+  return score.X > score.O ? 'X' : 'O';
 }
 
 function nextTurn() { return 'X'; }
@@ -128,9 +137,11 @@ function nextTurn() { return 'X'; }
 function publicState(state, player) {
   const mine = ['X', 'O'].includes(player) ? player : 'X';
   const opponent = mine === 'X' ? 'O' : 'X';
+  const score = duel.scoreFromHistory(state.history);
   return {
-    score: state.score,
-    roundIndex: state.roundIndex,
+    logicVersion: 2,
+    score,
+    roundIndex: state.history.length,
     totalRounds: duel.DECK_SIZE,
     roundTitle: duel.ROUND_FOCUS[state.roundIndex]?.label || 'پایان نبرد',
     // ── معیارِ راندِ جاری، صریح و کامل ──
@@ -178,9 +189,6 @@ function botMove(state, player) {
   if (!remaining.length) return null;
   const cards = state.decks[player] || [];
   const focus = duel.ROUND_FOCUS[state.roundIndex] || duel.ROUND_FOCUS[duel.ROUND_FOCUS.length - 1];
-  const mine = Number(state.score?.[player] || 0);
-  const other = Number(state.score?.[player === 'X' ? 'O' : 'X'] || 0);
-  const delta = mine - other;
   const finalRound = state.roundIndex === duel.DECK_SIZE - 1;
   const futureFocuses = duel.ROUND_FOCUS.slice(state.roundIndex + 1);
   const ranked = remaining
@@ -192,18 +200,19 @@ function botMove(state, player) {
         ? Math.max(...futureFocuses.map(next => duel.focusStatOf(card, next)))
         : 0;
       const conservePenalty = !finalRound && futurePeak - focusNow >= 14 ? 9 : 0;
-      const pressureBonus = delta < 0 && state.roundIndex >= 2 ? Math.max(0, Number(card.goalChance || card.power || 0) - 70) * 0.22 : 0;
-      const safetyBonus = delta > 0 && (card.effect === 'wall' || card.defense >= 78) ? 5 : 0;
+      // ربات هم دقیقاً با همان اعدادِ آشکارِ موتور تصمیم می‌گیرد؛ heuristic
+      // قدیمی بونوس‌هایی تا ۲۰ و استات‌های نامرتبط فرض می‌کرد درحالی‌که
+      // حکم واقعی فقط ویژگی همین راند + افکت آشکار است.
       const effectNow = ({
-        speedster: state.roundIndex === 0 ? 14 : 1,
-        playmaker: state.roundIndex === 1 ? 8 : state.roundIndex === 2 ? 6 : 2,
-        wall: state.roundIndex === 3 ? 11 : 3,
-        finisher: finalRound ? 20 : -12,
-        lucky_star: state.roundIndex >= 2 ? 4 : 1,
+        speedster: state.roundIndex === 0 ? 6 : 0,
+        playmaker: state.roundIndex > 0 && state.previousWinner === player ? 4 : 0,
+        wall: state.roundIndex === 3 ? 6 : 0,
+        finisher: finalRound ? 6 : 0,
+        lucky_star: state.roundIndex >= 2 ? 3 : 0,
       })[card.effect] || 0;
       return {
         card,
-        score: focusNow * 3.1 + Number(card.power || 0) * 0.75 + effectNow + pressureBonus + safetyBonus - conservePenalty,
+        score: (focusNow + effectNow) * 3.1 - conservePenalty,
       };
     })
     .sort((a, b) => b.score - a.score);

@@ -140,7 +140,7 @@ export default function PlayerCard({
           {selected && <span className="ggCardCheck">✓</span>}
           {qty > 1 && <span className="ggCardQty">×{fa(qty)}</span>}
           {badge && <span className="ggCardBadge">{badge}</span>}
-          {winner && <span className="ggCardWinnerStamp">WINNER</span>}
+          {winner && <span className="ggCardWinnerStamp">برنده</span>}
           {loser && <span className="ggCardLoserVeil" aria-hidden="true" />}
         </div>
         <div className="ggCardBody">

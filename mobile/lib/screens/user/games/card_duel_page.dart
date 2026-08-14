@@ -307,19 +307,28 @@ class _CardDuelPageState extends State<CardDuelPage> {
 
   Map<String, dynamic>? _resultMvp() {
     final history = (_session.state['history'] as List?) ?? const [];
-    final cards = <Map<String, dynamic>>[];
+    final performances = <Map<String, dynamic>>[];
     for (final raw in history.whereType<Map>()) {
-      for (final key in const ['cardX', 'cardO']) {
-        if (raw[key] is Map) {
-          cards.add(Map<String, dynamic>.from(raw[key] as Map));
-        }
-      }
+      final winner = '${raw['winner'] ?? ''}';
+      if (winner != 'X' && winner != 'O') continue;
+      final card = raw['card$winner'];
+      if (card is! Map) continue;
+      performances.add({
+        ...Map<String, dynamic>.from(card),
+        'mvpRound': NumberParser.toInt(raw['round']),
+        'mvpRoundPower': NumberParser.toInt(raw['power$winner']),
+        'mvpMargin': NumberParser.toInt(raw['powerGap']),
+      });
     }
-    cards.sort(
-      (a, b) => NumberParser.toInt(b['power'])
-          .compareTo(NumberParser.toInt(a['power'])),
-    );
-    return cards.isEmpty ? null : cards.first;
+    performances.sort((a, b) {
+      final margin = NumberParser.toInt(b['mvpMargin'])
+          .compareTo(NumberParser.toInt(a['mvpMargin']));
+      return margin != 0
+          ? margin
+          : NumberParser.toInt(b['mvpRoundPower'])
+              .compareTo(NumberParser.toInt(a['mvpRoundPower']));
+    });
+    return performances.isEmpty ? null : performances.first;
   }
 
   Future<XFile> _renderResultCard({
@@ -412,7 +421,7 @@ class _CardDuelPageState extends State<CardDuelPage> {
 
     text('GHELGHELI CARD ARENA', 120, 34, _cyan, weight: FontWeight.w900);
     text(title, 240, 76, Colors.white, weight: FontWeight.w900);
-    text(score, 380, 120, _gold, weight: FontWeight.w900);
+    text(score, 380, 82, _gold, weight: FontWeight.w900);
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         const Rect.fromLTWH(135, 590, 810, 200),
@@ -422,7 +431,7 @@ class _CardDuelPageState extends State<CardDuelPage> {
     );
     text('MVP مسابقه', 625, 32, _gold, weight: FontWeight.w900);
     text(
-      '${mvp?['name'] ?? 'ستاره آرنا'} · قدرت ${faNum(mvp?['power'])}',
+      '${mvp?['name'] ?? 'ستاره آرنا'} · عدد راند ${faNum(mvp?['mvpRoundPower'])}',
       690,
       46,
       Colors.white,
@@ -462,13 +471,16 @@ class _CardDuelPageState extends State<CardDuelPage> {
           : _session.iWon
               ? 'من آرنا را بردم!'
               : 'این بار حریف برد!';
+      final opponentRole = _session.vsBot ? 'ربات' : 'حریف';
+      final scoreLabel =
+          'تو ${faNum(score[me])}  •  $opponentRole ${faNum(score[other])}';
       final message = '$title\n'
-          'نتیجه ${faNum(score[me])} - ${faNum(score[other])}\n'
-          'MVP: ${mvp?['name'] ?? 'ستاره آرنا'} (قدرت ${faNum(mvp?['power'])})\n'
+          'نتیجه: $scoreLabel\n'
+          'MVP: ${mvp?['name'] ?? 'ستاره آرنا'} (عدد راند ${faNum(mvp?['mvpRoundPower'])})\n'
           'جرأت داری؟ مستقیم به چالشم بیا:\n${invite['shareUrl']}';
       final card = await _renderResultCard(
         title: title,
-        score: '${faNum(score[me])} - ${faNum(score[other])}',
+        score: scoreLabel,
         mvp: mvp,
         url: '${invite['shareUrl']}',
       );
@@ -523,7 +535,8 @@ class _CardDuelPageState extends State<CardDuelPage> {
                         ),
                       ),
                       Text(
-                        '${faNum(score[me])} - ${faNum(score[other])}',
+                        scoreLabel,
+                        textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: _gold,
                           fontSize: 40,
@@ -536,7 +549,7 @@ class _CardDuelPageState extends State<CardDuelPage> {
                         style: const TextStyle(fontWeight: FontWeight.w900),
                       ),
                       Text(
-                        'قدرت ${faNum(mvp?['power'])}',
+                        'عدد راند ${faNum(mvp?['mvpRoundPower'])}',
                         style: const TextStyle(
                           color: Colors.white60,
                           fontSize: 11,

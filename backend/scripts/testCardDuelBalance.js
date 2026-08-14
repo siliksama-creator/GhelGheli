@@ -325,8 +325,11 @@ console.log('\n== ۶. عددی که برنده را تعیین می‌کند ب�
   ck('مجموعِ اجزا دقیقاً برابرِ عددِ نهایی است', Math.abs(sum - b.total) <= 1,
     `اجزا ${sum} ولی total ${b.total} — توضیحِ روی صفحه با عدد نمی‌خواند`);
   ck('برنده با همان powerها می‌خواند',
-    round.winner === (round.powerX - round.powerO >= 6 ? 'X'
-      : round.powerO - round.powerX >= 6 ? 'O' : 'DRAW'));
+    round.winner === (round.powerX > round.powerO ? 'X'
+      : round.powerO > round.powerX ? 'O' : 'DRAW'));
+  ck('هیچ شانس یا جزء پنهانی در حکم نیست',
+    round.breakdownX.luck === 0
+      && round.breakdownX.total === round.breakdownX.focus + round.breakdownX.effectBonus);
 }
 
 console.log('\n== ۷. تعیینی بودن با seed (بازپخشِ نبرد) ==');

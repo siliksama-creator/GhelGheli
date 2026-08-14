@@ -8,7 +8,7 @@
 // می‌کند، فازها از کار می‌افتند، و چون هیچ خطایی نمی‌دهد ماه‌ها کسی نمی‌فهمد.
 //
 // درسِ ثبت‌شدهٔ این پروژه: «تستی که سبز است ولی چیزی را نمی‌سنجد». اگر فقط
-// `find.text('WINNER')` را چک کنیم، ویجتی که از فریمِ اول همه‌چیز را نشان
+// وجودِ متنِ «برنده» را چک کنیم، ویجتی که از فریمِ اول همه‌چیز را نشان
 // می‌دهد هم سبز می‌شود — یعنی دقیقاً حالتی که می‌خواهیم جلویش را بگیریم.
 //
 // پس اینجا **غیاب** را در فریم‌های اول می‌سنجیم، نه فقط حضور را در آخر:
@@ -22,32 +22,46 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ghelgheli_mobile/screens/user/games/card_duel_page.dart';
 
 // ⚠️ دامی که همین تست گرفتار شد: خودِ `PlayerCard` روی کارتِ برنده یک
-// نشانِ «WINNER» می‌زند. پس `find.text('WINNER')` دو نتیجه دارد و اصلاً
+// نشانِ «برنده» می‌زند. پس جستجوی متنِ عمومی دو نتیجه دارد و اصلاً
 // نمی‌گوید مهرِ حکم آمده یا نه. این هِلپِر فقط مهرِ حکمِ صحنه را می‌یابد:
 // متنی که مستقیماً داخلِ یک Container با گوشهٔ ۹۹ باشد. ساده‌تر و
 // پایدارتر: مهرِ حکم `letterSpacing: 0.6` دارد و نشانِ کارت `1.4`.
 Finder _verdictStamp(String text) => find.byWidgetPredicate(
-      (w) => w is Text &&
-          w.data == text &&
-          (w.style?.letterSpacing ?? 0) == 0.6,
+      (w) =>
+          w is Text && w.data == text && (w.style?.letterSpacing ?? 0) == 0.6,
       description: 'مهرِ حکمِ صحنهٔ برخورد «$text»',
     );
 
-Map<String, dynamic> _round(int n, String winner) => {
-      'round': n,
-      'title': 'فشار حمله',
-      'focusLabel': 'حمله',
-      'winner': winner,
-      'cardX': {'name': 'کارت من', 'duel_rarity': 'gold', 'power': 88},
-      'cardO': {'name': 'کارت حریف', 'duel_rarity': 'silver', 'power': 71},
-      'powerX': 88,
-      'powerO': 71,
-      'focusStatX': 90,
-      'focusStatO': 64,
-      'powerGap': 17,
-      'reason': 'قدرت حمله خط دفاع را شکافت',
-      'cinematic': 'ضربهٔ نهایی کار را تمام کرد',
-    };
+Map<String, dynamic> _round(int n, String winner) {
+  final draw = winner == 'DRAW';
+  final xPower = draw
+      ? 80
+      : winner == 'X'
+          ? 88
+          : 71;
+  final oPower = draw
+      ? 80
+      : winner == 'O'
+          ? 88
+          : 71;
+  return {
+    'round': n,
+    'title': 'فشار حمله',
+    'focusLabel': 'حمله',
+    'winner': winner,
+    'cardX': {'name': 'کارت من', 'duel_rarity': 'gold', 'power': xPower},
+    'cardO': {'name': 'کارت حریف', 'duel_rarity': 'silver', 'power': oPower},
+    'powerX': xPower,
+    'powerO': oPower,
+    'focusStatX': xPower,
+    'focusStatO': oPower,
+    'powerGap': (xPower - oPower).abs(),
+    'breakdownX': {'focus': xPower, 'effectBonus': 0, 'total': xPower},
+    'breakdownO': {'focus': oPower, 'effectBonus': 0, 'total': oPower},
+    'reason': 'عدد نهایی بزرگ‌تر برنده شد',
+    'cinematic': 'ضربهٔ برنده ثبت شد',
+  };
+}
 
 Widget _host(Map<String, dynamic>? round) => MaterialApp(
       home: Directionality(
@@ -88,7 +102,7 @@ void main() {
       // فریم اول = فازِ charge.
       await tester.pump(const Duration(milliseconds: 60));
 
-      expect(_verdictStamp('WINNER'), findsNothing,
+      expect(_verdictStamp('+۱ برای تو · تو برندهٔ راندی'), findsNothing,
           reason: 'مهرِ برنده نباید قبل از فازِ verdict روی صفحه باشد');
       expect(find.textContaining('اختلاف قدرت'), findsNothing,
           reason: 'اختلافِ قدرت متعلق به فازِ numbers است');
@@ -116,14 +130,24 @@ void main() {
           reason: 'عددِ نهاییِ حریف نباید قبل از فازِ numbers دیده شود');
     });
 
-    testWidgets('بعد از پایان فازها، حکم و عددها کامل دیده می‌شوند',
+    testWidgets('کارت و عددِ تو همیشه سمت راستِ حریف می‌ماند', (tester) async {
+      await tester.pumpWidget(_host(_round(1, 'X')));
+      await tester.pump(const Duration(milliseconds: 80));
+
+      final mine = tester.getCenter(find.text('کارت تو').first);
+      final theirs = tester.getCenter(find.text('کارت حریف').first);
+      expect(mine.dx, greaterThan(theirs.dx),
+          reason: 'در RTL هم مالکیت نباید با Row/LTR جابه‌جا شود');
+    });
+
+    testWidgets('بعد از پایان فازها، صاحبِ هر عدد و امتیاز کاملاً روشن است',
         (tester) async {
       await tester.pumpWidget(_host(_round(1, 'X')));
       await tester.pump(_revealTotal);
       await tester.pump(const Duration(milliseconds: 500));
 
-      expect(_verdictStamp('WINNER'), findsOneWidget);
-      expect(find.textContaining('قدرت حمله خط دفاع را شکافت'), findsOneWidget);
+      expect(_verdictStamp('+۱ برای تو · تو برندهٔ راندی'), findsOneWidget);
+      expect(find.textContaining('یک امتیاز به تو اضافه شد'), findsOneWidget);
       expect(find.textContaining('ضربهٔ نهایی'), findsOneWidget);
 
       // ⚠️ اینجا عمداً pumpAndSettle نیست: قابِ کمیابیِ PlayerCard یک
@@ -132,25 +156,27 @@ void main() {
       // باگ است، خودِ طراحی است.
     });
 
-    testWidgets('باخت راند مهر درست را نشان می‌دهد', (tester) async {
+    testWidgets('برد حریف صریحاً امتیاز را به حریف نسبت می‌دهد',
+        (tester) async {
       await tester.pumpWidget(_host(_round(1, 'O')));
       await tester.pump(_revealTotal);
       await tester.pump(const Duration(milliseconds: 400));
 
-      expect(_verdictStamp('باخت راند'), findsOneWidget);
-      expect(_verdictStamp('WINNER'), findsNothing);
+      expect(
+          _verdictStamp('+۱ برای حریف · حریف برندهٔ راند شد'), findsOneWidget);
+      expect(_verdictStamp('+۱ برای تو · تو برندهٔ راندی'), findsNothing);
       // ⚠️ اینجا عمداً pumpAndSettle نیست: قابِ کمیابیِ PlayerCard یک
       // انیمیشنِ بی‌پایان دارد (طلایی/پرمیوم می‌چرخند)، پس صحنه هرگز
       // «آرام» نمی‌گیرد و pumpAndSettle همیشه timeout می‌دهد. این نبودِ
       // باگ است، خودِ طراحی است.
     });
 
-    testWidgets('مساوی مهر «برخورد برابر» می‌دهد', (tester) async {
+    testWidgets('مساوی صریحاً می‌گوید امتیازی اضافه نشده', (tester) async {
       await tester.pumpWidget(_host(_round(1, 'DRAW')));
       await tester.pump(_revealTotal);
       await tester.pump(const Duration(milliseconds: 400));
 
-      expect(_verdictStamp('برخورد برابر'), findsOneWidget);
+      expect(_verdictStamp('مساوی؛ امتیازی اضافه نشد'), findsOneWidget);
       // ⚠️ اینجا عمداً pumpAndSettle نیست: قابِ کمیابیِ PlayerCard یک
       // انیمیشنِ بی‌پایان دارد (طلایی/پرمیوم می‌چرخند)، پس صحنه هرگز
       // «آرام» نمی‌گیرد و pumpAndSettle همیشه timeout می‌دهد. این نبودِ
@@ -163,21 +189,51 @@ void main() {
       // باگی که در نسخهٔ وب بدونِ `key` رخ می‌داد.
       await tester.pumpWidget(_host(_round(1, 'X')));
       await tester.pump(_revealTotal);
-      expect(_verdictStamp('WINNER'), findsOneWidget);
+      expect(_verdictStamp('+۱ برای تو · تو برندهٔ راندی'), findsOneWidget);
 
       // راند دوم می‌رسد.
       await tester.pumpWidget(_host(_round(2, 'O')));
       await tester.pump(const Duration(milliseconds: 60));
 
-      expect(_verdictStamp('باخت راند'), findsNothing,
+      expect(_verdictStamp('+۱ برای حریف · حریف برندهٔ راند شد'), findsNothing,
           reason: 'راندِ دوم باید دوباره تعلیق داشته باشد، نه نتیجهٔ فوری');
 
       await tester.pump(_revealTotal);
-      expect(_verdictStamp('باخت راند'), findsOneWidget);
+      expect(
+          _verdictStamp('+۱ برای حریف · حریف برندهٔ راند شد'), findsOneWidget);
       // ⚠️ اینجا عمداً pumpAndSettle نیست: قابِ کمیابیِ PlayerCard یک
       // انیمیشنِ بی‌پایان دارد (طلایی/پرمیوم می‌چرخند)، پس صحنه هرگز
       // «آرام» نمی‌گیرد و pumpAndSettle همیشه timeout می‌دهد. این نبودِ
       // باگ است، خودِ طراحی است.
+    });
+
+    testWidgets('کاربر O هم کارت، عدد و بردِ خودش را درست می‌بیند',
+        (tester) async {
+      final round = _round(1, 'O')
+        ..['powerX'] = 71
+        ..['powerO'] = 88
+        ..['cardX'] = {'name': 'کارت حریف', 'duel_rarity': 'silver'}
+        ..['cardO'] = {'name': 'کارت من O', 'duel_rarity': 'gold'};
+      await tester.pumpWidget(MaterialApp(
+        home: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
+            body: SingleChildScrollView(
+              child: SizedBox(
+                width: 420,
+                child: CardDuelClashStageForTest(
+                  round: round,
+                  mine: 'O',
+                  color: const Color(0xFF38BDF8),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ));
+      await tester.pump(_revealTotal);
+      expect(_verdictStamp('+۱ برای تو · تو برندهٔ راندی'), findsOneWidget);
+      expect(find.textContaining('کارت من O'), findsWidgets);
     });
 
     testWidgets('بدون راند، پیام انتظار نشان داده می‌شود و کرش نمی‌کند',

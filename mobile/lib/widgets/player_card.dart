@@ -247,7 +247,7 @@ class _WinnerStamp extends StatelessWidget {
       boxShadow: const [BoxShadow(color: Color(0xAAFFD166), blurRadius: 18)],
     ),
     child: const Text(
-      'WINNER',
+      'برنده',
       style: TextStyle(
         color: Color(0xFF3B2500),
         fontWeight: FontWeight.w900,

@@ -32,6 +32,8 @@ const mobile = read('mobile/lib/screens/user/games/card_duel_page.dart')
 const mobileHub = read('mobile/lib/screens/user/games_page.dart');
 const web = read('userweb/src/cardDuelGame.jsx');
 const webHub = read('userweb/src/games.jsx');
+const mobileSession = read('mobile/lib/screens/user/games/game_session.dart');
+const webSession = read('userweb/src/gameSession.js');
 const mobileWheel = read('mobile/lib/screens/user/wheel_page.dart');
 const webWheel = read('userweb/src/screens/Wheel.jsx');
 
@@ -118,6 +120,18 @@ ok(/<details/.test(web) && /slice\(0, 5\)/.test(web),
   'Web: لاگ بازی‌ها کشویی است و فقط پنج مورد را نشان می‌دهد');
 ok(/RoundTimeline/.test(web) && /تایم‌لاین کامل ۵ راند/.test(web),
   'Web: فیناله تایم‌لاین کامل راندها را دارد');
+ok(/CardDuelRoundPerspective/.test(mobile) && /roundForViewer/.test(web),
+  'Android/Web: نگاشت X/O فقط از آداپتر مشترک زاویهٔ دید می‌گذرد');
+ok(/کارت تو/.test(mobile) && /کارت تو/.test(web)
+  && /opponentRole/.test(mobile) && /opponentRole/.test(web),
+  'Android/Web: هر کارت و عدد با مالک صریح «تو/ربات/حریف» نمایش داده می‌شود');
+ok(/scoreFromHistory/.test(service) && /scoreAfter/.test(service),
+  'اسکوربورد و snapshot هر راند از history حکم‌ها مشتق می‌شوند');
+ok(/logicVersion:\s*2/.test(service) && /logicVersion:\s*2/.test(read('backend/src/games/rules/cardDuel.js')),
+  'قرارداد شفاف منطق نسخهٔ ۲ در موتور و snapshot اعلام می‌شود');
+ok(/resolvedWinner/.test(mobileSession) && /resolvedWinner/.test(webSession)
+  && /finishReason/.test(mobileSession) && /finishReason/.test(webSession),
+  'Android/Web: برد با قطع اتصال به صاحب واقعی نتیجه نگاشت می‌شود');
 ok(/stake: _activeStake/.test(mobileHub) && !/بازی مستقل با کارت/.test(mobileHub),
   'Android دوئل کارت را با حالت انتخاب‌شده ۱۰۰/۱۰۰۰ اجرا می‌کند');
 ok(/stake=\{Number\(active\.stake/.test(webHub) && !/بازی مستقل با کارت/.test(webHub),

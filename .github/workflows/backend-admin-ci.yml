@@ -130,6 +130,7 @@ jobs:
         with: { node-version: 24 }
       - run: npm install
       - run: npm run test:game-parity
+      - run: npm run test:card-duel
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - name: Serve the built app
