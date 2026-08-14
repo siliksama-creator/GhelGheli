@@ -431,49 +431,81 @@ test('معرف دوم برای یک کاربر ثبت نمی‌شود', () => {
     'شرط باید مانع بازنویسی معرف قبلی و دادن ۳ چرخش دوم شود');
 });
 
-test('هیچ منبعِ امتیازی کمیسیون نمی‌سازد — فقط خریدِ شاپ', () => {
-  // ⚠️ دامنه دوباره تنگ‌تر شد. مالک: «کمیسیون ۵٪ دعوت فقط از خرید
-  // کامل‌شدهٔ شاپ باشد، نه از امتیاز بازی/تپ».
-  //
-  // قبلاً `['card','tap']` بود. حالا مسیرِ امتیازی کاملاً بسته است و
-  // تنها کمیسیونِ زنده از `payPurchaseCommission` می‌آید.
-  assert.deepStrictEqual([...referrals.COMMISSIONABLE], [],
-    'لیستِ منابعِ امتیازیِ کمیسیون‌ساز باید خالی باشد');
+test('کمیسیونِ امتیازی فقط از ثبتِ کارت و بازیِ ضربه‌زن می‌آید', () => {
+  // دامنهٔ نهایی به‌خواستِ مالک — دو کمیسیونِ جدا:
+  //   • امتیازی: از «بازی ضربه‌زنِ دوستان» و «ثبت کارتِ دوستان» → باقی می‌ماند
+  //   • نقدی:    فقط از فروشِ شاپ → `payPurchaseCommission`
+  assert.deepStrictEqual([...referrals.COMMISSIONABLE].sort(), ['card', 'tap'],
+    'منابعِ امتیازیِ کمیسیون‌ساز باید دقیقاً card و tap باشند');
 });
 
-test('کمیسیونِ خرید همچنان فعال است (مسیرِ درست بسته نشده)', () => {
+test('کمیسیونِ خرید همچنان فعال است (مسیرِ نقدی بسته نشده)', () => {
   assert.strictEqual(referrals.PURCHASE_COMMISSION_PERCENT, 5);
   assert.strictEqual(typeof referrals.payPurchaseCommission, 'function');
 });
 
-test('هیچ منبعی کمیسیون نمی‌سازد — لیست سفید است نه سیاه', () => {
-  // پیش‌فرضِ امن: قابلیت جدید باید آگاهانه اضافه شود، نه اینکه بی‌سروصدا
-  // هزینه بسازد. `card` و `tap` هم عمداً در این فهرست‌اند.
-  for (const s of ['card', 'tap', 'game', 'admin', 'wheel', 'league', 'reward', 'unknown']) {
+test('لیست سفید است نه سیاه — منبعِ ناشناخته کمیسیون نمی‌سازد', () => {
+  // پیش‌فرضِ امن: قابلیت جدید باید آگاهانه هزینه بسازد، نه بی‌سروصدا.
+  for (const s of ['game', 'admin', 'wheel', 'league', 'reward', 'unknown',
+    'card_cash', 'photo_card_cash']) {
     assert.ok(!referrals.COMMISSIONABLE.has(s), `${s} نباید کمیسیون بسازد`);
   }
 });
 
-test('کمیسیونِ امتیازی از هیچ نقطه‌ای صدا زده نمی‌شود', () => {
+test('هر دو مسیرِ ثبتِ کارت کمیسیونِ امتیازی می‌دهند', () => {
   const path = require('path');
   const fs = require('fs');
   const read = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
 
-  // هر فراخوانیِ `payCommission` که `payPurchaseCommission` نباشد باید صفر باشد.
+  // فراخوانیِ کمیسیونِ امتیازی (نه نسخهٔ خرید) در هر فایل.
   const countPointCalls = (src) =>
     (src.match(/(?<!purchase)(?<!Purchase)\bpayCommission\(/g) || []).length;
 
-  for (const f of ['src/server.js',
-    'src/services/photoCardService.js',
-    'src/services/gameRewardService.js']) {
-    assert.strictEqual(countPointCalls(read(f)), 0,
-      `${f} نباید کمیسیونِ امتیازی بدهد — کمیسیون فقط از خریدِ شاپ است`);
-  }
+  // server.js دو نقطه دارد: مسیرِ کدِ سادهٔ کارت، و بازیِ ضربه‌زن.
+  assert.strictEqual(countPointCalls(read('src/server.js')), 2,
+    'server.js باید دقیقاً دو کمیسیونِ امتیازی بدهد: ثبتِ کارت و ضربه‌زن');
 
-  // و مسیرِ درست باید واقعاً وصل باشد.
-  const shop = read('src/services/shopService.js');
-  assert.ok(/payPurchaseCommission/.test(shop),
+  // مسیرِ عکسی هم باید بدهد، وگرنه نتیجه بسته به روشِ ثبت فرق می‌کند.
+  assert.strictEqual(countPointCalls(read('src/services/photoCardService.js')), 1,
+    'مسیرِ ثبتِ کارت با عکس هم باید کمیسیونِ امتیازی بدهد');
+
+  // و مسیرِ نقدی باید واقعاً وصل باشد.
+  assert.ok(/payPurchaseCommission/.test(read('src/services/shopService.js')),
     'خریدِ شاپ باید کمیسیونِ خرید را صدا بزند');
+});
+
+test('کارتِ نقدی هیچ کمیسیونی نمی‌دهد — هر دو مسیر شرط دارند', () => {
+  // ⚠️ خواستهٔ صریحِ مالک: «از کارت‌های نقدی که تیم در سیستم ثبت می‌کند،
+  // دوستانِ کاربر نباید کمیسیون بگیرند.»
+  //
+  // «کارتِ نقدی» = ردیفی با `card_types.cash_amount > 0` که هنگام ثبت
+  // مستقیماً پول به کیف پول می‌ریزد (`walletService.credit`, source
+  // `card_cash`). بودجه‌اش از پیش تعیین‌شده است؛ کمیسیون یعنی دو بار خرج.
+  //
+  // این تست ساختاری است چون منطق در محلِ فراخوانی است نه در سرویس:
+  // فقط آنجا `cash_amount` در دسترس است.
+  const path = require('path');
+  const fs = require('fs');
+  const read = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+
+  const server = read('src/server.js');
+  // مسیرِ کدِ ساده: شرطِ صفر بودنِ مبلغِ نقد باید بلافاصله قبلِ کمیسیون باشد.
+  assert.ok(
+    /Number\(card\.cash_amount \|\| 0\) === 0\)\s*\{\s*await referrals\.payCommission\([^)]*'card'\)/s
+      .test(server),
+    'مسیرِ /api/cards/redeem باید کمیسیون را به شرطِ cash_amount === 0 بدهد');
+
+  const photo = read('src/services/photoCardService.js');
+  // مسیرِ عکسی: متغیرِ محلیِ `cash` همان `Number(type.cash_amount || 0)` است.
+  assert.ok(/const cash = Number\(type\.cash_amount \|\| 0\)/.test(photo),
+    'photoCardService باید مبلغِ نقد را از cash_amount بخواند');
+  assert.ok(
+    /if \(cash === 0\)\s*\{\s*await referralService\.payCommission\([^)]*'card'\)/s.test(photo),
+    'مسیرِ ثبتِ کارت با عکس هم باید کمیسیون را به شرطِ cash === 0 بدهد');
+
+  // و بازیِ ضربه‌زن عمداً بی‌شرط است: هرگز پولِ نقد نمی‌دهد.
+  assert.ok(/payCommission\(client, userId, points, 'tap'\)/.test(server),
+    'کمیسیونِ ضربه‌زن باید بدونِ شرط پرداخت شود — این بازی نقد نمی‌دهد');
 });
 
 console.log('\nدعوت — یکپارچگی با لیگ');

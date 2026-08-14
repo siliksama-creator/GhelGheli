@@ -9,13 +9,30 @@ const root = path.join(__dirname, '..', '..');
 const read = p => fs.readFileSync(path.join(root, p), 'utf8');
 const mobileDir = path.join(root, 'mobile', 'assets', 'sfx');
 const webDir = path.join(root, 'userweb', 'public', 'sfx');
-const assets = {
+// Card Duel soundtrack and cues.
+const duelAssets = {
   duel_music: [29, 31], duel_lock: [.30, .50], duel_intro: [1, 1.3],
   duel_round_win: [1.2, 1.5], duel_round_lose: [1.2, 1.5],
   duel_round_draw: [1.2, 1.5], duel_points: [1.6, 1.9],
   duel_final_draw: [1.9, 2.2],
   duel_victory: [2.2, 2.5], duel_defeat: [2.2, 2.5],
 };
+// Cues shared by every game. These were once checked-in mono blips with no
+// generator; they are now synthesized by the same script and held to the same
+// bar. The upper bounds are deliberately tight: `tap`/`tick` fire many times
+// per second, so a regression that lengthens them would smear.
+//
+// NOTE: durations here are frame-count durations, which include the ~0.057 s
+// of encoder/decoder padding every MP3 carries. The decoded audio is shorter
+// by that amount — e.g. `tick` is a 0.05 s sound in a 0.10 s frame stream.
+// The duel bounds above were likewise set against this same measure.
+const sharedAssets = {
+  move: [.10, .21], move_opponent: [.14, .27], drop: [.12, .25],
+  flip: [.12, .25], tap: [.09, .20], tick: [.06, .15], tick_urgent: [.07, .17],
+  match_found: [.48, .68], your_turn: [.36, .54], timeout: [.62, .82],
+  win: [1.25, 1.55], lose: [1.05, 1.32], draw: [.70, .92],
+};
+const assets = { ...duelAssets, ...sharedAssets };
 
 function mp3Info(file) {
   const b = fs.readFileSync(file);
@@ -53,8 +70,22 @@ for (const [name, [min, max]] of Object.entries(assets)) {
   const info = mp3Info(a);
   assert.deepStrictEqual([info.channels, info.sampleRate], [2, 44100], `${name} format`);
   assert(info.duration >= min && info.duration <= max, `${name} duration ${info.duration.toFixed(2)}s`);
-  assert(info.bytes > 5000, `${name} is suspiciously small or silent`);
+  // Size is checked as a bitrate floor rather than a flat byte count, so the
+  // 0.05 s `tick` and the 30 s soundtrack are held to the same *quality* bar.
+  // 96 kbps is the floor below which VBR stereo starts audibly smearing.
+  const kbps = (info.bytes * 8) / info.duration / 1000;
+  assert(kbps > 96, `${name} encoded too low: ${kbps.toFixed(0)} kbps`);
+  assert(info.bytes > 1500, `${name} is suspiciously small or silent`);
   pass += 1;
+}
+
+// Every clip the players can hear must be stereo. The old shared cues were
+// mono, which on a phone collapsed them into the centre while the duel set
+// had a stereo image — the mismatch was audible when switching games.
+assert.strictEqual(Object.keys(assets).length, 23, 'all 23 game clips must be guarded');
+for (const name of Object.keys(sharedAssets)) {
+  assert.strictEqual(mp3Info(path.join(mobileDir, `${name}.mp3`)).channels, 2,
+    `${name} must be stereo like the rest of the set`);
 }
 
 assert.notDeepStrictEqual(
@@ -73,6 +104,12 @@ const mobileDuel = read('mobile/lib/screens/user/games/card_duel/card_duel_widge
 const webDuel = read('userweb/src/cardDuelGame.jsx');
 assert(generator.includes('RNG = np.random.default_rng(20260814)'));
 assert(generator.includes('No samples or third-party music are used'));
+// The generator must own every clip, so no asset can silently drift back to
+// being an unreproducible checked-in binary.
+for (const name of Object.keys(assets)) {
+  assert(generator.includes(`write("${name}.mp3"`), `generator does not produce ${name}.mp3`);
+}
+assert(generator.includes('quality=.0'), 'the looping soundtrack must use the top VBR tier');
 assert(/ReleaseMode\.loop/.test(dartAudio) && /setVolume\(0\.20\)/.test(dartAudio));
 assert(/duelMusic\.loop = true/.test(webAudio) && /duelMusic\.volume = 0\.20/.test(webAudio));
 for (const event of ['duelIntro', 'duelLock', 'duelRoundWin', 'duelRoundLose',
