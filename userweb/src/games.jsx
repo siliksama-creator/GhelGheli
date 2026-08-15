@@ -20,6 +20,18 @@ const GAMES = [
   { id: 'memory', title: 'جفت‌یاب', icon: '/games/memory/medal.webp', desc: 'جفت‌های فوتبالی را به خاطر بسپار', accent: '#A855F7', art: '/games/memory.webp' },
 ];
 
+// نامِ فارسیِ بازی از روی شناسهٔ فنی.
+// باگ: لیستِ لابی‌ها `l.gameId` خام را چاپ می‌کرد و کاربر «card_duel»
+// می‌دید، در حالی که همه‌جای دیگرِ برنامه نامِ فارسی است. سرور فقط
+// شناسه می‌فرستد، پس ترجمه وظیفهٔ کلاینت است. اگر روزی بازیِ جدیدی
+// اضافه شد و در GAMES نبود، خودِ شناسه برمی‌گردد نه رشتهٔ خالی.
+export function gameTitle(id) {
+  return GAMES.find(g => g.id === id)?.title || String(id || 'بازی');
+}
+function gameAccent(id) {
+  return GAMES.find(g => g.id === id)?.accent || '#38BDF8';
+}
+
 function tierLabel(level){
   const n=Number(level||0);
   if(n>=90) return {label:'افسانه‌ای', color:'#A855F7'};
@@ -229,11 +241,11 @@ export default function Games({ api, token, externalLaunch = null }) {
               <h3 style={{ color: '#FFF', fontWeight: '900', margin: 0, fontSize: '15px', display:'flex', alignItems:'center', gap:'6px' }}>
                 <DisplayName name={user?.nickname || 'قهرمان قلقلی'} cosmetics={user?.cosmetics} level={level?.level} />
               </h3>
-              <div style={{ background: 'rgba(255, 209, 102, 0.18)', border: '1px solid #FFD166', color: '#FFD166', padding: '3px 10px', borderRadius: '20px', fontWeight: '900', fontSize: '11px' }}>
+              <div style={{ background: 'rgba(255, 209, 102, 0.18)', border: '1px solid #FFD166', color: '#FFD166', padding: '3px 10px', borderRadius: '20px', fontWeight: '900', fontSize: '12.5px' }}>
                 {fa(user?.current_points || 0)} امتیاز
               </div>
             </div>
-            <p style={{ color: '#E2E8F0', fontSize: '11px', margin: 0, lineHeight: 1.4, fontWeight: '600' }}>
+            <p style={{ color: '#E2E8F0', fontSize: '12.5px', margin: 0, lineHeight: 1.5, fontWeight: '600' }}>
               آنلاین بازی کن، XP بگیر
             </p>
           </div>
@@ -242,10 +254,10 @@ export default function Games({ api, token, externalLaunch = null }) {
           <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '10px 12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ background: t.color+'22', border: '1px solid '+t.color+'88', color: t.color, padding: '2px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '900' }}>Level {lvl}</span>
+                <span style={{ background: t.color+'22', border: '1px solid '+t.color+'88', color: t.color, padding: '2px 8px', borderRadius: '6px', fontSize: '12.5px', fontWeight: '900' }}>Level {lvl}</span>
                 <span style={{ color: t.color, fontWeight: '800', fontSize: '12px' }}>{t.label}</span>
               </div>
-              <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', fontWeight: '700' }}>
+              <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12.5px', fontWeight: '700' }}>
                 {isMax ? 'MAX' : `${fa(into)} / ${fa(needed)}`}
               </span>
             </div>
@@ -275,7 +287,7 @@ export default function Games({ api, token, externalLaunch = null }) {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
             <h3 style={{ color: '#FFF', fontWeight: '900', margin: 0, fontSize: '15px' }}>بازی ضربه‌زن (تک‌نفره)</h3>
-            <span style={{ background: '#84CC16', color: '#000', padding: '2px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold' }}>۵۰ لول</span>
+            <span style={{ background: '#84CC16', color: '#000', padding: '2px 8px', borderRadius: '6px', fontSize: '12.5px', fontWeight: 'bold' }}>۵۰ لول</span>
           </div>
           <p style={{ color: '#CBD5E1', fontSize: '12px', margin: 0 }}>ضربه بزن، شخصیت باز کن، امتیاز بگیر</p>
         </div>
@@ -301,7 +313,7 @@ export default function Games({ api, token, externalLaunch = null }) {
               background: mode === m.id ? `${m.color}22` : 'rgba(255,255,255,0.04)',
               color: mode === m.id ? '#FFF' : '#94A3B8',
               fontWeight: '900',
-              fontSize: '11px',
+              fontSize: '12.5px',
               cursor: 'pointer',
               display: 'flex',
               flexDirection: 'column',
@@ -366,7 +378,7 @@ export default function Games({ api, token, externalLaunch = null }) {
                     background: customGame === g.id ? 'rgba(168, 85, 247, 0.3)' : 'rgba(255,255,255,0.05)',
                     color: '#FFF',
                     fontWeight: 'bold',
-                    fontSize: '11px',
+                    fontSize: '12.5px',
                     cursor: 'pointer',
                   }}
                 >
@@ -387,7 +399,7 @@ export default function Games({ api, token, externalLaunch = null }) {
                     border: customStake === s ? '1.5px solid #A855F7' : '1px solid rgba(255,255,255,0.1)',
                     background: customStake === s ? '#A855F7' : 'rgba(255,255,255,0.05)',
                     color: '#FFF',
-                    fontSize: '11px',
+                    fontSize: '12.5px',
                     fontWeight: 'bold',
                     cursor: 'pointer',
                     whiteSpace: 'nowrap',
@@ -435,13 +447,20 @@ export default function Games({ api, token, externalLaunch = null }) {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {lobbies.map(l => (
-                  <div key={l.lobbyId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'rgba(255,255,255,0.04)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                    <div>
-                      <div style={{ fontWeight: 'bold', color: '#FFF', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div key={l.lobbyId} className="lobbyRow" style={{ '--lobby-accent': gameAccent(l.gameId) }}>
+                    <span className="lobbyDot" aria-hidden="true">{l.hasPassword ? '🔒' : '🎮'}</span>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div className="lobbyHost">
                         <span>{l.hostName}</span>
-                        {l.hasPassword && <span title="دارای رمز عبور">🔒</span>}
+                        {l.hasPassword && <span className="lobbyLock" title="دارای رمز عبور">رمزدار</span>}
                       </div>
-                      <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '2px' }}>بازی: {l.gameId} · {l.stake===0 ? 'رایگان' : fa(l.stake)+' امتیاز'}</div>
+                      <div className="lobbyMeta">
+                        <b>{gameTitle(l.gameId)}</b>
+                        <span className="lobbySep">·</span>
+                        <span className={l.stake === 0 ? 'lobbyFree' : 'lobbyStake'}>
+                          {l.stake === 0 ? 'رایگان' : `${fa(l.stake)} امتیاز`}
+                        </span>
+                      </div>
                     </div>
                     <button
                       type="button"
@@ -459,7 +478,7 @@ export default function Games({ api, token, externalLaunch = null }) {
                           lobbyId: l.lobbyId, password: pass,
                         }));
                       }}
-                      style={{ background: '#22E7A6', color: '#000', padding: '6px 14px', borderRadius: '16px', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}
+                      className="lobbyJoin"
                     >
                       پیوستن
                     </button>
@@ -640,11 +659,11 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.35)', padding: '10px 16px', borderRadius: '16px', marginBottom: '16px', border: '1px solid rgba(255,255,255,0.1)' }}>
           <div style={{ display:'flex', flex:'1 1 0', minWidth:0, alignItems:'center', gap:'8px', borderBottom:g.turn==='X'?'2px solid #38BDF8':'none', paddingBottom:'4px' }}>
             <GamePlayerIdentity player={pX} fallback="کاربر ۱" />
-            {g.turn === 'X' && <span style={{ background: '#38BDF8', color: '#000', padding: '2px 6px', borderRadius: '6px', fontSize: '10px', fontWeight: 'bold' }}>نوبت ({fa(secondsLeft)}s)</span>}
+            {g.turn === 'X' && <span style={{ background: '#38BDF8', color: '#000', padding: '2px 6px', borderRadius: '7px', fontSize: '12.5px', fontWeight: '900' }}>نوبت ({fa(secondsLeft)}s)</span>}
           </div>
           <span style={{ color: '#94A3B8', fontWeight: '900', fontSize: '14px' }}>VS</span>
           <div style={{ display:'flex', flex:'1 1 0', minWidth:0, justifyContent:'flex-end', alignItems:'center', gap:'8px', borderBottom:g.turn==='O'?'2px solid #F59E0B':'none', paddingBottom:'4px' }}>
-            {g.turn === 'O' && <span style={{ background: '#F59E0B', color: '#000', padding: '2px 6px', borderRadius: '6px', fontSize: '10px', fontWeight: 'bold' }}>نوبت ({fa(secondsLeft)}s)</span>}
+            {g.turn === 'O' && <span style={{ background: '#F59E0B', color: '#000', padding: '2px 6px', borderRadius: '7px', fontSize: '12.5px', fontWeight: '900' }}>نوبت ({fa(secondsLeft)}s)</span>}
             <GamePlayerIdentity player={pO} fallback="کاربر ۲" />
           </div>
         </div>

@@ -1,7 +1,8 @@
 // Public chat room: Categorized Canned Messages & Emoji Palette (no custom text typing, no stickers).
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { io } from 'socket.io-client';
 
-import { req, asset, fa, avatarUrl } from '../lib/api.js';
+import { req, asset, fa, avatarUrl, API } from '../lib/api.js';
 import { CosmeticAvatarFrame, DisplayName } from '../components/Cosmetics.jsx';
 
 const EMOJIS = [
@@ -9,6 +10,35 @@ const EMOJIS = [
   '🎯', '⭐', '❤️', '🚀', '👑', '🥳', '🥇', '💯',
   '🧤', '⚡', '🤩', '👍', '🎮', '🍿', '🎩', '💎',
 ];
+
+/* پیامی که فقط ایموجی است حباب نمی‌خواهد؛ بزرگ و بدون کادر قشنگ‌تر است.
+   محدود به حداکثر سه ایموجی تا یک پیامِ متنیِ کوتاه اشتباه گرفته نشود. */
+const ONLY_EMOJI = /^(?:\p{Extended_Pictographic}\uFE0F?){1,3}$/u;
+
+/* ساعتِ پیام — سرور `sent_at` را همیشه می‌فرستد ولی هیچ‌کدام از دو کلاینت
+   نشانش نمی‌دادند، پس کاربر نمی‌فهمید پیام مالِ پنج دقیقه پیش است یا دیروز.
+   خروجی عمداً کوتاه است (فقط ساعت و دقیقه) تا کنارِ نام جا شود؛ برای پیامِ
+   قدیمی‌تر از امروز، روز هم اضافه می‌شود وگرنه «۱۴:۳۲» گمراه‌کننده است.
+   تاریخِ نامعتبر رشتهٔ خالی برمی‌گرداند تا هرگز «Invalid Date» دیده نشود. */
+function msgTime(raw) {
+  if (!raw) return '';
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return '';
+  try {
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tehran' });
+    const that = d.toLocaleDateString('en-CA', { timeZone: 'Asia/Tehran' });
+    const hm = d.toLocaleTimeString('fa-IR-u-nu-arabext', {
+      timeZone: 'Asia/Tehran', hour: '2-digit', minute: '2-digit',
+    });
+    if (today === that) return hm;
+    const day = d.toLocaleDateString('fa-IR-u-nu-arabext', {
+      timeZone: 'Asia/Tehran', month: 'numeric', day: 'numeric',
+    });
+    return `${day} · ${hm}`;
+  } catch {
+    return '';
+  }
+}
 
 const BASE_CATEGORIES = [
   { title: '💬 گفتگو', items: ['سلام بچه‌ها!', 'من اومدم!', 'چه خبر بچه‌ها؟', 'خداحافظ تا بعد!', 'مواظب خودتون باشید!', 'خوشبختم دوستان!', 'کجا زندگی می‌کنید؟', 'امروز چیکار کردید؟'] },
@@ -60,6 +90,14 @@ export default function Chat({ token, openProfile, meId }) {
       if (res) {
         setPinned(res.config?.pinned || null);
         setEmotePacks(Array.isArray(res.config?.emotePacks) ? res.config.emotePacks : []);
+        // اندروید این را چک می‌کرد و وب نه: کاربرِ واجدشرایط‌نشده صفحهٔ
+        // خالی می‌دید بدون هیچ توضیحی که چرا. سرور `eligible:false` را
+        // در همین پاسخ می‌فرستد.
+        if (res.config?.eligible === false) {
+          setErr(`برای چت باید حداقل ${fa(res.config.minLifetimePoints)} امتیاز تاریخی داشته باشید.`);
+          setLoading(false);
+          return;
+        }
         const msgs = res.messages || [];
         const grew = msgs.length > lastCount.current;
         lastCount.current = msgs.length;
@@ -78,6 +116,31 @@ export default function Chat({ token, openProfile, meId }) {
 
   useEffect(() => {
     load();
+
+    // سرور از همان اول `chat:new` را emit می‌کرد ولی هیچ کلاینتی گوش
+    // نمی‌داد، پس چت عملاً هر ۵ ثانیه یک‌بار «زنده» می‌شد. حالا پیام
+    // بی‌درنگ می‌رسد و polling فقط تورِ ایمنیِ قطعیِ سوکت است — با فاصلهٔ
+    // ۱۵ ثانیه به‌جای ۵، چون دیگر مسیرِ اصلی نیست (⅓ ترافیک قبلی).
+    let socket = null;
+    try {
+      socket = io(API, {
+        auth: { token }, transports: ['websocket', 'polling'],
+        forceNew: true, reconnection: true,
+      });
+      socket.on('chat:new', msg => {
+        if (!alive.current || !msg?.id) return;
+        setMessages(prev => {
+          // سرور پیام را به فرستنده هم برمی‌گرداند و `sendCanned` خودش آن
+          // را اضافه می‌کند؛ بدون این نگهبان، پیامِ خودت دو بار می‌نشست.
+          if (prev.some(m => String(m.id) === String(msg.id))) return prev;
+          const next = [...prev, msg];
+          lastCount.current = next.length;
+          return next;
+        });
+        scrollDown();
+      });
+    } catch { /* سوکت اختیاری است؛ polling پایین کار را ادامه می‌دهد */ }
+
     const timer = setInterval(() => {
       req('/api/chat/messages', 'GET', null, token).then(msgs => {
         if (!alive.current || !Array.isArray(msgs)) return;
@@ -86,8 +149,12 @@ export default function Chat({ token, openProfile, meId }) {
         setMessages(msgs);
         if (grew) scrollDown();
       }).catch(() => {});
-    }, 5000);
-    return () => clearInterval(timer);
+    }, 15000);
+
+    return () => {
+      clearInterval(timer);
+      try { socket?.off('chat:new'); socket?.disconnect(); } catch { /* noop */ }
+    };
   }, [load, token, scrollDown]);
 
   const sendCanned = async (text) => {
@@ -140,11 +207,25 @@ export default function Chat({ token, openProfile, meId }) {
       {err && <div className="err" style={{ margin: '12px' }}>{err}</div>}
 
       <div ref={boxRef} style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {messages.length === 0 && (
+          /* بدونِ این، چتِ خالی یک مستطیلِ سیاه بود و کاربر فکر می‌کرد
+             بارگذاری نشده. */
+          <div className="chatEmpty">
+            <span className="chatEmptyIcon">💬</span>
+            <b>هنوز پیامی نیست</b>
+            <small>اولین نفری باش که سلام می‌کند — از دکمه‌های پایین انتخاب کن.</small>
+          </div>
+        )}
         {messages.map(m => {
-          const isMe = String(m.user_id) === String(meId);
+          // سرور `is_mine` را حساب می‌کند (تک‌منبعِ حقیقت، آینهٔ اندروید).
+          // مقایسه با `meId` به‌عنوان پشتیبان می‌ماند چون پیامی که از
+          // broadcast سوکت می‌آید عمداً `is_mine` ندارد.
+          const isMe = m.is_mine === true || String(m.user_id) === String(meId);
+          const time = msgTime(m.sent_at);
+          const onlyEmoji = ONLY_EMOJI.test((m.message_text || '').trim());
           return (
-            <div key={m.id} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-              <CosmeticAvatarFrame frame={m.cosmetics?.frame} style={{width:42,height:42,padding:m.cosmetics?.frame?3:0}}>
+            <div key={m.id} className={`chatMsg${isMe ? ' me' : ''}`}>
+              <CosmeticAvatarFrame frame={m.cosmetics?.frame} style={{width:38,height:38,padding:m.cosmetics?.frame?3:0,flexShrink:0}}>
                 <img
                   src={m.profile_image_url ? asset(m.profile_image_url) : avatarUrl(m.profile_avatar_key)}
                   alt=""
@@ -152,25 +233,32 @@ export default function Chat({ token, openProfile, meId }) {
                   onClick={() => openProfile && openProfile(m.user_id)}
                 />
               </CosmeticAvatarFrame>
-              <div style={{ flex: 1, maxWidth: '85%' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
-                  <DisplayName name={m.nickname || m.first_name || 'کاربر'} cosmetics={m.cosmetics} level={m.level} />
-                  <button type="button" onClick={() => setReply(m)} style={{ background: 'none', border: 'none', color: '#D7DEE8', fontSize: '11px', cursor: 'pointer' }}>↩ پاسخ</button>
+              <div className="chatMsgBody">
+                <div className="chatMsgHead">
+                  {!isMe && <DisplayName name={m.nickname || m.first_name || 'کاربر'} cosmetics={m.cosmetics} level={m.level} />}
+                  {isMe && <b className="chatMeTag">شما</b>}
+                  {time && <span className="chatTime">{time}</span>}
                 </div>
 
                 {m.reply_text && (
-                  <div style={{ background: 'rgba(255,255,255,0.06)', borderRight: '2px solid #22E7A6', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', color: '#CBD5E1', marginBottom: '4px' }}>
-                    {m.reply_nickname}: {m.reply_text}
+                  <div className="chatQuote">
+                    <b>{m.reply_nickname}</b>
+                    <span>{m.reply_text}</span>
                   </div>
                 )}
 
-                <div style={{ background: isMe ? 'rgba(56, 189, 248, 0.18)' : 'rgba(255,255,255,0.05)', border: isMe ? '1px solid rgba(56, 189, 248, 0.35)' : '1px solid rgba(255,255,255,0.08)', padding: '8px 12px', borderRadius: '12px', color: '#FFF', fontSize: '13px', userSelect: 'text', WebkitUserSelect: 'text', cursor: 'text' }}>
+                <div className={`chatBubble${isMe ? ' me' : ''}${onlyEmoji ? ' emoji' : ''}`}>
                   {m.message_text}
                 </div>
 
-                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '2px' }}>
-                  <button type="button" onClick={() => toggleLike(m)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', color: m.liked_by_me ? '#EF4444' : '#94A3B8' }}>
+                <div className="chatMsgFoot">
+                  <button type="button" onClick={() => toggleLike(m)}
+                    className={`chatAct${m.liked_by_me ? ' liked' : ''}`}
+                    aria-label="پسندیدن">
                     {m.liked_by_me ? '❤️' : '🤍'} {m.like_count > 0 ? fa(m.like_count) : ''}
+                  </button>
+                  <button type="button" onClick={() => setReply(m)} className="chatAct" aria-label="پاسخ">
+                    ↩ پاسخ
                   </button>
                 </div>
               </div>
@@ -180,9 +268,13 @@ export default function Chat({ token, openProfile, meId }) {
       </div>
 
       {reply && (
-        <div style={{ background: 'rgba(0,0,0,0.4)', padding: '6px 14px', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-          <span>پاسخ به {reply.nickname}: {reply.message_text}</span>
-          <button type="button" onClick={() => setReply(null)} style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer' }}>✕</button>
+        <div className="chatReplyBar">
+          <span className="chatReplyIcon">↩</span>
+          <div className="chatReplyText">
+            <b>پاسخ به {reply.nickname}</b>
+            <span>{reply.message_text}</span>
+          </div>
+          <button type="button" onClick={() => setReply(null)} className="chatReplyX" aria-label="لغو پاسخ">✕</button>
         </div>
       )}
 

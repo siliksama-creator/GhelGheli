@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../api_client.dart';
 import '../../core/cosmetics.dart';
@@ -11,6 +12,38 @@ import '../../widgets/state_views.dart';
 import '../../widgets/lifecycle_poller.dart';
 import '../shared/public_profile_sheet.dart';
 import 'games/pinned_banner.dart';
+
+/// افستِ ثابتِ تهران. ایران از ۱۴۰۱ ساعتِ تابستانی ندارد، پس یک عددِ ثابت
+/// دقیق است و نیازی به دیتابیسِ منطقهٔ زمانی نیست. سمتِ وب هم همین را با
+/// `timeZone: 'Asia/Tehran'` می‌گیرد، پس دو کلاینت یک ساعت نشان می‌دهند.
+const Duration _tehranOffset = Duration(hours: 3, minutes: 30);
+
+/// ساعتِ پیام — آینهٔ `msgTime` در وب. سرور `sent_at` را همیشه می‌فرستاد ولی
+/// هیچ‌کدام از دو کلاینت نشانش نمی‌دادند. برای پیامِ امروز فقط ساعت و دقیقه،
+/// وگرنه روز هم می‌آید تا «۱۴:۳۲» گمراه‌کننده نباشد. ورودیِ نامعتبر رشتهٔ
+/// خالی می‌دهد تا هرگز متنِ خراب روی صفحه نیفتد.
+String chatTime(Object? raw) {
+  if (raw == null) return '';
+  final parsed = DateTime.tryParse('$raw');
+  if (parsed == null) return '';
+  final t = parsed.toUtc().add(_tehranOffset);
+  final now = DateTime.now().toUtc().add(_tehranOffset);
+  final hm = '${faNum(t.hour.toString().padLeft(2, '0'))}:'
+      '${faNum(t.minute.toString().padLeft(2, '0'))}';
+  final sameDay = t.year == now.year && t.month == now.month && t.day == now.day;
+  if (sameDay) return hm;
+  return '${faNum(t.month)}/${faNum(t.day)} · $hm';
+}
+
+/// پیامی که فقط ایموجی است حباب نمی‌خواهد. سقفِ سه ایموجی گذاشته شده تا
+/// یک پیامِ متنیِ کوتاه اشتباه گرفته نشود.
+final RegExp _emojiOnly = RegExp(
+  r'^(?:[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}]'
+  r'[\u{FE0F}\u{200D}]?){1,3}$',
+  unicode: true,
+);
+
+bool isOnlyEmoji(String text) => _emojiOnly.hasMatch(text.trim());
 
 /// Group chat room: Canned messages only (no custom typing, no stickers).
 class ChatPage extends StatefulWidget {
@@ -34,17 +67,61 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
   int _cooldownLeft = 0;
   Timer? _cooldownTimer;
   bool _loading = true;
+  io.Socket? _socket;
 
   @override
   void initState() {
     super.initState();
     _load();
-    startPolling(const Duration(seconds: 4), _refreshMessages);
+    _connectSocket();
+    // polling حالا فقط تورِ ایمنیِ قطعیِ سوکت است، نه مسیرِ اصلیِ رسیدنِ
+    // پیام؛ پس فاصله از ۴ به ۱۵ ثانیه رفت (کمتر از ⅓ ترافیک و مصرفِ باتری).
+    startPolling(const Duration(seconds: 15), _refreshMessages);
+  }
+
+  /// سرور از همان اول `chat:new` را emit می‌کرد ولی هیچ کلاینتی گوش نمی‌داد،
+  /// پس چت عملاً هر چند ثانیه یک‌بار «زنده» می‌شد. آینهٔ همین کار در وب.
+  void _connectSocket() {
+    try {
+      final s = io.io(
+        widget.api.baseUrl,
+        io.OptionBuilder()
+            .setTransports(['websocket', 'polling'])
+            .setAuth({'token': widget.api.token})
+            .enableForceNew()
+            .enableReconnection()
+            .setReconnectionDelay(800)
+            .setReconnectionDelayMax(5000)
+            .build(),
+      );
+      _socket = s;
+      s.on('chat:new', (data) {
+        if (!mounted || data is! Map) return;
+        final id = data['id'];
+        if (id == null) return;
+        // سرور پیام را به فرستنده هم برمی‌گرداند و مسیرِ ارسال خودش آن را
+        // اضافه می‌کند؛ بدون این نگهبان پیامِ خودت دو بار می‌نشست.
+        final exists = _messages.any((m) => m is Map && '${m['id']}' == '$id');
+        if (exists) return;
+        setState(() {
+          _messages = [..._messages, Map<String, dynamic>.from(data)];
+          _lastCount = _messages.length;
+        });
+        _scrollToBottom();
+      });
+    } catch (_) {
+      // سوکت اختیاری است؛ polling کار را ادامه می‌دهد.
+    }
   }
 
   @override
   void dispose() {
     stopPolling();
+    try {
+      _socket?.off('chat:new');
+      _socket?.dispose();
+    } catch (_) {}
+    _socket = null;
     _cooldownTimer?.cancel();
     _scroll.dispose();
     super.dispose();
@@ -188,7 +265,6 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
       );
     }
 
-    final theme = Theme.of(context);
     return Column(
       children: [
         if (_pinned != null)
@@ -196,7 +272,31 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
             pinned: _pinned!,
           ),
         Expanded(
-          child: ListView.builder(
+          child: _messages.isEmpty
+              // بدونِ این، چتِ خالی یک صفحهٔ سیاهِ خام بود و کاربر فکر
+              // می‌کرد بارگذاری نشده. آینهٔ `.chatEmpty` در وب.
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 18),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('💬', style: TextStyle(fontSize: 40, color: Colors.white.withValues(alpha: 0.65))),
+                        const SizedBox(height: 9),
+                        const Text('هنوز پیامی نیست',
+                            style: TextStyle(
+                                fontSize: 14.5, fontWeight: FontWeight.w800, color: Color(0xFFCBD5E1))),
+                        const SizedBox(height: 5),
+                        const Text(
+                          'اولین نفری باش که سلام می‌کند — از دکمه‌های پایین انتخاب کن.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 12.5, height: 1.6, color: Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : ListView.builder(
             controller: _scroll,
             padding: const EdgeInsets.symmetric(horizontal: Gaps.md, vertical: Gaps.sm),
             itemCount: _messages.length,
@@ -220,22 +320,39 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
         ),
         if (_reply != null)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            color: theme.colorScheme.surfaceContainerHigh,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: const BoxDecoration(
+              color: Color(0xFF0B1220),
+              border: Border(top: BorderSide(color: Colors.white12)),
+            ),
             child: Row(
               children: [
-                const Icon(Icons.reply_rounded, size: 18),
-                const SizedBox(width: 8),
+                const Icon(Icons.reply_rounded, size: 17, color: BrandColors.emerald),
+                const SizedBox(width: 9),
                 Expanded(
-                  child: Text(
-                    'پاسخ به ${_reply!['nickname'] ?? 'کاربر'}: ${_reply!['message_text'] ?? ''}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'پاسخ به ${_reply!['nickname'] ?? 'کاربر'}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 11, fontWeight: FontWeight.w800, color: BrandColors.emerald),
+                      ),
+                      Text(
+                        '${_reply!['message_text'] ?? ''}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                      ),
+                    ],
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close_rounded, size: 16),
+                  icon: const Icon(Icons.close_rounded, size: 17, color: Color(0xFFEF4444)),
+                  visualDensity: VisualDensity.compact,
+                  tooltip: 'لغو پاسخ',
                   onPressed: () => setState(() => _reply = null),
                 ),
               ],
@@ -276,102 +393,167 @@ class _MessageBubble extends StatelessWidget {
     final liked = message['liked_by_me'] == true;
     final likes = (message['like_count'] as num?)?.toInt() ?? 0;
     final cosmetics = message['cosmetics'] is Map ? message['cosmetics'] as Map : const {};
+    final time = chatTime(message['sent_at']);
+    final onlyEmoji = isOnlyEmoji(text);
+
+    final avatar = InkWell(
+      onTap: onOpenProfile,
+      borderRadius: BorderRadius.circular(16),
+      child: CosmeticAvatarFrame(
+        frame: cosmetics['frame'] as String?,
+        padding: 2,
+        child: AvatarImage(
+          keyName: message['profile_avatar_key'],
+          imageUrl: message['profile_image_url'],
+          radius: 16,
+        ),
+      ),
+    );
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
+        // پیامِ خودم از سمتِ مقابل می‌آید — بدون این، در یک چتِ شلوغ
+        // پیدا کردنِ حرفِ خودت فقط از روی رنگِ حباب ممکن بود.
+        textDirection: isMe ? TextDirection.ltr : TextDirection.rtl,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          InkWell(
-            onTap: onOpenProfile,
-            borderRadius: BorderRadius.circular(16),
-            child: CosmeticAvatarFrame(
-              frame: cosmetics['frame'] as String?,
-              padding: 2,
-              child: AvatarImage(
-                keyName: message['profile_avatar_key'],
-                imageUrl: message['profile_image_url'],
-                radius: 16,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
+          avatar,
+          const SizedBox(width: 9),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
               children: [
                 Row(
+                  textDirection: TextDirection.rtl,
+                  mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    InkWell(
-                      onTap: onOpenProfile,
-                      child: DisplayName(
-                        name: message['nickname'] ?? 'کاربر',
-                        cosmetics: cosmetics,
-                        level: (message['level'] as num?)?.toInt(),
-                        style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w800),
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.reply_rounded, size: 14),
-                      visualDensity: VisualDensity.compact,
-                      onPressed: onReply,
-                    ),
+                    if (!isMe)
+                      Flexible(
+                        child: InkWell(
+                          onTap: onOpenProfile,
+                          child: DisplayName(
+                            name: message['nickname'] ?? 'کاربر',
+                            cosmetics: cosmetics,
+                            level: (message['level'] as num?)?.toInt(),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                                fontSize: 12, fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                      )
+                    else
+                      const Text('شما',
+                          style: TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.w800, color: BrandColors.blue)),
+                    if (time.isNotEmpty) ...[
+                      const SizedBox(width: 7),
+                      Text(time,
+                          style: const TextStyle(
+                              fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
+                    ],
                   ],
                 ),
+                const SizedBox(height: 3),
                 if (message['reply_text'] != null)
                   Container(
                     margin: const EdgeInsets.only(bottom: 4),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(6),
-                      border: const Border(right: BorderSide(color: BrandColors.emerald, width: 2)),
+                      color: Colors.white.withValues(alpha: 0.04),
+                      borderRadius: BorderRadius.circular(8),
+                      border: const BorderDirectional(
+                          start: BorderSide(color: BrandColors.emerald, width: 2)),
                     ),
-                    child: Text(
-                      '${message['reply_nickname'] ?? ''}: ${message['reply_text']}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 10, color: Colors.white70),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('${message['reply_nickname'] ?? ''}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 10.5, fontWeight: FontWeight.w800, color: BrandColors.emerald)),
+                        Text('${message['reply_text']}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8))),
+                      ],
                     ),
                   ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isMe ? BrandColors.blue.withValues(alpha: 0.20) : theme.colorScheme.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isMe ? BrandColors.blue.withValues(alpha: 0.35) : Colors.transparent,
+                if (onlyEmoji)
+                  // ایموجیِ تنها حباب نمی‌خواهد؛ بزرگ و بدون کادر.
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    child: Text(text, style: const TextStyle(fontSize: 36, height: 1.15)),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isMe
+                          ? BrandColors.blue.withValues(alpha: 0.20)
+                          : theme.colorScheme.surfaceContainerHigh,
+                      borderRadius: BorderRadiusDirectional.only(
+                        topStart: Radius.circular(isMe ? 14 : 4),
+                        topEnd: Radius.circular(isMe ? 4 : 14),
+                        bottomStart: const Radius.circular(14),
+                        bottomEnd: const Radius.circular(14),
+                      ),
+                      border: Border.all(
+                        color: isMe
+                            ? BrandColors.blue.withValues(alpha: 0.35)
+                            : Colors.white.withValues(alpha: 0.08),
+                      ),
                     ),
+                    child: Text(text, style: const TextStyle(fontSize: 13.5, height: 1.55)),
                   ),
-                  child: Text(text, style: const TextStyle(fontSize: 13, height: 1.35)),
-                ),
+                const SizedBox(height: 2),
                 Row(
+                  textDirection: TextDirection.rtl,
+                  mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     InkWell(
                       onTap: onLike,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                         child: Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
                               liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                              size: 13,
+                              size: 14,
                               color: liked ? const Color(0xFFEF4444) : Colors.white54,
                             ),
                             if (likes > 0) ...[
                               const SizedBox(width: 3),
                               Text(
-                                '$likes',
+                                faNum(likes),
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 11.5,
                                   color: liked ? const Color(0xFFEF4444) : Colors.white54,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ],
+                          ],
+                        ),
+                      ),
+                    ),
+                    InkWell(
+                      onTap: onReply,
+                      borderRadius: BorderRadius.circular(10),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.reply_rounded, size: 14, color: Color(0xFF94A3B8)),
+                            SizedBox(width: 3),
+                            Text('پاسخ',
+                                style: TextStyle(
+                                    fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8))),
                           ],
                         ),
                       ),
@@ -490,7 +672,7 @@ class _CannedMessagesPanelState extends State<_CannedMessagesPanel> {
                   ),
                   child: Text(
                     'صبر کنید (${faNum(widget.cooldownLeft)})',
-                    style: const TextStyle(color: Color(0xFFEF4444), fontSize: 10, fontWeight: FontWeight.w800),
+                    style: const TextStyle(color: Color(0xFFEF4444), fontSize: 11.5, fontWeight: FontWeight.w800),
                   ),
                 ),
             ],

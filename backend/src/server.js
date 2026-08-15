@@ -1803,7 +1803,8 @@ app.get('/api/chat/bootstrap', auth, asyncHandler(async (req, res) => {
   const { rows } = await pool.query(`SELECT m.*, u.nickname,u.first_name,u.last_name,u.profile_image_url,u.profile_avatar_key,
       rm.message_text AS reply_text, rm.message_type AS reply_type, ru.nickname AS reply_nickname,
       (SELECT count(*)::int FROM chat_message_likes l WHERE l.message_id=m.id) AS like_count,
-      EXISTS(SELECT 1 FROM chat_message_likes l WHERE l.message_id=m.id AND l.user_id=$1) AS liked_by_me
+      EXISTS(SELECT 1 FROM chat_message_likes l WHERE l.message_id=m.id AND l.user_id=$1) AS liked_by_me,
+      (m.user_id=$1) AS is_mine
     FROM chat_messages m
     JOIN users u ON u.id=m.user_id
     LEFT JOIN chat_messages rm ON rm.id=m.reply_to_message_id
@@ -1840,7 +1841,8 @@ app.get('/api/chat/messages', auth, asyncHandler(async (req, res) => {
   const { rows } = await pool.query(`SELECT m.*, u.nickname,u.first_name,u.last_name,u.profile_image_url,u.profile_avatar_key,
       rm.message_text AS reply_text, rm.message_type AS reply_type, ru.nickname AS reply_nickname,
       (SELECT count(*)::int FROM chat_message_likes l WHERE l.message_id=m.id) AS like_count,
-      EXISTS(SELECT 1 FROM chat_message_likes l WHERE l.message_id=m.id AND l.user_id=$1) AS liked_by_me
+      EXISTS(SELECT 1 FROM chat_message_likes l WHERE l.message_id=m.id AND l.user_id=$1) AS liked_by_me,
+      (m.user_id=$1) AS is_mine
     FROM chat_messages m
     JOIN users u ON u.id=m.user_id
     LEFT JOIN chat_messages rm ON rm.id=m.reply_to_message_id
@@ -1891,8 +1893,12 @@ app.post('/api/chat/messages', auth, chatLimiter, asyncHandler(async (req, res) 
   // every old message but vanished from their own new one until the page was
   // reloaded — reading as "my badge stopped working".
   const cosNew = await shop.cosmeticsFor([req.user.id]);
-  const msg = { ...rows[0], nickname: req.user.nickname, first_name: req.user.first_name, last_name: req.user.last_name, profile_image_url: req.user.profile_image_url, profile_avatar_key: req.user.profile_avatar_key, like_count: 0, liked_by_me: false, cosmetics: cosNew.get(req.user.id) || null };
-  io.emit('chat:new', msg);
+  const msg = { ...rows[0], nickname: req.user.nickname, first_name: req.user.first_name, last_name: req.user.last_name, profile_image_url: req.user.profile_image_url, profile_avatar_key: req.user.profile_avatar_key, like_count: 0, liked_by_me: false, is_mine: true, cosmetics: cosNew.get(req.user.id) || null };
+  // `is_mine` مخصوصِ گیرنده است. اگر همین شیء broadcast شود، همهٔ کاربران
+  // پیام را «مالِ خودم» می‌بینند و در سمتِ چپ با رنگِ آبی رندر می‌کنند.
+  // پس نسخهٔ عمومی بدون این پرچم می‌رود و فقط پاسخِ HTTP آن را دارد.
+  const { is_mine: _mine, ...publicMsg } = msg;
+  io.emit('chat:new', publicMsg);
   res.json(msg);
 }));
 
@@ -2425,7 +2431,10 @@ io.on('connection', socket => {
       // seconds earlier does not show on the sender's own new message.
       const cosWs = await shop.cosmeticsFor([socket.user.id]);
       const msg = { ...rows[0], nickname: socket.user.nickname, first_name: socket.user.first_name, last_name: socket.user.last_name, profile_image_url: socket.user.profile_image_url, profile_avatar_key: socket.user.profile_avatar_key, like_count: 0, cosmetics: cosWs.get(socket.user.id) || null };
-      io.emit('chat:new', msg); cb && cb({ ok: true, message: msg });
+      // مثل مسیرِ REST: نسخهٔ عمومی بدونِ `is_mine` broadcast می‌شود و فقط
+      // خودِ فرستنده آن را در callback با پرچمِ true می‌گیرد.
+      io.emit('chat:new', msg);
+      cb && cb({ ok: true, message: { ...msg, is_mine: true } });
     } catch(e){ cb && cb({ ok: false, error: e.message }); }
   });
 

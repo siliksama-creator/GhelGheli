@@ -5344,3 +5344,149 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
     animation: none !important; transform: none !important;
   }
 }
+
+/* ═══ ردیفِ لابی ═══════════════════════════════════════════════════════
+   قبلاً یک کادرِ خاکستریِ بی‌هویت بود که «بازی: card_duel» را چاپ می‌کرد.
+   حالا رنگِ لهجهٔ همان بازی روی نوارِ کناری و آیکون می‌نشیند، پس کاربر
+   بدون خواندن هم می‌فهمد کدام بازی است. `--lobby-accent` را React ست
+   می‌کند تا این فایل لازم نباشد نامِ بازی‌ها را بداند. */
+.lobbyRow{
+  display:flex; align-items:center; gap:11px;
+  padding:11px 13px; border-radius:14px;
+  background:linear-gradient(90deg,
+    color-mix(in srgb,var(--lobby-accent) 13%,transparent), #ffffff08 62%);
+  border:1px solid color-mix(in srgb,var(--lobby-accent) 26%,transparent);
+  border-inline-start:3px solid var(--lobby-accent);
+  transition:transform .16s cubic-bezier(.2,.8,.2,1), box-shadow .16s, border-color .16s;
+}
+.lobbyRow:hover{
+  transform:translateY(-2px);
+  border-color:color-mix(in srgb,var(--lobby-accent) 55%,transparent);
+  box-shadow:0 10px 22px #0006;
+}
+.lobbyDot{
+  width:38px; height:38px; flex-shrink:0; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; font-size:17px;
+  background:color-mix(in srgb,var(--lobby-accent) 17%,#0b1220);
+  border:1px solid color-mix(in srgb,var(--lobby-accent) 34%,transparent);
+}
+.lobbyHost{
+  display:flex; align-items:center; gap:6px;
+  font-weight:800; font-size:13.5px; color:#fff;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.lobbyLock{
+  flex-shrink:0; font-size:10.5px; font-weight:800; color:#FFD166;
+  background:#FFD16618; border:1px solid #FFD16640;
+  padding:1px 7px; border-radius:99px;
+}
+.lobbyMeta{
+  display:flex; align-items:center; gap:6px; margin-top:3px;
+  font-size:12.5px; color:#94A3B8; white-space:nowrap;
+}
+.lobbyMeta b{ color:var(--lobby-accent); font-weight:800; }
+.lobbySep{ opacity:.45 }
+.lobbyStake{ color:#CBD5E1; font-weight:700 }
+.lobbyFree{ color:#22E7A6; font-weight:800 }
+.lobbyJoin{
+  flex-shrink:0; cursor:pointer;
+  background:var(--lobby-accent); color:#04101c;
+  padding:8px 17px; border-radius:99px; border:none;
+  font-weight:900; font-size:12.5px;
+  transition:filter .16s, transform .16s;
+}
+.lobbyJoin:hover{ filter:brightness(1.12); transform:scale(1.04) }
+.lobbyJoin:active{ transform:scale(.98) }
+
+/* ═══ چت ═══════════════════════════════════════════════════════════════
+   سه ایرادِ پایه‌ای رفع شد: پیام‌ها ساعت نداشتند، پیامِ خودم از همان سمتِ
+   بقیه می‌آمد (فقط رنگِ حباب کمی فرق داشت) و چتِ خالی مستطیلِ سیاه بود.
+   جهتِ صفحه RTL است، پس «پیامِ من» با row-reverse به سمتِ چپ می‌رود. */
+.chatMsg{ display:flex; gap:9px; align-items:flex-start }
+.chatMsg.me{ flex-direction:row-reverse }
+.chatMsgBody{ min-width:0; max-width:78%; display:flex; flex-direction:column }
+.chatMsg.me .chatMsgBody{ align-items:flex-end }
+
+.chatMsgHead{
+  display:flex; align-items:center; gap:7px; margin-bottom:3px;
+  font-size:12px; line-height:1;
+}
+.chatMeTag{ color:#38BDF8; font-size:12px; font-weight:800 }
+.chatTime{
+  color:#64748B; font-size:10.5px; font-weight:700;
+  font-variant-numeric:tabular-nums; white-space:nowrap;
+}
+
+/* نقلِ قولِ پیامِ پاسخ‌داده‌شده */
+.chatQuote{
+  display:flex; flex-direction:column; gap:1px;
+  background:#ffffff0a; border-inline-start:2px solid #22E7A6;
+  padding:4px 9px; border-radius:8px; margin-bottom:4px;
+  max-width:100%; overflow:hidden;
+}
+.chatQuote b{ color:#22E7A6; font-size:10.5px; font-weight:800 }
+.chatQuote span{
+  color:#94A3B8; font-size:11.5px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+
+.chatBubble{
+  padding:8px 12px; border-radius:14px;
+  background:#ffffff0d; border:1px solid #ffffff14;
+  color:#fff; font-size:13.5px; line-height:1.55;
+  word-break:break-word; user-select:text; -webkit-user-select:text;
+  border-start-start-radius:4px;   /* دُمِ حباب سمتِ فرستنده */
+}
+.chatBubble.me{
+  background:linear-gradient(135deg,#38BDF830,#38BDF818);
+  border-color:#38BDF855;
+  border-start-start-radius:14px;
+  border-start-end-radius:4px;
+}
+/* پیامِ تک‌ایموجی: بزرگ و بدون کادر */
+.chatBubble.emoji{
+  background:none; border:none; padding:2px 4px;
+  font-size:36px; line-height:1.15;
+}
+
+.chatMsgFoot{ display:flex; gap:4px; align-items:center; margin-top:3px }
+.chatAct{
+  background:none; border:none; cursor:pointer;
+  color:#94A3B8; font-size:11.5px; font-weight:700;
+  padding:2px 6px; border-radius:8px;
+  transition:background .15s, color .15s;
+}
+.chatAct:hover{ background:#ffffff0d; color:#CBD5E1 }
+.chatAct.liked{ color:#EF4444 }
+
+/* چتِ خالی */
+.chatEmpty{
+  margin:auto; text-align:center; padding:26px 18px;
+  display:flex; flex-direction:column; align-items:center; gap:5px;
+}
+.chatEmptyIcon{
+  font-size:40px; opacity:.65; margin-bottom:4px;
+  filter:drop-shadow(0 6px 16px #38BDF840);
+}
+.chatEmpty b{ color:#CBD5E1; font-size:14.5px; font-weight:800 }
+.chatEmpty small{ color:#64748B; font-size:12.5px; max-width:250px; line-height:1.6 }
+
+/* نوارِ «در حال پاسخ به…» */
+.chatReplyBar{
+  display:flex; align-items:center; gap:9px;
+  background:#0b1220; border-top:1px solid #ffffff14;
+  padding:8px 14px;
+}
+.chatReplyIcon{ color:#22E7A6; font-size:15px; font-weight:900; flex-shrink:0 }
+.chatReplyText{ flex:1; min-width:0; display:flex; flex-direction:column; gap:1px }
+.chatReplyText b{ color:#22E7A6; font-size:11px; font-weight:800 }
+.chatReplyText span{
+  color:#94A3B8; font-size:12px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.chatReplyX{
+  flex-shrink:0; background:none; border:none; cursor:pointer;
+  color:#EF4444; font-size:15px; line-height:1;
+  padding:4px 7px; border-radius:8px; transition:background .15s;
+}
+.chatReplyX:hover{ background:#EF444418 }

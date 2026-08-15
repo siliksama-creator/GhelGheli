@@ -136,6 +136,7 @@ jobs:
       # landing on one client and not the other.
       - run: npm run test:feedback-parity
       - run: npm run test:coin-parity
+      - run: npm run test:chat-parity
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - name: Serve the built app

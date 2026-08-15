@@ -45,6 +45,26 @@ const _games = <_GameEntry>[
 
 List<_GameEntry> get _multiplayerGames => _games.where((g) => g.id != 'tap').toList();
 
+// نامِ فارسیِ بازی از روی شناسهٔ فنی — آینهٔ `gameTitle` در وب.
+// باگ: لیستِ لابی‌ها شناسهٔ خام را چاپ می‌کرد و کاربر «card_duel» می‌دید.
+// سرور فقط شناسه می‌فرستد، پس ترجمه وظیفهٔ کلاینت است. اگر بازیِ ناشناخته
+// آمد، خودِ شناسه برمی‌گردد نه رشتهٔ خالی.
+String gameTitleOf(Object? id) {
+  final key = '${id ?? ''}';
+  for (final g in _games) {
+    if (g.id == key) return g.title;
+  }
+  return key.isEmpty ? 'بازی' : key;
+}
+
+Color gameAccentOf(Object? id) {
+  final key = '${id ?? ''}';
+  for (final g in _games) {
+    if (g.id == key) return g.accent;
+  }
+  return const Color(0xFF38BDF8);
+}
+
 class GameExternalLaunch {
   const GameExternalLaunch({required this.socket, required this.start, required this.nonce});
   final io.Socket socket;
@@ -679,7 +699,7 @@ class _TapGameHeroCard extends StatelessWidget {
                         decoration: BoxDecoration(color: Color(0xFF84CC16), borderRadius: BorderRadius.all(Radius.circular(6))),
                         child: Padding(
                           padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          child: Text('۵۰ لول', style: TextStyle(color: Color(0xFF1E0A00), fontSize: 9.5, fontWeight: FontWeight.w900)),
+                          child: Text('۵۰ لول', style: TextStyle(color: Color(0xFF1E0A00), fontSize: 12.5, fontWeight: FontWeight.w900)),
                         ),
                       ),
                     ],
@@ -1114,7 +1134,7 @@ class _PrivateLobbyHubState extends State<_PrivateLobbyHub> {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                    fontSize: 9.5,
+                                    fontSize: 12,
                                     fontWeight: FontWeight.w800,
                                     color: _selectedGame == g.$1 ? Colors.white : Colors.white70,
                                   ),
@@ -1217,69 +1237,128 @@ class _PrivateLobbyHubState extends State<_PrivateLobbyHub> {
           )
         else
           for (final l in _lobbies) ...[
-            Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                color: const Color(0xFF1E293B),
-                border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withValues(alpha: 0.06),
-                    ),
-                    child: Center(
-                      child: Icon(
-                        l['hasPassword'] == true ? Icons.lock_rounded : Icons.sports_esports_rounded,
-                        color: l['hasPassword'] == true ? const Color(0xFFFFD166) : const Color(0xFF38BDF8),
-                        size: 20,
+            // ردیفِ لابی — آینهٔ `.lobbyRow` در وب. رنگِ لهجهٔ همان بازی روی
+            // نوارِ کناری و آیکون می‌نشیند تا بدون خواندن هم معلوم باشد کدام
+            // بازی است، و نامِ بازی فارسی نوشته می‌شود نه شناسهٔ فنی.
+            Builder(builder: (context) {
+              final accent = gameAccentOf(l['gameId']);
+              final locked = l['hasPassword'] == true;
+              final free = l['stake'] == 0;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsetsDirectional.fromSTEB(13, 11, 13, 11),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  gradient: LinearGradient(
+                    begin: AlignmentDirectional.centerStart,
+                    end: AlignmentDirectional.centerEnd,
+                    colors: [
+                      Color.alphaBlend(accent.withValues(alpha: 0.13), const Color(0xFF0B1220)),
+                      const Color(0xFF0B1220),
+                    ],
+                  ),
+                  border: BorderDirectional(
+                    top: BorderSide(color: accent.withValues(alpha: 0.26)),
+                    bottom: BorderSide(color: accent.withValues(alpha: 0.26)),
+                    end: BorderSide(color: accent.withValues(alpha: 0.26)),
+                    start: BorderSide(color: accent, width: 3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color.alphaBlend(accent.withValues(alpha: 0.17), const Color(0xFF0B1220)),
+                        border: Border.all(color: accent.withValues(alpha: 0.34)),
+                      ),
+                      child: Center(
+                        child: Icon(
+                          locked ? Icons.lock_rounded : Icons.sports_esports_rounded,
+                          color: locked ? const Color(0xFFFFD166) : accent,
+                          size: 19,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Text(
-                              l['hostName'] ?? 'کاربر',
-                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Colors.white),
-                            ),
-                            if (l['hasPassword'] == true) ...[
-                              const SizedBox(width: 4),
-                              const Icon(Icons.lock_rounded, size: 13, color: Color(0xFFFFD166)),
+                    const SizedBox(width: 11),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  '${l['hostName'] ?? 'کاربر'}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w800, fontSize: 13.5, color: Colors.white),
+                                ),
+                              ),
+                              if (locked) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(99),
+                                    color: const Color(0xFFFFD166).withValues(alpha: 0.09),
+                                    border: Border.all(color: const Color(0xFFFFD166).withValues(alpha: 0.25)),
+                                  ),
+                                  child: const Text('رمزدار',
+                                      style: TextStyle(
+                                          fontSize: 10.5, fontWeight: FontWeight.w800, color: Color(0xFFFFD166))),
+                                ),
+                              ],
                             ],
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'بازی: ${l['gameId']} · ${l['stake'] == 0 ? 'رایگان' : '${faNum(l['stake'] ?? 100)} امتیاز'}',
-                          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
-                        ),
-                      ],
+                          ),
+                          const SizedBox(height: 3),
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  gameTitleOf(l['gameId']),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                      color: accent, fontSize: 12.5, fontWeight: FontWeight.w800),
+                                ),
+                              ),
+                              Text(' · ',
+                                  style: TextStyle(
+                                      color: const Color(0xFF94A3B8).withValues(alpha: 0.45), fontSize: 12.5)),
+                              Text(
+                                free ? 'رایگان' : '${faNum(l['stake'] ?? 100)} امتیاز',
+                                style: TextStyle(
+                                  color: free ? const Color(0xFF22E7A6) : const Color(0xFFCBD5E1),
+                                  fontSize: 12.5,
+                                  fontWeight: free ? FontWeight.w800 : FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF22E7A6),
-                      foregroundColor: const Color(0xFF00281D),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      minimumSize: Size.zero,
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: accent,
+                        foregroundColor: const Color(0xFF04101C),
+                        padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 8),
+                        minimumSize: Size.zero,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(99)),
+                      ),
+                      onPressed: () => _promptPasswordAndJoin(l),
+                      child: const Text('پیوستن',
+                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12.5)),
                     ),
-                    onPressed: () => _promptPasswordAndJoin(l),
-                    child: const Text('پیوستن', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
-                  ),
-                ],
-              ),
-            ),
+                  ],
+                ),
+              );
+            }),
           ],
 
         Gaps.vMd,
