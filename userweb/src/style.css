@@ -5617,6 +5617,21 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
     gap: 10px;
     padding: 14px 12px !important;
   }
+
+  /* اندازه‌گیری: تختهٔ پنالتی ۷۲۴px بود و ریلِ کناری ۱۵۹px — یعنی ۳۳۹px
+     حفرهٔ خالیِ آشکار در ستونِ راست، همان چیزی که نما را «ناتمام» نشان
+     می‌داد. ریل در ردیفِ ۲ می‌نشیند در حالی که تخته ردیفِ ۲ تا آخر را
+     می‌گیرد، پس فضای اضافی به ردیفِ ۵ (که `1fr` است) می‌رسد و زیرِ ریل
+     خلأ می‌ماند.
+     راه‌حل: وقتی هیچ‌کدام از بلوک‌های شرطیِ ستونِ کناری (پات، خطا، بنرِ
+     اتصالِ مجدد) رندر نشده‌اند — یعنی حالتِ متعارفِ تمرین با ربات — ریل
+     تمامِ ارتفاعِ ستون را بگیرد و عمودی وسط‌چین شود تا کنارِ مرکزِ تخته
+     بایستد. `:has()` این شرط را دقیق و بدون تغییرِ JSX بیان می‌کند. */
+  .gameShell.isPlaying:not(:has(> .gameShellPot)):not(:has(> .err)):not(:has(> .gameReconnectBanner))
+    > .gameShellScore {
+    grid-area: 2 / 2 / -1 / 3;
+    align-self: center;
+  }
   .gameShell.isPlaying > .gameShellScore > div { flex: 0 0 auto !important; width: 100%; justify-content: center !important; }
 
   /* ارتفاع، نه عرض، قیدِ اصلیِ داخلِ بازی است: بالای کارت نوارِ اپ و
@@ -5701,7 +5716,12 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
   .duelPageV2.isSetup > .duelCollection  { grid-area: 3 / 1 / 5 / 2; }
   .duelPageV2.isSetup > .duelHistoryV2   { grid-area: 5 / 1 / 6 / 2; }
   .duelPageV2.isSetup > .duelLineupV2    { grid-area: 2 / 2 / 4 / 3; }
-  .duelPageV2.isSetup > .duelIntelCompact{ grid-area: 4 / 2 / 5 / 3; }
+  /* ⚠️ باگِ اندازه‌گیری‌شده: این نوار کلاسِ عمومیِ `card` را هم دارد و
+     `.card` عرضِ صریحِ `min(560px,95vw)` می‌دهد. ستونِ دوم ۵۲۳px است، پس
+     نوار ۵۶۰px می‌شد و ۳۷px از لبهٔ چپِ ستون — حتی از لبهٔ خودِ صفحه
+     (L=93 در برابر L=130) — بیرون می‌زد. روی گوشی این اتفاق نمی‌افتد چون
+     مدیا کوئریِ ۹۰۰px با `!important` عرض را ۱۰۰٪ می‌کند. */
+  .duelPageV2.isSetup > .duelIntelCompact{ grid-area: 4 / 2 / 5 / 3; width: 100%; }
   .duelPageV2.isSetup > .duelLaunch      { grid-area: 5 / 2 / 6 / 3; }
   .duelPageV2.isSetup > .duelMessage,
   .duelPageV2.isSetup > .gameStakeNotice { grid-column: 2; grid-row: 6; }
