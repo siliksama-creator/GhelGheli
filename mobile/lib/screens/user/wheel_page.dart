@@ -450,11 +450,15 @@ class _WheelPageState extends State<WheelPage>
               ),
             ),
           ],
+          // ⚠️ منبعِ چرخشِ جایزه یکی نیست: `users.bonus_spins` هم از
+          // دعوت دوستان پر می‌شود و هم از پله‌های نوع `spins` در گذر
+          // نبرد. متنِ قبلی همیشه «از دعوت دوستان» می‌گفت و روی حسابی
+          // بدون هیچ دعوتی، ادعای نادرست نشان می‌داد.
           if (_bonusSpins > 0) ...[
             Gaps.vXs,
             Center(
               child: Text(
-                '${faNum(_bonusSpins)} چرخش جایزه از دعوت دوستان داری ',
+                '${faNum(_bonusSpins)} چرخش جایزه داری',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
                 ),

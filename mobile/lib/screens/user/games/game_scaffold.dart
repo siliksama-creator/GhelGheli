@@ -334,7 +334,7 @@ class GameScaffold extends StatelessWidget {
                         size: 14, color: Color(0xFFFFD166)),
                     const SizedBox(width: 5),
                     Text(
-                      'پات مسابقه: ${faNum(session.netPot > 0 ? session.netPot : session.stake * 2 * 0.9)} امتیاز (۱۰٪ کارمزد)',
+                      'جایزهٔ برنده: ${faNum(session.netPot > 0 ? session.netPot : netPotFor(session.stake))} امتیاز',
                       style: const TextStyle(
                           color: Color(0xFFFFD166),
                           fontSize: 11.5,

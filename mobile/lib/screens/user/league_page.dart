@@ -152,67 +152,90 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, Gaps.xxl),
               children: [
-                Container(
-                  padding: const EdgeInsets.all(Gaps.xl),
-                  decoration: BoxDecoration(
-                    borderRadius: Corners.rXxl,
-                    gradient: LinearGradient(
-                        colors: brand.leagueGradient,
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight),
-                    boxShadow: [
-                      BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.25), blurRadius: 26)
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      ClipRRect(
-                        borderRadius: Corners.rLg,
-                        child: Image.asset('assets/brand/league_banner.webp',
-                            height: 116, width: double.infinity, fit: BoxFit.cover,
-                            cacheWidth: 820),
-                      ),
-                      Gaps.vMd,
-                      const Text('لیگ قلقلی',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 22)),
-                      Gaps.vXxs,
-                      Text(
-                        'برترین کاربران تا پایان زمان اعلام شده؛ جوایز پس از پایان لیگ پرداخت و لیگ بعدی آغاز می‌شود.',
-                        style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.88),
-                            fontSize: 12.5,
-                            height: 1.5),
-                      ),
-                      Gaps.vMd,
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: Gaps.sm, vertical: 6),
-                        decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.16),
-                            borderRadius: Corners.rPill),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.timer_outlined,
-                                size: 15, color: Colors.white),
-                            const SizedBox(width: 6),
-                            Text(daysLeft.isEmpty ? 'در حال محاسبه' : daysLeft,
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 12.5)),
-                          ],
+                // ── ترتیبِ عمدی: راهنمای سکه پیش از هر چیزِ دیگر ──
+                // خواستهٔ مالک این بود که «سکه چطور به دست می‌آید» بدونِ
+                // اسکرول دیده شود. بنرِ قبلی ۱۱۶px عکس + تیتر + پاراگراف +
+                // چیپِ شمارش‌معکوس بود و به‌تنهایی کلِ نیمهٔ بالای صفحه را
+                // می‌گرفت؛ راهنما زیرِ خطِ تا می‌افتاد.
+                //
+                // بنر حذف نشد، فشرده شد: عکس به پس‌زمینهٔ کم‌رنگِ همان نوار
+                // تبدیل شد (`Stack` + `opacity: .22`) و تیتر و شمارش‌معکوس
+                // در یک ردیف نشستند. پاراگرافِ توضیحیِ لیگ به پایینِ لیست
+                // منتقل شد. آینهٔ `userweb/src/screens/League.jsx`.
+                ClipRRect(
+                  borderRadius: Corners.rXxl,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                          colors: brand.leagueGradient,
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight),
+                      boxShadow: [
+                        BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.25),
+                            blurRadius: 26)
+                      ],
+                    ),
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: Opacity(
+                            opacity: 0.22,
+                            child: Image.asset(
+                                'assets/brand/league_banner.webp',
+                                fit: BoxFit.cover,
+                                cacheWidth: 820,
+                                errorBuilder: (_, __, ___) =>
+                                    const SizedBox.shrink()),
+                          ),
                         ),
-                      ),
-                    ],
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: Gaps.md, vertical: 12),
+                          child: Row(
+                            children: [
+                              const Expanded(
+                                child: Text('لیگ قلقلی',
+                                    style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 20)),
+                              ),
+                              const SizedBox(width: 10),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: Gaps.sm, vertical: 6),
+                                decoration: BoxDecoration(
+                                    color:
+                                        Colors.white.withValues(alpha: 0.16),
+                                    borderRadius: Corners.rPill),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.timer_outlined,
+                                        size: 15, color: Colors.white),
+                                    const SizedBox(width: 6),
+                                    Flexible(
+                                      child: Text(
+                                          daysLeft.isEmpty
+                                              ? 'در حال محاسبه'
+                                              : daysLeft,
+                                          style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w800,
+                                              fontSize: 12.5)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                Gaps.vLg,
+                Gaps.vSm,
                 const CoinGuide(),
                 if (top.isNotEmpty)
                   Row(
@@ -388,6 +411,20 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
                       child: EmptyState(
                           icon: Icons.emoji_events_outlined,
                           title: 'هنوز کسی در این لیگ سکه‌ای نبرده است')),
+                // پاراگرافِ توضیحیِ لیگ، منتقل‌شده از بنرِ بالا: اطلاعاتِ
+                // لازم است ولی کسی برای خواندنش وارد صفحهٔ لیگ نمی‌شود،
+                // پس جای بالای صفحه را نمی‌گیرد. آینهٔ League.jsx.
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(2, 14, 2, 0),
+                  child: Text(
+                    'برترین کاربران تا پایان زمان اعلام شده؛ جوایز پس از پایان لیگ پرداخت و لیگ بعدی آغاز می‌شود.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.62),
+                        fontSize: 12.5,
+                        height: 1.65),
+                  ),
+                ),
               ],
             ),
           ),

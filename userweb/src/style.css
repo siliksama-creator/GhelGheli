@@ -999,7 +999,7 @@ button:hover {
   /* A pasted URL used to blow out the bubble width. */
   overflow-wrap:anywhere;word-break:break-word;
 }
-.chatTime{display:block;margin-top:3px;font-size:10.5px;color:#c9ddf266}
+.chatTime{display:block;margin-top:3px;font-size:11.5px;color:#c9ddf266}
 
 .reply{
   display:block;color:var(--brand-ink);background:#ffffff0c;
@@ -4480,14 +4480,40 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 
    راه‌حل: روی موبایل خودش اسکرولِ افقیِ کنترل‌شده بگیرد تا سرریزِ
    صفحه‌ای نسازد. */
+/* ⚠️ اصلاحِ دور ۲۱ — تبِ چهارم بیرونِ نما می‌افتاد.
+   اندازه‌گیری (Playwright، پیش از رفع): در نمای ۳۹۰px نوار
+   `scrollWidth=452` بود و دکمهٔ «گذر نبرد» روی `left:-70` می‌نشست —
+   یعنی کاملاً بیرونِ صفحه و عملاً **غیرقابل دسترس**، چون این نوار
+   اسکرولِ افقی دارد ولی هیچ نشانه‌ای برای اسکرول دیده نمی‌شود.
+   در ۳۶۰px به `left:-100` می‌رسید؛ نشانِ قرمزِ گذر نبرد هم با آن
+   بیرون می‌ماند و بندِ «آلرت قرمز» بی‌اثر می‌شد.
+
+   دو علت داشت و هر دو رفع شد:
+   ۱) لیبل‌های وب بلندتر از اندروید بودند («چت روم» / «ماموریت و
+      دوستان» در برابر «چت» / «ماموریت»). حالا هر دو پلتفرم دقیقاً
+      یک متن دارند — این خودش شرطِ آینگی است.
+   ۲) `flex:0 0 auto` اجازهٔ کوچک‌شدن نمی‌داد. حالا چهار تب سهمِ
+      مساوی می‌گیرند و در قاب جا می‌شوند. */
 @media (max-width:520px){
   .clubTabs{
-    display:flex; max-width:100%;
-    overflow-x:auto; scrollbar-width:none;
-    -webkit-overflow-scrolling:touch;
+    display:flex; max-width:100%; width:100%;
+    overflow-x:clip; gap:3px; padding:4px;
   }
-  .clubTabs::-webkit-scrollbar{display:none}
-  .clubTabs button{flex:0 0 auto; padding:8px 14px; font-size:12.5px}
+  .clubTabs button{
+    flex:1 1 0; min-width:0; padding:8px 4px; font-size:11.5px;
+    display:inline-flex; align-items:center; justify-content:center;
+    gap:3px; white-space:nowrap;
+  }
+  /* اگر نامِ تب از سهمش بلندتر شد، به‌جای سرریز کوتاه شود. */
+  .clubTabs button{overflow:hidden; text-overflow:ellipsis}
+}
+@media (max-width:360px){
+  /* گوشی‌های خیلی باریک: آیکون‌ها می‌روند تا متنِ تب‌ها کامل بماند.
+     ⚠️ آیکونِ «گذر نبرد» استثناست: نشانِ قرمز روی همان آیکون سوار
+     است، پس اگر پنهانش کنیم آلرت هم ناپدید می‌شود. */
+  .clubTabs button:not(.passTabBtn) .svgIcon,
+  .clubTabs button:not(.passTabBtn) .assetIcon{display:none}
+  .clubTabs button{font-size:11px; padding:8px 3px}
 }
 
 /* ═══ لوپ ۴: فشرده‌سازیِ قفسهٔ کلکسیون ══════════════════════════════════
@@ -5516,8 +5542,11 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
   font-size:12px; line-height:1;
 }
 .chatMeTag{ color:#38BDF8; font-size:12px; font-weight:800 }
+/* ⚠️ کفِ خوانایی: ۱۱.۵px. مقدارِ قبلی ۱۰.۵px بود و گاردِ typography
+   روی تبِ «چت و بازی» قرمز می‌شد. دوقلوی اندروید: `chat_page.dart`
+   (ساعتِ پیام و نامِ نقلِ قول) — هر دو با هم بالا رفتند. */
 .chatTime{
-  color:#64748B; font-size:10.5px; font-weight:700;
+  color:#64748B; font-size:11.5px; font-weight:700;
   font-variant-numeric:tabular-nums; white-space:nowrap;
 }
 
@@ -5528,7 +5557,7 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
   padding:4px 9px; border-radius:8px; margin-bottom:4px;
   max-width:100%; overflow:hidden;
 }
-.chatQuote b{ color:#22E7A6; font-size:10.5px; font-weight:800 }
+.chatQuote b{ color:#22E7A6; font-size:11.5px; font-weight:800 }
 .chatQuote span{
   color:#94A3B8; font-size:11.5px;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;

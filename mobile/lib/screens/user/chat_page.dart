@@ -448,9 +448,10 @@ class _MessageBubble extends StatelessWidget {
                               fontSize: 12, fontWeight: FontWeight.w800, color: BrandColors.blue)),
                     if (time.isNotEmpty) ...[
                       const SizedBox(width: 7),
+                      // کفِ خوانایی ۱۱.۵px — آینهٔ `.chatTime` در وب.
                       Text(time,
                           style: const TextStyle(
-                              fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
+                              fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF64748B))),
                     ],
                   ],
                 ),
@@ -471,8 +472,9 @@ class _MessageBubble extends StatelessWidget {
                         Text('${message['reply_nickname'] ?? ''}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
+                            // آینهٔ `.chatQuote b` در وب.
                             style: const TextStyle(
-                                fontSize: 10.5, fontWeight: FontWeight.w800, color: BrandColors.emerald)),
+                                fontSize: 11.5, fontWeight: FontWeight.w800, color: BrandColors.emerald)),
                         Text('${message['reply_text']}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,

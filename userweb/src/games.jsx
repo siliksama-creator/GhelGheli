@@ -32,6 +32,27 @@ function gameAccent(id) {
   return GAMES.find(g => g.id === id)?.accent || '#38BDF8';
 }
 
+/**
+ * پاتِ خالصِ برنده برای یک ورودی — آینهٔ دقیقِ سرور.
+ *
+ * سرور در `gameStakeService.js` این‌طور حساب می‌کند:
+ *   grossPot  = stake * 2
+ *   commission = Math.ceil(grossPot * 0.10)
+ *   netPot     = grossPot - commission
+ *
+ * ⚠️ `stake * 2 * 0.9` **همیشه** جوابِ درست را نمی‌دهد، چون سرور
+ *    کمیسیون را به بالا گرد می‌کند. برای ورودی‌های فرد (مثلاً لابیِ
+ *    ۱۲۵ امتیازی) عددِ ساده یک واحد بیشتر از واقعیت درمی‌آید و کاربر
+ *    کمتر از چیزی که وعده دادیم می‌گیرد. همان `Math.ceil` را تکرار
+ *    می‌کنیم تا عددِ روی صفحه دقیقاً همان چیزی باشد که واریز می‌شود.
+ */
+export function netPotFor(stake) {
+  const s = Number(stake) || 0;
+  if (s <= 0) return 0;
+  const gross = s * 2;
+  return gross - Math.ceil(gross * 0.10);
+}
+
 function tierLabel(level){
   const n=Number(level||0);
   if(n>=90) return {label:'افسانه‌ای', color:'#A855F7'};
@@ -340,7 +361,7 @@ export default function Games({ api, token, externalLaunch = null }) {
             ? 'بدون اثر روی موجودی و لیگ.'
             : mode === -1
               ? 'ورودی امتیازی تا پایان بازی امن می‌ماند.'
-              : `باخت: −${fa(mode)} · برد: پات پس از ۱۰٪ کارمزد.`}</small>
+              : `برنده ${fa(netPotFor(mode))} امتیاز می‌گیرد · بازنده ${fa(mode)} امتیاز می‌دهد.`}</small>
         </div>
       </div>
 
@@ -677,7 +698,7 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
 
       {activeStake>0 && !g.vsBot && phase==='playing' && (
         <div className="gameShellPot" style={{ margin:'0 auto 10px', display:'inline-flex', alignItems:'center', gap:'6px', background:'linear-gradient(90deg, #FFD70022, #FF9F4322)', border:'1px solid #FFD166', color:'#FFD166', padding:'4px 12px', borderRadius:'99px', fontSize:'11px', fontWeight:'900' }}>
-          <span>🏆</span> پات مسابقه: {fa(g.netPot||activeStake*2*0.9)} امتیاز (۱۰٪ کارمزد)
+          <span>🏆</span> جایزهٔ برنده: {fa(g.netPot || netPotFor(activeStake))} امتیاز
         </div>
       )}
 

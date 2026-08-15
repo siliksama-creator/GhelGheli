@@ -371,7 +371,8 @@ function Portal({ token, logout }) {
         {tab === 'club' && (
           <Club token={token} openProfile={setPublicUser} meId={u.id}
             openGames={Boolean(sharedRoom)} setMsg={setMsg}
-            openShop={() => setTab('shop')} />
+            openShop={() => setTab('shop')}
+            passClaimable={Number(passBrief?.claimable || 0)} />
         )}
         {tab === 'wheel' && (
           <Wheel token={token} setMsg={setMsg} reloadProfile={load}
@@ -394,30 +395,65 @@ function Portal({ token, logout }) {
   );
 }
 
-function Club({ token, openProfile, meId, openGames = false, setMsg, openShop }) {
+function Club({ token, openProfile, meId, openGames = false, setMsg, openShop, passClaimable = 0 }) {
   const [sub, setSub] = useState(openGames ? 'games' : 'chat');
   const [externalLaunch, setExternalLaunch] = useState(null);
+  // نسلِ پنلِ ماموریت — آینهٔ `_growthGeneration` در اندروید.
+  // با هر انتقالِ سوکت به تبِ بازی یکی زیاد می‌شود تا پنلِ قدیمی
+  // (که سوکتش دیگر مالِ خودش نیست) هرگز دوباره mount نشود.
+  const [growthGen, setGrowthGen] = useState(0);
   return (
     <div className="clubWrap">
       <div className="clubTabs socialTripleTabs">
         <button className={sub === 'chat' ? 'on' : ''}
-          onClick={() => setSub('chat')}><UiIcon name="support" size={17} /> چت روم</button>
+          onClick={() => setSub('chat')}><UiIcon name="support" size={17} /> چت</button>
         <button className={sub === 'games' ? 'on' : ''}
           onClick={() => setSub('games')}><UiIcon name="game" size={17} /> بازی‌ها</button>
         <button className={sub === 'growth' ? 'on' : ''}
-          onClick={() => setSub('growth')}><UiIcon name="group" size={17} /> ماموریت و دوستان</button>
+          onClick={() => setSub('growth')}><UiIcon name="group" size={17} /> ماموریت</button>
         {/* گذر نبرد از این‌جا هم در دسترس است.
             دلیل: تنها راه ورودش یک آیکون کوچک در نوار بالا بود و عملاً
             دیده نمی‌شد. گذر نبرد مهم‌ترین دلیلِ خریدِ «پلاس» است، پس
             باید دقیقاً کنار بازی‌ها — جایی که کاربر XP می‌گیرد — دیده شود. */}
-        <button className={sub === 'pass' ? 'on' : ''}
-          onClick={() => setSub('pass')}><UiIcon name="trophy" size={17} /> گذر نبرد</button>
+        {/* آلرتِ قرمز: وقتی جایزه‌ای در گذر نبرد آماده است، تب یک نشانِ
+            قرمزِ نبض‌دار می‌گیرد. قرمز عمدی است — نوار خودش سبز/آبی است و
+            هر رنگِ دیگری در آن گم می‌شد. دوقلوی اندروید: `_TabIcon` در
+            `social_page.dart`. */}
+        <button className={`${sub === 'pass' ? 'on' : ''} passTabBtn`}
+          onClick={() => setSub('pass')}>
+          <span className="passTabIcon">
+            <UiIcon name="trophy" size={17} />
+            {passClaimable > 0 && (
+              <i className="passAlertDot" aria-hidden="true">
+                {fa(Math.min(passClaimable, 9))}
+              </i>
+            )}
+          </span> گذر نبرد
+          {passClaimable > 0 && (
+            <span className="srOnly">{fa(passClaimable)} جایزهٔ آمادهٔ دریافت</span>
+          )}
+        </button>
       </div>
       {sub === 'chat' && <Chat token={token} openProfile={openProfile} meId={meId} />}
       {sub === 'games' && <GamesHub api={API} token={token} openProfile={openProfile}
         externalLaunch={externalLaunch} />}
+      {/* ⚠️ چرا `key` روی GrowthHub — و چرا رندرِ شرطی این‌جا یک باگِ واقعی بود:
+          کاربر از تبِ «ماموریت و دوستان» دوستی را به دوئل دعوت می‌کند؛
+          `game:start` می‌آید، سوکت به تبِ بازی منتقل می‌شود و تب عوض
+          می‌شود. اما چون این‌جا رندرِ شرطی است، GrowthHub از DOM حذف
+          می‌شود و cleanup اجرا می‌گردد. `transferred.current` جلوی
+          disconnect را می‌گیرد — ولی همین که کاربر بعد از بازی به تب
+          ماموریت برگردد، کامپوننت **دوباره از صفر** ساخته می‌شود و
+          `transferred` به false برمی‌گردد، در حالی که سوکتِ منتقل‌شده
+          هنوز زندهٔ تبِ بازی است. رفتِ‌وبرگشتِ بعدی، همان سوکت را
+          disconnect می‌کرد و مسابقهٔ در جریان قطع می‌شد.
+          اندروید این مشکل را نداشت چون `IndexedStack` + `ValueKey(_growthGeneration)`
+          دارد: هر انتقال، نسلِ تازه‌ای از پنل می‌سازد و نسلِ قبلی —
+          همان که سوکتش رفته — دیگر برنمی‌گردد. وب حالا دقیقاً همان
+          کار را می‌کند تا آینهٔ اندروید بماند. */}
       {sub === 'pass' && <Pass token={token} setMsg={setMsg} openShop={openShop} />}
-      {sub === 'growth' && <GrowthHub api={API} token={token} onSocketGame={(socket, start) => {
+      {sub === 'growth' && <GrowthHub key={growthGen} api={API} token={token} onSocketGame={(socket, start) => {
+        setGrowthGen(g => g + 1);
         setExternalLaunch({ socket, start, nonce: Date.now() });
         setSub('games');
       }} />}

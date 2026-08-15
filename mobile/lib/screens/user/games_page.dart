@@ -10,6 +10,7 @@ import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/coin_quota_line.dart';
 import '../../widgets/level_badge.dart';
+import 'games/game_session.dart' show netPotFor;
 import 'games/memory_board.dart';
 import 'games/penalty_board.dart';
 import 'games/tap/tap_screen.dart';
@@ -547,7 +548,7 @@ class _StakeRulesBanner extends StatelessWidget {
         ? 'بدون اثر روی موجودی و لیگ.'
         : isLobby
             ? 'ورودی امتیازی تا پایان بازی امن می‌ماند.'
-            : 'باخت: −${faNum(mode)} · برد: پات پس از ۱۰٪ کارمزد.';
+            : 'برنده ${faNum(netPotFor(mode))} امتیاز می‌گیرد · بازنده ${faNum(mode)} امتیاز می‌دهد.';
     return Container(
       padding: const EdgeInsets.all(Gaps.sm),
       decoration: BoxDecoration(

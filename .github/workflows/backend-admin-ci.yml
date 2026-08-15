@@ -143,6 +143,11 @@ jobs:
       # so the mobile layout -- which Android mirrors -- cannot drift.
       - run: npm run test:desktop-layout
       - run: npm run test:round-intro-parity
+      # نوارِ تب‌های «چت و بازی»: تبِ چهارم (گذر نبرد) یک‌بار کاملاً بیرونِ
+      # نمای گوشی افتاد (در ۳۹۰px روی left:-70) و هیچ تستی نگرفتش. این
+      # گارد هم آینگیِ متنِ تب‌ها با اندروید را می‌بندد، هم قاعدهٔ CSS که
+      # اجازهٔ کوچک‌شدنِ دکمه‌ها را می‌دهد.
+      - run: npm run test:club-tabs
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - name: Serve the built app

@@ -15,7 +15,8 @@
     "test:coin-parity": "node tool/coin-parity.mjs",
     "test:chat-parity": "node tool/chat-parity.mjs",
     "test:desktop-layout": "node tool/desktop-layout.mjs",
-    "test:round-intro-parity": "node tool/round-intro-parity.mjs"
+    "test:round-intro-parity": "node tool/round-intro-parity.mjs",
+    "test:club-tabs": "node tool/club-tabs-parity.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^6.0.5",

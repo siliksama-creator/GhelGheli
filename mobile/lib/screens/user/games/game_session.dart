@@ -13,6 +13,25 @@ import 'game_audio.dart';
 
 enum GamePhase { idle, waiting, playing, over }
 
+/// پاتِ خالصِ برنده برای یک ورودی — آینهٔ دقیقِ سرور.
+///
+/// سرور در `gameStakeService.js` این‌طور حساب می‌کند:
+///   grossPot   = stake * 2
+///   commission = Math.ceil(grossPot * 0.10)
+///   netPot     = grossPot - commission
+///
+/// ⚠️ `stake * 2 * 0.9` همیشه درست نیست، چون سرور کمیسیون را **به بالا**
+///    گرد می‌کند. برای ورودی‌های فرد (مثل لابیِ ۱۲۵ امتیازی) عددِ ساده یک
+///    واحد بیشتر از واقعیت درمی‌آید و کاربر کمتر از وعده می‌گیرد. همان
+///    `ceil` را تکرار می‌کنیم تا عددِ روی صفحه دقیقاً همان واریزی باشد.
+///
+/// دوقلوی وب: `netPotFor()` در `userweb/src/games.jsx`.
+int netPotFor(int stake) {
+  if (stake <= 0) return 0;
+  final gross = stake * 2;
+  return gross - (gross * 0.10).ceil();
+}
+
 class GameSession extends ChangeNotifier {
   int stake = 0;
   int totalPot = 0;

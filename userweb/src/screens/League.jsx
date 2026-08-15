@@ -156,13 +156,20 @@ export default function League({ token, openProfile }) {
               <button onClick={()=>setTab('prev')} >برندگان قبل</button>
             </div>
 
-            <div style={{ margin:'16px 0', background:'linear-gradient(135deg, #16345F, #071521)', border:'1px solid rgba(56,189,248,0.3)', padding:'20px', borderRadius:'16px' }}>
-              <img src="/brand/league_banner.webp" alt="" style={{ width:'100%', height:'116px', objectFit:'cover', borderRadius:'12px', marginBottom:'12px' }} onError={e=>e.currentTarget.style.display='none'} />
-              <h2 style={{ color:'#FFF', fontWeight:'900', margin:'0 0 6px', fontSize:'22px' }}>لیگ قلقلی</h2>
-              <p style={{ color:'rgba(255,255,255,0.88)', fontSize:'12.5px', lineHeight:1.5, margin:0 }}>
-                برترین کاربران تا پایان زمان اعلام شده؛ جوایز پس از پایان لیگ پرداخت و لیگ بعدی آغاز می‌شود.
-              </p>
-              <div style={{ display:'inline-flex', alignItems:'center', gap:'6px', background:'rgba(255,255,255,0.16)', padding:'6px 12px', borderRadius:'20px', marginTop:'10px', fontSize:'12px', color:'#FFF', fontWeight:'700' }}>
+            {/* ── ترتیبِ عمدی: راهنمای سکه پیش از بنر ──
+                خواستهٔ مالک این بود که «سکه چطور به دست می‌آید» بدونِ
+                اسکرول دیده شود. بنرِ قبلی ۱۱۶px عکس + تیتر + پاراگراف +
+                چیپِ شمارش‌معکوس بود و به‌تنهایی کلِ نیمهٔ بالای صفحه را
+                می‌گرفت؛ راهنما زیرِ خطِ تا می‌افتاد و عملاً دیده نمی‌شد.
+
+                بنر حذف نشد، فشرده شد: عکس به نوارِ ۵۶px پس‌زمینه تبدیل شد
+                و تیتر و شمارش‌معکوس در یک ردیف نشستند. پاراگرافِ توضیحیِ
+                لیگ به پایینِ صفحه منتقل شد — اطلاعاتِ لازم است ولی کسی
+                برای خواندنش وارد صفحهٔ لیگ نمی‌شود. */}
+            <div style={{ margin:'14px 0 12px', position:'relative', overflow:'hidden', background:'linear-gradient(135deg, #16345F, #071521)', border:'1px solid rgba(56,189,248,0.3)', padding:'12px 14px', borderRadius:'16px', display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap' }}>
+              <img src="/brand/league_banner.webp" alt="" aria-hidden="true" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', opacity:0.22, pointerEvents:'none' }} onError={e=>e.currentTarget.style.display='none'} />
+              <h2 style={{ position:'relative', color:'#FFF', fontWeight:'900', margin:0, fontSize:'20px', flex:1, minWidth:0 }}>لیگ قلقلی</h2>
+              <div style={{ position:'relative', display:'inline-flex', alignItems:'center', gap:'6px', background:'rgba(255,255,255,0.16)', padding:'6px 12px', borderRadius:'20px', fontSize:'12.5px', color:'#FFF', fontWeight:'800' }}>
                 ⏱ {days>0 ? `${fa(days)} روز تا پایان این دوره لیگ` : 'در حال محاسبه'}
               </div>
             </div>
@@ -206,6 +213,10 @@ export default function League({ token, openProfile }) {
                 </div>
               ))}
             </div>
+
+            <p style={{ color:'rgba(255,255,255,0.62)', fontSize:'12.5px', lineHeight:1.65, margin:'14px 2px 0', textAlign:'center' }}>
+              برترین کاربران تا پایان زمان اعلام شده؛ جوایز پس از پایان لیگ پرداخت و لیگ بعدی آغاز می‌شود.
+            </p>
 
             {entries.length===0 && <div style={{ textAlign:'center', padding:'30px', color:'#64748B' }}><div style={{ fontSize:'40px' }}>🏆</div><b style={{ fontSize:'15px', display:'block', marginTop:'6px' }}>هنوز کسی در این لیگ سکه‌ای نبرده است</b><span style={{ fontSize:'13px', display:'block', marginTop:'6px', lineHeight:1.6 }}>اولین برد شما مقابل حریف واقعی، شما را صدرنشین می‌کند.</span></div>}
           </section>

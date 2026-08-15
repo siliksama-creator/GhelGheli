@@ -14,6 +14,19 @@ import '../api_client.dart';
 ///
 /// جدولِ سه‌ستونی عمدی است: نگفتنِ عددِ دقیق یعنی کاربر باید حدس بزند کدام
 /// بازی می‌ارزد، و حدس‌زدن همان چیزی است که حس «قمار» می‌دهد.
+///
+/// ── بازطراحیِ دورِ بیست‌ویکم: «بدون اسکرول» ──
+///
+/// نسخهٔ قبلی همه‌چیز — از جمله جدولِ نرخ — را پشتِ آکاردئون پنهان می‌کرد.
+/// یعنی کاربر برای فهمیدنِ «سکه چطور به دست می‌آید» باید اول کارت را پیدا
+/// می‌کرد، بعد بازش می‌کرد، بعد اسکرول می‌کرد. عملاً هیچ‌کس این سه کار را
+/// نمی‌کند.
+///
+/// حالا تفکیک بر اساسِ «چیزی که باید بدانی» در برابر «چیزی که خوب است
+/// بدانی» است، نه بر اساسِ کم‌کردنِ ارتفاع:
+///   • همیشه پیدا  → یک جمله + جدولِ نرخ (همان پاسخِ سؤال).
+///   • بازشدنی     → پنج قاعدهٔ ریز که فقط کنجکاوها می‌خواهند.
+/// معنیِ کلیدِ `coinGuideSeen` عوض نشده: «قبلاً جزئیات را دیده».
 class CoinGuide extends StatefulWidget {
   const CoinGuide({super.key});
 
@@ -22,9 +35,12 @@ class CoinGuide extends StatefulWidget {
 }
 
 class _CoinGuideState extends State<CoinGuide> {
+  /// آیا بخشِ «قوانین کامل» باز است.
+  ///
   /// بارِ اول باز است: کاربر روی چیزی که نمی‌شناسد ضربه نمی‌زند، پس اگر
   /// بسته شروع شود هرگز خوانده نمی‌شود. بعد از اولین بستن، انتخابش را
-  /// به خاطر می‌سپاریم تا هر بار جلوی چشمش نباشد.
+  /// به خاطر می‌سپاریم تا هر بار جلوی چشمش نباشد. جملهٔ اصلی و جدولِ نرخ
+  /// به این پرچم کاری ندارند — آنها همیشه دیده می‌شوند.
   bool _open = true;
   static const _seenKey = 'coinGuideSeen';
 
@@ -90,21 +106,19 @@ class _CoinGuideState extends State<CoinGuide> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ── سرِ کارت: همیشه دیده می‌شود ──
-          InkWell(
-            onTap: _toggle,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+          // ── پاسخِ سؤال: همیشه دیده می‌شود، بدونِ ضربه و بدونِ اسکرول ──
+          Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Image.asset(
                     'assets/pass/icon_coin.webp',
-                    width: 44,
-                    height: 44,
+                    width: 46,
+                    height: 46,
                     errorBuilder: (_, __, ___) => const Icon(
                         Icons.monetization_on_rounded,
-                        size: 44,
+                        size: 46,
                         color: _gold),
                   ),
                   const SizedBox(width: 12),
@@ -112,7 +126,7 @@ class _CoinGuideState extends State<CoinGuide> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('سکه چیست؟',
+                        const Text('سکه چطور به دست می‌آید؟',
                             style: TextStyle(
                                 fontSize: 17,
                                 fontWeight: FontWeight.w900,
@@ -123,7 +137,7 @@ class _CoinGuideState extends State<CoinGuide> {
                             style: TextStyle(
                                 fontSize: 13.5,
                                 height: 1.6,
-                                color: Colors.white.withValues(alpha: 0.86)),
+                                color: Colors.white.withValues(alpha: 0.90)),
                             children: const [
                               TextSpan(text: 'رتبهٔ لیگ با '),
                               TextSpan(
@@ -133,7 +147,7 @@ class _CoinGuideState extends State<CoinGuide> {
                                       fontWeight: FontWeight.w900)),
                               TextSpan(
                                   text:
-                                      ' تعیین می‌شود، نه امتیاز. سکه فقط با '),
+                                      ' تعیین می‌شود، نه امتیاز — و سکه فقط با '),
                               TextSpan(
                                   text: 'بردن مسابقه مقابل حریف واقعی',
                                   style: TextStyle(
@@ -146,31 +160,22 @@ class _CoinGuideState extends State<CoinGuide> {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 6),
-                  AnimatedRotation(
-                    turns: _open ? 0.5 : 0,
-                    duration: const Duration(milliseconds: 200),
-                    child: const Icon(Icons.keyboard_arrow_down_rounded,
-                        color: _gold, size: 26),
-                  ),
                 ],
               ),
             ),
-          ),
 
-          // ── جزئیات: بازشدنی ──
-          if (_open)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+          // ── جدولِ نرخ: مهم‌ترین عددهای صفحه، پس پنهان نمی‌شود ──
+          Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(14),
-                      color: Colors.black.withValues(alpha: 0.28),
+                      color: Colors.black.withValues(alpha: 0.30),
                       border:
-                          Border.all(color: _gold.withValues(alpha: 0.22)),
+                          Border.all(color: _gold.withValues(alpha: 0.24)),
                     ),
                     clipBehavior: Clip.antiAlias,
                     child: Table(
@@ -181,7 +186,7 @@ class _CoinGuideState extends State<CoinGuide> {
                       },
                       children: [
                         const TableRow(children: [
-                          _Head('بازی', start: true),
+                          _Head('بردِ شما در', start: true),
                           _Head('ورودی ۱۰۰'),
                           _Head('ورودی ۱۰۰۰'),
                         ]),
@@ -224,7 +229,47 @@ class _CoinGuideState extends State<CoinGuide> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 14),
+                ],
+              ),
+            ),
+
+          // ── قواعدِ ریز: بازشدنی، چون پاسخِ سؤالِ اصلی نیستند ──
+          InkWell(
+            onTap: _toggle,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 16),
+              decoration: BoxDecoration(
+                color: _gold.withValues(alpha: 0.09),
+                border: Border(
+                    top: BorderSide(color: _gold.withValues(alpha: 0.22))),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(_open ? 'بستن جزئیات' : 'قوانین کامل سکه',
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                          color: _gold)),
+                  const SizedBox(width: 7),
+                  AnimatedRotation(
+                    turns: _open ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: const Icon(Icons.keyboard_arrow_down_rounded,
+                        color: _gold, size: 22),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          if (_open)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 13, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
                   for (final b in _bullets)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 9),
@@ -278,6 +323,11 @@ class _Head extends StatelessWidget {
   }
 }
 
+/// خانهٔ عددِ جدول — آیکونِ سکه کنارِ عدد.
+///
+/// آیکون در نسخهٔ قبلی نبود و ستون‌ها فقط «۲ / ۲۰» بودند؛ در جدولی که
+/// بالایش «ورودی ۱۰۰» نوشته شده، عددِ برهنه به‌سادگی با امتیاز اشتباه
+/// گرفته می‌شود. آیکون همان‌جا می‌گوید واحدش سکه است.
 class _Cell extends StatelessWidget {
   const _Cell(this.text);
   final String text;
@@ -285,14 +335,25 @@ class _Cell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
-      child: Text(
-        text,
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w900,
-            color: Color(0xFFFFD166)),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Image.asset(
+            'assets/pass/icon_coin.webp',
+            width: 17,
+            height: 17,
+            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFFFFD166)),
+          ),
+        ],
       ),
     );
   }

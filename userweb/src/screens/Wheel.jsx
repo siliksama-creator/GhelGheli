@@ -181,9 +181,16 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
             <SvgIcon name="support" size={16} /> شانس بعدی تا {countdown(state.resetInMs)} دیگر
           </p>
         )}
+        {/* ⚠️ منبعِ چرخشِ جایزه یکی نیست.
+            `users.bonus_spins` از **دو جا** پر می‌شود: دعوت دوستان
+            (referralService) و پله‌های نوع `spins` در گذر نبرد
+            (passService). متنِ قبلی همیشه می‌گفت «از دعوت دوستان» و
+            روی حسابی که هیچ دعوتی نداشت ولی سه پلهٔ گذر نبرد گرفته بود،
+            یک ادعای آشکارا نادرست نشان می‌داد. چون سرور تفکیکِ منبع را
+            نمی‌فرستد، متن باید نسبت به منبع بی‌طرف باشد. */}
         {state.bonusSpins > 0 && (
           <p className="hint wheelBonus">
-            {fa(state.bonusSpins)} چرخش جایزه از دعوت دوستان داری
+            {fa(state.bonusSpins)} چرخش جایزه داری
           </p>
         )}
       </div>
