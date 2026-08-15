@@ -736,7 +736,10 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
   const iWon = finalVerdict.iWon;
   const resultPalette = ['#071522', '#FFD166'];
 
-  return <main className="duelPageV2" style={{ '--mode-color': mode.color, position:'relative', overflow:'hidden' }}>
+  /* `isSetup`/`isLive`: چیدمانِ دسکتاپ برای این دو حالت فرق دارد و CSS
+     بدون این نشانه راهی برای تشخیصشان ندارد. روی موبایل هیچ اثری
+     ندارند — تک‌ستونهٔ فعلی دست‌نخورده می‌ماند (آینهٔ اندروید). */
+  return <main className={`duelPageV2 ${activeGame ? 'isLive' : 'isSetup'}`} style={{ '--mode-color': mode.color, position:'relative', overflow:'hidden' }}>
     {/* ═══════════════════════════════════════════════════════════════════
         سربرگ: بزرگ در چیدمان، نوارِ باریک هنگام بازی
         ═══════════════════════════════════════════════════════════════════

@@ -639,8 +639,14 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
   };
 
   return (
-    <div className="card wide" style={{ padding: '20px', textAlign: 'center', maxWidth: '640px', margin: '0 auto', position:'relative', overflow:'hidden' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', position:'relative', zIndex:5 }}>
+    /* `gameShell` جای `maxWidth:640px`ِ inline نشسته: روی گوشی همان ۶۴۰px
+       است (آینهٔ اندروید، بدون تغییر)، ولی روی دسکتاپ CSS می‌تواند به
+       چیدمان دو‌ستونه سوییچ کند — کاری که با استایلِ inline ممکن نبود.
+       `isPlaying` فقط وقتی روشن است که تخته واقعاً رندر می‌شود؛ صفحه‌های
+       idle/waiting/over تک‌ستونهٔ وسط‌چین می‌مانند. */
+    <div className={`card wide gameShell gameShell-${activeGameId}${phase === 'playing' ? ' isPlaying' : ''}`}
+      style={{ padding: '20px', textAlign: 'center', position:'relative', overflow:'hidden' }}>
+      <div className="gameShellHead" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', position:'relative', zIndex:5 }}>
         <button type="button" onClick={() => { leave(); onBack(); }} style={{ background: 'rgba(255,255,255,0.1)', color: '#FFF', border: 'none', padding: '6px 14px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>
           ← بازگشت
         </button>
@@ -656,7 +662,7 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
       {connectionNotice && <div className="gameReconnectBanner">{connectionNotice}</div>}
 
       {phase === 'playing' && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.35)', padding: '10px 16px', borderRadius: '16px', marginBottom: '16px', border: '1px solid rgba(255,255,255,0.1)' }}>
+        <div className="gameShellScore" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.35)', padding: '10px 16px', borderRadius: '16px', marginBottom: '16px', border: '1px solid rgba(255,255,255,0.1)' }}>
           <div style={{ display:'flex', flex:'1 1 0', minWidth:0, alignItems:'center', gap:'8px', borderBottom:g.turn==='X'?'2px solid #38BDF8':'none', paddingBottom:'4px' }}>
             <GamePlayerIdentity player={pX} fallback="کاربر ۱" />
             {g.turn === 'X' && <span style={{ background: '#38BDF8', color: '#000', padding: '2px 6px', borderRadius: '7px', fontSize: '12.5px', fontWeight: '900' }}>نوبت ({fa(secondsLeft)}s)</span>}
@@ -670,7 +676,7 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
       )}
 
       {activeStake>0 && !g.vsBot && phase==='playing' && (
-        <div style={{ margin:'0 auto 10px', display:'inline-flex', alignItems:'center', gap:'6px', background:'linear-gradient(90deg, #FFD70022, #FF9F4322)', border:'1px solid #FFD166', color:'#FFD166', padding:'4px 12px', borderRadius:'99px', fontSize:'11px', fontWeight:'900' }}>
+        <div className="gameShellPot" style={{ margin:'0 auto 10px', display:'inline-flex', alignItems:'center', gap:'6px', background:'linear-gradient(90deg, #FFD70022, #FF9F4322)', border:'1px solid #FFD166', color:'#FFD166', padding:'4px 12px', borderRadius:'99px', fontSize:'11px', fontWeight:'900' }}>
           <span>🏆</span> پات مسابقه: {fa(g.netPot||activeStake*2*0.9)} امتیاز (۱۰٪ کارمزد)
         </div>
       )}
@@ -722,7 +728,7 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
       )}
 
       {phase === 'playing' && (
-        <div>
+        <div className="gameShellBoard">
           {activeGameId === 'penalty' && (
             <PenaltyGame state={g.state} mySymbol={g.me} turn={g.turn} onMove={move} />
           )}

@@ -44,6 +44,9 @@ function strip(src) {
 
 const css = strip(fs.readFileSync(path.join(root, 'userweb/src/style.css'), 'utf8'));
 
+/** یک فایلِ سورسِ userweb را می‌خواند و کامنت‌هایش را حذف می‌کند. */
+const read = (rel) => strip(fs.readFileSync(path.join(root, 'userweb', rel), 'utf8'));
+
 let checks = 0;
 function ok(label, cond) {
   checks += 1;
@@ -117,5 +120,43 @@ ok('منطقِ حذفِ media-block: محتوای داخلِ min-width حذف م
   !stripped.includes('.b'));
 ok('منطقِ حذفِ media-block: محتوای بیرونِ آن دست‌نخورده می‌ماند',
   stripped.includes('.a') && stripped.includes('.c'));
+
+// ── ۵. چیدمانِ داخلِ بازی (دور ۱۴) ─────────────────────────────────────
+// اندازه‌گیری نشان داد داخلِ بازی‌ها روی دسکتاپ تا ۲۹۸px اسکرولِ عمودی
+// داشت و گریدِ جفت‌یاب زیرِ نوارِ پایین پنهان می‌شد. این تست‌ها جلوی
+// برگشتنِ علت‌های ریشه‌ای را می‌گیرند.
+
+// (الف) پوستهٔ بازی نباید دوباره عرضش را inline ببندد؛ آن `maxWidth:640px`
+// همان چیزی بود که همهٔ بازی‌ها را روی مانیتور در یک ستونِ باریک حبس کرد
+// و چون inline بود، هیچ media query نمی‌توانست لغوش کند.
+const gamesJsx = read('src/games.jsx');
+ok('پوستهٔ بازی کلاسِ gameShell دارد (نه maxWidth inline)',
+  /className=\{`card wide gameShell/.test(gamesJsx));
+ok('در games.jsx هیچ maxWidth: \'640px\'ِ inline نمانده',
+  !/maxWidth:\s*'640px'/.test(gamesJsx));
+ok('حالتِ بازی با کلاسِ isPlaying به CSS اعلام می‌شود',
+  /isPlaying/.test(gamesJsx));
+
+// (ب) دوئل هم باید حالتش را اعلام کند تا چیدمانِ دو‌ستونه ممکن شود.
+const duelJsx = read('src/cardDuelGame.jsx');
+ok('دوئل حالتِ isSetup/isLive را روی duelPageV2 می‌گذارد',
+  /duelPageV2 \$\{activeGame \? 'isLive' : 'isSetup'\}/.test(duelJsx));
+
+// (ج) چیدمانِ دو‌ستونه فقط باید در media queryِ دسکتاپ باشد. اگر به
+// قواعدِ پایه نشت کند، موبایل دیگر آینهٔ اندروید نیست.
+ok('گریدِ دو‌ستونهٔ پوستهٔ بازی در قواعدِ پایه نیست',
+  !/\.gameShell\.isPlaying\s*\{[^}]*display:\s*grid/.test(base));
+ok('گریدِ دو‌ستونهٔ دوئل در قواعدِ پایه نیست',
+  !/\.duelPageV2\.isSetup\s*\{[^}]*display:\s*grid/.test(base));
+ok('چیدمانِ دو‌ستونهٔ پوستهٔ بازی در بلوکِ دسکتاپ تعریف شده',
+  /\.gameShell\.isPlaying\s*\{[^}]*display:\s*grid/.test(css));
+ok('چیدمانِ دو‌ستونهٔ دوئل در بلوکِ دسکتاپ تعریف شده',
+  /\.duelPageV2\.isSetup\s*\{[^}]*display:\s*grid/.test(css));
+
+// (د) گریدِ جفت‌یاب باید نسبت به ارتفاعِ نما هم بسته شود، وگرنه ردیفِ
+// آخرِ کارت‌ها زیرِ نوارِ شناور می‌رود و بازی غیرقابلِ تمام‌کردن می‌شود.
+// این باگ روی گوشی هم بود (۳۹۰×۸۴۴: کفِ گرید ۷۸۸ > نوار ۷۶۹).
+ok('عرضِ گریدِ جفت‌یاب به vh مقید شده (ردیفِ آخر زیرِ نوار نرود)',
+  /\.memGrid\s*\{[^}]*vh/.test(css));
 
 console.log(`\n✅ ${checks} تست چیدمانِ دسکتاپ موفق بود\n`);

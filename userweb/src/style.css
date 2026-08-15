@@ -5574,3 +5574,187 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
   .portal > .tabPane { max-width: 1380px; }
   .homeInventoryPreview { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }
+
+/* ─────────────────────────────────────────────────────────────────────
+   دورِ چهاردهم — چیدمانِ داخلِ بازی روی دسکتاپ
+   ---------------------------------------------------------------------
+   مشکل اندازه‌گیری‌شده: پوستهٔ بازی یک `maxWidth:640px`ِ inline داشت، پس
+   روی مانیتور یک ستونِ باریکِ وسط بود و تخته از پایینِ صفحه می‌زد بیرون
+   (۱۳۶۶×۷۶۸: پنالتی ۲۹۸px و جفت‌یاب ۲۲۵px اسکرول؛ گریدِ جفت‌یاب حتی زیرِ
+   نوارِ پایین پنهان می‌شد). آن inline برداشته شد و اینجا بازسازی می‌شود:
+   موبایل دقیقاً همان ۶۴۰px قبلی می‌ماند (آینهٔ اندروید، دست‌نخورده) و
+   فقط از ۱۱۰۰px به بالا چیدمانِ دو‌ستونه فعال می‌شود. */
+.gameShell { max-width: 640px; margin-inline: auto; }
+
+@media (min-width: 1100px) {
+  /* دو ستون: تخته در ستونِ پهن، و «ریلِ» وضعیت (اسکوربورد، پات، هشدارها)
+     در ستونِ باریک کنارش — الگوی استانداردِ سایت‌های بازی. این هم فضای
+     خالیِ دو طرفِ صفحه را پر می‌کند و هم ارتفاع را نصف می‌کند، چون
+     اسکوربورد دیگر یک ردیفِ جدا بالای تخته نیست.
+     جای‌گذاری با شمارهٔ صریحِ سطر/ستون است نه auto-placement، چون
+     `.err` و بنرِ اتصال شرطی‌اند و جابه‌جا شدنشان کلِ چیدمان را می‌لغزاند. */
+  .gameShell.isPlaying {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(248px, 0.82fr);
+    grid-template-rows: auto auto auto auto 1fr;
+    column-gap: 20px;
+    row-gap: 12px;
+    align-items: start;
+    max-width: min(1080px, 96vw);
+    text-align: start;
+  }
+  .gameShell.isPlaying > .gameShellHead   { grid-area: 1 / 1 / 2 / -1; margin-bottom: 0; }
+  .gameShell.isPlaying > .gameShellBoard  { grid-area: 2 / 1 / -1 / 2; align-self: start; }
+  .gameShell.isPlaying > .gameShellScore  { grid-area: 2 / 2 / 3 / 3; margin-bottom: 0; }
+  .gameShell.isPlaying > .gameShellPot    { grid-area: 3 / 2 / 4 / 3; margin: 0 !important; }
+  .gameShell.isPlaying > .err             { grid-area: 4 / 2 / 5 / 3; margin: 0 !important; }
+  .gameShell.isPlaying > .gameReconnectBanner { grid-area: 5 / 2 / 6 / 3; margin: 0; }
+
+  /* اسکوربورد در ستونِ باریک باید عمودی شود، وگرنه دو نام و نشانِ نوبت
+     در ۲۴۸px له می‌شوند. */
+  .gameShell.isPlaying > .gameShellScore {
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 12px !important;
+  }
+  .gameShell.isPlaying > .gameShellScore > div { flex: 0 0 auto !important; width: 100%; justify-content: center !important; }
+
+  /* ارتفاع، نه عرض، قیدِ اصلیِ داخلِ بازی است: بالای کارت نوارِ اپ و
+     ساب‌تب‌ها (~۱۵۵px) و پایینش نوارِ شناور (~۱۰۰px) نشسته. پس تخته با
+     vh بسته می‌شود تا در ۷۶۸px هم کاملِ کادر داخلِ fold بماند. */
+  .gameShell.isPlaying .penPitch { width: min(100%, calc(43vh * 1.3)); }
+  .gameShell.isPlaying .memGrid  { width: min(392px, calc(43vh * 0.82)); }
+}
+
+/* مانیتورِ بلند: وقتی ارتفاع هست، تخته هم بزرگ‌تر نفس بکشد. */
+@media (min-width: 1100px) and (min-height: 1000px) {
+  .gameShell.isPlaying .penPitch { width: min(100%, 560px); }
+  .gameShell.isPlaying .memGrid  { width: min(392px, calc(46vh * 0.82)); }
+}
+
+/* مانیتورهای کوتاه (۷۶۸–۹۰۰px ارتفاع، یعنی لپ‌تاپِ متعارف) هنوز تنگ‌اند:
+   بالای کارت ۱۵۵px نوارِ اپ و ساب‌تب است و پایینش ۱۰۸px جای نوارِ شناور.
+   پس روی این ارتفاع‌ها کروم را می‌فشاریم تا خودِ تخته قربانی نشود. */
+@media (min-width: 1100px) and (max-height: 900px) {
+  .gameShell.isPlaying { padding: 14px !important; row-gap: 8px; }
+  .gameShell.isPlaying > .gameShellHead { margin-bottom: 0; }
+  .gameShell.isPlaying .penPitch { width: min(100%, calc(42vh * 1.3)); }
+  .gameShell.isPlaying .penaltyExact { gap: 5px; }
+  /* اسکورِ داخلِ زمین وقتی ستونِ کناری همان نام‌ها و نوبت را نشان می‌دهد
+     نباید ۳۰px جای عمودی بگیرد. */
+  .gameShell.isPlaying .penScore { padding: 4px 12px; }
+  .gameShell.isPlaying .penScore > strong { font-size: 22px; padding: 2px 14px; }
+  .gameShell.isPlaying .penPrompt { min-height: 24px; padding: 2px 12px; font-size: 14px; }
+  .gameShell.isPlaying .memEvent { margin: 0; }
+  .gameShell.isPlaying .memGrid { width: min(392px, calc(46vh * 0.82)); }
+  /* ستونِ کناری هم جمع‌وجورتر. */
+  .gameShell.isPlaying > .gameShellScore { padding: 10px !important; gap: 7px; }
+
+  /* آخرین ۱۳px: پدینگِ پایینِ پرتال برای نوارِ شناور ۱۰۸px بود، ولی روی
+     مانیتورِ کوتاه خودِ همان پدینگ اسکرول می‌سازد. نوار ۶۲px است + ۲۰px
+     فاصله از کف، پس ۹۰px کافی است و نوار همچنان چیزی را نمی‌پوشاند. */
+  .portal { padding-bottom: 90px; }
+}
+
+/* لپ‌تاپِ ۷۶۸px: یک پله کوتاه‌تر از ۹۰۰px، پس تخته باید بیشتر جمع شود.
+   جدا نگه داشته شده تا ۱۴۴۰×۹۰۰ که جا دارد بی‌خود کوچک نشود. */
+@media (min-width: 1100px) and (max-height: 820px) {
+  .gameShell.isPlaying .penPitch { width: min(100%, calc(34vh * 1.3)); }
+  .gameShell.isPlaying .memGrid  { width: min(392px, calc(40vh * 0.82)); }
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   دوئل کارت‌ها روی دسکتاپ
+   ---------------------------------------------------------------------
+   اندازه‌گیری: صفحهٔ چیدمانِ ترکیب ۱۰۳۸px بود در نمای ۹۰۰px (و ۷۶۸px)،
+   چون هفت بلوک — بنر، قوانین، ترکیب، تحلیل، دکمهٔ شروع، کلکسیون و
+   تاریخچه — همه در یک ستونِ ۹۸۰px روی هم چیده شده بودند.
+   روی مانیتور این ترتیبِ عمودی هیچ لزومی ندارد: کلکسیون (که گرید است و
+   عرض می‌خواهد) می‌رود ستونِ پهن، و ترکیب و دکمهٔ شروع کنارش می‌نشینند
+   تا کاربر همان لحظه که کارت انتخاب می‌کند ترکیبش را هم ببیند — که
+   دقیقاً کاری است که در این صفحه انجام می‌دهد. */
+@media (min-width: 1100px) {
+  .duelPageV2.isSetup {
+    display: grid;
+    /* ستونِ ترکیب باید پنج کارت را کنارِ هم جا دهد بدون بریدنِ نام؛
+       زیر ~۴۶۰px نام‌ها clip می‌شوند. پس کفِ ستونِ دوم ۴۶۰px است و
+       ستونِ اول بقیه را می‌گیرد. */
+    grid-template-columns: minmax(0, 1.1fr) minmax(460px, 0.9fr);
+    grid-auto-rows: min-content;
+    column-gap: 18px;
+    row-gap: 12px;
+    width: min(100%, 1180px);
+    align-items: start;
+  }
+  .duelPageV2.isSetup > .duelHeroV2 { grid-column: 1 / -1; }
+  /* تقسیمِ کار بین دو ستون بر اساسِ ارتفاعشان بسته شده، نه ترتیبِ
+     موبایل: اگر همهٔ بلوک‌های کوچک در ستونِ باریک بیفتند، همان ستون
+     ۶۹۴px بلند می‌شود و باز اسکرول می‌سازد در حالی که ستونِ پهن —
+     وقتی کلکسیون جمع است — خالی مانده.
+     پس: ستونِ پهن = قوانین + کلکسیون + تاریخچه، ستونِ باریک = ترکیب +
+     تحلیل + دکمهٔ شروع (سه چیزی که کاربر همزمان نگاهشان می‌کند). */
+  /* ردیف‌ها صریح‌اند، چون auto-placementِ گرید «sparse» است: وقتی
+     ترکیب دو ردیف در ستونِ ۲ می‌گیرد، کلکسیونِ ستونِ ۱ به ردیفِ خالیِ
+     عقب برنمی‌گردد و می‌افتد پایینِ همه‌چیز — همان چیزی که اندازه‌گیری
+     نشان داد (کلکسیون در top=684 زیرِ دکمهٔ شروع). */
+  .duelPageV2.isSetup > .duelRuleStrip   { grid-area: 2 / 1 / 3 / 2; }
+  .duelPageV2.isSetup > .duelCollection  { grid-area: 3 / 1 / 5 / 2; }
+  .duelPageV2.isSetup > .duelHistoryV2   { grid-area: 5 / 1 / 6 / 2; }
+  .duelPageV2.isSetup > .duelLineupV2    { grid-area: 2 / 2 / 4 / 3; }
+  .duelPageV2.isSetup > .duelIntelCompact{ grid-area: 4 / 2 / 5 / 3; }
+  .duelPageV2.isSetup > .duelLaunch      { grid-area: 5 / 2 / 6 / 3; }
+  .duelPageV2.isSetup > .duelMessage,
+  .duelPageV2.isSetup > .gameStakeNotice { grid-column: 2; grid-row: 6; }
+
+  /* کلکسیون در ستونِ پهن جا برای سه–چهار کارت در هر ردیف دارد؛
+     `auto-fit` خودش پر می‌کند، فقط سقفِ ارتفاع می‌گذاریم تا صفحه دراز
+     نشود و خودِ گرید اسکرول کند (نه کلِ صفحه). */
+  .duelPageV2.isSetup > .duelCollection[open] > .duelGridV2 {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    max-height: calc(100vh - 420px);
+    overflow-y: auto;
+    padding-inline-end: 4px;
+  }
+
+}
+
+/* حالتِ زندهٔ دوئل: نوارِ فشرده + میدانِ نبرد. اینجا تک‌ستونه درست است
+   (تمرکز روی کلَش وسط)، فقط عرض را مهار می‌کنیم تا کارت‌ها کش نیایند. */
+@media (min-width: 1100px) {
+  .duelPageV2.isLive { width: min(100%, 900px); }
+}
+
+/* روی لپ‌تاپِ کوتاه، بنرِ ۱۵۰pxیِ دوئل تنها بلوکی است که می‌شود بی‌ضرر
+   کوچکش کرد (تزیینی است، نه کارکردی). ۱۵۰→۹۶ یعنی ۵۴px آزاد. */
+@media (min-width: 1100px) and (max-height: 820px) {
+  .duelPageV2.isSetup > .duelHeroV2 {
+    min-height: 96px;
+    padding: 12px 18px;
+    grid-template-columns: auto 60px 1fr auto;
+    gap: 12px;
+  }
+  .duelPageV2.isSetup > .duelHeroV2 h1 { font-size: 22px; }
+  .duelPageV2.isSetup { row-gap: 9px; }
+}
+
+/* ─── جفت‌یاب روی گوشی: گرید زیرِ نوارِ پایین پنهان می‌شد ───
+   اندازه‌گیری روی ۳۹۰×۸۴۴: صفحه ۹۰۲px بود و کفِ گرید ۷۸۸px، در حالی که
+   نوارِ شناور از ۷۶۹px شروع می‌شود — یعنی ردیفِ آخرِ کارت‌ها زیرِ نوار
+   می‌رفت و کاربر نمی‌توانست بازی را تمام کند.
+   این باگ از قبل وجود داشت (با `git stash` تأیید شد؛ بدونِ تغییراتِ
+   دسکتاپ هم همین اعداد تکرار می‌شوند) و ربطی به چیدمانِ دسکتاپ ندارد.
+   علت: `width:min(392px,92vw)` فقط عرض را می‌بست و ارتفاعِ گرید از
+   `aspect-ratio` کارت‌ها می‌آمد، بدون هیچ قیدی نسبت به ارتفاعِ نما. */
+/* ── و چرا ۳۴۰px و کارتِ مربع ──
+   قیدِ پروژه: «چینشِ وب موبایل دقیقاً برابرِ اندروید». اندروید در
+   `memory_board.dart:433` گرید را با `maxWidth: 340`، `childAspectRatio:
+   1.0` و `spacing: 6` می‌سازد؛ وب ۳۹۲px با `aspect-ratio:.82` و
+   `gap:9px` داشت — یعنی کارت‌ها بلندتر و کلِ گرید ~۱۳۰px مرتفع‌تر از
+   اندروید بود. همین اختلاف بود که ردیفِ آخر را زیرِ نوار می‌برد.
+   پس به‌جای وصلهٔ vh، عددها را با اندروید یکی می‌کنیم؛ هم باگ می‌رود و
+   هم آینه واقعاً برقرار می‌شود. `vh` به‌عنوان سقفِ ایمنی می‌ماند تا روی
+   گوشیِ کوتاه (مثلاً ۶۴۰px) هم هرگز زیرِ نوار نرود. */
+@media (max-width: 1099px) {
+  .memGrid { width: min(340px, 92vw, calc(46vh)); gap: 6px; }
+  .memCard { aspect-ratio: 1; }
+}
