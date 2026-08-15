@@ -137,6 +137,11 @@ jobs:
       - run: npm run test:feedback-parity
       - run: npm run test:coin-parity
       - run: npm run test:chat-parity
+      # Desktop layout: the phone-shaped portal used to overflow horizontally
+      # on a monitor (2010px of content in a 1440px window). This guard also
+      # enforces that every desktop fix stays inside a `min-width` media query,
+      # so the mobile layout -- which Android mirrors -- cannot drift.
+      - run: npm run test:desktop-layout
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - name: Serve the built app

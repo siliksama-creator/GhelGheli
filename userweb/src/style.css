@@ -4251,6 +4251,14 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
   aspect-ratio:1;
   display:flex; flex-direction:column;
   padding:0; overflow:hidden;
+  /* ⚠️ باگ اندازه‌گیری‌شده (دسکتاپ ۱۴۴۰px): این کاشی کلاس `.card` را هم
+     می‌گیرد و `.card` عرضِ صریحِ `min(560px,95vw)` دارد. داخل
+     `.gameTileGrid` که ترکِ ۵۲۸px می‌سازد، آن ۵۶۰px نمی‌شکند و کاشی از
+     قاب بیرون می‌زند: scrollWidth=2010 در برابر viewport=1440.
+     روی موبایل پنهان بود چون `@media(max-width:900px)` قانونِ
+     `.card{width:100%!important}` را دارد — یعنی ایراد فقط دسکتاپ را
+     می‌زد. عرض را به کانتینر گره می‌زنیم، نه به عددِ ثابت. */
+  width:100%; max-width:none; min-width:0;
   border-radius:18px;
   border:1px solid color-mix(in srgb,var(--tile-accent) 30%,transparent);
   cursor:pointer;
@@ -5490,3 +5498,79 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
   padding:4px 7px; border-radius:8px; transition:background .15s;
 }
 .chatReplyX:hover{ background:#EF444418 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   دسکتاپ (≥1100px) — نسخهٔ وب روی مانیتور
+   ═══════════════════════════════════════════════════════════════════════
+
+   چرا این بلوک لازم بود: تمام چیدمانِ پرتال برای گوشی نوشته شده و روی
+   مانیتور همان ستونِ ۱۰۸۰px را وسط می‌انداخت؛ اندازه‌گیری روی ۱۴۴۰px:
+   تبِ خانه ۲۶۸۹px ارتفاع داشت، یعنی کاربر دسکتاپ برای دیدنِ همان محتوایی
+   که گوشی یکجا نشان می‌دهد سه صفحه اسکرول می‌کرد، در حالی که دو طرفِ
+   صفحه خالی بود.
+
+   ⚠️ همه‌چیز داخل `min-width` است، نه دستکاریِ قواعدِ پایه. دلیلش قید
+      «وب باید آینهٔ اندروید باشد» است: زیرِ ۱۱۰۰px حتی یک اعلانِ این بلوک
+      فعال نمی‌شود، پس رفتارِ گوشی و اندروید بیت‌به‌بیت دست‌نخورده می‌ماند و
+      فقط جایی عوض می‌شود که اندروید اصلاً وجود ندارد. */
+@media (min-width: 1100px) {
+  /* فضای افقی‌ای که هدر می‌رفت را پس می‌گیریم. */
+  .page { max-width: 1400px; padding: 22px 28px 40px; }
+  .portal > .appBar,
+  .portal > .mobileNav,
+  .portal > .tabPane { max-width: 1240px; }
+
+  /* نوار ناوبری: روی گوشی چسبیده به لبهٔ پایین درست است، ولی روی مانیتورِ
+     پهن یک نوارِ ۱۴۴۰px با پنج دکمهٔ پخش‌شده بدترکیب است. اینجا به یک
+     «پیل» شناور و جمع‌وجورِ وسط‌چین تبدیلش می‌کنیم.
+     سلکتور `.portal > .mobileNav` عمداً تکرار شده: قانونِ عرضِ بالاتر در
+     فایل همین ویژگی‌مندی (0,2,1) را دارد و با `.mobileNav`ِ تنها لغو
+     نمی‌شد. */
+  .portal > .mobileNav { width: auto; max-width: none; }
+  .mobileNav {
+    left: 50%; right: auto;
+    transform: translateX(-50%);
+    bottom: 20px;
+    border-radius: 22px;
+    border: 1px solid #ffffff1f;
+    padding: 8px 10px;
+    gap: 6px;
+    box-shadow: 0 20px 55px #000b;
+  }
+  .mobileNav button {
+    flex: 0 0 auto;
+    min-width: 108px;
+    padding: 9px 16px;
+    border-radius: 15px;
+  }
+  /* جای پیلِ شناور + فاصلهٔ نفس‌کشیدن. */
+  .portal { padding-bottom: 108px; }
+
+  /* روی موس، بازخوردِ hover معنا دارد (روی لمس نداشت). */
+  .mobileNav button:not(.on):hover { background: #ffffff12; color: #e8f4ff; }
+
+  /* کلکسیونِ خانه: سه ستون روی مانیتور یعنی یک نوارِ بلندِ ۱۱۶۶px.
+     پنج ستون همان کارت‌ها را در کمتر از نصفِ ارتفاع می‌نشاند. */
+  .homeInventoryPreview { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+
+  /* کاشی‌های بازی: دو ستونِ گوشی روی مانیتور کاشی‌های غول‌پیکر می‌سازد.
+     سه ستون، چون دقیقاً سه بازی اینجا رندر می‌شود (`tap` بالاتر بنر
+     اختصاصی دارد). با `repeat(4,…)` یک ستونِ خالی می‌ماند و ردیف
+     بدقواره از وسط می‌افتد. `max-width` هم لازم است تا اگر روزی بازی
+     چهارم اضافه شد کاشی‌ها کش نیایند. */
+  .gameTileGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    max-width: 880px;
+    margin-inline: auto;
+  }
+}
+
+/* مانیتورهای خیلی پهن: یک پله بازتر، بدون اینکه خطوط متن دراز شوند. */
+@media (min-width: 1600px) {
+  .page { max-width: 1560px; }
+  .portal > .appBar,
+  .portal > .mobileNav,
+  .portal > .tabPane { max-width: 1380px; }
+  .homeInventoryPreview { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}

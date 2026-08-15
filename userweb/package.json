@@ -13,7 +13,8 @@
     "test:card-duel": "node tool/card-duel-truth.mjs",
     "test:feedback-parity": "node tool/feedback-parity.mjs",
     "test:coin-parity": "node tool/coin-parity.mjs",
-    "test:chat-parity": "node tool/chat-parity.mjs"
+    "test:chat-parity": "node tool/chat-parity.mjs",
+    "test:desktop-layout": "node tool/desktop-layout.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^6.0.5",
