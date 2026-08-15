@@ -13,10 +13,15 @@ import '../../theme/tokens.dart';
 import 'chat_page.dart';
 import 'games_page.dart';
 import 'games/growth_panel.dart';
+import 'pass_page.dart';
 
 class SocialPage extends StatefulWidget {
-  const SocialPage({super.key, required this.api});
+  const SocialPage({super.key, required this.api, this.onOpenShop});
   final ApiClient api;
+
+  /// برای تبِ «گذر نبرد»: وقتی کاربر روی «خرید پلاس» می‌زند باید به
+  /// فروشگاه برود. اگر داده نشود، دکمه بی‌اثر می‌شود نه اینکه کرش کند.
+  final VoidCallback? onOpenShop;
 
   @override
   State<SocialPage> createState() => _SocialPageState();
@@ -64,6 +69,10 @@ class _SocialPageState extends State<SocialPage> {
                   },
                 ),
               ),
+              PassPage(
+                api: widget.api,
+                onOpenShop: widget.onOpenShop ?? () {},
+              ),
             ],
           ),
         ),
@@ -82,7 +91,11 @@ class _Switcher extends StatelessWidget {
   static const _items = [
     (icon: Icons.chat_bubble_rounded, label: 'چت'),
     (icon: Icons.sports_esports_rounded, label: 'بازی‌ها'),
-    (icon: Icons.rocket_launch_rounded, label: 'ماموریت و دوستان'),
+    (icon: Icons.rocket_launch_rounded, label: 'ماموریت'),
+    // گذر نبرد این‌جا هم می‌آید. تنها راه ورودش یک آیکون کوچک در نوار
+    // بالا بود و عملاً دیده نمی‌شد — در حالی که مهم‌ترین دلیلِ خریدِ
+    // «پلاس» است و باید کنار بازی‌ها (جایی که XP جمع می‌شود) باشد.
+    (icon: Icons.emoji_events_rounded, label: 'گذر نبرد'),
   ];
 
   @override
@@ -160,14 +173,21 @@ class _Switcher extends StatelessWidget {
                                     : scheme.onSurfaceVariant,
                               ),
                               Gaps.hXxs,
-                              Text(
-                                _items[i].label,
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: index == i
-                                      ? scheme.onPrimary
-                                      : scheme.onSurfaceVariant,
+                              // با چهار تب، عرض هر خانه کم می‌شود.
+                              // Flexible + ellipsis تضمین می‌کند لیبل
+                              // روی گوشی باریک سرریز نکند (overflow زرد).
+                              Flexible(
+                                child: Text(
+                                  _items[i].label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    color: index == i
+                                        ? scheme.onPrimary
+                                        : scheme.onSurfaceVariant,
+                                  ),
                                 ),
                               ),
                             ],

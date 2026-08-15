@@ -149,11 +149,50 @@ function tehranDay(now = new Date()) {
 }
 
 // ── فصل ────────────────────────────────────────────────────────────────
+/// مهلتِ دریافتِ جایزه بعد از پایان فصل (روز).
+///
+/// ═══════════════════════════════════════════════════════════════════════
+/// چرا این وجود دارد — باگی که جایزه‌های کاربر را می‌سوزاند
+/// ═══════════════════════════════════════════════════════════════════════
+///
+/// `activeSeason()` شرط `ends_at > NOW()` داشت و همه‌جا — از جمله
+/// `claim()` — از همان می‌خواند. یعنی دقیقاً در ثانیهٔ پایان فصل:
+///
+///   • `status()` مقدار `{ active: false }` برمی‌گرداند
+///   • `claim()` خطای «فصلی فعال نیست» می‌دهد
+///
+/// کاربری که پلهٔ ۵۰ را باز کرده بود ولی جایزه‌اش را **هنوز نگرفته
+/// بود**، آن را برای همیشه از دست می‌داد. این بدترین حالتِ ممکن است:
+/// کاربر تمام فصل تلاش کرده و درست در لحظهٔ موفقیت دستش خالی می‌ماند.
+/// برای کاربر پلاس که پول داده، این مستقیماً یعنی حس کلاهبرداری.
+///
+/// حالا دو مفهوم جدا شده‌اند:
+///   `activeSeason()`     → فصلی که هنوز XP می‌پذیرد (برای grantXp)
+///   `claimableSeason()`  → فصلی که هنوز می‌شود جایزه‌اش را گرفت
+const CLAIM_GRACE_DAYS = 7;
+
 async function activeSeason(client = pool) {
   const { rows } = await client.query(
     `SELECT * FROM pass_seasons
       WHERE is_active AND starts_at <= NOW() AND ends_at > NOW()
       ORDER BY starts_at DESC LIMIT 1`);
+  return rows[0] || null;
+}
+
+/**
+ * فصلی که هنوز می‌شود جایزه‌هایش را دریافت کرد.
+ *
+ * فصل جاری، یا اگر تازه تمام شده، تا `CLAIM_GRACE_DAYS` روز بعد از
+ * پایانش. XP دیگر اضافه نمی‌شود (آن کارِ activeSeason است) ولی
+ * پله‌هایی که کاربر **قبلاً باز کرده** قابل دریافت می‌مانند.
+ */
+async function claimableSeason(client = pool) {
+  const { rows } = await client.query(
+    `SELECT * FROM pass_seasons
+      WHERE is_active AND starts_at <= NOW()
+        AND ends_at > NOW() - ($1 || ' days')::interval
+      ORDER BY starts_at DESC LIMIT 1`,
+    [String(CLAIM_GRACE_DAYS)]);
   return rows[0] || null;
 }
 
@@ -340,8 +379,11 @@ async function grantXp(userId, source, { multiplier = 1 } = {}) {
 
 // ── وضعیت برای کلاینت ─────────────────────────────────────────────────
 async function status(userId) {
-  const season = await activeSeason();
+  // در مهلتِ ارفاق هم وضعیت را نشان بده تا کاربر بتواند جایزه‌های
+  // باز‌شده‌اش را بگیرد. `grace` به کلاینت می‌گوید حالت «فقط دریافت» است.
+  const season = await claimableSeason();
   if (!season) return { active: false };
+  const ended = new Date(season.ends_at) <= new Date();
 
   // پله‌های امروز را قبل از خواندن باز کن.
   //
@@ -416,6 +458,15 @@ async function status(userId) {
       daysLeft: Math.max(0,
         Math.ceil((new Date(season.ends_at) - Date.now()) / 86400000)),
     },
+    // فصل تمام شده ولی هنوز در مهلتِ دریافت است: کلاینت باید نوار
+    // «فقط فرصت دریافت» را نشان دهد و XP جدید وعده ندهد.
+    ended,
+    graceDays: CLAIM_GRACE_DAYS,
+    graceDaysLeft: ended
+      ? Math.max(0, Math.ceil(
+        (new Date(season.ends_at).getTime() + CLAIM_GRACE_DAYS * 86400000
+          - Date.now()) / 86400000))
+      : null,
     hasPlus: plus,
     xp,
     tier: pos.tier,
@@ -448,8 +499,10 @@ async function status(userId) {
  * آن، جایزهٔ نقدی با دو تپ سریع دوبار واریز می‌شد.
  */
 async function claim(userId, tierId) {
-  const season = await activeSeason();
-  if (!season) throw Object.assign(new Error('فصلی فعال نیست'), { status: 400 });
+  // عمداً claimableSeason و نه activeSeason: پله‌ای که کاربر باز کرده
+  // نباید در ثانیهٔ پایان فصل بسوزد. توضیح کامل کنار CLAIM_GRACE_DAYS.
+  const season = await claimableSeason();
+  if (!season) throw Object.assign(new Error('مهلت دریافت جایزه‌های این فصل تمام شده'), { status: 400 });
 
   const client = await pool.connect();
   try {
@@ -559,5 +612,6 @@ async function claimAll(userId) {
 module.exports = {
   SOURCES, TIER_COUNT, MAX_TIERS_PER_DAY,
   xpForTier, cumulativeXp, tierFromXp, syncTiers, pgDateToDay,
-  activeSeason, hasPlus, grantXp, status, claim, claimAll, tehranDay,
+  activeSeason, claimableSeason, CLAIM_GRACE_DAYS,
+  hasPlus, grantXp, status, claim, claimAll, tehranDay,
 };

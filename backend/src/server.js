@@ -2350,6 +2350,10 @@ app.use('/api', require('./routes/growth')({
   auth, adminAuth, requireRole, asyncHandler, validateUuid, presence, rateLimit,
 }));
 
+app.use('/api', require('./routes/payments')({
+  auth, asyncHandler, rateLimit,
+}));
+
 io.use(async (socket, next) => {
   try {
     const token = socket.handshake.auth?.token;

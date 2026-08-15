@@ -61,6 +61,8 @@ export default [
         TextEncoder: 'readonly',
         TextDecoder: 'readonly',
         AbortController: 'readonly',
+        // AbortSignal.timeout() برای مهلت‌گذاری روی درخواست به API کافه‌بازار
+        AbortSignal: 'readonly',
         fetch: 'readonly',
       },
     },

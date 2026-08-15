@@ -143,8 +143,8 @@ export default function GrowthHub({ api, token, onSocketGame }) {
       </article>)}
     </div>
 
-    <details className="weeklyMissions">
-      <summary>ماموریت‌های هفتگی <span>{weekly.length} ماموریت</span></summary>
+    <details className="weeklyMissions" open>
+      <summary>ماموریت‌های این هفته <span>{weekly.length} ماموریت جداگانه</span></summary>
       <div className="missionRail weekly">
         {weekly.map(mission => <article key={mission.key} className={mission.claimed ? 'claimed' : mission.complete ? 'complete' : ''}>
           <div className="missionTop"><i>{mission.icon || '📅'} هفتگی</i><strong>+{mission.reward}</strong></div>

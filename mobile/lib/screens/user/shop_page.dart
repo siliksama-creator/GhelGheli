@@ -8,6 +8,7 @@ import '../../core/money.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/async_section.dart';
+import '../../services/bazaar_billing.dart';
 
 class ShopPage extends StatefulWidget {
   final ApiClient api;
@@ -22,6 +23,8 @@ class _ShopPageState extends State<ShopPage> {
   String? _busy;
   String _kind = 'card_frame';
   bool _showPlans = true;
+  bool _showTopup = false;
+  Map<String, dynamic>? _topup;
 
   static const _categories = <(String, String, IconData)>[
     ('club_badge', 'باشگاه‌ها', Icons.shield_rounded),
@@ -31,6 +34,44 @@ class _ShopPageState extends State<ShopPage> {
     ('profile_background', 'پس‌زمینه', Icons.wallpaper_rounded),
     ('emote_pack', 'پیام‌ها', Icons.forum_rounded),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTopupCatalog();
+  }
+
+  /// بسته‌های شارژ. شکستِ این درخواست نباید فروشگاه را از کار بیندازد،
+  /// پس خطا بی‌صدا به «غیرفعال» تبدیل می‌شود.
+  Future<void> _loadTopupCatalog() async {
+    try {
+      final data = await widget.api.get('/api/wallet/topup/catalog');
+      if (mounted && data is Map) {
+        setState(() => _topup = Map<String, dynamic>.from(data));
+      }
+    } catch (_) {
+      if (mounted) setState(() => _topup = const {'enabled': false, 'products': []});
+    }
+  }
+
+  /// خرید بستهٔ شارژ: سفارش → پرداخت بازار → راستی‌آزمایی سرور.
+  Future<void> _buyTopup(Map<String, dynamic> product) async {
+    final id = '${product['id']}';
+    await _run(() async {
+      final order = await widget.api.post('/api/wallet/topup/order', {
+        'productId': id,
+      });
+      final orderId = '${(order as Map)['orderId']}';
+      final token = await BazaarBilling.purchase(
+        productId: id,
+        payload: orderId,
+      );
+      return widget.api.post('/api/wallet/topup/verify', {
+        'orderId': orderId,
+        'purchaseToken': token,
+      });
+    }, 'topup-$id', 'کیف پول شارژ شد');
+  }
 
   Future<void> _reload() async {
     setState(() => _future = widget.api.get('/api/shop'));
@@ -208,7 +249,16 @@ class _ShopPageState extends State<ShopPage> {
                 plus: plus,
                 expanded: _showPlans,
                 onToggle: () => setState(() => _showPlans = !_showPlans),
+                onTopup: () => setState(() => _showTopup = !_showTopup),
               ),
+              if (_showTopup) ...[
+                Gaps.vSm,
+                _TopupSheet(
+                  catalog: _topup,
+                  busy: _busy,
+                  onBuy: _buyTopup,
+                ),
+              ],
               if (_showPlans && plans.isNotEmpty) ...[
                 Gaps.vSm,
                 SizedBox(
@@ -282,11 +332,13 @@ class _ShopHero extends StatelessWidget {
     required this.plus,
     required this.expanded,
     required this.onToggle,
+    required this.onTopup,
   });
   final int balance;
   final Map<String, dynamic> plus;
   final bool expanded;
   final VoidCallback onToggle;
+  final VoidCallback onTopup;
 
   @override
   Widget build(BuildContext context) {
@@ -333,11 +385,40 @@ class _ShopHero extends StatelessWidget {
                       : 'نمونه واقعی آیتم‌ها · پلاس ماهانه ۵۹ هزار تومان',
                   style: const TextStyle(fontSize: 10.5, color: Colors.white60),
                 ),
-                Text('کیف پول: ${Money.withUnit(balance)}',
-                    style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF22E7A6),
-                        fontWeight: FontWeight.w900)),
+                Gaps.vXxs,
+                Row(children: [
+                  Flexible(
+                    child: Text('کیف پول: ${Money.withUnit(balance)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 12.5,
+                            color: Color(0xFF22E7A6),
+                            fontWeight: FontWeight.w900)),
+                  ),
+                  Gaps.hXs,
+                  // بدون این دکمه، کاربری که موجودی ندارد به بن‌بست
+                  // می‌خورد: «موجودی کافی نیست» می‌گیرد و هیچ راهی
+                  // برای شارژ نمی‌بیند.
+                  SizedBox(
+                    height: 30,
+                    width: 88,
+                    child: OutlinedButton.icon(
+                      onPressed: onTopup,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        foregroundColor: const Color(0xFFFFD166),
+                        side: const BorderSide(color: Color(0x80FFD166)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: const Icon(Icons.add_rounded, size: 16),
+                      label: const Text('شارژ',
+                          style: TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.w900)),
+                    ),
+                  ),
+                ]),
               ],
             ),
           ),
@@ -347,6 +428,93 @@ class _ShopHero extends StatelessWidget {
             icon: Icon(expanded
                 ? Icons.expand_less_rounded
                 : Icons.expand_more_rounded),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// بسته‌های شارژ کیف پول.
+class _TopupSheet extends StatelessWidget {
+  const _TopupSheet({
+    required this.catalog,
+    required this.busy,
+    required this.onBuy,
+  });
+
+  final Map<String, dynamic>? catalog;
+  final String? busy;
+  final Future<void> Function(Map<String, dynamic>) onBuy;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = catalog?['enabled'] == true && BazaarBilling.available;
+    final products = ((catalog?['products'] as List?) ?? const [])
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xD9040C16),
+        borderRadius: Corners.rLg,
+        border: Border.all(color: const Color(0x52FFD166)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('شارژ کیف پول',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
+          Text(
+            enabled
+                ? 'پرداخت امن از طریق کافه‌بازار'
+                : 'پرداخت درون‌برنامه‌ای هنوز فعال نشده است',
+            style: const TextStyle(fontSize: 11.5, color: Color(0xFFB9C5D5)),
+          ),
+          Gaps.vSm,
+          Wrap(
+            spacing: 9,
+            runSpacing: 9,
+            children: [
+              for (final product in products)
+                SizedBox(
+                  width: 104,
+                  child: OutlinedButton(
+                    onPressed: !enabled || busy == 'topup-${product['id']}'
+                        ? null
+                        : () => onBuy(product),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      side: const BorderSide(color: Color(0x24FFFFFF)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          Money.format(
+                              (product['amount'] as num?)?.toInt() ?? 0),
+                          style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFFFFD166)),
+                        ),
+                        const Text('تومان',
+                            style: TextStyle(
+                                fontSize: 10.5, color: Color(0xFF94A3B8))),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          Gaps.vXs,
+          const Text(
+            'پلاس ماهانه ۵۹٬۰۰۰ تومان · پلاس سالانه ۴۹۹٬۰۰۰ تومان',
+            style: TextStyle(fontSize: 11.5, color: Color(0xFF9CABBC)),
           ),
         ],
       ),

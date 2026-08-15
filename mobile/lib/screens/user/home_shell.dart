@@ -234,7 +234,10 @@ class _HomeShellState extends State<HomeShell>
       case 3:
         return LeaguePage(api: widget.api);
       case 4:
-        return SocialPage(api: widget.api);
+        return SocialPage(
+          api: widget.api,
+          onOpenShop: () => setState(() => _index = shopIndex),
+        );
       case 5:
         return SupportPage(api: widget.api);
       case 6:

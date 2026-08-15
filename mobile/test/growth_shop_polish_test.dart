@@ -22,8 +22,12 @@ void main() {
     final games = File('lib/screens/user/games_page.dart').readAsStringSync();
     final growth =
         File('lib/screens/user/games/growth_panel.dart').readAsStringSync();
-    expect(social.contains("label: 'ماموریت و دوستان'"), isTrue);
+    // با اضافه شدن تب چهارم («گذر نبرد») لیبل بلند سرریز می‌کرد،
+    // پس به «ماموریت» کوتاه شد. خودِ تب همچنان مستقل است.
+    expect(social.contains("label: 'ماموریت'"), isTrue);
+    expect(social.contains("label: 'گذر نبرد'"), isTrue);
     expect(social.contains('GrowthPanel('), isTrue);
+    expect(social.contains('PassPage('), isTrue);
     expect(games.contains('GrowthPanel('), isFalse);
     expect(growth.contains('دعوت از یک دوست'), isTrue);
     expect(growth.contains('/api/missions/daily-bonus/claim'), isTrue);

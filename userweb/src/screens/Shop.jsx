@@ -129,6 +129,20 @@ export default function Shop({ token, reloadProfile }) {
   }, [token]);
 
   useEffect(() => { load(); }, [load]);
+
+  // ── شارژ کیف پول (کافه‌بازار) ────────────────────────────────────────
+  // بدون این، دکمهٔ خرید پلاس برای کاربر جدید همیشه «موجودی کافی نیست»
+  // می‌داد و هیچ راهی برای شارژ وجود نداشت — بن‌بست کامل.
+  const [topup, setTopup] = useState(null);
+  const [topupOpen, setTopupOpen] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    req('/api/wallet/topup/catalog', 'GET', null, token)
+      .then((c) => { if (alive) setTopup(c); })
+      .catch(() => { if (alive) setTopup({ enabled: false, products: [] }); });
+    return () => { alive = false; };
+  }, [token]);
+
   const availableKinds = useMemo(() => KINDS.filter(([key]) => (data?.groups?.[key] || []).length), [data]);
   useEffect(() => {
     if (data && !(data.groups?.[activeKind] || []).length && availableKinds[0]) setActiveKind(availableKinds[0][0]);
@@ -142,6 +156,22 @@ export default function Shop({ token, reloadProfile }) {
     } catch (e) { setNotice(e.message || 'عملیات انجام نشد'); }
     finally { setBusy(''); }
   };
+
+  // خرید بستهٔ شارژ.
+  //
+  // روی وب پرداخت درون‌برنامه‌ای کافه‌بازار در دسترس نیست (آن API فقط
+  // داخل اپ اندروید وجود دارد). پس اینجا صادقانه به کاربر می‌گوییم از
+  // اپ اقدام کند — به‌جای اینکه دکمه‌ای بگذاریم که بی‌صدا شکست بخورد.
+  const buyTopup = (product) => act(`topup-${product.id}`, async () => {
+    if (!window.__ghBazaarPurchase) {
+      throw new Error('شارژ کیف پول از طریق اپ اندروید (کافه‌بازار) انجام می‌شود');
+    }
+    const order = await req('/api/wallet/topup/order', 'POST',
+      { productId: product.id }, token);
+    const purchaseToken = await window.__ghBazaarPurchase(product.id, order.orderId);
+    return req('/api/wallet/topup/verify', 'POST',
+      { orderId: order.orderId, purchaseToken }, token);
+  }, 'کیف پول شارژ شد');
 
   const buyPlan = (billingCycle) => act(`plus-${billingCycle}`,
     () => req('/api/shop/plus', 'POST', { billingCycle }, token),
@@ -162,6 +192,15 @@ export default function Shop({ token, reloadProfile }) {
       .shopHero:after{content:'+';position:absolute;left:28px;top:-48px;font:900 180px/1 sans-serif;color:rgba(255,209,102,.06);transform:rotate(10deg)}
       .shopHeroTop{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:12px}.shopHero h2{margin:0;font-weight:950;font-size:23px}.shopHero p{margin:4px 0 0;color:#b9c5d5;font-size:11.5px}.shopWallet{white-space:nowrap;background:rgba(0,0,0,.28);border:1px solid rgba(34,231,166,.35);padding:8px 12px;border-radius:14px;color:#22E7A6;font-weight:900}.shopToggle{border:0;background:rgba(255,255,255,.08);color:#fff;border-radius:11px;padding:7px 10px;cursor:pointer}
       .shopPlans{position:relative;z-index:1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:13px}.shopPlan{border:1px solid rgba(255,255,255,.12);border-radius:17px;padding:13px;background:rgba(5,14,26,.78);min-height:224px;display:flex;flex-direction:column}.shopPlan.annual{border-color:rgba(255,209,102,.54);background:linear-gradient(145deg,rgba(64,38,9,.78),rgba(30,20,67,.82))}.shopPlan.active{box-shadow:0 0 0 2px rgba(34,231,166,.28)}.shopPlanHead{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.shopPlanHead small{color:#94a3b8;font-size:9.5px}.shopPlanHead h3{margin:1px 0;font-size:16px}.shopPlanHead>b{font-size:10px;color:#94a3b8}.saveBadge{color:#071522!important;background:#FFD166;padding:5px 7px;border-radius:999px}.planPrice{color:#FFD166;font-size:20px;margin:7px 0}.planPrice small{font-size:10px;color:#cbd5e1}.annualCompare{font-size:9.5px;color:#cbd5e1;margin-top:-5px}.planVisuals{display:grid;grid-template-columns:70px 70px 1fr;gap:6px;align-items:center;margin:8px 0;padding:6px;border-radius:12px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.08)}.planVisuals img{width:70px;height:40px;border-radius:8px;object-fit:cover;border:1px solid rgba(255,255,255,.12)}.planVisuals span{font-size:9px;line-height:1.45;color:#dbeafe;font-weight:800}.shopPlan ul{list-style:none;padding:0;margin:8px 0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 9px;font-size:9.7px;color:#dbe6f2;flex:1}.shopPlan li{line-height:1.55}.shopPlan li::first-letter{color:#22E7A6}.shopPlan button,.shopProduct button{border:0;border-radius:11px;padding:9px 12px;background:linear-gradient(135deg,#22E7A6,#38BDF8);color:#071522;font-weight:950;cursor:pointer}.shopPlan button:disabled,.shopProduct button:disabled{opacity:.55;cursor:default}
+      .shopTopupBtn{border:1px solid rgba(255,209,102,.5);background:linear-gradient(135deg,rgba(255,209,102,.18),rgba(249,115,22,.1));color:#FFD166;border-radius:14px;padding:9px 14px;font-size:12.5px;font-weight:900;cursor:pointer;white-space:nowrap}
+      .topupSheet{position:relative;z-index:1;margin-top:13px;padding:14px;border-radius:18px;background:rgba(4,12,22,.85);border:1px solid rgba(255,209,102,.32)}
+      .topupHead{display:flex;flex-direction:column;gap:2px;margin-bottom:11px}.topupHead b{font-size:15px;font-weight:900;color:#fff}.topupHead small{font-size:11.5px;color:#b9c5d5}
+      .topupGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:9px}
+      .topupChip{display:grid;gap:1px;place-items:center;padding:12px 8px;border-radius:14px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:#fff;cursor:pointer;transition:border-color .2s,transform .2s}
+      .topupChip:hover:not(:disabled){border-color:#FFD166;transform:translateY(-2px)}
+      .topupChip:disabled{opacity:.45;cursor:default}
+      .topupChip strong{font-size:15px;font-weight:900;color:#FFD166}.topupChip span{font-size:10.5px;color:#94a3b8}
+      .topupNote{margin:10px 0 0;font-size:11.5px;color:#9cabbc;text-align:center}
       .shopNotice{border-radius:12px;padding:9px 12px;background:rgba(56,189,248,.11);border:1px solid rgba(56,189,248,.28);font-size:11.5px;text-align:center}.shopPlans,.shopNav,.shopCarousel{scrollbar-width:none;-ms-overflow-style:none}.shopPlans::-webkit-scrollbar,.shopNav::-webkit-scrollbar,.shopCarousel::-webkit-scrollbar{display:none}.shopNav{display:flex;gap:7px;overflow-x:auto;padding:3px 1px 7px}.shopNav button{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.045);color:#aebed0;border-radius:13px;padding:8px 11px;font-size:11px;font-weight:850;cursor:pointer}.shopNav button.active{color:#071522;border-color:#38BDF8;background:#38BDF8;box-shadow:0 6px 18px rgba(56,189,248,.24)}
       .shopShelf{border:1px solid rgba(255,255,255,.09);background:rgba(7,21,34,.6);border-radius:20px;padding:13px;overflow:hidden}.shopShelfHead{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}.shopShelfHead h3{margin:0;font-size:14px}.shopShelfHead span{font-size:10px;color:#94a3b8}.shopCarousel{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(250px,31%);gap:10px;overflow-x:auto;scroll-snap-type:x proximity;padding:2px 1px 9px}.shopProduct{scroll-snap-align:start;overflow:hidden;border-radius:18px;border:1px solid rgba(255,255,255,.11);background:linear-gradient(155deg,rgba(255,255,255,.075),rgba(255,255,255,.025));min-height:282px;display:flex;flex-direction:column;box-shadow:0 14px 35px rgba(0,0,0,.22);transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease}.shopProduct:hover{transform:translateY(-3px);border-color:rgba(56,189,248,.38);box-shadow:0 18px 42px rgba(0,0,0,.3)}.shopProduct.equipped{border-color:rgba(34,231,166,.7);box-shadow:0 0 0 1px rgba(34,231,166,.2),0 18px 42px rgba(34,231,166,.08)}.shopArtwork{height:144px;position:relative;border-bottom:1px solid rgba(255,255,255,.1);overflow:hidden;background:#03070d}.shopProductBody{padding:11px;display:flex;flex-direction:column;flex:1}.shopProductTitle{display:flex;align-items:center;justify-content:space-between;gap:6px}.shopProduct h3{margin:0;font-size:13.5px}.shopProductTitle span{font-size:9px;background:rgba(34,231,166,.15);color:#22E7A6;border-radius:999px;padding:3px 7px}.shopProduct p{color:#9cabbc;font-size:10px;line-height:1.6;margin:6px 0;min-height:28px}.shopProductFoot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto}.shopProductFoot strong{color:#FFD166;font-size:11px}.shopProduct button{font-size:10px;padding:7px 11px}.shopProduct button.secondary{background:#1e293b;color:#94a3b8}.plusAccess{display:block;color:#38BDF8;font-size:9px;margin-top:6px}.lockedGift{font-size:9px;color:#c4b5fd}.shopDisclosure{display:flex;justify-content:space-between;align-items:center;gap:10px;color:#94a3b8;font-size:10.5px;padding:3px 5px}.shopDisclosure button{border:0;background:none;color:#38BDF8;cursor:pointer}.historyPanel{border:1px solid rgba(255,255,255,.08);border-radius:15px;padding:10px;background:rgba(255,255,255,.025);display:grid;gap:5px}.historyRow{display:flex;justify-content:space-between;gap:8px;padding:6px 8px;border-radius:9px;background:rgba(255,255,255,.035);font-size:10px}.historyRow span{color:#94a3b8}
       .planFrameSwatch{width:48px;height:48px;box-shadow:0 0 14px #38bdf855}.planFrameSwatch img{width:100%!important;height:100%!important;border-radius:50%!important;object-fit:cover!important;border:2px solid #071522}.planNameSwatch{display:grid;place-items:center;width:72px;height:42px;border-radius:10px;background:#071522;font-weight:950}.planNameSwatch .animatedName{font-size:14px!important;color:inherit;font-weight:950}
@@ -177,8 +216,28 @@ export default function Shop({ token, reloadProfile }) {
       <div className="shopHeroTop">
         <div><h2>فروشگاه قلقلی پلاس</h2><p>نمونه واقعی هر آیتم را ببین · پلاس از {money(59000)} در ماه</p></div>
         <div className="shopWallet">کیف پول: {money(data.walletBalance)}</div>
+        <button type="button" className="shopTopupBtn"
+          onClick={() => setTopupOpen((v) => !v)}>＋ شارژ کیف پول</button>
         <button type="button" className="shopToggle" onClick={() => setShowPlans((v) => !v)}>{showPlans ? 'جمع کردن پلن‌ها' : 'دیدن پلن‌های پلاس'}</button>
       </div>
+      {topupOpen && <div className="topupSheet">
+        <div className="topupHead">
+          <b>شارژ کیف پول</b>
+          <small>{topup?.enabled
+            ? 'پرداخت امن از طریق کافه‌بازار'
+            : 'پرداخت درون‌برنامه‌ای هنوز فعال نشده است'}</small>
+        </div>
+        <div className="topupGrid">
+          {(topup?.products || []).map((product) => <button key={product.id} type="button"
+            className="topupChip" disabled={!topup?.enabled || busy === `topup-${product.id}`}
+            onClick={() => buyTopup(product)}>
+            <strong>{fa(product.amount)}</strong><span>تومان</span>
+          </button>)}
+        </div>
+        <p className="topupNote">
+          پلاس ماهانه {money(59000)} · پلاس سالانه {money(499000)}
+        </p>
+      </div>}
       {showPlans && <div className="shopPlans">{(data.plans || []).map((plan) => <PlanCard key={plan.billingCycle} plan={plan}
         activeTier={data.plus?.tier} busy={busy === `plus-${plan.billingCycle}`} onBuy={buyPlan} />)}</div>}
     </section>

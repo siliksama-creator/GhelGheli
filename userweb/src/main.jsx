@@ -370,7 +370,8 @@ function Portal({ token, logout }) {
         )}
         {tab === 'club' && (
           <Club token={token} openProfile={setPublicUser} meId={u.id}
-            openGames={Boolean(sharedRoom)} />
+            openGames={Boolean(sharedRoom)} setMsg={setMsg}
+            openShop={() => setTab('shop')} />
         )}
         {tab === 'wheel' && (
           <Wheel token={token} setMsg={setMsg} reloadProfile={load}
@@ -393,7 +394,7 @@ function Portal({ token, logout }) {
   );
 }
 
-function Club({ token, openProfile, meId, openGames = false }) {
+function Club({ token, openProfile, meId, openGames = false, setMsg, openShop }) {
   const [sub, setSub] = useState(openGames ? 'games' : 'chat');
   const [externalLaunch, setExternalLaunch] = useState(null);
   return (
@@ -405,10 +406,17 @@ function Club({ token, openProfile, meId, openGames = false }) {
           onClick={() => setSub('games')}><UiIcon name="game" size={17} /> بازی‌ها</button>
         <button className={sub === 'growth' ? 'on' : ''}
           onClick={() => setSub('growth')}><UiIcon name="group" size={17} /> ماموریت و دوستان</button>
+        {/* گذر نبرد از این‌جا هم در دسترس است.
+            دلیل: تنها راه ورودش یک آیکون کوچک در نوار بالا بود و عملاً
+            دیده نمی‌شد. گذر نبرد مهم‌ترین دلیلِ خریدِ «پلاس» است، پس
+            باید دقیقاً کنار بازی‌ها — جایی که کاربر XP می‌گیرد — دیده شود. */}
+        <button className={sub === 'pass' ? 'on' : ''}
+          onClick={() => setSub('pass')}><UiIcon name="trophy" size={17} /> گذر نبرد</button>
       </div>
       {sub === 'chat' && <Chat token={token} openProfile={openProfile} meId={meId} />}
       {sub === 'games' && <GamesHub api={API} token={token} openProfile={openProfile}
         externalLaunch={externalLaunch} />}
+      {sub === 'pass' && <Pass token={token} setMsg={setMsg} openShop={openShop} />}
       {sub === 'growth' && <GrowthHub api={API} token={token} onSocketGame={(socket, start) => {
         setExternalLaunch({ socket, start, nonce: Date.now() });
         setSub('games');

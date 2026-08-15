@@ -161,6 +161,9 @@ DELETE FROM support_ticket_messages;
 DELETE FROM support_tickets;
 DELETE FROM notifications;
 DELETE FROM photo_card_attempts;
+-- سفارش‌های شارژ کیف پول (مایگریشن ۰۶۷) باید **قبل از**
+-- wallet_transactions پاک شوند: ستون `wallet_tx_id` به آن ارجاع دارد.
+DELETE FROM payment_orders;
 DELETE FROM wallet_transactions;
 DELETE FROM otp_codes;
 DELETE FROM audit_log;
