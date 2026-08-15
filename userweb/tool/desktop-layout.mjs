@@ -172,4 +172,20 @@ ok('نوارِ تحلیلِ دوئل در دسکتاپ عرضِ ۵۶۰pxِ .card
 ok('ریلِ کناریِ بازیِ زنده کلِ ارتفاعِ ستون را می‌گیرد و وسط‌چین می‌شود',
   /\.gameShellScore\s*\{[^}]*grid-area:\s*2\s*\/\s*2\s*\/\s*-1\s*\/\s*3[^}]*align-self:\s*center/.test(css));
 
+// (ز) لپ‌تاپِ ۱۳۶۶×۷۶۸: تختهٔ زندهٔ دوئل تا y=۷۳۴ کشیده می‌شد ولی نوارِ
+// شناور از y=۶۶۵ شروع می‌شود ⇒ ۶۹px همپوشانی و **هر پنج کارتِ دست** زیرِ
+// نوار. یعنی روی رایج‌ترین رزولوشنِ لپ‌تاپ نوبت قابلِ بازی نبود.
+// محافظِ padding-bottom:84px فقط در @media (max-width:520px) بود.
+// درمان: جمع‌شدنِ تخته در همان بلوکِ max-height که penPitch/memGrid دارند.
+const shortDesk = css.match(
+  /@media\s*\(min-width:\s*1100px\)\s*and\s*\(max-height:\s*820px\)\s*\{([\s\S]*?)\n\}/);
+ok('بلوکِ لپ‌تاپِ کوتاه (min-width:1100px و max-height:820px) وجود دارد',
+  !!shortDesk);
+ok('در لپ‌تاپِ کوتاه، ارتفاعِ کارت‌های دستِ دوئل مهار شده (زیرِ نوار نروند)',
+  !!shortDesk && /\.duelPageV2\.isLive\s+\.duelHandV2\s+\.ggCardArt\s*\{[^}]*max-height/
+    .test(shortDesk[1]));
+ok('در لپ‌تاپِ کوتاه، پنلِ انتخابِ کارتِ دوئل هم جمع می‌شود',
+  !!shortDesk && /\.duelPageV2\.isLive\s+\.duelChoicePanel\s*\{[^}]*padding/
+    .test(shortDesk[1]));
+
 console.log(`\n✅ ${checks} تست چیدمانِ دسکتاپ موفق بود\n`);

@@ -5676,6 +5676,24 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 @media (min-width: 1100px) and (max-height: 820px) {
   .gameShell.isPlaying .penPitch { width: min(100%, calc(34vh * 1.3)); }
   .gameShell.isPlaying .memGrid  { width: min(392px, calc(40vh * 0.82)); }
+
+  /* ⚠️ دوئل از این جمع‌شدن جا افتاده بود و نتیجه‌اش بدترین باگِ داخلِ
+     بازی بود که تا امروز پیدا شد:
+     روی ۱۳۶۶×۷۶۸ تختهٔ زنده تا y=۷۳۴ ادامه می‌یافت، در حالی که
+     `.mobileNav` (شناور، `bottom:0`) از y=۶۶۵ شروع می‌شود — یعنی
+     ۶۹px همپوشانی، و **هر پنج کارتِ دستِ کاربر** زیرِ نوار می‌رفتند.
+     یعنی روی رایج‌ترین رزولوشنِ لپ‌تاپ، بازیکن کارت‌هایش را نمی‌دید و
+     نمی‌توانست نوبتش را بازی کند مگر اینکه کورکورانه اسکرول کند.
+     محافظِ `padding-bottom:84px` که برای همین باگ نوشته شده بود فقط
+     داخل `@media (max-width:520px)` بود — یعنی صرفاً موبایل.
+     ۱۴۴۰×۹۰۰ اتفاقی سالم بود چون ۱۳۲px ارتفاعِ بیشتر داشت.
+     درمان: به‌جای هُل دادنِ صفحه با padding (که اسکرولِ ۹۶px می‌ساخت)،
+     خودِ تخته یک پله جمع می‌شود — دقیقاً منطقِ penPitch/memGrid بالا. */
+  .duelPageV2.isLive .duelScoreV2       { padding: 7px 11px; }
+  .duelPageV2.isLive .duelChoicePanel   { padding: 10px; }
+  .duelPageV2.isLive .duelChoicePrompt  { margin-bottom: 6px; }
+  .duelPageV2.isLive .duelHandV2 .ggCardArt { min-height: 110px; max-height: 110px; }
+  .duelPageV2.isLive .duelClash  .ggCardArt { min-height: 116px; max-height: 116px; }
 }
 
 /* ─────────────────────────────────────────────────────────────────────
