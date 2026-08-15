@@ -142,6 +142,7 @@ jobs:
       # enforces that every desktop fix stays inside a `min-width` media query,
       # so the mobile layout -- which Android mirrors -- cannot drift.
       - run: npm run test:desktop-layout
+      - run: npm run test:round-intro-parity
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - name: Serve the built app

@@ -13,8 +13,9 @@
  *
  * It fails on:
  *   1. any text not rendered in Vazirmatn
- *   2. a computed font-weight above 800 (Vazirmatn's real maximum — anything
- *      higher makes the browser synthesise a smeared fake bold)
+ *   2. a computed font-weight above 900 (Vazirmatn's real maximum once
+ *      Vazirmatn-Black was added — anything higher makes the browser
+ *      synthesise a smeared fake bold)
  *   3. body text below 11.5px, which is unreadable on a phone
  *   4. horizontal page overflow
  *   5. any console/page error while walking the tabs
@@ -31,7 +32,7 @@ const MORE = { inventory: 'کلکسیون کارت‌ها', wallet: 'کیف پو
 const TABS = [...Object.keys(DIRECT), ...Object.keys(MORE)];
 
 /** Vazirmatn's heaviest real cut. Above this the browser fakes it. */
-const MAX_REAL_WEIGHT = 800;
+const MAX_REAL_WEIGHT = 900;
 const MIN_READABLE_PX = 11.5;
 
 let failures = 0;

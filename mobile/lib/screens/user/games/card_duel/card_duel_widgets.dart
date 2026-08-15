@@ -3023,14 +3023,31 @@ class _RoundIntroOverlayState extends State<_RoundIntroOverlay>
         builder: (context, _) {
           final v = _c!.value;
           if (v >= 1.0) return const SizedBox.shrink();
-          final enter =
-              Curves.easeOutBack.transform((v / 0.22).clamp(0.0, 1.0));
+
+          // ── تایم‌لاینِ صحنه ──
+          //
+          // هر مرحله منحنیِ خودش را دارد. قبلاً یک `easeOutBack` روی کلِ
+          // صحنه بود و همه‌چیز با هم می‌آمد، پس چشم نمی‌دانست کجا را
+          // نگاه کند. حالا ترتیب هست: پرده → مدال → نام معیار → شمارش.
+          final curtain = Curves.easeOutCubic.transform(
+            (v / 0.14).clamp(0.0, 1.0),
+          );
+          final enter = Curves.easeOutBack.transform(
+            ((v - 0.05) / 0.22).clamp(0.0, 1.0),
+          );
+          final nameIn = Curves.easeOutBack.transform(
+            ((v - 0.17) / 0.20).clamp(0.0, 1.0),
+          );
           final exit = Curves.easeInCubic.transform(
             ((v - 0.88) / 0.12).clamp(0.0, 1.0),
           );
           final opacity = (1 - exit).clamp(0.0, 1.0);
+
+          // موجِ ضربه‌ای که در لحظهٔ نشستنِ مدال بیرون می‌زند.
+          final shock = ((v - 0.20) / 0.30).clamp(0.0, 1.0);
           final spin = (1 - enter) * .55;
           final scale = 0.48 + 0.52 * enter;
+
           final beat = v < .50
               ? '۳'
               : v < .64
@@ -3051,146 +3068,302 @@ class _RoundIntroOverlayState extends State<_RoundIntroOverlay>
             absorbing: true,
             child: Opacity(
               opacity: opacity,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    colors: [
-                      tint.withValues(alpha: .28 * opacity),
-                      const Color(0xF20A0F1D),
-                    ],
-                    stops: const [.02, .82],
-                    radius: .95,
-                  ),
-                ),
-                alignment: Alignment.center,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 13,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: tint.withValues(alpha: .12),
-                        borderRadius: BorderRadius.circular(99),
-                        border: Border.all(color: tint.withValues(alpha: .46)),
-                      ),
-                      child: Text(
-                        'راند ${faNum(widget.roundNumber)} از ${faNum(widget.totalRounds)}',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white70,
-                        ),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // ── لایهٔ ۱: پرده ──
+                  //
+                  // گرادیانِ قبلی تخت بود. حالا زیرِ آن یک بافتِ
+                  // شعاعیِ متحرک هست تا پس‌زمینه «زنده» باشد، و لبه‌ها
+                  // تیره‌تر (vignette) تا نگاه به مرکز کشیده شود.
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        colors: [
+                          tint.withValues(alpha: .30 * curtain),
+                          const Color(0xFA060A14),
+                          const Color(0xFF03060C),
+                        ],
+                        stops: const [.02, .58, 1],
+                        radius: .98,
                       ),
                     ),
-                    const SizedBox(height: 18),
-                    Transform.rotate(
-                      angle: spin,
-                      child: Transform.scale(
-                        scale: scale,
-                        child: SizedBox(
-                          width: 126,
-                          height: 126,
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              CustomPaint(
-                                size: const Size.square(126),
-                                painter: _RoundIntroEmblemPainter(
-                                  progress: v,
-                                  color: tint,
-                                ),
-                              ),
-                              Transform.rotate(
-                                angle: v * 3.2,
-                                child: Container(
-                                  width: 122,
-                                  height: 122,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: tint.withValues(alpha: .30),
-                                      width: 1,
-                                    ),
+                  ),
+                  // پرتوهای پس‌زمینه + موجِ ضربه.
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: _RoundIntroBackdropPainter(
+                        progress: v,
+                        shock: shock,
+                        color: tint,
+                      ),
+                    ),
+                  ),
+                  // ── لایهٔ ۲: محتوا ──
+                  Center(
+                    child: SingleChildScrollView(
+                      physics: const NeverScrollableScrollPhysics(),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // نشانِ راند — با نوارِ پیشرفتِ راندها، تا
+                          // کاربر بدونِ خواندنِ متنِ بیشتر بفهمد کجای
+                          // مسابقه است.
+                          Opacity(
+                            opacity: curtain,
+                            child: Transform.translate(
+                              offset: Offset(0, -10 * (1 - curtain)),
+                              child: Container(
+                                padding: const EdgeInsets.fromLTRB(
+                                    14, 6, 14, 7),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: .38),
+                                  borderRadius: BorderRadius.circular(99),
+                                  border: Border.all(
+                                    color: tint.withValues(alpha: .46),
                                   ),
                                 ),
-                              ),
-                              Container(
-                                width: 96,
-                                height: 96,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: tint.withValues(alpha: .18),
-                                  border: Border.all(color: tint, width: 3),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: tint.withValues(alpha: .68),
-                                      blurRadius: 44,
-                                      spreadRadius: 4,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'راند ${faNum(widget.roundNumber)} از ${faNum(widget.totalRounds)}',
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w900,
+                                        color: Colors.white,
+                                        letterSpacing: .2,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 5),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: List.generate(
+                                        widget.totalRounds,
+                                        (index) {
+                                          final done =
+                                              index < widget.roundNumber - 1;
+                                          final now = index ==
+                                              widget.roundNumber - 1;
+                                          return Container(
+                                            width: now ? 18 : 7,
+                                            height: 4,
+                                            margin: const EdgeInsets
+                                                .symmetric(horizontal: 2),
+                                            decoration: BoxDecoration(
+                                              borderRadius:
+                                                  BorderRadius.circular(9),
+                                              color: now
+                                                  ? tint
+                                                  : done
+                                                      ? tint.withValues(
+                                                          alpha: .55)
+                                                      : Colors.white
+                                                          .withValues(
+                                                              alpha: .20),
+                                            ),
+                                          );
+                                        },
+                                      ),
                                     ),
                                   ],
                                 ),
-                                child: Icon(icon, color: tint, size: 50),
                               ),
-                            ],
+                            ),
                           ),
-                        ),
+                          const SizedBox(height: 20),
+                          // ── مدالِ معیار ──
+                          Transform.rotate(
+                            angle: spin,
+                            child: Transform.scale(
+                              scale: scale,
+                              child: SizedBox(
+                                width: 148,
+                                height: 148,
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    CustomPaint(
+                                      size: const Size.square(148),
+                                      painter: _RoundIntroEmblemPainter(
+                                        progress: v,
+                                        color: tint,
+                                      ),
+                                    ),
+                                    Transform.rotate(
+                                      angle: v * 3.2,
+                                      child: Container(
+                                        width: 138,
+                                        height: 138,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color:
+                                                tint.withValues(alpha: .30),
+                                            width: 1,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    // قرصِ مرکزی: گرادیانِ دوسویه به‌جای
+                                    // رنگِ تخت، با هالهٔ دولایه.
+                                    Container(
+                                      width: 106,
+                                      height: 106,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        gradient: RadialGradient(
+                                          colors: [
+                                            Color.lerp(tint, Colors.white,
+                                                    .22)!
+                                                .withValues(alpha: .34),
+                                            tint.withValues(alpha: .16),
+                                            const Color(0xFF071120),
+                                          ],
+                                          stops: const [0, .55, 1],
+                                        ),
+                                        border:
+                                            Border.all(color: tint, width: 3),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color:
+                                                tint.withValues(alpha: .70),
+                                            blurRadius: 46,
+                                            spreadRadius: 4,
+                                          ),
+                                          BoxShadow(
+                                            color:
+                                                tint.withValues(alpha: .28),
+                                            blurRadius: 90,
+                                            spreadRadius: 18,
+                                          ),
+                                        ],
+                                      ),
+                                      child: Icon(
+                                        icon,
+                                        color: Colors.white,
+                                        size: 54,
+                                        shadows: [
+                                          Shadow(color: tint, blurRadius: 22),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Opacity(
+                            opacity: nameIn.clamp(0.0, 1.0),
+                            child: Text(
+                              'معیار این راند',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w800,
+                                color: tint.withValues(alpha: .90),
+                                letterSpacing: 1.6,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          // ── نامِ معیار ──
+                          //
+                          // ۴۲px با وزنِ ۹۰۰ **واقعی** (Vazirmatn-Black
+                          // تازه به pubspec اضافه شد؛ پیش از آن w900 به
+                          // ExtraBoldِ مصنوعی‌ضخیم‌شده سقوط می‌کرد).
+                          // گرادیانِ روی متن با `ShaderMask` عمق می‌دهد.
+                          Transform.translate(
+                            offset: Offset(0, 14 * (1 - nameIn)),
+                            child: Transform.scale(
+                              scale: .80 + .20 * nameIn,
+                              child: ShaderMask(
+                                shaderCallback: (rect) => LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.white,
+                                    Color.lerp(tint, Colors.white, .55)!,
+                                    tint,
+                                  ],
+                                  stops: const [0, .55, 1],
+                                ).createShader(rect),
+                                child: Text(
+                                  statName,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 42,
+                                    height: 1.14,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                    letterSpacing: -.5,
+                                    shadows: [
+                                      Shadow(color: tint, blurRadius: 34),
+                                      const Shadow(
+                                        color: Colors.black,
+                                        blurRadius: 10,
+                                        offset: Offset(0, 3),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 9),
+                          // خطِ تزئینیِ زیرِ نام — باز می‌شود.
+                          Container(
+                            width: 132 * nameIn.clamp(0.0, 1.0),
+                            height: 2,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(9),
+                              gradient: LinearGradient(
+                                colors: [
+                                  tint.withValues(alpha: 0),
+                                  tint,
+                                  tint.withValues(alpha: 0),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 9),
+                          Opacity(
+                            opacity: nameIn.clamp(0.0, 1.0),
+                            child: const Text(
+                              'بالاترین عدد برنده است',
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                color: Colors.white70,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          Transform.scale(
+                            scale: beatScale,
+                            child: Text(
+                              beat,
+                              key: ValueKey(beat),
+                              style: TextStyle(
+                                fontSize: beat == 'انتخاب!' ? 20 : 27,
+                                fontWeight: FontWeight.w900,
+                                color:
+                                    beat == 'انتخاب!' ? _emerald : Colors.white,
+                                letterSpacing: beat == 'انتخاب!' ? .5 : 0,
+                                shadows: [
+                                  Shadow(
+                                    color: beat == 'انتخاب!' ? _emerald : tint,
+                                    blurRadius: 22,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    Text(
-                      'معیار این راند',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: tint.withValues(alpha: .86),
-                        letterSpacing: .2,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Transform.scale(
-                      scale: .84 + .16 * enter,
-                      child: Text(
-                        statName,
-                        style: TextStyle(
-                          fontSize: 34,
-                          height: 1.15,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                          shadows: [
-                            Shadow(color: tint, blurRadius: 28),
-                            const Shadow(color: Colors.black, blurRadius: 8),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 7),
-                    const Text(
-                      'بالاترین عدد برنده است',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.white70,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    Transform.scale(
-                      scale: beatScale,
-                      child: Text(
-                        beat,
-                        key: ValueKey(beat),
-                        style: TextStyle(
-                          fontSize: beat == 'انتخاب!' ? 18 : 24,
-                          fontWeight: FontWeight.w900,
-                          color: beat == 'انتخاب!' ? _emerald : tint,
-                          shadows: [Shadow(color: tint, blurRadius: 18)],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           );
@@ -3200,12 +3373,71 @@ class _RoundIntroOverlayState extends State<_RoundIntroOverlay>
   }
 }
 
-/// ═══════════════════════════════════════════════════════════════════════
-/// درگاهِ تستِ اعلانِ راند
-/// ═══════════════════════════════════════════════════════════════════════
+/// پس‌زمینهٔ صحنهٔ اعلان: پرتوهای چرخان + موجِ ضربه‌ای.
 ///
-/// همان الگوی `CardDuelClashStageForTest`: کلاس خصوصی می‌ماند ولی تست
-/// می‌تواند بسازدش. بدونِ این، انیمیشنِ اعلان هیچ نگهبانی نداشت.
+/// چرا `CustomPainter` و نه چند `Container`: این‌ها ده‌ها شکلِ محوشونده‌اند
+/// که هر فریم تغییر می‌کنند. با ویجت یعنی ده‌ها لایهٔ ترکیب در هر فریم؛
+/// با یک `Canvas` یک پاسِ نقاشی.
+class _RoundIntroBackdropPainter extends CustomPainter {
+  const _RoundIntroBackdropPainter({
+    required this.progress,
+    required this.shock,
+    required this.color,
+  });
+
+  final double progress;
+  final double shock;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final reach = size.longestSide;
+
+    // پرتوهای کم‌رنگِ چرخان — «نورِ استادیوم».
+    final rayFade = math.sin(math.pi * progress.clamp(0.0, 1.0)).abs();
+    final rayPaint = Paint()
+      ..color = color.withValues(alpha: .05 * rayFade)
+      ..style = PaintingStyle.fill;
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(progress * .5);
+    for (var index = 0; index < 10; index++) {
+      final a = index * math.pi / 5;
+      final path = Path()
+        ..moveTo(0, 0)
+        ..lineTo(math.cos(a - .052) * reach, math.sin(a - .052) * reach)
+        ..lineTo(math.cos(a + .052) * reach, math.sin(a + .052) * reach)
+        ..close();
+      canvas.drawPath(path, rayPaint);
+    }
+    canvas.restore();
+
+    // موجِ ضربه در لحظهٔ نشستنِ مدال.
+    if (shock > 0 && shock < 1) {
+      final ringPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3 * (1 - shock)
+        ..color = color.withValues(alpha: .42 * (1 - shock));
+      canvas.drawCircle(center, 70 + reach * .48 * shock, ringPaint);
+      final second = (shock - .18).clamp(0.0, 1.0);
+      if (second > 0 && second < 1) {
+        canvas.drawCircle(
+          center,
+          70 + reach * .40 * second,
+          ringPaint
+            ..strokeWidth = 2 * (1 - second)
+            ..color = color.withValues(alpha: .26 * (1 - second)),
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RoundIntroBackdropPainter old) =>
+      old.progress != progress || old.shock != shock || old.color != color;
+}
+
 class _RoundIntroEmblemPainter extends CustomPainter {
   const _RoundIntroEmblemPainter({required this.progress, required this.color});
 
@@ -3216,37 +3448,62 @@ class _RoundIntroEmblemPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = size.center(Offset.zero);
     final pulse = math.sin(math.pi * progress).abs();
+
+    // ── تیغه‌های شعاعی ──
+    // قبلاً ۱۲ خطِ هم‌ضخامت بودند. حالا بلندی‌شان یکی‌درمیان فرق دارد و
+    // ضخامتشان با نبض کم و زیاد می‌شود، پس حلقه «می‌تپد».
     final rayPaint = Paint()
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = 2
+      ..strokeWidth = 2.2
       ..color = color.withValues(alpha: .18 + .48 * pulse);
-    for (var index = 0; index < 12; index++) {
-      final angle = index * math.pi / 6 + progress * .9;
-      final inner = 51.0 + 3 * math.sin(progress * math.pi * 4 + index);
-      final outer = 59.0 + 5 * pulse + (index.isEven ? 4 : 0);
+    for (var index = 0; index < 16; index++) {
+      final angle = index * math.pi / 8 + progress * .9;
+      final inner = 58.0 + 3 * math.sin(progress * math.pi * 4 + index);
+      final outer = 66.0 + 6 * pulse + (index.isEven ? 5 : 0);
       canvas.drawLine(
         center + Offset(math.cos(angle), math.sin(angle)) * inner,
         center + Offset(math.cos(angle), math.sin(angle)) * outer,
         rayPaint,
       );
     }
+
+    // ── دو کمانِ چرخان در خلافِ هم ──
     final arcPaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = 2.2
-      ..color = color.withValues(alpha: .58);
-    final rect = Rect.fromCircle(center: center, radius: 58);
+      ..strokeWidth = 2.6
+      ..color = color.withValues(alpha: .62);
+    final rect = Rect.fromCircle(center: center, radius: 68);
+    canvas.drawArc(rect, progress * math.pi * 2, math.pi * .78, false, arcPaint);
     canvas.drawArc(
-        rect, progress * math.pi * 2, math.pi * .78, false, arcPaint);
+      rect,
+      progress * math.pi * 2 + math.pi,
+      math.pi * .42,
+      false,
+      arcPaint,
+    );
+    final innerArc = Rect.fromCircle(center: center, radius: 60);
     canvas.drawArc(
-        rect, progress * math.pi * 2 + math.pi, math.pi * .42, false, arcPaint);
+      innerArc,
+      -progress * math.pi * 2.6,
+      math.pi * .30,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = 1.6
+        ..color = Colors.white.withValues(alpha: .34),
+    );
+
+    // ── ذراتِ مداری ──
     final dotPaint = Paint()
       ..color = Colors.white.withValues(alpha: .35 + .5 * pulse);
-    for (var index = 0; index < 6; index++) {
-      final angle = -progress * 2.2 + index * math.pi / 3;
+    for (var index = 0; index < 8; index++) {
+      final angle = -progress * 2.2 + index * math.pi / 4;
+      final r = 71.0 + 3 * math.sin(progress * math.pi * 3 + index);
       canvas.drawCircle(
-        center + Offset(math.cos(angle), math.sin(angle)) * 61,
-        index.isEven ? 2.2 : 1.4,
+        center + Offset(math.cos(angle), math.sin(angle)) * r,
+        index.isEven ? 2.4 : 1.5,
         dotPaint,
       );
     }

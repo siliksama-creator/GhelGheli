@@ -122,6 +122,75 @@ void main() {
         reason: 'بدونِ ریست، فقط راندِ اول انیمیشن می‌گرفت');
   });
 
+  // ═════════════════════════════════════════════════════════════════════
+  // نگهبانانِ بازطراحیِ حرفه‌ای
+  // ═════════════════════════════════════════════════════════════════════
+  //
+  // خواستهٔ مالک: «انیمیشن اعلام آمار راند فوق حرفه‌ای‌تر شود — رنگ‌بندی و
+  // فونت و وضوح بالاتر». این‌ها همان‌ها را قفل می‌کنند تا یک ریفکتورِ بعدی
+  // بی‌سروصدا صحنه را به حالتِ ساده برنگرداند.
+
+  testWidgets('نامِ معیار با فونتِ ۹۰۰ واقعی و اندازهٔ سینمایی رندر می‌شود',
+      (tester) async {
+    await tester.pumpWidget(_wrap(const CardDuelRoundIntroForTest(
+        focus: _focus, roundNumber: 3, totalRounds: 5)));
+    await tester.pump(const Duration(milliseconds: 900));
+
+    final style = tester.widget<Text>(find.text('سرعت')).style!;
+    // ۴۲px: از ۳۴ قبلی درشت‌تر. اگر کسی کوچکش کند اینجا می‌شکند.
+    expect(style.fontSize, greaterThanOrEqualTo(38),
+        reason: 'نامِ معیار قلبِ صحنه است و باید سینمایی باشد');
+    expect(style.fontWeight, FontWeight.w900);
+    // وزنِ ۹۰۰ فقط وقتی «واقعی» است که Vazirmatn-Black در pubspec باشد.
+    // این تست خودِ فایل را نمی‌بیند، ولی تستِ زیر می‌بیند.
+    expect(style.shadows, isNotNull);
+    expect(style.shadows!.length, greaterThanOrEqualTo(2),
+        reason: 'هالهٔ رنگی + سایهٔ تیره، برای وضوح روی هر پس‌زمینه');
+
+    // گرادیانِ روی متن.
+    expect(find.byType(ShaderMask), findsWidgets,
+        reason: 'نامِ معیار باید گرادیانِ عمقی داشته باشد نه رنگِ تخت');
+  });
+
+  testWidgets('صحنه لایه‌های نقاشیِ حرفه‌ای دارد', (tester) async {
+    await tester.pumpWidget(_wrap(const CardDuelRoundIntroForTest(
+        focus: _focus, roundNumber: 1, totalRounds: 5)));
+    await tester.pump(const Duration(milliseconds: 700));
+
+    // پس‌زمینهٔ پرتویی + موجِ ضربه، و مدالِ شعاعی: دو `CustomPaint` مجزا.
+    expect(find.byType(CustomPaint), findsWidgets);
+    final painters = tester
+        .widgetList<CustomPaint>(find.byType(CustomPaint))
+        .map((w) => w.painter.runtimeType.toString())
+        .join(',');
+    expect(painters, contains('BackdropPainter'),
+        reason: 'پرتوها و موجِ ضربه باید نقاشی شوند');
+    expect(painters, contains('EmblemPainter'),
+        reason: 'مدالِ معیار باید حلقهٔ متحرک داشته باشد');
+  });
+
+  testWidgets('نوارِ پیشرفتِ راندها بدونِ افزودنِ متن وضعیت را نشان می‌دهد',
+      (tester) async {
+    await tester.pumpWidget(_wrap(const CardDuelRoundIntroForTest(
+        focus: _focus, roundNumber: 3, totalRounds: 5)));
+    await tester.pump(const Duration(milliseconds: 700));
+
+    // ── چرا این مهم است ──
+    // قیدِ مالک: «متن‌ها زیاد نشوند». وضعیتِ «کجای مسابقه‌ایم» به‌جای یک
+    // جملهٔ تازه، با پنج میلهٔ رنگی گفته می‌شود.
+    final pips = tester
+        .widgetList<Container>(find.byType(Container))
+        .where((c) => c.constraints?.maxHeight == 4.0)
+        .toList();
+    expect(pips.length, 5,
+        reason: 'به ازای هر راند یک میله — نه کمتر، نه بیشتر');
+
+    // میلهٔ راندِ جاری باید پهن‌تر باشد تا در یک نگاه پیدا شود.
+    final widths = pips.map((c) => c.constraints!.maxWidth).toList();
+    expect(widths.where((w) => w > 10).length, 1,
+        reason: 'دقیقاً یک میله (راندِ جاری) باید کشیده باشد');
+  });
+
   testWidgets('بدونِ تمرکز، اعلان اصلاً رندر نمی‌شود', (tester) async {
     await tester.pumpWidget(_wrap(const CardDuelRoundIntroForTest(
         focus: null, roundNumber: 1, totalRounds: 5)));

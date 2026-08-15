@@ -52,6 +52,18 @@
   font-style: normal;
   font-display: swap;
 }
+/* Real 900. Fifty rules in style.css asked for 900/1000 while the heaviest
+   file shipped was 800, so the browser SYNTHESISED the difference by smearing
+   the outlines — the exact fake-bold artefact the typography guard was written
+   to catch, and worst on Persian letterforms where the smear closes the
+   counters of ه / ص / ط. The guard's MAX_REAL_WEIGHT can now be 900. */
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('/fonts/Vazirmatn-Black.woff2') format('woff2');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
 
 :root {
   /* The emoji fonts at the END matter: Vazirmatn has no emoji coverage, so
@@ -164,14 +176,14 @@ small,
 
 /*
   SYNTHETIC BOLD.
-  Vazirmatn's heaviest real cut is 800. Ask for 900 or 1000 and the browser
-  cannot find a matching face, so it FAKES one by smearing the 800 outline —
-  the result is the slightly blurry, over-inked look the user described.
-  style.css was full of `font-weight: 900` (and one 1000 on the logo), and
-  because those rules come later in the cascade they beat a plain `button`
-  selector here. Clamping them explicitly is the only reliable fix, and it
-  is verified by tool/typography.mjs, which fails the build if any rendered
-  element reports a computed weight above 800.
+  Vazirmatn's heaviest real cut is now 900 (Vazirmatn-Black, added in round
+  20). Anything ABOVE 900 still has no matching face, so the browser FAKES
+  one by smearing the 900 outline — the slightly blurry, over-inked look the
+  user described. style.css used to be full of 950/1000 values; those have
+  been normalised down to 900, which is now a real file rather than a fake.
+  These clamps stay because later rules in the cascade beat a plain `button`
+  selector, and they are verified by tool/typography.mjs, which fails the
+  build if any rendered element reports a computed weight above 900.
 */
 button,
 .tabs button,
@@ -278,8 +290,9 @@ code {
 .streakKicker,
 /* ــ چرا .animatedName اینجا اضافه شد ــ
    `components/cosmeticsMotion.css` روی `.animatedName` مقدار
-   `font-weight:950` می‌گذارد. وزیرمتن حداکثر تا ۸۰۰ وزنِ واقعی دارد،
-   پس مرورگر برای ۹۵۰ یک «بولدِ مصنوعی» می‌سازد: حروف را الگوریتمی
+   `font-weight:950` می‌گذارد. سنگین‌ترین وزنِ واقعیِ وزیرمتن ۹۰۰ است
+   (Vazirmatn-Black، افزودهٔ دورِ بیستم)، پس مرورگر برای ۹۵۰ یک
+   «بولدِ مصنوعی» می‌سازد: حروف را الگوریتمی
    کلفت می‌کند و نتیجه در فارسی به‌هم‌چسبیده و لکه‌ای دیده می‌شود —
    دقیقاً همان چیزی که این فایل برای جلوگیری از آن نوشته شده.
    قوانینِ بالا فقط `[style*=...]` (استایلِ درون‌خطی) و چند کلاسِ
@@ -289,7 +302,7 @@ code {
    (home، profile، games hub → `animatedName:950`).
    این نامِ کاربر است — پرتکرارترین متنِ شخصیِ کلِ اپ. */
 .animatedName {
-  font-weight: 800 !important;
+  font-weight: 900 !important;
 }
 
 /* The parent shortcut deliberately uses an emoji-first stack for its icon;
@@ -308,7 +321,7 @@ code {
 }
 .streakCard .streakClaim span,
 .invStats b {
-  font-weight: 800 !important;
+  font-weight: 900 !important;
 }
 .wcBody small { font-size: var(--fs-xs) !important; }
 
@@ -362,7 +375,7 @@ code {
    استثنا کرده. */
 
 /* ═══ بولدِ مصنوعی در صفحهٔ دوئل ══════════════════════════════════════════
-   وزیرمتن حداکثر وزنِ واقعیِ ۸۰۰ دارد. هر مقدارِ بالاتر یعنی مرورگر
+   سنگین‌ترین وزنِ واقعیِ وزیرمتن ۹۰۰ است. هر مقدارِ بالاتر یعنی مرورگر
    حروف را الگوریتمی کلفت می‌کند («synthetic bold») و در فارسی نتیجه
    به‌هم‌چسبیده و لکه‌ای می‌شود — همان چیزی که خوانایی را از بین می‌برد.
 
@@ -379,7 +392,7 @@ code {
 .duelIntelOrder b,
 .streakDayIcon,
 .duelPageV2 [style*="font-weight: 950"],
-.duelPageV2 [style*="font-weight:950"] { font-weight: 800 !important; }
+.duelPageV2 [style*="font-weight:950"] { font-weight: 900 !important; }
 
 /* ═══ بولدِ مصنوعی روی کامپوننتِ مشترکِ کارت ═════════════════════════════
    این‌ها وزنِ ۹۰۰ داشتند و در **همهٔ** صفحاتی که کارت نشان می‌دهند
@@ -389,15 +402,15 @@ code {
    و روی تبِ خانه هم چون کارت‌ها پایین‌ترِ صفحه‌اند و `loading=lazy`
    دارند، بازرسی به آن‌ها نمی‌رسید. با گسترشِ نگهبان بلافاصله پیدا شد.
 
-   وزیرمتن تا ۸۰۰ وزنِ واقعی دارد؛ ۹۰۰ یعنی مرورگر حروف را الگوریتمی
-   کلفت می‌کند و در فارسی به‌هم‌چسبیده می‌شود. */
+   وزیرمتن تا ۹۰۰ وزنِ واقعی دارد؛ بالاتر از آن یعنی مرورگر حروف را
+   الگوریتمی کلفت می‌کند و در فارسی به‌هم‌چسبیده می‌شود. */
 .ggCardFallbackGlyph,
 .ggCardQty,
 .ggCardBadge,
 .ggCardName,
 .ggCardPower,
 .ggCardWinnerStamp,
-.ggCardStats b { font-weight: 800 !important; }
+.ggCardStats b { font-weight: 900 !important; }
 
 /* آخرین بازمانده‌های ریزِ کامپوننتِ کارت. `.ggCardName` نامِ بازیکن است
    و `.ggCardBadge` برچسبِ «جدید» — هر دو متنِ خواندنی‌اند، نه نشانِ
@@ -414,10 +427,10 @@ code {
 .duelRuleStrip span,
 .duelRuleStrip b,
 .duelPageV2 span[style*="font-weight"],
-.duelPageV2 b[style*="font-weight"] { font-weight: 800 !important; }
+.duelPageV2 b[style*="font-weight"] { font-weight: 900 !important; }
 
 /* دو عنصری که فقط بعد از تبدیل کلکسیون به قفسهٔ افقی نمایان شدند:
    `.ggCardPower` (عدد قدرت روی کارت) و `.ggCardCheck` (تیک انتخاب).
    قبلاً پایین صفحه و خارج از دسترسِ بازرسی بودند. */
 .ggCardPower{font-size:11.5px !important}
-.ggCardCheck{font-weight:800 !important}
+.ggCardCheck{font-weight: 900 !important}

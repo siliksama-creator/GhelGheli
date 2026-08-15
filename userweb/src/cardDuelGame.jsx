@@ -337,6 +337,11 @@ function RoundIntroOverlay({ focus, roundNumber, totalRounds }) {
     <div className="duelRoundIntro" key={`intro-${roundNumber}-${stat}`}
       style={{ '--focus-color': color }} aria-live="assertive"
       aria-label={`راند ${roundNumber} از ${totalRounds}، معیار ${meta.name || ''}. ${focus?.hint || ''}`}>
+      {/* پرتوهای پس‌زمینه («نورِ استادیوم») + دو موجِ ضربه‌ای که در لحظهٔ
+          نشستنِ مدال بیرون می‌زنند. معادلِ `_RoundIntroBackdropPainter`
+          در اندروید. */}
+      <div className="duelIntroRays" aria-hidden="true" />
+      <div className="duelIntroShock" aria-hidden="true"><i /><i /></div>
       <div className="duelIntroShards" aria-hidden="true">
         {Array.from({ length: 12 }, (_, index) => <i key={index} style={{
           '--shard-angle': `${index * 30}deg`,
@@ -344,12 +349,23 @@ function RoundIntroOverlay({ focus, roundNumber, totalRounds }) {
         }} />)}
       </div>
       <div className="duelRoundIntroInner">
-        <small>راند {fa(roundNumber)} از {fa(totalRounds)}</small>
+        {/* «کجای مسابقه‌ایم» با میله‌های رنگی گفته می‌شود نه با جملهٔ تازه —
+            قیدِ مالک: متن‌ها زیاد نشوند. هم‌تراز با نوارِ اندروید. */}
+        <div className="duelIntroHead">
+          <small>راند {fa(roundNumber)} از {fa(totalRounds)}</small>
+          <div className="duelIntroPips" aria-hidden="true">
+            {Array.from({ length: totalRounds }, (_, index) => (
+              <i key={index} className={index === roundNumber - 1 ? 'isNow'
+                : index < roundNumber - 1 ? 'isDone' : ''} />
+            ))}
+          </div>
+        </div>
         <span className="duelRoundIntroIcon" aria-hidden="true">
           <i>{meta.icon || '★'}</i>
         </span>
         <label>معیار این راند</label>
         <b>{meta.name || ''}</b>
+        <span className="duelIntroRule" aria-hidden="true" />
         <em>بالاترین عدد برنده است</em>
         <div className="duelIntroBeats" aria-hidden="true">
           <span>۳</span><span>۲</span><span>۱</span><strong>انتخاب!</strong>

@@ -206,3 +206,9 @@ flutter:
           weight: 700
         - asset: assets/fonts/Vazirmatn-ExtraBold.ttf
           weight: 800
+        # وزنِ ۹۰۰ واقعی. تا پیش از این، هر `FontWeight.w900` در کدِ اپ —
+        # از جمله نامِ معیارِ اعلانِ راند — به ExtraBold سقوط می‌کرد و
+        # موتور آن را مصنوعی ضخیم می‌کرد: لبه‌های چرب و کشیدهٔ حروفِ
+        # فارسی. حالا گلیفِ طراحی‌شده رندر می‌شود.
+        - asset: assets/fonts/Vazirmatn-Black.ttf
+          weight: 900

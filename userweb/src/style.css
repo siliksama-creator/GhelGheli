@@ -1,4 +1,4 @@
-*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;direction:rtl;color:#eef8ff;background:#06101d;min-height:100vh;overflow-x:hidden}body:before{content:"";position:fixed;inset:0;z-index:-3;background:radial-gradient(circle at 80% -10%,#1c78ff66,transparent 35%),radial-gradient(circle at 15% 15%,#00d49a55,transparent 32%),radial-gradient(circle at 50% 110%,#b5ef5840,transparent 30%),linear-gradient(135deg,#07111f 0%,#0e2742 48%,#07111f 100%)}body:after{content:"";position:fixed;inset:0;z-index:-2;background-image:linear-gradient(#ffffff09 1px,transparent 1px),linear-gradient(90deg,#ffffff08 1px,transparent 1px);background-size:44px 44px;mask-image:linear-gradient(to bottom,#000 0%,#0008 55%,transparent 100%)}.page{width:100%;min-height:100vh;max-width:1280px;margin:0 auto;padding:18px 18px 46px}.hero{display:grid;place-items:center;text-align:center;margin:0 auto 16px;max-width:760px}.hero img{width:min(330px,72vw);height:220px;object-fit:contain;filter:drop-shadow(0 24px 48px #000a)}.hero b{font-size:clamp(34px,5vw,54px);font-weight:1000;line-height:1;color:var(--brand-ink);text-shadow:0 5px 0 #224108,0 0 28px #b5ef5860;margin-top:-18px}.hero span,.hint{color:#c9ddf2}.card{width:min(560px,95vw);margin-inline:auto;background:linear-gradient(165deg,#ffffff18,#ffffff0b 48%,#00d49a0d);border:1px solid #ffffff22;border-radius:30px;padding:24px;box-shadow:0 30px 90px #0009, inset 0 1px 0 #ffffff20;backdrop-filter:blur(20px)}.wide{width:min(1080px,96vw)}input,textarea{width:100%;padding:14px 16px;border-radius:17px;border:1px solid #38658f;background:#07111fd9;color:#fff;margin:7px 0;font-family:inherit;outline:none;transition:.18s border,.18s box-shadow,.18s transform}input:focus,textarea:focus{border-color:var(--brand-ink);box-shadow:0 0 0 4px #b5ef5822;transform:translateY(-1px)}textarea{min-height:105px;resize:vertical}button {
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;direction:rtl;color:#eef8ff;background:#06101d;min-height:100vh;overflow-x:hidden}body:before{content:"";position:fixed;inset:0;z-index:-3;background:radial-gradient(circle at 80% -10%,#1c78ff66,transparent 35%),radial-gradient(circle at 15% 15%,#00d49a55,transparent 32%),radial-gradient(circle at 50% 110%,#b5ef5840,transparent 30%),linear-gradient(135deg,#07111f 0%,#0e2742 48%,#07111f 100%)}body:after{content:"";position:fixed;inset:0;z-index:-2;background-image:linear-gradient(#ffffff09 1px,transparent 1px),linear-gradient(90deg,#ffffff08 1px,transparent 1px);background-size:44px 44px;mask-image:linear-gradient(to bottom,#000 0%,#0008 55%,transparent 100%)}.page{width:100%;min-height:100vh;max-width:1280px;margin:0 auto;padding:18px 18px 46px}.hero{display:grid;place-items:center;text-align:center;margin:0 auto 16px;max-width:760px}.hero img{width:min(330px,72vw);height:220px;object-fit:contain;filter:drop-shadow(0 24px 48px #000a)}.hero b{font-size:clamp(34px,5vw,54px);font-weight:900;line-height:1;color:var(--brand-ink);text-shadow:0 5px 0 #224108,0 0 28px #b5ef5860;margin-top:-18px}.hero span,.hint{color:#c9ddf2}.card{width:min(560px,95vw);margin-inline:auto;background:linear-gradient(165deg,#ffffff18,#ffffff0b 48%,#00d49a0d);border:1px solid #ffffff22;border-radius:30px;padding:24px;box-shadow:0 30px 90px #0009, inset 0 1px 0 #ffffff20;backdrop-filter:blur(20px)}.wide{width:min(1080px,96vw)}input,textarea{width:100%;padding:14px 16px;border-radius:17px;border:1px solid #38658f;background:#07111fd9;color:#fff;margin:7px 0;font-family:inherit;outline:none;transition:.18s border,.18s box-shadow,.18s transform}input:focus,textarea:focus{border-color:var(--brand-ink);box-shadow:0 0 0 4px #b5ef5822;transform:translateY(-1px)}textarea{min-height:105px;resize:vertical}button {
   border: 0;
   border-radius: 16px;
   padding: 12px 18px;
@@ -2602,7 +2602,7 @@ a:focus-visible {
 }
 .pBannerText > div:first-child { flex: 1; min-width: 0; }
 .pBannerText h2 {
-  margin: 0 0 4px; font-size: 23px; font-weight: 1000; line-height: 1.2;
+  margin: 0 0 4px; font-size: 23px; font-weight:900; line-height: 1.2;
   color: #fff;
   /* سایهٔ متن، نه سایهٔ جعبه: متن باید روی هر بخشی از تصویر خوانا بماند. */
   text-shadow: 0 2px 10px #000c, 0 0 24px #0009;
@@ -2617,7 +2617,7 @@ a:focus-visible {
   background: linear-gradient(140deg, #d7f97a, #57d9a3);
   box-shadow: 0 8px 22px #00000066, inset 0 2px 0 #ffffff66;
 }
-.pMedal b { font-size: 30px; line-height: 1; font-weight: 1000; color: #06240f; }
+.pMedal b { font-size: 30px; line-height: 1; font-weight:900; color: #06240f; }
 .pMedal small { font-size: 10.5px; font-weight: 800; color: #0b3a16; }
 
 /* ── کارتِ پیشرفت ── */
@@ -2756,7 +2756,7 @@ a:focus-visible {
 .pNum .pLock { font-size: 12px; opacity: .85; }
 /* از ۱۵ به ۱۹ — شمارهٔ پله مهم‌ترین عددِ ردیف است. */
 .pNum b {
-  font-size: 19px; font-weight: 1000; color: #b8cce4;
+  font-size: 19px; font-weight:900; color: #b8cce4;
   font-variant-numeric: tabular-nums;
 }
 .pRow.is-unlocked .pNum b { color: var(--brand-ink); }
@@ -3556,7 +3556,7 @@ input:focus, textarea:focus {
   border-radius: 18px; color: rgba(255,255,255,.66); background: rgba(255,255,255,.075); border: 1px solid rgba(255,255,255,.13);
   transition: transform .22s ease, background .22s ease, border-color .22s ease, color .22s ease;
 }
-.streakDayIcon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 12px; background: rgba(255,255,255,.08); font-size: 14px; font-weight: 950; }
+.streakDayIcon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 12px; background: rgba(255,255,255,.08); font-size: 14px; font-weight:900; }
 .streakDay small { font-size: 10px; color: inherit; }
 .streakDay b { font-size: 10px; color: currentColor; }
 .streakDay.is-current { color: #ffd166; background: rgba(255,209,102,.18); border-color: rgba(255,209,102,.66); box-shadow: 0 12px 28px rgba(255,184,77,.14); transform: translateY(-2px); }
@@ -3567,7 +3567,7 @@ input:focus, textarea:focus {
 .streakClaim {
   position: relative; margin: 0; min-width: 132px; padding: 12px 16px; border: 0; border-radius: 16px;
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-  background: linear-gradient(135deg, #ffe08a, #ffb84d 52%, #ff7a45); color: #25110a; font-weight: 950;
+  background: linear-gradient(135deg, #ffe08a, #ffb84d 52%, #ff7a45); color: #25110a; font-weight:900;
   box-shadow: 0 14px 30px rgba(255,184,77,.24); overflow: hidden;
 }
 .streakClaim img { position: relative; z-index: 1; width: 21px; height: 21px; object-fit: contain; filter: drop-shadow(0 4px 9px rgba(255,255,255,.30)); }
@@ -4009,8 +4009,9 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 .duelRoundIntro{
   position:fixed; inset:0; z-index:60; display:grid; place-items:center;
   background:radial-gradient(circle at center,
-    color-mix(in srgb,var(--focus-color) 27%,rgba(3,7,13,.92)) 0,
-    rgba(3,7,13,.96) 70%);
+    color-mix(in srgb,var(--focus-color) 30%,rgba(3,7,13,.92)) 0,
+    rgba(6,10,20,.98) 58%,
+    #03060c 100%);
   backdrop-filter:blur(5px); pointer-events:auto;
   animation:duelIntroFade 2.8s ease forwards;
 }
@@ -4025,37 +4026,123 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
   align-items:center; gap:7px; text-align:center; padding:0 26px; max-width:430px;
   animation:duelIntroPop .58s cubic-bezier(.2,1.3,.4,1) both;
 }
-.duelRoundIntroInner small{
-  font-size:13px; color:#d8e3ee; font-weight:900; padding:5px 13px;
-  border:1px solid color-mix(in srgb,var(--focus-color) 48%,transparent);
-  background:color-mix(in srgb,var(--focus-color) 12%,transparent);border-radius:999px;
+/* سرِ صحنه: شمارهٔ راند + میله‌های پیشرفت. */
+.duelIntroHead{
+  display:flex; flex-direction:column; align-items:center; gap:5px;
+  padding:6px 14px 7px; border-radius:19px;
+  background:rgba(0,0,0,.38);
+  border:1px solid color-mix(in srgb,var(--focus-color) 46%,transparent);
+  animation:duelIntroHeadIn .34s ease-out both;
 }
+.duelRoundIntroInner small{
+  font-size:13px; color:#fff; font-weight:900; letter-spacing:.2px;
+}
+.duelIntroPips{display:flex;align-items:center;gap:4px}
+.duelIntroPips i{
+  width:7px;height:4px;border-radius:9px;background:rgba(255,255,255,.20);
+  transition:width .3s ease;
+}
+.duelIntroPips i.isDone{background:color-mix(in srgb,var(--focus-color) 55%,transparent)}
+.duelIntroPips i.isNow{width:18px;background:var(--focus-color)}
 .duelRoundIntroIcon{
-  display:grid; place-items:center; width:112px; height:112px; margin:9px 0 2px;
+  position:relative;
+  display:grid; place-items:center; width:132px; height:132px; margin:16px 0 2px;
   border-radius:50%; border:3px solid var(--focus-color);
-  background:radial-gradient(circle,color-mix(in srgb,var(--focus-color) 38%,transparent),transparent 72%);
-  box-shadow:0 0 50px color-mix(in srgb,var(--focus-color) 65%,transparent);
+  /* گرادیانِ سه‌ایستگاهی + هالهٔ دولایه: مدال «حجم» پیدا می‌کند به‌جای
+     اینکه یک دایرهٔ تختِ رنگی باشد. هم‌ترازِ قرصِ مرکزیِ اندروید. */
+  background:radial-gradient(circle,
+    color-mix(in srgb,var(--focus-color) 42%,#fff 18%) 0,
+    color-mix(in srgb,var(--focus-color) 18%,transparent) 55%,
+    #071120 100%);
+  box-shadow:0 0 52px color-mix(in srgb,var(--focus-color) 70%,transparent),
+             0 0 96px color-mix(in srgb,var(--focus-color) 28%,transparent);
   animation:duelIntroSpin .62s cubic-bezier(.2,1.2,.4,1) both;
 }
-.duelRoundIntroIcon i{font-style:normal;font-size:50px;filter:drop-shadow(0 0 12px var(--focus-color))}
-.duelRoundIntroInner label{font-size:12px;font-weight:900;color:var(--focus-color);margin-top:4px}
+/* دو حلقهٔ ناقصِ چرخان در خلافِ هم — معادلِ کمان‌های `EmblemPainter`. */
+.duelRoundIntroIcon::before,.duelRoundIntroIcon::after{
+  content:"";position:absolute;border-radius:50%;
+  border:2.6px solid transparent;
+  border-top-color:color-mix(in srgb,var(--focus-color) 62%,transparent);
+  border-left-color:color-mix(in srgb,var(--focus-color) 34%,transparent);
+}
+.duelRoundIntroIcon::before{
+  width:152px;height:152px;animation:duelIntroRing 2.8s linear infinite;
+}
+.duelRoundIntroIcon::after{
+  width:170px;height:170px;opacity:.5;
+  animation:duelIntroRing 3.6s linear infinite reverse;
+}
+.duelRoundIntroIcon i{font-style:normal;font-size:54px;filter:drop-shadow(0 0 14px var(--focus-color))}
+.duelRoundIntroInner label{
+  font-size:12.5px;font-weight:800;letter-spacing:1.6px;
+  color:color-mix(in srgb,var(--focus-color) 90%,#fff);margin-top:14px
+}
 .duelRoundIntroInner b{
-  font-size:34px; font-weight:1000; color:#fff; line-height:1.2;
-  text-shadow:0 0 28px var(--focus-color),0 3px 9px #000;
+  /* ۴۲px با وزنِ ۹۰۰ **واقعی** (Vazirmatn-Black تازه اضافه شد؛ پیش از آن
+     مرورگر بولدِ مصنوعی می‌ساخت). گرادیانِ روی متن با background-clip،
+     هم‌ترازِ ShaderMaskِ اندروید. */
+  font-size:42px; font-weight:900; line-height:1.14; letter-spacing:-.5px;
+  background:linear-gradient(180deg,#fff 0,
+    color-mix(in srgb,var(--focus-color) 45%,#fff) 55%,var(--focus-color) 100%);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  filter:drop-shadow(0 0 30px var(--focus-color)) drop-shadow(0 3px 9px #000);
+  animation:duelIntroName .42s .17s cubic-bezier(.2,1.4,.4,1) both;
+}
+/* خطِ تزئینیِ زیرِ نام — از وسط باز می‌شود. */
+.duelIntroRule{
+  display:block;height:2px;width:132px;margin:9px 0 0;border-radius:9px;
+  background:linear-gradient(90deg,transparent,var(--focus-color),transparent);
+  animation:duelIntroRuleIn .44s .22s cubic-bezier(.2,1.2,.4,1) both;
 }
 .duelRoundIntroInner em{
-  font-style:normal;font-size:13px;font-weight:850;color:rgba(255,255,255,.76)
+  font-style:normal;font-size:13.5px;font-weight:800;color:rgba(255,255,255,.78);
+  margin-top:9px;
+  animation:duelIntroHeadIn .4s .26s ease-out both;
 }
-.duelIntroBeats{position:relative;width:92px;height:34px;margin-top:10px}
+.duelIntroBeats{position:relative;width:92px;height:34px;margin-top:14px}
 .duelIntroBeats span,.duelIntroBeats strong{
   position:absolute;inset:0;display:grid;place-items:center;opacity:0;
-  color:var(--focus-color);font-size:25px;font-weight:1000;
+  color:var(--focus-color);font-size:25px;font-weight:900;
   text-shadow:0 0 18px var(--focus-color)
 }
 .duelIntroBeats span:nth-child(1){animation:duelBeat .42s 1.15s both}
 .duelIntroBeats span:nth-child(2){animation:duelBeat .42s 1.55s both}
 .duelIntroBeats span:nth-child(3){animation:duelBeat .42s 1.95s both}
 .duelIntroBeats strong{font-size:18px;color:#22e7a6;animation:duelGo .44s 2.34s both}
+/* ── لایه‌های پس‌زمینه ─────────────────────────────────────────────────
+   `duelIntroRays` نورِ چرخانِ استادیوم است و `duelIntroShock` دو موجِ
+   ضربه‌ای که در لحظهٔ نشستنِ مدال بیرون می‌زنند. هر دو `pointer-events:none`
+   دارند تا پردهٔ بالایی همچنان ورودی را ببندد. */
+.duelIntroRays{
+  position:absolute;inset:0;pointer-events:none;overflow:hidden;
+  background:repeating-conic-gradient(from 0deg at 50% 50%,
+    color-mix(in srgb,var(--focus-color) 9%,transparent) 0deg 3deg,
+    transparent 3deg 36deg);
+  animation:duelIntroRaysSpin 2.8s linear both;
+}
+.duelIntroShock{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
+.duelIntroShock i{
+  position:absolute;width:140px;height:140px;border-radius:50%;
+  border:3px solid color-mix(in srgb,var(--focus-color) 45%,transparent);
+  animation:duelIntroShockOut 1.05s .20s cubic-bezier(.2,.8,.3,1) both;
+}
+.duelIntroShock i:nth-child(2){animation-delay:.38s;border-width:2px;opacity:.6}
+@keyframes duelIntroRaysSpin{
+  0%{transform:rotate(0) scale(1.4);opacity:0}
+  22%{opacity:1}
+  100%{transform:rotate(80deg) scale(1.4);opacity:.25}
+}
+@keyframes duelIntroShockOut{
+  0%{transform:scale(.5);opacity:.9;border-width:3px}
+  100%{transform:scale(5.2);opacity:0;border-width:1px}
+}
+@keyframes duelIntroHeadIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
+@keyframes duelIntroRing{to{transform:rotate(360deg)}}
+@keyframes duelIntroName{
+  0%{opacity:0;transform:translateY(14px) scale(.80)}
+  100%{opacity:1;transform:none}
+}
+@keyframes duelIntroRuleIn{from{width:0;opacity:0}to{width:132px;opacity:1}}
 @keyframes duelIntroFade{0%,88%{opacity:1}100%{opacity:0}}
 @keyframes duelIntroPop{from{opacity:0;transform:translateY(18px) scale(.80)}to{opacity:1;transform:none}}
 @keyframes duelIntroSpin{from{transform:rotate(-34deg) scale(.38)}to{transform:none}}
@@ -4074,10 +4161,19 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 .duelFocusPill i{ font-style:normal; font-size:13px }
 
 @media (prefers-reduced-motion: reduce){
+  /* لایه‌های تازهٔ بازطراحی هم باید اینجا خاموش شوند، وگرنه کاربری که
+     «کاهش حرکت» را روشن کرده باز هم پرتوهای چرخان و موجِ ضربه می‌بیند. */
   .duelRoundIntroInner,.duelRoundIntroIcon,.duelRoundIntro::before,
-  .duelRoundIntro::after,.duelIntroBeats>*{animation:none !important}
+  .duelRoundIntro::after,.duelIntroBeats>*,.duelRoundIntroIcon::before,
+  .duelRoundIntroIcon::after,.duelIntroRays,.duelIntroShock i,
+  .duelIntroHead,.duelRoundIntroInner b,.duelIntroRule,
+  .duelRoundIntroInner em{animation:none !important}
   .duelRoundIntro{animation:duelIntroFade 2.8s steps(2) forwards}
   .duelIntroBeats strong{opacity:1}
+  /* بدونِ انیمیشن، حالتِ پایانی باید همان حالتِ خوانا باشد. */
+  .duelIntroRule{width:132px;opacity:1}
+  .duelIntroShock{display:none}
+  .duelIntroRays{opacity:.25}
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -5110,7 +5206,7 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 .duelClashCine.invalid{border-color:#f97316!important;box-shadow:0 0 32px #f9731638!important}
 .duelPointFlight{
   position:absolute;z-index:25;top:16%;padding:5px 9px;border-radius:999px;
-  font-size:18px;font-weight:1000;color:#06111d;background:#ffd166;
+  font-size:18px;font-weight:900;color:#06111d;background:#ffd166;
   box-shadow:0 0 24px #ffd166;pointer-events:none;
   animation:duelPointToScore 1.15s cubic-bezier(.16,.9,.3,1) both;
 }
@@ -5135,7 +5231,7 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 .duelFinalePanel{display:flex;flex-direction:column;align-items:center;gap:10px;padding:22px 18px}
 .duelFinalePanel>span{line-height:1}
 .duelFinalePanel h2{margin:0}
-.duelFinalScore{font-size:clamp(22px,6vw,34px);font-weight:1000;color:#fff;direction:rtl}
+.duelFinalScore{font-size:clamp(22px,6vw,34px);font-weight:900;color:#fff;direction:rtl}
 .duelFinalScore i{font-style:normal;color:var(--mode-color);padding-inline:7px}
 .duelMvpLine{color:#ffd166;font-size:12px;font-weight:900}
 .duelFinalePanel>.duelSettlement{display:block;padding:5px 11px;border-radius:999px;font-size:11.5px}
@@ -5154,7 +5250,7 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 
 /* تحلیل ترکیب: بدون details، بدون بازشدن و بدون اسکرول داخلی */
 .duelIntelCompact{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:9px;padding:10px 12px}
-.duelIntelCompact>span{width:36px;height:36px;display:grid;place-items:center;border-radius:50%;font-weight:1000}
+.duelIntelCompact>span{width:36px;height:36px;display:grid;place-items:center;border-radius:50%;font-weight:900}
 .duelIntelCompact.ready>span{color:#22e7a6;background:#22e7a618}
 .duelIntelCompact.warn>span{color:#ffd166;background:#ffd16618}
 .duelIntelCompact>div{min-width:0;display:flex;flex-direction:column}
@@ -5222,15 +5318,15 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 }
 .duelStakeFlight>strong{
   padding:8px 17px;border-radius:16px;background:linear-gradient(135deg,#fff2a8,#ffd166 45%,#f59e0b);
-  color:#3b2500;font-size:clamp(27px,8vw,42px);font-weight:1000;direction:ltr;
+  color:#3b2500;font-size:clamp(27px,8vw,42px);font-weight:900;direction:ltr;
   box-shadow:0 0 0 1px #fff8,0 0 42px #ffd166aa,0 18px 45px #0009;
   animation:duelPayoutLabel 2.2s cubic-bezier(.2,1.4,.3,1) both;
 }
-.duelStakeFlight>small{margin-top:8px;color:#fff;font-size:13px;font-weight:950;text-shadow:0 2px 9px #000,0 0 14px #ffd166}
+.duelStakeFlight>small{margin-top:8px;color:#fff;font-size:13px;font-weight:900;text-shadow:0 2px 9px #000,0 0 14px #ffd166}
 .duelCoinStream{position:absolute;inset:0;overflow:hidden}
 .duelCoinStream i{
   position:absolute;left:var(--coin-left);bottom:2%;width:24px;height:24px;
-  display:grid;place-items:center;border-radius:50%;font-style:normal;font-size:15px;font-weight:1000;
+  display:grid;place-items:center;border-radius:50%;font-style:normal;font-size:15px;font-weight:900;
   color:#5b3700;background:linear-gradient(145deg,#fff2a8,#f59e0b);border:1px solid #fff8;
   box-shadow:0 0 15px #ffd166;opacity:0;
   animation:duelCoinFly 1.55s var(--coin-delay) cubic-bezier(.16,.75,.24,1) both;
