@@ -8,6 +8,7 @@ import '../../api_client.dart';
 import '../../core/cosmetics.dart';
 import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/coin_quota_line.dart';
 import '../../widgets/level_badge.dart';
 import 'games/memory_board.dart';
 import 'games/penalty_board.dart';
@@ -74,6 +75,12 @@ class _GamesHubPageState extends State<GamesHubPage> {
   Map<String, dynamic>? _user;
   Map<String, dynamic> _cosmetics = const {};
 
+  /// سهمیهٔ سکهٔ امروز، از `/api/bootstrap`. شکلش:
+  /// `{date, used:{100,1000}, limit:{...}, remaining:{...}}`.
+  /// `null` یعنی سرور هنوز جواب نداده یا این نسخه از سرور سهمیه نمی‌فرستد —
+  /// در هر دو حالت چیزی نشان نمی‌دهیم، چون عددِ اشتباه از نبودِ عدد بدتر است.
+  Map<String, dynamic>? _coinQuota;
+
   @override
   void initState() {
     super.initState();
@@ -112,6 +119,7 @@ class _GamesHubPageState extends State<GamesHubPage> {
       setState(() {
         if (m['user'] is Map) _user = Map<String, dynamic>.from(m['user']);
         if (m['cosmetics'] is Map) _cosmetics = Map<String, dynamic>.from(m['cosmetics']);
+        if (m['coinQuota'] is Map) _coinQuota = Map<String, dynamic>.from(m['coinQuota']);
       });
       final d = await widget.api.get('/api/level');
       if (!mounted || d is! Map) return;
@@ -417,6 +425,7 @@ class _GamesHubPageState extends State<GamesHubPage> {
         ),
         Gaps.vSm,
         _StakeRulesBanner(mode: _selectedMode),
+        CoinQuotaLine(mode: _selectedMode, quota: _coinQuota),
         Gaps.vMd,
 
         // ── ۳. محتوای حالت انتخاب شده ──

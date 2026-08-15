@@ -1,5 +1,7 @@
 const { pool } = require('../config/db');
 const pointService = require('./pointService');
+const coinService = require('./coinService');
+const { coinRewardFor, quotaTracked, tehranDate } = require('./coinService');
 
 // مسابقهٔ عمومی فقط دو ورودی رسمی دارد. لابی خصوصی علاوه بر این دو،
 // رایگان و ۵۰۰۰ هم دارد. عددِ دلخواه از payload هرگز پذیرفته نمی‌شود.
@@ -26,7 +28,7 @@ function parseStake(raw, allowed) {
 const parsePublicStake = raw => parseStake(raw, PUBLIC_STAKES);
 const parseLobbyStake = raw => parseStake(raw, LOBBY_STAKES);
 
-function createGameStakeService(db = pool, points = pointService) {
+function createGameStakeService(db = pool, points = pointService, coins = coinService) {
   async function canAfford(userId, stake) {
     if (stake === 0) return { ok: true, balance: null };
     const { rows } = await db.query(
@@ -74,12 +76,43 @@ function createGameStakeService(db = pool, points = pointService) {
       const grossPot = stake * 2;
       const commission = Math.ceil(grossPot * 0.10);
       const netPot = grossPot - commission;
+
+      // ── سهمیهٔ سکه ──
+      //
+      // سهمیه در **شروع** مصرف می‌شود، نه در برد. دلیلِ کامل در
+      // coinService.consumeQuota آمده؛ خلاصه‌اش: هر مسابقه از سهمیهٔ هر دو
+      // طرف خرج می‌کند، پس دو حسابِ هماهنگ نمی‌توانند نوبتی ببرند و هر دو
+      // سقف را پر کنند.
+      //
+      // ⚠️ نداشتنِ سهمیه **مسابقه را متوقف نمی‌کند**. این تصمیمِ محصولی
+      //    مهمی است: کاربری که سقفش پر شده باید همچنان بتواند بازی کند و
+      //    امتیاز ببرد، فقط سکه نمی‌گیرد. اگر بازی را می‌بستیم، سقفِ سکه
+      //    عملاً تبدیل به سقفِ بازی می‌شد — یعنی محبوب‌ترین کاربران بعد از
+      //    ۳۰ بازی از اپ بیرون انداخته می‌شدند.
+      //
+      // ⚠️ ترتیبِ `ids` (مرتب‌شده) رعایت می‌شود تا با ترتیبِ قفلِ بالا یکی
+      //    باشد و دو مسابقهٔ هم‌زمانِ دارای بازیکنِ مشترک deadlock نسازند.
+      const coinReward = coinRewardFor(gameId, stake);
+      const quotaDate = quotaTracked(stake) ? tehranDate() : null;
+      const quotaByUser = new Map();
+      if (coinReward > 0 && quotaDate) {
+        for (const userId of ids) {
+          quotaByUser.set(
+            userId, await coins.consumeQuota(client, userId, stake));
+        }
+      }
+
       await client.query(
         `INSERT INTO game_stake_matches
            (id, game_id, player_x_id, player_o_id, stake_points,
-            gross_pot, commission_points, net_pot, status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'reserved')`,
-        [matchId, gameId, playerXId, playerOId, stake, grossPot, commission, netPot]);
+            gross_pot, commission_points, net_pot, status,
+            coin_reward, coin_quota_x, coin_quota_o, coin_quota_date)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'reserved',$9,$10,$11,$12)`,
+        [matchId, gameId, playerXId, playerOId, stake, grossPot, commission, netPot,
+          coinReward,
+          quotaByUser.get(playerXId) === true,
+          quotaByUser.get(playerOId) === true,
+          quotaDate]);
 
       // چون ردیف‌های users همین بالا FOR UPDATE شده‌اند، هر debit باید دقیقاً
       // کل stake را کم کند. کسر جزئی اینجا خطاست و کل transaction برمی‌گردد.
@@ -103,6 +136,13 @@ function createGameStakeService(db = pool, points = pointService) {
       return {
         matchId, stake, grossPot, commission, netPot,
         balances: Object.fromEntries(byId),
+        // کلاینت باید بداند این مسابقه اصلاً سکه دارد یا نه، تا نشانِ سکه
+        // را فقط وقتی نشان دهد که واقعاً چیزی در میان است.
+        coinReward,
+        coinEligible: {
+          [playerXId]: quotaByUser.get(playerXId) === true,
+          [playerOId]: quotaByUser.get(playerOId) === true,
+        },
       };
     } catch (e) {
       await client.query('ROLLBACK').catch(() => {});
@@ -131,6 +171,7 @@ function createGameStakeService(db = pool, points = pointService) {
       const players = [match.player_x_id, match.player_o_id].sort();
       let outcome;
       let winnerBalanceAfter = null;
+      let coinsAwarded = 0;
 
       if (draw) {
         for (const userId of players) {
@@ -146,6 +187,12 @@ function createGameStakeService(db = pool, points = pointService) {
           });
         }
         outcome = 'draw';
+        // ⚠️ سهمیه در تساوی **برنمی‌گردد** و این انتخاب است، نه فراموشی.
+        //    سهمیه هزینهٔ «شرکت کردن» است و مسابقه واقعاً انجام شده. اگر
+        //    برمی‌گشت، دو حسابِ هماهنگ می‌توانستند بی‌نهایت بار عمداً
+        //    مساوی کنند تا فقط ردیف‌های دفتر را شلوغ کنند، بی‌آنکه چیزی
+        //    خرج شود. (سکه‌ای هم داده نمی‌شود، پس سودی در کار نیست —
+        //    ولی هزینهٔ داشتن همیشه بهتر از هزینه نداشتن است.)
       } else {
         if (![match.player_x_id, match.player_o_id].includes(winnerUserId)) {
           throw new StakeError('برنده مسابقه معتبر نیست', 'INVALID_WINNER');
@@ -163,6 +210,23 @@ function createGameStakeService(db = pool, points = pointService) {
         });
         winnerBalanceAfter = Number(payout?.balanceAfter ?? 0);
         outcome = 'winner';
+
+        // ── سکهٔ برنده ──
+        //
+        // فقط اگر سهمیهٔ **خودِ برنده** موقعِ شروع سوخته باشد. اگر سقفش پر
+        // بود، مسابقه انجام شد و امتیازش را برد، ولی سکه نمی‌گیرد.
+        //
+        // ⚠️ سهمیهٔ بازنده برنمی‌گردد و این عمدی است. سهمیه هزینهٔ
+        //    «شرکت کردن» است نه «بردن»؛ اگر فقط از برنده کم می‌شد، یک
+        //    حسابِ فدایی می‌توانست بی‌نهایت بار ببازد و سهمیهٔ شریکش هرگز
+        //    تمام نشود.
+        const eligible = winnerUserId === match.player_x_id
+          ? match.coin_quota_x === true
+          : match.coin_quota_o === true;
+        if (eligible) {
+          coinsAwarded = await coins.awardCoins(
+            client, winnerUserId, Number(match.coin_reward || 0));
+        }
       }
 
       await client.query(
@@ -180,6 +244,7 @@ function createGameStakeService(db = pool, points = pointService) {
         commission: Number(match.commission_points),
         winnerUserId: draw ? null : winnerUserId,
         winnerBalanceAfter: draw ? null : winnerBalanceAfter,
+        coinsAwarded,
       };
     } catch (e) {
       await client.query('ROLLBACK').catch(() => {});
@@ -213,6 +278,32 @@ function createGameStakeService(db = pool, points = pointService) {
           lifetimeGain: 0,
         });
       }
+      // ── برگشتِ سهمیهٔ سکه ──
+      //
+      // مسابقه هرگز نتیجه نداد، پس سهمیه‌ای که موقعِ شروع سوخت باید
+      // برگردد — وگرنه یک قطعیِ شبکه یا کرشِ سرور، سهمیهٔ کاربر را
+      // می‌بلعد بی‌آنکه او حتی یک بازیِ کامل کرده باشد.
+      //
+      // ⚠️ فقط برای کسی که واقعاً سهمیه‌اش سوخته بود. اگر آن موقع سقفش
+      //    پر بود، `coin_quota_*` برایش false است و برگشتی در کار نیست؛
+      //    وگرنه به کاربرِ سقف‌پر یک سهمیهٔ رایگان هدیه می‌دادیم.
+      //
+      // ⚠️ تاریخِ ذخیره‌شده استفاده می‌شود، نه تاریخِ امروز. مسابقهٔ ناتمام
+      //    تا ۶۰ دقیقه بعد refund می‌شود و ۶۰ دقیقه به‌راحتی از نیمه‌شبِ
+      //    تهران رد می‌شود؛ با تاریخِ امروز، سهمیهٔ دیروز سوخته می‌ماند و
+      //    به امروز یکی هدیه می‌شد.
+      const quotaDate = match.coin_quota_date;
+      if (quotaDate) {
+        if (match.coin_quota_x) {
+          await coins.releaseQuota(
+            client, match.player_x_id, stake, quotaDate);
+        }
+        if (match.coin_quota_o) {
+          await coins.releaseQuota(
+            client, match.player_o_id, stake, quotaDate);
+        }
+      }
+
       await client.query(
         `UPDATE game_stake_matches
             SET status='refunded', outcome='stale_refund', settled_at=NOW()

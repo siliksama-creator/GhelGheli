@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../api_client.dart';
 import '../../../theme/tokens.dart';
+import 'coin_award.dart';
 import 'game_audio.dart';
 import 'game_session.dart';
 import 'versus_bar.dart';
@@ -345,8 +346,20 @@ class GameScaffold extends StatelessWidget {
             ],
             Gaps.vXxs,
             if (scoreboard != null) ...[scoreboard!, Gaps.vXxs],
-            if (session.phase == GamePhase.over)
-              _ResultStrip(session: session, accent: accent)
+            if (session.phase == GamePhase.over) ...[
+              _ResultStrip(session: session, accent: accent),
+              // سکهٔ لیگ. `coinsWinner` نمادِ برنده است (X/O) و با
+              // `mySymbol` مقایسه می‌شود نه با `winner` — چون در قطعِ
+              // ارتباط، `winner` می‌تواند چیز دیگری باشد در حالی که تسویه
+              // واقعاً یک برنده داشته. نمادِ خودِ تسویه همیشه درست است.
+              if (session.coinsAwarded > 0) ...[
+                Gaps.vXxs,
+                CoinAward(
+                  amount: session.coinsAwarded,
+                  mine: session.coinsWinner == session.mySymbol,
+                ),
+              ],
+            ]
             else
               _TurnBanner(session: session, accent: accent),
             if (session.timedOutSymbol != null &&

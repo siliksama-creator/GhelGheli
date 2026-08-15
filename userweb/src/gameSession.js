@@ -20,6 +20,7 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
     matchId: initialStart.roomId, timedOut: null, settlementStatus: 'settled',
     stakePayoutAmount: 0, stakePayoutWinner: null, stakeWinnerBalanceAfter: null,
     stakePayoutSequence: 0,
+    coinsAwarded: 0, coinsWinner: null,
     rematchAvailable: false, finishReason: null,
   } : {
     state: {}, players: null, me: null, turn: null, winner: null,
@@ -27,6 +28,7 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
     roomId: null, matchId: null, timedOut: null, settlementStatus: 'settled',
     stakePayoutAmount: 0, stakePayoutWinner: null, stakeWinnerBalanceAfter: null,
     stakePayoutSequence: 0,
+    coinsAwarded: 0, coinsWinner: null,
     rematchAvailable: false, finishReason: null,
   });
   const [error, setError] = useState('');
@@ -183,10 +185,20 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
     const onSettlement = d => {
       setG(prev => {
         if (d?.matchId && prev.matchId && d.matchId !== prev.matchId) return prev;
+        // ── سکهٔ مسابقه ──
+        //
+        // سرور این را به **هر دو** بازیکن می‌فرستد تا هر دو ببینند سکه به
+        // کدام سمت رفت. صفر یعنی سکه‌ای در کار نبود (سهمیهٔ برنده پر بود
+        // یا لیگِ فعالی نیست) و UI باید کاملاً ساکت بماند — نشانِ «۰ سکه»
+        // بدتر از نبودِ نشان است.
+        const coinsAwarded = Number(d?.coins || 0);
         const next = {
           ...prev,
           settlementStatus: d?.status || prev.settlementStatus,
           netPot: Number(d?.netPot || prev.netPot || 0),
+          coinsAwarded: coinsAwarded > 0 ? coinsAwarded : prev.coinsAwarded,
+          coinsWinner: coinsAwarded > 0
+            ? (d?.winner || null) : prev.coinsWinner,
         };
         const payoutId = String(d?.matchId || prev.matchId || '');
         const payoutWinner = String(d?.winner || '');

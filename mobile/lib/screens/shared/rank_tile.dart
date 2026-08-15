@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../api_client.dart';
 import '../../core/cosmetics.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/coin_chip.dart';
 
 /// Dense leaderboard row for ranks beyond the podium.
 class RankTile extends StatelessWidget {
@@ -62,8 +63,12 @@ class RankTile extends StatelessWidget {
                     style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Colors.white),
                   ),
                 ),
+                // سکه معیارِ رتبه است، امتیاز تساوی‌شکن — پس سکه اول و
+                // پررنگ، امتیاز کنارش و کم‌رنگ‌تر.
+                CoinChip(value: row['coins']),
+                Gaps.hXs,
                 Text(
-                  '${faNum(row['points'])} امتیاز',
+                  faNum(row['points']),
                   style: TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w800,

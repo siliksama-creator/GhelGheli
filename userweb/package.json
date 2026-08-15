@@ -11,7 +11,8 @@
     "test:jsx": "node tool/jsx-react-import.mjs",
     "test:game-parity": "node tool/game-parity.mjs",
     "test:card-duel": "node tool/card-duel-truth.mjs",
-    "test:feedback-parity": "node tool/feedback-parity.mjs"
+    "test:feedback-parity": "node tool/feedback-parity.mjs",
+    "test:coin-parity": "node tool/coin-parity.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^6.0.5",

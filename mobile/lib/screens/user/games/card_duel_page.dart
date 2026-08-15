@@ -19,6 +19,7 @@ import '../../../theme/tokens.dart';
 import '../../../widgets/app_card.dart';
 import '../../../widgets/avatar_image.dart';
 import '../../../widgets/player_card.dart';
+import 'coin_award.dart';
 import 'game_session.dart';
 
 part 'card_duel/card_duel_widgets.dart';

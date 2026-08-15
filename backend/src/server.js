@@ -39,6 +39,8 @@ const shop = require('./services/shopService');
 // لولِ دائمیِ بازیکن — کنارِ cosmetics در همان مسیرها پخش می‌شود.
 const level = require('./services/levelService');
 const chatRetention = require('./services/chatRetentionService');
+// سکه — ارزِ مهارتِ لیگ. سهمیهٔ روزانه‌اش در bootstrap پخش می‌شود.
+const coins = require('./services/coinService');
 // Same reason: the profile endpoint checks club membership before letting
 // someone wear a crest, and it is defined above the club routes.
 const clubs = require('./services/clubService');
@@ -1021,6 +1023,23 @@ app.get('/api/bootstrap', auth, asyncHandler(async (req, res) => {
     // لولِ خودِ کاربر — صفحهٔ بازی‌ها و هدرِ داشبورد از همین می‌خوانند،
     // پس هیچ درخواستِ اضافه‌ای لازم نیست.
     level: await level.statusFor(req.user.id),
+    // سهمیهٔ سکهٔ امروز — سوار بر همان bootstrap تا صفحهٔ بازی‌ها بتواند
+    // «۳۰ از ۳۰ بازی سکه‌دار» را بدونِ درخواستِ اضافه نشان بدهد.
+    coinQuota: await coins.getQuota(req.user.id),
+  });
+}));
+
+// ═══════════════════════════════════════════════════════════════════════════
+// سهمیهٔ سکهٔ امروز — سبک، برای تازه‌سازی بعد از هر مسابقه
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// bootstrap این را دارد، ولی بعد از هر بازی باید عددِ تازه خوانده شود و
+// کشیدنِ کلِ bootstrap برای دو عدد اسراف است — دقیقاً همان دلیلی که
+// `/api/level` جدا وجود دارد.
+app.get('/api/coins/quota', auth, asyncHandler(async (req, res) => {
+  res.json({
+    coins: Number(req.user.coins || 0),
+    quota: await coins.getQuota(req.user.id),
   });
 }));
 
@@ -1141,7 +1160,7 @@ app.post('/api/profile/change-password', auth, changePasswordLimiter, asyncHandl
 }));
 
 app.get('/api/users/:id/public', auth, validateUuid('id'), asyncHandler(async (req, res) => {
-  const { rows } = await pool.query('SELECT id,nickname,profile_image_url,profile_avatar_key,lifetime_points,current_points,monthly_league_points,joined_at FROM users WHERE id=$1', [req.params.id]);
+  const { rows } = await pool.query('SELECT id,nickname,profile_image_url,profile_avatar_key,lifetime_points,current_points,monthly_league_points,coins,joined_at FROM users WHERE id=$1', [req.params.id]);
   if (!rows[0]) return res.status(404).json({ message: 'کاربر پیدا نشد' });
   const rewards = await pool.query(`SELECT c.claimed_at,c.status,r.name,r.image_url,r.reward_type,r.reward_value FROM user_reward_claims c JOIN reward_tiers r ON r.id=c.reward_tier_id WHERE c.user_id=$1 AND c.status IN ('approved','paid') ORDER BY c.claimed_at DESC LIMIT 50`, [req.params.id]);
   // ═══════════════════════════════════════════════════════════════════════
@@ -1205,19 +1224,29 @@ app.get('/api/users/:id/public', auth, validateUuid('id'), asyncHandler(async (r
   const best = leagueHistory.rows.reduce(
     (acc, r) => (acc === null || r.rank < acc ? r.rank : acc), null);
 
+  // ⚠️ ترتیب باید **دقیقاً** همان getLeaderboard باشد: (coins, points).
+  //    اگر اینجا فقط points می‌ماند، کاربر در جدولِ لیگ رتبهٔ ۱ می‌دید و
+  //    در پروفایلِ خودش رتبهٔ ۴ — دو عددِ متناقض از یک حقیقت.
   const currentRankRow = await pool.query(
-    `SELECT sub.rank FROM (
-       SELECT user_id, DENSE_RANK() OVER(ORDER BY points DESC) AS rank
+    `SELECT sub.rank, sub.coins FROM (
+       SELECT user_id, coins,
+              DENSE_RANK() OVER(ORDER BY coins DESC, points DESC) AS rank
          FROM league_leaderboard_entries
         WHERE league_season_id = (SELECT id FROM league_seasons WHERE status='active' ORDER BY starts_at DESC LIMIT 1)
      ) sub WHERE sub.user_id = $1`,
     [req.params.id]
   );
   const currentRank = currentRankRow.rows[0]?.rank ? Number(currentRankRow.rows[0].rank) : null;
+  // سکهٔ فصلِ جاری از جدولِ رتبه‌بندی می‌آید (منبعِ حقیقت)، و اگر هیچ
+  // لیگِ فعالی نبود از شمارندهٔ users خوانده می‌شود.
+  const seasonCoins = currentRankRow.rows[0]?.coins != null
+    ? Number(currentRankRow.rows[0].coins)
+    : Number(rows[0].coins || 0);
 
   res.json({
     currentLeagueRank: currentRank,
     ...rows[0],
+    coins: seasonCoins,
     rewards: rewards.rows,
     cards: cards.rows,
     leaguePayouts: leaguePayouts.rows,
@@ -2329,7 +2358,7 @@ io.use(async (socket, next) => {
     // یک کوئریِ دوم در مسیرِ اتصال، تأخیرِ شروعِ بازی را زیاد می‌کرد.
     const { rows } = await pool.query(`SELECT id,nickname,first_name,last_name,
       profile_image_url,profile_avatar_key,chat_banned_until,status,
-      lifetime_points,current_points,game_xp, equipped_club,equipped_frame,
+      lifetime_points,current_points,game_xp,coins, equipped_club,equipped_frame,
       equipped_color,equipped_profile_background,equipped_emote_pack,profile_title
       FROM users WHERE id=$1`, [payload.sub]);
     if (!rows[0] || rows[0].status !== 'active') throw new Error('inactive');
@@ -2473,6 +2502,15 @@ cron.schedule('17 4 * * *', () => {
   cardDuel.pruneBattleHistory()
     .then(n => { if (n) console.log(`[card-duel] pruned ${n} old battle log(s)`); })
     .catch(e => console.error('[card-duel] history prune failed:', e.message));
+}, { timezone: 'Asia/Tehran' });
+
+// جدولِ سهمیهٔ سکه به ازای هر کاربرِ فعال روزی یک ردیف می‌سازد. بدونِ
+// هرس، بعد از یک سال با ۱۰٬۰۰۰ کاربرِ فعال حدود ۳.۶ میلیون ردیفِ مرده
+// می‌ماند. هفت روز نگه می‌داریم تا اگر لازم شد بشود دیروز را بررسی کرد.
+cron.schedule('23 4 * * *', () => {
+  coins.pruneQuota(7)
+    .then(n => { if (n) console.log(`[coins] pruned ${n} old quota row(s)`); })
+    .catch(e => console.error('[coins] quota prune failed:', e.message));
 }, { timezone: 'Asia/Tehran' });
 
 // Centralized error handler. Previously this forwarded err.message straight

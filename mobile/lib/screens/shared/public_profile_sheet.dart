@@ -7,6 +7,7 @@ import '../../core/cosmetics.dart';
 import '../../services/image_disk_cache.dart';
 import '../../widgets/async_section.dart';
 import '../../widgets/avatar_image.dart';
+import '../../widgets/coin_chip.dart';
 import '../../widgets/safe_image.dart';
 
 /// Shows a user's comprehensive public profile (points, league rank, club, plus, prizes, cards).
@@ -161,7 +162,12 @@ class _PublicProfileBody extends StatelessWidget {
             _StatCard(
               icon: Icons.emoji_events_rounded,
               iconColor: const Color(0xFFFFD166),
+              // رتبه با «سکه» تعیین می‌شود، نه امتیاز. بدون نمایشِ سکه،
+              // کاربر رتبه‌اش را با مجموعِ امتیازش می‌سنجد و فکر می‌کند
+              // جدول اشتباه است. عنوان به‌جای متنِ اضافه، خودِ عدد را
+              // حمل می‌کند — قرار نیست متن‌ها زیاد شوند.
               title: 'رتبه لیگ این ماه',
+              titleTrailing: CoinChip(value: data['coins'], size: 11),
               value: () {
                 final r = data['currentLeagueRank'] ?? bestRank;
                 return r != null ? 'رتبه ${faNum(r)}' : 'رتبه ۱';
@@ -313,12 +319,17 @@ class _StatCard extends StatelessWidget {
     required this.iconColor,
     required this.title,
     required this.value,
+    this.titleTrailing,
   });
 
   final IconData icon;
   final Color iconColor;
   final String title;
   final String value;
+
+  /// نشانِ کوچکی که کنارِ عنوان می‌نشیند (مثلاً سکهٔ فصل کنارِ «رتبه لیگ»).
+  /// `null` یعنی همان چیدمانِ قبلی، بدون هیچ تغییری در بقیهٔ کارت‌ها.
+  final Widget? titleTrailing;
 
   @override
   Widget build(BuildContext context) {
@@ -338,10 +349,23 @@ class _StatCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 10, color: Colors.white60, fontWeight: FontWeight.w700)),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.white60,
+                              fontWeight: FontWeight.w700)),
+                    ),
+                    if (titleTrailing != null) ...[
+                      const SizedBox(width: 5),
+                      titleTrailing!,
+                    ],
+                  ],
+                ),
                 const SizedBox(height: 2),
                 Text(value,
                     maxLines: 1,

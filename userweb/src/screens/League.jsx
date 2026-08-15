@@ -4,8 +4,18 @@ import { req, fa, asset, avatarUrl } from '../lib/api.js';
 import { DisplayName } from '../components/Cosmetics.jsx';
 import { useAsync } from '../lib/useAsync.js';
 import { AsyncSection, EmptyView } from '../components/states.jsx';
+import { ASSETS } from '../components/IconAsset.jsx';
 import Clubs from './Clubs.jsx';
+import CoinChip from '../components/CoinChip.jsx';
 
+/**
+ * نشانِ سکه در ردیفِ جدول.
+ *
+ * ⚠️ جدولِ لیگ از دورِ دهم بر اساس **سکه** مرتب می‌شود و امتیاز فقط
+ *    تساوی‌شکن است. اگر فقط امتیاز را نشان می‌دادیم، کاربر ردیفی را
+ *    می‌دید که «۵۰۰ امتیاز» بالای «۹۰۰ امتیاز» نشسته و ترتیب برایش
+ *    تصادفی به نظر می‌رسید. معیارِ مرتب‌سازی باید دیده شود.
+ */
 function PodiumCard({ rank, row, onTap }) {
   const isFirst = rank === 1;
   const borderColor = isFirst ? '#FFD700' : rank === 2 ? '#CBD5E1' : '#CD7F32';
@@ -21,7 +31,8 @@ function PodiumCard({ rank, row, onTap }) {
       <div style={{ fontWeight:'700', fontSize:'12.5px', color:'#FFF', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
         <DisplayName name={row.nickname || 'کاربر'} cosmetics={row.cosmetics} level={row.level} />
       </div>
-      <div style={{ fontSize:'11.5px', color:'rgba(255,255,255,0.7)', marginTop:'2px' }}>{fa(row.points)} امتیاز</div>
+      <div style={{ fontSize:'12px', marginTop:'3px' }}><CoinChip value={row.coins} size={15} /></div>
+      <div style={{ fontSize:'10px', color:'rgba(255,255,255,0.55)' }}>{fa(row.points)} امتیاز</div>
     </div>
   );
 }
@@ -155,7 +166,11 @@ export default function League({ token, openProfile }) {
                 <span style={{ width:'36px', height:'36px', borderRadius:'50%', background:'rgba(56,189,248,0.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'18px' }}>👤</span>
                 <div>
                   <div style={{ color:'#94A3B8', fontSize:'11.5px', fontWeight:'700' }}>جایگاه شما در این دوره لیگ:</div>
-                  <div style={{ color:'#FFF', fontWeight:'900', fontSize:'14px' }}>رتبه {fa(d.myEntry.rank)} · {fa(d.myEntry.points)} امتیاز</div>
+                  <div style={{ color:'#FFF', fontWeight:'900', fontSize:'14px', display:'flex', alignItems:'center', gap:'7px', flexWrap:'wrap' }}>
+                    <span>رتبه {fa(d.myEntry.rank)}</span>
+                    <CoinChip value={d.myEntry.coins} />
+                    <span style={{ color:'#94A3B8', fontWeight:'700', fontSize:'12px' }}>{fa(d.myEntry.points)} امتیاز</span>
+                  </div>
                 </div>
               </div>
             )}
@@ -167,12 +182,15 @@ export default function League({ token, openProfile }) {
                     <span style={{ fontWeight:'bold', width:'24px', textAlign:'center', color:'#94A3B8' }}>{fa(idx+4)}</span>
                     <DisplayName name={r.nickname || 'کاربر'} cosmetics={r.cosmetics} level={r.level} />
                   </div>
-                  <span style={{ fontWeight:'bold', color:'#38BDF8' }}>{fa(r.points)} امتیاز</span>
+                  <span style={{ display:'flex', alignItems:'center', gap:'9px' }}>
+                    <CoinChip value={r.coins} />
+                    <span style={{ fontWeight:'bold', color:'#38BDF8', fontSize:'12px' }}>{fa(r.points)}</span>
+                  </span>
                 </div>
               ))}
             </div>
 
-            {entries.length===0 && <div style={{ textAlign:'center', padding:'30px', color:'#64748B' }}><div style={{ fontSize:'32px' }}>🏆</div><b>هنوز امتیازی در لیگ ثبت نشده است</b></div>}
+            {entries.length===0 && <div style={{ textAlign:'center', padding:'30px', color:'#64748B' }}><div style={{ fontSize:'32px' }}>🏆</div><b>هنوز کسی در این لیگ سکه‌ای نبرده است</b></div>}
           </section>
         );
       }}

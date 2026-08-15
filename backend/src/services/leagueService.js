@@ -262,28 +262,41 @@ async function getLeaderboard(limit = 100, seasonId = null, userId = null) {
      LIMIT 10
   `, [season.id]);
 
+  // ── رتبه‌بندی: اول سکه، بعد امتیاز ──
+  //
+  // سکه معیارِ اصلی است چون فقط از بردِ آنلاین مقابل انسان می‌آید. امتیاز
+  // به «تساوی‌شکن» تنزل پیدا می‌کند، نه بیشتر.
+  //
+  // ⚠️ ترتیبِ ORDER BY و ترتیبِ داخلِ DENSE_RANK باید **دقیقاً** یکی
+  //    باشند. اگر یکی (coins, points) باشد و دیگری فقط (points)، ردیفِ
+  //    اولِ لیست ممکن است رتبهٔ ۲ نشان بدهد — جدولی که با خودش نمی‌خواند.
   const { rows } = await pool.query(
-    `SELECT e.user_id, e.points,
+    `SELECT e.user_id, e.points, e.coins,
             u.nickname, u.first_name, u.last_name, u.profile_image_url, u.profile_avatar_key,
-            DENSE_RANK() OVER(ORDER BY e.points DESC) AS rank
+            DENSE_RANK() OVER(ORDER BY e.coins DESC, e.points DESC) AS rank
        FROM league_leaderboard_entries e
        JOIN users u ON u.id=e.user_id
       WHERE e.league_season_id=$1 AND u.status='active'
-      ORDER BY e.points DESC LIMIT $2`,
+      ORDER BY e.coins DESC, e.points DESC LIMIT $2`,
     [season.id, limit]
   );
   let myEntry = null;
   if (userId) {
     const myRow = await pool.query(
-      `SELECT sub.rank, sub.points FROM (
-         SELECT e.user_id, e.points, DENSE_RANK() OVER(ORDER BY e.points DESC) AS rank
+      `SELECT sub.rank, sub.points, sub.coins FROM (
+         SELECT e.user_id, e.points, e.coins,
+                DENSE_RANK() OVER(ORDER BY e.coins DESC, e.points DESC) AS rank
            FROM league_leaderboard_entries e
           WHERE e.league_season_id=$1
        ) sub WHERE sub.user_id=$2`,
       [season.id, userId]
     );
     if (myRow.rows[0]) {
-      myEntry = { rank: Number(myRow.rows[0].rank), points: Number(myRow.rows[0].points) };
+      myEntry = {
+        rank: Number(myRow.rows[0].rank),
+        points: Number(myRow.rows[0].points),
+        coins: Number(myRow.rows[0].coins || 0),
+      };
     }
   }
 
@@ -343,9 +356,16 @@ async function closeActiveSeason({ force = false, seasonId = null } = {}) {
     const setting = await client.query("SELECT value FROM app_settings WHERE key='league_winner_count' LIMIT 1");
     const rawWinnerCount = setting.rows[0]?.value;
     const winnerCount = Number.isFinite(Number(rawWinnerCount)) && Number(rawWinnerCount) > 0 ? Math.floor(Number(rawWinnerCount)) : Math.max(10, (season.prize_table || []).length || 10);
+    // ⚠️ همان ترتیبِ getLeaderboard — و این حیاتی است، نه سلیقه‌ای.
+    //    اگر جدولی که کاربر تمامِ فصل می‌دید بر اساس (coins, points) بود
+    //    ولی جایزه بر اساس (points) پرداخت می‌شد، نفرِ اولِ جدول جایزهٔ
+    //    نفرِ سوم را می‌گرفت. یک اختلافِ خاموش بینِ «آنچه دیده شد» و
+    //    «آنچه پرداخت شد» — بدترین نوعِ باگ در یک محصولِ جایزه‌دار.
     const { rows: leaders } = await client.query(
-      `SELECT e.user_id, e.points, DENSE_RANK() OVER(ORDER BY e.points DESC) AS rank
-       FROM league_leaderboard_entries e WHERE e.league_season_id=$1 ORDER BY e.points DESC LIMIT $2`,
+      `SELECT e.user_id, e.points, e.coins,
+              DENSE_RANK() OVER(ORDER BY e.coins DESC, e.points DESC) AS rank
+       FROM league_leaderboard_entries e WHERE e.league_season_id=$1
+       ORDER BY e.coins DESC, e.points DESC LIMIT $2`,
       [season.id, winnerCount]
     );
     // دفاع لایه‌دوم: ورودی از API حالا اعتبارسنجی می‌شود، ولی جدول‌های
@@ -392,16 +412,19 @@ async function closeActiveSeason({ force = false, seasonId = null } = {}) {
       // a season nobody will look at again. Without this row the user has no
       // way to see "I finished 3rd in Mordad and won 100,000" once the new
       // month starts — which the product explicitly wants on the profile.
+      // سکه هم بایگانی می‌شود: بعد از ریستِ فصل، تنها جایی که «۲۴۰ سکه در
+      // مرداد گرفتم» باقی می‌ماند همین ردیف است.
       await client.query(
         `INSERT INTO user_league_history
-           (user_id, season_id, month_year, rank, points, prize_amount)
-         VALUES ($1,$2,$3,$4,$5,$6)
+           (user_id, season_id, month_year, rank, points, coins, prize_amount)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)
          ON CONFLICT (user_id, season_id) DO UPDATE
            SET rank = EXCLUDED.rank,
                points = EXCLUDED.points,
+               coins = EXCLUDED.coins,
                prize_amount = EXCLUDED.prize_amount`,
         [entry.user_id, season.id, season.month_year,
-         entry.rank, entry.points, amount]);
+         entry.rank, entry.points, Number(entry.coins || 0), amount]);
 
       // PAY THE WINNER.
       //
@@ -626,6 +649,8 @@ async function approvePayouts(payoutId, adminId) {
   let paid = 0;
   let total = 0;
   let skipped = 0;
+  let coinsReset = false;
+  const affectedSeasons = new Set();
   try {
     await client.query('BEGIN');
     const { rows } = payoutId
@@ -665,7 +690,46 @@ async function approvePayouts(payoutId, adminId) {
       } else {
         skipped += 1;
       }
+      affectedSeasons.add(p.league_season_id);
     }
+
+    // ═════════════════════════════════════════════════════════════════════
+    // ریستِ شمارندهٔ سکه — اینجا، نه در closeActiveSeason
+    // ═════════════════════════════════════════════════════════════════════
+    //
+    // ── چرا بعد از تأیید و نه موقعِ بستن ──
+    //
+    // بینِ «بستنِ لیگ» و «تأییدِ مدیر» ممکن است روزها فاصله باشد. اگر سکه
+    // در لحظهٔ بستن صفر می‌شد، کاربر وارد اپ می‌شد و می‌دید سکه‌هایش
+    // ناپدید شده‌اند در حالی که هنوز جایزه‌ای نگرفته و جدولِ نهایی هم
+    // هنوز رسمی نشده. از دید او یعنی «سکه‌هام رو خوردن».
+    //
+    // ── سه شرط، و چرا هر سه لازم‌اند ──
+    //
+    //   ۱. هیچ لیگِ فعالی نمانده باشد — وگرنه بستنِ یک لیگِ کوتاه،
+    //      سکهٔ بازیکنانِ لیگِ بلندترِ در حالِ اجرا را وسطِ مسابقه صفر
+    //      می‌کند. (همان باگی که برای monthly_league_points رخ داد.)
+    //   ۲. هیچ جایزهٔ تأییدنشده‌ای نمانده باشد — تأییدِ تک‌جایزه نباید
+    //      شمارندهٔ همه را صفر کند در حالی که بقیه هنوز منتظرند.
+    //   ۳. واقعاً چیزی تأیید شده باشد (`paid > 0`) — یک فراخوانیِ بی‌اثر
+    //      نباید عوارضِ سراسری داشته باشد.
+    //
+    // ⚠️ فقط `users.coins` (شمارندهٔ نمایشی) صفر می‌شود.
+    //    `league_leaderboard_entries.coins` و `user_league_history.coins`
+    //    دست‌نخورده می‌مانند — آن‌ها تاریخ‌اند و تاریخ پاک نمی‌شود.
+    if (paid > 0 && affectedSeasons.size) {
+      const { rows: stillActive } = await client.query(
+        "SELECT 1 FROM league_seasons WHERE status='active' LIMIT 1");
+      const { rows: stillPending } = await client.query(
+        `SELECT 1 FROM league_payouts
+          WHERE paid_at IS NULL AND amount > 0 LIMIT 1`);
+      if (!stillActive.length && !stillPending.length) {
+        await client.query(
+          'UPDATE users SET coins=0, updated_at=NOW() WHERE coins > 0');
+        coinsReset = true;
+      }
+    }
+
     await client.query('COMMIT');
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {});
@@ -684,7 +748,7 @@ async function approvePayouts(payoutId, adminId) {
       + 'تومان به کیف پول شما واریز شد.',
     ).catch((e) => console.error('[league] payout notify failed:', e.message));
   }
-  return { paid, amount: total, skipped };
+  return { paid, amount: total, skipped, coinsReset };
 }
 
 module.exports = {

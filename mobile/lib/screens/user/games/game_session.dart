@@ -54,6 +54,15 @@ class GameSession extends ChangeNotifier {
   int stakePayoutSequence = 0;
   String? _announcedPayoutMatchId;
 
+  /// سکهٔ لیگ که در این مسابقه اعطا شد و نمادِ (X/O) برنده‌ای که گرفتش.
+  ///
+  /// سرور `coins` را در `game:settlement` برای **هر دو** بازیکن می‌فرستد،
+  /// پس بازنده هم می‌بیند حریفش چه بُرد — همان چیزی که وب نشان می‌دهد.
+  /// وقتی صفر است هیچ چیزی رسم نمی‌شود: «۰ سکه» به کاربر می‌گوید چیزی
+  /// خراب است، در حالی که فقط سهمیه تمام شده یا لیگی فعال نبوده.
+  int coinsAwarded = 0;
+  String? coinsWinner;
+
   bool rematchAvailable = false;
   bool rematchWaiting = false;
   String? connectionNotice;
@@ -272,6 +281,8 @@ class GameSession extends ChangeNotifier {
       stakeWinnerBalanceAfter = null;
       stakePayoutSequence = 0;
       _announcedPayoutMatchId = null;
+      coinsAwarded = 0;
+      coinsWinner = null;
       rematchAvailable = false;
       rematchWaiting = false;
       connectionNotice = null;
@@ -384,6 +395,13 @@ class GameSession extends ChangeNotifier {
       }
       settlementStatus = '${m['status'] ?? settlementStatus}';
       netPot = (m['netPot'] as num?)?.toInt() ?? netPot;
+      // فقط وقتی سکه‌ای واقعاً داده شده state را دست می‌زنیم؛ رویدادِ
+      // بدونِ سکه نباید نشانِ قبلی را پاک کند یا نشانِ صفر بسازد.
+      final coins = (m['coins'] as num?)?.toInt() ?? 0;
+      if (coins > 0) {
+        coinsAwarded = coins;
+        coinsWinner = '${m['winner'] ?? ''}';
+      }
       notifyListeners();
 
       final payoutMatchId = '${m['matchId'] ?? matchId ?? ''}';

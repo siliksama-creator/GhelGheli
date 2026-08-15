@@ -8,6 +8,8 @@ import TapGame from './tapGame.jsx';
 import CardDuelWeb from './cardDuelGame.jsx';
 import { useGameSession } from './gameSession.js';
 import { CosmeticAvatarFrame, LevelBadge, DisplayName } from './components/Cosmetics.jsx';
+import CoinAward from './components/CoinAward.jsx';
+import { ASSETS } from './components/IconAsset.jsx';
 import { fa, asset, avatarUrl, req } from './lib/api.js';
 import './growth.css';
 
@@ -30,6 +32,9 @@ function tierLabel(level){
 export default function Games({ api, token, externalLaunch = null }) {
   const [active, setActive] = useState(null);
   const [mode, setMode] = useState(100);
+  // سهمیهٔ سکهٔ امروز از /api/bootstrap. تا وقتی نیامده `null` است و
+  // چیزی رسم نمی‌شود — بهتر از رسمِ «۰ باقی‌مانده» که دروغ است.
+  const [coinQuota, setCoinQuota] = useState(null);
   const [customStake, setCustomStake] = useState(500);
   const [customGame, setCustomGame] = useState('penalty');
   const [customPass, setCustomPass] = useState('');
@@ -126,6 +131,7 @@ export default function Games({ api, token, externalLaunch = null }) {
   useEffect(() => {
     req('/api/bootstrap', 'GET', null, token).then(d => {
       if (d?.user) setUser({ ...d.user, cosmetics: d.cosmetics || {} });
+      if (d?.coinQuota) setCoinQuota(d.coinQuota);
     }).catch(() => {});
     req('/api/level', 'GET', null, token).then(d => {
       if (d) setLevel(d);
@@ -325,6 +331,20 @@ export default function Games({ api, token, externalLaunch = null }) {
               : `باخت: −${fa(mode)} · برد: پات پس از ۱۰٪ کارمزد.`}</small>
         </div>
       </div>
+
+      {/* ── سهمیهٔ سکهٔ امروز ──
+          سکه فقط به برنده می‌رسد و روزانه سقف دارد. بدون این خط، کاربری
+          که سقفش پر شده می‌بُرد و سکه‌ای نمی‌گرفت و فکر می‌کرد باگ است.
+          فقط در حالت شرط‌دار نشان داده می‌شود (نه تمرین، نه لابی) و فقط
+          وقتی سرور واقعاً سهمیه‌ای برگردانده. یک خط، بدون شلوغی. */}
+      {mode > 0 && coinQuota?.remaining && (
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'6px', margin:'-4px 0 10px', fontSize:'11px', color: coinQuota.remaining[mode] > 0 ? '#94A3B8' : '#F59E0B' }}>
+          <img src={ASSETS.coin} alt="" width={14} height={14} style={{ display:'block', opacity: coinQuota.remaining[mode] > 0 ? 1 : 0.5 }} />
+          {coinQuota.remaining[mode] > 0
+            ? <span>امروز <b style={{ color:'#FFD166' }}>{fa(coinQuota.remaining[mode])}</b> برد دیگر سکه می‌دهد</span>
+            : <span>سهمیهٔ سکهٔ امروزِ این ورودی پر شده — برد امتیاز دارد، سکه نه</span>}
+        </div>
+      )}
 
       {/* Mode Content */}
       {mode === -1 ? (
@@ -699,6 +719,11 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
           <h2 style={{ color: g.winner === g.me ? '#22E7A6' : '#FFF', fontWeight: '900', margin: 0 }}>
             {g.winner === 'DRAW' ? 'مسابقه مساوی شد!' : (g.winner === g.me ? 'تبریک! شما برنده شدید' : 'متاسفانه باختید!')}
           </h2>
+          {/* سکهٔ لیگ. `coinsWinner` نمادِ برنده است (X/O) و با `g.me`
+              مقایسه می‌شود، نه با `g.winner` — چون در قطعِ ارتباط،
+              `g.winner` می‌تواند DISCONNECT باشد در حالی که تسویه واقعاً
+              یک برنده داشته. مقایسه با نمادِ خودِ تسویه همیشه درست است. */}
+          <CoinAward amount={g.coinsAwarded} mine={g.coinsWinner === g.me} />
           <div style={{ display:'flex',gap:8,flexWrap:'wrap',justifyContent:'center' }}>
             <button type="button" disabled={rematchWaiting || !g.rematchAvailable} onClick={rematch}
               style={{ background:'linear-gradient(135deg,#22E7A6,#38BDF8)',color:'#03121f',border:0,padding:'12px 20px',borderRadius:16,fontWeight:900 }}>

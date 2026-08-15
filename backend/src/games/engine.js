@@ -74,6 +74,10 @@ const infoOf = u => ({
   profileImageUrl: u.profile_image_url || null,
   profileAvatarKey: u.profile_avatar_key || null,
   lifetimePoints: Number(u.lifetime_points || 0),
+  // سکهٔ فصلِ جاری — تا حریف با یک تاچ روی نوارِ بالای بازی ببیند طرفِ
+  // مقابلش چقدر سکه دارد. مثل level از همان ردیفِ کاربرِ سوکت می‌آید و
+  // هیچ کوئریِ اضافه‌ای نمی‌سازد.
+  coins: Number(u.coins || 0),
   // Server-resolved entitlements: clients may animate these slugs but cannot
   // claim an unowned effect by mutating their local payload.
   cosmetics: u.cosmetics || null,
@@ -462,6 +466,11 @@ function finish(room, winner, disconnectedSym = null) {
               commission: result.commission || room.commission || 0,
               payout: !result.duplicate && !draw,
               balanceAfter: sym === winnerSym ? result.winnerBalanceAfter : null,
+              // سکهٔ این مسابقه — هر دو کلاینت می‌گیرند تا انیمیشنِ پروازِ
+              // سکه به سمتِ برنده را نشان دهند، نه فقط خودِ برنده.
+              // صفر یعنی این مسابقه سکه نداشت (سهمیهٔ برنده پر بود یا
+              // لیگِ فعالی نبود) و کلاینت باید انیمیشن را رد کند.
+              coins: Number(result.coinsAwarded || 0),
             }, room);
           }
           if (result.duplicate) return;
@@ -479,6 +488,7 @@ function finish(room, winner, disconnectedSym = null) {
               netPot: result.netPot,
               stake: result.stake,
               commission: result.commission,
+              coins: Number(result.coinsAwarded || 0),
             }, room);
           }
         })

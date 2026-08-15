@@ -174,6 +174,10 @@ DELETE FROM point_transactions;
 DELETE FROM login_streaks;
 DELETE FROM league_payouts;
 DELETE FROM league_leaderboard_entries;
+-- ⚠️ سهمیهٔ سکه (مایگریشن ۰۶۶). گاردِ testShopAssets.js همین را گرفت:
+-- جدولِ تازه اضافه شد و ابزار نمی‌شناختش. بدونِ این خط، سهمیهٔ روزِ
+-- کاربرانِ حذف‌شده باقی می‌ماند و بی‌معنا جدول را پر می‌کند.
+DELETE FROM user_coin_quota;
 
 -- ── ۳) کاربران، بجز حسابِ اصلیِ مدیر ──
 DELETE FROM users WHERE mobile <> '{ADMIN_MOBILE}';

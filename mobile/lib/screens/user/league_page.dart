@@ -12,6 +12,7 @@ import '../../widgets/app_card.dart';
 import '../../widgets/state_views.dart';
 import '../shared/public_profile_sheet.dart';
 import '../shared/rank_tile.dart';
+import '../../widgets/coin_chip.dart';
 import 'clubs_page.dart';
 
 /// Monthly league leaderboard: podium (top 3) + ranked list, refreshed
@@ -283,11 +284,12 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
                                       fontSize: 12.5,
                                       color: theme.colorScheme.onSurface),
                                 ),
-                                const SizedBox(height: 2),
+                                const SizedBox(height: 3),
+                                CoinChip(value: r['coins'], size: 15),
                                 Text(
                                   '${faNum(r['points'])} امتیاز',
                                   style: TextStyle(
-                                      fontSize: 11.5,
+                                      fontSize: 10,
                                       color: theme.colorScheme.onSurfaceVariant),
                                 ),
                               ],
@@ -304,6 +306,7 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
                     final myEntry = _data?['myEntry'] as Map?;
                     final rankNum = myEntry?['rank'] ?? 1;
                     final pts = myEntry?['points'] ?? (_data?['season']?['current_points'] ?? 0);
+                    final myCoins = myEntry?['coins'] ?? 0;
                     return Container(
                       margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -340,9 +343,20 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
                                   style: TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8), fontWeight: FontWeight.w700),
                                 ),
                                 const SizedBox(height: 2),
-                                Text(
-                                  'رتبه ${faNum(rankNum)} · ${faNum(pts)} امتیاز',
-                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.white),
+                                Wrap(
+                                  spacing: 7,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    Text(
+                                      'رتبه ${faNum(rankNum)}',
+                                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.white),
+                                    ),
+                                    CoinChip(value: myCoins),
+                                    Text(
+                                      '${faNum(pts)} امتیاز',
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8)),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -369,7 +383,7 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
                   const AppCard(
                       child: EmptyState(
                           icon: Icons.emoji_events_outlined,
-                          title: 'هنوز امتیازی در لیگ ثبت نشده است')),
+                          title: 'هنوز کسی در این لیگ سکه‌ای نبرده است')),
               ],
             ),
           ),

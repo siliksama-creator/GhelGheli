@@ -16,6 +16,9 @@ export const ASSETS = {
   spins: '/pass/icon_spins.png',
   item: '/pass/icon_item.png',
   medal: '/pass/icon_points.png',
+  // سکهٔ لیگ — همان فایلی که اندروید در assets/pass/icon_coin.png دارد،
+  // تا نشانِ سکه در دو پلتفرم دقیقاً یکی دیده شود.
+  coin: '/pass/icon_coin.png',
 };
 
 export function AssetIcon({ name, alt = '', className = '', size = 28 }) {

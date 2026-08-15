@@ -7,6 +7,7 @@ import { CosmeticAvatarFrame, CosmeticFrame, DisplayName } from './components/Co
 import PlayerCard from './components/PlayerCard.jsx';
 import { cardIdOf, cardPowerOf } from './lib/cards.js';
 import { matchTension, matchVerdictForViewer, resultMvp, roundEffectBonus, roundForViewer } from './lib/cardDuelLogic.js';
+import CoinAward from './components/CoinAward.jsx';
 
 const idOf = card => cardIdOf(card);
 const num = value => Number(value || 0);
@@ -858,6 +859,9 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
                   : `−${fa(session.g.stake || stake)} امتیاز`}
           </div>
         )}
+        {/* سکهٔ لیگ — زیرِ خطِ تسویه، جایی که چشم بعد از دیدنِ امتیاز
+            می‌رود. `resultMine` نمادِ خودِ کاربر در این مسابقه است. */}
+        <CoinAward amount={session.g.coinsAwarded} mine={session.g.coinsWinner === resultMine} />
         <small className="duelMvpLine">MVP • {resultMvp(session.g.state)?.name || 'ستاره آرنا'}</small>
         <RoundTimeline history={session.g.state?.history || []} mine={resultMine} opponentRole={resultOpponentRole} />
         <button className="duelShareButton" type="button" onClick={shareResult} disabled={sharing}>

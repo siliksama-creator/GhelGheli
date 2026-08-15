@@ -9,6 +9,7 @@ import { clubImg, CosmeticAvatarFrame, DisplayName, profileBackgroundClass, prof
 import { useAsync } from '../lib/useAsync.js';
 import { LoadingView, ErrorView } from '../components/states.jsx';
 import { SvgIcon } from '../components/IconAsset.jsx';
+import CoinChip from '../components/CoinChip.jsx';
 
 const medal = r => (r === 1 ? '🥇' : r === 2 ? '🥈' : r === 3 ? '🥉' : '');
 
@@ -82,7 +83,15 @@ export default function PublicProfile({ token, userId, close }) {
 
             {/* ── Key Stats 4-Grid ── */}
             <div className="ppStats" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', margin: '14px 0' }}>
-              <div><b>{`رتبه ${fa(u.currentLeagueRank || u.bestRank || 1)}`}</b><span>رتبه لیگ این ماه</span></div>
+              {/* رتبه با «سکه» تعیین می‌شود، نه امتیاز — پس همان عددی که
+                  رتبه را می‌سازد باید کنارش دیده شود، وگرنه کاربر رتبه‌اش را
+                  با مجموعِ امتیازش مقایسه می‌کند و به تناقض می‌رسد. */}
+              <div>
+                <b>{`رتبه ${fa(u.currentLeagueRank || u.bestRank || 1)}`}</b>
+                <span style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'4px' }}>
+                  <CoinChip value={u.coins} size={11} /> سکه فصل
+                </span>
+              </div>
               <div><b>{fa(u.lifetime_points)}</b><span>مجموع امتیازات کل</span></div>
               <div><b>{fa(u.totalPrizeAmount || 0)} تومان</b><span>جوایز نقدی کسب‌شده</span></div>
               <div><b>{fa((u.trophies?.length || 0) + (u.rewards?.length || 0))} جایزه</b><span>کل جوایز و تندیس‌ها</span></div>

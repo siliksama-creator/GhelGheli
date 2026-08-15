@@ -131,6 +131,11 @@ jobs:
       - run: npm install
       - run: npm run test:game-parity
       - run: npm run test:card-duel
+      # These two read `mobile/` and `backend/` as well as `userweb/`, so they
+      # only work on a full checkout -- they are the guards that catch a change
+      # landing on one client and not the other.
+      - run: npm run test:feedback-parity
+      - run: npm run test:coin-parity
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - name: Serve the built app

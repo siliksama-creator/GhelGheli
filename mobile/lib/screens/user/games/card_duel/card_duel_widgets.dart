@@ -1795,6 +1795,16 @@ class _Finale extends StatelessWidget {
                   style: const TextStyle(fontSize: 12, color: Colors.white60),
                 ),
               ],
+              // سکهٔ لیگ — درست زیرِ خطِ تسویه، جایی که چشم بعد از دیدنِ
+              // امتیاز می‌رود. `coinsWinner` نمادِ برندهٔ خودِ تسویه است،
+              // که حتی وقتی مسابقه با قطعِ ارتباط تمام شده هم درست است.
+              if (session.coinsAwarded > 0) ...[
+                Gaps.vXs,
+                CoinAward(
+                  amount: session.coinsAwarded,
+                  mine: session.coinsWinner == me,
+                ),
+              ],
               Gaps.vSm,
               if (history.isNotEmpty)
                 _RoundPips(
