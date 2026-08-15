@@ -7,9 +7,9 @@ import { AsyncSection } from '../components/states.jsx';
 import { AssetIcon, SvgIcon, UiIcon } from '../components/IconAsset.jsx';
 
 const ART = {
-  points: '/icon_points.png',
-  spins: '/icon_spins.png',
-  shop_item: '/icon_item.png',
+  points: '/icon_points.webp',
+  spins: '/icon_spins.webp',
+  shop_item: '/icon_item.webp',
 };
 
 function rewardText(r) {

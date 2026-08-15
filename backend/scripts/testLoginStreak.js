@@ -72,7 +72,7 @@ console.log('\n== اندروید: ظاهر و رفتار ۲۰۲۶ ==');
 {
   ok(fs.existsSync(path.join(root, 'mobile/assets/pass/streak_hero.webp')),
     'تصویر جدید streak_hero.webp داخل assets اندروید وجود دارد');
-  ok(fs.existsSync(path.join(root, 'mobile/assets/pass/cta_spark.png')),
+  ok(fs.existsSync(path.join(root, 'mobile/assets/pass/cta_spark.webp')),
     'آیکون شفاف CTA برای دکمهٔ دریافت داخل assets اندروید وجود دارد');
   ok(/SingleTickerProviderStateMixin/.test(mobileCard) && /AnimationController/.test(mobileCard),
     'کارت اندروید انیمیشن دائمی سبک دارد');
@@ -80,7 +80,7 @@ console.log('\n== اندروید: ظاهر و رفتار ۲۰۲۶ ==');
     'ذرات و گلوهای پس‌زمینه با painter ارزان کشیده می‌شوند');
   ok(/assets\/pass\/streak_hero\.webp/.test(mobileCard),
     'کارت اندروید از تصویر قهرمان جدید استفاده می‌کند');
-  ok(/assets\/pass\/cta_spark\.png/.test(mobileCard),
+  ok(/assets\/pass\/cta_spark\.webp/.test(mobileCard),
     'دکمهٔ دریافت اندروید از آیکون شفاف اختصاصی استفاده می‌کند');
   ok(/initialData/.test(mobileCard) && /onClaimed/.test(mobileCard),
     'کارت اندروید با bootstrap شروع می‌شود و بعد از claim امتیاز هدر را تازه می‌کند');
@@ -103,12 +103,12 @@ console.log('\n== وب: هم‌تراز با اندروید ==');
 {
   ok(fs.existsSync(path.join(root, 'userweb/public/pass/streak_hero.webp')),
     'تصویر جدید برای وب هم منتشر می‌شود');
-  ok(fs.existsSync(path.join(root, 'userweb/public/pass/cta_spark.png')),
+  ok(fs.existsSync(path.join(root, 'userweb/public/pass/cta_spark.webp')),
     'آیکون شفاف CTA برای وب هم منتشر می‌شود');
   ok(/initialData/.test(webCard) && /onClaimed/.test(webCard),
     'کارت وب با bootstrap شروع می‌شود و بعد از claim reload می‌کند');
   ok(/streak_hero\.webp/.test(webCard), 'کارت وب از تصویر قهرمان جدید استفاده می‌کند');
-  ok(/cta_spark\.png/.test(webCard), 'دکمهٔ دریافت وب از آیکون شفاف CTA استفاده می‌کند');
+  ok(/cta_spark\.webp/.test(webCard), 'دکمهٔ دریافت وب از آیکون شفاف CTA استفاده می‌کند');
   ok(/loginStreak:\s*boot\.loginStreak/.test(webMain),
     'وب loginStreak را در state بوت‌استرپ نگه می‌دارد');
   ok(/initialData=\{p\.loginStreak\}/.test(webHome) && /onClaimed=\{load\}/.test(webHome),

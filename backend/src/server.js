@@ -2187,7 +2187,9 @@ app.get('/api/admin/metrics', adminAuth, asyncHandler(async (req, res) => {
 
   res.json({
     socketCount: io.engine.clientsCount || 0,
-    onlineUsers: presence.onlineUsers(),
+    // onlineUsers ناهمگام است چون در حالت خوشه‌ای باید از ردیس بخواند.
+    // بدون await یک Promise به JSON می‌رفت و در پنل «{}» دیده می‌شد.
+    onlineUsers: await presence.onlineUsers(),
     activeRooms: attachGames.rooms ? attachGames.rooms.size : 0,
     postgresConnections: {
       total: pool.totalCount,
@@ -2663,4 +2665,29 @@ process.on('uncaughtException', (err) => {
 });
 
 const port = process.env.PORT || 4000;
-server.listen(port, async () => { await ensureActiveSeason(); console.log(`GhelGheli API on :${port}`); });
+// ── آمادگی خوشه‌ای ────────────────────────────────────────────────────
+//
+// اگر REDIS_URL تنظیم باشد، آداپتور ردیس وصل می‌شود تا رویدادهای
+// socket.io بین چند پروسه پخش شوند. اگر نباشد، هیچ اتفاقی نمی‌افتد و اپ
+// دقیقاً مثل همیشه تک‌پروسه بالا می‌آید.
+//
+// ⚠️ توجه: وصل شدن آداپتور به‌تنهایی اجازهٔ cluster نمی‌دهد. مسابقه‌های
+//    زنده هنوز در حافظهٔ یک پروسه‌اند (games/engine.js). شرح کامل در
+//    docs/scaling-fa.md — بخش «چه چیزی هنوز مانع است».
+const { attachRedisAdapter } = require('./lib/socketCluster');
+
+server.listen(port, async () => {
+  await attachRedisAdapter(io).catch(e => {
+    console.error('[cluster] اتصال آداپتور ناموفق بود، تک‌پروسه ادامه می‌دهیم:', e.message);
+  });
+  await ensureActiveSeason();
+  console.log(`GhelGheli API on :${port}`);
+});
+
+// خاموشی تمیز: ردپای حضور این پروسه از ردیس پاک شود تا کاربران برای
+// دو دقیقه «آنلاینِ روح» نمانند.
+for (const sig of ['SIGTERM', 'SIGINT']) {
+  process.on(sig, () => {
+    presence.drain().catch(() => {}).finally(() => process.exit(0));
+  });
+}

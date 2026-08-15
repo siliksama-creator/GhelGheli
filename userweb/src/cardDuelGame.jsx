@@ -769,7 +769,7 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
     ) : (
       <header className="duelHeroV2">
         <button type="button" className="ghost" onClick={() => { session.leave(); onBack(); }}>← بازگشت</button>
-        <div className="duelHeroIcon"><img src="/games/card_duel_glow.png" alt="" /></div>
+        <div className="duelHeroIcon"><img src="/games/card_duel_glow.webp" alt="" /></div>
         <div><h1>دوئل کارت‌ها</h1></div>
         <aside><span>{mode.icon}</span><b>{mode.title}</b><small>{mode.subtitle}</small></aside>
       </header>
@@ -832,7 +832,7 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
     </>}
 
     {enabled && session.phase === 'waiting' && <section className="duelMatchmaking card">
-      <div className="duelRadar"><img src="/games/card_duel_glow.png" alt="" /></div>
+      <div className="duelRadar"><img src="/games/card_duel_glow.webp" alt="" /></div>
       <h2>{vsBot ? 'آماده‌سازی ربات…' : 'جستجوی حریف…'}</h2>
       <button type="button" onClick={() => { session.leave(); setEnabled(false); }}>لغو و ویرایش ترکیب</button>
     </section>}

@@ -117,7 +117,7 @@ export default function LoginStreak({ token, initialData, setMsg, onClaimed }) {
           disabled={busy || data.claimedToday}
           onClick={claim}
         >
-          {!busy && !data.claimedToday && <img src="/pass/cta_spark.png" alt="" />}
+          {!busy && !data.claimedToday && <img src="/pass/cta_spark.webp" alt="" />}
           <span>{busy ? 'در حال ثبت...' : data.claimedToday ? 'دریافت شد' : 'دریافت امروز'}</span>
         </button>
       </div>

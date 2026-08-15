@@ -131,7 +131,7 @@ export default function Home({ token, p, rewards, load, setMsg, openProfile, ope
           <small style={{ color:'#84CC16', fontSize:'10px', fontWeight:'700' }}>دوستان</small>
         </button>
         <button onClick={openInventory} style={{ background:'linear-gradient(135deg, #38BDF822, #38BDF80A)', border:'1px solid #38BDF855', borderRadius:'16px', padding:'12px 6px', display:'flex', flexDirection:'column', alignItems:'center', gap:'6px', cursor:'pointer', boxShadow:'0 4px 12px #38BDF822' }}>
-          <span style={{ width:'40px', height:'40px', borderRadius:'50%', background:'#38BDF822', display:'flex', alignItems:'center', justifyContent:'center' }}><img src="/games/card_duel_glow.png" alt="" width="30" height="30" style={{ objectFit:'contain' }} /></span>
+          <span style={{ width:'40px', height:'40px', borderRadius:'50%', background:'#38BDF822', display:'flex', alignItems:'center', justifyContent:'center' }}><img src="/games/card_duel_glow.webp" alt="" width="30" height="30" style={{ objectFit:'contain' }} /></span>
           <b style={{ color:'#FFF', fontSize:'12px', fontWeight:'900' }}>کلکسیون</b>
           <small style={{ color:'#38BDF8', fontSize:'10px', fontWeight:'700' }}>{fa(inventory.length)} نوع</small>
         </button>

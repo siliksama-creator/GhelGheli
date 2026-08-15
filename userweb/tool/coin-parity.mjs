@@ -173,13 +173,13 @@ ok('هر دو کلاینت یک کامپوننتِ مشترکِ چیپ دارن�
 // ── اسِتِ آیکون ────────────────────────────────────────────────────────────
 console.log('\n== آیکونِ مشترک ==');
 ok('وب کلیدِ coin را در ASSETS دارد',
-  /coin:\s*'\/pass\/icon_coin\.png'/.test(web.icons));
-for (const p of ['userweb/public/pass/icon_coin.png', 'mobile/assets/pass/icon_coin.png']) {
+  /coin:\s*'\/pass\/icon_coin\.webp'/.test(web.icons));
+for (const p of ['userweb/public/pass/icon_coin.webp', 'mobile/assets/pass/icon_coin.webp']) {
   ok(`فایلِ ${p} موجود است`, fs.existsSync(path.join(root, p)));
 }
 ok('هر دو کلاینت دقیقاً یک فایلِ آیکون دارند (بایت‌به‌بایت یکسان)',
-  fs.readFileSync(path.join(root, 'userweb/public/pass/icon_coin.png'))
-    .equals(fs.readFileSync(path.join(root, 'mobile/assets/pass/icon_coin.png'))));
+  fs.readFileSync(path.join(root, 'userweb/public/pass/icon_coin.webp'))
+    .equals(fs.readFileSync(path.join(root, 'mobile/assets/pass/icon_coin.webp'))));
 
 // ── خوانایی ────────────────────────────────────────────────────────────────
 //
@@ -209,7 +209,7 @@ ok('فونتِ نشانِ جایزه در هر دو کلاینت یکی است',
 // ⚠️ به آیکون لنگر بزن، نه به اولین `width`. نسخهٔ اولِ همین گارد
 // `width: 1` از `Border.all` را می‌خواند و ۱ را با ۲۴ می‌سنجید.
 const awardIconWeb = num(web.award, /ASSETS\.coin[\s\S]{0,80}?width=\{(\d+)\}/);
-const awardIconAnd = num(android.award, /icon_coin\.png'[\s\S]{0,80}?width:\s*(\d+)/);
+const awardIconAnd = num(android.award, /icon_coin\.webp'[\s\S]{0,80}?width:\s*(\d+)/);
 ok(`آیکونِ جایزه در وب دستِ‌کم ۲۴px است (${awardIconWeb})`, awardIconWeb >= 24);
 ok(`آیکونِ جایزه در اندروید دستِ‌کم ۲۴ است (${awardIconAnd})`, awardIconAnd >= 24);
 

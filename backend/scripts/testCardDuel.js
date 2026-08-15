@@ -146,6 +146,6 @@ ok(/در صورت باخت|باخت:/.test(mobileHub) && /در صورت باخت
   'ریسک کسر امتیاز قبل از ورود در هر دو کلاینت روشن است');
 ok(/بچرخون/.test(mobileWheel) && !/بچرخان/.test(mobileWheel), 'Android: متن دکمه گردونه «بچرخون» است');
 ok(/بچرخون/.test(webWheel) && !/بچرخان/.test(webWheel), 'Web: متن دکمه گردونه «بچرخون» است');
-ok(fs.existsSync(path.join(root, 'mobile/assets/games/card_duel_glow.png')), 'آیکون شفاف آرنای کارت حفظ شده است');
+ok(fs.existsSync(path.join(root, 'mobile/assets/games/card_duel_glow.webp')), 'آیکون شفاف آرنای کارت حفظ شده است');
 
 console.log(`\n✅ ${pass} تست دوئل کارت موفق بود\n`);

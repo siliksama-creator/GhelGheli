@@ -12,13 +12,13 @@ export const ASSETS = {
   wheel: '/pass/wheel_icon.webp',
   football: '/pass/football_icon.webp',
   glove: '/pass/glove_icon.webp',
-  points: '/pass/icon_points.png',
-  spins: '/pass/icon_spins.png',
-  item: '/pass/icon_item.png',
-  medal: '/pass/icon_points.png',
-  // سکهٔ لیگ — همان فایلی که اندروید در assets/pass/icon_coin.png دارد،
+  points: '/pass/icon_points.webp',
+  spins: '/pass/icon_spins.webp',
+  item: '/pass/icon_item.webp',
+  medal: '/pass/icon_points.webp',
+  // سکهٔ لیگ — همان فایلی که اندروید در assets/pass/icon_coin.webp دارد،
   // تا نشانِ سکه در دو پلتفرم دقیقاً یکی دیده شود.
-  coin: '/pass/icon_coin.png',
+  coin: '/pass/icon_coin.webp',
 };
 
 export function AssetIcon({ name, alt = '', className = '', size = 28 }) {
