@@ -139,12 +139,15 @@ ok('وب: ردیف‌های جدول سکه دارند',
   /CoinChip value=\{r\.coins\}/.test(web.league));
 ok('وب: کارتِ «جایگاه شما» سکه دارد',
   /CoinChip value=\{d\.myEntry\.coins\}/.test(web.league));
+// ⚠️ `\(\s*` عمدی است: `dart format` وقتی آرگومانِ `size` اضافه شد سازنده را
+// چندخطی کرد و regexِ چسبیده به `CoinChip(value:` شکست — در حالی که کد کاملاً
+// درست بود. گارد نباید به سلیقهٔ فرمت‌کننده حساس باشد.
 ok('اندروید: پودیوم سکه دارد',
-  /CoinChip\(value:\s*r\['coins'\]/.test(android.league));
+  /CoinChip\(\s*value:\s*r\['coins'\]/.test(android.league));
 ok('اندروید: ردیف‌های جدول سکه دارند',
-  /CoinChip\(value:\s*row\['coins'\]/.test(android.tile));
+  /CoinChip\(\s*value:\s*row\['coins'\]/.test(android.tile));
 ok('اندروید: کارتِ «جایگاه شما» سکه دارد',
-  /CoinChip\(value:\s*myCoins\)/.test(android.league));
+  /CoinChip\(\s*value:\s*myCoins/.test(android.league));
 
 // ── مقاومت در برابر دادهٔ ناجور ────────────────────────────────────────────
 //
@@ -177,5 +180,73 @@ for (const p of ['userweb/public/pass/icon_coin.png', 'mobile/assets/pass/icon_c
 ok('هر دو کلاینت دقیقاً یک فایلِ آیکون دارند (بایت‌به‌بایت یکسان)',
   fs.readFileSync(path.join(root, 'userweb/public/pass/icon_coin.png'))
     .equals(fs.readFileSync(path.join(root, 'mobile/assets/pass/icon_coin.png'))));
+
+// ── خوانایی ────────────────────────────────────────────────────────────────
+//
+// نسخهٔ اولِ سکه با آیکونِ ۱۴px و فونتِ ۱۱px منتشر شد و اولین بازخوردِ کاربر
+// این بود که «آیکون دیده نمی‌شود و چشم فونت را نمی‌خواند». اینها حداقل‌هایی
+// هستند که آن حالت را برنمی‌گردانند. عددها سقف ندارند — فقط کف.
+console.log('\n== خوانایی ==');
+
+/** اولین عددِ پس از `label` در متن. */
+function num(src, re) {
+  const m = src.match(re);
+  return m ? parseFloat(m[1]) : NaN;
+}
+
+const chipWeb = num(web.chip, /size\s*=\s*(\d+(?:\.\d+)?)/);
+const chipAnd = num(android.chip, /this\.size\s*=\s*(\d+(?:\.\d+)?)/);
+ok(`چیپِ وب پیش‌فرض دستِ‌کم ۲۰px است (${chipWeb})`, chipWeb >= 20);
+ok(`چیپِ اندروید پیش‌فرض دستِ‌کم ۲۰ است (${chipAnd})`, chipAnd >= 20);
+ok('پیش‌فرضِ چیپ در هر دو کلاینت یکی است', chipWeb === chipAnd);
+
+const awardWeb = num(web.award, /fontSize:\s*'(\d+(?:\.\d+)?)px'/);
+const awardAnd = num(android.award, /fontSize:\s*(\d+(?:\.\d+)?)/);
+ok(`فونتِ نشانِ جایزه در وب دستِ‌کم ۱۵px است (${awardWeb})`, awardWeb >= 15);
+ok(`فونتِ نشانِ جایزه در اندروید دستِ‌کم ۱۵ است (${awardAnd})`, awardAnd >= 15);
+ok('فونتِ نشانِ جایزه در هر دو کلاینت یکی است', awardWeb === awardAnd);
+
+// ⚠️ به آیکون لنگر بزن، نه به اولین `width`. نسخهٔ اولِ همین گارد
+// `width: 1` از `Border.all` را می‌خواند و ۱ را با ۲۴ می‌سنجید.
+const awardIconWeb = num(web.award, /ASSETS\.coin[\s\S]{0,80}?width=\{(\d+)\}/);
+const awardIconAnd = num(android.award, /icon_coin\.png'[\s\S]{0,80}?width:\s*(\d+)/);
+ok(`آیکونِ جایزه در وب دستِ‌کم ۲۴px است (${awardIconWeb})`, awardIconWeb >= 24);
+ok(`آیکونِ جایزه در اندروید دستِ‌کم ۲۴ است (${awardIconAnd})`, awardIconAnd >= 24);
+
+// خطِ سهمیه: کوچک‌ترین متنِ کلِ جریانِ سکه بود (۱۱px).
+// از خودِ شرطِ نمایش لنگر می‌گیریم تا اگر بلوک جابه‌جا شد گارد ساکت نشود.
+const quotaWeb = num(web.games, /coinQuota\?\.remaining &&[\s\S]{0,200}?fontSize:\s*'(\d+(?:\.\d+)?)px'/);
+const quotaAnd = num(read('mobile/lib/widgets/coin_quota_line.dart'), /fontSize:\s*(\d+(?:\.\d+)?)/);
+ok('لنگرِ خطِ سهمیهٔ وب پیدا شد', Number.isFinite(quotaWeb));
+ok(`خطِ سهمیه در وب دستِ‌کم ۱۳px است (${quotaWeb})`, quotaWeb >= 13);
+ok(`خطِ سهمیه در اندروید دستِ‌کم ۱۳ است (${quotaAnd})`, quotaAnd >= 13);
+
+// ── راهنمای «سکه چیست» ─────────────────────────────────────────────────────
+//
+// بدونِ این کارت، کاربر می‌بیند رتبه‌اش با عددی تعیین می‌شود که هیچ‌جا
+// توضیح داده نشده. هر دو کلاینت باید همان جدول و همان قواعد را نشان بدهند،
+// وگرنه کاربرِ اندروید و کاربرِ وب دو فهمِ متفاوت از یک بازی پیدا می‌کنند.
+console.log('\n== راهنمای سکه ==');
+const guideWeb = read('userweb/src/components/CoinGuide.jsx');
+const guideAnd = read('mobile/lib/widgets/coin_guide.dart');
+
+ok('وب: راهنما در صفحهٔ لیگ رندر می‌شود', /<CoinGuide\b/.test(web.league));
+ok('اندروید: راهنما در صفحهٔ لیگ رندر می‌شود', /const CoinGuide\(\)/.test(android.league));
+
+// اعدادِ جدول باید با `COIN_TABLE` بک‌اند یکی باشند، وگرنه راهنما دروغ می‌گوید.
+for (const [label, n] of [['دوئل ۱۰۰', 2], ['دوئل ۱۰۰۰', 20], ['ساده ۱۰۰', 1], ['ساده ۱۰۰۰', 10]]) {
+  ok(`جدولِ راهنما مقدارِ «${label}» را در هر دو کلاینت دارد`,
+    new RegExp(`\\b${n}\\b`).test(guideWeb) && new RegExp(`\\b${n}\\b`).test(guideAnd));
+}
+
+for (const [label, re] of [
+  ['فقط برنده', /فقط برنده سکه می‌گیرد/],
+  ['ربات و تمرین سکه ندارند', /بازی با ربات و تمرین رایگان سکه ندارند/],
+  ['هرگز کم نمی‌شود', /سکه هرگز از شما کم نمی‌شود/],
+  ['سهمیهٔ روزانه', /۳۰ برد در ورودی ۱۰۰ و ۱۵ برد در ورودی ۱۰۰۰/],
+  ['ریست پایانِ فصل', /جوایز بر اساس سکه پرداخت و سکه‌ها صفر می‌شود/],
+]) {
+  ok(`قاعدهٔ «${label}» در هر دو کلاینت آمده`, re.test(guideWeb) && re.test(guideAnd));
+}
 
 console.log(`\n✅ ${checks} تست همسانیِ سکه موفق بود\n`);

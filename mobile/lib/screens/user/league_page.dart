@@ -13,6 +13,7 @@ import '../../widgets/state_views.dart';
 import '../shared/public_profile_sheet.dart';
 import '../shared/rank_tile.dart';
 import '../../widgets/coin_chip.dart';
+import '../../widgets/coin_guide.dart';
 import 'clubs_page.dart';
 
 /// Monthly league leaderboard: podium (top 3) + ranked list, refreshed
@@ -212,6 +213,7 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
                   ),
                 ),
                 Gaps.vLg,
+                const CoinGuide(),
                 if (top.isNotEmpty)
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
@@ -284,12 +286,14 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
                                       fontSize: 12.5,
                                       color: theme.colorScheme.onSurface),
                                 ),
-                                const SizedBox(height: 3),
-                                CoinChip(value: r['coins'], size: 15),
+                                const SizedBox(height: 5),
+                                CoinChip(
+                                    value: r['coins'], size: isFirst ? 30 : 25),
+                                const SizedBox(height: 2),
                                 Text(
                                   '${faNum(r['points'])} امتیاز',
                                   style: TextStyle(
-                                      fontSize: 10,
+                                      fontSize: 11.5,
                                       color: theme.colorScheme.onSurfaceVariant),
                                 ),
                               ],
@@ -340,21 +344,21 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
                               children: [
                                 const Text(
                                   'جایگاه شما در این دوره لیگ:',
-                                  style: TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8), fontWeight: FontWeight.w700),
+                                  style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8), fontWeight: FontWeight.w700),
                                 ),
                                 const SizedBox(height: 2),
                                 Wrap(
-                                  spacing: 7,
+                                  spacing: 9,
                                   crossAxisAlignment: WrapCrossAlignment.center,
                                   children: [
                                     Text(
                                       'رتبه ${faNum(rankNum)}',
-                                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.white),
+                                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.white),
                                     ),
-                                    CoinChip(value: myCoins),
+                                    CoinChip(value: myCoins, size: 24),
                                     Text(
                                       '${faNum(pts)} امتیاز',
-                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8)),
+                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8)),
                                     ),
                                   ],
                                 ),

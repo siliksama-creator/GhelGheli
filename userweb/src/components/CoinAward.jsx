@@ -33,19 +33,21 @@ export default function CoinAward({ amount, mine }) {
       className={mine ? 'coinAward coinAwardMine' : 'coinAward'}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: '7px',
-        padding: '6px 14px', borderRadius: '99px',
+        padding: '9px 18px', borderRadius: '99px',
         border: `1px solid ${color}${mine ? '' : '55'}`,
         background: mine
           ? 'linear-gradient(90deg,#FFD16622,#FF9F4322)'
           : 'rgba(255,255,255,0.04)',
-        color, fontWeight: 900, fontSize: '12.5px',
+        // ۱۶px، نه ۱۲.۵: این تنها لحظه‌ای است که کاربر سکه گرفتنش را
+        // می‌بیند و باید حس جایزه بدهد، نه حس زیرنویس.
+        color, fontWeight: 900, fontSize: '16px',
         // انیمیشن فقط برای برنده — حرکتِ اضافه برای بازنده‌ای که همین حالا
         // امتیازش را باخته، توی ذوق می‌زند.
         animation: mine ? 'coinPop .5s cubic-bezier(.2,1.4,.4,1) both' : 'none',
       }}
     >
       <img
-        src={ASSETS.coin} alt="" width={18} height={18}
+        src={ASSETS.coin} alt="" width={26} height={26}
         style={{ display: 'block', opacity: mine ? 1 : 0.55 }}
       />
       <span>{mine ? `+${fa(n)} سکه` : `${fa(n)} سکه به حریف`}</span>

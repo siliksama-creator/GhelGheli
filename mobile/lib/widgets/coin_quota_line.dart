@@ -35,16 +35,17 @@ class CoinQuotaLine extends StatelessWidget {
         children: [
           Image.asset(
             'assets/pass/icon_coin.png',
-            width: 14,
-            height: 14,
+            width: 22,
+            height: 22,
             opacity: AlwaysStoppedAnimation(hasLeft ? 1.0 : 0.5),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
           Flexible(
             child: hasLeft
                 ? Text.rich(
                     TextSpan(
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                      style: const TextStyle(
+                          fontSize: 13.5, height: 1.5, color: Color(0xFFCBD5E1)),
                       children: [
                         const TextSpan(text: 'امروز '),
                         TextSpan(
@@ -61,7 +62,8 @@ class CoinQuotaLine extends StatelessWidget {
                   )
                 : const Text(
                     'سهمیهٔ سکهٔ امروزِ این ورودی پر شده — برد امتیاز دارد، سکه نه',
-                    style: TextStyle(fontSize: 11, color: Color(0xFFF59E0B)),
+                    style: TextStyle(
+                        fontSize: 13.5, height: 1.5, color: Color(0xFFF59E0B)),
                     textAlign: TextAlign.center,
                   ),
           ),

@@ -338,8 +338,8 @@ export default function Games({ api, token, externalLaunch = null }) {
           فقط در حالت شرط‌دار نشان داده می‌شود (نه تمرین، نه لابی) و فقط
           وقتی سرور واقعاً سهمیه‌ای برگردانده. یک خط، بدون شلوغی. */}
       {mode > 0 && coinQuota?.remaining && (
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'6px', margin:'-4px 0 10px', fontSize:'11px', color: coinQuota.remaining[mode] > 0 ? '#94A3B8' : '#F59E0B' }}>
-          <img src={ASSETS.coin} alt="" width={14} height={14} style={{ display:'block', opacity: coinQuota.remaining[mode] > 0 ? 1 : 0.5 }} />
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', margin:'-2px 0 12px', fontSize:'13.5px', lineHeight:1.5, color: coinQuota.remaining[mode] > 0 ? '#CBD5E1' : '#F59E0B' }}>
+          <img src={ASSETS.coin} alt="" width={22} height={22} style={{ display:'block', flexShrink:0, opacity: coinQuota.remaining[mode] > 0 ? 1 : 0.5 }} />
           {coinQuota.remaining[mode] > 0
             ? <span>امروز <b style={{ color:'#FFD166' }}>{fa(coinQuota.remaining[mode])}</b> برد دیگر سکه می‌دهد</span>
             : <span>سهمیهٔ سکهٔ امروزِ این ورودی پر شده — برد امتیاز دارد، سکه نه</span>}

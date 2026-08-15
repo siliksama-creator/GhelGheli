@@ -89,7 +89,7 @@ export default function PublicProfile({ token, userId, close }) {
               <div>
                 <b>{`رتبه ${fa(u.currentLeagueRank || u.bestRank || 1)}`}</b>
                 <span style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'4px' }}>
-                  <CoinChip value={u.coins} size={11} /> سکه فصل
+                  <CoinChip value={u.coins} size={19} /> سکه فصل
                 </span>
               </div>
               <div><b>{fa(u.lifetime_points)}</b><span>مجموع امتیازات کل</span></div>

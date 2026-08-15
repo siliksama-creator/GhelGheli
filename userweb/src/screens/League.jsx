@@ -7,6 +7,7 @@ import { AsyncSection, EmptyView } from '../components/states.jsx';
 import { ASSETS } from '../components/IconAsset.jsx';
 import Clubs from './Clubs.jsx';
 import CoinChip from '../components/CoinChip.jsx';
+import CoinGuide from '../components/CoinGuide.jsx';
 
 /**
  * نشانِ سکه در ردیفِ جدول.
@@ -31,8 +32,10 @@ function PodiumCard({ rank, row, onTap }) {
       <div style={{ fontWeight:'700', fontSize:'12.5px', color:'#FFF', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
         <DisplayName name={row.nickname || 'کاربر'} cosmetics={row.cosmetics} level={row.level} />
       </div>
-      <div style={{ fontSize:'12px', marginTop:'3px' }}><CoinChip value={row.coins} size={15} /></div>
-      <div style={{ fontSize:'10px', color:'rgba(255,255,255,0.55)' }}>{fa(row.points)} امتیاز</div>
+      <div style={{ display:'flex', justifyContent:'center', marginTop:'5px' }}>
+        <CoinChip value={row.coins} size={isFirst ? 30 : 25} />
+      </div>
+      <div style={{ fontSize:'11.5px', color:'rgba(255,255,255,0.6)', marginTop:'2px' }}>{fa(row.points)} امتیاز</div>
     </div>
   );
 }
@@ -89,6 +92,18 @@ export default function League({ token, openProfile }) {
   const load = useCallback(() => req(selectedLeagueId ? `/api/league/current?seasonId=${selectedLeagueId}` : '/api/league/current', 'GET', null, token), [token, selectedLeagueId]);
   const state = useAsync(load, [load]);
   const [tab, setTab] = useState('table');
+  // راهنمای سکه بارِ اول باز است: کاربر روی چیزی که نمی‌شناسد کلیک نمی‌کند،
+  // پس اگر بسته شروع شود هرگز خوانده نمی‌شود. بعد از اولین بستن، انتخابش
+  // را به خاطر می‌سپاریم تا هر بار جلوی چشمش نباشد.
+  const [guideOpen, setGuideOpen] = useState(() => {
+    try { return localStorage.getItem('coinGuideSeen') !== '1'; } catch { return true; }
+  });
+  const toggleGuide = useCallback(() => {
+    setGuideOpen(v => {
+      if (v) { try { localStorage.setItem('coinGuideSeen', '1'); } catch { /* حالت خصوصی مرورگر */ } }
+      return !v;
+    });
+  }, []);
 
   // polling like mobile LifecyclePoller 12s
   useEffect(() => {
@@ -152,6 +167,8 @@ export default function League({ token, openProfile }) {
               </div>
             </div>
 
+            <CoinGuide open={guideOpen} onToggle={toggleGuide} />
+
             {top.length>0 && (
               <div style={{ display:'flex', gap:'6px', marginBottom:'20px', alignItems:'flex-end' }}>
                 {top.map((r,i) => (
@@ -165,11 +182,11 @@ export default function League({ token, openProfile }) {
               <div style={{ marginBottom:'12px', padding:'12px 16px', borderRadius:'16px', background:'linear-gradient(135deg, #1E293B, #0F172A)', border:'1px solid rgba(56,189,248,0.4)', display:'flex', alignItems:'center', gap:'12px' }}>
                 <span style={{ width:'36px', height:'36px', borderRadius:'50%', background:'rgba(56,189,248,0.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'18px' }}>👤</span>
                 <div>
-                  <div style={{ color:'#94A3B8', fontSize:'11.5px', fontWeight:'700' }}>جایگاه شما در این دوره لیگ:</div>
-                  <div style={{ color:'#FFF', fontWeight:'900', fontSize:'14px', display:'flex', alignItems:'center', gap:'7px', flexWrap:'wrap' }}>
+                  <div style={{ color:'#94A3B8', fontSize:'13px', fontWeight:'700' }}>جایگاه شما در این دوره لیگ:</div>
+                  <div style={{ color:'#FFF', fontWeight:'900', fontSize:'16px', display:'flex', alignItems:'center', gap:'9px', flexWrap:'wrap', marginTop:'2px' }}>
                     <span>رتبه {fa(d.myEntry.rank)}</span>
-                    <CoinChip value={d.myEntry.coins} />
-                    <span style={{ color:'#94A3B8', fontWeight:'700', fontSize:'12px' }}>{fa(d.myEntry.points)} امتیاز</span>
+                    <CoinChip value={d.myEntry.coins} size={24} />
+                    <span style={{ color:'#94A3B8', fontWeight:'700', fontSize:'13px' }}>{fa(d.myEntry.points)} امتیاز</span>
                   </div>
                 </div>
               </div>
@@ -179,18 +196,18 @@ export default function League({ token, openProfile }) {
               {rest.map((r, idx) => (
                 <div key={r.user_id} onClick={()=>openProfile && openProfile(r.user_id)} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 14px', background:'rgba(255,255,255,0.03)', borderRadius:'12px', marginBottom:'6px', cursor:'pointer' }}>
                   <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
-                    <span style={{ fontWeight:'bold', width:'24px', textAlign:'center', color:'#94A3B8' }}>{fa(idx+4)}</span>
+                    <span style={{ fontWeight:'bold', width:'26px', textAlign:'center', color:'#94A3B8', fontSize:'14px' }}>{fa(idx+4)}</span>
                     <DisplayName name={r.nickname || 'کاربر'} cosmetics={r.cosmetics} level={r.level} />
                   </div>
                   <span style={{ display:'flex', alignItems:'center', gap:'9px' }}>
                     <CoinChip value={r.coins} />
-                    <span style={{ fontWeight:'bold', color:'#38BDF8', fontSize:'12px' }}>{fa(r.points)}</span>
+                    <span style={{ fontWeight:'bold', color:'#38BDF8', fontSize:'13px' }}>{fa(r.points)}</span>
                   </span>
                 </div>
               ))}
             </div>
 
-            {entries.length===0 && <div style={{ textAlign:'center', padding:'30px', color:'#64748B' }}><div style={{ fontSize:'32px' }}>🏆</div><b>هنوز کسی در این لیگ سکه‌ای نبرده است</b></div>}
+            {entries.length===0 && <div style={{ textAlign:'center', padding:'30px', color:'#64748B' }}><div style={{ fontSize:'40px' }}>🏆</div><b style={{ fontSize:'15px', display:'block', marginTop:'6px' }}>هنوز کسی در این لیگ سکه‌ای نبرده است</b><span style={{ fontSize:'13px', display:'block', marginTop:'6px', lineHeight:1.6 }}>اولین برد شما مقابل حریف واقعی، شما را صدرنشین می‌کند.</span></div>}
           </section>
         );
       }}

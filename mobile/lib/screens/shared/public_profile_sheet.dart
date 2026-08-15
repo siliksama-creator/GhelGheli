@@ -167,7 +167,7 @@ class _PublicProfileBody extends StatelessWidget {
               // جدول اشتباه است. عنوان به‌جای متنِ اضافه، خودِ عدد را
               // حمل می‌کند — قرار نیست متن‌ها زیاد شوند.
               title: 'رتبه لیگ این ماه',
-              titleTrailing: CoinChip(value: data['coins'], size: 11),
+              titleTrailing: CoinChip(value: data['coins'], size: 19),
               value: () {
                 final r = data['currentLeagueRank'] ?? bestRank;
                 return r != null ? 'رتبه ${faNum(r)}' : 'رتبه ۱';

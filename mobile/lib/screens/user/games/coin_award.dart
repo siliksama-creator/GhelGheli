@@ -30,7 +30,7 @@ class CoinAward extends StatelessWidget {
     const gold = Color(0xFFFFD166);
     final color = mine ? gold : const Color(0xFF94A3B8);
     final chip = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
       decoration: BoxDecoration(
         borderRadius: Corners.rPill,
         gradient: mine
@@ -49,21 +49,33 @@ class CoinAward extends StatelessWidget {
             opacity: mine ? 1 : 0.55,
             child: Image.asset(
               'assets/pass/icon_coin.png',
-              width: 18,
-              height: 18,
+              width: 26,
+              height: 26,
               // اگر اسِت به هر دلیل لود نشد، نشان نباید کلاً ناپدید شود؛
               // متنِ سکه مهم‌تر از آیکونش است.
               errorBuilder: (_, __, ___) =>
-                  Icon(Icons.monetization_on_rounded, size: 18, color: color),
+                  Icon(Icons.monetization_on_rounded, size: 26, color: color),
             ),
           ),
-          const SizedBox(width: 7),
-          Text(
-            mine ? '+${faNum(amount)} سکه' : '${faNum(amount)} سکه به حریف',
-            style: TextStyle(
-              color: color,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w900,
+          const SizedBox(width: 8),
+          // ⚠️ `Flexible` لازم است، نه `Text` لخت.
+          //
+          // با بزرگ‌شدنِ فونت به ۱۶، متنِ بازنده («۱۰۰۰ سکه به حریف») روی
+          // عرض‌های باریک ۳۵ پیکسل سرریز می‌کرد و نوارِ زردِ خطا روی صفحهٔ
+          // نتیجه می‌نشست. `Row` با `mainAxisSize.min` به فرزندش عرضِ
+          // نامحدود می‌دهد مگر اینکه صریحاً محدودش کنی.
+          Flexible(
+            child: Text(
+              mine ? '+${faNum(amount)} سکه' : '${faNum(amount)} سکه به حریف',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                // ۱۶، نه ۱۲.۵: این تنها لحظه‌ای است که کاربر سکه گرفتنش را
+                // می‌بیند و باید حس جایزه بدهد، نه حس زیرنویس.
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
         ],
