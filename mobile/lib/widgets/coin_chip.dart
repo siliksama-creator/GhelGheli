@@ -43,7 +43,7 @@ class CoinChip extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Image.asset(
-          'assets/pass/icon_coin.png',
+          'assets/pass/icon_coin.webp',
           width: size,
           height: size,
           errorBuilder: (_, __, ___) => Icon(

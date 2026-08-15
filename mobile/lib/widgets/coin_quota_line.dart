@@ -34,7 +34,7 @@ class CoinQuotaLine extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Image.asset(
-            'assets/pass/icon_coin.png',
+            'assets/pass/icon_coin.webp',
             width: 22,
             height: 22,
             opacity: AlwaysStoppedAnimation(hasLeft ? 1.0 : 0.5),

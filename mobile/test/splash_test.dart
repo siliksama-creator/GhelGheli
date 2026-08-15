@@ -59,7 +59,7 @@ void main() {
 
       // قبلاً اینجا لوگوی متنی بود و اسپلش سیستمی شخصیت — دو نشان پشت سر
       // هم شبیه خطای بارگذاری دیده می‌شد.
-      expect(images, contains('assets/splash/splash_android12.png'));
+      expect(images, contains('assets/splash/splash_android12.webp'));
     });
 
     testWidgets('چیدمان از فریم اول ثابت است (بدون انیمیشن ورودی)',

@@ -222,7 +222,7 @@ class _DashboardPageState extends State<DashboardPage> {
               Expanded(
                 child: _AnimatedQuickTile(
                   icon: Image.asset(
-                    'assets/games/card_duel_glow.png',
+                    'assets/games/card_duel_glow.webp',
                     width: 29,
                     height: 29,
                     cacheWidth: 87,
@@ -261,7 +261,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         ),
                         border: Border.all(color: BrandColors.emerald.withValues(alpha: 0.35)),
                       ),
-                      child: Image.asset('assets/brand/card_scan_glow.png', cacheWidth: 150),
+                      child: Image.asset('assets/brand/card_scan_glow.webp', cacheWidth: 150),
                     ),
                     Gaps.hSm,
                     Expanded(

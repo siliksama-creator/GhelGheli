@@ -616,9 +616,9 @@ class _CompactRewardTile extends StatelessWidget {
   }
 
   static const _art = {
-    'points': 'assets/pass/icon_points.png',
-    'spins': 'assets/pass/icon_spins.png',
-    'shop_item': 'assets/pass/icon_item.png',
+    'points': 'assets/pass/icon_points.webp',
+    'spins': 'assets/pass/icon_spins.webp',
+    'shop_item': 'assets/pass/icon_item.webp',
   };
 
   @override

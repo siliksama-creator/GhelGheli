@@ -141,17 +141,19 @@ flutter_native_splash:
   # Matches BrandColors' dark canvas, so the splash and the first frame of
   # the app are literally the same colour.
   color: "#060D18"
-  image: assets/splash/splash_logo.png
   color_dark: "#060D18"
-  image_dark: assets/splash/splash_logo.png
+  image: assets/splash/splash_logo.png
+  # image_dark عمداً حذف شد: رنگ روشن و تیره هر دو #060D18 و تصویر هم
+  # عیناً همان فایل بود، پس ابزار دو نسخهٔ بایت-یکسان در res/ می‌ساخت
+  # (۱.۵ مگابایت هدررفتِ خالص در APK). بدون image_dark، همان تصویرِ
+  # روشن در حالت تیره هم استفاده می‌شود — ظاهر مو-به-مو یکسان است.
 
   android_12:
     color: "#060D18"
     color_dark: "#060D18"
-    # Square, face-centred crop with its own padding: this one goes inside
+      # Square, face-centred crop with its own padding: this one goes inside
     # the system's circular mask.
     image: assets/splash/splash_android12.png
-    image_dark: assets/splash/splash_android12.png
     # The circle behind the icon. Same colour as the page, so the mask is
     # invisible instead of reading as a grey coin behind the character.
     icon_background_color: "#060D18"
@@ -190,7 +192,7 @@ flutter:
     # splash_android12.png IS still needed at runtime: splash_screen.dart
     # draws it so the Flutter first frame matches the native splash exactly.
     # It is listed as a single file rather than re-including the folder.
-    - assets/splash/splash_android12.png
+    - assets/splash/splash_android12.webp
   fonts:
     - family: Vazirmatn
       fonts:

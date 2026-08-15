@@ -99,7 +99,7 @@ class _CoinGuideState extends State<CoinGuide> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Image.asset(
-                    'assets/pass/icon_coin.png',
+                    'assets/pass/icon_coin.webp',
                     width: 44,
                     height: 44,
                     errorBuilder: (_, __, ___) => const Icon(

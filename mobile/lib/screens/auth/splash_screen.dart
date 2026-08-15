@@ -61,7 +61,7 @@ class _SplashScreenState extends State<SplashScreen>
   /// 570 = the 190px draw size at 3x, so it is sharp on the densest common
   /// screen without decoding the full 768x768.
   static const _character = ResizeImage(
-    AssetImage('assets/splash/splash_android12.png'),
+    AssetImage('assets/splash/splash_android12.webp'),
     width: 570,
   );
 

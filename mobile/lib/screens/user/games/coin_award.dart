@@ -48,7 +48,7 @@ class CoinAward extends StatelessWidget {
           Opacity(
             opacity: mine ? 1 : 0.55,
             child: Image.asset(
-              'assets/pass/icon_coin.png',
+              'assets/pass/icon_coin.webp',
               width: 26,
               height: 26,
               // اگر اسِت به هر دلیل لود نشد، نشان نباید کلاً ناپدید شود؛

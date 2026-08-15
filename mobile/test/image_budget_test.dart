@@ -306,9 +306,34 @@ void main() {
           reason: 'کل پوشهٔ splash نباید بندل شود — splash_logo.png '
               'فقط ورودی بیلد است');
       // ولی این یکی واقعاً در زمان اجرا کشیده می‌شود.
-      expect(decl.contains('assets/splash/splash_android12.png'), isTrue,
+      // نسخهٔ webp بندل می‌شود (۲۲۸KB → ۳۶KB). فایل png کنارش می‌ماند
+      // چون ورودی flutter_native_splash است، ولی بندل نمی‌شود.
+      expect(decl.contains('assets/splash/splash_android12.webp'), isTrue,
           reason: 'splash_screen.dart این را می‌کشد؛ بدونش صفحهٔ لودینگ '
               'خالی می‌شود');
+      expect(decl.contains('assets/splash/splash_android12.png'), isFalse,
+          reason: 'png فقط ورودی بیلد است — نسخهٔ webp بندل می‌شود');
+    });
+
+    test('اسپلش تصویر تیرهٔ تکراری اعلام نمی‌کند', () {
+      // flutter_native_splash برای image_dark یک مجموعهٔ کامل drawable
+      // جداگانه می‌سازد. چون تصویر روشن و تیره عیناً یک فایل بودند،
+      // ۱.۵ مگابایت بایتِ مو‌به‌مو تکراری داخل res/ می‌رفت (۱۲ جفت
+      // فایل بایت-یکسان). رنگ‌های dark باید بمانند (بایت اضافه ندارند
+      // و نبودشان در حالت تیره فلاش سفید می‌دهد) ولی image_dark نه.
+      final pubspec = File('pubspec.yaml').readAsStringSync();
+      final block = pubspec.substring(
+        pubspec.indexOf('flutter_native_splash:'),
+        pubspec.indexOf('\nflutter:'),
+      );
+      final live =
+          block.split('\n').where((l) => !l.trimLeft().startsWith('#')).join('\n');
+
+      expect(live.contains('image_dark:'), isFalse,
+          reason: 'image_dark همان فایل روشن بود و ۱.۵MB تکرار می‌ساخت');
+      // این‌ها باید بمانند:
+      expect(live.contains('color_dark:'), isTrue,
+          reason: 'بدون color_dark حالت تیره هنگام لانچ سفید می‌زند');
     });
 
     test('باشگاه‌های ایرانی از بندل حذف شده‌اند', () {

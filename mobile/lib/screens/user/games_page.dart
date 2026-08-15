@@ -38,7 +38,7 @@ const _games = <_GameEntry>[
   _GameEntry('penalty', 'ضربات پنالتی', 'شوت دقیق و مهار دروازه‌بان', 'assets/games/penalty_icon.png',
       Color(0xFF38BDF8), 'assets/games/penalty.webp'),
   _GameEntry('card_duel', 'دوئل کارت‌ها', 'نبرد پنج‌راندی و کارت‌های کلکسیونی',
-      'assets/games/card_duel_glow.png', Color(0xFFFFD166), 'assets/games/card_duel_glow.png'),
+      'assets/games/card_duel_glow.webp', Color(0xFFFFD166), 'assets/games/card_duel_glow.webp'),
   _GameEntry('memory', 'جفت‌یاب', 'جفت‌های فوتبالی را به خاطر بسپار', 'assets/games/memory/medal.webp',
       Color(0xFFA855F7), 'assets/games/memory.webp'),
 ];
@@ -907,7 +907,7 @@ class _PrivateLobbyHubState extends State<_PrivateLobbyHub> {
 
   final _games = const [
     ('penalty', 'ضربات پنالتی', 'assets/pass/football_icon.webp'),
-    ('card_duel', 'دوئل کارت‌ها', 'assets/games/card_duel_glow.png'),
+    ('card_duel', 'دوئل کارت‌ها', 'assets/games/card_duel_glow.webp'),
     ('memory', 'جفت‌یاب', 'assets/games/memory/medal.webp'),
   ];
 

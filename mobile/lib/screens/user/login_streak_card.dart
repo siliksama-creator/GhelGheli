@@ -337,7 +337,7 @@ class _LoginStreakCardState extends State<LoginStreakCard>
                                     children: [
                                       if (!claimedToday) ...[
                                         Image.asset(
-                                          'assets/pass/cta_spark.png',
+                                          'assets/pass/cta_spark.webp',
                                           width: 14,
                                           height: 14,
                                           cacheWidth: 48,
