@@ -1,54 +1,91 @@
-// پرداخت درون‌برنامه‌ای — شارژ کیف پول از طریق کافه‌بازار
+// پرداخت درون‌برنامه‌ای — خرید مستقیم آیتم شاپ و پلاس از کافه‌بازار
 //
 // ═══════════════════════════════════════════════════════════════════════════
-// چرا کافه‌بازار و نه درگاه بانکی مستقیم
+// دو جریان پولِ کاملاً جدا
 // ═══════════════════════════════════════════════════════════════════════════
 //
-// اپ روی کافه‌بازار منتشر می‌شود و بازار برای فروش «محتوای دیجیتال»
-// (اشتراک پلاس، قاب، نشان) استفاده از پرداخت درون‌برنامه‌ای خودش را
-// الزامی می‌کند. اپی که مستقیم به درگاه بانکی می‌رود ریسک رد شدن در
-// بازبینی دارد.
+//   کیف پول = پولِ خودِ کاربر
+//     ورودی : کارت نقدی · جایزهٔ لیگ · گردونه · کمیسیون ۵٪ · واریز ادمین
+//     خروجی : فقط درخواست برداشت
+//     ✗ هرگز بابت خرید کم نمی‌شود
+//
+//   خرید = پولِ تازه از جیب کاربر
+//     آیتم شاپ و پلاس ۱۰۰٪ از پرداخت درون‌برنامه‌ای بازار
+//     ✗ هرگز از موجودی کیف پول
+//
+// این ماژول فقط جریان دوم را می‌شناسد. هیچ تابعی اینجا کیف پول را شارژ
+// نمی‌کند؛ تنها جایی که خرید به کیف پول دست می‌زند، کمیسیون ۵٪ معرف است
+// که در `referralService.payPurchaseCommission` و داخل همان تراکنش انجام
+// می‌شود.
 //
 // ═══════════════════════════════════════════════════════════════════════════
 // جریان کامل — و اینکه هر مرحله کجا می‌تواند بشکند
 // ═══════════════════════════════════════════════════════════════════════════
 //
-//   ۱. کلاینت  POST /api/wallet/topup/order  { productId }
-//      → سرور سفارش pending می‌سازد و id را برمی‌گرداند
+//   ۱. کلاینت  POST /api/purchase/order  { kind, slug|cycle }
+//      → سرور قیمت را از دیتابیس می‌خواند، سفارش pending می‌سازد،
+//        و **شناسهٔ محصولِ بازار** متناظرِ آن قیمت را برمی‌گرداند
 //      ✗ اگر اینجا قطع شود: سفارش pending می‌ماند، ضرری ندارد
 //
-//   ۲. کلاینت با Poolakey از کاربر پول می‌گیرد
-//      → یک purchaseToken می‌گیرد
+//   ۲. کلاینت با Poolakey از کاربر پول می‌گیرد → purchaseToken
 //      ✗ اگر اینجا قطع شود: کاربر پول داده ولی سرور خبر ندارد.
-//        برای همین مرحلهٔ ۳ از کلاینت **دوباره قابل ارسال** است.
+//        برای همین مرحلهٔ ۳ **قابل ارسال دوباره** است.
 //
-//   ۳. کلاینت  POST /api/wallet/topup/verify  { orderId, purchaseToken }
+//   ۳. کلاینت  POST /api/purchase/verify  { orderId, purchaseToken }
 //      → سرور توکن را از API بازار راستی‌آزمایی می‌کند
-//      → فقط اگر بازار تأیید کرد، کیف پول شارژ می‌شود
+//      → فقط اگر بازار تأیید کرد، آیتم/اشتراک **تحویل** می‌شود
+//      → و کمیسیون ۵٪ به معرف واریز می‌شود
 //
 // ═══════════════════════════════════════════════════════════════════════════
-// چرا مبلغ **هرگز** از کلاینت گرفته نمی‌شود
+// چرا قیمت **هرگز** از کلاینت گرفته نمی‌شود
 // ═══════════════════════════════════════════════════════════════════════════
 //
-// مبلغ فقط از `PRODUCTS` سمت سرور خوانده می‌شود. اگر مبلغ از بدنهٔ
-// درخواست می‌آمد، هر کسی با یک curl می‌توانست برای خودش ۱۰ میلیون تومان
-// شارژ کند. این همان اشتباهی است که در کامنت creditWheelPrize هم دربارهٔ
-// گردونه هشدار داده شده.
-const crypto = require('crypto');
+// کلاینت فقط می‌گوید «کدام آیتم»؛ قیمت از `shop_items.price` یا از
+// `PLUS_PLANS` سمت سرور خوانده می‌شود. اگر قیمت از بدنهٔ درخواست می‌آمد،
+// یک curl کافی بود تا کسی پلاس سالانه را با ۱۰۰ تومان بخرد.
+//
+// ═══════════════════════════════════════════════════════════════════════════
+// چرا محصولات بازار بر اساس «قیمت» است نه «آیتم»
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ۵۲ آیتم فروختنی داریم ولی فقط ۱۳ نقطهٔ قیمتی. اگر به ازای هر آیتم یک
+// محصول در کنسول بازار می‌ساختیم، هر بار که آیتم جدیدی اضافه می‌شد باید
+// دستی در پنل بازار هم ثبت می‌شد و تا تأیید بازار آن آیتم غیرقابل خرید
+// می‌ماند. با نگاشتِ قیمتی، افزودن آیتم جدید با قیمتِ موجود **هیچ** کار
+// دستی لازم ندارد.
+//
+// در ازایش: `payment_orders` باید بداند کدام آیتم خریداری شده، چون خودِ
+// شناسهٔ محصولِ بازار فقط قیمت را می‌گوید. برای همین `shop_item_id` در
+// همان مرحلهٔ ۱ ثبت می‌شود — و در مرحلهٔ ۳ فقط از روی سفارش خوانده
+// می‌شود، نه از کلاینت.
 const { pool } = require('../config/db');
-const wallet = require('./walletService');
 
-// ── محصولات ────────────────────────────────────────────────────────────
+// ── نگاشت قیمت → شناسهٔ محصول کافه‌بازار ───────────────────────────────
 //
-// `id` باید **دقیقاً** با شناسهٔ محصول در کنسول کافه‌بازار یکی باشد.
-// قیمت‌ها طوری چیده شده‌اند که دو پلن پلاس (۵۹٬۰۰۰ و ۴۹۹٬۰۰۰) بدون
-// باقی‌ماندهٔ بلااستفاده قابل خرید باشند.
-const PRODUCTS = Object.freeze({
-  ghelgheli_wallet_20000:  { amount: 20000,  label: '۲۰٬۰۰۰ تومان' },
-  ghelgheli_wallet_50000:  { amount: 50000,  label: '۵۰٬۰۰۰ تومان' },
-  ghelgheli_wallet_100000: { amount: 100000, label: '۱۰۰٬۰۰۰ تومان' },
-  ghelgheli_wallet_200000: { amount: 200000, label: '۲۰۰٬۰۰۰ تومان' },
-  ghelgheli_wallet_500000: { amount: 500000, label: '۵۰۰٬۰۰۰ تومان' },
+// این‌ها باید **دقیقاً** در کنسول کافه‌بازار ساخته شوند. اگر قیمتی اینجا
+// نباشد، آیتمِ با آن قیمت غیرقابل خرید می‌شود و `catalog()` علامتش
+// می‌زند — بی‌سروصدا شکست نمی‌خورد.
+const PRICE_PRODUCTS = Object.freeze({
+  9000:   'ghelgheli_item_9000',
+  12000:  'ghelgheli_item_12000',
+  15000:  'ghelgheli_item_15000',
+  19000:  'ghelgheli_item_19000',
+  24000:  'ghelgheli_item_24000',
+  25000:  'ghelgheli_item_25000',
+  29000:  'ghelgheli_item_29000',
+  39000:  'ghelgheli_item_39000',
+  45000:  'ghelgheli_item_45000',
+  49000:  'ghelgheli_item_49000',
+  50000:  'ghelgheli_item_50000',
+  59000:  'ghelgheli_item_59000',
+  69000:  'ghelgheli_item_69000',
+});
+
+// اشتراک پلاس محصول جداگانه دارد چون در بازار «اشتراک» است نه «کالای
+// یک‌بارمصرف» و چرخهٔ عمر متفاوتی دارد.
+const PLUS_PRODUCTS = Object.freeze({
+  monthly: { productId: 'ghelgheli_plus_monthly', price: 59000,  label: 'قلقلی پلاس ماهانه' },
+  annual:  { productId: 'ghelgheli_plus_annual',  price: 499000, label: 'قلقلی پلاس سالانه' },
 });
 
 const BAZAAR_API = 'https://pardakht.cafebazaar.ir';
@@ -73,6 +110,11 @@ function configured() {
 
 function fail(message, status = 400, code = null) {
   return Object.assign(new Error(message), { status, code });
+}
+
+/** شناسهٔ محصول بازار برای یک قیمت مشخص. null یعنی این قیمت فروختنی نیست. */
+function productForPrice(price) {
+  return PRICE_PRODUCTS[Number(price)] || null;
 }
 
 // ── توکن دسترسی ────────────────────────────────────────────────────────
@@ -121,8 +163,8 @@ async function accessToken() {
 async function verifyWithBazaar(productId, purchaseToken) {
   const c = cfg();
 
-  // حالت sandbox فقط برای توسعهٔ محلی. توکن باید با پیشوند مشخص باشد تا
-  // یک توکن واقعیِ اشتباهی هرگز از این مسیر رد نشود.
+  // حالت sandbox فقط برای توسعهٔ محلی. توکن باید پیشوند مشخص داشته باشد
+  // تا یک توکن واقعیِ اشتباهی هرگز از این مسیر رد نشود.
   if (c.sandbox) {
     if (!String(purchaseToken).startsWith('SANDBOX-')) {
       throw fail('در حالت آزمایشی فقط توکن SANDBOX- پذیرفته می‌شود', 400);
@@ -158,36 +200,106 @@ async function verifyWithBazaar(productId, purchaseToken) {
 }
 
 // ── مرحلهٔ ۱: ساخت سفارش ───────────────────────────────────────────────
-async function createOrder(userId, productId) {
-  const product = PRODUCTS[productId];
-  if (!product) throw fail('بستهٔ انتخابی معتبر نیست', 400);
+//
+// قیمت اینجا **قفل** می‌شود. اگر مدیر بین ساخت سفارش و تأیید پرداخت قیمت
+// را عوض کند، کاربر همان چیزی را می‌پردازد که دیده — و ما همان را تحویل
+// می‌دهیم.
+
+/** سفارش خرید یک آیتم شاپ. */
+async function createShopOrder(userId, slug) {
   if (!configured() && !cfg().sandbox) {
     throw fail('پرداخت درون‌برنامه‌ای هنوز فعال نشده است', 503, 'GATEWAY_OFF');
   }
-
+  // کلاینت ممکن است slug بفرستد یا UUID. روت قدیمیِ
+  // `/api/shop/items/:id/buy` با UUID کار می‌کرد و اپ‌های نصب‌شده هنوز
+  // همان را می‌فرستند؛ هر دو باید کار کنند وگرنه نسخهٔ قدیمی می‌شکند.
+  const key = String(slug || '');
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    .test(key);
   const { rows } = await pool.query(
-    `INSERT INTO payment_orders (user_id, amount, provider, product_id, status)
-     VALUES ($1, $2, 'cafebazaar', $3, 'pending')
-     RETURNING id, amount, product_id, status, created_at`,
-    [userId, product.amount, productId]);
+    `SELECT id, slug, name, price, access_tier, is_purchasable
+       FROM shop_items
+      WHERE ${isUuid ? 'id=$1::uuid' : 'slug=$1'} AND is_active=true`,
+    [key]);
+  const item = rows[0];
+  if (!item) throw fail('کالا پیدا نشد', 404);
+  if (!item.is_purchasable || item.access_tier === 'annual') {
+    throw fail('این هدیه فقط همراه پلاس سالانه فعال می‌شود', 409);
+  }
+
+  // مالکیت را قبل از گرفتن پول بررسی کن. اگر بعد از پرداخت بفهمیم کاربر
+  // قبلاً آیتم را داشته، باید پول را برگردانیم — که در بازار فرایند دستی
+  // و کندی است. بهتر است اصلاً پنجرهٔ پرداخت باز نشود.
+  const owned = await pool.query(
+    `SELECT 1 FROM user_shop_items WHERE user_id=$1 AND item_id=$2`,
+    [userId, item.id]);
+  if (owned.rows[0]) throw fail('این کالا را قبلاً خریده‌اید', 409);
+
+  const productId = productForPrice(item.price);
+  if (!productId) {
+    throw fail('این کالا فعلاً قابل خرید نیست', 503, 'NO_PRODUCT');
+  }
+
+  const order = await pool.query(
+    `INSERT INTO payment_orders
+       (user_id, amount, provider, product_id, status,
+        purchase_kind, shop_item_id)
+     VALUES ($1, $2, 'cafebazaar', $3, 'pending', 'shop_item', $4)
+     RETURNING id, amount, created_at`,
+    [userId, item.price, productId, item.id]);
 
   return {
-    orderId: rows[0].id,
+    orderId: order.rows[0].id,
     productId,
-    amount: Number(rows[0].amount),
-    label: product.label,
+    amount: Number(order.rows[0].amount),
+    kind: 'shop_item',
+    slug: item.slug,
+    label: item.name,
   };
 }
 
-// ── مرحلهٔ ۳: راستی‌آزمایی و شارژ ──────────────────────────────────────
+/** سفارش خرید اشتراک پلاس. */
+async function createPlusOrder(userId, billingCycle) {
+  if (!configured() && !cfg().sandbox) {
+    throw fail('پرداخت درون‌برنامه‌ای هنوز فعال نشده است', 503, 'GATEWAY_OFF');
+  }
+  const clean = String(billingCycle || 'monthly').toLowerCase();
+  const cycle = ['annual', 'yearly', 'year'].includes(clean) ? 'annual'
+    : ['monthly', 'month'].includes(clean) ? 'monthly' : null;
+  if (!cycle) throw fail('دوره اشتراک باید ماهانه یا سالانه باشد');
+
+  const plan = PLUS_PRODUCTS[cycle];
+  const order = await pool.query(
+    `INSERT INTO payment_orders
+       (user_id, amount, provider, product_id, status,
+        purchase_kind, plus_cycle)
+     VALUES ($1, $2, 'cafebazaar', $3, 'pending', $4, $5)
+     RETURNING id, amount, created_at`,
+    [userId, plan.price, plan.productId,
+      cycle === 'annual' ? 'plus_annual' : 'plus_monthly', cycle]);
+
+  return {
+    orderId: order.rows[0].id,
+    productId: plan.productId,
+    amount: Number(order.rows[0].amount),
+    kind: cycle === 'annual' ? 'plus_annual' : 'plus_monthly',
+    cycle,
+    label: plan.label,
+  };
+}
+
+// ── مرحلهٔ ۳: راستی‌آزمایی و تحویل ─────────────────────────────────────
 /**
- * توکن خرید را بررسی و در صورت تأیید کیف پول را شارژ می‌کند.
+ * توکن خرید را بررسی و در صورت تأیید، کالا/اشتراک را **تحویل** می‌دهد.
  *
  * **قابل فراخوانی چندباره است (idempotent).** اگر کلاینت به‌خاطر قطعی
- * شبکه دوباره بفرستد، بار دوم همان نتیجه را می‌گیرد بدون شارژ مجدد —
+ * شبکه دوباره بفرستد، بار دوم همان نتیجه را می‌گیرد بدون تحویل مجدد —
  * تضمین‌کنندهٔ اصلی، UNIQUE روی (provider, purchase_token) است.
+ *
+ * تحویل توسط `shopService` انجام می‌شود (تزریق‌شده تا وابستگی حلقوی
+ * نسازد: shopService خودش createOrder را صدا می‌زند).
  */
-async function verifyAndCredit(userId, orderId, purchaseToken) {
+async function verifyAndDeliver(userId, orderId, purchaseToken, deliver) {
   if (!purchaseToken || String(purchaseToken).length < 4) {
     throw fail('توکن پرداخت نامعتبر است', 400);
   }
@@ -198,16 +310,20 @@ async function verifyAndCredit(userId, orderId, purchaseToken) {
   const order = found[0];
   if (!order) throw fail('سفارش پیدا نشد', 404);
 
-  // قبلاً پرداخت شده: همان نتیجه را برگردان، دوباره شارژ نکن.
+  // قبلاً تحویل شده: همان نتیجه را برگردان، دوباره تحویل نده.
   if (order.status === 'paid') {
-    return { alreadyProcessed: true, amount: Number(order.amount) };
+    return {
+      alreadyProcessed: true,
+      amount: Number(order.amount),
+      kind: order.purchase_kind,
+    };
   }
   if (order.status === 'refunded') {
     throw fail('این پرداخت بازگردانده شده است', 400);
   }
-
-  const product = PRODUCTS[order.product_id];
-  if (!product) throw fail('بستهٔ این سفارش دیگر معتبر نیست', 400);
+  if (order.status === 'failed') {
+    throw fail('این سفارش منقضی شده؛ دوباره از فروشگاه اقدام کنید', 409);
+  }
 
   const result = await verifyWithBazaar(order.product_id, purchaseToken);
   if (!result.ok) {
@@ -225,7 +341,7 @@ async function verifyAndCredit(userId, orderId, purchaseToken) {
 
     // توکن را همین‌جا و داخل تراکنش ثبت کن. اگر همین توکن قبلاً برای
     // سفارش دیگری استفاده شده، UNIQUE اینجا می‌ترکد و کل تراکنش
-    // برمی‌گردد — یعنی شارژ دوباره غیرممکن است.
+    // برمی‌گردد — یعنی تحویل دوباره غیرممکن است.
     let claimed;
     try {
       claimed = await client.query(
@@ -246,27 +362,35 @@ async function verifyAndCredit(userId, orderId, purchaseToken) {
     if (!claimed.rowCount) {
       // یک درخواست هم‌زمان زودتر رسیده و سفارش را برداشته.
       await client.query('ROLLBACK');
-      return { alreadyProcessed: true, amount: Number(order.amount) };
+      return {
+        alreadyProcessed: true,
+        amount: Number(order.amount),
+        kind: order.purchase_kind,
+      };
     }
 
-    const credited = await wallet.credit(client, {
+    // تحویل + کمیسیون، همه داخل همین تراکنش. اگر تحویل بشکند، سفارش هم
+    // به pending برمی‌گردد و کاربر می‌تواند دوباره verify بزند — پولش
+    // در بازار محفوظ است و توکن هنوز مصرف‌نشده می‌ماند.
+    const delivered = await deliver(client, {
       userId,
+      order,
+      orderId,
       amount: Number(order.amount),
-      source: 'topup',
-      referenceType: 'payment_orders',
-      referenceId: orderId,
-      description: `شارژ کیف پول — ${product.label}`,
     });
 
     await client.query(
-      `UPDATE payment_orders SET wallet_tx_id=$2, updated_at=NOW() WHERE id=$1`,
-      [orderId, credited?.transaction?.id || null]);
+      `UPDATE payment_orders
+          SET granted_reference_id=$2, updated_at=NOW()
+        WHERE id=$1`,
+      [orderId, delivered?.referenceId || null]);
 
     await client.query('COMMIT');
     return {
       alreadyProcessed: false,
       amount: Number(order.amount),
-      balance: credited?.balance,
+      kind: order.purchase_kind,
+      ...delivered,
     };
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
@@ -276,32 +400,47 @@ async function verifyAndCredit(userId, orderId, purchaseToken) {
   }
 }
 
-/** بسته‌های قابل خرید برای نمایش در UI. */
+/** وضعیت درگاه + نگاشت قیمت‌ها، برای نمایش در UI. */
 function catalog() {
   return {
     enabled: configured() || cfg().sandbox,
     provider: 'cafebazaar',
-    products: Object.entries(PRODUCTS).map(([id, p]) => ({
-      id, amount: p.amount, label: p.label,
-    })),
+    // کیف پول دیگر شارژ نمی‌شود؛ کلاینت‌های قدیمی با دیدن این پرچم
+    // شیت شارژ را نشان نمی‌دهند.
+    walletTopupEnabled: false,
+    priceProducts: { ...PRICE_PRODUCTS },
+    plusProducts: Object.fromEntries(
+      Object.entries(PLUS_PRODUCTS).map(([k, v]) => [k, { ...v }])),
   };
 }
 
-/** تاریخچهٔ شارژ کاربر. */
+/** تاریخچهٔ خریدهای درگاهی کاربر. */
 async function history(userId, limit = 20) {
   const { rows } = await pool.query(
-    `SELECT id, amount, product_id, status, created_at, paid_at
-       FROM payment_orders
-      WHERE user_id=$1 AND status <> 'pending'
-      ORDER BY created_at DESC LIMIT $2`,
+    `SELECT o.id, o.amount, o.product_id, o.status, o.purchase_kind,
+            o.plus_cycle, o.created_at, o.paid_at,
+            i.name AS item_name, i.slug AS item_slug
+       FROM payment_orders o
+       LEFT JOIN shop_items i ON i.id = o.shop_item_id
+      WHERE o.user_id=$1 AND o.status <> 'pending'
+      ORDER BY o.created_at DESC LIMIT $2`,
     [userId, Math.min(50, Math.max(1, limit))]);
   return rows.map(r => ({
-    id: r.id, amount: Number(r.amount), productId: r.product_id,
-    status: r.status, createdAt: r.created_at, paidAt: r.paid_at,
+    id: r.id,
+    amount: Number(r.amount),
+    productId: r.product_id,
+    status: r.status,
+    kind: r.purchase_kind,
+    cycle: r.plus_cycle,
+    itemName: r.item_name,
+    itemSlug: r.item_slug,
+    createdAt: r.created_at,
+    paidAt: r.paid_at,
   }));
 }
 
 module.exports = {
-  PRODUCTS, createOrder, verifyAndCredit, catalog, history,
-  configured, verifyWithBazaar,
+  PRICE_PRODUCTS, PLUS_PRODUCTS, productForPrice,
+  createShopOrder, createPlusOrder, verifyAndDeliver,
+  catalog, history, configured, verifyWithBazaar,
 };

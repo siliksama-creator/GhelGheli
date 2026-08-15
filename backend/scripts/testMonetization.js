@@ -74,7 +74,13 @@ for (const [kind, slugs] of Object.entries(required)) {
 // Commission is direct-only, atomic, auditable and idempotent.
 assert.strictEqual((referrals.match(/async function payPurchaseCommission/g) || []).length, 1);
 assert(referrals.includes('PURCHASE_COMMISSION_PERCENT = 5'));
-assert(referrals.includes('VALUES($1,$2,$3,$4,$5,0.0500,$6)'));
+// نرخ باید در خودِ SQL هاردکد باشد (نه پارامتر) تا فراخوانی‌کننده
+// نتواند درصد دلخواه تزریق کند. تعداد پارامترها عمداً سنجیده نمی‌شود؛
+// افزودن ستونِ ممیزی نباید تست را بشکند.
+assert(/VALUES\(\$1,\$2,\$3,\$4,\$5,0\.0500(,\$\d+)+\)/.test(referrals),
+  'commission rate must stay hardcoded at 0.0500 inside the INSERT');
+// درگاه پرداخت باید در ردیف ممیزی ثبت شود (دور ۱۸: خرید مستقیم بازار).
+assert(referrals.includes('gateway_provider'), 'audit row must record the gateway');
 assert(rateMigration.includes('SET DEFAULT 0.0500'));
 assert(rateMigration.includes('0.1000'), 'historical 10% audit rows must remain valid');
 assert(referrals.includes('purchase_referral_commissions'));

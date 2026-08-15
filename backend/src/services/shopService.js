@@ -1,8 +1,8 @@
 // Deterministic cosmetics shop + monthly/annual GhelGheli Plus.
 // Prices and grants are authoritative here/the database; clients only render.
 const { pool } = require('../config/db');
-const wallet = require('./walletService');
 const referrals = require('./referralService');
+const payments = require('./paymentService');
 
 // Kept as named constants for economy audits and backwards-compatible tests.
 const PLUS_PRICE = 59000;
@@ -225,72 +225,78 @@ async function catalogue(userId) {
   };
 }
 
-async function buyItem(userId, itemId) {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const itemRes = await client.query(
-      `SELECT * FROM shop_items WHERE id=$1 AND is_active=true FOR UPDATE`,
-      [itemId],
-    );
-    const item = itemRes.rows[0];
-    if (!item) throw fail('کالا پیدا نشد', 404);
-    if (!item.is_purchasable || item.access_tier === 'annual') {
-      throw fail('این هدیه فقط همراه پلاس سالانه فعال می‌شود', 409);
-    }
-    const previous = await client.query(
-      `SELECT purchase_id FROM user_shop_items WHERE user_id=$1 AND item_id=$2`,
-      [userId, itemId],
-    );
-    if (previous.rows[0]) throw fail('این کالا را قبلاً خریده‌اید', 409);
-
-    const purchase = await client.query(
-      `INSERT INTO user_shop_items(user_id,item_id,price_paid)
-       VALUES($1,$2,$3) RETURNING purchase_id, bought_at`,
-      [userId, itemId, item.price],
-    );
-    const purchaseId = purchase.rows[0].purchase_id;
-    const payment = await wallet.debit(client, {
-      userId,
-      amount: Number(item.price),
-      source: 'shop',
-      referenceType: 'shop_item',
-      referenceId: purchaseId,
-      description: `خرید ${item.name}`,
-    });
-
-    // Buying a badge is permanent membership, independently of Plus.
-    if (item.kind === 'club_badge') {
-      const clubSlug = styleKey(item);
-      await client.query(
-        `INSERT INTO user_clubs(user_id,club_slug,source,joined_at)
-         VALUES($1,$2,'purchase',NOW())
-         ON CONFLICT(user_id,club_slug)
-         DO UPDATE SET source='purchase', joined_at=EXCLUDED.joined_at`,
-        [userId, clubSlug],
-      );
-    }
-
-    const commission = await referrals.payPurchaseCommission(client, {
-      buyerId: userId,
-      purchaseType: 'shop_item',
-      purchaseReferenceId: purchaseId,
-      purchaseAmount: Number(item.price),
-    });
-    await client.query('COMMIT');
-    return {
-      item: { ...item, price: Number(item.price), owned: true },
-      walletBalance: payment.balance,
-      boughtAt: purchase.rows[0].bought_at,
-      joinedClub: item.kind === 'club_badge' ? styleKey(item) : null,
-      referralCommissionCreated: Boolean(commission && !commission.duplicate),
-    };
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
+/**
+ * تحویل یک آیتم شاپ **پس از** تأیید پرداخت بازار.
+ *
+ * ⚠️ این تابع پول نمی‌گیرد. تنها فراخوانندهٔ مجازش
+ * `paymentService.verifyAndDeliver` است و فقط وقتی صدا زده می‌شود که
+ * کافه‌بازار پرداخت را تأیید کرده باشد. `client` همان تراکنشی است که
+ * سفارش را به `paid` تبدیل کرده — پس اگر تحویل بشکند، سفارش هم برمی‌گردد
+ * و کاربر می‌تواند دوباره verify بزند.
+ *
+ * قبلاً این تابع `buyItem` بود و از کیف پول `debit` می‌کرد. مالک آن مدل
+ * را رد کرد: کیف پول فقط پولِ خودِ کاربر است و خرید ۱۰۰٪ از بازار.
+ */
+async function deliverItem(client, { userId, itemId, amount }) {
+  const itemRes = await client.query(
+    `SELECT * FROM shop_items WHERE id=$1 AND is_active=true FOR UPDATE`,
+    [itemId],
+  );
+  const item = itemRes.rows[0];
+  if (!item) throw fail('کالا پیدا نشد', 404);
+  if (!item.is_purchasable || item.access_tier === 'annual') {
+    throw fail('این هدیه فقط همراه پلاس سالانه فعال می‌شود', 409);
   }
+
+  // مالکیت دوباره بررسی می‌شود گرچه `createShopOrder` هم بررسی کرده:
+  // بین ساخت سفارش و تأیید پرداخت ممکن است کاربر همان آیتم را از راه
+  // دیگری گرفته باشد (هدیهٔ سالانه، واریز ادمین). تحویلِ دوباره یعنی
+  // خطای UNIQUE و برگشتِ کل تراکنش — پس صریح و با پیام روشن رد می‌شود.
+  const previous = await client.query(
+    `SELECT purchase_id FROM user_shop_items WHERE user_id=$1 AND item_id=$2`,
+    [userId, itemId],
+  );
+  if (previous.rows[0]) throw fail('این کالا را قبلاً دریافت کرده‌اید', 409);
+
+  // `price_paid` مبلغِ واقعاً پرداخت‌شده در بازار است، نه قیمتِ فعلیِ
+  // آیتم. اگر مدیر بعداً قیمت را عوض کند، سابقهٔ مالی دست‌نخورده می‌ماند.
+  const purchase = await client.query(
+    `INSERT INTO user_shop_items(user_id,item_id,price_paid)
+     VALUES($1,$2,$3) RETURNING purchase_id, bought_at`,
+    [userId, itemId, Number(amount) || Number(item.price)],
+  );
+  const purchaseId = purchase.rows[0].purchase_id;
+
+  // Buying a badge is permanent membership, independently of Plus.
+  if (item.kind === 'club_badge') {
+    const clubSlug = styleKey(item);
+    await client.query(
+      `INSERT INTO user_clubs(user_id,club_slug,source,joined_at)
+       VALUES($1,$2,'purchase',NOW())
+       ON CONFLICT(user_id,club_slug)
+       DO UPDATE SET source='purchase', joined_at=EXCLUDED.joined_at`,
+      [userId, clubSlug],
+    );
+  }
+
+  // کمیسیون ۵٪ نقدی به معرف — تنها راهی که یک خرید به کیف پول پول
+  // اضافه می‌کند. مبلغِ مرجع قیمتِ کاملِ بازار است (تصمیم مالک)، نه
+  // سهم خالص پس از کسر ۳۰٪ کارمزد بازار.
+  const commission = await referrals.payPurchaseCommission(client, {
+    buyerId: userId,
+    purchaseType: 'shop_item',
+    purchaseReferenceId: purchaseId,
+    purchaseAmount: Number(amount) || Number(item.price),
+    gatewayProvider: 'cafebazaar',
+  });
+
+  return {
+    referenceId: purchaseId,
+    item: { ...item, price: Number(item.price), owned: true },
+    boughtAt: purchase.rows[0].bought_at,
+    joinedClub: item.kind === 'club_badge' ? styleKey(item) : null,
+    referralCommissionCreated: Boolean(commission && !commission.duplicate),
+  };
 }
 
 function normalizeBillingCycle(value) {
@@ -300,14 +306,23 @@ function normalizeBillingCycle(value) {
   throw fail('دوره اشتراک باید ماهانه یا سالانه باشد');
 }
 
-async function buyPlus(userId, billingCycle = 'monthly') {
+/**
+ * تحویل اشتراک پلاس **پس از** تأیید پرداخت بازار.
+ *
+ * ⚠️ پول نمی‌گیرد؛ فقط `paymentService.verifyAndDeliver` صدایش می‌زند.
+ *
+ * ── تمدید، نه بازنشانی ──
+ * اگر کاربر اشتراک فعال داشته باشد، دورهٔ جدید از `expires_at` فعلی
+ * شروع می‌شود نه از امروز. کاربری که ۲۰ روز اعتبار دارد و ماهانه
+ * می‌خرد، ۵۰ روز می‌گیرد — نه ۳۰ روز با ۲۰ روز سوخته. این همان رفتاری
+ * است که قبل از تغییرِ درگاه هم داشتیم و عمداً حفظ شده.
+ */
+async function deliverPlus(client, { userId, billingCycle, amount }) {
   const cycle = normalizeBillingCycle(billingCycle);
   const chosen = PLUS_PLANS[cycle];
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
+  {
     const locked = await client.query(
-      `SELECT wallet_balance FROM users WHERE id=$1 FOR UPDATE`, [userId]);
+      `SELECT id FROM users WHERE id=$1 FOR UPDATE`, [userId]);
     if (!locked.rows[0]) throw fail('کاربر پیدا نشد', 404);
 
     const active = await client.query(
@@ -326,14 +341,6 @@ async function buyPlus(userId, billingCycle = 'monthly') {
       [userId, chosen.plan, chosen.price, startsAt, expiresAt],
     );
     const subscriptionId = subscription.rows[0].id;
-    const payment = await wallet.debit(client, {
-      userId,
-      amount: chosen.price,
-      source: 'subscription',
-      referenceType: chosen.plan,
-      referenceId: subscriptionId,
-      description: `خرید ${chosen.label}`,
-    });
 
     if (cycle === 'annual') {
       await client.query(
@@ -366,27 +373,74 @@ async function buyPlus(userId, billingCycle = 'monthly') {
       );
     }
 
+    // کمیسیون ۵٪ نقدی به معرف، داخل همان تراکنش.
     const commission = await referrals.payPurchaseCommission(client, {
       buyerId: userId,
       purchaseType: cycle === 'annual' ? 'plus_annual' : 'plus_monthly',
       purchaseReferenceId: subscriptionId,
-      purchaseAmount: chosen.price,
+      purchaseAmount: Number(amount) || chosen.price,
+      gatewayProvider: 'cafebazaar',
     });
-    await client.query('COMMIT');
+
+    // `plusStatus` روی همین client خوانده می‌شود نه pool: اگر از pool
+    // بخوانیم، تراکنش هنوز commit نشده و وضعیتِ قبل از خرید برمی‌گردد —
+    // کاربر پول داده ولی پاسخ می‌گوید پلاس ندارد.
     return {
+      referenceId: subscriptionId,
       subscription: subscription.rows[0],
       billingCycle: cycle,
-      walletBalance: payment.balance,
-      plus: await plusStatus(userId),
+      plus: await plusStatus(userId, client),
       annualGiftsGranted: cycle === 'annual',
       referralCommissionCreated: Boolean(commission && !commission.duplicate),
     };
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
   }
+}
+
+// ── لایهٔ عمومی: سفارش → بازار → تحویل ────────────────────────────────
+//
+// این دو تابع همان چیزی هستند که روت‌ها صدا می‌زنند. عمداً اینجا (و نه در
+// paymentService) نشسته‌اند تا `require` یک‌طرفه بماند:
+//     routes → shopService → paymentService
+// اگر paymentService مستقیم shopService را require می‌کرد، حلقه می‌شد.
+
+/** مرحلهٔ ۱ برای آیتم شاپ: سفارش بساز و مشخصات محصول بازار را برگردان. */
+async function buyShopItem(userId, slug) {
+  return payments.createShopOrder(userId, slug);
+}
+
+/** مرحلهٔ ۱ برای پلاس. */
+async function buyPlusSubscription(userId, billingCycle = 'monthly') {
+  return payments.createPlusOrder(userId, billingCycle);
+}
+
+/**
+ * مرحلهٔ ۳: توکن را راستی‌آزمایی و کالا را تحویل بده.
+ *
+ * تابعِ تحویل بر اساس `purchase_kind` سفارش انتخاب می‌شود — از روی
+ * **سفارشِ ذخیره‌شده**، نه از روی چیزی که کلاینت فرستاده. کلاینت فقط
+ * `orderId` و `purchaseToken` می‌دهد؛ اینکه آن سفارش برای چه بوده و
+ * چقدر بوده، فقط از دیتابیس خوانده می‌شود.
+ */
+async function verifyPurchase(userId, orderId, purchaseToken) {
+  return payments.verifyAndDeliver(userId, orderId, purchaseToken,
+    async (client, { order, amount }) => {
+      if (order.purchase_kind === 'shop_item') {
+        if (!order.shop_item_id) throw fail('سفارش ناقص است', 409);
+        return deliverItem(client, {
+          userId, itemId: order.shop_item_id, amount,
+        });
+      }
+      if (order.purchase_kind === 'plus_monthly'
+       || order.purchase_kind === 'plus_annual') {
+        return deliverPlus(client, {
+          userId,
+          billingCycle: order.plus_cycle
+            || (order.purchase_kind === 'plus_annual' ? 'annual' : 'monthly'),
+          amount,
+        });
+      }
+      throw fail('نوع این سفارش پشتیبانی نمی‌شود', 409);
+    });
 }
 
 async function assertUsable(client, userId, item) {
@@ -623,8 +677,11 @@ async function isEmoteAllowed(userId, text) {
 
 module.exports = {
   catalogue,
-  buyItem,
-  buyPlus,
+  buyShopItem,
+  buyPlusSubscription,
+  deliverItem,
+  deliverPlus,
+  verifyPurchase,
   equip,
   plusStatus,
   purchaseHistory,

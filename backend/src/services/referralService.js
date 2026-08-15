@@ -65,6 +65,17 @@ const BASE_DAILY_SPINS = 1;
  *   ۲. کمیسیونِ **نقدی** (`payPurchaseCommission`، ۵٪): فقط از فروشِ
  *      شاپ (`shop_item` | `plus_monthly` | `plus_annual`) و به کیف پول.
  *
+ *      از دور ۱۸ این خریدها **۱۰۰٪ از کافه‌بازار** انجام می‌شوند، نه از
+ *      موجودی کیف پول. یعنی هر کمیسیونی که اینجا پرداخت می‌شود پشتش یک
+ *      پرداختِ واقعیِ تأییدشده توسط بازار وجود دارد — دیگر ممکن نیست
+ *      کسی با جایزهٔ لیگ آیتم بخرد و برای معرفش کمیسیون بسازد.
+ *
+ *      مبلغِ مرجع، **قیمتِ کاملی** است که کاربر در بازار پرداخته
+ *      (تصمیم مالک)، نه سهم خالصِ ما پس از کسر ~۳۰٪ کارمزد بازار. روی
+ *      پلاس ۵۹٬۰۰۰ تومانی معرف ۲٬۹۵۰ می‌گیرد در حالی که سهم ما ۴۱٬۳۰۰
+ *      است. آگاهانه سخاوتمندانه: عددی که کاربر می‌بیند همان عددی است که
+ *      ۵٪ رویش حساب می‌شود.
+ *
  * ⚠️ استثنای مهم — «کارتِ نقدی»:
  *
  *   کارتی که `card_types.cash_amount > 0` دارد، هنگام ثبت مستقیماً پولِ
@@ -327,7 +338,8 @@ async function payCommission(client, userId, basePoints, source) {
  */
 async function payPurchaseCommission(
   client,
-  { buyerId, purchaseType, purchaseReferenceId, purchaseAmount },
+  { buyerId, purchaseType, purchaseReferenceId, purchaseAmount,
+    gatewayProvider = null },
 ) {
   const amount = Math.floor(Number(purchaseAmount) || 0);
   if (amount <= 0 || !purchaseReferenceId) return null;
@@ -354,11 +366,12 @@ async function payPurchaseCommission(
   const reserved = await client.query(
     `INSERT INTO purchase_referral_commissions
        (referrer_id, referred_user_id, purchase_type, purchase_reference_id,
-        purchase_amount, commission_rate, commission_amount)
-     VALUES($1,$2,$3,$4,$5,0.0500,$6)
+        purchase_amount, commission_rate, commission_amount, gateway_provider)
+     VALUES($1,$2,$3,$4,$5,0.0500,$6,$7)
      ON CONFLICT(purchase_type, purchase_reference_id) DO NOTHING
      RETURNING id`,
-    [referrerId, buyerId, purchaseType, purchaseReferenceId, amount, earned],
+    [referrerId, buyerId, purchaseType, purchaseReferenceId, amount, earned,
+      gatewayProvider],
   );
   if (!reserved.rows[0]) return { duplicate: true, referrerId, earned: 0 };
 

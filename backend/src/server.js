@@ -1308,9 +1308,17 @@ const shopLimiter = rateLimit({
   message: { message: 'تعداد درخواست‌ها زیاد است؛ کمی صبر کن' },
 });
 
+// ── خرید: مرحلهٔ ۱ (ساخت سفارش) ───────────────────────────────────────
+//
+// این روت‌ها دیگر چیزی نمی‌فروشند؛ فقط سفارشِ pending می‌سازند و شناسهٔ
+// محصولِ کافه‌بازار را برمی‌گردانند تا کلاینت پنجرهٔ پرداخت را باز کند.
+// تحویلِ واقعی فقط در `/api/purchase/verify` و پس از تأیید بازار.
+//
+// کیف پول در هیچ‌کدام از این مسیرها دخالت ندارد.
+
 app.post('/api/shop/items/:id/buy', auth, validateUuid('id'), shopLimiter, asyncHandler(async (req, res) => {
   try {
-    res.json(await shop.buyItem(req.user.id, req.params.id));
+    res.json(await shop.buyShopItem(req.user.id, req.params.id));
   } catch (e) {
     res.status(e.status || 500).json({ message: e.message || 'خطا در خرید' });
   }
@@ -1318,12 +1326,36 @@ app.post('/api/shop/items/:id/buy', auth, validateUuid('id'), shopLimiter, async
 
 app.post('/api/shop/plus', auth, shopLimiter, asyncHandler(async (req, res) => {
   try {
-    res.json(await shop.buyPlus(
+    res.json(await shop.buyPlusSubscription(
       req.user.id,
       req.body?.billingCycle || req.body?.cycle || 'monthly',
     ));
   } catch (e) {
     res.status(e.status || 500).json({ message: e.message || 'خطا در خرید اشتراک' });
+  }
+}));
+
+// ── خرید: مرحلهٔ ۳ (راستی‌آزمایی و تحویل) ─────────────────────────────
+//
+// یک روتِ واحد برای هر دو نوع خرید. نوعِ سفارش از دیتابیس خوانده می‌شود
+// نه از بدنهٔ درخواست — کلاینت نمی‌تواند با فرستادن kind دلخواه، سفارشِ
+// ۹٬۰۰۰ تومانی را به پلاس سالانه تبدیل کند.
+app.post('/api/purchase/verify', auth, shopLimiter, asyncHandler(async (req, res) => {
+  try {
+    const result = await shop.verifyPurchase(
+      req.user.id,
+      String(req.body?.orderId || ''),
+      String(req.body?.purchaseToken || ''),
+    );
+    res.json({
+      ok: true,
+      ...result,
+      message: result.alreadyProcessed
+        ? 'این خرید قبلاً ثبت شده بود'
+        : 'خرید با موفقیت انجام شد',
+    });
+  } catch (e) {
+    res.status(e.status || 500).json({ message: e.message || 'خطا در تأیید خرید' });
   }
 }));
 
@@ -2350,9 +2382,7 @@ app.use('/api', require('./routes/growth')({
   auth, adminAuth, requireRole, asyncHandler, validateUuid, presence, rateLimit,
 }));
 
-app.use('/api', require('./routes/payments')({
-  auth, asyncHandler, rateLimit,
-}));
+app.use('/api', require('./routes/payments')({ auth, asyncHandler }));
 
 io.use(async (socket, next) => {
   try {

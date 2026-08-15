@@ -23,8 +23,6 @@ class _ShopPageState extends State<ShopPage> {
   String? _busy;
   String _kind = 'card_frame';
   bool _showPlans = true;
-  bool _showTopup = false;
-  Map<String, dynamic>? _topup;
 
   static const _categories = <(String, String, IconData)>[
     ('club_badge', 'باشگاه‌ها', Icons.shield_rounded),
@@ -35,42 +33,27 @@ class _ShopPageState extends State<ShopPage> {
     ('emote_pack', 'پیام‌ها', Icons.forum_rounded),
   ];
 
-  @override
-  void initState() {
-    super.initState();
-    _loadTopupCatalog();
-  }
-
-  /// بسته‌های شارژ. شکستِ این درخواست نباید فروشگاه را از کار بیندازد،
-  /// پس خطا بی‌صدا به «غیرفعال» تبدیل می‌شود.
-  Future<void> _loadTopupCatalog() async {
-    try {
-      final data = await widget.api.get('/api/wallet/topup/catalog');
-      if (mounted && data is Map) {
-        setState(() => _topup = Map<String, dynamic>.from(data));
-      }
-    } catch (_) {
-      if (mounted) setState(() => _topup = const {'enabled': false, 'products': []});
-    }
-  }
-
-  /// خرید بستهٔ شارژ: سفارش → پرداخت بازار → راستی‌آزمایی سرور.
-  Future<void> _buyTopup(Map<String, dynamic> product) async {
-    final id = '${product['id']}';
-    await _run(() async {
-      final order = await widget.api.post('/api/wallet/topup/order', {
-        'productId': id,
-      });
-      final orderId = '${(order as Map)['orderId']}';
-      final token = await BazaarBilling.purchase(
-        productId: id,
-        payload: orderId,
-      );
-      return widget.api.post('/api/wallet/topup/verify', {
-        'orderId': orderId,
-        'purchaseToken': token,
-      });
-    }, 'topup-$id', 'کیف پول شارژ شد');
+  /// خرید مستقیم از کافه‌بازار — سه گام، و گام سوم حیاتی است.
+  ///
+  ///   ۱. سرور سفارش pending می‌سازد و قیمت را **خودش** از دیتابیس
+  ///      می‌خواند (هیچ مبلغی از این کلاینت فرستاده نمی‌شود)
+  ///   ۲. Poolakey پرداخت را می‌گیرد و `purchaseToken` می‌دهد
+  ///   ۳. سرور توکن را مستقیم از API کافه‌بازار راستی‌آزمایی می‌کند و
+  ///      تازه بعد آیتم را تحویل می‌دهد
+  ///
+  /// بدون گام ۳ هر کسی با یک اپ دست‌کاری‌شده می‌توانست بگوید «خریدم» و
+  /// رایگان صاحب همه‌چیز شود. کیف پول در این مسیر اصلاً دخالت ندارد.
+  Future<dynamic> _purchase(dynamic order) async {
+    final map = Map<String, dynamic>.from(order as Map);
+    final orderId = '${map['orderId']}';
+    final token = await BazaarBilling.purchase(
+      productId: '${map['productId']}',
+      payload: orderId,
+    );
+    return widget.api.post('/api/purchase/verify', {
+      'orderId': orderId,
+      'purchaseToken': token,
+    });
   }
 
   Future<void> _reload() async {
@@ -107,7 +90,7 @@ class _ShopPageState extends State<ShopPage> {
     }
   }
 
-  Future<void> _buyPlan(Map<String, dynamic> plan, int balance) async {
+  Future<void> _buyPlan(Map<String, dynamic> plan) async {
     final price = (plan['price'] as num?)?.toInt() ?? 0;
     final annual = plan['billingCycle'] == 'annual';
     final ok = await showDialog<bool>(
@@ -118,17 +101,11 @@ class _ShopPageState extends State<ShopPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${Money.withUnit(price)} از کیف پول کم می‌شود.'),
+            Text('${Money.withUnit(price)} از طریق کافه‌بازار پرداخت می‌شود.'),
             Gaps.vXs,
             Text(annual
                 ? 'قاب، عنوان پروفایل و قالب نتیجهٔ سالانه دائمی هستند؛ یک فرصت تغییر باشگاه هم می‌گیری.'
                 : 'دسترسی قاب‌ها و افکت نام، ستاره پلاس، Premium Pass و حذف تبلیغات برای ۳۰ روز فعال می‌شود.'),
-            Gaps.vXs,
-            Text('موجودی: ${Money.withUnit(balance)}',
-                style: Theme.of(ctx).textTheme.bodySmall),
-            if (balance < price)
-              Text('موجودی ${Money.withUnit(price - balance)} کم است.',
-                  style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
           ],
         ),
         actions: [
@@ -136,23 +113,23 @@ class _ShopPageState extends State<ShopPage> {
               onPressed: () => Navigator.pop(ctx, false),
               child: const Text('انصراف')),
           FilledButton(
-            onPressed: balance < price ? null : () => Navigator.pop(ctx, true),
-            child: const Text('تأیید خرید'),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('پرداخت'),
           ),
         ],
       ),
     );
     if (ok != true) return;
     await _run(
-      () => widget.api.post('/api/shop/plus', {
+      () async => _purchase(await widget.api.post('/api/shop/plus', {
         'billingCycle': plan['billingCycle'],
-      }),
+      })),
       'plus-${plan['billingCycle']}',
       annual ? 'پلاس سالانه و هدیه‌های دائمی فعال شد' : 'پلاس ماهانه فعال شد',
     );
   }
 
-  Future<void> _buyItem(Map<String, dynamic> item, int balance) async {
+  Future<void> _buyItem(Map<String, dynamic> item) async {
     final price = (item['price'] as num?)?.toInt() ?? 0;
     final ok = await showDialog<bool>(
       context: context,
@@ -162,7 +139,7 @@ class _ShopPageState extends State<ShopPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${Money.withUnit(price)} از کیف پول کم می‌شود.'),
+            Text('${Money.withUnit(price)} از طریق کافه‌بازار پرداخت می‌شود.'),
             Gaps.vXs,
             const Text(
                 'این آیتم ظاهری برای همیشه در کلکسیونت می‌ماند و هیچ قدرت رقابتی نمی‌دهد.'),
@@ -171,11 +148,6 @@ class _ShopPageState extends State<ShopPage> {
               const Text(
                   'خرید نشان، عضویت دائمی همان باشگاه را هم فعال می‌کند.'),
             ],
-            if (balance < price) ...[
-              Gaps.vXs,
-              Text('موجودی ${Money.withUnit(price - balance)} کم است.',
-                  style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
-            ],
           ],
         ),
         actions: [
@@ -183,15 +155,16 @@ class _ShopPageState extends State<ShopPage> {
               onPressed: () => Navigator.pop(ctx, false),
               child: const Text('انصراف')),
           FilledButton(
-            onPressed: balance < price ? null : () => Navigator.pop(ctx, true),
-            child: const Text('بله، بخر'),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('پرداخت'),
           ),
         ],
       ),
     );
     if (ok != true) return;
     await _run(
-      () => widget.api.post('/api/shop/items/${item['id']}/buy', {}),
+      () async => _purchase(
+          await widget.api.post('/api/shop/items/${item['id']}/buy', {})),
       'buy-${item['id']}',
       '${item['name']} به کلکسیون اضافه شد',
     );
@@ -249,16 +222,7 @@ class _ShopPageState extends State<ShopPage> {
                 plus: plus,
                 expanded: _showPlans,
                 onToggle: () => setState(() => _showPlans = !_showPlans),
-                onTopup: () => setState(() => _showTopup = !_showTopup),
               ),
-              if (_showTopup) ...[
-                Gaps.vSm,
-                _TopupSheet(
-                  catalog: _topup,
-                  busy: _busy,
-                  onBuy: _buyTopup,
-                ),
-              ],
               if (_showPlans && plans.isNotEmpty) ...[
                 Gaps.vSm,
                 SizedBox(
@@ -273,7 +237,7 @@ class _ShopPageState extends State<ShopPage> {
                         plan: plan,
                         activeTier: '${plus['tier'] ?? ''}',
                         busy: _busy == 'plus-${plan['billingCycle']}',
-                        onBuy: () => _buyPlan(plan, balance),
+                        onBuy: () => _buyPlan(plan),
                       );
                     },
                   ),
@@ -303,7 +267,6 @@ class _ShopPageState extends State<ShopPage> {
                     ? available.firstWhere((c) => c.$1 == _kind).$2
                     : 'فروشگاه',
                 items: visible,
-                balance: balance,
                 busy: _busy,
                 onBuy: _buyItem,
                 onEquip: _equip,
@@ -332,13 +295,11 @@ class _ShopHero extends StatelessWidget {
     required this.plus,
     required this.expanded,
     required this.onToggle,
-    required this.onTopup,
   });
   final int balance;
   final Map<String, dynamic> plus;
   final bool expanded;
   final VoidCallback onToggle;
-  final VoidCallback onTopup;
 
   @override
   Widget build(BuildContext context) {
@@ -396,29 +357,14 @@ class _ShopHero extends StatelessWidget {
                             color: Color(0xFF22E7A6),
                             fontWeight: FontWeight.w900)),
                   ),
-                  Gaps.hXs,
-                  // بدون این دکمه، کاربری که موجودی ندارد به بن‌بست
-                  // می‌خورد: «موجودی کافی نیست» می‌گیرد و هیچ راهی
-                  // برای شارژ نمی‌بیند.
-                  SizedBox(
-                    height: 30,
-                    width: 88,
-                    child: OutlinedButton.icon(
-                      onPressed: onTopup,
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        foregroundColor: const Color(0xFFFFD166),
-                        side: const BorderSide(color: Color(0x80FFD166)),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                      ),
-                      icon: const Icon(Icons.add_rounded, size: 16),
-                      label: const Text('شارژ',
-                          style: TextStyle(
-                              fontSize: 12, fontWeight: FontWeight.w900)),
-                    ),
-                  ),
                 ]),
+                // آینهٔ `shopPayNote` در وب. کاربر باید بداند این موجودی
+                // خرج خرید نمی‌شود — فقط برداشت نقدی.
+                Gaps.vXxs,
+                const Text(
+                  'پرداخت امن از طریق کافه‌بازار · موجودی کیف پول برای برداشت نقدی است',
+                  style: TextStyle(fontSize: 9.5, color: Colors.white54),
+                ),
               ],
             ),
           ),
@@ -435,93 +381,7 @@ class _ShopHero extends StatelessWidget {
   }
 }
 
-/// بسته‌های شارژ کیف پول.
-class _TopupSheet extends StatelessWidget {
-  const _TopupSheet({
-    required this.catalog,
-    required this.busy,
-    required this.onBuy,
-  });
-
-  final Map<String, dynamic>? catalog;
-  final String? busy;
-  final Future<void> Function(Map<String, dynamic>) onBuy;
-
-  @override
-  Widget build(BuildContext context) {
-    final enabled = catalog?['enabled'] == true && BazaarBilling.available;
-    final products = ((catalog?['products'] as List?) ?? const [])
-        .whereType<Map>()
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xD9040C16),
-        borderRadius: Corners.rLg,
-        border: Border.all(color: const Color(0x52FFD166)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('شارژ کیف پول',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
-          Text(
-            enabled
-                ? 'پرداخت امن از طریق کافه‌بازار'
-                : 'پرداخت درون‌برنامه‌ای هنوز فعال نشده است',
-            style: const TextStyle(fontSize: 11.5, color: Color(0xFFB9C5D5)),
-          ),
-          Gaps.vSm,
-          Wrap(
-            spacing: 9,
-            runSpacing: 9,
-            children: [
-              for (final product in products)
-                SizedBox(
-                  width: 104,
-                  child: OutlinedButton(
-                    onPressed: !enabled || busy == 'topup-${product['id']}'
-                        ? null
-                        : () => onBuy(product),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      side: const BorderSide(color: Color(0x24FFFFFF)),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14)),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          Money.format(
-                              (product['amount'] as num?)?.toInt() ?? 0),
-                          style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFFFFD166)),
-                        ),
-                        const Text('تومان',
-                            style: TextStyle(
-                                fontSize: 10.5, color: Color(0xFF94A3B8))),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          Gaps.vXs,
-          const Text(
-            'پلاس ماهانه ۵۹٬۰۰۰ تومان · پلاس سالانه ۴۹۹٬۰۰۰ تومان',
-            style: TextStyle(fontSize: 11.5, color: Color(0xFF9CABBC)),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
+/// کارت پلن پلاس (ماهانه/سالانه).
 class _PlanCard extends StatelessWidget {
   const _PlanCard({
     required this.plan,
@@ -674,16 +534,14 @@ class _CategoryShelf extends StatelessWidget {
   const _CategoryShelf({
     required this.title,
     required this.items,
-    required this.balance,
     required this.busy,
     required this.onBuy,
     required this.onEquip,
   });
   final String title;
   final List<Map<String, dynamic>> items;
-  final int balance;
   final String? busy;
-  final void Function(Map<String, dynamic>, int) onBuy;
+  final void Function(Map<String, dynamic>) onBuy;
   final void Function(Map<String, dynamic>) onEquip;
 
   @override
@@ -721,7 +579,7 @@ class _CategoryShelf extends StatelessWidget {
                         item: item,
                         busy: busy == 'buy-${item['id']}' ||
                             busy == 'equip-${item['id']}',
-                        onBuy: () => onBuy(item, balance),
+                        onBuy: () => onBuy(item),
                         onEquip: () => onEquip(item),
                       );
                     },

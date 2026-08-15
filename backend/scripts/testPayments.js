@@ -1,8 +1,17 @@
-// تست لایهٔ شارژ کیف پول (کافه‌بازار)
+// تست لایهٔ خرید مستقیم از کافه‌بازار
 //
 // این تست‌ها بدون دیتابیس اجرا می‌شوند: فقط قراردادها و ثابت‌هایی را
-// می‌سنجند که اگر بشکنند، «پولِ پرداخت‌شده شارژ نمی‌شود» — یعنی بدترین
-// نوع باگ در یک اپ پولی، چون کاربر پول داده و چیزی نگرفته.
+// می‌سنجند که اگر بشکنند، «کاربر پول می‌دهد و چیزی نمی‌گیرد» — یعنی
+// بدترین نوع باگ در یک اپ پولی.
+//
+// معماری‌ای که این فایل نگهبانش است (تصمیم مالک، دور ۱۸):
+//
+//     کیف پول  = پولِ خودِ کاربر. ورودی: کارت نقدی/لیگ/گردونه/کمیسیون.
+//                خروجی: فقط برداشت. ✗ هرگز خرج خرید نمی‌شود.
+//     خرید     = ۱۰۰٪ از کافه‌بازار. ✗ هرگز از کیف پول.
+//
+// اگر روزی کسی دوباره `wallet.debit` را به مسیر خرید برگرداند، تست‌های
+// «تفکیک کیف پول از خرید» قرمز می‌شوند.
 const fs = require('fs');
 const path = require('path');
 
@@ -14,74 +23,180 @@ function ok(label, cond) {
 function section(t) { console.log(`\n== ${t} ==`); }
 
 const root = path.join(__dirname, '..');
-const svc = fs.readFileSync(path.join(root, 'src/services/paymentService.js'), 'utf8');
-const routes = fs.readFileSync(path.join(root, 'src/routes/payments.js'), 'utf8');
-const walletSvc = fs.readFileSync(path.join(root, 'src/services/walletService.js'), 'utf8');
-const migration = fs.readFileSync(path.join(root, 'migrations/067_payment_orders.sql'), 'utf8');
-const server = fs.readFileSync(path.join(root, 'src/server.js'), 'utf8');
+const R = (p) => fs.readFileSync(path.join(root, p), 'utf8');
+const svc      = R('src/services/paymentService.js');
+const routes   = R('src/routes/payments.js');
+const walletSvc= R('src/services/walletService.js');
+const shopSvc  = R('src/services/shopService.js');
+const referral = R('src/services/referralService.js');
+const server   = R('src/server.js');
+const mig067   = R('migrations/067_payment_orders.sql');
+const mig068   = R('migrations/068_direct_purchase.sql');
 
 // ───────────────────────────────────────────────────────────────────────
-section('همسانی منبع تراکنش بین کد و دیتابیس');
-// این دقیقاً همان باگی است که در بازبینی گرفته شد: `topup` به مایگریشن
-// اضافه شده بود ولی به VALID_SOURCES نه — نتیجه: هر شارژ با خطای
-// «منبع تراکنش نامعتبر» رد می‌شد، بعد از اینکه کاربر پول داده بود.
+section('تفکیک کیف پول از خرید');
+// مهم‌ترین بخش. مالک صریحاً خواست خرید هرگز از کیف پول کم نکند.
+ok('shopService دیگر walletService را require نمی‌کند',
+  !/require\(['"]\.\/walletService['"]\)/.test(shopSvc));
+ok('هیچ debit کیف پولی در shopService نمانده',
+  !/wallet\.debit\s*\(/.test(shopSvc));
+// فهرست را یک‌بار پارس می‌کنیم. regexِ سرراست («'shop' جایی بعد از
+// VALID_SOURCES هست؟») اشتباه است، چون LEGACY_SOURCES پایین‌ترش همین
+// نام‌ها را عمداً دارد و تست را همیشه سبز/قرمز نشان می‌داد.
 const jsSources = (walletSvc.match(/const VALID_SOURCES = new Set\(\[([\s\S]*?)\]\);/)[1]
+  .match(/'([a-z_]+)'/g) || []).map(x => x.replace(/'/g, ''));
+for (const dead of ['shop', 'subscription', 'topup', 'topup_refund']) {
+  ok(`منبع ${dead} دیگر تولید نمی‌شود`, !jsSources.includes(dead));
+}
+ok('منابع قدیمی در LEGACY_SOURCES مستند شده‌اند',
+  /LEGACY_SOURCES/.test(walletSvc)
+  && /LEGACY_SOURCES[\s\S]*?'shop'[\s\S]*?'subscription'/.test(walletSvc)
+  && /LEGACY_SOURCES[\s\S]*?'topup'/.test(walletSvc));
+
+// CHECK دیتابیس باید مقادیر قدیمی را نگه دارد وگرنه ردیف‌های تاریخی
+// نامعتبر می‌شوند و مایگریشن روی دیتابیس واقعی می‌ترکد.
+ok('CHECK دیتابیس مقادیر تاریخی را نگه داشته',
+  /'shop'/.test(mig067) && /'subscription'/.test(mig067) && /'topup'/.test(mig067));
+ok('مایگریشن ۰۶۸ منبع جدیدی به دفترکل اضافه نمی‌کند',
+  !/ADD CONSTRAINT wallet_transactions_source_check/.test(mig068));
+
+// هر منبعی که کد می‌سازد باید در CHECK دیتابیس باشد. این همان باگی است
+// که در دور ۱۷ گرفته شد و می‌توانست پولِ پرداخت‌شده را ببلعد.
+const sqlSources = (mig067.match(/CHECK \(source IN \(([\s\S]*?)\)\)/)[1]
   .match(/'([a-z_]+)'/g) || []).map(s => s.replace(/'/g, ''));
-const chkBlock = migration.match(/source\s+IN\s*\(([\s\S]*?)\)/i);
-const sqlSources = ((chkBlock ? chkBlock[1] : '').match(/'([a-z_]+)'/g) || [])
-  .map(s => s.replace(/'/g, ''));
-
-ok('topup در VALID_SOURCES هست', jsSources.includes('topup'));
-ok('topup_refund در VALID_SOURCES هست', jsSources.includes('topup_refund'));
-ok('topup در CHECK مایگریشن هست', sqlSources.includes('topup'));
-ok('فهرست JS و CHECK دقیقاً یکی است',
-  jsSources.length === sqlSources.length &&
-  jsSources.every(s => sqlSources.includes(s)));
+const orphans = jsSources.filter(s => !sqlSources.includes(s));
+ok(`همهٔ ${jsSources.length} منبع فعال در CHECK دیتابیس هستند`
+  + (orphans.length ? ` — یتیم: ${orphans.join(',')}` : ''), orphans.length === 0);
+ok('purchase_referral هنوز فعال است (تنها ورودیِ خرید به کیف پول)',
+  jsSources.includes('purchase_referral'));
+ok('کارت نقدی و لیگ هنوز می‌توانند کیف پول را پر کنند',
+  jsSources.includes('card_cash') && jsSources.includes('league'));
 
 // ───────────────────────────────────────────────────────────────────────
-section('ضدتقلب — مبلغ هرگز از کلاینت خوانده نمی‌شود');
-ok('روت‌ها amount را از body نمی‌خوانند', !/body\??\.\s*amount/.test(routes));
-ok('createOrder مبلغ را از جدول محصولات می‌گیرد',
-  /PRODUCTS\[[^\]]+\]/.test(svc) && /product\.amount/.test(svc));
-ok('verifyAndCredit مبلغ را از سفارشِ ذخیره‌شده می‌خواند',
-  /Number\(order\.amount\)/.test(svc));
+section('قیمت هرگز از کلاینت گرفته نمی‌شود');
+ok('createShopOrder قیمت را از جدول shop_items می‌خواند',
+  /createShopOrder[\s\S]*?SELECT[\s\S]*?price[\s\S]*?FROM shop_items/.test(svc));
+ok('createPlusOrder قیمت را از PLUS_PRODUCTS سمت سرور می‌خواند',
+  /createPlusOrder[\s\S]*?plan\.price/.test(svc));
+ok('verifyAndDeliver مبلغ را از سفارشِ ذخیره‌شده می‌خواند',
+  /verifyAndDeliver[\s\S]*?SELECT \* FROM payment_orders WHERE id=\$1 AND user_id=\$2/.test(svc));
+// مبلغِ برداشت را کاربر تعیین می‌کند و درست است؛ فقط مسیرهای *خرید*
+// نباید قیمت را از کلاینت بگیرند.
+const buyRoutes = (server.match(
+  /app\.post\('\/api\/(?:shop\/items\/:id\/buy|shop\/plus|purchase\/verify)'[\s\S]*?\n\}\)\);/g
+) || []).join('\n');
+ok('هر سه مسیر خرید پیدا شدند', (buyRoutes.match(/app\.post/g) || []).length === 3);
+ok('هیچ مبلغی در مسیرهای خرید از req.body خوانده نمی‌شود',
+  !/req\.body[^\n]*\b(amount|price|مبلغ)\b/.test(buyRoutes));
+ok('نوع خرید از سفارش خوانده می‌شود نه از بدنهٔ درخواست',
+  /order\.purchase_kind/.test(shopSvc)
+  && !/req\.body[^\n]*\bkind\b/.test(buyRoutes));
+ok('verify فقط orderId و purchaseToken می‌گیرد',
+  /purchase\/verify[\s\S]*?req\.body\?\.orderId[\s\S]*?req\.body\?\.purchaseToken/.test(server));
 
 // ───────────────────────────────────────────────────────────────────────
-section('ایدمپوتنسی — یک پرداخت دو بار شارژ نمی‌شود');
-ok('سفارشِ paid دوباره شارژ نمی‌شود',
-  /status === 'paid'/.test(svc) && /alreadyProcessed: true/.test(svc));
-ok('UPDATE فقط روی سفارشِ pending اثر دارد',
+section('ایدمپوتنسی — پرداخت دوبار تحویل نمی‌گیرد');
+ok('claim فقط روی سفارش pending اثر می‌کند',
   /WHERE id=\$1 AND status='pending'/.test(svc));
-ok('برخورد UNIQUE توکن (23505) گرفته می‌شود', /'23505'/.test(svc));
-ok('مایگریشن UNIQUE روی توکن دارد',
-  /UNIQUE/i.test(migration) && /purchase_token/.test(migration));
-ok('شارژ داخل تراکنش است', /BEGIN/.test(svc) && /COMMIT/.test(svc));
-ok('در خطا ROLLBACK می‌شود', /ROLLBACK/.test(svc));
+ok('توکن تکراری با کد 23505 گرفته می‌شود',
+  /e\.code === '23505'/.test(svc));
+ok('UNIQUE روی (provider, purchase_token) در مایگریشن هست',
+  /CREATE UNIQUE INDEX[\s\S]*?payment_orders \(provider, purchase_token\)/.test(mig067));
+ok('سفارشِ paid بدون تحویل دوباره برمی‌گردد',
+  /status === 'paid'[\s\S]*?alreadyProcessed: true/.test(svc));
+ok('تحویل داخل همان تراکنشِ claim انجام می‌شود',
+  /claimed\.rowCount[\s\S]*?deliver\(client/.test(svc));
+ok('مالکیت قبل از تحویل دوباره بررسی می‌شود',
+  /deliverItem[\s\S]*?SELECT purchase_id FROM user_shop_items/.test(shopSvc));
 
 // ───────────────────────────────────────────────────────────────────────
-section('راستی‌آزمایی سمت سرور');
-ok('توکن با API کافه‌بازار چک می‌شود', /verifyWithBazaar/.test(svc));
-ok('فقط purchaseState صفر موفق است', /purchaseState/.test(svc));
-ok('دامنهٔ رسمی پرداخت بازار', /pardakht\.cafebazaar\.ir/.test(svc));
-ok('پرداخت تأییدنشده سفارش را failed می‌کند', /status='failed'/.test(svc));
+section('تأیید سمت سرور — به کلاینت اعتماد نمی‌شود');
+ok('purchaseState از پاسخ بازار بررسی می‌شود',
+  /Number\(json\.purchaseState\) === 0/.test(svc));
+ok('آدرس API بازار هاردکد است نه از ورودی',
+  /const BAZAAR_API = 'https:\/\/pardakht\.cafebazaar\.ir'/.test(svc));
+ok('حالت sandbox پیش‌فرض خاموش است',
+  /process\.env\.BAZAAR_SANDBOX === 'true'/.test(svc));
+ok('sandbox فقط توکن با پیشوند SANDBOX- را می‌پذیرد',
+  /startsWith\('SANDBOX-'\)/.test(svc));
+ok('بدون اعتبارنامه، سفارش ساخته نمی‌شود',
+  (svc.match(/GATEWAY_OFF/g) || []).length >= 2);
 
 // ───────────────────────────────────────────────────────────────────────
-section('دسترسی و محدودیت نرخ');
-const routeLines = routes.split('\n').filter(l => /router\.(get|post)\(/.test(l));
-ok('هر چهار روت تعریف شده‌اند', routeLines.length === 4);
-ok('همهٔ روت‌ها auth دارند', routeLines.every(l => /auth/.test(l)));
-ok('order و verify محدودکنندهٔ نرخ دارند',
-  (routes.match(/payLimiter/g) || []).length >= 3);
-ok('روت‌ها در server.js ثبت شده‌اند', /require\('\.\/routes\/payments'\)/.test(server));
+section('کمیسیون ۵٪ معرف');
+ok('کمیسیون در تحویلِ آیتم پرداخت می‌شود',
+  /deliverItem[\s\S]*?payPurchaseCommission/.test(shopSvc));
+ok('کمیسیون در تحویلِ پلاس پرداخت می‌شود',
+  /deliverPlus[\s\S]*?payPurchaseCommission/.test(shopSvc));
+ok('کمیسیون روی قیمت کاملِ پرداختی حساب می‌شود',
+  /purchaseAmount: Number\(amount\)/.test(shopSvc));
+ok('درگاه در سند کمیسیون ثبت می‌شود',
+  /gatewayProvider: 'cafebazaar'/.test(shopSvc)
+  && /gateway_provider/.test(referral));
+ok('نرخ کمیسیون ۵٪ است',
+  /PURCHASE_COMMISSION_PERCENT\s*=\s*(?:Number\([^)]*\)\s*\|\|\s*)?5/.test(referral)
+  || /0\.0500/.test(referral));
+ok('کمیسیون به کیف پول واریز می‌شود (source=purchase_referral)',
+  /source: 'purchase_referral'/.test(referral));
+ok('سند کمیسیون یکتاست (ON CONFLICT DO NOTHING)',
+  /ON CONFLICT\(purchase_type, purchase_reference_id\) DO NOTHING/.test(referral));
 
 // ───────────────────────────────────────────────────────────────────────
-section('بسته‌های شارژ');
-const amounts = [...svc.matchAll(/amount:\s*(\d+)/g)].map(m => Number(m[1]));
-ok('پنج بسته تعریف شده', amounts.length === 5);
-ok('بسته‌ها صعودی‌اند', amounts.every((v, i) => i === 0 || v > amounts[i - 1]));
-ok('بسته‌ای هست که پلاس ماهانه (۵۹٬۰۰۰) را پوشش دهد', amounts.some(a => a >= 59000));
-ok('بسته‌ای هست که پلاس سالانه (۴۹۹٬۰۰۰) را پوشش دهد', amounts.some(a => a >= 499000));
-ok('شناسهٔ محصول‌ها با پیشوند یکسان', (svc.match(/ghelgheli_wallet_/g) || []).length >= 5);
+section('کمیسیون امتیازی از دوستان');
+ok('فقط از منابع card و tap',
+  /COMMISSIONABLE = new Set\(\['card', 'tap'\]\)/.test(referral));
+ok('ثبت کارت با کد ساده کمیسیون می‌دهد',
+  /payCommission\(client, req\.user\.id, card\.point_value, 'card'\)/.test(server));
+ok('بازی ضربه‌زن کمیسیون می‌دهد',
+  /payCommission\(client, userId, points, 'tap'\)/.test(server));
+ok('کارت نقدی کمیسیون نمی‌دهد (مسیر کد ساده)',
+  /Number\(card\.cash_amount \|\| 0\) === 0[\s\S]{0,200}?payCommission/.test(server));
+ok('کارت نقدی کمیسیون نمی‌دهد (مسیر عکسی)',
+  /cash === 0[\s\S]{0,200}?payCommission/.test(R('src/services/photoCardService.js')));
+
+// ───────────────────────────────────────────────────────────────────────
+section('نگاشت قیمت → محصول بازار');
+const prices = [...svc.matchAll(/^\s{2}(\d+):\s+'ghelgheli_item_(\d+)'/gm)]
+  .map(m => [Number(m[1]), Number(m[2])]);
+ok('حداقل ۱۳ نقطهٔ قیمتی تعریف شده', prices.length >= 13);
+ok('کلید و شناسهٔ محصول هم‌خوانی دارند',
+  prices.every(([k, v]) => k === v));
+ok('قیمت‌ها صعودی‌اند',
+  prices.every(([k], i) => i === 0 || k > prices[i - 1][0]));
+ok('پلاس ماهانه و سالانه محصول جدا دارند',
+  /ghelgheli_plus_monthly/.test(svc) && /ghelgheli_plus_annual/.test(svc));
+ok('قیمت پلاس با shopService یکی است',
+  /monthly:[^\n]*price: 59000/.test(svc)
+  && /annual:[^\n]*price: 499000/.test(svc)
+  && /PLUS_PRICE = 59000/.test(shopSvc)
+  && /ANNUAL_PLUS_PRICE = 499000/.test(shopSvc));
+ok('قیمتِ بدونِ محصول با خطای روشن رد می‌شود',
+  /NO_PRODUCT/.test(svc));
+
+// ───────────────────────────────────────────────────────────────────────
+section('مسیرهای شارژِ حذف‌شده');
+ok('createOrder قدیمی (شارژ کیف پول) دیگر وجود ندارد',
+  !/async function createOrder\s*\(/.test(svc));
+ok('verifyAndCredit قدیمی دیگر وجود ندارد',
+  !/verifyAndCredit/.test(svc));
+ok('محصولات شارژ کیف پول حذف شده‌اند',
+  !/ghelgheli_wallet_/.test(svc));
+ok('روت شارژ ۴۱۰ می‌دهد نه ۴۰۴',
+  /TOPUP_REMOVED/.test(routes) && /status\(410\)/.test(routes));
+ok('catalog می‌گوید شارژ کیف پول غیرفعال است',
+  /walletTopupEnabled: false/.test(svc));
+
+// ───────────────────────────────────────────────────────────────────────
+section('محافظت مسیرها');
+for (const r of ['/purchase/catalog', '/purchase/history']) {
+  ok(`${r} احراز هویت دارد`,
+    new RegExp(`'${r.replace(/\//g, '\\/')}',\\s*auth`).test(routes));
+}
+ok('/api/purchase/verify احراز هویت و محدودکنندهٔ نرخ دارد',
+  /'\/api\/purchase\/verify', auth, shopLimiter/.test(server));
+ok('روت‌های خرید محدودکنندهٔ نرخ دارند',
+  /'\/api\/shop\/items\/:id\/buy', auth, validateUuid\('id'\), shopLimiter/.test(server)
+  && /'\/api\/shop\/plus', auth, shopLimiter/.test(server));
 
 console.log(`\n${fail ? '✗' : '✓'} ${pass} تست موفق، ${fail} ناموفق`);
 process.exit(fail ? 1 : 0);
