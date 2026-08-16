@@ -88,9 +88,37 @@ router.post('/auth/register', asyncHandler(async (req, res) => {
     }
   }
 
+  // ── هدیهٔ امتیازِ عضویت ──
+  //
+  // ⚠️ این مسیر (OTP) مسیرِ **اصلیِ** ثبت‌نام است؛ `/auth/register-password`
+  //    با ALLOW_PASSWORD_REGISTRATION خاموش است. هدیه اول فقط آنجا وصل شده
+  //    بود، یعنی عملاً هیچ‌وقت پرداخت نمی‌شد — با ثبت‌نامِ واقعی روی سرور
+  //    مچ شد (کاربر ۰ امتیاز گرفت).
+  //
+  // شرطِ «تازه‌بودن» اینجا نبودِ `password_hash` است، نه نبودِ ردیفِ کاربر:
+  // `verify-otp` ردیف را از قبل می‌سازد، پس وجودِ ردیف معنایی ندارد. کسی
+  // که رمز دارد و دوباره این مسیر را بزند هدیه نمی‌گیرد و نمی‌شود دوشیدش.
+  //
+  // مثلِ مسیرِ دیگر، هرگز throw نمی‌کند: «امتیاز نگرفتم» شکایتِ کوچکی
+  // است، «ثبت‌نامم انجام نشد» فاجعه.
+  const isFirstTime = !rows[0].password_hash;
+  const giftPoints = isFirstTime ? await signupGift.payoutSignupGift(newUser.id) : 0;
+  if (giftPoints > 0) {
+    const gift = await signupGift.getSignupGift().catch(() => null);
+    createNotification(
+      newUser.id, 'signup_gift', 'هدیهٔ عضویت 🎁',
+      `${faDigits(giftPoints)} امتیاز به حساب تو اضافه شد. ${gift?.message || ''}`.trim(),
+    ).catch(() => {});
+  }
+
   res.json({
     token: signUser(newUser),
-    user: safeUser(newUser),
+    // موجودیِ تازه‌شده، وگرنه کلاینت «۰ امتیاز» نشان می‌دهد در حالی که
+    // اعلانِ هدیه رسیده — و کاربر فکر می‌کند دروغ است.
+    user: safeUser(giftPoints > 0
+      ? { ...newUser, current_points: Number(newUser.current_points || 0) + giftPoints }
+      : newUser),
+    signupGiftPoints: giftPoints,
     referralCode: myCode,
     referralApplied: referral?.ok === true,
     // چند چرخش خودِ دعوت‌شونده گرفت — تا کلاینت بتواند بگوید «۳ چرخش
