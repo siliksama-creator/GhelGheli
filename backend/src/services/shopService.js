@@ -3,6 +3,7 @@
 const { pool } = require('../config/db');
 const referrals = require('./referralService');
 const payments = require('./paymentService');
+const wallet = require('./walletService');
 
 // Kept as named constants for economy audits and backwards-compatible tests.
 const PLUS_PRICE = 59000;
@@ -237,7 +238,14 @@ async function catalogue(userId) {
  * قبلاً این تابع `buyItem` بود و از کیف پول `debit` می‌کرد. مالک آن مدل
  * را رد کرد: کیف پول فقط پولِ خودِ کاربر است و خرید ۱۰۰٪ از بازار.
  */
-async function deliverItem(client, { userId, itemId, amount }) {
+/**
+ * @param {number} [o.walletPaid=0]  چقدر از این خرید از کیف پول پرداخت
+ *   شده. اگر بزرگ‌تر از صفر باشد، کمیسیونِ معرف **پرداخت نمی‌شود** —
+ *   خواستهٔ صریحِ مالک. دلیلش این است که پولِ کیف پول خودش از کمیسیون و
+ *   جایزهٔ لیگ آمده؛ کمیسیونِ دوباره روی آن، حلقه‌ای می‌سازد که در آن
+ *   پول از هیچ زاده می‌شود.
+ */
+async function deliverItem(client, { userId, itemId, amount, walletPaid = 0 }) {
   const itemRes = await client.query(
     `SELECT * FROM shop_items WHERE id=$1 AND is_active=true FOR UPDATE`,
     [itemId],
@@ -282,13 +290,22 @@ async function deliverItem(client, { userId, itemId, amount }) {
   // کمیسیون ۵٪ نقدی به معرف — تنها راهی که یک خرید به کیف پول پول
   // اضافه می‌کند. مبلغِ مرجع قیمتِ کاملِ بازار است (تصمیم مالک)، نه
   // سهم خالص پس از کسر ۳۰٪ کارمزد بازار.
-  const commission = await referrals.payPurchaseCommission(client, {
-    buyerId: userId,
-    purchaseType: 'shop_item',
-    purchaseReferenceId: purchaseId,
-    purchaseAmount: Number(amount) || Number(item.price),
-    gatewayProvider: 'cafebazaar',
-  });
+  //
+  // ⛔ استثنا: سهمی که از کیف پول پرداخت شده کمیسیون‌پذیر نیست. در
+  // خریدِ ترکیبی فقط بخشِ واقعاً پرداخت‌شده به بازار مبنا قرار می‌گیرد؛
+  // اگر کلِ مبلغ از کیف پول آمده باشد، اصلاً کمیسیونی در کار نیست.
+  const commissionable = Math.max(
+    0, (Number(amount) || Number(item.price)) - (Number(walletPaid) || 0),
+  );
+  const commission = commissionable > 0
+    ? await referrals.payPurchaseCommission(client, {
+      buyerId: userId,
+      purchaseType: 'shop_item',
+      purchaseReferenceId: purchaseId,
+      purchaseAmount: commissionable,
+      gatewayProvider: 'cafebazaar',
+    })
+    : null;
 
   return {
     referenceId: purchaseId,
@@ -403,9 +420,109 @@ async function deliverPlus(client, { userId, billingCycle, amount }) {
 //     routes → shopService → paymentService
 // اگر paymentService مستقیم shopService را require می‌کرد، حلقه می‌شد.
 
-/** مرحلهٔ ۱ برای آیتم شاپ: سفارش بساز و مشخصات محصول بازار را برگردان. */
-async function buyShopItem(userId, slug) {
-  return payments.createShopOrder(userId, slug);
+/**
+ * مرحلهٔ ۱ برای آیتم شاپ: سفارش بساز و مشخصات محصول بازار را برگردان.
+ *
+ * ── پرداختِ ترکیبی با کیف پول (دورِ ۲۲) ──
+ *
+ * کاربری که از لیگ یا جایزهٔ نقدی پول گرفته باید بتواند همان را در شاپ
+ * خرج کند. سه حالت ممکن است:
+ *
+ *   موجودی ≥ قیمت   → کلِ مبلغ از کیف پول، تحویلِ فوری، بدونِ بازار.
+ *   ۰ < موجودی < قیمت → به‌اندازهٔ موجودی از کیف پول کم می‌شود و
+ *                        باقی‌مانده از بازار گرفته می‌شود.
+ *   موجودی = ۰       → رفتارِ قبلی، کاملاً از بازار.
+ *
+ * حالتِ میانی عمداً کیف پول را **همین‌جا** کم می‌کند و نه بعد از تأیید
+ * بازار: اگر اول بازار را باز کنیم و کاربر وسطش موجودی‌اش را با برداشت
+ * خالی کند، سفارش با مبلغی که دیگر وجود ندارد تأیید می‌شود. کسرِ زودهنگام
+ * یعنی اگر پرداختِ بازار نیمه‌کاره رها شود باید پول برگردد — که در
+ * `refundAbandonedWalletHold` انجام می‌شود.
+ *
+ * @param {boolean} [useWallet=false] فقط وقتی کلاینت صریحاً خواسته باشد.
+ *   پیش‌فرضِ خاموش عمدی است: کاربر نباید ناخواسته موجودیِ نقدی‌اش را
+ *   خرج کند چون دکمهٔ «خرید» را زده.
+ */
+async function buyShopItem(userId, slug, { useWallet = false } = {}) {
+  if (!useWallet) return payments.createShopOrder(userId, slug);
+
+  const item = await resolveShopItem(slug);
+  const price = Number(item.price);
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // قفلِ کاربر پیش از خواندنِ موجودی: بدونِ آن دو خریدِ همزمان هر دو
+    // موجودیِ قدیمی را می‌خوانند و کاربر دو کالا با پولِ یکی می‌گیرد.
+    const locked = await client.query(
+      'SELECT wallet_balance FROM users WHERE id=$1 FOR UPDATE', [userId]);
+    if (!locked.rows[0]) throw fail('کاربر پیدا نشد', 404);
+
+    const owned = await client.query(
+      'SELECT 1 FROM user_shop_items WHERE user_id=$1 AND item_id=$2',
+      [userId, item.id]);
+    if (owned.rows[0]) throw fail('این کالا را قبلاً خریده‌اید', 409);
+
+    const balance = Number(locked.rows[0].wallet_balance || 0);
+    if (balance <= 0) {
+      await client.query('ROLLBACK');
+      return payments.createShopOrder(userId, slug);
+    }
+
+    const fromWallet = Math.min(balance, price);
+    const remainder = price - fromWallet;
+
+    // ── حالتِ کامل: هیچ پولی به بازار نمی‌رود ──
+    if (remainder === 0) {
+      await wallet.debit(client, {
+        userId, amount: fromWallet, source: 'shop',
+        referenceType: 'shop_item', referenceId: item.id,
+        description: `خرید ${item.name} با موجودی کیف پول`,
+      });
+      const delivered = await deliverItem(client, {
+        userId, itemId: item.id, amount: price, walletPaid: fromWallet,
+      });
+      await client.query('COMMIT');
+      return {
+        settled: true,
+        paidFromWallet: fromWallet,
+        remainingToPay: 0,
+        walletBalance: balance - fromWallet,
+        ...delivered,
+      };
+    }
+
+    // ── حالتِ ترکیبی: سهمِ کیف پول رزرو، باقی از بازار ──
+    await client.query('COMMIT');
+    const order = await payments.createShopOrder(userId, slug, {
+      walletAmount: fromWallet,
+    });
+    return { ...order, settled: false, paidFromWallet: fromWallet, remainingToPay: remainder };
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+/** یافتنِ آیتم با slug یا UUID — همان قاعدهٔ `createShopOrder`. */
+async function resolveShopItem(slug) {
+  const key = String(slug || '');
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    .test(key);
+  const { rows } = await pool.query(
+    `SELECT id, slug, name, price, access_tier, is_purchasable
+       FROM shop_items
+      WHERE ${isUuid ? 'id=$1::uuid' : 'slug=$1'} AND is_active=true`,
+    [key]);
+  const item = rows[0];
+  if (!item) throw fail('کالا پیدا نشد', 404);
+  if (!item.is_purchasable || item.access_tier === 'annual') {
+    throw fail('این هدیه فقط همراه پلاس سالانه فعال می‌شود', 409);
+  }
+  return item;
 }
 
 /** مرحلهٔ ۱ برای پلاس. */
@@ -426,8 +543,15 @@ async function verifyPurchase(userId, orderId, purchaseToken) {
     async (client, { order, amount }) => {
       if (order.purchase_kind === 'shop_item') {
         if (!order.shop_item_id) throw fail('سفارش ناقص است', 409);
+        // `amount` مبلغی است که واقعاً به بازار رفته. در خریدِ ترکیبی،
+        // سهمِ کیف پول قبلاً کسر شده و باید به تحویل هم گفته شود تا
+        // کمیسیونِ معرف روی آن حساب نشود.
+        const walletPaid = Number(order.wallet_amount || 0);
         return deliverItem(client, {
-          userId, itemId: order.shop_item_id, amount,
+          userId,
+          itemId: order.shop_item_id,
+          amount: Number(amount) + walletPaid,
+          walletPaid,
         });
       }
       if (order.purchase_kind === 'plus_monthly'

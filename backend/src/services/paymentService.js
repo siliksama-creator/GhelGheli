@@ -206,7 +206,14 @@ async function verifyWithBazaar(productId, purchaseToken) {
 // می‌دهیم.
 
 /** سفارش خرید یک آیتم شاپ. */
-async function createShopOrder(userId, slug) {
+/**
+ * @param {object} [opts]
+ * @param {number} [opts.walletAmount=0] سهمی که قبلاً از کیف پول کسر شده.
+ *   فقط `shopService.buyShopItem` آن را می‌فرستد و همان‌جا هم واقعاً از
+ *   کیف پول کم شده است. اینجا صرفاً ثبت می‌شود تا هنگامِ تحویل بدانیم
+ *   کمیسیون روی چه مبلغی حساب شود.
+ */
+async function createShopOrder(userId, slug, { walletAmount = 0 } = {}) {
   if (!configured() && !cfg().sandbox) {
     throw fail('پرداخت درون‌برنامه‌ای هنوز فعال نشده است', 503, 'GATEWAY_OFF');
   }
@@ -235,7 +242,11 @@ async function createShopOrder(userId, slug) {
     [userId, item.id]);
   if (owned.rows[0]) throw fail('این کالا را قبلاً خریده‌اید', 409);
 
-  const productId = productForPrice(item.price);
+  // در خریدِ ترکیبی فقط باقی‌ماندهٔ پس از کیف پول از بازار گرفته می‌شود.
+  const fromWallet = Math.max(0, Math.min(Number(walletAmount) || 0, Number(item.price)));
+  const payable = Number(item.price) - fromWallet;
+
+  const productId = productForPrice(payable);
   if (!productId) {
     throw fail('این کالا فعلاً قابل خرید نیست', 503, 'NO_PRODUCT');
   }
@@ -243,15 +254,16 @@ async function createShopOrder(userId, slug) {
   const order = await pool.query(
     `INSERT INTO payment_orders
        (user_id, amount, provider, product_id, status,
-        purchase_kind, shop_item_id)
-     VALUES ($1, $2, 'cafebazaar', $3, 'pending', 'shop_item', $4)
+        purchase_kind, shop_item_id, wallet_amount)
+     VALUES ($1, $2, 'cafebazaar', $3, 'pending', 'shop_item', $4, $5)
      RETURNING id, amount, created_at`,
-    [userId, item.price, productId, item.id]);
+    [userId, payable, productId, item.id, fromWallet]);
 
   return {
     orderId: order.rows[0].id,
     productId,
     amount: Number(order.rows[0].amount),
+    walletAmount: fromWallet,
     kind: 'shop_item',
     slug: item.slug,
     label: item.name,

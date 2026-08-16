@@ -1,5 +1,6 @@
 /** User administration and immutable point-ledger inspection routes. */
 const express = require('express');
+const signupGift = require('../services/signupGiftService');
 
 module.exports = function createAdminUserRoutes(deps) {
   const {
@@ -56,6 +57,23 @@ router.patch('/admin/users/:id/status', adminAuth, validateUuid('id'), requireRo
 //
 //   ۳. **پیام گیج‌کننده بود.** «به مقدار -۵۰۰ تغییر کرد» را کاربر
 //      فارسی‌زبان باید در ذهنش ترجمه کند. حالا «۵۰۰ امتیاز کسر شد».
+
+// ── هدیهٔ امتیازِ عضویت ──
+//
+// مدیر یک عدد می‌گذارد و از آن لحظه هر کاربرِ تازه همان را می‌گیرد.
+// خواندنش `adminAuth` ساده است (پشتیبانی هم باید بداند چه عددی فعال
+// است تا به کاربر جواب بدهد) ولی تغییرش `requireRole()` می‌خواهد،
+// چون مستقیماً امتیاز تولید می‌کند.
+router.get('/admin/signup-gift', adminAuth, asyncHandler(async (req, res) => {
+  res.json(await signupGift.getSignupGift());
+}));
+
+router.patch('/admin/signup-gift', adminAuth, requireRole(), asyncHandler(async (req, res) => {
+  const saved = await signupGift.saveSignupGift(req.body || {}, req.admin.id);
+  await audit(req.admin.id, 'update_signup_gift', 'app_settings', null,
+    saved.enabled ? `هدیهٔ عضویت: ${saved.points} امتیاز` : 'هدیهٔ عضویت خاموش شد', saved);
+  res.json({ message: 'تنظیمات هدیهٔ عضویت ذخیره شد', settings: saved });
+}));
 
 router.post('/admin/users/:id/grant-plus', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
   const days = Math.max(1, Math.min(365, Number(req.body.days) || 30));

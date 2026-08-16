@@ -1314,11 +1314,21 @@ const shopLimiter = rateLimit({
 // محصولِ کافه‌بازار را برمی‌گردانند تا کلاینت پنجرهٔ پرداخت را باز کند.
 // تحویلِ واقعی فقط در `/api/purchase/verify` و پس از تأیید بازار.
 //
-// کیف پول در هیچ‌کدام از این مسیرها دخالت ندارد.
+// ── کیف پول (دورِ ۲۲) ──
+//
+// اگر کلاینت `useWallet: true` بفرستد، موجودیِ کیف پول اول خرج می‌شود:
+// کافی باشد کالا همان‌جا تحویل می‌شود (پاسخ `settled: true` و بدونِ
+// `productId`)، و اگر کافی نباشد سهمش کسر و باقی از بازار گرفته
+// می‌شود. بدونِ این پرچم، رفتار دقیقاً مثل قبل و ۱۰۰٪ بازاری است.
+//
+// کلاینت باید `settled` را ببیند: اگر true بود نباید پنجرهٔ پرداخت را
+// باز کند.
 
 app.post('/api/shop/items/:id/buy', auth, validateUuid('id'), shopLimiter, asyncHandler(async (req, res) => {
   try {
-    res.json(await shop.buyShopItem(req.user.id, req.params.id));
+    res.json(await shop.buyShopItem(req.user.id, req.params.id, {
+      useWallet: req.body?.useWallet === true,
+    }));
   } catch (e) {
     res.status(e.status || 500).json({ message: e.message || 'خطا در خرید' });
   }

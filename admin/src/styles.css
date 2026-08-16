@@ -1377,6 +1377,26 @@ table.data-table {
    دو صفحهٔ جدا بودند، هر بار برگشتن یعنی از دست دادنِ نتیجهٔ جست‌وجو. */
 .tabRow { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
 
+/* ── جعبهٔ راهنما در فرم‌های تنظیمات ──
+   جایی که مدیر باید پیامدِ یک تنظیم را قبل از ذخیره بداند. عمداً
+   کم‌رنگ و بی‌سر‌و‌صداست: هشدار نیست، توضیح است. */
+.hintBox {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(56, 189, 248, 0.07);
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--gg-text-2, #94A3B8);
+}
+.hintBox b { color: var(--gg-text-1, #E2E8F0); font-weight: 800; }
+
+/* دکمهٔ تأیید در انتهای فرم — در RTL یعنی سمتِ چپ. */
+.rowEnd { display: flex; justify-content: flex-end; gap: 8px; }
+
 .ptGrid {
   display: grid;
   /* ستونِ جست‌وجو ثابت می‌ماند و جزئیات بقیهٔ فضا را می‌گیرد؛ جدولِ

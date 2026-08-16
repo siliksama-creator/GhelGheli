@@ -1,5 +1,7 @@
 // Compact category-based Shop. Web parity: monthly/annual Plus and every
 // deterministic cosmetic use the same server catalogue and wallet ledger.
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
@@ -24,6 +26,20 @@ class _ShopPageState extends State<ShopPage> {
   String _kind = 'card_frame';
   bool _showPlans = true;
 
+  /// آیا اول از کیف پول کم شود؟
+  ///
+  /// پیش‌فرض روشن: اگر کاربر پولی در کیف پول دارد، انتظارِ طبیعی‌اش این
+  /// است که همان اول خرج شود، نه اینکه دوباره از جیبش بدهد.
+  /// خاموش‌کردنش یک تپ است.
+  bool _useWallet = true;
+
+  /// آخرین موجودیِ خوانده‌شده از `/api/shop`.
+  ///
+  /// دیالوگِ خرید باید بگوید چقدر از کیف پول می‌رود و چقدر از بازار.
+  /// چون دیالوگ بیرونِ `FutureBuilder` باز می‌شود، عدد را اینجا نگه
+  /// می‌داریم. عددِ نهایی همیشه سمتِ سرور دوباره حساب می‌شود.
+  int _walletBalance = 0;
+
   static const _categories = <(String, String, IconData)>[
     ('club_badge', 'باشگاه‌ها', Icons.shield_rounded),
     ('card_frame', 'قاب‌ها', Icons.crop_portrait_rounded),
@@ -42,9 +58,17 @@ class _ShopPageState extends State<ShopPage> {
   ///      تازه بعد آیتم را تحویل می‌دهد
   ///
   /// بدون گام ۳ هر کسی با یک اپ دست‌کاری‌شده می‌توانست بگوید «خریدم» و
-  /// رایگان صاحب همه‌چیز شود. کیف پول در این مسیر اصلاً دخالت ندارد.
+  /// رایگان صاحب همه‌چیز شود.
+  ///
+  /// ⚠️ از دورِ ۲۲ کیف پول هم می‌تواند بخشی (یا همهٔ) قیمت را بدهد.
+  /// وقتی سرور `settled: true` برمی‌گرداند یعنی کالا از کیف پول تسویه
+  /// شده و این تابع **نباید** صدا زده شود — باز کردنِ پنجرهٔ بازار یعنی
+  /// دوباره از کاربر پول گرفتن.
   Future<dynamic> _purchase(dynamic order) async {
     final map = Map<String, dynamic>.from(order as Map);
+    // کمربندِ ایمنی: اگر سرور خرید را از کیف پول تسویه کرده، هیچ سفارشی
+    // برای بازار وجود ندارد.
+    if (map['settled'] == true) return map;
     final orderId = '${map['orderId']}';
     final token = await BazaarBilling.purchase(
       productId: '${map['productId']}',
@@ -131,42 +155,93 @@ class _ShopPageState extends State<ShopPage> {
 
   Future<void> _buyItem(Map<String, dynamic> item) async {
     final price = (item['price'] as num?)?.toInt() ?? 0;
+
+    // ── تقسیمِ پیش‌بینی‌شده بینِ کیف پول و بازار ──
+    //
+    // فقط برای نمایش در دیالوگ است. سرور خودش دوباره و زیرِ قفل حساب
+    // می‌کند، چون موجودی ممکن است بینِ باز شدنِ دیالوگ و زدنِ دکمه عوض
+    // شده باشد.
+    var wantWallet = _useWallet && _walletBalance > 0;
+    final fromWallet = wantWallet ? math.min(_walletBalance, price) : 0;
+    final remainder = price - fromWallet;
+
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('خرید «${item['name']}»'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('${Money.withUnit(price)} از طریق کافه‌بازار پرداخت می‌شود.'),
-            Gaps.vXs,
-            const Text(
-                'این آیتم ظاهری برای همیشه در کلکسیونت می‌ماند و هیچ قدرت رقابتی نمی‌دهد.'),
-            if (item['kind'] == 'club_badge') ...[
-              Gaps.vXs,
-              const Text(
-                  'خرید نشان، عضویت دائمی همان باشگاه را هم فعال می‌کند.'),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          final wallet = wantWallet ? math.min(_walletBalance, price) : 0;
+          final rest = price - wallet;
+          return AlertDialog(
+            title: Text('خرید «${item['name']}»'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_walletBalance > 0) ...[
+                  // چک‌باکسِ کیف پول فقط وقتی معنا دارد که پولی باشد.
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    dense: true,
+                    value: wantWallet,
+                    onChanged: (v) {
+                      setLocal(() => wantWallet = v ?? false);
+                      setState(() => _useWallet = v ?? false);
+                    },
+                    title: const Text('اول از کیف پول کم شود',
+                        style: TextStyle(
+                            fontSize: 13.5, fontWeight: FontWeight.w800)),
+                    subtitle: Text('موجودی: ${Money.withUnit(_walletBalance)}',
+                        style: const TextStyle(fontSize: 11.5)),
+                  ),
+                  Gaps.vXs,
+                ],
+                if (wallet > 0 && rest > 0)
+                  Text('${Money.withUnit(wallet)} از کیف پول و '
+                      '${Money.withUnit(rest)} از کافه‌بازار پرداخت می‌شود.')
+                else if (wallet > 0)
+                  Text('${Money.withUnit(wallet)} کاملاً از کیف پول پرداخت '
+                      'می‌شود — نیازی به کافه‌بازار نیست.')
+                else
+                  Text('${Money.withUnit(price)} از طریق کافه‌بازار پرداخت '
+                      'می‌شود.'),
+                Gaps.vXs,
+                const Text(
+                    'این آیتم ظاهری برای همیشه در کلکسیونت می‌ماند و هیچ قدرت رقابتی نمی‌دهد.'),
+                if (item['kind'] == 'club_badge') ...[
+                  Gaps.vXs,
+                  const Text(
+                      'خرید نشان، عضویت دائمی همان باشگاه را هم فعال می‌کند.'),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('انصراف')),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('پرداخت'),
+              ),
             ],
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('انصراف')),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('پرداخت'),
-          ),
-        ],
+          );
+        },
       ),
     );
     if (ok != true) return;
+
+    // ── پیامِ موفقیت متناسب با مسیرِ واقعیِ پرداخت ──
+    final settledFully = wantWallet && fromWallet >= price && remainder == 0;
     await _run(
       () async => _purchase(
-          await widget.api.post('/api/shop/items/${item['id']}/buy', {})),
+        await widget.api.post('/api/shop/items/${item['id']}/buy', {
+          'useWallet': wantWallet,
+        }),
+      ),
       'buy-${item['id']}',
-      '${item['name']} به کلکسیون اضافه شد',
+      settledFully
+          ? '${item['name']} با موجودی کیف پول خریداری شد'
+          : '${item['name']} به کلکسیون اضافه شد',
     );
   }
 
@@ -203,6 +278,8 @@ class _ShopPageState extends State<ShopPage> {
               .map((e) => Map<String, dynamic>.from(e))
               .toList();
           final balance = (data['walletBalance'] as num?)?.toInt() ?? 0;
+          // بدونِ setState — فقط ذخیرهٔ آخرین مقدار برای دیالوگِ خرید.
+          _walletBalance = balance;
           final available = _categories
               .where((c) => items.any((item) => item['kind'] == c.$1))
               .toList();

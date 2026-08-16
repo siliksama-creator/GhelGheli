@@ -231,6 +231,24 @@ void main() {
         of: modeBar, matching: find.text('اتاق خصوصی')).first);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
+
+      // ── چرا `scrollUntilVisible` و نه `expect` مستقیم ──
+      //
+      // صفحهٔ بازی‌ها یک `ListView` است و `ListView` تنبل می‌سازد: هر
+      // چیزی که بیرونِ ویوپورتِ ۸۰۰×۶۰۰ی تست باشد اصلاً ساخته نمی‌شود
+      // و `find.text` صفر نتیجه می‌دهد.
+      //
+      // با اضافه شدنِ نوارِ نرخِ سکه در دورِ ۲۲، عنوانِ اتاقِ خصوصی چند
+      // ده پیکسل پایین‌تر رفت و از ویوپورت بیرون افتاد — روی دستگاهِ
+      // واقعی با یک اسکرولِ کوچک دیده می‌شود، پس این باگِ محصول نبود.
+      //
+      // ⚠️ به‌جای حذفِ سنجه، تست مثلِ کاربرِ واقعی اسکرول می‌کند و هنوز
+      //    همان چیز را اثبات می‌کند: بخشِ اتاقِ خصوصی واقعاً رندر شده.
+      await tester.scrollUntilVisible(
+        find.text('ساخت اتاق و لابی اختصاصی'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.text('ساخت اتاق و لابی اختصاصی'), findsOneWidget);
     });
   });

@@ -117,6 +117,10 @@ export default function Shop({ token, reloadProfile }) {
   const [error, setError] = useState('');
   const [showPlans, setShowPlans] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
+  // پیش‌فرض روشن: اگر کاربر پولی در کیف پول دارد، انتظارِ طبیعی‌اش این
+  // است که همان اول خرج شود، نه اینکه دوباره از جیبش بدهد. خاموش‌کردنش
+  // یک کلیک است.
+  const [useWallet, setUseWallet] = useState(true);
 
   const load = useCallback(async () => {
     try {
@@ -144,11 +148,22 @@ export default function Shop({ token, reloadProfile }) {
     finally { setBusy(''); }
   };
 
-  // ── خرید: همیشه از کافه‌بازار، هرگز از کیف پول ─────────────────────
+  // ── خرید: کیف پول + باقی‌مانده از کافه‌بازار (هیبرید) ───────────────
   //
-  // کیف پول فقط پولِ خودِ کاربر است (کارت نقدی، جایزهٔ لیگ، گردونه،
-  // کمیسیون معرفی) و تنها راه خروجش برداشت نقدی است. هر خرید سه گام
-  // دارد و گام سوم حیاتی است:
+  // ⚠️ این رفتار در دورِ ۲۲ به خواستهٔ صریحِ مالک برگشت. پیش‌تر خرید
+  // ۱۰۰٪ از بازار بود و کیف پول فقط برداشت نقدی داشت.
+  //
+  // منطقِ فعلی (سمتِ سرور تصمیم می‌گیرد، نه اینجا):
+  //
+  //   موجودی ≥ قیمت  →  کاملاً از کیف پول، بازار اصلاً باز نمی‌شود
+  //   ۰ < موجودی < قیمت →  سهمِ کیف پول رزرو و باقی از بازار
+  //   موجودی = ۰    →  مثلِ قبل، کاملاً از بازار
+  //
+  // پس کلاینت فقط `useWallet` را می‌فرستد و به `settled` نگاه می‌کند:
+  // اگر `true` بود یعنی کار تمام است و **نباید** پنجرهٔ بازار باز شود.
+  // باز کردنش یعنی از کاربر دوباره پول گرفتن.
+  //
+  // گامِ راستی‌آزمایی برای سهمِ بازار همچنان حیاتی است:
   //
   //   ۱. سرور سفارش pending می‌سازد و قیمت را خودش از دیتابیس می‌خواند
   //   ۲. کافه‌بازار پرداخت را می‌گیرد و purchaseToken می‌دهد
@@ -159,8 +174,8 @@ export default function Shop({ token, reloadProfile }) {
   // «خریدم» و رایگان صاحب همه‌چیز شود.
   //
   // روی وب مرورگر، API پرداخت بازار وجود ندارد (فقط داخل WebView اپ
-  // اندروید تزریق می‌شود). پس به‌جای دکمه‌ای که بی‌صدا شکست بخورد،
-  // صادقانه کاربر را به اپ ارجاع می‌دهیم.
+  // اندروید تزریق می‌شود). پس خریدی که کاملاً از کیف پول تسویه شود
+  // روی وب هم کار می‌کند؛ فقط سهمِ بازار به اپ نیاز دارد.
   const purchase = async (order) => {
     if (!window.__ghBazaarPurchase) {
       throw new Error('برای خرید، اپ اندروید را از کافه‌بازار نصب کنید');
@@ -176,7 +191,11 @@ export default function Shop({ token, reloadProfile }) {
   }, billingCycle === 'annual' ? 'پلاس سالانه و هدیه‌های دائمی فعال شد' : 'پلاس ماهانه فعال شد');
 
   const buyItem = (item) => act(`buy-${item.id}`, async () => {
-    const order = await req(`/api/shop/items/${item.id}/buy`, 'POST', {}, token);
+    const order = await req(`/api/shop/items/${item.id}/buy`, 'POST',
+      { useWallet }, token);
+    // سرور کالا را از کیف پول تسویه کرده — باز کردنِ پنجرهٔ بازار یعنی
+    // دوباره پول گرفتن. همین‌جا تمام.
+    if (order?.settled) return order;
     return purchase(order);
   }, `${item.name} به کلکسیونت اضافه شد`);
   const equipItem = (item) => act(`equip-${item.id}`,
@@ -194,6 +213,7 @@ export default function Shop({ token, reloadProfile }) {
       .shopHeroTop{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:12px}.shopHero h2{margin:0;font-weight:950;font-size:23px}.shopHero p{margin:4px 0 0;color:#b9c5d5;font-size:11.5px}.shopWallet{white-space:nowrap;background:rgba(0,0,0,.28);border:1px solid rgba(34,231,166,.35);padding:8px 12px;border-radius:14px;color:#22E7A6;font-weight:900}.shopToggle{border:0;background:rgba(255,255,255,.08);color:#fff;border-radius:11px;padding:7px 10px;cursor:pointer}
       .shopPlans{position:relative;z-index:1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:13px}.shopPlan{border:1px solid rgba(255,255,255,.12);border-radius:17px;padding:13px;background:rgba(5,14,26,.78);min-height:224px;display:flex;flex-direction:column}.shopPlan.annual{border-color:rgba(255,209,102,.54);background:linear-gradient(145deg,rgba(64,38,9,.78),rgba(30,20,67,.82))}.shopPlan.active{box-shadow:0 0 0 2px rgba(34,231,166,.28)}.shopPlanHead{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.shopPlanHead small{color:#94a3b8;font-size:9.5px}.shopPlanHead h3{margin:1px 0;font-size:16px}.shopPlanHead>b{font-size:10px;color:#94a3b8}.saveBadge{color:#071522!important;background:#FFD166;padding:5px 7px;border-radius:999px}.planPrice{color:#FFD166;font-size:20px;margin:7px 0}.planPrice small{font-size:10px;color:#cbd5e1}.annualCompare{font-size:9.5px;color:#cbd5e1;margin-top:-5px}.planVisuals{display:grid;grid-template-columns:70px 70px 1fr;gap:6px;align-items:center;margin:8px 0;padding:6px;border-radius:12px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.08)}.planVisuals img{width:70px;height:40px;border-radius:8px;object-fit:cover;border:1px solid rgba(255,255,255,.12)}.planVisuals span{font-size:9px;line-height:1.45;color:#dbeafe;font-weight:800}.shopPlan ul{list-style:none;padding:0;margin:8px 0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 9px;font-size:9.7px;color:#dbe6f2;flex:1}.shopPlan li{line-height:1.55}.shopPlan li::first-letter{color:#22E7A6}.shopPlan button,.shopProduct button{border:0;border-radius:11px;padding:9px 12px;background:linear-gradient(135deg,#22E7A6,#38BDF8);color:#071522;font-weight:950;cursor:pointer}.shopPlan button:disabled,.shopProduct button:disabled{opacity:.55;cursor:default}
       .shopPayNote{position:relative;z-index:1;margin:9px 0 0;font-size:11px;color:#9cabbc;text-align:center}
+      .shopWalletPay{position:relative;z-index:1;display:flex;align-items:flex-start;gap:9px;margin:11px 0 0;padding:9px 12px;border-radius:14px;background:rgba(34,231,166,.08);border:1px solid rgba(34,231,166,.3);cursor:pointer}.shopWalletPay input{width:17px;height:17px;margin:1px 0 0;accent-color:#22E7A6;cursor:pointer;flex-shrink:0}.shopWalletPay>span{display:flex;flex-direction:column;gap:3px;font-size:12px;font-weight:900;color:#22E7A6}.shopWalletPay small{font-size:10px;font-weight:700;color:#9cabbc;line-height:1.6}.shopWalletPay small b{color:#22E7A6}
       .shopNotice{border-radius:12px;padding:9px 12px;background:rgba(56,189,248,.11);border:1px solid rgba(56,189,248,.28);font-size:11.5px;text-align:center}.shopPlans,.shopNav,.shopCarousel{scrollbar-width:none;-ms-overflow-style:none}.shopPlans::-webkit-scrollbar,.shopNav::-webkit-scrollbar,.shopCarousel::-webkit-scrollbar{display:none}.shopNav{display:flex;gap:7px;overflow-x:auto;padding:3px 1px 7px}.shopNav button{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.045);color:#aebed0;border-radius:13px;padding:8px 11px;font-size:11px;font-weight:850;cursor:pointer}.shopNav button.active{color:#071522;border-color:#38BDF8;background:#38BDF8;box-shadow:0 6px 18px rgba(56,189,248,.24)}
       .shopShelf{border:1px solid rgba(255,255,255,.09);background:rgba(7,21,34,.6);border-radius:20px;padding:13px;overflow:hidden}.shopShelfHead{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}.shopShelfHead h3{margin:0;font-size:14px}.shopShelfHead span{font-size:10px;color:#94a3b8}.shopCarousel{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(250px,31%);gap:10px;overflow-x:auto;scroll-snap-type:x proximity;padding:2px 1px 9px}.shopProduct{scroll-snap-align:start;overflow:hidden;border-radius:18px;border:1px solid rgba(255,255,255,.11);background:linear-gradient(155deg,rgba(255,255,255,.075),rgba(255,255,255,.025));min-height:282px;display:flex;flex-direction:column;box-shadow:0 14px 35px rgba(0,0,0,.22);transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease}.shopProduct:hover{transform:translateY(-3px);border-color:rgba(56,189,248,.38);box-shadow:0 18px 42px rgba(0,0,0,.3)}.shopProduct.equipped{border-color:rgba(34,231,166,.7);box-shadow:0 0 0 1px rgba(34,231,166,.2),0 18px 42px rgba(34,231,166,.08)}.shopArtwork{height:144px;position:relative;border-bottom:1px solid rgba(255,255,255,.1);overflow:hidden;background:#03070d}.shopProductBody{padding:11px;display:flex;flex-direction:column;flex:1}.shopProductTitle{display:flex;align-items:center;justify-content:space-between;gap:6px}.shopProduct h3{margin:0;font-size:13.5px}.shopProductTitle span{font-size:9px;background:rgba(34,231,166,.15);color:#22E7A6;border-radius:999px;padding:3px 7px}.shopProduct p{color:#9cabbc;font-size:10px;line-height:1.6;margin:6px 0;min-height:28px}.shopProductFoot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto}.shopProductFoot strong{color:#FFD166;font-size:11px}.shopProduct button{font-size:10px;padding:7px 11px}.shopProduct button.secondary{background:#1e293b;color:#94a3b8}.plusAccess{display:block;color:#38BDF8;font-size:9px;margin-top:6px}.lockedGift{font-size:9px;color:#c4b5fd}.shopDisclosure{display:flex;justify-content:space-between;align-items:center;gap:10px;color:#94a3b8;font-size:10.5px;padding:3px 5px}.shopDisclosure button{border:0;background:none;color:#38BDF8;cursor:pointer}.historyPanel{border:1px solid rgba(255,255,255,.08);border-radius:15px;padding:10px;background:rgba(255,255,255,.025);display:grid;gap:5px}.historyRow{display:flex;justify-content:space-between;gap:8px;padding:6px 8px;border-radius:9px;background:rgba(255,255,255,.035);font-size:10px}.historyRow span{color:#94a3b8}
       .planFrameSwatch{width:48px;height:48px;box-shadow:0 0 14px #38bdf855}.planFrameSwatch img{width:100%!important;height:100%!important;border-radius:50%!important;object-fit:cover!important;border:2px solid #071522}.planNameSwatch{display:grid;place-items:center;width:72px;height:42px;border-radius:10px;background:#071522;font-weight:950}.planNameSwatch .animatedName{font-size:14px!important;color:inherit;font-weight:950}
@@ -211,9 +231,30 @@ export default function Shop({ token, reloadProfile }) {
         <div className="shopWallet" title="موجودی قابل برداشت">کیف پول: {money(data.walletBalance)}</div>
         <button type="button" className="shopToggle" onClick={() => setShowPlans((v) => !v)}>{showPlans ? 'جمع کردن پلن‌ها' : 'دیدن پلن‌های پلاس'}</button>
       </div>
-      <p className="shopPayNote">
-        پرداخت امن از طریق کافه‌بازار · موجودی کیف پول برای برداشت نقدی است
-      </p>
+      {/* ── انتخابِ پرداخت با کیف پول ──
+          فقط وقتی پولی هست نشان داده می‌شود؛ چک‌باکسی که همیشه صفر
+          نشان بدهد فقط سر و صداست. متن عمداً می‌گوید «باقی‌مانده از
+          بازار» تا کاربرِ کم‌موجودی غافلگیر نشود. */}
+      {data.walletBalance > 0 ? (
+        <label className="shopWalletPay">
+          <input
+            type="checkbox"
+            checked={useWallet}
+            onChange={(e) => setUseWallet(e.target.checked)}
+          />
+          <span>
+            اول از کیف پول کم شود
+            <small>
+              موجودی: <b>{money(data.walletBalance)}</b> · اگر کمتر از قیمت باشد،
+              باقی‌مانده از کافه‌بازار گرفته می‌شود
+            </small>
+          </span>
+        </label>
+      ) : (
+        <p className="shopPayNote">
+          پرداخت امن از طریق کافه‌بازار · با شارژ کیف پول می‌توانی مستقیم از موجودی خرید کنی
+        </p>
+      )}
       {showPlans && <div className="shopPlans">{(data.plans || []).map((plan) => <PlanCard key={plan.billingCycle} plan={plan}
         activeTier={data.plus?.tier} busy={busy === `plus-${plan.billingCycle}`} onBuy={buyPlan} />)}</div>}
     </section>

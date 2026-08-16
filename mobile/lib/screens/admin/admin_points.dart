@@ -38,6 +38,17 @@ class _AdminPointsState extends State<AdminPoints> with SingleTickerProviderStat
   final _reasonController = TextEditingController();
   bool _savingPoints = false;
 
+  // ── هدیهٔ عضویت (تنظیمِ سراسری) ──
+  //
+  // یک رکورد در `app_settings` با کلیدِ `signup_gift`. هر کاربرِ تازه
+  // همین مقدار را یک‌بار می‌گیرد. عمداً سراسری است نه per-user، چون
+  // خواستهٔ مالک «هر کاربر جدید X امتیاز» بود.
+  Map? _gift;
+  bool _giftEnabled = false;
+  final _giftPoints = TextEditingController();
+  final _giftMessage = TextEditingController();
+  bool _giftBusy = false;
+
   // ── برترین‌ها ──
   Map? _topData;
   String _topDays = '';
@@ -53,6 +64,7 @@ class _AdminPointsState extends State<AdminPoints> with SingleTickerProviderStat
     'reward_claim': 'جایزه',
     'admin_adjust': 'تنظیم مدیر',
     'admin_deduct': 'کسر مدیر',
+    'signup_gift': 'هدیهٔ عضویت',
     'other': 'سایر',
   };
 
@@ -61,10 +73,13 @@ class _AdminPointsState extends State<AdminPoints> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() {
       if (_tabController.index == 1 && _topData == null) {
         _loadTop();
+      }
+      if (_tabController.index == 2 && _gift == null) {
+        _loadGift();
       }
     });
   }
@@ -75,6 +90,8 @@ class _AdminPointsState extends State<AdminPoints> with SingleTickerProviderStat
     _searchQuery.dispose();
     _amountController.dispose();
     _reasonController.dispose();
+    _giftPoints.dispose();
+    _giftMessage.dispose();
     super.dispose();
   }
 
@@ -220,6 +237,64 @@ class _AdminPointsState extends State<AdminPoints> with SingleTickerProviderStat
     }
   }
 
+  // ── خواندنِ تنظیمِ هدیه ──
+  Future<void> _loadGift() async {
+    try {
+      final d = await widget.api.get('/api/admin/signup-gift');
+      if (!mounted || d is! Map) return;
+      setState(() {
+        _gift = d;
+        _giftEnabled = d['enabled'] == true;
+        _giftPoints.text = '${d['points'] ?? 0}';
+        _giftMessage.text = '${d['message'] ?? ''}';
+      });
+    } catch (e) {
+      _snack(apiError(e));
+    }
+  }
+
+  // ── ذخیرهٔ تنظیمِ هدیه ──
+  //
+  // اعتبارسنجی اینجا فقط برای بازخوردِ سریع است؛ منبعِ حقیقت همچنان
+  // بک‌اند است که سقفِ ۱M و عددِ صحیح را دوباره چک می‌کند.
+  Future<void> _saveGift() async {
+    final pts = int.tryParse(_giftPoints.text.trim());
+    if (pts == null || pts < 0) {
+      _snack('امتیاز باید عددی صحیح و نامنفی باشد');
+      return;
+    }
+    if (pts > 1000000) {
+      _snack('حداکثر ۱٬۰۰۰٬۰۰۰ امتیاز');
+      return;
+    }
+    if (_giftEnabled && pts == 0) {
+      _snack('برای فعال کردن، امتیاز باید بیشتر از صفر باشد');
+      return;
+    }
+    setState(() => _giftBusy = true);
+    try {
+      final r = await widget.api.patch('/api/admin/signup-gift', {
+        'enabled': _giftEnabled,
+        'points': pts,
+        'message': _giftMessage.text.trim(),
+      });
+      final saved = (r is Map && r['settings'] is Map) ? r['settings'] as Map : null;
+      if (saved != null && mounted) {
+        setState(() {
+          _gift = saved;
+          _giftEnabled = saved['enabled'] == true;
+          _giftPoints.text = '${saved['points'] ?? 0}';
+          _giftMessage.text = '${saved['message'] ?? ''}';
+        });
+      }
+      _snack(r is Map ? '${r['message'] ?? 'ذخیره شد'}' : 'ذخیره شد');
+    } catch (e) {
+      _snack(apiError(e));
+    } finally {
+      if (mounted) setState(() => _giftBusy = false);
+    }
+  }
+
   void _snack(String m) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
@@ -237,6 +312,7 @@ class _AdminPointsState extends State<AdminPoints> with SingleTickerProviderStat
             tabs: const [
               Tab(text: 'جست‌وجو و ریز امتیازات'),
               Tab(text: 'برترین‌ها و تراکنش‌های بزرگ'),
+              Tab(text: 'هدیهٔ عضویت'),
             ],
           ),
         ),
@@ -246,6 +322,7 @@ class _AdminPointsState extends State<AdminPoints> with SingleTickerProviderStat
         children: [
           _buildSearchTab(),
           _buildTopTab(),
+          _buildGiftTab(),
         ],
       ),
     );
@@ -724,4 +801,133 @@ class _AdminPointsState extends State<AdminPoints> with SingleTickerProviderStat
       ],
     );
   }
+
+  // ═══ تبِ هدیهٔ عضویت ═══
+  //
+  // یک تنظیمِ سراسری: هر کاربرِ تازه‌ثبت‌نام یک‌بار این امتیاز را
+  // می‌گیرد. عمداً یک کارتِ ساده است نه یک صفحهٔ کامل — یک عدد و یک
+  // کلید. آینهٔ دقیقِ تبِ «هدیهٔ عضویت» در points.jsx.
+  Widget _buildGiftTab() {
+    if (_gift == null) return const LoadingView();
+
+    final savedEnabled = _gift!['enabled'] == true;
+    final savedPoints = '${_gift!['points'] ?? 0}';
+    final savedMessage = '${_gift!['message'] ?? ''}';
+    final dirty = savedEnabled != _giftEnabled ||
+        savedPoints != _giftPoints.text.trim() ||
+        savedMessage != _giftMessage.text.trim();
+
+    return ListView(
+      padding: const EdgeInsets.all(Gaps.md),
+      children: [
+        AppCard(
+          title: 'هدیهٔ امتیاز برای عضویت',
+          subtitle: 'هر کاربری که تازه ثبت‌نام کند، یک‌بار این امتیاز را می‌گیرد',
+          // `StatusBadge` رنگ را از خودِ `status` می‌گیرد: `active` سبز،
+          // `closed` خاکستریِ خنثی. برچسبِ فارسی را با `labels` می‌دهیم.
+          action: StatusBadge(
+            status: savedEnabled ? 'active' : 'closed',
+            labels: {
+              'active': 'فعال — ${faNum(_gift!['points'] ?? 0)} امتیاز',
+              'closed': 'غیرفعال',
+            },
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _giftEnabled,
+                onChanged: _giftBusy ? null : (v) => setState(() => _giftEnabled = v),
+                title: const Text('فعال باشد',
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                subtitle: Text(
+                  _giftEnabled
+                      ? 'به هر کاربر جدید هدیه داده می‌شود'
+                      : 'کاربر جدید هدیه‌ای نمی‌گیرد',
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ),
+              Gaps.vSm,
+              TextField(
+                controller: _giftPoints,
+                keyboardType: TextInputType.number,
+                enabled: !_giftBusy,
+                onChanged: (_) => setState(() {}),
+                decoration: const InputDecoration(
+                  labelText: 'مقدار امتیاز',
+                  hintText: 'مثلاً ۵۰۰',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              Gaps.vSm,
+              TextField(
+                controller: _giftMessage,
+                maxLines: 2,
+                maxLength: 200,
+                enabled: !_giftBusy,
+                onChanged: (_) => setState(() {}),
+                decoration: const InputDecoration(
+                  labelText: 'پیامِ اعلان به کاربر',
+                  hintText: 'به قلقلی خوش آمدی! این امتیاز هدیهٔ عضویت توست.',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              Gaps.vSm,
+              // ── چرا این هشدارها ──
+              // مدیر باید بداند این تنظیم بر چه چیزی اثر دارد و بر چه
+              // چیزی ندارد. مهم‌ترینش: گذشته را عوض نمی‌کند.
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF38BDF8).withValues(alpha: 0.07),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.22)),
+                ),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _GiftHint('فقط برای ثبت‌نام‌های بعد از ذخیره — کاربرانِ فعلی چیزی نمی‌گیرند.'),
+                    _GiftHint('هر کاربر فقط یک‌بار می‌گیرد؛ ورودِ مجدد هدیهٔ دوباره ندارد.'),
+                    _GiftHint('این امتیاز در رتبه‌بندی لیگ حساب نمی‌شود و کمیسیون معرف ندارد.'),
+                    _GiftHint('در ریز تراکنش‌ها با منبعِ «هدیهٔ عضویت» ثبت می‌شود.'),
+                  ],
+                ),
+              ),
+              Gaps.vMd,
+              FilledButton(
+                onPressed: (_giftBusy || !dirty) ? null : _saveGift,
+                child: _giftBusy
+                    ? const SizedBox(
+                        width: 18, height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('ذخیرهٔ تنظیم'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// یک سطرِ راهنما با نقطهٔ ابتدایی. جدا شده تا `const` بماند.
+class _GiftHint extends StatelessWidget {
+  const _GiftHint(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('· ', style: TextStyle(fontSize: 12.5, height: 1.7)),
+            Expanded(
+              child: Text(text,
+                  style: const TextStyle(fontSize: 12.5, height: 1.7)),
+            ),
+          ],
+        ),
+      );
 }

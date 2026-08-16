@@ -1,0 +1,13 @@
+import { chromium } from 'playwright';
+const TOK=process.argv[2];
+const b=await chromium.launch();
+const p=await (await b.newContext({viewport:{width:390,height:844}})).newPage();
+const errs=[]; p.on('pageerror',e=>errs.push(e.message.slice(0,150)));
+await p.goto('http://localhost:4173',{waitUntil:'networkidle'});
+await p.evaluate(t=>localStorage.setItem('token',t),TOK);
+await p.reload({waitUntil:'networkidle'}); await p.waitForTimeout(3000);
+console.log('nav count:', await p.locator('.mobileNav button').count());
+console.log('root len:', await p.evaluate(()=>document.getElementById('root')?.innerHTML.length||0));
+console.log('body:', (await p.innerText('body')).slice(0,300).replace(/\s+/g,' '));
+console.log('errs:', JSON.stringify(errs.slice(0,3)));
+await b.close();

@@ -74,10 +74,12 @@ class _CoinGuideState extends State<CoinGuide> {
   static const _gold = Color(0xFFFFD166);
 
   /// جدولِ سکه — همان اعدادِ `COIN_TABLE` در بک‌اند.
+  /// زیرنویسِ توضیحیِ بازی‌ها حذف شد (خواستهٔ مالک، دورِ ۲۲): جدول باید
+  /// عدد بدهد، نه نقد و بررسیِ بازی. آینهٔ `ROWS` در `CoinGuide.jsx`.
   static const _rows = [
-    ('دوئل کارت', 2, 20, 'طولانی‌ترین و فکری‌ترین بازی'),
-    ('پنالتی', 1, 10, null),
-    ('جفت‌یاب', 1, 10, null),
+    ('دوئل کارت', 2, 20),
+    ('پنالتی', 1, 10),
+    ('جفت‌یاب', 1, 10),
   ];
 
   static const _bullets = [
@@ -92,9 +94,9 @@ class _CoinGuideState extends State<CoinGuide> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -108,35 +110,35 @@ class _CoinGuideState extends State<CoinGuide> {
         children: [
           // ── پاسخِ سؤال: همیشه دیده می‌شود، بدونِ ضربه و بدونِ اسکرول ──
           Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+              padding: const EdgeInsets.fromLTRB(14, 11, 14, 9),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Image.asset(
                     'assets/pass/icon_coin.webp',
-                    width: 46,
-                    height: 46,
+                    width: 40,
+                    height: 40,
                     errorBuilder: (_, __, ___) => const Icon(
                         Icons.monetization_on_rounded,
-                        size: 46,
+                        size: 40,
                         color: _gold),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 11),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text('سکه چطور به دست می‌آید؟',
                             style: TextStyle(
-                                fontSize: 17,
+                                fontSize: 16,
                                 fontWeight: FontWeight.w900,
                                 color: _gold)),
-                        const SizedBox(height: 3),
+                        const SizedBox(height: 2),
                         RichText(
                           text: TextSpan(
                             style: TextStyle(
-                                fontSize: 13.5,
-                                height: 1.6,
+                                fontSize: 12.5,
+                                height: 1.55,
                                 color: Colors.white.withValues(alpha: 0.90)),
                             children: const [
                               TextSpan(text: 'رتبهٔ لیگ با '),
@@ -166,13 +168,13 @@ class _CoinGuideState extends State<CoinGuide> {
 
           // ── جدولِ نرخ: مهم‌ترین عددهای صفحه، پس پنهان نمی‌شود ──
           Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 11),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Container(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(13),
                       color: Colors.black.withValues(alpha: 0.30),
                       border:
                           Border.all(color: _gold.withValues(alpha: 0.24)),
@@ -201,26 +203,12 @@ class _CoinGuideState extends State<CoinGuide> {
                             children: [
                               Padding(
                                 padding:
-                                    const EdgeInsets.fromLTRB(10, 9, 10, 9),
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: [
-                                    Text(r.$1,
-                                        style: const TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w800,
-                                            color: Colors.white)),
-                                    if (r.$4 != null) ...[
-                                      const SizedBox(height: 2),
-                                      Text(r.$4!,
-                                          style: const TextStyle(
-                                              fontSize: 11.5,
-                                              fontWeight: FontWeight.w600,
-                                              color: Color(0xFF94A3B8))),
-                                    ],
-                                  ],
-                                ),
+                                    const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                                child: Text(r.$1,
+                                    style: const TextStyle(
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white)),
                               ),
                               _Cell(faNum(r.$2)),
                               _Cell(faNum(r.$3)),
@@ -238,7 +226,7 @@ class _CoinGuideState extends State<CoinGuide> {
             onTap: _toggle,
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 16),
+              padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 16),
               decoration: BoxDecoration(
                 color: _gold.withValues(alpha: 0.09),
                 border: Border(
@@ -249,7 +237,7 @@ class _CoinGuideState extends State<CoinGuide> {
                 children: [
                   Text(_open ? 'بستن جزئیات' : 'قوانین کامل سکه',
                       style: const TextStyle(
-                          fontSize: 13,
+                          fontSize: 12.5,
                           fontWeight: FontWeight.w900,
                           color: _gold)),
                   const SizedBox(width: 7),
@@ -310,12 +298,12 @@ class _Head extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(start ? 10 : 4, 9, start ? 10 : 4, 9),
+      padding: EdgeInsets.fromLTRB(start ? 10 : 4, 6, start ? 10 : 4, 6),
       child: Text(
         text,
         textAlign: start ? TextAlign.start : TextAlign.center,
         style: const TextStyle(
-            fontSize: 12.5,
+            fontSize: 11.5,
             fontWeight: FontWeight.w800,
             color: Color(0xFF94A3B8)),
       ),
@@ -335,21 +323,21 @@ class _Cell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+      padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Image.asset(
             'assets/pass/icon_coin.webp',
-            width: 17,
-            height: 17,
+            width: 16,
+            height: 16,
             errorBuilder: (_, __, ___) => const SizedBox.shrink(),
           ),
           const SizedBox(width: 4),
           Text(
             text,
             style: const TextStyle(
-                fontSize: 15,
+                fontSize: 14.5,
                 fontWeight: FontWeight.w900,
                 color: Color(0xFFFFD166)),
           ),

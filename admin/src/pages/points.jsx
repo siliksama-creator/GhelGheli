@@ -40,11 +40,11 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  AlertTriangle, ArrowDownCircle, ArrowUpCircle, Search, TrendingUp, User,
+  AlertTriangle, ArrowDownCircle, ArrowUpCircle, Gift, Search, TrendingUp, User,
 } from 'lucide-react';
 import { fmtDateTime, fmtNumber } from '../lib/api.js';
 import {
-  Badge, Button, Card, EmptyState, Field, Input, Select, Skeleton, Table,
+  Badge, Button, Card, EmptyState, Field, Input, Select, Skeleton, Table, Textarea,
 } from '../components/ui.jsx';
 import { useToast } from '../lib/toast.jsx';
 
@@ -59,6 +59,7 @@ const SOURCE_FA = {
   reward_claim: 'جایزه',
   admin_adjust: 'تنظیم مدیر',
   admin_deduct: 'کسر مدیر',
+  signup_gift: 'هدیهٔ عضویت',
   other: 'سایر',
 };
 
@@ -73,6 +74,15 @@ export function PointsPage({ request }) {
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState(false);
+
+  // ── هدیهٔ عضویت (تنظیمِ سراسری) ──
+  //
+  // یک رکورد در `app_settings` با کلیدِ `signup_gift`. هر کاربرِ تازه
+  // همین مقدار را یک‌بار می‌گیرد. عمداً سراسری است نه per-user، چون
+  // خواستهٔ مالک «هر کاربر جدید X امتیاز» بود.
+  const [gift, setGift] = useState(null);
+  const [giftDraft, setGiftDraft] = useState({ enabled: false, points: '', message: '' });
+  const [giftBusy, setGiftBusy] = useState(false);
 
   // ── کاربرِ انتخاب‌شده ──
   const [sel, setSel] = useState(null);
@@ -185,6 +195,75 @@ export function PointsPage({ request }) {
     }
   }
 
+  // ── خواندنِ تنظیمِ هدیه ──
+  const loadGift = useCallback(async () => {
+    try {
+      const r = await request('/api/admin/signup-gift');
+      const g = r?.settings || r;
+      setGift(g);
+      setGiftDraft({
+        enabled: !!g?.enabled,
+        points: String(g?.points ?? 0),
+        message: g?.message || '',
+      });
+    } catch (e) {
+      notify(e.message || 'خطا در خواندن تنظیم هدیه', 'error');
+    }
+  }, [request, notify]);
+
+  useEffect(() => { if (tab === 'gift' && !gift) loadGift(); }, [tab, gift, loadGift]);
+
+  // ── ذخیرهٔ تنظیمِ هدیه ──
+  //
+  // اعتبارسنجی اینجا فقط برای بازخوردِ سریع است؛ منبعِ حقیقت همچنان
+  // بک‌اند است که سقفِ ۱M و عددِ صحیح را دوباره چک می‌کند.
+  async function saveGift() {
+    const pts = Number(giftDraft.points);
+    if (!Number.isFinite(pts) || !Number.isInteger(pts) || pts < 0) {
+      notify('امتیاز باید عددی صحیح و نامنفی باشد', 'error');
+      return;
+    }
+    if (pts > 1_000_000) {
+      notify('حداکثر ۱٬۰۰۰٬۰۰۰ امتیاز', 'error');
+      return;
+    }
+    if (giftDraft.enabled && pts === 0) {
+      notify('برای فعال کردن، امتیاز باید بیشتر از صفر باشد', 'error');
+      return;
+    }
+    setGiftBusy(true);
+    try {
+      const r = await request('/api/admin/signup-gift', {
+        method: 'PATCH',
+        body: {
+          enabled: giftDraft.enabled,
+          points: pts,
+          message: giftDraft.message.trim(),
+        },
+      });
+      const g = r?.settings || r;
+      setGift(g);
+      setGiftDraft({
+        enabled: !!g?.enabled,
+        points: String(g?.points ?? 0),
+        message: g?.message || '',
+      });
+      notify(g?.enabled
+        ? `فعال شد — هر کاربر جدید ${fmtNumber(g.points)} امتیاز می‌گیرد`
+        : 'هدیهٔ عضویت غیرفعال شد', 'success');
+    } catch (e) {
+      notify(e.message || 'خطا در ذخیره', 'error');
+    } finally {
+      setGiftBusy(false);
+    }
+  }
+
+  const giftDirty = gift && (
+    !!gift.enabled !== giftDraft.enabled
+    || String(gift.points ?? 0) !== String(giftDraft.points)
+    || (gift.message || '') !== giftDraft.message
+  );
+
   return (
     <div className="stack">
       <div className="tabRow">
@@ -200,6 +279,10 @@ export function PointsPage({ request }) {
         <Button variant={tab === 'top' ? 'primary' : 'secondary'}
           icon={TrendingUp} onClick={() => setTab('top')}>
           بیشترین امتیازگیرندگان
+        </Button>
+        <Button variant={tab === 'gift' ? 'primary' : 'secondary'}
+          icon={Gift} onClick={() => setTab('gift')}>
+          هدیهٔ عضویت
         </Button>
       </div>
 
@@ -502,6 +585,75 @@ export function PointsPage({ request }) {
               />
             </Card>
           )}
+        </div>
+      )}
+
+      {/* ═══ تبِ هدیهٔ عضویت ═══
+          یک تنظیمِ سراسری: هر کاربرِ تازه‌ثبت‌نام یک‌بار این امتیاز را
+          می‌گیرد. عمداً یک کارتِ ساده است نه یک صفحهٔ کامل — یک عدد و
+          یک کلید. */}
+      {tab === 'gift' && (
+        <div className="stack">
+          <Card
+            title="هدیهٔ امتیاز برای عضویت"
+            subtitle="هر کاربری که تازه ثبت‌نام کند، یک‌بار این امتیاز را می‌گیرد"
+            action={gift ? (
+              <Badge tone={gift.enabled ? 'success' : 'neutral'}>
+                {gift.enabled ? `فعال — ${fmtNumber(gift.points)} امتیاز` : 'غیرفعال'}
+              </Badge>
+            ) : null}
+          >
+            {!gift ? <Skeleton height={200} /> : (
+              <div className="stack">
+                <Field label="وضعیت">
+                  <Select
+                    value={giftDraft.enabled ? '1' : '0'}
+                    onChange={(e) => setGiftDraft((d) => ({ ...d, enabled: e.target.value === '1' }))}
+                  >
+                    <option value="0">غیرفعال — کاربر جدید هدیه نمی‌گیرد</option>
+                    <option value="1">فعال — به هر کاربر جدید هدیه بده</option>
+                  </Select>
+                </Field>
+
+                <Field label="مقدار امتیاز">
+                  <Input
+                    type="number" min="0" max="1000000" step="1"
+                    placeholder="مثلاً ۵۰۰"
+                    value={giftDraft.points}
+                    onChange={(e) => setGiftDraft((d) => ({ ...d, points: e.target.value }))}
+                  />
+                </Field>
+
+                <Field label="پیامِ اعلان به کاربر">
+                  <Textarea
+                    rows={2} maxLength={200}
+                    placeholder="به قلقلی خوش آمدی! این امتیاز هدیهٔ عضویت توست."
+                    value={giftDraft.message}
+                    onChange={(e) => setGiftDraft((d) => ({ ...d, message: e.target.value }))}
+                  />
+                </Field>
+
+                {/* ── چرا این هشدارها ──
+                    مدیر باید بداند این تنظیم بر چه چیزی اثر دارد و بر چه
+                    چیزی ندارد. مهم‌ترینش: گذشته را عوض نمی‌کند. */}
+                <div className="hintBox">
+                  <div><b>فقط برای ثبت‌نام‌های بعد از ذخیره</b> — کاربرانِ فعلی چیزی نمی‌گیرند.</div>
+                  <div>هر کاربر <b>فقط یک‌بار</b> می‌گیرد؛ ورودِ مجدد هدیهٔ دوباره ندارد.</div>
+                  <div>این امتیاز <b>در رتبه‌بندی لیگ حساب نمی‌شود</b> و <b>کمیسیون معرف ندارد</b>.</div>
+                  <div>در ریز تراکنش‌ها با منبعِ «هدیهٔ عضویت» ثبت می‌شود.</div>
+                </div>
+
+                <div className="rowEnd">
+                  <Button
+                    variant="primary" loading={giftBusy} disabled={!giftDirty}
+                    onClick={saveGift}
+                  >
+                    ذخیرهٔ تنظیم
+                  </Button>
+                </div>
+              </div>
+            )}
+          </Card>
         </div>
       )}
     </div>

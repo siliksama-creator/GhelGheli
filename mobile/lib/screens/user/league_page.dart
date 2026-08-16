@@ -252,8 +252,8 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
                           child: Container(
                             margin: const EdgeInsets.symmetric(horizontal: 3),
                             padding: EdgeInsets.symmetric(
-                                vertical: isFirst ? Gaps.lg : Gaps.md,
-                                horizontal: Gaps.xs),
+                                vertical: isFirst ? 11 : 9,
+                                horizontal: 5),
                             decoration: BoxDecoration(
                               color: theme.colorScheme.surfaceContainerHigh,
                               borderRadius: Corners.rXl,
@@ -270,35 +270,44 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
                                       ? [BoxShadow(color: const Color(0xFFCBD5E1).withValues(alpha: 0.18), blurRadius: 10)]
                                       : [BoxShadow(color: const Color(0xFFCD7F32).withValues(alpha: 0.16), blurRadius: 10)],
                             ),
+                            // مدال و شمارهٔ رتبه در یک خط، سکه و امتیاز هم
+                            // در یک خط: قبلاً پنج سطرِ جدا بودند و کارت
+                            // ۱۸۷px ارتفاع می‌گرفت. مدال خودش رتبه را
+                            // می‌گوید، پس چیپِ «رتبه ۱» تکرار بود.
+                            // آینهٔ PodiumCard در League.jsx.
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(999),
-                                    color: isFirst
-                                        ? const Color(0xFFFFD700)
-                                        : rank == 2
-                                            ? const Color(0xFFCBD5E1)
-                                            : const Color(0xFFCD7F32),
-                                    boxShadow: isFirst ? [BoxShadow(color: const Color(0xFFFFD700).withValues(alpha: 0.4), blurRadius: 8)] : null,
-                                  ),
-                                  child: Text(
-                                    rank == 1 ? 'رتبه ۱' : rank == 2 ? 'رتبه ۲' : 'رتبه ۳',
-                                    style: TextStyle(
-                                      fontSize: 9.5,
-                                      fontWeight: FontWeight.w900,
-                                      color: isFirst ? const Color(0xFF241900) : rank == 2 ? const Color(0xFF1E293B) : Colors.white,
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      rank == 1 ? '🥇' : (rank == 2 ? '🥈' : '🥉'),
+                                      style: const TextStyle(fontSize: 18),
                                     ),
-                                  ),
+                                    const SizedBox(width: 4),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(999),
+                                        color: isFirst
+                                            ? const Color(0xFFFFD700)
+                                            : rank == 2
+                                                ? const Color(0xFFCBD5E1)
+                                                : const Color(0xFFCD7F32),
+                                      ),
+                                      child: Text(
+                                        faNum(rank),
+                                        style: TextStyle(
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.w900,
+                                          color: isFirst ? const Color(0xFF241900) : rank == 2 ? const Color(0xFF1E293B) : Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  rank == 1 ? '🥇' : (rank == 2 ? '🥈' : '🥉'),
-                                  style: const TextStyle(fontSize: 22),
-                                ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: 5),
                                 DisplayName(
                                   name: r['nickname'] ?? 'کاربر',
                                   cosmetics: r['cosmetics'] is Map
@@ -306,18 +315,24 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
                                       : null,
                                   style: TextStyle(
                                       fontWeight: FontWeight.w700,
-                                      fontSize: 12.5,
+                                      fontSize: 12,
                                       color: theme.colorScheme.onSurface),
                                 ),
-                                const SizedBox(height: 5),
-                                CoinChip(
-                                    value: r['coins'], size: isFirst ? 30 : 25),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${faNum(r['points'])} امتیاز',
-                                  style: TextStyle(
-                                      fontSize: 11.5,
-                                      color: theme.colorScheme.onSurfaceVariant),
+                                const SizedBox(height: 4),
+                                Wrap(
+                                  alignment: WrapAlignment.center,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  spacing: 6,
+                                  children: [
+                                    CoinChip(
+                                        value: r['coins'], size: isFirst ? 26 : 22),
+                                    Text(
+                                      faNum(r['points']),
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          color: theme.colorScheme.onSurfaceVariant),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -335,10 +350,10 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
                     final pts = myEntry?['points'] ?? (_data?['season']?['current_points'] ?? 0);
                     final myCoins = myEntry?['coins'] ?? 0;
                     return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(14),
                         gradient: const LinearGradient(
                           colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
                         ),
@@ -350,43 +365,35 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
                           ),
                         ],
                       ),
+                      // تک‌سطری: عنوانِ بلندِ «جایگاه شما در این دوره لیگ»
+                      // روی سطرِ جدا، کارت را دوبرابر می‌کرد بی‌آنکه چیزی
+                      // اضافه بگوید. آینهٔ League.jsx.
                       child: Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: const Color(0xFF38BDF8).withValues(alpha: 0.15),
                             ),
-                            child: const Icon(Icons.person_pin_rounded, color: Color(0xFF38BDF8), size: 22),
+                            child: const Icon(Icons.person_pin_rounded, color: Color(0xFF38BDF8), size: 16),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'جایگاه شما در این دوره لیگ:',
-                                  style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8), fontWeight: FontWeight.w700),
-                                ),
-                                const SizedBox(height: 2),
-                                Wrap(
-                                  spacing: 9,
-                                  crossAxisAlignment: WrapCrossAlignment.center,
-                                  children: [
-                                    Text(
-                                      'رتبه ${faNum(rankNum)}',
-                                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.white),
-                                    ),
-                                    CoinChip(value: myCoins, size: 24),
-                                    Text(
-                                      '${faNum(pts)} امتیاز',
-                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8)),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
+                          const SizedBox(width: 9),
+                          const Text(
+                            'جایگاه شما',
+                            style: TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8), fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(width: 9),
+                          Text(
+                            faNum(rankNum),
+                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.white),
+                          ),
+                          const Spacer(),
+                          CoinChip(value: myCoins, size: 21),
+                          const SizedBox(width: 7),
+                          Text(
+                            faNum(pts),
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8)),
                           ),
                         ],
                       ),

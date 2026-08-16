@@ -32,10 +32,12 @@ import { ASSETS } from './IconAsset.jsx';
 // `open`/`onToggle` حالا فقط همان بخشِ دومند. کلیدِ `coinGuideSeen` معنایش
 // عوض نشده: «این کاربر قبلاً جزئیات را دیده».
 
+// زیرنویسِ توضیحیِ بازی‌ها حذف شد (خواستهٔ مالک، دورِ ۲۲): جدول باید
+// عدد بدهد، نه نقد و بررسیِ بازی. حذفش یک سطرِ اضافه از هر ردیف کم کرد.
 const ROWS = [
-  { game: 'دوئل کارت', s100: 2, s1000: 20, hint: 'طولانی‌ترین و فکری‌ترین بازی' },
-  { game: 'پنالتی', s100: 1, s1000: 10, hint: null },
-  { game: 'جفت‌یاب', s100: 1, s1000: 10, hint: null },
+  { game: 'دوئل کارت', s100: 2, s1000: 20 },
+  { game: 'پنالتی', s100: 1, s1000: 10 },
+  { game: 'جفت‌یاب', s100: 1, s1000: 10 },
 ];
 
 const RULES = [
@@ -49,20 +51,20 @@ const RULES = [
 export default function CoinGuide({ open, onToggle }) {
   return (
     <div className="coinGuide" style={{
-      margin: '0 0 14px', borderRadius: '18px', overflow: 'hidden',
+      margin: '0 0 12px', borderRadius: '16px', overflow: 'hidden',
       background: 'linear-gradient(135deg, #2A1F05, #14100A)',
       border: '1.5px solid rgba(255,209,102,0.45)',
       boxShadow: '0 0 30px rgba(255,209,102,0.10)',
     }}>
       {/* ── پاسخِ سؤال: همیشه دیده می‌شود، بدونِ کلیک و بدونِ اسکرول ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px 12px' }}>
-        <img src={ASSETS.coin} alt="" width={46} height={46}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '11px', padding: '11px 14px 9px' }}>
+        <img src={ASSETS.coin} alt="" width={40} height={40}
           style={{ display: 'block', flexShrink: 0, filter: 'drop-shadow(0 0 10px rgba(255,209,102,0.45))' }} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <b style={{ display: 'block', fontSize: '17px', fontWeight: 900, color: '#FFD166', marginBottom: '3px' }}>
+          <b style={{ display: 'block', fontSize: '16px', fontWeight: 900, color: '#FFD166', marginBottom: '2px' }}>
             سکه چطور به دست می‌آید؟
           </b>
-          <span style={{ display: 'block', fontSize: '13.5px', lineHeight: 1.6, color: 'rgba(255,255,255,0.9)' }}>
+          <span style={{ display: 'block', fontSize: '12.5px', lineHeight: 1.55, color: 'rgba(255,255,255,0.9)' }}>
             رتبهٔ لیگ با <b style={{ color: '#FFD166' }}>سکه</b> تعیین می‌شود، نه امتیاز — و سکه فقط با{' '}
             <b style={{ color: '#FFD166' }}>بردن مسابقه مقابل حریف واقعی</b> به دست می‌آید.
           </span>
@@ -70,36 +72,31 @@ export default function CoinGuide({ open, onToggle }) {
       </div>
 
       {/* ── جدولِ نرخ: مهم‌ترین عددهای صفحه، پس پنهان نمی‌شوند ── */}
-      <div style={{ padding: '0 16px 14px' }}>
+      <div style={{ padding: '0 14px 11px' }}>
         <div style={{
           display: 'grid', gridTemplateColumns: '1.35fr 1fr 1fr',
           borderRadius: '14px', overflow: 'hidden',
           background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,209,102,0.24)',
         }}>
-          <div style={{ padding: '8px 10px', fontSize: '12.5px', fontWeight: 800, color: '#94A3B8' }}>بردِ شما در</div>
-          <div style={{ padding: '8px 4px', fontSize: '12.5px', fontWeight: 800, color: '#94A3B8', textAlign: 'center' }}>ورودی ۱۰۰</div>
-          <div style={{ padding: '8px 4px', fontSize: '12.5px', fontWeight: 800, color: '#94A3B8', textAlign: 'center' }}>ورودی ۱۰۰۰</div>
+          <div style={{ padding: '6px 10px', fontSize: '11.5px', fontWeight: 800, color: '#94A3B8' }}>بردِ شما در</div>
+          <div style={{ padding: '6px 4px', fontSize: '11.5px', fontWeight: 800, color: '#94A3B8', textAlign: 'center' }}>ورودی ۱۰۰</div>
+          <div style={{ padding: '6px 4px', fontSize: '11.5px', fontWeight: 800, color: '#94A3B8', textAlign: 'center' }}>ورودی ۱۰۰۰</div>
 
           {ROWS.map(r => (
             <React.Fragment key={r.game}>
               <div style={{
-                padding: '8px 10px', fontSize: '14px', fontWeight: 800, color: '#FFF',
+                padding: '7px 10px', fontSize: '13.5px', fontWeight: 800, color: '#FFF',
                 borderTop: '1px solid rgba(255,255,255,0.07)',
               }}>
                 {r.game}
-                {r.hint && (
-                  <span style={{ display: 'block', fontSize: '11.5px', fontWeight: 600, color: '#94A3B8', marginTop: '2px' }}>
-                    {r.hint}
-                  </span>
-                )}
               </div>
               {[r.s100, r.s1000].map((v, i) => (
                 <div key={i} style={{
                   borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex',
-                  alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '8px 4px',
+                  alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '7px 4px',
                 }}>
-                  <img src={ASSETS.coin} alt="" width={17} height={17} style={{ display: 'block', flexShrink: 0 }} />
-                  <span style={{ fontSize: '15px', fontWeight: 900, color: '#FFD166' }}>{fa(v)}</span>
+                  <img src={ASSETS.coin} alt="" width={16} height={16} style={{ display: 'block', flexShrink: 0 }} />
+                  <span style={{ fontSize: '14.5px', fontWeight: 900, color: '#FFD166' }}>{fa(v)}</span>
                 </div>
               ))}
             </React.Fragment>
@@ -113,9 +110,9 @@ export default function CoinGuide({ open, onToggle }) {
         aria-expanded={open}
         style={{
           width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          gap: '7px', padding: '11px 16px', background: 'rgba(255,209,102,0.09)',
+          gap: '7px', padding: '9px 16px', background: 'rgba(255,209,102,0.09)',
           border: 'none', borderTop: '1px solid rgba(255,209,102,0.22)',
-          cursor: 'pointer', color: '#FFD166', fontSize: '13px', fontWeight: 900,
+          cursor: 'pointer', color: '#FFD166', fontSize: '12.5px', fontWeight: 900,
         }}
       >
         {open ? 'بستن جزئیات' : 'قوانین کامل سکه'}

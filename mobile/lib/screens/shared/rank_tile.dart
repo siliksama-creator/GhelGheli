@@ -26,9 +26,9 @@ class RankTile extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(12),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(11),
               color: isTop
                   ? const Color(0xFFFFC94D).withValues(alpha: 0.16)
                   : scheme.surfaceContainerHigh.withValues(alpha: 0.65),
@@ -41,7 +41,7 @@ class RankTile extends StatelessWidget {
             child: Row(
               children: [
                 CircleAvatar(
-                  radius: 13,
+                  radius: 11,
                   backgroundColor: isTop
                       ? const Color(0xFFFFC94D)
                       : scheme.surfaceContainerHighest,
@@ -50,7 +50,7 @@ class RankTile extends StatelessWidget {
                     style: TextStyle(
                       fontWeight: FontWeight.w900,
                       color: isTop ? const Color(0xFF241900) : scheme.onSurface,
-                      fontSize: 11,
+                      fontSize: 10.5,
                     ),
                   ),
                 ),
@@ -60,17 +60,17 @@ class RankTile extends StatelessWidget {
                     name: row['nickname'] ?? row['first_name'] ?? 'کاربر',
                     cosmetics: row['cosmetics'] as Map?,
                     level: (row['level'] as num?)?.toInt(),
-                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Colors.white),
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white),
                   ),
                 ),
                 // سکه معیارِ رتبه است، امتیاز تساوی‌شکن — پس سکه اول و
                 // پررنگ، امتیاز کنارش و کم‌رنگ‌تر.
-                CoinChip(value: row['coins']),
+                CoinChip(value: row['coins'], size: 20),
                 Gaps.hXs,
                 Text(
                   faNum(row['points']),
                   style: TextStyle(
-                    fontSize: 11.5,
+                    fontSize: 12,
                     fontWeight: FontWeight.w800,
                     color: isTop ? const Color(0xFFFFD166) : const Color(0xFF38BDF8),
                   ),

@@ -24,18 +24,22 @@ function PodiumCard({ rank, row, onTap }) {
   const badgeBg = isFirst ? '#FFD700' : rank === 2 ? '#CBD5E1' : '#CD7F32';
   const badgeColor = isFirst ? '#241900' : rank === 2 ? '#1E293B' : '#FFF';
   return (
-    <div onClick={onTap} style={{ flex:1, margin:'0 3px', padding: isFirst ? '16px 6px' : '12px 6px', background: bg, borderRadius:'16px', border: `1.4px solid ${borderColor}`, borderWidth: isFirst?'1.8px':'1.4px', boxShadow: isFirst ? '0 4px 14px rgba(255,215,0,0.28)' : rank===2 ? '0 4px 10px rgba(203,213,225,0.18)' : '0 4px 10px rgba(205,127,50,0.16)', textAlign:'center', cursor:'pointer' }}>
-      <div style={{ display:'inline-block', padding:'2px 7px', borderRadius:'99px', background: badgeBg, color: badgeColor, fontSize:'9.5px', fontWeight:'900', boxShadow: isFirst?'0 2px 8px rgba(255,215,0,0.4)':'none' }}>
-        رتبه {fa(rank)}
+    <div onClick={onTap} style={{ flex:1, margin:'0 3px', padding: isFirst ? '11px 5px' : '9px 5px', background: bg, borderRadius:'14px', border: `1.4px solid ${borderColor}`, borderWidth: isFirst?'1.8px':'1.4px', boxShadow: isFirst ? '0 4px 14px rgba(255,215,0,0.28)' : rank===2 ? '0 4px 10px rgba(203,213,225,0.18)' : '0 4px 10px rgba(205,127,50,0.16)', textAlign:'center', cursor:'pointer' }}>
+      {/* مدال و شمارهٔ رتبه در یک خط: قبلاً دو سطرِ جدا بودند و هر کارت
+          ۱۸۷px ارتفاع می‌گرفت. مدال خودش رتبه را می‌گوید، پس چیپِ
+          «رتبه ۱» فقط تکرار بود. */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'4px' }}>
+        <span style={{ fontSize:'18px', lineHeight:1 }}>{rank===1?'🥇':rank===2?'🥈':'🥉'}</span>
+        <span style={{ display:'inline-block', padding:'1px 6px', borderRadius:'99px', background: badgeBg, color: badgeColor, fontSize:'9.5px', fontWeight:'900' }}>{fa(rank)}</span>
       </div>
-      <div style={{ fontSize:'22px', margin:'6px 0 4px' }}>{rank===1?'🥇':rank===2?'🥈':'🥉'}</div>
-      <div style={{ fontWeight:'700', fontSize:'12.5px', color:'#FFF', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+      <div style={{ fontWeight:'700', fontSize:'12px', color:'#FFF', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', marginTop:'5px' }}>
         <DisplayName name={row.nickname || 'کاربر'} cosmetics={row.cosmetics} level={row.level} />
       </div>
-      <div style={{ display:'flex', justifyContent:'center', marginTop:'5px' }}>
-        <CoinChip value={row.coins} size={isFirst ? 30 : 25} />
+      {/* سکه و امتیاز کنارِ هم، نه زیرِ هم */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'6px', marginTop:'4px', flexWrap:'wrap' }}>
+        <CoinChip value={row.coins} size={isFirst ? 26 : 22} />
+        <span style={{ fontSize:'11px', color:'rgba(255,255,255,0.6)' }}>{fa(row.points)}</span>
       </div>
-      <div style={{ fontSize:'11.5px', color:'rgba(255,255,255,0.6)', marginTop:'2px' }}>{fa(row.points)} امتیاز</div>
     </div>
   );
 }
@@ -177,7 +181,7 @@ export default function League({ token, openProfile }) {
             <CoinGuide open={guideOpen} onToggle={toggleGuide} />
 
             {top.length>0 && (
-              <div style={{ display:'flex', gap:'6px', marginBottom:'20px', alignItems:'flex-end' }}>
+              <div style={{ display:'flex', gap:'6px', marginBottom:'12px', alignItems:'flex-end' }}>
                 {top.map((r,i) => (
                   <PodiumCard key={r.user_id} rank={i+1} row={r} onTap={()=>openProfile && openProfile(r.user_id)} />
                 ))}
@@ -186,29 +190,27 @@ export default function League({ token, openProfile }) {
 
             {/* جایگاه شما */}
             {d.myEntry && (
-              <div style={{ marginBottom:'12px', padding:'12px 16px', borderRadius:'16px', background:'linear-gradient(135deg, #1E293B, #0F172A)', border:'1px solid rgba(56,189,248,0.4)', display:'flex', alignItems:'center', gap:'12px' }}>
-                <span style={{ width:'36px', height:'36px', borderRadius:'50%', background:'rgba(56,189,248,0.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'18px' }}>👤</span>
-                <div>
-                  <div style={{ color:'#94A3B8', fontSize:'13px', fontWeight:'700' }}>جایگاه شما در این دوره لیگ:</div>
-                  <div style={{ color:'#FFF', fontWeight:'900', fontSize:'16px', display:'flex', alignItems:'center', gap:'9px', flexWrap:'wrap', marginTop:'2px' }}>
-                    <span>رتبه {fa(d.myEntry.rank)}</span>
-                    <CoinChip value={d.myEntry.coins} size={24} />
-                    <span style={{ color:'#94A3B8', fontWeight:'700', fontSize:'13px' }}>{fa(d.myEntry.points)} امتیاز</span>
-                  </div>
-                </div>
+              <div style={{ marginBottom:'10px', padding:'9px 12px', borderRadius:'14px', background:'linear-gradient(135deg, #1E293B, #0F172A)', border:'1px solid rgba(56,189,248,0.4)', display:'flex', alignItems:'center', gap:'9px' }}>
+                <span style={{ width:'28px', height:'28px', borderRadius:'50%', background:'rgba(56,189,248,0.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'15px', flexShrink:0 }}>👤</span>
+                <span style={{ color:'#94A3B8', fontSize:'12.5px', fontWeight:'700', flexShrink:0 }}>جایگاه شما</span>
+                <span style={{ color:'#FFF', fontWeight:'900', fontSize:'15px' }}>{fa(d.myEntry.rank)}</span>
+                <span style={{ marginInlineStart:'auto', display:'flex', alignItems:'center', gap:'7px' }}>
+                  <CoinChip value={d.myEntry.coins} size={21} />
+                  <span style={{ color:'#94A3B8', fontWeight:'700', fontSize:'12px' }}>{fa(d.myEntry.points)}</span>
+                </span>
               </div>
             )}
 
             <div>
               {rest.map((r, idx) => (
-                <div key={r.user_id} onClick={()=>openProfile && openProfile(r.user_id)} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 14px', background:'rgba(255,255,255,0.03)', borderRadius:'12px', marginBottom:'6px', cursor:'pointer' }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
-                    <span style={{ fontWeight:'bold', width:'26px', textAlign:'center', color:'#94A3B8', fontSize:'14px' }}>{fa(idx+4)}</span>
+                <div key={r.user_id} onClick={()=>openProfile && openProfile(r.user_id)} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'7px 12px', background:'rgba(255,255,255,0.03)', borderRadius:'11px', marginBottom:'4px', cursor:'pointer' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:'9px', minWidth:0 }}>
+                    <span style={{ fontWeight:'bold', width:'22px', textAlign:'center', color:'#94A3B8', fontSize:'13px', flexShrink:0 }}>{fa(idx+4)}</span>
                     <DisplayName name={r.nickname || 'کاربر'} cosmetics={r.cosmetics} level={r.level} />
                   </div>
-                  <span style={{ display:'flex', alignItems:'center', gap:'9px' }}>
-                    <CoinChip value={r.coins} />
-                    <span style={{ fontWeight:'bold', color:'#38BDF8', fontSize:'13px' }}>{fa(r.points)}</span>
+                  <span style={{ display:'flex', alignItems:'center', gap:'8px', flexShrink:0 }}>
+                    <CoinChip value={r.coins} size={20} />
+                    <span style={{ fontWeight:'bold', color:'#38BDF8', fontSize:'12px' }}>{fa(r.points)}</span>
                   </span>
                 </div>
               ))}

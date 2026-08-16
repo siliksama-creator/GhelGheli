@@ -37,7 +37,11 @@ const { pool } = require('../config/db');
 /** منابعِ مجاز — باید با CHECK مایگریشن ۰۴۵ یکی بماند. */
 const SOURCES = Object.freeze([
   'photo_card', 'card_code', 'referral', 'game', 'pass_reward',
-  'wheel', 'login_streak', 'mission', 'reward_claim', 'admin_adjust', 'admin_deduct', 'other',
+  'wheel', 'login_streak', 'mission', 'reward_claim', 'admin_adjust', 'admin_deduct',
+  // هدیهٔ امتیازِ عضویت (دورِ ۲۲). باید در CHECK دیتابیس هم باشد —
+  // مایگریشن ۰۷۰. اگر یکی از این دو جا نباشد، ثبت‌نام می‌شکند.
+  'signup_gift',
+  'other',
 ]);
 
 /**

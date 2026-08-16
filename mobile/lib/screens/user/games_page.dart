@@ -9,6 +9,7 @@ import '../../core/cosmetics.dart';
 import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/coin_quota_line.dart';
+import '../../widgets/coin_rate_strip.dart';
 import '../../widgets/level_badge.dart';
 import 'games/game_session.dart' show netPotFor;
 import 'games/memory_board.dart';
@@ -388,6 +389,10 @@ class _GamesHubPageState extends State<GamesHubPage> {
           onTap: () => setState(() => _active = 'tap'),
         ),
         Gaps.vMd,
+
+        // نوارِ کوچکِ نرخِ سکه — پیش از انتخابِ ورودی، چون همین‌جا تصمیم
+        // گرفته می‌شود کدام بازی ارزش دارد. آینهٔ games.jsx.
+        const CoinRateStrip(),
 
         // ── ۲. انتخاب حالت بازی (۴ حالت: ۱۰۰، ۱۰۰۰، تمرین با ربات، اتاق خصوصی) ──
         const Text(

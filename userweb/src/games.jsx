@@ -9,6 +9,7 @@ import CardDuelWeb from './cardDuelGame.jsx';
 import { useGameSession } from './gameSession.js';
 import { CosmeticAvatarFrame, LevelBadge, DisplayName } from './components/Cosmetics.jsx';
 import CoinAward from './components/CoinAward.jsx';
+import CoinRateStrip from './components/CoinRateStrip.jsx';
 import { ASSETS } from './components/IconAsset.jsx';
 import { fa, asset, avatarUrl, req } from './lib/api.js';
 import './growth.css';
@@ -314,6 +315,10 @@ export default function Games({ api, token, externalLaunch = null }) {
         </div>
         <span style={{ fontSize: '28px' }}>⚽</span>
       </div>
+
+      {/* نوارِ کوچکِ نرخِ سکه — پیش از انتخابِ ورودی، چون همین‌جا تصمیم
+          گرفته می‌شود کدام بازی ارزش دارد. آینهٔ games_page.dart. */}
+      <CoinRateStrip />
 
       {/* Mode Selector (4 Tabs) — رنگ هر قرص مثل اندروید */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>

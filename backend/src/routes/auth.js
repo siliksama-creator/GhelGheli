@@ -1,5 +1,6 @@
 /** OTP, registration, password login, and password reset routes. */
 const express = require('express');
+const signupGift = require('../services/signupGiftService');
 
 module.exports = function createAuthRoutes(deps) {
   const {
@@ -224,9 +225,32 @@ router.post('/auth/register-password', userLoginLimiter, asyncHandler(async (req
     }
   }
 
+  // ── هدیهٔ امتیازِ عضویت ──
+  //
+  // مبلغش را مدیر در پنل تعیین می‌کند. عمداً **بعد از** ساختِ کاربر و
+  // ثبتِ معرفی می‌آید و خودش هرگز throw نمی‌کند: اگر پرداخت شکست بخورد
+  // کاربر همچنان اکانتش را دارد. «امتیاز نگرفتم» شکایتِ کوچکی است،
+  // «ثبت‌نامم انجام نشد» فاجعه است.
+  //
+  // فقط برای کاربرِ واقعاً تازه — نه کسی که با ON CONFLICT پروفایلش
+  // به‌روزرسانی شده، وگرنه می‌شد با ثبت‌نامِ دوباره هدیه را دوشید.
+  const giftPoints = existing.rows[0] ? 0 : await signupGift.payoutSignupGift(rows[0].id);
+  if (giftPoints > 0) {
+    const gift = await signupGift.getSignupGift().catch(() => null);
+    createNotification(
+      rows[0].id, 'signup_gift', 'هدیهٔ عضویت 🎁',
+      `${faDigits(giftPoints)} امتیاز به حساب تو اضافه شد. ${gift?.message || ''}`.trim(),
+    ).catch(() => {});
+  }
+
   res.json({
     token: signUser(rows[0]),
-    user: safeUser(rows[0]),
+    // موجودیِ تازه‌شده را برمی‌گردانیم، وگرنه کلاینت «۰ امتیاز» نشان
+    // می‌دهد در حالی که اعلانِ هدیه رسیده — و کاربر فکر می‌کند دروغ است.
+    user: safeUser(giftPoints > 0
+      ? { ...rows[0], current_points: Number(rows[0].current_points || 0) + giftPoints }
+      : rows[0]),
+    signupGiftPoints: giftPoints,
     referralCode: myCode,
     referralApplied: referral?.ok === true,
     // چند چرخش خودِ دعوت‌شونده گرفت — تا کلاینت بتواند بگوید «۳ چرخش
