@@ -10,7 +10,7 @@ import { useGameSession } from './gameSession.js';
 import { CosmeticAvatarFrame, LevelBadge, DisplayName } from './components/Cosmetics.jsx';
 import CoinAward from './components/CoinAward.jsx';
 import CoinRateStrip from './components/CoinRateStrip.jsx';
-import { ASSETS } from './components/IconAsset.jsx';
+import { ASSETS, SvgIcon } from './components/IconAsset.jsx';
 import { fa, asset, avatarUrl, req } from './lib/api.js';
 import './growth.css';
 
@@ -313,7 +313,7 @@ export default function Games({ api, token, externalLaunch = null }) {
           </div>
           <p style={{ color: '#CBD5E1', fontSize: '12px', margin: 0 }}>ضربه بزن، شخصیت باز کن، امتیاز بگیر</p>
         </div>
-        <span style={{ fontSize: '28px' }}>⚽</span>
+        <span style={{ color:'#FFD166', display:'flex' }}><SvgIcon name="football" size={27} /></span>
       </div>
 
       {/* نوارِ کوچکِ نرخِ سکه — پیش از انتخابِ ورودی، چون همین‌جا تصمیم
@@ -323,10 +323,10 @@ export default function Games({ api, token, externalLaunch = null }) {
       {/* Mode Selector (4 Tabs) — رنگ هر قرص مثل اندروید */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
         {[
-          { id: 100, label: '۱۰۰ امتیاز', icon: '⚡', color: '#38BDF8' },
-          { id: 1000, label: '۱۰۰۰ امتیاز', icon: '🌟', color: '#FFD166' },
-          { id: 0, label: 'تمرین با ربات', icon: '🤖', color: '#22E7A6' },
-          { id: -1, label: 'اتاق خصوصی', icon: '🚪', color: '#A855F7' },
+          { id: 100, label: '۱۰۰ امتیاز', icon: 'bolt', color: '#38BDF8' },
+          { id: 1000, label: '۱۰۰۰ امتیاز', icon: 'star', color: '#FFD166' },
+          { id: 0, label: 'تمرین با ربات', icon: 'robot', color: '#22E7A6' },
+          { id: -1, label: 'اتاق خصوصی', icon: 'door', color: '#A855F7' },
         ].map(m => (
           <button
             key={m.id}
@@ -348,14 +348,14 @@ export default function Games({ api, token, externalLaunch = null }) {
               boxShadow: mode===m.id ? `0 6px 16px ${m.color}30` : 'none',
             }}
           >
-            <span style={{ fontSize: '18px', color: mode===m.id ? m.color : '#94A3B8' }}>{m.icon}</span>
+            <span style={{ display: 'flex', color: mode===m.id ? m.color : '#94A3B8' }}><SvgIcon name={m.icon} size={18} /></span>
             <span>{m.label}</span>
           </button>
         ))}
       </div>
 
       <div className={`gameStakeNotice ${mode === 0 ? 'practice' : mode === -1 ? 'lobby' : 'competitive'}`}>
-        <span>{mode === 0 ? '🤖' : mode === -1 ? '🔐' : '⚠️'}</span>
+        <span style={{ display:'flex' }}><SvgIcon name={mode === 0 ? 'robot' : mode === -1 ? 'key' : 'warning'} size={17} /></span>
         <div>
           <b>{mode === 0
             ? 'تمرین رایگان؛ بدون ریسک امتیاز'
@@ -474,7 +474,7 @@ export default function Games({ api, token, externalLaunch = null }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {lobbies.map(l => (
                   <div key={l.lobbyId} className="lobbyRow" style={{ '--lobby-accent': gameAccent(l.gameId) }}>
-                    <span className="lobbyDot" aria-hidden="true">{l.hasPassword ? '🔒' : '🎮'}</span>
+                    <span className="lobbyDot" aria-hidden="true"><SvgIcon name={l.hasPassword ? 'lock' : 'game'} size={15} /></span>
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div className="lobbyHost">
                         <span>{l.hostName}</span>
@@ -622,7 +622,7 @@ function GamePlayerIdentity({ player, fallback }) {
   const imageUrl = p.profileImageUrl || p.profile_image_url;
   const avatarKey = p.profileAvatarKey || p.profile_avatar_key;
   return <span style={{ display:'inline-flex', alignItems:'center', gap:6, minWidth:0, maxWidth:'100%' }}>
-    {p.isBot ? <span aria-hidden="true" style={{fontSize:22}}>🤖</span> : (
+    {p.isBot ? <span aria-hidden="true" style={{display:'flex'}}><SvgIcon name="robot" size={22} /></span> : (
       <CosmeticAvatarFrame frame={p.cosmetics?.frame} style={{width:34,height:34,padding:p.cosmetics?.frame?2:0}}>
         <img src={imageUrl ? asset(imageUrl) : avatarUrl(avatarKey)} alt="" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%',border:'1px solid #071522'}}/>
       </CosmeticAvatarFrame>
@@ -680,7 +680,7 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
           {activeGameId === 'penalty' ? 'ضربات پنالتی' : (activeGameId === 'memory' ? 'جفت‌یاب' : 'دوئل کارت‌ها')}
         </span>
         <button type="button" onClick={onToggleSound} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer' }}>
-          {soundOn ? '🔊' : '🔇'}
+          <SvgIcon name={soundOn ? 'soundOn' : 'soundOff'} size={17} />
         </button>
       </div>
 
@@ -703,13 +703,13 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
 
       {activeStake>0 && !g.vsBot && phase==='playing' && (
         <div className="gameShellPot" style={{ margin:'0 auto 10px', display:'inline-flex', alignItems:'center', gap:'6px', background:'linear-gradient(90deg, #FFD70022, #FF9F4322)', border:'1px solid #FFD166', color:'#FFD166', padding:'4px 12px', borderRadius:'99px', fontSize:'11px', fontWeight:'900' }}>
-          <span>🏆</span> جایزهٔ برنده: {fa(g.netPot || netPotFor(activeStake))} امتیاز
+          <span style={{ display:'inline-flex', verticalAlign:'-3px', color:'#FFD166' }}><SvgIcon name="trophy" size={16} /></span> جایزهٔ برنده: {fa(g.netPot || netPotFor(activeStake))} امتیاز
         </div>
       )}
 
       {phase === 'idle' && (
         <div style={{ padding:'36px 18px', display:'flex', flexDirection:'column', alignItems:'center', gap:'12px' }}>
-          <div style={{ fontSize:'42px' }}>🎮</div>
+          <div style={{ color:'#64748B', display:'flex', justifyContent:'center' }}><SvgIcon name="game" size={40} /></div>
           <h3 style={{ margin:0, color:'#FFF' }}>آماده‌ای شروع کنیم؟</h3>
           <p className="hint">آنلاین با حریف واقعی رقابت کن یا فوری با ربات تمرین کن.</p>
           <div style={{ display:'flex', flexWrap:'wrap', justifyContent:'center', gap:'8px' }}>
@@ -766,7 +766,8 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
 
       {phase === 'over' && (
         <div style={{ padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', position:'relative', zIndex:5, borderRadius:'20px', border:`1px solid ${resultColors[1]}99`, background:`radial-gradient(circle at 50% 0,${resultColors[1]}55,transparent 48%),linear-gradient(145deg,${resultColors[0]}DD,#071522)` }}>
-          <div style={{ fontSize: '48px' }}>{g.winner === 'DRAW' ? '🤝' : (g.winner === g.me ? '🎉' : '💔')}</div>
+          <div style={{ display:'flex', justifyContent:'center', color: g.winner === 'DRAW' ? '#94A3B8' : (g.winner === g.me ? '#FFD166' : '#FB7185') }}>
+            <SvgIcon name={g.winner === 'DRAW' ? 'handshake' : (g.winner === g.me ? 'party' : 'broken')} size={46} /></div>
           <h2 style={{ color: g.winner === g.me ? '#22E7A6' : '#FFF', fontWeight: '900', margin: 0 }}>
             {g.winner === 'DRAW' ? 'مسابقه مساوی شد!' : (g.winner === g.me ? 'تبریک! شما برنده شدید' : 'متاسفانه باختید!')}
           </h2>

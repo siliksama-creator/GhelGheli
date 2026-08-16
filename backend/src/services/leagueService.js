@@ -532,7 +532,7 @@ async function closeActiveSeason({ force = false, seasonId = null } = {}) {
       createNotification(
         w.userId,
         'league',
-        `🏆 رتبهٔ ${w.rank} لیگ ${w.monthYear}`,
+        `رتبهٔ ${w.rank} لیگ ${w.monthYear}`,
         w.pendingApproval
           ? `تبریک! رتبهٔ ${w.rank} را گرفتی. جایزهٔ `
             + `${w.amount.toLocaleString('fa-IR')} تومانی پس از بررسی و `
@@ -743,7 +743,7 @@ async function approvePayouts(payoutId, adminId) {
   for (const n of notify) {
     createNotification(
       n.userId, 'league',
-      `💰 جایزهٔ لیگ ${n.monthYear} واریز شد`,
+      `جایزهٔ لیگ ${n.monthYear} واریز شد`,
       `جایزهٔ رتبهٔ ${n.rank} به مبلغ ${n.amount.toLocaleString('fa-IR')} `
       + 'تومان به کیف پول شما واریز شد.',
     ).catch((e) => console.error('[league] payout notify failed:', e.message));

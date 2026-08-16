@@ -15,6 +15,7 @@ import '../shared/rank_tile.dart';
 import '../../widgets/coin_chip.dart';
 import '../../widgets/coin_guide.dart';
 import 'clubs_page.dart';
+import '../../widgets/ui_icon.dart';
 
 /// Monthly league leaderboard: podium (top 3) + ranked list, refreshed
 /// every 12s. Includes Previous Season Winners tab.
@@ -281,9 +282,16 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Text(
-                                      rank == 1 ? '🥇' : (rank == 2 ? '🥈' : '🥉'),
-                                      style: const TextStyle(fontSize: 18),
+                                    UiIcon(
+                                      rank == 1
+                                          ? 'medal1'
+                                          : (rank == 2 ? 'medal2' : 'medal3'),
+                                      size: 19,
+                                      color: rank == 1
+                                          ? const Color(0xFFFFD166)
+                                          : rank == 2
+                                              ? const Color(0xFFCBD5E1)
+                                              : const Color(0xFFD08B5B),
                                     ),
                                     const SizedBox(width: 4),
                                     Container(

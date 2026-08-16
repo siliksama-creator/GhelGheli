@@ -109,7 +109,7 @@ class GroupedPhotoCardTile extends StatelessWidget {
                             color: const Color(0x1FF59E0B),
                             border: Border.all(color: const Color(0x55F59E0B)),
                           ),
-                          child: const Text('🏅 کارت کلکسیونی — در آرنای دوئل نیست',
+                          child: const Text('کارت کلکسیونی — در آرنای دوئل نیست',
                               style: TextStyle(fontSize: 10.5, color: Color(0xFFFBBF24))),
                         )
                       else

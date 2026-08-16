@@ -55,7 +55,7 @@ class VictoryShareDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final shareMsg = 'من در بازی «$gameTitle» قلقلی با نتیجه $scoreText برنده شدم! 🏆\n\nبا کد معرف من ثبت‌نام کن و جایزه نقدی ببر:\nکد معرف: $referralCode\nhttps://user.ghelghelishop.ir';
+    final shareMsg = 'من در بازی «$gameTitle» قلقلی با نتیجه $scoreText برنده شدم!\n\nبا کد معرف من ثبت‌نام کن و جایزه نقدی ببر:\nکد معرف: $referralCode\nhttps://user.ghelghelishop.ir';
 
     return Dialog(
       backgroundColor: Colors.transparent,

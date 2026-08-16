@@ -1001,7 +1001,7 @@ class _ShopEmoteArtwork extends StatelessWidget {
     return switch (slug) {
       'emote_respect' => const ['بازی خوبی بود', 'دوباره؟'],
       'emote_comeback' => const ['این یکی شانسی بود!', 'آماده جبران باش'],
-      _ => const ['گوووول! ⚽', 'باشگاه من همیشه آماده‌ست!'],
+      _ => const ['گوووول!', 'باشگاه من همیشه آماده‌ست!'],
     };
   }
 

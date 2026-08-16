@@ -789,7 +789,7 @@ async function emotePacksFor(userId) {
   return rows.map((r) => ({
     slug: r.slug,
     name: r.name,
-    icon: r.metadata?.icon || '✨',
+    icon: r.metadata?.icon || 'sparkle',
     messages: Array.isArray(r.metadata?.messages) ? r.metadata.messages : [],
   }));
 }

@@ -79,11 +79,11 @@ router.post('/auth/register', asyncHandler(async (req, res) => {
       // پاداش سیستم است و بی‌صدا دادنش حیف است.
       if (referral.referrerInvites % referrals.INVITES_PER_DAILY_SPIN === 0
           && referral.referrerInvites <= referrals.MAX_INVITES_FOR_DAILY) {
-        body += ` 🎉 با ${faDigits(referral.referrerInvites)} دعوت، از حالا `
+        body += ` با ${faDigits(referral.referrerInvites)} دعوت، از حالا `
           + `روزی ${faDigits(referral.referrerDailySpins)} چرخش رایگان داری!`;
       }
       createNotification(
-        referral.referrerId, 'referral', 'یک دوست با کد تو عضو شد 🎉', body,
+        referral.referrerId, 'referral', 'یک دوست با کد تو عضو شد', body,
       ).catch(() => {});
     }
   }
@@ -106,7 +106,7 @@ router.post('/auth/register', asyncHandler(async (req, res) => {
   if (giftPoints > 0) {
     const gift = await signupGift.getSignupGift().catch(() => null);
     createNotification(
-      newUser.id, 'signup_gift', 'هدیهٔ عضویت 🎁',
+      newUser.id, 'signup_gift', 'هدیهٔ عضویت',
       `${faDigits(giftPoints)} امتیاز به حساب تو اضافه شد. ${gift?.message || ''}`.trim(),
     ).catch(() => {});
   }
@@ -244,11 +244,11 @@ router.post('/auth/register-password', userLoginLimiter, asyncHandler(async (req
       // پاداش سیستم است و بی‌صدا دادنش حیف است.
       if (referral.referrerInvites % referrals.INVITES_PER_DAILY_SPIN === 0
           && referral.referrerInvites <= referrals.MAX_INVITES_FOR_DAILY) {
-        body += ` 🎉 با ${faDigits(referral.referrerInvites)} دعوت، از حالا `
+        body += ` با ${faDigits(referral.referrerInvites)} دعوت، از حالا `
           + `روزی ${faDigits(referral.referrerDailySpins)} چرخش رایگان داری!`;
       }
       createNotification(
-        referral.referrerId, 'referral', 'یک دوست با کد تو عضو شد 🎉', body,
+        referral.referrerId, 'referral', 'یک دوست با کد تو عضو شد', body,
       ).catch(() => {});
     }
   }
@@ -266,7 +266,7 @@ router.post('/auth/register-password', userLoginLimiter, asyncHandler(async (req
   if (giftPoints > 0) {
     const gift = await signupGift.getSignupGift().catch(() => null);
     createNotification(
-      rows[0].id, 'signup_gift', 'هدیهٔ عضویت 🎁',
+      rows[0].id, 'signup_gift', 'هدیهٔ عضویت',
       `${faDigits(giftPoints)} امتیاز به حساب تو اضافه شد. ${gift?.message || ''}`.trim(),
     ).catch(() => {});
   }

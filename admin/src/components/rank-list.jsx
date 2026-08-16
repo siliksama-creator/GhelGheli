@@ -14,7 +14,7 @@ export function RankList({ entries = [] }) {
         const top = rank <= 3;
         return (
           <div key={e.user_id} className={`rank-row ${top ? 'top' : ''}`}>
-            <div className="rank-num">{top ? ['🥇', '🥈', '🥉'][rank - 1] : fmtNumber(rank)}</div>
+            <div className={`rank-num${top ? ` medal m${rank}` : ''}`}>{fmtNumber(rank)}</div>
             <span style={{ fontWeight: 700, fontSize: 14 }}>{e.nickname || e.first_name || 'کاربر'}</span>
             <strong>{fmtNumber(e.points)} امتیاز</strong>
           </div>

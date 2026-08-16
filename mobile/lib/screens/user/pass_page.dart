@@ -602,7 +602,7 @@ class _CompactRewardTile extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             AnimePlusButton(
-              label: 'ورود به فروشگاه و فعال‌سازی پلاس ⚡',
+              label: 'ورود به فروشگاه و فعال‌سازی پلاس',
               onPressed: () {
                 Navigator.pop(ctx);
                 onOpenShop();

@@ -74,7 +74,7 @@ function PinnedMessageCard({ request }) {
           rows={3}
           maxLength={300}
           value={text}
-          placeholder="مثال: مسابقه ویژه این هفته آغاز شد 🎉"
+          placeholder="مثال: مسابقه ویژه این هفته آغاز شد"
           onChange={(e) => setText(e.target.value)}
         />
       </Field>

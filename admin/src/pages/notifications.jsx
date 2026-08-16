@@ -62,7 +62,7 @@ export function NotificationsPage({ request }) {
         }}>
           <Clock size={18} color={isDaytime ? '#22C55E' : '#F59E0B'} />
           <div style={{ fontSize: 12.5 }}>
-            <b>ساعت فعلی تهران: {tehranHour}:00</b> — {isDaytime ? 'ساعت مجاز ارسال روزانه (۱۰ تا ۲۲) ✅' : 'ساعت شبانه (ارسال در صورت لزوم نیاز به تیک اجباری دارد) ⚠️'}
+            <b>ساعت فعلی تهران: {tehranHour}:00</b> — {isDaytime ? 'ساعت مجاز ارسال روزانه (۱۰ تا ۲۲)' : 'ساعت شبانه (ارسال در صورت لزوم نیاز به تیک اجباری دارد)'}
           </div>
         </div>
 
@@ -82,12 +82,12 @@ export function NotificationsPage({ request }) {
         <form onSubmit={send} className="stack">
           <Field label="گروه هدف (سگمنت کاربران)">
             <select className="input" value={segment} onChange={e => setSegment(e.target.value)}>
-              <option value="all">👥 همه کاربران فعال</option>
-              <option value="inactive_3d">💤 کاربران غایب ۳ روز اخیر (یادآوری بازگشت)</option>
-              <option value="top20_league">🏆 ۲۰ نفر اول جدول لیگ (رقابت داغ)</option>
-              <option value="near_cash_reward">💰 کاربران نزدیک به جایزه نقدی (کمتر از ۱۰۰ امتیاز)</option>
-              <option value="plus_users">⭐ کاربران دارای اشتراک پلاس</option>
-              <option value="free_users">🎁 کاربران بدون اشتراک پلاس (تخفیف و ارتقا)</option>
+              <option value="all">همه کاربران فعال</option>
+              <option value="inactive_3d">کاربران غایب ۳ روز اخیر (یادآوری بازگشت)</option>
+              <option value="top20_league">۲۰ نفر اول جدول لیگ (رقابت داغ)</option>
+              <option value="near_cash_reward">کاربران نزدیک به جایزه نقدی (کمتر از ۱۰۰ امتیاز)</option>
+              <option value="plus_users">کاربران دارای اشتراک پلاس</option>
+              <option value="free_users">کاربران بدون اشتراک پلاس (تخفیف و ارتقا)</option>
             </select>
           </Field>
 

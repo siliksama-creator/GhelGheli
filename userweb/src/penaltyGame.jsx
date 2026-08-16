@@ -8,6 +8,7 @@ import PenaltyNet from './penaltyNet.js';
 import { play } from './gameAudio.js';
 import { heavyImpact, lightImpact, mediumImpact, selectionClick } from './haptics.js';
 import { penaltyPowerAt, penaltyView, zoneCenter } from './penaltyModel.js';
+import { SvgIcon } from './components/IconAsset.jsx';
 
 const GOAL = '#84CC16';
 const SAVE = '#38BDF8';
@@ -384,7 +385,7 @@ export default function PenaltyGame({ state, mySymbol, onMove }) {
               onPointerUp={releaseShot}
               onPointerCancel={releaseShot}
               onClick={() => dive(zone)}>
-              {selected === zone ? (view.amShooter ? '◎' : '✋') : ''}
+              {selected === zone ? (view.amShooter ? <SvgIcon name="target" size={20} /> : <SvgIcon name="glove" size={20} />) : ''}
             </button>
           ))}
         </div>

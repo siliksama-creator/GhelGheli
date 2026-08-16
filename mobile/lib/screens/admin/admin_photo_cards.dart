@@ -727,8 +727,8 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
             subtitle: Text(
               _collectible
-                  ? '🏅 فقط جمع‌آوری: در اینونتوری و جوایز دیده می‌شود، ولی در آرنای دوئل قابل انتخاب نیست.'
-                  : '⚔️ کارت بازی: در آرنای دوئل قابل استفاده است و استاتس می‌خواهد.',
+                  ? 'فقط جمع‌آوری: در اینونتوری و جوایز دیده می‌شود، ولی در آرنای دوئل قابل انتخاب نیست.'
+                  : 'کارت بازی: در آرنای دوئل قابل استفاده است و استاتس می‌خواهد.',
               style: const TextStyle(fontSize: 11, height: 1.6),
             ),
           ),

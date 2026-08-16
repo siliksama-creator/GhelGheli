@@ -4,7 +4,7 @@ import { req, fa, asset, avatarUrl } from '../lib/api.js';
 import { DisplayName } from '../components/Cosmetics.jsx';
 import { useAsync } from '../lib/useAsync.js';
 import { AsyncSection, EmptyView } from '../components/states.jsx';
-import { ASSETS } from '../components/IconAsset.jsx';
+import { ASSETS, SvgIcon } from '../components/IconAsset.jsx';
 import Clubs from './Clubs.jsx';
 import CoinChip from '../components/CoinChip.jsx';
 import CoinGuide from '../components/CoinGuide.jsx';
@@ -29,7 +29,8 @@ function PodiumCard({ rank, row, onTap }) {
           ۱۸۷px ارتفاع می‌گرفت. مدال خودش رتبه را می‌گوید، پس چیپِ
           «رتبه ۱» فقط تکرار بود. */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'4px' }}>
-        <span style={{ fontSize:'18px', lineHeight:1 }}>{rank===1?'🥇':rank===2?'🥈':'🥉'}</span>
+        <span style={{ lineHeight:1, display:'flex', color: rank===1?'#FFD166':rank===2?'#CBD5E1':'#D08B5B' }}>
+          <SvgIcon name={rank===1?'medal1':rank===2?'medal2':'medal3'} size={19} /></span>
         <span style={{ display:'inline-block', padding:'1px 6px', borderRadius:'99px', background: badgeBg, color: badgeColor, fontSize:'9.5px', fontWeight:'900' }}>{fa(rank)}</span>
       </div>
       <div style={{ fontWeight:'700', fontSize:'12px', color:'#FFF', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', marginTop:'5px' }}>
@@ -55,12 +56,12 @@ function PreviousWinners({ data }) {
     return (
       <div style={{ padding:'16px' }}>
         <div style={{ padding:'24px', borderRadius:'20px', background:'linear-gradient(135deg, #3D2E00, #1A1400)', textAlign:'center' }}>
-          <div style={{ fontSize:'48px' }}>🏆</div>
+          <div style={{ color:'#FFD700', display:'flex', justifyContent:'center' }}><SvgIcon name="trophy" size={46} /></div>
           <h3 style={{ color:'#FFD700', fontWeight:'900', margin:'8px 0 4px' }}>برندگان دوره قبل لیگ</h3>
           <p style={{ color:'rgba(255,255,255,0.7)', fontSize:'12px' }}>پس از پایان لیگ، برندگان تا شروع لیگ بعدی اینجا نمایش داده می‌شوند.</p>
         </div>
         <div style={{ marginTop:'24px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'16px', padding:'20px', textAlign:'center' }}>
-          <div style={{ fontSize:'32px' }}>🎖️</div>
+          <div style={{ color:'#94A3B8', display:'flex', justifyContent:'center' }}><SvgIcon name="medal1" size={30} /></div>
           <b style={{ color:'#FFF' }}>هنوز دوره قبلی بسته نشده است</b>
           <p style={{ color:'#94A3B8', fontSize:'12px', marginTop:'4px' }}>به محض پایان این دوره لیگ و پرداخت جوایز، لیست برندگان در این قسمت ثبت خواهد شد.</p>
         </div>
@@ -71,7 +72,7 @@ function PreviousWinners({ data }) {
   return (
     <div style={{ padding:'16px' }}>
       <div style={{ padding:'24px', borderRadius:'20px', background:'linear-gradient(135deg, #3D2E00, #1A1400)', boxShadow:'0 4px 20px rgba(255,215,0,0.15)', textAlign:'center' }}>
-        <div style={{ fontSize:'48px' }}>🏆</div>
+        <div style={{ color:'#FFD700', display:'flex', justifyContent:'center' }}><SvgIcon name="trophy" size={46} /></div>
         <h3 style={{ color:'#FFD700', fontWeight:'900', margin:'8px 0 4px' }}>برندگان دوره قبل لیگ</h3>
         <p style={{ color:'rgba(255,255,255,0.7)', fontSize:'12px' }}>فصل {monthLabel} — این برندگان تا پایان لیگ بعدی اینجا نمایش داده می‌شوند</p>
       </div>
@@ -191,7 +192,7 @@ export default function League({ token, openProfile }) {
             {/* جایگاه شما */}
             {d.myEntry && (
               <div style={{ marginBottom:'10px', padding:'9px 12px', borderRadius:'14px', background:'linear-gradient(135deg, #1E293B, #0F172A)', border:'1px solid rgba(56,189,248,0.4)', display:'flex', alignItems:'center', gap:'9px' }}>
-                <span style={{ width:'28px', height:'28px', borderRadius:'50%', background:'rgba(56,189,248,0.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'15px', flexShrink:0 }}>👤</span>
+                <span style={{ width:'28px', height:'28px', borderRadius:'50%', background:'rgba(56,189,248,0.15)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, color:'#38BDF8' }}><SvgIcon name="person" size={15} /></span>
                 <span style={{ color:'#94A3B8', fontSize:'12.5px', fontWeight:'700', flexShrink:0 }}>جایگاه شما</span>
                 <span style={{ color:'#FFF', fontWeight:'900', fontSize:'15px' }}>{fa(d.myEntry.rank)}</span>
                 <span style={{ marginInlineStart:'auto', display:'flex', alignItems:'center', gap:'7px' }}>
@@ -220,7 +221,7 @@ export default function League({ token, openProfile }) {
               برترین کاربران تا پایان زمان اعلام شده؛ جوایز پس از پایان لیگ پرداخت و لیگ بعدی آغاز می‌شود.
             </p>
 
-            {entries.length===0 && <div style={{ textAlign:'center', padding:'30px', color:'#64748B' }}><div style={{ fontSize:'40px' }}>🏆</div><b style={{ fontSize:'15px', display:'block', marginTop:'6px' }}>هنوز کسی در این لیگ سکه‌ای نبرده است</b><span style={{ fontSize:'13px', display:'block', marginTop:'6px', lineHeight:1.6 }}>اولین برد شما مقابل حریف واقعی، شما را صدرنشین می‌کند.</span></div>}
+            {entries.length===0 && <div style={{ textAlign:'center', padding:'30px', color:'#64748B' }}><div style={{ color:'#FFD166', display:'flex', justifyContent:'center' }}><SvgIcon name="trophy" size={38} /></div><b style={{ fontSize:'15px', display:'block', marginTop:'6px' }}>هنوز کسی در این لیگ سکه‌ای نبرده است</b><span style={{ fontSize:'13px', display:'block', marginTop:'6px', lineHeight:1.6 }}>اولین برد شما مقابل حریف واقعی، شما را صدرنشین می‌کند.</span></div>}
           </section>
         );
       }}

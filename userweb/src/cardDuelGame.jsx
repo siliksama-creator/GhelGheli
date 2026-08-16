@@ -8,6 +8,7 @@ import PlayerCard from './components/PlayerCard.jsx';
 import { cardIdOf, cardPowerOf } from './lib/cards.js';
 import { matchTension, matchVerdictForViewer, resultMvp, roundEffectBonus, roundForViewer } from './lib/cardDuelLogic.js';
 import CoinAward from './components/CoinAward.jsx';
+import { SvgIcon } from './components/IconAsset.jsx';
 
 const idOf = card => cardIdOf(card);
 const num = value => Number(value || 0);
@@ -36,11 +37,11 @@ const rarityColor = rarity => ({
 }[rarity] || '#22E7A6');
 
 function modeCopy({ stake, vsBot, roomCode, initialStart }) {
-  if (vsBot) return { title: 'تمرین با ربات', subtitle: 'رایگان و بدون جابه‌جایی امتیاز', color: '#22E7A6', icon: '🤖' };
+  if (vsBot) return { title: 'تمرین با ربات', subtitle: 'رایگان و بدون جابه‌جایی امتیاز', color: '#22E7A6', icon: 'robot' };
   if (roomCode || initialStart?.matchMode === 'lobby') {
-    return { title: 'لابی خصوصی', subtitle: stake ? `ورودی ${fa(stake)} امتیاز` : 'مسابقه دوستانه', color: '#A855F7', icon: '🔐' };
+    return { title: 'لابی خصوصی', subtitle: stake ? `ورودی ${fa(stake)} امتیاز` : 'مسابقه دوستانه', color: '#A855F7', icon: 'key' };
   }
-  return { title: `نبرد آنلاین ${fa(stake)}`, subtitle: `باخت یعنی کسر ${fa(stake)} امتیاز`, color: stake === 1000 ? '#FFD166' : '#38BDF8', icon: '⚔️' };
+  return { title: `نبرد آنلاین ${fa(stake)}`, subtitle: `باخت یعنی کسر ${fa(stake)} امتیاز`, color: stake === 1000 ? '#FFD166' : '#38BDF8', icon: 'swords' };
 }
 
 function HoloCard({ card, selected, disabled, compact = false, onClick, frame, winner = false, loser = false, badge = '' }) {
@@ -293,11 +294,11 @@ function RoundReveal({ round, me, myFrame, opponentFrame, opponentRole = 'حری
 // می‌سازند. همان عدد نهایی حکم را می‌دهد؛ این بنر قرارداد را پیش از انتخاب
 // بزرگ و روشن اعلام می‌کند تا هیچ قانون پنهانی باقی نماند.
 const FOCUS_META = {
-  speed: { name: 'سرعت', icon: '⚡', color: '#38BDF8' },
-  technique: { name: 'تکنیک', icon: '✨', color: '#A855F7' },
-  attack: { name: 'حمله', icon: '🔥', color: '#FB7185' },
-  defense: { name: 'دفاع', icon: '🛡️', color: '#22E7A6' },
-  goalChance: { name: 'شانس گل', icon: '⚽', color: '#FFD166' },
+  speed: { name: 'سرعت', icon: 'bolt', color: '#38BDF8' },
+  technique: { name: 'تکنیک', icon: 'sparkle', color: '#A855F7' },
+  attack: { name: 'حمله', icon: 'flame', color: '#FB7185' },
+  defense: { name: 'دفاع', icon: 'shield', color: '#22E7A6' },
+  goalChance: { name: 'شانس گل', icon: 'football', color: '#FFD166' },
 };
 
 
@@ -361,7 +362,7 @@ function RoundIntroOverlay({ focus, roundNumber, totalRounds }) {
           </div>
         </div>
         <span className="duelRoundIntroIcon" aria-hidden="true">
-          <i>{meta.icon || '★'}</i>
+          <i><SvgIcon name={meta.icon || 'star'} size={15} /></i>
         </span>
         <label>معیار این راند</label>
         <b>{meta.name || ''}</b>
@@ -389,7 +390,7 @@ function FocusStatRibbon({ card, stat, roundIndex = 0, previousRoundWon = false 
   return (
     <span className="duelFocusRibbon" style={{ '--focus-color': meta.color || '#38BDF8' }}
       aria-label={bonus ? `${fa(value)} به علاوه افکت ${fa(bonus)} برابر ${fa(finalValue)}` : `عدد نهایی ${fa(finalValue)}`}>
-      <i aria-hidden="true">{meta.icon || '★'}</i>
+      <i aria-hidden="true"><SvgIcon name={meta.icon || 'star'} size={13} /></i>
       {bonus ? `${fa(value)}+${fa(bonus)}=${fa(finalValue)}` : fa(finalValue)}
     </span>
   );
@@ -400,7 +401,7 @@ function DuelIdentity({ player, fallback }) {
   const imageUrl = p.profileImageUrl || p.profile_image_url;
   const avatarKey = p.profileAvatarKey || p.profile_avatar_key;
   return <span className="duelIdentity">
-    {p.isBot ? <span aria-hidden="true">🤖</span> : (
+    {p.isBot ? <span aria-hidden="true" style={{display:'flex'}}><SvgIcon name="robot" size={20} /></span> : (
       <CosmeticAvatarFrame frame={p.cosmetics?.frame} style={{width:30,height:30,padding:p.cosmetics?.frame?2:0}}>
         <img src={imageUrl ? asset(imageUrl) : avatarUrl(avatarKey)} alt="" />
       </CosmeticAvatarFrame>
@@ -570,10 +571,10 @@ function DeckIntel({ insights, suggestedDeck, onApply }) {
   const opener = order[0]?.name || '';
   const summary = `${warning || strength}${opener ? ` • شروع: ${opener}` : ''}`;
   return <section className={`duelIntelCompact card ${warning ? 'warn' : 'ready'}`}>
-    <span aria-hidden="true">{warning ? '⚡' : '✓'}</span>
+    <span aria-hidden="true" style={{display:'flex'}}><SvgIcon name={warning ? 'bolt' : 'check'} size={14} /></span>
     <div><b>{warning ? 'یک اصلاح پیشنهادی' : 'ترکیب آماده'}</b><small>{summary}</small></div>
     {suggestedDeck && <button type="button" className="ghost" aria-label="چیدن خودکار"
-      onClick={onApply}>✦</button>}
+      onClick={onApply}><SvgIcon name="sparkle" size={14} /></button>}
   </section>;
 }
 
@@ -823,7 +824,7 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
         <small>{vsBot ? 'بدون ریسک امتیاز' : stake ? `ورودی ${fa(stake)} امتیاز` : 'مسابقه خصوصی'}</small>
       </button>
       {error && <div className="err duelMessage">{error}</div>}
-      {practiceFallback && <div className="gameStakeNotice practice"><span>🎁</span><div>
+      {practiceFallback && <div className="gameStakeNotice practice"><span style={{display:'flex',color:'#22E7A6'}}><SvgIcon name="gift" size={18} /></span><div>
         <b>کارت‌های تمرینی رایگان</b>
       </div></div>}
       {/* ── چرا کلکسیون جمع‌شونده شد ──
@@ -864,7 +865,7 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
         opponentRole={resultOpponentRole} sequence={session.g.stakePayoutSequence}
         balanceAfter={session.g.stakeWinnerBalanceAfter}/>
       <div className="duelFinalePanel">
-        <span>{winner === 'DRAW' ? '🤝' : iWon ? '🏆' : '🛡️'}</span>
+        <span style={{display:'flex', color: winner === 'DRAW' ? '#94A3B8' : iWon ? '#FFD166' : '#38BDF8'}}><SvgIcon name={winner === 'DRAW' ? 'handshake' : iWon ? 'trophy' : 'shield'} size={30} /></span>
         <h2>{winner === 'DRAW' ? 'DRAW' : iWon ? 'VICTORY' : 'DEFEAT'}</h2>
         <strong className="duelFinalScore">
           تو {fa(resultScore[resultMine])} <i>—</i> {resultOpponentRole} {fa(resultScore[resultOther])}

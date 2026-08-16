@@ -11,7 +11,7 @@ import { LoadingView, ErrorView } from '../components/states.jsx';
 import { SvgIcon } from '../components/IconAsset.jsx';
 import CoinChip from '../components/CoinChip.jsx';
 
-const medal = r => (r === 1 ? '🥇' : r === 2 ? '🥈' : r === 3 ? '🥉' : '');
+const medal = r => (r === 1 ? 'medal1' : r === 2 ? 'medal2' : r === 3 ? 'medal3' : '');
 
 export default function PublicProfile({ token, userId, close }) {
   const load = useCallback(
@@ -160,7 +160,7 @@ export default function PublicProfile({ token, userId, close }) {
                   <div className="ppLeague">
                     {u.leagueHistory.map((h, i) => (
                       <div className="ppLeagueRow" key={i}>
-                        <span className="ppMedal">{medal(h.rank)}</span>
+                        {medal(h.rank) && <span className="ppMedal"><SvgIcon name={medal(h.rank)} size={15} /></span>}
                         <span className="ppMonth">{h.monthYear}</span>
                         <span className="ppRank">رتبهٔ {fa(h.rank)}</span>
                         <span className="ppPts">{fa(h.points)} امتیاز</span>

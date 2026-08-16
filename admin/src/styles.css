@@ -547,6 +547,23 @@ table.data-table {
   background: var(--gg-gradient-gold);
   color: #241900;
 }
+/* سکوی سه‌نفرهٔ اول — دورِ ۲۳.
+   قبلاً 🥇🥈🥉 بود؛ ایموجی در جدولِ عددیِ ادمین هم ناهماهنگ دیده می‌شد و
+   هم شمارهٔ رتبه را پنهان می‌کرد. حالا خودِ عدد می‌ماند و جنسِ فلز را
+   حلقهٔ رنگی می‌گوید — طلا/نقره/برنز. */
+.rank-row .rank-num.medal {
+  box-shadow: 0 0 0 2px var(--medal-ring, transparent) inset;
+}
+.rank-row .rank-num.m1 { --medal-ring: #FFD166; }
+.rank-row .rank-num.m2 {
+  --medal-ring: #CBD5E1;
+  background: linear-gradient(140deg, #E2E8F0, #94A3B8);
+}
+.rank-row .rank-num.m3 {
+  --medal-ring: #D08B5B;
+  background: linear-gradient(140deg, #D9A277, #A96B3C);
+  color: #2A1607;
+}
 .rank-row.top {
   background: color-mix(in srgb, var(--gg-amber) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--gg-amber) 30%, transparent);

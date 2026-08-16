@@ -62,7 +62,7 @@ router.patch('/admin/wallet/withdrawals/:id', adminAuth, validateUuid('id'), req
         ? ` کد پیگیری: ${request.trackingCode}`
         : '';
       createNotification(request.userId || request.user_id, 'wallet',
-        '✅ برداشت شما پرداخت شد',
+        'برداشت شما پرداخت شد',
         `مبلغ ${amount} تومان به حساب شما واریز شد.${code}`,
       ).catch(() => {});
     } else if (st === 'rejected') {

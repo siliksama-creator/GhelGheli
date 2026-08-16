@@ -304,7 +304,7 @@ router.patch('/admin/reward-claims/:id', adminAuth, validateUuid('id'), requireR
       createNotification(
         claim.user_id,
         'wallet',
-        'جایزهٔ نقدی به کیف پول اضافه شد 🎁',
+        'جایزهٔ نقدی به کیف پول اضافه شد',
         `${credited.toLocaleString('en-US')} تومان بابت جایزهٔ «${claim.reward_name}» به کیف پول شما واریز شد.`,
       ).catch(() => {});
     }

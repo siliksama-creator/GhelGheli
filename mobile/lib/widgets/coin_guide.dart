@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import 'ui_icon.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api_client.dart';
@@ -83,12 +85,12 @@ class _CoinGuideState extends State<CoinGuide> {
   ];
 
   static const _bullets = [
-    ('✅', 'فقط برنده سکه می‌گیرد — مقابل حریف واقعی و با ورودی امتیاز.'),
-    ('🚫', 'مساوی، باخت، بازی با ربات و تمرین رایگان سکه ندارند.'),
-    ('🔒', 'سکه هرگز از شما کم نمی‌شود؛ حتی وقتی ببازید.'),
-    ('📅',
+    ('check', 'فقط برنده سکه می‌گیرد — مقابل حریف واقعی و با ورودی امتیاز.'),
+    ('ban', 'مساوی، باخت، بازی با ربات و تمرین رایگان سکه ندارند.'),
+    ('lock', 'سکه هرگز از شما کم نمی‌شود؛ حتی وقتی ببازید.'),
+    ('calendar',
         'هر روز تا ۳۰ برد در ورودی ۱۰۰ و ۱۵ برد در ورودی ۱۰۰۰ سکه می‌دهد. بعد از آن، برد امتیاز دارد ولی سکه نه.'),
-    ('🏆', 'در پایان فصل، جوایز بر اساس سکه پرداخت و سکه‌ها صفر می‌شود.'),
+    ('trophy', 'در پایان فصل، جوایز بر اساس سکه پرداخت و سکه‌ها صفر می‌شود.'),
   ];
 
   @override
@@ -264,9 +266,10 @@ class _CoinGuideState extends State<CoinGuide> {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(b.$1,
-                              style: const TextStyle(
-                                  fontSize: 15, height: 1.5)),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: UiIcon(b.$1, size: 17, color: _gold),
+                          ),
                           const SizedBox(width: 9),
                           Expanded(
                             child: Text(

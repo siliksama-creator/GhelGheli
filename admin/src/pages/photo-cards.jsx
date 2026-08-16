@@ -31,8 +31,8 @@ import { EditGroupedCardModal } from '../components/photoCards/EditGroupedCardMo
 // مراحلِ واقعیِ آنالیزِ آپلود — هر کدام کارِ واقعیِ سرور.
 const UPLOAD_STEPS = [
   '⏳ در حال تحلیل تصویر — رنگ، لبه‌ها، بافت و روشنایی…',
-  '🔤 در حال خواندن متن کارت — نام بازیکن و شمارهٔ پیراهن…',
-  '🔍 بررسی تکراری نبودن و ثبت در کاتالوگ…',
+  'در حال خواندن متن کارت — نام بازیکن و شمارهٔ پیراهن…',
+  'بررسی تکراری نبودن و ثبت در کاتالوگ…',
 ];
 
 export function PhotoCardsPage({ request }) {
@@ -535,7 +535,7 @@ export function PhotoCardsPage({ request }) {
             </Field>
             <p className={`topbar-sub codeTypeHint${fileBack ? ' ok' : ''}`}>
               {fileBack
-                ? '✅ هر دو عکس آنالیز می‌شوند — کاربر از هر طرف عکس '
+                ? 'هر دو عکس آنالیز می‌شوند — کاربر از هر طرف عکس '
                   + 'بگیرد شناخته می‌شود.'
                 : 'ℹ️ اگر پشتِ کارت هم طرح دارد اضافه‌اش کنید، وگرنه '
                   + 'کاربری که از پشت عکس بگیرد شناخته نمی‌شود.'}
@@ -571,9 +571,9 @@ export function PhotoCardsPage({ request }) {
                   <b>کارت کلکسیونی است (برای بازی نیست)</b>
                   <span className="topbar-sub" style={{ display: 'block' }}>
                     {collectible
-                      ? '🏅 فقط جمع‌آوری: در اینونتوری و جوایز دیده می‌شود، '
+                      ? 'فقط جمع‌آوری: در اینونتوری و جوایز دیده می‌شود، '
                         + 'ولی در آرنای دوئل قابل انتخاب نیست.'
-                      : '⚔️ کارت بازی: در آرنای دوئل قابل استفاده است و '
+                      : 'کارت بازی: در آرنای دوئل قابل استفاده است و '
                         + 'استاتس می‌خواهد.'}
                   </span>
                 </span>
@@ -651,9 +651,9 @@ export function PhotoCardsPage({ request }) {
             )}
             <p className={`topbar-sub codeTypeHint${ownCodes.trim() ? ' ok' : ''}`}>
               {ownCodes.trim()
-                ? '✅ این کدها به همین کارت گره می‌خورند — ثبتِ کاربر با '
+                ? 'این کدها به همین کارت گره می‌خورند — ثبتِ کاربر با '
                   + 'شباهت ۲۰٪ هم خودکار تأیید می‌شود.'
-                : 'ℹ️ بدون کد اختصاصی، فقط طرح ثبت می‌شود و تشخیص از روی '
+                : 'بدون کد اختصاصی، فقط طرح ثبت می‌شود و تشخیص از روی '
                   + 'عکس انجام می‌گیرد (آستانهٔ ۴۰٪).'}
             </p>
 
@@ -783,12 +783,12 @@ export function PhotoCardsPage({ request }) {
         </Field>
         {codeType ? (
           <p className="topbar-sub codeTypeHint ok">
-            ✅ ثبت این کدها تقریباً همیشه خودکار تأیید می‌شود — کاربر فقط
+            ثبت این کدها تقریباً همیشه خودکار تأیید می‌شود — کاربر فقط
             باید عکسی از کارت بفرستد، حتی اگر کیفیتش پایین باشد.
           </p>
         ) : (
           <p className="topbar-sub codeTypeHint">
-            ℹ️ بدون انتخاب کارت، تشخیص فقط از روی عکس انجام می‌شود و
+            بدون انتخاب کارت، تشخیص فقط از روی عکس انجام می‌شود و
             عکس‌های نامفهوم به صف بررسی شما می‌روند.
           </p>
         )}
@@ -942,7 +942,7 @@ export function PhotoCardsPage({ request }) {
                 className="codeGroupHead"
                 onClick={() => setOpenGroup(open ? null : g.name)}
               >
-                <span className="codeGroupName">🔗 {g.name}</span>
+                <span className="codeGroupName">{g.name}</span>
                 <span className="codeGroupCount">
                   {fmtNumber(g.list.length)} کد
                 </span>
@@ -977,7 +977,7 @@ export function PhotoCardsPage({ request }) {
                         بعد از مصرف است، این تصمیمِ مدیر پیش از توزیع.
                         نشانِ 🔗 تفکیکشان را در یک نگاه ممکن می‌کند. */}
                     {c.expected_card_type_name && (
-                      <Badge tone="info">🔗 {c.expected_card_type_name}</Badge>
+                      <Badge tone="info">{c.expected_card_type_name}</Badge>
                     )}
                     {c.card_type_name && (
                       <Badge tone="success">{c.card_type_name}</Badge>
@@ -1038,7 +1038,7 @@ export function PhotoCardsPage({ request }) {
                 openGroup === '__free__' ? null : '__free__')}
             >
               <span className="codeGroupName">
-                ❓ بدون کارتِ مشخص — تشخیص از روی عکس
+                بدون کارتِ مشخص — تشخیص از روی عکس
               </span>
               <span className="codeGroupCount">
                 {fmtNumber(codeGroups.free.length)} کد
@@ -1076,7 +1076,7 @@ export function PhotoCardsPage({ request }) {
                         بعد از مصرف است، این تصمیمِ مدیر پیش از توزیع.
                         نشانِ 🔗 تفکیکشان را در یک نگاه ممکن می‌کند. */}
                     {c.expected_card_type_name && (
-                      <Badge tone="info">🔗 {c.expected_card_type_name}</Badge>
+                      <Badge tone="info">{c.expected_card_type_name}</Badge>
                     )}
                     {c.card_type_name && (
                       <Badge tone="success">{c.card_type_name}</Badge>
@@ -1165,7 +1165,7 @@ export function PhotoCardsPage({ request }) {
                   باشد نه اینکه از روی درصد شباهت حدس زده شود. */}
               {s.review_reason === 'image_unknown' && (
                 <div className="reviewWhy">
-                  <b>✅ کد معتبر است</b>
+                  <b>کد معتبر است</b>
                   <span>ولی عکس با هیچ کارتی تطبیق نخورد.
                     مشخص کنید این کد مربوط به کدام کارت است.</span>
                 </div>

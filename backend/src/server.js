@@ -727,7 +727,7 @@ app.post('/api/cards/redeem', auth, cardRedeemLimiter, asyncHandler(async (req, 
       createNotification(
         req.user.id,
         'wallet',
-        'جایزهٔ نقدی به کیف پول اضافه شد 💰',
+        'جایزهٔ نقدی به کیف پول اضافه شد',
         `${cashAmount.toLocaleString('en-US')} تومان بابت کارت «${card.card_type_name}» به کیف پول شما واریز شد.`,
       ).catch(() => {});
     }
@@ -1542,7 +1542,7 @@ async function creditWheelPrize(userId, amount, spinId, label = 'جایزهٔ گ
     createNotification(
       userId,
       'wallet',
-      'برندهٔ گردونه شدی 🎡',
+      'برندهٔ گردونه شدی',
       `${Number(amount).toLocaleString('en-US')} تومان به کیف پول شما اضافه شد.`,
     ).catch(() => {});
   }
@@ -1610,7 +1610,7 @@ app.post('/api/wheel/spin', auth, wheelLimiter, asyncHandler(async (req, res) =>
   // را به نویز تبدیل می‌کند و کاربر خاموشش می‌کند.
   if (result.prize.kind === 'cash') {
     createNotification(
-      req.user.id, 'wallet', 'برندهٔ گردونه شدی 🎡',
+      req.user.id, 'wallet', 'برندهٔ گردونه شدی',
       `${result.prize.label} به کیف پولت اضافه شد.`).catch(() => {});
   }
   pass.grantXp(req.user.id, 'wheel_spin').catch(() => {});

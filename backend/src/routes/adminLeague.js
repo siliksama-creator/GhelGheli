@@ -353,7 +353,7 @@ router.patch('/admin/league/payouts/:id', adminAuth, validateUuid('id'), require
       createNotification(
         payout.user_id,
         'wallet',
-        'جایزهٔ لیگ به کیف پول اضافه شد 🏆',
+        'جایزهٔ لیگ به کیف پول اضافه شد',
         `${credited.toLocaleString('en-US')} تومان بابت رتبهٔ ${payout.rank} لیگ به کیف پول شما واریز شد.`,
       ).catch(() => {});
     }

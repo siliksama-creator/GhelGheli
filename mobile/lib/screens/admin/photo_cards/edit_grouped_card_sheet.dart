@@ -92,8 +92,8 @@ required ValueChanged<String> showMessage,
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.white)),
                 subtitle: Text(
                   collectible
-                      ? '🏅 از آرنای دوئل حذف می‌شود. اگر کاربری این کارت را در ترکیبش داشته باشد، از او خواسته می‌شود دوباره بچیند.'
-                      : '⚔️ در آرنای دوئل قابل استفاده است.',
+                      ? 'از آرنای دوئل حذف می‌شود. اگر کاربری این کارت را در ترکیبش داشته باشد، از او خواسته می‌شود دوباره بچیند.'
+                      : 'در آرنای دوئل قابل استفاده است.',
                   style: const TextStyle(fontSize: 11, color: Colors.white60, height: 1.6),
                 ),
               ),

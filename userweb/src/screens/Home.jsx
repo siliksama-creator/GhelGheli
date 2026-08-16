@@ -7,6 +7,7 @@ import LoginStreak from '../components/LoginStreak.jsx';
 import { CosmeticAvatarFrame, DisplayName } from '../components/Cosmetics.jsx';
 import CachedImg from '../components/CachedImg.jsx';
 import PlayerCard from '../components/PlayerCard.jsx';
+import { SvgIcon } from '../components/IconAsset.jsx';
 
 const asInt = v => {
   const n = parseInt(String(v ?? 0).split('.')[0], 10);
@@ -73,7 +74,7 @@ function HeroHeader({ points, nickname, nextReward, user, cosmetics, onOpenProfi
       </div>
       {onOpenWallet && (
         <div className="walletEntry" onClick={onOpenWallet} style={{ marginTop:'8px', background:'rgba(0,0,0,0.28)', border:`1px solid ${asInt(user?.wallet_balance)>0?'rgba(255,211,107,0.5)':'rgba(255,255,255,0.15)'}`, borderRadius:'12px', padding:'6px 10px', display:'flex', alignItems:'center', gap:'8px', cursor:'pointer' }}>
-          <span style={{ width:'26px', height:'26px', borderRadius:'50%', background: asInt(user?.wallet_balance)>0 ? 'linear-gradient(135deg, #FFE9A8, #D4A227)' : 'rgba(255,255,255,0.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'14px' }}>💰</span>
+          <span style={{ width:'26px', height:'26px', borderRadius:'50%', background: asInt(user?.wallet_balance)>0 ? 'linear-gradient(135deg, #FFE9A8, #D4A227)' : 'rgba(255,255,255,0.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'14px' }}><SvgIcon name="wallet" size={15} /></span>
           <span style={{ flex:1, color:'rgba(255,255,255,0.7)', fontSize:'10.5px', fontWeight:'600' }}>کیف پول من</span>
           <span style={{ color: asInt(user?.wallet_balance)>0 ? '#FFD36B' : '#FFF', fontWeight:'900', fontSize:'14px' }}>{fa(user?.wallet_balance||0)} <span style={{ fontSize:'9.5px', color:'rgba(255,211,107,0.8)' }}>تومان</span></span>
           <span style={{ background:'rgba(255,211,107,0.18)', color:'#FFD36B', padding:'2px 8px', borderRadius:'99px', fontSize:'9.5px', fontWeight:'800' }}>{asInt(user?.wallet_balance)>0?'برداشت':'مشاهده'} ‹</span>
@@ -81,7 +82,7 @@ function HeroHeader({ points, nickname, nextReward, user, cosmetics, onOpenProfi
       )}
       {missing.length>0 && (
         <div onClick={onOpenProfile} style={{ marginTop:'6px', background:'rgba(0,0,0,0.25)', borderRadius:'8px', padding:'6px 8px', display:'flex', alignItems:'center', gap:'6px', cursor:'pointer' }}>
-          <span style={{ color:'#FFD36B', fontSize:'12px' }}>🪪</span>
+          <span style={{ color:'#FFD36B', display:'flex' }}><SvgIcon name="idcard" size={13} /></span>
           <span style={{ flex:1, color:'#FFF', fontSize:'10.5px', fontWeight:'700', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>تکمیل پروفایل ({done} از {Object.keys(requiredFields).length}): {missing.slice(0,2).join('، ')}{missing.length>2?` +${missing.length-2} مورد`:''}</span>
           <span style={{ color:'#FFD36B', fontSize:'10.5px', fontWeight:'800' }}>تکمیل ‹</span>
         </div>
@@ -126,7 +127,7 @@ export default function Home({ token, p, rewards, load, setMsg, openProfile, ope
           <small style={{ color:'#F59E0B', fontSize:'10px', fontWeight:'700' }}>گردونه شانس</small>
         </button>
         <button onClick={openInvite} style={{ background:'linear-gradient(135deg, #84CC1622, #84CC160A)', border:'1px solid #84CC1655', borderRadius:'16px', padding:'12px 6px', display:'flex', flexDirection:'column', alignItems:'center', gap:'6px', cursor:'pointer', boxShadow:'0 4px 12px #84CC1622' }}>
-          <span style={{ width:'40px', height:'40px', borderRadius:'50%', background:'#84CC1622', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'22px' }}>👥</span>
+          <span style={{ width:'40px', height:'40px', borderRadius:'50%', background:'#84CC1622', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'22px' }}><SvgIcon name="people" size={20} /></span>
           <b style={{ color:'#FFF', fontSize:'12px', fontWeight:'900' }}>دعوت و کسب درآمد</b>
           <small style={{ color:'#84CC16', fontSize:'10px', fontWeight:'700' }}>دوستان</small>
         </button>

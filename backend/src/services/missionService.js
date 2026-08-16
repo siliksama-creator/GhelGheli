@@ -7,27 +7,27 @@ const DAILY_BONUS_REWARD = 100;
 
 const DAILY_FAMILIES = Object.freeze([
   {
-    event: 'match_completed', icon: '⚽', baseReward: 14,
+    event: 'match_completed', icon: 'football', baseReward: 14,
     titles: ['شروع پرقدرت', 'گرم‌کردن قهرمان', 'نبرد روز', 'تا سوت آخر', 'بازیکن ثابت‌قدم', 'ریتم مسابقه'],
     describe: goal => `${goal} مسابقه را تا پایان کامل کن`, goals: [1, 1, 2, 2, 3, 3, 4, 5],
   },
   {
-    event: 'online_win', icon: '🏆', baseReward: 22,
+    event: 'online_win', icon: 'trophy', baseReward: 22,
     titles: ['شکارچی برد', 'فرمانروای آنلاین', 'برد تمیز', 'قهرمان امروز', 'ضربه نهایی', 'توقف‌ناپذیر'],
     describe: goal => `${goal} مسابقه آنلاین را ببر`, goals: [1, 1, 1, 2, 2, 3],
   },
   {
-    event: 'share', icon: '🚀', baseReward: 12,
+    event: 'share', icon: 'bolt', baseReward: 12,
     titles: ['صدای بردت را برسان', 'لحظه‌ات را منتشر کن', 'چالش عمومی', 'خبرساز شو', 'افتخار امروز', 'دعوت به رقابت'],
     describe: goal => `${goal} نتیجه یا لینک چالش را به اشتراک بگذار`, goals: [1, 1, 1, 1, 2, 2],
   },
   {
-    event: 'rematch', icon: '⚡', baseReward: 16,
+    event: 'rematch', icon: 'bolt', baseReward: 16,
     titles: ['فرصت جبران', 'دوباره روبه‌رو شو', 'حساب باز', 'نبرد برگشت', 'یک دست دیگر', 'ریمچ داغ'],
     describe: goal => `${goal} مسابقه دوباره با همان حریف شروع کن`, goals: [1, 1, 1, 2, 2, 3],
   },
   {
-    event: 'friend_challenge', icon: '🤝', baseReward: 18,
+    event: 'friend_challenge', icon: 'handshake', baseReward: 18,
     titles: ['رفیق و رقیب', 'دوئل دوستانه', 'دوستت را صدا کن', 'چالش رفاقتی', 'حریف آشنا', 'تیم اجتماعی'],
     describe: goal => `${goal} دوست را مستقیم به دوئل دعوت کن`, goals: [1, 1, 1, 2, 2, 3],
   },
@@ -78,16 +78,16 @@ function buildDailyPool() {
 }
 
 const WEEKLY_POOL = Object.freeze([
-  { key:'weekly_matches_5', period:'weekly', event:'match_completed', icon:'⚽', title:'پنج نبرد هفته', description:'۵ مسابقه را کامل کن', goal:5, reward:75 },
-  { key:'weekly_matches_10', period:'weekly', event:'match_completed', icon:'🎮', title:'بازیکن پرتلاش', description:'۱۰ مسابقه را کامل کن', goal:10, reward:130 },
-  { key:'weekly_wins_2', period:'weekly', event:'online_win', icon:'🏆', title:'شکارچی برد', description:'۲ برد آنلاین ثبت کن', goal:2, reward:70 },
-  { key:'weekly_wins_5', period:'weekly', event:'online_win', icon:'👑', title:'سلطان هفته', description:'۵ برد آنلاین ثبت کن', goal:5, reward:160 },
-  { key:'weekly_share_3', period:'weekly', event:'share', icon:'🚀', title:'خبرساز هفته', description:'۳ نتیجه را به اشتراک بگذار', goal:3, reward:65 },
-  { key:'weekly_share_5', period:'weekly', event:'share', icon:'📣', title:'صدای آرنا', description:'۵ بار لینک چالش را منتشر کن', goal:5, reward:105 },
-  { key:'weekly_rematch_3', period:'weekly', event:'rematch', icon:'⚡', title:'سه فرصت جبران', description:'۳ ریمچ شروع کن', goal:3, reward:75 },
-  { key:'weekly_rematch_6', period:'weekly', event:'rematch', icon:'🔁', title:'رقابت ادامه‌دار', description:'۶ ریمچ شروع کن', goal:6, reward:130 },
-  { key:'weekly_friends_3', period:'weekly', event:'friend_challenge', icon:'🤝', title:'حلقه دوستان', description:'۳ دوست را به بازی دعوت کن', goal:3, reward:80 },
-  { key:'weekly_friends_6', period:'weekly', event:'friend_challenge', icon:'🌟', title:'ستاره اجتماعی', description:'۶ چالش دوستانه بفرست', goal:6, reward:145 },
+  { key:'weekly_matches_5', period:'weekly', event:'match_completed', icon:'football', title:'پنج نبرد هفته', description:'۵ مسابقه را کامل کن', goal:5, reward:75 },
+  { key:'weekly_matches_10', period:'weekly', event:'match_completed', icon:'game', title:'بازیکن پرتلاش', description:'۱۰ مسابقه را کامل کن', goal:10, reward:130 },
+  { key:'weekly_wins_2', period:'weekly', event:'online_win', icon:'trophy', title:'شکارچی برد', description:'۲ برد آنلاین ثبت کن', goal:2, reward:70 },
+  { key:'weekly_wins_5', period:'weekly', event:'online_win', icon:'crown', title:'سلطان هفته', description:'۵ برد آنلاین ثبت کن', goal:5, reward:160 },
+  { key:'weekly_share_3', period:'weekly', event:'share', icon:'bolt', title:'خبرساز هفته', description:'۳ نتیجه را به اشتراک بگذار', goal:3, reward:65 },
+  { key:'weekly_share_5', period:'weekly', event:'share', icon:'bell', title:'صدای آرنا', description:'۵ بار لینک چالش را منتشر کن', goal:5, reward:105 },
+  { key:'weekly_rematch_3', period:'weekly', event:'rematch', icon:'bolt', title:'سه فرصت جبران', description:'۳ ریمچ شروع کن', goal:3, reward:75 },
+  { key:'weekly_rematch_6', period:'weekly', event:'rematch', icon:'swords', title:'رقابت ادامه‌دار', description:'۶ ریمچ شروع کن', goal:6, reward:130 },
+  { key:'weekly_friends_3', period:'weekly', event:'friend_challenge', icon:'handshake', title:'حلقه دوستان', description:'۳ دوست را به بازی دعوت کن', goal:3, reward:80 },
+  { key:'weekly_friends_6', period:'weekly', event:'friend_challenge', icon:'star', title:'ستاره اجتماعی', description:'۶ چالش دوستانه بفرست', goal:6, reward:145 },
 ]);
 
 const DAILY_POOL = Object.freeze(buildDailyPool());

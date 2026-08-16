@@ -12,6 +12,7 @@ import 'package:ghelgheli_mobile/screens/user/chat_page.dart';
 import 'package:ghelgheli_mobile/screens/user/games_page.dart';
 import 'package:ghelgheli_mobile/screens/admin/admin_notifications.dart';
 import 'package:ghelgheli_mobile/screens/admin/admin_rewards.dart';
+import 'package:ghelgheli_mobile/widgets/ui_icon.dart';
 
 class _MockUniversalAdapter implements HttpClientAdapter {
   @override
@@ -185,11 +186,19 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
-      expect(find.text('💬 گفتگو'), findsOneWidget);
-      expect(find.text('⚽ بازی'), findsOneWidget);
-      expect(find.text('😀 ایموجی'), findsOneWidget);
+      // ── دورِ ۲۳: برچسبِ تب‌ها دیگر ایموجیِ چسبیده ندارد ──
+      //
+      // «💬 گفتگو» شد آیکونِ وکتور + متنِ «گفتگو». خودِ ایموجیِ قابلِ
+      // ارسال (پایین‌تر: 🔥) عمداً ایموجی مانده — آن محتوایی است که کاربر
+      // می‌فرستد، نه عنصرِ رابطِ کاربری.
+      expect(find.text('گفتگو'), findsOneWidget);
+      expect(find.text('بازی'), findsOneWidget);
+      expect(find.text('ایموجی'), findsOneWidget);
 
-      await tester.tap(find.text('😀 ایموجی'));
+      // آیکونِ هر تب واقعاً رسم می‌شود (نه اینکه فقط متن مانده باشد).
+      expect(find.byType(UiIcon), findsWidgets);
+
+      await tester.tap(find.text('ایموجی'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
       expect(find.text('🔥'), findsOneWidget);

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { req, fa } from '../lib/api.js';
 import { AnimatedName, CosmeticAvatarFrame, DisplayName, profileBackgroundClass, profileBackgroundStyle } from '../components/Cosmetics.jsx';
+import { SvgIcon } from '../components/IconAsset.jsx';
 
 const KINDS = [
   ['club_badge', 'باشگاه‌ها'],
@@ -26,7 +27,7 @@ function money(value) { return `${fa(Number(value || 0))} تومان`; }
 const EMOTE_COPY = {
   emote_respect: ['بازی خوبی بود', 'دوباره؟'],
   emote_comeback: ['این یکی شانسی بود!', 'آماده جبران باش'],
-  emote_goal_club: ['گوووول! ⚽', 'باشگاه من همیشه آماده‌ست!'],
+  emote_goal_club: ['گوووول!', 'باشگاه من همیشه آماده‌ست!'],
 };
 
 function CosmeticPreview({ item }) {
@@ -99,7 +100,7 @@ function ShopItem({ item, busy, onBuy, onEquip }) {
         {canEquip ? (
           <button type="button" className={item.equipped ? 'secondary' : ''} disabled={busy || item.equipped}
             onClick={() => onEquip(item)}>{item.equipped ? 'انتخاب‌شده' : 'انتخاب'}</button>
-        ) : annualGift ? <span className="lockedGift">🔒 اختصاصی</span> : (
+        ) : annualGift ? <span className="lockedGift"><SvgIcon name="lock" size={12} /> اختصاصی</span> : (
           <button type="button" disabled={busy} onClick={() => onBuy(item)}>{busy ? '…' : 'خرید'}</button>
         )}
       </div>

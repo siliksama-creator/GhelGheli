@@ -12,6 +12,7 @@ import '../../widgets/state_views.dart';
 import '../../widgets/lifecycle_poller.dart';
 import '../shared/public_profile_sheet.dart';
 import 'games/pinned_banner.dart';
+import '../../widgets/ui_icon.dart';
 
 /// افستِ ثابتِ تهران. ایران از ۱۴۰۱ ساعتِ تابستانی ندارد، پس یک عددِ ثابت
 /// دقیق است و نیازی به دیتابیسِ منطقهٔ زمانی نیست. سمتِ وب هم همین را با
@@ -281,7 +282,7 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text('💬', style: TextStyle(fontSize: 40, color: Colors.white.withValues(alpha: 0.65))),
+                        UiIcon('chat', size: 38, color: const Color(0xFF38BDF8).withValues(alpha: 0.65)),
                         const SizedBox(height: 9),
                         const Text('هنوز پیامی نیست',
                             style: TextStyle(
@@ -598,17 +599,22 @@ class _CannedMessagesPanelState extends State<_CannedMessagesPanel> {
     '🧤', '⚡', '🤩', '👍', '🎮', '🍿', '🎩', '💎',
   ];
 
-  List<(String, List<String>)> get _categories {
+  /// (نامِ آیکون، عنوان، پیام‌ها) — آینهٔ `BASE_CATEGORIES` در Chat.jsx.
+  ///
+  /// دورِ ۲۳: عنوان‌ها ایموجیِ چسبیده داشتند («💬 گفتگو»). خودِ ایموجیِ
+  /// قابلِ ارسال می‌ماند — آن محتواست — ولی برچسبِ تب عنصرِ رابط است و
+  /// حالا آیکونِ وکتور دارد.
+  List<(String, String, List<String>)> get _categories {
     final premium = widget.emotePacks.whereType<Map>().map((raw) {
       final messages = (raw['messages'] as List? ?? const []).map((e) => '$e').toList();
-      return ('${raw['icon'] ?? '✨'} ${raw['name'] ?? 'پک ویژه'}', messages);
+      return ('sparkle', '${raw['name'] ?? 'پک ویژه'}', messages);
     });
     return [
-      ('💬 گفتگو', const ['سلام بچه‌ها!', 'من اومدم!', 'چه خبر بچه‌ها؟', 'خداحافظ تا بعد!', 'مواظب خودتون باشید!', 'خوشبختم دوستان!', 'کجا زندگی می‌کنید؟', 'امروز چیکار کردید؟']),
-      ('⚽ بازی', const ['کی پایه بازیه؟', 'بریم برای برد!', 'من عاشق این بازی‌ام!', 'منم می‌خوام بازی کنم!', 'دوباره امتحان می‌کنم!']),
-      ('🎮 رقابت', const ['بزن بریم بازی!', 'آماده‌ای برای مسابقه؟', 'این دست من می‌برم!', 'بازی عالی بود!', 'دوباره بازی کنیم؟', 'کارت خفن گرفتم!', 'حریف قوی می‌خوام!', 'پنالتی رو دریبل کردم!']),
+      ('chat', 'گفتگو', const ['سلام بچه‌ها!', 'من اومدم!', 'چه خبر بچه‌ها؟', 'خداحافظ تا بعد!', 'مواظب خودتون باشید!', 'خوشبختم دوستان!', 'کجا زندگی می‌کنید؟', 'امروز چیکار کردید؟']),
+      ('football', 'بازی', const ['کی پایه بازیه؟', 'بریم برای برد!', 'من عاشق این بازی‌ام!', 'منم می‌خوام بازی کنم!', 'دوباره امتحان می‌کنم!']),
+      ('game', 'رقابت', const ['بزن بریم بازی!', 'آماده‌ای برای مسابقه؟', 'این دست من می‌برم!', 'بازی عالی بود!', 'دوباره بازی کنیم؟', 'کارت خفن گرفتم!', 'حریف قوی می‌خوام!', 'پنالتی رو دریبل کردم!']),
       ...premium,
-      ('😀 ایموجی', const <String>[]),
+      ('heart', 'ایموجی', const <String>[]),
     ];
   }
 
@@ -655,9 +661,17 @@ class _CannedMessagesPanelState extends State<_CannedMessagesPanel> {
                               color: _tab == i ? const Color(0xFF38BDF8).withValues(alpha: 0.22) : Colors.white.withValues(alpha: 0.04),
                               border: Border.all(color: _tab == i ? const Color(0xFF38BDF8) : Colors.white12),
                             ),
-                            child: Text(categories[i].$1,
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800,
-                                color: _tab == i ? const Color(0xFF38BDF8) : Colors.white70)),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                UiIcon(categories[i].$1, size: 13,
+                                  color: _tab == i ? const Color(0xFF38BDF8) : Colors.white70),
+                                const SizedBox(width: 5),
+                                Text(categories[i].$2,
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800,
+                                    color: _tab == i ? const Color(0xFF38BDF8) : Colors.white70)),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -718,9 +732,9 @@ class _CannedMessagesPanelState extends State<_CannedMessagesPanel> {
                       crossAxisSpacing: 8,
                       childAspectRatio: 0.30,
                     ),
-                    itemCount: categories[_tab].$2.length,
+                    itemCount: categories[_tab].$3.length,
                     itemBuilder: (ctx, i) {
-                      final text = categories[_tab].$2[i];
+                      final text = categories[_tab].$3[i];
                       return InkWell(
                         onTap: disabled ? null : () => widget.onSend(text),
                         borderRadius: BorderRadius.circular(12),

@@ -1,6 +1,6 @@
 import React from 'react';
 import { fa } from '../lib/api.js';
-import { ASSETS } from './IconAsset.jsx';
+import { ASSETS, SvgIcon } from './IconAsset.jsx';
 
 // کارتِ «سکه چیست و چطور به دست می‌آید» — بالای جدولِ لیگ.
 //
@@ -41,11 +41,11 @@ const ROWS = [
 ];
 
 const RULES = [
-  ['✅', 'فقط برنده سکه می‌گیرد — مقابل حریف واقعی و با ورودی امتیاز.'],
-  ['🚫', 'مساوی، باخت، بازی با ربات و تمرین رایگان سکه ندارند.'],
-  ['🔒', 'سکه هرگز از شما کم نمی‌شود؛ حتی وقتی ببازید.'],
-  ['📅', 'هر روز تا ۳۰ برد در ورودی ۱۰۰ و ۱۵ برد در ورودی ۱۰۰۰ سکه می‌دهد. بعد از آن، برد امتیاز دارد ولی سکه نه.'],
-  ['🏆', 'در پایان فصل، جوایز بر اساس سکه پرداخت و سکه‌ها صفر می‌شود.'],
+  ['check', 'فقط برنده سکه می‌گیرد — مقابل حریف واقعی و با ورودی امتیاز.'],
+  ['ban', 'مساوی، باخت، بازی با ربات و تمرین رایگان سکه ندارند.'],
+  ['lock', 'سکه هرگز از شما کم نمی‌شود؛ حتی وقتی ببازید.'],
+  ['calendar', 'هر روز تا ۳۰ برد در ورودی ۱۰۰ و ۱۵ برد در ورودی ۱۰۰۰ سکه می‌دهد. بعد از آن، برد امتیاز دارد ولی سکه نه.'],
+  ['trophy', 'در پایان فصل، جوایز بر اساس سکه پرداخت و سکه‌ها صفر می‌شود.'],
 ];
 
 export default function CoinGuide({ open, onToggle }) {
@@ -129,7 +129,9 @@ export default function CoinGuide({ open, onToggle }) {
         }}>
           {RULES.map(([icon, text]) => (
             <li key={text} style={{ display: 'flex', gap: '9px', alignItems: 'flex-start' }}>
-              <span style={{ fontSize: '15px', flexShrink: 0, lineHeight: 1.5 }}>{icon}</span>
+              <span style={{ flexShrink: 0, color: '#FFD166', display: 'flex', paddingTop: '2px' }}>
+                <SvgIcon name={icon} size={17} />
+              </span>
               <span style={{ fontSize: '13.5px', lineHeight: 1.65, color: 'rgba(255,255,255,0.88)' }}>{text}</span>
             </li>
           ))}

@@ -4,6 +4,7 @@ import { io } from 'socket.io-client';
 
 import { req, asset, fa, avatarUrl, API } from '../lib/api.js';
 import { CosmeticAvatarFrame, DisplayName } from '../components/Cosmetics.jsx';
+import { SvgIcon } from '../components/IconAsset.jsx';
 
 const EMOJIS = [
   '🔥', '⚽', '🏆', '😎', '😂', '👏', '🤝', '💪',
@@ -41,9 +42,9 @@ function msgTime(raw) {
 }
 
 const BASE_CATEGORIES = [
-  { title: '💬 گفتگو', items: ['سلام بچه‌ها!', 'من اومدم!', 'چه خبر بچه‌ها؟', 'خداحافظ تا بعد!', 'مواظب خودتون باشید!', 'خوشبختم دوستان!', 'کجا زندگی می‌کنید؟', 'امروز چیکار کردید؟'] },
-  { title: '⚽ بازی', items: ['کی پایه بازیه؟', 'بریم برای برد!', 'من عاشق این بازی‌ام!', 'منم می‌خوام بازی کنم!', 'دوباره امتحان می‌کنم!'] },
-  { title: '🎮 رقابت', items: ['بزن بریم بازی!', 'آماده‌ای برای مسابقه؟', 'این دست من می‌برم!', 'بازی عالی بود!', 'دوباره بازی کنیم؟', 'کارت خفن گرفتم!', 'حریف قوی می‌خوام!', 'پنالتی رو دریبل کردم!'] },
+  { title: 'گفتگو', icon: 'chat', items: ['سلام بچه‌ها!', 'من اومدم!', 'چه خبر بچه‌ها؟', 'خداحافظ تا بعد!', 'مواظب خودتون باشید!', 'خوشبختم دوستان!', 'کجا زندگی می‌کنید؟', 'امروز چیکار کردید؟'] },
+  { title: 'بازی', icon: 'football', items: ['کی پایه بازیه؟', 'بریم برای برد!', 'من عاشق این بازی‌ام!', 'منم می‌خوام بازی کنم!', 'دوباره امتحان می‌کنم!'] },
+  { title: 'رقابت', icon: 'game', items: ['بزن بریم بازی!', 'آماده‌ای برای مسابقه؟', 'این دست من می‌برم!', 'بازی عالی بود!', 'دوباره بازی کنیم؟', 'کارت خفن گرفتم!', 'حریف قوی می‌خوام!', 'پنالتی رو دریبل کردم!'] },
 ];
 
 export default function Chat({ token, openProfile, meId }) {
@@ -58,11 +59,12 @@ export default function Chat({ token, openProfile, meId }) {
   const categories = useMemo(() => [
     ...BASE_CATEGORIES,
     ...emotePacks.map((pack) => ({
-      title: `${pack.icon || '✨'} ${pack.name}`,
+      title: pack.name,
+      icon: 'sparkle',
       items: Array.isArray(pack.messages) ? pack.messages : [],
       premium: true,
     })),
-    { title: '😀 ایموجی', items: [], isEmoji: true },
+    { title: 'ایموجی', icon: 'heart', items: [], isEmoji: true },
   ], [emotePacks]);
 
   const boxRef = useRef(null);
@@ -196,7 +198,7 @@ export default function Chat({ token, openProfile, meId }) {
     <section className="card wide chatPage" style={{ display: 'flex', flexDirection: 'column', height: '640px', padding: 0 }}>
       {pinned && pinned.active && (
         <div style={{ background: 'rgba(255, 197, 61, 0.12)', borderBottom: '1px solid rgba(255, 197, 61, 0.35)', padding: '10px 16px', display: 'flex', gap: '8px' }}>
-          <span style={{ fontSize: '18px' }}>📌</span>
+          <span style={{ display: 'flex', color: '#FFC53D', flexShrink: 0 }}><SvgIcon name="pin" size={17} /></span>
           <div>
             <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#FFC53D' }}>اعلان مدیریت</div>
             <div style={{ fontSize: '13px', color: '#FFF' }}>{pinned.text}</div>
@@ -211,7 +213,7 @@ export default function Chat({ token, openProfile, meId }) {
           /* بدونِ این، چتِ خالی یک مستطیلِ سیاه بود و کاربر فکر می‌کرد
              بارگذاری نشده. */
           <div className="chatEmpty">
-            <span className="chatEmptyIcon">💬</span>
+            <span className="chatEmptyIcon"><SvgIcon name="chat" size={30} /></span>
             <b>هنوز پیامی نیست</b>
             <small>اولین نفری باش که سلام می‌کند — از دکمه‌های پایین انتخاب کن.</small>
           </div>
@@ -255,7 +257,7 @@ export default function Chat({ token, openProfile, meId }) {
                   <button type="button" onClick={() => toggleLike(m)}
                     className={`chatAct${m.liked_by_me ? ' liked' : ''}`}
                     aria-label="پسندیدن">
-                    {m.liked_by_me ? '❤️' : '🤍'} {m.like_count > 0 ? fa(m.like_count) : ''}
+                    <SvgIcon name="heart" size={13} /> {m.like_count > 0 ? fa(m.like_count) : ''}
                   </button>
                   <button type="button" onClick={() => setReply(m)} className="chatAct" aria-label="پاسخ">
                     ↩ پاسخ
@@ -297,8 +299,12 @@ export default function Chat({ token, openProfile, meId }) {
                   fontWeight: 'bold',
                   whiteSpace: 'nowrap',
                   cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
                 }}
               >
+                {cat.icon && <SvgIcon name={cat.icon} size={13} />}
                 {cat.title}
               </button>
             ))}

@@ -96,7 +96,7 @@ async function sendDailyReminder({ force = false } = {}) {
     try {
       await createNotification(
         r.id, 'wheel',
-        'چرخش رایگان امروزت آماده است 🎡',
+        'چرخش رایگان امروزت آماده است',
         'تا نیمه‌شب فرصت داری بچرخانی — فردا این شانس از بین می‌رود.');
       sent++;
     } catch { /* یک کاربر ناموفق نباید بقیه را متوقف کند */ }

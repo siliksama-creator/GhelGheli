@@ -21,6 +21,7 @@ import '../../../widgets/avatar_image.dart';
 import '../../../widgets/player_card.dart';
 import 'coin_award.dart';
 import 'game_session.dart';
+import '../../../widgets/ui_icon.dart';
 
 part 'card_duel/card_duel_widgets.dart';
 
@@ -756,7 +757,7 @@ class _CardDuelPageState extends State<CardDuelPage> {
             ),
             child: const Row(
               children: [
-                Text('🎁', style: TextStyle(fontSize: 24)),
+                UiIcon('gift', size: 22, color: Color(0xFF22E7A6)),
                 SizedBox(width: Gaps.sm),
                 Expanded(
                   child: Column(

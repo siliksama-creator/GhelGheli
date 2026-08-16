@@ -168,7 +168,7 @@ function publicState(state, player) {
         text: duel.ROUND_FOCUS[state.roundIndex].userText,
         cry: duel.ROUND_FOCUS[state.roundIndex].cry,
         hint: duel.ROUND_FOCUS[state.roundIndex].hint,
-        emoji: duel.ROUND_FOCUS[state.roundIndex].emoji,
+        icon: duel.ROUND_FOCUS[state.roundIndex].icon,
         index: state.roundIndex,
       }
       : null,

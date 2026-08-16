@@ -177,7 +177,7 @@ class _PrivateMatchDialogState extends State<PrivateMatchDialog> {
                         icon: const Icon(Icons.share_rounded, size: 16),
                         label: const Text('ارسال لینک دعوت برای دوست', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
                         onPressed: () {
-                          final msg = 'بیا در بازی قلقلی با هم مسابقه بدیم! 🎮\nبازی: $_selectedGame\nکد اتاق: $_createdCode\n$_shareUrl';
+                          final msg = 'بیا در بازی قلقلی با هم مسابقه بدیم!\nبازی: $_selectedGame\nکد اتاق: $_createdCode\n$_shareUrl';
                           Clipboard.setData(ClipboardData(text: msg));
                           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لینک و کد اتاق در کلیپ‌بورد کپی شد')));
                         },

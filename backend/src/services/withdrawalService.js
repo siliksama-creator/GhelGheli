@@ -302,7 +302,7 @@ async function decide(adminId, requestId, { status, adminNote, trackingCode }) {
     const amountFa = Number(req.amount).toLocaleString('en-US');
     const messages = {
       approved: ['درخواست برداشت تأیید شد', `برداشت ${amountFa} تومانی شما تأیید شد و به‌زودی واریز می‌شود.`],
-      paid: ['واریز انجام شد 🎉', `مبلغ ${amountFa} تومان به کارت شما واریز شد.${tracking ? ` کد پیگیری: ${tracking}` : ''}`],
+      paid: ['واریز انجام شد', `مبلغ ${amountFa} تومان به کارت شما واریز شد.${tracking ? ` کد پیگیری: ${tracking}` : ''}`],
       rejected: ['درخواست برداشت رد شد', `درخواست ${amountFa} تومانی شما رد شد و مبلغ به کیف پولتان برگشت.${note ? ` دلیل: ${note}` : ''}`],
     };
     if (messages[status]) {

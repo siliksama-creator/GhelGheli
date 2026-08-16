@@ -101,9 +101,9 @@ export function EditGroupedCardModal({ card, request, notify, onClose, onSaved }
                 <b>کارت کلکسیونی است (برای بازی نیست)</b>
                 <span className="topbar-sub" style={{ display: 'block' }}>
                   {form.collectible
-                    ? '🏅 از آرنای دوئل حذف می‌شود. اگر کاربری این کارت را در '
+                    ? 'از آرنای دوئل حذف می‌شود. اگر کاربری این کارت را در '
                       + 'ترکیبش داشته باشد، از او خواسته می‌شود دوباره بچیند.'
-                    : '⚔️ در آرنای دوئل قابل استفاده است.'}
+                    : 'در آرنای دوئل قابل استفاده است.'}
                 </span>
               </span>
             </label>

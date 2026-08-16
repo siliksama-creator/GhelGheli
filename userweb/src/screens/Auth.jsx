@@ -1,6 +1,7 @@
 // Sign in / quick registration with 2028 Next-Gen aesthetic.
 import React, { useState } from 'react';
 import { req, avatars } from '../lib/api.js';
+import { SvgIcon } from '../components/IconAsset.jsx';
 
 const faNum = n => new Intl.NumberFormat('fa-IR').format(Number(n || 0));
 
@@ -44,7 +45,7 @@ export default function Auth({ mode, setMode, done }) {
         : await req('/api/auth/login', 'POST', { mobile: cleanMobile, password: f.password });
 
       if (d.referralApplied) {
-        setMsg(`🎉 ${faNum(d.referralSpins)} چرخش گردونه پاداش گرفتی!`);
+        setMsg(`${faNum(d.referralSpins)} چرخش گردونه پاداش گرفتی!`);
       }
       done(d.token);
     } catch (x) {
@@ -66,7 +67,7 @@ export default function Auth({ mode, setMode, done }) {
       }}>
         <div style={{ textAlign: 'center', marginBottom: 16 }}>
           <h2 style={{ fontSize: 22, fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
-            {mode === 'register' ? 'ثبت‌نام در قلقلی ⚽' : 'ورود به حساب قلقلی 🚀'}
+            {mode === 'register' ? 'ثبت‌نام در قلقلی' : 'ورود به حساب قلقلی'}
           </h2>
           <p style={{ color: '#94A3B8', fontSize: 13, marginTop: 4 }}>
             {mode === 'register' ? 'کارت‌ها را ثبت کن، بازی کن و جایزه ببر' : 'به دنیای هیجان و فوتبال خوش آمدید'}

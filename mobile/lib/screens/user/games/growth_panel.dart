@@ -6,6 +6,7 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../../../api_client.dart';
 import '../../../core/share_invite.dart';
 import '../../../theme/tokens.dart';
+import '../../../widgets/ui_icon.dart';
 
 class GrowthPanel extends StatefulWidget {
   const GrowthPanel({super.key, required this.api, required this.onJoinGame});
@@ -386,7 +387,7 @@ class _DailyBonusCard extends StatelessWidget {
         boxShadow: ready ? const [BoxShadow(color: Color(0x33FFD166), blurRadius: 20)] : null,
       ),
       child: Row(children: [
-        const Text('🎁', style: TextStyle(fontSize: 30)),
+        const UiIcon('gift', size: 28, color: Color(0xFFFFD166)),
         Gaps.hXs,
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('جایزه تکمیل هر ۵ ماموریت', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900)),
@@ -479,7 +480,7 @@ class _WeeklyMissions extends StatelessWidget {
             padding: const EdgeInsets.all(11),
             decoration: BoxDecoration(color: Colors.white.withValues(alpha: .035), borderRadius: Corners.rMd),
             child: Row(children: [
-              Text('${mission['icon'] ?? '📅'}', style: const TextStyle(fontSize: 22)),
+              UiIcon((mission['icon'] ?? 'calendar').toString(), size: 22, color: const Color(0xFFFFD166)),
               Gaps.hXs,
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('${mission['title']}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900)),

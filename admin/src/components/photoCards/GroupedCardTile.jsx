@@ -29,13 +29,13 @@ export function GroupedCardTile({ card, deleting = false, onEdit, onToggle, onDe
           <p>{fmtNumber(card.point_value || 0)} امتیاز · {fmtNumber(card.side_count || card.sides?.length || 0)} تصویر تشخیص</p>
           <small>{fmtNumber(card.redeemed_count || 0)} بار ثبت‌شده{card.code_count != null ? ` · ${fmtNumber(card.code_count)} کد` : ''}</small>
           <div className="adminAnalysisState">
-            <strong className={card.analysis_complete ? 'ok' : 'bad'}>{card.analysis_complete ? '✓ اثرانگشت کامل' : '⚠ آنالیز ناقص'}</strong>
+            <strong className={card.analysis_complete ? 'ok' : 'bad'}>{card.analysis_complete ? '✓ اثرانگشت کامل' : 'آنالیز ناقص'}</strong>
             <span>OCR: {fmtNumber(card.ocr_token_count || 0)} توکن</span>
           </div>
           {/* کارتِ کلکسیونی استاتس ندارد؛ نمایشِ شش عددِ بی‌معنی فقط مدیر
               را گمراه می‌کند که انگار این کارت در بازی نقشی دارد. */}
           {card.is_collectible
-            ? <p className="adminCollectibleTag">🏅 کارت کلکسیونی — در آرنای دوئل نیست</p>
+            ? <p className="adminCollectibleTag">کارت کلکسیونی — در آرنای دوئل نیست</p>
             : (
               <div className="adminDuelStats">
                 {STAT_LABELS.map(([key,label]) => <span key={key}>{label}<b>{fmtNumber(card[key] ?? 0)}</b></span>)}

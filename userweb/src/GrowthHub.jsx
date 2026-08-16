@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import { req } from './lib/api.js';
+import { SvgIcon } from './components/IconAsset.jsx';
 
 export default function GrowthHub({ api, token, onSocketGame }) {
   const [data, setData] = useState(null);
@@ -121,7 +122,7 @@ export default function GrowthHub({ api, token, onSocketGame }) {
     </div>
 
     <div className={`dailyBonusCard ${data?.dailyBonus?.ready ? 'ready' : ''} ${data?.dailyBonus?.claimed ? 'claimed' : ''}`}>
-      <span>🎁</span><div><b>جایزه تکمیل هر ۵ ماموریت</b><small>امروز +{data?.dailyBonus?.reward || 100} امتیاز اضافه</small></div>
+      <span style={{display:'flex',color:'#FFD166'}}><SvgIcon name="gift" size={20} /></span><div><b>جایزه تکمیل هر ۵ ماموریت</b><small>امروز +{data?.dailyBonus?.reward || 100} امتیاز اضافه</small></div>
       <button disabled={!data?.dailyBonus?.ready || data?.dailyBonus?.claimed || busy === 'daily-bonus'} onClick={claimDailyBonus}>
         {data?.dailyBonus?.claimed ? 'گرفته شد' : data?.dailyBonus?.ready ? 'دریافت جایزه' : `${data?.dailyBonus?.completed || 0}/۵`}
       </button>
@@ -147,7 +148,7 @@ export default function GrowthHub({ api, token, onSocketGame }) {
       <summary>ماموریت‌های این هفته <span>{weekly.length} ماموریت جداگانه</span></summary>
       <div className="missionRail weekly">
         {weekly.map(mission => <article key={mission.key} className={mission.claimed ? 'claimed' : mission.complete ? 'complete' : ''}>
-          <div className="missionTop"><i>{mission.icon || '📅'} هفتگی</i><strong>+{mission.reward}</strong></div>
+          <div className="missionTop"><i><SvgIcon name={mission.icon || 'calendar'} size={13} /> هفتگی</i><strong>+{mission.reward}</strong></div>
           <b>{mission.title}</b><small>{mission.description}</small>
           <progress max={mission.goal} value={mission.progress}/>
           <footer><span>{mission.progress}/{mission.goal}</span><button disabled={!mission.complete || mission.claimed}

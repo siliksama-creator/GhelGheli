@@ -13,6 +13,7 @@ import {
   cardStatsOf,
 } from '../lib/cards.js';
 import { fa } from '../lib/api.js';
+import { SvgIcon } from './IconAsset.jsx';
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  ⚠️⚠️ باگ: کارتِ بدونِ تصویر برای همیشه اسپینر نشان می‌داد
@@ -52,7 +53,9 @@ function CardFallback({ item, loading = false }) {
         <span className="ggCardSpinner" aria-hidden="true" />
       ) : (
         <>
-          <span className="ggCardFallbackGlyph" aria-hidden="true">{item?.id?.startsWith('bot-') ? '🤖' : initial}</span>
+          <span className="ggCardFallbackGlyph" aria-hidden="true">
+            {item?.id?.startsWith('bot-') ? <SvgIcon name="robot" size={26} /> : initial}
+          </span>
           <b>{meta.label}</b>
           <small>{item?.effectLabel || item?.effect || 'بدون افکت'}</small>
         </>
