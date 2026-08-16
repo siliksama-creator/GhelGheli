@@ -17,6 +17,39 @@ import CoinGuide from '../components/CoinGuide.jsx';
  *    می‌دید که «۵۰۰ امتیاز» بالای «۹۰۰ امتیاز» نشسته و ترتیب برایش
  *    تصادفی به نظر می‌رسید. معیارِ مرتب‌سازی باید دیده شود.
  */
+/**
+ * ردیفِ تک‌سطریِ صدرنشین — برای وقتی که کمتر از سه نفر در جدول‌اند.
+ *
+ * ⚠️ چرا لازم شد: پودیومِ سه‌ستونه با `flex:1` طراحی شده. وقتی فقط یک
+ *    یا دو نفر در لیگ هستند، همان کارت تمامِ عرض را می‌گیرد و چون
+ *    محتوایش عمودی چیده شده (مدال / نام / سکه)، یک ستونِ بلندِ سه‌طبقه
+ *    وسطِ صفحه می‌شود که با ردیفِ تک‌سطریِ «جایگاه شما» درست زیرش
+ *    ناهماهنگ است. با کمتر از سه نفر، پودیوم معنای بصری‌اش (سکوی
+ *    مقایسه‌ای) را هم از دست می‌دهد.
+ *
+ * پس زیرِ سه نفر، همان اطلاعات در یک سطر و هم‌تراز با بقیهٔ جدول
+ * نمایش داده می‌شود. `PodiumRow` عمداً همان چیدمانِ ردیفِ «جایگاه شما»
+ * را دارد تا همهٔ نفرات در یک سطح دیده شوند.
+ */
+function PodiumRow({ rank, row, onTap }) {
+  const accent = rank === 1 ? '#FFD700' : rank === 2 ? '#CBD5E1' : '#CD7F32';
+  const badgeColor = rank === 1 ? '#241900' : rank === 2 ? '#1E293B' : '#FFF';
+  return (
+    <div onClick={onTap} style={{ display:'flex', alignItems:'center', gap:'9px', padding:'9px 12px', marginBottom:'6px', borderRadius:'14px', background:'rgba(255,255,255,0.05)', border:`1.4px solid ${accent}`, boxShadow:`0 4px 12px ${accent}22`, cursor:'pointer' }}>
+      <span style={{ lineHeight:1, display:'flex', flexShrink:0, color: rank===1?'#FFD166':rank===2?'#CBD5E1':'#D08B5B' }}>
+        <SvgIcon name={rank===1?'medal1':rank===2?'medal2':'medal3'} size={19} /></span>
+      <span style={{ display:'inline-block', padding:'1px 7px', borderRadius:'99px', background:accent, color:badgeColor, fontSize:'10px', fontWeight:'900', flexShrink:0 }}>{fa(rank)}</span>
+      <span style={{ minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', fontWeight:'700', fontSize:'13px', color:'#FFF' }}>
+        <DisplayName name={row.nickname || 'کاربر'} cosmetics={row.cosmetics} level={row.level} />
+      </span>
+      <span style={{ marginInlineStart:'auto', display:'flex', alignItems:'center', gap:'7px', flexShrink:0 }}>
+        <CoinChip value={row.coins} size={22} />
+        <span style={{ fontSize:'12px', color:'rgba(255,255,255,0.6)', fontWeight:'700' }}>{fa(row.points)}</span>
+      </span>
+    </div>
+  );
+}
+
 function PodiumCard({ rank, row, onTap }) {
   const isFirst = rank === 1;
   const borderColor = isFirst ? '#FFD700' : rank === 2 ? '#CBD5E1' : '#CD7F32';
@@ -181,12 +214,22 @@ export default function League({ token, openProfile }) {
 
             <CoinGuide open={guideOpen} onToggle={toggleGuide} />
 
+            {/* سکوی سه‌نفره فقط وقتی معنا دارد که سه نفر باشند؛ زیرِ آن،
+                ردیفِ تک‌سطری تا همهٔ نفرات با «جایگاه شما» هم‌تراز بمانند. */}
             {top.length>0 && (
-              <div style={{ display:'flex', gap:'6px', marginBottom:'12px', alignItems:'flex-end' }}>
-                {top.map((r,i) => (
-                  <PodiumCard key={r.user_id} rank={i+1} row={r} onTap={()=>openProfile && openProfile(r.user_id)} />
-                ))}
-              </div>
+              top.length < 3 ? (
+                <div style={{ marginBottom:'12px' }}>
+                  {top.map((r,i) => (
+                    <PodiumRow key={r.user_id} rank={i+1} row={r} onTap={()=>openProfile && openProfile(r.user_id)} />
+                  ))}
+                </div>
+              ) : (
+                <div style={{ display:'flex', gap:'6px', marginBottom:'12px', alignItems:'flex-end' }}>
+                  {top.map((r,i) => (
+                    <PodiumCard key={r.user_id} rank={i+1} row={r} onTap={()=>openProfile && openProfile(r.user_id)} />
+                  ))}
+                </div>
+              )
             )}
 
             {/* جایگاه شما */}

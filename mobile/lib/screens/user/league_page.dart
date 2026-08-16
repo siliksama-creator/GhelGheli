@@ -238,7 +238,93 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
                 ),
                 Gaps.vSm,
                 const CoinGuide(),
-                if (top.isNotEmpty)
+                // سکوی سه‌نفره فقط وقتی معنا دارد که سه نفر باشند. با یک یا
+                // دو نفر، Expanded کارت را تمامِ‌عرض می‌کند و چون محتوایش
+                // عمودی است (مدال/نام/سکه) یک ستونِ بلندِ سه‌طبقه می‌شود که
+                // با ردیفِ تک‌سطریِ «جایگاه شما» درست زیرش ناهماهنگ است.
+                // آینهٔ PodiumRow در League.jsx.
+                if (top.isNotEmpty && top.length < 3)
+                  ...top.asMap().entries.map((e) {
+                    final i = e.key;
+                    final r = e.value;
+                    final rank = i + 1;
+                    final accent = rank == 1
+                        ? const Color(0xFFFFD700)
+                        : rank == 2
+                            ? const Color(0xFFCBD5E1)
+                            : const Color(0xFFCD7F32);
+                    return InkWell(
+                      onTap: () => showPublicProfile(context, widget.api, r['user_id']),
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHigh,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: accent, width: 1.4),
+                          boxShadow: [
+                            BoxShadow(color: accent.withValues(alpha: 0.13), blurRadius: 12, offset: const Offset(0, 4)),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            UiIcon(
+                              rank == 1 ? 'medal1' : (rank == 2 ? 'medal2' : 'medal3'),
+                              size: 19,
+                              color: rank == 1
+                                  ? const Color(0xFFFFD166)
+                                  : rank == 2
+                                      ? const Color(0xFFCBD5E1)
+                                      : const Color(0xFFD08B5B),
+                            ),
+                            const SizedBox(width: 9),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(999),
+                                color: accent,
+                              ),
+                              child: Text(
+                                faNum(rank),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  color: rank == 1
+                                      ? const Color(0xFF241900)
+                                      : rank == 2
+                                          ? const Color(0xFF1E293B)
+                                          : Colors.white,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 9),
+                            Expanded(
+                              child: DisplayName(
+                                name: r['nickname'] ?? 'کاربر',
+                                cosmetics: r['cosmetics'] is Map
+                                    ? Map<String, dynamic>.from(r['cosmetics'])
+                                    : null,
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13,
+                                    color: theme.colorScheme.onSurface),
+                              ),
+                            ),
+                            CoinChip(value: r['coins'], size: 22),
+                            const SizedBox(width: 7),
+                            Text(
+                              faNum(r['points']),
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: theme.colorScheme.onSurfaceVariant),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                if (top.length >= 3)
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: top.asMap().entries.map((e) {
