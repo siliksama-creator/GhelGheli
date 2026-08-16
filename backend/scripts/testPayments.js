@@ -36,18 +36,33 @@ const mig068   = R('migrations/068_direct_purchase.sql');
 // ───────────────────────────────────────────────────────────────────────
 section('تفکیک کیف پول از خرید');
 // مهم‌ترین بخش. مالک صریحاً خواست خرید هرگز از کیف پول کم نکند.
-ok('shopService دیگر walletService را require نمی‌کند',
-  !/require\(['"]\.\/walletService['"]\)/.test(shopSvc));
-ok('هیچ debit کیف پولی در shopService نمانده',
-  !/wallet\.debit\s*\(/.test(shopSvc));
+// ⚠️ بازنگری دور ۲۳: این دو تست قانونِ دورِ ۲۰ را رمزگذاری می‌کردند
+// («خرید هرگز از کیف پول کم نکند»). دورِ ۲۲ آن قانون را عمداً نقض کرد:
+// کاربری که از لیگ یا جایزهٔ نقدی پول گرفته باید بتواند همان را در شاپ
+// خرج کند. پس شرط درست دیگر «کیف پول دست نخورد» نیست، بلکه:
+//   ۱) کسر از کیف پول فقط با درخواستِ صریحِ کلاینت (`useWallet`)،
+//   ۲) مسیرِ پیش‌فرض همچنان سفارشِ بازار باشد،
+//   ۳) خریدِ کیف‌پولی کمیسیونِ معرف ندهد.
+ok('کسر از کیف پول فقط با useWallet صریح انجام می‌شود',
+  /useWallet\s*=\s*false/.test(shopSvc)
+  && /if\s*\(!useWallet\)\s*return\s+payments\.createShopOrder/.test(shopSvc));
+ok('هر debit کیف پولی در shopService با منبع shop و مرجع آیتم است',
+  !/wallet\.debit\s*\(/.test(shopSvc)
+  || /wallet\.debit\([\s\S]{0,200}?source:\s*'shop'[\s\S]{0,200}?referenceType:\s*'shop_item'/.test(shopSvc));
+ok('سهمِ پرداخت‌شده از کیف پول از پایهٔ کمیسیون کسر می‌شود',
+  /-\s*\(Number\(walletPaid\)\s*\|\|\s*0\)/.test(shopSvc));
 // فهرست را یک‌بار پارس می‌کنیم. regexِ سرراست («'shop' جایی بعد از
 // VALID_SOURCES هست؟») اشتباه است، چون LEGACY_SOURCES پایین‌ترش همین
 // نام‌ها را عمداً دارد و تست را همیشه سبز/قرمز نشان می‌داد.
 const jsSources = (walletSvc.match(/const VALID_SOURCES = new Set\(\[([\s\S]*?)\]\);/)[1]
   .match(/'([a-z_]+)'/g) || []).map(x => x.replace(/'/g, ''));
-for (const dead of ['shop', 'subscription', 'topup', 'topup_refund']) {
+// 'shop' از دور ۲۲ دوباره زنده است (خرید با موجودی کیف پول) و باید در
+// VALID_SOURCES باشد؛ بقیه همچنان مرده‌اند.
+for (const dead of ['subscription', 'topup', 'topup_refund']) {
   ok(`منبع ${dead} دیگر تولید نمی‌شود`, !jsSources.includes(dead));
 }
+ok("منبع shop برای خریدِ کیف‌پولیِ دور ۲۲ مجاز است",
+  jsSources.includes('shop'));
 ok('منابع قدیمی در LEGACY_SOURCES مستند شده‌اند',
   /LEGACY_SOURCES/.test(walletSvc)
   && /LEGACY_SOURCES[\s\S]*?'shop'[\s\S]*?'subscription'/.test(walletSvc)
