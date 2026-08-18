@@ -30,6 +30,15 @@ export function LeaguePage({ request }) {
   const [prizes, setPrizes] = useState(Array.from({ length: 10 }, (_, i) => ({ rank: i + 1, amount: 0 })));
   const [saving, setSaving] = useState(false);
 
+  // ── جوایزِ غیرنقدی (دورِ ۲۶) ──
+  //
+  // خواستهٔ مالک: «جایزه نقدی بین ۵۰ نفر، ۲۰ نفر بعدی جوایز غیرنقدی».
+  // ردیف‌ها آزادند: مدیر خودش رتبه را می‌نویسد، پس اگر فردا خواست
+  // رتبهٔ ۱ هم پلاس بگیرد، بدونِ تغییرِ کد ممکن است.
+  const [perks, setPerks] = useState([]);
+  const [shopItems, setShopItems] = useState([]);
+  const [editingTitle, setEditingTitle] = useState('');
+
   // ── تاریخِ فصل، به‌دستِ مدیر ──
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
@@ -55,9 +64,16 @@ export function LeaguePage({ request }) {
   const load = () =>
     request('/api/admin/league').then((x) => {
       setData(x);
-      const table = x.season?.prize_table;
+      // ⚠️ از `x.prizeTable` خوانده می‌شود نه `x.season.prize_table`.
+      //    `season` در پاسخ، فصلی است که لیدربرد نشان می‌دهد؛ ذخیره اما
+      //    روی فصلِ دیگری می‌نشیند. سرور حالا صریحاً جدولِ همان فصلی را
+      //    که PATCH ویرایش می‌کند برمی‌گرداند.
+      const table = x.prizeTable?.length ? x.prizeTable : x.season?.prize_table;
       if (table?.length) setPrizes(table);
       setWinnerCount(x.winnerCount || table?.length || 10);
+      setPerks(Array.isArray(x.perkTable) ? x.perkTable : []);
+      setShopItems(x.shopItems || []);
+      setEditingTitle(x.editingSeasonTitle || '');
       setStartsAt(toLocalInput(x.season?.starts_at));
       setEndsAt(toLocalInput(x.season?.ends_at));
     });
@@ -138,9 +154,16 @@ export function LeaguePage({ request }) {
   async function save() {
     setSaving(true);
     try {
-      await request('/api/admin/league/current/prizes', { method: 'PATCH', body: { prizeTable: prizes, winnerCount } });
+      await request('/api/admin/league/current/prizes', {
+        method: 'PATCH',
+        body: { prizeTable: prizes, perkTable: perks, winnerCount },
+      });
       notify('جوایز لیگ ذخیره شد');
       load();
+    } catch (e) {
+      // پیامِ اعتبارسنجیِ سرور باید دیده شود. بدونِ این، ردیفِ خرابِ
+      // جدولِ غیرنقدی بی‌صدا ذخیره نمی‌شد و مدیر خیال می‌کرد شده.
+      notify(e?.message || 'ذخیره جوایز ناموفق بود', 'error');
     } finally {
       setSaving(false);
     }
@@ -209,6 +232,35 @@ export function LeaguePage({ request }) {
 
   const pending = payouts.filter((p) => !p.paid_at && Number(p.amount) > 0);
   const pendingSum = pending.reduce((a, p) => a + Number(p.amount || 0), 0);
+
+  const PERK_KINDS = [
+    { id: 'plus_days', label: 'روز اشتراک پلاس', unit: 'روز' },
+    { id: 'points', label: 'امتیاز', unit: 'امتیاز' },
+    { id: 'shop_item', label: 'آیتم فروشگاه', unit: '' },
+  ];
+
+  function addPerkRow() {
+    // رتبهٔ پیشنهادی: درست بعدِ آخرین رتبه‌ای که جایزه دارد. مدیری که
+    // ۲۰ ردیف پشتِ هم می‌سازد نباید ۲۰ بار رتبه تایپ کند.
+    const used = new Set(perks.map((p) => Number(p.rank)));
+    let next = Number(winnerCount) + 1;
+    while (used.has(next)) next += 1;
+    setPerks((ps) => [...ps, {
+      rank: next, kind: 'plus_days', value: 7, itemSlug: null, label: '',
+    }]);
+  }
+
+  function setPerk(i, patch) {
+    setPerks((ps) => ps.map((p, j) => (j === i ? { ...p, ...patch } : p)));
+  }
+
+  // رتبهٔ تکراری را سرور رد می‌کند؛ اینجا هم نشان داده می‌شود تا مدیر
+  // قبل از ذخیره ببیند.
+  const perkRankCounts = perks.reduce((m, p) => {
+    const k = Number(p.rank);
+    m[k] = (m[k] || 0) + 1;
+    return m;
+  }, {});
 
   return (
     <div className="stack">
@@ -371,6 +423,100 @@ export function LeaguePage({ request }) {
         </Button>
       </Card>
     </div>
+
+      {/* ══ جوایزِ غیرنقدی ══
+          خواستهٔ مالک: «جایزه نقدی بین ۵۰ نفر، ۲۰ نفر بعدی جوایز
+          غیرنقدی (پلاس، آیتم‌های شاپ)».
+
+          مرزِ جایزه یک صخره است: نفرِ ۵۰ پول می‌برد و نفرِ ۵۱ هیچ. این
+          رده صخره را به پله تبدیل می‌کند، بی‌آنکه یک ریال به هزینهٔ
+          نقدی اضافه شود. */}
+      <Card title="جوایز غیرنقدی"
+        subtitle={`نفرات بعد از رتبهٔ ${fmtNumber(winnerCount)} — پلاس، آیتم فروشگاه یا امتیاز. بلافاصله پس از بستن فصل خودکار تحویل می‌شود و نیازی به تأیید مالی ندارد.`}
+        action={<Badge tone={perks.length ? 'success' : 'neutral'}>
+          {fmtNumber(perks.length)} رتبه
+        </Badge>}>
+        {perks.length ? (
+          <Table head={['رتبه', 'نوع جایزه', 'مقدار', 'عنوان دلخواه', '']}>
+            {perks.map((p, i) => (
+              <tr key={`perk-${i}`}>
+                <td style={{ width: 96 }}>
+                  <Input type="number" min="1" max="100" value={p.rank}
+                    onChange={(e) => setPerk(i, { rank: Number(e.target.value) || 0 })} />
+                  {perkRankCounts[Number(p.rank)] > 1 && (
+                    <small className="lgWarn">رتبهٔ تکراری</small>
+                  )}
+                </td>
+                <td style={{ width: 168 }}>
+                  <select className="input" value={p.kind}
+                    onChange={(e) => setPerk(i, {
+                      kind: e.target.value,
+                      // مقدارِ پیش‌فرضِ منطقی برای هر نوع، وگرنه «۷ امتیاز»
+                      // یا «۵۰۰۰ روز پلاس» ساخته می‌شود.
+                      value: e.target.value === 'points' ? 5000
+                        : e.target.value === 'plus_days' ? 7 : 1,
+                      itemSlug: e.target.value === 'shop_item'
+                        ? (p.itemSlug || shopItems[0]?.slug || null) : null,
+                    })}>
+                    {PERK_KINDS.map((k) => (
+                      <option key={k.id} value={k.id}>{k.label}</option>
+                    ))}
+                  </select>
+                </td>
+                <td>
+                  {p.kind === 'shop_item' ? (
+                    <select className="input" value={p.itemSlug || ''}
+                      onChange={(e) => setPerk(i, { itemSlug: e.target.value })}>
+                      <option value="">— انتخاب آیتم —</option>
+                      {shopItems.map((it) => (
+                        <option key={it.slug} value={it.slug}>{it.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <Input type="number" min="1" value={p.value}
+                      onChange={(e) => setPerk(i, { value: Number(e.target.value) || 0 })} />
+                  )}
+                </td>
+                <td>
+                  <Input value={p.label || ''} placeholder="اختیاری — مثلاً جایزه ویژه نوروز"
+                    onChange={(e) => setPerk(i, { label: e.target.value })} />
+                </td>
+                <td style={{ width: 64 }}>
+                  <Button variant="ghost" size="sm"
+                    onClick={() => setPerks((ps) => ps.filter((_, j) => j !== i))}>
+                    حذف
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </Table>
+        ) : (
+          <EmptyState icon={Trophy} title="جایزه غیرنقدی ندارید"
+            message={`با دکمهٔ پایین برای نفرات بعد از رتبهٔ ${fmtNumber(winnerCount)} جایزه بگذارید.`} />
+        )}
+
+        <div className="lgPerkActions">
+          <Button variant="ghost" onClick={addPerkRow}>افزودن رتبه</Button>
+          {/* میان‌بُر: دقیقاً همان چیزی که مالک خواست — ۲۰ نفرِ بعدی. */}
+          <Button variant="ghost" onClick={() => {
+            const start = Number(winnerCount) + 1;
+            setPerks(Array.from({ length: 20 }, (_, i) => ({
+              rank: start + i, kind: 'plus_days', value: 7,
+              itemSlug: null, label: '',
+            })));
+          }}>
+            ساخت ۲۰ رتبهٔ بعدی با ۷ روز پلاس
+          </Button>
+          <Button icon={Save} onClick={save} loading={saving}>
+            ذخیره جوایز غیرنقدی
+          </Button>
+        </div>
+        <p className="lgHint">
+          جوایز غیرنقدی برخلاف جایزهٔ نقدی، منتظر تأیید نمی‌مانند و همان
+          لحظهٔ بستن فصل به کاربر می‌رسند.
+          {editingTitle ? ` این جدول برای «${editingTitle}» ذخیره می‌شود.` : ''}
+        </p>
+      </Card>
 
       {/* ══ تاریخچهٔ واریزها ══ */}
       {!!payouts.filter((p) => p.paid_at).length && (

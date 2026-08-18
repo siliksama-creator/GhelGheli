@@ -53,6 +53,16 @@ class _AdminLeagueState extends State<AdminLeague> {
   //
   // این بخش با نسخهٔ وب مو‌به‌مو یکی است تا مدیر از هر دو پنل همان
   // کار را بتواند بکند.
+  // ── جوایزِ غیرنقدی (دورِ ۲۶) ──
+  //
+  // خواستهٔ مالک: «جایزه نقدی بین ۵۰ نفر، ۲۰ نفر بعدی جوایز غیرنقدی
+  // (پلاس، آیتم‌های شاپ)» و «قسمت ادمین برای قرار دادن جوایز لیگ هم در
+  // اپ اندروید و هم وب کامل شود». پس این بخش مو‌به‌مو آینهٔ
+  // `admin/src/pages/league.jsx` است.
+  List<Map> _perks = [];
+  List<Map> _shopItems = const [];
+  String _editingTitle = '';
+
   List<Map> _seasons = const [];
   final _newTitleController = TextEditingController();
   final _newMinPointsController = TextEditingController(text: '0');
@@ -93,7 +103,20 @@ class _AdminLeagueState extends State<AdminLeague> {
       if (mounted) {
         setState(() {
           _data = d;
-          _prizes = List<Map>.from(d?['season']?['prize_table'] ?? _prizes);
+          //  از `prizeTable` خوانده می‌شود نه `season.prize_table`.
+          //    `season` فصلی است که لیدربرد نشان می‌دهد، ولی ذخیره روی
+          //    فصلِ دیگری می‌نشیند (یکی ASC مرتب می‌کند، دیگری DESC).
+          //    با دو لیگِ هم‌زمان، مدیر عدد را عوض می‌کرد و بعدِ رفرش
+          //    عددِ قبلی برمی‌گشت.
+          final serverPrizes = d?['prizeTable'];
+          _prizes = List<Map>.from(
+            (serverPrizes is List && serverPrizes.isNotEmpty)
+                ? serverPrizes
+                : (d?['season']?['prize_table'] ?? _prizes),
+          );
+          _perks = List<Map>.from(d?['perkTable'] ?? const []);
+          _shopItems = List<Map>.from(d?['shopItems'] ?? const []);
+          _editingTitle = '${d?['editingSeasonTitle'] ?? ''}';
           _payouts = List<Map>.from(p ?? []);
           _seasons = seasons;
           _winnerCountController.text = '${d?['winnerCount'] ?? _prizes.length}';
@@ -131,6 +154,7 @@ class _AdminLeagueState extends State<AdminLeague> {
       final n = int.tryParse(_winnerCountController.text) ?? _prizes.length;
       await widget.api.patch('/api/admin/league/current/prizes', {
         'prizeTable': _prizes,
+        'perkTable': _perks,
         'winnerCount': n,
       });
       _snack('جدول جوایز لیگ ذخیره شد');
@@ -140,6 +164,165 @@ class _AdminLeagueState extends State<AdminLeague> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+
+  // ══ جوایزِ غیرنقدی ══════════════════════════════════════════════════
+  static const List<Map<String, String>> _perkKinds = [
+    {'id': 'plus_days', 'label': 'روز اشتراک پلاس'},
+    {'id': 'points', 'label': 'امتیاز'},
+    {'id': 'shop_item', 'label': 'آیتم فروشگاه'},
+  ];
+
+  int get _winnerCount =>
+      int.tryParse(_winnerCountController.text) ?? _prizes.length;
+
+  void _addPerkRow() {
+    // رتبهٔ پیشنهادی: اولین رتبهٔ آزاد بعد از ردهٔ نقدی. مدیری که ۲۰
+    // ردیف می‌سازد نباید ۲۰ بار رتبه تایپ کند.
+    final used = _perks.map((p) => _asInt(p['rank'])).toSet();
+    var next = _winnerCount + 1;
+    while (used.contains(next)) {
+      next += 1;
+    }
+    setState(() => _perks.add({
+          'rank': next,
+          'kind': 'plus_days',
+          'value': 7,
+          'itemSlug': null,
+          'label': '',
+        }));
+  }
+
+  void _fillTwentyPerks() {
+    final start = _winnerCount + 1;
+    setState(() => _perks = List<Map>.generate(
+          20,
+          (i) => {
+            'rank': start + i,
+            'kind': 'plus_days',
+            'value': 7,
+            'itemSlug': null,
+            'label': '',
+          },
+        ));
+  }
+
+  /// رتبهٔ تکراری را سرور رد می‌کند؛ اینجا هم پیش از ذخیره دیده شود.
+  bool _isDuplicateRank(int index) {
+    final r = _asInt(_perks[index]['rank']);
+    for (var i = 0; i < _perks.length; i++) {
+      if (i != index && _asInt(_perks[i]['rank']) == r) return true;
+    }
+    return false;
+  }
+
+  Widget _perkRow(int i) {
+    final perk = _perks[i];
+    final kind = '${perk['kind']}';
+    final dup = _isDuplicateRank(i);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              SizedBox(
+                width: 96,
+                child: TextFormField(
+                  key: ValueKey('perk_rank_$i'),
+                  initialValue: '${perk['rank']}',
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'رتبه',
+                    errorText: dup ? 'تکراری' : null,
+                  ),
+                  onChanged: (v) => setState(
+                      () => perk['rank'] = int.tryParse(v) ?? 0),
+                ),
+              ),
+              Gaps.hSm,
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  key: ValueKey('perk_kind_$i'),
+                  initialValue: kind,
+                  decoration: const InputDecoration(labelText: 'نوع جایزه'),
+                  items: [
+                    for (final k in _perkKinds)
+                      DropdownMenuItem(
+                        value: k['id'],
+                        child: Text(k['label']!),
+                      ),
+                  ],
+                  onChanged: (v) {
+                    if (v == null) return;
+                    setState(() {
+                      perk['kind'] = v;
+                      // مقدارِ پیش‌فرضِ منطقی برای هر نوع، وگرنه «۷
+                      // امتیاز» یا «۵۰۰۰ روز پلاس» ساخته می‌شود.
+                      perk['value'] = v == 'points'
+                          ? 5000
+                          : v == 'plus_days'
+                              ? 7
+                              : 1;
+                      perk['itemSlug'] = v == 'shop_item'
+                          ? (perk['itemSlug'] ??
+                              (_shopItems.isNotEmpty
+                                  ? _shopItems.first['slug']
+                                  : null))
+                          : null;
+                    });
+                  },
+                ),
+              ),
+              IconButton(
+                tooltip: 'حذف رتبه',
+                icon: const Icon(Icons.delete_outline_rounded),
+                onPressed: () => setState(() => _perks.removeAt(i)),
+              ),
+            ],
+          ),
+          Gaps.vXs,
+          if (kind == 'shop_item')
+            DropdownButtonFormField<String>(
+              key: ValueKey('perk_slug_$i'),
+              initialValue: _shopItems.any((it) => it['slug'] == perk['itemSlug'])
+                  ? '${perk['itemSlug']}'
+                  : null,
+              decoration: const InputDecoration(labelText: 'آیتم فروشگاه'),
+              items: [
+                for (final it in _shopItems)
+                  DropdownMenuItem(
+                    value: '${it['slug']}',
+                    child: Text('${it['name']}'),
+                  ),
+              ],
+              onChanged: (v) => setState(() => perk['itemSlug'] = v),
+            )
+          else
+            TextFormField(
+              key: ValueKey('perk_value_$i'),
+              initialValue: '${perk['value']}',
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: kind == 'points' ? 'مقدار (امتیاز)' : 'مقدار (روز)',
+                prefixIcon: const Icon(Icons.card_giftcard_outlined),
+              ),
+              onChanged: (v) => perk['value'] = int.tryParse(v) ?? 0,
+            ),
+          Gaps.vXs,
+          TextFormField(
+            key: ValueKey('perk_label_$i'),
+            initialValue: '${perk['label'] ?? ''}',
+            decoration: const InputDecoration(
+              labelText: 'عنوان دلخواه (اختیاری)',
+            ),
+            onChanged: (v) => perk['label'] = v,
+          ),
+        ],
+      ),
+    );
   }
 
   Future<DateTime?> _pickDateTime(DateTime? initial) async {
@@ -665,6 +848,65 @@ class _AdminLeagueState extends State<AdminLeague> {
                     )
                   : const Icon(Icons.save_rounded),
               label: const Text('ذخیره جدول جوایز لیگ'),
+            ),
+          ],
+        ),
+        Gaps.vMd,
+
+        // ── جوایزِ غیرنقدی ──
+        //
+        // مرزِ جایزه یک صخره است: نفرِ ۵۰ پول می‌برد و نفرِ ۵۱ هیچ. این
+        // رده صخره را به پله تبدیل می‌کند، بی‌آنکه یک ریال به هزینهٔ
+        // نقدی اضافه شود.
+        FormSection(
+          title: 'جوایز غیرنقدی',
+          children: [
+            Text(
+              'نفرات بعد از رتبهٔ ${faNum(_winnerCount)} — پلاس، آیتم '
+              'فروشگاه یا امتیاز. بلافاصله پس از بستن فصل خودکار تحویل '
+              'می‌شود و نیازی به تأیید مالی ندارد.'
+              '${_editingTitle.isEmpty ? '' : ' این جدول برای «$_editingTitle» ذخیره می‌شود.'}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            Gaps.vSm,
+            if (_perks.isEmpty)
+              EmptyState(
+                icon: Icons.card_giftcard_outlined,
+                title: 'جایزه غیرنقدی ندارید',
+                message: 'برای نفرات بعد از رتبهٔ ${faNum(_winnerCount)} '
+                    'جایزه بگذارید.',
+              )
+            else
+              ...List.generate(_perks.length, _perkRow),
+            Gaps.vSm,
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _addPerkRow,
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('افزودن رتبه'),
+                ),
+                // میان‌بُر: دقیقاً همان چیزی که مالک خواست — ۲۰ نفرِ بعدی.
+                OutlinedButton.icon(
+                  onPressed: _fillTwentyPerks,
+                  icon: const Icon(Icons.playlist_add_rounded),
+                  label: const Text('۲۰ رتبهٔ بعدی، ۷ روز پلاس'),
+                ),
+                FilledButton.icon(
+                  onPressed: _saving ? null : _save,
+                  icon: _saving
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2.2, color: Colors.white),
+                        )
+                      : const Icon(Icons.save_rounded),
+                  label: const Text('ذخیره جوایز غیرنقدی'),
+                ),
+              ],
             ),
           ],
         ),

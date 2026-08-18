@@ -181,6 +181,14 @@ DELETE FROM league_leaderboard_entries;
 -- جدولِ تازه اضافه شد و ابزار نمی‌شناختش. بدونِ این خط، سهمیهٔ روزِ
 -- کاربرانِ حذف‌شده باقی می‌ماند و بی‌معنا جدول را پر می‌کند.
 DELETE FROM user_coin_quota;
+-- ⚠️ جدول‌های مایگریشنِ ۰۷۲ (دورِ ۲۶). باز هم همان گارد این‌ها را گرفت.
+--
+--   • card_box_purchases — تاریخچهٔ خریدِ صندوقِ کارت. ردیفش به کاربر
+--     ارجاع دارد و کارت‌های تحویلی‌اش در user_card_inventory بالاتر پاک
+--     می‌شوند، پس بدونِ این خط سندِ خرید بی‌صاحب می‌ماند.
+--   • league_perk_awards — جوایزِ غیرنقدیِ ۲۰ نفرِ بعد از رتبهٔ ۵۰.
+DELETE FROM card_box_purchases;
+DELETE FROM league_perk_awards;
 
 -- ── ۳) کاربران، بجز حسابِ اصلیِ مدیر ──
 DELETE FROM users WHERE mobile <> '{ADMIN_MOBILE}';

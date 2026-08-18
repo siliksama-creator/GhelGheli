@@ -79,6 +79,10 @@ const PRICE_PRODUCTS = Object.freeze({
   50000:  'ghelgheli_item_50000',
   59000:  'ghelgheli_item_59000',
   69000:  'ghelgheli_item_69000',
+  // صندوق کارت. قیمتش را مالک تعیین کرده و در `app_settings.card_box_price`
+  // هم نگهداری می‌شود؛ اگر مدیر آنجا عددی بگذارد که اینجا محصولی ندارد،
+  // `createCardBoxOrder` با NO_PRODUCT رد می‌کند نه اینکه نصفه پیش برود.
+  100000: 'ghelgheli_item_100000',
 });
 
 // اشتراک پلاس محصول جداگانه دارد چون در بازار «اشتراک» است نه «کالای
@@ -270,6 +274,52 @@ async function createShopOrder(userId, slug, { walletAmount = 0 } = {}) {
   };
 }
 
+/**
+ * سفارش خرید صندوق کارت.
+ *
+ * ── تفاوت‌های عمدی با `createShopOrder` ──
+ *
+ * ۱. **بررسیِ مالکیت ندارد.** آیتم شاپ یک‌بار خریدنی است و خریدِ دومش خطا
+ *    می‌دهد؛ صندوق ذاتاً مصرفی است و کاربر باید بتواند هر چند بار که
+ *    خواست بخرد.
+ * ۲. **کیف پول را نمی‌پذیرد.** صندوق مسیرِ ورودِ پولِ تازه به اقتصاد است.
+ *    اگر با کیف پول (که از جوایزِ لیگ پر می‌شود) خریدنی بود، جایزهٔ نقدیِ
+ *    ماهِ قبل به کارتِ ماهِ بعد تبدیل می‌شد و حلقهٔ بسته‌ای می‌ساخت که هیچ
+ *    درآمدی تولید نمی‌کند.
+ * ۳. **قیمت از تنظیمات خوانده می‌شود** نه از جدولِ shop_items، چون صندوق
+ *    ردیفِ shop_item ندارد (روی `user_shop_items` یکتاست و صندوقِ تکراری
+ *    را رد می‌کرد).
+ */
+async function createCardBoxOrder(userId) {
+  if (!configured() && !cfg().sandbox) {
+    throw fail('پرداخت درون‌برنامه‌ای هنوز فعال نشده است', 503, 'GATEWAY_OFF');
+  }
+
+  const { rows } = await pool.query(
+    "SELECT value FROM app_settings WHERE key='card_box_price' LIMIT 1");
+  const raw = Number(rows[0]?.value);
+  const price = Number.isFinite(raw) && raw > 0 ? Math.trunc(raw) : 100000;
+
+  const productId = productForPrice(price);
+  if (!productId) throw fail('صندوق فعلاً قابل خرید نیست', 503, 'NO_PRODUCT');
+
+  const order = await pool.query(
+    `INSERT INTO payment_orders
+       (user_id, amount, provider, product_id, status, purchase_kind, wallet_amount)
+     VALUES ($1, $2, 'cafebazaar', $3, 'pending', 'card_box', 0)
+     RETURNING id, amount, created_at`,
+    [userId, price, productId]);
+
+  return {
+    orderId: order.rows[0].id,
+    productId,
+    amount: Number(order.rows[0].amount),
+    walletAmount: 0,
+    kind: 'card_box',
+    label: 'صندوق کارت',
+  };
+}
+
 /** سفارش خرید اشتراک پلاس. */
 async function createPlusOrder(userId, billingCycle) {
   if (!configured() && !cfg().sandbox) {
@@ -453,6 +503,6 @@ async function history(userId, limit = 20) {
 
 module.exports = {
   PRICE_PRODUCTS, PLUS_PRODUCTS, productForPrice,
-  createShopOrder, createPlusOrder, verifyAndDeliver,
+  createShopOrder, createPlusOrder, createCardBoxOrder, verifyAndDeliver,
   catalog, history, configured, verifyWithBazaar,
 };

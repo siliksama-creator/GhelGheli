@@ -145,7 +145,35 @@ export function DataRow({ title, subtitle, thumb, selected, onClick, actions, tr
  *     cols={['نام', 'امتیاز']}          rows={[['علی', 10]]}
  *     cols={[['name','نام']]}           rows={[{name:'علی'}]}
  */
-export function Table({ rows = [], cols = [] }) {
+export function Table({ rows = [], cols = [], head = null, children = null }) {
+  // ══ شکلِ سوم: <Table head={[...]}>{<tr>...}</Table> ══
+  //
+  // 🔴 این شاخه نبود و جدولِ «لیگ‌های هم‌زمان» در پنلِ زنده **کاملاً
+  //    خالی** رندر می‌شد: نه سرآیند، نه ردیف. چون `head` و `children`
+  //    اصلاً از props بیرون کشیده نمی‌شدند، React بی‌صدا دورشان
+  //    می‌انداخت — هیچ خطایی هم در کنسول نبود.
+  //
+  //    وقتی ردیف‌ها ورودیِ تعاملی دارند (Input/select)، شکلِ آرایه‌ایِ
+  //    `rows` کار نمی‌کند چون هر بار آرایهٔ تازه ساخته می‌شود و فوکوس
+  //    از فیلد می‌پرد. پس این شکل لازم است، نه سلیقه‌ای.
+  if (head) {
+    return (
+      <div className="table-wrap">
+        <table className="data-table">
+          <thead>
+            <tr>
+              {head.map((h, i) => (
+                // eslint-disable-next-line react/no-array-index-key
+                <th key={i}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>{children}</tbody>
+        </table>
+      </div>
+    );
+  }
+
   // اگر عضوِ اول رشته باشد، شکلِ ساده است.
   const simple = cols.length === 0 || typeof cols[0] === 'string';
   const headers = simple ? cols : cols.map((c) => c[1]);

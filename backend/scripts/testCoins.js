@@ -13,8 +13,8 @@
 //    هیچ‌وقت رد نمی‌شود، تست نیست.
 
 const {
-  createCoinService, coinRewardFor, quotaTracked, tehranDate,
-  COIN_TABLE, DAILY_QUOTA,
+  createCoinService, coinRewardFor, hasCoinReward, quotaTracked, tehranDate,
+  tapLevelCoin, tapCoinsFor, COIN_TABLE, DAILY_QUOTA,
 } = require('../src/services/coinService');
 const { createGameStakeService } = require('../src/services/gameStakeService');
 
@@ -92,11 +92,12 @@ class FakeDb {
     }
     if (/INSERT INTO game_stake_matches/.test(sql)) {
       const [id, gameId, x, o, stake, gross, comm, net,
-        coinReward, qx, qo, qDate] = params;
+        coinReward, cWin, cDraw, cLoss, qx, qo, qDate] = params;
       this.matches.set(id, {
         id, game_id: gameId, player_x_id: x, player_o_id: o,
         stake_points: stake, gross_pot: gross, commission_points: comm,
         net_pot: net, status: 'reserved', coin_reward: coinReward,
+        coin_reward_win: cWin, coin_reward_draw: cDraw, coin_reward_loss: cLoss,
         coin_quota_x: qx, coin_quota_o: qo, coin_quota_date: qDate,
       });
       return { rowCount: 1, rows: [] };
@@ -137,24 +138,115 @@ const mk = n => `${String(n).padStart(8, '0')}-0000-4000-8000-000000000000`;
   // ═══════════════════════════════════════════════════════════════════════
   console.log('\n== جدول پاداش سکه ==');
   // ═══════════════════════════════════════════════════════════════════════
-  ok(coinRewardFor('card_duel', 100) === 2, 'دوئل ۱۰۰ → ۲ سکه');
-  ok(coinRewardFor('card_duel', 1000) === 20, 'دوئل ۱۰۰۰ → ۲۰ سکه');
-  ok(coinRewardFor('penalty', 100) === 1, 'پنالتی ۱۰۰ → ۱ سکه');
-  ok(coinRewardFor('penalty', 1000) === 10, 'پنالتی ۱۰۰۰ → ۱۰ سکه');
-  ok(coinRewardFor('memory', 100) === 1, 'جفت‌یاب ۱۰۰ → ۱ سکه');
-  ok(coinRewardFor('memory', 1000) === 10, 'جفت‌یاب ۱۰۰۰ → ۱۰ سکه');
+  // ── جدولِ سه‌حالته (دورِ ۲۶) ────────────────────────────────────────────
+  //
+  // تا پیش از این فقط برنده سکه می‌گرفت و مبلغش به بازی وابسته بود
+  // (دوئل دو برابرِ پنالتی). هر دو تصمیم عوض شد:
+  //
+  //   ۱. **هر سه بازی یکسان‌اند.** وقتی دوئل دو برابر می‌داد، بازیکن
+  //      مجبور بود برای رتبه، بازی‌ای را انتخاب کند که دوستش ندارد.
+  //      انتخابِ بازی باید سلیقه باشد نه بهینه‌سازی.
+  //   ۲. **هر سه نتیجه پول دارند.** باختِ صفرسکه یعنی کسی که تازه شروع
+  //      کرده و هنوز می‌بازد، ساعت‌ها بازی می‌کند و در جدول تکان نمی‌خورد.
+  //      حالا باخت هم چیزی می‌دهد — کم، ولی نه هیچ.
+  const t100 = coinRewardFor('card_duel', 100);
+  ok(t100.win === 10, 'شرط ۱۰۰: بردِ ۱۰ سکه');
+  ok(t100.draw === 3, 'شرط ۱۰۰: تساویِ ۳ سکه');
+  ok(t100.loss === 1, 'شرط ۱۰۰: باختِ ۱ سکه');
 
-  // بازی رایگان و شرطِ لابیِ ۵۰۰۰ عمداً سکه ندارند.
-  ok(coinRewardFor('card_duel', 0) === 0, 'بازی رایگان سکه ندارد');
-  ok(coinRewardFor('card_duel', 5000) === 0, 'شرط ۵۰۰۰ لابی سکه ندارد');
-  ok(coinRewardFor('tap', 100) === 0, 'بازی تک‌نفرهٔ تپ سکه ندارد');
-  ok(coinRewardFor('unknown_game', 100) === 0, 'بازی ناشناخته سکه ندارد');
+  const t1000 = coinRewardFor('card_duel', 1000);
+  ok(t1000.win === 30, 'شرط ۱۰۰۰: بردِ ۳۰ سکه');
+  ok(t1000.draw === 9, 'شرط ۱۰۰۰: تساویِ ۹ سکه');
+  ok(t1000.loss === 3, 'شرط ۱۰۰۰: باختِ ۳ سکه');
 
-  // نسبتِ ۱:۱۰ باید در هر سه بازی برقرار باشد، وگرنه یک سطحِ شرط
-  // «کارآمدتر» می‌شود و بازیکن مجبور به بهینه‌سازی می‌شود نه انتخاب.
-  for (const [game, row] of Object.entries(COIN_TABLE)) {
-    ok(row[1000] === row[100] * 10, `نسبت ۱:۱۰ در ${game} برقرار است`);
+  // هر سه بازی دقیقاً یک جدول دارند.
+  for (const game of ['card_duel', 'penalty', 'memory']) {
+    for (const stake of [100, 1000]) {
+      const r = coinRewardFor(game, stake);
+      const ref = coinRewardFor('card_duel', stake);
+      ok(r.win === ref.win && r.draw === ref.draw && r.loss === ref.loss,
+        `${game} در شرطِ ${stake} همان جدولِ مشترک را دارد`);
+    }
   }
+
+  // ⚠️ برد باید همیشه به‌روشنی از تساوی بهتر باشد و تساوی از باخت،
+  //    وگرنه انگیزهٔ بردن از بین می‌رود و بازیکن یاد می‌گیرد که مساوی
+  //    کردن «به‌صرفه‌تر» است.
+  for (const stake of [100, 1000]) {
+    const r = coinRewardFor('card_duel', stake);
+    ok(r.win > r.draw && r.draw > r.loss,
+      `شرطِ ${stake}: نردبانِ برد > تساوی > باخت برقرار است`);
+    ok(r.win >= r.loss * 5,
+      `شرطِ ${stake}: بردن دستِ‌کم ۵ برابرِ باختن می‌ارزد`);
+  }
+
+  // نسبتِ ۱:۳ بینِ دو سطحِ شرط، در هر سه نتیجه.
+  //
+  // شرطِ ۱۰۰۰ ده برابرِ ۱۰۰ امتیاز خرج دارد ولی فقط سه برابر سکه می‌دهد.
+  // این عمدی است: اگر ۱:۱۰ بود، سکه عملاً با امتیاز خریدنی می‌شد و
+  // کاربرِ پرپول رتبه را می‌خرید. ۱:۳ ریسکِ بیشتر را پاداش می‌دهد بدون
+  // آنکه جدول را به مزایدهٔ امتیاز تبدیل کند.
+  for (const [game, row] of Object.entries(COIN_TABLE)) {
+    for (const key of ['win', 'draw', 'loss']) {
+      ok(row[1000][key] === row[100][key] * 3,
+        `نسبت ۱:۳ در ${game} برای ${key} برقرار است`);
+    }
+  }
+
+  // بازی رایگان و شرطِ لابیِ ۵۰۰۰ عمداً سکه ندارند — در هر سه نتیجه.
+  const zero = r => r.win === 0 && r.draw === 0 && r.loss === 0;
+  ok(zero(coinRewardFor('card_duel', 0)), 'بازی رایگان سکه ندارد');
+  ok(zero(coinRewardFor('card_duel', 5000)), 'شرط ۵۰۰۰ لابی سکه ندارد');
+  ok(zero(coinRewardFor('tap', 100)), 'بازی تک‌نفرهٔ تپ سکه ندارد');
+  ok(zero(coinRewardFor('unknown_game', 100)), 'بازی ناشناخته سکه ندارد');
+
+  ok(hasCoinReward('card_duel', 100) === true, 'شرطِ ۱۰۰ سکه‌دار است');
+  ok(hasCoinReward('card_duel', 0) === false, 'رایگان سکه‌دار نیست');
+  ok(hasCoinReward('card_duel', 5000) === false, 'لابیِ ۵۰۰۰ سکه‌دار نیست');
+  ok(hasCoinReward('tap', 1000) === false, 'تپ سکه‌دارِ شرطی نیست');
+
+  // ═══════════════════════════════════════════════════════════════════════
+  console.log('\n== سکهٔ بازی ضربه‌زن ==');
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // `ceil(level/5)`: هر پنج لول یک پله بالاتر. لولِ ۱ تا ۵ یک سکه،
+  // ۴۶ تا ۵۰ ده سکه.
+  ok(tapLevelCoin(1) === 1, 'لول ۱ → ۱ سکه');
+  ok(tapLevelCoin(5) === 1, 'لول ۵ → ۱ سکه (پایانِ پلهٔ اول)');
+  ok(tapLevelCoin(6) === 2, 'لول ۶ → ۲ سکه (شروعِ پلهٔ دوم)');
+  ok(tapLevelCoin(46) === 10, 'لول ۴۶ → ۱۰ سکه');
+  ok(tapLevelCoin(50) === 10, 'لول ۵۰ → ۱۰ سکه');
+
+  // ورودیِ خراب نباید سکه بسازد.
+  for (const bad of [0, -1, -50, null, undefined, NaN, 'abc']) {
+    ok(tapLevelCoin(bad) === 0, `لولِ نامعتبر ${bad} صفر سکه می‌دهد`);
+  }
+
+  {
+    // جمعِ کلِ مسیر باید دقیقاً ۲۷۵ باشد — عددی که کلِ بودجهٔ اقتصادی
+    // رویش بسته شده. اگر کسی روزی فرمول را عوض کند، اینجا می‌شکند.
+    let total = 0;
+    for (let lv = 1; lv <= 50; lv++) total += tapLevelCoin(lv);
+    ok(total === 275, `جمعِ کلِ ۵۰ لول ۲۷۵ سکه است (${total})`);
+
+    // پاداش هرگز نباید نزولی شود.
+    let monotonic = true;
+    for (let lv = 2; lv <= 50; lv++) {
+      if (tapLevelCoin(lv) < tapLevelCoin(lv - 1)) monotonic = false;
+    }
+    ok(monotonic, 'پاداش با بالا رفتنِ لول هیچ‌وقت کم نمی‌شود');
+  }
+
+  // جمعِ یک بسته: سرویس فهرستِ لول‌های تمام‌شده را می‌دهد، نه اختلافِ ساده.
+  ok(tapCoinsFor([9, 10, 11]) === 7, 'بستهٔ لول ۹ و ۱۰ و ۱۱ → ۷ سکه');
+  ok(tapCoinsFor([]) === 0, 'بستهٔ خالی صفر سکه');
+  ok(tapCoinsFor(null) === 0, 'ورودیِ غیرآرایه صفر سکه');
+  ok(tapCoinsFor([50, 50]) === 20, 'تکرارِ لول جمع می‌شود (منطقِ خالصِ جمع)');
+
+  // ⚠️ ضربه‌زن نباید از یک بازیِ رقابتیِ شرطِ ۱۰۰۰ سودآورتر باشد،
+  //    وگرنه بازیکن به‌جای رقابت، تنها می‌نشیند و تپ می‌کند.
+  ok(tapLevelCoin(50) < coinRewardFor('card_duel', 1000).win,
+    'گران‌ترین لولِ ضربه‌زن از بردِ یک دوئلِ ۱۰۰۰ کمتر است');
 
   // ═══════════════════════════════════════════════════════════════════════
   console.log('\n== روزِ تقویمی به وقت تهران ==');
@@ -228,7 +320,7 @@ const mk = n => `${String(n).padStart(8, '0')}-0000-4000-8000-000000000000`;
   }
 
   // ═══════════════════════════════════════════════════════════════════════
-  console.log('\n== سکه فقط به برندهٔ واجدِ سهمیه می‌رسد ==');
+  console.log('\n== تسویه: برنده، بازنده و تساوی ==');
   // ═══════════════════════════════════════════════════════════════════════
   {
     const db = new FakeDb({ users: [{ id: U1 }, { id: U2 }] });
@@ -240,14 +332,26 @@ const mk = n => `${String(n).padStart(8, '0')}-0000-4000-8000-000000000000`;
       playerXId: U1, playerOId: U2,
     });
     const res = await stakes.settleMatch({ matchId: mk(1), winnerUserId: U1 });
-    ok(res.coinsAwarded === 20, 'برندهٔ دوئل ۱۰۰۰ بیست سکه گرفت');
-    ok(db.users.get(U1).coins === 20, 'شمارندهٔ users.coins برنده به‌روز شد');
-    ok(!db.users.get(U2).coins, 'بازنده هیچ سکه‌ای نگرفت');
-    ok(db.entries.get(U1) === 20, 'جدولِ رتبه‌بندیِ فصل هم به‌روز شد');
+
+    // ⚠️ `coinsAwarded` فقط سکهٔ **برنده** است — نه جمعِ پرداختی.
+    //    موتور آن را مستقیم به کلاینتِ برنده می‌فرستد، پس اگر روزی جمع
+    //    شود، بازنده عددِ برنده را روی صفحه‌اش می‌بیند.
+    ok(res.coinsAwarded === 30, 'برندهٔ دوئل ۱۰۰۰ سی سکه گرفت');
+    ok(res.loserCoins === 3, 'بازنده سه سکهٔ دلجویی گرفت');
+    ok(db.users.get(U1).coins === 30, 'شمارندهٔ users.coins برنده به‌روز شد');
+    ok(db.users.get(U2).coins === 3, 'شمارندهٔ users.coins بازنده هم به‌روز شد');
+    ok(db.entries.get(U1) === 30, 'جدولِ رتبه‌بندیِ فصل برای برنده به‌روز شد');
+    ok(db.entries.get(U2) === 3, 'جدولِ فصل برای بازنده هم به‌روز شد');
+
+    // ⚠️ سکهٔ باخت باید واقعاً کوچک بماند. اگر روزی کسی آن را بالا ببرد،
+    //    باختنِ سریعِ پشتِ‌سرهم به یک استراتژیِ کشتِ سکه تبدیل می‌شود:
+    //    بازیکن عمداً می‌بازد تا سهمیه‌اش را سریع خرج کند.
+    ok(res.loserCoins * 5 <= res.coinsAwarded,
+      'سکهٔ باخت حداکثر یک‌پنجمِ سکهٔ برد است (ضدِ کشتِ باخت)');
   }
 
   // ═══════════════════════════════════════════════════════════════════════
-  console.log('\n== مساوی سکه نمی‌دهد ==');
+  console.log('\n== مساوی به هر دو بازیکن سکه می‌دهد ==');
   // ═══════════════════════════════════════════════════════════════════════
   {
     const db = new FakeDb({ users: [{ id: U1 }, { id: U2 }] });
@@ -257,9 +361,23 @@ const mk = n => `${String(n).padStart(8, '0')}-0000-4000-8000-000000000000`;
       playerXId: U1, playerOId: U2,
     });
     const res = await stakes.settleMatch({ matchId: mk(2), draw: true });
-    ok(res.coinsAwarded === 0, 'تساوی صفر سکه می‌دهد');
-    ok(!db.users.get(U1).coins && !db.users.get(U2).coins,
-      'هیچ‌کدام از دو بازیکن سکه نگرفتند');
+
+    // تساوی تا دورِ ۲۶ هیچ نمی‌داد. با نرخِ تساویِ ۴.۵٪ در دوئل، آن
+    // صفر یعنی تقریباً یکی از هر بیست بازیِ کامل بی‌مزد بود — و بدتر،
+    // بازیکن انگیزه پیدا می‌کرد در وضعیتِ مساوی بازی را رها کند.
+    ok(res.drawCoins === 9, 'تساویِ شرطِ ۱۰۰۰ نُه سکه می‌دهد');
+    ok(res.coinsAwarded === 0, 'در تساوی برنده‌ای وجود ندارد');
+    ok(db.users.get(U1).coins === 9 && db.users.get(U2).coins === 9,
+      'هر دو بازیکن سکهٔ تساوی را گرفتند');
+    ok(db.entries.get(U1) === 9 && db.entries.get(U2) === 9,
+      'جدولِ فصل برای هر دو به‌روز شد');
+
+    // ⚠️ تساوی نباید از برد به‌صرفه‌تر باشد — نه برای یک نفر، نه در جمع.
+    //    اگر ۲×draw از win بیشتر شود، دو بازیکنِ هماهنگ می‌توانند با
+    //    تساویِ عمدی بیشتر از یک بازیِ واقعی سکه بسازند.
+    const row = coinRewardFor('card_duel', 1000);
+    ok(row.draw * 2 <= row.win + row.loss,
+      'تساویِ تبانی‌شده از یک بازیِ واقعی سودآورتر نیست');
     // سهمیه در تساوی برنمی‌گردد — تصمیمِ عمدی، مستند در settleMatch.
     const q = await createCoinService(db).getQuota(U1);
     ok(q.used[1000] === 1, 'سهمیهٔ تساوی سوخته می‌ماند (عمدی)');
@@ -355,6 +473,78 @@ const mk = n => `${String(n).padStart(8, '0')}-0000-4000-8000-000000000000`;
   }
 
   // ═══════════════════════════════════════════════════════════════════════
+  console.log('\n== لابیِ خصوصی: نه سکه، نه سوختنِ سهمیه ==');
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // 🔴 باگی که تا دورِ ۲۶ زنده بود: موتور `matchMode` را به `reserveMatch`
+  //    پاس نمی‌داد، پس مسابقهٔ لابیِ خصوصی هم مثل مسابقهٔ عمومی حساب
+  //    می‌شد. نتیجه: دو دوستِ هماهنگ می‌توانستند در اتاقِ خصوصی، دور از
+  //    هر حریفِ واقعی، سکهٔ لیگ بسازند — و بدتر، سهمیهٔ روزانه‌شان هم
+  //    سر بازی‌های خصوصی می‌سوخت.
+  {
+    const db = new FakeDb({ users: [{ id: U1 }, { id: U2 }] });
+    const coinSvc = createCoinService(db);
+    const stakes = createGameStakeService(db, fakePoints(), coinSvc);
+
+    const r = await stakes.reserveMatch({
+      matchId: mk(8), gameId: 'card_duel', stake: 1000,
+      playerXId: U1, playerOId: U2, matchMode: 'lobby',
+    });
+    ok(r.coinEligible[U1] === false && r.coinEligible[U2] === false,
+      'در لابیِ خصوصی هیچ‌کس واجدِ سکه نیست');
+
+    const q = await coinSvc.getQuota(U1);
+    ok(q.used[1000] === 0, 'سهمیهٔ روزانه در لابیِ خصوصی نمی‌سوزد');
+
+    const res = await stakes.settleMatch({ matchId: mk(8), winnerUserId: U1 });
+    ok(res.coinsAwarded === 0, 'بردِ لابیِ خصوصی سکه نمی‌دهد');
+    ok(res.loserCoins === 0, 'باختِ لابیِ خصوصی هم سکه نمی‌دهد');
+    ok(!db.users.get(U1).coins && !db.users.get(U2).coins,
+      'شمارندهٔ سکهٔ هیچ‌کدام تکان نخورد');
+    ok(!db.entries.get(U1), 'جدولِ لیگ از بازیِ خصوصی اثر نگرفت');
+
+    // ⚠️ ولی امتیاز واقعاً جابه‌جا می‌شود — لابی «بازیِ الکی» نیست،
+    //    فقط از اقتصادِ لیگ جدا است.
+    ok(res.netPot > 0, 'پاتِ امتیازی در لابی همچنان پرداخت می‌شود');
+  }
+
+  // مسابقهٔ عمومی برای مقایسه: همان شرط، ولی این‌بار سکه دارد.
+  {
+    const db = new FakeDb({ users: [{ id: U1 }, { id: U2 }] });
+    const stakes = createGameStakeService(db, fakePoints(), createCoinService(db));
+    await stakes.reserveMatch({
+      matchId: mk(9), gameId: 'card_duel', stake: 1000,
+      playerXId: U1, playerOId: U2, matchMode: 'online',
+    });
+    const res = await stakes.settleMatch({ matchId: mk(9), winnerUserId: U1 });
+    ok(res.coinsAwarded === 30, 'همان شرط در حالتِ عمومی ۳۰ سکه می‌دهد');
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  console.log('\n== نقشهٔ coinsByUser با پرداختِ واقعی می‌خواند ==');
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // موتور برای هر سوکت از این نقشه می‌خواند، نه از عددِ جدول. اگر سهمیهٔ
+  // یک بازیکن پر باشد باید صفرِ صادقانه ببیند نه «+۳۰»ی که نگرفته.
+  {
+    const db = new FakeDb({ users: [{ id: U1 }, { id: U2 }] });
+    const coinSvc = createCoinService(db);
+    const stakes = createGameStakeService(db, fakePoints(), coinSvc);
+    const client = await db.connect();
+    for (let i = 0; i < DAILY_QUOTA[1000]; i++) {
+      await coinSvc.consumeQuota(client, U1, 1000);
+    }
+    await stakes.reserveMatch({
+      matchId: mk(10), gameId: 'memory', stake: 1000,
+      playerXId: U1, playerOId: U2,
+    });
+    const res = await stakes.settleMatch({ matchId: mk(10), winnerUserId: U1 });
+    ok(res.coinsByUser[U1] === 0, 'برندهٔ سقف‌پر در نقشه صفر دارد');
+    ok(res.coinsByUser[U2] === 3, 'بازندهٔ سهمیه‌دار سکهٔ باختش را دارد');
+    ok(res.coinsAwarded === 0, 'coinsAwarded هم صفرِ واقعی است');
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
   console.log('\n== تسویهٔ تکراری دو بار سکه نمی‌دهد ==');
   // ═══════════════════════════════════════════════════════════════════════
   {
@@ -367,7 +557,9 @@ const mk = n => `${String(n).padStart(8, '0')}-0000-4000-8000-000000000000`;
     await stakes.settleMatch({ matchId: mk(7), winnerUserId: U1 });
     const again = await stakes.settleMatch({ matchId: mk(7), winnerUserId: U1 });
     ok(again.duplicate === true, 'تسویهٔ دوم duplicate تشخیص داده شد');
-    ok(db.users.get(U1).coins === 2, 'سکه فقط یک بار داده شد (۲ نه ۴)');
+    // شرطِ ۱۰۰: برنده ۱۰، بازنده ۱ — هر کدام دقیقاً یک بار.
+    ok(db.users.get(U1).coins === 10, 'سکهٔ برنده فقط یک بار داده شد (۱۰ نه ۲۰)');
+    ok(db.users.get(U2).coins === 1, 'سکهٔ بازنده هم فقط یک بار داده شد');
   }
 
   // ═══════════════════════════════════════════════════════════════════════

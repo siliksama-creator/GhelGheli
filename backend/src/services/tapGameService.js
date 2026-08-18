@@ -438,7 +438,9 @@ async function getProgress(userId) {
  * @param {object} raw     request body
  * @returns {Promise<{status:number, payload:object}>}
  */
-async function submitBatch(userId, token, raw, onPointsEarned = null) {
+async function submitBatch(
+  userId, token, raw, onPointsEarned = null, onLevelsGained = null,
+) {
   // Gate 2 — shape.
   const parsed = validateShape(raw);
   if (!parsed.ok) {
@@ -646,6 +648,27 @@ async function submitBatch(userId, token, raw, onPointsEarned = null) {
     // advances the level without paying.
     if (earnedPoints > 0 && typeof onPointsEarned === 'function') {
       await onPointsEarned(client, userId, earnedPoints);
+    }
+
+    // ── سکهٔ لول‌های همین بسته (دورِ ۲۶) ──────────────────────────────────
+    //
+    // ضربه‌زن تا امروز فقط امتیاز می‌داد. سکه — که ارزِ رتبه‌بندیِ لیگ و
+    // جایزهٔ نقدی است — فقط از بازی‌های رقابتی می‌آمد، پس کاربری که ضربه‌زن
+    // بازی می‌کرد ساعت‌ها وقت می‌گذاشت و در جدولِ لیگ صفر می‌ماند.
+    //
+    // `next.gained` تعدادِ لول‌هایی است که **در همین بسته** تمام شده‌اند —
+    // بعد از اعمالِ سقفِ روزانه و بعد از ردِ ضربه‌های مشکوک. لول‌های
+    // تمام‌شده `current.level` تا `current.level + gained - 1` هستند:
+    // تمام‌کردنِ لولِ L یعنی رفتن از L به L+1، پس پاداش به L تعلق دارد نه
+    // به لولِ جدید.
+    //
+    // ⚠️ بیرونِ شرطِ `earnedPoints > 0` نیست و نباید باشد: هر لولِ
+    //    تمام‌شده لزوماً امتیازِ مثبت دارد، ولی وابسته‌کردنِ سکه به امتیاز
+    //    دو منطق را به هم گره می‌زند. اینجا فقط به `gained` نگاه می‌کنیم.
+    if (!rejected && next.gained > 0 && typeof onLevelsGained === 'function') {
+      const levels = [];
+      for (let i = 0; i < next.gained; i++) levels.push(current.level + i);
+      await onLevelsGained(client, userId, levels);
     }
 
     await client.query('COMMIT');

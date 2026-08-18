@@ -453,6 +453,23 @@ function finish(room, winner, disconnectedSym = null) {
       const winnerUserId = draw ? null : room.players?.[winnerSym]?.id;
       stakes.settleMatch({ matchId: room.id, winnerUserId, draw })
         .then(result => {
+          // سکهٔ واقعاً واریزشده به هر بازیکن، کلیدخورده به شناسهٔ کاربر.
+          // سرویس آن را بعد از اعمالِ سهمیه و وضعیتِ لیگ می‌سازد، پس
+          // همیشه بر اعدادِ جدول ارجح است.
+          const paidCoins = result.coinsByUser || {};
+          const coinsForSeat = (sym) => {
+            const uid = room.players?.[sym]?.id;
+            // ⚠️ `??` نه `||` — صفرِ واقعی («سهمیه‌ات پر بود») باید صفر
+            //    بماند و به عددِ جدول برنگردد.
+            const paid = uid ? paidCoins[uid] : undefined;
+            if (paid !== undefined) return Number(paid) || 0;
+            // مسیرِ پشتیبان: تسویهٔ تکراری نقشه ندارد.
+            if (draw) return Number(result.drawCoins || 0);
+            return sym === winnerSym
+              ? Number(result.coinsAwarded || 0)
+              : Number(result.loserCoins || 0);
+          };
+
           for (const sym of ['X', 'O']) {
             const sock = room.seats[sym];
             if (sock?.emit) safeEmit(sock, 'game:settlement', {
@@ -466,11 +483,18 @@ function finish(room, winner, disconnectedSym = null) {
               commission: result.commission || room.commission || 0,
               payout: !result.duplicate && !draw,
               balanceAfter: sym === winnerSym ? result.winnerBalanceAfter : null,
-              // سکهٔ این مسابقه — هر دو کلاینت می‌گیرند تا انیمیشنِ پروازِ
-              // سکه به سمتِ برنده را نشان دهند، نه فقط خودِ برنده.
-              // صفر یعنی این مسابقه سکه نداشت (سهمیهٔ برنده پر بود یا
-              // لیگِ فعالی نبود) و کلاینت باید انیمیشن را رد کند.
-              coins: Number(result.coinsAwarded || 0),
+              // ── سکهٔ **همین** بازیکن ────────────────────────────────
+              //
+              // تا دورِ ۲۵ اینجا سکهٔ برنده به هر دو سوکت می‌رفت، چون
+              // بازنده صفر می‌گرفت و عدد فقط برای انیمیشنِ «پروازِ سکه به
+              // سمتِ برنده» بود. حالا بازنده هم واقعاً سکه می‌گیرد، پس
+              // فرستادنِ عددِ برنده به بازنده یعنی به او «+۱۰» نشان دهیم
+              // در حالی که ۱ گرفته — یعنی دروغ در صفحهٔ نتیجه.
+              //
+              // صفر یعنی سکه‌ای در کار نبود (سهمیه پر بود، لیگِ فعالی
+              // نبود، یا مسابقهٔ لابیِ خصوصی بود) و کلاینت انیمیشن را
+              // رد می‌کند.
+              coins: coinsForSeat(sym),
             }, room);
           }
           if (result.duplicate) return;
@@ -480,6 +504,7 @@ function finish(room, winner, disconnectedSym = null) {
               if (sock?.emit) safeEmit(sock, 'game:stake_refund', {
                 stake: room.stake,
                 message: 'مسابقه مساوی شد؛ ورودی کامل برگشت.',
+                coins: coinsForSeat(sym),
               }, room);
             }
           } else {
@@ -488,8 +513,21 @@ function finish(room, winner, disconnectedSym = null) {
               netPot: result.netPot,
               stake: result.stake,
               commission: result.commission,
-              coins: Number(result.coinsAwarded || 0),
+              coins: coinsForSeat(winnerSym),
             }, room);
+            // بازنده هم رویدادِ خودش را می‌گیرد. بدونِ این، تنها نشانهٔ
+            // سکه‌اش عددِ داخلِ settlement بود که کلاینتِ فعلی برای
+            // بازنده انیمیت نمی‌کند — سکه واریز می‌شد و کاربر هرگز
+            // نمی‌فهمید.
+            const loserSym = winnerSym === 'X' ? 'O' : 'X';
+            const loseSock = room.seats[loserSym];
+            const loseCoins = coinsForSeat(loserSym);
+            if (loseSock?.emit && loseCoins > 0) {
+              safeEmit(loseSock, 'game:stake_consolation', {
+                coins: loseCoins,
+                stake: result.stake,
+              }, room);
+            }
           }
         })
         .catch(e => {
@@ -698,6 +736,12 @@ async function startRoom(io, rules, gameId, a, b, stake, matchMode = null) {
       stake: s,
       playerXId: a.user.id,
       playerOId: b.user.id,
+      // 🔴 رفعِ باگ (دورِ ۲۶): این آرگومان وجود نداشت.
+      //
+      // `matchMode` ساخته می‌شد و در `room` می‌نشست، ولی هرگز به سرویسِ
+      // شرط نمی‌رسید — پس سرویس نمی‌دانست مسابقه عمومی است یا لابیِ
+      // خصوصی، و به هر دو یکسان سکه می‌داد. جزئیات در `reserveMatch`.
+      matchMode: matchMode || (vsBot ? 'bot' : 'online'),
     });
     // snapshot اتصال باید موجودیِ بعد از رزرو را بداند؛ وگرنه هدر کلاینت
     // تا refresh عدد قدیمی نشان می‌دهد.

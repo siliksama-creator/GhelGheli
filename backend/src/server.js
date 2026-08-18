@@ -36,6 +36,7 @@ const cardDuel = require('./services/cardDuelService');
 // above the shop routes, so a require next to those would read as a
 // temporal-dead-zone bug even though route handlers run after startup.
 const shop = require('./services/shopService');
+const cardBox = require('./services/cardBoxService');
 // لولِ دائمیِ بازیکن — کنارِ cosmetics در همان مسیرها پخش می‌شود.
 const level = require('./services/levelService');
 const chatRetention = require('./services/chatRetentionService');
@@ -828,6 +829,18 @@ app.post('/api/games/tap/progress', auth, tapBatchLimiter, asyncHandler(async (r
       // معرف هم برگردد و دو دفتر از هم جدا نیفتند.
       await referrals.payCommission(client, userId, points, 'tap');
     },
+    // ── سکهٔ لول‌های تمام‌شده (دورِ ۲۶) ───────────────────────────────────
+    //
+    // روی همان تراکنشِ پیشرفت. `levels` فهرستِ لول‌هایی است که در همین
+    // بسته تمام شده‌اند و سرویس آن را بعد از سقفِ روزانه حساب کرده.
+    //
+    // ⚠️ `awardCoins` بدونِ لیگِ فعال صفر برمی‌گرداند و خطا نمی‌دهد — یعنی
+    //    بینِ دو فصل، ضربه‌زن امتیازش را می‌دهد ولی سکه‌ای نمی‌سازد. این
+    //    درست است: سکه فقط داخلِ یک فصل معنا دارد.
+    async (client, userId, levels) => {
+      const amount = coins.tapCoinsFor(levels);
+      if (amount > 0) await coins.awardCoins(client, userId, amount);
+    },
   );
   // XP گذر نبرد به ازای هر لولی که در همین بستهٔ ارسالی تمام شده.
   // سقف روزانهٔ منبع (۶۰) خودش جلوی سوءاستفاده را می‌گیرد.
@@ -1343,6 +1356,31 @@ app.post('/api/shop/plus', auth, shopLimiter, asyncHandler(async (req, res) => {
   } catch (e) {
     res.status(e.status || 500).json({ message: e.message || 'خطا در خرید اشتراک' });
   }
+}));
+
+// ── صندوق کارت ─────────────────────────────────────────────────────────
+//
+// مسیرِ ورودِ کاربری که کارتِ فیزیکی ندارد. بدونِ کارت، دوئلِ کارت اصلاً
+// باز نمی‌شود — نه نسخهٔ ضعیف‌تری از بازی، بلکه هیچ. صندوق همان در است.
+//
+// ⚠️ اینجا هیچ کارتی تحویل داده نمی‌شود. `buy` فقط سفارشِ pending
+//    می‌سازد؛ قرعه‌کشی و تحویل داخلِ تراکنشِ `/api/purchase/verify`
+//    انجام می‌شود، بعد از آنکه کافه‌بازار پرداخت را تأیید کرد.
+app.get('/api/card-box/overview', auth, asyncHandler(async (req, res) => {
+  res.json(await cardBox.overview(req.user.id));
+}));
+
+app.post('/api/card-box/buy', auth, shopLimiter, asyncHandler(async (req, res) => {
+  try {
+    res.json(await shop.buyCardBox(req.user.id));
+  } catch (e) {
+    res.status(e.status || 500)
+      .json({ message: e.message || 'خطا در ساخت سفارش صندوق' });
+  }
+}));
+
+app.get('/api/card-box/history', auth, asyncHandler(async (req, res) => {
+  res.json(await cardBox.history(req.user.id, req.query.limit));
 }));
 
 // ── خرید: مرحلهٔ ۳ (راستی‌آزمایی و تحویل) ─────────────────────────────

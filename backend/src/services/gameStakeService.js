@@ -1,7 +1,9 @@
 const { pool } = require('../config/db');
 const pointService = require('./pointService');
 const coinService = require('./coinService');
-const { coinRewardFor, quotaTracked, tehranDate } = require('./coinService');
+const {
+  coinRewardFor, hasCoinReward, quotaTracked, tehranDate,
+} = require('./coinService');
 
 // مسابقهٔ عمومی فقط دو ورودی رسمی دارد. لابی خصوصی علاوه بر این دو،
 // رایگان و ۵۰۰۰ هم دارد. عددِ دلخواه از payload هرگز پذیرفته نمی‌شود.
@@ -46,7 +48,9 @@ function createGameStakeService(db = pool, points = pointService, coins = coinSe
    * قفل‌ها بر اساس UUID مرتب می‌شوند تا دو بازی هم‌زمان با بازیکنان مشترک
    * deadlock نسازند. بعد از این تابع، ساخت اتاق امن است؛ قبلش نه.
    */
-  async function reserveMatch({ matchId, gameId, stake, playerXId, playerOId }) {
+  async function reserveMatch({
+    matchId, gameId, stake, playerXId, playerOId, matchMode = null,
+  }) {
     if (!matchId || !playerXId || !playerOId || playerXId === playerOId) {
       throw new StakeError('بازیکنان مسابقه معتبر نیستند', 'INVALID_PLAYERS');
     }
@@ -92,10 +96,31 @@ function createGameStakeService(db = pool, points = pointService, coins = coinSe
       //
       // ⚠️ ترتیبِ `ids` (مرتب‌شده) رعایت می‌شود تا با ترتیبِ قفلِ بالا یکی
       //    باشد و دو مسابقهٔ هم‌زمانِ دارای بازیکنِ مشترک deadlock نسازند.
-      const coinReward = coinRewardFor(gameId, stake);
-      const quotaDate = quotaTracked(stake) ? tehranDate() : null;
+      // ── 🔴 لابیِ خصوصی سکه نمی‌دهد ──────────────────────────────────
+      //
+      // این شرط رفعِ یک باگِ واقعی است، نه احتیاط.
+      //
+      // `matchMode` در `engine.js` ساخته می‌شد ('lobby' یا 'online') ولی
+      // هرگز به این تابع نمی‌رسید. نتیجه: مسابقهٔ لابیِ خصوصیِ ۱۰۰ یا
+      // ۱۰۰۰ امتیازی سکهٔ کاملِ لیگ می‌داد. دو نفر دوست می‌توانستند لابیِ
+      // رمزدار بسازند، نوبتی ببرند و بی‌آنکه با کسی رقابت کنند سهمیهٔ
+      // روزانه‌شان را پر کنند — یعنی جدولِ لیگ (و جایزهٔ نقدیِ ۵۰ نفر)
+      // با مسابقه‌های تشریفاتی تعیین می‌شد.
+      //
+      // شرطِ ۵۰۰۰ این را نمی‌پوشاند: ۵۰۰۰ چون در `DAILY_QUOTA` نیست
+      // اتفاقی امن بود، ولی ۱۰۰ و ۱۰۰۰ در لابی کاملاً باز بودند.
+      //
+      // امتیاز و پات همچنان عادی جابه‌جا می‌شوند — لابی برای بازی با
+      // دوستان است و باید کار کند. فقط **سکه** که ارزِ رتبه‌بندیِ لیگ
+      // است، از مسابقهٔ غیرعمومی ساخته نمی‌شود.
+      const coinEligibleMode = matchMode !== 'lobby';
+      const coinReward = coinEligibleMode
+        ? coinRewardFor(gameId, stake)
+        : { win: 0, draw: 0, loss: 0 };
+      const quotaDate = (coinEligibleMode && quotaTracked(stake))
+        ? tehranDate() : null;
       const quotaByUser = new Map();
-      if (coinReward > 0 && quotaDate) {
+      if (coinEligibleMode && hasCoinReward(gameId, stake) && quotaDate) {
         for (const userId of ids) {
           quotaByUser.set(
             userId, await coins.consumeQuota(client, userId, stake));
@@ -106,10 +131,13 @@ function createGameStakeService(db = pool, points = pointService, coins = coinSe
         `INSERT INTO game_stake_matches
            (id, game_id, player_x_id, player_o_id, stake_points,
             gross_pot, commission_points, net_pot, status,
-            coin_reward, coin_quota_x, coin_quota_o, coin_quota_date)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'reserved',$9,$10,$11,$12)`,
+            coin_reward, coin_reward_win, coin_reward_draw, coin_reward_loss,
+            coin_quota_x, coin_quota_o, coin_quota_date)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'reserved',$9,$10,$11,$12,$13,$14,$15)`,
         [matchId, gameId, playerXId, playerOId, stake, grossPot, commission, netPot,
-          coinReward,
+          // ستونِ قدیمی معنایش «سکهٔ برنده» است و همان می‌ماند.
+          coinReward.win,
+          coinReward.win, coinReward.draw, coinReward.loss,
           quotaByUser.get(playerXId) === true,
           quotaByUser.get(playerOId) === true,
           quotaDate]);
@@ -172,6 +200,44 @@ function createGameStakeService(db = pool, points = pointService, coins = coinSe
       let outcome;
       let winnerBalanceAfter = null;
       let coinsAwarded = 0;
+      // سکهٔ بازنده جدا نگه داشته می‌شود تا engine بتواند به هر سوکت عددِ
+      // خودش را بفرستد. در تساوی بی‌معناست و صفر می‌ماند.
+      let loserCoins = 0;
+
+      // ── پرداختِ سکه به هر دو طرف ────────────────────────────────────
+      //
+      // اعداد از **سندِ رزرو** خوانده می‌شوند نه از جدولِ زندهٔ سکه؛ دلیلش
+      // در مایگریشن ۰۷۲ آمده (قراردادِ لحظهٔ ورود نباید وسطِ بازی عوض شود).
+      //
+      // `eligibleOf` همان قاعدهٔ قبلی است: سکه فقط به کسی می‌رسد که موقعِ
+      // شروع سهمیهٔ روزانه‌اش سوخته. اگر سقفِ کاربر پر بوده، بازی کرده و
+      // امتیازش را برده ولی سکه نمی‌گیرد — چه ببرد چه ببازد.
+      const rewardOf = {
+        win:  Number(match.coin_reward_win  ?? match.coin_reward ?? 0),
+        draw: Number(match.coin_reward_draw ?? 0),
+        loss: Number(match.coin_reward_loss ?? 0),
+      };
+      const eligibleOf = userId => (userId === match.player_x_id
+        ? match.coin_quota_x === true
+        : match.coin_quota_o === true);
+      /** سکه می‌دهد اگر سهمیه‌اش سوخته و مبلغ مثبت است. */
+      const coinsByUser = {};
+      const payCoins = async (userId, amount) => {
+        // ⚠️ صفر هم ثبت می‌شود، نه فقط پرداختِ موفق. موتور با «آیا کلید
+        //    وجود دارد؟» تصمیم می‌گیرد به عددِ جدول برگردد یا نه؛ اگر
+        //    کاربرِ سقف‌پر اینجا کلید نگیرد، کلاینتش عددی را نشان می‌دهد
+        //    که هرگز واریز نشده.
+        if (!(amount > 0) || !eligibleOf(userId)) {
+          coinsByUser[userId] = coinsByUser[userId] || 0;
+          return 0;
+        }
+        const paid = await coins.awardCoins(client, userId, amount);
+        // آنچه **واقعاً** پرداخت شد، کلیدخورده به کاربر. عددِ جدول کافی
+        // نیست: اگر سهمیهٔ کاربر پر باشد یا لیگِ فعالی نباشد، پرداخت صفر
+        // می‌شود و کلاینت نباید عددی ببیند که به موجودی‌اش اضافه نشده.
+        coinsByUser[userId] = (coinsByUser[userId] || 0) + Number(paid || 0);
+        return paid;
+      };
 
       if (draw) {
         for (const userId of players) {
@@ -187,12 +253,27 @@ function createGameStakeService(db = pool, points = pointService, coins = coinSe
           });
         }
         outcome = 'draw';
+
+        // ── سکهٔ تساوی: به هر دو ──
+        //
+        // پیش از دورِ ۲۶ تساوی هیچ سکه‌ای نداشت. یعنی دو بازیکن یک مسابقهٔ
+        // کاملِ نزدیک انجام می‌دادند، سهمیهٔ هر دو می‌سوخت و هیچ‌کدام چیزی
+        // نمی‌گرفت — بدترین حالتِ ممکن از دیدِ بازیکن، چون تساوی نتیجهٔ
+        // یک بازیِ برابر است نه شکست.
+        //
+        // ⚠️ عمداً در `coinsAwarded` جمع نمی‌شود. آن فیلد قراردادش «سکهٔ
+        //    برنده» است و در تساوی برنده‌ای وجود ندارد؛ جمع‌کردنِ سکهٔ دو
+        //    نفر در آن باعث می‌شد هر بازیکن رویِ صفحهٔ نتیجه، دو برابرِ
+        //    چیزی که گرفته ببیند. مقدارِ تساوی در `drawCoins` می‌رود.
+        for (const userId of players) {
+          await payCoins(userId, rewardOf.draw);
+        }
         // ⚠️ سهمیه در تساوی **برنمی‌گردد** و این انتخاب است، نه فراموشی.
         //    سهمیه هزینهٔ «شرکت کردن» است و مسابقه واقعاً انجام شده. اگر
         //    برمی‌گشت، دو حسابِ هماهنگ می‌توانستند بی‌نهایت بار عمداً
         //    مساوی کنند تا فقط ردیف‌های دفتر را شلوغ کنند، بی‌آنکه چیزی
-        //    خرج شود. (سکه‌ای هم داده نمی‌شود، پس سودی در کار نیست —
-        //    ولی هزینهٔ داشتن همیشه بهتر از هزینه نداشتن است.)
+        //    خرج شود. حالا که تساوی سکه **می‌دهد**، این هزینه از همیشه
+        //    مهم‌تر است: بدونِ آن، تبانیِ تساوی یک چاهِ بی‌انتهای سکه بود.
       } else {
         if (![match.player_x_id, match.player_o_id].includes(winnerUserId)) {
           throw new StakeError('برنده مسابقه معتبر نیست', 'INVALID_WINNER');
@@ -220,13 +301,24 @@ function createGameStakeService(db = pool, points = pointService, coins = coinSe
         //    «شرکت کردن» است نه «بردن»؛ اگر فقط از برنده کم می‌شد، یک
         //    حسابِ فدایی می‌توانست بی‌نهایت بار ببازد و سهمیهٔ شریکش هرگز
         //    تمام نشود.
-        const eligible = winnerUserId === match.player_x_id
-          ? match.coin_quota_x === true
-          : match.coin_quota_o === true;
-        if (eligible) {
-          coinsAwarded = await coins.awardCoins(
-            client, winnerUserId, Number(match.coin_reward || 0));
-        }
+        // ── سکهٔ بازنده ──
+        //
+        // بازنده هم سکه می‌گیرد (۱ در سطحِ ۱۰۰، ۳ در سطحِ ۱۰۰۰). خواستهٔ
+        // مالک بود که «پرداخت به هر دو طرف باشد نه فقط برنده»، و دلیلِ
+        // فنی‌اش هم روشن است: چون سهمیه در شروع خرج می‌شود، پاداشِ صفر
+        // برای باخت یعنی رها کردنِ بازیِ در حالِ باخت هیچ هزینه‌ای ندارد.
+        //
+        // ⚠️ `coinsAwarded` عمداً فقط سکهٔ **برنده** را برمی‌گرداند، نه
+        //    جمعِ دو نفر. این عدد به کلاینت می‌رود تا «+۱۰ سکه» را روی
+        //    صفحهٔ نتیجه نشان دهد؛ اگر جمع بود، برنده عددی می‌دید که
+        //    نگرفته. سکهٔ بازنده جدا در `loserCoins` برمی‌گردد و engine
+        //    آن را به سوکتِ بازنده می‌فرستد.
+        const loserUserId = winnerUserId === match.player_x_id
+          ? match.player_o_id
+          : match.player_x_id;
+
+        coinsAwarded = await payCoins(winnerUserId, rewardOf.win);
+        loserCoins = await payCoins(loserUserId, rewardOf.loss);
       }
 
       await client.query(
@@ -245,6 +337,13 @@ function createGameStakeService(db = pool, points = pointService, coins = coinSe
         winnerUserId: draw ? null : winnerUserId,
         winnerBalanceAfter: draw ? null : winnerBalanceAfter,
         coinsAwarded,
+        loserCoins,
+        // در تساوی هر دو یک مقدار گرفته‌اند؛ engine برای نمایش لازمش دارد.
+        drawCoins: draw ? Number(match.coin_reward_draw ?? 0) : 0,
+        // سکهٔ واقعاً پرداخت‌شده به هر کاربر. engine باید این را ترجیح
+        // بدهد: بازیکنی که سهمیه‌اش پر بوده اینجا صفر دارد، در حالی که
+        // `drawCoins`/`coinsAwarded` عددِ جدول را نشان می‌دهند.
+        coinsByUser,
       };
     } catch (e) {
       await client.query('ROLLBACK').catch(() => {});

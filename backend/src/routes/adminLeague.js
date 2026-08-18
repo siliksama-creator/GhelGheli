@@ -10,7 +10,47 @@ module.exports = function createAdminLeagueRoutes(deps) {
   } = deps;
   const router = express.Router();
 
-router.get('/admin/league', adminAuth, asyncHandler(async (req, res) => { const data = await getLeaderboard(100); data.winnerCount = await getLeagueWinnerCount(); res.json(data); }));
+router.get('/admin/league', adminAuth, asyncHandler(async (req, res) => {
+  const data = await getLeaderboard(100);
+  data.winnerCount = await getLeagueWinnerCount();
+
+  // ── جدولِ جوایز برای پنل (دورِ ۲۶) ────────────────────────────────────
+  //
+  // تا امروز پنل فقط جدولِ رتبه‌بندی را می‌گرفت و فرمِ جوایز را از صفر
+  // نشان می‌داد؛ مدیر نمی‌دید چه چیزی از قبل ذخیره شده و هر بار کل جدول
+  // را دوباره می‌ساخت. حالا هر دو جدولِ ذخیره‌شده برمی‌گردند تا فرم
+  // بتواند مقدارِ فعلی را نشان بدهد.
+  //
+  // ⚠️ این حتماً باید همان فصلی باشد که PATCH ویرایش می‌کند، نه فصلی که
+  //    لیدربرد نشان می‌دهد. این دو **یکی نیستند**:
+  //
+  //      getLeaderboard   → ORDER BY starts_at ASC   (قدیمی‌ترینِ فعال)
+  //      ensureActiveSeason → ORDER BY starts_at DESC (تازه‌ترینِ فعال)
+  //
+  //    با دو لیگِ هم‌زمان — که خودِ مالک خواسته — پنل جدولِ لیگ A را نشان
+  //    می‌داد ولی ذخیره روی لیگ B می‌نشست. مدیر عدد را عوض می‌کرد، پیامِ
+  //    موفقیت می‌گرفت، و بعدِ رفرش عددِ قبلی برمی‌گشت.
+  //
+  //    عنوانِ فصلِ ویرایش‌شونده هم برمی‌گردد تا پنل بتواند صریح بگوید
+  //    «داری جوایزِ کدام لیگ را می‌چینی».
+  const season = await ensureActiveSeason();
+  const { rows } = await pool.query(
+    'SELECT prize_table, perk_table, title, month_year FROM league_seasons WHERE id=$1',
+    [season.id]);
+  data.prizeTable = rows[0]?.prize_table || [];
+  data.perkTable = rows[0]?.perk_table || [];
+  data.seasonId = season.id;
+  data.editingSeasonTitle = rows[0]?.title || rows[0]?.month_year || '';
+
+  // فهرستِ آیتم‌های فروشگاه برای منویِ کشوییِ جایزهٔ غیرنقدی.
+  // بدونِ این، مدیر باید slug را از حفظ تایپ کند — و یک تایپو تا لحظهٔ
+  // بستنِ فصل پنهان می‌ماند.
+  const { rows: items } = await pool.query(
+    `SELECT slug, name FROM shop_items
+      WHERE is_active = true ORDER BY display_order ASC, name ASC`);
+  data.shopItems = items;
+  res.json(data);
+}));
 router.patch('/admin/league/current/prizes', adminAuth, requireRole(), asyncHandler(async (req, res) => {
   const season = await ensureActiveSeason();
 
@@ -48,10 +88,90 @@ router.patch('/admin/league/current/prizes', adminAuth, requireRole(), asyncHand
     }
     prizeTable.push({ rank, amount });
   }
+  // ── جدولِ جوایزِ غیرنقدی (دورِ ۲۶) ──────────────────────────────────
+  //
+  // ۲۰ نفرِ بعد از ردهٔ نقدی. همان سختگیریِ جدولِ نقدی اینجا هم لازم
+  // است: مقدارِ خراب اینجا بی‌صدا ذخیره می‌شود و ماهِ بعد وسطِ بستنِ
+  // فصل بیرون می‌زند، جایی که هیچ‌کس نگاه نمی‌کند.
+  //
+  // ⚠️ `perkTable` اگر در بدنه **نباشد** دست نمی‌خورد. پنلِ قدیمی که
+  //    فقط `prizeTable` می‌فرستد نباید جوایزِ غیرنقدی را پاک کند —
+  //    همان الگوی PATCH: نبودنِ کلید یعنی «تغییر نده»، نه «خالی کن».
+  const PERK_KINDS = ['plus_days', 'shop_item', 'points'];
+  let perkTable = null;
+  if (req.body.perkTable !== undefined) {
+    const rawPerks = Array.isArray(req.body.perkTable) ? req.body.perkTable : [];
+    if (rawPerks.length > 100) {
+      return res.status(400).json({ message: 'جدول جوایز غیرنقدی حداکثر ۱۰۰ رتبه می‌تواند داشته باشد' });
+    }
+    perkTable = [];
+    const seenPerkRanks = new Set();
+    for (const row of rawPerks) {
+      const rank = Number(row?.rank);
+      if (!Number.isInteger(rank) || rank < 1 || rank > 100) {
+        return res.status(400).json({ message: `رتبهٔ جایزهٔ غیرنقدی باید بین ۱ تا ۱۰۰ باشد (دریافت شد: ${row?.rank})` });
+      }
+      if (seenPerkRanks.has(rank)) {
+        return res.status(400).json({ message: `رتبهٔ ${rank} در جدول غیرنقدی تکراری است` });
+      }
+      seenPerkRanks.add(rank);
+
+      const kind = String(row?.kind || '');
+      if (!PERK_KINDS.includes(kind)) {
+        return res.status(400).json({ message: `نوع جایزهٔ رتبهٔ ${rank} باید یکی از پلاس، آیتم فروشگاه یا امتیاز باشد` });
+      }
+
+      const value = Number(row?.value ?? 0);
+      if (!Number.isInteger(value) || value < 0 || value > 1000000) {
+        return res.status(400).json({ message: `مقدار جایزهٔ غیرنقدی رتبهٔ ${rank} معتبر نیست` });
+      }
+      // پلاسِ صفرروزه یا امتیازِ صفر یعنی ردیفی که هیچ نمی‌دهد ولی به
+      // کاربر اعلانِ «برنده شدی» می‌فرستد.
+      if (kind !== 'shop_item' && value <= 0) {
+        return res.status(400).json({ message: `مقدار جایزهٔ رتبهٔ ${rank} باید بزرگ‌تر از صفر باشد` });
+      }
+
+      const itemSlug = row?.itemSlug ? String(row.itemSlug).slice(0, 64) : null;
+      if (kind === 'shop_item' && !itemSlug) {
+        return res.status(400).json({ message: `برای جایزهٔ آیتمِ رتبهٔ ${rank} باید آیتم فروشگاه انتخاب شود` });
+      }
+
+      perkTable.push({
+        rank,
+        kind,
+        value: kind === 'shop_item' ? 1 : value,
+        itemSlug,
+        label: row?.label ? String(row.label).slice(0, 160) : null,
+      });
+    }
+
+    // ⚠️ آیتمِ انتخابی باید واقعاً وجود داشته باشد. بدونِ این بررسی، یک
+    //    slug اشتباه تا لحظهٔ بستنِ فصل زنده می‌ماند و بعد جایزهٔ کاربر
+    //    به ردیفی اشاره می‌کند که تحویل‌دادنی نیست.
+    const slugs = [...new Set(perkTable.filter(p => p.itemSlug).map(p => p.itemSlug))];
+    if (slugs.length) {
+      const { rows: found } = await pool.query(
+        'SELECT slug FROM shop_items WHERE slug = ANY($1::text[])', [slugs]);
+      const known = new Set(found.map(r => r.slug));
+      const missing = slugs.filter(sl => !known.has(sl));
+      if (missing.length) {
+        return res.status(400).json({ message: `آیتم فروشگاه پیدا نشد: ${missing.join('، ')}` });
+      }
+    }
+  }
+
   const winnerCount = Math.max(1, Math.min(100, Number(req.body.winnerCount || prizeTable.length || 10)));
   await pool.query('UPDATE league_seasons SET prize_table=$1, updated_at=NOW() WHERE id=$2', [JSON.stringify(prizeTable), season.id]);
+  if (perkTable !== null) {
+    await pool.query('UPDATE league_seasons SET perk_table=$1, updated_at=NOW() WHERE id=$2', [JSON.stringify(perkTable), season.id]);
+  }
   await pool.query(`INSERT INTO app_settings(key,value,updated_by_admin_id,updated_at) VALUES('league_winner_count',$1,$2,NOW()) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value, updated_by_admin_id=EXCLUDED.updated_by_admin_id, updated_at=NOW()`, [JSON.stringify(winnerCount), req.admin.id]);
-  await audit(req.admin.id,'update_league_prizes','league_seasons',season.id,null,{...req.body,winnerCount}); res.json({ message: 'جدول جوایز لیگ ذخیره شد', winnerCount });
+  await audit(req.admin.id,'update_league_prizes','league_seasons',season.id,null,{...req.body,winnerCount}); res.json({
+    message: 'جدول جوایز لیگ ذخیره شد',
+    winnerCount,
+    cashRanks: prizeTable.length,
+    perkRanks: perkTable === null ? undefined : perkTable.length,
+  });
 }));
 router.post('/admin/league/close', adminAuth, requireRole(), asyncHandler(async (req, res) => res.json(await closeActiveSeason({ force: req.body?.force === true }))));
 

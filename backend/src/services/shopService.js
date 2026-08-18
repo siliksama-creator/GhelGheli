@@ -4,6 +4,8 @@ const { pool } = require('../config/db');
 const referrals = require('./referralService');
 const payments = require('./paymentService');
 const wallet = require('./walletService');
+const points = require('./pointService');
+const cardBox = require('./cardBoxService');
 
 // Kept as named constants for economy audits and backwards-compatible tests.
 const PLUS_PRICE = 59000;
@@ -245,6 +247,64 @@ async function catalogue(userId) {
  *   جایزهٔ لیگ آمده؛ کمیسیونِ دوباره روی آن، حلقه‌ای می‌سازد که در آن
  *   پول از هیچ زاده می‌شود.
  */
+/**
+ * تحویلِ صندوق کارت پس از تأییدِ پرداخت.
+ *
+ * داخلِ تراکنشِ `verifyAndDeliver` اجرا می‌شود، پس اگر هر کدام از سه گامِ
+ * زیر شکست بخورد، هیچ‌کدام اعمال نمی‌شود: کارت بی‌امتیاز نمی‌ماند و
+ * امتیازِ بی‌کارت هم داده نمی‌شود.
+ *
+ * ── چرا `league: true` است ──
+ *
+ * امتیازِ صندوق در رتبه‌بندیِ ماهانه حساب می‌شود. این یعنی پول می‌تواند
+ * رتبهٔ لیگ را بالا ببرد — و آگاهانه پذیرفته شده، چون دقیقاً همان چیزی
+ * است که کارتِ فیزیکیِ خریداری‌شده هم می‌کند و صندوق قرار است جایگزینِ
+ * دیجیتالِ آن باشد. اگر صندوق امتیازِ لیگ نمی‌داد، کاربرِ بدونِ دسترسی به
+ * کارتِ فیزیکی در لیگ عقب می‌ماند — همان نابرابری‌ای که صندوق برای رفعش
+ * ساخته شد.
+ *
+ * توزیعِ جایزهٔ نقدی همچنان بر اساسِ **سکه** است (`ORDER BY coins DESC`) و
+ * سکه فقط از بازی‌کردن می‌آید؛ پس خریدِ صندوق مستقیماً پول برنمی‌گرداند.
+ */
+async function deliverCardBox(client, { userId, amount, orderId }) {
+  const box = await cardBox.grantBox(client, {
+    userId,
+    pricePaid: Number(amount) || 0,
+    source: 'cafebazaar',
+    orderId,
+  });
+
+  if (box.points > 0) {
+    await points.credit(client, {
+      userId,
+      points: box.points,
+      source: 'card_box',
+      referenceType: 'card_box_purchases',
+      referenceId: box.boxId,
+      description: `صندوق کارت — ${box.cards.length} کارت`,
+    });
+  }
+
+  // کمیسیونِ نقدیِ ۱۰٪ به معرف. صندوق فروشِ نقدیِ درگاهی است، پس دقیقاً
+  // مثل آیتمِ شاپ رفتار می‌کند. `walletPaid` ندارد چون صندوق با کیف پول
+  // خریدنی نیست.
+  await referrals.payPurchaseCommission(client, {
+    buyerId: userId,
+    purchaseType: 'card_box',
+    purchaseReferenceId: box.boxId,
+    purchaseAmount: Number(amount) || 0,
+    gatewayProvider: 'cafebazaar',
+  });
+
+  return {
+    kind: 'card_box',
+    boxId: box.boxId,
+    cards: box.cards,
+    points: box.points,
+    referenceId: box.boxId,
+  };
+}
+
 async function deliverItem(client, { userId, itemId, amount, walletPaid = 0 }) {
   const itemRes = await client.query(
     `SELECT * FROM shop_items WHERE id=$1 AND is_active=true FOR UPDATE`,
@@ -531,6 +591,18 @@ async function buyPlusSubscription(userId, billingCycle = 'monthly') {
 }
 
 /**
+ * مرحلهٔ ۱ برای صندوق کارت: فقط سفارش می‌سازد.
+ *
+ * ⚠️ عمداً کیف پول را نمی‌پذیرد. صندوق برخلافِ آیتمِ شاپ، کارتِ
+ *    امتیازدار تحویل می‌دهد و امتیاز در لیگ می‌نشیند؛ اجازهٔ خریدش با
+ *    موجودیِ نقدیِ برداشت‌شده از خودِ لیگ، حلقهٔ «جایزه را دوباره به
+ *    امتیاز تبدیل کن» را باز می‌کرد. صندوق فقط با پولِ تازه از بازار.
+ */
+async function buyCardBox(userId) {
+  return payments.createCardBoxOrder(userId);
+}
+
+/**
  * مرحلهٔ ۳: توکن را راستی‌آزمایی و کالا را تحویل بده.
  *
  * تابعِ تحویل بر اساس `purchase_kind` سفارش انتخاب می‌شود — از روی
@@ -553,6 +625,9 @@ async function verifyPurchase(userId, orderId, purchaseToken) {
           amount: Number(amount) + walletPaid,
           walletPaid,
         });
+      }
+      if (order.purchase_kind === 'card_box') {
+        return deliverCardBox(client, { userId, amount, orderId: order.id });
       }
       if (order.purchase_kind === 'plus_monthly'
        || order.purchase_kind === 'plus_annual') {
@@ -803,6 +878,7 @@ module.exports = {
   catalogue,
   buyShopItem,
   buyPlusSubscription,
+  buyCardBox,
   deliverItem,
   deliverPlus,
   verifyPurchase,

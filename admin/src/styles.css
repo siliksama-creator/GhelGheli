@@ -1665,3 +1665,13 @@ table.data-table {
 .lgSpan span{opacity:.6; padding:0 4px}
 .lgCheck{display:flex; align-items:center; gap:8px; font-size:12.5px; cursor:pointer}
 .lgCheck input{width:16px; height:16px; cursor:pointer}
+
+/* ── جوایزِ غیرنقدیِ لیگ ──
+   ردیف‌ها ورودیِ تعاملی دارند، پس سلول‌ها باید بالا-تراز باشند وگرنه
+   هشدارِ «رتبهٔ تکراری» ارتفاعِ ردیف را می‌شکند. */
+.lgPerkActions{
+  display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-top:14px;
+}
+.lgWarn{
+  display:block; margin-top:4px; font-size:10.5px; color:#fca5a5; line-height:1.5;
+}
