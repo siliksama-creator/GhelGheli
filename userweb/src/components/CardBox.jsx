@@ -2,7 +2,11 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { req, fa } from '../lib/api.js';
 import { CARD_RARITY_META } from '../lib/cards.js';
 
-const money = n => `${fa(Number(n || 0).toLocaleString('en-US'))} تومان`;
+// ⚠️ `fa()` خودش جداکنندهٔ هزارگان می‌گذارد و ورودی را `Number()` می‌کند.
+// اگر اول `toLocaleString()` بزنیم، رشتهٔ «100,000» به `fa()` می‌رسد و
+// `Number('100,000')` مقدارِ NaN می‌دهد ⇒ روی صفحه «ناعدد تومان» چاپ
+// می‌شد. عدد را خام بده؛ قالب‌بندی کارِ خودِ `fa()` است.
+const money = n => `${fa(Number(n || 0))} تومان`;
 
 /**
  * صندوقِ کارت.
@@ -200,7 +204,7 @@ export default function CardBox({ token, compact = false, onGranted }) {
 
       /* ── رونماییِ کارت‌ها ───────────────────────────────────────────
          z-index برابرِ ۱۳۰۰ است چون قراردادِ مودال‌های همین اپ همین است
-         (`.invModalShade` در style.css). با عددِ کمتر، نویگیشنِ پایین و
+         (.invModalShade در style.css). با عددِ کمتر، نویگیشنِ پایین و
          هدر روی کارت‌ها می‌افتند — دقیقاً روی لحظه‌ای که کاربر باید
          جایزه‌اش را ببیند. */
       .cardBoxReveal{position:fixed;inset:0;z-index:1300;display:grid;place-items:center;padding:18px;

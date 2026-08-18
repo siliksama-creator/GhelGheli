@@ -217,7 +217,9 @@ export default function Shop({ token, reloadProfile }) {
       .shopPayNote{position:relative;z-index:1;margin:9px 0 0;font-size:11px;color:#9cabbc;text-align:center}
       .shopWalletPay{position:relative;z-index:1;display:flex;align-items:flex-start;gap:9px;margin:11px 0 0;padding:9px 12px;border-radius:14px;background:rgba(34,231,166,.08);border:1px solid rgba(34,231,166,.3);cursor:pointer}.shopWalletPay input{width:17px;height:17px;margin:1px 0 0;accent-color:#22E7A6;cursor:pointer;flex-shrink:0}.shopWalletPay>span{display:flex;flex-direction:column;gap:3px;font-size:12px;font-weight:900;color:#22E7A6}.shopWalletPay small{font-size:10px;font-weight:700;color:#9cabbc;line-height:1.6}.shopWalletPay small b{color:#22E7A6}
       .shopNotice{border-radius:12px;padding:9px 12px;background:rgba(56,189,248,.11);border:1px solid rgba(56,189,248,.28);font-size:11.5px;text-align:center}.shopPlans,.shopNav,.shopCarousel{scrollbar-width:none;-ms-overflow-style:none}.shopPlans::-webkit-scrollbar,.shopNav::-webkit-scrollbar,.shopCarousel::-webkit-scrollbar{display:none}.shopNav{display:flex;gap:7px;overflow-x:auto;padding:3px 1px 7px}.shopNav button{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.045);color:#aebed0;border-radius:13px;padding:8px 11px;font-size:11px;font-weight:850;cursor:pointer}.shopNav button.active{color:#071522;border-color:#38BDF8;background:#38BDF8;box-shadow:0 6px 18px rgba(56,189,248,.24)}
-      /* بخشِ شاخصِ صندوق — عمداً از قابِ `.shopShelf` پیروی نمی‌کند تا
+      /* بخشِ شاخصِ صندوق — عمداً از قابِ .shopShelf پیروی نمی‌کند تا
+         (هشدار: داخل این بلوکِ style هرگز بک‌تیک ننویس؛ رشتهٔ قالبی را
+         می‌بندد و کلِ صفحهٔ فروشگاه سفید می‌شود.)
          چشم آن را «یک قفسهٔ دیگر» نخواند. جداکنندهٔ بالا و پایین،
          فاصلهٔ بیشتر و عنوانِ طلایی، آن را از ردیفِ آیتم‌ها بیرون می‌کشد. */
       .shopFeature{margin:6px 0 2px;padding:4px 0;
