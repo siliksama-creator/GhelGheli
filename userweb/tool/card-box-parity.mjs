@@ -1,0 +1,135 @@
+#!/usr/bin/env node
+//
+// گاردِ صندوقِ کارت — «بک‌اندِ زنده‌ای که هیچ درِ ورودی ندارد».
+//
+// چرا این فایل وجود دارد
+// ──────────────────────
+// صندوقِ کارت کامل ساخته شد: جدول‌ها، قرعه‌کشیِ وزنی، روت‌های
+// `overview`/`buy`/`history`، تحویلِ امتیاز، کمیسیونِ معرف. همه تست هم
+// داشتند و همه سبز بودند. ولی **هیچ کلاینتی صدایش نمی‌زد** — نه وب، نه
+// اندروید. نتیجه‌اش این بود:
+//
+//   کاربرِ بدونِ کارتِ فیزیکی → دوئل → «حداقل پنج کارت فعال لازم داری»
+//   → و هیچ دکمه‌ای، هیچ لینکی، هیچ راهی. بن‌بستِ کامل.
+//
+// یعنی دقیقاً همان قابلیتی که برای شکستنِ این بن‌بست ساخته شده بود، خودش
+// پشتِ در مانده بود. تستِ بک‌اند این را نمی‌گیرد چون بک‌اند سالم است؛
+// چیزی که غایب است «سیم‌کشیِ کلاینت» است. این گارد همان سیم‌کشی را قفل
+// می‌کند.
+//
+// درس کلی: یک اندپوینتِ کاربری که هیچ کلاینتی صدایش نمی‌زند، یا مرده است
+// یا یک بن‌بستِ پنهان. هر دو حالت باید سر و صدا کند.
+
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+
+const root = path.resolve(import.meta.dirname, '..', '..');
+
+function strip(src) {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/\/?.*$/gm, '')
+    .replace(/([^:])\/\/.*$/gm, '$1');
+}
+const read = p => strip(fs.readFileSync(path.join(root, p), 'utf8'));
+
+let pass = 0;
+const ok = (label, cond) => {
+  assert.ok(cond, `✗ ${label}`);
+  pass += 1;
+  console.log(`  ✓ ${label}`);
+};
+
+console.log('\n== صندوق کارت ==');
+
+const webBox = read('userweb/src/components/CardBox.jsx');
+const andBox = read('mobile/lib/widgets/card_box.dart');
+const webShop = read('userweb/src/screens/Shop.jsx');
+const andShop = read('mobile/lib/screens/user/shop_page.dart');
+const webDuel = read('userweb/src/cardDuelGame.jsx');
+const andDuel = read('mobile/lib/screens/user/games/card_duel_page.dart');
+
+// ── ۱. هر سه روت در هر دو کلاینت واقعاً صدا زده می‌شوند ───────────────
+for (const [label, route] of [
+  ['نمای کلی', '/api/card-box/overview'],
+  ['خرید', '/api/card-box/buy'],
+]) {
+  ok(`وب روتِ «${label}» را صدا می‌زند`, webBox.includes(route));
+  ok(`اندروید روتِ «${label}» را صدا می‌زند`, andBox.includes(route));
+}
+
+// خرید بدون راستی‌آزماییِ سرور یعنی کالای رایگان.
+ok('وب بعد از پرداخت، سرور را برای تحویل صدا می‌زند',
+  webBox.includes('/api/purchase/verify'));
+ok('اندروید بعد از پرداخت، سرور را برای تحویل صدا می‌زند',
+  andBox.includes('/api/purchase/verify'));
+
+// ── ۲. صندوق از هر دو نقطه در دسترس است ───────────────────────────────
+//
+// فروشگاه تنها کافی نیست: کاربرِ گیرافتاده در دوئل، به فروشگاه فکر
+// نمی‌کند. راهِ خروج باید همان‌جا باشد که بن‌بست رخ می‌دهد.
+ok('صندوق در فروشگاهِ وب رندر می‌شود', /<CardBox\b/.test(webShop));
+ok('صندوق در فروشگاهِ اندروید رندر می‌شود', /CardBox\(/.test(andShop));
+ok('صندوق در بن‌بستِ دوئلِ وب رندر می‌شود', /<CardBox\b/.test(webDuel));
+ok('صندوق در بن‌بستِ دوئلِ اندروید رندر می‌شود', /CardBox\(/.test(andDuel));
+
+// ── ۳. بن‌بست دیگر بن‌بست نیست ─────────────────────────────────────────
+//
+// متنِ قدیمی فقط شرط را اعلام می‌کرد. متنِ تازه باید راه را هم نشان بدهد،
+// وگرنه صندوق هست ولی کاربر نمی‌فهمد که همان است.
+for (const [label, src] of [['وب', webDuel], ['اندروید', andDuel]]) {
+  const m = src.match(/حداقل پنج کارت فعال[^'"]*/);
+  ok(`پیامِ «پنج کارت» در ${label} هست`, Boolean(m));
+  ok(`پیامِ «پنج کارت» در ${label} راهِ خروج را نشان می‌دهد`,
+    /صندوق/.test(src.slice(src.indexOf(m[0]), src.indexOf(m[0]) + 400)));
+}
+
+// ── ۴. عددهای صندوق از سرور می‌آیند، نه هاردکد ────────────────────────
+//
+// همان اشتباهی که در `coin-parity` افتاد: عددِ کپی‌شده فردا دروغ است.
+// قیمت و تعداد و شانس‌ها هر سه از `overview` می‌آیند.
+for (const [label, src] of [['وب', webBox], ['اندروید', andBox]]) {
+  ok(`${label}: قیمت را از سرور می‌خواند`, /\bprice\b/.test(src));
+  ok(`${label}: تعدادِ کارت را از سرور می‌خواند`, /\bsize\b/.test(src));
+  ok(`${label}: شانس‌ها را از سرور می‌خواند`, /\bodds\b/.test(src));
+  ok(`${label}: قیمتِ ۱۰۰٬۰۰۰ را هاردکد نکرده`, !/100000|۱۰۰٬۰۰۰/.test(src));
+  ok(`${label}: عددِ ۵ کارت را هاردکد نکرده`,
+    !/(پنج کارت|۵ کارت)/.test(src));
+}
+
+// ── ۵. کارت‌های صندوق امتیاز می‌دهند و این به کاربر گفته می‌شود ────────
+//
+// تصمیمِ صریحِ مالک در دورِ ۲۶ (ناقضِ تصمیمِ قبلی): کارتِ صندوق باید
+// `point_value` بدهد. اگر UI این را نگوید، کاربر ارزشِ خرید را نمی‌بیند.
+ok('وب امتیازِ کارت‌ها را نشان می‌دهد',
+  /pointValue/.test(webBox) && /امتیاز/.test(webBox));
+ok('اندروید امتیازِ کارت‌ها را نشان می‌دهد',
+  /pointValue/.test(andBox) && /امتیاز/.test(andBox));
+
+// ── ۶. برچسبِ سطح‌ها در دو کلاینت یکی است ─────────────────────────────
+//
+// کراس‌پلی: دو کاربر کنار هم صندوق باز می‌کنند. «لجند» در یکی و
+// «افسانه‌ای» در دیگری یعنی دو بازیِ متفاوت.
+const webRarity = read('userweb/src/lib/cards.js');
+const andRarity = read('mobile/lib/widgets/rarity_card_frame.dart');
+for (const label of ['معمولی', 'نقره‌ای', 'طلایی', 'پرمیوم', 'لجند']) {
+  ok(`برچسبِ «${label}» در هر دو کلاینت یکسان است`,
+    webRarity.includes(label) && andRarity.includes(label));
+}
+ok('وب برچسب‌ها را از منبعِ مشترک می‌گیرد',
+  webBox.includes('CARD_RARITY_META'));
+ok('اندروید برچسب‌ها را از منبعِ مشترک می‌گیرد',
+  andBox.includes('rarityLabels'));
+
+// ── ۷. روت‌ها واقعاً در سرور وجود دارند ───────────────────────────────
+//
+// گاردی که فقط کلاینت را ببیند، می‌تواند دو کلاینتِ هماهنگ را تأیید کند
+// که هر دو یک روتِ ناموجود را صدا می‌زنند.
+const server = read('backend/src/server.js');
+for (const route of ['/api/card-box/overview', '/api/card-box/buy',
+  '/api/card-box/history']) {
+  ok(`سرور روتِ ${route} را دارد`, server.includes(route));
+}
+
+console.log(`\n✅ ${pass} تست صندوقِ کارت موفق بود\n`);

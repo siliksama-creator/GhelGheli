@@ -20,10 +20,15 @@ import '../api_client.dart';
 class CoinRateStrip extends StatelessWidget {
   const CoinRateStrip({super.key});
 
+  // 🔴 این اعداد تا دورِ ۲۶ منسوخ بودند: دوئل ۲/۲۰ و بقیه ۱/۱۰، در حالی
+  //    که `COIN_TABLE` بک‌اند مدت‌ها بود هر سه بازی را یکسان کرده بود.
+  //    یعنی نوار به کاربر عددی نشان می‌داد که هیچ‌وقت نمی‌گرفت.
+  //
+  //    حالا هر سه بازی یکی‌اند، پس ردیف‌ها بر اساس نتیجه‌اند نه بازی.
   static const _rows = [
-    ('دوئل کارت', 2, 20),
-    ('پنالتی', 1, 10),
-    ('جفت‌یاب', 1, 10),
+    ('برد', 10, 30),
+    ('مساوی', 3, 9),
+    ('باخت', 1, 3),
   ];
 
   @override
@@ -67,7 +72,7 @@ class CoinRateStrip extends StatelessWidget {
                               size: 16,
                               color: _gold)),
                       const SizedBox(width: 6),
-                      const Text('سکهٔ برد',
+                      const Text('سکه در هر بازی',
                           style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w900,
@@ -118,7 +123,7 @@ class CoinRateStrip extends StatelessWidget {
                   Border(top: BorderSide(color: _gold.withValues(alpha: 0.14))),
             ),
             child: Text(
-              'فقط بردِ آنلاین مقابل حریف واقعی سکه می‌دهد · رتبهٔ لیگ با سکه تعیین می‌شود',
+              'هر سه بازی یکسان · فقط مقابل حریف واقعی · رتبهٔ لیگ با سکه تعیین می‌شود',
               style: TextStyle(
                   fontSize: 10.5,
                   height: 1.5,

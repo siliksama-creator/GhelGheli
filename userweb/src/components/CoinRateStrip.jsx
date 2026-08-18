@@ -19,10 +19,16 @@ import { ASSETS } from './IconAsset.jsx';
 //
 // اعداد آینهٔ `COIN_TABLE` بک‌اند و `ROWS` در `CoinGuide.jsx` هستند.
 
+// 🔴 این اعداد تا دورِ ۲۶ منسوخ بودند: دوئل ۲/۲۰ و بقیه ۱/۱۰، در حالی
+//    که `COIN_TABLE` بک‌اند مدت‌ها بود هر سه بازی را یکسان کرده بود.
+//    یعنی نوار به کاربر عددی نشان می‌داد که هیچ‌وقت نمی‌گرفت.
+//
+//    حالا هر سه بازی یکی‌اند، پس یک ردیف «همهٔ بازی‌ها» کافی است و
+//    خواستهٔ «خیلی شلوغ نشه» را بهتر برآورده می‌کند.
 const ROWS = [
-  { game: 'دوئل کارت', s100: 2, s1000: 20 },
-  { game: 'پنالتی', s100: 1, s1000: 10 },
-  { game: 'جفت‌یاب', s100: 1, s1000: 10 },
+  { game: 'برد', s100: 10, s1000: 30 },
+  { game: 'مساوی', s100: 3, s1000: 9 },
+  { game: 'باخت', s100: 1, s1000: 3 },
 ];
 
 export default function CoinRateStrip() {
@@ -39,7 +45,7 @@ export default function CoinRateStrip() {
       }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 900, color: '#FFD166' }}>
           <img src={ASSETS.coin} alt="" width={16} height={16} style={{ display: 'block', flexShrink: 0 }} />
-          سکهٔ برد
+          سکه در هر بازی
         </span>
         <span style={{ fontSize: '10.5px', fontWeight: 800, color: '#94A3B8', textAlign: 'center' }}>ورودی ۱۰۰</span>
         <span style={{ fontSize: '10.5px', fontWeight: 800, color: '#94A3B8', textAlign: 'center' }}>ورودی ۱۰۰۰</span>
@@ -61,7 +67,7 @@ export default function CoinRateStrip() {
         padding: '5px 12px 6px', fontSize: '10.5px', lineHeight: 1.5,
         color: 'rgba(255,255,255,0.55)', borderTop: '1px solid rgba(255,209,102,0.14)',
       }}>
-        فقط بردِ آنلاین مقابل حریف واقعی سکه می‌دهد · رتبهٔ لیگ با سکه تعیین می‌شود
+        هر سه بازی یکسان · فقط مقابل حریف واقعی · رتبهٔ لیگ با سکه تعیین می‌شود
       </div>
     </div>
   );

@@ -57,7 +57,6 @@ class ChatPage extends StatefulWidget {
 
 class _ChatPageState extends State<ChatPage> with LifecyclePoller {
   List _messages = [];
-  List _cannedMessages = [];
   List _emotePacks = [];
   Map? _reply;
   String? _error;
@@ -176,7 +175,6 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
       if (res is Map) {
         final cfg = res['config'] is Map ? res['config'] as Map : const {};
         final m = (res['messages'] is List) ? res['messages'] as List : const [];
-        final cm = (res['cannedMessages'] is List) ? res['cannedMessages'] as List : const [];
 
         final pin = cfg['pinned'];
         if (pin is Map) _pinned = Map<String, dynamic>.from(pin);
@@ -194,7 +192,6 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
 
         setState(() {
           _messages = m;
-          _cannedMessages = cm;
           _emotePacks = cfg['emotePacks'] is List ? cfg['emotePacks'] as List : const [];
           _lastCount = m.length;
           _error = null;
@@ -361,8 +358,12 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
           ),
 
         // ── پنل زیبا و مدرن پیام‌های آماده ──
+        // `cannedMessages` سرور اینجا مصرف نمی‌شود و عمداً هم گرفته
+        // نمی‌شود: آن فهرست تخت است و فقط برای اعتبارسنجیِ سمتِ سرور
+        // به کار می‌رود. دسته‌بندیِ نمایشی وظیفهٔ کلاینت است و باید با
+        // وب یکی بماند — گاردِ `chat-parity.mjs` همان را می‌بندد.
+        // (پیش‌تر گرفته و پاس داده می‌شد و هرگز خوانده نمی‌شد.)
         _CannedMessagesPanel(
-          cannedMessages: _cannedMessages,
           emotePacks: _emotePacks,
           cooldownLeft: _cooldownLeft,
           onSend: _sendCannedMessage,
@@ -575,13 +576,11 @@ class _MessageBubble extends StatelessWidget {
 /// پنل مدرن، دسته‌بندی‌شده و زیبای پیام‌های آماده و ایموجی‌ها
 class _CannedMessagesPanel extends StatefulWidget {
   const _CannedMessagesPanel({
-    required this.cannedMessages,
     required this.emotePacks,
     required this.cooldownLeft,
     required this.onSend,
   });
 
-  final List cannedMessages;
   final List emotePacks;
   final int cooldownLeft;
   final void Function(String text) onSend;
@@ -601,6 +600,11 @@ class _CannedMessagesPanelState extends State<_CannedMessagesPanel> {
 
   /// (نامِ آیکون، عنوان، پیام‌ها) — آینهٔ `BASE_CATEGORIES` در Chat.jsx.
   ///
+  /// ⚠️ منبعِ حقیقتِ *مجازبودن* یک پیام، `CANNED_MESSAGES` در
+  /// `backend/src/server.js` است؛ سرور هر متنِ خارج از آن را رد می‌کند.
+  /// اینجا فقط دسته‌بندیِ نمایشی است. گاردِ `chat-parity.mjs` برابریِ این
+  /// فهرست با فهرستِ سرور و با وب را در CI می‌بندد.
+  ///
   /// دورِ ۲۳: عنوان‌ها ایموجیِ چسبیده داشتند («💬 گفتگو»). خودِ ایموجیِ
   /// قابلِ ارسال می‌ماند — آن محتواست — ولی برچسبِ تب عنصرِ رابط است و
   /// حالا آیکونِ وکتور دارد.
@@ -610,9 +614,9 @@ class _CannedMessagesPanelState extends State<_CannedMessagesPanel> {
       return ('sparkle', '${raw['name'] ?? 'پک ویژه'}', messages);
     });
     return [
-      ('chat', 'گفتگو', const ['سلام بچه‌ها!', 'من اومدم!', 'چه خبر بچه‌ها؟', 'خداحافظ تا بعد!', 'مواظب خودتون باشید!', 'خوشبختم دوستان!', 'کجا زندگی می‌کنید؟', 'امروز چیکار کردید؟']),
-      ('football', 'بازی', const ['کی پایه بازیه؟', 'بریم برای برد!', 'من عاشق این بازی‌ام!', 'منم می‌خوام بازی کنم!', 'دوباره امتحان می‌کنم!']),
-      ('game', 'رقابت', const ['بزن بریم بازی!', 'آماده‌ای برای مسابقه؟', 'این دست من می‌برم!', 'بازی عالی بود!', 'دوباره بازی کنیم؟', 'کارت خفن گرفتم!', 'حریف قوی می‌خوام!', 'پنالتی رو دریبل کردم!']),
+      ('chat', 'گفتگو', const ['سلام بچه‌ها!', 'من اومدم!', 'چه خبر بچه‌ها؟', 'خداحافظ تا بعد!', 'مواظب خودتون باشید!', 'خوشبختم دوستان!', 'کجا زندگی می‌کنید؟', 'امروز چیکار کردید؟', 'ممنون از شما!', 'میشه کمکم کنید؟', 'تبریک میگم!', 'وای چقدر خنده‌دار بود!', 'ایول به همگی!', 'کسی کد جدید داره؟']),
+      ('football', 'بازی', const ['کی پایه بازیه؟', 'بریم برای برد!', 'من عاشق این بازی‌ام!', 'منم می‌خوام بازی کنم!', 'دوباره امتحان می‌کنم!', 'بازی خیلی باحال بود!', 'عالی بود!', 'موفق باشی!', 'شگفت‌انگیز بود!']),
+      ('game', 'رقابت', const ['بزن بریم بازی!', 'آماده‌ای برای مسابقه؟', 'این دست من می‌برم!', 'بازی عالی بود!', 'دوباره بازی کنیم؟', 'کارت خفن گرفتم!', 'حریف قوی می‌خوام!', 'پنالتی رو دریبل کردم!', 'خیلی خفن بود!', 'شما تو کدوم لیگ هستید؟', 'چقدر امتیازم بالا رفت!', 'کارت جدید پیدا کردم!', 'امروز روز منه!']),
       ...premium,
       ('heart', 'ایموجی', const <String>[]),
     ];

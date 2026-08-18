@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { req, fa } from '../lib/api.js';
 import { AnimatedName, CosmeticAvatarFrame, DisplayName, profileBackgroundClass, profileBackgroundStyle } from '../components/Cosmetics.jsx';
 import { SvgIcon } from '../components/IconAsset.jsx';
+import CardBox from '../components/CardBox.jsx';
 
 const KINDS = [
   ['club_badge', 'باشگاه‌ها'],
@@ -261,6 +262,11 @@ export default function Shop({ token, reloadProfile }) {
     </section>
 
     {notice && <div className="shopNotice">{notice}</div>}
+
+    {/* صندوقِ کارت بالای قفسه می‌نشیند چون تنها راهِ ورود به دوئل برای
+        کسی است که کارتِ فیزیکی ندارد — آیتمِ ظاهری نیست، درِ ورود است. */}
+    <CardBox token={token} onGranted={() => { load(); reloadProfile?.(); }} />
+
     <nav className="shopNav" aria-label="دسته‌های فروشگاه">{availableKinds.map(([key, label]) => <button key={key}
       type="button" className={activeKind === key ? 'active' : ''} onClick={() => setActiveKind(key)}><CategoryMark kind={key} /> {label}</button>)}</nav>
 

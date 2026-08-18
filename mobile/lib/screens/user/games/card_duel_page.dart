@@ -22,6 +22,7 @@ import '../../../widgets/player_card.dart';
 import 'coin_award.dart';
 import 'game_session.dart';
 import '../../../widgets/ui_icon.dart';
+import '../../../widgets/card_box.dart';
 
 part 'card_duel/card_duel_widgets.dart';
 
@@ -791,10 +792,23 @@ class _CardDuelPageState extends State<CardDuelPage> {
         ),
         Gaps.vXs,
         if (_cards.length < 5)
-          const AppCard(
-            child: Text(
-              'برای ورود به آرنا حداقل پنج کارت فعال در کلکسیون لازم داری.',
-            ),
+          //  اینجا بن‌بست بود: پیام می‌گفت پنج کارت لازم داری و هیچ
+          //    راهی برای گرفتنش نشان نمی‌داد. صندوق همان راه است.
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Padding(
+                padding: EdgeInsets.only(bottom: 11),
+                child: Text(
+                  'برای ورود به آرنا حداقل پنج کارت فعال لازم داری — با'
+                  ' صندوق زیر می‌توانی همین حالا شروع کنی.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: 12, height: 1.75, color: Color(0xFFCBD5E1)),
+                ),
+              ),
+              CardBox(api: widget.api, onGranted: () => unawaited(_load())),
+            ],
           )
         else
           // گریدِ عمودی برای ۳۰–۵۰ کارت صفحه را چند هزار پیکسل بلند

@@ -8,6 +8,7 @@ import PlayerCard from './components/PlayerCard.jsx';
 import { cardIdOf, cardPowerOf } from './lib/cards.js';
 import { matchTension, matchVerdictForViewer, resultMvp, roundEffectBonus, roundForViewer } from './lib/cardDuelLogic.js';
 import CoinAward from './components/CoinAward.jsx';
+import CardBox from './components/CardBox.jsx';
 import { SvgIcon } from './components/IconAsset.jsx';
 
 const idOf = card => cardIdOf(card);
@@ -841,7 +842,12 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
           </h3>
           <small>{fa(cards.length)} کارت</small>
         </summary>
-        {cards.length < 5 ? <div className="card pad center muted">برای بازی حداقل پنج کارت فعال در کلکسیون لازم داری.</div>
+        {/* 🔴 اینجا بن‌بست بود: پیام می‌گفت پنج کارت لازم داری و هیچ
+            راهی برای گرفتنش نشان نمی‌داد. صندوق همان راه است. */}
+        {cards.length < 5 ? <div className="duelNeedCards">
+          <p>برای ورود به آرنا حداقل پنج کارت فعال لازم داری — با صندوق زیر می‌توانی همین حالا شروع کنی.</p>
+          <CardBox token={token} compact onGranted={() => load()} />
+        </div>
           : <div className="duelGridV2">{cards.map(card => <HoloCard key={idOf(card)} card={card}
             selected={selected.includes(idOf(card))} onClick={() => toggle(idOf(card))} />)}</div>}
       </details>

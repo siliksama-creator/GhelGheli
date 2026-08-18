@@ -18,7 +18,8 @@
     "test:round-intro-parity": "node tool/round-intro-parity.mjs",
     "test:club-tabs": "node tool/club-tabs-parity.mjs",
     "test:no-emoji": "node tool/no-emoji.mjs",
-    "test:icon-parity": "node tool/icon-parity.mjs"
+    "test:icon-parity": "node tool/icon-parity.mjs",
+    "test:card-box": "node tool/card-box-parity.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^6.0.5",

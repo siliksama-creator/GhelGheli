@@ -185,4 +185,59 @@ for (const [name, src] of [['وب', gamesWeb], ['اندروید', gamesAnd]]) {
     small.length === 0);
 }
 
+// ── پیام‌های آماده: یک فهرست، سه جا ───────────────────────────────────
+//
+// چرا این بلوک لازم شد
+// ────────────────────
+// «پیام آماده» سه نسخهٔ مستقل داشت که هیچ‌کدام همدیگر را نمی‌شناختند:
+//
+//   ۱. `CANNED_MESSAGES` در سرور — تنها مرجعِ *مجازبودن*. هر متنِ خارج از
+//      این فهرست در `isAllowedChatMessage` رد می‌شود.
+//   ۲. `BASE_CATEGORIES` در `Chat.jsx` — چیزی که کاربرِ وب می‌بیند.
+//   ۳. `_categories` در `chat_page.dart` — چیزی که کاربرِ اندروید می‌بیند.
+//
+// نتیجه‌اش این بود که سرور ۳۶ پیام می‌پذیرفت و هر دو کلاینت فقط ۲۱ تا را
+// نشان می‌دادند: ۱۵ پیام نوشته شده بود، تست می‌شد، مجاز بود و هیچ کاربری
+// در هیچ پلتفرمی نمی‌توانست بفرستدشان.
+//
+// جهتِ خطرناک‌ترش عکسِ این است: اگر کلاینتی پیامی را نشان بدهد که سرور
+// نمی‌شناسد، کاربر دکمه را می‌زند و «پیام مجاز نیست» می‌گیرد — دکمه‌ای که
+// خودِ ما گذاشته‌ایم. پس تساویِ دقیقِ هر سه مجموعه را می‌بندیم.
+const serverCanned = new Set(
+  [...(server.match(/const CANNED_MESSAGES = \[[\s\S]*?\n\];/) || [''])[0]
+    .matchAll(/"([^"]+)"/g)].map(m => m[1]));
+
+const webCanned = new Set(
+  [...(web.match(/const BASE_CATEGORIES = \[[\s\S]*?\n\];/) || [''])[0]
+    .matchAll(/'([^']+!?)'/g)].map(m => m[1])
+    .filter(t => !['chat', 'football', 'game', 'گفتگو', 'بازی', 'رقابت'].includes(t)));
+
+// فقط سه ردیفِ `('icon', 'عنوان', const [...])` را می‌خوانیم. پک‌های
+// ویژه از سرور می‌آیند (نه فهرستِ ثابت) و رشته‌های کدشان نباید به‌عنوان
+// پیام شمرده شوند.
+const andCanned = new Set(
+  [...(android.match(/List<\(String, String, List<String>\)> get _categories[\s\S]*?\n  \}/) || [''])[0]
+    .matchAll(/\(\s*'[a-z]+',\s*'[^']+',\s*const \[([^\]]*)\]\s*\)/g)]
+    .flatMap(m => [...m[1].matchAll(/'([^']+)'/g)].map(x => x[1])));
+
+ok(`فهرستِ سرور خالی نیست (${serverCanned.size} پیام)`, serverCanned.size > 20);
+ok(`فهرستِ وب خالی نیست (${webCanned.size} پیام)`, webCanned.size > 20);
+ok(`فهرستِ اندروید خالی نیست (${andCanned.size} پیام)`, andCanned.size > 20);
+
+const webExtra = [...webCanned].filter(t => !serverCanned.has(t));
+ok(`هیچ پیامی در وب نیست که سرور ردش کند — یافت: [${webExtra.join(' | ')}]`,
+  webExtra.length === 0);
+
+const andExtra = [...andCanned].filter(t => !serverCanned.has(t));
+ok(`هیچ پیامی در اندروید نیست که سرور ردش کند — یافت: [${andExtra.join(' | ')}]`,
+  andExtra.length === 0);
+
+const webMissing = [...serverCanned].filter(t => !webCanned.has(t));
+ok(`هیچ پیامِ مجازی در وب جا نمانده — یافت: [${webMissing.join(' | ')}]`,
+  webMissing.length === 0);
+
+const andMissing = [...serverCanned].filter(t => !andCanned.has(t));
+ok(`هیچ پیامِ مجازی در اندروید جا نمانده — یافت: [${andMissing.join(' | ')}]`,
+  andMissing.length === 0);
+
 console.log(`\n✅ ${checks} تست همسانیِ چت موفق بود\n`);

@@ -11,6 +11,7 @@ import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/async_section.dart';
 import '../../services/bazaar_billing.dart';
+import '../../widgets/card_box.dart';
 
 class ShopPage extends StatefulWidget {
   final ApiClient api;
@@ -321,6 +322,10 @@ class _ShopPageState extends State<ShopPage> {
                 ),
               ],
               Gaps.vSm,
+              // صندوقِ کارت بالای قفسه می‌نشیند چون تنها راهِ ورود به دوئل
+              // برای کسی است که کارتِ فیزیکی ندارد — آیتمِ ظاهری نیست،
+              // درِ ورود است.
+              CardBox(api: widget.api, onGranted: _reload),
               SizedBox(
                 height: 44,
                 child: ListView.separated(

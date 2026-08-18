@@ -97,6 +97,12 @@ void main() {
       await tester.tap(find.byTooltip('فروشگاه'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
+      // فروشگاه حالا صندوقِ کارت را دارد و صندوق در initState سراغِ
+      // `/api/card-box/overview` می‌رود. مثل بخشِ «ثبت کارت با عکس» در
+      // داشبورد، یک فریمِ اضافه لازم است تا آن درخواست ته‌نشین شود؛
+      // وگرنه «A Timer is still pending» می‌گیریم — ایرادِ زمان‌بندیِ
+      // تست است نه اپ.
+      await tester.pump(const Duration(milliseconds: 600));
 
       expect(find.text('فروشگاه'), findsWidgets,
           reason: 'عنوان نوار بالا باید «فروشگاه» شود');
