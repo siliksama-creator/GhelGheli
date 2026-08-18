@@ -121,8 +121,20 @@ class VictoryShareDialog extends StatelessWidget {
                   const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(nickname, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white)),
+                      // نامِ کاربر تا ۱۰۰ کاراکتر می‌تواند باشد
+                      // (`users.nickname VARCHAR(100)`) و هیچ‌جا کوتاه
+                      // نمی‌شود؛ بدونِ Flexible این ردیف سرریز می‌کند.
+                      Flexible(
+                        child: Text(
+                          nickname,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white),
+                        ),
+                      ),
                       if (hasPlus) ...[
                         const SizedBox(width: 4),
                         const Icon(Icons.star_rounded, size: 18, color: Color(0xFFFFD166)),

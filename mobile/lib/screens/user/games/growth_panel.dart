@@ -303,7 +303,9 @@ class _GrowthPanelState extends State<GrowthPanel> {
     padding: const EdgeInsets.only(bottom: 5),
     child: Row(children: [
       Container(width: 9, height: 9, decoration: BoxDecoration(shape: BoxShape.circle, color: friend['online'] == true ? const Color(0xFF22E7A6) : Colors.blueGrey)),
-      Gaps.hXs, Expanded(child: Text('${friend['nickname'] ?? 'کاربر'}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800))),
+      // نام تا ۱۰۰ کاراکتر می‌آید؛ بدون ellipsis ردیف سه‌برابر بلند
+      // می‌شود و فهرستِ دوستان به‌هم می‌ریزد.
+      Gaps.hXs, Expanded(child: Text('${friend['nickname'] ?? 'کاربر'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800))),
       if (incoming) SizedBox(height: 29, child: FilledButton(
         style: _compactClaimStyle(height: 29),
         onPressed: () => _run('${friend['friendshipId']}', () => widget.api.post('/api/friends/requests/${friend['friendshipId']}/accept', {})),
@@ -316,7 +318,7 @@ class _GrowthPanelState extends State<GrowthPanel> {
   );
 
   Widget _searchRow(Map user) => Padding(padding: const EdgeInsets.only(top: 5), child: Row(children: [
-    Expanded(child: Text('${user['nickname'] ?? 'کاربر'}', style: const TextStyle(fontSize: 10))),
+    Expanded(child: Text('${user['nickname'] ?? 'کاربر'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10))),
     SizedBox(height: 28, child: OutlinedButton(
       style: _compactClaimStyle(height: 28),
       onPressed: user['relation'] == 'none' ? () => _run('${user['id']}', () => widget.api.post('/api/friends/${user['id']}/request', {})) : null,
