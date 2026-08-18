@@ -5,8 +5,44 @@
 // device, a revoked permission, a codec hiccup...). The mute preference is
 // persisted so it survives app restarts.
 import 'package:audioplayers/audioplayers.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+/// ═══════════════════════════════════════════════════════════════════════
+/// چرا «تمرکزِ صوتی» را دستی روی `none` می‌گذاریم
+/// ═══════════════════════════════════════════════════════════════════════
+///
+/// این ریشهٔ باگِ «صدا وسطِ دوئل قطع می‌شود» بود.
+///
+/// پیش‌فرضِ audioplayers روی اندروید `AndroidAudioFocus.gain` است، یعنی
+/// «من تنها منبعِ صدای دستگاهم». آن پیش‌فرض برای یک اپِ پخشِ موسیقی درست
+/// است، ولی ما همزمان دو چیز پخش می‌کنیم: موزیکِ لوپِ دوئل و افکت‌های
+/// کوتاه. با آن پیش‌فرض، این اتفاق در هر برخورد می‌افتد:
+///
+///   ۱. `play(duelLock)` → `maybeRequestAudioFocus()` → سیستم تمرکز را
+///      از دارندهٔ فعلی (خودِ `_musicPlayer`) می‌گیرد و به آن LOSS می‌دهد؛
+///      `onLoss` داخلِ پکیج موزیک را `pause()` می‌کند.
+///   ۲. کلیپ تمام می‌شود → `onCompletion()` → چون `releaseMode != LOOP`
+///      متد `stop()` صدا می‌خورد → `focusManager.handleStop()` →
+///      `abandonAudioFocusRequest()`.
+///
+/// یعنی هر افکت، تمرکز را از موزیک می‌قاپد و هنگام تمام‌شدن رهایش
+/// می‌کند — و موزیک دیگر خودش برنمی‌گردد. در یک مسابقهٔ پنج‌راندی ۱۱ نقطهٔ
+/// پخش داریم (بدون شمردنِ تیک‌های ثانیه‌شمار که هر ثانیه یکی‌اند)، پس
+/// عملاً همان اوایلِ کار موزیک خاموش می‌شد.
+///
+/// `AndroidAudioFocus.none` یعنی «اصلاً درخواستِ تمرکز نده، صدایت را با
+/// بقیه مخلوط کن». آن‌وقت افکت‌ها و موزیکِ خودمان روی هم می‌نشینند و هیچ
+/// کدام دیگری را قطع نمی‌کند. سودِ جانبی: موزیکی که کاربر در اپِ دیگری
+/// گوش می‌دهد را هم قطع نمی‌کنیم — که همان چیزی است که کامنتِ
+/// «Never let game SFX hijack music the user is playing elsewhere» ادعا
+/// می‌کرد ولی `PlayerMode.lowLatency` هرگز انجامش نمی‌داد.
+///
+/// نکته: این تنظیم سراسری است و باید **پیش از** ساختِ هر پخش‌کننده اعمال
+/// شود، وگرنه پخش‌کننده‌های ازپیش‌ساخته با متنِ قدیمی می‌مانند.
+final AudioContext _mixWithOthers = AudioContextConfig(
+  focus: AudioContextConfigFocus.mixWithOthers,
+).build();
 
 enum Sfx {
   move('move.mp3'),
@@ -36,6 +72,30 @@ enum Sfx {
   final String file;
 }
 
+/// موزیک باید با کوچک‌شدنِ اپ ساکت شود و با بازگشت ادامه یابد.
+///
+/// بدونِ این، خروجِ موقت از اپ (یک تماس، یک نوتیفیکیشن، فشردنِ دکمهٔ
+/// خانه) موزیکِ دوئل را پشتِ سرِ کاربر روشن نگه می‌داشت. `dispose` صفحه
+/// این را نمی‌گرفت، چون رفتن به پس‌زمینه صفحه را dispose نمی‌کند.
+///
+/// چرا کلاسِ جدا و نه `with WidgetsBindingObserver` روی خودِ `GameAudio`:
+/// همان دلیلِ `MemoryGuard` — آن اینترفیس بین نسخه‌های فلاتر عضو تازه
+/// می‌گیرد و پیاده‌سازیِ مستقیمش در هر ارتقا بیلد را می‌شکند.
+class _AudioLifecycle with WidgetsBindingObserver {
+  _AudioLifecycle(this._audio);
+
+  final GameAudio _audio;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _audio._resumeMusicIfWanted();
+    } else {
+      _audio._suspendMusic();
+    }
+  }
+}
+
 class GameAudio {
   GameAudio._();
   static final GameAudio instance = GameAudio._();
@@ -52,10 +112,22 @@ class GameAudio {
   bool _ready = false;
   bool _duelMusicRequested = false;
   bool _duelMusicPlaying = false;
+  _AudioLifecycle? _lifecycle;
 
   bool get enabled => _enabled;
 
   Future<void> load() async {
+    // متنِ سراسری باید پیش از ساختِ هر پخش‌کننده اعمال شود — توضیح کامل
+    // بالای `_mixWithOthers`. بدونِ این، افکت‌ها موزیکِ دوئل را قطع می‌کنند.
+    try {
+      await AudioPlayer.global.setAudioContext(_mixWithOthers);
+    } catch (e) {
+      debugPrint('audio context failed: $e');
+    }
+    if (_lifecycle == null) {
+      _lifecycle = _AudioLifecycle(this);
+      WidgetsBinding.instance.addObserver(_lifecycle!);
+    }
     try {
       final sp = await SharedPreferences.getInstance();
       _enabled = sp.getBool(_prefsKey) ?? true;
@@ -82,8 +154,14 @@ class GameAudio {
     _ready = true;
     for (var i = 0; i < _poolSize; i++) {
       final p = AudioPlayer()..setReleaseMode(ReleaseMode.stop);
-      // Never let game SFX hijack music the user is playing elsewhere.
       p.setPlayerMode(PlayerMode.lowLatency);
+      // متن را روی خودِ پخش‌کننده هم می‌گذاریم، نه فقط سراسری: `load()`
+      // در main.dart بدون await صدا زده می‌شود، پس اگر کاربر خیلی سریع
+      // وارد بازی شود ممکن است پخش‌کننده زودتر از تنظیمِ سراسری ساخته
+      // شود. این خط آن مسابقه را بی‌اثر می‌کند.
+      p.setAudioContext(_mixWithOthers).catchError((Object e) {
+        debugPrint('sfx context failed: $e');
+      });
       _pool.add(p);
     }
   }
@@ -114,6 +192,9 @@ class GameAudio {
     _duelMusicPlaying = true;
     () async {
       try {
+        // همان دلیلِ بالا: موزیک هم نباید تمرکزِ صوتی بگیرد، وگرنه خودش
+        // با اولین افکت تمرکز را از دست می‌دهد و پکیج pause‌اش می‌کند.
+        await _musicPlayer.setAudioContext(_mixWithOthers);
         await _musicPlayer.setReleaseMode(ReleaseMode.loop);
         await _musicPlayer.setVolume(0.20);
         await _musicPlayer.play(AssetSource('sfx/duel_music.mp3'));
@@ -132,6 +213,23 @@ class GameAudio {
     } catch (_) {/* ignore */}
   }
 
+  /// اپ کوچک شد: موزیک را نگه دار ولی «درخواست» را پاک نکن، تا موقعِ
+  /// برگشت بدانیم باید ادامه دهیم. از `pause` استفاده می‌کنیم نه `stop`
+  /// تا از همان‌جا ادامه یابد و صحنه پرش نداشته باشد.
+  void _suspendMusic() {
+    if (!_duelMusicPlaying) return;
+    _musicPlayer.pause().catchError((Object e) {
+      debugPrint('duel music pause failed: $e');
+    });
+  }
+
+  void _resumeMusicIfWanted() {
+    if (!_enabled || !_duelMusicRequested || !_duelMusicPlaying) return;
+    _musicPlayer.resume().catchError((Object e) {
+      debugPrint('duel music resume failed: $e');
+    });
+  }
+
   Future<void> stopAll() async {
     _duelMusicPlaying = false;
     try {
@@ -147,6 +245,10 @@ class GameAudio {
   Future<void> dispose() async {
     _duelMusicRequested = false;
     _duelMusicPlaying = false;
+    if (_lifecycle != null) {
+      WidgetsBinding.instance.removeObserver(_lifecycle!);
+      _lifecycle = null;
+    }
     try {
       await _musicPlayer.dispose();
     } catch (_) {/* ignore */}

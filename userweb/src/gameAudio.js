@@ -50,6 +50,23 @@ function beginMusic() {
   } catch { /* never let audio break the game */ }
 }
 
+// Mirror of `_AudioLifecycle` on Android: a backgrounded tab must not keep
+// the duel soundtrack running behind the user's back. `pause` rather than
+// `stop` so returning resumes mid-phrase instead of restarting the loop.
+//
+// Registered once at module load — the listener is cheap and the guard below
+// makes it a no-op whenever no duel is running.
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (!duelMusic) return;
+    if (document.visibilityState === 'hidden') {
+      try { duelMusic.pause(); } catch { /* cosmetic */ }
+    } else if (enabled && duelMusicRequested) {
+      duelMusic.play()?.catch?.(() => { /* resumes on next tap */ });
+    }
+  });
+}
+
 export function startDuelMusic() {
   duelMusicRequested = true;
   beginMusic();
