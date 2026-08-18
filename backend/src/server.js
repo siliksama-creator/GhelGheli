@@ -2158,8 +2158,42 @@ app.post('/api/admin/auth/login', adminLoginLimiter, asyncHandler(async (req, re
 app.get('/api/admin/dashboard', adminAuth, asyncHandler(async (req, res) => {
   const q = await Promise.all([
     pool.query('SELECT count(*)::int AS count FROM users'),
-    pool.query("SELECT count(*)::int AS count FROM card_codes WHERE status='used' AND used_at::date=CURRENT_DATE"),
-    pool.query("SELECT count(*)::int AS count FROM card_codes WHERE status='used' AND used_at >= date_trunc('month', NOW())"),
+    // ═══════════════════════════════════════════════════════════════════
+    // کارت‌های ثبت‌شده = مجموعِ **هر دو** نسلِ جدولِ کد
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    // ── باگی که این کوئری رفع می‌کند ──
+    //
+    // این دو کاشی فقط `card_codes` را می‌شمردند — جدولِ سیستمِ **قدیم**
+    // (کدِ تنها، روتِ `/api/cards/redeem`). ولی امروز هر ثبتِ واقعی از
+    // مسیرِ **عکس+کد** می‌آید که در `photo_card_codes` می‌نویسد
+    // (`photoCardService.creditSubmission`). هیچ کلاینتی — نه وب، نه
+    // اندروید — دیگر روتِ قدیمی را صدا نمی‌زند.
+    //
+    // نتیجه در عمل: مدیر هر روز صفر می‌دید، حتی وقتی ده‌ها کارت ثبت شده
+    // بود. کاشی‌ای که همیشه صفر است بدتر از نبودنش است، چون مدیر بر
+    // اساسش نتیجه می‌گیرد «امروز کسی کارت ثبت نکرده».
+    //
+    // ── چرا مجموع، نه صرفاً تعویضِ نامِ جدول ──
+    //
+    // جدولِ قدیم هنوز رکوردِ تاریخیِ مصرف‌شده دارد و روتش هم زنده است.
+    // اگر فقط نام را عوض می‌کردیم، آمارِ گذشته از گزارشِ ماه حذف می‌شد
+    // (یعنی باگ از «همیشه صفر» به «تاریخچهٔ گم‌شده» تغییر شکل می‌داد).
+    // UNION ALL هر دو نسل را می‌پوشاند و روزی که جدولِ قدیم واقعاً خالی
+    // و حذف شود، این کوئری بدونِ تغییر درست می‌ماند.
+    //
+    // ⚠️ عمداً از `user_card_inventory` شمرده نمی‌شود: آن جدول کارتِ
+    // صندوق و اعطای دستی را هم نگه می‌دارد، و ردیفش با `quantity` جمع
+    // می‌شود نه یک ردیف به‌ازای هر ثبت — یعنی عددی می‌داد که «کارتِ
+    // ثبت‌شده» نیست.
+    pool.query(`SELECT (
+        (SELECT count(*) FROM card_codes       WHERE status='used' AND used_at::date=CURRENT_DATE) +
+        (SELECT count(*) FROM photo_card_codes WHERE status='used' AND used_at::date=CURRENT_DATE)
+      )::int AS count`),
+    pool.query(`SELECT (
+        (SELECT count(*) FROM card_codes       WHERE status='used' AND used_at >= date_trunc('month', NOW())) +
+        (SELECT count(*) FROM photo_card_codes WHERE status='used' AND used_at >= date_trunc('month', NOW()))
+      )::int AS count`),
     pool.query("SELECT count(*)::int AS count FROM user_reward_claims WHERE status='pending'"),
     getLeaderboard(10)
   ]);

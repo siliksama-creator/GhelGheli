@@ -108,7 +108,10 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
       _error = '';
       _phase = _Phase.shaking;
     });
-    _shakeCtrl.repeat();
+    // `repeat()` یک Future برمی‌گرداند که تا وقتی انیمیشن ادامه دارد
+    // کامل نمی‌شود؛ منتظر ماندنش یعنی هرگز به مرحلهٔ خرید نمی‌رسیم.
+    // پس مثل `_burstCtrl` پایین‌تر، عمداً رهایش می‌کنیم.
+    unawaited(_shakeCtrl.repeat());
     try {
       // همان سه‌گامِ فروشگاه: سفارش از سرور، پرداخت در بازار، تحویل بعد
       // از راستی‌آزماییِ سرور. کلاینت هیچ‌وقت خودش «تحویل شد» نمی‌گوید.

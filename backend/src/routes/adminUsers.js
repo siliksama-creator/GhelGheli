@@ -16,9 +16,13 @@ router.get('/admin/users', adminAuth, asyncHandler(async (req, res) => {
   const searchDigits = `%${normalizedDigits}%`;
 
   const rows = (await pool.query(
+    // `wallet_balance` برای رابطِ «اصلاح کیف پول» لازم است: مدیر باید
+    // موجودیِ فعلی را کنارِ دکمه ببیند، وگرنه کسر کورکورانه انجام می‌دهد
+    // و با خطای «موجودی کافی نیست» روبه‌رو می‌شود بدون آنکه بداند چقدر
+    // هست.
     `SELECT id,mobile,first_name,last_name,nickname,age,city,province,bank_account,
             profile_image_url,profile_avatar_key,current_points,lifetime_points,
-            monthly_league_points,status,joined_at,game_xp 
+            monthly_league_points,status,joined_at,game_xp,wallet_balance 
        FROM users 
       WHERE mobile ILIKE $1 OR mobile ILIKE $2 OR nickname ILIKE $1 OR first_name ILIKE $1 
          OR last_name ILIKE $1 OR (first_name || ' ' || last_name) ILIKE $1
@@ -27,6 +31,9 @@ router.get('/admin/users', adminAuth, asyncHandler(async (req, res) => {
   )).rows;
   res.json(rows.map((u) => ({
     ...u,
+    // پستگرس `numeric` را رشته برمی‌گرداند؛ بدون Number سمتِ کلاینت
+    // «۱۰۰۰۰» با «۵۰۰» رشته‌ای مقایسه می‌شد و قالب‌بندی عدد می‌شکست.
+    wallet_balance: Number(u.wallet_balance || 0),
     level: level.levelFromXp(u.game_xp).level,
   })));
 }));

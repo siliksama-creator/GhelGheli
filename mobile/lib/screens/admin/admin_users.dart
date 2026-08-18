@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
+import '../../theme/brand_theme.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/badges.dart';
@@ -153,6 +154,140 @@ class _AdminUsersState extends State<AdminUsers> {
   void _snack(String m) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // اصلاح دستی کیف پول (پول واقعی) — آینهٔ دقیقِ همین قابلیت در پنلِ وب
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // روتِ `POST /api/admin/wallet/users/:id/adjust` از ابتدا کامل بود
+  // (تراکنشِ اتمیک، دفترِ کل، دلیلِ اجباری، ممیزی، اعلانِ کاربر) ولی در
+  // هیچ‌کدام از دو پنل دکمه‌ای نداشت؛ پشتیبانی برای عودتِ یک پرداختِ
+  // ناموفق مجبور بود مستقیم به دیتابیس دست بزند.
+  //
+  // برخلافِ امتیاز، اینجا دلیل برای **هر دو جهت** اجباری است: واریزِ
+  // بی‌سند هم همان‌قدر مسئله‌ساز است که کسرِ بی‌سند.
+  Future<void> _adjustWallet(Map user) async {
+    final id = user['id'] as String;
+    final balance = (user['wallet_balance'] as num?)?.toInt() ?? 0;
+    final amountController = TextEditingController();
+    final reasonController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    final value = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('اصلاح موجودی کیف پول'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Text('موجودی فعلی: ${faNum(balance)} تومان',
+                    style: const TextStyle(fontSize: 12.5)),
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: amountController,
+                keyboardType:
+                    const TextInputType.numberWithOptions(signed: true),
+                decoration: const InputDecoration(
+                    labelText: 'مبلغ به تومان (منفی برای کسر)',
+                    prefixIcon: Icon(Icons.account_balance_wallet_rounded)),
+                autofocus: true,
+                validator: (v) {
+                  final n = int.tryParse((v ?? '').trim());
+                  if (n == null || n == 0) return 'مبلغ باید عددی مخالف صفر باشد';
+                  // همان محافظِ سمتِ وب: کسرِ بیش از موجودی را پیش از
+                  // رفتن به سرور می‌گیریم تا خطای گنگ نگیرد.
+                  if (n < 0 && n.abs() > balance) {
+                    return 'مبلغ کسر از موجودی کاربر بیشتر است';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: reasonController,
+                decoration: const InputDecoration(
+                    labelText: 'دلیل (الزامی، برای کاربر ارسال می‌شود)',
+                    prefixIcon: Icon(Icons.comment_rounded)),
+                validator: (v) => (v == null || v.trim().length < 3)
+                    ? 'ثبت دلیل (حداقل ۳ حرف) الزامی است'
+                    : null,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('لغو')),
+          FilledButton(
+              onPressed: () {
+                if (formKey.currentState?.validate() == true) {
+                  Navigator.pop(dialogContext, {
+                    'amount': amountController.text,
+                    'reason': reasonController.text,
+                  });
+                }
+              },
+              child: const Text('ادامه')),
+        ],
+      ),
+    );
+
+    try {
+      if (value == null) return;
+      final amount = int.tryParse(value['amount']!.trim());
+      final reason = value['reason']!.trim();
+      if (amount == null || amount == 0) {
+        _snack('مبلغ وارد‌شده معتبر نیست');
+        return;
+      }
+      if (!mounted) return;
+
+      // تأییدِ دوم: تنها جای اپِ مدیریت که یک اشتباهِ تایپی مستقیماً
+      // پولِ واقعی جابه‌جا می‌کند.
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: Text(amount > 0 ? 'تأیید واریز' : 'تأیید کسر'),
+          content: Text(
+              '${faNum(amount.abs())} تومان ${amount > 0 ? 'به' : 'از'} کیف پول '
+              '«${user['nickname'] ?? user['mobile']}» ${amount > 0 ? 'اضافه' : 'کسر'} می‌شود. '
+              'این عملیات برگشت‌پذیر نیست.'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(c, false),
+                child: const Text('لغو')),
+            FilledButton(
+                onPressed: () => Navigator.pop(c, true),
+                child: Text(amount > 0 ? 'واریز کن' : 'کسر کن')),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+
+      try {
+        final r = await widget.api.post(
+            '/api/admin/wallet/users/$id/adjust',
+            {'amount': amount, 'reason': reason});
+        await _load();
+        _snack(r is Map && r['message'] != null
+            ? '${r['message']}'
+            : 'موجودی کیف پول تغییر کرد');
+      } catch (e) {
+        // پیامِ سرور («دسترسی کافی نیست» برای نقشِ غیرِ super_admin،
+        // «موجودی کافی نیست» و ...) عیناً نمایش داده می‌شود.
+        _snack(apiError(e));
+      }
+    } finally {
+      amountController.dispose();
+      reasonController.dispose();
+    }
   }
 
   // SMS OTP isn't active yet, so users can't self-service a forgotten
@@ -442,6 +577,20 @@ class _AdminUsersState extends State<AdminUsers> {
                                 Text('${faNum(u['current_points'])} امتیاز',
                                     style: theme.textTheme.bodySmall),
                                 Gaps.hSm,
+                                // موجودی کیف پول کنارِ امتیاز — مدیر پیش
+                                // از هر اصلاحی باید عدد فعلی را ببیند.
+                                Text(
+                                    '${faNum((u['wallet_balance'] as num?)?.toInt() ?? 0)} تومان',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      // `context.brand.success` نسخهٔ
+                                      // سازگار با کنتراستِ تمِ فعلی را
+                                      // می‌دهد (ثابتِ خام روی سطحِ روشن
+                                      // زیر حداقلِ WCAG است).
+                                      color: ((u['wallet_balance'] as num?) ?? 0) > 0
+                                          ? context.brand.success
+                                          : null,
+                                    )),
+                                Gaps.hSm,
                                 StatusBadge(
                                     status: u['status'] ?? '',
                                     labels: const {
@@ -459,6 +608,8 @@ class _AdminUsersState extends State<AdminUsers> {
                             await _grantPlus(u['id']);
                           } else if (s == 'points') {
                             await _adjustPoints(u['id']);
+                          } else if (s == 'wallet') {
+                            await _adjustWallet(u);
                           } else if (s == 'reset_password') {
                             await _resetPassword(u['id']);
                           } else if (s == 'notify') {
@@ -475,6 +626,9 @@ class _AdminUsersState extends State<AdminUsers> {
                               value: 'grant_plus', child: Text('اعطای اشتراک پلاس')),
                           const PopupMenuItem(
                               value: 'points', child: Text('تغییر امتیاز')),
+                          const PopupMenuItem(
+                              value: 'wallet',
+                              child: Text('اصلاح کیف پول')),
                           const PopupMenuItem(
                               value: 'reset_password',
                               child: Text('بازیابی رمز عبور')),
