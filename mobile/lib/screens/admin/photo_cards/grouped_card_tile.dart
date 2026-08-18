@@ -63,7 +63,7 @@ class GroupedPhotoCardTile extends StatelessWidget {
                     child: SafeImage(
                       url: '${primary?['image_url'] ?? ''}',
                       fit: BoxFit.cover,
-                      fallbackEmoji: '🃏',
+                      fallbackIcon: Icons.style_rounded,
                     ),
                   ),
                 ),

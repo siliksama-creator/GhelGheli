@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { fa } from '../lib/api.js';
 import PlayerCard from '../components/PlayerCard.jsx';
 import { cardQtyOf } from '../lib/cards.js';
+import { SvgIcon } from '../components/IconAsset.jsx';
 
 const asInt = v => Number.parseInt(v || 0, 10) || 0;
 const dateOf = m => new Date(m.updated_at || m.created_at || 0).getTime();
@@ -67,7 +68,7 @@ export default function Inventory({ items = [], reload }) {
       </div>
       {!shown.length ? (
         <div className="card pad center invEmpty">
-          <span>🃏</span>
+          <span><SvgIcon name="card" size={48} /></span>
           <b>{items.length ? 'کارتی با این نام پیدا نشد' : 'هنوز کارتی در کلکسیون شما نیست'}</b>
           <p>{items.length ? 'نام دیگری را امتحان کن.' : 'یک کد کارت ثبت کن یا از کارتت عکس بگیر.'}</p>
         </div>

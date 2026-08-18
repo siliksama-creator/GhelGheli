@@ -179,7 +179,7 @@ export default function Home({ token, p, rewards, load, setMsg, openProfile, ope
           </div>
         ) : (
           <div style={{ textAlign:'center', padding:'20px' }}>
-            <div style={{ fontSize:'40px', marginBottom:'8px' }}>🃏</div>
+            <div style={{ marginBottom:'8px', display:'flex', justifyContent:'center', color:'#FFD36B', opacity:.75 }}><SvgIcon name="card" size={40} /></div>
             <b style={{ color:'#FFF' }}>هنوز کارتی در کلکسیون شما نیست</b>
             <p style={{ color:'#94A3B8', fontSize:'12px', marginTop:'4px' }}>بعد از ثبت، کارت‌ها اینجا دیده می‌شوند.</p>
             <img src="/games/empty_collection.webp" alt="" style={{ width:'120px', opacity:0.6, marginTop:'12px' }} onError={e=>e.currentTarget.style.display='none'} />
