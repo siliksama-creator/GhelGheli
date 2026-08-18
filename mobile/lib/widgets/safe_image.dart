@@ -21,7 +21,6 @@ class SafeImage extends StatelessWidget {
     this.fit = BoxFit.cover,
     this.borderRadius,
     this.fallbackIcon = Icons.image_outlined,
-    this.fallbackEmoji,
     this.fallbackAsset,
   });
 
@@ -32,7 +31,6 @@ class SafeImage extends StatelessWidget {
   final BoxFit fit;
   final BorderRadius? borderRadius;
   final IconData fallbackIcon;
-  final String? fallbackEmoji;
   final String? fallbackAsset;
 
   @override
@@ -110,10 +108,7 @@ class SafeImage extends StatelessWidget {
                     size: ((height ?? 40) * 0.4).clamp(14.0, 40.0),
                     color: Theme.of(context).colorScheme.outline),
               )
-            : fallbackEmoji != null
-                ? Text(fallbackEmoji!,
-                    style: TextStyle(fontSize: (height ?? 40) * 0.45))
-                : Icon(fallbackIcon,
+            : Icon(fallbackIcon,
                 size: ((height ?? 40) * 0.4).clamp(14.0, 40.0),
                 color: Theme.of(context).colorScheme.outline),
       );
@@ -126,13 +121,11 @@ class SafeThumb extends StatelessWidget {
     required this.url,
     this.size = 56,
     this.radius,
-    this.fallbackEmoji,
   });
 
   final Object? url;
   final double size;
   final double? radius;
-  final String? fallbackEmoji;
 
   @override
   Widget build(BuildContext context) => SafeImage(
@@ -140,6 +133,5 @@ class SafeThumb extends StatelessWidget {
         width: size,
         height: size,
         borderRadius: BorderRadius.circular(radius ?? Corners.sm),
-        fallbackEmoji: fallbackEmoji,
       );
 }
