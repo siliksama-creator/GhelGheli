@@ -24,20 +24,23 @@ class Money {
   /// ۵۰۰۰۰ → «۵۰٬۰۰۰ تومان»
   static String withUnit(Object? value) => '${format(value)} تومان';
 
-  /// نمایش فشرده برای فضاهای تنگ: ۱٬۲۰۰٬۰۰۰ → «۱.۲ میلیون تومان»
+  /// نمایش فشرده برای فضاهای تنگ: ۱٬۲۰۰٬۰۰۰ → «۱٫۲ میلیون تومان»
+  ///
+  /// جداکنندهٔ اعشار را `faNum` به «٫» فارسی تبدیل می‌کند.
   static String compact(Object? value) {
     final n = _toInt(value);
     if (n.abs() >= 1000000000) {
-      return '${faNum((n / 1000000000).toStringAsFixed(1))} میلیارد تومان';
+      return '${faNum(_trim(n / 1000000000))} میلیارد تومان';
     }
     if (n.abs() >= 1000000) {
-      final m = n / 1000000;
-      // ۲.۰ میلیون زشت است؛ وقتی رقم اعشار صفر است حذفش می‌کنیم
-      final s = m == m.roundToDouble() ? m.round().toString() : m.toStringAsFixed(1);
-      return '${faNum(s)} میلیون تومان';
+      return '${faNum(_trim(n / 1000000))} میلیون تومان';
     }
     return withUnit(n);
   }
+
+  /// «۲.۰» زشت است؛ وقتی رقم اعشار صفر است حذفش می‌کنیم.
+  static String _trim(double v) =>
+      v == v.roundToDouble() ? v.round().toString() : v.toStringAsFixed(1);
 
   /// ورودی کاربر («۵۰٬۰۰۰» یا «50,000» یا «۵۰ ۰۰۰») → عدد صحیح
   static int? parse(String? input) {

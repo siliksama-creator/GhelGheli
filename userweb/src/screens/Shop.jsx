@@ -217,6 +217,15 @@ export default function Shop({ token, reloadProfile }) {
       .shopPayNote{position:relative;z-index:1;margin:9px 0 0;font-size:11px;color:#9cabbc;text-align:center}
       .shopWalletPay{position:relative;z-index:1;display:flex;align-items:flex-start;gap:9px;margin:11px 0 0;padding:9px 12px;border-radius:14px;background:rgba(34,231,166,.08);border:1px solid rgba(34,231,166,.3);cursor:pointer}.shopWalletPay input{width:17px;height:17px;margin:1px 0 0;accent-color:#22E7A6;cursor:pointer;flex-shrink:0}.shopWalletPay>span{display:flex;flex-direction:column;gap:3px;font-size:12px;font-weight:900;color:#22E7A6}.shopWalletPay small{font-size:10px;font-weight:700;color:#9cabbc;line-height:1.6}.shopWalletPay small b{color:#22E7A6}
       .shopNotice{border-radius:12px;padding:9px 12px;background:rgba(56,189,248,.11);border:1px solid rgba(56,189,248,.28);font-size:11.5px;text-align:center}.shopPlans,.shopNav,.shopCarousel{scrollbar-width:none;-ms-overflow-style:none}.shopPlans::-webkit-scrollbar,.shopNav::-webkit-scrollbar,.shopCarousel::-webkit-scrollbar{display:none}.shopNav{display:flex;gap:7px;overflow-x:auto;padding:3px 1px 7px}.shopNav button{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.045);color:#aebed0;border-radius:13px;padding:8px 11px;font-size:11px;font-weight:850;cursor:pointer}.shopNav button.active{color:#071522;border-color:#38BDF8;background:#38BDF8;box-shadow:0 6px 18px rgba(56,189,248,.24)}
+      /* بخشِ شاخصِ صندوق — عمداً از قابِ `.shopShelf` پیروی نمی‌کند تا
+         چشم آن را «یک قفسهٔ دیگر» نخواند. جداکنندهٔ بالا و پایین،
+         فاصلهٔ بیشتر و عنوانِ طلایی، آن را از ردیفِ آیتم‌ها بیرون می‌کشد. */
+      .shopFeature{margin:6px 0 2px;padding:4px 0;
+        border-top:1px solid rgba(255,209,102,.16);border-bottom:1px solid rgba(255,209,102,.16)}
+      .shopFeatureHead{display:flex;align-items:baseline;justify-content:space-between;gap:9px;
+        flex-wrap:wrap;padding:10px 5px 0}
+      .shopFeatureHead h3{margin:0;font-size:14.5px;color:#FFD166;font-weight:950}
+      .shopFeatureHead span{font-size:10.5px;color:#94a3b8}
       .shopShelf{border:1px solid rgba(255,255,255,.09);background:rgba(7,21,34,.6);border-radius:20px;padding:13px;overflow:hidden}.shopShelfHead{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}.shopShelfHead h3{margin:0;font-size:14px}.shopShelfHead span{font-size:10px;color:#94a3b8}.shopCarousel{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(250px,31%);gap:10px;overflow-x:auto;scroll-snap-type:x proximity;padding:2px 1px 9px}.shopProduct{scroll-snap-align:start;overflow:hidden;border-radius:18px;border:1px solid rgba(255,255,255,.11);background:linear-gradient(155deg,rgba(255,255,255,.075),rgba(255,255,255,.025));min-height:282px;display:flex;flex-direction:column;box-shadow:0 14px 35px rgba(0,0,0,.22);transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease}.shopProduct:hover{transform:translateY(-3px);border-color:rgba(56,189,248,.38);box-shadow:0 18px 42px rgba(0,0,0,.3)}.shopProduct.equipped{border-color:rgba(34,231,166,.7);box-shadow:0 0 0 1px rgba(34,231,166,.2),0 18px 42px rgba(34,231,166,.08)}.shopArtwork{height:144px;position:relative;border-bottom:1px solid rgba(255,255,255,.1);overflow:hidden;background:#03070d}.shopProductBody{padding:11px;display:flex;flex-direction:column;flex:1}.shopProductTitle{display:flex;align-items:center;justify-content:space-between;gap:6px}.shopProduct h3{margin:0;font-size:13.5px}.shopProductTitle span{font-size:9px;background:rgba(34,231,166,.15);color:#22E7A6;border-radius:999px;padding:3px 7px}.shopProduct p{color:#9cabbc;font-size:10px;line-height:1.6;margin:6px 0;min-height:28px}.shopProductFoot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto}.shopProductFoot strong{color:#FFD166;font-size:11px}.shopProduct button{font-size:10px;padding:7px 11px}.shopProduct button.secondary{background:#1e293b;color:#94a3b8}.plusAccess{display:block;color:#38BDF8;font-size:9px;margin-top:6px}.lockedGift{font-size:9px;color:#c4b5fd}.shopDisclosure{display:flex;justify-content:space-between;align-items:center;gap:10px;color:#94a3b8;font-size:10.5px;padding:3px 5px}.shopDisclosure button{border:0;background:none;color:#38BDF8;cursor:pointer}.historyPanel{border:1px solid rgba(255,255,255,.08);border-radius:15px;padding:10px;background:rgba(255,255,255,.025);display:grid;gap:5px}.historyRow{display:flex;justify-content:space-between;gap:8px;padding:6px 8px;border-radius:9px;background:rgba(255,255,255,.035);font-size:10px}.historyRow span{color:#94a3b8}
       .planFrameSwatch{width:48px;height:48px;box-shadow:0 0 14px #38bdf855}.planFrameSwatch img{width:100%!important;height:100%!important;border-radius:50%!important;object-fit:cover!important;border:2px solid #071522}.planNameSwatch{display:grid;place-items:center;width:72px;height:42px;border-radius:10px;background:#071522;font-weight:950}.planNameSwatch .animatedName{font-size:14px!important;color:inherit;font-weight:950}
       .shopLiveClub{display:grid;grid-template-columns:1fr 1.3fr;align-items:center;padding:16px 24px;background:radial-gradient(circle at 22% 50%,#38bdf822,transparent 35%),#071522}.shopLiveClub>img{width:88px;height:88px;object-fit:contain;justify-self:center}.shopLiveClub>div{display:grid;grid-template-columns:40px 1fr;align-items:center;gap:3px 8px;padding:9px;border-radius:14px;background:#ffffff0a;border:1px solid #ffffff16}.shopLiveClub>div img{grid-row:1/3;width:40px;height:40px;border-radius:50%;object-fit:cover}.shopLiveClub span{font-size:12px;font-weight:900}.shopLiveClub b{font-size:8px;color:#94a3b8}
@@ -264,8 +273,18 @@ export default function Shop({ token, reloadProfile }) {
     {notice && <div className="shopNotice">{notice}</div>}
 
     {/* صندوقِ کارت بالای قفسه می‌نشیند چون تنها راهِ ورود به دوئل برای
-        کسی است که کارتِ فیزیکی ندارد — آیتمِ ظاهری نیست، درِ ورود است. */}
-    <CardBox token={token} onGranted={() => { load(); reloadProfile?.(); }} />
+        کسی است که کارتِ فیزیکی ندارد — آیتمِ ظاهری نیست، درِ ورود است.
+
+        دورِ ۲۸: پیش از این، صندوق بدونِ هیچ فاصله یا عنوانی بینِ پلن‌های
+        پلاس و چیپ‌های دسته‌بندی می‌نشست و چشم آن را یک ردیفِ دیگر
+        می‌خواند. حالا بخشِ خودش را دارد تا از قفسهٔ آیتم‌ها جدا بیفتد. */}
+    <section className="shopFeature">
+      <div className="shopFeatureHead">
+        <h3>درِ ورود به دوئل</h3>
+        <span>کارت فیزیکی نداری؟ از اینجا شروع کن</span>
+      </div>
+      <CardBox token={token} onGranted={() => { load(); reloadProfile?.(); }} />
+    </section>
 
     <nav className="shopNav" aria-label="دسته‌های فروشگاه">{availableKinds.map(([key, label]) => <button key={key}
       type="button" className={activeKind === key ? 'active' : ''} onClick={() => setActiveKind(key)}><CategoryMark kind={key} /> {label}</button>)}</nav>

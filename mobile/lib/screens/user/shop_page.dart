@@ -325,7 +325,51 @@ class _ShopPageState extends State<ShopPage> {
               // صندوقِ کارت بالای قفسه می‌نشیند چون تنها راهِ ورود به دوئل
               // برای کسی است که کارتِ فیزیکی ندارد — آیتمِ ظاهری نیست،
               // درِ ورود است.
-              CardBox(api: widget.api, onGranted: _reload),
+              //
+              // دورِ ۲۸: پیش از این، صندوق بدونِ هیچ فاصله یا عنوانی بینِ
+              // پلن‌های پلاس و چیپ‌های دسته‌بندی می‌نشست و چشم آن را یک
+              // ردیفِ دیگر می‌خواند. حالا بخشِ خودش را دارد.
+              Container(
+                margin: const EdgeInsets.only(top: 6, bottom: 2),
+                decoration: const BoxDecoration(
+                  border: Border(
+                    top: BorderSide(color: Color(0x29FFD166)),
+                    bottom: BorderSide(color: Color(0x29FFD166)),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(5, 10, 5, 0),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            'درِ ورود به دوئل',
+                            style: TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFFFFD166),
+                            ),
+                          ),
+                          Spacer(),
+                          Flexible(
+                            child: Text(
+                              'کارت فیزیکی نداری؟ از اینجا شروع کن',
+                              textAlign: TextAlign.end,
+                              style: TextStyle(
+                                  fontSize: 10.5, color: Color(0xFF94A3B8)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    CardBox(api: widget.api, onGranted: _reload),
+                  ],
+                ),
+              ),
               SizedBox(
                 height: 44,
                 child: ListView.separated(

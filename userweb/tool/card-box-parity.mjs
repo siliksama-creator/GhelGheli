@@ -132,4 +132,48 @@ for (const route of ['/api/card-box/overview', '/api/card-box/buy',
   ok(`سرور روتِ ${route} را دارد`, server.includes(route));
 }
 
+// ── ۸. تصویرِ صندوق در هر دو مقصد واقعاً وجود دارد ────────────────────
+//
+// دورِ ۲۸ صندوق را به بنرِ تصویری تبدیل کرد. تصویر برخلافِ کد، در بیلد
+// خطا نمی‌دهد: وب یک آیکونِ شکسته نشان می‌دهد و اندروید یک مستطیلِ خاکستری،
+// هر دو بی‌سر و صدا. پس وجودِ فایل باید همین‌جا سنجیده شود.
+//
+// دو مقصد جداست چون وب از `public/` سرو می‌کند و اندروید از `assets/` که
+// در `pubspec.yaml` هم باید فهرست شده باشد. کپی‌کردن در یکی و یادرفتنِ
+// دیگری، دقیقاً همان نقضِ آینگی است که این گارد برایش نوشته شده.
+const bin = f => fs.existsSync(path.join(root, f));
+for (const name of ['card_box_closed.webp', 'card_box_open.webp']) {
+  ok(`وب تصویرِ ${name} را دارد`, bin(`userweb/public/shop/${name}`));
+  ok(`اندروید تصویرِ ${name} را دارد`, bin(`mobile/assets/shop/${name}`));
+  ok(`وب به ${name} ارجاع می‌دهد`, webBox.includes(`/shop/${name}`));
+  ok(`اندروید به ${name} ارجاع می‌دهد`,
+    andBox.includes(`assets/shop/${name}`));
+}
+ok('پوشهٔ assets/shop در pubspec فهرست شده است',
+  /assets\/shop\//.test(read('mobile/pubspec.yaml')));
+
+// ── ۹. باز شدنِ صندوق در هر دو کلاینت انیمیشن دارد ────────────────────
+//
+// خواستهٔ صریحِ مالک: باز شدن باید افکت داشته باشد و کارت‌ها جذاب رو
+// بیایند. اگر یک کلاینت انیمیشن بگیرد و دیگری نه، همان دو-بازیِ متفاوت
+// می‌شود که کراس‌پلی را می‌شکند — این بار در حسِ بازی، نه در قانونش.
+//
+// هر دو باید سه چیز داشته باشند: مرحلهٔ لرزش، تعویضِ تصویرِ بسته با باز،
+// و رونماییِ پلکانیِ کارت‌ها.
+ok('وب مرحلهٔ لرزش دارد', /shaking/.test(webBox));
+ok('اندروید مرحلهٔ لرزش دارد', /shaking/.test(andBox));
+ok('وب تصویرِ باز و بسته را عوض می‌کند',
+  webBox.includes('card_box_open') && webBox.includes('card_box_closed'));
+ok('اندروید تصویرِ باز و بسته را عوض می‌کند',
+  andBox.includes('card_box_open') && andBox.includes('card_box_closed'));
+ok('وب کارت‌ها را پلکانی رو می‌آورد', /revealed/.test(webBox));
+ok('اندروید کارت‌ها را پلکانی رو می‌آورد', /_revealed/.test(andBox));
+
+// فاصلهٔ رونماییِ هر کارت باید در دو کلاینت یکی باشد، وگرنه یک نفر
+// جشنِ کندتری می‌گیرد. عدد از خودِ سورس خوانده می‌شود، نه کپی.
+const webStep = webBox.match(/260\s*\*\s*i/);
+const andStep = andBox.match(/260\s*\*\s*i/);
+ok('گامِ رونمایی در هر دو کلاینت یکی است',
+  Boolean(webStep) && Boolean(andStep));
+
 console.log(`\n✅ ${pass} تست صندوقِ کارت موفق بود\n`);

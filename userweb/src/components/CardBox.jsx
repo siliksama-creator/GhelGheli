@@ -1,7 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { req, fa } from '../lib/api.js';
 import { CARD_RARITY_META } from '../lib/cards.js';
-import { SvgIcon } from './IconAsset.jsx';
 
 const money = n => `${fa(Number(n || 0).toLocaleString('en-US'))} تومان`;
 
@@ -14,6 +13,17 @@ const money = n => `${fa(Number(n || 0).toLocaleString('en-US'))} تومان`;
  *    راهی برای گرفتنشان نبود — بن‌بستِ کامل. صندوق دقیقاً برای همین ساخته
  *    شده بود و فقط درِ ورودی‌اش جا مانده بود.
  *
+ * ── دورِ ۲۸: از «یک ردیفِ دیگر» به «قهرمانِ صفحه» ──
+ *
+ * تا دیروز صندوق یک کارتِ مستطیلی بود که بینِ پلن‌های پلاس و چیپ‌های
+ * دسته‌بندی گم می‌شد؛ هم‌وزنِ یک آیتمِ ظاهریِ ده‌هزار تومانی دیده می‌شد در
+ * حالی که تنها درِ ورود به دوئل است. سه چیز عوض شد:
+ *
+ *   ۱. **بنرِ شاخص** با تصویرِ ترنسپرنتِ صندوق، نه آیکونِ کوچکِ کنارِ تیتر.
+ *   ۲. **باز شدنِ انیمیشنی**: لرزش → انفجارِ نور → تعویضِ درِ بسته با باز.
+ *   ۳. **رونماییِ کارت‌ها** روی تمامِ صفحه، یکی‌یکی و با رنگِ سطحِ خودشان،
+ *      به‌جای فهرستِ افقیِ ریزی که کاربر اصلاً نمی‌دیدش.
+ *
  * دو جا رندر می‌شود: قفسهٔ فروشگاه، و درست همان‌جا که دوئل بن‌بست می‌شود.
  */
 export default function CardBox({ token, compact = false, onGranted }) {
@@ -21,6 +31,23 @@ export default function CardBox({ token, compact = false, onGranted }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [won, setWon] = useState(null);
+
+  // مرحلهٔ نمایش: idle → shaking → bursting → revealing
+  //
+  // این جدا از `busy` است: `busy` وضعیتِ شبکه را می‌گوید و `phase` وضعیتِ
+  // نمایش را. اگر یکی‌شان می‌کردیم، پرداختِ سریع باعث می‌شد انیمیشن نصفه
+  // بپرد و پرداختِ کند باعث می‌شد صندوق قبل از رسیدنِ کارت‌ها باز شود.
+  const [phase, setPhase] = useState('idle');
+  const [revealed, setRevealed] = useState(0);
+  const timers = useRef([]);
+
+  const clearTimers = () => {
+    timers.current.forEach(clearTimeout);
+    timers.current = [];
+  };
+  const later = (fn, ms) => { timers.current.push(setTimeout(fn, ms)); };
+
+  useEffect(() => clearTimers, []);
 
   const load = useCallback(async () => {
     try {
@@ -32,8 +59,16 @@ export default function CardBox({ token, compact = false, onGranted }) {
 
   useEffect(() => { load(); }, [load]);
 
+  const closeReveal = () => {
+    clearTimers();
+    setPhase('idle');
+    setWon(null);
+    setRevealed(0);
+  };
+
   const buy = async () => {
-    setBusy(true); setError(''); setWon(null);
+    setBusy(true); setError(''); setWon(null); setRevealed(0);
+    setPhase('shaking');
     try {
       // همان سه‌گامِ فروشگاه: سفارش از سرور، پرداخت در بازار، تحویل بعد
       // از راستی‌آزماییِ سرور. کلاینت هیچ‌وقت خودش «تحویل شد» نمی‌گوید.
@@ -44,11 +79,22 @@ export default function CardBox({ token, compact = false, onGranted }) {
       const purchaseToken = await window.__ghBazaarPurchase(order.productId, order.orderId);
       const result = await req('/api/purchase/verify', 'POST',
         { orderId: order.orderId, purchaseToken }, token);
-      setWon(result?.cards || []);
+      const cards = result?.cards || [];
+      setWon(cards);
       await load();
       onGranted?.(result);
+
+      // ترتیبِ نمایش، بعد از قطعی‌شدنِ تحویل: در باز می‌شود، نور می‌ترکد،
+      // بعد کارت‌ها یکی‌یکی رو می‌آیند. هر کارت ۲۶۰ms فاصله دارد تا چشم
+      // فرصتِ دیدنِ هرکدام را داشته باشد.
+      setPhase('bursting');
+      later(() => {
+        setPhase('revealing');
+        cards.forEach((_, i) => later(() => setRevealed(i + 1), 260 * i + 180));
+      }, 620);
     } catch (e) {
       setError(e.message || 'خرید انجام نشد');
+      setPhase('idle');
     } finally {
       setBusy(false);
     }
@@ -60,91 +106,234 @@ export default function CardBox({ token, compact = false, onGranted }) {
     </div>;
   }
 
+  const open = phase === 'bursting' || phase === 'revealing';
+
   return <section className={`cardBox ${compact ? 'compact' : ''}`} dir="rtl">
     <style>{`
-      .cardBox{border:1px solid rgba(255,209,102,.32);border-radius:20px;padding:15px;color:#fff;
-        background:radial-gradient(circle at 88% 0,rgba(124,58,237,.28),transparent 44%),linear-gradient(140deg,#0d1b2c,#141033 68%,#2a1140);
-        box-shadow:0 16px 44px rgba(0,0,0,.26);display:grid;gap:12px}
-      .cardBoxLoading{text-align:center;color:#94a3b8;font-size:12px;padding:22px}
-      .cardBoxHead{display:flex;align-items:flex-start;justify-content:space-between;gap:11px}
-      .cardBoxHead h3{margin:0;font-size:17px;font-weight:950;display:flex;align-items:center;gap:7px}
-      .cardBoxHead p{margin:5px 0 0;font-size:11px;line-height:1.7;color:#b9c5d5;max-width:46ch}
-      .cardBoxPrice{white-space:nowrap;background:rgba(0,0,0,.3);border:1px solid rgba(255,209,102,.4);
-        border-radius:14px;padding:8px 12px;color:#FFD166;font-weight:950;font-size:13px}
+      /* ── بنرِ شاخص ─────────────────────────────────────────────────
+         عمداً از قابِ آیتم‌های فروشگاه پیروی نمی‌کند: هالهٔ طلایی، قابِ
+         ضخیم‌تر و عرضِ کامل، تا در یک نگاه از قفسهٔ آیتم‌ها جدا بیفتد. */
+      .cardBox{position:relative;overflow:hidden;border:1.5px solid rgba(255,209,102,.55);
+        border-radius:26px;padding:0;color:#fff;margin:18px 0 22px;
+        background:radial-gradient(120% 130% at 82% -18%,rgba(249,115,22,.32),transparent 52%),
+          radial-gradient(100% 120% at 12% 110%,rgba(124,58,237,.34),transparent 56%),
+          linear-gradient(140deg,#0d1b2c,#141033 62%,#2a1140);
+        box-shadow:0 20px 60px rgba(0,0,0,.42),0 0 0 5px rgba(255,209,102,.07),
+          inset 0 1px 0 rgba(255,255,255,.09)}
+      /* نوارِ نورِ کندی که آرام روی بنر می‌لغزد — «زنده» بودنِ بی‌سروصدا */
+      .cardBox::after{content:'';position:absolute;inset:0;pointer-events:none;
+        background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.09) 47%,transparent 56%);
+        transform:translateX(-120%);animation:cbSheen 5.6s ease-in-out infinite}
+      @keyframes cbSheen{0%,72%{transform:translateX(-120%)}100%{transform:translateX(120%)}}
+      .cardBoxLoading{text-align:center;color:#94a3b8;font-size:12px;padding:26px}
+
+      .cardBoxRibbon{position:absolute;top:15px;left:-40px;transform:rotate(-38deg);
+        background:linear-gradient(135deg,#FFD166,#F97316);color:#2a1002;font-weight:950;
+        font-size:10px;letter-spacing:.4px;padding:5px 44px;box-shadow:0 5px 16px rgba(0,0,0,.35);z-index:3}
+
+      .cardBoxBody{position:relative;z-index:2;display:grid;
+        grid-template-columns:minmax(0,168px) minmax(0,1fr);gap:16px;padding:18px 18px 16px;align-items:center}
+
+      /* ── صحنهٔ صندوق ──────────────────────────────────────────────── */
+      .cardBoxStage{position:relative;aspect-ratio:1;display:grid;place-items:center}
+      .cardBoxGlow{position:absolute;width:88%;height:88%;border-radius:50%;
+        background:radial-gradient(circle,rgba(255,209,102,.45),rgba(249,115,22,.16) 45%,transparent 70%);
+        filter:blur(9px);animation:cbPulse 3.1s ease-in-out infinite}
+      @keyframes cbPulse{0%,100%{opacity:.55;transform:scale(.93)}50%{opacity:1;transform:scale(1.07)}}
+      .cardBoxImg{position:relative;width:100%;height:100%;object-fit:contain;
+        filter:drop-shadow(0 12px 20px rgba(0,0,0,.5));animation:cbFloat 3.6s ease-in-out infinite}
+      @keyframes cbFloat{0%,100%{transform:translateY(0) rotate(-1deg)}50%{transform:translateY(-7px) rotate(1deg)}}
+      /* لرزشِ قبل از باز شدن: تند و کوتاه، مثل چیزی که دارد از تو فشار می‌آورد */
+      .cardBox.shaking .cardBoxImg{animation:cbShake .42s linear infinite}
+      @keyframes cbShake{0%,100%{transform:translate(0,0) rotate(0)}
+        20%{transform:translate(-3px,1px) rotate(-3deg)}40%{transform:translate(3px,-1px) rotate(3deg)}
+        60%{transform:translate(-2px,-2px) rotate(-2deg)}80%{transform:translate(2px,2px) rotate(2deg)}}
+      .cardBox.open .cardBoxImg{animation:cbPop .55s cubic-bezier(.2,1.5,.4,1) both}
+      @keyframes cbPop{0%{transform:scale(.86)}60%{transform:scale(1.13)}100%{transform:scale(1)}}
+      .cardBox.open .cardBoxGlow{animation:cbBurst .62s ease-out both}
+      @keyframes cbBurst{0%{opacity:.4;transform:scale(.6)}55%{opacity:1;transform:scale(1.7)}
+        100%{opacity:.85;transform:scale(1.15)}}
+      /* پرتوهای نوری که فقط لحظهٔ باز شدن می‌زنند */
+      .cardBoxRays{position:absolute;inset:-14%;border-radius:50%;opacity:0;pointer-events:none;
+        background:conic-gradient(from 0deg,rgba(255,209,102,.7) 0 3deg,transparent 3deg 30deg,
+          rgba(255,209,102,.5) 30deg 33deg,transparent 33deg 60deg,rgba(249,115,22,.6) 60deg 63deg,
+          transparent 63deg 90deg,rgba(255,209,102,.7) 90deg 93deg,transparent 93deg 120deg,
+          rgba(255,209,102,.5) 120deg 123deg,transparent 123deg 150deg,rgba(249,115,22,.6) 150deg 153deg,
+          transparent 153deg 180deg,rgba(255,209,102,.7) 180deg 183deg,transparent 183deg 210deg,
+          rgba(255,209,102,.5) 210deg 213deg,transparent 213deg 240deg,rgba(249,115,22,.6) 240deg 243deg,
+          transparent 243deg 270deg,rgba(255,209,102,.7) 270deg 273deg,transparent 273deg 300deg,
+          rgba(255,209,102,.5) 300deg 303deg,transparent 303deg 330deg,rgba(249,115,22,.6) 330deg 333deg,
+          transparent 333deg 360deg);
+        -webkit-mask:radial-gradient(circle,transparent 24%,#000 42%,transparent 74%);
+        mask:radial-gradient(circle,transparent 24%,#000 42%,transparent 74%)}
+      .cardBox.open .cardBoxRays{animation:cbRays 1s ease-out both}
+      @keyframes cbRays{0%{opacity:0;transform:scale(.5) rotate(0)}
+        35%{opacity:1}100%{opacity:0;transform:scale(1.5) rotate(58deg)}}
+
+      /* ── متنِ بنر ─────────────────────────────────────────────────── */
+      .cardBoxInfo{display:grid;gap:9px;min-width:0}
+      .cardBoxTitleRow{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+      .cardBoxInfo h3{margin:0;font-size:20px;font-weight:950;letter-spacing:-.2px;
+        background:linear-gradient(100deg,#FFF3D0,#FFD166 45%,#F97316);
+        -webkit-background-clip:text;background-clip:text;color:transparent}
+      .cardBoxInfo p{margin:0;font-size:11.5px;line-height:1.75;color:#c3cedd}
+      .cardBoxInfo p b{color:#FFD166}
+      .cardBoxPrice{white-space:nowrap;background:rgba(0,0,0,.34);border:1px solid rgba(255,209,102,.45);
+        border-radius:14px;padding:7px 12px;color:#FFD166;font-weight:950;font-size:13.5px}
+
       .cardBoxOdds{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
-      .cardBoxOdd{border-radius:12px;padding:8px 5px;text-align:center;background:rgba(255,255,255,.05);
-        border:1px solid rgba(255,255,255,.09)}
+      .cardBoxOdd{border-radius:12px;padding:7px 4px;text-align:center;background:rgba(0,0,0,.26);
+        border:1px solid rgba(255,255,255,.1)}
       .cardBoxOdd b{display:block;font-size:14px;font-weight:950}
-      .cardBoxOdd span{display:block;font-size:9.5px;color:#94a3b8;margin-top:2px}
+      .cardBoxOdd span{display:block;font-size:9.5px;color:#9aa8ba;margin-top:2px}
+
       .cardBoxFoot{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
-      .cardBoxFoot small{color:#94a3b8;font-size:10.5px}
-      .cardBoxBtn{border:0;border-radius:13px;padding:11px 20px;font-weight:950;font-size:13px;cursor:pointer;
-        background:linear-gradient(135deg,#FFD166,#F97316);color:#1a0f02}
-      .cardBoxBtn:disabled{opacity:.55;cursor:default}
-      .cardBoxErr{color:#FCA5A5;font-size:11px;margin:0}
-      .cardBoxWon{border-top:1px solid rgba(255,255,255,.1);padding-top:11px;display:grid;gap:7px}
-      .cardBoxWon>b{font-size:12.5px;color:#22E7A6}
-      .cardBoxWonList{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(84px,1fr);gap:7px;overflow-x:auto}
-      .cardBoxWonCard{border-radius:11px;padding:8px 6px;text-align:center;background:rgba(0,0,0,.32);
-        border:1px solid rgba(255,255,255,.12)}
-      .cardBoxWonCard b{display:block;font-size:10.5px;margin-bottom:3px}
-      .cardBoxWonCard span{font-size:9px;color:#94a3b8}
       .cardBoxOwned{font-size:11px;color:#dbe6f2}
       .cardBoxOwned b{color:#FFD166}
-      @media(max-width:560px){.cardBoxOdds{grid-template-columns:repeat(3,minmax(0,1fr))}
-        .cardBoxHead{flex-wrap:wrap}.cardBox{padding:13px}}
+      .cardBoxBtn{position:relative;border:0;border-radius:14px;padding:12px 22px;font-weight:950;
+        font-size:13.5px;cursor:pointer;color:#1a0f02;overflow:hidden;
+        background:linear-gradient(135deg,#FFE9A8,#FFD166 40%,#F97316);
+        box-shadow:0 8px 22px rgba(249,115,22,.34)}
+      .cardBoxBtn:disabled{opacity:.6;cursor:default;box-shadow:none}
+      .cardBoxHint{color:#8fa0b4;font-size:10px;line-height:1.65;margin:0;padding:0 18px 15px}
+      .cardBoxErr{color:#FCA5A5;font-size:11px;margin:0;padding:0 18px 14px}
+
+      /* ── رونماییِ کارت‌ها ───────────────────────────────────────────
+         z-index برابرِ ۱۳۰۰ است چون قراردادِ مودال‌های همین اپ همین است
+         (`.invModalShade` در style.css). با عددِ کمتر، نویگیشنِ پایین و
+         هدر روی کارت‌ها می‌افتند — دقیقاً روی لحظه‌ای که کاربر باید
+         جایزه‌اش را ببیند. */
+      .cardBoxReveal{position:fixed;inset:0;z-index:1300;display:grid;place-items:center;padding:18px;
+        background:radial-gradient(circle at 50% 42%,rgba(42,17,64,.94),rgba(4,8,15,.97));
+        animation:cbFade .3s ease both;overflow-y:auto}
+      @keyframes cbFade{from{opacity:0}to{opacity:1}}
+      .cardBoxRevealInner{width:min(100%,540px);display:grid;gap:16px;justify-items:center}
+      .cardBoxRevealTitle{margin:0;text-align:center;font-size:19px;font-weight:950;color:#FFD166}
+      .cardBoxRevealSub{margin:0;text-align:center;font-size:11.5px;color:#a9b7c8}
+      .cardBoxDeck{display:flex;flex-wrap:wrap;gap:11px;justify-content:center}
+      .cardBoxPrize{width:98px;border-radius:16px;padding:12px 8px;text-align:center;
+        background:linear-gradient(165deg,rgba(255,255,255,.13),rgba(0,0,0,.4));
+        border:1.5px solid var(--accent);box-shadow:0 0 22px -6px var(--accent);
+        opacity:0;transform:rotateY(90deg) scale(.7)}
+      .cardBoxPrize.shown{animation:cbFlip .5s cubic-bezier(.2,1.3,.4,1) both}
+      @keyframes cbFlip{0%{opacity:0;transform:rotateY(90deg) scale(.7)}
+        60%{opacity:1;transform:rotateY(-12deg) scale(1.08)}
+        100%{opacity:1;transform:rotateY(0) scale(1)}}
+      .cardBoxPrizeTier{display:block;font-size:9.5px;font-weight:900;color:var(--accent);
+        letter-spacing:.3px;margin-bottom:6px}
+      .cardBoxPrizeName{display:block;font-size:11.5px;font-weight:950;color:#fff;line-height:1.5;
+        min-height:2.9em;overflow:hidden}
+      .cardBoxPrizePts{display:block;margin-top:6px;font-size:10px;color:#FFD166;font-weight:900}
+      .cardBoxDone{border:0;border-radius:14px;padding:12px 34px;font-weight:950;font-size:13.5px;
+        cursor:pointer;color:#1a0f02;background:linear-gradient(135deg,#FFD166,#F97316)}
+      .cardBoxTotal{font-size:12px;color:#22E7A6;font-weight:900}
+
+      /* حالتِ فشرده — جایی که صندوق داخلِ بن‌بستِ دوئل می‌نشیند و
+         نباید کلِ صفحه را بگیرد: هالهٔ کوچک‌تر، متنِ کمکی پنهان. */
+      .cardBox.compact{margin:12px 0}
+      .cardBox.compact .cardBoxBody{grid-template-columns:minmax(0,116px) minmax(0,1fr);
+        gap:12px;padding:14px 14px 12px}
+      .cardBox.compact .cardBoxInfo h3{font-size:17px}
+      .cardBox.compact .cardBoxHint{display:none}
+      @media(max-width:560px){
+        .cardBoxBody{grid-template-columns:minmax(0,110px) minmax(0,1fr);gap:12px;padding:15px 14px 13px}
+        .cardBoxInfo h3{font-size:17px}
+        .cardBoxOdds{grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}
+        .cardBoxOdd b{font-size:12px}.cardBoxOdd span{font-size:8.5px}
+        .cardBoxBtn{width:100%}.cardBoxFoot{gap:8px}
+        .cardBoxPrize{width:86px}
+      }
+      @media(prefers-reduced-motion:reduce){
+        .cardBox::after,.cardBoxGlow,.cardBoxImg,.cardBoxRays,.cardBoxPrize.shown{animation:none}
+        .cardBoxPrize.shown{opacity:1;transform:none}
+      }
     `}</style>
 
-    <div className="cardBoxHead">
-      <div>
-        <h3><SvgIcon name="gift" size={19} /> صندوق کارت</h3>
+    <span className="cardBoxRibbon">ویژه</span>
+
+    <div className="cardBoxBody">
+      <div className="cardBoxStage">
+        <span className="cardBoxGlow" />
+        <span className="cardBoxRays" />
+        <img
+          className="cardBoxImg"
+          src={open ? '/shop/card_box_open.webp' : '/shop/card_box_closed.webp'}
+          alt="صندوق کارت"
+          width={168}
+          height={168}
+        />
+      </div>
+
+      <div className="cardBoxInfo">
+        <div className="cardBoxTitleRow">
+          <h3>صندوق کارت</h3>
+          <span className="cardBoxPrice">{money(data.price)}</span>
+        </div>
         <p>
           {data.needsBox
-            ? <>برای دوئل به <b>{fa(data.size)} کارت</b> نیاز داری. این صندوق دقیقاً {fa(data.size)} کارتِ
-              تصادفی می‌دهد و کارت‌ها <b>امتیاز</b> هم دارند.</>
-            : <>کلکسیونت آمادهٔ دوئل است. هر صندوق {fa(data.size)} کارتِ تصادفیِ دیگر با امتیازشان اضافه می‌کند.</>}
+            ? <>برای شروعِ دوئل به <b>{fa(data.size)} کارت</b> نیاز داری. این صندوق دقیقاً
+              همان‌قدر کارتِ تصادفی می‌دهد و هر کارت <b>امتیاز</b> هم دارد.</>
+            : <>کلکسیونت آمادهٔ دوئل است. هر صندوق <b>{fa(data.size)} کارتِ</b> تصادفیِ
+              دیگر با امتیازشان اضافه می‌کند.</>}
         </p>
+
+        <div className="cardBoxOdds">
+          {(data.odds || []).map(o => {
+            const meta = CARD_RARITY_META[o.rarity] || { label: o.rarity, accent: '#94A3B8' };
+            return <div key={o.rarity} className="cardBoxOdd">
+              <b style={{ color: meta.accent }}>{fa(o.percent)}٪</b>
+              <span>{meta.label}</span>
+            </div>;
+          })}
+        </div>
+
+        <div className="cardBoxFoot">
+          <span className="cardBoxOwned">
+            کارت‌های فعال تو: <b>{fa(data.ownedCards)}</b>
+            {data.needsBox ? ` از ${fa(data.size)}` : ' · آمادهٔ دوئل'}
+          </span>
+          <button type="button" className="cardBoxBtn" onClick={buy} disabled={busy}>
+            {busy ? 'در حال باز کردن…' : 'باز کردن صندوق'}
+          </button>
+        </div>
       </div>
-      <div className="cardBoxPrice">{money(data.price)}</div>
     </div>
 
-    <div className="cardBoxOdds">
-      {(data.odds || []).map(o => {
-        const meta = CARD_RARITY_META[o.rarity] || { label: o.rarity, accent: '#94A3B8' };
-        return <div key={o.rarity} className="cardBoxOdd">
-          <b style={{ color: meta.accent }}>{fa(o.percent)}٪</b>
-          <span>{meta.label}</span>
-        </div>;
-      })}
-    </div>
-
-    <div className="cardBoxFoot">
-      <span className="cardBoxOwned">
-        کارت‌های فعال تو: <b>{fa(data.ownedCards)}</b>
-        {data.needsBox ? ` از ${fa(data.size)}` : ' · آمادهٔ دوئل'}
-      </span>
-      <button type="button" className="cardBoxBtn" onClick={buy} disabled={busy}>
-        {busy ? 'در حال باز کردن…' : `باز کردن صندوق · ${money(data.price)}`}
-      </button>
-    </div>
-
-    <small style={{ color: '#94a3b8', fontSize: '10px' }}>
-      شانسِ هر سطح بالا نوشته شده و برای همه یکسان است. کارت‌ها به کلکسیون اضافه می‌شوند و در دوئل قابل بازی‌اند.
-    </small>
+    <p className="cardBoxHint">
+      شانسِ هر سطح بالا نوشته شده و برای همه یکسان است. کارت‌ها به کلکسیون اضافه
+      می‌شوند و در دوئل قابل بازی‌اند.
+    </p>
 
     {error && <p className="cardBoxErr">{error}</p>}
 
-    {won && won.length > 0 && <div className="cardBoxWon">
-      <b>صندوق باز شد — {fa(won.length)} کارت گرفتی</b>
-      <div className="cardBoxWonList">
-        {won.map((c, i) => {
-          const meta = CARD_RARITY_META[c.rarity] || { label: c.rarity, accent: '#94A3B8' };
-          return <div key={i} className="cardBoxWonCard" style={{ borderColor: `${meta.accent}55` }}>
-            <b style={{ color: meta.accent }}>{c.name || 'کارت'}</b>
-            <span>{meta.label} · {fa(c.pointValue || 0)} امتیاز</span>
-          </div>;
-        })}
+    {phase === 'revealing' && won && won.length > 0 && (
+      <div className="cardBoxReveal" role="dialog" aria-label="کارت‌های صندوق">
+        <div className="cardBoxRevealInner">
+          <h4 className="cardBoxRevealTitle">صندوق باز شد</h4>
+          <p className="cardBoxRevealSub">
+            <span className="cardBoxTotal">{fa(won.length)} کارت</span> به کلکسیونت اضافه شد
+          </p>
+          <div className="cardBoxDeck">
+            {won.map((c, i) => {
+              const meta = CARD_RARITY_META[c.rarity] || { label: c.rarity, accent: '#94A3B8' };
+              return <div
+                key={i}
+                className={`cardBoxPrize ${i < revealed ? 'shown' : ''}`}
+                style={{ '--accent': meta.accent }}
+              >
+                <span className="cardBoxPrizeTier">{meta.label}</span>
+                <span className="cardBoxPrizeName">{c.name || 'کارت'}</span>
+                <span className="cardBoxPrizePts">{fa(c.pointValue || 0)} امتیاز</span>
+              </div>;
+            })}
+          </div>
+          {revealed >= won.length && (
+            <button type="button" className="cardBoxDone" onClick={closeReveal}>
+              عالی
+            </button>
+          )}
+        </div>
       </div>
-    </div>}
+    )}
   </section>;
 }

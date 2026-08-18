@@ -56,8 +56,16 @@ if (fail) {
   process.exit(1);
 }
 
-const web = fs.readdirSync(WEB_DIR).filter(f => f.endsWith('.webp')).sort();
-const app = fs.readdirSync(APP_DIR).filter(f => f.endsWith('.webp')).sort();
+// ⚠️ این پوشه فقط لوگوی باشگاه ندارد: از دورِ ۲۸ عکس‌های صندوقِ کارت
+// (`card_box_*.webp`) هم اینجا هستند. این تست دربارهٔ لوگوهاست، پس
+// مجموعهٔ مرجع را به `club_*` محدود می‌کنیم — وگرنه هر دارایی تازه‌ای
+// که به فروشگاه اضافه شود این تست را الکی قرمز می‌کند و کسی که عجله
+// دارد فقط عددِ EXPECTED را زیاد می‌کند و معنیِ تست از بین می‌رود.
+const isBadge = f => /^club_.*\.webp$/.test(f);
+const allWeb = fs.readdirSync(WEB_DIR).filter(f => f.endsWith('.webp')).sort();
+const allApp = fs.readdirSync(APP_DIR).filter(f => f.endsWith('.webp')).sort();
+const web = allWeb.filter(isBadge);
+const app = allApp.filter(isBadge);
 
 console.log('\n══ ۲. هیچ لوگویی گم نشده ══');
 // عددِ سفت‌وسخت عمدی است. اگر روزی باشگاهِ تازه‌ای اضافه شد، این تست
@@ -116,6 +124,26 @@ ck(`${alive.length} لوگوی ارجاع‌شده روی دیسک هست`,
 const orphanFiles = web.filter(f => !uniqRef.includes(f));
 ck('هیچ فایلِ بی‌صاحبی نیست', orphanFiles.length === 0,
   `${orphanFiles.join(', ')} — ردیفِ فروشگاه ندارند`);
+
+console.log('\n══ ۴.۵ دارایی‌های صندوقِ کارت ══');
+// صندوق ردیفِ `shop_items` ندارد (کالای درون‌برنامه‌ایِ بازار است، نه
+// ردیفِ فروشگاه)، پس بررسیِ «بی‌صاحب» بالا شاملش نمی‌شود. ولی اگر یکی
+// از این دو فایل گم شود، کاربر روی گران‌ترین کالای اپ یک مربعِ خالی
+// می‌بیند — پس جداگانه قفلش می‌کنیم.
+const CHEST = ['card_box_closed.webp', 'card_box_open.webp'];
+for (const f of CHEST) {
+  ck(`${f} در وب و اندروید هست`,
+    allWeb.includes(f) && allApp.includes(f),
+    `وب=${allWeb.includes(f)} اندروید=${allApp.includes(f)}`);
+  const wp = path.join(WEB_DIR, f);
+  const ap = path.join(APP_DIR, f);
+  if (fs.existsSync(wp) && fs.existsSync(ap)) {
+    // دو کلاینت باید بایت‌به‌بایت یک فایل باشند، وگرنه انیمیشن در یکی
+    // می‌پرد و در دیگری نه.
+    ck(`${f} در دو کلاینت یکسان است`,
+      fs.readFileSync(wp).equals(fs.readFileSync(ap)));
+  }
+}
 
 console.log('\n══ ۵. لوگوها از دسترسِ ابزارِ پاکسازی دورند ══');
 // ⚠️ مهم‌ترین بررسیِ این فایل.

@@ -807,7 +807,11 @@ class _CardDuelPageState extends State<CardDuelPage> {
                       fontSize: 12, height: 1.75, color: Color(0xFFCBD5E1)),
                 ),
               ),
-              CardBox(api: widget.api, onGranted: () => unawaited(_load())),
+              CardBox(
+                api: widget.api,
+                compact: true,
+                onGranted: () => unawaited(_load()),
+              ),
             ],
           )
         else
