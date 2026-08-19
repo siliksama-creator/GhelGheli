@@ -21,7 +21,8 @@
     "test:icon-parity": "node tool/icon-parity.mjs",
     "test:card-box": "node tool/card-box-parity.mjs",
     "test:style-backtick": "node tool/style-backtick.mjs",
-    "test:audio-focus": "node tool/audio-focus.mjs"
+    "test:audio-focus": "node tool/audio-focus.mjs",
+    "test:cache-headers": "node tool/cache-headers.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^6.0.5",
