@@ -5,6 +5,7 @@ import React, { useCallback, useState } from 'react';
 import { req, fa, avatarUrl } from '../lib/api.js';
 import { useAsync } from '../lib/useAsync.js';
 import { AsyncSection, EmptyView } from '../components/states.jsx';
+import { UiIcon } from '../components/IconAsset.jsx';
 import CachedImg from '../components/CachedImg.jsx';
 import { cardArtOf, cardRarityOf, CARD_RARITY_META } from '../lib/cards.js';
 
@@ -150,10 +151,30 @@ export default function Rewards({ token, setMsg, reloadProfile }) {
       {data => {
         const groups = (data.groups || []).filter(g => g.tiers?.length);
         if (!groups.length) {
+          // ── چرا حالتِ خالی این‌قدر بزرگ است ──────────────────────────
+          // «جوایز» یکی از پنج مقصدِ نوارِ پایین است. وقتی ادمین هنوز
+          // پله‌ای تعریف نکرده، این صفحه یک کارتِ کوچک بالا و ~۸۰٪ فضای
+          // مرده بود؛ برای کاربرِ تازه‌وارد پیامش «اپ ناقص است» می‌شد.
+          //
+          // پس به‌جای اعلامِ نبود، همان چیزی را نشان می‌دهیم که کاربر
+          // برای وقتی جوایز آمد لازم دارد: امتیازِ فعلی‌اش و اینکه از
+          // کجا امتیاز بگیرد. هیچ متنِ اضافه‌ای اضافه نشده — همان یک
+          // جمله مانده، فقط دورش محتوای واقعی نشسته.
           return (
-            <section className="card wide">
+            <section className="card wide rgSoon">
               <h2>جوایز</h2>
-              <EmptyView icon="gift">هنوز جایزه‌ای تعریف نشده است.</EmptyView>
+              <div className="rgSoonScore">
+                <span>امتیاز فعلی تو</span>
+                <b>{fa(data.currentPoints || 0)}</b>
+              </div>
+              <EmptyView icon="gift">
+                جایزه‌ها هنوز اعلام نشده‌اند؛ امتیازت جمع می‌شود و می‌ماند.
+              </EmptyView>
+              <div className="rgSoonWays">
+                <div><UiIcon name="game" size={19} /><span>برد در بازی‌ها</span></div>
+                <div><UiIcon name="card" size={19} /><span>ثبت کارت</span></div>
+                <div><UiIcon name="group" size={19} /><span>دعوت دوستان</span></div>
+              </div>
             </section>
           );
         }

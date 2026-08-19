@@ -22,7 +22,7 @@ class ShopPage extends StatefulWidget {
 }
 
 class _ShopPageState extends State<ShopPage> {
-  late Future<dynamic> _future = widget.api.get('/api/shop');
+  late Future<dynamic> _future = widget.api.get('/api/shop?shape=items');
   String? _busy;
   String _kind = 'card_frame';
   bool _showPlans = true;
@@ -82,7 +82,7 @@ class _ShopPageState extends State<ShopPage> {
   }
 
   Future<void> _reload() async {
-    setState(() => _future = widget.api.get('/api/shop'));
+    setState(() => _future = widget.api.get('/api/shop?shape=items'));
     try {
       await _future;
     } catch (_) {

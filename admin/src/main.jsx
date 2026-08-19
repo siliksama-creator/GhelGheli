@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, Suspense, lazy } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BarChart3, Bell, Gift, MessageCircle, LifeBuoy, ScanLine, Settings, Shield, Sigma, Trophy, Users, Gamepad2, Wallet, Activity } from 'lucide-react';
 
@@ -12,20 +12,32 @@ import { AppShell } from './components/app-shell.jsx';
 
 import { LoginScreen } from './pages/login.jsx';
 import { Dashboard } from './pages/dashboard.jsx';
-import { PhotoCardsPage } from './pages/photo-cards.jsx';
-import { PointsPage } from './pages/points.jsx';
-import { RewardsPage } from './pages/rewards.jsx';
-import { LeaguePage } from './pages/league.jsx';
-import { WalletPage } from './pages/wallet.jsx';
-import { UsersPage } from './pages/users.jsx';
-import { ChatModerationPage } from './pages/chat-moderation.jsx';
-import { SupportPage } from './pages/support.jsx';
-import { NotificationsPage } from './pages/notifications.jsx';
-import { GameRewardsPage } from './pages/game-rewards.jsx';
-import { SettingsPage } from './pages/settings.jsx';
-import { AdminsPage } from './pages/admins.jsx';
-import { MetricsPage } from './pages/metrics.jsx';
-import { AnalyticsPage } from './pages/analytics.jsx';
+
+// ── چرا صفحاتِ ادمین تنبل بارگذاری می‌شوند ────────────────────────────
+//
+// همه ایستا import می‌شدند، پس هر ادمین برای دیدنِ فرمِ ورود کلِ پنل را
+// دانلود می‌کرد — از جمله `photo-cards.jsx` با ۱۲۳۵ خط که فقط یک نفر و
+// فقط گاهی بازش می‌کند.
+//
+// `LoginScreen` و `Dashboard` ایستا می‌مانند: اولی همیشه اولین چیزِ
+// دیده‌شده است و دومی بلافاصله بعد از ورود می‌آید؛ تنبل‌کردنشان فقط یک
+// رفت‌وبرگشتِ اضافه می‌ساخت.
+//
+// هیچ صفحه‌ای حذف نشده — فقط لحظهٔ دانلودش عوض شده.
+const PhotoCardsPage = lazy(() => import('./pages/photo-cards.jsx').then(m => ({ default: m.PhotoCardsPage })));
+const PointsPage = lazy(() => import('./pages/points.jsx').then(m => ({ default: m.PointsPage })));
+const RewardsPage = lazy(() => import('./pages/rewards.jsx').then(m => ({ default: m.RewardsPage })));
+const LeaguePage = lazy(() => import('./pages/league.jsx').then(m => ({ default: m.LeaguePage })));
+const WalletPage = lazy(() => import('./pages/wallet.jsx').then(m => ({ default: m.WalletPage })));
+const UsersPage = lazy(() => import('./pages/users.jsx').then(m => ({ default: m.UsersPage })));
+const ChatModerationPage = lazy(() => import('./pages/chat-moderation.jsx').then(m => ({ default: m.ChatModerationPage })));
+const SupportPage = lazy(() => import('./pages/support.jsx').then(m => ({ default: m.SupportPage })));
+const NotificationsPage = lazy(() => import('./pages/notifications.jsx').then(m => ({ default: m.NotificationsPage })));
+const GameRewardsPage = lazy(() => import('./pages/game-rewards.jsx').then(m => ({ default: m.GameRewardsPage })));
+const SettingsPage = lazy(() => import('./pages/settings.jsx').then(m => ({ default: m.SettingsPage })));
+const AdminsPage = lazy(() => import('./pages/admins.jsx').then(m => ({ default: m.AdminsPage })));
+const MetricsPage = lazy(() => import('./pages/metrics.jsx').then(m => ({ default: m.MetricsPage })));
+const AnalyticsPage = lazy(() => import('./pages/analytics.jsx').then(m => ({ default: m.AnalyticsPage })));
 
 const NAV = [
   ['dashboard', 'داشبورد', BarChart3, Dashboard],
@@ -134,7 +146,9 @@ function App() {
       title={active[1]}
       subtitle="تمام تغییرات حساس در Audit Log ثبت می‌شود."
     >
-      <ActivePage request={request} />
+      <Suspense fallback={<div className="pageLoading" aria-busy="true" />}>
+        <ActivePage request={request} />
+      </Suspense>
     </AppShell>
   );
 }

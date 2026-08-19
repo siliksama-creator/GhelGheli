@@ -162,10 +162,11 @@ class _CoinGuideState extends State<CoinGuide> {
                                   style: TextStyle(
                                       color: _gold,
                                       fontWeight: FontWeight.w900)),
-                              TextSpan(
-                                  text: ' به دست می‌آید — بردن بیشترین سکه'
-                                      ' را می‌دهد، ولی مساوی و باخت هم'
-                                      ' دست‌خالی نمی‌مانند.'),
+                              // دورِ ۳۳ — آینهٔ `CoinGuide.jsx`: این جمله سه
+                              // سطر می‌شد و جدولِ رتبه‌بندی را زیرِ خطِ تا
+                              // می‌برد. چیزی که جدول خودش می‌گوید از متن
+                              // برداشته شد، نه از محصول.
+                              TextSpan(text: ' به دست می‌آید.'),
                             ],
                           ),
                         ),

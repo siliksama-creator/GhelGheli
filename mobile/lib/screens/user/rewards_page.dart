@@ -162,13 +162,68 @@ class _RewardsPageState extends State<RewardsPage> {
               .toList();
 
           if (groups.isEmpty) {
+            // آینهٔ `rgSoon` در `userweb/src/screens/Rewards.jsx`.
+            // «جوایز» یکی از پنج مقصدِ نوارِ پایین است؛ تا وقتی ادمین
+            // پله‌ای نساخته بود این صفحه تقریباً خالی می‌ماند و پیامش
+            // برای کاربرِ تازه‌وارد «اپ ناقص است» بود. حالا امتیازِ
+            // فعلی و راه‌های کسبِ آن جای فضای مرده را می‌گیرند.
+            final points = (map['currentPoints'] as num?)?.toInt() ?? 0;
             return ListView(
               padding: const EdgeInsets.all(Gaps.md),
-              children: const [
-                EmptyState(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 18, vertical: 16),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: const Color(0x33FFC53D)),
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0x1AFFC53D), Color(0x08FFC53D)],
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      const Text('امتیاز فعلی تو',
+                          style: TextStyle(
+                              fontSize: 13.5, color: Color(0xFFCBD5E1))),
+                      const Spacer(),
+                      Text(faNum(points),
+                          style: const TextStyle(
+                              fontSize: 30,
+                              height: 1,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFFFFC53D))),
+                    ],
+                  ),
+                ),
+                Gaps.vSm,
+                const EmptyState(
                     icon: Icons.card_giftcard_outlined,
-                    title: 'هنوز جایزه‌ای تعریف نشده است',
+                    title: 'جایزه‌ها هنوز اعلام نشده‌اند؛ '
+                        'امتیازت جمع می‌شود و می‌ماند.',
                     image: 'assets/games/empty_rewards.webp'),
+                Gaps.vSm,
+                const Row(
+                  children: [
+                    Expanded(
+                        child: _RewardWay(
+                            icon: Icons.sports_esports_outlined,
+                            label: 'برد در بازی‌ها')),
+                    SizedBox(width: 10),
+                    Expanded(
+                        child: _RewardWay(
+                            icon: Icons.style_outlined, label: 'ثبت کارت')),
+                    SizedBox(width: 10),
+                    Expanded(
+                        child: _RewardWay(
+                            icon: Icons.group_outlined,
+                            label: 'دعوت دوستان')),
+                  ],
+                ),
               ],
             );
           }
@@ -561,6 +616,37 @@ class _ConfirmLine extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// یکی از سه راهِ کسبِ امتیاز در حالتِ «هنوز جایزه‌ای نیست».
+/// آینهٔ `.rgSoonWays > div` در وب.
+class _RewardWay extends StatelessWidget {
+  const _RewardWay({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: const Color(0x08FFFFFF),
+        border: Border.all(color: const Color(0x12FFFFFF)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 19, color: const Color(0xFF7DD3FC)),
+          const SizedBox(height: 8),
+          Text(label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8))),
+        ],
+      ),
     );
   }
 }

@@ -1304,7 +1304,9 @@ app.get('/api/reward-groups', auth, asyncHandler(async (req, res) => {
 
 // ── Shop: cosmetics + GhelGheli Plus ───────────────────────────────────────
 app.get('/api/shop', auth, asyncHandler(async (req, res) => {
-  res.json(await shop.catalogue(req.user.id));
+  // `shape=groups|items` نصفِ پاسخ را حذف می‌کند؛ توضیح در shopService.
+  // بدونِ پارامتر هر دو می‌آید تا APKهای منتشرشده نشکنند.
+  res.json(await shop.catalogue(req.user.id, req.query.shape));
 }));
 
 app.get('/api/shop/history', auth, asyncHandler(async (req, res) => {

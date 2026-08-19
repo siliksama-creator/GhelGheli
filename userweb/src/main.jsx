@@ -6,7 +6,7 @@
 // every change risky — the "stuck on a loading spinner forever" bug in the
 // league tab survived several passes precisely because it was invisible in
 // that wall of text.
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense, lazy } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { API, req, fa } from './lib/api.js';
@@ -14,22 +14,50 @@ import { primeImageCache, registerImageCacheWorker } from './lib/imageCache.js';
 import Notifications from './components/Notifications.jsx';
 import Auth from './screens/Auth.jsx';
 import Home from './screens/Home.jsx';
-import Profile from './screens/Profile.jsx';
-import League from './screens/League.jsx';
-import Chat from './screens/Chat.jsx';
-import PublicProfile from './screens/PublicProfile.jsx';
-import Rewards from './screens/Rewards.jsx';
-import Shop from './screens/Shop.jsx';
-import Wheel from './screens/Wheel.jsx';
-import Referral from './screens/Referral.jsx';
-import Pass from './screens/Pass.jsx';
-import GamesHub from './games.jsx';
-import GrowthHub from './GrowthHub.jsx';
-import Support from './support.jsx';
-import Wallet from './wallet.jsx';
-import Inventory from './screens/Inventory.jsx';
 import { LoadingView, ErrorView } from './components/states.jsx';
 import { UiIcon } from './components/IconAsset.jsx';
+
+// ── چرا این‌ها تنبل بارگذاری می‌شوند ──────────────────────────────────────
+//
+// همه‌چیز ایستا import می‌شد، پس یک باندلِ ۴۸۸KB ساخته می‌شد که کاربر
+// **قبل از دیدنِ صفحهٔ ورود** تمامش را دانلود می‌کرد — شاملِ موتورِ هر سه
+// بازی. اندازه‌گیریِ پایه روی ۴G با CPU چهاربرابر کندتر: FCP = ۲۴۴۸ms.
+//
+// `Auth` و `Home` ایستا می‌مانند چون اولین چیزی هستند که دیده می‌شوند؛
+// تنبل‌کردنشان فقط یک رفت‌وبرگشتِ اضافه اضافه می‌کرد. بقیه پشت تعاملِ
+// کاربرند و تا کلیک‌نشدن هیچ‌کس به آن‌ها نیاز ندارد.
+//
+// هیچ امکانی حذف نشده — فقط زمانِ رسیدنش عوض شده.
+const Profile = lazy(() => import('./screens/Profile.jsx'));
+const League = lazy(() => import('./screens/League.jsx'));
+const Chat = lazy(() => import('./screens/Chat.jsx'));
+const PublicProfile = lazy(() => import('./screens/PublicProfile.jsx'));
+const Rewards = lazy(() => import('./screens/Rewards.jsx'));
+const Shop = lazy(() => import('./screens/Shop.jsx'));
+const Wheel = lazy(() => import('./screens/Wheel.jsx'));
+const Referral = lazy(() => import('./screens/Referral.jsx'));
+const Pass = lazy(() => import('./screens/Pass.jsx'));
+const GamesHub = lazy(() => import('./games.jsx'));
+const GrowthHub = lazy(() => import('./GrowthHub.jsx'));
+const Support = lazy(() => import('./support.jsx'));
+const Wallet = lazy(() => import('./wallet.jsx'));
+const Inventory = lazy(() => import('./screens/Inventory.jsx'));
+
+// وقتی کاربر روی تبی می‌زند، چانکش تازه دانلود می‌شود. برای اینکه آن
+// لحظه صفر حس شود، به‌محضِ بی‌کار شدنِ مرورگر چانک‌های پرتردد را از
+// پیش می‌گیریم. کاربر هیچ‌وقت منتظر نمی‌ماند، ولی بایت‌ها هم جلوی
+// رندرِ اول را نگرفته‌اند.
+function prefetchTabs() {
+  const warm = () => {
+    import('./games.jsx');
+    import('./screens/League.jsx');
+    import('./screens/Rewards.jsx');
+    import('./screens/Shop.jsx');
+    import('./screens/Chat.jsx');
+  };
+  if (typeof requestIdleCallback === 'function') requestIdleCallback(warm, { timeout: 4000 });
+  else setTimeout(warm, 2500);
+}
 
 import './style.css';
 // AFTER style.css on purpose: style.css is full of `font-weight:900` (and one
@@ -230,6 +258,8 @@ function Portal({ token, logout }) {
       });
       setRewards(boot.rewards || []);
       primeImageCache(boot).catch(() => {});
+      // کاربر وارد شده و صفحهٔ اول رندر شده؛ حالا وقتِ گرم‌کردنِ بقیه است.
+      prefetchTabs();
       const wheel = boot.wheel;
       if (wheel) setSpins(wheel.unlimited ? '∞' : (wheel.spinsLeft ?? 0));
       setPassBrief(boot.pass || null);
@@ -354,6 +384,10 @@ function Portal({ token, logout }) {
           شیت پس از کلیک بسته می‌شود. این یک قلابِ خواندنی و بی‌اثر روی
           ظاهر است، نه تضعیفِ محصول برای آسان‌شدنِ تست. */}
       <main className="tabPane" key={tab} data-tab={tab}>
+        {/* fallback عمداً `LoadingView` نیست: چانک‌ها معمولاً چند ده
+            میلی‌ثانیه می‌آیند و اسپینرِ کوتاه‌مدت بیشتر از نبودش آزار
+            دارد. یک ظرفِ هم‌ارتفاع می‌گذاریم تا صفحه نپرد. */}
+        <Suspense fallback={<div className="tabLoading" aria-busy="true" />}>
         {tab === 'home' && (
           <Home token={token} p={p} rewards={rewards} load={load}
             setMsg={setMsg} openProfile={() => setTab('profile')}
@@ -400,11 +434,14 @@ function Portal({ token, logout }) {
           <Support token={token} api={API} req={req} asset={v =>
             (!v ? '' : String(v).startsWith('http') ? v : API + v)} />
         )}
+        </Suspense>
       </main>
 
       {publicUser && (
+        <Suspense fallback={null}>
         <PublicProfile token={token} userId={publicUser}
           close={() => setPublicUser(null)} />
+        </Suspense>
       )}
     </div>
   );

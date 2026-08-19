@@ -116,7 +116,7 @@ async function plusStatus(userId, client = pool, preloadedUser = undefined) {
   };
 }
 
-async function catalogue(userId) {
+async function catalogue(userId, shape) {
   // ── یک خواندنِ `users` به‌جای سه‌تا ────────────────────────────────────
   //
   // قبلاً همین یک ردیف سه بار از دیتابیس خوانده می‌شد:
@@ -185,8 +185,25 @@ async function catalogue(userId) {
     };
   });
 
-  const groups = {};
-  for (const item of decorated) (groups[item.kind] ||= []).push(item);
+  // ── چرا شکلِ پاسخ به کلاینت وابسته است ────────────────────────────────
+  // پاسخ هر ۵۴ آیتم را دو بار می‌فرستاد: یک بار در `items` و یک بار در
+  // `groups` (همان اشیاء، دسته‌بندی‌شده). اندازه‌گیری روی تولید: ۶۶.۷KB
+  // که ۳۲KB آن دقیقاً تکرار بود — idها ۱۰۰٪ منطبق و اشیاء عیناً برابر.
+  //
+  // هیچ کلاینتی هر دو را نمی‌خواند: وب فقط `groups` (Shop.jsx:208) و
+  // اندروید فقط `items` (shop_page.dart:277). ولی APKهای منتشرشده روی
+  // کافه‌بازار قابل بروزرسانیِ فوری نیستند، پس نمی‌شود یکی را حذف کرد.
+  //
+  // راه‌حل: کلاینت با `?shape=` می‌گوید کدام را می‌خواهد. درخواستِ بدونِ
+  // پارامتر — یعنی هر APK قدیمی — همچنان هر دو را می‌گیرد و چیزی نمی‌شکند.
+  const wantGroups = shape !== 'items';
+  const wantItems = shape !== 'groups';
+
+  let groups;
+  if (wantGroups) {
+    groups = {};
+    for (const item of decorated) (groups[item.kind] ||= []).push(item);
+  }
   const walletBalance = Number(userRecord?.wallet_balance || 0);
   return {
     walletBalance,
@@ -205,8 +222,8 @@ async function catalogue(userId) {
       expiryNote: 'خرید مستقیم دائمی است؛ دسترسی اشتراکی با پایان دوره متوقف می‌شود و باشگاه منتخبت می‌ماند.',
     },
     plans: [planView(PLUS_PLANS.monthly), planView(PLUS_PLANS.annual)],
-    groups,
-    items: decorated,
+    ...(wantGroups ? { groups } : {}),
+    ...(wantItems ? { items: decorated } : {}),
     clubs: clubs.rows,
     purchaseHistory: history.map((row) => ({
       ...row,

@@ -108,3 +108,37 @@ body {
 
    مقادیر در PIN_COLORS (lib/api.js) هستند. */
 .pinnedBanner { --pin: var(--pin-dark); }
+
+/* ظرفِ چانکِ در حالِ آمدن. ارتفاعِ کم ولی غیرصفر تا وقتی صفحه از
+   حالتِ تنبل بیرون می‌آید، محتوا نپرد (جهش چیدمان). */
+.tabLoading { min-height: 42vh; }
+
+/* ── صفحهٔ جوایز، پیش از تعریفِ پله‌ها ────────────────────────────────
+   «جوایز» یکی از پنج مقصدِ نوارِ پایین است و تا وقتی ادمین پله‌ای
+   نساخته بود ~۸۰٪ صفحه خالی می‌ماند. حالا امتیازِ کاربر و راه‌های
+   کسبِ امتیاز جای آن فضای مرده را می‌گیرند. */
+.rgSoonScore {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px; margin: 14px 0 4px; padding: 16px 18px; border-radius: 18px;
+  background: linear-gradient(135deg, #ffc53d1a, #ffc53d08);
+  border: 1px solid #ffc53d33;
+}
+.rgSoonScore span { color: #cbd5e1; font-size: 13.5px; }
+.rgSoonScore b {
+  font-size: 30px; font-weight: 800; color: #ffc53d;
+  font-variant-numeric: tabular-nums; line-height: 1;
+}
+.rgSoonWays {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px; margin-top: 6px;
+}
+.rgSoonWays > div {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 16px 8px; border-radius: 16px;
+  background: #ffffff08; border: 1px solid #ffffff12;
+  color: #94a3b8; font-size: 12.5px; text-align: center;
+}
+.rgSoonWays svg { color: #7dd3fc; opacity: .9; }
+@media (min-width: 1100px) {
+  .rgSoonWays { max-width: 620px; margin-inline: auto; }
+}

@@ -127,7 +127,7 @@ export default function Shop({ token, reloadProfile }) {
   const load = useCallback(async () => {
     try {
       const [catalogue, purchases] = await Promise.all([
-        req('/api/shop', 'GET', null, token),
+        req('/api/shop?shape=groups', 'GET', null, token),
         req('/api/shop/history?limit=24', 'GET', null, token),
       ]);
       setData(catalogue); setHistory(Array.isArray(purchases) ? purchases : []); setError('');
