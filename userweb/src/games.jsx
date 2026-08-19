@@ -316,9 +316,11 @@ export default function Games({ api, token, externalLaunch = null }) {
         <span style={{ color:'#FFD166', display:'flex' }}><SvgIcon name="football" size={27} /></span>
       </div>
 
-      {/* نوارِ کوچکِ نرخِ سکه — پیش از انتخابِ ورودی، چون همین‌جا تصمیم
-          گرفته می‌شود کدام بازی ارزش دارد. آینهٔ games_page.dart. */}
-      <CoinRateStrip />
+      {/* نوارِ نرخِ سکه — پیش از انتخابِ ورودی، چون همین‌جا تصمیم گرفته
+          می‌شود کدام بازی ارزش دارد. آینهٔ games_page.dart.
+          دورِ ۳۲: `mode` پاس داده می‌شود تا در تمرین و لابی — که سکه
+          نمی‌دهند — به‌جای جدولِ نرخ، دلیلش گفته شود. */}
+      <CoinRateStrip mode={mode} />
 
       {/* Mode Selector (4 Tabs) — رنگ هر قرص مثل اندروید */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>

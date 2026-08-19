@@ -15,6 +15,42 @@ let enabled = localStorage.getItem(KEY) !== '0';
 let duelMusic = null;
 let duelMusicRequested = false;
 
+// ── نگهبانِ ازسرگیری (دورِ ۳۲) ───────────────────────────────────────────
+//
+// باگی که کاربر گزارش کرد: «صدا وسطِ بازی کارت قطع می‌شود».
+//
+// بازتولیدِ دقیق: کاربر وسطِ دوئل به اپِ دیگری می‌رود (نوتیفیکیشن، تماس،
+// عوض‌کردنِ تب). شنوندهٔ `visibilitychange` درست کار می‌کند و موزیک را
+// `pause` می‌کند. تا اینجا درست. اما موقعِ برگشتن، `duelMusic.play()` را
+// بیرون از پنجرهٔ ژستِ کاربر صدا می‌زنیم و مرورگرِ موبایل آن را با
+// `NotAllowedError` رد می‌کند — چون بازگشت به تب «ژستِ کاربر» حساب نمی‌شود.
+// نتیجه: موزیک برای همیشه خاموش می‌ماند، حتی وقتی کاربر بعداً روی کارت
+// می‌زند، چون هیچ‌کس دوباره تلاش نمی‌کند. بقیهٔ افکت‌ها هم شنیده نمی‌شوند
+// چون همان قفلِ autoplay روی کلون‌ها هم هست.
+//
+// چرا `beginMusic` به‌تنهایی کافی نبود: retry داخلِ آن فقط یک‌بار و فقط
+// برای شکستِ *شروع* ثبت می‌شد؛ مسیرِ `visibilitychange` اصلاً از آن رد
+// نمی‌شد و شکستش بی‌صدا بلعیده می‌شد (`?.catch?.(() => {})`).
+//
+// راه‌حل: یک نقطهٔ واحد `resumeOnGesture()` که هر شکستِ پخش را به شنوندهٔ
+// یک‌بارمصرفِ `pointerdown` گره می‌زند. این معادلِ وبیِ همان کاری است که
+// `_AudioLifecycle` روی اندروید می‌کند (اندروید مشکلِ ژست ندارد، ولی
+// همان قرارداد را دارد: برگشت به پیش‌زمینه = ازسرگیری).
+let unlockArmed = false;
+
+function resumeOnGesture() {
+  if (unlockArmed || typeof document === 'undefined') return;
+  unlockArmed = true;
+  const unlock = () => {
+    unlockArmed = false;
+    if (!enabled || !duelMusicRequested || !duelMusic) return;
+    // اگر این تلاش هم شکست خورد، دوباره مسلح می‌شویم: کاربر ممکن است
+    // اولین لمسش را جایی بزند که مرورگر هنوز قانع نشده باشد.
+    duelMusic.play()?.catch?.(() => resumeOnGesture());
+  };
+  document.addEventListener('pointerdown', unlock, { once: true });
+}
+
 const source = name => `/sfx/${name}.mp3`;
 
 function get(name) {
@@ -37,16 +73,9 @@ function beginMusic() {
     duelMusic.preload = 'auto';
     duelMusic.loop = true;
     duelMusic.volume = 0.20;
-    const attempt = duelMusic.play();
-    // If the socket event fell outside the browser's gesture window, retry
-    // exactly once on the next real tap instead of leaving the match silent.
-    if (attempt?.catch) attempt.catch(() => {
-      const unlock = () => {
-        document.removeEventListener('pointerdown', unlock);
-        if (enabled && duelMusicRequested) duelMusic?.play()?.catch?.(() => {});
-      };
-      document.addEventListener('pointerdown', unlock, { once: true });
-    });
+    // اگر رویدادِ سوکت بیرون از پنجرهٔ ژستِ مرورگر افتاد، به‌جای سکوتِ
+    // دائمی روی لمسِ بعدی دوباره تلاش کن.
+    duelMusic.play()?.catch?.(() => resumeOnGesture());
   } catch { /* never let audio break the game */ }
 }
 
@@ -62,7 +91,10 @@ if (typeof document !== 'undefined') {
     if (document.visibilityState === 'hidden') {
       try { duelMusic.pause(); } catch { /* cosmetic */ }
     } else if (enabled && duelMusicRequested) {
-      duelMusic.play()?.catch?.(() => { /* resumes on next tap */ });
+      // 🔴 اینجا بود که صدا برای همیشه می‌مرد: مرورگرِ موبایل این
+      // `play()` را رد می‌کند چون بازگشت به تب ژستِ کاربر نیست.
+      // حالا شکست را به لمسِ بعدی گره می‌زنیم.
+      duelMusic.play()?.catch?.(() => resumeOnGesture());
     }
   });
 }
@@ -97,10 +129,24 @@ export function play(name, volume = 1) {
   if (!enabled || !FILES.includes(name)) return;
   try {
     const base = get(name);
-    // Clone so impact and result layers can overlap without cutting off.
+    // کلون می‌گیریم تا لایهٔ ضربه و لایهٔ نتیجه هم‌زمان پخش شوند و
+    // همدیگر را قطع نکنند.
+    //
+    // 🔴 دورِ ۳۲ — نشتِ المانِ صوتی: تا پیش از این، هر کلون تا ابد زنده
+    // می‌ماند. در یک دوئلِ کاملِ اندازه‌گیری‌شده ۱۱ المانِ صوتیِ رهاشده
+    // شمردیم. روی موبایل تعدادِ همزمانِ المان‌های مدیا سقف دارد؛ بعد از
+    // چند دست، `play()` بی‌صدا شکست می‌خورَد و کاربر می‌گوید «صدا وسطِ
+    // بازی قطع شد». با آزادکردنِ کلون بعد از پایانِ پخش، سقف هرگز پر
+    // نمی‌شود.
     const a = base.cloneNode();
     a.volume = Math.max(0, Math.min(1, volume));
-    const p = a.play();
-    if (p?.catch) p.catch(() => { /* autoplay blocked until first tap */ });
+    const release = () => {
+      a.removeEventListener('ended', release);
+      a.removeEventListener('error', release);
+      try { a.src = ''; a.removeAttribute('src'); a.load(); } catch { /* ignore */ }
+    };
+    a.addEventListener('ended', release);
+    a.addEventListener('error', release);
+    a.play()?.catch?.(() => release());
   } catch { /* never let audio break the game */ }
 }

@@ -17,8 +17,16 @@ import '../api_client.dart';
 /// کامل یک تپ آن‌طرف‌تر در صفحهٔ لیگ می‌ماند.
 ///
 /// آینهٔ دقیقِ `CoinRateStrip.jsx`. اعداد از `COIN_TABLE` بک‌اند می‌آیند.
+///
+/// 🔴 دورِ ۳۲ — `mode` اضافه شد. آینهٔ همان تغییر در `CoinRateStrip.jsx`:
+/// نوار تا پیش از این حتی در «تمرین با ربات» و «اتاق خصوصی» — که طبقِ
+/// قاعدهٔ خودمان سکه نمی‌دهند — جدولِ نرخ را نشان می‌داد. عدد غلط نبود،
+/// ولی به حالتِ فعلی ربطی نداشت و کاربر آن را «نادقیق» تجربه می‌کرد.
 class CoinRateStrip extends StatelessWidget {
-  const CoinRateStrip({super.key});
+  const CoinRateStrip({super.key, this.mode});
+
+  /// ورودیِ انتخاب‌شده. `null` یعنی «حالت مهم نیست، جدول را نشان بده».
+  final int? mode;
 
   // 🔴 این اعداد تا دورِ ۲۶ منسوخ بودند: دوئل ۲/۲۰ و بقیه ۱/۱۰، در حالی
   //    که `COIN_TABLE` بک‌اند مدت‌ها بود هر سه بازی را یکسان کرده بود.
@@ -33,6 +41,44 @@ class CoinRateStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // حالت‌هایی که سکه نمی‌دهند: تمرین با ربات (۰) و اتاق خصوصی (−۱).
+    if (mode == 0 || mode == -1) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          color: const Color(0xFF94A3B8).withValues(alpha: 0.08),
+          border: Border.all(
+              color: const Color(0xFF94A3B8).withValues(alpha: 0.22)),
+        ),
+        child: Row(
+          children: [
+            Opacity(
+              opacity: 0.45,
+              child: Image.asset('assets/pass/icon_coin.webp',
+                  width: 18,
+                  height: 18,
+                  errorBuilder: (_, __, ___) => const Icon(
+                      Icons.monetization_on_rounded,
+                      size: 18,
+                      color: _gold)),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                mode == 0
+                    ? 'تمرین با ربات سکه ندارد — برای سکه، ورودی ۱۰۰ یا ۱۰۰۰ را انتخاب کن.'
+                    : 'اتاق خصوصی سکه ندارد — برای سکه، ورودی ۱۰۰ یا ۱۰۰۰ را انتخاب کن.',
+                style: const TextStyle(
+                    fontSize: 12, height: 1.55, color: Color(0xFF94A3B8)),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
