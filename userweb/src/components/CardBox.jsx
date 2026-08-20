@@ -35,6 +35,7 @@ export default function CardBox({ token, compact = false, onGranted }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [won, setWon] = useState(null);
+  const [wonMeta, setWonMeta] = useState(null);
 
   // مرحلهٔ نمایش: idle → shaking → bursting → revealing
   //
@@ -67,11 +68,12 @@ export default function CardBox({ token, compact = false, onGranted }) {
     clearTimers();
     setPhase('idle');
     setWon(null);
+    setWonMeta(null);
     setRevealed(0);
   };
 
   const buy = async () => {
-    setBusy(true); setError(''); setWon(null); setRevealed(0);
+    setBusy(true); setError(''); setWon(null); setWonMeta(null); setRevealed(0);
     setPhase('shaking');
     try {
       // همان سه‌گامِ فروشگاه: سفارش از سرور، پرداخت در بازار، تحویل بعد
@@ -85,6 +87,12 @@ export default function CardBox({ token, compact = false, onGranted }) {
         { orderId: order.orderId, purchaseToken }, token);
       const cards = result?.cards || [];
       setWon(cards);
+      // امتیازِ کل و پرچمِ «پنج کارتِ متفاوت» از پاسخِ سرور می‌آید، نه از
+      // جمعِ کلاینت: منبعِ حقیقت همان چیزی است که در تراکنش ثبت شد.
+      setWonMeta({
+        points: Number(result?.points || 0),
+        distinct: result?.distinctCards === true,
+      });
       await load();
       onGranted?.(result);
 
@@ -231,6 +239,11 @@ export default function CardBox({ token, compact = false, onGranted }) {
       .cardBoxDone{border:0;border-radius:14px;padding:12px 34px;font-weight:950;font-size:13.5px;
         cursor:pointer;color:#1a0f02;background:linear-gradient(135deg,#FFD166,#F97316)}
       .cardBoxTotal{font-size:12px;color:#22E7A6;font-weight:900}
+      /* امتیازِ کل با رنگِ کهربایی از تعدادِ کارت جدا می‌شود تا در یک نگاه
+         دو عددِ متفاوت خوانده شوند، نه یک رشتهٔ یکدست. */
+      .cardBoxTotalPts{font-size:12px;color:#FFC24B;font-weight:900}
+      .cardBoxRevealNote{margin:2px 0 0;text-align:center;font-size:10.5px;
+        color:#7ee0b8;animation:cbFade .4s ease both}
 
       /* حالتِ فشرده — جایی که صندوق داخلِ بن‌بستِ دوئل می‌نشیند و
          نباید کلِ صفحه را بگیرد: هالهٔ کوچک‌تر، متنِ کمکی پنهان. */
@@ -316,7 +329,14 @@ export default function CardBox({ token, compact = false, onGranted }) {
           <h4 className="cardBoxRevealTitle">صندوق باز شد</h4>
           <p className="cardBoxRevealSub">
             <span className="cardBoxTotal">{fa(won.length)} کارت</span> به کلکسیونت اضافه شد
+            {wonMeta?.points > 0 && <>
+              {' · '}
+              <span className="cardBoxTotalPts">{fa(wonMeta.points)} امتیاز</span>
+            </>}
           </p>
+          {wonMeta?.distinct && <p className="cardBoxRevealNote">
+            همهٔ کارت‌ها متفاوت‌اند — ترکیبت کامل است
+          </p>}
           <div className="cardBoxDeck">
             {won.map((c, i) => {
               const meta = CARD_RARITY_META[c.rarity] || { label: c.rarity, accent: '#94A3B8' };

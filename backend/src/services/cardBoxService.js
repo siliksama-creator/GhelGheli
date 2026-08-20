@@ -128,17 +128,45 @@ function createCardBoxService(db = pool) {
    * قرعهٔ اول و پنجم مدیر می‌تواند کارتی را غیرفعال کند و نیمهٔ دومِ صندوق
    * از کاتالوگِ دیگری بیاید.
    *
-   * ── چرا تکرار مجاز است ──
+   * ── چرا تکرار به‌طورِ کلی مجاز است ──
    *
    * کارتِ تکراری در اینونتوری `quantity` را بالا می‌برد و بی‌ارزش نیست:
    * جوایزِ پلکانی (`reward_tier_cards`) تعدادِ مشخصی از یک کارت می‌خواهند.
-   * اگر تکرار را ممنوع می‌کردیم، صندوق با کاتالوگِ ۲۹ کارتی بعد از شش خرید
-   * عملاً تمام می‌شد.
+   * اگر تکرار را همه‌جا ممنوع می‌کردیم، صندوق با کاتالوگِ ۲۹ کارتی بعد از
+   * شش خرید عملاً تمام می‌شد.
+   *
+   * ── استثنا: اولین صندوقِ کاربرِ بی‌کارت ──
+   *
+   * خواستهٔ مالک: «بین کارت‌هایی که به کاربر بدون کارت داده میشه تکراری
+   * نباشه». دلیلش تجربهٔ کاربر است، نه اقتصاد: کسی که هیچ کارتی ندارد و
+   * اولین صندوقش را می‌خرد، اگر دو کارتِ یکسان بگیرد **ترکیبِ پنج‌نفره‌اش
+   * ناقص می‌ماند** — `validateDeck` پنج کارتِ *متمایز* می‌خواهد. یعنی
+   * صندوقی که کل هدفش «بتواند وارد دوئل شود» بود، همان وعده را می‌شکست.
+   *
+   * برای صندوق‌های بعدی تکرار دوباره مجاز است، چون آن‌وقت کاربر از قبل
+   * ترکیبِ کاملی دارد و کارتِ تکراری برایش سرمایهٔ جوایزِ پلکانی است.
    */
   async function grantBox(client, {
     userId, pricePaid, source = 'cafebazaar', orderId = null, rng = crypto,
   }) {
     const weights = await odds(client);
+
+    // آیا این «اولین صندوقِ کاربرِ بی‌کارت» است؟
+    //
+    // ⚠️ هر دو شرط لازم است. فقط `owned === 0` کافی نیست: کاربری که
+    //    کارت‌هایش در جایزه مصرف شده دوباره به صفر می‌رسد و آن‌وقت هر
+    //    صندوقش بدونِ تکرار می‌شد — که خواسته نبود.
+    //
+    // ⚠️ کوئری داخلِ همان تراکنشِ تحویل است، پس دو خریدِ هم‌زمان نمی‌توانند
+    //    هر دو «اولین» تشخیص داده شوند.
+    const { rows: preRows } = await client.query(
+      `SELECT
+         (SELECT COALESCE(SUM(quantity),0)::int FROM user_card_inventory
+           WHERE user_id=$1 AND consumed_in_reward=false) AS owned,
+         (SELECT COUNT(*)::int FROM card_box_purchases WHERE user_id=$1) AS boxes`,
+      [userId]);
+    const distinctMode = Number(preRows[0]?.owned || 0) === 0
+      && Number(preRows[0]?.boxes || 0) === 0;
 
     // فقط کارت‌های قابلِ بازی. کارتِ کلکسیونی (مهاجرت ۰۶۱) در دوئل
     // نمی‌آید، پس گذاشتنش در صندوقی که هدفش «بتواند بازی کند» است، دقیقاً
@@ -176,21 +204,68 @@ function createCardBoxService(db = pool) {
       for (const [r, list] of byRarity) if (list.length) live[r] = 1;
     }
 
+    // ── قرعه‌کشی ──────────────────────────────────────────────────────
+    //
+    // در حالتِ `distinctMode` کارتِ انتخاب‌شده از سطلِ خودش کنار گذاشته
+    // می‌شود تا دوباره نیاید. اگر سطلی خالی شد، وزنش از `live` حذف می‌شود
+    // و شانسش به‌طورِ طبیعی بینِ بقیه پخش می‌گردد (چون `pickWeighted` روی
+    // جمعِ ورودی نرمال می‌کند).
+    //
+    // ⚠️ گاردِ «صندوق همیشه پنج کارت»: اگر کاتالوگ آن‌قدر کوچک باشد که
+    //    پنج کارتِ متمایز نداشته باشد، `distinctMode` وسطِ کار خاموش
+    //    می‌شود و بقیهٔ اسلات‌ها با قاعدهٔ عادی پر می‌شوند. یک صندوقِ
+    //    چهارکارتی در مسیرِ پولی به‌هیچ‌وجه قابلِ قبول نیست.
+    const distinctTotal = new Set(catalogue.map(c => c.id)).size;
+    let noRepeat = distinctMode && distinctTotal >= BOX_SIZE;
+
+    const pool = new Map();
+    for (const [r, list] of byRarity) pool.set(r, list.slice());
+    const liveNow = { ...live };
+
     const picked = [];
     for (let slot = 0; slot < BOX_SIZE; slot++) {
-      const rarity = pickWeighted(live, rng);
-      const bucket = byRarity.get(rarity) || catalogue;
-      picked.push(bucket[rng.randomInt(0, bucket.length)]);
+      if (!noRepeat) {
+        const rarity = pickWeighted(live, rng);
+        const bucket = byRarity.get(rarity) || catalogue;
+        picked.push(bucket[rng.randomInt(0, bucket.length)]);
+        continue;
+      }
+
+      let rarity = pickWeighted(liveNow, rng);
+      let bucket = rarity ? pool.get(rarity) : null;
+
+      // سطلِ قرعه‌خورده تمام شده — از `liveNow` بیرونش می‌کنیم و دوباره
+      // قرعه می‌زنیم. حلقه‌ٔ بی‌پایان ممکن نیست چون هر دور یک کلید کم
+      // می‌شود.
+      while (rarity && (!bucket || !bucket.length)) {
+        delete liveNow[rarity];
+        rarity = pickWeighted(liveNow, rng);
+        bucket = rarity ? pool.get(rarity) : null;
+      }
+
+      if (!bucket || !bucket.length) {
+        // هیچ کلاسی کارتِ استفاده‌نشده ندارد. نباید برسیم اینجا (گاردِ
+        // `distinctTotal` جلویش را گرفته)، ولی اگر رسیدیم صندوق را ناقص
+        // رها نمی‌کنیم.
+        noRepeat = false;
+        slot -= 1;
+        continue;
+      }
+
+      const idx = rng.randomInt(0, bucket.length);
+      picked.push(bucket[idx]);
+      bucket.splice(idx, 1); // دیگر در همین صندوق نیاید
     }
 
     const points = picked.reduce((s, c) => s + Number(c.point_value || 0), 0);
 
     const box = await client.query(
       `INSERT INTO card_box_purchases
-         (user_id, price_paid, points_awarded, source, order_id, odds_snapshot)
-       VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, created_at`,
+         (user_id, price_paid, points_awarded, source, order_id, odds_snapshot,
+          distinct_cards)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, created_at`,
       [userId, Math.max(0, Math.trunc(Number(pricePaid) || 0)), points,
-        source, orderId, JSON.stringify(weights)]);
+        source, orderId, JSON.stringify(weights), noRepeat]);
     const boxId = box.rows[0].id;
 
     for (let i = 0; i < picked.length; i++) {
@@ -220,6 +295,9 @@ function createCardBoxService(db = pool) {
     return {
       boxId,
       points,
+      // کلاینت با این پرچم می‌تواند در رونماییِ اولین صندوق پیامِ
+      // «پنج کارتِ متفاوت» را نشان دهد.
+      distinctCards: noRepeat,
       createdAt: box.rows[0].created_at,
       cards: picked.map((c, i) => ({
         slot: i + 1,

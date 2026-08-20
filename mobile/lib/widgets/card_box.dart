@@ -146,7 +146,11 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
           barrierLabel: 'کارت‌های صندوق',
           barrierColor: Colors.transparent,
           transitionDuration: const Duration(milliseconds: 300),
-          pageBuilder: (_, __, ___) => _RevealScreen(cards: cards),
+          pageBuilder: (_, __, ___) => _RevealScreen(
+            cards: cards,
+            points: (result['points'] as num?)?.toInt() ?? 0,
+            distinct: result['distinctCards'] == true,
+          ),
           transitionBuilder: (_, anim, __, child) =>
               FadeTransition(opacity: anim, child: child),
         );
@@ -574,9 +578,19 @@ class _RaysPainter extends CustomPainter {
 /// روی تمامِ صفحه است، نه یک فهرستِ افقیِ ریز در پایینِ بنر — چون لحظهٔ
 /// گرفتنِ جایزه تنها لحظه‌ای است که کاربر واقعاً می‌خواهد نگاه کند.
 class _RevealScreen extends StatefulWidget {
-  const _RevealScreen({required this.cards});
+  const _RevealScreen({
+    required this.cards,
+    required this.points,
+    required this.distinct,
+  });
 
   final List<dynamic> cards;
+
+  /// مجموعِ امتیازِ این صندوق، از پاسخِ سرور — نه جمعِ کلاینت.
+  final int points;
+
+  /// آیا این صندوق با قاعدهٔ «بدون کارت تکراری» قرعه خورد.
+  final bool distinct;
 
   @override
   State<_RevealScreen> createState() => _RevealScreenState();
@@ -636,9 +650,27 @@ class _RevealScreenState extends State<_RevealScreen> {
                               fontSize: 12),
                         ),
                         const TextSpan(text: ' به کلکسیونت اضافه شد'),
+                        if (widget.points > 0) ...[
+                          const TextSpan(text: ' · '),
+                          TextSpan(
+                            text: '${faNum(widget.points)} امتیاز',
+                            style: const TextStyle(
+                                color: Color(0xFFFFC24B),
+                                fontWeight: FontWeight.w900,
+                                fontSize: 12),
+                          ),
+                        ],
                       ],
                     ),
                   ),
+                  if (widget.distinct) ...[
+                    const SizedBox(height: 4),
+                    const Text(
+                      'همهٔ کارت‌ها متفاوت‌اند — ترکیبت کامل است',
+                      style: TextStyle(
+                          fontSize: 10.5, color: Color(0xFF7EE0B8)),
+                    ),
+                  ],
                   const SizedBox(height: 18),
                   Wrap(
                     spacing: 11,

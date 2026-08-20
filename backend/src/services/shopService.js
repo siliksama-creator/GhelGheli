@@ -318,6 +318,9 @@ async function deliverCardBox(client, { userId, amount, orderId }) {
     boxId: box.boxId,
     cards: box.cards,
     points: box.points,
+    // اولین صندوقِ کاربرِ بی‌کارت پنج کارتِ **متمایز** می‌دهد تا ترکیبش
+    // واقعاً کامل شود. کلاینت با این پرچم پیامش را نشان می‌دهد.
+    distinctCards: box.distinctCards === true,
     referenceId: box.boxId,
   };
 }
