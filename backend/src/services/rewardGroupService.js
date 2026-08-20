@@ -21,6 +21,7 @@
 // A tier may additionally require specific CARDS. Those are checked against
 // the user's un-consumed inventory and consumed on claim.
 const { pool } = require('../config/db');
+const { faAmount } = require('../lib/faNum');
 const walletService = require('./walletService');
 
 const GROUP_TYPES = ['cash', 'physical', 'mixed'];
@@ -236,8 +237,8 @@ async function claim(userId, tierId) {
     if (spendable < tier.required_points) {
       throw Object.assign(
         new Error(
-          `امتیاز کافی نداری — ${tier.required_points} امتیاز لازم است و ` +
-          `${spendable} امتیاز داری`),
+          `امتیاز کافی نداری — ${faAmount(tier.required_points)} امتیاز لازم است و ` +
+          `${faAmount(spendable)} امتیاز داری`),
         { status: 400 });
     }
 

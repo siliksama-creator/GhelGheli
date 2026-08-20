@@ -84,11 +84,17 @@ class _GhelGheliAppState extends State<GhelGheliApp> {
       await api.post('/api/telemetry/crash', {
         'platform': 'android',
         'source': source,
-        // با نسخهٔ واقعی APK یکی بماند؛ مقدار قدیمی 1.0.0+1 باعث می‌شد
-        // همهٔ crashها به release اشتباه نسبت داده شوند.
+        // APK رسمی این مقدار را با --dart-define از pubspec می‌گیرد
+        // (build-apk.yml). مقدارِ پیش‌فرضِ ثابت اینجا یک‌بار روی 1.0.0+1
+        // مانده بود و بعد روی 1.1.9+11 — هر بار نسخه بالا می‌رفت این عدد
+        // جا می‌ماند و کرش‌ها به نسخهٔ اشتباه نسبت داده می‌شدند.
+        //
+        // به‌جای عددِ سومی که باز کهنه شود، صراحتاً می‌گوییم «نامشخص»:
+        // یک ردیفِ unknown در صندوقِ کرش بی‌ضرر است، ولی ردیفی که به
+        // نسخهٔ اشتباه چسبیده باشد تحلیل را گمراه می‌کند.
         'release': const String.fromEnvironment(
           'APP_RELEASE',
-          defaultValue: '1.1.9+11',
+          defaultValue: 'android-unknown',
         ),
         'message': message,
         'stack': stack,

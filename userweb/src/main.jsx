@@ -138,6 +138,21 @@ function useDarkOnly() {
   }, []);
 }
 
+/**
+ * کوتاه‌کردنِ متنِ خطا بدون از دست دادنِ دو سرِ آن.
+ *
+ * پیام‌های خطای مرورگر گاهی یک رشتهٔ غول‌پیکر (مثلاً کلِ یک شیتِ CSS) را
+ * داخل خود دارند و نکتهٔ تعیین‌کننده در انتهاست. بریدنِ ساده از ابتدا
+ * همان نکته را دور می‌ریزد، پس وسط را حذف می‌کنیم.
+ */
+function squeeze(value, limit) {
+  const text = String(value ?? '');
+  if (text.length <= limit) return text;
+  const head = Math.ceil((limit - 20) * 0.7);
+  const tail = limit - 20 - head;
+  return `${text.slice(0, head)} … [${text.length}] … ${text.slice(-tail)}`;
+}
+
 function App() {
   const [token, setToken] = useState(() => {
     try { return localStorage.token || ''; } catch { return ''; }
@@ -151,12 +166,30 @@ function App() {
       reporting = true;
       req('/api/telemetry/crash', 'POST', {
         platform: 'web', source, release: import.meta.env.VITE_APP_RELEASE || 'web',
-        message: String(message || 'Unknown browser error').slice(0, 2000),
+        // بریدنِ سادهٔ ۲۰۰۰ کاراکترِ اول یک‌بار تحلیل را کور کرد: پیامِ
+        // `TypeError: "<کل شیتِ CSS>" is not a function` دقیقاً سرِ ۲۰۰۰
+        // بریده شد و همان تکهٔ تعیین‌کننده («is not a function») که علت را
+        // می‌گفت از دست رفت. حالا وسط حذف می‌شود تا هم ابتدا هم انتهای
+        // پیام برسد.
+        message: squeeze(message || 'Unknown browser error', 2000),
         stack: String(stack || '').slice(0, 10000),
         context: { path: location.pathname },
       }, token).catch(() => {}).finally(() => { reporting = false; });
     };
-    const onError = event => report('window.error', event.message || event.error, event.error?.stack);
+    // `Script error.` تنها چیزی است که مرورگر از خطای یک اسکریپتِ
+    // cross-origin (افزونه‌های مرورگر، اسکریپتِ تزریقیِ اپراتور) بیرون
+    // می‌دهد: بدون پیام، بدون stack، بدون فایل. در تولید ۹ ردیف از این
+    // نوع ثبت شده و هیچ‌کدام قابلِ پیگیری نیستند چون کدِ ما نیستند —
+    // اسکریپت‌های خودمان same-origin و با crossorigin بارگذاری می‌شوند.
+    //
+    // نگه‌داشتنشان فقط صندوقِ کرش را کور می‌کند، پس ثبت نمی‌شوند.
+    const isOpaqueForeignError = event =>
+      (event.message === 'Script error.' || event.message === 'Script error')
+      && !event.error && !event.filename;
+    const onError = event => {
+      if (isOpaqueForeignError(event)) return;
+      report('window.error', event.message || event.error, event.error?.stack);
+    };
     const onRejection = event => report('unhandledrejection', event.reason?.message || event.reason, event.reason?.stack);
     window.addEventListener('error', onError);
     window.addEventListener('unhandledrejection', onRejection);

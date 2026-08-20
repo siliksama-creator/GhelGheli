@@ -1,4 +1,5 @@
 const { pool } = require('../config/db');
+const { faAmount } = require('../lib/faNum');
 const pointService = require('./pointService');
 const coinService = require('./coinService');
 const {
@@ -151,7 +152,7 @@ function createGameStakeService(db = pool, points = pointService, coins = coinSe
           source: 'game',
           referenceType: 'game_stake_entry',
           referenceId: matchId,
-          description: `ورودی مسابقه ${stake} امتیازی`,
+          description: `ورودی مسابقه ${faAmount(stake)} امتیازی`,
           league: false,
         });
         if (!d || d.delta !== -stake) {
@@ -247,7 +248,7 @@ function createGameStakeService(db = pool, points = pointService, coins = coinSe
             source: 'game',
             referenceType: 'game_stake_draw_refund',
             referenceId: matchId,
-            description: `بازگشت ورودی مسابقه مساوی (${stake} امتیاز)`,
+            description: `بازگشت ورودی مسابقه مساوی (${faAmount(stake)} امتیاز)`,
             league: false,
             lifetimeGain: 0,
           });
@@ -285,7 +286,7 @@ function createGameStakeService(db = pool, points = pointService, coins = coinSe
           source: 'game',
           referenceType: 'game_stake_payout',
           referenceId: matchId,
-          description: `برد پات مسابقه ${stake} امتیازی`,
+          description: `برد پات مسابقه ${faAmount(stake)} امتیازی`,
           league: false,
           lifetimeGain: Math.max(0, netPot - stake),
         });

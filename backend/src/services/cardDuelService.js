@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { faDigits } = require('../lib/faNum');
 const { pool } = require('../config/db');
 
 // پنج راند = حس یک مسابقه واقعی، نه یک برخورد سه‌ثانیه‌ای.
@@ -518,7 +519,7 @@ async function playableCards(userId, client = pool) {
 
 async function validateDeck(userId, ids, client = pool) {
   if (!Array.isArray(ids) || ids.length !== DECK_SIZE) {
-    const e = new Error(`تیم باید دقیقاً ${DECK_SIZE} کارت داشته باشد`); e.status = 400; throw e;
+    const e = new Error(`تیم باید دقیقاً ${faDigits(DECK_SIZE)} کارت داشته باشد`); e.status = 400; throw e;
   }
   const clean = ids.map(x => String(x || '').trim()).filter(Boolean);
   if (clean.length !== DECK_SIZE || new Set(clean).size !== DECK_SIZE) {

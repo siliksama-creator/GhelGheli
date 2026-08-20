@@ -194,8 +194,24 @@ void _report(String source, Object error, StackTrace? stack) {
   }
   final sink = _crashReportSink;
   if (sink != null) {
-    unawaited(sink(source, '$error', stack?.toString()).catchError((_) {}));
+    unawaited(sink(source, _squeeze('$error', 2000),
+        stack?.toString()).catchError((_) {}));
   }
+}
+
+/// کوتاه‌کردنِ متنِ خطا بدون از دست دادنِ دو سرِ آن — قرینهٔ `squeeze`
+/// در `userweb/src/main.jsx`.
+///
+/// در وب یک‌بار پیامِ خطا دقیقاً سرِ ۲۰۰۰ کاراکتر بریده شد و همان تکهٔ
+/// پایانی که علتِ کرش را می‌گفت از دست رفت. اینجا اصلاً بریده نمی‌شد و
+/// متنِ خام می‌رفت تا سرور/دیتابیس خودش قطعش کند — یعنی همان تله، فقط
+/// یک لایه عقب‌تر. پس هر دو سمت یک قاعده دارند: وسط حذف می‌شود.
+String _squeeze(String text, int limit) {
+  if (text.length <= limit) return text;
+  final head = ((limit - 20) * 0.7).ceil();
+  final tail = limit - 20 - head;
+  return '${text.substring(0, head)} … [${text.length}] … '
+      '${text.substring(text.length - tail)}';
 }
 
 /// بخشِ «جزئیات فنی» — عمداً بدون هیچ ویجتِ Material که به
