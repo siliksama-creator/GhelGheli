@@ -782,14 +782,24 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
         <button type="button" className="ghost" aria-label="بازگشت"
           onClick={() => { session.leave(); onBack(); }}>←</button>
         <b>دوئل کارت‌ها</b>
-        <span>{mode.icon} {mode.title}</span>
+        <span>
+          <i aria-hidden="true" style={{ display: 'flex' }}>
+            <SvgIcon name={mode.icon} size={14} />
+          </i>
+          {mode.title}
+        </span>
       </header>
     ) : (
       <header className="duelHeroV2">
         <button type="button" className="ghost" onClick={() => { session.leave(); onBack(); }}>← بازگشت</button>
         <div className="duelHeroIcon"><img src="/games/card_duel_glow.webp" alt="" /></div>
         <div><h1>دوئل کارت‌ها</h1></div>
-        <aside><span>{mode.icon}</span><b>{mode.title}</b><small>{mode.subtitle}</small></aside>
+        <aside>
+          <span aria-hidden="true" style={{ display: 'flex' }}>
+            <SvgIcon name={mode.icon} size={18} />
+          </span>
+          <b>{mode.title}</b><small>{mode.subtitle}</small>
+        </aside>
       </header>
     )}
 

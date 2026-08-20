@@ -4714,7 +4714,7 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
    دو خط است: تیتر + «پنج کارت با نقش‌های مکمل بچین». آن راهنما در
    کشوی «چطور بازی کنم؟» هم هست ⇒ تکرار. */
 @media (max-width:520px){
-  .duelLineupTitle small{display:none}
+  .duelLineupTitle>div small{display:none}
   .duelLineupTitle{margin-bottom:6px}
   .duelLineupV2{padding:8px}
 }

@@ -83,6 +83,52 @@ for (const file of walk(join(ROOT, 'backend/src'))) {
   }
 }
 
+// ── ۳. نامِ آیکون نباید مستقیم داخلِ JSX چاپ شود ────────────────────────
+//
+// این باگ واقعاً رخ داد: `cardDuelGame.jsx` عبارتِ `{mode.icon}` را در دو
+// جای هدر می‌گذاشت. `mode.icon` رشتهٔ `'robot'` است، نه یک المانِ React —
+// پس روی صفحهٔ کاربر کلمهٔ لاتینِ «robot» کنارِ «تمرین با ربات» چاپ می‌شد.
+//
+// بخشِ ۱ و ۲ این را نمی‌گرفتند: نامِ آیکون در هر دو پلتفرم **تعریف** شده
+// بود، فقط **رندر** نمی‌شد. یعنی گاردِ قبلی «وجود» را می‌سنجید و این یکی
+// «استفادهٔ درست» را.
+//
+// الگوی درست:  <SvgIcon name={mode.icon} size={14} />
+// الگوی غلط:   <span>{mode.icon}</span>
+const JSX_FILES = [];
+(function walk(dir) {
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    if (e.name === 'node_modules' || e.name === 'dist') continue;
+    const full = join(dir, e.name);
+    if (e.isDirectory()) walk(full);
+    else if (e.name.endsWith('.jsx')) JSX_FILES.push(full);
+  }
+})(join(ROOT, 'userweb/src'));
+
+for (const file of JSX_FILES) {
+  const src = readFileSync(file, 'utf8');
+  // `{...icon}` که مستقیم فرزندِ یک تگ است و داخلِ prop نیست.
+  // فقط شناسه‌هایی که به `.icon` ختم می‌شوند، تا `{iconEl}` علامت نخورد.
+  for (const m of src.matchAll(/>\s*\{([a-zA-Z_$][\w$]*)\.icon\}/g)) {
+    const line = src.slice(0, m.index).split('\n').length;
+    // ⚠️ مثبتِ کاذب: بعضی جدول‌ها زیرِ کلیدِ `icon` یک **نویسهٔ یونیکد**
+    //    نگه می‌دارند (مثلِ `icon:'♛'` در CardRarityFrame) نه نامِ آیکون.
+    //    چاپِ مستقیمِ آن‌ها درست است. فقط وقتی ایراد می‌گیریم که مقدارهای
+    //    همان جدول نامِ لاتینِ آیکون باشند — یعنی چیزی که SvgIcon می‌فهمد.
+    const table = m[1];
+    const decl = new RegExp(`${table}\\s*=|\\b${table}\\b\\s*\\[`);
+    const values = [...src.matchAll(/icon:\s*'([^']+)'/g)].map(x => x[1]);
+    const latin = values.filter(v => /^[a-z][a-zA-Z0-9_]*$/.test(v));
+    // اگر هیچ مقدارِ لاتینی در فایل نیست، این جدول یونیکدی است ⇒ رد شو.
+    if (!latin.length) continue;
+    void decl;
+    problems.push(
+      `  ${relative(ROOT, file)}:${line} «{${m[1]}}» مستقیم چاپ می‌شود — ` +
+      'باید <SvgIcon name={...} /> باشد وگرنه نامِ خامِ آیکون روی صفحه می‌آید',
+    );
+  }
+}
+
 if (problems.length) {
   console.error(`\n✗ ${problems.length} ناهماهنگی در نام‌های آیکون:\n`);
   console.error(problems.join('\n'));
