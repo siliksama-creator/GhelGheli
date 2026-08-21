@@ -620,21 +620,22 @@ class _RevealScreenState extends State<_RevealScreen> {
   int _revealed = 0;
 
   static const Map<String, Sfx> _raritySfx = {
-    'silver': Sfx.drop,
-    'gold': Sfx.duelPoints,
-    'premium': Sfx.win,
-    'legend': Sfx.duelVictory,
+    'normal': Sfx.cardNormal,
+    'silver': Sfx.cardSilver,
+    'gold': Sfx.cardGold,
+    'premium': Sfx.cardPremium,
+    'legend': Sfx.cardLegend,
   };
 
   @override
   void initState() {
     super.initState();
     // صدای بازشدنِ صندوق
-    GameAudio.instance.play(Sfx.draw);
+    GameAudio.instance.play(Sfx.boxOpen);
     for (var i = 0; i < widget.cards.length; i++) {
       final rarity =
           '${(widget.cards[i] as Map)['rarity'] ?? 'normal'}';
-      final sfx = _raritySfx[rarity] ?? Sfx.flip;
+      final sfx = _raritySfx[rarity] ?? Sfx.cardNormal;
       Future<void>.delayed(Duration(milliseconds: 260 * i + 180), () {
         if (mounted) setState(() => _revealed = i + 1);
         GameAudio.instance.play(sfx);

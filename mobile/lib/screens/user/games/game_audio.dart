@@ -66,7 +66,15 @@ enum Sfx {
   duelPoints('duel_points.mp3'),
   duelFinalDraw('duel_final_draw.mp3'),
   duelVictory('duel_victory.mp3'),
-  duelDefeat('duel_defeat.mp3');
+  duelDefeat('duel_defeat.mp3'),
+  // ── صندوق کارت: زنگ‌های نرمِ جعبه‌موسیقی (جدا از افکت‌های دوئل) ──
+  boxShake('box_shake.mp3'),
+  boxOpen('box_open.mp3'),
+  cardNormal('card_normal.mp3'),
+  cardSilver('card_silver.mp3'),
+  cardGold('card_gold.mp3'),
+  cardPremium('card_premium.mp3'),
+  cardLegend('card_legend.mp3');
 
   const Sfx(this.file);
   final String file;
@@ -215,7 +223,7 @@ class GameAudio {
       () async {
         await _shakePlayer.stop();
         await _shakePlayer.setReleaseMode(ReleaseMode.loop);
-        await _shakePlayer.setVolume(0.85);
+        await _shakePlayer.setVolume(0.55);
         await _shakePlayer.play(AssetSource('sfx/box_shake.mp3'));
       }();
     } catch (e) {

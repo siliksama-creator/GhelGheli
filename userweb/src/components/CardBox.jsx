@@ -9,8 +9,11 @@ import { play, playShake, stopShake, warmup } from '../gameAudio.js';
 // می‌شد. عدد را خام بده؛ قالب‌بندی کارِ خودِ `fa()` است.
 const money = n => `${fa(Number(n || 0))} تومان`;
 
-// صدای رونمایی هر سطح — بالاتر = باشکوه‌تر.
-const REVEAL_SFX = { normal: 'flip', silver: 'drop', gold: 'duel_points', premium: 'win', legend: 'duel_victory' };
+// صدای رونمایی هر سطح — زنگ‌های نرمِ جعبه‌موسیقی؛ بالاتر = درخشان‌تر.
+const REVEAL_SFX = {
+  normal: 'card_normal', silver: 'card_silver', gold: 'card_gold',
+  premium: 'card_premium', legend: 'card_legend',
+};
 
 /**
  * صندوقِ کارت.
@@ -85,8 +88,8 @@ export default function CardBox({ token, compact = false, onGranted }) {
   const buy = async () => {
     setBusy(true); setError(''); setWon(null); setWonMeta(null); setRevealed(0);
     setPhase('shaking');
-    warmup(['box_shake', 'draw', 'flip', 'drop', 'duel_points', 'win', 'duel_victory']);
-    play('draw');
+    warmup(['box_shake', 'box_open', 'card_normal', 'card_silver', 'card_gold', 'card_premium', 'card_legend']);
+    play('box_open');
     startShakeSound();
     const t0 = Date.now();
     try {
@@ -139,8 +142,8 @@ export default function CardBox({ token, compact = false, onGranted }) {
   const buyWithWallet = async () => {
     setBusy(true); setError(''); setWon(null); setWonMeta(null); setRevealed(0);
     setPhase('shaking');
-    warmup(['box_shake', 'draw', 'flip', 'drop', 'duel_points', 'win', 'duel_victory']);
-    play('draw');
+    warmup(['box_shake', 'box_open', 'card_normal', 'card_silver', 'card_gold', 'card_premium', 'card_legend']);
+    play('box_open');
     startShakeSound();
     const t0 = Date.now();
     try {

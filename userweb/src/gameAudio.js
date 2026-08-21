@@ -7,7 +7,8 @@ const FILES = [
   'tick', 'tick_urgent', 'timeout', 'win', 'lose', 'draw', 'tap',
   'duel_lock', 'duel_intro', 'duel_round_win', 'duel_round_lose',
   'duel_round_draw', 'duel_points', 'duel_final_draw', 'duel_victory', 'duel_defeat',
-  'box_shake',
+  'box_shake', 'box_open', 'card_normal', 'card_silver',
+  'card_gold', 'card_premium', 'card_legend',
 ];
 
 const KEY = 'game_sound_enabled';
@@ -139,7 +140,7 @@ export function playShake() {
     const base = get('box_shake');
     const a = base.cloneNode();
     a.loop = true;
-    a.volume = 0.85;
+    a.volume = 0.55;
     a.play()?.catch?.(() => {});
     _shakeAudio = a;
   } catch { /* never let audio break the box */ }
