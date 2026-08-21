@@ -430,7 +430,7 @@ class _HomeShellState extends State<HomeShell>
     // nothing on screen depends on it, so let the first frames render first.
     WidgetsBinding.instance.addPostFrameCallback((_) => _registerFcm());
     // پیکربندی کلاینت: درگاه نسخه + بنر اطلاعیه — بدون نیاز به آپدیت.
-    _checkClientConfig();
+    unawaited(_checkClientConfig());
   }
 
   /// بنر اطلاعیهٔ مدیریتی (از /api/config) — null یعنی فعال نیست.
@@ -512,7 +512,7 @@ class _HomeShellState extends State<HomeShell>
             onPressed: () {
               if (url.isNotEmpty) {
                 launchUrl(Uri.parse(url),
-                    mode: LaunchMode.externalApplication).catchError((_) {});
+                    mode: LaunchMode.externalApplication).catchError((_) => false);
               }
               if (!forced) Navigator.pop(ctx);
             },
@@ -1233,7 +1233,7 @@ class _AnnouncementBanner extends StatelessWidget {
       child: InkWell(
         onTap: link.isNotEmpty
             ? () => launchUrl(Uri.parse(link),
-                mode: LaunchMode.externalApplication).catchError((_) {})
+                mode: LaunchMode.externalApplication).catchError((_) => false)
             : null,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
