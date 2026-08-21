@@ -107,6 +107,9 @@ class GameAudio {
 
   final List<AudioPlayer> _pool = [];
   final AudioPlayer _musicPlayer = AudioPlayer();
+  // پخش‌کنندهٔ جدا برای صدای لرزشِ صندوق — با loop روی فایلِ مخصوص،
+  // دقیقاً هم‌زمان با انیمیشن شروع و با stopShake قطع می‌شود.
+  final AudioPlayer _shakePlayer = AudioPlayer();
   int _next = 0;
   bool _enabled = true;
   bool _ready = false;
@@ -205,6 +208,27 @@ class GameAudio {
     }();
   }
 
+  /// صدای لرزشِ صندوق — loop تا وقتی stopShake صدا زده شود.
+  void playShake() {
+    if (!_enabled) return;
+    try {
+      () async {
+        await _shakePlayer.stop();
+        await _shakePlayer.setReleaseMode(ReleaseMode.loop);
+        await _shakePlayer.setVolume(0.85);
+        await _shakePlayer.play(AssetSource('sfx/box_shake.mp3'));
+      }();
+    } catch (e) {
+      debugPrint('shake sfx failed: $e');
+    }
+  }
+
+  Future<void> stopShake() async {
+    try {
+      await _shakePlayer.stop();
+    } catch (_) {/* ignore */}
+  }
+
   Future<void> stopDuelMusic() async {
     _duelMusicRequested = false;
     _duelMusicPlaying = false;
@@ -251,6 +275,7 @@ class GameAudio {
     }
     try {
       await _musicPlayer.dispose();
+      await _shakePlayer.dispose();
     } catch (_) {/* ignore */}
     for (final p in _pool) {
       try {

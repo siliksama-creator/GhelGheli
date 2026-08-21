@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { req, fa, API } from '../lib/api.js';
 import { CARD_RARITY_META } from '../lib/cards.js';
-import { play } from '../gameAudio.js';
+import { play, playShake, stopShake, warmup } from '../gameAudio.js';
 
 // ⚠️ `fa()` خودش جداکنندهٔ هزارگان می‌گذارد و ورودی را `Number()` می‌کند.
 // اگر اول `toLocaleString()` بزنیم، رشتهٔ «100,000» به `fa()` می‌رسد و
@@ -59,17 +59,8 @@ export default function CardBox({ token, compact = false, onGranted }) {
   // ── صدای لرزشِ صندوق ──────────────────────────────────────────────
   // در طولِ ۳ ثانیهٔ لرزش، یک صدای شبیه به هم‌زدنِ کارت پخش می‌شود
   // (تناوبِ flip/drop) و هنگامِ ترکِ مرحلهٔ shaking قطع می‌شود.
-  const shakeTimer = useRef(null);
-  const stopShakeSound = () => {
-    if (shakeTimer.current) { clearInterval(shakeTimer.current); shakeTimer.current = null; }
-  };
-  const startShakeSound = () => {
-    stopShakeSound();
-    let k = 0;
-    shakeTimer.current = setInterval(() => {
-      play(k++ % 2 ? 'drop' : 'flip');
-    }, 220);
-  };
+  const stopShakeSound = () => { stopShake(); };
+  const startShakeSound = () => { playShake(); };
 
   useEffect(() => () => { clearTimers(); stopShakeSound(); }, []);
 
@@ -94,6 +85,7 @@ export default function CardBox({ token, compact = false, onGranted }) {
   const buy = async () => {
     setBusy(true); setError(''); setWon(null); setWonMeta(null); setRevealed(0);
     setPhase('shaking');
+    warmup(['box_shake', 'draw', 'flip', 'drop', 'duel_points', 'win', 'duel_victory']);
     play('draw');
     startShakeSound();
     const t0 = Date.now();
@@ -147,6 +139,7 @@ export default function CardBox({ token, compact = false, onGranted }) {
   const buyWithWallet = async () => {
     setBusy(true); setError(''); setWon(null); setWonMeta(null); setRevealed(0);
     setPhase('shaking');
+    warmup(['box_shake', 'draw', 'flip', 'drop', 'duel_points', 'win', 'duel_victory']);
     play('draw');
     startShakeSound();
     const t0 = Date.now();
@@ -189,7 +182,7 @@ export default function CardBox({ token, compact = false, onGranted }) {
 
   const open = phase === 'bursting' || phase === 'revealing';
 
-  return <section className={`cardBox ${compact ? 'compact' : ''}`} dir="rtl">
+  return <section className={`cardBox${phase === 'shaking' ? ' shaking' : ''} ${compact ? 'compact' : ''}`} dir="rtl">
     <style>{`
       /* ── بنرِ شاخص ─────────────────────────────────────────────────
          عمداً از قابِ آیتم‌های فروشگاه پیروی نمی‌کند: هالهٔ طلایی، قابِ

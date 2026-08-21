@@ -62,8 +62,7 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
   bool _busy = false;
   _Phase _phase = _Phase.idle;
 
-  // صدای لرزش + شروعِ لرزش (برای سقفِ حداقل ۳ ثانیه).
-  Timer? _shakeSfx;
+  // شروعِ لرزش (برای سقفِ حداقل ۳ ثانیه). صدا با GameAudio.playShake.
   DateTime _shakeStart = DateTime.now();
 
   late final AnimationController _idleCtrl = AnimationController(
@@ -89,7 +88,7 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-    _shakeSfx?.cancel();
+    GameAudio.instance.stopShake();
     _idleCtrl.dispose();
     _shakeCtrl.dispose();
     _burstCtrl.dispose();
@@ -118,13 +117,9 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
     // کامل نمی‌شود؛ منتظر ماندنش یعنی هرگز به مرحلهٔ خرید نمی‌رسیم.
     // پس مثل `_burstCtrl` پایین‌تر، عمداً رهایش می‌کنیم.
     unawaited(_shakeCtrl.repeat());
-    // صدای لرزش: هم‌زدنِ کارت تا وقتی صندوق می‌لرزد.
+    // صدای لرزشِ پیوسته (فایلِ مخصوص با loop) — هم‌زمان با انیمیشن.
     _shakeStart = DateTime.now();
-    _shakeSfx?.cancel();
-    var k = 0;
-    _shakeSfx = Timer.periodic(const Duration(milliseconds: 220), (_) {
-      GameAudio.instance.play(k++ % 2 == 0 ? Sfx.flip : Sfx.drop);
-    });
+    GameAudio.instance.playShake();
     try {
       // همان سه‌گامِ فروشگاه: سفارش از سرور، پرداخت در بازار، تحویل بعد
       // از راستی‌آزماییِ سرور. کلاینت هیچ‌وقت خودش «تحویل شد» نمی‌گوید.
@@ -149,7 +144,7 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
       if (remain > 0) {
         await Future<void>.delayed(Duration(milliseconds: remain));
       }
-      _shakeSfx?.cancel();
+      GameAudio.instance.stopShake();
       _shakeCtrl.stop();
       setState(() => _phase = _Phase.bursting);
       unawaited(_burstCtrl.forward(from: 0));
@@ -179,7 +174,7 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
       if (!mounted) return;
       setState(() => _phase = _Phase.idle);
     } on BillingUnavailable {
-      _shakeSfx?.cancel();
+      GameAudio.instance.stopShake();
       if (mounted) {
         setState(() {
           _error = 'خرید درون‌برنامه‌ای روی این دستگاه فعال نیست';
@@ -187,7 +182,7 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
         });
       }
     } catch (e) {
-      _shakeSfx?.cancel();
+      GameAudio.instance.stopShake();
       if (mounted) {
         setState(() {
           _error = 'خرید انجام نشد';

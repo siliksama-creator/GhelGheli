@@ -7,6 +7,7 @@ const FILES = [
   'tick', 'tick_urgent', 'timeout', 'win', 'lose', 'draw', 'tap',
   'duel_lock', 'duel_intro', 'duel_round_win', 'duel_round_lose',
   'duel_round_draw', 'duel_points', 'duel_final_draw', 'duel_victory', 'duel_defeat',
+  'box_shake',
 ];
 
 const KEY = 'game_sound_enabled';
@@ -123,6 +124,43 @@ export function setEnabled(v) {
     beginMusic();
   }
   return enabled;
+}
+
+// ── صدای لرزشِ صندوق ───────────────────────────────────────────────────
+// یک المانِ جدا با loop روی فایلِ مخصوصِ لرزش؛ دقیقاً هم‌زمان با شروعِ
+// انیمیشن شروع می‌شود و با `stopShake` قطع می‌شود. بدونِ loop، هم‌زمانیِ
+// چند clone با تأخیرِ لود، ریتم را می‌شکست.
+let _shakeAudio = null;
+
+export function playShake() {
+  if (!enabled) return;
+  try {
+    stopShake();
+    const base = get('box_shake');
+    const a = base.cloneNode();
+    a.loop = true;
+    a.volume = 0.85;
+    a.play()?.catch?.(() => {});
+    _shakeAudio = a;
+  } catch { /* never let audio break the box */ }
+}
+
+export function stopShake() {
+  if (!_shakeAudio) return;
+  try {
+    _shakeAudio.pause();
+    _shakeAudio.src = '';
+    _shakeAudio.removeAttribute('src');
+    _shakeAudio.load();
+  } catch { /* ignore */ }
+  _shakeAudio = null;
+}
+
+// پیش‌لودِ چند افکتِ کوتاه تا اولین پخشِ هر کدام بی‌تأخیر باشد. چون
+// `get()` همان کشِ سراسریِ بازی را پر می‌کند، بقیهٔ بازی هم سود می‌برد.
+export function warmup(names) {
+  if (!Array.isArray(names)) names = [names];
+  names.forEach(n => { try { get(n).load(); } catch { /* ignore */ } });
 }
 
 export function play(name, volume = 1) {
