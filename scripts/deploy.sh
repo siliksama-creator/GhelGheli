@@ -67,6 +67,9 @@ log "Installing backend dependencies"
 cd "$APP_DIR/backend"
 npm ci --omit=dev --no-audit --no-fund
 
+log "Validating backend syntax"
+node --check src/server.js || die "syntax error in backend/src/server.js"
+
 log "Running database migrations"
 npm run migrate
 

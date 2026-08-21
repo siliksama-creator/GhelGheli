@@ -98,8 +98,12 @@ function createCardBoxService(db = pool) {
         WHERE user_id=$1 AND consumed_in_reward=false`, [userId]);
     const owned = Number(rows[0]?.owned || 0);
     const total = Object.values(table).reduce((s, w) => s + w, 0) || 1000;
+    const { rows: wRows } = await db.query(
+      'SELECT wallet_balance FROM users WHERE id=$1', [userId]);
     return {
       price: boxPrice,
+      // موجودیِ کیف پول برای دکمهٔ «خرید با کیف پول» — صفرِ نبودِ ردیف امن است.
+      walletBalance: Number(wRows[0]?.wallet_balance || 0),
       size: BOX_SIZE,
       ownedCards: owned,
       // پنج کارت لازم است تا ترکیب کامل شود. این عدد از DECK_SIZE می‌آید.

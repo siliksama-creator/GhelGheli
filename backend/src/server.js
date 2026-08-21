@@ -1374,7 +1374,9 @@ app.get('/api/card-box/overview', auth, asyncHandler(async (req, res) => {
 
 app.post('/api/card-box/buy', auth, shopLimiter, asyncHandler(async (req, res) => {
   try {
-    res.json(await shop.buyCardBox(req.user.id));
+    res.json(await shop.buyCardBox(req.user.id, {
+      useWallet: req.body?.useWallet === true,
+    }));
   } catch (e) {
     res.status(e.status || 500)
       .json({ message: e.message || 'خطا در ساخت سفارش صندوق' });

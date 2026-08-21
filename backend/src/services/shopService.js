@@ -618,8 +618,95 @@ async function buyPlusSubscription(userId, billingCycle = 'monthly') {
  *    موجودیِ نقدیِ برداشت‌شده از خودِ لیگ، حلقهٔ «جایزه را دوباره به
  *    امتیاز تبدیل کن» را باز می‌کرد. صندوق فقط با پولِ تازه از بازار.
  */
-async function buyCardBox(userId) {
+async function buyCardBox(userId, { useWallet = false } = {}) {
+  if (useWallet) return buyCardBoxWithWallet(userId);
   return payments.createCardBoxOrder(userId);
+}
+
+/**
+ * خریدِ کاملِ صندوق از موجودیِ کیف پول — داخل یک تراکنش:
+ * قفلِ کاربر → کسرِ موجودی (wallet.debit با دفترِ کل) → سفارشِ paid →
+ * قرعه‌کشی و تحویلِ کارت‌ها → امتیاز. اگر هر مرحله بشکند، کل تراکنش
+ * برمی‌گردد و ریالی کم نمی‌شود.
+ */
+async function buyCardBoxWithWallet(userId) {
+  const { rows } = await pool.query(
+    "SELECT value FROM app_settings WHERE key='card_box_price' LIMIT 1");
+  const raw = Number(rows[0]?.value);
+  const price = Number.isFinite(raw) && raw > 0 ? Math.trunc(raw) : 100000;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // قفلِ کاربر پیش از خواندنِ موجودی: دو خریدِ هم‌زمان هر دو موجودیِ
+    // قدیمی را نمی‌خوانند (همان الگوی buyShopItem).
+    const locked = await client.query(
+      'SELECT wallet_balance FROM users WHERE id=$1 FOR UPDATE', [userId]);
+    if (!locked.rows[0]) throw fail('کاربر پیدا نشد', 404);
+    const balance = Number(locked.rows[0].wallet_balance || 0);
+    if (balance < price) {
+      throw fail('موجودی کیف پول کافی نیست', 400, 'INSUFFICIENT_WALLET');
+    }
+
+    // سفارشِ پرداخت‌شده با provider='wallet' — تاریخچهٔ خرید صندوق یکدست
+    // می‌ماند و در جست‌وجوهای ادمین هم دیده می‌شود.
+    const order = await client.query(
+      `INSERT INTO payment_orders
+         (user_id, amount, provider, product_id, status, purchase_kind,
+          wallet_amount, paid_at)
+       VALUES ($1,$2,'wallet',NULL,'paid','card_box',$3,NOW())
+       RETURNING id`,
+      [userId, price, price]);
+
+    await wallet.debit(client, {
+      userId,
+      amount: price,
+      source: 'card_box',
+      referenceType: 'payment_orders',
+      referenceId: order.rows[0].id,
+      description: 'خرید صندوق کارت با موجودی کیف پول',
+    });
+
+    // تحویلِ هم‌سانِ مسیرِ بازار (قرعه + امتیاز) ولی بدون کمیسیونِ معرف:
+    // سهمِ کیف پول هرگز کمیسیون‌پذیر نیست.
+    const box = await cardBox.grantBox(client, {
+      userId,
+      pricePaid: price,
+      source: 'wallet',
+      orderId: order.rows[0].id,
+    });
+    if (box.points > 0) {
+      await points.credit(client, {
+        userId,
+        points: box.points,
+        source: 'card_box',
+        referenceType: 'card_box_purchases',
+        referenceId: box.boxId,
+        description: `صندوق کارت — ${box.cards.length} کارت`,
+      });
+    }
+
+    await client.query('COMMIT');
+    return {
+      settled: true,
+      orderId: order.rows[0].id,
+      paidFromWallet: price,
+      remainingToPay: 0,
+      walletBalance: balance - price,
+      kind: 'card_box',
+      label: 'صندوق کارت',
+      cards: box.cards,
+      points: box.points,
+      distinctCards: box.distinctCards === true,
+      referenceId: box.boxId,
+    };
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
 }
 
 /**

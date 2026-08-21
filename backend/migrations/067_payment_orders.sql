@@ -101,6 +101,7 @@ BEGIN
       'card_cash', 'wheel', 'reward', 'league',
       'admin_credit', 'admin_debit', 'withdrawal_hold', 'withdrawal_refund',
       'shop', 'subscription', 'purchase_referral', 'pass',
-      'topup', 'topup_refund'
+      'topup', 'topup_refund',
+      'card_box'
     ));
 END $$;
