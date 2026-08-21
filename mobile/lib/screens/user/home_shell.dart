@@ -460,10 +460,10 @@ class _HomeShellState extends State<HomeShell>
         'APP_RELEASE', defaultValue: '1.1.17');
       final minStr = '${min['android'] ?? ''}';
       if (minStr.isNotEmpty && _versionLower(current, minStr)) {
-        _showUpdateDialog(
+        unawaited(_showUpdateDialog(
           forced: force['android'] == true,
           url: '${urls['android'] ?? ''}',
-        );
+        ));
       }
       final ann = m['announcement'] is Map
           ? Map<String, dynamic>.from(m['announcement'] as Map)
