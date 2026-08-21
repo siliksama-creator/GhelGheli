@@ -88,7 +88,7 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-    GameAudio.instance.stopShake();
+    unawaited(GameAudio.instance.stopShake());
     _idleCtrl.dispose();
     _shakeCtrl.dispose();
     _burstCtrl.dispose();
@@ -144,7 +144,7 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
       if (remain > 0) {
         await Future<void>.delayed(Duration(milliseconds: remain));
       }
-      GameAudio.instance.stopShake();
+      unawaited(GameAudio.instance.stopShake());
       _shakeCtrl.stop();
       setState(() => _phase = _Phase.bursting);
       unawaited(_burstCtrl.forward(from: 0));
@@ -174,7 +174,7 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
       if (!mounted) return;
       setState(() => _phase = _Phase.idle);
     } on BillingUnavailable {
-      GameAudio.instance.stopShake();
+      unawaited(GameAudio.instance.stopShake());
       if (mounted) {
         setState(() {
           _error = 'خرید درون‌برنامه‌ای روی این دستگاه فعال نیست';
@@ -182,7 +182,7 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
         });
       }
     } catch (e) {
-      GameAudio.instance.stopShake();
+      unawaited(GameAudio.instance.stopShake());
       if (mounted) {
         setState(() {
           _error = 'خرید انجام نشد';
