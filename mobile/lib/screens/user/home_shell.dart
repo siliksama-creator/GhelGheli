@@ -6,6 +6,7 @@ import '../../theme/tokens.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../api_client.dart';
 import '../../services/image_disk_cache.dart';
@@ -428,6 +429,98 @@ class _HomeShellState extends State<HomeShell>
     // Firebase init + permission prompt can take seconds on a cold start and
     // nothing on screen depends on it, so let the first frames render first.
     WidgetsBinding.instance.addPostFrameCallback((_) => _registerFcm());
+    // پیکربندی کلاینت: درگاه نسخه + بنر اطلاعیه — بدون نیاز به آپدیت.
+    _checkClientConfig();
+  }
+
+  /// بنر اطلاعیهٔ مدیریتی (از /api/config) — null یعنی فعال نیست.
+  Map<String, dynamic>? _announcement;
+
+  /// از /api/config می‌خواند: اگر نسخهٔ اپ از حداقلِ تعیین‌شده پایین‌تر
+  /// باشد دیالوگ آپدیت نشان می‌دهد (اختیاری/اجباری) و اگر اطلاعیه فعال
+  /// باشد بنر بالای صفحه می‌آید.
+  Future<void> _checkClientConfig() async {
+    try {
+      final res = await widget.api.get('/api/config', fresh: true);
+      if (!mounted || res is! Map) return;
+      final m = Map<String, dynamic>.from(res);
+      final app = m['app'] is Map
+          ? Map<String, dynamic>.from(m['app'] as Map)
+          : <String, dynamic>{};
+      final min = app['minVersion'] is Map
+          ? Map<String, dynamic>.from(app['minVersion'] as Map)
+          : <String, dynamic>{};
+      final force = app['forceUpdate'] is Map
+          ? Map<String, dynamic>.from(app['forceUpdate'] as Map)
+          : <String, dynamic>{};
+      final urls = app['updateUrl'] is Map
+          ? Map<String, dynamic>.from(app['updateUrl'] as Map)
+          : <String, dynamic>{};
+      final current = const String.fromEnvironment(
+        'APP_RELEASE', defaultValue: '1.1.17');
+      final minStr = '${min['android'] ?? ''}';
+      if (minStr.isNotEmpty && _versionLower(current, minStr)) {
+        _showUpdateDialog(
+          forced: force['android'] == true,
+          url: '${urls['android'] ?? ''}',
+        );
+      }
+      final ann = m['announcement'] is Map
+          ? Map<String, dynamic>.from(m['announcement'] as Map)
+          : null;
+      if (ann?['active'] == true) {
+        setState(() => _announcement = ann);
+      }
+    } catch (_) {
+      // پیکربندی best-effort است؛ شکستش نباید چیزی را بشکند.
+    }
+  }
+
+  /// مقایسهٔ سادهٔ نسخه (۱.۲.۳ < ۱.۱۰.۰). true اگر a پایین‌تر از b باشد.
+  bool _versionLower(String a, String b) {
+    final as = a.split('.').map((x) => int.tryParse(x) ?? 0).toList();
+    final bs = b.split('.').map((x) => int.tryParse(x) ?? 0).toList();
+    for (var i = 0; i < (as.length > bs.length ? as.length : bs.length); i++) {
+      final x = i < as.length ? as[i] : 0;
+      final y = i < bs.length ? bs[i] : 0;
+      if (x != y) return x < y;
+    }
+    return false;
+  }
+
+  Future<void> _showUpdateDialog({
+    required bool forced,
+    required String url,
+  }) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: !forced,
+      builder: (ctx) => AlertDialog(
+        title: const Text('نسخهٔ جدید قلقلی آماده است'),
+        content: const Text(
+          'لطفاً اپلیکیشن را به آخرین نسخه به‌روزرسانی کنید تا همه‌چیز '
+          'درست کار کند.',
+        ),
+        actions: [
+          if (!forced)
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('بعداً'),
+            ),
+          FilledButton(
+            onPressed: () {
+              if (url.isNotEmpty) {
+                launchUrl(Uri.parse(url),
+                    mode: LaunchMode.externalApplication).catchError((_) {});
+              }
+              if (!forced) Navigator.pop(ctx);
+            },
+            child: const Text('به‌روزرسانی'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -690,15 +783,26 @@ class _HomeShellState extends State<HomeShell>
             colors: [Color(0x331C78FF), Color(0x00060D18)],
           ),
         ),
-        child: FadeTransition(
-          opacity: _entranceFade,
-          child: SlideTransition(
-            position: _entranceSlide,
+        child: Column(
+          children: [
+            if (_announcement != null)
+              _AnnouncementBanner(
+                announcement: _announcement!,
+                onDismiss: () => setState(() => _announcement = null),
+              ),
+            Expanded(
+              child: FadeTransition(
+                opacity: _entranceFade,
+                child: SlideTransition(
+                  position: _entranceSlide,
             // AnimatedSwitcher قبلی subtree تبِ قبلی را dispose می‌کرد؛
             // ظاهرش fade بود ولی هزینه‌اش init/API/image load دوباره بود.
             // جابه‌جایی حالا فوری است و State واقعی هر تب زنده می‌ماند.
-            child: _buildPersistentPages(),
-          ),
+                  child: _buildPersistentPages(),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
       bottomNavigationBar: NavigationBar(
@@ -1097,6 +1201,63 @@ class _ShopButtonState extends State<_ShopButton>
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+
+/// بنر اطلاعیهٔ مدیریتی — از /api/config، بدون نیاز به آپدیت اپ.
+class _AnnouncementBanner extends StatelessWidget {
+  const _AnnouncementBanner({
+    required this.announcement,
+    required this.onDismiss,
+  });
+
+  final Map<String, dynamic> announcement;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = '${announcement['text'] ?? ''}';
+    final link = '${announcement['link'] ?? ''}';
+    final accent = announcement['accent'] == 'green'
+        ? const Color(0xFF22E7A6)
+        : announcement['accent'] == 'blue'
+            ? const Color(0xFF38BDF8)
+            : announcement['accent'] == 'orange'
+                ? const Color(0xFFF97316)
+                : const Color(0xFFFFD166);
+    return Material(
+      color: accent.withValues(alpha: 0.14),
+      child: InkWell(
+        onTap: link.isNotEmpty
+            ? () => launchUrl(Uri.parse(link),
+                mode: LaunchMode.externalApplication).catchError((_) {})
+            : null,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              Icon(Icons.campaign_rounded, size: 18, color: accent),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  text,
+                  style: TextStyle(
+                      color: accent,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12.5),
+                ),
+              ),
+              GestureDetector(
+                onTap: onDismiss,
+                child: const Icon(Icons.close_rounded,
+                    size: 16, color: Colors.white54),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

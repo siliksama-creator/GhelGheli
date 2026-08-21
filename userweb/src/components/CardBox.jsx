@@ -56,7 +56,22 @@ export default function CardBox({ token, compact = false, onGranted }) {
   };
   const later = (fn, ms) => { timers.current.push(setTimeout(fn, ms)); };
 
-  useEffect(() => clearTimers, []);
+  // ── صدای لرزشِ صندوق ──────────────────────────────────────────────
+  // در طولِ ۳ ثانیهٔ لرزش، یک صدای شبیه به هم‌زدنِ کارت پخش می‌شود
+  // (تناوبِ flip/drop) و هنگامِ ترکِ مرحلهٔ shaking قطع می‌شود.
+  const shakeTimer = useRef(null);
+  const stopShakeSound = () => {
+    if (shakeTimer.current) { clearInterval(shakeTimer.current); shakeTimer.current = null; }
+  };
+  const startShakeSound = () => {
+    stopShakeSound();
+    let k = 0;
+    shakeTimer.current = setInterval(() => {
+      play(k++ % 2 ? 'drop' : 'flip');
+    }, 220);
+  };
+
+  useEffect(() => () => { clearTimers(); stopShakeSound(); }, []);
 
   const load = useCallback(async () => {
     try {
@@ -80,6 +95,8 @@ export default function CardBox({ token, compact = false, onGranted }) {
     setBusy(true); setError(''); setWon(null); setWonMeta(null); setRevealed(0);
     setPhase('shaking');
     play('draw');
+    startShakeSound();
+    const t0 = Date.now();
     try {
       // همان سه‌گامِ فروشگاه: سفارش از سرور، پرداخت در بازار، تحویل بعد
       // از راستی‌آزماییِ سرور. کلاینت هیچ‌وقت خودش «تحویل شد» نمی‌گوید.
@@ -104,15 +121,20 @@ export default function CardBox({ token, compact = false, onGranted }) {
       // ترتیبِ نمایش، بعد از قطعی‌شدنِ تحویل: در باز می‌شود، نور می‌ترکد،
       // بعد کارت‌ها یکی‌یکی رو می‌آیند. هر کارت ۲۶۰ms فاصله دارد تا چشم
       // فرصتِ دیدنِ هرکدام را داشته باشد.
-      setPhase('bursting');
+      const shakeRemain = Math.max(0, 3000 - (Date.now() - t0));
+      later(() => {
+        stopShakeSound();
+        setPhase('bursting');
+      }, shakeRemain);
       later(() => {
         setPhase('revealing');
         cards.forEach((c, i) => later(() => {
           setRevealed(i + 1);
           play(REVEAL_SFX[c.rarity] || 'flip');
         }, 260 * i + 180));
-      }, 620);
+      }, shakeRemain + 640);
     } catch (e) {
+      stopShakeSound();
       setError(e.message || 'خرید انجام نشد');
       setPhase('idle');
     } finally {
@@ -126,6 +148,8 @@ export default function CardBox({ token, compact = false, onGranted }) {
     setBusy(true); setError(''); setWon(null); setWonMeta(null); setRevealed(0);
     setPhase('shaking');
     play('draw');
+    startShakeSound();
+    const t0 = Date.now();
     try {
       const result = await req('/api/card-box/buy', 'POST', { useWallet: true }, token);
       const cards = result?.cards || [];
@@ -136,15 +160,20 @@ export default function CardBox({ token, compact = false, onGranted }) {
       });
       await load();
       onGranted?.(result);
-      setPhase('bursting');
+      const shakeRemain = Math.max(0, 3000 - (Date.now() - t0));
+      later(() => {
+        stopShakeSound();
+        setPhase('bursting');
+      }, shakeRemain);
       later(() => {
         setPhase('revealing');
         cards.forEach((c, i) => later(() => {
           setRevealed(i + 1);
           play(REVEAL_SFX[c.rarity] || 'flip');
         }, 260 * i + 180));
-      }, 620);
+      }, shakeRemain + 640);
     } catch (e) {
+      stopShakeSound();
       setError(e.message || 'خرید با کیف پول انجام نشد');
       setPhase('idle');
     } finally {
@@ -196,7 +225,11 @@ export default function CardBox({ token, compact = false, onGranted }) {
         filter:drop-shadow(0 12px 20px rgba(0,0,0,.5));animation:cbFloat 3.6s ease-in-out infinite}
       @keyframes cbFloat{0%,100%{transform:translateY(0) rotate(-1deg)}50%{transform:translateY(-7px) rotate(1deg)}}
       /* لرزشِ قبل از باز شدن: تند و کوتاه، مثل چیزی که دارد از تو فشار می‌آورد */
-      .cardBox.shaking .cardBoxImg{animation:cbShake .42s linear infinite}
+      .cardBox.shaking{animation:cbBoxShake .38s ease-in-out infinite}
+      .cardBox.shaking .cardBoxImg{animation:cbShake .16s linear infinite}
+      .cardBox.shaking .cardBoxGlow{animation:cbGlowPulse .55s ease-in-out infinite}
+      @keyframes cbBoxShake{0%,100%{transform:translate(0,0) rotate(0)}18%{transform:translate(-7px,3px) rotate(-1.4deg)}36%{transform:translate(6px,-4px) rotate(1.2deg)}54%{transform:translate(-5px,-3px) rotate(-.9deg)}72%{transform:translate(7px,3px) rotate(1.3deg)}90%{transform:translate(-3px,2px) rotate(-.5deg)}}
+      @keyframes cbGlowPulse{0%,100%{opacity:.55;transform:scale(1)}50%{opacity:1;transform:scale(1.12)}}
       @keyframes cbShake{0%,100%{transform:translate(0,0) rotate(0)}
         20%{transform:translate(-3px,1px) rotate(-3deg)}40%{transform:translate(3px,-1px) rotate(3deg)}
         60%{transform:translate(-2px,-2px) rotate(-2deg)}80%{transform:translate(2px,2px) rotate(2deg)}}
@@ -267,10 +300,11 @@ export default function CardBox({ token, compact = false, onGranted }) {
         background:linear-gradient(165deg,rgba(255,255,255,.13),rgba(0,0,0,.4));
         border:1.5px solid var(--accent);box-shadow:0 0 22px -6px var(--accent);
         opacity:0;transform:rotateY(90deg) scale(.7)}
-      .cardBoxPrize.shown{animation:cbFlip .5s cubic-bezier(.2,1.3,.4,1) both}
-      @keyframes cbFlip{0%{opacity:0;transform:rotateY(90deg) scale(.7)}
-        60%{opacity:1;transform:rotateY(-12deg) scale(1.08)}
-        100%{opacity:1;transform:rotateY(0) scale(1)}}
+      .cardBoxPrize.shown{animation:cbFlip .55s cubic-bezier(.2,1.3,.4,1) both}
+      @keyframes cbFlip{0%{opacity:0;transform:translateY(48px) scale(.4) rotate(-10deg)}
+        55%{opacity:1;transform:translateY(-12px) scale(1.16) rotate(4deg)}
+        80%{transform:translateY(2px) scale(.97) rotate(-1deg)}
+        100%{opacity:1;transform:translateY(0) scale(1) rotate(0)}}
       .cardBoxPrizeTier{display:block;font-size:9.5px;font-weight:900;color:var(--accent);
         letter-spacing:.3px;margin-bottom:6px}
       .cardBoxPrizeName{display:block;font-size:11.5px;font-weight:950;color:#fff;line-height:1.5;
@@ -301,7 +335,7 @@ export default function CardBox({ token, compact = false, onGranted }) {
         .cardBoxPrize{width:86px}
       }
       @media(prefers-reduced-motion:reduce){
-        .cardBox::after,.cardBoxGlow,.cardBoxImg,.cardBoxRays,.cardBoxPrize.shown{animation:none}
+        .cardBox::after,.cardBox.shaking,.cardBoxGlow,.cardBoxImg,.cardBoxRays,.cardBoxPrize.shown{animation:none}
         .cardBoxPrize--silver.shown,.cardBoxPrize--gold.shown,
         .cardBoxPrize--premium.shown,.cardBoxPrize--legend.shown{animation:none}
         .cardBoxPrize.shown{opacity:1;transform:none}

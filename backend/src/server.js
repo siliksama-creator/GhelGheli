@@ -2465,6 +2465,11 @@ app.use('/api', require('./routes/adminSecurity')({
   pool, adminAuth, requireRole, asyncHandler, audit, validateUuid, bcrypt,
 }));
 
+// Client runtime config (min version + announcement) — «اهرمِ بدون-آپدیت».
+app.use('/api', require('./routes/clientConfig')({
+  pool, adminAuth, requireRole, asyncHandler, audit, rateLimit,
+}));
+
 const presence = createPresenceService(pool);
 app.use('/api', require('./routes/growth')({
   auth, adminAuth, requireRole, asyncHandler, validateUuid, presence, rateLimit,

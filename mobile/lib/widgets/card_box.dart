@@ -62,6 +62,10 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
   bool _busy = false;
   _Phase _phase = _Phase.idle;
 
+  // صدای لرزش + شروعِ لرزش (برای سقفِ حداقل ۳ ثانیه).
+  Timer? _shakeSfx;
+  DateTime _shakeStart = DateTime.now();
+
   late final AnimationController _idleCtrl = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 3600),
@@ -85,6 +89,7 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _shakeSfx?.cancel();
     _idleCtrl.dispose();
     _shakeCtrl.dispose();
     _burstCtrl.dispose();
@@ -113,6 +118,13 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
     // کامل نمی‌شود؛ منتظر ماندنش یعنی هرگز به مرحلهٔ خرید نمی‌رسیم.
     // پس مثل `_burstCtrl` پایین‌تر، عمداً رهایش می‌کنیم.
     unawaited(_shakeCtrl.repeat());
+    // صدای لرزش: هم‌زدنِ کارت تا وقتی صندوق می‌لرزد.
+    _shakeStart = DateTime.now();
+    _shakeSfx?.cancel();
+    var k = 0;
+    _shakeSfx = Timer.periodic(const Duration(milliseconds: 220), (_) {
+      GameAudio.instance.play(k++ % 2 == 0 ? Sfx.flip : Sfx.drop);
+    });
     try {
       // همان سه‌گامِ فروشگاه: سفارش از سرور، پرداخت در بازار، تحویل بعد
       // از راستی‌آزماییِ سرور. کلاینت هیچ‌وقت خودش «تحویل شد» نمی‌گوید.
@@ -131,6 +143,13 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
       if (!mounted) return;
 
       final cards = (result['cards'] as List?) ?? const [];
+      // حداقل ۳ ثانیه لرزش جذاب با صدا، حتی اگر پرداخت سریع باشد.
+      final elapsed = DateTime.now().difference(_shakeStart).inMilliseconds;
+      final remain = 3000 - elapsed;
+      if (remain > 0) {
+        await Future<void>.delayed(Duration(milliseconds: remain));
+      }
+      _shakeSfx?.cancel();
       _shakeCtrl.stop();
       setState(() => _phase = _Phase.bursting);
       unawaited(_burstCtrl.forward(from: 0));
@@ -160,6 +179,7 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
       if (!mounted) return;
       setState(() => _phase = _Phase.idle);
     } on BillingUnavailable {
+      _shakeSfx?.cancel();
       if (mounted) {
         setState(() {
           _error = 'خرید درون‌برنامه‌ای روی این دستگاه فعال نیست';
@@ -167,6 +187,7 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
         });
       }
     } catch (e) {
+      _shakeSfx?.cancel();
       if (mounted) {
         setState(() {
           _error = 'خرید انجام نشد';
@@ -752,14 +773,23 @@ class _PrizeCard extends StatelessWidget {
     final points = (card['pointValue'] as num?)?.toInt() ?? 0;
     final imgUrl = '${card['imageUrl'] ?? ''}';
 
-    return AnimatedScale(
-      scale: shown ? 1 : 0.7,
-      duration: const Duration(milliseconds: 500),
-      curve: Curves.easeOutBack,
-      child: AnimatedOpacity(
-        opacity: shown ? 1 : 0,
-        duration: const Duration(milliseconds: 320),
-        child: Container(
+    // انیمیشن ورود: از پایین می‌پرد بالا با چرخش و فنر — «جذاب‌تر از فلپ ساده».
+    return AnimatedSlide(
+      offset: shown ? Offset.zero : const Offset(0, 0.6),
+      duration: const Duration(milliseconds: 440),
+      curve: Curves.easeOutCubic,
+      child: AnimatedRotation(
+        turns: shown ? 0 : -0.055,
+        duration: const Duration(milliseconds: 460),
+        curve: Curves.easeOutBack,
+        child: AnimatedScale(
+          scale: shown ? 1 : 0.25,
+          duration: const Duration(milliseconds: 520),
+          curve: Curves.easeOutBack,
+          child: AnimatedOpacity(
+            opacity: shown ? 1 : 0,
+            duration: const Duration(milliseconds: 260),
+            child: Container(
           width: 98,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
           decoration: BoxDecoration(
@@ -840,6 +870,8 @@ class _PrizeCard extends StatelessWidget {
                     fontWeight: FontWeight.w900),
               ),
             ],
+              ),
+            ),
           ),
         ),
       ),

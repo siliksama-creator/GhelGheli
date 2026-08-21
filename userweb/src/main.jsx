@@ -158,6 +158,11 @@ function App() {
     try { return localStorage.token || ''; } catch { return ''; }
   });
   useDarkOnly();
+  // پیکربندی کلاینت (بنر اطلاعیه و…) — از /api/config، بدون نیاز به آپدیت.
+  const [cfg, setCfg] = useState(null);
+  useEffect(() => {
+    req('/api/config', 'GET', null, null).then(setCfg).catch(() => {});
+  }, []);
   useEffect(() => {
     if (!token) return undefined;
     let reporting = false;
@@ -214,6 +219,22 @@ function App() {
 
   return (
     <div className={`page ${token ? 'signedIn' : ''}`}>
+      {cfg?.announcement?.active && cfg.announcement.text && (
+        <a
+          className="cfgBanner"
+          href={cfg.announcement.link || undefined}
+          target={cfg.announcement.link ? '_blank' : undefined}
+          rel="noreferrer"
+          style={{
+            display: 'block', textAlign: 'center', padding: '9px 14px',
+            fontSize: 12.5, fontWeight: 800, color: '#1a0f02',
+            background: 'linear-gradient(90deg,#FFD166,#F97316)',
+            textDecoration: 'none',
+          }}
+        >
+          {cfg.announcement.text}
+        </a>
+      )}
       {/* The animated brand mark. Matches the Flutter AnimatedLogo widget:
           aurora behind, settle-in entrance, a specular sweep clipped to the
           logo's own shape, and phased sparkles. Built with CSS rather than a
