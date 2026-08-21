@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../api_client.dart';
+import '../screens/user/games/game_audio.dart';
 import '../core/money.dart';
 import '../services/bazaar_billing.dart';
 import 'rarity_card_frame.dart';
@@ -150,6 +151,7 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
             cards: cards,
             points: (result['points'] as num?)?.toInt() ?? 0,
             distinct: result['distinctCards'] == true,
+            baseUrl: widget.api.baseUrl,
           ),
           transitionBuilder: (_, anim, __, child) =>
               FadeTransition(opacity: anim, child: child),
@@ -582,9 +584,11 @@ class _RevealScreen extends StatefulWidget {
     required this.cards,
     required this.points,
     required this.distinct,
+    required this.baseUrl,
   });
 
   final List<dynamic> cards;
+  final String baseUrl;
 
   /// مجموعِ امتیازِ این صندوق، از پاسخِ سرور — نه جمعِ کلاینت.
   final int points;
@@ -599,12 +603,25 @@ class _RevealScreen extends StatefulWidget {
 class _RevealScreenState extends State<_RevealScreen> {
   int _revealed = 0;
 
+  static const Map<String, Sfx> _raritySfx = {
+    'silver': Sfx.drop,
+    'gold': Sfx.duelPoints,
+    'premium': Sfx.win,
+    'legend': Sfx.duelVictory,
+  };
+
   @override
   void initState() {
     super.initState();
+    // صدای بازشدنِ صندوق
+    GameAudio.instance.play(Sfx.draw);
     for (var i = 0; i < widget.cards.length; i++) {
+      final rarity =
+          '${(widget.cards[i] as Map)['rarity'] ?? 'normal'}';
+      final sfx = _raritySfx[rarity] ?? Sfx.flip;
       Future<void>.delayed(Duration(milliseconds: 260 * i + 180), () {
         if (mounted) setState(() => _revealed = i + 1);
+        GameAudio.instance.play(sfx);
       });
     }
   }
@@ -682,6 +699,7 @@ class _RevealScreenState extends State<_RevealScreen> {
                           card: Map<String, dynamic>.from(
                               widget.cards[i] as Map),
                           shown: i < _revealed,
+                          baseUrl: widget.baseUrl,
                         ),
                     ],
                   ),
@@ -716,10 +734,15 @@ class _RevealScreenState extends State<_RevealScreen> {
 }
 
 class _PrizeCard extends StatelessWidget {
-  const _PrizeCard({required this.card, required this.shown});
+  const _PrizeCard({
+    required this.card,
+    required this.shown,
+    required this.baseUrl,
+  });
 
   final Map<String, dynamic> card;
   final bool shown;
+  final String baseUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -727,6 +750,7 @@ class _PrizeCard extends StatelessWidget {
     final accent = (rarityColors[rarity] ?? const [Color(0xFF94A3B8)]).first;
     final label = rarityLabels[rarity] ?? rarity;
     final points = (card['pointValue'] as num?)?.toInt() ?? 0;
+    final imgUrl = '${card['imageUrl'] ?? ''}';
 
     return AnimatedScale(
       scale: shown ? 1 : 0.7,
@@ -771,6 +795,26 @@ class _PrizeCard extends StatelessWidget {
                     letterSpacing: 0.3),
               ),
               const SizedBox(height: 6),
+              if (imgUrl.isNotEmpty)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.network(
+                    imgUrl.startsWith('http') ? imgUrl : '$baseUrl$imgUrl',
+                    width: 62,
+                    height: 62,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        const SizedBox(width: 62, height: 62),
+                    loadingBuilder: (_, child, progress) => progress == null
+                        ? child
+                        : Container(
+                            width: 62,
+                            height: 62,
+                            color: Colors.white10,
+                          ),
+                  ),
+                ),
+              const SizedBox(height: 7),
               SizedBox(
                 height: 34,
                 child: Center(

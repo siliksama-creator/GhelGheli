@@ -1,12 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { req, fa } from '../lib/api.js';
+import { req, fa, API } from '../lib/api.js';
 import { CARD_RARITY_META } from '../lib/cards.js';
+import { play } from '../gameAudio.js';
 
 // ⚠️ `fa()` خودش جداکنندهٔ هزارگان می‌گذارد و ورودی را `Number()` می‌کند.
 // اگر اول `toLocaleString()` بزنیم، رشتهٔ «100,000» به `fa()` می‌رسد و
 // `Number('100,000')` مقدارِ NaN می‌دهد ⇒ روی صفحه «ناعدد تومان» چاپ
 // می‌شد. عدد را خام بده؛ قالب‌بندی کارِ خودِ `fa()` است.
 const money = n => `${fa(Number(n || 0))} تومان`;
+
+// صدای رونمایی هر سطح — بالاتر = باشکوه‌تر.
+const REVEAL_SFX = { normal: 'flip', silver: 'drop', gold: 'duel_points', premium: 'win', legend: 'duel_victory' };
 
 /**
  * صندوقِ کارت.
@@ -75,6 +79,7 @@ export default function CardBox({ token, compact = false, onGranted }) {
   const buy = async () => {
     setBusy(true); setError(''); setWon(null); setWonMeta(null); setRevealed(0);
     setPhase('shaking');
+    play('draw');
     try {
       // همان سه‌گامِ فروشگاه: سفارش از سرور، پرداخت در بازار، تحویل بعد
       // از راستی‌آزماییِ سرور. کلاینت هیچ‌وقت خودش «تحویل شد» نمی‌گوید.
@@ -102,7 +107,10 @@ export default function CardBox({ token, compact = false, onGranted }) {
       setPhase('bursting');
       later(() => {
         setPhase('revealing');
-        cards.forEach((_, i) => later(() => setRevealed(i + 1), 260 * i + 180));
+        cards.forEach((c, i) => later(() => {
+          setRevealed(i + 1);
+          play(REVEAL_SFX[c.rarity] || 'flip');
+        }, 260 * i + 180));
       }, 620);
     } catch (e) {
       setError(e.message || 'خرید انجام نشد');
@@ -117,6 +125,7 @@ export default function CardBox({ token, compact = false, onGranted }) {
   const buyWithWallet = async () => {
     setBusy(true); setError(''); setWon(null); setWonMeta(null); setRevealed(0);
     setPhase('shaking');
+    play('draw');
     try {
       const result = await req('/api/card-box/buy', 'POST', { useWallet: true }, token);
       const cards = result?.cards || [];
@@ -130,7 +139,10 @@ export default function CardBox({ token, compact = false, onGranted }) {
       setPhase('bursting');
       later(() => {
         setPhase('revealing');
-        cards.forEach((_, i) => later(() => setRevealed(i + 1), 260 * i + 180));
+        cards.forEach((c, i) => later(() => {
+          setRevealed(i + 1);
+          play(REVEAL_SFX[c.rarity] || 'flip');
+        }, 260 * i + 180));
       }, 620);
     } catch (e) {
       setError(e.message || 'خرید با کیف پول انجام نشد');
@@ -290,8 +302,37 @@ export default function CardBox({ token, compact = false, onGranted }) {
       }
       @media(prefers-reduced-motion:reduce){
         .cardBox::after,.cardBoxGlow,.cardBoxImg,.cardBoxRays,.cardBoxPrize.shown{animation:none}
+        .cardBoxPrize--silver.shown,.cardBoxPrize--gold.shown,
+        .cardBoxPrize--premium.shown,.cardBoxPrize--legend.shown{animation:none}
         .cardBoxPrize.shown{opacity:1;transform:none}
       }
+      /* ── عکسِ کارت + انیمیشنِ رونماییِ هر سطح ─────────────────── */
+      .cardBoxPrizeImg{width:62px;height:62px;object-fit:cover;border-radius:10px;
+        margin:0 auto 8px;display:block;background:#0b1422;
+        border:1px solid rgba(255,255,255,.16)}
+      .cardBoxPrize--silver.shown,.cardBoxPrize--gold.shown,
+      .cardBoxPrize--premium.shown,.cardBoxPrize--legend.shown{position:relative;overflow:hidden}
+      .cardBoxPrize--silver.shown{animation:cbFlip .5s cubic-bezier(.2,1.3,.4,1) both,
+        cbShine 1.05s ease .08s both}
+      .cardBoxPrize--gold.shown{animation:cbFlip .55s cubic-bezier(.2,1.4,.4,1) both,
+        cbShine 1.15s ease .1s both,cbGlow 1.2s ease .1s 2}
+      .cardBoxPrize--premium.shown{animation:cbFlip .55s cubic-bezier(.2,1.4,.4,1) both,
+        cbShine 1.2s ease .12s both,cbGlow 1.3s ease .12s 3}
+      .cardBoxPrize--legend.shown{animation:cbFlip .6s cubic-bezier(.2,1.5,.4,1) both,
+        cbShine 1.25s ease .14s both,cbLegend 1.6s ease .3s infinite}
+      .cardBoxPrize--silver::after,.cardBoxPrize--gold::after,
+      .cardBoxPrize--premium::after,.cardBoxPrize--legend::after{
+        content:'';position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+        background:linear-gradient(105deg,transparent 32%,rgba(255,255,255,.55) 50%,transparent 68%);
+        background-size:250% 100%;opacity:0}
+      .cardBoxPrize--silver.shown::after,.cardBoxPrize--gold.shown::after,
+      .cardBoxPrize--premium.shown::after,.cardBoxPrize--legend.shown::after{
+        opacity:1;animation:cbShine 1.1s ease .12s both}
+      @keyframes cbShine{0%{background-position:130% 0}100%{background-position:-130% 0}}
+      @keyframes cbGlow{0%,100%{box-shadow:0 0 18px -4px var(--accent)}
+        50%{box-shadow:0 0 36px 4px var(--accent)}}
+      @keyframes cbLegend{0%,100%{transform:translateY(0) scale(1.02)}
+        50%{transform:translateY(-6px) scale(1.06)}}
     `}</style>
 
     <span className="cardBoxRibbon">ویژه</span>
@@ -384,10 +425,19 @@ export default function CardBox({ token, compact = false, onGranted }) {
               const meta = CARD_RARITY_META[c.rarity] || { label: c.rarity, accent: '#94A3B8' };
               return <div
                 key={i}
-                className={`cardBoxPrize ${i < revealed ? 'shown' : ''}`}
+                className={`cardBoxPrize cardBoxPrize--${c.rarity || 'normal'} ${i < revealed ? 'shown' : ''}`}
                 style={{ '--accent': meta.accent }}
               >
                 <span className="cardBoxPrizeTier">{meta.label}</span>
+                {c.imageUrl && (
+                  <img
+                    className="cardBoxPrizeImg"
+                    src={c.imageUrl.startsWith('http') ? c.imageUrl : API + c.imageUrl}
+                    alt={c.name || 'کارت'}
+                    loading="lazy"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                )}
                 <span className="cardBoxPrizeName">{c.name || 'کارت'}</span>
                 <span className="cardBoxPrizePts">{fa(c.pointValue || 0)} امتیاز</span>
               </div>;
