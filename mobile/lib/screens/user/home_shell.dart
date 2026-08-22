@@ -477,12 +477,30 @@ class _HomeShellState extends State<HomeShell>
   }
 
   /// مقایسهٔ سادهٔ نسخه (۱.۲.۳ < ۱.۱۰.۰). true اگر a پایین‌تر از b باشد.
+  ///
+  /// ⚠️ بخشِ build (مثل `+19` در `1.1.17+19`) جدا و نادیده گرفته می‌شود:
+  /// قبلاً `int.tryParse('17+19')` مقدار ۰ می‌داد و نسخهٔ برابر همیشه
+  /// «پایین‌تر» تشخیص داده می‌شد — یعنی دیالوگِ آپدیت برای کاربرانی که
+  /// آخرین نسخه را داشتند هم نمایش داده می‌شد.
+  ///
+  /// ⚠️ اگر نسخه قابل‌تشخیص نباشد (مثل `android-unknown`)، false
+  /// برمی‌گردد تا هرگز به‌اشتباه کاربر را مجبور به آپدیت نکند.
   bool _versionLower(String a, String b) {
-    final as = a.split('.').map((x) => int.tryParse(x) ?? 0).toList();
-    final bs = b.split('.').map((x) => int.tryParse(x) ?? 0).toList();
-    for (var i = 0; i < (as.length > bs.length ? as.length : bs.length); i++) {
-      final x = i < as.length ? as[i] : 0;
-      final y = i < bs.length ? bs[i] : 0;
+    List<int> parts(String v) {
+      final clean = v.split('+').first.trim();
+      return clean
+          .split('.')
+          .map((x) => int.tryParse(x))
+          .toList();
+    }
+    final as = parts(a);
+    final bs = parts(b);
+    if (as.any((x) => x == null) || bs.any((x) => x == null)) return false;
+    final an = as.map((x) => x!).toList();
+    final bn = bs.map((x) => x!).toList();
+    for (var i = 0; i < (an.length > bn.length ? an.length : bn.length); i++) {
+      final x = i < an.length ? an[i] : 0;
+      final y = i < bn.length ? bn[i] : 0;
       if (x != y) return x < y;
     }
     return false;
