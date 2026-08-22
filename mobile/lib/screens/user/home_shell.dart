@@ -486,7 +486,7 @@ class _HomeShellState extends State<HomeShell>
   /// ⚠️ اگر نسخه قابل‌تشخیص نباشد (مثل `android-unknown`)، false
   /// برمی‌گردد تا هرگز به‌اشتباه کاربر را مجبور به آپدیت نکند.
   bool _versionLower(String a, String b) {
-    List<int> parts(String v) {
+    List<int?> parts(String v) {
       final clean = v.split('+').first.trim();
       return clean
           .split('.')
