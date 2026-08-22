@@ -281,8 +281,18 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
     if (initialStart) onStart(initialStart);
 
     const timer = window.setInterval(() => {
-      if (!deadlineRef.current) return;
       const now = Date.now();
+      // ⚠️⚠️ رفعِ باگِ «برنده نمی‌تواند در راندِ بعد انتخاب کند»
+      // ─────────────────────────────────────────────────────────────
+      // قبلاً این تیک ابتدا `if (!deadlineRef.current) return;` داشت.
+      // اگر `deadline` به هر دلیلی null/0 می‌شد (مثلاً یک `game:update`
+      // بدون remainingMs)، تایمر از همان اول برمی‌گشت و `holding` و
+      // `resultHolding` هرگز ریست نمی‌شدند:
+      //   • دستِ برندهٔ راندِ قبل برای همیشه قفل می‌ماند (راندِ بعد
+      //     فقط حریف می‌توانست انتخاب کند — دقیقاً گزارشِ کاربر)،
+      //   • و صحنهٔ نتیجه (برندهٔ راند) هم هیچ‌وقت بسته نمی‌شد.
+      // حالا این دو پرچم **همیشه** از روی مهرِ زمانی شان محاسبه
+      // می‌شوند، مستقل از وجودِ `deadline`.
       // ── چرا ساعت در مکث یخ می‌زند ──
       //
       // تا وقتی نتیجهٔ راندِ قبل یا اعلانِ راندِ تازه روی صفحه است،
@@ -302,6 +312,7 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
           play('duel_intro', 0.82);
         }
       }
+      if (!deadlineRef.current) return;
       if (held) {
         // عددِ نمایش‌داده‌شده همان مهلتِ فکرکردن است، نه شمارشِ مکث.
         setSecondsLeft(Math.max(0, Math.ceil((deadlineRef.current - holdUntilRef.current) / 1000)));
