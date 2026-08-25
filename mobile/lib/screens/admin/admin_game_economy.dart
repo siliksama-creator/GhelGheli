@@ -144,9 +144,9 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
   }
 
-  Widget _numField(TextEditingController c, String label, {int width = 90}) {
+  Widget _numField(TextEditingController c, String label, {num width = 90}) {
     return SizedBox(
-      width: width,
+      width: width.toDouble(),
       child: TextField(
         controller: c,
         keyboardType: TextInputType.number,
