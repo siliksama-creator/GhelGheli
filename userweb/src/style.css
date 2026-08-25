@@ -5933,3 +5933,28 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
    همان‌جا باز می‌شود، پس جمله باید مقدمهٔ آن باشد نه دیوارِ بن‌بست. */
 .duelNeedCards{display:grid;gap:11px}
 .duelNeedCards>p{margin:0;text-align:center;font-size:12px;line-height:1.75;color:#cbd5e1}
+
+/* ── ضربه‌زن: راهنما و نشانِ شناورِ سکهٔ لول‌آپ (دورِ ۳۳) ── */
+.tapCoinGuide {
+  display: flex; align-items: center; gap: 6px;
+  margin: -6px 0 10px; padding: 6px 10px;
+  border-radius: 12px; font-size: 11.5px; line-height: 1.5;
+  color: #FDE68A; background: rgba(255,209,102,.08);
+  border: 1px solid rgba(255,209,102,.25);
+}
+.tapCoinGuide b { color: #FFD166; font-weight: 900; }
+.tapCoinToast {
+  position: relative; z-index: 6;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin: 4px 0 8px; padding: 8px 14px;
+  border-radius: 99px; font-size: 14px;
+  color: #1A1205; background: linear-gradient(135deg, #FFD166, #F59E0B);
+  box-shadow: 0 8px 24px rgba(255,209,102,.35);
+  animation: tapCoinPop .45s cubic-bezier(.2,.8,.2,1.2);
+}
+.tapCoinToast b { font-weight: 900; }
+.tapCoinToast span { font-size: 11.5px; opacity: .8; font-weight: 700; }
+@keyframes tapCoinPop {
+  from { transform: scale(.6); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}

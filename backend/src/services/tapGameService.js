@@ -665,11 +665,22 @@ async function submitBatch(
     // ⚠️ بیرونِ شرطِ `earnedPoints > 0` نیست و نباید باشد: هر لولِ
     //    تمام‌شده لزوماً امتیازِ مثبت دارد، ولی وابسته‌کردنِ سکه به امتیاز
     //    دو منطق را به هم گره می‌زند. اینجا فقط به `gained` نگاه می‌کنیم.
+    // ⚠️ callback حالا **مقدارِ سکهٔ واقعاً اعطاشده** را برمی‌گرداند تا
+    //    کلاینت همان لحظه «+۵ سکه» را جلوی چشمِ کاربر نشان دهد — بدون
+    //    هیچ درخواستِ جداگانه.
+    let coinsEarned = 0;
     if (!rejected && next.gained > 0 && typeof onLevelsGained === 'function') {
       const levels = [];
       for (let i = 0; i < next.gained; i++) levels.push(current.level + i);
-      await onLevelsGained(client, userId, levels);
+      const awarded = await onLevelsGained(client, userId, levels);
+      coinsEarned = Math.max(0, Math.trunc(Number(awarded) || 0));
     }
+
+    // جمعِ سکهٔ کاربر بعد از همین بسته — برای به‌روزرسانیِ نشانِ سکه
+    // بدونِ نیاز به refresh.
+    const coinRow = await client.query(
+      'SELECT coins FROM users WHERE id=$1', [userId]);
+    const coinsTotal = Number(coinRow.rows[0]?.coins || 0);
 
     await client.query('COMMIT');
 
@@ -695,6 +706,12 @@ async function submitBatch(
         // if the rate ever changes, only this file does.
         pointsEarned: earnedPoints,
         pointsAwarded: Number(row.points_awarded),
+        // ── coins ─────────────────────────────────────────────────────────
+        // سکهٔ لول‌های همین بسته + جمعِ کل — تا کلاینت «+۵ سکه» را همان
+        // لحظهٔ لول‌آپ نشان دهد (خواستهٔ مالک: «سکه بعد هر لول جلوی
+        // چشماشون اضافه بشه»).
+        coinsEarned,
+        coinsTotal,
         pointsToNextLevel: Math.max(0, requiredTaps(row.level) - row.level_taps),
         totalGamePoints: totalGamePoints(),
         // The client needs all three: the limit to explain the rule, what is

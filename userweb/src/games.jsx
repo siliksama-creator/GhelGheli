@@ -80,6 +80,9 @@ export default function Games({ api, token, externalLaunch = null }) {
   const lobbySocketRef = useRef(null);
   const [lobbyNotice, setLobbyNotice] = useState('');
   const [memoryRecords, setMemoryRecords] = useState(null);
+  // اقتصادِ بازی‌ها (سکهٔ هر نتیجه، درصدِ انتقال بین لیگ‌ها، سکهٔ ضربه‌زن)
+  // — از /api/config؛ وقتی ادمین در پنل عوض کند همین‌جا زنده عوض می‌شود.
+  const [economy, setEconomy] = useState(null);
 
   useEffect(() => {
     if (!externalLaunch?.start || !externalLaunch?.socket) return;
@@ -166,6 +169,10 @@ export default function Games({ api, token, externalLaunch = null }) {
     req('/api/bootstrap', 'GET', null, token).then(d => {
       if (d?.user) setUser({ ...d.user, cosmetics: d.cosmetics || {} });
       if (d?.coinQuota) setCoinQuota(d.coinQuota);
+      if (d?.economy) setEconomy(d.economy);
+    }).catch(() => {});
+    req('/api/config', 'GET', null, null).then(d => {
+      if (d?.economy) setEconomy(d.economy);
     }).catch(() => {});
     req('/api/level', 'GET', null, token).then(d => {
       if (d) setLevel(d);
@@ -182,7 +189,7 @@ export default function Games({ api, token, externalLaunch = null }) {
   }, [api, token, mode]);
 
   if (active === 'tap') {
-    return <TapGame token={token} onBack={() => setActive(null)} />;
+    return <TapGame token={token} economy={economy} onBack={() => setActive(null)} />;
   }
 
   if (active) {
@@ -220,6 +227,7 @@ export default function Games({ api, token, externalLaunch = null }) {
         initialStart={active.initialStart}
         onSolo={active.id === 'memory' && Number(active.stake || 0) === 0
           ? openMemorySolo : null}
+        economy={economy}
         soundOn={soundOn}
         onToggleSound={toggleSound}
         onBack={() => setActive(null)}
@@ -320,7 +328,7 @@ export default function Games({ api, token, externalLaunch = null }) {
           می‌شود کدام بازی ارزش دارد. آینهٔ games_page.dart.
           دورِ ۳۲: `mode` پاس داده می‌شود تا در تمرین و لابی — که سکه
           نمی‌دهند — به‌جای جدولِ نرخ، دلیلش گفته شود. */}
-      <CoinRateStrip mode={mode} />
+      <CoinRateStrip mode={mode} economy={economy} />
 
       {/* Mode Selector (4 Tabs) — رنگ هر قرص مثل اندروید */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
@@ -633,7 +641,7 @@ function GamePlayerIdentity({ player, fallback }) {
   </span>;
 }
 
-function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSocket, initialStart, onSolo, soundOn, onToggleSound, onBack }) {
+function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSocket, initialStart, onSolo, soundOn, onToggleSound, onBack, economy }) {
   const {
     phase, g, error, secondsLeft, move, leave, playBot, joinOnline, rematch,
     stillSearching, connectionNotice, rematchWaiting,
@@ -773,6 +781,31 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
           <h2 style={{ color: g.winner === g.me ? '#22E7A6' : '#FFF', fontWeight: '900', margin: 0 }}>
             {g.winner === 'DRAW' ? 'مسابقه مساوی شد!' : (g.winner === g.me ? 'تبریک! شما برنده شدید' : 'متاسفانه باختید!')}
           </h2>
+          {/* ── امتیازِ مثبت برای برنده، منفی برای بازنده ──
+              خواستهٔ مالک: «امتیاز مثبت رو بنویسه برای برنده، امتیاز منفی
+              رو بنویسه برای بازنده». فقط در مسابقهٔ امتیازیِ واقعی (نه ربات،
+              نه رایگان). برندهٔ واقعی: netPot منهای ورودیِ خودش؛ بازنده:
+              منهایِ ورودی. */}
+          {activeStake > 0 && !g.vsBot && g.winner && g.winner !== 'DISCONNECT' && (
+            <div style={{
+              display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center',
+              fontSize: '13.5px', fontWeight: 900,
+            }}>
+              {g.winner === 'DRAW' ? (
+                <span style={{ color: '#94A3B8', background: 'rgba(148,163,184,0.12)', padding: '5px 14px', borderRadius: 99 }}>
+                  امتیاز تو: {fa(0)} (ورودی کامل برگشت)
+                </span>
+              ) : g.winner === g.me ? (
+                <span style={{ color: '#22E7A6', background: 'rgba(34,231,166,0.14)', padding: '5px 14px', borderRadius: 99 }}>
+                  +{fa(Math.max(0, Number(g.netPot || 0) - Number(activeStake)))} امتیاز
+                </span>
+              ) : (
+                <span style={{ color: '#FB7185', background: 'rgba(251,113,133,0.14)', padding: '5px 14px', borderRadius: 99 }}>
+                  −{fa(activeStake)} امتیاز
+                </span>
+              )}
+            </div>
+          )}
           {/* سکهٔ لیگ. `coinsWinner` نمادِ برنده است (X/O) و با `g.me`
               مقایسه می‌شود، نه با `g.winner` — چون در قطعِ ارتباط،
               `g.winner` می‌تواند DISCONNECT باشد در حالی که تسویه واقعاً

@@ -23,21 +23,50 @@ import '../api_client.dart';
 /// قاعدهٔ خودمان سکه نمی‌دهند — جدولِ نرخ را نشان می‌داد. عدد غلط نبود،
 /// ولی به حالتِ فعلی ربطی نداشت و کاربر آن را «نادقیق» تجربه می‌کرد.
 class CoinRateStrip extends StatelessWidget {
-  const CoinRateStrip({super.key, this.mode});
+  const CoinRateStrip({super.key, this.mode, this.economy});
 
   /// ورودیِ انتخاب‌شده. `null` یعنی «حالت مهم نیست، جدول را نشان بده».
   final int? mode;
 
-  // 🔴 این اعداد تا دورِ ۲۶ منسوخ بودند: دوئل ۲/۲۰ و بقیه ۱/۱۰، در حالی
-  //    که `COIN_TABLE` بک‌اند مدت‌ها بود هر سه بازی را یکسان کرده بود.
-  //    یعنی نوار به کاربر عددی نشان می‌داد که هیچ‌وقت نمی‌گرفت.
-  //
-  //    حالا هر سه بازی یکی‌اند، پس ردیف‌ها بر اساس نتیجه‌اند نه بازی.
-  static const _rows = [
+  /// اقتصادِ بازی‌ها از `/api/bootstrap` (تنظیماتِ ادمین). اگر نباشد —
+  /// نسخهٔ قدیمی یا آفلاین — جدولِ پیش‌فرض استفاده می‌شود.
+  final Map<String, dynamic>? economy;
+
+  static const _defaultRows = [
     ('برد', 10, 30),
     ('مساوی', 3, 9),
     ('باخت', 1, 3),
   ];
+
+  /// اعدادِ زنده از تنظیماتِ ادمین — بدونِ آپدیتِ اپ.
+  List<(String, int, int)> get _rows {
+    final rewards = economy?['coinRewards'];
+    final base = rewards is Map && rewards['card_duel'] is Map
+        ? (rewards['card_duel'] as Map)
+        : null;
+    int v(String key, int stake, int fallback) {
+      final stakeMap = base?[stake];
+      if (stakeMap is Map) {
+        final n = num.tryParse('${stakeMap[key] ?? ''}');
+        if (n != null) return n.toInt();
+      }
+      return fallback;
+    }
+    return [
+      ('برد', v('win', 100, 10), v('win', 1000, 30)),
+      ('مساوی', v('draw', 100, 3), v('draw', 1000, 9)),
+      ('باخت', v('loss', 100, 1), v('loss', 1000, 3)),
+    ];
+  }
+
+  /// متنِ توضیحِ استانداردِ سکه — درصدِ انتقال از تنظیماتِ ادمین.
+  String get _footer {
+    final pct = num.tryParse('${economy?['coinCarryoverPercent'] ?? ''}')?.toInt() ?? 10;
+    final pctText = pct == 0
+        ? 'انتقالِ سکه به لیگِ بعدی صفر است'
+        : '${faNum(pct)}٪ از سکه به لیگِ بعدی منتقل می‌شود';
+    return 'سکه مبنای دریافتِ جایزهٔ لیگ است؛ رتبهٔ لیگ بر اساسِ سکه تعیین می‌شود و با سکه‌ها در استخرِ جایزه شرکت می‌کنی. سکه‌ها بعد از پایانِ لیگ صفر می‌شوند و $pctText.';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -169,7 +198,7 @@ class CoinRateStrip extends StatelessWidget {
                   Border(top: BorderSide(color: _gold.withValues(alpha: 0.14))),
             ),
             child: Text(
-              'هر سه بازی یکسان · فقط مقابل حریف واقعی · رتبهٔ لیگ با سکه تعیین می‌شود',
+              _footer,
               style: TextStyle(
                   fontSize: 10.5,
                   height: 1.5,

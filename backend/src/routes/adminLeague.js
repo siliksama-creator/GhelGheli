@@ -6,7 +6,7 @@ module.exports = function createAdminLeagueRoutes(deps) {
     pool, adminAuth, requireRole, asyncHandler, audit, validateUuid,
     getLeaderboard, getLeagueWinnerCount, ensureActiveSeason,
     closeActiveSeason, leagueApprove, walletService, createNotification,
-    defaultPrizeTable,
+    defaultPrizeTable, seedCarryoverFromLatestClosed,
   } = deps;
   const router = express.Router();
 
@@ -327,7 +327,22 @@ router.post('/admin/league/seasons', adminAuth, requireRole(), asyncHandler(asyn
 
   await audit(req.admin.id, 'league_create', 'league_seasons', rows[0].id, null,
     { title, leagueType, startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString() });
-  res.status(201).json({ message: 'لیگ تازه ساخته شد', season: rows[0] });
+
+  // ── انتقالِ درصدیِ سکه از لیگِ بستهٔ قبلیِ همین نوع (خواستهٔ مالک) ──
+  //
+  // اگر موقعِ بستنِ لیگِ قبل، لیگِ بعدی هنوز ساخته نشده بود، سکهٔ
+  // انتقالی اینجا — با ساختِ لیگِ تازه — منتقل می‌شود. درصدش را ادمین
+  // در «تنظیمات اقتصاد بازی» تعیین کرده (صفر هم مجاز است).
+  let carryover = null;
+  try {
+    carryover = await seedCarryoverFromLatestClosed({
+      leagueType,
+      targetSeasonId: rows[0].id,
+    });
+  } catch (e) {
+    console.error('[league] انتقالِ سکه هنگامِ ساخت لیگ شکست خورد:', e.message);
+  }
+  res.status(201).json({ message: 'لیگ تازه ساخته شد', season: rows[0], carryover });
 }));
 
 /** ویرایشِ یک لیگِ مشخص (نه فقط «لیگِ جاری»). */

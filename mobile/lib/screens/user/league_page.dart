@@ -47,7 +47,21 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
     super.dispose();
   }
 
+  /// اقتصادِ بازی‌ها (درصدِ انتقالِ سکه و…) — از /api/config؛ وقتی ادمین
+  /// عوض کند، این صفحه هم بدونِ آپدیتِ اپ متنِ جدید را نشان می‌دهد.
+  Map<String, dynamic>? _economy;
+
   Future<void> _load() async {
+    try {
+      final cfg = await widget.api.get('/api/config');
+      if (mounted && cfg is Map) {
+        final m = Map<String, dynamic>.from(cfg);
+        if (m['economy'] is Map) {
+          setState(() => _economy = Map<String, dynamic>.from(m['economy']));
+        }
+      }
+    } catch (_) {}
+
     try {
       final url = _selectedLeagueId != null
           ? '/api/league/current?seasonId=$_selectedLeagueId'
@@ -518,7 +532,18 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(2, 14, 2, 0),
                   child: Text(
-                    'برترین کاربران تا پایان زمان اعلام شده؛ جوایز پس از پایان لیگ پرداخت و لیگ بعدی آغاز می‌شود.',
+                    () {
+                      final pct = num.tryParse(
+                              '${_economy?['coinCarryoverPercent'] ?? ''}')
+                              ?.toInt() ??
+                          10;
+                      final pctText = pct == 0
+                          ? 'انتقالِ سکه به لیگِ بعدی صفر است'
+                          : '${faNum(pct)}٪ از سکه به لیگِ بعدی منتقل می‌شود';
+                      return 'مبنای دریافتِ جایزهٔ لیگ، رتبه بر اساسِ سکه است و با سکه‌ها در استخرِ جایزه شرکت می‌کنی. '
+                          'برترین کاربران تا پایان زمانِ اعلام‌شده؛ جوایز پس از پایانِ لیگ پرداخت و لیگِ بعدی آغاز می‌شود. '
+                          'سکه‌ها بعد از پایانِ لیگ صفر می‌شوند و $pctText.';
+                    }(),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.62),

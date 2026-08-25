@@ -171,6 +171,14 @@ class TapEngine extends ChangeNotifier {
 
   TapEvent? get lastEvent => _lastEvent;
   int get eventSerial => _eventSerial;
+
+  /// سکهٔ واریزشده برای لول‌های آخرین بستهٔ تأییدشده + شمارهٔ تغییر.
+  /// صفحه با مقایسهٔ `coinsEarnedSerial` می‌فهمد نشانِ «+N سکه» را کی
+  /// نمایش دهد (خواستهٔ مالک: «سکه بعد هر لول جلوی چشمشون اضافه بشه»).
+  int coinsEarnedLastBatch = 0;
+  int coinsTotalLastBatch = 0;
+  int _coinsEarnedSerial = 0;
+  int get coinsEarnedSerial => _coinsEarnedSerial;
   String? get notice => _notice;
 
   // ── lifecycle ────────────────────────────────────────────────────────────
@@ -498,6 +506,14 @@ class TapEngine extends ChangeNotifier {
           }
         }
         _adoptDailyAllowance(result);
+        // ── سکهٔ لول‌های همین بسته ──
+        // سرور در پاسخِ بسته `coinsEarned` را می‌فرستد؛ اگر لولی تمام شده
+        // باشد، عددش مثبت است و صفحه نشانِ شناور «+N سکه» را نشان می‌دهد.
+        if ((result.coinsEarned ?? 0) > 0) {
+          coinsEarnedLastBatch = result.coinsEarned!;
+          coinsTotalLastBatch = result.coinsTotal ?? 0;
+          _coinsEarnedSerial++;
+        }
         await _persist(immediate: true);
         _safeNotify();
       } else if (result.rejected) {

@@ -40,22 +40,41 @@ import { ASSETS, SvgIcon } from './IconAsset.jsx';
 //    هیچ‌جا وعده‌اش داده نشده بود.
 //
 //    آینهٔ `COIN_TABLE` در `backend/src/services/coinService.js`.
-const ROWS = [
+const DEFAULT_ROWS = [
   { game: 'برد', s100: 10, s1000: 30 },
   { game: 'مساوی', s100: 3, s1000: 9 },
   { game: 'باخت', s100: 1, s1000: 3 },
 ];
 
-const RULES = [
-  ['check', 'هر سه بازی یکسان سکه می‌دهند — دوئل کارت، پنالتی و جفت‌یاب.'],
-  ['ban', 'بازی با ربات، تمرین رایگان و لابی خصوصی سکه ندارند.'],
-  ['lock', 'سکه هرگز از شما کم نمی‌شود؛ حتی وقتی ببازید.'],
-  ['calendar', 'هر روز تا ۳۰ بازی در ورودی ۱۰۰ و ۱۵ بازی در ورودی ۱۰۰۰ سکه می‌دهد. بعد از آن، بازی امتیاز دارد ولی سکه نه.'],
-  ['target', 'بازی ضربه‌زن هم سکه دارد: هر پنج لول یک سکهٔ بیشتر — در کل ۲۷۵ سکه.'],
-  ['trophy', 'در پایان فصل، جوایز بر اساس سکه پرداخت و سکه‌ها صفر می‌شود.'],
-];
+const KEY = { win: 'برد', draw: 'مساوی', loss: 'باخت' };
 
-export default function CoinGuide({ open, onToggle }) {
+// ⚠️ دورِ ۳۳: اعداد و متن‌ها از تنظیماتِ ادمین (`/api/config`) می‌آیند —
+//    تغییرِ ادمین در پنل، همین راهنما را در وب و اندروید (بدونِ آپدیت)
+//    به‌روز می‌کند.
+export default function CoinGuide({ open, onToggle, economy }) {
+  const table = economy?.coinRewards?.card_duel;
+  const ROWS = Object.keys(KEY).map(key => ({
+    game: KEY[key],
+    s100: Number(table?.[100]?.[key] ?? DEFAULT_ROWS.find(r => r.game === KEY[key])?.s100 ?? 0),
+    s1000: Number(table?.[1000]?.[key] ?? DEFAULT_ROWS.find(r => r.game === KEY[key])?.s1000 ?? 0),
+  }));
+
+  const pct = Number(economy?.coinCarryoverPercent ?? 10);
+  const pctText = pct === 0
+    ? 'انتقالِ سکه به لیگِ بعدی صفر است'
+    : `${fa(pct)}٪ از سکه به لیگِ بعدی منتقل می‌شود`;
+  const tapCoins = Number(economy?.tapCoinsPerLevel ?? 5);
+  const quota100 = Number(economy?.dailyCoinQuota?.[100] ?? 30);
+  const quota1000 = Number(economy?.dailyCoinQuota?.[1000] ?? 15);
+
+  const RULES = [
+    ['check', 'هر سه بازی یکسان سکه می‌دهند — دوئل کارت، پنالتی و جفت‌یاب.'],
+    ['ban', 'بازی با ربات، تمرین رایگان و لابی خصوصی سکه ندارند.'],
+    ['lock', 'سکه هرگز از شما کم نمی‌شود؛ حتی وقتی ببازید.'],
+    ['calendar', `هر روز تا ${fa(quota100)} بازی در ورودی ۱۰۰ و ${fa(quota1000)} بازی در ورودی ۱۰۰۰ سکه می‌دهد. بعد از آن، بازی امتیاز دارد ولی سکه نه.`],
+    ['target', `بازی ضربه‌زن هم سکه دارد: هر لول ${fa(tapCoins)} سکه — همان لحظهٔ لول‌آپ به موجودی‌ات اضافه می‌شود.`],
+    ['trophy', `مبنای دریافتِ جایزهٔ لیگ، رتبه بر اساسِ سکه است و با سکه‌ها در استخرِ جایزه شرکت می‌کنی. در پایانِ فصل جوایز بر اساسِ سکه پرداخت و سکه‌ها صفر می‌شوند؛ ${pctText}.`],
+  ];
   return (
     <div className="coinGuide" style={{
       margin: '0 0 12px', borderRadius: '16px', overflow: 'hidden',

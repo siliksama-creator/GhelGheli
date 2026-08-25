@@ -497,6 +497,25 @@ class _ResultStrip extends StatelessWidget {
         : draw
             ? Icons.handshake_rounded
             : Icons.close_rounded;
+    // ── امتیازِ مثبت برای برنده، منفی برای بازنده (خواستهٔ مالک) ──
+    // فقط در مسابقهٔ امتیازیِ واقعی: نه ربات، نه رایگان، نه قطعِ اتصال.
+    final int stakeVal = session.stake;
+    final bool showDelta = stakeVal > 0 &&
+        !session.vsBot &&
+        session.winner != null &&
+        session.winner != 'DISCONNECT';
+    String? deltaText;
+    if (showDelta) {
+      if (draw) {
+        deltaText = 'امتیاز تو: ۰ (ورودی کامل برگشت)';
+      } else if (won) {
+        final net = (session.netPot - stakeVal).clamp(0, 1 << 31);
+        deltaText = '+${faNum(net)} امتیاز';
+      } else {
+        deltaText = '−${faNum(stakeVal)} امتیاز';
+      }
+    }
+
     return AnimatedContainer(
       duration: Motion.fast,
       width: double.infinity,
@@ -512,23 +531,39 @@ class _ResultStrip extends StatelessWidget {
           BoxShadow(color: color.withValues(alpha: 0.20), blurRadius: 12)
         ],
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 18, color: color),
-          Gaps.hXs,
-          Flexible(
-            child: Text(
-              session.resultText,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: color),
+              Gaps.hXs,
+              Flexible(
+                child: Text(
+                  session.resultText,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    color: color,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (deltaText != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              deltaText,
               textAlign: TextAlign.center,
-              style: theme.textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w900,
-                color: color,
+              style: theme.textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: color.withValues(alpha: 0.95),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );

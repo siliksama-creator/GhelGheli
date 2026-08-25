@@ -890,8 +890,11 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
           <div className={`duelSettlement ${session.g.settlementStatus || 'settled'}`}>
             {session.g.finishReason === 'disconnect'
               ? finalVerdict.label
-              : winner === 'DRAW' ? 'ورودی برگشت'
-                : iWon ? ({ pending: 'در حال تسویه', settled: 'تسویه شد', refunded: 'ورودی برگشت' }[session.g.settlementStatus || 'settled'])
+              : winner === 'DRAW' ? 'امتیاز تو: ۰ (ورودی کامل برگشت)'
+                : iWon
+                  // امتیازِ مثبت برای برنده — سودِ خالص: پاتِ دریافتی منهای
+                  // ورودیِ خودش. (خواستهٔ مالک)
+                  ? `+${fa(Math.max(0, Number(session.g.netPot || 0) - Number(session.g.stake || stake)))} امتیاز · ${({ pending: 'در حال تسویه', settled: 'تسویه شد', refunded: 'ورودی برگشت' }[session.g.settlementStatus || 'settled'])}`
                   : `−${fa(session.g.stake || stake)} امتیاز`}
           </div>
         )}

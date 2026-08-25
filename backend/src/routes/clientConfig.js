@@ -47,7 +47,7 @@ function mergeConfig(raw) {
 
 module.exports = function createClientConfigRoutes(deps) {
   const {
-    pool, adminAuth, requireRole, asyncHandler, audit, rateLimit,
+    pool, adminAuth, requireRole, asyncHandler, audit, rateLimit, gameEconomy,
   } = deps;
 
   // عمومی و سبک — هر اجرای اپ/باز شدن وب یک درخواست می‌زند.
@@ -80,6 +80,10 @@ module.exports = function createClientConfigRoutes(deps) {
     res.json({
       ...cfg,
       wallet: { enabled: wallet.enabled !== false },
+      // اقتصادِ بازی‌ها: سکهٔ هر نتیجه، سهمیهٔ روزانه، درصدِ انتقالِ
+      // سکه بین لیگ‌ها و سکهٔ هر لولِ ضربه‌زن. کلاینت‌ها متن‌های راهنما
+      // را از همین اعداد می‌سازند — بدونِ نیاز به آپدیتِ اپ.
+      economy: await gameEconomy.publicView().catch(() => null),
       serverTime: new Date().toISOString(),
     });
   }));

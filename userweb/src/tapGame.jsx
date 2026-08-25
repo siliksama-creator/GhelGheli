@@ -274,7 +274,12 @@ function registerTap(guard, nowMs) {
 }
 
 // ── component ──────────────────────────────────────────────────────────────
-export default function TapGame({ token, onBack }) {
+export default function TapGame({ token, onBack, economy }) {
+  // ── سکهٔ لول‌آپ جلوی چشمِ کاربر (خواستهٔ مالک) ──
+  // وقتی سرور پاسخِ بسته را با coinsEarned برمی‌گرداند، یک نشانِ شناور
+  // «+N سکه» چند ثانیه نمایش داده می‌شود.
+  const [coinToast, setCoinToast] = useState(null);
+  const coinToastTimer = useRef(null);
   const [progress, setProgress] = useState(loadProgress);
   const [notice, setNotice] = useState('');
   const [rate, setRate] = useState(0);
@@ -324,6 +329,7 @@ export default function TapGame({ token, onBack }) {
   useEffect(() => () => {
     for (const id of timers.current) clearTimeout(id);
     timers.current.clear();
+    clearTimeout(coinToastTimer.current);
   }, []);
 
   const level = progress.level;
@@ -428,6 +434,16 @@ export default function TapGame({ token, onBack }) {
 
       if (res && res.rejected) {
         setNotice(res.message || 'ضربه‌های غیرعادی نادیده گرفته شد');
+      }
+      // ── سکهٔ لول‌آپ: «+۵ سکه» جلوی چشمِ کاربر ──
+      if (res && Number(res.coinsEarned) > 0) {
+        setCoinToast({
+          coins: Number(res.coinsEarned),
+          total: Number(res.coinsTotal ?? 0),
+          at: Date.now(),
+        });
+        clearTimeout(coinToastTimer.current);
+        coinToastTimer.current = setTimeout(() => setCoinToast(null), 3000);
       }
       // The server is authoritative: adopt its numbers when they differ.
       if (res && typeof res.level === 'number') {
@@ -703,6 +719,16 @@ export default function TapGame({ token, onBack }) {
         <span className="tapTotal"> {fa(points)} امتیاز</span>
       </div>
 
+      {/* ── راهنمای سکه: «هر لول N سکه» — عدد از تنظیماتِ ادمین می‌آید ── */}
+      <div className="tapCoinGuide">
+        <img src="/pass/icon_coin.webp" alt="" width={15} height={15}
+          style={{ display: 'block', opacity: 0.9 }} />
+        <span>
+          هر لول <b>{fa(economy?.tapCoinsPerLevel ?? 5)} سکه</b> می‌دهد؛ سکهٔ
+          هر لول همان لحظه به موجودی‌ات اضافه می‌شود.
+        </span>
+      </div>
+
       <div className="tapProgress">
         <div className="tapProgressTop">
           <b dir="ltr">{fa(progress.taps)} / {fa(need)}</b>
@@ -716,6 +742,14 @@ export default function TapGame({ token, onBack }) {
           {progress.pendingTaps > 0 && <small>در حال ثبت: {fa(progress.pendingTaps)}</small>}
         </div>
       </div>
+
+      {coinToast && (
+        <div className="tapCoinToast" role="status">
+          <img src="/pass/icon_coin.webp" alt="" width={18} height={18} />
+          <b>+{fa(coinToast.coins)} سکه</b>
+          <span>موجودی: {fa(coinToast.total)}</span>
+        </div>
+      )}
 
       {notice && <div className="tapNotice">{notice}</div>}
 

@@ -22,7 +22,7 @@ const {
   isFirebaseConfigured,
 } = require('./services/notificationService');
 const gameStakes = require('./services/gameStakeService');
-const { ensureActiveSeason, addLeaguePoints, getLeaderboard, closeActiveSeason, closeExpiredSeasons, approvePayouts: leagueApprove, defaultPrizeTable } = require('./services/leagueService');
+const { ensureActiveSeason, addLeaguePoints, getLeaderboard, closeActiveSeason, closeExpiredSeasons, approvePayouts: leagueApprove, defaultPrizeTable, seedCarryoverFromLatestClosed } = require('./services/leagueService');
 const { optimizeUpload, kb } = require('./services/imageService');
 const { getGameRewardSettings, saveGameRewardSettings } = require('./services/gameRewardService');
 const walletService = require('./services/walletService');
@@ -42,6 +42,10 @@ const level = require('./services/levelService');
 const chatRetention = require('./services/chatRetentionService');
 // سکه — ارزِ مهارتِ لیگ. سهمیهٔ روزانه‌اش در bootstrap پخش می‌شود.
 const coins = require('./services/coinService');
+// تنظیماتِ اقتصادِ بازی‌ها (سکهٔ برد/مساوی/باخت، سهمیه، درصدِ انتقالِ
+// سکه بین لیگ‌ها، سکهٔ هر لولِ ضربه‌زن) — قابل کنترل از پنل ادمین و
+// قابل خواندن توسط کلاینت‌ها از `/api/config` بدونِ آپدیتِ اپ.
+const gameEconomy = require('./services/gameEconomyService');
 // Same reason: the profile endpoint checks club membership before letting
 // someone wear a crest, and it is defined above the club routes.
 const clubs = require('./services/clubService');
@@ -840,6 +844,9 @@ app.post('/api/games/tap/progress', auth, tapBatchLimiter, asyncHandler(async (r
     async (client, userId, levels) => {
       const amount = coins.tapCoinsFor(levels);
       if (amount > 0) await coins.awardCoins(client, userId, amount);
+      // مقدارِ واقعاً اعطاشده برمی‌گردد تا tapGameService همان را در
+      // پاسخِ بسته بگذارد و کلاینت «+۵ سکه» را فوری نشان دهد.
+      return amount;
     },
   );
   // XP گذر نبرد به ازای هر لولی که در همین بستهٔ ارسالی تمام شده.
@@ -1039,6 +1046,9 @@ app.get('/api/bootstrap', auth, asyncHandler(async (req, res) => {
     // سهمیهٔ سکهٔ امروز — سوار بر همان bootstrap تا صفحهٔ بازی‌ها بتواند
     // «۳۰ از ۳۰ بازی سکه‌دار» را بدونِ درخواستِ اضافه نشان بدهد.
     coinQuota: await coins.getQuota(req.user.id),
+    // اقتصادِ بازی‌ها برای متن‌های راهنمای داخلِ اپ/وب — از تنظیماتِ
+    // ادمین می‌آید، پس حتی اپ‌های قدیمی هم متنِ جدید می‌بینند.
+    economy: await gameEconomy.publicView().catch(() => null),
   });
 }));
 
@@ -2444,7 +2454,7 @@ app.use('/api', require('./routes/adminLeague')({
   pool, adminAuth, requireRole, asyncHandler, audit, validateUuid,
   getLeaderboard, getLeagueWinnerCount, ensureActiveSeason,
   closeActiveSeason, leagueApprove, walletService, createNotification,
-  defaultPrizeTable,
+  defaultPrizeTable, seedCarryoverFromLatestClosed,
 }));
 
 // User administration and point-ledger inspection.
@@ -2465,9 +2475,17 @@ app.use('/api', require('./routes/adminSecurity')({
   pool, adminAuth, requireRole, asyncHandler, audit, validateUuid, bcrypt,
 }));
 
-// Client runtime config (min version + announcement) — «اهرمِ بدون-آپدیت».
+// Client runtime config (min version + announcement + اقتصاد بازی) —
+// «اهرمِ بدون-آپدیت»: کلاینت‌ها این را از /api/config می‌خوانند.
 app.use('/api', require('./routes/clientConfig')({
-  pool, adminAuth, requireRole, asyncHandler, audit, rateLimit,
+  pool, adminAuth, requireRole, asyncHandler, audit, rateLimit, gameEconomy,
+}));
+
+// تنظیماتِ اقتصادِ بازی‌ها (سکه، سهمیه، درصدِ انتقال بین لیگ‌ها،
+// سکهٔ ضربه‌زن و امتیازِ برد/باخت) — پنل ادمین وب و اندروید.
+app.use('/api', require('./routes/adminGameEconomy')({
+  adminAuth, requireRole, asyncHandler, audit, gameEconomy,
+  gameRewards: { getGameRewardSettings, saveGameRewardSettings },
 }));
 
 const presence = createPresenceService(pool);

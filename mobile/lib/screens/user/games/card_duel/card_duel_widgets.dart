@@ -1787,9 +1787,11 @@ class _Finale extends StatelessWidget {
                   session.finishReason == 'disconnect'
                       ? session.resultText
                       : draw
-                          ? 'ورودی برگشت خورد'
+                          ? 'امتیاز تو: ۰ (ورودی کامل برگشت)'
                           : won
-                              ? 'تسویه شد'
+                              // امتیازِ مثبت برای برنده — سودِ خالص:
+                              // پاتِ دریافتی منهای ورودیِ خودش (خواستهٔ مالک).
+                              ? '+${faNum((session.netPot - session.stake).clamp(0, 1 << 31))} امتیاز · تسویه شد'
                               : '−${faNum(session.stake)} امتیاز',
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 12, color: Colors.white60),

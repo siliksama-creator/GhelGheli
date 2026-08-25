@@ -82,6 +82,8 @@ class TapSyncResult {
     this.levelsPerDay,
     this.rejected = false,
     this.message,
+    this.coinsEarned,
+    this.coinsTotal,
   });
 
   final bool ok;
@@ -105,6 +107,13 @@ class TapSyncResult {
   final bool rejected;
 
   final String? message;
+
+  /// سکهٔ لول‌های تمام‌شده در همین بسته — سرور همان لحظه واریز کرده و
+  /// این عدد را می‌فرستد تا کلاینت «+۵ سکه» را جلوی چشمِ کاربر نشان دهد.
+  final int? coinsEarned;
+
+  /// جمعِ کلِ سکهٔ کاربر بعد از این بسته.
+  final int? coinsTotal;
 }
 
 class TapSync {
@@ -219,6 +228,8 @@ class TapSync {
         levelsPerDay: _asInt(map['levelsPerDay']),
         rejected: map['rejected'] == true,
         message: map['message']?.toString(),
+        coinsEarned: _asInt(map['coinsEarned']),
+        coinsTotal: _asInt(map['coinsTotal']),
       );
     } catch (e) {
       // Offline or server hiccup: the engine retains the taps and retries on

@@ -95,6 +95,15 @@ class _TapGameScreenState extends State<TapGameScreen>
   String? _lastSkin;
   String? _lastNotice;
 
+  // ── سکهٔ لول‌آپ جلوی چشمِ کاربر (خواستهٔ مالک) ──
+  int _seenCoinsSerial = 0;
+  int? _coinsToast;
+  int? _coinsTotal;
+  Timer? _coinsToastTimer;
+
+  /// اقتصادِ بازی‌ها از /api/config — سکهٔ هر لول و درصدِ انتقالِ سکه.
+  Map<String, dynamic>? _economy;
+
   @override
   void initState() {
     super.initState();
@@ -105,6 +114,20 @@ class _TapGameScreenState extends State<TapGameScreen>
       sync: TapSync(api: widget.api),
     )..addListener(_onEngineChanged);
     _engine.init();
+    _loadEconomy();
+  }
+
+  Future<void> _loadEconomy() async {
+    try {
+      final res = await widget.api.get('/api/config');
+      if (!mounted || res is! Map) return;
+      final m = Map<String, dynamic>.from(res);
+      if (m['economy'] is Map) {
+        setState(() => _economy = Map<String, dynamic>.from(m['economy']));
+      }
+    } catch (_) {
+      // آفلاین یا سرورِ قدیمی — متن با پیش‌فرض (هر لول ۵ سکه) می‌ماند.
+    }
   }
 
   @override
@@ -112,6 +135,7 @@ class _TapGameScreenState extends State<TapGameScreen>
     // Must be cancelled: a pending rebuild firing after dispose would call
     // setState on a defunct State.
     _rebuildTimer?.cancel();
+    _coinsToastTimer?.cancel();
     _hapticClock.stop();
     _uiTick.dispose();
     WidgetsBinding.instance.removeObserver(this);
@@ -174,6 +198,23 @@ class _TapGameScreenState extends State<TapGameScreen>
           break;
       }
     }
+    // ── سکهٔ لول‌های تأییدشده: نشانِ شناور «+N سکه» ──
+    if (_engine.coinsEarnedSerial != _seenCoinsSerial) {
+      _seenCoinsSerial = _engine.coinsEarnedSerial;
+      if (_engine.coinsEarnedLastBatch > 0) {
+        setState(() {
+          _coinsToast = _engine.coinsEarnedLastBatch;
+          _coinsTotal = _engine.coinsTotalLastBatch;
+        });
+        _coinsToastTimer?.cancel();
+        _coinsToastTimer =
+            Timer(const Duration(milliseconds: 2600), () {
+          if (!mounted) return;
+          setState(() => _coinsToast = null);
+        });
+      }
+    }
+
     _scheduleRebuild();
   }
 
@@ -276,6 +317,18 @@ class _TapGameScreenState extends State<TapGameScreen>
             ),
           ),
         ),
+        // ── راهنمای سکه: «هر لول N سکه» — عدد از تنظیماتِ ادمین می‌آید ──
+        Padding(
+          padding: const EdgeInsets.fromLTRB(Gaps.lg, Gaps.xxs, Gaps.lg, 0),
+          child: _CoinGuide(accent: _accent, economy: _economy),
+        ),
+        // ── نشانِ شناورِ سکهٔ لول‌آپ ──
+        if (_coinsToast != null) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(Gaps.lg, Gaps.xs, Gaps.lg, 0),
+            child: _CoinToast(coins: _coinsToast!, total: _coinsTotal),
+          ),
+        ],
         Expanded(
           child: _engine.isComplete
               ? _CompletionView(
@@ -733,6 +786,103 @@ class _NoticeBar extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// راهنمای سکهٔ ضربه‌زن — عددها از تنظیماتِ ادمین (بدونِ آپدیتِ اپ).
+class _CoinGuide extends StatelessWidget {
+  const _CoinGuide({required this.accent, this.economy});
+  final Color accent;
+  final Map<String, dynamic>? economy;
+
+  @override
+  Widget build(BuildContext context) {
+    final perLevel =
+        num.tryParse('${economy?['tapCoinsPerLevel'] ?? ''}')?.toInt() ?? 5;
+    final pct =
+        num.tryParse('${economy?['coinCarryoverPercent'] ?? ''}')?.toInt() ?? 10;
+    final pctText = pct == 0
+        ? 'انتقالِ سکه به لیگِ بعدی صفر است'
+        : '${faNum(pct)}٪ از سکه به لیگِ بعدی منتقل می‌شود';
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 7, 12, 7),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.10),
+        borderRadius: Corners.rMd,
+        border: Border.all(color: accent.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.monetization_on_rounded, size: 16, color: Color(0xFFFFD166)),
+          Gaps.hXs,
+          Expanded(
+            child: Text(
+              'هر لول ${faNum(perLevel)} سکه می‌دهد — همان لحظه به موجودی‌ات اضافه می‌شود. '
+              'سکه مبنای جایزهٔ لیگ است؛ بعد از پایانِ لیگ صفر می‌شود و $pctText.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: const Color(0xFFFDE68A),
+                    fontWeight: FontWeight.w700,
+                    height: 1.5,
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// نشانِ شناورِ «+N سکه» بعد از لول‌آپ (خواستهٔ مالک).
+class _CoinToast extends StatelessWidget {
+  const _CoinToast({required this.coins, this.total});
+  final int coins;
+  final int? total;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+              colors: [Color(0xFFFFD166), Color(0xFFF59E0B)]),
+          borderRadius: Corners.rPill,
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFFFD166).withValues(alpha: 0.35),
+              blurRadius: 14,
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.monetization_on_rounded,
+                size: 18, color: Color(0xFF1A1205)),
+            Gaps.hXxs,
+            Text(
+              '+${faNum(coins)} سکه',
+              style: const TextStyle(
+                color: Color(0xFF1A1205),
+                fontWeight: FontWeight.w900,
+                fontSize: 14,
+              ),
+            ),
+            if (total != null) ...[
+              Gaps.hXxs,
+              Text(
+                'موجودی: ${faNum(total!)}',
+                style: const TextStyle(
+                  color: Color(0xB31A1205),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

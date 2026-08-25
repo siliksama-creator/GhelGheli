@@ -102,6 +102,9 @@ class _GamesHubPageState extends State<GamesHubPage> {
   /// `null` یعنی سرور هنوز جواب نداده یا این نسخه از سرور سهمیه نمی‌فرستد —
   /// در هر دو حالت چیزی نشان نمی‌دهیم، چون عددِ اشتباه از نبودِ عدد بدتر است.
   Map<String, dynamic>? _coinQuota;
+  /// اقتصادِ بازی‌ها از /api/bootstrap — سکهٔ هر نتیجه، درصدِ انتقالِ
+  /// سکه بین لیگ‌ها و سکهٔ هر لولِ ضربه‌زن (تنظیماتِ ادمین، بدونِ آپدیت).
+  Map<String, dynamic>? _economy;
 
   @override
   void initState() {
@@ -142,6 +145,7 @@ class _GamesHubPageState extends State<GamesHubPage> {
         if (m['user'] is Map) _user = Map<String, dynamic>.from(m['user']);
         if (m['cosmetics'] is Map) _cosmetics = Map<String, dynamic>.from(m['cosmetics']);
         if (m['coinQuota'] is Map) _coinQuota = Map<String, dynamic>.from(m['coinQuota']);
+        if (m['economy'] is Map) _economy = Map<String, dynamic>.from(m['economy']);
       });
       final d = await widget.api.get('/api/level');
       if (!mounted || d is! Map) return;
@@ -394,7 +398,7 @@ class _GamesHubPageState extends State<GamesHubPage> {
         // گرفته می‌شود کدام بازی ارزش دارد. آینهٔ games.jsx.
         // دورِ ۳۲: حالت پاس داده می‌شود تا در تمرین و لابی — که سکه
         // نمی‌دهند — به‌جای جدولِ نرخ، دلیلش گفته شود.
-        CoinRateStrip(mode: _selectedMode),
+        CoinRateStrip(mode: _selectedMode, economy: _economy),
 
         // ── ۲. انتخاب حالت بازی (۴ حالت: ۱۰۰، ۱۰۰۰، تمرین با ربات، اتاق خصوصی) ──
         const Text(

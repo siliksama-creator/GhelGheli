@@ -2,6 +2,9 @@ const { pool } = require('../config/db');
 const walletService = require('./walletService');
 const { createNotification } = require('./notificationService');
 const pointLedger = require('./pointService');
+// تنظیماتِ اقتصادِ بازی‌ها — درصدِ انتقالِ سکه بین لیگ‌ها را ادمین
+// از پنل تعیین می‌کند (صفر هم مجاز است).
+const economy = require('./gameEconomyService');
 
 // LEAGUE MONTHS RUN ON THE IRANIAN CALENDAR, IN TEHRAN TIME.
 //
@@ -413,6 +416,111 @@ async function getLeaderboard(limit = 100, seasonId = null, userId = null) {
  *
  *    کرونِ شبانه بدونِ آرگومان صدا می‌زند و رفتارش دست‌نخورده می‌ماند.
  */
+/**
+ * سکه‌های یک لیگِ بسته را با درصدِ تنظیم‌شده به لیگِ بعدی منتقل می‌کند.
+ *
+ * خواستهٔ مالک: «مشخص کنه چند درصد از سکه به لیگ بعدی منتقل شه؛ ممکنه
+ * ۰ قرار بده». پس:
+ *   • درصدِ ۰ ⇒ هیچ انتقالی رخ نمی‌دهد (سکه‌ها با پایانِ لیگ می‌سوزند).
+ *   • سهمِ هر کاربر = floor(سکهٔ لیگِ قبلی × درصد / ۱۰۰) و روی ردیفِ
+ *     همان کاربر در لیگِ هدف جمع می‌شود.
+ *
+ * ⚠️ باید داخلِ همان تراکنشِ بستن/ساختنِ لیگ صدا زده شود.
+ *
+ * @returns {{pct:number, targetSeasonId:string|null, carriedUsers:number}|null}
+ */
+async function carryoverBetween(client, sourceSeasonId, targetSeasonId) {
+  let cfg = null;
+  try { cfg = await economy.load(); } catch { /* پیش‌فرض */ }
+  const pct = Number(cfg?.coinCarryoverPercent ?? 10);
+  if (!Number.isFinite(pct) || pct <= 0 || pct > 100) {
+    return { pct: 0, targetSeasonId, carriedUsers: 0 };
+  }
+
+  const { rows: entries } = await client.query(
+    `SELECT user_id, coins FROM league_leaderboard_entries
+      WHERE league_season_id=$1 AND coins > 0`,
+    [sourceSeasonId]);
+
+  let carriedUsers = 0;
+  const touched = [];
+  for (const e of entries) {
+    const carry = carryoverAmount(e.coins, pct);
+    if (carry <= 0) continue;
+    await client.query(
+      `INSERT INTO league_leaderboard_entries
+         (league_season_id, user_id, points, coins)
+       VALUES ($1,$2,0,$3)
+       ON CONFLICT (league_season_id, user_id)
+       DO UPDATE SET coins = league_leaderboard_entries.coins + EXCLUDED.coins,
+                     updated_at = NOW()`,
+      [targetSeasonId, e.user_id, carry]);
+    carriedUsers += 1;
+    touched.push(e.user_id);
+  }
+
+  if (touched.length) {
+    // شمارندهٔ نمایشیِ users.coins باید مجموعِ سکهٔ لیگ‌های **فعالِ**
+    // همان کاربر باشد — وگرنه بعد از انتقال، کاربر سکه‌ای را می‌بیند که
+    // در هیچ لیگِ فعالی ندارد.
+    await client.query(
+      `UPDATE users u SET
+         coins = COALESCE((
+           SELECT SUM(e.coins)::int
+             FROM league_leaderboard_entries e
+             JOIN league_seasons s ON s.id = e.league_season_id
+            WHERE e.user_id = u.id AND s.status='active'), 0),
+         updated_at = NOW()
+       WHERE u.id = ANY($1::uuid[])`,
+      [touched]);
+  }
+
+  return { pct, targetSeasonId, carriedUsers };
+}
+
+/**
+ * انتقالِ سکه از تازه‌ترین لیگِ بستهٔ یک نوع به یک لیگِ تازه‌ساخته.
+ * موقعِ ساختِ لیگِ جدید توسط ادمین صدا زده می‌شود — چون ممکن است موقعِ
+ * بستنِ لیگِ قبلی هنوز لیگِ بعدی وجود نداشته باشد.
+ */
+/**
+ * سهمِ انتقالیِ یک کاربر: floor(سکه × درصد / ۱۰۰). خالص و قابل تست.
+ * درصدِ ۰ یا نامعتبر ⇒ ۰ — یعنی «انتقال به لیگِ بعدی صفر می‌شود» (خواستهٔ مالک).
+ */
+function carryoverAmount(coins, pct) {
+  const c = Number(coins);
+  const p = Number(pct);
+  if (!Number.isFinite(c) || c <= 0) return 0;
+  if (!Number.isFinite(p) || p <= 0 || p > 100) return 0;
+  return Math.floor(c * p / 100);
+}
+
+async function seedCarryoverFromLatestClosed({ leagueType = null, targetSeasonId }) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query(
+      `SELECT id FROM league_seasons
+        WHERE status='closed'
+          AND ($1::text IS NULL OR league_type = $1)
+        ORDER BY ends_at DESC LIMIT 1`,
+      [leagueType]);
+    const source = rows[0];
+    if (!source) {
+      await client.query('COMMIT');
+      return { seeded: false, reason: 'no closed season' };
+    }
+    const result = await carryoverBetween(client, source.id, targetSeasonId);
+    await client.query('COMMIT');
+    return { seeded: true, sourceSeasonId: source.id, ...result };
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
 async function closeActiveSeason({ force = false, seasonId = null } = {}) {
   const client = await pool.connect();
   try {
@@ -712,6 +820,22 @@ async function closeActiveSeason({ force = false, seasonId = null } = {}) {
     await client.query(
       "UPDATE league_seasons SET status='closed', paid_at=NOW(), updated_at=NOW() WHERE id=$1",
       [season.id]);
+    // ── انتقالِ درصدیِ سکه به لیگِ بعدی (خواستهٔ مالک) ──────────────────
+    //
+    // «لیگِ بعدی» = فعال‌ترین لیگِ هم‌نوع که بعد از پایانِ این لیگ شروع
+    // شده. اگر هنوز ساخته نشده، موقعِ ساخت توسط ادمین
+    // (`seedCarryoverFromLatestClosed`) منتقل می‌شود.
+    const { rows: nextSeasons } = await client.query(
+      `SELECT id FROM league_seasons
+        WHERE id <> $1 AND status='active'
+          AND league_type = $2
+          AND starts_at >= $3
+        ORDER BY starts_at ASC LIMIT 1`,
+      [season.id, season.league_type, season.ends_at]);
+    let carryover = null;
+    if (nextSeasons[0]) {
+      carryover = await carryoverBetween(client, season.id, nextSeasons[0].id);
+    }
     // Reset ONLY the monthly counter. current_points (spendable) and
     // lifetime_points (history) are untouched: a user's saved-up points and
     // their all-time total must survive the month rolling over.
@@ -799,6 +923,7 @@ async function closeActiveSeason({ force = false, seasonId = null } = {}) {
       perksAwarded,
       // برای پنل: چند جایزه منتظرِ تأیید است.
       pendingApproval: winnersToNotify.filter(w => w.pendingApproval).length,
+      carryover,
     };
   } catch (e) {
     await client.query('ROLLBACK');
@@ -1004,4 +1129,5 @@ async function approvePayouts(payoutId, adminId) {
 module.exports = {
   ensureActiveSeason, addLeaguePoints, getLeaderboard, closeActiveSeason,
   closeExpiredSeasons, defaultPrizeTable, approvePayouts,
+  carryoverBetween, seedCarryoverFromLatestClosed, carryoverAmount,
 };

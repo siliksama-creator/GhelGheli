@@ -127,6 +127,14 @@ function PreviousWinners({ data }) {
 
 export default function League({ token, openProfile }) {
   const [selectedLeagueId, setSelectedLeagueId] = useState(null);
+  // اقتصادِ بازی‌ها (نرخِ سکه، درصدِ انتقال بین لیگ‌ها) — از /api/config؛
+  // وقتی ادمین در پنل عوض کند، این راهنما هم بدونِ آپدیت به‌روز می‌شود.
+  const [economy, setEconomy] = useState(null);
+  useEffect(() => {
+    req('/api/config', 'GET', null, null)
+      .then(d => { if (d?.economy) setEconomy(d.economy); })
+      .catch(() => {});
+  }, []);
   const load = useCallback(() => req(selectedLeagueId ? `/api/league/current?seasonId=${selectedLeagueId}` : '/api/league/current', 'GET', null, token), [token, selectedLeagueId]);
   const state = useAsync(load, [load]);
   const [tab, setTab] = useState('table');
@@ -212,7 +220,7 @@ export default function League({ token, openProfile }) {
               </div>
             </div>
 
-            <CoinGuide open={guideOpen} onToggle={toggleGuide} />
+            <CoinGuide open={guideOpen} onToggle={toggleGuide} economy={economy} />
 
             {/* سکوی سه‌نفره فقط وقتی معنا دارد که سه نفر باشند؛ زیرِ آن،
                 ردیفِ تک‌سطری تا همهٔ نفرات با «جایگاه شما» هم‌تراز بمانند. */}
@@ -261,7 +269,11 @@ export default function League({ token, openProfile }) {
             </div>
 
             <p style={{ color:'rgba(255,255,255,0.62)', fontSize:'12.5px', lineHeight:1.65, margin:'14px 2px 0', textAlign:'center' }}>
+              مبنای دریافتِ جایزهٔ لیگ، رتبه بر اساسِ سکه است و با سکه‌ها در استخرِ جایزه شرکت می‌کنی.
               برترین کاربران تا پایان زمان اعلام شده؛ جوایز پس از پایان لیگ پرداخت و لیگ بعدی آغاز می‌شود.
+              سکه‌ها بعد از پایانِ لیگ صفر می‌شوند و {(Number(economy?.coinCarryoverPercent ?? 10) === 0)
+                ? 'انتقالِ سکه به لیگِ بعدی صفر است'
+                : `${fa(economy?.coinCarryoverPercent ?? 10)}٪ از سکه به لیگِ بعدی منتقل می‌شود`}.
             </p>
 
             {entries.length===0 && <div style={{ textAlign:'center', padding:'30px', color:'#64748B' }}><div style={{ color:'#FFD166', display:'flex', justifyContent:'center' }}><SvgIcon name="trophy" size={38} /></div><b style={{ fontSize:'15px', display:'block', marginTop:'6px' }}>هنوز کسی در این لیگ سکه‌ای نبرده است</b><span style={{ fontSize:'13px', display:'block', marginTop:'6px', lineHeight:1.6 }}>اولین برد شما مقابل حریف واقعی، شما را صدرنشین می‌کند.</span></div>}
