@@ -320,6 +320,9 @@ function Portal({ token, logout }) {
         loginStreak: boot.loginStreak || null,
         cosmetics: boot.cosmetics || null,
         level: boot.level || null,
+        // بدون این، بنر خانه و دکمهٔ باز کردن صندوق در کلکسیون همیشه
+        // خالی می‌ماند — سرور می‌فرستاد و کلاینت دور می‌ریخت.
+        pendingGrants: boot.pendingGrants || [],
       });
       setRewards(boot.rewards || []);
       primeImageCache(boot).catch(() => {});
@@ -462,7 +465,8 @@ function Portal({ token, logout }) {
             openInventory={() => setTab('inventory')} />
         )}
         {tab === 'inventory' && (
-          <Inventory items={p.inventory || []} reload={load} />
+          <Inventory items={p.inventory || []} grants={p.pendingGrants || []}
+            token={token} reload={load} />
         )}
         {tab === 'profile' && (
           <Profile token={token} p={p} load={load} setMsg={setMsg} />

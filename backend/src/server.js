@@ -46,6 +46,7 @@ const coins = require('./services/coinService');
 // سکه بین لیگ‌ها، سکهٔ هر لولِ ضربه‌زن) — قابل کنترل از پنل ادمین و
 // قابل خواندن توسط کلاینت‌ها از `/api/config` بدونِ آپدیتِ اپ.
 const gameEconomy = require('./services/gameEconomyService');
+const grants = require('./services/grantService');
 // Same reason: the profile endpoint checks club membership before letting
 // someone wear a crest, and it is defined above the club routes.
 const clubs = require('./services/clubService');
@@ -370,7 +371,7 @@ async function getLeagueWinnerCount(client = pool) {
   const { rows } = await client.query("SELECT value FROM app_settings WHERE key='league_winner_count' LIMIT 1");
   const raw = rows[0]?.value;
   const n = Number(typeof raw === 'object' && raw !== null ? raw.value : raw);
-  return Number.isFinite(n) && n > 0 ? Math.min(100, Math.floor(n)) : 10;
+  return Number.isFinite(n) && n > 0 ? Math.min(300, Math.floor(n)) : 10;
 }
 async function ensureChatCooldown(userId) {
   const cooldown = await getChatCooldownSeconds();
@@ -1053,6 +1054,8 @@ app.get('/api/bootstrap', auth, asyncHandler(async (req, res) => {
     // اقتصادِ بازی‌ها برای متن‌های راهنمای داخلِ اپ/وب — از تنظیماتِ
     // ادمین می‌آید، پس حتی اپ‌های قدیمی هم متنِ جدید می‌بینند.
     economy: await gameEconomy.publicView().catch(() => null),
+    gamePoints: await getGameRewardSettings().catch(() => null),
+    pendingGrants: await grants.pendingFor(req.user.id).catch(() => []),
   });
 }));
 
@@ -1401,6 +1404,24 @@ app.get('/api/card-box/history', auth, asyncHandler(async (req, res) => {
   res.json(await cardBox.history(req.user.id, req.query.limit));
 }));
 
+// ── جایزه‌های بازنشده (صندوقِ گردونه/لیگ) ──────────────────────────────
+app.get('/api/grants', auth, asyncHandler(async (req, res) => {
+  res.json({ grants: await grants.pendingFor(req.user.id) });
+}));
+
+app.post('/api/grants/:id/open', auth, validateUuid('id'), shopLimiter,
+  asyncHandler(async (req, res) => {
+    try {
+      const result = await grants.open(req.user.id, req.params.id);
+      res.json({
+        message: result.alreadyOpened ? 'این صندوق قبلاً باز شده' : 'صندوق باز شد',
+        ...result,
+      });
+    } catch (e) {
+      res.status(e.status || 500).json({ message: e.message || 'باز کردن صندوق ناموفق بود' });
+    }
+  }));
+
 // ── خرید: مرحلهٔ ۳ (راستی‌آزمایی و تحویل) ─────────────────────────────
 //
 // یک روتِ واحد برای هر دو نوع خرید. نوعِ سفارش از دیتابیس خوانده می‌شود
@@ -1670,6 +1691,14 @@ app.post('/api/wheel/spin', auth, wheelLimiter, asyncHandler(async (req, res) =>
     createNotification(
       req.user.id, 'wallet', 'برندهٔ گردونه شدی',
       `${result.prize.label} به کیف پولت اضافه شد.`).catch(() => {});
+  } else if (result.prize.kind === 'card_box') {
+    createNotification(
+      req.user.id, 'reward', 'صندوق کارت بردی',
+      'صندوق کارت برنده‌ای — از کلکسیون بازش کن.').catch(() => {});
+  } else if (result.prize.kind === 'shop_item' || result.prize.kind === 'plus_days') {
+    createNotification(
+      req.user.id, 'reward', 'جایزهٔ گردونه',
+      `${result.prize.label} به حسابت اضافه شد.`).catch(() => {});
   }
   pass.grantXp(req.user.id, 'wheel_spin').catch(() => {});
   res.json(result);
@@ -2510,6 +2539,16 @@ app.use('/api', require('./routes/adminSecurity')({
 // «اهرمِ بدون-آپدیت»: کلاینت‌ها این را از /api/config می‌خوانند.
 app.use('/api', require('./routes/clientConfig')({
   pool, adminAuth, requireRole, asyncHandler, audit, rateLimit, gameEconomy,
+  // بدون این، GET /api/config همیشه gamePoints=null می‌فرستد و نوار
+  // راهنمای بازی فقط از bootstrap پر می‌شود. کلاینتی که فقط config
+  // می‌خواند (یا bootstrap شکست خورده) امتیاز پنل را نمی‌دید.
+  gameRewards: { getGameRewardSettings, saveGameRewardSettings },
+}));
+
+// ویرایشگر گردونه — ظاهر (برچسب/رنگ) و درون (نوع/وزن). بدون این mount
+// پنل ادمین روی /admin/wheel/prizes چهار۰۴ می‌گرفت و کل قابلیت مرده بود.
+app.use('/api', require('./routes/adminWheel')({
+  pool, adminAuth, requireRole, asyncHandler, audit, wheel,
 }));
 
 // تنظیماتِ اقتصادِ بازی‌ها (سکه، سهمیه، درصدِ انتقال بین لیگ‌ها،

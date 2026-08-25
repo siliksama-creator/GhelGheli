@@ -80,6 +80,7 @@ class _DashboardPageState extends State<DashboardPage> {
         'leaguePayouts': m['leaguePayouts'] ?? const [],
         if (m['loginStreak'] != null) 'loginStreak': m['loginStreak'],
         if (m['cosmetics'] != null) 'cosmetics': m['cosmetics'],
+        if (m['pendingGrants'] != null) 'pendingGrants': m['pendingGrants'],
       };
       _error = null;
       _loading = false;
@@ -108,6 +109,7 @@ class _DashboardPageState extends State<DashboardPage> {
           'leaguePayouts': m['leaguePayouts'] ?? const [],
           if (m['loginStreak'] != null) 'loginStreak': m['loginStreak'],
           if (m['cosmetics'] != null) 'cosmetics': m['cosmetics'],
+          if (m['pendingGrants'] != null) 'pendingGrants': m['pendingGrants'],
         };
         _rewards = List<Map<String, dynamic>>.from(
             ((m['rewards'] as List?) ?? const [])
@@ -165,6 +167,33 @@ class _DashboardPageState extends State<DashboardPage> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, Gaps.xxl),
         children: [
+          if ((_data?['pendingGrants'] is List) &&
+              (_data!['pendingGrants'] as List).isNotEmpty) ...[
+            InkWell(
+              onTap: widget.onOpenInventory,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(Gaps.md),
+                decoration: BoxDecoration(
+                  borderRadius: Corners.rXl,
+                  border: Border.all(
+                      color: const Color(0xFFFFD166).withValues(alpha: 0.6)),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF2A1140), Color(0xFF0D1B2C)],
+                  ),
+                ),
+                child: Text(
+                  'صندوق کارت برنده‌ای — از کلکسیون بازش کن  ·  '
+                  '${faNum((_data!['pendingGrants'] as List).length)} صندوق',
+                  style: const TextStyle(
+                      color: Color(0xFFFFD166),
+                      fontWeight: FontWeight.w900,
+                      fontSize: 13),
+                ),
+              ),
+            ),
+            Gaps.vSm,
+          ],
           HeroHeader(
             points: points,
             nickname: user?['nickname'] ?? 'قهرمان',

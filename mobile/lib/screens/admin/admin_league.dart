@@ -139,7 +139,7 @@ class _AdminLeagueState extends State<AdminLeague> {
   }
 
   void _changeWinnerCount(int n) {
-    if (n < 1 || n > 100) return;
+    if (n < 1 || n > 300) return;
     setState(() {
       _prizes = List<Map>.generate(n, (i) {
         if (i < _prizes.length) return _prizes[i];
@@ -172,6 +172,7 @@ class _AdminLeagueState extends State<AdminLeague> {
     {'id': 'plus_days', 'label': 'روز اشتراک پلاس'},
     {'id': 'points', 'label': 'امتیاز'},
     {'id': 'shop_item', 'label': 'آیتم فروشگاه'},
+    {'id': 'card_box', 'label': 'صندوق کارت'},
   ];
 
   int get _winnerCount =>
@@ -813,7 +814,7 @@ class _AdminLeagueState extends State<AdminLeague> {
               controller: _winnerCountController,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
-                labelText: 'تعداد برندگان (حداکثر ۱۰۰)',
+                labelText: 'تعداد برندگان نقدی (حداکثر ۳۰۰)',
                 prefixIcon: Icon(Icons.people_outline_rounded),
               ),
               onChanged: (v) {

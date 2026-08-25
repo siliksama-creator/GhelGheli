@@ -24,7 +24,7 @@ import '../core/json_get.dart';
 /// قاعدهٔ خودمان سکه نمی‌دهند — جدولِ نرخ را نشان می‌داد. عدد غلط نبود،
 /// ولی به حالتِ فعلی ربطی نداشت و کاربر آن را «نادقیق» تجربه می‌کرد.
 class CoinRateStrip extends StatelessWidget {
-  const CoinRateStrip({super.key, this.mode, this.economy});
+  const CoinRateStrip({super.key, this.mode, this.economy, this.gamePoints});
 
   /// ورودیِ انتخاب‌شده. `null` یعنی «حالت مهم نیست، جدول را نشان بده».
   final int? mode;
@@ -32,6 +32,7 @@ class CoinRateStrip extends StatelessWidget {
   /// اقتصادِ بازی‌ها از `/api/bootstrap` (تنظیماتِ ادمین). اگر نباشد —
   /// نسخهٔ قدیمی یا آفلاین — جدولِ پیش‌فرض استفاده می‌شود.
   final Map<String, dynamic>? economy;
+  final Map<String, dynamic>? gamePoints;
 
   static const _defaultRows = [
     ('برد', 10, 30),
@@ -213,7 +214,11 @@ class CoinRateStrip extends StatelessWidget {
                   Border(top: BorderSide(color: _gold.withValues(alpha: 0.14))),
             ),
             child: Text(
-              _footer,
+              gamePoints?['enabled'] == true
+                  ? '$_footer\nامتیاز آنلاین: برد +${faNum(gamePoints!['winPoints'])}'
+                      ' · باخت ${faNum(gamePoints!['losePoints'])}'
+                      ' · مساوی ${faNum(gamePoints!['drawPoints'])}'
+                  : _footer,
               style: TextStyle(
                   fontSize: 10.5,
                   height: 1.5,

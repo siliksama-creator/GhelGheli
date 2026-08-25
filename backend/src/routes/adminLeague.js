@@ -65,16 +65,16 @@ router.patch('/admin/league/current/prizes', adminAuth, requireRole(), asyncHand
   //
   // حالا همین‌جا اعتبارسنجی می‌شود، جایی که مدیر بازخورد می‌گیرد.
   const rawTable = Array.isArray(req.body.prizeTable) ? req.body.prizeTable : [];
-  if (rawTable.length > 100) {
-    return res.status(400).json({ message: 'جدول جوایز حداکثر ۱۰۰ رتبه می‌تواند داشته باشد' });
+  if (rawTable.length > 300) {
+    return res.status(400).json({ message: 'جدول جوایز حداکثر ۳۰۰ رتبه می‌تواند داشته باشد' });
   }
   const prizeTable = [];
   const seenRanks = new Set();
   for (const row of rawTable) {
     const rank = Number(row?.rank);
     const amount = Number(row?.amount ?? 0);
-    if (!Number.isInteger(rank) || rank < 1 || rank > 100) {
-      return res.status(400).json({ message: `رتبه باید عددی صحیح بین ۱ تا ۱۰۰ باشد (دریافت شد: ${row?.rank})` });
+    if (!Number.isInteger(rank) || rank < 1 || rank > 300) {
+      return res.status(400).json({ message: `رتبه باید عددی صحیح بین ۱ تا ۳۰۰ باشد (دریافت شد: ${row?.rank})` });
     }
     if (seenRanks.has(rank)) {
       return res.status(400).json({ message: `رتبهٔ ${rank} تکراری است` });
@@ -97,19 +97,19 @@ router.patch('/admin/league/current/prizes', adminAuth, requireRole(), asyncHand
   // ⚠️ `perkTable` اگر در بدنه **نباشد** دست نمی‌خورد. پنلِ قدیمی که
   //    فقط `prizeTable` می‌فرستد نباید جوایزِ غیرنقدی را پاک کند —
   //    همان الگوی PATCH: نبودنِ کلید یعنی «تغییر نده»، نه «خالی کن».
-  const PERK_KINDS = ['plus_days', 'shop_item', 'points'];
+  const PERK_KINDS = ['plus_days', 'shop_item', 'points', 'card_box'];
   let perkTable = null;
   if (req.body.perkTable !== undefined) {
     const rawPerks = Array.isArray(req.body.perkTable) ? req.body.perkTable : [];
-    if (rawPerks.length > 100) {
-      return res.status(400).json({ message: 'جدول جوایز غیرنقدی حداکثر ۱۰۰ رتبه می‌تواند داشته باشد' });
+    if (rawPerks.length > 300) {
+      return res.status(400).json({ message: 'جدول جوایز غیرنقدی حداکثر ۳۰۰ رتبه می‌تواند داشته باشد' });
     }
     perkTable = [];
     const seenPerkRanks = new Set();
     for (const row of rawPerks) {
       const rank = Number(row?.rank);
-      if (!Number.isInteger(rank) || rank < 1 || rank > 100) {
-        return res.status(400).json({ message: `رتبهٔ جایزهٔ غیرنقدی باید بین ۱ تا ۱۰۰ باشد (دریافت شد: ${row?.rank})` });
+      if (!Number.isInteger(rank) || rank < 1 || rank > 300) {
+        return res.status(400).json({ message: `رتبهٔ جایزهٔ غیرنقدی باید بین ۱ تا ۳۰۰ باشد (دریافت شد: ${row?.rank})` });
       }
       if (seenPerkRanks.has(rank)) {
         return res.status(400).json({ message: `رتبهٔ ${rank} در جدول غیرنقدی تکراری است` });
@@ -118,7 +118,7 @@ router.patch('/admin/league/current/prizes', adminAuth, requireRole(), asyncHand
 
       const kind = String(row?.kind || '');
       if (!PERK_KINDS.includes(kind)) {
-        return res.status(400).json({ message: `نوع جایزهٔ رتبهٔ ${rank} باید یکی از پلاس، آیتم فروشگاه یا امتیاز باشد` });
+        return res.status(400).json({ message: `نوع جایزهٔ رتبهٔ ${rank} باید یکی از پلاس، صندوق کارت، آیتم فروشگاه یا امتیاز باشد` });
       }
 
       const value = Number(row?.value ?? 0);
@@ -130,6 +130,9 @@ router.patch('/admin/league/current/prizes', adminAuth, requireRole(), asyncHand
       if (kind !== 'shop_item' && value <= 0) {
         return res.status(400).json({ message: `مقدار جایزهٔ رتبهٔ ${rank} باید بزرگ‌تر از صفر باشد` });
       }
+      if (kind === 'card_box' && value > 5) {
+        return res.status(400).json({ message: `تعداد صندوق رتبهٔ ${rank} حداکثر ۵ است` });
+      }
 
       const itemSlug = row?.itemSlug ? String(row.itemSlug).slice(0, 64) : null;
       if (kind === 'shop_item' && !itemSlug) {
@@ -139,7 +142,7 @@ router.patch('/admin/league/current/prizes', adminAuth, requireRole(), asyncHand
       perkTable.push({
         rank,
         kind,
-        value: kind === 'shop_item' ? 1 : value,
+        value: kind === 'shop_item' ? 1 : (kind === 'card_box' ? Math.max(1, value) : value),
         itemSlug,
         label: row?.label ? String(row.label).slice(0, 160) : null,
       });
@@ -160,7 +163,7 @@ router.patch('/admin/league/current/prizes', adminAuth, requireRole(), asyncHand
     }
   }
 
-  const winnerCount = Math.max(1, Math.min(100, Number(req.body.winnerCount || prizeTable.length || 10)));
+  const winnerCount = Math.max(1, Math.min(300, Number(req.body.winnerCount || prizeTable.length || 10)));
   await pool.query('UPDATE league_seasons SET prize_table=$1, updated_at=NOW() WHERE id=$2', [JSON.stringify(prizeTable), season.id]);
   if (perkTable !== null) {
     await pool.query('UPDATE league_seasons SET perk_table=$1, updated_at=NOW() WHERE id=$2', [JSON.stringify(perkTable), season.id]);

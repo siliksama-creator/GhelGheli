@@ -106,6 +106,73 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
     }
   }
 
+  Future<void> _reveal(Map<String, dynamic> result) async {
+    final cards = (result['cards'] as List?) ?? const [];
+    final elapsed = DateTime.now().difference(_shakeStart).inMilliseconds;
+    final remain = 3000 - elapsed;
+    if (remain > 0) {
+      await Future<void>.delayed(Duration(milliseconds: remain));
+    }
+    unawaited(GameAudio.instance.stopShake());
+    _shakeCtrl.stop();
+    setState(() => _phase = _Phase.bursting);
+    unawaited(_burstCtrl.forward(from: 0));
+    await _load();
+    widget.onGranted?.call();
+    await Future<void>.delayed(const Duration(milliseconds: 620));
+    if (!mounted) return;
+    if (cards.isNotEmpty) {
+      await showGeneralDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        barrierLabel: 'کارت‌های صندوق',
+        barrierColor: Colors.transparent,
+        transitionDuration: const Duration(milliseconds: 300),
+        pageBuilder: (_, __, ___) => _RevealScreen(
+          cards: cards,
+          points: (result['points'] as num?)?.toInt() ?? 0,
+          distinct: result['distinctCards'] == true,
+          baseUrl: widget.api.baseUrl,
+        ),
+        transitionBuilder: (_, anim, __, child) =>
+            FadeTransition(opacity: anim, child: child),
+      );
+    }
+    if (!mounted) return;
+    setState(() => _phase = _Phase.idle);
+  }
+
+  Future<void> _buyWithWallet() async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _error = '';
+      _phase = _Phase.shaking;
+    });
+    unawaited(_shakeCtrl.repeat());
+    _shakeStart = DateTime.now();
+    GameAudio.instance.playShake();
+    try {
+      final result = Map<String, dynamic>.from(
+          await widget.api.post('/api/card-box/buy', {
+        'useWallet': true,
+      }) as Map);
+      if (!mounted) return;
+      await _reveal(result);
+    } catch (e) {
+      unawaited(GameAudio.instance.stopShake());
+      if (mounted) {
+        setState(() {
+          _error = apiError(e);
+          _phase = _Phase.idle;
+        });
+      }
+    } finally {
+      _shakeCtrl.stop();
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _buy() async {
     if (_busy) return;
     setState(() {
@@ -372,6 +439,9 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
                       ),
                     ),
                     const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
                     DecoratedBox(
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(14),
@@ -401,6 +471,16 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
                         child: Text(
                             _busy ? 'در حال باز کردن…' : 'باز کردن صندوق'),
                       ),
+                    ),
+                    if (((data['walletBalance'] as num?)?.toInt() ?? 0) >=
+                        ((data['price'] as num?)?.toInt() ?? 0))
+                      TextButton(
+                        onPressed: _busy ? null : _buyWithWallet,
+                        child: const Text('خرید با کیف پول',
+                            style: TextStyle(
+                                fontSize: 11.5, fontWeight: FontWeight.w800)),
+                      ),
+                      ],
                     ),
                   ],
                 ),

@@ -16,6 +16,7 @@ import 'admin_notifications.dart';
 import 'admin_rewards.dart';
 import 'admin_game_rewards.dart';
 import 'admin_game_economy.dart';
+import 'admin_wheel.dart';
 import 'admin_settings.dart';
 import 'admin_support.dart';
 import 'admin_users.dart';
@@ -65,6 +66,7 @@ class _AdminShellState extends State<AdminShell> {
     AdminChat(api: widget.api),
     AdminGameRewards(api: widget.api),
     AdminGameEconomy(api: widget.api),
+    AdminWheel(api: widget.api),
     AdminSupport(api: widget.api),
     AdminNotifications(api: widget.api),
     AdminSettings(api: widget.api),
@@ -84,6 +86,7 @@ class _AdminShellState extends State<AdminShell> {
     'چت',
     'امتیاز بازی',
     'اقتصاد بازی',
+    'گردونه شانس',
     'پشتیبانی',
     'اطلاعیه‌ها',
     'تنظیمات',
@@ -102,6 +105,7 @@ class _AdminShellState extends State<AdminShell> {
     Icons.chat_bubble_rounded,
     Icons.sports_esports_rounded,
     Icons.monetization_on_rounded,
+    Icons.casino_rounded,
     Icons.support_agent_rounded,
     Icons.campaign_rounded,
     Icons.settings_rounded,

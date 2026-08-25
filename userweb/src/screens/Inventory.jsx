@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { fa } from '../lib/api.js';
+import { fa, req } from '../lib/api.js';
 import PlayerCard from '../components/PlayerCard.jsx';
 import { cardQtyOf } from '../lib/cards.js';
 import { SvgIcon } from '../components/IconAsset.jsx';
@@ -15,6 +15,59 @@ function stats(items) {
     a.points += q * asInt(x.point_value);
     return a;
   }, { kinds: items.length, total: 0, points: 0 });
+}
+
+function GrantChests({ token, grants, onOpened }) {
+  const [busy, setBusy] = useState(null);
+  const [error, setError] = useState('');
+  const [won, setWon] = useState(null);
+
+  const open = async (id) => {
+    if (busy) return;
+    setBusy(id); setError('');
+    try {
+      const r = await req(`/api/grants/${id}/open`, 'POST', {}, token);
+      setWon(r);
+      onOpened?.();
+    } catch (e) {
+      setError(e.message || 'باز کردن صندوق ناموفق بود');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="card" style={{
+      padding: 14, border: '1.5px solid rgba(255,209,102,.55)',
+      background: 'linear-gradient(135deg,#2a1140,#0d1b2c)',
+    }}>
+      <b style={{ color: '#FFD166' }}>صندوق کارت برنده‌ای</b>
+      <p className="hint" style={{ margin: '6px 0 10px' }}>
+        این صندوق‌ها جایزهٔ گردونه یا لیگ‌اند. بازشان کن تا پنج کارت تصادفی بگیری.
+      </p>
+      {grants.map((g) => (
+        <button key={g.id} type="button" className="primary"
+          disabled={busy === g.id}
+          onClick={() => open(g.id)}
+          style={{ marginInlineEnd: 8, marginBottom: 6 }}>
+          {busy === g.id ? 'در حال باز کردن…' : (g.label || 'باز کردن صندوق')}
+        </button>
+      ))}
+      {error && <p style={{ color: '#FCA5A5', fontSize: 12 }}>{error}</p>}
+      {won?.cards?.length > 0 && (
+        <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {won.cards.map((c, i) => (
+            <span key={i} style={{
+              background: 'rgba(0,0,0,.35)', borderRadius: 10, padding: '8px 10px',
+              fontSize: 12, fontWeight: 800,
+            }}>
+              {c.name} · {fa(c.pointValue || 0)} امتیاز
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function CardDetail({ item, close }) {
@@ -34,7 +87,7 @@ function CardDetail({ item, close }) {
   );
 }
 
-export default function Inventory({ items = [], reload }) {
+export default function Inventory({ items = [], grants = [], token, reload }) {
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('recent');
   const [open, setOpen] = useState(null);
@@ -52,6 +105,9 @@ export default function Inventory({ items = [], reload }) {
 
   return (
     <div className="inventoryPage">
+      {!!grants.length && (
+        <GrantChests token={token} grants={grants} onOpened={reload} />
+      )}
       <div className="invStats card">
         <div><b>{fa(summary.kinds)}</b><span>نوع کارت</span></div>
         <div><b>{fa(summary.total)}</b><span>کل کارت‌ها</span></div>

@@ -136,6 +136,7 @@ class _HomeShellState extends State<HomeShell>
   /// درخواستِ اضافه یعنی نیم ثانیه انتظارِ بی‌دلیل هر بار که تب باز
   /// می‌شود.
   List<Map<String, dynamic>> _inventory = const [];
+  List<Map<String, dynamic>> _pendingGrants = const [];
 
   // A subtle one-shot "welcome" entrance the moment the user lands on the
   // home shell after logging in — fades and lifts the whole shell into
@@ -280,7 +281,12 @@ class _HomeShellState extends State<HomeShell>
       // درج در وسط یعنی جابه‌جا شدنِ همهٔ آن‌ها و — همان‌طور که
       // navigation_test قبلاً گرفت — RangeError و کرشِ کاملِ اپ.
       case inventoryIndex:
-        return InventoryPage(items: _inventory, onRefresh: _loadProfile);
+        return InventoryPage(
+          items: _inventory,
+          grants: _pendingGrants,
+          api: widget.api,
+          onRefresh: _loadProfile,
+        );
       default:
         // ایندکسِ ناشناخته نباید کرش بدهد؛ به خانه برمی‌گردیم.
         return DashboardPage(api: widget.api, reloadProfile: _loadProfile);
@@ -589,6 +595,15 @@ class _HomeShellState extends State<HomeShell>
               .whereType<Map>()
               .map((e) => Map<String, dynamic>.from(e))
               .toList();
+        }
+        final pg = m['pendingGrants'];
+        if (pg is List) {
+          _pendingGrants = pg
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+        }
+        if (inv is List || pg is List) {
           _refreshInventoryPageConfig();
         }
         final p = m['pass'];

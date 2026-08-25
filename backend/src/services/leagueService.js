@@ -2,9 +2,12 @@ const { pool } = require('../config/db');
 const walletService = require('./walletService');
 const { createNotification } = require('./notificationService');
 const pointLedger = require('./pointService');
+const grants = require('./grantService');
 // تنظیماتِ اقتصادِ بازی‌ها — درصدِ انتقالِ سکه بین لیگ‌ها را ادمین
 // از پنل تعیین می‌کند (صفر هم مجاز است).
 const economy = require('./gameEconomyService');
+
+const PERK_KINDS = Object.freeze(['plus_days', 'shop_item', 'points', 'card_box']);
 
 // LEAGUE MONTHS RUN ON THE IRANIAN CALENDAR, IN TEHRAN TIME.
 //
@@ -99,6 +102,10 @@ function describePerk(perk) {
   if (perk.kind === 'plus_days') return `${value.toLocaleString('fa-IR')} روز اشتراک پلاس`;
   if (perk.kind === 'points') return `${value.toLocaleString('fa-IR')} امتیاز`;
   if (perk.kind === 'shop_item') return 'یک آیتم فروشگاه';
+  if (perk.kind === 'card_box') {
+    const n = Math.max(1, value || 1);
+    return n === 1 ? 'یک صندوق کارت' : `${n.toLocaleString('fa-IR')} صندوق کارت`;
+  }
   return 'جایزه ویژه';
 }
 
@@ -161,7 +168,8 @@ async function deliverPerk(client, { userId, perk, seasonId, monthYear }) {
 
   if (perk.kind === 'shop_item' && perk.itemSlug) {
     const { rows } = await client.query(
-      'SELECT id FROM shop_items WHERE slug=$1', [perk.itemSlug]);
+      'SELECT id, kind, payload, slug FROM shop_items WHERE slug=$1',
+      [perk.itemSlug]);
     if (!rows[0]) {
       // آیتم بین تنظیمِ جایزه و بستنِ فصل حذف شده. کلِ بستنِ فصل نباید
       // به‌خاطرِ یک slug بمیرد؛ ردیفِ جایزه می‌ماند با delivered_at خالی
@@ -173,6 +181,34 @@ async function deliverPerk(client, { userId, perk, seasonId, monthYear }) {
       `INSERT INTO user_shop_items(user_id,item_id,price_paid)
        VALUES($1,$2,0) ON CONFLICT DO NOTHING`,
       [userId, rows[0].id]);
+    if (rows[0].kind === 'club_badge') {
+      const clubSlug = rows[0].payload || rows[0].slug;
+      if (clubSlug) {
+        await client.query(
+          `INSERT INTO user_clubs(user_id,club_slug,source,joined_at)
+           VALUES($1,$2,'purchase',NOW())
+           ON CONFLICT(user_id,club_slug)
+           DO UPDATE SET source='purchase', joined_at=EXCLUDED.joined_at`,
+          [userId, clubSlug]);
+      }
+    }
+    return true;
+  }
+
+  if (perk.kind === 'card_box') {
+    // صندوق pending می‌ماند تا کاربر از کلکسیون بازش کند. value = تعداد
+    // صندوق (سقف ۵ تا یک رتبه نتواند انبارِ صندوق بسازد).
+    const n = Math.min(5, Math.max(1, Number(perk.value) || 1));
+    for (let i = 0; i < n; i += 1) {
+      await grants.award(client, {
+        userId,
+        kind: 'card_box',
+        value: 1,
+        label: perk.label || 'صندوق کارت جایزهٔ لیگ',
+        source: 'league',
+        sourceRef: null,
+      });
+    }
     return true;
   }
 
@@ -589,7 +625,9 @@ async function closeActiveSeason({ force = false, seasonId = null } = {}) {
     }
     const setting = await client.query("SELECT value FROM app_settings WHERE key='league_winner_count' LIMIT 1");
     const rawWinnerCount = setting.rows[0]?.value;
-    const winnerCount = Number.isFinite(Number(rawWinnerCount)) && Number(rawWinnerCount) > 0 ? Math.floor(Number(rawWinnerCount)) : Math.max(10, (season.prize_table || []).length || 10);
+    const winnerCount = Number.isFinite(Number(rawWinnerCount)) && Number(rawWinnerCount) > 0
+      ? Math.min(300, Math.floor(Number(rawWinnerCount)))
+      : Math.max(10, Math.min(300, (season.prize_table || []).length || 10));
     // ⚠️ همان ترتیبِ getLeaderboard — و این حیاتی است، نه سلیقه‌ای.
     //    اگر جدولی که کاربر تمامِ فصل می‌دید بر اساس (coins, points) بود
     //    ولی جایزه بر اساس (points) پرداخت می‌شد، نفرِ اولِ جدول جایزهٔ
@@ -611,7 +649,7 @@ async function closeActiveSeason({ force = false, seasonId = null } = {}) {
       const rank = Number(p?.rank);
       if (!Number.isFinite(rank) || rank <= 0) continue;
       const kind = String(p?.kind || '');
-      if (!['plus_days', 'shop_item', 'points'].includes(kind)) {
+      if (!PERK_KINDS.includes(kind)) {
         console.error(`[league] نوعِ جایزهٔ غیرنقدیِ ناشناخته «${kind}» برای رتبهٔ ${rank} — رد شد`);
         continue;
       }

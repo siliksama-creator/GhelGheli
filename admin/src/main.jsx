@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, Suspense, lazy } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BarChart3, Bell, Coins, Gift, MessageCircle, LifeBuoy, ScanLine, Settings, Shield, Sigma, Trophy, Users, Gamepad2, Wallet, Activity } from 'lucide-react';
+import { BarChart3, Bell, Coins, Gift, MessageCircle, LifeBuoy, ScanLine, Settings, Shield, Sigma, Trophy, Users, Gamepad2, Wallet, Activity, CircleDot } from 'lucide-react';
 
 import './theme.css';
 import './styles.css';
@@ -35,6 +35,7 @@ const SupportPage = lazy(() => import('./pages/support.jsx').then(m => ({ defaul
 const NotificationsPage = lazy(() => import('./pages/notifications.jsx').then(m => ({ default: m.NotificationsPage })));
 const GameRewardsPage = lazy(() => import('./pages/game-rewards.jsx').then(m => ({ default: m.GameRewardsPage })));
 const GameEconomyPage = lazy(() => import('./pages/game-economy.jsx').then(m => ({ default: m.GameEconomyPage })));
+const WheelPage = lazy(() => import('./pages/wheel.jsx').then(m => ({ default: m.WheelAdminPage })));
 const SettingsPage = lazy(() => import('./pages/settings.jsx').then(m => ({ default: m.SettingsPage })));
 const AdminsPage = lazy(() => import('./pages/admins.jsx').then(m => ({ default: m.AdminsPage })));
 const MetricsPage = lazy(() => import('./pages/metrics.jsx').then(m => ({ default: m.MetricsPage })));
@@ -82,6 +83,7 @@ const NAV = [
   ['chat', 'چت', MessageCircle, ChatModerationPage],
   ['game-rewards', 'امتیاز بازی', Gamepad2, GameRewardsPage],
   ['game-economy', 'اقتصاد بازی', Coins, GameEconomyPage],
+  ['wheel', 'گردونه شانس', CircleDot, WheelPage],
   ['support', 'پشتیبانی', LifeBuoy, SupportPage],
   ['notifications', 'اطلاعیه‌ها', Bell, NotificationsPage],
   ['settings', 'تنظیمات', Settings, SettingsPage],

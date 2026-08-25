@@ -32,6 +32,59 @@ function countdown(ms) {
 const SPIN_MS = 5600;
 const FULL_SPINS = 9;
 
+function LiveWheelDisc({ prizes }) {
+  const list = Array.isArray(prizes) ? prizes : [];
+  const n = list.length || 1;
+  const stops = list.map((p, i) => {
+    const a0 = (i / n) * 360;
+    const a1 = ((i + 1) / n) * 360;
+    return `${p.color || '#84CC16'} ${a0}deg ${a1}deg`;
+  }).join(', ');
+  return (
+    <div
+      className="wheelDiscLive"
+      role="img"
+      aria-label="گردونهٔ شانس"
+      style={{
+        width: '100%', height: '100%', borderRadius: '50%',
+        background: list.length
+          ? `conic-gradient(from -90deg, ${stops})`
+          : '#16345F',
+        position: 'relative',
+        boxShadow: 'inset 0 0 0 10px #0B1220, 0 0 0 6px #F59E0B',
+      }}
+    >
+      {list.map((p, i) => {
+        const deg = (i + 0.5) * (360 / n);
+        const flip = deg > 90 && deg < 270 ? 180 : 0;
+        return (
+          <span
+            key={p.id || i}
+            style={{
+              position: 'absolute', left: '50%', top: '50%',
+              width: 0, height: '38%',
+              transform: `rotate(${deg}deg)`,
+              transformOrigin: '0 0',
+              pointerEvents: 'none',
+            }}
+          >
+            <span style={{
+              position: 'absolute',
+              left: 0, top: 0,
+              transform: `translate(-50%, 0) rotate(${flip}deg)`,
+              color: '#fff',
+              fontSize: 10,
+              fontWeight: 900,
+              whiteSpace: 'nowrap',
+              textShadow: '0 1px 2px #000, 0 0 6px #000',
+            }}>{p.label}</span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
   const [state, setState] = useState(null);
   const [error, setError] = useState('');
@@ -41,6 +94,7 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
   // برشِ برنده، برای درخشش بعد از توقف. null یعنی هیچ.
   const [winner, setWinner] = useState(null);
   const [history, setHistory] = useState([]);
+  const [opening, setOpening] = useState(false);
 
   // مجموع چرخش تجمعی است و هرگز کم نمی‌شود: اگر زاویه را ریست کنیم، گردونه
   // بین دو چرخش به عقب می‌پرد.
@@ -129,6 +183,20 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
     return <section className="card wide"><p className="hint">در حال بارگذاری…</p></section>;
   }
 
+  const openGrant = async (id) => {
+    if (!id || opening) return;
+    setOpening(true);
+    try {
+      const r = await req(`/api/grants/${id}/open`, 'POST', {}, token);
+      setMsg?.(r.message || 'صندوق باز شد');
+      reloadProfile?.();
+    } catch (e) {
+      setMsg?.(e?.data?.message || e.message || 'باز کردن صندوق ناموفق بود');
+    } finally {
+      setOpening(false);
+    }
+  };
+
   const canSpin = state.spinsLeft > 0 && !spinning;
 
   return (
@@ -150,7 +218,7 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
               : 'none',
           }}
         >
-          <img className="wheelDisc" src="/wheel/wheel.svg" alt="گردونهٔ شانس" />
+          <LiveWheelDisc prizes={state.prizes} />
           {/* درخشش روی برشِ برنده — مهم‌ترین بازخورد بصری صفحه: بدون آن
               کاربر باید سوزن را با متنِ نتیجه تطبیق بدهد تا مطمئن شود
               گردونه واقعاً همان‌جا ایستاده. یک قطاعِ conic-gradient روی
@@ -197,8 +265,21 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
 
       {result && (
         <div className={`wheelResult ${result.kind}`}>
-          <b>{result.kind === 'cash' ? ' برنده شدی!' : ' گرفتی!'}</b>
+          <b>{result.kind === 'cash' || result.kind === 'card_box' ? ' برنده شدی!' : ' گرفتی!'}</b>
           <span>{result.label}</span>
+          {result.kind === 'card_box' && (
+            <>
+              <p className="hint" style={{ marginTop: 8 }}>
+                صندوق کارت به کلکسیونت اضافه شد. همین‌جا یا از کلکسیون بازش کن.
+              </p>
+              {result.grantId && (
+                <button type="button" className="primary" style={{ marginTop: 8 }}
+                  disabled={opening} onClick={() => openGrant(result.grantId)}>
+                  {opening ? 'در حال باز کردن…' : 'باز کردن صندوق'}
+                </button>
+              )}
+            </>
+          )}
         </div>
       )}
 

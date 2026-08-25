@@ -116,6 +116,19 @@ export default function Home({ token, p, rewards, load, setMsg, openProfile, ope
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:'12px', padding:'0 12px 80px' }}>
+      {(p.pendingGrants || []).length > 0 && (
+        <button type="button" onClick={openInventory} style={{
+          background: 'linear-gradient(135deg,#F59E0B22,#2a1140)',
+          border: '1.5px solid #FFD166', borderRadius: 16, padding: '12px 14px',
+          color: '#FFD166', fontWeight: 900, cursor: 'pointer', textAlign: 'right',
+        }}>
+          صندوق کارت برنده‌ای — از کلکسیون بازش کن
+          <small style={{ display: 'block', color: '#FDE68A', fontWeight: 700, marginTop: 4 }}>
+            {fa((p.pendingGrants || []).length)} صندوق منتظر توست
+          </small>
+        </button>
+      )}
+
       <HeroHeader points={asInt(u.current_points)} nickname={u.nickname||u.mobile||'قهرمان'} nextReward={next} user={u} cosmetics={p.cosmetics} onOpenProfile={openProfile} onOpenWallet={openWallet} />
 
       <LoginStreak token={token} initialData={p.loginStreak} setMsg={setMsg} onClaimed={load} />

@@ -46,11 +46,14 @@ ok('روت در server.js mount شده', /require\('\.\/routes\/clientConfig'\)/
 // ── مایگریشن seed ───────────────────────────────────────────────────────
 const mig = fs.readdirSync(path.join(root, 'migrations'))
   .filter(f => f.endsWith('.sql')).sort();
-const last = mig[mig.length - 1] || '';
-ok(`آخرین مایگریشن، seed پیکربندی است (${last})`, /client_config/.test(last));
-const migSrc = fs.readFileSync(path.join(root, 'migrations', last), 'utf8');
+const cfgMig = mig.find(f => /client_config/.test(f)) || '';
+ok(`مایگریشن seed پیکربندی وجود دارد (${cfgMig})`, /client_config/.test(cfgMig));
+const migSrc = cfgMig
+  ? fs.readFileSync(path.join(root, 'migrations', cfgMig), 'utf8') : '';
 ok('seed مقدار client_config دارد', /'client_config'/.test(migSrc));
 ok('seed ON CONFLICT DO NOTHING دارد (قابل اجرای دوباره)', /ON CONFLICT \(key\) DO NOTHING/.test(migSrc));
+ok('PATCH پرچم features را پاک نمی‌کند',
+  /features: featureFlags\.normalizeFeatures/.test(routeSrc));
 
 // ── در فهرست npm test هست؟ ──────────────────────────────────────────────
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));

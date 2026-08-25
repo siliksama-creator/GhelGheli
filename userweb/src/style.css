@@ -1814,6 +1814,8 @@ button:hover {
 }
 .wheelSpinner { width: 100%; height: 100%; will-change: transform; }
 .wheelDisc { width: 100%; height: 100%; display: block; }
+.wheelDiscLive { width: 100%; height: 100%; display: block; border-radius: 50%; overflow: hidden; }
+.wheelResult.card_box { background: #f59e0b24; color: #fcd34d; }
 
 /* سوزن بالای گردونه، بیرون از عنصر چرخان — نباید بچرخد. */
 .wheelPointer {

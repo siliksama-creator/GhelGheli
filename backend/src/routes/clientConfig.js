@@ -83,6 +83,13 @@ module.exports = function createClientConfigRoutes(deps) {
     const wallet = ws.rows[0]?.value
       && typeof ws.rows[0].value === 'object' ? ws.rows[0].value : {};
 
+    let gamePoints = null;
+    try {
+      if (deps.gameRewards?.getGameRewardSettings) {
+        gamePoints = await deps.gameRewards.getGameRewardSettings();
+      }
+    } catch { /* امتیاز بازی یک زینت است؛ config نباید بشکند */ }
+
     res.json({
       ...cfg,
       wallet: { enabled: wallet.enabled !== false },
@@ -90,6 +97,8 @@ module.exports = function createClientConfigRoutes(deps) {
       // سکه بین لیگ‌ها و سکهٔ هر لولِ ضربه‌زن. کلاینت‌ها متن‌های راهنما
       // را از همین اعداد می‌سازند — بدونِ نیاز به آپدیتِ اپ.
       economy: await gameEconomy.publicView().catch(() => null),
+      // امتیازِ برد/باخت/مساویِ بازی آنلاین — همان تنظیمِ پنل ادمین.
+      gamePoints,
       serverTime: new Date().toISOString(),
     });
   }));
@@ -134,6 +143,10 @@ module.exports = function createClientConfigRoutes(deps) {
             ? b.announcement.accent
             : cur.announcement.accent,
         },
+        // ذخیرهٔ بنر نباید پرچم خاموشی بازی را پاک کند.
+        features: featureFlags.normalizeFeatures(
+          b.features !== undefined ? b.features : cur.features,
+        ),
       };
 
       await pool.query(

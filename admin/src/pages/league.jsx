@@ -237,6 +237,7 @@ export function LeaguePage({ request }) {
     { id: 'plus_days', label: 'روز اشتراک پلاس', unit: 'روز' },
     { id: 'points', label: 'امتیاز', unit: 'امتیاز' },
     { id: 'shop_item', label: 'آیتم فروشگاه', unit: '' },
+    { id: 'card_box', label: 'صندوق کارت', unit: 'صندوق' },
   ];
 
   function addPerkRow() {
@@ -404,8 +405,8 @@ export function LeaguePage({ request }) {
         {data ? <RankList entries={data.entries} /> : null}
       </Card>
       <Card title="تعداد برندگان و جدول جوایز" subtitle="مبلغ هر رتبه در پایان ماه به کاربر تعلق می‌گیرد">
-        <Field label="تعداد برندگان">
-          <Input type="number" value={winnerCount} onChange={(e) => changeWinnerCount(Number(e.target.value) || 0)} />
+        <Field label="تعداد برندگان نقدی (۱ تا ۳۰۰)">
+          <Input type="number" min="1" max="300" value={winnerCount} onChange={(e) => changeWinnerCount(Number(e.target.value) || 0)} />
         </Field>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           {prizes.map((p, i) => (
@@ -426,13 +427,13 @@ export function LeaguePage({ request }) {
 
       {/* ══ جوایزِ غیرنقدی ══
           خواستهٔ مالک: «جایزه نقدی بین ۵۰ نفر، ۲۰ نفر بعدی جوایز
-          غیرنقدی (پلاس، آیتم‌های شاپ)».
+          غیرنقدی (پلاس، صندوق کارت، آیتم‌های شاپ)».
 
           مرزِ جایزه یک صخره است: نفرِ ۵۰ پول می‌برد و نفرِ ۵۱ هیچ. این
           رده صخره را به پله تبدیل می‌کند، بی‌آنکه یک ریال به هزینهٔ
           نقدی اضافه شود. */}
       <Card title="جوایز غیرنقدی"
-        subtitle={`نفرات بعد از رتبهٔ ${fmtNumber(winnerCount)} — پلاس، آیتم فروشگاه یا امتیاز. بلافاصله پس از بستن فصل خودکار تحویل می‌شود و نیازی به تأیید مالی ندارد.`}
+        subtitle={`نفرات بعد از رتبهٔ ${fmtNumber(winnerCount)} — پلاس، صندوق کارت، آیتم فروشگاه یا امتیاز. بلافاصله پس از بستن فصل خودکار تحویل می‌شود و نیازی به تأیید مالی ندارد.`}
         action={<Badge tone={perks.length ? 'success' : 'neutral'}>
           {fmtNumber(perks.length)} رتبه
         </Badge>}>

@@ -71,7 +71,7 @@ ok(/_shopItems\s*=\s*List<Map>\.from\(d\?\['shopItems'\]/.test(droid)
   'اندروید آیتم‌ها را در منوی کشویی نشان می‌دهد، نه ورودی متنی آزاد');
 
 // ── ۴) هر سه نوع جایزه در هر دو پنل ───────────────────────────────────
-for (const kind of ['plus_days', 'points', 'shop_item']) {
+for (const kind of ['plus_days', 'points', 'shop_item', 'card_box']) {
   ok(web.includes(`'${kind}'`), `وب نوع ${kind} را پشتیبانی می‌کند`);
   ok(droid.includes(`'${kind}'`), `اندروید نوع ${kind} را پشتیبانی می‌کند`);
   ok(route.includes(`'${kind}'`), `سرور نوع ${kind} را می‌پذیرد`);

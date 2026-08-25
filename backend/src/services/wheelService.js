@@ -19,6 +19,12 @@
 const crypto = require('crypto');
 const { pool } = require('../config/db');
 const referrals = require('./referralService');
+const grants = require('./grantService');
+
+/** انواعِ جایزه‌ای که پنل ادمین می‌تواند روی گردونه بگذارد. */
+const PRIZE_KINDS = Object.freeze([
+  'points', 'cash', 'card_box', 'shop_item', 'plus_days',
+]);
 
 /** مخرج مشترک وزن‌ها. جمع وزن جوایز فعال باید دقیقاً همین باشد.
  *
@@ -88,10 +94,24 @@ function storedDay(value) {
 /** جوایز فعال، به ترتیب برش‌ها. */
 async function prizes(client = pool) {
   const { rows } = await client.query(
-    `SELECT id, label, kind, value, weight, slice_order, color
+    `SELECT id, label, kind, value, weight, slice_order, color, payload
        FROM wheel_prizes WHERE is_active = true
       ORDER BY slice_order`);
   return rows;
+}
+
+function publicPrize(p) {
+  const payload = p.payload && typeof p.payload === 'object' ? p.payload : {};
+  return {
+    id: p.id,
+    label: p.label,
+    kind: p.kind,
+    value: p.value,
+    color: p.color,
+    sliceOrder: p.slice_order,
+    // وزن عمداً به کلاینتِ کاربر نمی‌رود.
+    itemSlug: payload.itemSlug || payload.item_slug || null,
+  };
 }
 
 /**
@@ -151,12 +171,7 @@ async function status(userId) {
   const bonus = Number(user.rows[0]?.bonus_spins) || 0;
 
   return {
-    prizes: prizeRows.map((p) => ({
-      id: p.id, label: p.label, kind: p.kind,
-      value: p.value, color: p.color, sliceOrder: p.slice_order,
-      // وزن عمداً به کلاینت نمی‌رود: نه لازمش دارد، و نمایشش فقط باعث
-      // می‌شود کاربر شانس واقعی‌اش را حساب کند و دلسرد شود.
-    })),
+    prizes: prizeRows.map(publicPrize),
     dailyQuota: unlimited ? UNLIMITED_DISPLAY : dailyQuota,
     dailyLeft,
     dailyAvailable: dailyLeft > 0,
@@ -301,12 +316,30 @@ async function spin(userId, { creditCash, addPoints }) {
         [userId]);
     }
 
-    // پرداخت. هر دو تابع تزریق‌شده‌اند تا این سرویس به server.js وابسته
-    // نشود (وگرنه require حلقوی می‌شود) و تست بتواند بدون دیتابیس اجرا کند.
+    // پرداخت. توابع نقدی/امتیازی تزریق شده‌اند تا این سرویس به server.js
+    // وابسته نشود. صندوق/آیتم/پلاس از grantService می‌گذرند تا کاربر
+    // صندوقِ بسته‌اش را بعداً باز کند — نه اینکه کارت همان لحظه بریزد.
+    let grant = null;
     if (prize.kind === 'points') {
       await addPoints(client, userId, prize.value, 'wheel');
-    } else {
+    } else if (prize.kind === 'cash') {
       await creditCash(client, userId, prize.value, spinRow.id, prize.label);
+    } else if (PRIZE_KINDS.includes(prize.kind)) {
+      const payload = prize.payload && typeof prize.payload === 'object'
+        ? prize.payload : {};
+      const awarded = await grants.award(client, {
+        userId,
+        kind: prize.kind,
+        value: prize.value,
+        itemSlug: payload.itemSlug || payload.item_slug || null,
+        label: prize.label,
+        source: 'wheel',
+        sourceRef: spinRow.id,
+      });
+      grant = awarded.grant;
+    } else {
+      throw Object.assign(
+        new Error(`نوع جایزهٔ ناشناخته: ${prize.kind}`), { status: 500 });
     }
 
     await client.query('COMMIT');
@@ -318,9 +351,11 @@ async function spin(userId, { creditCash, addPoints }) {
     return {
       spinId: spinRow.id,
       prize: {
-        id: prize.id, label: prize.label, kind: prize.kind,
-        value: prize.value, color: prize.color, sliceOrder: prize.slice_order,
+        ...publicPrize(prize),
+        grantId: grant?.id || null,
+        pending: grant?.pending === true,
       },
+      grant,
       dailyQuota: unlimited ? UNLIMITED_DISPLAY : dailyQuota,
       dailyLeft: remainingDaily,
       dailyAvailable: remainingDaily > 0,
@@ -397,9 +432,187 @@ async function stats() {
   };
 }
 
+async function listAll() {
+  const { rows } = await pool.query(
+    `SELECT id, label, kind, value, weight, slice_order, color, payload, is_active
+       FROM wheel_prizes ORDER BY slice_order, created_at`);
+  return rows.map((p) => {
+    const payload = p.payload && typeof p.payload === 'object' ? p.payload : {};
+    return {
+      id: p.id,
+      label: p.label,
+      kind: p.kind,
+      value: Number(p.value),
+      weight: Number(p.weight),
+      sliceOrder: p.slice_order,
+      color: p.color,
+      isActive: p.is_active !== false,
+      itemSlug: payload.itemSlug || payload.item_slug || null,
+      payload,
+    };
+  });
+}
+
+function hexColor(v, fallback = '#84CC16') {
+  const s = String(v || '').trim();
+  return /^#[0-9A-Fa-f]{6}$/.test(s) ? s.toUpperCase() : fallback;
+}
+
+async function saveAll(rawList) {
+  if (!Array.isArray(rawList) || rawList.length < 2) {
+    throw Object.assign(
+      new Error('گردونه حداقل دو برش لازم دارد'), { status: 400 });
+  }
+  if (rawList.length > 24) {
+    throw Object.assign(
+      new Error('گردونه حداکثر ۲۴ برش می‌تواند داشته باشد'), { status: 400 });
+  }
+
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const seenOrder = new Set();
+  const cleaned = [];
+  for (const row of rawList) {
+    const kind = String(row?.kind || '');
+    if (!PRIZE_KINDS.includes(kind)) {
+      throw Object.assign(
+        new Error('نوع جایزه باید یکی از امتیاز، نقدی، صندوق، آیتم یا پلاس باشد'),
+        { status: 400 });
+    }
+    const label = String(row?.label || '').trim().slice(0, 64);
+    if (label.length < 2) {
+      throw Object.assign(new Error('برچسب هر برش حداقل ۲ نویسه باشد'), { status: 400 });
+    }
+    const value = Math.trunc(Number(row?.value));
+    if (!Number.isInteger(value) || value < 1 || value > 100_000_000) {
+      throw Object.assign(
+        new Error(`مقدار «${label}» باید عددی صحیح و بزرگ‌تر از صفر باشد`),
+        { status: 400 });
+    }
+    const weight = Math.trunc(Number(row?.weight));
+    if (!Number.isInteger(weight) || weight < 0 || weight > WEIGHT_TOTAL) {
+      throw Object.assign(
+        new Error(`وزن «${label}» نامعتبر است`), { status: 400 });
+    }
+    const sliceOrder = Math.trunc(Number(row?.sliceOrder ?? row?.slice_order));
+    if (!Number.isInteger(sliceOrder) || sliceOrder < 1 || sliceOrder > 24) {
+      throw Object.assign(
+        new Error('ترتیب برش باید بین ۱ و ۲۴ باشد'), { status: 400 });
+    }
+    if (seenOrder.has(sliceOrder)) {
+      throw Object.assign(
+        new Error(`ترتیب برش ${sliceOrder} تکراری است`), { status: 400 });
+    }
+    seenOrder.add(sliceOrder);
+
+    const isActive = row?.isActive !== false && row?.is_active !== false;
+    const itemSlug = row?.itemSlug || row?.item_slug
+      || row?.payload?.itemSlug || null;
+    if (kind === 'shop_item' && isActive && !itemSlug) {
+      throw Object.assign(
+        new Error(`برای «${label}» باید آیتم فروشگاه انتخاب شود`), { status: 400 });
+    }
+    const id = row?.id && UUID_RE.test(String(row.id)) ? String(row.id) : null;
+    cleaned.push({
+      id,
+      label,
+      kind,
+      value: kind === 'card_box' ? 1 : value,
+      weight,
+      sliceOrder,
+      color: hexColor(row?.color),
+      isActive,
+      payload: kind === 'shop_item' ? { itemSlug: String(itemSlug).slice(0, 64) } : {},
+    });
+  }
+
+  const activeWeight = cleaned
+    .filter((p) => p.isActive)
+    .reduce((s, p) => s + p.weight, 0);
+  if (activeWeight !== WEIGHT_TOTAL) {
+    throw Object.assign(
+      new Error(
+        `جمع وزن برش‌های فعال باید ${WEIGHT_TOTAL.toLocaleString('fa-IR')} باشد `
+        + `ولی ${activeWeight.toLocaleString('fa-IR')} است`,
+      ),
+      { status: 400, code: 'WEIGHT_MISMATCH', expected: WEIGHT_TOTAL, actual: activeWeight },
+    );
+  }
+
+  const slugs = [...new Set(
+    cleaned.filter((p) => p.kind === 'shop_item' && p.payload.itemSlug)
+      .map((p) => p.payload.itemSlug),
+  )];
+  if (slugs.length) {
+    const { rows: found } = await pool.query(
+      'SELECT slug FROM shop_items WHERE slug = ANY($1::text[])', [slugs]);
+    const known = new Set(found.map((r) => r.slug));
+    const missing = slugs.filter((s) => !known.has(s));
+    if (missing.length) {
+      throw Object.assign(
+        new Error(`آیتم فروشگاه پیدا نشد: ${missing.join('، ')}`),
+        { status: 400 });
+    }
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows: existing } = await client.query('SELECT id FROM wheel_prizes');
+    const incomingIds = new Set(cleaned.filter((p) => p.id).map((p) => p.id));
+
+    for (const p of cleaned) {
+      const payload = JSON.stringify(p.payload);
+      if (p.id) {
+        const { rowCount } = await client.query(
+          `UPDATE wheel_prizes SET
+             label=$2, kind=$3, value=$4, weight=$5, slice_order=$6,
+             color=$7, is_active=$8, payload=$9, updated_at=NOW()
+           WHERE id=$1`,
+          [p.id, p.label, p.kind, p.value, p.weight, p.sliceOrder,
+            p.color, p.isActive, payload]);
+        if (!rowCount) {
+          throw Object.assign(new Error('یکی از برش‌ها پیدا نشد'), { status: 404 });
+        }
+      } else {
+        await client.query(
+          `INSERT INTO wheel_prizes
+             (label, kind, value, weight, slice_order, color, is_active, payload)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+          [p.label, p.kind, p.value, p.weight, p.sliceOrder,
+            p.color, p.isActive, payload]);
+      }
+    }
+
+    const omitted = existing.map((r) => r.id).filter((id) => !incomingIds.has(id));
+    if (omitted.length) {
+      await client.query(
+        `UPDATE wheel_prizes SET is_active=false, updated_at=NOW()
+          WHERE id = ANY($1::uuid[])`,
+        [omitted]);
+    }
+
+    const { rows: sumRows } = await client.query(
+      `SELECT COALESCE(SUM(weight),0)::bigint AS s
+         FROM wheel_prizes WHERE is_active = true`);
+    const live = Number(sumRows[0].s);
+    if (live !== WEIGHT_TOTAL) {
+      throw Object.assign(
+        new Error(`جمع وزن فعال بعد از ذخیره ${live} شد — ذخیره لغو شد`),
+        { status: 400 });
+    }
+    await client.query('COMMIT');
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+  return listAll();
+}
+
 module.exports = {
   prizes, status, spinCount, spin, history, stats,
-  // برای تست
+  listAll, saveAll, publicPrize,
   pickPrize, tehranDay, msUntilTehranMidnight, storedDay,
-  WEIGHT_TOTAL, UNLIMITED_DISPLAY,
+  WEIGHT_TOTAL, UNLIMITED_DISPLAY, PRIZE_KINDS,
 };

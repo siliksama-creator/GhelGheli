@@ -105,6 +105,7 @@ class _GamesHubPageState extends State<GamesHubPage> {
   /// اقتصادِ بازی‌ها از /api/bootstrap — سکهٔ هر نتیجه، درصدِ انتقالِ
   /// سکه بین لیگ‌ها و سکهٔ هر لولِ ضربه‌زن (تنظیماتِ ادمین، بدونِ آپدیت).
   Map<String, dynamic>? _economy;
+  Map<String, dynamic>? _gamePoints;
   Map<String, dynamic>? _features;
 
   @override
@@ -147,12 +148,25 @@ class _GamesHubPageState extends State<GamesHubPage> {
         if (m['cosmetics'] is Map) _cosmetics = Map<String, dynamic>.from(m['cosmetics']);
         if (m['coinQuota'] is Map) _coinQuota = Map<String, dynamic>.from(m['coinQuota']);
         if (m['economy'] is Map) _economy = Map<String, dynamic>.from(m['economy']);
+        if (m['gamePoints'] is Map) {
+          _gamePoints = Map<String, dynamic>.from(m['gamePoints']);
+        }
       });
       try {
         final cfg = await widget.api.get('/api/config');
-        if (mounted && cfg is Map && cfg['features'] is Map) {
-          setState(() =>
-              _features = Map<String, dynamic>.from(cfg['features'] as Map));
+        if (mounted && cfg is Map) {
+          setState(() {
+            if (cfg['features'] is Map) {
+              _features = Map<String, dynamic>.from(cfg['features'] as Map);
+            }
+            if (cfg['economy'] is Map) {
+              _economy = Map<String, dynamic>.from(cfg['economy'] as Map);
+            }
+            if (cfg['gamePoints'] is Map) {
+              _gamePoints =
+                  Map<String, dynamic>.from(cfg['gamePoints'] as Map);
+            }
+          });
         }
       } catch (_) {}
       final d = await widget.api.get('/api/level');
@@ -423,7 +437,8 @@ class _GamesHubPageState extends State<GamesHubPage> {
         // گرفته می‌شود کدام بازی ارزش دارد. آینهٔ games.jsx.
         // دورِ ۳۲: حالت پاس داده می‌شود تا در تمرین و لابی — که سکه
         // نمی‌دهند — به‌جای جدولِ نرخ، دلیلش گفته شود.
-        CoinRateStrip(mode: _selectedMode, economy: _economy),
+        CoinRateStrip(
+            mode: _selectedMode, economy: _economy, gamePoints: _gamePoints),
 
         // ── ۲. انتخاب حالت بازی (۴ حالت: ۱۰۰، ۱۰۰۰، تمرین با ربات، اتاق خصوصی) ──
         const Text(

@@ -488,7 +488,7 @@ class _ShopHero extends StatelessWidget {
                 // خرج خرید نمی‌شود — فقط برداشت نقدی.
                 Gaps.vXxs,
                 const Text(
-                  'پرداخت امن از طریق کافه‌بازار · موجودی کیف پول برای برداشت نقدی است',
+                  'پرداخت از کافه‌بازار یا با جایزهٔ نقدیِ کیف پول. کیف پول با خرید شارژ نمی‌شود.',
                   style: TextStyle(fontSize: 9.5, color: Colors.white54),
                 ),
               ],

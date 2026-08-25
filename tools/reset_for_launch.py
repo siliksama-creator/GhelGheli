@@ -187,6 +187,9 @@ DELETE FROM user_coin_quota;
 --     ارجاع دارد و کارت‌های تحویلی‌اش در user_card_inventory بالاتر پاک
 --     می‌شوند، پس بدونِ این خط سندِ خرید بی‌صاحب می‌ماند.
 --   • league_perk_awards — جوایزِ غیرنقدیِ ۲۰ نفرِ بعد از رتبهٔ ۵۰.
+-- ⚠️ مایگریشن ۰۷۷: صندوقِ بازنشدهٔ گردونه/لیگ به کاربر ارجاع دارد و
+--    box_id به card_box_purchases. باید قبل از خریدهای صندوق پاک شود.
+DELETE FROM user_item_grants;
 DELETE FROM card_box_purchases;
 DELETE FROM league_perk_awards;
 

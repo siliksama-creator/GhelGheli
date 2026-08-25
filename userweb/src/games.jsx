@@ -83,6 +83,7 @@ export default function Games({ api, token, externalLaunch = null }) {
   // اقتصادِ بازی‌ها (سکهٔ هر نتیجه، درصدِ انتقال بین لیگ‌ها، سکهٔ ضربه‌زن)
   // — از /api/config؛ وقتی ادمین در پنل عوض کند همین‌جا زنده عوض می‌شود.
   const [economy, setEconomy] = useState(null);
+  const [gamePoints, setGamePoints] = useState(null);
   const [features, setFeatures] = useState(null);
 
   useEffect(() => {
@@ -171,9 +172,11 @@ export default function Games({ api, token, externalLaunch = null }) {
       if (d?.user) setUser({ ...d.user, cosmetics: d.cosmetics || {} });
       if (d?.coinQuota) setCoinQuota(d.coinQuota);
       if (d?.economy) setEconomy(d.economy);
+      if (d?.gamePoints) setGamePoints(d.gamePoints);
     }).catch(() => {});
     req('/api/config', 'GET', null, null).then(d => {
       if (d?.economy) setEconomy(d.economy);
+      if (d?.gamePoints) setGamePoints(d.gamePoints);
       if (d?.features) setFeatures(d.features);
     }).catch(() => {});
     req('/api/level', 'GET', null, token).then(d => {
@@ -339,7 +342,7 @@ export default function Games({ api, token, externalLaunch = null }) {
           می‌شود کدام بازی ارزش دارد. آینهٔ games_page.dart.
           دورِ ۳۲: `mode` پاس داده می‌شود تا در تمرین و لابی — که سکه
           نمی‌دهند — به‌جای جدولِ نرخ، دلیلش گفته شود. */}
-      <CoinRateStrip mode={mode} economy={economy} />
+      <CoinRateStrip mode={mode} economy={economy} gamePoints={gamePoints} />
 
       {/* Mode Selector (4 Tabs) — رنگ هر قرص مثل اندروید */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>

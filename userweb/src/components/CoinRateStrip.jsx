@@ -23,7 +23,7 @@ export function coinExplanation(economy) {
   return `سکه مبنای دریافتِ جایزهٔ لیگ است؛ رتبهٔ لیگ بر اساسِ سکه تعیین می‌شود و با سکه‌ها در استخرِ جایزه شرکت می‌کنی. سکه‌ها بعد از پایانِ لیگ صفر می‌شوند و ${pctText}.`;
 }
 
-export default function CoinRateStrip({ mode, economy }) {
+export default function CoinRateStrip({ mode, economy, gamePoints }) {
   const coinless = mode === 0 || mode === -1;
 
   if (coinless) {
@@ -89,6 +89,13 @@ export default function CoinRateStrip({ mode, economy }) {
         color: 'rgba(255,255,255,0.55)', borderTop: '1px solid rgba(255,209,102,0.14)',
       }}>
         {coinExplanation(economy)}
+        {gamePoints?.enabled && (
+          <div style={{ marginTop: 4, color: 'rgba(255,255,255,0.72)' }}>
+            امتیاز آنلاین: برد +{fa(gamePoints.winPoints)}
+            {' · '}باخت {fa(gamePoints.losePoints)}
+            {' · '}مساوی {fa(gamePoints.drawPoints)}
+          </div>
+        )}
       </div>
     </div>
   );

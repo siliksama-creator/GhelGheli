@@ -265,7 +265,7 @@ export default function Shop({ token, reloadProfile }) {
         </label>
       ) : (
         <p className="shopPayNote">
-          پرداخت امن از طریق کافه‌بازار · با شارژ کیف پول می‌توانی مستقیم از موجودی خرید کنی
+          پرداخت از کافه‌بازار یا با جایزهٔ نقدیِ کیف پول (لیگ و گردونه). کیف پول با خرید شارژ نمی‌شود.
         </p>
       )}
       {showPlans && <div className="shopPlans">{(data.plans || []).map((plan) => <PlanCard key={plan.billingCycle} plan={plan}

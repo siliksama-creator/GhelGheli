@@ -77,4 +77,14 @@ check(/GroupedCardTile/.test(webCards) && /GroupedPhotoCardTile/.test(mobileCard
 check(/method: 'DELETE'/.test(webCards) && /_deleteCard\(Map card\)/.test(mobileCards),
   'both clients expose safe whole-card deletion');
 
+const webWheel = read('admin/src/pages/wheel.jsx');
+const mobileWheel = read('mobile/lib/screens/admin/admin_wheel.dart');
+check(/admin\/wheel\/prizes/.test(webWheel) && /admin\/wheel\/prizes/.test(mobileWheel),
+  'both admin clients edit wheel prizes');
+check(/card_box/.test(webWheel) && /card_box/.test(mobileWheel),
+  'both admin clients can put a card box on the wheel');
+check(/card_box/.test(read('admin/src/pages/league.jsx'))
+  && /card_box/.test(read('mobile/lib/screens/admin/admin_league.dart')),
+  'both admin clients can award a card box as a league perk');
+
 console.log(`\n✅ ${passed} admin parity assertions passed\n`);

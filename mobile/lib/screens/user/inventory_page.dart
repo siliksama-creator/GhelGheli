@@ -125,10 +125,14 @@ class InventoryPage extends StatefulWidget {
   const InventoryPage({
     super.key,
     required this.items,
+    this.grants = const [],
+    this.api,
     this.onRefresh,
   });
 
   final List<Map<String, dynamic>> items;
+  final List<Map<String, dynamic>> grants;
+  final ApiClient? api;
   final Future<void> Function()? onRefresh;
 
   @override
@@ -167,6 +171,14 @@ class _InventoryPageState extends State<InventoryPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _StatsStrip(stats: stats),
+                if (widget.grants.isNotEmpty && widget.api != null) ...[
+                  Gaps.vMd,
+                  _PendingChests(
+                    api: widget.api!,
+                    grants: widget.grants,
+                    onOpened: widget.onRefresh,
+                  ),
+                ],
                 Gaps.vMd,
                 // ── جست‌وجو فقط وقتی معنا دارد که چیزی برای گشتن باشد ──
                 // زیر ۸ کارت، نوارِ جست‌وجو فقط فضا می‌گیرد.
@@ -390,4 +402,91 @@ class _Chip extends StatelessWidget {
             style: TextStyle(
                 color: fg, fontSize: 10.5, fontWeight: FontWeight.w900)),
       );
+}
+
+class _PendingChests extends StatefulWidget {
+  const _PendingChests({
+    required this.api,
+    required this.grants,
+    this.onOpened,
+  });
+  final ApiClient api;
+  final List<Map<String, dynamic>> grants;
+  final Future<void> Function()? onOpened;
+
+  @override
+  State<_PendingChests> createState() => _PendingChestsState();
+}
+
+class _PendingChestsState extends State<_PendingChests> {
+  String? _busy;
+
+  Future<void> _open(String id) async {
+    if (_busy != null) return;
+    setState(() => _busy = id);
+    try {
+      final r = await widget.api.post('/api/grants/$id/open', const {});
+      if (!mounted) return;
+      final cards = (r is Map ? r['cards'] as List? : null) ?? const [];
+      final names = cards
+          .whereType<Map>()
+          .map((c) => '${c['name'] ?? 'کارت'}')
+          .join('، ');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(names.isEmpty ? 'صندوق باز شد' : 'صندوق باز شد: $names'),
+      ));
+      await widget.onOpened?.call();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(apiError(e))));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(Gaps.md),
+      decoration: BoxDecoration(
+        borderRadius: Corners.rXl,
+        border: Border.all(color: const Color(0xFFFFD166).withValues(alpha: 0.55)),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2A1140), Color(0xFF0D1B2C)],
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text('صندوق کارت برنده‌ای',
+              style: TextStyle(
+                  color: Color(0xFFFFD166),
+                  fontWeight: FontWeight.w900,
+                  fontSize: 14)),
+          const SizedBox(height: 4),
+          const Text(
+            'جایزهٔ گردونه یا لیگ — بازش کن تا پنج کارت تصادفی بگیری.',
+            style: TextStyle(fontSize: 11.5, color: Color(0xFFCBD5E1)),
+          ),
+          Gaps.vSm,
+          for (final g in widget.grants)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: FilledButton(
+                onPressed: _busy != null ? null : () => _open('${g['id']}'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFFFD166),
+                  foregroundColor: const Color(0xFF1A0F02),
+                ),
+                child: Text(_busy == '${g['id']}'
+                    ? 'در حال باز کردن…'
+                    : '${g['label'] ?? 'باز کردن صندوق'}'),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
