@@ -133,6 +133,9 @@ class _AdminWheelState extends State<AdminWheel> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
+      // بدون این، اگر فهرست از صفحه کوتاه‌تر باشد کشیدن هیچ اثری ندارد
+      // و مدیر فکر می‌کند تازه‌سازی خراب است.
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(Gaps.md),
       children: [
         FormSection(

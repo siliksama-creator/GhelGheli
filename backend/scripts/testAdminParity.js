@@ -25,6 +25,10 @@ for (const capability of ['grant-plus', 'grant-item', 'points', 'reset-password'
   check(webUsers.includes(`/${capability}`), `Web user management exposes ${capability}`);
   check(mobileUsers.includes(`/${capability}`), `Android user management exposes ${capability}`);
 }
+check(/\{grant &&/.test(webUsers) && /اعطا کن/.test(webUsers),
+  'Web grant-item actually renders a form, not a dead button');
+check(/Future<void> _grantItem/.test(mobileUsers) && /showDialog/.test(mobileUsers),
+  'Android grant-item opens a dialog');
 check(/unlimited-spins/.test(webUsers) && /unlimited-spins/.test(mobileUsers),
   'both admin clients can toggle unlimited wheel spins');
 check(/signup-gift/.test(read('admin/src/pages/settings.jsx'))

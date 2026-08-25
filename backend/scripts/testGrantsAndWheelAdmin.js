@@ -122,9 +122,16 @@ ok(/grants,/.test(read('backend/src/server.js')),
 ok(/از کلکسیون بازش کن/.test(league),
   'اعلان لیگ برای صندوق می‌گوید از کلکسیون باز شود');
 
-ok(/grant-item/.test(read('admin/src/pages/users.jsx'))
-  && /grant-item/.test(read('mobile/lib/screens/admin/admin_users.dart')),
-  'هر دو پنل ادمین اعطای صندوق/آیتم دارند');
+const webUsers = read('admin/src/pages/users.jsx');
+ok(/grant-item/.test(webUsers)
+  && /\{grant &&/.test(webUsers)
+  && /اعطا کن/.test(webUsers)
+  && /submitGrant/.test(webUsers),
+  'وب فرم اعطای جایزه را واقعاً رندر می‌کند — نه فقط API را صدا بزند');
+ok(/grant-item/.test(read('mobile/lib/screens/admin/admin_users.dart'))
+  && /_grantItem/.test(read('mobile/lib/screens/admin/admin_users.dart'))
+  && /showDialog/.test(read('mobile/lib/screens/admin/admin_users.dart')),
+  'اندروید دیالوگ اعطای جایزه دارد');
 
 ok(/TickerProviderStateMixin/.test(read('mobile/lib/screens/user/wheel_page.dart'))
   && !/class _WheelPageState[\s\S]{0,80}SingleTickerProviderStateMixin/

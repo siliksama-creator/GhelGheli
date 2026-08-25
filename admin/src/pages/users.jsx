@@ -352,7 +352,82 @@ export function UsersPage({ request }) {
                 <b>{v}</b>
               </div>
             ))}
+            {(detail.grants || []).length > 0 && (
+              <div style={{ marginTop: 8 }}>
+                <span className="topbar-sub">جایزه‌های اخیر</span>
+                <ul style={{ margin: '6px 0 0', paddingInlineStart: 18, fontSize: 12 }}>
+                  {(detail.grants || []).slice(0, 8).map((g) => (
+                    <li key={g.id}>
+                      {g.label || g.kind}
+                      {g.pending ? ' — بازنشده' : ''}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <Button variant="secondary" onClick={() => setDetail(null)}>بستن</Button>
+          </div>
+        </Card>
+      </div>
+    )}
+    {grant && (
+      <div
+        role="dialog"
+        onClick={() => !grant.saving && setGrant(null)}
+        style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 80,
+        }}
+      >
+        <Card
+          title={`اعطای جایزه به ${grant.user.nickname || grant.user.mobile}`}
+          subtitle="صندوق در کلکسیون کاربر می‌ماند تا خودش بازش کند"
+          style={{ width: 'min(480px, 92vw)' }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ display: 'grid', gap: 10 }}>
+            <Field label="نوع جایزه">
+              <Select value={grant.kind} onChange={(e) => setGrant((g) => ({
+                ...g,
+                kind: e.target.value,
+                value: e.target.value === 'plus_days' ? 7 : 1,
+              }))}>
+                <option value="card_box">صندوق کارت</option>
+                <option value="shop_item">آیتم فروشگاه</option>
+                <option value="plus_days">روز پلاس</option>
+              </Select>
+            </Field>
+            {grant.kind === 'shop_item' ? (
+              <Field label="آیتم فروشگاه">
+                <Select value={grant.itemSlug} onChange={(e) => setGrant((g) => ({ ...g, itemSlug: e.target.value }))}>
+                  <option value="">— انتخاب —</option>
+                  {grant.shopItems.map((it) => (
+                    <option key={it.slug} value={it.slug}>{it.name}</option>
+                  ))}
+                </Select>
+              </Field>
+            ) : (
+              <Field label={grant.kind === 'plus_days' ? 'تعداد روز' : 'تعداد صندوق (۱ تا ۵)'}>
+                <Input type="number" min="1" max={grant.kind === 'plus_days' ? 365 : 5}
+                  value={grant.value}
+                  onChange={(e) => setGrant((g) => ({ ...g, value: Number(e.target.value) || 1 }))} />
+              </Field>
+            )}
+            <Field label="دلیل (برای کاربر و ممیزی)">
+              <Input value={grant.reason} maxLength={160}
+                placeholder="مثلاً جبران خطای پشتیبانی"
+                onChange={(e) => setGrant((g) => ({ ...g, reason: e.target.value }))} />
+            </Field>
+            {(grant.existing || []).some((g) => g.pending) && (
+              <p className="topbar-sub" style={{ margin: 0 }}>
+                این کاربر الان {(grant.existing || []).filter((g) => g.pending).length} صندوق بازنشده دارد.
+              </p>
+            )}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <Button variant="secondary" disabled={grant.saving} onClick={() => setGrant(null)}>لغو</Button>
+              <Button disabled={grant.saving} onClick={submitGrant}>
+                {grant.saving ? 'در حال ثبت…' : 'اعطا کن'}
+              </Button>
+            </div>
           </div>
         </Card>
       </div>
