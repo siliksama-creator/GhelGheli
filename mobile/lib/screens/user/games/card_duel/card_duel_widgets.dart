@@ -609,6 +609,7 @@ class _LiveBattle extends StatelessWidget {
                                   final card = hand[index];
                                   final id = cardIdOf(card);
                                   final canPlay = !session.introHolding &&
+                                      !session.resultHolding &&
                                       !iChose &&
                                       remaining.contains(id);
                                   final focusStat =

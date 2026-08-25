@@ -124,4 +124,13 @@ ok('هیچ‌کدام از کلاینت‌ها برندهٔ راند را خود
   !/function\s+decideRound|computeWinner\s*=/.test(dart)
   && !/function\s+decideRound|computeWinner\s*=/.test(js));
 
+console.log('\n== مکث نتیجه در هر دو کلاینت حرکت را قفل می‌کند ==');
+// اگر یکی وسطِ صحنهٔ برخورد قفل بفرستد و دیگری نه، بازیکنِ اندروید
+// کارتِ راندِ بعد را وقتی می‌زند که هنوز راندِ قبل را می‌بیند.
+ok('وب holding را از resultUntil و introUntil می‌سازد',
+  /resultUntil/.test(js) && /introUntil/.test(js)
+  && /if \(phase !== 'playing' \|\| !connected \|\| holding\) return/.test(js));
+ok('اندروید هم resultHolding را در moveObject چک می‌کند',
+  /introHolding \|\| resultHolding/.test(dart));
+
 console.log(`\n✅ ${pass} تست بازی متقابل وب↔اندروید موفق بود\n`);

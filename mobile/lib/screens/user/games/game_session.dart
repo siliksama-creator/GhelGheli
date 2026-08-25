@@ -723,7 +723,15 @@ class GameSession extends ChangeNotifier {
   /// جلوگیری از انتخاب دوباره روی سرور است (isValidMove)، نه اینجا —
   /// کلاینت هیچ‌وقت منبع حقیقت نیست.
   void moveObject(Map<String, dynamic> payload) {
-    if (phase != GamePhase.playing || !connected || introHolding) return;
+    // ⚠️ `resultHolding` هم باید قفل کند. وب `holding` را از
+    //    max(resultUntil, introUntil) می‌سازد و وسطِ صحنهٔ برخورد
+    //    حرکت نمی‌فرستد. اندروید فقط `introHolding` را می‌دید، پس
+    //    کاربر می‌توانست همان ۳٫۲ ثانیه‌ای که برندهٔ راند قبل را
+    //    تماشا می‌کند کارتِ راندِ بعد را قفل کند — و حسِ «کارتِ
+    //    برنده به راند بعد رفت» برگردد.
+    if (phase != GamePhase.playing || !connected || introHolding || resultHolding) {
+      return;
+    }
     GameAudio.instance.play(
       gameId == 'card_duel' ? Sfx.duelLock : moveSound,
       volume: gameId == 'card_duel' ? 0.78 : 1.0,
