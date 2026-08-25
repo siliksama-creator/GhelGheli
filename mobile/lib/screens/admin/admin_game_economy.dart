@@ -10,6 +10,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
+import '../../core/json_get.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/state_views.dart';
@@ -85,16 +86,14 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
       setState(() {
         _pct.text = '${e['coinCarryoverPercent'] ?? 10}';
         _tap.text = '${e['tapCoinsPerLevel'] ?? 5}';
-        _q100.text = '${quota[100] ?? 30}';
-        _q1000.text = '${quota[1000] ?? 15}';
+        // JSON کلیدِ عددی را رشته می‌فرستد. `quota[100]` همیشه null بود
+        // و پنل بعد از ذخیره دوباره پیش‌فرض نشان می‌داد.
+        _q100.text = '${jsonGet(quota, 100) ?? 30}';
+        _q1000.text = '${jsonGet(quota, 1000) ?? 15}';
         for (final g in _games) {
-          final gr = rewards[g] is Map
-              ? Map<String, dynamic>.from(rewards[g] as Map)
-              : <String, dynamic>{};
+          final gr = jsonMap(rewards[g]);
           for (final s in [100, 1000]) {
-            final sr = gr[s] is Map
-                ? Map<String, dynamic>.from(gr[s] as Map)
-                : <String, dynamic>{};
+            final sr = jsonMap(jsonGet(gr, s));
             for (final o in _outcomes) {
               _coins['$g.$s.$o']!.text = '${sr[o] ?? 0}';
             }
@@ -114,9 +113,11 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
       for (final g in _games) {
         coinRewards[g] = <String, dynamic>{};
         for (final s in [100, 1000]) {
-          coinRewards[g][s] = <String, dynamic>{};
+          // کلید باید رشته باشد: `jsonEncode` روی کلیدِ int پرتاب می‌کند
+          // و ذخیره از پنل اندروید بی‌صدا شکست می‌خورد.
+          coinRewards[g]['$s'] = <String, dynamic>{};
           for (final o in _outcomes) {
-            coinRewards[g][s][o] = _v(_coins['$g.$s.$o']!, 0);
+            coinRewards[g]['$s'][o] = _v(_coins['$g.$s.$o']!, 0);
           }
         }
       }
@@ -182,34 +183,33 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
                 Gaps.vSm,
                 FormSection(
                   title: 'انتقال سکه بین لیگ‌ها',
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          _numField(_pct, 'درصدِ انتقال (۰ تا ۱۰۰)',
-                              width: 170),
-                        ],
-                      ),
-                      Gaps.vXxs,
-                      const Text(
-                        'سکه‌ها بعد از پایان لیگ صفر می‌شوند و این درصد به لیگ بعدی منتقل می‌شود. صفر یعنی انتقال صفر.',
-                        style: TextStyle(fontSize: 11.5, color: Colors.white60),
-                      ),
-                    ],
-                  ),
+                  children: [
+                    Row(
+                      children: [
+                        _numField(_pct, 'درصدِ انتقال (۰ تا ۱۰۰)',
+                            width: 170),
+                      ],
+                    ),
+                    const Text(
+                      'سکه‌ها بعد از پایان لیگ صفر می‌شوند و این درصد به لیگ بعدی منتقل می‌شود. صفر یعنی انتقال صفر.',
+                      style: TextStyle(fontSize: 11.5, color: Colors.white60),
+                    ),
+                  ],
                 ),
                 Gaps.vSm,
                 FormSection(
                   title: 'سهمیهٔ روزانه و ضربه‌زن',
-                  child: Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      _numField(_q100, 'سهمیهٔ ۱۰۰'),
-                      _numField(_q1000, 'سهمیهٔ ۱۰۰۰'),
-                      _numField(_tap, 'سکهٔ هر لولِ ضربه‌زن'),
-                    ],
-                  ),
+                  children: [
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        _numField(_q100, 'سهمیهٔ ۱۰۰'),
+                        _numField(_q1000, 'سهمیهٔ ۱۰۰۰'),
+                        _numField(_tap, 'سکهٔ هر لولِ ضربه‌زن'),
+                      ],
+                    ),
+                  ],
                 ),
               ],
             ),

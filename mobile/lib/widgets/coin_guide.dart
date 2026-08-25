@@ -4,6 +4,7 @@ import 'ui_icon.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api_client.dart';
+import '../core/json_get.dart';
 
 /// کارتِ «سکه چیست و چطور به دست می‌آید» — بالای جدولِ لیگ.
 /// آینهٔ دقیقِ `userweb/src/components/CoinGuide.jsx`.
@@ -30,7 +31,11 @@ import '../api_client.dart';
 ///   • بازشدنی     → پنج قاعدهٔ ریز که فقط کنجکاوها می‌خواهند.
 /// معنیِ کلیدِ `coinGuideSeen` عوض نشده: «قبلاً جزئیات را دیده».
 class CoinGuide extends StatefulWidget {
-  const CoinGuide({super.key});
+  const CoinGuide({super.key, this.economy});
+
+  /// تنظیماتِ زنده‌ی اقتصاد از `/api/config`. اگر نباشد — نسخهٔ قدیمی
+  /// یا آفلاین — همان پیش‌فرض‌های بک‌اند نشان داده می‌شود.
+  final Map<String, dynamic>? economy;
 
   @override
   State<CoinGuide> createState() => _CoinGuideState();
@@ -75,28 +80,83 @@ class _CoinGuideState extends State<CoinGuide> {
 
   static const _gold = Color(0xFFFFD166);
 
-  /// جدولِ سکه — همان اعدادِ `COIN_TABLE` در بک‌اند.
-  /// زیرنویسِ توضیحیِ بازی‌ها حذف شد (خواستهٔ مالک، دورِ ۲۲): جدول باید
-  /// عدد بدهد، نه نقد و بررسیِ بازی. آینهٔ `ROWS` در `CoinGuide.jsx`.
-  //  تا دورِ ۲۶ این جدول منسوخ بود (دوئل ۲/۲۰، بقیه ۱/۱۰) و فقط ستونِ
-  //    برد را داشت. بک‌اند اما هر سه بازی را یکسان کرده و به مساوی و باخت
-  //    هم سکه می‌دهد.
-  static const _rows = [
+  /// پیش‌فرضِ جدول — همان `DEFAULTS.coinRewards` بک‌اند.
+  /// این عددها باید در سورس بمانند تا گاردِ همسانی آن‌ها را ببیند.
+  static const _fallbackRows = [
     ('برد', 10, 30),
     ('مساوی', 3, 9),
     ('باخت', 1, 3),
   ];
 
-  static const _bullets = [
-    ('check', 'هر سه بازی یکسان سکه می‌دهند — دوئل کارت، پنالتی و جفت‌یاب.'),
-    ('ban', 'بازی با ربات، تمرین رایگان و لابی خصوصی سکه ندارند.'),
-    ('lock', 'سکه هرگز از شما کم نمی‌شود؛ حتی وقتی ببازید.'),
-    ('calendar',
-        'هر روز تا ۳۰ بازی در ورودی ۱۰۰ و ۱۵ بازی در ورودی ۱۰۰۰ سکه می‌دهد. بعد از آن، بازی امتیاز دارد ولی سکه نه.'),
-    ('target',
-        'بازی ضربه‌زن هم سکه دارد: هر پنج لول یک سکهٔ بیشتر — در کل ۲۷۵ سکه.'),
-    ('trophy', 'در پایان فصل، جوایز بر اساس سکه پرداخت و سکه‌ها صفر می‌شود.'),
-  ];
+  /// جدولِ سکه از تنظیماتِ ادمین؛ اگر نیامده بود پیش‌فرض.
+  ///
+  /// ── چرا این دیگر ثابت نیست ──
+  /// نسخهٔ قبلی اعداد و متنِ ضربه‌زن را هاردکد کرده بود («هر پنج لول
+  /// یک سکهٔ بیشتر — در کل ۲۷۵ سکه»). بک‌اند از دورِ ۳۳ هر لول را ۵
+  /// سکهٔ ثابت می‌دهد و ادمین می‌تواند عوضش کند. وب همان لحظه عددِ
+  /// تازه را نشان می‌داد و اندروید دروغِ کهنه را — دقیقاً همان نقصی
+  /// که گاردِ `coin-parity` برای جلوگیری‌اش نوشته شده بود.
+  List<(String, int, int)> get _rows {
+    final table = widget.economy?['coinRewards'];
+    final base = table is Map ? jsonMap(table['card_duel']) : null;
+    int v(String key, int stake, int fallback) {
+      final stakeMap = jsonGet(base, stake);
+      if (stakeMap is Map) {
+        final n = num.tryParse('${stakeMap[key] ?? ''}');
+        if (n != null) return n.toInt();
+      }
+      return fallback;
+    }
+    return [
+      (
+        _fallbackRows[0].$1,
+        v('win', 100, _fallbackRows[0].$2),
+        v('win', 1000, _fallbackRows[0].$3)
+      ),
+      (
+        _fallbackRows[1].$1,
+        v('draw', 100, _fallbackRows[1].$2),
+        v('draw', 1000, _fallbackRows[1].$3)
+      ),
+      (
+        _fallbackRows[2].$1,
+        v('loss', 100, _fallbackRows[2].$2),
+        v('loss', 1000, _fallbackRows[2].$3)
+      ),
+    ];
+  }
+
+  List<(String, String)> get _bullets {
+    final quota = jsonMap(widget.economy?['dailyCoinQuota']);
+    final q100 = num.tryParse('${jsonGet(quota, 100) ?? ''}')?.toInt() ?? 30;
+    final q1000 = num.tryParse('${jsonGet(quota, 1000) ?? ''}')?.toInt() ?? 15;
+    final tap = num.tryParse('${widget.economy?['tapCoinsPerLevel'] ?? ''}')
+            ?.toInt() ??
+        5;
+    final pct = num.tryParse('${widget.economy?['coinCarryoverPercent'] ?? ''}')
+            ?.toInt() ??
+        10;
+    final pctText = pct == 0
+        ? 'انتقالِ سکه به لیگِ بعدی صفر است'
+        : '${faNum(pct)}٪ از سکه به لیگِ بعدی منتقل می‌شود';
+    return [
+      ('check', 'هر سه بازی یکسان سکه می‌دهند — دوئل کارت، پنالتی و جفت‌یاب.'),
+      ('ban', 'بازی با ربات، تمرین رایگان و لابی خصوصی سکه ندارند.'),
+      ('lock', 'سکه هرگز از شما کم نمی‌شود؛ حتی وقتی ببازید.'),
+      (
+        'calendar',
+        'هر روز تا ${faNum(q100)} بازی در ورودی ۱۰۰ و ${faNum(q1000)} بازی در ورودی ۱۰۰۰ سکه می‌دهد. بعد از آن، بازی امتیاز دارد ولی سکه نه.'
+      ),
+      (
+        'target',
+        'بازی ضربه‌زن هم سکه دارد: هر لول ${faNum(tap)} سکه — همان لحظهٔ لول‌آپ به موجودی‌ات اضافه می‌شود.'
+      ),
+      (
+        'trophy',
+        'مبنای دریافتِ جایزهٔ لیگ، رتبه بر اساسِ سکه است و با سکه‌ها در استخرِ جایزه شرکت می‌کنی. در پایانِ فصل جوایز بر اساسِ سکه پرداخت و سکه‌ها صفر می‌شوند؛ $pctText.'
+      ),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {

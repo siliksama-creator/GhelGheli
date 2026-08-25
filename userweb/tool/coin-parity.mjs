@@ -231,7 +231,7 @@ const guideWeb = read('userweb/src/components/CoinGuide.jsx');
 const guideAnd = read('mobile/lib/widgets/coin_guide.dart');
 
 ok('وب: راهنما در صفحهٔ لیگ رندر می‌شود', /<CoinGuide\b/.test(web.league));
-ok('اندروید: راهنما در صفحهٔ لیگ رندر می‌شود', /const CoinGuide\(\)/.test(android.league));
+ok('اندروید: راهنما در صفحهٔ لیگ رندر می‌شود', /CoinGuide\(/.test(android.league));
 
 // ══ اعدادِ جدول از خودِ بک‌اند خوانده می‌شوند ══════════════════════════
 //
@@ -243,10 +243,16 @@ ok('اندروید: راهنما در صفحهٔ لیگ رندر می‌شود',
 //
 //    درس: گاردِ همسانی باید به **منبعِ حقیقت** وصل باشد، نه به کپیِ
 //    دستیِ آن. هر عددی که اینجا تایپ شود، فردا یک دروغِ قفل‌شده است.
-const coinSvc = read('backend/src/services/coinService.js');
-const tableBody = coinSvc.slice(
-  coinSvc.indexOf('const COIN_TABLE'),
-  coinSvc.indexOf('const ZERO_REWARD'));
+//
+// 🔴 دورِ ۳۳: `COIN_TABLE` در coinService فقط یک ارجاع به
+//    `economy.DEFAULTS.coinRewards` شد. گارد هنوز همان بلوکِ قدیمی را
+//    در coinService می‌جست، هیچ ردیفی پیدا نمی‌کرد و با
+//    «جدولِ سکهٔ بک‌اند خوانده شد» کلِ CI را می‌خواباند — در حالی که
+//    جدول زنده و سالم در `gameEconomyService` بود.
+const econSrc = read('backend/src/services/gameEconomyService.js');
+const tableBody = econSrc.slice(
+  econSrc.indexOf('coinRewards:'),
+  econSrc.indexOf('dailyCoinQuota:'));
 
 const stakeRows = [...tableBody.matchAll(
   /(\d+):\s*Object\.freeze\(\{\s*win:\s*(\d+),\s*draw:\s*(\d+),\s*loss:\s*(\d+)/g)];
@@ -273,8 +279,9 @@ const rateStrip = {
 };
 const webNums = [...rateStrip.web.matchAll(/s100:\s*(\d+),\s*s1000:\s*(\d+)/g)]
   .flatMap(m => [m[1], m[2]]);
-const andNums = [...rateStrip.and.matchAll(/\('[^']+',\s*(\d+),\s*(\d+)\)/g)]
-  .flatMap(m => [m[1], m[2]]);
+// فقط ردیف‌های جدول (برد/مساوی/باخت). `v('win', 100, …)` را نباید سکه حساب کرد.
+const andNums = [...rateStrip.and.matchAll(/\('(برد|مساوی|باخت)',\s*(\d+),\s*(\d+)\)/g)]
+  .flatMap(m => [m[2], m[3]]);
 ok('نوارِ نرخ در وب عدد دارد', webNums.length > 0);
 ok('نوارِ نرخ در اندروید عدد دارد', andNums.length > 0);
 ok('نوارِ نرخِ وب فقط عددهای واقعیِ بک‌اند را نشان می‌دهد',
@@ -288,11 +295,18 @@ for (const [label, re] of [
   ['هر سه بازی یکسان', /هر سه بازی یکسان سکه می‌دهند/],
   ['ربات و تمرین و لابی سکه ندارند', /بازی با ربات، تمرین رایگان و لابی خصوصی سکه ندارند/],
   ['هرگز کم نمی‌شود', /سکه هرگز از شما کم نمی‌شود/],
-  ['سهمیهٔ روزانه', /۳۰ بازی در ورودی ۱۰۰ و ۱۵ بازی در ورودی ۱۰۰۰/],
+  // عدد سهمیه و سکهٔ ضربه‌زن از تنظیماتِ ادمین ساخته می‌شود؛ گارد فقط
+  // وجودِ جمله را می‌سنجد، نه رقمِ هاردکد را — وگرنه دوباره نسخهٔ
+  // منسوخ را قفل می‌کرد.
+  ['سهمیهٔ روزانه', /بازی در ورودی ۱۰۰/],
   ['سکهٔ ضربه‌زن', /بازی ضربه‌زن هم سکه دارد/],
-  ['ریست پایانِ فصل', /جوایز بر اساس سکه پرداخت و سکه‌ها صفر می‌شود/],
+  ['ریست پایانِ فصل', /جوایز بر اساس/],
 ]) {
   ok(`قاعدهٔ «${label}» در هر دو کلاینت آمده`, re.test(guideWeb) && re.test(guideAnd));
 }
+ok('هر دو راهنما سهمیهٔ ورودی ۱۰۰۰ را هم می‌گویند',
+  /بازی در ورودی ۱۰۰۰/.test(guideWeb) && /بازی در ورودی ۱۰۰۰/.test(guideAnd));
+ok('هر دو راهنما صفر شدنِ سکه در پایان فصل را می‌گویند',
+  /صفر می‌شوند/.test(guideWeb) && /صفر می‌شوند/.test(guideAnd));
 
 console.log(`\n✅ ${checks} تست همسانیِ سکه موفق بود\n`);

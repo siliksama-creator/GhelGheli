@@ -623,7 +623,12 @@ function finish(room, winner, disconnectedSym = null) {
         const info = room.players?.[sym];
         if (!info?.id || info.isBot) continue;
         pass.grantXp(info.id, 'game_play').catch(() => {});
-        if (winner === sym) pass.grantXp(info.id, 'game_win').catch(() => {});
+        // ⚠️ `resolvedWinner` نه `winner`. وقتی حریف قطع می‌شود موتور
+        // `winner='DISCONNECT'` می‌فرستد و برندهٔ واقعی در
+        // `resolvedWinner` است. سنجش با `winner` یعنی برنده‌ی قطع‌اتصال
+        // نه XP گذر نبرد می‌گرفت نه XP لول — در حالی که تسویه و آنالیتیکس
+        // درست به او برد می‌دادند.
+        if (resolvedWinner === sym) pass.grantXp(info.id, 'game_win').catch(() => {});
 
         // ═══════════════════════════════════════════════════════════════
         // XP لولِ دائمی — جدا از گذر نبرد
@@ -640,7 +645,7 @@ function finish(room, winner, disconnectedSym = null) {
         level
           .grantGameXp(info.id, {
             gameId: room.gameId,
-            won: winner === sym,
+            won: resolvedWinner === sym,
             opponentId: other?.isBot ? null : other?.id,
           })
           .catch(() => {});

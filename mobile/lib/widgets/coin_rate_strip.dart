@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api_client.dart';
+import '../core/json_get.dart';
 
 /// نوارِ کوچکِ نرخِ سکه — بالای فهرستِ بازی‌ها.
 ///
@@ -39,13 +40,15 @@ class CoinRateStrip extends StatelessWidget {
   ];
 
   /// اعدادِ زنده از تنظیماتِ ادمین — بدونِ آپدیتِ اپ.
+  ///
+  /// پیش‌فرض‌ها از `_defaultRows` می‌آیند تا فیلد استفاده شود و گاردِ
+  /// همسانی همان عددها را در سورس ببیند. کلیدِ سطحِ ورودی با `jsonGet`
+  /// خوانده می‌شود چون JSON شبکه `"100"` می‌فرستد نه `100`.
   List<(String, int, int)> get _rows {
     final rewards = economy?['coinRewards'];
-    final base = rewards is Map && rewards['card_duel'] is Map
-        ? (rewards['card_duel'] as Map)
-        : null;
+    final base = rewards is Map ? jsonMap(rewards['card_duel']) : null;
     int v(String key, int stake, int fallback) {
-      final stakeMap = base?[stake];
+      final stakeMap = jsonGet(base, stake);
       if (stakeMap is Map) {
         final n = num.tryParse('${stakeMap[key] ?? ''}');
         if (n != null) return n.toInt();
@@ -53,9 +56,21 @@ class CoinRateStrip extends StatelessWidget {
       return fallback;
     }
     return [
-      ('برد', v('win', 100, 10), v('win', 1000, 30)),
-      ('مساوی', v('draw', 100, 3), v('draw', 1000, 9)),
-      ('باخت', v('loss', 100, 1), v('loss', 1000, 3)),
+      (
+        _defaultRows[0].$1,
+        v('win', 100, _defaultRows[0].$2),
+        v('win', 1000, _defaultRows[0].$3)
+      ),
+      (
+        _defaultRows[1].$1,
+        v('draw', 100, _defaultRows[1].$2),
+        v('draw', 1000, _defaultRows[1].$3)
+      ),
+      (
+        _defaultRows[2].$1,
+        v('loss', 100, _defaultRows[2].$2),
+        v('loss', 1000, _defaultRows[2].$3)
+      ),
     ];
   }
 

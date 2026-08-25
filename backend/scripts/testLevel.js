@@ -203,6 +203,10 @@ console.log('\n== فقط بازیِ آنلاین XP می‌دهد ==');
   const block = eng.slice(guard, eng.indexOf('} catch', guard));
   ok(block.includes('grantGameXp'),
     'XP لول داخلِ بلوکِ مسابقهٔ آنلاین امتیازی است');
+  ok(block.includes('won: resolvedWinner === sym'),
+    'XP بردِ لول از resolvedWinner می‌آید نه از DISCONNECT');
+  ok(block.includes('if (resolvedWinner === sym)'),
+    'XP بردِ گذر نبرد هم از resolvedWinner است');
 }
 
 console.log('\n== مسیرهای require واقعاً وجود دارند ==');

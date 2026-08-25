@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 
@@ -627,10 +628,16 @@ class ApiClient {
   ///
   /// مسیرهای عادی از `get` می‌گذرند که JSON را پارس می‌کند؛ این متد
   /// بایت‌های خام را می‌دهد تا بتوان مستقیم به اشتراک‌گذاشت یا ذخیره کرد.
-  Future<List<int>> downloadBytes(String path) async {
+  ///
+  /// ⚠️ خروجی `Uint8List` است، نه `List<int>`. `XFile.fromData` و
+  /// `File.writeAsBytes` هر دو `Uint8List` می‌خواهند؛ برگرداندنِ
+  /// `List<int>` بیلدِ ریلیز را با `argument_type_not_assignable` می‌شکست.
+  Future<Uint8List> downloadBytes(String path) async {
     final opts = Options(responseType: ResponseType.bytes);
     final res = await dio.get<List<int>>(path, options: opts);
-    return res.data ?? const <int>[];
+    final data = res.data;
+    if (data == null || data.isEmpty) return Uint8List(0);
+    return data is Uint8List ? data : Uint8List.fromList(data);
   }
 
   /// حذفِ یک منبع.

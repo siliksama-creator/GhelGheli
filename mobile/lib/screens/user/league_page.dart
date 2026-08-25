@@ -251,7 +251,7 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
                   ),
                 ),
                 Gaps.vSm,
-                const CoinGuide(),
+                CoinGuide(economy: _economy),
                 // سکوی سه‌نفره فقط وقتی معنا دارد که سه نفر باشند. با یک یا
                 // دو نفر، Expanded کارت را تمامِ‌عرض می‌کند و چون محتوایش
                 // عمودی است (مدال/نام/سکه) یک ستونِ بلندِ سه‌طبقه می‌شود که
