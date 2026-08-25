@@ -159,6 +159,11 @@ module.exports = {
   title: 'ضربات پنالتی',
   turnMs: 12000,
   simultaneous: true,
+  // کلیدِ ساعتِ هر ضربه: فقط وقتی عوض می‌شود که ضربهٔ قبلی واقعاً حل شده
+  // باشد (هر دو طرف انتخاب کرده‌اند). قفلِ زننده یا دروازه‌بان وسطِ ضربه
+  // نباید ساعتِ ۱۲ ثانیه‌ای را از نو شروع کند — همان باگی که در دوئل
+  // کارت صحنهٔ راندِ قبل را وسطِ راندِ جدید پخش می‌کرد.
+  clockKey: state => `${state.round ?? 0}:${state.taken?.X ?? 0}:${state.taken?.O ?? 0}`,
   ZONES, ROUNDS,
   create, result, isValidMove, applyMove, nextTurn, botMove,
   publicState, resolveKick,

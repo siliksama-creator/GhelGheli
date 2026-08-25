@@ -317,7 +317,7 @@ class GameSession extends ChangeNotifier {
       }
       _stopSearchClock();
       _startClock(m['deadline'], m['turnMs'], m['remainingMs'], m['introMs'],
-          m['resultHoldMs']);
+          m['resultHoldMs'], m['introUntil'], m['resultUntil']);
       notifyListeners();
     }
 
@@ -370,7 +370,7 @@ class GameSession extends ChangeNotifier {
       }
 
       _startClock(m['deadline'], m['turnMs'], m['remainingMs'], m['introMs'],
-          m['resultHoldMs']);
+          m['resultHoldMs'], m['introUntil'], m['resultUntil']);
       notifyListeners();
     });
 
@@ -486,7 +486,8 @@ class GameSession extends ChangeNotifier {
   }
 
   void _startClock(dynamic deadline, dynamic turnMs, dynamic remainingMs,
-      [dynamic introMs, dynamic resultHoldMs]) {
+      [dynamic introMs, dynamic resultHoldMs, dynamic introUntil,
+          dynamic resultUntil]) {
     _ticker?.cancel();
     final ms = (turnMs as num?)?.toInt();
     if (ms != null && ms > 0) turnSeconds = (ms / 1000).round();
@@ -499,19 +500,30 @@ class GameSession extends ChangeNotifier {
     // کاربر عددی مثل «۲۳ ثانیه» می‌بیند که از `turnMs` بیشتر است و
     // بعد ناگهان می‌پرد. به‌جایش تا پایانِ اعلان، عدد **ثابت** روی
     // مقدارِ کاملِ نوبت می‌ماند و بعد شمارش شروع می‌شود.
-    // ── مکثِ نتیجهٔ راند + اعلانِ راند ──
+    // ── مکث از مهرِ زمانیِ سرور، نه از مدتِ ثابت ──
     //
-    // گزارشِ مالک: «اون لحظه‌ای که مبارزه تو راندو میگه برای راند ها
-    // سریع میاد بدون اینکه لود بشه میره».
+    // ⚠️ باگِ «کارتِ برندهٔ راند به راندِ بعدی منتقل می‌شود»: هر قفلِ
+    //    وسطِ راند یک `game:update` می‌آورد و نسخهٔ قبلی از روی
+    //    `introMs`/`resultHoldMs`ِ ثابت، هر بار مکثِ تازه می‌ساخت —
+    //    صحنهٔ برخوردِ راندِ قبل (با کارتِ برنده) و اعلانِ راند دوباره
+    //    وسطِ راندِ جدید پخش می‌شد و دست ۶ ثانیه دوباره قفل می‌شد.
     //
-    // سرور حالا دو مهرِ زمانی می‌فرستد؛ مجموعشان مدتی است که کاربر
-    // نمی‌تواند انتخاب کند و ساعت باید یخ بماند: اول نتیجهٔ راندِ قبل
-    // را می‌بیند، بعد اعلانِ راندِ تازه را.
+    //    حالا فقط وقتی مکث می‌کنیم که مهرِ زمانیِ خودِ سرور
+    //    (`introUntil`/`resultUntil`) هنوز در آینده باشد. سرور هم بعد از
+    //    رفع، این مهرها را فقط در انتقالِ راند صادر می‌کند. اگر مهرها
+    //    نباشند (سرورِ قدیمی) رفتارِ قبلی حفظ می‌شود.
     final intro = (introMs as num?)?.toInt() ?? 0;
-    final hold = (resultHoldMs as num?)?.toInt() ?? 0;
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final rUntil = (resultUntil as num?)?.toInt();
+    final iUntil = (introUntil as num?)?.toInt();
+    final hold = (rUntil != null && rUntil > nowMs)
+        ? rUntil - nowMs
+        : (resultHoldMs as num?)?.toInt() ?? 0;
     _resultHoldMs = hold > 0 ? hold : 0;
     resultHolding = _resultHoldMs > 0;
-    _introHoldMs = (intro > 0 ? intro : 0) + _resultHoldMs;
+    _introHoldMs = (iUntil != null && iUntil > nowMs)
+        ? iUntil - nowMs
+        : (intro > 0 ? intro + hold : 0);
 
     // Use the server's REMAINING milliseconds against a local stopwatch
     // rather than `deadline - DateTime.now()`. A device with a wrong clock

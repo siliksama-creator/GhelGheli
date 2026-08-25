@@ -153,7 +153,10 @@ function startPayload(room, symbol) {
     introUntil: room.introUntil || null,
     resultUntil: room.resultUntil || null,
     introMs: Number(room.rules.introMs) || 0,
-    resultHoldMs: room.resultUntil ? Number(room.rules.resultHoldMs) || 0 : 0,
+    // مکث فقط وقتی اعلام می‌شود که پنجره‌اش هنوز زنده باشد. مهرِ کهنهٔ
+    // راندِ قبل (مثلاً در update وسطِ راند) نباید کلاینت را وادار کند
+    // صحنهٔ برخوردِ راندِ قبلی را دوباره پخش کند.
+    resultHoldMs: room.resultUntil && room.resultUntil > Date.now() ? Number(room.rules.resultHoldMs) || 0 : 0,
     stake: room.stake,
     netPot: room.netPot,
     commission: room.commission,
@@ -211,7 +214,10 @@ function emitState(room, event, extra = {}) {
     introUntil: room.introUntil || null,
     resultUntil: room.resultUntil || null,
     introMs: Number(room.rules.introMs) || 0,
-    resultHoldMs: room.resultUntil ? Number(room.rules.resultHoldMs) || 0 : 0,
+    // مکث فقط وقتی اعلام می‌شود که پنجره‌اش هنوز زنده باشد. مهرِ کهنهٔ
+    // راندِ قبل (مثلاً در update وسطِ راند) نباید کلاینت را وادار کند
+    // صحنهٔ برخوردِ راندِ قبلی را دوباره پخش کند.
+    resultHoldMs: room.resultUntil && room.resultUntil > Date.now() ? Number(room.rules.resultHoldMs) || 0 : 0,
       ...extra,
     }, room);
     if (!delivered && !room.done) suspendForReconnect(room, sym);
@@ -222,7 +228,6 @@ function emitState(room, event, extra = {}) {
 // time forfeits the turn: we play a move for them (via the bot brain) so the
 // game keeps flowing instead of hanging until someone disconnects.
 function armTurnClock(room) {
-  clearTimeout(room.turnTimer);
   if (room.done) return;
   if (room.reconnecting && (room.reconnecting.X || room.reconnecting.O)) {
     room.deadline = null;
@@ -234,6 +239,44 @@ function armTurnClock(room) {
   // کنند — پس فقط وقتی صرف‌نظر می‌کنیم که هر دو صندلی ربات باشند.
   const seat = room.seats[room.turn];
   if (!sim && (!seat || seat === 'BOT')) { room.deadline = null; return; }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // رفعِ باگ: «کارتِ برندهٔ راند به راندِ بعدی منتقل می‌شود»
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // ── گزارشِ مالک ──
+  //   مسابقهٔ آنلاینِ امتیازیِ اندروید در برابر وب: بعد از راندِ اول،
+  //   وقتی هر بازیکنی کارتش را قفل می‌کرد، صحنهٔ برخوردِ راندِ قبل — با
+  //   کارتِ برنده — دوباره وسطِ راندِ جدید پخش می‌شد و دست دوباره قفل
+  //   می‌شد؛ انگار کارتِ برنده به راندِ بعد منتقل شده است.
+  //
+  // ── علت ──
+  //   در بازی هم‌زمان، هر قفلِ کارت `advance` را صدا می‌زند و `advance`
+  //   همیشه `armTurnClock` را دوباره مسلح می‌کرد. و چون `state.lastRound`
+  //   تا پایانِ راندِ جاری همان نتیجهٔ راندِ قبلی است، `holdMs` دوباره
+  //   ۳۲۰۰ms می‌شد: مهرهای `resultUntil`/`introUntil` از نو صادر می‌شدند
+  //   (کلاینت صحنهٔ برخوردِ راندِ قبل را دوباره پخش می‌کرد) و `deadline`
+  //   از نو ۲۶.۲ ثانیه می‌شد (ساعتِ هر دو بازیکن به عقب می‌پرید).
+  //
+  //   بازتولید شد، نه حدس: تستِ `scripts/testCardDuelMidRoundLock.js`
+  //   روی کدِ قبلی دقیقاً `resultHoldMs=3200` وسطِ راند نشان می‌دهد.
+  //
+  // ── رفع ──
+  //   هر بازیِ هم‌زمان یک `clockKey` معرفی می‌کند که فقط در *انتقالِ
+  //   راند* عوض می‌شود (دوئل کارت: طولِ history؛ پنالتی: شمارهٔ راند +
+  //   ضرباتِ گرفته‌شده). اگر کلید همان راندِ مسلح‌شده باشد و ساعت هنوز
+  //   فعال است، مسلح‌سازیِ تکراری بی‌اثر برمی‌گردد: نه مهرِ مکث تازه
+  //   صادر می‌شود، نه deadline ریست می‌شود، نه تایمرِ موجود پاک می‌شود.
+  //
+  //   بازی‌های بدونِ `clockKey` (مثل جفت‌یابِ نوبتی) دقیقاً رفتارِ
+  //   قبلی را دارند — هیچ تغییری نکرده‌اند.
+  const roundKey = room.rules.clockKey ? room.rules.clockKey(room.state) : null;
+  if (roundKey !== null && room.deadline && roundKey === room.armedRoundKey) {
+    return;
+  }
+  room.armedRoundKey = roundKey;
+
+  clearTimeout(room.turnTimer);
   // ═══════════════════════════════════════════════════════════════════════
   // مهلتِ خواندنِ اعلانِ راند — تایمر بعد از انیمیشن شروع می‌شود
   // ═══════════════════════════════════════════════════════════════════════
@@ -762,6 +805,9 @@ async function startRoom(io, rules, gameId, a, b, stake, matchMode = null) {
     seats: { X: a, O: b || 'BOT' },
     reconnecting: { X: false, O: false },
     reconnectTimers: { X: null, O: null },
+    // کلیدِ راندِ مسلح‌شده برای guard داخلِ armTurnClock — قفلِ وسطِ
+    // راند نباید ساعت را ریست کند (توضیح کامل بالای armTurnClock).
+    armedRoundKey: null,
     stake: s,
     netPot: reservation?.netPot || 0,
     commission: reservation?.commission || 0,
@@ -859,7 +905,10 @@ function resumeSeat(socket) {
     introUntil: room.introUntil || null,
     resultUntil: room.resultUntil || null,
     introMs: Number(room.rules.introMs) || 0,
-    resultHoldMs: room.resultUntil ? Number(room.rules.resultHoldMs) || 0 : 0,
+    // مکث فقط وقتی اعلام می‌شود که پنجره‌اش هنوز زنده باشد. مهرِ کهنهٔ
+    // راندِ قبل (مثلاً در update وسطِ راند) نباید کلاینت را وادار کند
+    // صحنهٔ برخوردِ راندِ قبلی را دوباره پخش کند.
+    resultHoldMs: room.resultUntil && room.resultUntil > Date.now() ? Number(room.rules.resultHoldMs) || 0 : 0,
       resumed: true,
     }, room);
   }
