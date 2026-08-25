@@ -116,4 +116,30 @@ async function resolveCrash(id, status) {
   return rows[0];
 }
 
-module.exports = { EVENTS, record, reportCrash, summary, resolveCrash, safeObject };
+/**
+ * بستن یک گروه خطا با hash.
+ *
+ * چرا جدا از resolveCrash(id): خلاصهٔ پنل گروه‌بندی می‌کند
+ * (error_hash + platform). دکمهٔ «حل شد» باید کل گروه را ببندد، وگرنه
+ * مدیر یک رخداد را می‌بندد و همان خطا فردا دوباره در صندوق ظاهر می‌شود.
+ * نسخهٔ قبلی پنل وب اصلاً API را صدا نمی‌زد — فقط toast می‌داد.
+ */
+async function resolveCrashGroup(hash, status, platform) {
+  if (!['resolved', 'ignored', 'open'].includes(status)) {
+    throw Object.assign(new Error('وضعیت گزارش خطا معتبر نیست'), { status: 400 });
+  }
+  const h = String(hash || '').trim().toLowerCase();
+  if (!/^[a-f0-9]{16,64}$/.test(h)) {
+    throw Object.assign(new Error('شناسهٔ گروه خطا معتبر نیست'), { status: 400 });
+  }
+  const p = platform && String(platform).trim() ? String(platform).trim() : null;
+  const { rowCount } = await pool.query(
+    `UPDATE app_crash_reports SET status=$2,
+       resolved_at=CASE WHEN $2='open' THEN NULL ELSE NOW() END
+     WHERE error_hash=$1 AND ($3::text IS NULL OR platform=$3)`,
+    [h, status, p]);
+  if (!rowCount) throw Object.assign(new Error('گروه خطا پیدا نشد'), { status: 404 });
+  return { hash: h, status, updated: rowCount };
+}
+
+module.exports = { EVENTS, record, reportCrash, summary, resolveCrash, resolveCrashGroup, safeObject };

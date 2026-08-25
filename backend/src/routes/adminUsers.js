@@ -20,13 +20,20 @@ router.get('/admin/users', adminAuth, asyncHandler(async (req, res) => {
     // موجودیِ فعلی را کنارِ دکمه ببیند، وگرنه کسر کورکورانه انجام می‌دهد
     // و با خطای «موجودی کافی نیست» روبه‌رو می‌شود بدون آنکه بداند چقدر
     // هست.
-    `SELECT id,mobile,first_name,last_name,nickname,age,city,province,bank_account,
-            profile_image_url,profile_avatar_key,current_points,lifetime_points,
-            monthly_league_points,status,joined_at,game_xp,wallet_balance 
-       FROM users 
-      WHERE mobile ILIKE $1 OR mobile ILIKE $2 OR nickname ILIKE $1 OR first_name ILIKE $1 
-         OR last_name ILIKE $1 OR (first_name || ' ' || last_name) ILIKE $1
-      ORDER BY joined_at DESC LIMIT 300`,
+    `SELECT u.id,u.mobile,u.first_name,u.last_name,u.nickname,u.age,u.city,u.province,u.bank_account,
+            u.profile_image_url,u.profile_avatar_key,u.current_points,u.lifetime_points,
+            u.monthly_league_points,u.status,u.joined_at,u.game_xp,u.wallet_balance,
+            u.coins, u.unlimited_spins,
+            plus.expires_at AS plus_expires_at
+       FROM users u
+       LEFT JOIN LATERAL (
+         SELECT expires_at FROM user_subscriptions
+          WHERE user_id = u.id AND expires_at > NOW()
+          ORDER BY expires_at DESC LIMIT 1
+       ) plus ON true
+      WHERE u.mobile ILIKE $1 OR u.mobile ILIKE $2 OR u.nickname ILIKE $1 OR u.first_name ILIKE $1 
+         OR u.last_name ILIKE $1 OR (u.first_name || ' ' || u.last_name) ILIKE $1
+      ORDER BY u.joined_at DESC LIMIT 300`,
     [search, searchDigits]
   )).rows;
   res.json(rows.map((u) => ({
@@ -34,6 +41,10 @@ router.get('/admin/users', adminAuth, asyncHandler(async (req, res) => {
     // پستگرس `numeric` را رشته برمی‌گرداند؛ بدون Number سمتِ کلاینت
     // «۱۰۰۰۰» با «۵۰۰» رشته‌ای مقایسه می‌شد و قالب‌بندی عدد می‌شکست.
     wallet_balance: Number(u.wallet_balance || 0),
+    coins: Number(u.coins || 0),
+    unlimited_spins: u.unlimited_spins === true,
+    plus_expires_at: u.plus_expires_at || null,
+    has_plus: Boolean(u.plus_expires_at),
     level: level.levelFromXp(u.game_xp).level,
   })));
 }));

@@ -294,7 +294,38 @@ class _AdminUsersState extends State<AdminUsers> {
   // password. Support can set a temporary one here after verifying the
   // user's identity by phone/in person — the action is written to the
   // audit log on the backend.
-  
+
+  Future<void> _toggleSpins(Map user) async {
+    final on = user['unlimited_spins'] != true;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(on ? 'چرخش نامحدود گردونه' : 'قطع چرخش نامحدود'),
+        content: Text(on
+            ? 'این حساب دیگر سهمیهٔ روزانه ندارد — فقط برای تست مالک.'
+            : 'سهمیهٔ روزانه دوباره اعمال می‌شود.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('لغو')),
+          FilledButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: Text(on ? 'فعال کن' : 'قطع کن')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      final r = await widget.api.post(
+          '/api/admin/users/${user['id']}/unlimited-spins',
+          {'enabled': on, 'reason': 'از اپ مدیریت'});
+      _snack(r is Map ? '${r['message'] ?? 'ثبت شد'}' : 'ثبت شد');
+      await _load();
+    } catch (e) {
+      _snack(apiError(e));
+    }
+  }
+
   Future<void> _grantPlus(String id) async {
     final controller = TextEditingController(text: '30');
     final value = await showDialog<String>(
@@ -591,6 +622,17 @@ class _AdminUsersState extends State<AdminUsers> {
                                           : null,
                                     )),
                                 Gaps.hSm,
+                                Text('${faNum((u['coins'] as num?)?.toInt() ?? 0)} سکه',
+                                    style: theme.textTheme.bodySmall),
+                                if (u['has_plus'] == true) ...[
+                                  Gaps.hSm,
+                                  Text('پلاس',
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                              color: const Color(0xFFFFD166),
+                                              fontWeight: FontWeight.w800)),
+                                ],
+                                Gaps.hSm,
                                 StatusBadge(
                                     status: u['status'] ?? '',
                                     labels: const {
@@ -606,6 +648,8 @@ class _AdminUsersState extends State<AdminUsers> {
                         onSelected: (s) async {
                           if (s == 'grant_plus') {
                             await _grantPlus(u['id']);
+                          } else if (s == 'spins') {
+                            await _toggleSpins(u);
                           } else if (s == 'points') {
                             await _adjustPoints(u['id']);
                           } else if (s == 'wallet') {
@@ -624,6 +668,11 @@ class _AdminUsersState extends State<AdminUsers> {
                         itemBuilder: (_) => [
                           const PopupMenuItem(
                               value: 'grant_plus', child: Text('اعطای اشتراک پلاس')),
+                          PopupMenuItem(
+                              value: 'spins',
+                              child: Text(u['unlimited_spins'] == true
+                                  ? 'قطع چرخش نامحدود'
+                                  : 'چرخش نامحدود گردونه')),
                           const PopupMenuItem(
                               value: 'points', child: Text('تغییر امتیاز')),
                           const PopupMenuItem(

@@ -471,6 +471,22 @@ class _HomeShellState extends State<HomeShell>
       if (ann?['active'] == true) {
         setState(() => _announcement = ann);
       }
+      final feat = m['features'] is Map
+          ? Map<String, dynamic>.from(m['features'] as Map)
+          : null;
+      final maint = feat?['maintenance'] is Map
+          ? Map<String, dynamic>.from(feat!['maintenance'] as Map)
+          : null;
+      if (maint?['active'] == true && mounted) {
+        setState(() {
+          _announcement ??= {
+            'active': true,
+            'text': maint!['message'] ??
+                'سرویس موقتاً در دسترس نیست. کمی بعد دوباره سر بزن.',
+            'accent': 'orange',
+          };
+        });
+      }
     } catch (_) {
       // پیکربندی best-effort است؛ شکستش نباید چیزی را بشکند.
     }

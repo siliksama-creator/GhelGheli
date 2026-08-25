@@ -50,6 +50,27 @@ class _AdminChatState extends State<AdminChat> {
     }
   }
 
+  Future<int?> _askBanMinutes() async {
+    final picked = await showDialog<int>(
+      context: context,
+      builder: (c) => SimpleDialog(
+        title: const Text('مدت محرومیت چت'),
+        children: [
+          SimpleDialogOption(
+              onPressed: () => Navigator.pop(c, 60),
+              child: const Text('یک ساعت')),
+          SimpleDialogOption(
+              onPressed: () => Navigator.pop(c, 1440),
+              child: const Text('یک روز')),
+          SimpleDialogOption(
+              onPressed: () => Navigator.pop(c, 10080),
+              child: const Text('یک هفته')),
+        ],
+      ),
+    );
+    return picked;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) return const LoadingView();
@@ -105,10 +126,12 @@ class _AdminChatState extends State<AdminChat> {
                                       {'reason': 'از اپ مدیریت'});
                                 }
                                 if (s == 'ban') {
+                                  final minutes = await _askBanMinutes();
+                                  if (minutes == null) return;
                                   await widget.api.patch(
                                       '/api/admin/chat/users/${m['user_id']}/ban',
                                       {
-                                        'minutes': 1440,
+                                        'minutes': minutes,
                                         'reason': 'از اپ مدیریت'
                                       });
                                 }

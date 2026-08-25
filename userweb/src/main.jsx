@@ -219,6 +219,17 @@ function App() {
 
   return (
     <div className={`page ${token ? 'signedIn' : ''}`}>
+      {cfg?.features?.maintenance?.active && (
+        <div
+          style={{
+            display: 'block', textAlign: 'center', padding: '10px 14px',
+            fontSize: 13, fontWeight: 800, color: '#1a0f02',
+            background: 'linear-gradient(90deg,#F97316,#EF4444)',
+          }}
+        >
+          {cfg.features.maintenance.message || 'سرویس موقتاً در دسترس نیست. کمی بعد دوباره سر بزن.'}
+        </div>
+      )}
       {cfg?.announcement?.active && cfg.announcement.text && (
         <a
           className="cfgBanner"

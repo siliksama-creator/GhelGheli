@@ -12,17 +12,35 @@ export function AdminsPage({ request }) {
   const { confirmAction } = useDialog();
   const [admins, setAdmins] = useState([]);
   const [logs, setLogs] = useState([]);
+  const [logTotal, setLogTotal] = useState(0);
+  const [logQ, setLogQ] = useState('');
+  const [logDetail, setLogDetail] = useState(null);
   const [form, setForm] = useState({ username: '', password: '', role: 'support' });
   const [saving, setSaving] = useState(false);
 
+  const loadLogs = (q = logQ) => {
+    const qs = new URLSearchParams({ limit: '50' });
+    if (q.trim()) qs.set('q', q.trim());
+    request(`/api/admin/audit-log?${qs}`)
+      .then(d => {
+        setLogs(Array.isArray(d) ? d : (d?.entries ?? []));
+        setLogTotal(Array.isArray(d) ? d.length : (d?.total ?? 0));
+      });
+  };
+
   const load = () => {
     request('/api/admin/admins').then(setAdmins);
-    // پاسخ صفحه‌بندی‌شده: {entries, total, ...}. شکل قدیمی (آرایه) هم
-    // پذیرفته می‌شود تا اگر سرور قدیمی بود صفحه نشکند.
-    request('/api/admin/audit-log?limit=50')
-      .then(d => setLogs(Array.isArray(d) ? d : (d?.entries ?? [])));
+    loadLogs();
   };
   useEffect(load, [request]);
+
+  async function openLog(id) {
+    try {
+      setLogDetail(await request(`/api/admin/audit-log/${id}`));
+    } catch (err) {
+      notify(err.message, 'error');
+    }
+  }
 
   async function add(e) {
     e.preventDefault();
@@ -105,17 +123,47 @@ export function AdminsPage({ request }) {
         </div>
       </Card>
 
-      <Card title="گزارش فعالیت (Audit Log)">
+      <Card title="گزارش فعالیت (Audit Log)" subtitle={logTotal ? `${logTotal} رخداد` : 'جست‌وجو روی عمل، کاربر و دلیل'}>
+        <div className="field-row" style={{ marginBottom: 12 }}>
+          <Input
+            value={logQ}
+            onChange={(e) => setLogQ(e.target.value)}
+            placeholder="جست‌وجو: عمل، کاربر، دلیل"
+            onKeyDown={(e) => e.key === 'Enter' && loadLogs(logQ)}
+          />
+          <Button variant="secondary" icon={History} onClick={() => loadLogs(logQ)} style={{ flex: '0 0 auto' }}>
+            جستجو
+          </Button>
+        </div>
         {logs.length === 0 ? (
           <EmptyState icon={History} title="رویدادی ثبت نشده" />
         ) : (
           <div style={{ maxHeight: 460, overflowY: 'auto' }}>
             {logs.slice(0, 80).map((l) => (
-              <p key={l.id} className="log-line">
-                <b style={{ color: 'var(--gg-text)' }}>{l.username || 'سیستم'}</b> — {l.action} — {fmtDateTime(l.created_at)}
-              </p>
+              <button
+                key={l.id}
+                type="button"
+                className="log-line"
+                onClick={() => l.has_detail && openLog(l.id)}
+                style={{
+                  display: 'block', width: '100%', textAlign: 'start',
+                  background: 'transparent', border: 0, color: 'inherit',
+                  cursor: l.has_detail ? 'pointer' : 'default', padding: '4px 0',
+                }}
+              >
+                <b style={{ color: 'var(--gg-text)' }}>{l.username || 'سیستم'}</b> — {l.action}
+                {l.reason ? ` — ${l.reason}` : ''} — {fmtDateTime(l.created_at)}
+              </button>
             ))}
           </div>
+        )}
+        {logDetail && (
+          <pre style={{
+            marginTop: 12, padding: 12, borderRadius: 10, overflow: 'auto',
+            background: 'rgba(0,0,0,.35)', fontSize: 11, direction: 'ltr', textAlign: 'left',
+          }}>
+            {JSON.stringify(logDetail.metadata || logDetail, null, 2)}
+          </pre>
         )}
       </Card>
     </div>

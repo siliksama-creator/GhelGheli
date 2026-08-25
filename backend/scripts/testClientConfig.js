@@ -35,6 +35,9 @@ ok('پیش‌فرض minVersion اندروید', /minVersion:\s*\{\s*android:\s*'
 ok('پیش‌فرض minVersion آی‌او‌اس', /ios:\s*'[0-9.]+'/.test(routeSrc));
 ok('forceUpdate پیش‌فرض خاموش', /forceUpdate:\s*\{\s*android:\s*false/.test(routeSrc));
 ok('بنر اطلاعیه پیش‌فرض خاموش', /announcement:\s*\{\s*active:\s*false/.test(routeSrc));
+ok('پرچم features در merge هست', /features/.test(routeSrc));
+ok('سرویس featureFlags وجود دارد',
+  fs.existsSync(path.join(root, 'src', 'services', 'featureFlags.js')));
 
 // ── mount در server.js ──────────────────────────────────────────────────
 const serverSrc = fs.readFileSync(path.join(root, 'src', 'server.js'), 'utf8');

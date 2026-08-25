@@ -83,6 +83,7 @@ export default function Games({ api, token, externalLaunch = null }) {
   // اقتصادِ بازی‌ها (سکهٔ هر نتیجه، درصدِ انتقال بین لیگ‌ها، سکهٔ ضربه‌زن)
   // — از /api/config؛ وقتی ادمین در پنل عوض کند همین‌جا زنده عوض می‌شود.
   const [economy, setEconomy] = useState(null);
+  const [features, setFeatures] = useState(null);
 
   useEffect(() => {
     if (!externalLaunch?.start || !externalLaunch?.socket) return;
@@ -173,6 +174,7 @@ export default function Games({ api, token, externalLaunch = null }) {
     }).catch(() => {});
     req('/api/config', 'GET', null, null).then(d => {
       if (d?.economy) setEconomy(d.economy);
+      if (d?.features) setFeatures(d.features);
     }).catch(() => {});
     req('/api/level', 'GET', null, token).then(d => {
       if (d) setLevel(d);
@@ -234,6 +236,9 @@ export default function Games({ api, token, externalLaunch = null }) {
       />
     );
   }
+
+  const gameOn = (id) => !features || features.games?.[id] !== false;
+  const maintOn = features?.maintenance?.active === true;
 
   const lvl = level ? Number(level.level||0) : 0;
   const into = level ? Number(level.into||0) : 0;
@@ -298,8 +303,14 @@ export default function Games({ api, token, externalLaunch = null }) {
         )}
       </div>
 
+      {maintOn && (
+        <div className="card" style={{ padding: 14, border: '1px solid #F97316', color: '#FDBA74' }}>
+          {features.maintenance.message || 'سرویس بازی موقتاً در دسترس نیست.'}
+        </div>
+      )}
+
       {/* Tap Game Hero Banner */}
-      <div
+      {gameOn('tap') && <div
         className="card"
         onClick={() => setActive('tap')}
         style={{
@@ -322,7 +333,7 @@ export default function Games({ api, token, externalLaunch = null }) {
           <p style={{ color: '#CBD5E1', fontSize: '12px', margin: 0 }}>ضربه بزن، شخصیت باز کن، امتیاز بگیر</p>
         </div>
         <span style={{ color:'#FFD166', display:'flex' }}><SvgIcon name="football" size={27} /></span>
-      </div>
+      </div>}
 
       {/* نوارِ نرخِ سکه — پیش از انتخابِ ورودی، چون همین‌جا تصمیم گرفته
           می‌شود کدام بازی ارزش دارد. آینهٔ games_page.dart.
@@ -563,7 +574,7 @@ export default function Games({ api, token, externalLaunch = null }) {
            می‌ماند. `aspect-ratio:1` کار را به مرورگر می‌سپارد تا روی
            هر عرضی مربع بماند. */
         <div className="gameTileGrid">
-          {GAMES.filter(g => g.id !== 'tap').map(g => (
+          {GAMES.filter(g => g.id !== 'tap' && gameOn(g.id)).map(g => (
             <div
               key={g.id}
               className="card gameTileSquare"

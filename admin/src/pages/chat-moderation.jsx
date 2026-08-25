@@ -159,8 +159,11 @@ export function ChatModerationPage({ request }) {
   }
 
   async function ban(uid) {
-    await request(`/api/admin/chat/users/${uid}/ban`, { method: 'PATCH', body: { minutes: 1440, reason: 'اسپم/تخلف' } });
-    notify('کاربر از چت محروم شد');
+    const raw = window.prompt('مدت محرومیت به دقیقه (۶۰ = یک ساعت، ۱۴۴۰ = یک روز، ۱۰۰۸۰ = یک هفته)', '1440');
+    if (raw == null) return;
+    const minutes = Math.max(1, Math.min(10080, Number(raw) || 1440));
+    await request(`/api/admin/chat/users/${uid}/ban`, { method: 'PATCH', body: { minutes, reason: 'اسپم/تخلف' } });
+    notify(`کاربر ${minutes} دقیقه از چت محروم شد`);
   }
 
   return (

@@ -149,7 +149,7 @@ function App() {
       subtitle="تمام تغییرات حساس در Audit Log ثبت می‌شود."
     >
       <Suspense fallback={<div className="pageLoading" aria-busy="true" />}>
-        <ActivePage request={request} />
+        <ActivePage request={request} onNavigate={setPage} />
       </Suspense>
     </AppShell>
   );

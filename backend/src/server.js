@@ -791,6 +791,8 @@ app.get('/api/games/tap/progress', auth, asyncHandler(async (req, res) => {
 }));
 
 app.post('/api/games/tap/progress', auth, tapBatchLimiter, asyncHandler(async (req, res) => {
+  const play = await require('./services/featureFlags').checkPlayable('tap', pool);
+  if (!play.ok) return res.status(503).json({ message: play.message });
   // The raw token doubles as the HMAC key material, so the signature can only
   // be produced by whoever holds a live session for this user.
   const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
@@ -1627,6 +1629,8 @@ const wheelLimiter = rateLimit({
 });
 
 app.post('/api/wheel/spin', auth, wheelLimiter, asyncHandler(async (req, res) => {
+  const wheelOk = await require('./services/featureFlags').checkWheel(pool);
+  if (!wheelOk.ok) return res.status(503).json({ message: wheelOk.message });
   const result = await wheel.spin(req.user.id, {
     // پرداخت نقدی از همان مسیر امن کیف پول می‌رود: spinId مرجع یکتاست، پس
     // حتی اگر این تابع دو بار صدا زده شود، واریز دوم duplicate تشخیص داده
@@ -2211,9 +2215,34 @@ app.get('/api/admin/dashboard', adminAuth, asyncHandler(async (req, res) => {
         (SELECT count(*) FROM photo_card_codes WHERE status='used' AND used_at >= date_trunc('month', NOW()))
       )::int AS count`),
     pool.query("SELECT count(*)::int AS count FROM user_reward_claims WHERE status='pending'"),
-    getLeaderboard(10)
+    getLeaderboard(10),
+    // صف‌های عملیاتی — داشبورد قبلی فقط چهار عدد کلی داشت و مدیر برای
+    // «کار امروز» باید چهار صفحه را جدا باز می‌کرد. این‌ها COUNT ارزان‌اند.
+    pool.query("SELECT count(*)::int AS count FROM support_tickets WHERE status <> 'closed'"),
+    pool.query("SELECT count(*)::int AS count, COALESCE(SUM(amount),0)::bigint AS amount FROM withdrawal_requests WHERE status='pending'"),
+    pool.query("SELECT count(*)::int AS count FROM photo_card_submissions WHERE status='pending'"),
+    pool.query("SELECT count(DISTINCT user_id)::int AS count FROM user_subscriptions WHERE expires_at > NOW()"),
+    pool.query('SELECT COALESCE(SUM(coins),0)::bigint AS total FROM users'),
+    pool.query("SELECT count(*)::int AS count FROM app_crash_reports WHERE status='open'"),
+    pool.query("SELECT count(*)::int AS count FROM users WHERE joined_at::date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tehran')::date"),
+    pool.query("SELECT count(*)::int AS count FROM wheel_spins WHERE spun_day = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tehran')::date"),
   ]);
-  res.json({ users: q[0].rows[0].count, usedCodesToday: q[1].rows[0].count, usedCodesThisMonth: q[2].rows[0].count, pendingClaims: q[3].rows[0].count, league: q[4] });
+  res.json({
+    users: q[0].rows[0].count,
+    usedCodesToday: q[1].rows[0].count,
+    usedCodesThisMonth: q[2].rows[0].count,
+    pendingClaims: q[3].rows[0].count,
+    league: q[4],
+    pendingTickets: q[5].rows[0].count,
+    pendingWithdrawals: q[6].rows[0].count,
+    pendingWithdrawalAmount: Number(q[6].rows[0].amount || 0),
+    pendingPhotoReviews: q[7].rows[0].count,
+    plusActive: q[8].rows[0].count,
+    coinsInCirculation: Number(q[9].rows[0].total || 0),
+    openCrashes: q[10].rows[0].count,
+    usersJoinedToday: q[11].rows[0].count,
+    wheelSpinsToday: q[12].rows[0].count,
+  });
 }));
 
 // ── حافظهٔ کشِ مانیتورینگ سرور ───────────────────────────────────────────

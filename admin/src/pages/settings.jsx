@@ -29,8 +29,15 @@ export function SettingsPage({ request }) {
       updateUrl: { android: '', ios: '' },
     },
     announcement: { active: false, text: '', link: null, accent: 'gold' },
+    features: {
+      maintenance: { active: false, message: '' },
+      games: { memory: true, tap: true, penalty: true, card_duel: true },
+      wheel: true,
+    },
   });
   const [savingClient, setSavingClient] = useState(false);
+  const [gift, setGift] = useState({ enabled: false, points: 0, message: '' });
+  const [savingGift, setSavingGift] = useState(false);
 
   useEffect(() => {
     request('/api/admin/settings/chat')
@@ -38,6 +45,7 @@ export function SettingsPage({ request }) {
     request('/api/admin/settings/sms')
       .then(s => setSms({ ...s, apiKey: s.apiKeyMasked || '' }));
     request('/api/admin/settings/client-config').then(setClient);
+    request('/api/admin/signup-gift').then(setGift).catch(() => {});
   }, [request]);
 
   async function saveChat(e) {
@@ -88,6 +96,27 @@ export function SettingsPage({ request }) {
       notify('تنظیمات اپ ذخیره شد — بدون آپدیت اعمال می‌شود');
     } finally {
       setSavingClient(false);
+    }
+  }
+
+  async function saveGift(e) {
+    e.preventDefault();
+    setSavingGift(true);
+    try {
+      const r = await request('/api/admin/signup-gift', {
+        method: 'PATCH',
+        body: {
+          enabled: gift.enabled,
+          points: Number(gift.points) || 0,
+          message: gift.message,
+        },
+      });
+      setGift(r.settings || gift);
+      notify(r.message || 'هدیهٔ عضویت ذخیره شد');
+    } catch (err) {
+      notify(err.message, 'error');
+    } finally {
+      setSavingGift(false);
     }
   }
 
@@ -184,9 +213,99 @@ export function SettingsPage({ request }) {
             <Input value={client.announcement.link || ''}
               onChange={e => setClient({ ...client, announcement: { ...client.announcement, link: e.target.value } })} />
           </Field>
+          <Field label="رنگ بنر اطلاعیه">
+            <select className="input" value={client.announcement.accent || 'gold'}
+              onChange={e => setClient({ ...client, announcement: { ...client.announcement, accent: e.target.value } })}>
+              <option value="gold">طلایی</option>
+              <option value="green">سبز</option>
+              <option value="blue">آبی</option>
+              <option value="orange">نارنجی</option>
+            </select>
+          </Field>
           <Button type="submit" icon={Save} loading={savingClient}
             className="btn-block" style={{ marginTop: 8 }}>
             ذخیره تنظیمات اپ
+          </Button>
+        </form>
+      </Card>
+
+      <Card title="حالت تعمیر و خاموشی بازی‌ها"
+        subtitle="بدون انتشار نسخهٔ جدید. سرور join را رد می‌کند؛ کلاینت‌های تازه کاشی را نشان نمی‌دهند.">
+        <form onSubmit={saveClientConfig}>
+          <label className="checkbox-row">
+            <input type="checkbox" checked={!!client.features?.maintenance?.active}
+              onChange={e => setClient({
+                ...client,
+                features: {
+                  ...client.features,
+                  maintenance: { ...(client.features?.maintenance || {}), active: e.target.checked },
+                },
+              })} />
+            حالت تعمیر — ورود به بازی و گردونه بسته شود
+          </label>
+          <Field label="پیام حالت تعمیر (برای کاربر)">
+            <Input value={client.features?.maintenance?.message || ''}
+              onChange={e => setClient({
+                ...client,
+                features: {
+                  ...client.features,
+                  maintenance: { ...(client.features?.maintenance || {}), message: e.target.value },
+                },
+              })} />
+          </Field>
+          <div style={{ display: 'grid', gap: 6, margin: '10px 0' }}>
+            {[
+              ['tap', 'ضربه‌زن'],
+              ['penalty', 'ضربات پنالتی'],
+              ['card_duel', 'دوئل کارت‌ها'],
+              ['memory', 'جفت‌یاب'],
+            ].map(([id, label]) => (
+              <label key={id} className="checkbox-row">
+                <input type="checkbox"
+                  checked={client.features?.games?.[id] !== false}
+                  onChange={e => setClient({
+                    ...client,
+                    features: {
+                      ...client.features,
+                      games: { ...(client.features?.games || {}), [id]: e.target.checked },
+                    },
+                  })} />
+                {label} فعال باشد
+              </label>
+            ))}
+            <label className="checkbox-row">
+              <input type="checkbox" checked={client.features?.wheel !== false}
+                onChange={e => setClient({
+                  ...client,
+                  features: { ...client.features, wheel: e.target.checked },
+                })} />
+              گردونه فعال باشد
+            </label>
+          </div>
+          <Button type="submit" icon={Save} loading={savingClient} className="btn-block">
+            ذخیره خاموشی‌ها
+          </Button>
+        </form>
+      </Card>
+
+      <Card title="هدیهٔ امتیاز عضویت"
+        subtitle="از لحظهٔ ذخیره، هر کاربر تازه همین مقدار را می‌گیرد. پیش‌فرض خاموش است تا نصب تازه بی‌دعوت امتیاز پخش نکند.">
+        <form onSubmit={saveGift}>
+          <label className="checkbox-row">
+            <input type="checkbox" checked={!!gift.enabled}
+              onChange={e => setGift({ ...gift, enabled: e.target.checked })} />
+            هدیهٔ عضویت فعال باشد
+          </label>
+          <Field label="امتیاز خوش‌آمدگویی">
+            <Input type="number" min="0" max="1000000" value={gift.points || 0}
+              onChange={e => setGift({ ...gift, points: e.target.value })} />
+          </Field>
+          <Field label="متن پیام (در دفتر امتیاز ثبت می‌شود)">
+            <Input value={gift.message || ''}
+              onChange={e => setGift({ ...gift, message: e.target.value })} />
+          </Field>
+          <Button type="submit" icon={Save} loading={savingGift} className="btn-block">
+            ذخیره هدیهٔ عضویت
           </Button>
         </form>
       </Card>

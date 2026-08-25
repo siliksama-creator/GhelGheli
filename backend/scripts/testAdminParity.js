@@ -25,6 +25,17 @@ for (const capability of ['grant-plus', 'points', 'reset-password', 'notify']) {
   check(webUsers.includes(`/${capability}`), `Web user management exposes ${capability}`);
   check(mobileUsers.includes(`/${capability}`), `Android user management exposes ${capability}`);
 }
+check(/unlimited-spins/.test(webUsers) && /unlimited-spins/.test(mobileUsers),
+  'both admin clients can toggle unlimited wheel spins');
+check(/signup-gift/.test(read('admin/src/pages/settings.jsx'))
+  && /signup-gift/.test(read('mobile/lib/screens/admin/admin_settings.dart')),
+  'both admin clients expose signup-gift settings');
+check(read('admin/src/pages/analytics.jsx').includes('crashes/groups')
+  && read('mobile/lib/screens/admin/admin_analytics.dart').includes('crashes/groups'),
+  'both admin clients resolve crash groups via API');
+check(read('admin/src/pages/analytics.jsx').includes('wheel/stats')
+  && read('mobile/lib/screens/admin/admin_analytics.dart').includes('wheel/stats'),
+  'both admin clients show wheel stats');
 check(/\/status/.test(webUsers) && /\/status/.test(mobileUsers),
   'both admin clients can block/unblock users');
 

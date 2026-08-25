@@ -11,6 +11,7 @@ export function UsersPage({ request }) {
   const [rows, setRows] = useState([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [detail, setDetail] = useState(null);
 
   const load = () => {
     setLoading(true);
@@ -120,6 +121,38 @@ export function UsersPage({ request }) {
   // password themselves via OTP. Support can set a temporary password here
   // after verifying the user's identity by phone/in person — every use is
   // recorded in the audit log.
+  async function showDetails(id) {
+    try {
+      const d = await request(`/api/admin/users/${id}`);
+      setDetail(d);
+    } catch (e) {
+      notify(e.message || 'جزئیات کاربر دریافت نشد', 'error');
+    }
+  }
+
+  async function toggleSpins(u) {
+    const on = !u.unlimited_spins;
+    const ok = await confirmAction({
+      title: on ? 'چرخش نامحدود گردونه' : 'قطع چرخش نامحدود',
+      message: on
+        ? `حساب «${u.nickname || u.mobile}» دیگر سهمیهٔ روزانه ندارد — فقط برای تست مالک.`
+        : 'سهمیهٔ روزانه دوباره اعمال می‌شود.',
+      confirmLabel: on ? 'فعال کن' : 'قطع کن',
+      danger: on,
+    });
+    if (!ok) return;
+    try {
+      const r = await request(`/api/admin/users/${u.id}/unlimited-spins`, {
+        method: 'POST',
+        body: { enabled: on, reason: 'از پنل وب' },
+      });
+      notify(r.message || 'ثبت شد');
+      load();
+    } catch (e) {
+      notify(e.message, 'error');
+    }
+  }
+
   async function resetPassword(id) {
     const pw = await promptText({
       title: 'تنظیم رمز موقت برای کاربر',
@@ -173,6 +206,11 @@ export function UsersPage({ request }) {
                 >
                   {fmtNumber(u.wallet_balance || 0)} تومان
                 </span>
+                <span title="سکهٔ فصل" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                  {fmtNumber(u.coins || 0)} سکه
+                </span>
+                {u.has_plus && <span style={{ color: 'var(--gg-warning)', fontWeight: 800 }}>پلاس</span>}
+                {u.unlimited_spins && <span style={{ color: 'var(--gg-info)' }}>∞ گردونه</span>}
               </span>
             }
             trailing={
@@ -204,6 +242,9 @@ export function UsersPage({ request }) {
             }
             actions={
               <>
+                <Button size="sm" variant="secondary" icon={UserRoundSearch} onClick={() => showDetails(u.id)}>
+                  جزئیات
+                </Button>
                 <Button size="sm" variant="secondary" icon={Coins} onClick={() => changePoints(u.id)}>
                   امتیاز
                 </Button>
@@ -215,6 +256,9 @@ export function UsersPage({ request }) {
                 </Button>
                 <Button size="sm" variant="secondary" icon={MessageSquareText} onClick={() => privateMessage(u.id)}>
                   پیام
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => toggleSpins(u)}>
+                  {u.unlimited_spins ? 'قطع ∞' : '∞ گردونه'}
                 </Button>
                 <Button size="sm" variant="secondary" icon={KeyRound} onClick={() => resetPassword(u.id)}>
                   بازیابی رمز
@@ -228,6 +272,41 @@ export function UsersPage({ request }) {
         ))
       )}
     </Card>
+    {uDetail && (
+      <div
+        role="dialog"
+        onClick={() => setDetail(null)}
+        style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 80,
+        }}
+      >
+        <Card
+          title={`${uDetail.nickname || uDetail.mobile || 'کاربر'}`}
+          subtitle="جزئیات حساب — کلیک بیرون می‌بندد"
+          style={{ width: 'min(520px, 92vw)', maxHeight: '80vh', overflow: 'auto' }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ display: 'grid', gap: 8, fontSize: 13.5 }}>
+            {[
+              ['موبایل', uDetail.mobile],
+              ['نام', `${uDetail.first_name || ''} ${uDetail.last_name || ''}`.trim() || '—'],
+              ['استان / شهر', `${uDetail.province || '—'} / ${uDetail.city || '—'}`],
+              ['امتیاز فعلی', fmtNumber(uDetail.current_points)],
+              ['امتیاز تاریخی', fmtNumber(uDetail.lifetime_points)],
+              ['سکه', fmtNumber(uDetail.coins)],
+              ['کیف پول', `${fmtNumber(uDetail.wallet_balance)} تومان`],
+            ].map(([k, v]) => (
+              <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                <span className="topbar-sub">{k}</span>
+                <b>{v}</b>
+              </div>
+            ))}
+            <Button variant="secondary" onClick={() => setDetail(null)}>بستن</Button>
+          </div>
+        </Card>
+      </div>
+    )}
+    </>
   );
 }
 

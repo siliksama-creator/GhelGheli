@@ -51,16 +51,31 @@ router.patch('/admin/admins/:id/status', adminAuth, validateUuid('id'), requireR
 router.get('/admin/audit-log', adminAuth, requireRole(), asyncHandler(async (req, res) => {
   const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50));
   const offset = Math.max(0, Number(req.query.offset) || 0);
+  // جست‌وجو روی عمل/کاربر/دلیل — بدون این، دفتر ۵۰ رخداد آخر است و
+  // «چه کسی امتیاز فلان کاربر را کم کرد» فقط با اسکرول شانسی پیدا می‌شد.
+  const q = String(req.query.q || '').trim().slice(0, 80);
+  const action = String(req.query.action || '').trim().slice(0, 80);
+  const like = q ? `%${q}%` : null;
   const { rows } = await pool.query(
     `SELECT a.id, a.admin_user_id, a.action, a.target_type, a.target_id,
             a.reason, a.created_at, ad.username,
             (a.metadata IS NOT NULL AND a.metadata::text <> '{}') AS has_detail
        FROM audit_log a
        LEFT JOIN admin_users ad ON ad.id = a.admin_user_id
+      WHERE ($3::text IS NULL OR a.action ILIKE $3 OR ad.username ILIKE $3
+             OR COALESCE(a.reason,'') ILIKE $3 OR COALESCE(a.target_type,'') ILIKE $3)
+        AND ($4::text IS NULL OR $4 = '' OR a.action = $4)
       ORDER BY a.created_at DESC
-      LIMIT $1 OFFSET $2`, [limit, offset]);
-  const { rows: cnt } = await pool.query('SELECT count(*)::int AS n FROM audit_log');
-  res.json({ entries: rows, total: cnt[0].n, limit, offset });
+      LIMIT $1 OFFSET $2`, [limit, offset, like, action || null]);
+  const { rows: cnt } = await pool.query(
+    `SELECT count(*)::int AS n
+       FROM audit_log a
+       LEFT JOIN admin_users ad ON ad.id = a.admin_user_id
+      WHERE ($1::text IS NULL OR a.action ILIKE $1 OR ad.username ILIKE $1
+             OR COALESCE(a.reason,'') ILIKE $1 OR COALESCE(a.target_type,'') ILIKE $1)
+        AND ($2::text IS NULL OR $2 = '' OR a.action = $2)`,
+    [like, action || null]);
+  res.json({ entries: rows, total: cnt[0].n, limit, offset, q, action });
 }));
 
 /// جزئیات کاملِ یک رخداد — شامل metadata.

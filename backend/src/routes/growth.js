@@ -89,6 +89,12 @@ module.exports = function growthRoutes({
   router.get('/admin/analytics', adminAuth, asyncHandler(async (req, res) => {
     res.json(await analytics.summary(req.query.days));
   }));
+  // گروه باید قبل از :reportId ثبت شود، وگرنه «groups» به‌عنوان شناسه
+  // عددی خوانده می‌شود و همیشه ۴۰۰ می‌دهد.
+  router.patch('/admin/crashes/groups/:hash', adminAuth, requireRole(), asyncHandler(async (req, res) => {
+    res.json(await analytics.resolveCrashGroup(
+      req.params.hash, req.body?.status || 'resolved', req.body?.platform));
+  }));
   router.patch('/admin/crashes/:reportId', adminAuth, requireRole(), asyncHandler(async (req, res) => {
     if (!/^\d+$/.test(req.params.reportId)) return res.status(400).json({ message: 'شناسه نامعتبر است' });
     res.json(await analytics.resolveCrash(req.params.reportId, req.body?.status));

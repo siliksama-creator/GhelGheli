@@ -105,6 +105,7 @@ class _GamesHubPageState extends State<GamesHubPage> {
   /// اقتصادِ بازی‌ها از /api/bootstrap — سکهٔ هر نتیجه، درصدِ انتقالِ
   /// سکه بین لیگ‌ها و سکهٔ هر لولِ ضربه‌زن (تنظیماتِ ادمین، بدونِ آپدیت).
   Map<String, dynamic>? _economy;
+  Map<String, dynamic>? _features;
 
   @override
   void initState() {
@@ -147,10 +148,23 @@ class _GamesHubPageState extends State<GamesHubPage> {
         if (m['coinQuota'] is Map) _coinQuota = Map<String, dynamic>.from(m['coinQuota']);
         if (m['economy'] is Map) _economy = Map<String, dynamic>.from(m['economy']);
       });
+      try {
+        final cfg = await widget.api.get('/api/config');
+        if (mounted && cfg is Map && cfg['features'] is Map) {
+          setState(() =>
+              _features = Map<String, dynamic>.from(cfg['features'] as Map));
+        }
+      } catch (_) {}
       final d = await widget.api.get('/api/level');
       if (!mounted || d is! Map) return;
       setState(() => _level = Map<String, dynamic>.from(d));
     } catch (_) {}
+  }
+
+  bool _gameEnabled(String id) {
+    final games = _features?['games'];
+    if (games is! Map) return true;
+    return games[id] != false;
   }
 
   void _back() {
@@ -388,10 +402,21 @@ class _GamesHubPageState extends State<GamesHubPage> {
         ),
         Gaps.vSm,
 
+        if (_features?['maintenance'] is Map &&
+            (_features!['maintenance'] as Map)['active'] == true)
+          Padding(
+            padding: const EdgeInsets.only(bottom: Gaps.sm),
+            child: Text(
+              '${(_features!['maintenance'] as Map)['message'] ?? 'سرویس بازی موقتاً در دسترس نیست.'}',
+              style: const TextStyle(
+                  color: Color(0xFFFDBA74), fontWeight: FontWeight.w800),
+            ),
+          ),
         // ── ۱. بازی ضربه‌زن: بالای صفحه و مستقل ──
-        _TapGameHeroCard(
-          onTap: () => setState(() => _active = 'tap'),
-        ),
+        if (_gameEnabled('tap'))
+          _TapGameHeroCard(
+            onTap: () => setState(() => _active = 'tap'),
+          ),
         Gaps.vMd,
 
         // نوارِ کوچکِ نرخِ سکه — پیش از انتخابِ ورودی، چون همین‌جا تصمیم
@@ -501,6 +526,7 @@ class _GamesHubPageState extends State<GamesHubPage> {
             childAspectRatio: 1,
             children: [
               for (final g in _multiplayerGames)
+                if (_gameEnabled(g.id))
                 _CleanGameTile(
                   entry: g,
                   mode: _selectedMode,

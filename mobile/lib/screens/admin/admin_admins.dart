@@ -18,11 +18,13 @@ class AdminAdmins extends StatefulWidget {
 class _AdminAdminsState extends State<AdminAdmins> {
   List _admins = [];
   List _logs = [];
+  int _logTotal = 0;
   bool _loading = true;
   String? _loadError;
   bool _saving = false;
   final _username = TextEditingController();
   final _password = TextEditingController();
+  final _logQ = TextEditingController();
   String _role = 'support';
 
   static const _roleLabels = {
@@ -41,6 +43,7 @@ class _AdminAdminsState extends State<AdminAdmins> {
   void dispose() {
     _username.dispose();
     _password.dispose();
+    _logQ.dispose();
     super.dispose();
   }
 
@@ -57,12 +60,16 @@ class _AdminAdminsState extends State<AdminAdmins> {
       // که روی گوشی پارس و در حافظه نگه داشته می‌شد. حالا ۵۰ ردیفِ سبک.
       // شکل قدیمی (آرایهٔ خام) هم پذیرفته می‌شود تا نسخهٔ قدیمیِ اپ با
       // سرور جدید نشکند.
-      final logsRaw = await widget.api.get('/api/admin/audit-log?limit=50');
+      final q = _logQ.text.trim();
+      final logsRaw = await widget.api.get(
+          '/api/admin/audit-log?limit=50${q.isEmpty ? '' : '&q=${Uri.encodeComponent(q)}'}');
       final logs = logsRaw is Map ? (logsRaw['entries'] ?? const []) : logsRaw;
+      final total = logsRaw is Map ? (logsRaw['total'] ?? 0) : (logs is List ? logs.length : 0);
       if (mounted) {
         setState(() {
           _admins = admins;
           _logs = logs;
+          _logTotal = total is num ? total.toInt() : 0;
           _loading = false;
         });
       }
@@ -226,7 +233,20 @@ class _AdminAdminsState extends State<AdminAdmins> {
         Gaps.vMd,
         FormSection(
           title: 'گزارش فعالیت (Audit Log)',
-          children: _logs.isEmpty
+          subtitle: _logTotal > 0 ? '$_logTotal رخداد' : 'جست‌وجو روی عمل، کاربر و دلیل',
+          children: [
+            TextField(
+              controller: _logQ,
+              onSubmitted: (_) => _load(),
+              decoration: InputDecoration(
+                labelText: 'جست‌وجو: عمل، کاربر، دلیل',
+                suffixIcon: IconButton(
+                  onPressed: _load,
+                  icon: const Icon(Icons.search_rounded),
+                ),
+              ),
+            ),
+            ...(_logs.isEmpty
               ? [
                   const EmptyState(
                       icon: Icons.history_rounded, title: 'رویدادی ثبت نشده')
@@ -239,7 +259,8 @@ class _AdminAdminsState extends State<AdminAdmins> {
                             '${l['username'] ?? 'سیستم'} — ${l['action']} — ${l['created_at']}',
                             style: theme.textTheme.bodySmall),
                       ))
-                  .toList(),
+                  .toList()),
+          ],
         ),
       ],
     );

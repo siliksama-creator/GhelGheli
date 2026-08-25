@@ -42,6 +42,42 @@ function growthServices() {
   }
 }
 
+// پرچم خاموشی بازی/تعمیر — تنبل و fail-open تا تست واحد قوانین بدون
+// Postgres بماند و قطع تنظیمات کل بازی را نکشد.
+function featureFlags() {
+  try {
+    return require('../services/featureFlags');
+  } catch {
+    return null;
+  }
+}
+
+function rejectIfDisabled(socket, gameId) {
+  const ff = featureFlags();
+  if (!ff) return false;
+  try {
+    // همگام از کش می‌خوانیم تا handler سوکت await نکند — FakeSocket
+    // تست موتور fire را await نمی‌کند و یک await یعنی game:start بعد از
+    // برگشت تست می‌آید و تست قرمزِ دروغین می‌دهد.
+    const f = ff.cachedFeatures();
+    ff.loadFeatures().catch(() => {});
+    if (f.maintenance.active) {
+      safeEmit(socket, 'game:error', {
+        message: f.maintenance.message
+          || 'سرویس موقتاً در دسترس نیست. کمی بعد دوباره سر بزن.',
+      });
+      return true;
+    }
+    if (gameId && f.games[gameId] === false) {
+      safeEmit(socket, 'game:error', { message: 'این بازی موقتاً غیرفعال است' });
+      return true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
 // How long we hunt for a REAL opponent before falling back to the bot. The
 // client shows this as a visible countdown so waiting feels intentional
 // rather than broken.
@@ -987,6 +1023,7 @@ const attachGames = function attachGames(io, rulesById) {
       const gameId = (payload && typeof payload === 'object' && payload.gameId) || Object.keys(rulesById)[0];
       const rules = rulesById[gameId];
       if (!rules) return safeEmit(socket, 'game:error', { message: 'بازی یافت نشد' });
+      if (rejectIfDisabled(socket, gameId)) return;
       try {
         if (rules.validatePlayer) await ensurePlayerReady(rules, socket);
       } catch (e) {
@@ -1040,6 +1077,7 @@ const attachGames = function attachGames(io, rulesById) {
       const gameId = String(payload?.gameId || Object.keys(rulesById)[0]);
       const rules = rulesById[gameId];
       if (!rules) return safeEmit(socket, 'game:error', { message: 'بازی مورد نظر یافت نشد' });
+      if (rejectIfDisabled(socket, gameId)) return;
       try {
         if (rules.validatePlayer) await ensurePlayerReady(rules, socket);
       } catch (e) {
@@ -1160,6 +1198,7 @@ const attachGames = function attachGames(io, rulesById) {
           || Object.keys(rulesById)[0];
         const rules = rulesById[gameId];
         if (!rules) return safeEmit(socket, 'game:error', { message: 'این بازی در دسترس نیست' });
+        if (rejectIfDisabled(socket, gameId)) return;
         try {
           if (rules.validatePlayer) await ensurePlayerReady(rules, socket);
         } catch (e) {
@@ -1286,6 +1325,7 @@ const attachGames = function attachGames(io, rulesById) {
         || Object.keys(rulesById)[0];
       const rules = rulesById[gameId];
       if (!rules) return safeEmit(socket, 'game:error', { message: 'این بازی در دسترس نیست' });
+      if (rejectIfDisabled(socket, gameId)) return;
       try {
         if (rules.validatePlayer) await ensurePlayerReady(rules, socket, { vsBot: true });
       } catch (e) {
@@ -1382,3 +1422,4 @@ attachGames.completedMatches = completedMatches;
 attachGames.RECONNECT_WINDOW_MS = RECONNECT_WINDOW_MS;
 attachGames.REMATCH_WINDOW_MS = REMATCH_WINDOW_MS;
 module.exports = attachGames;
+;

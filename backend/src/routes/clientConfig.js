@@ -9,6 +9,7 @@
  * می‌شود — فقط PATCH از پنل ادمین.
  */
 const express = require('express');
+const featureFlags = require('../services/featureFlags');
 
 const DEFAULTS = Object.freeze({
   app: {
@@ -17,6 +18,7 @@ const DEFAULTS = Object.freeze({
     updateUrl: { android: '', ios: '' },
   },
   announcement: { active: false, text: '', link: null, accent: 'gold' },
+  features: featureFlags.DEFAULTS,
 });
 
 /** عمیق-مرج می‌کند تا کلیدهای از دست رفته همیشه مقدار پیش‌فرض بگیرند. */
@@ -42,7 +44,11 @@ function mergeConfig(raw) {
     ...DEFAULTS.announcement,
     ...(v.announcement && typeof v.announcement === 'object' ? v.announcement : {}),
   };
-  return { app, announcement };
+  // پرچم‌های اجرایی (تعمیر، خاموشی هر بازی، گردونه) داخل همین JSON
+  // می‌مانند تا مایگریشن تازه لازم نباشد و کلاینت‌های قدیمی کلید
+  // ناشناخته را نادیده بگیرند.
+  const features = featureFlags.normalizeFeatures(v.features);
+  return { app, announcement, features };
 }
 
 module.exports = function createClientConfigRoutes(deps) {
@@ -138,6 +144,9 @@ module.exports = function createClientConfigRoutes(deps) {
         [JSON.stringify(next), req.admin.id]);
       await audit(req.admin.id, 'update_client_config', 'app_settings',
         null, null, next);
+      // کش پرچم‌ها را همان لحظه تازه کن تا خاموشی بازی تا ۵ ثانیهٔ بعد
+      // اعمال نشود — وگرنه مدیر فکر می‌کند کلید کار نمی‌کند.
+      featureFlags.primeFeatures(next.features);
       res.json(next);
     }));
 
