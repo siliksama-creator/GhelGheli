@@ -843,10 +843,12 @@ app.post('/api/games/tap/progress', auth, tapBatchLimiter, asyncHandler(async (r
     //    درست است: سکه فقط داخلِ یک فصل معنا دارد.
     async (client, userId, levels) => {
       const amount = coins.tapCoinsFor(levels);
-      if (amount > 0) await coins.awardCoins(client, userId, amount);
-      // مقدارِ واقعاً اعطاشده برمی‌گردد تا tapGameService همان را در
-      // پاسخِ بسته بگذارد و کلاینت «+۵ سکه» را فوری نشان دهد.
-      return amount;
+      if (amount <= 0) return 0;
+      // ⚠️ باید همان عددی برگردد که واقعاً در دفتر نشسته. اگر لیگِ
+      //    فعالی نباشد `awardCoins` صفر می‌دهد؛ برگرداندنِ `amount`
+      //    یعنی کلاینت «+۵ سکه» نشان می‌دهد در حالی که موجودی‌اش
+      //    تکان نخورده.
+      return coins.awardCoins(client, userId, amount);
     },
   );
   // XP گذر نبرد به ازای هر لولی که در همین بستهٔ ارسالی تمام شده.

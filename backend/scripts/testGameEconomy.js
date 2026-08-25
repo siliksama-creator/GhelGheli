@@ -101,6 +101,17 @@ function finish() {
       'هر لولِ ضربه‌زن ۵ سکه (پیش‌فرض)');
     ok(coins.tapCoinsFor([1, 2, 3]) === 15, 'سه لول = ۱۵ سکه');
   }
+  console.log('\n══ ۵. کشِ سینک مقدار قبلی را پاک نمی‌کند ══');
+  {
+    const fs = require('fs');
+    const path = require('path');
+    const src = fs.readFileSync(
+      path.join(__dirname, '../src/services/coinService.js'), 'utf8');
+    ok(!/snapshot = \{ at: now, value: null \}/.test(src),
+      'تازه‌سازی کش مقدار قبلی را null نمی‌کند');
+    ok(/const previous = snapshot\?\.value/.test(src),
+      'مقدار کهنه تا جواب تازه نگه داشته می‌شود');
+  }
   console.log(`\n${fail === 0 ? '✓' : '✗'} ${pass} موفق، ${fail} ناموفق\n`);
   process.exit(fail === 0 ? 0 : 1);
 }

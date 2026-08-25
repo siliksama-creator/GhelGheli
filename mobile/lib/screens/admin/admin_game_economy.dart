@@ -38,6 +38,11 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
   final _tap = TextEditingController();
   final _q100 = TextEditingController();
   final _q1000 = TextEditingController();
+  final _winPts = TextEditingController();
+  final _losePts = TextEditingController();
+  final _drawPts = TextEditingController();
+  final _capPts = TextEditingController();
+  bool _pointsEnabled = false;
   final Map<String, TextEditingController> _coins = {};
   bool _loading = true;
   bool _saving = false;
@@ -61,6 +66,10 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
     _tap.dispose();
     _q100.dispose();
     _q1000.dispose();
+    _winPts.dispose();
+    _losePts.dispose();
+    _drawPts.dispose();
+    _capPts.dispose();
     for (final c in _coins.values) {
       c.dispose();
     }
@@ -90,6 +99,12 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
         // و پنل بعد از ذخیره دوباره پیش‌فرض نشان می‌داد.
         _q100.text = '${jsonGet(quota, 100) ?? 30}';
         _q1000.text = '${jsonGet(quota, 1000) ?? 15}';
+        final gp = jsonMap(res['gamePoints']);
+        _pointsEnabled = gp['enabled'] == true;
+        _winPts.text = '${gp['winPoints'] ?? 10}';
+        _losePts.text = '${gp['losePoints'] ?? 0}';
+        _drawPts.text = '${gp['drawPoints'] ?? 0}';
+        _capPts.text = '${gp['dailyCap'] ?? 10}';
         for (final g in _games) {
           final gr = jsonMap(rewards[g]);
           for (final s in [100, 1000]) {
@@ -127,6 +142,13 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
           'tapCoinsPerLevel': _v(_tap, 5),
           'dailyCoinQuota': {'100': _v(_q100, 30), '1000': _v(_q1000, 15)},
           'coinRewards': coinRewards,
+        },
+        'gamePoints': {
+          'enabled': _pointsEnabled,
+          'winPoints': _v(_winPts, 10),
+          'losePoints': _v(_losePts, 0),
+          'drawPoints': _v(_drawPts, 0),
+          'dailyCap': _v(_capPts, 10),
         },
       });
       if (!mounted) return;
@@ -241,6 +263,41 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
                   ),
                   Gaps.vSm,
                 ],
+              ],
+            ),
+          ),
+          Gaps.vSm,
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text('امتیاز بازی‌های آنلاین',
+                          style: Theme.of(context).textTheme.titleMedium),
+                    ),
+                    Switch(
+                      value: _pointsEnabled,
+                      onChanged: (v) => setState(() => _pointsEnabled = v),
+                    ),
+                  ],
+                ),
+                const Text(
+                  'امتیاز مثبت برای برد، منفی برای باخت — همان صفحهٔ «امتیاز بازی». اینجا هم هست تا وب و اندروید یک صفحه داشته باشند.',
+                  style: TextStyle(fontSize: 12, color: Colors.white60),
+                ),
+                Gaps.vSm,
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    _numField(_winPts, 'امتیاز برد'),
+                    _numField(_losePts, 'امتیاز باخت'),
+                    _numField(_drawPts, 'امتیاز مساوی'),
+                    _numField(_capPts, 'سقف روزانه'),
+                  ],
+                ),
               ],
             ),
           ),

@@ -55,10 +55,16 @@ let snapshot = null; // { at, value }
 function snapshotEconomy() {
   const now = Date.now();
   if (!snapshot || now - snapshot.at > 15000) {
-    snapshot = { at: now, value: null };
+    // ⚠️ مقدار قبلی را پاک نکن. نسخهٔ اول `value: null` می‌گذاشت و
+    //    همان تیک برمی‌گشت — یعنی هر ۱۵ ثانیه، *اولین* مسابقه‌ای که
+    //    تسویه می‌شد جدولِ پیش‌فرض می‌گرفت نه عددِ ادمین. `then` حتی
+    //    اگر load از کشِ حافظه جواب بدهد، بعد از این فراخوانی اجرا
+    //    می‌شود. مقدار کهنه تا جواب تازه برسد درست‌تر از پیش‌فرض است.
+    const previous = snapshot?.value || null;
+    snapshot = { at: now, value: previous };
     economy.load()
-      .then(value => { snapshot.value = value; })
-      .catch(() => { /* پیش‌فرض می‌ماند */ });
+      .then(value => { snapshot = { at: Date.now(), value }; })
+      .catch(() => { /* مقدار قبلی یا پیش‌فرض می‌ماند */ });
   }
   return snapshot.value;
 }
