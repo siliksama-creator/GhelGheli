@@ -166,7 +166,9 @@ export function UsersPage({ request }) {
     notify('رمز عبور کاربر تغییر کرد؛ رمز جدید را به او اطلاع دهید');
   }
 
+  const uDetail = detail?.user;
   return (
+    <>
     <Card>
       <div className="field-row" style={{ marginBottom: 16 }}>
         <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="جستجوی موبایل یا نام مستعار" onKeyDown={(e) => e.key === 'Enter' && load()} />
