@@ -19,6 +19,16 @@ class _AdminSettingsState extends State<AdminSettings> {
   final _chatMin = TextEditingController();
   final _cooldown = TextEditingController();
   final _badWords = TextEditingController();
+  // ── پیکربندیِ کلاینت (بنرِ اطلاعیه + نسخهٔ حداقل) — هم‌ترازِ پنلِ وب ──
+  final _announceText = TextEditingController();
+  final _announceLink = TextEditingController();
+  final _minVersionAndroid = TextEditingController();
+  final _minVersionIos = TextEditingController();
+  bool _announceActive = false;
+  String _announceAccent = 'gold';
+  bool _forceAndroid = false;
+  bool _forceIos = false;
+  bool _savingClient = false;
   final _provider = TextEditingController();
   final _sender = TextEditingController();
   final _apiKey = TextEditingController();
@@ -46,6 +56,10 @@ class _AdminSettingsState extends State<AdminSettings> {
     _sender.dispose();
     _apiKey.dispose();
     _pattern.dispose();
+    _announceText.dispose();
+    _announceLink.dispose();
+    _minVersionAndroid.dispose();
+    _minVersionIos.dispose();
     super.dispose();
   }
 
@@ -66,6 +80,21 @@ class _AdminSettingsState extends State<AdminSettings> {
       _pattern.text = s['patternCode'] ?? '';
       _smsEnabled = s['enabled'] == true;
       _smsTest = s['testMode'] != false;
+      // ── پیکربندیِ کلاینت — بدونِ آن ادمینِ اندروید نمی‌توانست بنرِ
+      //    اطلاعیه یا حداقلِ نسخه را ببیند/عوض کند (شکافِ پنل‌ها).
+      final cc = await widget.api.get('/api/admin/settings/client-config');
+      final app = cc['app'] is Map ? Map<String, dynamic>.from(cc['app']) : <String, dynamic>{};
+      final ann = cc['announcement'] is Map ? Map<String, dynamic>.from(cc['announcement']) : <String, dynamic>{};
+      _announceText.text = '${ann['text'] ?? ''}';
+      _announceLink.text = '${ann['link'] ?? ''}';
+      _announceActive = ann['active'] == true;
+      _announceAccent = '${ann['accent'] ?? 'gold'}';
+      final minV = app['minVersion'] is Map ? Map<String, dynamic>.from(app['minVersion']) : <String, dynamic>{};
+      final force = app['forceUpdate'] is Map ? Map<String, dynamic>.from(app['forceUpdate']) : <String, dynamic>{};
+      _minVersionAndroid.text = '${minV['android'] ?? ''}';
+      _minVersionIos.text = '${minV['ios'] ?? ''}';
+      _forceAndroid = force['android'] == true;
+      _forceIos = force['ios'] == true;
       if (mounted) setState(() => _loading = false);
   
     } catch (e) {
@@ -119,6 +148,37 @@ class _AdminSettingsState extends State<AdminSettings> {
     }
   }
 
+  Future<void> _saveClient() async {
+    setState(() => _savingClient = true);
+    try {
+      final r = await widget.api.patch('/api/admin/settings/client-config', {
+        'app': {
+          'minVersion': {
+            'android': _minVersionAndroid.text.trim(),
+            'ios': _minVersionIos.text.trim(),
+          },
+          'forceUpdate': {
+            'android': _forceAndroid,
+            'ios': _forceIos,
+          },
+        },
+        'announcement': {
+          'active': _announceActive,
+          'text': _announceText.text.trim(),
+          'link': _announceLink.text.trim(),
+          'accent': _announceAccent,
+        },
+      });
+      if (!mounted) return;
+      setState(() => _message = r['message'] ?? 'ذخیره شد');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _message = apiError(e));
+    } finally {
+      if (mounted) setState(() => _savingClient = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) return const LoadingView();
@@ -136,6 +196,67 @@ class _AdminSettingsState extends State<AdminSettings> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(Gaps.lg, Gaps.md, Gaps.lg, Gaps.xxl),
       children: [
+        FormSection(
+          title: 'پیکربندی کلاینت (بدون نیاز به نسخهٔ جدید)',
+          subtitle: 'بنرِ اطلاعیه و حداقلِ نسخهٔ اپ — همان چیزی که پنلِ وب دارد. '
+              'تغییرات بلافاصله در اپ کاربران دیده می‌شود.',
+          children: [
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _announceActive,
+              onChanged: (v) => setState(() => _announceActive = v),
+              title: const Text('بنرِ اطلاعیه فعال باشد'),
+            ),
+            TextField(
+                controller: _announceText,
+                decoration: const InputDecoration(labelText: 'متن اطلاعیه')),
+            TextField(
+                controller: _announceLink,
+                decoration: const InputDecoration(labelText: 'لینک اطلاعیه (اختیاری)')),
+            DropdownButtonFormField<String>(
+              initialValue: _announceAccent,
+              items: const [
+                DropdownMenuItem(value: 'gold', child: Text('طلایی')),
+                DropdownMenuItem(value: 'green', child: Text('سبز')),
+                DropdownMenuItem(value: 'blue', child: Text('آبی')),
+                DropdownMenuItem(value: 'orange', child: Text('نارنجی')),
+              ],
+              onChanged: (v) => setState(() => _announceAccent = v ?? 'gold'),
+              decoration: const InputDecoration(labelText: 'رنگ بنر'),
+            ),
+            TextField(
+                controller: _minVersionAndroid,
+                decoration: const InputDecoration(
+                    labelText: 'حداقل نسخهٔ اندروید')),
+            TextField(
+                controller: _minVersionIos,
+                decoration: const InputDecoration(labelText: 'حداقل نسخهٔ iOS')),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _forceAndroid,
+              onChanged: (v) => setState(() => _forceAndroid = v),
+              title: const Text('آپدیت اجباری اندروید'),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _forceIos,
+              onChanged: (v) => setState(() => _forceIos = v),
+              title: const Text('آپدیت اجباری iOS'),
+            ),
+            FilledButton.icon(
+              onPressed: _savingClient ? null : _saveClient,
+              icon: _savingClient
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2.2, color: Colors.white))
+                  : const Icon(Icons.save_rounded),
+              label: const Text('ذخیره پیکربندی کلاینت'),
+            ),
+          ],
+        ),
+        Gaps.vMd,
         FormSection(
           title: 'تنظیمات چت کاربران',
           subtitle:

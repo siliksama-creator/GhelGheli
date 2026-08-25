@@ -623,6 +623,16 @@ class ApiClient {
     return r.data;
   }
 
+  /// دانلودِ خامِ بایت‌های یک پاسخ — برای خروجیِ CSV و فایل‌های متنی.
+  ///
+  /// مسیرهای عادی از `get` می‌گذرند که JSON را پارس می‌کند؛ این متد
+  /// بایت‌های خام را می‌دهد تا بتوان مستقیم به اشتراک‌گذاشت یا ذخیره کرد.
+  Future<List<int>> downloadBytes(String path) async {
+    final opts = Options(responseType: ResponseType.bytes);
+    final res = await dio.get<List<int>>(path, options: opts);
+    return res.data ?? const <int>[];
+  }
+
   /// حذفِ یک منبع.
   ///
   /// تا امروز هیچ صفحه‌ای به DELETE نیاز نداشت؛ مدیریتِ کدهای «کارت با

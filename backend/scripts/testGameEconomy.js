@@ -79,6 +79,14 @@ console.log('\n══ ۳. carryoverBetween با client جعلی ══');
     const display = log.find(l => /UPDATE users u SET/.test(l.sql) && /coins = COALESCE/.test(l.sql));
     ok(Boolean(display) && display.params[0].length === 2,
       'شمارندهٔ نمایشی از لیگ‌های فعال بازسازی شد');
+    // ⚠️ نشانِ انتقال: بدونِ آن، سکهٔ یک لیگِ بسته دو بار منتقل می‌شد
+    //    (بستنِ لیگ + ساختِ لیگِ بعدی توسط ادمین).
+    const marker = log.find(l => /INSERT INTO app_settings/.test(l.sql));
+    ok(Boolean(marker), 'نشانِ «این لیگ منتقل شد» ثبت می‌شود', JSON.stringify(marker?.params || null));
+    ok(String(marker?.params?.[0] || '').startsWith('coin_carryover_seeded:'),
+      'کلیدِ نشان با پیشوندِ استاندارد است');
+    ok(league.carryoverMarkerKey('s-x') === 'coin_carryover_seeded:s-x',
+      'تابعِ کلیدِ نشان درست است');
   })().then(() => finish()).catch(e => { console.error(e); process.exit(1); });
 }
 

@@ -429,6 +429,20 @@ async function getLeaderboard(limit = 100, seasonId = null, userId = null) {
  *
  * @returns {{pct:number, targetSeasonId:string|null, carriedUsers:number}|null}
  */
+// ── نشانِ انتقال ─────────────────────────────────────────────────────────
+//
+// ⚠️ بدونِ این نشان، سکهٔ یک لیگِ بسته **دو بار** منتقل می‌شد:
+//    لیگ A بسته می‌شود و لیگ B فعال است → ۱۰٪ به B منتقل می‌شود.
+//    بعد ادمین لیگ C می‌سازد → «آخرین لیگِ بسته» دوباره A پیدا می‌شود
+//    و ۱۰٪ **دوباره** به C منتقل می‌شود. یعنی چاپِ سکه.
+//
+// هر انتقالِ موفق یک ردیف در app_settings می‌گذارد؛ بذرپاشیِ بعدی
+// (موقعِ ساختِ لیگ) فقط لیگِ بستهٔ بدونِ نشان را برمی‌دارد.
+const CARRYOVER_MARKER_PREFIX = 'coin_carryover_seeded:';
+function carryoverMarkerKey(sourceSeasonId) {
+  return CARRYOVER_MARKER_PREFIX + sourceSeasonId;
+}
+
 async function carryoverBetween(client, sourceSeasonId, targetSeasonId) {
   let cfg = null;
   try { cfg = await economy.load(); } catch { /* پیش‌فرض */ }
@@ -475,6 +489,14 @@ async function carryoverBetween(client, sourceSeasonId, targetSeasonId) {
       [touched]);
   }
 
+  // نشانِ «این لیگِ بسته منتقل شد» — جلوی انتقالِ دوباره را می‌گیرد.
+  await client.query(
+    `INSERT INTO app_settings(key, value)
+     VALUES ($1, $2)
+     ON CONFLICT (key) DO NOTHING`,
+    [carryoverMarkerKey(sourceSeasonId),
+      JSON.stringify({ target: targetSeasonId, at: new Date().toISOString() })]);
+
   return { pct, targetSeasonId, carriedUsers };
 }
 
@@ -499,16 +521,26 @@ async function seedCarryoverFromLatestClosed({ leagueType = null, targetSeasonId
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    // ⚠️ فقط لیگِ بسته‌ای که هنوز نشانِ انتقال ندارد — وگرنه سکهٔ یک لیگ
+    //    دو بار منتقل می‌شود (توضیح کامل بالای `carryoverBetween`).
+    //    `IS NOT DISTINCT FROM` چون لیگ‌های قدیمیِ خودکار league_type=NULL
+    //    دارند و باید با هم‌نوعِ NULL خودشان جفت شوند.
     const { rows } = await client.query(
       `SELECT id FROM league_seasons
         WHERE status='closed'
-          AND ($1::text IS NULL OR league_type = $1)
-        ORDER BY ends_at DESC LIMIT 1`,
+          AND ($1::text IS NULL OR league_type IS NOT DISTINCT FROM $1)
+        ORDER BY ends_at DESC LIMIT 8`,
       [leagueType]);
-    const source = rows[0];
+    let source = null;
+    for (const row of rows) {
+      const marked = await client.query(
+        'SELECT 1 FROM app_settings WHERE key=$1',
+        [carryoverMarkerKey(row.id)]);
+      if (!marked.rows.length) { source = row; break; }
+    }
     if (!source) {
       await client.query('COMMIT');
-      return { seeded: false, reason: 'no closed season' };
+      return { seeded: false, reason: 'no unseeded closed season' };
     }
     const result = await carryoverBetween(client, source.id, targetSeasonId);
     await client.query('COMMIT');
@@ -828,7 +860,7 @@ async function closeActiveSeason({ force = false, seasonId = null } = {}) {
     const { rows: nextSeasons } = await client.query(
       `SELECT id FROM league_seasons
         WHERE id <> $1 AND status='active'
-          AND league_type = $2
+          AND league_type IS NOT DISTINCT FROM $2
           AND starts_at >= $3
         ORDER BY starts_at ASC LIMIT 1`,
       [season.id, season.league_type, season.ends_at]);
@@ -1130,4 +1162,5 @@ module.exports = {
   ensureActiveSeason, addLeaguePoints, getLeaderboard, closeActiveSeason,
   closeExpiredSeasons, defaultPrizeTable, approvePayouts,
   carryoverBetween, seedCarryoverFromLatestClosed, carryoverAmount,
+  carryoverMarkerKey,
 };

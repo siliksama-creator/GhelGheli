@@ -19,6 +19,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../api_client.dart';
 import '../../theme/colors.dart';
@@ -1053,6 +1054,35 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
   }
 
   // ── فهرست و مدیریتِ کدها ──
+  /// خروجیِ CSV کدها برای چاپخانه — همان دکمه‌ای که پنلِ وب دارد.
+  /// بایت‌های خام را می‌گیرد و مستقیم به برگهٔ اشتراک‌گذاری می‌فرستد
+  /// (تلگرام/ایمیل/درایو/…)؛ برای فایل‌های متنی مسیرِ دیسک لازم نیست.
+  Future<void> _exportCodesCsv() async {
+    try {
+      final bytes = await widget.api.downloadBytes(
+          '/api/admin/photo-cards/codes/export');
+      if (!mounted) return;
+      if (bytes.isEmpty) {
+        _snack('خروجی خالی است — کدی برای خروج وجود ندارد');
+        return;
+      }
+      await SharePlus.instance.share(ShareParams(
+        files: [
+          XFile.fromData(
+            bytes,
+            mimeType: 'text/csv',
+            name: 'photo-card-codes.csv',
+          ),
+        ],
+        subject: 'کدهای کارت قلقلی',
+        text: 'خروجی CSV کدهای کارت قلقلی',
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      _snack('خروجی ناموفق بود: ${apiError(e)}');
+    }
+  }
+
   Widget _codeListSection(BuildContext context) {
     final theme = Theme.of(context);
     const filters = [
@@ -1064,6 +1094,13 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
       subtitle: 'ویرایش یا حذف فقط برای کدهای استفاده‌نشده ممکن است — '
           'کدِ مصرف‌شده امتیاز داده و در مجموعهٔ کاربر نشسته.',
       children: [
+        // ── خروجیِ CSV برای چاپخانه — هم‌ترازِ پنلِ وب ──
+        OutlinedButton.icon(
+          onPressed: _exportCodesCsv,
+          icon: const Icon(Icons.download_rounded, size: 17),
+          label: const Text('خروجی CSV کدها برای چاپخانه'),
+        ),
+        Gaps.vXs,
         // ── جستجوی سریع و فعال/غیرفعال‌سازی کد ──
         Container(
           padding: const EdgeInsets.all(10),
