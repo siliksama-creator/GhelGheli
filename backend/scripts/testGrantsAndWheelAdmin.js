@@ -105,6 +105,37 @@ ok(/require\('\.\/routes\/clientConfig'\)[\s\S]{0,500}gameRewards:/.test(server)
   'GET /api/config به سرویس امتیاز بازی وصل است');
 ok(/user_clubs/.test(grant) && /club_badge/.test(grant),
   'جایزهٔ نشان باشگاه عضویت هم می‌سازد');
+ok(/async function awardBoxes/.test(grant) && /async function listFor/.test(grant),
+  'چند صندوق جدا ساخته می‌شود و ادمین تاریخچه را می‌بیند');
+
+ok(/grants\.awardBoxes/.test(wheel) && !/kind === 'card_box' \? 1/.test(wheel),
+  'تعداد صندوق گردونه دیگر بی‌صدا ۱ نمی‌شود');
+ok(/حداکثر ۵ است/.test(wheel),
+  'سقف ۵ صندوق روی گردونه قفل است');
+
+const adminUsers = read('backend/src/routes/adminUsers.js');
+ok(/grant-item/.test(adminUsers) && /MAX\(expires_at\)/.test(adminUsers),
+  'ادمین می‌تواند صندوق بدهد و پلاس را تمدید می‌کند نه بازنشانی');
+ok(/grants,/.test(read('backend/src/server.js')),
+  'سرویس grants به روت کاربران ادمین تزریق شده');
+
+ok(/از کلکسیون بازش کن/.test(league),
+  'اعلان لیگ برای صندوق می‌گوید از کلکسیون باز شود');
+
+ok(/grant-item/.test(read('admin/src/pages/users.jsx'))
+  && /grant-item/.test(read('mobile/lib/screens/admin/admin_users.dart')),
+  'هر دو پنل ادمین اعطای صندوق/آیتم دارند');
+
+ok(/TickerProviderStateMixin/.test(read('mobile/lib/screens/user/wheel_page.dart'))
+  && !/class _WheelPageState[\s\S]{0,80}SingleTickerProviderStateMixin/
+    .test(read('mobile/lib/screens/user/wheel_page.dart')),
+  'گردونهٔ اندروید دو انیمیشن را با یک ticker نمی‌ترکاند');
+
+ok(/RefreshIndicator/.test(read('mobile/lib/screens/admin/admin_wheel.dart')),
+  'پنل گردونهٔ اندروید کشیدن-برای-تازه‌سازی دارد');
+
+ok(/opened\?\.cards/.test(webWheelUi),
+  'وب بعد از باز کردن صندوق از گردونه کارت‌ها را نشان می‌دهد');
 
 const shopWeb = read('userweb/src/screens/Shop.jsx');
 ok(/کیف پول با خرید شارژ نمی‌شود/.test(shopWeb),

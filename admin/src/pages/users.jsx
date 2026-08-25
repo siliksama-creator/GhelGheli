@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Coins, KeyRound, MessageSquareText, Search, ShieldOff, UserRoundSearch, Wallet } from 'lucide-react';
+import { Coins, Gift, KeyRound, MessageSquareText, Search, ShieldOff, UserRoundSearch, Wallet } from 'lucide-react';
 import { fmtNumber } from '../lib/api.js';
-import { Badge, Button, Card, DataRow, EmptyState, Input } from '../components/ui.jsx';
+import { Badge, Button, Card, DataRow, EmptyState, Field, Input, Select } from '../components/ui.jsx';
 import { useDialog } from '../components/dialog.jsx';
 import { useToast } from '../lib/toast.jsx';
 
@@ -12,6 +12,7 @@ export function UsersPage({ request }) {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState(null);
+  const [grant, setGrant] = useState(null);
 
   const load = () => {
     setLoading(true);
@@ -35,6 +36,51 @@ export function UsersPage({ request }) {
     });
     notify(r?.message || 'اشتراک پلاس برای کاربر فعال شد');
     load();
+  }
+
+  async function openGrant(u) {
+    try {
+      const d = await request(`/api/admin/users/${u.id}`);
+      setGrant({
+        user: u,
+        kind: 'card_box',
+        value: 1,
+        itemSlug: d.shopItems?.[0]?.slug || '',
+        reason: '',
+        shopItems: d.shopItems || [],
+        existing: d.grants || [],
+        saving: false,
+      });
+    } catch (e) {
+      notify(e.message || 'خواندن کاربر ناموفق بود', 'error');
+    }
+  }
+
+  async function submitGrant() {
+    if (!grant) return;
+    const reason = String(grant.reason || '').trim();
+    if (reason.length < 3) return notify('ثبت دلیل (حداقل ۳ حرف) الزامی است', 'error');
+    if (grant.kind === 'shop_item' && !grant.itemSlug) {
+      return notify('آیتم فروشگاه را انتخاب کنید', 'error');
+    }
+    setGrant((g) => ({ ...g, saving: true }));
+    try {
+      const r = await request(`/api/admin/users/${grant.user.id}/grant-item`, {
+        method: 'POST',
+        body: {
+          kind: grant.kind,
+          value: Number(grant.value) || 1,
+          itemSlug: grant.kind === 'shop_item' ? grant.itemSlug : null,
+          reason,
+        },
+      });
+      notify(r?.message || 'جایزه ثبت شد');
+      setGrant(null);
+      load();
+    } catch (e) {
+      notify(e.message || 'اعطای جایزه ناموفق بود', 'error');
+      setGrant((g) => (g ? { ...g, saving: false } : g));
+    }
   }
 
   async function block(id, status) {
@@ -255,6 +301,9 @@ export function UsersPage({ request }) {
                 </Button>
                 <Button size="sm" variant="secondary" onClick={() => grantPlus(u.id)}>
                   اعطای پلاس
+                </Button>
+                <Button size="sm" variant="secondary" icon={Gift} onClick={() => openGrant(u)}>
+                  اعطای جایزه
                 </Button>
                 <Button size="sm" variant="secondary" icon={MessageSquareText} onClick={() => privateMessage(u.id)}>
                   پیام

@@ -966,8 +966,13 @@ async function closeActiveSeason({ force = false, seasonId = null } = {}) {
       //    `pendingApproval` هم false. یعنی بهترین خبرِ ماهش به یک
       //    پیامِ خراب تبدیل می‌شد.
       const body = w.perk
-        ? `تبریک! رتبهٔ ${w.rank} لیگ را گرفتی و ${describePerk(w.perk)} `
-          + 'برایت ثبت شد.'
+        ? (w.perk.kind === 'card_box'
+          // بدون این جمله کاربر فکر می‌کند صندوق همان لحظه باز شده و
+          // کارت‌ها گم شده‌اند — در حالی که باید از کلکسیون بازش کند.
+          ? `تبریک! رتبهٔ ${w.rank} لیگ را گرفتی و ${describePerk(w.perk)} `
+            + 'برایت ثبت شد. از کلکسیون بازش کن.'
+          : `تبریک! رتبهٔ ${w.rank} لیگ را گرفتی و ${describePerk(w.perk)} `
+            + 'برایت ثبت شد.')
         : w.pendingApproval
           ? `تبریک! رتبهٔ ${w.rank} را گرفتی. جایزهٔ `
             + `${w.amount.toLocaleString('fa-IR')} تومانی پس از بررسی و `

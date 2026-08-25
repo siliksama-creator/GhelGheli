@@ -75,6 +75,61 @@ async function countPending(userId, client = pool) {
 }
 
 /**
+ * تاریخچهٔ جایزه‌های یک کاربر — برای جزئیاتِ پنل ادمین.
+ *
+ * بدون این، مدیر می‌توانست صندوق بدهد ولی نمی‌توانست ببیند کاربر چند
+ * صندوقِ بازنشده دارد. پشتیبانی به سؤالِ «صندوقم نیومد» جوابی نداشت.
+ */
+async function listFor(userId, { limit = 40 } = {}, client = pool) {
+  const n = Math.min(100, Math.max(1, Math.trunc(Number(limit) || 40)));
+  const { rows } = await client.query(
+    `SELECT * FROM user_item_grants
+      WHERE user_id=$1
+      ORDER BY created_at DESC
+      LIMIT $2`,
+    [userId, n],
+  );
+  return rows.map(view);
+}
+
+/**
+ * چند صندوقِ جدا می‌سازد (سقف ۵).
+ *
+ * ── چرا یک ردیف با value=N نه ──
+ *
+ * `open()` یک صندوق باز می‌کند و opened_at را می‌گذارد. اگر سه صندوق در
+ * یک ردیف می‌نشستند، یک تپ هر سه را می‌سوزاند یا دوتا گم می‌شدند. لیگ
+ * هم از قبل N ردیف جدا می‌سازد؛ گردونه و اعطای ادمین باید همان قرارداد
+ * را داشته باشند تا بنر خانه «۳ صندوق» راست بگوید.
+ *
+ * ضدتکرار فقط روی اولین ردیف است (`sourceRef`). بقیه source_ref=null
+ * می‌گیرند چون UNIQUE (source, source_ref) اجازهٔ چند ردیف با یک
+ * spinId نمی‌دهد. اگر اولین ردیف duplicate باشد، بقیه ساخته نمی‌شوند —
+ * وگرنه کرشِ وسطِ چرخش سه صندوق اضافه می‌ساخت.
+ */
+async function awardBoxes(client, {
+  userId, count = 1, label = null, source, sourceRef = null,
+}) {
+  const n = Math.min(5, Math.max(1, Math.trunc(Number(count) || 1)));
+  const out = [];
+  for (let i = 0; i < n; i += 1) {
+    const r = await award(client, {
+      userId,
+      kind: 'card_box',
+      value: 1,
+      label,
+      source,
+      sourceRef: i === 0 ? sourceRef : null,
+    });
+    if (r.duplicate) {
+      return { grants: [r.grant], grant: r.grant, duplicate: true };
+    }
+    out.push(r.grant);
+  }
+  return { grants: out, grant: out[0] || null, duplicate: false };
+}
+
+/**
  * یک جایزه را ثبت می‌کند. باید داخل تراکنش صدا زده شود.
  *
  * ── تحویلِ فوری در برابرِ pending ──
@@ -257,6 +312,8 @@ module.exports = {
   SOURCES,
   pendingFor,
   countPending,
+  listFor,
+  awardBoxes,
   award,
   open,
   view,

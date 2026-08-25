@@ -130,7 +130,9 @@ class _AdminWheelState extends State<AdminWheel> {
     final remaining = _weightTotal - _activeWeight;
     final ok = remaining == 0;
 
-    return ListView(
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
       padding: const EdgeInsets.all(Gaps.md),
       children: [
         FormSection(
@@ -171,6 +173,7 @@ class _AdminWheelState extends State<AdminWheel> {
         ),
         Gaps.vMd,
       ],
+    ),
     );
   }
 

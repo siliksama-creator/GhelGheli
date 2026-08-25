@@ -6,6 +6,7 @@ module.exports = function createAdminUserRoutes(deps) {
   const {
     pool, auth, adminAuth, requireRole, asyncHandler, audit, validateUuid,
     level, safeUser, points, createNotification, bcrypt, isValidPasswordLength,
+    grants,
   } = deps;
   const router = express.Router();
 
@@ -50,8 +51,20 @@ router.get('/admin/users', adminAuth, asyncHandler(async (req, res) => {
 }));
 router.get('/admin/users/:id', adminAuth, validateUuid('id'), asyncHandler(async (req, res) => {
   const user = await pool.query('SELECT * FROM users WHERE id=$1', [req.params.id]);
-  const codes = await pool.query('SELECT c.code,c.used_at,t.name,t.point_value FROM card_codes c JOIN card_types t ON t.id=c.card_type_id WHERE c.used_by_user_id=$1 ORDER BY c.used_at DESC LIMIT 100', [req.params.id]);
-  res.json({ user: safeUser(user.rows[0]), codes: codes.rows });
+  if (!user.rows[0]) return res.status(404).json({ message: 'کاربر پیدا نشد' });
+  const [codes, userGrants, shopItems] = await Promise.all([
+    pool.query('SELECT c.code,c.used_at,t.name,t.point_value FROM card_codes c JOIN card_types t ON t.id=c.card_type_id WHERE c.used_by_user_id=$1 ORDER BY c.used_at DESC LIMIT 100', [req.params.id]),
+    grants.listFor(req.params.id).catch(() => []),
+    pool.query(
+      `SELECT slug, name, kind FROM shop_items
+        WHERE is_active=true ORDER BY display_order ASC, name ASC`),
+  ]);
+  res.json({
+    user: safeUser(user.rows[0]),
+    codes: codes.rows,
+    grants: userGrants,
+    shopItems: shopItems.rows,
+  });
 }));
 router.patch('/admin/users/:id/status', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => { await pool.query('UPDATE users SET status=$1 WHERE id=$2', [req.body.status, req.params.id]); await audit(req.admin.id,'update_user_status','users',req.params.id,req.body.reason,{status:req.body.status}); res.json({message:'ثبت شد'}); }));
 // ═══════════════════════════════════════════════════════════════════════════
@@ -95,16 +108,157 @@ router.patch('/admin/signup-gift', adminAuth, requireRole(), asyncHandler(async 
 
 router.post('/admin/users/:id/grant-plus', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
   const days = Math.max(1, Math.min(365, Number(req.body.days) || 30));
-  const until = new Date(Date.now() + days * 86400000);
-  const r = await pool.query(
-    `INSERT INTO user_subscriptions(user_id, plan, price_paid, starts_at, expires_at)
-     VALUES($1, 'plus', 0, NOW(), $2)
-     RETURNING id, expires_at`,
-    [req.params.id, until]
-  );
-  await audit(req.admin.id, 'grant_plus', 'user_subscriptions', r.rows[0].id, req.body.reason || 'اعطای دستی اشتراک پلاس', { days });
+  // ── چرا از انتهای اشتراکِ فعلی شروع می‌شود ──
+  //
+  // نسخهٔ قبلی همیشه از NOW() می‌نوشت. اگر کاربر ۹۰ روز پلاس داشت و
+  // مدیر ۳۰ روز «اضافه» می‌کرد، ردیفِ تازه ۳۰ روزه می‌شد و MAX(expires_at)
+  // همان ۹۰ روزِ قبلی می‌ماند — یعنی اعطا عملاً هیچ اثری نداشت. مدیر
+  // پیام موفقیت می‌دید و کاربر هیچ روزی نمی‌گرفت.
+  //
+  // همان منطقِ grantService.award(plus_days) و deliverPlus: تمدید از
+  // انتهای اشتراکِ زنده، نه بازنشانی.
+  const client = await pool.connect();
+  let expiresAt;
+  let subId;
+  try {
+    await client.query('BEGIN');
+    const u = await client.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [req.params.id]);
+    if (!u.rows[0]) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ message: 'کاربر پیدا نشد' });
+    }
+    const active = await client.query(
+      `SELECT MAX(expires_at) AS expires_at
+         FROM user_subscriptions
+        WHERE user_id=$1 AND plan IN ('plus','plus_annual')
+          AND expires_at > NOW()`,
+      [req.params.id]);
+    const startsAt = active.rows[0]?.expires_at || new Date();
+    expiresAt = new Date(new Date(startsAt).getTime() + days * 86400000);
+    const r = await client.query(
+      `INSERT INTO user_subscriptions(user_id, plan, price_paid, starts_at, expires_at)
+       VALUES($1, 'plus', 0, $2, $3)
+       RETURNING id, expires_at`,
+      [req.params.id, startsAt, expiresAt],
+    );
+    subId = r.rows[0].id;
+    await client.query('COMMIT');
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+  await audit(req.admin.id, 'grant_plus', 'user_subscriptions', subId, req.body.reason || 'اعطای دستی اشتراک پلاس', { days });
   await createNotification(req.params.id, 'plus_granted', 'اشتراک قلقلی پلاس فعال شد!', `اشتراک قلقلی پلاس به مدت ${days} روز توسط مدیریت برای شما فعال شد.`);
-  res.json({ message: `اشتراک پلاس به مدت ${days} روز برای کاربر با موفقیت فعال شد`, expiresAt: r.rows[0].expires_at });
+  res.json({ message: `اشتراک پلاس به مدت ${days} روز برای کاربر با موفقیت فعال شد`, expiresAt });
+}));
+
+// ═══════════════════════════════════════════════════════════════════════════
+// اعطای صندوق / آیتم شاپ / روز پلاس از پنل — منبعِ 'admin'
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// خواستهٔ مالک: «کلا پنل ادمین باید دسترسی خیلی زیادی رو تغییرات داشته
+// باشه» و «اگه صندوق بردن پیام بیاد و کاربرها بتونن بازش کنن».
+//
+// grantService از قبل source='admin' را می‌شناخت ولی هیچ روتی صدایش
+// نمی‌زد. یعنی جدول آماده بود و قابلیت مرده.
+router.post('/admin/users/:id/grant-item', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
+  if (!grants) {
+    return res.status(500).json({ message: 'سرویس جایزه در دسترس نیست' });
+  }
+  const kind = String(req.body.kind || '');
+  if (!grants.KINDS.includes(kind)) {
+    return res.status(400).json({ message: 'نوع جایزه باید صندوق کارت، آیتم فروشگاه یا روز پلاس باشد' });
+  }
+  const reason = String(req.body.reason || '').trim();
+  if (reason.length < 3) {
+    return res.status(400).json({ message: 'ثبت دلیل (حداقل ۳ حرف) الزامی است' });
+  }
+  const value = Math.trunc(Number(req.body.value ?? 1));
+  if (!Number.isInteger(value) || value < 1) {
+    return res.status(400).json({ message: 'مقدار جایزه باید عددی بزرگ‌تر از صفر باشد' });
+  }
+  if (kind === 'card_box' && value > 5) {
+    return res.status(400).json({ message: 'حداکثر ۵ صندوق در هر اعطا' });
+  }
+  if (kind === 'plus_days' && value > 365) {
+    return res.status(400).json({ message: 'حداکثر ۳۶۵ روز پلاس در هر اعطا' });
+  }
+  const itemSlug = req.body.itemSlug || req.body.item_slug || null;
+  if (kind === 'shop_item' && !itemSlug) {
+    return res.status(400).json({ message: 'برای آیتم فروشگاه باید slug انتخاب شود' });
+  }
+
+  const client = await pool.connect();
+  let result;
+  try {
+    await client.query('BEGIN');
+    const u = await client.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [req.params.id]);
+    if (!u.rows[0]) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ message: 'کاربر پیدا نشد' });
+    }
+    if (kind === 'card_box') {
+      result = await grants.awardBoxes(client, {
+        userId: req.params.id,
+        count: value,
+        label: req.body.label || 'صندوق کارت از مدیریت',
+        source: 'admin',
+        sourceRef: null,
+      });
+    } else {
+      result = await grants.award(client, {
+        userId: req.params.id,
+        kind,
+        value,
+        itemSlug,
+        label: req.body.label || null,
+        source: 'admin',
+        sourceRef: null,
+      });
+      result = { grant: result.grant, grants: [result.grant], delivered: result.delivered };
+    }
+    await client.query('COMMIT');
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+
+  await audit(req.admin.id, 'grant_item', 'user_item_grants', result.grant?.id || null,
+    reason, { kind, value, itemSlug });
+
+  if (kind === 'card_box') {
+    const n = (result.grants || []).length || value;
+    await createNotification(
+      req.params.id, 'reward', 'صندوق کارت بردی',
+      n === 1
+        ? 'مدیریت یک صندوق کارت برایت ثبت کرد — از کلکسیون بازش کن.'
+        : `مدیریت ${n.toLocaleString('fa-IR')} صندوق کارت برایت ثبت کرد — از کلکسیون بازشان کن.`,
+    );
+  } else if (kind === 'shop_item') {
+    await createNotification(
+      req.params.id, 'reward', 'آیتم فروشگاه',
+      'یک آیتم فروشگاه از طرف مدیریت به حسابت اضافه شد.',
+    );
+  } else {
+    await createNotification(
+      req.params.id, 'plus_granted', 'اشتراک قلقلی پلاس فعال شد!',
+      `اشتراک قلقلی پلاس به مدت ${value} روز توسط مدیریت برای شما فعال شد.`,
+    );
+  }
+
+  res.json({
+    message: kind === 'card_box'
+      ? `${(result.grants || []).length} صندوق برای کاربر ثبت شد — از کلکسیون باز می‌کند`
+      : kind === 'shop_item'
+        ? 'آیتم فروشگاه به حساب کاربر اضافه شد'
+        : `${value} روز پلاس به اشتراک کاربر اضافه شد`,
+    grant: result.grant,
+    grants: result.grants || [result.grant],
+  });
 }));
 
 router.post('/admin/users/:id/points', adminAuth, validateUuid('id'), requireRole(), asyncHandler(async (req, res) => {

@@ -2521,6 +2521,7 @@ app.use('/api', require('./routes/adminLeague')({
 app.use('/api', require('./routes/adminUsers')({
   pool, auth, adminAuth, requireRole, asyncHandler, audit, validateUuid,
   level, safeUser, points, createNotification, bcrypt, isValidPasswordLength,
+  grants,
 }));
 
 // Chat moderation, support inbox, and outbound notifications.

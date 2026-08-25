@@ -324,6 +324,17 @@ async function spin(userId, { creditCash, addPoints }) {
       await addPoints(client, userId, prize.value, 'wheel');
     } else if (prize.kind === 'cash') {
       await creditCash(client, userId, prize.value, spinRow.id, prize.label);
+    } else if (prize.kind === 'card_box') {
+      // value = تعداد صندوق (۱ تا ۵). هر صندوق ردیف جداست تا کاربر
+      // بتواند یکی‌یکی باز کند — نه اینکه یک تپ هر سه را بسوزاند.
+      const awarded = await grants.awardBoxes(client, {
+        userId,
+        count: prize.value,
+        label: prize.label,
+        source: 'wheel',
+        sourceRef: spinRow.id,
+      });
+      grant = awarded.grant;
     } else if (PRIZE_KINDS.includes(prize.kind)) {
       const payload = prize.payload && typeof prize.payload === 'object'
         ? prize.payload : {};
@@ -488,6 +499,11 @@ async function saveAll(rawList) {
         new Error(`مقدار «${label}» باید عددی صحیح و بزرگ‌تر از صفر باشد`),
         { status: 400 });
     }
+    if (kind === 'card_box' && value > 5) {
+      throw Object.assign(
+        new Error(`تعداد صندوق «${label}» حداکثر ۵ است`),
+        { status: 400 });
+    }
     const weight = Math.trunc(Number(row?.weight));
     if (!Number.isInteger(weight) || weight < 0 || weight > WEIGHT_TOTAL) {
       throw Object.assign(
@@ -516,7 +532,8 @@ async function saveAll(rawList) {
       id,
       label,
       kind,
-      value: kind === 'card_box' ? 1 : value,
+      // قبلاً card_box بی‌صدا ۱ می‌شد و فیلد «تعداد صندوق» دروغ می‌گفت.
+      value,
       weight,
       sliceOrder,
       color: hexColor(row?.color),

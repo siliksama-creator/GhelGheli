@@ -362,6 +362,121 @@ class _AdminUsersState extends State<AdminUsers> {
     }
   }
 
+  Future<void> _grantItem(String id) async {
+    String kind = 'card_box';
+    final valueCtrl = TextEditingController(text: '1');
+    final reasonCtrl = TextEditingController();
+    String? itemSlug;
+    List<Map> shopItems = const [];
+    try {
+      final d = await widget.api.get('/api/admin/users/$id');
+      if (d is Map) {
+        shopItems = List<Map>.from((d['shopItems'] as List? ?? const [])
+            .whereType<Map>());
+        if (shopItems.isNotEmpty) itemSlug = '${shopItems.first['slug']}';
+      }
+    } catch (_) {
+      // کاتالوگ آیتم لازم است ولی شکستش نباید کل دیالوگ را ببندد.
+    }
+    if (!mounted) {
+      valueCtrl.dispose();
+      reasonCtrl.dispose();
+      return;
+    }
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setLocal) => AlertDialog(
+          title: const Text('اعطای جایزه'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: kind,
+                  decoration: const InputDecoration(labelText: 'نوع جایزه'),
+                  items: const [
+                    DropdownMenuItem(value: 'card_box', child: Text('صندوق کارت')),
+                    DropdownMenuItem(value: 'shop_item', child: Text('آیتم فروشگاه')),
+                    DropdownMenuItem(value: 'plus_days', child: Text('روز پلاس')),
+                  ],
+                  onChanged: (v) => setLocal(() {
+                    kind = v ?? 'card_box';
+                    if (kind == 'plus_days') valueCtrl.text = '7';
+                    if (kind == 'card_box') valueCtrl.text = '1';
+                  }),
+                ),
+                const SizedBox(height: 10),
+                if (kind == 'shop_item')
+                  DropdownButtonFormField<String>(
+                    initialValue: shopItems.any((it) => it['slug'] == itemSlug)
+                        ? itemSlug
+                        : null,
+                    decoration:
+                        const InputDecoration(labelText: 'آیتم فروشگاه'),
+                    items: [
+                      for (final it in shopItems)
+                        DropdownMenuItem(
+                          value: '${it['slug']}',
+                          child: Text('${it['name']}'),
+                        ),
+                    ],
+                    onChanged: (v) => setLocal(() => itemSlug = v),
+                  )
+                else
+                  TextField(
+                    controller: valueCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: kind == 'plus_days'
+                          ? 'تعداد روز'
+                          : 'تعداد صندوق (۱ تا ۵)',
+                    ),
+                  ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: reasonCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'دلیل (الزامی)',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('لغو')),
+            FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('اعطا')),
+          ],
+        ),
+      ),
+    );
+    final reason = reasonCtrl.text.trim();
+    final value = int.tryParse(valueCtrl.text.trim()) ?? 1;
+    valueCtrl.dispose();
+    reasonCtrl.dispose();
+    if (ok != true) return;
+    if (reason.length < 3) {
+      _snack('ثبت دلیل (حداقل ۳ حرف) الزامی است');
+      return;
+    }
+    try {
+      final r = await widget.api.post('/api/admin/users/$id/grant-item', {
+        'kind': kind,
+        'value': value,
+        'itemSlug': kind == 'shop_item' ? itemSlug : null,
+        'reason': reason,
+      });
+      _snack(r is Map ? '${r['message'] ?? 'ثبت شد'}' : 'جایزه ثبت شد');
+      await _load();
+    } catch (e) {
+      _snack(apiError(e));
+    }
+  }
+
   Future<void> _notifyUser(String id) async {
     final controller = TextEditingController();
     final message = await showDialog<String>(
@@ -648,6 +763,8 @@ class _AdminUsersState extends State<AdminUsers> {
                         onSelected: (s) async {
                           if (s == 'grant_plus') {
                             await _grantPlus(u['id']);
+                          } else if (s == 'grant_item') {
+                            await _grantItem(u['id']);
                           } else if (s == 'spins') {
                             await _toggleSpins(u);
                           } else if (s == 'points') {
@@ -668,6 +785,8 @@ class _AdminUsersState extends State<AdminUsers> {
                         itemBuilder: (_) => [
                           const PopupMenuItem(
                               value: 'grant_plus', child: Text('اعطای اشتراک پلاس')),
+                          const PopupMenuItem(
+                              value: 'grant_item', child: Text('اعطای جایزه')),
                           PopupMenuItem(
                               value: 'spins',
                               child: Text(u['unlimited_spins'] == true

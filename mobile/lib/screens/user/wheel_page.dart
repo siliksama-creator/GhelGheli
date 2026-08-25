@@ -92,7 +92,10 @@ class WheelPage extends StatefulWidget {
 }
 
 class _WheelPageState extends State<WheelPage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
+  // دو کنترلر مستقل (_spinCtl و _glowCtl). SingleTicker فقط یکی را
+  // تحمل می‌کند و در دیباگ assert می‌ترکاند — صفحهٔ گردونه وسط چرخش
+  // قرمز می‌شد.
   // مالک: «گردونه یکم بیشتر بچرخه برای هیجان بیشتر».
   //
   // ۵.۶ ثانیه و ۹ دور کامل. بیشتر از این، انتظار حس می‌شود نه هیجان —

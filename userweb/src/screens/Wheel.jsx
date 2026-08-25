@@ -95,6 +95,7 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
   const [winner, setWinner] = useState(null);
   const [history, setHistory] = useState([]);
   const [opening, setOpening] = useState(false);
+  const [opened, setOpened] = useState(null);
 
   // مجموع چرخش تجمعی است و هرگز کم نمی‌شود: اگر زاویه را ریست کنیم، گردونه
   // بین دو چرخش به عقب می‌پرد.
@@ -133,6 +134,7 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
     if (spinning || !state || state.spinsLeft <= 0) return;
     setSpinning(true);
     setResult(null);
+    setOpened(null);
     try {
       const res = await req('/api/wheel/spin', 'POST', {}, token);
       const n = state.prizes.length;
@@ -272,11 +274,23 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
               <p className="hint" style={{ marginTop: 8 }}>
                 صندوق کارت به کلکسیونت اضافه شد. همین‌جا یا از کلکسیون بازش کن.
               </p>
-              {result.grantId && (
+              {result.grantId && !opened && (
                 <button type="button" className="primary" style={{ marginTop: 8 }}
                   disabled={opening} onClick={() => openGrant(result.grantId)}>
                   {opening ? 'در حال باز کردن…' : 'باز کردن صندوق'}
                 </button>
+              )}
+              {opened?.cards?.length > 0 && (
+                <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {opened.cards.map((c, i) => (
+                    <span key={i} style={{
+                      background: 'rgba(0,0,0,.35)', borderRadius: 10, padding: '8px 10px',
+                      fontSize: 12, fontWeight: 800,
+                    }}>
+                      {c.name} · {fa(c.pointValue || 0)} امتیاز
+                    </span>
+                  ))}
+                </div>
               )}
             </>
           )}

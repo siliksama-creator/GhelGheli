@@ -21,7 +21,7 @@ check(/admins\/\$\{admin\['id'\]\}\/status/.test(mobileAdmins),
 
 const webUsers = read('admin/src/pages/users.jsx');
 const mobileUsers = read('mobile/lib/screens/admin/admin_users.dart');
-for (const capability of ['grant-plus', 'points', 'reset-password', 'notify']) {
+for (const capability of ['grant-plus', 'grant-item', 'points', 'reset-password', 'notify']) {
   check(webUsers.includes(`/${capability}`), `Web user management exposes ${capability}`);
   check(mobileUsers.includes(`/${capability}`), `Android user management exposes ${capability}`);
 }
