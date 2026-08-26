@@ -212,6 +212,12 @@ class _HomeShellState extends State<HomeShell>
     }
   }
 
+  void _refreshDashboardConfig() {
+    if (_pageCache.containsKey(0)) {
+      _pageCache[0] = _buildPage(0);
+    }
+  }
+
   /// تنها جایی که یک صفحه واقعاً ساخته می‌شود.
   ///
   /// `switch` و نه ساختنِ کلِ لیست و برداشتنِ عنصرِ i-ام: آن کار همان
@@ -228,6 +234,7 @@ class _HomeShellState extends State<HomeShell>
           onOpenWheel: () => setState(() => _index = wheelIndex),
           onOpenReferral: () => setState(() => _index = referralIndex),
           onOpenInventory: () => setState(() => _index = inventoryIndex),
+          pendingGrants: _pendingGrants,
         );
       case 1:
         return RewardsPage(api: widget.api);
@@ -289,7 +296,11 @@ class _HomeShellState extends State<HomeShell>
         );
       default:
         // ایندکسِ ناشناخته نباید کرش بدهد؛ به خانه برمی‌گردیم.
-        return DashboardPage(api: widget.api, reloadProfile: _loadProfile);
+        return DashboardPage(
+          api: widget.api,
+          reloadProfile: _loadProfile,
+          pendingGrants: _pendingGrants,
+        );
     }
   }
 
@@ -690,13 +701,7 @@ class _HomeShellState extends State<HomeShell>
 
   void _onNavTap(int slot) {
     if (slot < _navIndexes.length) {
-      setState(() => _index = _navIndexes[slot]);
-    } else {
-      _openMore();
-    }
-  }
-
-  Future<void> _openMore() async {
+      setState(() => _index = _navIndexenc {
     final picked = await showModalBottomSheet<int>(
       context: context,
       showDragHandle: true,
@@ -1303,6 +1308,15 @@ class _AnnouncementBanner extends StatelessWidget {
                 onTap: onDismiss,
                 child: const Icon(Icons.close_rounded,
                     size: 16, color: Colors.white54),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+54),
               ),
             ],
           ),

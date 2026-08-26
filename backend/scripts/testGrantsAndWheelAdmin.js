@@ -98,6 +98,10 @@ ok(/_PendingChests\(/.test(droidInv) && /grants: widget\.grants/.test(droidInv),
 const dash = read('mobile/lib/screens/user/dashboard_page.dart');
 ok((dash.match(/pendingGrants/g) || []).length >= 3,
   'اندروید داشبورد pendingGrants را بعد از شبکه هم نگه می‌دارد');
+ok(/widget\.pendingGrants/.test(dash)
+  && /pendingGrants: _pendingGrants/.test(read('mobile/lib/screens/user/home_shell.dart'))
+  && /_refreshDashboardConfig/.test(read('mobile/lib/screens/user/home_shell.dart')),
+  'بنر خانه بعد از باز کردن صندوق در کلکسیون کهنه نمی‌ماند');
 
 ok(/require\('\.\/routes\/adminWheel'\)/.test(server),
   'مسیر ادمین گردونه در server.js mount شده');

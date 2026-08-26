@@ -28,6 +28,10 @@ class DashboardPage extends StatefulWidget {
   final VoidCallback? onOpenReferral;
   final VoidCallback? onOpenInventory;
 
+  /// منبعِ واحدِ بنر صندوق: از پوسته می‌آید تا بعد از باز کردن صندوق
+  /// در کلکسیون، خانه همان عدد کهنه را نشان ندهد.
+  final List<Map<String, dynamic>> pendingGrants;
+
   const DashboardPage({
     super.key,
     required this.api,
@@ -37,6 +41,7 @@ class DashboardPage extends StatefulWidget {
     this.onOpenWheel,
     this.onOpenReferral,
     this.onOpenInventory,
+    this.pendingGrants = const [],
   });
 
   @override
@@ -160,6 +165,10 @@ class _DashboardPageState extends State<DashboardPage> {
     }
     nextReward ??= sorted.isNotEmpty ? sorted.last : null;
 
+    // پوسته منبع حقیقت است. اگر خالی بودنِ ویجت را با کش محلی پر کنیم،
+    // بعد از باز کردن صندوق دوباره بنر کهنه برمی‌گردد.
+    final pendingChests = widget.pendingGrants;
+
     final theme = Theme.of(context);
 
     return RefreshIndicator(
@@ -167,8 +176,7 @@ class _DashboardPageState extends State<DashboardPage> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, Gaps.xxl),
         children: [
-          if ((_data?['pendingGrants'] is List) &&
-              (_data!['pendingGrants'] as List).isNotEmpty) ...[
+          if (pendingChests.isNotEmpty) ...[
             InkWell(
               onTap: widget.onOpenInventory,
               child: Container(
@@ -184,7 +192,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
                 child: Text(
                   'صندوق کارت برنده‌ای — از کلکسیون بازش کن  ·  '
-                  '${faNum((_data!['pendingGrants'] as List).length)} صندوق',
+                  '${faNum(pendingChests.length)} صندوق',
                   style: const TextStyle(
                       color: Color(0xFFFFD166),
                       fontWeight: FontWeight.w900,
