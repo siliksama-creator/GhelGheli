@@ -19,6 +19,16 @@ import { GrantChestOpener } from '../components/CardBoxReveal.jsx';
 
 const fa = n => new Intl.NumberFormat('fa-IR').format(Number(n || 0));
 
+/** شانس را خوانا نشان بده. زیر ۰.۰۱٪ به‌جای اعشارِ بی‌معنی، «۱ در N». */
+function formatChance(percent) {
+  const p = Number(percent) || 0;
+  if (p <= 0) return `${fa(0)}٪`;
+  if (p >= 1) return `${fa(Math.round(p * 10) / 10)}٪`;
+  if (p >= 0.01) return `${fa(Math.round(p * 100) / 100)}٪`;
+  const n = Math.max(1, Math.round(100 / p));
+  return `۱ در ${fa(n)}`;
+}
+
 /** شمارش معکوس فارسی. رو به بالا گرد می‌شود — «۱ ساعت» وقتی ۹۰ دقیقه مانده
  *  وعده‌ای است که زیرش می‌زنیم. */
 function countdown(ms) {
@@ -249,6 +259,31 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
           </p>
         )}
       </div>
+
+      {(state.prizes || []).some((p) => Number(p.percent) > 0) && (
+        <div className="wheelOdds" style={{ marginTop: 16 }}>
+          <h3 style={{ margin: '0 0 8px', fontSize: 14 }}>شانس هر جایزه</h3>
+          <ul style={{ margin: 0, padding: 0, listStyle: 'none', fontSize: 12.5 }}>
+            {state.prizes.map((p) => (
+              <li key={p.id || p.sliceOrder} style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                marginBottom: 5,
+              }}>
+                <span style={{
+                  width: 10, height: 10, borderRadius: 3,
+                  background: p.color || '#84CC16', flexShrink: 0,
+                }} />
+                <span style={{ flex: 1 }}>{p.label}</span>
+                <b>{formatChance(p.percent)}</b>
+              </li>
+            ))}
+          </ul>
+          <p className="hint" style={{ marginTop: 8 }}>
+            این عددها از پنل می‌آیند. برش‌ها از نظر اندازه مساوی‌اند؛
+            جایزه را سرور با همین شانس‌ها انتخاب می‌کند.
+          </p>
+        </div>
+      )}
 
       {result && (
         <div className={`wheelResult ${result.kind}`}>

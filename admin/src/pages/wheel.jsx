@@ -16,6 +16,22 @@ const DEFAULT_COLORS = [
   '#F43F5E', '#FBBF24', '#FDE68A', '#FB7185', '#34D399',
 ];
 
+function pctOf(weight, total) {
+  const t = Number(total) || 0;
+  if (t <= 0) return 0;
+  return Math.round((Number(weight || 0) * 100 / t) * 1e5) / 1e5;
+}
+function weightOf(percent, total) {
+  return Math.round(Number(percent || 0) * Number(total || 0) / 100);
+}
+function fmtPct(p) {
+  const n = Number(p) || 0;
+  if (n <= 0) return '۰';
+  if (n >= 1) return (Math.round(n * 10) / 10).toLocaleString('fa-IR');
+  if (n >= 0.01) return (Math.round(n * 100) / 100).toLocaleString('fa-IR');
+  return n.toLocaleString('fa-IR', { maximumFractionDigits: 5 });
+}
+
 /**
  * ویرایشگر گردونه — ظاهر و درون.
  *
@@ -78,7 +94,7 @@ export function WheelAdminPage({ request }) {
 
   async function save() {
     if (!weightOk) {
-      notify(`جمع وزن فعال باید دقیقاً ${weightTotal.toLocaleString('fa-IR')} باشد`, 'error');
+      notify('جمع شانس برش‌های فعال باید دقیقاً ۱۰۰٪ باشد', 'error');
       return;
     }
     setSaving(true);
@@ -108,8 +124,8 @@ export function WheelAdminPage({ request }) {
             <CircleDot size={20} /> محتوای گردونه
           </h2>
           <p className="topbar-sub">
-            برچسب و رنگ همین حالا روی اپ و وب دیده می‌شود. وزن جمعِ برش‌های فعال باید
-            دقیقاً {weightTotal.toLocaleString('fa-IR')} باشد وگرنه گردونه از کار می‌افتد.
+            برچسب، رنگ، نوع جایزه و شانس همین حالا روی اپ و وب می‌نشیند.
+            جمع شانس برش‌های فعال باید دقیقاً ۱۰۰٪ باشد.
           </p>
         </div>
         <Button onClick={save} disabled={saving || !weightOk}>
@@ -118,26 +134,38 @@ export function WheelAdminPage({ request }) {
       </div>
 
       <Card
-        title="جمع وزن"
+        title="جمع شانس"
         action={weightOk
           ? <Badge tone="success">سالم</Badge>
           : <Badge tone="warning">نخواند</Badge>}
       >
         <p style={{ margin: 0, fontSize: 13 }}>
-          فعال: <b>{activeWeight.toLocaleString('fa-IR')}</b>
-          {' · '}هدف: <b>{weightTotal.toLocaleString('fa-IR')}</b>
+          فعال: <b>{fmtPct(pctOf(activeWeight, weightTotal))}٪</b>
+          {' · '}هدف: <b>۱۰۰٪</b>
           {' · '}باقی: <b style={{ color: remaining === 0 ? 'var(--gg-success)' : 'var(--gg-danger)' }}>
-            {remaining.toLocaleString('fa-IR')}
+            {fmtPct(pctOf(remaining, weightTotal))}٪
           </b>
         </p>
         <p className="topbar-sub" style={{ marginTop: 6 }}>
-          اگر باقی منفی است وزن را کم کن. اگر مثبت است به یک برش اضافه کن.
+          اگر باقی منفی است شانس یکی را کم کن. اگر مثبت است به یکی اضافه کن.
           نرمال‌سازی خودکار نداریم — یک صفرِ جاافتاده می‌تواند جایزهٔ بزرگ را صد برابر کند.
         </p>
+        <ul style={{ margin: '10px 0 0', padding: 0, listStyle: 'none', fontSize: 12 }}>
+          {prizes.filter((p) => p.isActive).map((p) => {
+            const pct = pctOf(p.weight, weightTotal);
+            return (
+              <li key={p.id || p.sliceOrder} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
+                <span style={{ width: 10, height: 10, borderRadius: 3, background: p.color }} />
+                <span style={{ flex: 1 }}>{p.label}</span>
+                <b>{fmtPct(pct)}٪</b>
+              </li>
+            );
+          })}
+        </ul>
       </Card>
 
       <Card title="پیش‌نمایش برش‌ها" subtitle="همان چیزی که کاربر روی گردونه می‌بیند — رنگ و برچسب زنده است.">
-        <WheelPreview prizes={prizes.filter((p) => p.isActive)} />
+        <WheelPreview prizes={prizes.filter((p) => p.isActive)} weightTotal={weightTotal} />
       </Card>
 
       {prizes.map((p, i) => (
@@ -191,10 +219,10 @@ export function WheelAdminPage({ request }) {
                   onChange={(e) => setPrize(i, { value: Number(e.target.value) || 0 })} />
               </Field>
             )}
-            <Field label="وزن (از ده میلیون)">
-              <Input type="number" min="0"
-                value={p.weight}
-                onChange={(e) => setPrize(i, { weight: Number(e.target.value) || 0 })} />
+            <Field label="شانس (٪)">
+              <Input type="number" min="0" max="100" step="0.00001"
+                value={pctOf(p.weight, weightTotal)}
+                onChange={(e) => setPrize(i, { weight: weightOf(e.target.value, weightTotal) })} />
             </Field>
             <Field label="ترتیب برش">
               <Input type="number" min="1" max="24"
@@ -225,10 +253,11 @@ export function WheelAdminPage({ request }) {
   );
 }
 
-function WheelPreview({ prizes }) {
+function WheelPreview({ prizes, weightTotal }) {
   if (!prizes.length) {
     return <p className="topbar-sub">هیچ برش فعالی نیست.</p>;
   }
+  const total = Number(weightTotal) || prizes.reduce((s, p) => s + Number(p.weight || 0), 0);
   const n = prizes.length;
   const stops = prizes.map((p, i) => {
     const a0 = (i / n) * 360;
@@ -247,7 +276,7 @@ function WheelPreview({ prizes }) {
         {prizes.map((p) => (
           <li key={p.id || p.sliceOrder} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
             <span style={{ width: 12, height: 12, borderRadius: 3, background: p.color }} />
-            {p.label} · {KIND_LABEL[p.kind] || p.kind}
+            {p.label} · {KIND_LABEL[p.kind] || p.kind} · {fmtPct(p.weight)}٪
           </li>
         ))}
       </ul>

@@ -41,7 +41,7 @@ module.exports = function createAdminWheelRoutes(deps) {
         req.body?.reason || null,
         { count: prizes.length, active: prizes.filter((p) => p.isActive).length });
       res.json({
-        message: 'محتوای گردونه ذخیره شد — ظاهر اپ و وب همین حالا عوض می‌شود',
+        message: 'محتوای گردونه ذخیره شد — شانس و ظاهر همین حالا روی اپ و وب عوض می‌شود',
         prizes,
         weightTotal: wheel.WEIGHT_TOTAL,
         activeWeight: prizes.filter((p) => p.isActive)

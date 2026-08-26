@@ -37,6 +37,7 @@ class _AdminWheelState extends State<AdminWheel> {
   bool _loading = true;
   bool _saving = false;
   String? _error;
+  int _gen = 0;
 
   int get _activeWeight => _prizes
       .where((p) => p['isActive'] != false)
@@ -50,6 +51,23 @@ class _AdminWheelState extends State<AdminWheel> {
 
   int _asInt(dynamic v) =>
       v is int ? v : (v is num ? v.toInt() : int.tryParse('$v') ?? 0);
+
+  double _pct(int weight) {
+    if (_weightTotal <= 0) return 0;
+    return (weight * 10000000 / _weightTotal).round() / 100000;
+  }
+
+  String _fmtPct(double p) {
+    if (p <= 0) return '0';
+    if (p >= 1) {
+      final one = (p * 10).round() / 10;
+      return one == one.roundToDouble()
+          ? '${one.toInt()}'
+          : one.toStringAsFixed(1);
+    }
+    if (p >= 0.01) return p.toStringAsFixed(2);
+    return p.toStringAsFixed(5);
+  }
 
   Future<void> _load() async {
     try {
@@ -66,6 +84,7 @@ class _AdminWheelState extends State<AdminWheel> {
         _weightTotal = _asInt(d is Map ? d['weightTotal'] : 10000000);
         _loading = false;
         _error = null;
+        _gen += 1;
       });
     } catch (e) {
       if (!mounted) return;
@@ -78,7 +97,7 @@ class _AdminWheelState extends State<AdminWheel> {
 
   Future<void> _save() async {
     if (_activeWeight != _weightTotal) {
-      _snack('جمع وزن فعال باید دقیقاً ${faNum(_weightTotal)} باشد');
+      _snack('جمع شانس برش‌های فعال باید دقیقاً ۱۰۰٪ باشد');
       return;
     }
     setState(() => _saving = true);
@@ -141,13 +160,13 @@ class _AdminWheelState extends State<AdminWheel> {
         FormSection(
           title: 'محتوای گردونه',
           children: [
-            Text(
-              'برچسب و رنگ همین حالا روی اپ کاربر دیده می‌شود. '
-              'جمع وزن فعال باید دقیقاً ${faNum(_weightTotal)} باشد.',
-              style: const TextStyle(fontSize: 12, color: Colors.white60),
+            const Text(
+              'برچسب، رنگ، نوع جایزه و شانس همین حالا روی اپ و وب می‌نشیند. '
+              'جمع شانس برش‌های فعال باید دقیقاً ۱۰۰٪ باشد.',
+              style: TextStyle(fontSize: 12, color: Colors.white60),
             ),
             Text(
-              'فعال: ${faNum(_activeWeight)} · باقی: ${faNum(remaining)}',
+              'فعال: ${_fmtPct(_pct(_activeWeight))}٪ · باقی: ${_fmtPct(_pct(remaining))}٪',
               style: TextStyle(
                 fontWeight: FontWeight.w900,
                 color: ok ? const Color(0xFF22E7A6) : const Color(0xFFF87171),
@@ -264,13 +283,22 @@ class _AdminWheelState extends State<AdminWheel> {
               ),
             Gaps.vXs,
             TextFormField(
-              key: ValueKey('wheel_weight_$i'),
-              initialValue: '${p['weight']}',
-              keyboardType: TextInputType.number,
-              decoration:
-                  const InputDecoration(labelText: 'وزن (از ده میلیون)'),
-              onChanged: (v) =>
-                  setState(() => p['weight'] = int.tryParse(v) ?? 0),
+              key: ValueKey('wheel_pct_${i}_$_gen'),
+              initialValue: _fmtPct(_pct(_asInt(p['weight']))),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'شانس (٪)',
+                suffixText: '٪',
+              ),
+              onChanged: (v) {
+                final parsed =
+                    double.tryParse(v.replaceAll(',', '.')) ?? 0;
+                setState(() {
+                  final n = ((parsed * _weightTotal) / 100).round();
+                  p['weight'] = n < 0 ? 0 : (n > _weightTotal ? _weightTotal : n);
+                });
+              },
             ),
             Gaps.vXs,
             TextFormField(

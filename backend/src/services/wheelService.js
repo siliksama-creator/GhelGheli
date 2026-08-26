@@ -36,6 +36,29 @@ const PRIZE_KINDS = Object.freeze([
 const WEIGHT_TOTAL = 10000000;
 
 /**
+ * وزن صحیح ↔ درصد انسانی.
+ *
+ * پنل با درصد فکر می‌کند («این برش ۲۰٪ باشد»). قرعه با عدد صحیح.
+ * تبدیل اینجاست تا وب و اندروید هر کدام فرمول خودشان را نسازند و
+ * ۲۰.۷٪ یکی ۲۰۷۰۰۰۰ شود و دیگری ۲۰۶۹۸۱۶.
+ *
+ * پنج رقم اعشار کوچک‌ترین واحد را پوشش می‌دهد: ۱ / ۱۰٬۰۰۰٬۰۰۰ = ۰.۰۰۰۰۱٪.
+ */
+function weightToPercent(weight, total = WEIGHT_TOTAL) {
+  const w = Number(weight);
+  const t = Number(total);
+  if (!Number.isFinite(w) || !Number.isFinite(t) || t <= 0) return 0;
+  return Math.round((w * 100 / t) * 1e5) / 1e5;
+}
+
+function percentToWeight(percent, total = WEIGHT_TOTAL) {
+  const p = Number(percent);
+  const t = Number(total);
+  if (!Number.isFinite(p) || !Number.isFinite(t) || t <= 0) return 0;
+  return Math.round(p * t / 100);
+}
+
+/**
  * چرخش‌های نمایشی برای حساب‌های نامحدود.
  *
  * Infinity واقعی به JSON نمی‌رود (به null تبدیل می‌شود) و کلاینت‌ها با آن
@@ -109,7 +132,10 @@ function publicPrize(p) {
     value: p.value,
     color: p.color,
     sliceOrder: p.slice_order,
-    // وزن عمداً به کلاینتِ کاربر نمی‌رود.
+    // شانس به درصد — نه وزن خام. کلاینت‌ها جدول شانس را از همین
+    // می‌سازند تا عوض کردن پنل بدون آپدیت اپ روی وب و اندروید دیده شود.
+    // وزن خام عمداً نمی‌رود: عدد ده میلیونی فقط ابزار داخلی ذخیره است.
+    percent: weightToPercent(p.weight),
     itemSlug: payload.itemSlug || payload.item_slug || null,
   };
 }
@@ -455,6 +481,7 @@ async function listAll() {
       kind: p.kind,
       value: Number(p.value),
       weight: Number(p.weight),
+      percent: weightToPercent(Number(p.weight)),
       sliceOrder: p.slice_order,
       color: p.color,
       isActive: p.is_active !== false,
@@ -504,10 +531,21 @@ async function saveAll(rawList) {
         new Error(`تعداد صندوق «${label}» حداکثر ۵ است`),
         { status: 400 });
     }
-    const weight = Math.trunc(Number(row?.weight));
+    // درصد یا وزن — هر دو یک چیزند. پنل درصد می‌فرستد؛ تست‌های قدیمی
+    // و ذخیرهٔ دستی هنوز وزن می‌فرستند. اگر هر دو آمد، وزن منبع حقیقت
+    // است چون تبدیل درصد ممکن است یک واحد گرد کند.
+    let weight;
+    if (row?.weight !== undefined && row?.weight !== null && row?.weight !== '') {
+      weight = Math.trunc(Number(row.weight));
+    } else if (row?.percent !== undefined && row?.percent !== null && row?.percent !== '') {
+      weight = percentToWeight(row.percent);
+    } else {
+      throw Object.assign(
+        new Error(`شانس «${label}» مشخص نشده`), { status: 400 });
+    }
     if (!Number.isInteger(weight) || weight < 0 || weight > WEIGHT_TOTAL) {
       throw Object.assign(
-        new Error(`وزن «${label}» نامعتبر است`), { status: 400 });
+        new Error(`شانس «${label}» نامعتبر است`), { status: 400 });
     }
     const sliceOrder = Math.trunc(Number(row?.sliceOrder ?? row?.slice_order));
     if (!Number.isInteger(sliceOrder) || sliceOrder < 1 || sliceOrder > 24) {
@@ -548,8 +586,8 @@ async function saveAll(rawList) {
   if (activeWeight !== WEIGHT_TOTAL) {
     throw Object.assign(
       new Error(
-        `جمع وزن برش‌های فعال باید ${WEIGHT_TOTAL.toLocaleString('fa-IR')} باشد `
-        + `ولی ${activeWeight.toLocaleString('fa-IR')} است`,
+        `جمع شانس برش‌های فعال باید دقیقاً ۱۰۰٪ باشد `
+        + `ولی الان ${weightToPercent(activeWeight)}٪ است`,
       ),
       { status: 400, code: 'WEIGHT_MISMATCH', expected: WEIGHT_TOTAL, actual: activeWeight },
     );
@@ -631,5 +669,6 @@ module.exports = {
   prizes, status, spinCount, spin, history, stats,
   listAll, saveAll, publicPrize,
   pickPrize, tehranDay, msUntilTehranMidnight, storedDay,
+  weightToPercent, percentToWeight,
   WEIGHT_TOTAL, UNLIMITED_DISPLAY, PRIZE_KINDS,
 };

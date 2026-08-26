@@ -36,6 +36,7 @@ class WheelPrize {
     required this.value,
     required this.color,
     required this.sliceOrder,
+    this.percent = 0,
     this.grantId,
   });
 
@@ -44,6 +45,8 @@ class WheelPrize {
   final int value;
   final Color color;
   final int sliceOrder;
+  /// شانس این برش به درصد، از سرور. صفر یعنی سرور قدیمی است و جدول نشان داده نمی‌شود.
+  final double percent;
   final String? grantId;
 
   static WheelPrize fromJson(Map<String, dynamic> j) {
@@ -65,6 +68,7 @@ class WheelPrize {
       value: asInt(j['value']),
       color: parse(j['color']),
       sliceOrder: asInt(j['sliceOrder']),
+      percent: j['percent'] is num ? (j['percent'] as num).toDouble() : 0,
       grantId: j['grantId'] == null ? null : '${j['grantId']}',
     );
   }
@@ -914,6 +918,76 @@ class _ResultCardState extends State<_ResultCard>
 }
 
 
+String formatWheelChance(double p) {
+  if (p <= 0) return '${faNum(0)}٪';
+  if (p >= 1) return '${faNum((p * 10).round() / 10)}٪';
+  if (p >= 0.01) return '${faNum((p * 100).round() / 100)}٪';
+  final n = (100 / p).round();
+  return '۱ در ${faNum(n < 1 ? 1 : n)}';
+}
+
+/// جدول شانس زنده — همان عددی که پنل ذخیره کرده.
+class _OddsCard extends StatelessWidget {
+  const _OddsCard({required this.prizes});
+  final List<WheelPrize> prizes;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(Gaps.md),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.onSurface.withValues(alpha: 0.04),
+        borderRadius: Corners.rLg,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('شانس هر جایزه',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFFA3E635),
+              )),
+          Gaps.vXs,
+          for (final p in prizes)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 5),
+              child: Row(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: p.color,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(p.label, style: theme.textTheme.bodySmall),
+                  ),
+                  Text(
+                    formatWheelChance(p.percent),
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(fontWeight: FontWeight.w900),
+                  ),
+                ],
+              ),
+            ),
+          Text(
+            'این عددها از پنل می‌آیند. برش‌ها از نظر اندازه مساوی‌اند؛ '
+            'جایزه را سرور با همین شانس‌ها انتخاب می‌کند.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.62),
+              height: 1.55,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// توضیح قوانین گردونه.
 class _RulesCard extends StatelessWidget {
   const _RulesCard({required this.dailyQuota, this.unlimited = false});
@@ -1079,6 +1153,10 @@ class _AnimeSpinButtonState extends State<_AnimeSpinButton>
             ),
           ),
         );
+      },
+    );
+  }
+}
       },
     );
   }

@@ -36,6 +36,9 @@ ok(/grants\.award/.test(wheel),
   'چرخشِ صندوق از grantService می‌گذرد نه grantBox مستقیم');
 ok(/async function saveAll/.test(wheel) && /WEIGHT_TOTAL/.test(wheel),
   'ذخیرهٔ ادمین جمع وزن را با WEIGHT_TOTAL می‌سنجد');
+ok(/percentToWeight/.test(wheel) && /weightToPercent/.test(wheel)
+  && /percent: weightToPercent/.test(wheel),
+  'شانس گردونه به درصد به کلاینت می‌رود نه وزن خام');
 ok(/WEIGHT_MISMATCH/.test(wheel),
   'وزن ناهماهنگ بی‌صدا نرمال نمی‌شود');
 
@@ -79,6 +82,11 @@ ok(/\/api\/grants\/\$id\/open/.test(droidInv),
 const webWheelUi = read('userweb/src/screens/Wheel.jsx');
 ok(/<LiveWheelDisc\s+prizes/.test(webWheelUi) && /conic-gradient/.test(webWheelUi),
   'وب گردونه را واقعاً از جوایز سرور می‌کشد');
+ok(/formatChance/.test(webWheelUi) && /p\.percent/.test(webWheelUi),
+  'وب شانس هر جایزه را از سرور نشان می‌دهد');
+ok(/formatWheelChance/.test(read('mobile/lib/screens/user/wheel_page.dart'))
+  && /p\.percent/.test(read('mobile/lib/screens/user/wheel_page.dart')),
+  'اندروید شانس هر جایزه را از سرور نشان می‌دهد');
 ok(!/<img className="wheelDisc"/.test(webWheelUi),
   'وب دیگر تصویر ثابت /wheel/wheel.svg را به‌جای دیسک زنده نمی‌گذارد');
 ok(/<GrantChestOpener/.test(webWheelUi),

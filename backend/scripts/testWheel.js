@@ -43,6 +43,21 @@ test('جمع وزن‌ها دقیقاً ده میلیون است', () => {
   assert.strictEqual(total, 10000000);
 });
 
+test('وزن و درصد به هم تبدیل می‌شوند بدون از دست دادن واحد', () => {
+  assert.strictEqual(wheel.percentToWeight(20.7), 2070000);
+  assert.strictEqual(wheel.weightToPercent(2070000), 20.7);
+  assert.strictEqual(wheel.percentToWeight(100), wheel.WEIGHT_TOTAL);
+  assert.strictEqual(wheel.weightToPercent(10), 0.0001);
+  assert.strictEqual(wheel.weightToPercent(wheel.percentToWeight(1)), 1);
+});
+
+test('جایزهٔ عمومی شانس دارد و وزن خام ندارد', () => {
+  const pub = wheel.publicPrize({ ...PRIZES[0], payload: {} });
+  assert.strictEqual(typeof pub.percent, 'number');
+  assert.ok(pub.percent > 20 && pub.percent < 21, String(pub.percent));
+  assert.strictEqual(pub.weight, undefined);
+});
+
 test('جوایز بزرگ واقعاً «خیلی خیلی کم» هستند', () => {
   // خواستهٔ صریح مالک. با ۲ چرخش در روز، هر کدام از این‌ها یعنی چند دهه
   // انتظار برای یک کاربر — که همان چیزی است که خواسته شد.

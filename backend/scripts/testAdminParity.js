@@ -85,6 +85,8 @@ const webWheel = read('admin/src/pages/wheel.jsx');
 const mobileWheel = read('mobile/lib/screens/admin/admin_wheel.dart');
 check(/admin\/wheel\/prizes/.test(webWheel) && /admin\/wheel\/prizes/.test(mobileWheel),
   'both admin clients edit wheel prizes');
+check(/شانس/.test(webWheel) && /شانس/.test(mobileWheel),
+  'both admin clients edit wheel chances as percent, not raw 10-million weights');
 check(/card_box/.test(webWheel) && /card_box/.test(mobileWheel),
   'both admin clients can put a card box on the wheel');
 check(/card_box/.test(read('admin/src/pages/league.jsx'))
