@@ -91,4 +91,14 @@ check(/card_box/.test(read('admin/src/pages/league.jsx'))
   && /card_box/.test(read('mobile/lib/screens/admin/admin_league.dart')),
   'both admin clients can award a card box as a league perk');
 
+const webBox = read('admin/src/pages/card-box.jsx');
+const mobileBox = read('mobile/lib/screens/admin/admin_card_box.dart');
+check(webBox.includes('/api/admin/card-box') && mobileBox.includes('/api/admin/card-box'),
+  'both admin clients edit card-box odds');
+check(/weightTotal/.test(webBox) && /_weightTotal/.test(mobileBox),
+  'both admin clients refuse to save odds that do not sum to 100%');
+check(/card-box/.test(read('admin/src/main.jsx'))
+  && /AdminCardBox/.test(read('mobile/lib/screens/admin/admin_shell.dart')),
+  'both admin shells expose the card-box page');
+
 console.log(`\n✅ ${passed} admin parity assertions passed\n`);

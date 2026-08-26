@@ -437,49 +437,13 @@ export default function CardBox({ token, compact = false, onGranted }) {
     {error && <p className="cardBoxErr">{error}</p>}
 
     {phase === 'revealing' && won && won.length > 0 && (
-      <div className="cardBoxReveal" role="dialog" aria-label="کارت‌های صندوق">
-        <div className="cardBoxRevealInner">
-          <h4 className="cardBoxRevealTitle">صندوق باز شد</h4>
-          <p className="cardBoxRevealSub">
-            <span className="cardBoxTotal">{fa(won.length)} کارت</span> به کلکسیونت اضافه شد
-            {wonMeta?.points > 0 && <>
-              {' · '}
-              <span className="cardBoxTotalPts">{fa(wonMeta.points)} امتیاز</span>
-            </>}
-          </p>
-          {wonMeta?.distinct && <p className="cardBoxRevealNote">
-            همهٔ کارت‌ها متفاوت‌اند — ترکیبت کامل است
-          </p>}
-          <div className="cardBoxDeck">
-            {won.map((c, i) => {
-              const meta = CARD_RARITY_META[c.rarity] || { label: c.rarity, accent: '#94A3B8' };
-              return <div
-                key={i}
-                className={`cardBoxPrize cardBoxPrize--${c.rarity || 'normal'} ${i < revealed ? 'shown' : ''}`}
-                style={{ '--accent': meta.accent }}
-              >
-                <span className="cardBoxPrizeTier">{meta.label}</span>
-                {c.imageUrl && (
-                  <img
-                    className="cardBoxPrizeImg"
-                    src={c.imageUrl.startsWith('http') ? c.imageUrl : API + c.imageUrl}
-                    alt={c.name || 'کارت'}
-                    loading="lazy"
-                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                  />
-                )}
-                <span className="cardBoxPrizeName">{c.name || 'کارت'}</span>
-                <span className="cardBoxPrizePts">{fa(c.pointValue || 0)} امتیاز</span>
-              </div>;
-            })}
-          </div>
-          {revealed >= won.length && (
-            <button type="button" className="cardBoxDone" onClick={closeReveal}>
-              عالی
-            </button>
-          )}
-        </div>
-      </div>
+      <CardBoxReveal
+        cards={won}
+        points={wonMeta?.points || 0}
+        distinct={wonMeta?.distinct}
+        revealed={revealed}
+        onClose={closeReveal}
+      />
     )}
   </section>;
 }

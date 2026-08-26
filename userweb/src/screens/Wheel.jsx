@@ -15,6 +15,7 @@ import { req } from '../lib/api.js';
 import { play as playSfx } from '../gameAudio.js';
 import { heavyImpact } from '../haptics.js';
 import { SvgIcon, AssetIcon } from '../components/IconAsset.jsx';
+import { GrantChestOpener } from '../components/CardBoxReveal.jsx';
 
 const fa = n => new Intl.NumberFormat('fa-IR').format(Number(n || 0));
 
@@ -94,8 +95,7 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
   // برشِ برنده، برای درخشش بعد از توقف. null یعنی هیچ.
   const [winner, setWinner] = useState(null);
   const [history, setHistory] = useState([]);
-  const [opening, setOpening] = useState(false);
-  const [opened, setOpened] = useState(null);
+
 
   // مجموع چرخش تجمعی است و هرگز کم نمی‌شود: اگر زاویه را ریست کنیم، گردونه
   // بین دو چرخش به عقب می‌پرد.
@@ -134,7 +134,6 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
     if (spinning || !state || state.spinsLeft <= 0) return;
     setSpinning(true);
     setResult(null);
-    setOpened(null);
     try {
       const res = await req('/api/wheel/spin', 'POST', {}, token);
       const n = state.prizes.length;
@@ -184,20 +183,6 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
   if (!state) {
     return <section className="card wide"><p className="hint">در حال بارگذاری…</p></section>;
   }
-
-  const openGrant = async (id) => {
-    if (!id || opening) return;
-    setOpening(true);
-    try {
-      const r = await req(`/api/grants/${id}/open`, 'POST', {}, token);
-      setMsg?.(r.message || 'صندوق باز شد');
-      reloadProfile?.();
-    } catch (e) {
-      setMsg?.(e?.data?.message || e.message || 'باز کردن صندوق ناموفق بود');
-    } finally {
-      setOpening(false);
-    }
-  };
 
   const canSpin = state.spinsLeft > 0 && !spinning;
 
@@ -274,22 +259,13 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
               <p className="hint" style={{ marginTop: 8 }}>
                 صندوق کارت به کلکسیونت اضافه شد. همین‌جا یا از کلکسیون بازش کن.
               </p>
-              {result.grantId && !opened && (
-                <button type="button" className="primary" style={{ marginTop: 8 }}
-                  disabled={opening} onClick={() => openGrant(result.grantId)}>
-                  {opening ? 'در حال باز کردن…' : 'باز کردن صندوق'}
-                </button>
-              )}
-              {opened?.cards?.length > 0 && (
-                <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {opened.cards.map((c, i) => (
-                    <span key={i} style={{
-                      background: 'rgba(0,0,0,.35)', borderRadius: 10, padding: '8px 10px',
-                      fontSize: 12, fontWeight: 800,
-                    }}>
-                      {c.name} · {fa(c.pointValue || 0)} امتیاز
-                    </span>
-                  ))}
+              {result.grantId && (
+                <div style={{ marginTop: 8 }}>
+                  <GrantChestOpener
+                    token={token}
+                    grantId={result.grantId}
+                    onOpened={() => reloadProfile?.()}
+                  />
                 </div>
               )}
             </>

@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { fa, req } from '../lib/api.js';
+import { fa } from '../lib/api.js';
 import PlayerCard from '../components/PlayerCard.jsx';
 import { cardQtyOf } from '../lib/cards.js';
 import { SvgIcon } from '../components/IconAsset.jsx';
+import { GrantChestOpener } from '../components/CardBoxReveal.jsx';
 
 const asInt = v => Number.parseInt(v || 0, 10) || 0;
 const dateOf = m => new Date(m.updated_at || m.created_at || 0).getTime();
@@ -19,22 +20,6 @@ function stats(items) {
 
 function GrantChests({ token, grants, onOpened }) {
   const [busy, setBusy] = useState(null);
-  const [error, setError] = useState('');
-  const [won, setWon] = useState(null);
-
-  const open = async (id) => {
-    if (busy) return;
-    setBusy(id); setError('');
-    try {
-      const r = await req(`/api/grants/${id}/open`, 'POST', {}, token);
-      setWon(r);
-      onOpened?.();
-    } catch (e) {
-      setError(e.message || 'باز کردن صندوق ناموفق بود');
-    } finally {
-      setBusy(null);
-    }
-  };
 
   return (
     <div className="card" style={{
@@ -43,29 +28,19 @@ function GrantChests({ token, grants, onOpened }) {
     }}>
       <b style={{ color: '#FFD166' }}>صندوق کارت برنده‌ای</b>
       <p className="hint" style={{ margin: '6px 0 10px' }}>
-        این صندوق‌ها جایزهٔ گردونه یا لیگ‌اند. بازشان کن تا پنج کارت تصادفی بگیری.
+        این صندوق‌ها جایزهٔ گردونه یا لیگ‌اند. بازشان کن تا کارت‌های تصادفی بگیری.
       </p>
       {grants.map((g) => (
-        <button key={g.id} type="button" className="primary"
-          disabled={busy === g.id}
-          onClick={() => open(g.id)}
-          style={{ marginInlineEnd: 8, marginBottom: 6 }}>
-          {busy === g.id ? 'در حال باز کردن…' : (g.label || 'باز کردن صندوق')}
-        </button>
+        <GrantChestOpener
+          key={g.id}
+          token={token}
+          grantId={g.id}
+          label={g.label}
+          disabled={Boolean(busy) && busy !== g.id}
+          onBusy={setBusy}
+          onOpened={onOpened}
+        />
       ))}
-      {error && <p style={{ color: '#FCA5A5', fontSize: 12 }}>{error}</p>}
-      {won?.cards?.length > 0 && (
-        <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {won.cards.map((c, i) => (
-            <span key={i} style={{
-              background: 'rgba(0,0,0,.35)', borderRadius: 10, padding: '8px 10px',
-              fontSize: 12, fontWeight: 800,
-            }}>
-              {c.name} · {fa(c.pointValue || 0)} امتیاز
-            </span>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

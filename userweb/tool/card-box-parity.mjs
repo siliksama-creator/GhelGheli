@@ -44,6 +44,7 @@ const ok = (label, cond) => {
 console.log('\n== صندوق کارت ==');
 
 const webBox = read('userweb/src/components/CardBox.jsx');
+const webReveal = read('userweb/src/components/CardBoxReveal.jsx');
 const andBox = read('mobile/lib/widgets/card_box.dart');
 const webShop = read('userweb/src/screens/Shop.jsx');
 const andShop = read('mobile/lib/screens/user/shop_page.dart');
@@ -103,7 +104,7 @@ for (const [label, src] of [['وب', webBox], ['اندروید', andBox]]) {
 // تصمیمِ صریحِ مالک در دورِ ۲۶ (ناقضِ تصمیمِ قبلی): کارتِ صندوق باید
 // `point_value` بدهد. اگر UI این را نگوید، کاربر ارزشِ خرید را نمی‌بیند.
 ok('وب امتیازِ کارت‌ها را نشان می‌دهد',
-  /pointValue/.test(webBox) && /امتیاز/.test(webBox));
+  /pointValue/.test(webReveal) && /امتیاز/.test(webReveal) && /امتیاز/.test(webBox));
 ok('اندروید امتیازِ کارت‌ها را نشان می‌دهد',
   /pointValue/.test(andBox) && /امتیاز/.test(andBox));
 
@@ -175,5 +176,20 @@ const webStep = webBox.match(/260\s*\*\s*i/);
 const andStep = andBox.match(/260\s*\*\s*i/);
 ok('گامِ رونمایی در هر دو کلاینت یکی است',
   Boolean(webStep) && Boolean(andStep));
+
+// ── ۱۰. جایزهٔ گردونه/لیگ همان رونمایی خرید را دارد ──────────────────
+//
+// مسیر خرید از اول overlay سینمایی داشت. مسیر جایزه فقط نام کارت را
+// در یک ردیف می‌نوشت. کاربر دو حس متفاوت از «باز شدن صندوق» می‌گرفت.
+const webInv = read('userweb/src/screens/Inventory.jsx');
+const webWheel = read('userweb/src/screens/Wheel.jsx');
+ok('وب کلکسیون از GrantChestOpener استفاده می‌کند',
+  /<GrantChestOpener/.test(webInv));
+ok('وب گردونه از GrantChestOpener استفاده می‌کند',
+  /<GrantChestOpener/.test(webWheel));
+ok('رونمایی جایزه همان گام ۲۶۰ms خرید را دارد',
+  /260\s*\*\s*i/.test(webReveal));
+ok('رونمایی جایزه لرزش و تصویر صندوق دارد',
+  /shaking/.test(webReveal) && /card_box_closed/.test(webReveal));
 
 console.log(`\n✅ ${pass} تست صندوقِ کارت موفق بود\n`);

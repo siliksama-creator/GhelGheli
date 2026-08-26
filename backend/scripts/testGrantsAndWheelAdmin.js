@@ -70,8 +70,8 @@ ok(/user_item_grants/.test(mig) && /card_box/.test(mig),
   'مایگریشن جدول grants و نوع card_box را می‌سازد');
 
 const webInv = read('userweb/src/screens/Inventory.jsx');
-ok(/\/api\/grants\/\$\{id\}\/open/.test(webInv),
-  'وب صندوق جایزه را از کلکسیون باز می‌کند');
+ok(/<GrantChestOpener/.test(webInv),
+  'وب صندوق جایزه را از کلکسیون با رونمایی سینمایی باز می‌کند');
 const droidInv = read('mobile/lib/screens/user/inventory_page.dart');
 ok(/\/api\/grants\/\$id\/open/.test(droidInv),
   'اندروید صندوق جایزه را از کلکسیون باز می‌کند');
@@ -81,9 +81,8 @@ ok(/<LiveWheelDisc\s+prizes/.test(webWheelUi) && /conic-gradient/.test(webWheelU
   'وب گردونه را واقعاً از جوایز سرور می‌کشد');
 ok(!/<img className="wheelDisc"/.test(webWheelUi),
   'وب دیگر تصویر ثابت /wheel/wheel.svg را به‌جای دیسک زنده نمی‌گذارد');
-ok(/\/api\/grants\/\$\{id\}\/open/.test(webWheelUi)
-  || /\/api\/grants\/\$\{.*grantId/.test(webWheelUi),
-  'وب از صفحهٔ گردونه هم صندوق را باز می‌کند');
+ok(/<GrantChestOpener/.test(webWheelUi),
+  'وب از صفحهٔ گردونه هم صندوق را با همان رونمایی باز می‌کند');
 
 const webMain = read('userweb/src/main.jsx');
 ok(/pendingGrants:\s*boot\.pendingGrants/.test(webMain),
@@ -145,8 +144,17 @@ ok(/TickerProviderStateMixin/.test(read('mobile/lib/screens/user/wheel_page.dart
 ok(/RefreshIndicator/.test(read('mobile/lib/screens/admin/admin_wheel.dart')),
   'پنل گردونهٔ اندروید کشیدن-برای-تازه‌سازی دارد');
 
-ok(/opened\?\.cards/.test(webWheelUi),
-  'وب بعد از باز کردن صندوق از گردونه کارت‌ها را نشان می‌دهد');
+ok(server.includes("require('./routes/adminCardBox')")
+  && read('admin/src/pages/card-box.jsx').includes('/api/admin/card-box')
+  && read('mobile/lib/screens/admin/admin_card_box.dart').includes('/api/admin/card-box'),
+  'شانس صندوق از هر دو پنل ادمین ذخیره می‌شود');
+
+ok(/<GrantChestOpener/.test(webWheelUi)
+  && read('userweb/src/components/CardBoxReveal.jsx').includes('cardBoxReveal'),
+  'وب بعد از باز کردن صندوق از گردونه کارت‌ها را با overlay نشان می‌دهد');
+ok(/resultRef/.test(read('userweb/src/components/CardBoxReveal.jsx'))
+  && /if \(r\) onOpened/.test(read('userweb/src/components/CardBoxReveal.jsx')),
+  'تازه کردن لیست کلکسیون overlay را وسط لرزش نمی‌کشد');
 
 const shopWeb = read('userweb/src/screens/Shop.jsx');
 ok(/کیف پول با خرید شارژ نمی‌شود/.test(shopWeb),

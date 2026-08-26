@@ -2552,6 +2552,12 @@ app.use('/api', require('./routes/adminWheel')({
   pool, adminAuth, requireRole, asyncHandler, audit, wheel,
 }));
 
+// شانس و قیمت صندوق کارت — بدون این mount پنل روی /admin/card-box
+// چهار۰۴ می‌گرفت و «قابل تنظیم بودنِ شانس» فقط روی کاغذ بود.
+app.use('/api', require('./routes/adminCardBox')({
+  pool, adminAuth, requireRole, asyncHandler, audit, cardBox,
+}));
+
 // تنظیماتِ اقتصادِ بازی‌ها (سکه، سهمیه، درصدِ انتقال بین لیگ‌ها،
 // سکهٔ ضربه‌زن و امتیازِ برد/باخت) — پنل ادمین وب و اندروید.
 app.use('/api', require('./routes/adminGameEconomy')({

@@ -24,6 +24,114 @@ const { pool } = require('../config/db');
 const BOX_SIZE = 5;
 const DEFAULT_PRICE = 100000;
 
+// پنج کلاسِ ثابتِ جدول `card_box_odds`. ترتیب نمایش در پنل ادمین همین است
+// — از معمولی به کمیاب — تا مدیر شانس را مثل نردبان ببیند، نه مثل JSON.
+const RARITIES = Object.freeze(['normal', 'silver', 'gold', 'premium', 'legend']);
+const RARITY_LABELS = Object.freeze({
+  normal: 'معمولی',
+  silver: 'نقره‌ای',
+  gold: 'طلایی',
+  premium: 'پرمیوم',
+  legend: 'لجند',
+});
+// در هزار. همان قیدِ مایگریشن ۰۷۲/۰۷۳: جمع باید دقیقاً ۱۰۰۰ باشد.
+const WEIGHT_TOTAL = 1000;
+// پیش‌فرض زندهٔ تولید بعد از مایگریشن ۰۷۳ (لجند ۱٪). دکمهٔ «بازگردانی»
+// پنل همین را می‌گذارد، نه اعدادِ اولیهٔ ۰۷۲.
+const DEFAULT_ODDS = Object.freeze({
+  normal: 409,
+  silver: 306,
+  gold: 153,
+  premium: 122,
+  legend: 10,
+});
+
+function fail(message, status = 400, code) {
+  return Object.assign(new Error(message), { status, code });
+}
+
+/**
+ * ورودی پنل را به `{rarity: permille}` تبدیل می‌کند.
+ *
+ * ── چرا نرمال‌سازیِ بی‌صدا ممنوع است ──
+ *
+ * اگر جمع ۹۹٪ بود و ما خودمان ۱٪ را به معمولی اضافه می‌کردیم، مدیر
+ * ذخیره می‌زد و فردا می‌پرسید «چرا لجند ۱.۱٪ شده». در مسیر پولی، عددِ
+ * اشتباهِ آشکار بهتر از عددِ «درست‌شده»ی پنهان است. همان فلسفهٔ گردونه
+ * (`WEIGHT_MISMATCH`).
+ *
+ * هم آرایهٔ `{rarity, permille|percent}` قبول است هم نقشهٔ
+ * `{normal: 409, ...}`. هر پنج کلاس باید باشند؛ نبودنِ یکی یعنی فرم
+ * ناقص است، نه «شانس صفر».
+ */
+function parseOddsInput(input) {
+  const raw = input && typeof input === 'object' ? input : {};
+  const list = Array.isArray(raw) ? raw
+    : Array.isArray(raw.odds) ? raw.odds
+      : null;
+  const map = {};
+  if (list) {
+    for (const row of list) {
+      if (!row || typeof row !== 'object') continue;
+      const rarity = String(row.rarity || '');
+      if (!RARITIES.includes(rarity)) continue;
+      if (row.permille !== undefined && row.permille !== null && row.permille !== '') {
+        map[rarity] = Math.trunc(Number(row.permille));
+      } else if (row.percent !== undefined && row.percent !== null && row.percent !== '') {
+        map[rarity] = Math.round(Number(row.percent) * 10);
+      }
+    }
+  } else {
+    for (const rarity of RARITIES) {
+      const v = raw[rarity];
+      if (v === undefined || v === null || v === '') continue;
+      if (typeof v === 'object') {
+        if (v.permille !== undefined) map[rarity] = Math.trunc(Number(v.permille));
+        else if (v.percent !== undefined) map[rarity] = Math.round(Number(v.percent) * 10);
+      } else {
+        map[rarity] = Math.trunc(Number(v));
+      }
+    }
+  }
+
+  const missing = RARITIES.filter((r) => map[r] === undefined);
+  if (missing.length) {
+    throw fail(
+      `شانس این کلاس‌ها مشخص نشده: ${missing.map((r) => RARITY_LABELS[r]).join('، ')}`,
+      400,
+      'ODDS_INCOMPLETE',
+    );
+  }
+  for (const rarity of RARITIES) {
+    const w = map[rarity];
+    if (!Number.isFinite(w) || w < 0 || w > WEIGHT_TOTAL) {
+      throw fail(
+        `شانس «${RARITY_LABELS[rarity]}» باید بین ۰ و ۱۰۰٪ باشد`,
+        400,
+        'ODDS_RANGE',
+      );
+    }
+    map[rarity] = w;
+  }
+  const sum = RARITIES.reduce((s, r) => s + map[r], 0);
+  if (sum !== WEIGHT_TOTAL) {
+    throw fail(
+      `جمع شانس‌ها باید دقیقاً ۱۰۰٪ باشد؛ الان ${(sum / 10).toFixed(1)}٪ است`,
+      400,
+      'ODDS_MISMATCH',
+    );
+  }
+  return map;
+}
+
+function parsePrice(value) {
+  const n = Math.trunc(Number(value));
+  if (!Number.isFinite(n) || n < 1 || n > 10_000_000) {
+    throw fail('قیمت صندوق باید بین ۱ تا ۱۰٬۰۰۰٬۰۰۰ تومان باشد');
+  }
+  return n;
+}
+
 // ── چرا قرعه‌کشی دو مرحله‌ای است ──────────────────────────────────────────
 //
 // اول کلاس (rarity) با وزن انتخاب می‌شود، بعد یک کارت **درونِ** آن کلاس
@@ -339,13 +447,107 @@ function createCardBoxService(db = pool) {
     }));
   }
 
-  return { odds, price, overview, grantBox, history };
+  function formatOdds(table) {
+    const total = Object.values(table).reduce((s, w) => s + Number(w || 0), 0)
+      || WEIGHT_TOTAL;
+    return RARITIES.map((rarity) => {
+      const w = Number(table[rarity] || 0);
+      return {
+        rarity,
+        label: RARITY_LABELS[rarity],
+        permille: w,
+        percent: Math.round((w / total) * 1000) / 10,
+      };
+    });
+  }
+
+  /**
+   * نمای پنل ادمین: شانس، قیمت، و تعداد کارت زندهٔ هر کلاس.
+   *
+   * تعداد کارت برای تصمیم است، نه برای قرعه. اگر لجند صفر کارت داشته
+   * باشد، وزنش موقع باز شدن بین بقیه پخش می‌شود — مدیر باید این را
+   * ببیند وگرنه «۳٪ لجند» را ذخیره می‌کند و هیچ‌وقت لجند نمی‌آید.
+   */
+  async function adminView() {
+    const [table, boxPrice, counts] = await Promise.all([
+      odds(),
+      price(),
+      db.query(
+        `SELECT COALESCE(duel_rarity, 'normal') AS rarity, COUNT(*)::int AS n
+           FROM card_types
+          WHERE is_active = true AND is_collectible = false
+          GROUP BY 1`,
+      ),
+    ]);
+    const catalogue = Object.fromEntries(RARITIES.map((r) => [r, 0]));
+    for (const row of counts.rows) {
+      if (catalogue[row.rarity] !== undefined) catalogue[row.rarity] = Number(row.n);
+    }
+    const list = formatOdds(table).map((o) => ({
+      ...o,
+      catalogueCount: catalogue[o.rarity] || 0,
+    }));
+    return {
+      price: boxPrice,
+      weightTotal: WEIGHT_TOTAL,
+      sum: list.reduce((s, o) => s + o.permille, 0),
+      odds: list,
+    };
+  }
+
+  async function saveOdds(input, client = null) {
+    const map = parseOddsInput(input);
+    const own = !client;
+    const c = client || await db.connect();
+    try {
+      if (own) await c.query('BEGIN');
+      for (const rarity of RARITIES) {
+        await c.query(
+          `INSERT INTO card_box_odds (rarity, weight_permille, updated_at)
+           VALUES ($1,$2,NOW())
+           ON CONFLICT (rarity) DO UPDATE
+             SET weight_permille = EXCLUDED.weight_permille,
+                 updated_at = NOW()`,
+          [rarity, map[rarity]],
+        );
+      }
+      if (own) await c.query('COMMIT');
+      return map;
+    } catch (e) {
+      if (own) await c.query('ROLLBACK').catch(() => {});
+      throw e;
+    } finally {
+      if (own) c.release();
+    }
+  }
+
+  async function savePrice(value, adminId = null, client = db) {
+    const n = parsePrice(value);
+    await client.query(
+      `INSERT INTO app_settings(key, value, updated_by_admin_id, updated_at)
+       VALUES ('card_box_price', $1, $2, NOW())
+       ON CONFLICT (key) DO UPDATE
+         SET value = EXCLUDED.value,
+             updated_by_admin_id = EXCLUDED.updated_by_admin_id,
+             updated_at = NOW()`,
+      [JSON.stringify(n), adminId || null],
+    );
+    return n;
+  }
+
+  return { odds, price, overview, grantBox, history, adminView, saveOdds, savePrice };
 }
 
 module.exports = {
   ...createCardBoxService(),
   createCardBoxService,
   pickWeighted,
+  parseOddsInput,
+  parsePrice,
+  RARITIES,
+  RARITY_LABELS,
+  WEIGHT_TOTAL,
+  DEFAULT_ODDS,
   BOX_SIZE,
   DEFAULT_PRICE,
 };
