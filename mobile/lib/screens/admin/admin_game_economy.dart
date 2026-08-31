@@ -38,6 +38,11 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
   final _tap = TextEditingController();
   final _q100 = TextEditingController();
   final _q1000 = TextEditingController();
+  // ── منحنیِ ضربه‌زن (دورِ ۳۳) — قابلِ مدیریت بدونِ آپدیتِ اپ ──
+  final _tapLevels = TextEditingController();
+  final _tapTotal = TextEditingController();
+  final _tapGrowth = TextEditingController();
+  final _tapPerDay = TextEditingController();
   final _winPts = TextEditingController();
   final _losePts = TextEditingController();
   final _drawPts = TextEditingController();
@@ -66,6 +71,10 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
     _tap.dispose();
     _q100.dispose();
     _q1000.dispose();
+    _tapLevels.dispose();
+    _tapTotal.dispose();
+    _tapGrowth.dispose();
+    _tapPerDay.dispose();
     _winPts.dispose();
     _losePts.dispose();
     _drawPts.dispose();
@@ -95,6 +104,11 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
       setState(() {
         _pct.text = '${e['coinCarryoverPercent'] ?? 10}';
         _tap.text = '${e['tapCoinsPerLevel'] ?? 5}';
+        final tc = jsonMap(e['tapCurve']);
+        _tapLevels.text = '${tc['levelCount'] ?? 50}';
+        _tapTotal.text = '${tc['totalPoints'] ?? 50000}';
+        _tapGrowth.text = '${tc['growthFactor'] ?? 1.05}';
+        _tapPerDay.text = '${tc['levelsPerDay'] ?? 2}';
         // JSON کلیدِ عددی را رشته می‌فرستد. `quota[100]` همیشه null بود
         // و پنل بعد از ذخیره دوباره پیش‌فرض نشان می‌داد.
         _q100.text = '${jsonGet(quota, 100) ?? 30}';
@@ -142,6 +156,13 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
           'tapCoinsPerLevel': _v(_tap, 5),
           'dailyCoinQuota': {'100': _v(_q100, 30), '1000': _v(_q1000, 15)},
           'coinRewards': coinRewards,
+          'tapCurve': {
+            'levelCount': _v(_tapLevels, 50),
+            'totalPoints': _v(_tapTotal, 50000),
+            'growthFactor':
+                double.tryParse(_tapGrowth.text.trim()) ?? 1.05,
+            'levelsPerDay': _v(_tapPerDay, 2),
+          },
         },
         'gamePoints': {
           'enabled': _pointsEnabled,
@@ -220,7 +241,7 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
                 ),
                 Gaps.vSm,
                 FormSection(
-                  title: 'سهمیهٔ روزانه و ضربه‌زن',
+                  title: 'سهمیهٔ روزانه و سکهٔ ضربه‌زن',
                   children: [
                     Wrap(
                       spacing: 10,
@@ -230,6 +251,27 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
                         _numField(_q1000, 'سهمیهٔ ۱۰۰۰'),
                         _numField(_tap, 'سکهٔ هر لولِ ضربه‌زن'),
                       ],
+                    ),
+                  ],
+                ),
+                Gaps.vSm,
+                FormSection(
+                  title: 'منحنیِ بازی ضربه‌زن (دورِ ۳۳)',
+                  children: [
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        _numField(_tapLevels, 'تعداد لول', width: 110),
+                        _numField(_tapTotal, 'جمعِ امتیازِ کل', width: 130),
+                        _numField(_tapGrowth, 'شیب (۱ تا ۱٫۵)', width: 120),
+                        _numField(_tapPerDay, 'لول در روز', width: 110),
+                      ],
+                    ),
+                    const Text(
+                      'جمعِ امتیاز دقیقاً بینِ لول‌ها پخش می‌شود. تغییرِ منحنی پیشرفتِ کسی را پاک نمی‌کند؛ '
+                      'بازیکنانِ تمام‌کرده تا ریستِ دستی آزاد نمی‌شوند (بخشِ «آمار و ریست» پایین).',
+                      style: TextStyle(fontSize: 11.5, color: Colors.white60),
                     ),
                   ],
                 ),
@@ -313,6 +355,221 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
             label: Text(_saving ? 'در حال ذخیره…' : 'ذخیرهٔ همه'),
           ),
           Gaps.vMd,
+          // ── آمار و ریستِ بازی ضربه‌زن (دورِ ۳۳) ──
+          _TapStatsSection(api: widget.api),
+          Gaps.vMd,
+        ],
+      ),
+    );
+  }
+}
+
+/// آمارِ «چه کسانی بازی را تمام کردند» + ریستِ تک‌کاربر یا کلِ بازی.
+///
+/// خواستهٔ مالک: «ادمین بتونه کامل بازی ضربه‌زن رو مدیریت کنه و درصورت
+/// نیاز رست بده و آمار لولِ آخر شدن کاربرها رو داشته باشه». ریستِ
+/// تک‌کاربر فقط همان یک نفر را به لول ۱ برمی‌گرداند؛ «ریستِ کل» برای
+/// فصلِ تازه است و همهٔ پیشرفت‌ها را پاک می‌کند.
+class _TapStatsSection extends StatefulWidget {
+  const _TapStatsSection({required this.api});
+
+  final ApiClient api;
+
+  @override
+  State<_TapStatsSection> createState() => _TapStatsSectionState();
+}
+
+class _TapStatsSectionState extends State<_TapStatsSection> {
+  Map<String, dynamic>? _stats;
+  bool _loading = true;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final res = await widget.api.get('/api/admin/tap/stats');
+      if (!mounted || res is! Map) return;
+      setState(() {
+        _stats = Map<String, dynamic>.from(res);
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _toast(String m) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+  }
+
+  Future<void> _resetOne(Map u) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('ریست پیشرفت ضربه‌زن'),
+        content: Text(
+            'پیشرفتِ «${u['nickname']}» پاک شود؟ از لول ۱ شروع می‌کند.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('ریست')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _busy = true);
+    try {
+      final d = await widget.api
+          .post('/api/admin/tap/reset', {'userId': u['userId']}) as Map;
+      _toast('${d['message'] ?? 'ریست شد'}');
+      await _load();
+    } catch (e) {
+      _toast(apiError(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _resetAll() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('ریست کل بازی ضربه‌زن'),
+        content: const Text(
+            'پیشرفتِ «همهٔ کاربران» پاک می‌شود. برای شروعِ فصلِ تازه است و برگشت‌پذیر نیست.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('ریست کل'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _busy = true);
+    try {
+      final d = await widget.api
+          .post('/api/admin/tap/reset', {'all': true}) as Map;
+      _toast('${d['message'] ?? 'ریست کل انجام شد'}');
+      await _load();
+    } catch (e) {
+      _toast(apiError(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const AppCard(child: LoadingView());
+    }
+    final s = _stats;
+    if (s == null) return const SizedBox.shrink();
+    final finished = (s['finishedUsers'] as List?) ?? const [];
+    final curve = s['curve'] is Map ? Map<String, dynamic>.from(s['curve'] as Map) : const <String, dynamic>{};
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text('بازی ضربه‌زن — آمار و ریست',
+                    style: Theme.of(context).textTheme.titleMedium),
+              ),
+              IconButton(
+                onPressed: _load,
+                icon: const Icon(Icons.refresh_rounded, size: 20),
+                tooltip: 'به‌روزرسانی',
+              ),
+            ],
+          ),
+          Gaps.vXs,
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _statChip('بازیکن', '${s['players'] ?? 0}'),
+              _statChip('تمام‌کرده', '${s['finished'] ?? 0}',
+                  color: const Color(0xFFFFD166)),
+              _statChip('روی لولِ آخر', '${s['atFinalLevel'] ?? 0}'),
+              _statChip(
+                  'سکهٔ داده‌شده', '${s['totalCoinsAwarded'] ?? 0}',
+                  color: const Color(0xFFFFD166)),
+              if (curve.isNotEmpty)
+                _statChip('منحنی', '${curve['levelCount']} لول · ${curve['levelsPerDay']}/روز'),
+            ],
+          ),
+          Gaps.vSm,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  'بازیکنانی که بازی را تمام کرده‌اند (${finished.length})',
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: _busy ? null : _resetAll,
+                icon: const Icon(Icons.restart_alt_rounded, size: 17),
+                label: const Text('ریست کل'),
+                style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+              ),
+            ],
+          ),
+          if (finished.isEmpty)
+            const Text('هنوز کسی بازی را تمام نکرده است.',
+                style: TextStyle(fontSize: 12, color: Colors.white60))
+          else
+            for (final u in finished)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                leading: const Icon(Icons.emoji_events_rounded,
+                    color: Color(0xFFFFD166), size: 22),
+                title: Text('${u['nickname']}',
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                subtitle: Text(
+                  '${u['pointsAwarded'] ?? 0} امتیاز · ${u['coinsAwarded'] ?? 0} سکه',
+                  style: const TextStyle(fontSize: 11.5),
+                ),
+                trailing: TextButton(
+                  onPressed: _busy ? null : () => _resetOne(Map<String, dynamic>.from(u)),
+                  child: const Text('ریست'),
+                ),
+              ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statChip(String label, String value, {Color? color}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        borderRadius: Corners.rMd,
+        color: (color ?? Colors.white).withValues(alpha: 0.08),
+        border: Border.all(
+            color: (color ?? Colors.white).withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        children: [
+          Text(value,
+              style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 16,
+                  color: color ?? Colors.white)),
+          Text(label, style: const TextStyle(fontSize: 10.5, color: Colors.white60)),
         ],
       ),
     );
