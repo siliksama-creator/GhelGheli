@@ -125,7 +125,7 @@ export function BattlePassPage({ request }) {
   return (
     <div className="page-stack">
       <Card title="فصل‌های گذر نبرد" subtitle="فقط یک فصل می‌تواند فعال باشد — فعال‌کردن فصل جدید، قبلی را می‌بندد"
-        action={<Button icon={Plus} onClick={() => document.getElementById('new-season-form').scrollIntoView({ behavior: 'smooth' })}>فصل جدید</Button>}>
+        action={<Button icon={Plus} onClick={() => document.getElementById('new-season-form')?.scrollIntoView({ behavior: 'smooth' })}>فصل جدید</Button>}>
         {!loaded ? <p>در حال خواندن…</p> : seasonRows.length === 0 ? (
           <EmptyState icon={Layers} title="فصلی وجود ندارد" message="اولین فصل را بسازید." />
         ) : (

@@ -42,9 +42,9 @@ export function IconButton({ icon: Icon, variant = 'secondary', ...rest }) {
   );
 }
 
-export function Card({ title, subtitle, action, children, className = '', style }) {
+export function Card({ title, subtitle, action, children, className = '', style, ...rest }) {
   return (
-    <section className={`card ${className}`} style={style}>
+    <section className={`card ${className}`} style={style} {...rest}>
       {(title || action) && (
         <div className="card-header">
           <div>
