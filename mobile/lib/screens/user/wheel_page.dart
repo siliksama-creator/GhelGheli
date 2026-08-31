@@ -25,6 +25,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../api_client.dart';
+import '../../utils/fa_date.dart';
 import '../../theme/tokens.dart';
 import 'games/game_audio.dart';
 
@@ -124,6 +125,9 @@ class _WheelPageState extends State<WheelPage>
   int _winnerIndex = -1;
 
   List<WheelPrize> _prizes = const [];
+  // چرخش‌های اخیر — همان بخشِ «تاریخچه» که وب نشان می‌دهد؛ کاربر باید
+  // ببیند چرخشش ثبت شده حتی اگر اعلانِ نتیجه را از دست داده باشد.
+  List<Map<String, dynamic>> _history = const [];
   int _spinsLeft = 0;
   int _bonusSpins = 0;
   int _dailyQuota = 1;
@@ -156,10 +160,19 @@ class _WheelPageState extends State<WheelPage>
 
   Future<void> _load() async {
     try {
-      final res = await widget.api.get('/api/wheel');
+      final results = await Future.wait<dynamic>([
+        widget.api.get('/api/wheel'),
+        // تاریخچه جدا می‌آید و شکستِ آن نباید گردونه را از کار بیندازد.
+        widget.api.get('/api/wheel/history').catchError((_) => <String, dynamic>{}),
+      ]);
       if (!mounted) return;
-      final map = Map<String, dynamic>.from(res as Map);
+      final map = Map<String, dynamic>.from(results[0] as Map);
+      final hist = results[1] is Map ? results[1] as Map : const {};
       setState(() {
+        _history = (hist['spins'] as List? ?? const [])
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
         _prizes = (map['prizes'] as List? ?? [])
             .whereType<Map>()
             .map((e) => WheelPrize.fromJson(Map<String, dynamic>.from(e)))
@@ -489,6 +502,10 @@ class _WheelPageState extends State<WheelPage>
               api: widget.api,
               onOpened: widget.onChanged,
             ),
+          ],
+          if (_history.isNotEmpty) ...[
+            Gaps.vMd,
+            _HistoryCard(spins: _history),
           ],
           Gaps.vLg,
           // قوانین — مالک خواست همه‌چیز برای کاربر توضیح داده شود. بدون
@@ -992,6 +1009,70 @@ class _OddsCard extends StatelessWidget {
               height: 1.55,
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+
+/// چرخش‌های اخیر — آینهٔ بخشِ `wheelHistory` وب.
+///
+/// تا این دور فقط وب تاریخچهٔ ۸ چرخشِ آخر را نشان می‌داد؛ کاربر اندروید
+/// بعد از هر چرخش فقط اعلانِ لحظه‌ای را می‌دید. ثبتِ سرور (`wheel_spins`)
+/// روی هر دو پلتفرم بود — این‌جا فقط همان داده نمایش داده می‌شود.
+class _HistoryCard extends StatelessWidget {
+  const _HistoryCard({required this.spins});
+
+  final List<Map<String, dynamic>> spins;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final visible = spins.take(8).toList();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(Gaps.md),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.onSurface.withValues(alpha: 0.04),
+        borderRadius: Corners.rLg,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('چرخش‌های اخیر',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFFA3E635),
+              )),
+          Gaps.vXs,
+          for (final h in visible)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${h['label'] ?? ''}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: h['kind'] == 'cash'
+                            ? const Color(0xFFFDE68A)
+                            : null,
+                        fontWeight:
+                            h['kind'] == 'cash' ? FontWeight.w800 : null,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    faDate(h['at']),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );

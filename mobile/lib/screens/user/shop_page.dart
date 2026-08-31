@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../api_client.dart';
 import '../../core/cosmetics.dart';
 import '../../core/money.dart';
+import '../../utils/fa_date.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/async_section.dart';
@@ -26,6 +27,13 @@ class _ShopPageState extends State<ShopPage> {
   String? _busy;
   String _kind = 'card_frame';
   bool _showPlans = true;
+
+  /// سوابق خرید — مثل وب، با تپ باز/بسته می‌شود و تنبلانه از
+  /// `/api/shop/history` می‌آید (فقط وقتی کاربر بخواهد، نه در هر بازشدن
+  /// فروشگاه).
+  bool _showHistory = false;
+  bool _historyLoaded = false;
+  List<Map<String, dynamic>> _history = const [];
 
   /// آیا اول از کیف پول کم شود؟
   ///
@@ -112,6 +120,29 @@ class _ShopPageState extends State<ShopPage> {
       return null;
     } finally {
       if (mounted) setState(() => _busy = null);
+    }
+  }
+
+  /// باز/بستهٔ سوابق خرید؛ اولین بازشدن فهرست را از سرور می‌گیرد.
+  Future<void> _toggleHistory() async {
+    setState(() => _showHistory = !_showHistory);
+    if (_showHistory && !_historyLoaded) {
+      try {
+        final res = await widget.api.get('/api/shop/history?limit=24');
+        if (!mounted) return;
+        setState(() {
+          _history = (res is List ? res : const [])
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+          _historyLoaded = true;
+        });
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _historyLoaded = true); // خالی می‌ماند؛ دوباره می‌توان باز کرد
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('سوابق خرید در دسترس نیست — دوباره تلاش کن')));
+      }
     }
   }
 
@@ -407,9 +438,88 @@ class _ShopPageState extends State<ShopPage> {
                       fontSize: 9.5, color: Colors.white54, height: 1.5),
                 ),
               ),
+              // ── سوابق خرید — آینهٔ دکمهٔ «سوابق خرید» وب ──────────────
+              // تا این دور فقط وب این فهرست را داشت؛ خریدِ اندرویدی (به‌ویژه
+              // از کیف پول) در هیچ‌جای اپ دیده نمی‌شد و کاربر نمی‌توانست
+              // ببیند پولش صرفِ چه چیزی شده. داده از همان
+              // `/api/shop/history` سرور می‌آید که وب می‌خواند.
+              TextButton.icon(
+                onPressed: _toggleHistory,
+                icon: Icon(
+                  _showHistory
+                      ? Icons.keyboard_arrow_up_rounded
+                      : Icons.receipt_long_rounded,
+                  size: 16,
+                ),
+                label: Text(
+                  _showHistory
+                      ? 'بستن سوابق خرید'
+                      : 'سوابق خرید (${_history.isEmpty && !_historyLoaded ? '…' : faNum(_history.length)})',
+                ),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFF38BDF8),
+                  textStyle: const TextStyle(
+                      fontSize: 11.5, fontWeight: FontWeight.w800),
+                ),
+              ),
+              if (_showHistory) _HistoryPanel(history: _history),
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+/// فهرست سوابق خرید — آینهٔ `historyPanel` وب: نام آیتم، مبلغ، تاریخ.
+class _HistoryPanel extends StatelessWidget {
+  const _HistoryPanel({required this.history});
+
+  final List<Map<String, dynamic>> history;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    if (history.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 10),
+        child: Text('هنوز خریدی ثبت نشده است.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 11, color: Colors.white54)),
+      );
+    }
+    return Container(
+      margin: const EdgeInsets.only(top: 6),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final h in history.take(24))
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${h['name'] ?? ''}',
+                      style: const TextStyle(
+                          fontSize: 11.5, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  Text(
+                    '${faNum(h['price_paid'] ?? 0)} تومان · ${faDate(h['purchased_at'])}',
+                    style: TextStyle(
+                        fontSize: 10, color: theme.colorScheme.onSurface.withValues(alpha: 0.55)),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }
