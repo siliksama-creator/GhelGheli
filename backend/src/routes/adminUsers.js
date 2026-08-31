@@ -10,7 +10,10 @@ module.exports = function createAdminUserRoutes(deps) {
   } = deps;
   const router = express.Router();
 
-router.get('/admin/users', adminAuth, asyncHandler(async (req, res) => {
+// SECURITY (ممیزی دورِ ۲۳): requireRole('support') اضافه شد — فهرستِ
+// کاربران PII کامل (موبایل، شهر، حساب بانکی، موجودی) را برمی‌گرداند؛
+// نقشِ «ناظر» (observer) فقط باید آمارِ کلیِ داشبورد را ببیند.
+router.get('/admin/users', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
   const rawQ = String(req.query.search || req.query.q || req.query.query || '').trim();
   const search = `%${rawQ}%`;
   const normalizedDigits = rawQ.replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
@@ -49,7 +52,8 @@ router.get('/admin/users', adminAuth, asyncHandler(async (req, res) => {
     level: level.levelFromXp(u.game_xp).level,
   })));
 }));
-router.get('/admin/users/:id', adminAuth, validateUuid('id'), asyncHandler(async (req, res) => {
+// SECURITY (ممیزی دورِ ۲۳): مثل فهرست — پروندهٔ کاملِ کاربر PII دارد.
+router.get('/admin/users/:id', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
   const user = await pool.query('SELECT * FROM users WHERE id=$1', [req.params.id]);
   if (!user.rows[0]) return res.status(404).json({ message: 'کاربر پیدا نشد' });
   const [codes, userGrants, shopItems] = await Promise.all([
@@ -357,7 +361,8 @@ router.post('/admin/users/:id/points', adminAuth, validateUuid('id'), requireRol
 //
 // خواستهٔ مالک: «کاربر هارو میتونه از شماره موبایلی که ثبت کردن
 // جستجوکنه و ریز امتیازات کاملشون رو ببینه».
-router.get('/admin/points/search', adminAuth, asyncHandler(async (req, res) => {
+// SECURITY (ممیزی دورِ ۲۳): نتیجهٔ جست‌وجو موبایلِ کاربران را برمی‌گرداند.
+router.get('/admin/points/search', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
   const q = String(req.query.q || '');
   if (q.trim().length < 3) {
     return res.json({ users: [], message: 'حداقل ۳ نویسه وارد کنید' });
@@ -366,7 +371,8 @@ router.get('/admin/points/search', adminAuth, asyncHandler(async (req, res) => {
 }));
 
 // ریزِ کاملِ امتیازاتِ یک کاربر + خلاصهٔ منابع.
-router.get('/admin/points/user/:id', adminAuth, validateUuid('id'), asyncHandler(async (req, res) => {
+// SECURITY (ممیزی دورِ ۲۳): مثل جست‌وجو — دفترِ امتیاز با موبایلِ کاربر.
+router.get('/admin/points/user/:id', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
   const u = await pool.query(
     `SELECT id, mobile, nickname, first_name, last_name, status,
             current_points, lifetime_points, monthly_league_points, joined_at

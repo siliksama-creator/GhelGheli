@@ -174,7 +174,10 @@ router.delete('/admin/card-types/:id', adminAuth, validateUuid('id'),
     res.json({ message: `«${t.rows[0].name}» حذف شد` });
   }));
 
-router.get('/admin/card-codes', adminAuth, asyncHandler(async (req, res) => {
+// SECURITY (ممیزی دورِ ۲۳): requireRole('support') اضافه شد — این پاسخ
+// «کدهای کارتِ استفاده‌نشده» را کامل برمی‌گرداند؛ کدِ استفاده‌نشده ارزشِ
+// قابلِ بازخرید است و دیدنش باید محدودِ پشتیبانی باشد، نه هر نقشِ فعالی.
+router.get('/admin/card-codes', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
   const { status, cardTypeId, userId, search } = req.query;
   const params = []; const where = [];
   if (status) { params.push(status); where.push(`c.status=$${params.length}`); }

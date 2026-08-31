@@ -23,7 +23,7 @@ const {
 } = require('./services/notificationService');
 const gameStakes = require('./services/gameStakeService');
 const { ensureActiveSeason, addLeaguePoints, getLeaderboard, closeActiveSeason, closeExpiredSeasons, approvePayouts: leagueApprove, defaultPrizeTable, seedCarryoverFromLatestClosed } = require('./services/leagueService');
-const { optimizeUpload, kb } = require('./services/imageService');
+const { optimizeUpload, verifyUpload, kb, IMAGE_EXT_RE } = require('./services/imageService');
 const { getGameRewardSettings, saveGameRewardSettings } = require('./services/gameRewardService');
 const walletService = require('./services/walletService');
 const referrals = require('./services/referralService');
@@ -114,6 +114,37 @@ if (process.env.NODE_ENV === 'production') {
 const uploadRoot = path.join(__dirname, '..', 'uploads');
 const imageUploadDir = path.join(uploadRoot, 'images');
 fs.mkdirSync(imageUploadDir, { recursive: true });
+// ═══════════════════════════════════════════════════════════════════════════
+// قرنطینهٔ فایل‌های غیرتصویریِ ممکن‌مانده از روزگارِ فیلترِ ضعیف‌تر
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// تا این کامیت، فیلترِ آپلود فقط به mimetype اعلامیِ فرستنده اعتماد می‌کرد
+// و پسوندِ فایل را دست‌نخورده نگه می‌داشت؛ در نتیجه ممکن است فایل‌های
+// .html/.svg/.js از قبل روی دیسک مانده باشند و express.static آن‌ها را با
+// Content-Type اجرایی سرو کند. حذفِ آنی هم درست نیست (شاید بررسی‌اش لازم
+// باشد) — به‌جایش به uploads/.quarantine منتقل می‌شوند که هیچ مسیری
+// سروش نمی‌کند. idempotent است و بعد از این کامیت دیگر چیزی برای
+// قرنطینه‌کردن ندارد.
+try {
+  const DANGEROUS_EXT = /\.(html?|xhtml|svg|js|mjs|xml|css)$/i;
+  const quarantineDir = path.join(uploadRoot, '.quarantine');
+  let quarantined = 0;
+  for (const name of fs.readdirSync(imageUploadDir)) {
+    if (!DANGEROUS_EXT.test(name)) continue;
+    try {
+      fs.mkdirSync(quarantineDir, { recursive: true });
+      // پیشوندِ زمانی برای نامِ تکراری در قرنطینه.
+      fs.renameSync(
+        path.join(imageUploadDir, name),
+        path.join(quarantineDir, `${Date.now()}-${name}`),
+      );
+      quarantined++;
+    } catch { /* فایل سرِجایش ماند؛ بعد از فیلترِ تازه فایلِ تازه‌ای اضافه نمی‌شود */ }
+  }
+  if (quarantined > 0) {
+    console.warn(`[uploads] ${quarantined} فایلِ غیرتصویری به قرنطینه منتقل شد (uploads/.quarantine)`);
+  }
+} catch { /* پوشهٔ images هنوز وجود ندارد — بی‌خطر */ }
 // CROSS-ORIGIN FIX: helmet() sets Cross-Origin-Resource-Policy: same-origin
 // by default. The API is on api.ghelghelishop.ir but the web app runs on
 // user.ghelghelishop.ir, so every uploaded card image / ticket attachment was
@@ -227,6 +258,19 @@ const docsGuard = (req, res, next) => {
   return res.status(404).json({ message: 'یافت نشد' });
 };
 app.use('/docs', docsGuard, swaggerUi.serve, swaggerUi.setup(YAML.parse(fs.readFileSync(path.join(__dirname, '..', 'docs/openapi.yaml'), 'utf8'))));
+// ── فیلترِ پسوندِ آپلود ──────────────────────────────────────────────────
+//
+// SECURITY (ممیزی دورِ ۲۳): پسوندِ «فایلِ ذخیره‌شده» همان پسوندِ فرستنده
+// است. فیلترِ قبلی فقط به mimetype اعلامیِ multipart اعتماد می‌کرد — که
+// سمتِ کلاینت است و جعلش هزینه‌ای ندارد — پس فایلِ evil.html با اعلامِ
+// دروغینِ image/png رد می‌شد، در optimizeUpload (که برای محتوای غیرتصویری
+// شکست می‌خورد و به‌خاطر «عکسِ کند بهتر از عکسِ گم‌شده است» اصلِ فایل را
+// نگه می‌دارد) دست‌نخورده می‌ماند و بعد express.static آن را با Content-Type
+// بر اساسِ پسوند — یعنی text/html یا image/svg+xml — سرو می‌کرد: XSSِ
+// ذخیره‌شده روی دامنهٔ API. حالا پسوندِ نامِ فایل هم باید تصویری باشد
+// (IMAGE_EXT_RE از imageService — همان یک تعریف، همیشه هم‌خوان). فایلِ
+// بی‌پسوند رد نمی‌شود؛ محتوایش را verifyUpload بعد از نوشتن با sharp
+// راستی‌آزمایی می‌کند و در صورتِ خرابی همان‌جا حذف و ۴۰۰ می‌شود.
 const imageUpload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => cb(null, imageUploadDir),
@@ -238,7 +282,12 @@ const imageUpload = multer({
   // 12 MB: modern phone photos routinely exceed 5 MB. The server re-encodes
   // every upload straight away, so what actually gets stored stays small.
   limits: { fileSize: 12 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => cb(null, /^image\/(png|jpe?g|webp|gif)$/i.test(file.mimetype)),
+  fileFilter: (req, file, cb) => {
+    const declaredImage = /^image\/(png|jpe?g|webp|gif)$/i.test(file.mimetype);
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    // پسوندِ خالی = «نامشخص»؛ محتوا بعداً با sharp چک می‌شود.
+    cb(null, declaredImage && (!ext || IMAGE_EXT_RE.test(ext)));
+  },
 });
 
 const asyncHandler = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -2066,7 +2115,12 @@ function sanitizeAttachments(input) {
   for (const raw of input) {
     const v = String(raw || '').trim();
     if (!v) continue;
-    if (!/^\/uploads\/images\/[A-Za-z0-9._-]+$/.test(v)) {
+    // SECURITY (ممیزی دورِ ۲۳): پسوندِ فایل هم باید تصویری باشد. قبلاً هر
+    // مسیری زیر /uploads/images/ با هر پسوندی پذیرفته می‌شد — از جمله
+    // .html/.svg که (قبل از سخت‌گیریِ فیلترِ آپلود) می‌شد فایلِ حمله را
+    // به‌عنوان پیوستِ تیکت به کاربر/ادمین نشان داد. حالا فقط همان
+    // پسوندهایی که فیلترِ multer می‌پذیرد.
+    if (!/^\/uploads\/images\/[A-Za-z0-9._-]+\.(png|jpe?g|webp|gif)$/i.test(v)) {
       const err = new Error('یکی از پیوست‌ها معتبر نیست');
       err.status = 400;
       throw err;
@@ -2096,6 +2150,10 @@ const uploadLimiter = rateLimit({
 
 app.post('/api/support/uploads/image', auth, uploadLimiter, imageUpload.single('image'), asyncHandler(async (req, res) => {
   if (!req.file) return res.status(400).json({ message: 'فقط فایل تصویری (PNG/JPG/WEBP/GIF) مجاز است' });
+  // محتوای واقعیِ فایل راستی‌آزمایی شود، نه فقط اعلامِ فرستنده — چراییِ کامل
+  // روی خودِ verifyUpload در imageService نوشته شده است. خطایش status:400
+  // دارد و از همان error handlerِ عمومی پاسِ درست می‌گیرد.
+  await verifyUpload(req.file);
   // Phone photos are multi-megabyte; shrink before anyone has to download it.
   const r = await optimizeUpload(req.file);
   console.log(`[upload] support ${kb(r.bytesBefore)} -> ${kb(r.bytesAfter)}`);
@@ -2361,6 +2419,9 @@ app.post('/api/admin/uploads/image', adminAuth, requireRole('support'), imageUpl
   // fileFilter drops anything that isn't png/jpg/webp/gif without raising,
   // so a missing req.file here means "wrong type" rather than "no file".
   if (!req.file) return res.status(400).json({ message: 'فقط فایل تصویری (PNG/JPG/WEBP/GIF) مجاز است' });
+  // همانِ مسیر کاربر: محتوای واقعی با sharp راستی‌آزمایی می‌شود — mimetype
+  // و پسوندِ اعلامیِ فرستنده هر دو جعل‌شدنی‌اند (توضیح کامل در imageService).
+  await verifyUpload(req.file);
   const r = await optimizeUpload(req.file);
   console.log(`[upload] admin ${kb(r.bytesBefore)} -> ${kb(r.bytesAfter)}`);
   res.json({ url: `/uploads/images/${r.filename}`, bytes: r.bytesAfter });
@@ -2493,7 +2554,7 @@ app.use('/api', require('./routes/adminCardCatalog')({
 app.use('/api', require('./routes/photoCards')({
   pool, auth, adminAuth, requireRole, asyncHandler, imageUpload, audit,
   validateUuid, createNotification, addLeaguePoints, pass, io, getLeaderboard,
-  optimizeUpload, UUID_RE,
+  optimizeUpload, verifyUpload, UUID_RE,
 }));
 
 // Reward catalogue, grouping, and claim administration.

@@ -64,6 +64,47 @@ async function prewarmThumbnailVariants(sourcePath, filename) {
 const isAnimated = (mimetype, file) =>
   /gif/i.test(mimetype || '') || /\.gif$/i.test(file || '');
 
+// فرمت‌هایی که sharp از آنها metadata می‌خواند و ما در آپلود می‌پذیریم.
+// `jpeg` همان jpg است — نامی که libvips گزارش می‌کند.
+const DECODE_FORMATS = new Set(['png', 'jpeg', 'webp', 'gif']);
+// پسوندهای مجاز — همین RE در server.js هم برای فیلترِ multer استفاده می‌شود.
+const IMAGE_EXT_RE = /\.(png|jpe?g|webp|gif)$/i;
+
+/**
+ * راستی‌آزماییِ محتوای واقعیِ فایلِ تازه‌آپلودشده با sharp.
+ *
+ * فیلترِ multer فقط سراغِ «اعلامِ» فرستنده می‌رود (mimetype و پسوندِ نامِ
+ * فایل) — هر دو سمتِ کلاینت‌اند و جعلشان هزینه‌ای ندارد. این تابع بعد از
+ * نوشتنِ فایل روی دیسک، خودِ بایت‌ها را decode می‌کند؛ اگر sharp نتواند
+ * تصویر بخواند یا فرمتش جزو فرمت‌های مجاز نباشد، فایل همان‌جا حذف و خطای
+ * ۴۰۰ پرتاب می‌شود.
+ *
+ * چرا «حذف + ردِ صریح» و نه «نگه‌داشتنِ اصل» مثلِ fallbackِ optimizeUpload:
+ * آن رفتار برای تصویرِ خرابِ واقعی درست است (عکسِ کند بهتر از عکسِ گم‌شده
+ * است) ولی برای محتوای غیرتصویریِ جایگزین‌شده یعنی «ذخیرهٔ مطمئنِ فایلِ
+ * حمله» — و با پسوندهای تازه‌فیلترشده دیگر نباید پیش بیاید. این تابع
+ * تورِ آخر است: حتی اگر فایلی از فیلتر رد شود، تا decode نشود سرو نمی‌شود.
+ *
+ * باید بعد از multer و قبل از optimizeUpload صدا زده شود.
+ */
+async function verifyUpload(file) {
+  if (!file || !file.path) return;
+  // sharp جزو dependencies است؛ نبودنش فقط در محیطِ ناقصِ dev ممکن است.
+  // در آن حالت به فیلترِ mimetype/پسوندِ multer اکتفا می‌کنیم.
+  if (!sharp) return;
+  let format = null;
+  try {
+    const meta = await sharp(file.path, { failOn: 'none' }).metadata();
+    format = meta && meta.format;
+  } catch {
+    format = null;
+  }
+  if (!format || !DECODE_FORMATS.has(format)) {
+    try { fs.unlinkSync(file.path); } catch { /* قبلاً حذف شده — اشکالی ندارد */ }
+    throw Object.assign(new Error('فایل تصویری معتبر نیست'), { status: 400 });
+  }
+}
+
 /**
  * Optimises a freshly uploaded file in place.
  *
@@ -120,8 +161,10 @@ const kb = n => `${Math.round(n / 1024)}KB`;
 
 module.exports = {
   optimizeUpload,
+  verifyUpload,
   prewarmThumbnailVariants,
   CARD_THUMB_WIDTHS,
   kb,
   MAX_DIMENSION,
+  IMAGE_EXT_RE,
 };

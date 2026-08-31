@@ -19,7 +19,10 @@ router.get('/admin/wallet/stats', adminAuth, asyncHandler(async (req, res) => {
 
 // فهرست درخواست‌های برداشت. تنها نقطه‌ای که شمارهٔ کامل کارت برمی‌گردد،
 // چون مدیر باید واریز را واقعاً انجام دهد.
-router.get('/admin/wallet/withdrawals', adminAuth, asyncHandler(async (req, res) => {
+// SECURITY (ممیزی دورِ ۲۳): requireRole('support') اضافه شد — این پاسخ
+// شمارهٔ کارتِ کامل، شبا، نامِ صاحبِ حساب و موبایل را برمی‌گرداند؛ نقشِ
+// «ناظر» (observer) نیازی به دیدنش ندارد.
+router.get('/admin/wallet/withdrawals', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
   res.json(await withdrawalService.listForAdmin({
     status: req.query.status,
     search: req.query.search,

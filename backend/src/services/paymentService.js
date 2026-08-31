@@ -121,6 +121,47 @@ function productForPrice(price) {
   return PRICE_PRODUCTS[Number(price)] || null;
 }
 
+/**
+ * بیشترین شکستِ ممکنِ «کیف پول + بازار» برای یک قیمت و موجودیِ داده‌شده.
+ *
+ * چرا اصلاً «شکست» لازم است: کافه‌بازار فقط نقطه‌های قیمتیِ PRICE_PRODUCTS
+ * را می‌فروشد؛ «باقیمانده‌ای» که باید در بازار پرداخت شود دقیقاً روی یکی از
+ * آن نقطه‌ها باید بیفتد وگرنه سفارش اصلاً ساخته نمی‌شود (NO_PRODUCT). تا
+ * ممیزیِ دورِ ۲۳ سهمِ کیف پول بی‌توجه به این قید انتخاب می‌شد
+ * (min(موجودی، قیمت)) و خریدِ ترکیبیِ خیلی از موجودی‌ها با خطای مبهمِ
+ * ۵۰۳ می‌شکست — با اینکه هم کیف پول پول داشت هم کارتِ پشتیبان.
+ *
+ * الگوریتم: نقطه‌های قیمتیِ کوچک‌تر یا مساویِ قیمت را صعودی مرتب می‌کنیم —
+ * کوچک‌ترینِ نقطهٔ قابلِ پرداخت یعنی بیشترین استفاده از کیف پول — و اولین
+ * نقطه‌ای را برمی‌گردانیم که سهمِ کیف پولش (قیمت − نقطه) از موجودی بیشتر
+ * نباشد. خودِ قیمت هم کاندیداست (سهمِ کیف پول = صفر)، پس تا وقتی قیمتِ
+ * کالا روی یکی از نقطه‌های قابلِ فروش است، همیشه پاسخی هست.
+ *
+ * پیش‌شرطِ ضمنی: موجودی < قیمت. مسیرِ «موجودی کافی برای کلِ قیمت» باید
+ * قبل از صدازدنِ این تابع تسویهٔ کامل شود (مثل buyShopItem) — اینجا فقط
+ * شکستِ جزئی محاسبه می‌شود.
+ *
+ * @returns {{walletAmount:number, payable:number}|null} null یعنی حتی
+ *   پرداختِ تماماً-بازاریِ این قیمت هم ممکن نیست (خودِ قیمت نقطهٔ قیمتی
+ *   نیست) — فراخوان باید همان خطای NO_PRODUCTِ همیشگی را بدهد.
+ */
+function bestWalletSplit(price, balance) {
+  const p = Number(price);
+  const b = Math.max(0, Math.floor(Number(balance) || 0));
+  if (!Number.isFinite(p) || p <= 0) return null;
+  const points = Object.keys(PRICE_PRODUCTS)
+    .map(Number)
+    .filter(n => Number.isFinite(n) && n > 0 && n <= p)
+    .sort((a, c) => a - c);
+  for (const payable of points) {
+    const walletAmount = p - payable;
+    if (walletAmount <= b) {
+      return { walletAmount, payable };
+    }
+  }
+  return null;
+}
+
 // ── توکن دسترسی ────────────────────────────────────────────────────────
 //
 // بازار access_token کوتاه‌عمر می‌دهد (۱ ساعت). کش‌کردنش لازم است وگرنه
@@ -502,7 +543,7 @@ async function history(userId, limit = 20) {
 }
 
 module.exports = {
-  PRICE_PRODUCTS, PLUS_PRODUCTS, productForPrice,
+  PRICE_PRODUCTS, PLUS_PRODUCTS, productForPrice, bestWalletSplit,
   createShopOrder, createPlusOrder, createCardBoxOrder, verifyAndDeliver,
   catalog, history, configured, verifyWithBazaar,
 };

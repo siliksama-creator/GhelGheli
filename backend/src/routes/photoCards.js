@@ -53,7 +53,7 @@ module.exports = function createPhotoCardRoutes(deps) {
   const {
     pool, auth, adminAuth, requireRole, asyncHandler,
     imageUpload, audit, createNotification, addLeaguePoints, validateUuid,
-    pass, io, getLeaderboard, optimizeUpload, UUID_RE,
+    pass, io, getLeaderboard, optimizeUpload, verifyUpload, UUID_RE,
   } = deps;
 
   const router = express.Router();
@@ -186,7 +186,7 @@ module.exports = function createPhotoCardRoutes(deps) {
    */
   require('./photoCards/adminUpload')({
     router, pool, adminAuth, requireRole, asyncHandler, imageUpload, audit,
-    optimizeUpload, UUID_RE, safeUnlink, toFloats,
+    optimizeUpload, verifyUpload, UUID_RE, safeUnlink, toFloats,
     fs, path, fpEngine, photoCards, cardDuel, cardCrop,
     MAX_BATCH, DUPLICATE_SIMILARITY,
   });
@@ -650,6 +650,12 @@ module.exports = function createPhotoCardRoutes(deps) {
     imageUpload.single('image'),
     asyncHandler(async (req, res) => {
       if (!req.file) return res.status(400).json({ message: 'عکس کارت را بفرستید' });
+
+      // محتوای واقعیِ عکس قبل از هر پردازشی راستی‌آزمایی شود (تورِ آخرِ
+      // مشترکِ همهٔ مسیرهای آپلود — توضیح روی verifyUpload در imageService).
+      // خودش فایلِ نامعتبر را حذف می‌کند، پس تورِ ایمنیِ پایینِ route همیشه
+      // درست کار می‌کند.
+      await verifyUpload(req.file);
 
       let filePath = req.file.path;
       let keepFile = false;

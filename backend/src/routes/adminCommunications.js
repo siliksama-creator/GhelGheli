@@ -9,7 +9,10 @@ module.exports = function createAdminCommunicationRoutes(deps) {
   } = deps;
   const router = express.Router();
 
-router.get('/admin/chat/messages', adminAuth, asyncHandler(async (req, res) => res.json((await pool.query('SELECT m.*, u.mobile,u.nickname FROM chat_messages m JOIN users u ON u.id=m.user_id ORDER BY m.sent_at DESC LIMIT 300')).rows)));
+// SECURITY (ممیزی دورِ ۲۳): requireRole('support') اضافه شد — پیام‌های چت
+// با موبایلِ فرستنده برمی‌گردند؛ برای نقشِ «ناظر» PII لازم نیست (آمارِ چت
+// از داشبورد می‌آید، نه از اینجا).
+router.get('/admin/chat/messages', adminAuth, requireRole('support'), asyncHandler(async (req, res) => res.json((await pool.query('SELECT m.*, u.mobile,u.nickname FROM chat_messages m JOIN users u ON u.id=m.user_id ORDER BY m.sent_at DESC LIMIT 300')).rows)));
 router.patch('/admin/chat/messages/:id/delete', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => { await pool.query('UPDATE chat_messages SET is_deleted=true WHERE id=$1', [req.params.id]); await audit(req.admin.id,'delete_chat_message','chat_messages',req.params.id,req.body.reason); res.json({message:'حذف شد'}); }));
 router.patch('/admin/chat/users/:id/ban', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => { await pool.query("UPDATE users SET chat_banned_until=NOW()+($1::text||' minutes')::interval WHERE id=$2", [req.body.minutes||1440, req.params.id]); await audit(req.admin.id,'ban_chat_user','users',req.params.id,req.body.reason,{minutes:req.body.minutes}); await createNotification(req.params.id,'chat_penalty','محدودیت چت',`شما به مدت ${req.body.minutes||1440} دقیقه از چت محروم شدید. ${req.body.reason||''}`); res.json({message:'کاربر از چت محروم شد'}); }));
 

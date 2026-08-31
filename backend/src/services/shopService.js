@@ -355,6 +355,41 @@ async function deliverItem(client, { userId, itemId, amount, walletPaid = 0 }) {
   );
   const purchaseId = purchase.rows[0].purchase_id;
 
+  // ── سهمِ کیف پول — دقیقاً همان‌جا که کالا تحویل می‌شود ──────────────────
+  //
+  // این کسر تا امروز وجود نداشت و بزرگ‌ترین حفرهٔ مالیِ پروژه بود: در خریدِ
+  // ترکیبی («سهمِ کیف پول + باقی از بازار») مبلغِ کیف پول فقط روی سفارش
+  // ثبت می‌شد (wallet_amount) اما هیچ‌جا از موجودی کم نمی‌شد؛ کامنتِ
+  // verifyPurchase ادعا می‌کرد «قبلاً کسر شده» در حالی که مسیرِ ترکیبی
+  // هیچ کسری انجام نمی‌داد. نتیجه: کاربر آیتمِ ۲۵هزاری را با ۱۵هزارِ
+  // بازار می‌خرید و ۱۰هزارِ کیف پولش دست‌نخورده می‌ماند — قابلِ تکرار برای
+  // هر آیتم (ممیزی دورِ ۲۳، با PoC روی کدِ واقعی تأیید شد).
+  //
+  // حالا کسر در همان تراکنشِ تحویل انجام می‌شود، پس یا «کسر + تحویل» هر
+  // دو اعمال می‌شوند یا هیچ‌کدام:
+  //   • خریدِ تماماً-کیف‌پولی: buyShopItem با walletPaid=قیمت صدایش می‌زند.
+  //   • خریدِ ترکیبی: verifyPurchase بعد از تأییدِ بازار با
+  //     walletPaid=wallet_amount سفارش صدایش می‌زند.
+  // اگر موجودیِ کاربر در فاصلهٔ پرداختِ بازار و verify کم شده باشد، debit
+  // خطای «موجودی کافی نیست» می‌دهد، کلِ تراکنش برمی‌گردد، سفارش pending
+  // می‌ماند و کاربر بعد از شارژِ کیف پول همان توکن را دوباره verify
+  // می‌کند — پولش در بازار محفوظ است.
+  //
+  // مرجعِ تراکنش purchase_id است، چون مرجعِ «همین خرید» است. دوباره‌صدا
+  // شدنش ممکن نیست: تحویل فقط یک‌بار از status='pending' رد می‌شود (ادعای
+  // اتمیکِ سفارش + قیدِ یکتای توکن) و مسیرِ تماماً-کیف‌پولی هم داخلِ
+  // تراکنشِ خودش است.
+  if (Number(walletPaid) > 0) {
+    await wallet.debit(client, {
+      userId,
+      amount: Number(walletPaid),
+      source: 'shop',
+      referenceType: 'shop_item',
+      referenceId: purchaseId,
+      description: `سهم کیف پول خرید ${item.name}`,
+    });
+  }
+
   // Buying a badge is permanent membership, independently of Plus.
   if (item.kind === 'club_badge') {
     const clubSlug = styleKey(item);
@@ -554,12 +589,14 @@ async function buyShopItem(userId, slug, { useWallet = false } = {}) {
     const remainder = price - fromWallet;
 
     // ── حالتِ کامل: هیچ پولی به بازار نمی‌رود ──
+    //
+    // کسرِ سهمِ کیف پول اینجا انجام نمی‌شود؛ `deliverItem` همان‌جا و در همین
+    // تراکنش و بلافاصله بعد از ثبتِ مالکیت انجامش می‌دهد. دلیلِ
+    // جابه‌جایی: مسیرِ ترکیبی هم بعد از تأییدِ پرداختِ بازار همان
+    // `deliverItem` را صدا می‌زند و کسرِ پول باید در هر دو مسیر در «یک»
+    // نقطه تعریف شود — نبودِ کسر در همان یک‌جا دقیقاً باگِ مالیِ دورِ ۲۳
+    // بود (تحویل کامل، کسر هیچ).
     if (remainder === 0) {
-      await wallet.debit(client, {
-        userId, amount: fromWallet, source: 'shop',
-        referenceType: 'shop_item', referenceId: item.id,
-        description: `خرید ${item.name} با موجودی کیف پول`,
-      });
       const delivered = await deliverItem(client, {
         userId, itemId: item.id, amount: price, walletPaid: fromWallet,
       });
@@ -573,12 +610,43 @@ async function buyShopItem(userId, slug, { useWallet = false } = {}) {
       };
     }
 
-    // ── حالتِ ترکیبی: سهمِ کیف پول رزرو، باقی از بازار ──
+    // ── حالتِ ترکیبی: بخشی از کیف پول، باقی از بازار ──
+    //
+    // ⚠️ بازار فقط «نقطه‌های قیمتیِ» مشخصی را می‌فروشد (PRICE_PRODUCTS).
+    // قبلاً سهمِ کیف پول بی‌قید و شرط min(موجودی، قیمت) بود؛ اگر باقیمانده
+    // روی هیچ نقطه‌ای نمی‌افتاد، کل خرید با خطای مبهمِ ۵۰۳ِ «این کالا فعلاً
+    // قابل خرید نیست» می‌شکست — با اینکه کارتِ پشتیبانِ کاربر پول داشت و
+    // می‌توانست بقیه را در بازار بدهد. `bestWalletSplit` بیشترین سهمِ ممکنِ
+    // کیف پول را طوری انتخاب می‌کند که باقیمانده دقیقاً روی یک محصولِ واقعیِ
+    // بازار بیفتد؛ اگر هیچ شکستِ کیف‌پول‌داری ممکن نبود (مثلاً موجودیِ ۵۰۰
+    // تومانی برای آیتمِ ۲۵هزاری)، سفارشِ عادیِ تماماً-بازاری ساخته می‌شود.
+    //
+    // پولِ کیف پول اینجا کسر **نمی‌شود**؛ فقط مقدارش روی سفارش قفل می‌شود و
+    // `deliverItem` بعد از تأییدِ بازار، در همان تراکنشِ تحویل، کسرش می‌کند.
+    // (چرا در لحظهٔ سفارش کسر نکنیم؟ چون اگر کاربر پنجرهٔ پرداختِ بازار را
+    // ببندد و هرگز نپردازد، پولش تا ابد بلوکه می‌ماند و به سازوکارِ انقضا/
+    // بازپرداختِ جداگانه‌ای نیاز می‌شود. کسر در لحظهٔ تحویل یعنی پول فقط
+    // وقتی کم می‌شود که کالا واقعاً داده شده است.)
+    const split = payments.bestWalletSplit(price, balance);
     await client.query('COMMIT');
+    if (!split || split.walletAmount <= 0) {
+      // هیچ شکستِ ممکنی با کیف پول ممکن نیست — سفارشِ تماماً-بازاری.
+      return {
+        ...await payments.createShopOrder(userId, slug),
+        settled: false,
+        paidFromWallet: 0,
+        remainingToPay: price,
+      };
+    }
     const order = await payments.createShopOrder(userId, slug, {
-      walletAmount: fromWallet,
+      walletAmount: split.walletAmount,
     });
-    return { ...order, settled: false, paidFromWallet: fromWallet, remainingToPay: remainder };
+    return {
+      ...order,
+      settled: false,
+      paidFromWallet: split.walletAmount,
+      remainingToPay: split.payable,
+    };
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {});
     throw e;
@@ -722,9 +790,11 @@ async function verifyPurchase(userId, orderId, purchaseToken) {
     async (client, { order, amount }) => {
       if (order.purchase_kind === 'shop_item') {
         if (!order.shop_item_id) throw fail('سفارش ناقص است', 409);
-        // `amount` مبلغی است که واقعاً به بازار رفته. در خریدِ ترکیبی،
-        // سهمِ کیف پول قبلاً کسر شده و باید به تحویل هم گفته شود تا
-        // کمیسیونِ معرف روی آن حساب نشود.
+        // `amount` مبلغی است که واقعاً به بازار رفته. در خریدِ ترکیبی، سهمِ
+        // کیف پول (wallet_amount سفارش) به‌عنوان walletPaid به تحویل پاس
+        // داده می‌شود تا (۱) همان‌جا در همین تراکنش از موجودی کسر شود و
+        // (۲) کمیسیونِ معرف روی آن حساب نشود. تا کامیتِ ممیزیِ دورِ ۲۳
+        // این کسر در هیچ‌جا انجام نمی‌شد — کامنتِ اینجا به آن اشاره دارد.
         const walletPaid = Number(order.wallet_amount || 0);
         return deliverItem(client, {
           userId,

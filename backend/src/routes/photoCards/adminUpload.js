@@ -9,7 +9,7 @@
 module.exports = function registerAdminPhotoCardUpload(deps) {
   const {
     router, pool, adminAuth, requireRole, asyncHandler, imageUpload, audit,
-    optimizeUpload, UUID_RE, safeUnlink, toFloats,
+    optimizeUpload, verifyUpload, UUID_RE, safeUnlink, toFloats,
     fs, path, fpEngine, photoCards, cardDuel, cardCrop,
     MAX_BATCH, DUPLICATE_SIMILARITY,
   } = deps;
@@ -53,6 +53,12 @@ module.exports = function registerAdminPhotoCardUpload(deps) {
       const front = req.files?.image?.[0] || req.file || null;
       const back = req.files?.imageBack?.[0] || null;
       if (!front) return res.status(400).json({ message: 'تصویری فرستاده نشد' });
+      // محتوای واقعیِ هر دو عکس قبل از هر پردازشی راستی‌آزمایی شود — همان
+      // تورِ آخرِ مسیرهای پشتیبانی/ادمین (توضیح کامل روی verifyUpload در
+      // imageService). فایلِ نامعتبر همان‌جا حذف و ۴۰۰ داده می‌شود.
+      for (const side of [front, back].filter(Boolean)) {
+        await verifyUpload(side);
+      }
 
       // فایل‌های موقتِ multer باید در هر مسیرِ خروج پاک شوند، وگرنه
       // دیسکِ VPS با هر آپلود چند صد کیلوبایت پر می‌شود.
