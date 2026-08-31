@@ -27,9 +27,24 @@ const DAILY_FAMILIES = Object.freeze([
     describe: goal => `${goal} مسابقه دوباره با همان حریف شروع کن`, goals: [1, 1, 1, 2, 2, 3],
   },
   {
-    event: 'friend_challenge', icon: 'handshake', baseReward: 18,
-    titles: ['رفیق و رقیب', 'دوئل دوستانه', 'دوستت را صدا کن', 'چالش رفاقتی', 'حریف آشنا', 'تیم اجتماعی'],
-    describe: goal => `${goal} دوست را مستقیم به دوئل دعوت کن`, goals: [1, 1, 1, 2, 2, 3],
+    // ── دورِ ۳۳: جایزهٔ ماموریت‌های دوستانه بالا رفت ──────────────────────
+    // خواستهٔ مالک: «جوایز امتیازات ماموریت مرتبط به دوست باید افزایش
+    // بیشتری داشته باشن و ساده سازی و قابل فهم باشن».
+    //
+    // چرا ۱۸ → ۳۰: ماموریتِ «دعوت دوست به دوئل» سخت‌ترین عملِ اجتماعیِ
+    // بازی است — کاربر باید یک آدمِ دیگر را متقاعد کند؛ در حالی که
+    // پاداشش (۱۸+) از «کامل‌کردن مسابقه» (۱۴+) کمی بیشتر بود و از
+    // «بردِ آنلاین» (۲۲+) کمتر. ارزشِ آوردنِ یک بازیکنِ جدید باید
+    // مشخصاً بالاتر از هر اقدامِ تک‌نفره‌ای باشد؛ ۳۰ یعنی ~۲ برابرِ
+    // مسابقه‌ی معمولی و بالاترین پایهٔ بین همهٔ خانواده‌ها.
+    //
+    // ساده‌سازی: عنوان‌ها همه یک الگوی روشن گرفتند «دعوت + جایزه»، و
+    // توضیح همان یک جملهٔ کوتاه باقی مانده — بدون واژه‌های مبهم مثل
+    // «حریف آشنا» یا «تیم اجتماعی» که کاربر باید حدس می‌زد یعنی چه.
+    event: 'friend_challenge', icon: 'handshake', baseReward: 30,
+    titles: ['دعوت اول', 'دوئل دوستانه', 'دوستت را به چالش بکش',
+      'رفیق‌بازی', 'دوستان بیشتر، برد بیشتر', 'گروه دوستان'],
+    describe: goal => `${goal} دوست را به یک دوئل دعوت کن`, goals: [1, 1, 1, 2, 2, 3],
   },
 ]);
 
@@ -86,8 +101,11 @@ const WEEKLY_POOL = Object.freeze([
   { key:'weekly_share_5', period:'weekly', event:'share', icon:'bell', title:'صدای آرنا', description:'۵ بار لینک چالش را منتشر کن', goal:5, reward:105 },
   { key:'weekly_rematch_3', period:'weekly', event:'rematch', icon:'bolt', title:'سه فرصت جبران', description:'۳ ریمچ شروع کن', goal:3, reward:75 },
   { key:'weekly_rematch_6', period:'weekly', event:'rematch', icon:'swords', title:'رقابت ادامه‌دار', description:'۶ ریمچ شروع کن', goal:6, reward:130 },
-  { key:'weekly_friends_3', period:'weekly', event:'friend_challenge', icon:'handshake', title:'حلقه دوستان', description:'۳ دوست را به بازی دعوت کن', goal:3, reward:80 },
-  { key:'weekly_friends_6', period:'weekly', event:'friend_challenge', icon:'star', title:'ستاره اجتماعی', description:'۶ چالش دوستانه بفرست', goal:6, reward:145 },
+  // دورِ ۳۳ — ماموریت‌های دوستانهٔ هفتگی هم با همان منطقِ بالا تقویت شدند:
+  // هر «دعوتِ موفق» در نسخهٔ جدید به‌طور میانگین ~۴۳ امتیاز می‌ارزد
+  // (قبلاً ~۲۴) و توضیح‌ها به یک فعلِ روشن و یک عدد خلاصه شدند.
+  { key:'weekly_friends_3', period:'weekly', event:'friend_challenge', icon:'handshake', title:'دعوت هفتگی', description:'۳ دوست را به دوئل دعوت کن', goal:3, reward:130 },
+  { key:'weekly_friends_6', period:'weekly', event:'friend_challenge', icon:'star', title:'ستارهٔ دوستی', description:'۶ دوست را به دوئل دعوت کن', goal:6, reward:230 },
 ]);
 
 const DAILY_POOL = Object.freeze(buildDailyPool());
