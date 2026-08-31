@@ -280,6 +280,11 @@ export default function TapGame({ token, onBack, economy }) {
   // «+N سکه» چند ثانیه نمایش داده می‌شود.
   const [coinToast, setCoinToast] = useState(null);
   const coinToastTimer = useRef(null);
+  // ── «بازی تمام شد» (دورِ ۳۳) ──
+  // پرچم و جمعِ واقعی از سرور می‌آیند؛ تا ادمین ریست نکند بازیکن می‌ماند.
+  const [srvFinished, setSrvFinished] = useState(false);
+  const [coinsTotalFromSrv, setCoinsTotalFromSrv] = useState(null);
+  const [pointsTotalFromSrv, setPointsTotalFromSrv] = useState(null);
   const [progress, setProgress] = useState(loadProgress);
   const [notice, setNotice] = useState('');
   const [rate, setRate] = useState(0);
@@ -302,6 +307,26 @@ export default function TapGame({ token, onBack, economy }) {
   // performance.now() is monotonic: changing the device clock cannot reset
   // the rate-limit window, which Date.now() would allow.
   const clock = useCallback(() => Math.round(performance.now()), []);
+
+  // ── منحنیِ زندهٔ ادمین (دورِ ۳۳) ────────────────────────────────────────
+  // خواستهٔ مالک: «هر تغییر ادمین بدون نیاز به بروزرسانی کامل اپلیکیشن
+  // اندروید باید اعمال بشه». همین کار برای وب هم انجام شد: تعداد لول،
+  // جمعِ امتیاز، شیب و سقفِ روزانه از GET /api/config (propِ economy)
+  // می‌آیند و با پیش‌فرضِ تاریخی مرج می‌شوند. اگر سرور چیزی نگفته بود
+  // (کشِ خالی، شبکهٔ قطع) بازی با همان اعدادِ همیشگی ادامه می‌دهد.
+  const CFG = useMemo(() => {
+    const tc = economy?.tapCurve || {};
+    const num = (v, d) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : d);
+    return {
+      ...TAP_CONFIG,
+      levelCount: Math.min(200, Math.max(1, Math.round(num(tc.levelCount, TAP_CONFIG.levelCount)))),
+      totalPoints: num(tc.totalPoints, TAP_CONFIG.totalPoints),
+      growthFactor: Number(tc.growthFactor) > 1 ? Number(tc.growthFactor) : TAP_CONFIG.growthFactor,
+      levelsPerDay: Number.isFinite(Number(tc.levelsPerDay))
+        ? Math.min(50, Math.max(0, Math.round(Number(tc.levelsPerDay))))
+        : TAP_CONFIG.levelsPerDay,
+    };
+  }, [economy]);
 
   useEffect(() => { progressRef.current = progress; }, [progress]);
 
@@ -333,14 +358,17 @@ export default function TapGame({ token, onBack, economy }) {
   }, []);
 
   const level = progress.level;
-  const isComplete = level > TAP_CONFIG.levelCount;
-  const need = requiredTaps(level);
+  // «تمام‌شدن» فقط عبورِ محلی از لولِ آخر نیست؛ مهرِ سرور (srvFinished)
+  // حکمِ نهایی است — حتی اگر ادمین بعداً تعداد لول را بالا ببرد، تا
+  // ریست نکند بازیکن همان‌جا قفل می‌ماند (خواستهٔ صریحِ مالک).
+  const isComplete = srvFinished || level > CFG.levelCount;
+  const need = requiredTaps(level, CFG);
   const pct = isComplete ? 100 : Math.min(100, (progress.taps / need) * 100);
-  const skin = skinForLevel(Math.min(level, TAP_CONFIG.levelCount));
+  const skin = skinForLevel(Math.min(level, CFG.levelCount), CFG);
   const remaining = isComplete ? 0 : Math.max(0, need - progress.taps);
   // امتیاز، نه تعداد ضربه — خواستهٔ مالک. هر ضربه یک امتیاز است، پس این
   // عدد همان کاری است که کاربر کرده.
-  const points = cumulativePoints(progress.level, progress.taps);
+  const points = cumulativePoints(progress.level, progress.taps, CFG);
 
   // ── daily cap ────────────────────────────────────────────────────────────
   // Recomputed from `progress` on every render rather than held in its own
@@ -364,9 +392,9 @@ export default function TapGame({ token, onBack, economy }) {
   // skinIndexForLevel when the boundary was corrected.
   const untilNextSkin = useMemo(() => {
     if (isComplete) return null;
-    const here = skinIndexForLevel(level);
-    for (let lv = level + 1; lv <= TAP_CONFIG.levelCount; lv++) {
-      if (skinIndexForLevel(lv) !== here) return lv - level;
+    const here = skinIndexForLevel(level, CFG);
+    for (let lv = level + 1; lv <= CFG.levelCount; lv++) {
+      if (skinIndexForLevel(lv, CFG) !== here) return lv - level;
     }
     return null;
   }, [level, isComplete]);
@@ -392,7 +420,7 @@ export default function TapGame({ token, onBack, economy }) {
     // a timed one — both send a full batch with a near-zero window.
     // Sending only the affordable slice and carrying the rest loses nothing,
     // and gains an attacker nothing since the server checks independently.
-    const affordable = Math.ceil((elapsed / 1000) * TAP_CONFIG.maxTapsPerSecond) + 20;
+    const affordable = Math.ceil((elapsed / 1000) * CFG.maxTapsPerSecond) + 20;
     const sentTaps = Math.min(b.taps, affordable);
     const sentFlagged = b.flagged;
     if (sentTaps <= 0 && sentFlagged <= 0) {
@@ -419,6 +447,21 @@ export default function TapGame({ token, onBack, economy }) {
         // A rejected batch (409/400) is an ANSWER, not a network failure:
         // retrying it would just replay the same refusal forever.
         if (err.status && err.status !== 0 && err.status < 500) {
+          // ── بازیِ تمام‌شده (دورِ ۳۳) ──
+          // سرور بازیکنِ تمام‌کرده را با 409 و پرچمِ finished برمی‌گرداند؛
+          // ضربه‌های کش‌شده هم دور ریخته می‌شوند چون دیگر شمرده نمی‌شوند.
+          if (err.data && err.data.finished) {
+            setSrvFinished(true);
+            if (typeof err.data.coinsAwardedTotal === 'number') {
+              setCoinsTotalFromSrv(err.data.coinsAwardedTotal);
+            }
+            setProgress(p => {
+              const next = { ...p, pendingTaps: 0 };
+              saveProgress(next);
+              return next;
+            });
+            return;
+          }
           if (err.data && err.data.rejected) {
             setNotice(err.data.message || 'ضربه‌های غیرعادی نادیده گرفته شد');
           }
@@ -434,6 +477,19 @@ export default function TapGame({ token, onBack, economy }) {
 
       if (res && res.rejected) {
         setNotice(res.message || 'ضربه‌های غیرعادی نادیده گرفته شد');
+      }
+      // همین بسته ممکن است لولِ آخر را بسته باشد — جمع‌ها را همان لحظه
+      // نگه می‌داریم تا صفحهٔ پایان با عددِ واقعی باز شود، نه محلی.
+      if (res && res.finished) {
+        setSrvFinished(true);
+        if (typeof res.coinsAwarded === 'number') setCoinsTotalFromSrv(res.coinsAwarded);
+        if (typeof res.pointsAwarded === 'number') setPointsTotalFromSrv(res.pointsAwarded);
+      }
+      if (typeof res?.coinsAwarded === 'number' && !res.finished) {
+        setCoinsTotalFromSrv(res.coinsAwarded);
+      }
+      if (typeof res?.pointsAwarded === 'number' && !res.finished) {
+        setPointsTotalFromSrv(res.pointsAwarded);
       }
       // ── سکهٔ لول‌آپ: «+۵ سکه» جلوی چشمِ کاربر ──
       if (res && Number(res.coinsEarned) > 0) {
@@ -459,8 +515,8 @@ export default function TapGame({ token, onBack, economy }) {
           // was just spent. min() is right in both directions.
           if (typeof res.levelsLeftToday === 'number') {
             const serverUsed = Math.max(0, Math.min(
-              TAP_CONFIG.levelsPerDay,
-              TAP_CONFIG.levelsPerDay - res.levelsLeftToday));
+              CFG.levelsPerDay,
+              CFG.levelsPerDay - res.levelsLeftToday));
             const today = tehranDay();
             if (serverUsed > levelsUsedToday(p, today)) {
               next.levelsToday = serverUsed;
@@ -473,11 +529,11 @@ export default function TapGame({ token, onBack, economy }) {
           // fault only appeared "after a while".
           const safeLevel = Math.min(
             Math.max(1, Math.floor(res.level)),
-            TAP_CONFIG.levelCount + 1,
+            CFG.levelCount + 1,
           );
           if (safeLevel !== p.level || Math.abs((res.levelTaps ?? p.taps) - p.taps) > 5) {
             next.level = safeLevel;
-            next.taps = Math.min(res.levelTaps ?? 0, requiredTaps(safeLevel));
+            next.taps = Math.min(res.levelTaps ?? 0, requiredTaps(safeLevel, CFG));
             next.totalTaps = res.totalTaps ?? p.totalTaps;
           }
           saveProgress(next);
@@ -502,6 +558,15 @@ export default function TapGame({ token, onBack, economy }) {
       try {
         const server = await req('/api/games/tap/progress', 'GET', null, token);
         if (!alive || !server || typeof server.level !== 'number') return;
+        // وضعیتِ پایان و جمعِ واقعی از سرور — منبعِ حقیقتِ «تمام‌شدن»
+        // مهرِ سرور است، نه مقایسهٔ سطح با عددِ کش‌شدهٔ محلی.
+        if (server.finished) setSrvFinished(true);
+        if (typeof server.coinsAwarded === 'number') {
+          setCoinsTotalFromSrv(server.coinsAwarded);
+        }
+        if (typeof server.pointsAwarded === 'number') {
+          setPointsTotalFromSrv(server.pointsAwarded);
+        }
         setProgress(p => {
           let next = p;
           // Another device may be ahead; the server always wins. Only move
@@ -518,8 +583,8 @@ export default function TapGame({ token, onBack, economy }) {
           // it is adopted whenever the server says more of it is spent.
           if (typeof server.levelsLeftToday === 'number') {
             const serverUsed = Math.max(0, Math.min(
-              TAP_CONFIG.levelsPerDay,
-              TAP_CONFIG.levelsPerDay - server.levelsLeftToday));
+              CFG.levelsPerDay,
+              CFG.levelsPerDay - server.levelsLeftToday));
             const today = tehranDay();
             if (serverUsed > levelsUsedToday(p, today)) {
               next = { ...next, levelsToday: serverUsed, levelsDay: today };
@@ -530,7 +595,7 @@ export default function TapGame({ token, onBack, economy }) {
         });
       } catch { /* offline: keep playing locally */ }
     })();
-    const t = setInterval(() => flush(), TAP_CONFIG.flushIntervalMs);
+    const t = setInterval(() => flush(), CFG.flushIntervalMs);
     return () => { alive = false; clearInterval(t); };
   }, [token, flush, clock]);
 
@@ -624,7 +689,7 @@ export default function TapGame({ token, onBack, economy }) {
     setProgress(p => {
       let lv = p.level;
       let taps = p.taps + 1;
-      const prevSkin = skinIndexForLevel(lv);
+      const prevSkin = skinIndexForLevel(lv, CFG);
       let leveled = false;
 
       // Allowance read once, before the loop, from the value being mutated.
@@ -635,10 +700,10 @@ export default function TapGame({ token, onBack, economy }) {
       // Bounded: a zero-cost level would otherwise spin forever and lock the
       // tab. requiredTaps can no longer return 0, but the guard is free.
       let spins = 0;
-      while (lv <= TAP_CONFIG.levelCount
-             && taps >= requiredTaps(lv)
-             && spins++ < TAP_CONFIG.levelCount) {
-        const cost = requiredTaps(lv);
+      while (lv <= CFG.levelCount
+             && taps >= requiredTaps(lv, CFG)
+             && spins++ < CFG.levelCount) {
+        const cost = requiredTaps(lv, CFG);
         if (cost <= 0) break;
         if (left <= 0) {
           // Out of levels for today. DISCARD the surplus rather than banking
@@ -665,7 +730,7 @@ export default function TapGame({ token, onBack, economy }) {
       if (leveled) {
         // Count and day written together — a count without the day it
         // belongs to is what makes a stale counter look current.
-        next.levelsToday = TAP_CONFIG.levelsPerDay - left;
+        next.levelsToday = CFG.levelsPerDay - left;
         next.levelsDay = today;
       }
       saveProgress(next);
@@ -673,12 +738,12 @@ export default function TapGame({ token, onBack, economy }) {
       if (leveled) {
         setPulse(true);
         later(() => setPulse(false), 450);
-        if (skinIndexForLevel(lv) !== prevSkin) {
+        if (skinIndexForLevel(lv, CFG) !== prevSkin) {
           setNotice('شخصیت جدید باز شد! ');
           later(() => setNotice(''), 2500);
           // skinChanged — the loudest thing that can happen mid-run.
           heavyImpact();
-        } else if (lv > TAP_CONFIG.levelCount) {
+        } else if (lv > CFG.levelCount) {
           heavyImpact();          // gameCompleted
         } else if (left <= 0) {
           heavyImpact();          // dailyCapHit, once, on the level that spent it
@@ -687,14 +752,14 @@ export default function TapGame({ token, onBack, economy }) {
         }
         // A level boundary is a natural checkpoint.
         later(() => flush(true), 0);
-      } else if (batchRef.current.taps >= TAP_CONFIG.maxBatchTaps) {
+      } else if (batchRef.current.taps >= CFG.maxBatchTaps) {
         later(() => flush(), 0);
       }
       return next;
     });
   }, [isComplete, capped, notice, clock, flush, later]);
 
-  const nearLimit = rate >= TAP_CONFIG.maxTapsPerSecond - 2;
+  const nearLimit = rate >= CFG.maxTapsPerSecond - 2;
 
   return (
     <section className="card wide tapGame">
@@ -702,16 +767,16 @@ export default function TapGame({ token, onBack, economy }) {
         <button className="ghost" onClick={() => { flush(true); onBack(); }}>‹ بازگشت</button>
         <div className="tapTitle">
           <b>ضربه‌زن</b>
-          <span>لول {fa(Math.min(level, TAP_CONFIG.levelCount))} از {fa(TAP_CONFIG.levelCount)}</span>
+          <span>لول {fa(Math.min(level, CFG.levelCount))} از {fa(CFG.levelCount)}</span>
         </div>
         {/* Today's allowance, as dots. Shown BEFORE the cap is hit, not only
             after — a limit the player discovers by hitting it reads as a
             bug; one they can see coming reads as a rule. */}
         {!isComplete && (
           <span className="tapDots"
-            title={`امروز ${fa(levelsLeft)} لول از ${fa(TAP_CONFIG.levelsPerDay)} باقی مانده`}
-            aria-label={`امروز ${levelsLeft} لول از ${TAP_CONFIG.levelsPerDay} باقی مانده`}>
-            {Array.from({ length: TAP_CONFIG.levelsPerDay }, (_, i) => (
+            title={`امروز ${fa(levelsLeft)} لول از ${fa(CFG.levelsPerDay)} باقی مانده`}
+            aria-label={`امروز ${levelsLeft} لول از ${CFG.levelsPerDay} باقی مانده`}>
+            {Array.from({ length: CFG.levelsPerDay }, (_, i) => (
               <i key={i} className={i < levelsLeft ? 'on' : ''} />
             ))}
           </span>
@@ -744,20 +809,78 @@ export default function TapGame({ token, onBack, economy }) {
       </div>
 
       {coinToast && (
-        <div className="tapCoinToast" role="status">
-          <img src="/pass/icon_coin.webp" alt="" width={18} height={18} />
-          <b>+{fa(coinToast.coins)} سکه</b>
-          <span>موجودی: {fa(coinToast.total)}</span>
+        // ── جشنِ سکهٔ لول‌آپ (دورِ ۳۳) ──
+        // خواستهٔ مالک: «۵ سکهٔ دریافتی بصورت انیمیشنی جذاب نمایش داده
+        // بشه». سه لایه: سکهٔ SVG با چرخشِ سه‌بعدی و پرتو، ذراتِ
+        // جرقه، و شمارندهٔ «+N» با پاپ. بدونِ ایموجی — همه SVG/CSS.
+        <div className="tapCoinBurst" role="status" aria-live="polite">
+          <span className="tapCoinRing" aria-hidden="true">
+            <svg viewBox="0 0 40 40" width="46" height="46">
+              <defs>
+                <linearGradient id="tcg" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stopColor="#FFE38A" />
+                  <stop offset=".5" stopColor="#FFC53D" />
+                  <stop offset="1" stopColor="#E59A1F" />
+                </linearGradient>
+              </defs>
+              <circle cx="20" cy="20" r="17" fill="url(#tcg)" />
+              <circle cx="20" cy="20" r="17" fill="none" stroke="#B9770E" strokeWidth="2" />
+              <circle cx="20" cy="20" r="12.5" fill="none" stroke="#B9770E" strokeWidth="1.4" opacity=".55" />
+              <path d="M20 12.5v15M15.8 15.2h5.1a2.6 2.6 0 0 1 0 5.2h-5.1h6a2.6 2.6 0 0 1 0 5.2h-5.1"
+                fill="none" stroke="#8C5E0B" strokeWidth="2.1" strokeLinecap="round" />
+            </svg>
+          </span>
+          {Array.from({ length: 8 }, (_, i) => (
+            <span key={i} className="tapCoinSpark" style={{ '--i': i }} aria-hidden="true" />
+          ))}
+          <b className="tapCoinNum">+{fa(coinToast.coins)} سکه</b>
+          <span className="tapCoinWallet">موجودی: {fa(coinToast.total)}</span>
         </div>
       )}
 
       {notice && <div className="tapNotice">{notice}</div>}
 
       {isComplete ? (
-        <div className="tapDone">
-          <img src={skinForLevel(TAP_CONFIG.levelCount)} alt="" />
-          <h2> تبریک! همهٔ لول‌ها را تمام کردی</h2>
-          <p>مجموع امتیاز: {fa(points)}</p>
+        // ── صفحهٔ «بازی تمام شد» (دورِ ۳۳) ──
+        // خواستهٔ مالک: «به کاربر تمامی امتیازات بدست‌آورده از بازی
+        // ضربه‌زن و همینطور سکه نمایش داده بشه» و تا ریستِ ادمین قفل.
+        // اعداد از خودِ سرور می‌آیند (pointsTotalFromSrv/coinsTotalFromSrv)
+        // و فقط در نبودِ‌شان روی حسابِ محلی می‌مانیم.
+        <div className="tapDone tapFinished">
+          <span className="tapFinishTrophy" aria-hidden="true">
+            <svg viewBox="0 0 64 64" width="86" height="86">
+              <defs>
+                <linearGradient id="tfg" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stopColor="#FFE38A" />
+                  <stop offset="1" stopColor="#E5A61F" />
+                </linearGradient>
+              </defs>
+              <path d="M18 10h28v10a14 14 0 0 1-28 0V10z" fill="url(#tfg)" />
+              <path d="M18 12h-6a8 8 0 0 0 8 10M46 12h6a8 8 0 0 1-8 10"
+                fill="none" stroke="url(#tfg)" strokeWidth="3" strokeLinecap="round" />
+              <path d="M29 33h6v7h-6z" fill="url(#tfg)" />
+              <path d="M22 44h20v4H22z" fill="url(#tfg)" />
+              <path d="M18 50h28v5H18a2.5 2.5 0 0 1 0-5z" fill="url(#tfg)" />
+              <circle cx="32" cy="20" r="5.5" fill="#FFF7DF" opacity=".85" />
+            </svg>
+          </span>
+          <h2>تبریک! بازی ضربه‌زن را کامل تمام کردی</h2>
+          <div className="tapFinishStats">
+            <div className="tapFinishStat">
+              <SvgIcon name="star" size={17} />
+              <b>{fa(pointsTotalFromSrv ?? points)}</b>
+              <span>امتیاز از ضربه‌زن</span>
+            </div>
+            <div className="tapFinishStat tapFinishStat--coin">
+              <img src="/pass/icon_coin.webp" alt="" width={17} height={17} />
+              <b>{fa(coinsTotalFromSrv ?? 0)}</b>
+              <span>سکهٔ کسب‌شده</span>
+            </div>
+          </div>
+          <p className="tapFinishLock">
+            <SvgIcon name="lock" size={15} />
+            تا زمانی که مدیر بازی را ریست نکند نمی‌توانی دوباره بازی کنی.
+          </p>
         </div>
       ) : capped ? (
         // The tap area is REPLACED, not merely disabled. Leaving a tappable
@@ -766,7 +889,7 @@ export default function TapGame({ token, onBack, economy }) {
         <div className="tapDone tapCapped">
           <img src={skin} alt="" />
           <h2> سهمیهٔ امروز تمام شد</h2>
-          <p>هر روز {fa(TAP_CONFIG.levelsPerDay)} لول می‌توانی بالا بروی.</p>
+          <p>هر روز {fa(CFG.levelsPerDay)} لول می‌توانی بالا بروی.</p>
           <p className="tapResetIn"><SvgIcon name="support" size={16} /> باز شدن تا {formatCountdown(resetIn)} دیگر</p>
         </div>
       ) : (
@@ -787,7 +910,7 @@ export default function TapGame({ token, onBack, economy }) {
       )}
 
       <p className="tapHint">
-        {isComplete ? `همهٔ ${fa(TAP_CONFIG.levelCount)} لول تمام شد!`
+        {isComplete ? `همهٔ ${fa(CFG.levelCount)} لول تمام شد!`
           : capped ? 'فردا دوباره سر بزن'
             : `ضربه بزن — ${fa(remaining)} امتیاز تا لول بعد`}
       </p>

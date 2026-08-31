@@ -5956,7 +5956,188 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 }
 .tapCoinToast b { font-weight: 900; }
 .tapCoinToast span { font-size: 11.5px; opacity: .8; font-weight: 700; }
+
+/* ── جشنِ سکهٔ لول‌آپ (دورِ ۳۳) ─────────────────────────────────────────
+   خواستهٔ مالک: «+۵ سکه با انیمیشنی جذاب». سه لایه: سکهٔ SVG که مثل سکهٔ
+   واقعی می‌چرخد (rotateY) و می‌درخشد، هشت جرقه که به طرفین پرتاب می‌شوند،
+   و عددِ «+N» که با پاپ بالا می‌آید. همه با CSS — بدون ایموجی. */
+.tapCoinBurst {
+  position: relative; z-index: 6;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  margin: 6px auto 10px; padding: 12px 26px 10px;
+  border-radius: 18px;
+  background: linear-gradient(160deg, rgba(255,209,102,.16), rgba(245,158,11,.10));
+  border: 1px solid rgba(255,209,102,.45);
+  box-shadow: 0 10px 30px rgba(255,180,40,.22), inset 0 1px 0 rgba(255,255,255,.14);
+  animation: tapCoinBurstIn .5s cubic-bezier(.18,1.4,.4,1) both;
+}
+.tapCoinBurst .tapCoinRing {
+  display: flex; animation: tapCoinSpinY 1.15s cubic-bezier(.3,.7,.3,1) both;
+  filter: drop-shadow(0 4px 10px rgba(255,190,60,.55));
+}
+.tapCoinBurst .tapCoinNum {
+  font-size: 19px; font-weight: 900; color: #FFD166;
+  text-shadow: 0 2px 12px rgba(255,200,60,.45);
+  animation: tapCoinNumPop .55s cubic-bezier(.2,1.6,.4,1) .12s both;
+}
+.tapCoinBurst .tapCoinWallet { font-size: 11.5px; font-weight: 700; color: #EAD9A8; opacity: .9; }
+.tapCoinBurst .tapCoinSpark {
+  position: absolute; left: 50%; top: 46%; width: 5px; height: 5px; border-radius: 50%;
+  background: radial-gradient(circle, #FFE9AD 0%, #FFC53D 60%, transparent 75%);
+  animation: tapCoinSparkFly .8s cubic-bezier(.15,.75,.4,1) .06s both;
+}
+@keyframes tapCoinBurstIn {
+  from { transform: scale(.55) translateY(14px); opacity: 0; }
+  60%  { transform: scale(1.06); }
+  to   { transform: scale(1) translateY(0); opacity: 1; }
+}
+@keyframes tapCoinSpinY {
+  from { transform: rotateY(-100deg) scale(.5); opacity: 0; }
+  55%  { transform: rotateY(18deg) scale(1.12); opacity: 1; }
+  to   { transform: rotateY(0) scale(1); }
+}
+@keyframes tapCoinNumPop {
+  from { transform: scale(.4); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+@keyframes tapCoinSparkFly {
+  from { transform: rotate(calc(var(--i) * 45deg)) translateX(6px) scale(1); opacity: 1; }
+  to   { transform: rotate(calc(var(--i) * 45deg)) translateX(64px) scale(.1); opacity: 0; }
+}
+
+/* ── صفحهٔ «بازی تمام شد» (دورِ ۳۳) ── */
+.tapFinished { gap: 10px; }
+.tapFinishTrophy {
+  display: flex; animation: tapTrophyIn .7s cubic-bezier(.2,1.5,.4,1) both,
+    tapTrophyFloat 2.6s ease-in-out .7s infinite;
+  filter: drop-shadow(0 10px 26px rgba(255,196,60,.4));
+}
+@keyframes tapTrophyIn {
+  from { transform: scale(.3) rotate(-14deg); opacity: 0; }
+  to   { transform: scale(1) rotate(0); opacity: 1; }
+}
+@keyframes tapTrophyFloat {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-7px); }
+}
+.tapFinishStats {
+  display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 2px;
+}
+.tapFinishStat {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  min-width: 118px; padding: 10px 14px; border-radius: 14px;
+  background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.12);
+  animation: tapCoinBurstIn .5s cubic-bezier(.18,1.4,.4,1) .18s both;
+}
+.tapFinishStat b { font-size: 21px; font-weight: 900; color: #A3E635; }
+.tapFinishStat--coin b { color: #FFD166; }
+.tapFinishStat span { font-size: 11.5px; color: #B9CCE0; font-weight: 700; }
+.tapFinishStat--coin { border-color: rgba(255,209,102,.35); }
+.tapFinishLock {
+  display: flex; align-items: center; gap: 6px; justify-content: center;
+  margin: 4px 0 0; padding: 8px 14px; border-radius: 99px;
+  background: rgba(148,163,184,.1); border: 1px solid rgba(148,163,184,.28);
+  color: #C7D5E4; font-size: 12.5px; font-weight: 700;
+}
 @keyframes tapCoinPop {
   from { transform: scale(.6); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
+}
+
+/* ═══ جشنِ بزرگِ برندهٔ پایانِ مسابقه (دورِ ۳۳) ═══
+   خواستهٔ مالک: برنده باید «بزرگ و زیبا و جذاب» مشخص شود. صحنهٔ تمام‌صفحهٔ
+   بازی با هالهٔ رنگیِ نتیجه، آیکونِ درشت، تیترِ بزرگ و خطِ نتیجه. */
+.winStage {
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  padding: 42px 18px 26px; margin-top: 10px;
+  border-radius: 22px;
+  animation: winStageIn .55s cubic-bezier(.2, 1.3, .4, 1) both;
+}
+.winStage--win {
+  background:
+    radial-gradient(circle at 50% -10%, rgba(255, 209, 102, .30), transparent 55%),
+    linear-gradient(160deg, rgba(34, 231, 166, .16), rgba(7, 21, 34, .92));
+  border: 1px solid rgba(255, 209, 102, .5);
+  box-shadow: 0 18px 50px rgba(255, 190, 60, .18);
+}
+.winStage--draw {
+  background: linear-gradient(160deg, rgba(148, 163, 184, .14), rgba(7, 21, 34, .92));
+  border: 1px solid rgba(148, 163, 184, .4);
+}
+.winStage--loss {
+  background:
+    radial-gradient(circle at 50% -10%, rgba(251, 113, 133, .20), transparent 55%),
+    linear-gradient(160deg, rgba(251, 113, 133, .10), rgba(7, 21, 34, .92));
+  border: 1px solid rgba(251, 113, 133, .38);
+}
+@keyframes winStageIn {
+  from { transform: scale(.86) translateY(18px); opacity: 0; }
+  60%  { transform: scale(1.03); }
+  to   { transform: scale(1) translateY(0); opacity: 1; }
+}
+.winStageIcon {
+  display: flex;
+  animation: winIconIn .7s cubic-bezier(.2, 1.5, .4, 1) both,
+    winIconFloat 2.8s ease-in-out .7s infinite;
+}
+.winStage--win .winStageIcon { color: #FFD166; filter: drop-shadow(0 12px 28px rgba(255, 196, 60, .5)); }
+.winStage--draw .winStageIcon { color: #B6C4D4; }
+.winStage--loss .winStageIcon { color: #94A3B8; opacity: .8; filter: grayscale(.6); }
+@keyframes winIconIn {
+  from { transform: scale(.3) rotate(-12deg); opacity: 0; }
+  to   { transform: scale(1) rotate(0); opacity: 1; }
+}
+@keyframes winIconFloat {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
+.winStageTitle {
+  margin: 0; font-size: 27px; font-weight: 900; letter-spacing: -.4px;
+  animation: winTitleIn .55s cubic-bezier(.2, 1.6, .4, 1) .1s both;
+}
+.winStage--win .winStageTitle { color: #22E7A6; text-shadow: 0 3px 20px rgba(34, 231, 166, .4); }
+.winStage--draw .winStageTitle { color: #E2E8F0; }
+.winStage--loss .winStageTitle { color: #FFF; }
+@keyframes winTitleIn {
+  from { transform: scale(.5); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+.winStageVs {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center;
+  animation: winTitleIn .5s cubic-bezier(.2, 1.4, .4, 1) .2s both;
+}
+.winSide {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 15px; border-radius: 99px; font-size: 13.5px; font-weight: 800;
+  color: #C9D8E8; background: rgba(255, 255, 255, .05);
+  border: 1px solid rgba(255, 255, 255, .12); max-width: 46vw;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.winSide b { font-size: 17px; font-weight: 900; color: #FFF; }
+.winSide.me {
+  color: #FFF; background: rgba(56, 189, 248, .16);
+  border-color: rgba(56, 189, 248, .5);
+}
+.winStageSep {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: rgba(255, 255, 255, .5); box-shadow: 0 0 10px rgba(255,255,255,.35);
+}
+.winStageNote { margin: 0; font-size: 12.5px; font-weight: 700; color: #AFC3D6; }
+
+/* کاغذرنگی — فقط برای برد؛ ۱۴ قطعه با متغیرهای پلکانی از کامپوننت */
+.winConfetti { position: absolute; inset: 0; pointer-events: none; }
+.winConfetti span {
+  position: absolute; top: -12px; left: var(--x);
+  width: 8px; height: 13px; border-radius: 2.5px;
+  background: var(--c); opacity: 0;
+  transform: rotate(var(--rot));
+  animation: winConfettiFall
+    calc(2.5s + (var(--i) * .13s)) linear var(--d) infinite;
+}
+@keyframes winConfettiFall {
+  0%   { transform: translateY(-16px) rotate(var(--rot)); opacity: 0; }
+  8%   { opacity: 1; }
+  82%  { opacity: 1; }
+  100% { transform: translateY(560px) rotate(calc(var(--rot) + 300deg)); opacity: 0; }
 }
