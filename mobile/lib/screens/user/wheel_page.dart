@@ -1157,7 +1157,3 @@ class _AnimeSpinButtonState extends State<_AnimeSpinButton>
     );
   }
 }
-      },
-    );
-  }
-}

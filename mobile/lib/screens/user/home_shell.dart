@@ -614,6 +614,13 @@ class _HomeShellState extends State<HomeShell>
               .map((e) => Map<String, dynamic>.from(e))
               .toList();
         }
+        // بنرِ صندوقِ خانه حالا از همین فهرست می‌آید (DashboardPage.pendingGrants)
+        // پس page-cacheِ خانه هم باید تازه شود — وگرنه همان بنرِ کهنه
+        // سرِجایش می‌ماند؛ دقیقاً باگی که df9303c می‌خواست ببندد ولی
+        // فراخوانی‌اش در همان کامیتِ خراب گم شد.
+        if (pg is List) {
+          _refreshDashboardConfig();
+        }
         if (inv is List || pg is List) {
           _refreshInventoryPageConfig();
         }
@@ -701,7 +708,13 @@ class _HomeShellState extends State<HomeShell>
 
   void _onNavTap(int slot) {
     if (slot < _navIndexes.length) {
-      setState(() => _index = _navIndexenc {
+      setState(() => _index = _navIndexes[slot]);
+    } else {
+      _openMore();
+    }
+  }
+
+  Future<void> _openMore() async {
     final picked = await showModalBottomSheet<int>(
       context: context,
       showDragHandle: true,
@@ -1308,15 +1321,6 @@ class _AnnouncementBanner extends StatelessWidget {
                 onTap: onDismiss,
                 child: const Icon(Icons.close_rounded,
                     size: 16, color: Colors.white54),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-54),
               ),
             ],
           ),
