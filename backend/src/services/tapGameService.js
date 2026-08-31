@@ -20,65 +20,101 @@ const crypto = require('crypto');
 const { pool } = require('../config/db');
 
 // ── curve ──────────────────────────────────────────────────────────────────
-// MUST stay identical to mobile/lib/screens/user/games/tap/tap_config.dart
-// and userweb/src/tapGame.jsx. If you change one, change all three in the
-// same commit.
-//
-// ONE TAP = ONE POINT, AND THE WHOLE GAME IS WORTH 50,000.
-//
-// The owner set the total: "کل بازی ۵۰ هزار امتیاز میدهد". Making a tap
-// worth exactly one point is the simplest model that can satisfy it, and it
-// buys something valuable: the number on screen IS the work done. There is
-// no hidden multiplier that later makes a player ask "why did 100 taps give
-// me 40 points?".
-//
-// WHY THE GROWTH FACTOR DROPPED FROM 1.15 TO 1.05
-//
-// The old curve summed to 721,772 taps. With a daily cap that is 25 hours of
-// uninterrupted tapping, and the shape was far worse than the total suggests:
-// the last three levels alone were 34% of the game, and day 14 demanded 2.8
-// hours in one sitting. Nobody was ever going to finish it, which also meant
-// the daily cap stopped mattering around day 12 — the curve was already
-// harsher than the cap.
-//
-// 1.05 over 50 levels sums to 50,000 and gives a shape a person can actually
-// live with: about a minute on day one, about ten minutes on the last day.
+// دورِ ۳۳: این منحنی دیگر ثابتِ هاردکد نیست — ادمین از پنل تعداد لول، جمعِ
+// امتیاز، شیب و سقفِ روزانه را عوض می‌کند و کلاینت‌ها همان لحظه آن را از
+// GET /api/config می‌خوانند (خواستهٔ مالک: «هر تغییر بدون آپدیت اپ»).
+// مقدارهای پیش‌فرض دقیقاً همان اعدادِ قبلی‌اند؛ math پایین هم همان است،
+// فقط پارامتری شده تا با هر منحنی کار کند.
 const LEVEL_COUNT = 50;
 const TOTAL_POINTS = 50000;
 const GROWTH_FACTOR = 1.05;
+const MAX_LEVELS_PER_DAY = 2;
 
 /**
- * Points needed to clear `level`, precomputed once.
+ * Points needed to clear each level, precomputed once per curve.
  *
  * Built as a table rather than `round(base * g^(n-1))` per call because the
- * rounding has to be reconciled: fifty independently rounded terms do not sum
- * to exactly 50,000. The remainder is folded into the last level so the total
- * the owner specified is exact rather than approximately right.
+ * rounding has to be reconciled: independently rounded terms do not sum to
+ * exactly `totalPoints`. The remainder is folded into the last level so the
+ * total is exact rather than approximately right.
  */
-const LEVEL_COST = (() => {
+function buildLevelCost(levelCount, totalPoints, growthFactor) {
   const geometric = [];
   let sum = 0;
-  for (let i = 0; i < LEVEL_COUNT; i++) {
-    const term = Math.pow(GROWTH_FACTOR, i);
+  for (let i = 0; i < levelCount; i++) {
+    const term = Math.pow(growthFactor, i);
     geometric.push(term);
     sum += term;
   }
-  const base = TOTAL_POINTS / sum;
+  const base = totalPoints / sum;
   const table = geometric.map((t) => Math.round(base * t));
-  const drift = TOTAL_POINTS - table.reduce((a, b) => a + b, 0);
+  const drift = totalPoints - table.reduce((a, b) => a + b, 0);
   table[table.length - 1] += drift;
   return table;
-})();
-
-function requiredTaps(level) {
-  if (level < 1) return LEVEL_COST[0];
-  const capped = level > LEVEL_COUNT ? LEVEL_COUNT : level;
-  return LEVEL_COST[capped - 1];
 }
 
-/** Total points across every level — exactly TOTAL_POINTS by construction. */
+/** یک «منحنیِ» کامل با جدول‌های پیش‌محاسبه‌شده. Memoised با کلیدِ پارامترها. */
+const _curveCache = new Map();
+function buildCurve({ levelCount, totalPoints, growthFactor, levelsPerDay }) {
+  const key = `${levelCount}|${totalPoints}|${growthFactor}|${levelsPerDay}`;
+  if (_curveCache.has(key)) return _curveCache.get(key);
+  const levelCost = buildLevelCost(levelCount, totalPoints, growthFactor);
+  const cumulative = [0];
+  for (let i = 0; i < levelCost.length; i++) cumulative.push(cumulative[i] + levelCost[i]);
+  const curve = Object.freeze({
+    levelCount, totalPoints, growthFactor,
+    levelsPerDay: Math.max(0, Math.trunc(levelsPerDay)),
+    LEVEL_COST: Object.freeze(levelCost),
+    CUMULATIVE: Object.freeze(cumulative),
+  });
+  if (_curveCache.size > 32) _curveCache.clear(); // سقفِ حافظه؛ ۳۲ پیکربندی کافی است
+  _curveCache.set(key, curve);
+  return curve;
+}
+
+/** منحنیِ پیش‌فرض — همان اعدادِ تاریخی؛ پfallback وقتی دیتابیس در دسترس نیست. */
+const DEFAULT_CURVE = buildCurve({
+  levelCount: LEVEL_COUNT,
+  totalPoints: TOTAL_POINTS,
+  growthFactor: GROWTH_FACTOR,
+  levelsPerDay: MAX_LEVELS_PER_DAY,
+});
+
+/**
+ * منحنیِ زنده از تنظیمات اقتصاد (کشِ ۱۵ ثانیه‌ای خود سرویس اقتصاد).
+ *
+ * هر دو نقطهٔ ورود (getProgress و submitBatch) آن را یک‌بار می‌خوانند و
+ * تمامِ حساب‌های همین بسته با همان snapshot انجام می‌شود — یعنی اگر
+ * ادمین وسطِ یک بسته منحنی را عوض کند، بسته با منحنیِ قدیمیِ همان لحظهٔ
+ * شروع تمام می‌شود و هیچ ضربه‌ای «بین دو منحنی» گم نمی‌شود.
+ */
+async function currentCurve() {
+  try {
+    const economy = require('./gameEconomyService');
+    const cfg = await economy.load();
+    return buildCurve(cfg.tapCurve);
+  } catch {
+    return DEFAULT_CURVE;
+  }
+}
+
+function requiredTapsOn(curve, level) {
+  const cost = curve.LEVEL_COST;
+  if (level < 1) return cost[0];
+  const capped = level > curve.levelCount ? curve.levelCount : level;
+  return cost[capped - 1];
+}
+
+function requiredTaps(level) {
+  return requiredTapsOn(DEFAULT_CURVE, level);
+}
+
+/** Total points across every level — exactly curve.totalPoints by construction. */
+function totalGamePointsOn(curve) {
+  return curve.CUMULATIVE[curve.CUMULATIVE.length - 1];
+}
 function totalGamePoints() {
-  return LEVEL_COST.reduce((a, b) => a + b, 0);
+  return totalGamePointsOn(DEFAULT_CURVE);
 }
 
 /**
@@ -91,46 +127,43 @@ function totalGamePoints() {
  * cap trims the advance.
  *
  * A prefix-sum table rather than a loop: this is called on every batch, and
- * summing up to 50 terms each time is pointless when the answer never
+ * summing up to 200 terms each time is pointless when the answer never
  * changes.
  */
-const CUMULATIVE = (() => {
-  const out = [0];
-  for (let i = 0; i < LEVEL_COST.length; i++) {
-    out.push(out[i] + LEVEL_COST[i]);
-  }
-  return out;
-})();
+function cumulativePointsOn(curve, level, levelTaps) {
+  const lv = Math.max(1, Math.min(level, curve.levelCount + 1));
+  const cleared = curve.CUMULATIVE[lv - 1];
+  // Past the final level the game is complete; there is no "inside" left.
+  if (lv > curve.levelCount) return cleared;
+  const inside = Math.max(
+    0, Math.min(Number(levelTaps) || 0, curve.LEVEL_COST[lv - 1]));
+  return cleared + inside;
+}
 
 function cumulativePoints(level, levelTaps) {
-  const lv = Math.max(1, Math.min(level, LEVEL_COUNT + 1));
-  const cleared = CUMULATIVE[lv - 1];
-  // Past the final level the game is complete; there is no "inside" left.
-  if (lv > LEVEL_COUNT) return cleared;
-  const inside = Math.max(0, Math.min(Number(levelTaps) || 0, LEVEL_COST[lv - 1]));
-  return cleared + inside;
+  return cumulativePointsOn(DEFAULT_CURVE, level, levelTaps);
 }
 
 // Kept for the old wire contract: a few tests and the client still speak of
 // "base taps". Level one's cost is that number.
-const BASE_TAPS = LEVEL_COST[0];
+const BASE_TAPS = DEFAULT_CURVE.LEVEL_COST[0];
 
 // ── daily level cap ────────────────────────────────────────────────────────
-// A player may clear at most this many levels per calendar day.
+// A player may clear at most `curve.levelsPerDay` levels per calendar day.
 //
 // The cap exists so the game is a daily habit rather than a single evening's
-// grind, and so the 50-level curve lasts. It is enforced HERE because the
+// grind, and so the level curve lasts. It is enforced HERE because the
 // phone is treated as hostile and because two clients sharing an account must
 // share one allowance.
-//
-// Two per day, over 50 levels, is 25 days to finish.
 //
 // PARTIAL PROGRESS IS KEPT. The owner was explicit: "یه روزایی بعد گرفتن نصف
 // لول یا کمی از لول خسته شدن اشکالی نداره میتونن ادامشو برن". So a player who
 // stops mid-level keeps those points and resumes tomorrow — `advance()` only
 // refuses to cross a level BOUNDARY once the allowance is spent, it never
 // discards banked progress inside the current level.
-const MAX_LEVELS_PER_DAY = 2;
+//
+// دورِ ۳۳: سقفِ روزانه هم مثل بقیهٔ منحنی از تنظیمات اقتصاد می‌آید
+// (`curve.levelsPerDay`) تا ادمین بدون انتشارِ اپ آن را عوض کند.
 
 /**
  * Today's date in Asia/Tehran as YYYY-MM-DD.
@@ -247,7 +280,7 @@ function asInt(value, fallback = NaN) {
  * Validates the request body shape and bounds.
  * @returns {{ok: true, body: object} | {ok: false, message: string}}
  */
-function validateShape(raw) {
+function validateShape(raw, curve = DEFAULT_CURVE) {
   const body = {
     taps: asInt(raw?.taps),
     flagged: asInt(raw?.flagged, 0),
@@ -271,10 +304,11 @@ function validateShape(raw) {
   if (body.elapsedMs <= 0 || body.elapsedMs > MAX_BATCH_WINDOW_MS) {
     return { ok: false, message: 'بازهٔ زمانی ارسالی معتبر نیست' };
   }
-  if (body.level < 1 || body.level > LEVEL_COUNT + 1) {
+  if (body.level < 1 || body.level > curve.levelCount + 1) {
     return { ok: false, message: 'لول ارسالی معتبر نیست' };
   }
-  if (body.levelTaps < 0 || body.levelTaps > requiredTaps(LEVEL_COUNT) * 2) {
+  if (body.levelTaps < 0
+    || body.levelTaps > requiredTapsOn(curve, curve.levelCount) * 2) {
     return { ok: false, message: 'مقدار levelTaps معتبر نیست' };
   }
   if (body.seq < 1) {
@@ -323,21 +357,22 @@ function plausibleCeiling(elapsedMs) {
  * already below the boundary. Only a batch that genuinely overshot is
  * trimmed.
  */
-function advance(level, levelTaps, taps, levelsLeftToday = Infinity) {
+function advance(level, levelTaps, taps, levelsLeftToday = Infinity,
+  curve = DEFAULT_CURVE) {
   let lv = level;
   let lt = levelTaps + taps;
   let gained = 0;
-  while (lv <= LEVEL_COUNT && lt >= requiredTaps(lv)) {
+  while (lv <= curve.levelCount && lt >= requiredTapsOn(curve, lv)) {
     if (gained >= levelsLeftToday) {
-      lt = Math.min(lt, requiredTaps(lv) - 1);
+      lt = Math.min(lt, requiredTapsOn(curve, lv) - 1);
       return { level: lv, levelTaps: lt, gained, capped: true };
     }
-    lt -= requiredTaps(lv);
+    lt -= requiredTapsOn(curve, lv);
     lv += 1;
     gained += 1;
   }
-  if (lv > LEVEL_COUNT) {
-    lv = LEVEL_COUNT + 1;
+  if (lv > curve.levelCount) {
+    lv = curve.levelCount + 1;
     lt = 0;
   }
   return { level: lv, levelTaps: lt, gained, capped: false };
@@ -351,12 +386,13 @@ function advance(level, levelTaps, taps, levelsLeftToday = Infinity) {
  * so `getProgress` never reports a stale allowance to a client that opens the
  * game at 00:01 and taps before the first batch lands.
  */
-function levelsLeftToday(row, today = tehranDay()) {
-  if (!row) return MAX_LEVELS_PER_DAY;
+function levelsLeftToday(row, today = tehranDay(), curve = DEFAULT_CURVE) {
+  const cap = curve.levelsPerDay;
+  if (!row) return cap;
   const used = storedDay(row.levels_day) === today
     ? Number(row.levels_today) || 0
     : 0;
-  return Math.max(0, MAX_LEVELS_PER_DAY - used);
+  return Math.max(0, cap - used);
 }
 
 /**
@@ -389,44 +425,66 @@ function storedDay(value) {
 }
 
 async function getProgress(userId) {
+  // منحنیِ زندهٔ ادمین — هر دو خواندن و نوشتن با همان snapshot کار می‌کنند.
+  const curve = await currentCurve();
   const { rows } = await pool.query(
     `SELECT level, level_taps, total_taps, flagged_taps,
-            levels_today, levels_day, points_awarded
+            levels_today, levels_day, points_awarded, coins_awarded, finished_at
        FROM tap_game_progress WHERE user_id=$1`,
     [userId]
   );
   const r = rows[0];
-  const left = levelsLeftToday(r);
+  const left = levelsLeftToday(r, tehranDay(), curve);
   if (!r) {
     return {
       level: 1,
       levelTaps: 0,
       totalTaps: 0,
       flaggedTaps: 0,
-      requiredTaps: requiredTaps(1),
-      levelCount: LEVEL_COUNT,
+      requiredTaps: requiredTapsOn(curve, 1),
+      levelCount: curve.levelCount,
       pointsAwarded: 0,
-      pointsToNextLevel: requiredTaps(1),
-      totalGamePoints: totalGamePoints(),
-      levelsPerDay: MAX_LEVELS_PER_DAY,
+      coinsAwarded: 0,
+      pointsToNextLevel: requiredTapsOn(curve, 1),
+      totalGamePoints: totalGamePointsOn(curve),
+      levelsPerDay: curve.levelsPerDay,
       levelsLeftToday: left,
       resetInMs: msUntilTehranMidnight(),
+      finished: false,
+      growthFactor: curve.growthFactor,
+      totalPoints: curve.totalPoints,
     };
   }
+  // ── «بازی تمام شد» (دورِ ۳۳) ──
+  // خواستهٔ مالک: «وقتی لول ضربه‌زن به آخر رسید بازی تموم میشه و تا
+  // زمانی که ادمین رست نداده کاربر نمیتونه دیگه بازی کنه».
+  //
+  // دو شرط، هر کدام بهتنهایی کافی است:
+  //   ۱. finished_at — مهرِ زمانی که فقط ریستِ ادمین پاکش می‌کند؛
+  //   ۲. level > levelCount — پوششِ ردیف‌هایی که پیش از این تغییر به
+  //      لولِ آخر رسیده‌اند و مهر ندارند (سازگاری با دادهٔ موجود).
+  const finished = Boolean(r.finished_at) || r.level > curve.levelCount;
   return {
     level: r.level,
     levelTaps: r.level_taps,
     totalTaps: Number(r.total_taps),
     flaggedTaps: Number(r.flagged_taps),
-    requiredTaps: requiredTaps(r.level),
-    levelCount: LEVEL_COUNT,
+    requiredTaps: requiredTapsOn(curve, r.level),
+    levelCount: curve.levelCount,
     // نمایش بر حسب امتیاز است نه ضربه — خواستهٔ مالک.
     pointsAwarded: Number(r.points_awarded || 0),
-    pointsToNextLevel: Math.max(0, requiredTaps(r.level) - r.level_taps),
-    totalGamePoints: totalGamePoints(),
-    levelsPerDay: MAX_LEVELS_PER_DAY,
-    levelsLeftToday: left,
+    coinsAwarded: Number(r.coins_awarded || 0),
+    pointsToNextLevel: finished
+      ? 0
+      : Math.max(0, requiredTapsOn(curve, r.level) - r.level_taps),
+    totalGamePoints: totalGamePointsOn(curve),
+    levelsPerDay: curve.levelsPerDay,
+    levelsLeftToday: finished ? 0 : left,
     resetInMs: msUntilTehranMidnight(),
+    finished,
+    finishedAt: r.finished_at || null,
+    growthFactor: curve.growthFactor,
+    totalPoints: curve.totalPoints,
   };
 }
 
@@ -441,8 +499,10 @@ async function getProgress(userId) {
 async function submitBatch(
   userId, token, raw, onPointsEarned = null, onLevelsGained = null,
 ) {
+  // منحنیِ زنده — snapshotِ همین بسته؛ توضیح کامل بالای currentCurve.
+  const curve = await currentCurve();
   // Gate 2 — shape.
-  const parsed = validateShape(raw);
+  const parsed = validateShape(raw, curve);
   if (!parsed.ok) {
     return { status: 400, payload: { ok: false, message: parsed.message } };
   }
@@ -469,7 +529,8 @@ async function submitBatch(
     );
     const { rows } = await client.query(
       `SELECT level, level_taps, total_taps, flagged_taps, rejected_batches,
-              last_sequence, last_batch_at, levels_today, levels_day
+              last_sequence, last_batch_at, levels_today, levels_day,
+              coins_awarded, finished_at
          FROM tap_game_progress WHERE user_id=$1 FOR UPDATE`,
       [userId]
     );
@@ -512,7 +573,46 @@ async function submitBatch(
       [userId, nonce]
     );
     const today = tehranDay();
-    const left = levelsLeftToday(current, today);
+
+    // ── Gate 1.5 — بازیِ تمام‌شده (دورِ ۳۳) ─────────────────────────────
+    //
+    // خواستهٔ صریحِ مالک: «تا زمانی که ادمین بازی رو رست نداده کاربر
+    // نمیتونه دیگه بازی کنه». پس اولین چیزی که بعد از قفلِ ردیف چک
+    // می‌شود همین است — قبل از مصرفِ nonce و قبل از هر شمارشی، چون:
+    //   • بازیکنِ بلاک‌شده نباید nonce بسوزاند (در غیر این صورت
+    //     کلاینتِ کنارگذاشته‌شده با 409ِ «تکراری» گمراه می‌شود)؛
+    //   • شمارشِ ضربه‌ها روی ردیفِ قفل‌شده معنایی ندارد.
+    //
+    // همان دو شرطِ getProgress: مهرِ finished_at یا عبور از لولِ آخر.
+    // 409 چون «وضعیتِ فعلیِ منبع» است نه خطای ورودی — کلاینت باید صفحهٔ
+    // «بازی تمام شد» با جمعِ امتیاز و سکه را نشان دهد.
+    const isFinished = Boolean(current.finished_at)
+      || current.level > curve.levelCount;
+    if (isFinished) {
+      await client.query('COMMIT');
+      return {
+        status: 409,
+        payload: {
+          ok: false,
+          finished: true,
+          message: 'بازی ضربه‌زن را کامل تمام کرده‌ای؛ تا زمانی که مدیر بازی را ریست نکند نمی‌توانی دوباره بازی کنی',
+          level: current.level,
+          levelCount: curve.levelCount,
+          levelTaps: 0,
+          totalTaps: Number(current.total_taps),
+          pointsAwarded: 0,
+          pointsEarned: 0,
+          coinsEarned: 0,
+          // جمعِ سکهٔ واقعیِ این کاربر — برای صفحهٔ «بازی تمام شد»؛
+          // جمعِ امتیاز را کلاینت از GET /progress می‌گیرد.
+          coinsAwardedTotal: Number(current.coins_awarded || 0),
+          levelsPerDay: curve.levelsPerDay,
+          levelsLeftToday: 0,
+          resetInMs: msUntilTehranMidnight(),
+        },
+      };
+    }
+    const left = levelsLeftToday(current, today, curve);
 
     if (nonceInsert.rowCount === 0) {
       await client.query('COMMIT');
@@ -525,7 +625,7 @@ async function submitBatch(
           level: current.level,
           levelTaps: current.level_taps,
           totalTaps: Number(current.total_taps),
-          levelsPerDay: MAX_LEVELS_PER_DAY,
+          levelsPerDay: curve.levelsPerDay,
           levelsLeftToday: left,
           resetInMs: msUntilTehranMidnight(),
         },
@@ -577,16 +677,21 @@ async function submitBatch(
     const next = rejected
       ? { level: current.level, levelTaps: current.level_taps,
           gained: 0, capped: left <= 0 }
-      : advance(current.level, current.level_taps, accepted, left);
+      : advance(current.level, current.level_taps, accepted, left, curve);
+
+    // آیا همین بسته بازی را تمام کرد؟ (عبور از لولِ آخر)
+    // مهرِ finished_at فقط یک‌بار زده می‌شود؛ بسته‌های بعدی در گیتِ ۱.۵
+    // همین‌جا برمی‌گردند.
+    const justFinished = next.level > curve.levelCount;
 
     // Spent before this batch, plus whatever it just gained.
     //
     // Clamped because a corrupt stored counter above the cap would otherwise
     // be written straight back, and bounded below because `left` is already
-    // clamped to [0, MAX] by levelsLeftToday().
+    // clamped to [0, cap] by levelsLeftToday().
     const usedToday = Math.min(
-      MAX_LEVELS_PER_DAY,
-      (MAX_LEVELS_PER_DAY - left) + next.gained,
+      curve.levelsPerDay,
+      (curve.levelsPerDay - left) + next.gained,
     );
 
     // ── how many of the accepted taps actually COUNTED ───────────────────
@@ -600,10 +705,42 @@ async function submitBatch(
     // after the cap is spent still reports its taps honestly, and paying for
     // those would hand out points the cap was supposed to withhold — and,
     // through the referral commission, pay the referrer for them too.
-    const pointsBefore = cumulativePoints(current.level, current.level_taps);
-    const pointsAfter = cumulativePoints(next.level, next.levelTaps);
+    const pointsBefore = cumulativePointsOn(
+      curve, current.level, current.level_taps);
+    const pointsAfter = cumulativePointsOn(curve, next.level, next.levelTaps);
     const earnedPoints = rejected ? 0 : Math.max(0, pointsAfter - pointsBefore);
 
+    // ── credit the points ────────────────────────────────────────────────
+    //
+    // Inside the same transaction as the progress write. If either fails,
+    // both roll back — otherwise a crash between them either pays twice or
+    // advances the level without paying.
+    //
+    // دورِ ۳۳: این callback و callbackِ سکه اکنون **قبل از** آپدیتِ ردیفِ
+    // پیشرفت اجرا می‌شوند، نه بعدش. دلیل: ستونِ تازهٔ coins_awarded باید
+    // همان عددی را جمع کند که واقعاً در دفترِ سکه نشسته (خروجیِ callback)،
+    // و مهرِ finished_at هم در همان آپدیت می‌نشیند. همه روی یک تراکنش‌اند،
+    // پس ترتیبِ داخلش معنای همزمانی ندارد — ولی تک‌آپدیت‌کردن یعنی ردیف
+    // هیچ‌وقت بینِ دو نوشتن نیمه‌کاره دیده نمی‌شود.
+    if (earnedPoints > 0 && typeof onPointsEarned === 'function') {
+      await onPointsEarned(client, userId, earnedPoints);
+    }
+
+    // ── سکهٔ لول‌های همین بسته (دورِ ۲۶) ──────────────────────────────────
+    //
+    // `next.gained` تعدادِ لول‌هایی است که در همین بسته تمام شده‌اند —
+    // بعد از اعمالِ سقفِ روزانه و بعد از ردِ ضربه‌های مشکوک. callback مقدارِ
+    // سکهٔ واقعاً اعطاشده را برمی‌گرداند تا کلاینت همان لحظه «+۵ سکه» را
+    // جلوی چشمِ کاربر نشان دهد.
+    let coinsEarned = 0;
+    if (!rejected && next.gained > 0 && typeof onLevelsGained === 'function') {
+      const levels = [];
+      for (let i = 0; i < next.gained; i++) levels.push(current.level + i);
+      const awarded = await onLevelsGained(client, userId, levels);
+      coinsEarned = Math.max(0, Math.trunc(Number(awarded) || 0));
+    }
+
+    // ── آپدیتِ ردیفِ پیشرفت — تک‌نوشتِ نهاییِ همین بسته (دورِ ۳۳) ────────
     const updated = await client.query(
       `UPDATE tap_game_progress
           SET level = $2,
@@ -616,17 +753,22 @@ async function submitBatch(
               -- counters and mean nothing.
               last_sequence = GREATEST(last_sequence, $7),
               -- Written unconditionally, including the day, so the row is
-              -- self-consistent even on a batch that gained nothing. Storing
-              -- the count without the day it belongs to is what would make a
-              -- stale counter look current.
+              -- self-consistent even on a batch that gained nothing.
               levels_today = $8,
               levels_day = $9::date,
               points_awarded = points_awarded + $10,
+              -- جمعِ سکهٔ ضربه‌زنِ این کاربر — همان عددی که دفترِ سکه
+              -- واقعاً اعمال کرد (دورِ ۳۳؛ برای آمار ادمین و صفحهٔ پایان).
+              coins_awarded = coins_awarded + $11,
+              -- مهرِ «بازی تمام شد»: فقط بارِ اول زده می‌شود؛ پاک‌کردنش
+              -- فقط دستِ ریستِ ادمین است.
+              finished_at = COALESCE(finished_at, $12),
               last_batch_at = NOW(),
               updated_at = NOW()
         WHERE user_id = $1
         RETURNING level, level_taps, total_taps, flagged_taps,
-                  rejected_batches, levels_today, points_awarded`,
+                  rejected_batches, levels_today, points_awarded,
+                  coins_awarded, finished_at`,
       [
         userId,
         next.level,
@@ -638,43 +780,10 @@ async function submitBatch(
         usedToday,
         today,
         earnedPoints,
+        coinsEarned,
+        justFinished ? new Date() : null,
       ]
     );
-
-    // ── credit the points ────────────────────────────────────────────────
-    //
-    // Inside the same transaction as the progress write. If either fails,
-    // both roll back — otherwise a crash between them either pays twice or
-    // advances the level without paying.
-    if (earnedPoints > 0 && typeof onPointsEarned === 'function') {
-      await onPointsEarned(client, userId, earnedPoints);
-    }
-
-    // ── سکهٔ لول‌های همین بسته (دورِ ۲۶) ──────────────────────────────────
-    //
-    // ضربه‌زن تا امروز فقط امتیاز می‌داد. سکه — که ارزِ رتبه‌بندیِ لیگ و
-    // جایزهٔ نقدی است — فقط از بازی‌های رقابتی می‌آمد، پس کاربری که ضربه‌زن
-    // بازی می‌کرد ساعت‌ها وقت می‌گذاشت و در جدولِ لیگ صفر می‌ماند.
-    //
-    // `next.gained` تعدادِ لول‌هایی است که **در همین بسته** تمام شده‌اند —
-    // بعد از اعمالِ سقفِ روزانه و بعد از ردِ ضربه‌های مشکوک. لول‌های
-    // تمام‌شده `current.level` تا `current.level + gained - 1` هستند:
-    // تمام‌کردنِ لولِ L یعنی رفتن از L به L+1، پس پاداش به L تعلق دارد نه
-    // به لولِ جدید.
-    //
-    // ⚠️ بیرونِ شرطِ `earnedPoints > 0` نیست و نباید باشد: هر لولِ
-    //    تمام‌شده لزوماً امتیازِ مثبت دارد، ولی وابسته‌کردنِ سکه به امتیاز
-    //    دو منطق را به هم گره می‌زند. اینجا فقط به `gained` نگاه می‌کنیم.
-    // ⚠️ callback حالا **مقدارِ سکهٔ واقعاً اعطاشده** را برمی‌گرداند تا
-    //    کلاینت همان لحظه «+۵ سکه» را جلوی چشمِ کاربر نشان دهد — بدون
-    //    هیچ درخواستِ جداگانه.
-    let coinsEarned = 0;
-    if (!rejected && next.gained > 0 && typeof onLevelsGained === 'function') {
-      const levels = [];
-      for (let i = 0; i < next.gained; i++) levels.push(current.level + i);
-      const awarded = await onLevelsGained(client, userId, levels);
-      coinsEarned = Math.max(0, Math.trunc(Number(awarded) || 0));
-    }
 
     // جمعِ سکهٔ کاربر بعد از همین بسته — برای به‌روزرسانیِ نشانِ سکه
     // بدونِ نیاز به refresh.
@@ -685,7 +794,7 @@ async function submitBatch(
     await client.query('COMMIT');
 
     const row = updated.rows[0];
-    const remaining = Math.max(0, MAX_LEVELS_PER_DAY - row.levels_today);
+    const remaining = Math.max(0, curve.levelsPerDay - row.levels_today);
     return {
       status: 200,
       payload: {
@@ -697,8 +806,8 @@ async function submitBatch(
         level: row.level,
         levelTaps: row.level_taps,
         totalTaps: Number(row.total_taps),
-        requiredTaps: requiredTaps(row.level),
-        levelCount: LEVEL_COUNT,
+        requiredTaps: requiredTapsOn(curve, row.level),
+        levelCount: curve.levelCount,
         // ── points ────────────────────────────────────────────────────────
         // The owner wants the UI to show POINTS, not tap counts. Since a tap
         // is worth exactly one point these are the same number today, but
@@ -712,17 +821,26 @@ async function submitBatch(
         // چشماشون اضافه بشه»).
         coinsEarned,
         coinsTotal,
-        pointsToNextLevel: Math.max(0, requiredTaps(row.level) - row.level_taps),
-        totalGamePoints: totalGamePoints(),
+        // جمعِ سکهٔ ضربه‌زنِ این کاربر — برای صفحهٔ «بازی تمام شد».
+        coinsAwarded: Number(row.coins_awarded || 0),
+        pointsToNextLevel: justFinished
+          ? 0
+          : Math.max(0, requiredTapsOn(curve, row.level) - row.level_taps),
+        totalGamePoints: totalGamePointsOn(curve),
         // The client needs all three: the limit to explain the rule, what is
         // left to decide whether to keep counting, and when it resets so the
         // countdown is real rather than "tomorrow".
-        levelsPerDay: MAX_LEVELS_PER_DAY,
-        levelsLeftToday: remaining,
+        levelsPerDay: curve.levelsPerDay,
+        levelsLeftToday: justFinished ? 0 : remaining,
         resetInMs: msUntilTehranMidnight(),
         // True when THIS batch hit the wall — the moment to show the message,
         // as opposed to `levelsLeftToday === 0` which stays true all evening.
         cappedNow: next.capped === true,
+        // ── پایانِ بازی (دورِ ۳۳) ──
+        // true یعنی همین بسته لولِ آخر را بست؛ کلاینت باید جمعِ امتیاز و
+        // سکه را بزرگ نشان دهد و ورودی ضربه را قفل کند تا ریستِ ادمین.
+        finished: justFinished === true,
+        finishedAt: row.finished_at || null,
       },
     };
   } catch (e) {
@@ -774,11 +892,121 @@ async function leaderboard(limit = 50) {
   }));
 }
 
+// ── مدیریت ادمین (دورِ ۳۳) ─────────────────────────────────────────────────
+//
+// خواستهٔ مالک: «در پنل ادمین اندروید و وب باید ادمین بتونه کامل بازی
+// ضربه‌زن رو مدیریت کنه و درصورت نیاز رست بده و آمار لولِ آخر شدن
+// کاربرها رو داشته باشه». این سه تابع همان چیزی هستند که مسیرهای
+// /admin/tap/* صدا می‌زنند.
+
+/**
+ * آمارِ کلی + فهرست بازیکنانی که بازی را تمام کرده‌اند.
+ *
+ * «تمام‌کردن» با همان دو شرطِ getProgress تعریف می‌شود (مهرِ finished_at
+ * یا level > levelCountِ منحنیِ زنده) تا عددِ پنل همیشه با چیزی که
+ * کاربر می‌بیند یکی باشد.
+ */
+async function adminStats() {
+  const curve = await currentCurve();
+  const { rows } = await pool.query(
+    `SELECT
+       count(*) AS players,
+       count(*) FILTER (WHERE finished_at IS NOT NULL
+                          OR level > $1) AS finished,
+       count(*) FILTER (WHERE level = $1) AS at_final_level,
+       coalesce(sum(points_awarded), 0) AS total_points,
+       coalesce(sum(coins_awarded), 0) AS total_coins,
+       coalesce(max(updated_at), NULL) AS last_activity
+       FROM tap_game_progress`,
+    [curve.levelCount]
+  );
+  const dist = await pool.query(
+    `SELECT level, count(*) AS n
+       FROM tap_game_progress
+      GROUP BY level
+      ORDER BY level`
+  );
+  const finishedRows = await pool.query(
+    `SELECT p.user_id, p.level, p.total_taps, p.points_awarded, p.coins_awarded,
+            p.finished_at, u.nickname, u.first_name, u.last_name, u.mobile,
+            u.profile_image_url, u.profile_avatar_key
+       FROM tap_game_progress p
+       JOIN users u ON u.id = p.user_id
+      WHERE p.finished_at IS NOT NULL OR p.level > $1
+      ORDER BY coalesce(p.finished_at, p.updated_at) DESC
+      LIMIT 200`,
+    [curve.levelCount]
+  );
+  const r = rows[0] || {};
+  return {
+    curve: {
+      levelCount: curve.levelCount,
+      totalPoints: curve.totalPoints,
+      growthFactor: curve.growthFactor,
+      levelsPerDay: curve.levelsPerDay,
+    },
+    players: Number(r.players || 0),
+    finished: Number(r.finished || 0),
+    atFinalLevel: Number(r.at_final_level || 0),
+    totalPointsAwarded: Number(r.total_points || 0),
+    totalCoinsAwarded: Number(r.total_coins || 0),
+    lastActivity: r.last_activity || null,
+    levelDistribution: dist.rows.map(x => ({
+      level: x.level, count: Number(x.n),
+    })),
+    finishedUsers: finishedRows.rows.map(x => ({
+      userId: x.user_id,
+      // موبایل برای پنلِ امن مخفی می‌شود؛ جست‌وجوی کاربر با شناسه ممکن است.
+      mobile: String(x.mobile || '').slice(0, 4) + '***',
+      nickname: x.nickname || x.first_name || 'بازیکن',
+      profileImageUrl: x.profile_image_url,
+      profileAvatarKey: x.profile_avatar_key,
+      level: x.level,
+      totalTaps: Number(x.total_taps),
+      pointsAwarded: Number(x.points_awarded),
+      coinsAwarded: Number(x.coins_awarded),
+      finishedAt: x.finished_at,
+    })),
+  };
+}
+
+/**
+ * ریستِ پیشرفتِ یک کاربر — تنها راهِ بازگشاییِ بازیِ تمام‌شده.
+ *
+ * ردیفِ پیشرفت حذف می‌شود نه صفر، تا دفعهٔ بعد همان مسیرِ «ایجاد در
+ * اولین بسته» طی شود و هیچ شمارندهٔ کهنه‌ای (سقفِ روزانه، nonceها)
+ * باقی نماند. nonces هم پاک می‌شوند وگرنه کلاینتِ قدیمی که هنوز
+ * بستهٔ در راه دارد ممکن است با «تکراری» رد شود.
+ */
+async function adminResetUser(userId) {
+  const { rows } = await pool.query(
+    'SELECT nickname, first_name FROM users WHERE id=$1', [userId]);
+  if (!rows[0]) return { ok: false, message: 'کاربر پیدا نشد' };
+  const del = await pool.query(
+    'DELETE FROM tap_game_progress WHERE user_id=$1', [userId]);
+  await pool.query('DELETE FROM tap_game_nonces WHERE user_id=$1', [userId]);
+  return {
+    ok: true,
+    reset: del.rowCount > 0,
+    user: { userId, nickname: rows[0].nickname || rows[0].first_name },
+  };
+}
+
+/** ریستِ کلِ بازی برای همه — فصلِ تازه. آمارِ دفتر امتیاز دست‌نخورده می‌ماند. */
+async function adminResetAll() {
+  const { rowCount } = await pool.query('DELETE FROM tap_game_progress');
+  await pool.query('DELETE FROM tap_game_nonces');
+  return { ok: true, resetRows: rowCount || 0 };
+}
+
 module.exports = {
   getProgress,
   submitBatch,
   leaderboard,
   pruneNonces,
+  adminStats,
+  adminResetUser,
+  adminResetAll,
   // exported for tests
   requiredTaps,
   totalGamePoints,
@@ -796,4 +1024,10 @@ module.exports = {
   GROWTH_FACTOR,
   MAX_TAPS_PER_SECOND,
   MAX_LEVELS_PER_DAY,
+  buildCurve,
+  currentCurve,
+  DEFAULT_CURVE,
+  requiredTapsOn,
+  cumulativePointsOn,
+  totalGamePointsOn,
 };

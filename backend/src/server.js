@@ -2624,6 +2624,8 @@ app.use('/api', require('./routes/adminCardBox')({
 app.use('/api', require('./routes/adminGameEconomy')({
   adminAuth, requireRole, asyncHandler, audit, gameEconomy,
   gameRewards: { getGameRewardSettings, saveGameRewardSettings },
+  // دورِ ۳۳: مدیریتِ کامل بازی ضربه‌زن (آمار، ریست) در همان صفحهٔ اقتصاد.
+  tapGame,
 }));
 
 const presence = createPresenceService(pool);

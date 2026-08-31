@@ -572,11 +572,16 @@ test('a null or invalid day grants a full allowance', () => {
 
 test('a rejected batch does not wipe the counter', () => {
   // The live test surfaced this too: on a rejected batch `gained` is 0, so
-  // the written value is entirely (MAX - left). If `left` were wrong, a
+  // the written value is entirely (cap - left). If `left` were wrong, a
   // rejected batch would silently hand the allowance back.
+  //
+  // دورِ ۳۳: سقفِ روزانه از ثابتِ MAX_LEVELS_PER_DAY به curve.levelsPerDay
+  // (تنظیمِ زندهٔ ادمین) منتقل شد؛ نگهبان همان رابطه را با نامِ جدید
+  // چک می‌کند تا کسی در بازنویسی‌ها «هزینه‌شدهٔ امروز» را از «ریست»
+  // اشتباه نگیرد.
   const src = require('fs').readFileSync(
     require('path').join(__dirname, '../src/services/tapGameService.js'), 'utf8');
-  assert.ok(/\(MAX_LEVELS_PER_DAY - left\) \+ next\.gained/.test(src),
+  assert.ok(/\(curve\.levelsPerDay - left\) \+ next\.gained/.test(src),
     'usedToday must be derived from what was already spent, not reset');
 });
 
@@ -594,11 +599,76 @@ test('the cap is enforced in submitBatch, not only in advance()', () => {
   // would pass every test above and do nothing in production.
   const src = require('fs').readFileSync(
     require('path').join(__dirname, '../src/services/tapGameService.js'), 'utf8');
-  assert.ok(/advance\(current\.level, current\.level_taps, accepted, left\)/
+  assert.ok(/advance\(current\.level, current\.level_taps, accepted, left, curve\)/
     .test(src), 'submitBatch must pass the remaining allowance to advance()');
   assert.ok(/levels_today = \$8/.test(src), 'the counter must be persisted');
   assert.ok(/levels_day = \$9::date/.test(src),
     'the day must be persisted alongside the count, or it goes stale');
+});
+
+console.log('\ntap game — admin-driven curve (دورِ ۳۳)');
+
+test('a custom curve sums to exactly its own total', () => {
+  // ادمین از پنل جمعِ امتیاز و تعداد لول را عوض می‌کند؛ جدولِ ساخته‌شده
+  // باید دقیقاً همان جمع را بدهد، وگرنه دو سرِ سیستم بر سرِ «کی بازی
+  // تمام شد» اختلاف پیدا می‌کنند — همان باگی که برای منحنیِ ۵۰ لولی
+  // قبلاً دیده شده بود.
+  for (const spec of [
+    { levelCount: 10, totalPoints: 3000, growthFactor: 1.08, levelsPerDay: 3 },
+    { levelCount: 60, totalPoints: 80000, growthFactor: 1.04, levelsPerDay: 1 },
+    { levelCount: 5, totalPoints: 1000, growthFactor: 1, levelsPerDay: 5 },
+  ]) {
+    const curve = svc.buildCurve(spec);
+    assert.strictEqual(svc.totalGamePointsOn(curve), spec.totalPoints,
+      JSON.stringify(spec));
+    let sum = 0;
+    for (let lv = 1; lv <= spec.levelCount; lv++) {
+      sum += svc.requiredTapsOn(curve, lv);
+    }
+    assert.strictEqual(sum, spec.totalPoints, JSON.stringify(spec));
+  }
+});
+
+test('advance() honours a custom curve and its daily cap', () => {
+  const curve = svc.buildCurve(
+    { levelCount: 3, totalPoints: 300, growthFactor: 1, levelsPerDay: 1 });
+  // لول‌های ۱۰۰ تایی؛ سه لول. سقفِ روزانه: ۱ لول.
+  const a = svc.advance(1, 0, 150, 1, curve);
+  assert.strictEqual(a.level, 2);
+  assert.strictEqual(a.gained, 1);
+  assert.strictEqual(a.capped, false);
+  // سقفِ ۱ لول در روز: لولِ اول گرفته می‌شود، لولِ دوم تمام نمی‌شود و
+  // بازیکن با پیشرفتِ جزئیِ ۹۹ ضربه‌ای همان مرز می‌نشیند (خواستهٔ مالک:
+  // «نصفِ لول بماند اشکالی ندارد»)؛ مازادِ آن‌طرفِ مرز دور ریخته می‌شود.
+  const b = svc.advance(1, 0, 1000, 1, curve);
+  assert.strictEqual(b.capped, true);
+  assert.strictEqual(b.level, 2);
+  assert.strictEqual(b.gained, 1);
+  assert.strictEqual(b.levelTaps, svc.requiredTapsOn(curve, 2) - 1);
+  // بدون سقف: عبور از لولِ آخر یعنی sentinelِ levelCount+1.
+  const c = svc.advance(3, 99, 500, Infinity, curve);
+  assert.strictEqual(c.level, 4);
+  assert.strictEqual(c.levelTaps, 0);
+});
+
+test('cumulativePointsOn() banked points match the custom curve', () => {
+  const curve = svc.buildCurve(
+    { levelCount: 4, totalPoints: 400, growthFactor: 1, levelsPerDay: 2 });
+  // چهار لولِ ۱۰۰ تایی.
+  assert.strictEqual(svc.cumulativePointsOn(curve, 1, 40), 40);
+  assert.strictEqual(svc.cumulativePointsOn(curve, 3, 30), 230);
+  // گذشته از لولِ آخر، کلِ بازی.
+  assert.strictEqual(svc.cumulativePointsOn(curve, 5, 0), 400);
+});
+
+test('the live curve and the default agree while nothing is customised', () => {
+  // تنظیماتِ اقتصاد در تستِ بدون-DB خوانده نمی‌شود؛ currentCurve باید
+  // بی‌صدا روی پیش‌فرض بیفتد (خروجیِ سطحِ سرویس همیشه یک منحنیِ کامل است).
+  return svc.currentCurve().then(curve => {
+    assert.strictEqual(curve.levelCount, svc.LEVEL_COUNT);
+    assert.strictEqual(curve.totalPoints, svc.TOTAL_POINTS);
+    assert.strictEqual(curve.levelsPerDay, svc.MAX_LEVELS_PER_DAY);
+  });
 });
 
 console.log(`\n${passed} tap-game assertions passed\n`);

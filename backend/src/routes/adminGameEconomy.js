@@ -21,6 +21,7 @@ const express = require('express');
 module.exports = function createAdminGameEconomyRoutes(deps) {
   const {
     adminAuth, requireRole, asyncHandler, audit, gameEconomy, gameRewards,
+    tapGame,
   } = deps;
   const router = express.Router();
 
@@ -57,6 +58,48 @@ module.exports = function createAdminGameEconomyRoutes(deps) {
         economy,
         gamePoints,
         economyCustom: gameEconomy.isCustom(economy),
+      });
+    }));
+
+  // ── مدیریتِ بازی ضربه‌زن (دورِ ۳۳) ────────────────────────────────────
+  // خواستهٔ مالک: «ادمین بتونه کامل بازی ضربه‌زن رو مدیریت کنه و درصورت
+  // نیاز رست بده و آمار لولِ آخر شدن کاربرها رو داشته باشه».
+  //
+  // GET stats — آمارِ کلی، توزیعِ لول‌ها و فهرست بازیکنانِ تمام‌کرده.
+  router.get('/admin/tap/stats', adminAuth, asyncHandler(async (req, res) => {
+    res.json(await tapGame.adminStats());
+  }));
+
+  // POST reset — ریستِ یک کاربر (userId) یا همه (all:true).
+  //
+  // ⚠️ فقط نقشِ اپراتور به بالا (requireRole بدون آرگومان یعنی همان
+  //    سخت‌گیرانه‌ترین سطحِ فعلی پنل) و با ثبتِ رکوردِ ممیزی؛ ریستِ
+  //    کلِ بازی عملیاتِ برگشت‌ناپذیری است و باید ردپا داشته باشد.
+  router.post('/admin/tap/reset', adminAuth, requireRole(),
+    asyncHandler(async (req, res) => {
+      const b = req.body && typeof req.body === 'object' ? req.body : {};
+      if (b.all === true) {
+        const out = await tapGame.adminResetAll();
+        await audit(req.admin.id, 'tap_game_reset_all', 'app_settings', null,
+          b.reason || null, out);
+        return res.json({
+          message: `بازی ضربه‌زن برای همه ریست شد (${out.resetRows} بازیکن)`,
+          ...out,
+        });
+      }
+      const userId = String(b.userId || '').trim();
+      if (!/^[0-9a-fA-F-]{10,40}$/.test(userId)) {
+        return res.status(400).json({ message: 'شناسهٔ کاربر معتبر نیست' });
+      }
+      const out = await tapGame.adminResetUser(userId);
+      if (!out.ok) return res.status(404).json({ message: out.message });
+      await audit(req.admin.id, 'tap_game_reset', 'users', userId,
+        b.reason || null, out);
+      res.json({
+        message: out.reset
+          ? `پیشرفت ضربه‌زنِ «${out.user.nickname}» ریست شد — از لول ۱ شروع می‌کند`
+          : 'این کاربر پیشرفتِ ضربه‌زنی نداشت؛ چیزی پاک نشد',
+        ...out,
       });
     }));
 

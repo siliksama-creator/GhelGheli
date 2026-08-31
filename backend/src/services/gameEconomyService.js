@@ -39,6 +39,21 @@ const DEFAULTS = Object.freeze({
   dailyCoinQuota: Object.freeze({ 100: 30, 1000: 15 }),
   // سکهٔ هر لولِ تمام‌شدهٔ بازی ضربه‌زن — خواستهٔ مالک: «هر لول ۵ سکه»
   tapCoinsPerLevel: 5,
+  // ── منحنیِ بازی ضربه‌زن (دورِ ۳۳) ──────────────────────────────────────
+  // خواستهٔ مالک: «بتونه امتیازها و سکه به‌ازای هر لول بازی ضربه‌زن رو
+  // بصورت کامل مدیریت کنه» و «هر تغییر بدون آپدیت اپ اعمال بشه».
+  //
+  // تا امروز این چهار عدد ثابتِ هاردکد در سه فایل بودند (سرور + وب +
+  // اندروید) و تغییرشان یعنی انتشارِ نسخهٔ جدید. حالا منبعِ حقیقت اینجا
+  // است و کلاینت‌ها آن را از GET /api/config می‌خوانند؛ مقدارهای
+  // پیش‌فرض دقیقاً همان اعدادِ قبلی‌اند تا تا وقتی ادمین دست نزده،
+  // اقتصادی ذره‌ای عوض نشود.
+  tapCurve: Object.freeze({
+    levelCount: 50,      // تعداد لول‌های بازی
+    totalPoints: 50000,  // کل امتیاز بازی (خواستهٔ مالک: ۵۰ هزار)
+    growthFactor: 1.05,  // شیب گران‌شدن لول‌ها (شکل منحنی، نه جمع آن)
+    levelsPerDay: 2,     // سقف لول در روز (تقویم تهران)
+  }),
 });
 
 const GAME_IDS = ['card_duel', 'penalty', 'memory'];
@@ -74,6 +89,7 @@ function merge(raw) {
     }
   }
   const quotaSrc = v.dailyCoinQuota || {};
+  const tc = v.tapCurve && typeof v.tapCurve === 'object' ? v.tapCurve : {};
   return {
     coinCarryoverPercent: clampInt(
       v.coinCarryoverPercent, 0, 100, DEFAULTS.coinCarryoverPercent,
@@ -86,6 +102,23 @@ function merge(raw) {
     tapCoinsPerLevel: clampInt(
       v.tapCoinsPerLevel, 1, 1000, DEFAULTS.tapCoinsPerLevel,
     ),
+    // ── منحنیِ ضربه‌زن (دورِ ۳۳) ──
+    // محدوده‌ها عمداً محافظه‌کارانه‌اند: levelCount از ۵ (بازیِ نمایشی)
+    // تا ۲۰۰، totalPoints تا ده میلیون (سقفِ bigintِ ستونِ points_awarded
+    // بسیار بالاتر است ولی سرور جدولِ منحنی را در هر بسته بازمی‌سازد و
+    // سقفِ منطقی همین است)، growthFactor بین ۱ و ۱٫۵ تا منحنی همیشه
+    // صعودی و معقول بماند.
+    tapCurve: {
+      levelCount: clampInt(tc.levelCount, 5, 200, DEFAULTS.tapCurve.levelCount),
+      totalPoints: clampInt(
+        tc.totalPoints, 1000, 10_000_000, DEFAULTS.tapCurve.totalPoints),
+      growthFactor: Math.min(
+        1.5,
+        Math.max(1, Number(tc.growthFactor) || DEFAULTS.tapCurve.growthFactor),
+      ),
+      levelsPerDay: clampInt(
+        tc.levelsPerDay, 0, 50, DEFAULTS.tapCurve.levelsPerDay),
+    },
   };
 }
 
@@ -108,6 +141,7 @@ async function publicView() {
     coinRewards: cfg.coinRewards,
     dailyCoinQuota: cfg.dailyCoinQuota,
     tapCoinsPerLevel: cfg.tapCoinsPerLevel,
+    tapCurve: cfg.tapCurve,
   };
 }
 
@@ -132,6 +166,9 @@ function isCustom(cfg) {
   if (cfg.tapCoinsPerLevel !== d.tapCoinsPerLevel) return true;
   if (cfg.dailyCoinQuota[100] !== d.dailyCoinQuota[100]) return true;
   if (cfg.dailyCoinQuota[1000] !== d.dailyCoinQuota[1000]) return true;
+  for (const k of Object.keys(d.tapCurve)) {
+    if (Number(cfg.tapCurve[k]) !== Number(d.tapCurve[k])) return true;
+  }
   for (const gameId of GAME_IDS) {
     for (const stake of STAKE_LEVELS) {
       for (const outcome of OUTCOMES) {
