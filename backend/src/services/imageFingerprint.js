@@ -98,8 +98,17 @@ const COLOR_BINS = 12;   // ۱۲ سطل hue → ۱۹۲ عدد
 // ⚠️ این اعداد به فرمولِ `similarity` گره خورده‌اند. اگر وزن‌ها یا
 //    سیگنال‌ها عوض شوند، باید دوباره اندازه‌گیری شوند — نه تنظیمِ
 //    دستی. اسکریپت: scripts/benchPhotoMatch.js
-const ACCEPT_SCORE = 0.55;   // بالاتر + حاشیهٔ کافی: خودکار بپذیر
-const REVIEW_SCORE = 0.45;   // بین این دو: صف بررسی مدیر
+const ACCEPT_SCORE = 0.55;   // بالاتر + حاشیهٔ کافی: خودکار بپذیر (پیش‌فرض)
+const REVIEW_SCORE = 0.45;   // بین این دو: صف بررسی مدیر (پیش‌فرض)
+
+// آستانه‌های مؤثر از پنل ادمین (photo_match_settings) — ثابت‌های بالا
+// فقط پیش‌فرض‌اند و برای تست‌هایی که این export ها را می‌سنجند می‌مانند.
+const matchSettings = require('./matchSettings');
+
+function thresholds() {
+  const c = matchSettings.current();
+  return { acceptScore: c.acceptScore, reviewScore: c.reviewScore };
+}
 
 // ── چرا آستانهٔ رد این‌قدر پایین است ──
 //
@@ -1120,12 +1129,13 @@ function matchAgainst(queryFp, designs) {
   // باید دست‌کم ۱۵٪ بهتر از دوم باشد».
   const ratio = second > 1e-6 ? best.score / second : Infinity;
 
+  const th = thresholds();
   let verdict;
-  if (best.score >= ACCEPT_SCORE
+  if (best.score >= th.acceptScore
       && margin >= MIN_MARGIN
       && ratio >= MIN_RATIO) {
     verdict = 'accept';
-  } else if (best.score >= REVIEW_SCORE) {
+  } else if (best.score >= th.reviewScore) {
     verdict = 'review';
   } else {
     verdict = 'reject';
@@ -1167,6 +1177,7 @@ module.exports = {
   FP_VERSION,
   ACCEPT_SCORE,
   REVIEW_SCORE,
+  thresholds,
   MIN_MARGIN,
   MIN_RATIO,
   // برای تست

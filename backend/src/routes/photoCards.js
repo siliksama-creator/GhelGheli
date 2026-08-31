@@ -47,7 +47,8 @@ const MAX_BATCH = 20000;
 //
 // عمداً بالاتر از آستانهٔ تأیید است: دو کارتِ واقعاً متفاوت از یک سری
 // ممکن است ۰.۷ شباهت داشته باشند و آن‌ها مشکلی ندارند.
-const DUPLICATE_SIMILARITY = 0.93;
+const DUPLICATE_SIMILARITY = 0.93; // پیش‌فرض — مقدارِ مؤثر از matchSettings خوانده می‌شود
+const matchSettings = require('../services/matchSettings');
 
 module.exports = function createPhotoCardRoutes(deps) {
   const {
@@ -188,7 +189,7 @@ module.exports = function createPhotoCardRoutes(deps) {
     router, pool, adminAuth, requireRole, asyncHandler, imageUpload, audit,
     optimizeUpload, verifyUpload, UUID_RE, safeUnlink, toFloats,
     fs, path, fpEngine, photoCards, cardDuel, cardCrop,
-    MAX_BATCH, DUPLICATE_SIMILARITY,
+    MAX_BATCH, DUPLICATE_SIMILARITY, matchSettings,
   });
 
   router.patch(
@@ -920,10 +921,13 @@ module.exports = function createPhotoCardRoutes(deps) {
           ? designsRes.rows.some(d => d.card_type_id === expectedTypeId)
           : true;
 
+        const th = matchSettings.current();
         const decision = photoCards.decideSubmission({
           expectedTypeId,
           match,
           hasReference,
+          boundThreshold: th.boundAcceptScore,
+          freeThreshold: th.freeAcceptScore,
         });
 
         if (decision.action !== 'approve') {

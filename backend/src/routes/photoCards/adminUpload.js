@@ -11,7 +11,7 @@ module.exports = function registerAdminPhotoCardUpload(deps) {
     router, pool, adminAuth, requireRole, asyncHandler, imageUpload, audit,
     optimizeUpload, verifyUpload, UUID_RE, safeUnlink, toFloats,
     fs, path, fpEngine, photoCards, cardDuel, cardCrop,
-    MAX_BATCH, DUPLICATE_SIMILARITY,
+    MAX_BATCH, DUPLICATE_SIMILARITY, matchSettings,
   } = deps;
 
   router.post(
@@ -133,7 +133,7 @@ module.exports = function registerAdminPhotoCardUpload(deps) {
           // فرق کند قطعاً دو کارتِ متفاوت‌اند، هرچقدر هم تصویرشان
           // شبیه باشد. توضیحِ کامل در خودِ تابع.
           const selfSim = fpEngine.sameImageScore(sides[0].fp, sides[1].fp);
-          if (selfSim >= DUPLICATE_SIMILARITY) {
+          if (selfSim >= matchSettings.current().duplicateSimilarity) {
             return res.status(409).json({
               message: 'عکسِ رو و پشت تقریباً یکسان‌اند '
                 + `(${Math.round(selfSim * 100)}٪ شباهت). احتمالاً یک فایل را `
@@ -184,7 +184,7 @@ module.exports = function registerAdminPhotoCardUpload(deps) {
             });
             if (v > sim) { sim = v; simSide = side; }
           }
-          if (sim >= DUPLICATE_SIMILARITY) {
+          if (sim >= matchSettings.current().duplicateSimilarity) {
             // ⚠️ اینجا قبلاً `await releaseGuard()` بود — کپی‌شده از مسیرِ
             // «ثبت کاربر». آن تابع فقط در مسیرِ کاربر تعریف می‌شود و
             // اینجا اصلاً وجود ندارد، پس این خط ReferenceError پرتاب

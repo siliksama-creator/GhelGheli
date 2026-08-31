@@ -93,8 +93,8 @@ console.log('\n== 🔒 سقف سخت ۲ پله در روز — ایراد مال
     `بدون سقف، کاربر ${tiersInOneDay} پله در روز باز می‌کرد — برای همین سقف لازم بود`);
 
   ok(/unlocked_tier/.test(svc), 'پلهٔ باز شده جدا از XP ذخیره می‌شود');
-  ok(/const room = Math\.max\(0, MAX_TIERS_PER_DAY - usedToday\)/.test(svc),
-    'فضای باقی‌ماندهٔ امروز محاسبه می‌شود');
+  ok(svc.includes(String.raw`const room = Math.max(0, (RUNTIME?.maxTiersPerDay ?? MAX_TIERS_PER_DAY) - usedToday);`),
+    'فضای باقی‌ماندهٔ امروز از پیکربندی مؤثر خوانده می‌شود');
   ok(/const grant = Math\.min\(Math\.max\(0, earned - current\), room\)/.test(svc),
     'تعداد پلهٔ اعطایی به سقف روزانه محدود است');
 

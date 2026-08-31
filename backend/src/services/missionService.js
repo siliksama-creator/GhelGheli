@@ -1,9 +1,61 @@
 const crypto = require('crypto');
 const { pool } = require('../config/db');
 const points = require('./pointService');
+const ops = require('./opsConfig');
 
 const DAILY_BONUS_KEY = 'daily_all_bonus';
-const DAILY_BONUS_REWARD = 100;
+const DAILY_BONUS_DEFAULT = 100;
+
+// برای سازگاری با ابزارها/تست‌هایی که این ثابت را می‌خوانند نگه داشته
+// می‌شود؛ مقدارِ واقعیِ به‌کاررفته در مسیر محصول از `mission_config` است.
+const DAILY_BONUS_REWARD = DAILY_BONUS_DEFAULT;
+
+/**
+ * تنظیمات ماموریت از پنل ادمین: جایزهٔ تکمیل روزانه + بازنویسیِ
+ * تکیِ ماموریت‌های توکار (کلیدِ هر ماموریت → reward/goal/active).
+ * `overrides.active=false` یعنی ماموریت از چرخش بیرون می‌رود.
+ */
+function missionConfig() {
+  const v = ops.syncGet('mission_config');
+  if (!v || typeof v !== 'object') return { dailyBonus: DAILY_BONUS_DEFAULT, overrides: {} };
+  return {
+    dailyBonus: Number.isFinite(Number(v.dailyBonus)) ? Math.max(0, Number(v.dailyBonus)) : DAILY_BONUS_DEFAULT,
+    overrides: v.overrides && typeof v.overrides === 'object' ? v.overrides : {},
+  };
+}
+
+function applyOverride(item) {
+  const over = missionConfig().overrides[item.key];
+  if (!over || typeof over !== 'object') return { ...item, active: true };
+  const goal = Number.isFinite(Number(over.goal)) && Number(over.goal) >= 1
+    ? Math.round(Number(over.goal)) : item.goal;
+  const reward = Number.isFinite(Number(over.reward)) && Number(over.reward) >= 0
+    ? Math.round(Number(over.reward)) : item.reward;
+  return {
+    ...item,
+    goal,
+    reward,
+    title: typeof over.title === 'string' && over.title.trim() ? over.title.trim().slice(0, 120) : item.title,
+    description: typeof over.description === 'string' && over.description.trim()
+      ? over.description.trim().slice(0, 240) : item.description,
+    active: over.active !== false,
+  };
+}
+
+/** ماموریت‌های سفارشی ادمین — همیشه فعال، بدون چرخش تصادفی. */
+async function customDefinitions(client = pool) {
+  const { rows } = await client.query(
+    `SELECT key, period, event, icon, title, description, goal, reward
+       FROM mission_definitions
+      WHERE is_active = true
+      ORDER BY sort_order, created_at`);
+  return rows.map((r) => ({
+    key: r.key, period: r.period, event: r.event, icon: r.icon,
+    title: r.title, description: r.description,
+    goal: Number(r.goal) || 1, reward: Number(r.reward) || 0,
+    custom: true, active: true,
+  }));
+}
 
 const DAILY_FAMILIES = Object.freeze([
   {
@@ -137,13 +189,15 @@ function hashRank(seed) {
   return crypto.createHash('sha256').update(seed).digest('hex');
 }
 
-function activeDefinitions(userId, now = new Date()) {
+async function activeDefinitions(userId, now = new Date()) {
   const day = periodKey('daily', now);
   // Exactly one mission from each of five actionable families. This keeps the
   // daily set varied but balanced instead of randomly returning five shares.
   const daily = DAILY_FAMILIES.map(family => DAILY_POOL
-    .filter(item => item.event === family.event)
-    .sort((a, b) => hashRank(`${userId}:${day}:${a.key}`).localeCompare(hashRank(`${userId}:${day}:${b.key}`)))[0]);
+    .map(applyOverride)
+    .filter(item => item.event === family.event && item.active)
+    .sort((a, b) => hashRank(`${userId}:${day}:${a.key}`).localeCompare(hashRank(`${userId}:${day}:${b.key}`)))[0])
+    .filter(Boolean);
   const week = periodKey('weekly', now);
   // ═══════════════════════════════════════════════════════════════════════
   // چرا اینجا بر اساس **رویداد** یکتاسازی می‌شود — باگی که ۳۴٪ کاربران را
@@ -167,10 +221,14 @@ function activeDefinitions(userId, now = new Date()) {
       .localeCompare(hashRank(`${userId}:${week}:evt:${b}`)))
     .slice(0, 3);
   const weekly = weeklyEvents.map(event => WEEKLY_POOL
-    .filter(item => item.event === event)
+    .map(applyOverride)
+    .filter(item => item.event === event && item.active)
     .sort((a, b) => hashRank(`${userId}:${week}:${a.key}`)
-      .localeCompare(hashRank(`${userId}:${week}:${b.key}`)))[0]);
-  return [...daily, ...weekly];
+      .localeCompare(hashRank(`${userId}:${week}:${b.key}`)))[0])
+    .filter(Boolean);
+  // ماموریت‌های سفارشیِ ادمین همیشه کنارِ چرخشِ روزانه/هفتگی می‌آیند.
+  const customs = await customDefinitions();
+  return [...daily, ...weekly, ...customs];
 }
 
 function referenceUuid(userId, missionKey, period) {
@@ -180,7 +238,7 @@ function referenceUuid(userId, missionKey, period) {
 
 async function record(userId, event, amount = 1) {
   const count = Math.min(100, Math.max(1, Math.floor(Number(amount) || 1)));
-  const definitions = activeDefinitions(userId).filter(d => d.event === event);
+  const definitions = (await activeDefinitions(userId)).filter(d => d.event === event);
   await Promise.all(definitions.map(d => pool.query(
     `INSERT INTO user_mission_progress(user_id,mission_key,period_key,progress,updated_at)
      VALUES($1,$2,$3,$4,NOW())
@@ -191,7 +249,7 @@ async function record(userId, event, amount = 1) {
 }
 
 async function status(userId) {
-  const active = activeDefinitions(userId);
+  const active = await activeDefinitions(userId);
   const keys = [...new Set(active.map(d => periodKey(d.period)))];
   const { rows } = await pool.query(
     `SELECT mission_key,period_key,progress,claimed_at,updated_at
@@ -217,10 +275,10 @@ async function status(userId) {
     weekly: missions.filter(m => m.period === 'weekly'),
     dailyBonus: {
       key: DAILY_BONUS_KEY,
-      reward: DAILY_BONUS_REWARD,
+      reward: missionConfig().dailyBonus,
       completed,
       goal: daily.length,
-      ready: daily.length === 5 && completed === daily.length,
+      ready: daily.length > 0 && completed === daily.length,
       claimed: Boolean(bonusRow?.claimed_at),
     },
     rotation: { dailyPoolSize: DAILY_POOL.length, shownDaily: daily.length },
@@ -228,7 +286,7 @@ async function status(userId) {
 }
 
 async function claim(userId, missionKey) {
-  const definition = activeDefinitions(userId).find(d => d.key === missionKey);
+  const definition = (await activeDefinitions(userId)).find(d => d.key === missionKey);
   if (!definition) throw Object.assign(new Error('این ماموریت امروز یا این هفته فعال نیست'), { status: 404 });
   const key = periodKey(definition.period);
   const client = await pool.connect();
@@ -263,7 +321,7 @@ async function claim(userId, missionKey) {
 }
 
 async function claimDailyBonus(userId) {
-  const daily = activeDefinitions(userId).filter(d => d.period === 'daily');
+  const daily = (await activeDefinitions(userId)).filter(d => d.period === 'daily');
   const key = periodKey('daily');
   const client = await pool.connect();
   try {
@@ -284,13 +342,14 @@ async function claimDailyBonus(userId) {
        ON CONFLICT(user_id,mission_key,period_key) DO UPDATE SET
          progress=5,claimed_at=COALESCE(user_mission_progress.claimed_at,NOW()),updated_at=NOW()`,
       [userId, DAILY_BONUS_KEY, key]);
+    const bonus = missionConfig().dailyBonus;
     const credited = await points.credit(client, {
-      userId, points: DAILY_BONUS_REWARD, source: 'mission',
+      userId, points: bonus, source: 'mission',
       referenceType: 'daily_mission_bonus', referenceId: referenceUuid(userId, DAILY_BONUS_KEY, key),
-      description: 'جایزه تکمیل هر ۵ ماموریت روزانه', league: false,
+      description: 'جایزه تکمیل ماموریت‌های روزانه', league: false,
     });
     await client.query('COMMIT');
-    return { message: `${DAILY_BONUS_REWARD} امتیاز جایزه تکمیل روزانه دریافت شد`, reward: DAILY_BONUS_REWARD, balance: credited?.balanceAfter };
+    return { message: `${bonus} امتیاز جایزه تکمیل روزانه دریافت شد`, reward: bonus, balance: credited?.balanceAfter };
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     throw error;
@@ -299,7 +358,29 @@ async function claimDailyBonus(userId) {
   }
 }
 
+/**
+ * کاتالوگ کامل برای پنل ادمین: پیکربندی + فهرست ماموریت‌های توکار با
+ * مقادیرِ مؤثر (بعد از overrides) + ماموریت‌های سفارشی.
+ */
+async function adminCatalog() {
+  const cfg = missionConfig();
+  const builtin = [
+    ...DAILY_POOL.map(applyOverride),
+    ...WEEKLY_POOL.map(applyOverride),
+  ].map((d) => ({ ...d, custom: false }));
+  const { rows } = await pool.query(
+    `SELECT * FROM mission_definitions ORDER BY sort_order, created_at`);
+  const customs = rows.map((r) => ({
+    key: r.key, period: r.period, event: r.event, icon: r.icon,
+    title: r.title, description: r.description,
+    goal: Number(r.goal) || 1, reward: Number(r.reward) || 0,
+    active: Boolean(r.is_active), custom: true,
+  }));
+  return { config: { dailyBonus: cfg.dailyBonus }, builtin, customs };
+}
+
 module.exports = {
   DEFINITIONS, DAILY_POOL, WEEKLY_POOL, DAILY_BONUS_REWARD,
   tehranDate, isoWeek, periodKey, activeDefinitions, record, status, claim, claimDailyBonus,
+  adminCatalog, missionConfig,
 };

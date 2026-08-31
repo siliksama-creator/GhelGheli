@@ -96,6 +96,29 @@ function db() {
 const MIN_LEVEL = 0;
 const MAX_LEVEL = 100;
 
+// ═══════════════════════════════════════════════════════════════════════
+// منحنی سطح از پنل ادمین — «بدون دپلوی»
+// ═══════════════════════════════════════════════════════════════════════
+// ثابت‌های بالا/پایین پیش‌فرض‌اند؛ مقدارِ مؤثر از `level_settings`
+// (app_settings) خوانده می‌شود. جدولِ تجمعی با همان مقدارها ساخته
+// می‌شود، پس رفتارِ پیش‌فرض با قبل یکسان است.
+const ops = require('./opsConfig');
+
+function curveParams() {
+  const v = ops.syncGet('level_settings');
+  const num = (x, fallback) => {
+    const n = Number(x);
+    return Number.isFinite(n) ? n : fallback;
+  };
+  return {
+    base: num(v?.base, BASE),
+    lin: num(v?.lin, LIN),
+    exp: num(v?.exp, EXP),
+    knee: Math.round(num(v?.knee, KNEE)),
+    tail: num(v?.tail, TAIL),
+  };
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // کالیبراسیون: لول ۱۰۰ = شش ماه تلاشِ مداوم
 // ═══════════════════════════════════════════════════════════════════════════
@@ -144,9 +167,10 @@ const TAIL = 30;
 /** XP لازم برای رفتن از لول [n] به [n+1]. */
 function xpForLevel(n) {
   if (n < 1) return 0;
-  const e = Math.min(n, KNEE);
-  let v = BASE + LIN * n + BASE * Math.pow(e - 1, EXP);
-  if (n > KNEE) v += (n - KNEE) * TAIL;
+  const c = curveParams();
+  const e = Math.min(n, c.knee);
+  let v = c.base + c.lin * n + c.base * Math.pow(e - 1, c.exp);
+  if (n > c.knee) v += (n - c.knee) * c.tail;
   return Math.round(v);
 }
 
@@ -161,20 +185,33 @@ function xpForLevel(n) {
 // جدول ۱۰۱ عدد است: ~۸۰۰ بایت، یک بار در عمرِ پروسه.
 // `CUMULATIVE[k]` = کل XP لازم برای **رسیدن** به لول k.
 // ایندکس ۰ یعنی لول صفر که با صفر XP شروع می‌شود.
-const CUMULATIVE = (() => {
-  const out = [0];
-  let total = 0;
-  for (let n = 0; n < MAX_LEVEL; n++) {
-    // `xpForLevel(n)` هزینهٔ رفتن از n به n+1 است. برای n=0 هم
-    // معنادار است: اولین لول‌آپ باید ارزان باشد.
-    total += xpForLevel(n + 1);
-    out[n + 1] = total;
+// کشِ جدولِ تجمعی: تا وقتی ادمین منحنی را عوض نکرده، فقط یک بار ساخته
+// می‌شود (۱۰۱ تکرار). اگر بدون کش باشد، levelFromXp که برای هر ردیفِ
+// لیگ/چت صدا زده می‌شود ۲۰۰هزار بار جدول می‌سازد و API کند می‌شود.
+let _cachedKey = null;
+let _cachedTable = null;
+
+function cumulativeTable() {
+  const c = curveParams();
+  const key = `${c.base}|${c.lin}|${c.exp}|${c.knee}|${c.tail}`;
+  if (key !== _cachedKey) {
+    _cachedKey = key;
+    const out = [0];
+    let total = 0;
+    for (let n = 0; n < MAX_LEVEL; n++) {
+      // `xpForLevel(n)` هزینهٔ رفتن از n به n+1 است. برای n=0 هم
+      // معنادار است: اولین لول‌آپ باید ارزان باشد.
+      total += xpForLevel(n + 1);
+      out[n + 1] = total;
+    }
+    _cachedTable = out;
   }
-  return out;
-})();
+  return _cachedTable;
+}
 
 /** کل XP لازم برای رسیدن به لول [level]. */
 function totalXpFor(level) {
+  const CUMULATIVE = cumulativeTable();
   if (level <= MIN_LEVEL) return 0;
   if (level >= MAX_LEVEL) return CUMULATIVE[MAX_LEVEL];
   return CUMULATIVE[level];
@@ -188,6 +225,7 @@ function totalXpFor(level) {
  * منحنی می‌تواند بدون انتشارِ نسخهٔ جدیدِ اپ تنظیم شود.
  */
 function levelFromXp(xp) {
+  const CUMULATIVE = cumulativeTable();
   const total = Math.max(0, Number(xp) || 0);
 
   // جست‌وجوی دودویی روی جدولِ تجمعی. با ۱۰۰ عنصر تفاوتِ عملی با
@@ -260,6 +298,7 @@ async function grantGameXp(userId, { gameId, won, opponentId }) {
   try {
     const amount = XP_PLAY + (won ? XP_WIN_BONUS : 0);
     const client = await db().connect();
+    const CUMULATIVE = cumulativeTable();
     try {
       await client.query('BEGIN');
 

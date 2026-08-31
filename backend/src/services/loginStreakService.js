@@ -3,8 +3,25 @@ const points = require('./pointService');
 
 // A complete seven-day cycle. The final day is intentionally a little more
 // generous so the user has a reason to finish the week.
+//
+// چرخه از پنل ادمین قابل تنظیم شد (streak_settings): طول چرخه و مبلغ هر
+// روز از app_settings خوانده می‌شود؛ آرایهٔ بالا فقط پیش‌فرض است.
+const ops = require('./opsConfig');
 const REWARDS = Object.freeze([100, 150, 200, 250, 300, 350, 500]);
 const CYCLE_DAYS = REWARDS.length;
+
+/** آرایهٔ مؤثرِ جوایز — با اعتبارسنجی (۲ تا ۳۰ روز، هر روز ۰ تا ۱٬۰۰۰٬۰۰۰). */
+function rewardsConfig() {
+  const v = ops.syncGet('streak_settings');
+  const raw = v && Array.isArray(v.rewards) ? v.rewards : null;
+  if (!raw || raw.length < 2) return REWARDS;
+  const list = raw.map((x) => {
+    const n = Number(x);
+    return Number.isFinite(n) ? Math.round(Math.min(1_000_000, Math.max(0, n))) : NaN;
+  });
+  if (list.some(Number.isNaN)) return REWARDS;
+  return list.slice(0, 30);
+}
 // The claim path is covered by the same migration/reset contract as the points ledger.
 
 const dayFormatter = new Intl.DateTimeFormat('en-US', {
@@ -34,7 +51,8 @@ function dateValue(value) {
 }
 
 function cycleDayAfter(day) {
-  return day >= CYCLE_DAYS ? 1 : day + 1;
+  const cycle = rewardsConfig().length;
+  return day >= cycle ? 1 : day + 1;
 }
 
 function nextClaimDay(row, today) {
@@ -47,27 +65,29 @@ function nextClaimDay(row, today) {
 }
 
 function publicStatus(row, today = tehranDay()) {
+  const cycle = rewardsConfig().length;
   const last = dateValue(row?.last_claimed_date);
   const claimedToday = last === today;
-  const savedDay = Math.min(CYCLE_DAYS, Math.max(0, Number(row?.streak_day) || 0));
+  const savedDay = Math.min(cycle, Math.max(0, Number(row?.streak_day) || 0));
   const claimDay = claimedToday ? savedDay : nextClaimDay(row, today);
-  // A completed day-seven cycle starts a fresh visual cycle tomorrow.
-  // Keep the next claim on day one instead of showing all seven old pills
+  // A completed cycle starts a fresh visual cycle tomorrow.
+  // Keep the next claim on day one instead of showing all old pills
   // as already claimed while day one is waiting.
   const currentDay = claimedToday
     ? savedDay
-    : (last === previousDay(today) && savedDay < CYCLE_DAYS ? savedDay : 0);
+    : (last === previousDay(today) && savedDay < cycle ? savedDay : 0);
 
+  const rewards = rewardsConfig();
   return {
     active: true,
     claimedToday,
     canClaim: !claimedToday,
     currentDay,
     nextDay: claimDay,
-    nextReward: REWARDS[claimDay - 1],
+    nextReward: rewards[claimDay - 1] ?? 0,
     totalClaims: Number(row?.total_claims) || 0,
     today,
-    rewards: REWARDS.map((amount, index) => ({
+    rewards: rewards.map((amount, index) => ({
       day: index + 1,
       amount,
       claimed: claimedToday ? index + 1 <= savedDay : index + 1 <= currentDay,
@@ -103,7 +123,8 @@ async function claim(userId) {
     }
 
     const day = nextClaimDay(row, today);
-    const reward = REWARDS[day - 1];
+    const rewards = rewardsConfig();
+    const reward = rewards[day - 1] ?? 0;
     const updated = await client.query(
       `INSERT INTO login_streaks(user_id, streak_day, last_claimed_date, total_claims)
        VALUES($1,$2,$3,1)

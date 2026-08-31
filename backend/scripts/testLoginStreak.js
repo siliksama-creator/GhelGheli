@@ -35,8 +35,8 @@ console.log('\n== قرارداد سرور استریک روزانه ==');
     'روز هفتم جایزهٔ بزرگ‌تر دارد');
   ok(/const CYCLE_DAYS = REWARDS\.length/.test(svc),
     'طول چرخه از خود لیست جوایز می‌آید، نه عددِ جدا');
-  ok(/day >= CYCLE_DAYS \? 1 : day \+ 1/.test(svc),
-    'بعد از روز هفتم، چرخهٔ هفتگی از روز اول ریست می‌شود');
+  ok(/day >= cycle \? 1 : day \+ 1/.test(svc) && /rewardsConfig\(\)\.length/.test(svc),
+    'بعد از آخرین روز چرخه، از روز اول ریست می‌شود — طول چرخه از پیکربندی مؤثر می‌آید');
   ok(/timeZone:\s*'Asia\/Tehran'/.test(svc),
     'محاسبهٔ روز با منطقهٔ زمانی تهران انجام می‌شود');
   ok(!/toISOString\(\)\.slice\(0, 10\)/.test(svc),

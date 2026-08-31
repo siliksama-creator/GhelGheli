@@ -32,6 +32,7 @@
 const { pool } = require('../config/db');
 const walletService = require('./walletService');
 const pointLedger = require('./pointService');
+const ops = require('./opsConfig');
 
 // ── XP و پله‌ها ────────────────────────────────────────────────────────
 //
@@ -141,6 +142,80 @@ const SOURCES = {
   daily_login:  { xp: 20, dailyCap: 20,  label: 'ورود روزانه' },
 };
 
+// ═══════════════════════════════════════════════════════════════════════
+// پیکربندی پویا از پنل ادمین — «گذر نبرد بدون دپلوی»
+// ═══════════════════════════════════════════════════════════════════════
+//
+// مقادیرِ مؤثرِ اجرا از کلیدِ `pass_config` در app_settings می‌آیند؛
+// ثابت‌های بالای همین فایل فقط «پیش‌فرض»اند تا اگر ادمین چیزی تنظیم
+// نکرده باشد رفتار محصول دقیقاً مثل قبل بماند. `refreshConfig` در ورودیِ
+// هر مسیرِ عمومی صدا زده می‌شود و مقدارها از کشِ همگام (opsConfig)
+// خوانده می‌شوند — بدون کوئری اضافه در هر درخواست.
+let RUNTIME = null;
+
+function refreshRuntime() {
+  const v = ops.syncGet('pass_config');
+  const sMap = v && typeof v === 'object' && v.sources && typeof v.sources === 'object' ? v.sources : {};
+  const num = (x, fallback, min, max) => {
+    const n = Number(x);
+    return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
+  };
+  RUNTIME = {
+    xpBase: num(v?.xpBase, XP_BASE, 1, 10000),
+    xpStep: num(v?.xpStep, XP_STEP, 0, 10000),
+    maxTiersPerDay: Math.round(num(v?.maxTiersPerDay, MAX_TIERS_PER_DAY, 1, 50)),
+    claimGraceDays: Math.round(num(v?.claimGraceDays, CLAIM_GRACE_DAYS, 0, 90)),
+    sources: Object.fromEntries(Object.keys(SOURCES).map((k) => {
+      const d = sMap[k] && typeof sMap[k] === 'object' ? sMap[k] : {};
+      return [k, {
+        xp: num(d.xp, SOURCES[k].xp, 0, 100000),
+        dailyCap: num(d.dailyCap, SOURCES[k].dailyCap, 0, 1000000),
+        label: typeof d.label === 'string' && d.label.trim() ? d.label.trim().slice(0, 60) : SOURCES[k].label,
+      }];
+    })),
+  };
+}
+
+async function refreshConfig() {
+  await ops.get('pass_config');
+  refreshRuntime();
+}
+
+/** نسخه‌های همگامِ «مؤثر» منحنی — جایگزین ثابت‌ها در مسیرِ اجرا. */
+function runtimeXpForTier(n) {
+  const base = RUNTIME ? RUNTIME.xpBase : XP_BASE;
+  const step = RUNTIME ? RUNTIME.xpStep : XP_STEP;
+  return base + (n - 1) * step;
+}
+function runtimeCumulativeXp(n) {
+  let acc = 0;
+  for (let i = 1; i <= n; i++) acc += runtimeXpForTier(i);
+  return acc;
+}
+function runtimeTierFromXp(xp) {
+  const total = Math.max(0, Number(xp) || 0);
+  let acc = 0;
+  for (let t = 1; t <= TIER_COUNT; t++) {
+    const need = runtimeXpForTier(t);
+    if (total < acc + need) return { tier: Math.max(0, t - 1), into: total - acc, need, total };
+    acc += need;
+  }
+  return { tier: TIER_COUNT, into: 0, need: 0, total };
+}
+
+/** برای پنل ادمین: پیکربندی مؤثرِ فعلی + پیش‌فرض‌ها. */
+async function getPassConfig() {
+  await refreshConfig();
+  return {
+    xpBase: RUNTIME?.xpBase ?? XP_BASE,
+    xpStep: RUNTIME?.xpStep ?? XP_STEP,
+    maxTiersPerDay: RUNTIME?.maxTiersPerDay ?? MAX_TIERS_PER_DAY,
+    claimGraceDays: RUNTIME?.claimGraceDays ?? CLAIM_GRACE_DAYS,
+    tierCount: TIER_COUNT,
+    sources: RUNTIME?.sources ?? SOURCES,
+  };
+}
+
 /** روز جاری به وقت تهران (YYYY-MM-DD). */
 function tehranDay(now = new Date()) {
   return new Intl.DateTimeFormat('en-CA', {
@@ -172,6 +247,7 @@ function tehranDay(now = new Date()) {
 const CLAIM_GRACE_DAYS = 7;
 
 async function activeSeason(client = pool) {
+  await refreshConfig();
   const { rows } = await client.query(
     `SELECT * FROM pass_seasons
       WHERE is_active AND starts_at <= NOW() AND ends_at > NOW()
@@ -187,6 +263,7 @@ async function activeSeason(client = pool) {
  * پله‌هایی که کاربر **قبلاً باز کرده** قابل دریافت می‌مانند.
  */
 async function claimableSeason(client = pool) {
+  await refreshConfig();
   const { rows } = await client.query(
     `SELECT * FROM pass_seasons
       WHERE is_active AND starts_at <= NOW()
@@ -268,6 +345,7 @@ function pgDateToDay(v) {
  * نگیرد، لحظه‌ای که صفحه را باز کند پله‌های امروزش باز می‌شوند.
  */
 async function syncTiers(userId, seasonId, client = pool) {
+  await refreshConfig();
   const day = tehranDay();
   const { rows } = await client.query(
     `SELECT xp, unlocked_tier, tiers_day, tiers_today
@@ -278,10 +356,10 @@ async function syncTiers(userId, seasonId, client = pool) {
 
   const sameDay = pgDateToDay(row.tiers_day) === day;
   const usedToday = sameDay ? Number(row.tiers_today) || 0 : 0;
-  const room = Math.max(0, MAX_TIERS_PER_DAY - usedToday);
+  const room = Math.max(0, (RUNTIME?.maxTiersPerDay ?? MAX_TIERS_PER_DAY) - usedToday);
 
   const current = Math.min(TIER_COUNT, Number(row.unlocked_tier) || 0);
-  const earned = tierFromXp(Number(row.xp)).tier;
+  const earned = runtimeTierFromXp(Number(row.xp)).tier;
   const grant = Math.min(Math.max(0, earned - current), room);
 
   if (grant > 0 || !sameDay) {
@@ -309,7 +387,8 @@ async function syncTiers(userId, seasonId, client = pool) {
  */
 async function grantXp(userId, source, { multiplier = 1 } = {}) {
   try {
-    const cfg = SOURCES[source];
+    await refreshConfig();
+    const cfg = (RUNTIME?.sources ?? SOURCES)[source];
     if (!cfg || !userId) return null;
     const season = await activeSeason();
     if (!season) return null;
@@ -418,15 +497,15 @@ async function status(userId) {
   // سقف روزانه فقط یک عدد تزئینی بود.
   const unlocked = Math.min(TIER_COUNT, Number(pr.unlocked_tier) || 0);
   // پیشرفت داخل پلهٔ بعد، نسبت به پلهٔ باز شده.
-  const spent = cumulativeXp(unlocked);
-  const nextNeed = unlocked < TIER_COUNT ? xpForTier(unlocked + 1) : 0;
+  const spent = runtimeCumulativeXp(unlocked);
+  const nextNeed = unlocked < TIER_COUNT ? runtimeXpForTier(unlocked + 1) : 0;
   const into = Math.max(0, Math.min(nextNeed, xp - spent));
   const pos = { tier: unlocked, into, need: nextNeed };
   const claimed = new Set(claimsRes.rows.map(r => r.tier_id));
 
   const tiers = [];
   for (let t = 1; t <= TIER_COUNT; t++) {
-    const row = { tier: t, xpNeeded: cumulativeXp(t), unlocked: pos.tier >= t };
+    const row = { tier: t, xpNeeded: runtimeCumulativeXp(t), unlocked: pos.tier >= t };
     for (const track of ['free', 'plus']) {
       const r = tiersRes.rows.find(x => x.tier === t && x.track === track);
       if (!r) continue;
@@ -461,10 +540,10 @@ async function status(userId) {
     // فصل تمام شده ولی هنوز در مهلتِ دریافت است: کلاینت باید نوار
     // «فقط فرصت دریافت» را نشان دهد و XP جدید وعده ندهد.
     ended,
-    graceDays: CLAIM_GRACE_DAYS,
+    graceDays: RUNTIME?.claimGraceDays ?? CLAIM_GRACE_DAYS,
     graceDaysLeft: ended
       ? Math.max(0, Math.ceil(
-        (new Date(season.ends_at).getTime() + CLAIM_GRACE_DAYS * 86400000
+        (new Date(season.ends_at).getTime() + (RUNTIME?.claimGraceDays ?? CLAIM_GRACE_DAYS) * 86400000
           - Date.now()) / 86400000))
       : null,
     hasPlus: plus,
@@ -477,14 +556,14 @@ async function status(userId) {
     // کلاینت این‌ها را برای نشانِ قرمز کنار آیکون و پیام «سقف امروز پر
     // شد» لازم دارد.
     tiersToday,
-    maxTiersPerDay: MAX_TIERS_PER_DAY,
-    dayCapReached: tiersToday >= MAX_TIERS_PER_DAY,
+    maxTiersPerDay: RUNTIME?.maxTiersPerDay ?? MAX_TIERS_PER_DAY,
+    dayCapReached: tiersToday >= (RUNTIME?.maxTiersPerDay ?? MAX_TIERS_PER_DAY),
     // XP جمع‌شده‌ای که هنوز به پله تبدیل نشده چون سقف پر است. صفر یعنی
     // چیزی معلق نمانده.
-    pendingTiers: Math.max(0, tierFromXp(xp).tier - unlocked),
+    pendingTiers: Math.max(0, runtimeTierFromXp(xp).tier - unlocked),
     claimable,
     tiers,
-    sources: Object.entries(SOURCES).map(([k, v]) => ({
+    sources: Object.entries(RUNTIME?.sources ?? SOURCES).map(([k, v]) => ({
       source: k, xp: v.xp, dailyCap: v.dailyCap, label: v.label,
     })),
   };
@@ -612,6 +691,7 @@ async function claimAll(userId) {
 module.exports = {
   SOURCES, TIER_COUNT, MAX_TIERS_PER_DAY,
   xpForTier, cumulativeXp, tierFromXp, syncTiers, pgDateToDay,
+  getPassConfig, refreshConfig, runtimeXpForTier, runtimeCumulativeXp, runtimeTierFromXp,
   activeSeason, claimableSeason, CLAIM_GRACE_DAYS,
   hasPlus, grantXp, status, claim, claimAll, tehranDay,
 };

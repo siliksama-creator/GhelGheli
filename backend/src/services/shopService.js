@@ -1,6 +1,7 @@
 // Deterministic cosmetics shop + monthly/annual GhelGheli Plus.
 // Prices and grants are authoritative here/the database; clients only render.
 const { pool } = require('../config/db');
+const ops = require('./opsConfig');
 const referrals = require('./referralService');
 const payments = require('./paymentService');
 const wallet = require('./walletService');
@@ -36,6 +37,39 @@ const ANNUAL_BENEFITS = Object.freeze([
   'یک فرصت تغییر باشگاه منتخب در هر دوره سالانه',
 ]);
 
+// ═══════════════════════════════════════════════════════════════════════
+// پلن‌های پلاس از پنل ادمین — «قیمت بدون دپلوی»
+// ═══════════════════════════════════════════════════════════════════════
+// ثابت‌های بالا پیش‌فرض‌اند؛ مقدارِ مؤثر از کلید `shop_plus_plans` در
+// app_settings خوانده می‌شود. سرور همیشه قیمت را از اینجا می‌گیرد،
+// پس تغییر پنل بلافاصله روی سفارش‌های جدید اثر می‌گذارد.
+function plusPlansConfig() {
+  const v = ops.syncGet('shop_plus_plans');
+  const num = (x, fallback) => {
+    const n = Number(x);
+    return Number.isFinite(n) && n >= 0 ? Math.round(n) : fallback;
+  };
+  const list = (x, fallback) => (Array.isArray(x) ? x.map(String).slice(0, 30) : fallback);
+  return {
+    monthly: {
+      key: 'monthly', plan: 'plus',
+      price: num(v?.monthly?.price, PLUS_PLANS.monthly.price),
+      days: Math.max(1, Math.round(num(v?.monthly?.days, PLUS_PLANS.monthly.days))),
+      label: String(v?.monthly?.label || PLUS_PLANS.monthly.label).slice(0, 60),
+      savingPercent: num(v?.monthly?.savingPercent, PLUS_PLANS.monthly.savingPercent),
+    },
+    annual: {
+      key: 'annual', plan: 'plus_annual',
+      price: num(v?.annual?.price, PLUS_PLANS.annual.price),
+      days: Math.max(1, Math.round(num(v?.annual?.days, PLUS_PLANS.annual.days))),
+      label: String(v?.annual?.label || PLUS_PLANS.annual.label).slice(0, 60),
+      savingPercent: num(v?.annual?.savingPercent, PLUS_PLANS.annual.savingPercent),
+    },
+    benefits: list(v?.benefits, PLUS_BENEFITS),
+    annualBenefits: list(v?.annualBenefits, ANNUAL_BENEFITS),
+  };
+}
+
 const SLOT_FOR_KIND = Object.freeze({
   club_badge: 'equipped_club',
   card_frame: 'equipped_frame',
@@ -58,7 +92,7 @@ function selectedValue(user, kind) {
   return user?.[SLOT_FOR_KIND[kind]] || null;
 }
 
-function planView(plan) {
+function planView(plan, cfg = plusPlansConfig()) {
   return {
     billingCycle: plan.key,
     plan: plan.plan,
@@ -67,8 +101,8 @@ function planView(plan) {
     days: plan.days,
     savingPercent: plan.savingPercent,
     benefits: plan.key === 'annual'
-      ? [...PLUS_BENEFITS, ...ANNUAL_BENEFITS]
-      : [...PLUS_BENEFITS],
+      ? [...cfg.benefits, ...cfg.annualBenefits]
+      : [...cfg.benefits],
   };
 }
 
@@ -205,23 +239,24 @@ async function catalogue(userId, shape) {
     for (const item of decorated) (groups[item.kind] ||= []).push(item);
   }
   const walletBalance = Number(userRecord?.wallet_balance || 0);
+  const plansCfg = plusPlansConfig();
   return {
     walletBalance,
     // Compatibility with APKs released before the compact Shop redesign.
     balance: walletBalance,
     plus: {
       ...plus,
-      price: PLUS_PLANS.monthly.price,
-      days: PLUS_PLANS.monthly.days,
+      price: plansCfg.monthly.price,
+      days: plansCfg.monthly.days,
       daysLeft: plus.expiresAt
         ? Math.max(0, Math.ceil((new Date(plus.expiresAt) - Date.now()) / 86400000))
         : 0,
-      benefits: [...PLUS_BENEFITS],
-      perks: [...PLUS_BENEFITS],
-      annualBenefits: [...ANNUAL_BENEFITS],
+      benefits: [...plansCfg.benefits],
+      perks: [...plansCfg.benefits],
+      annualBenefits: [...plansCfg.annualBenefits],
       expiryNote: 'خرید مستقیم دائمی است؛ دسترسی اشتراکی با پایان دوره متوقف می‌شود و باشگاه منتخبت می‌ماند.',
     },
-    plans: [planView(PLUS_PLANS.monthly), planView(PLUS_PLANS.annual)],
+    plans: [planView(plansCfg.monthly, plansCfg), planView(plansCfg.annual, plansCfg)],
     ...(wantGroups ? { groups } : {}),
     ...(wantItems ? { items: decorated } : {}),
     clubs: clubs.rows,
@@ -451,7 +486,7 @@ function normalizeBillingCycle(value) {
  */
 async function deliverPlus(client, { userId, billingCycle, amount }) {
   const cycle = normalizeBillingCycle(billingCycle);
-  const chosen = PLUS_PLANS[cycle];
+  const chosen = plusPlansConfig()[cycle] || plusPlansConfig().monthly;
   {
     const locked = await client.query(
       `SELECT id FROM users WHERE id=$1 FOR UPDATE`, [userId]);
@@ -1066,6 +1101,7 @@ module.exports = {
   useClubAvatar,
   emotePacksFor,
   isEmoteAllowed,
+  plusPlansConfig,
   PLUS_PLANS,
   PLUS_BENEFITS,
   ANNUAL_BENEFITS,

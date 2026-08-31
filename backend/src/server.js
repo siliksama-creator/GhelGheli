@@ -16,6 +16,7 @@ const YAML = require('yaml');
 const { Server } = require('socket.io');
 const { pool } = require('./config/db');
 const { audit } = require('./services/auditService');
+const opsConfig = require('./services/opsConfig');
 const {
   createNotification,
   sendSegmented,
@@ -1903,7 +1904,7 @@ app.get('/api/chat/config', auth, asyncHandler(async (req, res) => {
 async function isAllowedChatMessage(text, userId) {
   if (!text || !String(text).trim()) return false;
   const clean = String(text).trim();
-  if (CANNED_MESSAGES.includes(clean)) return true;
+  if (cannedMessages().includes(clean)) return true;
   // Allow single emoji or emoji sequences (up to 16 emoji chars)
   const emojiRegex = /^[\p{Extended_Pictographic}\p{Emoji}\p{Emoji_Component}\p{Emoji_Modifier}\p{Emoji_Modifier_Base}\p{Emoji_Presentation}\u2600-\u27BF\u2B50\u2764\uFE0F\u200D\s]+$/u;
   if (emojiRegex.test(clean) && clean.length <= 20) return true;
@@ -1912,7 +1913,7 @@ async function isAllowedChatMessage(text, userId) {
   return Boolean(userId && await shop.isEmoteAllowed(userId, clean));
 }
 
-const CANNED_MESSAGES = [
+const DEFAULT_CANNED_MESSAGES = Object.freeze([
   "سلام بچه‌ها!",
   "من اومدم!",
   "بازی خیلی باحال بود!",
@@ -1948,8 +1949,19 @@ const CANNED_MESSAGES = [
   "دوباره بازی کنیم؟",
   "کارت خفن گرفتم!",
   "حریف قوی می‌خوام!",
-  "پنالتی رو دریبل کردم!"
-];
+  "پنالتی رو دریبل کردم!",
+]);
+
+// پیام‌های آمادهٔ چت از پنل ادمین قابل ویرایش‌اند (chat_canned_messages)؛
+// آرایهٔ بالا فقط پیش‌فرض است تا رفتار بدونِ تنظیم مثل قبل بماند.
+function cannedMessages() {
+  const v = opsConfig.syncGet('chat_canned_messages');
+  if (!Array.isArray(v) || v.length === 0) return DEFAULT_CANNED_MESSAGES;
+  return v
+    .map((x) => String(x).trim())
+    .filter((x) => x.length > 0 && x.length <= 80)
+    .slice(0, 60);
+}
 
 app.get('/api/chat/bootstrap', auth, asyncHandler(async (req, res) => {
   const minLifetimePoints = await getChatMinLifetimePoints();
@@ -1974,7 +1986,7 @@ app.get('/api/chat/bootstrap', auth, asyncHandler(async (req, res) => {
       config,
       messages: [],
       stickers: [],
-      cannedMessages: CANNED_MESSAGES,
+      cannedMessages: cannedMessages(),
     });
   }
 
@@ -2005,12 +2017,12 @@ app.get('/api/chat/bootstrap', auth, asyncHandler(async (req, res) => {
     config,
     messages,
     stickers: [],
-    cannedMessages: CANNED_MESSAGES,
+    cannedMessages: cannedMessages(),
   });
 }));
 
 app.get('/api/chat/canned-messages', asyncHandler(async (req, res) => {
-  res.json(CANNED_MESSAGES);
+  res.json(cannedMessages());
 }));
 
 app.get('/api/chat/messages', auth, asyncHandler(async (req, res) => {
@@ -2628,6 +2640,30 @@ app.use('/api', require('./routes/adminGameEconomy')({
   tapGame,
 }));
 
+// ── مدیریت کامل فروشگاه (دورِ عملیات) ───────────────────────────────────
+// تا امروز کاتالوگ فقط با مایگریشن SQL عوض می‌شد؛ از این پس آیتم، قیمت،
+// ترتیب، پلن‌های پلاس و آمار فروش از پنل ادمین — بدون دپلوی.
+app.use('/api', require('./routes/adminShop')({
+  pool, adminAuth, requireRole, asyncHandler, audit, validateUuid, shop, opsConfig,
+}));
+
+// ── مدیریت گذر نبرد ─────────────────────────────────────────────────────
+app.use('/api', require('./routes/adminPass')({
+  pool, adminAuth, requireRole, asyncHandler, audit, validateUuid, pass, opsConfig,
+}));
+
+// ── مدیریت ماموریت‌های روزانه/هفتگی ─────────────────────────────────────
+app.use('/api', require('./routes/adminMissions')({
+  pool, adminAuth, requireRole, asyncHandler, audit,
+  missions: require('./services/missionService'), opsConfig,
+}));
+
+// ── اهرم‌های موتور (آستانه‌های تشخیص، سطح، استریک، پیام‌های آماده) ──────
+app.use('/api', require('./routes/adminOps')({
+  adminAuth, requireRole, asyncHandler, audit, opsConfig,
+  matchSettings: require('./services/matchSettings'),
+}));
+
 const presence = createPresenceService(pool);
 app.use('/api', require('./routes/growth')({
   auth, adminAuth, requireRole, asyncHandler, validateUuid, presence, rateLimit,
@@ -2942,6 +2978,13 @@ server.listen(port, async () => {
   await attachRedisAdapter(io).catch(e => {
     console.error('[cluster] اتصال آداپتور ناموفق بود، تک‌پروسه ادامه می‌دهیم:', e.message);
   });
+  // پیش‌بارگذاری اهرم‌های عملیاتی پنل: بعد از ری‌استارت، تنظیمِ ادمین
+  // از دیتابیس برگردانده می‌شود نه اینکه به پیش‌فرض کد برگردد.
+  await opsConfig.preload([
+    'pass_config', 'mission_config', 'level_settings', 'streak_settings',
+    'photo_match_settings', 'chat_canned_messages', 'shop_plus_plans',
+    'sms_config', 'game_economy_settings', 'game_reward_settings',
+  ]).catch(e => console.error('[ops] پیش‌بارگذاری تنظیمات ناموفق بود:', e.message));
   await ensureActiveSeason();
   console.log(`GhelGheli API on :${port}`);
 });

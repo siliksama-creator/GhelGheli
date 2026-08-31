@@ -1,6 +1,7 @@
 /** OTP, registration, password login, and password reset routes. */
 const express = require('express');
 const signupGift = require('../services/signupGiftService');
+const smsService = require('../services/smsService');
 
 module.exports = function createAuthRoutes(deps) {
   const {
@@ -19,13 +20,22 @@ router.post('/auth/request-otp', otpLimiter, asyncHandler(async (req, res) => {
   const hash = await bcrypt.hash(code, 10);
   const ttl = Number(process.env.OTP_TTL_MINUTES || 5);
   await pool.query('INSERT INTO otp_codes(mobile,code_hash,purpose,expires_at) VALUES($1,$2,$3,NOW()+($4::text||\' minutes\')::interval)', [mobile, hash, purpose, ttl]);
-  // NOTE: no SMS gateway is wired up yet (see backend/src/services/smsService.js).
-  // Until a real provider is configured in the admin settings panel, OTP codes
-  // are generated and stored but not delivered to the user's phone. Keep
-  // OTP_DEV_MODE=true in non-production environments to see the code in the
-  // response/logs for manual testing.
+  // ── ارسال واقعی پیامک ─────────────────────────────────────────────────
+  // تا قبل از دورِ عملیات، این‌جا فقط کامنت بود و هیچ درگاهی وصل نبود؛
+  // کد ساخته می‌شد ولی به دستِ کاربر نمی‌رسید. حالا `smsService` تنظیماتِ
+  // پنل ادمین را می‌خواند: اگر پیامک فعال باشد ارسال می‌شود، و اگر ارسال
+  // در حالتِ غیرآزمایشی شکست بخورد، مسیرِ ورود متوقف می‌شود تا کاربرِ
+  // واقعی با «کد ارسال شد»ی که هرگز نمی‌رسد گمراه نشود.
+  const sms = await smsService.sendOtp(mobile, code, purpose);
+  if (sms.sent === false && sms.reason === 'failed') {
+    return res.status(502).json({ message: 'ارسال پیامک ناموفق بود؛ کمی بعد دوباره تلاش کنید' });
+  }
   if (process.env.OTP_DEV_MODE === 'true') console.log(`DEV OTP for ${mobile}: ${code}`);
-  res.json({ message: 'کد تایید ارسال شد', devCode: process.env.OTP_DEV_MODE === 'true' ? code : undefined });
+  res.json({
+    message: 'کد تایید ارسال شد',
+    devCode: process.env.OTP_DEV_MODE === 'true' ? code : undefined,
+    sms: { sent: sms.sent, provider: sms.provider || null },
+  });
 }));
 
 router.post('/auth/verify-otp', otpVerifyLimiter, asyncHandler(async (req, res) => {
