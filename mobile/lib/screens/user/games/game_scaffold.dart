@@ -347,6 +347,12 @@ class GameScaffold extends StatelessWidget {
             Gaps.vXxs,
             if (scoreboard != null) ...[scoreboard!, Gaps.vXxs],
             if (session.phase == GamePhase.over) ...[
+              // ── جشنِ بزرگِ برنده (دورِ ۳۳) ──
+              // خواستهٔ مالک: «در بازی پنالتی چه با ربات و چه با کاربر
+              // آنلاین، برنده باید بزرگ و زیبا و جذاب مشخص بشه» — برای
+              // هر سه بازیِ این اسکلت، هم‌ارزِ WinnerCelebration وب.
+              WinnerStage(session: session, accent: accent),
+              Gaps.vXs,
               _ResultStrip(session: session, accent: accent),
               // سکهٔ لیگ. `coinsWinner` نمادِ برنده است (X/O) و با
               // `mySymbol` مقایسه می‌شود نه با `winner` — چون در قطعِ
@@ -934,4 +940,357 @@ class _ConfettiPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+
+/// ═══ جشنِ بزرگِ پایانِ مسابقه (دورِ ۳۳) ═══
+///
+/// همتایِ دقیقِ `userweb/src/components/WinnerCelebration.jsx` — تجربهٔ
+/// یکدست، همان چیزی که مالک «بصورت یکپارچه در اندروید و وب» خواست.
+///
+/// سه لایه: بارانِ کاغذرنگی (فقط برای برد — جشنِ باختِ چشمگیر بی‌مزه
+/// است)، جامِ طلاییِ شناور با ترکیدنِ فنری، و خطِ نتیجه با نامِ دو طرف
+/// و امتیازشان. بدونِ ایموجی؛ آیکون‌ها و رنگ‌ها، مطابقِ سلیقهٔ مالک.
+class WinnerStage extends StatefulWidget {
+  const WinnerStage({super.key, required this.session, required this.accent});
+
+  final GameSession session;
+  final Color accent;
+
+  @override
+  State<WinnerStage> createState() => _WinnerStageState();
+}
+
+class _WinnerStageState extends State<WinnerStage>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2600),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final session = widget.session;
+    final theme = Theme.of(context);
+    final won = session.iWon;
+    final draw = session.winner == 'DRAW';
+    final title = draw ? 'مسابقه مساوی شد' : (won ? 'تو برنده شدی' : 'حریف برنده شد');
+    final titleColor = draw
+        ? const Color(0xFFE2E8F0)
+        : won
+            ? const Color(0xFF22E7A6)
+            : Colors.white;
+    final glow = draw
+        ? const Color(0xFF94A3B8)
+        : won
+            ? const Color(0xFFFFD166)
+            : const Color(0xFFFB7185);
+
+    // امتیاز دو طرف — اگر بازی امتیازِ دونفره دارد (جفت‌یاب)؛ پنالتی و
+    // دوئل هم scores می‌فرستند و در نبودِ آن چیزی نشان نمی‌دهیم.
+    final scores = session.state['scores'];
+    int? myScore, oppScore;
+    if (scores is Map && session.mySymbol != null) {
+      final me = scores[session.mySymbol];
+      final other = scores[session.mySymbol == 'X' ? 'O' : 'X'];
+      if (me is num || other is num) {
+        myScore = me is num ? me.toInt() : null;
+        oppScore = other is num ? other.toInt() : null;
+      }
+    }
+    final myName = session.nameOf(session.mySymbol ?? 'X');
+    final oppSym = session.mySymbol == 'X' ? 'O' : 'X';
+    final oppName = session.vsBot ? 'ربات هوشمند' : session.nameOf(oppSym);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.lg, Gaps.md, Gaps.md),
+      decoration: BoxDecoration(
+        borderRadius: Corners.rLg,
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            glow.withValues(alpha: won ? 0.20 : 0.10),
+            Colors.transparent,
+          ],
+        ),
+        border: Border.all(color: glow.withValues(alpha: won ? 0.5 : 0.28)),
+      ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // کاغذرنگی فقط برای برد.
+          if (won)
+            Positioned.fill(
+              child: AnimatedBuilder(
+                animation: _controller,
+                builder: (_, __) => CustomPaint(
+                  painter: _WinnerConfettiPainter(_controller.value),
+                ),
+              ),
+            ),
+          Column(
+            children: [
+              _TrophyBounce(color: glow, won: won),
+              Gaps.vSm,
+              // تیترِ بزرگ — با ترکیدنِ فنری.
+              TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: 1),
+                duration: const Duration(milliseconds: 550),
+                curve: Curves.elasticOut,
+                builder: (_, v, child) => Transform.scale(
+                  scale: 0.5 + v * 0.5,
+                  child: child,
+                ),
+                child: Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    color: titleColor,
+                    fontSize: 25,
+                    shadows: [
+                      Shadow(
+                        color: glow.withValues(alpha: 0.55),
+                        blurRadius: 22,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Gaps.vSm,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _WinnerSide(
+                    name: myName,
+                    score: myScore,
+                    highlight: won,
+                    me: true,
+                  ),
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: Gaps.sm),
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withValues(alpha: 0.55),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.white.withValues(alpha: 0.35),
+                          blurRadius: 8,
+                        ),
+                      ],
+                    ),
+                  ),
+                  _WinnerSide(
+                    name: oppName,
+                    score: oppScore,
+                    highlight: !won && !draw,
+                    me: false,
+                  ),
+                ],
+              ),
+              Gaps.vSm,
+              Text(
+                draw
+                    ? 'هیچ‌کس جام را نبرد — یک دست دیگر؟'
+                    : won
+                        ? (session.vsBot
+                            ? 'تمرینِ خوبی بود — برای سکه و امتیاز آنلاین بازی کن'
+                            : 'این برد در جدول لیگ ثبت شد')
+                        : 'دفعهٔ بعد جبران می‌کنی — تمرین با ربات باز است',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: theme.colorScheme.outline,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// جامِ طلاییِ برنده — ترکیدنِ فنری و بعد شناوریِ آرام.
+class _TrophyBounce extends StatefulWidget {
+  const _TrophyBounce({required this.color, required this.won});
+
+  final Color color;
+  final bool won;
+
+  @override
+  State<_TrophyBounce> createState() => _TrophyBounceState();
+}
+
+class _TrophyBounceState extends State<_TrophyBounce>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pop = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0, 0.25, curve: Curves.elasticOut),
+    );
+    final float = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.25, 1, curve: Curves.easeInOut),
+    );
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (_, __) {
+        final dy = math.sin(float.value * math.pi * 2) * 5;
+        return Transform.translate(
+          offset: Offset(0, dy),
+          child: Transform.scale(
+            scale: 0.4 + pop.value * 0.6,
+            child: Icon(
+              Icons.emoji_events_rounded,
+              size: widget.won ? 84 : 64,
+              color: widget.color,
+              shadows: [
+                Shadow(
+                  color: widget.color.withValues(alpha: 0.55),
+                  blurRadius: 26,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// یک طرفِ خطِ نتیجه: نام + امتیاز.
+class _WinnerSide extends StatelessWidget {
+  const _WinnerSide({
+    required this.name,
+    required this.score,
+    required this.highlight,
+    required this.me,
+  });
+
+  final String name;
+  final int? score;
+  final bool highlight;
+  final bool me;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+      constraints: const BoxConstraints(maxWidth: 150),
+      decoration: BoxDecoration(
+        borderRadius: Corners.rPill,
+        color: highlight
+            ? const Color(0xFF38BDF8).withValues(alpha: 0.16)
+            : Colors.white.withValues(alpha: 0.05),
+        border: Border.all(
+          color: highlight
+              ? const Color(0xFF38BDF8).withValues(alpha: 0.5)
+              : Colors.white.withValues(alpha: 0.12),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: highlight ? Colors.white : const Color(0xFFC9D8E8),
+              ),
+            ),
+          ),
+          if (score != null) ...[
+            const SizedBox(width: 7),
+            Text(
+              faNum(score!),
+              style: theme.textTheme.titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w900, color: Colors.white),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// بارانِ کاغذرنگی — ۱۸ قطعه با مسیرها و سرعت‌های پلکانی.
+class _WinnerConfettiPainter extends CustomPainter {
+  _WinnerConfettiPainter(this.t);
+  final double t;
+
+  static const _colors = [
+    Color(0xFFFFD166),
+    Color(0xFF38BDF8),
+    Color(0xFF22E7A6),
+    Color(0xFFF472B6),
+    Color(0xFFA78BFA),
+    Color(0xFFFDBA74),
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint();
+    for (var i = 0; i < 18; i++) {
+      // هر قطعه با یک اختلافِ فازِ کوچک شروع می‌کند تا باران یکنواخت نباشد.
+      final phase = (t + i * 0.061) % 1.0;
+      final x = (i * 53.0 / 18) * size.width + math.sin(t * 4 + i) * 8;
+      final y = phase * (size.height + 24) - 12;
+      final rot = (t * 3 + i) * 1.3;
+      final o = (1 - phase).clamp(0.0, 1.0);
+      paint.color = _colors[i % _colors.length].withValues(alpha: 0.9 * o);
+      canvas.save();
+      canvas.translate(x, y);
+      canvas.rotate(rot);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          const Rect.fromLTWH(-3.5, -6, 7, 12),
+          const Radius.circular(2.5),
+        ),
+        paint,
+      );
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(_WinnerConfettiPainter old) => old.t != t;
 }
