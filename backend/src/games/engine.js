@@ -737,7 +737,10 @@ function scheduleBot(room) {
   room.botTimer = setTimeout(() => {
     try {
       if (room.done || (!sim && room.turn !== 'O')) return;
-      const move = room.rules.botMove(room.state, 'O');
+      // دورِ ۳۳: اتاق به‌عنوان آرگومانِ سوم به botMove می‌رود تا هر بازی
+      // بتواند رباتِ «تمرین» را از رباتِ جدی جدا کند (جفت‌یاب: تمرینِ
+      // نرم‌تر). بازی‌های دیگر این آرگومان را نادیده می‌گیرند.
+      const move = room.rules.botMove(room.state, 'O', room);
       if (move === null || move === undefined) return advance(room, null);
       // اگر ربات قبلاً در همین ضربه انتخاب کرده، دوباره نفرست.
       if (!room.rules.isValidMove(room.state, move, 'O')) return;

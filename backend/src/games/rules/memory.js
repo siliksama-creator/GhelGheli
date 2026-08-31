@@ -31,6 +31,18 @@ const FACES = [
 // Only used to auto-play a turn that ran out of time (never as an opponent).
 const BOT_MEMORY = 6;
 
+// ── رباتِ تمرینِ نرم‌تر (دورِ ۳۳) ─────────────────────────────────────────
+// گزارشِ مالک: «در حالت تمرین با ربات، رباتی باهاش بازی نمی‌کنه». بازتولید
+// روی production نشان داد ربات واقعاً بازی می‌کند — ولی با حافظهٔ کاملِ
+// ۶ کارتی، بعد از اولین خطای انسان همهٔ جفت‌های دیده‌شده را پشتِ سر هم
+// می‌برد (تستِ زنده: ۸–0). برایِ کاربری که آمده «تمرین» کند این تجربهٔ
+// درست همان حسی را می‌دهد که می‌گفت: تو ضربه می‌زنی، «چیزی» ناپدید می‌شود
+// و می‌بازی. در اتاقِ تمرین (matchMode==='bot') ربات فقط ۳ کارتِ اخیر را
+// به یاد می‌آورد و یک‌پنجمِ وقت‌ها عمداً کارتِ دیده‌شده را نمی‌بیند تا
+// بازی رفت‌وبرگشتی و آموزنده باشد.
+const PRACTICE_BOT_MEMORY = 3;
+const PRACTICE_BLUNDER_CHANCE = 0.2;
+
 function shuffle(a) {
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -132,19 +144,27 @@ const openIndexes = state =>
   state.deck.map((_, i) => i).filter(i => isValidMove(state, i));
 
 /// What the bot is allowed to "remember": the most recent BOT_MEMORY cards.
-function botKnown(state) {
+/// `limit` برای اتاق‌های تمرین کوچک‌تر است (توضیحِ PRACTICE_BOT_MEMORY).
+function botKnown(state, limit = BOT_MEMORY) {
   const entries = Object.entries(state._seen)
     .filter(([i]) => !isTaken(state, Number(i)))
-    .slice(-BOT_MEMORY);
+    .slice(-limit);
   return Object.fromEntries(entries);
 }
 
 /// NOT an opponent — this only picks a legal card when a HUMAN's turn clock
 /// expires, so the match keeps moving instead of hanging. See `noBot` below.
-function botMove(state, me) {
+function botMove(state, me, room = null) {
   const open = openIndexes(state);
   if (!open.length) return null;
-  const known = botKnown(state);
+
+  // دورِ ۳۳: در اتاقِ تمرین حافظهٔ کوتاه‌تر + خطایِ انسانیِ گاه‌به‌گاه.
+  // room.matchMode==='bot' یعنی بازیکن آمدة‌گاه تمرین؛ در مسیرهای دیگر
+  // (پخشِ حرکتِ وقتی‌تمام‌شده از طرفِ انسان) رفتارِ قبلی دست‌نخورده است.
+  const practice = room && room.matchMode === 'bot';
+  const memoryLimit = practice ? PRACTICE_BOT_MEMORY : BOT_MEMORY;
+  const blunder = practice && Math.random() < PRACTICE_BLUNDER_CHANCE;
+  const known = blunder ? {} : botKnown(state, memoryLimit);
 
   // Second card of the turn: complete the pair if we know where it is.
   if (state.flipped.length === 1) {
