@@ -154,12 +154,43 @@ export function GameEconomyPage({ request }) {
           </Field>
         </Card>
 
-        <Card title="بازی ضربه‌زن" subtitle="سکهٔ هر لولِ تمام‌شده — راهنمای داخلِ اپ و وب از همین عدد ساخته می‌شود.">
+        <Card
+          title="بازی ضربه‌زن — سکه و منحنی"
+          subtitle="منحنی (تعداد لول، جمعِ امتیاز، شیب، سقفِ روزانه) و سکهٔ هر لول — همه بدونِ انتشارِ نسخهٔ جدید، همان لحظه در اپ و وب اعمال می‌شود."
+        >
           <Field label="سکهٔ هر لول (راهنمای اپ: «هر لول N سکه می‌دهد»)">
             <Input type="number" min="1" max="1000"
               value={cfg.economy.tapCoinsPerLevel}
               onChange={e => setEcon('tapCoinsPerLevel', Number(e.target.value))} />
           </Field>
+          <div className="card-grid cols-2" style={{ gap: 8, marginTop: 10 }}>
+            <Field label="تعداد لول‌های بازی (۵ تا ۲۰۰)">
+              <Input type="number" min="5" max="200"
+                value={cfg.economy.tapCurve?.levelCount ?? 50}
+                onChange={e => setEcon('tapCurve.levelCount', Number(e.target.value))} />
+            </Field>
+            <Field label="جمعِ امتیازِ کلِ بازی">
+              <Input type="number" min="1000" max="10000000"
+                value={cfg.economy.tapCurve?.totalPoints ?? 50000}
+                onChange={e => setEcon('tapCurve.totalPoints', Number(e.target.value))} />
+            </Field>
+            <Field label="شیبِ گران‌شدنِ لول‌ها (۱ تا ۱٫۵)">
+              <Input type="number" min="1" max="1.5" step="0.01"
+                value={cfg.economy.tapCurve?.growthFactor ?? 1.05}
+                onChange={e => setEcon('tapCurve.growthFactor', Number(e.target.value))} />
+            </Field>
+            <Field label="سقفِ لول در روز (تقویم تهران)">
+              <Input type="number" min="0" max="50"
+                value={cfg.economy.tapCurve?.levelsPerDay ?? 2}
+                onChange={e => setEcon('tapCurve.levelsPerDay', Number(e.target.value))} />
+            </Field>
+          </div>
+          <p className="topbar-sub" style={{ marginTop: 8 }}>
+            جمعِ امتیازِ لول‌ها دقیقاً برابرِ عددِ بالا توزیع می‌شود (خطای گرد شدن در
+            لول آخر جبران می‌شود). تغییرِ منحنی پیشرفتِ کسی را پاک نمی‌کند؛ اگر
+            لولِ آخر را کم کنی، بازیکنانی که از آن گذشته‌اند در حالتِ «بازی
+            تمام شد» می‌مانند تا با دکمهٔ ریستِ پایینِ همین صفحه آزادشان کنی.
+          </p>
         </Card>
       </div>
 
@@ -201,6 +232,129 @@ export function GameEconomyPage({ request }) {
           </Field>
         </div>
       </Card>
+
+      <TapManagementCard request={request} notify={notify} />
     </div>
+  );
+}
+
+/* ═══ آمار و ریستِ بازی ضربه‌زن (دورِ ۳۳) ═══
+ * خواستهٔ مالک: «ادمین بتونه کامل بازی ضربه‌زن رو مدیریت کنه و درصورت نیاز
+ * رست بده و آمار لولِ آخر شدن کاربرها رو داشته باشه».
+ * ریستِ تک‌کاربر پیشرفتش را صفر می‌کند و فقط همان یک نفر دوباره از
+ * لول ۱ شروع می‌کند؛ «ریستِ کل» برای شروعِ فصلِ تازه است. */
+function TapManagementCard({ request, notify }) {
+  const [stats, setStats] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = () => request('/api/admin/tap/stats')
+    .then(setStats)
+    .catch(() => {});
+  useEffect(() => { load(); }, [request]);
+
+  async function resetUser(u) {
+    if (!window.confirm(`پیشرفتِ ضربه‌زنِ «${u.nickname}» ریست شود؟ از لول ۱ شروع می‌کند.`)) return;
+    setBusy(true);
+    try {
+      const d = await request('/api/admin/tap/reset', {
+        method: 'POST', body: { userId: u.userId },
+      });
+      notify(d.message || 'ریست شد');
+      load();
+    } catch (err) { notify(err.message, 'error'); }
+    finally { setBusy(false); }
+  }
+
+  async function resetAll() {
+    if (!window.confirm('بازی ضربه‌زن برای «همهٔ کاربران» ریست شود؟ این عمل برگشت‌پذیر نیست.')) return;
+    setBusy(true);
+    try {
+      const d = await request('/api/admin/tap/reset', {
+        method: 'POST', body: { all: true },
+      });
+      notify(d.message || 'ریست کل انجام شد');
+      load();
+    } catch (err) { notify(err.message, 'error'); }
+    finally { setBusy(false); }
+  }
+
+  const fa = n => new Intl.NumberFormat('fa-IR').format(Number(n || 0));
+  return (
+    <Card
+      title="بازی ضربه‌زن — آمار و ریست"
+      subtitle="چه کسانی بازی را تمام کرده‌اند، جمعِ امتیاز و سکهٔ توزیع‌شده، و ریستِ تک‌کاربر یا کلِ بازی."
+      action={stats?.curve
+        ? <Badge tone="info">{fa(stats.curve.levelCount)} لول · {fa(stats.curve.levelsPerDay)} در روز</Badge>
+        : null}
+    >
+      {!stats ? <p className="topbar-sub">در حال بارگذاری…</p> : (
+        <>
+          <div className="card-grid cols-4" style={{ gap: 8 }}>
+            <div style={{ padding: 10, border: '1px solid rgba(255,255,255,.08)', borderRadius: 10 }}>
+              <small className="topbar-sub">بازیکنان</small>
+              <div style={{ fontSize: 21, fontWeight: 900 }}>{fa(stats.players)}</div>
+            </div>
+            <div style={{ padding: 10, border: '1px solid rgba(255,209,102,.4)', borderRadius: 10 }}>
+              <small className="topbar-sub">بازی را تمام کردند</small>
+              <div style={{ fontSize: 21, fontWeight: 900, color: '#FFD166' }}>{fa(stats.finished)}</div>
+            </div>
+            <div style={{ padding: 10, border: '1px solid rgba(255,255,255,.08)', borderRadius: 10 }}>
+              <small className="topbar-sub">روی لولِ آخر</small>
+              <div style={{ fontSize: 21, fontWeight: 900 }}>{fa(stats.atFinalLevel)}</div>
+            </div>
+            <div style={{ padding: 10, border: '1px solid rgba(255,255,255,.08)', borderRadius: 10 }}>
+              <small className="topbar-sub">جمعِ سکهٔ داده‌شده</small>
+              <div style={{ fontSize: 21, fontWeight: 900, color: '#FFD166' }}>{fa(stats.totalCoinsAwarded)}</div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, flexWrap: 'wrap', gap: 8 }}>
+            <b style={{ fontSize: 13.5 }}>
+              بازیکنانی که بازی را تمام کرده‌اند {stats.finishedUsers?.length ? `(${fa(stats.finishedUsers.length)})` : ''}
+            </b>
+            <Button variant="danger" onClick={resetAll} disabled={busy}>
+              ریستِ کلِ بازی (فصلِ تازه)
+            </Button>
+          </div>
+
+          {!stats.finishedUsers?.length ? (
+            <p className="topbar-sub" style={{ marginTop: 8 }}>هنوز کسی بازی را تمام نکرده است.</p>
+          ) : (
+            <div style={{ overflowX: 'auto', marginTop: 8 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                <thead>
+                  <tr style={{ textAlign: 'right', color: 'rgba(255,255,255,.55)' }}>
+                    <th style={{ padding: '6px 8px' }}>بازیکن</th>
+                    <th style={{ padding: '6px 8px' }}>امتیاز</th>
+                    <th style={{ padding: '6px 8px' }}>سکه</th>
+                    <th style={{ padding: '6px 8px' }}>ضربه‌ها</th>
+                    <th style={{ padding: '6px 8px' }}>تاریخِ پایان</th>
+                    <th style={{ padding: '6px 8px' }} />
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.finishedUsers.map(u => (
+                    <tr key={u.userId} style={{ borderTop: '1px solid rgba(255,255,255,.07)' }}>
+                      <td style={{ padding: '7px 8px', fontWeight: 700 }}>{u.nickname}</td>
+                      <td style={{ padding: '7px 8px' }}>{fa(u.pointsAwarded)}</td>
+                      <td style={{ padding: '7px 8px', color: '#FFD166', fontWeight: 700 }}>{fa(u.coinsAwarded)}</td>
+                      <td style={{ padding: '7px 8px' }}>{fa(u.totalTaps)}</td>
+                      <td style={{ padding: '7px 8px' }}>
+                        {u.finishedAt ? new Date(u.finishedAt).toLocaleDateString('fa-IR') : '—'}
+                      </td>
+                      <td style={{ padding: '7px 8px' }}>
+                        <Button size="sm" variant="secondary" onClick={() => resetUser(u)} disabled={busy}>
+                          ریست
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </Card>
   );
 }
