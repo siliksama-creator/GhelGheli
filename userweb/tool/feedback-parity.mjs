@@ -102,9 +102,11 @@ ok('اندروید skinChanged را heavyImpact می‌دهد',
   /skinChanged:[\s\S]{0,120}heavyImpact/.test(android.tap));
 // The web detects a skin change by comparing skin indexes rather than by an
 // event enum, so the assertion pins that branch specifically: the heavy buzz
-// must sit inside the `skinIndexForLevel(lv) !== prevSkin` block.
+// must sit inside the `skinIndexForLevel(lv, …) !== prevSkin` block.
+// (Round 33: the call gained a CFG argument when the level curve became
+// server-driven — any curve, same skin-index comparison.)
 ok('وب هم تغییر شخصیت را heavyImpact می‌دهد',
-  /skinIndexForLevel\(lv\) !== prevSkin\)[\s\S]{0,320}?heavyImpact\(\);\s*\n\s*\} else if/
+  /skinIndexForLevel\(lv[^)]*\) !== prevSkin\)[\s\S]{0,320}?heavyImpact\(\);\s*\n\s*\} else if/
     .test(web.tap));
 ok('وب برای سقف روزانه هم لرزش دارد', /heavyImpact\(\);\s*\/\/ dailyCapHit/.test(web.tap));
 ok('وب برای پایان بازی هم لرزش دارد', /heavyImpact\(\);\s*\/\/ gameCompleted/.test(web.tap));
