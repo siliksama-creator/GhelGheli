@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, Suspense, lazy } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BarChart3, Bell, Coins, Gift, MessageCircle, LifeBuoy, ScanLine, Settings, Shield, Sigma, Trophy, Users, Gamepad2, Wallet, Activity, CircleDot, Package } from 'lucide-react';
+import { BarChart3, Bell, Coins, Gift, MessageCircle, LifeBuoy, ScanLine, Settings, Shield, Sigma, Trophy, Users, Gamepad2, Wallet, Activity, CircleDot, Package, Store, Layers, Target, SlidersHorizontal } from 'lucide-react';
 
 import './theme.css';
 import './styles.css';
@@ -41,6 +41,11 @@ const SettingsPage = lazy(() => import('./pages/settings.jsx').then(m => ({ defa
 const AdminsPage = lazy(() => import('./pages/admins.jsx').then(m => ({ default: m.AdminsPage })));
 const MetricsPage = lazy(() => import('./pages/metrics.jsx').then(m => ({ default: m.MetricsPage })));
 const AnalyticsPage = lazy(() => import('./pages/analytics.jsx').then(m => ({ default: m.AnalyticsPage })));
+// ── صفحاتِ دورِ عملیات: فروشگاه، گذر نبرد، ماموریت، اهرم‌های موتور ──
+const ShopAdminPage = lazy(() => import('./pages/shop.jsx').then(m => ({ default: m.ShopAdminPage })));
+const BattlePassPage = lazy(() => import('./pages/battle-pass.jsx').then(m => ({ default: m.BattlePassPage })));
+const MissionsPage = lazy(() => import('./pages/missions.jsx').then(m => ({ default: m.MissionsPage })));
+const EnginePage = lazy(() => import('./pages/engine.jsx').then(m => ({ default: m.EnginePage })));
 
 const NAV = [
   ['dashboard', 'داشبورد', BarChart3, Dashboard],
@@ -74,6 +79,9 @@ const NAV = [
   //    آپلودِ طرح)، پس انتخابگرِ «کارت‌های لازم» در صفحهٔ جوایز بدونِ
   //    تغییر کار می‌کند.
   ['photo-cards', 'ثبت کارت', ScanLine, PhotoCardsPage],
+  ['shop', 'فروشگاه', Store, ShopAdminPage],
+  ['battle-pass', 'گذر نبرد', Layers, BattlePassPage],
+  ['missions', 'ماموریت‌ها', Target, MissionsPage],
   ['rewards', 'جوایز', Gift, RewardsPage],
   ['wallet', 'کیف پول', Wallet, WalletPage],
   ['league', 'لیگ ماهانه', Trophy, LeaguePage],
@@ -88,6 +96,7 @@ const NAV = [
   ['support', 'پشتیبانی', LifeBuoy, SupportPage],
   ['notifications', 'اطلاعیه‌ها', Bell, NotificationsPage],
   ['settings', 'تنظیمات', Settings, SettingsPage],
+  ['engine', 'موتور', SlidersHorizontal, EnginePage],
   ['admins', 'ادمین‌ها', Shield, AdminsPage],
   ['analytics', 'تحلیل رشد و خطا', BarChart3, AnalyticsPage],
   ['metrics', 'مانیتورینگ سرور', Activity, MetricsPage],

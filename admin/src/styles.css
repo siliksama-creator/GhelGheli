@@ -1675,3 +1675,34 @@ table.data-table {
 .lgWarn{
   display:block; margin-top:4px; font-size:10.5px; color:#fca5a5; line-height:1.5;
 }
+
+/* ── صفحات دورِ عملیات: فروشگاه، گذر نبرد، ماموریت، موتور ─────────────── */
+.page-stack { display: flex; flex-direction: column; gap: 16px; }
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+  align-items: end;
+}
+.form-grid .field { margin: 0; }
+.check-row { display: flex; align-items: center; gap: 8px; font-size: 13px; align-self: center; }
+.row-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.inline-inputs { display: flex; gap: 8px; align-items: center; }
+.inline-inputs input { flex: 1; min-width: 80px; }
+.warn-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #f59e0b; font-weight: 600; }
+.full-row { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 10px; }
+.dim { color: #7d8aa5; font-weight: 400; }
+.tier-grid { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.tier-row {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  padding: 10px; border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 12px; background: rgba(148, 163, 184, 0.05);
+}
+.tier-num { width: 64px; flex-shrink: 0; font-size: 13px; }
+.tier-edit { display: flex; gap: 6px; align-items: center; flex: 1; min-width: 300px; }
+.tier-edit small { width: 52px; color: #94a3b8; font-size: 11px; }
+.tier-edit select { width: 120px; }
+.tier-edit input { flex: 1; min-width: 60px; }
+.tier-edit input[type="number"] { width: 84px; flex: none; }
+.tier-missing { color: #64748b; padding: 10px; font-size: 12px; }
