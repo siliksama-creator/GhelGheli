@@ -103,4 +103,53 @@ check(/card-box/.test(read('admin/src/main.jsx'))
   && /AdminCardBox/.test(read('mobile/lib/screens/admin/admin_shell.dart')),
   'both admin shells expose the card-box page');
 
+// ═══ دورِ عملیات (۱۴۰۵): فروشگاه، گذر نبرد، ماموریت‌ها، اهرم‌های موتور ═══
+const webShop = read('admin/src/pages/shop.jsx');
+const mobileShop = read('mobile/lib/screens/admin/admin_shop.dart');
+check(/admin\/shop/.test(webShop) && /admin\/shop/.test(mobileShop),
+  'both admin clients expose shop item CRUD');
+check(/admin\/shop\/plus/.test(webShop) && /admin\/shop\/plus/.test(mobileShop),
+  'both admin clients edit plus plans');
+check(/method: 'DELETE'/.test(webShop) && /api.delete\('\/api\/admin\/shop/.test(mobileShop),
+  'both admin clients expose shop item deletion');
+check(/'shop'/.test(read('admin/src/main.jsx')) && /AdminShop/.test(read('mobile/lib/screens/admin/admin_shell.dart')),
+  'both admin shells expose the shop page');
+
+const webPass = read('admin/src/pages/battle-pass.jsx');
+const mobilePass = read('mobile/lib/screens/admin/admin_pass.dart');
+check(/admin\/pass\/seasons/.test(webPass) && /admin\/pass\/seasons/.test(mobilePass),
+  'both admin clients manage battle-pass seasons');
+check(/admin\/pass\/tiers/.test(webPass) && /admin\/pass\/tiers/.test(mobilePass),
+  'both admin clients edit battle-pass tier rewards');
+check(/admin\/pass\/config/.test(webPass) && /admin\/pass\/config/.test(mobilePass),
+  'both admin clients edit the pass XP curve');
+check(/maxTiersPerDay/.test(webPass) && /maxTiersPerDay/.test(mobilePass),
+  'both admin clients expose the daily tier cap');
+check(/'battle-pass'/.test(read('admin/src/main.jsx')) && /AdminPass/.test(read('mobile/lib/screens/admin/admin_shell.dart')),
+  'both admin shells expose the battle-pass page');
+
+const webMissions = read('admin/src/pages/missions.jsx');
+const mobileMissions = read('mobile/lib/screens/admin/admin_missions.dart');
+check(/admin\/missions\/config/.test(webMissions) && /admin\/missions\/config/.test(mobileMissions),
+  'both admin clients edit the daily mission bonus');
+check(/admin\/missions\/builtin/.test(webMissions) && /admin\/missions\/builtin/.test(mobileMissions),
+  'both admin clients override builtin missions');
+check(/admin\/missions/.test(webMissions) && /admin\/missions/.test(mobileMissions),
+  'both admin clients create custom missions');
+check(/'missions'/.test(read('admin/src/main.jsx')) && /AdminMissions/.test(read('mobile/lib/screens/admin/admin_shell.dart')),
+  'both admin shells expose the missions page');
+
+const webEngine = read('admin/src/pages/engine.jsx');
+const mobileEngine = read('mobile/lib/screens/admin/admin_engine.dart');
+check(/settings\/photo-match/.test(webEngine) && /settings\/photo-match/.test(mobileEngine),
+  'both admin clients edit photo-match thresholds');
+check(/settings\/levels/.test(webEngine) && /settings\/levels/.test(mobileEngine),
+  'both admin clients edit the level curve');
+check(/settings\/streak/.test(webEngine) && /settings\/streak/.test(mobileEngine),
+  'both admin clients edit the login-streak cycle');
+check(/chat\/canned/.test(webEngine) && /chat\/canned/.test(mobileEngine),
+  'both admin clients edit canned chat messages');
+check(/'engine'/.test(read('admin/src/main.jsx')) && /AdminEngine/.test(read('mobile/lib/screens/admin/admin_shell.dart')),
+  'both admin shells expose the engine page');
+
 console.log(`\n✅ ${passed} admin parity assertions passed\n`);

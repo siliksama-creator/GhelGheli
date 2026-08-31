@@ -108,14 +108,14 @@ void main() {
           ),
         ),
       ));
-      expect(tester_exceptions(), isEmpty);
+      expect(testerExceptions(), isEmpty);
     });
   });
 }
 
 /// خطاهای رندر (از جمله overflow) در `FlutterError.onError` جمع می‌شوند و
 /// تست را قرمز می‌کنند؛ این کمکی فقط خوانایی ادعا را بالا می‌برد.
-List<Object> tester_exceptions() {
+List<Object> testerExceptions() {
   final e = <Object>[];
   final pending = TestWidgetsFlutterBinding.instance.takeException();
   if (pending != null) e.add(pending);

@@ -22,6 +22,10 @@ import 'admin_settings.dart';
 import 'admin_support.dart';
 import 'admin_users.dart';
 import 'admin_wallet.dart';
+import 'admin_shop.dart';
+import 'admin_pass.dart';
+import 'admin_missions.dart';
+import 'admin_engine.dart';
 
 /// Root shell for the in-app admin console: responsive layout that shows a
 /// permanent side rail on tablets/desktop and a drawer + bottom nav on
@@ -59,6 +63,9 @@ class _AdminShellState extends State<AdminShell> {
     //  فقط رابط رفت، نه داده: جدول و مسیرهای سرور دست‌نخورده‌اند چون
     //    کدهای مصرف‌شده در تاریخچهٔ کاربران به آن‌ها ارجاع دارند.
     AdminPhotoCards(api: widget.api),
+    AdminShop(api: widget.api),
+    AdminPass(api: widget.api),
+    AdminMissions(api: widget.api),
     AdminRewards(api: widget.api),
     AdminWallet(api: widget.api),
     AdminLeague(api: widget.api),
@@ -72,6 +79,7 @@ class _AdminShellState extends State<AdminShell> {
     AdminSupport(api: widget.api),
     AdminNotifications(api: widget.api),
     AdminSettings(api: widget.api),
+    AdminEngine(api: widget.api),
     AdminAdmins(api: widget.api),
     AdminAnalytics(api: widget.api),
     AdminMetrics(api: widget.api),
@@ -80,6 +88,9 @@ class _AdminShellState extends State<AdminShell> {
   static const _titles = [
     'داشبورد',
     'ثبت کارت',
+    'فروشگاه',
+    'گذر نبرد',
+    'ماموریت‌ها',
     'جوایز',
     'کیف پول',
     'لیگ',
@@ -93,6 +104,7 @@ class _AdminShellState extends State<AdminShell> {
     'پشتیبانی',
     'اطلاعیه‌ها',
     'تنظیمات',
+    'موتور',
     'ادمین‌ها',
     'تحلیل رشد و خطا',
     'مانیتورینگ'
@@ -100,6 +112,9 @@ class _AdminShellState extends State<AdminShell> {
   static const _icons = [
     Icons.dashboard_rounded,
     Icons.document_scanner_rounded,
+    Icons.storefront_rounded,
+    Icons.layers_rounded,
+    Icons.flag_rounded,
     Icons.card_giftcard_rounded,
     Icons.account_balance_wallet_rounded,
     Icons.emoji_events_rounded,
@@ -113,6 +128,7 @@ class _AdminShellState extends State<AdminShell> {
     Icons.support_agent_rounded,
     Icons.campaign_rounded,
     Icons.settings_rounded,
+    Icons.tune_rounded,
     Icons.admin_panel_settings_rounded,
     Icons.insights_rounded,
     Icons.analytics_rounded,

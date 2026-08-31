@@ -62,12 +62,12 @@ void main() {
 
     testWidgets('انیمیشنِ برنده در عرضِ باریک overflow نمی‌دهد',
         (tester) async {
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpWidget(const MaterialApp(
         home: Scaffold(
           body: Center(
             child: SizedBox(
               width: 200,
-              child: const CoinAward(amount: 1000, mine: true),
+              child: CoinAward(amount: 1000, mine: true),
             ),
           ),
         ),

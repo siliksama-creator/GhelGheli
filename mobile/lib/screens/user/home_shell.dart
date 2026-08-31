@@ -473,7 +473,7 @@ class _HomeShellState extends State<HomeShell>
       final urls = app['updateUrl'] is Map
           ? Map<String, dynamic>.from(app['updateUrl'] as Map)
           : <String, dynamic>{};
-      final current = const String.fromEnvironment(
+      const current = String.fromEnvironment(
         'APP_RELEASE', defaultValue: '1.1.17');
       final minStr = '${min['android'] ?? ''}';
       if (minStr.isNotEmpty && _versionLower(current, minStr)) {
