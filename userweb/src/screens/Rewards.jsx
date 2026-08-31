@@ -170,11 +170,6 @@ export default function Rewards({ token, setMsg, reloadProfile }) {
               <EmptyView icon="gift">
                 جایزه‌ها هنوز اعلام نشده‌اند؛ امتیازت جمع می‌شود و می‌ماند.
               </EmptyView>
-              <div className="rgSoonWays">
-                <div><UiIcon name="game" size={19} /><span>برد در بازی‌ها</span></div>
-                <div><UiIcon name="card" size={19} /><span>ثبت کارت</span></div>
-                <div><UiIcon name="group" size={19} /><span>دعوت دوستان</span></div>
-              </div>
             </section>
           );
         }

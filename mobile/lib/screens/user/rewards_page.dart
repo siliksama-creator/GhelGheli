@@ -206,24 +206,10 @@ class _RewardsPageState extends State<RewardsPage> {
                     title: 'جایزه‌ها هنوز اعلام نشده‌اند؛ '
                         'امتیازت جمع می‌شود و می‌ماند.',
                     image: 'assets/games/empty_rewards.webp'),
-                Gaps.vSm,
-                const Row(
-                  children: [
-                    Expanded(
-                        child: _RewardWay(
-                            icon: Icons.sports_esports_outlined,
-                            label: 'برد در بازی‌ها')),
-                    SizedBox(width: 10),
-                    Expanded(
-                        child: _RewardWay(
-                            icon: Icons.style_outlined, label: 'ثبت کارت')),
-                    SizedBox(width: 10),
-                    Expanded(
-                        child: _RewardWay(
-                            icon: Icons.group_outlined,
-                            label: 'دعوت دوستان')),
-                  ],
-                ),
+                // دورِ ۳۳ — ردیفِ «راه‌های کسب امتیاز» (برد در بازی‌ها /
+                // ثبت کارت / دعوت دوستان) به دستورِ مالک حذف شد: نه
+                // آیکینش نه نوشتش نباید در صفحهٔ جوایز باشد. همان کارتِ
+                // امتیازِ فعلی + EmptyState می‌ماند.
               ],
             );
           }
@@ -622,31 +608,3 @@ class _ConfirmLine extends StatelessWidget {
 
 /// یکی از سه راهِ کسبِ امتیاز در حالتِ «هنوز جایزه‌ای نیست».
 /// آینهٔ `.rgSoonWays > div` در وب.
-class _RewardWay extends StatelessWidget {
-  const _RewardWay({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        color: const Color(0x08FFFFFF),
-        border: Border.all(color: const Color(0x12FFFFFF)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 19, color: const Color(0xFF7DD3FC)),
-          const SizedBox(height: 8),
-          Text(label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8))),
-        ],
-      ),
-    );
-  }
-}
