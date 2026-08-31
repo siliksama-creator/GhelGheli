@@ -11,6 +11,7 @@ import { CosmeticAvatarFrame, LevelBadge, DisplayName } from './components/Cosme
 import CoinAward from './components/CoinAward.jsx';
 import CoinRateStrip from './components/CoinRateStrip.jsx';
 import { ASSETS, SvgIcon } from './components/IconAsset.jsx';
+import WinnerCelebration from './components/WinnerCelebration.jsx';
 import { fa, asset, avatarUrl, req } from './lib/api.js';
 import './growth.css';
 
@@ -789,12 +790,19 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
       )}
 
       {phase === 'over' && (
-        <div style={{ padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', position:'relative', zIndex:5, borderRadius:'20px', border:`1px solid ${resultColors[1]}99`, background:`radial-gradient(circle at 50% 0,${resultColors[1]}55,transparent 48%),linear-gradient(145deg,${resultColors[0]}DD,#071522)` }}>
-          <div style={{ display:'flex', justifyContent:'center', color: g.winner === 'DRAW' ? '#94A3B8' : (g.winner === g.me ? '#FFD166' : '#FB7185') }}>
-            <SvgIcon name={g.winner === 'DRAW' ? 'handshake' : (g.winner === g.me ? 'party' : 'broken')} size={46} /></div>
-          <h2 style={{ color: g.winner === g.me ? '#22E7A6' : '#FFF', fontWeight: '900', margin: 0 }}>
-            {g.winner === 'DRAW' ? 'مسابقه مساوی شد!' : (g.winner === g.me ? 'تبریک! شما برنده شدید' : 'متاسفانه باختید!')}
-          </h2>
+        /* ── جشنِ بزرگِ برنده (دورِ ۳۳) ──
+           خواستهٔ مالک: برنده باید «بزرگ و به‌شکلِ زیبا» مشخص شود — چه
+           با ربات چه آنلاین، چه پنالتی چه بقیهٔ بازی‌ها. صحنهٔ قدیمی یک
+           آیکونِ ۴۶ پیکسلی و یک h2 بود؛ حالا کاغذرنگی + آیکونِ درشت +
+           تیترِ بزرگ + خطِ نتیجه با نام و امتیاز دو طرف. */
+        <WinnerCelebration
+          outcome={g.winner === 'DRAW' ? 'draw' : (g.winner === g.me ? 'win' : 'loss')}
+          myName={pX.nickname || 'بازیکن یک'} oppName={pO.nickname || (g.vsBot ? 'ربات هوشمند' : 'بازیکن دو')}
+          vsBot={Boolean(g.vsBot)}
+          myScore={g.state?.scores ? Number(g.state.scores[g.me] ?? 0) : undefined}
+          oppScore={g.state?.scores ? Number(g.state.scores[g.me === 'X' ? 'O' : 'X'] ?? 0) : undefined}
+        >
+        <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', position:'relative', zIndex:5 }}>
           {/* ── امتیازِ مثبت برای برنده، منفی برای بازنده ──
               خواستهٔ مالک: «امتیاز مثبت رو بنویسه برای برنده، امتیاز منفی
               رو بنویسه برای بازنده». فقط در مسابقهٔ امتیازیِ واقعی (نه ربات،
@@ -841,6 +849,7 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
             >بازگشت به باشگاه بازی‌ها</button>
           </div>
         </div>
+        </WinnerCelebration>
       )}
     </div>
   );
