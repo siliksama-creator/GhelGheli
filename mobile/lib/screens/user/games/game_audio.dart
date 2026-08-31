@@ -4,9 +4,27 @@
 // call is wrapped and failures are swallowed (an emulator with no audio
 // device, a revoked permission, a codec hiccup...). The mute preference is
 // persisted so it survives app restarts.
+import 'dart:async';
+
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+/// ساختِ پخش‌کنندهٔ صدا در زونِ محافظ‌شده.
+///
+/// سازندهٔ `AudioPlayer` داخلش کانالِ پلتفرم را async مقداردهی می‌کند؛
+/// جایی که پلاگین نیست (تست‌های CI، دستگاهِ بدونِ سرویس صوتی) این
+/// مقداردهی به یک خطای async می‌رسد که بدونِ زون «unhandled» می‌شود و
+/// تست/جلسه را بعد از اتمام خراب می‌کند. زون خطا را می‌بلعد — دقیقاً با
+/// همان فلسفهٔ «صدا هرگز بازی را نمی‌شکند» که بالای همین فایل نوشته شده.
+AudioPlayer _safePlayer() {
+  // runZonedGuarded<T> مقدار را nullable برمی‌گرداند؛ body همیشه
+  // غیرnull است، ولی برای کامپایل باید fallback بی‌خطری گذاشت.
+  return runZonedGuarded<AudioPlayer>(
+    AudioPlayer.new,
+    (error, stack) => debugPrint('audio player init failed: $error'),
+  ) ?? AudioPlayer();
+}
 
 /// ═══════════════════════════════════════════════════════════════════════
 /// چرا «تمرکزِ صوتی» را دستی روی `none` می‌گذاریم
@@ -114,10 +132,10 @@ class GameAudio {
   static const _poolSize = 3;
 
   final List<AudioPlayer> _pool = [];
-  final AudioPlayer _musicPlayer = AudioPlayer();
+  final AudioPlayer _musicPlayer = _safePlayer();
   // پخش‌کنندهٔ جدا برای صدای لرزشِ صندوق — با loop روی فایلِ مخصوص،
   // دقیقاً هم‌زمان با انیمیشن شروع و با stopShake قطع می‌شود.
-  final AudioPlayer _shakePlayer = AudioPlayer();
+  final AudioPlayer _shakePlayer = _safePlayer();
   int _next = 0;
   bool _enabled = true;
   bool _ready = false;
@@ -164,7 +182,7 @@ class GameAudio {
     if (_ready) return;
     _ready = true;
     for (var i = 0; i < _poolSize; i++) {
-      final p = AudioPlayer()..setReleaseMode(ReleaseMode.stop);
+      final p = _safePlayer()..setReleaseMode(ReleaseMode.stop);
       p.setPlayerMode(PlayerMode.lowLatency);
       // متن را روی خودِ پخش‌کننده هم می‌گذاریم، نه فقط سراسری: `load()`
       // در main.dart بدون await صدا زده می‌شود، پس اگر کاربر خیلی سریع

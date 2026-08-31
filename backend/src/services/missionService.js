@@ -10,6 +10,10 @@ const DAILY_BONUS_DEFAULT = 100;
 // می‌شود؛ مقدارِ واقعیِ به‌کاررفته در مسیر محصول از `mission_config` است.
 const DAILY_BONUS_REWARD = DAILY_BONUS_DEFAULT;
 
+// کشِ ۳۰ ثانیه‌ایِ ماموریت‌های سفارشی (DB) — هر درخواستِ کاربر نباید
+// کوئری تازه بزند؛ تغییرِ ادمین حداکثر ۳۰ ثانیه بعد دیده می‌شود.
+let _customCache = null;
+
 /**
  * تنظیمات ماموریت از پنل ادمین: جایزهٔ تکمیل روزانه + بازنویسیِ
  * تکیِ ماموریت‌های توکار (کلیدِ هر ماموریت → reward/goal/active).
@@ -44,17 +48,31 @@ function applyOverride(item) {
 
 /** ماموریت‌های سفارشی ادمین — همیشه فعال، بدون چرخش تصادفی. */
 async function customDefinitions(client = pool) {
-  const { rows } = await client.query(
-    `SELECT key, period, event, icon, title, description, goal, reward
-       FROM mission_definitions
-      WHERE is_active = true
-      ORDER BY sort_order, created_at`);
-  return rows.map((r) => ({
-    key: r.key, period: r.period, event: r.event, icon: r.icon,
-    title: r.title, description: r.description,
-    goal: Number(r.goal) || 1, reward: Number(r.reward) || 0,
-    custom: true, active: true,
-  }));
+  const now = Date.now();
+  if (_customCache && now - _customCache.at < 30_000) return _customCache.rows;
+  try {
+    const { rows } = await client.query(
+      `SELECT key, period, event, icon, title, description, goal, reward
+         FROM mission_definitions
+        WHERE is_active = true
+        ORDER BY sort_order, created_at`);
+    _customCache = {
+      at: now,
+      rows: rows.map((r) => ({
+        key: r.key, period: r.period, event: r.event, icon: r.icon,
+        title: r.title, description: r.description,
+        goal: Number(r.goal) || 1, reward: Number(r.reward) || 0,
+        custom: true, active: true,
+      })),
+    };
+    return _customCache.rows;
+  } catch (err) {
+    // چرخشِ پایه نباید به‌خاطرِ خطای خواندنِ جدولِ سفارشی‌ها از کار بیفتد؛
+    // بدونِ دیتابیس (مثلاً تست‌های CI) هم باید همان چرخشِ روزانه/هفتگی
+    // برگردد. کشِ قبلی اگر باشد، برگردان؛ وگرنه لیستِ خالی.
+    if (_customCache) return _customCache.rows;
+    return [];
+  }
 }
 
 const DAILY_FAMILIES = Object.freeze([

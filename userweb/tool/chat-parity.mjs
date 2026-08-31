@@ -203,8 +203,11 @@ for (const [name, src] of [['وب', gamesWeb], ['اندروید', gamesAnd]]) {
 // جهتِ خطرناک‌ترش عکسِ این است: اگر کلاینتی پیامی را نشان بدهد که سرور
 // نمی‌شناسد، کاربر دکمه را می‌زند و «پیام مجاز نیست» می‌گیرد — دکمه‌ای که
 // خودِ ما گذاشته‌ایم. پس تساویِ دقیقِ هر سه مجموعه را می‌بندیم.
+// سرچشمهٔ فهرستِ آماده از زمانِ «اهرم‌های موتور» به `DEFAULT_CANNED_MESSAGES`
+// منتقل شد (قابل ویرایش از پنل ادمین از طریق `chat_canned_messages` در
+// app_settings). همان گاردِ تساویِ دقیق، فقط روی ثابتِ تازه.
 const serverCanned = new Set(
-  [...(server.match(/const CANNED_MESSAGES = \[[\s\S]*?\n\];/) || [''])[0]
+  [...(server.match(/const DEFAULT_CANNED_MESSAGES = (?:Object\.freeze\()?\[[\s\S]*?\n\]\)?;/) || [''])[0]
     .matchAll(/"([^"]+)"/g)].map(m => m[1]));
 
 const webCanned = new Set(

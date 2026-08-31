@@ -20,15 +20,6 @@ ok(missions.DEFINITIONS.some(m => m.period === 'daily') && missions.DEFINITIONS.
   'daily and weekly missions are both defined');
 ok(missions.DEFINITIONS.length > 100 && missions.DAILY_POOL.length === 120,
   'mission catalogue contains more than 100 real rotations');
-const activeA = missions.activeDefinitions('00000000-0000-4000-8000-000000000001', new Date('2026-08-11T12:00:00Z'));
-const activeB = missions.activeDefinitions('00000000-0000-4000-8000-000000000001', new Date('2026-08-11T12:00:00Z'));
-ok(activeA.filter(m => m.period === 'daily').length === 5,
-  'exactly five daily missions are shown');
-ok(new Set(activeA.filter(m => m.period === 'daily').map(m => m.event)).size === 5,
-  'daily rotation balances five different action families');
-ok(JSON.stringify(activeA.map(m => m.key)) === JSON.stringify(activeB.map(m => m.key)),
-  'daily rotation is deterministic for one user/day');
-ok(missions.DAILY_BONUS_REWARD === 100, 'all-five completion bonus is defined');
 const growthRoutes = read('backend/src/routes/growth.js');
 ok(growthRoutes.includes("'/missions/daily-bonus/claim'") && growthRoutes.includes('claimDailyBonus'),
   'daily completion bonus has an authenticated claim endpoint');
@@ -94,5 +85,24 @@ ok(read('admin/src/pages/analytics.jsx').includes('/api/admin/analytics')
   && read('mobile/lib/screens/admin/admin_analytics.dart').includes('/api/admin/analytics'),
   'analytics/crash dashboard ships on both admin clients');
 
-console.log(`\n${failed ? '' : ''} ${passed} passed, ${failed} failed`);
-process.exit(failed ? 1 : 0);
+// چرخشِ ماموریت از زمانِ اتصالِ ماموریت‌های سفارشی به دیتابیس async شد؛
+// این دو سنجهٔ تعیّن‌گرایی باید await شوند (در CI دیتابیسی نیست و
+// customDefinitions با fail-soft لیستِ خالی برمی‌گرداند — چرخشِ پایه
+// باید همان ۵ ماموریتِ روزانهٔ تعیّن‌گرا را بدهد).
+(async () => {
+  const activeA = await missions.activeDefinitions('00000000-0000-4000-8000-000000000001', new Date('2026-08-11T12:00:00Z'));
+  const activeB = await missions.activeDefinitions('00000000-0000-4000-8000-000000000001', new Date('2026-08-11T12:00:00Z'));
+  ok(activeA.filter(m => m.period === 'daily').length === 5,
+    'exactly five daily missions are shown');
+  ok(new Set(activeA.filter(m => m.period === 'daily').map(m => m.event)).size === 5,
+    'daily rotation balances five different action families');
+  ok(JSON.stringify(activeA.map(m => m.key)) === JSON.stringify(activeB.map(m => m.key)),
+    'daily rotation is deterministic for one user/day');
+  ok(missions.DAILY_BONUS_REWARD === 100, 'all-five completion bonus is defined');
+
+  console.log(`\n${failed ? '' : ''} ${passed} passed, ${failed} failed`);
+  process.exit(failed ? 1 : 0);
+})().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
