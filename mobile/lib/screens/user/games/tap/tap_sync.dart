@@ -26,6 +26,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:crypto/crypto.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../../api_client.dart';
@@ -84,6 +85,9 @@ class TapSyncResult {
     this.message,
     this.coinsEarned,
     this.coinsTotal,
+    this.finished = false,
+    this.coinsAwardedTotal,
+    this.pointsAwardedTotal,
   });
 
   final bool ok;
@@ -114,6 +118,19 @@ class TapSyncResult {
 
   /// جمعِ کلِ سکهٔ کاربر بعد از این بسته.
   final int? coinsTotal;
+
+  /// ── «بازی تمام شد» (دورِ ۳۳) ──
+  ///
+  /// سرور تا وقتی ادمین ریست نکند بازیکنِ تمام‌کرده را با 409 و
+  /// finished=true برمی‌گرداند؛ موتور باید ورودی را قفل کند و صفحهٔ
+  /// جمعِ امتیاز/سکه را نشان دهد.
+  final bool finished;
+
+  /// جمعِ سکهٔ کسب‌شدهٔ این کاربر از ضربه‌زن — برای صفحهٔ پایان.
+  final int? coinsAwardedTotal;
+
+  /// جمعِ امتیازِ کسب‌شدهٔ این کاربر از ضربه‌زن — برای صفحهٔ پایان.
+  final int? pointsAwardedTotal;
 }
 
 class TapSync {
@@ -185,6 +202,9 @@ class TapSync {
         serverTotalTaps: _asInt(map['totalTaps']),
         levelsLeftToday: _asInt(map['levelsLeftToday']),
         levelsPerDay: _asInt(map['levelsPerDay']),
+        finished: map['finished'] == true,
+        coinsAwardedTotal: _asInt(map['coinsAwarded']),
+        pointsAwardedTotal: _asInt(map['pointsAwarded']),
       );
     } catch (e) {
       // Offline: play on with local state. Never throws.
@@ -230,8 +250,28 @@ class TapSync {
         message: map['message']?.toString(),
         coinsEarned: _asInt(map['coinsEarned']),
         coinsTotal: _asInt(map['coinsTotal']),
+        finished: map['finished'] == true,
+        coinsAwardedTotal: _asInt(map['coinsAwarded']),
+        pointsAwardedTotal: _asInt(map['pointsAwarded']),
       );
     } catch (e) {
+      // ── بازیِ تمام‌شده (دورِ ۳۳) ──
+      // سرور بازیکنِ تمام‌کرده را با 409 و پرچمِ finished در بدنهٔ خطا
+      // برمی‌گرداند. این «خطا» نیست — وضعیتِ منبع است؛ باید مثل یک
+      // پاسخِ موفقِ «بازی تمام شد» تفسیر شود، وگرنه موتور بسته را برای
+      // همیشه retry می‌کند.
+      final status = _statusOf(e);
+      if (status == 409) {
+        final body = _bodyOf(e);
+        if (body is Map && body['finished'] == true) {
+          return TapSyncResult(
+            ok: false,
+            finished: true,
+            message: body['message']?.toString(),
+            coinsAwardedTotal: _asInt(body['coinsAwardedTotal']),
+          );
+        }
+      }
       // Offline or server hiccup: the engine retains the taps and retries on
       // the next flush. Losing a batch must never lose the player's progress.
       debugPrint('tap sync failed: $e');
@@ -245,4 +285,10 @@ class TapSync {
     if (v is String) return int.tryParse(v);
     return null;
   }
+
+  /// کدِ وضعیتِ HTTP از دلِ خطای Dio.
+  static int? _statusOf(Object e) => e is DioException ? e.response?.statusCode : null;
+
+  /// بدنهٔ JSON پاسخِ خطا (مثلاً {finished:true, message:...}).
+  static Object? _bodyOf(Object e) => e is DioException ? e.response?.data : null;
 }

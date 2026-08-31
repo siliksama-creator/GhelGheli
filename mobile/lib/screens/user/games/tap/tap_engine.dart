@@ -181,6 +181,22 @@ class TapEngine extends ChangeNotifier {
   int get coinsEarnedSerial => _coinsEarnedSerial;
   String? get notice => _notice;
 
+  // ── «بازی تمام شد» (دورِ ۳۳) ──────────────────────────────────────────
+  // مهرِ سرور: تا ادمین ریست نکند بازیکن قفل است، حتی اگر ادمین بعداً
+  // تعداد لول را بالا ببرد (خواستهٔ صریحِ مالک). isComplete (عبورِ محلی
+  // از لولِ آخر) همچنان معتبر است؛ حکمِ نهایی «یا مهرِ سرور یا عبورِ
+  // محلی» است.
+  bool _serverFinished = false;
+  bool get isFinished => _serverFinished || isComplete;
+
+  /// جمعِ سکهٔ این کاربر از ضربه‌زن — برای صفحهٔ پایان.
+  int _coinsAwardedTotal = 0;
+  int get coinsAwardedTotal => _coinsAwardedTotal;
+
+  /// جمعِ امتیازِ این کاربر از ضربه‌زن — برای صفحهٔ پایان.
+  int _pointsAwardedTotal = 0;
+  int get pointsAwardedTotal => _pointsAwardedTotal;
+
   // ── lifecycle ────────────────────────────────────────────────────────────
 
   Future<void> init() async {
@@ -232,9 +248,26 @@ class TapEngine extends ChangeNotifier {
     // The allowance is adopted unconditionally (well, by the stricter-of-two
     // rule inside): unlike level progress, spending it elsewhere is not
     // something local play can undo.
+    _adoptFinishState(result);
     _adoptDailyAllowance(result);
     await _persist(immediate: true);
     _safeNotify();
+  }
+
+  /// وضعیتِ «بازی تمام شد» + جمع‌های واقعی از سرور.
+  ///
+  /// یک‌طرفه است: true شدنش ماندگار است (فقط ریستِ ادمین برمی‌گرداندش)
+  /// و false شدنِ بعدی — پاسخِ کهنهٔ یک درخواستِ موازی — نمی‌تواند
+  /// قفل را باز کند.
+  void _adoptFinishState(TapSyncResult result) {
+    if (result.finished) {
+      _serverFinished = true;
+      _progress = _progress.copyWith(pendingTaps: 0);
+    }
+    final c = result.coinsAwardedTotal;
+    if (c != null && c > _coinsAwardedTotal) _coinsAwardedTotal = c;
+    final p = result.pointsAwardedTotal;
+    if (p != null && p > _pointsAwardedTotal) _pointsAwardedTotal = p;
   }
 
   void _startFlushTimer() {
@@ -244,6 +277,7 @@ class TapEngine extends ChangeNotifier {
       // so the batch can only be empty. `_flush` would return immediately
       // anyway; skipping it means the timer's callback is the only thing
       // running on a screen the player may leave open for a long time.
+      if (isFinished) return; // بازیِ تمام‌شده دیگر بسته نمی‌فرستد
       if (dailyCapReached && _batchTaps <= 0 && _batchFlagged <= 0) return;
       _flush();
     });
@@ -253,7 +287,7 @@ class TapEngine extends ChangeNotifier {
 
   /// Registers one tap. Returns true when it counted.
   bool tap() {
-    if (!_loaded || isComplete) return false;
+    if (!_loaded || isFinished) return false;
 
     // DAILY CAP — refuse before the guard, not after.
     //
@@ -505,6 +539,7 @@ class TapEngine extends ChangeNotifier {
             );
           }
         }
+        _adoptFinishState(result);
         _adoptDailyAllowance(result);
         // ── سکهٔ لول‌های همین بسته ──
         // سرور در پاسخِ بسته `coinsEarned` را می‌فرستد؛ اگر لولی تمام شده
@@ -514,6 +549,13 @@ class TapEngine extends ChangeNotifier {
           coinsTotalLastBatch = result.coinsTotal ?? 0;
           _coinsEarnedSerial++;
         }
+        await _persist(immediate: true);
+        _safeNotify();
+      } else if (result.finished) {
+        // بستهٔ بازیکنِ تمام‌شده: سرور آن را نشمرده و دیگر نمی‌شمارد؛
+        // نگه‌داشتنش برای «ریتِری» یعنی ارسالِ ابدیِ بسته‌های ۴۰۹.
+        _progress = _progress.copyWith(pendingTaps: 0);
+        _notice = result.message;
         await _persist(immediate: true);
         _safeNotify();
       } else if (result.rejected) {

@@ -39,7 +39,25 @@ class _TapGameScreenState extends State<TapGameScreen>
     with WidgetsBindingObserver {
   static const Color _accent = Color(0xFF84CC16);
 
+  // ── بوتِ دومرحله‌ای با منحنیِ زندهٔ ادمین (دورِ ۳۳) ──────────────────────
+  //
+  // خواستهٔ مالک: «هر تغییر ادمین بدون نیاز به بروزرسانی کامل اپلیکیشن
+  // اندروید باید اعمال بشه». تا امروز منحنی (تعداد لول، جمعِ امتیاز، شیب،
+  // سقفِ روزانه) داخلِ APK هاردکد بود؛ حالا صفحه قبل از ساختِ موتور آن
+  // را از /api/config می‌خواند و روی پیش‌فرضِ تاریخی مرج می‌کند.
+  //
+  // چرا قبل از موتور و نه بعدش: config در TapEngine نهایی (final) است و
+  // کلِ حساب‌های موتور — سطح، سقفِ روزانه، پوست‌ها — با همان ساخته
+  // می‌شود. عوض‌کردنِ وسطِ بازی یعنی ریختنِ پیشرفتِ محلی روی منحنیِ
+  // دیگری؛ سرور بلافاصله پس از init اصلاح می‌کند ولی ساختنِ موتور با
+  // منحنیِ درست از همان لحظه یعنی هیچ اصلاحی لازم نمی‌شود.
+  //
+  // سقفِ انتظار ۲.۵ ثانیه است: آفلاین یا کند، بازی با اعدادِ پیش‌فرض
+  // باز می‌شود و همان‌طور بازی می‌کند (سرور بعداً هنگامِ sync اصلاح
+  // می‌کند — همان قراردادِ همیشگیِ «سرور منبعِ حقیقت است»).
   late final TapEngine _engine;
+  bool _engineCreated = false;
+  bool _booting = true;
   final GlobalKey<TapCharacterState> _characterKey =
       GlobalKey<TapCharacterState>();
 
@@ -108,27 +126,48 @@ class _TapGameScreenState extends State<TapGameScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _boot();
+  }
+
+  Future<void> _boot() async {
+    var cfg = widget.config;
+    Map<String, dynamic>? economy;
+    try {
+      final res = await widget.api
+          .get('/api/config')
+          .timeout(const Duration(milliseconds: 2500));
+      if (res is Map) {
+        final m = Map<String, dynamic>.from(res);
+        if (m['economy'] is Map) {
+          economy = Map<String, dynamic>.from(m['economy']);
+        }
+        // ── منحنی از تنظیماتِ ادمین ──
+        final curve = economy?['tapCurve'];
+        if (curve is Map) {
+          cfg = cfg.copyWith(
+            levelCount: (curve['levelCount'] as num?)?.toInt(),
+            totalPoints: (curve['totalPoints'] as num?)?.toInt(),
+            growthFactor: (curve['growthFactor'] as num?)?.toDouble(),
+            levelsPerDay: (curve['levelsPerDay'] as num?)?.toInt(),
+          );
+        }
+      }
+    } catch (_) {
+      // آفلاین/کند — همان مسیرِ پیش‌فرض؛ سرور بعداً اصلاح می‌کند.
+    }
+    if (!mounted) return;
+    setState(() => _economy = economy);
     _engine = TapEngine(
-      config: widget.config,
+      config: cfg,
       storage: TapStorage(),
       sync: TapSync(api: widget.api),
     )..addListener(_onEngineChanged);
-    _engine.init();
-    _loadEconomy();
+    _engineCreated = true;
+    unawaited(_engine.init());
+    if (mounted) setState(() => _booting = false);
   }
 
-  Future<void> _loadEconomy() async {
-    try {
-      final res = await widget.api.get('/api/config');
-      if (!mounted || res is! Map) return;
-      final m = Map<String, dynamic>.from(res);
-      if (m['economy'] is Map) {
-        setState(() => _economy = Map<String, dynamic>.from(m['economy']));
-      }
-    } catch (_) {
-      // آفلاین یا سرورِ قدیمی — متن با پیش‌فرض (هر لول ۵ سکه) می‌ماند.
-    }
-  }
+
 
   @override
   void dispose() {
@@ -139,8 +178,12 @@ class _TapGameScreenState extends State<TapGameScreen>
     _hapticClock.stop();
     _uiTick.dispose();
     WidgetsBinding.instance.removeObserver(this);
-    _engine.removeListener(_onEngineChanged);
-    _engine.dispose();
+    // با بوتِ دومرحله‌ای ممکن است کاربر قبل از ساخته‌شدنِ موتور خارج شود؛
+    // دست‌زدن به فیلدِ lateِ مقدارنگرفته خودش کرش است.
+    if (_engineCreated) {
+      _engine.removeListener(_onEngineChanged);
+      _engine.dispose();
+    }
     super.dispose();
   }
 
@@ -281,7 +324,7 @@ class _TapGameScreenState extends State<TapGameScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    if (!_engine.loaded) {
+    if (_booting || !_engineCreated || !_engine.loaded) {
       return const Center(child: CircularProgressIndicator());
     }
 
@@ -298,10 +341,10 @@ class _TapGameScreenState extends State<TapGameScreen>
               widget.onBack();
             },
             level: _engine.level,
-            levelCount: widget.config.levelCount,
+            levelCount: _engine.config.levelCount,
             points: _engine.pointsEarned,
             levelsLeftToday: _engine.levelsLeftToday,
-            levelsPerDay: widget.config.levelsPerDay,
+            levelsPerDay: _engine.config.levelsPerDay,
             isComplete: _engine.isComplete,
             accent: _accent,
           ),
@@ -330,12 +373,18 @@ class _TapGameScreenState extends State<TapGameScreen>
           ),
         ],
         Expanded(
-          child: _engine.isComplete
+          // دورِ ۳۳: مهرِ سرور (isFinished) هم مثل عبورِ محلی از لولِ آخر
+          // (isComplete) صفحهٔ پایان را می‌آورد — جمعِ امتیاز و سکه از
+          // خودِ سرور، و پیامِ «تا ریستِ مدیر قفل».
+          child: _engine.isFinished
               ? _CompletionView(
-                  points: _engine.pointsEarned,
+                  points: _engine.pointsAwardedTotal > 0
+                      ? _engine.pointsAwardedTotal
+                      : _engine.pointsEarned,
+                  coins: _engine.coinsAwardedTotal,
                   accent: _accent,
-                  skin: widget.config
-                      .skinForLevel(widget.config.levelCount),
+                  skin: _engine.config
+                      .skinForLevel(_engine.config.levelCount),
                 )
               : _engine.dailyCapReached
                   // The character is REPLACED, not merely disabled. Leaving a
@@ -346,7 +395,7 @@ class _TapGameScreenState extends State<TapGameScreen>
                   // of the day instead of idling on screen.
                   ? _DailyCapView(
                       accent: _accent,
-                      levelsPerDay: widget.config.levelsPerDay,
+                      levelsPerDay: _engine.config.levelsPerDay,
                       level: _engine.level,
                       skin: _engine.skin,
                     )
@@ -382,8 +431,8 @@ class _TapGameScreenState extends State<TapGameScreen>
                 child: ValueListenableBuilder<int>(
                   valueListenable: _uiTick,
                   builder: (_, __, ___) => Text(
-                  _engine.isComplete
-                      ? 'همهٔ ${faNum(widget.config.levelCount)} لول تمام شد!'
+                  _engine.isFinished
+                      ? 'همهٔ ${faNum(_engine.config.levelCount)} لول تمام شد!'
                       : _engine.dailyCapReached
                           ? 'سهمیهٔ امروز تمام شد'
                           : 'ضربه بزن — ${faNum(_engine.pointsToNextLevel)} امتیاز تا لول بعد',
@@ -835,52 +884,167 @@ class _CoinGuide extends StatelessWidget {
 }
 
 /// نشانِ شناورِ «+N سکه» بعد از لول‌آپ (خواستهٔ مالک).
-class _CoinToast extends StatelessWidget {
+/// ── جشنِ سکهٔ لول‌آپ (دورِ ۳۳) ──────────────────────────────────────────
+///
+/// خواستهٔ مالک: «وقتی کاربر لول آپ می‌شه باید ۵ سکهٔ دریافتی بصورتِ
+/// انیمیشنی جذاب نشون داده بشه». نسخهٔ قبلی یک چیپِ ساکن بود؛ حالا:
+/// سکهٔ طلایی با چرخشِ سه‌بعدی (rotateY مثل سکهٔ واقعی) و پاپِ فنری،
+/// هشت جرقه که به اطراف می‌پرند، و عددِ «+N» که با تأخیرِ کوتاه می‌ترکد.
+/// همه با یک AnimationController — بدون ایموجی، مطابقِ سلیقهٔ مالک.
+class _CoinToast extends StatefulWidget {
   const _CoinToast({required this.coins, this.total});
   final int coins;
   final int? total;
 
   @override
+  State<_CoinToast> createState() => _CoinToastState();
+}
+
+class _CoinToastState extends State<_CoinToast>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // سکه: ۰→۰.۴۵ چرخشِ + پاپ؛ بعدرتر حالتِ شناورِ آرام.
+    final coinT = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0, 0.45, curve: Curves.easeOutBack),
+    );
+    final floatT = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.45, 1, curve: Curves.easeInOut),
+    );
+    final numT = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.12, 0.5, curve: Curves.easeOutBack),
+    );
+
     return Center(
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-              colors: [Color(0xFFFFD166), Color(0xFFF59E0B)]),
-          borderRadius: Corners.rPill,
-          boxShadow: [
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0x2EFFD166), Color(0x1AF59E0B)]),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0x73FFD166)),
+          boxShadow: const [
             BoxShadow(
-              color: const Color(0xFFFFD166).withValues(alpha: 0.35),
-              blurRadius: 14,
+              color: Color(0x38FFB42C),
+              blurRadius: 26,
+              spreadRadius: 1,
             ),
           ],
         ),
-        child: Row(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.monetization_on_rounded,
-                size: 18, color: Color(0xFF1A1205)),
-            Gaps.hXxs,
-            Text(
-              '+${faNum(coins)} سکه',
-              style: const TextStyle(
-                color: Color(0xFF1A1205),
-                fontWeight: FontWeight.w900,
-                fontSize: 14,
+            SizedBox(
+              width: 64,
+              height: 64,
+              child: AnimatedBuilder(
+                animation: _controller,
+                builder: (_, __) {
+                  final spin = (1 - coinT.value) * 3.4; // از چرخش به ثابت
+                  final dy = (1 - floatT.value) * 6;
+                  return Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // جرقه‌ها: هشت پرتو که با پیشرفتِ انیمیشن دور می‌شوند.
+                      for (var i = 0; i < 8; i++)
+                        () {
+                          final angle = i * 45.0 * math.pi / 180;
+                          final dist = 10 + coinT.value * 22;
+                          final op = (1 - _controller.value).clamp(0.0, 1.0);
+                          return Transform.translate(
+                            offset: Offset(
+                              math.cos(angle) * dist,
+                              math.sin(angle) * dist - dy,
+                            ),
+                            child: Opacity(
+                              opacity: op * 0.9,
+                              child: Container(
+                                width: 5,
+                                height: 5,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: RadialGradient(colors: [
+                                    const Color(0xFFFFE9AD),
+                                    const Color(0xFFFFC53D)
+                                        .withValues(alpha: 0),
+                                  ]),
+                                ),
+                              ),
+                            ),
+                          );
+                        }(),
+                      Transform.translate(
+                        offset: Offset(0, -dy),
+                        child: Transform(
+                          alignment: Alignment.center,
+                          transform: Matrix4.identity()
+                            ..setEntry(3, 2, 0.002)
+                            ..rotateY(spin)
+                            ..scaleByDouble(0.5 + coinT.value * 0.5,
+                                0.5 + coinT.value * 0.5, 1.0, 1.0),
+                          child: Image.asset(
+                            'assets/pass/icon_coin.webp',
+                            width: 46,
+                            height: 46,
+                            errorBuilder: (_, __, ___) => const Icon(
+                                Icons.monetization_on_rounded,
+                                size: 46,
+                                color: Color(0xFFFFD166)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
-            if (total != null) ...[
-              Gaps.hXxs,
-              Text(
-                'موجودی: ${faNum(total!)}',
+            const SizedBox(height: 6),
+            // عددِ «+N» با ترکیدنِ فنری.
+            ScaleTransition(
+              scale: numT,
+              child: Text(
+                '+${faNum(widget.coins)} سکه',
                 style: const TextStyle(
-                  color: Color(0xB31A1205),
-                  fontWeight: FontWeight.w700,
-                  fontSize: 11,
+                  color: Color(0xFFFFD166),
+                  fontWeight: FontWeight.w900,
+                  fontSize: 19,
+                  shadows: [
+                    Shadow(color: Color(0x66FFC53D), blurRadius: 14),
+                  ],
                 ),
               ),
-            ],
+            ),
+            if (widget.total != null)
+              Text(
+                'موجودی: ${faNum(widget.total!)}',
+                style: const TextStyle(
+                  color: Color(0xFFEAD9A8),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11.5,
+                ),
+              ),
           ],
         ),
       ),
@@ -893,9 +1057,15 @@ class _CompletionView extends StatelessWidget {
     required this.points,
     required this.accent,
     required this.skin,
+    this.coins,
   });
 
   final int points;
+
+  /// جمعِ سکهٔ کسب‌شده از ضربه‌زن — از دفترِ سرور؛ null یعنی هنوز
+  /// synced نشده (مثلاً آفلاین) و آنگاه چیزی نشان نمی‌دهیم تا دروغ
+  /// نگوییم.
+  final int? coins;
   final Color accent;
   final String skin;
 
@@ -920,16 +1090,102 @@ class _CompletionView extends StatelessWidget {
           Icon(Icons.emoji_events_rounded, size: 56, color: theme.colorScheme.primary),
           Gaps.vXs,
           Text(
-            'تبریک! همهٔ لول‌ها را تمام کردی',
+            'تبریک! بازی ضربه‌زن را کامل تمام کردی',
             textAlign: TextAlign.center,
             style: theme.textTheme.titleMedium
                 ?.copyWith(fontWeight: FontWeight.w900, color: accent),
           ),
-          Gaps.vXxs,
-          Text(
-            'مجموع امتیاز: ${faNum(points)}',
-            style: theme.textTheme.bodyMedium,
+          Gaps.vSm,
+          // ── دو کارتِ جمعِ واقعی (دورِ ۳۳) ──
+          // خواستهٔ مالک: «تمامی امتیازات و همینطور سکه نمایش داده بشه».
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _FinishStat(
+                icon: Icons.stars_rounded,
+                color: accent,
+                value: faNum(points),
+                label: 'امتیاز از ضربه‌زن',
+              ),
+              const SizedBox(width: 10),
+              if (coins != null)
+                _FinishStat(
+                  icon: Icons.monetization_on_rounded,
+                  color: const Color(0xFFFFD166),
+                  value: faNum(coins!),
+                  label: 'سکهٔ کسب‌شده',
+                ),
+            ],
           ),
+          Gaps.vSm,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            decoration: BoxDecoration(
+              borderRadius: Corners.rPill,
+              color: Colors.white.withValues(alpha: 0.06),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.lock_outline_rounded,
+                    size: 15, color: theme.colorScheme.outline),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    'تا زمانی که مدیر بازی را ریست نکند نمی‌توانی دوباره بازی کنی',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// یک عددِ درشت با زیرنویس — تکهٔ صفحهٔ پایانِ ضربه‌زن.
+class _FinishStat extends StatelessWidget {
+  const _FinishStat({
+    required this.icon,
+    required this.color,
+    required this.value,
+    required this.label,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        borderRadius: Corners.rMd,
+        color: color.withValues(alpha: 0.10),
+        border: Border.all(color: color.withValues(alpha: 0.45)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 17, color: color),
+              const SizedBox(width: 5),
+              Text(value,
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w900, color: color)),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(label, style: theme.textTheme.labelSmall),
         ],
       ),
     );
