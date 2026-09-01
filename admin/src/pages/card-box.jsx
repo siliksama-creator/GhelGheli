@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Package, Save, RotateCcw } from 'lucide-react';
+import { History, Package, Save, RotateCcw } from 'lucide-react';
 import { Badge, Button, Card, Field, Input } from '../components/ui.jsx';
 import { useToast } from '../lib/toast.jsx';
 import { fmtNumber } from '../lib/api.js';
@@ -34,6 +34,15 @@ export function CardBoxAdminPage({ request }) {
   const [weightTotal, setWeightTotal] = useState(1000);
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [purchases, setPurchases] = useState(null);
+
+  // تاریخچهٔ خریدِ صندوق — همان جدولی که کاربر در اپ می‌بیند، با نام و
+  // شمارهٔ پوشیده برای پنل.
+  const loadPurchases = () => {
+    request('/api/admin/card-box/purchases?limit=50')
+      .then((d) => setPurchases(d.purchases || []))
+      .catch(() => setPurchases([]));
+  };
 
   const load = () => {
     request('/api/admin/card-box')
@@ -46,6 +55,7 @@ export function CardBoxAdminPage({ request }) {
       .catch((e) => notify(e.message || 'خواندن شانس صندوق ناموفق بود', 'error'));
   };
   useEffect(load, [request]);
+  useEffect(loadPurchases, [request]);
 
   const sum = useMemo(
     () => odds.reduce((s, o) => s + Number(o.permille || 0), 0),
@@ -199,6 +209,54 @@ export function CardBoxAdminPage({ request }) {
           <Save size={15} /> {saving ? 'در حال ذخیره…' : 'ذخیرهٔ همه'}
         </Button>
       </div>
+
+      <Card
+        title="خریدهای اخیر صندوق"
+        subtitle="۵۰ صندوقِ آخر با نامِ کاربر و خلاصهٔ کارت‌های هر صندوق — همان تاریخچه‌ای که کاربر در اپ می‌بیند."
+        action={<Button size="sm" variant="secondary" onClick={loadPurchases}><History size={13} /> تازه‌سازی</Button>}
+      >
+        {!purchases ? <p className="topbar-sub">در حال بارگذاری…</p>
+          : !purchases.length ? <p className="topbar-sub">هنوز خریدی ثبت نشده است.</p>
+          : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                <thead>
+                  <tr style={{ textAlign: 'right', color: 'rgba(255,255,255,.55)' }}>
+                    <th style={{ padding: '6px 8px' }}>کاربر</th>
+                    <th style={{ padding: '6px 8px' }}>شماره</th>
+                    <th style={{ padding: '6px 8px' }}>مبلغ</th>
+                    <th style={{ padding: '6px 8px' }}>امتیاز</th>
+                    <th style={{ padding: '6px 8px' }}>کارت‌ها</th>
+                    <th style={{ padding: '6px 8px' }}>تاریخ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {purchases.map((p) => (
+                    <tr key={p.id} style={{ borderTop: '1px solid rgba(255,255,255,.07)' }}>
+                      <td style={{ padding: '7px 8px', fontWeight: 700 }}>{p.nickname}</td>
+                      <td style={{ padding: '7px 8px', direction: 'ltr', textAlign: 'right', color: 'rgba(255,255,255,.6)' }}>{p.mobile}</td>
+                      <td style={{ padding: '7px 8px', color: '#FFD166', fontWeight: 700 }}>{fmtNumber(p.pricePaid)}</td>
+                      <td style={{ padding: '7px 8px', color: '#A3E635' }}>{fmtNumber(p.points)}</td>
+                      <td style={{ padding: '7px 8px' }}>
+                        <span style={{ display: 'inline-flex', gap: 4 }}>
+                          {(p.cards || []).map((c, i) => (
+                            <span key={i} title={`${c.name} · ${c.rarity}`} style={{
+                              width: 12, height: 12, borderRadius: 4, display: 'inline-block',
+                              background: ACCENT[c.rarity] || '#94A3B8',
+                            }} />
+                          ))}
+                        </span>
+                      </td>
+                      <td style={{ padding: '7px 8px' }}>
+                        {new Date(p.createdAt).toLocaleDateString('fa-IR')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+      </Card>
     </div>
   );
 }

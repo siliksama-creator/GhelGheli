@@ -51,6 +51,9 @@ export default function CardBox({ token, compact = false, onGranted }) {
   // بپرد و پرداختِ کند باعث می‌شد صندوق قبل از رسیدنِ کارت‌ها باز شود.
   const [phase, setPhase] = useState('idle');
   const [revealed, setRevealed] = useState(0);
+  const [showHistory, setShowHistory] = useState(false);
+  const [history, setHistory] = useState(null);
+  const [historyErr, setHistoryErr] = useState('');
   const timers = useRef([]);
 
   const clearTimers = () => {
@@ -67,9 +70,25 @@ export default function CardBox({ token, compact = false, onGranted }) {
 
   useEffect(() => () => { clearTimers(); stopShakeSound(); }, []);
 
+  // تاریخچهٔ خریدِ صندوق — از GET /api/card-box/history؛ بارگذاریِ
+  // تنبل تا بیلدِ اولیهٔ فروشگاه سنگین نشود. بعد از هر خریدِ موفق هم
+  // صفر می‌شود تا صندوقِ تازه در فهرست بیاید.
+  const toggleHistory = async () => {
+    const next = !showHistory;
+    setShowHistory(next);
+    if (next && !history) {
+      try {
+        setHistory(await req('/api/card-box/history?limit=10', 'GET', null, token));
+      } catch (e) {
+        setHistoryErr(e.message || 'تاریخچه در دسترس نیست');
+      }
+    }
+  };
+
   const load = useCallback(async () => {
     try {
       setData(await req('/api/card-box/overview', 'GET', null, token));
+      setHistory(null);
     } catch (e) {
       setError(e.message || 'صندوق در دسترس نیست');
     }
@@ -150,6 +169,7 @@ export default function CardBox({ token, compact = false, onGranted }) {
       const result = await req('/api/card-box/buy', 'POST', { useWallet: true }, token);
       const cards = result?.cards || [];
       setWon(cards);
+      setHistory(null); // صندوقِ تازه باید در تاریخچه بیاید
       setWonMeta({
         points: Number(result?.points || 0),
         distinct: result?.distinctCards === true,
@@ -277,6 +297,18 @@ export default function CardBox({ token, compact = false, onGranted }) {
         box-shadow:0 8px 22px rgba(249,115,22,.34)}
       .cardBoxBtn:disabled{opacity:.6;cursor:default;box-shadow:none}
       .cardBoxHint{color:#8fa0b4;font-size:10px;line-height:1.65;margin:0;padding:0 18px 15px}
+      /* تاریخچهٔ خرید صندوق — ردیف‌های فشرده با نقطهٔ رنگیِ هر کارت */
+      .cardBoxHistoryBtn{display:inline-flex;align-items:center;gap:6px;margin:0 18px 4px;padding:7px 12px;
+        border-radius:999px;border:1px solid rgba(255,209,102,.35);background:rgba(255,209,102,.08);
+        color:#FFD166;font-weight:800;font-size:11.5px;cursor:pointer}
+      .cardBoxHistory{display:grid;gap:6px;margin:8px 18px 15px}
+      .cardBoxHistRow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 10px;
+        border-radius:12px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.07);font-size:11.5px}
+      .cardBoxHistDate{color:#9fb0c8;font-weight:700;min-width:88px}
+      .cardBoxHistPrice{color:#FFD166;font-weight:800}
+      .cardBoxHistPts{color:#a3e635;font-weight:700}
+      .cardBoxHistCards{display:flex;gap:5px;margin-inline-start:auto}
+      .cardBoxHistCards i{width:13px;height:13px;border-radius:4px;box-shadow:inset 0 -2px 3px rgba(0,0,0,.35),0 1px 2px rgba(0,0,0,.4)}
       .cardBoxErr{color:#FCA5A5;font-size:11px;margin:0;padding:0 18px 14px}
 
       /* ── رونماییِ کارت‌ها ───────────────────────────────────────────
@@ -433,6 +465,33 @@ export default function CardBox({ token, compact = false, onGranted }) {
       شانسِ هر سطح بالا نوشته شده و برای همه یکسان است. کارت‌ها به کلکسیون اضافه
       می‌شوند و در دوئل قابل بازی‌اند.
     </p>
+
+    <button type="button" className="cardBoxHistoryBtn" onClick={toggleHistory}>
+      {showHistory ? 'بستن تاریخچه' : 'تاریخچهٔ خرید صندوق'}
+    </button>
+    {showHistory && (
+      <div className="cardBoxHistory">
+        {historyErr ? <p className="cardBoxErr">{historyErr}</p>
+          : !history ? <p className="cardBoxHint">در حال بارگذاری…</p>
+          : !history.length ? <p className="cardBoxHint">هنوز صندوقی نخریده‌ای.</p>
+          : history.map(h => (
+            <div key={h.id} className="cardBoxHistRow">
+              <span className="cardBoxHistDate">
+                {new Date(h.createdAt).toLocaleDateString('fa-IR', { day: 'numeric', month: 'long' })}
+              </span>
+              <span className="cardBoxHistPrice">{money(h.pricePaid)}</span>
+              <span className="cardBoxHistPts">{fa(h.points)} امتیاز</span>
+              <span className="cardBoxHistCards">
+                {(h.cards || []).map(c => {
+                  const meta = CARD_RARITY_META[c.rarity] || { accent: '#94A3B8', label: c.rarity };
+                  return <i key={c.slot} title={`${c.name} · ${meta.label}`}
+                    style={{ background: meta.accent }} />;
+                })}
+              </span>
+            </div>
+          ))}
+      </div>
+    )}
 
     {error && <p className="cardBoxErr">{error}</p>}
 

@@ -447,6 +447,38 @@ function createCardBoxService(db = pool) {
     }));
   }
 
+  /**
+   * خریدهای اخیرِ صندوق برای پنلِ ادمین — کاربر، مبلغ، امتیاز و خلاصهٔ
+   * کارت‌های هر صندوق. همان جدولی که تاریخچهٔ کاربر از آن می‌خواند،
+   * با JOIN کاربر برای نام و شماره.
+   */
+  async function adminPurchases(limit = 50) {
+    const n = Math.min(200, Math.max(1, Number(limit) || 50));
+    const { rows } = await db.query(
+      `SELECT b.id, b.user_id, b.price_paid, b.points_awarded, b.created_at,
+              u.nickname, u.first_name, u.mobile,
+              COALESCE(json_agg(json_build_object(
+                'rarity', c.rarity, 'name', t.name
+              ) ORDER BY c.slot) FILTER (WHERE c.slot IS NOT NULL), '[]') AS cards
+         FROM card_box_purchases b
+         JOIN users u ON u.id = b.user_id
+         LEFT JOIN card_box_cards c ON c.box_id = b.id
+         LEFT JOIN card_types t ON t.id = c.card_type_id
+        GROUP BY b.id, u.nickname, u.first_name, u.mobile
+        ORDER BY b.created_at DESC
+        LIMIT $1`, [n]);
+    return rows.map(r => ({
+      id: r.id,
+      userId: r.user_id,
+      nickname: r.nickname || r.first_name || 'کاربر',
+      mobile: String(r.mobile || '').slice(0, 4) + '***',
+      pricePaid: Number(r.price_paid),
+      points: Number(r.points_awarded),
+      createdAt: r.created_at,
+      cards: r.cards,
+    }));
+  }
+
   function formatOdds(table) {
     const total = Object.values(table).reduce((s, w) => s + Number(w || 0), 0)
       || WEIGHT_TOTAL;
@@ -535,7 +567,7 @@ function createCardBoxService(db = pool) {
     return n;
   }
 
-  return { odds, price, overview, grantBox, history, adminView, saveOdds, savePrice };
+  return { odds, price, overview, grantBox, history, adminView, adminPurchases, saveOdds, savePrice };
 }
 
 module.exports = {

@@ -6,10 +6,13 @@
 //
 // ⚠️ فیلدها TextFormField با ValueKey دارند، نه TextEditingController
 //    تازه‌ساخته در build: آن الگو فوکوس را می‌دزدد و کنترلر نشت می‌کند.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
 import '../../theme/tokens.dart';
+import '../../utils/fa_date.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/state_views.dart';
 import 'widgets/form_section.dart';
@@ -38,6 +41,8 @@ class _AdminCardBoxState extends State<AdminCardBox> {
   bool _saving = false;
   String? _error;
   int _gen = 0;
+  List<Map<String, dynamic>> _purchases = const [];
+  bool _purchasesLoading = true;
 
   int get _sum =>
       _odds.fold<int>(0, (s, o) => s + _asInt(o['permille']));
@@ -51,7 +56,22 @@ class _AdminCardBoxState extends State<AdminCardBox> {
   int _asInt(dynamic v) =>
       v is int ? v : (v is num ? v.toInt() : int.tryParse('$v') ?? 0);
 
+  Future<void> _loadPurchases() async {
+    try {
+      final d = await widget.api.get('/api/admin/card-box/purchases?limit=50');
+      final rows = ((d is Map ? d['purchases'] : null) as List? ?? const [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      if (mounted) setState(() => _purchases = rows);
+    } catch (_) {
+      if (mounted) setState(() => _purchases = const []);
+    } finally {
+      if (mounted) setState(() => _purchasesLoading = false);
+    }
+  }
+
   Future<void> _load() async {
+    unawaited(_loadPurchases());
     try {
       final d = await widget.api.get('/api/admin/card-box');
       if (!mounted) return;
@@ -178,6 +198,46 @@ class _AdminCardBoxState extends State<AdminCardBox> {
             label: Text(_saving ? 'در حال ذخیره…' : 'ذخیرهٔ شانس'),
           ),
           Gaps.vMd,
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text('خریدهای اخیر صندوق',
+                          style: Theme.of(context).textTheme.titleMedium),
+                    ),
+                    IconButton(
+                      onPressed: _loadPurchases,
+                      icon: const Icon(Icons.refresh_rounded, size: 20),
+                      tooltip: 'تازه‌سازی',
+                    ),
+                  ],
+                ),
+                Gaps.vXxs,
+                const Text(
+                  '۵۰ صندوقِ آخر با نامِ کاربر و خلاصهٔ کارت‌ها — همان تاریخچه‌ای که کاربر در اپ می‌بیند.',
+                  style: TextStyle(fontSize: 11.5, color: Colors.white60),
+                ),
+                Gaps.vSm,
+                if (_purchasesLoading)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (_purchases.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Text('هنوز خریدی ثبت نشده است.',
+                        style: TextStyle(fontSize: 12, color: Colors.white60)),
+                  )
+                else
+                  for (final p in _purchases) _purchaseRow(p),
+              ],
+            ),
+          ),
+          Gaps.vMd,
         ],
       ),
     );
@@ -231,4 +291,73 @@ class _AdminCardBoxState extends State<AdminCardBox> {
       ),
     );
   }
+  Widget _purchaseRow(Map<String, dynamic> p) {
+    final cards = (p['cards'] as List?) ?? const [];
+    final price = _asInt(p['pricePaid']);
+    final pts = _asInt(p['points']);
+    final createdAt = p['createdAt'];
+    final date = createdAt != null ? faDate('$createdAt') : '';
+    return Container(
+      margin: const EdgeInsets.only(bottom: Gaps.xs),
+      padding: const EdgeInsets.symmetric(horizontal: Gaps.sm, vertical: Gaps.xs),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: Corners.rMd,
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${p['nickname']}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800, fontSize: 12.5)),
+                Text('${p['mobile'] ?? ''} · $date',
+                    style: const TextStyle(fontSize: 10.5, color: Colors.white60)),
+              ],
+            ),
+          ),
+          Text('${faNum(price)} ت',
+              style: const TextStyle(
+                  fontSize: 11.5,
+                  color: Color(0xFFFFD166),
+                  fontWeight: FontWeight.w800)),
+          const SizedBox(width: 8),
+          Text('${faNum(pts)} امتیاز',
+              style: const TextStyle(
+                  fontSize: 10.5,
+                  color: Color(0xFFA3E635),
+                  fontWeight: FontWeight.w700)),
+          const SizedBox(width: 8),
+          Wrap(
+            spacing: 3,
+            children: [
+              for (final c in cards)
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: _rarityAccent('${(c as Map)['rarity']}'),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _rarityAccent(String rarity) => switch (rarity) {
+        'normal' => const Color(0xFF34D399),
+        'silver' => const Color(0xFFE5EEF8),
+        'gold' => const Color(0xFFFFD166),
+        'premium' => const Color(0xFF38BDF8),
+        'legend' => const Color(0xFFF97316),
+        _ => const Color(0xFF94A3B8),
+      };
 }

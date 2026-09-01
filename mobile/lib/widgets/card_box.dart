@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../api_client.dart';
 import '../screens/user/games/game_audio.dart';
 import '../core/money.dart';
+import '../utils/fa_date.dart';
 import '../services/bazaar_billing.dart';
 import 'rarity_card_frame.dart';
 
@@ -60,6 +61,9 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
   Map<String, dynamic>? _data;
   String _error = '';
   bool _busy = false;
+  List<Map<String, dynamic>> _history = const [];
+  bool _showHistory = false;
+  bool _historyLoading = false;
   _Phase _phase = _Phase.idle;
 
   // شروعِ لرزش (برای سقفِ حداقل ۳ ثانیه). صدا با GameAudio.playShake.
@@ -95,6 +99,30 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
     super.dispose();
   }
 
+  /// تاریخچهٔ خریدِ صندوق — آینهٔ toggleHistory در CardBox.jsx وب.
+  /// پاسخِ GET /api/card-box/history یک آرایهٔ خام است (نه آبجکت).
+  Future<void> _loadHistory() async {
+    if (_historyLoading) return;
+    setState(() => _historyLoading = true);
+    try {
+      final res = await widget.api.get('/api/card-box/history?limit=10');
+      final rows = (res is List ? res : const <dynamic>[])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      if (mounted) setState(() => _history = rows);
+    } catch (_) {
+      // اگر نیامد، فهرست خالی می‌ماند و متنِ راهنما دیده می‌شود.
+    } finally {
+      if (mounted) setState(() => _historyLoading = false);
+    }
+  }
+
+  Future<void> _toggleHistory() async {
+    final next = !_showHistory;
+    setState(() => _showHistory = next);
+    if (next) await _loadHistory();
+  }
+
   Future<void> _load() async {
     try {
       final res = await widget.api.get('/api/card-box/overview', fresh: true);
@@ -118,6 +146,11 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
     setState(() => _phase = _Phase.bursting);
     unawaited(_burstCtrl.forward(from: 0));
     await _load();
+    if (_showHistory) {
+      await _loadHistory();
+    } else {
+      _history = const [];
+    }
     widget.onGranted?.call();
     await Future<void>.delayed(const Duration(milliseconds: 620));
     if (!mounted) return;
@@ -260,6 +293,62 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
       _shakeCtrl.stop();
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// یک ردیفِ تاریخچه: تاریخِ شمسی، مبلغ، امتیاز و نقطهٔ رنگیِ کارت‌ها.
+  Widget _historyRow(Map<String, dynamic> h) {
+    final cards = (h['cards'] as List?) ?? const [];
+    final price = (h['pricePaid'] as num?)?.toInt() ?? 0;
+    final pts = (h['points'] as num?)?.toInt() ?? 0;
+    final date = faDate(h['createdAt']);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.045),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 88,
+            child: Text(date,
+                style: const TextStyle(
+                    fontSize: 10.5,
+                    color: Color(0xFF9FB0C8),
+                    fontWeight: FontWeight.w700)),
+          ),
+          Text(Money.withUnit(price),
+              style: const TextStyle(
+                  fontSize: 11.5,
+                  color: Color(0xFFFFD166),
+                  fontWeight: FontWeight.w800)),
+          const SizedBox(width: 8),
+          Text('$pts امتیاز',
+              style: const TextStyle(
+                  fontSize: 10.5,
+                  color: Color(0xFFA3E635),
+                  fontWeight: FontWeight.w700)),
+          const Spacer(),
+          Wrap(
+            spacing: 4,
+            children: [
+              for (final c in cards)
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: rarityColors['${(c as Map)['rarity']}']?.first ??
+                        const Color(0xFF64748B),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -498,6 +587,57 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
                 )
               else
                 const SizedBox(height: 13),
+              // ── تاریخچهٔ خریدِ صندوق ─────────────────────────────────
+              // آینهٔ بخشِ cardBoxHistory در وب؛ ردیف‌های فشرده با
+              // نقطهٔ رنگیِ هر کارت از همان rarityColors سراسری.
+              if (!widget.compact) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 0, 10, 2),
+                  child: TextButton.icon(
+                    onPressed: _toggleHistory,
+                    icon: Icon(
+                      _showHistory
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.history_rounded,
+                      size: 16,
+                      color: const Color(0xFFFFD166),
+                    ),
+                    label: Text(
+                      _showHistory ? 'بستن تاریخچه' : 'تاریخچهٔ خرید صندوق',
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFFFD166),
+                      ),
+                    ),
+                  ),
+                ),
+                if (_showHistory) ...[
+                  if (_historyLoading)
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
+                      child: Text('در حال بارگذاری…',
+                          style: TextStyle(
+                              fontSize: 10, color: Color(0xFF8FA0B4))),
+                    )
+                  else if (_history.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
+                      child: Text('هنوز صندوقی نخریده‌ای.',
+                          style: TextStyle(
+                              fontSize: 10, color: Color(0xFF8FA0B4))),
+                    )
+                  else
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 2, 16, 12),
+                      child: Column(
+                        children: [
+                          for (final h in _history) _historyRow(h),
+                        ],
+                      ),
+                    ),
+                ],
+              ],
               if (_error.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),

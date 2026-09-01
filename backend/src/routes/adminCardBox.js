@@ -21,6 +21,13 @@ module.exports = function createAdminCardBoxRoutes(deps) {
     res.json(await cardBox.adminView());
   }));
 
+  // خریدهای اخیرِ صندوق — کاربر، مبلغ و خلاصهٔ کارت‌ها؛ برای بخشِ
+  // «تاریخچه» پنلِ ادمین (وب و اندروید).
+  router.get('/admin/card-box/purchases', adminAuth,
+    asyncHandler(async (req, res) => {
+      res.json({ purchases: await cardBox.adminPurchases(req.query.limit) });
+    }));
+
   router.put('/admin/card-box', adminAuth, requireRole(),
     asyncHandler(async (req, res) => {
       const body = req.body && typeof req.body === 'object' ? req.body : {};
