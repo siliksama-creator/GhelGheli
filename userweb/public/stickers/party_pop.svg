@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+  <defs>
+    <linearGradient id="pbody" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#F472B6"/><stop offset="100%" stop-color="#EC4899"/>
+    </linearGradient>
+  </defs>
+  <g>
+    <animateTransform attributeName="transform" type="rotate" values="-6 44 60;6 44 60;-6 44 60" dur="1.2s" repeatCount="indefinite"/>
+    <path d="M36 44 L52 44 L54 86 L34 86 Z" fill="url(#pbody)" stroke="#9D174D" stroke-width="2"/>
+    <path d="M44 44 L36 30 L40 44 Z" fill="#FDE68A" stroke="#B45309" stroke-width="1.5"/>
+    <path d="M44 44 L52 30 L48 44 Z" fill="#38BDF8" stroke="#075985" stroke-width="1.5"/>
+    <path d="M44 44 L44 26 L40 44 Z" fill="#34D399" stroke="#065F46" stroke-width="1.5"/>
+    <path d="M44 44 L56 36 L50 46 Z" fill="#FBBF24" stroke="#92400E" stroke-width="1.5"/>
+  </g>
+  <path d="M44 24 C42 22 40 22 38 24 C36 22 34 22 32 24 C34 27 37 27 38 24 C39 27 42 27 44 24 Z" fill="#F59E0B">
+    <animate attributeName="opacity" values="1;0.3;1" dur="0.5s" repeatCount="indefinite"/>
+  </path>
+  <rect x="60" y="30" width="7" height="7" rx="1.5" fill="#F43F5E" transform="rotate(25 63 33)">
+    <animate attributeName="y" values="30;16;30" dur="1.6s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="1;0;1" dur="1.6s" repeatCount="indefinite"/>
+  </rect>
+  <rect x="26" y="34" width="6" height="6" rx="1.5" fill="#38BDF8" transform="rotate(-20 29 37)">
+    <animate attributeName="y" values="34;20;34" dur="1.6s" repeatCount="indefinite" begin="0.3s"/>
+    <animate attributeName="opacity" values="1;0;1" dur="1.6s" repeatCount="indefinite" begin="0.3s"/>
+  </rect>
+  <circle cx="70" cy="40" r="3.2" fill="#A78BFA">
+    <animate attributeName="cy" values="40;26;40" dur="1.4s" repeatCount="indefinite" begin="0.6s"/>
+    <animate attributeName="opacity" values="1;0;1" dur="1.4s" repeatCount="indefinite" begin="0.6s"/>
+  </circle>
+  <circle cx="22" cy="44" r="2.6" fill="#FDE68A">
+    <animate attributeName="cy" values="44;30;44" dur="1.3s" repeatCount="indefinite" begin="0.15s"/>
+    <animate attributeName="opacity" values="1;0;1" dur="1.3s" repeatCount="indefinite" begin="0.15s"/>
+  </circle>
+  <path d="M78 52 L81 57 L87 57.6 L82.4 61 L83.6 67 L78 64 L72.4 67 L73.6 61 L69 57.6 L75 57 Z" fill="#34D399">
+    <animateTransform attributeName="transform" type="rotate" values="0 78 59;360 78 59" dur="3s" repeatCount="indefinite"/>
+  </path>
+</svg>

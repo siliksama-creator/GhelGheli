@@ -356,7 +356,6 @@ class ApiClient {
   static bool _swrEligible(String path) {
     const ok = [
       '/api/bootstrap',
-      '/api/cards',
       '/api/card-duel',
       '/api/inventory',
       '/api/rewards',

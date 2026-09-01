@@ -371,8 +371,6 @@ function faDigits(n) {
 function anonymousNickname() {
   return `کاربر-${Math.floor(1000 + Math.random() * 9000)}`;
 }
-function normalizeCardCode(code) { return String(code || '').trim().toUpperCase(); }
-function validateCodeFormat(code) { return /^[A-Z0-9_-]{8,128}$/.test(normalizeCardCode(code)); }
 // bcrypt silently truncates input at 72 BYTES — anything past that is
 // ignored when hashing, so e.g. "AAAA...(72 x's)...AAAA-realsecret" and
 // "AAAA...(72 x's)...AAAA-totallydifferent" hash identically and both
@@ -528,7 +526,6 @@ const perUserKey = (req) => req.user?.id || req.ip;
 
 // همهٔ limiterهای زیر روی مسیرهای احراز هویت‌شده‌اند، پس همه `perUserKey`
 // می‌گیرند. (فهرست کامل در تستِ testRateLimit.js نگهبانی می‌شود.)
-const cardRedeemLimiter = rateLimit({ windowMs: 60_000, limit: 12, standardHeaders: true, legacyHeaders: false, keyGenerator: perUserKey, message: { message: 'تعداد تلاش زیاد است؛ کمی بعد دوباره امتحان کنید' } });
 const chatLimiter = rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false, keyGenerator: perUserKey });
 const otpLimiter = rateLimit({ windowMs: 10 * 60_000, limit: 5, standardHeaders: true, legacyHeaders: false });
 // Brute-force protection for the 6-digit OTP code itself. request-otp only
@@ -681,140 +678,10 @@ app.use('/api', require('./routes/auth')({
   anonymousNickname, isValidPasswordLength,
 }));
 
-app.post('/api/cards/redeem', auth, cardRedeemLimiter, asyncHandler(async (req, res) => {
-  const code = normalizeCardCode(req.body.code);
-  if (!validateCodeFormat(code)) return res.status(400).json({ message: 'فرمت کد کارت معتبر نیست' });
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const q = await client.query(`SELECT c.*, t.point_value, t.cash_amount, t.name AS card_type_name, t.is_active
-      FROM card_codes c JOIN card_types t ON t.id=c.card_type_id WHERE c.code=$1 FOR UPDATE`, [code]);
-    const card = q.rows[0];
-    if (!card) throw Object.assign(new Error('کد نامعتبر است'), { status: 404 });
-    if (card.status === 'used') throw Object.assign(new Error('این کد قبلاً استفاده شده است'), { status: 409 });
-    if (card.status !== 'unused') throw Object.assign(new Error('این کد دیگر معتبر نیست'), { status: 409 });
-    if (!card.is_active) throw Object.assign(new Error('نوع این کارت غیرفعال است'), { status: 400 });
-    await client.query("UPDATE card_codes SET status='used', used_by_user_id=$1, used_at=NOW(), updated_at=NOW() WHERE id=$2", [req.user.id, card.id]);
-    // از دفترِ امتیاز می‌گذرد تا کاربر و مدیر بتوانند بعداً بفهمند این
-    // امتیاز از کدام کارت آمده. توضیح در مایگریشنِ ۰۴۵.
-    await points.credit(client, {
-      userId: req.user.id,
-      points: card.point_value,
-      source: 'card_code',
-      referenceType: 'card_codes',
-      referenceId: card.id,
-      description: `ثبت کارت «${card.name || 'کارت'}» با کد`,
-    });
-    // کمیسیونِ امتیازیِ ۵٪ به معرف — ولی **نه** از کارتِ نقدی.
-    //
-    // کارتی که `cash_amount > 0` دارد چند خط پایین‌تر پولِ نقد به کیف
-    // پولِ کاربر می‌ریزد. این کارت‌ها را تیم با بودجهٔ نقدیِ مشخص چاپ
-    // می‌کند؛ پرداختِ کمیسیون بابتشان یعنی همان بودجه دو بار خرج شود.
-    // مالک صریحاً خواست دوستانِ کاربر از کارتِ نقدی کمیسیون نگیرند.
-    //
-    // کارتِ امتیازیِ معمولی (`cash_amount = 0`) کماکان کمیسیون می‌سازد.
-    if (Number(card.cash_amount || 0) === 0) {
-      await referrals.payCommission(client, req.user.id, card.point_value, 'card');
-    }
-    // ── طرحِ نمایشی: رو یا پشت، تصادفی ──
-    //
-    // ⚠️ چرا مسیرِ «فقط کد» هم این کار را می‌کند
-    //
-    // این مسیرِ قدیمی است (کاربر فقط کد را وارد می‌کند، بدونِ عکس) و
-    // وسوسه‌کننده بود که دست‌نخورده بماند. ولی هر دو مسیر در **یک**
-    // جدولِ اینونتوری می‌نویسند و کاربر همان یک صفحه را می‌بیند. اگر
-    // فقط یکی از دو مسیر قرعه بیندازد، نصفِ کارت‌های کاربر تصادفی و
-    // نصفِ دیگر همیشه تصویرِ پیش‌فرض می‌شوند — که بدتر از نداشتنِ
-    // قابلیت است چون بی‌قاعده به نظر می‌رسد.
-    //
-    // اگر برای این نوعِ کارت هیچ طرحِ تصویری آپلود نشده باشد (که در
-    // سیستمِ قدیمی عادی است) نتیجه NULL می‌ماند و همان
-    // `card_types.image_url` نمایش داده می‌شود — رفتارِ قبلی، بدونِ
-    // تغییر. توضیحِ کاملِ چراییِ این طراحی در `photoCardService.js`.
-    const pickDesign = await client.query(
-      `SELECT id FROM photo_card_designs
-        WHERE card_type_id=$1 AND is_active=true ORDER BY random() LIMIT 1`,
-      [card.card_type_id]);
-    const displayDesignId = pickDesign.rows[0]?.id ?? null;
-
-    // ── UPSERT اتمیک، نه SELECT-سپس-INSERT ──
-    //
-    // الگوی قبلی با دو درخواستِ هم‌زمان روی **اولین** نسخهٔ یک کارت
-    // می‌شکست: هر دو SELECT خالی می‌دیدند، هر دو INSERT می‌زدند، و دومی
-    // به `uq_inventory_active` می‌خورد. بازتولید شد، حدس نبود.
-    //
-    // شرطِ `WHERE consumed_in_reward = false` در ON CONFLICT لازم است تا
-    // Postgres بداند کدام ایندکسِ **جزئی** را هدف بگیرد.
-    //
-    // COALESCE: نسخهٔ دوم طرحِ انتخاب‌شده را عوض نمی‌کند تا خانهٔ
-    // اینونتوری جلوی چشمِ کاربر ورق نخورد و کشِ گوشی باطل نشود.
-    //
-    // توضیحِ کاملِ باگ در `photoCardService.creditSubmission`.
-    await client.query(
-      `INSERT INTO user_card_inventory
-         (user_id, card_type_id, quantity, consumed_in_reward, display_design_id)
-       VALUES($1,$2,1,false,$3)
-       ON CONFLICT (user_id, card_type_id) WHERE consumed_in_reward = false
-       DO UPDATE SET
-         quantity = user_card_inventory.quantity + 1,
-         display_design_id = COALESCE(
-           user_card_inventory.display_design_id, EXCLUDED.display_design_id),
-         updated_at = NOW()`,
-      [req.user.id, card.card_type_id, displayDesignId]);
-    await addLeaguePoints(client, req.user.id, card.point_value);
-
-    // جایزهٔ نقدی کارت → کیف پول، در همان تراکنش مصرف کد.
-    // مرجع = شناسهٔ خود کد کارت، پس حتی اگر این مسیر به هر دلیلی دوباره اجرا
-    // شود، ایندکس یکتای دفتر کل مانع واریز دوم می‌شود.
-    const cashAmount = Number(card.cash_amount || 0);
-    if (cashAmount > 0) {
-      await walletService.credit(client, {
-        userId: req.user.id,
-        amount: cashAmount,
-        source: 'card_cash',
-        referenceType: 'card_codes',
-        referenceId: card.id,
-        description: `جایزهٔ نقدی کارت «${card.card_type_name}»`,
-      });
-    }
-
-    await client.query('COMMIT');
-    if (cashAmount > 0) {
-      createNotification(
-        req.user.id,
-        'wallet',
-        'جایزهٔ نقدی به کیف پول اضافه شد',
-        `${cashAmount.toLocaleString('en-US')} تومان بابت کارت «${card.card_type_name}» به کیف پول شما واریز شد.`,
-      ).catch(() => {});
-    }
-    // ── چرا اینجا XP گذر نبرد داده نمی‌شود ──
-    //
-    // خواستهٔ صریح مالک: «ثبت کارت در هیچ حالتی نباید بتل‌پس رو چه در
-    // رایگان چه در پلاس باز کنه».
-    //
-    // قبلاً `pass.grantXp(req.user.id, 'card_redeem')` اینجا بود.
-    // اکشنِ `card_redeem` هم از `passService.SOURCES` حذف شد، پس حتی
-    // اگر کسی این خط را دوباره اضافه کند هیچ اثری ندارد و تستِ
-    // «هیچ اکشنی برای ثبت کارت وجود ندارد» قرمز می‌شود.
-    //
-    // مسیرِ «ثبت کارت با عکس» هم همین قاعده را دارد.
-    const userNow = await pool.query('SELECT current_points,lifetime_points,monthly_league_points,wallet_balance FROM users WHERE id=$1', [req.user.id]);
-    const reward = await pool.query('SELECT * FROM reward_tiers WHERE is_active=true AND required_points <= $1 ORDER BY required_points DESC LIMIT 1', [userNow.rows[0].current_points]);
-    if (reward.rows[0]) createNotification(req.user.id, 'reward_threshold', 'تبریک! به جایزه رسیدی', `شما به سطح ${reward.rows[0].name} رسیدید.`).catch(()=>{});
-    io.emit('leaderboard:update', await getLeaderboard(20));
-    res.json({
-      message: 'کد با موفقیت ثبت شد',
-      cardType: card.card_type_name,
-      addedPoints: card.point_value,
-      addedCash: cashAmount,
-      walletBalance: Number(userNow.rows[0].wallet_balance || 0),
-      points: userNow.rows[0],
-    });
-  } catch (e) {
-    await client.query('ROLLBACK');
-    res.status(e.status || 500).json({ message: (e.code && friendlyDbError(e)) || e.message || 'خطای ثبت کد' });
-  } finally { client.release(); }
-}));
+// ═══════════════════════════════════════════════════════════════════════════
+// «ثبت کد کارت» قدیمی حذف شد (مایگریشن ۰۸۰ جدولِ card_codes را برداشت).
+// ثبتِ کارتِ واقعی فقط از مسیرِ «کارت با عکس» (photoCards.js) می‌گذرد.
+// ═══════════════════════════════════════════════════════════════════════════
 
 // ── Tap game ───────────────────────────────────────────────────────────────
 // Progress is reported in signed BATCHES, never one tap per request: a
@@ -1954,6 +1821,41 @@ const DEFAULT_CANNED_MESSAGES = Object.freeze([
 
 // پیام‌های آمادهٔ چت از پنل ادمین قابل ویرایش‌اند (chat_canned_messages)؛
 // آرایهٔ بالا فقط پیش‌فرض است تا رفتار بدونِ تنظیم مثل قبل بماند.
+// ── استیکرهای چت ─────────────────────────────────────────────────────────
+// فهرست و اعتبارسنجی از جدولِ chat_stickers. image_url نسبی است:
+// وب همان دامنه را می‌گیرد و اندروید baseUrl خودش را پیشوند می‌کند —
+// پس افزودن/حذفِ استیکر فقط یک ردیفِ دیتابیس می‌خواهد و هیچ کلاینتی
+// آپدیت نمی‌شود.
+async function activeStickers() {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, title, image_url, sticker_type
+         FROM chat_stickers WHERE is_active = TRUE
+        ORDER BY created_at, title`);
+    return rows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      url: r.image_url,
+      type: r.sticker_type,
+    }));
+  } catch {
+    // استیکر هرگز نباید چت را بشکند؛ در بدترین حالت فهرست خالی است.
+    return [];
+  }
+}
+
+async function activeStickerById(id) {
+  if (!id || !UUID_RE.test(String(id))) return null;
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, title, image_url, sticker_type
+         FROM chat_stickers WHERE id=$1 AND is_active = TRUE`, [id]);
+    return rows[0] || null;
+  } catch {
+    return null;
+  }
+}
+
 function cannedMessages() {
   const v = opsConfig.syncGet('chat_canned_messages');
   if (!Array.isArray(v) || v.length === 0) return DEFAULT_CANNED_MESSAGES;
@@ -1966,10 +1868,11 @@ function cannedMessages() {
 app.get('/api/chat/bootstrap', auth, asyncHandler(async (req, res) => {
   const minLifetimePoints = await getChatMinLifetimePoints();
   const eligible = Number(req.user.lifetime_points || 0) >= minLifetimePoints;
-  const [cooldownSec, pinned, emotePacks] = await Promise.all([
+  const [cooldownSec, pinned, emotePacks, stickers] = await Promise.all([
     getChatCooldownSeconds(),
     getChatPinnedMessage(),
     shop.emotePacksFor(req.user.id),
+    activeStickers(),
   ]);
 
   const config = {
@@ -1985,13 +1888,14 @@ app.get('/api/chat/bootstrap', auth, asyncHandler(async (req, res) => {
     return res.json({
       config,
       messages: [],
-      stickers: [],
+      stickers,
       cannedMessages: cannedMessages(),
     });
   }
 
   const { rows } = await pool.query(`SELECT m.*, u.nickname,u.first_name,u.last_name,u.profile_image_url,u.profile_avatar_key,
       rm.message_text AS reply_text, rm.message_type AS reply_type, ru.nickname AS reply_nickname,
+      s.image_url AS sticker_url, s.title AS sticker_title,
       (SELECT count(*)::int FROM chat_message_likes l WHERE l.message_id=m.id) AS like_count,
       EXISTS(SELECT 1 FROM chat_message_likes l WHERE l.message_id=m.id AND l.user_id=$1) AS liked_by_me,
       (m.user_id=$1) AS is_mine
@@ -1999,6 +1903,7 @@ app.get('/api/chat/bootstrap', auth, asyncHandler(async (req, res) => {
     JOIN users u ON u.id=m.user_id
     LEFT JOIN chat_messages rm ON rm.id=m.reply_to_message_id
     LEFT JOIN users ru ON ru.id=rm.user_id
+    LEFT JOIN chat_stickers s ON s.id=m.sticker_id
     WHERE m.is_deleted=false ORDER BY m.sent_at DESC LIMIT 60`, [req.user.id]);
 
   const ids = [...new Set(rows.map(r => r.user_id))];
@@ -2016,7 +1921,7 @@ app.get('/api/chat/bootstrap', auth, asyncHandler(async (req, res) => {
   res.json({
     config,
     messages,
-    stickers: [],
+    stickers,
     cannedMessages: cannedMessages(),
   });
 }));
@@ -2030,6 +1935,7 @@ app.get('/api/chat/messages', auth, asyncHandler(async (req, res) => {
   if (Number(req.user.lifetime_points || 0) < minLifetimePoints) return res.status(403).json({ message: `برای ورود به چت باید حداقل ${minLifetimePoints} امتیاز تاریخی داشته باشید`, minLifetimePoints });
   const { rows } = await pool.query(`SELECT m.*, u.nickname,u.first_name,u.last_name,u.profile_image_url,u.profile_avatar_key,
       rm.message_text AS reply_text, rm.message_type AS reply_type, ru.nickname AS reply_nickname,
+      s.image_url AS sticker_url, s.title AS sticker_title,
       (SELECT count(*)::int FROM chat_message_likes l WHERE l.message_id=m.id) AS like_count,
       EXISTS(SELECT 1 FROM chat_message_likes l WHERE l.message_id=m.id AND l.user_id=$1) AS liked_by_me,
       (m.user_id=$1) AS is_mine
@@ -2037,6 +1943,7 @@ app.get('/api/chat/messages', auth, asyncHandler(async (req, res) => {
     JOIN users u ON u.id=m.user_id
     LEFT JOIN chat_messages rm ON rm.id=m.reply_to_message_id
     LEFT JOIN users ru ON ru.id=rm.user_id
+    LEFT JOIN chat_stickers s ON s.id=m.sticker_id
     WHERE m.is_deleted=false ORDER BY m.sent_at DESC LIMIT 100`, [req.user.id]);
   // Attach cosmetics so the club badge and name colour render next to each
   // message. Resolved server-side because an equipped item stops applying the
@@ -2059,12 +1966,15 @@ app.post('/api/chat/messages', auth, chatLimiter, asyncHandler(async (req, res) 
   const cd = await ensureChatCooldown(req.user.id);
   if (cd.remaining > 0) return res.status(429).json({ message: `برای جلوگیری از اسپم، ${cd.remaining} ثانیه دیگر پیام بدهید`, cooldownSeconds: cd.cooldown, remainingSeconds: cd.remaining });
   const stickerId = req.body.stickerId || req.body.sticker_id || null;
-  if (stickerId) {
-    return res.status(400).json({ message: 'استیکر تصویری دیگر پشتیبانی نمی‌شود' });
-  }
   const replyTo = req.body.replyTo || req.body.reply_to_message_id || null;
   const clean = String(req.body.message || req.body.text || '').trim();
-  const messageType = 'text';
+  // استیکر متنِ آزاد ندارد؛ اعتبارش فقط عضویت در فهرستِ فعالِ
+  // chat_stickers است. کولدون و بن و سقف امتیاز همچنان یکسان اعمال می‌شوند.
+  const sticker = stickerId ? await activeStickerById(stickerId) : null;
+  if (stickerId && !sticker) {
+    return res.status(400).json({ message: 'استیکر معتبر نیست' });
+  }
+  const messageType = sticker ? 'sticker' : 'text';
   // Validate reply target up front instead of letting a bad/deleted id hit
   // the DB's foreign key constraint, which previously bubbled up as a raw
   // Postgres error message to the client (see friendlyDbError note above).
@@ -2084,6 +1994,10 @@ app.post('/api/chat/messages', auth, chatLimiter, asyncHandler(async (req, res) 
   // reloaded — reading as "my badge stopped working".
   const cosNew = await shop.cosmeticsFor([req.user.id]);
   const msg = { ...rows[0], nickname: req.user.nickname, first_name: req.user.first_name, last_name: req.user.last_name, profile_image_url: req.user.profile_image_url, profile_avatar_key: req.user.profile_avatar_key, like_count: 0, liked_by_me: false, is_mine: true, cosmetics: cosNew.get(req.user.id) || null };
+  if (sticker) {
+    msg.sticker_url = sticker.image_url;
+    msg.sticker_title = sticker.title;
+  }
   // `is_mine` مخصوصِ گیرنده است. اگر همین شیء broadcast شود، همهٔ کاربران
   // پیام را «مالِ خودم» می‌بینند و در سمتِ چپ با رنگِ آبی رندر می‌کنند.
   // پس نسخهٔ عمومی بدون این پرچم می‌رود و فقط پاسخِ HTTP آن را دارد.
@@ -2278,41 +2192,22 @@ app.get('/api/admin/dashboard', adminAuth, asyncHandler(async (req, res) => {
   const q = await Promise.all([
     pool.query('SELECT count(*)::int AS count FROM users'),
     // ═══════════════════════════════════════════════════════════════════
-    // کارت‌های ثبت‌شده = مجموعِ **هر دو** نسلِ جدولِ کد
+    // کارت‌های ثبت‌شده = photo_card_codes (مسیرِ فعلیِ عکس+کد)
     // ═══════════════════════════════════════════════════════════════════
     //
-    // ── باگی که این کوئری رفع می‌کند ──
-    //
-    // این دو کاشی فقط `card_codes` را می‌شمردند — جدولِ سیستمِ **قدیم**
-    // (کدِ تنها، روتِ `/api/cards/redeem`). ولی امروز هر ثبتِ واقعی از
-    // مسیرِ **عکس+کد** می‌آید که در `photo_card_codes` می‌نویسد
-    // (`photoCardService.creditSubmission`). هیچ کلاینتی — نه وب، نه
-    // اندروید — دیگر روتِ قدیمی را صدا نمی‌زند.
-    //
-    // نتیجه در عمل: مدیر هر روز صفر می‌دید، حتی وقتی ده‌ها کارت ثبت شده
-    // بود. کاشی‌ای که همیشه صفر است بدتر از نبودنش است، چون مدیر بر
-    // اساسش نتیجه می‌گیرد «امروز کسی کارت ثبت نکرده».
-    //
-    // ── چرا مجموع، نه صرفاً تعویضِ نامِ جدول ──
-    //
-    // جدولِ قدیم هنوز رکوردِ تاریخیِ مصرف‌شده دارد و روتش هم زنده است.
-    // اگر فقط نام را عوض می‌کردیم، آمارِ گذشته از گزارشِ ماه حذف می‌شد
-    // (یعنی باگ از «همیشه صفر» به «تاریخچهٔ گم‌شده» تغییر شکل می‌داد).
-    // UNION ALL هر دو نسل را می‌پوشاند و روزی که جدولِ قدیم واقعاً خالی
-    // و حذف شود، این کوئری بدونِ تغییر درست می‌ماند.
+    // قبلاً این دو کاشی مجموعِ دو نسلِ جدول کد را می‌شمردند (card_codes
+    // قدیمی + photo_card_codes). سیستمِ قدیمی با مایگریشن ۰۸۰ حذف شد و
+    // فقط جدولِ فعلی مانده — هر ثبتِ واقعی از مسیرِ «کارت با عکس» در
+    // photo_card_codes می‌نویسد.
     //
     // ⚠️ عمداً از `user_card_inventory` شمرده نمی‌شود: آن جدول کارتِ
     // صندوق و اعطای دستی را هم نگه می‌دارد، و ردیفش با `quantity` جمع
     // می‌شود نه یک ردیف به‌ازای هر ثبت — یعنی عددی می‌داد که «کارتِ
     // ثبت‌شده» نیست.
-    pool.query(`SELECT (
-        (SELECT count(*) FROM card_codes       WHERE status='used' AND used_at::date=CURRENT_DATE) +
-        (SELECT count(*) FROM photo_card_codes WHERE status='used' AND used_at::date=CURRENT_DATE)
-      )::int AS count`),
-    pool.query(`SELECT (
-        (SELECT count(*) FROM card_codes       WHERE status='used' AND used_at >= date_trunc('month', NOW())) +
-        (SELECT count(*) FROM photo_card_codes WHERE status='used' AND used_at >= date_trunc('month', NOW()))
-      )::int AS count`),
+    pool.query(`SELECT count(*)::int AS count FROM photo_card_codes
+                 WHERE status='used' AND used_at::date=CURRENT_DATE`),
+    pool.query(`SELECT count(*)::int AS count FROM photo_card_codes
+                 WHERE status='used' AND used_at >= date_trunc('month', NOW())`),
     pool.query("SELECT count(*)::int AS count FROM user_reward_claims WHERE status='pending'"),
     getLeaderboard(10),
     // صف‌های عملیاتی — داشبورد قبلی فقط چهار عدد کلی داشت و مدیر برای
@@ -2545,12 +2440,10 @@ app.patch('/api/admin/settings/sms', adminAuth, requireRole(), asyncHandler(asyn
   res.json({ message: 'تنظیمات پیامک ذخیره شد', ...cfg, apiKey: undefined, apiKeyMasked: maskSecret(cfg.apiKey) });
 }));
 
-// Legacy code-only card catalogue administration. Kept separate from the
-// photo-card router because the redemption and code lifecycles are distinct.
+// فقط فهرستِ کارت‌های کلکسیونی برای انتخابگرهای پنل (جوایز).
+// مدیریتِ کدِ کارت قدیمی حذف شد؛ ساختِ کارت از مسیرِ «کارت با عکس» می‌گذرد.
 app.use('/api', require('./routes/adminCardCatalog')({
-  pool, adminAuth, requireRole, asyncHandler, audit,
-  validateUuid, UUID_RE, keepImage, cashAmountInput,
-  normalizeCardCode, validateCodeFormat,
+  pool, adminAuth, asyncHandler,
 }));
 
 // ── «ثبت کارت از طریق عکس» ────────────────────────────────────────────────
@@ -2733,10 +2626,11 @@ io.on('connection', socket => {
       if (socket.user.chat_banned_until && new Date(socket.user.chat_banned_until) > new Date()) throw new Error('شما موقتاً از چت محروم هستید');
       const body = typeof payload === 'object' && payload ? payload : { text: payload };
       const stickerId = body.stickerId || null;
-      if (stickerId) throw new Error('استیکر تصویری دیگر پشتیبانی نمی‌شود');
+      const sticker = stickerId ? await activeStickerById(stickerId) : null;
+      if (stickerId && !sticker) throw new Error('استیکر معتبر نیست');
       const replyTo = body.replyTo || null;
       const clean = String(body.text || '').trim();
-      const messageType = 'text';
+      const messageType = sticker ? 'sticker' : 'text';
       if (replyTo) {
         const rm = await pool.query('SELECT id FROM chat_messages WHERE id=$1 AND is_deleted=false', [replyTo]);
         if (!rm.rows[0]) throw new Error('پیام موردنظر برای پاسخ پیدا نشد');
@@ -2752,6 +2646,10 @@ io.on('connection', socket => {
       // seconds earlier does not show on the sender's own new message.
       const cosWs = await shop.cosmeticsFor([socket.user.id]);
       const msg = { ...rows[0], nickname: socket.user.nickname, first_name: socket.user.first_name, last_name: socket.user.last_name, profile_image_url: socket.user.profile_image_url, profile_avatar_key: socket.user.profile_avatar_key, like_count: 0, cosmetics: cosWs.get(socket.user.id) || null };
+      if (sticker) {
+        msg.sticker_url = sticker.image_url;
+        msg.sticker_title = sticker.title;
+      }
       // مثل مسیرِ REST: نسخهٔ عمومی بدونِ `is_mine` broadcast می‌شود و فقط
       // خودِ فرستنده آن را در callback با پرچمِ true می‌گیرد.
       io.emit('chat:new', msg);

@@ -143,26 +143,7 @@ module.exports = function registerAdminPhotoCardCodes(deps) {
 
       let inserted = [];
       let duplicateInDb = [];
-      let clashWithOldBank = [];
       if (candidates.length) {
-        // ── هشدار برخورد با بانکِ سیستم قدیمی ──
-        //
-        // دو بانک کاملاً مستقل‌اند (`card_codes` و `photo_card_codes`) و
-        // این عمدی است. ولی یک خطر واقعی دارد: اگر مدیر یک رشتهٔ یکسان
-        // را در **هر دو** بانک وارد کند، کاربر می‌تواند یک بار از راه
-        // «ثبت کد کارت» و یک بار از راه «ثبت با عکس» امتیاز بگیرد —
-        // دو بار برای یک کارت.
-        //
-        // بلوکش نمی‌کنیم چون ممکن است عمدی باشد (مثلاً همان کارت‌های
-        // قدیمی حالا با عکس هم قابل ثبت شوند). فقط گزارش می‌دهیم تا
-        // مدیر بداند چه چیزی را انتخاب کرده — سکوت اینجا یعنی نشتِ
-        // امتیاز که ماه‌ها بعد کشف می‌شود.
-        const clash = await pool.query(
-          `SELECT code FROM card_codes WHERE code = ANY($1::citext[])`,
-          [candidates],
-        );
-        clashWithOldBank = clash.rows.map(x => String(x.code));
-
         // درج دسته‌ای با ON CONFLICT — اتمیک و بدون مسابقهٔ زمانی.
         // بررسی جداگانهٔ «آیا وجود دارد؟» قبل از درج، پنجره‌ای می‌ساخت
         // که ادمین دوم می‌توانست همان کد را وسطش درج کند.
@@ -188,7 +169,6 @@ module.exports = function registerAdminPhotoCardCodes(deps) {
           duplicateInFile: duplicateInFile.length,
           duplicateInDb: duplicateInDb.length,
           invalid: invalid.length,
-          clashWithOldBank: clashWithOldBank.length,
           batchLabel: label,
           expectedCardTypeId: expectedTypeId,
         });
@@ -205,10 +185,6 @@ module.exports = function registerAdminPhotoCardCodes(deps) {
         duplicateInFile: sample(duplicateInFile),
         duplicateInDb: sample(duplicateInDb),
         invalid: sample(invalid),
-        // هشدار، نه خطا: مدیر باید بداند این کدها در سیستم قدیمی هم
-        // هستند و آن کارت دو بار قابل ثبت می‌شود.
-        clashWithOldBankCount: clashWithOldBank.length,
-        clashWithOldBank: sample(clashWithOldBank),
         truncatedSamples: inserted.length > 20 || duplicateInDb.length > 20
           || invalid.length > 20,
         batchLabel: label,

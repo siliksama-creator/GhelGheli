@@ -467,7 +467,7 @@ test('لیست سفید است نه سیاه — منبعِ ناشناخته ک�
   }
 });
 
-test('هر دو مسیرِ ثبتِ کارت کمیسیونِ امتیازی می‌دهند', () => {
+test('مسیرهای ثبتِ کارت و ضربه‌زن کمیسیونِ امتیازی می‌دهند', () => {
   const path = require('path');
   const fs = require('fs');
   const read = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
@@ -476,20 +476,21 @@ test('هر دو مسیرِ ثبتِ کارت کمیسیونِ امتیازی م�
   const countPointCalls = (src) =>
     (src.match(/(?<!purchase)(?<!Purchase)\bpayCommission\(/g) || []).length;
 
-  // server.js دو نقطه دارد: مسیرِ کدِ سادهٔ کارت، و بازیِ ضربه‌زن.
-  assert.strictEqual(countPointCalls(read('src/server.js')), 2,
-    'server.js باید دقیقاً دو کمیسیونِ امتیازی بدهد: ثبتِ کارت و ضربه‌زن');
+  // سیستمِ قدیمیِ «ثبت کد کارت» حذف شد (مایگریشن ۰۸۰)؛ server.js فقط
+  // بازیِ ضربه‌زن را کمیسیون می‌دهد.
+  assert.strictEqual(countPointCalls(read('src/server.js')), 1,
+    'server.js باید دقیقاً یک کمیسیونِ امتیازی بدهد: ضربه‌زن');
 
-  // مسیرِ عکسی هم باید بدهد، وگرنه نتیجه بسته به روشِ ثبت فرق می‌کند.
+  // مسیرِ عکسی باید بدهد — ثبتِ کارت فقط از همین مسیر ممکن است.
   assert.strictEqual(countPointCalls(read('src/services/photoCardService.js')), 1,
-    'مسیرِ ثبتِ کارت با عکس هم باید کمیسیونِ امتیازی بدهد');
+    'مسیرِ ثبتِ کارت با عکس باید کمیسیونِ امتیازی بدهد');
 
-  // و مسیرِ نقدی باید واقعاً وصل باشد.
+  // و مسیرِ خرید باید واقعاً وصل باشد.
   assert.ok(/payPurchaseCommission/.test(read('src/services/shopService.js')),
     'خریدِ شاپ باید کمیسیونِ خرید را صدا بزند');
 });
 
-test('کارتِ نقدی هیچ کمیسیونی نمی‌دهد — هر دو مسیر شرط دارند', () => {
+test('کارتِ نقدی هیچ کمیسیونی نمی‌دهد — مسیرِ عکس شرط دارد', () => {
   // ⚠️ خواستهٔ صریحِ مالک: «از کارت‌های نقدی که تیم در سیستم ثبت می‌کند،
   // دوستانِ کاربر نباید کمیسیون بگیرند.»
   //
@@ -504,12 +505,6 @@ test('کارتِ نقدی هیچ کمیسیونی نمی‌دهد — هر دو 
   const read = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
 
   const server = read('src/server.js');
-  // مسیرِ کدِ ساده: شرطِ صفر بودنِ مبلغِ نقد باید بلافاصله قبلِ کمیسیون باشد.
-  assert.ok(
-    /Number\(card\.cash_amount \|\| 0\) === 0\)\s*\{\s*await referrals\.payCommission\([^)]*'card'\)/s
-      .test(server),
-    'مسیرِ /api/cards/redeem باید کمیسیون را به شرطِ cash_amount === 0 بدهد');
-
   const photo = read('src/services/photoCardService.js');
   // مسیرِ عکسی: متغیرِ محلیِ `cash` همان `Number(type.cash_amount || 0)` است.
   assert.ok(/const cash = Number\(type\.cash_amount \|\| 0\)/.test(photo),

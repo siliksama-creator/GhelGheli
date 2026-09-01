@@ -291,8 +291,6 @@ module.exports = function createPhotoCardRoutes(deps) {
           `SELECT
              (SELECT count(*)::int FROM user_card_inventory
                WHERE card_type_id=$1) AS inventory_count,
-             (SELECT count(*)::int FROM card_codes
-               WHERE card_type_id=$1) AS legacy_code_count,
              (SELECT count(*)::int
                 FROM photo_card_submissions submission
                WHERE submission.matched_design_id IN
@@ -314,9 +312,6 @@ module.exports = function createPhotoCardRoutes(deps) {
         }
         if (counts.committed_code_count) {
           blockers.push(`${counts.committed_code_count} کد مصرف‌شده یا درحال بررسی`);
-        }
-        if (counts.legacy_code_count) {
-          blockers.push(`${counts.legacy_code_count} کد در سیستم قدیمی`);
         }
         if (blockers.length) {
           await client.query('ROLLBACK');

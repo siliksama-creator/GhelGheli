@@ -36,6 +36,7 @@ const referralService = require('./referralService');
 //    function` می‌داد — همان جنسِ خطای ساکتی که فقط در زمانِ اجرا و
 //    فقط در مسیرِ موفق معلوم می‌شود.
 const pointLedger = require('./pointService');
+const notificationService = require('./notificationService');
 
 /**
  * کد را به شکل متعارف در می‌آورد.
@@ -259,6 +260,27 @@ async function creditSubmission(
     // بدونِ عکس، نتیجهٔ متفاوت می‌گیرد — که باگِ بی‌قاعده‌ای است.
     if (cash === 0) {
       await referralService.payCommission(client, userId, points, 'card');
+    }
+
+    // اعلانِ «رسیدن به سطحِ جایزه» — قبلاً فقط مسیرِ کدِ سادهٔ کارت این
+    // اعلان را می‌داد؛ با حذفِ آن مسیر (مایگریشن ۰۸۰)، ثبتِ کارت با عکس
+    // جانشینش می‌شود وگرنه کاربر هرگز از رسیدن به آستانهٔ جایزه خبردار
+    // نمی‌شد. همان منطقِ قبلی: بالاترین سطحِ فعالِ قابلِ دریافت.
+    try {
+      const userNow = await client.query(
+        'SELECT current_points FROM users WHERE id=$1', [userId]);
+      const reward = await client.query(
+        `SELECT name FROM reward_tiers
+          WHERE is_active=true AND required_points <= $1
+          ORDER BY required_points DESC LIMIT 1`,
+        [Number(userNow.rows[0]?.current_points || 0)]);
+      if (reward.rows[0]) {
+        await notificationService.createNotification(
+          userId, 'reward_threshold', 'تبریک! به جایزه رسیدی',
+          `شما به سطح ${reward.rows[0].name} رسیدید.`);
+      }
+    } catch {
+      // اعلان نباید ثبتِ کارت را بشکند.
     }
   }
 

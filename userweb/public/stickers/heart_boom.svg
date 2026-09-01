@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+  <defs>
+    <linearGradient id="hred" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FDA4AF"/><stop offset="100%" stop-color="#E11D48"/>
+    </linearGradient>
+  </defs>
+  <g>
+    <animateTransform attributeName="transform" type="scale" values="1;1.18;1" dur="0.8s" repeatCount="indefinite" additive="sum"/>
+    <animateTransform attributeName="transform" type="translate" values="0 0;0 0;0 0" dur="0.8s" repeatCount="indefinite" additive="sum"/>
+    <path d="M48 84 C20 62 18 38 32 28 C42 21 48 26 48 34 C48 26 54 21 64 28 C78 38 76 62 48 84 Z" fill="url(#hred)" stroke="#9F1239" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M32 34 C34 30 38 28 42 28" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
+  </g>
+  <circle cx="22" cy="22" r="3.5" fill="#F9A8D4">
+    <animate attributeName="cy" values="22;10;22" dur="1.5s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0;1;0" dur="1.5s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="74" cy="24" r="3" fill="#FBCFE8">
+    <animate attributeName="cy" values="24;12;24" dur="1.5s" repeatCount="indefinite" begin="0.5s"/>
+    <animate attributeName="opacity" values="0;1;0" dur="1.5s" repeatCount="indefinite" begin="0.5s"/>
+  </circle>
+  <path d="M80 60 L82 64 L86 64.4 L82.6 67 L83.4 71 L80 68.8 L76.6 71 L77.4 67 L74 64.4 L78 64 Z" fill="#FDA4AF">
+    <animate attributeName="opacity" values="0.2;1;0.2" dur="1.1s" repeatCount="indefinite"/>
+  </path>
+</svg>

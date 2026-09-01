@@ -56,8 +56,7 @@ router.get('/admin/users', adminAuth, requireRole('support'), asyncHandler(async
 router.get('/admin/users/:id', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
   const user = await pool.query('SELECT * FROM users WHERE id=$1', [req.params.id]);
   if (!user.rows[0]) return res.status(404).json({ message: 'کاربر پیدا نشد' });
-  const [codes, userGrants, shopItems] = await Promise.all([
-    pool.query('SELECT c.code,c.used_at,t.name,t.point_value FROM card_codes c JOIN card_types t ON t.id=c.card_type_id WHERE c.used_by_user_id=$1 ORDER BY c.used_at DESC LIMIT 100', [req.params.id]),
+  const [userGrants, shopItems] = await Promise.all([
     grants.listFor(req.params.id).catch(() => []),
     pool.query(
       `SELECT slug, name, kind FROM shop_items
@@ -65,7 +64,6 @@ router.get('/admin/users/:id', adminAuth, validateUuid('id'), requireRole('suppo
   ]);
   res.json({
     user: safeUser(user.rows[0]),
-    codes: codes.rows,
     grants: userGrants,
     shopItems: shopItems.rows,
   });

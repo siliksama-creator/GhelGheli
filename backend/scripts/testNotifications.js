@@ -49,6 +49,7 @@ const serverRaw = [
   read('src', 'routes', 'adminWallet.js'),
   read('src', 'routes', 'adminRewards.js'),
   read('src', 'routes', 'adminLeague.js'),
+  read('src', 'services', 'photoCardService.js'),
 ].join('\n');
 const server = strip(serverRaw);
 const league = strip(read('src', 'services', 'leagueService.js'));

@@ -160,12 +160,12 @@ ok('سند کمیسیون یکتاست (ON CONFLICT DO NOTHING)',
 section('کمیسیون امتیازی از دوستان');
 ok('فقط از منابع card و tap',
   /COMMISSIONABLE = new Set\(\['card', 'tap'\]\)/.test(referral));
-ok('ثبت کارت با کد ساده کمیسیون می‌دهد',
-  /payCommission\(client, req\.user\.id, card\.point_value, 'card'\)/.test(server));
+// سیستمِ قدیمیِ «ثبت کد کارت» حذف شد (مایگریشن ۰۸۰) — مسیرِ کدِ ساده
+// دیگر وجود ندارد و کمیسیونِ ثبتِ کارت فقط از مسیرِ عکس می‌آید.
+ok('مسیرِ قدیمیِ ثبت کد در server.js نیست',
+  !/\/api\/cards\/redeem/.test(server));
 ok('بازی ضربه‌زن کمیسیون می‌دهد',
   /payCommission\(client, userId, points, 'tap'\)/.test(server));
-ok('کارت نقدی کمیسیون نمی‌دهد (مسیر کد ساده)',
-  /Number\(card\.cash_amount \|\| 0\) === 0[\s\S]{0,200}?payCommission/.test(server));
 ok('کارت نقدی کمیسیون نمی‌دهد (مسیر عکسی)',
   /cash === 0[\s\S]{0,200}?payCommission/.test(R('src/services/photoCardService.js')));
 

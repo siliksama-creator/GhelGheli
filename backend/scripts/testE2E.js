@@ -123,8 +123,6 @@ const uniq = () => Math.random().toString(36).slice(2, 8);
 const ctx = {
   adminToken: null,
   users: [],          // {mobile, password, token, id}
-  cardTypeIds: [],
-  cardCodes: [],
   rewardIds: [],
   withdrawalIds: [],
 };
@@ -411,89 +409,11 @@ async function testBankCard() {
 }
 
 // ---------------------------------------------------------------------------
-async function testCardCashFlow() {
-  section('۷. جریان پول: کارت جایزه‌دار → کیف پول');
-
-  if (!ctx.adminToken) { skipped('کارت نقدی', 'توکن مدیر نداریم'); return null; }
-  const t = ctx.users[0]?.token;
-  if (!t) { skipped('کارت نقدی', 'کاربر آزمایشی نداریم'); return null; }
-
-  const CASH = 120000;
-  const POINTS = 30;
-
-  group('مدیر کارت با جایزهٔ نقدی تعریف می‌کند');
-  const ct = await POST('/api/admin/card-types', {
-    name: `E2E نقدی ${uniq()}`, pointValue: POINTS, cashAmount: CASH, isActive: true,
-  }, ctx.adminToken);
-  ok(ct.status === 200 && ct.data?.id, 'نوع کارت ساخته شد', `status=${ct.status}`);
-  if (!ct.data?.id) return null;
-  ctx.cardTypeIds.push(ct.data.id);
-  ok(Number(ct.data.cash_amount) === CASH, 'مبلغ نقدی روی نوع کارت ذخیره شد',
-    `cash=${ct.data.cash_amount}`);
-
-  group('اعتبارسنجی مبلغ نقدی');
-  const negCash = await POST('/api/admin/card-types',
-    { name: `E2E بد ${uniq()}`, pointValue: 1, cashAmount: -500 }, ctx.adminToken);
-  ok(negCash.status === 400, 'مبلغ نقدی منفی رد می‌شود', `status=${negCash.status}`);
-  const nanCash = await POST('/api/admin/card-types',
-    { name: `E2E بد ${uniq()}`, pointValue: 1, cashAmount: 'خیلی زیاد' }, ctx.adminToken);
-  ok(nanCash.status === 400, 'مبلغ نقدی غیرعددی رد می‌شود', `status=${nanCash.status}`);
-
-  group('مدیر کد صادر می‌کند');
-  const code = `E2E${uniq().toUpperCase()}${Date.now().toString().slice(-6)}`;
-  const cc = await POST('/api/admin/card-codes',
-    { cardTypeId: ct.data.id, code }, ctx.adminToken);
-  ok(cc.status === 200, 'کد کارت ساخته شد', `status=${cc.status}`);
-  ctx.cardCodes.push(code);
-
-  group('کاربر کد را ثبت می‌کند');
-  const before = (await GET('/api/wallet', t)).data;
-  const redeem = await POST('/api/cards/redeem', { code }, t);
-  ok(redeem.status === 200, 'ثبت کد موفق است', `status=${redeem.status} ${redeem.data?.message}`);
-  ok(Number(redeem.data?.addedCash) === CASH, 'پاسخ می‌گوید چقدر پول اضافه شد',
-    `addedCash=${redeem.data?.addedCash}`);
-  ok(Number(redeem.data?.addedPoints) === POINTS, 'امتیاز هم اضافه شد');
-
-  const after = (await GET('/api/wallet', t)).data;
-  ok(Number(after.balance) === Number(before.balance) + CASH,
-    `موجودی دقیقاً ${CASH} تومان افزایش یافت`,
-    `${before.balance} → ${after.balance}`);
-  ok(Number(after.totalIn) === Number(before.totalIn) + CASH,
-    'مجموع دریافتی هم به‌روز شد');
-
-  group('دفتر کل');
-  const tx = (await GET('/api/wallet/transactions', t)).data;
-  const cashTx = tx.find(x => x.source === 'card_cash');
-  ok(cashTx, 'تراکنش با منبع card_cash ثبت شد');
-  ok(cashTx && Number(cashTx.amount) === CASH, 'مبلغ تراکنش درست است');
-  ok(cashTx && cashTx.direction === 'credit', 'جهت تراکنش «واریز» است');
-  ok(cashTx && Number(cashTx.balance_after) === Number(after.balance),
-    'balance_after با موجودی فعلی می‌خواند',
-    `tx=${cashTx?.balance_after} wallet=${after.balance}`);
-
-  group('کد یک‌بارمصرف است');
-  const again = await POST('/api/cards/redeem', { code }, t);
-  ok(again.status === 409, 'ثبت دوبارهٔ همان کد ۴۰۹ می‌دهد', `status=${again.status}`);
-  const afterAgain = (await GET('/api/wallet', t)).data;
-  ok(Number(afterAgain.balance) === Number(after.balance),
-    'تلاش دوباره موجودی را تغییر نداد — پول دوبار واریز نشد',
-    `balance=${afterAgain.balance}`);
-
-  group('کد نامعتبر');
-  const fake = await POST('/api/cards/redeem', { code: 'NOSUCHCODE12345' }, t);
-  ok(fake.status === 404, 'کد ناموجود ۴۰۴ می‌دهد', `status=${fake.status}`);
-  const malformed = await POST('/api/cards/redeem', { code: 'a b' }, t);
-  ok(malformed.status === 400, 'کد با فرمت غلط ۴۰۰ می‌دهد', `status=${malformed.status}`);
-
-  group('کارت دومِ همان کاربر توسط کاربر دیگر');
-  // کد را کاربر اول مصرف کرده؛ کاربر دوم نباید بتواند
-  if (ctx.users[1]) {
-    const other = await POST('/api/cards/redeem', { code }, ctx.users[1].token);
-    ok(other.status === 409, 'کد مصرف‌شده برای کاربر دیگر هم کار نمی‌کند');
-  }
-
-  return { cardTypeId: ct.data.id, cash: CASH };
-}
+// ═══════════════════════════════════════════════════════════════════════════
+// بخشِ «کارت با کد» (testCardCashFlow) حذف شد: سیستمِ قدیمیِ کد کارت
+// در مایگریشن ۰۸۰ جمع شد و ثبتِ کارت فقط از مسیرِ «کارت با عکس» می‌گذرد —
+// تستِ آن مسیر در testPhotoCards / testPhotoCardGrouping است.
+// ═══════════════════════════════════════════════════════════════════════════
 
 // ---------------------------------------------------------------------------
 async function testWithdrawalFlow() {
@@ -995,27 +915,6 @@ async function testConcurrency() {
     'موجودی دقیقاً به اندازهٔ درخواست‌های موفق کم شد',
     `${start} → ${end}، موفق=${succeeded.length}`);
 
-  group('همزمانی روی ثبت کد کارت');
-  if (ctx.adminToken && ctx.cardTypeIds[0]) {
-    const code = `CONC${uniq().toUpperCase()}${Date.now().toString().slice(-6)}`;
-    const made = await POST('/api/admin/card-codes',
-      { cardTypeId: ctx.cardTypeIds[0], code }, ctx.adminToken);
-    if (made.status === 200) {
-      ctx.cardCodes.push(code);
-      const b1 = Number((await GET('/api/wallet', t)).data.balance);
-      const rr = await Promise.all([
-        POST('/api/cards/redeem', { code }, t),
-        POST('/api/cards/redeem', { code }, t),
-        POST('/api/cards/redeem', { code }, t),
-      ]);
-      const okCount = rr.filter(r => r.status === 200).length;
-      ok(okCount === 1, 'فقط یکی از سه ثبت همزمان همان کد موفق شد',
-        `موفق=${okCount} کدها=${rr.map(r => r.status).join(',')}`);
-      const b2 = Number((await GET('/api/wallet', t)).data.balance);
-      ok(b2 === b1 + 120000,
-        '⚠️ حیاتی: پول فقط یک بار واریز شد، نه سه بار', `${b1} → ${b2}`);
-    }
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1120,150 +1019,11 @@ async function testAuditFindings() {
 }
 
 // ---------------------------------------------------------------------------
-async function testCardTypeManagement() {
-  section('۱۹. ویرایش کارت و ثبت کد دسته‌ای');
-
-  if (!ctx.adminToken) { skipped('مدیریت کارت', 'توکن مدیر نداریم'); return; }
-  const A = ctx.adminToken;
-
-  group('ساخت کارت برای آزمون');
-  const created = await POST('/api/admin/card-types',
-    { name: `E2E مدیریت ${uniq()}`, pointValue: 10, cashAmount: 0 }, A);
-  if (created.status !== 200) { skipped('مدیریت کارت', 'ساخت کارت ناموفق'); return; }
-  const id = created.data.id;
-  ctx.cardTypeIds.push(id);
-  ok(true, 'کارت ساخته شد');
-
-  group('ویرایش: تغییر نام و مقادیر');
-  const newName = `E2E تغییرنام ${uniq()}`;
-  const edit = await PATCH(`/api/admin/card-types/${id}`,
-    { name: newName, pointValue: 55, cashAmount: 30000 }, A);
-  ok(edit.status === 200, 'ویرایش موفق است', `status=${edit.status}`);
-  const list1 = await GET('/api/admin/card-types', A);
-  const mine = (list1.data || []).find(t => t.id === id);
-  ok(mine?.name === newName, 'نام کارت واقعاً عوض شد', `name=${mine?.name}`);
-  ok(Number(mine?.point_value) === 55, 'امتیاز به‌روزرسانی شد');
-  ok(Number(mine?.cash_amount) === 30000, 'جایزهٔ نقدی به‌روزرسانی شد');
-
-  group('شمار کدها در فهرست نوع کارت‌ها');
-  for (const k of ['code_count', 'unused_count', 'used_count', 'voided_count']) {
-    ok(k in (mine || {}), `کلید «${k}» در پاسخ هست`);
-  }
-  ok(Number(mine.code_count) === 0, 'کارت تازه صفر کد دارد');
-
-  group('ثبت دسته‌ای');
-  const codes = Array.from({ length: 120 }, (_, i) => `E2EB${uniq().toUpperCase()}${String(i).padStart(4, '0')}`);
-  const bulk = await POST('/api/admin/card-codes/bulk',
-    { cardTypeId: id, rawCodes: codes.join('\n') }, A);
-  ok(bulk.status === 200, 'ثبت دسته‌ای موفق است', `status=${bulk.status}`);
-  ok(bulk.data?.insertedCount === 120, '۱۲۰ کد ثبت شد',
-    `inserted=${bulk.data?.insertedCount}`);
-  ok(bulk.data?.cardTypeName === newName, 'پاسخ نام کارت مقصد را برمی‌گرداند');
-
-  const list2 = await GET('/api/admin/card-types', A);
-  const mine2 = (list2.data || []).find(t => t.id === id);
-  ok(Number(mine2.code_count) === 120, 'شمار کدها در فهرست به‌روز شد',
-    `count=${mine2.code_count}`);
-  ok(Number(mine2.unused_count) === 120, 'همه مصرف‌نشده‌اند');
-
-  group('تکراری‌ها دوباره ثبت نمی‌شوند');
-  const again = await POST('/api/admin/card-codes/bulk',
-    { cardTypeId: id, rawCodes: codes.join('\n') }, A);
-  ok(again.data?.insertedCount === 0, 'هیچ‌کدام دوباره ثبت نشد',
-    `inserted=${again.data?.insertedCount}`);
-  ok(again.data?.duplicateInDbCount === 120, 'همه به‌عنوان تکراری شناسایی شدند',
-    `dup=${again.data?.duplicateInDbCount}`);
-  const list3 = await GET('/api/admin/card-types', A);
-  ok(Number((list3.data || []).find(t => t.id === id).code_count) === 120,
-    '⚠️ حیاتی: تعداد کدها دو برابر نشد');
-
-  group('تکراری با حروف کوچک هم گرفته می‌شود');
-  const lower = await POST('/api/admin/card-codes/bulk',
-    { cardTypeId: id, rawCodes: codes.slice(0, 5).map(c => c.toLowerCase()).join('\n') }, A);
-  ok(lower.data?.insertedCount === 0,
-    'کد با حروف کوچک تکراری تشخیص داده می‌شود (citext)',
-    `inserted=${lower.data?.insertedCount}`);
-
-  group('سقف ۱۰۰۰ کد');
-  const tooMany = Array.from({ length: 1001 }, (_, i) => `OVER${String(i).padStart(6, '0')}`);
-  const over = await POST('/api/admin/card-codes/bulk',
-    { cardTypeId: id, rawCodes: tooMany.join('\n') }, A);
-  ok(over.status === 400, 'بیش از ۱۰۰۰ کد رد می‌شود', `status=${over.status}`);
-  ok(/۱۰۰۰|1000/.test(String(over.data?.message || '')),
-    'پیام خطا سقف را می‌گوید', `msg=${over.data?.message}`);
-
-  group('دقیقاً ۱۰۰۰ کد پذیرفته می‌شود');
-  const exact = Array.from({ length: 1000 }, (_, i) => `EXACT${uniq().toUpperCase()}${String(i).padStart(4, '0')}`);
-  const t0 = Date.now();
-  const okBulk = await POST('/api/admin/card-codes/bulk',
-    { cardTypeId: id, rawCodes: exact.join('\n') }, A);
-  const ms = Date.now() - t0;
-  ok(okBulk.status === 200 && okBulk.data?.insertedCount === 1000,
-    'هزار کد یکجا ثبت شد', `inserted=${okBulk.data?.insertedCount} در ${ms}ms`);
-  ok(ms < 10000, 'ثبت هزار کد زیر ۱۰ ثانیه طول کشید', `${ms}ms`);
-  ok(Array.isArray(okBulk.data?.inserted) && okBulk.data.inserted.length <= 20,
-    'پاسخ فقط نمونه برمی‌گرداند نه هزار کد',
-    `sample=${okBulk.data?.inserted?.length}`);
-
-  group('⚠️ بدون سقف تجمعی: چند نوبت روی همان کارت');
-  // این کارت تا اینجا ۱۰۰۰+۱۲۰ کد دارد. سه نوبت دیگر اضافه می‌کنیم تا
-  // ثابت شود سقف ۱۰۰۰ فقط «هر بار» است و مجموع کدهای یک کارت محدود نیست.
-  // اگر روزی کسی سهواً یک شرط تجمعی اضافه کند، این تست می‌افتد.
-  const before = Number((await GET('/api/admin/card-types', A)).data
-    .find(t => t.id === id).code_count);
-  let added = 0;
-  for (let round = 0; round < 3; round++) {
-    const more = Array.from({ length: 500 },
-      (_, i) => `CUM${round}${uniq().toUpperCase()}${String(i).padStart(4, '0')}`);
-    const r = await POST('/api/admin/card-codes/bulk',
-      { cardTypeId: id, rawCodes: more.join('\n') }, A);
-    ok(r.status === 200 && r.data?.insertedCount === 500,
-      `نوبت ${round + 1}: ۵۰۰ کد دیگر اضافه شد`,
-      `status=${r.status} inserted=${r.data?.insertedCount} msg=${r.data?.message || ''}`);
-    added += r.data?.insertedCount || 0;
-  }
-  const after = Number((await GET('/api/admin/card-types', A)).data
-    .find(t => t.id === id).code_count);
-  ok(after === before + added,
-    'همهٔ نوبت‌ها روی هم جمع شدند — هیچ سقف تجمعی وجود ندارد',
-    `${before} + ${added} = ${before + added}، سرور می‌گوید ${after}`);
-  ok(after > 2000,
-    'یک کارت بیش از ۲۰۰۰ کد دارد و سرور همچنان قبول می‌کند',
-    `total=${after}`);
-
-  group('ورودی‌های نامعتبر');
-  const noType = await POST('/api/admin/card-codes/bulk', { rawCodes: 'ABC12345' }, A);
-  ok(noType.status === 400, 'بدون نوع کارت ۴۰۰ می‌دهد', `status=${noType.status}`);
-  const badType = await POST('/api/admin/card-codes/bulk',
-    { cardTypeId: 'not-a-uuid', rawCodes: 'ABC12345' }, A);
-  ok(badType.status === 400, 'شناسهٔ نامعتبر ۴۰۰ می‌دهد نه ۵۰۰', `status=${badType.status}`);
-  const ghostType = await POST('/api/admin/card-codes/bulk',
-    { cardTypeId: '11111111-1111-4111-8111-111111111111', rawCodes: 'ABC12345' }, A);
-  ok(ghostType.status === 404, 'نوع کارت ناموجود ۴۰۴ می‌دهد نه ۵۰۰',
-    `status=${ghostType.status}`);
-  const empty = await POST('/api/admin/card-codes/bulk',
-    { cardTypeId: id, rawCodes: '   ' }, A);
-  ok(empty.status === 400, 'ورودی خالی ۴۰۰ می‌دهد', `status=${empty.status}`);
-
-  group('کدهای بدفرمت جدا می‌شوند و بقیه ثبت می‌شوند');
-  const mixed = ['VALID' + uniq().toUpperCase(), 'a b', 'short', '!!!@@@', 'VALID2' + uniq().toUpperCase()];
-  const mix = await POST('/api/admin/card-codes/bulk',
-    { cardTypeId: id, rawCodes: mixed.join('\n') }, A);
-  ok(mix.status === 200, 'درخواست مخلوط موفق است');
-  ok(mix.data?.invalidCount >= 1, 'کدهای بدفرمت شمرده شدند',
-    `invalid=${mix.data?.invalidCount}`);
-  ok(mix.data?.insertedCount >= 1, 'کدهای سالم با وجود بدفرمت‌ها ثبت شدند',
-    `inserted=${mix.data?.insertedCount}`);
-
-  group('کاربر عادی نمی‌تواند کد بسازد');
-  const t = ctx.users[0]?.token;
-  if (t) {
-    const attack = await POST('/api/admin/card-codes/bulk',
-      { cardTypeId: id, rawCodes: 'HACK1234' }, t);
-    ok(attack.status === 401 || attack.status === 403,
-      '⚠️ حیاتی: کاربر عادی نمی‌تواند کد کارت بسازد', `status=${attack.status}`);
-  }
-}
+// ═══════════════════════════════════════════════════════════════════════════
+// بخشِ «مدیریت کارت و کد دسته‌ای» (testCardTypeManagement) حذف شد —
+// مسیرهای admin/card-types و admin/card-codes دیگر وجود ندارند.
+// ساختِ card_types در تراکنشِ آپلودِ طرحِ «کارت با عکس» تست می‌شود.
+// ═══════════════════════════════════════════════════════════════════════════
 
 // ---------------------------------------------------------------------------
 async function cleanup() {
@@ -1274,15 +1034,6 @@ async function cleanup() {
     console.log(`     کاربران آزمایشی: ${ctx.users.map(u => u.mobile).join(', ')}`);
     return;
   }
-
-  // غیرفعال کردن نوع کارت‌های آزمایشی (حذف کامل به‌خاطر FK امکان‌پذیر نیست)
-  let deactivated = 0;
-  for (const id of ctx.cardTypeIds) {
-    const r = await PATCH(`/api/admin/card-types/${id}`, { isActive: false }, ctx.adminToken);
-    if (r.status === 200) deactivated++;
-  }
-  ok(deactivated === ctx.cardTypeIds.length || ctx.cardTypeIds.length === 0,
-    `نوع کارت‌های آزمایشی غیرفعال شدند (${deactivated}/${ctx.cardTypeIds.length})`);
 
   // مسدود کردن کاربران آزمایشی تا در لیگ و آمار دیده نشوند
   let blocked = 0;
@@ -1322,7 +1073,6 @@ async function cleanup() {
     await testUuidValidation();
     await testWalletBasics();
     await testBankCard();
-    await testCardCashFlow();
     await testWithdrawalFlow();
     await testAdminWithdrawalReview();
     await testCrossUserIsolation();
@@ -1333,7 +1083,6 @@ async function cleanup() {
     await testRateLimits();
     await testConcurrency();
     await testAdminSettings();
-    await testCardTypeManagement();
     await testAuditFindings();
     await cleanup();
   } catch (e) {

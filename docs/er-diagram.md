@@ -2,9 +2,7 @@
 
 ```mermaid
 erDiagram
-  users ||--o{ card_codes : consumes
   users ||--o{ user_card_inventory : owns
-  card_types ||--o{ card_codes : has
   card_types ||--o{ user_card_inventory : inventory
   users ||--o{ user_reward_claims : claims
   reward_tiers ||--o{ user_reward_claims : tier
@@ -42,14 +40,7 @@ erDiagram
     integer point_value
     boolean is_active
   }
-  card_codes {
-    uuid id PK
-    varchar code UNIQUE
-    uuid card_type_id FK
-    varchar status
-    uuid used_by_user_id FK
-    timestamptz used_at
-  }
+
   user_card_inventory {
     uuid id PK
     uuid user_id FK

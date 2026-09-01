@@ -75,12 +75,15 @@ ck('ON DELETE SET NULL دارد، نه CASCADE',
   /display_design_id[\s\S]{0,260}ON DELETE SET NULL/i.test(migrations),
   'CASCADE یعنی حذفِ یک طرح، کارتِ کاربر را از مجموعه‌اش پاک کند');
 
-console.log('\n══ ۲. هر دو مسیرِ ثبت قرعه می‌اندازند ══');
-// اگر فقط یکی این کار را بکند، نصفِ کارت‌های کاربر تصادفی‌اند و نصفِ
-// دیگر نه — که بی‌قاعده به نظر می‌رسد، نه عمدی.
+console.log('\n══ ۲. مسیرِ ثبت (فقط عکس) قرعه می‌اندازد ══');
+// سیستمِ قدیمیِ «ثبت با کدِ تنها» حذف شد (مایگریشن ۰۸۰) — پس فقط یک
+// مسیرِ ثبت باقی است و همین یکی باید طرحِ تصادفی بدهد، وگرنه کارت‌های
+// کاربر بی‌قاعده نصف‌تصادفی می‌مانند.
+ck('مسیرِ قدیمیِ «ثبت کد کارت» در server.js نیست',
+  !/INSERT INTO card_codes|\/api\/cards\/redeem/.test(serverSrc),
+  'سیستمِ حذف‌شده نباید برگردد');
 for (const [label, src] of [
   ['ثبت با عکس (photoCardService)', svcSrc],
-  ['ثبت با کدِ تنها (server.js)', serverSrc],
 ]) {
   ck(`${label}: از photo_card_designs طرح انتخاب می‌کند`,
     /FROM photo_card_designs[\s\S]{0,160}ORDER BY random\(\)/i.test(src),

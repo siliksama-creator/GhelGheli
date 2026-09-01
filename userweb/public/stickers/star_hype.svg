@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+  <defs>
+    <linearGradient id="syel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FEF08A"/><stop offset="100%" stop-color="#F59E0B"/>
+    </linearGradient>
+  </defs>
+  <g>
+    <animateTransform attributeName="transform" type="rotate" values="-6 48 48;6 48 48;-6 48 48" dur="1.8s" repeatCount="indefinite"/>
+    <path d="M48 8 L58 36 L88 36 L63 53 L73 82 L48 65 L23 82 L33 53 L8 36 L38 36 Z" fill="url(#syel)" stroke="#B45309" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M48 8 L58 36 L88 36 L63 53 L73 82 L48 65 L23 82 L33 53 L8 36 L38 36 Z" fill="#FFFFFF" opacity="0.18"/>
+  </g>
+  <g>
+    <path d="M38 40 L41 44 L45 44.5 L41 45 L38 49 L35 45 L31 44.5 L35 44 Z" fill="#7C2D12"><animate attributeName="opacity" values="1;1;0.15;1" dur="2.4s" repeatCount="indefinite"/></path>
+    <path d="M58 40 L61 44 L65 44.5 L61 45 L58 49 L55 45 L51 44.5 L55 44 Z" fill="#7C2D12"><animate attributeName="opacity" values="1;1;0.15;1" dur="2.4s" repeatCount="indefinite"/></path>
+  </g>
+  <path d="M42 56 C46 61 50 61 54 56" fill="none" stroke="#7C2D12" stroke-width="3" stroke-linecap="round">
+    <animate attributeName="d" values="M42 56 C46 61 50 61 54 56;M40 54 C46 62 50 62 56 54;M42 56 C46 61 50 61 54 56" dur="1.6s" repeatCount="indefinite"/>
+  </path>
+  <path d="M74 16 L75.5 19 L79 19.2 L76 21.5 L77 25 L74 23 L71 25 L72 21.5 L69 19.2 L72.5 19 Z" fill="#FDE68A"><animate attributeName="opacity" values="0;1;0" dur="1.7s" repeatCount="indefinite"/></path>
+  <path d="M20 26 L21.5 29 L25 29.2 L22 31.5 L23 35 L20 33 L17 35 L18 31.5 L15 29.2 L18.5 29 Z" fill="#FDE68A"><animate attributeName="opacity" values="1;0;1" dur="1.7s" repeatCount="indefinite"/></path>
+</svg>

@@ -942,7 +942,6 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
 
   Widget _reportView(BuildContext context, Map r) {
     final theme = Theme.of(context);
-    final clash = (r['clashWithOldBankCount'] ?? 0) as int;
     return Container(
       padding: const EdgeInsets.all(Gaps.sm),
       decoration: BoxDecoration(
@@ -970,48 +969,6 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
                     BrandColors.dangerOnLight),
             ],
           ),
-          // ── هشدارِ برخورد با بانکِ سیستم قدیمی ──
-          // سکوت اینجا یعنی یک کارت دو بار امتیاز می‌دهد و ماه‌ها بعد
-          // از روی شکایت کشف می‌شود.
-          if (clash > 0) ...[
-            const SizedBox(height: Gaps.xs),
-            Container(
-              padding: const EdgeInsets.all(Gaps.xs),
-              decoration: BoxDecoration(
-                borderRadius: Corners.rSm,
-                color: BrandColors.warningOnLight.withValues(alpha: 0.13),
-                border: Border.all(
-                    color: BrandColors.warningOnLight.withValues(alpha: 0.45)),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.warning_amber_rounded,
-                      size: 17, color: BrandColors.warningOnLight),
-                  const SizedBox(width: 7),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${faNum(clash)} کد در سیستم «ثبت کد کارت» هم وجود دارد.',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: BrandColors.warningOnLight),
-                        ),
-                        Text(
-                          'یعنی همان کارت یک بار با کد و یک بار با عکس قابل '
-                          'ثبت است و دو بار امتیاز می‌دهد. اگر عمدی نیست، آن '
-                          'کدها را از یکی از دو سیستم باطل کنید.',
-                          style: theme.textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
         ],
       ),
     );

@@ -853,23 +853,6 @@ export function PhotoCardsPage({ request }) {
               )}
             </div>
 
-            {/* هشدارِ برخورد با بانکِ سیستم قدیمی. سکوت اینجا یعنی یک
-                کارت دو بار امتیاز می‌دهد و ماه‌ها بعد کشف می‌شود. */}
-            {report.clashWithOldBankCount > 0 && (
-              <div className="crWarn">
-                <AlertTriangle size={15} />
-                <div>
-                  <b>{fmtNumber(report.clashWithOldBankCount)} کد در سیستم «ثبت کد کارت» هم وجود دارد.</b>
-                  <span>
-                    یعنی همان کارت یک بار با کد و یک بار با عکس قابل ثبت است
-                    و دو بار امتیاز می‌دهد. اگر عمدی نیست، آن کدها را از یکی
-                    از دو سیستم باطل کنید.
-                  </span>
-                  <code>{report.clashWithOldBank.join('، ')}</code>
-                </div>
-              </div>
-            )}
-
             {report.invalidCount > 0 && (
               <p className="crList">
                 نامعتبر: <code>{report.invalid.join('، ')}</code>
