@@ -166,14 +166,18 @@ function OpsLimitsCard({ request, notify }) {
         <Field label="دورِ کامل گردونه"><Input type="number" min="1" max="20" value={l.wheelSpinRotations} onChange={(e) => setNum('wheelSpinRotations', e.target.value)} /></Field>
         <Field label="کمیسیون امتیازی معرف (٪)"><Input type="number" min="0" max="50" value={l.referralCommissionPercent} onChange={(e) => setNum('referralCommissionPercent', e.target.value)} /></Field>
         <Field label="کمیسیون نقدی معرف از خرید (٪)"><Input type="number" min="0" max="50" value={l.referralPurchaseCommissionPercent} onChange={(e) => setNum('referralPurchaseCommissionPercent', e.target.value)} /></Field>
-        <Field label="سقف دعوت مؤثر روزانه"><Input type="number" min="1" max="500" value={l.referralMaxInvitesForDaily} onChange={(e) => setNum('referralMaxInvitesForDaily', e.target.value)} /></Field>
-        <Field label="چرخش هدیه به هر دو طرف (هر دعوت)"><Input type="number" min="0" max="50" value={l.referralSpinsPerInvite} onChange={(e) => setNum('referralSpinsPerInvite', e.target.value)} /></Field>
-        <Field label="دعوت لازم برای چرخش روزانهٔ اضافه"><Input type="number" min="1" max="100" value={l.referralInvitesPerDailySpin} onChange={(e) => setNum('referralInvitesPerDailySpin', e.target.value)} /></Field>
+        <Field label="سقف دعوت مؤثر روزانه" hint="بیشتر از این تعداد دعوت در یک روز، چرخشِ اضافه نمی‌دهد."><Input type="number" min="1" max="500" value={l.referralMaxInvitesForDaily} onChange={(e) => setNum('referralMaxInvitesForDaily', e.target.value)} /></Field>
+        <Field label="چرخش هدیه به هر دو طرف (هر دعوت)" hint="با هر دعوتِ موفق، هم دعوت‌کننده هم دعوت‌شده این تعداد چرخش می‌گیرند."><Input type="number" min="0" max="50" value={l.referralSpinsPerInvite} onChange={(e) => setNum('referralSpinsPerInvite', e.target.value)} /></Field>
+        <Field label="دعوت لازم برای چرخش روزانهٔ اضافه" hint="با رسیدن دعوت‌های روز به این عدد، یک چرخشِ بیشتر در همان روز."><Input type="number" min="1" max="100" value={l.referralInvitesPerDailySpin} onChange={(e) => setNum('referralInvitesPerDailySpin', e.target.value)} /></Field>
         <Field label="چرخش روزانهٔ پایه"><Input type="number" min="0" max="50" value={l.referralBaseDailySpins} onChange={(e) => setNum('referralBaseDailySpins', e.target.value)} /></Field>
         <Field label="آدرس درگاه کافه‌بازار"><Input value={l.bazaarApiBase} onChange={(e) => setL((p) => ({ ...p, bazaarApiBase: e.target.value }))} /></Field>
       </div>
 
       <h4 style={{ margin: '16px 0 8px', fontSize: 13.5 }}>محدودکننده‌های نرخ (پنجره/سقف)</h4>
+      <p className="topbar-sub" style={{ margin: '-2px 0 8px' }}>
+        عدد اول پنجرهٔ زمانی (میلی‌ثانیه) و عدد دوم سقفِ درخواست در همان
+        پنجره است؛ عبور از سقف، درخواست را با خطای «زیادی تلاش کردی» رد می‌کند.
+      </p>
       <div style={{ display: 'grid', gap: 6 }}>
         {Object.entries(l.rateLimits || {}).map(([k, v]) => (
           <div key={k} style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>

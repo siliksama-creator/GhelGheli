@@ -142,7 +142,8 @@ export function RewardsPage({ request }) {
   return (
     <div className="card-grid cols-2">
       <div style={{ display: 'grid', gap: 20, alignContent: 'start' }}>
-        <Card title="گروه‌های جایزه">
+        <Card title="گروه‌های جایزه"
+          subtitle="جایزه‌ها را گروه‌بندی کنید (مثلاً «نقدی»، «فروشگاهی»)؛ هر گروه مستقل نمایش داده می‌شود">
           <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>
             هر گروه نوار پیشرفت مستقل دارد؛ کاربر می‌تواند در هر گروه جداگانه
             جایزه بگیرد و نوار همان گروه از ابتدا شروع می‌شود.
@@ -263,7 +264,8 @@ export function RewardsPage({ request }) {
           </form>
         </Card>
 
-        <Card title="سطح‌های جایزه فعلی">
+        <Card title="سطح‌های جایزه فعلی"
+          subtitle="هر سطح یک آستانهٔ امتیاز و یک جایزه دارد — کاربر با رسیدن به آستانه می‌تواند ادعا کند">
           {rewards.length === 0 ? (
             <EmptyState icon={Gift} title="هنوز جایزه‌ای تعریف نشده" />
           ) : (
@@ -351,7 +353,8 @@ export function RewardsPage({ request }) {
         </div>
       )}
 
-      <Card title="درخواست‌های جایزه">
+      <Card title="درخواست‌های جایزه"
+          subtitle="ادعاهای کاربران: تأیید = واریز جایزه؛ رد = برگشت امتیاز">
         {claims.length === 0 ? (
           <EmptyState icon={CreditCard} title="درخواستی وجود ندارد" />
         ) : (

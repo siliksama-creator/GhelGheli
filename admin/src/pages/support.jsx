@@ -100,7 +100,7 @@ export function SupportPage({ request }) {
 
   return (
     <div className="card-grid cols-2">
-      <Card title="تیکت‌های پشتیبانی">
+      <Card title="تیکت‌های پشتیبانی" subtitle="پاسخ شما در اپ کاربر به‌صورت گفتگو دیده می‌شود؛ بعد از حل، تیکت را ببندید">
         {tickets.length === 0 ? (
           <EmptyState icon={LifeBuoy} title="تیکتی وجود ندارد" />
         ) : (

@@ -82,7 +82,7 @@ export function AdminsPage({ request }) {
 
   return (
     <div className="card-grid cols-2">
-      <Card title="ادمین جدید">
+      <Card title="ادمین جدید" subtitle="نقش «پشتیبان» فقط تیکت‌ها را می‌بیند؛ بقیهٔ صفحه‌ها مخصوص سوپرادمین است">
         <form onSubmit={add}>
           <Field label="نام کاربری">
             <Input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} required />

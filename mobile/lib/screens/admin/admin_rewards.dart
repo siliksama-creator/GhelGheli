@@ -374,6 +374,7 @@ class _AdminRewardsState extends State<AdminRewards> {
       children: [
         FormSection(
           title: 'گروه‌های جایزه',
+          subtitle: 'جایزه‌ها را گروه‌بندی کنید (مثلاً «نقدی»، «فروشگاهی») — هر گروه مستقل نمایش داده می‌شود',
           children: [
             Text(
               'هر گروه نوار پیشرفت مستقل دارد؛ بعد از دریافت جایزه، نوار همان '
@@ -446,6 +447,7 @@ class _AdminRewardsState extends State<AdminRewards> {
         Gaps.vMd,
         FormSection(
           title: 'جایزه جدید (${faNum(_rewards.length)}/۳۰)',
+          subtitle: 'هر سطح یک آستانهٔ امتیاز و یک جایزه دارد — کاربر با رسیدن به آستانه می‌تواند ادعا کند',
           children: [
             DropdownButtonFormField<String?>(
               initialValue: _groupId,
@@ -531,6 +533,7 @@ class _AdminRewardsState extends State<AdminRewards> {
         Gaps.vMd,
         FormSection(
           title: 'سطح‌های جایزه',
+          subtitle: 'تغییر هر سطح از همین لحظه اعمال می‌شود؛ ادعاهای قبلی دست‌نخورده می‌مانند',
           children: _rewards.isEmpty
               ? [
                   const EmptyState(
@@ -594,6 +597,7 @@ class _AdminRewardsState extends State<AdminRewards> {
         Gaps.vMd,
         FormSection(
           title: 'درخواست‌های جایزه',
+          subtitle: 'ادعاهای کاربران: تأیید = واریز جایزه؛ رد = برگشت امتیاز',
           children: _claims.isEmpty
               ? [
                   const EmptyState(

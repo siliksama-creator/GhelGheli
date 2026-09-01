@@ -77,7 +77,7 @@ export function MetricsPage({ request }) {
         {/* ۱. سوکت‌های آنلاین */}
         <Card
           title="سوکت‌های آنلاین"
-          subtitle="Socket.io Active Connections"
+          subtitle="تعداد اتصال‌های زندهٔ Socket.io — کاربرانی که همین حالا به بازی/چت وصل‌اند"
           action={<Network size={20} className="pos" style={{ opacity: 0.8 }} />}
         >
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 8 }}>
@@ -91,7 +91,7 @@ export function MetricsPage({ request }) {
         {/* ۲. اتاق‌های بازی آنلاین */}
         <Card
           title="اتاق‌های بازی زنده"
-          subtitle="Active Multiplayer Rooms"
+          subtitle="بازی‌های دونفره‌ای که همین حالا در جریان‌اند"
           action={<Cpu size={20} className="pos" style={{ opacity: 0.8 }} />}
         >
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 8 }}>
@@ -105,7 +105,7 @@ export function MetricsPage({ request }) {
         {/* ۳. حافظه کش Redis */}
         <Card
           title="حافظه موقت Redis"
-          subtitle="Redis RAM Allocation"
+          subtitle="مصرف حافظهٔ سرویس کش و صف‌ها"
           action={<HardDrive size={20} className="pos" style={{ opacity: 0.8 }} />}
         >
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
@@ -118,7 +118,7 @@ export function MetricsPage({ request }) {
         {/* ۴. اتصالات PostgreSQL */}
         <Card
           title="اتصال‌های PostgreSQL"
-          subtitle="DB Pool Clients Size"
+          subtitle="تعداد اتصال‌های باز به دیتابیس"
           action={<Database size={20} className="pos" style={{ opacity: 0.8 }} />}
         >
           <div style={{ marginTop: 8 }}>
