@@ -441,7 +441,7 @@ export function PointsPage({ request }) {
 
               {/* ── تاریخچه ── */}
               <Card title="ریز تراکنش‌ها"
-                subtitle={detail ? `${fmtNumber(detail.total)} ردیف` : ''}
+                subtitle={detail ? `${fmtNumber(detail.total)} ردیف — هر ردیف = یک واریز یا کسر امتیاز با منبع و دلیل` : ''}
                 action={(
                   <Select value={srcFilter}
                     onChange={(e) => {

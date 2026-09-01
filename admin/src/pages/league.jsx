@@ -521,7 +521,7 @@ export function LeaguePage({ request }) {
 
       {/* ══ تاریخچهٔ واریزها ══ */}
       {!!payouts.filter((p) => p.paid_at).length && (
-        <Card title="جوایز واریزشده">
+        <Card title="جوایز واریزشده" subtitle="۳۰ واریز آخر — هر ردیف یعنی پول به کیف پول کاربر رفته است">
           <Table
             cols={['رتبه', 'کاربر', 'مبلغ', 'ماه', 'زمان واریز']}
             rows={payouts.filter((p) => p.paid_at).slice(0, 30).map((p) => [
