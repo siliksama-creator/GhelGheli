@@ -19,6 +19,7 @@
 const crypto = require('crypto');
 const { pool } = require('../config/db');
 const referrals = require('./referralService');
+const opsLimits = require('./opsLimits');
 const grants = require('./grantService');
 
 /** انواعِ جایزه‌ای که پنل ادمین می‌تواند روی گردونه بگذارد. */
@@ -210,6 +211,10 @@ async function status(userId) {
     spinsLeft: dailyLeft + bonus,
     invitedCount: invites,
     resetInMs: msUntilTehranMidnight(),
+    // ثابت‌های ظاهریِ انیمیشن چرخش — کلاینت‌ها به‌جای عددِ کامپایل‌شده
+    // از این می‌خوانند تا تغییرِ پنل بدون آپدیت اعمال شود.
+    spinDurationMs: opsLimits.get().wheelSpinMs,
+    spinRotations: opsLimits.get().wheelSpinRotations,
   };
 }
 

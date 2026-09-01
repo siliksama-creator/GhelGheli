@@ -73,12 +73,20 @@ for (const [kind, slugs] of Object.entries(required)) {
 
 // Commission is direct-only, atomic, auditable and idempotent.
 assert.strictEqual((referrals.match(/async function payPurchaseCommission/g) || []).length, 1);
-assert(referrals.includes('PURCHASE_COMMISSION_PERCENT = 5'));
-// نرخ باید در خودِ SQL هاردکد باشد (نه پارامتر) تا فراخوانی‌کننده
-// نتواند درصد دلخواه تزریق کند. تعداد پارامترها عمداً سنجیده نمی‌شود؛
-// افزودن ستونِ ممیزی نباید تست را بشکند.
-assert(/VALUES\(\$1,\$2,\$3,\$4,\$5,0\.0500(,\$\d+)+\)/.test(referrals),
-  'commission rate must stay hardcoded at 0.0500 inside the INSERT');
+// نرخ پیش‌فرض در opsLimits است؛ سرویس باید از getter بخواند نه ثابت.
+assert(/purchaseCommissionPercent\(\)/.test(referrals));
+assert(/referralPurchaseCommissionPercent:\s*5/.test(
+  require('fs').readFileSync(require('path').join(__dirname, '../src/services/opsLimits.js'), 'utf8')));
+// نرخ حالا از ops_limits می‌آید (قابل تنظیم از پنل ادمین، پیش‌فرض ۵٪)،
+// ولی هرگز از بدنهٔ درخواستِ کلاینت — روحِ گاردِ قبلی حفظ می‌شود:
+// در payPurchaseCommission نرخ از getter سرویس محاسبه می‌شود و همان
+// مقدار (rate) در ستونِ commission_rate ثبت می‌شود.
+assert(/const rate = pct \/ 100;/.test(referrals),
+  'نرخ از getter سرویس محاسبه می‌شود');
+assert(/VALUES\(\$1,\$2,\$3,\$4,\$5,\$6,\$7,\$8\)/.test(referrals),
+  'نرخ به‌عنوان پارامترِ محاسبه‌شده در INSERT می‌رود — نه از کلاینت');
+assert(!/req\.body/.test(referrals.split('payPurchaseCommission')[1].split('ON CONFLICT')[0]),
+  'بدنهٔ درخواست در مسیر نرخ دخالت ندارد');
 // درگاه پرداخت باید در ردیف ممیزی ثبت شود (دور ۱۸: خرید مستقیم بازار).
 assert(referrals.includes('gateway_provider'), 'audit row must record the gateway');
 assert(rateMigration.includes('SET DEFAULT 0.0500'));

@@ -52,8 +52,10 @@ async function main() {
   const svc = require(svcPath);
 
   // ── ۱. ثابت‌ها همان چیزی‌اند که مالک خواست ──
-  check('سقف روی ۲۰۰ پیام تنظیم است', () => {
-    assert.strictEqual(svc.CHAT_KEEP_LIMIT, 200);
+  check('سقف پیش‌فرض روی ۲۰۰ پیام تنظیم است', () => {
+    // سقف حالا از ops_limits می‌آید (قابل تنظیم از پنل)؛ بدون تنظیمِ
+    // ذخیره‌شده، پیش‌فرض باید دقیقاً ثابتِ قبلیِ کد باشد.
+    assert.strictEqual(svc.keepLimit(), 200);
   });
 
   check('فاصلهٔ پاک‌سازی عددی مثبت و معقول است', () => {

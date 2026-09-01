@@ -105,8 +105,12 @@ class _WheelPageState extends State<WheelPage>
   //
   // ۵.۶ ثانیه و ۹ دور کامل. بیشتر از این، انتظار حس می‌شود نه هیجان —
   // مخصوصاً برای کاربری که روزی چند بار می‌چرخاند.
-  static const Duration _spinDuration = Duration(milliseconds: 5600);
-  static const double _fullSpins = 9.0;
+  //
+  // این دو پیش‌فرض‌اند نه ثابت: سرور در پاسخِ /api/wheel مقدارِ
+  // spinDurationMs و spinRotations را می‌فرستد (قابل تنظیم از پنل ادمین)
+  // و کلاینت همان را اجرا می‌کند — بدون آپدیت.
+  Duration _spinDuration = const Duration(milliseconds: 5600);
+  double _fullSpins = 9.0;
 
   late final AnimationController _spinCtl = AnimationController(
     vsync: this,
@@ -183,6 +187,9 @@ class _WheelPageState extends State<WheelPage>
         _dailyQuota = (map['dailyQuota'] as num?)?.toInt() ?? 1;
         _unlimited = map['unlimited'] == true;
         _resetInMs = (map['resetInMs'] as num?)?.toInt() ?? 0;
+        _spinDuration = Duration(
+            milliseconds: (map['spinDurationMs'] as num?)?.toInt() ?? 5600);
+        _fullSpins = (map['spinRotations'] as num?)?.toDouble() ?? 9.0;
         _loading = false;
         _error = null;
       });
@@ -253,6 +260,9 @@ class _WheelPageState extends State<WheelPage>
           (MediaQuery.maybeDisableAnimationsOf(context) ?? false);
       if (reduce) {
         _spinCtl.value = 1;
+        // مدتِ تازه از سرور: ادمین می‌تواند طولِ چرخش را عوض کند و
+        // همان لحظه روی این کنترلر بنشیند.
+        _spinCtl.duration = _spinDuration;
       } else {
         // `forward` یک Future برمی‌گرداند که وقتی انیمیشن تمام شود
         // کامل می‌شود. عمداً منتظرش نمی‌مانیم و به‌جایش روی

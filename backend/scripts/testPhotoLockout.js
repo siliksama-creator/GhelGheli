@@ -119,7 +119,7 @@ const U = 'user-1';
   await t('مدت قفل دقیقاً ۳ ساعت است', async () => {
     // خواستهٔ صریح مالک. اگر کسی این عدد را عوض کرد، تست بگیردش.
     assert.strictEqual(lockout.LOCK_MS, 3 * 60 * 60 * 1000);
-    assert.strictEqual(lockout.MAX_FAILS, 5);
+    assert.strictEqual(lockout.maxFails(), 5);
   });
 
   // ── وضعیت ──

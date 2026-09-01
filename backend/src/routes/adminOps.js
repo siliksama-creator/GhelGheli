@@ -8,6 +8,8 @@
  * اثر می‌گذارد، بدون ری‌استارت و بدون آپدیت اپ.
  */
 const express = require('express');
+const opsLimits = require('../services/opsLimits');
+const payments = require('../services/paymentService');
 
 module.exports = function createAdminOpsRoutes(deps) {
   const {
@@ -111,6 +113,39 @@ module.exports = function createAdminOpsRoutes(deps) {
       await audit(req.admin.id, 'update_chat_canned_messages', 'app_settings', null,
         b.reason || null, { count: messages.length });
       res.json({ message: `فهرست پیام‌های آماده ذخیره شد (${messages.length} پیام)`, messages });
+    }));
+
+  // ── سقف‌ها و اعدادِ عملیاتی (chatKeepLimit، قفل عکس، معرف، نرخ‌ها،
+  //    گردونه) — آخرین دسته از ثابت‌هایی که از پنل قابل تنظیم شدند ──────
+  router.get('/admin/settings/ops-limits', adminAuth,
+    asyncHandler(async (req, res) => {
+      res.json(opsLimits.panelView());
+    }));
+
+  router.patch('/admin/settings/ops-limits', adminAuth, requireRole(),
+    asyncHandler(async (req, res) => {
+      const saved = await opsLimits.save(req.body || {}, req.admin.id);
+      await audit(req.admin.id, 'update_ops_limits', 'app_settings', null,
+        req.body.reason || null, saved);
+      res.json({
+        message: 'سقف‌ها ذخیره شد — از همین لحظه اعمال می‌شوند',
+        ...saved,
+      });
+    }));
+
+  // ── نقاط قیمتی کافه‌بازار — فقط‌خواندنی ───────────────────────────────
+  // این جدول باید دقیقاً با کنسول کافه‌بازار یکی باشد؛ پنل فقط نشانش
+  // می‌دهد تا مدیر ببیند کدام قیمت‌ها قابل خریدند و آدرسِ درگاه چیست.
+  router.get('/admin/bazaar-products', adminAuth,
+    asyncHandler(async (req, res) => {
+      const cat = payments.bazaarCatalog();
+      res.json({
+        priceProducts: Object.entries(cat.priceProducts)
+          .map(([price, productId]) => ({ price: Number(price), productId })),
+        plusProducts: Object.entries(cat.plusProducts)
+          .map(([plan, p]) => ({ plan, ...p })),
+        apiBase: cat.apiBase,
+      });
     }));
 
   return router;

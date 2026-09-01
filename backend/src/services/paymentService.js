@@ -92,7 +92,17 @@ const PLUS_PRODUCTS = Object.freeze({
   annual:  { productId: 'ghelgheli_plus_annual',  price: 499000, label: 'قلقلی پلاس سالانه' },
 });
 
-const BAZAAR_API = 'https://pardakht.cafebazaar.ir';
+// آدرسِ درگاه — اول env، بعد ops_limits (قابل تنظیم از پنل)، بعد پیش‌فرض.
+// env بالاتر است چون آدرس را معمولاً در لایهٔ دیپلوی می‌گذارند.
+const opsLimits = require('./opsLimits');
+
+function bazaarApiBase() {
+  return process.env.BAZAAR_API
+    || opsLimits.get().bazaarApiBase
+    || 'https://pardakht.cafebazaar.ir';
+}
+
+const BAZAAR_API = bazaarApiBase();
 
 function cfg() {
   return {
@@ -182,7 +192,7 @@ async function accessToken() {
     client_secret: c.clientSecret,
     refresh_token: c.refreshToken,
   });
-  const res = await fetch(`${BAZAAR_API}/auth/token/`, {
+  const res = await fetch(`${bazaarApiBase()}/auth/token/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body,
@@ -218,7 +228,7 @@ async function verifyWithBazaar(productId, purchaseToken) {
   }
 
   const token = await accessToken();
-  const url = `${BAZAAR_API}/devapi/v2/api/validate/`
+  const url = `${bazaarApiBase()}/devapi/v2/api/validate/`
     + `${encodeURIComponent(c.packageName)}/inapp/`
     + `${encodeURIComponent(productId)}/purchases/`
     + `${encodeURIComponent(purchaseToken)}/`;
@@ -544,6 +554,11 @@ async function history(userId, limit = 20) {
 
 module.exports = {
   PRICE_PRODUCTS, PLUS_PRODUCTS, productForPrice, bestWalletSplit,
+  bazaarCatalog: () => ({
+    priceProducts: PRICE_PRODUCTS,
+    plusProducts: PLUS_PRODUCTS,
+    apiBase: bazaarApiBase(),
+  }),
   createShopOrder, createPlusOrder, createCardBoxOrder, verifyAndDeliver,
   catalog, history, configured, verifyWithBazaar,
 };

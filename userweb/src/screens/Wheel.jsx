@@ -40,6 +40,10 @@ function countdown(ms) {
 
 // مالک: «گردونه یکم بیشتر بچرخه برای هیجان بیشتر».
 // ۵.۶ ثانیه و ۹ دور. بیشتر از این، انتظار حس می‌شود نه هیجان.
+//
+// این دو حالا پیش‌فرض‌اند، نه ثابت: سرور در پاسخِ /api/wheel مقدارِ
+// spinDurationMs و spinRotations را می‌فرستد (قابل تنظیم از پنل ادمین) و
+// کلاینت همان را اجرا می‌کند — بدون آپدیت.
 const SPIN_MS = 5600;
 const FULL_SPINS = 9;
 
@@ -157,7 +161,8 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
       // کمی تصادفی داخل خودِ برش، تا سوزن همیشه دقیقاً وسط نایستد و
       // چرخش‌ها یک‌شکل به‌نظر نرسند. ۳۵٪ عرض برش، پس هرگز از مرز رد نمی‌شود.
       const jitter = (Math.random() - 0.5) * seg * 0.7;
-      const full = FULL_SPINS * 360;
+      const spinMs = Number(state.spinDurationMs) || SPIN_MS;
+      const full = (Number(state.spinRotations) || FULL_SPINS) * 360;
       const next = spunRef.current + full
         + (((target + jitter) - (spunRef.current % 360)) + 360) % 360;
       spunRef.current = next;
@@ -177,7 +182,7 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
         // موجودی/امتیاز هدر باید فوراً درست شود، وگرنه کاربر جایزه را
         // می‌بیند ولی عددِ بالای صفحه هنوز قدیمی است.
         reloadProfile?.();
-      }, SPIN_MS);
+      }, spinMs);
     } catch (e) {
       setSpinning(false);
       const m = e?.data?.message || 'چرخش ناموفق بود';
@@ -211,7 +216,7 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
             transition: spinning
               ? // easeOutQuint — انتهای نرم‌تر از منحنی قبلی، پس گردونه در
               // ثانیهٔ آخر آرام روی جایزه می‌نشیند به‌جای توقف ناگهانی.
-              `transform ${SPIN_MS}ms cubic-bezier(.15,.85,.2,1)`
+              `transform ${Number(state.spinDurationMs) || SPIN_MS}ms cubic-bezier(.15,.85,.2,1)`
               : 'none',
           }}
         >

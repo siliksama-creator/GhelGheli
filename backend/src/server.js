@@ -17,6 +17,7 @@ const { Server } = require('socket.io');
 const { pool } = require('./config/db');
 const { audit } = require('./services/auditService');
 const opsConfig = require('./services/opsConfig');
+const opsLimits = require('./services/opsLimits');
 const {
   createNotification,
   sendSegmented,
@@ -524,9 +525,33 @@ async function assertNoBadWords(text) {
 // نه به «بدون محدودیت».
 const perUserKey = (req) => req.user?.id || req.ip;
 
+// ── محدودکننده‌های قابل تنظیم از پنل ─────────────────────────────────────
+// پنج سقفِ غیرامنیتی (چت، ضربه‌زن، دوئل، برداشت، گردونه) از ops_limits
+// خوانده می‌شوند. هر ذخیره در پنل، instance تازه می‌سازد و از همان لحظه
+// اعمال می‌شود. گاردهای امنیتی (OTP، ورودها) عمداً ثابت‌اند — بالای
+// opsLimits.js توضیح داده شده چرا.
+function opsRateLimit(name, defaults, extra = {}) {
+  const build = () => {
+    const rl = opsLimits.get().rateLimits[name] || defaults;
+    return rateLimit({
+      windowMs: rl.windowMs,
+      limit: rl.limit,
+      standardHeaders: true,
+      legacyHeaders: false,
+      ...extra,
+    });
+  };
+  const api = {
+    mw: null,
+    reload: () => { api.mw = build(); },
+  };
+  api.mw = build();
+  return api;
+}
+
 // همهٔ limiterهای زیر روی مسیرهای احراز هویت‌شده‌اند، پس همه `perUserKey`
 // می‌گیرند. (فهرست کامل در تستِ testRateLimit.js نگهبانی می‌شود.)
-const chatLimiter = rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false, keyGenerator: perUserKey });
+const chatLimiter = opsRateLimit('chat', { windowMs: 60_000, limit: 20 }, { keyGenerator: perUserKey });
 const otpLimiter = rateLimit({ windowMs: 10 * 60_000, limit: 5, standardHeaders: true, legacyHeaders: false });
 // Brute-force protection for the 6-digit OTP code itself. request-otp only
 // throttled how many codes could be requested — verify-otp and the password
@@ -693,22 +718,20 @@ const tapGame = require('./services/tapGameService');
 // Rate limit sized against the client's 8s flush cadence: ~7 legitimate
 // batches per minute, so 20 leaves room for level-up flushes and a retry
 // after a dropped connection while still stopping a request flood.
-const tapBatchLimiter = rateLimit({
-  windowMs: 60_000,
-  limit: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  // Key on the user, not the IP: a whole school behind one NAT must not
-  // share a bucket, and a single cheater must not escape by changing IP.
-  keyGenerator: (req) => req.user?.id || req.ip,
-  message: { message: 'تعداد درخواست‌ها زیاد است؛ کمی صبر کن' },
-});
+const tapBatchLimiter = opsRateLimit('tapBatch',
+  { windowMs: 60_000, limit: 20 },
+  {
+    // Key on the user, not the IP: a whole school behind one NAT must not
+    // share a bucket, and a single cheater must not escape by changing IP.
+    keyGenerator: (req) => req.user?.id || req.ip,
+    message: { message: 'تعداد درخواست‌ها زیاد است؛ کمی صبر کن' },
+  });
 
 app.get('/api/games/tap/progress', auth, asyncHandler(async (req, res) => {
   res.json(await tapGame.getProgress(req.user.id));
 }));
 
-app.post('/api/games/tap/progress', auth, tapBatchLimiter, asyncHandler(async (req, res) => {
+app.post('/api/games/tap/progress', auth, tapBatchLimiter.mw, asyncHandler(async (req, res) => {
   const play = await require('./services/featureFlags').checkPlayable('tap', pool);
   if (!play.ok) return res.status(503).json({ message: play.message });
   // The raw token doubles as the HMAC key material, so the signature can only
@@ -788,27 +811,22 @@ app.get('/api/games/tap/leaderboard', auth, asyncHandler(async (req, res) => {
 // The REST surface prepares a user's authoritative deck and supports old
 // clients' free bot practice. New bot/online/lobby matches all run through the
 // shared Socket.IO engine and escrow used by the other competitive games.
-const cardDuelLimiter = rateLimit({
-  windowMs: 60_000,
-  limit: 24,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: perUserKey,
-  message: { message: 'تعداد دوئل زیاد است؛ کمی صبر کن' },
-});
+const cardDuelLimiter = opsRateLimit('cardDuel',
+  { windowMs: 60_000, limit: 24 },
+  { keyGenerator: perUserKey, message: { message: 'تعداد دوئل زیاد است؛ کمی صبر کن' } });
 
 app.get('/api/card-duel', auth, asyncHandler(async (req, res) => {
   res.json(await cardDuel.status(req.user.id));
 }));
 
-app.post('/api/card-duel/deck', auth, cardDuelLimiter, asyncHandler(async (req, res) => {
+app.post('/api/card-duel/deck', auth, cardDuelLimiter.mw, asyncHandler(async (req, res) => {
   res.json(await cardDuel.saveDeck(
     req.user.id,
     req.body?.cardTypeIds || req.body?.cards || [],
   ));
 }));
 
-app.post('/api/card-duel/bot', auth, cardDuelLimiter, asyncHandler(async (req, res) => {
+app.post('/api/card-duel/bot', auth, cardDuelLimiter.mw, asyncHandler(async (req, res) => {
   res.json(await cardDuel.botBattle(req.user.id,
     Array.isArray(req.body?.cardTypeIds) ? req.body.cardTypeIds : null));
 }));
@@ -1447,14 +1465,9 @@ app.post('/api/rewards/:id/claim', auth, validateUuid('id'), asyncHandler(async 
 // CGNAT: `perUserKey` بالای فایل (کنار بقیهٔ limiterها) تعریف شده و حالا
 // **همهٔ** مسیرهای احراز هویت‌شده از آن استفاده می‌کنند، نه فقط این دو.
 // تعریفِ دومی که قبلاً اینجا بود حذف شد.
-const withdrawalLimiter = rateLimit({
-  windowMs: 60_000,
-  limit: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: perUserKey,
-  message: { message: 'تعداد درخواست‌ها زیاد است؛ کمی بعد دوباره تلاش کنید' },
-});
+const withdrawalLimiter = opsRateLimit('withdrawal',
+  { windowMs: 60_000, limit: 10 },
+  { keyGenerator: perUserKey, message: { message: 'تعداد درخواست‌ها زیاد است؛ کمی بعد دوباره تلاش کنید' } });
 const bankCardLimiter = rateLimit({
   windowMs: 10 * 60_000,
   limit: 15,
@@ -1488,7 +1501,7 @@ app.delete('/api/wallet/bank-card', auth, asyncHandler(async (req, res) => {
 }));
 
 // ثبت درخواست برداشت (مبلغ همان لحظه بلوکه می‌شود)
-app.post('/api/wallet/withdrawals', auth, withdrawalLimiter, asyncHandler(async (req, res) => {
+app.post('/api/wallet/withdrawals', auth, withdrawalLimiter.mw, asyncHandler(async (req, res) => {
   const request = await withdrawalService.createRequest(req.user.id, req.body?.amount);
   res.json({ message: 'درخواست برداشت ثبت شد و در انتظار بررسی مدیریت است', request });
 }));
@@ -1498,7 +1511,7 @@ app.get('/api/wallet/withdrawals', auth, asyncHandler(async (req, res) => {
 }));
 
 // لغو توسط کاربر — فقط تا قبل از تأیید مدیر
-app.post('/api/wallet/withdrawals/:id/cancel', auth, validateUuid('id'), withdrawalLimiter, asyncHandler(async (req, res) => {
+app.post('/api/wallet/withdrawals/:id/cancel', auth, validateUuid('id'), withdrawalLimiter.mw, asyncHandler(async (req, res) => {
   res.json(await withdrawalService.cancelRequest(req.user.id, req.params.id));
 }));
 
@@ -1547,16 +1560,21 @@ app.get('/api/wheel', auth, asyncHandler(async (req, res) => {
 // محدودکنندهٔ نرخ: سهمیهٔ روزانه و قید یکتای دیتابیس کار اصلی را می‌کنند،
 // ولی این جلوی کوبیدن endpoint را می‌گیرد — هر تلاش یک تراکنش با قفل ردیف
 // باز می‌کند و بدون این، یک اسکریپت می‌تواند ردیف کاربر را قفل نگه دارد.
-const wheelLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: perUserKey, // CGNAT — توضیح کامل کنار تعریفِ perUserKey
-  message: { message: 'تعداد درخواست‌ها زیاد است، کمی صبر کن' },
+const wheelLimiter = opsRateLimit('wheel',
+  { windowMs: 60_000, limit: 20 },
+  { keyGenerator: perUserKey, message: { message: 'تعداد درخواست‌ها زیاد است، کمی صبر کن' } });
+
+// اعمالِ بی‌درنگِ تغییرِ سقف‌ها از پنل: با هر ذخیره، instanceهای تازه
+// ساخته می‌شوند (سطل‌های قدیمی صفر می‌شوند — برای تغییرِ نادرِ ادمین
+// بی‌ضرر و از رفتارِ نیمه‌اعمال‌شده بهتر است).
+opsLimits.onChange(() => {
+  for (const l of [chatLimiter, tapBatchLimiter, cardDuelLimiter,
+    withdrawalLimiter, wheelLimiter]) {
+    l.reload();
+  }
 });
 
-app.post('/api/wheel/spin', auth, wheelLimiter, asyncHandler(async (req, res) => {
+app.post('/api/wheel/spin', auth, wheelLimiter.mw, asyncHandler(async (req, res) => {
   const wheelOk = await require('./services/featureFlags').checkWheel(pool);
   if (!wheelOk.ok) return res.status(503).json({ message: wheelOk.message });
   const result = await wheel.spin(req.user.id, {
@@ -1947,7 +1965,7 @@ app.get('/api/chat/messages', auth, asyncHandler(async (req, res) => {
     level: lvl[r.user_id]?.level ?? 0,
   })));
 }));
-app.post('/api/chat/messages', auth, chatLimiter, asyncHandler(async (req, res) => {
+app.post('/api/chat/messages', auth, chatLimiter.mw, asyncHandler(async (req, res) => {
   const minLifetimePoints = await getChatMinLifetimePoints();
   if (Number(req.user.lifetime_points || 0) < minLifetimePoints) return res.status(403).json({ message: `برای ارسال پیام باید حداقل ${minLifetimePoints} امتیاز تاریخی داشته باشید` });
   if (req.user.chat_banned_until && new Date(req.user.chat_banned_until) > new Date()) return res.status(403).json({ message: 'شما موقتاً از چت محروم هستید' });
@@ -2869,6 +2887,7 @@ server.listen(port, async () => {
   await opsConfig.preload([
     'pass_config', 'mission_config', 'level_settings', 'streak_settings',
     'photo_match_settings', 'chat_canned_messages', 'shop_plus_plans',
+    'ops_limits',
     'sms_config', 'game_economy_settings', 'game_reward_settings',
   ]).catch(e => console.error('[ops] پیش‌بارگذاری تنظیمات ناموفق بود:', e.message));
   await ensureActiveSeason();

@@ -83,12 +83,12 @@ router.post('/auth/register', asyncHandler(async (req, res) => {
       // اعلان فقط برای معرف. دعوت‌شونده جایزه‌اش را همان لحظه در پاسخ
       // ثبت‌نام می‌بیند، پس یک نوتیفیکیشن اضافه فقط تکرار است.
       let body = `${referrals.SPINS_PER_REFERRAL} چرخش گردونه گرفتی و از `
-        + `این به بعد ${referrals.COMMISSION_PERCENT}٪ امتیازهای او از ثبت `
+        + `این به بعد ${referrals.commissionPercent()}٪ امتیازهای او از ثبت `
         + `کارت و بازی ضربه‌زن هم به تو می‌رسد.`;
       // اگر همین دعوت باعث شد سهمیهٔ روزانه بالا برود، بگو — این بزرگ‌ترین
       // پاداش سیستم است و بی‌صدا دادنش حیف است.
       if (referral.referrerInvites % referrals.INVITES_PER_DAILY_SPIN === 0
-          && referral.referrerInvites <= referrals.MAX_INVITES_FOR_DAILY) {
+          && referral.referrerInvites <= referrals.maxInvitesForDaily()) {
         body += ` با ${faDigits(referral.referrerInvites)} دعوت، از حالا `
           + `روزی ${faDigits(referral.referrerDailySpins)} چرخش رایگان داری!`;
       }
@@ -248,12 +248,12 @@ router.post('/auth/register-password', userLoginLimiter, asyncHandler(async (req
       // اعلان فقط برای معرف. دعوت‌شونده جایزه‌اش را همان لحظه در پاسخ
       // ثبت‌نام می‌بیند، پس یک نوتیفیکیشن اضافه فقط تکرار است.
       let body = `${referrals.SPINS_PER_REFERRAL} چرخش گردونه گرفتی و از `
-        + `این به بعد ${referrals.COMMISSION_PERCENT}٪ امتیازهای او از ثبت `
+        + `این به بعد ${referrals.commissionPercent()}٪ امتیازهای او از ثبت `
         + `کارت و بازی ضربه‌زن هم به تو می‌رسد.`;
       // اگر همین دعوت باعث شد سهمیهٔ روزانه بالا برود، بگو — این بزرگ‌ترین
       // پاداش سیستم است و بی‌صدا دادنش حیف است.
       if (referral.referrerInvites % referrals.INVITES_PER_DAILY_SPIN === 0
-          && referral.referrerInvites <= referrals.MAX_INVITES_FOR_DAILY) {
+          && referral.referrerInvites <= referrals.maxInvitesForDaily()) {
         body += ` با ${faDigits(referral.referrerInvites)} دعوت، از حالا `
           + `روزی ${faDigits(referral.referrerDailySpins)} چرخش رایگان داری!`;
       }

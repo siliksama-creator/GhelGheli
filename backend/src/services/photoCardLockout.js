@@ -35,8 +35,13 @@
  * سه ساعت قفل می‌شد — دقیقاً همان کسی که باید کمکش کنیم.
  */
 
-/** حداکثر خطای پشت‌سرهم پیش از قفل. */
-const MAX_FAILS = 5;
+const opsLimits = require('./opsLimits');
+
+/** حداکثر خطای پشت‌سرهم پیش از قفل — از پنل ادمین قابل تنظیم است
+ *  (پیش‌فرض ۵، همان ثابتِ قبلی کد). */
+function maxFails() {
+  return opsLimits.get().photoLockMaxFails;
+}
 
 /** مدت قفل — خواستهٔ صریح مالک: ۳ ساعت. */
 const LOCK_MS = 3 * 60 * 60 * 1000;
@@ -54,7 +59,7 @@ async function getState(pool, userId, now = new Date()) {
   );
   const row = rows[0];
   if (!row) {
-    return { locked: false, until: null, remainingMs: 0, failStreak: 0, triesLeft: MAX_FAILS };
+    return { locked: false, until: null, remainingMs: 0, failStreak: 0, triesLeft: maxFails() };
   }
   const until = row.locked_until ? new Date(row.locked_until) : null;
   const locked = until != null && until.getTime() > now.getTime();
@@ -65,7 +70,7 @@ async function getState(pool, userId, now = new Date()) {
     failStreak: row.fail_streak || 0,
     // وقتی قفل منقضی شده، شمارنده عملاً صفر است حتی اگر هنوز در جدول
     // عددی مانده باشد؛ `registerFailure` آن را پاک می‌کند.
-    triesLeft: locked ? 0 : Math.max(0, MAX_FAILS - (row.fail_streak || 0)),
+    triesLeft: locked ? 0 : Math.max(0, maxFails() - (row.fail_streak || 0)),
   };
 }
 
@@ -101,11 +106,11 @@ async function registerFailure(pool, userId, now = new Date()) {
   );
 
   const streak = rows[0].fail_streak;
-  if (streak < MAX_FAILS) {
+  if (streak < maxFails()) {
     return {
       locked: false,
       remainingMs: 0,
-      triesLeft: MAX_FAILS - streak,
+      triesLeft: maxFails() - streak,
       failStreak: streak,
     };
   }
@@ -145,7 +150,7 @@ function humanRemaining(ms) {
 }
 
 module.exports = {
-  MAX_FAILS,
+  maxFails,
   LOCK_MS,
   getState,
   registerFailure,

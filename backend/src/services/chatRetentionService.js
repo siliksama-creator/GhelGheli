@@ -27,9 +27,13 @@
 // می‌کنیم. سقف در عمل `200 + PRUNE_EVERY` می‌شود که کاملاً بی‌ضرر است.
 
 const { pool } = require('../config/db');
+const opsLimits = require('./opsLimits');
 
-/** سقفِ سراسریِ پیام‌های نگه‌داشته‌شده. */
-const CHAT_KEEP_LIMIT = 200;
+/** سقفِ سراسریِ پیام‌های نگه‌داشته‌شده — از پنل ادمین قابل تنظیم است
+ *  (پیش‌فرض ۲۰۰، همان ثابتِ قبلی کد). */
+function keepLimit() {
+  return opsLimits.get().chatKeepLimit;
+}
 
 /**
  * هر چند پیام یک‌بار پاک‌سازی اجرا شود.
@@ -67,7 +71,7 @@ async function pruneChatHistory(client = pool) {
          ORDER BY sent_at DESC, id DESC
         OFFSET $1
       )`,
-    [CHAT_KEEP_LIMIT],
+    [keepLimit()],
   );
   return rowCount;
 }
@@ -106,7 +110,7 @@ function _counter() {
 }
 
 module.exports = {
-  CHAT_KEEP_LIMIT,
+  keepLimit,
   PRUNE_EVERY,
   pruneChatHistory,
   onMessageInserted,

@@ -31,26 +31,41 @@ const crypto = require('crypto');
 const { pool } = require('../config/db');
 const pointLedger = require('./pointService');
 const wallet = require('./walletService');
+const opsLimits = require('./opsLimits');
 
-/** درصد کمیسیون امتیازی قدیمی (ثبت کارت و Tap). */
-const COMMISSION_PERCENT = 5;
-/** سهم نقدی معرف از هر خرید مستقیم دوست، به تومان. */
-const PURCHASE_COMMISSION_PERCENT = 5;
+/** درصد کمیسیون امتیازی (ثبت کارت و Tap) — از پنل ادمین قابل تنظیم،
+ *  پیش‌فرض ۵ مثل ثابتِ قبلی. */
+function commissionPercent() {
+  return opsLimits.get().referralCommissionPercent;
+}
+/** سهم نقدی معرف از هر خرید مستقیم دوست، به درصد — از پنل قابل تنظیم. */
+function purchaseCommissionPercent() {
+  return opsLimits.get().referralPurchaseCommissionPercent;
+}
 /** آستانهٔ برداشت کیف پول. تنظیمات کیف پول نیز همین مقدار را enforce می‌کند. */
 const REFERRAL_WITHDRAWAL_THRESHOLD = 50000;
 
-/** چرخش گردونه برای *هر یک* از دو طرف، به ازای یک معرفی موفق. */
-const SPINS_PER_REFERRAL = 3;
+/** چرخش گردونه برای *هر یک* از دو طرف، به ازای یک معرفی موفق — از پنل
+ *  قابل تنظیم، پیش‌فرض ۳ (خواستهٔ مالک). */
+function spinsPerReferral() {
+  return opsLimits.get().referralSpinsPerInvite;
+}
 
 /** به ازای هر این تعداد دعوت، یک چرخش روزانهٔ دائمی اضافه می‌شود. */
-const INVITES_PER_DAILY_SPIN = 10;
+function invitesPerDailySpin() {
+  return opsLimits.get().referralInvitesPerDailySpin;
+}
 
-/** سقف دعوت‌هایی که چرخش روزانه می‌سازند. بعد از این، دعوت آزاد است ولی
- *  چرخش روزانهٔ بیشتری اضافه نمی‌کند. */
-const MAX_INVITES_FOR_DAILY = 50;
+/** سقف دعوت‌هایی که چرخش روزانه می‌سازند — از پنل قابل تنظیم. بعد از این،
+ *  دعوت آزاد است ولی چرخش روزانهٔ بیشتری اضافه نمی‌کند. */
+function maxInvitesForDaily() {
+  return opsLimits.get().referralMaxInvitesForDaily;
+}
 
-/** چرخش روزانهٔ پایه که هر کاربر بدون هیچ دعوتی دارد. */
-const BASE_DAILY_SPINS = 1;
+/** چرخش روزانهٔ پایه که هر کاربر بدون هیچ دعوتی دارد — از پنل قابل تنظیم. */
+function baseDailySpins() {
+  return opsLimits.get().referralBaseDailySpins;
+}
 
 /**
  * منابعِ **امتیازی** که کمیسیون می‌سازند.
@@ -188,8 +203,8 @@ function dailySpinsFor(invitedCount) {
   // به‌جای اینکه بی‌اثر باشد، قابلیت را خاموش می‌کند.
   const n = Number(invitedCount);
   const safe = Number.isFinite(n) ? Math.max(0, n) : 0;
-  const counted = Math.min(safe, MAX_INVITES_FOR_DAILY);
-  return BASE_DAILY_SPINS + Math.floor(counted / INVITES_PER_DAILY_SPIN);
+  const counted = Math.min(safe, maxInvitesForDaily());
+  return baseDailySpins() + Math.floor(counted / invitesPerDailySpin());
 }
 
 /** تعداد دعوت‌های موفق یک کاربر. */
@@ -234,13 +249,13 @@ async function attachReferrer(client, newUserId, rawCode) {
   await client.query(
     `UPDATE users SET bonus_spins = bonus_spins + $2, updated_at = NOW()
       WHERE id = ANY($1::uuid[])`,
-    [[referrerId, newUserId], SPINS_PER_REFERRAL]);
+    [[referrerId, newUserId], spinsPerReferral()]);
 
   const n = await invitedCount(referrerId, client);
   return {
     ok: true,
     referrerId,
-    spinsAwarded: SPINS_PER_REFERRAL,
+    spinsAwarded: spinsPerReferral(),
     referrerInvites: n,
     referrerDailySpins: dailySpinsFor(n),
   };
@@ -281,7 +296,7 @@ async function payCommission(client, userId, basePoints, source) {
   const referrerId = u.rows[0]?.referred_by;
   if (!referrerId) return null;
 
-  const earned = Math.ceil(points * COMMISSION_PERCENT / 100);
+  const earned = Math.ceil(points * commissionPercent() / 100);
   if (earned <= 0) return null;
 
   // معرف باید هنوز فعال باشد؛ اکانت مسدود نباید امتیاز جمع کند.
@@ -360,18 +375,20 @@ async function payPurchaseCommission(
     `SELECT 1 FROM users WHERE id=$1 AND status='active'`, [referrerId]);
   if (!active.rows[0]) return null;
 
-  const earned = Math.floor(amount * PURCHASE_COMMISSION_PERCENT / 100);
+  const pct = purchaseCommissionPercent();
+  const rate = pct / 100;
+  const earned = Math.floor(amount * pct / 100);
   if (earned <= 0) return null;
 
   const reserved = await client.query(
     `INSERT INTO purchase_referral_commissions
        (referrer_id, referred_user_id, purchase_type, purchase_reference_id,
         purchase_amount, commission_rate, commission_amount, gateway_provider)
-     VALUES($1,$2,$3,$4,$5,0.0500,$6,$7)
+     VALUES($1,$2,$3,$4,$5,$6,$7,$8)
      ON CONFLICT(purchase_type, purchase_reference_id) DO NOTHING
      RETURNING id`,
-    [referrerId, buyerId, purchaseType, purchaseReferenceId, amount, earned,
-      gatewayProvider],
+    [referrerId, buyerId, purchaseType, purchaseReferenceId, amount, rate,
+      earned, gatewayProvider],
   );
   if (!reserved.rows[0]) return { duplicate: true, referrerId, earned: 0 };
 
@@ -470,24 +487,24 @@ async function summary(userId) {
   const daily = dailySpinsFor(invited);
   // چند دعوت دیگر تا چرخش روزانهٔ بعدی. وقتی به سقف رسیده باشد null است تا
   // رابط کاربری «۰ نفر مانده» نشان ندهد.
-  const atCap = invited >= MAX_INVITES_FOR_DAILY;
+  const atCap = invited >= maxInvitesForDaily();
   const toNext = atCap
     ? null
-    : INVITES_PER_DAILY_SPIN - (invited % INVITES_PER_DAILY_SPIN);
+    : invitesPerDailySpin() - (invited % invitesPerDailySpin());
 
   return {
     code,
-    commissionPercent: COMMISSION_PERCENT,
-    purchaseCommissionPercent: PURCHASE_COMMISSION_PERCENT,
+    commissionPercent: commissionPercent(),
+    purchaseCommissionPercent: purchaseCommissionPercent(),
     withdrawalThreshold: Number(walletSettings.minWithdrawal || REFERRAL_WITHDRAWAL_THRESHOLD),
     walletBalance: Number(walletRow.rows[0]?.wallet_balance || 0),
     cashCommissionEarned: Number(cashEarnings.rows[0]?.total || 0),
     commissionedPurchases: Number(cashEarnings.rows[0]?.purchase_count || 0),
     cashWithdrawReady: Number(walletRow.rows[0]?.wallet_balance || 0)
       >= Number(walletSettings.minWithdrawal || REFERRAL_WITHDRAWAL_THRESHOLD),
-    spinsPerReferral: SPINS_PER_REFERRAL,
-    invitesPerDailySpin: INVITES_PER_DAILY_SPIN,
-    maxInvitesForDaily: MAX_INVITES_FOR_DAILY,
+    spinsPerReferral: spinsPerReferral(),
+    invitesPerDailySpin: invitesPerDailySpin(),
+    maxInvitesForDaily: maxInvitesForDaily(),
     invitedCount: invited,
     totalEarned: earnings.rows[0].total,
     bonusSpins: Number(spins.rows[0]?.bonus_spins) || 0,
@@ -507,8 +524,8 @@ module.exports = {
   ensureCode, attachReferrer, payCommission, payPurchaseCommission,
   purchaseCommissionAudit, summary,
   generateCode, normalizeDigits, dailySpinsFor, invitedCount,
-  COMMISSION_PERCENT, PURCHASE_COMMISSION_PERCENT,
-  REFERRAL_WITHDRAWAL_THRESHOLD, SPINS_PER_REFERRAL,
-  INVITES_PER_DAILY_SPIN, MAX_INVITES_FOR_DAILY, BASE_DAILY_SPINS,
+  commissionPercent, purchaseCommissionPercent,
+  REFERRAL_WITHDRAWAL_THRESHOLD, spinsPerReferral,
+  invitesPerDailySpin, maxInvitesForDaily, baseDailySpins,
   COMMISSIONABLE,
 };

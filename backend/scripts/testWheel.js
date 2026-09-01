@@ -373,20 +373,22 @@ test('ورودی خراب سهمیه را منفی یا NaN نمی‌کند', ()
   }
 });
 
-test('کمیسیون ۵٪ است و به بالا گرد می‌شود', () => {
-  assert.strictEqual(referrals.COMMISSION_PERCENT, 5);
+test('کمیسیون پیش‌فرض ۵٪ است و به بالا گرد می‌شود', () => {
+  // درصدها حالا از ops_limits می‌آیند (قابل تنظیم از پنل)؛ بدون تنظیمِ
+  // ذخیره‌شده پیش‌فرض باید دقیقاً همان ۵ قبلی باشد.
+  assert.strictEqual(referrals.commissionPercent(), 5);
   // گرد کردن به بالا عمدی است: با ۵٪، هر امتیاز کمتر از ۲۰ به سمت صفر
   // گرد می‌شد و معرف از ریز-امتیازها — که بیشترِ فعالیت روزمره است —
   // هیچ نمی‌گرفت.
-  const pct = referrals.COMMISSION_PERCENT;
+  const pct = referrals.commissionPercent();
   assert.strictEqual(Math.ceil(100 * pct / 100), 5);
   assert.strictEqual(Math.ceil(10 * pct / 100), 1);
   assert.strictEqual(Math.ceil(1 * pct / 100), 1);
   assert.strictEqual(Math.ceil(1000 * pct / 100), 50);
 });
 
-test('هر معرفی ۳ چرخش می‌دهد — به هر دو طرف', () => {
-  assert.strictEqual(referrals.SPINS_PER_REFERRAL, 3);
+test('هر معرفی پیش‌فرض ۳ چرخش می‌دهد — به هر دو طرف', () => {
+  assert.strictEqual(referrals.spinsPerReferral(), 3);
   const src = require('fs').readFileSync(
     require('path').join(__dirname, '../src/services/referralService.js'),
     'utf8');
@@ -394,7 +396,7 @@ test('هر معرفی ۳ چرخش می‌دهد — به هر دو طرف', () =
   // کرده هر دو ۳ شانس گردونه بگیرند». یک UPDATE روی آرایه‌ای از دو id.
   assert.ok(/id = ANY\(\$1::uuid\[\]\)/.test(src),
     'باید هر دو طرف در یک UPDATE جایزه بگیرند');
-  assert.ok(/\[\[referrerId, newUserId\], SPINS_PER_REFERRAL\]/.test(src));
+  assert.ok(/\[\[referrerId, newUserId\], spinsPerReferral\(\)\]/.test(src));
 });
 
 test('دعوت نامحدود است', () => {
@@ -405,7 +407,7 @@ test('دعوت نامحدود است', () => {
     'utf8');
   assert.ok(!/MAX_REFERRALS|maxInvites\s*=/.test(src),
     'نباید سقفی روی تعداد دعوت باشد');
-  assert.strictEqual(referrals.MAX_INVITES_FOR_DAILY, 50,
+  assert.strictEqual(referrals.maxInvitesForDaily(), 50,
     'سقف فقط روی پاداش چرخش روزانه است');
 });
 
@@ -455,7 +457,7 @@ test('کمیسیونِ امتیازی فقط از ثبتِ کارت و بازی�
 });
 
 test('کمیسیونِ خرید همچنان فعال است (مسیرِ نقدی بسته نشده)', () => {
-  assert.strictEqual(referrals.PURCHASE_COMMISSION_PERCENT, 5);
+  assert.strictEqual(referrals.purchaseCommissionPercent(), 5);
   assert.strictEqual(typeof referrals.payPurchaseCommission, 'function');
 });
 

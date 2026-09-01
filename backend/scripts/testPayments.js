@@ -128,8 +128,12 @@ ok('مالکیت قبل از تحویل دوباره بررسی می‌شود',
 section('تأیید سمت سرور — به کلاینت اعتماد نمی‌شود');
 ok('purchaseState از پاسخ بازار بررسی می‌شود',
   /Number\(json\.purchaseState\) === 0/.test(svc));
-ok('آدرس API بازار هاردکد است نه از ورودی',
-  /const BAZAAR_API = 'https:\/\/pardakht\.cafebazaar\.ir'/.test(svc));
+// آدرسِ درگاه حالا از env/ops_limits می‌آید (قابل تنظیم از پنل ادمین) ولی
+// هرگز از بدنهٔ درخواستِ کلاینت — روحِ گارد حفظ می‌شود.
+ok('آدرس API بازار از ورودیِ کلاینت نمی‌آید',
+  /process\.env\.BAZAAR_API/.test(svc)
+  && /opsLimits\.get\(\)\.bazaarApiBase/.test(svc)
+  && /pardakht\.cafebazaar\.ir/.test(svc));
 ok('حالت sandbox پیش‌فرض خاموش است',
   /process\.env\.BAZAAR_SANDBOX === 'true'/.test(svc));
 ok('sandbox فقط توکن با پیشوند SANDBOX- را می‌پذیرد',
@@ -148,9 +152,10 @@ ok('کمیسیون روی قیمت کاملِ پرداختی حساب می‌ش�
 ok('درگاه در سند کمیسیون ثبت می‌شود',
   /gatewayProvider: 'cafebazaar'/.test(shopSvc)
   && /gateway_provider/.test(referral));
-ok('نرخ کمیسیون ۵٪ است',
-  /PURCHASE_COMMISSION_PERCENT\s*=\s*(?:Number\([^)]*\)\s*\|\|\s*)?5/.test(referral)
-  || /0\.0500/.test(referral));
+ok('نرخ پیش‌فرض کمیسیون ۵٪ است و از getter می‌آید',
+  /purchaseCommissionPercent\(\)/.test(referral)
+  && /referralPurchaseCommissionPercent:\s*5/.test(
+    require('fs').readFileSync(require('path').join(__dirname, '../src/services/opsLimits.js'), 'utf8')));
 ok('کمیسیون به کیف پول واریز می‌شود (source=purchase_referral)',
   /source: 'purchase_referral'/.test(referral));
 ok('سند کمیسیون یکتاست (ON CONFLICT DO NOTHING)',

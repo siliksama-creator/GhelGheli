@@ -276,6 +276,10 @@ class _AdminEngineState extends State<AdminEngine> {
               ),
             ],
           ),
+          const SizedBox(height: Gaps.md),
+          _OpsLimitsSection(api: widget.api),
+          const SizedBox(height: Gaps.md),
+          _BazaarProductsSection(api: widget.api),
         ],
       ),
     );
@@ -334,6 +338,321 @@ class _NumEditState extends State<_NumEdit> {
           TextInputType.numberWithOptions(decimal: !widget.integer),
       onChanged: widget.onChanged,
       decoration: InputDecoration(labelText: widget.label, hintText: widget.hint),
+    );
+  }
+}
+
+/// سقف‌ها و اعدادِ عملیاتی — آینهٔ OpsLimitsCard در پنلِ وب.
+/// نگهداری چت، قفل عکس‌کارت، اقتصاد معرف، نرخ پنج مسیر و انیمیشن گردونه؛
+/// گاردهای امنیتی فقط نمایش داده می‌شوند.
+class _OpsLimitsSection extends StatefulWidget {
+  const _OpsLimitsSection({required this.api});
+  final ApiClient api;
+
+  @override
+  State<_OpsLimitsSection> createState() => _OpsLimitsSectionState();
+}
+
+class _OpsLimitsSectionState extends State<_OpsLimitsSection> {
+  Map<String, dynamic> _l = const {};
+  bool _loading = true;
+  bool _saving = false;
+  int _gen = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final d = await widget.api.get('/api/admin/settings/ops-limits');
+      if (!mounted) return;
+      setState(() {
+        _l = Map<String, dynamic>.from(d as Map);
+        _loading = false;
+        _gen++;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _setNum(String path, String value) {
+    final parts = path.split('.');
+    setState(() {
+      Map<String, dynamic> node = _l;
+      for (var i = 0; i < parts.length - 1; i++) {
+        final cur = node[parts[i]];
+        if (cur is Map) {
+          node = Map<String, dynamic>.from(cur);
+        } else {
+          node = {};
+        }
+        _l[parts[i]] = node;
+      }
+      node[parts.last] = int.tryParse(value) ?? 0;
+    });
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    try {
+      final d = await widget.api.patch('/api/admin/settings/ops-limits', _l);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('${d['message'] ?? 'ذخیره شد'}')));
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      final msg = apiError(e);
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg.isNotEmpty ? msg : 'ذخیره ناموفق بود')));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  int _num(String path) {
+    final parts = path.split('.');
+    Map<String, dynamic> node = _l;
+    for (var i = 0; i < parts.length - 1; i++) {
+      final cur = node[parts[i]];
+      if (cur is Map) {
+        node = Map<String, dynamic>.from(cur);
+      } else {
+        return 0;
+      }
+    }
+    return (node[parts.last] as num?)?.toInt() ?? 0;
+  }
+
+  static const _rlNames = {
+    'chat': 'چت',
+    'tapBatch': 'ضربه‌زن',
+    'wheel': 'گردونه',
+    'cardDuel': 'دوئل کارت',
+    'withdrawal': 'برداشت کیف پول',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const LoadingView();
+    }
+    final rl = _l['rateLimits'] is Map
+        ? Map<String, dynamic>.from(_l['rateLimits'] as Map)
+        : const <String, dynamic>{};
+    final sec = _l['securityRateLimits'] is Map
+        ? Map<String, dynamic>.from(_l['securityRateLimits'] as Map)
+        : const <String, dynamic>{};
+
+    return FormSection(
+      title: 'سقف‌ها و اعدادِ عملیاتی',
+      subtitle: 'تا امروز ثابتِ کد بودند؛ ذخیره بدون ری‌استارت و بدون آپدیت اعمال می‌شود.',
+      children: [
+        _numField('chatKeepLimit', 'نگه‌داری پیام چت'),
+        _numField('photoLockMaxFails', 'تلاش مجاز عکس‌کارت پیش از قفل'),
+        _numField('wheelSpinMs', 'مدت انیمیشن گردونه (ms)'),
+        _numField('wheelSpinRotations', 'دورِ کامل گردونه'),
+        _numField('referralCommissionPercent', 'کمیسیون امتیازی معرف (٪)'),
+        _numField('referralPurchaseCommissionPercent', 'کمیسیون نقدی معرف (٪)'),
+        _numField('referralMaxInvitesForDaily', 'سقف دعوت مؤثر روزانه'),
+        _numField('referralSpinsPerInvite', 'چرخش هدیه هر دعوت'),
+        _numField('referralInvitesPerDailySpin', 'دعوت لازم برای چرخش اضافه'),
+        _numField('referralBaseDailySpins', 'چرخش روزانهٔ پایه'),
+        const Text('محدودکننده‌های نرخ (پنجره/سقف)',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+        for (final entry in rl.entries) ...[
+          Row(children: [
+            SizedBox(
+              width: 110,
+              child: Text(_rlNames[entry.key] ?? entry.key,
+                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
+            ),
+            Expanded(
+              child: _numField('rateLimits.${entry.key}.windowMs', 'پنجره (ms)'),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _numField('rateLimits.${entry.key}.limit', 'سقف'),
+            ),
+          ]),
+        ],
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.04),
+            borderRadius: Corners.rMd,
+            border: Border.all(color: Colors.white10),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(children: [
+                Icon(Icons.shield_rounded, size: 15, color: Color(0xFF7DD3FC)),
+                SizedBox(width: 6),
+                Text('گاردهای امنیتی — فقط نمایش',
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5)),
+              ]),
+              const Text(
+                'سقف OTP و ورودها ضدِ brute-force‌اند و عمداً از پنل قابل ویرایش نیستند.',
+                style: TextStyle(fontSize: 11, color: Colors.white60),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 12,
+                runSpacing: 4,
+                children: [
+                  for (final e in sec.entries)
+                    Text('${e.key}: ${(e.value as Map)['limit']} در '
+                        '${((e.value as Map)['windowMs'] as num) ~/ 60000} دقیقه',
+                        style: const TextStyle(
+                            fontSize: 11, color: Colors.white60)),
+                ],
+              ),
+            ],
+          ),
+        ),
+        FilledButton.icon(
+          onPressed: _saving ? null : _save,
+          icon: const Icon(Icons.save_rounded),
+          label: Text(_saving ? 'در حال ذخیره…' : 'ذخیرهٔ سقف‌ها'),
+        ),
+      ],
+    );
+  }
+
+  Widget _numField(String path, String label) {
+    return TextFormField(
+      key: ValueKey('ops_$path$_gen'),
+      initialValue: '${_num(path)}',
+      keyboardType: TextInputType.number,
+      decoration: InputDecoration(labelText: label),
+      onChanged: (v) => _setNum(path, v),
+    );
+  }
+}
+
+/// نقاط قیمتی کافه‌بازار — آینهٔ BazaarProductsCard در پنل وب.
+/// فقط‌خواندنی + هشدار وقتی قیمت صندوق محصولِ متناظر ندارد.
+class _BazaarProductsSection extends StatefulWidget {
+  const _BazaarProductsSection({required this.api});
+  final ApiClient api;
+
+  @override
+  State<_BazaarProductsSection> createState() => _BazaarProductsSectionState();
+}
+
+class _BazaarProductsSectionState extends State<_BazaarProductsSection> {
+  List<Map<String, dynamic>> _prices = const [];
+  List<Map<String, dynamic>> _plus = const [];
+  String _apiBase = '';
+  int? _boxPrice;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final c = await widget.api.get('/api/admin/bazaar-products');
+      int? boxPrice;
+      try {
+        final b = await widget.api.get('/api/admin/card-box');
+        boxPrice = (b['price'] as num?)?.toInt();
+      } catch (_) {/* قیمت صندوق اختیاری است */}
+      if (!mounted) return;
+      setState(() {
+        _prices = ((c['priceProducts'] as List?) ?? const [])
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+        _plus = ((c['plusProducts'] as List?) ?? const [])
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+        _apiBase = '${c['apiBase'] ?? ''}';
+        _boxPrice = boxPrice;
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const LoadingView();
+    }
+    final priceSet = _prices.map((e) => (e['price'] as num?)?.toInt() ?? 0).toSet();
+    final boxOk = _boxPrice == null || priceSet.contains(_boxPrice);
+    return FormSection(
+      title: 'نقاط قیمتی کافه‌بازار — فقط خواندنی',
+      subtitle: 'اگر قیمتی اینجا نباشد، خرید آن آیتم ناممکن است. درگاه: $_apiBase',
+      children: [
+        if (!boxOk)
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF87171).withValues(alpha: 0.1),
+              borderRadius: Corners.rMd,
+              border: Border.all(color: const Color(0xFFF87171).withValues(alpha: 0.4)),
+            ),
+            child: Text(
+              '⚠ قیمت فعلی صندوق کارت (${faNum(_boxPrice ?? 0)} تومان) در کافه‌بازار '
+              'محصول ندارد — خرید صندوق رد می‌شود.',
+              style: const TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFFCA5A5)),
+            ),
+          ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final p in _prices)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFD166).withValues(alpha: 0.08),
+                  borderRadius: Corners.rMd,
+                  border: Border.all(color: const Color(0xFFFFD166).withValues(alpha: 0.3)),
+                ),
+                child: Text('${faNum(p['price'])} → ${p['productId']}',
+                    style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFFFD166))),
+              ),
+          ],
+        ),
+        const Text('اشتراک پلاس',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final p in _plus)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF38BDF8).withValues(alpha: 0.08),
+                  borderRadius: Corners.rMd,
+                  border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.3)),
+                ),
+                child: Text('${p['label']} → ${p['productId']}',
+                    style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF7DD3FC))),
+              ),
+          ],
+        ),
+      ],
     );
   }
 }
