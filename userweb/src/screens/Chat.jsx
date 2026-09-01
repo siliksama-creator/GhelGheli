@@ -66,6 +66,7 @@ export default function Chat({ token, openProfile, meId }) {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState(0);
   const [emotePacks, setEmotePacks] = useState([]);
+  const [stickers, setStickers] = useState([]);
   const categories = useMemo(() => [
     ...BASE_CATEGORIES,
     ...emotePacks.map((pack) => ({
@@ -75,6 +76,7 @@ export default function Chat({ token, openProfile, meId }) {
       premium: true,
     })),
     { title: 'ایموجی', icon: 'heart', items: [], isEmoji: true },
+    { title: 'استیکر', icon: 'party', items: [], isSticker: true },
   ], [emotePacks]);
 
   const boxRef = useRef(null);
@@ -102,6 +104,7 @@ export default function Chat({ token, openProfile, meId }) {
       if (res) {
         setPinned(res.config?.pinned || null);
         setEmotePacks(Array.isArray(res.config?.emotePacks) ? res.config.emotePacks : []);
+        setStickers(Array.isArray(res.stickers) ? res.stickers : []);
         // اندروید این را چک می‌کرد و وب نه: کاربرِ واجدشرایط‌نشده صفحهٔ
         // خالی می‌دید بدون هیچ توضیحی که چرا. سرور `eligible:false` را
         // در همین پاسخ می‌فرستد.
@@ -192,6 +195,31 @@ export default function Chat({ token, openProfile, meId }) {
     }
   };
 
+  // ارسالِ استیکر — همان مسیرِ پیام با بدنهٔ stickerId. سرور اعتبارش را
+  // از فهرستِ فعالِ chat_stickers می‌گیرد، پس استیکرِ ناشناخته رد می‌شود.
+  const sendSticker = async (stickerId) => {
+    if (cdLeft > 0) return;
+    try {
+      const payload = { stickerId };
+      if (reply) payload.replyTo = reply.id;
+      const sent = await req('/api/chat/messages', 'POST', payload, token);
+      setReply(null);
+      setCdLeft(10);
+      const cdTimer = setInterval(() => {
+        setCdLeft(prev => {
+          if (prev <= 1) { clearInterval(cdTimer); return 0; }
+          return prev - 1;
+        });
+      }, 1000);
+      if (sent) {
+        setMessages(prev => [...prev, sent]);
+        scrollDown(true);
+      }
+    } catch (e) {
+      alert(e.message || 'خطا در ارسال استیکر');
+    }
+  };
+
   const toggleLike = async (m) => {
     const liked = m.liked_by_me;
     setMessages(prev => prev.map(x => x.id === m.id ? { ...x, liked_by_me: !liked, like_count: (x.like_count || 0) + (liked ? -1 : 1) } : x));
@@ -259,9 +287,19 @@ export default function Chat({ token, openProfile, meId }) {
                   </div>
                 )}
 
-                <div className={`chatBubble${isMe ? ' me' : ''}${onlyEmoji ? ' emoji' : ''}`}>
-                  {m.message_text}
-                </div>
+                {m.message_type === 'sticker' && m.sticker_url ? (
+                  /* استیکر حبابِ متنی نمی‌خواهد؛ SVG انیمیشنیِ خودش را دارد. */
+                  <img
+                    src={m.sticker_url.startsWith('http') ? m.sticker_url : asset(m.sticker_url)}
+                    alt={m.sticker_title || 'استیکر'}
+                    title={m.sticker_title || ''}
+                    style={{ width: 108, height: 108, display: 'block', marginTop: 2 }}
+                  />
+                ) : (
+                  <div className={`chatBubble${isMe ? ' me' : ''}${onlyEmoji ? ' emoji' : ''}`}>
+                    {m.message_text}
+                  </div>
+                )}
 
                 <div className="chatMsgFoot">
                   <button type="button" onClick={() => toggleLike(m)}
@@ -323,7 +361,38 @@ export default function Chat({ token, openProfile, meId }) {
         </div>
 
         <div style={{ height: '96px', overflowX: 'auto', overflowY: 'hidden', paddingBottom: '4px' }}>
-          {categories[tab]?.isEmoji ? (
+          {categories[tab]?.isSticker ? (
+            <div style={{ display: 'flex', gap: '8px', height: '100%', overflowX: 'auto', alignItems: 'center', paddingBottom: '2px' }}>
+              {stickers.length === 0 && (
+                <span style={{ color: '#64748B', fontSize: '12px' }}>استیکری در دسترس نیست.</span>
+              )}
+              {stickers.map((st, idx) => (
+                <button
+                  key={st.id || idx}
+                  type="button"
+                  disabled={cdLeft > 0}
+                  title={st.title || ''}
+                  onClick={() => sendSticker(st.id)}
+                  style={{
+                    background: cdLeft > 0 ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    borderRadius: '14px',
+                    padding: '5px',
+                    flexShrink: 0,
+                    cursor: cdLeft > 0 ? 'not-allowed' : 'pointer',
+                    opacity: cdLeft > 0 ? 0.5 : 1,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  <img
+                    src={st.url?.startsWith('http') ? st.url : asset(st.url)}
+                    alt={st.title || 'استیکر'}
+                    style={{ width: 62, height: 62, display: 'block' }}
+                  />
+                </button>
+              ))}
+            </div>
+          ) : categories[tab]?.isEmoji ? (
             <div style={{ display: 'grid', gridTemplateRows: 'repeat(2, 1fr)', gridAutoFlow: 'column', gap: '6px', height: '100%', gridAutoColumns: 'minmax(60px, auto)' }}>
               {EMOJIS.map((em, idx) => (
                 <button
