@@ -13,7 +13,7 @@ import { useAsync } from '../lib/useAsync.js';
 import { AsyncSection, EmptyView } from '../components/states.jsx';
 import { clubImg, DisplayName } from '../components/Cosmetics.jsx';
 
-function Roster({ token, club, back, openProfile }) {
+function Roster({ token, club, back, openProfile, onUseAvatar, avatarBusy }) {
   const load = useCallback(
     () => req(`/api/clubs/${club.slug}/members`, 'GET', null, token),
     [club.slug, token]);
@@ -28,6 +28,12 @@ function Roster({ token, club, back, openProfile }) {
           <h3>{club.name}</h3>
           <small>{fa(club.memberCount)} هوادار</small>
         </div>
+        <button className="ghost small" type="button"
+          disabled={avatarBusy === club.slug}
+          onClick={() => onUseAvatar(club)}
+          style={{ marginInlineStart: 'auto' }}>
+          {avatarBusy === club.slug ? 'در حال اعمال...' : 'عکس پروفایل من'}
+        </button>
       </div>
 
       <AsyncSection state={state} loadingLabel="در حال بارگذاری هواداران...">
@@ -79,6 +85,24 @@ export default function Clubs({ token, openProfile }) {
     () => req('/api/clubs', 'GET', null, token), [token]);
   const state = useAsync(load, [load]);
   const [open, setOpen] = useState(null);
+  const [avatarBusy, setAvatarBusy] = useState(null);
+  const [avatarMsg, setAvatarMsg] = useState('');
+
+  // عکسِ پروفایل از لوگوی باشگاه — سرویس فقط برای عضوِ واقعیِ باشگاه
+  // اعمال می‌کند (۴۰۳ برای غیرعضو) و کلیدِ club:slug را می‌نشاند.
+  const useClubAvatar = async (club) => {
+    if (avatarBusy) return;
+    setAvatarBusy(club.slug);
+    setAvatarMsg('');
+    try {
+      await req('/api/shop/club-avatar', 'POST', { club: club.slug }, token);
+      setAvatarMsg(`عکس پروفایلت لوگوی «${club.name}» شد.`);
+    } catch (e) {
+      setAvatarMsg(e.message || 'خطا در تغییر عکس');
+    } finally {
+      setAvatarBusy(null);
+    }
+  };
 
   return (
     <AsyncSection state={state} loadingLabel="در حال بارگذاری باشگاه‌ها...">
@@ -87,7 +111,8 @@ export default function Clubs({ token, openProfile }) {
           const fresh = d.clubs.find(c => c.slug === open.slug) || open;
           return (
             <Roster token={token} club={fresh} openProfile={openProfile}
-              back={() => setOpen(null)} />
+              back={() => setOpen(null)} onUseAvatar={useClubAvatar}
+              avatarBusy={avatarBusy} />
           );
         }
 
@@ -99,6 +124,25 @@ export default function Clubs({ token, openProfile }) {
               هوادارهای هر باشگاه را ببین. با خرید نشان باشگاه از فروشگاه عضو
               می‌شوی و اسمت اینجا می‌آید.
             </p>
+
+            {avatarMsg && (
+              <div className="ok" style={{ margin: '0 0 10px' }}>{avatarMsg}</div>
+            )}
+
+            {d.mine?.length > 0 && (
+              <div className="myClubsRow" style={{ marginBottom: '12px' }}>
+                <span className="hint">عکس پروفایل از لوگوی باشگاه:</span>
+                {d.mine.map(c => (
+                  <button key={c.slug} type="button" className="ghost small"
+                    disabled={avatarBusy === c.slug}
+                    onClick={() => useClubAvatar(c)}>
+                    <img src={clubImg(c.slug)} alt="" width="18" height="18"
+                      style={{ borderRadius: '50%' }} />
+                    {avatarBusy === c.slug ? 'در حال اعمال...' : c.name}
+                  </button>
+                ))}
+              </div>
+            )}
 
             <div className="clubGrid">
               {d.clubs.map(c => (

@@ -26,6 +26,29 @@ class ClubsTab extends StatefulWidget {
 class _ClubsTabState extends State<ClubsTab> {
   late Future<dynamic> _future = widget.api.get('/api/clubs');
   Map<String, dynamic>? _open;
+  String? _avatarBusy;
+
+  /// عکسِ پروفایل از لوگوی باشگاه — سرویس فقط برای عضوِ واقعی اعمال
+  /// می‌کند (۴۰۳ برای غیرعضو). آینهٔ useClubAvatar در Clubs.jsx وب.
+  Future<void> _useClubAvatar(Map<String, dynamic> club) async {
+    if (_avatarBusy != null) return;
+    setState(() => _avatarBusy = '${club['slug']}');
+    try {
+      await widget.api.post('/api/shop/club-avatar', {'club': club['slug']});
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('عکس پروفایلت لوگوی «${club['name']}» شد.'),
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      final msg = apiError(e);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(msg.isNotEmpty ? msg : 'خطا در تغییر عکس'),
+      ));
+    } finally {
+      if (mounted) setState(() => _avatarBusy = null);
+    }
+  }
 
   Future<void> _reload() async {
     setState(() => _future = widget.api.get('/api/clubs'));
@@ -138,6 +161,38 @@ class _ClubsTabState extends State<ClubsTab> {
                                 : 'بدون هوادار',
                             style: theme.textTheme.labelSmall,
                           ),
+                          if (isMine) ...[
+                            Gaps.vXxs,
+                            // این InkWell درونی است و فقط روی خودش می‌نشیند؛
+                            // بازکردنِ روستر با تپِ بقیهٔ کارت می‌ماند.
+                            InkWell(
+                              onTap: _avatarBusy != null
+                                  ? null
+                                  : () => _useClubAvatar(c),
+                              borderRadius: Corners.rPill,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  borderRadius: Corners.rPill,
+                                  color: const Color(0xFFB5EF58)
+                                      .withValues(alpha: 0.14),
+                                  border: Border.all(
+                                      color: const Color(0xFFB5EF58)
+                                          .withValues(alpha: 0.45)),
+                                ),
+                                child: Text(
+                                  _avatarBusy == '${c['slug']}'
+                                      ? 'در حال اعمال...'
+                                      : 'عکس پروفایل من',
+                                  style: const TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFFB5EF58)),
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
