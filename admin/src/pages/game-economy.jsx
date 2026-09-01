@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Coins, Save } from 'lucide-react';
+import { Coins, Gift, Save, Trophy } from 'lucide-react';
 import { Badge, Button, Card, Field, Input } from '../components/ui.jsx';
 import { useToast } from '../lib/toast.jsx';
 
@@ -234,6 +234,7 @@ export function GameEconomyPage({ request }) {
       </Card>
 
       <TapManagementCard request={request} notify={notify} />
+      <TapPrizesCard request={request} notify={notify} />
     </div>
   );
 }
@@ -243,6 +244,153 @@ export function GameEconomyPage({ request }) {
  * رست بده و آمار لولِ آخر شدن کاربرها رو داشته باشه».
  * ریستِ تک‌کاربر پیشرفتش را صفر می‌کند و فقط همان یک نفر دوباره از
  * لول ۱ شروع می‌کند؛ «ریستِ کل» برای شروعِ فصلِ تازه است. */
+function TapPrizesCard({ request, notify }) {
+  const [board, setBoard] = useState(null);
+  const [shopItems, setShopItems] = useState([]);
+  const [form, setForm] = useState(null); // {userId, nickname, type}
+  const [amount, setAmount] = useState('');
+  const [itemSlug, setItemSlug] = useState('');
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const load = () => {
+    request('/api/admin/tap/leaderboard?limit=10')
+      .then(d => setBoard(d.entries || []))
+      .catch(() => setBoard([]));
+    request('/api/admin/shop')
+      .then(d => setShopItems((d.items || []).filter(i => i.slug)))
+      .catch(() => {});
+  };
+  useEffect(() => { load(); }, [request]);
+
+  const openForm = (u, type) => {
+    setForm({ userId: u.userId, nickname: u.nickname, type });
+    setAmount(type === 'cash' ? '10000' : '');
+    setItemSlug('');
+    setReason(type === 'cash' ? 'جایزهٔ نفرات برتر ضربه‌زن' : 'جایزهٔ فروشگاهی ضربه‌زن');
+  };
+
+  async function award() {
+    if (!form) return;
+    const reasonText = reason.trim();
+    if (reasonText.length < 3) {
+      notify('ثبت دلیل (حداقل ۳ حرف) الزامی است', 'error');
+      return;
+    }
+    setBusy(true);
+    try {
+      let d;
+      if (form.type === 'cash') {
+        const n = Math.floor(Number(amount || 0));
+        if (!Number.isFinite(n) || n <= 0) {
+          notify('مبلغ نقدی باید عددی بزرگ‌تر از صفر باشد', 'error');
+          return;
+        }
+        d = await request(`/api/admin/wallet/users/${form.userId}/adjust`, {
+          method: 'POST', body: { amount: n, reason: reasonText },
+        });
+      } else {
+        if (!itemSlug) {
+          notify('اول آیتم فروشگاه را انتخاب کن', 'error');
+          return;
+        }
+        d = await request(`/api/admin/users/${form.userId}/grant-item`, {
+          method: 'POST',
+          body: { kind: 'shop_item', value: 1, itemSlug, reason: reasonText },
+        });
+      }
+      notify(d.message || 'جایزه ثبت شد');
+      setForm(null);
+    } catch (err) { notify(err.message, 'error'); }
+    finally { setBusy(false); }
+  }
+
+  const fa = n => new Intl.NumberFormat('fa-IR').format(Number(n || 0));
+  return (
+    <Card
+      title="نفرات برتر ضربه‌زن — اهدای جایزه"
+      subtitle="۱۰ نفرِ برترِ بازی ضربه‌زن؛ به هر کدام می‌توانی جایزهٔ نقدی (کیف پول) یا فروشگاهی بدهی. هر اعطا با دلیل در دفترِ کل ثبت می‌شود."
+      action={<Badge tone="gold"><Trophy size={13} /> جوایز نفرات برتر</Badge>}
+    >
+      {!board ? <p className="topbar-sub">در حال بارگذاری…</p> : !board.length ? (
+        <p className="topbar-sub">هنوز ضربه‌ای ثبت نشده است.</p>
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+            <thead>
+              <tr style={{ textAlign: 'right', color: 'rgba(255,255,255,.55)' }}>
+                <th style={{ padding: '6px 8px' }}>رتبه</th>
+                <th style={{ padding: '6px 8px' }}>بازیکن</th>
+                <th style={{ padding: '6px 8px' }}>ضربه‌ها</th>
+                <th style={{ padding: '6px 8px' }}>لول</th>
+                <th style={{ padding: '6px 8px' }}>جایزه</th>
+              </tr>
+            </thead>
+            <tbody>
+              {board.map((u, i) => (
+                <tr key={u.userId} style={{ borderTop: '1px solid rgba(255,255,255,.07)' }}>
+                  <td style={{ padding: '7px 8px' }}>
+                    {i < 3
+                      ? <span style={{ display: 'inline-grid', placeItems: 'center', width: 22, height: 22, borderRadius: '50%', background: ['linear-gradient(160deg,#FDE68A,#F59E0B)', 'linear-gradient(160deg,#F1F5F9,#94A3B8)', 'linear-gradient(160deg,#FCD9B6,#B45309)'][i], color: i === 1 ? '#0f172a' : '#2b1a02', fontWeight: 900, fontSize: 11 }}>{fa(i + 1)}</span>
+                      : <span style={{ padding: '0 8px', fontWeight: 700, color: 'rgba(255,255,255,.6)' }}>{fa(i + 1)}</span>}
+                  </td>
+                  <td style={{ padding: '7px 8px', fontWeight: 700 }}>{u.nickname}</td>
+                  <td style={{ padding: '7px 8px', color: '#FFD166', fontWeight: 700 }}>{fa(u.totalTaps)}</td>
+                  <td style={{ padding: '7px 8px' }}>{fa(u.level)}</td>
+                  <td style={{ padding: '7px 8px', whiteSpace: 'nowrap' }}>
+                    <Button size="sm" variant="secondary" disabled={busy}
+                      onClick={() => openForm(u, 'cash')}>
+                      <Coins size={13} /> نقدی
+                    </Button>{' '}
+                    <Button size="sm" variant="secondary" disabled={busy}
+                      onClick={() => openForm(u, 'shop')}>
+                      <Gift size={13} /> فروشگاهی
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {form && (
+        <div style={{ marginTop: 14, padding: 12, border: '1px solid rgba(255,209,102,.35)', borderRadius: 12, background: 'rgba(255,209,102,.05)' }}>
+          <b style={{ fontSize: 13 }}>
+            {form.type === 'cash' ? 'جایزهٔ نقدی' : 'جایزهٔ فروشگاهی'} برای «{form.nickname}»
+          </b>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginTop: 10 }}>
+            {form.type === 'cash' ? (
+              <Field label="مبلغ (تومان)">
+                <Input type="number" min="1" value={amount}
+                  onChange={e => setAmount(e.target.value)} style={{ width: 160 }} />
+              </Field>
+            ) : (
+              <Field label="آیتم فروشگاه">
+                <select value={itemSlug} onChange={e => setItemSlug(e.target.value)}
+                  style={{ padding: '9px 10px', borderRadius: 10, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.15)', color: 'inherit', fontSize: 13 }}>
+                  <option value="">انتخاب آیتم…</option>
+                  {shopItems.map(it => (
+                    <option key={it.slug} value={it.slug}>{it.name}</option>
+                  ))}
+                </select>
+              </Field>
+            )}
+            <Field label="دلیل (در دفترِ کل ثبت می‌شود)">
+              <Input value={reason} onChange={e => setReason(e.target.value)}
+                style={{ width: 240 }} />
+            </Field>
+            <Button onClick={award} disabled={busy}>
+              <Save size={14} /> ثبت جایزه
+            </Button>
+            <Button variant="ghost" onClick={() => setForm(null)} disabled={busy}>انصراف</Button>
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function TapManagementCard({ request, notify }) {
   const [stats, setStats] = useState(null);
   const [busy, setBusy] = useState(false);

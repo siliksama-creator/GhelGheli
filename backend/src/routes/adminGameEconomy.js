@@ -70,6 +70,13 @@ module.exports = function createAdminGameEconomyRoutes(deps) {
     res.json(await tapGame.adminStats());
   }));
 
+  // GET leaderboard — نفراتِ برترِ ضربه‌زن برای بخشِ «اهدای جایزه».
+  // همان تابعِ leaderboard عمومی است (userId را هم برمی‌گرداند) تا
+  // پنل بتواند روی هر ردیف «نقدی/فروشگاهی» بفرستد.
+  router.get('/admin/tap/leaderboard', adminAuth, asyncHandler(async (req, res) => {
+    res.json({ entries: await tapGame.leaderboard(req.query.limit) });
+  }));
+
   // POST reset — ریستِ یک کاربر (userId) یا همه (all:true).
   //
   // ⚠️ فقط نقشِ اپراتور به بالا (requireRole بدون آرگومان یعنی همان

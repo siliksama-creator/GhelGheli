@@ -487,6 +487,7 @@
 .badge-danger { background: color-mix(in srgb, var(--gg-danger) 18%, transparent); color: var(--gg-danger); }
 .badge-info { background: color-mix(in srgb, var(--gg-info) 18%, transparent); color: var(--gg-info); }
 .badge-neutral { background: var(--gg-surface-highest); color: var(--gg-text-muted); }
+.badge-gold { background: color-mix(in srgb, #FFD166 16%, transparent); color: #FFD166; }
 
 /* ---------- Table ---------- */
 .table-wrap {

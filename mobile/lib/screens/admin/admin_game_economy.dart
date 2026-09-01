@@ -357,6 +357,7 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
           Gaps.vMd,
           // ── آمار و ریستِ بازی ضربه‌زن (دورِ ۳۳) ──
           _TapStatsSection(api: widget.api),
+          _TapPrizesSection(api: widget.api),
           Gaps.vMd,
         ],
       ),
@@ -571,6 +572,242 @@ class _TapStatsSectionState extends State<_TapStatsSection> {
                   color: color ?? Colors.white)),
           Text(label, style: const TextStyle(fontSize: 10.5, color: Colors.white60)),
         ],
+      ),
+    );
+  }
+}
+
+/// «نفرات برتر ضربه‌زن — اهدای جایزه» — آینهٔ TapPrizesCard در پنلِ وب.
+/// ادمین ۱۰ نفرِ برتر را می‌بیند و برای هر کدام جایزهٔ نقدی (کیف پول) یا
+/// فروشگاهی (آیتم شاپ) با دلیلِ ثبت‌شده در دفترِ کل می‌فرستد.
+class _TapPrizesSection extends StatefulWidget {
+  const _TapPrizesSection({required this.api});
+
+  final ApiClient api;
+
+  @override
+  State<_TapPrizesSection> createState() => _TapPrizesSectionState();
+}
+
+class _TapPrizesSectionState extends State<_TapPrizesSection> {
+  List<Map<String, dynamic>> _board = const [];
+  List<Map<String, dynamic>> _shopItems = const [];
+  bool _loading = true;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final b = await widget.api.get('/api/admin/tap/leaderboard?limit=10');
+      final entries = ((b['entries'] as List?) ?? const [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      final shop = await widget.api.get('/api/admin/shop');
+      final items = ((shop['items'] as List?) ?? const [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .where((e) => e['slug'] != null)
+          .toList();
+      if (!mounted) return;
+      setState(() {
+        _board = entries;
+        _shopItems = items;
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  /// فرمِ اعطا: نقدی = adjust کیف پول، فروشگاهی = grant-item.
+  Future<void> _award(Map<String, dynamic> u, String type) async {
+    final amountCtrl = TextEditingController(
+        text: type == 'cash' ? '10000' : '');
+    final reasonCtrl = TextEditingController(
+        text: type == 'cash' ? 'جایزهٔ نفرات برتر ضربه‌زن' : 'جایزهٔ فروشگاهی ضربه‌زن');
+    String? itemSlug;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) => AlertDialog(
+          title: Text('${type == 'cash' ? 'جایزهٔ نقدی' : 'جایزهٔ فروشگاهی'} برای «${u['nickname']}»'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (type == 'cash')
+                TextField(
+                  controller: amountCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'مبلغ (تومان)'),
+                )
+              else
+                DropdownButtonFormField<String>(
+                  initialValue: itemSlug,
+                  decoration: const InputDecoration(labelText: 'آیتم فروشگاه'),
+                  items: [
+                    for (final it in _shopItems)
+                      DropdownMenuItem(
+                        value: '${it['slug']}',
+                        child: Text('${it['name']}', overflow: TextOverflow.ellipsis),
+                      ),
+                  ],
+                  onChanged: (v) => setDlg(() => itemSlug = v),
+                ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: reasonCtrl,
+                decoration: const InputDecoration(
+                    labelText: 'دلیل (در دفترِ کل ثبت می‌شود)'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('انصراف'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('ثبت جایزه'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (ok != true) return;
+    final reason = reasonCtrl.text.trim();
+    if (reason.length < 3) {
+      _toast('ثبت دلیل (حداقل ۳ حرف) الزامی است');
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      Map<String, dynamic> d;
+      if (type == 'cash') {
+        final n = int.tryParse(amountCtrl.text.trim()) ?? 0;
+        if (n <= 0) {
+          _toast('مبلغ نقدی باید عددی بزرگ‌تر از صفر باشد');
+          return;
+        }
+        d = await widget.api.post('/api/admin/wallet/users/${u['userId']}/adjust',
+            {'amount': n, 'reason': reason});
+      } else {
+        if (itemSlug == null || itemSlug!.isEmpty) {
+          _toast('اول آیتم فروشگاه را انتخاب کن');
+          return;
+        }
+        d = await widget.api.post('/api/admin/users/${u['userId']}/grant-item',
+            {'kind': 'shop_item', 'value': 1, 'itemSlug': itemSlug, 'reason': reason});
+      }
+      _toast('${d['message'] ?? 'جایزه ثبت شد'}');
+    } catch (e) {
+      final msg = apiError(e);
+      _toast(msg.isNotEmpty ? msg : 'خطا در ثبت جایزه');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _toast(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text('نفرات برتر ضربه‌زن — اهدای جایزه',
+                    style: Theme.of(context).textTheme.titleMedium),
+              ),
+              IconButton(
+                onPressed: _load,
+                icon: const Icon(Icons.refresh_rounded, size: 20),
+                tooltip: 'به‌روزرسانی',
+              ),
+            ],
+          ),
+          Gaps.vXxs,
+          const Text(
+            'به هر یک از ۱۰ نفرِ برتر می‌توانی جایزهٔ نقدی (کیف پول) یا فروشگاهی بدهی؛ هر اعطا با دلیل در دفترِ کل ثبت می‌شود.',
+            style: TextStyle(fontSize: 11.5, color: Colors.white60),
+          ),
+          Gaps.vSm,
+          if (_loading)
+            const LoadingView()
+          else if (_board.isEmpty)
+            const Text('هنوز ضربه‌ای ثبت نشده است.',
+                style: TextStyle(fontSize: 12, color: Colors.white60))
+          else
+            for (var i = 0; i < _board.length; i++)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                leading: _rankBadge(i + 1),
+                title: Text('${_board[i]['nickname']}',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800, fontSize: 13)),
+                subtitle: Text(
+                  '${_board[i]['totalTaps'] ?? 0} ضربه · لول ${_board[i]['level'] ?? 0}',
+                  style: const TextStyle(fontSize: 11.5),
+                ),
+                trailing: Wrap(
+                  spacing: 6,
+                  children: [
+                    TextButton.icon(
+                      onPressed: _busy
+                          ? null
+                          : () => _award(_board[i], 'cash'),
+                      icon: const Icon(Icons.paid_rounded, size: 15),
+                      label: const Text('نقدی'),
+                    ),
+                    TextButton.icon(
+                      onPressed: _busy
+                          ? null
+                          : () => _award(_board[i], 'shop'),
+                      icon: const Icon(Icons.card_giftcard_rounded, size: 15),
+                      label: const Text('فروشگاهی'),
+                    ),
+                  ],
+                ),
+              ),
+        ],
+      ),
+    );
+  }
+
+  Widget _rankBadge(int rank) {
+    final (bg, fg) = switch (rank) {
+      1 => (const Color(0xFFF59E0B), const Color(0xFF2B1A02)),
+      2 => (const Color(0xFF94A3B8), const Color(0xFF0F172A)),
+      3 => (const Color(0xFFB45309), Colors.white),
+      _ => (Colors.transparent, Colors.white70),
+    };
+    return Container(
+      width: 24,
+      height: 24,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: bg,
+        shape: BoxShape.circle,
+        border: rank > 3 ? Border.all(color: Colors.white24) : null,
+      ),
+      child: Text(
+        '$rank',
+        style: TextStyle(
+            fontSize: 11, fontWeight: FontWeight.w900, color: fg),
       ),
     );
   }
