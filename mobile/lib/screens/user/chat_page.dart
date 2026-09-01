@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../api_client.dart';
@@ -58,6 +59,7 @@ class ChatPage extends StatefulWidget {
 class _ChatPageState extends State<ChatPage> with LifecyclePoller {
   List _messages = [];
   List _emotePacks = [];
+  List _stickers = [];
   Map? _reply;
   String? _error;
   Map<String, dynamic>? _pinned;
@@ -193,6 +195,7 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
         setState(() {
           _messages = m;
           _emotePacks = cfg['emotePacks'] is List ? cfg['emotePacks'] as List : const [];
+          _stickers = res['stickers'] is List ? res['stickers'] as List : const [];
           _lastCount = m.length;
           _error = null;
           _loading = false;
@@ -206,6 +209,38 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
           if (msg.isNotEmpty) _error = msg;
           _loading = false;
         });
+      }
+    }
+  }
+
+  /// آدرسِ کاملِ استیکر: مسیرِ نسبیِ سرور + baseUrl کلاینت. فایلِ SVG از
+  /// شبکه می‌آید تا استیکرِ جدیدِ دیتابیس بدون آپدیتِ اپ دیده شود.
+  String _stickerUrl(Object? rel) {
+    final s = '$rel';
+    if (s.isEmpty) return '';
+    if (s.startsWith('http://') || s.startsWith('https://')) return s;
+    return widget.api.baseUrl.replaceAll(RegExp(r'/\$'), '') + s;
+  }
+
+  Future<void> _sendSticker(String stickerId) async {
+    if (_cooldownLeft > 0) return;
+    try {
+      final payload = <String, dynamic>{'stickerId': stickerId};
+      if (_reply != null) payload['replyTo'] = _reply!['id'];
+      final sent = await widget.api.post('/api/chat/messages', payload);
+      if (!mounted) return;
+      setState(() => _reply = null);
+      _startCooldown();
+      if (sent is Map) {
+        setState(() => _messages.add(sent));
+        _scrollToBottom(force: true);
+      }
+    } catch (e) {
+      if (mounted) {
+        final msg = apiError(e);
+        if (msg.isNotEmpty) {
+          setState(() => _error = msg);
+        }
       }
     }
   }
@@ -304,6 +339,7 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
               return _MessageBubble(
                 message: m,
                 isMe: isMe,
+                stickerUrl: _stickerUrl,
                 onReply: () => setState(() => _reply = m),
                 onLike: () => _toggleLike(m),
                 onOpenProfile: () {
@@ -365,8 +401,11 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
         // (پیش‌تر گرفته و پاس داده می‌شد و هرگز خوانده نمی‌شد.)
         _CannedMessagesPanel(
           emotePacks: _emotePacks,
+          stickers: _stickers,
+          stickerUrl: _stickerUrl,
           cooldownLeft: _cooldownLeft,
           onSend: _sendCannedMessage,
+          onSendSticker: _sendSticker,
         ),
       ],
     );
@@ -377,6 +416,7 @@ class _MessageBubble extends StatelessWidget {
   const _MessageBubble({
     required this.message,
     required this.isMe,
+    required this.stickerUrl,
     required this.onReply,
     required this.onLike,
     required this.onOpenProfile,
@@ -384,6 +424,7 @@ class _MessageBubble extends StatelessWidget {
 
   final Map message;
   final bool isMe;
+  final String Function(Object? rel) stickerUrl;
   final VoidCallback onReply;
   final VoidCallback onLike;
   final VoidCallback onOpenProfile;
@@ -484,7 +525,19 @@ class _MessageBubble extends StatelessWidget {
                       ],
                     ),
                   ),
-                if (onlyEmoji)
+                if (message['message_type'] == 'sticker' &&
+                    message['sticker_url'] != null)
+                  // استیکر حبابِ متنی نمی‌خواهد؛ SVG خودش را با یک
+                  // ضربانِ ملایمِ مقیاس نشان می‌دهد (انیمیشن سمتِ فلاتر،
+                  // چون flutter_svg از SMIL پشتیبانی نمی‌کند).
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: AnimatedSticker(
+                      url: stickerUrl(message['sticker_url']),
+                      title: message['sticker_title'] as String?,
+                    ),
+                  )
+                else if (onlyEmoji)
                   // ایموجیِ تنها حباب نمی‌خواهد؛ بزرگ و بدون کادر.
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
@@ -577,13 +630,19 @@ class _MessageBubble extends StatelessWidget {
 class _CannedMessagesPanel extends StatefulWidget {
   const _CannedMessagesPanel({
     required this.emotePacks,
+    required this.stickers,
+    required this.stickerUrl,
     required this.cooldownLeft,
     required this.onSend,
+    required this.onSendSticker,
   });
 
   final List emotePacks;
+  final List stickers;
+  final String Function(Object? rel) stickerUrl;
   final int cooldownLeft;
   final void Function(String text) onSend;
+  final void Function(String stickerId) onSendSticker;
 
   @override
   State<_CannedMessagesPanel> createState() => _CannedMessagesPanelState();
@@ -619,7 +678,61 @@ class _CannedMessagesPanelState extends State<_CannedMessagesPanel> {
       ('game', 'رقابت', const ['بزن بریم بازی!', 'آماده‌ای برای مسابقه؟', 'این دست من می‌برم!', 'بازی عالی بود!', 'دوباره بازی کنیم؟', 'کارت خفن گرفتم!', 'حریف قوی می‌خوام!', 'پنالتی رو دریبل کردم!', 'خیلی خفن بود!', 'شما تو کدوم لیگ هستید؟', 'چقدر امتیازم بالا رفت!', 'کارت جدید پیدا کردم!', 'امروز روز منه!']),
       ...premium,
       ('heart', 'ایموجی', const <String>[]),
+      ('party', 'استیکر', const <String>[]),
     ];
+  }
+
+  /// گریدِ افقیِ استیکرها — فایل SVG از شبکه (بدون آپدیت برای استیکرِ
+  /// جدید). آینهٔ تبِ «استیکر» در Chat.jsx وب.
+  Widget _stickerGrid(bool disabled) {
+    final stickers = widget.stickers.whereType<Map>().toList();
+    if (stickers.isEmpty) {
+      return const Center(
+        child: Text(
+          'استیکری در دسترس نیست.',
+          style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+        ),
+      );
+    }
+    return ListView.separated(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      itemCount: stickers.length,
+      separatorBuilder: (_, __) => const SizedBox(width: 8),
+      itemBuilder: (ctx, i) {
+        final st = stickers[i];
+        final url = widget.stickerUrl(st['url']);
+        return InkWell(
+          onTap: disabled ? null : () => widget.onSendSticker('${st['id'] ?? ''}'),
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            width: 78,
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              color: disabled
+                  ? Colors.white.withValues(alpha: 0.02)
+                  : Colors.white.withValues(alpha: 0.05),
+              border: Border.all(color: Colors.white12),
+            ),
+            child: Tooltip(
+              message: '${st['title'] ?? 'استیکر'}',
+              child: url.isEmpty
+                  ? const Icon(Icons.image_not_supported_outlined,
+                      size: 28, color: Colors.white30)
+                  : SvgPicture.network(
+                      url,
+                      width: 62,
+                      height: 62,
+                      fit: BoxFit.contain,
+                      placeholderBuilder: (_) => const Icon(Icons.image_outlined,
+                          size: 28, color: Colors.white30),
+                    ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -699,11 +812,13 @@ class _CannedMessagesPanelState extends State<_CannedMessagesPanel> {
           ),
           const SizedBox(height: 8),
 
-          // لیست پیام‌ها یا ایموجی‌ها
+          // لیست پیام‌ها یا ایموجی‌ها یا استیکرها
           SizedBox(
             height: 96,
             child: _tab == categories.length - 1
-                ? GridView.builder(
+                ? _stickerGrid(disabled)
+                : _tab == categories.length - 2
+                    ? GridView.builder(
                     scrollDirection: Axis.horizontal,
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
@@ -728,7 +843,7 @@ class _CannedMessagesPanelState extends State<_CannedMessagesPanel> {
                       );
                     },
                   )
-                : GridView.builder(
+                    : GridView.builder(
                     scrollDirection: Axis.horizontal,
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
@@ -768,6 +883,60 @@ class _CannedMessagesPanelState extends State<_CannedMessagesPanel> {
                   ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// استیکرِ چت: SVG شبکه + ضربانِ مقیاسِ ملایم.
+///
+/// flutter_svg از انیمیشنِ داخلِ فایل (SMIL) پشتیبانی نمی‌کند، پس حسِ
+/// «زنده بودن» با یک مقیاسِ رفت‌وبرگشتیِ خودِ فلاتر ساخته می‌شود — بدون
+/// هیچ وابستگیِ اضافه. اگر شبکه در دسترس نبود، آیکونِ جایگزین می‌آید تا
+/// جای خالی دیده نشود.
+class AnimatedSticker extends StatefulWidget {
+  const AnimatedSticker({super.key, required this.url, this.title});
+
+  final String url;
+  final String? title;
+
+  @override
+  State<AnimatedSticker> createState() => _AnimatedStickerState();
+}
+
+class _AnimatedStickerState extends State<AnimatedSticker>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  )..repeat(reverse: true);
+
+  late final Animation<double> _scale = Tween<double>(begin: 0.94, end: 1.06)
+      .animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: widget.title ?? 'استیکر',
+      child: ScaleTransition(
+        scale: _scale,
+        child: widget.url.isEmpty
+            ? const Icon(Icons.image_not_supported_outlined,
+                size: 56, color: Colors.white30)
+            : SvgPicture.network(
+                widget.url,
+                width: 96,
+                height: 96,
+                fit: BoxFit.contain,
+                placeholderBuilder: (_) => const Icon(Icons.image_outlined,
+                    size: 56, color: Colors.white30),
+              ),
       ),
     );
   }
