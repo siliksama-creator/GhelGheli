@@ -214,38 +214,6 @@ async function status(userId) {
 }
 
 /**
- * فقط تعداد چرخش — برای نشانِ کنار آیکون در نوار بالا.
- *
- * چرا جدا از status(): آن تابع کل کاتالوگ ۱۲ جایزه را با رنگ و برچسب
- * برمی‌گرداند، و نشانِ نوار بالا فقط به یک عدد نیاز دارد. این نسخه سه
- * کوئری کوچک است به‌جای چهار کوئری که یکی‌شان کل جدول جوایز را می‌خواند —
- * و روی هر بار باز شدن اپ صدا زده می‌شود.
- */
-async function spinCount(userId) {
-  const today = tehranDay();
-  const [spun, user, invites] = await Promise.all([
-    pool.query(
-      `SELECT COUNT(*)::int AS n FROM wheel_spins
-        WHERE user_id = $1 AND spin_source = 'daily' AND spun_day = $2::date`,
-      [userId, today]),
-    pool.query(
-      'SELECT bonus_spins, unlimited_spins FROM users WHERE id = $1',
-      [userId]),
-    referrals.invitedCount(userId),
-  ]);
-  const unlimited = user.rows[0]?.unlimited_spins === true;
-  const bonus = Number(user.rows[0]?.bonus_spins) || 0;
-  const dailyLeft = unlimited
-    ? UNLIMITED_DISPLAY
-    : Math.max(0, referrals.dailySpinsFor(invites) - spun.rows[0].n);
-  return {
-    spinsLeft: dailyLeft + bonus,
-    unlimited,
-    resetInMs: msUntilTehranMidnight(),
-  };
-}
-
-/**
  * یک چرخش. برمی‌گرداند: جایزه، و وضعیت جدید.
  *
  * ترتیب کارها مهم است و عمدی:
@@ -666,7 +634,7 @@ async function saveAll(rawList) {
 }
 
 module.exports = {
-  prizes, status, spinCount, spin, history, stats,
+  prizes, status, spin, history, stats,
   listAll, saveAll, publicPrize,
   pickPrize, tehranDay, msUntilTehranMidnight, storedDay,
   weightToPercent, percentToWeight,

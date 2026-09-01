@@ -977,18 +977,9 @@ app.get('/api/bootstrap', auth, asyncHandler(async (req, res) => {
 }));
 
 // ═══════════════════════════════════════════════════════════════════════════
-// سهمیهٔ سکهٔ امروز — سبک، برای تازه‌سازی بعد از هر مسابقه
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// bootstrap این را دارد، ولی بعد از هر بازی باید عددِ تازه خوانده شود و
-// کشیدنِ کلِ bootstrap برای دو عدد اسراف است — دقیقاً همان دلیلی که
-// `/api/level` جدا وجود دارد.
-app.get('/api/coins/quota', auth, asyncHandler(async (req, res) => {
-  res.json({
-    coins: Number(req.user.coins || 0),
-    quota: await coins.getQuota(req.user.id),
-  });
-}));
+// `/api/coins/quota` حذف شد (چرخهٔ ۲۴): هیچ کلاینتی صدایش نمی‌زد —
+// سهمیهٔ سکه در bootstrap هست و بعد از هر بازی هم کلاینت‌ها `/api/level`
+// را می‌خوانند. یک کوئریِ بی‌مصرف فقط سطحِ حمله را زیاد می‌کرد.
 
 // ═══════════════════════════════════════════════════════════════════════════
 // وضعیتِ کاملِ لول — برای صفحهٔ بازی‌ها
@@ -1441,10 +1432,9 @@ app.post('/api/rewards/:id/claim', auth, validateUuid('id'), asyncHandler(async 
   }
 }));
 
-app.get('/api/rewards/claims/me', auth, asyncHandler(async (req, res) => {
-  const { rows } = await pool.query('SELECT c.*, r.name, r.reward_type, r.reward_value FROM user_reward_claims c JOIN reward_tiers r ON r.id=c.reward_tier_id WHERE c.user_id=$1 ORDER BY c.claimed_at DESC', [req.user.id]);
-  res.json(rows);
-}));
+// `/api/rewards/claims/me` حذف شد (چرخهٔ ۲۴): بدون مصرف‌کننده در هر سه
+// کلاینت؛ وضعیتِ ادعاها (claimed/status) از /api/reward-groups می‌آید و
+// ادعای تکراری هم با قفلِ تراکنشیِ rewardGroupService بسته شده است.
 
 // ===========================================================================
 //  کیف پول تومانی — مسیرهای کاربر
@@ -1621,11 +1611,9 @@ app.post('/api/wheel/spin', auth, wheelLimiter, asyncHandler(async (req, res) =>
   res.json(result);
 }));
 
-// فقط شمارنده، برای نشانِ نوار بالا. سبک‌تر از /api/wheel که کل کاتالوگ
-// جوایز را می‌فرستد.
-app.get('/api/wheel/count', auth, asyncHandler(async (req, res) => {
-  res.json(await wheel.spinCount(req.user.id));
-}));
+// `/api/wheel/count` حذف شد (چرخهٔ ۲۴): هر دو کلاینت نوارِ گردونه را از
+// GET /api/wheel (که spinsLeft دارد) می‌سازند؛ شمارندهٔ جدا فقط یک مسیرِ
+// تکراریِ احراز‌شده بود.
 
 // ── گذر نبرد ─────────────────────────────────────────────────────────────
 app.get('/api/pass', auth, asyncHandler(async (req, res) => {

@@ -791,9 +791,11 @@ async function testRewardsAndLeague() {
       'هر جایزه می‌گوید کاربر واجد شرایط هست یا نه');
   }
 
-  const claims = await GET('/api/rewards/claims/me', t);
+  // /api/rewards/claims/me حذف شد (بدون مصرف‌کننده)؛ وضعیتِ ادعاها از
+  // /api/reward-groups می‌آید — همان چیزی که کلاینت‌ها واقعاً می‌خوانند.
+  const claims = await GET('/api/reward-groups', t);
   ok(claims.status === 200 && Array.isArray(claims.data),
-    'فهرست درخواست‌های جایزهٔ من دریافت شد');
+    'وضعیت ادعای جایزه‌ها از گروه‌های جایزه دریافت شد');
 
   const league = await GET('/api/league/current', t);
   ok(league.status === 200, 'جدول لیگ دریافت شد', `status=${league.status}`);

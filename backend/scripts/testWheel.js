@@ -650,13 +650,15 @@ test('endpoint فقط برای سوپرادمین است', () => {
   assert.ok(/audit\(/.test(route), 'باید در audit ثبت شود');
 });
 
-test('سرویس سبکِ شمارنده وجود دارد', () => {
-  // /api/wheel کل کاتالوگ ۱۲ جایزه را می‌فرستد؛ نشانِ نوار بالا فقط یک
-  // عدد می‌خواهد و روی هر بار باز شدن اپ صدا زده می‌شود.
-  assert.strictEqual(typeof wheel.spinCount, 'function');
+test('مسیر تکراریِ شمارنده حذف شد و spinsLeft از status می‌آید', () => {
+  // /api/wheel/count بدون مصرف‌کننده بود: هر دو کلاینت نشانِ گردونه را از
+  // status() می‌سازند که spinsLeft را دارد. مسیرِ تکراری فقط سطحِ حمله را
+  // زیاد می‌کرد؛ spinCount سرویس هم که هیچ صدازننده‌ای نداشت پاک شد.
+  assert.strictEqual(typeof wheel.spinCount, 'undefined');
+  assert.strictEqual(typeof wheel.status, 'function');
   const src = require('fs').readFileSync(
     require('path').join(__dirname, '../src/server.js'), 'utf8');
-  assert.ok(/app\.get\('\/api\/wheel\/count'/.test(src));
+  assert.ok(!/app\.get\('\/api\/wheel\/count'/.test(src));
 });
 
 console.log(`\n${passed} ادعای گردونه و دعوت موفق بود\n`);
