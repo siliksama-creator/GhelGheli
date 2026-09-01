@@ -2747,6 +2747,16 @@ cron.schedule('23 4 * * *', () => {
     .catch(e => console.error('[coins] quota prune failed:', e.message));
 }, { timezone: 'Asia/Tehran' });
 
+// هرسِ رویدادهای تحلیلیِ کهنه — بند ۶بِ ممیزیِ مستقلِ دوم: این جدول
+// تنها جدولِ رویدادی بود که بدون سقف رشد می‌کرد. رویدادها فقط به‌دردِ
+// نمودارهای پنل می‌خورند که حداکثر ۹۰ روز عقب را نشان می‌دهند؛ کهنه‌تر
+// از آن نه کاربردی دارد نه ارزش نگهداری.
+cron.schedule('41 4 * * *', () => {
+  analytics.pruneOld(90)
+    .then(n => { if (n) console.log(`[analytics] pruned ${n} old event(s)`); })
+    .catch(e => console.error('[analytics] event prune failed:', e.message));
+}, { timezone: 'Asia/Tehran' });
+
 // Centralized error handler. Previously this forwarded err.message straight
 // to the client, which meant raw PostgreSQL errors (unique/foreign-key
 // constraint names, column/table names, data types) leaked verbatim to

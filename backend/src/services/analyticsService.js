@@ -142,4 +142,38 @@ async function resolveCrashGroup(hash, status, platform) {
   return { hash: h, status, updated: rowCount };
 }
 
-module.exports = { EVENTS, record, reportCrash, summary, resolveCrash, resolveCrashGroup, safeObject };
+/**
+ * هرسِ رویدادهای تحلیلیِ کهنه — بند ۶بِ ممیزیِ مستقلِ دوم.
+ *
+ * چرا: analytics_events تنها جدولِ رویدادیِ سیستم بود که هیچ کارِ
+ * پاک‌سازی‌ای نداشت و بدون سقف رشد می‌کرد، در حالی که همهٔ جدول‌های
+ * موقتیِ دیگر (سهمیهٔ سکه، نانسِ ضربه‌زن، تاریخچهٔ دوئل، پیام چت)
+ * هرسِ زمان‌بندی‌شده دارند.
+ *
+ * چرا ۹۰ روز: خلاصهٔ پنل (summary) حداکثر ۹۰ روز عقب را نشان می‌دهد،
+ * پس حذفِ قدیمی‌تر از آن هیچ نموداری را نمی‌شکند.
+ *
+ * چرا حذفِ دسته‌ای در حلقه: یک DELETEِ بزرگ روی جدولِ پررشد، قفلِ
+ * طولانی می‌گیرد و تراکنش را باد می‌کند؛ دسته‌های ۵۰۰تایی همان الگوی
+ * امنِ بقیهٔ هرس‌های پروژه است.
+ */
+async function pruneOld(keepDays = 90) {
+  const days = Math.max(7, Math.trunc(Number(keepDays) || 90));
+  let removed = 0;
+  for (;;) {
+    const { rowCount } = await pool.query(
+      `DELETE FROM analytics_events
+        WHERE id IN (
+          SELECT id FROM analytics_events
+           WHERE created_at < NOW() - ($1::text || ' days')::interval
+           LIMIT 500
+        )`,
+      [days],
+    );
+    removed += rowCount || 0;
+    if (!rowCount) break;
+  }
+  return removed;
+}
+
+module.exports = { EVENTS, record, reportCrash, summary, resolveCrash, resolveCrashGroup, safeObject, pruneOld };

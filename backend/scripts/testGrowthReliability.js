@@ -85,6 +85,25 @@ ok(read('admin/src/pages/analytics.jsx').includes('/api/admin/analytics')
   && read('mobile/lib/screens/admin/admin_analytics.dart').includes('/api/admin/analytics'),
   'analytics/crash dashboard ships on both admin clients');
 
+// ── بند ۶الف/۶بِ ممیزیِ مستقلِ دوم: ایندکسِ جدول‌های پرترافیک و
+//    هرسِ analytics_events. مایگریشن ۰۸۱ باید هر دو ایندکسِ جدید را
+//    بسازد و کارِ زمان‌بندی‌شدهٔ هرس باید در سرور با خطاگیریِ امن
+//    ثبت شده باشد (همان الگوی هرس‌های موجود).
+const idxMigration = read('backend/migrations/081_hot_table_indexes.sql');
+ok(idxMigration.includes('CREATE INDEX IF NOT EXISTS idx_wheel_spins_day')
+  && idxMigration.includes('ON wheel_spins(spun_day)'),
+  'hot-table migration indexes the wheel day column');
+ok(idxMigration.includes('CREATE INDEX IF NOT EXISTS idx_analytics_created_at'),
+  'hot-table migration indexes analytics created_at for the pruner');
+const analyticsSrc = read('backend/src/services/analyticsService.js');
+ok(analyticsSrc.includes('async function pruneOld') && analyticsSrc.includes('keepDays = 90'),
+  'analytics service prunes old events with a 90-day floor');
+const serverSrc = read('backend/src/server.js');
+ok(serverSrc.includes('analytics.pruneOld(90)')
+  && serverSrc.includes('[analytics] event prune failed'),
+  'server schedules the analytics prune with safe error handling');
+
+
 // چرخشِ ماموریت از زمانِ اتصالِ ماموریت‌های سفارشی به دیتابیس async شد؛
 // این دو سنجهٔ تعیّن‌گرایی باید await شوند (در CI دیتابیسی نیست و
 // customDefinitions با fail-soft لیستِ خالی برمی‌گرداند — چرخشِ پایه
