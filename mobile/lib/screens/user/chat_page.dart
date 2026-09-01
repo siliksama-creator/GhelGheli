@@ -275,6 +275,48 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
     }
   }
 
+  /// گزارشِ پیام — آینهٔ reportMessage در Chat.jsx وب. تأیید می‌گیرد و
+  /// همان پیام را گزارش‌شده علامت می‌زند تا دوبار گزارش نفرستد؛ ادمین
+  /// پیامِ گزارش‌شده را در پنل مدیریت چت می‌بیند.
+  Future<void> _reportMessage(Map m) async {
+    if (m['is_reported'] == true) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('گزارش پیام'),
+        content: const Text('این پیام برای مدیر گزارش شود؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('انصراف'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('گزارش'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      await widget.api.post('/api/chat/messages/${m['id']}/report', {});
+      if (!mounted) return;
+      setState(() {
+        m['is_reported'] = true;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('گزارش ثبت شد — ممنون از دقتت.'),
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      final msg = apiError(e);
+      if (msg.isNotEmpty) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(msg)));
+      }
+    }
+  }
+
   Future<void> _toggleLike(Map m) async {
     final id = m['id'];
     if (id == null) return;
@@ -348,6 +390,7 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
                 stickerUrl: _stickerUrl,
                 onReply: () => setState(() => _reply = m),
                 onLike: () => _toggleLike(m),
+                onReport: () => _reportMessage(m),
                 onOpenProfile: () {
                   final uid = m['user_id'];
                   if (uid != null) {
@@ -424,6 +467,7 @@ class _MessageBubble extends StatelessWidget {
     required this.stickerUrl,
     required this.onReply,
     required this.onLike,
+    required this.onReport,
     required this.onOpenProfile,
   });
 
@@ -432,6 +476,7 @@ class _MessageBubble extends StatelessWidget {
   final String Function(Object? rel) stickerUrl;
   final VoidCallback onReply;
   final VoidCallback onLike;
+  final VoidCallback onReport;
   final VoidCallback onOpenProfile;
 
   @override
@@ -439,6 +484,7 @@ class _MessageBubble extends StatelessWidget {
     final theme = Theme.of(context);
     final text = message['message_text'] as String? ?? '';
     final liked = message['liked_by_me'] == true;
+    final reported = message['is_reported'] == true;
     final likes = (message['like_count'] as num?)?.toInt() ?? 0;
     final cosmetics = message['cosmetics'] is Map ? message['cosmetics'] as Map : const {};
     final time = chatTime(message['sent_at']);
@@ -620,6 +666,34 @@ class _MessageBubble extends StatelessWidget {
                         ),
                       ),
                     ),
+                    // گزارش فقط روی پیامِ دیگران — پیامِ خودِ کاربر این
+                    // دکمه را ندارد، همان‌طور که وب ندارد.
+                    if (!isMe)
+                      InkWell(
+                        onTap: reported ? null : onReport,
+                        borderRadius: BorderRadius.circular(10),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.flag_rounded,
+                                  size: 13,
+                                  color: reported
+                                      ? const Color(0xFFF87171)
+                                      : Colors.white38),
+                              const SizedBox(width: 3),
+                              Text(reported ? 'گزارش شد' : 'گزارش',
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: reported
+                                          ? const Color(0xFFF87171)
+                                          : Colors.white38)),
+                            ],
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ],

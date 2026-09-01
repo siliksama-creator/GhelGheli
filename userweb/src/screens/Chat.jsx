@@ -67,6 +67,8 @@ export default function Chat({ token, openProfile, meId }) {
   const [tab, setTab] = useState(0);
   const [emotePacks, setEmotePacks] = useState([]);
   const [stickers, setStickers] = useState([]);
+  const [adminCanned, setAdminCanned] = useState([]);
+  const [notice, setNotice] = useState('');
   const categories = useMemo(() => [
     ...BASE_CATEGORIES,
     ...emotePacks.map((pack) => ({
@@ -221,6 +223,23 @@ export default function Chat({ token, openProfile, meId }) {
     }
   };
 
+  // گزارشِ پیام — POST /api/chat/messages/:id/report. پیامِ خودِ کاربر
+  // دکمه ندارد؛ بعد از ثبت، دکمه همان پیام غیرفعال می‌شود تا دوبار
+  // گزارشِ بی‌دلیل نفرستد (ادمین پیامِ گزارش‌شده را در پنل می‌بیند).
+  const reportMessage = async (m) => {
+    if (!window.confirm('این پیام برای مدیر گزارش شود؟')) return;
+    try {
+      await req(`/api/chat/messages/${m.id}/report`, 'POST', {}, token);
+      setMessages(prev => prev.map(x => x.id === m.id ? { ...x, is_reported: true } : x));
+      setNotice('گزارش ثبت شد — ممنون از دقتت.');
+      if (noticeTimer.current) clearTimeout(noticeTimer.current);
+      noticeTimer.current = setTimeout(() => setNotice(''), 3200);
+    } catch (e) {
+      setErr(e.message || 'ثبت گزارش نشد');
+    }
+  };
+  const noticeTimer = useRef(null);
+
   const toggleLike = async (m) => {
     const liked = m.liked_by_me;
     setMessages(prev => prev.map(x => x.id === m.id ? { ...x, liked_by_me: !liked, like_count: (x.like_count || 0) + (liked ? -1 : 1) } : x));
@@ -246,6 +265,13 @@ export default function Chat({ token, openProfile, meId }) {
       )}
 
       {err && <div className="err" style={{ margin: '12px' }}>{err}</div>}
+      {notice && (
+        <div style={{
+          margin: '12px 12px 0', padding: '8px 12px', borderRadius: 10,
+          background: 'rgba(0,212,154,.12)', border: '1px solid rgba(0,212,154,.4)',
+          color: '#00d49a', fontSize: 12.5, fontWeight: 700,
+        }}>{notice}</div>
+      )}
 
       <div ref={boxRef} style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {messages.length === 0 && (
@@ -311,6 +337,16 @@ export default function Chat({ token, openProfile, meId }) {
                   <button type="button" onClick={() => setReply(m)} className="chatAct" aria-label="پاسخ">
                     ↩ پاسخ
                   </button>
+                  {!isMe && (
+                    <button type="button"
+                      onClick={() => reportMessage(m)}
+                      className={`chatAct${m.is_reported ? ' reported' : ''}`}
+                      disabled={m.is_reported}
+                      aria-label="گزارش پیام"
+                      title={m.is_reported ? 'گزارش شده' : 'گزارش این پیام'}>
+                      <SvgIcon name="flag" size={13} /> {m.is_reported ? 'گزارش شد' : 'گزارش'}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

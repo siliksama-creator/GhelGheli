@@ -71,6 +71,7 @@ class UiIcons {
     'soundOn': Icons.volume_up_rounded,
     'soundOff': Icons.volume_off_rounded,
     'party': Icons.celebration_rounded,
+    'flag': Icons.flag_rounded,
     'broken': Icons.heart_broken_rounded,
     'star': Icons.star_rounded,
     'key': Icons.vpn_key_rounded,
