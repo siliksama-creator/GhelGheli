@@ -101,4 +101,14 @@ ok(pages.length === titles.length && titles.length === icons.length,
 ok(titles.some((t) => t.includes('صندوق کارت')),
   'عنوان صندوق کارت در ناوبری اندروید هست');
 
+// ساده‌خوانیِ پنل: هر صفحه در هر دو کلاینت توضیحِ یک‌خطی دارد.
+const subsMatch = shell.match(/_subtitles = \[([\s\S]*?)\];/);
+const subCount = subsMatch ? (subsMatch[1].match(/'[^']+',/g) || []).length : 0;
+ok(subCount === titles.length,
+  `شل اندروید برای هر صفحه توضیح دارد (${subCount}/${titles.length})`);
+const webNav = read('admin/src/main.jsx');
+const navDescs = (webNav.match(/^ {4}'[\u0600-\u06FF][^']*'\],$/gm) || []).length;
+ok(/active\[4\]/.test(webNav) && navDescs >= 20,
+  `پنل وب برای صفحات توضیحِ یک‌خطی دارد (${navDescs})`);
+
 console.log(`\n✓ ${passed} بررسی موفق\n`);

@@ -48,7 +48,8 @@ const MissionsPage = lazy(() => import('./pages/missions.jsx').then(m => ({ defa
 const EnginePage = lazy(() => import('./pages/engine.jsx').then(m => ({ default: m.EnginePage })));
 
 const NAV = [
-  ['dashboard', 'داشبورد', BarChart3, Dashboard],
+  ['dashboard', 'داشبورد', BarChart3, Dashboard,
+    'خلاصهٔ یک‌نگاهیِ سیستم: کاربران، فروش، بازی‌ها و هشدارها. همهٔ اعداد فقط خواندنی‌اند.'],
   // ═══════════════════════════════════════════════════════════════════════
   // چرا «کارت و کد» حذف شد و فقط «ثبت کارت» ماند
   // ═══════════════════════════════════════════════════════════════════════
@@ -78,28 +79,50 @@ const NAV = [
   // ⚠️ `card_types` همچنان از «ثبت کارت» ساخته می‌شود (در همان تراکنشِ
   //    آپلودِ طرح)، پس انتخابگرِ «کارت‌های لازم» در صفحهٔ جوایز بدونِ
   //    تغییر کار می‌کند.
-  ['photo-cards', 'ثبت کارت', ScanLine, PhotoCardsPage],
-  ['shop', 'فروشگاه', Store, ShopAdminPage],
-  ['battle-pass', 'گذر نبرد', Layers, BattlePassPage],
-  ['missions', 'ماموریت‌ها', Target, MissionsPage],
-  ['rewards', 'جوایز', Gift, RewardsPage],
-  ['wallet', 'کیف پول', Wallet, WalletPage],
-  ['league', 'لیگ ماهانه', Trophy, LeaguePage],
-  ['users', 'کاربران', Users, UsersPage],
+  ['photo-cards', 'ثبت کارت', ScanLine, PhotoCardsPage,
+    'ثبت کارت‌های فیزیکی با عکس؛ کارتِ تأییدشده وارد کاتالوگِ صندوق و دوئل می‌شود.'],
+  ['shop', 'فروشگاه', Store, ShopAdminPage,
+    'آیتم‌های فروشگاه و صندوق کارت؛ هر تغییری همان لحظه در فروشگاهِ کاربران می‌نشیند — بدون آپدیت اپ.'],
+  ['card-box', 'صندوق کارت', Package, CardBoxPage,
+    'شانسِ هر کلاس، قیمت و روشن/خاموش‌کردن فروش صندوق + تاریخچهٔ خریدها.'],
+  ['battle-pass', 'گذر نبرد', Layers, BattlePassPage,
+    'فصل‌های گذر نبرد، پله‌های XP و جایزهٔ هر پله — همه قابل تغییر بدون آپدیت.'],
+  ['missions', 'ماموریت‌ها', Target, MissionsPage,
+    'ماموریت‌های روزانه و هفتگی، جایزهٔ هر ماموریت و جایزهٔ تکمیلِ همه.'],
+  ['rewards', 'جوایز', Gift, RewardsPage,
+    'ساخت و ویرایش جایزه‌ها (نقدی، فروشگاهی، فیزیکی) و تأیید درخواست‌های کاربران.'],
+  ['wallet', 'کیف پول', Wallet, WalletPage,
+    'تراکنش‌های کیف پول، درخواست‌های برداشت و واریز/برداشت دستی.'],
+  ['league', 'لیگ ماهانه', Trophy, LeaguePage,
+    'لیگ ماهانه: شروع و پایان فصل، جوایز نفرات برتر و تاریخچهٔ پرداخت‌ها.'],
+  ['users', 'کاربران', Users, UsersPage,
+    'جست‌وجوی کاربر، پروفایل و موجودی او + ابزارهای دستی (امتیاز، بن، حذف).'],
   // «ریز امتیازات» کنارِ «کاربران» می‌نشیند: هر دو دربارهٔ یک نفرند و
   // مدیر معمولاً از یکی به دیگری می‌رود.
-  ['points', 'ریز امتیازات', Sigma, PointsPage],
-  ['chat', 'چت', MessageCircle, ChatModerationPage],
-  ['game-rewards', 'امتیاز بازی', Gamepad2, GameRewardsPage],
-  ['game-economy', 'اقتصاد بازی', Coins, GameEconomyPage],
-  ['wheel', 'گردونه شانس', CircleDot, WheelPage],
-  ['support', 'پشتیبانی', LifeBuoy, SupportPage],
-  ['notifications', 'اطلاعیه‌ها', Bell, NotificationsPage],
-  ['settings', 'تنظیمات', Settings, SettingsPage],
-  ['engine', 'موتور', SlidersHorizontal, EnginePage],
-  ['admins', 'ادمین‌ها', Shield, AdminsPage],
-  ['analytics', 'تحلیل رشد و خطا', BarChart3, AnalyticsPage],
-  ['metrics', 'مانیتورینگ سرور', Activity, MetricsPage],
+  ['points', 'ریز امتیازات', Sigma, PointsPage,
+    'دفترِ امتیاز: هر کاربر چه مقدار، از کجا گرفت و کجا خرج کرد.'],
+  ['chat', 'چت', MessageCircle, ChatModerationPage,
+    'پیامِ سنجاق‌شدهٔ بالای چت، فیلتر کلمات و گزارش‌های کاربران.'],
+  ['game-rewards', 'امتیاز بازی', Gamepad2, GameRewardsPage,
+    'امتیازِ هر بازی و ضریب‌های جایزه — عددها مستقیم به سرور می‌روند.'],
+  ['game-economy', 'اقتصاد بازی', Coins, GameEconomyPage,
+    'اهرم‌های اقتصادی بازی‌ها: هزینه‌ها، جوایز و سقف‌های روزانه.'],
+  ['wheel', 'گردونه شانس', CircleDot, WheelPage,
+    'جایزه‌های گردونه و شانسِ هر بخش؛ جمع شانس‌ها باید ۱۰۰٪ باشد.'],
+  ['support', 'پشتیبانی', LifeBuoy, SupportPage,
+    'تیکت‌های کاربران: پاسخ بدهید یا ببندید — کاربر پاسخ را در اپ می‌بیند.'],
+  ['notifications', 'اطلاعیه‌ها', Bell, NotificationsPage,
+    'ارسال اطلاعیهٔ push به همه یا گروهی از کاربران — با پیش‌نمایشِ ساعت تهران.'],
+  ['settings', 'تنظیمات', Settings, SettingsPage,
+    'تنظیمات چت و پیامک + تنظیمات اپ: نسخهٔ اجباری، بنر اطلاعیه و چیدمان تب‌ها.'],
+  ['engine', 'موتور', SlidersHorizontal, EnginePage,
+    'سقف‌ها و اعدادِ عملیاتی سیستم — هر عدد توضیح دارد؛ با احتیاط تغییر دهید.'],
+  ['admins', 'ادمین‌ها', Shield, AdminsPage,
+    'حساب‌های ادمین و نقش‌ها + کارنامهٔ تغییرات (Audit Log): چه کسی چه کرد.'],
+  ['analytics', 'تحلیل رشد و خطا', BarChart3, AnalyticsPage,
+    'نمودار رشد، قیف بازی‌ها و صندوق خطاهای اپ — فقط خواندنی، بدون دکمهٔ خطرناک.'],
+  ['metrics', 'مانیتورینگ سرور', Activity, MetricsPage,
+    'سلامت سرور و سرویس‌ها — فقط مانیتورینگ؛ اینجا چیزی تغییر نمی‌کند.'],
 ];
 
 function App() {
@@ -150,6 +173,9 @@ function App() {
 
   const active = NAV.find((x) => x[0] === page);
   const ActivePage = active[3];
+  // توضیحِ یک‌خطیِ هر صفحه زیر عنوانش — مدیر قبل از هر دکمه‌ای بداند
+  // این صفحه چه می‌کند.
+  const activeDesc = active[4] || '';
 
   return (
     <AppShell
@@ -158,7 +184,7 @@ function App() {
       onNavigate={setPage}
       onLogout={() => logout()}
       title={active[1]}
-      subtitle="تمام تغییرات حساس در Audit Log ثبت می‌شود."
+      subtitle={activeDesc}
     >
       <Suspense fallback={<div className="pageLoading" aria-busy="true" />}>
         <ActivePage request={request} onNavigate={setPage} />

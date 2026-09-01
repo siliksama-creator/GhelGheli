@@ -99,9 +99,9 @@ check(webBox.includes('/api/admin/card-box') && mobileBox.includes('/api/admin/c
   'both admin clients edit card-box odds');
 check(/weightTotal/.test(webBox) && /_weightTotal/.test(mobileBox),
   'both admin clients refuse to save odds that do not sum to 100%');
-check(/card-box/.test(read('admin/src/main.jsx'))
+check(/\['card-box', 'صندوق کارت'/.test(read('admin/src/main.jsx'))
   && /AdminCardBox/.test(read('mobile/lib/screens/admin/admin_shell.dart')),
-  'both admin shells expose the card-box page');
+  'both admin shells expose the card-box page (menu entry, not just an import)');
 
 // ═══ دورِ عملیات (۱۴۰۵): فروشگاه، گذر نبرد، ماموریت‌ها، اهرم‌های موتور ═══
 const webShop = read('admin/src/pages/shop.jsx');
