@@ -740,6 +740,11 @@ button:hover {
 .tapTitle b{font-size:17px;font-weight:800}
 .tapTitle span{font-size:12px;color:#c9ddf2b0}
 .tapTotal{background:#84cc1624;color:#a3e635;border-radius:999px;padding:6px 12px;font-weight:800;font-size:13px;white-space:nowrap}
+/* رتبه‌بندی ضربه‌زن — دکمهٔ کنار امتیاز و ردیفِ اسم+آواتار داخلِ پنل */
+.tapBoardBtn{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;white-space:nowrap}
+.tapBoardWho{display:flex;align-items:center;gap:8px;min-width:0}
+.tapBoardWho img{border-radius:50%;object-fit:cover;flex:none}
+.tapBoardWho b{min-width:0}
 
 .tapProgress{display:flex;flex-direction:column;gap:6px}
 .tapProgressTop{display:flex;align-items:baseline;justify-content:space-between;gap:8px}

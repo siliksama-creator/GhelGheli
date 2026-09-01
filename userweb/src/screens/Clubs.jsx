@@ -126,7 +126,11 @@ export default function Clubs({ token, openProfile }) {
             </p>
 
             {avatarMsg && (
-              <div className="ok" style={{ margin: '0 0 10px' }}>{avatarMsg}</div>
+              <div style={{
+                margin: '0 0 10px', padding: '8px 12px', borderRadius: 10,
+                background: 'rgba(0,212,154,.12)', border: '1px solid rgba(0,212,154,.4)',
+                color: '#00d49a', fontSize: 13, fontWeight: 700,
+              }}>{avatarMsg}</div>
             )}
 
             {d.mine?.length > 0 && (

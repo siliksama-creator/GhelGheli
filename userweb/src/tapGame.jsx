@@ -6,7 +6,7 @@
 // backend/src/services/tapGameService.js, so a drift between the two clients
 // shows up as one platform silently losing taps.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { req } from './lib/api.js';
+import { req, asset, avatarUrl } from './lib/api.js';
 import { heavyImpact, mediumImpact, selectionClick } from './haptics.js';
 import { SvgIcon } from './components/IconAsset.jsx';
 
@@ -290,6 +290,9 @@ export default function TapGame({ token, onBack, economy }) {
   const [rate, setRate] = useState(0);
   const [floaters, setFloaters] = useState([]);
   const [pulse, setPulse] = useState(false);
+  const [showBoard, setShowBoard] = useState(false);
+  const [board, setBoard] = useState(null);
+  const [boardErr, setBoardErr] = useState('');
 
   const guardRef = useRef(createGuard());
   const seqRef = useRef(0);
@@ -761,6 +764,19 @@ export default function TapGame({ token, onBack, economy }) {
 
   const nearLimit = rate >= CFG.maxTapsPerSecond - 2;
 
+  // رتبه‌بندی ضربه‌زن — GET /api/games/tap/leaderboard. عدد و نام‌ها از
+  // سرور می‌آیند تا همیشه تازه باشد و به هیچ آپدیتی نیاز نداشته باشد.
+  const loadBoard = useCallback(async () => {
+    if (board) return;
+    setBoardErr('');
+    try {
+      const d = await req('/api/games/tap/leaderboard?limit=30', 'GET', null, token);
+      setBoard(d.entries || []);
+    } catch (e) {
+      setBoardErr(e.message || 'خطا در گرفتن رتبه‌بندی');
+    }
+  }, [board, token]);
+
   return (
     <section className="card wide tapGame">
       <div className="tapHead">
@@ -782,7 +798,46 @@ export default function TapGame({ token, onBack, economy }) {
           </span>
         )}
         <span className="tapTotal"> {fa(points)} امتیاز</span>
+        <button type="button" className="ghost tapBoardBtn"
+          onClick={() => {
+            if (!showBoard && !board && !boardErr) loadBoard();
+            setShowBoard(v => !v);
+          }}>
+          <SvgIcon name="trophy" size={15} />
+          رتبه‌بندی
+        </button>
       </div>
+
+      {showBoard && (
+        <div className="soloBoard">
+          <h3>
+            رتبه‌بندی ضربه‌زن
+            <small>بر اساس مجموع ضربه‌ها</small>
+          </h3>
+          {boardErr ? (
+            <p className="hint">{boardErr}</p>
+          ) : !board ? (
+            <p className="hint">در حال بارگذاری...</p>
+          ) : !board.length ? (
+            <p className="hint">هنوز ضربه‌ای ثبت نشده. اولین نفر باش!</p>
+          ) : (
+            board.map((e, i) => (
+              <div className="soloRow" key={e.userId}>
+                <span className="rk">{fa(i + 1)}</span>
+                <span className="tapBoardWho">
+                  <img
+                    src={e.profileImageUrl ? asset(e.profileImageUrl) : avatarUrl(e.profileAvatarKey)}
+                    alt="" width="22" height="22" loading="lazy"
+                  />
+                  <b>{e.nickname}</b>
+                </span>
+                <span className="soloTime">{fa(e.totalTaps)} ضربه</span>
+                <small>لول {fa(e.level)}</small>
+              </div>
+            ))
+          )}
+        </div>
+      )}
 
       {/* ── راهنمای سکه: «هر لول N سکه» — عدد از تنظیماتِ ادمین می‌آید ── */}
       <div className="tapCoinGuide">

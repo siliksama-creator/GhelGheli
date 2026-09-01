@@ -12,6 +12,7 @@ import 'package:flutter/services.dart';
 
 import '../../../../api_client.dart';
 import '../../../../theme/tokens.dart';
+import '../../../../widgets/avatar_image.dart';
 import 'tap_character.dart';
 import 'tap_config.dart';
 import 'tap_day.dart';
@@ -296,6 +297,20 @@ class _TapGameScreenState extends State<TapGameScreen>
     });
   }
 
+  /// رتبه‌بندی ضربه‌زن — آینهٔ پنلِ رتبه‌بندی در tapGame.jsx وب.
+  /// داده از GET /api/games/tap/leaderboard می‌آید تا بدون آپدیت تازه بماند.
+  void _openLeaderboard() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0B1220),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (ctx) => _TapLeaderboardSheet(api: widget.api),
+    );
+  }
+
   void _showLevelUpDialog(int newLevel) {
     showDialog(
       context: context,
@@ -340,6 +355,7 @@ class _TapGameScreenState extends State<TapGameScreen>
               _engine.flushNow();
               widget.onBack();
             },
+            onLeaderboard: _openLeaderboard,
             level: _engine.level,
             levelCount: _engine.config.levelCount,
             points: _engine.pointsEarned,
@@ -457,6 +473,7 @@ class _TapGameScreenState extends State<TapGameScreen>
 class _Header extends StatelessWidget {
   const _Header({
     required this.onBack,
+    required this.onLeaderboard,
     required this.level,
     required this.levelCount,
     required this.points,
@@ -467,6 +484,7 @@ class _Header extends StatelessWidget {
   });
 
   final VoidCallback onBack;
+  final VoidCallback onLeaderboard;
   final int level;
   final int levelCount;
   final int points;
@@ -487,6 +505,11 @@ class _Header extends StatelessWidget {
             onPressed: onBack,
             icon: const Icon(Icons.arrow_forward_rounded),
             tooltip: 'بازگشت',
+          ),
+          IconButton(
+            onPressed: onLeaderboard,
+            icon: const Icon(Icons.emoji_events_rounded, size: 21),
+            tooltip: 'رتبه‌بندی',
           ),
           Expanded(
             child: Column(
@@ -1465,4 +1488,163 @@ class _SunburstPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// شیتِ رتبه‌بندی ضربه‌زن — فهرستِ ۳۰ نفرِ برتر با آواتار و جمعِ ضربه‌ها.
+/// آینهٔ پنلِ `.soloBoard` در وب؛ داده از سرور، پس همیشه تازه است.
+class _TapLeaderboardSheet extends StatelessWidget {
+  const _TapLeaderboardSheet({required this.api});
+
+  final ApiClient api;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(Gaps.lg, Gaps.md, Gaps.lg, Gaps.lg),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.emoji_events_rounded, size: 20,
+                    color: Color(0xFFFBBF24)),
+                Gaps.hXs,
+                Text('رتبه‌بندی ضربه‌زن',
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w800)),
+                Gaps.hXs,
+                Text('بر اساس مجموع ضربه‌ها',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurface
+                            .withValues(alpha: 0.55))),
+              ],
+            ),
+            Gaps.vSm,
+            Flexible(
+              child: FutureBuilder<dynamic>(
+                future: api.get('/api/games/tap/leaderboard?limit=30'),
+                builder: (context, snap) {
+                  if (snap.connectionState != ConnectionState.done) {
+                    return const Padding(
+                      padding: EdgeInsets.all(Gaps.md),
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+                  if (snap.hasError) {
+                    final msg = apiError(snap.error ?? 'خطا');
+                    return Padding(
+                      padding: const EdgeInsets.all(Gaps.md),
+                      child: Center(
+                        child: Text(
+                          msg.isNotEmpty ? msg : 'خطا در گرفتن رتبه‌بندی',
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ),
+                    );
+                  }
+                  final entries = ((snap.data as Map?)?['entries'] as List?) ??
+                      const [];
+                  if (entries.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.all(Gaps.md),
+                      child: Center(
+                        child: Text('هنوز ضربه‌ای ثبت نشده. اولین نفر باش!'),
+                      ),
+                    );
+                  }
+                  return ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: entries.length,
+                    itemBuilder: (_, i) {
+                      final e = Map<String, dynamic>.from(entries[i] as Map);
+                      final taps = (e['totalTaps'] as num?)?.toInt() ?? 0;
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: Gaps.xs),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: Gaps.sm, vertical: Gaps.xxs),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.04),
+                          borderRadius: Corners.rMd,
+                          border: Border.all(color: Colors.white10),
+                        ),
+                        child: Row(
+                          children: [
+                            _RankBadge(rank: i + 1),
+                            Gaps.hSm,
+                            AvatarImage(
+                              keyName: e['profileAvatarKey'],
+                              imageUrl: e['profileImageUrl'],
+                              radius: 15,
+                            ),
+                            Gaps.hSm,
+                            Expanded(
+                              child: Text(
+                                '${e['nickname'] ?? 'بازیکن'}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodyMedium
+                                    ?.copyWith(fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                            Text(
+                              '${faNum(taps)} ضربه',
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                  color: const Color(0xFFFBBF24),
+                                  fontWeight: FontWeight.w900),
+                            ),
+                            Gaps.hSm,
+                            Text(
+                              'لول ${faNum((e['level'] as num?)?.toInt() ?? 0)}',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                  color: theme.colorScheme.onSurface
+                                      .withValues(alpha: 0.55)),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// نشانِ رتبه — سه نفرِ اول مدالِ رنگی می‌گیرند (آینهٔ مدال‌های CSS در وب).
+class _RankBadge extends StatelessWidget {
+  const _RankBadge({required this.rank});
+
+  final int rank;
+
+  @override
+  Widget build(BuildContext context) {
+    final (color, textColor) = switch (rank) {
+      1 => (const Color(0xFFF59E0B), const Color(0xFF2B1A02)),
+      2 => (const Color(0xFF94A3B8), const Color(0xFF0F172A)),
+      3 => (const Color(0xFFB45309), Colors.white),
+      _ => (Colors.transparent, Colors.white70),
+    };
+    return Container(
+      width: 24,
+      height: 24,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        border: rank > 3 ? Border.all(color: Colors.white24) : null,
+      ),
+      child: Text(
+        faNum(rank),
+        style: TextStyle(
+            fontSize: 11, fontWeight: FontWeight.w900, color: textColor),
+      ),
+    );
+  }
 }
