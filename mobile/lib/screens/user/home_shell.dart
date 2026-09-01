@@ -335,7 +335,18 @@ class _HomeShellState extends State<HomeShell>
   // واضح در هدر داشبورد (همان‌جا که «سلام ...» نوشته شده) نشسته است. آنجا
   // موجودی واقعی هم دیده می‌شود، پس هم دم‌دست‌تر است و هم اطلاعات بیشتری
   // می‌دهد تا یک آیکون کوچک در نوار پایین.
-  static const _navIndexes = [0, 1, 3, 4];
+  /// چهار تبِ نوار پایین — با چیدمانِ سرور (tabOrder) وگرنه پیش‌فرض.
+  /// idهای قراردادیِ این چهار تا: home, rewards, league, social.
+  List<int> get _navIndexes {
+    const defaultOrder = [0, 1, 3, 4];
+    const idOf = {0: 'home', 1: 'rewards', 3: 'league', 4: 'social'};
+    int pos(int page) {
+      final i = _tabOrder.indexOf(idOf[page]!);
+      return i < 0 ? 999 : i; // تبِ جاافتاده از ترتیبِ سرور به انتها می‌رود
+    }
+    final order = defaultOrder.toList()..sort((a, b) => pos(a).compareTo(pos(b)));
+    return order;
+  }
   // «دعوت دوستان» (۸) به شیت اضافه شد.
   //
   // قبلاً تنها راه رسیدن به آن، یک میان‌بر در داشبورد بود. کاربری که آن
@@ -353,21 +364,26 @@ class _HomeShellState extends State<HomeShell>
   //    `_destinations`/`_pages` بماند — حذفِ آن از این‌جا فقط یک ردیفِ
   //    منو را برمی‌دارد، نه خودِ صفحه را. آیکونِ نوار بالا و تبِ داخلِ
   //    «چت و بازی» هر دو مستقیم به همین ایندکس می‌پرند.
-  static const _moreIndexes = [
-    // 🔴 دورِ ۳۲ — فروشگاه اولِ فهرست. آینهٔ `MORE_TABS` در `main.jsx`.
-    //
-    // تا پیش از این، تنها راهِ رسیدن به فروشگاه آیکونِ کوچکِ نوارِ بالا بود
-    // (خط ۶۵۱). همان آیکون در وب هم بود و کاربر گزارش داد «شاپ درست وجود
-    // ندارد» — آیکونِ بی‌برچسب در ردیفِ شلوغِ هدر دیده نمی‌شود. فروشگاه
-    // تنها مسیرِ درآمدیِ اپ است و باید یک مقصدِ نام‌دار داشته باشد.
-    // میان‌برِ هدر سرِ جایش می‌ماند.
-    shopIndex,
-    inventoryIndex,
-    2,
-    referralIndex,
-    5,
-    6,
-  ];
+  /// فهرستِ شیتِ «بیشتر» — با چیدمانِ سرور (tabOrder) وگرنه پیش‌فرض.
+  ///
+  /// 🔴 دورِ ۳۲ — فروشگاه اولِ فهرست. آینهٔ `MORE_TABS` در `main.jsx`.
+  /// تا پیش از این، تنها راهِ رسیدن به فروشگاه آیکونِ کوچکِ نوارِ بالا بود
+  /// (خط ۶۵۱) و کاربر گزارش داد «شاپ درست وجود ندارد» — آیکونِ بی‌برچسب
+  /// دیده نمی‌شود. فروشگاه تنها مسیرِ درآمدیِ اپ است و باید مقصدِ نام‌دار
+  /// داشته باشد. میان‌برِ هدر سرِ جایش می‌ماند.
+  List<int> get _moreIndexes {
+    const defaultOrder = [shopIndex, inventoryIndex, 2, referralIndex, 5, 6];
+    const idOf = {
+      shopIndex: 'shop', inventoryIndex: 'inventory', 2: 'wallet',
+      referralIndex: 'invite', 5: 'support', 6: 'profile',
+    };
+    int pos(int page) {
+      final i = _tabOrder.indexOf(idOf[page]!);
+      return i < 0 ? 999 : i;
+    }
+    final order = defaultOrder.toList()..sort((a, b) => pos(a).compareTo(pos(b)));
+    return order;
+  }
 
   /// شمارهٔ صفحهٔ کیف پول — از هدر داشبورد مستقیم به آن پرش می‌شود.
   static const _walletIndex = 2;
@@ -453,6 +469,12 @@ class _HomeShellState extends State<HomeShell>
   /// بنر اطلاعیهٔ مدیریتی (از /api/config) — null یعنی فعال نیست.
   Map<String, dynamic>? _announcement;
 
+  /// چیدمان تب‌ها از /api/config — آرایهٔ idهای قراردادی؛ خالی = پیش‌فرض.
+  /// نگاشتِ idها به شمارهٔ صفحه: home=0, rewards=1, wallet=2, league=3,
+  /// social=4, support=5, profile=6, wheel=7, invite=8, shop=9, pass=10,
+  /// inventory=11.
+  List<String> _tabOrder = const [];
+
   /// از /api/config می‌خواند: اگر نسخهٔ اپ از حداقلِ تعیین‌شده پایین‌تر
   /// باشد دیالوگ آپدیت نشان می‌دهد (اختیاری/اجباری) و اگر اطلاعیه فعال
   /// باشد بنر بالای صفحه می‌آید.
@@ -481,6 +503,12 @@ class _HomeShellState extends State<HomeShell>
           forced: force['android'] == true,
           url: '${urls['android'] ?? ''}',
         ));
+      }
+      final tabOrder = (m['tabOrder'] as List? ?? const [])
+          .map((e) => '$e')
+          .toList();
+      if (tabOrder.isNotEmpty) {
+        setState(() => _tabOrder = tabOrder);
       }
       final ann = m['announcement'] is Map
           ? Map<String, dynamic>.from(m['announcement'] as Map)

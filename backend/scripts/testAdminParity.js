@@ -152,4 +152,14 @@ check(/chat\/canned/.test(webEngine) && /chat\/canned/.test(mobileEngine),
 check(/'engine'/.test(read('admin/src/main.jsx')) && /AdminEngine/.test(read('mobile/lib/screens/admin/admin_shell.dart')),
   'both admin shells expose the engine page');
 
+const webSettings = read('admin/src/pages/settings.jsx');
+const mobileSettings = read('mobile/lib/screens/admin/admin_settings.dart');
+check(/client-config/.test(webSettings) && /client-config/.test(mobileSettings),
+  'both admin clients edit the client config');
+check(/tabOrder/.test(webSettings) && /tabOrder/.test(mobileSettings),
+  'both admin clients edit the tab order');
+check(/tabOrder/.test(read('userweb/src/main.jsx'))
+    && /tabOrder/.test(read('mobile/lib/screens/user/home_shell.dart')),
+  'both user clients read the server-driven tab order');
+
 console.log(`\n✅ ${passed} admin parity assertions passed\n`);

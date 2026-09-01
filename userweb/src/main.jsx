@@ -85,6 +85,17 @@ const NAV_TABS = [
   ['club', 'چت و بازی', 'game'],
 ];
 
+// چیدمانِ سرور-درایوِ تب‌ها: GET /api/config یک آرایهٔ `tabOrder` از
+// idهای قراردادی می‌فرستد (home, rewards, league, social, shop, …).
+// idِ وب برای «چت و بازی» club است که با socialِ قرارداد یکی می‌شود.
+// ترتیبِ سرور را اعمال می‌کنیم و تب‌های جاافتاده به انتها می‌روند تا
+// هیچ‌وقت تبی از نوار گم نشود — تغییرِ چیدمان بدون آپدیت.
+const orderByServer = (tabs, idOf) => {
+  const order = (window.__tabOrderServer || []);
+  const pos = (id) => { const i = order.indexOf(id); return i === -1 ? 9999 : i; };
+  return [...tabs].sort((a, b) => pos(idOf(a)) - pos(idOf(b)));
+};
+
 const MORE_TABS = [
   // 🔴 دورِ ۳۲ — فروشگاه به اینجا اضافه شد.
   //
@@ -161,7 +172,10 @@ function App() {
   // پیکربندی کلاینت (بنر اطلاعیه و…) — از /api/config، بدون نیاز به آپدیت.
   const [cfg, setCfg] = useState(null);
   useEffect(() => {
-    req('/api/config', 'GET', null, null).then(setCfg).catch(() => {});
+    req('/api/config', 'GET', null, null).then((d) => {
+      setCfg(d);
+      if (Array.isArray(d?.tabOrder)) window.__tabOrderServer = d.tabOrder;
+    }).catch(() => {});
   }, []);
   useEffect(() => {
     if (!token) return undefined;
@@ -402,7 +416,7 @@ function Portal({ token, logout }) {
       </header>
 
       <nav className="mobileNav" aria-label="ناوبری اصلی">
-        {NAV_TABS.map(([id, label, icon]) => (
+        {orderByServer(NAV_TABS, t => (t[0] === 'club' ? 'social' : t[0])).map(([id, label, icon]) => (
           <button key={id} className={tab === id ? 'on' : ''}
             aria-current={tab === id ? 'page' : undefined}
             onClick={() => setTab(id)}>
@@ -427,7 +441,7 @@ function Portal({ token, logout }) {
           <div className="sheetShade" onClick={() => setMoreOpen(false)} />
           <div className="moreSheet" role="menu">
             <div className="sheetGrip" />
-            {MORE_TABS.map(([id, label, icon]) => (
+            {orderByServer(MORE_TABS, t => t[0]).map(([id, label, icon]) => (
               <button key={id} role="menuitem"
                 className={tab === id ? 'on' : ''}
                 onClick={() => { setTab(id); setMoreOpen(false); }}>

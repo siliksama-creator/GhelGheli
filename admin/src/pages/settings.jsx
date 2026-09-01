@@ -213,6 +213,16 @@ export function SettingsPage({ request }) {
             <Input value={client.announcement.link || ''}
               onChange={e => setClient({ ...client, announcement: { ...client.announcement, link: e.target.value } })} />
           </Field>
+          <Field label="چیدمان تب‌ها (ترتیب idها با ویرگول — خالی = پیش‌فرض)">
+            <Input
+              dir="ltr"
+              value={(client.tabOrder || []).join(', ')}
+              placeholder="home, rewards, league, social, shop, inventory, wallet, invite, support, profile"
+              onChange={e => setClient({
+                ...client,
+                tabOrder: e.target.value.split(',').map(x => x.trim()).filter(Boolean),
+              })} />
+          </Field>
           <Field label="رنگ بنر اطلاعیه">
             <select className="input" value={client.announcement.accent || 'gold'}
               onChange={e => setClient({ ...client, announcement: { ...client.announcement, accent: e.target.value } })}>

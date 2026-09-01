@@ -11,6 +11,32 @@
 const express = require('express');
 const featureFlags = require('../services/featureFlags');
 
+// شناسه‌های مجازِ تب‌ها — یک قراردادِ مشترک بین وب و اندروید. هر کلاینت
+// تب‌های خودش را با همین idها نگاشت می‌کند و ترتیبِ ارسالیِ سرور را
+// روی نوارِ پایین و شیتِ «بیشتر» اعمال می‌کند؛ id ناشناخته نادیده و
+// تب‌های جاافتاده به انتها می‌روند تا هیچ‌وقت تبی گم نشود.
+const TAB_IDS = Object.freeze([
+  'home', 'rewards', 'league', 'social',
+  'shop', 'inventory', 'wallet', 'invite', 'support', 'profile',
+]);
+
+/** ترتیبِ پیش‌فرض — دقیقاً چیدمانِ فعلیِ هر دو کلاینت. */
+const DEFAULT_TAB_ORDER = Object.freeze([...TAB_IDS]);
+
+/** tabOrder ورودی را پاک‌سازی می‌کند: فقط idهای مجاز، یکتا، به همان ترتیب. */
+function normalizeTabOrder(input) {
+  if (!Array.isArray(input)) return null;
+  const seen = new Set();
+  const out = [];
+  for (const raw of input) {
+    const id = String(raw ?? '').trim();
+    if (!TAB_IDS.includes(id) || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out.length ? out : null;
+}
+
 const DEFAULTS = Object.freeze({
   app: {
     minVersion: { android: '1.1.17', ios: '1.1.17' },
@@ -48,7 +74,8 @@ function mergeConfig(raw) {
   // می‌مانند تا مایگریشن تازه لازم نباشد و کلاینت‌های قدیمی کلید
   // ناشناخته را نادیده بگیرند.
   const features = featureFlags.normalizeFeatures(v.features);
-  return { app, announcement, features };
+  const tabOrder = normalizeTabOrder(v.tabOrder) || DEFAULT_TAB_ORDER;
+  return { app, announcement, features, tabOrder };
 }
 
 module.exports = function createClientConfigRoutes(deps) {
@@ -147,6 +174,10 @@ module.exports = function createClientConfigRoutes(deps) {
         features: featureFlags.normalizeFeatures(
           b.features !== undefined ? b.features : cur.features,
         ),
+        // چیدمان تب‌ها — آرایهٔ idها به ترتیب دلخواه؛ خالی = پیش‌فرض.
+        tabOrder: b.tabOrder !== undefined
+          ? (normalizeTabOrder(b.tabOrder) || cur.tabOrder)
+          : cur.tabOrder,
       };
 
       await pool.query(

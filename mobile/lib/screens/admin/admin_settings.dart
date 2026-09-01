@@ -19,6 +19,7 @@ class _AdminSettingsState extends State<AdminSettings> {
   final _cooldown = TextEditingController();
   final _badWords = TextEditingController();
   final _announceText = TextEditingController();
+  final _tabOrder = TextEditingController();
   final _announceLink = TextEditingController();
   final _minVersionAndroid = TextEditingController();
   final _minVersionIos = TextEditingController();
@@ -70,6 +71,7 @@ class _AdminSettingsState extends State<AdminSettings> {
     _apiKey.dispose();
     _pattern.dispose();
     _announceText.dispose();
+    _tabOrder.dispose();
     _announceLink.dispose();
     _minVersionAndroid.dispose();
     _minVersionIos.dispose();
@@ -105,6 +107,7 @@ class _AdminSettingsState extends State<AdminSettings> {
       _announceLink.text = '${ann['link'] ?? ''}';
       _announceActive = ann['active'] == true;
       _announceAccent = '${ann['accent'] ?? 'gold'}';
+      _tabOrder.text = ((cc['tabOrder'] as List?) ?? const []).join('، ');
       final minV = app['minVersion'] is Map
           ? Map<String, dynamic>.from(app['minVersion'] as Map)
           : <String, dynamic>{};
@@ -235,6 +238,13 @@ class _AdminSettingsState extends State<AdminSettings> {
           'link': _announceLink.text.trim(),
           'accent': _announceAccent,
         },
+        // چیدمان تب‌ها — سرور idهای نامعتبر را دور می‌ریزد و تبِ
+        // جاافتاده را به انتها می‌برد؛ خالی = پیش‌فرض.
+        'tabOrder': _tabOrder.text
+            .split(RegExp(r'[,،]'))
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList(),
         'features': {
           'maintenance': {
             'active': _maintActive,
@@ -290,6 +300,13 @@ class _AdminSettingsState extends State<AdminSettings> {
               onChanged: (v) => setState(() => _announceActive = v),
               title: const Text('بنرِ اطلاعیه فعال باشد'),
             ),
+            TextField(
+                controller: _tabOrder,
+                textDirection: TextDirection.ltr,
+                decoration: const InputDecoration(
+                  labelText: 'چیدمان تب‌ها (idها با ویرگول — خالی = پیش‌فرض)',
+                  hintText: 'home, rewards, league, social, shop, …'),
+              ),
             TextField(
                 controller: _announceText,
                 decoration: const InputDecoration(labelText: 'متن اطلاعیه')),
