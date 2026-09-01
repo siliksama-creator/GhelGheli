@@ -36,6 +36,7 @@ class _AdminCardBoxState extends State<AdminCardBox> {
 
   List<Map<String, dynamic>> _odds = [];
   int _price = 100000;
+  bool _enabled = true;
   int _weightTotal = 1000;
   bool _loading = true;
   bool _saving = false;
@@ -82,6 +83,7 @@ class _AdminCardBoxState extends State<AdminCardBox> {
               .map((e) => Map<String, dynamic>.from(e)),
         );
         _price = _asInt(d is Map ? d['price'] : 100000);
+        _enabled = d is Map ? d['enabled'] != false : true;
         _weightTotal = _asInt(d is Map ? d['weightTotal'] : 1000);
         _loading = false;
         _error = null;
@@ -106,6 +108,7 @@ class _AdminCardBoxState extends State<AdminCardBox> {
       final d = await widget.api.put('/api/admin/card-box', {
         'odds': _odds,
         'price': _price,
+        'enabled': _enabled,
       });
       if (!mounted) return;
       _snack('${d['message'] ?? 'ذخیره شد'}');
@@ -148,14 +151,53 @@ class _AdminCardBoxState extends State<AdminCardBox> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(Gaps.md),
         children: [
-          FormSection(
-            title: 'شانس صندوق کارت',
+          const FormSection(
+            title: 'صندوق کارت فروشگاه',
             children: [
-              const Text(
-                'درصد هر کلاس مستقل از تعداد کارت‌های آن کلاس است. '
-                'جمع باید دقیقاً ۱۰۰٪ باشد.',
+              Text(
+                'شانس هر کلاس، قیمت صندوق و روشن/خاموش‌کردن فروش. '
+                'هر تغییری که ذخیره کنید همان لحظه روی فروشگاه کاربران '
+                'می‌نشیند — بدون آپدیتِ اپ.',
                 style: TextStyle(fontSize: 12, color: Colors.white60),
               ),
+            ],
+          ),
+          Gaps.vSm,
+          FormSection(
+            title: 'وضعیت فروش',
+            children: [
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(
+                  _enabled ? 'فروش صندوق باز است' : 'فروش صندوق بسته است',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    color: _enabled
+                        ? const Color(0xFF22E7A6)
+                        : const Color(0xFFFBBF24),
+                  ),
+                ),
+                subtitle: const Text(
+                  'وقتی خاموش باشد، خرید صندوق در وب و اندروید بسته می‌شود '
+                  'و حتی اگر کسی دکمهٔ کهنه‌ای را بزند، سرور سفارش نمی‌سازد. '
+                  'برای تعمیر یا تغییر قیمت، خاموشش کنید و بعد از ذخیره روشن.',
+                  style: TextStyle(fontSize: 11.5, color: Colors.white60),
+                ),
+                value: _enabled,
+                onChanged: (v) => setState(() => _enabled = v),
+              ),
+            ],
+          ),
+          Gaps.vSm,
+          FormSection(
+            title: 'شانس هر کلاس',
+            children: [
+              const Text(
+                'عددِ «در هزار» یعنی از هر ۱۰۰۰ صندوق چند تا از این کلاس '
+                'بیرون می‌آید. جمع باید دقیقاً ۱۰۰۰ باشد.',
+                style: TextStyle(fontSize: 12, color: Colors.white60),
+              ),
+              Gaps.vXxs,
               Text(
                 'مجموع: ${faNum(_sum / 10)}٪ · باقی: ${faNum(remaining / 10)}٪',
                 style: TextStyle(
@@ -167,14 +209,22 @@ class _AdminCardBoxState extends State<AdminCardBox> {
           ),
           Gaps.vSm,
           FormSection(
-            title: 'قیمت صندوق (تومان)',
+            title: 'قیمت صندوق',
             children: [
               TextFormField(
                 key: ValueKey('box_price_$_gen'),
                 initialValue: '$_price',
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'قیمت به تومان'),
+                decoration: const InputDecoration(
+                  labelText: 'قیمت به تومان',
+                  hintText: 'مثلاً ۱۰۰۰۰۰ یعنی صد هزار تومان',
+                ),
                 onChanged: (v) => _price = int.tryParse(v) ?? 0,
+              ),
+              const Text(
+                'همان عددی که کاربر در فروشگاه می‌بیند — هم با کیف پول، '
+                'هم با پرداخت کافه‌بازار.',
+                style: TextStyle(fontSize: 11.5, color: Colors.white60),
               ),
             ],
           ),
@@ -195,7 +245,7 @@ class _AdminCardBoxState extends State<AdminCardBox> {
                     height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2))
                 : const Icon(Icons.save_rounded),
-            label: Text(_saving ? 'در حال ذخیره…' : 'ذخیرهٔ شانس'),
+            label: Text(_saving ? 'در حال ذخیره…' : 'ذخیرهٔ همه'),
           ),
           Gaps.vMd,
           AppCard(

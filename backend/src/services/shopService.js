@@ -722,6 +722,13 @@ async function buyPlusSubscription(userId, billingCycle = 'monthly') {
  *    امتیاز تبدیل کن» را باز می‌کرد. صندوق فقط با پولِ تازه از بازار.
  */
 async function buyCardBox(userId, { useWallet = false } = {}) {
+  // سوییچ فروش از پنل ادمین — گاردِ سرور، نه فقط دکمهٔ خاموش در کلاینت.
+  // کلید در app_settings است؛ نبودِ ردیف یعنی فروش باز است.
+  const { rows } = await pool.query(
+    "SELECT value FROM app_settings WHERE key='card_box_enabled' LIMIT 1");
+  if (rows[0] && rows[0].value === 'false') {
+    throw fail('فروش صندوق کارت موقتاً غیرفعال است — کمی بعد دوباره امتحان کنید', 403, 'BOX_DISABLED');
+  }
   if (useWallet) return buyCardBoxWithWallet(userId);
   return payments.createCardBoxOrder(userId);
 }

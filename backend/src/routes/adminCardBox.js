@@ -41,13 +41,21 @@ module.exports = function createAdminCardBoxRoutes(deps) {
         } else {
           price = await cardBox.price(client);
         }
+        // سوییچ فروش: فقط وقتی خودِ کلید در بدنه آمده باشد ذخیره می‌شود —
+        // PUT بدون enabled به معنای «وضعیت فعلی را دست نزن».
+        let boxEnabled;
+        if (body.enabled !== undefined && body.enabled !== null) {
+          boxEnabled = await cardBox.saveEnabled(body.enabled, req.admin.id, client);
+        } else {
+          boxEnabled = await cardBox.enabled(client);
+        }
         await client.query('COMMIT');
         await audit(req.admin.id, 'update_card_box', 'card_box_odds', null,
           body.reason || null,
-          { odds, price });
+          { odds, price, enabled: boxEnabled });
         const view = await cardBox.adminView();
         res.json({
-          message: 'شانس و قیمت صندوق ذخیره شد — فروشگاه همین حالا عدد تازه را نشان می‌دهد',
+          message: 'شانس، قیمت و وضعیت فروش صندوق ذخیره شد — فروشگاه همین حالا عدد تازه را نشان می‌دهد',
           ...view,
         });
       } catch (e) {

@@ -531,6 +531,18 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
+                    if (data['enabled'] == false)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 6),
+                        child: Text(
+                          'فروش صندوق موقتاً غیرفعال است — کمی بعد دوباره سر بزن.',
+                          style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFFFBBF24)),
+                        ),
+                      )
+                    else ...[
                     DecoratedBox(
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(14),
@@ -569,7 +581,8 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
                             style: TextStyle(
                                 fontSize: 11.5, fontWeight: FontWeight.w800)),
                       ),
-                      ],
+                    ],
+                    ],
                     ),
                   ],
                 ),

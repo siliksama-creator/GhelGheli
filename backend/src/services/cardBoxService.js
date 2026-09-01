@@ -199,7 +199,7 @@ function createCardBoxService(db = pool) {
    * دوئل شود.
    */
   async function overview(userId) {
-    const [table, boxPrice] = await Promise.all([odds(), price()]);
+    const [table, boxPrice, boxEnabled] = await Promise.all([odds(), price(), enabled()]);
     const { rows } = await db.query(
       `SELECT COALESCE(SUM(quantity),0)::int AS owned
          FROM user_card_inventory
@@ -210,6 +210,8 @@ function createCardBoxService(db = pool) {
       'SELECT wallet_balance FROM users WHERE id=$1', [userId]);
     return {
       price: boxPrice,
+      // وقتی خاموش است، کلاینت دکمهٔ خرید را می‌بندد و جملهٔ واضح نشان می‌دهد.
+      enabled: boxEnabled,
       // موجودیِ کیف پول برای دکمهٔ «خرید با کیف پول» — صفرِ نبودِ ردیف امن است.
       walletBalance: Number(wRows[0]?.wallet_balance || 0),
       size: BOX_SIZE,
@@ -494,14 +496,24 @@ function createCardBoxService(db = pool) {
   }
 
   /**
-   * نمای پنل ادمین: شانس، قیمت، و تعداد کارت زندهٔ هر کلاس.
+   * وضعیت فروش صندوق — کلید app_settings `card_box_enabled`.
+   * نبودِ ردیف یعنی «فعال» (پیش‌فرض امن: صندوق همیشه فروخته می‌شده).
+   */
+  async function enabled(client = db) {
+    const { rows } = await client.query(
+      "SELECT value FROM app_settings WHERE key='card_box_enabled' LIMIT 1");
+    return !rows[0] || rows[0].value !== 'false';
+  }
+
+  /**
+   * نمای پنل ادمین: شانس، قیمت، وضعیت فروش، و تعداد کارت زندهٔ هر کلاس.
    *
    * تعداد کارت برای تصمیم است، نه برای قرعه. اگر لجند صفر کارت داشته
    * باشد، وزنش موقع باز شدن بین بقیه پخش می‌شود — مدیر باید این را
    * ببیند وگرنه «۳٪ لجند» را ذخیره می‌کند و هیچ‌وقت لجند نمی‌آید.
    */
   async function adminView() {
-    const [table, boxPrice, counts] = await Promise.all([
+    const [table, boxPrice, counts, boxEnabled] = await Promise.all([
       odds(),
       price(),
       db.query(
@@ -510,6 +522,7 @@ function createCardBoxService(db = pool) {
           WHERE is_active = true AND is_collectible = false
           GROUP BY 1`,
       ),
+      enabled(),
     ]);
     const catalogue = Object.fromEntries(RARITIES.map((r) => [r, 0]));
     for (const row of counts.rows) {
@@ -521,10 +534,25 @@ function createCardBoxService(db = pool) {
     }));
     return {
       price: boxPrice,
+      enabled: boxEnabled,
       weightTotal: WEIGHT_TOTAL,
       sum: list.reduce((s, o) => s + o.permille, 0),
       odds: list,
     };
+  }
+
+  async function saveEnabled(value, adminId = null, client = db) {
+    const v = value === true || value === 'true' ? 'true' : 'false';
+    await client.query(
+      `INSERT INTO app_settings(key, value, updated_by_admin_id, updated_at)
+       VALUES ('card_box_enabled', $1, $2, NOW())
+       ON CONFLICT (key) DO UPDATE
+         SET value = EXCLUDED.value,
+             updated_by_admin_id = EXCLUDED.updated_by_admin_id,
+             updated_at = NOW()`,
+      [v, adminId || null],
+    );
+    return v === 'true';
   }
 
   async function saveOdds(input, client = null) {
@@ -567,7 +595,10 @@ function createCardBoxService(db = pool) {
     return n;
   }
 
-  return { odds, price, overview, grantBox, history, adminView, adminPurchases, saveOdds, savePrice };
+  return {
+    odds, price, enabled, overview, grantBox, history, adminView, adminPurchases,
+    saveOdds, savePrice, saveEnabled,
+  };
 }
 
 module.exports = {

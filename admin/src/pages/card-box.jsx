@@ -21,16 +21,17 @@ const DEFAULT_ODDS = {
 };
 
 /**
- * شانس و قیمت صندوق کارت.
+ * مدیریت کامل صندوق کارتِ فروشگاه: شانس، قیمت، سوییچ فروش و تاریخچه.
  *
- * کلاینت‌های کاربر درصد را از GET /api/card-box/overview می‌خوانند.
- * پس ذخیرهٔ همین‌جا، بدون انتشار نسخهٔ جدید، روی فروشگاه وب و اندروید
- * می‌نشیند.
+ * هر تغییری که اینجا ذخیره شود، بدون انتشار نسخهٔ جدید، روی فروشگاه وب
+ * و اندروید می‌نشیند — کلاینت‌های کاربر عدد را از GET /api/card-box/overview
+ * می‌خوانند.
  */
 export function CardBoxAdminPage({ request }) {
   const notify = useToast();
   const [odds, setOdds] = useState([]);
   const [price, setPrice] = useState(100000);
+  const [enabled, setEnabled] = useState(true);
   const [weightTotal, setWeightTotal] = useState(1000);
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -49,6 +50,7 @@ export function CardBoxAdminPage({ request }) {
       .then((d) => {
         setOdds(d.odds || []);
         setPrice(Number(d.price || 100000));
+        setEnabled(d.enabled !== false);
         setWeightTotal(Number(d.weightTotal || 1000));
         setLoaded(true);
       })
@@ -80,7 +82,7 @@ export function CardBoxAdminPage({ request }) {
     try {
       const d = await request('/api/admin/card-box', {
         method: 'PUT',
-        body: { odds, price },
+        body: { odds, price, enabled },
       });
       setOdds(d.odds || odds);
       setPrice(Number(d.price || price));
@@ -101,11 +103,11 @@ export function CardBoxAdminPage({ request }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div>
           <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Package size={20} /> شانس صندوق کارت
+            <Package size={20} /> صندوق کارت فروشگاه
           </h2>
           <p className="topbar-sub">
-            درصد هر کلاس مستقل از تعداد کارت‌های آن کلاس است. جمع باید دقیقاً
-            ۱۰۰٪ باشد وگرنه ذخیره رد می‌شود — نرمال‌سازی خودکار نداریم.
+            شانس هر کلاس، قیمت صندوق و روشن/خاموش‌کردن فروش. هر تغییری که
+            ذخیره کنید همان لحظه روی فروشگاه کاربران می‌نشیند — بدون آپدیتِ اپ.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -118,10 +120,32 @@ export function CardBoxAdminPage({ request }) {
             <RotateCcw size={15} /> پیش‌فرض تولید
           </Button>
           <Button onClick={save} disabled={saving || !weightOk}>
-            <Save size={15} /> {saving ? 'در حال ذخیره…' : 'ذخیرهٔ شانس'}
+            <Save size={15} /> {saving ? 'در حال ذخیره…' : 'ذخیرهٔ همه'}
           </Button>
         </div>
       </div>
+
+      <Card
+        title="وضعیت فروش صندوق"
+        action={enabled
+          ? <Badge tone="success">فروش باز است</Badge>
+          : <Badge tone="warning">فروش بسته است</Badge>}
+      >
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => setEnabled(e.target.checked)}
+          />
+          <span style={{ fontWeight: 700 }}>کاربران می‌توانند صندوق بخرند</span>
+        </label>
+        <p className="topbar-sub" style={{ marginTop: 8 }}>
+          وقتی خاموش باشد، خریدِ صندوق در فروشگاه وب و اندروید به‌طور کامل
+          بسته می‌شود و پیام «فروش موقتاً غیرفعال است» را می‌بینند — حتی
+          اگر کسی دکمهٔ کهنه‌ای را بزند، سرور سفارش نمی‌سازد. برای تعمیر
+          یا تغییر قیمت، همین‌جا خاموشش کنید و بعد از ذخیره روشن.
+        </p>
+      </Card>
 
       <Card
         title="جمع شانس"
@@ -142,8 +166,8 @@ export function CardBoxAdminPage({ request }) {
         </p>
       </Card>
 
-      <Card title="قیمت صندوق" subtitle="تومان. فروشگاه وب و اندروید همین عدد را نشان می‌دهند.">
-        <Field label="قیمت (تومان)">
+      <Card title="قیمت صندوق" subtitle="قیمت به تومان — همان عددی که کاربر در فروشگاه می‌بیند (هم با کیف پول، هم با پرداخت کافه‌بازار).">
+        <Field label="قیمت (تومان)" hint="مثلاً ۱۰۰۰۰۰ یعنی صندوق صد هزار تومان است.">
           <Input type="number" min="1" max="10000000" value={price}
             onChange={(e) => setPrice(Number(e.target.value) || 0)} />
         </Field>
@@ -161,7 +185,7 @@ export function CardBoxAdminPage({ request }) {
               : <Badge>{fmtNumber(o.catalogueCount)} کارت</Badge>}
           >
             <div className="card-grid cols-3" style={{ gap: 10 }}>
-              <Field label="درصد شانس">
+              <Field label="درصد شانس" hint="درصد کلاس — اعشار هم قبول است (مثلاً ۱٫۵).">
                 <Input
                   type="number"
                   min="0"
@@ -171,7 +195,7 @@ export function CardBoxAdminPage({ request }) {
                   onChange={(e) => setRow(o.rarity, Math.round(Number(e.target.value) * 10))}
                 />
               </Field>
-              <Field label="در هزار (دقیق)">
+              <Field label="در هزار (دقیق)" hint="عدد اصلی ذخیره‌شده: از هر ۱۰۰۰ صندوق چند تا از این کلاس.">
                 <Input
                   type="number"
                   min="0"

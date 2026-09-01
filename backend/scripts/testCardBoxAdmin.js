@@ -75,6 +75,21 @@ ok(read('admin/src/main.jsx').includes('card-box')
   && read('mobile/lib/screens/admin/admin_shell.dart').includes('AdminCardBox'),
   'هر دو شل ادمین صفحه را نشان می‌دهند');
 
+// سوییچ فروش (خواستهٔ مالک: «مدیریت صندوق کارت فروشگاه از ادمین»).
+ok(/saveEnabled/.test(svc) && /card_box_enabled/.test(svc),
+  'سرویس سوییچ فروش را در app_settings ذخیره می‌کند');
+ok(/body\.enabled/.test(routes) && /saveEnabled/.test(routes),
+  'PUT ادمین سوییچ فروش را می‌پذیرد');
+ok(web.includes('وضعیت فروش') && web.includes('enabled')
+  && droid.includes('وضعیت فروش') && droid.includes("'enabled': _enabled"),
+  'هر دو پنل سوییچ فروش را نشان می‌دهند و ذخیره می‌کنند');
+const shopSvc = read('backend/src/services/shopService.js');
+ok(/card_box_enabled/.test(shopSvc) && /BOX_DISABLED/.test(shopSvc),
+  'خرید صندوق وقتی فروش بسته است در سرور رد می‌شود — نه فقط در ظاهر');
+ok(read('userweb/src/components/CardBox.jsx').includes('موقتاً غیرفعال')
+  && read('mobile/lib/widgets/card_box.dart').includes('موقتاً غیرفعال'),
+  'هر دو کلاینت کاربر پیام بسته‌بودن فروش را نشان می‌دهند');
+
 const shell = read('mobile/lib/screens/admin/admin_shell.dart');
 const pages = shell.match(/Admin[A-Za-z]+\(api:/g) || [];
 const titlesBlock = shell.split('static const _titles = [')[1].split('];')[0];

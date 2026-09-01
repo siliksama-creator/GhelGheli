@@ -59,11 +59,12 @@ export function Card({ title, subtitle, action, children, className = '', style,
   );
 }
 
-export function Field({ label, children }) {
+export function Field({ label, hint, children }) {
   return (
     <label className="field">
       {label && <span>{label}</span>}
       {children}
+      {hint && <em className="field-hint">{hint}</em>}
     </label>
   );
 }

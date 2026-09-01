@@ -440,23 +440,29 @@ export default function CardBox({ token, compact = false, onGranted }) {
             کارت‌های فعال تو: <b>{fa(data.ownedCards)}</b>
             {data.needsBox ? ` از ${fa(data.size)}` : ' · آمادهٔ دوئل'}
           </span>
-          <div className="cardBoxBuyRow" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <button type="button" className="cardBoxBtn" onClick={buy} disabled={busy}>
-              {busy ? 'در حال باز کردن…' : 'باز کردن صندوق'}
-            </button>
-            {typeof data.walletBalance === 'number' && (
-              <button type="button" className="cardBoxBtn cardBoxBtnWallet"
-                style={{ fontSize: 11, padding: '8px 12px',
-                  opacity: busy || data.walletBalance < data.price ? 0.55 : 1 }}
-                onClick={buyWithWallet}
-                disabled={busy || data.walletBalance < data.price}>
-                خرید با کیف پول
-                <small style={{ display: 'block', opacity: 0.75, fontWeight: 400 }}>
-                  موجودی: {money(data.walletBalance)}
-                </small>
+          {data.enabled === false ? (
+            <p style={{ margin: '10px 0 0', color: '#FBBF24', fontSize: 13, fontWeight: 700 }}>
+              فروش صندوق موقتاً غیرفعال است — کمی بعد دوباره سر بزن.
+            </p>
+          ) : (
+            <div className="cardBoxBuyRow" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <button type="button" className="cardBoxBtn" onClick={buy} disabled={busy}>
+                {busy ? 'در حال باز کردن…' : 'باز کردن صندوق'}
               </button>
-            )}
-          </div>
+              {typeof data.walletBalance === 'number' && (
+                <button type="button" className="cardBoxBtn cardBoxBtnWallet"
+                  style={{ fontSize: 11, padding: '8px 12px',
+                    opacity: busy || data.walletBalance < data.price ? 0.55 : 1 }}
+                  onClick={buyWithWallet}
+                  disabled={busy || data.walletBalance < data.price}>
+                  خرید با کیف پول
+                  <small style={{ display: 'block', opacity: 0.75, fontWeight: 400 }}>
+                    موجودی: {money(data.walletBalance)}
+                  </small>
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
