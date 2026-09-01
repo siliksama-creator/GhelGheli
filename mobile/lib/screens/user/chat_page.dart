@@ -60,6 +60,9 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
   List _messages = [];
   List _emotePacks = [];
   List _stickers = [];
+  // پیام‌های آماده‌ای که مدیر در پنل ساخته — از bootstrap سرور می‌آید
+  // (بدون آپدیت)؛ خالی یعنی تبی برایش ساخته نمی‌شود.
+  List _adminCanned = [];
   Map? _reply;
   String? _error;
   Map<String, dynamic>? _pinned;
@@ -196,6 +199,9 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
           _messages = m;
           _emotePacks = cfg['emotePacks'] is List ? cfg['emotePacks'] as List : const [];
           _stickers = res['stickers'] is List ? res['stickers'] as List : const [];
+          _adminCanned = res['cannedMessages'] is List
+              ? res['cannedMessages'] as List
+              : const [];
           _lastCount = m.length;
           _error = null;
           _loading = false;
@@ -394,14 +400,13 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
           ),
 
         // ── پنل زیبا و مدرن پیام‌های آماده ──
-        // `cannedMessages` سرور اینجا مصرف نمی‌شود و عمداً هم گرفته
-        // نمی‌شود: آن فهرست تخت است و فقط برای اعتبارسنجیِ سمتِ سرور
-        // به کار می‌رود. دسته‌بندیِ نمایشی وظیفهٔ کلاینت است و باید با
-        // وب یکی بماند — گاردِ `chat-parity.mjs` همان را می‌بندد.
-        // (پیش‌تر گرفته و پاس داده می‌شد و هرگز خوانده نمی‌شد.)
+        // دسته‌های پایه و ایموجی ثابتِ کلاینت‌اند تا با وب یکی بمانند؛
+        // ولی پیام‌هایی که مدیر ساخته از سرور می‌آید و در تبِ
+        // «پیام‌های مدیر» اولِ همه نشان داده می‌شود.
         _CannedMessagesPanel(
           emotePacks: _emotePacks,
           stickers: _stickers,
+          adminCanned: _adminCanned,
           stickerUrl: _stickerUrl,
           cooldownLeft: _cooldownLeft,
           onSend: _sendCannedMessage,
@@ -631,6 +636,7 @@ class _CannedMessagesPanel extends StatefulWidget {
   const _CannedMessagesPanel({
     required this.emotePacks,
     required this.stickers,
+    required this.adminCanned,
     required this.stickerUrl,
     required this.cooldownLeft,
     required this.onSend,
@@ -638,6 +644,7 @@ class _CannedMessagesPanel extends StatefulWidget {
   });
 
   final List emotePacks;
+  final List adminCanned;
   final List stickers;
   final String Function(Object? rel) stickerUrl;
   final int cooldownLeft;
@@ -673,6 +680,9 @@ class _CannedMessagesPanelState extends State<_CannedMessagesPanel> {
       return ('sparkle', '${raw['name'] ?? 'پک ویژه'}', messages);
     });
     return [
+      if (widget.adminCanned.isNotEmpty)
+        ('sparkle', 'پیام‌های مدیر',
+            widget.adminCanned.map((e) => '$e').toList()),
       ('chat', 'گفتگو', const ['سلام بچه‌ها!', 'من اومدم!', 'چه خبر بچه‌ها؟', 'خداحافظ تا بعد!', 'مواظب خودتون باشید!', 'خوشبختم دوستان!', 'کجا زندگی می‌کنید؟', 'امروز چیکار کردید؟', 'ممنون از شما!', 'میشه کمکم کنید؟', 'تبریک میگم!', 'وای چقدر خنده‌دار بود!', 'ایول به همگی!', 'کسی کد جدید داره؟']),
       ('football', 'بازی', const ['کی پایه بازیه؟', 'بریم برای برد!', 'من عاشق این بازی‌ام!', 'منم می‌خوام بازی کنم!', 'دوباره امتحان می‌کنم!', 'بازی خیلی باحال بود!', 'عالی بود!', 'موفق باشی!', 'شگفت‌انگیز بود!']),
       ('game', 'رقابت', const ['بزن بریم بازی!', 'آماده‌ای برای مسابقه؟', 'این دست من می‌برم!', 'بازی عالی بود!', 'دوباره بازی کنیم؟', 'کارت خفن گرفتم!', 'حریف قوی می‌خوام!', 'پنالتی رو دریبل کردم!', 'خیلی خفن بود!', 'شما تو کدوم لیگ هستید؟', 'چقدر امتیازم بالا رفت!', 'کارت جدید پیدا کردم!', 'امروز روز منه!']),

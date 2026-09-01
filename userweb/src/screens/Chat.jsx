@@ -77,7 +77,7 @@ export default function Chat({ token, openProfile, meId }) {
     })),
     { title: 'ایموجی', icon: 'heart', items: [], isEmoji: true },
     { title: 'استیکر', icon: 'party', items: [], isSticker: true },
-  ], [emotePacks]);
+  ], [emotePacks, adminCanned]);
 
   const boxRef = useRef(null);
   const lastCount = useRef(0);
@@ -105,6 +105,7 @@ export default function Chat({ token, openProfile, meId }) {
         setPinned(res.config?.pinned || null);
         setEmotePacks(Array.isArray(res.config?.emotePacks) ? res.config.emotePacks : []);
         setStickers(Array.isArray(res.stickers) ? res.stickers : []);
+        setAdminCanned(Array.isArray(res.cannedMessages) ? res.cannedMessages : []);
         // اندروید این را چک می‌کرد و وب نه: کاربرِ واجدشرایط‌نشده صفحهٔ
         // خالی می‌دید بدون هیچ توضیحی که چرا. سرور `eligible:false` را
         // در همین پاسخ می‌فرستد.
