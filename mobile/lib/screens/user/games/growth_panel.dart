@@ -125,7 +125,7 @@ class _GrowthPanelState extends State<GrowthPanel> {
           padding: const EdgeInsets.all(16),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             const Text('دعوت از یک دوست', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
-            Text(_inviteHint(referral is Map ? Map<String, dynamic>.from(referral as Map) : const {}),
+            Text(_inviteHint(referral is Map ? Map<String, dynamic>.from(referral) : const {}),
                 style: const TextStyle(fontSize: 10.5, color: Colors.white60, height: 1.5)),
             Gaps.vSm,
             for (final item in shareTargets)

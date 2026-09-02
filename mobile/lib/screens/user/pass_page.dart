@@ -283,10 +283,10 @@ class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin
               color: Colors.white.withValues(alpha: 0.04),
               border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
             ),
-            child: const Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                const Row(
                   children: [
                     Icon(Icons.bolt_rounded, color: Color(0xFFFFD166), size: 15),
                     SizedBox(width: 4),
@@ -298,7 +298,7 @@ class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin
                     ),
                   ],
                 ),
-                SizedBox(height: 6),
+                const SizedBox(height: 6),
                 Wrap(
                   spacing: 5,
                   runSpacing: 5,
