@@ -228,7 +228,14 @@ void main() {
       // ⚠️ به‌جای شل‌کردنِ تست، دامنه‌اش به خودِ نوارِ حالت محدود شد تا
       //    هنوز چیزی را اثبات کند: اینکه چهار پیل واقعاً آنجا هستند.
       final modeBar = find.byKey(const Key('gameModeBar'));
-      for (final label in ['۱۰۰ امتیاز', '۱۰۰۰ امتیاز', 'تمرین با ربات', 'اتاق خصوصی']) {
+      // برچسب stake از faNum می‌آید (با جداکنندهٔ هزارگان برای ≥1000).
+      // ثابتِ «۱۰۰۰ امتیاز» دیگر با UI یکی نیست — همان faNum را صدا می‌زنیم.
+      for (final label in [
+        '${faNum(100)} امتیاز',
+        '${faNum(1000)} امتیاز',
+        'تمرین با ربات',
+        'اتاق خصوصی',
+      ]) {
         expect(
           find.descendant(of: modeBar, matching: find.text(label)),
           findsWidgets,
