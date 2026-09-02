@@ -82,14 +82,21 @@ enum ShareOutcome {
 
 /// متن دعوت — اعداد از سرور (`/api/config.referral`) می‌آیند تا با تغییر
 /// پنل بدون آپدیت اپ عوض شوند. پیش‌فرض‌ها همان مقادیر تاریخی‌اند.
+/// دامنهٔ عمومی وب — از --dart-define=PUBLIC_WEB_URL در CI قابل override است.
+const String kPublicWebUrl = String.fromEnvironment(
+  'PUBLIC_WEB_URL',
+  defaultValue: 'https://ghelghelishop.ir',
+);
+
 String inviteMessage(
   String code, {
   int spins = 3,
   int purchasePercent = 5,
+  String? webBase,
 }) =>
     'کد دعوت من به قلقلی: $code\n'
     'با این کد ثبت‌نام کن؛ هر دومون $spins چرخش هدیه می‌گیریم و من از خریدهای مستقیم تو $purchasePercent٪ درآمد معرفی می‌گیرم.\n'
-    'https://ghelghelishop.ir';
+    '${webBase ?? kPublicWebUrl}';
 
 Future<ShareOutcome> shareInvite(
   ShareTarget target,

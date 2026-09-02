@@ -49,6 +49,7 @@ const MAX_BATCH = 20000;
 // ممکن است ۰.۷ شباهت داشته باشند و آن‌ها مشکلی ندارند.
 const DUPLICATE_SIMILARITY = 0.93; // پیش‌فرض — مقدارِ مؤثر از matchSettings خوانده می‌شود
 const matchSettings = require('../services/matchSettings');
+const { parseFaNumber } = require('../lib/faNum');
 
 module.exports = function createPhotoCardRoutes(deps) {
   const {
@@ -1137,15 +1138,15 @@ module.exports = function createPhotoCardRoutes(deps) {
         return res.status(400).json({ message: 'شناسه معتبر نیست' });
       }
       const name = req.body.name ? String(req.body.name).trim() : null;
-      const pointValue = req.body.pointValue !== undefined ? Math.max(0, Math.floor(Number(req.body.pointValue || 0))) : null;
-      const cashAmount = req.body.cashAmount !== undefined ? Math.max(0, Math.floor(Number(req.body.cashAmount || 0))) : null;
+      const pointValue = req.body.pointValue !== undefined ? Math.max(0, Math.floor(parseFaNumber(req.body.pointValue || 0))) : null;
+      const cashAmount = req.body.cashAmount !== undefined ? Math.max(0, Math.floor(parseFaNumber(req.body.cashAmount || 0))) : null;
       const isActive = req.body.isActive !== undefined ? (req.body.isActive === true || req.body.isActive === 'true') : null;
-      const duelAttack = req.body.duelAttack != null ? Number(req.body.duelAttack) : null;
-      const duelDefense = req.body.duelDefense != null ? Number(req.body.duelDefense) : null;
-      const duelSpeed = req.body.duelSpeed != null ? Number(req.body.duelSpeed) : null;
-      const duelTechnique = req.body.duelTechnique != null ? Number(req.body.duelTechnique) : null;
-      const duelGoalChance = req.body.duelGoalChance != null ? Number(req.body.duelGoalChance) : null;
-      const duelEnergy = req.body.duelEnergy != null ? Number(req.body.duelEnergy) : null;
+      const duelAttack = req.body.duelAttack != null ? parseFaNumber(req.body.duelAttack) : null;
+      const duelDefense = req.body.duelDefense != null ? parseFaNumber(req.body.duelDefense) : null;
+      const duelSpeed = req.body.duelSpeed != null ? parseFaNumber(req.body.duelSpeed) : null;
+      const duelTechnique = req.body.duelTechnique != null ? parseFaNumber(req.body.duelTechnique) : null;
+      const duelGoalChance = req.body.duelGoalChance != null ? parseFaNumber(req.body.duelGoalChance) : null;
+      const duelEnergy = req.body.duelEnergy != null ? parseFaNumber(req.body.duelEnergy) : null;
       const duelRarity = req.body.duelRarity || null;
       const duelEffect = req.body.duelEffect || null;
 

@@ -1041,7 +1041,7 @@ const attachGames = function attachGames(io, rulesById) {
       const response = {
         roomCode: code,
         gameId,
-        shareUrl: `https://user.ghelghelishop.ir/?game=${gameId}&room=${code}`,
+        shareUrl: `${(process.env.PUBLIC_WEB_URL || process.env.CLIENT_URL || 'https://user.ghelghelishop.ir').replace(/\/$/, '')}/?game=${gameId}&room=${code}`,
         message: 'اتاق ساخته شد — کد یا لینک را برای دوستت بفرست',
       };
       safeEmit(socket, 'game:room_created', response);

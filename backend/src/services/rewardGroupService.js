@@ -361,16 +361,28 @@ async function claim(userId, tierId) {
     // مقدارِ ثبت‌شده **کسرِ واقعی** است نه هزینهٔ اسمی — اگر موجودی
     // کمتر بود، GREATEST آن را محدود می‌کند و دفتر باید همان را
     // بگوید، وگرنه SUM(delta) با موجودی نمی‌خواند.
+    // FOR UPDATE + actual داخل SQL — همان درسِ gameReward/pointService.
+    // زیرکوئری RETURNING قبل از قفل، under concurrency تفاضل غلط می‌داد.
     const { rows: spent } = await client.query(
-      `UPDATE users
-          SET current_points = GREATEST(0, current_points - $2),
+      `WITH locked AS (
+         SELECT id, current_points AS before_val
+           FROM users WHERE id = $1 FOR UPDATE
+       ),
+       calc AS (
+         SELECT id, before_val,
+                GREATEST(0, before_val - $2) AS after_val,
+                before_val - GREATEST(0, before_val - $2) AS actual
+           FROM locked
+       )
+       UPDATE users u
+          SET current_points = c.after_val,
               updated_at = NOW()
-        WHERE id = $1
-        RETURNING current_points,
-                  (SELECT current_points FROM users WHERE id=$1) AS before_val`,
+         FROM calc c
+        WHERE u.id = c.id
+        RETURNING c.after_val AS current_points, c.actual, c.before_val`,
       [userId, tier.required_points]);
     if (spent[0]) {
-      const actual = Number(spent[0].before_val) - Number(spent[0].current_points);
+      const actual = Number(spent[0].actual);
       if (actual > 0) {
         await client.query(
           `INSERT INTO point_transactions

@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+import '../../widgets/safe_svg.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../api_client.dart';
@@ -804,12 +804,12 @@ class _CannedMessagesPanelState extends State<_CannedMessagesPanel> {
               child: url.isEmpty
                   ? const Icon(Icons.image_not_supported_outlined,
                       size: 28, color: Colors.white30)
-                  : SvgPicture.network(
-                      url,
+                  : SafeSvgNetwork(
+                      url: url,
                       width: 62,
                       height: 62,
                       fit: BoxFit.contain,
-                      placeholderBuilder: (_) => const Icon(Icons.image_outlined,
+                      placeholder: const Icon(Icons.image_outlined,
                           size: 28, color: Colors.white30),
                     ),
             ),
@@ -1013,12 +1013,12 @@ class _AnimatedStickerState extends State<AnimatedSticker>
         child: widget.url.isEmpty
             ? const Icon(Icons.image_not_supported_outlined,
                 size: 56, color: Colors.white30)
-            : SvgPicture.network(
-                widget.url,
+            : SafeSvgNetwork(
+                url: widget.url,
                 width: 96,
                 height: 96,
                 fit: BoxFit.contain,
-                placeholderBuilder: (_) => const Icon(Icons.image_outlined,
+                placeholder: const Icon(Icons.image_outlined,
                     size: 56, color: Colors.white30),
               ),
       ),

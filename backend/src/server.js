@@ -1990,9 +1990,22 @@ app.post('/api/chat/messages', auth, chatLimiter.mw, asyncHandler(async (req, re
     const rm = await pool.query('SELECT id FROM chat_messages WHERE id=$1 AND is_deleted=false', [replyTo]);
     if (!rm.rows[0]) return res.status(400).json({ message: 'پیام موردنظر برای پاسخ پیدا نشد' });
   }
-  if (messageType === 'text' && !await isAllowedChatMessage(clean, req.user.id)) return res.status(400).json({ message: 'فقط پیام‌های آماده و ایموجی‌ها مجاز هستند.' });
-  if (clean) await assertNoBadWords(clean);
-  const { rows } = await pool.query('INSERT INTO chat_messages(user_id,message_text,reply_to_message_id,sticker_id,message_type) VALUES($1,$2,$3,$4,$5) RETURNING *', [req.user.id, clean, replyTo, stickerId, messageType]);
+  if (messageType === 'text') {
+    if (!clean) return res.status(400).json({ message: 'متن پیام خالی است' });
+    if (!await isAllowedChatMessage(clean, req.user.id)) {
+      return res.status(400).json({ message: 'فقط پیام‌های آماده و ایموجی‌ها مجاز هستند.' });
+    }
+    await assertNoBadWords(clean);
+  }
+  // CHECK constraint: length(trim(message_text)) BETWEEN 1 AND 1000
+  // برای استیکر متن آزاد نیست — یک placeholder غیرخالی می‌گذاریم
+  // تا constraint نشکند (قبلاً '' باعث crash بک‌اند می‌شد).
+  const storedText = messageType === 'sticker'
+    ? (sticker.title ? String(sticker.title).slice(0, 80) : 'استیکر')
+    : clean.slice(0, 1000);
+  const { rows } = await pool.query(
+    'INSERT INTO chat_messages(user_id,message_text,reply_to_message_id,sticker_id,message_type) VALUES($1,$2,$3,$4,$5) RETURNING *',
+    [req.user.id, storedText, replyTo, sticker ? sticker.id : null, messageType]);
   // سقفِ ۲۰۰ پیامِ سراسری — هر دو مسیرِ درج (REST و سوکت) باید صدایش
   // بزنند، وگرنه کاربرِ وب که از REST می‌فرستد از سقف فرار می‌کند.
   chatRetention.onMessageInserted().catch(() => {});
@@ -2645,10 +2658,20 @@ io.on('connection', socket => {
         const rm = await pool.query('SELECT id FROM chat_messages WHERE id=$1 AND is_deleted=false', [replyTo]);
         if (!rm.rows[0]) throw new Error('پیام موردنظر برای پاسخ پیدا نشد');
       }
-      if (messageType === 'text' && !await isAllowedChatMessage(clean, socket.user.id)) throw new Error('فقط پیام‌های آماده و ایموجی‌ها مجاز هستند.');
-      if (clean) await assertNoBadWords(clean);
+      if (messageType === 'text') {
+        if (!clean) throw new Error('متن پیام خالی است');
+        if (!await isAllowedChatMessage(clean, socket.user.id)) {
+          throw new Error('فقط پیام‌های آماده و ایموجی‌ها مجاز هستند.');
+        }
+        await assertNoBadWords(clean);
+      }
+      const storedText = messageType === 'sticker'
+        ? (sticker.title ? String(sticker.title).slice(0, 80) : 'استیکر')
+        : clean.slice(0, 1000);
       arr.push(now); socketMessageTimes.set(socket.user.id, arr);
-      const { rows } = await pool.query('INSERT INTO chat_messages(user_id,message_text,reply_to_message_id,sticker_id,message_type) VALUES($1,$2,$3,$4,$5) RETURNING *', [socket.user.id, clean, replyTo, stickerId, messageType]);
+      const { rows } = await pool.query(
+        'INSERT INTO chat_messages(user_id,message_text,reply_to_message_id,sticker_id,message_type) VALUES($1,$2,$3,$4,$5) RETURNING *',
+        [socket.user.id, storedText, replyTo, sticker ? sticker.id : null, messageType]);
       // سقفِ ۲۰۰ پیامِ سراسری. خودش throw نمی‌کند، پس ثبتِ پیام هرگز
       // به‌خاطر پاک‌سازی شکست نمی‌خورد.
       chatRetention.onMessageInserted().catch(() => {});

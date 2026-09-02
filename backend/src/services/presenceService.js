@@ -72,7 +72,7 @@ function createPresenceService(pool) {
             },
             roomCode,
             gameId,
-            shareUrl: `https://user.ghelghelishop.ir/?game=${encodeURIComponent(gameId)}&room=${roomCode}`,
+            shareUrl: `${(process.env.PUBLIC_WEB_URL || process.env.CLIENT_URL || 'https://user.ghelghelishop.ir').replace(/\/$/, '')}/?game=${encodeURIComponent(gameId)}&room=${roomCode}`,
             expiresInSeconds: 120,
           };
           io.to(`user:${targetUserId}`).emit('friend:challenge', invitation);

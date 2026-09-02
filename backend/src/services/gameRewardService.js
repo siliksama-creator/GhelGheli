@@ -119,29 +119,37 @@ async function recordMatch({ gameId, vsBot, winner, players }) {
       if (delta !== 0) {
         // GREATEST(...,0) keeps a balance from going negative after a penalty.
         // lifetime_points only ever grows, so a loss must not reduce it.
+        // ── دفتر امتیاز با قفل ردیف (FOR UPDATE) ──
+        //
+        // باگ قبلی: `RETURNING (SELECT current_points …)` زیرکوئری را از
+        // اسنپ‌شاتِ ابتدای دستور می‌خواند. تحت همزمانی دو مسابقه،
+        // before_val با مقدار واقعیِ قبل از این UPDATE یکی نبود و
+        // تفاضلِ دفتر غلط ثبت می‌شد.
+        //
+        // الگو مثل pointService: قفل، محاسبهٔ actual داخل SQL، بعد UPDATE.
         const { rows: bal } = await client.query(
-          `UPDATE users SET
-             current_points = GREATEST(current_points + $1, 0),
-             lifetime_points = lifetime_points + GREATEST($1, 0),
-             monthly_league_points = GREATEST(monthly_league_points + $1, 0),
+          `WITH locked AS (
+             SELECT id, current_points AS before_val
+               FROM users WHERE id = $2 FOR UPDATE
+           ),
+           calc AS (
+             SELECT id, before_val,
+                    GREATEST(before_val + $1, 0) AS after_val,
+                    GREATEST(before_val + $1, 0) - before_val AS actual
+               FROM locked
+           )
+           UPDATE users u SET
+             current_points = c.after_val,
+             lifetime_points = u.lifetime_points + GREATEST(c.actual, 0),
+             monthly_league_points = GREATEST(u.monthly_league_points + c.actual, 0),
              updated_at = NOW()
-           WHERE id = $2
-           RETURNING current_points,
-                     (SELECT current_points FROM users WHERE id=$2) AS before_val`,
+            FROM calc c
+           WHERE u.id = c.id
+           RETURNING c.after_val AS current_points, c.actual, c.before_val`,
           [delta, userId],
         );
-        // ── ثبت در دفترِ امتیاز ──
-        //
-        // این تنها مسیری است که `delta` می‌تواند **منفی** باشد (جریمهٔ
-        // باخت). پس نمی‌شود از `credit` استفاده کرد.
-        //
-        // ⚠️ مقدارِ ثبت‌شده تفاضلِ واقعیِ موجودی است نه `delta` خام:
-        //    اگر کاربر ۱۰ امتیاز داشته و جریمه ۵۰ باشد، GREATEST آن را
-        //    به ۱۰ محدود می‌کند و دفتر هم باید ۱۰- بگوید. وگرنه
-        //    SUM(delta) با موجودی نمی‌خواند و ابزارِ ممیزی هشدارِ
-        //    دروغین می‌دهد.
         if (bal[0]) {
-          const actual = Number(bal[0].current_points) - Number(bal[0].before_val);
+          const actual = Number(bal[0].actual);
           if (actual !== 0) {
             await client.query(
               `INSERT INTO point_transactions

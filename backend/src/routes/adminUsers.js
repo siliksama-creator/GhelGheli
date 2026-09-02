@@ -1,6 +1,7 @@
 /** User administration and immutable point-ledger inspection routes. */
 const express = require('express');
 const signupGift = require('../services/signupGiftService');
+const { parseFaNumber } = require('../lib/faNum');
 
 module.exports = function createAdminUserRoutes(deps) {
   const {
@@ -109,7 +110,7 @@ router.patch('/admin/signup-gift', adminAuth, requireRole(), asyncHandler(async 
 }));
 
 router.post('/admin/users/:id/grant-plus', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
-  const days = Math.max(1, Math.min(365, Number(req.body.days) || 30));
+  const days = Math.max(1, Math.min(365, parseFaNumber(req.body.days) || 30));
   // ── چرا از انتهای اشتراکِ فعلی شروع می‌شود ──
   //
   // نسخهٔ قبلی همیشه از NOW() می‌نوشت. اگر کاربر ۹۰ روز پلاس داشت و
@@ -177,7 +178,7 @@ router.post('/admin/users/:id/grant-item', adminAuth, validateUuid('id'), requir
   if (reason.length < 3) {
     return res.status(400).json({ message: 'ثبت دلیل (حداقل ۳ حرف) الزامی است' });
   }
-  const value = Math.trunc(Number(req.body.value ?? 1));
+  const value = Math.trunc(parseFaNumber(req.body.value ?? 1));
   if (!Number.isInteger(value) || value < 1) {
     return res.status(400).json({ message: 'مقدار جایزه باید عددی بزرگ‌تر از صفر باشد' });
   }
@@ -264,7 +265,7 @@ router.post('/admin/users/:id/grant-item', adminAuth, validateUuid('id'), requir
 }));
 
 router.post('/admin/users/:id/points', adminAuth, validateUuid('id'), requireRole(), asyncHandler(async (req, res) => {
-  const p = Math.trunc(Number(req.body.points || 0));
+  const p = Math.trunc(parseFaNumber(req.body.points || 0));
   if (!Number.isFinite(p) || p === 0) {
     return res.status(400).json({ message: 'مقدار امتیاز باید عددی غیر صفر باشد' });
   }

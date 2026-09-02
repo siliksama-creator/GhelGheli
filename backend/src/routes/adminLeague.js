@@ -1,5 +1,6 @@
 /** League season, prize, and payout administration routes. */
 const express = require('express');
+const { parseFaNumber } = require('../lib/faNum');
 
 module.exports = function createAdminLeagueRoutes(deps) {
   const {
@@ -163,7 +164,7 @@ router.patch('/admin/league/current/prizes', adminAuth, requireRole(), asyncHand
     }
   }
 
-  const winnerCount = Math.max(1, Math.min(300, Number(req.body.winnerCount || prizeTable.length || 10)));
+  const winnerCount = Math.max(1, Math.min(300, parseFaNumber(req.body.winnerCount) || prizeTable.length || 10));
   await pool.query('UPDATE league_seasons SET prize_table=$1, updated_at=NOW() WHERE id=$2', [JSON.stringify(prizeTable), season.id]);
   if (perkTable !== null) {
     await pool.query('UPDATE league_seasons SET perk_table=$1, updated_at=NOW() WHERE id=$2', [JSON.stringify(perkTable), season.id]);
@@ -288,8 +289,8 @@ router.post('/admin/league/seasons', adminAuth, requireRole(), asyncHandler(asyn
     return res.status(400).json({ message: 'طول لیگ نمی‌تواند بیش از دو سال باشد' });
   }
 
-  const minPoints = Number.isFinite(Number(req.body.minPointsEntry))
-    ? Math.max(0, Math.trunc(Number(req.body.minPointsEntry))) : 0;
+  const minPoints = Number.isFinite(parseFaNumber(req.body.minPointsEntry))
+    ? Math.max(0, Math.trunc(parseFaNumber(req.body.minPointsEntry))) : 0;
   const plusOnly = req.body.plusOnly === true || req.body.plusOnly === 'true';
 
   // ── سقفِ لیگِ هم‌زمان ──
@@ -385,7 +386,7 @@ router.patch('/admin/league/seasons/:id', adminAuth, validateUuid('id'), require
       patch.manual_dates = true;
     }
     if (req.body.minPointsEntry !== undefined) {
-      patch.min_points_entry = Math.max(0, Math.trunc(Number(req.body.minPointsEntry) || 0));
+      patch.min_points_entry = Math.max(0, Math.trunc(parseFaNumber(req.body.minPointsEntry) || 0));
     }
     if (req.body.plusOnly !== undefined) {
       patch.plus_only = req.body.plusOnly === true || req.body.plusOnly === 'true';
