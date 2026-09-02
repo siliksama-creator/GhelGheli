@@ -41,7 +41,7 @@ export default function Referral({ token, setMsg }) {
   };
 
   const inviteMsg = (code) =>
-    `کد دعوت من به قلقلی: ${code}\nبا این کد ثبت‌نام کن؛ هر دومون ۳ چرخش هدیه می‌گیریم و من از خریدهای مستقیم تو ۵٪ درآمد معرفی می‌گیرم.\nhttps://ghelghelishop.ir`;
+    `کد دعوت من به قلقلی: ${code}\nبا این کد ثبت‌نام کن؛ هر دومون ${fa(d.spinsPerReferral ?? 3)} چرخش هدیه می‌گیریم و من از خریدهای مستقیم تو ${fa(d.purchaseCommissionPercent ?? 5)}٪ درآمد معرفی می‌گیرم.\nhttps://ghelghelishop.ir`;
 
   const shareTo = (target) => {
     const text = encodeURIComponent(inviteMsg(d.code));

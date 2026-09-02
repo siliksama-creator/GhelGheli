@@ -2516,6 +2516,8 @@ app.use('/api', require('./routes/clientConfig')({
   // راهنمای بازی فقط از bootstrap پر می‌شود. کلاینتی که فقط config
   // می‌خواند (یا bootstrap شکست خورده) امتیاز پنل را نمی‌دید.
   gameRewards: { getGameRewardSettings, saveGameRewardSettings },
+  // اعدادِ دعوت/گذر/پلاس/شرط — تا متن‌های راهنما بدون آپدیت اپ زنده بمانند.
+  opsLimits, referrals, pass, shop, gameStakes,
 }));
 
 // ویرایشگر گردونه — ظاهر (برچسب/رنگ) و درون (نوع/وزن). بدون این mount

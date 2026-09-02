@@ -51,8 +51,8 @@ class _ReferralPageState extends State<ReferralPage> {
     _toast(ok ? 'کد دعوت کپی شد ✓' : 'کپی نشد؛ لطفاً دستی کپی کنید');
   }
 
-  Future<void> _share(ShareTarget t, String code) async {
-    final outcome = await shareInvite(t, code);
+  Future<void> _share(ShareTarget t, String code, {int spins = 3, int purchasePercent = 5}) async {
+    final outcome = await shareInvite(t, code, spins: spins, purchasePercent: purchasePercent);
     if (!mounted) return;
     switch (outcome) {
       case ShareOutcome.opened:
@@ -215,7 +215,7 @@ class _ReferralPageState extends State<ReferralPage> {
                     for (final t in shareTargets)
                       _ShareChip(
                         target: t,
-                        onTap: () => _share(t, code),
+                        onTap: () => _share(t, code, spins: spins, purchasePercent: purchasePercent),
                       ),
                   ],
                 ),

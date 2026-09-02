@@ -71,6 +71,7 @@ export default function Games({ api, token, externalLaunch = null }) {
   // چیزی رسم نمی‌شود — بهتر از رسمِ «۰ باقی‌مانده» که دروغ است.
   const [coinQuota, setCoinQuota] = useState(null);
   const [customStake, setCustomStake] = useState(500);
+  const [tapLevels, setTapLevels] = useState(50);
   const [customGame, setCustomGame] = useState('penalty');
   const [customPass, setCustomPass] = useState('');
   const [lobbies, setLobbies] = useState([]);
@@ -176,6 +177,7 @@ export default function Games({ api, token, externalLaunch = null }) {
       if (d?.gamePoints) setGamePoints(d.gamePoints);
     }).catch(() => {});
     req('/api/config', 'GET', null, null).then(d => {
+      if (d?.tapLevelCount) setTapLevels(d.tapLevelCount);
       if (d?.economy) setEconomy(d.economy);
       if (d?.gamePoints) setGamePoints(d.gamePoints);
       if (d?.features) setFeatures(d.features);
@@ -332,7 +334,7 @@ export default function Games({ api, token, externalLaunch = null }) {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
             <h3 style={{ color: '#FFF', fontWeight: '900', margin: 0, fontSize: '15px' }}>بازی ضربه‌زن (تک‌نفره)</h3>
-            <span style={{ background: '#84CC16', color: '#000', padding: '2px 8px', borderRadius: '6px', fontSize: '12.5px', fontWeight: 'bold' }}>۵۰ لول</span>
+            <span style={{ background: '#84CC16', color: '#000', padding: '2px 8px', borderRadius: '6px', fontSize: '12.5px', fontWeight: 'bold' }}>{fa(tapLevels)} لول</span>
           </div>
           <p style={{ color: '#CBD5E1', fontSize: '12px', margin: 0 }}>ضربه بزن، شخصیت باز کن، امتیاز بگیر</p>
         </div>

@@ -43,6 +43,26 @@ class _AuthScreenState extends State<AuthScreen> {
   // then reveal this field so the real owner can prove ownership and change
   // their password — a real SMS-based reset isn't available yet.
   bool _needsCurrentPassword = false;
+  // از /api/config — تا تغییر پنل بدون آپدیت اپ روی متن ثبت‌نام بنشیند.
+  int _referralSpins = 3;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReferralHint();
+  }
+
+  Future<void> _loadReferralHint() async {
+    try {
+      final res = await widget.api.get('/api/config', fresh: true);
+      if (!mounted || res is! Map) return;
+      final ref = res['referral'];
+      if (ref is Map) {
+        final n = (ref['spinsPerReferral'] as num?)?.toInt();
+        if (n != null && n >= 0) setState(() => _referralSpins = n);
+      }
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -216,6 +236,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       if (_formKey.currentState?.validate() ?? true) _submit();
                     },
                     onQuickAdmin: () => _setMode(_AuthMode.admin),
+                    referralSpins: _referralSpins,
                   ),
                 ),
               ),
@@ -243,6 +264,7 @@ class _AuthGlassCard extends StatelessWidget {
   final ValueChanged<_AuthMode> onModeChanged;
   final VoidCallback onSubmit;
   final VoidCallback onQuickAdmin;
+  final int referralSpins;
 
   const _AuthGlassCard({
     required this.formKey,
@@ -260,6 +282,7 @@ class _AuthGlassCard extends StatelessWidget {
     required this.onModeChanged,
     required this.onSubmit,
     required this.onQuickAdmin,
+    this.referralSpins = 3,
   });
 
   bool get isAdmin => mode == _AuthMode.admin;
@@ -386,7 +409,7 @@ class _AuthGlassCard extends StatelessWidget {
                       ),
                       child: Text(
                         ' اگر کد دعوت یکی از دوستانت را وارد کنی، '
-                        'هر دوی شما ۳ چرخش گردونهٔ شانس می‌گیرید.',
+                        'هر دوی شما $referralSpins چرخش گردونهٔ شانس می‌گیرید.',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: const Color(0xFFBEF264),

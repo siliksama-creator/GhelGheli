@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
-import { req } from './lib/api.js';
+import { req, fa } from './lib/api.js';
 import { SvgIcon } from './components/IconAsset.jsx';
 
 export default function GrowthHub({ api, token, onSocketGame }) {
@@ -96,7 +96,9 @@ export default function GrowthHub({ api, token, onSocketGame }) {
   const inviteFriend = async () => {
     const code = data?.referral?.code;
     if (!code) return;
-    const text = `کد دعوت من به قلقلی: ${code}\nبا این کد ثبت‌نام کن؛ هر دومون ۳ چرخش هدیه می‌گیریم و من از خرید مستقیم تو ۵٪ درآمد معرفی می‌گیرم.\nhttps://ghelghelishop.ir`;
+    const spins = data?.referral?.spinsPerReferral ?? 3;
+    const pct = data?.referral?.purchaseCommissionPercent ?? 5;
+    const text = `کد دعوت من به قلقلی: ${code}\nبا این کد ثبت‌نام کن؛ هر دومون ${spins} چرخش هدیه می‌گیریم و من از خرید مستقیم تو ${pct}٪ درآمد معرفی می‌گیرم.\nhttps://ghelghelishop.ir`;
     try {
       if (navigator.share) await navigator.share({ title:'دعوت به قلقلی', text, url:'https://ghelghelishop.ir' });
       else { await navigator.clipboard.writeText(text); setNotice('متن دعوت کپی شد'); }
@@ -118,7 +120,7 @@ export default function GrowthHub({ api, token, onSocketGame }) {
     <div className="growthSummary">
       <div className="dailyQuestMeter" style={{'--daily-progress':(data?.dailyBonus?.completed || 0)/5}}><strong>{data?.dailyBonus?.completed || 0}<i>/۵</i></strong><span>ماموریت امروز</span></div>
       <div><b>هر روز ۵ ماموریت تازه</b><small>از میان بیش از {data?.rotation?.dailyPoolSize || 120} ماموریت؛ هر پنج‌تا را تمام کن و جایزه کامل بگیر.</small></div>
-      <button className="inviteFriendCta" type="button" onClick={inviteFriend}><span>＋</span><b>دعوت از یک دوست</b><small>۳ چرخش برای هر دو + درآمد معرفی</small></button>
+      <button className="inviteFriendCta" type="button" onClick={inviteFriend}><span>＋</span><b>دعوت از یک دوست</b><small>{fa(data?.referral?.spinsPerReferral ?? 3)} چرخش برای هر دو + درآمد معرفی</small></button>
     </div>
 
     <div className={`dailyBonusCard ${data?.dailyBonus?.ready ? 'ready' : ''} ${data?.dailyBonus?.claimed ? 'claimed' : ''}`}>

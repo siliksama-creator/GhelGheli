@@ -6,6 +6,26 @@ import { useAsync } from '../lib/useAsync.js';
 import { AsyncSection } from '../components/states.jsx';
 import { AssetIcon, SvgIcon, UiIcon } from '../components/IconAsset.jsx';
 
+function xpPills(d) {
+  const sources = Array.isArray(d?.sources) ? d.sources : [];
+  const by = (k) => sources.find((s) => s.source === k);
+  const xp = (k, fb) => {
+    const n = Number(by(k)?.xp);
+    return Number.isFinite(n) ? `+${fa(n)}` : fb;
+  };
+  const lab = (k, fb) => by(k)?.label || fb;
+  const play = Number(by('game_play')?.xp); const win = Number(by('game_win')?.xp);
+  const online = (Number.isFinite(play) || Number.isFinite(win))
+    ? `+${fa(play || 15)}/${fa(win || 25)}` : '+۱۵/۲۵';
+  return [
+    { icon: 'game', label: 'بازی آنلاین', xp: online },
+    { icon: 'bolt', label: lab('tap_level', 'ضربه‌زن'), xp: xp('tap_level', '+۳۰') },
+    { icon: 'wheel', label: lab('wheel_spin', 'گردونه'), xp: xp('wheel_spin', '+۲۰') },
+    { icon: 'group', label: lab('referral', 'دعوت دوست'), xp: xp('referral', '+۱۰۰') },
+    { icon: 'calendar', label: lab('daily_login', 'ورود روزانه'), xp: xp('daily_login', '+۲۰') },
+  ];
+}
+
 const ART = {
   points: '/icon_points.webp',
   spins: '/icon_spins.webp',
@@ -157,11 +177,9 @@ export default function Pass({ token, setMsg, openShop }) {
                 <small>حداکثر {fa(d.maxTiersPerDay)} پله در هر روز</small>
               </div>
               <div className="pSourcesPills">
-                <span className="xpPill"><UiIcon name="game" size={14} /> بازی آنلاین <b>+۱۵/۲۵</b></span>
-                <span className="xpPill"><UiIcon name="bolt" size={14} /> ضربه‌زن <b>+۳۰</b></span>
-                <span className="xpPill"><UiIcon name="wheel" size={14} /> گردونه <b>+۲۰</b></span>
-                <span className="xpPill"><UiIcon name="group" size={14} /> دعوت دوست <b>+۱۰۰</b></span>
-                <span className="xpPill"><UiIcon name="calendar" size={14} /> ورود روزانه <b>+۲۰</b></span>
+                {xpPills(d).map((p) => (
+                  <span className="xpPill" key={p.label}><UiIcon name={p.icon} size={14} /> {p.label} <b>{p.xp}</b></span>
+                ))}
               </div>
             </div>
 

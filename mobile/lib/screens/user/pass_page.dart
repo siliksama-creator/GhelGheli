@@ -303,11 +303,8 @@ class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin
                   spacing: 5,
                   runSpacing: 5,
                   children: [
-                    _XpPill(label: 'بازی آنلاین', xp: '+۱۵/۲۵'),
-                    _XpPill(label: 'ضربه‌زن', xp: '+۳۰'),
-                    _XpPill(label: 'گردونه', xp: '+۲۰'),
-                    _XpPill(label: 'دعوت دوست', xp: '+۱۰۰'),
-                    _XpPill(label: 'ورود روزانه', xp: '+۲۰'),
+                    for (final pill in _xpPillsFrom(d))
+                      _XpPill(label: pill[0], xp: pill[1]),
                   ],
                 ),
               ],
@@ -871,3 +868,40 @@ class _AnimePlusButtonState extends State<AnimePlusButton>
     );
   }
 }
+
+List<List<String>> _xpPillsFrom(Map d) {
+  final sources = (d['sources'] as List? ?? const [])
+      .whereType<Map>()
+      .map((e) => Map<String, dynamic>.from(e))
+      .toList();
+  if (sources.isEmpty) {
+    return const [
+      ['بازی آنلاین', '+۱۵/۲۵'],
+      ['ضربه‌زن', '+۳۰'],
+      ['گردونه', '+۲۰'],
+      ['دعوت دوست', '+۱۰۰'],
+      ['ورود روزانه', '+۲۰'],
+    ];
+  }
+  Map<String, dynamic>? by(String key) {
+    for (final s in sources) {
+      if ('${s['source']}' == key) return s;
+    }
+    return null;
+  }
+  String lab(String key, String fb) => '${by(key)?['label'] ?? fb}';
+  String xp(String key, String fb) {
+    final n = (by(key)?['xp'] as num?)?.toInt();
+    return n == null ? fb : '+${faNum(n)}';
+  }
+  final play = (by('game_play')?['xp'] as num?)?.toInt() ?? 15;
+  final win = (by('game_win')?['xp'] as num?)?.toInt() ?? 25;
+  return [
+    ['بازی آنلاین', '+${faNum(play)}/${faNum(win)}'],
+    [lab('tap_level', 'ضربه‌زن'), xp('tap_level', '+۳۰')],
+    [lab('wheel_spin', 'گردونه'), xp('wheel_spin', '+۲۰')],
+    [lab('referral', 'دعوت دوست'), xp('referral', '+۱۰۰')],
+    [lab('daily_login', 'ورود روزانه'), xp('daily_login', '+۲۰')],
+  ];
+}
+

@@ -81,6 +81,8 @@ function mergeConfig(raw) {
 module.exports = function createClientConfigRoutes(deps) {
   const {
     pool, adminAuth, requireRole, asyncHandler, audit, rateLimit, gameEconomy,
+    // اختیاری — برای اهرمِ بدون‌آپدیتِ متن‌های راهنما/دعوت/گذر/شرط.
+    opsLimits, referrals, pass, shop, gameStakes,
   } = deps;
 
   // عمومی و سبک — هر اجرای اپ/باز شدن وب یک درخواست می‌زند.
@@ -117,6 +119,87 @@ module.exports = function createClientConfigRoutes(deps) {
       }
     } catch { /* امتیاز بازی یک زینت است؛ config نباید بشکند */ }
 
+    // ── دعوت / گردونه / راهنما — اعدادِ زنده‌ای که متن UI را می‌سازند ──
+    //
+    // قبلاً فقط در `/api/referrals` (نیازمند توکن) بودند و صفحاتِ عمومی
+    // (ثبت‌نام، پیام اشتراک، راهنمای گردونه) عدد را داخل APK نوشته بودند.
+    // حالا بدون احراز هویت هم می‌آیند تا هر راهنما بدون آپدیت زنده بماند.
+    let referral = null;
+    try {
+      if (opsLimits?.get) {
+        const o = opsLimits.get();
+        referral = {
+          commissionPercent: o.referralCommissionPercent,
+          purchaseCommissionPercent: o.referralPurchaseCommissionPercent,
+          spinsPerReferral: o.referralSpinsPerInvite,
+          invitesPerDailySpin: o.referralInvitesPerDailySpin,
+          maxInvitesForDaily: o.referralMaxInvitesForDaily,
+          baseDailySpins: o.referralBaseDailySpins,
+          withdrawalThreshold: o.referralWithdrawalThreshold,
+        };
+      } else if (referrals) {
+        referral = {
+          commissionPercent: referrals.commissionPercent(),
+          purchaseCommissionPercent: referrals.purchaseCommissionPercent(),
+          spinsPerReferral: referrals.spinsPerReferral(),
+          invitesPerDailySpin: referrals.invitesPerDailySpin(),
+          maxInvitesForDaily: referrals.maxInvitesForDaily(),
+          baseDailySpins: referrals.baseDailySpins(),
+          withdrawalThreshold: referrals.referralWithdrawalThreshold
+            ? referrals.referralWithdrawalThreshold()
+            : referrals.REFERRAL_WITHDRAWAL_THRESHOLD,
+        };
+      }
+    } catch { /* راهنما زینت است */ }
+
+    // منابع XP گذر نبرد — قرص‌های راهنما روی صفحهٔ گذر از همین ساخته می‌شوند.
+    let passSources = null;
+    try {
+      if (pass?.getPassConfig) {
+        const pc = await pass.getPassConfig();
+        passSources = Object.entries(pc.sources || {}).map(([k, v]) => ({
+          source: k,
+          xp: v.xp,
+          dailyCap: v.dailyCap,
+          label: v.label,
+        }));
+      }
+    } catch { /* */ }
+
+    // قیمت پلاس برای تیتر فروشگاه — نه عددِ ۵۹۰۰۰ داخل APK.
+    let plus = null;
+    try {
+      if (shop?.plusPlansConfig) {
+        const plans = shop.plusPlansConfig();
+        plus = {
+          monthlyPrice: plans.monthly?.price ?? null,
+          annualPrice: plans.annual?.price ?? null,
+          monthlyDays: plans.monthly?.days ?? 30,
+          annualDays: plans.annual?.days ?? 365,
+          annualSavingPercent: plans.annual?.savingPercent ?? 30,
+        };
+      }
+    } catch { /* */ }
+
+    // شرط‌های مجاز — تا وقتی سرور stake جدید اضافه کند، کلاینت‌های قدیمی
+    // همان لیستِ ثابت را دارند؛ کلاینت‌های جدید از اینجا می‌خوانند.
+    let stakes = null;
+    try {
+      const pub = gameStakes?.PUBLIC_STAKES || [0, 100, 1000];
+      const lobby = gameStakes?.LOBBY_STAKES || [0, 100, 1000, 5000];
+      stakes = {
+        public: [...pub],
+        lobby: [...lobby],
+      };
+    } catch { /* */ }
+
+    // منحنی ضربه‌زن برای زیرعنوان کاتالوگ بازی («N لول …»).
+    let tapLevelCount = null;
+    try {
+      const econ = await gameEconomy.publicView().catch(() => null);
+      tapLevelCount = econ?.tapCurve?.levelCount ?? null;
+    } catch { /* */ }
+
     res.json({
       ...cfg,
       wallet: { enabled: wallet.enabled !== false },
@@ -126,6 +209,11 @@ module.exports = function createClientConfigRoutes(deps) {
       economy: await gameEconomy.publicView().catch(() => null),
       // امتیازِ برد/باخت/مساویِ بازی آنلاین — همان تنظیمِ پنل ادمین.
       gamePoints,
+      referral,
+      passSources,
+      plus,
+      stakes,
+      tapLevelCount,
       serverTime: new Date().toISOString(),
     });
   }));

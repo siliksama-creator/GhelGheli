@@ -342,11 +342,19 @@ class _ShopPageState extends State<ShopPage> {
                     separatorBuilder: (_, __) => Gaps.hSm,
                     itemBuilder: (_, index) {
                       final plan = plans[index];
+                      final monthly = plans.cast<Map>().firstWhere(
+                        (p) => p['billingCycle'] == 'monthly' || p['key'] == 'monthly',
+                        orElse: () => <String, dynamic>{},
+                      );
+                      final monthlyPrice = (monthly['price'] as num?)?.toInt()
+                          ?? (plus['price'] as num?)?.toInt()
+                          ?? 59000;
                       return _PlanCard(
                         plan: plan,
                         activeTier: '${plus['tier'] ?? ''}',
                         busy: _busy == 'plus-${plan['billingCycle']}',
                         onBuy: () => _buyPlan(plan),
+                        monthlyPrice: monthlyPrice,
                       );
                     },
                   ),
@@ -579,7 +587,7 @@ class _ShopHero extends StatelessWidget {
                 Text(
                   active
                       ? 'پلاس ${plus['tier'] == 'annual' ? 'سالانه' : 'ماهانه'} فعال است'
-                      : 'نمونه واقعی آیتم‌ها · پلاس ماهانه ۵۹ هزار تومان',
+                      : 'نمونه واقعی آیتم‌ها · پلاس ماهانه ${Money.withUnit((plus['price'] as num?)?.toInt() ?? 59000)}',
                   style: const TextStyle(fontSize: 10.5, color: Colors.white60),
                 ),
                 Gaps.vXxs,
@@ -624,11 +632,13 @@ class _PlanCard extends StatelessWidget {
     required this.activeTier,
     required this.busy,
     required this.onBuy,
+    this.monthlyPrice = 59000,
   });
   final Map<String, dynamic> plan;
   final String activeTier;
   final bool busy;
   final VoidCallback onBuy;
+  final int monthlyPrice;
 
   @override
   Widget build(BuildContext context) {
@@ -667,7 +677,7 @@ class _PlanCard extends StatelessWidget {
                     fontWeight: FontWeight.w900,
                     color: Color(0xFFFFD166))),
             if (annual)
-              Text('به‌جای ${Money.withUnit(59000 * 12)} پرداخت ماهانه',
+              Text('به‌جای ${Money.withUnit(monthlyPrice * 12)} پرداخت ماهانه',
                   style: const TextStyle(fontSize: 9, color: Colors.white54)),
             Gaps.vXs,
             _PlanVisuals(annual: annual),

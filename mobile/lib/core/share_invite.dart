@@ -80,13 +80,24 @@ enum ShareOutcome {
   copiedOnly,
 }
 
-String inviteMessage(String code) =>
+/// متن دعوت — اعداد از سرور (`/api/config.referral`) می‌آیند تا با تغییر
+/// پنل بدون آپدیت اپ عوض شوند. پیش‌فرض‌ها همان مقادیر تاریخی‌اند.
+String inviteMessage(
+  String code, {
+  int spins = 3,
+  int purchasePercent = 5,
+}) =>
     'کد دعوت من به قلقلی: $code\n'
-    'با این کد ثبت‌نام کن؛ هر دومون ۳ چرخش هدیه می‌گیریم و من از خریدهای مستقیم تو ۵٪ درآمد معرفی می‌گیرم.\n'
+    'با این کد ثبت‌نام کن؛ هر دومون $spins چرخش هدیه می‌گیریم و من از خریدهای مستقیم تو $purchasePercent٪ درآمد معرفی می‌گیرم.\n'
     'https://ghelghelishop.ir';
 
-Future<ShareOutcome> shareInvite(ShareTarget target, String code) =>
-    shareText(target, inviteMessage(code));
+Future<ShareOutcome> shareInvite(
+  ShareTarget target,
+  String code, {
+  int spins = 3,
+  int purchasePercent = 5,
+}) =>
+    shareText(target, inviteMessage(code, spins: spins, purchasePercent: purchasePercent));
 
 Future<ShareOutcome> shareText(ShareTarget target, String text) async {
   final encoded = Uri.encodeComponent(text);

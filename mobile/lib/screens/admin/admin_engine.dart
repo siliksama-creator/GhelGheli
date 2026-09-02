@@ -462,6 +462,7 @@ class _OpsLimitsSectionState extends State<_OpsLimitsSection> {
         _numField('referralSpinsPerInvite', 'چرخش هدیه هر دعوت'),
         _numField('referralInvitesPerDailySpin', 'دعوت لازم برای چرخش اضافه'),
         _numField('referralBaseDailySpins', 'چرخش روزانهٔ پایه'),
+        _numField('referralWithdrawalThreshold', 'آستانهٔ برداشت معرف (تومان)'),
         const Text('محدودکننده‌های نرخ (پنجره/سقف)',
             style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
         for (final entry in rl.entries) ...[

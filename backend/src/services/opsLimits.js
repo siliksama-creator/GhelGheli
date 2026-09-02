@@ -35,6 +35,9 @@ const DEFAULTS = Object.freeze({
   referralSpinsPerInvite: 3,
   referralInvitesPerDailySpin: 10,
   referralBaseDailySpins: 1,
+  // آستانهٔ برداشتِ درآمد نقدی معرف — قبلاً ثابت ۵۰٬۰۰۰ در referralService
+  // بود و تغییرش دپلوی می‌خواست. حالا از همین پنل.
+  referralWithdrawalThreshold: 50000,
   bazaarApiBase: 'https://pardakht.cafebazaar.ir',
   wheelSpinMs: 5600,
   wheelSpinRotations: 9,
@@ -100,6 +103,12 @@ function sanitize(input, current) {
     referralSpinsPerInvite: num(b.referralSpinsPerInvite, current.referralSpinsPerInvite, 0, 50),
     referralInvitesPerDailySpin: num(b.referralInvitesPerDailySpin, current.referralInvitesPerDailySpin, 1, 100),
     referralBaseDailySpins: num(b.referralBaseDailySpins, current.referralBaseDailySpins, 0, 50),
+    referralWithdrawalThreshold: num(
+      b.referralWithdrawalThreshold,
+      current.referralWithdrawalThreshold,
+      1000,
+      50_000_000,
+    ),
     bazaarApiBase: String(b.bazaarApiBase || current.bazaarApiBase).trim().slice(0, 300) || current.bazaarApiBase,
     wheelSpinMs: num(b.wheelSpinMs, current.wheelSpinMs, 500, 20_000),
     wheelSpinRotations: num(b.wheelSpinRotations, current.wheelSpinRotations, 1, 20),

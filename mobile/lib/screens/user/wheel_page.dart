@@ -136,6 +136,9 @@ class _WheelPageState extends State<WheelPage>
   int _bonusSpins = 0;
   int _dailyQuota = 1;
   bool _unlimited = false;
+  int _invitesPerDaily = 10;
+  int _maxInvitesDaily = 50;
+  int _spinsPerReferral = 3;
   int _resetInMs = 0;
   bool _loading = true;
   bool _spinning = false;
@@ -193,6 +196,18 @@ class _WheelPageState extends State<WheelPage>
         _loading = false;
         _error = null;
       });
+      // اعداد راهنمای دعوت از /api/config — نه ثابت ۱۰/۵۰/۳ داخل APK.
+      try {
+        final cfg = await widget.api.get('/api/config');
+        if (mounted && cfg is Map && cfg['referral'] is Map) {
+          final r = Map<String, dynamic>.from(cfg['referral'] as Map);
+          setState(() {
+            _invitesPerDaily = (r['invitesPerDailySpin'] as num?)?.toInt() ?? _invitesPerDaily;
+            _maxInvitesDaily = (r['maxInvitesForDaily'] as num?)?.toInt() ?? _maxInvitesDaily;
+            _spinsPerReferral = (r['spinsPerReferral'] as num?)?.toInt() ?? _spinsPerReferral;
+          });
+        }
+      } catch (_) {}
       widget.onSpinsChanged?.call(_spinsLeft, _unlimited);
     } catch (e) {
       if (!mounted) return;
@@ -521,7 +536,13 @@ class _WheelPageState extends State<WheelPage>
           // قوانین — مالک خواست همه‌چیز برای کاربر توضیح داده شود. بدون
           // این، کاربر نمی‌داند چرا امروز ۱ چرخش دارد و دوستش ۳ تا، و فکر
           // می‌کند سیستم خراب است.
-          _RulesCard(dailyQuota: _dailyQuota, unlimited: _unlimited),
+          _RulesCard(
+            dailyQuota: _dailyQuota,
+            unlimited: _unlimited,
+            invitesPerDaily: _invitesPerDaily,
+            maxInvitesDaily: _maxInvitesDaily,
+            spinsPerReferral: _spinsPerReferral,
+          ),
           Gaps.vLg,
         ],
       ),
@@ -1092,10 +1113,19 @@ class _HistoryCard extends StatelessWidget {
 
 /// توضیح قوانین گردونه.
 class _RulesCard extends StatelessWidget {
-  const _RulesCard({required this.dailyQuota, this.unlimited = false});
+  const _RulesCard({
+    required this.dailyQuota,
+    this.unlimited = false,
+    this.invitesPerDaily = 10,
+    this.maxInvitesDaily = 50,
+    this.spinsPerReferral = 3,
+  });
 
   final int dailyQuota;
   final bool unlimited;
+  final int invitesPerDaily;
+  final int maxInvitesDaily;
+  final int spinsPerReferral;
 
   @override
   Widget build(BuildContext context) {

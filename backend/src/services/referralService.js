@@ -42,8 +42,13 @@ function commissionPercent() {
 function purchaseCommissionPercent() {
   return opsLimits.get().referralPurchaseCommissionPercent;
 }
-/** آستانهٔ برداشت کیف پول. تنظیمات کیف پول نیز همین مقدار را enforce می‌کند. */
+/** آستانهٔ برداشتِ پیش‌فرض — فقط fallback. مقدارِ زنده از ops_limits می‌آید. */
 const REFERRAL_WITHDRAWAL_THRESHOLD = 50000;
+
+/** آستانهٔ برداشتِ درآمد نقدی معرف — از پنل ops_limits قابل تنظیم. */
+function referralWithdrawalThreshold() {
+  return opsLimits.get().referralWithdrawalThreshold || REFERRAL_WITHDRAWAL_THRESHOLD;
+}
 
 /** چرخش گردونه برای *هر یک* از دو طرف، به ازای یک معرفی موفق — از پنل
  *  قابل تنظیم، پیش‌فرض ۳ (خواستهٔ مالک). */
@@ -313,7 +318,7 @@ async function payCommission(client, userId, basePoints, source) {
     source: 'referral',
     referenceType: 'users',
     referenceId: userId,
-    description: 'کمیسیون ۵٪ معرفی',
+    description: `کمیسیون ${commissionPercent()}٪ معرفی`,
     // `addLeaguePoints` پایین‌تر جدولِ لیگ را جدا به‌روز می‌کند، ولی
     // `users.monthly_league_points` را همین‌جا باید زیاد کنیم چون
     // صفحهٔ پروفایل از آن می‌خواند.
@@ -398,7 +403,7 @@ async function payPurchaseCommission(
     source: 'purchase_referral',
     referenceType: purchaseType,
     referenceId: purchaseReferenceId,
-    description: `کمیسیون ۵٪ خرید مستقیم دوست (${purchaseType})`,
+    description: `کمیسیون ${rate}٪ خرید مستقیم دوست (${purchaseType})`,
   });
   if (credited.duplicate) {
     // The ledger is the final idempotency guard. Backfill the audit link if a
@@ -496,12 +501,14 @@ async function summary(userId) {
     code,
     commissionPercent: commissionPercent(),
     purchaseCommissionPercent: purchaseCommissionPercent(),
-    withdrawalThreshold: Number(walletSettings.minWithdrawal || REFERRAL_WITHDRAWAL_THRESHOLD),
+    withdrawalThreshold: Number(
+      walletSettings.minWithdrawal || referralWithdrawalThreshold(),
+    ),
     walletBalance: Number(walletRow.rows[0]?.wallet_balance || 0),
     cashCommissionEarned: Number(cashEarnings.rows[0]?.total || 0),
     commissionedPurchases: Number(cashEarnings.rows[0]?.purchase_count || 0),
     cashWithdrawReady: Number(walletRow.rows[0]?.wallet_balance || 0)
-      >= Number(walletSettings.minWithdrawal || REFERRAL_WITHDRAWAL_THRESHOLD),
+      >= Number(walletSettings.minWithdrawal || referralWithdrawalThreshold()),
     spinsPerReferral: spinsPerReferral(),
     invitesPerDailySpin: invitesPerDailySpin(),
     maxInvitesForDaily: maxInvitesForDaily(),
@@ -525,7 +532,10 @@ module.exports = {
   purchaseCommissionAudit, summary,
   generateCode, normalizeDigits, dailySpinsFor, invitedCount,
   commissionPercent, purchaseCommissionPercent,
-  REFERRAL_WITHDRAWAL_THRESHOLD, spinsPerReferral,
+  REFERRAL_WITHDRAWAL_THRESHOLD, referralWithdrawalThreshold,
+  spinsPerReferral,
+  // نام قدیمی که auth.js هنوز صدا می‌زند — alias زنده‌ی spinsPerReferral.
+  get SPINS_PER_REFERRAL() { return spinsPerReferral(); },
   invitesPerDailySpin, maxInvitesForDaily, baseDailySpins,
   COMMISSIONABLE,
 };

@@ -125,8 +125,8 @@ class _GrowthPanelState extends State<GrowthPanel> {
           padding: const EdgeInsets.all(16),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             const Text('دعوت از یک دوست', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
-            const Text('هر دو ۳ چرخش هدیه می‌گیرید و خرید مستقیم دوستت برایت ۵٪ درآمد معرفی می‌سازد.',
-                style: TextStyle(fontSize: 10.5, color: Colors.white60, height: 1.5)),
+            Text(_inviteHint(referral is Map ? Map<String, dynamic>.from(referral as Map) : const {}),
+                style: const TextStyle(fontSize: 10.5, color: Colors.white60, height: 1.5)),
             Gaps.vSm,
             for (final item in shareTargets)
               ListTile(
@@ -140,7 +140,9 @@ class _GrowthPanelState extends State<GrowthPanel> {
       ),
     );
     if (target == null) return;
-    final result = await shareInvite(target, code);
+    final spins = referral is Map ? ((referral['spinsPerReferral'] as num?)?.toInt() ?? 3) : 3;
+    final purchasePercent = referral is Map ? ((referral['purchaseCommissionPercent'] as num?)?.toInt() ?? 5) : 5;
+    final result = await shareInvite(target, code, spins: spins, purchasePercent: purchasePercent);
     if (mounted) setState(() => _notice = result == ShareOutcome.copiedOnly ? 'متن دعوت کپی شد' : 'دعوت آماده ارسال شد');
   }
 
@@ -501,4 +503,11 @@ class _WeeklyMissions extends StatelessWidget {
       ),
     ),
   );
+}
+
+
+String _inviteHint(Map referral) {
+  final spins = (referral['spinsPerReferral'] as num?)?.toInt() ?? 3;
+  final pct = (referral['purchaseCommissionPercent'] as num?)?.toInt() ?? 5;
+  return 'هر دو $spins چرخش هدیه می‌گیرید و خرید مستقیم دوستت برایت $pct٪ درآمد معرفی می‌سازد.';
 }

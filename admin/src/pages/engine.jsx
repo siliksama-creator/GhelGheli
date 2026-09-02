@@ -170,6 +170,7 @@ function OpsLimitsCard({ request, notify }) {
         <Field label="چرخش هدیه به هر دو طرف (هر دعوت)" hint="با هر دعوتِ موفق، هم دعوت‌کننده هم دعوت‌شده این تعداد چرخش می‌گیرند."><Input type="number" min="0" max="50" value={l.referralSpinsPerInvite} onChange={(e) => setNum('referralSpinsPerInvite', e.target.value)} /></Field>
         <Field label="دعوت لازم برای چرخش روزانهٔ اضافه" hint="با رسیدن دعوت‌های روز به این عدد، یک چرخشِ بیشتر در همان روز."><Input type="number" min="1" max="100" value={l.referralInvitesPerDailySpin} onChange={(e) => setNum('referralInvitesPerDailySpin', e.target.value)} /></Field>
         <Field label="چرخش روزانهٔ پایه"><Input type="number" min="0" max="50" value={l.referralBaseDailySpins} onChange={(e) => setNum('referralBaseDailySpins', e.target.value)} /></Field>
+        <Field label="آستانهٔ برداشت درآمد معرف (تومان)" hint="حداقل موجودی کیف پول برای درخواست برداشت کمیسیون نقدی معرفی. راهنمای صفحهٔ دعوت از همین عدد ساخته می‌شود."><Input type="number" min="1000" max="50000000" value={l.referralWithdrawalThreshold ?? 50000} onChange={(e) => setNum('referralWithdrawalThreshold', e.target.value)} /></Field>
         <Field label="آدرس درگاه کافه‌بازار"><Input value={l.bazaarApiBase} onChange={(e) => setL((p) => ({ ...p, bazaarApiBase: e.target.value }))} /></Field>
       </div>
 

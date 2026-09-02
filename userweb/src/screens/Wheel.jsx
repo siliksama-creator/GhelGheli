@@ -102,6 +102,7 @@ function LiveWheelDisc({ prizes }) {
 
 export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
   const [state, setState] = useState(null);
+  const [refRules, setRefRules] = useState({ invitesPerDailySpin: 10, maxInvitesForDaily: 50, spinsPerReferral: 3 });
   const [error, setError] = useState('');
   const [spinning, setSpinning] = useState(false);
   const [angle, setAngle] = useState(0);
@@ -109,6 +110,15 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
   // برشِ برنده، برای درخشش بعد از توقف. null یعنی هیچ.
   const [winner, setWinner] = useState(null);
   const [history, setHistory] = useState([]);
+  useEffect(() => {
+    req('/api/config', 'GET', null, null).then((c) => {
+      if (c?.referral) setRefRules({
+        invitesPerDailySpin: c.referral.invitesPerDailySpin ?? 10,
+        maxInvitesForDaily: c.referral.maxInvitesForDaily ?? 50,
+        spinsPerReferral: c.referral.spinsPerReferral ?? 3,
+      });
+    }).catch(() => {});
+  }, []);
 
 
   // مجموع چرخش تجمعی است و هرگز کم نمی‌شود: اگر زاویه را ریست کنیم، گردونه
@@ -328,11 +338,11 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
           </li>
           <li>چرخاندن گردونه <b>هیچ هزینه‌ای ندارد</b> و هیچ‌وقت نخواهد داشت.</li>
           <li>
-            به ازای هر <b>{fa(10)} دوستی</b> که دعوت کنی، یک چرخش رایگانِ
-            روزانهٔ دیگر می‌گیری — تا سقف {fa(50)} دوست.
+            به ازای هر <b>{fa(refRules.invitesPerDailySpin)} دوستی</b> که دعوت کنی، یک چرخش رایگانِ
+            روزانهٔ دیگر می‌گیری — تا سقف {fa(refRules.maxInvitesForDaily)} دوست.
           </li>
           <li>
-            هر دعوت موفق، <b>{fa(3)} چرخش فوری</b> هم به تو و هم به دوستت
+            هر دعوت موفق، <b>{fa(refRules.spinsPerReferral)} چرخش فوری</b> هم به تو و هم به دوستت
             می‌دهد.
           </li>
           <li>سهمیهٔ روزانه هر شب ساعت ۱۲ به وقت تهران تازه می‌شود.</li>
