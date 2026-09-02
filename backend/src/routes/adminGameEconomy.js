@@ -34,6 +34,10 @@ module.exports = function createAdminGameEconomyRoutes(deps) {
       economy,
       gamePoints,
       economyCustom: gameEconomy.isCustom(economy),
+      // ورودی‌های امتیازدار از ops_limits — پنل اقتصاد همین را رسم می‌کند
+      stakeLevels: typeof gameEconomy.stakeLevels === 'function'
+        ? gameEconomy.stakeLevels()
+        : (gameEconomy.STAKE_LEVELS || [100, 1000]),
     });
   }));
 
@@ -58,6 +62,9 @@ module.exports = function createAdminGameEconomyRoutes(deps) {
         economy,
         gamePoints,
         economyCustom: gameEconomy.isCustom(economy),
+        stakeLevels: typeof gameEconomy.stakeLevels === 'function'
+          ? gameEconomy.stakeLevels()
+          : (gameEconomy.STAKE_LEVELS || [100, 1000]),
       });
     }));
 

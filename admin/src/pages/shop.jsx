@@ -104,6 +104,11 @@ export function ShopAdminPage({ request }) {
         label: form.a_label.value,
         savingPercent: Number(form.a_saving.value || 0),
       },
+      // هر خط یک مزیت — همان‌طور که کلاینت‌ها لیست را نشان می‌دهند
+      benefits: String(form.benefits?.value || '')
+        .split('\n').map((s) => s.trim()).filter(Boolean).slice(0, 30),
+      annualBenefits: String(form.annualBenefits?.value || '')
+        .split('\n').map((s) => s.trim()).filter(Boolean).slice(0, 30),
     };
     try {
       const r = await request('/api/admin/shop/plus', { method: 'PATCH', body });
@@ -177,6 +182,14 @@ export function ShopAdminPage({ request }) {
             <Field label="مدت (روز)"><Input name="a_days" type="number" required defaultValue={plans.annual.days} /></Field>
             <Field label="برچسب"><Input name="a_label" defaultValue={plans.annual.label} /></Field>
             <Field label="درصد صرفه‌جویی"><Input name="a_saving" type="number" defaultValue={plans.annual.savingPercent} /></Field>
+            <Field label="مزایای پلاس (هر خط یک مورد)">
+              <textarea name="benefits" rows={5} defaultValue={(plans.benefits || []).join('\n')}
+                style={{ width: '100%', borderRadius: 10, padding: 10, background: 'rgba(0,0,0,.25)', color: 'inherit', border: '1px solid rgba(255,255,255,.12)' }} />
+            </Field>
+            <Field label="مزایای اضافهٔ سالانه (هر خط یک مورد)">
+              <textarea name="annualBenefits" rows={4} defaultValue={(plans.annualBenefits || []).join('\n')}
+                style={{ width: '100%', borderRadius: 10, padding: 10, background: 'rgba(0,0,0,.25)', color: 'inherit', border: '1px solid rgba(255,255,255,.12)' }} />
+            </Field>
             <Button type="submit" icon={Save}>ذخیره پلن‌ها</Button>
           </form>
         )}

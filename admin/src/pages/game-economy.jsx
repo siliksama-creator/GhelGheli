@@ -9,7 +9,6 @@ const GAMES = [
   { id: 'memory', label: 'جفت‌یاب' },
 ];
 const OUTCOME = { win: 'برد', draw: 'مساوی', loss: 'باخت' };
-const STAKES = [100, 1000];
 
 /**
  * اقتصاد بازی‌ها — یک‌جا کنترلِ همهٔ اهرم‌های سکه و امتیاز.
@@ -25,14 +24,21 @@ export function GameEconomyPage({ request }) {
   const notify = useToast();
   const [cfg, setCfg] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [stakes, setStakes] = useState([100, 1000]);
 
   const load = () => {
     request('/api/admin/settings/game-economy')
-      .then(d => setCfg({
-        economy: d.economy,
-        gamePoints: d.gamePoints,
-        economyCustom: d.economyCustom,
-      }))
+      .then(d => {
+        const levels = Array.isArray(d.stakeLevels) && d.stakeLevels.length
+          ? d.stakeLevels.map(Number).filter((n) => n > 0)
+          : [100, 1000];
+        setStakes(levels);
+        setCfg({
+          economy: d.economy,
+          gamePoints: d.gamePoints,
+          economyCustom: d.economyCustom,
+        });
+      })
       .catch(() => {});
   };
   useEffect(load, [request]);
@@ -41,7 +47,11 @@ export function GameEconomyPage({ request }) {
     const next = JSON.parse(JSON.stringify(prev));
     const parts = path.split('.');
     let node = next.economy;
-    for (let i = 0; i < parts.length - 1; i++) node = node[parts[i]];
+    for (let i = 0; i < parts.length - 1; i++) {
+      const key = parts[i];
+      if (node[key] == null || typeof node[key] !== 'object') node[key] = {};
+      node = node[key];
+    }
     node[parts[parts.length - 1]] = value;
     return next;
   });
@@ -117,7 +127,7 @@ export function GameEconomyPage({ request }) {
           {GAMES.map(g => (
             <div key={g.id} style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: 10 }}>
               <b style={{ fontSize: 13 }}>{g.label}</b>
-              {STAKES.map(stake => (
+              {stakes.map(stake => (
                 <div key={stake} style={{ marginTop: 8 }}>
                   <small className="topbar-sub">ورودی {stake}</small>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 4 }}>
@@ -126,7 +136,7 @@ export function GameEconomyPage({ request }) {
                         {OUTCOME[outcome]}
                         <Input
                           type="number" min="0" max="10000"
-                          value={cfg.economy.coinRewards[g.id][stake][outcome]}
+                          value={cfg.economy.coinRewards?.[g.id]?.[stake]?.[outcome] ?? cfg.economy.coinRewards?.[g.id]?.[String(stake)]?.[outcome] ?? 0}
                           onChange={e => setEcon(`coinRewards.${g.id}.${stake}.${outcome}`, Number(e.target.value))}
                           style={{ marginTop: 2 }}
                         />
@@ -141,17 +151,14 @@ export function GameEconomyPage({ request }) {
       </Card>
 
       <div className="card-grid cols-2">
-        <Card title="سهمیهٔ روزانهٔ سکه" subtitle="تعداد مسابقهٔ سکه‌دار در روز — مشترک بین هر سه بازی.">
-          <Field label="سهمیهٔ ورودی ۱۰۰ در روز">
-            <Input type="number" min="0" max="1000"
-              value={cfg.economy.dailyCoinQuota[100]}
-              onChange={e => setEcon('dailyCoinQuota.100', Number(e.target.value))} />
-          </Field>
-          <Field label="سهمیهٔ ورودی ۱۰۰۰ در روز">
-            <Input type="number" min="0" max="1000"
-              value={cfg.economy.dailyCoinQuota[1000]}
-              onChange={e => setEcon('dailyCoinQuota.1000', Number(e.target.value))} />
-          </Field>
+        <Card title="سهمیهٔ روزانهٔ سکه" subtitle="تعداد مسابقهٔ سکه‌دار در روز — مشترک بین هر سه بازی. سطوح از ورودی‌های عمومی ops می‌آید.">
+          {stakes.map((stake) => (
+            <Field key={stake} label={`سهمیهٔ ورودی ${stake} در روز`}>
+              <Input type="number" min="0" max="1000"
+                value={cfg.economy.dailyCoinQuota?.[stake] ?? cfg.economy.dailyCoinQuota?.[String(stake)] ?? 0}
+                onChange={e => setEcon(`dailyCoinQuota.${stake}`, Number(e.target.value))} />
+            </Field>
+          ))}
         </Card>
 
         <Card

@@ -48,6 +48,7 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
   final _drawPts = TextEditingController();
   final _capPts = TextEditingController();
   bool _pointsEnabled = false;
+  List<int> _stakes = const [100, 1000];
   final Map<String, TextEditingController> _coins = {};
   bool _loading = true;
   bool _saving = false;
@@ -55,13 +56,7 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
   @override
   void initState() {
     super.initState();
-    for (final g in _games) {
-      for (final s in [100, 1000]) {
-        for (final o in _outcomes) {
-          _coins['$g.$s.$o'] = TextEditingController();
-        }
-      }
-    }
+    _ensureCoinControllers(_stakes);
     _load();
   }
 
@@ -88,6 +83,18 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
   int _v(TextEditingController c, int fallback) =>
       int.tryParse(c.text.trim()) ?? fallback;
 
+  void _ensureCoinControllers(List<int> stakes) {
+    for (final g in _games) {
+      for (final s in stakes) {
+        for (final o in _outcomes) {
+          _coins.putIfAbsent('$g.$s.$o', TextEditingController.new);
+        }
+        _coins.putIfAbsent('quota.$s', TextEditingController.new);
+      }
+    }
+  }
+
+
   Future<void> _load() async {
     try {
       final res = await widget.api.get('/api/admin/settings/game-economy');
@@ -101,7 +108,13 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
       final quota = e['dailyCoinQuota'] is Map
           ? Map<String, dynamic>.from(e['dailyCoinQuota'] as Map)
           : <String, dynamic>{};
+      final levels = (res['stakeLevels'] is List)
+          ? (res['stakeLevels'] as List).map((x) => (x as num).toInt()).where((n) => n > 0).toList()
+          : const <int>[100, 1000];
+      final stakeList = levels.isNotEmpty ? levels : const [100, 1000];
+      _ensureCoinControllers(stakeList);
       setState(() {
+        _stakes = stakeList;
         _pct.text = '${e['coinCarryoverPercent'] ?? 10}';
         _tap.text = '${e['tapCoinsPerLevel'] ?? 5}';
         final tc = jsonMap(e['tapCurve']);
@@ -111,8 +124,17 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
         _tapPerDay.text = '${tc['levelsPerDay'] ?? 2}';
         // JSON کلیدِ عددی را رشته می‌فرستد. `quota[100]` همیشه null بود
         // و پنل بعد از ذخیره دوباره پیش‌فرض نشان می‌داد.
-        _q100.text = '${jsonGet(quota, 100) ?? 30}';
-        _q1000.text = '${jsonGet(quota, 1000) ?? 15}';
+        for (final s in stakeList) {
+          final def = s == 100 ? 30 : 15;
+          _coins['quota.$s']!.text = '${jsonGet(quota, s) ?? def}';
+        }
+        // سازگاری فیلدهای قدیمی اگر هنوز در درخت ویجت باشند
+        if (stakeList.contains(100)) {
+          _q100.text = _coins['quota.100']!.text;
+        }
+        if (stakeList.contains(1000)) {
+          _q1000.text = _coins['quota.1000']!.text;
+        }
         final gp = jsonMap(res['gamePoints']);
         _pointsEnabled = gp['enabled'] == true;
         _winPts.text = '${gp['winPoints'] ?? 10}';
@@ -121,7 +143,7 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
         _capPts.text = '${gp['dailyCap'] ?? 10}';
         for (final g in _games) {
           final gr = jsonMap(rewards[g]);
-          for (final s in [100, 1000]) {
+          for (final s in _stakes) {
             final sr = jsonMap(jsonGet(gr, s));
             for (final o in _outcomes) {
               _coins['$g.$s.$o']!.text = '${sr[o] ?? 0}';
@@ -141,7 +163,7 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
       final coinRewards = <String, dynamic>{};
       for (final g in _games) {
         coinRewards[g] = <String, dynamic>{};
-        for (final s in [100, 1000]) {
+        for (final s in _stakes) {
           // کلید باید رشته باشد: `jsonEncode` روی کلیدِ int پرتاب می‌کند
           // و ذخیره از پنل اندروید بی‌صدا شکست می‌خورد.
           coinRewards[g]['$s'] = <String, dynamic>{};
@@ -154,7 +176,10 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
         'economy': {
           'coinCarryoverPercent': _v(_pct, 10),
           'tapCoinsPerLevel': _v(_tap, 5),
-          'dailyCoinQuota': {'100': _v(_q100, 30), '1000': _v(_q1000, 15)},
+          'dailyCoinQuota': {
+            for (final s in _stakes)
+              '$s': _v(_coins['quota.$s']!, s == 100 ? 30 : 15),
+          },
           'coinRewards': coinRewards,
           'tapCurve': {
             'levelCount': _v(_tapLevels, 50),
@@ -247,8 +272,8 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
                       spacing: 10,
                       runSpacing: 10,
                       children: [
-                        _numField(_q100, 'سهمیهٔ ۱۰۰'),
-                        _numField(_q1000, 'سهمیهٔ ۱۰۰۰'),
+                        for (final s in _stakes)
+                          _numField(_coins['quota.$s']!, 'سهمیهٔ $s'),
                         _numField(_tap, 'سکهٔ هر لولِ ضربه‌زن'),
                       ],
                     ),
@@ -297,7 +322,7 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      for (final s in [100, 1000])
+                      for (final s in _stakes)
                         for (final o in _outcomes)
                           _numField(_coins['$g.$s.$o']!,
                               '${_outcomeLabels[o]} · $s'),
@@ -390,6 +415,7 @@ class _TapStatsSectionState extends State<_TapStatsSection> {
     super.initState();
     _load();
   }
+
 
   Future<void> _load() async {
     try {
@@ -600,6 +626,7 @@ class _TapPrizesSectionState extends State<_TapPrizesSection> {
     super.initState();
     _load();
   }
+
 
   Future<void> _load() async {
     try {

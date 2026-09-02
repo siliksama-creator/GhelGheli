@@ -57,8 +57,21 @@ const DEFAULTS = Object.freeze({
 });
 
 const GAME_IDS = ['card_duel', 'penalty', 'memory'];
-const STAKE_LEVELS = [100, 1000];
+// پیش‌فرض تاریخی؛ در runtime از ops_limits.publicStakes (امتیازی >0) می‌آید
+// تا پنل اقتصاد با ورودی‌های زنده هم‌خوان باشد.
+const DEFAULT_STAKE_LEVELS = Object.freeze([100, 1000]);
 const OUTCOMES = ['win', 'draw', 'loss'];
+
+function stakeLevels() {
+  try {
+    const ops = require('./opsLimits').get();
+    const scored = (ops.publicStakes || [])
+      .map(Number)
+      .filter((n) => Number.isSafeInteger(n) && n > 0 && n <= 1_000_000);
+    if (scored.length) return [...new Set(scored)].sort((a, b) => a - b);
+  } catch { /* */ }
+  return [...DEFAULT_STAKE_LEVELS];
+}
 
 // کشِ سبک: خواندنِ تنظیمات در مسیرهای داغ (رزرو مسابقه، هر بستهٔ ضربه‌زن)
 // نباید هر بار یک کوئریِ جدا بزند. ادمین که ذخیره می‌کند کش باطل می‌شود.
@@ -75,15 +88,18 @@ function clampInt(v, min, max, fallback) {
 function merge(raw) {
   const v = raw && typeof raw === 'object' ? raw : {};
   const coinRewards = {};
+  const stakes = stakeLevels();
   for (const gameId of GAME_IDS) {
-    const src = v.coinRewards?.[gameId] || DEFAULTS.coinRewards[gameId];
+    const src = v.coinRewards?.[gameId] || DEFAULTS.coinRewards[gameId] || {};
+    const defGame = DEFAULTS.coinRewards[gameId] || {};
     coinRewards[gameId] = {};
-    for (const stake of STAKE_LEVELS) {
-      const s = src[stake] || DEFAULTS.coinRewards[gameId][stake];
+    for (const stake of stakes) {
+      const s = src[stake] || src[String(stake)] || defGame[stake] || defGame[String(stake)] || {};
+      const defS = defGame[stake] || defGame[String(stake)] || { win: 0, draw: 0, loss: 0 };
       coinRewards[gameId][stake] = {};
       for (const outcome of OUTCOMES) {
         coinRewards[gameId][stake][outcome] = clampInt(
-          s[outcome], 0, 10000, DEFAULTS.coinRewards[gameId][stake][outcome],
+          s[outcome], 0, 10000, defS[outcome] || 0,
         );
       }
     }
@@ -95,10 +111,17 @@ function merge(raw) {
       v.coinCarryoverPercent, 0, 100, DEFAULTS.coinCarryoverPercent,
     ),
     coinRewards,
-    dailyCoinQuota: {
-      100: clampInt(quotaSrc[100], 0, 1000, DEFAULTS.dailyCoinQuota[100]),
-      1000: clampInt(quotaSrc[1000], 0, 1000, DEFAULTS.dailyCoinQuota[1000]),
-    },
+    dailyCoinQuota: Object.fromEntries(
+      stakes.map((stake) => [
+        stake,
+        clampInt(
+          quotaSrc[stake] ?? quotaSrc[String(stake)],
+          0,
+          1000,
+          DEFAULTS.dailyCoinQuota[stake] ?? DEFAULTS.dailyCoinQuota[String(stake)] ?? 15,
+        ),
+      ]),
+    ),
     tapCoinsPerLevel: clampInt(
       v.tapCoinsPerLevel, 1, 1000, DEFAULTS.tapCoinsPerLevel,
     ),
@@ -164,16 +187,18 @@ function isCustom(cfg) {
   const d = DEFAULTS;
   if (cfg.coinCarryoverPercent !== d.coinCarryoverPercent) return true;
   if (cfg.tapCoinsPerLevel !== d.tapCoinsPerLevel) return true;
-  if (cfg.dailyCoinQuota[100] !== d.dailyCoinQuota[100]) return true;
-  if (cfg.dailyCoinQuota[1000] !== d.dailyCoinQuota[1000]) return true;
+  for (const stake of stakeLevels()) {
+    if (Number(cfg.dailyCoinQuota?.[stake]) !== Number(d.dailyCoinQuota?.[stake] ?? 15)) return true;
+  }
   for (const k of Object.keys(d.tapCurve)) {
     if (Number(cfg.tapCurve[k]) !== Number(d.tapCurve[k])) return true;
   }
   for (const gameId of GAME_IDS) {
-    for (const stake of STAKE_LEVELS) {
+    for (const stake of stakeLevels()) {
       for (const outcome of OUTCOMES) {
-        if (cfg.coinRewards[gameId][stake][outcome]
-          !== d.coinRewards[gameId][stake][outcome]) return true;
+        const a = cfg.coinRewards?.[gameId]?.[stake]?.[outcome];
+        const b = d.coinRewards?.[gameId]?.[stake]?.[outcome];
+        if (Number(a || 0) !== Number(b || 0)) return true;
       }
     }
   }
@@ -187,7 +212,9 @@ function setCachedForTest(value) { cache = { at: Date.now(), value: merge(value)
 module.exports = {
   DEFAULTS,
   GAME_IDS,
-  STAKE_LEVELS,
+  // سازگاری: آرایهٔ زنده — هر بار stakeLevels() تازه
+  get STAKE_LEVELS() { return stakeLevels(); },
+  stakeLevels,
   load,
   publicView,
   save,
