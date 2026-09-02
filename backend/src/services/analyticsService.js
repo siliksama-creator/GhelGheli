@@ -108,9 +108,11 @@ async function resolveCrash(id, status) {
   if (!['resolved', 'ignored', 'open'].includes(status)) {
     throw Object.assign(new Error('وضعیت گزارش خطا معتبر نیست'), { status: 400 });
   }
+  // $2::text لازم است: بدون cast، CASE WHEN $2='open' با SET status=$2
+  // نوع پارامتر را ناسازگار می‌بیند (42P08) و API پنل ۵۰۰ می‌دهد.
   const { rows } = await pool.query(
-    `UPDATE app_crash_reports SET status=$2,
-       resolved_at=CASE WHEN $2='open' THEN NULL ELSE NOW() END
+    `UPDATE app_crash_reports SET status=$2::text,
+       resolved_at=CASE WHEN $2::text='open' THEN NULL ELSE NOW() END
      WHERE id=$1 RETURNING id,status`, [id, status]);
   if (!rows[0]) throw Object.assign(new Error('گزارش خطا پیدا نشد'), { status: 404 });
   return rows[0];
@@ -133,9 +135,10 @@ async function resolveCrashGroup(hash, status, platform) {
     throw Object.assign(new Error('شناسهٔ گروه خطا معتبر نیست'), { status: 400 });
   }
   const p = platform && String(platform).trim() ? String(platform).trim() : null;
+  // همان درسِ resolveCrash: $2 باید ::text باشد وگرنه 42P08.
   const { rowCount } = await pool.query(
-    `UPDATE app_crash_reports SET status=$2,
-       resolved_at=CASE WHEN $2='open' THEN NULL ELSE NOW() END
+    `UPDATE app_crash_reports SET status=$2::text,
+       resolved_at=CASE WHEN $2::text='open' THEN NULL ELSE NOW() END
      WHERE error_hash=$1 AND ($3::text IS NULL OR platform=$3)`,
     [h, status, p]);
   if (!rowCount) throw Object.assign(new Error('گروه خطا پیدا نشد'), { status: 404 });
