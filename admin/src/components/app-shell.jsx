@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { LogOut, Menu, X } from 'lucide-react';
+import { ScrollHint } from './ScrollHint.jsx';
 
 // Responsive app shell: permanent sidebar on desktop, slide-in drawer +
 // hamburger on mobile — same principle as the Flutter admin shell
@@ -56,7 +57,11 @@ export function AppShell({ nav, activePage, onNavigate, onLogout, title, subtitl
           <div className="topbar-actions">
           </div>
         </header>
-        <main className="content-area">{children}</main>
+        <main className="content-area">
+          <ScrollHint key={activePage} label="پایین‌تر هم هست" padBottom={8}>
+            {children}
+          </ScrollHint>
+        </main>
       </div>
     </div>
   );

@@ -26,6 +26,7 @@ import 'admin_shop.dart';
 import 'admin_pass.dart';
 import 'admin_missions.dart';
 import 'admin_engine.dart';
+import '../../widgets/scroll_hint.dart';
 
 /// Root shell for the in-app admin console: responsive layout that shows a
 /// permanent side rail on tablets/desktop and a drawer + bottom nav on
@@ -47,35 +48,22 @@ class _AdminShellState extends State<AdminShell> {
 
   late final List<Widget> _pages = [
     AdminDashboard(api: widget.api),
-    // ═══════════════════════════════════════════════════════════════════
-    // چرا تبِ «کارت و کد» حذف شد
-    // ═══════════════════════════════════════════════════════════════════
-    //
-    // دو تب وجود داشت که هر دو «کارت تعریف می‌کردند»: `AdminCards`
-    // (سیستمِ قدیمیِ کد-تنها، جدولِ `card_codes`) و `AdminPhotoCards`
-    // (سیستمِ فعلی، جدولِ `photo_card_codes`).
-    //
-    // مسیرِ قدیمی از سمتِ کاربر حذف شده — فرمِ «فقط کد» نه در وب‌اپ هست
-    // و نه در داشبوردِ اندروید. پس کدی که در تبِ قدیمی ساخته می‌شد
-    // **هیچ‌وقت قابلِ خرج کردن نبود**: مدیر پیامِ «ثبت شد» می‌گرفت، کد
-    // را چاپ می‌کرد، و کاربر با آن به هیچ‌جا نمی‌رسید. بدونِ هیچ خطایی.
-    //
-    //  فقط رابط رفت، نه داده: جدول و مسیرهای سرور دست‌نخورده‌اند چون
-    //    کدهای مصرف‌شده در تاریخچهٔ کاربران به آن‌ها ارجاع دارند.
+    // ترتیب منو = پنل وب (admin/src/main.jsx NAV) تا ادمین بین
+    // اندروید و وب گیج نشود. «کارت و کد» قدیمی عمداً نیست.
     AdminPhotoCards(api: widget.api),
     AdminShop(api: widget.api),
+    AdminCardBox(api: widget.api),
     AdminPass(api: widget.api),
     AdminMissions(api: widget.api),
     AdminRewards(api: widget.api),
     AdminWallet(api: widget.api),
     AdminLeague(api: widget.api),
-    AdminPoints(api: widget.api),
     AdminUsers(api: widget.api),
+    AdminPoints(api: widget.api),
     AdminChat(api: widget.api),
     AdminGameRewards(api: widget.api),
     AdminGameEconomy(api: widget.api),
     AdminWheel(api: widget.api),
-    AdminCardBox(api: widget.api),
     AdminSupport(api: widget.api),
     AdminNotifications(api: widget.api),
     AdminSettings(api: widget.api),
@@ -89,42 +77,42 @@ class _AdminShellState extends State<AdminShell> {
     'داشبورد',
     'ثبت کارت',
     'فروشگاه',
+    'صندوق کارت',
     'گذر نبرد',
     'ماموریت‌ها',
     'جوایز',
     'کیف پول',
-    'لیگ',
-    'ریز امتیازات',
+    'لیگ ماهانه',
     'کاربران',
+    'ریز امتیازات',
     'چت',
     'امتیاز بازی',
     'اقتصاد بازی',
     'گردونه شانس',
-    'صندوق کارت',
     'پشتیبانی',
     'اطلاعیه‌ها',
     'تنظیمات',
     'موتور',
     'ادمین‌ها',
     'تحلیل رشد و خطا',
-    'مانیتورینگ'
+    'مانیتورینگ سرور',
   ];
   static const _icons = [
     Icons.dashboard_rounded,
     Icons.document_scanner_rounded,
     Icons.storefront_rounded,
-    Icons.layers_rounded,
-    Icons.flag_rounded,
+    Icons.inventory_2_rounded, // صندوق کارت
+    Icons.layers_rounded, // گذر نبرد
+    Icons.flag_rounded, // ماموریت
     Icons.card_giftcard_rounded,
     Icons.account_balance_wallet_rounded,
-    Icons.emoji_events_rounded,
-    Icons.trending_up_rounded,
-    Icons.people_alt_rounded,
+    Icons.emoji_events_rounded, // لیگ
+    Icons.people_alt_rounded, // کاربران
+    Icons.trending_up_rounded, // ریز امتیازات
     Icons.chat_bubble_rounded,
     Icons.sports_esports_rounded,
     Icons.monetization_on_rounded,
     Icons.casino_rounded,
-    Icons.inventory_2_rounded,
     Icons.support_agent_rounded,
     Icons.campaign_rounded,
     Icons.settings_rounded,
@@ -140,19 +128,19 @@ class _AdminShellState extends State<AdminShell> {
   static const _subtitles = [
     'خلاصهٔ یک‌نگاهی: کاربران، فروش، بازی‌ها و هشدارها — فقط خواندنی.',
     'ثبت کارت‌های فیزیکی با عکس؛ کارتِ تأییدشده وارد کاتالوگِ صندوق و دوئل می‌شود.',
-    'آیتم‌های فروشگاه و صندوق کارت — هر تغییری همان لحظه در فروشگاهِ کاربران می‌نشیند.',
+    'آیتم‌های فروشگاه — هر تغییری همان لحظه در فروشگاهِ کاربران می‌نشیند، بدون آپدیت اپ.',
+    'شانسِ هر کلاس، قیمت و روشن/خاموش‌کردن فروش صندوق + تاریخچهٔ خریدها.',
     'فصل‌های گذر نبرد، پله‌های XP و جایزهٔ هر پله — قابل تغییر بدون آپدیت.',
     'ماموریت‌های روزانه و هفتگی + جایزهٔ هر ماموریت و جایزهٔ تکمیلِ همه.',
     'ساخت و ویرایش جایزه‌ها و تأیید درخواست‌های کاربران.',
     'تراکنش‌های کیف پول، برداشت‌ها و واریز/برداشت دستی.',
     'لیگ ماهانه: شروع و پایان فصل و جوایز نفرات برتر.',
-    'دفترِ امتیاز: هر کاربر چه مقدار، از کجا گرفت و کجا خرج کرد.',
     'جست‌وجوی کاربر، پروفایل و موجودی + ابزارهای دستی (امتیاز، بن، حذف).',
+    'دفترِ امتیاز: هر کاربر چه مقدار، از کجا گرفت و کجا خرج کرد.',
     'پیامِ سنجاق‌شدهٔ بالای چت، فیلتر کلمات و گزارش‌های کاربران.',
     'امتیازِ هر بازی و ضریب‌های جایزه.',
     'اهرم‌های اقتصادی بازی‌ها: هزینه‌ها، جوایز و سقف‌های روزانه.',
     'جایزه‌های گردونه و شانسِ هر بخش؛ جمع شانس‌ها باید ۱۰۰٪ باشد.',
-    'شانسِ هر کلاس، قیمت و روشن/خاموش‌کردن فروش + تاریخچهٔ خریدها.',
     'تیکت‌های کاربران: پاسخ بدهید یا ببندید.',
     'ارسال اطلاعیهٔ push به همه یا گروهی از کاربران.',
     'تنظیمات چت و پیامک + نسخهٔ اجباری، بنر اطلاعیه و چیدمان تب‌ها.',
@@ -210,7 +198,13 @@ class _AdminShellState extends State<AdminShell> {
       body: _AdminBackdrop(
         child: AnimatedSwitcher(
           duration: Motion.normal,
-          child: KeyedSubtree(key: ValueKey(_index), child: _pages[_index]),
+          child: KeyedSubtree(
+            key: ValueKey(_index),
+            child: ScrollHint(
+              hintLabel: 'پایین‌تر هم هست',
+              child: _pages[_index],
+            ),
+          ),
         ),
       ),
     );
@@ -245,7 +239,12 @@ class _AdminShellState extends State<AdminShell> {
                 child: AnimatedSwitcher(
                   duration: Motion.normal,
                   child: KeyedSubtree(
-                      key: ValueKey(_index), child: _pages[_index]),
+                    key: ValueKey(_index),
+                    child: ScrollHint(
+                      hintLabel: 'پایین‌تر هم هست',
+                      child: _pages[_index],
+                    ),
+                  ),
                 ),
               ),
             ),

@@ -1715,3 +1715,37 @@ table.data-table {
 .tier-edit input { flex: 1; min-width: 60px; }
 .tier-edit input[type="number"] { width: 84px; flex: none; }
 .tier-missing { color: #64748b; padding: 10px; font-size: 12px; }
+
+
+/* ScrollHint admin */
+.scrollHintRoot{position:relative;width:100%;min-height:100%}
+.scrollHintFade{
+  position:sticky;bottom:0;left:0;right:0;height:56px;margin-top:-56px;
+  z-index:20;pointer-events:none;
+  background:linear-gradient(to bottom, transparent, color-mix(in srgb, var(--gg-bg) 88%, transparent));
+}
+/* fixed rail relative to viewport of main */
+.main-area{position:relative}
+.content-area{position:relative;overflow-y:auto;max-height:calc(100vh - 72px)}
+.scrollHintRail{
+  position:fixed;top:88px;right:6px;width:5px;bottom:16px;z-index:30;pointer-events:none;
+  border-radius:99px;background:color-mix(in srgb, var(--gg-emerald) 18%, transparent);
+}
+.scrollHintThumb{
+  position:absolute;left:0;right:0;border-radius:99px;min-height:28px;
+  background:var(--gg-emerald);
+  box-shadow:0 0 10px color-mix(in srgb, var(--gg-emerald) 45%, transparent);
+}
+.scrollHintPill{
+  position:fixed;right:22px;z-index:31;pointer-events:none;
+  display:inline-flex;align-items:center;gap:6px;
+  padding:8px 12px;border-radius:999px;
+  background:color-mix(in srgb, var(--gg-emerald) 90%, #000);
+  color:#04101c;font-size:12.5px;font-weight:900;
+  border:1px solid rgba(255,255,255,.16);
+  box-shadow:0 10px 24px rgba(0,0,0,.28);
+  animation:scrollHintBob 1.4s ease-in-out infinite alternate;
+}
+.scrollHintPill b{letter-spacing:-2px}
+@keyframes scrollHintBob{from{transform:translateY(0)}to{transform:translateY(5px)}}
+@media (prefers-reduced-motion:reduce){.scrollHintPill{animation:none}}

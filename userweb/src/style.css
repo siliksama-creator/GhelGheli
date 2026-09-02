@@ -6172,3 +6172,44 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
   82%  { opacity: 1; }
   100% { transform: translateY(560px) rotate(calc(var(--rot) + 300deg)); opacity: 0; }
 }
+
+
+/* ── ScrollHint: راهنمای «پایین هم ادامه دارد» (آینهٔ Flutter ScrollHint) ── */
+.scrollHintRoot{position:relative;width:100%}
+.scrollHintFade{
+  position:fixed;left:0;right:0;height:64px;z-index:28;pointer-events:none;
+  background:linear-gradient(to bottom, transparent, rgba(6,16,29,.78));
+}
+.scrollHintRail{
+  position:fixed;top:72px;right:4px;width:5px;z-index:29;pointer-events:none;
+  border-radius:99px;background:rgba(181,239,88,.12);
+}
+.scrollHintThumb{
+  position:absolute;left:0;right:0;border-radius:99px;
+  background:rgba(181,239,88,.88);
+  box-shadow:0 0 8px rgba(181,239,88,.45);
+  min-height:28px;
+}
+.scrollHintPill{
+  position:fixed;right:18px;z-index:30;pointer-events:none;
+  display:inline-flex;align-items:center;gap:6px;
+  padding:7px 12px;border-radius:999px;
+  background:rgba(0,212,154,.88);color:#04101c;
+  font-size:12.5px;font-weight:900;
+  border:1px solid rgba(255,255,255,.18);
+  box-shadow:0 8px 22px rgba(0,0,0,.35);
+  animation:scrollHintBob 1.4s ease-in-out infinite alternate;
+  max-width:min(160px,46vw);
+}
+.scrollHintPill span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.scrollHintPill b{font-weight:900;letter-spacing:-2px}
+@keyframes scrollHintBob{from{transform:translateY(0)}to{transform:translateY(5px)}}
+@media (prefers-reduced-motion:reduce){
+  .scrollHintPill{animation:none}
+}
+
+.forceGateModal{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.72);display:grid;place-items:center;padding:18px}
+.forceGateCard{width:min(420px,94vw);background:linear-gradient(160deg,#122844,#0a1626);border:1px solid #ffffff22;border-radius:22px;padding:22px;box-shadow:0 30px 80px #000a;text-align:center}
+.forceGateCard b{font-size:18px;display:block;margin-bottom:8px}
+.forceGateCard p{color:#c9ddf2;font-size:13.5px;line-height:1.7;margin:0 0 14px}
+.forceGateActions{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}

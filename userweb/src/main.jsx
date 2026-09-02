@@ -67,6 +67,7 @@ import './style.css';
 import './typography.css';
 // LAST: the theme layer overrides style.css surface colours.
 import './theme.css';
+import { ScrollHint } from './components/ScrollHint.jsx';
 
 // ── ناوبری ────────────────────────────────────────────────────────────────
 //
@@ -171,10 +172,31 @@ function App() {
   useDarkOnly();
   // پیکربندی کلاینت (بنر اطلاعیه و…) — از /api/config، بدون نیاز به آپدیت.
   const [cfg, setCfg] = useState(null);
+  const [forceGate, setForceGate] = useState(null); // {forced, url, min}
   useEffect(() => {
     req('/api/config', 'GET', null, null).then((d) => {
       setCfg(d);
       if (Array.isArray(d?.tabOrder)) window.__tabOrderServer = d.tabOrder;
+      // آپدیت نسخهٔ وب از سرور — بدون hardcode در بیلد
+      try {
+        const app = d?.app || {};
+        const min = String(app?.minVersion?.android || app?.minVersion?.web || '');
+        const forced = !!(app?.forceUpdate?.android || app?.forceUpdate?.web);
+        const url = String(app?.updateUrl?.web || app?.updateUrl?.android || 'https://ghelghelishop.ir');
+        const current = String(import.meta.env.VITE_APP_RELEASE || '1.1.17');
+        const lower = (a, b) => {
+          const parts = (v) => String(v).split('+')[0].trim().split('.').map((x) => parseInt(x, 10));
+          const as = parts(a), bs = parts(b);
+          if (as.some((x) => Number.isNaN(x)) || bs.some((x) => Number.isNaN(x))) return false;
+          for (let i = 0; i < Math.max(as.length, bs.length); i++) {
+            const x = as[i] || 0, y = bs[i] || 0;
+            if (x < y) return true;
+            if (x > y) return false;
+          }
+          return false;
+        };
+        if (min && lower(current, min)) setForceGate({ forced, url, min, current });
+      } catch (_) { /* ignore */ }
     }).catch(() => {});
   }, []);
   useEffect(() => {
@@ -244,34 +266,28 @@ function App() {
           {cfg.features.maintenance.message || 'سرویس موقتاً در دسترس نیست. کمی بعد دوباره سر بزن.'}
         </div>
       )}
-      {cfg?.announcement?.active && cfg.announcement.text && (() => {
-        const link = String(cfg.announcement.link || '');
-        const text = String(cfg.announcement.text || '');
-        const isShop = /shop|فروشگاه/i.test(link) || /فروشگاه/.test(text);
-        const open = (e) => {
-          if (!isShop) return;
-          e.preventDefault();
-          if (token) setTab('shop');
-        };
-        return (
-          <a
-            className="cfgBanner"
-            href={isShop ? undefined : (link || undefined)}
-            target={!isShop && link ? '_blank' : undefined}
-            rel="noreferrer"
-            onClick={open}
-            role={isShop ? 'button' : undefined}
-            style={{
-              display: 'block', textAlign: 'center', padding: '9px 14px',
-              fontSize: 12.5, fontWeight: 800, color: '#1a0f02',
-              background: 'linear-gradient(90deg,#FFD166,#F97316)',
-              textDecoration: 'none', cursor: 'pointer',
-            }}
-          >
-            {cfg.announcement.text}
-          </a>
-        );
-      })()}
+      {forceGate && (
+        <div className="forceGateModal" role="dialog" aria-modal="true">
+          <div className="forceGateCard">
+            <b>نسخهٔ جدید آماده است</b>
+            <p>
+              نسخهٔ شما ({forceGate.current}) از حداقل لازم ({forceGate.min}) پایین‌تر است.
+              برای ادامه، صفحه را تازه‌سازی کن یا آخرین نسخه را باز کن.
+            </p>
+            <div className="forceGateActions">
+              <button type="button" className="main" onClick={() => { location.reload(); }}>
+                تازه‌سازی
+              </button>
+              {forceGate.url && (
+                <a className="ghost" href={forceGate.url} target="_blank" rel="noreferrer">دانلود / ورود</a>
+              )}
+              {!forceGate.forced && (
+                <button type="button" className="ghost" onClick={() => setForceGate(null)}>بعداً</button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       {/* The animated brand mark. Matches the Flutter AnimatedLogo widget:
           aurora behind, settle-in entrance, a specular sweep clipped to the
           logo's own shape, and phased sparkles. Built with CSS rather than a
@@ -297,7 +313,7 @@ function App() {
       )}
 
       {token ? (
-        <Portal token={token} logout={logout} />
+        <Portal token={token} logout={logout} cfg={cfg} />
       ) : (
         <>
           <Auth mode={mode} setMode={setMode}
@@ -311,7 +327,7 @@ function App() {
   );
 }
 
-function Portal({ token, logout }) {
+function Portal({ token, logout, cfg }) {
   const sharedRoom = new URLSearchParams(window.location.search).get('room');
   const [tab, setTab] = useState(sharedRoom ? 'club' : 'home');
   const [p, setP] = useState(null);
@@ -384,6 +400,35 @@ function Portal({ token, logout }) {
 
   return (
     <div className="portal">
+      {cfg?.announcement?.active && cfg.announcement.text && (() => {
+        const link = String(cfg.announcement.link || '');
+        const text = String(cfg.announcement.text || '');
+        const isShop = /shop|فروشگاه/i.test(link) || /فروشگاه/.test(text);
+        const open = (e) => {
+          if (!isShop) return;
+          e.preventDefault();
+          setTab('shop');
+        };
+        return (
+          <a
+            className="cfgBanner"
+            href={isShop ? undefined : (link || undefined)}
+            target={!isShop && link ? '_blank' : undefined}
+            rel="noreferrer"
+            onClick={open}
+            role={isShop ? 'button' : undefined}
+            style={{
+              display: 'block', textAlign: 'center', padding: '9px 14px',
+              fontSize: 12.5, fontWeight: 800, color: '#1a0f02',
+              background: 'linear-gradient(90deg,#FFD166,#F97316)',
+              textDecoration: 'none', cursor: 'pointer', width: 'min(1080px, 96vw)',
+            }}
+          >
+            {cfg.announcement.text}
+          </a>
+        );
+      })()}
+
       <header className="appBar">
         {/* لوگوی درخشان — همان چیزی که در اپ اندروید هست، تا دو کلاینت
             یک حس بدهند. درخشش با CSS (کلاس .appLogo) ساخته می‌شود. */}
@@ -477,6 +522,25 @@ function Portal({ token, logout }) {
           برای تبِ‌های داخلِ شیتِ «بیشتر» هم `aria-current` کافی نیست چون
           شیت پس از کلیک بسته می‌شود. این یک قلابِ خواندنی و بی‌اثر روی
           ظاهر است، نه تضعیفِ محصول برای آسان‌شدنِ تست. */}
+            <ScrollHint
+        key={`hint-${tab}`}
+        target="window"
+        label={({
+          home: 'میان‌برها و کارت‌ها پایین‌ترند',
+          rewards: 'جوایز بیشتری پایین‌تر هست',
+          wallet: 'تاریخچهٔ تراکنش‌ها پایین‌تر است',
+          league: 'ادامهٔ جدول پایین‌تر است',
+          club: 'بازی‌های بیشتری پایین‌تر است',
+          wheel: 'جایزه‌ها و شرایط پایین‌تر است',
+          invite: 'راهنمای دعوت پایین‌تر است',
+          shop: 'محصولات بیشتری پایین‌تر است',
+          inventory: 'کارت‌های بیشتری پایین‌تر است',
+          profile: 'تنظیمات پایین‌تر است',
+          support: 'تیکت‌ها پایین‌ترند',
+          pass: 'پله‌های بیشتری پایین‌تر است',
+        })[tab] || 'پایین‌تر هم هست'}
+        padBottom={72}
+      >
       <main className="tabPane" key={tab} data-tab={tab}>
         {/* fallback عمداً `LoadingView` نیست: چانک‌ها معمولاً چند ده
             میلی‌ثانیه می‌آیند و اسپینرِ کوتاه‌مدت بیشتر از نبودش آزار
@@ -531,6 +595,7 @@ function Portal({ token, logout }) {
         )}
         </Suspense>
       </main>
+      </ScrollHint>
 
       {publicUser && (
         <Suspense fallback={null}>

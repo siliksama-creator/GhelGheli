@@ -721,10 +721,14 @@ class _HomeShellState extends State<HomeShell>
     1: 'جوایز بیشتری پایین‌تر هست',
     2: 'تاریخچهٔ تراکنش‌ها پایین‌تر است',
     3: 'ادامهٔ جدول پایین‌تر است',
-    4: 'بازی‌های بیشتری پایین‌تر است',
+    4: 'بازی‌ها و ماموریت‌ها پایین‌ترند',
+    5: 'تیکت‌ها پایین‌ترند',
+    6: 'تنظیمات پروفایل پایین‌تر است',
     7: 'جایزه‌ها و شرایط پایین‌تر است',
     8: 'راهنمای دعوت پایین‌تر است',
     9: 'محصولات بیشتری پایین‌تر است',
+    10: 'پله‌های گذر نبرد پایین‌تر است',
+    11: 'کارت‌های بیشتری پایین‌تر است',
   };
 
   /// Which bar slot to highlight — the "more" slot when a sheet-only page
@@ -794,12 +798,12 @@ class _HomeShellState extends State<HomeShell>
             offstage: entry.key != _index,
             child: TickerMode(
               enabled: entry.key == _index,
-              child: entry.key == passIndex
-                  ? entry.value
-                  : ScrollHint(
-                      hintLabel: _scrollHints[entry.key] ?? 'پایین‌تر هم هست',
-                      child: entry.value,
-                    ),
+              child: ScrollHint(
+                hintLabel: _scrollHints[entry.key] ?? 'پایین‌تر هم هست',
+                // padBottom برای نوار پایین تا قرص روی تب‌ها ننشیند
+                padBottom: 8,
+                child: entry.value,
+              ),
             ),
           ),
       ],
