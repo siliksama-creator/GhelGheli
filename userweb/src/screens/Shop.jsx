@@ -66,7 +66,7 @@ function CosmeticPreview({ item }) {
   return <div className="shopArtwork shopLiveEmotes">{messages.map((message,index)=><span key={message} className={index ? 'alt' : ''}>{message}</span>)}</div>;
 }
 
-function PlanCard({ plan, activeTier, busy, onBuy, monthlyPrice = 59000 }) {
+function PlanCard({ plan, activeTier, busy, onBuy, monthlyPrice = 0 }) {
   const annual = plan.billingCycle === 'annual';
   const active = activeTier === plan.billingCycle;
   return <article className={`shopPlan ${annual ? 'annual' : ''} ${active ? 'active' : ''}`}>
@@ -75,7 +75,7 @@ function PlanCard({ plan, activeTier, busy, onBuy, monthlyPrice = 59000 }) {
       {annual ? <b className="saveBadge">حدود ۳۰٪ صرفه‌جویی</b> : <b>۳۰ روز</b>}
     </div>
     <strong className="planPrice">{money(plan.price)} <small>/ {annual ? 'سال' : 'ماه'}</small></strong>
-    {annual && <div className="annualCompare">به‌جای {money((monthlyPrice || 59000) * 12)} پرداخت ماهانه</div>}
+    {annual && <div className="annualCompare">به‌جای {money((monthlyPrice || 0) * 12)} پرداخت ماهانه</div>}
     <div className="planVisuals" aria-label="نمونه واقعی مزایای پلن">
       <CosmeticAvatarFrame frame={annual?'annual_royal_frame':'blue_fire'} className="planFrameSwatch"><img src="/avatars/avatar_10_crown.webp" alt=""/></CosmeticAvatarFrame>
       <div className="planNameSwatch"><AnimatedName name={annual?'MVP':'hotcat'} effect={annual?'mvp_name':'gold_gradient'}/></div>
@@ -240,7 +240,7 @@ export default function Shop({ token, reloadProfile }) {
 
     <section className="shopHero">
       <div className="shopHeroTop">
-        <div><h2>فروشگاه قلقلی پلاس</h2><p>نمونه واقعی هر آیتم را ببین · پلاس از {money(data?.plus?.price ?? data?.plans?.find?.(p => p.billingCycle === 'monthly' || p.key === 'monthly')?.price ?? 59000)} در ماه</p></div>
+        <div><h2>فروشگاه قلقلی پلاس</h2><p>نمونه واقعی هر آیتم را ببین · پلاس از {money(data?.plus?.price ?? data?.plans?.find?.(p => p.billingCycle === 'monthly' || p.key === 'monthly')?.price ?? 0)} در ماه</p></div>
         <div className="shopWallet" title="موجودی قابل برداشت">کیف پول: {money(data.walletBalance)}</div>
         <button type="button" className="shopToggle" onClick={() => setShowPlans((v) => !v)}>{showPlans ? 'جمع کردن پلن‌ها' : 'دیدن پلن‌های پلاس'}</button>
       </div>
@@ -270,7 +270,7 @@ export default function Shop({ token, reloadProfile }) {
       )}
       {showPlans && <div className="shopPlans">{(data.plans || []).map((plan) => {
         const monthlyPlanPrice = (data.plans || []).find((p) => p.billingCycle === 'monthly' || p.key === 'monthly')?.price
-          ?? data?.plus?.price ?? 59000;
+          ?? data?.plus?.price ?? 0;
         return (
           <PlanCard
             key={plan.billingCycle}

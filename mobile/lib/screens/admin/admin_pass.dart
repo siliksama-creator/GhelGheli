@@ -37,6 +37,9 @@ class _AdminPassState extends State<AdminPass> {
   String? _selectedId;
   Map<String, dynamic> _season = const {};
   List<Map<String, dynamic>> _tiers = [];
+  double _scaleFactor = 1;
+  String _scaleTrack = 'both'; // both|free|plus
+  bool _scaleBusy = false;
   bool _loading = true;
   bool _saving = false;
   String? _error;
@@ -165,6 +168,46 @@ class _AdminPassState extends State<AdminPass> {
     }
   }
 
+
+  Future<void> _applyScale() async {
+    if (_selectedId == null) return;
+    if ((_scaleFactor - 1).abs() < 0.001) {
+      _toast('ضریب ۱ یعنی بدون تغییر');
+      return;
+    }
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('مقیاس‌دهی امتیازات'),
+        content: Text(
+          'همهٔ پاداش‌های نوع «امتیاز» '
+          '${_scaleTrack == 'free' ? 'مسیر رایگان' : _scaleTrack == 'plus' ? 'مسیر پلاس' : 'هر دو مسیر'} '
+          '× ${_scaleFactor.toStringAsFixed(2)} می‌شوند. ادامه؟',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('اعمال')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _scaleBusy = true);
+    try {
+      final r = await widget.api.post(
+        '/api/admin/pass/seasons/$_selectedId/scale-points',
+        {'factor': _scaleFactor, 'track': _scaleTrack},
+      );
+      if (!mounted) return;
+      _toast('${r is Map ? (r['message'] ?? 'اعمال شد') : 'اعمال شد'}');
+      setState(() => _scaleFactor = 1);
+      await _openSeason(_selectedId!);
+    } catch (e) {
+      if (mounted) _toast(apiError(e));
+    } finally {
+      if (mounted) setState(() => _scaleBusy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) return const LoadingView();
@@ -249,7 +292,57 @@ class _AdminPassState extends State<AdminPass> {
             ],
           ),
           const SizedBox(height: Gaps.md),
-          if (_selectedId != null)
+          if (_selectedId != null) ...[
+            FormSection(
+              title: 'مقیاس‌دهی یک‌جای امتیازات',
+              subtitle: 'فقط kind=امتیاز · نوار را بکش و اعمال کن — بدون ویرایش تک‌تک',
+              children: [
+                SegmentedButton<String>(
+                  segments: const [
+                    ButtonSegment(value: 'both', label: Text('هر دو')),
+                    ButtonSegment(value: 'free', label: Text('رایگان')),
+                    ButtonSegment(value: 'plus', label: Text('پلاس')),
+                  ],
+                  selected: {_scaleTrack},
+                  onSelectionChanged: (s) => setState(() => _scaleTrack = s.first),
+                ),
+                const SizedBox(height: Gaps.sm),
+                Text('ضریب × ${_scaleFactor.toStringAsFixed(2)}',
+                    style: const TextStyle(fontWeight: FontWeight.w900)),
+                Slider(
+                  value: _scaleFactor.clamp(0, 3),
+                  min: 0,
+                  max: 3,
+                  divisions: 60,
+                  label: '× ${_scaleFactor.toStringAsFixed(2)}',
+                  onChanged: _scaleBusy ? null : (v) => setState(() => _scaleFactor = v),
+                ),
+                Wrap(
+                  spacing: 6,
+                  children: [
+                    for (final v in [0.5, 0.75, 1.0, 1.25, 1.5, 2.0])
+                      ChoiceChip(
+                        label: Text('×$v'),
+                        selected: (_scaleFactor - v).abs() < 0.001,
+                        onSelected: _scaleBusy ? null : (_) => setState(() => _scaleFactor = v),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: Gaps.sm),
+                FilledButton.icon(
+                  onPressed: _scaleBusy || (_scaleFactor - 1).abs() < 0.001
+                      ? null
+                      : _applyScale,
+                  icon: _scaleBusy
+                      ? const SizedBox.square(
+                          dimension: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.tune_rounded),
+                  label: const Text('اعمال روی همهٔ پله‌ها'),
+                ),
+              ],
+            ),
+            const SizedBox(height: Gaps.md),
             FormSection(
               title: 'پاداش پله‌های «${_season['name'] ?? ''}»',
               subtitle: 'فقط پله‌هایی که پاداش دارند فهرست شده‌اند',
@@ -267,6 +360,7 @@ class _AdminPassState extends State<AdminPass> {
                       message: 'هنوز پاداشی برای این فصل ثبت نشده'),
               ],
             ),
+          ],
         ],
       ),
     );
@@ -305,6 +399,46 @@ class _ConfigFieldState extends State<_ConfigField> {
   void dispose() {
     _c.dispose();
     super.dispose();
+  }
+
+
+  Future<void> _applyScale() async {
+    if (_selectedId == null) return;
+    if ((_scaleFactor - 1).abs() < 0.001) {
+      _toast('ضریب ۱ یعنی بدون تغییر');
+      return;
+    }
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('مقیاس‌دهی امتیازات'),
+        content: Text(
+          'همهٔ پاداش‌های نوع «امتیاز» '
+          '${_scaleTrack == 'free' ? 'مسیر رایگان' : _scaleTrack == 'plus' ? 'مسیر پلاس' : 'هر دو مسیر'} '
+          '× ${_scaleFactor.toStringAsFixed(2)} می‌شوند. ادامه؟',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('اعمال')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _scaleBusy = true);
+    try {
+      final r = await widget.api.post(
+        '/api/admin/pass/seasons/$_selectedId/scale-points',
+        {'factor': _scaleFactor, 'track': _scaleTrack},
+      );
+      if (!mounted) return;
+      _toast('${r is Map ? (r['message'] ?? 'اعمال شد') : 'اعمال شد'}');
+      setState(() => _scaleFactor = 1);
+      await _openSeason(_selectedId!);
+    } catch (e) {
+      if (mounted) _toast(apiError(e));
+    } finally {
+      if (mounted) setState(() => _scaleBusy = false);
+    }
   }
 
   @override
@@ -377,6 +511,46 @@ class _TierRowState extends State<_TierRow> {
       _kind = '${t?['kind'] ?? 'points'}';
       _amount.text = '${t?['amount'] ?? 0}';
     });
+  }
+
+
+  Future<void> _applyScale() async {
+    if (_selectedId == null) return;
+    if ((_scaleFactor - 1).abs() < 0.001) {
+      _toast('ضریب ۱ یعنی بدون تغییر');
+      return;
+    }
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('مقیاس‌دهی امتیازات'),
+        content: Text(
+          'همهٔ پاداش‌های نوع «امتیاز» '
+          '${_scaleTrack == 'free' ? 'مسیر رایگان' : _scaleTrack == 'plus' ? 'مسیر پلاس' : 'هر دو مسیر'} '
+          '× ${_scaleFactor.toStringAsFixed(2)} می‌شوند. ادامه؟',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('اعمال')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _scaleBusy = true);
+    try {
+      final r = await widget.api.post(
+        '/api/admin/pass/seasons/$_selectedId/scale-points',
+        {'factor': _scaleFactor, 'track': _scaleTrack},
+      );
+      if (!mounted) return;
+      _toast('${r is Map ? (r['message'] ?? 'اعمال شد') : 'اعمال شد'}');
+      setState(() => _scaleFactor = 1);
+      await _openSeason(_selectedId!);
+    } catch (e) {
+      if (mounted) _toast(apiError(e));
+    } finally {
+      if (mounted) setState(() => _scaleBusy = false);
+    }
   }
 
   @override

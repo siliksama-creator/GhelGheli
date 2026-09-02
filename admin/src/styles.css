@@ -1749,3 +1749,54 @@ table.data-table {
 .scrollHintPill b{letter-spacing:-2px}
 @keyframes scrollHintBob{from{transform:translateY(0)}to{transform:translateY(5px)}}
 @media (prefers-reduced-motion:reduce){.scrollHintPill{animation:none}}
+
+
+/* ── نوار مقیاس‌دهی گذر نبرد ── */
+.passScaleBar{
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--gg-emerald) 35%, transparent);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--gg-emerald) 12%, transparent),
+    color-mix(in srgb, var(--gg-surface-alt) 80%, transparent));
+  display: grid; gap: 12px;
+}
+.passScaleHead{display:grid;gap:2px}
+.passScaleHead b{font-size:15px}
+.passScaleHead small{color:var(--gg-text-muted);font-size:12px}
+.passScaleControls{display:grid;gap:12px;grid-template-columns:minmax(160px,.4fr) minmax(220px,1fr);align-items:end}
+@media(max-width:720px){.passScaleControls{grid-template-columns:1fr}}
+.passScaleTrack{display:grid;gap:6px;font-size:12px;font-weight:700;color:var(--gg-text-muted)}
+.passScaleTrack select{
+  border-radius:10px;padding:10px 12px;border:1px solid var(--gg-border-soft);
+  background:rgba(0,0,0,.22);color:inherit;font:inherit;
+}
+.passScaleSlider{display:grid;gap:6px;font-size:12.5px;font-weight:700}
+.passScaleSlider input[type=range]{
+  width:100%; accent-color: var(--gg-emerald); height: 28px; cursor: pointer;
+}
+.passScaleTicks{display:flex;justify-content:space-between;font-size:10px;color:var(--gg-text-muted);font-weight:600}
+.passScaleQuick{display:flex;flex-wrap:wrap;gap:6px;grid-column:1/-1}
+.passScaleQuick button{
+  border:1px solid var(--gg-border-soft);background:rgba(255,255,255,.04);
+  color:inherit;border-radius:999px;padding:6px 12px;font-weight:800;font-size:12px;cursor:pointer;
+}
+.passScaleQuick button.on{
+  background:color-mix(in srgb, var(--gg-emerald) 28%, transparent);
+  border-color:color-mix(in srgb, var(--gg-emerald) 55%, transparent);
+  color:var(--gg-emerald-ink);
+}
+.passScalePreview{
+  display:flex;flex-wrap:wrap;gap:12px 18px;font-size:12.5px;color:var(--gg-text-muted);
+  padding:8px 10px;border-radius:10px;background:rgba(0,0,0,.18);
+}
+.passScalePreview b{color:var(--gg-text);font-weight:900}
+.passScalePreview .up{color:#22e7a6;font-weight:800}
+.passScalePreview .down{color:#f87171;font-weight:800}
+.passScaleActions{display:flex;flex-wrap:wrap;gap:8px}
+
+/* دکمه‌های عملیات جدول نباید محو شوند */
+.data-table tbody td .row-actions{display:inline-flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.data-table tbody td{vertical-align:middle;color:var(--gg-text);font-size:13px}
+.data-table thead th{white-space:nowrap}

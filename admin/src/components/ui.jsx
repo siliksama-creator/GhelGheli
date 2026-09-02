@@ -175,16 +175,47 @@ export function Table({ rows = [], cols = [], head = null, children = null }) {
     );
   }
 
-  // اگر عضوِ اول رشته باشد، شکلِ ساده است.
-  const simple = cols.length === 0 || typeof cols[0] === 'string';
-  const headers = simple ? cols : cols.map((c) => c[1]);
+  // ═══════════════════════════════════════════════════════════════════
+  // سه شکلِ cols پشتیبانی می‌شود (هر سه در صفحات مختلف زنده استفاده
+  // می‌شوند — یکی را حذف کردن = جدول پر از «-» مثل اسکرین‌شاتِ
+  // فروشگاه/ماموریت):
+  //
+  //   ۱) ساده:   cols={['نام','قیمت']}  rows={[['الف',10]]}
+  //   ۲) tuple:  cols={[['name','نام'],['price','قیمت']]} rows={[{name,price}]}
+  //   ۳) object: cols={[{key,title,render?}]}  ← shop/missions/battle-pass
+  //
+  // باگ زنده: تشخیص «object» نبود → headers از c[1] روی object می‌شد
+  // undefined و cells از c[0] هم undefined → هر سلول «-».
+  // ═══════════════════════════════════════════════════════════════════
+  const first = cols[0];
+  const simple = cols.length === 0 || typeof first === 'string';
+  const objectish = !simple && first && typeof first === 'object' && !Array.isArray(first) && ('key' in first || 'title' in first);
 
-  const cellsOf = (r, i) => {
+  const headers = simple
+    ? cols
+    : objectish
+      ? cols.map((c) => c.title ?? c.label ?? c.key ?? '')
+      : cols.map((c) => (Array.isArray(c) ? c[1] : c));
+
+  const cellsOf = (r) => {
     if (simple) return Array.isArray(r) ? r : [r];
+    if (objectish) {
+      return cols.map((c) => {
+        if (typeof c.render === 'function') {
+          try { return c.render(r); } catch { return '—'; }
+        }
+        const v = r?.[c.key];
+        if (typeof v === 'boolean') return v ? 'بله' : 'خیر';
+        if (v == null || v === '') return '—';
+        return v;
+      });
+    }
+    // tuple [key, label]
     return cols.map((c) => {
-      const v = r[c[0]];
+      const key = Array.isArray(c) ? c[0] : c;
+      const v = r?.[key];
       if (typeof v === 'boolean') return v ? 'بله' : 'خیر';
-      return v ?? '-';
+      return v ?? '—';
     });
   };
 
@@ -205,8 +236,8 @@ export function Table({ rows = [], cols = [], head = null, children = null }) {
         <tbody>
           {rows.map((r, i) => (
             // eslint-disable-next-line react/no-array-index-key
-            <tr key={r?.id || i}>
-              {cellsOf(r, i).map((cell, j) => (
+            <tr key={r?.id || r?.key || i}>
+              {cellsOf(r).map((cell, j) => (
                 // eslint-disable-next-line react/no-array-index-key
                 <td key={j}>{cell}</td>
               ))}

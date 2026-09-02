@@ -224,6 +224,75 @@ module.exports = function createAdminPassRoutes(deps) {
       res.json({ message: 'پاداش پله ثبت شد', tier: rows[0] });
     }));
 
+  // ── مقیاس‌دهی دسته‌ای امتیازات پله‌ها (نوار ادمین) ─────────────────────
+  //
+  // خواستهٔ مالک: «با یک نوار، تمام امتیازات گذر نبرد را به‌صورت
+  // درجه‌بندی اضافه کن» — بدون ویرایش تک‌تک پله‌ها.
+  //
+  // فقط kind=points لمس می‌شود (اسپین/نقدی/آیتم دست‌نخورده می‌ماند).
+  // amount جدید = round(amount * factor) با کف ۰.
+  // track: 'both' | 'free' | 'plus'
+  router.post('/admin/pass/seasons/:id/scale-points', adminAuth, validateUuid('id'), requireRole(),
+    asyncHandler(async (req, res) => {
+      const b = req.body && typeof req.body === 'object' ? req.body : {};
+      const factor = Number(b.factor);
+      if (!Number.isFinite(factor) || factor < 0 || factor > 20) {
+        return res.status(400).json({ message: 'ضریب باید عددی بین ۰ و ۲۰ باشد' });
+      }
+      const track = str(b.track, 'both');
+      if (!['both', 'free', 'plus'].includes(track)) {
+        return res.status(400).json({ message: 'مسیر نامعتبر است' });
+      }
+      const { rows: seasonRows } = await pool.query(
+        'SELECT id, name FROM pass_seasons WHERE id=$1', [req.params.id]);
+      if (!seasonRows[0]) return res.status(404).json({ message: 'فصل پیدا نشد' });
+
+      const params = [req.params.id];
+      let trackSql = '';
+      if (track !== 'both') {
+        params.push(track);
+        trackSql = ` AND track = $2`;
+      }
+      const { rows: before } = await pool.query(
+        `SELECT id, tier, track, amount FROM pass_tiers
+          WHERE season_id=$1 AND kind='points'${trackSql}
+          ORDER BY tier, track`,
+        params);
+
+      if (before.length === 0) {
+        return res.json({ message: 'هیچ پلهٔ امتیازی برای مقیاس‌دهی نبود', updated: 0, factor });
+      }
+
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        let updated = 0;
+        for (const row of before) {
+          const next = Math.max(0, Math.round(Number(row.amount) * factor));
+          if (next === Number(row.amount)) continue;
+          await client.query(
+            'UPDATE pass_tiers SET amount=$2 WHERE id=$1',
+            [row.id, next]);
+          updated += 1;
+        }
+        await client.query('COMMIT');
+        await audit(req.admin.id, 'scale_pass_points', 'pass_seasons', req.params.id,
+          b.reason || null, { factor, track, updated, total: before.length });
+        res.json({
+          message: `امتیاز ${updated} پله با ضریب ${factor} به‌روز شد`,
+          updated,
+          total: before.length,
+          factor,
+          track,
+        });
+      } catch (e) {
+        try { await client.query('ROLLBACK'); } catch (_) {}
+        throw e;
+      } finally {
+        client.release();
+      }
+    }));
+
   // ── پیکربندی منحنی/سقف/منابع ───────────────────────────────────────────
   router.patch('/admin/pass/config', adminAuth, requireRole(),
     asyncHandler(async (req, res) => {

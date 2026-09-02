@@ -345,7 +345,7 @@ class _ShopPageState extends State<ShopPage> {
                     );
                     final monthlyPrice = (monthly['price'] as num?)?.toInt()
                         ?? (plus['price'] as num?)?.toInt()
-                        ?? 59000;
+                        ?? 0;
                     return _PlanCard(
                       plan: plan,
                       activeTier: '${plus['tier'] ?? ''}',
@@ -580,7 +580,7 @@ class _ShopHero extends StatelessWidget {
                 Text(
                   active
                       ? 'پلاس ${plus['tier'] == 'annual' ? 'سالانه' : 'ماهانه'} فعال است'
-                      : 'نمونه واقعی آیتم‌ها · پلاس ماهانه ${Money.withUnit((plus['price'] as num?)?.toInt() ?? 59000)}',
+                      : 'نمونه واقعی آیتم‌ها · پلاس ماهانه ${Money.withUnit((plus['price'] as num?)?.toInt() ?? 0)}',
                   style: const TextStyle(fontSize: 10.5, color: Colors.white60),
                 ),
                 Gaps.vXxs,
@@ -625,7 +625,7 @@ class _PlanCard extends StatelessWidget {
     required this.activeTier,
     required this.busy,
     required this.onBuy,
-    this.monthlyPrice = 59000,
+    this.monthlyPrice = 0,
     this.fullWidth = false,
   });
   final Map<String, dynamic> plan;
@@ -671,7 +671,7 @@ class _PlanCard extends StatelessWidget {
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
                     color: Color(0xFFFFD166))),
-            if (annual)
+            if (annual && monthlyPrice > 0)
               Text('به‌جای ${Money.withUnit(monthlyPrice * 12)} پرداخت ماهانه',
                   style: const TextStyle(fontSize: 9, color: Colors.white54)),
             Gaps.vXs,
