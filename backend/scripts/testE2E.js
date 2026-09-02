@@ -793,9 +793,16 @@ async function testRewardsAndLeague() {
 
   // /api/rewards/claims/me حذف شد (بدون مصرف‌کننده)؛ وضعیتِ ادعاها از
   // /api/reward-groups می‌آید — همان چیزی که کلاینت‌ها واقعاً می‌خوانند.
+  // شکل پاسخ: { currentPoints, lifetimePoints, leaguePoints, groups: [...] }
+  // نه آرایهٔ خام — تست قدیمی با Array.isArray کل body اشتباه می‌کرد.
   const claims = await GET('/api/reward-groups', t);
-  ok(claims.status === 200 && Array.isArray(claims.data),
-    'وضعیت ادعای جایزه‌ها از گروه‌های جایزه دریافت شد');
+  const groupsPayload = claims.data;
+  const groupsList = Array.isArray(groupsPayload)
+    ? groupsPayload
+    : (Array.isArray(groupsPayload?.groups) ? groupsPayload.groups : null);
+  ok(claims.status === 200 && groupsList,
+    'وضعیت ادعای جایزه‌ها از گروه‌های جایزه دریافت شد',
+    `status=${claims.status} shape=${groupsPayload && typeof groupsPayload}`);
 
   const league = await GET('/api/league/current', t);
   ok(league.status === 200, 'جدول لیگ دریافت شد', `status=${league.status}`);

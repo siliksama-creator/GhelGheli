@@ -47,13 +47,6 @@ const _games = <_GameEntry>[
 
 List<_GameEntry> get _multiplayerGames => _games.where((g) => g.id != 'tap').toList();
 
-String _gameSubtitle(_GameEntry g) {
-  if (g.id == 'tap') {
-    return '${faNum(_tapLevelCount)} لول ضربه بزن و شخصیت‌ها را باز کن';
-  }
-  return g.subtitle;
-}
-
 // نامِ فارسیِ بازی از روی شناسهٔ فنی — آینهٔ `gameTitle` در وب.
 // باگ: لیستِ لابی‌ها شناسهٔ خام را چاپ می‌کرد و کاربر «card_duel» می‌دید.
 // سرور فقط شناسه می‌فرستد، پس ترجمه وظیفهٔ کلاینت است. اگر بازیِ ناشناخته
@@ -118,6 +111,13 @@ class _GamesHubPageState extends State<GamesHubPage> {
   List<int> _publicStakes = const [100, 1000];
   List<int> _lobbyStakes = const [0, 100, 1000, 5000];
   int _tapLevelCount = 50;
+
+  String _gameSubtitle(_GameEntry g) {
+    if (g.id == 'tap') {
+      return '${faNum(_tapLevelCount)} لول ضربه بزن و شخصیت‌ها را باز کن';
+    }
+    return g.subtitle;
+  }
 
   @override
   void initState() {
