@@ -247,7 +247,7 @@ function BazaarProductsCard({ request }) {
     >
       {boxPrice !== null && !boxOk && (
         <p style={{ margin: '0 0 10px', padding: '8px 12px', borderRadius: 10, background: 'rgba(248,113,113,.12)', border: '1px solid rgba(248,113,113,.4)', color: '#FCA5A5', fontSize: 12.5, fontWeight: 700 }}>
-          ⚠ قیمت فعلی صندوق کارت ({fa(boxPrice)} تومان) در نقاط قیمتی کافه‌بازار محصول ندارد — خرید صندوق رد می‌شود تا وقتی در کنسول محصولش را بسازی یا قیمت را عوض کنی.
+          هشدار: قیمت فعلی صندوق کارت ({fa(boxPrice)} تومان) در نقاط قیمتی کافه‌بازار محصول ندارد — خرید صندوق رد می‌شود تا وقتی در کنسول محصولش را بسازی یا قیمت را عوض کنی.
         </p>
       )}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>

@@ -605,7 +605,7 @@ class _BazaarProductsSectionState extends State<_BazaarProductsSection> {
               border: Border.all(color: const Color(0xFFF87171).withValues(alpha: 0.4)),
             ),
             child: Text(
-              '⚠ قیمت فعلی صندوق کارت (${faNum(_boxPrice ?? 0)} تومان) در کافه‌بازار '
+              'هشدار: قیمت فعلی صندوق کارت (${faNum(_boxPrice ?? 0)} تومان) در کافه‌بازار '
               'محصول ندارد — خرید صندوق رد می‌شود.',
               style: const TextStyle(
                   fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFFCA5A5)),
