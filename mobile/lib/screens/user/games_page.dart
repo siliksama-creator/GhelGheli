@@ -580,6 +580,7 @@ class _GamesHubPageState extends State<GamesHubPage> {
                 _CleanGameTile(
                   entry: g,
                   mode: _selectedMode,
+                  subtitle: _gameSubtitle(g),
                   onTap: () {
                     if (_selectedMode > 0 &&
                         ((_user?['current_points'] as num?)?.toInt() ?? 0) < _selectedMode) {
@@ -825,11 +826,14 @@ class _CleanGameTile extends StatelessWidget {
   const _CleanGameTile({
     required this.entry,
     required this.mode,
+    required this.subtitle,
     required this.onTap,
   });
 
   final _GameEntry entry;
   final int mode; // 100, 1000, 0
+  /// زیرنویس — برای tap از config زنده می‌آید (تعداد لول).
+  final String subtitle;
   final VoidCallback onTap;
 
   @override
@@ -925,7 +929,7 @@ class _CleanGameTile extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    _gameSubtitle(entry),
+                    subtitle,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodySmall?.copyWith(
