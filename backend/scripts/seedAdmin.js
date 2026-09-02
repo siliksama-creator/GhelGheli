@@ -31,14 +31,26 @@ const { pool } = require('../src/config/db');
     console.log('legacy lowercase admin disabled');
   }
 
-  const testMobile = process.env.TEST_USER_MOBILE || 'Admin';
-  const testPassword = process.env.TEST_USER_PASSWORD || 'Ali@0142';
+  // کاربر عادی تست با همان نام کاربری ادمین — برای ورود به اپ/وب کاربر
+  // بدون ساخت شماره موبایل جدا. رمز پیش‌فرض با MAIN_ADMIN (رمز واقعی
+  // مالک) هم‌تراز است تا «همان Admin + همان پسورد» در هر دو سمت کار کند.
+  // TEST_USER_PASSWORD فقط وقتی عمداً جدا می‌خواهید override می‌کند.
+  const testMobile = process.env.TEST_USER_MOBILE
+    || process.env.MAIN_ADMIN_USERNAME
+    || process.env.ADMIN_DEFAULT_USERNAME
+    || 'Admin';
+  const testPassword = process.env.TEST_USER_PASSWORD
+    || process.env.MAIN_ADMIN_PASSWORD
+    || process.env.ADMIN_DEFAULT_PASSWORD
+    || 'Ali@0142';
   const testHash = await bcrypt.hash(testPassword, 12);
+  const testNick = process.env.TEST_USER_NICKNAME || testMobile;
   await pool.query(
     `INSERT INTO users(mobile,mobile_verified,password_hash,nickname,status)
-     VALUES($1,true,$2,'کاربر تست','active')
-     ON CONFLICT(mobile) DO UPDATE SET mobile_verified=true, password_hash=EXCLUDED.password_hash, nickname='کاربر تست', status='active', updated_at=NOW()`,
-    [testMobile, testHash]
+     VALUES($1,true,$2,$3,'active')
+     ON CONFLICT(mobile) DO UPDATE SET mobile_verified=true, password_hash=EXCLUDED.password_hash,
+       nickname=EXCLUDED.nickname, status='active', updated_at=NOW()`,
+    [testMobile, testHash, testNick]
   );
   console.log(`mobile test user ready: ${testMobile}`);
 
