@@ -870,19 +870,25 @@ async function pruneNonces() {
   return rowCount;
 }
 
-/** Top tappers — cheap to serve, useful for a future leaderboard tab. */
-async function leaderboard(limit = 50) {
+/**
+ * رتبه‌بندی ضربه‌زن — ۱۰ (یا limit) نفر برتر + رتبهٔ واقعی درخواست‌کننده.
+ * اگر کاربر داخل top نباشد، `me` جدا برمی‌گردد تا UI کنار کاراکتر
+ * نشان دهد «رتبهٔ تو N» بدون تب/شیت جدا.
+ */
+async function leaderboard(limit = 10, viewerId = null) {
+  const lim = Math.min(Math.max(Number(limit) || 10, 1), 100);
   const { rows } = await pool.query(
     `SELECT p.user_id, p.level, p.total_taps,
             u.nickname, u.first_name, u.profile_image_url, u.profile_avatar_key
        FROM tap_game_progress p
        JOIN users u ON u.id = p.user_id
       WHERE u.status = 'active'
-      ORDER BY p.total_taps DESC
+      ORDER BY p.total_taps DESC, p.level DESC, p.updated_at ASC
       LIMIT $1`,
-    [Math.min(Math.max(Number(limit) || 50, 1), 100)]
+    [lim]
   );
-  return rows.map((r) => ({
+  const entries = rows.map((r, i) => ({
+    rank: i + 1,
     userId: r.user_id,
     level: r.level,
     totalTaps: Number(r.total_taps),
@@ -890,6 +896,49 @@ async function leaderboard(limit = 50) {
     profileImageUrl: r.profile_image_url,
     profileAvatarKey: r.profile_avatar_key,
   }));
+
+  let me = null;
+  if (viewerId) {
+    const inTop = entries.find((e) => e.userId === viewerId);
+    if (inTop) {
+      me = { ...inTop, inTop: true };
+    } else {
+      const { rows: mine } = await pool.query(
+        `SELECT p.user_id, p.level, p.total_taps,
+                u.nickname, u.first_name, u.profile_image_url, u.profile_avatar_key,
+                (
+                  SELECT 1 + count(*)::int
+                    FROM tap_game_progress p2
+                    JOIN users u2 ON u2.id = p2.user_id
+                   WHERE u2.status = 'active'
+                     AND (
+                       p2.total_taps > p.total_taps
+                       OR (p2.total_taps = p.total_taps AND p2.level > p.level)
+                       OR (p2.total_taps = p.total_taps AND p2.level = p.level
+                           AND p2.updated_at < p.updated_at)
+                     )
+                ) AS rank
+           FROM tap_game_progress p
+           JOIN users u ON u.id = p.user_id
+          WHERE p.user_id = $1`,
+        [viewerId]
+      );
+      if (mine[0]) {
+        const r = mine[0];
+        me = {
+          rank: Number(r.rank) || null,
+          userId: r.user_id,
+          level: r.level,
+          totalTaps: Number(r.total_taps),
+          nickname: r.nickname || r.first_name || 'بازیکن',
+          profileImageUrl: r.profile_image_url,
+          profileAvatarKey: r.profile_avatar_key,
+          inTop: false,
+        };
+      }
+    }
+  }
+  return { entries, me, limit: lim };
 }
 
 // ── مدیریت ادمین (دورِ ۳۳) ─────────────────────────────────────────────────

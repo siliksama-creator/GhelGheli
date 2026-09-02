@@ -297,20 +297,6 @@ class _TapGameScreenState extends State<TapGameScreen>
     });
   }
 
-  /// رتبه‌بندی ضربه‌زن — آینهٔ پنلِ رتبه‌بندی در tapGame.jsx وب.
-  /// داده از GET /api/games/tap/leaderboard می‌آید تا بدون آپدیت تازه بماند.
-  void _openLeaderboard() {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF0B1220),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-      builder: (ctx) => _TapLeaderboardSheet(api: widget.api),
-    );
-  }
-
   void _showLevelUpDialog(int newLevel) {
     showDialog(
       context: context,
@@ -355,7 +341,6 @@ class _TapGameScreenState extends State<TapGameScreen>
               _engine.flushNow();
               widget.onBack();
             },
-            onLeaderboard: _openLeaderboard,
             level: _engine.level,
             levelCount: _engine.config.levelCount,
             points: _engine.pointsEarned,
@@ -392,6 +377,9 @@ class _TapGameScreenState extends State<TapGameScreen>
           // دورِ ۳۳: مهرِ سرور (isFinished) هم مثل عبورِ محلی از لولِ آخر
           // (isComplete) صفحهٔ پایان را می‌آورد — جمعِ امتیاز و سکه از
           // خودِ سرور، و پیامِ «تا ریستِ مدیر قفل».
+          //
+          // لیدربورد top-10 + رتبهٔ واقعیِ خودِ بازیکن، inline کنار کاراکتر
+          // (نه شیت جدا) — خواستهٔ مالک برای کاهش side-scroll/تب اضافه.
           child: _engine.isFinished
               ? _CompletionView(
                   points: _engine.pointsAwardedTotal > 0
@@ -403,12 +391,6 @@ class _TapGameScreenState extends State<TapGameScreen>
                       .skinForLevel(_engine.config.levelCount),
                 )
               : _engine.dailyCapReached
-                  // The character is REPLACED, not merely disabled. Leaving a
-                  // tappable character that silently does nothing is the
-                  // worst version of a limit: the player assumes the game is
-                  // broken. It also means the whole animation stack —
-                  // ticker, painter, cross-fade — is torn down for the rest
-                  // of the day instead of idling on screen.
                   ? _DailyCapView(
                       accent: _accent,
                       levelsPerDay: _engine.config.levelsPerDay,
@@ -416,16 +398,40 @@ class _TapGameScreenState extends State<TapGameScreen>
                       skin: _engine.skin,
                     )
                   : Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: Gaps.xl, vertical: Gaps.md),
-                      child: Center(
-                        child: TapCharacter(
-                          key: _characterKey,
-                          skin: _engine.skin,
-                          accent: _accent,
-                          onTap: _handleTap,
-                        ),
-                      ),
+                      padding: const EdgeInsets.fromLTRB(
+                          Gaps.sm, Gaps.xs, Gaps.sm, Gaps.xs),
+                      child: LayoutBuilder(builder: (context, c) {
+                        final sideBySide = c.maxWidth >= 340;
+                        final character = Center(
+                          child: TapCharacter(
+                            key: _characterKey,
+                            skin: _engine.skin,
+                            accent: _accent,
+                            onTap: _handleTap,
+                          ),
+                        );
+                        final board = _TapInlineLeaderboard(api: widget.api);
+                        if (!sideBySide) {
+                          return Column(
+                            children: [
+                              Expanded(flex: 3, child: character),
+                              const SizedBox(height: 6),
+                              SizedBox(height: 168, child: board),
+                            ],
+                          );
+                        }
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(flex: 5, child: character),
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: (c.maxWidth * 0.38).clamp(132.0, 200.0),
+                              child: board,
+                            ),
+                          ],
+                        );
+                      }),
                     ),
         ),
         if (_engine.notice != null)
@@ -473,7 +479,6 @@ class _TapGameScreenState extends State<TapGameScreen>
 class _Header extends StatelessWidget {
   const _Header({
     required this.onBack,
-    required this.onLeaderboard,
     required this.level,
     required this.levelCount,
     required this.points,
@@ -484,7 +489,6 @@ class _Header extends StatelessWidget {
   });
 
   final VoidCallback onBack;
-  final VoidCallback onLeaderboard;
   final int level;
   final int levelCount;
   final int points;
@@ -505,11 +509,6 @@ class _Header extends StatelessWidget {
             onPressed: onBack,
             icon: const Icon(Icons.arrow_forward_rounded),
             tooltip: 'بازگشت',
-          ),
-          IconButton(
-            onPressed: onLeaderboard,
-            icon: const Icon(Icons.emoji_events_rounded, size: 21),
-            tooltip: 'رتبه‌بندی',
           ),
           Expanded(
             child: Column(
@@ -1490,128 +1489,214 @@ class _SunburstPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-/// شیتِ رتبه‌بندی ضربه‌زن — فهرستِ ۳۰ نفرِ برتر با آواتار و جمعِ ضربه‌ها.
-/// آینهٔ پنلِ `.soloBoard` در وب؛ داده از سرور، پس همیشه تازه است.
-class _TapLeaderboardSheet extends StatelessWidget {
-  const _TapLeaderboardSheet({required this.api});
-
+/// لیدربورد inline کنار کاراکتر — top-10 + رتبهٔ واقعی خودت اگر خارج ۱۰.
+/// API: GET /api/games/tap/leaderboard → {entries, me, limit}
+class _TapInlineLeaderboard extends StatefulWidget {
+  const _TapInlineLeaderboard({required this.api});
   final ApiClient api;
+
+  @override
+  State<_TapInlineLeaderboard> createState() => _TapInlineLeaderboardState();
+}
+
+class _TapInlineLeaderboardState extends State<_TapInlineLeaderboard> {
+  late Future<Map<String, dynamic>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _load();
+  }
+
+  Future<Map<String, dynamic>> _load() async {
+    final raw = await widget.api.get('/api/games/tap/leaderboard?limit=10');
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    return <String, dynamic>{'entries': const [], 'me': null, 'limit': 10};
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(Gaps.lg, Gaps.md, Gaps.lg, Gaps.lg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.emoji_events_rounded, size: 20,
-                    color: Color(0xFFFBBF24)),
-                Gaps.hXs,
-                Text('رتبه‌بندی ضربه‌زن',
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w800)),
-                Gaps.hXs,
-                Text('بر اساس مجموع ضربه‌ها',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface
-                            .withValues(alpha: 0.55))),
-              ],
-            ),
-            Gaps.vSm,
-            Flexible(
-              child: FutureBuilder<dynamic>(
-                future: api.get('/api/games/tap/leaderboard?limit=30'),
-                builder: (context, snap) {
-                  if (snap.connectionState != ConnectionState.done) {
-                    return const Padding(
-                      padding: EdgeInsets.all(Gaps.md),
-                      child: Center(child: CircularProgressIndicator()),
-                    );
-                  }
-                  if (snap.hasError) {
-                    final msg = apiError(snap.error ?? 'خطا');
-                    return Padding(
-                      padding: const EdgeInsets.all(Gaps.md),
-                      child: Center(
-                        child: Text(
-                          msg.isNotEmpty ? msg : 'خطا در گرفتن رتبه‌بندی',
-                          style: theme.textTheme.bodyMedium,
-                        ),
-                      ),
-                    );
-                  }
-                  final entries = ((snap.data as Map?)?['entries'] as List?) ??
-                      const [];
-                  if (entries.isEmpty) {
-                    return const Padding(
-                      padding: EdgeInsets.all(Gaps.md),
-                      child: Center(
-                        child: Text('هنوز ضربه‌ای ثبت نشده. اولین نفر باش!'),
-                      ),
-                    );
-                  }
-                  return ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: entries.length,
-                    itemBuilder: (_, i) {
-                      final e = Map<String, dynamic>.from(entries[i] as Map);
-                      final taps = (e['totalTaps'] as num?)?.toInt() ?? 0;
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: Gaps.xs),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: Gaps.sm, vertical: Gaps.xxs),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.04),
-                          borderRadius: Corners.rMd,
-                          border: Border.all(color: Colors.white10),
-                        ),
-                        child: Row(
-                          children: [
-                            _RankBadge(rank: i + 1),
-                            Gaps.hSm,
-                            AvatarImage(
-                              keyName: e['profileAvatarKey'],
-                              imageUrl: e['profileImageUrl'],
-                              radius: 15,
-                            ),
-                            Gaps.hSm,
-                            Expanded(
-                              child: Text(
-                                '${e['nickname'] ?? 'بازیکن'}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.bodyMedium
-                                    ?.copyWith(fontWeight: FontWeight.w700),
-                              ),
-                            ),
-                            Text(
-                              '${faNum(taps)} ضربه',
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                  color: const Color(0xFFFBBF24),
-                                  fontWeight: FontWeight.w900),
-                            ),
-                            Gaps.hSm,
-                            Text(
-                              'لول ${faNum((e['level'] as num?)?.toInt() ?? 0)}',
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                  color: theme.colorScheme.onSurface
-                                      .withValues(alpha: 0.55)),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.045),
+        borderRadius: Corners.rMd,
+        border: Border.all(color: Colors.white12),
+      ),
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.emoji_events_rounded,
+                  size: 14, color: Color(0xFFFBBF24)),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  'رتبه‌بندی',
+                  style: theme.textTheme.labelLarge
+                      ?.copyWith(fontWeight: FontWeight.w900, fontSize: 12),
+                ),
+              ),
+              InkWell(
+                onTap: () => setState(() => _future = _load()),
+                borderRadius: BorderRadius.circular(99),
+                child: const Padding(
+                  padding: EdgeInsets.all(2),
+                  child: Icon(Icons.refresh_rounded, size: 14, color: Colors.white54),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Expanded(
+            child: FutureBuilder<Map<String, dynamic>>(
+              future: _future,
+              builder: (context, snap) {
+                if (snap.connectionState != ConnectionState.done) {
+                  return const Center(
+                    child: SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
                   );
-                },
+                }
+                if (snap.hasError) {
+                  return Center(
+                    child: Text(
+                      apiError(snap.error ?? 'خطا'),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 10, color: Colors.white60),
+                    ),
+                  );
+                }
+                final data = snap.data ?? const {};
+                final entries = (data['entries'] as List?) ?? const [];
+                final me = data['me'] is Map
+                    ? Map<String, dynamic>.from(data['me'] as Map)
+                    : null;
+                if (entries.isEmpty && me == null) {
+                  return const Center(
+                    child: Text(
+                      'هنوز کسی نیست\nاولین باش!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 10.5, color: Colors.white54),
+                    ),
+                  );
+                }
+                final showMe = me != null && me['inTop'] != true;
+                return Column(
+                  children: [
+                    Expanded(
+                      child: ListView.builder(
+                        padding: EdgeInsets.zero,
+                        itemCount: entries.length,
+                        itemBuilder: (_, i) {
+                          final e = Map<String, dynamic>.from(entries[i] as Map);
+                          return _TapLbRow(
+                            rank: (e['rank'] as num?)?.toInt() ?? (i + 1),
+                            nickname: '${e['nickname'] ?? 'بازیکن'}',
+                            taps: (e['totalTaps'] as num?)?.toInt() ?? 0,
+                            avatarKey: e['profileAvatarKey'],
+                            imageUrl: e['profileImageUrl'],
+                            highlight: false,
+                            dense: true,
+                          );
+                        },
+                      ),
+                    ),
+                    if (showMe) ...[
+                      const Divider(height: 8, color: Colors.white12),
+                      _TapLbRow(
+                        rank: (me['rank'] as num?)?.toInt() ?? 0,
+                        nickname: '${me['nickname'] ?? 'تو'}',
+                        taps: (me['totalTaps'] as num?)?.toInt() ?? 0,
+                        avatarKey: me['profileAvatarKey'],
+                        imageUrl: me['profileImageUrl'],
+                        highlight: true,
+                        dense: true,
+                      ),
+                    ],
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TapLbRow extends StatelessWidget {
+  const _TapLbRow({
+    required this.rank,
+    required this.nickname,
+    required this.taps,
+    required this.dense,
+    required this.highlight,
+    this.avatarKey,
+    this.imageUrl,
+  });
+
+  final int rank;
+  final String nickname;
+  final int taps;
+  final bool dense;
+  final bool highlight;
+  final dynamic avatarKey;
+  final dynamic imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: EdgeInsets.only(bottom: dense ? 3 : 6),
+      padding: EdgeInsets.symmetric(
+        horizontal: dense ? 4 : 8,
+        vertical: dense ? 3 : 6,
+      ),
+      decoration: BoxDecoration(
+        color: highlight
+            ? const Color(0xFF22E7A6).withValues(alpha: 0.12)
+            : Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: highlight ? const Color(0xFF22E7A6).withValues(alpha: 0.35) : Colors.transparent,
+        ),
+      ),
+      child: Row(
+        children: [
+          _RankBadge(rank: rank),
+          const SizedBox(width: 4),
+          AvatarImage(
+            keyName: avatarKey,
+            imageUrl: imageUrl,
+            radius: dense ? 10 : 14,
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(
+              nickname,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: dense ? 10 : 12,
+                fontWeight: FontWeight.w800,
+                color: highlight ? const Color(0xFF22E7A6) : Colors.white,
               ),
             ),
-          ],
-        ),
+          ),
+          Text(
+            faNum(taps),
+            style: TextStyle(
+              fontSize: dense ? 9.5 : 11,
+              fontWeight: FontWeight.w900,
+              color: const Color(0xFFFBBF24),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -229,35 +229,47 @@ class _GrowthPanelState extends State<GrowthPanel> {
         Gaps.vSm,
         const Text('ماموریت‌های امروز', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, letterSpacing: -0.2)),
         Gaps.vXs,
-        SizedBox(height: 176, child: ListView.separated(scrollDirection: Axis.horizontal,
-          itemCount: daily.length, separatorBuilder: (_, __) => const SizedBox(width: 8),
-          itemBuilder: (_, index) {
-            final m = daily[index];
-            final complete = m['complete'] == true; final claimed = m['claimed'] == true;
-            final progress = (m['progress'] as num?)?.toDouble() ?? 0; final goal = (m['goal'] as num?)?.toDouble() ?? 1;
-            return Container(width: 226, padding: const EdgeInsets.all(12), decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: .045), borderRadius: Corners.rMd,
-              border: Border.all(color: complete ? const Color(0xFFFFD166) : Colors.white12)),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  Text(m['period'] == 'daily' ? 'روزانه' : 'هفتگی', style: const TextStyle(color: Color(0xFF7DD8FF), fontSize: 11.5, fontWeight: FontWeight.w800)),
-                  const Spacer(),
-                  Text('+${faNum(m['reward'])}', style: const TextStyle(color: Color(0xFFFFD166), fontSize: 14.5, fontWeight: FontWeight.w900)),
+        // ماموریت‌های روزانه عمودی — بدون side-scroll
+        ...[
+          for (var index = 0; index < daily.length; index++) ...[
+            if (index > 0) const SizedBox(height: 8),
+            Builder(builder: (_) {
+              final m = daily[index];
+              final complete = m['complete'] == true; final claimed = m['claimed'] == true;
+              final progress = (m['progress'] as num?)?.toDouble() ?? 0; final goal = (m['goal'] as num?)?.toDouble() ?? 1;
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: .045),
+                  borderRadius: Corners.rMd,
+                  border: Border.all(color: complete ? const Color(0xFFFFD166) : Colors.white12),
+                ),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Text(m['period'] == 'daily' ? 'روزانه' : 'هفتگی', style: const TextStyle(color: Color(0xFF7DD8FF), fontSize: 11.5, fontWeight: FontWeight.w800)),
+                    const Spacer(),
+                    Text('+${faNum(m['reward'])}', style: const TextStyle(color: Color(0xFFFFD166), fontSize: 14.5, fontWeight: FontWeight.w900)),
+                  ]),
+                  const SizedBox(height: 4),
+                  Text('${m['title']}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, height: 1.35)),
+                  Text('${m['description']}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Color(0xFFB6C6D8), height: 1.5)),
+                  const SizedBox(height: 8),
+                  ClipRRect(borderRadius: BorderRadius.circular(99),
+                    child: LinearProgressIndicator(value: (progress / goal).clamp(0.0, 1.0), minHeight: 9)),
+                  const SizedBox(height: 7),
+                  Row(children: [
+                    Expanded(child: Text('${m['progress']}/${m['goal']}', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800))),
+                    SizedBox(height: 34, child: FilledButton(
+                      style: _compactClaimStyle(),
+                      onPressed: !complete || claimed ? null : () => _run('${m['key']}', () => widget.api.post('/api/missions/${m['key']}/claim', {})),
+                      child: Text(claimed ? 'گرفته شد' : complete ? 'دریافت' : 'ادامه', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900)))),
+                  ]),
                 ]),
-                Text('${m['title']}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, height: 1.35)),
-                Text('${m['description']}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Color(0xFFB6C6D8), height: 1.5)),
-                const Spacer(), ClipRRect(borderRadius: BorderRadius.circular(99),
-                  child: LinearProgressIndicator(value: (progress / goal).clamp(0.0, 1.0), minHeight: 9)),
-                const SizedBox(height: 7), Row(children: [
-                  Expanded(child: Text('${m['progress']}/${m['goal']}', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800))),
-                  SizedBox(height: 34, child: FilledButton(
-                    style: _compactClaimStyle(),
-                    onPressed: !complete || claimed ? null : () => _run('${m['key']}', () => widget.api.post('/api/missions/${m['key']}/claim', {})),
-                    child: Text(claimed ? 'گرفته شد' : complete ? 'دریافت' : 'ادامه', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900)))),
-                ]),
-              ]),
-            );
-          })),
+              );
+            }),
+          ],
+        ],
         Gaps.vSm,
         _WeeklyMissions(
           missions: weekly,

@@ -243,8 +243,12 @@ void main() {
           reason: 'مسیر تصویر باید مستقیماً از slug سرور ساخته شود');
       expect(source.contains('cacheWidth: 640'), isTrue,
           reason: 'پیش‌نمایش فروشگاه باید سقف decode صریح داشته باشد');
-      expect(source.contains('scrollDirection: Axis.horizontal'), isTrue,
-          reason: 'فقط تصاویر نزدیک viewport باید ساخته شوند');
+      // شبکهٔ عمودی به‌جای carousel افقی — shrinkWrap + NeverScrollable
+      // تا فقط با اسکرول صفحه decode شود، نه side-scroll جدا.
+      expect(source.contains('GridView.builder'), isTrue,
+          reason: 'ویترین فروشگاه باید شبکه باشد نه carousel افقی');
+      expect(source.contains('scrollDirection: Axis.horizontal'), isFalse,
+          reason: 'side-scroll افقی از فروشگاه حذف شده');
 
       final files = Directory('assets/shop/cosmetics')
           .listSync()

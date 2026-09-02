@@ -244,22 +244,34 @@ function App() {
           {cfg.features.maintenance.message || 'سرویس موقتاً در دسترس نیست. کمی بعد دوباره سر بزن.'}
         </div>
       )}
-      {cfg?.announcement?.active && cfg.announcement.text && (
-        <a
-          className="cfgBanner"
-          href={cfg.announcement.link || undefined}
-          target={cfg.announcement.link ? '_blank' : undefined}
-          rel="noreferrer"
-          style={{
-            display: 'block', textAlign: 'center', padding: '9px 14px',
-            fontSize: 12.5, fontWeight: 800, color: '#1a0f02',
-            background: 'linear-gradient(90deg,#FFD166,#F97316)',
-            textDecoration: 'none',
-          }}
-        >
-          {cfg.announcement.text}
-        </a>
-      )}
+      {cfg?.announcement?.active && cfg.announcement.text && (() => {
+        const link = String(cfg.announcement.link || '');
+        const text = String(cfg.announcement.text || '');
+        const isShop = /shop|فروشگاه/i.test(link) || /فروشگاه/.test(text);
+        const open = (e) => {
+          if (!isShop) return;
+          e.preventDefault();
+          if (token) setTab('shop');
+        };
+        return (
+          <a
+            className="cfgBanner"
+            href={isShop ? undefined : (link || undefined)}
+            target={!isShop && link ? '_blank' : undefined}
+            rel="noreferrer"
+            onClick={open}
+            role={isShop ? 'button' : undefined}
+            style={{
+              display: 'block', textAlign: 'center', padding: '9px 14px',
+              fontSize: 12.5, fontWeight: 800, color: '#1a0f02',
+              background: 'linear-gradient(90deg,#FFD166,#F97316)',
+              textDecoration: 'none', cursor: 'pointer',
+            }}
+          >
+            {cfg.announcement.text}
+          </a>
+        );
+      })()}
       {/* The animated brand mark. Matches the Flutter AnimatedLogo widget:
           aurora behind, settle-in entrance, a specular sweep clipped to the
           logo's own shape, and phased sparkles. Built with CSS rather than a

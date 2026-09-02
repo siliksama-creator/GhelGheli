@@ -52,67 +52,63 @@ ButtonStyle _compactClaimStyle({double height = 27}) => ButtonStyle(
 ///
 /// عمداً کپی است و نه import: `GrowthPanel` به `ApiClient` و سوکت نیاز
 /// دارد و آوردنشان آزمونِ چیدمان را به آزمونِ شبکه تبدیل می‌کرد. عددهای
-/// چیدمان (۱۳۲، ۱۹۰، ۲۷، فونت ۹.۵) دقیقاً همان‌هایند.
+/// چیدمان دکمه (ارتفاع ۲۷، فونت ۹.۵) و _compactClaimStyle همان‌اند.
 Widget _missionCard({
   required bool complete,
   required bool claimed,
   required bool fixed,
 }) {
-  return SizedBox(
-    height: 132,
-    child: ListView.separated(
-      scrollDirection: Axis.horizontal,
-      itemCount: 1,
-      separatorBuilder: (_, __) => const SizedBox(width: 8),
-      itemBuilder: (_, __) => Container(
-        width: 190,
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: .045),
-          borderRadius: Corners.rMd,
-          border: Border.all(
-              color: complete ? const Color(0xFFFFD166) : Colors.white12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Row(children: [
-              Text('روزانه',
-                  style: TextStyle(color: Color(0xFF38BDF8), fontSize: 9.5)),
-              Spacer(),
-              Text('+۳۶',
-                  style: TextStyle(
-                      color: Color(0xFFFFD166),
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w900)),
-            ]),
-            const Text('شروع پرقدرت · سطح ۱',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900)),
-            const Text('۴ مسابقه را تا پایان کامل کن',
-                maxLines: 1,
-                style: TextStyle(fontSize: 9.5, color: Colors.white54)),
-            const Spacer(),
-            const LinearProgressIndicator(value: 1, minHeight: 5),
-            const SizedBox(height: 5),
-            Row(children: [
-              const Expanded(
-                  child: Text('۴/۴', style: TextStyle(fontSize: 9.5))),
-              SizedBox(
-                height: 27,
-                child: FilledButton(
-                  style: fixed ? _compactClaimStyle() : null,
-                  onPressed: !complete || claimed ? null : () {},
-                  child: Text(
-                      claimed ? 'گرفته شد' : complete ? 'دریافت' : 'ادامه',
-                      style: const TextStyle(fontSize: 9.5)),
-                ),
-              ),
-            ]),
-          ],
-        ),
-      ),
+  // آینهٔ چیدمان عمودیِ فعلی growth_panel — بدون side-scroll.
+  // دکمه هنوز داخل Row با ارتفاع ثابت است؛ همان باگِ minimumSize
+  // بی‌نهایت باید اینجا قابل بازتولید باشد.
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: .045),
+      borderRadius: Corners.rMd,
+      border: Border.all(
+          color: complete ? const Color(0xFFFFD166) : Colors.white12),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Row(children: [
+          Text('روزانه',
+              style: TextStyle(color: Color(0xFF38BDF8), fontSize: 9.5)),
+          Spacer(),
+          Text('+۳۶',
+              style: TextStyle(
+                  color: Color(0xFFFFD166),
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w900)),
+        ]),
+        const Text('شروع پرقدرت · سطح ۱',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900)),
+        const Text('۴ مسابقه را تا پایان کامل کن',
+            maxLines: 1,
+            style: TextStyle(fontSize: 9.5, color: Colors.white54)),
+        const SizedBox(height: 8),
+        const LinearProgressIndicator(value: 1, minHeight: 5),
+        const SizedBox(height: 5),
+        Row(children: [
+          const Expanded(
+              child: Text('۴/۴', style: TextStyle(fontSize: 9.5))),
+          SizedBox(
+            height: 27,
+            child: FilledButton(
+              style: fixed ? _compactClaimStyle() : null,
+              onPressed: !complete || claimed ? null : () {},
+              child: Text(
+                  claimed ? 'گرفته شد' : complete ? 'دریافت' : 'ادامه',
+                  style: const TextStyle(fontSize: 9.5)),
+            ),
+          ),
+        ]),
+      ],
     ),
   );
 }

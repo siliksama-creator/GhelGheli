@@ -334,31 +334,28 @@ class _ShopPageState extends State<ShopPage> {
               ),
               if (_showPlans && plans.isNotEmpty) ...[
                 Gaps.vSm,
-                SizedBox(
-                  height: MediaQuery.sizeOf(context).width < 390 ? 380 : 354,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: plans.length,
-                    separatorBuilder: (_, __) => Gaps.hSm,
-                    itemBuilder: (_, index) {
-                      final plan = plans[index];
-                      final monthly = plans.cast<Map>().firstWhere(
-                        (p) => p['billingCycle'] == 'monthly' || p['key'] == 'monthly',
-                        orElse: () => <String, dynamic>{},
-                      );
-                      final monthlyPrice = (monthly['price'] as num?)?.toInt()
-                          ?? (plus['price'] as num?)?.toInt()
-                          ?? 59000;
-                      return _PlanCard(
-                        plan: plan,
-                        activeTier: '${plus['tier'] ?? ''}',
-                        busy: _busy == 'plus-${plan['billingCycle']}',
-                        onBuy: () => _buyPlan(plan),
-                        monthlyPrice: monthlyPrice,
-                      );
-                    },
-                  ),
-                ),
+                // عمودی — بدون side-scroll؛ هر پلن یک کارت تمام‌عرض
+                for (var index = 0; index < plans.length; index++) ...[
+                  if (index > 0) Gaps.vSm,
+                  Builder(builder: (_) {
+                    final plan = plans[index];
+                    final monthly = plans.cast<Map>().firstWhere(
+                      (p) => p['billingCycle'] == 'monthly' || p['key'] == 'monthly',
+                      orElse: () => <String, dynamic>{},
+                    );
+                    final monthlyPrice = (monthly['price'] as num?)?.toInt()
+                        ?? (plus['price'] as num?)?.toInt()
+                        ?? 59000;
+                    return _PlanCard(
+                      plan: plan,
+                      activeTier: '${plus['tier'] ?? ''}',
+                      busy: _busy == 'plus-${plan['billingCycle']}',
+                      onBuy: () => _buyPlan(plan),
+                      monthlyPrice: monthlyPrice,
+                      fullWidth: true,
+                    );
+                  }),
+                ],
               ],
               Gaps.vSm,
               // صندوقِ کارت بالای قفسه می‌نشیند چون تنها راهِ ورود به دوئل
@@ -409,22 +406,18 @@ class _ShopPageState extends State<ShopPage> {
                   ],
                 ),
               ),
-              SizedBox(
-                height: 44,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: available.length,
-                  separatorBuilder: (_, __) => Gaps.hXxs,
-                  itemBuilder: (_, index) {
-                    final category = available[index];
-                    return ChoiceChip(
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final category in available)
+                    ChoiceChip(
                       selected: _kind == category.$1,
                       avatar: Icon(category.$3, size: 17),
                       label: Text(category.$2),
                       onSelected: (_) => setState(() => _kind = category.$1),
-                    );
-                  },
-                ),
+                    ),
+                ],
               ),
               Gaps.vSm,
               _CategoryShelf(
@@ -633,12 +626,14 @@ class _PlanCard extends StatelessWidget {
     required this.busy,
     required this.onBuy,
     this.monthlyPrice = 59000,
+    this.fullWidth = false,
   });
   final Map<String, dynamic> plan;
   final String activeTier;
   final bool busy;
   final VoidCallback onBuy;
   final int monthlyPrice;
+  final bool fullWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -647,7 +642,7 @@ class _PlanCard extends StatelessWidget {
     final benefits =
         ((plan['benefits'] as List?) ?? const []).take(annual ? 9 : 5);
     return SizedBox(
-      width: 300,
+      width: fullWidth ? double.infinity : 300,
       child: AppCard(
         color: annual ? const Color(0xFF2D2340) : const Color(0xFF101D2B),
         child: Column(
@@ -807,30 +802,44 @@ class _CategoryShelf extends StatelessWidget {
                 child: Text(title,
                     style: const TextStyle(
                         fontSize: 14, fontWeight: FontWeight.w900))),
-            Text('${faNum(items.length)} انتخاب · ورق بزن',
+            Text('${faNum(items.length)} مورد',
                 style: const TextStyle(fontSize: 9.5, color: Colors.white54)),
           ]),
           Gaps.vXs,
-          SizedBox(
-            height: 280,
-            child: items.isEmpty
-                ? const Center(child: Text('آیتمی در این دسته نیست.'))
-                : ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: items.length,
-                    separatorBuilder: (_, __) => Gaps.hSm,
-                    itemBuilder: (_, index) {
-                      final item = items[index];
-                      return _ProductCard(
-                        item: item,
-                        busy: busy == 'buy-${item['id']}' ||
-                            busy == 'equip-${item['id']}',
-                        onBuy: () => onBuy(item),
-                        onEquip: () => onEquip(item),
-                      );
-                    },
-                  ),
-          ),
+          if (items.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 28),
+              child: Center(child: Text('آیتمی در این دسته نیست.')),
+            )
+          else
+            // شبکهٔ ۲ ستونه — بدون side-scroll؛ اسکرول فقط عمودیِ صفحه
+            LayoutBuilder(builder: (context, c) {
+              final w = c.maxWidth;
+              final cross = w >= 720 ? 3 : 2;
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: items.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: cross,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                  // کارت بلندتر از مربعی تا دکمه و قیمت جا شود
+                  childAspectRatio: w < 400 ? 0.68 : 0.72,
+                ),
+                itemBuilder: (_, index) {
+                  final item = items[index];
+                  return _ProductCard(
+                    item: item,
+                    busy: busy == 'buy-${item['id']}' ||
+                        busy == 'equip-${item['id']}',
+                    onBuy: () => onBuy(item),
+                    onEquip: () => onEquip(item),
+                    compact: true,
+                  );
+                },
+              );
+            }),
         ],
       ),
     );
@@ -843,11 +852,13 @@ class _ProductCard extends StatelessWidget {
     required this.busy,
     required this.onBuy,
     required this.onEquip,
+    this.compact = false,
   });
   final Map<String, dynamic> item;
   final bool busy;
   final VoidCallback onBuy;
   final VoidCallback onEquip;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -855,9 +866,7 @@ class _ProductCard extends StatelessWidget {
     final selected = item['equipped'] == true;
     final owned = item['owned'] == true;
     final annualGift = item['access_tier'] == 'annual';
-    return SizedBox(
-      width: MediaQuery.sizeOf(context).width < 500 ? 276 : 235,
-      child: Container(
+    final card = Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           borderRadius: Corners.rXl,
@@ -950,7 +959,11 @@ class _ProductCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
+    );
+    if (compact) return card;
+    return SizedBox(
+      width: MediaQuery.sizeOf(context).width < 500 ? 276 : 235,
+      child: card,
     );
   }
 }

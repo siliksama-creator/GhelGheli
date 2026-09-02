@@ -884,6 +884,7 @@ class _HomeShellState extends State<HomeShell>
               _AnnouncementBanner(
                 announcement: _announcement!,
                 onDismiss: () => setState(() => _announcement = null),
+                onOpenShop: () => setState(() => _index = shopIndex),
               ),
             Expanded(
               child: FadeTransition(
@@ -1307,10 +1308,26 @@ class _AnnouncementBanner extends StatelessWidget {
   const _AnnouncementBanner({
     required this.announcement,
     required this.onDismiss,
+    this.onOpenShop,
   });
 
   final Map<String, dynamic> announcement;
   final VoidCallback onDismiss;
+  /// اگر لینک به فروشگاه اشاره کند، به‌جای مرورگر خارجی تب فروشگاه باز می‌شود.
+  final VoidCallback? onOpenShop;
+
+  static bool _isShopLink(String link) {
+    final l = link.toLowerCase();
+    if (l.isEmpty) return false;
+    if (l == 'shop' || l == '/shop' || l.endsWith('/shop')) return true;
+    if (l.contains('ghelghelishop') && l.contains('shop')) return true;
+    if (l.contains('/shop') || l.contains('tab=shop') || l.contains('page=shop')) {
+      return true;
+    }
+    // متن‌های رایج داشبورد
+    if (l.contains('فروشگاه')) return true;
+    return false;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1323,13 +1340,18 @@ class _AnnouncementBanner extends StatelessWidget {
             : announcement['accent'] == 'orange'
                 ? const Color(0xFFF97316)
                 : const Color(0xFFFFD166);
+    final openShop = onOpenShop != null && (_isShopLink(link) || text.contains('فروشگاه'));
     return Material(
       color: accent.withValues(alpha: 0.14),
       child: InkWell(
-        onTap: link.isNotEmpty
-            ? () => launchUrl(Uri.parse(link),
-                mode: LaunchMode.externalApplication).catchError((_) => false)
-            : null,
+        onTap: openShop
+            ? () {
+                onOpenShop!();
+              }
+            : link.isNotEmpty
+                ? () => launchUrl(Uri.parse(link),
+                    mode: LaunchMode.externalApplication).catchError((_) => false)
+                : null,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: Row(

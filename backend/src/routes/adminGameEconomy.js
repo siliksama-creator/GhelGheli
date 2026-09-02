@@ -81,7 +81,9 @@ module.exports = function createAdminGameEconomyRoutes(deps) {
   // همان تابعِ leaderboard عمومی است (userId را هم برمی‌گرداند) تا
   // پنل بتواند روی هر ردیف «نقدی/فروشگاهی» بفرستد.
   router.get('/admin/tap/leaderboard', adminAuth, asyncHandler(async (req, res) => {
-    res.json({ entries: await tapGame.leaderboard(req.query.limit) });
+    // شکل جدید {entries, me} — برای سازگاری همان entries را بیرون می‌دهیم
+    const data = await tapGame.leaderboard(req.query.limit || 10, null);
+    res.json({ entries: data.entries || data });
   }));
 
   // POST reset — ریستِ یک کاربر (userId) یا همه (all:true).

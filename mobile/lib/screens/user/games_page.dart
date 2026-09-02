@@ -485,49 +485,46 @@ class _GamesHubPageState extends State<GamesHubPage> {
         // انتخابِ حالت» را از بقیهٔ صفحه جدا کند. بدونِ کلید، تست
         // مجبور بود متن را در کلِ صفحه بشمارد — و وقتی کاشی‌ها مربعی
         // شدند و نشانِ حالت را هم نشان دادند، شکست.
-        SingleChildScrollView(
+        // Wrap به‌جای side-scroll — همهٔ حالت‌ها در چند ردیف جا می‌گیرند
+        Wrap(
           key: const Key('gameModeBar'),
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              for (final stake in _publicStakes) ...[
-                SizedBox(
-                  width: 96,
-                  child: _ModePill(
-                    title: '${faNum(stake)} امتیاز',
-                    icon: stake >= 1000 ? Icons.stars_rounded : Icons.bolt_rounded,
-                    selected: _selectedMode == stake,
-                    color: stake >= 1000
-                        ? const Color(0xFFFFD166)
-                        : const Color(0xFF38BDF8),
-                    onTap: () => setState(() => _selectedMode = stake),
-                  ),
-                ),
-                Gaps.hXs,
-              ],
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            for (final stake in _publicStakes)
               SizedBox(
-                width: 110,
+                width: 96,
                 child: _ModePill(
-                  title: 'تمرین با ربات',
-                  icon: Icons.smart_toy_rounded,
-                  selected: _selectedMode == 0,
-                  color: const Color(0xFF22E7A6),
-                  onTap: () => setState(() => _selectedMode = 0),
+                  title: '${faNum(stake)} امتیاز',
+                  icon: stake >= 1000 ? Icons.stars_rounded : Icons.bolt_rounded,
+                  selected: _selectedMode == stake,
+                  color: stake >= 1000
+                      ? const Color(0xFFFFD166)
+                      : const Color(0xFF38BDF8),
+                  onTap: () => setState(() => _selectedMode = stake),
                 ),
               ),
-              Gaps.hXs,
-              SizedBox(
-                width: 110,
-                child: _ModePill(
-                  title: 'اتاق خصوصی',
-                  icon: Icons.meeting_room_rounded,
-                  selected: _selectedMode == -1,
-                  color: const Color(0xFFA855F7),
-                  onTap: () => setState(() => _selectedMode = -1),
-                ),
+            SizedBox(
+              width: 110,
+              child: _ModePill(
+                title: 'تمرین با ربات',
+                icon: Icons.smart_toy_rounded,
+                selected: _selectedMode == 0,
+                color: const Color(0xFF22E7A6),
+                onTap: () => setState(() => _selectedMode = 0),
               ),
-            ],
-          ),
+            ),
+            SizedBox(
+              width: 110,
+              child: _ModePill(
+                title: 'اتاق خصوصی',
+                icon: Icons.meeting_room_rounded,
+                selected: _selectedMode == -1,
+                color: const Color(0xFFA855F7),
+                onTap: () => setState(() => _selectedMode = -1),
+              ),
+            ),
+          ],
         ),
         Gaps.vSm,
         _StakeRulesBanner(mode: _selectedMode),
@@ -1250,24 +1247,20 @@ class _PrivateLobbyHubState extends State<_PrivateLobbyHub> {
               // Stake presets (Up to 10,000)
               const Text('تعیین امتیاز مسابقه:', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11.5, fontWeight: FontWeight.w700)),
               const SizedBox(height: 4),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    for (final s in _presetStakes)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 6),
-                        child: ChoiceChip(
-                          label: Text(s == 0 ? 'رایگان' : faNum(s), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900)),
-                          selected: _stake == s,
-                          selectedColor: const Color(0xFFA855F7),
-                          onSelected: (val) {
-                            if (val) setState(() => _stake = s);
-                          },
-                        ),
-                      ),
-                  ],
-                ),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final s in _presetStakes)
+                    ChoiceChip(
+                      label: Text(s == 0 ? 'رایگان' : faNum(s), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900)),
+                      selected: _stake == s,
+                      selectedColor: const Color(0xFFA855F7),
+                      onSelected: (val) {
+                        if (val) setState(() => _stake = s);
+                      },
+                    ),
+                ],
               ),
               const SizedBox(height: 10),
 

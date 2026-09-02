@@ -804,7 +804,9 @@ app.post('/api/games/tap/progress', auth, tapBatchLimiter.mw, asyncHandler(async
 }));
 
 app.get('/api/games/tap/leaderboard', auth, asyncHandler(async (req, res) => {
-  res.json({ entries: await tapGame.leaderboard(req.query.limit) });
+  // limit پیش‌فرض ۱۰ — UI کنار کاراکتر؛ me = رتبهٔ واقعی بیننده
+  const data = await tapGame.leaderboard(req.query.limit || 10, req.user.id);
+  res.json(data);
 }));
 
 // ── دوئل پنج‌کارتی زنده ──────────────────────────────────────────────────

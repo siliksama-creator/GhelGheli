@@ -746,6 +746,32 @@ button:hover {
 .tapBoardWho img{border-radius:50%;object-fit:cover;flex:none}
 .tapBoardWho b{min-width:0}
 
+/* لیدربورد inline کنار کاراکتر — top-10 + me */
+.tapPlayRow{display:flex;gap:12px;align-items:stretch;width:100%}
+.tapPlayMain{flex:1;min-width:0}
+.tapInlineBoard{
+  flex:0 0 clamp(140px,28vw,200px);
+  max-height:min(52vh,420px);
+  display:flex;flex-direction:column;gap:6px;
+  padding:8px 8px 6px;
+  border-radius:16px;
+  background:#ffffff0b;border:1px solid #ffffff14;
+  overflow:hidden;
+}
+.tapInlineBoardHead{display:flex;align-items:center;gap:6px;font-size:12px}
+.tapInlineBoardHead b{flex:1;font-weight:900}
+.tapInlineBoardHead button{padding:2px 6px;font-size:12px;min-width:0}
+.tapInlineBoardList{overflow-y:auto;display:flex;flex-direction:column;gap:3px;flex:1;min-height:0}
+.tapInlineRow{padding:4px 6px!important;gap:6px!important;font-size:11px}
+.tapInlineRow .rk{width:18px;font-size:10px}
+.tapInlineRow .soloTime{font-size:10px;white-space:nowrap}
+.tapInlineMe{background:rgba(34,231,166,.12)!important;border:1px solid rgba(34,231,166,.35);border-radius:8px}
+@media(max-width:560px){
+  .tapPlayRow{flex-direction:column}
+  .tapInlineBoard{flex:0 0 auto;max-height:180px;width:100%}
+}
+
+
 .tapProgress{display:flex;flex-direction:column;gap:6px}
 .tapProgressTop{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
 .tapProgressTop b{color:#a3e635;font-weight:800;font-size:14px}

@@ -116,7 +116,7 @@ assert(server.includes('shop.emotePacksFor(req.user.id)'));
 assert(server.includes('await isAllowedChatMessage(clean, req.user.id)'));
 assert(webShop.includes('shopNav') && webShop.includes('shopCarousel'));
 assert(webShop.includes("billingCycle === 'annual'"));
-assert(mobileShop.includes('ChoiceChip') && mobileShop.includes('Axis.horizontal'));
+assert(mobileShop.includes('ChoiceChip') && mobileShop.includes('GridView.builder'));
 assert(mobileShop.includes("'billingCycle': plan['billingCycle']"));
 for (const removed of ['result_template', 'match_effect']) {
   assert(removalMigration.includes(removed), `removal migration missing ${removed}`);

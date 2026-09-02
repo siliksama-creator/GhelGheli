@@ -290,8 +290,9 @@ export default function TapGame({ token, onBack, economy }) {
   const [rate, setRate] = useState(0);
   const [floaters, setFloaters] = useState([]);
   const [pulse, setPulse] = useState(false);
-  const [showBoard, setShowBoard] = useState(false);
+  // لیدربورد inline (top-10 + me) — بدون تب/پنل جدا
   const [board, setBoard] = useState(null);
+  const [boardMe, setBoardMe] = useState(null);
   const [boardErr, setBoardErr] = useState('');
 
   const guardRef = useRef(createGuard());
@@ -764,18 +765,19 @@ export default function TapGame({ token, onBack, economy }) {
 
   const nearLimit = rate >= CFG.maxTapsPerSecond - 2;
 
-  // رتبه‌بندی ضربه‌زن — GET /api/games/tap/leaderboard. عدد و نام‌ها از
-  // سرور می‌آیند تا همیشه تازه باشد و به هیچ آپدیتی نیاز نداشته باشد.
+  // رتبه‌بندی inline — top-10 + رتبهٔ واقعی خودت اگر خارج ۱۰.
   const loadBoard = useCallback(async () => {
-    if (board) return;
     setBoardErr('');
     try {
-      const d = await req('/api/games/tap/leaderboard?limit=30', 'GET', null, token);
+      const d = await req('/api/games/tap/leaderboard?limit=10', 'GET', null, token);
       setBoard(d.entries || []);
+      setBoardMe(d.me || null);
     } catch (e) {
       setBoardErr(e.message || 'خطا در گرفتن رتبه‌بندی');
     }
-  }, [board, token]);
+  }, [token]);
+
+  useEffect(() => { loadBoard(); }, [loadBoard]);
 
   return (
     <section className="card wide tapGame">
@@ -798,46 +800,7 @@ export default function TapGame({ token, onBack, economy }) {
           </span>
         )}
         <span className="tapTotal"> {fa(points)} امتیاز</span>
-        <button type="button" className="ghost tapBoardBtn"
-          onClick={() => {
-            if (!showBoard && !board && !boardErr) loadBoard();
-            setShowBoard(v => !v);
-          }}>
-          <SvgIcon name="trophy" size={15} />
-          رتبه‌بندی
-        </button>
       </div>
-
-      {showBoard && (
-        <div className="soloBoard">
-          <h3>
-            رتبه‌بندی ضربه‌زن
-            <small>بر اساس مجموع ضربه‌ها</small>
-          </h3>
-          {boardErr ? (
-            <p className="hint">{boardErr}</p>
-          ) : !board ? (
-            <p className="hint">در حال بارگذاری...</p>
-          ) : !board.length ? (
-            <p className="hint">هنوز ضربه‌ای ثبت نشده. اولین نفر باش!</p>
-          ) : (
-            board.map((e, i) => (
-              <div className="soloRow" key={e.userId}>
-                <span className="rk">{fa(i + 1)}</span>
-                <span className="tapBoardWho">
-                  <img
-                    src={e.profileImageUrl ? asset(e.profileImageUrl) : avatarUrl(e.profileAvatarKey)}
-                    alt="" width="22" height="22" loading="lazy"
-                  />
-                  <b>{e.nickname}</b>
-                </span>
-                <span className="soloTime">{fa(e.totalTaps)} ضربه</span>
-                <small>لول {fa(e.level)}</small>
-              </div>
-            ))
-          )}
-        </div>
-      )}
 
       {/* ── راهنمای سکه: «هر لول N سکه» — عدد از تنظیماتِ ادمین می‌آید ── */}
       <div className="tapCoinGuide">
@@ -895,7 +858,10 @@ export default function TapGame({ token, onBack, economy }) {
 
       {notice && <div className="tapNotice">{notice}</div>}
 
-      {isComplete ? (
+      
+      <div className="tapPlayRow">
+        <div className="tapPlayMain">
+{isComplete ? (
         // ── صفحهٔ «بازی تمام شد» (دورِ ۳۳) ──
         // خواستهٔ مالک: «به کاربر تمامی امتیازات بدست‌آورده از بازی
         // ضربه‌زن و همینطور سکه نمایش داده بشه» و تا ریستِ ادمین قفل.
@@ -963,6 +929,54 @@ export default function TapGame({ token, onBack, economy }) {
           ))}
         </div>
       )}
+        </div>
+        {!isComplete && !capped && (
+          <aside className="tapInlineBoard" aria-label="رتبه‌بندی ضربه‌زن">
+            <div className="tapInlineBoardHead">
+              <SvgIcon name="trophy" size={14} />
+              <b>رتبه‌بندی</b>
+              <button type="button" className="ghost" onClick={loadBoard} title="تازه‌سازی">↻</button>
+            </div>
+            {boardErr ? (
+              <p className="hint">{boardErr}</p>
+            ) : !board ? (
+              <p className="hint">…</p>
+            ) : !board.length ? (
+              <p className="hint">هنوز کسی نیست</p>
+            ) : (
+              <div className="tapInlineBoardList">
+                {board.map((e, i) => (
+                  <div className="soloRow tapInlineRow" key={e.userId || i}>
+                    <span className="rk">{fa(e.rank ?? (i + 1))}</span>
+                    <span className="tapBoardWho">
+                      <img
+                        src={e.profileImageUrl ? asset(e.profileImageUrl) : avatarUrl(e.profileAvatarKey)}
+                        alt="" width="18" height="18" loading="lazy"
+                      />
+                      <b>{e.nickname}</b>
+                    </span>
+                    <span className="soloTime">{fa(e.totalTaps)}</span>
+                  </div>
+                ))}
+                {boardMe && boardMe.inTop !== true && (
+                  <div className="soloRow tapInlineRow tapInlineMe">
+                    <span className="rk">{fa(boardMe.rank)}</span>
+                    <span className="tapBoardWho">
+                      <img
+                        src={boardMe.profileImageUrl ? asset(boardMe.profileImageUrl) : avatarUrl(boardMe.profileAvatarKey)}
+                        alt="" width="18" height="18" loading="lazy"
+                      />
+                      <b>{boardMe.nickname || 'تو'}</b>
+                    </span>
+                    <span className="soloTime">{fa(boardMe.totalTaps)}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </aside>
+        )}
+      </div>
+
 
       <p className="tapHint">
         {isComplete ? `همهٔ ${fa(CFG.levelCount)} لول تمام شد!`
