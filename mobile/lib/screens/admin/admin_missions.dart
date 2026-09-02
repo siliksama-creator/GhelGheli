@@ -31,6 +31,10 @@ class _AdminMissionsState extends State<AdminMissions> {
 
   Map<String, dynamic> _config = const {};
   List<Map<String, dynamic>> _builtin = [];
+  double _mScale = 1;
+  String _mScope = 'all';
+  bool _mScaleBusy = false;
+  bool _scaleDailyBonus = true;
   List<Map<String, dynamic>> _customs = [];
   List<String> _events = const [];
   List<String> _periods = const [];
@@ -223,6 +227,45 @@ class _AdminMissionsState extends State<AdminMissions> {
     await _run(() => widget.api.delete('/api/admin/missions/${m['key']}'));
   }
 
+
+  Future<void> _applyMissionScale() async {
+    if ((_mScale - 1).abs() < 0.001) {
+      _toast('ضریب ۱ یعنی بدون تغییر');
+      return;
+    }
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('مقیاس‌دهی جوایز ماموریت'),
+        content: Text(
+          'جایزه‌های ${_mScope == 'builtin' ? 'توکار' : _mScope == 'custom' ? 'سفارشی' : 'همه'} '
+          '× ${_mScale.toStringAsFixed(2)} می‌شوند. هدف‌ها ثابت می‌مانند.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('اعمال')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _mScaleBusy = true);
+    try {
+      final r = await widget.api.post('/api/admin/missions/scale-rewards', {
+        'factor': _mScale,
+        'scope': _mScope,
+        'scaleDailyBonus': _scaleDailyBonus,
+      });
+      if (!mounted) return;
+      _toast('${r is Map ? (r['message'] ?? 'اعمال شد') : 'اعمال شد'}');
+      setState(() => _mScale = 1);
+      await _load();
+    } catch (e) {
+      if (mounted) _toast(apiError(e));
+    } finally {
+      if (mounted) setState(() => _mScaleBusy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) return const LoadingView();
@@ -234,6 +277,65 @@ class _AdminMissionsState extends State<AdminMissions> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          FormSection(
+            title: 'مقیاس‌دهی یک‌جای جوایز',
+            subtitle: 'همهٔ rewardها × ضریب — هدف‌ها ثابت',
+            children: [
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'all', label: Text('همه')),
+                  ButtonSegment(value: 'builtin', label: Text('توکار')),
+                  ButtonSegment(value: 'custom', label: Text('سفارشی')),
+                ],
+                selected: {_mScope},
+                onSelectionChanged: (s) => setState(() => _mScope = s.first),
+              ),
+              const SizedBox(height: Gaps.sm),
+              Text('ضریب × ${_mScale.toStringAsFixed(2)}',
+                  style: const TextStyle(fontWeight: FontWeight.w900)),
+              Slider(
+                value: _mScale.clamp(0, 3),
+                min: 0,
+                max: 3,
+                divisions: 60,
+                label: '× ${_mScale.toStringAsFixed(2)}',
+                onChanged: _mScaleBusy ? null : (v) => setState(() => _mScale = v),
+              ),
+              Wrap(
+                spacing: 6,
+                children: [
+                  for (final v in [0.5, 0.75, 1.0, 1.25, 1.5, 2.0])
+                    ChoiceChip(
+                      label: Text('×$v'),
+                      selected: (_mScale - v).abs() < 0.001,
+                      onSelected:
+                          _mScaleBusy ? null : (_) => setState(() => _mScale = v),
+                    ),
+                ],
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('جایزهٔ تکمیل روزانه هم',
+                    style: TextStyle(fontSize: 13)),
+                value: _scaleDailyBonus,
+                onChanged: _mScaleBusy
+                    ? null
+                    : (v) => setState(() => _scaleDailyBonus = v),
+              ),
+              FilledButton.icon(
+                onPressed: _mScaleBusy || (_mScale - 1).abs() < 0.001
+                    ? null
+                    : _applyMissionScale,
+                icon: _mScaleBusy
+                    ? const SizedBox.square(
+                        dimension: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.tune_rounded),
+                label: const Text('اعمال روی جوایز'),
+              ),
+            ],
+          ),
+          const SizedBox(height: Gaps.md),
           FormSection(
             title: 'جایزهٔ تکمیل روزانه',
             subtitle: 'امتیازی که بعد از انجام همهٔ ماموریت‌های روز داده می‌شود',

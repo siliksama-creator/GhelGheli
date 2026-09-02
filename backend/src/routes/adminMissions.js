@@ -133,5 +133,69 @@ module.exports = function createAdminMissionsRoutes(deps) {
       res.json({ message: 'ماموریت سفارشی حذف شد' });
     }));
 
+
+  // ── مقیاس‌دهی یک‌جای جوایز ماموریت‌ها ──────────────────────────────────
+  //
+  // خواستهٔ مالک: اهرم کلی مثل گذر نبرد — همهٔ rewardها × ضریب.
+  // scope: builtin | custom | all
+  // فقط reward (امتیاز) لمس می‌شود؛ goal/active دست‌نخورده.
+  router.post('/admin/missions/scale-rewards', adminAuth, requireRole(),
+    asyncHandler(async (req, res) => {
+      const b = req.body && typeof req.body === 'object' ? req.body : {};
+      const factor = Number(b.factor);
+      if (!Number.isFinite(factor) || factor < 0 || factor > 20) {
+        return res.status(400).json({ message: 'ضریب باید عددی بین ۰ و ۲۰ باشد' });
+      }
+      const scope = str(b.scope, 'all'); // builtin|custom|all
+      if (!['builtin', 'custom', 'all'].includes(scope)) {
+        return res.status(400).json({ message: 'دامنه نامعتبر است' });
+      }
+
+      let builtinUpdated = 0;
+      let customUpdated = 0;
+
+      if (scope === 'builtin' || scope === 'all') {
+        const catalog = await missions.adminCatalog();
+        const cur = opsConfig.syncGet('mission_config') || { dailyBonus: 100, overrides: {} };
+        const overrides = { ...(cur.overrides || {}) };
+        for (const m of (catalog.builtin || [])) {
+          const base = Number(m.reward) || 0;
+          const next = Math.max(0, Math.round(base * factor));
+          if (next === base) continue;
+          const prev = overrides[m.key] || {};
+          overrides[m.key] = { ...prev, reward: next };
+          builtinUpdated += 1;
+        }
+        // daily bonus هم اگر خواسته شده در همان scope
+        let dailyBonus = cur.dailyBonus;
+        if (b.scaleDailyBonus !== false) {
+          dailyBonus = Math.max(0, Math.round(Number(cur.dailyBonus || 100) * factor));
+        }
+        await opsConfig.set('mission_config', { ...cur, overrides, dailyBonus }, req.admin.id);
+      }
+
+      if (scope === 'custom' || scope === 'all') {
+        const { rows } = await pool.query(
+          'SELECT key, reward FROM mission_definitions');
+        for (const r of rows) {
+          const base = Number(r.reward) || 0;
+          const next = Math.max(0, Math.round(base * factor));
+          if (next === base) continue;
+          await pool.query('UPDATE mission_definitions SET reward=$2 WHERE key=$1', [r.key, next]);
+          customUpdated += 1;
+        }
+      }
+
+      await audit(req.admin.id, 'scale_mission_rewards', 'mission_definitions', null,
+        b.reason || null, { factor, scope, builtinUpdated, customUpdated });
+      res.json({
+        message: `جایزهٔ ${builtinUpdated + customUpdated} ماموریت با ضریب ${factor} به‌روز شد`,
+        factor,
+        scope,
+        builtinUpdated,
+        customUpdated,
+      });
+    }));
+
   return router;
 };

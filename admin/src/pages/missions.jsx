@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Target, Plus, Save, Trash2 } from 'lucide-react';
+import { fmtNumber } from '../lib/api.js';
 import { Badge, Button, Card, EmptyState, Field, Input, Select, Table } from '../components/ui.jsx';
 import { useToast } from '../lib/toast.jsx';
 
@@ -16,6 +17,10 @@ export function MissionsPage({ request }) {
   const [bonus, setBonus] = useState(null);
   const [edits, setEdits] = useState({}); // key -> override fields
   const [newMission, setNewMission] = useState(null);
+  const [mScale, setMScale] = useState(1);
+  const [mScope, setMScope] = useState('all'); // builtin|custom|all
+  const [mScaleBusy, setMScaleBusy] = useState(false);
+  const [scaleDailyBonus, setScaleDailyBonus] = useState(true);
 
   const load = () => {
     request('/api/admin/missions')
@@ -93,10 +98,114 @@ export function MissionsPage({ request }) {
     }
   }
 
+
+  const missionPreview = useMemo(() => {
+    if (!data) return null;
+    let before = 0, after = 0, count = 0;
+    const take = (list) => {
+      for (const m of list || []) {
+        const a = Number(m.reward) || 0;
+        before += a;
+        after += Math.max(0, Math.round(a * mScale));
+        count += 1;
+      }
+    };
+    if (mScope === 'builtin' || mScope === 'all') take(data.builtin);
+    if (mScope === 'custom' || mScope === 'all') take(data.customs);
+    if (scaleDailyBonus && (mScope === 'builtin' || mScope === 'all')) {
+      const b = Number(bonus) || 0;
+      before += b;
+      after += Math.max(0, Math.round(b * mScale));
+      count += 1;
+    }
+    return { before, after, count };
+  }, [data, mScale, mScope, scaleDailyBonus, bonus]);
+
+  async function applyMissionScale() {
+    if (Math.abs(mScale - 1) < 0.001) {
+      notify('ضریب ۱ یعنی بدون تغییر — نوار را جابه‌جا کنید', 'error');
+      return;
+    }
+    const scopeLabel = mScope === 'builtin' ? 'توکار' : mScope === 'custom' ? 'سفارشی' : 'همه';
+    if (!window.confirm(`جایزهٔ امتیاز ماموریت‌های ${scopeLabel} × ${mScale.toFixed(2)} شود؟`)) return;
+    setMScaleBusy(true);
+    try {
+      const r = await request('/api/admin/missions/scale-rewards', {
+        method: 'POST',
+        body: { factor: mScale, scope: mScope, scaleDailyBonus },
+      });
+      notify(r.message || 'اعمال شد', 'success');
+      setMScale(1);
+      setEdits({});
+      load();
+    } catch (err) {
+      notify(err.message || 'مقیاس‌دهی ناموفق بود', 'error');
+    } finally {
+      setMScaleBusy(false);
+    }
+  }
+
   if (!data) return <p>در حال خواندن…</p>;
 
   return (
     <div className="page-stack">
+
+      <Card title="مقیاس‌دهی یک‌جای جوایز ماموریت"
+        subtitle="همهٔ جایزه‌های امتیازی را با یک نوار × ضریب کن — هدف (goal) و وضعیت فعال دست‌نخورده می‌مانند">
+        <div className="passScaleBar" dir="rtl">
+          <div className="passScaleControls">
+            <label className="passScaleTrack">
+              <span>دامنه</span>
+              <select value={mScope} onChange={(e) => setMScope(e.target.value)}>
+                <option value="all">توکار + سفارشی</option>
+                <option value="builtin">فقط توکار</option>
+                <option value="custom">فقط سفارشی</option>
+              </select>
+            </label>
+            <label className="passScaleSlider">
+              <span>ضریب: <strong>× {mScale.toFixed(2)}</strong></span>
+              <input type="range" min="0" max="3" step="0.05" value={mScale}
+                onChange={(e) => setMScale(Number(e.target.value))} />
+              <span className="passScaleTicks">
+                <i>۰</i><i>۰٫۵</i><i>۱</i><i>۱٫۵</i><i>۲</i><i>۲٫۵</i><i>۳</i>
+              </span>
+            </label>
+            <div className="passScaleQuick">
+              {[0.5, 0.75, 1, 1.25, 1.5, 2].map((v) => (
+                <button type="button" key={v}
+                  className={Math.abs(mScale - v) < 0.001 ? 'on' : ''}
+                  onClick={() => setMScale(v)}>×{v}</button>
+              ))}
+            </div>
+          </div>
+          <label className="check-row" style={{ margin: 0 }}>
+            <input type="checkbox" checked={scaleDailyBonus}
+              onChange={(e) => setScaleDailyBonus(e.target.checked)} />
+            جایزهٔ تکمیل روزانه هم × ضریب شود
+          </label>
+          {missionPreview && (
+            <div className="passScalePreview">
+              <span>{missionPreview.count} مورد</span>
+              <span>جمع قبل: <b>{fmtNumber(missionPreview.before)}</b></span>
+              <span>جمع بعد: <b>{fmtNumber(missionPreview.after)}</b></span>
+              <span className={missionPreview.after >= missionPreview.before ? 'up' : 'down'}>
+                {missionPreview.after >= missionPreview.before ? '▲' : '▼'}
+                {' '}{fmtNumber(Math.abs(missionPreview.after - missionPreview.before))}
+              </span>
+            </div>
+          )}
+          <div className="passScaleActions">
+            <Button icon={Save} loading={mScaleBusy}
+              disabled={mScaleBusy || Math.abs(mScale - 1) < 0.001}
+              onClick={applyMissionScale}>
+              اعمال روی جوایز
+            </Button>
+            <Button variant="ghost" disabled={mScaleBusy || Math.abs(mScale - 1) < 0.001}
+              onClick={() => setMScale(1)}>بازنشانی</Button>
+          </div>
+        </div>
+      </Card>
+
       <Card title="جایزهٔ تکمیل روزانه" subtitle="وقتی همهٔ ماموریت‌های روز را تمام کند می‌گیرد">
         <span className="inline-inputs">
           <Input type="number" min="0" value={bonus} onChange={(e) => setBonus(e.target.value)} />
@@ -109,8 +218,8 @@ export function MissionsPage({ request }) {
           <Table rows={builtin.map((m) => ({ ...m, ...(edits[m.key] || {}) }))} cols={[
             { key: 'title', title: 'عنوان', render: (r) => <><b>{r.title}</b><br /><small className="dim">{r.key}</small></> },
             { key: 'period', title: 'دوره', render: (r) => <Badge tone={r.period === 'daily' ? 'info' : 'neutral'}>{r.period === 'daily' ? 'روزانه' : 'هفتگی'}</Badge> },
-            { key: 'goal', title: 'هدف', render: (r) => <Input type="number" min="1" defaultValue={r.goal} onChange={(e) => edit(r.key, 'goal', e.target.value)} /> },
-            { key: 'reward', title: 'جایزه (امتیاز)', render: (r) => <Input type="number" min="0" defaultValue={r.reward} onChange={(e) => edit(r.key, 'reward', e.target.value)} /> },
+            { key: 'goal', title: 'هدف', render: (r) => <Input key={`g-${r.key}-${r.goal}`} type="number" min="1" defaultValue={r.goal} onChange={(e) => edit(r.key, 'goal', e.target.value)} /> },
+            { key: 'reward', title: 'جایزه (امتیاز)', render: (r) => <Input key={`rw-${r.key}-${r.reward}`} type="number" min="0" defaultValue={r.reward} onChange={(e) => edit(r.key, 'reward', e.target.value)} /> },
             { key: 'active', title: 'وضعیت', render: (r) => <Select defaultValue={r.active ? 'on' : 'off'} onChange={(e) => edit(r.key, 'active', e.target.value === 'on')}>
               <option value="on">فعال</option><option value="off">خاموش</option>
             </Select> },

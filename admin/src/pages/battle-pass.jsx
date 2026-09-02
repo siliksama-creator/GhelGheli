@@ -38,6 +38,16 @@ export function BattlePassPage({ request }) {
   };
   useEffect(load, [request]);
 
+  // بعد از load، فصل فعال را باز کن تا نوار مقیاس بالا دیده شود
+  useEffect(() => {
+    if (!loaded) return;
+    const aid = activeId || seasons.find((s) => s.is_active)?.id;
+    if (aid && !seasonDetail) {
+      openSeason(aid);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, activeId]);
+
   async function openSeason(id) {
     setDetailBusy(true);
     try {
@@ -128,7 +138,11 @@ export function BattlePassPage({ request }) {
 
 
   async function applyScale() {
-    if (!seasonDetail?.season?.id) return;
+    const sid = seasonDetail?.season?.id || activeId || seasons.find((s) => s.is_active)?.id;
+    if (!sid) {
+      notify('فصلی برای مقیاس‌دهی انتخاب نشده', 'error');
+      return;
+    }
     if (Math.abs(scaleFactor - 1) < 0.001) {
       notify('ضریب ۱ یعنی بدون تغییر — نوار را جابه‌جا کنید', 'error');
       return;
@@ -137,13 +151,13 @@ export function BattlePassPage({ request }) {
     if (!window.confirm(`همهٔ پاداش‌های «امتیاز» ${label} در این فصل × ${scaleFactor.toFixed(2)} می‌شوند. ادامه؟`)) return;
     setScaleBusy(true);
     try {
-      const r = await request(`/api/admin/pass/seasons/${seasonDetail.season.id}/scale-points`, {
+      const r = await request(`/api/admin/pass/seasons/${sid}/scale-points`, {
         method: 'POST',
         body: { factor: scaleFactor, track: scaleTrack },
       });
       notify(r.message || 'اعمال شد', 'success');
       setScaleFactor(1);
-      await openSeason(seasonDetail.season.id);
+      await openSeason(sid);
     } catch (err) {
       notify(err.message || 'مقیاس‌دهی ناموفق بود', 'error');
     } finally {
@@ -173,6 +187,75 @@ export function BattlePassPage({ request }) {
 
   return (
     <div className="page-stack">
+
+      {/* اهرم مقیاس — همیشه دیده می‌شود (فصل فعال یا انتخاب‌شده) */}
+      <Card title="مقیاس‌دهی یک‌جای امتیازات گذر نبرد"
+        subtitle="بدون باز کردن تک‌تک پله‌ها: فقط پاداش‌های نوع «امتیاز» × ضریب می‌شوند (گردونه/نقدی/آیتم ثابت)">
+        {!loaded ? <p>در حال خواندن…</p> : !(activeId || seasons.find((s) => s.is_active)?.id || seasonDetail?.season?.id) ? (
+          <p className="dim">اول یک فصل بسازید یا فعال کنید.</p>
+        ) : (
+          <div className="passScaleBar" dir="rtl">
+            <div className="passScaleHead">
+              <b>فصل هدف: {seasonDetail?.season?.name
+                || seasons.find((s) => s.id === activeId)?.name
+                || seasons.find((s) => s.is_active)?.name
+                || '—'}</b>
+              <small>پیشنهاد: اول «پله‌ها» را یک‌بار باز کنید تا پیش‌نمایش جمع دقیق شود؛ اعمال بدون پیش‌نمایش هم کار می‌کند.</small>
+            </div>
+            <div className="passScaleControls">
+              <label className="passScaleTrack">
+                <span>مسیر</span>
+                <select value={scaleTrack} onChange={(e) => setScaleTrack(e.target.value)}>
+                  <option value="both">هر دو (رایگان + پلاس)</option>
+                  <option value="free">فقط رایگان</option>
+                  <option value="plus">فقط پلاس</option>
+                </select>
+              </label>
+              <label className="passScaleSlider">
+                <span>ضریب: <strong>× {scaleFactor.toFixed(2)}</strong></span>
+                <input type="range" min="0" max="3" step="0.05" value={scaleFactor}
+                  onChange={(e) => setScaleFactor(Number(e.target.value))} />
+                <span className="passScaleTicks">
+                  <i>۰</i><i>۰٫۵</i><i>۱</i><i>۱٫۵</i><i>۲</i><i>۲٫۵</i><i>۳</i>
+                </span>
+              </label>
+              <div className="passScaleQuick">
+                {[0.5, 0.75, 1, 1.25, 1.5, 2].map((v) => (
+                  <button type="button" key={v}
+                    className={Math.abs(scaleFactor - v) < 0.001 ? 'on' : ''}
+                    onClick={() => setScaleFactor(v)}>×{v}</button>
+                ))}
+              </div>
+            </div>
+            {scalePreview && (
+              <div className="passScalePreview">
+                <span>{scalePreview.count} پلهٔ امتیازی</span>
+                <span>جمع قبل: <b>{fmtNumber(scalePreview.before)}</b></span>
+                <span>جمع بعد: <b>{fmtNumber(scalePreview.after)}</b></span>
+                <span className={scalePreview.after >= scalePreview.before ? 'up' : 'down'}>
+                  {scalePreview.after >= scalePreview.before ? '▲' : '▼'}
+                  {' '}{fmtNumber(Math.abs(scalePreview.after - scalePreview.before))}
+                </span>
+              </div>
+            )}
+            <div className="passScaleActions">
+              <Button icon={Save} loading={scaleBusy}
+                disabled={scaleBusy || Math.abs(scaleFactor - 1) < 0.001}
+                onClick={applyScale}>
+                اعمال روی همهٔ پله‌ها
+              </Button>
+              <Button variant="ghost" disabled={scaleBusy || Math.abs(scaleFactor - 1) < 0.001}
+                onClick={() => setScaleFactor(1)}>بازنشانی نوار</Button>
+              {!seasonDetail && (activeId || seasons.find((s) => s.is_active)?.id) && (
+                <Button variant="secondary" onClick={() => openSeason(activeId || seasons.find((s) => s.is_active).id)}>
+                  باز کردن پله‌ها برای پیش‌نمایش
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </Card>
+
       <Card title="فصل‌های گذر نبرد" subtitle="فقط یک فصل می‌تواند فعال باشد — فعال‌کردن فصل جدید، قبلی را می‌بندد"
         action={<Button icon={Plus} onClick={() => document.getElementById('new-season-form')?.scrollIntoView({ behavior: 'smooth' })}>فصل جدید</Button>}>
         {!loaded ? <p>در حال خواندن…</p> : seasonRows.length === 0 ? (
@@ -213,68 +296,7 @@ export function BattlePassPage({ request }) {
       {detailBusy && <p>در حال خواندن فصل…</p>}
       {seasonDetail && (
         <Card title={`پله‌های «${seasonDetail.season.name}»`} subtitle="هر پله دو جایزه دارد: مسیر رایگان و مسیر پلاس. مقدار پلهٔ پلاس فقط برای دارندگان اشتراک باز می‌شود.">
-
-          {/* ── نوار مقیاس کلی امتیازات ──
-              ادمین بدون دست زدن به تک‌تک پله‌ها، همهٔ kind=points را
-              یک‌جا × ضریب می‌کند. اسپین/نقدی/آیتم دست‌نخورده می‌مانند. */}
-          <div className="passScaleBar" dir="rtl">
-            <div className="passScaleHead">
-              <b>مقیاس‌دهی یک‌جای امتیازات</b>
-              <small>فقط پاداش‌های نوع «امتیاز» · بقیه (گردونه/نقدی/آیتم) ثابت می‌مانند</small>
-            </div>
-            <div className="passScaleControls">
-              <label className="passScaleTrack">
-                <span>مسیر</span>
-                <select value={scaleTrack} onChange={(e) => setScaleTrack(e.target.value)}>
-                  <option value="both">هر دو (رایگان + پلاس)</option>
-                  <option value="free">فقط رایگان</option>
-                  <option value="plus">فقط پلاس</option>
-                </select>
-              </label>
-              <label className="passScaleSlider">
-                <span>ضریب: <strong>× {scaleFactor.toFixed(2)}</strong></span>
-                <input
-                  type="range" min="0" max="3" step="0.05"
-                  value={scaleFactor}
-                  onChange={(e) => setScaleFactor(Number(e.target.value))}
-                />
-                <span className="passScaleTicks">
-                  <i>۰</i><i>۰٫۵</i><i>۱</i><i>۱٫۵</i><i>۲</i><i>۲٫۵</i><i>۳</i>
-                </span>
-              </label>
-              <div className="passScaleQuick">
-                {[0.5, 0.75, 1, 1.25, 1.5, 2].map((v) => (
-                  <button type="button" key={v}
-                    className={Math.abs(scaleFactor - v) < 0.001 ? 'on' : ''}
-                    onClick={() => setScaleFactor(v)}>×{v}</button>
-                ))}
-              </div>
-            </div>
-            {scalePreview && (
-              <div className="passScalePreview">
-                <span>{scalePreview.count} پلهٔ امتیازی</span>
-                <span>جمع قبل: <b>{fmtNumber(scalePreview.before)}</b></span>
-                <span>جمع بعد: <b>{fmtNumber(scalePreview.after)}</b></span>
-                <span className={scalePreview.after >= scalePreview.before ? 'up' : 'down'}>
-                  {scalePreview.after >= scalePreview.before ? '▲' : '▼'}
-                  {' '}{fmtNumber(Math.abs(scalePreview.after - scalePreview.before))}
-                </span>
-              </div>
-            )}
-            <div className="passScaleActions">
-              <Button
-                icon={Save}
-                loading={scaleBusy}
-                disabled={scaleBusy || Math.abs(scaleFactor - 1) < 0.001}
-                onClick={applyScale}
-              >
-                اعمال روی همهٔ پله‌ها
-              </Button>
-              <Button variant="ghost" disabled={scaleBusy || Math.abs(scaleFactor - 1) < 0.001}
-                onClick={() => setScaleFactor(1)}>بازنشانی نوار</Button>
-            </div>
-          </div>
-          <div className="tier-grid">
+<div className="tier-grid">
             {seasonDetail.tiers.map((t) => (
               <div className="tier-row" key={t.tier}>
                 <b className="tier-num">پلهٔ {t.tier}</b>
