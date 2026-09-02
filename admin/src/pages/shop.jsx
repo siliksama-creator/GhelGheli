@@ -119,13 +119,30 @@ export function ShopAdminPage({ request }) {
     }
   }
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // چرا key روی فرم اجباری است
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // فیلدها با defaultValue پر می‌شوند. React فقط در mount اول آن‌ها را
+  // می‌گذارد. اگر ادمین «ویرایش بایرن» را باز کند و بعد بدون بستن،
+  // «ویرایش صندوق» را بزند، state عوض می‌شود (عنوان درست می‌شود) ولی
+  // inputها همان مقادیر بایرن را نگه می‌دارند — دقیقاً باگ اسکرین‌شات.
+  //
+  // key = id آیتم (یا 'new') فرم را از نو mount می‌کند تا defaultValue
+  // با دادهٔ تازه هم‌خوان شود.
+  const editorKey = editing == null ? null : (editing.id || editing.slug || 'new');
   const editor = editing !== null && (
     <Card
-      title={editing?.id ? `ویرایش «${editing.name}»` : 'آیتم جدید'}
+      key={`shop-editor-${editorKey}`}
+      title={editing?.id ? `ویرایش «${editing.name || editing.slug || ''}»` : 'آیتم جدید'}
       subtitle="ذخیره یعنی همین حالا در فروشگاه اپ و وب دیده شود"
       action={<Button variant="ghost" onClick={() => setEditing(null)}>بستن</Button>}
     >
-      <form onSubmit={saveItem} className="form-grid">
+      <form
+        key={`shop-form-${editorKey}`}
+        onSubmit={saveItem}
+        className="form-grid"
+      >
         <Field label="نوع"><Select name="kind" defaultValue={editing?.kind || 'card_frame'}>
           {Object.entries(KIND_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </Select></Field>
@@ -149,7 +166,7 @@ export function ShopAdminPage({ request }) {
   return (
     <div className="page-stack">
       <Card title="فروشگاه" subtitle={`${items.length} آیتم · ${activeCount} فعال · کلاب‌ها خودکار از نوع «باشگاه» ساخته می‌شوند`}
-        action={<Button icon={Plus} onClick={() => setEditing({})}>آیتم جدید</Button>}>
+        action={<Button icon={Plus} onClick={() => { setEditing({}); queueMicrotask(() => document.getElementById('shop-editor-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' })); }}>آیتم جدید</Button>}>
         {!loaded ? <p>در حال خواندن…</p> : items.length === 0 ? (
           <EmptyState icon={Store} title="فروشگاه خالی است" message="اولین آیتم را بسازید." />
         ) : (
@@ -161,7 +178,7 @@ export function ShopAdminPage({ request }) {
             { key: 'isActive', title: 'وضعیت', render: (r) => <Badge tone={r.isActive ? 'success' : 'danger'}>{r.isActive ? 'فعال' : 'غیرفعال'}</Badge> },
             { key: 'actions', title: '', render: (r) => (
               <span className="row-actions">
-                <Button size="sm" variant="ghost" icon={Pencil} onClick={() => setEditing(r)}>ویرایش</Button>
+                <Button size="sm" variant="ghost" icon={Pencil} onClick={() => { setEditing(r); queueMicrotask(() => document.getElementById('shop-editor-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' })); }}>ویرایش</Button>
                 <Button size="sm" variant="ghost" icon={Trash2} onClick={() => removeItem(r)}>حذف</Button>
               </span>
             ) },
@@ -169,11 +186,11 @@ export function ShopAdminPage({ request }) {
         )}
       </Card>
 
-      {editor}
+      <div id="shop-editor-anchor">{editor}</div>
 
       <Card title="پلن‌های پلاس" subtitle="قیمت از همین لحظه روی سفارش‌های جدید اعمال می‌شود — کلاینت‌ها هر بار از سرور می‌خوانند">
         {!plans ? <p>در حال خواندن…</p> : (
-          <form onSubmit={savePlans} className="form-grid">
+          <form key={`plus-form-${plans?.monthly?.price}-${plans?.annual?.price}-${(plans?.benefits||[]).length}`} onSubmit={savePlans} className="form-grid">
             <Field label="قیمت ماهانه (تومان)"><Input name="m_price" type="number" required defaultValue={plans.monthly.price} /></Field>
             <Field label="مدت (روز)"><Input name="m_days" type="number" required defaultValue={plans.monthly.days} /></Field>
             <Field label="برچسب"><Input name="m_label" defaultValue={plans.monthly.label} /></Field>
