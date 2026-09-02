@@ -171,6 +171,36 @@ function OpsLimitsCard({ request, notify }) {
         <Field label="دعوت لازم برای چرخش روزانهٔ اضافه" hint="با رسیدن دعوت‌های روز به این عدد، یک چرخشِ بیشتر در همان روز."><Input type="number" min="1" max="100" value={l.referralInvitesPerDailySpin} onChange={(e) => setNum('referralInvitesPerDailySpin', e.target.value)} /></Field>
         <Field label="چرخش روزانهٔ پایه"><Input type="number" min="0" max="50" value={l.referralBaseDailySpins} onChange={(e) => setNum('referralBaseDailySpins', e.target.value)} /></Field>
         <Field label="آستانهٔ برداشت درآمد معرف (تومان)" hint="حداقل موجودی کیف پول برای درخواست برداشت کمیسیون نقدی معرفی. راهنمای صفحهٔ دعوت از همین عدد ساخته می‌شود."><Input type="number" min="1000" max="50000000" value={l.referralWithdrawalThreshold ?? 50000} onChange={(e) => setNum('referralWithdrawalThreshold', e.target.value)} /></Field>
+        <Field
+          label="ورودی‌های عمومی (امتیاز، با ویرگول)"
+          hint="۰ = تمرین با ربات. فقط همین اعداد در نوار حالت بازی وب/اندروید و سرور پذیرفته می‌شوند."
+        >
+          <Input
+            value={(l.publicStakes || []).join('، ')}
+            onChange={(e) => setL((p) => ({
+              ...p,
+              publicStakes: e.target.value
+                .split(/[,\s،]+/)
+                .map((x) => Number(x.trim()))
+                .filter((n) => Number.isFinite(n)),
+            }))}
+          />
+        </Field>
+        <Field
+          label="ورودی‌های لابی/خصوصی (امتیاز، با ویرگول)"
+          hint="شامل رایگان و مبالغ بالاتر از عمومی. کلاینت‌ها از /api/config.stakes می‌خوانند."
+        >
+          <Input
+            value={(l.lobbyStakes || []).join('، ')}
+            onChange={(e) => setL((p) => ({
+              ...p,
+              lobbyStakes: e.target.value
+                .split(/[,\s،]+/)
+                .map((x) => Number(x.trim()))
+                .filter((n) => Number.isFinite(n)),
+            }))}
+          />
+        </Field>
         <Field label="آدرس درگاه کافه‌بازار"><Input value={l.bazaarApiBase} onChange={(e) => setL((p) => ({ ...p, bazaarApiBase: e.target.value }))} /></Field>
       </div>
 

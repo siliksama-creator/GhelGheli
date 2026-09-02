@@ -216,6 +216,7 @@ class _GrowthPanelState extends State<GrowthPanel> {
         Gaps.vSm,
         _DailyMissionSummary(
           completed: (bonus['completed'] as num?)?.toInt() ?? 0,
+          goal: (bonus['goal'] as num?)?.toInt() ?? 5,
           poolSize: ((_data?['rotation'] as Map?)?['dailyPoolSize'] as num?)?.toInt() ?? 120,
           onInvite: _inviteFriend,
         ),
@@ -329,9 +330,10 @@ class _GrowthPanelState extends State<GrowthPanel> {
 }
 
 class _DailyMissionSummary extends StatelessWidget {
-  const _DailyMissionSummary({required this.completed, required this.poolSize, required this.onInvite});
+  const _DailyMissionSummary({required this.completed, required this.poolSize, required this.onInvite, this.goal = 5});
   final int completed;
   final int poolSize;
+  final int goal;
   final VoidCallback onInvite;
 
   @override
@@ -347,18 +349,18 @@ class _DailyMissionSummary extends StatelessWidget {
         dimension: 58,
         child: Stack(alignment: Alignment.center, children: [
           CircularProgressIndicator(
-            value: (completed / 5).clamp(0.0, 1.0).toDouble(),
+            value: (completed / (goal <= 0 ? 5 : goal)).clamp(0.0, 1.0).toDouble(),
             strokeWidth: 5,
             color: const Color(0xFF22E7A6),
             backgroundColor: Colors.white12,
           ),
-          Text('${faNum(completed)}/۵', style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
+          Text('${faNum(completed)}/${faNum(goal)}', style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
         ]),
       ),
       Gaps.hSm,
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('هر روز ۵ ماموریت تازه', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
-        Text('از میان بیش از ${faNum(poolSize)} ماموریت؛ هر پنج‌تا را کامل کن.',
+        Text('هر روز ${faNum(goal)} ماموریت تازه', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
+        Text('از میان بیش از ${faNum(poolSize)} ماموریت؛ هر ${faNum(goal)} تا را کامل کن.',
             style: const TextStyle(fontSize: 12, color: Color(0xFFADC0D3), height: 1.6)),
       ])),
       IconButton.filledTonal(
@@ -394,14 +396,14 @@ class _DailyBonusCard extends StatelessWidget {
         const UiIcon('gift', size: 28, color: Color(0xFFFFD166)),
         Gaps.hXs,
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('جایزه تکمیل هر ۵ ماموریت', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900)),
+          Text('جایزه تکمیل هر ${faNum((bonus['goal'] as num?)?.toInt() ?? 5)} ماموریت', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900)),
           Text('+${faNum(bonus['reward'] ?? 100)} امتیاز اضافه امروز',
               style: const TextStyle(fontSize: 8.5, color: Color(0xFFFFD166))),
         ])),
         SizedBox(width: 82, height: 30, child: FilledButton(
           style: _compactClaimStyle(height: 30),
           onPressed: ready && !claimed && !busy ? onClaim : null,
-          child: Text(claimed ? 'گرفته شد' : ready ? 'دریافت' : '${faNum(bonus['completed'] ?? 0)}/۵',
+          child: Text(claimed ? 'گرفته شد' : ready ? 'دریافت' : '${faNum(bonus['completed'] ?? 0)}/${faNum(bonus['goal'] ?? 5)}',
               style: const TextStyle(fontSize: 8.5)),
         )),
       ]),

@@ -6,10 +6,60 @@ const {
   coinRewardFor, hasCoinReward, quotaTracked, tehranDate,
 } = require('./coinService');
 
-// مسابقهٔ عمومی فقط دو ورودی رسمی دارد. لابی خصوصی علاوه بر این دو،
-// رایگان و ۵۰۰۰ هم دارد. عددِ دلخواه از payload هرگز پذیرفته نمی‌شود.
-const PUBLIC_STAKES = Object.freeze([0, 100, 1000]);
-const LOBBY_STAKES = Object.freeze([0, 100, 1000, 5000]);
+// پیش‌فرض تاریخی — فقط fallback وقتی ops_limits هنوز بار نشده.
+const DEFAULT_PUBLIC_STAKES = Object.freeze([0, 100, 1000]);
+const DEFAULT_LOBBY_STAKES = Object.freeze([0, 100, 1000, 5000]);
+
+// سازگاری با importهای قدیمی که PUBLIC_STAKES/LOBBY_STAKES را مستقیم
+// می‌خوانند: Proxy تا همیشه فهرستِ زنده‌ی ops_limits را بدهد.
+function livePublicStakes() {
+  try {
+    const ops = require('./opsLimits').get();
+    const list = ops?.publicStakes;
+    if (Array.isArray(list) && list.length) return list;
+  } catch { /* */ }
+  return DEFAULT_PUBLIC_STAKES;
+}
+function liveLobbyStakes() {
+  try {
+    const ops = require('./opsLimits').get();
+    const list = ops?.lobbyStakes;
+    if (Array.isArray(list) && list.length) return list;
+  } catch { /* */ }
+  return DEFAULT_LOBBY_STAKES;
+}
+
+const PUBLIC_STAKES = new Proxy([], {
+  get(_t, prop) {
+    const live = livePublicStakes();
+    if (prop === Symbol.iterator) return live[Symbol.iterator].bind(live);
+    if (prop === 'length') return live.length;
+    if (prop === 'includes') return (...a) => live.includes(...a);
+    if (prop === 'map') return (...a) => live.map(...a);
+    if (prop === 'filter') return (...a) => live.filter(...a);
+    if (prop === 'slice') return (...a) => live.slice(...a);
+    if (prop === 'indexOf') return (...a) => live.indexOf(...a);
+    if (typeof prop === 'string' && /^\d+$/.test(prop)) return live[Number(prop)];
+    if (prop === 'toJSON' || prop === Symbol.toStringTag) return undefined;
+    const v = live[prop];
+    return typeof v === 'function' ? v.bind(live) : v;
+  },
+});
+const LOBBY_STAKES = new Proxy([], {
+  get(_t, prop) {
+    const live = liveLobbyStakes();
+    if (prop === Symbol.iterator) return live[Symbol.iterator].bind(live);
+    if (prop === 'length') return live.length;
+    if (prop === 'includes') return (...a) => live.includes(...a);
+    if (prop === 'map') return (...a) => live.map(...a);
+    if (prop === 'filter') return (...a) => live.filter(...a);
+    if (prop === 'slice') return (...a) => live.slice(...a);
+    if (prop === 'indexOf') return (...a) => live.indexOf(...a);
+    if (typeof prop === 'string' && /^\d+$/.test(prop)) return live[Number(prop)];
+    const v = live[prop];
+    return typeof v === 'function' ? v.bind(live) : v;
+  },
+});
 
 class StakeError extends Error {
   constructor(message, code = 'STAKE_ERROR') {
@@ -22,14 +72,15 @@ class StakeError extends Error {
 
 function parseStake(raw, allowed) {
   const value = raw === undefined || raw === null || raw === '' ? 0 : Number(raw);
-  if (!Number.isSafeInteger(value) || !allowed.includes(value)) {
+  const list = Array.isArray(allowed) ? allowed : [...allowed];
+  if (!Number.isSafeInteger(value) || !list.includes(value)) {
     throw new StakeError('مقدار امتیاز مسابقه معتبر نیست', 'INVALID_STAKE');
   }
   return value;
 }
 
-const parsePublicStake = raw => parseStake(raw, PUBLIC_STAKES);
-const parseLobbyStake = raw => parseStake(raw, LOBBY_STAKES);
+const parsePublicStake = raw => parseStake(raw, livePublicStakes());
+const parseLobbyStake = raw => parseStake(raw, liveLobbyStakes());
 
 function createGameStakeService(db = pool, points = pointService, coins = coinService) {
   async function canAfford(userId, stake) {
@@ -55,7 +106,7 @@ function createGameStakeService(db = pool, points = pointService, coins = coinSe
     if (!matchId || !playerXId || !playerOId || playerXId === playerOId) {
       throw new StakeError('بازیکنان مسابقه معتبر نیستند', 'INVALID_PLAYERS');
     }
-    if (!LOBBY_STAKES.includes(stake) || stake === 0) {
+    if (!liveLobbyStakes().includes(stake) || stake === 0) {
       throw new StakeError('ورودی مسابقه امتیازی معتبر نیست', 'INVALID_STAKE');
     }
 

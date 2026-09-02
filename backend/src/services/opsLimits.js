@@ -38,6 +38,11 @@ const DEFAULTS = Object.freeze({
   // آستانهٔ برداشتِ درآمد نقدی معرف — قبلاً ثابت ۵۰٬۰۰۰ در referralService
   // بود و تغییرش دپلوی می‌خواست. حالا از همین پنل.
   referralWithdrawalThreshold: 50000,
+  // ورودی‌های مجاز مسابقه — قبلاً ثابتِ gameStakeService بودند.
+  // کلاینت‌ها از /api/config.stakes می‌خوانند تا بدون آپدیت عوض شوند.
+  // 0 = تمرین/رایگان. public بدون 0 هم در UI به‌عنوان «ورودی امتیازی» نشان داده می‌شود.
+  publicStakes: [0, 100, 1000],
+  lobbyStakes: [0, 100, 1000, 5000],
   bazaarApiBase: 'https://pardakht.cafebazaar.ir',
   wheelSpinMs: 5600,
   wheelSpinRotations: 9,
@@ -64,6 +69,22 @@ const SECURITY_RATE_LIMITS = Object.freeze({
 const listeners = new Set();
 
 /** مقادیرِ فعلی (کشِ همگام) روی پیش‌فرض‌ها — همیشه یک آبجکتِ کامل برمی‌گرداند. */
+/** فهرست stake را پاک‌سازی می‌کند: عدد صحیح یکتا، مرتب، در بازهٔ امن. */
+function normalizeStakeList(input, fallback) {
+  const src = Array.isArray(input) ? input : fallback;
+  const out = [];
+  const seen = new Set();
+  for (const raw of src) {
+    const n = Number(raw);
+    if (!Number.isSafeInteger(n) || n < 0 || n > 1_000_000) continue;
+    if (seen.has(n)) continue;
+    seen.add(n);
+    out.push(n);
+  }
+  out.sort((a, b) => a - b);
+  return out.length ? out : [...fallback];
+}
+
 function get() {
   const stored = opsConfig.syncGet(KEY);
   const s = stored && typeof stored === 'object' ? stored : {};
@@ -71,6 +92,8 @@ function get() {
   return {
     ...DEFAULTS,
     ...s,
+    publicStakes: normalizeStakeList(s.publicStakes, DEFAULTS.publicStakes),
+    lobbyStakes: normalizeStakeList(s.lobbyStakes, DEFAULTS.lobbyStakes),
     rateLimits: { ...DEFAULTS.rateLimits, ...storedRl },
   };
 }
@@ -108,6 +131,14 @@ function sanitize(input, current) {
       current.referralWithdrawalThreshold,
       1000,
       50_000_000,
+    ),
+    publicStakes: normalizeStakeList(
+      b.publicStakes !== undefined ? b.publicStakes : current.publicStakes,
+      DEFAULTS.publicStakes,
+    ),
+    lobbyStakes: normalizeStakeList(
+      b.lobbyStakes !== undefined ? b.lobbyStakes : current.lobbyStakes,
+      DEFAULTS.lobbyStakes,
     ),
     bazaarApiBase: String(b.bazaarApiBase || current.bazaarApiBase).trim().slice(0, 300) || current.bazaarApiBase,
     wheelSpinMs: num(b.wheelSpinMs, current.wheelSpinMs, 500, 20_000),

@@ -185,12 +185,17 @@ module.exports = function createClientConfigRoutes(deps) {
     // همان لیستِ ثابت را دارند؛ کلاینت‌های جدید از اینجا می‌خوانند.
     let stakes = null;
     try {
-      const pub = gameStakes?.PUBLIC_STAKES || [0, 100, 1000];
-      const lobby = gameStakes?.LOBBY_STAKES || [0, 100, 1000, 5000];
-      stakes = {
-        public: [...pub],
-        lobby: [...lobby],
-      };
+      if (opsLimits?.get) {
+        const o = opsLimits.get();
+        stakes = {
+          public: [...(o.publicStakes || [0, 100, 1000])],
+          lobby: [...(o.lobbyStakes || [0, 100, 1000, 5000])],
+        };
+      } else {
+        const pub = gameStakes?.PUBLIC_STAKES || [0, 100, 1000];
+        const lobby = gameStakes?.LOBBY_STAKES || [0, 100, 1000, 5000];
+        stakes = { public: [...pub], lobby: [...lobby] };
+      }
     } catch { /* */ }
 
     // منحنی ضربه‌زن برای زیرعنوان کاتالوگ بازی («N لول …»).

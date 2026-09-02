@@ -428,6 +428,35 @@ class _OpsLimitsSectionState extends State<_OpsLimitsSection> {
     return (node[parts.last] as num?)?.toInt() ?? 0;
   }
 
+
+  Widget _stakesField(String key, String label) {
+    final list = (_l[key] is List)
+        ? List<dynamic>.from(_l[key] as List)
+        : const <dynamic>[];
+    final text = list.map((e) => '$e').join('، ');
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: TextFormField(
+        key: ValueKey('stakes-$key-$text'),
+        initialValue: text,
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+          isDense: true,
+          helperText: 'اعداد را با ویرگول جدا کنید؛ ۰ = رایگان/تمرین',
+        ),
+        onChanged: (v) {
+          final nums = v
+              .split(RegExp(r'[,،\s]+'))
+              .map((s) => int.tryParse(s.trim()))
+              .whereType<int>()
+              .toList();
+          _l[key] = nums;
+        },
+      ),
+    );
+  }
+
   static const _rlNames = {
     'chat': 'چت',
     'tapBatch': 'ضربه‌زن',
@@ -463,6 +492,8 @@ class _OpsLimitsSectionState extends State<_OpsLimitsSection> {
         _numField('referralInvitesPerDailySpin', 'دعوت لازم برای چرخش اضافه'),
         _numField('referralBaseDailySpins', 'چرخش روزانهٔ پایه'),
         _numField('referralWithdrawalThreshold', 'آستانهٔ برداشت معرف (تومان)'),
+        _stakesField('publicStakes', 'ورودی‌های عمومی (۰=تمرین، با ویرگول)'),
+        _stakesField('lobbyStakes', 'ورودی‌های لابی/خصوصی (با ویرگول)'),
         const Text('محدودکننده‌های نرخ (پنجره/سقف)',
             style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
         for (final entry in rl.entries) ...[

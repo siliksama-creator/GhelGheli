@@ -30,7 +30,7 @@ class PrivateMatchDialog extends StatefulWidget {
 
 class _PrivateMatchDialogState extends State<PrivateMatchDialog> {
   String _selectedGame = 'penalty';
-  int _selectedStake = 500;
+  int _selectedStake = 100;
   String? _createdCode;
   String? _shareUrl;
   final _joinCodeCtrl = TextEditingController();
@@ -41,7 +41,30 @@ class _PrivateMatchDialogState extends State<PrivateMatchDialog> {
     ('memory', 'جفت‌یاب', Icons.grid_view_rounded),
   ];
 
-  final _presetStakes = const [100, 200, 500, 1000, 2000, 5000, 10000];
+  List<int> _presetStakes = const [0, 100, 1000, 5000];
+  @override
+  void initState() {
+    super.initState();
+    _loadStakes();
+  }
+  Future<void> _loadStakes() async {
+    try {
+      final cfg = await widget.api.get('/api/config');
+      if (!mounted || cfg is! Map) return;
+      final st = cfg['stakes'];
+      if (st is Map && st['lobby'] is List) {
+        final list = (st['lobby'] as List).map((e) => (e as num).toInt()).toList();
+        if (list.isNotEmpty) {
+          setState(() {
+            _presetStakes = list;
+            if (!_presetStakes.contains(_selectedStake)) {
+              _selectedStake = _presetStakes.firstWhere((s) => s > 0, orElse: () => _presetStakes.first);
+            }
+          });
+        }
+      }
+    } catch (_) {}
+  }
 
   void _createRoom() {
     final code = (1000 + (DateTime.now().millisecondsSinceEpoch % 9000)).toString();

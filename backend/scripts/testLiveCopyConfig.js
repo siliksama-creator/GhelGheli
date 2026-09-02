@@ -28,9 +28,16 @@ ok('clientConfig stakes block', /stakes,/.test(route));
 ok('clientConfig passSources', /passSources/.test(route));
 ok('ops_limits referralWithdrawalThreshold default', /referralWithdrawalThreshold:\s*50000/.test(ops));
 ok('ops_limits sanitize threshold', /referralWithdrawalThreshold: num\(/.test(ops));
+ok('ops_limits publicStakes default', /publicStakes:\s*\[0,\s*100,\s*1000\]/.test(ops));
+ok('ops_limits lobbyStakes default', /lobbyStakes:\s*\[0,\s*100,\s*1000,\s*5000\]/.test(ops));
+ok('ops_limits normalizeStakeList', /function normalizeStakeList/.test(ops));
 ok('referralService uses ops threshold', /referralWithdrawalThreshold\(\)/.test(ref));
 ok('SPINS_PER_REFERRAL is live getter', /get SPINS_PER_REFERRAL\(\)/.test(ref));
 ok('server mounts live deps into clientConfig', /opsLimits, referrals, pass, shop, gameStakes/.test(server));
+
+const stakeSvc = fs.readFileSync(path.join(root, 'src/services/gameStakeService.js'), 'utf8');
+ok('gameStake livePublicStakes', /function livePublicStakes/.test(stakeSvc));
+ok('gameStake PUBLIC_STAKES Proxy', /const PUBLIC_STAKES = new Proxy/.test(stakeSvc));
 
 // Client hardcode guards — product numbers in share/help copy.
 const guards = [
@@ -43,6 +50,13 @@ const guards = [
   ['userweb pass xpPills', 'userweb/src/screens/Pass.jsx', /function xpPills/],
   ['admin web threshold field', 'admin/src/pages/engine.jsx', /referralWithdrawalThreshold/],
   ['admin android threshold field', 'mobile/lib/screens/admin/admin_engine.dart', /referralWithdrawalThreshold/],
+  ['admin web publicStakes field', 'admin/src/pages/engine.jsx', /publicStakes/],
+  ['admin android publicStakes field', 'mobile/lib/screens/admin/admin_engine.dart', /publicStakes/],
+  ['mobile games publicStakes from config', 'mobile/lib/screens/user/games_page.dart', /_publicStakes/],
+  ['mobile games lobbyStakes', 'mobile/lib/screens/user/games_page.dart', /lobbyStakes:/],
+  ['mobile growth daily goal', 'mobile/lib/screens/user/games/growth_panel.dart', /bonus\['goal'\]/],
+  ['userweb games publicStakes', 'userweb/src/games.jsx', /setPublicStakes/],
+  ['userweb growth daily goal', 'userweb/src/GrowthHub.jsx', /dailyBonus\?\.goal/],
 ];
 for (const [name, rel, re] of guards) {
   const src = fs.readFileSync(path.join(repo, rel), 'utf8');

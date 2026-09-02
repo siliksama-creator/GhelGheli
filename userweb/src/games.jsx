@@ -16,7 +16,7 @@ import { fa, asset, avatarUrl, req } from './lib/api.js';
 import './growth.css';
 
 const GAMES = [
-  { id: 'tap', title: 'ضربه‌زن', icon: '/games/tap/skin_1.webp', desc: '۵۰ لول ضربه بزن و شخصیت‌ها را باز کن', accent: '#84CC16', singlePlayer: true, art: '/games/tap/skin_1.webp' },
+  { id: 'tap', title: 'ضربه‌زن', icon: '/games/tap/skin_1.webp', desc: null, accent: '#84CC16', singlePlayer: true, art: '/games/tap/skin_1.webp' },
   { id: 'penalty', title: 'ضربات پنالتی', icon: '/games/penalty_icon.png', desc: 'شوت دقیق و مهار دروازه‌بان', accent: '#38BDF8', art: '/games/penalty.webp' },
   { id: 'card_duel', title: 'دوئل کارت‌ها', icon: '/games/card_duel_glow.webp', desc: 'نبرد پنج‌راندی و کارت‌های کلکسیونی', accent: '#FFD166', art: '/games/card_duel_glow.webp' },
   { id: 'memory', title: 'جفت‌یاب', icon: '/games/memory/medal.webp', desc: 'جفت‌های فوتبالی را به خاطر بسپار', accent: '#A855F7', art: '/games/memory.webp' },
@@ -72,6 +72,8 @@ export default function Games({ api, token, externalLaunch = null }) {
   const [coinQuota, setCoinQuota] = useState(null);
   const [customStake, setCustomStake] = useState(500);
   const [tapLevels, setTapLevels] = useState(50);
+  const [publicStakes, setPublicStakes] = useState([100, 1000]);
+  const [lobbyStakes, setLobbyStakes] = useState([0, 100, 1000, 5000]);
   const [customGame, setCustomGame] = useState('penalty');
   const [customPass, setCustomPass] = useState('');
   const [lobbies, setLobbies] = useState([]);
@@ -178,6 +180,16 @@ export default function Games({ api, token, externalLaunch = null }) {
     }).catch(() => {});
     req('/api/config', 'GET', null, null).then(d => {
       if (d?.tapLevelCount) setTapLevels(d.tapLevelCount);
+      if (Array.isArray(d?.stakes?.public)) {
+        const scored = d.stakes.public.map(Number).filter(n => n > 0);
+        if (scored.length) {
+          setPublicStakes(scored);
+          setMode(m => (scored.includes(m) || m <= 0 ? m : scored[0]));
+        }
+      }
+      if (Array.isArray(d?.stakes?.lobby) && d.stakes.lobby.length) {
+        setLobbyStakes(d.stakes.lobby.map(Number).filter(n => n >= 0));
+      }
       if (d?.economy) setEconomy(d.economy);
       if (d?.gamePoints) setGamePoints(d.gamePoints);
       if (d?.features) setFeatures(d.features);
@@ -350,8 +362,12 @@ export default function Games({ api, token, externalLaunch = null }) {
       {/* Mode Selector (4 Tabs) — رنگ هر قرص مثل اندروید */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
         {[
-          { id: 100, label: '۱۰۰ امتیاز', icon: 'bolt', color: '#38BDF8' },
-          { id: 1000, label: '۱۰۰۰ امتیاز', icon: 'star', color: '#FFD166' },
+          ...publicStakes.map((s, i) => ({
+            id: s,
+            label: `${fa(s)} امتیاز`,
+            icon: s >= 1000 ? 'star' : 'bolt',
+            color: s >= 1000 ? '#FFD166' : '#38BDF8',
+          })),
           { id: 0, label: 'تمرین با ربات', icon: 'robot', color: '#22E7A6' },
           { id: -1, label: 'اتاق خصوصی', icon: 'door', color: '#A855F7' },
         ].map(m => (
@@ -360,7 +376,7 @@ export default function Games({ api, token, externalLaunch = null }) {
             type="button"
             onClick={() => setMode(m.id)}
             style={{
-              padding: '12px 6px',
+              flex: '1 1 90px', minWidth: 90, padding: '12px 6px',
               borderRadius: '14px',
               border: mode === m.id ? `1.5px solid ${m.color}` : '1px solid rgba(255,255,255,0.1)',
               background: mode === m.id ? `${m.color}22` : 'rgba(255,255,255,0.04)',
@@ -441,7 +457,7 @@ export default function Games({ api, token, externalLaunch = null }) {
             </div>
 
             <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', marginBottom: '12px' }}>
-              {[0, 100, 1000, 5000].map(s => (
+              {lobbyStakes.map(s => (
                 <button
                   key={s}
                   type="button"
@@ -605,7 +621,7 @@ export default function Games({ api, token, externalLaunch = null }) {
               </div>
               <div className="gameTileBody">
                 <h4>{g.title}</h4>
-                <p>{g.desc}</p>
+                <p>{g.id === 'tap' ? `${fa(tapLevels)} لول ضربه بزن و شخصیت‌ها را باز کن` : g.desc}</p>
                 <div className="gameTileFoot">
                   <span className="gameTilePlay">شروع</span>
                   {g.id === 'memory' && mode === 0 && (

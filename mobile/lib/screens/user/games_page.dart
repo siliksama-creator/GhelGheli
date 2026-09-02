@@ -107,6 +107,10 @@ class _GamesHubPageState extends State<GamesHubPage> {
   Map<String, dynamic>? _economy;
   Map<String, dynamic>? _gamePoints;
   Map<String, dynamic>? _features;
+  /// ورودی‌های عمومی از /api/config.stakes — بدون 0 (تمرین جداست).
+  List<int> _publicStakes = const [100, 1000];
+  List<int> _lobbyStakes = const [0, 100, 1000, 5000];
+  int _tapLevelCount = 50;
 
   @override
   void initState() {
@@ -166,6 +170,28 @@ class _GamesHubPageState extends State<GamesHubPage> {
               _gamePoints =
                   Map<String, dynamic>.from(cfg['gamePoints'] as Map);
             }
+            if (cfg['stakes'] is Map) {
+              final st = Map<String, dynamic>.from(cfg['stakes'] as Map);
+              final pub = (st['public'] as List? ?? const [])
+                  .map((e) => (e as num).toInt())
+                  .where((n) => n >= 0)
+                  .toList();
+              final lobby = (st['lobby'] as List? ?? const [])
+                  .map((e) => (e as num).toInt())
+                  .where((n) => n >= 0)
+                  .toList();
+              final scored = pub.where((n) => n > 0).toList();
+              if (scored.isNotEmpty) {
+                _publicStakes = scored;
+                if (!_publicStakes.contains(_selectedMode) &&
+                    _selectedMode > 0) {
+                  _selectedMode = _publicStakes.first;
+                }
+              }
+              if (lobby.isNotEmpty) _lobbyStakes = lobby;
+            }
+            final tapN = (cfg['tapLevelCount'] as num?)?.toInt();
+            if (tapN != null && tapN > 0) _tapLevelCount = tapN;
           });
         }
       } catch (_) {}
@@ -429,6 +455,7 @@ class _GamesHubPageState extends State<GamesHubPage> {
         // ── ۱. بازی ضربه‌زن: بالای صفحه و مستقل ──
         if (_gameEnabled('tap'))
           _TapGameHeroCard(
+            levelCount: _tapLevelCount,
             onTap: () => setState(() => _active = 'tap'),
           ),
         Gaps.vMd,
@@ -451,49 +478,49 @@ class _GamesHubPageState extends State<GamesHubPage> {
         // انتخابِ حالت» را از بقیهٔ صفحه جدا کند. بدونِ کلید، تست
         // مجبور بود متن را در کلِ صفحه بشمارد — و وقتی کاشی‌ها مربعی
         // شدند و نشانِ حالت را هم نشان دادند، شکست.
-        Row(
+        SingleChildScrollView(
           key: const Key('gameModeBar'),
-          children: [
-            Expanded(
-              child: _ModePill(
-                title: '۱۰۰ امتیاز',
-                icon: Icons.bolt_rounded,
-                selected: _selectedMode == 100,
-                color: const Color(0xFF38BDF8),
-                onTap: () => setState(() => _selectedMode = 100),
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (final stake in _publicStakes) ...[
+                SizedBox(
+                  width: 96,
+                  child: _ModePill(
+                    title: '${faNum(stake)} امتیاز',
+                    icon: stake >= 1000 ? Icons.stars_rounded : Icons.bolt_rounded,
+                    selected: _selectedMode == stake,
+                    color: stake >= 1000
+                        ? const Color(0xFFFFD166)
+                        : const Color(0xFF38BDF8),
+                    onTap: () => setState(() => _selectedMode = stake),
+                  ),
+                ),
+                Gaps.hXs,
+              ],
+              SizedBox(
+                width: 110,
+                child: _ModePill(
+                  title: 'تمرین با ربات',
+                  icon: Icons.smart_toy_rounded,
+                  selected: _selectedMode == 0,
+                  color: const Color(0xFF22E7A6),
+                  onTap: () => setState(() => _selectedMode = 0),
+                ),
               ),
-            ),
-            Gaps.hXs,
-            Expanded(
-              child: _ModePill(
-                title: '۱۰۰۰ امتیاز',
-                icon: Icons.stars_rounded,
-                selected: _selectedMode == 1000,
-                color: const Color(0xFFFFD166),
-                onTap: () => setState(() => _selectedMode = 1000),
+              Gaps.hXs,
+              SizedBox(
+                width: 110,
+                child: _ModePill(
+                  title: 'اتاق خصوصی',
+                  icon: Icons.meeting_room_rounded,
+                  selected: _selectedMode == -1,
+                  color: const Color(0xFFA855F7),
+                  onTap: () => setState(() => _selectedMode = -1),
+                ),
               ),
-            ),
-            Gaps.hXs,
-            Expanded(
-              child: _ModePill(
-                title: 'تمرین با ربات',
-                icon: Icons.smart_toy_rounded,
-                selected: _selectedMode == 0,
-                color: const Color(0xFF22E7A6),
-                onTap: () => setState(() => _selectedMode = 0),
-              ),
-            ),
-            Gaps.hXs,
-            Expanded(
-              child: _ModePill(
-                title: 'اتاق خصوصی',
-                icon: Icons.meeting_room_rounded,
-                selected: _selectedMode == -1,
-                color: const Color(0xFFA855F7),
-                onTap: () => setState(() => _selectedMode = -1),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
         Gaps.vSm,
         _StakeRulesBanner(mode: _selectedMode),
@@ -506,6 +533,7 @@ class _GamesHubPageState extends State<GamesHubPage> {
           _PrivateLobbyHub(
             api: widget.api,
             currentPoints: (_user?['current_points'] as num?)?.toInt() ?? 0,
+            lobbyStakes: _lobbyStakes,
             onJoinGame: (gameId, stake, roomCode, existingSocket, initialStart) {
               _launchGame(
                 gameId,
@@ -710,8 +738,9 @@ class _ModePill extends StatelessWidget {
 
 /// بنر ضربه‌زن در بالای صفحه
 class _TapGameHeroCard extends StatelessWidget {
-  const _TapGameHeroCard({required this.onTap});
+  const _TapGameHeroCard({required this.onTap, this.levelCount = 50});
   final VoidCallback onTap;
+  final int levelCount;
 
   @override
   Widget build(BuildContext context) {
@@ -740,25 +769,25 @@ class _TapGameHeroCard extends StatelessWidget {
           children: [
             Image.asset('assets/games/tap/skin_1.webp', width: 56, height: 56, cacheWidth: 150),
             const SizedBox(width: 12),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Text('بازی ضربه‌زن (تک‌نفره)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.white)),
-                      SizedBox(width: 6),
+                      const Text('بازی ضربه‌زن (تک‌نفره)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.white)),
+                      const SizedBox(width: 6),
                       DecoratedBox(
-                        decoration: BoxDecoration(color: Color(0xFF84CC16), borderRadius: BorderRadius.all(Radius.circular(6))),
+                        decoration: const BoxDecoration(color: Color(0xFF84CC16), borderRadius: BorderRadius.all(Radius.circular(6))),
                         child: Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          child: Text('۵۰ لول', style: TextStyle(color: Color(0xFF1E0A00), fontSize: 12.5, fontWeight: FontWeight.w900)),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          child: Text('${faNum(levelCount)} لول', style: const TextStyle(color: Color(0xFF1E0A00), fontSize: 12.5, fontWeight: FontWeight.w900)),
                         ),
                       ),
                     ],
                   ),
-                  SizedBox(height: 3),
-                  Text('ضربه بزن، شخصیت‌های مخفی را باز کن و امتیاز بگیر', style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 11)),
+                  const SizedBox(height: 3),
+                  const Text('ضربه بزن، شخصیت‌های مخفی را باز کن و امتیاز بگیر', style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 11)),
                 ],
               ),
             ),
@@ -931,10 +960,12 @@ class _PrivateLobbyHub extends StatefulWidget {
     required this.api,
     required this.currentPoints,
     required this.onJoinGame,
+    this.lobbyStakes = const [0, 100, 1000, 5000],
   });
 
   final ApiClient api;
   final int currentPoints;
+  final List<int> lobbyStakes;
   final void Function(
     String gameId,
     int stake,
@@ -954,7 +985,7 @@ class _PrivateLobbyHubState extends State<_PrivateLobbyHub> {
   bool _socketTransferred = false;
 
   String _selectedGame = 'penalty';
-  int _stake = 500;
+  late int _stake;
   final _passCtrl = TextEditingController();
   final _joinCodeCtrl = TextEditingController();
 
@@ -964,11 +995,14 @@ class _PrivateLobbyHubState extends State<_PrivateLobbyHub> {
     ('memory', 'جفت‌یاب', 'assets/games/memory/medal.webp'),
   ];
 
-  final _presetStakes = const [0, 100, 1000, 5000];
+  List<int> get _presetStakes =>
+      widget.lobbyStakes.isNotEmpty ? widget.lobbyStakes : const [0, 100, 1000, 5000];
 
   @override
   void initState() {
     super.initState();
+    final presets = _presetStakes;
+    _stake = presets.firstWhere((s) => s > 0, orElse: () => presets.isEmpty ? 0 : presets.first);
     _initSocket();
   }
 

@@ -118,15 +118,15 @@ export default function GrowthHub({ api, token, onSocketGame }) {
     </header>
 
     <div className="growthSummary">
-      <div className="dailyQuestMeter" style={{'--daily-progress':(data?.dailyBonus?.completed || 0)/5}}><strong>{data?.dailyBonus?.completed || 0}<i>/۵</i></strong><span>ماموریت امروز</span></div>
-      <div><b>هر روز ۵ ماموریت تازه</b><small>از میان بیش از {data?.rotation?.dailyPoolSize || 120} ماموریت؛ هر پنج‌تا را تمام کن و جایزه کامل بگیر.</small></div>
+      <div className="dailyQuestMeter" style={{'--daily-progress':(data?.dailyBonus?.completed || 0)/Math.max(1, data?.dailyBonus?.goal || 5)}}><strong>{data?.dailyBonus?.completed || 0}<i>/{fa(data?.dailyBonus?.goal || 5)}</i></strong><span>ماموریت امروز</span></div>
+      <div><b>هر روز {fa(data?.dailyBonus?.goal || 5)} ماموریت تازه</b><small>از میان بیش از {fa(data?.rotation?.dailyPoolSize || 120)} ماموریت؛ هر {fa(data?.dailyBonus?.goal || 5)} تا را تمام کن و جایزه کامل بگیر.</small></div>
       <button className="inviteFriendCta" type="button" onClick={inviteFriend}><span>＋</span><b>دعوت از یک دوست</b><small>{fa(data?.referral?.spinsPerReferral ?? 3)} چرخش برای هر دو + درآمد معرفی</small></button>
     </div>
 
     <div className={`dailyBonusCard ${data?.dailyBonus?.ready ? 'ready' : ''} ${data?.dailyBonus?.claimed ? 'claimed' : ''}`}>
-      <span style={{display:'flex',color:'#FFD166'}}><SvgIcon name="gift" size={20} /></span><div><b>جایزه تکمیل هر ۵ ماموریت</b><small>امروز +{data?.dailyBonus?.reward || 100} امتیاز اضافه</small></div>
+      <span style={{display:'flex',color:'#FFD166'}}><SvgIcon name="gift" size={20} /></span><div><b>جایزه تکمیل هر {fa(data?.dailyBonus?.goal || 5)} ماموریت</b><small>امروز +{fa(data?.dailyBonus?.reward || 100)} امتیاز اضافه</small></div>
       <button disabled={!data?.dailyBonus?.ready || data?.dailyBonus?.claimed || busy === 'daily-bonus'} onClick={claimDailyBonus}>
-        {data?.dailyBonus?.claimed ? 'گرفته شد' : data?.dailyBonus?.ready ? 'دریافت جایزه' : `${data?.dailyBonus?.completed || 0}/۵`}
+        {data?.dailyBonus?.claimed ? 'گرفته شد' : data?.dailyBonus?.ready ? 'دریافت جایزه' : `${data?.dailyBonus?.completed || 0}/${fa(data?.dailyBonus?.goal || 5)}`}
       </button>
     </div>
 

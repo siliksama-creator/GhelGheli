@@ -349,7 +349,10 @@ async function claimDailyBonus(userId) {
         WHERE user_id=$1 AND period_key=$2 FOR UPDATE`, [userId, key]);
     const byMission = new Map(rows.map(row => [row.mission_key, row]));
     if (!daily.every(mission => Number(byMission.get(mission.key)?.progress || 0) >= mission.goal)) {
-      throw Object.assign(new Error('برای دریافت جایزه کامل، هر ۵ ماموریت روزانه را تمام کن'), { status: 409 });
+      throw Object.assign(
+        new Error(`برای دریافت جایزه کامل، هر ${daily.length || 5} ماموریت روزانه را تمام کن`),
+        { status: 409 },
+      );
     }
     if (byMission.get(DAILY_BONUS_KEY)?.claimed_at) {
       throw Object.assign(new Error('جایزه تکمیل امروز قبلاً دریافت شده است'), { status: 409 });
