@@ -3,6 +3,10 @@ import { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import { play, startDuelMusic, stopDuelMusic } from './gameAudio.js';
 import { heavyImpact, mediumImpact, victoryFanfare } from './haptics.js';
+import { fa } from './lib/api.js';
+// پنجرهٔ اتصالِ دوباره و جملهٔ «۲۵ ثانیه…» هر دو از سرور می‌آیند (فاز ۲)
+// تا با تغییرِ live_rules عددِ روی صفحه و رفتارِ موتور واگرا نمانند.
+import { text, ruleNumber, liveConfigVersion } from './lib/liveConfig.js';
 
 export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roomCode = null,
   externalSocket = null, initialStart = null, enabled = true) {
@@ -240,7 +244,9 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
     const onDisconnect = () => {
       if (disposed) return;
       setConnected(false);
-      if (activeRoomRef.current) setConnectionNotice('شبکه قطع شد؛ ۲۵ ثانیه برای بازگشت فرصت داری…');
+      if (activeRoomRef.current) setConnectionNotice(text('reconnect.offlineNote',
+        `شبکه قطع شد؛ ${fa(ruleNumber('reconnectSeconds', 25))} ثانیه برای بازگشت فرصت داری…`,
+        { reconnectSeconds: ruleNumber('reconnectSeconds', 25) }));
     };
     const onOpponentReconnecting = d => setConnectionNotice(d?.message || 'منتظر بازگشت حریف…');
     const onOpponentReconnected = d => { setConnectionNotice(d?.message || 'حریف برگشت'); window.setTimeout(() => setConnectionNotice(''), 1800); };

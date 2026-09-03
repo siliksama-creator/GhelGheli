@@ -10,6 +10,10 @@ import React, { useEffect, useState, Suspense, lazy } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { API, req, fa } from './lib/api.js';
+// متن‌ها و اعداد زنده (فاز ۲): این fetchِ بنَاییِ config همان چیزی است که
+// کشِ ماژول‌سطحِ liveConfig را پر می‌کند، پس هیچ صفحه‌ای برای دانستنِ یک
+// برچسب درخواستِ دوم نمی‌زند.
+import { primeLiveConfig } from './lib/liveConfig.js';
 import { primeImageCache, registerImageCacheWorker } from './lib/imageCache.js';
 import Notifications from './components/Notifications.jsx';
 import Auth from './screens/Auth.jsx';
@@ -176,6 +180,9 @@ function App() {
   useEffect(() => {
     req('/api/config', 'GET', null, null).then((d) => {
       setCfg(d);
+      // تک‌منبعِ متن/عدد: هر صفحه‌ای که `useLive()` می‌زند از همین کش
+      // تازه می‌شود — چهار fetchِ پراکندهٔ قبلی لازم نبود.
+      primeLiveConfig(d);
       if (Array.isArray(d?.tabOrder)) window.__tabOrderServer = d.tabOrder;
       // آپدیت نسخهٔ وب از سرور — بدون hardcode در بیلد
       try {

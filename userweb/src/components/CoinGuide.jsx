@@ -1,5 +1,10 @@
 import React from 'react';
 import { fa } from '../lib/api.js';
+// متن‌های زنده (فاز ۲ نقشه‌راهٔ یکپارچه‌سازی): هر جملهٔ این راهنما از
+// `live_copy` خوانده می‌شود و رشتهٔ کناری‌اش فقط **فول‌بکِ ایمن** است — یعنی
+// همان متنِ دیروز. عدد هرگز در متن نوشته نمی‌شود: همیشه از جای‌نگهدار
+// می‌آید تا «جمله یک‌چیز بگوید و منطقِ سرور چیزِ دیگر».
+import { text, useLive } from '../lib/liveConfig.js';
 import { ASSETS, SvgIcon } from './IconAsset.jsx';
 
 // کارتِ «سکه چیست و چطور به دست می‌آید» — بالای جدولِ لیگ.
@@ -52,6 +57,7 @@ const KEY = { win: 'برد', draw: 'مساوی', loss: 'باخت' };
 //    تغییرِ ادمین در پنل، همین راهنما را در وب و اندروید (بدونِ آپدیت)
 //    به‌روز می‌کند.
 export default function CoinGuide({ open, onToggle, economy }) {
+  useLive(); // با رسیدنِ config یک بار تازه می‌شود
   const table = economy?.coinRewards?.card_duel;
   const ROWS = Object.keys(KEY).map(key => ({
     game: KEY[key],
@@ -59,21 +65,40 @@ export default function CoinGuide({ open, onToggle, economy }) {
     s1000: Number(table?.[1000]?.[key] ?? DEFAULT_ROWS.find(r => r.game === KEY[key])?.s1000 ?? 0),
   }));
 
+  // دو ورودیِ امتیازآور از `economy.dailyCoinQuota` خوانده می‌شوند. اگر روزی
+  // ادمین ورودیِ تازه‌ای تعریف کند، این راهنما و جدولش خودکار ردیفِ تازه
+  // می‌گیرند — پیش از این «۱۰۰» و «۱۰۰۰» در چهار رشته هاردکد بودند.
+  const quotaMap = (economy?.dailyCoinQuota && typeof economy.dailyCoinQuota === 'object')
+    ? economy.dailyCoinQuota : {};
+  const stakeTiers = Object.keys(quotaMap)
+    .map(Number).filter(n => Number.isFinite(n) && n > 0).sort((a, b) => a - b);
+  const stakeLow = stakeTiers[0] ?? 100;
+  const stakeHigh = stakeTiers[stakeTiers.length - 1] ?? 1000;
+
   const pct = Number(economy?.coinCarryoverPercent ?? 10);
   const pctText = pct === 0
     ? 'انتقالِ سکه به لیگِ بعدی صفر است'
     : `${fa(pct)}٪ از سکه به لیگِ بعدی منتقل می‌شود`;
   const tapCoins = Number(economy?.tapCoinsPerLevel ?? 5);
-  const quota100 = Number(economy?.dailyCoinQuota?.[100] ?? 30);
-  const quota1000 = Number(economy?.dailyCoinQuota?.[1000] ?? 15);
+  const quota100 = Number(quotaMap[stakeLow] ?? 30);
+  const quota1000 = Number(quotaMap[stakeHigh] ?? 15);
 
   const RULES = [
-    ['check', 'هر سه بازی یکسان سکه می‌دهند — دوئل کارت، پنالتی و جفت‌یاب.'],
-    ['ban', 'بازی با ربات، تمرین رایگان و لابی خصوصی سکه ندارند.'],
-    ['lock', 'سکه هرگز از شما کم نمی‌شود؛ حتی وقتی ببازید.'],
-    ['calendar', `هر روز تا ${fa(quota100)} بازی در ورودی ۱۰۰ و ${fa(quota1000)} بازی در ورودی ۱۰۰۰ سکه می‌دهد. بعد از آن، بازی امتیاز دارد ولی سکه نه.`],
-    ['target', `بازی ضربه‌زن هم سکه دارد: هر لول ${fa(tapCoins)} سکه — همان لحظهٔ لول‌آپ به موجودی‌ات اضافه می‌شود.`],
-    ['trophy', `مبنای دریافتِ جایزهٔ لیگ، رتبه بر اساسِ سکه است و با سکه‌ها در استخرِ جایزه شرکت می‌کنی. در پایانِ فصل جوایز بر اساسِ سکه پرداخت و سکه‌ها صفر می‌شوند؛ ${pctText}.`],
+    ['check', text('coinGuide.allEqual',
+      'هر سه بازی یکسان سکه می‌دهند — دوئل کارت، پنالتی و جفت‌یاب.')],
+    ['ban', text('coinGuide.noCoin',
+      'بازی با ربات، تمرین رایگان و لابی خصوصی سکه ندارند.')],
+    ['lock', text('coinGuide.neverLost',
+      'سکه هرگز از شما کم نمی‌شود؛ حتی وقتی ببازید.')],
+    ['calendar', text('coinGuide.quota',
+      `هر روز تا ${fa(quota100)} بازی در ورودی ${fa(stakeLow)} و ${fa(quota1000)} بازی در ورودی ${fa(stakeHigh)} سکه می‌دهد. بعد از آن، بازی امتیاز دارد ولی سکه نه.`,
+      { qLow: quota100, stakeLow, qHigh: quota1000, stakeHigh })],
+    ['target', text('coinGuide.tapCoins',
+      `بازی ضربه‌زن هم سکه دارد: هر لول ${fa(tapCoins)} سکه — همان لحظهٔ لول‌آپ به موجودی‌ات اضافه می‌شود.`,
+      { tapCoins })],
+    ['trophy', text('coinGuide.league',
+      `مبنای دریافتِ جایزهٔ لیگ، رتبه بر اساسِ سکه است و با سکه‌ها در استخرِ جایزه شرکت می‌کنی. در پایانِ فصل جوایز بر اساسِ سکه پرداخت و سکه‌ها صفر می‌شوند؛ ${pctText}.`,
+      { carryover: pctText })],
   ];
   return (
     <div className="coinGuide" style={{
@@ -88,7 +113,7 @@ export default function CoinGuide({ open, onToggle, economy }) {
           style={{ display: 'block', flexShrink: 0, filter: 'drop-shadow(0 0 10px rgba(255,209,102,0.45))' }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <b style={{ display: 'block', fontSize: '16px', fontWeight: 900, color: '#FFD166', marginBottom: '2px' }}>
-            سکه چطور به دست می‌آید؟
+            {text('coinGuide.heading', 'سکه چطور به دست می‌آید؟')}
           </b>
           {/* دورِ ۳۳ — این پاراگراف سه سطر بود و روی گوشیِ ۴۱۲px کلِ بلوک
               را به ۳۴۰px می‌رساند، پس جدولِ رتبه‌بندی (هدفِ اصلیِ صفحهٔ
@@ -111,8 +136,8 @@ export default function CoinGuide({ open, onToggle, economy }) {
           background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,209,102,0.24)',
         }}>
           <div style={{ padding: '6px 10px', fontSize: '11.5px', fontWeight: 800, color: '#94A3B8' }}>نتیجهٔ بازی</div>
-          <div style={{ padding: '6px 4px', fontSize: '11.5px', fontWeight: 800, color: '#94A3B8', textAlign: 'center' }}>ورودی ۱۰۰</div>
-          <div style={{ padding: '6px 4px', fontSize: '11.5px', fontWeight: 800, color: '#94A3B8', textAlign: 'center' }}>ورودی ۱۰۰۰</div>
+          <div style={{ padding: '6px 4px', fontSize: '11.5px', fontWeight: 800, color: '#94A3B8', textAlign: 'center' }}>{text('coinGuide.stakeLabel', `ورودی ${fa(stakeLow)}`, { stake: stakeLow })}</div>
+          <div style={{ padding: '6px 4px', fontSize: '11.5px', fontWeight: 800, color: '#94A3B8', textAlign: 'center' }}>{text('coinGuide.stakeLabel', `ورودی ${fa(stakeHigh)}`, { stake: stakeHigh })}</div>
 
           {ROWS.map(r => (
             <React.Fragment key={r.game}>

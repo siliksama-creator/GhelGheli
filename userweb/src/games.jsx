@@ -13,6 +13,10 @@ import CoinRateStrip from './components/CoinRateStrip.jsx';
 import { ASSETS, SvgIcon } from './components/IconAsset.jsx';
 import WinnerCelebration from './components/WinnerCelebration.jsx';
 import { fa, asset, avatarUrl, req } from './lib/api.js';
+// «۵۰ لول»، «کد ۴ رقمی» و برچسب‌های بازی از این به بعد زنده‌اند (فاز ۲):
+// عدد از live_rules و جمله از live_copy. این هاب یکی از fetchهای
+// تکراریِ /api/config را هم داشت که به کشِ مشترک وصل شد.
+import { text, ruleNumber, loadLiveConfig, useLive } from './lib/liveConfig.js';
 import './growth.css';
 
 const GAMES = [
@@ -32,6 +36,28 @@ export function gameTitle(id) {
 }
 function gameAccent(id) {
   return GAMES.find(g => g.id === id)?.accent || '#38BDF8';
+}
+
+/**
+ * زیرعنوانِ بازی — زنده، با فول‌بکِ دقیقاً برابرِ متنِ امروز.
+ *
+ * چرا اینجا و نه در خودِ آرایهٔ `GAMES`؟ چون `GAMES` یک ثابتِ سطح‌ماژول است
+ * و در زمانِ import ساخته می‌شود — یعنی **پیش از** رسیدنِ config. اگر
+ * قالب‌ها را داخلش می‌گذاشتیم، همیشه متنِ کهنه نمایش داده می‌شد. هر چه
+ * زنده است باید در زمانِ رندر خوانده شود.
+ */
+function gameSubtitle(g, tapLevels) {
+  if (g.id === 'tap') {
+    return text('games.tapSubtitle', `${fa(tapLevels)} لول ضربه بزن و شخصیت‌ها را باز کن`,
+      { levelCount: tapLevels });
+  }
+  if (g.id === 'card_duel') {
+    return text('games.duelSubtitle', g.desc);
+  }
+  if (g.id === 'memory') {
+    return text('games.memorySubtitle', g.desc);
+  }
+  return g.desc;
 }
 
 /**
@@ -178,7 +204,8 @@ export default function Games({ api, token, externalLaunch = null }) {
       if (d?.economy) setEconomy(d.economy);
       if (d?.gamePoints) setGamePoints(d.gamePoints);
     }).catch(() => {});
-    req('/api/config', 'GET', null, null).then(d => {
+    loadLiveConfig().then(d => {
+      if (!d) return;
       if (d?.tapLevelCount) setTapLevels(d.tapLevelCount);
       if (Array.isArray(d?.stakes?.public)) {
         const scored = d.stakes.public.map(Number).filter(n => n > 0);
@@ -561,7 +588,12 @@ export default function Games({ api, token, externalLaunch = null }) {
           <div className="card" style={{ padding: '16px', borderRadius: '18px', display: 'flex', gap: '8px' }}>
             <input
               type="text"
-              placeholder="کد ۴ رقمی اتاق دوست"
+              // طولِ کد از live_rules (فاز ۲): اگر ادمین کد را ۶ رقمی کند،
+              // این راهنما و `maxLength` همان لحظه عوض می‌شوند.
+              placeholder={text('games.roomCodeLabel',
+                `کد ${fa(ruleNumber('roomCodeLength', 4))} رقمی اتاق دوست`,
+                { codeLength: ruleNumber('roomCodeLength', 4) })}
+              maxLength={ruleNumber('roomCodeLength', 4)}
               value={joinCode}
               onChange={e => setJoinCode(e.target.value)}
               style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#FFF' }}
@@ -621,7 +653,7 @@ export default function Games({ api, token, externalLaunch = null }) {
               </div>
               <div className="gameTileBody">
                 <h4>{g.title}</h4>
-                <p>{g.id === 'tap' ? `${fa(tapLevels)} لول ضربه بزن و شخصیت‌ها را باز کن` : g.desc}</p>
+                <p>{gameSubtitle(g, tapLevels)}</p>
                 <div className="gameTileFoot">
                   <span className="gameTilePlay">شروع</span>
                   {g.id === 'memory' && mode === 0 && (

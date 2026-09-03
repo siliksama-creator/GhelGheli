@@ -1,11 +1,15 @@
 // 1:1 با اندروید profile_page.dart — پروفایل خصوصی دقیقاً مثل اپ
 import React, { useCallback, useState } from 'react';
 import { req, avatars, asset, avatarUrl, fa } from '../lib/api.js';
+// «۱۰ مدل اختصاصی» دیگر عددِ داخل فایل نیست: تعداد از /api/config و
+// جمله از live_copy می‌آید، پس افزودن آواتارِ تازه متن را به‌روز می‌کند.
+import { text, avatarCount, useLive } from '../lib/liveConfig.js';
 import { useAsync } from '../lib/useAsync.js';
 import { clubImg, CosmeticAvatarFrame, DisplayName, profileBackgroundClass, profileBackgroundStyle } from '../components/Cosmetics.jsx';
 import Field from '../components/Field.jsx';
 
 export default function Profile({ token, p, load, setMsg }) {
+  useLive();
   const u = p.user;
   const [edit, setEdit] = useState({
     firstName: u.first_name || '',
@@ -91,7 +95,7 @@ export default function Profile({ token, p, load, setMsg }) {
           <Field label="شماره کارت" value={edit.bankAccount} onChange={v=>setEdit({...edit, bankAccount:v})} />
         </div>
         <div style={{ marginTop:'16px' }}>
-          <b style={{ color:'#FFF', fontSize:'12px', display:'block', marginBottom:'8px' }}>انتخاب آواتار پروفایل (۱۰ مدل اختصاصی):</b>
+          <b style={{ color:'#FFF', fontSize:'12px', display:'block', marginBottom:'8px' }}>{text('avatars.countLabel', `انتخاب آواتار پروفایل (${fa(avatarCount(avatars.length))} مدل اختصاصی):`, { count: avatarCount(avatars.length) })}</b>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:'8px' }}>
             {avatars.map(a=>(
               <img key={a} src={avatarUrl(a)} alt="آواتار" width="62" height="62" loading="lazy" style={{ width:'100%', aspectRatio:'1', borderRadius:'12px', border: edit.profileAvatarKey===a?'2.5px solid #38BDF8':'1px solid rgba(255,255,255,0.1)', cursor:'pointer', objectFit:'cover' }} onClick={()=>setEdit({...edit, profileAvatarKey:a})} />

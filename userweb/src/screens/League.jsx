@@ -8,6 +8,9 @@ import { ASSETS, SvgIcon } from '../components/IconAsset.jsx';
 import Clubs from './Clubs.jsx';
 import CoinChip from '../components/CoinChip.jsx';
 import CoinGuide from '../components/CoinGuide.jsx';
+// اقتصادِ بازی از کشِ مشترکِ config خوانده می‌شود (فاز ۲). این صفحه یکی از
+// fetchهای تکراریِ `/api/config` بود که حالا حذف شده است.
+import { useLive } from '../lib/liveConfig.js';
 
 /**
  * نشانِ سکه در ردیفِ جدول.
@@ -127,14 +130,10 @@ function PreviousWinners({ data }) {
 
 export default function League({ token, openProfile }) {
   const [selectedLeagueId, setSelectedLeagueId] = useState(null);
-  // اقتصادِ بازی‌ها (نرخِ سکه، درصدِ انتقال بین لیگ‌ها) — از /api/config؛
-  // وقتی ادمین در پنل عوض کند، این راهنما هم بدونِ آپدیت به‌روز می‌شود.
-  const [economy, setEconomy] = useState(null);
-  useEffect(() => {
-    req('/api/config', 'GET', null, null)
-      .then(d => { if (d?.economy) setEconomy(d.economy); })
-      .catch(() => {});
-  }, []);
+  // اقتصادِ بازی‌ها (نرخِ سکه، درصدِ انتقال بین لیگ‌ها) — از همان کشِ مشترک؛
+  // وقتی ادمین در پنل عوض کند این راهنما هم بدونِ آپدیت به‌روز می‌شود.
+  const live = useLive();
+  const economy = live?.economy ?? null;
   const load = useCallback(() => req(selectedLeagueId ? `/api/league/current?seasonId=${selectedLeagueId}` : '/api/league/current', 'GET', null, token), [token, selectedLeagueId]);
   const state = useAsync(load, [load]);
   const [tab, setTab] = useState('table');

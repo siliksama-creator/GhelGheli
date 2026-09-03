@@ -10,6 +10,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import { play } from './gameAudio.js';
 import { selectionClick } from './haptics.js';
+import { fa } from './lib/api.js';
+// «۸ جفت» از live_rules/live_copy می‌آید (فاز ۲): تخته همین حالا از
+// state.size پویا رندر می‌شود؛ این جمله یارِ همان عدد بود و نباید
+// از آن جدا بماند.
+import { text, ruleNumber, useLive } from './lib/liveConfig.js';
 
 // Server sends asset KEYS, not emoji. Emoji were a real bug: every OS/browser
 // draws them from a different font, and on several Androids two distinct
@@ -231,7 +236,9 @@ export default function MemorySolo({ api, token, onVersus, onBack, records, relo
             <span className="soloIcon clock" aria-hidden="true" />
             <h3>مسابقه با ساعت</h3>
             <p className="hint">
-              همه‌ی ۸ جفت را در کمترین زمان و کمترین برگرداندن پیدا کن.
+              {text('games.memoryRule',
+                `همه‌ی ${fa(ruleNumber('memoryPairs', 8))} جفت را در کمترین زمان و کمترین برگرداندن پیدا کن.`,
+                { memoryPairs: ruleNumber('memoryPairs', 8) })}
               <br />این حالت امتیاز ندارد؛ فقط رکوردت ثبت می‌شود.
             </p>
             {best != null && <span className="countdown">بهترین رکورد تو: {runTime(best)}</span>}

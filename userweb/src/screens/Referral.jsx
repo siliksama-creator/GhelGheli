@@ -1,11 +1,15 @@
 // دعوت دوستان — کد اختصاصی، آمار، و اشتراک مستقیم در پیام‌رسان‌ها
 import React, { useCallback, useEffect, useState } from 'react';
 import { req } from '../lib/api.js';
+// جملهٔ «هر N دعوت = M چرخش…» از live_copy می‌آید؛ «۱» دیگر در فایل
+// ثابت نیست (فاز ۲ — باقی‌ماندهٔ موردِ ۶ نقشه‌راه).
+import { text, useLive } from '../lib/liveConfig.js';
 import { SvgIcon } from '../components/IconAsset.jsx';
 
 const fa = n => new Intl.NumberFormat('fa-IR').format(Number(n || 0));
 
 export default function Referral({ token, setMsg }) {
+  useLive();
   const [d, setD] = useState(null);
   const [err, setErr] = useState('');
 
@@ -115,7 +119,13 @@ export default function Referral({ token, setMsg }) {
         <ul>
           <li><b>{fa(d.purchaseCommissionPercent)}٪ درآمد نقدی</b> از تمام خریدهای دوستان مستقیم، با آستانه برداشت {fa(d.withdrawalThreshold)} تومان.</li>
           <li><b>{fa(d.commissionPercent)}٪ کمیسیون امتیازی</b> از امتیازات حاصل از ثبت کارت و بازی ضربه‌زن دوست شما.</li>
-          <li><b>هر {fa(d.invitesPerDailySpin)} دعوت</b> = ۱ چرخش روزانه دائمی به گردونه شانس (تا سقف {fa(d.maxInvitesForDaily)} نفر).</li>
+          <li>{text('referral.dailySpinRule',
+            <>هر <b>{fa(d.invitesPerDailySpin)} دعوت</b> = ۱ چرخش روزانه دائمی به گردونه شانس (تا سقف {fa(d.maxInvitesForDaily)} نفر).</>,
+            {
+              invitesPerDailySpin: d.invitesPerDailySpin,
+              spinsPerDailyThreshold: d.spinsPerDailyThreshold ?? 1,
+              maxInvitesForDaily: d.maxInvitesForDaily,
+            })}</li>
           <li><b>دعوت نامحدود</b> برای دریافت چرخش‌های هدیه و جوایز.</li>
         </ul>
       </div>

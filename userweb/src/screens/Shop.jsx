@@ -1,5 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { req, fa } from '../lib/api.js';
+// برچسب‌های «۳۰ روز» و «حدود ۳۰٪» از live_copy + اعدادِ پلن می‌آیند
+// (فاز ۲). `days`/`savingPercent` را خودِ /api/shop در هر پلن می‌فرستد.
+import { text, useLive } from '../lib/liveConfig.js';
 import { AnimatedName, CosmeticAvatarFrame, DisplayName, profileBackgroundClass, profileBackgroundStyle } from '../components/Cosmetics.jsx';
 import { SvgIcon } from '../components/IconAsset.jsx';
 import CardBox from '../components/CardBox.jsx';
@@ -67,12 +70,17 @@ function CosmeticPreview({ item }) {
 }
 
 function PlanCard({ plan, activeTier, busy, onBuy, monthlyPrice = 0 }) {
+  useLive();
   const annual = plan.billingCycle === 'annual';
+  const days = Number(plan.days) || (annual ? 365 : 30);
+  const saving = Number(plan.savingPercent ?? 30);
   const active = activeTier === plan.billingCycle;
   return <article className={`shopPlan ${annual ? 'annual' : ''} ${active ? 'active' : ''}`}>
     <div className="shopPlanHead">
       <div><small>{annual ? 'بیشترین ارزش' : 'انعطاف ماهانه'}</small><h3>{plan.label}</h3></div>
-      {annual ? <b className="saveBadge">حدود ۳۰٪ صرفه‌جویی</b> : <b>۳۰ روز</b>}
+      {annual
+        ? <b className="saveBadge">{text('plus.annualBadge', `حدود ${fa(saving)}٪ صرفه‌جویی`, { savingPercent: saving })}</b>
+        : <b>{text('plus.monthlyBadge', `${fa(days)} روز`, { days })}</b>}
     </div>
     <strong className="planPrice">{money(plan.price)} <small>/ {annual ? 'سال' : 'ماه'}</small></strong>
     {annual && <div className="annualCompare">به‌جای {money((monthlyPrice || 0) * 12)} پرداخت ماهانه</div>}

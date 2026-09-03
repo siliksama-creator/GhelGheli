@@ -1,5 +1,7 @@
 import React from 'react';
 import { fa } from '../lib/api.js';
+// متن‌های زنده (فاز ۲) — رشته‌های پایین فول‌بک‌اند، نه متنِ رقیب.
+import { text, useLive } from '../lib/liveConfig.js';
 import { ASSETS } from './IconAsset.jsx';
 
 // نوارِ کوچکِ نرخِ سکه — بالای فهرستِ بازی‌ها.
@@ -18,12 +20,14 @@ const DEFAULT_ROWS = [
 export function coinExplanation(economy) {
   const pct = economy?.coinCarryoverPercent ?? 10;
   const pctText = pct === 0
-    ? 'انتقالِ سکه به لیگِ بعدی صفر است'
-    : `${fa(pct)}٪ از سکه به لیگِ بعدی منتقل می‌شود`;
+    ? text('coinGuide.carryoverZero', 'انتقالِ سکه به لیگِ بعدی صفر است')
+    : text('coinGuide.carryoverPercent',
+      `${fa(pct)}٪ از سکه به لیگِ بعدی منتقل می‌شود`, { percent: pct });
   return `سکه مبنای دریافتِ جایزهٔ لیگ است؛ رتبهٔ لیگ بر اساسِ سکه تعیین می‌شود و با سکه‌ها در استخرِ جایزه شرکت می‌کنی. سکه‌ها بعد از پایانِ لیگ صفر می‌شوند و ${pctText}.`;
 }
 
 export default function CoinRateStrip({ mode, economy, gamePoints }) {
+  useLive();
   const coinless = mode === 0 || mode === -1;
 
   if (coinless) {
@@ -38,8 +42,12 @@ export default function CoinRateStrip({ mode, economy, gamePoints }) {
           style={{ display: 'block', flexShrink: 0, opacity: 0.45 }} />
         <span style={{ fontSize: '12px', lineHeight: 1.55, color: '#94A3B8' }}>
           {mode === 0
-            ? 'تمرین با ربات سکه ندارد — برای سکه، ورودی ۱۰۰ یا ۱۰۰۰ را انتخاب کن.'
-            : 'اتاق خصوصی سکه ندارد — برای سکه، ورودی ۱۰۰ یا ۱۰۰۰ را انتخاب کن.'}
+            ? text('coinGuide.botNote',
+              'تمرین با ربات سکه ندارد — برای سکه، ورودی ۱۰۰ یا ۱۰۰۰ را انتخاب کن.',
+              { stakeLow: 100, stakeHigh: 1000 })
+            : text('coinGuide.privateNote',
+              'اتاق خصوصی سکه ندارد — برای سکه، ورودی ۱۰۰ یا ۱۰۰۰ را انتخاب کن.',
+              { stakeLow: 100, stakeHigh: 1000 })}
         </span>
       </div>
     );

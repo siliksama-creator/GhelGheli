@@ -12,6 +12,7 @@
 // نه فریب: همان کاری که هر گردونهٔ فیزیکی هم می‌کند.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { req } from '../lib/api.js';
+import { text, rawText } from '../lib/liveConfig.js';
 import { play as playSfx } from '../gameAudio.js';
 import { heavyImpact } from '../haptics.js';
 import { SvgIcon, AssetIcon } from '../components/IconAsset.jsx';
@@ -101,8 +102,16 @@ function LiveWheelDisc({ prizes }) {
 }
 
 export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
+  // جملهٔ «سهمیه هر شب ساعت ۱۲…» و عددِ چرخشِ آستانه از پنل زنده‌اند
+  // (فاز ۲). مشترک‌شدن روی همان کشِ config است — fetchِ تازه‌ای لازم نیست.
+  useLive();
   const [state, setState] = useState(null);
-  const [refRules, setRefRules] = useState({ invitesPerDailySpin: 10, maxInvitesForDaily: 50, spinsPerReferral: 3 });
+  // پیش‌فرض‌ها **همان اعدادِ امروزِ محصول**‌اند و از یک نقطه می‌آیند؛ اگر
+  // config نرسد، حداقل کهنه‌یِ یک‌دست نشان داده می‌شود نه چیزِ دیگر.
+  const [refRules, setRefRules] = useState({
+    invitesPerDailySpin: 10, maxInvitesForDaily: 50, spinsPerReferral: 3,
+    spinsPerDailyThreshold: 1,
+  });
   const [error, setError] = useState('');
   const [spinning, setSpinning] = useState(false);
   const [angle, setAngle] = useState(0);
@@ -116,6 +125,7 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
         invitesPerDailySpin: c.referral.invitesPerDailySpin ?? 10,
         maxInvitesForDaily: c.referral.maxInvitesForDaily ?? 50,
         spinsPerReferral: c.referral.spinsPerReferral ?? 3,
+        spinsPerDailyThreshold: c.referral.spinsPerDailyThreshold ?? 1,
       });
     }).catch(() => {});
   }, []);
@@ -338,14 +348,20 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
           </li>
           <li>چرخاندن گردونه <b>هیچ هزینه‌ای ندارد</b> و هیچ‌وقت نخواهد داشت.</li>
           <li>
-            به ازای هر <b>{fa(refRules.invitesPerDailySpin)} دوستی</b> که دعوت کنی، یک چرخش رایگانِ
-            روزانهٔ دیگر می‌گیری — تا سقف {fa(refRules.maxInvitesForDaily)} دوست.
+            {text('referral.dailySpinRule',
+              <>به ازای هر <b>{fa(refRules.invitesPerDailySpin)} دوستی</b> که دعوت کنی، یک چرخش رایگانِ
+                روزانهٔ دیگر می‌گیری — تا سقف {fa(refRules.maxInvitesForDaily)} دوست.</>,
+              {
+                invitesPerDailySpin: refRules.invitesPerDailySpin,
+                spinsPerDailyThreshold: refRules.spinsPerDailyThreshold,
+                maxInvitesForDaily: refRules.maxInvitesForDaily,
+              })}
           </li>
           <li>
             هر دعوت موفق، <b>{fa(refRules.spinsPerReferral)} چرخش فوری</b> هم به تو و هم به دوستت
             می‌دهد.
           </li>
-          <li>سهمیهٔ روزانه هر شب ساعت ۱۲ به وقت تهران تازه می‌شود.</li>
+          <li>{rawText('wheel.resetNote', 'سهمیهٔ روزانه هر شب ساعت ۱۲ به وقت تهران تازه می‌شود.')}</li>
           <li className="wheelRuleOdds">
             جایزه‌های بزرگ عمداً خیلی کم‌یاب‌اند؛ بیشتر چرخش‌ها امتیاز
             می‌دهند. جایزه را سرور انتخاب می‌کند، نه گوشی تو.
