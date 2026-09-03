@@ -259,6 +259,50 @@ ok('اندروید: پیش‌نمایش از `/preview` می‌گیرد', /live-
   ok('اندروید: fieldهایِ بی‌مصرف نگه نمی‌داریم (منبعِ حقیقتِ دوم)',
     !/_ruleValues\s*=/.test(mobilePage),
     'پاسخِ PATCHِ rules باید روی کنترلرها بنشیند (`_syncNums`)، نه در یک mapِ خاموش');
+
+  // قاعدهٔ خطِ سومی که از همین CI گرفتیم: هر `await` که *قبل* از
+  // `ScaffoldMessenger/of(context)` اضافه شود، باید `if (mounted)` هم
+  // داشته باشد. دورِ قبل ما `_loadHistory()` را await کردیم (که خودش رفعِ
+  // خطایِ دیگری بود) و همان await، پیامِ موفقیت را از میانِ async gap
+  // عبور داد → `use_build_context_synchronously`. یعنی «رفعِ یک خطایِ
+  // analyzer» بدونِ این سنجه، خودش خطایِ بعدی را می‌ساخت.
+  {
+    const ls = mobilePage.split('\n');
+    let sinceAwait = 0;
+    const exposed = [];
+    for (let i = 0; i < ls.length; i++) {
+      const t = ls[i].replace(/\/\/.*$/, '').trim();
+      if (!t) continue;
+      // چیزی که `use_build_context_synchronously` رد می‌کند، مصرفِ context
+      // در خطوطِ **بعد از** وقفه است؛ `if (mounted)` (در همان خط یا خطِ
+      // قبل) همان مصرف را ایمن می‌کند. این heuristic است نه type-check —
+      // قضاوتِ آخر با خودِ دارت است — و هدفِ ما یک چیزِ مشخص است: رفعِ یک
+      // خطایِ analyzer نباید بی‌سر‌و‌صدا خطایِ بعدی را بسازد (این دور
+      // `await _loadHistory()` که خودش رفعِ باگ بود، پیامِ موفقیت را
+      // بی‌محافظ کرد).
+      const prev = i > 0 ? ls[i - 1].replace(/\/\/.*$/, '').trim() : '';
+      const guarded = /\bif\s*\(\s*!?mounted\s*\)/.test(t) || /\bif\s*\(\s*!?mounted\s*\)/.test(prev);
+      if (/\bif\s*\(\s*!?mounted\s*\)/.test(t)) sinceAwait = 0;
+      // دامنه عمداً فقط `ScaffoldMessenger.of(context)` است، نه هر مصرفِ
+      // context. چرا: نسخهٔ «همهٔ contextها» ابتدا `showDialog(context: …)`
+      // را قرمز کرد، بعد `Navigator.pop(ctx)` داخلِ *builderِ* دیالوگ را —
+      // و builder توابعِ مستقل‌اند که هیچ awaitِ بیرونی را نمی‌بینند. برای
+      // تشخیصِ درست باید بلوکِ بستگی (closure) را پیمود، و یک grepِ
+      // خط‌محور آن را ندارد؛ گاردی که دو سومِ قرمزی‌هایش خطایِ جعلی باشد،
+      // فقط عضلهٔ «بی‌توجهی به قرمزی» را در تیم قوی می‌کند. الگوی واقعیِ
+      // این پروژه (و همان که CI را قرمز کرد) پیامِ بعد از await است.
+      if (sinceAwait > 0 && !guarded && /ScaffoldMessenger\.of\(context\)/.test(t)) {
+        exposed.push(`خط ${i + 1}: ${t.slice(0, 60)}`);
+        sinceAwait = 0; // یک بار به‌ازای هر await کافی است، نه هر خط
+      }
+      // شمارشِ await **آخر از همه** — در
+      // `final ok = await showDialog(context: context…)` آرگومان پیش از وقفه
+      // خوانده می‌شود و اگر اول بشماریم، خودِ خطِ سالم قرمز می‌شود.
+      if (/\bawait\b/.test(t)) sinceAwait++;
+    }
+    ok('اندروید: context بعدِ await بی‌محافظ نمی‌آید', exposed.length === 0,
+      exposed.join(' | ') + ' — use_build_context_synchronously هم error است');
+  }
 }
 ok('وب: ذخیره با هشدارِ جای‌نگهدار قفل می‌شود', /disabled=\{missing\.length > 0\}/.test(webPage));
 ok('اندروید: ذخیره با هشدارِ جای‌نگهدار قفل می‌شود',

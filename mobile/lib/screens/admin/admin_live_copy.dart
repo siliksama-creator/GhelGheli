@@ -365,9 +365,17 @@ class _AdminLiveCopyState extends State<AdminLiveCopy> {
       // Zone می‌افتد (dart analyze این را `unawaited_futures` و از نوعِ error
       // می‌شمارد، نه warning — همان چیزی که باعث شد CI قرمز شود).
       await _loadHistory();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text(
-              'ذخیره شد — از اجرای/بارِ بعدی، وب و اندروید همین را می‌بینند')));
+      // `mounted` **بعدِ** await، نه قبلش: تا دورِ قبل، پیامِ موفقیت بیawait
+      // گرفته می‌شد و به همین دلیل context از میانِ async gap رد نمی‌شد.
+      // حالا که `_loadHistory()` را await کردیم (تا خطایش unhandled نشود)،
+      // کاربر می‌تواند در فاصله‌ای که تاریخچه بار می‌شود صفحه را ببندد و
+      // `ScaffoldMessenger.of(context)` روی elementِ مرده فریاد بزند.
+      // `use_build_context_synchronously` دقیقاً همین را error می‌شمارد.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text(
+                'ذخیره شد — از اجرای/بارِ بعدی، وب و اندروید همین را می‌بینند')));
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
