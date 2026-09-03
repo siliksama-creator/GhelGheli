@@ -54,8 +54,9 @@
 // بود، بقیهٔ صفحه هم با خودش می‌برد.
 import React, { useEffect, useRef, useState } from 'react';
 
-import { API } from '../lib/api.js';
+import { API, fa } from '../lib/api.js';
 import { SvgIcon } from './IconAsset.jsx';
+import { text, ruleNumber, useLive } from '../lib/liveConfig.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // مراحلِ واقعیِ آنالیز
@@ -115,6 +116,9 @@ async function shrink(file) {
 }
 
 export default function PhotoCardBox({ token, onDone, setMsg }) {
+  // وعدهٔ بررسی عکس از config خوانده می‌شود؛ بدونِ این خط، متنِ تازهٔ
+  // ادمین فقط با رفرشِ کاملِ صفحه دیده می‌شد.
+  useLive();
   const [available, setAvailable] = useState(null);
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState('');
@@ -382,8 +386,14 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
             سه‌خطی. متنِ کامل در `title` است، پس با نگه‌داشتنِ اشاره‌گر
             دیده می‌شود و صفحه‌خوان هم می‌خواندش. */}
         {pendingCount > 0 && !result && (
+          // وعدهٔ «تا ۲۴ ساعت» از `live_rules.reviewSlaHours` می‌آید: وعده را
+          // تیم پشتیبانی در پنل تنظیم می‌کند، پس نباید در دو کلاینت دو عدد
+          // مختلف باشد (اندروید همین کلید را می‌خواند). متن در `title` است،
+          // پس هیچ تغییرِ ظاهری روی صفحه نمی‌افتد.
           <span className="pcPendingChip"
-            title="کیفیت عکس کامل نبود؛ کارشناس بررسی می‌کند و ممکن است تا ۲۴ ساعت طول بکشد. کد شما محفوظ است و می‌توانید کارت‌های دیگرتان را ثبت کنید.">
+            title={text('photoReview.pendingNote',
+              `کیفیت عکس کامل نبود؛ کارشناس بررسی می‌کند و ممکن است تا ${fa(ruleNumber('reviewSlaHours', 24))} ساعت طول بکشد. کد شما محفوظ است و می‌توانید کارت‌های دیگرتان را ثبت کنید.`,
+              { slaHours: ruleNumber('reviewSlaHours', 24) })}>
             <SvgIcon name="support" size={16} /> {pendingCount} در بررسی
           </span>
         )}

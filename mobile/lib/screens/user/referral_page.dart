@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
+import '../../core/app_config.dart';
 import '../../core/share_invite.dart';
 import '../../theme/tokens.dart';
 
@@ -422,6 +423,13 @@ class _CompactRules extends StatelessWidget {
   final int perDaily;
   final int maxDaily;
 
+  /// ضریبِ «هر آستانه = چند چرخش» — از `live_rules`، با فول‌بکِ ۱ که
+  /// همان مقدارِ امروزِ محصول است (`RULE_DEFS.spinsPerDailyThreshold`).
+  /// صفحهٔ وب هم همین عدد را از `referral.spinsPerDailyThreshold` می‌گیرد؛
+  /// خواندن از `rules` یعنی اگر سرورِ قدیمی آن فیلد را در `referral`
+  /// نمی‌فرستاد، باز هم دو کلاینت یک عدد می‌دیدند.
+  int get spinThreshold => liveRule('spinsPerDailyThreshold', 1);
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -445,7 +453,19 @@ class _CompactRules extends StatelessWidget {
           _bullet('${faNum(spins)} شانس رایگان گردونه برای هر دو نفر بلافاصله پس از ثبت کد.'),
           _bullet('${faNum(purchasePercent)}٪ درآمد نقدی از خریدهای دوست مستقیم؛ برداشت از ${faNum(threshold)} تومان.'),
           _bullet('${faNum(percent)}٪ کمیسیون امتیازی از امتیازات کارت و بازی ضربه‌زن دوست شما.'),
-          _bullet('هر ${faNum(perDaily)} دعوت = ۱ چرخش روزانه اضافه به گردونه شانس (تا سقف ${faNum(maxDaily)} نفر).'),
+          // همان کلیدِ وب (`referral.dailySpinRule`) با همان
+          // جای‌نگهدارها. «۱» قبلاً داخلِ این رشته سفت شده بود در حالی که
+          // ضریبِ واقعی در `live_rules.spinsPerDailyThreshold` است — یعنی
+          // ادمین می‌توانست «هر آستانه = ۲ چرخش» بکند و اندروید همچنان
+          // «۱ چرخش» را نشان دهد.
+          _bullet(liveText(
+              'referral.dailySpinRule',
+              'هر ${faNum(perDaily)} دعوت = ${faNum(spinThreshold)} چرخش روزانه دائمی به گردونه شانس (تا سقف ${faNum(maxDaily)} نفر).',
+              vars: {
+                'invitesPerDailySpin': perDaily,
+                'spinsPerDailyThreshold': spinThreshold,
+                'maxInvitesForDaily': maxDaily,
+              })),
         ],
       ),
     );

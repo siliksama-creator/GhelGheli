@@ -4,6 +4,8 @@
 // routing between auth / user / admin shells). All screen implementations
 // live under lib/screens, reusable UI primitives under lib/widgets, and the
 // design system under lib/theme — see ARCHITECTURE.md for the full map.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
@@ -13,6 +15,7 @@ import 'screens/auth/splash_screen.dart';
 import 'screens/admin/admin_shell.dart';
 import 'screens/user/home_shell.dart';
 import 'screens/user/games/game_audio.dart';
+import 'core/app_config.dart';
 import 'core/error_boundary.dart';
 import 'core/memory_guard.dart';
 import 'theme/app_theme.dart';
@@ -59,6 +62,10 @@ void main() {
   //
   // جزئیاتِ دو سطحِ واکنش در core/memory_guard.dart.
   MemoryGuard.instance.install();
+  // متن/عددِ زنده (فاز ۲): گوش‌دادن به بازگشت از پس‌زمینه تا تغییری که
+  // ادمین در پنل می‌دهد، در اپِ بازِ کاربر هم بنشیند. خودِ fetch در
+  // `_GhelGheliAppState` وصل می‌شود، چون ApiClient همان‌جا ساخته می‌شود.
+  AppConfig.instance.install();
   runApp(const GhelGheliApp());
 }
 
@@ -76,6 +83,11 @@ class _GhelGheliAppState extends State<GhelGheliApp> {
   @override
   void initState() {
     super.initState();
+    // منبعِ یکتای config: AppConfig همان ApiClientِ اپ را می‌گیرد (نه یک
+    // کلاینتِ تازه) تا کشِ ETag و حذفِ تکرارِ درخواست بین همهٔ صفحه‌ها یکی
+    // بماند — `home_shell_perf_test` و `etag_cache_test` دقیقاً همین را
+    // می‌سنجند؛ کلاینتِ دوم یعنی دو درخواستِ config در هر اجرا.
+    AppConfig.instance.attach(api);
     configureCrashReporter((source, message, stack) async {
       // Authenticated, privacy-minimised first-party crash inbox. Reporting
       // failure is intentionally ignored by error_boundary so it can never
@@ -130,6 +142,10 @@ class _GhelGheliAppState extends State<GhelGheliApp> {
     api.loadToken().whenComplete(() {
       if (mounted) setState(() => _ready = true);
     });
+    // config عمومی است (بدونِ توکن)، پس معطلِ توکن نمی‌مانیم. اگر این
+    // درخواست با fetchِ HomeShell هم‌زمان شود، پنجرهٔ ۱.۲ ثانیه‌ایِ
+    // ApiClient آن را ادغام می‌کند: دو فراخوانی = یک درخواستِ واقعی.
+    unawaited(AppConfig.instance.ensure(api));
   }
 
   Future<void> _refresh() async => setState(() {});

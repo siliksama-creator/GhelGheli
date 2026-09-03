@@ -12,7 +12,7 @@
 // نه فریب: همان کاری که هر گردونهٔ فیزیکی هم می‌کند.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { req } from '../lib/api.js';
-import { text, rawText } from '../lib/liveConfig.js';
+import { text, rawText, useLive } from '../lib/liveConfig.js';
 import { play as playSfx } from '../gameAudio.js';
 import { heavyImpact } from '../haptics.js';
 import { SvgIcon, AssetIcon } from '../components/IconAsset.jsx';

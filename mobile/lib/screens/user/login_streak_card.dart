@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
+import '../../core/app_config.dart';
 import '../../core/assets.dart';
 import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
@@ -149,12 +150,25 @@ class _LoginStreakCardState extends State<LoginStreakCard>
         .whereType<Map>()
         .map((item) => Map<String, dynamic>.from(item))
         .toList();
-    final currentDay = _int(_data!['currentDay']).clamp(0, 7).toInt();
-    final nextDay = _int(_data!['nextDay']).clamp(1, 7).toInt();
+    // طولِ چرخه = تعدادِ ردیف‌هایِ پاداش که سرور فرستاده (adminOps →
+    // `streak_settings.rewards`). چرا از همین‌جا و نه از یک عددِ ثابت:
+    // «۷» قبلاً داخلِ رشتهٔ فارسی سفت شده بود، یعنی ادمین اگر چرخه را
+    // ۵ یا ۱۰ روزه می‌کرد، نوارِ پیشرفت درست می‌شد ولی متن همچنان
+    // «چرخه ۷ روزه» را نشان می‌داد. fallback همان ۷ است.
+    final cycleDays = days.isNotEmpty ? days.length : 7;
+    // سقفِ clamp هم باید با چرخه بیاید، نه با ۷: با چرخهٔ ۱۰ روزه،
+    // `clamp(0, 7)` روزِ هشتم را می‌انداخت روی ۷ و نوارِ پیشرفت روی
+    // «روز ۷ از ۱۰» گیر می‌کرد (همان باگِ نسخهٔ وبِ ما در دور ۳۴).
+    final currentDay = _int(_data!['currentDay']).clamp(0, cycleDays).toInt();
+    final nextDay = _int(_data!['nextDay']).clamp(1, cycleDays).toInt();
     final nextReward = _int(_data!['nextReward']);
     final claimedToday = _data!['claimedToday'] == true;
     final progressDay = claimedToday ? currentDay : math.max(0, nextDay - 1);
-    final progress = (progressDay / 7.0).clamp(0.0, 1.0);
+    // `/ cycleDays.toDouble()` عمدي است: در دارت تقسیمِ دو `int` نتیجه‌اش
+    // `num` است و `clamp(0.0, 1.0)` هم `num` برمی‌گرداند، در حالی که
+    // عرضِ نوار `double` می‌خواهد — همان چیزی که کامپایلر در فازِ build
+    // می‌گیرد، نه در تحلیلِ ایستا.
+    final progress = (progressDay / cycleDays.toDouble()).clamp(0.0, 1.0);
 
     return AnimatedBuilder(
       animation: _loop,
@@ -278,8 +292,26 @@ class _LoginStreakCardState extends State<LoginStreakCard>
                               const SizedBox(height: 1),
                               Text(
                                 claimedToday
-                                    ? 'چرخه ۷ روزه · امروز روز ${faNum(currentDay)} تکمیل شد'
-                                    : 'چرخه ۷ روزه · روز ${faNum(nextDay)} · ${faNum(nextReward)} امتیاز هدیه',
+                                    // «۷» هم زنده است: چرخهٔ پاداشِ ورود
+                                    // عددِ قابل‌تنظیمی است که قبلاً فقط داخل
+                                    // رشتهٔ فارسی نوشته شده بود — یعنی
+                                    // تغییرِ چرخه در پنل، متنِ اندروید را
+                                    // دروغ‌گو می‌کرد.
+                                    liveText(
+                                        'streak.cycleDone',
+                                        'چرخه ۷ روزه · امروز روز ${faNum(currentDay)} تکمیل شد',
+                                        vars: {
+                                          'days': cycleDays,
+                                          'day': currentDay
+                                        }),
+                                    : liveText(
+                                        'streak.cycleNext',
+                                        'چرخه ۷ روزه · روز ${faNum(nextDay)} · ${faNum(nextReward)} امتیاز هدیه',
+                                        vars: {
+                                          'days': cycleDays,
+                                          'day': nextDay,
+                                          'reward': nextReward
+                                        }),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
@@ -361,21 +393,41 @@ class _LoginStreakCardState extends State<LoginStreakCard>
 
                     const SizedBox(height: 8),
 
-                    // ── 7-Day Interactive Nodes (Dense & Crisp) ──
+                    // ── گره‌های روزِ چرخه (Dense & Crisp) ──
+                    //
+                    // تعدادِ گره‌ها و پهنای‌شان از طولِ چرخه ساخته می‌شود،
+                    // نه از عددِ ۷ِ سفت‌شده. دو باگِ واقعی این‌جا بود:
+                    //   • با چرخهٔ ۱۰ روزه فقط ۷ گره رسم می‌شد و سه روزِ
+                    //     جایزه‌دارِ آخر هیچ‌وقت دیده نمی‌شدند؛
+                    //   • با چرخهٔ ۵ روزه هفت گره روی همان عرض پخش می‌شد و
+                    //     دو گرهٔ آخر (فول‌بکِ ۱۰۰/۱۵۰/۲۰۰…) دادهٔ ساختگی
+                    //     نشان می‌داد.
+                    // با `cycleDays == 7` خروجی بایت‌به‌بایت همان امروز است:
+                    // `6 * 4` همان `(7 - 1) * 4` و تقسیم بر همان ۷.
                     LayoutBuilder(
                       builder: (context, constraints) {
-                        final nodeWidth = (constraints.maxWidth - (6 * 4)) / 7;
+                        final nodeWidth =
+                            (constraints.maxWidth - ((cycleDays - 1) * 4)) /
+                            cycleDays.toDouble();
                         return Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            for (var i = 0; i < 7; i++)
+                            for (var i = 0; i < cycleDays; i++)
                               _StreakDayCard(
                                 day: i + 1,
-                                reward: days.length > i ? _int(days[i]['amount']) : (100 + i * 50),
+                                // `(100 + i * 50)`ِ قبلی یعنی اگر سرور
+                                // ردیفی نفرستد، جایزهٔ **ساختگی** روی
+                                // صفحه می‌آمد. حالا صفر است و ویجت خودش
+                                // آن را ساکت می‌گذارد؛ دادهٔ جعلی از
+                                // نبودِ داده بدتر است.
+                                reward: days.length > i ? _int(days[i]['amount']) : 0,
                                 claimed: days.length > i && days[i]['claimed'] == true,
                                 current: days.length > i ? days[i]['current'] == true : (i + 1 == nextDay),
                                 width: nodeWidth,
-                                isLastDay: i == 6,
+                                // «روزِ آخر» هم از طولِ چرخه می‌آید: با
+                                // ۶ِ سفت‌شده، در چرخهٔ ۱۰ روزه جایزهٔ
+                                // طلایی به روزِ هفتم چسبیده می‌ماند.
+                                isLastDay: i == cycleDays - 1,
                                 tick: t,
                               ),
                           ],
@@ -505,8 +557,12 @@ class _StreakDayCard extends StatelessWidget {
               ),
             ),
             icon,
+            // صفر = هیچ. همان قراردادی که `coin-parity` برای سکه گذاشته:
+            // «+۰» به کاربر می‌گوید چیزی خراب است، در حالی که فقط داده
+            // نرسیده. قبلاً `100 + i * 50` جای خالی را پُر می‌کرد و گاهی
+            // عددِ ساختگی روی کارت می‌آمد.
             Text(
-              '+${faNum(reward)}',
+              reward > 0 ? '+${faNum(reward)}' : '·',
               maxLines: 1,
               overflow: TextOverflow.fade,
               style: TextStyle(

@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { req } from '../lib/api.js';
 // جملهٔ «هر N دعوت = M چرخش…» از live_copy می‌آید؛ «۱» دیگر در فایل
 // ثابت نیست (فاز ۲ — باقی‌ماندهٔ موردِ ۶ نقشه‌راه).
-import { text, useLive } from '../lib/liveConfig.js';
+import { ruleNumber, text, useLive } from '../lib/liveConfig.js';
 import { SvgIcon } from '../components/IconAsset.jsx';
 
 const fa = n => new Intl.NumberFormat('fa-IR').format(Number(n || 0));
@@ -123,7 +123,12 @@ export default function Referral({ token, setMsg }) {
             <>هر <b>{fa(d.invitesPerDailySpin)} دعوت</b> = ۱ چرخش روزانه دائمی به گردونه شانس (تا سقف {fa(d.maxInvitesForDaily)} نفر).</>,
             {
               invitesPerDailySpin: d.invitesPerDailySpin,
-              spinsPerDailyThreshold: d.spinsPerDailyThreshold ?? 1,
+              // `?? 1` فقط وقتی لازم است که سرورِ قدیمی این عدد را در
+              // `referral` نگذارد؛ همان لحظه هم بهتر است از `live_rules`
+              // بخوانیم تا از یک رقمِ دستی: ادمین «هر آستانه = ۲ چرخش» را
+              // در همان پنل تنظیم می‌کند.
+              spinsPerDailyThreshold: d.spinsPerDailyThreshold
+                ?? ruleNumber('spinsPerDailyThreshold', 1),
               maxInvitesForDaily: d.maxInvitesForDaily,
             })}</li>
           <li><b>دعوت نامحدود</b> برای دریافت چرخش‌های هدیه و جوایز.</li>

@@ -2,6 +2,7 @@ import React from 'react';
 import { fa } from '../lib/api.js';
 // متن‌های زنده (فاز ۲) — رشته‌های پایین فول‌بک‌اند، نه متنِ رقیب.
 import { text, useLive } from '../lib/liveConfig.js';
+import { carryoverText, coinStakeTiers, stakeLabel } from '../lib/coinCopy.js';
 import { ASSETS } from './IconAsset.jsx';
 
 // نوارِ کوچکِ نرخِ سکه — بالای فهرستِ بازی‌ها.
@@ -19,16 +20,17 @@ const DEFAULT_ROWS = [
 
 export function coinExplanation(economy) {
   const pct = economy?.coinCarryoverPercent ?? 10;
-  const pctText = pct === 0
-    ? text('coinGuide.carryoverZero', 'انتقالِ سکه به لیگِ بعدی صفر است')
-    : text('coinGuide.carryoverPercent',
-      `${fa(pct)}٪ از سکه به لیگِ بعدی منتقل می‌شود`, { percent: pct });
+  // از فایلِ مشترک: این جمله عیناً همان چیزی است که کارتِ راهنما می‌گوید.
+  // قبلاً دو پیاده‌سازیِ جدا داشت و یکی از آن‌ها `text()` نداشت — یعنی
+  // یکِشان از پنل عوض می‌شد و دیگری نه.
+  const pctText = carryoverText(pct);
   return `سکه مبنای دریافتِ جایزهٔ لیگ است؛ رتبهٔ لیگ بر اساسِ سکه تعیین می‌شود و با سکه‌ها در استخرِ جایزه شرکت می‌کنی. سکه‌ها بعد از پایانِ لیگ صفر می‌شوند و ${pctText}.`;
 }
 
 export default function CoinRateStrip({ mode, economy, gamePoints }) {
   useLive();
   const coinless = mode === 0 || mode === -1;
+  const stakes = coinStakeTiers(economy);
 
   if (coinless) {
     return (
@@ -42,12 +44,18 @@ export default function CoinRateStrip({ mode, economy, gamePoints }) {
           style={{ display: 'block', flexShrink: 0, opacity: 0.45 }} />
         <span style={{ fontSize: '12px', lineHeight: 1.55, color: '#94A3B8' }}>
           {mode === 0
+            // لایه‌ها و برچسب‌ها از همان `coinStakeTiers`/`stakeLabel` می‌آیند
+            // که جدولِ راهنما می‌سازد. پیش از این `stakeLow: 100` پاس داده
+            // می‌شد و قالبِ سرور «ورودی {stakeLow}» داشت — یعنی خروجی
+            // «ورودی 100» با رقمِ لاتین در میانِ متنِ فارسی، در حالی که همان
+            // جمله در کارتِ راهنما «ورودی ۱۰۰» بود. گاردِ همسانی که فقط
+            // بودِنِ کلید را می‌سنجد، این را نمی‌دید.
             ? text('coinGuide.botNote',
-              'تمرین با ربات سکه ندارد — برای سکه، ورودی ۱۰۰ یا ۱۰۰۰ را انتخاب کن.',
-              { stakeLow: 100, stakeHigh: 1000 })
+              `تمرین با ربات سکه ندارد — برای سکه، ${stakeLabel(stakes[0])} یا ${stakeLabel(stakes[1])} را انتخاب کن.`,
+              { stakeLowText: stakeLabel(stakes[0]), stakeHighText: stakeLabel(stakes[1]) })
             : text('coinGuide.privateNote',
-              'اتاق خصوصی سکه ندارد — برای سکه، ورودی ۱۰۰ یا ۱۰۰۰ را انتخاب کن.',
-              { stakeLow: 100, stakeHigh: 1000 })}
+              `اتاق خصوصی سکه ندارد — برای سکه، ${stakeLabel(stakes[0])} یا ${stakeLabel(stakes[1])} را انتخاب کن.`,
+              { stakeLowText: stakeLabel(stakes[0]), stakeHighText: stakeLabel(stakes[1]) })}
         </span>
       </div>
     );

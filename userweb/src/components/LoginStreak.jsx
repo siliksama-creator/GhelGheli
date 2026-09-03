@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 
 import { fa, req } from '../lib/api.js';
+import { text, useLive } from '../lib/liveConfig.js';
 
 /** A premium seven-day claim card shared by the web dashboard. */
 export default function LoginStreak({ token, initialData, setMsg, onClaimed }) {
@@ -42,11 +43,17 @@ export default function LoginStreak({ token, initialData, setMsg, onClaimed }) {
     }
   };
 
+  useLive();
   const days = Array.isArray(data?.rewards) ? data.rewards : [];
+  // طولِ چرخه = تعدادِ ردیف‌هایِ پاداش که سرور می‌فرستد. چرا اینجا و نه «۷»:
+  // سه‌جا رقمِ ۷ نوشته شده بود (عنوان، نوارِ پیشرفت، جملهٔ «از ۷ تکمیل شد»)
+  // در حالی که چرخه از `streak_settings.rewards` ساخته می‌شود؛ اگر ادمین
+  // چرخه را ۵ یا ۱۰ روزه می‌کرد، کارت درست کار می‌کرد ولی همه‌جا «۷» می‌خواندیم.
+  const cycleDays = days.length > 0 ? days.length : 7;
   const nextDay = Number(data?.nextDay || 1);
   const currentDay = Number(data?.currentDay || 0);
   const progressDay = data?.claimedToday ? currentDay : Math.max(0, nextDay - 1);
-  const progress = Math.max(0, Math.min(100, Math.round(progressDay / 7 * 100)));
+  const progress = Math.max(0, Math.min(100, Math.round(progressDay / cycleDays * 100)));
   const totalReward = useMemo(
     () => days.reduce((sum, day) => sum + Number(day.amount || 0), 0),
     [days]);
@@ -65,7 +72,7 @@ export default function LoginStreak({ token, initialData, setMsg, onClaimed }) {
           <span className="streakKicker">
             {data.claimedToday ? 'امروز زنجیره محفوظ شد' : 'آمادهٔ دریافت امروز'}
           </span>
-          <h3>استریک ورود ۷ روزه</h3>
+          <h3>استریک ورود {fa(cycleDays)} روزه</h3>
           <p>
             {data.claimedToday
               ? 'فردا برای ادامهٔ زنجیره برگرد؛ هر روز جایزه بزرگ‌تر می‌شود.'
@@ -81,7 +88,7 @@ export default function LoginStreak({ token, initialData, setMsg, onClaimed }) {
 
       <div className="streakStats">
         <span><b>{fa(data.totalClaims)}</b><small>دریافت کل</small></span>
-        <span><b>{fa(progressDay)}/۷</b><small>پیشرفت هفته</small></span>
+        <span><b>{fa(progressDay)}/{fa(cycleDays)}</b><small>پیشرفت هفته</small></span>
         <span><b>{fa(totalReward)}</b><small>امتیاز چرخه</small></span>
       </div>
 
@@ -108,7 +115,9 @@ export default function LoginStreak({ token, initialData, setMsg, onClaimed }) {
       <div className="streakFoot">
         <span>
           {data.claimedToday
-            ? `روز ${fa(data.currentDay)} از ۷ تکمیل شد؛ زنجیره‌ات امن است.`
+            ? text('streak.webDone',
+                `روز ${fa(data.currentDay)} از ${fa(cycleDays)} تکمیل شد؛ زنجیره‌ات امن است.`,
+                { day: Number(data.currentDay) || 0, days: cycleDays })
             : `روز ${fa(nextDay)} — پاداش ${fa(data.nextReward)} امتیاز آماده است.`}
         </span>
         <button

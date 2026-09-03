@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
+import '../../core/app_config.dart';
 import '../../core/cosmetics.dart';
 import '../../core/money.dart';
 import '../../utils/fa_date.dart';
@@ -639,6 +640,10 @@ class _PlanCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final annual = plan['billingCycle'] == 'annual';
     final active = activeTier == plan['billingCycle'];
+    // همان فرمولِ وب: `Number(plan.savingPercent ?? 30)` — عدد از خودِ
+    // پلنِ /api/shop می‌آید، پس ادمین با یک ویرایش، تخفیف را در دو کلاینت
+    // یکی عوض می‌کند.
+    final saving = (plan['savingPercent'] as num?)?.toInt() ?? 30;
     final benefits =
         ((plan['benefits'] as List?) ?? const []).take(annual ? 9 : 5);
     return SizedBox(
@@ -661,7 +666,15 @@ class _PlanCard extends StatelessWidget {
                             fontSize: 15, fontWeight: FontWeight.w900)),
                   ])),
               if (annual)
-                const _Pill(text: 'حدود ۳۰٪ تخفیف', color: Color(0xFFFFD166))
+                // «۳۰٪» قبلاً داخلِ رشته سفت نوشته بود؛ وب همان عدد را از
+                // `savingPercent` می‌خواند. واژهٔ «تخفیف/صرفه‌جویی» هم از
+                // همان `plus.annualBadge` می‌آید که وب می‌خواند و فول‌بک‌اش
+                // عیناً متنِ دیروزِ همین فایل است.
+                _Pill(
+                    text: liveText('plus.annualBadge',
+                        'حدود ${faNum(saving)}٪ تخفیف',
+                        vars: {'savingPercent': saving}),
+                    color: const Color(0xFFFFD166))
               else if (active)
                 const _Pill(text: 'فعال', color: Color(0xFF22E7A6)),
             ]),

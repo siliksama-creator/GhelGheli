@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api_client.dart';
+import '../core/app_config.dart';
 import '../core/json_get.dart';
 
 /// نوارِ کوچکِ نرخِ سکه — بالای فهرستِ بازی‌ها.
@@ -56,31 +57,44 @@ class CoinRateStrip extends StatelessWidget {
       }
       return fallback;
     }
+    // `100/1000`ِ دستی در سه ردیفِ بالا، همان چیزی بود که جدول را به
+    // «دو ستونِ همیشگی» قفل می‌کرد در حالی که متنِ زیرِ جدول از config
+    // می‌آمد. حالا هر دو از `_tiers` می‌آیند؛ با دو لایه (وضعیتِ امروز)
+    // خروجی واژه‌به‌واژه همان است.
+    final low = _tiers[0], high = _tiers[1];
     return [
-      (
-        _defaultRows[0].$1,
-        v('win', 100, _defaultRows[0].$2),
-        v('win', 1000, _defaultRows[0].$3)
-      ),
-      (
-        _defaultRows[1].$1,
-        v('draw', 100, _defaultRows[1].$2),
-        v('draw', 1000, _defaultRows[1].$3)
-      ),
-      (
-        _defaultRows[2].$1,
-        v('loss', 100, _defaultRows[2].$2),
-        v('loss', 1000, _defaultRows[2].$3)
-      ),
+      (_defaultRows[0].$1, v('win', low, _defaultRows[0].$2),
+          v('win', high, _defaultRows[0].$3)),
+      (_defaultRows[1].$1, v('draw', low, _defaultRows[1].$2),
+          v('draw', high, _defaultRows[1].$3)),
+      (_defaultRows[2].$1, v('loss', low, _defaultRows[2].$2),
+          v('loss', high, _defaultRows[2].$3)),
     ];
   }
 
+  /// لایه‌های ورودی — از همان `stakes.public` که کارتِ راهنما می‌خواند.
+  static List<int> get _tiers {
+    final t = AppConfig.instance.stakeTiers;
+    return t.length > 1 ? t : const [100, 1000];
+  }
+
+  /// «ورودی ۱۰۰» — همان `coinGuide.stakeLabel` در هر دو کلاینت.
+  static String _stakeLabel(int stake) => liveText(
+      'coinGuide.stakeLabel', 'ورودی ${faNum(stake)}', vars: {'stake': stake});
+
   /// متنِ توضیحِ استانداردِ سکه — درصدِ انتقال از تنظیماتِ ادمین.
+  ///
+  /// ⚠️ جمله و درصد هر دو زنده‌اند: قبلاً این‌جا هم `pct == 0` دستی نوشته
+  /// می‌شد و متنِ «صفر است» از هیچ کلیدی نمی‌خواند؛ یعنی در صفحهٔ لیگ
+  /// (کارتِ راهنما) ادمین می‌توانست لحن را عوض کند و در این نوار نه — دو
+  /// جملهٔ متفاوت برای یک کاربر، در یک صفحهٔ مجاور.
   String get _footer {
     final pct = num.tryParse('${economy?['coinCarryoverPercent'] ?? ''}')?.toInt() ?? 10;
     final pctText = pct == 0
-        ? 'انتقالِ سکه به لیگِ بعدی صفر است'
-        : '${faNum(pct)}٪ از سکه به لیگِ بعدی منتقل می‌شود';
+        ? liveText('coinGuide.carryoverZero', 'انتقالِ سکه به لیگِ بعدی صفر است')
+        : liveText('coinGuide.carryoverPercent',
+            '${faNum(pct)}٪ از سکه به لیگِ بعدی منتقل می‌شود',
+            vars: {'percent': pct});
     return 'سکه مبنای دریافتِ جایزهٔ لیگ است؛ رتبهٔ لیگ بر اساسِ سکه تعیین می‌شود و با سکه‌ها در استخرِ جایزه شرکت می‌کنی. سکه‌ها بعد از پایانِ لیگ صفر می‌شوند و $pctText.';
   }
 
@@ -112,9 +126,22 @@ class CoinRateStrip extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
+                // «۱۰۰/۱۰۰۰» از جمله بیرون رفت: لایه‌ها از config می‌آیند و
+                // واژهٔ «ورودی» هم از `coinGuide.stakeLabel` — همان‌جا که
+                // سرستون‌های همین جدول از آن ساخته می‌شوند.
                 mode == 0
-                    ? 'تمرین با ربات سکه ندارد — برای سکه، ورودی ۱۰۰ یا ۱۰۰۰ را انتخاب کن.'
-                    : 'اتاق خصوصی سکه ندارد — برای سکه، ورودی ۱۰۰ یا ۱۰۰۰ را انتخاب کن.',
+                    ? liveText('coinGuide.botNote',
+                        'تمرین با ربات سکه ندارد — برای سکه، ${_stakeLabel(_tiers[0])} یا ${_stakeLabel(_tiers[1])} را انتخاب کن.',
+                        vars: {
+                          'stakeLowText': _stakeLabel(_tiers[0]),
+                          'stakeHighText': _stakeLabel(_tiers[1]),
+                        })
+                    : liveText('coinGuide.privateNote',
+                        'اتاق خصوصی سکه ندارد — برای سکه، ${_stakeLabel(_tiers[0])} یا ${_stakeLabel(_tiers[1])} را انتخاب کن.',
+                        vars: {
+                          'stakeLowText': _stakeLabel(_tiers[0]),
+                          'stakeHighText': _stakeLabel(_tiers[1]),
+                        }),
                 style: const TextStyle(
                     fontSize: 12, height: 1.55, color: Color(0xFF94A3B8)),
               ),
@@ -171,8 +198,8 @@ class CoinRateStrip extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Expanded(flex: 10, child: _HeadCell('ورودی ۱۰۰')),
-                const Expanded(flex: 10, child: _HeadCell('ورودی ۱۰۰۰')),
+                Expanded(flex: 10, child: _HeadCell(_stakeLabel(_tiers[0]))),
+                Expanded(flex: 10, child: _HeadCell(_stakeLabel(_tiers[1]))),
               ],
             ),
           ),

@@ -61,6 +61,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../api_client.dart';
+import '../core/app_config.dart';
 import '../theme/colors.dart';
 import '../theme/tokens.dart';
 import 'card_frame_guide.dart';
@@ -799,9 +800,16 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
       onTap: () => ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            '${faNum(_pendingCount)} عکس در حال بررسی است. کیفیت عکس کامل '
-            'نبود؛ کارشناس بررسی می‌کند و ممکن است تا ۲۴ ساعت طول بکشد. '
-            'کد شما محفوظ است و می‌توانید کارت‌های دیگرتان را ثبت کنید.',
+            // جملهٔ میانی از `photoReview.pendingNote` می‌آید (همان کلیدی که
+            // وب در `title` نشان می‌دهد) و وعدهٔ ساعت از `reviewSlaHours`.
+            // پیشوندِ شمارنده اینجا می‌ماند چون وب آن را در چیپ جدا چاپ می‌کند
+            // و یک کلیدِ مشترکِ دوپاره، هر دو را می‌شکست.
+            '${faNum(_pendingCount)} عکس در حال بررسی است. '
+            '${liveText('photoReview.pendingNote',
+                'کیفیت عکس کامل نبود؛ کارشناس بررسی می‌کند و ممکن است تا '
+                '${faNum(liveRule('reviewSlaHours', 24))} ساعت طول بکشد. '
+                'کد شما محفوظ است و می‌توانید کارت‌های دیگرتان را ثبت کنید.',
+                vars: {'slaHours': liveRule('reviewSlaHours', 24)})}',
           ),
           duration: const Duration(seconds: 6),
         ),

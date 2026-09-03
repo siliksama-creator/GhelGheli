@@ -25,6 +25,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../api_client.dart';
+import '../../core/app_config.dart';
 import '../../utils/fa_date.dart';
 import '../../theme/tokens.dart';
 import 'games/game_audio.dart';
@@ -139,6 +140,9 @@ class _WheelPageState extends State<WheelPage>
   int _invitesPerDaily = 10;
   int _maxInvitesDaily = 50;
   int _spinsPerReferral = 3;
+  // «هر آستانه = چند چرخشِ روزانه» — از `live_rules` تا جملهٔ راهنما با
+  // عددِ واقعیِ گردونه یکی بماند (قبلاً «۱» داخلِ متن سفت نوشته شده بود).
+  int _spinThreshold = 1;
   int _resetInMs = 0;
   bool _loading = true;
   bool _spinning = false;
@@ -205,6 +209,8 @@ class _WheelPageState extends State<WheelPage>
             _invitesPerDaily = (r['invitesPerDailySpin'] as num?)?.toInt() ?? _invitesPerDaily;
             _maxInvitesDaily = (r['maxInvitesForDaily'] as num?)?.toInt() ?? _maxInvitesDaily;
             _spinsPerReferral = (r['spinsPerReferral'] as num?)?.toInt() ?? _spinsPerReferral;
+            _spinThreshold =
+                (r['spinsPerDailyThreshold'] as num?)?.toInt() ?? _spinThreshold;
           });
         }
       } catch (_) {}
@@ -542,6 +548,7 @@ class _WheelPageState extends State<WheelPage>
             invitesPerDaily: _invitesPerDaily,
             maxInvitesDaily: _maxInvitesDaily,
             spinsPerReferral: _spinsPerReferral,
+            spinThreshold: _spinThreshold,
           ),
           Gaps.vLg,
         ],
@@ -1119,6 +1126,7 @@ class _RulesCard extends StatelessWidget {
     this.invitesPerDaily = 10,
     this.maxInvitesDaily = 50,
     this.spinsPerReferral = 3,
+    this.spinThreshold = 1,
   });
 
   final int dailyQuota;
@@ -1126,6 +1134,7 @@ class _RulesCard extends StatelessWidget {
   final int invitesPerDaily;
   final int maxInvitesDaily;
   final int spinsPerReferral;
+  final int spinThreshold;
 
   @override
   Widget build(BuildContext context) {
@@ -1168,11 +1177,26 @@ class _RulesCard extends StatelessWidget {
             row('هر روز ${faNum(dailyQuota)} چرخش رایگان داری'
                 '${dailyQuota > 1 ? ' (به‌خاطر دوستانی که دعوت کردی)' : ''}.'),
           row('چرخاندن گردونه هیچ هزینه‌ای ندارد و هیچ‌وقت نخواهد داشت.'),
-          row('به ازای هر ${faNum(invitesPerDaily)} دوستی که دعوت کنی، یک چرخش رایگانِ '
-              'روزانهٔ دیگر می‌گیری — تا سقف ${faNum(maxInvitesDaily)} دوست.'),
+          // همان `referral.dailySpinRule` که وب و صفحهٔ دعوت می‌خوانند —
+          // سه جا، یک جمله. قبلاً این‌جا «به ازای هر …» بود و در صفحهٔ دعوت
+          // «هر … = ۱ چرخش»؛ یعنی یک ویرایشِ ادمین فقط یکی از دو صفحه را
+          // عوض می‌کرد و کاربر دو قانونِ متفاوت می‌دید.
+          row(liveText(
+              'referral.dailySpinRule',
+              'هر ${faNum(invitesPerDaily)} دعوت موفق = '
+              '${faNum(spinThreshold)} چرخش روزانه دائمی به گردونه شانس '
+              '(تا سقف ${faNum(maxInvitesDaily)} نفر).',
+              vars: {
+                'invitesPerDailySpin': invitesPerDaily,
+                'spinsPerDailyThreshold': spinThreshold,
+                'maxInvitesForDaily': maxInvitesDaily,
+              }))),
           row('هر دعوت موفق، ${faNum(spinsPerReferral)} چرخش فوری هم به تو و هم به دوستت '
               'می‌دهد.'),
-          row('سهمیهٔ روزانه هر شب ساعت ۱۲ به وقت تهران تازه می‌شود.'),
+          // لحنِ جمله زنده است، ساعتِ ریست نه: نیمه‌شب تهران منطقِ سرور است
+          // (بند ۴ نقشه‌راه)؛ ادمین فقط می‌تواند جمله را نرم‌تر یا جدی‌تر کند.
+          row(liveText('wheel.resetNote',
+              'سهمیهٔ روزانه هر شب ساعت ۱۲ به وقت تهران تازه می‌شود.')),
           row('جایزه‌های بزرگ عمداً خیلی کم‌یاب‌اند؛ بیشتر چرخش‌ها امتیاز '
               'می‌دهند. جایزه را سرور انتخاب می‌کند، نه گوشی تو.'),
         ],

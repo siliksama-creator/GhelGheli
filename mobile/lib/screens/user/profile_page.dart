@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
+import '../../core/app_config.dart';
 import '../../core/assets.dart';
 import '../../core/cosmetics.dart';
 import '../../theme/tokens.dart';
@@ -270,7 +271,15 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(height: 12),
 
               // ── All 10 Avatars Grid (100% visible & selectable) ──
-              const Text('انتخاب آواتار پروفایل (۱۰ مدل اختصاصی):', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800)),
+              // تعدادِ آواتار از `avatars.count` می‌آید (آینهٔ
+              // `avatars.countLabel` در وب). فهرستِ خودِ آواتارها از فایل‌های
+              // باندل است — اگر سرور مدلِ تازه‌ای اضافه کند ولی تصویرش در APK
+              // نباشد، شبکه چیزی برای نمایش ندارد؛ پس تعداد را هم فقط وقتی
+              // زنده می‌خوانیم که با باندل بخواند.
+              Text(liveText('avatars.countLabel',
+                  'انتخاب آواتار پروفایل (۱۰ مدل اختصاصی):',
+                  vars: {'count': AppConfig.instance.avatarCount(avatarFiles.length)}),
+                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800)),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,

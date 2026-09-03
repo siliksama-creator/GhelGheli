@@ -14,6 +14,7 @@ import 'package:flutter/services.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../../api_client.dart';
+import '../../../core/app_config.dart';
 import '../../../theme/tokens.dart';
 import '../../../widgets/app_card.dart';
 import 'game_scaffold.dart';
@@ -302,7 +303,10 @@ class _SoloView extends StatelessWidget {
                         ?.copyWith(fontWeight: FontWeight.w800)),
                 Gaps.vXxs,
                 Text(
-                  'همه‌ی ۸ جفت را در کمترین زمان و کمترین برگرداندن پیدا کن.\n'
+                  // عددِ جفت‌ها از `live_rules.memoryPairs` (آینهٔ وب): تخته
+                  // ۴×۴ است و اگر ادمین چرخشِ تخته را کم کند، جمله‌ای که
+                  // «۸ جفت» می‌گوید دروغ می‌شود.
+                  '${liveText('games.memoryRule', 'همه‌ی ۸ جفت را در کمترین زمان و کمترین برگرداندن پیدا کن.', vars: {'memoryPairs': liveRule('memoryPairs', 8)})}\n'
                   'این حالت امتیاز ندارد؛ فقط رکوردت ثبت می‌شود.',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodySmall,

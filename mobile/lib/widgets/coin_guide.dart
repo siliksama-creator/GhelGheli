@@ -4,6 +4,7 @@ import 'ui_icon.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api_client.dart';
+import '../core/app_config.dart';
 import '../core/json_get.dart';
 
 /// کارتِ «سکه چیست و چطور به دست می‌آید» — بالای جدولِ لیگ.
@@ -137,26 +138,62 @@ class _CoinGuideState extends State<CoinGuide> {
             ?.toInt() ??
         10;
     final pctText = pct == 0
-        ? 'انتقالِ سکه به لیگِ بعدی صفر است'
-        : '${faNum(pct)}٪ از سکه به لیگِ بعدی منتقل می‌شود';
+        ? liveText('coinGuide.carryoverZero', 'انتقالِ سکه به لیگِ بعدی صفر است')
+        : liveText(
+            'coinGuide.carryoverPercent',
+            '${faNum(pct)}٪ از سکه به لیگِ بعدی منتقل می‌شود',
+            vars: {'percent': pct});
+    // لایه‌های ورودی از `stakes.public` می‌آیند (آینهٔ `stakeTiers` در وب)،
+    // نه از رقمِ «۱۰۰/۱۰۰۰»ِ نوشته‌شده در جمله. چرا این مهم است: جدولِ
+    // پایین از config ساخته می‌شد و همین جمله نه — یعنی افزودنِ یک لایهٔ
+    // تازه در پنل، جدولِ سه‌ستونه و متنِ دودانه می‌ساخت. حالا هر دو از
+    // یک‌جا می‌آیند.
+    final tiers = AppConfig.instance.stakeTiers;
+    final low = tiers.isNotEmpty ? tiers[0] : 100;
+    final high = tiers.length > 1 ? tiers[1] : 1000;
     return [
-      ('check', 'هر سه بازی یکسان سکه می‌دهند — دوئل کارت، پنالتی و جفت‌یاب.'),
-      ('ban', 'بازی با ربات، تمرین رایگان و لابی خصوصی سکه ندارند.'),
-      ('lock', 'سکه هرگز از شما کم نمی‌شود؛ حتی وقتی ببازید.'),
+      ('check', liveText('coinGuide.allEqual',
+          'هر سه بازی یکسان سکه می‌دهند — دوئل کارت، پنالتی و جفت‌یاب.')),
+      ('ban', liveText('coinGuide.noCoin',
+          'بازی با ربات، تمرین رایگان و لابی خصوصی سکه ندارند.')),
+      ('lock', liveText('coinGuide.neverLost',
+          'سکه هرگز از شما کم نمی‌شود؛ حتی وقتی ببازید.')),
       (
         'calendar',
-        'هر روز تا ${faNum(q100)} بازی در ورودی ۱۰۰ و ${faNum(q1000)} بازی در ورودی ۱۰۰۰ سکه می‌دهد. بعد از آن، بازی امتیاز دارد ولی سکه نه.'
+        liveText(
+            'coinGuide.quota',
+            'هر روز تا ${faNum(q100)} بازی در ${stakeLabel(low)} و ${faNum(q1000)} بازی در ${stakeLabel(high)} سکه می‌دهد. بعد از آن، بازی امتیاز دارد ولی سکه نه.',
+            vars: {
+              'qLow': q100,
+              'stakeLowText': stakeLabel(low),
+              'qHigh': q1000,
+              'stakeHighText': stakeLabel(high),
+            })
       ),
       (
         'target',
-        'بازی ضربه‌زن هم سکه دارد: هر لول ${faNum(tap)} سکه — همان لحظهٔ لول‌آپ به موجودی‌ات اضافه می‌شود.'
+        liveText(
+            'coinGuide.tapCoins',
+            'بازی ضربه‌زن هم سکه دارد: هر لول ${faNum(tap)} سکه — همان لحظهٔ لول‌آپ به موجودی‌ات اضافه می‌شود.',
+            vars: {'tapCoins': tap})
       ),
       (
         'trophy',
-        'مبنای دریافتِ جایزهٔ لیگ، رتبه بر اساسِ سکه است و با سکه‌ها در استخرِ جایزه شرکت می‌کنی. در پایانِ فصل جوایز بر اساسِ سکه پرداخت و سکه‌ها صفر می‌شوند؛ $pctText.'
+        liveText(
+            'coinGuide.league',
+            'مبنای دریافتِ جایزهٔ لیگ، رتبه بر اساسِ سکه است و با سکه‌ها در استخرِ جایزه شرکت می‌کنی. در پایانِ فصل جوایز بر اساسِ سکه پرداخت و سکه‌ها صفر می‌شوند؛ $pctText.',
+            vars: {'carryover': pctText})
       ),
     ];
   }
+
+  /// «ورودی ۱۰۰» — از `coinGuide.stakeLabel` تا واژه‌ای که ادمین انتخاب
+  /// می‌کند (ورودی/قفل/…) در جدول و در جمله یکی باشد.
+  static String stakeLabel(int stake) => liveText(
+      'coinGuide.stakeLabel', 'ورودی ${faNum(stake)}', vars: {'stake': stake});
+
+  /// لایه‌های ورودیِ همان config که جملهٔ سهمیه می‌سازد.
+  static List<int> get _tiers => AppConfig.instance.stakeTiers;
 
   @override
   Widget build(BuildContext context) {
@@ -195,8 +232,15 @@ class _CoinGuideState extends State<CoinGuide> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('سکه چطور به دست می‌آید؟',
-                            style: TextStyle(
+                        // تیتر از config؛ فقط همین یک خط. بدنهٔ معرفی
+                        // عمداً سفت‌شده مانده: با `RichText`/`TextSpan`
+                        // رنگِ طلایی روی دو واژه دارد و تزریقِ متنِ سرور
+                        // یعنی از‌دست‌رفتنِ آن بولدِ انتخابی — یعنی تغییرِ
+                        // ظاهرِ محصول، که نقشه‌راه صریحاً ممنوعش کرده.
+                        Text(
+                            liveText('coinGuide.heading',
+                                'سکه چطور به دست می‌آید؟'),
+                            style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w900,
                                 color: _gold)),
@@ -258,10 +302,11 @@ class _CoinGuideState extends State<CoinGuide> {
                         2: FlexColumnWidth(1),
                       },
                       children: [
-                        const TableRow(children: [
-                          _Head('نتیجهٔ بازی', start: true),
-                          _Head('ورودی ۱۰۰'),
-                          _Head('ورودی ۱۰۰۰'),
+                        TableRow(children: [
+                          const _Head('نتیجهٔ بازی', start: true),
+                          _Head(stakeLabel(_tiers.isNotEmpty ? _tiers[0] : 100)),
+                          _Head(stakeLabel(
+                              _tiers.length > 1 ? _tiers[1] : 1000)),
                         ]),
                         for (final r in _rows)
                           TableRow(

@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../api_client.dart';
+import '../../core/app_config.dart';
 import '../../services/image_disk_cache.dart';
 import '../../widgets/app_bar_logo.dart';
 import '../../widgets/notification_bell.dart';
@@ -532,6 +533,10 @@ class _HomeShellState extends State<HomeShell>
           };
         });
       }
+      // همان بدنه را به منبعِ یکتای متن/عدد می‌دهیم تا صفحه‌هایی که fetchِ
+      // جدا نمی‌زنند (راهنمای سکه، برچسب آواتار، طول کد اتاق…) هم از همین
+      // config زنده تغذیه شوند — بدونِ هیچ درخواستِ اضافه.
+      AppConfig.instance.apply(m);
     } catch (_) {
       // پیکربندی best-effort است؛ شکستش نباید چیزی را بشکند.
     }

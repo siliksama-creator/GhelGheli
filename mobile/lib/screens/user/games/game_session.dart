@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../../../api_client.dart';
+import '../../../core/app_config.dart';
 import 'game_audio.dart';
 
 enum GamePhase { idle, waiting, playing, over }
@@ -238,7 +239,15 @@ class GameSession extends ChangeNotifier {
     s.onDisconnect((_) {
       _setConnected(false);
       if (phase == GamePhase.playing) {
-        connectionNotice = 'شبکه قطع شد؛ ۲۵ ثانیه برای بازگشت فرصت داری…';
+        // ثانیه‌ها از `live_rules.reconnectSeconds` می‌آیند، نه از ۲۵ِ
+        // نوشته‌شده در رشته: موتورِ بازی همین عدد را به ms تبدیل می‌کند و
+        // قبلاً اگر ادمین فرصتِ اتصالِ دوباره را عوض می‌کرد، تایمرِ سرور
+        // عوض می‌شد ولی پیامِ کاربر همان «۲۵ ثانیه» را نگه می‌داشت.
+        final grace = liveRule('reconnectSeconds', 25);
+        connectionNotice = liveText(
+            'reconnect.offlineNote',
+            'شبکه قطع شد؛ ${faNum(grace)} ثانیه برای بازگشت فرصت داری…',
+            vars: {'reconnectSeconds': grace});
       }
       _stopClock();
     });

@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../../api_client.dart';
+import '../../core/app_config.dart';
 import '../../core/cosmetics.dart';
 import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
@@ -112,12 +113,33 @@ class _GamesHubPageState extends State<GamesHubPage> {
   List<int> _lobbyStakes = const [0, 100, 1000, 5000];
   int _tapLevelCount = 50;
 
+  /// زیرعنوانِ بازی — از متنِ زندهٔ سرور (`games.*Subtitle`)، با فول‌بکِ
+  /// همان رشته‌ای که دیروز در `_games` نوشته بود.
+  ///
+  /// چرا این‌طور: `_games` یک `const` است و `_tapLevelCount` از config
+  /// می‌آمد؛ یعنی ضربه‌زن عددش زنده بود ولی بقیهٔ بازی‌ها نه — «نبرد
+  /// پنج‌راندی» و «جفت‌های فوتبالی…» سفت نوشته شده بودند. حالا همه از یک
+  /// در می‌گذرند و ادمین بدونِ آپدیتِ APK می‌تواند جمله را عوض کند.
+  /// عددِ لول‌ها هم مثلِ قبل از `economy` می‌آید تا متن و بازی هرگز دو
+  /// رقم نشان ندهند.
   String _gameSubtitle(_GameEntry g) {
     if (g.id == 'tap') {
-      return '${faNum(_tapLevelCount)} لول ضربه بزن و شخصیت‌ها را باز کن';
+      return liveText(
+          'games.tapSubtitle',
+          '${faNum(_tapLevelCount)} لول ضربه بزن و شخصیت‌ها را باز کن',
+          vars: {'levelCount': _tapLevelCount});
+    }
+    if (g.id == 'card_duel') {
+      return liveText('games.duelSubtitle', g.subtitle);
+    }
+    if (g.id == 'memory') {
+      return liveText('games.memorySubtitle', g.subtitle);
     }
     return g.subtitle;
   }
+
+  /// طولِ کدِ اتاق از `live_rules` — فول‌بک ۴، یعنی همان امروزِ محصول.
+  int get _codeLength => liveRule('roomCodeLength', 4);
 
   @override
   void initState() {
@@ -1477,10 +1499,17 @@ class _PrivateLobbyHubState extends State<_PrivateLobbyHub> {
                       controller: _joinCodeCtrl,
                       textAlign: TextAlign.center,
                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 3),
-                      decoration: const InputDecoration(
-                        hintText: 'کد ۴ رقمی',
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      // طول و متنِ راهنمای کد از config می‌آیند (آینهٔ
+                      // `games.jsx` در وب که `maxLength` را هم به همان عدد
+                      // بسته). قبلاً هر دو «۴ رقمی» بود: ادمین کد را ۵ رقمی
+                      // می‌کرد و کاربرِ اندروید با کدِ درست رد می‌شد.
+                      decoration: InputDecoration(
+                        hintText: liveText('games.roomCodeLabel',
+                            'کد ${faNum(_codeLength)} رقمی',
+                            vars: {'codeLength': _codeLength}),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       ),
+                      maxLength: _codeLength,
                     ),
                   ),
                   const SizedBox(width: 8),

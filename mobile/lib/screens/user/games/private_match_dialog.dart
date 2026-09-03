@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../api_client.dart';
+import '../../../core/app_config.dart';
 
 /// دیالوگ ساخت اتاق خصوصی و دوئل مستقیم با دوست
 class PrivateMatchDialog extends StatefulWidget {
@@ -66,8 +67,26 @@ class _PrivateMatchDialogState extends State<PrivateMatchDialog> {
     } catch (_) {}
   }
 
+  /// طولِ کدِ اتاق — فول‌بک ۴، یعنی همان امروزِ محصول.
+  static int get _codeLength => liveRule('roomCodeLength', 4);
+
+  static int _pow10(int n) {
+    var v = 1;
+    for (var i = 0; i < n; i++) {
+      v *= 10;
+    }
+    return v;
+  }
+
   void _createRoom() {
-    final code = (1000 + (DateTime.now().millisecondsSinceEpoch % 9000)).toString();
+    // عددِ کد باید همان طولی را بسازد که راهنما و `maxLength` وعده می‌دهند.
+    // قبلاً «۱۰۰۰ + پیمانهٔ ۹۰۰۰» سفت نوشته شده بود (همیشه ۴ رقم)؛ اگر
+    // ادمین کد را ۶ رقمی می‌کرد، کاربر کدِ ۴ رقمی می‌گرفت و سرور قبولش
+    // نمی‌کرد — یعنی اتاقی که فقط روی کاغذ ساخته می‌شد.
+    final n = _codeLength < 2 ? 2 : _codeLength;
+    final lo = _pow10(n - 1);
+    final code = (lo + (DateTime.now().millisecondsSinceEpoch % (lo * 9)))
+        .toString();
     setState(() {
       _createdCode = code;
       _shareUrl = 'https://user.ghelghelishop.ir/?game=$_selectedGame&room=$code';
@@ -237,7 +256,15 @@ class _PrivateMatchDialogState extends State<PrivateMatchDialog> {
                       controller: _joinCodeCtrl,
                       textAlign: TextAlign.center,
                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 3),
-                      decoration: const InputDecoration(hintText: 'کد ۴ رقمی', contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10)),
+                      // آینهٔ `games_page.dart` و وب: راهنما و سقفِ ورودی
+                      // هر دو از `live_rules.roomCodeLength` می‌آیند.
+                      decoration: InputDecoration(
+                        hintText: liveText('games.roomCodeLabel',
+                            'کد ${faNum(_codeLength)} رقمی',
+                            vars: {'codeLength': _codeLength}),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                      ),
+                      maxLength: _codeLength,
                     ),
                   ),
                   const SizedBox(width: 8),
