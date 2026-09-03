@@ -19,7 +19,7 @@ import 'tap_day.dart';
 import 'tap_engine.dart';
 import 'tap_storage.dart';
 import 'tap_sync.dart';
-import '../../core/app_config.dart';
+import '../../../../core/app_config.dart';
 
 class TapGameScreen extends StatefulWidget {
   const TapGameScreen({
