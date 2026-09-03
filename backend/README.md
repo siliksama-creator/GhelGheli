@@ -23,5 +23,6 @@ npm run seed:admin
 
 این دستور علاوه بر ادمین، یک کاربر تست اپ هم می‌سازد:
 
-- Admin panel: `Admin / Ali@0142`
-- Mobile app: `Admin / Ali@0142`
+- Admin panel: `Admin` + رمزِ `ADMIN_DEFAULT_PASSWORD` در `backend/.env`
+- Mobile app: همان کاربر و رمز
+(پیش‌فرضِ عمومی وجود ندارد — مخزن public است)

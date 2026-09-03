@@ -3,8 +3,19 @@ const bcrypt = require('bcryptjs');
 const { pool } = require('../src/config/db');
 
 (async () => {
-  const adminAccounts = new Map([
-    [process.env.ADMIN_DEFAULT_USERNAME || 'Admin', process.env.ADMIN_DEFAULT_PASSWORD || 'Ali@0142'],
+  // ── چرا دیگر پیش‌فرضِ عمومیِ رمز وجود ندارد ──
+//
+// مخزن public است و مقدارِ `Ali@0142` که قبلاً در `.env.example` و
+// READMEها و همین فایل بود، برای هر کسی قابلِ دیدن است. ابرادمینِ
+// `Admin` با رمزِ عمومی یعنی پنلِ مدیریتِ کلِ محصول در دستِ همه است.
+// اگر `ADMIN_DEFAULT_PASSWORD` در .env نباشد، seed به‌جای ساختِ حسابِ
+// ابرادمینِ با-رمز-عمومی، صریحاً می‌شکند.
+if (!process.env.ADMIN_DEFAULT_PASSWORD) {
+  console.error('seed:admin: backend/.env باید ADMIN_DEFAULT_PASSWORD را داشته باشد — پیش‌فرضِ عمومیِ رمز مجاز نیست (مخزن public است).');
+  process.exit(1);
+}
+const adminAccounts = new Map([
+    [process.env.ADMIN_DEFAULT_USERNAME || 'Admin', process.env.ADMIN_DEFAULT_PASSWORD],
   ]);
 
   // For the real owner/admin account, do not hardcode the password in the APK or repository.
@@ -39,10 +50,11 @@ const { pool } = require('../src/config/db');
     || process.env.MAIN_ADMIN_USERNAME
     || process.env.ADMIN_DEFAULT_USERNAME
     || 'Admin';
+  // FALLBACKِ ADMIN_DEFAULT_PASSWORD همیشه هست (بالا صریحاً چک شد)؛
+  // پیش‌فرضِ عمومی دیگر نمی‌تواند راهِ فرار باشد.
   const testPassword = process.env.TEST_USER_PASSWORD
     || process.env.MAIN_ADMIN_PASSWORD
-    || process.env.ADMIN_DEFAULT_PASSWORD
-    || 'Ali@0142';
+    || process.env.ADMIN_DEFAULT_PASSWORD;
   const testHash = await bcrypt.hash(testPassword, 12);
   const testNick = process.env.TEST_USER_NICKNAME || testMobile;
   await pool.query(

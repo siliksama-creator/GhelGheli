@@ -75,6 +75,21 @@ function ocrAvailable() {
   });
 }
 
+/** آیا بستهٔ فارسی (fas) نصب است؟ یک بار سنجیده و کش می‌شود. */
+let _fasReady = null;
+
+function fasAvailable() {
+  if (_ocrReady === false) return Promise.resolve(false);
+  if (_fasReady !== null) return Promise.resolve(_fasReady);
+  return new Promise((resolve) => {
+    execFile('tesseract', ['--list-langs'], { timeout: 5000 }, (err, stdout) => {
+      _fasReady = !err
+        && String(stdout || '').split('\n').some((l) => l.trim() === 'fas');
+      resolve(_fasReady);
+    });
+  });
+}
+
 /**
  * متنِ لاتینِ روی تصویر را می‌خواند و به توکن‌های معنادار می‌شکند.
  *
@@ -83,6 +98,19 @@ function ocrAvailable() {
 async function readText(buf) {
   if (process.env.GG_DISABLE_OCR === '1') return [];
   if (!(await ocrAvailable())) return [];
+
+  // ── زبان‌ها: فارسی فقط وقتی اضافه می‌شود که واقعاً نصب باشد ──
+  //
+  // درخواستِ `-l eng+fas` روی سروری که fas ندارد کلِ tesseract را خطا
+  // می‌دهد و **هر دو** زبان از کار می‌افتد — نه فقط فارسی. پس زبانِ
+  // فارسی شرطِ حضورِ واقعیِ بستهٔ `tesseract-ocr-fas` است. با فعال‌شدن
+  // فارسی، حروفِ الفبای فارسی هم به whitelist اضافه می‌شود؛ وگرنه
+  // tesseract آن‌ها را «خارج از الفبا» می‌شمارد و متنِ فارسی باز هم
+  // خوانده نمی‌شود.
+  const HAS_FAS = await fasAvailable();
+  const LANGS = HAS_FAS ? 'eng+fas' : 'eng';
+  const WHITELIST = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+    + (HAS_FAS ? 'ابپتجچحخدذرزسشصضطظعغفقکگلمنوهی' : '');
 
   // ══════════════════════════════════════════════════════════════════════
   // OCR روی **چند ناحیه**، نه فقط کلِ تصویر
@@ -170,8 +198,8 @@ async function readText(buf) {
         // eslint-disable-next-line no-await-in-loop
         const part = await new Promise((resolve) => {
           execFile('tesseract',
-            [tmpI, '-', '--psm', '11', '-c',
-              'tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'],
+            [tmpI, '-', '--psm', '11', '-l', LANGS, '-c',
+              `tessedit_char_whitelist=${WHITELIST}`],
             { timeout: 20000, maxBuffer: 1 << 20 },
             (err, stdout) => resolve(err ? '' : String(stdout || '')));
         });
@@ -213,6 +241,24 @@ async function readText(buf) {
     const up = raw.toUpperCase();
     for (const t of (up.match(/[A-Z]{4,}/g) || [])) {
       if (words.size < 40) words.add(t);
+    }
+    // ── کلمه‌های فارسی ──
+    //
+    // کارت (یا پشتِ کارت) ممکن است نامِ فارسی داشته باشد. قبل از این
+    // تغییر حتی با نصبِ `tesseract-ocr-fas` هم خروجیِ فارسی در `raw`
+    // بود ولی ریگکسِ [A-Z]{4,} همهٔ آن را دور می‌ریخت — سیگنالِ متنی
+    // برای نام‌های فارسی عملاً صفر بود و همین یکی از دلایلِ «حاشیهٔ
+    // کمِ تشخیص کارت‌های هم‌طرح» بود.
+    //
+    // محدودهٔ U+0600–U+06FF حرف‌های عربی/فارسی را پوشش می‌دهد؛ آستانهٔ
+    // ۴ حرف همان قاعدهٔ لاتین است (نویزِ کوتاه حذف می‌شود). بعد از
+    // کلمه‌های لاتین اضافه می‌شوند تا هر دو جا داشته باشند؛ سقفِ ۶۰
+    // فقط وقتی فارسی هم باشد باز می‌شود و حالتِ لاتینِ خالص دست
+    // نمی‌خورد. تطبیق مجموعه‌ای و بی‌فرهنگ است: `textSimilarity`
+    // فارسی را با همان تحملِ زیررشته می‌سنجد که برای
+    // `EMBELE`/`DEMBELE` ساخته شده.
+    for (const t of (raw.match(/[\u0600-\u06FF]{4,}/g) || [])) {
+      if (words.size < 60) words.add(t);
     }
     for (const t of (up.match(/[0-9]{1,4}/g) || [])) {
       // صفرهای ابتدایی حذف می‌شوند تا «07» و «7» یکی شمرده شوند.

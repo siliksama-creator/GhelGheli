@@ -13,5 +13,6 @@ VITE_API_BASE=http://localhost:4000 npm run dev
 
 ```text
 Username: Admin
-Password: Ali@0142
+Password: همانی که به‌عنوان `ADMIN_DEFAULT_PASSWORD` در `backend/.env` تعیین کرده‌ای
+(پیش‌فرضِ عمومی وجود ندارد — مخزن public است)
 ```

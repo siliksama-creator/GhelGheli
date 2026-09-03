@@ -57,7 +57,7 @@ Workflow `Build Android APK` بعد از push اجرا می‌شود و APK دی
 
 ## ورود تست بدون پیامک
 
-بعد از اجرای `npm run seed:admin` در backend، در اپ از حالت «ورود مدیر» با نام کاربری Admin و رمز Ali@0142 استفاده کنید.
+بعد از اجرای `npm run seed:admin` در backend، در اپ از حالت «ورود مدیر» با نام کاربری Admin و رمزِ تعیین‌شدهٔ `ADMIN_DEFAULT_PASSWORD` در `backend/.env` استفاده کنید.
 
 ## حالت مدیریت داخل اپ
 
@@ -74,7 +74,7 @@ Workflow `Build Android APK` بعد از push اجرا می‌شود و APK دی
 
 در Admin Mode مسیر «تنظیمات» اضافه شده است. مدیر می‌تواند حداقل امتیاز تاریخی لازم برای ورود/ارسال پیام در چت را تعیین کند. این مقدار سمت backend ذخیره و در Socket.io و API چت enforce می‌شود.
 
-برای مشاهده سریع محیط مدیریت در APK تست، حالت «ورود مدیر» با نام کاربری Admin و رمز Ali@0142 در صفحه ورود اضافه شده است.
+برای مشاهده سریع محیط مدیریت در APK تست، حالت «ورود مدیر» با نام کاربری Admin و رمزِ تعیین‌شدهٔ `ADMIN_DEFAULT_PASSWORD` در `backend/.env` در صفحه ورود اضافه شده است.
 
 ## جوایز و نوار پیشرفت
 
@@ -86,7 +86,7 @@ Workflow `Build Android APK` بعد از push اجرا می‌شود و APK دی
 
 ```text
 Username: Admin
-Password: Ali@0142
+Password: همانی که به‌عنوان `ADMIN_DEFAULT_PASSWORD` در `backend/.env` تعیین کرده‌ای
 ```
 
 رمز به‌صورت دکمه ورود یک‌کلیکی داخل اپ hardcode نشده است؛ باید در فیلد رمز وارد شود.
