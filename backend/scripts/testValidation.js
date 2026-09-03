@@ -43,12 +43,13 @@ console.log('\n== UUID validation ==');
 
 console.log('\n== avatar key whitelist ==');
 {
-  const AVATAR_KEYS = new Set([
-    'avatar_1_football.png', 'avatar_2_trophy.png', 'avatar_3_star.png',
-    'avatar_4_rocket.png', 'avatar_5_lion.png', 'avatar_6_tiger.png',
-    'avatar_7_eagle.png', 'avatar_8_target.png', 'avatar_9_bolt.png',
-    'avatar_10_crown.png',
-  ]);
+  // لیستِ آواتارها از `src/lib/avatarKeys.js` خوانده می‌شود، نه از یک
+  // کپیِ دستی داخلِ تست. چرا این مهم است: کپیِ دوم یعنی تستی که یک
+  // تغییرِ واقعی را **نمی‌بیند** — اگر کسی فایلِ سرور را عوض کند و این
+  // ردیف‌ها را نه، تست سبز می‌ماند و «گارد» فقط خودش را تضمین می‌کرد.
+  // حالا افزودنِ آواتار = یک ردیف در avatarKeys.js و همین تست، بدونِ
+  // هیچ ویرایشِ متنی در شمارهٔ ۱۰ یا متنِ «۱۰ مدل» در کلاینت‌ها.
+  const { AVATAR_KEYS, AVATAR_LIST } = require('../src/lib/avatarKeys');
   const safeAvatarKey = v => (v && AVATAR_KEYS.has(String(v)) ? String(v) : null);
 
   // BUG: the API stored ANY string, and both clients interpolate it straight
@@ -59,7 +60,13 @@ console.log('\n== avatar key whitelist ==');
   ok(safeAvatarKey('..%2F..%2Fsecret') === null, 'rejects encoded traversal');
   ok(safeAvatarKey('avatar_99_fake.png') === null, 'rejects an unknown avatar');
   ok(safeAvatarKey('') === null && safeAvatarKey(null) === null, 'rejects empty/null');
-  ok(AVATAR_KEYS.size === 10, 'whitelist covers all ten shipped avatars');
+  ok(AVATAR_KEYS.size === 10 && AVATAR_LIST.length === 10,
+    'whitelist covers all ten shipped avatars');
+  // ۱۰ بودن عمداً **دو جا** چک می‌شود: یکی طولِ فهرست و دیگری اندازهٔ
+  // Set. اگر روزی دو ردیفِ تکراری در فهرست بیفتد، طول ۱۱ و اندازه ۱۰
+  // می‌شود و این خط همان را می‌گیرد (قبلاً چنین تکراری در فهرستِ وب دیده شد).
+  ok(new Set(AVATAR_LIST).size === AVATAR_LIST.length,
+    'avatar list has no duplicates');
 }
 
 console.log('\n== bounded text ==');
