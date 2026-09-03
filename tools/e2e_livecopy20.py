@@ -70,7 +70,12 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-API = 'https://api.ghelghelishop.ir'
+# API از محیط قابلِ عوض است، نه با ویرایشِ فایل روی سرور: اجرایِ کاملِ
+# این ابزار روی *خودِ سرورِ تولیدی* (از 127.0.0.1) معنی‌دارترین حالت است —
+# همان‌جا که ETag/کش/nginx واقعاً سرِ جایشان‌اند — و 'localhost' در URL یعنی
+# از 127.0.0.1 خارج نشود. اگر این خط در فایلِ repo عوض شود، دفعهٔ بعدی روی
+# ماشینِ توسعه‌دهنده به آدرسِ اشتباه می‌زند.
+API = (os.environ.get('E2E_API') or 'https://api.ghelghelishop.ir').rstrip('/')
 LIVE = '/api/admin/settings/live-content'
 MARK = ' [e2e]'
 
@@ -229,12 +234,17 @@ def main():
         r.report('فاز ۵ · «تستِ ۲۰ تغییر» — حالتِ فقط‌خواندنی')
         return 1 if r.bad else 0
 
-    if not args:
-        print('رمزِ ادمین لازم است: python3 tools/e2e_livecopy20.py <password>\n'
+    # رمز از محیط هم خوانده می‌شود: گذاشتنِ رمز در argv یعنی در `ps` و
+    # در تاریخچة شلِ سرور visible باشد — روی همان ماشینِ production که
+    # سرویسِ دیگری هم روش نشسته است.
+    pwd = os.environ.get('E2E_ADMIN_PASSWORD') or (args[0] if args else '')
+    if not pwd:
+        print('رمزِ ادمین لازم است: E2E_ADMIN_PASSWORD=… یا '
+              'python3 tools/e2e_livecopy20.py <password>\n'
               'یا برای سنجشِ بی‌خطر: --read-only')
         return 2
     from _authcache import admin_token  # noqa: E402
-    tok = admin_token(args[0])
+    tok = admin_token(pwd)
     if not tok:
         print('!! ورودِ ادمین ممکن نشد؛ چیزی نمی‌نویسم.')
         return 2
@@ -274,7 +284,11 @@ def main():
             continue
         if lo == hi:
             continue
+        # اگر کل بازه یک عددِ صحیح بیشتر ندارد (min+1 == max)، همان عدد
+        # تنها انتخاب است؛ butcur دیگر لازم نیست.
         nxt = lo if cur != lo else hi
+        if lo + 1 == hi and cur == lo:
+            nxt = hi
         edits_num.append((name, nxt))
 
     all_keys = [k for k, _ in edits_text] + [n for n, _ in edits_num]
