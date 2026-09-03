@@ -52,11 +52,16 @@ export function EnginePage({ request }) {
             duplicateSimilarity: Number(f.dup.value),
           });
         }}>
-          <Field label="آستانهٔ پذیرش خودکار (بالای این = تأیید)"><Input name="accept" type="number" step="0.01" min="0" max="1" defaultValue={data.photoMatch.acceptScore} /></Field>
-          <Field label="آستانهٔ صف بررسی"><Input name="review" type="number" step="0.01" min="0" max="1" defaultValue={data.photoMatch.reviewScore} /></Field>
-          <Field label="آستانهٔ کد نام‌دار (عکس فقط اثباتِ داشتن کارت)"><Input name="bound" type="number" step="0.01" min="0" max="1" defaultValue={data.photoMatch.boundAcceptScore} /></Field>
-          <Field label="آستانهٔ کد بی‌نام"><Input name="free" type="number" step="0.01" min="0" max="1" defaultValue={data.photoMatch.freeAcceptScore} /></Field>
-          <Field label="آستانهٔ طرح تکراری"><Input name="dup" type="number" step="0.01" min="0" max="1" defaultValue={data.photoMatch.duplicateSimilarity} /></Field>
+          <Field label="آستانهٔ پذیرش خودکار (بالای این = تأیید)"
+            hint="اگر کارتِ شبیه‌تری پیدا نشود، امتیازِ تنها کافی نیست: رتبهٔ اول باید دست‌کم ۱۵٪ از رتبهٔ دوم بهتر باشد. بالا بردنِ این عدد، تأییدِ خودکار را کم و صفِ بررسیِ انسانی را پر می‌کند."><Input name="accept" type="number" step="0.01" min="0" max="1" defaultValue={data.photoMatch.acceptScore} /></Field>
+          <Field label="آستانهٔ صف بررسی"
+            hint="زیرِ این عدد «رد» و بینِ این تا آستانهٔ پذیرش «به صفِ بررسی». سرور اجازه نمی‌دهد این از آستانهٔ پذیرش بیشتر شود."><Input name="review" type="number" step="0.01" min="0" max="1" defaultValue={data.photoMatch.reviewScore} /></Field>
+          <Field label="آستانهٔ کد نام‌دار (عکس فقط اثباتِ داشتن کارت)"
+            hint="برای کارتی که کدِ چاپی‌اش خوانده شده؛ خودِ کد اثبات است، پس عکس شل‌تر سنجیده می‌شود."><Input name="bound" type="number" step="0.01" min="0" max="1" defaultValue={data.photoMatch.boundAcceptScore} /></Field>
+          <Field label="آستانهٔ کد بی‌نام"
+            hint="برای کارتِ رایگانِ بی‌کد؛ اثباتی جزِ خودِ عکس نیست، پس سخت‌تر از کارتِ دفترچه‌ای گرفته می‌شود."><Input name="free" type="number" step="0.01" min="0" max="1" defaultValue={data.photoMatch.freeAcceptScore} /></Field>
+          <Field label="آستانهٔ طرح تکراری"
+            hint="شباهت به یک کارتِ ثبت‌شدهٔ دیگر؛ بالاتر از این یعنی «همان طرحِ قبلی است» و بارگذاری رد می‌شود."><Input name="dup" type="number" step="0.01" min="0" max="1" defaultValue={data.photoMatch.duplicateSimilarity} /></Field>
           <Button type="submit" icon={Save}>ذخیره آستانه‌ها</Button>
         </form>
       </Card>
@@ -71,11 +76,16 @@ export function EnginePage({ request }) {
             tail: Number(f.tail.value),
           });
         }}>
-          <Field label="پایه (XP لول‌های اول)"><Input name="base" type="number" step="0.1" defaultValue={data.levels.base} /></Field>
-          <Field label="شیب خطی"><Input name="lin" type="number" step="0.1" defaultValue={data.levels.lin} /></Field>
-          <Field label="توان نمایی (رشد اولیه)"><Input name="exp" type="number" step="0.05" defaultValue={data.levels.exp} /></Field>
-          <Field label="زانو (از این لول رشد خطی می‌شود)"><Input name="knee" type="number" min="1" max="99" defaultValue={data.levels.knee} /></Field>
-          <Field label="پلهٔ بعد از زانو"><Input name="tail" type="number" step="0.1" defaultValue={data.levels.tail} /></Field>
+          <Field label="پایه (XP لول‌های اول)"
+            hint="XPِ لازمِ لولِ اول. پایین بیاوریدید شروعِ بازی آسان‌تر می‌شود."><Input name="base" type="number" step="0.1" defaultValue={data.levels.base} /></Field>
+          <Field label="شیب خطی"
+            hint="به هر لول اضافه می‌شود: لولِ n ≈ پایه × (۱ + (n−۱) × این عدد)."><Input name="lin" type="number" step="0.1" defaultValue={data.levels.lin} /></Field>
+          <Field label="توان نمایی (رشد اولیه)"
+            hint="عددِ بزرگ‌تر، فاصلهٔ لول‌های اول را زیاد و لول‌های بعدی را تقریباً مساوی می‌کند."><Input name="exp" type="number" step="0.05" defaultValue={data.levels.exp} /></Field>
+          <Field label="زانو (از این لول رشد خطی می‌شود)"
+            hint="از این لول به بعد رشدِ نمایی کنار می‌رود و یک «پلهٔ» ثابت جایش می‌آید."><Input name="knee" type="number" min="1" max="99" defaultValue={data.levels.knee} /></Field>
+          <Field label="پلهٔ بعد از زانو"
+            hint="مقداری که از لولِ زانو به هر لولِ بعدی اضافه می‌شود."><Input name="tail" type="number" step="0.1" defaultValue={data.levels.tail} /></Field>
           <Button type="submit" icon={Save}>ذخیره منحنی</Button>
         </form>
       </Card>
@@ -91,7 +101,8 @@ export function EnginePage({ request }) {
           }
           save('/settings/streak', { rewards });
         }}>
-          <Field label="جوایز (با فاصله یا ویرگول)"><Input name="rewards" defaultValue={data.streak.rewards.join('، ')} /></Field>
+          <Field label="جوایز (با فاصله یا ویرگول)"
+            hint="طولِ فهرست = طولِ چرخه (۲ تا ۳۰ روز)؛ جایزهٔ شبِ بعد را کاربر در اپ همین‌جا می‌بیند."><Input name="rewards" defaultValue={data.streak.rewards.join('، ')} /></Field>
           <Button type="submit" icon={Save}>ذخیره چرخه</Button>
         </form>
       </Card>

@@ -150,10 +150,11 @@ class _AdminEngineState extends State<AdminEngine> {
 
   Widget _numField(String label, String key, Map<String, dynamic> src,
       void Function(String) onChanged,
-      {String? hint, bool integer = false}) {
+      {String? hint, String? helper, bool integer = false}) {
     return _NumEdit(
       label: label,
       hint: hint,
+      helper: helper,
       integer: integer,
       value: '${src[key] ?? ''}',
       onChanged: onChanged,
@@ -178,24 +179,24 @@ class _AdminEngineState extends State<AdminEngine> {
               Row(children: [
                 Expanded(
                     child: _numField('پذیرش خودکار', 'acceptScore', _photo,
-                        (v) => _photo['acceptScore'] = v)),
+                        (v) => _photo['acceptScore'] = v, helper: 'اگر کارتِ شبیه‌تری پیدا نشود، امتیازِ تنها کافی نیست: رتبهٔ اول باید دست‌کم ۱۵٪ از رتبهٔ دوم بهتر باشد. بالا بردنِ این عدد، تأییدِ خودکار را کم و صفِ بررسیِ انسانی را پر می‌کند.')),
                 const SizedBox(width: Gaps.sm),
                 Expanded(
                     child: _numField('بررسی انسانی', 'reviewScore', _photo,
-                        (v) => _photo['reviewScore'] = v)),
+                        (v) => _photo['reviewScore'] = v, helper: 'زیرِ این عدد «رد» و بینِ این تا آستانهٔ پذیرش «به صفِ بررسی». سرور اجازه نمی‌دهد این از آستانهٔ پذیرش بیشتر شود.')),
               ]),
               Row(children: [
                 Expanded(
                     child: _numField('کارت‌های دفترچه‌ای', 'boundAcceptScore',
-                        _photo, (v) => _photo['boundAcceptScore'] = v)),
+                        _photo, (v) => _photo['boundAcceptScore'] = v, helper: 'برای کارتی که کدِ چاپی‌اش خوانده شده؛ خودِ کد اثبات است، پس عکس شل‌تر سنجیده می‌شود.')),
                 const SizedBox(width: Gaps.sm),
                 Expanded(
                     child: _numField('کارت‌های رایگان', 'freeAcceptScore', _photo,
-                        (v) => _photo['freeAcceptScore'] = v)),
+                        (v) => _photo['freeAcceptScore'] = v, helper: 'برای کارتِ رایگانِ بی‌کد؛ اثباتی جزِ خودِ عکس نیست، پس سخت‌تر از کارتِ دفترچه‌ای گرفته می‌شود.')),
                 const SizedBox(width: Gaps.sm),
                 Expanded(
                     child: _numField('تشخیص تکراری', 'duplicateSimilarity',
-                        _photo, (v) => _photo['duplicateSimilarity'] = v)),
+                        _photo, (v) => _photo['duplicateSimilarity'] = v, helper: 'شباهت به یک کارتِ ثبت‌شدهٔ دیگر؛ بالاتر از این یعنی «همان طرحِ قبلی است» و بارگذاری رد می‌شود.')),
               ]),
               FilledButton.icon(
                 onPressed: _saving ? null : _savePhoto,
@@ -212,24 +213,24 @@ class _AdminEngineState extends State<AdminEngine> {
               Row(children: [
                 Expanded(
                     child: _numField('پایه (XP لول‌های اول)', 'base', _levels,
-                        (v) => _levels['base'] = v)),
+                        (v) => _levels['base'] = v, helper: 'XPِ لازمِ لولِ اول. پایین بیاوریدید شروعِ بازی آسان‌تر می‌شود.')),
                 const SizedBox(width: Gaps.sm),
                 Expanded(
                     child: _numField('شیب خطی', 'lin', _levels,
-                        (v) => _levels['lin'] = v)),
+                        (v) => _levels['lin'] = v, helper: 'به هر لول اضافه می‌شود: لولِ n ≈ پایه × (۱ + (n−۱) × این عدد).')),
                 const SizedBox(width: Gaps.sm),
                 Expanded(
                     child: _numField('توان نمایی', 'exp', _levels,
-                        (v) => _levels['exp'] = v)),
+                        (v) => _levels['exp'] = v, helper: 'عددِ بزرگ‌تر، فاصلهٔ لول‌های اول را زیاد و لول‌های بعدی را تقریباً مساوی می‌کند.')),
               ]),
               Row(children: [
                 Expanded(
                     child: _numField('زانو (لول)', 'knee', _levels,
-                        (v) => _levels['knee'] = v, integer: true)),
+                        (v) => _levels['knee'] = v, integer: true, helper: 'از این لول به بعد رشدِ نمایی کنار می‌رود و یک «پلهٔ» ثابت جایش می‌آید.')),
                 const SizedBox(width: Gaps.sm),
                 Expanded(
                     child: _numField('پلهٔ بعد از زانو', 'tail', _levels,
-                        (v) => _levels['tail'] = v)),
+                        (v) => _levels['tail'] = v, helper: 'مقداری که از لولِ زانو به هر لولِ بعدی اضافه می‌شود.')),
               ]),
               FilledButton.icon(
                 onPressed: _saving ? null : _saveLevels,
@@ -293,12 +294,18 @@ class _AdminEngineState extends State<AdminEngine> {
 class _NumEdit extends StatefulWidget {
   final String label;
   final String? hint;
+
+  /// `hint` روی `hintText` می‌نشیند و در فیلدِ **پر** دیده نمی‌شود؛ این
+  /// شماره‌ها همیشه از سرور مقدار دارند، پس توضیحِ «چه چیزی را لمس می‌کند»
+  /// باید `helperText` باشد. پارامترِ بی‌مصرف = دروغِ رابط، نه قابلیت.
+  final String? helper;
   final bool integer;
   final String value;
   final ValueChanged<String> onChanged;
   const _NumEdit(
       {required this.label,
       this.hint,
+      this.helper,
       this.integer = false,
       required this.value,
       required this.onChanged});
@@ -337,7 +344,12 @@ class _NumEditState extends State<_NumEdit> {
       keyboardType:
           TextInputType.numberWithOptions(decimal: !widget.integer),
       onChanged: widget.onChanged,
-      decoration: InputDecoration(labelText: widget.label, hintText: widget.hint),
+      decoration: InputDecoration(
+        labelText: widget.label,
+        hintText: widget.hint,
+        helperText: widget.helper,
+        helperMaxLines: 3,
+      ),
     );
   }
 }
