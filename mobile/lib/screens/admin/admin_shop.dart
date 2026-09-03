@@ -146,10 +146,12 @@ class _AdminShopState extends State<AdminShop> {
                 TextField(
                     controller: price,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'قیمت (تومان)')),
+                    decoration: const InputDecoration(labelText: 'قیمت (تومان)',
+                    helperText: 'همین عدد در اپ نشان داده و همان‌قدر هم از کیف پول کم می‌شود (بی‌تخفیفِ پنهان)؛ منفی مجاز نیست و سرور به ۰ می‌چسباندش.')),
                 TextField(
                     controller: payload,
-                    decoration: const InputDecoration(labelText: 'مقدار/payload')),
+                    decoration: const InputDecoration(labelText: 'مقدار/payload',
+                    helperText: 'همین رشته «اثرِ» آیتم است: برای قاب، طرح را می‌سازد و برای رنگِ نام، کدِ رنگ. اگر خالی بماند کلاینت به‌جایش شناسه را مصرف می‌کند.')),
                 DropdownButtonFormField<String>(
                   initialValue: _kinds.contains(kind.text) ? kind.text : null,
                   items: [
@@ -169,7 +171,8 @@ class _AdminShopState extends State<AdminShop> {
                     DropdownMenuItem(value: 'annual', child: Text('پلاس سالانه')),
                   ],
                   onChanged: (v) => setD(() => access = v ?? 'public'),
-                  decoration: const InputDecoration(labelText: 'دسترسی'),
+                  decoration: const InputDecoration(labelText: 'دسترسی',
+                    helperText: '«فقط پلاس» و «پلاس سالانه» یعنی کاربرِ عادی آن را در فروشگاه نمی‌بیند، نه این‌که رایگان شده باشد. مقدارِ ناشناخته بی‌صدا «عمومی» می‌شود.'),
                 ),
                 CheckboxListTile(
                   value: active,
@@ -323,7 +326,8 @@ class _AdminShopState extends State<AdminShop> {
                         controller: _price,
                         keyboardType: TextInputType.number,
                         decoration:
-                            const InputDecoration(labelText: 'قیمت (تومان)'))),
+                            const InputDecoration(labelText: 'قیمت (تومان)',
+                    helperText: 'همین عدد در اپ نشان داده و همان‌قدر هم از کیف پول کم می‌شود (بی‌تخفیفِ پنهان)؛ منفی مجاز نیست و سرور به ۰ می‌چسباندش.'))),
                 const SizedBox(width: Gaps.sm),
                 Expanded(
                     child: TextField(
@@ -353,7 +357,8 @@ class _AdminShopState extends State<AdminShop> {
                       DropdownMenuItem(value: 'annual', child: Text('پلاس سالانه')),
                     ],
                     onChanged: (v) => setState(() => _access = v ?? 'public'),
-                    decoration: const InputDecoration(labelText: 'دسترسی'),
+                    decoration: const InputDecoration(labelText: 'دسترسی',
+                    helperText: '«فقط پلاس» و «پلاس سالانه» یعنی کاربرِ عادی آن را در فروشگاه نمی‌بیند، نه این‌که رایگان شده باشد. مقدارِ ناشناخته بی‌صدا «عمومی» می‌شود.'),
                   ),
                 ),
               ]),

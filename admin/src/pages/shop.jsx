@@ -146,14 +146,21 @@ export function ShopAdminPage({ request }) {
         <Field label="نوع"><Select name="kind" defaultValue={editing?.kind || 'card_frame'}>
           {Object.entries(KIND_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </Select></Field>
-        <Field label="شناسهٔ یکتا (انگلیسی)"><Input name="slug" required defaultValue={editing?.slug || ''} placeholder="fire_frame" /></Field>
+        <Field label="شناسهٔ یکتا (انگلیسی)"
+            hint="همان چیزی که در لینک‌ها و در دادهٔ خریدِ کاربران ثبت می‌شود؛ بعد از انتشار عوضش نکنید — نامِ نمایشی برای عوض‌کردن هست، شناسه نه."><Input name="slug" required defaultValue={editing?.slug || ''} placeholder="fire_frame" /></Field>
         <Field label="نام فارسی"><Input name="name" required defaultValue={editing?.name || ''} /></Field>
-        <Field label="قیمت (تومان)"><Input name="price" type="number" min="0" required defaultValue={editing?.price ?? ''} /></Field>
-        <Field label="ترتیب نمایش"><Input name="displayOrder" type="number" defaultValue={editing?.displayOrder ?? items.length} /></Field>
-        <Field label="مقدار/اثر (payload)"><Input name="payload" defaultValue={editing?.payload || ''} placeholder="برای رنگ نام: کد رنگ؛ برای باشگاه: همان slug" /></Field>
-        <Field label="آدرس عکس"><Input name="imageUrl" defaultValue={editing?.imageUrl || ''} placeholder="/uploads/images/… یا آدرس کامل" /></Field>
-        <Field label="توضیح"><Input name="description" defaultValue={editing?.description || ''} /></Field>
-        <Field label="دسترسی"><Select name="accessTier" defaultValue={editing?.accessTier || 'public'}>
+        <Field label="قیمت (تومان)"
+            hint="همین عدد در اپ نشان داده و همان‌قدر هم از کیف پول کم می‌شود (بی‌تخفیفِ پنهان)؛ منفی مجاز نیست و سرور به ۰ می‌چسباندش."><Input name="price" type="number" min="0" required defaultValue={editing?.price ?? ''} /></Field>
+        <Field label="ترتیب نمایش"
+            hint="کوچک‌تر = بالاتر در شبکهٔ فروشگاه؛ فقط ترتیب را عوض می‌کند و رویِ قیمت یا دسترسی اثر ندارد."><Input name="displayOrder" type="number" defaultValue={editing?.displayOrder ?? items.length} /></Field>
+        <Field label="مقدار/اثر (payload)"
+            hint="همین رشته «اثرِ» آیتم است: برای قاب، طرح را می‌سازد و برای رنگِ نام، کدِ رنگ. اگر خالی بماند کلاینت به‌جایش شناسه را مصرف می‌کند."><Input name="payload" defaultValue={editing?.payload || ''} placeholder="برای رنگ نام: کد رنگ؛ برای باشگاه: همان slug" /></Field>
+        <Field label="آدرس عکس"
+            hint="مسیرِ نسبت‌به‌سایت از uploads/images شروع شود؛ پاک‌سازیِ فایل‌های یتیم فقط فایلِ بی‌ارجاع را می‌برد، پس این آدرس باید به فایلِ موجود برگردد."><Input name="imageUrl" defaultValue={editing?.imageUrl || ''} placeholder="/uploads/images/… یا آدرس کامل" /></Field>
+        <Field label="توضیح"
+            hint="زیرِ نامِ آیتم در فروشگاهِ کاربر چاپ می‌شود (وب و اندروید همان یک رشته را نشان می‌دهند)."><Input name="description" defaultValue={editing?.description || ''} /></Field>
+        <Field label="دسترسی"
+            hint="«فقط پلاس» و «پلاس سالانه» یعنی کاربرِ عادی آن را در فروشگاه نمی‌بیند، نه این‌که رایگان شده باشد. مقدارِ ناشناخته بی‌صدا «عمومی» می‌شود."><Select name="accessTier" defaultValue={editing?.accessTier || 'public'}>
           {Object.entries(TIER_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </Select></Field>
         <label className="check-row"><input type="checkbox" name="isActive" defaultChecked={editing?.isActive !== false} /> فعال در فروشگاه</label>
@@ -194,12 +201,13 @@ export function ShopAdminPage({ request }) {
             <Field label="قیمت ماهانه (تومان)"><Input name="m_price" type="number" required defaultValue={plans.monthly.price} /></Field>
             <Field label="مدت (روز)"><Input name="m_days" type="number" required defaultValue={plans.monthly.days} /></Field>
             <Field label="برچسب"><Input name="m_label" defaultValue={plans.monthly.label} /></Field>
-            <Field label="درصد صرفه‌جویی"><Input name="m_saving" type="number" defaultValue={plans.monthly.savingPercent} /></Field>
+            <Field label="درصد صرفه‌جویی" hint="فقط رویِ برچسبِ «حدود N٪ صرفه‌جویی» می‌نشیند و در محاسبهٔ قیمت کاری نمی‌کند؛ سرور آن را بینِ ۰ تا ۹۹ نگه می‌دارد و اگر خالی بماند کلاینت ۳۰ را نشان می‌دهد."><Input name="m_saving" type="number" defaultValue={plans.monthly.savingPercent} /></Field>
             <Field label="قیمت سالانه (تومان)"><Input name="a_price" type="number" required defaultValue={plans.annual.price} /></Field>
             <Field label="مدت (روز)"><Input name="a_days" type="number" required defaultValue={plans.annual.days} /></Field>
             <Field label="برچسب"><Input name="a_label" defaultValue={plans.annual.label} /></Field>
-            <Field label="درصد صرفه‌جویی"><Input name="a_saving" type="number" defaultValue={plans.annual.savingPercent} /></Field>
-            <Field label="مزایای پلاس (هر خط یک مورد)">
+            <Field label="درصد صرفه‌جویی" hint="فقط رویِ برچسبِ «حدود N٪ صرفه‌جویی» می‌نشیند و در محاسبهٔ قیمت کاری نمی‌کند؛ سرور آن را بینِ ۰ تا ۹۹ نگه می‌دارد و اگر خالی بماند کلاینت ۳۰ را نشان می‌دهد."><Input name="a_saving" type="number" defaultValue={plans.annual.savingPercent} /></Field>
+            <Field label="مزایای پلاس (هر خط یک مورد)"
+            hint="زیرِ برچسبِ پلاس در اپ چاپ می‌شود؛ از خطِ ششم به بعد در پلنِ ماهانه و از دهم در سالانه نمایش داده نمی‌شود (برشِ خودِ کلاینت است، نه بی‌اعتناییِ پنل).">
               <textarea name="benefits" rows={5} defaultValue={(plans.benefits || []).join('\n')}
                 style={{ width: '100%', borderRadius: 10, padding: 10, background: 'rgba(0,0,0,.25)', color: 'inherit', border: '1px solid rgba(255,255,255,.12)' }} />
             </Field>
