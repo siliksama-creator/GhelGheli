@@ -387,6 +387,14 @@ module.exports = function createClientConfigRoutes(deps) {
       res.json({ copy: next, configVersion: liveContent.configVersion() });
     }));
 
+  // بازگشت به «پیش‌فرضِ کد» — نه «آخرین تغییرِ قبلی» که `revert` می‌دهد.
+  // دو چیزِ متفاوت‌اند: ادمین ممکن است چهار بار ویرایش کرده باشد و بخواهد
+  // به همان متنِ روزِ اوّلِ محصول برگردد؛ `revert` فقط یک مرحله می‌رود عقب.
+  router.get('/admin/settings/live-content/defaults', adminAuth, asyncHandler(async (req, res) => {
+    if (!liveContent) throw Object.assign(new Error('دسترس‌نیافته'), { status: 404 });
+    res.json({ copy: liveContent.defaultsView() });
+  }));
+
   // پیش‌نمایش: کلاینت اعدادِ «امروز» (از همان /api/config) می‌فرستد تا
   // مدیر قبل از ذخیره ببیند متنِ کاربر چه می‌شود — ویرایشِ کور نیست.
   router.post('/admin/settings/live-content/preview', adminAuth, asyncHandler(async (req, res) => {
@@ -412,7 +420,14 @@ module.exports = function createClientConfigRoutes(deps) {
         : req.params.key === 'rules' ? liveContent.RULES_KEY : req.params.key;
       const next = await liveContent.revert(key, req.admin.id);
       await audit(req.admin.id, 'revert_live_content', key, null, null, next);
-      res.json({ [key]: next, configVersion: liveContent.configVersion() });
+      // نامِ کلیدِ دیتابیس (`live_copy`) عمداً در پاسخ نیست: پاسخِ
+      // `PATCH …/copy` شکلش `{ copy }` است و این‌جا `{ [key]: next }`
+      // یعنی `{ live_copy: … }` — دو شکلِ متفاوت برای یک مفهوم. پنل وب
+      // با `r.copy` `undefined` می‌گرفت و `structuredClone(undefined)`
+      // استثنا می‌داد؛ یعنی «بازگردانی» در UI ذخیره می‌شد ولی فرم
+      // به‌روز نمی‌شد و ادمین فکر می‌کرد دکمه کار نکرده. پس: شکلِ یکتا.
+      const field = key === liveContent.COPY_KEY ? 'copy' : 'rules';
+      res.json({ [field]: next, configVersion: liveContent.configVersion() });
     }));
 
   return router;

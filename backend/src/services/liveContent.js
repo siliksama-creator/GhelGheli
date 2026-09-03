@@ -456,6 +456,19 @@ async function revert(key, adminId) {
  * هر عدد، و قالب‌های فعلی + قراردادِ جای‌نگهدارها. پنلِ وب و اندروید
  * هر دو با همین یک پاسخ ساخته می‌شوند.
  */
+/**
+ * پیش‌فرض‌هایِ کد، در شکلِ «patchِ خالی». `sanitizeCopy({})` عمداً همان
+ * `DEFAULT_COPY` را برمی‌گرداند، پس «بازگشت به پیش‌فرض» یک مسیرِ تازه و
+ * تازه‌نویسی‌شده لازم ندارد — همان ذخیره است با بدنهٔ خالی. این مهم است
+ * چون مسیرِ ذخیره تنها جایی است که اعتبارسنجی، تاریخچه و `configVersion++`
+ * روی آن سوار است؛ اگر «reset» مسیرِ جدا می‌رفت، روزی یکی از این سه را
+ * فراموش می‌کردیم (و «متن‌ها ریست شدند ولی اپ کهنه ماند» باگی است که هیچ
+ * گاردی نمی‌بیندش).
+ */
+function defaultsView() {
+  return JSON.parse(JSON.stringify(DEFAULT_COPY));
+}
+
 function panelView() {
   return {
     rules: {
@@ -472,21 +485,40 @@ function panelView() {
 
 /** پیش‌نمایشِ زنده: قالب‌های فعلی با اعدادِ فعلیِ config پرشده. */
 function preview(vars = {}) {
-  const out = {};
-  const filled = (obj) => {
-    if (typeof obj === 'string') return fillTemplate(obj, vars);
-    if (Array.isArray(obj)) return obj.map(filled);
+  // اعدادی که درخواست می‌فرستد اولویت دارند؛ هرچه نباشد از `live_rules`ی
+  // امروز پر می‌شود. بیِ این دوم، پیش‌نمایشِ پنل برای «تعدادِ جفت‌های
+  // جفت‌یاب» یا «طولِ کد اتاق» جای‌نگهدارِ خالی می‌گذاشت و مدیر فکر می‌کرد
+  // قالب خراب است — فیلدِ خالی در پیش‌نمایش بدترین بازخورد ممکن است،
+  // چون کاربرِ واقعی هرگز چنین چیزی نمی‌بیند.
+  const withDefaults = { ...rules(), ...(vars || {}) };
+  const fill = (obj) => {
+    if (typeof obj === 'string') return fillTemplate(obj, withDefaults);
+    if (Array.isArray(obj)) return obj.map(fill);
     if (obj && typeof obj === 'object') {
       const r = {};
-      for (const [k, v] of Object.entries(obj)) r[k] = filled(v);
+      for (const [k, v] of Object.entries(obj)) r[k] = fill(v);
       return r;
     }
     return obj;
   };
-  const r = filled(copy());
-  // flatten تا کلاینت/پنل راحت‌تر بخواند: `games.memoryRule` و…
-  out.template = r;
-  return out;
+  const raw = (obj) => {
+    if (Array.isArray(obj)) return obj.map(raw);
+    if (obj && typeof obj === 'object') {
+      const r = {};
+      for (const [k, v] of Object.entries(obj)) r[k] = raw(v);
+      return r;
+    }
+    return obj;
+  };
+  const current = copy();
+  return {
+    // `template` پرشده است و همین را تستِ `testLiveContent` و هر
+    // کلاینتِ فعلی می‌خواند (تغییرِ معنا ندادیم تا چیزی بشکند).
+    template: fill(current),
+    // `raw` همان قالبِ خامِ لحظه است: پنل برای «جای‌نگهدارِ گم‌شده» به
+    // این نگاه می‌کند، نه به نسخهٔ پرشده (در پرشده هیچ `{…}` نمی‌ماند).
+    raw: raw(current),
+  };
 }
 
 module.exports = {
@@ -494,6 +526,6 @@ module.exports = {
   RULE_DEFS, DEFAULT_COPY, COPY_CONTRACT,
   rules, copy, configVersion, fillTemplate,
   sanitizeRules, saveRules, sanitizeCopy, saveCopy,
-  history, revert, bumpConfigVersion,
+  history, revert, bumpConfigVersion, defaultsView,
   panelView, preview,
 };

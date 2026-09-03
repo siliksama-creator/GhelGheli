@@ -203,6 +203,7 @@ ok('گردونه ضریبِ آستانه را از liveContent می‌خواند
   /liveContent\.rules\(\)\.spinsPerDailyThreshold/.test(refSrc));
 
 const routeSrc = read('src/routes/clientConfig.js');
+const svcSrc = read('src/services/liveContent.js');
 ok('/api/config copy می‌دهد', /copy: liveContent\.copy\(\)/.test(routeSrc));
 ok('/api/config rules می‌دهد', /rules: liveContent\.rules\(\)/.test(routeSrc));
 ok('/api/config configVersion می‌دهد', /configVersion: liveContent\.configVersion\(\)/.test(routeSrc));
@@ -212,6 +213,23 @@ ok('PATCH copy با adminAuth + requireRole',
   /router\.patch\('\/admin\/settings\/live-content\/copy', adminAuth, requireRole\(\)/.test(routeSrc));
 ok('revert با adminAuth + requireRole',
   /router\.post\('\/admin\/settings\/live-content\/:key\/revert', adminAuth, requireRole\(\)/.test(routeSrc));
+
+// «بازگشت به پیش‌فرضِ کد» هم مثلِ بقیهٔ GETها با adminAuth است (بدِ
+// requireRole: خواندنِ پیش‌فرضها تغییرِ خطرناکی نیست) و پاسخِ revert باید
+// شکلِ یکسانِ `PATCH copy` را داشته باشد. چرا این دو خط این‌جا هستند:
+// پاسخِ قدیمی `{ [key]: next }` نامِ کلیدِ دیتابیس (`live_copy`) را به
+// پنل نشت می‌داد و `r.copy` در UI تعریف‌نشده می‌شد — یعنی «بازگردانیِ
+// متن» در سرور انجام می‌شد ولی فرم به‌نظر *تکان نمی‌خورد*. یک تستِ سه‌خطی،
+// آن کدِ سه‌خطیِ پنل را از دوباره‌نوشته‌شدن نجات می‌دهد.
+ok('defaults با adminAuth ثبت شده',
+  /router\.get\('\/admin\/settings\/live-content\/defaults', adminAuth/.test(routeSrc));
+ok('پاسخِ revert شکلِ یکتا دارد (copy|rules، نه نامِ کلیدِ دیتابیس)',
+  /const field = key === liveContent\.COPY_KEY \? 'copy' : 'rules';/.test(routeSrc)
+  && !/res\.json\(\{ \[key\]: next/.test(routeSrc));
+ok('preview هم قالبِ خام و هم پرشده می‌دهد (پنل برای هشدارِ جای‌نگهدار به خام نیاز دارد)',
+  /template: fill\(current\)/.test(svcSrc) && /raw: raw\(current\)/.test(svcSrc));
+ok('defaultsView نسخهٔ مستقل می‌دهد (نه ارجاعِ زندهٔ DEFAULT_COPY)',
+  /function defaultsView\(\)[\s\S]{0,120}JSON\.parse\(JSON\.stringify\(DEFAULT_COPY\)\)/.test(svcSrc));
 ok('ذخیرهٔ rules audited می‌شود', /audit\(req\.admin\.id, 'save_live_rules'/.test(routeSrc));
 ok('ذخیرهٔ copy audited می‌شود', /audit\(req\.admin\.id, 'save_live_copy'/.test(routeSrc));
 ok('بازگردانی audited می‌شود', /audit\(req\.admin\.id, 'revert_live_content'/.test(routeSrc));
