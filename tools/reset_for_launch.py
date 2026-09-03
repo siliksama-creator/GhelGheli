@@ -41,33 +41,65 @@ DELETE روی جدول فقط ردیف را می‌برد؛ فایلِ webp رو
   • `pass_tiers` / `pass_seasons` / `league_seasons` — تقویمِ فصل‌ها
   • `shop_items`         — کاتالوگِ فروشگاهِ کازمتیک
   • `wheel_prizes`       — چیدمانِ گردونه
+  • `chat_stickers`      — استیکرهایِ پیش‌فرض (چیزی که کاربر می‌فرستد در
+    `chat_messages` است و آنجا پاک می‌شود؛ خودِ کاتالوگ تنظیمات است)
+  • `card_box_odds` / `mission_definitions` / `reward_groups` /
+    `league_perk_tiers` — شانسِ صندوق، تعریفِ ماموریت‌ها، گروه‌هایِ جایزه و
+    پلکانِ پاداشِ لیگ: این‌ها همان اعدادی‌اند که *ادمین با پنل* ساخته و اگر
+    پاک شوند، «صبحِ انتشار با پنلِ خالی» را داریم. نام‌برده‌شدنِ این چهار در
+    فهرستِ پایین، خودِ همان باگِ تاریخیِ این ابزار بود (جدولِ تازه‌ای که
+    مایگریشن می‌سازد و پاک‌ساز نمی‌شناسدش) — و گاردِ `testResetGuard.js`
+    دقیقاً برای همین نوشته شد.
+  • `live_content_history` — تاریخچهٔ ویرایشِ متن/قاعدهٔ زنده: «چه کسی چه
+    چیزی را عوض کرد» بخشی از دادهٔ محصول است نه ردپایِ تستِ کاربر.
   • `schema_migrations`  — وگرنه مایگریشن‌ها دوباره اجرا می‌شوند
 
-اجرا:
+اجرا (رویِ خودِ سرور، چون به فایل‌هایِ uploads هم کار دارد):
     python3 tools/reset_for_launch.py            # فقط گزارش
-    python3 tools/reset_for_launch.py --yes      # واقعاً پاک می‌کند
+    python3 tools/reset_for_launch.py --yes      # واقعاً پاک می‌کند (اول pg_dump)
 """
+import re
 import subprocess
 import sys
 
-RX = '/home/user/tools/rx.py'
 ADMIN_MOBILE = 'Admin'
 UPLOADS = '/var/www/GhelGheli/backend/uploads/images'
+DB = 'ghelgheli'
+BACKUP_DIR = '/var/backups/ghelgheli'
 
 
-def ssh(cmd, timeout=600):
-    """اجرای فرمان روی سرورِ زنده."""
-    out = subprocess.run(['python3', RX, cmd],
-                         capture_output=True, text=True, timeout=timeout)
+def ssh(cmd, timeout=900):
+    """اجرای فرمان.
+
+    تا پیش از این، اینجا فراخوانیِ یک اسکریپتِ کمکیِ *بیرونِ مخزن* بود که در
+    هیچ clone تازه‌ای نیست: ابزارِ لحظهٔ عرضه به مسیرِ یک پوشهٔ شخصی وابسته بود و
+    با پاک‌سازیِ ورک‌اسپیس، عملاً «اجرا شدنی» نبود — بدترین شکلِ وابستگی،
+    یعنی چیزی که فقط رویِ لپ‌تاپِ یک نفر کار می‌کند و این در روزِ انتشار
+    کشف می‌شود. حالا خودِ اسکریپت با psql کار می‌کند و همان‌جا روی سرور
+    اجرا می‌شود:
+
+        ssh root@server 'cd /var/www/GhelGheli && python3 tools/reset_for_launch.py'
+    """
+    out = subprocess.run(['bash', '-lc', cmd], capture_output=True, text=True,
+                         timeout=timeout)
     if out.returncode != 0:
-        raise RuntimeError(out.stderr[:2000])
+        raise RuntimeError((out.stderr or out.stdout)[:2000])
     return out.stdout
 
 
 def psql(sql, tuples_only=True):
-    flag = '-tAc' if tuples_only else '-c'
-    # تک‌کوتیشن داخلِ SQL با کوتیشنِ پوستهٔ SSH تداخل دارد؛ heredoc امن است.
-    return ssh(f"sudo -u postgres psql -d ghelgheli {flag} \"$(cat <<'__SQL__'\n{sql}\n__SQL__\n)\"")
+    # تک‌کوتیشن داخلِ SQL با کوتیشنِ پوسته تداخل دارد؛ heredoc امن است و
+    # ON_ERROR_STOP=1 لازم است، وگرنه `psql` خطایِ وسطِ تراکنش را چاپ می‌کند
+    # و exit ۰ می‌دهد: یعنی «پاکسازیِ نصفه» سبز رد می‌شد.
+    q = "-tAc" if tuples_only else "-c"
+    return ssh("sudo -u postgres psql -d %s -v ON_ERROR_STOP=1 %s \"$(cat <<'__SQL__'\n%s\n__SQL__\n)\""
+               % (DB, q, sql))
+
+
+def existing_tables():
+    rows = psql("select table_name from information_schema.tables "
+                "where table_schema='public' and table_type='BASE TABLE'")
+    return set(x.strip() for x in rows.split('\n') if x.strip())
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -193,6 +225,14 @@ DELETE FROM user_item_grants;
 DELETE FROM card_box_purchases;
 DELETE FROM league_perk_awards;
 
+-- ⚠️ فاز ۲/۳ (لایو-کانتنت و متن‌هایِ زنده) دو جدولِ تازه آورد که در این
+--    فهرست نبودند و همان دامِ «۴۵۷ فایل یتیم» را تکرار می‌کردند:
+--      • card_box_odds و mission_definitions *تنظیماتِ محصول‌اند* و عمداً
+--        پایین‌تر، در بخشِ «دست‌نخورده‌ها» نگه داشته می‌شوند؛
+--      • ردیف‌هایِ کاربریِ باقی‌مانده از فصل‌ها/لیگ:
+DELETE FROM league_perk_grants;
+DELETE FROM user_coin_quota;
+
 -- ── ۳) کاربران، بجز حسابِ اصلیِ مدیر ──
 DELETE FROM users WHERE mobile <> '{ADMIN_MOBILE}';
 
@@ -231,13 +271,57 @@ UNION ALL SELECT reward_image FROM user_reward_claims WHERE reward_image IS NOT 
 """
 
 
+def prune_missing(sql):
+    """حذفِ خط‌هایی که به جدولِ ناموجود اشاره می‌کنند (به‌جای خطایِ زمانِ اجرا).
+
+    باگِ واقعی و *اجراشده*: `card_codes` در مایگریشن ۰۰۱ ساخته شد و در
+    ۰۸۰_stickers_and_card_codes_cleanup.sql حذف؛ این ابزار هر دو را می‌شناخت و
+    رویِ `DELETE FROM card_codes` (و همان سطرِ شمارش در گزارش) می‌سوخت —
+    یعنی دقیقاً در لحظه‌ای که نباید بسوزد. فهرستِ جدول‌ها بعدِ یک حذفِ
+    schema، «حرفِ باقی‌مانده» است نه فرضِ ابدی. اینجا از دیتابیس می‌پرسیم و
+    رد می‌کنیم، ولی **گزارشش می‌دهیم**: سکوت در ابزارِ پاکسازی = دروغ.
+    """
+    live = existing_tables()
+    kept, skipped = [], []
+    for line in sql.split('\n'):
+        tables = set(re.findall(r'\b(?:from|update)\s+([a-z_][a-z0-9_]*)', line, re.I))
+        missing = sorted(t for t in tables if t not in live)
+        if missing:
+            skipped.append(', '.join(missing))
+            continue
+        kept.append(line)
+    body = '\n'.join(kept)
+    # اگر *اولین* سطرِ یک کوئریِ UNION حذف شده باشد، سطرِ بعدی «UNION ALL»
+    # می‌ماند و SQL بی‌سرِخود می‌شود (نخستین اجرایِ این اصلاح، همین را با
+    # IndexError رویِ پروداکشنِ کپی‌شده نشان داد).
+    body = re.sub(r'^\s*\n*', '', body)
+    m = re.match(r'^(\s*)UNION ALL\s+', body)
+    if m:
+        body = body[:m.start()] + body[m.end():]
+    return body, sorted(set(skipped))
+
+
 def show(title):
     print(f'\n── {title} ──')
-    print(psql(REPORT).strip())
+    q, skipped = prune_missing(REPORT)
+    print(psql(q).strip())
+    if skipped:
+        print('   (ستون‌هایِ بی‌جدول حذف شدند: ' + '; '.join(skipped) + ')')
 
 
 def main():
+    global DB, UPLOADS
     dry = '--yes' not in sys.argv
+    args = sys.argv[1:]
+    # ── --db/--uploads: «کپیِ دیتابیس» قبلِ اجرا رویِ پروداکشن ──────────────
+    # بدونِ این دو، آزمودنِ این ابزار رویِ پروداکشن است یا هیچ. رویِ کپی
+    # (pg_dump + `--db reset_probe`) سنجیده شد و همان‌جا سه باگِ اجرا پیدا شد.
+    if '--db' in args:
+        DB = args[args.index('--db') + 1]
+        print(f'· دیتابیسِ هدف: {DB}')
+    if '--uploads' in args:
+        UPLOADS = args[args.index('--uploads') + 1]
+        print(f'· پوشهٔ فایل‌ها: {UPLOADS}')
 
     show('وضعیت فعلی')
 
@@ -249,19 +333,67 @@ def main():
         print('\n⚠️  اجرای آزمایشی. برای پاکسازیِ واقعی: --yes')
         return
 
+    # ── بکاپ: بیِ آن هیچ حذفی اجرا نمی‌شود ──
+    # «فکر می‌کردم dry-run بود» تنها با یک بکاپِ سالم جبران می‌شود؛ و
+    # صحتِ بکاپ با *حجم* سنجیده می‌شود نه exit code، چون `pg_dump | gzip`
+    # با لوله‌هایِ شکسته هم می‌تواند صفر برگرداند و فایلِ ۲۰ بایتی بدهد.
+    if '--no-backup' in args:
+        # فقط برایِ آزمون رویِ کپی؛ رویِ پروداکشن بی‌بکاپ اجرا نکنید.
+        print('⚠ بکاپ عمداً گرفته نشد (--no-backup)')
+        stamp = None
+    else:
+        stamp = subprocess.run(['date', '-u', '+%Y%m%dT%H%M%SZ'],
+                               capture_output=True, text=True).stdout.strip()
+    if stamp:
+        dest = f'{BACKUP_DIR}/pre-reset-{stamp}.sql.gz'
+        ssh(f'mkdir -p {BACKUP_DIR} && sudo -u postgres pg_dump -d {DB} | gzip > {dest}'
+            f' && test $(stat -c%s {dest}) -gt 2048')
+        print(f'\n✓ بکاپ: {dest}')
+
     print('\n▸ پاکسازیِ دیتابیس…')
-    psql(PURGE, tuples_only=False)
+    purge, skipped = prune_missing(PURGE)
+    if skipped:
+        print('   (جمله‌هایِ بی‌جدول رد شد: ' + '; '.join(skipped) + ')')
+    psql(purge, tuples_only=False)
 
     print('▸ پاکسازیِ فایل‌های یتیم…')
-    # فهرستِ نگه‌دار را در فایلی روی سرور می‌نویسیم و با comm مقایسه
-    # می‌کنیم — نه با حلقهٔ shell، که با ۵۰۰ فایل کند و شکننده است.
-    ssh(f"sudo -u postgres psql -d ghelgheli -tAc \"$(cat <<'__SQL__'\n{KEEP_FILES}\n__SQL__\n)\""
-        " | sed 's|.*/||' | sed '/^$/d' | sort -u > /tmp/keep.txt")
+    # فهرستِ «نگه‌دار» را در فایلی روی سرور می‌نویسیم و با comm مقایسه می‌کنیم
+    # — نه با حلقهٔ shell، که با ۵۰۰ فایل کند و شکننده است.
+    keepf, killf = f'/tmp/keep-{DB}.txt', f'/tmp/kill-{DB}.txt'
+    # نامِ فایلِ موقت با نامِ دیتابیس قفل می‌شود: نسخهٔ قبلی `/tmp/keep.txt`
+    # مشترک داشت و دو اجرایِ هم‌زمان (یکی رویِ پروداکشن، یکی رویِ کپیِ آزمون)
+    # یکدیگر را با فهرستِ *دیگری* پاک می‌کردند — بدترین حالتِ ممکن برای ابزاری
+    # که فایل حذف می‌کند.
+    q_keep, skipped_keep = prune_missing(KEEP_FILES)
+    if skipped_keep:
+        print('  (ارجاع‌هایِ بی‌جدول رد شد: ' + '; '.join(skipped_keep) + ')')
+    ssh("sudo -u postgres psql -d %s -v ON_ERROR_STOP=1 -tAc \"$(cat <<'__SQL__'\\n%s\\n__SQL__\\n)\""
+        % (DB, q_keep) + " | sed 's|.*/||' | sed '/^$/d' | sort -u > " + keepf)
+    # پوشهٔ نبودنی = «صفر فایل»، نه exception: در اجرایِ اولِ این اصلاح رویِ
+    # کپی، `cd` به پوشهٔ نبودنی *بعد از* پاک‌شدنِ دیتابیس خطا می‌داد و ابزار
+    # نیمی‌کاره می‌مرد (دیتابیس پاک، فایل‌ها سرجایشان).
     removed = ssh(
-        f"cd {UPLOADS} && comm -23 <(ls -1 | sort) /tmp/keep.txt > /tmp/kill.txt;"
-        " wc -l < /tmp/kill.txt;"
-        f" cd {UPLOADS} && xargs -a /tmp/kill.txt -d '\\n' -r rm -f --")
+        f"if [ -d {UPLOADS} ]; then cd {UPLOADS} && comm -23 <(ls -1 | sort) {keepf}"
+        f" > {killf} && wc -l < {killf} && xargs -a {killf} -d '\\n' -r rm -f --;"
+        f" else echo '0 (پوشهٔ فایل نیست: {UPLOADS})'; fi")
     print(f'  {removed.strip()} فایل حذف شد')
+
+    # ── شمارشِ دوباره: «صفرشدن» را باور نمی‌کنیم مگر اندازه بگیریم ──
+    # تریگر/RLS/کلیدِ خارجیِ RESTRICT می‌تواند ردیفی را نگه دارد و psql هم
+    # exit ۰ بدهد؛ ابزارِ پاکسازی که فقط «دستور را اجرا کرد» و نگاه نکرد،
+    # در بهترین حالت دادهٔ تستی را به محیطِ واقعی منتقل می‌کند.
+    leftovers = psql("select coalesce(string_agg(t, ', '), '') from ("
+                     "  select 'users' t, count(*) n from users where mobile <> '{m}'"
+                     "  union all select 'chat_messages', count(*) from chat_messages"
+                     "  union all select 'wallet_transactions', count(*) from wallet_transactions"
+                     "  union all select 'analytics_events', count(*) from analytics_events"
+                     "  union all select 'point_transactions', count(*) from point_transactions"
+                     "  union all select 'user_coin_quota', count(*) from user_coin_quota"
+                     "  union all select 'card_box_purchases', count(*) from card_box_purchases"
+                     ") x where x.n > 0".format(m=ADMIN_MOBILE)).strip()
+    if leftovers:
+        raise SystemExit('✗ این جدول‌ها صفر نشدند (کلیدِ خارجی/تریگر؟): ' + leftovers)
+    print('✓ بازبینی: ردیف‌هایِ هدف صفر شدند')
 
     show('وضعیت پس از پاکسازی')
     files_after = ssh(f'ls -1 {UPLOADS} 2>/dev/null | wc -l').strip()
