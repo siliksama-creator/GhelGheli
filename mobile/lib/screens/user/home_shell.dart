@@ -503,6 +503,8 @@ class _HomeShellState extends State<HomeShell>
         unawaited(_showUpdateDialog(
           forced: force['android'] == true,
           url: '${urls['android'] ?? ''}',
+          current: current,
+          min: minStr,
         ));
       }
       final tabOrder = (m['tabOrder'] as List? ?? const [])
@@ -575,22 +577,37 @@ class _HomeShellState extends State<HomeShell>
   Future<void> _showUpdateDialog({
     required bool forced,
     required String url,
+    // دو عددِ نسخه هم از فراخوانی می‌آیند، نه از const: این‌ها از
+    // `app.minVersion` و `--dart-define=APP_RELEASE` می‌آیند و اگر
+    // دیالوگ خودش می‌خواند، منبعِ حقیقتِ دوم می‌شد.
+    required String current,
+    required String min,
   }) async {
     if (!mounted) return;
     await showDialog<void>(
       context: context,
       barrierDismissible: !forced,
       builder: (ctx) => AlertDialog(
-        title: const Text('نسخهٔ جدید قلقلی آماده است'),
-        content: const Text(
-          'لطفاً اپلیکیشن را به آخرین نسخه به‌روزرسانی کنید تا همه‌چیز '
-          'درست کار کند.',
+        // هر سه سطر از `live_copy.update` می‌آید (آینهٔ `main.jsx`).
+        // فول‌بکِ `update.body` واژه‌به‌واژه جملهٔ دیروزِ همین دیالوگ است —
+        // پس اگر config نرسد، صفحه دقیقاً همان چیزی را می‌بیند که الان
+        // می‌بیند. وقتی config برسد، سطرِ «نسخهٔ فعلی شما X و حداقلِ
+        // لازم Y است» هم *جلویِ* بدنه می‌آید: عددِ نسخه از `minVersion`
+        // می‌آید و اگر ادمین بخواهد، می‌تواند جمله را عوض کند؛ قبلاً کاربر
+        // می‌فهمید «اپت قدیمی است» ولی نمی‌فهمید چقدر قدیمی.
+        title: Text(liveText('update.title', 'نسخهٔ تازه قلقلی آماده است')),
+        content: Text(
+          '${liveText('update.notice', '', vars: {
+            'current': faNum(current),
+            'min': faNum(minStr),
+          })}${liveText('update.body',
+            'برای اینکه همه‌چیز درست کار کند، لطفاً به تازه‌ترین نسخه به‌روزرسانی کنید.')}',
         ),
         actions: [
           if (!forced)
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('بعداً'),
+              child: Text(liveText('update.later', 'بعداً')),
             ),
           FilledButton(
             onPressed: () {
@@ -600,7 +617,7 @@ class _HomeShellState extends State<HomeShell>
               }
               if (!forced) Navigator.pop(ctx);
             },
-            child: const Text('به‌روزرسانی'),
+            child: Text(liveText('update.action', 'به‌روزرسانی')),
           ),
         ],
       ),

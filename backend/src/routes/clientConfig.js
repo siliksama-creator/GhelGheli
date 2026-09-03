@@ -42,6 +42,13 @@ const DEFAULTS = Object.freeze({
     minVersion: { android: '1.1.17', ios: '1.1.17' },
     forceUpdate: { android: false, ios: false },
     updateUrl: { android: '', ios: '' },
+    // بستهٔ کافه‌بازار. چرا یک فیلدِ جدا و نه سخت‌نوشتنِ لینک در کلاینت:
+    // تا این دور وب این رشته را در خودش داشت —
+    // `'https://ghelghelishop.ir'` — یعنی اگر ادمین `updateUrl` را خالی
+    // می‌گذاشت (که حالتِ پیش‌فرضِ همین مخزن است!) دکمهٔ «دانلود / ورود»
+    // کاربر را به سایت می‌برد، نه به صفحهٔ نصب؛ و در اندروید هم هیچ
+    // لینکی نبود و دکمه بی‌کار می‌شد. حالا لینک *یک‌جا* ساخته می‌شود.
+    bazaarPackage: 'ir.ghelgheli.shop',
   },
   announcement: { active: false, text: '', link: null, accent: 'gold' },
   features: featureFlags.DEFAULTS,
@@ -66,6 +73,9 @@ function mergeConfig(raw) {
     ...DEFAULTS.app.updateUrl,
     ...(app.updateUrl && typeof app.updateUrl === 'object' ? app.updateUrl : {}),
   };
+  app.bazaarPackage = String(
+    app.bazaarPackage ?? DEFAULTS.app.bazaarPackage,
+  ).trim().slice(0, 120) || DEFAULTS.app.bazaarPackage;
   const announcement = {
     ...DEFAULTS.announcement,
     ...(v.announcement && typeof v.announcement === 'object' ? v.announcement : {}),
@@ -214,8 +224,27 @@ module.exports = function createClientConfigRoutes(deps) {
       tapLevelCount = econ?.tapCurve?.levelCount ?? null;
     } catch { /* */ }
 
+    // ── لینکِ نصب/آپدیت (فاز ۴) ─────────────────────────────────────────
+    //
+    // اگر ادمین `updateUrl` را پر کرده باشد، همان حرفِ آخر است. اگر خالی
+    // بود — که پیش‌فرضِ مخزن است — از `ops_limits.bazaarApiBase` + نامِ
+    // بسته ساخته می‌شود. دلیلِ آمدن به سرور: هیچ کلاینتی نباید بداند
+    // «سایتِ ما چیست»؛ یک رشتهٔ fallback در دو کلاینت یعنی دو رشتهٔ
+    // متفاوت که فردا یکی‌شان کهنه می‌ماند (و وب دقیقاً همین بود).
+    const o = typeof opsLimits?.get === 'function' ? opsLimits.get() : null;
+    const bazaar = o && o.bazaarApiBase
+      ? `${String(o.bazaarApiBase).replace(/\/$/, '')}/ir/package/${cfg.app.bazaarPackage}/`
+      : '';
+    const app = {
+      ...cfg.app,
+      updateUrl: {
+        android: cfg.app.updateUrl.android || bazaar,
+        ios: cfg.app.updateUrl.ios || '',
+      },
+    };
     res.json({
       ...cfg,
+      app,
       wallet: { enabled: wallet.enabled !== false },
       // اقتصادِ بازی‌ها: سکهٔ هر نتیجه، سهمیهٔ روزانه، درصدِ انتقالِ
       // سکه بین لیگ‌ها و سکهٔ هر لولِ ضربه‌زن. کلاینت‌ها متن‌های راهنما
@@ -315,6 +344,11 @@ module.exports = function createClientConfigRoutes(deps) {
             android: str(b.app?.updateUrl?.android, cur.app.updateUrl.android, 500),
             ios: str(b.app?.updateUrl?.ios, cur.app.updateUrl.ios, 500),
           },
+          // خالی‌کردنِ این فیلد یعنی «همان لینکِ کافه‌بازار را بساز»، پس
+          // fallbackِ DEFAULTS لازم است؛ str() با خالی، همان خالی را
+          // برمی‌گرداند و config لینکِ بی‌دکمه می‌سازد.
+          bazaarPackage: str(
+            b.app?.bazaarPackage, cur.app.bazaarPackage || DEFAULTS.app.bazaarPackage, 120),
         },
         announcement: {
           active: bool(b.announcement?.active, cur.announcement.active),

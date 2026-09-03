@@ -53,6 +53,10 @@ const Map<String, String> kAdminCopyGroups = {
   'games': 'بازی‌ها',
   'reconnect': 'اتصالِ دوباره',
   'avatars': 'آواتارها',
+  // مو‌به‌موِ `GROUP_LABEL` در `admin/src/pages/live-copy.jsx` — گاردِ
+  // admin-copy-parity تفاوتِ این دو را قرمز می‌کند، چون «دو پنلِ
+  // ناهمسان» یعنی ادمین در یک پنل چیزی می‌بیند که در دیگری نیست.
+  'update': 'پیامِ نسخهٔ تازه',
 };
 
 final RegExp _placeholderRe = RegExp(r'\{([a-zA-Z][a-zA-Z0-9_]*)\}');

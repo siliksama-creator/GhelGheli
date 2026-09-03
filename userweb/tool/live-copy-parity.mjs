@@ -525,6 +525,33 @@ ok(`خواندنِ فهرستی هم شمرده شد (${listUsed.size} کلید)
     leaks.join(' | '));
 }
 
+// ── ۵.۷) لینکِ نصب/آپدیت: هیچ دامنه‌ای در کلاینت سفت نمی‌شود ──────────────
+//
+// دقیقاً همان بیماریِ «۵ تا عکس» ولی در قالبِ لینک: وب یک دامنهٔ
+// fallbackِ سفت در کد داشت و اندروید هیچ fallbackی. یعنی با `updateUrl` خالی
+// (که پیش‌فرضِ مخزن است!) دکمهٔ وب به سایت می‌رفت و دکمهٔ اندروید هیچ کاری
+// نمی‌کرد. حالا سرور لینک را از `ops_limits.bazaarApiBase` +
+// `app.bazaarPackage` می‌سازد. این سنجه هر http(s) سفت‌شده در *متن*
+// کلاینت‌ها را می‌گیرد — نه hrefهای staticِ خودِ باندل (لوگو، manifest).
+{
+  const siteRe = /https?:\/\/(?!www\.w3\.org|schemas\.|localhost)[\w.-]+/g;
+  const offenders = [];
+  for (const [side, client] of Object.entries(CLIENTS)) {
+    for (const file of filesIn(client.dir, client.exts)) {
+      const src = strip(read(path.relative(root, file)));
+      // تنها *رشته‌های* داخلِ کد، آن‌هم جایی که `updateUrl` یا `bazaar`
+      // در همان خط هست — تا خطِ import یا کامنتِ URL‌دار بی‌دلیل قرمز نشود.
+      for (const line of src.split('\n')) {
+        if (!/updateUrl|bazaar|Bazaar/.test(line)) continue;
+        const hit = line.match(siteRe);
+        if (hit) offenders.push(`${side}/${path.basename(file)}: ${hit[0]}`);
+      }
+    }
+  }
+  ok('هیچ آدرسِ سایتی در کلاینت به‌عنوانِ fallbackِ لینکِ آپدیت سفت نشده',
+    offenders.length === 0, offenders.join(' | '));
+}
+
 // ── ۶) عددِ فول‌بک = عددِ سرور ───────────────────────────────────────────
 //
 // بند ۲ نقشه‌راه: کلاینت حقِ «عددِ کارِ خودِ ما» را ندارد، ولی **باید**

@@ -110,7 +110,15 @@ class _GhelGheliAppState extends State<GhelGheliApp> {
         ),
         'message': message,
         'stack': stack,
-        'context': {'screen': 'flutter'},
+        // `configVersion` هم می‌آید (آینهٔ `main.jsx`): «این کرش از کدام
+        // متن یا قاعده شروع شد» فقط وقتی قابلِ پاسخ‌دادن است که شمارهٔ
+        // config در خودِ ردیف باشد. اگر config هرگز نرسیده باشد null
+        // می‌فرستیم، نه ۰: ۰ یعنی «نسخهٔ صفر» و با یک configِ واقعی
+        // اشتباه گرفته می‌شود.
+        'context': {
+          'screen': 'flutter',
+          'configVersion': AppConfig.instance.configVersion,
+        },
       });
     });
     // Restore the saved mute preference before any game can play a sound.

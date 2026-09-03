@@ -9,11 +9,16 @@
 import React, { useEffect, useState, Suspense, lazy } from 'react';
 import { createRoot } from 'react-dom/client';
 
+// «دانلود / ورود» عمداً در `live_copy` نیست: این برچسب فقط در وب وجود
+// دارد (اندروید یک دکمهٔ «به‌روزرسانی» دارد که همان کار را می‌کند) و
+// ساختنِ کلیدِ یک‌طرفه برای یک برچسبِ تنها-در-یک-پلتفرم، همان الگویی
+// است که فاز ۲ رد کرد: یک رشته که «از پنل» به‌نظر می‌رسد ولی در پنلِ
+// دیگر هیچ معادلی ندارد و بعد فراموش می‌شود.
 import { API, req, fa } from './lib/api.js';
 // متن‌ها و اعداد زنده (فاز ۲): این fetchِ بنَاییِ config همان چیزی است که
 // کشِ ماژول‌سطحِ liveConfig را پر می‌کند، پس هیچ صفحه‌ای برای دانستنِ یک
 // برچسب درخواستِ دوم نمی‌زند.
-import { primeLiveConfig } from './lib/liveConfig.js';
+import { primeLiveConfig, text, liveConfigVersion } from './lib/liveConfig.js';
 import { primeImageCache, registerImageCacheWorker } from './lib/imageCache.js';
 import Notifications from './components/Notifications.jsx';
 import Auth from './screens/Auth.jsx';
@@ -189,7 +194,15 @@ function App() {
         const app = d?.app || {};
         const min = String(app?.minVersion?.android || app?.minVersion?.web || '');
         const forced = !!(app?.forceUpdate?.android || app?.forceUpdate?.web);
-        const url = String(app?.updateUrl?.web || app?.updateUrl?.android || 'https://ghelghelishop.ir');
+        // دیگر `|| 'https://ghelghelishop.ir'` نیست. آن رشته یک fallbackِ
+        // کلاینت بود با سه اشکالِ هم‌زمان: (۱) اگر ادمین `updateUrl` را خالی
+        // می‌گذاشت — که پیش‌فرضِ مخزن است — دکمهٔ «دانلود / ورود» کاربر را
+        // به سایت می‌برد نه به صفحهٔ نصب؛ (۲) در اندروید هیچ fallbackِ
+        // لینکی نبود، پس «لینکِ پیش‌فرضِ وب» یک مفهومِ بی‌معنی در دو
+        // پلتفرم می‌ساخت؛ (۳) عوض‌کردنِ دامنه یعنی buildِ تازه. سرور حالا
+        // خودِ لینک را از `ops_limits.bazaarApiBase` + `app.bazaarPackage`
+        // می‌سازد و اینجا فقط مصرف می‌کنیم.
+        const url = String(app?.updateUrl?.web || app?.updateUrl?.android || '');
         const current = String(import.meta.env.VITE_APP_RELEASE || '1.1.17');
         const lower = (a, b) => {
           const parts = (v) => String(v).split('+')[0].trim().split('.').map((x) => parseInt(x, 10));
@@ -202,7 +215,23 @@ function App() {
           }
           return false;
         };
-        if (min && lower(current, min)) setForceGate({ forced, url, min, current });
+        if (min && lower(current, min)) {
+          setForceGate({
+            forced,
+            url,
+            min,
+            current,
+            // جای‌نگهدارها با همان `fa()` شماره‌گذاری می‌شوند که بقیهٔ
+            // اعدادِ UI استفاده می‌کند؛ اگر ادمینِ فارسی‌پسند رقمِ لاتین
+            // هم بپذیرد، باز خروجیِ ما یکدست است.
+            notice: (() => {
+              const t = text('update.notice', '', {
+                current: fa(current), min: fa(min),
+              });
+              return t ? `${t} ` : '';
+            })(),
+          });
+        }
       } catch (_) { /* ignore */ }
     }).catch(() => {});
   }, []);
@@ -221,7 +250,12 @@ function App() {
         // پیام برسد.
         message: squeeze(message || 'Unknown browser error', 2000),
         stack: String(stack || '').slice(0, 10000),
-        context: { path: location.pathname },
+        // `configVersion` در لاگِ کرش: «این خطا از کی شروع شد» بدونِ این
+        // عدد حدس‌زدنی است. کرش‌هایِ روزِ فلان با «متن‌های زندهٔ version ۴۲»
+        // وقتی تحلیل می‌شود که version در خودِ ردیف باشد، نه در ذهنِ تیم.
+        // (فاز ۴ نقشه‌راه: به‌روزرسانیِ هوشمند = فهمیدنِ این‌که کاربر روی
+        // کدام config نشسته بوده.)
+        context: { path: location.pathname, configVersion: liveConfigVersion() },
       }, token).catch(() => {}).finally(() => { reporting = false; });
     };
     // `Script error.` تنها چیزی است که مرورگر از خطای یک اسکریپتِ
@@ -276,20 +310,31 @@ function App() {
       {forceGate && (
         <div className="forceGateModal" role="dialog" aria-modal="true">
           <div className="forceGateCard">
-            <b>نسخهٔ جدید آماده است</b>
+            {/* سه جمله، سه کلید از `live_copy.update`. چرا رشتهٔ کاملِ
+                «نسخهٔ شما (X) …» را به‌عنوانِ فول‌بک نمی‌نویسیم: آن رشته
+                جای‌نگهدارِ `notice` را ندارد و اگر config نرسیده باشد،
+                عددِ نسخه را دستی در رشته می‌گذاشتیم = رقمِ سفتِ ممنوع.
+                پس fallbackِ notice رشتهٔ *خالی* است و در همان حالتِ آفلاین،
+                دقیقاً همان یک سطرِ امروزِ وب دیده می‌شود. به‌محض رسیدنِ
+                config، سطرِ «نسخهٔ شما ۱.۱.۱۷ …» اضافه می‌شود و همین
+                کلاینتِ اندروید هم همان رشته را در بدنهٔ دیالوگش می‌گذارد. */}
+            <b>{text('update.title', 'نسخهٔ تازه قلقلی آماده است')}</b>
             <p>
-              نسخهٔ شما ({forceGate.current}) از حداقل لازم ({forceGate.min}) پایین‌تر است.
-              برای ادامه، صفحه را تازه‌سازی کن یا آخرین نسخه را باز کن.
+              {forceGate.notice}
+              {text('update.body',
+                'برای اینکه همه‌چیز درست کار کند، لطفاً به تازه‌ترین نسخه به‌روزرسانی کنید.')}
             </p>
             <div className="forceGateActions">
               <button type="button" className="main" onClick={() => { location.reload(); }}>
-                تازه‌سازی
+                {text('update.reload', 'تازه‌سازی')}
               </button>
               {forceGate.url && (
                 <a className="ghost" href={forceGate.url} target="_blank" rel="noreferrer">دانلود / ورود</a>
               )}
               {!forceGate.forced && (
-                <button type="button" className="ghost" onClick={() => setForceGate(null)}>بعداً</button>
+                <button type="button" className="ghost" onClick={() => setForceGate(null)}>
+                  {text('update.later', 'بعداً')}
+                </button>
               )}
             </div>
           </div>
