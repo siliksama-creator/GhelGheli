@@ -112,14 +112,20 @@ const DEFAULT_COPY = Object.freeze({
     allEqual: 'هر سه بازی یکسان سکه می‌دهند — دوئل کارت، پنالتی و جفت‌یاب.',
     noCoin: 'بازی با ربات، تمرین رایگان و لابی خصوصی سکه ندارند.',
     neverLost: 'سکه هرگز از شما کم نمی‌شود؛ حتی وقتی ببازید.',
-    quota: 'هر روز تا {qLow} بازی در ورودی {stakeLow} و {qHigh} بازی در ورودی {stakeHigh} سکه می‌دهد. بعد از آن، بازی امتیاز دارد ولی سکه نه.',
+    // «ورودی» دیگر در این قالب نوشته نشده: خودِ برچسبِ لایه از
+    // `coinGuide.stakeLabel` ساخته می‌شود تا جدولِ راهنما و همین جمله هرگز
+    // دو واژهٔ مختلف برای یک چیز نشان ندهند. خروجی با نسخهٔ قبلی
+    // **واژه‌به‌واژه یکی** است («… بازی در ورودی ۱۰۰ و …»)، فقط رقم‌ها از
+    // جای‌نگهدارِ تازه (`*Text`) می‌آیند، چون هر دو کلاینت عدد را با
+    // رقمِ فارسی و از همان `stakeLabel` می‌سازند.
+    quota: 'هر روز تا {qLow} بازی در {stakeLowText} و {qHigh} بازی در {stakeHighText} سکه می‌دهد. بعد از آن، بازی امتیاز دارد ولی سکه نه.',
     tapCoins: 'بازی ضربه‌زن هم سکه دارد: هر لول {tapCoins} سکه — همان لحظهٔ لول‌آپ به موجودی‌ات اضافه می‌شود.',
     league: 'مبنای دریافتِ جایزهٔ لیگ، رتبه بر اساسِ سکه است و با سکه‌ها در استخرِ جایزه شرکت می‌کنی. در پایانِ فصل جوایز بر اساسِ سکه پرداخت و سکه‌ها صفر می‌شوند؛ {carryover}.',
     carryoverZero: 'انتقالِ سکه به لیگِ بعدی صفر است',
     carryoverPercent: '{percent}٪ از سکه به لیگِ بعدی منتقل می‌شود',
     stakeLabel: 'ورودی {stake}',
-    botNote: 'تمرین با ربات سکه ندارد — برای سکه، ورودی {stakeLow} یا {stakeHigh} را انتخاب کن.',
-    privateNote: 'اتاق خصوصی سکه ندارد — برای سکه، ورودی {stakeLow} یا {stakeHigh} را انتخاب کن.',
+    botNote: 'تمرین با ربات سکه ندارد — برای سکه، {stakeLowText} یا {stakeHighText} را انتخاب کن.',
+    privateNote: 'اتاق خصوصی سکه ندارد — برای سکه، {stakeLowText} یا {stakeHighText} را انتخاب کن.',
   },
   plus: {
     monthlyBadge: '{days} روز',
@@ -181,21 +187,30 @@ const DEFAULT_COPY = Object.freeze({
 // و تستِ قراردادِ CI در فاز ۳/۵).
 const COPY_CONTRACT = Object.freeze({
   referral: {
+    // جملهٔ «هر ۱۰ دعوت = … چرخش» در **سه** جا خوانده می‌شود: صفحهٔ دعوت و
+    // کارتِ قوانینِ گردونه در وب، و همان دو در اندروید. پس هر سه جای‌نگهدار
+    // باید در قرارداد باشند؛ اگر این کلید اینجا نبود، پیش‌نمایشِ پنل (فاز ۳)
+    // نمی‌توانست بگوید «این متن عددِ لازم را ندارد» و اشتباهِ ادمین فقط روی
+    // گوشیِ کاربر دیده می‌شد.
     dailySpinRule: ['invitesPerDailySpin', 'spinsPerDailyThreshold', 'maxInvitesForDaily'],
   },
   coinGuide: {
+    // تیترِ کارت — وب و اندروید هر دو همین را می‌خوانند.
+    heading: [],
     lead: [],
     allEqual: [],
     noCoin: [],
     neverLost: [],
-    quota: ['qLow', 'stakeLow', 'qHigh', 'stakeHigh'],
+    // نام‌های این فهرست **همان چیزی است که هر دو کلاینت پاس می‌دهند**؛
+    // گاردِ `test:live-copy-parity` همین برابری را می‌سنجد.
+    quota: ['qLow', 'stakeLowText', 'qHigh', 'stakeHighText'],
     tapCoins: ['tapCoins'],
     league: ['carryover'],
     carryoverZero: [],
     carryoverPercent: ['percent'],
     stakeLabel: ['stake'],
-    botNote: ['stakeLow', 'stakeHigh'],
-    privateNote: ['stakeLow', 'stakeHigh'],
+    botNote: ['stakeLowText', 'stakeHighText'],
+    privateNote: ['stakeLowText', 'stakeHighText'],
   },
   plus: {
     monthlyBadge: ['days'],
@@ -210,6 +225,17 @@ const COPY_CONTRACT = Object.freeze({
   support: {
     ticketRule: ['ticketsPerDay'],
     attachmentsFull: ['maxAttachments'],
+    // تیترِ منشورِ حریم خصوصی — بی‌جای‌نگهدار و بی‌عدد؛ ردیفش در قرارداد
+    // فقط برای این است که «هر قالبِ پیش‌فرض، ردیفِ قرارداد هم داشته باشد»
+    // (گاردِ `test:live-copy-parity`). بدونِ آن، پنل دربارهٔ این کلید هیچ
+    // هشدارِ پیش‌نمایشی نمی‌داد و ما هم تفاوتِ «فراموش‌شده» با «عمداً تهی»
+    // را نمی‌توانستیم تشخیص بدهیم.
+    // `privacySections` ردیفِ قرارداد **ندارد**، چون آرایهٔ بندهاست نه
+    // قالبِ رشته‌ای: هیچ `{placeholder}`‌ی قابل‌تعویضی ندارد و پیش‌نمایشِ
+    // پنل برایش چیزی نشان نمی‌دهد. (تستِ `testLiveContent` عمداً
+    // می‌گوید «هر ردیفِ قرارداد باید به یک رشتهٔ پیش‌فرض برسد» — و
+    // درست هم می‌گوید: ردیفِ بی‌مصرف، گاردِ جعلی می‌سازد.)
+    privacyTitle: [],
   },
   photoReview: {
     pendingNote: ['slaHours'],
@@ -218,6 +244,11 @@ const COPY_CONTRACT = Object.freeze({
     resetNote: [],
   },
   games: {
+    // سه کلیدی که *وب* می‌خواند ولی در قرارداد نبودند: با حذف‌شدنِ
+    // {levelCount} از متن، پیش‌نمایشِ پنل سکوت می‌کرد. (دور ۳۳: این
+    // ردیف‌ها موقع افزودنِ کلید جا افتادند، نه موقع ویرایشِ ادمین.)
+    duelSubtitle: [],
+    memorySubtitle: [],
     tapSubtitle: ['levelCount'],
     memoryRule: ['memoryPairs'],
     roomCodeLabel: ['codeLength'],
