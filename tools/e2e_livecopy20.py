@@ -360,7 +360,10 @@ def main():
                 'جای‌نگهدارِ ناپر‌شده در پیش‌نمایش = ادمین فکر می‌کند پنل خراب است')
 
         # ── تاریخچه و بازگردانی ────────────────────────────────────────────
-        code, hist = req('GET', LIVE + '/history/copy')[:2]
+        # توکن لازم است؛ بی‌توکن 401 می‌آید و `json.loads` روی بدنهٔ خطا
+        # None می‌دهد — یعنی «تاریخچه خالی» به‌جای «اجازه نداری». اولین
+        # اجرا روی پروداکشن دقیقاً همین را به‌عنوانِ باگِ سرور گزارش داد.
+        code, hist = req('GET', LIVE + '/history/copy', tok)[:2]
         # `req` سه‌تایی برمی‌گرداند (status, body, etag). اولین نسخهٔ این
         # تست `code, hist = req(...)` نوشته بود و به همین دلیل hist هیچ‌وقت
         # آرایه نبود و تاریخچه «۰ ردیف» شد — یعنی گاردِ محصول *خودش* باید
@@ -401,6 +404,19 @@ def main():
         c1, out1, _ = req('PATCH', LIVE + '/copy', tok, original_copy)
         c2, out2, _ = req('PATCH', LIVE + '/rules', tok, original_rules)
         final = read_panel(tok)
+        # شاهدِ اصلیِ بندِ «بدونِ نصبِ مجدد» همین‌جاست — و **بعد** از
+        # بازگردانی، نه قبلش. اولین اجرا این مقایسه را وسطِ تست (بعد از
+        # ۲۰ تغییر و پیش از restore) خوانده بود و قرمز شد، چون config
+        # عمومی *درست* داشت برچسبِ [e2e] را نشان می‌داد: باگِ محصول نبود،
+        # جایِ اشتباهِ یک سنجه بود. سنجهٔ «چیزی عوض نشده» باید در انتهای
+        # کار بایستد، وگرنه خودش را نقض می‌کند.
+        _, cfg_end, etag_end = req('GET', '/api/config')
+        r.check('configِ عمومی بعدِ تست مو‌به‌مو به ابتدا برگشت',
+                (cfg_end or {}).get('copy') == original_copy
+                and (cfg_end or {}).get('rules') == original_rules,
+                ' | '.join(_diff(original_copy, (cfg_end or {}).get('copy'))[:3]))
+        r.check('ETag هم با بدنهٔ برگشتی تازه شده (کشِ مرورگر گول نمی‌خورد)',
+                bool(etag_end))
         same_copy = final['copy']['template'] == original_copy
         same_rules = final['rules']['values'] == original_rules
         restored = same_copy and same_rules
