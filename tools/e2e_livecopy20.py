@@ -360,14 +360,35 @@ def main():
                 'جای‌نگهدارِ ناپر‌شده در پیش‌نمایش = ادمین فکر می‌کند پنل خراب است')
 
         # ── تاریخچه و بازگردانی ────────────────────────────────────────────
-        code, hist, _ = req('GET', LIVE + '/history/copy')
-        n = len(hist) if isinstance(hist, list) else 0
-        r.check('تاریخچه، کم‌کم ۲۰ ردیف را نگه داشته (%s)' % n, n >= 5,
-                'کم از ۵ ردیف یعنی ذخیره‌ها audit نشده‌اند')
-        who = {str((h or {}).get('by') or (h or {}).get('admin') or '')
-               for h in (hist if isinstance(hist, list) else [])}
-        r.check('هر ردیفِ تاریخچه می‌گوید *چه کسی* عوض کرد',
-                bool(who - {''}), str(list(who)[:3]))
+        code, hist = req('GET', LIVE + '/history/copy')[:2]
+        # `req` سه‌تایی برمی‌گرداند (status, body, etag). اولین نسخهٔ این
+        # تست `code, hist = req(...)` نوشته بود و به همین دلیل hist هیچ‌وقت
+        # آرایه نبود و تاریخچه «۰ ردیف» شد — یعنی گاردِ محصول *خودش* باید
+        # اول روی دادهٔ واقعی آزمایش شود، وگرنه دو خطایِ جعلی به پایِ سرور
+        # می‌نوشتی.
+        rows = hist if isinstance(hist, list) else []
+        n = len(rows)
+        r.check('تاریخچه ردیف‌ها را نگه داشته (%s از سقفِ ۲۰)' % n, n >= 5,
+                'کم از ۵ یعنی ذخیره‌ها audit نشده‌اند')
+        r.check('تاریخچه، ۲۰ ذخیره را دیده (حداقل ۱۸)', n >= 18,
+                'اگر کمتر است، یا حلقهٔ ۲۰‌تایی نصف شده یا سقفِ HISTORY_KEEP')
+        who = [h.get('adminUsername') for h in rows if isinstance(h, dict)]
+        r.check('هر ردیف می‌گوید *چه کسی* عوض کرد (نام، نه شناسه)',
+                bool(who) and all(w for w in who), str(who[:3]))
+        r.check('ردیفِ تاریخچه لاغر است: بدنهٔ copy در آن نیست',
+                all('value' not in h for h in rows if isinstance(h, dict)),
+                'اسنپ‌شاتِ کامل در پاسخِ پنل = ~۸۰KB برای یک جدولِ تاریخ')
+        r.check('ردیف‌ها `createdAt` دارند (شکلِ camelCaseِ historyView)',
+                all(isinstance(h.get('createdAt'), str) for h in rows if isinstance(h, dict)),
+                'پنل‌ها این فیلد را می‌خوانند؛ نبودنش یعنی «تاریخچهٔ بی‌تاریخ»')
+        # شاهدِ اصلیِ «بدونِ نصبِ مجدد»: بدنهٔ *عمومیِ* config بعد از همه‌چیز
+        # باید مو‌به‌مو همان چیزی باشد که پیش از تست خواندیم. این را نه
+        # پنلِ ادمین می‌گوید نه تستِ لوکال؛ فقط همین سرورِ زنده.
+        _, cfg_end, _ = req('GET', '/api/config')
+        r.check('configِ عمومی بعدِ تست مو‌به‌مو به ابتدا برگشت',
+                (cfg_end or {}).get('copy') == original_copy
+                and (cfg_end or {}).get('rules') == original_rules,
+                ' | '.join(_diff(original_copy, (cfg_end or {}).get('copy'))[:3]))
 
         code, rv, _ = req('POST', LIVE + '/copy/revert', tok)
         r.check('revert یک نسخه به عقب می‌رود و `{copy}` برمی‌گرداند',
