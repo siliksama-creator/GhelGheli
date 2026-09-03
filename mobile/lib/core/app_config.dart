@@ -48,7 +48,10 @@
 // نه فقط آن عدد را. «هر ۱۰ دعوت =  چرخش» بی‌عدد از جملهٔ دیروز بدتر است:
 // کاربر فارسی‌زبان نمی‌فهمد چه چیزی کم است، ولی جملهٔ کاملِ دیروز را
 // می‌فهمد. جای‌نگهدارِ خام (`{x}`) هم هرگز روی صفحه نمی‌آید.
-import 'package:flutter/foundation.dart';
+// `ChangeNotifier` را `widgets.dart` هم صادر می‌کند؛ importِ
+// `foundation.dart` بی‌مصرف بود. این فقط آرایش نبود: این پروژه در CI
+// `flutter analyze --fatal-infos` می‌گیرد، پس هر هشدارِ بی‌مصرف هم
+// شغل را قرمز می‌کند و یک بیلدِ سالم را بلوکه می‌کند.
 import 'package:flutter/widgets.dart';
 
 import '../api_client.dart';

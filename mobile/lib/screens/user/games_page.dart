@@ -138,9 +138,6 @@ class _GamesHubPageState extends State<GamesHubPage> {
     return g.subtitle;
   }
 
-  /// طولِ کدِ اتاق از `live_rules` — فول‌بک ۴، یعنی همان امروزِ محصول.
-  int get _codeLength => liveRule('roomCodeLength', 4);
-
   @override
   void initState() {
     super.initState();
@@ -1009,6 +1006,16 @@ class _PrivateLobbyHub extends StatefulWidget {
 }
 
 class _PrivateLobbyHubState extends State<_PrivateLobbyHub> {
+  /// طولِ کدِ اتاق از `live_rules` — فول‌بک ۴، یعنی همان امروزِ محصول.
+  ///
+  /// چرا این‌جا و نه بالایِ فایل: فیلدِ کد و `maxLength` در *لابیِ
+  /// خصوصی* ساخته می‌شوند، نه در خودِ صفحهٔ بازی‌ها. نسخهٔ اولِ همین
+  /// وصله getter را در کلاسِ بیرونی گذاشته بود و از ۱۵۰۸ به آن مرجع
+  /// می‌داد؛ `flutter analyze` دقیقاً همان را دو خطا گرفت:
+  /// «_codeLength تعریف‌نشده» در نقطهٔ مصرف و «استفاده نمی‌شود» در
+  /// نقطهٔ تعریف. دارت برای عضوهایِ کلاس scope بیرونی ندارد، پس
+  /// «تعریف در همان فایل» کافی نیست — باید در همان کلاس باشد.
+  int get _codeLength => liveRule('roomCodeLength', 4);
   io.Socket? _socket;
   List<Map<String, dynamic>> _lobbies = [];
   bool _loadingLobbies = true;

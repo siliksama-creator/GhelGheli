@@ -1190,7 +1190,7 @@ class _RulesCard extends StatelessWidget {
                 'invitesPerDailySpin': invitesPerDaily,
                 'spinsPerDailyThreshold': spinThreshold,
                 'maxInvitesForDaily': maxInvitesDaily,
-              }))),
+              })),
           row('هر دعوت موفق، ${faNum(spinsPerReferral)} چرخش فوری هم به تو و هم به دوستت '
               'می‌دهد.'),
           // لحنِ جمله زنده است، ساعتِ ریست نه: نیمه‌شب تهران منطقِ سرور است

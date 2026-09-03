@@ -303,7 +303,7 @@ class _LoginStreakCardState extends State<LoginStreakCard>
                                         vars: {
                                           'days': cycleDays,
                                           'day': currentDay
-                                        }),
+                                        })
                                     : liveText(
                                         'streak.cycleNext',
                                         'چرخه ۷ روزه · روز ${faNum(nextDay)} · ${faNum(nextReward)} امتیاز هدیه',
