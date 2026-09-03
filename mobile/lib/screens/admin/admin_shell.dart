@@ -47,10 +47,14 @@ class AdminShell extends StatefulWidget {
 class _AdminShellState extends State<AdminShell> {
   int _index = 0;
 
+  // ترتیبِ منو = ترتیبِ NAVِ وب (admin/src/main.jsx)، یعنی دسته‌به‌دسته.
+  // هر پنج فهرستِ این فایل با هم هم‌شاخص‌اند: یکی جابه‌جا شود، بقیه هم باید
+  // جابه‌جا شوند — گاردِ admin-copy-parity تعدادِ هر پنج را می‌شمارد و
+  // برچسبِ گروه‌ها را با وب واژه‌به‌واژه مقایسه می‌کند.
   late final List<Widget> _pages = [
     AdminDashboard(api: widget.api),
-    // ترتیب منو = پنل وب (admin/src/main.jsx NAV) تا ادمین بین
-    // اندروید و وب گیج نشود. «کارت و کد» قدیمی عمداً نیست.
+    AdminAnalytics(api: widget.api),
+    AdminMetrics(api: widget.api),
     AdminPhotoCards(api: widget.api),
     AdminShop(api: widget.api),
     AdminCardBox(api: widget.api),
@@ -59,27 +63,24 @@ class _AdminShellState extends State<AdminShell> {
     AdminRewards(api: widget.api),
     AdminWallet(api: widget.api),
     AdminLeague(api: widget.api),
-    AdminUsers(api: widget.api),
-    AdminPoints(api: widget.api),
-    AdminChat(api: widget.api),
     AdminGameRewards(api: widget.api),
     AdminGameEconomy(api: widget.api),
     AdminWheel(api: widget.api),
+    AdminUsers(api: widget.api),
+    AdminPoints(api: widget.api),
+    AdminChat(api: widget.api),
     AdminSupport(api: widget.api),
     AdminNotifications(api: widget.api),
     AdminSettings(api: widget.api),
-    // ترتیب = پنل وب: «متن‌های زنده» در NAV بلافاصله بعد از «تنظیمات»
-    // است، پس این‌جا هم همین‌جا می‌نشیند (هر چهار فهرستِ زیر با هم
-    // هم‌شاخص‌اند؛ یکی جابه‌جا شود، بقیه هم باید جابه‌جا شوند).
     AdminLiveCopy(api: widget.api),
     AdminEngine(api: widget.api),
     AdminAdmins(api: widget.api),
-    AdminAnalytics(api: widget.api),
-    AdminMetrics(api: widget.api),
   ];
 
   static const _titles = [
     'داشبورد',
+    'تحلیل رشد و خطا',
+    'مانیتورینگ سرور',
     'ثبت کارت',
     'فروشگاه',
     'صندوق کارت',
@@ -88,45 +89,43 @@ class _AdminShellState extends State<AdminShell> {
     'جوایز',
     'کیف پول',
     'لیگ ماهانه',
-    'کاربران',
-    'ریز امتیازات',
-    'چت',
     'امتیاز بازی',
     'اقتصاد بازی',
     'گردونه شانس',
+    'کاربران',
+    'ریز امتیازات',
+    'چت',
     'پشتیبانی',
     'اطلاعیه‌ها',
     'تنظیمات',
     'متن‌های زنده',
     'موتور',
     'ادمین‌ها',
-    'تحلیل رشد و خطا',
-    'مانیتورینگ سرور',
   ];
   static const _icons = [
     Icons.dashboard_rounded,
+    Icons.insights_rounded,
+    Icons.analytics_rounded,
     Icons.document_scanner_rounded,
     Icons.storefront_rounded,
-    Icons.inventory_2_rounded, // صندوق کارت
-    Icons.layers_rounded, // گذر نبرد
-    Icons.flag_rounded, // ماموریت
+    Icons.inventory_2_rounded,
+    Icons.layers_rounded,
+    Icons.flag_rounded,
     Icons.card_giftcard_rounded,
     Icons.account_balance_wallet_rounded,
-    Icons.emoji_events_rounded, // لیگ
-    Icons.people_alt_rounded, // کاربران
-    Icons.trending_up_rounded, // ریز امتیازات
-    Icons.chat_bubble_rounded,
+    Icons.emoji_events_rounded,
     Icons.sports_esports_rounded,
     Icons.monetization_on_rounded,
     Icons.casino_rounded,
+    Icons.people_alt_rounded,
+    Icons.trending_up_rounded,
+    Icons.chat_bubble_rounded,
     Icons.support_agent_rounded,
     Icons.campaign_rounded,
     Icons.settings_rounded,
-    Icons.text_snippet_rounded, // متن‌های زنده
+    Icons.text_snippet_rounded,
     Icons.tune_rounded,
     Icons.admin_panel_settings_rounded,
-    Icons.insights_rounded,
-    Icons.analytics_rounded,
   ];
 
   // توضیحِ یک‌خطیِ هر صفحه زیر عنوانش — همان هدفِ زیرنویسِ پنل وب:
@@ -134,6 +133,8 @@ class _AdminShellState extends State<AdminShell> {
   // می‌نشیند.
   static const _subtitles = [
     'خلاصهٔ یک‌نگاهی: کاربران، فروش، بازی‌ها و هشدارها — فقط خواندنی.',
+    'نمودار رشد، قیف بازی‌ها و صندوق خطاهای اپ — فقط خواندنی.',
+    'سلامت سرور و سرویس‌ها — فقط مانیتورینگ.',
     'ثبت کارت‌های فیزیکی با عکس؛ کارتِ تأییدشده وارد کاتالوگِ صندوق و دوئل می‌شود.',
     'آیتم‌های فروشگاه — هر تغییری همان لحظه در فروشگاهِ کاربران می‌نشیند، بدون آپدیت اپ.',
     'شانسِ هر کلاس، قیمت و روشن/خاموش‌کردن فروش صندوق + تاریخچهٔ خریدها.',
@@ -142,21 +143,60 @@ class _AdminShellState extends State<AdminShell> {
     'ساخت و ویرایش جایزه‌ها و تأیید درخواست‌های کاربران.',
     'تراکنش‌های کیف پول، برداشت‌ها و واریز/برداشت دستی.',
     'لیگ ماهانه: شروع و پایان فصل و جوایز نفرات برتر.',
-    'جست‌وجوی کاربر، پروفایل و موجودی + ابزارهای دستی (امتیاز، بن، حذف).',
-    'دفترِ امتیاز: هر کاربر چه مقدار، از کجا گرفت و کجا خرج کرد.',
-    'پیامِ سنجاق‌شدهٔ بالای چت، فیلتر کلمات و گزارش‌های کاربران.',
     'امتیازِ هر بازی و ضریب‌های جایزه.',
     'اهرم‌های اقتصادی بازی‌ها: هزینه‌ها، جوایز و سقف‌های روزانه.',
     'جایزه‌های گردونه و شانسِ هر بخش؛ جمع شانس‌ها باید ۱۰۰٪ باشد.',
+    'جست‌وجوی کاربر، پروفایل و موجودی + ابزارهای دستی (امتیاز، بن، حذف).',
+    'دفترِ امتیاز: هر کاربر چه مقدار، از کجا گرفت و کجا خرج کرد.',
+    'پیامِ سنجاق‌شدهٔ بالای چت، فیلتر کلمات و گزارش‌های کاربران.',
     'تیکت‌های کاربران: پاسخ بدهید یا ببندید.',
     'ارسال اطلاعیهٔ push به همه یا گروهی از کاربران.',
     'تنظیمات چت و پیامک + نسخهٔ اجباری، بنر اطلاعیه و چیدمان تب‌ها.',
     'هرچه کاربر در وب و اندروید می‌خواند: جمله‌ها و عددهایش، با پیش‌نمایشِ زنده.',
     'سقف‌ها و اعدادِ عملیاتی سیستم — هر عدد توضیح دارد.',
     'حساب‌های ادمین و نقش‌ها + کارنامهٔ تغییرات.',
-    'نمودار رشد، قیف بازی‌ها و صندوق خطاهای اپ — فقط خواندنی.',
-    'سلامت سرور و سرویس‌ها — فقط مانیتورینگ.',
   ];
+
+  // گروه‌ها (۳.۲). همین کلیدها و همین ترتیب، عضوِ ششمِ هر ردیفِ NAV در
+  // `admin/src/main.jsx` است. فهرستِ *جدا* نگه داشته شد، نه چسبیده به
+  // `_titles`: آن فهرست در AppBar برای عنوانِ خودِ صفحه خوانده می‌شود و
+  // آلوده‌کردنش یعنی «داشبورد · امروزِ سیستم» در تیترِ صفحه.
+  static const _adminNavGroups = [
+    'today',
+    'today',
+    'today',
+    'cards',
+    'cards',
+    'cards',
+    'rewards',
+    'rewards',
+    'rewards',
+    'rewards',
+    'rewards',
+    'games',
+    'games',
+    'games',
+    'people',
+    'people',
+    'talk',
+    'talk',
+    'talk',
+    'config',
+    'config',
+    'config',
+    'admin',
+  ];
+
+  static const _groupLabels = {
+    'today': 'امروزِ سیستم',
+    'cards': 'کارت و فروشگاه',
+    'rewards': 'جایزه و درآمد',
+    'games': 'بازی‌ها',
+    'people': 'کاربران',
+    'talk': 'گفت‌وگو و اطلاع‌رسانی',
+    'config': 'پیکربندیِ متن و اپ',
+    'admin': 'حساب‌های ادمین',
+  };
 
   void _select(int i) => setState(() => _index = i);
 
@@ -195,6 +235,8 @@ class _AdminShellState extends State<AdminShell> {
                   index: _index,
                   titles: _titles,
                   icons: _icons,
+                  groups: _adminNavGroups,
+                  groupLabels: _groupLabels,
                   onSelect: (i) {
                     _select(i);
                     Navigator.pop(context);
@@ -231,6 +273,8 @@ class _AdminShellState extends State<AdminShell> {
                     index: _index,
                     titles: _titles,
                     icons: _icons,
+                    groups: _adminNavGroups,
+                    groupLabels: _groupLabels,
                     onSelect: _select,
                     onLogout: widget.onLogout),
               ),
@@ -291,6 +335,12 @@ class _AdminNavList extends StatelessWidget {
   final int index;
   final List<String> titles;
   final List<IconData> icons;
+
+  /// کلیدِ گروهِ هر آیتم (هم‌شاخصِ `titles`) و نامِ فارسیِ گروه‌ها.
+  /// بی‌`groups` منو همان‌طورِ قبلی و بی‌سرتیتر رندر می‌شود؛ یعنی افزودنِ
+  /// دسته‌بندی (۳.۲) در حالتِ خراب، نیم‌کاره نمی‌گذارد.
+  final List<String> groups;
+  final Map<String, String> groupLabels;
   final ValueChanged<int> onSelect;
   final VoidCallback onLogout;
 
@@ -298,6 +348,8 @@ class _AdminNavList extends StatelessWidget {
       {required this.index,
       required this.titles,
       required this.icons,
+      this.groups = const [],
+      this.groupLabels = const {},
       required this.onSelect,
       required this.onLogout});
 
@@ -336,7 +388,23 @@ class _AdminNavList extends StatelessWidget {
           ),
         ),
         const Divider(),
-        for (var i = 0; i < titles.length; i++)
+        for (var i = 0; i < titles.length; i++) ...[
+          // سرتیترِ گروه فقط قبلِ اولین آیتمِ هر دسته — همان قاعدهٔ پنل وب،
+          // چون یک «نقشهٔ ذهنی» باید برای هر دو پنل کافی باشد.
+          if (groups.length == titles.length &&
+              (i == 0 || groups[i] != groups[i - 1]))
+            Padding(
+              padding: EdgeInsets.only(
+                  top: i == 0 ? 0 : Gaps.md, bottom: 4, right: Gaps.xs),
+              child: Text(
+                groupLabels[groups[i]] ?? '',
+                style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: .2,
+                    color: Color(0x99FFFFFF)),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 2),
             child: ListTile(
@@ -350,6 +418,7 @@ class _AdminNavList extends StatelessWidget {
               onTap: () => onSelect(i),
             ),
           ),
+        ],
         const Divider(),
         ListTile(
           leading: const Icon(Icons.logout_rounded),

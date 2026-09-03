@@ -90,6 +90,29 @@
   display: inline-flex;
 }
 
+/* سرتیترِ گروه‌ها در نوارِ کنار (۳.۲). عمداً «متنِ ریزِ کم‌رنگ» است و نه یک
+   کارت/باکس: جعبه، ارتفاعِ ستونِ منو را زیاد می‌کرد و در گوشیِ ۳۶۰px چند
+   آیتمِ اول از دید می‌افتاد.
+
+   رنگ: در همین پنل یک ممیزیِ کنتراست داریم که «متنِ ۱۱px با رنگِ فینت» را
+   رد می‌کند (۳.۹۶:۱، زیرِ حدِ ۴.۵). سرتیترِ گروه هم دقیقاً همان شکل است —
+   ریز و کم‌رنگ — پس همان‌جورایی که `.topbar-sub` به `--gg-text-muted`
+   جابه‌جا شد، این هم یک پله بالاتر از رنگِ خودِ آیتم‌ها می‌نشیند: آیتم‌ها
+   با --gg-text-muted نوشته شده‌اند، پس سرتیتر باید *روشن‌تر* باشد تا «برچسب
+   کمرنگ و بی‌اهمیت» به چشم نیاید. --gg-text-soft اصلاً در این پنل تعریف
+   نشده (فقط fallback سفید ۵۵٪ کار می‌کرد، با کنتراست ~۲.۸). */
+.nav-group-label {
+  margin: var(--gg-space-4) 6px 2px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .2px;
+  color: color-mix(in srgb, var(--gg-text-muted) 55%, #ffffff);
+}
+
+.nav-group-label:first-child {
+  margin-top: var(--gg-space-1);
+}
+
 .sidebar-footer {
   margin-top: auto;
   padding-top: var(--gg-space-4);

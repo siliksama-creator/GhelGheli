@@ -107,8 +107,37 @@ const subCount = subsMatch ? (subsMatch[1].match(/'[^']+',/g) || []).length : 0;
 ok(subCount === titles.length,
   `شل اندروید برای هر صفحه توضیح دارد (${subCount}/${titles.length})`);
 const webNav = read('admin/src/main.jsx');
-const navDescs = (webNav.match(/^ {4}'[\u0600-\u06FF][^']*'\],$/gm) || []).length;
+// قالبِ NAV از ۳.۲ به بعد سه‌سطری است: توضیح در سطرِ خودش و کلیدِ گروه در
+// سطرِ بعد. الگوی قبلی «'],» را می‌خواست — یعنی خطای سینتکسِ JS نه، بلکه
+// یک گاردِ قرمزِ بی‌دلیل: توضیح‌ها سرِ جایشان بودند و فقط آرایه پرانتزی‌تر
+// شده بود. پس اینجا به‌جای regexِ چندسطری، خودِ سطرِ NAV را جدا می‌کنیم و
+// هر سطر را ساده می‌شماریم (خطای قبلی دقیقاً از «$» چسبیده به کاما بود).
+const navBody = webNav.slice(webNav.indexOf('const NAV = ['));
+const navLines = navBody.split('\n');
+// سطرِ توضیح: چهار فاصله، با «'» شروع و با «',» تمام می‌شود.
+// سطرِ گروه:  همان چهار فاصله و با «'» شروع می‌شود ولی در پایان «]» دارد.
+// همین دو تفاوت، بی‌هیچ regexِ چندسطری، دو شمارش را از هم جدا می‌کند.
+const quotedLine = (l) => l.startsWith("    '");
+// در قالبِ NAVِ امروز، «سطرِ گروه» تنها سطری است که با «]» بسته می‌شود و
+// «سطرِ توضیح» تنها سطرِ نقل‌قولی است که با «',» تمام می‌شود. بی‌این تفکیک،
+// سه تلاشِ regex‌پیچیده برای شمارش، سه بار عددِ غلط داد (۰، ۲۲، ۱) در حالی
+// که فایلِ JS سالم بود — گاردِ قرمزِ کور هم مثلِ سبزِ کور بی‌ارزش است، پس
+// اینجا دو قاعدهٔ ساده و قابل‌خواندن نشسته، نه الگویِ چندسطری.
+const groupLines = navLines.filter((l) => quotedLine(l) && l.includes(']'));
+const navDescs = navLines.filter((l) => quotedLine(l) && !l.includes(']')
+  && l.endsWith("',")).length;
+const navGroupsWeb = groupLines.length;
+// هر گروهی که در NAV مصرف می‌شود باید در `NAV_GROUPS` نام داشته باشد، وگرنه
+// سرتیترِ خالی در منو می‌بینیم (منوی نیمه‌کاره: نه خطا دارد، نه معنا).
+const groupNameBlock = (webNav.match(/const NAV_GROUPS = \{([\s\S]*?)\n\};/) || [])[1] || '';
+const namedGroups = (groupNameBlock.match(/'[a-z][\w-]*'\s*:/g) || []).length;
 ok(/active\[4\]/.test(webNav) && navDescs >= 20,
   `پنل وب برای صفحات توضیحِ یک‌خطی دارد (${navDescs})`);
+// گروه‌بندی نباید توضیح‌ها را ببلعد: هر قلم باید هم سطرِ توضیح و هم سطرِ
+// کلیدِ گروه داشته باشد؛ برابرِ همین دو شمارش، همان قول است.
+ok(navGroupsWeb === navDescs,
+  `پنل وب: هر ${navDescs} قلم، عضوِ ششمِ گروه‌دار دارد (${navGroupsWeb})`);
+ok(namedGroups >= new Set(groupLines.map((l) => /^\s*'([\w-]+)'/.exec(l)[1])).size && namedGroups > 0,
+  `پنل وب: نامِ گروه‌هایِ مصرفی در جدول هست (${namedGroups} نامِ جدول، ${groupLines.length} ردیفِ گروه‌دار)`);
 
 console.log(`\n✓ ${passed} بررسی موفق\n`);

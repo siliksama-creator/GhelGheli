@@ -18,7 +18,7 @@
 //  ۳) هر دو به *همهٔ* گروه‌های `DEFAULT_COPY` ردیف دارند و برعکس — یعنی پنل
 //     هیچ‌وقت «نیمی از متن‌ها» را پنهان نمی‌کند (این همان «۱۰۰٪ parity»ی است که
 //     در پذیرش خواسته شده).
-//  ۴) چهار فهرستِ اندروید (`_pages`/`_titles`/`_icons`/`_subtitles`) هم‌طولند؛
+//  ۴) پنج فهرستِ اندروید (`_pages`/`_titles`/`_icons`/`_subtitles`/`_adminNavGroups`)
 //     یکی جابه‌جا شدن = صفحه با تیترِ صفحهٔ دیگر باز می‌شود و این فاجعهٔ
 //     *بی‌صدا* است، چون هیچ خطایی نمی‌دهد.
 //  ۵) قاعدهٔ «حداکثر یک درخواست به هر مسیر در هر build» در اندروید — همان
@@ -156,6 +156,10 @@ ok('پنل وب: صفحه تنبل بارگذاری می‌شود (مثل بقی
 // ── ۲) پنل اندروید ────────────────────────────────────────────────────────
 const MOBILE_PAGE = 'mobile/lib/screens/admin/admin_live_copy.dart';
 const MOBILE_SHELL = 'mobile/lib/screens/admin/admin_shell.dart';
+// دو فایلِ «تنظیمات» هم سنجیده می‌شوند: فیلدی که به سرور اضافه می‌شود و
+// در پنل نیست، عملاً «تنظیماتِ فقط با curl» است.
+const WEB_SETTINGS_PAGE = 'admin/src/pages/settings.jsx';
+const MOB_SETTINGS_PAGE = 'mobile/lib/screens/admin/admin_settings.dart';
 const mobilePage = read(MOBILE_PAGE);
 const mobileShell = read(MOBILE_SHELL);
 
@@ -208,23 +212,105 @@ ok('گروه‌هایِ بی‌منبع (که هیچ متنی ندارند) در
 
 // ── ۴) هم‌طولیِ چهار فهرستِ اندروید ───────────────────────────────────────
 {
-  const count = (marker) => {
+  // شمارشِ ردیف با الگویِ مخصوصِ خودِ فهرست، نه یک کلاسِ کاراکتریِ عمومی:
+  // نسخهٔ اول «خطوطی که با حرف یا نقل‌قول شروع می‌شوند» را می‌شمرد و با
+  // قالبِ سه‌سطریِ تازهٔ `_titles` (که سطرِ دومِ هر ردیف با ' شروع می‌شود) عدد
+  // نصفه‌نیمه می‌داد. یک گاردِ قرمزِ کور از سبزِ کور هم بی‌فایده‌تر است.
+  const count = (marker, lineRe = /^\s*[A-Za-z`]/) => {
     const body = arrayAt(mobileShell, marker);
     if (!body) return -1;
-    return body.split('\n').filter((l) => /^\s*[A-Za-z'`]/.test(l.trim()) && l.trim()).length;
+    return body.split('\n').filter((l) => lineRe.test(l.trim())).length;
   };
+  const countQuoted = (marker) => count(marker, /^'[A-Za-z'`\u0600-\u06FF]/);
+  const countOneWord = (marker) => count(marker, /^'[a-z][\w-]*',$/);
   const pages = (arrayAt(mobileShell, 'late final List<Widget> _pages') || '')
     .split('\n').filter((l) => l.trim().startsWith('Admin')).length;
-  const titles = count('static const _titles');
-  const icons = count('static const _icons');
-  const subs = count('static const _subtitles');
-  ok(`چهار فهرستِ اندروید هم‌طولند (صفحات ${pages}، تیتر ${titles}، آیکون ${icons}، توضیح ${subs})`,
-    pages > 0 && pages === titles && pages === icons && pages === subs,
-    'جابه‌جا‌شدنِ یکی = صفحه با تیتر/آیکونِ صفحهٔ دیگر باز می‌شود و هیچ خطایی نمی‌دهد');
+  const titles = countQuoted('static const _titles');
+  const icons = count('static const _icons', /^Icons\./);
+  const subs = countQuoted('static const _subtitles');
+  const groups = countOneWord('static const _adminNavGroups');
+  ok(`پنج فهرستِ اندروید هم‌طولند (صفحات ${pages}، تیتر ${titles}، آیکون ${icons}، توضیح ${subs}، گروه ${groups})`,
+    pages > 0 && pages === titles && pages === icons && pages === subs && pages === groups,
+    'جابه‌جا‌شدنِ یکی = صفحه با تیتر/آیکون/گروهِ صفحهٔ دیگر باز می‌شود و هیچ خطایی نمی‌دهد');
+
+  // ── ۴.۱) گروه‌بندیِ منو (۳.۲): یکی‌به‌یکی با NAVِ وب ────────────────────
+  //
+  // چرا این‌همه سختی: «گروه» تنها چیزی است که مدیرِ تازه‌کار با آن منو را
+  // یاد می‌گیرد. اگر در یک پنل دسته‌بندی باشد و در دیگری آیتم‌ها بی‌گروه
+  // بمانند، همان آدم باید دو نقشهٔ ذهنی بسازد — و این دقیقاً همان هزینه‌ای
+  // است که کلِ «دو پنلِ یکسان» برای حذفش ساخته شد.
+  {
+    const webNav = arrayAt(webMain, 'const NAV = [') || '';
+    // ردیف‌ها را با مرزِ «],\n  [» جدا می‌کنیم. تلاشِ اول یک regex بود که
+    // [^\]]*? followed by \] — یعنی کاراکتری که خودش ] را حذف می‌کند و بعد
+    // همان ] را می‌خواهد: هیچ‌وقت نمی‌خورد و گارد، «NAV خالی» گزارش می‌کرد
+    // در حالی که فایلِ سالم بود. یک گاردِ قرمزِ کور هم مثلِ سبزِ کور بی‌ارزش است.
+    const webRows = webNav.split(/\],\s*\n\s*\[/).map((x) => x.trim());
+    const webIds = webRows.map((r) => /^'([\w-]+)'/.exec(r)?.[1] ?? '');
+    const lastStr = (r) => {
+      const m = [...r.matchAll(/'([^']+)'/g)];
+      return m.length ? m[m.length - 1][1] : null;
+    };
+    const webGroups = webRows.map(lastStr);
+    ok(`وب: هر ${webIds.length} ردیفِ NAV عضوِ ششمِ گروه‌دار دارد`,
+      webIds.length === 23 && webGroups.every(Boolean),
+      `ردیف ${webIds.length}، بی‌گروه ${webGroups.filter((x) => !x).length}`);
+
+    // عضوِ ششم باید کلیدِ گروه باشد، نه چیزِ دیگر: «بی‌گروه» یعنی آخرین
+    // رشتهٔ ردیف، توضیحِ صفحه است — پس اگر یکی گروهش حذف شود، همان توضیح
+    // به‌عنوان گروه شمرده می‌شود. مقایسه با جدولِ نام‌ها این را می‌گیرد.
+    const labels = (src, marker) =>
+      (objectAt(src, marker) || '').match(/'[\w-]+':\s*'[^']+'/g) || [];
+    const webLabelRows = labels(webMain, 'const NAV_GROUPS = {');
+    const mobLabelRows = labels(mobileShell, 'static const _groupLabels = {');
+    const labelKeys = new Set(webLabelRows.map((x) => /^'([\w-]+)'/.exec(x)[1]));
+    const realGroups = webGroups.filter((g) => labelKeys.has(g));
+    ok('وب: ردیفِ آخرِ هر قلم، کلیدِ شناخته‌شدهٔ گروه است',
+      realGroups.length === 23, `${realGroups.length}/23 ردیف کلیدِ معتبر دارد`);
+
+    const mobileGroupList = (arrayAt(mobileShell, 'static const _adminNavGroups') || '')
+      .split('\n').map((l) => /^\s*'([\w-]+)'/.exec(l.trim())?.[1]).filter(Boolean);
+    ok('اندروید: ترتیبِ گروه‌ها مو‌به‌مو با NAVِ وب یکی است',
+      mobileGroupList.length === webGroups.length &&
+      mobileGroupList.every((g, k) => g === webGroups[k]),
+      `وب ${webGroups.join(',')} ↔ اندروید ${mobileGroupList.join(',')}`);
+
+    const norm = (arr) => arr.map((x) => x.replace(/\s+/g, '').replace(/,+$/, '')).sort();
+    ok('نامِ فارسیِ گروه‌ها در دو پنل واژه‌به‌واژه یکی است',
+      webLabelRows.length >= 7 && norm(webLabelRows).join('|') === norm(mobLabelRows).join('|'),
+      `وب ${webLabelRows.length} ↔ اندروید ${mobLabelRows.length}`);
+
+    // هر کلیدِ گروه باید در جدولِ نام‌ها ردیف داشته باشد، وگرنه سرتیترِ خالی
+    // رندر می‌شود: منوی «نیمه‌کاره» که نه خطا دارد نه معنا.
+    const orphans = [...new Set(webGroups)].filter((g) => !labelKeys.has(g));
+    ok('هر گروهِ مصرفی در جدولِ نام‌ها ردیف دارد', orphans.length === 0, orphans.join(', '));
+    ok('هر نامِ جدول در واقع مصرف می‌شود (گروهِ یتیم = سرتیترِ مرده)',
+      [...labelKeys].every((k) => webGroups.includes(k)),
+      [...labelKeys].filter((k) => !webGroups.includes(k)).join(', '));
+  }
   ok('اندروید: «متن‌های زنده» در فهرستِ تیترها هست',
     /'متن\u200cهای زنده'/.test(mobileShell));
   ok('اندروید: صفحه ساخته می‌شود', /AdminLiveCopy\(api: widget\.api\)/.test(mobileShell));
   ok('اندروید: importِ صفحه هست', /import 'admin_live_copy\.dart';/.test(mobileShell));
+}
+
+// ── ۴.۵) فیلدهایِ تازهٔ `app` در تنظیماتِ *هر دو* پنل ─────────────────────
+//
+// `app.bazaarPackage` به سرور اضافه شد (لینکِ نصب از همین ساخته می‌شود).
+// فیلدی که فقط در سرور و در یک پنل باشد، همان «سیمِ تک‌پل» است که در فاز ۲
+// رد کردیم: ادمینِ اندروید هیچ‌وقت نمی‌فهمد چرا لینکش خالی مانده.
+{
+  const webSettings = read(WEB_SETTINGS_PAGE);
+  const mobSettings = read(MOB_SETTINGS_PAGE);
+  for (const [name, src] of [['وب', webSettings], ['اندروید', mobSettings]]) {
+    ok(`${name}: «نامِ بستهٔ کافه‌بازار» در تنظیمات هست`,
+      /bazaarPackage/.test(src), 'در سرور هست، در پنل نیست = هرگز قابلِ عوض نیست');
+  }
+  ok('اندروید: مقدار از پاسخِ GET خوانده و در PATCH فرستاده می‌شود',
+    /_bazaarPackage\.text = /.test(mobSettings)
+      && /'bazaarPackage': _bazaarPackage\.text\.trim\(\)/.test(mobSettings));
+  ok('وب: مقدار در stateِ اولیه هست (بیِ آن، فیلد روی undefined می‌سوزد)',
+    /bazaarPackage: ''/.test(webSettings));
 }
 
 // ── ۵) رفتارِ یکسانِ «پیش‌نمایشِ زنده» و «قفلِ ذخیره» ─────────────────────
