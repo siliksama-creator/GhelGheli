@@ -444,7 +444,9 @@ module.exports = function createClientConfigRoutes(deps) {
     if (key !== liveContent.COPY_KEY && key !== liveContent.RULES_KEY) {
       throw Object.assign(new Error('کلید ناشناخته'), { status: 400 });
     }
-    res.json(await liveContent.history(key));
+    // `historyView` و نه `history`: ستونِ `value` (اسنپ‌شاتِ کامل) برای این
+    // کارت هیچ مصرف‌کننده‌ای ندارد. سرورِ زنده همان را ۲۰ بار می‌فرستاد.
+    res.json(await liveContent.historyView(key));
   }));
 
   router.post('/admin/settings/live-content/:key/revert', adminAuth, requireRole(),

@@ -414,9 +414,36 @@ async function recordHistory(key, prevValue, adminId) {
 
 async function history(key, limit = HISTORY_KEEP) {
   const { rows } = await pool.query(
-    'SELECT key, value, admin_id, created_at FROM live_content_history WHERE key = $1 ORDER BY id DESC LIMIT $2',
+    `SELECT h.id, h.key, h.value, h.admin_id, h.created_at, a.username AS admin_username
+       FROM live_content_history h
+       LEFT JOIN admin_users a ON a.id = h.admin_id
+      WHERE h.key = $1 ORDER BY h.id DESC LIMIT $2`,
     [key, limit]);
   return rows;
+}
+
+/**
+ * همان تاریخچه، فقط با ستون‌هایی که UI واقعاً می‌خواند.
+ *
+ * چرا لازم شد: «تستِ ۲۰ تغییر» که همین دور روی سرورِ زنده اجرا شد، دو چیز را
+ * نشان داد. (۱) بدونِ این لایه، `history/copy` بیست ردیف × اسنپ‌شاتِ کاملِ
+ * copy را به پنل و به اندروید می‌فرستاد — چیزی در حد ۸۰KB که هیچ‌کدام از
+ * مصرف‌کننده‌ها (کارتِ تاریخچه در وب، کارتِ اندروید، `history()` داخلی) حتی
+ * به آن نگاه نمی‌کردند. روی سرورِ واقعی این یعنی پهنای‌باندِ مفت در هر باز
+ * شدنِ صفحه. (۲) کارتِ تاریخچه «(ادمین 3)» چاپ می‌کرد؛ یعنی همان چیزِ فنی
+ * که پنل قول داده بود حرفِ آدمی بزند، در مهم‌ترین سؤالش: «چه کسی این را
+ * عوض کرد؟» نام از همان joinِ لاگِ حسابِ کاربری (`admin_users.username`)
+ * می‌آید و نبودنش به «تیم پشتیبانی» ترجمه می‌شود، نه به عدد.
+ */
+async function historyView(key, limit = HISTORY_KEEP) {
+  const rows = await history(key, limit);
+  return rows.map((r) => ({
+    id: r.id,
+    key: r.key,
+    adminId: r.admin_id,
+    adminUsername: r.admin_username || null,
+    createdAt: r.created_at,
+  }));
 }
 
 async function bumpConfigVersion(adminId) {
@@ -577,6 +604,6 @@ module.exports = {
   RULE_DEFS, DEFAULT_COPY, COPY_CONTRACT,
   rules, copy, configVersion, fillTemplate,
   sanitizeRules, saveRules, sanitizeCopy, saveCopy,
-  history, revert, bumpConfigVersion, defaultsView,
+  history, historyView, revert, bumpConfigVersion, defaultsView,
   panelView, preview,
 };

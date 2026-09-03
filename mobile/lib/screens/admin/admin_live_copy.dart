@@ -704,10 +704,17 @@ class _AdminLiveCopyState extends State<AdminLiveCopy> {
   /// می‌داد و کلِ صفحهٔ پنل را سفید می‌کرد.
   String _historyLine(dynamic h) {
     final m = _mapOf(h);
-    final created = '${m['created_at'] ?? ''}'.replaceFirst('T', ' ');
+    // `createdAt`: لایهٔ `historyView` سرور، ردیفِ DB را camelCase می‌کند.
+    // `created_at` دیگر در پاسخ نیست و خواندنش یعنی «تاریخچهٔ بی‌تاریخ».
+    final created = '${m['createdAt'] ?? ''}'.replaceFirst('T', ' ');
     final when = created.length > 16 ? created.substring(0, 16) : created;
-    final admin = m['admin_id'];
-    return 'متن‌ها — ${when.isEmpty ? '—' : when}'
-        '${admin != null ? ' (ادمین $admin)' : ''}';
+    // آینهٔ `whoFor` در نسخهٔ وب: نامِ ادمین، نه شناسه‌اش. اگر join نامی
+    // پیدا نکند (ادمین حذف‌شده یا ردیفِ قدیمی)، «یک ادمینِ دیگر» می‌گوییم —
+    // نه عدد، نه null که برای مدیرِ غیرفنی بی‌معنی است.
+    final who = '${m['adminUsername'] ?? ''}'.trim();
+    final tail = who.isNotEmpty
+        ? ' · $who'
+        : (m['adminId'] != null ? ' · یک ادمینِ دیگر' : ' · تیم پشتیبانی');
+    return 'متن‌ها — ${when.isEmpty ? '—' : when}$tail';
   }
 }

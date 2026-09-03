@@ -172,7 +172,6 @@ ok('مایگریشن 082 جدولِ تاریخچه را می‌سازد',
   /CREATE TABLE IF NOT EXISTS live_content_history/.test(migration));
 ok('مایگریشن 082 ایندکسِ (key,id) دارد',
   /live_content_history_key_id_idx/.test(migration));
-
 const engineSrc = read('src/games/engine.js');
 ok('موتور پنجرهٔ اتصال را از liveContent می‌خواند',
   /liveContent\.rules\(\)\.reconnectSeconds \* 1000/.test(engineSrc));
@@ -204,6 +203,27 @@ ok('گردونه ضریبِ آستانه را از liveContent می‌خواند
 
 const routeSrc = read('src/routes/clientConfig.js');
 const svcSrc = read('src/services/liveContent.js');
+
+// سه سنجهٔ تازه، مستقیم از دلِ «تستِ ۲۰ تغییر» روی سرورِ زنده:
+//  • تاریخچهٔ پنل باید از `historyView` رد شود؛ `history()` اسنپ‌شاتِ
+//    کاملِ copy را ۲۰ بار به هر دو کلاینت می‌فرستاد و هیچ مصرف‌کننده‌ای
+//    نداشت (روی پروداکشن: ~۸۰KB برای نمایشِ یک تاریخ).
+//  • «چه کسی عوض کرد» باید نام داشته باشد نه admin_id — قولِ پنل،
+//    «زبانِ آدم» است و «(ادمین 3)» آن قول را می‌شکست.
+//  • هر دو پنل باید همان نامِ فیلدِ تازه (`createdAt`) را بخوانند؛
+//    یک پاسخِ camelCase شده و پنلِ کهنه، بی‌صدا «—» نشان می‌دهد.
+ok('history endpoint از historyView رد می‌شود (ردیفِ لاغر)',
+  /liveContent\.historyView\(/.test(routeSrc));
+ok('تاریخچه، نامِ ادمین را با LEFT JOIN از admin_users می‌گیرد',
+  /LEFT JOIN admin_users/.test(svcSrc) && /admin_username/.test(svcSrc));
+{
+  const up = path.join(root, '..');
+  const webPanel = fs.readFileSync(path.join(up, 'admin/src/pages/live-copy.jsx'), 'utf8');
+  const mobPanel = fs.readFileSync(path.join(up, 'mobile/lib/screens/admin/admin_live_copy.dart'), 'utf8');
+  ok('هر دو پنل نامِ ادمین را نشان می‌دهند و فیلدِ camelCase را می‌خوانند',
+  /whoFor/.test(webPanel) && /adminUsername/.test(webPanel)
+    && /adminUsername/.test(mobPanel) && /createdAt/.test(mobPanel));
+}
 ok('/api/config copy می‌دهد', /copy: liveContent\.copy\(\)/.test(routeSrc));
 ok('/api/config rules می‌دهد', /rules: liveContent\.rules\(\)/.test(routeSrc));
 ok('/api/config configVersion می‌دهد', /configVersion: liveContent\.configVersion\(\)/.test(routeSrc));

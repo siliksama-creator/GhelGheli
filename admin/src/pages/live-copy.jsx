@@ -48,6 +48,21 @@ const GROUP_LABEL = {
   update: 'پیامِ نسخهٔ تازه',
 };
 
+// «چه کسی» و «کِی» در کارتِ تاریخچه.
+//
+// پیش از این `(ادمین 3)` چاپ می‌شد: شمارهٔ شناسایی در رابطی که قولِ «زبانِ
+// آدم» دارد. ادمینی که سه کاربرِ ادمین دارد، از روی شماره نمی‌فهمد کدام‌شان
+// دیشب قیمت را عوض کرده. fallbackها هم عمداً *بدونِ عدد*‌اند: نبودنِ join
+// نباید با «ادمین null» یا «ادمین ۰» به کاربر حرفِ بی‌معنی بزند.
+// `createdAt` (نه `created_at`): لایهٔ `historyView` ردیفِ DB را به camelCase
+// تبدیل می‌کند و هر دو پنل باید همان را بخوانند — سنجه‌اش در
+// `backend/scripts/testLiveContent.js` است، چون یک فیلدِ عوض‌شده در پاسخِ
+// ادمین، بی‌گارد یعنی «پنلِ سفید» در بهترین حالت و «تاریخچهٔ خالی» در بدترین.
+const whenFor = (h) => (h.createdAt || '').slice(0, 16).replace('T', ' ') || '—';
+const whoFor = (h) => (h.adminUsername
+  ? ` · ${h.adminUsername}`
+  : (h.adminId ? ' · یک ادمینِ دیگر' : ' · تیم پشتیبانی'));
+
 const PLACEHOLDER = /\{([a-zA-Z][a-zA-Z0-9_]*)\}/g;
 
 const placeholdersOf = (s) => {
@@ -430,14 +445,14 @@ export function LiveCopyPage({ request }) {
           <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: 6, fontSize: 13 }}>
             {history.copy.map((h) => (
               <li key={`c${h.id}`} style={{ opacity: .85 }}>
-                متن‌ها — {h.created_at?.slice(0, 16).replace('T', ' ')}
-                {h.admin_id ? ` (ادمین ${h.admin_id})` : ''}
+                متن‌ها — {whenFor(h)}
+                {whoFor(h)}
               </li>
             ))}
             {history.rules.map((h) => (
               <li key={`r${h.id}`} style={{ opacity: .85 }}>
-                عددها — {h.created_at?.slice(0, 16).replace('T', ' ')}
-                {h.admin_id ? ` (ادمین ${h.admin_id})` : ''}
+                عددها — {whenFor(h)}
+                {whoFor(h)}
               </li>
             ))}
           </ul>
