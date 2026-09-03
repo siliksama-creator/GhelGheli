@@ -27,6 +27,10 @@ export function SettingsPage({ request }) {
       minVersion: { android: '1.1.17', ios: '1.1.17' },
       forceUpdate: { android: false, ios: false },
       updateUrl: { android: '', ios: '' },
+      // نامِ بستهٔ کافه‌بازار: اگر «لینک دانلود» خالی بماند، سرور لینک را
+      // از همین می‌سازد. تا پیش از این، لینکِ پیش‌فرض داخلِ کدِ وب سفت بود
+      // (`|| 'https://ghelghelishop.ir'`) و ادمین هیچ راهی برای عوضش نداشت.
+      bazaarPackage: '',
     },
     announcement: { active: false, text: '', link: null, accent: 'gold' },
     features: {
@@ -201,9 +205,17 @@ export function SettingsPage({ request }) {
               onChange={e => setClient({ ...client, app: { ...client.app, forceUpdate: { ...client.app.forceUpdate, ios: e.target.checked } } })} />
             آپدیت iOS اجباری باشد
           </label>
-          <Field label="لینک دانلود اندروید (اختیاری)">
+          <Field label="لینک دانلود اندروید (خالی = لینکِ کافه‌بازار ساخته می‌شود)">
             <Input value={client.app.updateUrl.android || ''}
               onChange={e => setClient({ ...client, app: { ...client.app, updateUrl: { ...client.app.updateUrl, android: e.target.value } } })} />
+          </Field>
+          {/* فیلدِ تازهٔ فاز ۴. برچسبش عمداً «نامِ بسته» است نه package ID و
+              در توضیح هم گفته شده کِی اصلاً استفاده می‌شود — وگرنه مدیر
+              فکر می‌کند باید هر دو را پر کند. */}
+          <Field label="نامِ بستهٔ اپ در کافه‌بازار (برای ساختنِ لینک، وقتی لینکِ بالا خالی است)">
+            <Input value={client.app.bazaarPackage || ''}
+              placeholder="ir.ghelgheli.shop"
+              onChange={e => setClient({ ...client, app: { ...client.app, bazaarPackage: e.target.value } })} />
           </Field>
           <Field label="متن اطلاعیه (خالی = غیرفعال)">
             <Textarea rows={2} value={client.announcement.text || ''}

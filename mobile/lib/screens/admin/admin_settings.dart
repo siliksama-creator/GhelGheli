@@ -25,6 +25,7 @@ class _AdminSettingsState extends State<AdminSettings> {
   final _minVersionIos = TextEditingController();
   final _updateUrlAndroid = TextEditingController();
   final _updateUrlIos = TextEditingController();
+  final _bazaarPackage = TextEditingController();
   final _maintMsg = TextEditingController();
   final _giftPoints = TextEditingController();
   final _giftMessage = TextEditingController();
@@ -76,6 +77,7 @@ class _AdminSettingsState extends State<AdminSettings> {
     _minVersionAndroid.dispose();
     _minVersionIos.dispose();
     _updateUrlAndroid.dispose();
+    _bazaarPackage.dispose();
     _updateUrlIos.dispose();
     _maintMsg.dispose();
     _giftPoints.dispose();
@@ -123,6 +125,7 @@ class _AdminSettingsState extends State<AdminSettings> {
           : <String, dynamic>{};
       _updateUrlAndroid.text = '${urls['android'] ?? ''}';
       _updateUrlIos.text = '${urls['ios'] ?? ''}';
+      _bazaarPackage.text = '${app['bazaarPackage'] ?? ''}';
       final feat = cc['features'] is Map
           ? Map<String, dynamic>.from(cc['features'] as Map)
           : <String, dynamic>{};
@@ -231,6 +234,8 @@ class _AdminSettingsState extends State<AdminSettings> {
             'android': _updateUrlAndroid.text.trim(),
             'ios': _updateUrlIos.text.trim(),
           },
+          // آینهٔ `settings.jsx`: خالی = سرور لینک را از همین نامِ بسته می‌سازد.
+          'bazaarPackage': _bazaarPackage.text.trim(),
         },
         'announcement': {
           'active': _announceActive,
@@ -351,6 +356,11 @@ class _AdminSettingsState extends State<AdminSettings> {
             TextField(
                 controller: _updateUrlIos,
                 decoration: const InputDecoration(labelText: 'لینک دانلود iOS')),
+            TextField(
+                controller: _bazaarPackage,
+                decoration: const InputDecoration(
+                    labelText: 'نامِ بستهٔ اپ در کافه‌بازار',
+                    helperText: 'وقتی «لینک دانلود اندروید» خالی است، لینک از همین ساخته می‌شود.')),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               value: _maintActive,
