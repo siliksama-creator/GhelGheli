@@ -64,6 +64,13 @@ console.log('\n== گارد در CI فهرست شده ==');
   const be = JSON.parse(read('backend/package.json'));
   ok(be.scripts.test.includes('testLiveWiring.js'),
     'backend: `npm test` این گارد را صدا می‌زند');
+  ok(be.scripts.test.includes('testAdminCopyParity.js'),
+    'backend: همسانیِ دو پنل (`testAdminCopyParity`) هم در `npm test` است');
+  ok(!!web.scripts['test:admin-copy-parity'],
+    'userweb: اسکریپتِ `test:admin-copy-parity` ثبت شده');
+  ok(web.scripts['test:live-copy-parity'] === 'node tool/live-copy-parity.mjs'
+    && web.scripts['test:admin-copy-parity'] === 'node tool/admin-copy-parity.mjs',
+    'هر دو گارد به فایلِ درست اشاره می‌کنند');
   ok(be.scripts.test.includes('testLiveContent.js'),
     'backend: گاردِ محتوای زنده (`testLiveContent`) هم در `npm test` است',
     'بی‌این خط، افزودنِ قالبِ جدید به پنل بدونِ تستِ قرارداد ممکن می‌شد');

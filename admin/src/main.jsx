@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, Suspense, lazy } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BarChart3, Bell, Coins, Gift, MessageCircle, LifeBuoy, ScanLine, Settings, Shield, Sigma, Trophy, Users, Gamepad2, Wallet, Activity, CircleDot, Package, Store, Layers, Target, SlidersHorizontal } from 'lucide-react';
+import { BarChart3, Bell, BookText, Coins, Gift, MessageCircle, LifeBuoy, ScanLine, Settings, Shield, Sigma, Trophy, Users, Gamepad2, Wallet, Activity, CircleDot, Package, Store, Layers, Target, SlidersHorizontal } from 'lucide-react';
 
 import './theme.css';
 import './styles.css';
@@ -38,6 +38,7 @@ const GameEconomyPage = lazy(() => import('./pages/game-economy.jsx').then(m => 
 const WheelPage = lazy(() => import('./pages/wheel.jsx').then(m => ({ default: m.WheelAdminPage })));
 const CardBoxPage = lazy(() => import('./pages/card-box.jsx').then(m => ({ default: m.CardBoxAdminPage })));
 const SettingsPage = lazy(() => import('./pages/settings.jsx').then(m => ({ default: m.SettingsPage })));
+const LiveCopyPage = lazy(() => import('./pages/live-copy.jsx').then(m => ({ default: m.LiveCopyPage })));
 const AdminsPage = lazy(() => import('./pages/admins.jsx').then(m => ({ default: m.AdminsPage })));
 const MetricsPage = lazy(() => import('./pages/metrics.jsx').then(m => ({ default: m.MetricsPage })));
 const AnalyticsPage = lazy(() => import('./pages/analytics.jsx').then(m => ({ default: m.AnalyticsPage })));
@@ -115,6 +116,11 @@ const NAV = [
     'ارسال اطلاعیهٔ push به همه یا گروهی از کاربران — با پیش‌نمایشِ ساعت تهران.'],
   ['settings', 'تنظیمات', Settings, SettingsPage,
     'تنظیمات چت و پیامک + تنظیمات اپ: نسخهٔ اجباری، بنر اطلاعیه و چیدمان تب‌ها.'],
+  // «متن‌های زنده» عمداً کنارِ «تنظیمات» نشسته و نه کنارِ «اقتصاد بازی»:
+  // اینجا متن و عددِ *دیدنیِ کاربر* عوض می‌شود، نه منطقِ بازی — کسی که
+  // دنبالِ «جمله را عوض کنم» باید در همین حوالی پیدایش کند.
+  ['live-copy', 'متن‌های زنده', BookText, LiveCopyPage,
+    'هرچه کاربر در وب و اندروید می‌خواند: جمله‌ها و عددهایش، با پیش‌نمایشِ زنده و بازگردانی.'],
   ['engine', 'موتور', SlidersHorizontal, EnginePage,
     'سقف‌ها و اعدادِ عملیاتی سیستم — هر عدد توضیح دارد؛ با احتیاط تغییر دهید.'],
   ['admins', 'ادمین‌ها', Shield, AdminsPage,

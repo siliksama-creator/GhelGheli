@@ -19,6 +19,7 @@ import 'admin_game_economy.dart';
 import 'admin_wheel.dart';
 import 'admin_card_box.dart';
 import 'admin_settings.dart';
+import 'admin_live_copy.dart';
 import 'admin_support.dart';
 import 'admin_users.dart';
 import 'admin_wallet.dart';
@@ -67,6 +68,10 @@ class _AdminShellState extends State<AdminShell> {
     AdminSupport(api: widget.api),
     AdminNotifications(api: widget.api),
     AdminSettings(api: widget.api),
+    // ترتیب = پنل وب: «متن‌های زنده» در NAV بلافاصله بعد از «تنظیمات»
+    // است، پس این‌جا هم همین‌جا می‌نشیند (هر چهار فهرستِ زیر با هم
+    // هم‌شاخص‌اند؛ یکی جابه‌جا شود، بقیه هم باید جابه‌جا شوند).
+    AdminLiveCopy(api: widget.api),
     AdminEngine(api: widget.api),
     AdminAdmins(api: widget.api),
     AdminAnalytics(api: widget.api),
@@ -92,6 +97,7 @@ class _AdminShellState extends State<AdminShell> {
     'پشتیبانی',
     'اطلاعیه‌ها',
     'تنظیمات',
+    'متن‌های زنده',
     'موتور',
     'ادمین‌ها',
     'تحلیل رشد و خطا',
@@ -116,6 +122,7 @@ class _AdminShellState extends State<AdminShell> {
     Icons.support_agent_rounded,
     Icons.campaign_rounded,
     Icons.settings_rounded,
+    Icons.text_snippet_rounded, // متن‌های زنده
     Icons.tune_rounded,
     Icons.admin_panel_settings_rounded,
     Icons.insights_rounded,
@@ -144,6 +151,7 @@ class _AdminShellState extends State<AdminShell> {
     'تیکت‌های کاربران: پاسخ بدهید یا ببندید.',
     'ارسال اطلاعیهٔ push به همه یا گروهی از کاربران.',
     'تنظیمات چت و پیامک + نسخهٔ اجباری، بنر اطلاعیه و چیدمان تب‌ها.',
+    'هرچه کاربر در وب و اندروید می‌خواند: جمله‌ها و عددهایش، با پیش‌نمایشِ زنده.',
     'سقف‌ها و اعدادِ عملیاتی سیستم — هر عدد توضیح دارد.',
     'حساب‌های ادمین و نقش‌ها + کارنامهٔ تغییرات.',
     'نمودار رشد، قیف بازی‌ها و صندوق خطاهای اپ — فقط خواندنی.',
