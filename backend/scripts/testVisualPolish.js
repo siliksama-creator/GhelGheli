@@ -31,8 +31,14 @@ check(crypto.createHash('sha256').update(mobilePenaltyIcon).digest('hex')
 const growthCss = text('userweb/src/growth.css');
 const webGrowth = text('userweb/src/GrowthHub.jsx');
 const mobileGrowth = text('mobile/lib/screens/user/games/growth_panel.dart');
-check(/missionRail[^}]*display:flex[^}]*overflow-x:auto/s.test(growthCss),
-  'mobile Web missions are a horizontal rail, not five tall cards');
+// از کامیت a57c3ce به بعد، به‌خاطر درخواستِ «حذف side-scroll»، ماموریت‌های
+// هر دو کلاینت دیگر ریل افقی نیستند: وب — ستونِ عمودیِ کارت‌های
+// تمام‌عرض، اندروید — عمودی (کامنتِ growth_panel.dart: «بدون side-scroll»).
+// گاردِ قدیمی چیدمانِ منسوخ‌شده را قفل می‌کرد و CI را از همان کامیتِ
+// تغییرِ عمدی قرمز کرده بود؛ حالا چیدمانِ جدید قفل می‌شود.
+check(/\.missionRail\{display:flex;flex-direction:column[^}]*overflow-x:visible\}/.test(growthCss)
+  && /\.missionRail article\{[^}]*width:100%/.test(growthCss),
+  'mobile Web missions are a full-width vertical column, no side-scroll');
 check(webGrowth.includes('searchOpen') && mobileGrowth.includes('_searchOpen'),
   'friend search stays collapsed until requested on both clients');
 check(webGrowth.includes('social_mission_badge.png') && mobileGrowth.includes('social_mission_badge.png'),
