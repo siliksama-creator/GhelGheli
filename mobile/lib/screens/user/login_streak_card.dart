@@ -169,6 +169,27 @@ class _LoginStreakCardState extends State<LoginStreakCard>
     // عرضِ نوار `double` می‌خواهد — همان چیزی که کامپایلر در فازِ build
     // می‌گیرد، نه در تحلیلِ ایستا.
     final progress = (progressDay / cycleDays.toDouble()).clamp(0.0, 1.0);
+    // «۷» هم زنده است: چرخهٔ پاداشِ ورود عددِ قابل‌تنظیمی است که
+    // قبلاً فقط داخلِ رشتهٔ فارسی نوشته شده بود — یعنی تغییرِ چرخه
+    // در پنل، متنِ اندروید را دروغ‌گو می‌کرد.
+    //
+    // چرا این‌جا ساخته می‌شوند و نه داخلِ خودِ `Text(...)`: وقتی دو
+    // فراخوانیِ `liveText` با آبجکتِ `vars` دو سرِ یک عملگرِ شرطی
+    // بنشیند، تحلیل‌گرِ نسخهٔ CI (flutter 3.47) سرِ رشتهٔ
+    // شرطی گیج می‌شود و چهار خطایِ زنجیره‌ای روی کدِ سالم می‌دهد
+    // («bool به String»، «Expected to find ','»، «Too many positional
+    // arguments»، «Expected to find ')'»). بیرون‌کشیدنِ عبارت به یک
+    // `final` هم‌ارزِ کامل است و بی‌خطر؛ طرحِ صفحه ذره‌ای عوض نمی‌شود.
+    final cycleDoneLine = liveText(
+      'streak.cycleDone',
+      'چرخه ۷ روزه · امروز روز ${faNum(currentDay)} تکمیل شد',
+      vars: {'days': cycleDays, 'day': currentDay},
+    );
+    final cycleNextLine = liveText(
+      'streak.cycleNext',
+      'چرخه ۷ روزه · روز ${faNum(nextDay)} · ${faNum(nextReward)} امتیاز هدیه',
+      vars: {'days': cycleDays, 'day': nextDay, 'reward': nextReward},
+    );
 
     return AnimatedBuilder(
       animation: _loop,
@@ -291,27 +312,7 @@ class _LoginStreakCardState extends State<LoginStreakCard>
                               ),
                               const SizedBox(height: 1),
                               Text(
-                                claimedToday
-                                    // «۷» هم زنده است: چرخهٔ پاداشِ ورود
-                                    // عددِ قابل‌تنظیمی است که قبلاً فقط داخل
-                                    // رشتهٔ فارسی نوشته شده بود — یعنی
-                                    // تغییرِ چرخه در پنل، متنِ اندروید را
-                                    // دروغ‌گو می‌کرد.
-                                    liveText(
-                                        'streak.cycleDone',
-                                        'چرخه ۷ روزه · امروز روز ${faNum(currentDay)} تکمیل شد',
-                                        vars: {
-                                          'days': cycleDays,
-                                          'day': currentDay
-                                        })
-                                    : liveText(
-                                        'streak.cycleNext',
-                                        'چرخه ۷ روزه · روز ${faNum(nextDay)} · ${faNum(nextReward)} امتیاز هدیه',
-                                        vars: {
-                                          'days': cycleDays,
-                                          'day': nextDay,
-                                          'reward': nextReward
-                                        }),
+                                claimedToday ? cycleDoneLine : cycleNextLine,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
