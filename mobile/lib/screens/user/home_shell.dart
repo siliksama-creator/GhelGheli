@@ -574,6 +574,33 @@ class _HomeShellState extends State<HomeShell>
     return false;
   }
 
+  /// بدنهٔ دیالوگِ آپدیت: «نسخهٔ فعلی …» + جملهٔ اصلی.
+  ///
+  /// چرا یک متدِ جدا و نه `Builder` داخلِ `content`: `Builder` فقط برایِ
+  /// گرفتنِ context است و این‌جا contextِ خودِ State کافی بود — یک wrapperِ
+  /// بی‌مورد یعنی یک parameterِ سایه‌دار (`_`) که analyzerِ سخت‌گیرِ این
+  /// پروژه دوست ندارد. رشته‌ها هم نمی‌توانستند در یک `'${…}'` چندسطری
+  /// بچرخند: رشتهٔ دارت از میانِ خط نمی‌شکند و بیلد «newline inside string»
+  /// می‌داد (همان چیزی که در دورِ قبل CI را قرمز کرد).
+  /// اگر `update.notice` خالی برگردد — فول‌بکِ آفلاین، یا این‌که ادمین
+  /// کل جمله را پاک کند — فقط بدنه چاپ می‌شود و فاصلهٔ یتیمی نمی‌ماند.
+  Widget _updateBody(BuildContext context,
+      {required String current, required String min}) {
+    final notice = liveText('update.notice', '',
+        vars: {'current': faNum(current), 'min': faNum(min)});
+    final body = liveText('update.body',
+        'برای اینکه همه‌چیز درست کار کند، لطفاً به تازه‌ترین نسخه به‌روزرسانی کنید.');
+    return RichText(
+      text: TextSpan(
+        style: Theme.of(context).textTheme.bodyMedium,
+        children: [
+          if (notice.trim().isNotEmpty) TextSpan(text: '$notice '),
+          TextSpan(text: body),
+        ],
+      ),
+    );
+  }
+
   Future<void> _showUpdateDialog({
     required bool forced,
     required String url,
@@ -596,13 +623,12 @@ class _HomeShellState extends State<HomeShell>
         // می‌آید و اگر ادمین بخواهد، می‌تواند جمله را عوض کند؛ قبلاً کاربر
         // می‌فهمید «اپت قدیمی است» ولی نمی‌فهمید چقدر قدیمی.
         title: Text(liveText('update.title', 'نسخهٔ تازه قلقلی آماده است')),
-        content: Text(
-          '${liveText('update.notice', '', vars: {
-            'current': faNum(current),
-            'min': faNum(minStr),
-          })}${liveText('update.body',
-            'برای اینکه همه‌چیز درست کار کند، لطفاً به تازه‌ترین نسخه به‌روزرسانی کنید.')}',
-        ),
+        // دو جمله، دو `liveText`ی جدا و سپس *الحاق* — نه یک interpolationِ
+        // چندسطری داخلِ `'${…}'`: رشتهٔ دارت نمی‌تواند از میانِ خط بشکند و
+        // اولین بیلد همین را به‌شکلِ «newline inside string» رد می‌کرد.
+        // اگر `update.notice` خالی برگردد (فول‌بکِ آفلاین یا پاک‌کردنِ ادمین)،
+        // RichText فقط بدنه را نشان می‌دهد و یک فاصلهٔ یتیم نمی‌افتد.
+        content: _updateBody(context, current: current, min: min),
         actions: [
           if (!forced)
             TextButton(
