@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
+import '../../core/app_config.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/badges.dart';
@@ -126,49 +127,15 @@ class _SupportPageState extends State<SupportPage> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.security_rounded, color: Color(0xFF34D399), size: 22),
-            SizedBox(width: 8),
-            Text('حریم خصوصی و شفافیت بازی', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+            const Icon(Icons.security_rounded, color: Color(0xFF34D399), size: 22),
+            const SizedBox(width: 8),
+            Text(liveText('support.privacyTitle', 'حریم خصوصی و شفافیت بازی'),
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
           ],
         ),
-        content: const SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '۱. ماهیت پلتفرم سرگرمی و بازی مهارت‌محور:',
-                style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFFFFD166), fontSize: 13),
-              ),
-              SizedBox(height: 4),
-              Text(
-                'اپلیکیشن قلقلی یک محیط سرگرمی، مسابقات مهارتی و کلکسیون فوتوکارت است. این پلتفرم هیچ‌گونه فعالیت شرط‌بندی، بخت‌آزمایی یا قمار نداشته و تمامی پاداش‌ها و امتیازات بر مبنای فعالیت، هوش و مهارت بازیکنان در بازی‌ها محاسبه می‌شود.',
-                style: TextStyle(fontSize: 12, height: 1.5, color: Colors.white70),
-              ),
-              SizedBox(height: 12),
-              Text(
-                '۲. حفظ اطلاعات کاربری:',
-                style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFFFFD166), fontSize: 13),
-              ),
-              SizedBox(height: 4),
-              Text(
-                'شماره تماس و اطلاعات هویتی شما کاملاً محفوظ بوده و به هیچ شخص ثالثی واگذار نمی‌شود. در محیط‌های عمومی (چت و لیگ) صرفاً نام مستعار و عکس انتخابی شما نمایش داده می‌شود.',
-                style: TextStyle(fontSize: 12, height: 1.5, color: Colors.white70),
-              ),
-              SizedBox(height: 12),
-              Text(
-                '۳. شفافیت مالی و تسویه‌حساب:',
-                style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFFFFD166), fontSize: 13),
-              ),
-              SizedBox(height: 4),
-              Text(
-                'جوایز و موجودی کیف پول کاربران طبق قوانین رسمی بانک مرکزی و از طریق شماره شبا به نام صاحب حساب تاییدشده تسویه می‌گردد.',
-                style: TextStyle(fontSize: 12, height: 1.5, color: Colors.white70),
-              ),
-            ],
-          ),
-        ),
+        content: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: _privacySections())),
         actions: [
           FilledButton(
             onPressed: () => Navigator.pop(ctx),
@@ -179,12 +146,66 @@ class _SupportPageState extends State<SupportPage> {
     );
   }
 
+  /// بندهایِ منشورِ حریم خصوصی.
+  ///
+  /// اول از `copy.support.privacySections` (یعنی همان چیزی که ادمین در پنل
+  /// می‌بیند) خوانده می‌شود و اگر نبود، به همین فهرستِ ثابت برمی‌گردد که
+  /// واژه‌به‌واژه متنِ امروزِ اندروید است. چرا این‌طور و نه برعکس:
+  /// نسخهٔ وبِ همین منشور کوتاه‌تر بود («بخت‌آزمایی» و «قوانین بانک مرکزی»
+  /// را نداشت). وقتی هر دو از یک ردیفِ سرور بخوانند، آن اختلافِ حقوقی
+  /// خودبه‌خود بسته می‌شود و اگر روزی لازم شد ادمین *یک* جا اصلاحش می‌کند،
+  /// نه دو جا در دو پلتفرم.
+  ///
+  /// `const` عمداً حذف شد: مقدارِ زنده در `const` جا نمی‌شود. اگر فردا
+  /// کسی برگرداند، اولین بیلد می‌شکند — بهتر از این که بی‌صدا نسخهٔ سفت
+  /// روی صفحه بماند و ادمین فکر کند پنل کار نمی‌کند.
+  List<Widget> _privacySections() {
+    final raw = AppConfig.instance.copySection('support', 'privacySections');
+    final sections = <Map<String, dynamic>>[
+      for (final e in (raw ?? const []))
+        if (e is Map) Map<String, dynamic>.from(e),
+    ];
+    final list = sections.isNotEmpty
+        ? sections
+        : const [
+            {
+              'title': '۱. ماهیت پلتفرم سرگرمی و بازی مهارت‌محور:',
+              'body': 'اپلیکیشن قلقلی یک محیط سرگرمی، مسابقات مهارتی و کلکسیون فوتوکارت است. این پلتفرم هیچ‌گونه فعالیت شرط‌بندی، بخت‌آزمایی یا قمار نداشته و تمامی پاداش‌ها و امتیازات بر مبنای فعالیت، هوش و مهارت بازیکنان در بازی‌ها محاسبه می‌شود.',
+            },
+            {
+              'title': '۲. حفظ اطلاعات کاربری:',
+              'body': 'شماره تماس و اطلاعات هویتی شما کاملاً محفوظ بوده و به هیچ شخص ثالثی واگذار نمی‌شود. در محیط‌های عمومی (چت و لیگ) صرفاً نام مستعار و عکس انتخابی شما نمایش داده می‌شود.',
+            },
+            {
+              'title': '۳. شفافیت مالی و تسویه‌حساب:',
+              'body': 'جوایز و موجودی کیف پول کاربران طبق قوانین رسمی بانک مرکزی و از طریق شماره شبا به نام صاحب حساب تاییدشده تسویه می‌گردد.',
+            },
+          ];
+    final out = <Widget>[];
+    for (var i = 0; i < list.length; i++) {
+      if (i > 0) out.add(const SizedBox(height: 12));
+      out.add(Text('${list[i]['title'] ?? ''}',
+          style: const TextStyle(
+              fontWeight: FontWeight.w800, color: Color(0xFFFFD166), fontSize: 13)));
+      out.add(const SizedBox(height: 4));
+      out.add(Text('${list[i]['body'] ?? ''}',
+          style: const TextStyle(fontSize: 12, height: 1.5, color: Colors.white70)));
+    }
+    return out;
+  }
+
+
   @override
   Widget build(BuildContext context) {
     if (_loading) return const LoadingView();
     final theme = Theme.of(context);
     final canCreate = _quota?['canCreate'] == true;
-    final maxAttachments = (_quota?['maxAttachments'] as num?)?.toInt() ?? 5;
+    // اولِیت با سرور است (`quota.maxAttachments`)؛ اگر نبود از
+    // `live_rules` خوانده می‌شود و در نهایت همان ۵ِ امروز. قبلاً `?? 5`
+    // تنها لنگر بود: با سرورِ بی فیلد، اندروید ۵ تا اجازه می‌داد در حالی
+    // که پنل ۳ گذاشته بود.
+    final maxAttachments = (_quota?['maxAttachments'] as num?)?.toInt()
+        ?? liveRule('maxTicketAttachments', 5);
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -284,6 +305,16 @@ class _SupportPageState extends State<SupportPage> {
                     enabled: !_sending,
                     onChanged: (v) => setState(() => _attachments = v),
                   ),
+                  // آینهٔ `support.jsx`: پیامِ «سقف تکمیل شد» از
+                  // `support.attachmentsFull`، با همان عددِ مجاز.
+                  if (_attachments.length >= maxAttachments) ...[
+                    Gaps.vXs,
+                    Text(liveText('support.attachmentsFull',
+                        'تکمیل سقف {maxAttachments} تصویر',
+                        vars: {'maxAttachments': maxAttachments}),
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: const Color(0xFFF59E0B))),
+                  ],
                   Gaps.vMd,
                   FilledButton.icon(
                     onPressed: _sending ? null : _submit,
@@ -416,7 +447,11 @@ class _QuotaNotice extends StatelessWidget {
                     style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
                 const SizedBox(height: 3),
                 Text(
-                  '${quota?['message'] ?? ''}',
+                  // اگر سرور پیامِ ویژه نفرستد، به‌جای خطِ خالی، قانونِ روزانه
+                  // از `support.ticketRule` ساخته می‌شود (عدد از `live_rules`،
+                  // `liveText` هم رقم را فارسی می‌کند) — همان جمله‌ای که وب
+                  // در همین حالت نشان می‌دهد.
+                  '${quota?['message'] ?? liveText('support.ticketRule', 'در هر روز می‌توانید {ticketsPerDay} تیکت جدید ثبت کنید.', vars: {'ticketsPerDay': liveRule('ticketsPerDay', 1)})}',
                   style: theme.textTheme.bodySmall,
                 ),
                 if (hasOpen) ...[

@@ -1,7 +1,28 @@
 // Support tickets, FAQ, and Privacy / Fair-Play Terms for the web app.
 import React, { useCallback, useEffect, useState } from 'react';
+import { fa } from './lib/api.js';
+import { text, rawList, ruleNumber, useLive } from './lib/liveConfig.js';
 
-const MAX_SHOTS = 5;
+// سقفِ تصاویر از `live_rules.maxTicketAttachments` (فول‌بک ۵ = همان
+// عددِ امروزِ محصول). چرا به‌جای `const MAX_SHOTS = 5`: اندروید این عدد
+// را از همان اول از `/api/support/quota` می‌خواند و وب نه — یعنی ادمین
+// سقف را ۳ می‌کرد، کاربرِ وب ۵ تا انتخاب می‌کرد و بعد سرور با 413 ردش
+// می‌کرد. بدترین شکلِ «پنل کار نمی‌کند»: تقصیر به‌نظرِ وب می‌رسید.
+const maxShots = () => ruleNumber('maxTicketAttachments', 5);
+
+// فول‌بکِ آفلاینِ منشور: واژه‌به‌واژه همان چیزی که دیروز در این فایل سفت
+// بود. عمداً با متنِ سرور *یکی نیست*: متنِ سرور نسخهٔ کامل‌تر است (ذکرِ
+// «بخت‌آزمایی» و «قوانین بانک مرکزی»). به‌محض رسیدنِ config همین
+// فول‌بک جایش را به نسخهٔ سرور می‌دهد و وب و اندروید یک منشور می‌شوند.
+// تنها حالتی که متنِ کوتاهِ وب دیده می‌شود، قطعیِ شبکه در اولین اجراست.
+const PRIVACY_FALLBACK = [
+  { title: '۱. ماهیت پلتفرم سرگرمی و بازی مهارت‌محور:',
+    body: 'اپلیکیشن قلقلی یک محیط سرگرمی، مسابقات مهارتی و کلکسیون فوتوکارت است. این پلتفرم هیچ‌گونه فعالیت شرط‌بندی یا قمار نداشته و تمامی پاداش‌ها بر مبنای مهارت بازیکنان محاسبه می‌شود.' },
+  { title: '۲. حفظ اطلاعات کاربری:',
+    body: 'شماره تماس و اطلاعات هویتی شما کاملاً محفوظ بوده و به هیچ شخص ثالثی واگذار نمی‌شود.' },
+  { title: '۳. شفافیت مالی و تسویه‌حساب:',
+    body: 'جوایز کیف پول طبق قوانین شاپرک و پایا به نام صاحب حساب واریز می‌گردد.' },
+];
 
 const STATUS_LABEL = {
   open: 'باز',
@@ -31,6 +52,7 @@ const FAQ = [
 ];
 
 export default function Support({ token, api, req, asset }) {
+  useLive(); // با رسیدنِ config، متن‌ها و سقفِ پیوست تازه می‌شوند
   const [tickets, setTickets] = useState([]);
   const [quota, setQuota] = useState(null);
   const [active, setActive] = useState(null);
@@ -97,14 +119,24 @@ export default function Support({ token, api, req, asset }) {
       {privacyOpen && (
         <div className="modalShade" onClick={() => setPrivacyOpen(false)}>
           <div className="confirmBox" onClick={e => e.stopPropagation()}>
-            <h3>حریم خصوصی و شفافیت بازی</h3>
+            <h3>{text('support.privacyTitle', 'حریم خصوصی و شفافیت بازی')}</h3>
+            {/* بندها از `support.privacySections` می‌آیند و *تعدادشان* هم از
+                همان‌جا: اگر ادمین بندِ چهارمی اضافه کند، وب و اندروید هر دو
+                بندِ چهارم را نشان می‌دهند. قبلاً هر دو کلاینت سه بند را دستی
+                نوشته بودند و افزودنِ یک بند یعنی ساختنِ آپدیت — همان چیزی
+                که فاز ۲ برای «بی‌نصبِ مجدد» وجود دارد. چیدمان (بُلد + دو
+                شکستِ خط) مو‌به‌مو همانِ دیروز است. */}
             <p>
-              <b>۱. ماهیت پلتفرم سرگرمی و بازی مهارت‌محور:</b><br />
-              اپلیکیشن قلقلی یک محیط سرگرمی، مسابقات مهارتی و کلکسیون فوتوکارت است. این پلتفرم هیچ‌گونه فعالیت شرط‌بندی یا قمار نداشته و تمامی پاداش‌ها بر مبنای مهارت بازیکنان محاسبه می‌شود.<br /><br />
-              <b>۲. حفظ اطلاعات کاربری:</b><br />
-              شماره تماس و اطلاعات هویتی شما کاملاً محفوظ بوده و به هیچ شخص ثالثی واگذار نمی‌شود.<br /><br />
-              <b>۳. شفافیت مالی و تسویه‌حساب:</b><br />
-              جوایز کیف پول طبق قوانین شاپرک و پایا به نام صاحب حساب واریز می‌گردد.
+              {(() => {
+                const secs = rawList('support.privacySections', PRIVACY_FALLBACK);
+                return secs.map((sec, i) => (
+                  <React.Fragment key={i}>
+                    <b>{sec?.title ?? ''}</b><br />
+                    {sec?.body ?? ''}
+                    {i < secs.length - 1 ? <><br /><br /></> : null}
+                  </React.Fragment>
+                ));
+              })()}
             </p>
             <button className="main" onClick={() => setPrivacyOpen(false)}>متوجه شدم</button>
           </div>
@@ -119,7 +151,13 @@ export default function Support({ token, api, req, asset }) {
             onError={setMsg} />
         : <div className="quotaBox">
             <b>{quota?.reason === 'open_ticket' ? 'یک تیکت باز دارید' : 'سقف روزانه تکمیل شد'}</b>
-            <p>{quota?.message}</p>
+            {/* اگر سرور پیامِ ویژه نفرستد، به‌جای جایِ خالی، قانونِ روزانه را
+                خودمان از `support.ticketRule` می‌سازیم. عدد از `live_rules`
+                است — پس «۱» این‌جا دوباره سفت نشده، فقط در جایِ فول‌بک نشسته
+                و `fa()` همان تبدیلِ رقمِ بی‌رویه را یک‌جا انجام می‌دهد. */}
+            <p>{quota?.message || text('support.ticketRule',
+              `در هر روز می‌توانید ${fa(ruleNumber('ticketsPerDay', 1))} تیکت جدید ثبت کنید.`,
+              { ticketsPerDay: ruleNumber('ticketsPerDay', 1) })}</p>
             {quota?.openTicket && (
               <button className="main" onClick={() => setActive(quota.openTicket)}>
                 رفتن به تیکت باز
@@ -158,7 +196,8 @@ function Shots({ urls, asset, onRemove }) {
 
 function ShotPicker({ urls, setUrls, api, token, disabled }) {
   const [busy, setBusy] = useState(false);
-  const room = MAX_SHOTS - urls.length;
+  const limit = maxShots();
+  const room = limit - urls.length;
 
   async function pick(files) {
     if (room <= 0) return;
@@ -184,9 +223,20 @@ function ShotPicker({ urls, setUrls, api, token, disabled }) {
     setBusy(false);
   }
 
+  // `support.attachmentsFull` تا این دور **هیچ‌جا خوانده نمی‌شد**: فیلدی
+  // در پنل که کاربر_effect_ آن هیچ بود — یعنی ادمین می‌نوشت «دیگر تصویری
+  // لازم نیست» و هیچ صفحه‌ای عوض نمی‌شد. گاردِ بی‌مصرف حالا همین را قرمز
+  // می‌کند. چیدمان دست‌نخورده: یک <small> زیر همان label، فقط در حالتی
+  // که سقف پر شده دیده می‌شود (امروز آن‌جا هیچ متنی نبود، پس این افزودنِ
+  // سبکِ راهنماست نه تغییرِ طرح — و در دو کلاینت یکسان است).
+  const fullNote = room <= 0
+    ? text('support.attachmentsFull', 'تکمیل سقف {maxAttachments} تصویر',
+        { maxAttachments: fa(limit) })
+    : null;
+
   return (
     <label className="shotBtn">
-      {busy ? 'در حال آپلود...' : `افزودن عکس (${urls.length}/${MAX_SHOTS})`}
+      {busy ? 'در حال آپلود...' : `افزودن عکس (${urls.length}/${limit})`}
       <input type="file" accept="image/*" multiple hidden
         disabled={disabled || busy || room <= 0}
         onChange={(e) => { pick(e.target.files); e.target.value = ''; }} />

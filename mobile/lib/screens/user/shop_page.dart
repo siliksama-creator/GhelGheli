@@ -150,6 +150,10 @@ class _ShopPageState extends State<ShopPage> {
   Future<void> _buyPlan(Map<String, dynamic> plan) async {
     final price = (plan['price'] as num?)?.toInt() ?? 0;
     final annual = plan['billingCycle'] == 'annual';
+    // مدتِ پلن از خودِ پلن می‌آید (`durationDays`)، با همان فول‌بک‌هایی
+    // که وب در `Shop.jsx` می‌گذارد (۳۰/۳۶۵) — تا دو کلاینت در حالتِ
+    // بی‌فیلد هم یک عدد ببینند.
+    final days = (plan['durationDays'] as num?)?.toInt() ?? (annual ? 365 : 30);
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -162,7 +166,18 @@ class _ShopPageState extends State<ShopPage> {
             Gaps.vXs,
             Text(annual
                 ? 'قاب، عنوان پروفایل و قالب نتیجهٔ سالانه دائمی هستند؛ یک فرصت تغییر باشگاه هم می‌گیری.'
-                : 'دسترسی قاب‌ها و افکت نام، ستاره پلاس، Premium Pass و حذف تبلیغات برای ۳۰ روز فعال می‌شود.'),
+                // عددِ «۳۰ روز» داخلِ رشته سفت بود: ادمین اگر مدتِ پلاس را
+                // عوض می‌کرد، جمله دروغ می‌گفت. حالا جمله از
+                // `plus.benefitsNote` و عدد از `durationDays` می‌آید؛
+                // فول‌بک هم *قالب* است (با {days}) تا در حالتِ آفلاین هم
+                // رقمِ سفت‌شده‌ای روی صفحه نماند — `liveText` خودش
+                // `faNum` می‌کند، پس خروجی مو‌به‌مو همان دیروز است.
+                // شاخهٔ `annual` عمداً وصل نشد: جمله‌اش («تغییرِ باشگاه»)
+                // مخصوصِ دیالوگِ اندروید است و در وب وجود ندارد؛ ساختنِ
+                // کلیدِ نو برای یک رشته، قراردادِ کلیدها را شلوغ می‌کند.
+                : liveText('plus.benefitsNote',
+                    'دسترسی قاب‌ها و افکت نام، ستاره پلاس، Premium Pass و حذف تبلیغات برای {days} روز فعال می‌شود.',
+                    vars: {'days': days})),
           ],
         ),
         actions: [
