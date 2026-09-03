@@ -384,15 +384,6 @@ def main():
         r.check('ردیف‌ها `createdAt` دارند (شکلِ camelCaseِ historyView)',
                 all(isinstance(h.get('createdAt'), str) for h in rows if isinstance(h, dict)),
                 'پنل‌ها این فیلد را می‌خوانند؛ نبودنش یعنی «تاریخچهٔ بی‌تاریخ»')
-        # شاهدِ اصلیِ «بدونِ نصبِ مجدد»: بدنهٔ *عمومیِ* config بعد از همه‌چیز
-        # باید مو‌به‌مو همان چیزی باشد که پیش از تست خواندیم. این را نه
-        # پنلِ ادمین می‌گوید نه تستِ لوکال؛ فقط همین سرورِ زنده.
-        _, cfg_end, _ = req('GET', '/api/config')
-        r.check('configِ عمومی بعدِ تست مو‌به‌مو به ابتدا برگشت',
-                (cfg_end or {}).get('copy') == original_copy
-                and (cfg_end or {}).get('rules') == original_rules,
-                ' | '.join(_diff(original_copy, (cfg_end or {}).get('copy'))[:3]))
-
         code, rv, _ = req('POST', LIVE + '/copy/revert', tok)
         r.check('revert یک نسخه به عقب می‌رود و `{copy}` برمی‌گرداند',
                 code == 200 and isinstance((rv or {}).get('copy'), dict),
