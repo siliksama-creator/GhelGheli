@@ -234,6 +234,32 @@ ok('گروه‌هایِ بی‌منبع (که هیچ متنی ندارند) در
 // می‌گوید «پنلِ موبایل باگ دارد» در حالی که فقط نصفش ساخته شده.
 ok('وب: پیش‌نمایش از `/preview` می‌گیرد', /live-content\/preview/.test(webPage));
 ok('اندروید: پیش‌نمایش از `/preview` می‌گیرد', /live-content\/preview/.test(mobilePage));
+
+// «preview را صدا می‌زند» گاردِ بی‌ارزشی بود: نسخهٔ اندروید دقیقاً همین را
+// داشت و `_preview` را **هیچ‌جا نمایش نمی‌داد** — `dart analyze` آن را
+// `unused_field` و از نوعِ error گفت و CI قرمز شد (صفحه‌ای که هرگز
+// کامپایل نشده بود، با ✅ در نقشه‌راه ایستاده بود). پس دو سنجهٔ واقعی:
+//  • خروجیِ سرور باید در ویجتِ متنی بنشیند، نه فقط در یک field؛
+//  • هیچ Futureِ بیawait در این صفحه نماند (قاعدهٔ همان‌جا، نه در کل ریپو).
+{
+  const renders = /Text\(\s*filled\b/.test(mobilePage) ||
+    /_previewOf\(/.test(mobilePage) && /Text\(\s*\n?\s*filled/.test(mobilePage);
+  ok('اندروید: خروجیِ preview در متنِ «در اپ:» نشسته، نه فقط در یک فیلد',
+    renders, 'پیش‌نمایشِ بی‌مصرف = هم باگِ analyze، هم ادمینِ کور');
+  // خط‌به‌خط، نه با `slice` و `$`: تعریفِ `Future<void> _loadHistory() async {`
+  // هم `-loadHistory()` را دارد و اگر کلِ متنِ قبلی را بکاوی، هر `await`ِ
+  // دیگری در فایل آن را «پوشش‌داده» می‌نمایاند — گاردی که *سبزِ کور* است.
+  const naked = mobilePage.split('\n')
+    .map((l, i) => ({ l: l.replace(/\/\/.*$/, '').trim(), i: i + 1 }))
+    .filter(({ l }) => l.includes('_loadHistory()') && !/async\s*\{?\s*$/.test(l) &&
+      !/^(await|return)\b/.test(l));
+  ok('اندروید: هیچ فراخوانیِ Futureِ بیawait نمانده', naked.length === 0,
+    naked.map((x) => `خط ${x.i}: ${x.l}`).join(' | ') +
+      ' — unawaited_futures در این پروژه error است، warning نه');
+  ok('اندروید: fieldهایِ بی‌مصرف نگه نمی‌داریم (منبعِ حقیقتِ دوم)',
+    !/_ruleValues\s*=/.test(mobilePage),
+    'پاسخِ PATCHِ rules باید روی کنترلرها بنشیند (`_syncNums`)، نه در یک mapِ خاموش');
+}
 ok('وب: ذخیره با هشدارِ جای‌نگهدار قفل می‌شود', /disabled=\{missing\.length > 0\}/.test(webPage));
 ok('اندروید: ذخیره با هشدارِ جای‌نگهدار قفل می‌شود',
   /warnings\.isNotEmpty\)\s*\?\s*null\s*:\s*_save/.test(mobilePage));

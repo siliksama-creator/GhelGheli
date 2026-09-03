@@ -4,6 +4,13 @@ import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
 import '../../theme/tokens.dart';
+// `SectionHeader` در `state_views.dart` نیست (آن‌جا فقط LoadingView/
+// EmptyState/ErrorBanner زندگی می‌کنند). این فایل بدونِ `flutter analyze`
+// نوشته شد و اولین باری که دارت واقعاً ترجمه‌اش کرد همین خط شکست.
+// درسِ فاز ۳ که در نقشه‌راه هم نوشته شد: تا `analyze-and-test` سبز نشود،
+// هیچ «پنل ساخته شد»ی تمام‌شده نیست — گاردِ parityِ متن‌محور فایل را به‌عنوانِ
+// *متن* می‌خواند و از وجودِ یک کلاسِ ناموجود خبر نمی‌داد.
+import '../../widgets/section_header.dart';
 import '../../widgets/state_views.dart';
 import 'widgets/form_section.dart';
 
@@ -72,7 +79,11 @@ class _AdminLiveCopyState extends State<AdminLiveCopy> {
   bool _proMode = false;
 
   Map<String, dynamic> _ruleDefs = const {};
-  Map<String, dynamic> _ruleValues = const {};
+  // `_ruleValues` حذف شد. کادرهای عددی مقدارشان را از کنترلرهای `_nums`
+  // می‌گیرند و پاسخِ PATCHِ `rules` هیچ مصرف‌کننده‌ای نداشت — یعنی یک
+  // «منبعِ حقیقتِ دوم» که می‌توانست با کادرِ روی صفحه می‌چرید. بی‌فیلد،
+  // سرریزِ مقدار به clampِ سمتِ سرور فقط یک‌جا دیده می‌شود: همین‌جا پایین،
+  // با `_syncNums` روی همان کنترلرها.
   Map<String, dynamic> _saved = const {}; // قالبِ ذخیره‌شده (مرجعِ مقایسه)
   Map<String, dynamic> _preview = const {}; // خروجیِ پرشده از سرور
   List<dynamic> _history = const [];
@@ -152,12 +163,15 @@ class _AdminLiveCopyState extends State<AdminLiveCopy> {
       if (!mounted) return;
       setState(() {
         _ruleDefs = defs;
-        _ruleValues = values;
         _saved = template;
         _loading = false;
       });
       _refreshPreview();
-      _loadHistory();
+      // `await` نه برای ترتیب، برای *خطا*: این متد try/catch دارد و اگر
+      // بیawait صداش کنیم، خطای شبکهٔ تاریخچه به unhandled-rejectionِ خودِ
+      // Zone می‌افتد (dart analyze این را `unawaited_futures` و از نوعِ error
+      // می‌شمارد، نه warning — همان چیزی که باعث شد CI قرمز شود).
+      await _loadHistory();
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -190,6 +204,17 @@ class _AdminLiveCopyState extends State<AdminLiveCopy> {
     } finally {
       if (mounted) setState(() => _loadingDefaults = false);
     }
+  }
+
+  /// مقدارهایِ بازگشتیِ سرور را روی کادرهای عددی می‌نشاند.
+  void _syncNums(Map<String, dynamic> rules) {
+    rules.forEach((name, v) {
+      final c = _nums['$name'];
+      if (c != null) {
+        final t = '$v';
+        if (c.text != t) c.text = t;
+      }
+    });
   }
 
   void _notify(String text, {bool error = false}) {
@@ -329,10 +354,17 @@ class _AdminLiveCopyState extends State<AdminLiveCopy> {
       setState(() {
         _saved = _mapOf(patched['copy']);
         _draftOverride = const {};
-        if (rules['rules'] is Map) _ruleValues = _mapOf(rules['rules']);
       });
+      // سرور عدد را clamp کرده؟ کادر را با مقدارِ *نهایی* هماهنگ می‌کنیم،
+      // وگرنه ادمین ۹ تایپ می‌کند، ۵ ذخیره می‌شود، و کادر همچنان ۹ نشان
+      // می‌دهد — یعنی پنلی که دروغ می‌گوید و باید دو بار ذخیره شود.
+      _syncNums(_mapOf(rules['rules']));
       _refreshPreview();
-      _loadHistory();
+      // `await` نه برای ترتیب، برای *خطا*: این متد try/catch دارد و اگر
+      // بیawait صداش کنیم، خطای شبکهٔ تاریخچه به unhandled-rejectionِ خودِ
+      // Zone می‌افتد (dart analyze این را `unawaited_futures` و از نوعِ error
+      // می‌شمارد، نه warning — همان چیزی که باعث شد CI قرمز شود).
+      await _loadHistory();
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text(
               'ذخیره شد — از اجرای/بارِ بعدی، وب و اندروید همین را می‌بینند')));
@@ -372,7 +404,11 @@ class _AdminLiveCopyState extends State<AdminLiveCopy> {
       if (!mounted) return;
       setState(() => _saved = back);
       _refreshPreview();
-      _loadHistory();
+      // `await` نه برای ترتیب، برای *خطا*: این متد try/catch دارد و اگر
+      // بیawait صداش کنیم، خطای شبکهٔ تاریخچه به unhandled-rejectionِ خودِ
+      // Zone می‌افتد (dart analyze این را `unawaited_futures` و از نوعِ error
+      // می‌شمارد، نه warning — همان چیزی که باعث شد CI قرمز شود).
+      await _loadHistory();
       if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text('به نسخهٔ قبلی برگشت')));
@@ -474,6 +510,14 @@ class _AdminLiveCopyState extends State<AdminLiveCopy> {
     );
   }
 
+  /// `preview` از سرور shapeِ `{group: {field: "رشتهٔ پرشده"}}` است.
+  String? _previewOf(String group, String field) {
+    final g = _preview[group];
+    if (g is! Map) return null;
+    final v = g[field];
+    return v is String ? v : null;
+  }
+
   Widget _warningsCard(List<String> warnings) {
     return FormSection(
       title: 'چیزهایی که جا افتاده',
@@ -497,21 +541,55 @@ class _AdminLiveCopyState extends State<AdminLiveCopy> {
     fields.forEach((field, value) {
       final key = _key(group, '$field');
       if (value is String) {
+        // آینهٔ `live-copy.jsx`: پیش‌نمایشِ پر‌شده زیرِ همان فیلد. بدونِ این
+        // خط، `_preview` فقط نوشته می‌شد و خوانده نمی‌شد (dart analyze دقیقاً
+        // همین را `unused_field` گفت و قرمز شد) — یعنی سرور برای nothing
+        // کار می‌کرد و ادمینِ اندروید هیچ‌وقت نمی‌دید خروجیِ واقعیِ «ورودی
+        // {stakeLow}» چه می‌شود. وقتی پاسخِ سرور هنوز نیامده «—» نشان
+        // می‌دهیم، نه خودِ ورودی: پیش‌نمایشی که ورودیِ کاربر را به‌عنوانِ
+        // «چیزی که کاربر می‌بیند» چاپ کند، دروغ‌گو است.
+        final filled = _previewOf(group, '$field');
         children.add(Padding(
           padding: const EdgeInsets.only(bottom: Gaps.sm),
-          child: TextField(
-            controller: _ctrlFor(group, '$field', value),
-            maxLines: null,
-            decoration: InputDecoration(
-              labelText:
-                  _proMode ? key : _labelFor(key, value),
-              border: const OutlineInputBorder(),
-              isDense: true,
-            ),
-            onChanged: (_) {
-              setState(() {});
-              _refreshPreview();
-            },
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: _ctrlFor(group, '$field', value),
+                maxLines: null,
+                decoration: InputDecoration(
+                  labelText: _proMode ? key : _labelFor(key, value),
+                  border: const OutlineInputBorder(),
+                  isDense: true,
+                ),
+                onChanged: (_) {
+                  setState(() {});
+                  _refreshPreview();
+                },
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 4, right: 2),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.visibility_outlined,
+                        size: 13, color: Colors.white54),
+                    const SizedBox(width: 4),
+                    const Text('در اپ: ',
+                        style: TextStyle(
+                            fontSize: 11.5, color: Colors.white54)),
+                    Expanded(
+                      child: Text(
+                          filled == null || filled.isEmpty ? '—' : filled,
+                          style: const TextStyle(
+                              fontSize: 11.5,
+                              height: 1.5,
+                              color: Color(0xFF9AE6B4))),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ));
       } else if (value is List) {
