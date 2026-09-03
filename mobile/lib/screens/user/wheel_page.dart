@@ -203,6 +203,13 @@ class _WheelPageState extends State<WheelPage>
       // اعداد راهنمای دعوت از /api/config — نه ثابت ۱۰/۵۰/۳ داخل APK.
       try {
         final cfg = await widget.api.get('/api/config');
+        // این صفحه هم `/api/config` را خودش می‌گیرد؛ همان بدنه را به منبع
+        // می‌دهیم تا «منبعِ یکتا» شعارِ معماری نماند: بیِ این خط، متنِ
+        // زندهٔ این صفحه تا باری که home_shell config را می‌گیرد (یا تا
+        // بازگشت از پس‌زمینه) کهنه می‌ماند — یعنی کاربر عددِ امروز را در
+        // جدول می‌بیند و جملهٔ دیروز را در توضیح. برای تستِ «۲۰ تغییرِ
+        // پنل» بدترین حالت همین است: پنل کار می‌کند ولی نصفِ صفحه نه.
+        if (mounted && cfg is Map) AppConfig.instance.apply(cfg);
         if (mounted && cfg is Map && cfg['referral'] is Map) {
           final r = Map<String, dynamic>.from(cfg['referral'] as Map);
           setState(() {

@@ -16,6 +16,7 @@ import '../../widgets/coin_chip.dart';
 import '../../widgets/coin_guide.dart';
 import 'clubs_page.dart';
 import '../../widgets/ui_icon.dart';
+import '../../core/app_config.dart';
 
 /// Monthly league leaderboard: podium (top 3) + ranked list, refreshed
 /// every 12s. Includes Previous Season Winners tab.
@@ -54,8 +55,15 @@ class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
   Future<void> _load() async {
     try {
       final cfg = await widget.api.get('/api/config');
+      // این صفحه هم `/api/config` را خودش می‌گیرد؛ همان بدنه را به منبع
+      // می‌دهیم تا «منبعِ یکتا» شعارِ معماری نماند: بیِ این خط، متنِ
+      // زندهٔ این صفحه تا باری که home_shell config را می‌گیرد (یا تا
+      // بازگشت از پس‌زمینه) کهنه می‌ماند — یعنی کاربر عددِ امروز را در
+      // جدول می‌بیند و جملهٔ دیروز را در توضیح. برای تستِ «۲۰ تغییرِ
+      // پنل» بدترین حالت همین است: پنل کار می‌کند ولی نصفِ صفحه نه.
       if (mounted && cfg is Map) {
         final m = Map<String, dynamic>.from(cfg);
+        AppConfig.instance.apply(m);
         if (m['economy'] is Map) {
           setState(() => _economy = Map<String, dynamic>.from(m['economy']));
         }

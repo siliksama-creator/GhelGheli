@@ -52,6 +52,7 @@ class _PrivateMatchDialogState extends State<PrivateMatchDialog> {
     try {
       final cfg = await widget.api.get('/api/config');
       if (!mounted || cfg is! Map) return;
+      AppConfig.instance.apply(cfg);
       final st = cfg['stakes'];
       if (st is Map && st['lobby'] is List) {
         final list = (st['lobby'] as List).map((e) => (e as num).toInt()).toList();

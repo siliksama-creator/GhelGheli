@@ -6,6 +6,7 @@ import '../../theme/tokens.dart';
 import '../../widgets/badges.dart';
 import '../../widgets/gradient_panel.dart';
 import '../../widgets/animated_logo.dart';
+import '../../core/app_config.dart';
 
 /// Unified login / register / admin-login screen.
 ///
@@ -56,6 +57,7 @@ class _AuthScreenState extends State<AuthScreen> {
     try {
       final res = await widget.api.get('/api/config', fresh: true);
       if (!mounted || res is! Map) return;
+      AppConfig.instance.apply(res);
       final ref = res['referral'];
       if (ref is Map) {
         final n = (ref['spinsPerReferral'] as num?)?.toInt();

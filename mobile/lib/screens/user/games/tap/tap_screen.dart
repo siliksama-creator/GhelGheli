@@ -19,6 +19,7 @@ import 'tap_day.dart';
 import 'tap_engine.dart';
 import 'tap_storage.dart';
 import 'tap_sync.dart';
+import '../../../core/app_config.dart';
 
 class TapGameScreen extends StatefulWidget {
   const TapGameScreen({
@@ -138,6 +139,13 @@ class _TapGameScreenState extends State<TapGameScreen>
           .get('/api/config')
           .timeout(const Duration(milliseconds: 2500));
       if (res is Map) {
+        // این صفحه هم `/api/config` را خودش می‌گیرد؛ همان بدنه را به منبع
+        // می‌دهیم تا «منبعِ یکتا» شعارِ معماری نماند: بیِ این خط، متنِ
+        // زندهٔ این صفحه تا باری که home_shell config را می‌گیرد (یا تا
+        // بازگشت از پس‌زمینه) کهنه می‌ماند — یعنی کاربر عددِ امروز را در
+        // جدول می‌بیند و جملهٔ دیروز را در توضیح. برای تستِ «۲۰ تغییرِ
+        // پنل» بدترین حالت همین است: پنل کار می‌کند ولی نصفِ صفحه نه.
+        AppConfig.instance.apply(res);
         final m = Map<String, dynamic>.from(res);
         if (m['economy'] is Map) {
           economy = Map<String, dynamic>.from(m['economy']);
