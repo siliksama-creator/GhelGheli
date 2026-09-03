@@ -18,6 +18,7 @@ const { pool } = require('./config/db');
 const { audit } = require('./services/auditService');
 const opsConfig = require('./services/opsConfig');
 const opsLimits = require('./services/opsLimits');
+const liveContent = require('./services/liveContent');
 const {
   createNotification,
   sendSegmented,
@@ -2051,7 +2052,12 @@ app.delete('/api/chat/messages/:id/like', auth, validateUuid('id'), asyncHandler
 //   * while a ticket is open the user replies inside that thread instead
 //   * only an admin can close it, which frees the user to open a new one
 //   * every message may carry 1..5 image attachments
-const TICKET_MAX_ATTACHMENTS = 5;
+// سقفِ ضمیمهٔ هر تیکت و سهمیهٔ تیکتِ روزانه حالا **زنده**اند
+// (live_rules.maxTicketAttachments / ticketsPerDay). تابع برمی‌گردانیم نه
+// ثابت، تا اگر ادمین از پنل سقف را عوض کند، همان درخواستِ بعدی سقفِ
+// تازه را ببیند.
+const ticketMaxAttachments = () => liveContent.rules().maxTicketAttachments;
+const ticketsPerDay = () => liveContent.rules().ticketsPerDay;
 
 // Accepts an array of upload URLs previously returned by the upload route.
 // Anything that isn't one of our own /uploads/ paths is rejected so a caller
@@ -2073,8 +2079,9 @@ function sanitizeAttachments(input) {
       throw err;
     }
     out.push(v);
-    if (out.length > TICKET_MAX_ATTACHMENTS) {
-      const err = new Error(`حداکثر ${TICKET_MAX_ATTACHMENTS} عکس می‌توانید ارسال کنید`);
+    const maxAtt = ticketMaxAttachments();
+    if (out.length > maxAtt) {
+      const err = new Error(`حداکثر ${maxAtt} عکس می‌توانید ارسال کنید`);
       err.status = 400;
       throw err;
     }
@@ -2126,11 +2133,18 @@ async function ticketQuota(userId) {
     "SELECT count(*)::int AS c FROM support_tickets WHERE user_id=$1 AND created_at >= date_trunc('day', NOW())",
     [userId]
   );
-  if (today.rows[0].c >= 1) {
+  // سهمیهٔ روزانه از اعدادِ زنده — متنِ راهنما هم از همان قالبِ زنده
+  // (live_copy.support.ticketRule) می‌آید تا عددِ متن با عددِ منطقِ
+  // سرور هرگز در دو رقم نباشد.
+  const limit = ticketsPerDay();
+  if (today.rows[0].c >= limit) {
     return {
       canCreate: false,
       reason: 'daily_limit',
-      message: 'در هر روز فقط یک تیکت می‌توانید ثبت کنید. فردا دوباره امتحان کنید.',
+      message: liveContent.fillTemplate(
+        liveContent.copy().support.ticketRule,
+        { ticketsPerDay: limit },
+      ),
       openTicket: null,
     };
   }
@@ -2138,7 +2152,7 @@ async function ticketQuota(userId) {
 }
 
 app.get('/api/support/quota', auth, asyncHandler(async (req, res) => {
-  res.json({ ...(await ticketQuota(req.user.id)), maxAttachments: TICKET_MAX_ATTACHMENTS });
+  res.json({ ...(await ticketQuota(req.user.id)), maxAttachments: ticketMaxAttachments() });
 }));
 
 app.post('/api/support/tickets', auth, asyncHandler(async (req, res) => {
@@ -2533,6 +2547,9 @@ app.use('/api', require('./routes/clientConfig')({
   gameRewards: { getGameRewardSettings, saveGameRewardSettings },
   // اعدادِ دعوت/گذر/پلاس/شرط — تا متن‌های راهنما بدون آپدیت اپ زنده بمانند.
   opsLimits, referrals, pass, shop, gameStakes,
+  // محتوا و اعداد زنده (فاز ۱ نقشه‌راه): /api/config حالا `copy`, `rules`
+  // و `configVersion` می‌دهد و پنل‌ها متن/اعداد کل محصول را می‌بینند.
+  liveContent,
 }));
 
 // ویرایشگر گردونه — ظاهر (برچسب/رنگ) و درون (نوع/وزن). بدون این mount
@@ -2926,6 +2943,10 @@ server.listen(port, async () => {
     'photo_match_settings', 'chat_canned_messages', 'shop_plus_plans',
     'ops_limits',
     'sms_config', 'game_economy_settings', 'game_reward_settings',
+    // محتوا و اعداد زنده — بدون این، تا اولین PATCH، کشِ همگامِ
+    // liveContent خالی بود و همهٔ مسیرهای داغ (ساختِ تختهٔ جفت‌یاب،
+    // پنجرهٔ اتصال) از پیش‌فرض کد می‌خواندند نه از دیتابیس.
+    'live_copy', 'live_rules', 'config_version',
   ]).catch(e => console.error('[ops] پیش‌بارگذاری تنظیمات ناموفق بود:', e.message));
   await ensureActiveSeason();
   console.log(`GhelGheli API on :${port}`);

@@ -32,6 +32,7 @@ const { pool } = require('../config/db');
 const pointLedger = require('./pointService');
 const wallet = require('./walletService');
 const opsLimits = require('./opsLimits');
+const liveContent = require('./liveContent');
 
 /** درصد کمیسیون امتیازی (ثبت کارت و Tap) — از پنل ادمین قابل تنظیم،
  *  پیش‌فرض ۵ مثل ثابتِ قبلی. */
@@ -70,6 +71,17 @@ function maxInvitesForDaily() {
 /** چرخش روزانهٔ پایه که هر کاربر بدون هیچ دعوتی دارد — از پنل قابل تنظیم. */
 function baseDailySpins() {
   return opsLimits.get().referralBaseDailySpins;
+}
+
+/**
+ * «هر X دعوت = Y چرخش روزانه» — این Y از اعدادِ زنده می‌آید.
+ *
+ * تا این فاز، Y همیشه ۱ بود و عددِ «۱» در متن راهنمای وب/اندروید سفت بود.
+ * حالا ادمین می‌تواند Y را از پنل (فاز ۳) عوض کند و همان راهنما بدون
+ * آپدیت آپدیت می‌شود؛ مقدار پیش‌فرض ۱ است تا اقتصادِ فعلی دست‌نخورده بماند.
+ */
+function spinsPerDailyThreshold() {
+  return liveContent.rules().spinsPerDailyThreshold;
 }
 
 /**
@@ -192,8 +204,8 @@ async function ensureCode(userId, client = pool) {
 /**
  * چند چرخش روزانه این کاربر دارد.
  *
- * پایه ۱، به‌علاوهٔ یکی به ازای هر ۱۰ دعوت، تا سقف ۵۰ دعوت. یعنی بیشترین
- * حالت ۶ چرخش در روز است (۱ پایه + ۵ از دعوت).
+ * «پایه + (دعوت‌های شمرده ÷ آستانه) × ضریب» — پایه و آستانه در
+ * ops_limits، و ضریب (live_rules.spinsPerDailyThreshold) از پنل: «هر آستانه = چند چرخش».
  *
  * از روی COUNT حساب می‌شود نه یک ستون ذخیره‌شده. یک شمارندهٔ ذخیره‌شده باید
  * در هر ثبت‌نام، هر حذف کاربر و هر مسدودسازی به‌روز شود، و اولین جایی که
@@ -209,7 +221,12 @@ function dailySpinsFor(invitedCount) {
   const n = Number(invitedCount);
   const safe = Number.isFinite(n) ? Math.max(0, n) : 0;
   const counted = Math.min(safe, maxInvitesForDaily());
-  return baseDailySpins() + Math.floor(counted / invitesPerDailySpin());
+  // ضریبِ «هر آستانه = چند چرخش» از اعدادِ زنده (live_rules) — پیش‌فرض ۱،
+  // یعنی اقتصادِ فعلی دست‌نخورده؛ ادمین از پنل هر آستانه را به ۲ یا ۳
+  // برساند، راهنمای دعوت (live_copy) هم هم‌زمان همان عدد تازه را چاپ
+  // می‌کند چون هر دو از یک منبع می‌خوانند.
+  return baseDailySpins()
+    + Math.floor(counted / invitesPerDailySpin()) * spinsPerDailyThreshold();
 }
 
 /** تعداد دعوت‌های موفق یک کاربر. */
@@ -537,5 +554,6 @@ module.exports = {
   // نام قدیمی که auth.js هنوز صدا می‌زند — alias زنده‌ی spinsPerReferral.
   get SPINS_PER_REFERRAL() { return spinsPerReferral(); },
   invitesPerDailySpin, maxInvitesForDaily, baseDailySpins,
+  spinsPerDailyThreshold,
   COMMISSIONABLE,
 };

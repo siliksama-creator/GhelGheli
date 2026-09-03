@@ -27,7 +27,10 @@ ok(missions.periodKey('daily', new Date('2026-08-11T12:00:00Z')) === '2026-08-11
   'mission day follows Tehran civil date');
 
 const engine = read('backend/src/games/engine.js');
-ok(engine.includes('RECONNECT_WINDOW_MS = 25_000') && engine.includes("'game:resume'"),
+// نگهبانِ قدیمی «ثابت ۲۵ ثانیه» بود؛ حالا پنجرهٔ اتصال زنده است — نگهبان
+// جدید همان قصد را می‌پرسد: موتور پنجره‌ای برای قطع‌های کوتاه دارد و
+// 'game:resume' را می‌شنود.
+ok(engine.includes('reconnectWindowMs = () =>') && engine.includes("'game:resume'"),
   'engine preserves and resumes short disconnects');
 ok(engine.includes("'game:rematch'") && engine.includes('completedMatches'),
   'engine has bounded same-opponent rematch contracts');

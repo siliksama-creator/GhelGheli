@@ -14,7 +14,16 @@
 // rather than on points.
 //
 // Move = the index of the card to flip.
-const SIZE = 16; // 4x4 => 8 pairs
+//
+// اندازهٔ تخته حالا **زنده** است (live_rules.memoryPairs، بازهٔ امن ۴–۸):
+// ادمین تعداد جفت را از پنل عوض کند، همان اجرا با تختهٔ تازه ساخته می‌شود
+// و کلاینت‌ها اندازه را از `state.size`/`state.cols` می‌گیرند — بدون آپدیت.
+// چرا ۸ سفت است: شکل‌ها (FACES) فقط ۸ تا هستند و تخته ۴×۴؛ بازهٔ امن
+// دقیقاً همین مرزِ واقعی است تا هیچ‌وقت جفتی بدون شکل یا تخته‌ای
+// پُرتر از شکل ساخته نشود.
+const liveContent = require('../../services/liveContent');
+const pairCount = () => liveContent.rules().memoryPairs;
+const boardSize = () => pairCount() * 2;
 const COLS = 4;
 
 // Card faces. These are ASSET KEYS, not emoji: each one maps to a purpose-made
@@ -52,15 +61,20 @@ function shuffle(a) {
 }
 
 function create() {
-  const deck = shuffle([...FACES, ...FACES]);
+  const n = boardSize();
+  // فقط j = pairs() شکلِ اول را می‌بریم — اگر ادمین تخته را کوچک کند،
+  // کارتِ اضافه نباید بیافتد؛ و اگر بزرگ کند، از ۸ شکلِ موجود حداکثر
+  // را داریم (بازۀِ امنِ live_rules همین مرز است).
+  const faces = FACES.slice(0, pairCount());
+  const deck = shuffle([...faces, ...faces]);
   return {
     cols: COLS,
-    size: SIZE,
+    size: n,
     deck,                       // never sent raw to clients (see decorate)
-    matched: Array(SIZE).fill(null), // owner symbol once a pair is taken
+    matched: Array(n).fill(null), // owner symbol once a pair is taken
     flipped: [],                // face-up this turn (max 2)
     // Diagnostics + the flip ceiling that guarantees a match always ends.
-    reveals: Array(SIZE).fill(0),
+    reveals: Array(n).fill(0),
     totalFlips: 0,
     scores: { X: 0, O: 0 },
     lastResult: null,           // 'match' | 'miss'
@@ -78,7 +92,10 @@ const isTaken = (state, i) => state.matched[i] !== null;
 const pairShowing = state => state.flipped.length >= 2;
 
 function isValidMove(state, i) {
-  if (!Number.isInteger(i) || i < 0 || i >= SIZE) return false;
+  // اندازه از **خودِ تخته** — نه از ثابتِ لحظهٔ ساخت: اگر میانِ بازی
+  // ادمین اندازه را عوض کند، اتاقِ باز باید دقیقاً با تخته‌ی خودش
+  // قید شود (نه اندازهٔ جدید).
+  if (!Number.isInteger(i) || i < 0 || i >= state.size) return false;
   if (isTaken(state, i)) return false;
   // Never allow the card(s) currently face-up to be chosen again. Without
   // this the stale missed pair stayed "playable" and a client could re-flip
@@ -228,5 +245,8 @@ module.exports = {
   // Playable alone against the clock (backend/src/games/solo.js).
   solo: true,
   create, result, isValidMove, applyMove, nextTurn, botMove, decorate,
-  FACES, SIZE, COLS,
+  FACES, pairCount, COLS,
+  // `SIZE` باقی مانده تا خواننده‌های قدیمی (تست‌ها) شکست نخورند؛ حالا
+  // «اندازهٔ لحظه‌ایِ تخته» را برمی‌گرداند نه ثابتِ ۱۶.
+  get SIZE() { return boardSize(); },
 };

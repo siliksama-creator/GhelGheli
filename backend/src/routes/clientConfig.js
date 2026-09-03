@@ -83,6 +83,8 @@ module.exports = function createClientConfigRoutes(deps) {
     pool, adminAuth, requireRole, asyncHandler, audit, rateLimit, gameEconomy,
     // اختیاری — برای اهرمِ بدون‌آپدیتِ متن‌های راهنما/دعوت/گذر/شرط.
     opsLimits, referrals, pass, shop, gameStakes,
+    // محتوا و اعداد زنده (فاز ۱ نقشه‌راه).
+    liveContent,
   } = deps;
 
   // عمومی و سبک — هر اجرای اپ/باز شدن وب یک درخواست می‌زند.
@@ -133,6 +135,11 @@ module.exports = function createClientConfigRoutes(deps) {
           purchaseCommissionPercent: o.referralPurchaseCommissionPercent,
           spinsPerReferral: o.referralSpinsPerInvite,
           invitesPerDailySpin: o.referralInvitesPerDailySpin,
+          // ضریبِ «هر آستانه = چند چرخش روزانه» — از اعدادِ زنده تا متنِ
+          // راهنمای دعوت و عددِ واقعیِ گردونه هرگز در دو رقم نباشند.
+          spinsPerDailyThreshold: liveContent?.rules
+            ? liveContent.rules().spinsPerDailyThreshold
+            : 1,
           maxInvitesForDaily: o.referralMaxInvitesForDaily,
           baseDailySpins: o.referralBaseDailySpins,
           withdrawalThreshold: o.referralWithdrawalThreshold,
@@ -219,6 +226,20 @@ module.exports = function createClientConfigRoutes(deps) {
       plus,
       stakes,
       tapLevelCount,
+      // ── محتوا و اعداد زنده (نقشه‌راه یکپارچه‌سازی — فاز ۱) ────────────
+      //
+      // `copy` قالب‌های متنِ کلِ محصول (با جای‌نگهدار)، `rules` اعدادِ
+      // ساختاریِ زنده و `configVersion` شمارندهٔ ذخیره‌هاست. کلاینت‌های
+      // فاز ۲ این سه را می‌گیرند و متن/عددِ سفتِ APK از بین می‌رود.
+      // کلاینتِ قدیمی این سه کلیدِ ناشناخته را بی‌صدا نادیده می‌گیرد،
+      // پس این افزودن برای نسخه‌های موجودِ استور کاملاً بی‌ضرر است.
+      ...(liveContent
+        ? {
+          copy: liveContent.copy(),
+          rules: liveContent.rules(),
+          configVersion: liveContent.configVersion(),
+        }
+        : {}),
       serverTime: new Date().toISOString(),
     });
   }));
@@ -285,6 +306,72 @@ module.exports = function createClientConfigRoutes(deps) {
       // اعمال نشود — وگرنه مدیر فکر می‌کند کلید کار نمی‌کند.
       featureFlags.primeFeatures(next.features);
       res.json(next);
+    }));
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // «متن‌ها و اعداد» — پنلِ یکپارچه‌سازی (نقشه‌راه — فاز ۱، سمت سرور)
+  //
+  // پنلِ وب و پنلِ اندروید **همین** چهار مسیر را صدا می‌زنند تا «یک محصول،
+  // یک بافت» از همان جا چاپ شود:
+  //   GET   /admin/settings/live-content          → همه‌چیز (نمای پنل)
+  //   PATCH /admin/settings/live-content/rules    → اعدادِ ساختاری (بازهٔ امن)
+  //   PATCH /admin/settings/live-content/copy     → قالب‌های متن
+  //   GET   /admin/settings/live-content/history/:key
+  //   POST  /admin/settings/live-content/:key/revert
+  //   POST  /admin/settings/live-content/preview  → پیش‌نمایش با اعدادِ امروز
+  //
+  // هر ذخیره: تاریخچهٔ قبلی + cache prime + configVersion++ — یعنی همان
+  // لحظه، کلِ محصول (وب + اندروید) بدون آپدیت تغییر می‌کند.
+  // ═══════════════════════════════════════════════════════════════════════
+
+  router.get('/admin/settings/live-content', adminAuth, asyncHandler(async (req, res) => {
+    if (!liveContent) throw Object.assign(new Error('دسترس‌نیافته'), { status: 404 });
+    res.json(liveContent.panelView());
+  }));
+
+  router.patch('/admin/settings/live-content/rules', adminAuth, requireRole(),
+    asyncHandler(async (req, res) => {
+      if (!liveContent) throw Object.assign(new Error('دسترس‌نیافته'), { status: 404 });
+      const next = await liveContent.saveRules(req.body, req.admin.id);
+      await audit(req.admin.id, 'save_live_rules', 'app_settings', null, null, next);
+      res.json({ rules: next, configVersion: liveContent.configVersion() });
+    }));
+
+  router.patch('/admin/settings/live-content/copy', adminAuth, requireRole(),
+    asyncHandler(async (req, res) => {
+      if (!liveContent) throw Object.assign(new Error('دسترس‌نیافته'), { status: 404 });
+      const next = await liveContent.saveCopy(req.body, req.admin.id);
+      await audit(req.admin.id, 'save_live_copy', 'app_settings', null, null,
+        { version: liveContent.configVersion() });
+      res.json({ copy: next, configVersion: liveContent.configVersion() });
+    }));
+
+  // پیش‌نمایش: کلاینت اعدادِ «امروز» (از همان /api/config) می‌فرستد تا
+  // مدیر قبل از ذخیره ببیند متنِ کاربر چه می‌شود — ویرایشِ کور نیست.
+  router.post('/admin/settings/live-content/preview', adminAuth, asyncHandler(async (req, res) => {
+    if (!liveContent) throw Object.assign(new Error('دسترس‌نیافته'), { status: 404 });
+    const vars = req.body?.vars && typeof req.body.vars === 'object' ? req.body.vars : {};
+    res.json(liveContent.preview(vars));
+  }));
+
+  router.get('/admin/settings/live-content/history/:key', adminAuth, asyncHandler(async (req, res) => {
+    if (!liveContent) throw Object.assign(new Error('دسترس‌نیافته'), { status: 404 });
+    const key = req.params.key === 'copy' ? liveContent.COPY_KEY
+      : req.params.key === 'rules' ? liveContent.RULES_KEY : req.params.key;
+    if (key !== liveContent.COPY_KEY && key !== liveContent.RULES_KEY) {
+      throw Object.assign(new Error('کلید ناشناخته'), { status: 400 });
+    }
+    res.json(await liveContent.history(key));
+  }));
+
+  router.post('/admin/settings/live-content/:key/revert', adminAuth, requireRole(),
+    asyncHandler(async (req, res) => {
+      if (!liveContent) throw Object.assign(new Error('دسترس‌نیافته'), { status: 404 });
+      const key = req.params.key === 'copy' ? liveContent.COPY_KEY
+        : req.params.key === 'rules' ? liveContent.RULES_KEY : req.params.key;
+      const next = await liveContent.revert(key, req.admin.id);
+      await audit(req.admin.id, 'revert_live_content', key, null, null, next);
+      res.json({ [key]: next, configVersion: liveContent.configVersion() });
     }));
 
   return router;

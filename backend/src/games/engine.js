@@ -93,7 +93,13 @@ const DEFAULT_TURN_MS = 20_000;
 const QUEUE_PING_MS = 25_000;
 // A short carrier/Wi-Fi handoff must not decide a real match. The room is
 // paused and the same authenticated user can claim the seat on a new socket.
-const RECONNECT_WINDOW_MS = 25_000;
+//
+// طولِ پنجرهٔ اتصالِ دوباره حالا **زنده** است (live_rules.reconnectSeconds،
+// بازهٔ امن ۱۰–۶۰): ادمین از پنل «۲۵ ثانیه» را به مثلاً «۳۰» کند، اتاق‌های
+// **تازه** با پنجرهٔ تازه می‌سازند. اتاقی که وسطِ بازی است پنجرهٔ لحظهٔ
+// قطعِ خودش را نگه می‌دارد (تایمر همان ثانیه‌ای ساخته شده که قطع شد).
+const liveContent = require('../services/liveContent');
+const reconnectWindowMs = () => liveContent.rules().reconnectSeconds * 1000;
 const REMATCH_WINDOW_MS = 90_000;
 const turnMsFor = rules => Number(rules.turnMs) || DEFAULT_TURN_MS;
 
@@ -911,15 +917,19 @@ function suspendForReconnect(room, symbol) {
   room.deadline = null;
   const opponent = symbol === 'X' ? 'O' : 'X';
   const opponentSocket = room.seats[opponent];
+  // پنجرهٔ تازه از اعدادِ زنده — ثانیه را به پیامِ خودمان هم می‌رسانیم
+  // تا متنِ سرور با عددِ واقعی هم‌صدا بماند (کلاینت متنِ خودش را هم
+  // از live_copy می‌گیرد؛ این پیام فقط برای مسیرهای که مستقیم می‌خوانند).
+  const windowMs = reconnectWindowMs();
   if (opponentSocket?.emit) safeEmit(opponentSocket, 'game:opponent_reconnecting', {
     roomId: room.id,
     userId: room.players?.[symbol]?.id,
-    reconnectWindowMs: RECONNECT_WINDOW_MS,
-    message: 'اتصال حریف ناپایدار شده؛ تا ۲۵ ثانیه منتظر بازگشتش می‌مانیم.',
+    reconnectWindowMs: windowMs,
+    message: `اتصال حریف ناپایدار شده؛ تا ${Math.round(windowMs / 1000)} ثانیه منتظر بازگشتش می‌مانیم.`,
   }, room);
   room.reconnectTimers[symbol] = setTimeout(() => {
     if (!room.done && room.reconnecting[symbol]) finish(room, 'DISCONNECT', symbol);
-  }, RECONNECT_WINDOW_MS);
+  }, windowMs);
 }
 
 function resumeSeat(socket) {
@@ -1033,12 +1043,15 @@ const attachGames = function attachGames(io, rulesById) {
         return safeEmit(socket, 'game:error', { message: e.message || 'ترکیب بازی آماده نیست' });
       }
       dropFromQueue(socket);
-      // کد اتاق: ۴ رقمیِ عدد — دقیقاً همان شکلی که کلاینتِ اندروید هم می‌سازد
-      // (و متن «کد ۴ رقمی» در هر دو کلاینت اشاره به همین است). قبلاً این مسیر
-      // ۴ حرفِ base36 می‌ساخت و مسیرِ عمق‌لینک ۴ رقم می‌ساخت؛ دو نسلِ کد در
-      // یک محصول گیج‌کننده بود. اگر طول کد بعداً از پنل قابل تنظیم شد
-      // (live_rules)، این نقطه هم از همان می‌خواند.
-      const code = String(1000 + Math.floor(Math.random() * 9000));
+      // کد اتاق: عددی، و طولش **زنده** است (live_rules.roomCodeLength،
+      // بازهٔ امن ۴–۸). قبل از این فاز این مسیر ۴ حرفِ base36 می‌ساخت و
+      // مسیرِ عمق‌لینک ۴ رقم — دو نسلِ کد در یک محصول؛ حالا هر دو مسیر
+      // یکسان‌اند و هر دو همین «نسلِ زنده» را می‌سازند تا کدِ ارسالیِ
+      // عمق‌لینک (که کلاینت خودش ساخته) همیشه اتاقِ این مسیر را هم باز
+      // کند: هر دو از همان بازه و همان عددِ طول می‌سازند.
+      const codeLen = liveContent.rules().roomCodeLength;
+      const codeLo = 10 ** (codeLen - 1);
+      const code = String(codeLo + Math.floor(Math.random() * (9 * codeLo)));
       const roomId = `room-${code}`;
       socket.privateRoomCode = code;
       socket.privateGameId = gameId;
@@ -1427,7 +1440,8 @@ const attachGames = function attachGames(io, rulesById) {
 
 attachGames.rooms = rooms;
 attachGames.completedMatches = completedMatches;
-attachGames.RECONNECT_WINDOW_MS = RECONNECT_WINDOW_MS;
+// برای تست‌ها و کلاینتِ قدیمی: «پنجرهٔ لحظه‌ای» را برمی‌گرداند نه ثابت.
+attachGames.reconnectWindowMs = reconnectWindowMs;
 attachGames.REMATCH_WINDOW_MS = REMATCH_WINDOW_MS;
 module.exports = attachGames;
 ;
