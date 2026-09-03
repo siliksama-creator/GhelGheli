@@ -85,6 +85,8 @@ module.exports = function createClientConfigRoutes(deps) {
     opsLimits, referrals, pass, shop, gameStakes,
     // محتوا و اعداد زنده (فاز ۱ نقشه‌راه).
     liveContent,
+    // فهرستِ آواتارهای باندل‌شده (lib/avatarKeys) — برای `GET /api/avatars`.
+    avatars,
   } = deps;
 
   // عمومی و سبک — هر اجرای اپ/باز شدن وب یک درخواست می‌زند.
@@ -226,6 +228,25 @@ module.exports = function createClientConfigRoutes(deps) {
       plus,
       stakes,
       tapLevelCount,
+      // ── آواتارها — «چند مدل؟» دیگر عددِ داخل APK نیست (فاز ۲) ──────────
+      //
+      // پیش از این هر دو کلاینت «۱۰ مدل اختصاصی» را در متنِ خودشان نوشته
+      // بودند؛ افزودن آواتارِ تازه یعنی سه تغییرِ جدا و یک آپدیتِ اجباری.
+      // حالا فهرست از همین یک منبع می‌آید: اگر نبود، کلاینت به عددِ
+      // تاریخیِ خودش برمی‌گردد (رفتارِ امروز، بدونِ هیچ تفاوتِ بصری).
+      avatars: avatars
+        ? {
+          count: avatars.AVATAR_LIST.length,
+          keys: avatars.AVATAR_LIST.map((key) => ({
+            key,
+            label: avatars.avatarLabel(key),
+            // مسیرهای هر کلاینت از همان اول فرق داشت (اپ فایلِ داخل APK
+            // را می‌گیرد، وب فایلِ کنارِ باندل را). سرور **فایل** را
+            // می‌گوید و هر کلاینت پیشوندِ خودش را می‌چسباند.
+            file: key,
+          })),
+        }
+        : null,
       // ── محتوا و اعداد زنده (نقشه‌راه یکپارچه‌سازی — فاز ۱) ────────────
       //
       // `copy` قالب‌های متنِ کلِ محصول (با جای‌نگهدار)، `rules` اعدادِ
@@ -241,6 +262,26 @@ module.exports = function createClientConfigRoutes(deps) {
         }
         : {}),
       serverTime: new Date().toISOString(),
+    });
+  }));
+
+  // ── عمومی: فهرستِ آواتارها ────────────────────────────────────────────
+  //
+  // چرا یک مسیرِ جدا وقتی `/api/config` هم آن را می‌دهد؟ چون صفحهٔ
+  // «انتخاب آواتار» تنها جایی است که *فهرست* لازم دارد نه فقط *تعداد*، و
+  // کلاینت نباید برای یک لیستِ ۱۰تایی به کشِ کل config وابسته باشد. پاسخ
+  // کش‌پذیر است (ETag روی همهٔ GETها) و بدونِ احراز هویت — آواتارها دادهٔ
+  // عمومیِ باندل‌اند. افزودن آواتارِ تازه از این به بعد: یک فایل در هر دو
+  // کلاینت + یک ردیف در `backend/src/lib/avatarKeys.js`، بدونِ انتشار اپ.
+  router.get('/avatars', asyncHandler(async (req, res) => {
+    if (!avatars) return res.json({ count: 0, items: [] });
+    res.json({
+      count: avatars.AVATAR_LIST.length,
+      items: avatars.AVATAR_LIST.map((key) => ({
+        key,
+        label: avatars.avatarLabel(key),
+        file: key,
+      })),
     });
   }));
 

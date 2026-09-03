@@ -15,6 +15,10 @@ const swaggerUi = require('swagger-ui-express');
 const YAML = require('yaml');
 const { Server } = require('socket.io');
 const { pool } = require('./config/db');
+// تنها فهرستِ آواتارها — هم `safeAvatarKey` از آن می‌خواند و هم
+// `GET /api/avatars` که «چند مدل آواتار داریم» را از متنِ APK بیرون می‌آورد
+// (فاز ۲ نقشه‌راه یکپارچه‌سازی: هیچ عددِ بازاری در متن UI کلاینت نماند).
+const avatarKeys = require('./lib/avatarKeys');
 const { audit } = require('./services/auditService');
 const opsConfig = require('./services/opsConfig');
 const opsLimits = require('./services/opsLimits');
@@ -663,12 +667,11 @@ function boundedText(value, max) {
 /// interpolated straight into an asset path by the clients
 /// (mobile/lib/core/assets.dart: 'assets/avatars/$key'). That is a path
 /// traversal waiting for a client that resolves it.
-const AVATAR_KEYS = new Set([
-  'avatar_1_football.png', 'avatar_2_trophy.png', 'avatar_3_star.png',
-  'avatar_4_rocket.png', 'avatar_5_lion.png', 'avatar_6_tiger.png',
-  'avatar_7_eagle.png', 'avatar_8_target.png', 'avatar_9_bolt.png',
-  'avatar_10_crown.png',
-]);
+// The list itself moved to `src/lib/avatarKeys.js` (فاز ۲) so the *count* can
+// be served to the clients — `GET /api/avatars` and `avatars` in /api/config —
+// instead of being frozen inside the APK text («۱۰ مدل اختصاصی»). The Set
+// stays bound here because `safeAvatarKey` runs on every profile write.
+const AVATAR_KEYS = avatarKeys.AVATAR_KEYS;
 /// A club crest may also be a profile picture, stored as `club:<slug>`. The
 /// slug is bounded to the same characters the shop generates, so this stays a
 /// whitelist — it can never resolve to a path segment.
@@ -2541,6 +2544,9 @@ app.use('/api', require('./routes/adminSecurity')({
 // «اهرمِ بدون-آپدیت»: کلاینت‌ها این را از /api/config می‌خوانند.
 app.use('/api', require('./routes/clientConfig')({
   pool, adminAuth, requireRole, asyncHandler, audit, rateLimit, gameEconomy,
+  // فهرستِ آواتارها از همان یک منبع — تا «۱۰ مدل» در متنِ اپ نمرد و
+  // افزودن آواتارِ تازه فقط یک ردیف در lib/avatarKeys.js بخواهد.
+  avatars: avatarKeys,
   // بدون این، GET /api/config همیشه gamePoints=null می‌فرستد و نوار
   // راهنمای بازی فقط از bootstrap پر می‌شود. کلاینتی که فقط config
   // می‌خواند (یا bootstrap شکست خورده) امتیاز پنل را نمی‌دید.
