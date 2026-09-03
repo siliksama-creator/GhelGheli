@@ -1033,7 +1033,12 @@ const attachGames = function attachGames(io, rulesById) {
         return safeEmit(socket, 'game:error', { message: e.message || 'ترکیب بازی آماده نیست' });
       }
       dropFromQueue(socket);
-      const code = Math.random().toString(36).substring(2, 6).toUpperCase();
+      // کد اتاق: ۴ رقمیِ عدد — دقیقاً همان شکلی که کلاینتِ اندروید هم می‌سازد
+      // (و متن «کد ۴ رقمی» در هر دو کلاینت اشاره به همین است). قبلاً این مسیر
+      // ۴ حرفِ base36 می‌ساخت و مسیرِ عمق‌لینک ۴ رقم می‌ساخت؛ دو نسلِ کد در
+      // یک محصول گیج‌کننده بود. اگر طول کد بعداً از پنل قابل تنظیم شد
+      // (live_rules)، این نقطه هم از همان می‌خواند.
+      const code = String(1000 + Math.floor(Math.random() * 9000));
       const roomId = `room-${code}`;
       socket.privateRoomCode = code;
       socket.privateGameId = gameId;

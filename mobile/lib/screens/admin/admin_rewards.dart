@@ -446,7 +446,7 @@ class _AdminRewardsState extends State<AdminRewards> {
         ),
         Gaps.vMd,
         FormSection(
-          title: 'جایزه جدید (${faNum(_rewards.length)}/۳۰)',
+          title: 'جایزه جدید (${faNum(_rewards.length)}/۵۰۰)',
           subtitle: 'هر سطح یک آستانهٔ امتیاز و یک جایزه دارد — کاربر با رسیدن به آستانه می‌تواند ادعا کند',
           children: [
             DropdownButtonFormField<String?>(
