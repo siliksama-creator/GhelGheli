@@ -78,7 +78,7 @@ export function GameRewardsPage({ request }) {
           <Input type="number" value={cfg.drawPoints} onChange={set('drawPoints')} />
         </Field>
         <Field label="سقف بازی امتیازدار در روز"
-              hint="۰ یعنی بی‌سقف؛ فقط برد‌هایِ امتیازدار را می‌شمارد و باختِ بدونِ امتیاز همیشه ثبت می‌شود. این عدد هم در «اقتصادِ بازی» دیده می‌شود.">
+              hint="۰ یعنی بی‌سقف؛ فقط برد‌هایِ امتیازدار را می‌شمارد و باختِ بدونِ امتیاز همیشه ثبت می‌شود. این عدد *بینِ دو دوستِ هم‌رتبه* را هم بی‌کار می‌کند: بعد از سقف، بردِ تازه امتیاز ندارد. این عدد هم در «اقتصادِ بازی» دیده می‌شود.">
           <Input type="number" value={cfg.dailyCap} onChange={set('dailyCap')} />
         </Field>
         <p className="topbar-sub" style={{ marginBottom: 10 }}>

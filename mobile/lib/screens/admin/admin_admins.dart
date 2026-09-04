@@ -169,16 +169,19 @@ class _AdminAdminsState extends State<AdminAdmins> {
                 controller: _username,
                 decoration: const InputDecoration(
                     labelText: 'نام کاربری',
+                    helperText: 'در دفترِ رخدادها کنارِ هر تغییرِ شما ثبت می‌شود («چه کسی این عدد را عوض کرد»)؛ نامِ اشتباه یعنی ردپایِ اشتباه.', helperMaxLines: 6,
                     prefixIcon: Icon(Icons.person_outline_rounded))),
             TextField(
                 controller: _password,
                 obscureText: true,
                 decoration: const InputDecoration(
                     labelText: 'رمز عبور',
+                    helperText: 'برای حسابِ مدیر هیچ طولی در سرور چک نمی‌شود (برخلافِ حسابِ کاربر که ۶ تا ۷۲ نویسه لازم دارد)؛ خودتان مراقب باشید.', helperMaxLines: 6,
                     prefixIcon: Icon(Icons.lock_outline_rounded))),
             DropdownButtonFormField<String>(
               initialValue: _role,
               decoration: const InputDecoration(labelText: 'نقش'),
+                    helperText: '«مدیر کل» همه‌چیز را می‌بیند؛ «پشتیبان» فقط تیکت و چند صفحهٔ محدود؛ «ناظر» چیزی را نمی‌تواند عوض کند. بیشترِ صفحه‌هایِ این پنل فقط برای مدیر کل باز است.', helperMaxLines: 6,
               items: const [
                 DropdownMenuItem(value: 'super_admin', child: Text('مدیر کل')),
                 DropdownMenuItem(value: 'support', child: Text('پشتیبان')),

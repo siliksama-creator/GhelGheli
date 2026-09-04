@@ -573,6 +573,7 @@ class _AdminPointsState extends State<AdminPoints> with SingleTickerProviderStat
             keyboardType: const TextInputType.numberWithOptions(signed: true),
             decoration: const InputDecoration(
               labelText: 'مقدار (مثبت یا منفی)',
+              helperText: 'منفی که باشد، «دلیل» اجباری می‌شود و همین جمله برای کاربر ارسال می‌شود؛ موجودیِ کاربر زیرِ صفر نمی‌رود.', helperMaxLines: 6,
               prefixIcon: Icon(Icons.exposure_rounded),
             ),
           ),
@@ -856,6 +857,7 @@ class _AdminPointsState extends State<AdminPoints> with SingleTickerProviderStat
                 onChanged: (_) => setState(() {}),
                 decoration: const InputDecoration(
                   labelText: 'مقدار امتیاز',
+              helperText: 'فقط به ثبت‌نام‌هایِ بعد از ذخیره داده می‌شود، یک‌بار برای هر کاربر، و در رتبه‌بندیِ لیگ حساب نمی‌شود.', helperMaxLines: 6,
                   hintText: 'مثلاً ۵۰۰',
                   border: OutlineInputBorder(),
                 ),
@@ -869,6 +871,7 @@ class _AdminPointsState extends State<AdminPoints> with SingleTickerProviderStat
                 onChanged: (_) => setState(() {}),
                 decoration: const InputDecoration(
                   labelText: 'پیامِ اعلان به کاربر',
+              helperText: 'حداکثر ۲۰۰ نویسه؛ همین متن در اعلانِ خوش‌آمدگوییِ کاربر خوانده می‌شود (جایِ متنِ پیش‌فرضِ سرور).', helperMaxLines: 6,
                   hintText: 'به قلقلی خوش آمدی! این امتیاز هدیهٔ عضویت توست.',
                   border: OutlineInputBorder(),
                 ),
