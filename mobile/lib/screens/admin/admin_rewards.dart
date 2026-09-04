@@ -384,14 +384,16 @@ class _AdminRewardsState extends State<AdminRewards> {
             Gaps.vXs,
             TextField(
                 controller: _groupName,
-                decoration: const InputDecoration(labelText: 'نام گروه')),
+                decoration: const InputDecoration(labelText: 'نام گروه',
+                    helperText: 'تیترِ بخش در صفحهٔ جوایز؛ کاربر همین را می‌خواند نه نوعِ گروه را.')),
             Gaps.vXs,
             Row(children: [
               Expanded(
                 child: DropdownButtonFormField<String>(
                   isExpanded: true,
                   initialValue: _groupType,
-                  decoration: const InputDecoration(labelText: 'نوع گروه'),
+                  decoration: const InputDecoration(labelText: 'نوع گروه',
+                    helperText: 'فرمِ دریافت را عوض می‌کند: «نقدی» آدرس/شماره کارت می‌خواهد و «فیزیکی» نشانیِ پست.'),
                   items: const [
                     DropdownMenuItem(value: 'mixed', child: Text('ترکیبی')),
                     DropdownMenuItem(value: 'cash', child: Text('نقدی')),
@@ -405,7 +407,8 @@ class _AdminRewardsState extends State<AdminRewards> {
                 child: DropdownButtonFormField<String>(
                   isExpanded: true,
                   initialValue: _groupAccent,
-                  decoration: const InputDecoration(labelText: 'رنگ'),
+                  decoration: const InputDecoration(labelText: 'رنگ',
+                    helperText: 'فقط یکی از پنج رنگِ همین فهرست؛ رنگِ دلخواه در پنل ساخته نمی‌شود (طرحِ کلاینت از همین پنج نام می‌آید).'),
                   items: const [
                     DropdownMenuItem(value: 'emerald', child: Text('زمردی')),
                     DropdownMenuItem(value: 'gold', child: Text('طلایی')),
@@ -464,17 +467,20 @@ class _AdminRewardsState extends State<AdminRewards> {
             ),
             TextField(
                 controller: _name,
-                decoration: const InputDecoration(labelText: 'نام جایزه')),
+                decoration: const InputDecoration(labelText: 'نام جایزه',
+                    helperText: 'همان چیزی که کاربر رویِ کارتِ جایزه در اپ می‌بیند؛ در دفترِ امتیاز هم همین نوشته می‌شود.')),
             TextField(
                 controller: _maxClaims,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
-                    labelText: 'حداکثر دریافت هر کاربر (۰ = نامحدود)')),
+                    labelText: 'حداکثر دریافت هر کاربر (۰ = نامحدود)',
+                    helperText: 'سرور با «تعدادِ درخواستِ تأییدشده» مقایسه می‌کند، نه تعدادِ کلیک؛ درخواستِ ردشده دوباره جا می‌گذارد.')),
             TextField(
                 controller: _points,
                 keyboardType: TextInputType.number,
                 decoration:
-                    const InputDecoration(labelText: 'امتیاز مورد نیاز')),
+                    const InputDecoration(labelText: 'امتیاز مورد نیاز',
+                    helperText: 'روی «موجودیِ امروز» سنجیده می‌شود (`current_points`)، برخلافِ حداقلِ امتیازِ چت که «امتیازِ کلِ عمر» را می‌بیند — دو عددِ شبیه، دو منبعِ متفاوت.')),
             ImageUrlField(
                 controller: _imageUrl,
                 onPick: _pickRewardImage,
@@ -493,7 +499,8 @@ class _AdminRewardsState extends State<AdminRewards> {
             TextField(
                 controller: _value,
                 decoration:
-                    const InputDecoration(labelText: 'مبلغ / توضیح جایزه')),
+                    const InputDecoration(labelText: 'مبلغ / توضیح جایزه',
+                    helperText: 'برای جایزهٔ نقدی فقط متن است (مبلغِ واقعی فیلدِ زیرین است)؛ برای فیزیکی، همان رشته در کارتِ کاربر چاپ می‌شود.')),
             // فقط برای جایزهٔ نقدی: مبلغ عددی که واقعاً به کیف پول واریز
             // می‌شود. فیلد «مبلغ / توضیح» بالا متن آزاد است و ماشین نمی‌تواند
             // رویش حساب کند، پس مبلغ واریزی جدا و عددی گرفته می‌شود.
@@ -516,7 +523,8 @@ class _AdminRewardsState extends State<AdminRewards> {
               ),
             TextField(
                 controller: _desc,
-                decoration: const InputDecoration(labelText: 'توضیحات')),
+                decoration: const InputDecoration(labelText: 'توضیحات',
+                    helperText: 'متنِ کاملِ جایزه در صفحهٔ جزئیاتِ اپ؛ کاربر پیش از تأییدِ دریافت این را می‌خواند.')),
             FilledButton.icon(
               onPressed: (_saving || _rewards.length >= 500) ? null : _add,
               icon: _saving

@@ -310,6 +310,7 @@ class _AdminSettingsState extends State<AdminSettings> {
                 textDirection: TextDirection.ltr,
                 decoration: const InputDecoration(
                   labelText: 'چیدمان تب‌ها (idها با ویرگول — خالی = پیش‌فرض)',
+                    helperText: 'هر idِ ناشناخته بی‌صدا دور ریخته می‌شود؛ اگر همه بی‌اعتبار باشند، ترتیبِ پیش‌فرض برمی‌گردد.',
                   hintText: 'home, rewards, league, social, shop, …'),
               ),
             TextField(
@@ -328,7 +329,8 @@ class _AdminSettingsState extends State<AdminSettings> {
                 DropdownMenuItem(value: 'orange', child: Text('نارنجی')),
               ],
               onChanged: (v) => setState(() => _announceAccent = v ?? 'gold'),
-              decoration: const InputDecoration(labelText: 'رنگ بنر'),
+              decoration: const InputDecoration(labelText: 'رنگ بنر',
+                    helperText: 'فقط یکی از رنگ‌هایِ همین فهرست مصرف می‌شود؛ نوشتنِ رنگِ دلخواه اینجا ممکن نیست و پیش‌فرض «طلایی» می‌ماند.'),
             ),
             TextField(
                 controller: _minVersionAndroid,
@@ -370,7 +372,8 @@ class _AdminSettingsState extends State<AdminSettings> {
             TextField(
                 controller: _maintMsg,
                 decoration:
-                    const InputDecoration(labelText: 'پیام حالت تعمیر')),
+                    const InputDecoration(labelText: 'پیام حالت تعمیر',
+                    helperText: 'همان جمله‌ای که کاربر هنگام ورود یا چرخشِ گردونه می‌بیند؛ کلیدِ خاموش/روشن کردنش در همین‌جا است، نه در فایلِ سرور.')),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               value: _wheelEnabled,
@@ -412,11 +415,13 @@ class _AdminSettingsState extends State<AdminSettings> {
                 controller: _giftPoints,
                 keyboardType: TextInputType.number,
                 decoration:
-                    const InputDecoration(labelText: 'امتیاز خوش‌آمدگویی')),
+                    const InputDecoration(labelText: 'امتیاز خوش‌آمدگویی',
+                    helperText: 'فقط در لحظهٔ ساختنِ حسابِ تازه پرداخت می‌شود؛ عوض‌کردنش به حساب‌هایِ قبلی چیزی اضافه یا از آن‌ها کم نمی‌کند.')),
             TextField(
                 controller: _giftMessage,
                 decoration:
-                    const InputDecoration(labelText: 'متن پیام دفتر امتیاز')),
+                    const InputDecoration(labelText: 'متن پیام دفتر امتیاز',
+                    helperText: 'در ستونِ «توضیح»ِ دفترِ امتیازِ کاربر چاپ می‌شود؛ اگر خالی بماند متنِ پیش‌فرضِ سرور ثبت می‌شود.')),
             FilledButton.icon(
               onPressed: _savingGift ? null : _saveGift,
               icon: _savingGift
@@ -440,18 +445,21 @@ class _AdminSettingsState extends State<AdminSettings> {
                 controller: _chatMin,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
-                    labelText: 'حداقل امتیاز تاریخی برای چت')),
+                    labelText: 'حداقل امتیاز تاریخی برای چت',
+                    helperText: 'سنجیده می‌شود روی «امتیازِ کلِ عمر» نه موجودیِ امروز؛ کاربرِ کم‌تر از این، پیامش رد می‌شود با همین جمله: «برای ارسال پیام باید حداقل N امتیاز تاریخی داشته باشید».')),
             TextField(
                 controller: _cooldown,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
-                    labelText: 'فاصله بین پیام‌ها - ثانیه')),
+                    labelText: 'فاصله بین پیام‌ها - ثانیه',
+                    helperText: '۰ = بدونِ محدودیت؛ اگر خالی بماند ۵ ثانیه در نظر گرفته می‌شود و منفی به ۰ می‌چسبد.')),
             TextField(
                 controller: _badWords,
                 minLines: 3,
                 maxLines: 6,
                 decoration: const InputDecoration(
-                    labelText: 'کلمات رکیک/ممنوعه؛ هر خط یک کلمه')),
+                    labelText: 'کلمات رکیک/ممنوعه؛ هر خط یک کلمه',
+                    helperText: 'با ویرگول یا ویرگولِ فارسی هم جدا می‌شود؛ پیامِ شاملِ هرکدام رد می‌شود و برای کاربر نوشته می‌شود «پیام شامل کلمات غیرمجاز است».')),
             FilledButton.icon(
               onPressed: _savingChat ? null : _saveChat,
               icon: _savingIcon(_savingChat),
@@ -469,13 +477,16 @@ class _AdminSettingsState extends State<AdminSettings> {
                     const InputDecoration(labelText: 'نام سرویس‌دهنده')),
             TextField(
                 controller: _sender,
-                decoration: const InputDecoration(labelText: 'فرستنده')),
+                decoration: const InputDecoration(labelText: 'فرستنده',
+                    helperText: 'شماره‌ای که در پنلِ کاوه‌نگار ثبت شده؛ اگر نخواند، پیامک کاربر نمی‌رسد و فقط در لاگ دیده می‌شود.')),
             TextField(
                 controller: _apiKey,
-                decoration: const InputDecoration(labelText: 'API Key')),
+                decoration: const InputDecoration(labelText: 'API Key',
+                    helperText: 'اینجا نمی‌تواند خوانده شود و اگر خالی باشد، ارسالِ پیامک بی‌سروصدا «پیکربندی‌نشده» برمی‌گردد؛ یعنی هیچ OTP واقعی فرستاده نمی‌شود.')),
             TextField(
                 controller: _pattern,
-                decoration: const InputDecoration(labelText: 'کد پترن/قالب')),
+                decoration: const InputDecoration(labelText: 'کد پترن/قالب',
+                    helperText: 'نامِ قالبِ OTP در کاوه‌نگار؛ اگر خالی بماند `ghelgheli-otp` مصرف می‌شود.')),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               value: _smsEnabled,

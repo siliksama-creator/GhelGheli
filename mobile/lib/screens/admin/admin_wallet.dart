@@ -198,25 +198,29 @@ class _AdminWalletState extends State<AdminWallet> {
                   controller: minCtl,
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(
-                      labelText: 'حداقل برداشت (تومان)'),
+                      labelText: 'حداقل برداشت (تومان)',
+                    helperText: 'کمتر از ۱۰۰۰ تومان ممکن نیست و به همان ۱۰۰۰ می‌چسبد؛ کاربرِ کم‌تر از این، پیغامِ «حداقل مبلغ قابل برداشت …» را می‌بیند.'),
                 ),
                 TextField(
                   controller: maxCtl,
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(
-                      labelText: 'حداکثر هر برداشت (تومان)'),
+                      labelText: 'حداکثر هر برداشت (تومان)',
+                    helperText: 'اگر از حداقلِ برداشت کوچک‌تر شود، سرور بی‌سروصدا آن را با حداقلِ برداشت برابر می‌کند؛ دو عددِ وارونه در پنل نمی‌ماند.'),
                 ),
                 TextField(
                   controller: pendCtl,
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(
-                      labelText: 'حداکثر درخواست همزمان هر کاربر'),
+                      labelText: 'حداکثر درخواست همزمان هر کاربر',
+                    helperText: 'بینِ ۱ تا ۱۰ نگه داشته می‌شود؛ با رسیدن به این عدد، پیامک «شما درخواست برداشت در حال بررسی دارید» می‌آید.'),
                 ),
                 TextField(
                   controller: noteCtl,
                   maxLines: 2,
                   decoration: const InputDecoration(
-                      labelText: 'یادداشت نمایشی به کاربر'),
+                      labelText: 'یادداشت نمایشی به کاربر',
+                    helperText: 'در پنجرهٔ درخواستِ برداشتِ اپِ اندروید چاپ می‌شود؛ بیش از ۵۰۰ کاراکتر بریده می‌شود. وبِ کاربران این یادداشت را نشان نمی‌دهد.'),
                 ),
               ],
             ),

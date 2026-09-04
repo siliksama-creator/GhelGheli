@@ -210,28 +210,32 @@ export function WalletPage({ request }) {
                 <span>{settings.enabled ? 'برداشت فعال است' : 'برداشت غیرفعال است'}</span>
               </label>
             </Field>
-            <Field label="حداقل مبلغ برداشت (تومان)">
+            <Field label="حداقل مبلغ برداشت (تومان)"
+              hint="کمتر از ۱۰۰۰ تومان ممکن نیست و به همان ۱۰۰۰ می‌چسبد؛ کاربرِ کم‌تر از این، پیغامِ «حداقل مبلغ قابل برداشت …» را می‌بیند.">
               <Input
                 type="number"
                 value={settings.minWithdrawal}
                 onChange={(e) => setSettings({ ...settings, minWithdrawal: e.target.value })}
               />
             </Field>
-            <Field label="حداکثر هر برداشت (تومان)">
+            <Field label="حداکثر هر برداشت (تومان)"
+              hint="اگر از حداقلِ برداشت کوچک‌تر شود، سرور بی‌سروصدا آن را با حداقلِ برداشت برابر می‌کند؛ دو عددِ وارونه در پنل نمی‌ماند.">
               <Input
                 type="number"
                 value={settings.maxWithdrawal}
                 onChange={(e) => setSettings({ ...settings, maxWithdrawal: e.target.value })}
               />
             </Field>
-            <Field label="حداکثر درخواست همزمان هر کاربر">
+            <Field label="حداکثر درخواست همزمان هر کاربر"
+              hint="بینِ ۱ تا ۱۰ نگه داشته می‌شود؛ با رسیدن به این عدد، پیامک «شما درخواست برداشت در حال بررسی دارید» می‌آید.">
               <Input
                 type="number"
                 value={settings.maxPendingRequests}
                 onChange={(e) => setSettings({ ...settings, maxPendingRequests: e.target.value })}
               />
             </Field>
-            <Field label="یادداشت نمایشی به کاربر">
+            <Field label="یادداشت نمایشی به کاربر"
+              hint="در پنجرهٔ درخواستِ برداشتِ اپِ اندروید چاپ می‌شود؛ بیش از ۵۰۰ کاراکتر بریده می‌شود. وبِ کاربران این یادداشت را نشان نمی‌دهد.">
               <Input
                 value={settings.note || ''}
                 onChange={(e) => setSettings({ ...settings, note: e.target.value })}

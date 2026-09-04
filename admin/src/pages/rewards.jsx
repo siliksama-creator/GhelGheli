@@ -149,18 +149,21 @@ export function RewardsPage({ request }) {
             جایزه بگیرد و نوار همان گروه از ابتدا شروع می‌شود.
           </p>
           <form onSubmit={addGroup} style={{ display: 'grid', gap: 10 }}>
-            <Field label="نام گروه">
+            <Field label="نام گروه"
+              hint="تیترِ بخش در صفحهٔ جوایز؛ کاربر همین را می‌خواند نه نوعِ گروه را.">
               <Input value={groupForm.name} onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })} required />
             </Field>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <Field label="نوع گروه">
+              <Field label="نوع گروه"
+              hint="فرمِ دریافت را عوض می‌کند: «نقدی» آدرس/شماره کارت می‌خواهد و «فیزیکی» نشانیِ پست.">
                 <Select value={groupForm.groupType} onChange={(e) => setGroupForm({ ...groupForm, groupType: e.target.value })}>
                   <option value="mixed">ترکیبی</option>
                   <option value="cash">نقدی</option>
                   <option value="physical">فیزیکی</option>
                 </Select>
               </Field>
-              <Field label="رنگ">
+              <Field label="رنگ"
+              hint="فقط یکی از پنج رنگِ همین فهرست؛ رنگِ دلخواه در پنل ساخته نمی‌شود (طرحِ کلاینت از همین پنج نام می‌آید).">
                 <Select value={groupForm.accent} onChange={(e) => setGroupForm({ ...groupForm, accent: e.target.value })}>
                   <option value="emerald">زمردی</option>
                   <option value="gold">طلایی</option>
@@ -170,10 +173,12 @@ export function RewardsPage({ request }) {
                 </Select>
               </Field>
             </div>
-            <Field label="توضیح">
+            <Field label="توضیح"
+              hint="زیرِ نامِ گروه در اپ نمایش داده می‌شود؛ اگر خالی بماند هیچ خطی چاپ نمی‌شود.">
               <Input value={groupForm.desc} onChange={(e) => setGroupForm({ ...groupForm, desc: e.target.value })} />
             </Field>
-            <Field label="آدرس عکس گروه">
+            <Field label="آدرس عکس گروه"
+              hint="مسیرِ `/uploads/images/…` یا آدرسِ کامل؛ پاک‌سازیِ فایل‌های یتیم فقط فایلِ بی‌ارجاع را می‌برد.">
               <Input value={groupForm.image} onChange={(e) => setGroupForm({ ...groupForm, image: e.target.value })} placeholder="/uploads/images/..." />
             </Field>
             <Button type="submit" disabled={groupSaving}>
@@ -203,10 +208,12 @@ export function RewardsPage({ request }) {
 
         <Card title={`سطح جایزه جدید (${fmtNumber(rewards.length)}/۵۰۰)`}>
           <form onSubmit={add}>
-            <Field label="نام جایزه">
+            <Field label="نام جایزه"
+              hint="همان چیزی که کاربر رویِ کارتِ جایزه در اپ می‌بیند؛ در دفترِ امتیاز هم همین نوشته می‌شود.">
               <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
             </Field>
-            <Field label="گروه جایزه">
+            <Field label="گروه جایزه"
+              hint="فقط جای نمایش را تعیین می‌کند؛ اگر گروهی «نقدی» باشد و این جایزه «فیزیکی»، فرمِ درخواستِ کاربر به همان گروه می‌رود.">
               <Select value={form.groupId} onChange={(e) => setForm({ ...form, groupId: e.target.value })}>
                 <option value="">بدون گروه</option>
                 {groups.map((g) => (
@@ -214,11 +221,13 @@ export function RewardsPage({ request }) {
                 ))}
               </Select>
             </Field>
-            <Field label="حداکثر دریافت برای هر کاربر (۰ = نامحدود)">
+            <Field label="حداکثر دریافت برای هر کاربر (۰ = نامحدود)"
+              hint="سرور با «تعدادِ درخواستِ تأییدشده» مقایسه می‌کند، نه تعدادِ کلیک؛ درخواستِ ردشده دوباره جا می‌گذارد.">
               <Input type="number" min="0" value={form.maxClaims}
                 onChange={(e) => setForm({ ...form, maxClaims: e.target.value })} />
             </Field>
-            <Field label="آستانه امتیاز">
+            <Field label="آستانه امتیاز"
+              hint="روی «موجودیِ امروز» سنجیده می‌شود (`current_points`)، برخلافِ حداقلِ امتیازِ چت که «امتیازِ کلِ عمر» را می‌بیند — دو عددِ شبیه، دو منبعِ متفاوت.">
               <Input type="number" value={form.points} onChange={(e) => setForm({ ...form, points: e.target.value })} required />
             </Field>
             <Field label="نوع جایزه">
@@ -227,7 +236,8 @@ export function RewardsPage({ request }) {
                 <option value="physical">فیزیکی</option>
               </Select>
             </Field>
-            <Field label="مبلغ / توضیح جایزه">
+            <Field label="مبلغ / توضیح جایزه"
+              hint="برای جایزهٔ نقدی فقط متن است (مبلغِ واقعی فیلدِ زیرین است)؛ برای فیزیکی، همان رشته در کارتِ کاربر چاپ می‌شود.">
               <Input value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} />
             </Field>
             {form.type === 'cash' && (
@@ -246,7 +256,8 @@ export function RewardsPage({ request }) {
                 </span>
               </Field>
             )}
-            <Field label="عکس جایزه">
+            <Field label="عکس جایزه"
+              hint="اگر فایل تازه انتخاب کنید، تصویرِ تازه آپلود می‌شود و فایلِ قدیمی رویِ دیسک می‌ماند تا پاک‌سازیِ بعد.">
               <div className="file-field">
                 <Input placeholder="آدرس عکس آماده" value={form.image} onChange={(e) => setForm({ ...form, image: e.target.value })} />
                 <label className="btn btn-secondary btn-icon" style={{ cursor: 'pointer' }}>
@@ -255,7 +266,8 @@ export function RewardsPage({ request }) {
                 </label>
               </div>
             </Field>
-            <Field label="توضیحات">
+            <Field label="توضیحات"
+              hint="متنِ کاملِ جایزه در صفحهٔ جزئیاتِ اپ؛ کاربر پیش از تأییدِ دریافت این را می‌خواند.">
               <Textarea value={form.desc} onChange={(e) => setForm({ ...form, desc: e.target.value })} rows={3} />
             </Field>
             <Button type="submit" loading={saving} disabled={rewards.length >= 500} className="btn-block">
