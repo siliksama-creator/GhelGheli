@@ -108,9 +108,14 @@ function extractRoutes() {
     while ((m = re.exec(src))) {
       const [, verb, rawPath] = m;
       let p = rawPath;
-      if (p.startsWith('/api/admin')) p = p.slice(4);        // /api/admin/.. → /admin/..
-      else if (p.startsWith('/admin')) { /* همان است */ }
+      // نرمال‌سازی به شکلِ داخلِ گاردِ ادمین: app.use('/api/admin') مسیر را
+      // بدونِ پیشوندِ /api/admin می‌بیند (مثلاً '/dashboard') و روت‌های
+      // ماژولار هم از '/admin/...' ثبت می‌شوند. هر دو باید به یک شکل
+      // برسند وگرنه سفیدِ ناظر (که روی req.path است) هیچ‌وقت جور نمی‌شود.
+      if (p.startsWith('/api/admin')) p = p.slice('/api/admin'.length);
+      else if (p.startsWith('/admin')) p = p.slice('/admin'.length);
       else continue;                                          // مسیر غیرادمین
+      if (!p.startsWith('/')) p = '/' + p;
       // پارامتر مسیر را با مقدارِ بی‌خطر جایگزین کن (UUID جعلیِ فرم‌درست
       // تا به ۵۰۰ نرسد؛ گاردِ نقش قبل از منطق اجرا می‌شود).
       const concrete = p
