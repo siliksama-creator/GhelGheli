@@ -55,7 +55,8 @@ export function GameRewardsPage({ request }) {
         subtitle="فقط بازی دو نفره واقعی امتیاز می‌گیرد؛ بازی با ربات هیچ امتیازی ندارد"
         action={cfg.enabled ? <Badge tone="success">فعال</Badge> : <Badge>غیرفعال</Badge>}
       >
-        <Field label="وضعیت">
+        <Field label="وضعیت"
+              hint="همان کلیدِ «امتیازِ بازی‌هایِ آنلاین» در صفحهٔ «اقتصادِ بازی» است؛ دو صفحه یکی را ذخیره کنید، آن یکی هم به‌روز می‌شود.">
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
             <input
               type="checkbox"
@@ -65,16 +66,19 @@ export function GameRewardsPage({ request }) {
             <span>امتیازدهی به بازی‌ها فعال باشد</span>
           </label>
         </Field>
-        <Field label="امتیاز برنده (۰ تا ۱۰۰۰)">
+        <Field label="امتیاز برنده (۰ تا ۱۰۰۰)"
+              hint="بین ۰ تا ۱۰۰۰ در سرور نگه داشته می‌شود و همان «امتیازِ برد» در صفحهٔ «اقتصادِ بازی» است — یکی را عوض کنید، آن یکی هم عوض می‌شود.">
           <Input type="number" value={cfg.winPoints} onChange={set('winPoints')} />
         </Field>
-        <Field label="امتیاز بازنده (منفی، مثلاً ‎-۵)">
+        <Field label="امتیاز بازنده (منفی، مثلاً ‎-۵)"
+              hint="فقط منفی یا صفر قبول می‌شود؛ عددِ مثبت به صفر برمی‌گردد. کسرِ امتیاز با «سقفِ روزانه» متوقف نمی‌شود.">
           <Input type="number" value={cfg.losePoints} onChange={set('losePoints')} />
         </Field>
         <Field label="امتیاز مساوی">
           <Input type="number" value={cfg.drawPoints} onChange={set('drawPoints')} />
         </Field>
-        <Field label="سقف بازی امتیازدار در روز">
+        <Field label="سقف بازی امتیازدار در روز"
+              hint="۰ یعنی بی‌سقف؛ فقط برد‌هایِ امتیازدار را می‌شمارد و باختِ بدونِ امتیاز همیشه ثبت می‌شود. این عدد هم در «اقتصادِ بازی» دیده می‌شود.">
           <Input type="number" value={cfg.dailyCap} onChange={set('dailyCap')} />
         </Field>
         <p className="topbar-sub" style={{ marginBottom: 10 }}>

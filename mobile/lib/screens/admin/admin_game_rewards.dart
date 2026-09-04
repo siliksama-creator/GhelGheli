@@ -167,6 +167,8 @@ class _AdminGameRewardsState extends State<AdminGameRewards> {
                 keyboardType: const TextInputType.numberWithOptions(signed: true),
                 decoration: const InputDecoration(
                   labelText: 'امتیاز مساوی',
+                  helperText: 'می‌تواند منفی باشد؛ سرور آن را بین ۱۰۰۰- تا ۱۰۰۰+ نگه می‌دارد.',
+                  helperMaxLines: 6,
                   prefixIcon: Icon(Icons.handshake_rounded),
                 ),
               ),

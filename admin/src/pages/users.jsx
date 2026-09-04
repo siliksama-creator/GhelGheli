@@ -385,7 +385,8 @@ export function UsersPage({ request }) {
           style={{ width: 'min(480px, 92vw)' }}
         >
           <div onClick={(e) => e.stopPropagation()} style={{ display: 'grid', gap: 10 }}>
-            <Field label="نوع جایزه">
+            <Field label="نوع جایزه"
+              hint="واحدِ فیلدِ بعدی را عوض می‌کند: صندوقِ کارت (۱ تا ۵)، روزِ پلاس (تا ۳۶۵) یا آیتمِ فروشگاه؛ آیتم را باید از فهرست انتخاب کنید.">
               <Select value={grant.kind} onChange={(e) => setGrant((g) => ({
                 ...g,
                 kind: e.target.value,
@@ -406,13 +407,15 @@ export function UsersPage({ request }) {
                 </Select>
               </Field>
             ) : (
-              <Field label={grant.kind === 'plus_days' ? 'تعداد روز' : 'تعداد صندوق (۱ تا ۵)'}>
+              <Field label={grant.kind === 'plus_days' ? 'تعداد روز' : 'تعداد صندوق (۱ تا ۵)'}
+                hint="روزهایِ تازه به «انتهایِ اشتراکِ فعلی» اضافه می‌شود، نه از امروز؛ پس اگر کاربری ۹۰ روز پلاس داشته باشد و شما ۳۰ روز بدهید، ۱۲۰ روز می‌شود — نه ۳۰ روزِ تازه.">
                 <Input type="number" min="1" max={grant.kind === 'plus_days' ? 365 : 5}
                   value={grant.value}
                   onChange={(e) => setGrant((g) => ({ ...g, value: Number(e.target.value) || 1 }))} />
               </Field>
             )}
-            <Field label="دلیل (برای کاربر و ممیزی)">
+            <Field label="دلیل (برای کاربر و ممیزی)"
+              hint="حداکثر ۱۶۰ نویسه؛ در دفترِ رخدادها و در اعلانِ کاربر چاپ می‌شود — جمله‌ای بنویسید که خواندنش برای کاربر هم درست باشد.">
               <Input value={grant.reason} maxLength={160}
                 placeholder="مثلاً جبران خطای پشتیبانی"
                 onChange={(e) => setGrant((g) => ({ ...g, reason: e.target.value }))} />

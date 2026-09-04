@@ -414,7 +414,8 @@ export function PointsPage({ request }) {
               <Card title="تغییر امتیاز"
                 subtitle="عدد منفی برای کسر · دلیل برای کاربر ارسال می‌شود">
                 <div className="ptForm">
-                  <Field label="مقدار (منفی = کسر)">
+                  <Field label="مقدار (منفی = کسر)"
+              hint="منفی که باشد، «دلیل» اجباری می‌شود و همین جمله برای کاربر ارسال می‌شود؛ موجودیِ کاربر زیرِ صفر نمی‌رود.">
                     <Input value={amount} inputMode="numeric"
                       onChange={(e) => setAmount(e.target.value)}
                       placeholder="مثلاً ‎-۵۰۰‎ یا ۱۰۰" />
@@ -615,7 +616,8 @@ export function PointsPage({ request }) {
                   </Select>
                 </Field>
 
-                <Field label="مقدار امتیاز">
+                <Field label="مقدار امتیاز"
+              hint="فقط به ثبت‌نام‌هایِ بعد از ذخیره داده می‌شود، یک‌بار برای هر کاربر، و در رتبه‌بندیِ لیگ حساب نمی‌شود.">
                   <Input
                     type="number" min="0" max="1000000" step="1"
                     placeholder="مثلاً ۵۰۰"
@@ -624,7 +626,8 @@ export function PointsPage({ request }) {
                   />
                 </Field>
 
-                <Field label="پیامِ اعلان به کاربر">
+                <Field label="پیامِ اعلان به کاربر"
+              hint="حداکثر ۲۰۰ نویسه؛ همین متن در اعلانِ خوش‌آمدگوییِ کاربر خوانده می‌شود (جایِ متنِ پیش‌فرضِ سرور).">
                   <Textarea
                     rows={2} maxLength={200}
                     placeholder="به قلقلی خوش آمدی! این امتیاز هدیهٔ عضویت توست."

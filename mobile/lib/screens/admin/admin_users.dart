@@ -341,7 +341,11 @@ class _AdminUsersState extends State<AdminUsers> {
             TextField(
               controller: controller,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'تعداد روز', prefixIcon: Icon(Icons.star_rounded)),
+              decoration: const InputDecoration(
+                  labelText: 'تعداد روز',
+                  helperText: 'روزهایِ تازه به «انتهایِ اشتراکِ فعلی» اضافه می‌شود، نه از امروز؛ پس اگر کاربری ۹۰ روز پلاس داشته باشد و شما ۳۰ روز بدهید، ۱۲۰ روز می‌شود — نه ۳۰ روزِ تازه.',
+                  helperMaxLines: 6,
+                  prefixIcon: Icon(Icons.star_rounded)),
             ),
           ],
         ),
