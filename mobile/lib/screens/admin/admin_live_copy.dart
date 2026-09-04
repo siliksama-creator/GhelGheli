@@ -151,12 +151,12 @@ class _AdminLiveCopyState extends State<AdminLiveCopy> {
         if (fields is! Map) return;
         fields.forEach((field, value) {
           if (value is String) {
-            _ctrlFor('$group', '$field', value);
+            _ctrlFor(group, field, value);
           } else if (value is List) {
             for (var i = 0; i < value.length; i++) {
               final item = _mapOf(value[i]);
               for (final part in ['title', 'body']) {
-                final key = '${_key('$group', '$field')}#$i.$part';
+                final key = '${_key(group, field)}#$i.$part';
                 _text.putIfAbsent(key,
                     () => TextEditingController(text: '${item[part] ?? ''}'));
               }
@@ -217,7 +217,7 @@ class _AdminLiveCopyState extends State<AdminLiveCopy> {
   /// مقدارهایِ بازگشتیِ سرور را روی کادرهای عددی می‌نشاند.
   void _syncNums(Map<String, dynamic> rules) {
     rules.forEach((name, v) {
-      final c = _nums['$name'];
+      final c = _nums[name];
       if (c != null) {
         final t = '$v';
         if (c.text != t) c.text = t;
@@ -274,7 +274,7 @@ class _AdminLiveCopyState extends State<AdminLiveCopy> {
       if (fields is! Map) return;
       fields.forEach((field, raw) {
         if (raw is! String) return;
-        final key = _key('$group', '$field');
+        final key = _key(group, field);
         final value = _text[key]?.text ?? raw;
         final need = _placeholdersOf(raw).toSet();
         final have = _placeholdersOf(value).toSet();
@@ -311,7 +311,7 @@ class _AdminLiveCopyState extends State<AdminLiveCopy> {
     values.forEach((group, fields) {
       if (fields is! Map) return;
       fields.forEach((field, value) {
-        final key = _key('$group', '$field');
+        final key = _key(group, field);
         if (value is String) {
           (_text[key] ??= TextEditingController()).text = value;
         } else if (value is List) {
@@ -333,24 +333,24 @@ class _AdminLiveCopyState extends State<AdminLiveCopy> {
       if (fields is! Map) return;
       final g = <String, dynamic>{};
       fields.forEach((field, raw) {
-        final key = _key('$group', '$field');
+        final key = _key(group, field);
         if (raw is String) {
-          g['$field'] = _text[key]?.text ?? raw;
+          g[field] = _text[key]?.text ?? raw;
         } else if (raw is List) {
           // بندهای منشور: همان ترتیبِ آرایه برمی‌گردد؛ `sanitizeCopy` طولِ
           // فهرست را ثابت نگه می‌دارد، پس این‌جا هم فقط مقدارها می‌روند.
-          g['$field'] = [
+          g[field] = [
             for (var i = 0; i < raw.length; i++)
               {
-                'title': _sectionValue('$group', '$field', i, 'title',
+                'title': _sectionValue(group, field, i, 'title',
                     '${_mapOf(raw[i])['title'] ?? ''}'),
-                'body': _sectionValue('$group', '$field', i, 'body',
+                'body': _sectionValue(group, field, i, 'body',
                     '${_mapOf(raw[i])['body'] ?? ''}'),
               },
           ];
         }
       });
-      out['$group'] = g;
+      out[group] = g;
     });
     return out;
   }
@@ -499,7 +499,7 @@ class _AdminLiveCopyState extends State<AdminLiveCopy> {
           const SizedBox(height: Gaps.sm),
         ],
         for (final group in groups) ...[
-          _groupCard('$group'),
+          _groupCard(group),
           const SizedBox(height: Gaps.sm),
         ],
         _actionsCard(warnings),
@@ -567,7 +567,7 @@ class _AdminLiveCopyState extends State<AdminLiveCopy> {
     if (fields.isEmpty) return const SizedBox.shrink();
     final children = <Widget>[];
     fields.forEach((field, value) {
-      final key = _key(group, '$field');
+      final key = _key(group, field);
       if (value is String) {
         // آینهٔ `live-copy.jsx`: پیش‌نمایشِ پر‌شده زیرِ همان فیلد. بدونِ این
         // خط، `_preview` فقط نوشته می‌شد و خوانده نمی‌شد (dart analyze دقیقاً
@@ -576,14 +576,14 @@ class _AdminLiveCopyState extends State<AdminLiveCopy> {
         // {stakeLow}» چه می‌شود. وقتی پاسخِ سرور هنوز نیامده «—» نشان
         // می‌دهیم، نه خودِ ورودی: پیش‌نمایشی که ورودیِ کاربر را به‌عنوانِ
         // «چیزی که کاربر می‌بیند» چاپ کند، دروغ‌گو است.
-        final filled = _previewOf(group, '$field');
+        final filled = _previewOf(group, field);
         children.add(Padding(
           padding: const EdgeInsets.only(bottom: Gaps.sm),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TextField(
-                controller: _ctrlFor(group, '$field', value),
+                controller: _ctrlFor(group, field, value),
                 maxLines: null,
                 decoration: InputDecoration(
                   labelText: _proMode ? key : _labelFor(key, value),
