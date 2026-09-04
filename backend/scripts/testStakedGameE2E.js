@@ -222,10 +222,14 @@ async function main() {
     return Number(u?.current_points ?? u?.points ?? NaN);
   }
 
+  // ⚠️ شرطِ بازی روی **امتیاز** (current_points) است نه کیف پولِ تومانی؛
+  // مسیر ادمینِ شارژ امتیاز هم جداست (POST /admin/users/:id/points).
+  // استفاده از مسیر کیف پول، موجودیِ تومان را عوض می‌کرد و امتیاز صفر
+  // می‌ماند — تست با «موجودی کافی نیست» می‌مُرد.
   async function grant(player, amount) {
-    const r = await POST(`/api/admin/wallet/users/${player.id}/adjust`,
-      { amount, reason: 'تست E2E مسابقهٔ امتیازی' }, adminToken);
-    if (r.status !== 200) throw new Error(`شارژ ${player.tag} شکست: ${r.status} ${JSON.stringify(r.data).slice(0, 200)}`);
+    const r = await POST(`/api/admin/users/${player.id}/points`,
+      { points: amount, reason: 'تست E2E مسابقهٔ امتیازی' }, adminToken);
+    if (r.status !== 200) throw new Error(`شارژ امتیاز ${player.tag} شکست: ${r.status} ${JSON.stringify(r.data).slice(0, 200)}`);
   }
 
   const [p1, p2] = await Promise.all([makePlayer('الف'), makePlayer('ب')]);
