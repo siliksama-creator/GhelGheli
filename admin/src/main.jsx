@@ -6,6 +6,7 @@ import './theme.css';
 import './styles.css';
 
 import { createApi } from './lib/api.js';
+import { canSeePage, isSuperAdmin } from './lib/roles.js';
 import { ToastProvider, useToast } from './lib/toast.jsx';
 import { DialogProvider } from './components/dialog.jsx';
 import { AppShell } from './components/app-shell.jsx';
@@ -142,11 +143,16 @@ const NAV = [
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem('adminToken') || '');
+  // نقشِ ادمین از پاسخِ ورود خوانده و در sessionStorage می‌ماند تا با
+  // رفرش صفحه از بین نرود. منبعِ حقیقتِ دسترسی بک‌اند است؛ این فقط برای
+  // پنهان‌کردنِ صفحه/دکمه‌هایی است که سرور در هر صورت ۴۰۳ می‌دهد.
+  const [role, setRole] = useState(() => sessionStorage.getItem('adminRole') || 'super_admin');
   const [page, setPage] = useState('dashboard');
   const notify = useToast();
 
   const logout = useCallback((message) => {
     localStorage.removeItem('adminToken');
+    sessionStorage.removeItem('adminRole');
     setToken('');
     if (message) notify(message, 'error');
   }, [notify]);
@@ -178,32 +184,45 @@ function App() {
   if (!token) {
     return (
       <LoginScreen
-        onLogin={(t) => {
+        onLogin={(t, admin) => {
           localStorage.setItem('adminToken', t);
+          // نقش پیش‌فرض برای نشست‌های قدیمی (که نقشی ذخیره نشده)
+          // super_admin است؛ پس از ورود، نقشِ واقعی می‌نشیند.
+          const r = admin?.role || 'super_admin';
+          sessionStorage.setItem('adminRole', r);
+          setRole(r);
           setToken(t);
         }}
       />
     );
   }
 
+  // صفحه‌ها و آیتم‌های منو را بر اساس نقش فیلتر می‌کنیم. اگر نشانی
+  // ممنوع مستقیم تایپ شود، به نخستین صفحهٔ مجاز برمی‌گردد.
+  const visibleNav = NAV.filter((x) => canSeePage(role, x[0]));
   const active = NAV.find((x) => x[0] === page);
-  const ActivePage = active[3];
+  const activeAllowed = active && canSeePage(role, active[0]);
+  const effectiveKey = activeAllowed ? active[0] : (visibleNav[0]?.[0] || 'dashboard');
+  const effective = NAV.find((x) => x[0] === effectiveKey);
+  const ActivePage = effective[3];
   // توضیحِ یک‌خطیِ هر صفحه زیر عنوانش — مدیر قبل از هر دکمه‌ای بداند
   // این صفحه چه می‌کند.
-  const activeDesc = active[4] || '';
+  const activeDesc = effective[4] || '';
 
   return (
     <AppShell
-      nav={NAV}
+      nav={visibleNav}
       navGroups={NAV_GROUPS}
-      activePage={page}
+      activePage={effectiveKey}
       onNavigate={setPage}
       onLogout={() => logout()}
-      title={active[1]}
+      role={role}
+      isSuperAdmin={isSuperAdmin(role)}
+      title={effective[1]}
       subtitle={activeDesc}
     >
       <Suspense fallback={<div className="pageLoading" aria-busy="true" />}>
-        <ActivePage request={request} onNavigate={setPage} />
+        <ActivePage request={request} onNavigate={setPage} isSuperAdmin={isSuperAdmin(role)} />
       </Suspense>
     </AppShell>
   );

@@ -28,6 +28,12 @@ class ApiClient {
 
   String? token;
   bool isAdmin = false;
+  // نقشِ ادمینِ واردشده ('super_admin' | 'support' | 'observer'). فقط
+  // برای پنهان‌کردنِ صفحه/دکمه‌هایی است که بک‌اند در هر صورت ۴۰۳ می‌دهد؛
+  // منبعِ حقیقتِ دسترسی سرور است. پیش‌فرض super_admin تا برای نشست‌های
+  // قدیمی (که نقشی ذخیره نکرده‌اند) چیزی پنهان نشود.
+  String adminRole = 'super_admin';
+  bool get isSuperAdmin => adminRole == 'super_admin';
 
   /// صدا زده می‌شود وقتی سرور می‌گوید توکن دیگر معتبر نیست (۴۰۱).
   ///
@@ -76,6 +82,7 @@ class ApiClient {
     // نفرستد.
     token = null;
     isAdmin = false;
+    adminRole = 'super_admin';
     _getCache.clear();
     // ⚠️ کشِ ETag هم باید برود. اگر نرود، کاربرِ بعدی که وارد می‌شود
     // `If-None-Match` نفرِ قبلی را می‌فرستد و سرور ۳۰۴ می‌دهد — یعنی
@@ -87,6 +94,7 @@ class ApiClient {
     SharedPreferences.getInstance().then((sp) {
       sp.remove('token');
       sp.remove('isAdmin');
+      sp.remove('adminRole');
     }).catchError((_) => null);
     onSessionExpired?.call();
   }
@@ -197,30 +205,38 @@ class ApiClient {
       final sp = await SharedPreferences.getInstance();
       token = sp.getString('token');
       isAdmin = sp.getBool('isAdmin') ?? false;
+      adminRole = sp.getString('adminRole') ?? 'super_admin';
     } catch (e) {
       // بدترین حالت: کاربر یک بار دیگر وارد می‌شود.
       token = null;
       isAdmin = false;
+      adminRole = 'super_admin';
       debugPrint('loadToken failed, continuing signed-out: $e');
     }
   }
 
-  Future<void> saveToken(String t, {bool admin = false}) async {
+  Future<void> saveToken(String t,
+      {bool admin = false, String? role}) async {
     // ورود با حساب دیگر یعنی هر پاسخِ کش‌شده مال شخص اشتباهی است.
     invalidateCache();
     token = t;
     isAdmin = admin;
+    if (admin && role != null && role.isNotEmpty) adminRole = role;
+    if (!admin) adminRole = 'super_admin';
     final sp = await SharedPreferences.getInstance();
     await sp.setString('token', t);
     await sp.setBool('isAdmin', admin);
+    await sp.setString('adminRole', adminRole);
   }
 
   Future<void> logout() async {
     token = null;
     isAdmin = false;
+    adminRole = 'super_admin';
     final sp = await SharedPreferences.getInstance();
     await sp.remove('token');
     await sp.remove('isAdmin');
+    await sp.remove('adminRole');
     // Per-user game saves must not survive a sign-out: on a shared phone the
     // next person saw the previous user's tap-game level until the server
     // reconciled it.
@@ -353,17 +369,20 @@ class ApiClient {
   /// عمداً فهرستِ سفید و نه همه‌چیز: مسیرهایی مثل کیف پول یا نتیجهٔ
   /// گردونه نباید مقدارِ کهنه نشان بدهند، چون کاربر بر اساسشان تصمیمِ
   /// مالی می‌گیرد. اینها همگی «کاتالوگ»اند: کارت‌ها، ترکیب، پروفایل.
+  ///
+  /// نکتهٔ نگهداری: فقط مسیرهای **واقعاً صدا‌زده‌شده** اینجا باشند. سه
+  /// ورودیِ `/api/inventory`، `/api/league` و `/api/social` هیچ‌وقت
+  /// فراخوانی نمی‌شدند (داده‌شان از `/api/bootstrap` و مسیرهای واقعی
+  /// مثل `/api/league/current` می‌آید) و فقط ردّ گمراه‌کننده بودند؛ حذف
+  /// شدند تا کسی روزی فکر نکند کشِ یک مسیرِ بی‌route را می‌خوانَد.
   static bool _swrEligible(String path) {
     const ok = [
       '/api/bootstrap',
       '/api/card-duel',
-      '/api/inventory',
       '/api/rewards',
       '/api/reward-groups',
       '/api/shop',
-      '/api/league',
       '/api/pass',
-      '/api/social',
       '/api/missions',
     ];
     for (final prefix in ok) {

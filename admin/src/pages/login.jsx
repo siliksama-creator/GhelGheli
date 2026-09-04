@@ -16,7 +16,9 @@ export function LoginScreen({ onLogin }) {
     setLoading(true);
     try {
       const d = await request('/api/admin/auth/login', { method: 'POST', body: { username, password } });
-      onLogin(d.token);
+      // پاسخ شامل { token, admin:{ id, username, role } } است؛ نقش را
+      // هم می‌فرستیم تا پنل بر اساس دسترسی، صفحه/دکمه‌ها را پنهان کند.
+      onLogin(d.token, d.admin);
     } catch (err) {
       setError(err.message);
     } finally {

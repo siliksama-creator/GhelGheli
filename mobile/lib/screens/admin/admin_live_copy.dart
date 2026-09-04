@@ -91,6 +91,10 @@ class _AdminLiveCopyState extends State<AdminLiveCopy> {
   Map<String, dynamic> _saved = const {}; // قالبِ ذخیره‌شده (مرجعِ مقایسه)
   Map<String, dynamic> _preview = const {}; // خروجیِ پرشده از سرور
   List<dynamic> _history = const [];
+  // تاریخچهٔ «قانون‌ها/اعداد» (rules) — وب هم‌زمان copy و rules را نشان
+  // می‌داد ولی اندروید فقط copy را می‌گرفت؛ مدیر روی گوشی سابقهٔ تغییرِ
+  // اعداد را نمی‌دید. اینجا قرینه‌اش می‌کنیم.
+  List<dynamic> _rulesHistory = const [];
 
   /// کلِ fieldهایِ متنی و بندها در یک dictِ کنترلر؛ ساختشان در `build`
   /// فاجعه بود (هر rebuild کنترلرِ نو می‌ساخت و متنِ تایپ‌شده می‌پرید).
@@ -227,10 +231,22 @@ class _AdminLiveCopyState extends State<AdminLiveCopy> {
   }
 
   Future<void> _loadHistory() async {
+    // هر دو تاریخچه مستقل‌اند؛ با getAll هم‌زمان گرفته می‌شوند تا یکی
+    // خطا داد، دیگری هم خالی نماند.
     try {
-      final h =
-          await widget.api.get('/api/admin/settings/live-content/history/copy');
-      if (mounted) setState(() => _history = (h is List ? h : const []));
+      final batch = await widget.api.getAll([
+        '/api/admin/settings/live-content/history/copy',
+        '/api/admin/settings/live-content/history/rules',
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _history = (batch.isNotEmpty && batch[0] is List)
+            ? batch[0] as List
+            : const [];
+        _rulesHistory = (batch.length > 1 && batch[1] is List)
+            ? batch[1] as List
+            : const [];
+      });
     } catch (_) {
       // تاریخچه اختیاری است؛ نبودنش نباید صفحه را خراب کند.
     }
@@ -682,19 +698,44 @@ class _AdminLiveCopyState extends State<AdminLiveCopy> {
   }
 
   Widget _historyCard() {
+    final empty = _history.isEmpty && _rulesHistory.isEmpty;
     return FormSection(
       title: 'تغییراتِ اخیر',
       subtitle:
           'هر ذخیره یک ردیف می‌گذارد؛ این‌جا می‌بینی چه کسی چه چیزی را عوض کرده.',
       children: [
-        if (_history.isEmpty)
+        if (empty)
           const Text('هنوز تغییری ثبت نشده.', style: TextStyle(fontSize: 12.5))
-        else
-          for (final h in _history.take(10))
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text(_historyLine(h), style: const TextStyle(fontSize: 12)),
+        else ...[
+          if (_history.isNotEmpty) ...[
+            const Padding(
+              padding: EdgeInsets.only(bottom: 4),
+              child: Text('متن‌ها',
+                  style:
+                      TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
             ),
+            for (final h in _history.take(10))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(_historyLine(h, kind: 'متن‌ها'),
+                    style: const TextStyle(fontSize: 12)),
+              ),
+          ],
+          if (_rulesHistory.isNotEmpty) ...[
+            const Padding(
+              padding: EdgeInsets.only(top: 6, bottom: 4),
+              child: Text('اعداد و قانون‌ها',
+                  style:
+                      TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+            ),
+            for (final h in _rulesHistory.take(10))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(_historyLine(h, kind: 'اعداد'),
+                    style: const TextStyle(fontSize: 12)),
+              ),
+          ],
+        ],
       ],
     );
   }
@@ -702,7 +743,7 @@ class _AdminLiveCopyState extends State<AdminLiveCopy> {
   /// برشِ «۲۰۲۶-۰۹-۰۳T۰۹:۱۲:۴۴» به تاریخ و ساعت — با `clamp`، چون
   /// `substring(0, 16)` روی ردیفِ ناقص (مثلاً بیِ `created_at`) استثنا
   /// می‌داد و کلِ صفحهٔ پنل را سفید می‌کرد.
-  String _historyLine(dynamic h) {
+  String _historyLine(dynamic h, {String kind = 'متن‌ها'}) {
     final m = _mapOf(h);
     // `createdAt`: لایهٔ `historyView` سرور، ردیفِ DB را camelCase می‌کند.
     // `created_at` دیگر در پاسخ نیست و خواندنش یعنی «تاریخچهٔ بی‌تاریخ».
@@ -715,6 +756,6 @@ class _AdminLiveCopyState extends State<AdminLiveCopy> {
     final tail = who.isNotEmpty
         ? ' · $who'
         : (m['adminId'] != null ? ' · یک ادمینِ دیگر' : ' · تیم پشتیبانی');
-    return 'متن‌ها — ${when.isEmpty ? '—' : when}$tail';
+    return '$kind — ${when.isEmpty ? '—' : when}$tail';
   }
 }

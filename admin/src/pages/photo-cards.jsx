@@ -358,6 +358,44 @@ export function PhotoCardsPage({ request }) {
   }
 
   /**
+   * حذفِ گروهیِ همهٔ کدهای استفاده‌نشده/باطلِ یک دسته.
+   *
+   * مسیر `bulk-delete` از قبل در بک‌اند بود (برای وقتی ۱۵هزار کد اشتباه
+   * وارد شده) ولی هیچ دکمه‌ای نداشت. چون «حذف» برگشت‌ناپذیر است، دو
+   * تأیید می‌گیریم و نام دسته را باید عیناً تایپ کند. کدهای مصرف‌شده به‌
+   * هیچ‌وجه حذف نمی‌شوند (سرور هم تضمین می‌کند) و شمار باقی‌مانده گزارش
+   * می‌شود.
+   */
+  async function deleteBatch(b) {
+    const name = b.batch_label;
+    const first = await confirmAction({
+      title: `حذف کدهای دستهٔ «${name}»؟`,
+      message: `فقط کدهای آزاد و باطلِ این دسته حذف می‌شوند (${fmtNumber(b.count || 0)} کد در این دسته). کدهای مصرف‌شده دست‌نخورده می‌مانند. این عملیات برگشت‌پذیر نیست.`,
+      confirmText: 'ادامه',
+      danger: true,
+    });
+    if (!first) return;
+    const typed = await promptText({
+      title: `برای تأیید، نام دسته را تایپ کنید`,
+      description: `نام دسته را دقیقاً بنویسید: ${name}`,
+      placeholder: name,
+    });
+    if ((typed || '').trim() !== name) {
+      return notify('نام دسته درست تایپ نشد؛ حذف لغو شد', 'error');
+    }
+    try {
+      const r = await request('/api/admin/photo-cards/codes/bulk-delete', {
+        method: 'POST',
+        body: { batchLabel: name },
+      });
+      notify(r.message || 'دسته حذف شد', 'success');
+      loadCodes();
+    } catch (e) {
+      notify(e.message, 'error');
+    }
+  }
+
+  /**
    * کدها را همان‌طور که مدیر نوشته می‌فرستد.
    *
    * شمارشِ محلی فقط برای نمایش است؛ تفکیک و اعتبارسنجیِ واقعی سمت سرور
@@ -879,6 +917,15 @@ export function PhotoCardsPage({ request }) {
                 <b>{b.batch_label}</b>
                 <span>{fmtNumber(b.count)} کد</span>
                 <small>{fmtDateTime(b.created_at)}</small>
+                <button
+                  type="button"
+                  className="batchDelBtn"
+                  title="حذف کدهای آزاد/باطل این دسته"
+                  onClick={() => deleteBatch(b)}
+                  style={{ marginInlineStart: 'auto', border: 'none', background: 'transparent', color: 'var(--gg-danger, #ef4444)', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}
+                >
+                  حذف دسته
+                </button>
               </div>
             ))}
           </div>

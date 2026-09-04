@@ -5,7 +5,22 @@ import { Badge, Button, Card, DataRow, EmptyState, Field, Input, Select } from '
 import { useDialog } from '../components/dialog.jsx';
 import { useToast } from '../lib/toast.jsx';
 
-export function UsersPage({ request }) {
+// برچسب فارسیِ منبعِ تراکنش کیف‌پول — هم‌خانوادهٔ `SOURCE_LABEL` در
+// userweb/wallet.jsx تا مدیر همان کلمه‌ای را ببیند که کاربر می‌بیند.
+const WALLET_TX_LABEL = {
+  card_cash: 'جایزهٔ نقدی کارت',
+  wheel: 'گردونهٔ شانس',
+  reward: 'جایزهٔ نقدی',
+  league: 'جایزهٔ لیگ',
+  referral_commission: 'کمیسیون معرفی',
+  admin_credit: 'افزایش توسط مدیریت',
+  admin_debit: 'کسر توسط مدیریت',
+  withdrawal_hold: 'درخواست برداشت',
+  withdrawal_refund: 'برگشت وجه',
+  purchase: 'خرید',
+};
+
+export function UsersPage({ request, isSuperAdmin = true }) {
   const notify = useToast();
   const { promptText, confirmAction } = useDialog();
   const [rows, setRows] = useState([]);
@@ -169,8 +184,15 @@ export function UsersPage({ request }) {
   // recorded in the audit log.
   async function showDetails(id) {
     try {
-      const d = await request(`/api/admin/users/${id}`);
-      setDetail(d);
+      // جزئیات کاربر و تراکنش‌های کیف‌پولش با هم گرفته می‌شوند. مسیر
+      // `/wallet/users/:id/transactions` از قبل در بک‌اند بود ولی هیچ
+      // پنلی صدایش نمی‌زد — پشتیبانی هنگام اعتراض مالی نمی‌توانست سابقهٔ
+      // کیف‌پول یک کاربر را ببیند. شکست این بخش نباید کل مودال را خراب کند.
+      const [d, tx] = await Promise.all([
+        request(`/api/admin/users/${id}`),
+        request(`/api/admin/wallet/users/${id}/transactions?limit=30`).catch(() => []),
+      ]);
+      setDetail({ ...d, walletTx: Array.isArray(tx) ? tx : (tx?.transactions || []) });
     } catch (e) {
       notify(e.message || 'جزئیات کاربر دریافت نشد', 'error');
     }
@@ -293,12 +315,18 @@ export function UsersPage({ request }) {
                 <Button size="sm" variant="secondary" icon={UserRoundSearch} onClick={() => showDetails(u.id)}>
                   جزئیات
                 </Button>
-                <Button size="sm" variant="secondary" icon={Coins} onClick={() => changePoints(u.id)}>
-                  امتیاز
-                </Button>
-                <Button size="sm" variant="secondary" icon={Wallet} onClick={() => adjustWallet(u)}>
-                  کیف پول
-                </Button>
+                {/* «امتیاز دستی» و «اصلاح کیف پول» در بک‌اند super_admin-only
+                    اند؛ از نقشِ پشتیبان پنهانشان می‌کنیم تا با ۴۰۳ روبه‌رو نشود. */}
+                {isSuperAdmin && (
+                  <Button size="sm" variant="secondary" icon={Coins} onClick={() => changePoints(u.id)}>
+                    امتیاز
+                  </Button>
+                )}
+                {isSuperAdmin && (
+                  <Button size="sm" variant="secondary" icon={Wallet} onClick={() => adjustWallet(u)}>
+                    کیف پول
+                  </Button>
+                )}
                 <Button size="sm" variant="secondary" onClick={() => grantPlus(u.id)}>
                   اعطای پلاس
                 </Button>
@@ -363,6 +391,28 @@ export function UsersPage({ request }) {
                     </li>
                   ))}
                 </ul>
+              </div>
+            )}
+            {(detail.walletTx || []).length > 0 && (
+              <div style={{ marginTop: 8 }}>
+                <span className="topbar-sub">تراکنش‌های کیف‌پول (اخیر)</span>
+                <div style={{ marginTop: 6, display: 'grid', gap: 4, fontSize: 12 }}>
+                  {(detail.walletTx || []).slice(0, 15).map((t) => {
+                    const credit = t.direction === 'credit';
+                    return (
+                      <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 8, background: 'rgba(127,127,127,0.08)' }}>
+                        <span style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: credit ? 'var(--gg-success, #22c55e)' : 'var(--gg-danger, #ef4444)' }} />
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <b style={{ fontSize: 12 }}>{WALLET_TX_LABEL[t.source] || t.description || t.source || 'تراکنش'}</b>
+                          <span className="topbar-sub" style={{ display: 'block', fontSize: 10.5 }}>{t.description || ''}</span>
+                        </span>
+                        <b style={{ color: credit ? 'var(--gg-success, #22c55e)' : 'var(--gg-danger, #ef4444)', fontVariantNumeric: 'tabular-nums' }}>
+                          {credit ? '+' : '−'} {fmtNumber(t.amount)}
+                        </b>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
             <Button variant="secondary" onClick={() => setDetail(null)}>بستن</Button>

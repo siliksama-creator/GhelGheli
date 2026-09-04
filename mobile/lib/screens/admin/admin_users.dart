@@ -601,13 +601,28 @@ class _AdminUsersState extends State<AdminUsers> {
     setState(() => _detailsBusy = true);
 
     Map<String, dynamic> u;
+    List<dynamic> walletTx = const [];
     try {
-      final d = await widget.api.get('/api/admin/users/$id');
+      // جزئیات کاربر و تراکنش‌های کیف‌پولش با هم. مسیر تراکنش از قبل در
+      // بک‌اند بود ولی هیچ پنلی صدایش نمی‌زد؛ شکستش نباید دیالوگ را
+      // خراب کند پس جداگانه و بی‌صدا گرفته می‌شود.
+      final results = await Future.wait<dynamic>([
+        widget.api.get('/api/admin/users/$id'),
+        widget.api
+            .get('/api/admin/wallet/users/$id/transactions?limit=30')
+            .then<dynamic>((v) => v)
+            .catchError((_) => const <dynamic>[]),
+      ]);
+      final d = results[0];
       final raw = d is Map ? d['user'] : null;
       if (raw is! Map) {
         throw StateError('پاسخ سرور شکل مورد انتظار را ندارد');
       }
       u = Map<String, dynamic>.from(raw);
+      final tx = results[1];
+      walletTx = (tx is Map && tx['transactions'] is List)
+          ? tx['transactions'] as List
+          : (tx is List ? tx : const []);
     } catch (e) {
       if (!mounted) return;
       setState(() => _detailsBusy = false);
@@ -641,6 +656,55 @@ class _AdminUsersState extends State<AdminUsers> {
               _DetailRow('شماره کارت/شبا', u['bank_account']),
               _DetailRow('امتیاز فعلی', faNum(u['current_points'])),
               _DetailRow('امتیاز تاریخی', faNum(u['lifetime_points'])),
+              if (walletTx.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                const Text('تراکنش‌های کیف‌پول (اخیر)',
+                    style:
+                        TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 4),
+                for (final rawTx in walletTx.take(15))
+                  Builder(builder: (_) {
+                    final t = Map<String, dynamic>.from(rawTx as Map);
+                    final credit = '${t['direction']}' == 'credit';
+                    final amount = (t['amount'] as num?)?.toInt() ?? 0;
+                    final label = _walletTxLabel('${t['source'] ?? ''}',
+                        '${t['description'] ?? ''}');
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            margin: const EdgeInsets.only(left: 6),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: credit
+                                  ? const Color(0xFF22C55E)
+                                  : const Color(0xFFEF4444),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(label,
+                                style: const TextStyle(fontSize: 11.5),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis),
+                          ),
+                          Text(
+                            '${credit ? '+' : '−'} ${faNum(amount)}',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w900,
+                              color: credit
+                                  ? const Color(0xFF22C55E)
+                                  : const Color(0xFFEF4444),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+              ],
             ],
           ),
         ),
@@ -796,11 +860,16 @@ class _AdminUsersState extends State<AdminUsers> {
                               child: Text(u['unlimited_spins'] == true
                                   ? 'قطع چرخش نامحدود'
                                   : 'چرخش نامحدود گردونه')),
-                          const PopupMenuItem(
-                              value: 'points', child: Text('تغییر امتیاز')),
-                          const PopupMenuItem(
-                              value: 'wallet',
-                              child: Text('اصلاح کیف پول')),
+                          // «تغییر امتیاز» و «اصلاح کیف پول» در بک‌اند
+                          // super_admin-only‌اند؛ از نقشِ پشتیبان پنهانشان
+                          // می‌کنیم تا با ۴۰۳ «دسترسی کافی نیست» روبه‌رو نشود.
+                          if (widget.api.isSuperAdmin) ...[
+                            const PopupMenuItem(
+                                value: 'points', child: Text('تغییر امتیاز')),
+                            const PopupMenuItem(
+                                value: 'wallet',
+                                child: Text('اصلاح کیف پول')),
+                          ],
                           const PopupMenuItem(
                               value: 'reset_password',
                               child: Text('بازیابی رمز عبور')),
@@ -824,6 +893,28 @@ class _AdminUsersState extends State<AdminUsers> {
           ),
       ],
     );
+  }
+
+  /// برچسب فارسیِ منبع تراکنش کیف‌پول — هم‌خانوادهٔ `SOURCE_LABEL` در
+  /// وب کاربر و `WALLET_TX_LABEL` در پنل وب، تا مدیر همان واژه‌ای را
+  /// ببیند که کاربر می‌بیند. توضیحِ خالی به منبع برمی‌گردد.
+  static const Map<String, String> _walletTxLabels = {
+    'card_cash': 'جایزهٔ نقدی کارت',
+    'wheel': 'گردونهٔ شانس',
+    'reward': 'جایزهٔ نقدی',
+    'league': 'جایزهٔ لیگ',
+    'referral_commission': 'کمیسیون معرفی',
+    'admin_credit': 'افزایش توسط مدیریت',
+    'admin_debit': 'کسر توسط مدیریت',
+    'withdrawal_hold': 'درخواست برداشت',
+    'withdrawal_refund': 'برگشت وجه',
+    'purchase': 'خرید',
+  };
+
+  String _walletTxLabel(String source, String description) {
+    final d = description.trim();
+    if (d.isNotEmpty) return d;
+    return _walletTxLabels[source] ?? (source.isEmpty ? 'تراکنش' : source);
   }
 }
 

@@ -106,7 +106,9 @@ class _AuthScreenState extends State<AuthScreen> {
             'username': _mobile.text.trim(),
             'password': _pass.text,
           });
-          await widget.api.saveToken(r['token'], admin: true);
+          final adminInfo = r is Map && r['admin'] is Map ? r['admin'] as Map : null;
+          await widget.api.saveToken(r['token'],
+              admin: true, role: adminInfo?['role']?.toString());
           break;
         case _AuthMode.register:
           final r = await widget.api.post('/api/auth/register-password', {

@@ -8,6 +8,32 @@ import { useAsync } from '../lib/useAsync.js';
 import { clubImg, CosmeticAvatarFrame, DisplayName, profileBackgroundClass, profileBackgroundStyle } from '../components/Cosmetics.jsx';
 import Field from '../components/Field.jsx';
 
+// برچسبِ فارسیِ منبعِ هر ردیفِ امتیاز — کلیدها با CHECK مایگریشنِ ۰۴۵ و
+// با نقشهٔ پنل ادمین یکی است. کاربر از همین‌جا می‌فهمد «این امتیاز از کجا
+// آمد / چرا کم شد»، بدون تماس با پشتیبانی.
+const POINT_SOURCE_FA = {
+  photo_card: 'ثبت کارت با عکس',
+  card_code: 'ثبت کارت با کد',
+  referral: 'کمیسیون معرفی',
+  game: 'بازی',
+  pass_reward: 'گذر نبرد',
+  wheel: 'گردونهٔ شانس',
+  reward_claim: 'دریافت جایزه',
+  admin_adjust: 'تنظیم مدیر',
+  admin_deduct: 'کسر مدیر',
+  signup_gift: 'هدیهٔ عضویت',
+  other: 'سایر',
+};
+const pointSrcFa = (s) => POINT_SOURCE_FA[s] || s || '—';
+
+// تاریخ شمسیِ کوتاه برای دفتر امتیاز — بدون وابستگی، همان الگوی بقیهٔ وب.
+function pointDate(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  try { return new Intl.DateTimeFormat('fa-IR', { dateStyle: 'short', timeStyle: 'short' }).format(d); }
+  catch { return d.toLocaleString(); }
+}
+
 export default function Profile({ token, p, load, setMsg }) {
   useLive();
   const u = p.user;
@@ -29,6 +55,15 @@ export default function Profile({ token, p, load, setMsg }) {
     [token],
   );
   const leagueHistory = useAsync(loadHistory, [loadHistory]);
+  // دفتر ریزامتیازِ خودِ کاربر — مسیر `/api/points/history` از قبل در
+  // بک‌اند کامل بود ولی به هیچ کلاینتی وصل نبود.
+  const loadPoints = useCallback(
+    () => req('/api/points/history?limit=30', 'GET', null, token),
+    [token],
+  );
+  const points = useAsync(loadPoints, [loadPoints]);
+  const pointTx = points.data?.transactions || [];
+  const pointTotals = points.data?.summary?.totals || null;
   const [pw, setPw] = useState({ currentPassword: '', newPassword: '' });
   const [pwMsg, setPwMsg] = useState('');
   const [saving, setSaving] = useState(false);
@@ -69,6 +104,35 @@ export default function Profile({ token, p, load, setMsg }) {
                   <span style={{ width:'32px', color:rank <= 3 ? '#FFD166' : '#94A3B8', fontWeight:'900' }}>#{fa(rank)}</span>
                   <span style={{ flex:1, color:'#FFF', fontSize:'11.5px', fontWeight:'700' }}>{h.monthYear} · رتبه {fa(rank)} ({fa(h.points)} امتیاز)</span>
                   {prize > 0 && <b style={{ color:'#84CC16', fontSize:'11px' }}>{fa(prize)} تومان</b>}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+      {pointTx.length > 0 && (
+        <section style={{ background:'linear-gradient(135deg, rgba(132,204,22,0.12), rgba(56,189,248,0.06))', border:'1px solid rgba(132,204,22,0.28)', borderRadius:'16px', padding:'14px' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'10px' }}>
+            <h3 style={{ color:'#84CC16', fontWeight:'900', margin:0, flex:1 }}>دفتر امتیازهای من</h3>
+            {pointTotals && (
+              <span style={{ color:'#94A3B8', fontSize:'10.5px', fontWeight:'700' }}>
+                کسب {fa(pointTotals.earned || 0)} · خرج {fa(pointTotals.spent || 0)}
+              </span>
+            )}
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:'6px' }}>
+            {pointTx.slice(0, 20).map((tx) => {
+              const delta = Number(tx.delta || 0);
+              const positive = delta >= 0;
+              const desc = (tx.description || '').trim();
+              return (
+                <div key={tx.id} style={{ display:'flex', alignItems:'flex-start', gap:'8px', padding:'7px 10px', borderRadius:'10px', background:'rgba(255,255,255,0.045)' }}>
+                  <span style={{ width:6, height:6, borderRadius:'50%', marginTop:7, flexShrink:0, background: positive ? '#84CC16' : '#EF4444' }} />
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ color:'#FFF', fontSize:'11.5px', fontWeight:'700' }}>{desc || pointSrcFa(tx.source)}</div>
+                    <div style={{ color:'#94A3B8', fontSize:'9.5px' }}>{pointSrcFa(tx.source)} · {pointDate(tx.created_at)}</div>
+                  </div>
+                  <b style={{ color: positive ? '#84CC16' : '#EF4444', fontSize:'12px', fontWeight:'900' }}>{positive ? '+' : ''}{fa(delta)}</b>
                 </div>
               );
             })}

@@ -200,9 +200,43 @@ class _AdminShellState extends State<AdminShell> {
 
   void _select(int i) => setState(() => _index = i);
 
+  /// شاخصِ صفحاتی که نقشِ ادمینِ واردشده اجازهٔ دیدنشان دارد.
+  ///
+  /// فقط برای رابط کاربری است (بک‌اند در هر صورت ۴۰۳ می‌دهد). فهرست‌های
+  /// ثابتِ `_pages/_titles/...` دست‌نخورده می‌مانند تا با NAVِ وب و گاردِ
+  /// admin-copy-parity یکی بمانند؛ اینجا فقط زیرمجموعه‌ای از شاخص‌ها رندر
+  /// می‌شود.
+  ///   observer     → فقط داشبورد (۰) و پشتیبانی (۱۷)
+  ///   support      → همه به‌جز «ادمین‌ها» (۲۲) که super_admin-only است
+  ///   super_admin  → همه
+  List<int> get _allowedIndices {
+    final role = widget.api.adminRole;
+    if (role == 'super_admin') {
+      return List<int>.generate(_pages.length, (i) => i);
+    }
+    if (role == 'observer') return const [0, 17];
+    return [for (var i = 0; i < _pages.length; i++) if (i != 22) i];
+  }
+
   @override
   Widget build(BuildContext context) {
     final isWide = Breakpoints.isTablet(MediaQuery.sizeOf(context).width);
+    final allowed = _allowedIndices;
+    // اگر شاخص فعلی برای این نقش مجاز نبود (نشستِ قدیمی)، به نخستین
+    // صفحهٔ مجاز برمی‌گردیم — بعد از فریم تا در میانهٔ build setState نزنیم.
+    if (!allowed.contains(_index)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _index = allowed.first);
+      });
+    }
+    final currentIndex =
+        allowed.contains(_index) ? _index : allowed.first;
+
+    // زیرفهرست‌های فیلترشده برای منو — فهرست‌های ثابت دست‌نخورده می‌مانند
+    // (گاردِ پاریتی تعداد کامل را می‌شمارد) و فقط آیتم‌های مجاز رندر می‌شوند.
+    final navTitles = [for (final i in allowed) _titles[i]];
+    final navIcons = <IconData>[for (final i in allowed) _icons[i]];
+    final navGroups = [for (final i in allowed) _adminNavGroups[i]];
 
     final scaffold = Scaffold(
       appBar: AppBar(
@@ -210,10 +244,10 @@ class _AdminShellState extends State<AdminShell> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('مدیریت قلقلی — ${_titles[_index]}',
+            Text('مدیریت قلقلی — ${_titles[currentIndex]}',
                 style: const TextStyle(fontSize: 17)),
             Text(
-              _subtitles[_index],
+              _subtitles[currentIndex],
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 10.5, color: Colors.white60),
@@ -232,13 +266,13 @@ class _AdminShellState extends State<AdminShell> {
           : Drawer(
               child: SafeArea(
                 child: _AdminNavList(
-                  index: _index,
-                  titles: _titles,
-                  icons: _icons,
-                  groups: _adminNavGroups,
+                  index: allowed.indexOf(currentIndex),
+                  titles: navTitles,
+                  icons: navIcons,
+                  groups: navGroups,
                   groupLabels: _groupLabels,
-                  onSelect: (i) {
-                    _select(i);
+                  onSelect: (pos) {
+                    _select(allowed[pos]);
                     Navigator.pop(context);
                   },
                   onLogout: widget.onLogout,
@@ -249,10 +283,10 @@ class _AdminShellState extends State<AdminShell> {
         child: AnimatedSwitcher(
           duration: Motion.normal,
           child: KeyedSubtree(
-            key: ValueKey(_index),
+            key: ValueKey(currentIndex),
             child: ScrollHint(
               hintLabel: 'پایین‌تر هم هست',
-              child: _pages[_index],
+              child: _pages[currentIndex],
             ),
           ),
         ),
@@ -270,12 +304,12 @@ class _AdminShellState extends State<AdminShell> {
               color: Theme.of(context).colorScheme.surfaceContainerLow,
               child: SafeArea(
                 child: _AdminNavList(
-                    index: _index,
-                    titles: _titles,
-                    icons: _icons,
-                    groups: _adminNavGroups,
+                    index: allowed.indexOf(currentIndex),
+                    titles: navTitles,
+                    icons: navIcons,
+                    groups: navGroups,
                     groupLabels: _groupLabels,
-                    onSelect: _select,
+                    onSelect: (pos) => _select(allowed[pos]),
                     onLogout: widget.onLogout),
               ),
             ),
@@ -284,17 +318,17 @@ class _AdminShellState extends State<AdminShell> {
           Expanded(
             child: Scaffold(
               appBar: AppBar(
-                title: Text('مدیریت قلقلی — ${_titles[_index]}'),
+                title: Text('مدیریت قلقلی — ${_titles[currentIndex]}'),
                 actions: const [SizedBox(width: 8)],
               ),
               body: _AdminBackdrop(
                 child: AnimatedSwitcher(
                   duration: Motion.normal,
                   child: KeyedSubtree(
-                    key: ValueKey(_index),
+                    key: ValueKey(currentIndex),
                     child: ScrollHint(
                       hintLabel: 'پایین‌تر هم هست',
-                      child: _pages[_index],
+                      child: _pages[currentIndex],
                     ),
                   ),
                 ),

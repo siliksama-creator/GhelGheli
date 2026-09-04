@@ -371,6 +371,46 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
     }
   }
 
+  /// حذفِ گروهیِ کدهای آزاد/باطلِ یک دسته — آینهٔ `deleteBatch` در پنل
+  /// وب. مسیر `bulk-delete` از قبل در بک‌اند بود ولی دکمه نداشت. چون
+  /// برگشت‌ناپذیر است، یک تأییدِ صریح می‌گیریم؛ کدهای مصرف‌شده را سرور
+  /// به‌هیچ‌وجه حذف نمی‌کند و شمار باقی‌مانده را گزارش می‌دهد.
+  Future<void> _deleteBatch() async {
+    final label = _batch.text.trim();
+    if (label.isEmpty) {
+      _snack('اول برچسب دسته را بنویسید');
+      return;
+    }
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('حذف کدهای دستهٔ «$label»؟'),
+        content: const Text(
+            'فقط کدهای آزاد و باطلِ این دسته حذف می‌شوند. کدهای مصرف‌شده '
+            'دست‌نخورده می‌مانند. این عملیات برگشت‌پذیر نیست.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('انصراف')),
+          FilledButton(
+              style: FilledButton.styleFrom(
+                  backgroundColor: Colors.red.shade700),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('حذف دسته')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      final r = await widget.api.post(
+          '/api/admin/photo-cards/codes/bulk-delete', {'batchLabel': label});
+      _snack(r['message']?.toString() ?? 'دسته حذف شد');
+      _batch.clear();
+      await _load();
+    } catch (e) {
+      _snack(apiError(e));
+    }
+  }
+
   /// ویرایشِ متنِ کد. فقط برای کدِ آزاد یا باطل — سرور هم همین را
   /// اجبار می‌کند، ولی دکمه‌اش را هم نشان نمی‌دهیم تا کاربر با خطای
   /// همیشگی روبه‌رو نشود.
@@ -923,6 +963,21 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
                     child: CircularProgressIndicator(strokeWidth: 2))
                 : const Icon(Icons.link_rounded, size: 18),
             label: const Text('اعمال کارتِ بالا روی کلِ این دسته'),
+          ),
+        ),
+        // حذف گروهی کدهای آزاد/باطلِ همین دسته (برای پاک‌کردن یک دستهٔ
+        // اشتباه). خطرناک است، پس با تأیید و استایلِ قرمز.
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: OutlinedButton.icon(
+            onPressed: _deleteBatch,
+            icon: Icon(Icons.delete_outline_rounded,
+                size: 18, color: Colors.red.shade700),
+            label: Text('حذف کدهای آزاد/باطل این دسته',
+                style: TextStyle(color: Colors.red.shade700)),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: Colors.red.shade700.withValues(alpha: 0.5)),
+            ),
           ),
         ),
         FilledButton.icon(
