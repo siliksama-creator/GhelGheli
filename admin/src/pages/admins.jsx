@@ -84,13 +84,16 @@ export function AdminsPage({ request }) {
     <div className="card-grid cols-2">
       <Card title="ادمین جدید" subtitle="نقش «پشتیبان» فقط تیکت‌ها را می‌بیند؛ بقیهٔ صفحه‌ها مخصوص سوپرادمین است">
         <form onSubmit={add}>
-          <Field label="نام کاربری">
+          <Field label="نام کاربری"
+              hint="در دفترِ رخدادها کنارِ هر تغییرِ شما ثبت می‌شود («چه کسی این عدد را عوض کرد»)؛ نامِ اشتباه یعنی ردپایِ اشتباه.">
             <Input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} required />
           </Field>
-          <Field label="رمز عبور">
+          <Field label="رمز عبور"
+              hint="برای حسابِ مدیر هیچ طولی در سرور چک نمی‌شود (برخلافِ حسابِ کاربر که ۶ تا ۷۲ نویسه لازم دارد)؛ خودتان مراقب باشید.">
             <Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
           </Field>
-          <Field label="نقش">
+          <Field label="نقش"
+              hint="«مدیر کل» همه‌چیز را می‌بیند؛ «پشتیبان» فقط تیکت و چند صفحهٔ محدود؛ «ناظر» چیزی را نمی‌تواند عوض کند. بیشترِ صفحه‌هایِ این پنل فقط برای مدیر کل باز است.">
             <Select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
               <option value="super_admin">مدیر کل</option>
               <option value="support">پشتیبان</option>

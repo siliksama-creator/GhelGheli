@@ -689,21 +689,24 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
         TextField(
           controller: _name,
           decoration: const InputDecoration(
-              labelText: 'نام کارت', hintText: 'مثلاً: امباپه — فرانسه'),
+              labelText: 'نام کارت', hintText: 'مثلاً: امباپه — فرانسه',
+                  helperText: 'همین نام در اعلانِ کاربر («… بابت کارت «نام» واریز شد») و در پیغامِ «طرحِ این کارت با «نامِ دیگر» یکی است» نوشته می‌شود؛ کارتِ بی‌نام یعنی اعلانِ بی‌نام.', helperMaxLines: 6),
         ),
         TextField(
           controller: _points,
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           decoration: const InputDecoration(
-              labelText: 'امتیاز این کارت', hintText: 'مثلاً 3000'),
+              labelText: 'امتیاز این کارت', hintText: 'مثلاً 3000',
+                  helperText: 'بعد از ثبت به موجودیِ کاربر اضافه می‌شود و در قدرتِ دوئل هم مصرف دارد: √امتیاز ÷ ۳٫۲، اما حداکثر ۲۲ واحد — یعنی از ۵۰۰۰ به بعد، افزایشِ امتیاز کارت را قوی‌تر نمی‌کند.', helperMaxLines: 6),
         ),
         TextField(
           controller: _cash,
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           decoration: const InputDecoration(
-              labelText: 'جایزهٔ نقدی (تومان، اختیاری)', hintText: '0'),
+              labelText: 'جایزهٔ نقدی (تومان، اختیاری)', hintText: '0',
+                  helperText: 'بزرگ‌تر از صفر یعنی هنگامِ ثبتِ همین کارت مبلغ به کیف پول کاربر واریز شود؛ برای کارت‌هایِ نقدی کمیسیونِ ۵٪ معرف عمداً پرداخت نمی‌شود تا بودجه دو بار خرج نشود.', helperMaxLines: 6),
         ),
         const SizedBox(height: 10),
         // ── نوعِ کارت: بازی یا کلکسیونی ──
@@ -762,7 +765,8 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
               Expanded(
                 child: DropdownButtonFormField<String>(
                   initialValue: _rarity,
-                  decoration: const InputDecoration(labelText: 'کلاس کارت'),
+                  decoration: const InputDecoration(labelText: 'کلاس کارت',
+                  helperText: 'به قدرتِ دوئل عددِ ثابت اضافه می‌کند (معمولی ۰، نقره‌ای ۵، طلایی ۱۰، پرمیوم ۱۶، لجند ۲۴) و شانسِ افتِ همین کارت از جعبه هم با همین نام‌ها تنظیم می‌شود.', helperMaxLines: 6),
                   items: const [
                     DropdownMenuItem(value: 'normal', child: Text('معمولی')),
                     DropdownMenuItem(value: 'silver', child: Text('نقره‌ای')),
@@ -777,7 +781,8 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
               Expanded(
                 child: DropdownButtonFormField<String>(
                   initialValue: _effect,
-                  decoration: const InputDecoration(labelText: 'افکت خاص'),
+                  decoration: const InputDecoration(labelText: 'افکت خاص',
+                  helperText: 'امتیازِ هر راند را عوض می‌کند، نه استات‌ها را: سرعتی راندِ اول را بالا می‌برد، فینیشر راندِ آخر را ۲۰ تا زیاد و بقیه را ۱۰ تا کم می‌کند، دیوار دفاعی راندِ چهارم را محکم می‌کند.', helperMaxLines: 6),
                   items: const [
                     DropdownMenuItem(value: 'none', child: Text('بدون افکت')),
                     DropdownMenuItem(value: 'finisher', child: Text('فینیشر')),
@@ -863,7 +868,7 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
             labelText: 'کدها — هر خط یک کد (یا با کاما/فاصله جدا کنید)',
             hintText: 'GHP-A2B3-C4D5\nQL-2026-0001\n…',
             alignLabelWithHint: true,
-          ),
+                  helperText: 'کدها بزرگ‌حرف می‌شوند، رقمِ فارسی به لاتین تبدیل می‌شود و فاصله/نقطه به خط تیره؛ بعد ۴ تا ۶۴ نویسهٔ A-Z/۰-۹/- می‌ماند. کدِ تکراری بی‌سروصدا رد می‌شود و در گزارشِ «چند کد ثبت شد» می‌بینید چند تا رد شده‌اند.', helperMaxLines: 6),
         ),
         Text(
           _typedCount > 0
@@ -880,7 +885,8 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
           initialValue: _codeType,
           isExpanded: true,
           decoration: const InputDecoration(
-              labelText: 'این کدها روی کدام کارت چاپ می‌شوند؟'),
+              labelText: 'این کدها روی کدام کارت چاپ می‌شوند؟',
+                  helperText: 'کارتِ انتخاب‌شده «نامِ کد» می‌شود: اگر کاربر عکس و کد را با هم بفرستد، عکس از ۲۰٪ شباهت هم خودکار تأیید می‌شود؛ بدونِ انتخابِ کارت، تشخیص فقط با آستانهٔ ۴۰٪ انجام می‌گیرد.', helperMaxLines: 6),
           items: [
             const DropdownMenuItem<String?>(
                 value: null, child: Text('نمی‌دانم — تشخیص از روی عکس')),

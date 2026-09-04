@@ -542,15 +542,18 @@ export function PhotoCardsPage({ request }) {
             </p>
           </div>
           <div className="stack">
-            <Field label="نام کارت">
+            <Field label="نام کارت"
+              hint="همین نام در اعلانِ کاربر («… بابت کارت «نام» واریز شد») و در پیغامِ «طرحِ این کارت با «نامِ دیگر» یکی است» نوشته می‌شود؛ کارتِ بی‌نام یعنی اعلانِ بی‌نام.">
               <Input value={name} onChange={e => setName(e.target.value)}
                 placeholder="مثلاً: امباپه — فرانسه" />
             </Field>
-            <Field label="امتیاز این کارت">
+            <Field label="امتیاز این کارت"
+              hint="بعد از ثبت به موجودیِ کاربر اضافه می‌شود و در قدرتِ دوئل هم مصرف دارد: √امتیاز ÷ ۳٫۲، اما حداکثر ۲۲ واحد — یعنی از ۵۰۰۰ به بعد، افزایشِ امتیاز کارت را قوی‌تر نمی‌کند.">
               <Input type="number" min="0" value={points}
                 onChange={e => setPoints(e.target.value)} placeholder="مثلاً 3000" />
             </Field>
-            <Field label="جایزهٔ نقدی (تومان، اختیاری)">
+            <Field label="جایزهٔ نقدی (تومان، اختیاری)"
+              hint="بزرگ‌تر از صفر یعنی هنگامِ ثبتِ همین کارت مبلغ به کیف پول کاربر واریز شود؛ برای کارت‌هایِ نقدی کمیسیونِ ۵٪ معرف عمداً پرداخت نمی‌شود تا بودجه دو بار خرج نشود.">
               <Input type="number" min="0" value={cash}
                 onChange={e => setCash(e.target.value)} placeholder="0" />
             </Field>
@@ -596,7 +599,8 @@ export function PhotoCardsPage({ request }) {
                 ))}
               </div>
               <div className="card-grid cols-2">
-                <Field label="کلاس کارت">
+                <Field label="کلاس کارت"
+              hint="به قدرتِ دوئل عددِ ثابت اضافه می‌کند (معمولی ۰، نقره‌ای ۵، طلایی ۱۰، پرمیوم ۱۶، لجند ۲۴) و شانسِ افتِ همین کارت از جعبه هم با همین نام‌ها تنظیم می‌شود.">
                   <select value={duel.rarity}
                     onChange={e => setDuel(d => ({ ...d, rarity: e.target.value }))}>
                     <option value="normal">معمولی</option>
@@ -606,7 +610,8 @@ export function PhotoCardsPage({ request }) {
                     <option value="legend">لجند</option>
                   </select>
                 </Field>
-                <Field label="افکت خاص">
+                <Field label="افکت خاص"
+              hint="امتیازِ هر راند را عوض می‌کند، نه استات‌ها را: سرعتی راندِ اول را بالا می‌برد، فینیشر راندِ آخر را ۲۰ تا زیاد و بقیه را ۱۰ تا کم می‌کند، دیوار دفاعی راندِ چهارم را محکم می‌کند.">
                   <select value={duel.effect}
                     onChange={e => setDuel(d => ({ ...d, effect: e.target.value }))}>
                     <option value="none">بدون افکت</option>
@@ -738,7 +743,8 @@ export function PhotoCardsPage({ request }) {
             یا ۱۵ هزار کد چسبانده‌شده از اکسل. دو فرم جدا فقط مدیر را
             مجبور می‌کرد بین دوتاشان انتخاب کند بدون اینکه سودی داشته
             باشد. */}
-        <Field label="کدها — هر خط یک کد (یا با کاما/فاصله جدا کنید)">
+        <Field label="کدها — هر خط یک کد (یا با کاما/فاصله جدا کنید)"
+              hint="کدها بزرگ‌حرف می‌شوند، رقمِ فارسی به لاتین تبدیل می‌شود و فاصله/نقطه به خط تیره؛ بعد ۴ تا ۶۴ نویسهٔ A-Z/۰-۹/- می‌ماند. کدِ تکراری بی‌سروصدا رد می‌شود و در گزارشِ «چند کد ثبت شد» می‌بینید چند تا رد شده‌اند.">
           <Textarea
             rows={7}
             dir="ltr"
@@ -772,7 +778,8 @@ export function PhotoCardsPage({ request }) {
 
             پیش‌فرض عمداً «نمی‌دانم» است: انتخابِ اشتباهِ یک کارت بدتر
             از انتخاب نکردن است — کاربر امتیازِ کارتِ دیگری می‌گیرد. */}
-        <Field label="این کدها روی کدام کارت چاپ می‌شوند؟">
+        <Field label="این کدها روی کدام کارت چاپ می‌شوند؟"
+              hint="کارتِ انتخاب‌شده «نامِ کد» می‌شود: اگر کاربر عکس و کد را با هم بفرستد، عکس از ۲۰٪ شباهت هم خودکار تأیید می‌شود؛ بدونِ انتخابِ کارت، تشخیص فقط با آستانهٔ ۴۰٪ انجام می‌گیرد.">
           <select className="input" value={codeType}
             onChange={e => setCodeType(e.target.value)}>
             <option value="">نمی‌دانم — تشخیص از روی عکس</option>
