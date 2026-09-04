@@ -106,7 +106,8 @@ export function GameEconomyPage({ request }) {
         subtitle="سکه‌ها بعد از پایان لیگ صفر می‌شوند و درصدِ تعیین‌شده به لیگِ بعدی منتقل می‌شود. صفر یعنی انتقال صفر."
         action={cfg.economyCustom ? <Badge tone="warning">سفارشی</Badge> : <Badge>پیش‌فرض</Badge>}
       >
-        <Field label="درصدِ انتقالِ سکه به لیگ بعدی (۰ تا ۱۰۰)">
+        <Field label="درصدِ انتقالِ سکه به لیگ بعدی (۰ تا ۱۰۰)"
+              hint="کفِ عدد حساب می‌شود: ۹۹۹ سکه با ۱۰٪ یعنی ۹۹ سکه؛ عددِ بیرون از ۰ تا ۱۰۰ یا خالی، هیچ سکه‌ای منتقل نمی‌کند.">
           <Input
             type="number" min="0" max="100"
             value={cfg.economy.coinCarryoverPercent}
@@ -165,28 +166,33 @@ export function GameEconomyPage({ request }) {
           title="بازی ضربه‌زن — سکه و منحنی"
           subtitle="منحنی (تعداد لول، جمعِ امتیاز، شیب، سقفِ روزانه) و سکهٔ هر لول — همه بدونِ انتشارِ نسخهٔ جدید، همان لحظه در اپ و وب اعمال می‌شود."
         >
-          <Field label="سکهٔ هر لول (راهنمای اپ: «هر لول N سکه می‌دهد»)">
+          <Field label="سکهٔ هر لول (راهنمای اپ: «هر لول N سکه می‌دهد»)"
+              hint="به لول‌هایی که تا حالا رد شده چیزی اضافه نمی‌کند؛ از لحظهٔ ذخیره، برایِ لول‌هایِ بعدی مصرف می‌شود.">
             <Input type="number" min="1" max="1000"
               value={cfg.economy.tapCoinsPerLevel}
               onChange={e => setEcon('tapCoinsPerLevel', Number(e.target.value))} />
           </Field>
           <div className="card-grid cols-2" style={{ gap: 8, marginTop: 10 }}>
-            <Field label="تعداد لول‌های بازی (۵ تا ۲۰۰)">
+            <Field label="تعداد لول‌های بازی (۵ تا ۲۰۰)"
+              hint="اگر کمتر از لولی باشد که بعضی بازیکن‌ها رد کرده‌اند، آن‌ها در حالتِ «بازی تمام شد» می‌مانند و ریستِ پایینِ همین صفحه آزادشان می‌کند.">
               <Input type="number" min="5" max="200"
                 value={cfg.economy.tapCurve?.levelCount ?? 50}
                 onChange={e => setEcon('tapCurve.levelCount', Number(e.target.value))} />
             </Field>
-            <Field label="جمعِ امتیازِ کلِ بازی">
+            <Field label="جمعِ امتیازِ کلِ بازی"
+              hint="همین عدد بینِ لول‌ها توزیع می‌شود (کسرِ گردکردن در لولِ آخر جبران می‌شود)؛ بالا بردنش جمعِ کل را بالا می‌برد، نه فقط لولِ آخر را.">
               <Input type="number" min="1000" max="10000000"
                 value={cfg.economy.tapCurve?.totalPoints ?? 50000}
                 onChange={e => setEcon('tapCurve.totalPoints', Number(e.target.value))} />
             </Field>
-            <Field label="شیبِ گران‌شدنِ لول‌ها (۱ تا ۱٫۵)">
+            <Field label="شیبِ گران‌شدنِ لول‌ها (۱ تا ۱٫۵)"
+              hint="۱ = همهٔ لول‌ها هم‌قیمت؛ ۱٫۵ یعنی لولِ آخر چند برابرِ اول گران‌تر است — جمعِ کل همان عددِ بالاست، فقط توزیعش عوض می‌شود.">
               <Input type="number" min="1" max="1.5" step="0.01"
                 value={cfg.economy.tapCurve?.growthFactor ?? 1.05}
                 onChange={e => setEcon('tapCurve.growthFactor', Number(e.target.value))} />
             </Field>
-            <Field label="سقفِ لول در روز (تقویم تهران)">
+            <Field label="سقفِ لول در روز (تقویم تهران)"
+              hint="۰ یعنی هیچ لولی در روز بسته نمی‌شود (بازی تا فردا قفل است)، نه بی‌سقف؛ اگر خالی بماند پیش‌فرض ۲ است و بیش از ۵۰ به ۵۰ می‌چسبد.">
               <Input type="number" min="0" max="50"
                 value={cfg.economy.tapCurve?.levelsPerDay ?? 2}
                 onChange={e => setEcon('tapCurve.levelsPerDay', Number(e.target.value))} />
@@ -217,22 +223,26 @@ export function GameEconomyPage({ request }) {
               امتیازِ بازی آنلاین فعال باشد
             </label>
           </Field>
-          <Field label="امتیازِ برد (مثبت)">
+          <Field label="امتیازِ برد (مثبت)"
+              hint="در دفترِ امتیاز با همین عدد ثبت می‌شود؛ بردِ بدونِ امتیاز (۰) فقط در کارنامهٔ بازیکن دیده می‌شود.">
             <Input type="number" min="0" max="1000"
               value={cfg.gamePoints.winPoints}
               onChange={e => setPoints('winPoints', Number(e.target.value))} />
           </Field>
-          <Field label="امتیازِ باخت (منفی = کسر)">
+          <Field label="امتیازِ باخت (منفی = کسر)"
+              hint="منفی فقط کسر می‌کند و موجودی تا صفر پایین می‌آید (زیرِ صفر نمی‌رود)؛ کسرِ امتیاز هیچ‌وقت با سقفِ روزانه متوقف نمی‌شود.">
             <Input type="number" min="-1000" max="0"
               value={cfg.gamePoints.losePoints}
               onChange={e => setPoints('losePoints', Number(e.target.value))} />
           </Field>
-          <Field label="امتیازِ مساوی">
+          <Field label="امتیازِ مساوی"
+              hint="می‌تواند منفی باشد؛ سرور آن را بین ۱۰۰۰- تا ۱۰۰۰+ نگه می‌دارد.">
             <Input type="number" min="-1000" max="1000"
               value={cfg.gamePoints.drawPoints}
               onChange={e => setPoints('drawPoints', Number(e.target.value))} />
           </Field>
-          <Field label="سقفِ روزانهٔ امتیازِ مثبت">
+          <Field label="سقفِ روزانهٔ امتیازِ مثبت"
+              hint="۰ یعنی بی‌سقف (خاموش)، نه «هیچ امتیازی نده»؛ فقط جایزه‌هایِ مثبت را می‌بندد و کسرِ امتیازِ باخت همیشه انجام می‌شود.">
             <Input type="number" min="0" max="500"
               value={cfg.gamePoints.dailyCap}
               onChange={e => setPoints('dailyCap', Number(e.target.value))} />

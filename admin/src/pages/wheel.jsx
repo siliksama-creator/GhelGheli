@@ -175,11 +175,13 @@ export function WheelAdminPage({ request }) {
           action={p.isActive ? <Badge tone="success">فعال</Badge> : <Badge>خاموش</Badge>}
         >
           <div className="card-grid cols-3" style={{ gap: 10 }}>
-            <Field label="برچسب (روی گردونه)">
+            <Field label="برچسب (روی گردونه)"
+              hint="همین متن رویِ خودِ گردونه و در «جایزهٔ بُختهُ شما» چاپ می‌شود؛ ۶۴ نویسه بیشتر جا نمی‌شود.">
               <Input value={p.label || ''} maxLength={64}
                 onChange={(e) => setPrize(i, { label: e.target.value })} />
             </Field>
-            <Field label="نوع جایزه">
+            <Field label="نوع جایزه"
+              hint="واحدِ فیلدِ «مقدار» را عوض می‌کند: نقدی تومان، پلاس روز، صندوق کارتی عدد، و «آیتمِ فروشگاه» جایزهٔ فروشگاه می‌دهد — نوعِ فروشگاه بدونِ آیتم رد می‌شود.">
               <Select value={p.kind} onChange={(e) => {
                 const kind = e.target.value;
                 setPrize(i, {
@@ -196,7 +198,8 @@ export function WheelAdminPage({ request }) {
                 ))}
               </Select>
             </Field>
-            <Field label="رنگ برش">
+            <Field label="رنگ برش"
+              hint="برخلافِ رنگِ گروهِ جوایز که از فهرستِ از پیش آماده انتخاب می‌شود، رنگِ برشِ گردونه هر کدِ HEX است و بی‌واسطه در طرحِ گردونه می‌نشیند.">
               <Input type="color" value={p.color || '#84CC16'}
                 onChange={(e) => setPrize(i, { color: e.target.value })} />
             </Field>
@@ -219,12 +222,14 @@ export function WheelAdminPage({ request }) {
                   onChange={(e) => setPrize(i, { value: Number(e.target.value) || 0 })} />
               </Field>
             )}
-            <Field label="شانس (٪)">
+            <Field label="شانس (٪)"
+              hint="سهمِ همین برش از کلِ گردونه است؛ دکمهٔ ذخیره تا وقتی جمعِ برش‌هایِ فعال دقیقاً ۱۰۰٪ نشود (و دستِ کم دو برشِ فعال باشد) قفل است.">
               <Input type="number" min="0" max="100" step="0.00001"
                 value={pctOf(p.weight, weightTotal)}
                 onChange={(e) => setPrize(i, { weight: weightOf(e.target.value, weightTotal) })} />
             </Field>
-            <Field label="ترتیب برش">
+            <Field label="ترتیب برش"
+              hint="جای نمایش در گردونه است، نه احتمالِ بُخت؛ باید یکتا و بین ۱ تا ۲۴ باشد وگرنه سرور با «ترتیب برش … تکراری است» ذخیره نمی‌کند.">
               <Input type="number" min="1" max="24"
                 value={p.sliceOrder}
                 onChange={(e) => setPrize(i, { sliceOrder: Number(e.target.value) || 1 })} />

@@ -212,7 +212,10 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
   }
 
-  Widget _numField(TextEditingController c, String label, {num width = 90}) {
+  /// `hint` توضیحِ مدیر است، نه متنِ محصول؛ روی `helperText` می‌نشیند، چون
+  /// این فیلدها همیشه پرند و `hintText` رویِ فیلدِ پر دیده نمی‌شود.
+  Widget _numField(TextEditingController c, String label,
+    {num width = 90, String? hint}) {
     return SizedBox(
       width: width.toDouble(),
       child: TextField(
@@ -221,6 +224,8 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
         textAlign: TextAlign.center,
         decoration: InputDecoration(
           labelText: label,
+          helperText: hint,
+          helperMaxLines: 6,
           isDense: true,
           border: const OutlineInputBorder(),
         ),
@@ -255,7 +260,8 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
                     Row(
                       children: [
                         _numField(_pct, 'درصدِ انتقال (۰ تا ۱۰۰)',
-                            width: 170),
+                            width: 170,
+                        hint: 'کفِ عدد حساب می‌شود: ۹۹۹ سکه با ۱۰٪ یعنی ۹۹ سکه؛ عددِ بیرون از ۰ تا ۱۰۰ یا خالی، هیچ سکه‌ای منتقل نمی‌کند.'),
                       ],
                     ),
                     const Text(
@@ -274,7 +280,8 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
                       children: [
                         for (final s in _stakes)
                           _numField(_coins['quota.$s']!, 'سهمیهٔ $s'),
-                        _numField(_tap, 'سکهٔ هر لولِ ضربه‌زن'),
+                        _numField(_tap, 'سکهٔ هر لولِ ضربه‌زن',
+                        hint: 'به لول‌هایی که تا حالا رد شده چیزی اضافه نمی‌کند؛ از لحظهٔ ذخیره، برایِ لول‌هایِ بعدی مصرف می‌شود.'),
                       ],
                     ),
                   ],
@@ -287,10 +294,14 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
                       spacing: 10,
                       runSpacing: 10,
                       children: [
-                        _numField(_tapLevels, 'تعداد لول', width: 110),
-                        _numField(_tapTotal, 'جمعِ امتیازِ کل', width: 130),
-                        _numField(_tapGrowth, 'شیب (۱ تا ۱٫۵)', width: 120),
-                        _numField(_tapPerDay, 'لول در روز', width: 110),
+                        _numField(_tapLevels, 'تعداد لول', width: 110,
+                        hint: 'اگر کمتر از لولی باشد که بعضی بازیکن‌ها رد کرده‌اند، آن‌ها در حالتِ «بازی تمام شد» می‌مانند و ریستِ پایینِ همین صفحه آزادشان می‌کند.'),
+                        _numField(_tapTotal, 'جمعِ امتیازِ کل', width: 130,
+                        hint: 'همین عدد بینِ لول‌ها توزیع می‌شود (کسرِ گردکردن در لولِ آخر جبران می‌شود)؛ بالا بردنش جمعِ کل را بالا می‌برد، نه فقط لولِ آخر را.'),
+                        _numField(_tapGrowth, 'شیب (۱ تا ۱٫۵)', width: 120,
+                        hint: '۱ = همهٔ لول‌ها هم‌قیمت؛ ۱٫۵ یعنی لولِ آخر چند برابرِ اول گران‌تر است — جمعِ کل همان عددِ بالاست، فقط توزیعش عوض می‌شود.'),
+                        _numField(_tapPerDay, 'لول در روز', width: 110,
+                        hint: '۰ یعنی هیچ لولی در روز بسته نمی‌شود (بازی تا فردا قفل است)، نه بی‌سقف؛ اگر خالی بماند پیش‌فرض ۲ است و بیش از ۵۰ به ۵۰ می‌چسبد.'),
                       ],
                     ),
                     const Text(
@@ -359,10 +370,14 @@ class _AdminGameEconomyState extends State<AdminGameEconomy> {
                   spacing: 10,
                   runSpacing: 10,
                   children: [
-                    _numField(_winPts, 'امتیاز برد'),
-                    _numField(_losePts, 'امتیاز باخت'),
-                    _numField(_drawPts, 'امتیاز مساوی'),
-                    _numField(_capPts, 'سقف روزانه'),
+                    _numField(_winPts, 'امتیاز برد',
+                    hint: 'در دفترِ امتیاز با همین عدد ثبت می‌شود؛ بردِ بدونِ امتیاز (۰) فقط در کارنامهٔ بازیکن دیده می‌شود.'),
+                    _numField(_losePts, 'امتیاز باخت',
+                    hint: 'منفی فقط کسر می‌کند و موجودی تا صفر پایین می‌آید (زیرِ صفر نمی‌رود)؛ کسرِ امتیاز هیچ‌وقت با سقفِ روزانه متوقف نمی‌شود.'),
+                    _numField(_drawPts, 'امتیاز مساوی',
+                    hint: 'می‌تواند منفی باشد؛ سرور آن را بین ۱۰۰۰- تا ۱۰۰۰+ نگه می‌دارد.'),
+                    _numField(_capPts, 'سقف روزانه',
+                    hint: '۰ یعنی بی‌سقف (خاموش)، نه «هیچ امتیازی نده»؛ فقط جایزه‌هایِ مثبت را می‌بندد و کسرِ امتیازِ باخت همیشه انجام می‌شود.'),
                   ],
                 ),
               ],

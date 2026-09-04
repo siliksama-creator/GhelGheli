@@ -221,14 +221,16 @@ class _AdminWheelState extends State<AdminWheel> {
             TextFormField(
               key: ValueKey('wheel_label_$i'),
               initialValue: '${p['label'] ?? ''}',
-              decoration: const InputDecoration(labelText: 'برچسب'),
+              decoration: const InputDecoration(labelText: 'برچسب',
+                  helperText: 'همین متن رویِ خودِ گردونه و در «جایزهٔ بُختهُ شما» چاپ می‌شود؛ ۶۴ نویسه بیشتر جا نمی‌شود.', helperMaxLines: 6),
               onChanged: (v) => p['label'] = v,
             ),
             Gaps.vXs,
             DropdownButtonFormField<String>(
               key: ValueKey('wheel_kind_$i'),
               initialValue: _kindLabels.containsKey(kind) ? kind : 'points',
-              decoration: const InputDecoration(labelText: 'نوع جایزه'),
+              decoration: const InputDecoration(labelText: 'نوع جایزه',
+                  helperText: 'واحدِ فیلدِ «مقدار» را عوض می‌کند: نقدی تومان، پلاس روز، صندوق کارتی عدد، و «آیتمِ فروشگاه» جایزهٔ فروشگاه می‌دهد — نوعِ فروشگاه بدونِ آیتم رد می‌شود.', helperMaxLines: 6),
               items: [
                 for (final e in _kindLabels.entries)
                   DropdownMenuItem(value: e.key, child: Text(e.value)),
@@ -290,7 +292,7 @@ class _AdminWheelState extends State<AdminWheel> {
               decoration: const InputDecoration(
                 labelText: 'شانس (٪)',
                 suffixText: '٪',
-              ),
+                  helperText: 'سهمِ همین برش از کلِ گردونه است؛ دکمهٔ ذخیره تا وقتی جمعِ برش‌هایِ فعال دقیقاً ۱۰۰٪ نشود (و دستِ کم دو برشِ فعال باشد) قفل است.', helperMaxLines: 6),
               onChanged: (v) {
                 final parsed =
                     double.tryParse(v.replaceAll(',', '.')) ?? 0;
@@ -305,7 +307,8 @@ class _AdminWheelState extends State<AdminWheel> {
               key: ValueKey('wheel_color_$i'),
               initialValue: '${p['color'] ?? '#84CC16'}',
               decoration:
-                  const InputDecoration(labelText: 'رنگ (مثل #84CC16)'),
+                  const InputDecoration(labelText: 'رنگ (مثل #84CC16)',
+                  helperText: 'برخلافِ رنگِ گروهِ جوایز که از فهرستِ از پیش آماده انتخاب می‌شود، رنگِ برشِ گردونه هر کدِ HEX است و بی‌واسطه در طرحِ گردونه می‌نشیند.', helperMaxLines: 6),
               onChanged: (v) => p['color'] = v,
             ),
             Align(
