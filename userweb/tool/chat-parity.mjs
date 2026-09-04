@@ -64,9 +64,14 @@ ok('پاسخِ POST هم `is_mine: true` دارد',
 
 // broadcast نباید پرچمِ شخصی داشته باشد وگرنه همه پیام را «مالِ خودم»
 // می‌بینند و در سمتِ اشتباه رندر می‌کنند.
-ok('نسخهٔ broadcast پیش از `io.emit` پرچمِ `is_mine` را حذف می‌کند',
+//
+// فاز مقیاس: پخش سراسری io.emit به اتاقِ 'chat:public' تغییر کرد تا فقط
+// به مشترکینِ چت برود (و در حالت چندپروسه با آداپتور Redis بین گره‌ها
+// برسد)، به‌جای پخش به هر سوکتِ باز. پس هر دو شکلِ اعلان مجاز است.
+ok('نسخهٔ broadcast پیش از پخش پرچمِ `is_mine` را حذف می‌کند',
   /is_mine:\s*_mine,\s*\.\.\.publicMsg/.test(server)
-  && /io\.emit\('chat:new',\s*publicMsg\)/.test(server));
+  && (/io\.to\(['"]chat:public['"]\)\.emit\('chat:new',\s*publicMsg\)/.test(server)
+      || /io\.emit\('chat:new',\s*publicMsg\)/.test(server)));
 
 // ── ۲. ساعتِ پیام ─────────────────────────────────────────────────────
 console.log('\n== ساعتِ پیام ==');
@@ -130,7 +135,11 @@ ok('هر دو عدد را از `minLifetimePoints` سرور می‌خوانند'
 // ── ۶. زندهٔ سوکت ─────────────────────────────────────────────────────
 console.log('\n== دریافتِ زندهٔ پیام ==');
 
-ok('سرور رویدادِ chat:new را emit می‌کند', /io\.emit\('chat:new'/.test(server));
+// فاز مقیاس: پخش به اتاق 'chat:public' یا io.emit سراسری — هر دو کلاینت
+// همان رویداد را می‌شنوند.
+ok('سرور رویدادِ chat:new را emit می‌کند',
+  /io\.to\(['"]chat:public['"]\)\.emit\('chat:new'/.test(server)
+  || /io\.emit\('chat:new'/.test(server));
 ok('وب به chat:new گوش می‌دهد', /socket\.on\('chat:new'/.test(web));
 ok('اندروید به chat:new گوش می‌دهد', /s\.on\('chat:new'/.test(android));
 
