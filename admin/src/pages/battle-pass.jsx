@@ -282,10 +282,12 @@ export function BattlePassPage({ request }) {
 
       <Card id="new-season-form" title="ساخت فصل جدید" subtitle="پاداش پله‌ها از فصل الگو کپی می‌شود؛ بدون الگو، فصل خالی ساخته می‌شود">
         <form onSubmit={createSeason} className="form-grid">
-          <Field label="نام فصل"><Input name="name" required placeholder="فصل مهر" /></Field>
+          <Field label="نام فصل"
+              hint="در صفحهٔ گذرِ نبردِ کاربر و در دفترِ رخدادها نوشته می‌شود؛ فقط یک فصل می‌تواند فعال باشد و فعال‌کردنِ فصلِ تازه، قبلی را می‌بندد."><Input name="name" required placeholder="فصل مهر" /></Field>
           <Field label="شروع (شمسی را خودتان تبدیل کنید)"><Input name="startsAt" type="date" required /></Field>
           <Field label="پایان"><Input name="endsAt" type="date" required /></Field>
-          <Field label="کپی پاداش‌ها از فصل"><Select name="template" defaultValue="">
+          <Field label="کپی پاداش‌ها از فصل"
+              hint="اگر فصلی انتخاب نکنید، سرور پله‌هایِ تازه‌ساخته‌شده را از «آخرین فصلِ ساخته‌شده» کپی می‌کند (نه از هیچ)؛ برای فصلِ کاملاً خالی، پس از ساختن ردیف‌هایش را پاک کنید."><Select name="template" defaultValue="">
             <option value="">— بدون الگو —</option>
             {seasons.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </Select></Field>
@@ -339,10 +341,14 @@ export function BattlePassPage({ request }) {
       {config && (
         <Card title="منحنی و سقف‌ها" subtitle="XP لازم هر پله از این دو عدد ساخته می‌شود؛ سقف روزانه یعنی چند پله در روز باز می‌شود">
           <form onSubmit={saveConfig} className="form-grid">
-            <Field label="XP پلهٔ اول"><Input name="xpBase" type="number" required defaultValue={config.xpBase} /></Field>
-            <Field label="رشد هر پله"><Input name="xpStep" type="number" required defaultValue={config.xpStep} /></Field>
-            <Field label="سقف پله در روز"><Input name="maxTiers" type="number" min="1" max="50" required defaultValue={config.maxTiersPerDay} /></Field>
-            <Field label="مهلت دریافت بعد از پایان (روز)"><Input name="grace" type="number" min="0" required defaultValue={config.claimGraceDays} /></Field>
+            <Field label="XP پلهٔ اول"
+              hint="XPِ لازمِ پله‌ها این‌گونه ساخته می‌شود: اولی = این عدد، و هر پله به اندازهٔ «رشد هر پله» گران‌تر؛ بین ۱ تا ۱۰۰۰۰ پذیرفته می‌شود."><Input name="xpBase" type="number" required defaultValue={config.xpBase} /></Field>
+            <Field label="رشد هر پله"
+              hint="۰ = همهٔ پله‌ها هم‌قیمت؛ بزرگ‌کردنش هزینهٔ پله‌هایِ آخر را خطی بالا می‌برد و پیشرفتِ کسی را که به آن پله‌ها رسیده پاک نمی‌کند."><Input name="xpStep" type="number" required defaultValue={config.xpStep} /></Field>
+            <Field label="سقف پله در روز"
+              hint="حتی اگر XPِ کافیِ ده پله را داشته باشید، روزی فقط همین تعداد پله باز می‌شود و XPِ اضافه برای فردا می‌ماند؛ این عدد را کم کنید، شکایتِ «ایکس‌پی دارم ولی پله باز نشد» می‌آید."><Input name="maxTiers" type="number" min="1" max="50" required defaultValue={config.maxTiersPerDay} /></Field>
+            <Field label="مهلت دریافت بعد از پایان (روز)"
+              hint="پس از پایانِ فصل، فقط تا این تعداد روز می‌توان پله‌هایِ بازنشده را گرفت (۰ تا ۹۰ روز) و در همین مدت XP تازه‌ای به گذر نبرد داده نمی‌شود؛ با ۰، جایزه‌هایِ نگرفته در همان نیمه‌شب از دست می‌روند."><Input name="grace" type="number" min="0" required defaultValue={config.claimGraceDays} /></Field>
             <div className="full-row">
               <b>منابع XP (هر منبع سقف روزانهٔ خودش را دارد):</b>
               <div className="form-grid">

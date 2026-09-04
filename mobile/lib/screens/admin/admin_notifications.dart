@@ -110,7 +110,8 @@ class _AdminNotificationsState extends State<AdminNotifications> {
             DropdownButtonFormField<String>(
               isExpanded: true,
               initialValue: _segment,
-              decoration: const InputDecoration(labelText: 'گروه هدف (سگمنت)'),
+              decoration: const InputDecoration(labelText: 'گروه هدف (سگمنت)',
+                  helperText: 'همهٔ سگمنت‌ها فقط کاربرانِ «فعال» را می‌گیرند؛ «غایب ۳ روز» یعنی نبودِ هر رخدادِ تازه در امتیاز/چت/بازی/گردونه (نه بی‌وکاریِ پروفایل) و «نزدیکِ جایزهٔ نقدی» مستقیم از جدولِ جوایزِ پنل حساب می‌شود.', helperMaxLines: 6),
               items: _segments.map((s) => DropdownMenuItem(value: s.$1, child: Text(s.$2, style: const TextStyle(fontSize: 12.5)))).toList(),
               onChanged: (v) => setState(() => _segment = v ?? 'all'),
             ),
@@ -119,12 +120,14 @@ class _AdminNotificationsState extends State<AdminNotifications> {
               decoration: const InputDecoration(
                 labelText: 'عنوان اعلان',
                 prefixIcon: Icon(Icons.title_rounded),
-              ),
+              
+                  helperText: 'بیش از ۱۶۰ نویسه بریده می‌شود؛ عنوانِ خالی یعنی «عنوان و متن اعلان لازم است» و هیچ پیامکی ارسال نمی‌شود.', helperMaxLines: 6),
             ),
             TextField(
               controller: _body,
               maxLines: 4,
-              decoration: const InputDecoration(labelText: 'متن پیام'),
+              decoration: const InputDecoration(labelText: 'متن پیام',
+                  helperText: 'تا ۴۰۰۰ نویسه می‌گیرد و بقیه بریده می‌شود؛ همین متن هم در اعلانِ درون‌برنامه می‌ماند و هم در پوش.', helperMaxLines: 6),
             ),
             Row(
               children: [

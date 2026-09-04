@@ -671,7 +671,7 @@ class _AdminLeagueState extends State<AdminLeague> {
               decoration: const InputDecoration(
                 labelText: 'عنوان لیگ',
                 hintText: 'مثلاً لیگ هفتگی قهرمانان',
-              ),
+                  helperText: 'بین ۳ تا ۱۲۰ نویسه؛ عنوانِ کوتاه‌تر یا بلندتر ذخیره نمی‌شود و پیامِ «عنوان لیگ باید بین ۳ تا ۱۲۰ نویسه باشد» را می‌بینید.', helperMaxLines: 6),
             ),
             Gaps.vXs,
             DropdownButtonFormField<String>(
@@ -713,7 +713,8 @@ class _AdminLeagueState extends State<AdminLeague> {
             TextField(
               controller: _newMinPointsController,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'حداقل امتیاز ورود'),
+              decoration: const InputDecoration(labelText: 'حداقل امتیاز ورود',
+                  helperText: 'با «امتیازِ کلِ عمر» سنجیده می‌شود (`lifetime_points`)، نه موجودیِ امروز؛ ۰ یعنی بدونِ شرط. کاربری که نرسد، در لیگ امتیاز نمی‌گیرد هرچقدر هم بازی کند.', helperMaxLines: 6),
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
@@ -816,7 +817,7 @@ class _AdminLeagueState extends State<AdminLeague> {
               decoration: const InputDecoration(
                 labelText: 'تعداد برندگان نقدی (حداکثر ۳۰۰)',
                 prefixIcon: Icon(Icons.people_outline_rounded),
-              ),
+                  helperText: 'کمتر از ۱ یا بیشتر از ۳۰۰ در سرور به همین بازه برمی‌گردد و اگر عددی خوانده نشود، طولِ جدولِ جوایز مصرف می‌شود؛ جدولِ جوایزِ بلندتر از این عدد، بی‌صدا نیمه‌کاره می‌ماند.', helperMaxLines: 6),
               onChanged: (v) {
                 final val = int.tryParse(v) ?? 0;
                 _changeWinnerCount(val);

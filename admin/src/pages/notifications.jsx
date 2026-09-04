@@ -80,7 +80,8 @@ export function NotificationsPage({ request }) {
         )}
 
         <form onSubmit={send} className="stack">
-          <Field label="گروه هدف (سگمنت کاربران)">
+          <Field label="گروه هدف (سگمنت کاربران)"
+              hint="همهٔ سگمنت‌ها فقط کاربرانِ «فعال» را می‌گیرند؛ «غایب ۳ روز» یعنی نبودِ هر رخدادِ تازه در امتیاز/چت/بازی/گردونه (نه بی‌وکاریِ پروفایل) و «نزدیکِ جایزهٔ نقدی» مستقیم از جدولِ جوایزِ پنل حساب می‌شود.">
             <select className="input" value={segment} onChange={e => setSegment(e.target.value)}>
               <option value="all">همه کاربران فعال</option>
               <option value="inactive_3d">کاربران غایب ۳ روز اخیر (یادآوری بازگشت)</option>
@@ -91,11 +92,13 @@ export function NotificationsPage({ request }) {
             </select>
           </Field>
 
-          <Field label="عنوان اعلان">
+          <Field label="عنوان اعلان"
+              hint="بیش از ۱۶۰ نویسه بریده می‌شود؛ عنوانِ خالی یعنی «عنوان و متن اعلان لازم است» و هیچ پیامکی ارسال نمی‌شود.">
             <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="مثلاً: جایزه این هفته در انتظار شماست!" />
           </Field>
 
-          <Field label="متن پیام">
+          <Field label="متن پیام"
+              hint="تا ۴۰۰۰ نویسه می‌گیرد و بقیه بریده می‌شود؛ همین متن هم در اعلانِ درون‌برنامه می‌ماند و هم در پوش.">
             <Textarea value={body} onChange={e => setBody(e.target.value)} rows={4} placeholder="متن اعلان را بنویسید..." />
           </Field>
 

@@ -362,7 +362,8 @@ export function LeaguePage({ request }) {
         )}
 
         <div className="lgNewLeague">
-          <Field label="عنوان لیگ">
+          <Field label="عنوان لیگ"
+              hint="بین ۳ تا ۱۲۰ نویسه؛ عنوانِ کوتاه‌تر یا بلندتر ذخیره نمی‌شود و پیامِ «عنوان لیگ باید بین ۳ تا ۱۲۰ نویسه باشد» را می‌بینید.">
             <Input value={newLeague.title} placeholder="مثلاً لیگ هفتگی قهرمانان"
               onChange={(e) => setNewLeague({ ...newLeague, title: e.target.value })} />
           </Field>
@@ -375,19 +376,23 @@ export function LeaguePage({ request }) {
               <option value="special">ویژه</option>
             </select>
           </Field>
-          <Field label="شروع">
+          <Field label="شروع"
+              hint="اگر پایان بعد از شروع نباشد، سرور «تاریخ پایان باید بعد از تاریخ شروع باشد» می‌گوید؛ فاصلهٔ بیش از دو سال هم رد می‌شود (لیگی که هرگز بسته نشود، جایزه‌اش پرداخت نمی‌شود).">
             <Input type="datetime-local" value={newLeague.startsAt}
               onChange={(e) => setNewLeague({ ...newLeague, startsAt: e.target.value })} />
           </Field>
-          <Field label="پایان">
+          <Field label="پایان"
+              hint="در پایانِ بازه، جایزه‌ها خودکار پرداخت می‌شود؛ پیش از آن، «ثبتِ جایزه» چیزی واریز نمی‌کند تا لیگِ نیمه‌تمام تسویه نشود.">
             <Input type="datetime-local" value={newLeague.endsAt}
               onChange={(e) => setNewLeague({ ...newLeague, endsAt: e.target.value })} />
           </Field>
-          <Field label="حداقل امتیاز ورود">
+          <Field label="حداقل امتیاز ورود"
+              hint="با «امتیازِ کلِ عمر» سنجیده می‌شود (`lifetime_points`)، نه موجودیِ امروز؛ ۰ یعنی بدونِ شرط. کاربری که نرسد، در لیگ امتیاز نمی‌گیرد هرچقدر هم بازی کند.">
             <Input type="number" min="0" value={newLeague.minPointsEntry}
               onChange={(e) => setNewLeague({ ...newLeague, minPointsEntry: e.target.value })} />
           </Field>
-          <Field label="ویژهٔ پلاس">
+          <Field label="ویژهٔ پلاس"
+              hint="با اشتراکِ منقضی‌شده، کاربر در این لیگ هیچ امتیازی نمی‌گیرد (coinService.js:304) — فعالیتش در لیگ صفر می‌ماند بی‌هیچ پیغامی؛ پس این تیکت را برای «مسابقهٔ همه» برندارید.">
             <label className="lgCheck">
               <input type="checkbox" checked={newLeague.plusOnly}
                 onChange={(e) => setNewLeague({ ...newLeague, plusOnly: e.target.checked })} />
@@ -405,7 +410,8 @@ export function LeaguePage({ request }) {
         {data ? <RankList entries={data.entries} /> : null}
       </Card>
       <Card title="تعداد برندگان و جدول جوایز" subtitle="مبلغ هر رتبه در پایان ماه به کاربر تعلق می‌گیرد">
-        <Field label="تعداد برندگان نقدی (۱ تا ۳۰۰)">
+        <Field label="تعداد برندگان نقدی (۱ تا ۳۰۰)"
+              hint="کمتر از ۱ یا بیشتر از ۳۰۰ در سرور به همین بازه برمی‌گردد و اگر عددی خوانده نشود، طولِ جدولِ جوایز مصرف می‌شود؛ جدولِ جوایزِ بلندتر از این عدد، بی‌صدا نیمه‌کاره می‌ماند.">
           <Input type="number" min="1" max="300" value={winnerCount} onChange={(e) => changeWinnerCount(Number(e.target.value) || 0)} />
         </Field>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

@@ -272,6 +272,7 @@ class _AdminPassState extends State<AdminPass> {
                 _ConfigField(
                   key: ValueKey(key[0]),
                   label: key[1],
+                  helper: _passHints[key[0]],
                   value: _config[key[0]],
                   onSave: (v) {
                     final n = int.tryParse(v.trim());
@@ -380,12 +381,25 @@ class _AdminPassState extends State<AdminPass> {
   }
 }
 
+/// راهنمایِ هر اهرمِ گذرِ نبرد — کلیدِ کانفیگ → متنِ همان `hint`
+/// در پنلِ وب (متن باید عیناً یکی باشد).
+const _passHints = <String, String>{
+  'xpBase': 'XPِ لازمِ پله‌ها این‌گونه ساخته می‌شود: اولی = این عدد، و هر پله به اندازهٔ «رشد هر پله» گران‌تر؛ بین ۱ تا ۱۰۰۰۰ پذیرفته می‌شود.',
+  'xpStep': '۰ = همهٔ پله‌ها هم‌قیمت؛ بزرگ‌کردنش هزینهٔ پله‌هایِ آخر را خطی بالا می‌برد و پیشرفتِ کسی را که به آن پله‌ها رسیده پاک نمی‌کند.',
+  'maxTiersPerDay': 'حتی اگر XPِ کافیِ ده پله را داشته باشید، روزی فقط همین تعداد پله باز می‌شود و XPِ اضافه برای فردا می‌ماند؛ این عدد را کم کنید، شکایتِ «ایکس‌پی دارم ولی پله باز نشد» می‌آید.',
+  'claimGraceDays': 'پس از پایانِ فصل، فقط تا این تعداد روز می‌توان پله‌هایِ بازنشده را گرفت (۰ تا ۹۰ روز) و در همین مدت XP تازه‌ای به گذر نبرد داده نمی‌شود؛ با ۰، جایزه‌هایِ نگرفته در همان نیمه‌شب از دست می‌روند.',
+};
+
 class _ConfigField extends StatefulWidget {
   final String label;
   final dynamic value;
   final ValueChanged<String> onSave;
+  /// راهنمایِ مدیر (نه متنِ محصول) — مثلِ بقیهٔ پنل‌ها روی
+  /// `helperText`؛ `hintText` رویِ فیلدِ پر دیده نمی‌شود.
+  final String? helper;
   const _ConfigField(
-      {super.key, required this.label, required this.value, required this.onSave});
+      {super.key, required this.label, required this.value,
+      required this.onSave, this.helper});
 
   @override
   State<_ConfigField> createState() => _ConfigFieldState();
@@ -416,16 +430,30 @@ class _ConfigFieldState extends State<_ConfigField> {
 
   @override
   Widget build(BuildContext context) {
-    return Row(children: [
-      Expanded(
-          child: TextField(
-              controller: _c,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(labelText: widget.label))),
-      const SizedBox(width: Gaps.sm),
-      IconButton.filledTonal(
-        icon: const Icon(Icons.check_rounded),
-        onPressed: () => widget.onSave(_c.text),
+    final field = Expanded(
+        child: TextField(
+            controller: _c,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+                labelText: widget.label,
+                helperText: widget.helper,
+                helperMaxLines: 6)));
+    final ok = IconButton.filledTonal(
+      icon: const Icon(Icons.check_rounded),
+      onPressed: () => widget.onSave(_c.text),
+    );
+    // بدونِ راهنما، چیدمانِ قبلی (یک ردیف) دست‌نخورده می‌ماند؛
+    // با راهنما، ردیفِ دوم می‌آید تا متن از زیرِ دکمه بیرون نزند.
+    if (widget.helper == null) {
+      return Row(children: [field, const SizedBox(width: Gaps.sm), ok]);
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [field, const SizedBox(width: Gaps.sm), ok]),
+      Padding(
+        padding: const EdgeInsets.only(top: 2),
+        child: Text(widget.helper!,
+            style: const TextStyle(fontSize: 11, height: 1.5,
+                color: Colors.white70)),
       ),
     ]);
   }

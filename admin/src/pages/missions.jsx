@@ -246,16 +246,21 @@ export function MissionsPage({ request }) {
         )}
         {newMission && (
           <form onSubmit={createMission} className="form-grid">
-            <Field label="کلید انگلیسی (یکتا)"><Input name="key" required placeholder="daily_hello" /></Field>
-            <Field label="دوره"><Select name="period" defaultValue="daily"><option value="daily">روزانه</option><option value="weekly">هفتگی</option></Select></Field>
+            <Field label="کلید انگلیسی (یکتا)"
+              hint="پیشرفتِ کاربر با همین کلید در `user_mission_progress` نگه داشته می‌شود؛ پس عوض‌کردنِ کلید یعنی صفرشدنِ وضعیتِ انجامِ همه. برای ویرایشِ متن، همین‌جا کلید را دست نزنید."><Input name="key" required placeholder="daily_hello" /></Field>
+            <Field label="دوره"
+              hint="فقط «روزانه» یا «هفتگی» پذیرفته می‌شود؛ تغییرِ دوره، ماموریت را از چرخهٔ قبلی بیرون می‌آورد و پیشرفتِ آن چرخه برای کاربر باقی می‌ماند."><Select name="period" defaultValue="daily"><option value="daily">روزانه</option><option value="weekly">هفتگی</option></Select></Field>
             <Field label="رویداد"><Select name="event" defaultValue="other">
               {(data.events || []).map((e) => <option key={e} value={e}>{e}</option>)}
             </Select></Field>
             <Field label="آیکون"><Input name="icon" defaultValue="star" /></Field>
-            <Field label="عنوان فارسی"><Input name="title" required /></Field>
+            <Field label="عنوان فارسی"
+              hint="در فهرستِ ماموریت‌هایِ کاربر چاپ می‌شود؛ توضیح را هم اگر خالی بگذارید، کاربر فقط همین تیتر را می‌بیند."><Input name="title" required /></Field>
             <Field label="توضیح"><Input name="description" /></Field>
-            <Field label="هدف"><Input name="goal" type="number" min="1" defaultValue="1" /></Field>
-            <Field label="جایزه (امتیاز)"><Input name="reward" type="number" min="0" defaultValue="10" /></Field>
+            <Field label="هدف"
+              hint="چند بار از آن کار لازم است تا جایزه باز شود؛ ۱ یعنی «یک بار انجام بدهد کافی است»."><Input name="goal" type="number" min="1" defaultValue="1" /></Field>
+            <Field label="جایزه (امتیاز)"
+              hint="پس از تکمیل به موجودیِ کاربر اضافه می‌شود و در دفترِ امتیاز با همین مقدار ثبت می‌شود؛ صفر یعنی ماموریتِ بی‌جایزه."><Input name="reward" type="number" min="0" defaultValue="10" /></Field>
             <Button type="submit" icon={Save}>ثبت ماموریت</Button>
             <Button variant="ghost" onClick={() => setNewMission(null)}>انصراف</Button>
           </form>

@@ -144,11 +144,13 @@ class _AdminMissionsState extends State<AdminMissions> {
                 TextField(
                     controller: reward,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'جایزه (امتیاز)')),
+                    decoration: const InputDecoration(labelText: 'جایزه (امتیاز)',
+                  helperText: 'پس از تکمیل به موجودیِ کاربر اضافه می‌شود و در دفترِ امتیاز با همین مقدار ثبت می‌شود؛ صفر یعنی ماموریتِ بی‌جایزه.', helperMaxLines: 6)),
                 TextField(
                     controller: goal,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'هدف')),
+                    decoration: const InputDecoration(labelText: 'هدف',
+                  helperText: 'چند بار از آن کار لازم است تا جایزه باز شود؛ ۱ یعنی «یک بار انجام بدهد کافی است».', helperMaxLines: 6)),
                 CheckboxListTile(
                   value: active,
                   title: const Text('فعال'),
@@ -366,7 +368,8 @@ class _AdminMissionsState extends State<AdminMissions> {
                     child: TextField(
                         controller: _mKey,
                         decoration: const InputDecoration(
-                            labelText: 'کلید (حروف انگلیسی/عدد/_ )'))),
+                            labelText: 'کلید (حروف انگلیسی/عدد/_ )',
+                  helperText: 'پیشرفتِ کاربر با همین کلید در `user_mission_progress` نگه داشته می‌شود؛ پس عوض‌کردنِ کلید یعنی صفرشدنِ وضعیتِ انجامِ همه. برای ویرایشِ متن، همین‌جا کلید را دست نزنید.', helperMaxLines: 6))),
                 const SizedBox(width: Gaps.sm),
                 Expanded(
                     child: TextField(
@@ -382,14 +385,16 @@ class _AdminMissionsState extends State<AdminMissions> {
                     child: TextField(
                         controller: _mGoal,
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'هدف'))),
+                        decoration: const InputDecoration(labelText: 'هدف',
+                  helperText: 'چند بار از آن کار لازم است تا جایزه باز شود؛ ۱ یعنی «یک بار انجام بدهد کافی است».', helperMaxLines: 6))),
                 const SizedBox(width: Gaps.sm),
                 Expanded(
                     child: TextField(
                         controller: _mReward,
                         keyboardType: TextInputType.number,
                         decoration:
-                            const InputDecoration(labelText: 'جایزه (امتیاز)'))),
+                            const InputDecoration(labelText: 'جایزه (امتیاز)',
+                  helperText: 'پس از تکمیل به موجودیِ کاربر اضافه می‌شود و در دفترِ امتیاز با همین مقدار ثبت می‌شود؛ صفر یعنی ماموریتِ بی‌جایزه.', helperMaxLines: 6))),
               ]),
               Row(children: [
                 Expanded(
