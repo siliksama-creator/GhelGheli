@@ -114,6 +114,28 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
         });
         _scrollToBottom();
       });
+      // شمارندهٔ لایک لحظه‌ای: سرور بعد از هر لایک/آن‌لایک عدد نهایی را
+      // broadcast می‌کند؛ بدون این شنونده تا رفرش بعدی عدد روی گوشیِ طرف
+      // مقابل قدیمی می‌ماند (آینهٔ وب: Chat.jsx روی chat:liked).
+      s.on('chat:liked', (data) {
+        if (!mounted || data is! Map) return;
+        final mid = data['messageId'];
+        final count = data['likeCount'];
+        if (mid == null || count is! num) return;
+        setState(() {
+          _messages = _messages.map((m) {
+            if (m is Map && '${m['id']}' == '$mid') {
+              return {...m, 'like_count': count.toInt()};
+            }
+            return m;
+          }).toList();
+        });
+      });
+      // پیام سنجاق‌شده را با broadcastِ ادمین بی‌درنگ بنشان — بدون رفرش.
+      s.on('chat:pinned', (data) {
+        if (!mounted || data is! Map) return;
+        setState(() => _pinned = Map<String, dynamic>.from(data));
+      });
     } catch (_) {
       // سوکت اختیاری است؛ polling کار را ادامه می‌دهد.
     }
@@ -124,6 +146,8 @@ class _ChatPageState extends State<ChatPage> with LifecyclePoller {
     stopPolling();
     try {
       _socket?.off('chat:new');
+      _socket?.off('chat:liked');
+      _socket?.off('chat:pinned');
       _socket?.dispose();
     } catch (_) {}
     _socket = null;

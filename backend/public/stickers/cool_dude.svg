@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+  <defs>
+    <linearGradient id="sbone" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F8FAFC"/><stop offset="100%" stop-color="#CBD5E1"/>
+    </linearGradient>
+    <linearGradient id="sglass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0EA5E9"/><stop offset="100%" stop-color="#1E3A8A"/>
+    </linearGradient>
+  </defs>
+  <g>
+    <animateTransform attributeName="transform" type="rotate" values="-4 48 50;4 48 50;-4 48 50" dur="2s" repeatCount="indefinite"/>
+    <path d="M48 12 C32 12 22 22 22 38 C22 52 28 64 34 72 L36 84 H60 L62 72 C68 64 74 52 74 38 C74 22 64 12 48 12 Z" fill="url(#sbone)" stroke="#475569" stroke-width="2.5"/>
+    <circle cx="36" cy="42" r="9" fill="#1E293B"/>
+    <circle cx="60" cy="42" r="9" fill="#1E293B"/>
+    <path d="M30 40 L44 44 L44 50 L30 46 Z" fill="url(#sglass)" stroke="#1E40AF" stroke-width="1.5"/>
+    <path d="M66 40 L52 44 L52 50 L66 46 Z" fill="url(#sglass)" stroke="#1E40AF" stroke-width="1.5"/>
+    <path d="M42 40 L54 43" stroke="#FFFFFF" stroke-width="1.5" opacity="0.6"/>
+    <path d="M30 40 L44 44 L44 50 L30 46 Z" fill="#FFFFFF" opacity="0.25">
+      <animate attributeName="opacity" values="0.55;0.05;0.55" dur="1.6s" repeatCount="indefinite"/>
+    </path>
+    <path d="M66 40 L52 44 L52 50 L66 46 Z" fill="#FFFFFF" opacity="0.25">
+      <animate attributeName="opacity" values="0.05;0.55;0.05" dur="1.6s" repeatCount="indefinite"/>
+    </path>
+    <path d="M44 60 L44.5 64 L45.5 64 L45.5 60 Z" fill="#1E293B"/>
+    <path d="M50.5 60 L50.5 64 L51.5 64 L52 60 Z" fill="#1E293B"/>
+    <path d="M42 68 C45 70 51 70 54 68" fill="none" stroke="#475569" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M24 34 L22 30 M24 34 L20 32" stroke="#475569" stroke-width="1.6" stroke-linecap="round"/>
+  </g>
+  <path d="M80 16 L82.5 21 L88 21.5 L83 25 L84.5 31 L80 28 L75.5 31 L77 25 L72 21.5 L77.5 21 Z" fill="#FDE68A">
+    <animateTransform attributeName="transform" type="rotate" values="0 80 23;-360 80 23" dur="2.8s" repeatCount="indefinite"/>
+  </path>
+</svg>

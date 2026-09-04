@@ -16,6 +16,7 @@ import 'screens/admin/admin_shell.dart';
 import 'screens/user/home_shell.dart';
 import 'screens/user/games/game_audio.dart';
 import 'core/app_config.dart';
+import 'core/deep_links.dart';
 import 'core/error_boundary.dart';
 import 'core/memory_guard.dart';
 import 'theme/app_theme.dart';
@@ -66,6 +67,10 @@ void main() {
   // ادمین در پنل می‌دهد، در اپِ بازِ کاربر هم بنشیند. خودِ fetch در
   // `_GhelGheliAppState` وصل می‌شود، چون ApiClient همان‌جا ساخته می‌شود.
   AppConfig.instance.install();
+  // گوش‌دادن به لینکِ دعوتِ اتاق (ghelgheli://join یا دامنهٔ وب). اگر
+  // اپ از حالت سرد با لینک باز شود، کد اتاق برای صفحهٔ بازی‌ها ذخیره
+  // می‌شود؛ اگر اپ باز باشد از استریم می‌رسد. شکستش بی‌اثر است.
+  unawaited(DeepLinks.instance.start());
   runApp(const GhelGheliApp());
 }
 

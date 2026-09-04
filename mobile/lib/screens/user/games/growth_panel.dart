@@ -88,6 +88,26 @@ class _GrowthPanelState extends State<GrowthPanel> {
     }
   }
 
+  /// مثل _run ولی اول یک دیالوگ تأیید می‌گیرد — برای کنش‌های برگشت‌ناپذیر
+  /// (حذف دوست/بلاک) تا کاربر بدون تأیید چیزی از دست ندهد.
+  Future<void> _confirmThenRun(
+    String message,
+    String key,
+    Future<dynamic> Function() action,
+  ) async {
+    final confirmed = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('تأیید عملیات'),
+      content: Text(message),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('تأیید')),
+      ],
+    ));
+    if (confirmed == true) {
+      await _run(key, action);
+    }
+  }
+
   Future<void> _run(String key, Future<dynamic> Function() action) async {
     if (_busy != null) return;
     setState(() { _busy = key; _notice = null; });
@@ -325,10 +345,45 @@ class _GrowthPanelState extends State<GrowthPanel> {
         style: _compactClaimStyle(height: 29),
         onPressed: () => _run('${friend['friendshipId']}', () => widget.api.post('/api/friends/requests/${friend['friendshipId']}/accept', {})),
         child: const Text('قبول', style: TextStyle(fontSize: 9.5))))
-      else SizedBox(height: 29, child: OutlinedButton(
-        style: _compactClaimStyle(height: 29),
-        onPressed: friend['online'] == true ? () => _challenge(friend) : null,
-        child: const Text('چالش', style: TextStyle(fontSize: 9.5)))),
+      else ...[
+        SizedBox(height: 29, child: OutlinedButton(
+          style: _compactClaimStyle(height: 29),
+          onPressed: friend['online'] == true ? () => _challenge(friend) : null,
+          child: const Text('چالش', style: TextStyle(fontSize: 9.5)))),
+        // حذف از دوستان و بلاک — بک‌اند از قبل مسیرهای DELETE /api/friends
+        // (:id = شناسهٔ رابطه) و POST .../block (:id = شناسهٔ کاربر) را
+        // داشت ولی هیچ‌کدام از دو کلاینت دکمه‌ای برایشان نمی‌گذاشتند؛
+        // قابلیتِ یتیم بود (آینهٔ وب: GrowthHub.jsx).
+        Gaps.hXs,
+        IconButton(
+          tooltip: 'حذف از دوستان',
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+          iconSize: 17,
+          color: const Color(0xFFADC0D3),
+          icon: const Icon(Icons.person_remove_rounded),
+          onPressed: () => _confirmThenRun(
+            '«${friend['nickname'] ?? 'کاربر'}» از فهرست دوستان حذف شود؟',
+            'remove-${friend['friendshipId']}',
+            () => widget.api.delete('/api/friends/${friend['friendshipId']}'),
+          ),
+        ),
+        IconButton(
+          tooltip: 'مسدودکردن کاربر',
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+          iconSize: 17,
+          color: const Color(0xFFFF6B6B),
+          icon: const Icon(Icons.block_rounded),
+          onPressed: () => _confirmThenRun(
+            '«${friend['nickname'] ?? 'کاربر'}» مسدود شود؟ دیگر در نتایج دوستان و چالش ظاهر نمی‌شود.',
+            'block-${friend['id']}',
+            () => widget.api.post('/api/friends/users/${friend['id']}/block', {}),
+          ),
+        ),
+      ],
     ]),
   );
 

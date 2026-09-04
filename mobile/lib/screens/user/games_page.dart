@@ -7,6 +7,7 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../../api_client.dart';
 import '../../core/app_config.dart';
 import '../../core/cosmetics.dart';
+import '../../core/deep_links.dart';
 import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/coin_quota_line.dart';
@@ -1032,6 +1033,10 @@ class _PrivateLobbyHubState extends State<_PrivateLobbyHub> {
   late int _stake;
   final _passCtrl = TextEditingController();
   final _joinCodeCtrl = TextEditingController();
+  // هر کدِ اتاق فقط یک‌بار auto-join شود، وگرنه هر rebuild دوباره join
+  // می‌زد و اتاق‌های تکراری می‌ساخت.
+  final Set<String> _handledJoinCodes = <String>{};
+  StreamSubscription<PendingRoomJoin>? _deepLinkSub;
 
   final _games = const [
     ('penalty', 'ضربات پنالتی', 'assets/pass/football_icon.webp'),
@@ -1048,6 +1053,26 @@ class _PrivateLobbyHubState extends State<_PrivateLobbyHub> {
     final presets = _presetStakes;
     _stake = presets.firstWhere((s) => s > 0, orElse: () => presets.isEmpty ? 0 : presets.first);
     _initSocket();
+    // لینکِ دعوت (اپ از حالت سرد باز شد یا در حال اجرا بود): کد اتاق را
+    // بردار و مستقیم join بزن — دیگر کاربر به مرورگر نمی‌افتد.
+    unawaited(DeepLinks.instance.consumeInitialJoin().then((join) {
+      if (join != null) _autoJoin(join);
+    }));
+    _deepLinkSub = DeepLinks.instance.joins.listen(_autoJoin);
+  }
+
+  void _autoJoin(PendingRoomJoin join) {
+    if (!mounted) return;
+    if (_handledJoinCodes.contains(join.roomCode)) return;
+    _handledJoinCodes.add(join.roomCode);
+    if (join.gameId != null && join.gameId!.isNotEmpty) {
+      setState(() => _selectedGame = join.gameId!);
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('در حال ورود به اتاق ${faNum(join.roomCode)}…')),
+    );
+    _joinCodeCtrl.text = join.roomCode;
+    _socket?.emit('game:join_room', {'roomCode': join.roomCode});
   }
 
   void _initSocket() {
@@ -1121,6 +1146,7 @@ class _PrivateLobbyHubState extends State<_PrivateLobbyHub> {
 
   @override
   void dispose() {
+    _deepLinkSub?.cancel();
     if (!_socketTransferred) _socket?.dispose();
     _passCtrl.dispose();
     _joinCodeCtrl.dispose();

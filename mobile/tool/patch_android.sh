@@ -115,6 +115,47 @@ else:
                       "    <queries>\n" + QUERIES_BODY + "    </queries>\n</manifest>", 1)
     print("added <queries> for messenger deep links")
 
+# ═══════════════════════════════════════════════════════════════════════════
+# Deep link ورودی — دعوتِ اتاق خصوصی
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# چرا: لینک دعوتِ ساخته‌شده در اپ (private_match_dialog) روی وب را باز
+# می‌کند؛ دوستی که خودش اپ نصب دارد با کلیک باید داخل اپ بیفتد و مستقیم
+# به اتاق بپیوندد، نه اینکه به وب‌سایت هدایت شود. دو مسیر اعلام می‌شود:
+#
+#   • scheme اختصاصی «ghelgheli://join?room=CODE&game=...» — همیشه
+#     مستقیم به اپ می‌رسد (نیاز به App Links verification ندارد)؛
+#   • https دامنهٔ کاربری (بدون autoVerify) — اندروید در صورت نصب‌بودنِ
+#     اپ، دیالوگ «باز کردن با» نشان می‌دهد و وب هم در همان دامنه کار می‌کند.
+#
+# این بلوک داخل تگ <activity>ی موجود (همان‌جا که LAUNCHER هست) تزریق
+# می‌شود وگرنه intent-filter بدون activity بی‌اثر است.
+DEEP_LINK_BLOCK = """
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="ghelgheli" android:host="join"/>
+            </intent-filter>
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="user.ghelghelishop.ir"/>
+            </intent-filter>
+"""
+
+if 'android:scheme="ghelgheli"' not in src:
+    # بستنِ تگ <activity> اصلی محل امنِ تزریق است (پس از فیلترِ LAUNCHER).
+    activity_close = src.rfind('</activity>')
+    if activity_close != -1:
+        src = src[:activity_close] + DEEP_LINK_BLOCK + src[activity_close:]
+        print("added deep-link intent-filters for invite links")
+    else:
+        raise SystemExit('ERROR: no <activity> found to attach deep-link filters')
+else:
+    print("deep-link intent-filters already present")
+
 # Ship a real Persian app name rather than the raw Dart package identifier.
 src = src.replace('android:label="ghelgheli_mobile"', 'android:label="GhelGheli"')
 

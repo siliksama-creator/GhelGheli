@@ -88,6 +88,9 @@ dependencies:
   # Result cards are real PNG files shared through Android's secure chooser.
   # Direct messenger buttons for referral/result text still use url_launcher.
   share_plus: ^13.3.0
+  # ورود از لینکِ دعوتِ اتاق خصوصی (ghelgheli://join?room=...):
+  # بدون این، لینک دعوت همیشه وب را باز می‌کرد حتی وقتی اپ نصب بود.
+  app_links: ^6.3.2
 
 dev_dependencies:
   flutter_test:

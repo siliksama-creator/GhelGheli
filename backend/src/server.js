@@ -246,6 +246,14 @@ app.get('/uploads/images/:file', async (req, res, next) => {
 
 app.use('/uploads', express.static(uploadRoot, { setHeaders: publicAssetHeaders }));
 app.use('/public', express.static(path.join(__dirname, '..', 'public'), { setHeaders: publicAssetHeaders }));
+// استیکرهای چت: جدول chat_stickers آدرس نسبیِ /stickers/… دارد و **هر دو
+// کلاینت** آن را به دامنهٔ API می‌چسبانند (وب تابع asset() و اندروید
+// _stickerUrl هر دو پایهٔ api. هستند). قبلاً فایل‌ها فقط روی هاستِ وب
+// کاربری بودند، پس از سمتِ API چهار۰۴ می‌گرفتند و استیکر (هم در کشوی
+// انتخاب، هم در حباب پیام) روی هر دو پلتفرم شکسته بود. این مانت همان
+// فایل‌ها را از public/stickers سرور سرو می‌کند — مسیرِ دیتابیس دست
+// نمی‌خورد و فایل‌ها با ریپو می‌آیند.
+app.use('/stickers', express.static(path.join(__dirname, '..', 'public', 'stickers'), { setHeaders: publicAssetHeaders }));
 // مستندات Swagger.
 //
 // AUDIT: این مسیر برای همه باز بود و کل سطح API (از جمله مسیرهای مدیریتی
@@ -2226,6 +2234,36 @@ app.post('/api/admin/auth/login', adminLoginLimiter, asyncHandler(async (req, re
   if (!admin || !(await bcrypt.compare(String(req.body.password || ''), admin.password_hash))) return res.status(401).json({ message: 'ورود نامعتبر' });
   res.json({ token: signAdmin(admin), admin: { id: admin.id, username: admin.username, role: admin.role } });
 }));
+
+// ── مرزِ سرور برای نقشِ «ناظر» (observer) ──────────────────────────────
+//
+// چرا این میدل‌ویر لازم است: پنهان‌کاریِ صفحه‌ها فقط سمتِ هر دو کلاینت
+// (roles.js وب و admin_shell.dart اندروید) بود؛ کسی که توکنِ ناظر را
+// داشت و مستقیم API را صدا می‌زد (نسخهٔ قدیمی APK، اسکریپت، یا curl)،
+// تقریباً به همهٔ مسیرهای *خواندنیِ* پنل — پاس، فروشگاه، جوایز، تنظیمات
+// موتور، متن‌های زنده، کارت‌بانک عکس، آمار کیف‌پول — می‌رسید. هرچند
+// مسیرهای نوشتنیِ حساس با requireRole() جدا ۴۰۳ می‌دادند، خواندنی‌های
+// زیادی باز بودند.
+//
+// قانون، دقیقاً همان چیزی است که UI هر دو پنل می‌گوید: ناظر فقط
+// «داشبورد» و «پشتیبانی (تیکت‌ها)» را می‌بیند و هیچ تغییری نمی‌دهد.
+// فهرست سفید فقط GET است؛ هر نوشتاری (POST/PATCH/PUT/DELETE) برای ناظر
+// ۴۰۳ است. بعد از adminAuth اجرا می‌شود تا req.admin پر شده باشد؛ این
+// نقطه تنها جایی است که مرز باید سِفت شود و بقیهٔ مسیرها از همین‌جا
+// رد می‌شوند.
+const observerReadGuard = (req, res, next) => {
+  if (req.admin?.role !== 'observer') return next();
+  if (req.method !== 'GET') return res.status(403).json({ message: 'دسترسی کافی نیست' });
+  const p = req.path.replace(/\/+$/, '');
+  const observerAllowed =
+    p === '/dashboard' ||
+    p === '/metrics' ||
+    p === '/support/tickets' ||
+    /^\/support\/tickets\/[^/]+\/messages$/.test(p);
+  if (observerAllowed) return next();
+  return res.status(403).json({ message: 'دسترسی کافی نیست' });
+};
+app.use('/api/admin', adminAuth, observerReadGuard);
 app.get('/api/admin/dashboard', adminAuth, asyncHandler(async (req, res) => {
   const q = await Promise.all([
     pool.query('SELECT count(*)::int AS count FROM users'),

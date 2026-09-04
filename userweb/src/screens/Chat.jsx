@@ -157,6 +157,19 @@ export default function Chat({ token, openProfile, meId }) {
         });
         scrollDown();
       });
+      // لایکِ پیام به‌صورت لحظه‌ای روی همهٔ کلاینت‌ها (سرور بعد از لایک/
+      // آن‌لایک با شمارندهٔ نهایی broadcast می‌کند). بدون این شنونده، عددِ
+      // لایک تا رفرش بعدی (۱۵ ثانیه) روی گوشیِ طرف مقابل به‌روز نمی‌شد.
+      socket.on('chat:liked', ({ messageId, likeCount }) => {
+        if (!alive.current || !messageId) return;
+        setMessages(prev => prev.map(m =>
+          String(m.id) === String(messageId) ? { ...m, like_count: likeCount } : m));
+      });
+      // پیام سنجاق‌شده را که ادمین تغییر می‌دهد بی‌درنگ بنشان — بدون رفرش.
+      socket.on('chat:pinned', value => {
+        if (!alive.current || !value) return;
+        setPinned(value);
+      });
     } catch { /* سوکت اختیاری است؛ polling پایین کار را ادامه می‌دهد */ }
 
     const timer = setInterval(() => {
@@ -171,7 +184,12 @@ export default function Chat({ token, openProfile, meId }) {
 
     return () => {
       clearInterval(timer);
-      try { socket?.off('chat:new'); socket?.disconnect(); } catch { /* noop */ }
+      try {
+        socket?.off('chat:new');
+        socket?.off('chat:liked');
+        socket?.off('chat:pinned');
+        socket?.disconnect();
+      } catch { /* noop */ }
     };
   }, [load, token, scrollDown]);
 

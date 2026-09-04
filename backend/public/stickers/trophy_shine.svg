@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+  <defs>
+    <linearGradient id="tgold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FDE68A"/><stop offset="50%" stop-color="#F59E0B"/><stop offset="100%" stop-color="#B45309"/>
+    </linearGradient>
+    <linearGradient id="tshine" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0"/><stop offset="50%" stop-color="#FFFFFF" stop-opacity="0.9"/><stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <g>
+    <animateTransform attributeName="transform" type="translate" values="0 0;0 -3;0 0" dur="1.6s" repeatCount="indefinite"/>
+    <path d="M30 22 h36 v8 a18 18 0 0 1 -36 0 Z" fill="url(#tgold)" stroke="#92400E" stroke-width="2"/>
+    <path d="M30 22 h36 v8 a18 18 0 0 1 -36 0 Z" fill="url(#tshine)"/>
+    <path d="M24 22 C24 26 26 30 30 32 L28 44 H40 V32 C36 30 38 26 38 22 Z" fill="url(#tgold)" stroke="#92400E" stroke-width="2"/>
+    <path d="M72 22 C72 26 70 30 66 32 L68 44 H56 V32 C60 30 58 26 58 22 Z" fill="url(#tgold)" stroke="#92400E" stroke-width="2"/>
+    <rect x="38" y="44" width="20" height="8" rx="2" fill="url(#tgold)" stroke="#92400E" stroke-width="2"/>
+    <rect x="30" y="52" width="36" height="8" rx="2" fill="#B45309" stroke="#92400E" stroke-width="2"/>
+    <rect x="26" y="60" width="44" height="9" rx="3" fill="url(#tgold)" stroke="#92400E" stroke-width="2"/>
+    <path d="M36 60 h6 v6 h-6 Z M54 60 h6 v6 h-6 Z" fill="#92400E"/>
+    <rect x="40" y="69" width="16" height="7" rx="2" fill="#F59E0B" stroke="#92400E" stroke-width="2"/>
+  </g>
+  <g fill="#FDE68A">
+    <path d="M14 14 L16.5 19 L22 19.5 L17 23 L18.5 29 L14 26 L9.5 29 L11 23 L6 19.5 L11.5 19 Z">
+      <animateTransform attributeName="transform" type="rotate" values="0 14 21;360 14 21" dur="3s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="1;0.2;1" dur="1.5s" repeatCount="indefinite"/>
+    </path>
+    <path d="M78 58 L80.5 63 L86 63.5 L81 67 L82.5 73 L78 70 L73.5 73 L75 67 L70 63.5 L75.5 63 Z">
+      <animateTransform attributeName="transform" type="rotate" values="0 78 65;-360 78 65" dur="3.4s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.3;1;0.3" dur="1.3s" repeatCount="indefinite"/>
+    </path>
+  </g>
+</svg>

@@ -171,6 +171,14 @@ export default function GrowthHub({ api, token, onSocketGame }) {
         <small>{friend.online ? 'آنلاین' : 'آفلاین'}</small>
         <button disabled={!friend.online || busy === `challenge-${friend.id}`}
           onClick={() => challenge(friend)}>چالش</button>
+        <button
+          title="حذف از دوستان"
+          onClick={() => { if (window.confirm(`${friend.nickname} از فهرست دوستان حذف شود؟`)) run(`remove-${friend.friendshipId}`,
+            () => req(`/api/friends/${friend.friendshipId}`, 'DELETE', {}, token)); }}>حذف</button>
+        <button
+          title="مسدودکردن کاربر"
+          onClick={() => { if (window.confirm(`${friend.nickname} مسدود شود؟ دیگر در نتایج دوستان و چالش ظاهر نمی‌شود.`)) run(`block-${friend.id}`,
+            () => req(`/api/friends/users/${friend.id}/block`, 'POST', {}, token)); }}>بلاک</button>
       </div>)}
     </div>}
 
