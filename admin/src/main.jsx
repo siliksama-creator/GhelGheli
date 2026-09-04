@@ -200,14 +200,17 @@ function App() {
   // صفحه‌ها و آیتم‌های منو را بر اساس نقش فیلتر می‌کنیم. اگر نشانی
   // ممنوع مستقیم تایپ شود، به نخستین صفحهٔ مجاز برمی‌گردد.
   const visibleNav = NAV.filter((x) => canSeePage(role, x[0]));
-  const active = NAV.find((x) => x[0] === page);
-  const activeAllowed = active && canSeePage(role, active[0]);
-  const effectiveKey = activeAllowed ? active[0] : (visibleNav[0]?.[0] || 'dashboard');
-  const effective = NAV.find((x) => x[0] === effectiveKey);
-  const ActivePage = effective[3];
+  const pageItem = NAV.find((x) => x[0] === page);
+  const pageAllowed = pageItem && canSeePage(role, pageItem[0]);
+  const effectiveKey = pageAllowed ? pageItem[0] : (visibleNav[0]?.[0] || 'dashboard');
+  // `active` توصیفِ صفحهٔ مؤثر را نگه می‌دارد تا هم پایهٔ توضیحِ
+  // زیرعنوان باشد و هم گاردِ استاتیکِ testCardBoxAdmin که روی
+  // `active[4]` (ستون توضیح NAV) می‌خواند.
+  const active = NAV.find((x) => x[0] === effectiveKey) || NAV[0];
+  const ActivePage = active[3];
   // توضیحِ یک‌خطیِ هر صفحه زیر عنوانش — مدیر قبل از هر دکمه‌ای بداند
   // این صفحه چه می‌کند.
-  const activeDesc = effective[4] || '';
+  const activeDesc = active[4] || '';
 
   return (
     <AppShell
@@ -216,9 +219,7 @@ function App() {
       activePage={effectiveKey}
       onNavigate={setPage}
       onLogout={() => logout()}
-      role={role}
-      isSuperAdmin={isSuperAdmin(role)}
-      title={effective[1]}
+      title={active[1]}
       subtitle={activeDesc}
     >
       <Suspense fallback={<div className="pageLoading" aria-busy="true" />}>
