@@ -100,8 +100,17 @@ jobs:
             sleep 1
           done
           echo "::error::API did not become healthy in 40s"; exit 1
-      - name: End-to-end suite
+      - name: End-to-end suite (HTTP money paths — withdrawal ledger)
         run: npm run test:e2e
+      # سوکتِ واقعی، دو بازیکن: escrow شرط، تسویه به برنده، تساوی،
+      # رهاکردن بازی، ردِ ورودی نامعتبر. با Fake دیتابیس پوشش نداشت.
+      - name: E2E staked game (socket — stake escrow & settlement)
+        run: npm run test:e2e:stake
+      # عمق نقش‌ها روی سرورِ زنده: ناظر فقط سفیدِ GET، پشتیبان بیرونِ
+      # مسیرهای فقط-ابرادمین، کاربر عامی پشتِ درِ ادمین. جلوی تکرارِ
+      # باگ «مرز ناظر فقط در UI» را می‌گیرد.
+      - name: E2E admin role depth (observer/support/super_admin matrix)
+        run: npm run test:e2e:roles
       - name: Stop API
         if: always()
         run: kill "$(cat /tmp/api.pid)" 2>/dev/null || true
