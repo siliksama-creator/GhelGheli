@@ -147,7 +147,7 @@ class _AdminGameRewardsState extends State<AdminGameRewards> {
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
                   labelText: 'امتیاز برنده',
-                  helperText: 'عدد مثبت، بین ۰ تا ۱۰۰۰',
+                  helperText: 'بین ۰ تا ۱۰۰۰ در سرور نگه داشته می‌شود و همان «امتیازِ برد» در صفحهٔ «اقتصادِ بازی» است — یکی را عوض کنید، آن یکی هم عوض می‌شود.', helperMaxLines: 6,
                   prefixIcon: Icon(Icons.emoji_events_rounded),
                 ),
               ),
@@ -157,7 +157,7 @@ class _AdminGameRewardsState extends State<AdminGameRewards> {
                 keyboardType: const TextInputType.numberWithOptions(signed: true),
                 decoration: const InputDecoration(
                   labelText: 'امتیاز بازنده (منفی)',
-                  helperText: 'مثلاً ‎-۵ ؛ امتیاز کاربر هرگز زیر صفر نمی‌رود',
+                  helperText: 'فقط منفی یا صفر قبول می‌شود؛ عددِ مثبت به صفر برمی‌گردد. کسرِ امتیاز با «سقفِ روزانه» متوقف نمی‌شود.', helperMaxLines: 6,
                   prefixIcon: Icon(Icons.trending_down_rounded),
                 ),
               ),
@@ -178,7 +178,8 @@ class _AdminGameRewardsState extends State<AdminGameRewards> {
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
                   labelText: 'سقف بازی امتیازدار در روز',
-                  helperText: 'جلوی رد و بدل کردن برد بین دو دوست را می‌گیرد',
+                  helperText: '۰ یعنی بی‌سقف؛ فقط برد‌هایِ امتیازدار را می‌شمارد و باختِ بدونِ امتیاز همیشه ثبت می‌شود. این عدد هم در «اقتصادِ بازی» دیده می‌شود، و *بینِ دو دوستِ هم‌رتبه* را هم بی‌کار می‌کند: بعد از سقف، بردِ تازه امتیاز ندارد.',
+                  helperMaxLines: 6,
                   prefixIcon: Icon(Icons.today_rounded),
                 ),
               ),

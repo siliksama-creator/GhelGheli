@@ -132,6 +132,32 @@ for (const [page, hints] of Object.entries(webPages)) {
 }
 if (missingOnMobile) info.push('بدهیِ شناخته‌شده: ' + missingOnMobile + ' توضیحِ وب در اندرویدِ همان صفحه همتایِ هم‌متن ندارد (فیلدهایی که در پنلِ اندروید یا برچسبشان فرق دارد یا نبودن‌شان عمدی است).');
 
+/* ── قاعدهٔ ۰: دو شکلی که *همین* کارِ درج‌کردن می‌سازد ──
+   CI روی `4484cb4` با `undefined_named_parameter` شکست، چون یک `helperText`
+   بیرونِ `InputDecoration` افتاد (ساختارش در یک خط بسته شده بود). پس گارد
+   علاوه‌برِ «متن یکی باشد»، «ساختار جا به‌جاست» را هم می‌سنجد — وگرنه
+   خودِ ابزارِ راهنما، راهنماها را می‌شکند. */
+let structural = 0;
+for (const file of fs.readdirSync(MOB_ADMIN)) {
+  if (!file.endsWith('.dart')) continue;
+  const lines = read(path.join(MOB_ADMIN, file)).split('\n');
+  const hits = [];
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    const next = lines[i + 1] || '';
+    if (/helperMaxLines: (\d+),?\s+helperMaxLines: \1,/.test(l + ' ' + next.trim())) {
+      hits.push(file + ':' + (i + 1) + ' آرگومانِ تکراریِ helperMaxLines (درجِ دوباره)');
+    }
+    if (/decoration:\s*const?\s*InputDecoration\([^)]*\),\s*$/.test(l) && /^\s*helperText/.test(next)) {
+      hits.push(file + ':' + (i + 2) + ' helperText بیرونِ InputDecoration افتاده');
+    }
+  }
+  structural += hits.length;
+  for (const h of hits) check(false, h);
+}
+ok++; // یک سنجه: «ساختارِ helperTextها در کلِ پنلِ اندروید سالم است»
+check(structural === 0, 'ساختارِ راهنماها ناسالم است');
+
 /* ── قاعدهٔ ۳ (بازگشتی): راهنماها نباید به live_copy رفته باشند ── */
 const live = read(path.join(ROOT, 'backend/src/services/liveContent.js'));
 for (const t of webHints.keys()) {

@@ -180,8 +180,11 @@ class _AdminAdminsState extends State<AdminAdmins> {
                     prefixIcon: Icon(Icons.lock_outline_rounded))),
             DropdownButtonFormField<String>(
               initialValue: _role,
-              decoration: const InputDecoration(labelText: 'نقش'),
-                    helperText: '«مدیر کل» همه‌چیز را می‌بیند؛ «پشتیبان» فقط تیکت و چند صفحهٔ محدود؛ «ناظر» چیزی را نمی‌تواند عوض کند. بیشترِ صفحه‌هایِ این پنل فقط برای مدیر کل باز است.', helperMaxLines: 6,
+              decoration: const InputDecoration(
+                  labelText: 'نقش',
+                  helperText: '«مدیر کل» همه‌چیز را می‌بیند؛ «پشتیبان» فقط تیکت و چند صفحهٔ محدود؛ «ناظر» چیزی را نمی‌تواند عوض کند. بیشترِ صفحه‌هایِ این پنل فقط برای مدیر کل باز است.',
+                  helperMaxLines: 6,
+              ),
               items: const [
                 DropdownMenuItem(value: 'super_admin', child: Text('مدیر کل')),
                 DropdownMenuItem(value: 'support', child: Text('پشتیبان')),

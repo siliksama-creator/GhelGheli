@@ -74,11 +74,12 @@ export function GameRewardsPage({ request }) {
               hint="فقط منفی یا صفر قبول می‌شود؛ عددِ مثبت به صفر برمی‌گردد. کسرِ امتیاز با «سقفِ روزانه» متوقف نمی‌شود.">
           <Input type="number" value={cfg.losePoints} onChange={set('losePoints')} />
         </Field>
-        <Field label="امتیاز مساوی">
+        <Field label="امتیاز مساوی"
+              hint="می‌تواند منفی باشد؛ سرور آن را بین ۱۰۰۰- تا ۱۰۰۰+ نگه می‌دارد.">
           <Input type="number" value={cfg.drawPoints} onChange={set('drawPoints')} />
         </Field>
         <Field label="سقف بازی امتیازدار در روز"
-              hint="۰ یعنی بی‌سقف؛ فقط برد‌هایِ امتیازدار را می‌شمارد و باختِ بدونِ امتیاز همیشه ثبت می‌شود. این عدد *بینِ دو دوستِ هم‌رتبه* را هم بی‌کار می‌کند: بعد از سقف، بردِ تازه امتیاز ندارد. این عدد هم در «اقتصادِ بازی» دیده می‌شود.">
+              hint="۰ یعنی بی‌سقف؛ فقط برد‌هایِ امتیازدار را می‌شمارد و باختِ بدونِ امتیاز همیشه ثبت می‌شود. این عدد هم در «اقتصادِ بازی» دیده می‌شود، و *بینِ دو دوستِ هم‌رتبه* را هم بی‌کار می‌کند: بعد از سقف، بردِ تازه امتیاز ندارد.">
           <Input type="number" value={cfg.dailyCap} onChange={set('dailyCap')} />
         </Field>
         <p className="topbar-sub" style={{ marginBottom: 10 }}>
