@@ -29,7 +29,6 @@ class DeepLinks {
   DeepLinks._();
   static final DeepLinks instance = DeepLinks._();
 
-  AppLinks? _appLinks;
   PendingRoomJoin? _initial;
   final StreamController<PendingRoomJoin> _controller =
       StreamController<PendingRoomJoin>.broadcast();
@@ -63,7 +62,6 @@ class DeepLinks {
     _started = true;
     try {
       final links = AppLinks();
-      _appLinks = links;
       final initialUri = await links.getInitialLink();
       _initial = _parse(initialUri);
       links.uriLinkStream.listen((uri) {
