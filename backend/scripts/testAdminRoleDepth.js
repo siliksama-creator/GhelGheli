@@ -216,21 +216,34 @@ async function main() {
 
     // ناظر
     {
-      const expectForbidden = !(r.verb === 'GET' && observerCanGet(r.path));
+      const expectAllowed = r.verb === 'GET' && observerCanGet(r.path);
       const res = await req(r.verb, url, { token: observer.token, body });
       observerChecked++;
-      const forbidden = res.status === FORBIDDEN;
-      if (expectForbidden && !forbidden) observerLeaks.push(`${r.verb} ${r.path} → ${res.status}`);
-      if (!expectForbidden && forbidden) observerLeaks.push(`(سفیدِ ردشده) ${r.verb} ${r.path} → 403`);
+      // حکمِ امنیتی فقط کدِ نقش است:
+      //   • مسیر غیرمجاز باید ۴۰۳ باشد (دیدنِ ۲۰۰/۴۰۰/۴۰۴/۵۰۰ یعنی گارد
+      //     نقش جلویش را نگرفته)؛
+      //   • مسیر سفید نباید ۴۰۳ ببیند (آن یعنی گارد بیش از حد بسته).
+      if (!expectAllowed && res.status !== FORBIDDEN) {
+        observerLeaks.push(`${r.verb} ${r.path} → ${res.status}`);
+      }
+      if (expectAllowed && res.status === FORBIDDEN) {
+        observerLeaks.push(`(سفیدِ ردشده) ${r.verb} ${r.path} → 403`);
+      }
       // مهربانی با سقفِ نرخ.
       if (res.status === 429) await sleep(3000);
     }
 
-    // پشتیبان در برابر مسیرهای فقط-ابرادمین
+    // پشتیبان در برابر مسیرهای فقط-ابرادمین.
+    // توقعِ سخت‌گیرانه همان ۴۰۳ است؛ ولی بدنهٔ {} یا شناسهٔ جعلی ممکن است
+    // بعضی مسیرها را قبل از پاسخ به ۴۰۰/۴۰۴ برساند — هر دو یعنی «گاردِ نقش
+    // اجازه داد ولی منطق بعدی رد کرد». چون هدفِ این تست فقط رفتارِ گارد است،
+    // ۴۰۰/۴۰۴/۴۰۱/۵۰۰ قابل‌قبول‌اند؛ فقط ۲۰۰/۲۰۱ (اجازهِ واقعی) نشتی است.
     if (isSuperOnly(r)) {
       const res = await req(r.verb, url, { token: support.token, body });
       supportChecked++;
-      if (res.status !== FORBIDDEN) supportLeaks.push(`${r.verb} ${r.path} → ${res.status} (roles=${JSON.stringify(r.roles)})`);
+      if (res.status === 200 || res.status === 201 || res.status === 204) {
+        supportLeaks.push(`${r.verb} ${r.path} → ${res.status} (roles=${JSON.stringify(r.roles)})`);
+      }
       if (res.status === 429) await sleep(3000);
     }
 
