@@ -108,20 +108,24 @@ function extractRoutes() {
     while ((m = re.exec(src))) {
       const [, verb, rawPath] = m;
       let p = rawPath;
-      // نرمال‌سازی به شکلِ داخلِ گاردِ ادمین: app.use('/api/admin') مسیر را
-      // بدونِ پیشوندِ /api/admin می‌بیند (مثلاً '/dashboard') و روت‌های
-      // ماژولار هم از '/admin/...' ثبت می‌شوند. هر دو باید به یک شکل
-      // برسند وگرنه سفیدِ ناظر (که روی req.path است) هیچ‌وقت جور نمی‌شود.
-      if (p.startsWith('/api/admin')) p = p.slice('/api/admin'.length);
-      else if (p.startsWith('/admin')) p = p.slice('/admin'.length);
+      // نرمال‌سازی به دو شکلِ هم‌زمان:
+      //   • guardPath: همان که observerReadGuard در req.path می‌بیند، یعنی
+      //     بدونِ پیشوندِ مونت (/api/admin حذف می‌شود) → '/dashboard'؛
+      //   • url: نشانیِ نهاییِ HTTP برای درخواست، که برای هر دو کنوانسیونِ
+      //     کد (روترهای ماژولارِ '/admin/x' مونت‌شده زیر '/api'، و مسیرهای
+      //     مستقیمِ '/api/admin/x' در server.js) برابر '/api/admin/x' است.
+      let guardPath;
+      if (p.startsWith('/api/admin')) guardPath = p.slice('/api/admin'.length);
+      else if (p.startsWith('/admin')) guardPath = p.slice('/admin'.length);
       else continue;                                          // مسیر غیرادمین
-      if (!p.startsWith('/')) p = '/' + p;
+      if (!guardPath.startsWith('/')) guardPath = '/' + guardPath;
       // پارامتر مسیر را با مقدارِ بی‌خطر جایگزین کن (UUID جعلیِ فرم‌درست
       // تا به ۵۰۰ نرسد؛ گاردِ نقش قبل از منطق اجرا می‌شود).
-      const concrete = p
+      const concrete = guardPath
         .replace(/:hash/g, 'x'.repeat(40))
         .replace(/:[a-zA-Z]+/g, '00000000-0000-4000-8000-000000000000')
         .replace(/\/+/g, '/');
+      const url = `/api/admin${concrete}`;
       // نقشِ موردنیاز فقط از آرگومان‌های همین فراخوانی استخراج می‌شود.
       const openIdx = src.indexOf('(', m.index);
       const args = extractCallArgs(src, openIdx);
@@ -129,7 +133,7 @@ function extractRoutes() {
       const roles = roleM
         ? roleM[1].split(',').map(s => s.replace(/['"\s]/g, '')).filter(Boolean)
         : null; // null = بدون requireRole صریح (پیش‌فرضِ ادمینِ عام)
-      routes.push({ verb: verb.toUpperCase(), path: concrete, roles });
+      routes.push({ verb: verb.toUpperCase(), path: concrete, url, roles });
     }
   }
   // یکتا‌سازی (هم مسیر ممکن است در دو فایل الگو بخورد).
@@ -217,7 +221,7 @@ async function main() {
     if (r.path.includes('/auth/login')) continue;
 
     const body = ['GET'].includes(r.verb) ? undefined : {};
-    const url = `/api${r.path.startsWith('/admin') ? r.path : `/admin${r.path}`}`;
+    const url = r.url;
 
     // ناظر
     {
