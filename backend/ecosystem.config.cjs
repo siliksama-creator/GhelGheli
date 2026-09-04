@@ -1,30 +1,49 @@
 // PM2 process definition.
 //
-// NOTE ON CLUSTER MODE: this app must stay `fork` with ONE instance. The
-// games engine keeps live rooms, matchmaking queues and solo runs in plain
-// in-memory Maps (backend/src/games/engine.js, games/solo.js). Running two
-// workers would put two players in two different processes' queues and they
-// would never be matched — and a socket reconnecting to the other worker
-// would find its room gone. Scaling out needs a Redis adapter for Socket.IO
-// plus shared state first; until then a single process is the CORRECT
-// choice, not an oversight. Measured headroom: ~1000 concurrent active
-// users at 10ms p50 on the current 2-vCPU / 4GB VPS.
-module.exports = {
-  apps: [{
-    name: 'ghelgheli-api',
+// ── مقیاسِ چندپروسه‌ای بدون شکستنِ بازیِ زنده ────────────────────────
+//
+// موتور بازی (src/games/) اتاق‌ها، صفِ حریف‌جویی و تایمرهای زنده را در
+// Mapهای درون‌پروسه نگه می‌دارد و مستقیماً به شیءِ زندهٔ سوکتِ هر بازیکن
+// emit می‌کند (تا دستِ حریف لو نرود). این state قابلِ serialize به Redis
+// نیست؛ پس اگر دو پروسه سوکت بپذیرند، دو بازیکنِ روی دو پروسه همدیگر را
+// نمی‌بینند و بازی می‌شکند.
+//
+// راهکارِ امن (مطابق تحلیلِ معماری در docs): تفکیکِ نقش:
+//   • ghelgheli-api-1  → «گره بازی». همهٔ اتصال‌های Socket.IO (به‌واسطهٔ
+//     مسیریابیِ nginx که درخواست‌های Upgrade را فقط به این گره می‌فرستد)
+//     و سهمِ خودش از HTTP به اینجا می‌آید. اتاق‌ها منسجم می‌مانند.
+//   • ghelgheli-api-2  → «گره HTTP». فقط ترافیکِ REST (که stateless است)
+//     و Redis pub/sub را دارد؛ بارِ CPUِ سنگین (لیگ، کیف‌پول، تصاویر…)
+//     را با گره اول نصف می‌کند.
+//
+// هر دو گره آداپتور Redis را وصل می‌کنند، پس پخشِ چت/حضور/اعلان بینشان
+// درست کار می‌کند. شمارنده‌های rate-limit هم از Redis خوانده می‌شوند
+// (lib/rateLimitStore.js) تا سقف بین دو گره جمع بسته نشود.
+//
+// نکته: nginx باید درخواست‌های Upgrade را فقط به ghelgheli-api-1 بفرستد
+// (upstream جدا برای ws). بقیهٔ ترافیک روی هر دو upstream بالانس شود.
+// تک‌گره (بدون Redis/بدون nginx) هم کار می‌کند: api-2 وقتی PORT دوم
+// توسط nginx هدف گرفته نشود، صرفاً یک standby سالم است.
+function app(name, port, role) {
+  return {
+    name,
     script: 'src/server.js',
     cwd: __dirname,
     instances: 1,
     exec_mode: 'fork',
-    // A leak or a runaway upload should recycle the process rather than
-    // trigger the kernel OOM killer, which would take Postgres with it.
-    max_memory_restart: '900M',
-    // Node's default heap on a small box is conservative; the image
-    // pipeline (sharp) and the socket table both want more headroom.
+    // نشت حافظه یا پردازشِ آپلودیِ رهاکرده باید پروسه را recycle کند،
+    // نه اینکه kernel با OOM همه چیز (حتی Postgres) را بکشد.
+    max_memory_restart: '850M',
     node_args: '--max-old-space-size=1024',
-    env: { NODE_ENV: 'production' },
-    // Never spin-restart a process that is crash-looping on boot.
+    env: { NODE_ENV: 'production', PORT: String(port), PROCESS_ROLE: role },
     exp_backoff_restart_delay: 200,
     max_restarts: 15,
-  }]
+  };
+}
+
+module.exports = {
+  apps: [
+    app('ghelgheli-api', 4000, 'game'),   // گره بازی/سوکت — اسمِ اصلی برای سازگاری با deploy.sh
+    app('ghelgheli-api-http', 4001, 'http'), // گره کمکیِ HTTP/REST
+  ],
 };

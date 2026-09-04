@@ -98,11 +98,11 @@ chmod 600 .env
 chown -R "$SERVICE_USER:$SERVICE_USER" uploads
 find uploads -type d -exec chmod 750 {} +
 find uploads -type f -exec chmod 640 {} +
-if pm2_user describe "$PM2_APP" >/dev/null 2>&1; then
-  pm2_user reload "$PM2_APP" --update-env
-else
-  pm2_user start ecosystem.config.cjs
-fi
+# Reload all apps defined in ecosystem.config.cjs (گره بازی + گره HTTP).
+# قبلاً فقط $PM2_APP را reload می‌کرد؛ با افزوده‌شدنِ گره کمکیِ HTTP باید
+# هر دو کد تازه را بگیرند. startOrReload اگر اپ نبود می‌سازد و اگر بود
+# بدون‌داون‌تایم reload می‌کند.
+pm2_user startOrReload ecosystem.config.cjs --update-env
 pm2_user save
 
 log "Waiting for API health check"
@@ -116,7 +116,7 @@ if [ "$HEALTHY" -ne 1 ]; then
   log "Health check FAILED — rolling back to $PREVIOUS_SHA"
   git reset --hard "$PREVIOUS_SHA"
   cd "$APP_DIR/backend" && npm ci --omit=dev --no-audit --no-fund
-  pm2_user reload "$PM2_APP" --update-env || pm2_user start ecosystem.config.cjs
+  pm2_user startOrReload ecosystem.config.cjs --update-env
   pm2_user save
   die "Deploy rolled back. Check the $SERVICE_USER PM2 logs for $PM2_APP"
 fi

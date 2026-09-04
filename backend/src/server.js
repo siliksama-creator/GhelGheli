@@ -10,6 +10,14 @@ const morgan = require('morgan');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
+// شمارنده‌های محدودیتِ نرخ در حالتِ چندپروسه باید مشترک باشند وگرنه هر
+// پروسه سطلِ جدا دارد و سقف عملاً «سقف × تعدادِ پروسه» می‌شود (دورِ ردیس
+// توضیح کاملش را در rateLimitStore.js داده). وقتی REDIS_URL نباشد، null
+// برمی‌گردد و express-rate-limit به حافظهٔ خودش می‌افتد (رفتارِ تک‌پروسه).
+const { redisRateLimitStore } = require('./lib/rateLimitStore');
+const sharedRateStore = redisRateLimitStore();
+// کشِ مشترک با TTL (ردیس اگر باشد، وگرنه حافظهٔ پروسه) برای مسیرهای داغ.
+const { cacheGet, cacheSet } = require('./lib/cache');
 const cron = require('node-cron');
 const swaggerUi = require('swagger-ui-express');
 const YAML = require('yaml');
@@ -551,6 +559,8 @@ function opsRateLimit(name, defaults, extra = {}) {
       limit: rl.limit,
       standardHeaders: true,
       legacyHeaders: false,
+  ...(sharedRateStore ? { store: sharedRateStore } : {}),
+      ...(sharedRateStore ? { store: sharedRateStore } : {}),
       ...extra,
     });
   };
@@ -565,7 +575,7 @@ function opsRateLimit(name, defaults, extra = {}) {
 // همهٔ limiterهای زیر روی مسیرهای احراز هویت‌شده‌اند، پس همه `perUserKey`
 // می‌گیرند. (فهرست کامل در تستِ testRateLimit.js نگهبانی می‌شود.)
 const chatLimiter = opsRateLimit('chat', { windowMs: 60_000, limit: 20 }, { keyGenerator: perUserKey });
-const otpLimiter = rateLimit({ windowMs: 10 * 60_000, limit: 5, standardHeaders: true, legacyHeaders: false });
+const otpLimiter = rateLimit({ windowMs: 10 * 60_000, limit: 5, standardHeaders: true, legacyHeaders: false, ...(sharedRateStore ? { store: sharedRateStore } : {}) });
 // Brute-force protection for the 6-digit OTP code itself. request-otp only
 // throttled how many codes could be requested — verify-otp and the password
 // reset endpoint (which also consumes an OTP) had NO limiter at all, so a
@@ -577,6 +587,7 @@ const otpVerifyLimiter = rateLimit({
   limit: 10,
   standardHeaders: true,
   legacyHeaders: false,
+  ...(sharedRateStore ? { store: sharedRateStore } : {}),
   keyGenerator: (req) => `${req.ip}:${normalizeMobile(req.body?.mobile)}`,
   message: { message: 'تعداد تلاش زیاد است؛ کمی بعد دوباره امتحان کنید' },
 });
@@ -587,6 +598,7 @@ const adminLoginLimiter = rateLimit({
   limit: 10,
   standardHeaders: true,
   legacyHeaders: false,
+  ...(sharedRateStore ? { store: sharedRateStore } : {}),
   keyGenerator: (req) => `${req.ip}:${String(req.body?.username || '').toLowerCase()}`,
   message: { message: 'تعداد تلاش ورود زیاد است؛ چند دقیقه دیگر دوباره امتحان کنید' },
 });
@@ -596,6 +608,7 @@ const userLoginLimiter = rateLimit({
   limit: 20,
   standardHeaders: true,
   legacyHeaders: false,
+  ...(sharedRateStore ? { store: sharedRateStore } : {}),
   keyGenerator: (req) => `${req.ip}:${normalizeMobile(req.body?.mobile)}`,
   message: { message: 'تعداد تلاش ورود زیاد است؛ چند دقیقه دیگر دوباره امتحان کنید' },
 });
@@ -604,6 +617,7 @@ const loginStreakLimiter = rateLimit({
   limit: 8,
   standardHeaders: true,
   legacyHeaders: false,
+  ...(sharedRateStore ? { store: sharedRateStore } : {}),
   keyGenerator: perUserKey,
   message: { message: 'کمی صبر کن و دوباره تلاش کن' },
 });
@@ -816,9 +830,24 @@ app.post('/api/games/tap/progress', auth, tapBatchLimiter.mw, asyncHandler(async
 }));
 
 app.get('/api/games/tap/leaderboard', auth, asyncHandler(async (req, res) => {
-  // limit پیش‌فرض ۱۰ — UI کنار کاراکتر؛ me = رتبهٔ واقعی بیننده
-  const data = await tapGame.leaderboard(req.query.limit || 10, req.user.id);
-  res.json(data);
+  // فهرستِ مشترک برای همهٔ بیننده‌ها یکسان است؛ ۸ ثانیه کش (هم‌مقدار بین
+  // پروسه‌ها با Redis) تا این مسیر داغ هم در هر درخواست جدول را مرتب نکند.
+  const lim = Math.min(Math.max(Number(req.query.limit) || 10, 1), 100);
+  const cacheKey = `lb:tap:${lim}`;
+  const shared = await cacheGet(cacheKey) || await (async () => {
+    const full = await tapGame.leaderboard(lim, null); // فقط فهرست، بدون me
+    await cacheSet(cacheKey, full, 8000);
+    return full;
+  })();
+  // رتبهٔ خودِ بیننده تازه (مثل مسیر لیگ)؛ اگر در فهرست کش‌شده نباشد،
+  // تابع کامل فقط برای گرفتنِ me صدا زده می‌شود.
+  const inTop = (shared.entries || []).find(e => e.userId === req.user.id);
+  let me = inTop ? { ...inTop, inTop: true } : null;
+  if (!me) {
+    const fresh = await tapGame.leaderboard(lim, req.user.id);
+    me = fresh.me || null;
+  }
+  res.json({ ...shared, me });
 }));
 
 // ── دوئل پنج‌کارتی زنده ──────────────────────────────────────────────────
@@ -1116,6 +1145,7 @@ const changePasswordLimiter = rateLimit({
   limit: 10,
   standardHeaders: true,
   legacyHeaders: false,
+  ...(sharedRateStore ? { store: sharedRateStore } : {}),
   keyGenerator: perUserKey,
   message: { message: 'تعداد تلاش‌ها زیاد است؛ چند دقیقه دیگر دوباره امتحان کنید' },
 });
@@ -1487,6 +1517,7 @@ const bankCardLimiter = rateLimit({
   limit: 15,
   standardHeaders: true,
   legacyHeaders: false,
+  ...(sharedRateStore ? { store: sharedRateStore } : {}),
   keyGenerator: perUserKey,
   message: { message: 'تعداد تلاش برای ثبت کارت زیاد است؛ کمی بعد دوباره تلاش کنید' },
 });
@@ -1722,52 +1753,64 @@ app.post('/api/admin/users/:id/unlimited-spins', adminAuth, validateUuid('id'),
   }));
 
 app.get('/api/league/current', auth, asyncHandler(async (req, res) => {
-  const data = await getLeaderboard(Number(req.query.limit || 100), req.query.seasonId || null, req.user?.id);
+  // ── کشِ فهرستِ مشترکِ لیدربورد ──────────────────────────────────
+  // وب این مسیر را هر ۱۲ ثانیه برای هر کاربرِ بازِ صفحه می‌کوبد، و هر
+  // بار یک DENSE_RANK + کوئری برندگانِ دوره قبل اجرا می‌شد. فهرست برای
+  // همهٔ بیننده‌ها یکسان است (رتبهٔ خودِ کاربر تازه می‌ماند)، پس بخشِ
+  // مشترک را ۸ ثانیه کش می‌کنیم؛ با Redis بین همهٔ پروسه‌ها هم‌مقدار
+  // است و بدونش هم در حافظهٔ پروسه. کهنگیِ ۸ ثانیه برای جدولِ زنده
+  // کاملاً نامحسوس است و بارِ این مسیر را >۹۵٪ کم می‌کند.
+  const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 100);
+  const seasonKey = String(req.query.seasonId || 'current');
+  const cacheKey = `lb:league:${seasonKey}:${limit}`;
+  const data = await cacheGet(cacheKey)
+    || await (async () => {
+      const fresh = await getLeaderboard(limit, req.query.seasonId || null, null);
+      // قطعاتِ مشترکی که برای همه یکسان‌اند را پیش‌محاسبه و کش می‌کنیم.
+      const cos = await shop.cosmeticsFor(fresh.entries.map(e => e.user_id));
+      const lvl = await level.levelsFor(fresh.entries.map(e => e.user_id));
+      const { rows: prev } = await pool.query(
+        `SELECT h.user_id, h.month_year, h.rank, h.points, h.prize_amount,
+                u.nickname, u.first_name, u.profile_image_url, u.profile_avatar_key
+           FROM user_league_history h
+           JOIN users u ON u.id = h.user_id
+          WHERE h.season_id = (
+                  SELECT id FROM league_seasons
+                   WHERE status='closed' ORDER BY ends_at DESC LIMIT 1)
+            AND h.rank <= 3
+          ORDER BY h.rank`);
+      const payload = {
+        season: fresh.season,
+        activeLeagues: fresh.activeLeagues,
+        previousWinners: fresh.previousWinners,
+        entries: fresh.entries.map(e => ({
+          ...e,
+          cosmetics: cos.get(e.user_id) || null,
+          level: lvl[e.user_id]?.level ?? 0,
+        })),
+        previousSeason: prev.length ? {
+          monthYear: prev[0].month_year,
+          winners: prev.map(p => ({
+            userId: p.user_id, rank: p.rank, points: p.points,
+            prizeAmount: Number(p.prize_amount),
+            nickname: p.nickname || p.first_name || 'کاربر',
+            profileImageUrl: p.profile_image_url,
+            profileAvatarKey: p.profile_avatar_key,
+          })),
+        } : null,
+      };
+      await cacheSet(cacheKey, payload, 8000);
+      return payload;
+    })();
 
-  // Cosmetics for the standings (club badge, name colour).
-  const cos = await shop.cosmeticsFor(data.entries.map(e => e.user_id));
-  // ═══════════════════════════════════════════════════════════════════════
-  // چرا لول کنارِ cosmetics پخش می‌شود
-  // ═══════════════════════════════════════════════════════════════════════
-  //
-  // درخواست مالک: «این لول رو پروفایل افراد در تمامی قسمت ها دیده بشه».
-  //
-  // `cosmeticsFor` از قبل دقیقاً همین کار را می‌کند: یک کوئریِ دسته‌ای
-  // برای همهٔ کاربرانِ یک صفحه. سوار شدن روی همان الگو یعنی صفرِ
-  // درخواستِ اضافه — به‌جای N+1 که یک صفحهٔ لیگِ ۵۰ ردیفی را به ۵۰
-  // رفت‌وبرگشتِ دیتابیس تبدیل می‌کرد.
-  const lvl = await level.levelsFor(data.entries.map(e => e.user_id));
-
-  // Last month's podium, shown alongside the live table so the previous
-  // season's winners stay visible instead of vanishing at the reset.
-  const { rows: prev } = await pool.query(
-    `SELECT h.user_id, h.month_year, h.rank, h.points, h.prize_amount,
-            u.nickname, u.first_name, u.profile_image_url, u.profile_avatar_key
-       FROM user_league_history h
-       JOIN users u ON u.id = h.user_id
-      WHERE h.season_id = (
-              SELECT id FROM league_seasons
-               WHERE status='closed' ORDER BY ends_at DESC LIMIT 1)
-        AND h.rank <= 3
-      ORDER BY h.rank`);
+  // رتبهٔ خودِ بیننده همیشه تازه (کوئریِ سبکِ ایندکس‌دار، کش نمی‌شود).
+  const myEntry = req.user?.id
+    ? (await getLeaderboard(limit, req.query.seasonId || null, req.user.id)).myEntry
+    : null;
 
   res.json({
     ...data,
-    entries: data.entries.map(e => ({
-      ...e,
-      cosmetics: cos.get(e.user_id) || null,
-      level: lvl[e.user_id]?.level ?? 0,
-    })),
-    previousSeason: prev.length ? {
-      monthYear: prev[0].month_year,
-      winners: prev.map(p => ({
-        userId: p.user_id, rank: p.rank, points: p.points,
-        prizeAmount: Number(p.prize_amount),
-        nickname: p.nickname || p.first_name || 'کاربر',
-        profileImageUrl: p.profile_image_url,
-        profileAvatarKey: p.profile_avatar_key,
-      })),
-    } : null,
+    myEntry,
   });
 }));
 
@@ -2035,7 +2078,7 @@ app.post('/api/chat/messages', auth, chatLimiter.mw, asyncHandler(async (req, re
   // پیام را «مالِ خودم» می‌بینند و در سمتِ چپ با رنگِ آبی رندر می‌کنند.
   // پس نسخهٔ عمومی بدون این پرچم می‌رود و فقط پاسخِ HTTP آن را دارد.
   const { is_mine: _mine, ...publicMsg } = msg;
-  io.emit('chat:new', publicMsg);
+  io.to('chat:public').emit('chat:new', publicMsg);
   res.json(msg);
 }));
 
@@ -2047,13 +2090,13 @@ app.post('/api/chat/messages/:id/report', auth, validateUuid('id'), asyncHandler
 app.post('/api/chat/messages/:id/like', auth, validateUuid('id'), asyncHandler(async (req, res) => {
   await pool.query('INSERT INTO chat_message_likes(message_id,user_id) VALUES($1,$2) ON CONFLICT DO NOTHING', [req.params.id, req.user.id]);
   const c = await pool.query('SELECT count(*)::int AS count FROM chat_message_likes WHERE message_id=$1', [req.params.id]);
-  io.emit('chat:liked', { messageId: req.params.id, likeCount: c.rows[0].count });
+  io.to('chat:public').emit('chat:liked', { messageId: req.params.id, likeCount: c.rows[0].count });
   res.json({ liked: true, likeCount: c.rows[0].count });
 }));
 app.delete('/api/chat/messages/:id/like', auth, validateUuid('id'), asyncHandler(async (req, res) => {
   await pool.query('DELETE FROM chat_message_likes WHERE message_id=$1 AND user_id=$2', [req.params.id, req.user.id]);
   const c = await pool.query('SELECT count(*)::int AS count FROM chat_message_likes WHERE message_id=$1', [req.params.id]);
-  io.emit('chat:liked', { messageId: req.params.id, likeCount: c.rows[0].count });
+  io.to('chat:public').emit('chat:liked', { messageId: req.params.id, likeCount: c.rows[0].count });
   res.json({ liked: false, likeCount: c.rows[0].count });
 }));
 
@@ -2109,6 +2152,7 @@ const uploadLimiter = rateLimit({
   limit: 40,
   standardHeaders: true,
   legacyHeaders: false,
+  ...(sharedRateStore ? { store: sharedRateStore } : {}),
   keyGenerator: perUserKey, // CGNAT — توضیح کامل کنار تعریفِ perUserKey
   message: { message: 'تعداد آپلود زیاد است؛ کمی بعد دوباره تلاش کنید' },
 });
@@ -2468,7 +2512,7 @@ app.patch('/api/admin/chat/pinned', adminAuth, requireRole('support'), asyncHand
   );
   await audit(req.admin.id, active ? 'pin_chat_message' : 'unpin_chat_message', 'app_settings', null, req.body.reason || null, { accent, length: text.length });
   // Live-update everyone who currently has the chat room open.
-  io.emit('chat:pinned', value);
+  io.to('chat:public').emit('chat:pinned', value);
   res.json({ message: active ? 'پیام سنجاق شد' : 'سنجاق برداشته شد', ...value });
 }));
 
@@ -2697,6 +2741,11 @@ function sweepChatRateLimiter(now) {
 }
 
 io.on('connection', socket => {
+  // هر سوکتِ احرازشده عضو «اتاق چت» می‌شود تا پخش چت به‌جای io.emitِ
+  // سراسری (همهٔ سوکت‌ها، از جمله اتصال‌هایی که چت را نمی‌بینند) فقط به
+  // مشترکینِ چت برود. در حالتِ چندپروسه‌ای این اتاق با آداپتور Redis بین
+  // پروسه‌ها همگام است.
+  socket.join('chat:public');
   socket.on('chat:send', async (payload, cb) => {
     try {
       const now = Date.now();
@@ -2746,7 +2795,7 @@ io.on('connection', socket => {
       }
       // مثل مسیرِ REST: نسخهٔ عمومی بدونِ `is_mine` broadcast می‌شود و فقط
       // خودِ فرستنده آن را در callback با پرچمِ true می‌گیرد.
-      io.emit('chat:new', msg);
+      io.to('chat:public').emit('chat:new', msg);
       cb && cb({ ok: true, message: { ...msg, is_mine: true } });
     } catch(e){ cb && cb({ ok: false, error: e.message }); }
   });
@@ -2755,8 +2804,17 @@ io.on('connection', socket => {
 
 // Multiplayer games: a shared engine + one small rules file per game
 // (backend/src/games/), so adding a game never touches this file.
-const games = require('./games');
-games.attach(io);
+//
+// تفکیکِ نقش (ecosystem.config.cjs): فقط گرهِ «game» موتور زنده را
+// وصل می‌کند و اتاق‌ها/صف‌ها/تایمرها را در حافظهٔ خودش نگه می‌دارد.
+// گرهِ «http» سوکتِ بازی نمی‌پذیرد (nginx ترافیک Upgrade را فقط به
+// گره بازی می‌فرستد)، پس state زنده فقط در یک پروسه می‌ماند و
+// matchmaking و reconnect نمی‌شکند.
+const PROCESS_ROLE = String(process.env.PROCESS_ROLE || 'game');
+if (PROCESS_ROLE !== 'http') {
+  const games = require('./games');
+  games.attach(io);
+}
 
 // اگر process بعد از کسر stake و قبل از تسویه خاموش شود، سند reserved در
 // دیتابیس می‌ماند. startup و sweep ساعتی اصل امتیاز را برمی‌گردانند؛ در

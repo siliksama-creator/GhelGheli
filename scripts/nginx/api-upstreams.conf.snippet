@@ -1,0 +1,54 @@
+# ============================================================================
+#  قطعهٔ nginx برای مقیاسِ چندپروسه‌ای (Phase 1)
+# ============================================================================
+#
+# این فایل سند/الگوست؛ در دیپلوی روی VPS در سطح http (یا بالای server block)
+# قرار می‌گیرد. ایده:
+#
+#   • درخواست‌های Socket.IO (Upgrade/websocket) فقط به «گره بازی» (۴۰۰۰)
+#     می‌روند، چون موتور بازی state زنده را در حافظهٔ همان پروسه دارد و
+#     باید منسجم بماند؛
+#   • بقیهٔ ترافیک REST بین هر دو گره (۴۰۰۰ و ۴۰۰۱) با round-robin توزیع
+#     می‌شود تا بارِ CPUِ HTTP روی هر دو هسته پخش شود (گلوگاهِ تست بار بود).
+#
+# هر دو گره آداپتور Redis دارند، پس چت/حضور/اعلان بینشان درست پخش می‌شود و
+# شمارنده‌های rate-limit هم از Redis خوانده می‌شوند.
+#
+# مسیر `location /socket.io/` باید proxy_pass به http://ghelgheli_game باشد
+# و `location /` به http://ghelgheli_http (با همان headerهای قبلی).
+
+upstream ghelgheli_game {
+    # گره بازی/سوکت — اتاق‌های زنده اینجا منسجم‌اند.
+    server 127.0.0.1:4000;
+}
+
+upstream ghelgheli_http {
+    # REST stateless — بین دو هسته بالانس می‌شود.
+    server 127.0.0.1:4000;
+    server 127.0.0.1:4001;
+    keepalive 32;
+}
+
+# در server block دامنه api:
+#
+#   location /socket.io/ {
+#       proxy_pass http://ghelgheli_game;   # فقط گره بازی
+#       proxy_http_version 1.1;
+#       proxy_set_header Upgrade $http_upgrade;
+#       proxy_set_header Connection "upgrade";
+#       proxy_set_header Host $host;
+#       proxy_set_header X-Real-IP $remote_addr;
+#       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#       proxy_set_header X-Forwarded-Proto $scheme;
+#       proxy_read_timeout 300s;
+#   }
+#
+#   location / {
+#       proxy_pass http://ghelgheli_http;    # هر دو گره
+#       proxy_http_version 1.1;
+#       proxy_set_header Connection "";     # برای keepalive
+#       proxy_set_header Host $host;
+#       proxy_set_header X-Real-IP $remote_addr;
+#       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#       proxy_set_header X-Forwarded-Proto $scheme;
+#   }
