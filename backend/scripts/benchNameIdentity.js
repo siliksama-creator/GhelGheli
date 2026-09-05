@@ -39,19 +39,20 @@ async function main() {
 
   // نویزهای معمولِ OCR روی نام: خروجی واقعیِ تسرکت از عکس‌های نمونه.
   const noiseVariants = (lexemes) => {
-    // واژهٔ هویتی (نام‌خانوادگی = آخرین واژه).
+    // واقعی‌ترین حالت: OCR کلِ نام (نام + فامیلی) را می‌خواند.
+    const full = lexemes.map(w => w.toUpperCase());
     const sur = lexemes[lexemes.length - 1].toUpperCase();
     const given = (lexemes[0] || '').toUpperCase();
     const dropFirst = sur.length > 4 ? sur.slice(1) : sur;         // EMBELE
     const dropInner = sur.length > 4 ? sur.slice(0, sur.length - 1) : sur; // HAALAN
     const swapOne = sur.length > 5 ? (sur[0] + sur[2] + sur[1] + sur.slice(3)) : sur;
     return [
+      { label: 'نام کامل (واقعی‌ترین)', toks: [...full, 'PREMIUM', 'CARD'] },
       { label: 'نام‌خانوادگی کامل', toks: [sur] },
       { label: 'حرف‌اول‌گم (لبه)', toks: [dropFirst] },
       { label: 'حرف‌آخر‌گم (تاری)', toks: [dropInner] },
       { label: 'جابه‌جایی یک حرف', toks: [swapOne] },
       { label: 'فقط نام‌کوچک', toks: [given] },
-      { label: 'نام + زباله کارت', toks: [sur, 'PREMIUM', 'CARD', 'WORLD', 'ETIHAD'] },
     ];
   };
 
