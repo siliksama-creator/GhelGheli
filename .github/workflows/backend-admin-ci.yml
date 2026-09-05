@@ -116,6 +116,12 @@ jobs:
       # unsubscribe هم قطع می‌شود. زنجیرهٔ «تغییر → پخشِ اتاقی → رفرش» را
       # که تست‌های واحد نمی‌بینند، اینجا روی سرورِ زنده می‌بندد.
       - name: E2E leaderboard live update (socket room + subscribe)
+        # فازِ بستنِ فصل هم اجرا می‌شود؛ دیتابیس CI دورریختنی است پس بستنِ
+        # فصلِ تستی بی‌خطر است و سیگنالِ آن را هم می‌پوشاند.
+        env:
+          TEST_SEASON_CLOSE: '1'
+          E2E_ADMIN_USER: Admin
+          E2E_ADMIN_PASS: CiTestOnly@2026
         run: npm run test:e2e:leaderboard
       # تست بارِ HTTP: پرتگاهِ ظرفیت (پُرشِ ناگهانیِ p95 و سهم خطا) یک‌شبه
       # در گذشته غافلگیرمان کرد؛ حالا روی همان سرورِ واقعیِ CI، بعد از
