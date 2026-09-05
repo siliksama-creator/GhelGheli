@@ -50,6 +50,10 @@ const MAX_BATCH = 20000;
 const DUPLICATE_SIMILARITY = 0.93; // پیش‌فرض — مقدارِ مؤثر از matchSettings خوانده می‌شود
 const matchSettings = require('../services/matchSettings');
 const { parseFaNumber } = require('../lib/faNum');
+// بعد از ثبتِ کارت (که امتیاز/سکهٔ لیگ می‌دهد) کشِ لیدربورد بی‌اعتبار و
+// رویدادِ `leaderboard:update` پخش می‌شود تا بیننده‌های جدول بی‌درنگ
+// تازه شوند — به‌جای poll ثابتِ کلاینت.
+const leaderboardSignal = require('../services/leaderboardSignal');
 
 module.exports = function createPhotoCardRoutes(deps) {
   const {
@@ -578,7 +582,9 @@ module.exports = function createPhotoCardRoutes(deps) {
         // نبرد جلو می‌افتد — که هدفِ گذر نبرد نیست.
         //
         // مسیرِ قدیمیِ «ثبت کد کارت» (server.js) عمداً دست‌نخورده ماند.
-        getLeaderboard(20).then(l => io.emit('leaderboard:update', l)).catch(() => {});
+        // جدولِ لیگ عوض شد: کشِ فهرست بی‌اعتبار و سیگنالِ سوکت پخش می‌شود.
+        // (سیگنال داده ندارد؛ کلاینت `/api/league/current` را دوباره می‌زند.)
+        leaderboardSignal.leaderboardChanged();
       } else if (!approve) {
         createNotification(userId, 'card',
           'کارت شما تأیید نشد',
@@ -1073,7 +1079,9 @@ module.exports = function createPhotoCardRoutes(deps) {
             `${payload.cash.toLocaleString('en-US')} تومان بابت کارت «${payload.cardTypeName}» واریز شد.`,
           ).catch(() => {});
         }
-        getLeaderboard(20).then(l => io.emit('leaderboard:update', l)).catch(() => {});
+        // جدولِ لیگ عوض شد: کشِ فهرست بی‌اعتبار و سیگنالِ سوکت پخش می‌شود.
+        // (سیگنال داده ندارد؛ کلاینت `/api/league/current` را دوباره می‌زند.)
+        leaderboardSignal.leaderboardChanged();
 
         const now = await pool.query(
           `SELECT current_points, lifetime_points, monthly_league_points, wallet_balance

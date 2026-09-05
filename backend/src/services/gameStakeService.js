@@ -379,6 +379,10 @@ function createGameStakeService(db = pool, points = pointService, coins = coinSe
           WHERE id=$1 AND status='reserved'`,
         [matchId, outcome, draw ? null : winnerUserId]);
       await client.query('COMMIT');
+      // سکه/رتبهٔ لیگ بعد از یک مسابقهٔ آنلاین عوض شد (سکه معیارِ اصلیِ
+      // مرتب‌سازی است). کشِ لیدربورد بی‌اعتبار و سیگنالِ سوکت پخش شود تا
+      // جدولِ بیننده‌ها بی‌درنگ تازه شود — بعد از COMMIT و غیرمسدودکننده.
+      require('./leaderboardSignal').leaderboardChanged();
       return {
         duplicate: false,
         status: 'settled',

@@ -1,6 +1,7 @@
 // 1:1 با اندروید league_page.dart — لیگ ماهانه با پودیوم جدید (بدون پس‌زمینه زرد)
 import React, { useCallback, useEffect, useState } from 'react';
-import { req, fa, asset, avatarUrl } from '../lib/api.js';
+import { io } from 'socket.io-client';
+import { req, fa, asset, avatarUrl, API } from '../lib/api.js';
 import { DisplayName } from '../components/Cosmetics.jsx';
 import { useAsync } from '../lib/useAsync.js';
 import { AsyncSection, EmptyView } from '../components/states.jsx';
@@ -150,12 +151,48 @@ export default function League({ token, openProfile }) {
     });
   }, []);
 
-  // polling like mobile LifecyclePoller 12s
+  // به‌روزرسانیِ زندهٔ جدول به‌جای pollِ ثابتِ ۱۲ ثانیه.
+  //
+  // قبلاً این صفحه هر ۱۲ ثانیه یک HTTP می‌زد؛ حتی وقتی هیچ رتبه‌ای عوض
+  // نشده بود، هر بینندهٔ بازِ صفحه بی‌وقفه به سرور فشار می‌آورد و تازه‌شدن
+  // هم تا ۱۲ ثانیه تأخیر داشت. حالا سرور فقط وقتی جدول واقعاً تغییر می‌کند
+  // (پایان بازی، ثبت امتیاز/سکه) رویدادِ `leaderboard:update` را پخش
+  // می‌کند و کلاینت همان لحظه دوباره `/api/league/current` را می‌خواند.
+  //
+  // سیگنال داده ندارد؛ کلاینت خودش مسیر را می‌زند چون آن پاسخ رتبهٔ شخصیِ
+  // بیننده (myEntry) را هم دارد و منطقِ رتبه‌بندی یک‌جا روی سرور می‌ماند.
+  //
+  // تورِ ایمنی (نه pollِ زمانی): وقتی تبِ مرورگر دوباره دیده می‌شود یا
+  // سوکت بعد از قطعی وصل می‌شود، یک‌بار تازه می‌کنیم تا رکابی که هنگامِ
+  // قطعی از دست رفته باشد جا نماند. سوکت اختیاری است؛ اگر وصل نشد جدول
+  // همان دادهٔ بارگذاری‌شده را نشان می‌دهد و خطا هم نمی‌دهد.
   useEffect(() => {
-    if (tab !== 'table') return;
-    const id = setInterval(() => { load().catch(()=>{}); }, 12000);
-    return () => clearInterval(id);
-  }, [tab, load]);
+    if (tab !== 'table' || !token) return;
+    let socket = null;
+    try {
+      socket = io(API, {
+        auth: { token }, transports: ['websocket', 'polling'],
+        forceNew: true, reconnection: true,
+      });
+      const refresh = () => state.reload().catch(() => {});
+      socket.on('leaderboard:update', refresh);
+      // اتصالِ تازه = از این لحظه به‌بعد سیگنال‌ها می‌رسند؛ یک‌بار هم حالا
+      // بخوان تا تغییراتی که هنگامِ قطعی رخ داده تازه شوند.
+      socket.on('connect', refresh);
+    } catch { /* سوکت اختیاری است */ }
+
+    const onVisible = () => { if (document.visibilityState === 'visible') state.reload().catch(() => {}); };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      try {
+        socket?.off('leaderboard:update');
+        socket?.off('connect');
+        socket?.disconnect();
+      } catch { /* noop */ }
+    };
+  }, [tab, token, state.reload]);
 
   if (tab === 'clubs') {
     return (

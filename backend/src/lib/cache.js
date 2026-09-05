@@ -79,4 +79,37 @@ async function cacheDel(key) {
   memDel(key);
 }
 
-module.exports = { cacheGet, cacheSet, cacheDel, _shared: shared };
+/**
+ * حذفِ همهٔ کلیدهایی که با یک پیشوند شروع می‌شوند (مثلاً `lb:league:`).
+ *
+ * چرا لازم است: لیدربوردِ لیگ با کلیدهای متفاوت کش می‌شود
+ * (`lb:league:current:100`، `lb:league:<seasonId>:...` و …). وقتی رتبه‌ها
+ * عوض می‌شوند (پایان بازی، ثبت امتیاز) باید **همه‌شان** یک‌جا بی‌اعتبار
+ * شوند تا بیننده دادهٔ کهنه نبیند؛ تازه‌بودنِ جدول برای کاربر مهم است و
+ * TTLِ ۸ ثانیه اینجا کندیِ محسوس است.
+ *
+ * روی Redis از SCAN (نه KEYS) استفاده می‌شود که مسدودکننده نیست؛ روی
+ * فال‌بکِ حافظه‌ای هم Map پیمایش می‌شود. هر خطا بی‌صدا رد می‌شود —
+ * بدترین حالت، کلید تا انقضای TTL می‌ماند.
+ */
+async function cacheDelPrefix(prefix) {
+  const c = shared();
+  if (c) {
+    try {
+      let cursor = '0';
+      const keys = [];
+      do {
+        const [next, batch] = await c.scan(cursor, 'MATCH', `${prefix}*`, 'COUNT', 200);
+        cursor = next;
+        for (const k of batch) keys.push(k);
+      } while (cursor !== '0');
+      if (keys.length) await c.del(...keys);
+    } catch { /* بی‌کش — TTL خودش می‌گیرد */ }
+    return;
+  }
+  for (const k of Array.from(mem.keys())) {
+    if (k.startsWith(prefix)) mem.delete(k);
+  }
+}
+
+module.exports = { cacheGet, cacheSet, cacheDel, cacheDelPrefix, _shared: shared };

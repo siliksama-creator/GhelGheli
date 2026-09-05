@@ -71,6 +71,9 @@ const withdrawalService = require('./services/withdrawalService');
 const points = require('./services/pointService');
 const analytics = require('./services/analyticsService');
 const { createPresenceService } = require('./services/presenceService');
+// سیگنالِ «لیدربورد لیگ عوض شد»: کش را بی‌اعتبار و رویدادِ سوکت را پخش
+// می‌کند تا جدولِ لیگ به‌جای poll ثابت، فقط هنگامِ تغییر تازه شود.
+const leaderboardSignal = require('./services/leaderboardSignal');
 
 // Fail fast in production if the JWT secret was never configured — running
 // with the 'dev-secret' fallback would let anyone forge valid user/admin
@@ -793,6 +796,8 @@ app.post('/api/games/tap/progress', auth, tapBatchLimiter.mw, asyncHandler(async
         league: false,
       });
       await addLeaguePoints(client, userId, points);
+      // رتبه‌های لیگ عوض شد؛ جدولِ بیننده‌ها بی‌درنگ تازه شود (نه با poll).
+      leaderboardSignal.leaderboardChanged();
       // کمیسیونِ امتیازیِ ۵٪ به معرف — «بازی ضربه‌زنِ دوستان».
       //
       // بدونِ شرط، برخلافِ مسیرِ کارت: بازیِ ضربه‌زن هیچ‌وقت پولِ نقد
@@ -1652,6 +1657,8 @@ app.post('/api/wheel/spin', auth, wheelLimiter.mw, asyncHandler(async (req, res)
         league: false,
       });
       await addLeaguePoints(client, userId, amount);
+      // امتیازِ لیگ عوض شد؛ جدولِ بیننده‌ها بی‌درنگ تازه شود.
+      leaderboardSignal.leaderboardChanged();
     },
   });
 
@@ -2719,6 +2726,9 @@ io.use(async (socket, next) => {
   } catch(e){ next(new Error('unauthorized')); }
 });
 presence.attach(io);
+// همان io به سیگنالِ لیدربورد تزریق می‌شود تا سرویس‌های دامنه (که پایین‌تر
+// از io ساخته می‌شوند) بتوانند بدونِ وابستگیِ مستقیم پخش کنند.
+leaderboardSignal.attach(io);
 // کلید = شناسهٔ کاربر، مقدار = زمانِ ۲۰ پیامِ آخر در پنجرهٔ یک‌دقیقه‌ای.
 // این Map قبلاً فقط set می‌شد و هرگز پاک نمی‌شد: هر کاربری که یک‌بار در طول
 // عمرِ پروسه چت می‌کرد، برای همیشه یک ورودی نگه می‌داشت. با انتشار روی
