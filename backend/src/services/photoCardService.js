@@ -38,6 +38,13 @@ const referralService = require('./referralService');
 const pointLedger = require('./pointService');
 const notificationService = require('./notificationService');
 
+// کارتِ دارای جایزهٔ نقدی: اگر تصمیم خودکاری بخواهد نوعِ کارت را عوض کند
+// (اصلاحِ کدِ جابه‌جاشدهٔ شرکت)، هرگز روی کارت نقدیِ بدونِ تأییدِ ادمین
+// انجام نمی‌شود. این تابع با کش یک‌روزهٔ شناسهٔ کارت‌های نقدی نگه داشته
+// می‌شود، ولی چون تابع تصمیم **خالص** است، نتیجهٔ «آیا کارت نقدی است؟» از
+// طریق ورودی `isCashType` تزریق می‌شود و خود تابع I/O ندارد.
+// (این ثابت فقط مستندسازیِ مرز است؛ منطق در پایین.)
+
 /**
  * کد را به شکل متعارف در می‌آورد.
  *
@@ -499,9 +506,13 @@ const FREE_ACCEPT_SCORE = 0.40;
  * @param {boolean} a.hasReference    آیا طرحِ فعالی برای `expectedTypeId` هست؟
  * @param {number}  a.boundThreshold  آستانهٔ نرم برای کدِ نام‌دار (۲۰٪)
  * @param {number}  a.freeThreshold   آستانهٔ کدِ بی‌نام (۴۰٪)
- * @returns {{ action, cardTypeId, design, path, reason }}
+ * @param {object}  [a.identity]      خروجی `cardIdentity.rankIdentity`
+ *     (نام‌خوانِ واژه‌نامه + بردارِ عصبی). اگر نباشد رفتار قدیمی بدون تغییر است.
+ * @param {Function}[a.isCashType]    (cardTypeId)=>boolean — کارت جایزهٔ نقدی
+ *     دارد؟ اصلاحِ خودکارِ نوع فقط روی کارت غیرنقدی مجاز است.
+ * @returns {{ action, cardTypeId, design, path, reason, identityType }}
  *   action = 'approve' | 'review'
- *   path   = 'code_bound' | 'image_match'
+ *   path   = 'code_bound' | 'image_match' | 'identity_override'
  */
 function decideSubmission({
   expectedTypeId = null,
@@ -509,9 +520,63 @@ function decideSubmission({
   hasReference = true,
   boundThreshold = BOUND_ACCEPT_SCORE,
   freeThreshold = FREE_ACCEPT_SCORE,
+  identity = null,
+  isCashType = () => false,
 } = {}) {
   const best = match?.design || null;
   const score = Number(match?.score || 0);
+
+  // ═════════════════════════════════════════════════════════════════════
+  // لایهٔ هویت (نام‌خوانِ واژه‌نامه / بردارِ عصبی) — قوی‌ترین سیگنالِ
+  // «این کیست؟»، مستقل از رنگ و قالب.
+  //
+  // سه حالت را می‌سازد:
+  //   • هویت قاطع == کد        → تأیید ساده (بدون توجه به شباهت تصویریِ کم).
+  //   • هویت قاطع ≠ کد و کارت غیرنقدی → **اصلاحِ خودکار**: کارتی که عکسش
+  //     با قاطعیت دیده شده ثبت می‌شود (سناریوی کدِ هالند روی کارتِ رودری).
+  //   • هویت قاطع ≠ کد و کارت نقدی → صف با علت code_mismatch_suspected تا
+  //     پول بدونِ تأیید انسان جابه‌جا نشود؛ داشبوردِ کدهای مشکوک گزارشش می‌دهد.
+  //
+  // ⚠️ فقط وقتی هویت **قاطع** است (`found`) این منطق فعال می‌شود؛ حالتِ
+  //    مبهم به مسیرهای قدیمی سپرده می‌شود تا هیچ دقتی از دست نرود.
+  if (identity?.found && identity.design) {
+    const idTypeId = identity.design.card_type_id;
+    const isCash = !!isCashType(idTypeId);
+
+    if (!expectedTypeId || expectedTypeId === idTypeId) {
+      // هویت با کد یکی است (یا کد بی‌نام است): قوی‌ترین حالتِ تأیید خودکار.
+      return {
+        action: 'approve',
+        cardTypeId: idTypeId,
+        design: identity.design,
+        path: expectedTypeId ? 'code_bound' : 'identity_override',
+        reason: null,
+        identityType: identity.byText ? 'name' : (identity.byEmbedding ? 'embedding' : 'image'),
+      };
+    }
+
+    // هویت قاطعانه کارتِ **دیگری** را نشان می‌دهد.
+    if (!isCash) {
+      // کارت امتیازیِ غیرنقدی: با اطمینانِ بالا همان کارت را ثبت کن.
+      return {
+        action: 'approve',
+        cardTypeId: idTypeId,
+        design: identity.design,
+        path: 'identity_override',
+        reason: 'code_auto_corrected',
+        identityType: identity.byText ? 'name' : (identity.byEmbedding ? 'embedding' : 'image'),
+      };
+    }
+    // کارت نقدی: امن‌ترین راه = صف، با پیشنهادِ قاطع برای ادمین.
+    return {
+      action: 'review',
+      cardTypeId: expectedTypeId,
+      design: identity.design,
+      path: 'code_bound',
+      reason: 'code_mismatch_suspected',
+      identityType: identity.byText ? 'name' : (identity.byEmbedding ? 'embedding' : 'image'),
+    };
+  }
 
   // ── مسیرِ ۱: کد از پیش گره خورده ──
   if (expectedTypeId) {

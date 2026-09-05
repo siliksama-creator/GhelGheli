@@ -21,6 +21,8 @@ const rateLimit = require('express-rate-limit');
 
 const fpEngine = require('../services/imageFingerprint');
 const photoCards = require('../services/photoCardService');
+const cardIdentity = require('../services/cardIdentity');
+const imageQuality = require('../services/imageQuality');
 const cardDuel = require('../services/cardDuelService');
 const cardCrop = require('../services/cardCrop');
 const lockout = require('../services/photoCardLockout');
@@ -131,6 +133,13 @@ module.exports = function createPhotoCardRoutes(deps) {
     //    فقط به تصویر تکیه می‌کند — همان باگی که دو بار با texSig و
     //    rgbSig رخ داد. نگهبانِ `testFingerprintWiring` می‌گیردش.
     textTokens: Array.isArray(r.text_tokens) ? r.text_tokens : [],
+    // واژه‌نامهٔ بازیکن (از card_types) برای «نام‌خوان» و شمارهٔ پیراهن.
+    playerLexemes: Array.isArray(r.player_lexemes) ? r.player_lexemes : [],
+    playerNumber: r.player_number || null,
+    // بردارِ عصبیِ فاز ۲ (اگر برای این طرح ساخته شده باشد).
+    embedding: Array.isArray(r.embedding) ? r.embedding
+      : (r.embedding && r.embedding.v ? r.embedding.v : null),
+    cashAmount: Number(r.cash_amount || 0),
     width: r.width,
     height: r.height,
   });
@@ -389,6 +398,49 @@ module.exports = function createPhotoCardRoutes(deps) {
     router, pool, adminAuth, requireRole, asyncHandler, audit,
     validateUuid, UUID_RE, photoCards, MAX_BATCH,
   });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // داشبوردِ «کدهای مشکوکِ شرکت» (فاز ۴) — تشخیصِ دسته‌ایِ برچسبِ غلطِ کد
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // سناریو: شرکت یک سریِ کد را روی کارتِ اشتباه چاپ کرده (مثلاً کدِ «هالند»
+  // روی کارتِ «رودری»). اگر چند ثبتِ مختلف، کدی که انتظارش A بود را با
+  // تصویری که موتورِ هویت به‌صورت B می‌بیند بفرستند، این یک تصادف نیست —
+  // آن سریِ کد دسته‌ای اشتباه برچسب خورده. این گزارش آن را دسته‌ای نشان
+  // می‌دهد و تعداد آستانه (پیش‌فرض ۳) دارد تا تصادفِ تک‌موردی سروصدا نسازد.
+  router.get('/admin/photo-cards/code-mismatch', adminAuth,
+    asyncHandler(async (req, res) => {
+      const minCount = Math.max(1, Math.min(50, parseInt(req.query.min, 10) || 3));
+      const { rows } = await pool.query(
+        `WITH coded AS (
+           SELECT c.expected_card_type_id AS expected_type,
+                  d.card_type_id          AS seen_type,
+                  s.id, s.created_at,
+                  u.nickname, u.mobile, c.code
+             FROM photo_card_submissions s
+             JOIN photo_card_codes c ON c.id = s.code_id
+             JOIN photo_card_designs d ON d.id = s.matched_design_id
+             JOIN users u ON u.id = s.user_id
+            WHERE c.expected_card_type_id IS NOT NULL
+              AND d.card_type_id IS NOT NULL
+              AND c.expected_card_type_id <> d.card_type_id
+         )
+         SELECT expected_type, seen_type,
+                count(*)::int AS count,
+                max(created_at) AS last_seen,
+                te.name AS expected_name,
+                tn.name AS seen_name
+           FROM coded
+           JOIN card_types te ON te.id = coded.expected_type
+           JOIN card_types tn ON tn.id = coded.seen_type
+          GROUP BY expected_type, seen_type, te.name, tn.name
+         HAVING count(*) >= $1
+          ORDER BY count(*) DESC, max(created_at) DESC
+          LIMIT 100`,
+        [minCount],
+      );
+      res.json({ mismatches: rows, minCount });
+    }));
 
   router.get('/admin/photo-cards/submissions', adminAuth, asyncHandler(async (req, res) => {
     const status = ['pending', 'approved', 'rejected'].includes(req.query.status)
@@ -759,10 +811,21 @@ module.exports = function createPhotoCardRoutes(deps) {
         const designsRes = await pool.query(
           `SELECT d.id, d.card_type_id, d.image_url, d.dhash, d.phash,
                   d.color_sig, d.tex_sig, d.luma_sig, d.rgb_sig,
-                  d.text_tokens, d.width, d.height
+                  d.text_tokens, d.width, d.height,
+                  d.embedding,
+                  t.player_lexemes, t.player_number,
+                  COALESCE(t.cash_amount,0) AS cash_amount
              FROM photo_card_designs d
              JOIN card_types t ON t.id=d.card_type_id
             WHERE d.is_active=true AND t.is_active=true`,
+        );
+
+        // کارت‌های نقدی: تصمیمِ اصلاحِ خودکارِ نوع هرگز روی پول اعمال
+        // نمی‌شود (به صفِ ادمین می‌رود). این مجموعه از کوئریِ بالا می‌آید.
+        const cashTypeIds = new Set(
+          designsRes.rows
+            .filter(r => Number(r.cash_amount || 0) > 0)
+            .map(r => r.card_type_id),
         );
 
         // ── گامِ ۲: تصویر ──
@@ -819,9 +882,61 @@ module.exports = function createPhotoCardRoutes(deps) {
               + 'عکس بگیرید و مطمئن شوید آپلود کامل انجام می‌شود.',
           });
         }
+
+        // ═════════════════════════════════════════════════════════════
+        // گیتِ کیفیت عکس (فاز ۱) — روی نسخهٔ بریده‌شدهٔ کارت
+        // ═════════════════════════════════════════════════════════════
+        //
+        // اگر عکس آن‌قدر تار/تاریک/تخت است که حتی «کارتی بودن» هم قطعی
+        // نیست، همان لحظه به کاربر برمی‌گردد تا دوباره عکس بگیرد — به‌جای
+        // آنکه پرونده به صف برود و هم کد رزرو شود هم کاربر منتظر بماند.
+        //
+        // ⚠️ فقط تصویرِ فاجعه‌بار برگردانده می‌شود؛ عکسِ متوسط باید رد شود
+        //    چون موتور و لایهٔ هویت برای همان طراحی شده‌اند. `usable=false`
+        //    آستانهٔ محافظه‌کارانه دارد. این گیت کد را مصرف/رزرو نمی‌کند و
+        //    شمارندهٔ قفل را هم بالا نمی‌برد (تقصیرِ کاربر نیست).
+        try {
+          const q = await imageQuality.assess(workBuf);
+          if (!q.usable) {
+            return res.status(422).json({
+              status: 'poor_quality',
+              quality: { blur: q.blur, mean: q.mean, contrast: q.contrast, reasons: q.reasons },
+              message: imageQuality.qualityMessage(q.reasons)
+                || 'کیفیت عکس برای تشخیص کافی نیست. لطفاً عکس واضح‌تری بگیرید.',
+            });
+          }
+        } catch (e) {
+          // سنجهٔ کیفیت هرگز نباید ثبت را بشکند؛ صرفاً نادیده گرفته می‌شود.
+          console.warn('[photo-cards] سنجش کیفیت شکست خورد (نادیده):', e.message);
+        }
+        const designFps = designsRes.rows.map(rowToFp);
         const match = designsRes.rows.length
-          ? fpEngine.matchAgainst(queryFp, designsRes.rows.map(rowToFp))
+          ? fpEngine.matchAgainst(queryFp, designFps)
           : { verdict: 'reject', design: null, score: 0, margin: 0 };
+
+        // ═════════════════════════════════════════════════════════════
+        // لایهٔ هویت (فاز ۰/۲): نام‌خوانِ واژه‌نامه + بردارِ عصبی.
+        //
+        // قوی‌ترین سیگنالِ «این کیست؟» است و مستقل از رنگ/قالب کار می‌کند.
+        // بردارِ عصبیِ کاربر اگر کلاینت فرستاده باشد (مدلِ روی‌گوشی در فاز ۲)
+        // از `req.body.embedding` خوانده می‌شود؛ حالا اغلب فقط متنِ OCR است.
+        // ═════════════════════════════════════════════════════════════
+        let queryEmbedding = null;
+        try {
+          if (req.body.embedding) {
+            const parsed = typeof req.body.embedding === 'string'
+              ? JSON.parse(req.body.embedding) : req.body.embedding;
+            if (Array.isArray(parsed) && parsed.every(n => typeof n === 'number')) {
+              queryEmbedding = parsed;
+            }
+          }
+        } catch { /* embedding خراب → نادیده، فقط متن/تصویر */ }
+
+        const identity = designsRes.rows.length
+          ? cardIdentity.rankIdentity(
+              { textTokens: queryFp.textTokens, embedding: queryEmbedding },
+              designFps)
+          : null;
 
         // ═══════════════════════════════════════════════════════════════
         // چرا هیچ محدودیتی روی «عکسِ تکراری» وجود ندارد
@@ -930,6 +1045,8 @@ module.exports = function createPhotoCardRoutes(deps) {
           hasReference,
           boundThreshold: th.boundAcceptScore,
           freeThreshold: th.freeAcceptScore,
+          identity,
+          isCashType: (id) => cashTypeIds.has(id),
         });
 
         if (decision.action !== 'approve') {
@@ -987,7 +1104,7 @@ module.exports = function createPhotoCardRoutes(deps) {
             // بدون بازهٔ زمانی، کاربر نمی‌داند منتظر بماند یا دوباره
             // تلاش کند — و معمولاً دوباره تلاش می‌کند، که هم کدِ بعدی
             // را می‌سوزاند و هم صف را شلوغ می‌کند.
-            message: reason === 'type_mismatch'
+            message: (reason === 'type_mismatch' || reason === 'code_mismatch_suspected')
               // ── چرا این پیام صریح است ──
               // کد و عکس دو کارتِ متفاوت را نشان می‌دهند. محتمل‌ترین
               // توضیح اشتباهِ ساده است: کاربر چند کارت جلویش دارد و
