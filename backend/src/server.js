@@ -14,8 +14,12 @@ const rateLimit = require('express-rate-limit');
 // پروسه سطلِ جدا دارد و سقف عملاً «سقف × تعدادِ پروسه» می‌شود (دورِ ردیس
 // توضیح کاملش را در rateLimitStore.js داده). وقتی REDIS_URL نباشد، null
 // برمی‌گردد و express-rate-limit به حافظهٔ خودش می‌افتد (رفتارِ تک‌پروسه).
-const { redisRateLimitStore } = require('./lib/rateLimitStore');
-const sharedRateStore = redisRateLimitStore();
+const { makeRateStore } = require('./lib/rateLimitStore');
+// هر limiter باید نمونهٔ Store اختصاصی خودش را بگیرد (express-rate-limit نسخهٔ ۷
+// اشتراکِ یک نمونه را با ERR_ERL_STORE_REUSE رد می‌کند). این کمکی برای آن
+// limiter یک Store می‌سازد و اگر Redis نبود null می‌دهد تا همان spread بی‌اثر
+// شود و limiter به storeِ حافظه‌ای پیش‌فرض برگردد.
+const rlStore = prefix => { const s = makeRateStore(prefix); return s ? { store: s } : {}; };
 // کشِ مشترک با TTL (ردیس اگر باشد، وگرنه حافظهٔ پروسه) برای مسیرهای داغ.
 const { cacheGet, cacheSet } = require('./lib/cache');
 const cron = require('node-cron');
@@ -562,8 +566,9 @@ function opsRateLimit(name, defaults, extra = {}) {
       limit: rl.limit,
       standardHeaders: true,
       legacyHeaders: false,
-  ...(sharedRateStore ? { store: sharedRateStore } : {}),
-      ...(sharedRateStore ? { store: sharedRateStore } : {}),
+      // نمونهٔ Store اختصاصیِ همین limiter (با پیشوندِ نامش)، تا شمارنده‌ها
+      // هم در Redis مشترکِ دو پروسه باشند و هم به limiter دیگری نخورند.
+      ...rlStore(`ops:${name}`),
       ...extra,
     });
   };
@@ -578,7 +583,7 @@ function opsRateLimit(name, defaults, extra = {}) {
 // همهٔ limiterهای زیر روی مسیرهای احراز هویت‌شده‌اند، پس همه `perUserKey`
 // می‌گیرند. (فهرست کامل در تستِ testRateLimit.js نگهبانی می‌شود.)
 const chatLimiter = opsRateLimit('chat', { windowMs: 60_000, limit: 20 }, { keyGenerator: perUserKey });
-const otpLimiter = rateLimit({ windowMs: 10 * 60_000, limit: 5, standardHeaders: true, legacyHeaders: false, ...(sharedRateStore ? { store: sharedRateStore } : {}) });
+const otpLimiter = rateLimit({ windowMs: 10 * 60_000, limit: 5, standardHeaders: true, legacyHeaders: false, ...rlStore('otp') });
 // Brute-force protection for the 6-digit OTP code itself. request-otp only
 // throttled how many codes could be requested — verify-otp and the password
 // reset endpoint (which also consumes an OTP) had NO limiter at all, so a
@@ -590,7 +595,7 @@ const otpVerifyLimiter = rateLimit({
   limit: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  ...(sharedRateStore ? { store: sharedRateStore } : {}),
+  ...rlStore('otpverify'),
   keyGenerator: (req) => `${req.ip}:${normalizeMobile(req.body?.mobile)}`,
   message: { message: 'تعداد تلاش زیاد است؛ کمی بعد دوباره امتحان کنید' },
 });
@@ -601,7 +606,7 @@ const adminLoginLimiter = rateLimit({
   limit: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  ...(sharedRateStore ? { store: sharedRateStore } : {}),
+  ...rlStore('adminlogin'),
   keyGenerator: (req) => `${req.ip}:${String(req.body?.username || '').toLowerCase()}`,
   message: { message: 'تعداد تلاش ورود زیاد است؛ چند دقیقه دیگر دوباره امتحان کنید' },
 });
@@ -611,7 +616,7 @@ const userLoginLimiter = rateLimit({
   limit: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  ...(sharedRateStore ? { store: sharedRateStore } : {}),
+  ...rlStore('userlogin'),
   keyGenerator: (req) => `${req.ip}:${normalizeMobile(req.body?.mobile)}`,
   message: { message: 'تعداد تلاش ورود زیاد است؛ چند دقیقه دیگر دوباره امتحان کنید' },
 });
@@ -620,7 +625,7 @@ const loginStreakLimiter = rateLimit({
   limit: 8,
   standardHeaders: true,
   legacyHeaders: false,
-  ...(sharedRateStore ? { store: sharedRateStore } : {}),
+  ...rlStore('loginstreak'),
   keyGenerator: perUserKey,
   message: { message: 'کمی صبر کن و دوباره تلاش کن' },
 });
@@ -1150,7 +1155,7 @@ const changePasswordLimiter = rateLimit({
   limit: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  ...(sharedRateStore ? { store: sharedRateStore } : {}),
+  ...rlStore('changepw'),
   keyGenerator: perUserKey,
   message: { message: 'تعداد تلاش‌ها زیاد است؛ چند دقیقه دیگر دوباره امتحان کنید' },
 });
@@ -1522,7 +1527,7 @@ const bankCardLimiter = rateLimit({
   limit: 15,
   standardHeaders: true,
   legacyHeaders: false,
-  ...(sharedRateStore ? { store: sharedRateStore } : {}),
+  ...rlStore('bankcard'),
   keyGenerator: perUserKey,
   message: { message: 'تعداد تلاش برای ثبت کارت زیاد است؛ کمی بعد دوباره تلاش کنید' },
 });
@@ -2159,7 +2164,7 @@ const uploadLimiter = rateLimit({
   limit: 40,
   standardHeaders: true,
   legacyHeaders: false,
-  ...(sharedRateStore ? { store: sharedRateStore } : {}),
+  ...rlStore('upload'),
   keyGenerator: perUserKey, // CGNAT — توضیح کامل کنار تعریفِ perUserKey
   message: { message: 'تعداد آپلود زیاد است؛ کمی بعد دوباره تلاش کنید' },
 });
