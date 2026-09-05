@@ -28,7 +28,22 @@ git pull --ff-only
 
 cd "$BACK"
 log "۲) وابستگی‌ها"
-sudo -u ghelgheli npm install --omit=dev --no-audit --no-fund
+# ── مقاوم‌سازی در برابرِ مالکیتِ root ─────────────────────────────────
+# اجرای تست‌های E2E (که به devDependencies مثل socket.io-client نیاز
+# دارند) گاهی با `npm install` دستیِ root انجام می‌شود و مالکیتِ
+# node_modules و کش npm را به root می‌برد؛ دیپلویِ بعدی که به‌عنوانِ
+# کاربرِ ghelgheli اجرا می‌شود آن‌وقت با «operation not permitted» می‌میرد.
+# پس پیش از نصب، مالکیتِ همان چیزهایی که npm می‌نویسد یک‌دست می‌شود؛ این
+# عملیات idempotent است و روی دیپلویِ سالم هیچ کاری نمی‌کند.
+chown -R ghelgheli:ghelgheli \
+  "$BACK/node_modules" \
+  "$BACK/package.json" "$BACK/package-lock.json" \
+  /home/ghelgheli/.npm 2>/dev/null || true
+sudo -u ghelgheli npm install --omit=dev --no-audit --no-fund \
+  || { echo "::: نصب به‌عنوان ghelgheli نشد؛ پس از اصلاحِ مالکیت یک‌بار دیگر" \
+       "به‌عنوانِ root نصب و بلافاصله مالکیت به ghelgheli برگردانده می‌شود." >&2; \
+       npm install --omit=dev --no-audit --no-fund \
+       && chown -R ghelgheli:ghelgheli "$BACK/node_modules" "$BACK/package.json" "$BACK/package-lock.json"; }
 
 log "۳) مایگریشنِ استیجینگ"
 # DATABASE_URL از .env.staging می‌آید، نه تولید.

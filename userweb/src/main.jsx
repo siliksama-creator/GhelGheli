@@ -203,7 +203,10 @@ function App() {
         // خودِ لینک را از `ops_limits.bazaarApiBase` + `app.bazaarPackage`
         // می‌سازد و اینجا فقط مصرف می‌کنیم.
         const url = String(app?.updateUrl?.web || app?.updateUrl?.android || '');
-        const current = String(import.meta.env.VITE_APP_RELEASE || '1.1.17');
+        // نسخهٔ پایه باید با اپ اندروید هم‌تراز باشد (pubspec version) تا
+        // مقایسهٔ اجباریِ به‌روزرسانی و گزارشِ نسخه بین دو پلتفرم یکی بماند؛
+        // نسخهٔ واقعیِ دیپلوی از طریق VITE_APP_RELEASE (شِمای git) تزریق می‌شود.
+        const current = String(import.meta.env.VITE_APP_RELEASE || '1.1.18');
         const lower = (a, b) => {
           const parts = (v) => String(v).split('+')[0].trim().split('.').map((x) => parseInt(x, 10));
           const as = parts(a), bs = parts(b);

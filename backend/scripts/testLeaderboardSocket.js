@@ -187,6 +187,19 @@ async function main() {
     closerViewer.on('leaderboard:update', () => { closeEvents += 1; });
     await sleep(700);
 
+    // ── آماده‌سازیِ یک جایزهٔ نقدیِ واقعی برای فازِ پرداخت ────────────
+    // جدولِ جوایز فصلِ جاری را طوری می‌گذاریم که رتبهٔ ۱ مبلغِ کوچکی
+    // (۱۰۰۰ تومان) ببرد؛ بازیکن در بالا امتیاز/سکه ثبت کرده و برندهٔ
+    // نقدی می‌شود. بعد از بستن، یک ردیفِ league_payouts منتظرِ تأیید
+    // داریم تا approve-all واقعاً پول بدهد و سیگنال بفرستد.
+    const prizeRes = await req('PATCH', '/api/admin/league/current/prizes', {
+      token: adminToken,
+      body: { prizeTable: [{ rank: 1, amount: 1000 }], winnerCount: 1 },
+    });
+    ok('جدولِ جوایز نقدی برای تست ذخیره شد',
+      prizeRes.status === 200,
+      `status=${prizeRes.status} body=${JSON.stringify(prizeRes.data).slice(0, 160)}`);
+
     const closeRes = await req('POST', '/api/admin/league/close', {
       token: adminToken, body: { force: true },
     });
@@ -201,6 +214,40 @@ async function main() {
     ok('بعد از بستنِ فصل، بیننده رویدادِ leaderboard:update گرفت',
       closeEvents >= 1, `رویدادها=${closeEvents}`);
 
+    // ── فازِ تأییدِ واریزِ جوایز (approvePayouts) ─────────────────────
+    // تأیید، جایزهٔ نقدیِ برنده را به کیف‌پول واریز می‌کند و (اگر سکه
+    // ریست شود/پرداختی انجام شود) سیگنالِ لیدربورد می‌دهد. بیننده را پیش
+    // از تأیید با یک سوکتِ تازه آماده می‌کنیم تا رویدادِ پس از پرداخت را
+    // قطعی بگیریم (نه رویدادِ بستنِ فصل را).
+    const payViewer = await connect(viewer.token);
+    let payEvents = 0;
+    payViewer.emit('leaderboard:subscribe');
+    payViewer.on('leaderboard:update', () => { payEvents += 1; });
+    await sleep(700);
+
+    const payRes = await req('POST', '/api/admin/league/payouts/approve-all', {
+      token: adminToken, body: { reason: 'تست E2E تأیید واریز' },
+    });
+    ok('تأییدِ واریزِ جوایز از مسیر ادمین اجرا شد',
+      payRes.status === 200,
+      `status=${payRes.status} body=${JSON.stringify(payRes.data).slice(0, 160)}`);
+
+    // اگر پرداختی واقعی انجام شد، سیگنال باید آمده باشد.
+    const paid = Number(payRes.data?.paid || 0);
+    if (paid > 0) {
+      const pl = Date.now() + 8000;
+      while (Date.now() < pl && payEvents === 0) await sleep(150);
+      ok(`تأییدِ واریز (${paid} جایزه) سیگنالِ leaderboard:update داد`,
+        payEvents >= 1, `رویدادها=${payEvents}`);
+    } else {
+      // پرداختی نبود (مثلاً برندهٔ نقدی در این اجرا ساخته نشد) — خودِ
+      // پاسخ موفق است ولی قاعدهٔ «پرداخت ⇒ سیگنال» قابل‌سنجش نیست؛ این را
+      // به‌صرافت گزارش می‌دهیم نه اینکه بی‌صدا سبز شویم.
+      ok('تأییدِ واریز حداقل یک پرداخت واقعی داشت (برای سنجش سیگنال)',
+        false, `paid=${paid} — جایزهٔ نقدیِ قابل‌پرداخت ساخته نشد؟`);
+    }
+
+    try { payViewer.disconnect(); } catch { /* noop */ }
     try { closerViewer.disconnect(); } catch { /* noop */ }
   }
 
