@@ -272,6 +272,12 @@ export function PhotoCardsPage({ request }) {
         embeddingFront = await embMod.embedCardImage(file);
         if (fileBack) embeddingBack = await embMod.embedCardImage(fileBack);
       } catch { /* اختیاری */ }
+      // فاز ۳ — حالت سایه: بردار چهرهٔ بازیکن فقط برای سمت «رو».
+      let faceEmbeddingFront = null;
+      try {
+        const faceMod = await import('../lib/faceEmbedding.js');
+        faceEmbeddingFront = await faceMod.embedFaceImage(file);
+      } catch { /* چهره اختیاری */ }
 
       const r = await request.postForm('/api/admin/photo-cards/designs', {
         file,
@@ -282,6 +288,7 @@ export function PhotoCardsPage({ request }) {
           name: name.trim(),
           ...(embeddingFront ? { embeddingFront: JSON.stringify(embeddingFront) } : {}),
           ...(embeddingBack ? { embeddingBack: JSON.stringify(embeddingBack) } : {}),
+          ...(faceEmbeddingFront ? { faceEmbeddingFront: JSON.stringify(faceEmbeddingFront) } : {}),
           pointValue: points || 0,
           cashAmount: cash || 0,
           duelAttack: duel.attack || 50,

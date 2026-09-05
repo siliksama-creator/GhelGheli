@@ -249,6 +249,12 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
         const emb = await embedCardImage(file);
         if (emb && emb.length) fd.append('embedding', JSON.stringify(emb));
       } catch { /* بردار اختیاری است */ }
+      // فاز ۳ — حالت سایه: بردارِ چهرهٔ بازیکن (اختیاری، شکست بی‌صدا).
+      try {
+        const { embedFaceImage } = await import('../lib/faceEmbedding.js');
+        const fe = await embedFaceImage(file);
+        if (fe && fe.length) fd.append('faceEmbedding', JSON.stringify(fe));
+      } catch { /* چهره اختیاری است */ }
       // Content-Type دستی ست نمی‌شود: مرورگر باید boundary را خودش
       // اضافه کند، وگرنه سرور بدنه را خالی می‌بیند.
       const r = await fetch(`${API}/api/photo-cards/submit`, {
