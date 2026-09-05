@@ -52,10 +52,10 @@ async function main() {
   const svc = require(svcPath);
 
   // ── ۱. ثابت‌ها همان چیزی‌اند که مالک خواست ──
-  check('سقف پیش‌فرض روی ۲۰۰ پیام تنظیم است', () => {
+  check('سقف پیش‌فرض روی ۵۰ پیام تنظیم است', () => {
     // سقف حالا از ops_limits می‌آید (قابل تنظیم از پنل)؛ بدون تنظیمِ
-    // ذخیره‌شده، پیش‌فرض باید دقیقاً ثابتِ قبلیِ کد باشد.
-    assert.strictEqual(svc.keepLimit(), 200);
+    // ذخیره‌شده، پیش‌فرض باید دقیقاً خواستهٔ مالک باشد: ۵۰.
+    assert.strictEqual(svc.keepLimit(), 50);
   });
 
   check('فاصلهٔ پاک‌سازی عددی مثبت و معقول است', () => {
@@ -72,19 +72,21 @@ async function main() {
     assert.strictEqual(c.calls.length, 1, 'باید فقط یک کوئری بزند');
     const { sql, params } = c.calls[0];
     assert.ok(/DELETE\s+FROM\s+chat_messages/i.test(sql), 'باید DELETE باشد');
-    assert.ok(/ORDER BY\s+sent_at\s+DESC/i.test(sql), 'باید بر اساس زمان مرتب کند');
-    assert.ok(/OFFSET\s+\$1/i.test(sql), 'باید از OFFSET پارامتری استفاده کند');
-    assert.deepStrictEqual(params, [200], 'پارامتر باید ۲۰۰ باشد');
+    // حذف بر اساس «مرزِ» پیامِ پنجاهم (LIMIT 1 OFFSET $1 در زیرکوئری)
+    // نه OFFSET روی کلِ مرتب‌شده — تا روی جدولِ بزرگ ایندکسی بماند.
+    assert.ok(/LIMIT\s+1\s+OFFSET\s+\$1/i.test(sql),
+      'مرز باید با LIMIT 1 OFFSET پارامتری تعیین شود');
+    assert.deepStrictEqual(params, [50], 'پارامتر سقف باید ۵۰ باشد');
     passed += 1;
-    console.log('  ✓ کوئریِ حذف پارامتری و درست است');
+    console.log('  ✓ کوئریِ حذف مبتنی بر مرزِ ایندکسی و درست است');
   }
 
   // مرتب‌سازیِ قطعی: بدونِ tie-breaker، دو پیام با `sent_at` یکسان
-  // می‌توانند هر بار جای‌به‌جا شوند و OFFSET نتیجهٔ ناپایدار بدهد.
+  // می‌توانند هر بار جای‌به‌جا شوند و مرز نتیجهٔ ناپایدار بدهد.
   {
     const c = fakeClient();
     await svc.pruneChatHistory(c);
-    assert.ok(/ORDER BY\s+sent_at\s+DESC\s*,\s*id\s+DESC/i.test(c.calls[0].sql),
+    assert.ok(/ORDER BY\s+(?:c\.)?sent_at\s+DESC\s*,\s*(?:c\.)?id\s+DESC/i.test(c.calls[0].sql),
       'مرتب‌سازی باید با id هم شکسته شود تا قطعی باشد');
     passed += 1;
     console.log('  ✓ مرتب‌سازی قطعی است (tie-breaker روی id)');

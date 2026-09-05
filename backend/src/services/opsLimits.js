@@ -27,7 +27,10 @@ const opsConfig = require('./opsConfig');
 const KEY = 'ops_limits';
 
 const DEFAULTS = Object.freeze({
-  chatKeepLimit: 200,
+  // سقفِ سراسریِ نگه‌داری پیام چت. خواستهٔ مالک: «بیشتر از ۵۰ پیامِ آخر
+  // ذخیره نشود — پیام‌ها آماده‌اند و چت اهمیتی ندارد». جدول همیشه حداکثر
+  // ۵۰ (+فاصلهٔ پاک‌سازی) ردیف دارد و هرگز رشد نمی‌کند.
+  chatKeepLimit: 50,
   photoLockMaxFails: 5,
   referralCommissionPercent: 5,
   referralPurchaseCommissionPercent: 5,

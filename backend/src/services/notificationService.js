@@ -137,9 +137,39 @@ async function sendTokens(tokens, title, body, data = {}) {
 }
 
 async function sendPushToAll(title, body, data = {}) {
-  const { rows } = await pool.query(
-    "SELECT fcm_token FROM users WHERE fcm_token IS NOT NULL AND fcm_token<>'' AND status='active'");
-  return sendTokens(rows.map(r => r.fcm_token), title, body, data);
+  // کلِ توکن‌ها یک‌جا خوانده نمی‌شد؛ با چند ده‌هزار کاربر، SELECT بدونِ
+  // صفحه‌بندی همه ردیف‌ها را در حافظهٔ پروسه می‌ریخت. حالا با keyset روی
+  // u.id دسته‌دسته خوانده و ارسال می‌شود.
+  const base = `SELECT u.id, u.fcm_token FROM users u
+                 WHERE u.fcm_token IS NOT NULL AND u.fcm_token<>'' AND u.status='active'`;
+  const totals = { sent: 0, failed: 0, transportErrors: 0 };
+  await forEachUserPage(base, async (rows) => {
+    const r = await sendTokens(rows.map(x => x.fcm_token), title, body, data);
+    totals.sent += r.sent || 0;
+    totals.failed += r.failed || 0;
+    totals.transportErrors += r.transportErrors || 0;
+  });
+  return { ...totals, configured: true };
+}
+
+// ── صفحه‌بندیِ keyset روی شناسهٔ کاربر ────────────────────────────────
+// حافظه را به یک صفحهٔ PUSH_PAGE_SIZE ردیفی محدود می‌کند. `base` باید
+// u.id و u.fcm_token را برگرداند و شرط‌هایش روی سطحِ بیرونی باشند تا
+// افزودنِ `AND u.id > $cursor` معتبر بماند.
+const PUSH_PAGE_SIZE = 2000;
+async function forEachUserPage(base, onPage) {
+  let cursor = null;
+  for (;;) {
+    const params = [PUSH_PAGE_SIZE];
+    let where = '';
+    if (cursor) { params.push(cursor); where = ` AND u.id > $${params.length}`; }
+    const { rows } = await pool.query(
+      `${base}${where} ORDER BY u.id LIMIT $1`, params);
+    if (!rows.length) break;
+    await onPage(rows);
+    if (rows.length < PUSH_PAGE_SIZE) break;
+    cursor = rows[rows.length - 1].id;
+  }
 }
 
 const SEGMENTS = Object.freeze([
@@ -210,25 +240,36 @@ async function sendSegmented({ segment, title, body }) {
     throw Object.assign(new Error('عنوان و متن اعلان لازم است'), { status: 400 });
   }
 
-  const { rows: users } = await pool.query(segmentSql(segment));
-  if (users.length) {
-    // یک round-trip، نه N بار INSERT. هر کاربر ردیف خودش را دارد تا read
-    // status یک نفر، اعلان دیگران را خوانده علامت نزند.
-    await pool.query(
-      `INSERT INTO notifications(user_id,type,title,body)
-       SELECT x::uuid,'segmented',$2,$3 FROM unnest($1::uuid[]) AS x`,
-      [users.map(u => u.id), cleanTitle, cleanBody]);
-  }
-  const push = await sendTokens(
-    users.map(u => u.fcm_token), cleanTitle, cleanBody,
-    { type: 'segmented', segment });
+  // صفحه‌بندیِ keyset: نه INSERT میلیون‌ها شناسه در یک آرایه، نه بارگذاریِ
+  // همهٔ توکن‌ها در حافظه. هر صفحه در یک رخدادِ یکجا نوشته و دسته‌ای push
+  // می‌شود.
+  let targetCount = 0;
+  const totals = { sent: 0, failed: 0, transportErrors: 0, configured: true };
+  await forEachUserPage(segmentSql(segment), async (rows) => {
+    targetCount += rows.length;
+    if (rows.length) {
+      // یک round-trip برای کل صفحه، نه N بار INSERT. هر کاربر ردیف خودش
+      // را دارد تا read status یک نفر، اعلان دیگران را خوانده نزند.
+      await pool.query(
+        `INSERT INTO notifications(user_id,type,title,body)
+         SELECT x::uuid,'segmented',$2,$3 FROM unnest($1::uuid[]) AS x`,
+        [rows.map(u => u.id), cleanTitle, cleanBody]);
+    }
+    const r = await sendTokens(
+      rows.map(u => u.fcm_token), cleanTitle, cleanBody,
+      { type: 'segmented', segment });
+    totals.sent += r.sent || 0;
+    totals.failed += r.failed || 0;
+    totals.transportErrors += r.transportErrors || 0;
+    if (r.configured === false) totals.configured = false;
+  });
   return {
     segment,
-    targetCount: users.length,
-    pushSent: push.sent,
-    pushFailed: push.failed,
-    pushTransportErrors: push.transportErrors || 0,
-    fcmConfigured: push.configured,
+    targetCount,
+    pushSent: totals.sent,
+    pushFailed: totals.failed,
+    pushTransportErrors: totals.transportErrors,
+    fcmConfigured: totals.configured,
   };
 }
 

@@ -111,6 +111,17 @@ jobs:
       # باگ «مرز ناظر فقط در UI» را می‌گیرد.
       - name: E2E admin role depth (observer/support/super_admin matrix)
         run: npm run test:e2e:roles
+      # تست بارِ HTTP: پرتگاهِ ظرفیت (پُرشِ ناگهانیِ p95 و سهم خطا) یک‌شبه
+      # در گذشته غافلگیرمان کرد؛ حالا روی همان سرورِ واقعیِ CI، بعد از
+      # تست‌های کارکرد، موجی از ترافیک می‌فرستیم و با آستانهٔ توافق‌شده
+      # قرمز می‌شویم. اعداد روی رانر کوچک معنای «ظرفیت نهایی» ندارند؛ هدف
+      # گیرانداختنِ رگرسیونِ فاحش و ۵xx زیر بار است.
+      - name: HTTP load test (throughput / p95 / error rate)
+        env:
+          BASE: http://127.0.0.1:4999
+          CONCURRENCY: '40'
+          DURATION: '12'
+        run: node scripts/loadTest.js
       - name: Stop API
         if: always()
         run: kill "$(cat /tmp/api.pid)" 2>/dev/null || true

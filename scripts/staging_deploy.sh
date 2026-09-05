@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# ============================================================================
+#  دیپلوی روی **استیجینگِ دائمی** (بدون لمس تولید)
+# ============================================================================
+#
+#   sudo bash scripts/staging_deploy.sh
+#
+# بعد از هر تغییر می‌توان این را اجرا کرد: کدِ مخزن را pull می‌کند،
+# وابستگی/مایگریشنِ استیجینگ را می‌زند و اپِ ghelgheli-staging را reload
+# می‌کند. هرگز به تولید (۴۰۰۰/۴۰۰۱) یا دیتابیس تولید دست نمی‌زند.
+set -Eeuo pipefail
+
+APP_DIR="/var/www/GhelGheli"
+BACK="$APP_DIR/backend"
+ENV_FILE="$BACK/.env.staging"
+
+log() { echo -e "\e[1;36m==> $*\e[0m"; }
+die() { echo -e "\e[1;31mFATAL: $*\e[0m" >&2; exit 1; }
+
+[ "$(id -u)" = "0" ] || die "با root اجرا کن"
+[ -f "$ENV_FILE" ] || die ".env.staging نیست — اول staging_setup.sh را اجرا کن"
+
+cd "$APP_DIR"
+log "۱) به‌روزرسانیِ کد"
+git pull --ff-only
+
+cd "$BACK"
+log "۲) وابستگی‌ها"
+sudo -u ghelgheli npm install --omit=dev --no-audit --no-fund
+
+log "۳) مایگریشنِ استیجینگ"
+# DATABASE_URL از .env.staging می‌آید، نه تولید.
+sudo -u ghelgheli bash -c 'cd /var/www/GhelGheli/backend && set -a; . ./.env.staging; set +a; node scripts/migrate.js'
+
+log "۴) ری‌استارت اپ استیجینگ"
+sudo -u ghelgheli bash -c 'cd /var/www/GhelGheli/backend && pm2 startOrReload ecosystem.staging.cjs --update-env'
+sudo -u ghelgheli pm2 save
+
+log "۵) سلامت"
+for i in $(seq 1 20); do
+  if curl -fsS http://127.0.0.1:4100/health >/dev/null 2>&1; then
+    echo "   استیجینگ سالم: $(curl -s http://127.0.0.1:4100/health)"; break
+  fi
+  sleep 1
+  [ "$i" = 20 ] && die "استیجینگ سالم نشد"
+done
+
+echo
+log "استیجینگ به‌روزرسانی شد. اجرای تست‌ها روی آن:"
+echo "   BASE=http://127.0.0.1:4100 E2E_ADMIN_USER=Admin E2E_ADMIN_PASS='Staging@2026' node scripts/testE2E.js"
+echo "   BASE=http://127.0.0.1:4100 E2E_ADMIN_USER=Admin E2E_ADMIN_PASS='Staging@2026' node scripts/testAdminRoleDepth.js"
+echo "   BASE=http://127.0.0.1:4100 node scripts/loadTest.js   # بدون ALLOW_PROD"
