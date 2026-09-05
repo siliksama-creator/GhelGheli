@@ -23,6 +23,12 @@ const fpEngine = require('../services/imageFingerprint');
 const photoCards = require('../services/photoCardService');
 const cardIdentity = require('../services/cardIdentity');
 const cardEmbedding = require('../services/cardEmbedding');
+const cardFace = require('../services/cardFace');
+
+// آستانهٔ شباهتِ چهره برای «توافقِ چهره» در حالت سایه (SFace، کسینوس).
+// محافظه‌کارانه؛ فقط برای ثبتِ آمار، نه تصمیم. از روی مشاهدهٔ دادهٔ مرجع
+// (هم‌بازیکن ~۰.۴۵–۰.۷۶، بازیکنِ متفاوت عمدتاً زیر ۰.۳) انتخاب شده.
+const FACE_AGREE_COS = 0.36;
 const imageQuality = require('../services/imageQuality');
 const cardDuel = require('../services/cardDuelService');
 const cardCrop = require('../services/cardCrop');
@@ -142,6 +148,9 @@ module.exports = function createPhotoCardRoutes(deps) {
     embedding: Array.isArray(r.embedding) ? r.embedding
       : (r.embedding && r.embedding.v ? r.embedding.v : null),
     embeddingVersion: r.embedding_version ?? null,
+    faceEmbedding: Array.isArray(r.face_embedding) ? r.face_embedding
+      : (r.face_embedding && r.face_embedding.v ? r.face_embedding.v : null),
+    faceEmbeddingVersion: r.face_embedding_version ?? null,
     cashAmount: Number(r.cash_amount || 0),
     width: r.width,
     height: r.height,
@@ -205,7 +214,7 @@ module.exports = function createPhotoCardRoutes(deps) {
   require('./photoCards/adminUpload')({
     router, pool, adminAuth, requireRole, asyncHandler, imageUpload, audit,
     optimizeUpload, verifyUpload, UUID_RE, safeUnlink, toFloats,
-    fs, path, fpEngine, photoCards, cardDuel, cardCrop, cardEmbedding,
+    fs, path, fpEngine, photoCards, cardDuel, cardCrop, cardEmbedding, cardFace,
     MAX_BATCH, DUPLICATE_SIMILARITY, matchSettings,
   });
 
@@ -244,6 +253,38 @@ module.exports = function createPhotoCardRoutes(deps) {
       await audit(req.admin.id, 'set_design_embedding', 'photo_card_designs',
         rows[0].id, null, { version: emb.version });
       res.json({ ok: true, id: rows[0].id, embeddingVersion: emb.version });
+    }),
+  );
+
+  /**
+   * ذخیرهٔ بردارِ **چهرهٔ** مرجع برای یک طرحِ «رو» (فاز ۳ — حالت سایه).
+   * مثل بردار کارت: مدل روی کلاینت اجرا و بردار ۱۲۸تایی اینجا پالوده/ذخیره
+   * می‌شود. سرور هیچ مدلی اجرا نمی‌کند.
+   */
+  router.post(
+    '/admin/photo-cards/designs/:id/face-embedding',
+    adminAuth, validateUuid('id'), requireRole('support'),
+    asyncHandler(async (req, res) => {
+      if (!UUID_RE.test(String(req.params.id))) {
+        return res.status(400).json({ message: 'شناسه معتبر نیست' });
+      }
+      const fe = cardFace.sanitizeFaceEmbedding(
+        req.body?.faceEmbedding ?? req.body?.embedding ?? req.body?.v ?? null);
+      if (!fe) {
+        return res.status(422).json({
+          message: `بردار چهره معتبر نیست؛ باید آرایهٔ ${cardFace.FACE_DIM} عددی باشد.`,
+        });
+      }
+      const { rows } = await pool.query(
+        `UPDATE photo_card_designs
+            SET face_embedding=$1, face_embedding_version=$2, updated_at=NOW()
+          WHERE id=$3 RETURNING id, face_embedding_version`,
+        [JSON.stringify(fe.v), fe.version, req.params.id],
+      );
+      if (!rows[0]) return res.status(404).json({ message: 'طرح پیدا نشد' });
+      await audit(req.admin.id, 'set_design_face_embedding', 'photo_card_designs',
+        rows[0].id, null, { version: fe.version });
+      res.json({ ok: true, id: rows[0].id, faceEmbeddingVersion: fe.version });
     }),
   );
 
@@ -513,7 +554,10 @@ module.exports = function createPhotoCardRoutes(deps) {
                     FROM photo_card_designs WHERE embedding IS NOT NULL)::int    AS designs_with_embedding,
                  (SELECT count(*) FROM photo_card_designs
                     WHERE embedding IS NOT NULL
-                      AND embedding_version = $${days.length + 1})::int          AS embedding_rows`,
+                      AND embedding_version = $${days.length + 1})::int          AS embedding_rows,
+                 -- فاز ۳: شاهدِ چهره — فقط روی ردیف‌های دارای چهره و نسخهٔ جاری.
+                 (SELECT count(*) FROM a WHERE face_agreed IS NOT NULL)::int     AS face_total,
+                 (SELECT count(*) FROM a WHERE face_agreed)::int                 AS face_agreed`,
         days.concat(curVer));
       const r = rows[0] || {};
       const total = Number(r.total || 0);
@@ -525,6 +569,12 @@ module.exports = function createPhotoCardRoutes(deps) {
         agreementRate: total ? Number((100 * agreed / total).toFixed(1)) : null,
         designsWithEmbedding: Number(r.designs_with_embedding || 0),
         embeddingRows: Number(r.embedding_rows || 0),
+        // فاز ۳: نرخ توافقِ شاهد چهره (روی ردیف‌های دارای چهره).
+        faceTotal: Number(r.face_total || 0),
+        faceAgreed: Number(r.face_agreed || 0),
+        faceAgreementRate: Number(r.face_total || 0)
+          ? Number((100 * Number(r.face_agreed || 0) / Number(r.face_total)).toFixed(1))
+          : null,
         // آستانهٔ پیشنهادیِ نقشهٔ راه برای خروج از حالت سایه.
         activateThresholdPct: 99,
         readyToActivate: total >= 100 && total ? (100 * agreed / total) >= 99 : false,
@@ -682,18 +732,45 @@ module.exports = function createPhotoCardRoutes(deps) {
               [sub.identity_top_design_id]);
             const modelCardType = t.rows[0]?.card_type_id || null;
             const finalCardType = design?.card_type_id || expectedTypeId || null;
+            // ── فاز ۳: شاهد چهره در تصمیم دستی ادمین (shadow) ──
+            // اگر عکسِ کاربر بردار چهره داشته، شباهتش را با طرحِ نهایی‌شده
+            // می‌سنجیم؛ «توافقِ چهره» یعنی بازیکنِ چهره با بازیکنِ کارتِ
+            // تأییدشده یکی است. در تصمیم دخالت نمی‌کند، فقط ثبت می‌شود.
+            let faceAgreed = null;
+            let faceScore = null;
+            const faceArr = Array.isArray(sub.img_face_embedding)
+              ? sub.img_face_embedding
+              : (sub.img_face_embedding && sub.img_face_embedding.v
+                ? sub.img_face_embedding.v : null);
+            if (faceArr && design && design.id) {
+              const fr = await client.query(
+                `SELECT face_embedding, face_embedding_version
+                   FROM photo_card_designs WHERE id=$1`,
+                [design.id]);
+              const dv = Array.isArray(fr.rows[0]?.face_embedding)
+                ? fr.rows[0].face_embedding
+                : (fr.rows[0]?.face_embedding && fr.rows[0].face_embedding.v
+                  ? fr.rows[0].face_embedding.v : null);
+              if (dv && fr.rows[0].face_embedding_version
+                    === sub.face_embedding_version) {
+                faceScore = cardIdentity.cosine(faceArr, dv);
+                if (faceScore != null) faceAgreed = faceScore >= FACE_AGREE_COS;
+              }
+            }
             await client.query(
               `INSERT INTO photo_card_embedding_agreement
                  (submission_id, model_design_id, model_card_type_id,
                   model_score, model_margin, final_card_type_id,
-                  decided_by, agreed, embedding_version)
-               VALUES($1,$2,$3,$4,$5,$6,'admin',$7,$8)`,
+                  decided_by, agreed, embedding_version,
+                  face_agreed, face_match_score, face_embedding_version)
+               VALUES($1,$2,$3,$4,$5,$6,'admin',$7,$8,$9,$10,$11)`,
               [sub.id, sub.identity_top_design_id, modelCardType,
                sub.identity_top_score, sub.identity_margin,
                finalCardType,
                !!(modelCardType && finalCardType
                   && modelCardType === finalCardType),
-               sub.embedding_version || null],
+               sub.embedding_version || null,
+               faceAgreed, faceScore, sub.face_embedding_version || null],
             );
           }
         } else {
@@ -927,6 +1004,7 @@ module.exports = function createPhotoCardRoutes(deps) {
                   d.color_sig, d.tex_sig, d.luma_sig, d.rgb_sig,
                   d.text_tokens, d.width, d.height,
                   d.embedding, d.embedding_version,
+                  d.face_embedding, d.face_embedding_version,
                   t.player_lexemes, t.player_number,
                   COALESCE(t.cash_amount,0) AS cash_amount
              FROM photo_card_designs d
@@ -1061,6 +1139,30 @@ module.exports = function createPhotoCardRoutes(deps) {
           req.body.embedding ?? null);
         const queryEmbedding = emb ? emb.v : null;
         const embeddingVersion = emb ? emb.version : null;
+
+        // ── بردارِ چهرهٔ بازیکن (فاز ۳، حالت سایه) ──
+        //
+        // متعامد با بردار کارت: هویتِ بازیکن را عرضِ قالب می‌گوید ولی نوعِ
+        // کارت را نه؛ پس صرفاً ثبت/سنجیده می‌شود و در تصمیم دخالت نمی‌کند.
+        const face = cardFace.sanitizeFaceEmbedding(
+          req.body.faceEmbedding ?? null);
+        const queryFace = face ? face.v : null;
+        const faceVersion = face ? face.version : null;
+        // بهترین شباهت چهره با هر طرحِ «رو»ی مرجع (shadow).
+        let faceMatchScore = null;
+        let faceTopDesign = null;
+        if (queryFace) {
+          for (const d of designFps) {
+            const dv = Array.isArray(d.faceEmbedding) ? d.faceEmbedding
+              : (d.faceEmbedding && d.faceEmbedding.v ? d.faceEmbedding.v : null);
+            if (!dv || d.faceEmbeddingVersion !== faceVersion) continue;
+            const c = cardIdentity.cosine(queryFace, dv);
+            if (c != null && (faceMatchScore == null || c > faceMatchScore)) {
+              faceMatchScore = c;
+              faceTopDesign = d;
+            }
+          }
+        }
 
         const identity = designsRes.rows.length
           ? cardIdentity.rankIdentity(
@@ -1227,9 +1329,10 @@ module.exports = function createPhotoCardRoutes(deps) {
                 img_dhash, img_phash, img_color, img_tex, img_luma, img_rgb,
                 img_text, img_embedding, embedding_version,
                 identity_top_design_id, identity_top_score,
-                identity_margin, identity_by_embedding)
+                identity_margin, identity_by_embedding,
+                img_face_embedding, face_embedding_version, face_match_score)
              VALUES($1,$2,$3,$4,$5,$6,'pending',$7,$13,$8,$9,$10,$11,$12,$14,$15,
-                    $16,$17,$18,$19,$20,$21)
+                    $16,$17,$18,$19,$20,$21,$22,$23,$24)
              RETURNING id`,
             [req.user.id, codeId, match.design?.id ?? null,
               match.score, match.margin, savedPath, reason,
@@ -1243,7 +1346,9 @@ module.exports = function createPhotoCardRoutes(deps) {
               // فاز ۲ — حالت سایه: بردار و نظر هویتیِ عصبی (نه در تصمیم).
               queryEmbedding, embeddingVersion,
               shadowId.topDesignId, shadowId.topScore,
-              shadowId.margin, shadowId.byEmbedding],
+              shadowId.margin, shadowId.byEmbedding,
+              // فاز ۳ — حالت سایه: بردار چهرهٔ بازیکن (نه در تصمیم).
+              queryFace, faceVersion, faceMatchScore],
           );
 
           return res.json({
@@ -1324,9 +1429,10 @@ module.exports = function createPhotoCardRoutes(deps) {
                 img_dhash, img_phash, img_color, img_tex, img_luma, img_rgb,
                 img_text, img_embedding, embedding_version,
                 identity_top_design_id, identity_top_score,
-                identity_margin, identity_by_embedding)
+                identity_margin, identity_by_embedding,
+                img_face_embedding, face_embedding_version, face_match_score)
              VALUES($1,$2,$3,$3,$4,$5,'approved',$6,$7,$8,$9,$10,$11,$12,$13,
-                    $14,$15,$16,$17,$18,$19)
+                    $14,$15,$16,$17,$18,$19,$20,$21,$22)
              RETURNING id`,
             [req.user.id, codeId, design?.id ?? null,
               match.score, match.margin, decision.path,
@@ -1335,29 +1441,39 @@ module.exports = function createPhotoCardRoutes(deps) {
               queryFp.textTokens || [],
               queryEmbedding, embeddingVersion,
               shadowId.topDesignId, shadowId.topScore,
-              shadowId.margin, shadowId.byEmbedding],
+              shadowId.margin, shadowId.byEmbedding,
+              queryFace, faceVersion, faceMatchScore],
           );
 
           // ── ردیفِ توافقِ حالت سایه (فقط وقتی برداری در کار بوده) ──
           //
           // نظرِ مدل عصبی را کنار تصمیمِ خودکار می‌گذارد تا نرخِ توافق
           // سنجیده شود. این INSERT هیچ تأثیری روی نتیجهٔ کاربر ندارد.
+          // چهره (فاز ۳) هم اگر بوده به‌عنوان شاهد کمکی در همان ردیف ثبت
+          // می‌شود: بازیکنِ برترِ چهره با بازیکنِ کارتِ تصمیم‌شده یکی است؟
           if (queryEmbedding && shadowId.topDesignId) {
             const modelRow = designFps
               .find(d => d.id === shadowId.topDesignId) || null;
+            const faceAgreed = (queryFace && faceTopDesign)
+              ? (faceTopDesign.card_type_id === (decision.cardTypeId ?? null))
+              : null;
             await client.query(
               `INSERT INTO photo_card_embedding_agreement
                  (submission_id, model_design_id, model_card_type_id,
                   model_score, model_margin, final_card_type_id,
-                  decided_by, agreed, embedding_version)
-               VALUES($1,$2,$3,$4,$5,$6,'auto',$7,$8)`,
+                  decided_by, agreed, embedding_version,
+                  face_agreed, face_match_score, face_embedding_version)
+               VALUES($1,$2,$3,$4,$5,$6,'auto',$7,$8,$9,$10,$11)`,
               [insSub.rows[0].id, shadowId.topDesignId,
                modelRow ? modelRow.card_type_id : null,
                shadowId.topScore, shadowId.margin,
                decision.cardTypeId ?? null,
                !!(modelRow && decision.cardTypeId
                   && modelRow.card_type_id === decision.cardTypeId),
-               embeddingVersion],
+               embeddingVersion,
+               faceAgreed,
+               queryFace ? faceMatchScore : null,
+               faceVersion],
             );
           }
           await client.query('COMMIT');

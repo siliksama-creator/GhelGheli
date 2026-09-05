@@ -10,7 +10,7 @@ module.exports = function registerAdminPhotoCardUpload(deps) {
   const {
     router, pool, adminAuth, requireRole, asyncHandler, imageUpload, audit,
     optimizeUpload, verifyUpload, UUID_RE, safeUnlink, toFloats,
-    fs, path, fpEngine, photoCards, cardDuel, cardCrop, cardEmbedding,
+    fs, path, fpEngine, photoCards, cardDuel, cardCrop, cardEmbedding, cardFace,
     MAX_BATCH, DUPLICATE_SIMILARITY, matchSettings,
   } = deps;
 
@@ -121,6 +121,19 @@ module.exports = function registerAdminPhotoCardUpload(deps) {
             const emb = cardEmbedding && cardEmbedding.sanitizeEmbedding(parsed || null);
             if (emb) { side.embedding = emb.v; side.embeddingVersion = emb.version; }
           } catch { /* بدون بردار هم طرح ساخته می‌شود */ }
+
+          // بردارِ چهرهٔ بازیکن (فاز ۳) — فقط سمت «رو» معنا دارد. کلاینتِ
+          // ادمین (مرورگر/اپ) آن را با YuNet+SFace می‌سازد و در فیلد
+          // faceEmbeddingFront / faceEmbedding می‌فرستد. اختیاری و خوش‌رفتار.
+          if (side.kind === 'front') {
+            try {
+              const rawFace = req.body.faceEmbeddingFront ?? req.body.faceEmbedding;
+              const parsedFace = typeof rawFace === 'string'
+                ? JSON.parse(rawFace) : rawFace;
+              const fe = cardFace && cardFace.sanitizeFaceEmbedding(parsedFace || null);
+              if (fe) { side.faceEmbedding = fe.v; side.faceEmbeddingVersion = fe.version; }
+            } catch { /* بدون بردار چهره هم طرح ساخته می‌شود */ }
+          }
 
           try {
             side.fp = await fpEngine.fingerprint(buf);
@@ -409,15 +422,17 @@ module.exports = function registerAdminPhotoCardUpload(deps) {
               `INSERT INTO photo_card_designs
                  (card_type_id, side, image_url, dhash, phash, color_sig, tex_sig,
                   luma_sig, rgb_sig, text_tokens, width, height, created_by,
-                  embedding, embedding_version)
-               VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+                  embedding, embedding_version, face_embedding, face_embedding_version)
+               VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
                RETURNING id, side, image_url, width, height, created_at`,
               [cardTypeId, side.kind, side.imageUrl, side.fp.dhash, side.fp.phash,
                 side.fp.colorSig, side.fp.texSig, side.fp.lumaSig,
                 side.fp.rgbSig, side.fp.textTokens || [],
                 side.fp.width, side.fp.height, req.admin.id,
                 side.embedding ? JSON.stringify(side.embedding) : null,
-                side.embeddingVersion || null],
+                side.embeddingVersion || null,
+                side.faceEmbedding ? JSON.stringify(side.faceEmbedding) : null,
+                side.faceEmbeddingVersion || null],
             );
             inserted.push({ ...r.rows[0], sideLabel: side.label });
           }
