@@ -56,7 +56,10 @@ git fetch origin "$BRANCH"
 # the (previously tracked) userweb/dist, which made `git pull` fail with
 # "local changes would be overwritten".
 git reset --hard "origin/$BRANCH"
-git clean -fd -e node_modules -e .env -e uploads -e dist
+# ⚠️ .env.staging فایل پیکربندیِ استیجینگِ دائمی است (تولید را لمس نمی‌کند)
+# و مثلِ .env نباید با پاک‌سازیِ دیپلوی از بین برود، وگرنه اپِ استیجینگ بعد از
+# دیپلویِ تولید به‌خاطر گم‌شدن env پایین نمی‌آید.
+git clean -fd -e node_modules -e .env -e .env.staging -e uploads -e dist
 NEW_SHA="$(git rev-parse HEAD)"
 # release در health/crash inbox و build وب باید دقیقاً همان commit زنده باشد.
 export APP_RELEASE="$NEW_SHA"
