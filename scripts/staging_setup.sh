@@ -71,8 +71,12 @@ log "۳) مایگریشن و ادمینِ اولیه"
     node scripts/seedAdmin.js )
 
 log "۴) اپِ PM2 استیجینگ (روی 127.0.0.1:4100)"
-( cd "$BACK"
-  sudo -u ghelgheli bash -c 'cd /var/www/GhelGheli/backend && pm2 start ecosystem.staging.cjs' )
+# اگر اجرای قبلی با نامِ فایل (ecosystem.staging) به‌اشتباه به‌عنوان اسکریپت
+# استارت خورده، حذفش کن تا تداخل نام/پورت پیش نیاید.
+sudo -u ghelgheli pm2 delete ecosystem.staging >/dev/null 2>&1 || true
+# startOrReload فایل را به‌چشمِ کانفیگِ اکوسیستم می‌خواند (نه اسکریپت)، پس
+# نامِ اپ (ghelgheli-staging) و envها درست اعمال می‌شوند.
+sudo -u ghelgheli bash -c 'cd /var/www/GhelGheli/backend && pm2 startOrReload ecosystem.staging.cjs --update-env'
 sudo -u ghelgheli pm2 save || true
 
 log "۵) سلامت"
