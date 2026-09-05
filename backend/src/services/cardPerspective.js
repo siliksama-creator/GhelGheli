@@ -149,6 +149,9 @@ function findHomography(src, dst) {
   return [h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7], 1];
 }
 
+const DBG = process.env.GG_PERSPECTIVE_DEBUG === '1';
+function dlog(...a) { if (DBG) console.error('[persp]', ...a); }
+
 /**
  * تحلیلِ تصویر و استخراجِ چهار گوشهٔ کارت.
  * @returns {Promise<{corners:object[], w:number, h:number, confident:boolean}|null>}
@@ -204,7 +207,7 @@ async function detectCardQuad(normBuf) {
   // کارت باید بخشِ معقولی از کادر باشد، نه تمامِ آن (آن‌وقت تمام‌کادر است و
   // وارپ لازم نیست) و نه یک لکهٔ کوچک. بازهٔ پایین واقعی‌تر گرفته شده: در عکسِ
   // گوشی کارت می‌تواند ~۲۰٪ کادر باشد.
-  if (areaRatio < 0.12 || areaRatio > 0.88) return null;
+  if (areaRatio < 0.07 || areaRatio > 0.90) return null;
 
   // ── گاردِ «تمام‌کادر» (full-bleed) ──
   //
@@ -267,9 +270,11 @@ async function detectCardQuad(normBuf) {
     + Math.abs((Q[1].x - Q[3].x) * (Q[2].y - Q[3].y) - (Q[2].x - Q[3].x) * (Q[1].y - Q[3].y));
   const quadArea = found.area2 / 2; // px² در مختصاتِ تحلیلی
   const quadRatio = quadArea / (w * h);
-  if (quadRatio < 0.12 || quadRatio > 0.9) return null;
+  if (quadRatio < 0.10 || quadRatio > 0.9) return null;
   // اضلاع نباید خیلی نامتوازن باشند (کارت تحریفِ آن‌قدر شدید ندارد)
   const minE = Math.min(...edges); const maxE = Math.max(...edges);
+  dlog('quadRatio', quadRatio.toFixed(3), 'edgeMin/Max', (minE / maxE).toFixed(2),
+    'diagRatio', (Math.min(diagA, diagB) / Math.max(diagA, diagB)).toFixed(2));
   if (minE < 0.35 * maxE) return null;
   // قطرها نباید بیش از حد نابرابر باشند (چهار‌ضلعیِ ناجور = تشخیص غلط)
   if (Math.min(diagA, diagB) < 0.55 * Math.max(diagA, diagB)) return null;
@@ -295,7 +300,7 @@ async function detectCardQuad(normBuf) {
   const maxTilt = Math.max(tiltTop, tiltBot, tiltLeft, tiltRight);
   // sin(≈۶°)≈۰.۱۰. کجیِ کمتر از ~۶ درجه یعنی کارت عملاً روبه‌روست؛ وارپ
   // سودی ندارد و خطرِ دستکاریِ بی‌دلیل دارد.
-  if (maxTilt < 0.10) return null;
+  if (maxTilt < 0.05) return null;
 
   // ── گاردِ «پوشش» ──
   //
@@ -359,6 +364,18 @@ async function detectCardQuad(normBuf) {
   // کارتِ روی میز: بیرونش ~۰٪ پیش‌زمینهٔ غیر از بدنهٔ کارت است. اگر بیشتر از
   // چند درصد باشد، یعنی محتوای کارت بیرون چهارگوشه هم هست → تمام‌کادر.
   if (outsideFgRatio > 0.06) return null;
+
+  // ── گاردِ «حاشیهٔ چهارگوشه» ──
+  //
+  // کارتِ واقعی روی میز از هر چهار طرف با پس‌زمینه احاطه شده، پس بین چهارگوشه
+  // و لبه‌های تصویر فاصله است. در طرحِ تمام‌کادر کارت تا لبه می‌رسد؛ چهارگوشه‌ای
+  // که به لبه می‌چسبد یعنی در حال وارپِ خودِ تصویرِ مرجعیم. اگر کمترین فاصله
+  // از هر لبه از ~۴٪ کمتر بود، وارپ نکن.
+  const padL = Math.min(Q[0].x, Q[3].x) / w;
+  const padR = (w - Math.max(Q[1].x, Q[2].x)) / w;
+  const padT = Math.min(Q[0].y, Q[1].y) / h;
+  const padB = (h - Math.max(Q[2].y, Q[3].y)) / h;
+  if (Math.min(padL, padR, padT, padB) < 0.04) return null;
 
   return { corners: Q, w, h, confident: true, scale: 1 };
 }
