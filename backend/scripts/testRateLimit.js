@@ -136,5 +136,38 @@ console.log('\n══ perUserKey فقط یک بار تعریف شده ══');
 const perUserDefs = (serverSrc.match(/^const perUserKey\s*=/gm) || []).length;
 ok('perUserKey دقیقاً یک تعریف دارد', perUserDefs === 1, `${perUserDefs} تعریف پیدا شد`);
 
+console.log('\n══ هیچ Store مشترکی بین limiterها نیست (ERR_ERL_STORE_REUSE) ══');
+// express-rate-limit نسخهٔ ۷ یک نمونهٔ Store را که بین چند limiter به
+// اشتراک گذاشته شود با ERR_ERL_STORE_REUSE رد می‌کند و این خطا هنگامِ
+// تعریفِ میدلور (زمانِ بارگذاری ماژول) پرتاب می‌شود — یعنی پروسه در
+// طوفانِ ری‌استارتِ دیپلوی می‌افتاد. قاعدهٔ ساختاری که باید قفل بماند:
+//   ۱) نباید یک ثابتِ Store مشترک (مثل sharedRateStore) ساخته شود؛
+//   ۲) هر limiter باید از helperِ rlStore('<prefix>') با یک آرگومانِ
+//      رشته‌ایِ صریح استفاده کند؛
+//   ۳) پیشوندها یکتا باشند تا شمارندهٔ limiterها در Redis به هم نخورد.
+ok('ثابتِ Store مشترک (sharedRateStore/redisRateLimitStore) حذف شده',
+  !/sharedRateStore|redisRateLimitStore/.test(serverSrc),
+  'یک Store مشترک دوباره تعریف شده → خطای ERR_ERL_STORE_REUSE در بوت');
+
+const rlStoreCalls = [...serverSrc.matchAll(/rlStore\(\s*['"`]([^'"`]+)['"`]\s*\)/g)].map(m => m[1]);
+// helper عملیات: rlStore(`ops:${name}`) یک الگوی پویاست ولی پیشوندِ ثابت
+// 'ops:' دارد و name از کلیدهای پیکربندی می‌آید؛ آن را جدا می‌شماریم.
+const opsTempl = [...serverSrc.matchAll(/rlStore\(\s*`ops:\$\{name\}`\s*\)/g)].length;
+ok('حداقل چند limiter با rlStore فروشگاه اختصاصی می‌گیرند', rlStoreCalls.length >= 6,
+  `فقط ${rlStoreCalls.length} فراخوانی صریح rlStore پیدا شد`);
+ok('helper عملیات (ops:*) هم از rlStore استفاده می‌کند', opsTempl === 1,
+  `${opsTempl} مورد — باید دقیقاً یک الگوی ops:${'${name}'} باشد`);
+
+const dupes = rlStoreCalls.filter((p, i) => rlStoreCalls.indexOf(p) !== i);
+ok('پیشوندهای صریحِ rlStore یکتا هستند', dupes.length === 0,
+  `پیشوند تکراری: ${[...new Set(dupes)].join(', ')}`);
+
+// خودِ helper باید از makeRateStore استفاده کند (نه یک نمونهٔ مشترک).
+const storeSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'lib', 'rateLimitStore.js'), 'utf8');
+ok('rateLimitStore تابعِ makeRateStore(prefix) می‌دهد',
+  /function makeRateStore\s*\(\s*prefix\s*\)/.test(storeSrc)
+  && /prefix:\s*`rl:\$\{prefix\}:`/.test(storeSrc),
+  'هر limiter باید RedisStore تازه با پیشوندِ جدا بگیرد');
+
 console.log(`\n${fail === 0 ? '✓' : '✗'} ${pass} تست موفق، ${fail} ناموفق`);
 process.exit(fail === 0 ? 0 : 1);

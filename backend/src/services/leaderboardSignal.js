@@ -14,9 +14,12 @@
 //   ۱) کشِ مشترکِ `/api/league/current` را (که با کلیدهای متعددِ
 //      `lb:league:*` ذخیره شده) یک‌جا بی‌اعتبار می‌کند، تا پاسخِ بعدی
 //      رتبه‌های تازه را بدهد نه دادهٔ ۸-ثانیه-کهنه را؛
-//   ۲) رویدادِ `leaderboard:update` را به **همهٔ** سوکت‌ها پخش می‌کند.
-//      (آداپتورِ Redisِ Socket.IO باعث می‌شود این پخش از هر پروسه‌ای که
-//      صادر شود به کلاینت‌های روی هر دو گره برسد.)
+//   ۲) رویدادِ `leaderboard:update` را فقط به **اتاقِ `leaderboard`** پخش
+//      می‌کند، نه به همهٔ سوکت‌ها. کلاینتی که جدولِ لیگ را باز کرده با
+//      emitِ `leaderboard:subscribe` عضو این اتاق می‌شود و با بستنِ صفحه
+//      خارج می‌شود؛ پس بازیکنانی که در بازی‌اند یا صفحه‌های دیگر را
+//      می‌بینند هیچ سیگنالِ بیهوده‌ای نمی‌گیرند. (آداپتورِ Redisِ Socket.IO
+//      اتاق را بین هر دو گره همگام می‌کند.)
 //
 // مهم: سیگنال فقط «بگو دوباره بخوان» است، نه خودِ داده. کلاینت همان
 // `/api/league/current` را می‌زند که رتبهٔ شخصیِ بیننده (`myEntry`) را
@@ -28,6 +31,9 @@
 // بار از server اینجا attach می‌شود (مثل الگوی presenceService).
 
 const { cacheDelPrefix } = require('../lib/cache');
+
+// نامِ اتاقِ Socket.IO که مشترکینِ لیدربورد عضوش می‌شوند.
+const ROOM = 'leaderboard';
 
 let ioRef = null;
 
@@ -54,10 +60,11 @@ function leaderboardChanged(opts = {}) {
   }
   if (ioRef) {
     try {
-      // رویداد بدونِ داده؛ کلاینت خودش `/api/league/current` را می‌زند.
-      ioRef.emit('leaderboard:update', { at: Date.now() });
+      // فقط به مشترکینِ اتاقِ لیدربورد پخش می‌شود (نه همهٔ سوکت‌ها)؛
+      // رویداد بدونِ داده است و کلاینت خودش `/api/league/current` را می‌زند.
+      ioRef.to(ROOM).emit('leaderboard:update', { at: Date.now() });
     } catch { /* سوکت اختیاری است */ }
   }
 }
 
-module.exports = { attach, leaderboardChanged };
+module.exports = { attach, leaderboardChanged, ROOM };

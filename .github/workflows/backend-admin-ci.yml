@@ -111,6 +111,12 @@ jobs:
       # باگ «مرز ناظر فقط در UI» را می‌گیرد.
       - name: E2E admin role depth (observer/support/super_admin matrix)
         run: npm run test:e2e:roles
+      # سوکتِ واقعیِ لیدربورد: بینندهٔ عضوِ اتاق هنگام ثبتِ امتیاز، رویدادِ
+      # leaderboard:update را می‌گیرد و سوکتِ خارج از اتاق نمی‌گیرد؛ بعد از
+      # unsubscribe هم قطع می‌شود. زنجیرهٔ «تغییر → پخشِ اتاقی → رفرش» را
+      # که تست‌های واحد نمی‌بینند، اینجا روی سرورِ زنده می‌بندد.
+      - name: E2E leaderboard live update (socket room + subscribe)
+        run: npm run test:e2e:leaderboard
       # تست بارِ HTTP: پرتگاهِ ظرفیت (پُرشِ ناگهانیِ p95 و سهم خطا) یک‌شبه
       # در گذشته غافلگیرمان کرد؛ حالا روی همان سرورِ واقعیِ CI، بعد از
       # تست‌های کارکرد، موجی از ترافیک می‌فرستیم و با آستانهٔ توافق‌شده
@@ -157,6 +163,9 @@ jobs:
       - run: npm run test:feedback-parity
       - run: npm run test:coin-parity
       - run: npm run test:chat-parity
+      # جدول لیگ باید در هر دو کلاینت رویدادمحور (سوکت/اتاق) بماند و pollِ
+      # ثابت برنگردد؛ این گارد subscribe/unsubscribe و پخشِ اتاقی را قفل می‌کند.
+      - run: npm run test:league-live
       # Desktop layout: the phone-shaped portal used to overflow horizontally
       # on a monitor (2010px of content in a 1440px window). This guard also
       # enforces that every desktop fix stays inside a `min-width` media query,

@@ -176,9 +176,14 @@ export default function League({ token, openProfile }) {
       });
       const refresh = () => state.reload().catch(() => {});
       socket.on('leaderboard:update', refresh);
-      // اتصالِ تازه = از این لحظه به‌بعد سیگنال‌ها می‌رسند؛ یک‌بار هم حالا
-      // بخوان تا تغییراتی که هنگامِ قطعی رخ داده تازه شوند.
-      socket.on('connect', refresh);
+      // فقط این کلاینت (که جدول را باز کرده) عضو اتاقِ لیدربورد می‌شود تا
+      // سرور رویداد را فقط به بیننده‌های جدول بفرستد. بعد از هر وصلِ مجدد
+      // (reconnect) باید دوباره عضو شد، چون عضویتِ اتاق با اتصالِ تازه reset
+      // می‌شود. هنگامِ وصل یک‌بار هم می‌خوانیم تا تغییرِ حینِ قطعی جا نماند.
+      socket.on('connect', () => {
+        socket.emit('leaderboard:subscribe');
+        refresh();
+      });
     } catch { /* سوکت اختیاری است */ }
 
     const onVisible = () => { if (document.visibilityState === 'visible') state.reload().catch(() => {}); };
@@ -187,6 +192,7 @@ export default function League({ token, openProfile }) {
     return () => {
       document.removeEventListener('visibilitychange', onVisible);
       try {
+        socket?.emit('leaderboard:unsubscribe');
         socket?.off('leaderboard:update');
         socket?.off('connect');
         socket?.disconnect();

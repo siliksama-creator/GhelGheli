@@ -29,6 +29,7 @@
     "test:e2e": "node scripts/testE2E.js",
     "test:e2e:stake": "node scripts/testStakedGameE2E.js",
     "test:e2e:roles": "node scripts/testAdminRoleDepth.js",
+    "test:e2e:leaderboard": "node scripts/testLeaderboardSocket.js",
     "test:load": "node scripts/loadTest.js",
     "test:midround": "node scripts/testCardDuelMidRoundLock.js"
   },

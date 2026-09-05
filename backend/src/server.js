@@ -2761,6 +2761,17 @@ io.on('connection', socket => {
   // مشترکینِ چت برود. در حالتِ چندپروسه‌ای این اتاق با آداپتور Redis بین
   // پروسه‌ها همگام است.
   socket.join('chat:public');
+  // ── اتاقِ لیدربورد ────────────────────────────────────────────────
+  // برخلافِ چت، این اتاق را همه خودکار نمی‌گیرند: فقط کلاینتی که صفحهٔ
+  // لیگ را باز کرده مشترک می‌شود. هدف این است که رویدادِ
+  // `leaderboard:update` (که هر پایان بازی می‌تواند صادرش کند) فقط به
+  // کسانی برسد که جدول را می‌بینند، نه به هر سوکتِ بیکار.
+  socket.on('leaderboard:subscribe', () => {
+    try { socket.join(leaderboardSignal.ROOM); } catch { /* noop */ }
+  });
+  socket.on('leaderboard:unsubscribe', () => {
+    try { socket.leave(leaderboardSignal.ROOM); } catch { /* noop */ }
+  });
   socket.on('chat:send', async (payload, cb) => {
     try {
       const now = Date.now();

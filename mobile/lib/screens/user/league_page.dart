@@ -1,13 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../api_client.dart';
 import '../../core/assets.dart';
 import '../../core/cosmetics.dart';
 import '../../theme/brand_theme.dart';
 import '../../theme/tokens.dart';
-import '../../widgets/lifecycle_poller.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/state_views.dart';
 import '../shared/public_profile_sheet.dart';
@@ -18,8 +18,13 @@ import 'clubs_page.dart';
 import '../../widgets/ui_icon.dart';
 import '../../core/app_config.dart';
 
-/// Monthly league leaderboard: podium (top 3) + ranked list, refreshed
-/// every 12s. Includes Previous Season Winners tab.
+/// Monthly league leaderboard: podium (top 3) + ranked list. The table is
+/// refreshed over Socket.IO (the server emits `leaderboard:update` only to
+/// the leaderboard room whenever rankings actually change — a game settles,
+/// points/coins are awarded), not on a fixed 12s poll, so an open screen
+/// with no changes generates zero traffic. A foreground-resume refresh acts
+/// as a safety net for anything missed while disconnected. Includes the
+/// Previous Season Winners tab.
 class LeaguePage extends StatefulWidget {
   final ApiClient api;
   const LeaguePage({super.key, required this.api});
@@ -28,23 +33,78 @@ class LeaguePage extends StatefulWidget {
   State<LeaguePage> createState() => _LeaguePageState();
 }
 
-class _LeaguePageState extends State<LeaguePage> with LifecyclePoller {
+class _LeaguePageState extends State<LeaguePage> with WidgetsBindingObserver {
   Map? _data;
   bool _loading = true;
   String? _error;
   int _tab = 0;
   String? _selectedLeagueId;
+  io.Socket? _socket;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _load();
-    startPolling(const Duration(seconds: 12), _load);
+    _connectSocket();
+  }
+
+  /// سوکتِ به‌روزرسانیِ جدول — هم‌تراز با وب: فقط هنگام باز بودن صفحه عضو
+  /// اتاقِ «leaderboard» می‌شود و رویدادِ `leaderboard:update` را می‌گیرد.
+  /// سیگنال داده ندارد؛ در همان لحظه `/api/league/current` دوباره خوانده
+  /// می‌شود. سوکت اختیاری است؛ اگر وصل نشد جدول همان بارِ نخست می‌ماند.
+  void _connectSocket() {
+    try {
+      final s = io.io(
+        widget.api.baseUrl,
+        io.OptionBuilder()
+            .setTransports(['websocket', 'polling'])
+            .setAuth({'token': widget.api.token})
+            .enableForceNew()
+            .enableReconnection()
+            .setReconnectionDelay(800)
+            .setReconnectionDelayMax(5000)
+            .build(),
+      );
+      _socket = s;
+      // فقط این صفحه عضو اتاقِ لیدربورد است تا سرور رویداد را بی‌خود به
+      // بقیه نفرستد. بعد از هر وصلِ مجدد باید دوباره عضو شد.
+      void onConnect() {
+        s.emit('leaderboard:subscribe');
+        // تغییراتی که هنگامِ قطعی رخ داده بلافاصله جبران شوند.
+        unawaited(_load().catchError((_) {}));
+      }
+
+      s.onConnect((_) => onConnect());
+      s.on('leaderboard:update', (_) {
+        if (!mounted) return;
+        unawaited(_load().catchError((_) {}));
+      });
+    } catch (_) {
+      // سوکت اختیاری است؛ خطا نباید صفحه را بشکند.
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // تورِ ایمنیِ بدون‌تایمر: وقتی از پس‌زمینه برمی‌گردیم یک‌بار تازه کن تا
+    // رکابی که هنگام نبودن اپ رخ داده جا نماند.
+    if (state == AppLifecycleState.resumed && mounted) {
+      unawaited(_load().catchError((_) {}));
+    }
   }
 
   @override
   void dispose() {
-    stopPolling();
+    WidgetsBinding.instance.removeObserver(this);
+    try {
+      _socket?.emit('leaderboard:unsubscribe');
+      _socket?.off('leaderboard:update');
+      _socket?.dispose();
+    } catch (_) {
+      // noop
+    }
+    _socket = null;
     super.dispose();
   }
 
