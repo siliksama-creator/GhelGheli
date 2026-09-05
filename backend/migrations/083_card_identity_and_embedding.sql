@@ -39,10 +39,10 @@ UPDATE card_types c
 SET player_lexemes = sub.lex
 FROM (
   SELECT id,
-         COALESCE(array_agg(lower(m.w)), '{}'::text[]) AS lex
+         COALESCE(array_agg(lower((m.m)[1])), '{}'::text[]) AS lex
     FROM card_types
     CROSS JOIN LATERAL
-      regexp_matches(split_part(name, '·', 1), '[A-Za-zÀ-ÿ]{3,}', 'g') AS m(w)
+      regexp_matches(split_part(name, '·', 1), '[A-Za-zÀ-ÿ]{3,}', 'g') AS m(m)
    GROUP BY id
 ) sub
 WHERE c.id = sub.id
