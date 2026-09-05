@@ -242,6 +242,13 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
       const fd = new FormData();
       fd.append('image', small);
       fd.append('code', code.trim());
+      // فاز ۲ — حالت سایه: بردارِ عصبیِ مدلِ روی‌مرورگر. اگر ساختش شکست خورد
+      // یا مرورگر قدیمی بود، فیلد اصلاً فرستاده نمی‌شود و جریان دست‌نخورده است.
+      try {
+        const { embedCardImage } = await import('../lib/cardEmbedding.js');
+        const emb = await embedCardImage(file);
+        if (emb && emb.length) fd.append('embedding', JSON.stringify(emb));
+      } catch { /* بردار اختیاری است */ }
       // Content-Type دستی ست نمی‌شود: مرورگر باید boundary را خودش
       // اضافه کند، وگرنه سرور بدنه را خالی می‌بیند.
       const r = await fetch(`${API}/api/photo-cards/submit`, {

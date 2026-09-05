@@ -10,7 +10,7 @@ module.exports = function registerAdminPhotoCardUpload(deps) {
   const {
     router, pool, adminAuth, requireRole, asyncHandler, imageUpload, audit,
     optimizeUpload, verifyUpload, UUID_RE, safeUnlink, toFloats,
-    fs, path, fpEngine, photoCards, cardDuel, cardCrop,
+    fs, path, fpEngine, photoCards, cardDuel, cardCrop, cardEmbedding,
     MAX_BATCH, DUPLICATE_SIMILARITY, matchSettings,
   } = deps;
 
@@ -110,6 +110,18 @@ module.exports = function registerAdminPhotoCardUpload(deps) {
 
           // همان محافظتِ مسیرِ کاربر: تصویرِ خراب باید ۴۰۰ با پیامِ
           // فارسی بدهد، نه ۵۰۰ با خطای انگلیسیِ VipsJpeg.
+          // بردارِ عصبیِ مرجع که مرورگرِ ادمین (همان مدلِ فاز ۲) ساخته و
+          // در فیلدِ embeddingFront / embeddingBack فرستاده. اختیاری و
+          // خوش‌رفتار: هر مقدار خراب بی‌صدا کنار می‌گذاشته می‌شود.
+          try {
+            const rawEmb = side.kind === 'back'
+              ? (req.body.embeddingBack ?? req.body.embedding)
+              : (req.body.embeddingFront ?? req.body.embedding);
+            const parsed = typeof rawEmb === 'string' ? JSON.parse(rawEmb) : rawEmb;
+            const emb = cardEmbedding && cardEmbedding.sanitizeEmbedding(parsed || null);
+            if (emb) { side.embedding = emb.v; side.embeddingVersion = emb.version; }
+          } catch { /* بدون بردار هم طرح ساخته می‌شود */ }
+
           try {
             side.fp = await fpEngine.fingerprint(buf);
           } catch (imgErr) {
@@ -396,13 +408,16 @@ module.exports = function registerAdminPhotoCardUpload(deps) {
             const r = await client.query(
               `INSERT INTO photo_card_designs
                  (card_type_id, side, image_url, dhash, phash, color_sig, tex_sig,
-                  luma_sig, rgb_sig, text_tokens, width, height, created_by)
-               VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+                  luma_sig, rgb_sig, text_tokens, width, height, created_by,
+                  embedding, embedding_version)
+               VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
                RETURNING id, side, image_url, width, height, created_at`,
               [cardTypeId, side.kind, side.imageUrl, side.fp.dhash, side.fp.phash,
                 side.fp.colorSig, side.fp.texSig, side.fp.lumaSig,
                 side.fp.rgbSig, side.fp.textTokens || [],
-                side.fp.width, side.fp.height, req.admin.id],
+                side.fp.width, side.fp.height, req.admin.id,
+                side.embedding ? JSON.stringify(side.embedding) : null,
+                side.embeddingVersion || null],
             );
             inserted.push({ ...r.rows[0], sideLabel: side.label });
           }

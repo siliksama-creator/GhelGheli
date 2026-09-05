@@ -262,6 +262,17 @@ export function PhotoCardsPage({ request }) {
       setTimeout(() => setUpPhase(2), 1600),
     ];
     try {
+      // فاز ۲ — حالت سایه: بردارِ عصبیِ مرجع را در مرورگر برای هر دو طرف
+      // می‌سازیم تا طرحِ جدید هم فوراً در فضای برداری شرکت کند. اگر مرورگر/
+      // مدل آماده نشد، فیلد فرستاده نمی‌شود و آپلود بدون اختلال انجام می‌شود.
+      let embeddingFront = null;
+      let embeddingBack = null;
+      try {
+        const embMod = await import('../lib/cardEmbedding.js');
+        embeddingFront = await embMod.embedCardImage(file);
+        if (fileBack) embeddingBack = await embMod.embedCardImage(fileBack);
+      } catch { /* اختیاری */ }
+
       const r = await request.postForm('/api/admin/photo-cards/designs', {
         file,
         // پشت فقط وقتی فرستاده می‌شود که انتخاب شده باشد؛ سرور نبودش
@@ -269,6 +280,8 @@ export function PhotoCardsPage({ request }) {
         files: fileBack ? { imageBack: fileBack } : {},
         fields: {
           name: name.trim(),
+          ...(embeddingFront ? { embeddingFront: JSON.stringify(embeddingFront) } : {}),
+          ...(embeddingBack ? { embeddingBack: JSON.stringify(embeddingBack) } : {}),
           pointValue: points || 0,
           cashAmount: cash || 0,
           duelAttack: duel.attack || 50,

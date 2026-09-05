@@ -204,7 +204,7 @@ module.exports = function createPhotoCardRoutes(deps) {
   require('./photoCards/adminUpload')({
     router, pool, adminAuth, requireRole, asyncHandler, imageUpload, audit,
     optimizeUpload, verifyUpload, UUID_RE, safeUnlink, toFloats,
-    fs, path, fpEngine, photoCards, cardDuel, cardCrop,
+    fs, path, fpEngine, photoCards, cardDuel, cardCrop, cardEmbedding,
     MAX_BATCH, DUPLICATE_SIMILARITY, matchSettings,
   });
 
