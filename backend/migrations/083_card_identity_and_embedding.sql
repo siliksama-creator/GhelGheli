@@ -39,14 +39,20 @@ UPDATE card_types c
 SET player_lexemes = sub.lex
 FROM (
   SELECT id,
-         COALESCE((
-           SELECT array_agg(lower(m.w))
-             FROM regexp_matches(split_part(name, '·', 1), '[A-Za-zÀ-ÿ]{3,}', 'g') AS m(w)
-         ), '{}'::text[]) AS lex
+         COALESCE(array_agg(lower(m.w)), '{}'::text[]) AS lex
     FROM card_types
+    CROSS JOIN LATERAL
+      regexp_matches(split_part(name, '·', 1), '[A-Za-zÀ-ÿ]{3,}', 'g') AS m(w)
+   GROUP BY id
 ) sub
 WHERE c.id = sub.id
   AND c.player_lexemes IS NULL;
+
+-- کارت‌هایی که هیچ توکن لاتین نداشتند (مثلاً نام فارسی خالص) آرایهٔ خالی می‌گیرند
+-- تا «هیچ واژه‌نامه‌ای» از NULL (ستون پرنشده) قابل تفکیک باشد.
+UPDATE card_types
+   SET player_lexemes = '{}'::text[]
+ WHERE player_lexemes IS NULL;
 
 -- توکنِ شمارهٔ پیراهن هم از متنِ OCRِ تأییدشدهٔ طرح‌ها استخراج می‌شود تا اگر
 -- ادمین بعداً خواست شماره را صریح بگذارد دادهٔ اولیه موجود باشد (best-effort؛
