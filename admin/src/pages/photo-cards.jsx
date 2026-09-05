@@ -63,6 +63,7 @@ export function PhotoCardsPage({ request }) {
   // می‌دهد. `null` یعنی همه بسته.
   const [openGroup, setOpenGroup] = useState(null);
   const [subFilter, setSubFilter] = useState('pending');
+  const [mismatch, setMismatch] = useState(null);
   const [quickCode, setQuickCode] = useState('');
   const [quickResult, setQuickResult] = useState(null);
   const [quickBusy, setQuickBusy] = useState(false);
@@ -179,8 +180,19 @@ export function PhotoCardsPage({ request }) {
     [request],
   );
 
-  useEffect(() => { loadDesigns(); loadCodes(); loadOptions(); },
-    [loadDesigns, loadCodes, loadOptions]);
+  // داشبوردِ «کدهای مشکوکِ شرکت»: اگر چند ثبتِ مختلف، کدی که انتظارش
+  // «هالند» بوده را با تصویری که سیستم قاطعانه «رودری» دیده بفرستند، آن
+  // سریِ کد احتمالاً دسته‌ای روی کارتِ اشتباه چاپ شده. این گزارش همان را
+  // دسته‌ای نشان می‌دهد (آستانهٔ پیش‌فرض ۳).
+  const loadMismatch = useCallback(
+    () => request('/api/admin/photo-cards/code-mismatch?min=3')
+      .then(r => setMismatch(r.mismatches || []))
+      .catch(() => setMismatch([])),
+    [request],
+  );
+
+  useEffect(() => { loadDesigns(); loadCodes(); loadOptions(); loadMismatch(); },
+    [loadDesigns, loadCodes, loadOptions, loadMismatch]);
   useEffect(() => { loadCodeList(); }, [loadCodeList]);
   useEffect(() => { setSubs(null); loadSubs(subFilter); }, [subFilter, loadSubs]);
 
@@ -1159,6 +1171,46 @@ export function PhotoCardsPage({ request }) {
         )}
       </Card>
 
+      {/* ───────── هشدارِ سریِ کدِ غلط‌برچسبِ شرکت ───────── */}
+      {mismatch && mismatch.length > 0 && (
+        <Card
+          title="هشدار: احتمالِ اشتباه در برچسبِ کدهای چاپ‌شده"
+          subtitle="چند کاربرِ مختلف، کدِ یک کارت را با عکسِ کارتِ دیگری فرستاده‌اند. این الگو معمولاً یعنی شرکت هنگام چاپ، کد را روی کارتِ اشتباه گذاشته است."
+        >
+          <div className="stack">
+            {mismatch.map((m, i) => (
+              <div key={i} className="reviewRow" style={{
+                border: '1px solid rgba(239,68,68,.35)', borderRadius: 10, padding: 12,
+                background: 'rgba(239,68,68,.06)',
+              }}>
+                <div className="reviewBody">
+                  <div className="reviewWhy">
+                    <b><AlertTriangle size={15} style={{ verticalAlign: '-2px', color: '#ef4444' }} /> {fmtNumber(m.count)} ثبتِ ناسازگار</b>
+                    <span>
+                      کدِ «{m.expected_name}» روی عکسِ «{m.seen_name}» دیده شد.
+                    </span>
+                  </div>
+                  <div className="topbar-sub">
+                    آخرین مورد: {fmtDateTime(m.last_seen)}
+                  </div>
+                  <p className="topbar-sub" style={{ marginTop: 6 }}>
+                    اقدام پیشنهادی: دستهٔ کدِ این سری را بررسی و در صورت تأیید،
+                    از بخش «تغییر کارتِ یک دستهٔ ثبت‌شده» آن را به کارتِ درست
+                    («{m.seen_name}») گره بزنید.
+                  </p>
+                </div>
+              </div>
+            ))}
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Button size="sm" variant="secondary" icon={RotateCcw}
+                onClick={() => { loadMismatch(); loadSubs(subFilter); }}>
+                بازخوانی
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* ───────── ۳. صف بررسی ───────── */}
       <Card
         title={`صف بررسی${pendingCount ? ` (${fmtNumber(pendingCount)})` : ''}`}
@@ -1205,6 +1257,20 @@ export function PhotoCardsPage({ request }) {
                   <b>کد معتبر است</b>
                   <span>ولی عکس با هیچ کارتی تطبیق نخورد.
                     مشخص کنید این کد مربوط به کدام کارت است.</span>
+                </div>
+              )}
+              {(s.review_reason === 'code_mismatch_suspected'
+                || s.review_reason === 'type_mismatch') && (
+                <div className="reviewWhy" style={{
+                  border: '1px solid rgba(239,68,68,.3)', background: 'rgba(239,68,68,.06)',
+                  borderRadius: 8, padding: 8,
+                }}>
+                  <b><AlertTriangle size={14} style={{ verticalAlign: '-2px', color: '#ef4444' }} /> کد و عکس دو کارتِ متفاوت‌اند</b>
+                  <span>
+                    {s.review_reason === 'code_mismatch_suspected'
+                      ? 'سیستم با اطمینانِ بالا کارتِ دیگری را در عکس دید، ولی چون این کارت جایزهٔ نقدی دارد خودکار اصلاح نکرد. کارتِ درست را از منوی پایین انتخاب و تأیید کنید؛ اگر این الگو تکرار شود ممکن است کدها روی کارتِ اشتباه چاپ شده باشند.'
+                      : 'عکس با کارتی که کد می‌گوید هم‌خوان نیست. ممکن است عکس/کدِ دو کارت جابه‌جا شده باشند.'}
+                  </span>
                 </div>
               )}
               <b>{s.card_type_name || 'نامشخص'}</b>
