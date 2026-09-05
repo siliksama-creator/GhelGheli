@@ -88,7 +88,7 @@ class CardEmbedding {
       if (rgba == null) return null;
 
       final raw = rgba.buffer.asUint8List();
-      final n = size * size;
+      const n = size * size;
       final input = Float32List(3 * n);
       for (var y = 0; y < size; y++) {
         for (var x = 0; x < size; x++) {
