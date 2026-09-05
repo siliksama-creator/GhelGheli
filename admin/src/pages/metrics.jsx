@@ -175,11 +175,18 @@ export function MetricsPage({ request }) {
               boxShadow: 'inset 0 4px 20px rgba(0,0,0,0.5)',
             }}
           >
-            {data?.pm2Logs ? (
-              data.pm2Logs.trim()
-            ) : (
+            {loading && !data ? (
               <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', color: '#888' }}>
                 در حال بارگذاری لاگ‌ها...
+              </div>
+            ) : data?.pm2Logs?.trim() ? (
+              data.pm2Logs.trim()
+            ) : (
+              // این حالت دیگر «در حال بارگذاری» نیست: داده آمده ولی فایل لاگ
+              // خطایی ندارد (گره سالم است). قبلاً همین حالت به‌اشتباه متنِ
+              // «در حال بارگذاری…» را تا ابد نشان می‌داد چون رشتهٔ خالی falsy بود.
+              <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', color: '#34d399', fontWeight: 700 }}>
+                ✓ هیچ خطایی در لاگ سرور ثبت نشده است — همهٔ گره‌ها سالم‌اند
               </div>
             )}
           </div>

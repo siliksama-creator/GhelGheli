@@ -53,13 +53,13 @@
     "sharp": "^0.35.3",
     "socket.io": "^4.7.5",
     "swagger-ui-express": "^5.0.1",
-    "yaml": "^2.9.0"
+    "yaml": "^2.9.0",
+    "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
     "brace-expansion": "^5.0.9",
     "eslint": "^9.39.5",
-    "nodemon": "^3.1.4",
-    "socket.io-client": "^4.8.3"
+    "nodemon": "^3.1.4"
   },
   "overrides": {
     "uuid": "11.1.1"

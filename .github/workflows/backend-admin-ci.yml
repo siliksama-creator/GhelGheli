@@ -198,6 +198,10 @@ jobs:
       # بشناسندش؛ وگرنه اندروید رشتهٔ خام «football» را چاپ می‌کند — که
       # دقیقاً یک‌بار رخ داد و هیچ استثنایی پرتاب نکرد.
       - run: npm run test:icon-parity
+      # صفحهٔ مانیتورینگِ پنل ادمین: رشتهٔ خالیِ pm2Logs نباید «در حال بارگذاری»
+      # معنی شود و بک‌اند باید در حالتِ سالم یک متنِ صریح برگرداند و هر دو گره
+      # (game/http) را بخواند. این گارد آن قرارداد را بین بک‌اند و ادمین قفل می‌کند.
+      - run: npm run test:admin-monitoring
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - name: Serve the built app

@@ -2429,17 +2429,60 @@ async function readRedisMemory() {
 
 async function readPm2Logs() {
   try {
-    let logPath = '/root/.pm2/logs/ghelgheli-api-error-3.log';
+    // همهٔ گره‌های تولید (game + http) را از PM2 می‌خوانیم؛ قبلاً فقط
+    // ghelgheli-api خوانده می‌شد و خطای گرهٔ http هیچ‌وقت در پنل دیده نمی‌شد.
+    let apps = [];
     try {
       const { stdout } = await execP('pm2 jlist', { timeout: 3000 });
-      const jlist = JSON.parse(stdout);
-      const app = jlist.find(x => x.name === 'ghelgheli-api');
-      if (app?.pm2_env?.pm_err_log_path) logPath = app.pm2_env.pm_err_log_path;
-    } catch (_) { /* keep default path */ }
+      apps = JSON.parse(stdout)
+        .filter(x => x.name === 'ghelgheli-api' || x.name === 'ghelgheli-api-http');
+    } catch (_) { /* مسیر پیش‌فرض پایین */ }
 
-    if (!fs.existsSync(logPath)) return 'فایل لاگ پیدا نشد';
-    const { stdout } = await execP(`tail -n 100 ${logPath}`, { timeout: 3000 });
-    return stdout;
+    const chunks = [];
+    for (const app of apps) {
+      const logPath = app?.pm2_env?.pm_err_log_path;
+      if (!logPath) continue;
+      const label = app.name === 'ghelgheli-api' ? 'گره بازی (game)'
+        : app.name === 'ghelgheli-api-http' ? 'گره HTTP'
+        : app.name;
+      let body = '';
+      try {
+        if (fs.existsSync(logPath)) {
+          const { stdout } = await execP(`tail -n 100 ${logPath}`, { timeout: 3000 });
+          body = stdout;
+        }
+      } catch (_) { /* ناتوان در خواندن این گره */ }
+      // فایل جاری خالی است (از آخرین بوت هیچ خطایی نبوده)؛ آخرین آرشیو چرخش‌یافته
+      // را بخوان تا اگر خطای اخیری قبل از بوت فعلی بوده خاموش نماند.
+      if (!body.trim()) {
+        try {
+          const { stdout } = await execP(
+            `ls -1t ${logPath}.* 2>/dev/null | head -1`, { timeout: 2000 });
+          const rotated = stdout.trim();
+          if (rotated) {
+            const f = rotated.endsWith('.gz')
+              ? `gzip -dc ${rotated}` : `tail -n 40 ${rotated}`;
+            const { stdout: old } = await execP(`${f}`, { timeout: 3000 });
+            body = `(از آرشیو چرخش‌یافتهٔ ${rotated.split('/').pop()})\n${old}`;
+          }
+        } catch (_) { /* آرشیویی نیست */ }
+      }
+      chunks.push(
+        body.trim()
+          ? `# ───── ${label} · ${app.name} ─────\n${body.trim()}`
+          : `# ───── ${label} · ${app.name} ─────\n(هیچ خطایی در لاگ نیست — گره سالم)`,
+      );
+    }
+
+    if (!chunks.length) {
+      const fallback = '/home/ghelgheli/.pm2/logs/ghelgheli-api-error-0.log';
+      if (fs.existsSync(fallback)) {
+        const { stdout } = await execP(`tail -n 100 ${fallback}`, { timeout: 3000 });
+        return stdout.trim() || 'در فایل لاگ هیچ خطایی ثبت نشده — سرور سالم است.';
+      }
+      return 'فایل لاگ پیدا نشد';
+    }
+    return chunks.join('\n\n');
   } catch (e) {
     return `خطا در خواندن لاگ: ${e.message}`;
   }
