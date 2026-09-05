@@ -61,21 +61,12 @@ jobs:
           fi
 
       # پلاگینِ onnxruntime (مدلِ بردارِ تشخیص کارت، فاز ۲) و وابسته‌های androidx
-      # آن علیه android-34+ کامپایل می‌شوند؛ `flutter create` پیش‌فرضِ کمتری
-      # می‌گذارد و checkReleaseAarMetadata می‌شکند. مثل minSdk، چون android/ در
-      # هر اجرا بازساخته می‌شود این اصلاح هم باید همینجا اعمال شود.
+      # چند پلاگین دیگر علیه android-34+ کامپایل می‌شوند؛ `flutter create`
+      # پیش‌فرضِ کمتری می‌گذارد و checkReleaseAarMetadata می‌شکند. این پچ
+      # compileSdk را برای **همهٔ ماژول‌ها** (نه فقط app) بالا می‌برد. مثل
+      # minSdk، چون android/ در هر اجرا بازساخته می‌شود این اصلاح همینجاست.
       - name: Bump compileSdk for onnxruntime
-        run: |
-          cd mobile
-          if [ -f android/app/build.gradle.kts ]; then
-            sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 35/' android/app/build.gradle.kts
-          elif [ -f android/app/build.gradle ]; then
-            sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 35/' android/app/build.gradle
-          fi
-          # گاهی فلاتر از compileSdk = 33 رد می‌کند؛ هر مقدار که بود به ۳۵ برسان.
-          sed -i 's/compileSdk *= *[0-9]\+/compileSdk = 35/' android/app/build.gradle.kts 2>/dev/null || true
-          sed -i 's/compileSdkVersion *[0-9]\+/compileSdkVersion 35/' android/app/build.gradle 2>/dev/null || true
-          grep -n "compileSdk" android/app/build.gradle.kts android/app/build.gradle 2>/dev/null || true
+        run: cd mobile && bash tool/patch_compile_sdk.sh
 
       # `flutter create` only puts INTERNET in the DEBUG manifest; the
       # release manifest it generates has NO permissions, so the shipped APK
