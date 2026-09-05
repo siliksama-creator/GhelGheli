@@ -988,6 +988,12 @@ async function closeActiveSeason({ force = false, seasonId = null } = {}) {
       ).catch((e) => console.error('[league] notify failed:', e.message));
     }
 
+    // جدولِ لیگ یک‌جا عوض شد: فصلِ جاری بسته، فصلِ تازه ساخته شد و تبِ
+    // «برندگان قبل» پر شد. بیننده‌های بازِ صفحه باید بی‌درنگ تازه شوند.
+    // lazy require: leagueService پایین‌تر از سیگنال در گراف ماژول است و
+    // سیگنال هم io را از server می‌گیرد؛ require درون‌تابعه حلقه را می‌شکند.
+    try { require('./leaderboardSignal').leaderboardChanged(); } catch { /* best-effort */ }
+
     return {
       seasonId: season.id,
       // ⚠️ `leaders` حالا ردهٔ غیرنقدی را هم شامل می‌شود، پس دیگر
@@ -1197,6 +1203,12 @@ async function approvePayouts(payoutId, adminId) {
       `جایزهٔ رتبهٔ ${n.rank} به مبلغ ${n.amount.toLocaleString('fa-IR')} `
       + 'تومان به کیف پول شما واریز شد.',
     ).catch((e) => console.error('[league] payout notify failed:', e.message));
+  }
+  // تأییدِ واریز ممکن است شمارندهٔ سکه را ریست کرده باشد (نگاه کنید به
+  // شرحِ بالای همین تابع)؛ پس رتبه‌بندیِ جاری می‌تواند عوض شده باشد. اگر
+  // واقعاً پرداختی انجام شد (paid>0) سیگنال بده.
+  if (paid > 0) {
+    try { require('./leaderboardSignal').leaderboardChanged(); } catch { /* best-effort */ }
   }
   return { paid, amount: total, skipped, coinsReset };
 }
