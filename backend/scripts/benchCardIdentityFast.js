@@ -60,16 +60,29 @@ async function main() {
                        .webp({ quality: 55 }).toBuffer(),
   };
 
+  // نمونه‌گیری: OCR روی VPS تک‌هسته‌ای گران است. روی زیرمجموعه‌ای از طرح‌ها
+  // (به‌طور قطعی، نه تصادفی — تکرارپذیر) و چهار سناریوی گویا اندازه می‌گیریم تا
+  // روی دیتای واقعی عدد بدهد بدون نیم‌ساعت CPU. متغیر محیطی BENCH_ALL=1 همه را
+  // می‌سنجد.
+  const STEP = process.env.BENCH_ALL === '1' ? 1 : 2;   // هر ۲ طرح یکی
+  const USE_SCEN = process.env.BENCH_ALL === '1'
+    ? Object.keys(scenarios)
+    : ['clean', 'blur', 'harsh', 'rotate'];
+  const picked = designs.filter((_, idx) => idx % STEP === 0);
+  console.log(`سنجش روی ${picked.length} طرح × ${USE_SCEN.length} سناریو (BENCH_ALL=1 برای همه)`);
+
   const stat = () => ({ r1: 0, r1id: 0, idTop3: 0, auto: 0, bad: 0, review: 0, n: 0 });
   const R = {};
-  for (const s of Object.keys(scenarios)) R[s] = stat();
+  for (const s of USE_SCEN) R[s] = stat();
   const confuse = [];
 
   for (let i = 0; i < designs.length; i++) {
+    if (!picked.includes(designs[i])) continue;
     const truth = designs[i];
     const orig = await fs.promises.readFile(truth._path);
     const truthRef = refFps[i];
     for (const [sname, fn] of Object.entries(scenarios)) {
+      if (!USE_SCEN.includes(sname)) continue;
       let qb; try { qb = await fn(orig); } catch { continue; }
       let qfp; try { qfp = await fp.fingerprint(qb); } catch { continue; }
       const match = fp.matchAgainst(qfp, refFps);
