@@ -28,6 +28,9 @@
  */
 const crypto = require('crypto');
 const { io } = require('socket.io-client');
+// فقط فازهای مدیریتی (بستن فصل/پرداخت) که به یک «برندهٔ نقدیِ قطعی» نیاز
+// دارند از دیتابیس استفاده می‌کنند؛ DATABASE_URL فقط روی CI/استیجینگ ست است.
+const pg = (() => { try { return require('pg'); } catch { return null; } })();
 
 const BASE = process.env.BASE || `http://127.0.0.1:${process.env.PORT || 4000}`;
 const ALLOW_PROD = process.env.ALLOW_PROD === 'yes-i-know';
@@ -73,6 +76,29 @@ function signBatch(token, body, nonce) {
     body.level, body.levelTaps, body.seq, nonce,
   ].join('|');
   return crypto.createHmac('sha256', signingKey(token)).update(canonical, 'utf8').digest('hex');
+}
+
+// بازیکنِ تست را در فصلِ فعالِ جاری، صدرنشینِ سکه می‌کند تا هنگام بستن،
+// رتبهٔ ۱ (جایزهٔ نقدی) را ببرد. مستقیم به دیتابیس می‌نویسد چون این فاز
+// فقط روی محیطِ دورریختنیِ CI/استیجینگ اجرا می‌شود (DATABASE_URL)؛ هدف
+// آزمودنِ «پرداخت ⇒ سیگنال» است نه ساختِ سکه از مسیر بازی.
+async function seedTopCoins(userId) {
+  const dsn = process.env.DATABASE_URL;
+  if (!dsn) throw new Error('برای فاز مدیریتی DATABASE_URL لازم است (CI/استیجینگ)');
+  const pool = new pg.Pool({ connectionString: dsn });
+  try {
+    await pool.query(
+      `INSERT INTO league_leaderboard_entries (league_season_id, user_id, points, coins)
+       SELECT s.id, $1, 0, 99999
+         FROM league_seasons s
+        WHERE s.status='active' ORDER BY s.starts_at DESC LIMIT 1
+       ON CONFLICT (league_season_id, user_id)
+       DO UPDATE SET coins = EXCLUDED.coins, updated_at = NOW()`,
+      [userId],
+    );
+  } finally {
+    await pool.end();
+  }
 }
 
 async function main() {
@@ -186,6 +212,19 @@ async function main() {
     closerViewer.emit('leaderboard:subscribe');
     closerViewer.on('leaderboard:update', () => { closeEvents += 1; });
     await sleep(700);
+
+    // بازیکنِ تست را در فصلِ جاری صدرنشینِ سکه کن تا حتماً رتبهٔ ۱ نقدی
+    // را ببرد (در غیر این صورت، بسته به سهمیه/سکهٔ tap ممکن است برندهٔ
+    // نقدی ساخته نشود و فاز پرداخت paid=0 بدهد).
+    let seeded = false;
+    try {
+      await seedTopCoins(player.id);
+      seeded = true;
+    } catch (e) {
+      console.log('   (seed مستقیم سکه ممکن نشد:', e.message, '— به مسیر بازی اکتفا می‌شود)');
+    }
+    ok('برندهٔ نقدی برای فاز پرداخت آماده شد (seed سکه در دیتابیس تست)',
+      seeded, 'برای قطعیت پرداخت، DATABASE_URL روی محیط تست لازم است');
 
     // ── آماده‌سازیِ یک جایزهٔ نقدیِ واقعی برای فازِ پرداخت ────────────
     // جدولِ جوایز فصلِ جاری را طوری می‌گذاریم که رتبهٔ ۱ مبلغِ کوچکی
