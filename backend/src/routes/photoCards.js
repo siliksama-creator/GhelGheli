@@ -22,6 +22,7 @@ const rateLimit = require('express-rate-limit');
 const fpEngine = require('../services/imageFingerprint');
 const photoCards = require('../services/photoCardService');
 const cardIdentity = require('../services/cardIdentity');
+const cardEmbedding = require('../services/cardEmbedding');
 const imageQuality = require('../services/imageQuality');
 const cardDuel = require('../services/cardDuelService');
 const cardCrop = require('../services/cardCrop');
@@ -205,6 +206,44 @@ module.exports = function createPhotoCardRoutes(deps) {
     fs, path, fpEngine, photoCards, cardDuel, cardCrop,
     MAX_BATCH, DUPLICATE_SIMILARITY, matchSettings,
   });
+
+  /**
+   * ذخیرهٔ بردارِ عصبیِ **مرجع** برای یک طرح (فاز ۲).
+   *
+   * مدل روی کلاینتِ ادمین (وب) اجرا می‌شود و بردارِ عکسِ مرجع را همراه
+   * `designId` می‌فرستد؛ سرور فقط پالوده/نرمال و ذخیره می‌کند. وقتی برای
+   * طرحی بردار باشد، لایهٔ فیوژن (`cardIdentity`) در ثبتِ کاربران از آن
+   * استفاده می‌کند.
+   *
+   * حالت سایه: فعال‌شدنِ تصمیمِ خودکار بر پایهٔ برداز، بعد از سنجشِ توافق
+   * با ادمین روی دیتای واقعی است.
+   */
+  router.post(
+    '/admin/photo-cards/designs/:id/embedding',
+    adminAuth, validateUuid('id'), requireRole('support'),
+    asyncHandler(async (req, res) => {
+      if (!UUID_RE.test(String(req.params.id))) {
+        return res.status(400).json({ message: 'شناسه معتبر نیست' });
+      }
+      const emb = cardEmbedding.sanitizeEmbedding(
+        req.body?.embedding ?? req.body?.v ?? null);
+      if (!emb) {
+        return res.status(422).json({
+          message: `بردار معتبر نیست؛ باید آرایهٔ ${cardEmbedding.EMBED_DIM} عددی باشد.`,
+        });
+      }
+      const { rows } = await pool.query(
+        `UPDATE photo_card_designs
+            SET embedding=$1, embedding_version=$2, updated_at=NOW()
+          WHERE id=$3 RETURNING id, embedding_version`,
+        [JSON.stringify(emb.v), emb.version, req.params.id],
+      );
+      if (!rows[0]) return res.status(404).json({ message: 'طرح پیدا نشد' });
+      await audit(req.admin.id, 'set_design_embedding', 'photo_card_designs',
+        rows[0].id, null, { version: emb.version });
+      res.json({ ok: true, id: rows[0].id, embeddingVersion: emb.version });
+    }),
+  );
 
   router.patch(
     '/admin/photo-cards/designs/:id',
@@ -442,6 +481,48 @@ module.exports = function createPhotoCardRoutes(deps) {
       res.json({ mismatches: rows, minCount });
     }));
 
+  /**
+   * آمارِ حالتِ سایهٔ بردارِ عصبی (فاز ۲).
+   *
+   * نرخِ توافقِ نظرِ مدل با تصمیمِ نهایی (خودکار/ادمین) روی ثبت‌های واقعی را
+   * برمی‌گرداند، تا تصمیمِ «وصلِ مدل به تصمیم» داده‌محور گرفته شود. وقتی هنوز
+   * هیچ برداری نیامده، همه صفر است.
+   */
+  router.get('/admin/photo-cards/embedding-shadow', adminAuth,
+    asyncHandler(async (req, res) => {
+      const since = req.query.days
+        ? `NOW() - (GREATEST(1, LEAST(365, $1::int)) || ' days')::interval`
+        : `'-infinity'::timestamptz`;
+      const days = req.query.days ? [Number(req.query.days)] : [];
+      const { rows } = await pool.query(
+        `WITH a AS (
+            SELECT * FROM photo_card_embedding_agreement
+             WHERE created_at >= ${since}
+          )
+          SELECT (SELECT count(*) FROM a)::int                                   AS total,
+                 (SELECT count(*) FROM a WHERE agreed)::int                      AS agreed,
+                 (SELECT count(*) FROM a WHERE NOT agreed)::int                  AS disagreed,
+                 (SELECT count(DISTINCT embedding_version)
+                    FROM photo_card_designs WHERE embedding IS NOT NULL)::int    AS designs_with_embedding,
+                 (SELECT count(*) FROM photo_card_designs
+                    WHERE embedding IS NOT NULL)::int                            AS embedding_rows`,
+        days);
+      const r = rows[0] || {};
+      const total = Number(r.total || 0);
+      const agreed = Number(r.agreed || 0);
+      res.json({
+        total,
+        agreed,
+        disagreed: Number(r.disagreed || 0),
+        agreementRate: total ? Number((100 * agreed / total).toFixed(1)) : null,
+        designsWithEmbedding: Number(r.designs_with_embedding || 0),
+        embeddingRows: Number(r.embedding_rows || 0),
+        // آستانهٔ پیشنهادیِ نقشهٔ راه برای خروج از حالت سایه.
+        activateThresholdPct: 99,
+        readyToActivate: total >= 100 && total ? (100 * agreed / total) >= 99 : false,
+      });
+    }));
+
   router.get('/admin/photo-cards/submissions', adminAuth, asyncHandler(async (req, res) => {
     const status = ['pending', 'approved', 'rejected'].includes(req.query.status)
       ? req.query.status : 'pending';
@@ -582,6 +663,31 @@ module.exports = function createPhotoCardRoutes(deps) {
                 SET chosen_design_id=$1, decision_path='admin' WHERE id=$2`,
             [design?.id ?? null, req.params.id],
           );
+
+          // ── ردیفِ توافقِ حالت سایه برای تصمیمِ دستیِ ادمین ──
+          //
+          // اگر پرونده بردار/نظرِ هویتی داشته، نظرِ مدل را کنار کارتی که
+          // ادمین در عمل تأیید کرد می‌گذارد. تصمیمِ ادمین مرجعِ طلایی است.
+          if (sub.img_embedding && sub.identity_top_design_id) {
+            const t = await client.query(
+              `SELECT card_type_id FROM photo_card_designs WHERE id=$1`,
+              [sub.identity_top_design_id]);
+            const modelCardType = t.rows[0]?.card_type_id || null;
+            const finalCardType = design?.card_type_id || expectedTypeId || null;
+            await client.query(
+              `INSERT INTO photo_card_embedding_agreement
+                 (submission_id, model_design_id, model_card_type_id,
+                  model_score, model_margin, final_card_type_id,
+                  decided_by, agreed, embedding_version)
+               VALUES($1,$2,$3,$4,$5,$6,'admin',$7,$8)`,
+              [sub.id, sub.identity_top_design_id, modelCardType,
+               sub.identity_top_score, sub.identity_margin,
+               finalCardType,
+               !!(modelCardType && finalCardType
+                  && modelCardType === finalCardType),
+               sub.embedding_version || null],
+            );
+          }
         } else {
           // رد شد: کد آزاد می‌شود تا هدر نرود. کاربر ممکن است با عکس
           // بهتر دوباره تلاش کند، یا کد واقعاً مالِ کس دیگری باشد.
@@ -921,22 +1027,31 @@ module.exports = function createPhotoCardRoutes(deps) {
         // بردارِ عصبیِ کاربر اگر کلاینت فرستاده باشد (مدلِ روی‌گوشی در فاز ۲)
         // از `req.body.embedding` خوانده می‌شود؛ حالا اغلب فقط متنِ OCR است.
         // ═════════════════════════════════════════════════════════════
-        let queryEmbedding = null;
-        try {
-          if (req.body.embedding) {
-            const parsed = typeof req.body.embedding === 'string'
-              ? JSON.parse(req.body.embedding) : req.body.embedding;
-            if (Array.isArray(parsed) && parsed.every(n => typeof n === 'number')) {
-              queryEmbedding = parsed;
-            }
-          }
-        } catch { /* embedding خراب → نادیده، فقط متن/تصویر */ }
+        // بردارِ عصبیِ مدلِ روی‌گوشی (فاز ۲). با sanitizer مشترک پالوده و
+        // نرمال می‌شود؛ هر ورودیِ خراب/بدبُعد بی‌صدا کنار گذاشته می‌شود.
+        const emb = cardEmbedding.sanitizeEmbedding(
+          req.body.embedding ?? null);
+        const queryEmbedding = emb ? emb.v : null;
+        const embeddingVersion = emb ? emb.version : null;
 
         const identity = designsRes.rows.length
           ? cardIdentity.rankIdentity(
               { textTokens: queryFp.textTokens, embedding: queryEmbedding },
               designFps)
           : null;
+
+        // ── حالتِ سایه: نظرِ لایهٔ هویت (مستقل از تصمیم) برای ممیزی ──
+        //
+        // این مقادیر در هر ثبت دارای بردار ذخیره می‌شوند تا بعداً ببینیم
+        // «اگر مدل تصمیم می‌گرفت با ادمین موافق بود؟». در تصمیمِ فعلی دخالت
+        // نمی‌کنند؛ `decideSubmission` بر همان منطقِ قبلی استوار است.
+        const identityTop = identity && identity.ranked && identity.ranked[0];
+        const shadowId = {
+          topDesignId: identityTop ? identityTop.design.id : null,
+          topScore: identityTop ? identityTop.score : null,
+          margin: identity ? identity.margin : null,
+          byEmbedding: !!(identityTop && identityTop.byEmbedding),
+        };
 
         // ═══════════════════════════════════════════════════════════════
         // چرا هیچ محدودیتی روی «عکسِ تکراری» وجود ندارد
@@ -1081,8 +1196,11 @@ module.exports = function createPhotoCardRoutes(deps) {
                (user_id, code_id, matched_design_id, match_score, match_margin,
                 user_image_path, status, review_reason, decision_path,
                 img_dhash, img_phash, img_color, img_tex, img_luma, img_rgb,
-                img_text)
-             VALUES($1,$2,$3,$4,$5,$6,'pending',$7,$13,$8,$9,$10,$11,$12,$14,$15)
+                img_text, img_embedding, embedding_version,
+                identity_top_design_id, identity_top_score,
+                identity_margin, identity_by_embedding)
+             VALUES($1,$2,$3,$4,$5,$6,'pending',$7,$13,$8,$9,$10,$11,$12,$14,$15,
+                    $16,$17,$18,$19,$20,$21)
              RETURNING id`,
             [req.user.id, codeId, match.design?.id ?? null,
               match.score, match.margin, savedPath, reason,
@@ -1092,7 +1210,11 @@ module.exports = function createPhotoCardRoutes(deps) {
               // روزی الگوی مشکوکی دیده شد، داده‌اش هست.
               queryFp.dhash, queryFp.phash, queryFp.colorSig, queryFp.texSig,
               queryFp.lumaSig, decision.path, queryFp.rgbSig,
-              queryFp.textTokens || []],
+              queryFp.textTokens || [],
+              // فاز ۲ — حالت سایه: بردار و نظر هویتیِ عصبی (نه در تصمیم).
+              queryEmbedding, embeddingVersion,
+              shadowId.topDesignId, shadowId.topScore,
+              shadowId.margin, shadowId.byEmbedding],
           );
 
           return res.json({
@@ -1166,19 +1288,49 @@ module.exports = function createPhotoCardRoutes(deps) {
           //
           // عکسِ خودِ کاربر ذخیره نمی‌شود (خواستهٔ مالک)، فقط این چند
           // صد بایت.
-          await client.query(
+          const insSub = await client.query(
             `INSERT INTO photo_card_submissions
                (user_id, code_id, matched_design_id, chosen_design_id,
                 match_score, match_margin, status, decision_path,
                 img_dhash, img_phash, img_color, img_tex, img_luma, img_rgb,
-                img_text)
-             VALUES($1,$2,$3,$3,$4,$5,'approved',$6,$7,$8,$9,$10,$11,$12,$13)`,
+                img_text, img_embedding, embedding_version,
+                identity_top_design_id, identity_top_score,
+                identity_margin, identity_by_embedding)
+             VALUES($1,$2,$3,$3,$4,$5,'approved',$6,$7,$8,$9,$10,$11,$12,$13,
+                    $14,$15,$16,$17,$18,$19)
+             RETURNING id`,
             [req.user.id, codeId, design?.id ?? null,
               match.score, match.margin, decision.path,
               queryFp.dhash, queryFp.phash, queryFp.colorSig,
               queryFp.texSig, queryFp.lumaSig, queryFp.rgbSig,
-              queryFp.textTokens || []],
+              queryFp.textTokens || [],
+              queryEmbedding, embeddingVersion,
+              shadowId.topDesignId, shadowId.topScore,
+              shadowId.margin, shadowId.byEmbedding],
           );
+
+          // ── ردیفِ توافقِ حالت سایه (فقط وقتی برداری در کار بوده) ──
+          //
+          // نظرِ مدل عصبی را کنار تصمیمِ خودکار می‌گذارد تا نرخِ توافق
+          // سنجیده شود. این INSERT هیچ تأثیری روی نتیجهٔ کاربر ندارد.
+          if (queryEmbedding && shadowId.topDesignId) {
+            const modelRow = designFps
+              .find(d => d.id === shadowId.topDesignId) || null;
+            await client.query(
+              `INSERT INTO photo_card_embedding_agreement
+                 (submission_id, model_design_id, model_card_type_id,
+                  model_score, model_margin, final_card_type_id,
+                  decided_by, agreed, embedding_version)
+               VALUES($1,$2,$3,$4,$5,$6,'auto',$7,$8)`,
+              [insSub.rows[0].id, shadowId.topDesignId,
+               modelRow ? modelRow.card_type_id : null,
+               shadowId.topScore, shadowId.margin,
+               decision.cardTypeId ?? null,
+               !!(modelRow && decision.cardTypeId
+                  && modelRow.card_type_id === decision.cardTypeId),
+               embeddingVersion],
+            );
+          }
           await client.query('COMMIT');
         } catch (e) {
           await client.query('ROLLBACK').catch(() => {});
