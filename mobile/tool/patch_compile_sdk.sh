@@ -15,7 +15,7 @@
 set -Eeuo pipefail
 
 cd "$(dirname "$0")/.."
-SDK=35
+SDK=36
 MARKER="GG_COMPILE_SDK_PATCH"
 
 # فایل سطح پروژه (root) را پیدا کن.
