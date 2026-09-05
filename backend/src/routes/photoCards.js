@@ -496,10 +496,15 @@ module.exports = function createPhotoCardRoutes(deps) {
         ? `NOW() - (GREATEST(1, LEAST(365, $1::int)) || ' days')::interval`
         : `'-infinity'::timestamptz`;
       const days = req.query.days ? [Number(req.query.days)] : [];
+      // نرخِ توافق فقط روی ردیف‌هایی معنا دارد که با همین نسخهٔ مدلِ فعال
+      // ساخته شده‌اند؛ ردیفِ نسخهٔ قدیمی (v1) نباید تصمیمِ فعال‌سازی v2 را
+      // آلوده کند (فضای برداریِ متفاوتی داشته).
+      const curVer = cardEmbedding.EMBEDDING_VERSION;
       const { rows } = await pool.query(
         `WITH a AS (
             SELECT * FROM photo_card_embedding_agreement
              WHERE created_at >= ${since}
+               AND embedding_version = $${days.length + 1}
           )
           SELECT (SELECT count(*) FROM a)::int                                   AS total,
                  (SELECT count(*) FROM a WHERE agreed)::int                      AS agreed,
@@ -507,8 +512,9 @@ module.exports = function createPhotoCardRoutes(deps) {
                  (SELECT count(DISTINCT embedding_version)
                     FROM photo_card_designs WHERE embedding IS NOT NULL)::int    AS designs_with_embedding,
                  (SELECT count(*) FROM photo_card_designs
-                    WHERE embedding IS NOT NULL)::int                            AS embedding_rows`,
-        days);
+                    WHERE embedding IS NOT NULL
+                      AND embedding_version = $${days.length + 1})::int          AS embedding_rows`,
+        days.concat(curVer));
       const r = rows[0] || {};
       const total = Number(r.total || 0);
       const agreed = Number(r.agreed || 0);
