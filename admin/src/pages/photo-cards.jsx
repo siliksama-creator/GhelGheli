@@ -64,6 +64,7 @@ export function PhotoCardsPage({ request }) {
   const [openGroup, setOpenGroup] = useState(null);
   const [subFilter, setSubFilter] = useState('pending');
   const [mismatch, setMismatch] = useState(null);
+  const [shadow, setShadow] = useState(null);
   const [quickCode, setQuickCode] = useState('');
   const [quickResult, setQuickResult] = useState(null);
   const [quickBusy, setQuickBusy] = useState(false);
@@ -191,8 +192,17 @@ export function PhotoCardsPage({ request }) {
     [request],
   );
 
-  useEffect(() => { loadDesigns(); loadCodes(); loadOptions(); loadMismatch(); },
-    [loadDesigns, loadCodes, loadOptions, loadMismatch]);
+  // وضعیت «حالت سایه»ٔ بردارِ عصبی (فاز ۲): مدل روی گوشی بردار می‌فرستد ولی
+  // هنوز تصمیم نمی‌گیرد؛ این عدد نرخِ توافقش با تصمیم نهایی را نشان می‌دهد.
+  const loadShadow = useCallback(
+    () => request('/api/admin/photo-cards/embedding-shadow')
+      .then(r => setShadow(r))
+      .catch(() => setShadow(null)),
+    [request],
+  );
+
+  useEffect(() => { loadDesigns(); loadCodes(); loadOptions(); loadMismatch(); loadShadow(); },
+    [loadDesigns, loadCodes, loadOptions, loadMismatch, loadShadow]);
   useEffect(() => { loadCodeList(); }, [loadCodeList]);
   useEffect(() => { setSubs(null); loadSubs(subFilter); }, [subFilter, loadSubs]);
 
@@ -1170,6 +1180,36 @@ export function PhotoCardsPage({ request }) {
           <p className="topbar-sub">فقط ۳۰۰ کدِ اول نشان داده می‌شود — برای یافتن کدِ خاص از جست‌وجو استفاده کنید.</p>
         )}
       </Card>
+
+      {/* ───────── وضعیت «حالت سایه»ٔ بردارِ عصبی (فاز ۲) ───────── */}
+      {shadow && (
+        <Card title="موتور تشخیص هوشمند — حالت آزمایشی (Shadow)"
+          subtitle="مدل روی گوشی، عکس را به بردار معنایی تبدیل می‌کند و نظرش کنار تصمیم فعلی ذخیره می‌شود؛ هنوز در تأیید خودکار دخالت نمی‌کند تا دقتش روی دادهٔ واقعی به حدِ لازم برسد.">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+            <div style={{ flex: '1 1 140px', padding: 12, borderRadius: 10, background: 'var(--bg-subtle, rgba(0,0,0,.04))' }}>
+              <div className="topbar-sub">طرح‌های مرجع دارای بردار</div>
+              <div style={{ fontSize: 24, fontWeight: 700 }}>{fmtNumber(shadow.embeddingRows)}</div>
+            </div>
+            <div style={{ flex: '1 1 140px', padding: 12, borderRadius: 10, background: 'var(--bg-subtle, rgba(0,0,0,.04))' }}>
+              <div className="topbar-sub">ثبت‌های دارای نظر مدل</div>
+              <div style={{ fontSize: 24, fontWeight: 700 }}>{fmtNumber(shadow.total)}</div>
+            </div>
+            <div style={{ flex: '1 1 140px', padding: 12, borderRadius: 10, background: 'var(--bg-subtle, rgba(0,0,0,.04))' }}>
+              <div className="topbar-sub">نرخ توافق مدل با تصمیم نهایی</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: shadow.readyToActivate ? '#16a34a' : undefined }}>
+                {shadow.agreementRate == null ? '–' : `${shadow.agreementRate}٪`}
+              </div>
+            </div>
+          </div>
+          <p className="topbar-sub" style={{ marginTop: 10 }}>
+            {shadow.total < 100
+              ? `هنوز داده کافی برای قضاوت نیست (حداقل ۱۰۰ ثبتِ دارای بردار لازم است). به‌محض اینکه اپ نسخهٔ فرستندهٔ بردار منتشر شود این اعداد شروع به پر شدن می‌کنند.`
+              : shadow.readyToActivate
+                ? `توافق از ${shadow.activateThresholdPct}٪ گذشته — می‌توان موتور هوشمند را به تأیید خودکار وصل کرد.`
+                : `توافق هنوز به ${shadow.activateThresholdPct}٪ نرسیده؛ مدل در حالت سایه می‌ماند.`}
+          </p>
+        </Card>
+      )}
 
       {/* ───────── هشدارِ سریِ کدِ غلط‌برچسبِ شرکت ───────── */}
       {mismatch && mismatch.length > 0 && (
