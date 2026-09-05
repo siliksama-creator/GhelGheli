@@ -150,13 +150,17 @@ ok('ثابتِ Store مشترک (sharedRateStore/redisRateLimitStore) حذف ش�
   'یک Store مشترک دوباره تعریف شده → خطای ERR_ERL_STORE_REUSE در بوت');
 
 const rlStoreCalls = [...serverSrc.matchAll(/rlStore\(\s*['"`]([^'"`]+)['"`]\s*\)/g)].map(m => m[1]);
-// helper عملیات: rlStore(`ops:${name}`) یک الگوی پویاست ولی پیشوندِ ثابت
-// 'ops:' دارد و name از کلیدهای پیکربندی می‌آید؛ آن را جدا می‌شماریم.
-const opsTempl = [...serverSrc.matchAll(/rlStore\(\s*`ops:\$\{name\}`\s*\)/g)].length;
+// limiterهای عملیاتی (opsRateLimit) باید Storeِ **ثابت** را یک‌بار بیرون از
+// build() بسازند و در reload دوباره نسازند — وگرنه ذخیرهٔ تنظیمات ادمین با
+// ERR_ERL_STORE_REUSE می‌مرد (باگِ واقعیِ کشف‌شده در بازسازی زنده).
+ok('opsRateLimit Store را یک‌بار و ثابت می‌سازد (نه داخل build/reload)',
+  /const store = makeRateStore\(`ops:\$\{name\}`\);[\s\S]{0,200}?const build = \(\) => \{[\s\S]{0,400}?\.\.\.\(store \? \{ store \} : \{\}\)/.test(serverSrc),
+  'Store باید بالاتر از build ساخته و داخل build همان نمونهٔ ثابت استفاده شود');
+ok('داخل build هیچ فراخوانیِ rlStore/makeRateStore نیست (reload فروشگاه نسازد)',
+  !/const build = \(\) => \{[\s\S]{0,600}?(rlStore|makeRateStore)\(/.test(serverSrc),
+  'ساخت Store داخل build باعث خطای reload زنده می‌شود');
 ok('حداقل چند limiter با rlStore فروشگاه اختصاصی می‌گیرند', rlStoreCalls.length >= 6,
   `فقط ${rlStoreCalls.length} فراخوانی صریح rlStore پیدا شد`);
-ok('helper عملیات (ops:*) هم از rlStore استفاده می‌کند', opsTempl === 1,
-  `${opsTempl} مورد — باید دقیقاً یک الگوی ops:${'${name}'} باشد`);
 
 const dupes = rlStoreCalls.filter((p, i) => rlStoreCalls.indexOf(p) !== i);
 ok('پیشوندهای صریحِ rlStore یکتا هستند', dupes.length === 0,

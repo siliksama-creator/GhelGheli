@@ -15,10 +15,13 @@ const rateLimit = require('express-rate-limit');
 // توضیح کاملش را در rateLimitStore.js داده). وقتی REDIS_URL نباشد، null
 // برمی‌گردد و express-rate-limit به حافظهٔ خودش می‌افتد (رفتارِ تک‌پروسه).
 const { makeRateStore } = require('./lib/rateLimitStore');
-// هر limiter باید نمونهٔ Store اختصاصی خودش را بگیرد (express-rate-limit نسخهٔ ۷
-// اشتراکِ یک نمونه را با ERR_ERL_STORE_REUSE رد می‌کند). این کمکی برای آن
-// limiter یک Store می‌سازد و اگر Redis نبود null می‌دهد تا همان spread بی‌اثر
-// شود و limiter به storeِ حافظه‌ای پیش‌فرض برگردد.
+// هر limiterِ ثابت باید نمونهٔ Store اختصاصیِ خودش را بگیرد
+// (express-rate-limit نسخهٔ ۷ اشتراکِ یک نمونه را با ERR_ERL_STORE_REUSE رد
+// می‌کند). این کمکی یک Store می‌سازد و اگر Redis نبود {} می‌دهد تا limiter به
+// storeِ حافظه‌ای پیش‌فرض برگردد.
+// ⚠️ برای limiterهایِ دارای reload (opsRateLimit) این helper را استفاده نکنید؛
+//    آن‌ها Store ثابت را یک‌بار بالاتر نگه می‌دارند تا بازسازیِ پنجره دوباره
+//    Store نسازد.
 const rlStore = prefix => { const s = makeRateStore(prefix); return s ? { store: s } : {}; };
 // کشِ مشترک با TTL (ردیس اگر باشد، وگرنه حافظهٔ پروسه) برای مسیرهای داغ.
 const { cacheGet, cacheSet } = require('./lib/cache');
@@ -559,6 +562,16 @@ const perUserKey = (req) => req.user?.id || req.ip;
 // اعمال می‌شود. گاردهای امنیتی (OTP، ورودها) عمداً ثابت‌اند — بالای
 // opsLimits.js توضیح داده شده چرا.
 function opsRateLimit(name, defaults, extra = {}) {
+  // ⚠️ Store یک‌بار و ثابت برای طول عمرِ این limiter ساخته می‌شود.
+  // این limiterها «reloadِ زنده» دارند: وقتی ادمین تنظیماتِ عملیات را
+  // ذخیره می‌کند، build() دوباره اجرا می‌شود تا windowMs/limit تازه اعمال
+  // شود. اگر در هر reload یک Store تازه می‌ساختیم:
+  //   • روی Redis: نمونهٔ دومِ RateLimit با prefix مشابه، با اعتبارسنجیِ
+  //     unsharedStore express-rate-limit درمی‌افتاد و ذخیرهٔ تنظیماتِ
+  //     پنل را ۵۰۰ می‌کرد (ERR_ERL_STORE_REUSE)؛
+  //   • روی حافظه: هر reload شمارنده‌ها را صفر می‌کرد و سقف را دور می‌زد.
+  // پس Store ثابت نگه داشته می‌شود و فقط پنجره/سقفِ میدل‌ور نوسازی می‌شود.
+  const store = makeRateStore(`ops:${name}`);
   const build = () => {
     const rl = opsLimits.get().rateLimits[name] || defaults;
     return rateLimit({
@@ -566,9 +579,9 @@ function opsRateLimit(name, defaults, extra = {}) {
       limit: rl.limit,
       standardHeaders: true,
       legacyHeaders: false,
-      // نمونهٔ Store اختصاصیِ همین limiter (با پیشوندِ نامش)، تا شمارنده‌ها
-      // هم در Redis مشترکِ دو پروسه باشند و هم به limiter دیگری نخورند.
-      ...rlStore(`ops:${name}`),
+      // نمونهٔ Storeِ اختصاصی و ثابتِ همین limiter (شمارنده‌ها در Redis بینِ
+      // دو پروسه مشترک‌اند، ولی یک‌بار ساخته می‌شوند تا reload سالم بماند).
+      ...(store ? { store } : {}),
       ...extra,
     });
   };
