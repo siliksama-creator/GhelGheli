@@ -26,6 +26,7 @@ const cardEmbedding = require('../services/cardEmbedding');
 const imageQuality = require('../services/imageQuality');
 const cardDuel = require('../services/cardDuelService');
 const cardCrop = require('../services/cardCrop');
+const cardPerspective = require('../services/cardPerspective');
 const lockout = require('../services/photoCardLockout');
 const { groupAdminCards } = require('../services/photoCardAdminGrouping');
 
@@ -968,6 +969,7 @@ module.exports = function createPhotoCardRoutes(deps) {
         //    را برمی‌گرداند. برشِ اشتباه بدتر از نبریدن است.
         let workBuf = buf;
         let cropInfo = null;
+        let warped = false;
         try {
           const c = await cardCrop.cropCard(buf);
           if (c.cropped) { workBuf = c.buffer; cropInfo = c.box; }
@@ -976,6 +978,25 @@ module.exports = function createPhotoCardRoutes(deps) {
           // ثبتِ کاربر نباید به‌خاطرِ یک بهینه‌سازیِ اختیاری بشکند.
           console.warn('[photo-cards] برشِ خودکار شکست خورد:', e.message);
         }
+
+        // ── فاز ۱: تصحیحِ پرسپکتیو (فقط مسیرِ کاربر) ──
+        //
+        // عکسِ گوشی اغلب کارتِ کج روی میز است. برشِ محوری بالا فقط کادر را
+        // تنگ می‌کند ولی گوشه‌های کج و مثلث‌های میز می‌مانند و خودِ کارت صاف
+        // نمی‌شود — لایهٔ بردارِ عصبی این حالت را ضعیف می‌دید. این گام چهار
+        // گوشهٔ کارت را پیدا و آن را روبه‌رو می‌کند.
+        //
+        // ⚠️ عمداً روی آپلودِ مرجعِ ادمین اعمال **نمی‌شود**: طرح‌های تمام‌کادر
+        //    (full-bleed) حاشیهٔ پس‌زمینه ندارند و چهارتا گوشه‌ی کاذب از روی
+        //    فیگورهای داخلی ساخته می‌شد؛ مرجع‌ها باید همان فایلِ تمیز بمانند.
+        //    در هر تردیدی تابع بافرِ ورودی را دست‌نخورده برمی‌گرداند.
+        try {
+          const p = await cardPerspective.straightenCard(workBuf);
+          if (p.warped) { workBuf = p.buffer; warped = true; }
+        } catch (e) {
+          console.warn('[photo-cards] تصحیحِ پرسپکتیو شکست خورد:', e.message);
+        }
+        void warped;
 
         let queryFp;
         try {
