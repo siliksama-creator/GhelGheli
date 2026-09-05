@@ -154,11 +154,18 @@ const rlStoreCalls = [...serverSrc.matchAll(/rlStore\(\s*['"`]([^'"`]+)['"`]\s*\
 // build() بسازند و در reload دوباره نسازند — وگرنه ذخیرهٔ تنظیمات ادمین با
 // ERR_ERL_STORE_REUSE می‌مرد (باگِ واقعیِ کشف‌شده در بازسازی زنده).
 ok('opsRateLimit Store را یک‌بار و ثابت می‌سازد (نه داخل build/reload)',
-  /const store = makeRateStore\(`ops:\$\{name\}`\);[\s\S]{0,200}?const build = \(\) => \{[\s\S]{0,400}?\.\.\.\(store \? \{ store \} : \{\}\)/.test(serverSrc),
+  /const store = makeRateStore\(`ops:\$\{name\}`\);[\s\S]{0,240}?const build = \(\) => \{[\s\S]{0,500}?\.\.\.\(store \? \{ store \} : \{\}\)/.test(serverSrc),
   'Store باید بالاتر از build ساخته و داخل build همان نمونهٔ ثابت استفاده شود');
 ok('داخل build هیچ فراخوانیِ rlStore/makeRateStore نیست (reload فروشگاه نسازد)',
-  !/const build = \(\) => \{[\s\S]{0,600}?(rlStore|makeRateStore)\(/.test(serverSrc),
+  !/const build = \(\) => \{[\s\S]{0,700}?(rlStore|makeRateStore)\(/.test(serverSrc),
   'ساخت Store داخل build باعث خطای reload زنده می‌شود');
+// بازسازیِ عمدیِ همان Store (prefix ثابت) نباید با اعتبارسنجیِ unsharedStore
+// رد شود؛ وگرنه ذخیرهٔ تنظیمات پنل ۵۰۰ می‌داد. باید در ops آن قاعده خاموش باشد.
+// این قاعده باید درون همین تابع opsRateLimit (نه جای دیگر) باشد.
+const opsFnBlock = serverSrc.match(/function opsRateLimit[\s\S]*?\n\}/)?.[0] || '';
+ok('opsRateLimit اعتبارسنجیِ unsharedStore را برای بازسازیِ عمدی خاموش می‌کند',
+  /unsharedStore:\s*false/.test(opsFnBlock),
+  'reload زنده با Store ثابت به validate.unsharedStore=false نیاز دارد');
 ok('حداقل چند limiter با rlStore فروشگاه اختصاصی می‌گیرند', rlStoreCalls.length >= 6,
   `فقط ${rlStoreCalls.length} فراخوانی صریح rlStore پیدا شد`);
 
