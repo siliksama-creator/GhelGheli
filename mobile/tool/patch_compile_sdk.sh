@@ -30,6 +30,9 @@ if [ -z "$ROOT" ]; then
 fi
 
 if ! grep -q "$MARKER" "$ROOT"; then
+  # در Kotlin DSL extension اندروید مستقیم در دسترس نیست؛ با reflection روی
+  # extension کاملاًن‌شدهٔ com.android.build.gradle.BaseExtension مقداردهی
+  # می‌کنیم (در Groovy و Kotlin هر دو به یک شکل کامپایل می‌شود).
   cat >> "$ROOT" <<EOF
 
 // ── $MARKER ──
@@ -37,12 +40,23 @@ if ! grep -q "$MARKER" "$ROOT"; then
 // بلندکردن فقط app کافی نیست؛ برای هر زیرپروژه بعد از ارزیابی تنظیم می‌شود.
 subprojects {
     afterEvaluate {
-        if (it.hasProperty('android')) {
-            it.android {
-                if (compileSdk == null || compileSdk < $SDK) {
-                    compileSdk = $SDK
+        val androidExt = extensions.findByName("android")
+        if (androidExt != null) {
+            // چند امضا در نسخه‌های مختلف AGP وجود دارد؛ اول property، بعد
+            // setter با int، در نهایت setter با String ("android-35").
+            try {
+                val m = androidExt.javaClass.methods.firstOrNull {
+                    it.name == "setCompileSdk" && it.parameterTypes.size == 1
+                        && (it.parameterTypes[0] == Int::class.javaPrimitiveType || it.parameterTypes[0] == String::class.java)
                 }
-            }
+                if (m != null) {
+                    if (m.parameterTypes[0] == Int::class.javaPrimitiveType) m.invoke(androidExt, $SDK)
+                    else m.invoke(androidExt, "android-$SDK")
+                } else {
+                    androidExt.javaClass.methods.first { it.name == "setCompileSdkVersion" }
+                        .invoke(androidExt, $SDK)
+                }
+            } catch (ignored: Exception) { }
         }
     }
 }
