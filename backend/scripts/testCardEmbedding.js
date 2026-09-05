@@ -27,20 +27,24 @@ ok('رشتهٔ JSON معتبر پذیرفته شد', emb.sanitizeEmbedding(JSON.
 // دو طرح با بردارهای متعامد؛ کوئری فقط بردار دارد.
 const v1 = new Array(emb.EMBED_DIM).fill(0); v1[0] = 1;
 const v2 = new Array(emb.EMBED_DIM).fill(0); v2[1] = 1;
+const V = emb.EMBEDDING_VERSION;
 const designs = [
-  { id: 'd1', card_type_id: 'c1', embedding: v1, playerLexemes: ['Ronaldo'] },
-  { id: 'd2', card_type_id: 'c2', embedding: v2, playerLexemes: ['Messi'] },
+  { id: 'd1', card_type_id: 'c1', embedding: v1, embeddingVersion: V, playerLexemes: ['Ronaldo'] },
+  { id: 'd2', card_type_id: 'c2', embedding: v2, embeddingVersion: V, playerLexemes: ['Messi'] },
 ];
 // کوئری کاملاً شبیه d1
-const r1 = ci.rankIdentity({ textTokens: [], embedding: v1 }, designs);
+const r1 = ci.rankIdentity({ textTokens: [], embedding: v1, embeddingVersion: V }, designs);
 ok('بردارِ منطبق رتبهٔ اول است', r1.design && r1.design.id === 'd1');
 ok('بردارِ متعامدِ دوم با حاشیه قاطع است', r1.found === true);
 // کوئریِ بدون بردار و بدون متن → هیچ هویتی
 const r0 = ci.rankIdentity({ textTokens: [], embedding: null }, designs);
 ok('بدون سیگنال → found=false', r0.found === false);
+// نسخهٔ متفاوت → بردار نادیده گرفته می‌شود
+const rV = ci.rankIdentity({ textTokens: [], embedding: v1, embeddingVersion: V - 1 }, designs);
+ok('نسخهٔ بردارِ متفاوت → هویت با بردار قاطع نیست', rV.found === false);
 // بردارِ نیمه‌بینابین (حاشیه کم) → قاطع نمی‌شود
 const vmid = new Array(emb.EMBED_DIM).fill(0); vmid[0] = 1; vmid[1] = 0.9;
-const rm = ci.rankIdentity({ textTokens: [], embedding: vmid }, designs);
+const rm = ci.rankIdentity({ textTokens: [], embedding: vmid, embeddingVersion: V }, designs);
 ok('بردارِ بینابین حاشیهٔ کم دارد', rm.margin < 0.15);
 ok('بردارِ بینابین قاطع نمی‌شود', rm.found === false);
 

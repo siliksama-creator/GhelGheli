@@ -141,6 +141,7 @@ module.exports = function createPhotoCardRoutes(deps) {
     // بردارِ عصبیِ فاز ۲ (اگر برای این طرح ساخته شده باشد).
     embedding: Array.isArray(r.embedding) ? r.embedding
       : (r.embedding && r.embedding.v ? r.embedding.v : null),
+    embeddingVersion: r.embedding_version ?? null,
     cashAmount: Number(r.cash_amount || 0),
     width: r.width,
     height: r.height,
@@ -919,7 +920,7 @@ module.exports = function createPhotoCardRoutes(deps) {
           `SELECT d.id, d.card_type_id, d.image_url, d.dhash, d.phash,
                   d.color_sig, d.tex_sig, d.luma_sig, d.rgb_sig,
                   d.text_tokens, d.width, d.height,
-                  d.embedding,
+                  d.embedding, d.embedding_version,
                   t.player_lexemes, t.player_number,
                   COALESCE(t.cash_amount,0) AS cash_amount
              FROM photo_card_designs d
@@ -1057,7 +1058,8 @@ module.exports = function createPhotoCardRoutes(deps) {
 
         const identity = designsRes.rows.length
           ? cardIdentity.rankIdentity(
-              { textTokens: queryFp.textTokens, embedding: queryEmbedding },
+              { textTokens: queryFp.textTokens, embedding: queryEmbedding,
+                embeddingVersion },
               designFps)
           : null;
 

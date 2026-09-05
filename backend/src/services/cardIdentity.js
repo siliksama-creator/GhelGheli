@@ -57,7 +57,13 @@ function identityScore(query, design) {
   if (name != null && num != null) textScore = 0.75 * name + 0.25 * num;
   else if (name == null) textScore = null;
 
-  const embed = query?.embedding && design?.embedding
+  // بردار فقط وقتی معنا دارد که با همان نسخهٔ مدل ساخته شده باشد؛ فضای برداریِ
+  // نسخه‌های مختلف با هم قابل‌مقایسه نیست. نسخهٔ نامعلوم را رد می‌کنیم تا
+  // بردارِ v1 با v2 قاطی نشود.
+  const qv = query?.embeddingVersion;
+  const dv = design?.embeddingVersion;
+  const sameVersion = qv != null && dv != null && qv === dv;
+  const embed = (query?.embedding && design?.embedding && sameVersion)
     ? cosine(query.embedding, design.embedding)
     : null;
 

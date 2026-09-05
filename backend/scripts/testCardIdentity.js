@@ -84,11 +84,20 @@ ok('کسینوسِ هم‌جهت ≈ ۱', ci.cosine([1, 0, 0], [1, 0, 0]) > 0.99
 ok('کسینوسِ متعامد = ۰', Math.abs(ci.cosine([1, 0, 0], [0, 1, 0])) < 1e-9);
 ok('طولِ نابرابر → null', ci.cosine([1, 0], [1, 0, 0]) === null);
 const rEmb = ci.rankIdentity(
-  { textTokens: [], embedding: [0.99, 0.14, 0] },
-  [{ id: 'a', card_type_id: 'T1', embedding: [1, 0, 0] },
-   { id: 'b', card_type_id: 'T2', embedding: [0, 1, 0] }]);
+  { textTokens: [], embedding: [0.99, 0.14, 0], embeddingVersion: 2 },
+  [{ id: 'a', card_type_id: 'T1', embedding: [1, 0, 0], embeddingVersion: 2 },
+   { id: 'b', card_type_id: 'T2', embedding: [0, 1, 0], embeddingVersion: 2 }]);
 ok('بدون متن، بردارِ عصبی قاطع انتخاب می‌کند', rEmb.found && rEmb.design.card_type_id === 'T1',
   `score=${rEmb.score}`);
+// نسخه‌های ناسازگار نباید با هم مقایسه شوند (فضای برداری متفاوت).
+const sameVer = ci.identityScore(
+  { textTokens: [], embedding: [0.99, 0.14, 0], embeddingVersion: 2 },
+  { embedding: [1, 0, 0], embeddingVersion: 2 });
+ok('هم‌نسخه → بردار در امتیاز لحاظ می‌شود', sameVer.byEmbedding === true && sameVer.embed > 0.9);
+const diffVer = ci.identityScore(
+  { textTokens: [], embedding: [0.99, 0.14, 0], embeddingVersion: 1 },
+  { embedding: [1, 0, 0], embeddingVersion: 2 });
+ok('نسخهٔ بردارِ متفاوت → مقایسهٔ عصبی خاموش می‌شود', diffVer.byEmbedding === false && diffVer.embed === null);
 
 console.log('\n== تصمیم یکپارچه (decideSubmission با هویت) ==');
 const foundRodri = { found: true, decisive: true, score: 0.95, design: designs[1], byText: true, byEmbedding: false };
