@@ -415,7 +415,7 @@ module.exports = function createPhotoCardRoutes(deps) {
         `WITH coded AS (
            SELECT c.expected_card_type_id AS expected_type,
                   d.card_type_id          AS seen_type,
-                  s.id, s.created_at,
+                  s.id, s.created_at AS s_created_at,
                   u.nickname, u.mobile, c.code
              FROM photo_card_submissions s
              JOIN photo_card_codes c ON c.id = s.code_id
@@ -427,7 +427,7 @@ module.exports = function createPhotoCardRoutes(deps) {
          )
          SELECT expected_type, seen_type,
                 count(*)::int AS count,
-                max(created_at) AS last_seen,
+                max(s_created_at) AS last_seen,
                 te.name AS expected_name,
                 tn.name AS seen_name
            FROM coded
