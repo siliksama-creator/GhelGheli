@@ -55,6 +55,7 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -62,10 +63,15 @@ import 'package:image_picker/image_picker.dart';
 
 import '../api_client.dart';
 import '../core/app_config.dart';
+import '../services/card_embedding.dart';
 import '../theme/colors.dart';
 import '../theme/tokens.dart';
 import 'card_frame_guide.dart';
 import 'safe_image.dart';
+
+/// بردار را به رشتهٔ JSON فشرده تبدیل می‌کند تا در فیلد multipart بنشیند
+/// (سرور آن را JSON.parse و سپس اعتبارسنجی می‌کند).
+String _encodeEmbedding(List<double> v) => jsonEncode(v);
 
 /// مراحلِ واقعیِ آنالیز — برچسب و توضیح.
 ///
@@ -301,10 +307,22 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
             () { if (mounted) setState(() => _phase = 2); }),
       ]);
     try {
+      // فاز ۲ — حالت سایه: بردارِ عصبیِ مدلِ روی‌گوشی. اگر ساختش شکست بخورد
+      // یا مدل آماده نباشد، فیلد فرستاده نمی‌شود و جریانِ ثبت دست‌نخورده است.
+      final fields = <String, dynamic>{'code': _code.text.trim()};
+      try {
+        final emb =
+            await CardEmbedding.instance.embedFile(_imagePath!);
+        if (emb != null && emb.length == CardEmbedding.dim) {
+          fields['embedding'] = _encodeEmbedding(emb);
+        }
+      } catch (_) {
+        // بردار اختیاری است؛ هیچ تأثیری بر ثبت ندارد.
+      }
       final res = await widget.api.postMultipart(
         '/api/photo-cards/submit',
         filePath: _imagePath,
-        fields: {'code': _code.text.trim()},
+        fields: fields,
       );
       if (!mounted) return;
       final d = (res.data is Map) ? res.data as Map : const {};

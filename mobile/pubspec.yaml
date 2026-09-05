@@ -34,6 +34,9 @@ dependencies:
   firebase_messaging: ^15.1.0
   image_picker: ^1.1.2
   audioplayers: ^6.1.0
+  # استنتاجِ مدلِ بردارِ تشخیص کارت روی خودِ دستگاه (فاز ۲، حالت سایه).
+  # فقط بردار به سرور می‌رود؛ سرور هیچ مدل سنگینی اجرا نمی‌کند.
+  onnxruntime: ^1.4.0
   # Used to sign tap-game batches (HMAC-SHA256) and to name disk-cache files
   # (SHA-1 of the URL). Already present transitively via
   # firebase/shared_preferences; declared explicitly because we import it
@@ -191,6 +194,8 @@ flutter:
     - assets/avatars/
     - assets/wheel/
     - assets/pass/
+    # مدلِ بردارِ تشخیص کارت (فاز ۲). تک‌فایلِ ۳۱۶KB، صریح فهرست شده.
+    - assets/ml/card_embed_mobilenetv3.onnx
     # NOT bundled, deliberately:
     #
     #   assets/icon/  — 1.7 MB of source art (icon, background, foreground,

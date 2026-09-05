@@ -14,6 +14,7 @@
 /// دیده می‌شود و برعکس.
 library;
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -22,6 +23,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../api_client.dart';
+import '../../services/card_embedding.dart';
 import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/safe_image.dart';
@@ -264,14 +266,10 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
     if (_name.text.trim().isEmpty) return _snack('نام کارت را بنویسید');
     setState(() => _uploading = true);
     try {
-      final res = await widget.api.postMultipart(
-        '/api/admin/photo-cards/designs',
-        filePath: _pickedImage,
-        // پشت فقط وقتی فرستاده می‌شود که انتخاب شده باشد؛ سرور نبودش
-        // را «کارتِ یک‌طرفه» تفسیر می‌کند نه خطا.
-        extraFiles: _pickedBack != null ? {'imageBack': _pickedBack!} : const {},
-        fields: {
-          'name': _name.text.trim(),
+      // فاز ۲ — حالت سایه: بردارِ مرجعِ رو/پشت را روی گوشی می‌سازیم تا طرحِ
+      // جدید فوراً در فضای برداری شرکت کند. اگر مدل آماده نشد فیلد نمی‌رود.
+      final fields = <String, dynamic>{
+        'name': _name.text.trim(),
           'pointValue': _points.text.trim().isEmpty ? '0' : _points.text.trim(),
           'cashAmount': _cash.text.trim().isEmpty ? '0' : _cash.text.trim(),
           'duelAttack': _attack.text.trim().isEmpty ? '50' : _attack.text.trim(),
@@ -286,7 +284,25 @@ class _AdminPhotoCardsState extends State<AdminPhotoCards> {
           // collectibleInput رشته و boolean هر دو را می‌پذیرد.
           'isCollectible': _collectible ? 'true' : 'false',
           if (_ownCodes.text.trim().isNotEmpty) 'rawCodes': _ownCodes.text.trim(),
-        },
+        };
+      try {
+        final embF = await CardEmbedding.instance.embedFile(_pickedImage!);
+        if (embF != null) fields['embeddingFront'] = jsonEncode(embF);
+        if (_pickedBack != null) {
+          final embB = await CardEmbedding.instance.embedFile(_pickedBack!);
+          if (embB != null) fields['embeddingBack'] = jsonEncode(embB);
+        }
+      } catch (_) {
+        // بردار اختیاری است.
+      }
+      final res = await widget.api.postMultipart(
+        '/api/admin/photo-cards/designs',
+        filePath: _pickedImage,
+        // پشت فقط وقتی فرستاده می‌شود که انتخاب شده باشد؛ سرور نبودش
+        // را «کارتِ یک‌طرفه» تفسیر می‌کند نه خطا.
+        extraFiles:
+            _pickedBack != null ? {'imageBack': _pickedBack!} : const {},
+        fields: fields,
       );
       final d = (res.data is Map) ? res.data as Map : const {};
 
