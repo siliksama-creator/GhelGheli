@@ -163,6 +163,47 @@ async function main() {
   ok('بعد از unsubscribe دیگر رویداد به بیننده نمی‌رسد',
     viewerGot === before, `قبل=${before} بعد=${viewerGot}`);
 
+  // ── فازِ دوم: بستنِ فصل توسط ادمین هم باید سیگنال بدهد ──────────────
+  // این فاز فقط روی استیجینگ/تست اجرا می‌شود (فصلِ واقعیِ تولید نباید بسته
+  // شود). متغیر TEST_SEASON_CLOSE=1 آن را فعال می‌کند و نیازمند توکن ادمین
+  // (E2E_ADMIN_USER/E2E_ADMIN_PASS) است.
+  if (process.env.TEST_SEASON_CLOSE === '1') {
+    console.log('\n── فازِ بستنِ فصل (سیگنالِ رویدادهای نادر) ──');
+    const adminUser = process.env.E2E_ADMIN_USER || 'Admin';
+    const adminPass = process.env.E2E_ADMIN_PASS;
+    if (!adminPass) throw new Error('TEST_SEASON_CLOSE=1 ولی E2E_ADMIN_PASS نداده‌ای');
+
+    const adminLogin = await req('POST', '/api/admin/auth/login', {
+      body: { username: adminUser, password: adminPass },
+    });
+    const adminToken = adminLogin.data?.token;
+    ok('ادمین وارد شد (برای بستنِ فصل)', adminLogin.status === 200 && !!adminToken,
+      `status=${adminLogin.status}`);
+
+    // یک بینندهٔ تازه که عضو اتاق است.
+    const closerViewer = await connect(viewer.token);
+    let closeEvents = 0;
+    closerViewer.emit('leaderboard:subscribe');
+    closerViewer.on('leaderboard:update', () => { closeEvents += 1; });
+    await sleep(700);
+
+    const closeRes = await req('POST', '/api/admin/league/close', {
+      token: adminToken, body: { force: true },
+    });
+    // بستن ممکن است «هنوز در حال اجراست» یا موفق باشد؛ در حالت force باید
+    // ببندد یا فصلی برای بستن نماند. هر دو یعنی مسیر اجرا شد.
+    ok('بستنِ فصل از مسیر ادمین اجرا شد',
+      closeRes.status === 200,
+      `status=${closeRes.status} body=${JSON.stringify(closeRes.data).slice(0, 160)}`);
+
+    const dl = Date.now() + 8000;
+    while (Date.now() < dl && closeEvents === 0) await sleep(150);
+    ok('بعد از بستنِ فصل، بیننده رویدادِ leaderboard:update گرفت',
+      closeEvents >= 1, `رویدادها=${closeEvents}`);
+
+    try { closerViewer.disconnect(); } catch { /* noop */ }
+  }
+
   try { viewerSock.disconnect(); } catch { /* noop */ }
   try { outsiderSock.disconnect(); } catch { /* noop */ }
 
