@@ -42,21 +42,32 @@ subprojects {
     val applyCompileSdk = {
         val androidExt = extensions.findByName("android")
         if (androidExt != null) {
-            // چند امضا در نسخه‌های مختلف AGP وجود دارد: setCompileSdk(int|String)
-            // یا setCompileSdkVersion(int).
+            // چند امضا در نسخه‌های مختلف AGP وجود دارد:
+            //   AGP 7+: setCompileSdk(Integer)  — پارامتر باکس‌شده است نه int
+            //   قدیمی‌تر: setCompileSdkVersion(int|String)
             try {
                 val m = androidExt.javaClass.methods.firstOrNull {
                     it.name == "setCompileSdk" && it.parameterTypes.size == 1
-                        && (it.parameterTypes[0] == Int::class.javaPrimitiveType || it.parameterTypes[0] == String::class.java)
+                        && (it.parameterTypes[0] == Int::class.javaPrimitiveType
+                            || it.parameterTypes[0] == Int::class.javaObjectType
+                            || it.parameterTypes[0] == String::class.java)
                 }
                 if (m != null) {
-                    if (m.parameterTypes[0] == Int::class.javaPrimitiveType) m.invoke(androidExt, $SDK)
-                    else m.invoke(androidExt, "android-$SDK")
+                    val pt = m.parameterTypes[0]
+                    if (pt == String::class.java) m.invoke(androidExt, "android-$SDK")
+                    else m.invoke(androidExt, $SDK)
                 } else {
-                    androidExt.javaClass.methods.first { it.name == "setCompileSdkVersion" }
-                        .invoke(androidExt, $SDK)
+                    val old = androidExt.javaClass.methods.firstOrNull {
+                        it.name == "setCompileSdkVersion" && it.parameterTypes.size == 1
+                    }
+                    if (old != null) {
+                        if (old.parameterTypes[0] == String::class.java) old.invoke(androidExt, "android-$SDK")
+                        else old.invoke(androidExt, $SDK)
+                    }
                 }
-            } catch (ignored: Exception) { }
+            } catch (e: Exception) {
+                logger.warn("GG_COMPILE_SDK_PATCH: " + project.path + " -> " + e.message)
+            }
         }
     }
     // در چیدمان جدید فلاتر (settings.gradle.kts + includeBuild) ممکن است بعضی
