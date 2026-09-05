@@ -39,11 +39,11 @@ if ! grep -q "$MARKER" "$ROOT"; then
 // پلاگین‌های جدید (onnxruntime، androidx/*) به compileSdk >= 34 نیاز دارند.
 // بلندکردن فقط app کافی نیست؛ برای هر زیرپروژه بعد از ارزیابی تنظیم می‌شود.
 subprojects {
-    afterEvaluate {
+    val applyCompileSdk = {
         val androidExt = extensions.findByName("android")
         if (androidExt != null) {
-            // چند امضا در نسخه‌های مختلف AGP وجود دارد؛ اول property، بعد
-            // setter با int، در نهایت setter با String ("android-35").
+            // چند امضا در نسخه‌های مختلف AGP وجود دارد: setCompileSdk(int|String)
+            // یا setCompileSdkVersion(int).
             try {
                 val m = androidExt.javaClass.methods.firstOrNull {
                     it.name == "setCompileSdk" && it.parameterTypes.size == 1
@@ -58,6 +58,14 @@ subprojects {
                 }
             } catch (ignored: Exception) { }
         }
+    }
+    // در چیدمان جدید فلاتر (settings.gradle.kts + includeBuild) ممکن است بعضی
+    // ماژول‌ها تا این لحظه قبلاً evaluate شده باشند؛ afterEvaluate روی پروژهٔ
+    // evaluate‌شده خطا می‌دهد. هر دو حالت را پوشش می‌دهیم.
+    if (state.executed) {
+        applyCompileSdk()
+    } else {
+        afterEvaluate { applyCompileSdk() }
     }
 }
 EOF
