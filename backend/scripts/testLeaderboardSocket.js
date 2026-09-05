@@ -247,7 +247,33 @@ async function main() {
         false, `paid=${paid} — جایزهٔ نقدیِ قابل‌پرداخت ساخته نشد؟`);
     }
 
+    // ── فازِ reconnect سریع (مانند سوییچ تند تب / قطع‌و‌وصلِ بدشبکه) ──────
+    // سوکت را عمداً قطع و بلافاصله وصلِ تازه می‌کنیم؛ روی وصلِ تازه باید
+    // دوباره عضو اتاق شود (re-subscribe) و رویدادهای بعدی را بگیرد. اگر
+    // عضویتِ اتاق بعد از reconnect از دست برود، بیننده تا رفرش بعدی کور
+    // می‌شود.
+    console.log('\\n── فازِ reconnect سریع (re-subscribe به اتاق) ──');
     try { payViewer.disconnect(); } catch { /* noop */ }
+    const reconViewer = await connect(viewer.token);
+    let reconEvents = 0;
+    // re-subscribe باید روی رویداد connect انجام شود؛ یک مهلت کوتاه برای
+    // مستقرشدنِ عضویت، سپس یک تغییر بساز.
+    reconViewer.emit('leaderboard:subscribe');
+    reconViewer.on('leaderboard:update', () => { reconEvents += 1; });
+    await sleep(800);
+
+    const nonce3 = `n${uniq()}${uniq()}`;
+    const batch3 = { taps: 1, flagged: 0, elapsedMs: 2000, level: 1, levelTaps: 3, seq: 3 };
+    const sig3 = signBatch(player.token, batch3, nonce3);
+    await req('POST', '/api/games/tap/progress', {
+      token: player.token, body: { ...batch3, nonce: nonce3, sig: sig3 },
+    }).catch(() => {});
+    const rl = Date.now() + 8000;
+    while (Date.now() < rl && reconEvents === 0) await sleep(150);
+    ok('بعد از reconnect سریع، کلاینتِ re-subscribeشده رویداد را می‌گیرد',
+      reconEvents >= 1, `رویدادها=${reconEvents}`);
+
+    try { reconViewer.disconnect(); } catch { /* noop */ }
     try { closerViewer.disconnect(); } catch { /* noop */ }
   }
 
