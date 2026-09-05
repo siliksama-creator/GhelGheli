@@ -33,7 +33,7 @@ log "۳) مایگریشنِ استیجینگ"
 sudo -u ghelgheli bash -c 'cd /var/www/GhelGheli/backend && set -a; . ./.env.staging; set +a; node scripts/migrate.js'
 
 log "۴) ری‌استارت اپ استیجینگ"
-sudo -u ghelgheli bash -c 'cd /var/www/GhelGheli/backend && pm2 startOrReload ecosystem.staging.cjs --update-env'
+sudo -u ghelgheli bash -c 'cd /var/www/GhelGheli/backend && pm2 startOrReload ecosystem.config.staging.cjs --update-env'
 sudo -u ghelgheli pm2 save
 
 log "۵) سلامت"

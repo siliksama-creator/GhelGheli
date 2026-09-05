@@ -76,7 +76,7 @@ log "۴) اپِ PM2 استیجینگ (روی 127.0.0.1:4100)"
 sudo -u ghelgheli pm2 delete ecosystem.staging >/dev/null 2>&1 || true
 # startOrReload فایل را به‌چشمِ کانفیگِ اکوسیستم می‌خواند (نه اسکریپت)، پس
 # نامِ اپ (ghelgheli-staging) و envها درست اعمال می‌شوند.
-sudo -u ghelgheli bash -c 'cd /var/www/GhelGheli/backend && pm2 startOrReload ecosystem.staging.cjs --update-env'
+sudo -u ghelgheli bash -c 'cd /var/www/GhelGheli/backend && pm2 startOrReload ecosystem.config.staging.cjs --update-env'
 sudo -u ghelgheli pm2 save || true
 
 log "۵) سلامت"
