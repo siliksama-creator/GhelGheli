@@ -107,7 +107,11 @@ async function readText(buf) {
   // فارسی، حروفِ الفبای فارسی هم به whitelist اضافه می‌شود؛ وگرنه
   // tesseract آن‌ها را «خارج از الفبا» می‌شمارد و متنِ فارسی باز هم
   // خوانده نمی‌شود.
-  const HAS_FAS = await fasAvailable();
+  // GG_OCR_ENG_ONLY فقط برای بنچ‌مارک/تست است: نام بازیکنان لاتین است و
+  // اسکنِ زبان فارسی روی VPS تک‌هسته‌ای چند برابر کند است. در تولید این متغیر
+  // ست نمی‌شود و رفتار پیش‌فرض (eng+fas در صورت نصب) دست‌نخورده می‌ماند.
+  const ALLOW_FAS = process.env.GG_OCR_ENG_ONLY !== '1';
+  const HAS_FAS = ALLOW_FAS && (await fasAvailable());
   const LANGS = HAS_FAS ? 'eng+fas' : 'eng';
   const WHITELIST = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
     + (HAS_FAS ? 'ابپتجچحخدذرزسشصضطظعغفقکگلمنوهی' : '');
