@@ -6,6 +6,7 @@ import './theme.css';
 import './styles.css';
 
 import { createApi } from './lib/api.js';
+import { installAdminErrorMonitor } from './lib/errorMonitor.js';
 import { canSeePage, isSuperAdmin } from './lib/roles.js';
 import { ToastProvider, useToast } from './lib/toast.jsx';
 import { DialogProvider } from './components/dialog.jsx';
@@ -228,6 +229,10 @@ function App() {
     </AppShell>
   );
 }
+
+// تلهٔ سراسریِ خطای پنل باید پیش از رندر نصب شود تا حتی خطای همان فریمِ
+// اول هم به صندوقِ کرش برود. آینهٔ همان کاری که وب‌کاربر و اپ می‌کنند.
+installAdminErrorMonitor();
 
 createRoot(document.getElementById('root')).render(
   <ToastProvider>

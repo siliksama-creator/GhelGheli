@@ -5,7 +5,7 @@ const EVENTS = new Set([
   'match_started', 'match_completed', 'rematch', 'share', 'friend_challenge',
 ]);
 const PLATFORMS = new Set(['server', 'web', 'android', 'ios', 'unknown']);
-const CRASH_PLATFORMS = new Set(['backend', 'web', 'android', 'ios', 'unknown']);
+const CRASH_PLATFORMS = new Set(['backend', 'web', 'admin', 'android', 'ios', 'unknown']);
 
 function cleanText(value, max) {
   return String(value || '')
@@ -179,4 +179,40 @@ async function pruneOld(keepDays = 90) {
   return removed;
 }
 
-module.exports = { EVENTS, record, reportCrash, summary, resolveCrash, resolveCrashGroup, safeObject, pruneOld };
+/**
+ * هرسِ صندوقِ کرش — جفتِ منطقیِ `pruneOld` برای رویدادها.
+ *
+ * چرا: `app_crash_reports` هیچ پاک‌سازی‌ای نداشت و برای همیشه رشد می‌کرد؛
+ * هر خطای تکراریِ یک رخدادِ رفع‌شده ردیف می‌ساخت. خلاصهٔ پنل فقط ۳۰/۹۰ روز
+ * را نگاه می‌کند، پس نگه‌داشتنِ قدیمی‌تر نه‌تنها بی‌فایده است بلکه جدول را
+ * سنگین می‌کند.
+ *
+ * چرا ۱۸۰ روز و نه ۹۰: یک باگ ممکن است ماه‌ها خاموش بماند و بعد با یک
+ * نسخهٔ جدید دوباره سرِ همان hash بازگردد؛ شش ماه تاریخچه برای تشخیصِ
+ * «این قبلاً کی دیده شده؟» کافی است. گزارش‌های «باز» (هنوز حل‌نشده) به‌هیچ
+ * وجه حذف نمی‌شوند — فقط رخدادهای قدیمیِ حل/نادیده گرفته‌شده هرس می‌شوند.
+ *
+ * حذفِ دسته‌ای ۵۰۰تایی همان الگوی امنِ `pruneOld` است تا قفلِ طولانی روی
+ * یک DELETE بزرگ نگیریم.
+ */
+async function pruneCrashes(keepDays = 180) {
+  const days = Math.max(30, Math.trunc(Number(keepDays) || 180));
+  let removed = 0;
+  for (;;) {
+    const { rowCount } = await pool.query(
+      `DELETE FROM app_crash_reports
+        WHERE id IN (
+          SELECT id FROM app_crash_reports
+           WHERE status <> 'open'
+             AND created_at < NOW() - ($1::text || ' days')::interval
+           LIMIT 500
+        )`,
+      [days],
+    );
+    removed += rowCount || 0;
+    if (!rowCount) break;
+  }
+  return removed;
+}
+
+module.exports = { EVENTS, record, reportCrash, summary, resolveCrash, resolveCrashGroup, safeObject, pruneOld, pruneCrashes };

@@ -106,6 +106,33 @@ ok(serverSrc.includes('analytics.pruneOld(90)')
   && serverSrc.includes('[analytics] event prune failed'),
   'server schedules the analytics prune with safe error handling');
 
+// ── ارتقای صندوقِ خطا (مایگریشن ۰۸۶): پلتفرمِ «ادمین»، گزارشِ مهمان،
+//    و هرسِ خودکارِ کرش‌ها. پنل ادمین وب پیش از این خطاهایش را نمی‌فرستاد
+//    و CHECK روی platform مقدار 'admin' را رد می‌کرد.
+const crashMigration = read('backend/migrations/086_admin_crash_reporting.sql');
+ok(crashMigration.includes("'admin'")
+  && crashMigration.includes('app_crash_reports_platform_check'),
+  'migration 086 allows the admin platform in crash reports');
+ok(analyticsSrc.includes("'backend', 'web', 'admin', 'android', 'ios', 'unknown'"),
+  'analytics crash platform set includes admin');
+ok(analyticsSrc.includes('async function pruneCrashes')
+  && analyticsSrc.includes("status <> 'open'")
+  && analyticsSrc.includes('keepDays = 180'),
+  'analytics service prunes only closed crash reports older than 180 days');
+ok(serverSrc.includes('analytics.pruneCrashes(180)')
+  && serverSrc.includes('[analytics] crash prune failed'),
+  'server schedules the crash-report prune with safe error handling');
+ok(serverSrc.includes('async function authOptional'),
+  'server provides an optional-auth middleware for guest crash reports');
+ok(growthRoutes.includes("router.post('/telemetry/crash', authOptional, crashLimiter")
+  && growthRoutes.includes('guest: !req.user'),
+  'crash route accepts guests (authOptional) and tags them');
+const adminMonitor = read('admin/src/lib/errorMonitor.js');
+ok(adminMonitor.includes("platform: 'admin'")
+  && adminMonitor.includes('/api/telemetry/crash')
+  && adminMonitor.includes('installAdminErrorMonitor'),
+  'admin panel ships a global error monitor that reports to the crash inbox');
+
 
 // چرخشِ ماموریت از زمانِ اتصالِ ماموریت‌های سفارشی به دیتابیس async شد؛
 // این دو سنجهٔ تعیّن‌گرایی باید await شوند (در CI دیتابیسی نیست و

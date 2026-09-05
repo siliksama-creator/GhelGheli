@@ -423,6 +423,21 @@ async function auth(req, res, next) {
     req.user = rows[0]; next();
   } catch { res.status(401).json({ message: 'نیاز به ورود مجدد دارید' }); }
 }
+// احرازِ اختیاری: توکنِ معتبر → req.user پر می‌شود؛ بدون توکن یا توکنِ
+// نامعتبر → خطا نمی‌دهد و req.user خالی می‌ماند (مهمان). فقط برای مسیرهای
+// عمومی‌ای استفاده می‌شود که هم کاربرِ واردشده و هم مهمان صدا می‌زنند —
+// فعلاً تنها مصرف: گزارشِ کرش، تا خطای قبل‌ازورود هم گم نشود.
+async function authOptional(req, res, next) {
+  try {
+    const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+    if (!token) return next();
+    const payload = jwt.verify(token, JWT_SECRET);
+    if (payload.type !== 'user') return next();
+    const { rows } = await pool.query('SELECT * FROM users WHERE id=$1', [payload.sub]);
+    if (rows[0] && rows[0].status === 'active') req.user = rows[0];
+  } catch { /* مهمان فرض می‌کنیم */ }
+  return next();
+}
 async function adminAuth(req, res, next) {
   try {
     const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
@@ -2763,7 +2778,7 @@ app.use('/api', require('./routes/adminOps')({
 
 const presence = createPresenceService(pool);
 app.use('/api', require('./routes/growth')({
-  auth, adminAuth, requireRole, asyncHandler, validateUuid, presence, rateLimit,
+  auth, authOptional, adminAuth, requireRole, asyncHandler, validateUuid, presence, rateLimit,
 }));
 
 app.use('/api', require('./routes/payments')({ auth, asyncHandler }));
@@ -2991,6 +3006,11 @@ cron.schedule('41 4 * * *', () => {
   analytics.pruneOld(90)
     .then(n => { if (n) console.log(`[analytics] pruned ${n} old event(s)`); })
     .catch(e => console.error('[analytics] event prune failed:', e.message));
+  // صندوقِ کرش هم سقف دارد: رخدادهای حل/نادیدهٔ قدیمی‌تر از ۱۸۰ روز پاک
+  // می‌شوند (گزارش‌های «باز» هرگز). بدون این، جدولِ کرش برای همیشه رشد می‌کرد.
+  analytics.pruneCrashes(180)
+    .then(n => { if (n) console.log(`[analytics] pruned ${n} old crash report(s)`); })
+    .catch(e => console.error('[analytics] crash prune failed:', e.message));
 }, { timezone: 'Asia/Tehran' });
 
 // Centralized error handler. Previously this forwarded err.message straight

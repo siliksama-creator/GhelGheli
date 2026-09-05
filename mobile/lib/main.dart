@@ -94,10 +94,13 @@ class _GhelGheliAppState extends State<GhelGheliApp> {
     // می‌سنجند؛ کلاینتِ دوم یعنی دو درخواستِ config در هر اجرا.
     AppConfig.instance.attach(api);
     configureCrashReporter((source, message, stack) async {
-      // Authenticated, privacy-minimised first-party crash inbox. Reporting
-      // failure is intentionally ignored by error_boundary so it can never
-      // create a recursive crash loop.
-      if (api.token == null) return;
+      // صندوقِ کرشِ اول-شخصیِ کمینه-حریم‌خصوصی. خطای ارسال عمداً نادیده
+      // گرفته می‌شود (در error_boundary) تا هرگز حلقهٔ کرش نسازد.
+      //
+      // گزارشِ مهمان هم فرستاده می‌شود: قبلاً «بدون توکن = اصلاً نفرست»
+      // بود، اما مهم‌ترین خطاها همان‌هایی‌اند که قبل از ورود/ثبت‌نام روی
+      // اولین تجربهٔ کاربر رخ می‌دهند؛ مسیرِ سرور حالا مهمان را با
+      // user_id=NULL می‌پذیرد. توکن اگر حاضر باشد خودکار می‌رود.
       await api.post('/api/telemetry/crash', {
         'platform': 'android',
         'source': source,
@@ -122,6 +125,7 @@ class _GhelGheliAppState extends State<GhelGheliApp> {
         // اشتباه گرفته می‌شود.
         'context': {
           'screen': 'flutter',
+          'guest': api.token == null,
           'configVersion': AppConfig.instance.configVersion,
         },
       });

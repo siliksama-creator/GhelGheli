@@ -4,7 +4,7 @@ const missions = require('../services/missionService');
 const analytics = require('../services/analyticsService');
 
 module.exports = function growthRoutes({
-  auth, adminAuth, requireRole, asyncHandler, validateUuid, presence, rateLimit,
+  auth, authOptional, adminAuth, requireRole, asyncHandler, validateUuid, presence, rateLimit,
 }) {
   const router = express.Router();
   const writeLimiter = rateLimit({
@@ -15,6 +15,29 @@ module.exports = function growthRoutes({
     // Every route using this limiter runs `auth` first.
     keyGenerator: req => `user:${req.user.id}`,
     message: { message: 'تعداد درخواست‌ها زیاد است؛ کمی بعد دوباره تلاش کنید' },
+  });
+
+  // محدودیتِ مسیرِ گزارشِ کرش: کاربرِ واردشده بر پایهٔ شناسه، مهمان بر
+  // پایهٔ IP. مهمان (قبل از ورود/ثبت‌نام) هم می‌تواند کرش بفرستد، وگرنه
+  // خطاهای همان اولین تجربهٔ کاربر — که مهم‌ترین‌اند — کاملاً گم می‌شدند.
+  const crashLimiter = rateLimit({
+    windowMs: 60_000,
+    limit: 12,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: req => (req.user ? `crash:${req.user.id}` : `crash:${req.ip}`),
+    message: { message: 'تعداد گزارش‌ها زیاد است؛ کمی بعد دوباره' },
+  });
+
+  // بدنهٔ مجازِ گزارشِ کرش — فیلدها را صریح و سقف‌دار می‌گیریم تا گزارشِ
+  // مهمان نتواند هر JSON دلخواهی را داخل ستون‌ها بریزد.
+  const readCrashBody = body => ({
+    platform: body?.platform,
+    source: typeof body?.source === 'string' ? body.source.slice(0, 80) : null,
+    release: typeof body?.release === 'string' ? body.release.slice(0, 80) : null,
+    message: body?.message,
+    stack: body?.stack,
+    context: (body?.context && typeof body.context === 'object') ? body.context : {},
   });
 
   router.get('/growth/overview', auth, asyncHandler(async (req, res) => {
@@ -73,15 +96,20 @@ module.exports = function growthRoutes({
     res.json({ ok: true });
   }));
 
-  router.post('/telemetry/crash', auth, writeLimiter, asyncHandler(async (req, res) => {
+  // مسیرِ گزارشِ کرش با احرازِ اختیاری: کاربرِ واردشده شناسه‌اش می‌نشیند،
+  // مهمان هم با user_id=NULL پذیرفته می‌شود (reportCrash با userId=null
+  // مشکلی ندارد). این تنها مسیر «مهمان‌پذیرِ» قیف خطا است؛ خودِ سرویس
+  // ورودی‌ها را پاک‌سازی و سقف‌دار می‌کند.
+  router.post('/telemetry/crash', authOptional, crashLimiter, asyncHandler(async (req, res) => {
+    const b = readCrashBody(req.body);
     const result = await analytics.reportCrash({
-      userId: req.user.id,
-      platform: req.body?.platform,
-      source: req.body?.source,
-      release: req.body?.release,
-      message: req.body?.message,
-      stack: req.body?.stack,
-      context: req.body?.context,
+      userId: req.user?.id || null,
+      platform: b.platform,
+      source: b.source,
+      release: b.release,
+      message: b.message,
+      stack: b.stack,
+      context: { ...b.context, guest: !req.user },
     });
     res.status(202).json({ accepted: true, reportId: result.id });
   }));
