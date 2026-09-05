@@ -435,7 +435,7 @@ module.exports = function createPhotoCardRoutes(deps) {
            JOIN card_types tn ON tn.id = coded.seen_type
           GROUP BY expected_type, seen_type, te.name, tn.name
          HAVING count(*) >= $1
-          ORDER BY count(*) DESC, max(created_at) DESC
+          ORDER BY count(*) DESC, max(s_created_at) DESC
           LIMIT 100`,
         [minCount],
       );
