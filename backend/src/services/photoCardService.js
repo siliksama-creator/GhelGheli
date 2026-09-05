@@ -544,7 +544,20 @@ function decideSubmission({
     const isCash = !!isCashType(idTypeId);
 
     if (!expectedTypeId || expectedTypeId === idTypeId) {
-      // هویت با کد یکی است (یا کد بی‌نام است): قوی‌ترین حالتِ تأیید خودکار.
+      // هویت با کد یکی است؛ یا کد **بی‌نام** است و هویت قاطع داریم.
+      // گاردِ پول: در حالتِ بی‌نام، تشخیصِ کارتِ نقدی فقط بر عهدهٔ عکس
+      // است؛ پول نباید بدونِ تأیید انسان جابه‌جا شود → کارت نقدی به صف.
+      // (در حالتِ کدِ گره‌خورده خودِ کد مدرک است و تأیید خودکار بلامانع.)
+      if (!expectedTypeId && isCash) {
+        return {
+          action: 'review',
+          cardTypeId: idTypeId,
+          design: identity.design,
+          path: 'identity_override',
+          reason: 'cash_needs_review',
+          identityType: identity.byText ? 'name' : (identity.byEmbedding ? 'embedding' : 'image'),
+        };
+      }
       return {
         action: 'approve',
         cardTypeId: idTypeId,
@@ -688,6 +701,23 @@ function decideSubmission({
   // تشخیص دهد. `decisive` را خودِ موتور بر پایهٔ حاشیه و نسبتِ رتبهٔ
   // اول به دوم تعیین می‌کند.
   if (best && score >= freeThreshold && match?.decisive !== false) {
+    // ── گاردِ پول در حالتِ کدِ بی‌نام ──
+    //
+    // در مسیرِ کدِ گره‌خورده، کارتِ نقدیِ مشکوک به صف می‌رود؛ همین محافظت
+    // اینجا هم باید باشد: وقتی هویت کارت **فقط** از روی عکس تشخیص داده
+    // می‌شود (کد به هیچ کارتی گره نخورده)، تأییدِ خودکارِ یک کارتِ نقدی
+    // ریسکِ جابه‌جاییِ پول بدونِ تأیید انسان دارد. پس کارتِ نقدی با وجود
+    // اطمینانِ بالا به صف می‌رود و ادمین با پیشنهادِ قاطع تصمیم می‌گیرد.
+    // کارت‌های امتیازیِ غیرنقدی طبقِ معمول خودکار تأیید می‌شوند.
+    if (isCashType(best.card_type_id)) {
+      return {
+        action: 'review',
+        cardTypeId: best.card_type_id,
+        design: best,
+        path: 'image_match',
+        reason: 'cash_needs_review',
+      };
+    }
     return {
       action: 'approve',
       cardTypeId: best.card_type_id,

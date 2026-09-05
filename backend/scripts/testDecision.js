@@ -150,6 +150,26 @@ console.log('\n══ کدِ بی‌نام: آستانهٔ ۴۰٪ + شرطِ ق�
 }
 
 {
+  // گاردِ پول در حالتِ کدِ بی‌نام: کارتِ نقدی با وجود اطمینانِ بالا نباید
+  // خودکار تأیید شود (پول بدون تأیید انسان جابه‌جا نشود) → صف برای ادمین.
+  const d = svc.decideSubmission({
+    expectedTypeId: null,
+    match: m('accept', 0.80, designOf(TYPE_A)),
+    isCashType: (id) => id === TYPE_A,
+  });
+  ok('کدِ بی‌نام + کارتِ نقدیِ قاطع → صف ادمین', d.action === 'review',
+    JSON.stringify(d));
+  ok('علت cash_needs_review است', d.reason === 'cash_needs_review', d.reason);
+  // کارتِ غیرنقدی با همان شرایط خودکار تأیید می‌شود.
+  const e = svc.decideSubmission({
+    expectedTypeId: null,
+    match: m('accept', 0.80, designOf(TYPE_A)),
+    isCashType: () => false,
+  });
+  ok('کدِ بی‌نام + کارتِ غیرنقدیِ قاطع → تأیید خودکار', e.action === 'approve');
+}
+
+{
   // خواستهٔ صریح مالک: «بیش از ۴۰ درصد → اتوماتیک».
   const d = svc.decideSubmission({
     expectedTypeId: null, match: m('review', 0.42, designOf(TYPE_A)) });
