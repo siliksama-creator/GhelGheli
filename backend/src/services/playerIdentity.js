@@ -158,6 +158,30 @@ function numberIdentity(ocrTokens, playerNumber) {
 }
 
 /**
+ * شباهتِ خامِ نام‌خانوادگی (قطعه‌نامِ OCR) — بدون گیتِ ۰.۶.
+ *
+ * برخلاف nameIdentity که برای «شناسایی فقط با متن» محافظه‌کار است و زیرِ
+ * ۰.۶ را صفر می‌کند، این تابع بهترین شباهتِ هر توکنِ OCR به نام‌خانوادگیِ
+ * بازیکن را برمی‌گرداند. کاربردش **شاهدِ مستقل در کنار مدلِ بصری** است:
+ * وقتی بردارِ عصبی یک بازیکن را رتبهٔ اول آورد و نامِ نیمه‌خوانده‌شده روی
+ * کارت هم به همان بازیکن اشاره دارد (مثلاً «ERKI» که دو حرفِ اولِ «CHERKI»
+ * در سایه/برش افتاده)، اجماعِ این دو سیگنالِ مستقل ابهام بصری را می‌شکند.
+ *
+ * @returns {number|null} شباهت در [۰,۱]، یا null اگر نامی در هیچ طرف نباشد.
+ */
+function nameFragment(ocrTokens, lexemes) {
+  const ocr = (ocrTokens || []).filter(t => t && t.charCodeAt(0) !== 35 && !t.startsWith('#'));
+  const lex = (lexemes || [])
+    .filter(Boolean)
+    .flatMap(w => normalizeName(w).split(' '))
+    .filter(w => w.length >= 2);
+  if (!ocr.length || !lex.length) return null;
+  // نام‌خانوادگی (آخرین واژه) ملاک است؛ همان چیزی که درشت چاپ می‌شود.
+  const surname = lex[lex.length - 1];
+  return ocr.reduce((m, t) => Math.max(m, tokenSim(surname, t)), 0);
+}
+
+/**
  * بهترین بازیکن را از روی متنِ OCR در میان طرح‌های کاتالوگ پیدا می‌کند.
  *
  * @param {object}   opts
@@ -233,6 +257,7 @@ module.exports = {
   levenshtein,
   tokenSim,
   nameIdentity,
+  nameFragment,
   numberIdentity,
   identityAgainst,
   isGenericToken,

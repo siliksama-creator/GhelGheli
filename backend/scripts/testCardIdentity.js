@@ -162,6 +162,67 @@ ok('بردار قویِ رودری با متنِ OCRِ بی‌ربط قاطع م
   backRodri.found && backRodri.design.card_type_id === 'T-RODRI',
   `found=${backRodri.found} score=${backRodri.score?.toFixed(3)} margin=${backRodri.margin?.toFixed(3)} embedOnly=${backRodri.embedOnly}`);
 
+console.log('\\n== اجماعِ مدل بصری + نامِ نیمه‌خوانده (عکس کادربندی‌شده/تار) ==');
+// سناریوی واقعی چرکی: بردار چرکی ۰.۶۶۲ اول ولی حاشیه فقط ۰.۰۲۰ (صلاح ۰.۶۴۲)؛
+// OCR «ERKI» خوانده (دو حرف اولِ CHERKI در سایه افتاده). هیچ نامی به‌تنهایی
+// قاطع نیست (۰.۵۷ < ۰.۶)، ولی بردار و نام مستقلاً به چرکی اشاره می‌کنند.
+const cherkiOcr = ['FRANCE', 'ERKI', '#2', '#5'];
+const corr = ci.rankIdentity(
+  { textTokens: cherkiOcr, embedding: BASE, embeddingVersion: 2 },
+  [
+    { id: 'cherki', card_type_id: 'T-CHERKI', playerLexemes: ['rayan', 'cherki'], playerNumber: '24',
+      embedding: vecAtCos(BASE, 0.662), embeddingVersion: 2 },
+    { id: 'salah', card_type_id: 'T-SALAH', playerLexemes: ['mohamed', 'salah'], playerNumber: '10',
+      embedding: vecAtCos(BASE, 0.642), embeddingVersion: 2 },
+    { id: 'rodri', card_type_id: 'T-RODRI', playerLexemes: ['rodrigo', 'hernández'], playerNumber: '16',
+      embedding: vecAtCos(BASE, 0.603), embeddingVersion: 2 },
+  ]);
+ok('بردار چرکی با حاشیهٔ کم + نام ERKI (اجماع) → قاطعِ چرکی',
+  corr.found && corr.design.card_type_id === 'T-CHERKI',
+  `found=${corr.found} score=${corr.score?.toFixed(3)} margin=${corr.margin?.toFixed(3)}`);
+
+// امنیت: همان بردارِ با حاشیهٔ کم ولی نامی نخوانده شده (اجماع نیست) → صف.
+const noCorr = ci.rankIdentity(
+  { textTokens: ['FRANCE', 'FIFA'], embedding: BASE, embeddingVersion: 2 },
+  [
+    { id: 'cherki', card_type_id: 'T-CHERKI', playerLexemes: ['rayan', 'cherki'],
+      embedding: vecAtCos(BASE, 0.662), embeddingVersion: 2 },
+    { id: 'salah', card_type_id: 'T-SALAH', playerLexemes: ['mohamed', 'salah'],
+      embedding: vecAtCos(BASE, 0.642), embeddingVersion: 2 },
+  ]);
+ok('بردار با حاشیهٔ کم و بدون اجماع نام → قاطع نمی‌شود (صف)',
+  !noCorr.found,
+  `found=${noCorr.found} margin=${noCorr.margin?.toFixed(3)}`);
+
+// امنیت ۲: نامِ مطمئنِ یک بازیکن برخلاف بردارِ قویِ بازیکنِ دیگر (تعارض واقعی)
+// — بردار چرکی ۰.۸۰ قاطع ولی OCR واضح «SALAH» می‌خواند و بردارِ صلاح ضعیف
+// (۰.۴۰) است؛ اجماع نیست و حاشیه کم می‌شود → صف، نه تأیید خودکار.
+const conflicting = ci.rankIdentity(
+  { textTokens: ['SALAH'], embedding: BASE, embeddingVersion: 2 },
+  [
+    { id: 'cherki', card_type_id: 'T-CHERKI', playerLexemes: ['rayan', 'cherki'],
+      embedding: vecAtCos(BASE, 0.80), embeddingVersion: 2 },
+    { id: 'salah', card_type_id: 'T-SALAH', playerLexemes: ['mohamed', 'salah'],
+      embedding: vecAtCos(BASE, 0.40), embeddingVersion: 2 },
+  ]);
+ok('نام مطمئنِ خلاف بردار قوی (تعارض) → تأیید خودکار نمی‌کند (صف)',
+  !conflicting.found,
+  `found=${conflicting.found} top=${conflicting.design?.card_type_id} score=${conflicting.score?.toFixed(3)} margin=${conflicting.margin?.toFixed(3)}`);
+
+// امنیت ۳: قطعه‌نامِ یک بازیکنِ دیگر جلوی اجماع را نگیرد به‌اشتباه — بردار
+// چرکی اول، OCR «CHERKI» کامل را خوانده (textScore قوی) → قاطعِ چرکی.
+const strongText = ci.rankIdentity(
+  { textTokens: ['CHERKI', 'FRANCE'], embedding: BASE, embeddingVersion: 2 },
+  [
+    { id: 'cherki', card_type_id: 'T-CHERKI', playerLexemes: ['rayan', 'cherki'],
+      embedding: vecAtCos(BASE, 0.66), embeddingVersion: 2 },
+    { id: 'salah', card_type_id: 'T-SALAH', playerLexemes: ['mohamed', 'salah'],
+      embedding: vecAtCos(BASE, 0.64), embeddingVersion: 2 },
+  ]);
+ok('نام کامل چرکی + بردار نزدیک → قاطعِ چرکی (مسیر متنی/اجماع)',
+  strongText.found && strongText.design.card_type_id === 'T-CHERKI',
+  `found=${strongText.found} score=${strongText.score?.toFixed(3)} byText=${strongText.byText}`);
+
 console.log('\n== تصمیم یکپارچه (decideSubmission با هویت) ==');
 const foundRodri = { found: true, decisive: true, score: 0.95, design: designs[1], byText: true, byEmbedding: false };
 const foundHaaland = { found: true, decisive: true, score: 0.95, design: designs[0], byText: true, byEmbedding: false };

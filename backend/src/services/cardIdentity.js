@@ -26,7 +26,7 @@
  * `embedding` هنگام آپلودِ مرجع و ثبتِ کاربر پر شود — همین.
  */
 
-const { nameIdentity, numberIdentity } = require('./playerIdentity');
+const { nameIdentity, nameFragment, numberIdentity } = require('./playerIdentity');
 
 /**
  * شباهتِ کسینوسیِ دو بردار (برای بردارِ عصبی).
@@ -101,10 +101,15 @@ function identityScore(query, design) {
     score = 0;
   }
 
+  // شاهدِ مستقلِ نام: شباهتِ خامِ نام‌خانوادگی به OCR، بدون گیتِ متن (برای
+  // اجماعِ «مدل بصری رتبه‌اول + نامِ نیمه‌خوانده» در rankIdentity استفاده می‌شود).
+  const frag = nameFragment(query?.textTokens, design?.playerLexemes);
+
   return {
     score: Math.max(0, Math.min(1, score)),
     byText, byEmbedding,
     name: textScore, embed,
+    frag,
   };
 }
 
@@ -176,8 +181,29 @@ function rankIdentity(query, designs, th = {}) {
   // پذیرش ۰.۷۸. در حالت ترکیب (متن+بردار) هم نمره در مقیاس متنی است.
   const embedOnly = best.byEmbedding && !best.byText;
   const acceptCut = embedOnly ? EMBED_ACCEPT : ACCEPT;
-  const marginCut = embedOnly ? EMBED_MIN_MARGIN : (th.minMargin ?? 0.15);
-  const ratioCut = embedOnly ? 1.06 : MIN_RATIO;
+  let marginCut = embedOnly ? EMBED_MIN_MARGIN : (th.minMargin ?? 0.15);
+  let ratioCut = embedOnly ? 1.06 : MIN_RATIO;
+
+  // ── اجماعِ «مدل بصری + نامِ نیمه‌خوانده» (سناریوی عکسِ کادربندی‌شده) ──
+  //
+  // وقتی بچه‌ها با دوربینِ گوشی عکس می‌گیرند، طبیعی است گوشهٔ عکس میز/پس‌زمینه
+  // بگیرد یا تار باشد؛ آن‌وقت حاشیهٔ خالصِ بصری کوچک می‌شود (دو بازیکن به هم
+  // نزدیک می‌شوند) و یک تشخیصِ درست بی‌خود به صف می‌رود. اما نامِ بازیکن با
+  // حروف درشت روی کارت چاپ شده و OCR معمولاً قطعه‌ای از آن را می‌خواند
+  // (مثلاً «ERKI» از «CHERKI» که دو حرفِ اولش در سایه افتاده).
+  //
+  // اگر بردارِ عصبی بازیکنِ X را رتبهٔ اول آورد **و** نامِ نیمه‌خوانده هم به
+  // X بخورد (frag ≥ ۰.۵) و به هیچ بازیکنِ دیگری نخورد (فاصله تا رقیب ≥ ۰.۲)،
+  // این دو سیگنالِ مستقل هم‌نظرند و ابهام بصری را می‌شکنند؛ پس حاشیهٔ لازم
+  // پایین می‌آید. هیچ کدام به‌تنهایی کافی نیست — فقط اجماع.
+  let nameCorroborated = false;
+  if (embedOnly && best.frag != null) {
+    const rivalFrag = rival && rival.frag != null ? rival.frag : 0;
+    const FRAG_HIT = 0.5;
+    nameCorroborated = best.frag >= FRAG_HIT && (best.frag - rivalFrag) >= 0.2;
+    if (nameCorroborated) { marginCut = 0.015; ratioCut = 1.02; }
+  }
+
   const decisive = best.score >= acceptCut && margin >= marginCut && ratio >= ratioCut;
 
   return {
@@ -189,6 +215,7 @@ function rankIdentity(query, designs, th = {}) {
     byText: best.byText,
     byEmbedding: best.byEmbedding,
     embedOnly,
+    corroborated: nameCorroborated,
     design: best.design,
     ranked: ranked.slice(0, 3),
   };
