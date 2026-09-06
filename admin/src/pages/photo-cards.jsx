@@ -528,10 +528,10 @@ export function PhotoCardsPage({ request }) {
     // طرحی که مدیر انتخاب کرده؛ اگر انتخاب نکرده، حدسِ موتور.
     const designId = picks[sub.id] || null;
 
-    // ── وقتی موتور حدسی ندارد، انتخاب الزامی است ──
-    // بدون آن سرور ۴۰۰ می‌دهد؛ بهتر است همین‌جا جلویش گرفته شود تا
-    // مدیر پیام روشن‌تری ببیند.
-    if (approve && !designId && !sub.design_image) {
+    // ── وقتی هیچ حدسی نداریم، انتخاب الزامی است ──
+    // پیشنهادِ مدلِ عصبی (neural_image) یا تطبیقِ تصویری (design_image)
+    // کفایت می‌کند؛ بدونِ هیچ‌کدام سرور ۴۰۰ می‌دهد.
+    if (approve && !designId && !sub.neural_image && !sub.design_image) {
       return notify('اول مشخص کنید این کد مربوط به کدام کارت است', 'error');
     }
     if (!approve) {
@@ -1303,10 +1303,23 @@ export function PhotoCardsPage({ request }) {
                 <figcaption>عکس کاربر</figcaption>
               </figure>
               <ScanLine size={18} className="reviewArrow" />
-              <figure>
-                <img src={assetUrl(s.design_image)} alt="طرح پیشنهادی" />
-                <figcaption>حدس سیستم</figcaption>
-              </figure>
+              {/* پیشنهادِ مدلِ عصبی مقدم است؛ فقط وقتی مدل بردار نداشت حدسِ
+                  اثرانگشت نشان داده می‌شود. */}
+              {s.neural_card_type_name ? (
+                <figure>
+                  <img src={assetUrl(s.neural_image)} alt="تشخیص مدل" />
+                  <figcaption>
+                    تشخیص مدل {s.identity_by_embedding ? '· هوشمند' : ''}
+                    {s.identity_top_score != null
+                      && ` · ${Math.round(s.identity_top_score * 100)}٪`}
+                  </figcaption>
+                </figure>
+              ) : (
+                <figure>
+                  <img src={assetUrl(s.design_image)} alt="طرح پیشنهادی" />
+                  <figcaption>حدس سیستم</figcaption>
+                </figure>
+              )}
             </div>
             <div className="reviewBody">
               {/* ── چرا این پرونده اینجاست ──
@@ -1333,18 +1346,38 @@ export function PhotoCardsPage({ request }) {
                   </span>
                 </div>
               )}
-              <b>{s.card_type_name || 'نامشخص'}</b>
+              <b>{s.neural_card_type_name || s.card_type_name || 'نامشخص'}</b>
+              {s.neural_card_type_name && s.card_type_name
+                && s.neural_card_type_name !== s.card_type_name && (
+                  <div className="topbar-sub" style={{ color: '#b45309' }}>
+                    <AlertTriangle size={12} style={{ verticalAlign: '-2px' }} />{' '}
+                    تطبیقِ تصویریِ قدیمی «{s.card_type_name}» می‌گفت ولی مدلِ هوشمند
+                    «{s.neural_card_type_name}» را مطمئن‌تر شناخت — ملاک مدل است.
+                  </div>
+                )}
               <div className="topbar-sub">
                 {s.nickname || s.mobile} · کد {s.code || '—'}
-                {s.point_value != null && ` · ${fmtNumber(s.point_value)} امتیاز`}
+                {(s.neural_point_value ?? s.point_value) != null
+                  && ` · ${fmtNumber(s.neural_point_value ?? s.point_value)} امتیاز`}
               </div>
               <div className="reviewMeta">
-                {/* امتیاز تطبیق را نشان می‌دهیم چون مدیر باید بداند سیستم
-                    چقدر مطمئن بوده — نه اینکه کورکورانه تأیید کند. */}
-                <Badge tone={s.match_score >= 0.65 ? 'success' : 'warning'}>
-                  شباهت {Math.round((s.match_score || 0) * 100)}٪
-                </Badge>
-                {s.match_margin != null && s.match_margin < 0.03 && (
+                {/* اطمینانِ مدلِ عصبی ملاک است؛ تطبیقِ تصویریِ قدیمی فقط
+                    وقتی نمایش داده می‌شود که مدلی در کار نبوده. */}
+                {s.neural_card_type_name ? (
+                  <Badge tone={s.identity_top_score >= 0.65 ? 'success' : 'warning'}>
+                    اطمینان مدل {Math.round((s.identity_top_score || 0) * 100)}٪
+                  </Badge>
+                ) : (
+                  <Badge tone={s.match_score >= 0.65 ? 'success' : 'warning'}>
+                    شباهت {Math.round((s.match_score || 0) * 100)}٪
+                  </Badge>
+                )}
+                {s.identity_margin != null && s.identity_margin < 0.035 && s.neural_card_type_name && (
+                  <Badge tone="warning">
+                    <AlertTriangle size={12} /> نزدیک به چند بازیکن
+                  </Badge>
+                )}
+                {!s.neural_card_type_name && s.match_margin != null && s.match_margin < 0.03 && (
                   <Badge tone="warning">
                     <AlertTriangle size={12} /> شبیه چند طرح
                   </Badge>
@@ -1365,8 +1398,8 @@ export function PhotoCardsPage({ request }) {
                     setPicks(p => ({ ...p, [s.id]: e.target.value }))}
                 >
                   <option value="">
-                    {s.card_type_name
-                      ? `پیش‌فرض: ${s.card_type_name}`
+                    {(s.neural_card_type_name || s.card_type_name)
+                      ? `پیش‌فرض: ${s.neural_card_type_name || s.card_type_name}`
                       : '— انتخاب کارت —'}
                   </option>
                   {options.map(o => (

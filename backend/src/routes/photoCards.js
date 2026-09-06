@@ -587,14 +587,24 @@ module.exports = function createPhotoCardRoutes(deps) {
     const { rows } = await pool.query(
       `SELECT s.id, s.match_score, s.match_margin, s.status, s.created_at,
               s.user_image_path, s.reject_reason, s.review_reason,
+              s.identity_top_design_id, s.identity_top_score, s.identity_margin,
+              s.identity_by_embedding,
               u.nickname, u.mobile,
               c.code,
-              d.image_url AS design_image, t.name AS card_type_name, t.point_value
+              -- حدسِ اثرانگشتِ کلاسیک (روی پشت/تار بی‌اعتماد است)
+              fp.image_url AS design_image, fpt.name AS card_type_name,
+              fpt.point_value AS point_value,
+              -- حدسِ مدلِ عصبی (مرجعِ اصلی وقتی بردار آمده)
+              nd.image_url AS neural_image, nct.name AS neural_card_type_name,
+              nct.point_value AS neural_point_value,
+              nd.id AS neural_design_id
          FROM photo_card_submissions s
          JOIN users u ON u.id = s.user_id
          LEFT JOIN photo_card_codes c ON c.id = s.code_id
-         LEFT JOIN photo_card_designs d ON d.id = s.matched_design_id
-         LEFT JOIN card_types t ON t.id = d.card_type_id
+         LEFT JOIN photo_card_designs fp ON fp.id = s.matched_design_id
+         LEFT JOIN card_types fpt ON fpt.id = fp.card_type_id
+         LEFT JOIN photo_card_designs nd ON nd.id = s.identity_top_design_id
+         LEFT JOIN card_types nct ON nct.id = nd.card_type_id
         WHERE s.status = $1
         ORDER BY s.created_at DESC
         LIMIT 200`,
@@ -672,7 +682,13 @@ module.exports = function createPhotoCardRoutes(deps) {
           );
           const expectedTypeId = cq.rows[0]?.expected_card_type_id || null;
 
-          const designId = chosenId || sub.matched_design_id;
+          // پیش‌فرضِ تأیید: انتخابِ صریحِ مدیر مقدم است؛ سپس حدسِ **مدلِ
+          // عصبی** (مرجعِ اصلی، روی پشت/تار قابل‌اعتماد)؛ وگرنه حدسِ
+          // اثرانگشتِ کلاسیک. (باگ: قبلاً فقط اثرانگشت ملاک بود و مدیر
+          // ناخواسته کارتی را تأیید می‌کرد که اثرانگشت اشتباه پیشنهاد داده بود.)
+          const designId = chosenId
+            || sub.identity_top_design_id
+            || sub.matched_design_id;
           if (!designId && !expectedTypeId) {
             throw Object.assign(
               new Error('برای تأیید باید مشخص کنید این کد مربوط به کدام کارت است'),
