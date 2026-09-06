@@ -1305,6 +1305,8 @@ module.exports = function createPhotoCardRoutes(deps) {
           freeThreshold: th.freeAcceptScore,
           identity,
           isCashType: (id) => cashTypeIds.has(id),
+          // مدل عصبیِ روی‌گوشت تصویر را پردازش کرد و بردار فرستاد؟
+          neuralAttempted: !!queryEmbedding,
         });
 
         // برشِ ایمن: ستون‌های decision_path و review_reason varchar محدودند

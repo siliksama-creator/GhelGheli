@@ -117,8 +117,11 @@ function rankIdentity(query, designs, th = {}) {
   // ۱.۱۶. آستانه‌های پایین مخصوص بردار طوری است که این «واضحِ برتر» قاطع
   // شود ولی دو نامزدِ نزدیک (حاشیه ~۰) قاطع نشوند و به صف بروند.
   const ACCEPT = th.accept ?? 0.78;
-  const EMBED_ACCEPT = th.embedAccept ?? 0.70;
-  const EMBED_MIN_MARGIN = th.embedMinMargin ?? 0.08;
+  // آستانه‌های مسیرِ فقط-بردار از شبیه‌سازیِ ۵۶ طرح (رو و پشت) با خرابیِ
+  // تار/فشرده/چرخیده آمد: با این مقادیر ۵۶/۵۶ خودکارِ درست و صفر بازیکنِ غلط.
+  // حاشیه نسبت به نزدیک‌ترین بازیکنِ دیگر سنجیده می‌شود.
+  const EMBED_ACCEPT = th.embedAccept ?? 0.55;
+  const EMBED_MIN_MARGIN = th.embedMinMargin ?? 0.05;
   const MIN_RATIO = th.minRatio ?? 1.25;
 
   const list = Array.isArray(designs) ? designs : [];
@@ -133,15 +136,33 @@ function rankIdentity(query, designs, th = {}) {
   }
 
   const best = ranked[0];
-  const second = ranked.length > 1 ? ranked[1].score : 0;
-  const margin = ranked.length > 1 ? best.score - second : 1;
-  const ratio = second > 1e-6 ? best.score / second : 99;
+  // حاشیه/نسبت نسبت به نزدیک‌ترین **بازیکنِ دیگر** سنجیده می‌شود، نه رتبهٔ
+  // دومِ خام: واریانت‌های متفاوتِ یک بازیکن (معمولی/نقره‌ای/...) از نظر برداری
+  // به هم خیلی نزدیک‌اند و اگر رقیب به‌حساب بیایند، حاشیه را الکی کوچک و یک
+  // تشخیصِ واضح را «مبهم» می‌کنند (و انبوه کارتِ همان بازیکن بی‌خود به صف
+  // می‌رود). پس ردیف‌هایی که به همان بازیکنِ برنده اشاره دارند رد می‌شوند.
+  // هم‌بازیکن با کلماتِ نام (playerLexemes) یا شمارهٔ پیراهن تشخیص داده می‌شود.
+  const bestLex = (best.design?.playerLexemes || []).filter(Boolean).slice().sort();
+  const bestNum = best.design?.playerNumber || null;
+  const isSamePlayer = (d) => {
+    const lx = (d?.playerLexemes || []).filter(Boolean).slice().sort();
+    if (bestLex.length && lx.length && bestLex.length === lx.length
+        && bestLex.every((w, i) => w === lx[i])) return true;
+    if (bestNum && d?.playerNumber && String(bestNum) === String(d.playerNumber)) return true;
+    return false;
+  };
+  const rival = ranked
+    .slice(1)
+    .find(r => !isSamePlayer(r.design));
+  const rivalScore = rival ? rival.score : 0;
+  const margin = rival ? best.score - rivalScore : 1;
+  const ratio = rival && rivalScore > 1e-6 ? best.score / rivalScore : 99;
   // مسیرِ فقط-بردار (بدون متن) آستانه‌های خودش را دارد؛ مسیر متنی همان
   // پذیرش ۰.۷۸. در حالت ترکیب (متن+بردار) هم نمره در مقیاس متنی است.
   const embedOnly = best.byEmbedding && !best.byText;
   const acceptCut = embedOnly ? EMBED_ACCEPT : ACCEPT;
   const marginCut = embedOnly ? EMBED_MIN_MARGIN : (th.minMargin ?? 0.15);
-  const ratioCut = embedOnly ? 1.08 : MIN_RATIO;
+  const ratioCut = embedOnly ? 1.06 : MIN_RATIO;
   const decisive = best.score >= acceptCut && margin >= marginCut && ratio >= ratioCut;
 
   return {

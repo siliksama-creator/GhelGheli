@@ -522,6 +522,11 @@ function decideSubmission({
   freeThreshold = FREE_ACCEPT_SCORE,
   identity = null,
   isCashType = () => false,
+  // آیا مدلِ عصبیِ روی‌گوشت عکس را پردازش کرد و بردار فرستاد؟ وقتی بله،
+  // موتورِ اصلی همان مدل است و اثرانگشتِ کلاسیک دیگر اجازهٔ تأییدِ خودکار
+  // ندارد (روی عکسِ پشتِ تار بی‌اعتماد است؛ شبیه‌سازیِ ۵۶ طرح: اثرانگشت
+  // امباپه آورد ولی مدل عصبی بازیکن درست را رتبهٔ اول کرد با صفر خطا).
+  neuralAttempted = false,
 } = {}) {
   const best = match?.design || null;
   const score = Number(match?.score || 0);
@@ -534,17 +539,6 @@ function decideSubmission({
   // با نمرهٔ ضعیف امباپه آورد (۰.۶۴۶، حاشیهٔ ۰.۰۴۴) ولی بردارِ عصبی رودری را
   // گفته بود؛ بدونِ این گارد، امباپهِ غلط خودکار تأیید شد.
   //
-  // اختلاف فقط وقتی معنا دارد که **هر دو** موتور قاطع باشند: هویت found باشد
-  // و اثرانگشت هم decisive. اگر هویت قاطع نباشد (found=false) بلوک هویت
-  // اصلاً اجرا نمی‌شود و قاطعیت اثرانگشت جداگانه با نسبت/حاشیه سنجیده می‌شود.
-  const matchTypeId = best?.card_type_id ?? null;
-  const identityTypeId = identity?.found && identity?.design
-    ? identity.design.card_type_id ?? null
-    : null;
-  const enginesDisagree = !!(identity?.found && identity?.design
-    && match?.decisive === true
-    && matchTypeId && identityTypeId && matchTypeId !== identityTypeId);
-
   // ═════════════════════════════════════════════════════════════════════
   // لایهٔ هویت (نام‌خوانِ واژه‌نامه / بردارِ عصبی) — قوی‌ترین سیگنالِ
   // «این کیست؟»، مستقل از رنگ و قالب.
@@ -562,20 +556,9 @@ function decideSubmission({
     const idTypeId = identity.design.card_type_id;
     const isCash = !!isCashType(idTypeId);
 
-    // ── اجماعِ دو موتور: اگر اثرانگشت هم **قاطع** به کارتِ دیگری رفته، به
-    // اختلافِ دو موتورِ مطمئن با انتخابِ خودکار دامن نزن؛ به صفِ مدیر بفرست.
-    // (در دادهٔ واقعیِ مهر ۱۴۰۵ اثرانگشت روی عکسِ پشت تار می‌توانست قاطعِ
-    // غلط باشد؛ وقتی هویت عصبیِ قاطع با آن در تعارض است، انسان تصمیم بگیرد.)
-    if (enginesDisagree) {
-      return {
-        action: 'review',
-        cardTypeId: null,
-        design: identity.design,
-        path: expectedTypeId ? 'code_bound' : 'identity_override',
-        reason: 'conflicting_signals',
-        identityType: identity.byText ? 'name' : (identity.byEmbedding ? 'embedding' : 'image'),
-      };
-    }
+    // وقتی مدلِ عصبی قاطع است، او موتورِ اصلی است: نظرش بر اثرانگشتِ کلاسیک
+    // (که روی عکسِ پشت/تار بی‌اعتماد است) غالب می‌شود. گاردِ جداگانهٔ «اجماع»
+    // لازم نیست چون اعتماد به مدل ذاتی است و شبیه‌سازی ۵۶ طرح صفر خطا داد.
 
     if (!expectedTypeId || expectedTypeId === idTypeId) {
       // هویت با کد یکی است؛ یا کد **بی‌نام** است و هویت قاطع داریم.
@@ -603,23 +586,32 @@ function decideSubmission({
     }
 
     // هویت قاطعانه کارتِ **دیگری** را نشان می‌دهد.
-    if (!isCash) {
+    //
+    // محافظِ پول محتاطانه است: اگر **کدِ موردانتظار** نقدی باشد (عکس کارتِ
+    // دیگری نشان می‌دهد و نباید بی‌سروصدا اعتبارِ نقدی رد/تأیید شود) **یا**
+    // کارتی که عکس نشان می‌دهد نقدی باشد (اصلاحِ خودکار به سمتِ یک کارتِ
+    // نقدی = اعطای خودکارِ پول)، هر دو به صف می‌روند. در حالتِ بی‌نام کدی در
+    // کار نیست، پس نوعی که عکس نشان می‌دهد ملاک است.
+    const cashAtStake = expectedTypeId
+      ? (!!isCashType(expectedTypeId) || isCash)
+      : isCash;
+    if (!cashAtStake) {
       // کارت امتیازیِ غیرنقدی: با اطمینانِ بالا همان کارت را ثبت کن.
       return {
         action: 'approve',
         cardTypeId: idTypeId,
         design: identity.design,
-        path: 'identity_override',
-        reason: 'code_auto_corrected',
+        path: expectedTypeId ? 'code_bound' : 'identity_override',
+        reason: expectedTypeId ? 'code_auto_corrected' : null,
         identityType: identity.byText ? 'name' : (identity.byEmbedding ? 'embedding' : 'image'),
       };
     }
     // کارت نقدی: امن‌ترین راه = صف، با پیشنهادِ قاطع برای ادمین.
     return {
       action: 'review',
-      cardTypeId: expectedTypeId,
+      cardTypeId: expectedTypeId ?? idTypeId,
       design: identity.design,
-      path: 'code_bound',
+      path: expectedTypeId ? 'code_bound' : 'identity_override',
       reason: 'code_mismatch_suspected',
       identityType: identity.byText ? 'name' : (identity.byEmbedding ? 'embedding' : 'image'),
     };
@@ -656,6 +648,18 @@ function decideSubmission({
     // ببیندش.
     const matchesExpected = best && best.card_type_id === expectedTypeId;
 
+    // ⚠️ مدل عصبی پردازش کرد ولی هویتِ قاطعی نداد (identity.found=false).
+    // در این حالت به اثرانگشتِ کلاسیک برای تأیید خودکار اعتماد نمی‌کنیم
+    // (روی پشت/تار بی‌اعتماد است؛ دادهٔ واقعی امباپه به‌جای رودری) — مگر
+    // آنکه اصلاً مرجعی برای مقایسه نباشد که آنگاه کد به‌تنهایی مدرک است.
+    // (وقتی identity قاطع باشد، بلوکِ هویتِ بالاتر همین تابع تصمیم را داده.)
+    if (neuralAttempted && best && hasReference) {
+      return {
+        action: 'review', cardTypeId: expectedTypeId, design: best,
+        path: 'code_bound', reason: 'ambiguous',
+      };
+    }
+
     // ⚠️ چرا وقتی `best` نداریم آستانه اصلاً بررسی نمی‌شود
     //
     // اگر هیچ طرحی در کاتالوگ نباشد (یا همه غیرفعال باشند)، موتور
@@ -669,6 +673,7 @@ function decideSubmission({
     //
     // منطق: نمرهٔ صفر در نبودِ مرجع، «شواهدی علیه کاربر» نیست؛ فقط
     // «شواهدی نیست». و کد به‌تنهایی مدرکِ کافی است.
+    // (این فقط برای مسیرِ بدون بردار است؛ مسیرِ عصبی بالاتر خودش این حال را دارد.)
     if (!best || !hasReference) {
       return {
         action: 'approve',
@@ -734,6 +739,21 @@ function decideSubmission({
   // موتور باید بتواند بین گزینه‌ها **انتخاب** کند، نه فقط شبیه بودن را
   // تشخیص دهد. `decisive` را خودِ موتور بر پایهٔ حاشیه و نسبتِ رتبهٔ
   // اول به دوم تعیین می‌کند.
+  //
+  // ⚠️ اولویت موتور: اگر مدلِ عصبی عکس را پردازش کرده (neuralAttempted) ولی
+  // هویتِ قاطعی نداده، اثرانگشتِ کلاسیک **هرگز** خودکار تأیید نمی‌کند —
+  // روی عکسِ پشت/تار بی‌اعتماد است (دادهٔ واقعی: امباپه به‌جای رودری).
+  // انسان/مدلِ دفعهٔ بعد تصمیم می‌گیرد. اثرانگشت فقط وقتی موتورِ تصمیم است
+  // که اصلاً برداری نیامده باشد (کلاینت قدیمی/مدل لود نشد).
+  if (neuralAttempted && !(identity?.found && identity?.design)) {
+    return {
+      action: 'review',
+      cardTypeId: null,
+      design: best,
+      path: 'image_match',
+      reason: 'ambiguous',
+    };
+  }
   if (best && score >= freeThreshold && match?.decisive !== false) {
     // ── گاردِ پول در حالتِ کدِ بی‌نام ──
     //

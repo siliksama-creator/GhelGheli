@@ -42,10 +42,24 @@ ok('بدون سیگنال → found=false', r0.found === false);
 // نسخهٔ متفاوت → بردار نادیده گرفته می‌شود
 const rV = ci.rankIdentity({ textTokens: [], embedding: v1, embeddingVersion: V - 1 }, designs);
 ok('نسخهٔ بردارِ متفاوت → هویت با بردار قاطع نیست', rV.found === false);
-// بردارِ نیمه‌بینابین (حاشیه کم) → قاطع نمی‌شود
-const vmid = new Array(emb.EMBED_DIM).fill(0); vmid[0] = 1; vmid[1] = 0.9;
+// بردارِ نیمه‌بینابین (حاشیهٔ بسیار کم، دو بازیکن هم‌فاصله) → قاطع نمی‌شود
+const vmid = new Array(emb.EMBED_DIM).fill(0); vmid[0] = 1; vmid[1] = 0.97;
 const rm = ci.rankIdentity({ textTokens: [], embedding: vmid, embeddingVersion: V }, designs);
-ok('بردارِ بینابین حاشیهٔ کم دارد', rm.margin < 0.15);
+ok('بردارِ بینابین حاشیهٔ کم دارد (< 0.05)', rm.margin < 0.05);
 ok('بردارِ بینابین قاطع نمی‌شود', rm.found === false);
 
 console.log(`\n✅ همهٔ ${pass} تستِ لایهٔ بردار سبز شد.`);
+
+// ── حاشیه نسبت به بازیکنِ دیگر است، نه واریانتِ همان بازیکن ──
+{
+  const v3 = new Array(emb.EMBED_DIM).fill(0); v3[0] = 0.99; v3[1] = 0.1; // شبیه d1
+  const designs2 = [
+    { id: 'd1', card_type_id: 'c1', embedding: v1, embeddingVersion: V, playerLexemes: ['Ronaldo'], playerNumber: '7' },
+    // واریانتِ نقره‌ایِ همان بازیکن: برداری به‌شدت نزدیک به d1
+    { id: 'd1-silver', card_type_id: 'c1s', embedding: v3, embeddingVersion: V, playerLexemes: ['Ronaldo'], playerNumber: '7' },
+    { id: 'd2', card_type_id: 'c2', embedding: v2, embeddingVersion: V, playerLexemes: ['Messi'], playerNumber: '10' },
+  ];
+  const r = ci.rankIdentity({ textTokens: [], embedding: v1, embeddingVersion: V }, designs2);
+  ok('واریانتِ همان بازیکن رقیب حساب نمی‌شود (حاشیه تا بازیکن دیگر)', r.found === true && r.margin > 0.3,
+    `found=${r.found} margin=${r.margin.toFixed(3)}`);
+}

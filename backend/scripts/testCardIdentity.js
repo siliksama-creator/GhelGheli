@@ -148,6 +148,7 @@ const foundRodri = { found: true, decisive: true, score: 0.95, design: designs[1
 const foundHaaland = { found: true, decisive: true, score: 0.95, design: designs[0], byText: true, byEmbedding: false };
 
 // ۱) کدِ هالند، عکس قاطعِ رودری، کارت غیرنقدی → اصلاحِ خودکار به رودری
+//    (در مسیرِ کدِ نام‌دار path همان code_bound است و علت code_auto_corrected).
 const d1 = svc.decideSubmission({
   expectedTypeId: 'T-HAALAND',
   match: { design: designs[1], score: 0.5, decisive: true },
@@ -155,19 +156,34 @@ const d1 = svc.decideSubmission({
   isCashType: () => false,
 });
 ok('کدِ هالند + عکس رودریِ غیرنقدی → تأیید خودکارِ رودری (اصلاح کد)',
-  d1.action === 'approve' && d1.cardTypeId === 'T-RODRI' && d1.path === 'identity_override',
+  d1.action === 'approve' && d1.cardTypeId === 'T-RODRI'
+  && d1.path === 'code_bound' && d1.reason === 'code_auto_corrected',
   JSON.stringify(d1));
 
-// ۲) همان، ولی کارت رودری نقدی → صف با علت code_mismatch_suspected
+// ۲) همان، ولی **کدِ موردانتظار** نقدی است (حتی اگر عکس کارتِ امتیازی را
+//    نشان دهد) → صف؛ محافظِ پول به کد نگاه می‌کند نه به نوعِ تشخیصِ عکس.
 const d2 = svc.decideSubmission({
+  expectedTypeId: 'T-HAALAND',
+  match: { design: designs[1], score: 0.5, decisive: true },
+  identity: foundRodri,
+  isCashType: (id) => id === 'T-HAALAND',
+});
+ok('کدِ نقدی + عکس کارتِ دیگر → صف (پول بدون تأیید ادمین جابه‌جا نشود)',
+  d2.action === 'review' && d2.reason === 'code_mismatch_suspected',
+  JSON.stringify(d2));
+
+// ۲ب) برعکسِ ۲: عکس یک کارتِ نقدی را نشان می‌دهد ولی کدِ موردانتظار امتیازی
+//    است → باز هم صف، چون اصلاحِ خودکار به سمتِ کارتِ نقدی یعنی اعطای
+//    خودکارِ اعتبارِ پولی بدون دیدنِ انسان.
+const d2b = svc.decideSubmission({
   expectedTypeId: 'T-HAALAND',
   match: { design: designs[1], score: 0.5, decisive: true },
   identity: foundRodri,
   isCashType: (id) => id === 'T-RODRI',
 });
-ok('کدِ هالند + عکس رودریِ نقدی → صف (پول بدون تأیید ادمین جابه‌جا نشود)',
-  d2.action === 'review' && d2.reason === 'code_mismatch_suspected',
-  JSON.stringify(d2));
+ok('کدِ امتیازی + عکس کارتِ نقدیِ دیگر → صف (اعطای خودکارِ پول ممنوع)',
+  d2b.action === 'review' && d2b.reason === 'code_mismatch_suspected',
+  JSON.stringify(d2b));
 
 // ۳) کد و هویت یکی → تأیید ساده
 const d3 = svc.decideSubmission({

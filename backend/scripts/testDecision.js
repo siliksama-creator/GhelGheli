@@ -268,19 +268,20 @@ console.log('\n══ سناریوهای زندهٔ تأیید غلط (مهر ۱
   ok('اثرانگشتِ غیرقاطع(امباپه) + هویتِ غیرقاطع → صف، نه تأیید غلط',
     realRodri.action === 'review', JSON.stringify(realRodri));
 
-  // ۲) هر دو موتور **قاطع** ولی متعارض (اثرانگشت مطمئن امباپه، هویت مطمئن
-  //    رودری) → صف با conflicting_signals (انسان تصمیم بگیرد، نه auto).
+  // ۲) هر دو موتور **قاطع** ولی متعارض (اثرانگشت مطمئن امباپه، مدل مطمئن
+  //    رودری): مدل عصبی موتورِ اصلی است → نظرِ مدل (رودری) تأیید می‌شود، نه
+  //    اثرانگشتِ غلط. (مدل در شبیه‌سازی ۵۶ طرح صفر خطا داشت.)
   const fpDecisive = m('accept', 0.9, designOf(TYPE_B), true);
   const idRodri = {
-    found: true, decisive: true, score: 0.85, margin: 0.16, ratio: 1.3,
+    found: true, decisive: true, score: 0.7, margin: 0.06, ratio: 1.09,
     byText: false, byEmbedding: true, embedOnly: true,
     design: { id: 'd-rodri', card_type_id: TYPE_A },
   };
-  const disagree = svc.decideSubmission({
-    expectedTypeId: null, match: fpDecisive, identity: idRodri });
-  ok('اثرانگشتِ قاطع(امباپه) در تعارض با هویتِ قاطع(رودری) → صف',
-    disagree.action === 'review' && disagree.reason === 'conflicting_signals',
-    JSON.stringify(disagree));
+  const neuralWinsHard = svc.decideSubmission({
+    expectedTypeId: null, match: fpDecisive, identity: idRodri, neuralAttempted: true });
+  ok('اثرانگشت قاطعِ غلط ولی مدل قاطعِ درست → تأیید کارتِ مدل',
+    neuralWinsHard.action === 'approve' && neuralWinsHard.cardTypeId === TYPE_A,
+    JSON.stringify(neuralWinsHard));
 
   // ۳) حالت سالم: اثرانگشت قاطع و هویت قاطع بر یک کارت هم‌نظرند → تأیید.
   const agree = svc.decideSubmission({
@@ -292,6 +293,78 @@ console.log('\n══ سناریوهای زندهٔ تأیید غلط (مهر ۱
     } });
   ok('دو موتور هم‌نظر و قاطع → تأیید خودکار',
     agree.action === 'approve' && agree.cardTypeId === TYPE_A, JSON.stringify(agree));
+}
+
+console.log('\n══ مدل عصبی موتورِ اصلی است (اثرانگشت دیگر غلط تأیید نمی‌کند) ══');
+{
+  const idFound = {
+    found: true, decisive: true, score: 0.7, margin: 0.06, ratio: 1.09,
+    byEmbedding: true, embedOnly: true, byText: false,
+    design: { id: 'd-rodri', card_type_id: TYPE_A },
+  };
+
+  // کد بی‌نام: اثرانگشت قاطعِ غلط (امباپه) ولی مدل قاطعِ درست (رودری) → تأیید رودری.
+  const neuralWins = svc.decideSubmission({
+    expectedTypeId: null,
+    match: m('accept', 0.7, designOf(TYPE_B), true), // اثرانگشت قاطع، کارتِ دیگر
+    identity: idFound,
+    neuralAttempted: true });
+  ok('اثرانگشت غلط ولی مدل درست → تأیید کارتِ مدل',
+    neuralWins.action === 'approve' && neuralWins.cardTypeId === TYPE_A,
+    JSON.stringify(neuralWins));
+
+  // کد بی‌نام: مدل پردازش کرد ولی قاطع نیست، اثرانگشت قاطع هم نباید تأیید کند → صف.
+  const neuralUnsure = svc.decideSubmission({
+    expectedTypeId: null,
+    match: m('accept', 0.7, designOf(TYPE_B), true), // اثرانگشت قاطعِ غلط
+    identity: { found: false, decisive: false, score: 0.4, margin: 0.02, design: null },
+    neuralAttempted: true });
+  ok('مدل غیردقیق → صف (اثرانگشت قاطعِ مشکوک تأیید خودکار نمی‌کند)',
+    neuralUnsure.action === 'review', JSON.stringify(neuralUnsure));
+
+  // بدون بردار (کلاینت قدیمی) → همان رفتار قدیمیِ اثرانگشت برقرار است.
+  const legacy = svc.decideSubmission({
+    expectedTypeId: null,
+    match: m('accept', 0.7, designOf(TYPE_B), true),
+    identity: { found: false, decisive: false, score: 0, design: null },
+    neuralAttempted: false });
+  ok('کلاینت بدون بردار → اثرانگشت طبق گذشته کار می‌کند',
+    legacy.action === 'approve' && legacy.cardTypeId === TYPE_B, JSON.stringify(legacy));
+
+  // کد نام‌دار: مدل قاطع هم‌خوان با کد → تأیید حتی اگر اثرانگشت ضعیف باشد.
+  const boundAgree = svc.decideSubmission({
+    expectedTypeId: TYPE_A,
+    match: m('review', 0.1, designOf(TYPE_B), false),
+    identity: idFound,
+    neuralAttempted: true });
+  ok('کد + مدل هم‌خوان → تأیید (اثرانگشت ضعیف مهم نیست)',
+    boundAgree.action === 'approve', JSON.stringify(boundAgree));
+
+  // مدل قاطعِ متناقض با کدِ نقدی، حتی وقتی اثرانگشت هیچ مرجعی ندارد،
+  // نباید کورکورانه کد را تأیید کند → صف.
+  const CASH = 'cccccccc-0000-0000-0000-000000000003';
+  const idCash = {
+    found: true, decisive: true, score: 0.7, margin: 0.06, ratio: 1.09,
+    byEmbedding: true, embedOnly: true, byText: false,
+    design: { id: 'd-x', card_type_id: TYPE_A }, // عکس می‌گوید A
+  };
+  const cashContradict = svc.decideSubmission({
+    expectedTypeId: CASH,
+    match: m('reject', 0, null, false), hasReference: false,
+    identity: idCash, isCashType: (id) => id === CASH, neuralAttempted: true });
+  ok('مدل متناقض با کدِ نقدی (حتی بدون مرجع اثرانگشت) → صف',
+    cashContradict.action === 'review' && cashContradict.reason === 'code_mismatch_suspected',
+    JSON.stringify(cashContradict));
+
+  // مدل غیرقاطع + اثرانگشت بدون مرجع → کد به‌تنهایی کافی است → تأیید (نه صفِ بی‌مورد).
+  const unsureNoRef = svc.decideSubmission({
+    expectedTypeId: TYPE_A,
+    match: m('reject', 0, null, false), hasReference: false,
+    identity: { found: false, decisive: false, score: 0.4, design: null },
+    neuralAttempted: true });
+  ok('مدل غیردقیق و بدون مرجع اثرانگشت → کد تأیید می‌شود (صفِ بی‌مورد نساز)',
+    unsureNoRef.action === 'approve' && unsureNoRef.cardTypeId === TYPE_A,
+    JSON.stringify(unsureNoRef));
 }
 
 console.log('\n══ نسبتِ قاطعیت اثرانگشت محافظه‌کار است (۱.۱۵) ══');
