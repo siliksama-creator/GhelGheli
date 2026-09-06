@@ -68,7 +68,7 @@ async function reviewOne(pool, submissionId, hooks = {}) {
     // همیشه نظر سرور را ثبت می‌کنیم (حتی اگر خودکار نکنیم) تا پنل نشان دهد.
     await client.query(
       `UPDATE photo_card_submissions
-          SET server_verify = $1, updated_at = NOW()
+          SET server_verify = $1
         WHERE id = $2`,
       [JSON.stringify({
         at: new Date().toISOString(),
