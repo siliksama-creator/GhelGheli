@@ -182,6 +182,33 @@ function nameFragment(ocrTokens, lexemes) {
 }
 
 /**
+ * شاهدِ خامِ نام (هر واژه — اسم‌کوچک یا نام‌خانوادگی) به OCR، بدون گیت.
+ *
+ * برخلاف nameIdentity که فقط نام‌خانوادگیِ آخر را وزن می‌دهد و زیرِ ۰.۶ را صفر
+ * می‌کند، این تابع بهترین تطبیقِ توکن‌های OCR به **هر یک از واژه‌های نام** را
+ * برمی‌گرداند. کاربردش نجاتِ حالت‌هایی است که نام‌خانوادگی تار است ولی اسم‌کوچک
+ * درشت و واضح خوانده شده (مثلاً OCR «EMILIANO» برای Emiliano Martínez وقتی
+ * «MARTINEZ» خراب درآمده). برای جلوگیری از تصادفِ کلمات کوتاه، آستانهٔ مصرف در
+ * لایهٔ تصمیم بالاست و باید با رتبهٔ بصری هم هم‌پوشانی داشته باشد.
+ *
+ * @returns {{score:number, word:string}|null} بهترین شباهت و واژه‌ای که خورد.
+ */
+function nameEvidence(ocrTokens, lexemes) {
+  const ocr = (ocrTokens || []).filter(t => t && t.charCodeAt(0) !== 35 && !t.startsWith('#'));
+  const lex = (lexemes || [])
+    .filter(Boolean)
+    .flatMap(w => normalizeName(w).split(' '))
+    .filter(w => w.length >= 2);
+  if (!ocr.length || !lex.length) return null;
+  let best = 0; let hit = null;
+  for (const word of lex) {
+    const b = ocr.reduce((m, t) => Math.max(m, tokenSim(word, t)), 0);
+    if (b > best) { best = b; hit = word; }
+  }
+  return { score: best, word: hit };
+}
+
+/**
  * بهترین بازیکن را از روی متنِ OCR در میان طرح‌های کاتالوگ پیدا می‌کند.
  *
  * @param {object}   opts
@@ -258,6 +285,7 @@ module.exports = {
   tokenSim,
   nameIdentity,
   nameFragment,
+  nameEvidence,
   numberIdentity,
   identityAgainst,
   isGenericToken,

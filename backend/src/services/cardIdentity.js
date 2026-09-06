@@ -26,7 +26,7 @@
  * `embedding` هنگام آپلودِ مرجع و ثبتِ کاربر پر شود — همین.
  */
 
-const { nameIdentity, nameFragment, numberIdentity } = require('./playerIdentity');
+const { nameIdentity, nameFragment, nameEvidence, numberIdentity } = require('./playerIdentity');
 
 /**
  * شباهتِ کسینوسیِ دو بردار (برای بردارِ عصبی).
@@ -101,15 +101,21 @@ function identityScore(query, design) {
     score = 0;
   }
 
-  // شاهدِ مستقلِ نام: شباهتِ خامِ نام‌خانوادگی به OCR، بدون گیتِ متن (برای
-  // اجماعِ «مدل بصری رتبه‌اول + نامِ نیمه‌خوانده» در rankIdentity استفاده می‌شود).
+  // شاهدِ مستقلِ نام (بدون گیتِ متن، برای اجماع با مدل بصری در rankIdentity):
+  //   frag = شباهتِ خامِ نام‌خانوادگی؛ ev = بهترین تطبیق به هر واژه (اسم‌کوچک
+  //   یا نام‌خانوادگی) — برای حالت «نام‌خانوادگی تار، اسم‌کوچک واضح».
   const frag = nameFragment(query?.textTokens, design?.playerLexemes);
+  const ev = nameEvidence(query?.textTokens, design?.playerLexemes);
+  const evScore = ev ? ev.score : null;
+  const evWord = ev ? ev.word : null;
 
   return {
     score: Math.max(0, Math.min(1, score)),
     byText, byEmbedding,
     name: textScore, embed,
     frag,
+    ev: evScore,
+    evWord,
   };
 }
 
@@ -174,49 +180,105 @@ function rankIdentity(query, designs, th = {}) {
   const rival = ranked
     .slice(1)
     .find(r => !isSamePlayer(r.design));
-  const rivalScore = rival ? rival.score : 0;
-  const margin = rival ? best.score - rivalScore : 1;
-  const ratio = rival && rivalScore > 1e-6 ? best.score / rivalScore : 99;
-  // مسیرِ فقط-بردار (بدون متن) آستانه‌های خودش را دارد؛ مسیر متنی همان
-  // پذیرش ۰.۷۸. در حالت ترکیب (متن+بردار) هم نمره در مقیاس متنی است.
-  const embedOnly = best.byEmbedding && !best.byText;
+  // قوتِ شاهدِ نام برای هر ردیف: بهترین تطبیقِ توکن‌های OCR به اسم‌کوچک یا
+  // نام‌خانوادگیِ آن بازیکن (ev تطبیقِ کامل، frag نام‌خانوادگیِ نیمه‌خوانده).
+  const nameHit = r => Math.max(r.frag ?? 0, r.ev ?? 0);
+  const samePlayerRows = (a, b) =>
+    (a?.design?.playerLexemes || []).slice().sort().join(',') ===
+    (b?.design?.playerLexemes || []).slice().sort().join(',');
+
+  // ── نجات با نام: تساویِ بصری + نامِ قاطع ──
+  //
+  // روی عکسِ کادربندی‌شده/تار گاهی بردارِ عصبی بازیکنِ درست را فقط یک‌ذره پشتِ
+  // بازیکنِ دیگری می‌گذارد (مثلاً EMILIANO MARTÍNEZ: بصری چرکی ۰.۶۳۸ در برابر
+  // مارتینز ۰.۶۱۶، اختلاف ۰.۰۲۲) ولی نامِ روی کارت واضح است (OCR «EMILIANO»
+  // کامل خوانده شد). در فاصلهٔ کوچکِ بصری، نام برنده را تعیین می‌کند.
+  //
+  // محافظه‌کارانه — فقط در رژیمِ بصری (کسینوسِ خام) و با هر سه شرط:
+  //   الف) بازیکنِ نام‌زده از نظر بصری هم در کورس است (فاصلهٔ امتیازِ بردار تا
+  //        بهترین بصری ≤ ۰.۰۵)؛ اگر بصری اصلاً او را نشان ندهد دخالت نمی‌کنیم؛
+  //   ب) نامش قوی بخورد (تطبیق کاملِ اسم ≥۰.۷۵ یا نام‌خانوادگی ≥۰.۵)؛
+  //   ج) هیچ بازیکنِ دیگری آن‌قدر نام نخورده باشد (فاصلهٔ نام تا نفر بعد ≥۰.۲).
+  let nameRescued = false;
+  {
+    const visRows = ranked.filter(r => r.byEmbedding && r.embed != null);
+    if (visRows.length) {
+      const visMax = Math.max(...visRows.map(r => r.embed));
+      const near = visRows.filter(r => visMax - r.embed <= 0.05);
+      let cand = null;
+      for (const r of near) {
+        const strong = (r.ev ?? 0) >= 0.75 || (r.frag ?? 0) >= 0.5;
+        if (strong && (!cand || nameHit(r) > nameHit(cand))) cand = r;
+      }
+      if (cand) {
+        const otherBest = visRows
+          .filter(r => !samePlayerRows(r, cand))
+          .reduce((m, r) => Math.max(m, nameHit(r)), 0);
+        if (nameHit(cand) - otherBest >= 0.2) {
+          if (cand !== ranked[0]) {
+            ranked.splice(ranked.indexOf(cand), 1); ranked.unshift(cand);
+          }
+          nameRescued = true;
+        }
+      }
+    }
+  }
+
+  const winner = ranked[0];
+  const rivalR = ranked.slice(1).find(r => !isSamePlayer(r.design));
+  const rivalScore = rivalR ? rivalR.score : 0;
+  const visMargin = rivalR ? winner.score - rivalR.score : 1;
+  const visRatio = rivalR && rivalR.score > 1e-6 ? winner.score / rivalR.score : 99;
+
+  // مسیرِ فقط-بردار (بدون متن) آستانه‌های خودش را دارد؛ مسیر متنی همان ۰.۷۸.
+  const embedOnly = winner.byEmbedding && !winner.byText;
   const acceptCut = embedOnly ? EMBED_ACCEPT : ACCEPT;
   let marginCut = embedOnly ? EMBED_MIN_MARGIN : (th.minMargin ?? 0.15);
   let ratioCut = embedOnly ? 1.06 : MIN_RATIO;
 
-  // ── اجماعِ «مدل بصری + نامِ نیمه‌خوانده» (سناریوی عکسِ کادربندی‌شده) ──
-  //
-  // وقتی بچه‌ها با دوربینِ گوشی عکس می‌گیرند، طبیعی است گوشهٔ عکس میز/پس‌زمینه
-  // بگیرد یا تار باشد؛ آن‌وقت حاشیهٔ خالصِ بصری کوچک می‌شود (دو بازیکن به هم
-  // نزدیک می‌شوند) و یک تشخیصِ درست بی‌خود به صف می‌رود. اما نامِ بازیکن با
-  // حروف درشت روی کارت چاپ شده و OCR معمولاً قطعه‌ای از آن را می‌خواند
-  // (مثلاً «ERKI» از «CHERKI» که دو حرفِ اولش در سایه افتاده).
-  //
-  // اگر بردارِ عصبی بازیکنِ X را رتبهٔ اول آورد **و** نامِ نیمه‌خوانده هم به
-  // X بخورد (frag ≥ ۰.۵) و به هیچ بازیکنِ دیگری نخورد (فاصله تا رقیب ≥ ۰.۲)،
-  // این دو سیگنالِ مستقل هم‌نظرند و ابهام بصری را می‌شکنند؛ پس حاشیهٔ لازم
-  // پایین می‌آید. هیچ کدام به‌تنهایی کافی نیست — فقط اجماع.
+  // ── اجماعِ «مدل بصری + نام» وقتی نام رتبهٔ اول را تأیید می‌کند ──
+  // نامِ نیمه‌خوانده (مثل «ERKI» از CHERKI) یا اسمِ واضح، برندهٔ بصری را تأیید
+  // می‌کند؛ آن‌وقت حاشیهٔ لازم پایین می‌آید چون دو سیگنالِ مستقل هم‌نظرند.
   let nameCorroborated = false;
-  if (embedOnly && best.frag != null) {
-    const rivalFrag = rival && rival.frag != null ? rival.frag : 0;
-    const FRAG_HIT = 0.5;
-    nameCorroborated = best.frag >= FRAG_HIT && (best.frag - rivalFrag) >= 0.2;
-    if (nameCorroborated) { marginCut = 0.015; ratioCut = 1.02; }
+  if (!nameRescued && embedOnly) {
+    const wHit = nameHit(winner);
+    const rHit = rivalR ? nameHit(rivalR) : 0;
+    if (wHit >= 0.5 && (wHit - rHit) >= 0.2) {
+      nameCorroborated = true;
+      marginCut = 0.015; ratioCut = 1.02;
+    }
   }
 
-  const decisive = best.score >= acceptCut && margin >= marginCut && ratio >= ratioCut;
+  // حاشیه/نمره‌ای که گزارش می‌شود: در حالتِ نجات، نام تصمیم گرفته پس حاشیه بر
+  // مبنای فاصلهٔ نام تا **همهٔ بازیکنانِ دیگر** (صرف‌نظر از رتبهٔ بصری‌شان) است
+  // تا برنده‌ای که یک رقیبِ بصریِ کمی‌بالاتر داشته هم حاشیهٔ واقعی بدهد.
+  let outMargin, outRatio, outScore;
+  if (nameRescued) {
+    const wHit = nameHit(winner);
+    const rHit = ranked
+      .filter(r => !samePlayerRows(r, winner))
+      .reduce((m, r) => Math.max(m, nameHit(r)), 0);
+    outMargin = wHit - rHit; outRatio = 99; outScore = winner.score;
+  } else {
+    outMargin = visMargin; outRatio = visRatio; outScore = winner.score;
+  }
+
+  const decisive = nameRescued
+    ? true
+    : winner.score >= acceptCut && visMargin >= marginCut && visRatio >= ratioCut;
 
   return {
     found: decisive,
     decisive,
-    score: best.score,
-    margin,
-    ratio: Number.isFinite(ratio) ? ratio : 99,
-    byText: best.byText,
-    byEmbedding: best.byEmbedding,
+    score: outScore,
+    margin: outMargin,
+    ratio: Number.isFinite(outRatio) ? outRatio : 99,
+    byText: winner.byText,
+    byEmbedding: winner.byEmbedding,
     embedOnly,
-    corroborated: nameCorroborated,
-    design: best.design,
+    corroborated: nameCorroborated || nameRescued,
+    nameRescued,
+    design: winner.design,
     ranked: ranked.slice(0, 3),
   };
 }

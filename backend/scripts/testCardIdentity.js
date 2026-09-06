@@ -223,6 +223,38 @@ ok('نام کامل چرکی + بردار نزدیک → قاطعِ چرکی (م
   strongText.found && strongText.design.card_type_id === 'T-CHERKI',
   `found=${strongText.found} score=${strongText.score?.toFixed(3)} byText=${strongText.byText}`);
 
+console.log('\\n== نجات با نام: تساویِ بصری + اسم‌کوچکِ واضح (امیلیانو) ==');
+// کارتِ دروازه‌بان EMILIANO MARTÍNEZ: بصری چرکی را یک‌ذره جلو انداخت (۰.۶۳۸)
+// و امیلیانو ۰.۶۱۶ (اختلاف ۰.۰۲۲)؛ OCR اسم‌کوچکِ «EMILIANO» را کامل خواند.
+const emiOcr = ['FIFA', 'EMILIANO', 'ARTIN', '#1', '#23'];
+const emi = ci.rankIdentity(
+  { textTokens: emiOcr, embedding: BASE, embeddingVersion: 2 },
+  [
+    { id: 'cherki', card_type_id: 'T-CHERKI', playerLexemes: ['rayan', 'cherki'],
+      embedding: vecAtCos(BASE, 0.638), embeddingVersion: 2 },
+    { id: 'emiliano', card_type_id: 'T-EMI', playerLexemes: ['emiliano', 'martinez'],
+      embedding: vecAtCos(BASE, 0.616), embeddingVersion: 2 },
+    { id: 'mbappe', card_type_id: 'T-MBAPPE', playerLexemes: ['kylian', 'mbappe'],
+      embedding: vecAtCos(BASE, 0.605), embeddingVersion: 2 },
+  ]);
+ok('تساویِ بصری + اسم‌کوچکِ واضح EMILIANO → نجات به امیلیانو (قاطع)',
+  emi.found && emi.design.card_type_id === 'T-EMI' && emi.nameRescued === true,
+  `found=${emi.found} top=${emi.design?.card_type_id} margin=${emi.margin?.toFixed(3)} rescued=${emi.nameRescued}`);
+
+// امنیت: اسم‌کوچکِ واضح برای بازیکنی که از نظر بصری اصلاً در کورس نیست
+// (فاصلهٔ زیاد) نباید برنده را عوض کند → بصری قاطعِ خودش می‌ماند.
+const farName = ci.rankIdentity(
+  { textTokens: ['EMILIANO', '#23'], embedding: BASE, embeddingVersion: 2 },
+  [
+    { id: 'cherki', card_type_id: 'T-CHERKI', playerLexemes: ['rayan', 'cherki'],
+      embedding: vecAtCos(BASE, 0.80), embeddingVersion: 2 },
+    { id: 'emiliano', card_type_id: 'T-EMI', playerLexemes: ['emiliano', 'martinez'],
+      embedding: vecAtCos(BASE, 0.30), embeddingVersion: 2 },
+  ]);
+ok('اسمِ واضحِ بازیکنِ دور از نظر بصری، برنده را عوض نمی‌کند (فقط کورس)',
+  farName.design?.card_type_id === 'T-CHERKI',
+  `top=${farName.design?.card_type_id} found=${farName.found}`);
+
 console.log('\n== تصمیم یکپارچه (decideSubmission با هویت) ==');
 const foundRodri = { found: true, decisive: true, score: 0.95, design: designs[1], byText: true, byEmbedding: false };
 const foundHaaland = { found: true, decisive: true, score: 0.95, design: designs[0], byText: true, byEmbedding: false };
