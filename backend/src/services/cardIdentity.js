@@ -297,6 +297,49 @@ function rankIdentity(query, designs, th = {}) {
     }
   }
 
+  // ── نجاتِ لایهٔ دوم: بصری خوشه‌بسته و نامِ ضعیف ولی یکتا ──
+  //
+  // روی عکسِ تیره/پشت، گاهی مدل بصری اصلاً مطمئن نیست: چند بازیکن در یک
+  // خوشهٔ نزدیک‌اند (مثلاً دی‌بروینه: صلاح ۰.۶۱۳، حکیمی ۰.۵۹۴، دی‌بروینه ۰.۵۸۰،
+  // حاشیه ۰.۰۱۹). نامِ درشتِ کارت ممکن است فقط قطعه‌ای خوانده شود («EBRU» از
+  // BRUYNE → تطابقِ ضعیف ۰.۳۳) و به‌تنهایی قانع‌کننده نیست. اما اگر درونِ
+  // همان خوشهٔ نزدیک **فقط یک بازیکن** این نام را بخواند (و بقیه هیچ)، آن یکتا
+  // بودنِ نام، ابهامِ بصری را می‌شکند.
+  //
+  // محافظه‌کارانه و فقط وقتی لایهٔ اول (نامِ قوی) چیزی نیاورد:
+  //   • در خوشهٔ نزدیک (≤۰.۰۵ از بهترین بصری)؛
+  //   • دقیقاً یک بازیکن نامش ≥۰.۳ است و بیشینه است؛
+  //   • فاصلهٔ نام تا نفرِ بعدیِ خوشه ≥۰.۱؛
+  //   • و آن بازیکن از نظر بصری از رتبه‌های بعد هم دور نیست (همین خوشه).
+  if (!nameRescued) {
+    const visRows = ranked.filter(r => r.byEmbedding && r.embed != null);
+    if (visRows.length) {
+      const visMax = Math.max(...visRows.map(r => r.embed));
+      const near = visRows.filter(r => visMax - r.embed <= 0.05);
+      // این لایه فقط نام‌خانوادگی (frag) را می‌بیند: قطعه‌نامِ روی کارت
+      // عملاً همیشه نام‌خانوادگیِ درشت است و توکن‌های تصادفی (FRANCE/FIFA) با
+      // آن زیررشتهٔ معنادار نمی‌سازند، برخلافِ اسم‌کوچک که می‌تواند کور تصادفی
+      // بخورد. آستانهٔ ۰.۶ یعنی قطعهٔ پیوستهٔ واقعی (EBRU/BRUYNE≈۰.۷۵،
+      // ERKI/CHERKI با فاصلهٔ ویرایشی بالاتر).
+      const hits = near
+        .map(r => ({ r, h: r.frag ?? 0 }))
+        .filter(x => x.h >= 0.6)
+        .sort((a, b) => b.h - a.h);
+      if (hits.length >= 1) {
+        const top = hits[0];
+        const second = hits[1]?.h ?? near
+          .filter(x => !samePlayerRows(x, top.r))
+          .reduce((m, x) => Math.max(m, x.frag ?? 0), 0);
+        if (top.h - second >= 0.3) {
+          if (top.r !== ranked[0]) {
+            ranked.splice(ranked.indexOf(top.r), 1); ranked.unshift(top.r);
+          }
+          nameRescued = true;
+        }
+      }
+    }
+  }
+
   const winner = ranked[0];
   const rivalR = ranked.slice(1).find(r => !isSamePlayer(r.design));
   const rivalScore = rivalR ? rivalR.score : 0;

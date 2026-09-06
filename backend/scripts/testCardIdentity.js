@@ -276,6 +276,36 @@ ok('عکسِ پشت با مرجعِ روِ فریبنده → تفکیک طرف�
   sideTest.found && sideTest.design.card_type_id === 'T-A' && sideTest.side === 'back',
   `found=${sideTest.found} top=${sideTest.design?.card_type_id} side=${sideTest.side} margin=${sideTest.margin?.toFixed(3)}`);
 
+console.log('\\n== نجاتِ لایهٔ دوم: بصری خوشه‌بسته + قطعه‌نامِ یکتا (دی‌بروینه) ==');
+// کارتِ تیرهٔ دی‌بروینه: بصری صلاح/حکیمی را جلو آورد و دی‌بروینه سوم در خوشهٔ
+// نزدیک (۰.۶۱۳/۰.۵۹۴/۰.۵۸۰)؛ OCR فقط «EBRU» خواند (زیررشتهٔ BRUYNE=۰.۷۵).
+const db = ci.rankIdentity(
+  { textTokens: ['EBRU', '#7', '#11'], embedding: BASE, embeddingVersion: 2 },
+  [
+    { id: 'salah', card_type_id: 'T-SALAH', side: 'back', playerLexemes: ['mohamed', 'salah'],
+      embedding: vecAtCos(BASE, 0.613), embeddingVersion: 2 },
+    { id: 'hakimi', card_type_id: 'T-HAKIMI', side: 'back', playerLexemes: ['achraf', 'hakimi'],
+      embedding: vecAtCos(BASE, 0.594), embeddingVersion: 2 },
+    { id: 'debruyne', card_type_id: 'T-BRUYNE', side: 'back', playerLexemes: ['kevin', 'de', 'bruyne'],
+      embedding: vecAtCos(BASE, 0.580), embeddingVersion: 2 },
+  ]);
+ok('بصری خوشه‌بسته + قطعه‌نامِ یکتای دی‌بروینه → نجات به او',
+  db.found && db.design.card_type_id === 'T-BRUYNE' && db.nameRescued === true,
+  `found=${db.found} top=${db.design?.card_type_id} rescued=${db.nameRescued}`);
+
+// امنیت: همان خوشهٔ بصری ولی OCR فقط کلمات عمومی (بدون نام) → هیچ نجات، صف.
+const dbGeneric = ci.rankIdentity(
+  { textTokens: ['FRANCE', 'FIFA'], embedding: BASE, embeddingVersion: 2 },
+  [
+    { id: 'salah', card_type_id: 'T-SALAH', side: 'back', playerLexemes: ['mohamed', 'salah'],
+      embedding: vecAtCos(BASE, 0.613), embeddingVersion: 2 },
+    { id: 'bruyne', card_type_id: 'T-BRUYNE', side: 'back', playerLexemes: ['kevin', 'de', 'bruyne'],
+      embedding: vecAtCos(BASE, 0.580), embeddingVersion: 2 },
+  ]);
+ok('خوشهٔ بصری بدون نامِ خوانده → نجات نمی‌دهد (صف می‌ماند)',
+  !dbGeneric.nameRescued,
+  `rescued=${dbGeneric.nameRescued} top=${dbGeneric.design?.card_type_id}`);
+
 console.log('\n== تصمیم یکپارچه (decideSubmission با هویت) ==');
 const foundRodri = { found: true, decisive: true, score: 0.95, design: designs[1], byText: true, byEmbedding: false };
 const foundHaaland = { found: true, decisive: true, score: 0.95, design: designs[0], byText: true, byEmbedding: false };

@@ -177,8 +177,38 @@ function nameFragment(ocrTokens, lexemes) {
     .filter(w => w.length >= 2);
   if (!ocr.length || !lex.length) return null;
   // نام‌خانوادگی (آخرین واژه) ملاک است؛ همان چیزی که درشت چاپ می‌شود.
+  // هم فاصلهٔ ویرایشی (ERKI/CHERKI) و هم زیررشتهٔ پیوسته (EBRU⊂BRUYNE) را
+  // می‌سنجیم و بیشینه را می‌گیریم تا قطعهٔ نیمه‌خوانده از تطابق تصادفی جدا شود.
   const surname = lex[lex.length - 1];
-  return ocr.reduce((m, t) => Math.max(m, tokenSim(surname, t)), 0);
+  return ocr.reduce((m, t) => Math.max(m, tokenSim(surname, t), lcsRatio(surname, t)), 0);
+}
+
+/**
+ * شباهتِ زیررشته‌ایِ نام (LCS بر اساس طولِ قطعهٔ پیوستهٔ مشترک).
+ *
+ * فاصلهٔ ویرایشی (tokenSim) برای قطعه‌نامِ کوتاه ضعیف است: «EBRU» با «BRUYNE»
+ * فقط ۰.۳۳ می‌گیرد و در عوض به کلماتِ تصادفی (RAYAN~FRANCE) هم ۰.۳۳ می‌دهد.
+ * اما قطعه‌نامِ واقعی یک **زیررشتهٔ پیوسته** از نام است (EBRU سه حرفِ متوالی
+ * «BRU» را با BRUYNE دارد). این تابع نسبتِ طولانی‌ترین زیررشتهٔ مشترکِ پیوسته
+ * به طولِ کوتاه‌ترین رشته را برمی‌گرداند تا قطعهٔ واقعی (≈۰.۷+) از تطابقِ
+ * تصادفیِ پراکنده (<۰.۵) جدا شود.
+ */
+function lcsRatio(a, b) {
+  const A = String(a || '').toUpperCase();
+  const B = String(b || '').toUpperCase();
+  if (!A || !B) return 0;
+  const n = A.length; const m = B.length;
+  let best = 0;
+  const prev = new Array(m + 1).fill(0);
+  for (let i = 1; i <= n; i++) {
+    const cur = new Array(m + 1).fill(0);
+    for (let j = 1; j <= m; j++) {
+      if (A[i - 1] === B[j - 1]) cur[j] = prev[j - 1] + 1;
+      if (cur[j] > best) best = cur[j];
+    }
+    prev.splice(0, m + 1, ...cur);
+  }
+  return best / Math.min(n, m);
 }
 
 /**
@@ -202,7 +232,7 @@ function nameEvidence(ocrTokens, lexemes) {
   if (!ocr.length || !lex.length) return null;
   let best = 0; let hit = null;
   for (const word of lex) {
-    const b = ocr.reduce((m, t) => Math.max(m, tokenSim(word, t)), 0);
+    const b = ocr.reduce((m, t) => Math.max(m, tokenSim(word, t), lcsRatio(word, t)), 0);
     if (b > best) { best = b; hit = word; }
   }
   return { score: best, word: hit };
