@@ -45,5 +45,19 @@ ok(/status:\s*['"]poor_quality['"]/.test(routeSrc),
 ok(/quality\s*blur=/.test(routeSrc) || /quality blur=/.test(routeSrc),
   'سنجه‌های کیفیت برای کالیبراسیونِ آینده لاگ می‌شوند');
 
+// باگِ 22P02 «invalid input syntax for type json»: ستون‌های
+// img_embedding/img_face_embedding از نوع jsonb هستند؛ اگر آرایهٔ خامِ JS
+// پاس داده شود، درایور pg آن را با آکولاد ({"0.015",...}) می‌فرستد و سرور
+// ۵۰۰ می‌دهد (مهر ۱۴۰۵، بعد از رفعِ گیتِ تار آشکار شد). در هر دو INSERT
+// (approved و pending) باید JSON.stringify باشد.
+const rawEmbeddingParams = (routeSrc.match(/,\s*queryEmbedding,/g) || []).length
+  + (routeSrc.match(/,\s*queryFace,/g) || []).length;
+ok(rawEmbeddingParams === 0,
+  `هیچ بردارِ خامی مستقیم به ستون jsonb پاس داده نمی‌شود (مورد خام: ${rawEmbeddingParams})`);
+ok((routeSrc.match(/queryEmbedding \? JSON\.stringify\(queryEmbedding\)/g) || []).length === 2,
+  'بردار کارت در هر دو INSERT (approved و pending) رشتهٔ JSON می‌شود');
+ok((routeSrc.match(/queryFace \? JSON\.stringify\(queryFace\)/g) || []).length >= 2,
+  'بردار چهره در هر دو INSERT رشتهٔ JSON می‌شود');
+
 console.log(`\n  ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

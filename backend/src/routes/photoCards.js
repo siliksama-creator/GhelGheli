@@ -1356,11 +1356,14 @@ module.exports = function createPhotoCardRoutes(deps) {
               queryFp.lumaSig, decision.path, queryFp.rgbSig,
               queryFp.textTokens || [],
               // فاز ۲ — حالت سایه: بردار و نظر هویتیِ عصبی (نه در تصمیم).
-              queryEmbedding, embeddingVersion,
+              // ستون jsonb است → رشتهٔ JSON (وگرنه 22P02؛ توضیح در مسیر approved).
+              queryEmbedding ? JSON.stringify(queryEmbedding) : null,
+              embeddingVersion,
               shadowId.topDesignId, shadowId.topScore,
               shadowId.margin, shadowId.byEmbedding,
               // فاز ۳ — حالت سایه: بردار چهرهٔ بازیکن (نه در تصمیم).
-              queryFace, faceVersion, faceMatchScore],
+              queryFace ? JSON.stringify(queryFace) : null,
+              faceVersion, faceMatchScore],
           );
 
           return res.json({
@@ -1451,10 +1454,17 @@ module.exports = function createPhotoCardRoutes(deps) {
               queryFp.dhash, queryFp.phash, queryFp.colorSig,
               queryFp.texSig, queryFp.lumaSig, queryFp.rgbSig,
               queryFp.textTokens || [],
-              queryEmbedding, embeddingVersion,
+              // ⚠️ ستون‌ها jsonb هستند: آرایهٔ خامِ JS باید رشتهٔ JSON شود،
+              // وگرنه درایور pg آن را به‌صورت آرایهٔ پستگرس با آکولاد
+              // ({"0.015",...}) می‌فرستد و سرور 22P02 «invalid input syntax
+              // for type json» می‌دهد. همین خطا قبلاً پشتِ گیتِ تار پنهان
+              // بود و فقط بعد از رفعِ تار آشکار شد (500 هنگامِ تأیید خودکار).
+              queryEmbedding ? JSON.stringify(queryEmbedding) : null,
+              embeddingVersion,
               shadowId.topDesignId, shadowId.topScore,
               shadowId.margin, shadowId.byEmbedding,
-              queryFace, faceVersion, faceMatchScore],
+              queryFace ? JSON.stringify(queryFace) : null,
+              faceVersion, faceMatchScore],
           );
 
           // ── ردیفِ توافقِ حالت سایه (فقط وقتی برداری در کار بوده) ──
