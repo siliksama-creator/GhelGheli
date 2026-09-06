@@ -255,6 +255,27 @@ ok('اسمِ واضحِ بازیکنِ دور از نظر بصری، برنده 
   farName.design?.card_type_id === 'T-CHERKI',
   `top=${farName.design?.card_type_id} found=${farName.found}`);
 
+console.log('\\n== تفکیک طرفِ کارت (رو/پشت) در رتبه‌بندی برداری ==');
+// عکسِ پشتِ بازیکنِ A؛ مرجعِ روِ A بردارش پارسال دور است، ولی مرجعِ روِ
+// بازیکنِ B به‌اشتباه نزدیک. رتبه‌بندیِ قاطی رو/پشت B را جلو می‌اندازد؛
+// تفکیکِ طرف باید فقط پشت‌ها را بسنجد و A را قاطع بیاورد.
+const sideTest = ci.rankIdentity(
+  { textTokens: [], embedding: BASE, embeddingVersion: 2 },
+  [
+    // پشتِ A — همان طرفِ عکس، باید برنده شود
+    { id: 'a-back', card_type_id: 'T-A', side: 'back',
+      playerLexemes: ['aaa', 'player'], embedding: vecAtCos(BASE, 0.66), embeddingVersion: 2 },
+    // روِ B — طرفِ اشتباه ولی به‌اشتباه نزدیک (تلهٔ قاطی‌شدن رو/پشت)
+    { id: 'b-front', card_type_id: 'T-B', side: 'front',
+      playerLexemes: ['bbb', 'rival'], embedding: vecAtCos(BASE, 0.85), embeddingVersion: 2 },
+    // پشتِ B — رقیب هم‌طرف واقعی
+    { id: 'b-back', card_type_id: 'T-B', side: 'back',
+      playerLexemes: ['bbb', 'rival'], embedding: vecAtCos(BASE, 0.55), embeddingVersion: 2 },
+  ]);
+ok('عکسِ پشت با مرجعِ روِ فریبنده → تفکیک طرف، بازیکن درست (T-A) را می‌آورد',
+  sideTest.found && sideTest.design.card_type_id === 'T-A' && sideTest.side === 'back',
+  `found=${sideTest.found} top=${sideTest.design?.card_type_id} side=${sideTest.side} margin=${sideTest.margin?.toFixed(3)}`);
+
 console.log('\n== تصمیم یکپارچه (decideSubmission با هویت) ==');
 const foundRodri = { found: true, decisive: true, score: 0.95, design: designs[1], byText: true, byEmbedding: false };
 const foundHaaland = { found: true, decisive: true, score: 0.95, design: designs[0], byText: true, byEmbedding: false };

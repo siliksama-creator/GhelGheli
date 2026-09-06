@@ -76,11 +76,22 @@ function identityScore(query, design) {
   // را خرد می‌کرد (۰.۷۶۲ → ۰.۳۳۵، حاشیه ۰.۰۸۳ → ۰.۰۱۶) و یک تشخیصِ واضح به صف
   // می‌رفت و پیشنهادِ اشتباه نشان می‌داد.
   //
-  // قانون درست: فقط وقتی متن **نامِ بازیکنی را با اطمینان خوانده** (نمرهٔ
-  // نام بالاتر از آستانهٔ معنادار) در فیوژن شرکت می‌کند؛ یک تطبیقِ ضعیف/صفر
-  // یعنی «متن چیزی نگفته» و باید کنار گذاشته شود تا بردار خام بماند.
+  // ⚠️ باگِ دوم (امیلیانو/لائوتارو، نام‌خانوادگیِ مشترک): اگر نامی که OCR خوانده
+  // **مشترکِ چند بازیکن** باشد (مثلاً «MARTINEZ» که هم امیلیانو هم لائوتارو
+  // دارند)، متن برای **هر دو** امتیازِ بالا می‌سازد و تعیین‌کننده نیست؛ نسخهٔ
+  // قبل باز هم فیوژن می‌کرد و حاشیهٔ بصری را می‌کوبید (بُردِ واضحِ امیلیانو در
+  // کسینوسِ خام ۰.۶۵۶ → حاشیهٔ فیوژن ۰.۰۲۰). این «متنِ غیرِتعیین‌کننده» باید
+  // نادیده گرفته شود و تصمیم به کسینوسِ خامِ بردار برگردد.
+  //
+  // پس متن فقط وقتی در فیوژن شرکت می‌کند که **مطمئن و تعیین‌کننده** باشد:
+  //   • نمره‌اش بالاتر از آستانهٔ معنادار، و
+  //   • این تابع یک نام را می‌بیند؛ «تعیین‌کنندگی» بین بازیکنان را در
+  //     rankIdentity با حاشیهٔ نام نسبت به بازیکنِ دوم می‌سنجیم.
   const TEXT_CONFIDENT = 0.6;
-  const hasText = textScore != null && textScore >= TEXT_CONFIDENT;
+  const textConfident = textScore != null && textScore >= TEXT_CONFIDENT;
+  // متنِ تعیین‌کننده: علامتی روی خودِ ردیف می‌گذاریم؛ rankIdentity وقتی حاشیهٔ
+  // نامی ردیف برتر تا بهترین رقیب کم باشد فیوژن را برمی‌چیند (پایین همین فایل).
+  const hasText = textConfident;
 
   let score;
   let byText = false;
@@ -151,11 +162,73 @@ function rankIdentity(query, designs, th = {}) {
   const MIN_RATIO = th.minRatio ?? 1.25;
 
   const list = Array.isArray(designs) ? designs : [];
-  const ranked = list
+
+  // ── تفکیکِ طرفِ کارت (رو/پشت) پیش از رتبه‌بندیِ برداری ──
+  //
+  // بردارِ عصبیِ عکسِ «پشت» به مرجعِ «رو» بازیکنِ دیگری می‌تواند نزدیک‌تر
+  // باشد تا به مرجعِ درست (دو طرح ظاهر کاملاً متفاوت دارند). در دادهٔ واقعی،
+  // مقایسهٔ قاطیِ رو/پشت حاشیه را الکی کوچک می‌کرد (امیلیانو: حاشیه ۰.۰۲۰ در
+  // حالی‌که فقط-پشت حاشیه ۰.۰۹۷ و قاطع بود). شبیه‌سازیِ معتبر هم رو و پشت را
+  // جدا می‌سنجید. پس طرفِ عکس از روی **بلندترین شباهت برداری به هر طرف** تشخیص
+  // داده می‌شود و رتبه‌بندی فقط همان طرف را می‌بیند.
+  //
+  // نکته: متن (OCR) مستقل از طرف است و روی هر دو طرف هست؛ پس اگر بردار در کار
+  // نباشد یا طرف قابل‌تشخیص نباشد، به همهٔ طرح‌ها برمی‌گردیم تا نام کار کند.
+  let pool = list;
+  let querySide = null;
+  if (query?.embedding) {
+    // طرفِ عکس را از روی **چند نامزدِ برترِ برداری** می‌سنجیم، نه فقط رتبهٔ اول:
+    // فضای «رو» و «پشت» کاملاً جداست و یک عکسِ پشت باید به **خوشهٔ** پشت‌ها
+    // نزدیک باشد. اگر فقط رتبهٔ اول ملاک بود، یک تلهٔ رو (که به‌اشتباه شبیه‌تر
+    // درآمده) می‌توانست طرف را اشتباه تعیین کند. پس چند نامزد بالایی را می‌گیریم
+    // و طرفِ اکثریتشان را طرفِ عکس می‌دانیم.
+    const v = list
+      .filter(d => d.embedding)
+      .map(d => ({ side: d.side || 'front', embed: identityScore(query, d).embed }))
+      .filter(x => x.embed != null)
+      .sort((a, b) => b.embed - a.embed);
+    if (v.length) {
+      const K = Math.min(5, v.length);
+      let fronts = 0; let backs = 0;
+      for (let i = 0; i < K; i++) (v[i].side === 'back' ? backs++ : fronts++);
+      // تنها وقتی طرفی را برمی‌گزینیم که اکثریت روشنی داشته باشد؛ وگرنه (دو به
+      // دو / نامطمئن) همه را نگه می‌داریم و حاشیه تصمیم می‌گیرد.
+      if (backs > fronts) querySide = 'back';
+      else if (fronts > backs) querySide = 'front';
+      if (querySide) {
+        const sidePool = list.filter(d => (d.side || 'front') === querySide);
+        if (sidePool.some(d => d.embedding)) pool = sidePool;
+        else querySide = null;
+      }
+    }
+  }
+
+  let ranked = pool
     .map(d => ({ design: d, ...identityScore(query, d) }))
     // فقط طرح‌هایی که حداقل یک سیگنالِ هویتی دارند.
-    .filter(r => r.byText || r.byEmbedding)
-    .sort((x, y) => y.score - x.score);
+    .filter(r => r.byText || r.byEmbedding);
+
+  // ── متنِ غیرتعیین‌کننده را به کسینوسِ خام برگردان ──
+  //
+  // اگر ردیف‌هایی که متنشان قوی است (byText، نمرهٔ فیوژن) عملاً **یک نامِ
+  // مشترک** را می‌بینند (مثلاً نام‌خانوادگیِ MARTINEZ برای امیلیانو و لائوتارو)،
+  // آن متن بین بازیکنان تمایز ایجاد نمی‌کند و فقط حاشیهٔ بصری را می‌کوبد. در
+  // این حالت همهٔ ردیف‌های متن‌دار را به امتیازِ خامِ بردار برمی‌گردانیم تا
+  // خودِ بردار (که اینجا درست تفکیک می‌کند) رتبه را بسازد.
+  const textRows = ranked.filter(r => r.byText && r.embed != null);
+  if (textRows.length >= 2) {
+    const bestName = Math.max(...textRows.map(r => r.name ?? 0));
+    const secondName = textRows.map(r => r.name ?? 0).sort((a, b) => b - a)[1] ?? 0;
+    const textMargin = bestName - secondName;
+    if (textMargin < 0.2) {
+      // متن تعیین‌کننده نیست: ردیف‌های متن‌دار روی کسینوسِ خام.
+      ranked = ranked.map(r => (r.byText && r.embed != null)
+        ? { ...r, score: r.embed, byText: false, byEmbedding: true, _rawEmbed: true }
+        : r);
+    }
+  }
+
+  ranked = ranked.sort((x, y) => y.score - x.score);
 
   if (!ranked.length) {
     return { found: false, decisive: false, score: 0, margin: 0, ratio: 99, design: null, ranked: [] };
@@ -276,6 +349,7 @@ function rankIdentity(query, designs, th = {}) {
     byText: winner.byText,
     byEmbedding: winner.byEmbedding,
     embedOnly,
+    side: querySide,
     corroborated: nameCorroborated || nameRescued,
     nameRescued,
     design: winner.design,

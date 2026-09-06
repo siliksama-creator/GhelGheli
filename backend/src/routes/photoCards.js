@@ -120,6 +120,9 @@ module.exports = function createPhotoCardRoutes(deps) {
   const rowToFp = r => ({
     id: r.id,
     card_type_id: r.card_type_id,
+    // طرفِ کارت (رو/پشت) برای تفکیکِ رتبه‌بندیِ هویت — بردارِ رو نباید با
+    // بردارِ پشت قاطی شود و حاشیه را الکی کوچک کند.
+    side: r.side ?? 'front',
     image_url: r.image_url,
     dhash: r.dhash,
     phash: r.phash,
