@@ -526,6 +526,25 @@ function decideSubmission({
   const best = match?.design || null;
   const score = Number(match?.score || 0);
 
+  // ── گاردِ اختلافِ دو موتور (اجماع) ──
+  //
+  // مهم‌ترین محافظِ ضدِ تأییدِ غلط. وقتی هر دو موتورِ مستقل نتایج قابل‌اعتماد
+  // دارند ولی **بازیکنِ متفاوتی** می‌گویند، هیچ‌کدام را خودکار تأیید نمی‌کنیم —
+  // به صفِ مدیر می‌رود. سناریوی واقعی (مهر ۱۴۰۵): عکسِ پشتِ رودری، اثرانگشت
+  // با نمرهٔ ضعیف امباپه آورد (۰.۶۴۶، حاشیهٔ ۰.۰۴۴) ولی بردارِ عصبی رودری را
+  // گفته بود؛ بدونِ این گارد، امباپهِ غلط خودکار تأیید شد.
+  //
+  // اختلاف فقط وقتی معنا دارد که **هر دو** موتور قاطع باشند: هویت found باشد
+  // و اثرانگشت هم decisive. اگر هویت قاطع نباشد (found=false) بلوک هویت
+  // اصلاً اجرا نمی‌شود و قاطعیت اثرانگشت جداگانه با نسبت/حاشیه سنجیده می‌شود.
+  const matchTypeId = best?.card_type_id ?? null;
+  const identityTypeId = identity?.found && identity?.design
+    ? identity.design.card_type_id ?? null
+    : null;
+  const enginesDisagree = !!(identity?.found && identity?.design
+    && match?.decisive === true
+    && matchTypeId && identityTypeId && matchTypeId !== identityTypeId);
+
   // ═════════════════════════════════════════════════════════════════════
   // لایهٔ هویت (نام‌خوانِ واژه‌نامه / بردارِ عصبی) — قوی‌ترین سیگنالِ
   // «این کیست؟»، مستقل از رنگ و قالب.
@@ -542,6 +561,21 @@ function decideSubmission({
   if (identity?.found && identity.design) {
     const idTypeId = identity.design.card_type_id;
     const isCash = !!isCashType(idTypeId);
+
+    // ── اجماعِ دو موتور: اگر اثرانگشت هم **قاطع** به کارتِ دیگری رفته، به
+    // اختلافِ دو موتورِ مطمئن با انتخابِ خودکار دامن نزن؛ به صفِ مدیر بفرست.
+    // (در دادهٔ واقعیِ مهر ۱۴۰۵ اثرانگشت روی عکسِ پشت تار می‌توانست قاطعِ
+    // غلط باشد؛ وقتی هویت عصبیِ قاطع با آن در تعارض است، انسان تصمیم بگیرد.)
+    if (enginesDisagree) {
+      return {
+        action: 'review',
+        cardTypeId: null,
+        design: identity.design,
+        path: expectedTypeId ? 'code_bound' : 'identity_override',
+        reason: 'conflicting_signals',
+        identityType: identity.byText ? 'name' : (identity.byEmbedding ? 'embedding' : 'image'),
+      };
+    }
 
     if (!expectedTypeId || expectedTypeId === idTypeId) {
       // هویت با کد یکی است؛ یا کد **بی‌نام** است و هویت قاطع داریم.

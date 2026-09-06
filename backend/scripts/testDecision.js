@@ -255,6 +255,53 @@ console.log('\n══ آستانه قابل تنظیم است ══');
   ok('آستانهٔ بی‌نام هم قابل تنظیم است', strictFree.action === 'review');
 }
 
+console.log('\n══ سناریوهای زندهٔ تأیید غلط (مهر ۱۴۰۵) ══');
+{
+  // ۱) حالتِ واقعیِ رودری (مهر ۱۴۰۵): اثرانگشت با نمرهٔ ضعیف امباپه آورد
+  //    (۰.۶۴۶، حاشیهٔ ۰.۰۴۴، نسبت ۱.۰۷ → با MIN_RATIO=1.15 غیرقاطع) و هویت
+  //    هم قاطع نبود (۰.۳۲۵). باید به صف برود نه تأییدِ غلط.
+  const fpMbappe = m('review', 0.646, designOf(TYPE_B), false); // decisive=false
+  fpMbappe.margin = 0.044;
+  const weakId = { found: false, decisive: false, score: 0.325, margin: 0.011, design: null };
+  const realRodri = svc.decideSubmission({
+    expectedTypeId: null, match: fpMbappe, identity: weakId });
+  ok('اثرانگشتِ غیرقاطع(امباپه) + هویتِ غیرقاطع → صف، نه تأیید غلط',
+    realRodri.action === 'review', JSON.stringify(realRodri));
+
+  // ۲) هر دو موتور **قاطع** ولی متعارض (اثرانگشت مطمئن امباپه، هویت مطمئن
+  //    رودری) → صف با conflicting_signals (انسان تصمیم بگیرد، نه auto).
+  const fpDecisive = m('accept', 0.9, designOf(TYPE_B), true);
+  const idRodri = {
+    found: true, decisive: true, score: 0.85, margin: 0.16, ratio: 1.3,
+    byText: false, byEmbedding: true, embedOnly: true,
+    design: { id: 'd-rodri', card_type_id: TYPE_A },
+  };
+  const disagree = svc.decideSubmission({
+    expectedTypeId: null, match: fpDecisive, identity: idRodri });
+  ok('اثرانگشتِ قاطع(امباپه) در تعارض با هویتِ قاطع(رودری) → صف',
+    disagree.action === 'review' && disagree.reason === 'conflicting_signals',
+    JSON.stringify(disagree));
+
+  // ۳) حالت سالم: اثرانگشت قاطع و هویت قاطع بر یک کارت هم‌نظرند → تأیید.
+  const agree = svc.decideSubmission({
+    expectedTypeId: null,
+    match: m('accept', 0.7, designOf(TYPE_A), true),
+    identity: {
+      found: true, decisive: true, score: 0.85, margin: 0.15, ratio: 1.2,
+      byEmbedding: true, embedOnly: true, design: { id: 'd-a', card_type_id: TYPE_A },
+    } });
+  ok('دو موتور هم‌نظر و قاطع → تأیید خودکار',
+    agree.action === 'approve' && agree.cardTypeId === TYPE_A, JSON.stringify(agree));
+}
+
+console.log('\n══ نسبتِ قاطعیت اثرانگشت محافظه‌کار است (۱.۱۵) ══');
+{
+  const fpSrc = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'src', 'services', 'imageFingerprint.js'), 'utf8');
+  const mm = fpSrc.match(/const MIN_RATIO\s*=\s*([\d.]+)/);
+  ok('MIN_RATIO اثرانگشت ≥ ۱.۱۵ است', mm && Number(mm[1]) >= 1.15, mm && mm[1]);
+}
+
 console.log('\n══ طول رشته‌های path/reason در سقف ستون‌ها (مهاجرت ۰۸۷) ══');
 {
   // باگ زنده: 'identity_override' ۱۷ کاراکتر است ولی decision_path قبلاً
