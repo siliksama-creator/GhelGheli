@@ -1346,6 +1346,35 @@ export function PhotoCardsPage({ request }) {
                   </span>
                 </div>
               )}
+              {/* ── فاز ۴: نظرِ بازبینیِ خودکارِ سرور ──
+                  سرور با مدلِ روی خودش (چهره + بصریِ تمام‌رزولوشن) عکس را
+                  دوباره سنجیده. اگر پراطمینان باشد عملاً خودکار تأیید می‌شود؛
+                  این بنر نظر و اطمینانش را به ادمین نشان می‌دهد. */}
+              {s.server_verify && (
+                <div className="reviewWhy" style={{
+                  border: '1px solid rgba(34,197,94,.35)',
+                  background: 'rgba(34,197,94,.07)',
+                  borderRadius: 8, padding: 8,
+                }}>
+                  <b style={{ color: '#15803d' }}>
+                    <CheckCircle2 size={14} style={{ verticalAlign: '-2px' }} />{' '}
+                    بازبینیِ خودکار سرور
+                    {s.server_verify.action === 'approve' ? ' · تأییدِ قطعی' : ' · نیازمند بررسی'}
+                  </b>
+                  <span>
+                    {s.server_verify.action === 'approve'
+                      ? `سرور با اطمینانِ بالا «${s.server_verify.topName || ''}» را تشخیص داد `
+                        + `(بصری ${Math.round((s.server_verify.cardScore || 0) * 100)}٪`
+                        + (s.server_verify.faceScore != null
+                          ? `، چهره ${Math.round((s.server_verify.faceScore || 0) * 100)}٪` : '')
+                        + `). اگر شما هم همین را می‌بینید، فقط تأیید بزنید.`
+                      : `سرور مطمئن نبود (${s.server_verify.reason === 'face-contradicts'
+                          ? 'چهره با بصری هم‌خوان نیست'
+                          : s.server_verify.reason === 'card-weak' ? 'تشخیص بصری ضعیف'
+                          : 'چهره به‌اندازهٔ کافی مطمئن نیست'})؛ با چشم بررسی کنید.`}
+                  </span>
+                </div>
+              )}
               <b>{s.neural_card_type_name || s.card_type_name || 'نامشخص'}</b>
               {s.neural_card_type_name && s.card_type_name
                 && s.neural_card_type_name !== s.card_type_name && (

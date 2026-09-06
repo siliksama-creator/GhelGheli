@@ -3013,6 +3013,30 @@ cron.schedule('41 4 * * *', () => {
     .catch(e => console.error('[analytics] crash prune failed:', e.message));
 }, { timezone: 'Asia/Tehran' });
 
+// ── فاز ۴: جاروبِ بازبینیِ خودکارِ صفِ کارت‌های عکسی ──
+//
+// هر ده دقیقه پرونده‌های «در انتظار» را با مدلِ روی سرور (یونِت/س‌فیس + امبد
+// بصریِ تمام‌رزولوشن) دوباره می‌سنجد. مواردِ پراطمینان خودکار تأیید می‌شوند
+// (اگر SERVER_AUTO_APPROVE=true باشد)؛ بقیه در صفِ ادمین می‌مانند. هنگام
+// ورود به صف هم یک بازبینیِ فوری (آسنکرون) اجرا می‌شود؛ این کرون فقط پوششِ
+// عقب‌افتاده‌ها و مواردی که مدل دیرتر لود شد را تضمین می‌کند.
+{
+  const serverReviewQueue = require('./services/serverReviewQueue');
+  const runPhotoSweep = () => serverReviewQueue.sweepPending(pool, {
+    addLeaguePoints,
+    leaderboardSignal: () => {
+      try { require('./services/leaderboardSignal').leaderboardChanged(); } catch { /* بی‌خیال */ }
+    },
+  }).then(r => {
+    if (r.processed || r.approved) {
+      console.log(`[photoReview] sweep: ${r.processed} بررسی، ${r.approved} تأیید خودکار، ${r.queued} در صف، ${r.errors} خطا`);
+    }
+  }).catch(e => console.error('[photoReview] sweep failed:', e.message));
+  // یک‌بار بعد از بالا‌آمدن (فرصت لودشدن مدل)، سپس هر ده دقیقه.
+  setTimeout(runPhotoSweep, 45 * 1000);
+  cron.schedule('*/10 * * * *', runPhotoSweep);
+}
+
 // Centralized error handler. Previously this forwarded err.message straight
 // to the client, which meant raw PostgreSQL errors (unique/foreign-key
 // constraint names, column/table names, data types) leaked verbatim to

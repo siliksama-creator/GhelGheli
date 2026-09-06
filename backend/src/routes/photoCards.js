@@ -35,6 +35,8 @@ const cardCrop = require('../services/cardCrop');
 const cardPerspective = require('../services/cardPerspective');
 const lockout = require('../services/photoCardLockout');
 const { groupAdminCards } = require('../services/photoCardAdminGrouping');
+// فاز ۴ — بازبینیِ خودکارِ صف توسط سرور (یونِت/س‌فیس/امبد روی عکس کامل).
+const serverReviewQueue = require('../services/serverReviewQueue');
 
 // حداکثر کدی که در یک نوبت ساخته می‌شود.
 //
@@ -592,6 +594,7 @@ module.exports = function createPhotoCardRoutes(deps) {
               s.user_image_path, s.reject_reason, s.review_reason,
               s.identity_top_design_id, s.identity_top_score, s.identity_margin,
               s.identity_by_embedding,
+              s.server_verify,
               u.nickname, u.mobile,
               c.code,
               -- حدسِ اثرانگشتِ کلاسیک (روی پشت/تار بی‌اعتماد است)
@@ -1544,6 +1547,31 @@ module.exports = function createPhotoCardRoutes(deps) {
               : 'کیفیت عکس کامل نبود، برای همین در حال بررسی است و '
                 + 'ممکن است تا ۲۴ ساعت طول بکشد. کد شما محفوظ است.',
           });
+        }
+
+        // ── فاز ۴: بازبینیِ خودکارِ سرور، خارج از مسیر پاسخ ──
+        //
+        // عکسِ کامل روی دیسک مانده. یک ثانیه بعد (تا پاسخ کاربر برود) سرور با
+        // مدلِ خودش (چهره+بصری) پرونده را دوباره می‌سنجد؛ اگر پراطمینان بود
+        // خودکار تأیید می‌شود، وگرنه در صفِ ادمین می‌ماند. خطای این پردازش
+        // نباید ثبت را بشکند؛ پس فقط لاگ می‌شود.
+        {
+          const pendingId = sub.rows[0].id;
+          setTimeout(() => {
+            serverReviewQueue.reviewOne(pool, pendingId, {
+              addLeaguePoints,
+              leaderboardSignal: () => leaderboardSignal.leaderboardChanged(),
+              audit: (adminId, action, entity, entityId, detail, meta) =>
+                Promise.resolve(
+                  typeof audit === 'function'
+                    ? audit(adminId, action, entity, entityId,
+                        typeof detail === 'string' ? detail : JSON.stringify(detail || {}), meta || {})
+                    : null,
+                ).catch(() => {}),
+            }).catch((e) => {
+              console.error('[serverReview] pending verify failed:', e?.message || e);
+            });
+          }, 1500);
         }
 
         // ── گامِ ۳: تأیید خودکار ──

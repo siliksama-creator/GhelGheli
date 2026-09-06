@@ -54,7 +54,8 @@
     "socket.io": "^4.7.5",
     "swagger-ui-express": "^5.0.1",
     "yaml": "^2.9.0",
-    "socket.io-client": "^4.8.3"
+    "socket.io-client": "^4.8.3",
+    "onnxruntime-node": "^1.20.1"
   },
   "devDependencies": {
     "brace-expansion": "^5.0.9",
