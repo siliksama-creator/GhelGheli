@@ -99,6 +99,50 @@ const diffVer = ci.identityScore(
   { embedding: [1, 0, 0], embeddingVersion: 2 });
 ok('نسخهٔ بردارِ متفاوت → مقایسهٔ عصبی خاموش می‌شود', diffVer.byEmbedding === false && diffVer.embed === null);
 
+console.log('\n== رگرسیونِ دادهٔ واقعی: هالندِ کمی‌تار (کسینوس خام) ==');
+// سنجهٔ واقعی روی بردارِ ارسالیِ گوشی (مهر ۱۴۰۵): برنده هالند با کسینوسِ
+// خامِ ۰.۸۴۵، نفر دوم یامال ۰.۷۲۹ (حاشیه ۰.۱۱۶، نسبت ۱.۱۶). کین ششم ۰.۶۵۸.
+// قبلاً نگاشتِ (cos+1)/2 حاشیه را به ۰.۰۵۸ نصف می‌کرد و قاطعیت می‌مرد → پرونده
+// با اثرانگشتِ مبهم به صف می‌رفت. بردارهایی با همان زاویهٔ کسینوس می‌سازیم.
+function vecAtCos(base, c) {
+  // بردار دوبُعدی که کسینوسش با base برابر c باشد.
+  return [c, Math.sqrt(Math.max(0, 1 - c * c))];
+}
+const BASE = [1, 0];
+const realRanks = ci.rankIdentity(
+  { textTokens: [], embedding: BASE, embeddingVersion: 2 },
+  [
+    { id: 'haaland', card_type_id: 'T-HAALAND', embedding: vecAtCos(BASE, 0.845), embeddingVersion: 2 },
+    { id: 'yamal', card_type_id: 'T-YAMAL', embedding: vecAtCos(BASE, 0.729), embeddingVersion: 2 },
+    { id: 'salah', card_type_id: 'T-SALAH', embedding: vecAtCos(BASE, 0.708), embeddingVersion: 2 },
+    { id: 'kane', card_type_id: 'T-KANE', embedding: vecAtCos(BASE, 0.658), embeddingVersion: 2 },
+  ]);
+ok('هالندِ واضح (کسینوس ۰.۸۴۵، حاشیه ۰.۱۱۶) قاطعانه یافت می‌شود',
+  realRanks.found && realRanks.design.card_type_id === 'T-HAALAND',
+  `found=${realRanks.found} score=${realRanks.score?.toFixed(3)} margin=${realRanks.margin?.toFixed(3)}`);
+
+// حالات نزدیک‌به‌تساوی (کین ۰.۶۵۸، دو نامزد چسبیده) نباید قاطع شوند.
+const tie = ci.rankIdentity(
+  { textTokens: [], embedding: BASE, embeddingVersion: 2 },
+  [
+    { id: 'kane', card_type_id: 'T-KANE', embedding: vecAtCos(BASE, 0.66), embeddingVersion: 2 },
+    { id: 'olise', card_type_id: 'T-OLISE', embedding: vecAtCos(BASE, 0.656), embeddingVersion: 2 },
+  ]);
+ok('دو نامزدِ چسبیده (حاشیه ~۰.۰۰۴، نمره پایین) قاطع نمی‌شوند → صف',
+  !tie.found,
+  `found=${tie.found} score=${tie.score?.toFixed(3)} margin=${tie.margin?.toFixed(3)}`);
+
+// نمرهٔ بالا ولی حاشیهٔ کم (همان زوج‌های ۰.۹۰ کاتالوگ) هم باید احتیاط کنند.
+const highTie = ci.rankIdentity(
+  { textTokens: [], embedding: BASE, embeddingVersion: 2 },
+  [
+    { id: 'a', card_type_id: 'A', embedding: vecAtCos(BASE, 0.905), embeddingVersion: 2 },
+    { id: 'b', card_type_id: 'B', embedding: vecAtCos(BASE, 0.90), embeddingVersion: 2 },
+  ]);
+ok('نمرهٔ بالا ولی حاشیهٔ کم (۰.۰۰۵) قاطع نمی‌شود',
+  !highTie.found,
+  `margin=${highTie.margin?.toFixed(3)}`);
+
 console.log('\n== تصمیم یکپارچه (decideSubmission با هویت) ==');
 const foundRodri = { found: true, decisive: true, score: 0.95, design: designs[1], byText: true, byEmbedding: false };
 const foundHaaland = { found: true, decisive: true, score: 0.95, design: designs[0], byText: true, byEmbedding: false };

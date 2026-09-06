@@ -79,8 +79,12 @@ function identityScore(query, design) {
     score = textScore;
     byText = textScore > 0;
   } else if (embed != null) {
-    // فقط بردار عصبی؛ نگاشت [-۱,۱] → [۰,۱].
-    score = Math.max(0, (embed + 1) / 2);
+    // فقط بردار عصبی: امتیاز را روی **کسینوس خام** نگه می‌داریم ([-۱,۱]، ولی
+    // برای عکسِ کارت عملاً در ۰.۳ تا ۰.۹). نگاشتِ (cos+1)/2 فاصلهٔ اطمینانِ
+    // دو نامزد برتر را نصف می‌کرد (حاشیه ۰.۱۱۶ → ۰.۰۵۸) و قاطعیتی که واقعاً
+    // وجود داشت از بین می‌رفت — باگِ «هالندِ کمی‌تار به کین خورد و به صف رفت»
+    // از همین بود. rankIdentity حاشیه و حداقلِ امتیاز را روی همین مقیاس می‌سنجد.
+    score = embed;
     byEmbedding = true;
   } else {
     score = 0;
@@ -104,8 +108,17 @@ function identityScore(query, design) {
  * @param {number} [th.minRatio=1.25]  نسبتِ لازم رتبهٔ اول/دوم
  */
 function rankIdentity(query, designs, th = {}) {
+  // نقطهٔ مرجع، متن (OCR) امتیازِ ۰..۱ می‌دهد؛ پس پیش‌فرضِ accept=0.78 و
+  // حاشیهٔ ۰.۱۵ برای مسیرِ متنی درست است. اما مسیرِ فقط-بردار حالا کسینوسِ
+  // خام را نگه می‌دارد ([-۱,۱]) و مقیاسِ حاشیه‌اش متفاوت است: اندازه‌گیری
+  // روی کاتالوگِ واقعی نشان داد دو بازیکنِ متفاوت می‌توانند ~۰.۹۰ هم شباهت
+  // داشته باشند، پس نمرهٔ مطلقِ بالا امن نیست؛ **حاشیه نسبت به نفر دوم** است
+  // که قاطعیت را می‌سازد. عکسِ واقعیِ هالند: برنده ۰.۸۴۵، حاشیه ۰.۱۱۶، نسبت
+  // ۱.۱۶. آستانه‌های پایین مخصوص بردار طوری است که این «واضحِ برتر» قاطع
+  // شود ولی دو نامزدِ نزدیک (حاشیه ~۰) قاطع نشوند و به صف بروند.
   const ACCEPT = th.accept ?? 0.78;
-  const MIN_MARGIN = th.minMargin ?? 0.15;
+  const EMBED_ACCEPT = th.embedAccept ?? 0.70;
+  const EMBED_MIN_MARGIN = th.embedMinMargin ?? 0.08;
   const MIN_RATIO = th.minRatio ?? 1.25;
 
   const list = Array.isArray(designs) ? designs : [];
@@ -123,16 +136,23 @@ function rankIdentity(query, designs, th = {}) {
   const second = ranked.length > 1 ? ranked[1].score : 0;
   const margin = ranked.length > 1 ? best.score - second : 1;
   const ratio = second > 1e-6 ? best.score / second : 99;
-  const decisive = margin >= MIN_MARGIN && ratio >= MIN_RATIO;
+  // مسیرِ فقط-بردار (بدون متن) آستانه‌های خودش را دارد؛ مسیر متنی همان
+  // پذیرش ۰.۷۸. در حالت ترکیب (متن+بردار) هم نمره در مقیاس متنی است.
+  const embedOnly = best.byEmbedding && !best.byText;
+  const acceptCut = embedOnly ? EMBED_ACCEPT : ACCEPT;
+  const marginCut = embedOnly ? EMBED_MIN_MARGIN : (th.minMargin ?? 0.15);
+  const ratioCut = embedOnly ? 1.08 : MIN_RATIO;
+  const decisive = best.score >= acceptCut && margin >= marginCut && ratio >= ratioCut;
 
   return {
-    found: best.score >= ACCEPT && decisive,
+    found: decisive,
     decisive,
     score: best.score,
     margin,
     ratio: Number.isFinite(ratio) ? ratio : 99,
     byText: best.byText,
     byEmbedding: best.byEmbedding,
+    embedOnly,
     design: best.design,
     ranked: ranked.slice(0, 3),
   };
