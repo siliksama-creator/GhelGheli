@@ -1,16 +1,15 @@
 /**
- * تستِ گیتِ بازبینیِ خودکارِ سرور (فاز ۴).
+ * تستِ گیتِ بازبینیِ خودکارِ سرور (فاز ۴ — دولایه + برش چندگانه).
  *
- * خط‌قرمز: تأییدِ خودکار فقط وقتی که **بصریِ قوی** و **چهرهٔ یکتای پراطمینان**
- * هر دو بر **یک بازیکن** باشند. این تست تمامِ حالت‌های مرزی را قفل می‌کند:
- *   • بصری+چهره موافق و پراطمینان → تأیید.
- *   • بصری قوی ولی چهره نبود/چندچهره/حاشیه کم → صف.
- *   • چهرهٔ مطمئنِ بازیکنِ دیگر (تضاد) → صف (هرگز تأیید با بازیکن غلط).
- *   • بصری ضعیف حتی با چهرهٔ خوب → صف.
+ * خط‌قرمز: صفر تأییدِ اشتباه. قفل می‌کند:
+ *   • لایهٔ A (card-only): بصری فوق‌قوی → تأیید، مگر تضادِ قاطعِ چهره.
+ *   • لایهٔ B (card+face): بصری خوب + چهرهٔ یکتای پراطمینانِ موافق → تأیید.
+ *   • بصری ضعیف/حاشیه‌کم → صف.
+ *   • چهرهٔ مطمئنِ بازیکنِ دیگر (تضاد) → صف، حتی اگر بصری خوب باشد.
+ *   • نبودِ چهره (انیمه) مانعِ لایهٔ A نیست.
  *
- * مدل اینجا اجرا نمی‌شود (آهسته و وابسته به فایل)؛ فقط تابعِ خالصِ `gate`.
+ * مدل اجرا نمی‌شود؛ فقط تابعِ خالصِ `gate`.
  */
-const assert = require('assert');
 const sv = require('../src/services/serverVerify');
 
 let pass = 0; let fail = 0;
@@ -24,97 +23,75 @@ const O = 'card-type-2';
 const card = (score, margin, type = C) => ({ score, margin, cardTypeId: type });
 const face = (score, margin, type = C) => ({ score, margin, cardTypeId: type });
 
-console.log('\n== گیتِ تأییدِ خودکار ==');
+console.log('\n== لایهٔ A: تأیید فقط با بصریِ فوق‌قوی ==');
 
-// ۱) هر دو قوی و موافق → تأیید.
+// A1) بصری فوق‌قوی بدون چهره (کارت انیمه) → تأیید.
 {
-  const r = sv.gate({
-    topCard: card(0.90, 0.15), topFace: face(0.80, 0.35),
-    faceCount: 1, faceDetected: 0.95,
-  });
-  ok('بصری+چهرهٔ قویِ موافق → تأیید', r.action === 'approve');
+  const r = sv.gate({ topCard: card(0.74, 0.10), topFace: null, faceUsable: false });
+  ok('بصری فوق‌قوی + بدون چهره → تأیید (A)', r.action === 'approve' && /card-strong/.test(r.reason));
+}
+// A2) بصری فوق‌قوی + چهرهٔ موافق → تأیید.
+{
+  const r = sv.gate({ topCard: card(0.74, 0.10), topFace: face(0.8, 0.35), faceUsable: true });
+  ok('بصری فوق‌قوی + چهره موافق → تأیید', r.action === 'approve');
+}
+// A3) بصری فوق‌قوی ولی چهرهٔ مطمئنِ بازیکنِ دیگر → تضاد → صف.
+{
+  const r = sv.gate({ topCard: card(0.74, 0.10), topFace: face(0.8, 0.35, O), faceUsable: true });
+  ok('بصری قوی + تضادِ چهره → صف', r.action === 'queue' && r.reason === 'face-contradicts');
+}
+// A4) حاشیهٔ بصری زیر آستانهٔ A → نباید card-only تأیید شود (حتی نمره بالا).
+{
+  const r = sv.gate({ topCard: card(0.70, 0.04), topFace: null, faceUsable: false });
+  ok('حاشیهٔ کمِ بصری → صف (A رد)', r.action === 'queue');
+}
+// A5) نمرهٔ بصری زیر آستانهٔ A → صف.
+{
+  const r = sv.gate({ topCard: card(0.55, 0.20), topFace: null, faceUsable: false });
+  ok('نمرهٔ بصری متوسط بدون چهره → صف', r.action === 'queue');
 }
 
-// ۲) بصری قوی، چهره‌ای نیست → صف.
+console.log('\n== لایهٔ B: بصری خوب + چهرهٔ موافق ==');
+
+// B1) بصری خوب (زیر آستانهٔ A) + چهرهٔ قویِ موافق → تأیید.
 {
-  const r = sv.gate({
-    topCard: card(0.90, 0.15), topFace: null,
-    faceCount: 0, faceDetected: 0,
-  });
-  ok('بدون چهره → صف', r.action === 'queue' && r.reason === 'face-not-confident');
+  const r = sv.gate({ topCard: card(0.50, 0.02), topFace: face(0.8, 0.35), faceUsable: true });
+  ok('بصری خوب + چهرهٔ موافق → تأیید (B)', r.action === 'approve' && r.reason === 'card+face-agree');
+}
+// B2) بصری خوب + چهرهٔ قویِ مخالف → صف.
+{
+  const r = sv.gate({ topCard: card(0.50, 0.02), topFace: face(0.8, 0.35, O), faceUsable: true });
+  ok('بصری خوب + چهرهٔ مخالف → صف', r.action === 'queue' && r.reason === 'face-contradicts');
+}
+// B3) بصریِ فوق‌قوی حتی اگر چهره حاشیه کم داشت → لایهٔ A تأیید (چهرهٔ
+//     غیرقاطع ترمز نیست؛ فقط تضادِ قاطع ترمز است).
+{
+  const r = sv.gate({ topCard: card(0.90, 0.15), topFace: face(0.8, 0.05), faceUsable: true });
+  ok('بصری فوق‌قوی + چهرهٔ غیرقاطع → تأیید (A)', r.action === 'approve');
+}
+// B4) بصریِ متوسط (زیر A) + چهره با حاشیهٔ کم → صف (نه B، نه A).
+{
+  const r = sv.gate({ topCard: card(0.50, 0.02), topFace: face(0.8, 0.05), faceUsable: true });
+  ok('بصری متوسط + چهرهٔ غیرقاطع → صف', r.action === 'queue');
 }
 
-// ۳) چندچهره‌ای (پوستر گروهی) حتی اگر یکی شبیه بود → صف.
-{
-  const r = sv.gate({
-    topCard: card(0.90, 0.15), topFace: face(0.80, 0.35),
-    faceCount: 5, faceDetected: 0.94,
-  });
-  ok('کادر چندچهره‌ای → صف (روی چهره تکیه نمی‌شود)', r.action === 'queue');
-}
+console.log('\n== موارد امنیتیِ کلی ==');
 
-// ۴) چهرهٔ مطمئنِ بازیکنِ دیگر → تضاد → صف (هرگز تأیید غلط).
+// S1) بصری ضعیف حتی با چهرهٔ خوب → صف.
 {
-  const r = sv.gate({
-    topCard: card(0.90, 0.15), topFace: face(0.80, 0.35, O),
-    faceCount: 1, faceDetected: 0.95,
-  });
-  ok('چهرهٔ مطمئنِ بازیکنِ دیگر → تضاد → صف',
-    r.action === 'queue' && r.reason === 'face-contradicts');
-}
-
-// ۵) بصری ضعیف (نمره پایین) حتی با چهرهٔ خوبِ موافق → صف.
-{
-  const r = sv.gate({
-    topCard: card(0.30, 0.02), topFace: face(0.80, 0.35),
-    faceCount: 1, faceDetected: 0.95,
-  });
+  const r = sv.gate({ topCard: card(0.30, 0.01), topFace: face(0.9, 0.5), faceUsable: true });
   ok('بصری ضعیف → صف', r.action === 'queue' && r.reason === 'card-weak');
 }
-
-// ۶) حاشیهٔ بصری کم (چند بازیکن چسبیده) حتی با چهره → صف.
+// S2) بدون هیچ مرجعی → صف.
 {
-  const r = sv.gate({
-    topCard: card(0.90, 0.004), topFace: face(0.80, 0.35),
-    faceCount: 1, faceDetected: 0.95,
-  });
-  ok('حاشیهٔ بصری کم → صف', r.action === 'queue' && r.reason === 'card-weak');
+  const r = sv.gate({ topCard: null, topFace: null, faceUsable: false });
+  ok('بدون مرجع → صف', r.action === 'queue');
 }
-
-// ۷) چهره حاشیه کم (دو بازیکن چسبیده) حتی موافق → صف.
+// S3) چهرهٔ غیرقابل‌اتکا (مثلاً چندچهره‌ای، faceUsable=false) نباید ترمزِ اشتباه بزند
+//     و نباید به‌عنوان شاهد قبول شود؛ لایهٔ A با بصری قوی تأیید می‌کند.
 {
-  const r = sv.gate({
-    topCard: card(0.90, 0.15), topFace: face(0.80, 0.05),
-    faceCount: 1, faceDetected: 0.95,
-  });
-  ok('حاشیهٔ چهره کم → صف', r.action === 'queue' && r.reason === 'face-not-confident');
-}
-
-// ۸) نمرهٔ چهره زیر آستانه → صف.
-{
-  const r = sv.gate({
-    topCard: card(0.90, 0.15), topFace: face(0.40, 0.30),
-    faceCount: 1, faceDetected: 0.95,
-  });
-  ok('نمرهٔ چهره پایین → صف', r.action === 'queue');
-}
-
-// ۹) اطمینانِ آشکارساز کم (چهرهٔ محو) → صفحهٔ چهره نادیده گرفته می‌شود → صف.
-{
-  const r = sv.gate({
-    topCard: card(0.90, 0.15), topFace: face(0.90, 0.5),
-    faceCount: 1, faceDetected: 0.5,
-  });
-  ok('آشکارسازیِ ضعیفِ چهره → صف', r.action === 'queue');
-}
-
-// ۱۰) دو طرح هم‌بازیکن ولی چهره بازیکن درست را گفت → تأیید.
-{
-  const r = sv.gate({
-    topCard: card(0.95, 0.20), topFace: face(0.85, 0.40, C),
-    faceCount: 1, faceDetected: 0.9,
-  });
-  ok('حاشیهٔ خوب هر دو → تأیید', r.action === 'approve');
+  const r = sv.gate({ topCard: card(0.70, 0.10), topFace: null, faceUsable: false });
+  ok('چهرهٔ غیرقابل‌اتکا نادیده گرفته می‌شود (بصری قوی → A)', r.action === 'approve');
 }
 
 console.log(`\n${fail === 0 ? '✓' : '✗'} ${pass} تست موفق، ${fail} ناموفق`);

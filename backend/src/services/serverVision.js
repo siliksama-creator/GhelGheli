@@ -39,7 +39,7 @@ let _sessionsPromise = null;
 let _modelDir = null;
 let _disabled = false;
 
-function sharp() {
+function sharpLib() {
   if (_sharp === null) {
     try { _sharp = require('sharp'); } catch { _sharp = false; }
   }
@@ -108,16 +108,50 @@ async function getSessions() {
 
 /** true اگر حداقلِ ابزار (شَرپ + onnx + مدل‌ها) آماده است. */
 async function available() {
-  return !!(sharp() && await getSessions());
+  return !!(sharpLib() && await getSessions());
 }
 
 async function rawRgb(imageBuf, w, h) {
-  const { data } = await sharp()(imageBuf)
+  const { data } = await sharpLib()(imageBuf)
     .resize(w, h, { fit: 'fill' })
     .removeAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
   return data; // RGB، row-major
+}
+
+/**
+ * واریانت‌های برشِ یک عکس می‌سازد: عکسِ کامل + چند برشِ مرکزیِ متقارن.
+ *
+ * چرا: موبایل/وب قبل از امبد کارت را از کادر بیرون می‌کشند و پرِ کادر می‌کنند،
+ * ولی سرور عکسِ خام (با میز و حاشیهٔ پس‌زمینه) را می‌گیرد. وقتی کارت کل کادر را
+ * پر کرده، حاشیهٔ میز سیگنال را ضعیف می‌کند و بازیکنِ درست از رتبهٔ اول می‌افتد
+ * (نمونهٔ واقعی: هالندِ واضح روی عکسِ خام رتبهٔ دوم با حاشیهٔ ۰.۰۳، ولی با برش
+ * ۱۲٪ رتبهٔ اول با حاشیهٔ ۰.۱۱). هر واریانت مستقل امبد می‌شود و قوی‌ترینشان در
+ * تصمیم انتخاب می‌گردد. برش‌ها هرگز چیزی را جعل نمی‌کنند؛ فقط حاشیه را حذف می‌کنند.
+ *
+ * @returns {Promise<{label:string,buf:Buffer}[]>}
+ */
+async function cropVariants(imageBuf) {
+  const s = sharpLib();
+  if (!s) return [{ label: 'full', buf: imageBuf }];
+  const out = [{ label: 'full', buf: imageBuf }];
+  try {
+    const meta = await s(imageBuf).metadata();
+    const w = meta.width || 0, h = meta.height || 0;
+    if (w < 80 || h < 80) return out;
+    for (const f of [0.08, 0.12, 0.16]) {
+      try {
+        const cw = Math.round(w * (1 - 2 * f));
+        const ch = Math.round(h * (1 - 2 * f));
+        const b = await s(imageBuf)
+          .extract({ left: Math.round(w * f), top: Math.round(h * f), width: cw, height: ch })
+          .toBuffer();
+        out.push({ label: `c${Math.round(f * 100)}`, buf: b });
+      } catch { /* یک برش ناموفق نباید بقیه را خراب کند */ }
+    }
+  } catch { /* متادیتا نبود → فقط فول */ }
+  return out;
 }
 
 function cosine(a, b) {
@@ -346,6 +380,7 @@ module.exports = {
   available,
   embedFace,
   embedCard,
+  cropVariants,
   cosine,
   l2norm,
   FACE_DIM,

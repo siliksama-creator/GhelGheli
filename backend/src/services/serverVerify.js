@@ -116,125 +116,164 @@ async function ensureReferenceEmbeddings(pool) {
 }
 
 /**
- * رتبه‌بندیِ بردارِ عکسِ کاربر در برابر مرجع‌ها (فقط طراحی‌های هم‌طرف در صورت
- * معلوم‌بودن طرف). خروجی: [{name, designId, cardTypeId, score, margin, face...}].
+ * مرجع‌های فعال (بردارهای بصری/چهرهٔ ساخته‌شده روی سرور) را یک‌بار می‌خواند.
  */
-async function rankAgainst(pool, { cardVec, faceVec }) {
-  const refs = (await pool.query(
+async function loadRefs(pool) {
+  const rows = (await pool.query(
     `SELECT d.id AS design_id, d.side, ct.id AS card_type_id, ct.name,
             d.server_embedding, d.server_face_embedding
        FROM photo_card_designs d
        JOIN card_types ct ON ct.id = d.card_type_id
       WHERE d.is_active = true AND ct.is_active = true`,
   )).rows;
+  return rows.map((r) => ({
+    name: r.name,
+    designId: r.design_id,
+    cardTypeId: r.card_type_id,
+    side: r.side,
+    cardVec: asArray(r.server_embedding),
+    faceVec: asArray(r.server_face_embedding),
+  }));
+}
 
-  const cardRank = [];
-  const faceRank = [];
-  for (const r of refs) {
-    const se = asArray(r.server_embedding);
-    const fe = asArray(r.server_face_embedding);
-    const base = { name: r.name, designId: r.design_id, cardTypeId: r.card_type_id, side: r.side };
-    if (cardVec && se) cardRank.push({ ...base, score: vision.cosine(cardVec, se) });
-    if (faceVec && fe) faceRank.push({ ...base, score: vision.cosine(faceVec, fe) });
-  }
-  cardRank.sort((a, b) => b.score - a.score);
-  faceRank.sort((a, b) => b.score - a.score);
-  // حاشیهٔ هر ردیف = نمره‌اش منهای بهترینِ بازیکنِ **دیگر**.
-  const withMargin = (rank) => rank.map((row, idx) => {
-    const other = rank.find((r) => r.cardTypeId !== row.cardTypeId);
+/** رتبه‌بندی یک بردار در برابر مرجع‌ها (در حافظه) با حاشیه تا بازیکنِ بعدی. */
+function rankVector(vec, refs, key) {
+  if (!vec) return [];
+  const list = refs
+    .filter((r) => r[key])
+    .map((r) => ({ name: r.name, designId: r.designId, cardTypeId: r.cardTypeId,
+      side: r.side, score: vision.cosine(vec, r[key]) }))
+    .sort((a, b) => b.score - a.score);
+  return list.map((row) => {
+    const other = list.find((r) => r.cardTypeId !== row.cardTypeId);
     return { ...row, margin: other ? row.score - other.score : row.score };
   });
-  return { cardRank: withMargin(cardRank), faceRank: withMargin(faceRank) };
 }
 
 /**
  * یک پرونده را روی سرور بازبینی می‌کند و تصمیم می‌دهد.
+ *
+ * برای جبرانِ حاشیهٔ میز/پس‌زمینه، چند واریانتِ برش (کامل + برش‌های مرکزی)
+ * امبد می‌شوند و قوی‌ترینشان (بیشترین حاشیهٔ بصری) مبنای تصمیم است.
+ *
  * @returns {Promise<{action:'approve'|'queue', reason:string, cardTypeId?, designId?,
- *   cardScore?, cardMargin?, faceScore?, faceMargin?, faceCount?, topName?}>}
+ *   cardScore?, cardMargin?, faceScore?, faceMargin?, faceCount?, topName?, crop?}>}
  */
 async function decide(pool, submission, imageBuf) {
   const ready = await vision.available();
   if (!ready) return { action: 'queue', reason: 'vision-unavailable' };
 
-  const [cardVec, faceRes] = await Promise.all([
-    vision.embedCard(imageBuf),
-    vision.embedFace(imageBuf),
-  ]);
-  const faceVec = faceRes && faceRes.v ? faceRes.v : null;
+  const refs = await loadRefs(pool);
 
-  const { cardRank, faceRank } = await rankAgainst(pool, { cardVec, faceVec });
+  const variants = await vision.cropVariants(imageBuf);
+  let best = null;
+  for (const v of variants) {
+    const [cardVec, faceRes] = await Promise.all([
+      vision.embedCard(v.buf),
+      vision.embedFace(v.buf),
+    ]);
+    const cardRank = rankVector(cardVec, refs, 'cardVec');
+    const topCard = cardRank[0] || null;
 
-  const topCard = cardRank[0];
-  const topFace = faceRank[0];
+    let faceTop = null, faceUsable = false;
+    const faceVec = faceRes && faceRes.v ? faceRes.v : null;
+    if (faceVec && faceRes.faceCount === 1 && faceRes.detScore >= FACE_MIN_DET) {
+      const faceRank = rankVector(faceVec, refs, 'faceVec');
+      faceTop = faceRank[0] || null;
+      faceUsable = !!faceTop;
+    }
+    const cand = {
+      crop: v.label,
+      topCard,
+      faceTop,
+      faceUsable,
+      faceCount: faceRes ? faceRes.faceCount : 0,
+      faceDetected: faceRes ? faceRes.detScore : 0,
+    };
+    // بهترین واریانت = قوی‌ترین حاشیهٔ بصری (و اگر مساوی، نمرهٔ بالاتر).
+    if (topCard && (!best || !best.topCard
+      || topCard.margin > best.topCard.margin
+      || (topCard.margin === best.topCard.margin && topCard.score > best.topCard.score))) {
+      best = cand;
+    }
+  }
 
-  if (!topCard) return { action: 'queue', reason: 'no-card-reference' };
+  if (!best || !best.topCard) return { action: 'queue', reason: 'no-card-reference' };
 
   const g = gate({
-    topCard, topFace,
-    faceCount: faceRes.faceCount,
-    faceDetected: faceRes.detScore,
+    topCard: best.topCard,
+    topFace: best.faceTop,
+    faceUsable: best.faceUsable,
   });
+
+  const base = {
+    topName: best.topCard.name,
+    cardScore: best.topCard.score,
+    cardMargin: best.topCard.margin,
+    faceScore: g.faceScore,
+    faceMargin: g.faceMargin,
+    faceCount: best.faceCount,
+    crop: best.crop,
+  };
 
   if (g.action === 'approve') {
     return {
       action: 'approve',
-      reason: 'card+face-agree',
-      cardTypeId: topCard.cardTypeId,
-      designId: topCard.designId,
-      topName: topCard.name,
-      cardScore: topCard.score,
-      cardMargin: topCard.margin,
-      faceScore: g.faceScore,
-      faceMargin: g.faceMargin,
-      faceCount: faceRes.faceCount,
+      reason: g.reason,
+      cardTypeId: best.topCard.cardTypeId,
+      designId: best.topCard.designId,
+      ...base,
     };
   }
-
-  return {
-    action: 'queue',
-    reason: g.reason,
-    topName: topCard.name,
-    cardScore: topCard.score,
-    cardMargin: topCard.margin,
-    faceScore: g.faceScore,
-    faceMargin: g.faceMargin,
-    faceCount: faceRes.faceCount,
-    cardTop: topCard,
-    faceTop: topFace || null,
-  };
+  return { action: 'queue', reason: g.reason, ...base };
 }
+
+// ── آستانه‌های لایهٔ A: تأیید فقط با بصری (چهره انیمه/پیدا‌نشده) ──
+// روی عکسِ شبیه‌گوشی با برش، نمره/حاشیهٔ بازیکنِ درست به این حد می‌رسد؛ هر چیز
+// مبهم (تار/براق) پایین‌تر می‌ماند. تضادِ قاطعِ چهره همیشه ترمز می‌زند.
+const CARD_ONLY_MIN_SCORE = 0.62;
+const CARD_ONLY_MIN_MARGIN = 0.075;
 
 /**
  * گیتِ خالصِ تصمیم — جدا از مدل تا تست‌پذیر باشد.
  *
- * تأیید خودکار فقط وقتی که بصری قوی است **و** چهره یکتا/پراطمینان **و** هر دو
- * بر یک بازیکنند. هر حالت دیگر (بصری ضعیف، چهرهٔ نبوده، چندچهره‌ای، حاشیه کم،
- * یا تضادِ چهره) → صف.
+ * دولایه (خط‌قرمز «صفر تأییدِ اشتباه»):
+ *   • لایهٔ A (card-only): بصری فوق‌قوی (نمره+حاشیهٔ بالا) → تأیید، مگر آنکه
+ *     چهرهٔ یکتای پراطمینان بازیکنِ دیگری را بگوید (تضاد → صف). این لایه کارت‌های
+ *     با چهرهٔ سبکِ انیمه را که YuNet نمی‌گیرد نجات می‌دهد.
+ *   • لایهٔ B (card+face): بصری خوب + چهرهٔ یکتای پراطمینانِ موافق → تأیید.
+ *   • هر چیز دیگر (بصری ضعیف، حاشیه کم، تضاد چهره، چهرهٔ مبهم) → صف.
  */
-function gate({ topCard, topFace, faceCount, faceDetected }) {
-  const cardOk = !!topCard
-    && topCard.score >= CARD_MIN_SCORE
-    && topCard.margin >= CARD_MIN_MARGIN;
+function gate({ topCard, topFace, faceUsable }) {
+  if (!topCard) return { action: 'queue', reason: 'no-card-reference' };
 
-  let faceOk = false;
-  let faceAgrees = false;
-  let faceScore = null, faceMargin = null;
+  // چهرهٔ «قابل‌اتکا» یک چهرهٔ یکتای پراطمینان است (پیش‌فیلترشده در decide).
+  const faceStrong = !!faceUsable && !!topFace
+    && topFace.score >= FACE_MIN_SCORE
+    && topFace.margin >= FACE_MIN_MARGIN;
+  const faceAgrees = faceStrong && topFace.cardTypeId === topCard.cardTypeId;
+  const faceContradicts = faceStrong && !faceAgrees;
+  const faceScore = faceUsable && topFace ? topFace.score : null;
+  const faceMargin = faceUsable && topFace ? topFace.margin : null;
 
-  const faceUsable = !!topFace && faceCount === 1 && faceDetected >= FACE_MIN_DET;
-  if (faceUsable) {
-    faceScore = topFace.score;
-    faceMargin = topFace.margin;
-    if (topFace.score >= FACE_MIN_SCORE && topFace.margin >= FACE_MIN_MARGIN) {
-      faceOk = true;
-      faceAgrees = topFace.cardTypeId === topCard.cardTypeId;
-    }
+  // لایهٔ A: بصری فوق‌قوی و بدون تضادِ چهره.
+  if (topCard.score >= CARD_ONLY_MIN_SCORE
+    && topCard.margin >= CARD_ONLY_MIN_MARGIN
+    && !faceContradicts) {
+    return {
+      action: 'approve',
+      reason: faceAgrees ? 'card-strong-face-agree' : 'card-strong',
+      faceScore, faceMargin,
+    };
   }
-
-  if (cardOk && faceOk && faceAgrees) {
-    return { action: 'approve', reason: 'card+face-agree', faceScore, faceMargin };
-  }
-  if (faceOk && !faceAgrees) {
+  // تضادِ قاطعِ چهره → هرگز خودکار.
+  if (faceContradicts) {
     return { action: 'queue', reason: 'face-contradicts', faceScore, faceMargin };
+  }
+  // لایهٔ B: بصری خوب + چهرهٔ موافق.
+  const cardOk = topCard.score >= CARD_MIN_SCORE && topCard.margin >= CARD_MIN_MARGIN;
+  if (cardOk && faceAgrees) {
+    return { action: 'approve', reason: 'card+face-agree', faceScore, faceMargin };
   }
   if (!cardOk) {
     return { action: 'queue', reason: 'card-weak', faceScore, faceMargin };
@@ -246,10 +285,13 @@ module.exports = {
   ensureReferenceEmbeddings,
   decide,
   gate,
-  rankAgainst,
+  loadRefs,
+  rankVector,
   SERVER_EMBED_VERSION,
   CARD_MIN_SCORE,
   CARD_MIN_MARGIN,
+  CARD_ONLY_MIN_SCORE,
+  CARD_ONLY_MIN_MARGIN,
   FACE_MIN_SCORE,
   FACE_MIN_MARGIN,
 };
