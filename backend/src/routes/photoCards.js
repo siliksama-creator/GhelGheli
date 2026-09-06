@@ -1017,6 +1017,57 @@ module.exports = function createPhotoCardRoutes(deps) {
           });
         };
 
+        /**
+         * ── تکرارِ امن (idempotency) پس از تایم‌اوت ──
+         *
+         * اگر پاسخِ ثبت در راه شبکه/سرور گم شود، سرور ممکن است کار را **کامیت**
+         * کرده باشد (کد used و کارت در موجودی) ولی اپ چیزی نشنیده باشد. کاربر
+         * دوباره می‌زند؛ بدون این تابع خطای «کد قبلاً استفاده شده» می‌دید و فکر
+         * می‌کرد کدش سوخته، در حالی‌که کارت واقعاً ثبت شده بود.
+         *
+         * این تابع اگر همین کاربر این کد را قبلاً ثبت کرده باشد، **نتیجهٔ همان
+         * ثبت** را (موفقیت یا در‌حال‌بررسی) برمی‌گرداند — نه خطا. برای کاربرِ
+         * دیگری که کدِ شخص دیگر را بدزدد همچنان ۴۰۹ واقعی می‌ماند.
+         * @returns {Promise<object|null>} پاسخِ آمادهٔ res یا null اگر نبود.
+         */
+        const replayExisting = async (codeRowId) => {
+          const s = await pool.query(
+            `SELECT s.id, s.status, s.review_reason,
+                    s.chosen_design_id, s.matched_design_id,
+                    t.name AS card_type_name, t.point_value, t.cash_amount,
+                    t.image_url AS card_image_url
+               FROM photo_card_submissions s
+               JOIN photo_card_codes c ON c.id = s.code_id
+               LEFT JOIN photo_card_designs d ON d.id = COALESCE(s.chosen_design_id, s.matched_design_id)
+               LEFT JOIN card_types t ON t.id = COALESCE(d.card_type_id, c.expected_card_type_id)
+              WHERE s.code_id = $1 AND s.user_id = $2
+              ORDER BY s.created_at DESC LIMIT 1`,
+            [codeRowId, req.user.id],
+          );
+          const row = s.rows[0];
+          if (!row) return null;
+          if (row.status === 'approved') {
+            return {
+              status: 'approved',
+              message: 'کارت با موفقیت ثبت شد',
+              cardType: row.card_type_name,
+              addedPoints: Number(row.point_value || 0),
+              addedCash: Number(row.cash_amount || 0),
+              imageUrl: row.card_image_url,
+              replayed: true,
+            };
+          }
+          // pending/reserved → در حال بررسی.
+          return {
+            status: 'pending',
+            reason: row.review_reason,
+            submissionId: row.id,
+            replayed: true,
+            message: 'این کد از قبل در حال بررسی است و محفوظ است. نیازی به '
+              + 'ارسال دوباره نیست؛ نتیجه پس از بررسی به شما اطلاع داده می‌شود.',
+          };
+        };
+
         if (!photoCards.isValidPhotoCode(code)) {
           return wrongCode('کدِ واردشده معتبر نیست.');
         }
@@ -1045,12 +1096,31 @@ module.exports = function createPhotoCardRoutes(deps) {
         // کاربری که کدِ مصرف‌شده وارد می‌کند، کد را واقعاً **داشته** —
         // فقط دیر رسیده یا دوباره فرستاده. قفل کردنش یعنی مجازاتِ
         // کسی که کارت دارد.
+        // ── تکرارِ امن پس از تایم‌اوت (توضیح کامل بالای replayExisting) ──
+        // اگر همین کاربر این کد را قبلاً فرستاده و پاسخش گم شده، به‌جای خطا
+        // نتیجهٔ واقعیِ همان ثبت برمی‌گردد (موفقیت یا در حال بررسی).
+        const replay = await replayExisting(codeRow.rows[0].id);
+        if (replay) {
+          return res.status(200).json(replay);
+        }
         if (codeRow.rows[0].status === 'used') {
           return res.status(409).json({ message: 'این کد قبلاً استفاده شده است' });
         }
         if (codeRow.rows[0].status === 'reserved') {
-          return res.status(409).json({
-            message: 'این کد در حال بررسی توسط پشتیبانی است' });
+          // کد رزرو شده ولی هیچ پرونده‌ای برای این کاربر نیست (نباید رخ دهد،
+          // ولی اگر رزروِ یتیم شد بگذار کاربر ادامه دهد تا قفلِ کاذب نسازد).
+          const ownPending = await pool.query(
+            `SELECT 1 FROM photo_card_submissions WHERE code_id=$1 AND user_id=$2 LIMIT 1`,
+            [codeRow.rows[0].id, req.user.id]);
+          if (!ownPending.rows[0]) {
+            await pool.query(
+              `UPDATE photo_card_codes SET status='unused', updated_at=NOW()
+                WHERE id=$1 AND status='reserved'`, [codeRow.rows[0].id]);
+            codeRow.rows[0].status = 'unused';
+          } else {
+            return res.status(409).json({
+              message: 'این کد در حال بررسی توسط پشتیبانی است' });
+          }
         }
         if (codeRow.rows[0].status !== 'unused') {
           return res.status(409).json({ message: 'این کد دیگر معتبر نیست' });
@@ -1393,8 +1463,11 @@ module.exports = function createPhotoCardRoutes(deps) {
             //
             // `UPDATE … WHERE status='unused' RETURNING` اتمیک است، پس
             // اگر دو درخواست هم‌زمان همین کد را بخواهند فقط یکی ردیف
-            // برمی‌گرداند. آن یکیِ دیگر باید بفهمد باخته — وگرنه
-            // پرونده‌ای می‌سازد برای کدی که رزروِ خودش نیست.
+            // برمی‌گرداند. اول تکرارِ امن را می‌سنجیم: اگر همین کاربر
+            // پرونده‌اش را ساخته باشد (دوبارزدنِ دکمه/تایم‌اوت) نتیجهٔ
+            // واقعی برمی‌گردد؛ وگرنه کد به شخص دیگری رفته.
+            const lateReplay = await replayExisting(codeId);
+            if (lateReplay) return res.status(200).json(lateReplay);
             return res.status(409).json({
               message: 'این کد همین حالا توسط شخص دیگری ثبت شد' });
           }

@@ -343,11 +343,39 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
       } catch (_) {
         // بردار اختیاری است؛ هیچ تأثیری بر ثبت ندارد.
       }
-      final res = await widget.api.postMultipart(
-        '/api/photo-cards/submit',
-        filePath: _imagePath,
-        fields: fields,
-      );
+      // ── تکرارِ امن پس از تایم‌اوت/قطعیِ شبکه ──
+      //
+      // روی شبکهٔ ضعیف، ممکن است پاسخِ سرور در راه گم شود در حالی‌که سرور کار
+      // را انجام داده (کد مصرف یا پرونده ساخته شده) باشد. سرور ثبت را
+      // idempotent کرده: فرستادنِ دوبارهٔ همان عکس+کد، نتیجهٔ واقعی را
+      // برمی‌گرداند و دوباره امتیاز نمی‌دهد. پس اگر بار اول تایم‌اوت/قطعی شد،
+      // **یک بار** خودمان دوباره می‌فرستیم تا کاربر بی‌دلیل «کد مصرف شد» نبیند
+      // و مجبور به فرستادنِ دستی نباشد.
+      Object? firstNetError;
+      dynamic res;
+      for (var attempt = 0; attempt < 2 && res == null; attempt++) {
+        try {
+          res = await widget.api.postMultipart(
+            '/api/photo-cards/submit',
+            filePath: _imagePath,
+            fields: fields,
+          );
+        } catch (e) {
+          firstNetError = e;
+          // فقط تایم‌اوت/قطعی شبکه دلیلی برای تکرار است؛ خطای منطقی (۴xx)
+          // پاسخ داشته و دوباره فرستادن بی‌فایده است.
+          final msg = e.toString().toLowerCase();
+          final isNetwork =
+              msg.contains('timeout') || msg.contains('connection')
+                  || msg.contains('socket') || msg.contains('receive')
+                  || msg.contains('send') || msg.contains('network')
+                  || msg.contains('failed host');
+          if (!isNetwork || attempt == 1) rethrow;
+          // فاصلهٔ کوتاه پیش از تکرار.
+          await Future<void>.delayed(const Duration(seconds: 2));
+        }
+      }
+      if (res == null) throw firstNetError ?? Exception('ثبت نشد');
       if (!mounted) return;
       final d = (res.data is Map) ? res.data as Map : const {};
       final status = d['status'];
