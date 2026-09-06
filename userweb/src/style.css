@@ -3219,6 +3219,15 @@ a:focus-visible {
   border: 1px solid #fbbf2452;
   color: #fbbf24;
 }
+/* «از قبل ثبت شده»: اطلاع‌رسانیِ آرام (آبی)، نه موفقیتِ تازه و نه خطا. */
+.pcResult.already {
+  background: #3b82f614;
+  border: 1px solid #3b82f64d;
+  color: #93c5fd;
+  align-items: flex-start;
+}
+.pcResult.already b { font-weight: 800; }
+.pcResult.already span { font-weight: 600; opacity: .95; }
 .pcResult.err {
   background: #ec00161a;
   border: 1px solid #ec001652;

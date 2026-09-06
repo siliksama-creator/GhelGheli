@@ -285,6 +285,17 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
         return;
       }
 
+      // ── کدِ تکراریِ همین کاربر: کارت از قبل ثبت شده ──
+      // چیز تازه‌ای اضافه نمی‌شود؛ پیامِ آرام و صادقانه در همین‌جا (بدون
+      // جشن/امتیاز). عکس می‌ماند تا کدِ بعدی با همان عکس زده شود.
+      if (d.status === 'already') {
+        setResult({ kind: 'already', message: d.message, cardType: d.cardType });
+        setCode('');
+        codeRef.current?.focus();
+        setRefreshKey(k => k + 1);
+        return;
+      }
+
       if (d.status === 'pending') {
         // کد درست بوده ولی عکس شناخته نشد → بررسی دستی.
         //
@@ -424,6 +435,15 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
             <span>+{result.points} امتیاز
               {result.cash > 0 && ` · ${result.cash.toLocaleString('fa-IR')} تومان`}
             </span>
+          </div>
+        </div>
+      )}
+      {result?.kind === 'already' && (
+        <div className="pcResult already">
+          <SvgIcon name="support" size={18} />
+          <div>
+            <b>این کارت از قبل در مجموعهٔ شماست</b>
+            <span>{result.message}</span>
           </div>
         </div>
       )}

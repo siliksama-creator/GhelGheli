@@ -1050,14 +1050,27 @@ module.exports = function createPhotoCardRoutes(deps) {
           const row = s.rows[0];
           if (!row) return null;
           if (row.status === 'approved') {
+            // ── تکرارِ یک کد که همین کاربر قبلاً موفق ثبتش کرده ──
+            //
+            // این دفعه **هیچ چیز تازه‌ای اضافه نمی‌شود** (امتیاز/کارت در دفعهٔ قبل
+            // داده شده). پس وضعیت را از «ثبت موفقِ تازه» جدا می‌کنیم (`already` نه
+            // `approved`) تا کلاینت جشن/امتیاز نشان ندهد و پیام صادقانه بدهد؛ هم
+            // سناریوی تایم‌اوت (پاسخ بار اول گم شده) را پوشش می‌دهد هم کدِ تکراری/
+            // اشتباهیِ کاربر را.
             return {
-              status: 'approved',
-              message: 'کارت با موفقیت ثبت شد',
+              status: 'already',
               cardType: row.card_type_name,
-              addedPoints: Number(row.point_value || 0),
-              addedCash: Number(row.cash_amount || 0),
+              addedPoints: 0,
+              addedCash: 0,
               imageUrl: row.card_image_url,
               replayed: true,
+              message: 'این کد قبلاً استفاده شده و کارت «'
+                + (row.card_type_name || 'ثبت‌شده')
+                + '» شما از قبل ثبت شده و در مجموعهٔ شماست. این بار چیز تازه‌ای '
+                + 'اضافه نشد.'
+                + ' اگر بار اول پاسخش به‌خاطر کندیِ اینترنت نیامده بود، خیالتان '
+                + 'راحت که کارت درست ثبت شده است. اگر کارت تازه‌ای دستتان است، '
+                + 'کدِ نوِ روی همان کارت را وارد کنید.',
             };
           }
           // pending → واقعاً در صف بررسی است (کد reserved)؛ نتیجه را تکرار می‌کنیم.
@@ -1114,7 +1127,25 @@ module.exports = function createPhotoCardRoutes(deps) {
           return res.status(200).json(replay);
         }
         if (codeRow.rows[0].status === 'used') {
-          return res.status(409).json({ message: 'این کد قبلاً استفاده شده است' });
+          // کد مصرف شده و پرونده‌ای برای همین کاربر نیست → شخص دیگری زده.
+          // نام کارتِ ثبت‌شده را هم می‌آوریم تا پیام دقیق و راهنما باشد.
+          const owner = await pool.query(
+            `SELECT t.name AS card_name
+               FROM photo_card_codes c
+               LEFT JOIN photo_card_designs d ON d.id = c.bound_design_id
+               LEFT JOIN card_types t ON t.id =
+                 COALESCE(d.card_type_id, c.expected_card_type_id)
+              WHERE c.id = $1`,
+            [codeRow.rows[0].id],
+          );
+          const cardName = owner.rows[0]?.card_name;
+          return res.status(409).json({
+            codeStatus: 'used_by_other',
+            message: 'این کد قبلاً توسط شخص دیگری استفاده شده'
+              + (cardName ? ` (کارت «${cardName}» ثبت شده است)` : '')
+              + '. هر کد فقط یک‌بار قابل ثبت است. اگر چند نسخه از یک کارت دارید، '
+              + 'کدِ نوِ روی همان کارت را وارد کنید.',
+          });
         }
         if (codeRow.rows[0].status === 'reserved') {
           // کد رزرو شده ولی هیچ پرونده‌ای برای این کاربر نیست (نباید رخ دهد،

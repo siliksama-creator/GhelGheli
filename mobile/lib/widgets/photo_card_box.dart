@@ -1013,18 +1013,22 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
     final pending = status == 'pending';
     final badCode = status == 'bad_code';
     final locked = status == 'locked';
+    // «از قبل توسط همین کاربر ثبت شده»: نه موفقیتِ تازه (جشن/امتیاز) نه خطا.
+    // یک اطلاع‌رسانیِ آرام در همین‌جا؛ هیچ تب/صفحه‌ای باز نمی‌شود.
+    final already = status == 'already';
 
-    // ── سه خانوادهٔ رنگ برای سه پیامِ متفاوت ──
-    // «اشتباه کردی» (قرمز)، «فعلاً نمی‌توانی» (بنفش) و «منتظر بمان»
-    // (کهربایی) واکنش‌های متفاوتی می‌خواهند؛ یک رنگ برای همه یعنی
-    // کاربر نمی‌فهمد باید چه کند.
+    // ── خانواده‌های رنگ برای واکنش‌های متفاوت ──
+    // قرمز «اشتباه کردی» / بنفش «فعلاً نمی‌توانی» / کهربایی «منتظر بمان» /
+    // سبز «ثبت موفق» / آبی «از قبل داشتی».
     final color = locked
         ? const Color(0xFF7C4DFF)
         : badCode
             ? BrandColors.dangerOnLight
             : pending
                 ? BrandColors.warningOnLight
-                : BrandColors.successOnLight;
+                : already
+                    ? const Color(0xFF2563EB)
+                    : BrandColors.successOnLight;
 
     if (badCode || locked) {
       return Container(
@@ -1052,6 +1056,40 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
                   ),
                   Text('${r['message'] ?? ''}',
                       style: theme.textTheme.bodySmall),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // ── «از قبل ثبت شده»: آرام، در همین‌جا، بدون تب/صفحهٔ جدید و بدون امتیاز ──
+    if (already) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: Gaps.sm),
+        padding: const EdgeInsets.all(Gaps.sm),
+        decoration: BoxDecoration(
+          borderRadius: Corners.rMd,
+          color: color.withValues(alpha: 0.10),
+          border: Border.all(color: color.withValues(alpha: 0.40)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.verified_outlined, color: color, size: 22),
+            const SizedBox(width: Gaps.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'این کارت از قبل در مجموعهٔ شماست',
+                    style: theme.textTheme.titleSmall
+                        ?.copyWith(color: color, fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 2),
+                  Text('${r['message'] ?? ''}', style: theme.textTheme.bodySmall),
                 ],
               ),
             ),
