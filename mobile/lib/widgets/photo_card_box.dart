@@ -309,7 +309,31 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
     try {
       // فاز ۲ — حالت سایه: بردارِ عصبیِ مدلِ روی‌گوشی. اگر ساختش شکست بخورد
       // یا مدل آماده نباشد، فیلد فرستاده نمی‌شود و جریانِ ثبت دست‌نخورده است.
-      final fields = <String, dynamic>{'code': _code.text.trim()};
+      // ── پیش‌چکِ کد، قبل از اجرای مدلِ عصبی ──
+      //
+      // مدلِ روی‌گوشی چند ثانیه CPU می‌گیرد. اگر کد غلط یا قبلاً مصرف‌شده
+      // باشد، دلیلی نیست کاربر منتظر تشخیص عکس بماند؛ با یک کوئریِ سبک اول
+      // کد را می‌سنجیم. اگر شبکه در دسترس نبود بی‌صدا رد می‌شویم و submit
+      // خودش دوباره بررسی می‌کند (fail-open).
+      final codeText = _code.text.trim();
+      try {
+        final chk = await widget.api.get(
+          '/api/photo-cards/check-code?code=${Uri.encodeQueryComponent(codeText)}',
+          fresh: true,
+        ) as Map?;
+        if (chk != null && chk['ok'] != true) {
+          if (!mounted) return;
+          setState(() {
+            // عکس عمداً نگه داشته می‌شود تا کاربر فقط کد را اصلاح کند.
+            _error = (chk['message'] as String?) ?? 'این کد قابل استفاده نیست.';
+          });
+          return;
+        }
+      } catch (_) {
+        // پیش‌چک اختیاری است؛ قطعیِ شبکه نباید ثبت را متوقف کند.
+      }
+
+      final fields = <String, dynamic>{'code': codeText};
       try {
         final emb =
             await CardEmbedding.instance.embedFile(_imagePath!);

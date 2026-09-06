@@ -124,6 +124,47 @@ function isValidPhotoCode(code) {
   return /^[A-Z0-9-]{4,64}$/.test(code) && /[A-Z0-9]/.test(code);
 }
 
+/**
+ * دسته‌بندیِ خالصِ وضعیتِ یک کد برای پیش‌چکِ سبک (بدون عکس/پردازش).
+ *
+ * منطقِ مشترکِ endpoint چکِ سریع است تا اپِ گوشی بتواند **قبل از اجرای مدلِ
+ * عصبیِ روی‌گوشی (چند ثانیه CPU)** بفهمد کد غلط/مصرف‌شده است و کاربر را
+ * منتظر نگذارد. یک تابع خالص است تا بدون دیتابیس تست شود؛ route فقط وضعیتِ
+ * خامِ دیتابیس را می‌دهد و پیام/علت فارسی اینجا تصمیم گرفته می‌شود.
+ *
+ * @param {string|null|undefined} status  وضعیت خام کد از دیتابیس، یا null
+ *                                        اگر کد اصلاً پیدا نشد.
+ * @returns {{ok:boolean, reason:string, message:string}}
+ *
+ * نکتهٔ ضدتقلب: حالتِ معتبر `{ok:true}` هیچ اطلاعاتی دربارهٔ نوع/امتیاز کارت
+ * نمی‌دهد؛ ثبتِ واقعی همچنان عکس می‌خواهد. این تابع چیزی رزرو/تغییر نمی‌دهد و
+ * شمارندهٔ خطا را دست نمی‌زند (آن فقط در submit می‌ماند).
+ */
+function classifyCodeStatus(status) {
+  switch (status) {
+    case 'unused':
+      return { ok: true, reason: 'ready', message: '' };
+    case 'used':
+      return { ok: false, reason: 'used',
+        message: 'این کد قبلاً استفاده شده است.' };
+    case 'reserved':
+      return { ok: false, reason: 'reserved',
+        message: 'این کد در حال بررسی توسط پشتیبانی است.' };
+    case 'voided':
+      return { ok: false, reason: 'voided',
+        message: 'این کد دیگر معتبر نیست.' };
+    default:
+      // null/undefined یعنی کد در سیستم ثبت نشده؛ سایر مقادیرِ ناشناخته هم
+      // امن‌ترین حالند (غیرقابل‌استفاده).
+      if (status == null) {
+        return { ok: false, reason: 'not_found',
+          message: 'این کد در سیستم ثبت نشده است.' };
+      }
+      return { ok: false, reason: 'invalid',
+        message: 'این کد دیگر معتبر نیست.' };
+  }
+}
+
 // ── الفبای پیشنهادی برای چاپ‌های آینده ──
 //
 // دیگر برای تولید استفاده نمی‌شود (مالک کد را خودش وارد می‌کند)، ولی
@@ -841,6 +882,7 @@ module.exports = {
   normalizePhotoCode,
   foldPhotoCode,
   isValidPhotoCode,
+  classifyCodeStatus,
   parsePhotoCodesInput,
   suggestCode,
   creditSubmission,

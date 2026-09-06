@@ -109,6 +109,45 @@ async function testNormalize() {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
+// ۱ب. پیش‌چکِ سبکِ کد (classifyCodeStatus) — قبل از اجرای مدلِ عصبی
+// ───────────────────────────────────────────────────────────────────────────
+async function testClassifyCode() {
+  const c = svc.classifyCodeStatus;
+
+  await t('کد آماده مصرف → ok بدون افشای اطلاعات', () => {
+    const r = c('unused');
+    assert.strictEqual(r.ok, true);
+    // نباید نوع/امتیاز کارت را لو بدهد (ضد حدسِ کد).
+    assert.ok(!('card' in r) && !('point' in r));
+  });
+
+  await t('کد مصرف‌شده → رد با علت used', () => {
+    const r = c('used');
+    assert.strictEqual(r.ok, false);
+    assert.strictEqual(r.reason, 'used');
+    assert.ok(r.message.includes('قبلاً'));
+  });
+
+  await t('کد در حال بررسی → reserved', () => {
+    assert.strictEqual(c('reserved').reason, 'reserved');
+  });
+
+  await t('کد باطل‌شده → voided', () => {
+    assert.strictEqual(c('voided').ok, false);
+  });
+
+  await t('کد در سیستم نیست (null) → not_found', () => {
+    const r = c(null);
+    assert.strictEqual(r.ok, false);
+    assert.strictEqual(r.reason, 'not_found');
+  });
+
+  await t('وضعیت ناشناخته → امن‌ترین حال (رد)', () => {
+    assert.strictEqual(c('weird').ok, false);
+  });
+}
+
+// ───────────────────────────────────────────────────────────────────────────
 // ۳. کدهایی که مدیر وارد می‌کند
 // ───────────────────────────────────────────────────────────────────────────
 //
@@ -507,6 +546,7 @@ async function testMatching() {
 // ───────────────────────────────────────────────────────────────────────────
 (async () => {
   await testNormalize();
+  await testClassifyCode();
   await testAdminEnteredCodes();
   await testMatching();
 
