@@ -1096,24 +1096,35 @@ module.exports = function createPhotoCardRoutes(deps) {
         }
 
         // ═════════════════════════════════════════════════════════════
-        // گیتِ کیفیت عکس (فاز ۱) — روی نسخهٔ بریده‌شدهٔ کارت
+        // گیتِ کیفیت عکس — روی نسخهٔ بریده‌شدهٔ کارت
         // ═════════════════════════════════════════════════════════════
         //
-        // اگر عکس آن‌قدر تار/تاریک/تخت است که حتی «کارتی بودن» هم قطعی
-        // نیست، همان لحظه به کاربر برمی‌گردد تا دوباره عکس بگیرد — به‌جای
-        // آنکه پرونده به صف برود و هم کد رزرو شود هم کاربر منتظر بماند.
+        // تفکیکِ دو نوع «کیفیت پایین»:
         //
-        // ⚠️ فقط تصویرِ فاجعه‌بار برگردانده می‌شود؛ عکسِ متوسط باید رد شود
-        //    چون موتور و لایهٔ هویت برای همان طراحی شده‌اند. `usable=false`
-        //    آستانهٔ محافظه‌کارانه دارد. این گیت کد را مصرف/رزرو نمی‌کند و
-        //    شمارندهٔ قفل را هم بالا نمی‌برد (تقصیرِ کاربر نیست).
+        //  الف) عکسِ تار/کم‌جزئیات (blur): **سخت رد نمی‌شود.** عکسِ تار هنوز
+        //      کارت است و موتورِ تطبیق یا خودکار پیدایش می‌کند، یا با
+        //      اطمینانِ پایین به **صفِ مدیر** می‌رود — هیچ‌وقت تأییدِ غلط
+        //      رخ نمی‌دهد (شبیه‌سازیِ ۵۶ کارت با تارِ شدید: صفر تأیید غلط).
+        //      قبلاً «تار» هم ۴۲۲ می‌داد و کاربرِ عادی با عکسِ قابل‌قبولِ
+        //      گوشی بی‌دلیل بلاک می‌شد (باگِ «هر عکسی تار است»).
+        //  ب) عکسِ خوانانشدنِ واقعی — تاریکِ مطلق، فلاشِ سوخته، یا تختِ
+        //      بی‌هیچ جزئیات (تختهٔ میز/صفحهٔ سفید): این‌ها حتی «کارتی بودن»
+        //      را هم ندارند و موتور بی‌معنی تحلیل می‌کند؛ سخت رد می‌شوند.
+        //
+        // سنجه‌ها همیشه لاگ می‌شوند تا اگر روزی آستانه نیاز به تنظیم داشت،
+        // عددِ واقعیِ عکسِ کاربر در دسترس باشد (نه حدس).
+        let quality = null;
         try {
-          const q = await imageQuality.assess(workBuf);
-          if (!q.usable) {
+          quality = await imageQuality.assess(workBuf);
+          const hardReasons = quality.reasons.filter(r => r !== 'blur');
+          if (quality.blur != null) {
+            console.warn(`[photo-cards] quality blur=${quality.blur} mean=${quality.mean} contrast=${quality.contrast} reasons=${quality.reasons.join(',') || '-'}`);
+          }
+          if (hardReasons.length) {
             return res.status(422).json({
               status: 'poor_quality',
-              quality: { blur: q.blur, mean: q.mean, contrast: q.contrast, reasons: q.reasons },
-              message: imageQuality.qualityMessage(q.reasons)
+              quality: { blur: quality.blur, mean: quality.mean, contrast: quality.contrast, reasons: hardReasons },
+              message: imageQuality.qualityMessage(hardReasons)
                 || 'کیفیت عکس برای تشخیص کافی نیست. لطفاً عکس واضح‌تری بگیرید.',
             });
           }
@@ -1121,6 +1132,7 @@ module.exports = function createPhotoCardRoutes(deps) {
           // سنجهٔ کیفیت هرگز نباید ثبت را بشکند؛ صرفاً نادیده گرفته می‌شود.
           console.warn('[photo-cards] سنجش کیفیت شکست خورد (نادیده):', e.message);
         }
+        void quality;
         const designFps = designsRes.rows.map(rowToFp);
         const match = designsRes.rows.length
           ? fpEngine.matchAgainst(queryFp, designFps)
