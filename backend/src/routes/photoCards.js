@@ -1307,6 +1307,12 @@ module.exports = function createPhotoCardRoutes(deps) {
           isCashType: (id) => cashTypeIds.has(id),
         });
 
+        // برشِ ایمن: ستون‌های decision_path و review_reason varchar محدودند
+        // (به‌ترتیب ۳۲ و ۴۸ بعد از مهاجرت ۰۸۷). اگر روزی تصمیمی رشته‌ای بلندتر
+        // برگرداند، به‌جای خطای ۲۲۰۰۱ و ۵۰۰، خودِ مقدار کوتاه می‌شود.
+        const safePath = String(decision.path || '').slice(0, 32);
+        const safeReason = decision.reason ? String(decision.reason).slice(0, 48) : null;
+
         if (decision.action !== 'approve') {
           const reason = decision.reason;
 
@@ -1347,13 +1353,13 @@ module.exports = function createPhotoCardRoutes(deps) {
                     $16,$17,$18,$19,$20,$21,$22,$23,$24)
              RETURNING id`,
             [req.user.id, codeId, match.design?.id ?? null,
-              match.score, match.margin, savedPath, reason,
+              match.score, match.margin, savedPath, safeReason,
               // اثرانگشت **فقط برای ممیزی** ذخیره می‌شود، نه برای
               // مسدود کردنِ ارسالِ بعدی. عکسِ خودِ کاربر پس از تصمیمِ
               // مدیر پاک می‌شود ولی این چند صد بایت می‌ماند و اگر
               // روزی الگوی مشکوکی دیده شد، داده‌اش هست.
               queryFp.dhash, queryFp.phash, queryFp.colorSig, queryFp.texSig,
-              queryFp.lumaSig, decision.path, queryFp.rgbSig,
+              queryFp.lumaSig, safePath, queryFp.rgbSig,
               queryFp.textTokens || [],
               // فاز ۲ — حالت سایه: بردار و نظر هویتیِ عصبی (نه در تصمیم).
               // ستون jsonb است → رشتهٔ JSON (وگرنه 22P02؛ توضیح در مسیر approved).
@@ -1450,7 +1456,7 @@ module.exports = function createPhotoCardRoutes(deps) {
                     $14,$15,$16,$17,$18,$19,$20,$21,$22)
              RETURNING id`,
             [req.user.id, codeId, design?.id ?? null,
-              match.score, match.margin, decision.path,
+              match.score, match.margin, safePath,
               queryFp.dhash, queryFp.phash, queryFp.colorSig,
               queryFp.texSig, queryFp.lumaSig, queryFp.rgbSig,
               queryFp.textTokens || [],

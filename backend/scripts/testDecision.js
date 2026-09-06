@@ -255,5 +255,25 @@ console.log('\n══ آستانه قابل تنظیم است ══');
   ok('آستانهٔ بی‌نام هم قابل تنظیم است', strictFree.action === 'review');
 }
 
+console.log('\n══ طول رشته‌های path/reason در سقف ستون‌ها (مهاجرت ۰۸۷) ══');
+{
+  // باگ زنده: 'identity_override' ۱۷ کاراکتر است ولی decision_path قبلاً
+  // varchar(16) بود → 22001 هنگام تأیید. هر رشتهٔ ثابت path/reason که تصمیم
+  // برمی‌گرداند باید در سقفِ جدید (path≤32، reason≤48) جا شود.
+  const svcSrc = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'src', 'services', 'photoCardService.js'), 'utf8');
+  const literals = svcSrc.match(/'(code_bound|image_match|identity_override|[a-z_]+)'/g) || [];
+  const vals = [...new Set(literals.map(l => l.slice(1, -1)))];
+  const tooLongPath = vals.filter(v => v === 'code_bound' || v === 'image_match' || v === 'identity_override')
+    .filter(v => v.length > 32);
+  ok('هیچ decision_path ای بلندتر از ۳۲ نیست', tooLongPath.length === 0, tooLongPath.join(','));
+  // علت‌های شناخته‌شده‌ی صف
+  const reasons = ['type_mismatch', 'low_confidence', 'image_unknown', 'ambiguous',
+    'code_mismatch_suspected', 'cash_needs_review', 'code_auto_corrected'];
+  const tooLongReason = reasons.filter(r => r.length > 48);
+  ok('هیچ review_reason ای بلندتر از ۴۸ نیست', tooLongReason.length === 0, tooLongReason.join(','));
+  ok('طول identity_override کنترل شده (۱۷ ≤ ۳۲)', 'identity_override'.length <= 32);
+}
+
 console.log(`\n${fail === 0 ? '✓' : '✗'} ${pass} تست موفق، ${fail} ناموفق`);
 process.exit(fail === 0 ? 0 : 1);
