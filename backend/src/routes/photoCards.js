@@ -1488,7 +1488,7 @@ module.exports = function createPhotoCardRoutes(deps) {
           const savedPath = path.join(path.dirname(req.file.path), opt.filename);
           keepFile = true;
 
-          const sub = await pool.query(
+          const insertSub = await pool.query(
             `INSERT INTO photo_card_submissions
                (user_id, code_id, matched_design_id, match_score, match_margin,
                 user_image_path, status, review_reason, decision_path,
@@ -1523,7 +1523,7 @@ module.exports = function createPhotoCardRoutes(deps) {
           return res.json({
             status: 'pending',
             reason,
-            submissionId: sub.rows[0].id,
+            submissionId: insertSub.rows[0].id,
             // ── چرا «۲۴ ساعت» صریح گفته می‌شود ──
             //
             // بدون بازهٔ زمانی، کاربر نمی‌داند منتظر بماند یا دوباره
@@ -1547,31 +1547,31 @@ module.exports = function createPhotoCardRoutes(deps) {
               : 'کیفیت عکس کامل نبود، برای همین در حال بررسی است و '
                 + 'ممکن است تا ۲۴ ساعت طول بکشد. کد شما محفوظ است.',
           });
-        }
 
-        // ── فاز ۴: بازبینیِ خودکارِ سرور، خارج از مسیر پاسخ ──
-        //
-        // عکسِ کامل روی دیسک مانده. یک ثانیه بعد (تا پاسخ کاربر برود) سرور با
-        // مدلِ خودش (چهره+بصری) پرونده را دوباره می‌سنجد؛ اگر پراطمینان بود
-        // خودکار تأیید می‌شود، وگرنه در صفِ ادمین می‌ماند. خطای این پردازش
-        // نباید ثبت را بشکند؛ پس فقط لاگ می‌شود.
-        {
-          const pendingId = sub.rows[0].id;
-          setTimeout(() => {
-            serverReviewQueue.reviewOne(pool, pendingId, {
-              addLeaguePoints,
-              leaderboardSignal: () => leaderboardSignal.leaderboardChanged(),
-              audit: (adminId, action, entity, entityId, detail, meta) =>
-                Promise.resolve(
-                  typeof audit === 'function'
-                    ? audit(adminId, action, entity, entityId,
-                        typeof detail === 'string' ? detail : JSON.stringify(detail || {}), meta || {})
-                    : null,
-                ).catch(() => {}),
-            }).catch((e) => {
-              console.error('[serverReview] pending verify failed:', e?.message || e);
-            });
-          }, 1500);
+          // ── فاز ۴: بازبینیِ خودکارِ سرور، خارج از مسیر پاسخ ──
+          //
+          // عکسِ کامل روی دیسک مانده. کمی بعد (تا پاسخ کاربر برود) سرور با
+          // مدلِ خودش (چهره+بصری) پرونده را دوباره می‌سنجد؛ اگر پراطمینان بود
+          // خودکار تأیید می‌شود، وگرنه در صفِ ادمین می‌ماند. خطای این پردازش
+          // نباید ثبت را بشکند؛ پس فقط لاگ می‌شود.
+          {
+            const pendingId = insertSub.rows[0].id;
+            setTimeout(() => {
+              serverReviewQueue.reviewOne(pool, pendingId, {
+                addLeaguePoints,
+                leaderboardSignal: () => leaderboardSignal.leaderboardChanged(),
+                audit: (adminId, action, entity, entityId, detail, meta) =>
+                  Promise.resolve(
+                    typeof audit === 'function'
+                      ? audit(adminId, action, entity, entityId,
+                          typeof detail === 'string' ? detail : JSON.stringify(detail || {}), meta || {})
+                      : null,
+                  ).catch(() => {}),
+              }).catch((e) => {
+                console.error('[serverReview] pending verify failed:', e?.message || e);
+              });
+            }, 1500);
+          }
         }
 
         // ── گامِ ۳: تأیید خودکار ──
