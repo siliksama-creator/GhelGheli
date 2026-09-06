@@ -1057,15 +1057,22 @@ module.exports = function createPhotoCardRoutes(deps) {
               replayed: true,
             };
           }
-          // pending/reserved → در حال بررسی.
-          return {
-            status: 'pending',
-            reason: row.review_reason,
-            submissionId: row.id,
-            replayed: true,
-            message: 'این کد از قبل در حال بررسی است و محفوظ است. نیازی به '
-              + 'ارسال دوباره نیست؛ نتیجه پس از بررسی به شما اطلاع داده می‌شود.',
-          };
+          // pending → واقعاً در صف بررسی است (کد reserved)؛ نتیجه را تکرار می‌کنیم.
+          if (row.status === 'pending') {
+            return {
+              status: 'pending',
+              reason: row.review_reason,
+              submissionId: row.id,
+              replayed: true,
+              message: 'این کد از قبل در حال بررسی است و محفوظ است. نیازی به '
+                + 'ارسال دوباره نیست؛ نتیجه پس از بررسی به شما اطلاع داده می‌شود.',
+            };
+          }
+          // rejected → آن پرونده قبلاً رد شده و کد آزاد شده (unused) است؛ کاربر
+          // می‌تواند دوباره ثبت کند. اینجا **نباید** چیزی برگردانیم (وگرنه کاربر
+          // بی‌دلیل «در حال بررسی» می‌دید در حالی‌که چیزی در صف نیست). null یعنی
+          // ادامهٔ جریان عادیِ ثبت.
+          return null;
         };
 
         if (!photoCards.isValidPhotoCode(code)) {
