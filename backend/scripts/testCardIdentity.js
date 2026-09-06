@@ -143,6 +143,25 @@ ok('نمرهٔ بالا ولی حاشیهٔ کم (۰.۰۰۵) قاطع نمی‌�
   !highTie.found,
   `margin=${highTie.margin?.toFixed(3)}`);
 
+console.log('\\n== رگرسیونِ واقعی: متنِ OCRِ بی‌ربط روی پشت، بردارِ قوی را خرد نکند ==');
+// عکسِ پشتِ رودری با دوربینِ متوسط: بردار رودری ۰.۷۶۲، رقبا ~۰.۶۷؛ OCR چند
+// واژهٔ پرتی دارد که نامِ هیچ بازیکنی را واقعاً نمی‌خواند (nameIdentity صفر).
+// قبلاً فیوژنِ متن، نمره را به ۰.۳۳۵ و حاشیه را به ۰.۰۱۶ می‌رساند و به صف می‌رفت.
+const backRodri = ci.rankIdentity(
+  // توکن‌های OCRِ روی پشت: برند/کلماتِ عمومی، نه نام بازیکن.
+  { textTokens: ['panini', 'fifa', 'club'], embedding: BASE, embeddingVersion: 2 },
+  [
+    { id: 'rodri', card_type_id: 'T-RODRI', playerLexemes: ['rodrigo', 'hernández'],
+      embedding: vecAtCos(BASE, 0.762), embeddingVersion: 2 },
+    { id: 'haaland', card_type_id: 'T-HAALAND', playerLexemes: ['erling', 'haaland'],
+      embedding: vecAtCos(BASE, 0.679), embeddingVersion: 2 },
+    { id: 'salah', card_type_id: 'T-SALAH', playerLexemes: ['mohamed', 'salah'],
+      embedding: vecAtCos(BASE, 0.670), embeddingVersion: 2 },
+  ]);
+ok('بردار قویِ رودری با متنِ OCRِ بی‌ربط قاطع می‌ماند (مسیر بردار خام)',
+  backRodri.found && backRodri.design.card_type_id === 'T-RODRI',
+  `found=${backRodri.found} score=${backRodri.score?.toFixed(3)} margin=${backRodri.margin?.toFixed(3)} embedOnly=${backRodri.embedOnly}`);
+
 console.log('\n== تصمیم یکپارچه (decideSubmission با هویت) ==');
 const foundRodri = { found: true, decisive: true, score: 0.95, design: designs[1], byText: true, byEmbedding: false };
 const foundHaaland = { found: true, decisive: true, score: 0.95, design: designs[0], byText: true, byEmbedding: false };
