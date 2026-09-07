@@ -12,23 +12,30 @@ const cardDuel = require('./rules/cardDuel');
 // یک ردیف) was also retired on the owner's request — it contributed little
 // and duplicated Reversi's two-player-tactics slot. جفت‌یاب (memory) puts
 // purpose-made 3D football icons on a 3D card-flip and rewards real skill
-// (a match keeps your turn). It is the one game with NO bot: you either meet
-// a real opponent or play solo time-attack.
+// (a match keeps your turn).
+//
+// نکته دربارهٔ ربات جفت‌یاب: جفت‌یاب در مسابقهٔ **جدّی** حریفِ کامپیوتریِ
+// حریص ندارد (حریفِ با حافظهٔ کامل خوش نمی‌گذرد)، ولی برای اینکه کاربرِ
+// تنها نماند، دو مسیر دارد: حالت تک‌نفرهٔ time-attack و یک **رباتِ تمرینیِ
+// نرم‌تر** (فقط در اتاقِ تمرین، حافظهٔ کوتاه + خطای عمدی — جزئیات در
+// rules/memory.js، PRACTICE_BOT_MEMORY). پس فیلدِ `noBot:false` عمدی است.
 const RULES = { memory, penalty, card_duel: cardDuel };
 
-// Public catalogue served over REST so the app never hardcodes the list.
+// کاتالوگِ عمومی از طریق REST سرو می‌شود. ترتیب این آرایه عمداً **همان
+// ترتیبی است که هر دو کلاینت در هابِ بازی رندر می‌کنند**
+// (userweb/src/games.jsx و mobile/.../games_page.dart): ضربه‌زن، پنالتی،
+// دوئل کارت‌ها، جفت‌یاب.
+//
+// ⚠️ واقعیتِ معماری (دورِ ۲۶ اصلاح شد): کلاینت‌ها هاب‌شان را به‌خاطر
+//    دارایی/رنگ/توضیحِ مخصوصِ هر پلتفرم به‌صورت محلی فهرست می‌کنند و
+//    این endpoint عمدتاً مرجعِ متادیتا/سلامت است (و تستِ testE2E آن را
+//    می‌خواند). برای همین ترتیب و مجموعه باید اینجا با فهرستِ کلاینت‌ها
+//    هماهنگ بماند؛ اگر بازی‌ای اضافه/حذف/جابه‌جا شد، هر سه‌جا را با هم
+//    به‌روز کن (این فایل + هاب وب + هاب اندروید).
 const CATALOG = [
   {
-    id: 'memory', title: 'جفت‌یاب', emoji: 'card',
-    subtitle: 'جفت‌ها را به خاطر بسپار و ببر', accent: '#A855F7', minutes: 4,
-    // No computer opponent here — real rival, or solo against the clock.
-    noBot: false, solo: true,
-  },
-  {
     // Single-player: no lobby, no socket room, no rules file — it lives
-    // entirely in the clients plus the signed-progress endpoint. Listed here
-    // anyway so the catalogue stays the ONE description of what is playable;
-    // a hub that hardcodes its own list drifts the moment a game is added.
+    // entirely in the clients plus the signed-progress endpoint.
     id: 'tap', title: 'ضربه‌زن', emoji: 'fist',
     subtitle: '۵۰ لول ضربه بزن و شخصیت‌ها را باز کن', accent: '#84CC16',
     minutes: 3,
@@ -36,10 +43,7 @@ const CATALOG = [
   },
   {
     // پنالتی عمداً **بعد از** ضربه‌زن است — درخواست مالک: «بازی پنالتی
-    // باید پایین ضربه زن باشه». ترتیب این آرایه همان ترتیبی است که
-    // کاربر در فهرست بازی‌ها می‌بیند؛ هر دو کلاینت از همین می‌خوانند و
-    // فهرست خودشان را هاردکد نمی‌کنند، پس جای درستِ تغییر چیدمان
-    // همین‌جاست.
+    // باید پایین ضربه زن باشه».
     id: 'penalty', title: 'ضربات پنالتی', emoji: 'football',
     subtitle: 'یکی می‌زند، یکی می‌گیرد', accent: '#38BDF8', minutes: 4,
     noBot: false, solo: false,
@@ -49,6 +53,13 @@ const CATALOG = [
     subtitle: 'پنج راند زنده با کارت‌های کلکسیونی',
     accent: '#FFD166', minutes: 2,
     noBot: false, solo: false,
+  },
+  {
+    id: 'memory', title: 'جفت‌یاب', emoji: 'card',
+    subtitle: 'جفت‌ها را به خاطر بسپار و ببر', accent: '#A855F7', minutes: 4,
+    // مسابقهٔ جدّی فقط با حریف واقعی؛ برای بازیِ تنها، رباتِ تمرینیِ نرم یا
+    // time-attack تک‌نفره هست.
+    noBot: false, solo: true,
   },
 ];
 
