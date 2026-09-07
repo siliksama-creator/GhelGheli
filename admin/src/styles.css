@@ -868,6 +868,28 @@ table.data-table {
   .report-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+  /* C2: روی لمس، هدفِ ضربه باید دست‌کم ۴۴×۴۴ باشد (راهنمای دسترس‌پذیری
+     اپل/اندروید). دکمه‌های آیکونیِ فرم/جدول با padding 10px روی دسکتاپ
+     خوب‌اند ولی روی گوشی ~۳۸px می‌شدند و ریز بود. فقط در حالت موبایل
+     بزرگ‌شان می‌کنیم تا چیدمان دسکتاپ دست نخورد. */
+  .btn-icon {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .data-table tbody td .row-actions .btn-icon,
+  .btn-sm.btn-icon {
+    min-width: 40px;
+    min-height: 40px;
+  }
+  /* C4 (جزئی): ردیفِ ویرایشِ پلهٔ pass روی گوشیِ باریک (~۳۶۰px) با
+     min-width:300px سرریز افقی می‌ساخت؛ اجازهٔ جمع‌شدن بده. */
+  .tier-edit {
+    min-width: 0;
+    flex-wrap: wrap;
+  }
 }
 
 /* Support ticket attachments */
