@@ -131,8 +131,32 @@ ok(/کارت تو/.test(mobile) && /کارت تو/.test(web)
   'Android/Web: هر کارت و عدد با مالک صریح «تو/ربات/حریف» نمایش داده می‌شود');
 ok(/scoreFromHistory/.test(service) && /scoreAfter/.test(service),
   'اسکوربورد و snapshot هر راند از history حکم‌ها مشتق می‌شوند');
-ok(/logicVersion:\s*2/.test(service) && /logicVersion:\s*2/.test(read('backend/src/games/rules/cardDuel.js')),
-  'قرارداد شفاف منطق نسخهٔ ۲ در موتور و snapshot اعلام می‌شود');
+// نسخهٔ منطق: پیش‌فرض/پرچم‌خاموش باید ۲ باشد و طوفان (پرچم روشن) نسخهٔ ۳.
+// این را به‌جای رجکسِ شکننده روی سورس، روی رفتار واقعیِ موتور می‌سنجیم تا
+// هم قرارداد شفاف بماند و هم طوفان نتواند نسخهٔ کلاسیک را عوض کند.
+{
+  const duel = require('../src/services/cardDuelService');
+  const deck = (tag, base) => Array.from({ length: 5 }, (_, i) => card(`${tag}${i}`, base + i));
+  const classic = rules.createFromDecks(deck('cx', 70), deck('co', 66), { seed: 'lv-classic', mayhem: false });
+  for (let r = 0; r < 5; r += 1) {
+    rules.applyMove(classic, { cardId: classic.remaining.X[0] }, 'X');
+    rules.applyMove(classic, { cardId: classic.remaining.O[0] }, 'O');
+  }
+  const storm = rules.createFromDecks(deck('sx', 70), deck('so', 66), { seed: 'lv-storm', mayhem: true });
+  for (let r = 0; r < 5; r += 1) {
+    rules.applyMove(storm, { cardId: storm.remaining.X[0] }, 'X');
+    rules.applyMove(storm, { cardId: storm.remaining.O[0] }, 'O');
+  }
+  const classicPublic = rules.publicState(classic, 'X');
+  const stormPublic = rules.publicState(storm, 'X');
+  ok(classic.history.every(h => h.logicVersion === 2),
+    'منطق نسخهٔ ۲: با پرچم خاموش همهٔ راندها logicVersion=2 دارند');
+  ok(storm.history.every(h => h.logicVersion === 3) && stormPublic.logicVersion === 3,
+    'منطق نسخهٔ ۳: با پرچم روشن راندها و snapshot نسخهٔ ۳ را اعلام می‌کنند');
+  ok(classicPublic.logicVersion === 2 && classicPublic.roundModAnnounce === null
+    && classic.history.every(h => h.mod === undefined && h.awardX === undefined),
+    'قرارداد شفاف منطق نسخهٔ ۲ در موتور و snapshot اعلام می‌شود');
+}
 ok(/resolvedWinner/.test(mobileSession) && /resolvedWinner/.test(webSession)
   && /finishReason/.test(mobileSession) && /finishReason/.test(webSession),
   'Android/Web: برد با قطع اتصال به صاحب واقعی نتیجه نگاشت می‌شود');
