@@ -203,9 +203,14 @@ class ApiClient {
     try {
       final sp = await SharedPreferences.getInstance();
       token = sp.getString('token');
-      // کلیدهای ادمینِ نسخه‌های قدیمی را همین‌جا پاک می‌کنیم.
-      await sp.remove('isAdmin');
-      await sp.remove('adminRole');
+      // کلیدهای ادمینِ نسخه‌های قدیمی را همین‌جا پاک می‌کنیم. این پاک‌سازی
+      // «بهترین تلاش» است: اگر به هر دلیلی نوشتن روی حافظه خطا داد (یا در
+      // تست mock پیاده نشده)، نباید خواندنِ توکن را بکُشد و کاربر را بی‌دلیل
+      // از حساب خارج کند.
+      try {
+        await sp.remove('isAdmin');
+        await sp.remove('adminRole');
+      } catch (_) {/* بی‌خیالِ پاک‌سازیِ کلید قدیمی */}
     } catch (e) {
       // بدترین حالت: کاربر یک بار دیگر وارد می‌شود.
       token = null;
