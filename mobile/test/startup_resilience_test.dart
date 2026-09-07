@@ -69,7 +69,6 @@ void main() {
       await expectLater(api.loadToken(), completes);
       // و به حالتِ امنِ «وارد نشده» می‌رود، نه یک حالتِ نیمه‌کاره.
       expect(api.token, isNull);
-      expect(api.isAdmin, isFalse);
     });
 
     test('در حالت عادی توکن را درست می‌خواند', () async {
@@ -78,6 +77,8 @@ void main() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(channel, (call) async {
         if (call.method == 'getAll') {
+          // کلید isAdmin از نسخه‌های قدیمی می‌تواند روی دستگاه مانده باشد؛
+          // اپ کاربری دیگر آن را نمی‌خواند و نباید چیزی بشکند.
           return <String, Object>{
             'flutter.token': 'tok-123',
             'flutter.isAdmin': true,
@@ -89,7 +90,6 @@ void main() {
       final api = ApiClient();
       await api.loadToken();
       expect(api.token, 'tok-123');
-      expect(api.isAdmin, isTrue);
     });
 
     test('نبودِ توکن یعنی وارد نشده، نه خطا', () async {
@@ -102,7 +102,6 @@ void main() {
       final api = ApiClient();
       await api.loadToken();
       expect(api.token, isNull);
-      expect(api.isAdmin, isFalse);
     });
   });
 

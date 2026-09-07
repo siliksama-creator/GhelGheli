@@ -10,8 +10,6 @@ import 'package:ghelgheli_mobile/screens/user/games/private_match_dialog.dart';
 import 'package:ghelgheli_mobile/screens/user/league_page.dart';
 import 'package:ghelgheli_mobile/screens/user/chat_page.dart';
 import 'package:ghelgheli_mobile/screens/user/games_page.dart';
-import 'package:ghelgheli_mobile/screens/admin/admin_notifications.dart';
-import 'package:ghelgheli_mobile/screens/admin/admin_rewards.dart';
 import 'package:ghelgheli_mobile/widgets/ui_icon.dart';
 
 class _MockUniversalAdapter implements HttpClientAdapter {
@@ -63,29 +61,7 @@ class _MockUniversalAdapter implements HttpClientAdapter {
       );
     }
 
-    if (path == '/api/admin/rewards') {
-      return ResponseBody.fromString(
-        '[]',
-        200,
-        headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
-      );
-    }
-
-    if (path == '/api/admin/reward-claims') {
-      return ResponseBody.fromString(
-        '[]',
-        200,
-        headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
-      );
-    }
-
-    if (path == '/api/admin/reward-groups') {
-      return ResponseBody.fromString(
-        '{"groups":[]}',
-        200,
-        headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
-      );
-    }
+    // (مسیرهای /api/admin/rewards* حذف شدند: پنل ادمین از اپ موبایل رفت.)
 
     return ResponseBody.fromString(
       '{"ok":true,"message":"عملیات موفق"}',
@@ -269,28 +245,6 @@ void main() {
     });
   });
 
-  group('[2028 Battery] ۶. چک پنل ادمین اعلان‌های هدفمند و جوایز', () {
-    testWidgets('پنل اعلان‌های هدفمند با سگمنت‌ها بدون باگ رندر می‌شود', (tester) async {
-      final api = ApiClient();
-      api.dio.httpClientAdapter = _MockUniversalAdapter();
-
-      await tester.pumpWidget(_wrap(AdminNotifications(api: api)));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-
-      expect(find.text('استودیوی اعلان‌های هدفمند'), findsOneWidget);
-      expect(find.text('همه کاربران فعال'), findsOneWidget);
-    });
-
-    testWidgets('پنل ثبت جوایز با اعتبارسنجی مقادیر بدون خطا کار می‌کند', (tester) async {
-      final api = ApiClient();
-      api.dio.httpClientAdapter = _MockUniversalAdapter();
-
-      await tester.pumpWidget(_wrap(AdminRewards(api: api)));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-
-      expect(find.text('گروه‌های جایزه'), findsOneWidget);
-    });
-  });
+  // گروهِ «۶. چک پنل ادمین» عمداً حذف شد: پنل ادمین از اپ موبایل حذف شده
+  // (docs/ADMIN_PANEL_MOBILE_RETIREMENT.md) و آن صفحات دیگر وجود ندارند.
 }
