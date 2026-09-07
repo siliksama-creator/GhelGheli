@@ -89,11 +89,18 @@ async function getSessions() {
     if (!o || !dir) { _disabled = true; return null; }
     try {
       // لاگ‌های پُرسروصدای گرافِ onnx را خفه می‌کنیم.
-      try { o.env.logLevel = '3'; } catch { /* بی‌خیال */ }
+      // نکته: در onnxruntime-node پراپرتیِ درست `env.logSeverityLevel` (عددی)
+      // است؛ `env.logLevel = '3'` رشته‌ایِ نامعتبر است و نادیده گرفته می‌شود و
+      // هشدارهای C++ (مثل «Initializer ... appears in graph inputs») باز هم چاپ
+      // می‌شوند. سطحِ ۳ = ERROR تا WARNINGها لاگِ مانیتورینگ را پر نکنند.
+      // همین گزینه را به خودِ InferenceSession هم می‌دهیم چون لاگرِ C++ هنگامِ
+      // بارگذاریِ گراف، پیش از مقداردهیِ سراسریِ بعضی نسخه‌ها پیام می‌دهد.
+      try { o.env.logSeverityLevel = 3; } catch { /* بی‌خیال */ }
+      const sessOpts = { executionProviders: ['cpu'], logSeverityLevel: 3, logVerbosityLevel: -1 };
       const [det, rec, card] = await Promise.all([
-        o.InferenceSession.create(path.join(dir, 'yunet.onnx'), { executionProviders: ['cpu'] }),
-        o.InferenceSession.create(path.join(dir, 'sface.onnx'), { executionProviders: ['cpu'] }),
-        o.InferenceSession.create(path.join(dir, 'card_embed_mobilenetv3.onnx'), { executionProviders: ['cpu'] }),
+        o.InferenceSession.create(path.join(dir, 'yunet.onnx'), sessOpts),
+        o.InferenceSession.create(path.join(dir, 'sface.onnx'), sessOpts),
+        o.InferenceSession.create(path.join(dir, 'card_embed_mobilenetv3.onnx'), sessOpts),
       ]);
       return { o, det, rec, card };
     } catch {
