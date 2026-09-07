@@ -819,8 +819,8 @@ class _CardDuelPageState extends State<CardDuelPage> {
               && liveRule('duelMayhemStage', 0) >= 1
               ? Column(
                   children: [
-                    _MayhemLegend(onHelp: () => _openMayhemIntro()),
-                    const Gaps.vXs,
+                    _MayhemLegend(onHelp: _openMayhemIntro),
+                    Gaps.vXs,
                   ],
                 )
               : const SizedBox.shrink(),
