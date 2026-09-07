@@ -12,8 +12,12 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'api_client.dart';
 import 'screens/auth/auth_screen.dart';
 import 'screens/auth/splash_screen.dart';
-import 'screens/admin/admin_shell.dart';
 import 'screens/user/home_shell.dart';
+// پوستهٔ ادمین عمداً import نشده: مدیریت فقط با پنل وب ادمین است و کد
+// `lib/screens/admin/` از این اپ حذف شده. اگر روزی اپ ادمینِ داخلی خواستید،
+// صفحات را از تاریخچهٔ گیت برگردان و اینجا پشتِ فلگِ `kIncludeAdmin` وصل کن
+// (پیش‌فرض false؛ با --dart-define=INCLUDE_ADMIN=true روشن می‌شود). جزئیات:
+// docs/ADMIN_PANEL_MOBILE_RETIREMENT.md.
 import 'screens/user/games/game_audio.dart';
 import 'core/app_config.dart';
 import 'core/deep_links.dart';
@@ -211,8 +215,10 @@ class _GhelGheliAppState extends State<GhelGheliApp> {
           ? const SplashScreen()
           : api.token == null
           ? AuthScreen(api: api, onDone: _refresh)
-          : api.isAdmin
-          ? AdminShell(api: api, onLogout: _logout)
+          // پنل ادمین از اپ موبایل حذف شده — مدیریت فقط با پنل وب است
+          // (`docs/ADMIN_PANEL_MOBILE_RETIREMENT.md`). حتی اگر توکنِ ادمین
+          // در حافظه مانده باشد، اپ همیشه پوستهٔ کاربر را نشان می‌دهد؛ هیچ
+          // مسیری به پوستهٔ ادمین نمی‌رود (کد ادمین در بیلد tree-shake شد).
           : HomeShell(api: api, onLogout: _logout),
     );
   }

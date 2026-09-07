@@ -27,13 +27,12 @@ class ApiClient {
   ));
 
   String? token;
-  bool isAdmin = false;
-  // نقشِ ادمینِ واردشده ('super_admin' | 'support' | 'observer'). فقط
-  // برای پنهان‌کردنِ صفحه/دکمه‌هایی است که بک‌اند در هر صورت ۴۰۳ می‌دهد؛
-  // منبعِ حقیقتِ دسترسی سرور است. پیش‌فرض super_admin تا برای نشست‌های
-  // قدیمی (که نقشی ذخیره نکرده‌اند) چیزی پنهان نشود.
-  String adminRole = 'super_admin';
-  bool get isSuperAdmin => adminRole == 'super_admin';
+  // (حذف شد) isAdmin / adminRole / isSuperAdmin: اپ موبایل هیچ سطح ادمینی
+  // ندارد و مدیریت فقط از پنل وب ادمین است — این فلگ‌ها فقط پنل ادمینِ
+  // حذف‌شده را تغذیه می‌کردند. کلیدهای قدیمی `isAdmin`/`adminRole` در
+  // SharedPreferences بی‌ضررند و پاک‌شان هم می‌شوند؛ سمت سرور توکن کاربر
+  // عادی، دسترسی ادمینی ندارد.
+  // (docs/ADMIN_PANEL_MOBILE_RETIREMENT.md)
 
   /// صدا زده می‌شود وقتی سرور می‌گوید توکن دیگر معتبر نیست (۴۰۱).
   ///
@@ -81,8 +80,6 @@ class ApiClient {
     // ولی حافظه را همین حالا تمیز می‌کنیم تا درخواست بعدی توکن مرده را
     // نفرستد.
     token = null;
-    isAdmin = false;
-    adminRole = 'super_admin';
     _getCache.clear();
     // ⚠️ کشِ ETag هم باید برود. اگر نرود، کاربرِ بعدی که وارد می‌شود
     // `If-None-Match` نفرِ قبلی را می‌فرستد و سرور ۳۰۴ می‌دهد — یعنی
@@ -93,6 +90,8 @@ class ApiClient {
     _lastGood.clear();
     SharedPreferences.getInstance().then((sp) {
       sp.remove('token');
+      // کلیدهای ادمینِ باقی‌مانده از نسخه‌های قدیمی را هم پاک می‌کنیم تا
+      // اثری روی دستگاه نماند.
       sp.remove('isAdmin');
       sp.remove('adminRole');
     }).catchError((_) => null);
@@ -204,35 +203,29 @@ class ApiClient {
     try {
       final sp = await SharedPreferences.getInstance();
       token = sp.getString('token');
-      isAdmin = sp.getBool('isAdmin') ?? false;
-      adminRole = sp.getString('adminRole') ?? 'super_admin';
+      // کلیدهای ادمینِ نسخه‌های قدیمی را همین‌جا پاک می‌کنیم.
+      await sp.remove('isAdmin');
+      await sp.remove('adminRole');
     } catch (e) {
       // بدترین حالت: کاربر یک بار دیگر وارد می‌شود.
       token = null;
-      isAdmin = false;
-      adminRole = 'super_admin';
       debugPrint('loadToken failed, continuing signed-out: $e');
     }
   }
 
-  Future<void> saveToken(String t,
-      {bool admin = false, String? role}) async {
+  Future<void> saveToken(String t) async {
     // ورود با حساب دیگر یعنی هر پاسخِ کش‌شده مال شخص اشتباهی است.
     invalidateCache();
     token = t;
-    isAdmin = admin;
-    if (admin && role != null && role.isNotEmpty) adminRole = role;
-    if (!admin) adminRole = 'super_admin';
     final sp = await SharedPreferences.getInstance();
     await sp.setString('token', t);
-    await sp.setBool('isAdmin', admin);
-    await sp.setString('adminRole', adminRole);
+    // نرمال‌سازی نصب‌های قدیمی: هیچ نشانهٔ ادمینی روی اپ کاربری نمی‌ماند.
+    await sp.remove('isAdmin');
+    await sp.remove('adminRole');
   }
 
   Future<void> logout() async {
     token = null;
-    isAdmin = false;
-    adminRole = 'super_admin';
     final sp = await SharedPreferences.getInstance();
     await sp.remove('token');
     await sp.remove('isAdmin');
@@ -677,12 +670,8 @@ class ApiClient {
     return res.data['url'].toString();
   }
 
-  Future<String> uploadAdminImage(String filePath) async {
-    final form =
-        FormData.fromMap({'image': await MultipartFile.fromFile(filePath)});
-    final res = await dio.post('/api/admin/uploads/image', data: form);
-    return res.data['url'].toString();
-  }
+  // `uploadAdminImage` (POST /api/admin/uploads/image) حذف شد: اپ موبایل
+  // پنل ادمین ندارد؛ آپلودهای ادمینی از پنل وب ادمین انجام می‌شوند.
 
   /// ارسال فایل **به‌همراه فیلدهای متنی** به یک مسیر دلخواه.
   ///

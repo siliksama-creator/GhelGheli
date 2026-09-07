@@ -8,12 +8,14 @@ import '../../widgets/gradient_panel.dart';
 import '../../widgets/animated_logo.dart';
 import '../../core/app_config.dart';
 
-/// Unified login / register / admin-login screen.
+/// صفحهٔ ورود / ثبت‌نام کاربر.
 ///
-/// Functional contract preserved 1:1 from the legacy implementation:
+/// حالت ورود ادمین عمداً حذف شده: مدیریت فقط از پنل وب ادمین انجام می‌شود و
+/// اپ موبایل هیچ سطح ادمینی ندارد (docs/ADMIN_PANEL_MOBILE_RETIREMENT.md).
+///
+/// قراردادهای کاربر که ۱:۱ حفظ شده‌اند:
 /// - login:     POST /api/auth/login            {mobile, password}
 /// - register:  POST /api/auth/register-password {mobile, password, nickname, profileAvatarKey}
-/// - admin:     POST /api/admin/auth/login       {username, password}
 class AuthScreen extends StatefulWidget {
   final ApiClient api;
   final VoidCallback onDone;
@@ -23,10 +25,13 @@ class AuthScreen extends StatefulWidget {
   State<AuthScreen> createState() => _AuthScreenState();
 }
 
-enum _AuthMode { login, register, admin }
+// حالت ادمین عمداً حذف شده: مدیریت فقط از پنل وب ادمین است و اپ موبایل
+// پنل ادمین ندارد (docs/ADMIN_PANEL_MOBILE_RETIREMENT.md). این صفحه فقط
+// ورود و ثبت‌نامِ کاربر را انجام می‌دهد.
+enum _AuthMode { login, register }
 
 class _AuthScreenState extends State<AuthScreen> {
-  final _mobile = TextEditingController(text: 'Admin');
+  final _mobile = TextEditingController();
   final _pass = TextEditingController();
   final _name = TextEditingController();
   final _currentPassword = TextEditingController();
@@ -101,15 +106,6 @@ class _AuthScreenState extends State<AuthScreen> {
   Future<void> _submit() async {
     await _run(() async {
       switch (_mode) {
-        case _AuthMode.admin:
-          final r = await widget.api.post('/api/admin/auth/login', {
-            'username': _mobile.text.trim(),
-            'password': _pass.text,
-          });
-          final adminInfo = r is Map && r['admin'] is Map ? r['admin'] as Map : null;
-          await widget.api.saveToken(r['token'],
-              admin: true, role: adminInfo?['role']?.toString());
-          break;
         case _AuthMode.register:
           final r = await widget.api.post('/api/auth/register-password', {
             'mobile': normalizeMobileInput(_mobile.text),
@@ -156,14 +152,7 @@ class _AuthScreenState extends State<AuthScreen> {
       _mode = mode;
       _needsCurrentPassword = false;
       _currentPassword.clear();
-      if (mode == _AuthMode.admin) {
-        _mobile.text = 'Admin';
-        _pass.clear();
-      } else if (_mobile.text == 'Admin') {
-        _mobile.clear();
-      }
       _errorMessage = null;
-
     });
   }
 
@@ -239,7 +228,6 @@ class _AuthScreenState extends State<AuthScreen> {
                     onSubmit: () {
                       if (_formKey.currentState?.validate() ?? true) _submit();
                     },
-                    onQuickAdmin: () => _setMode(_AuthMode.admin),
                     referralSpins: _referralSpins,
                   ),
                 ),
@@ -267,7 +255,6 @@ class _AuthGlassCard extends StatelessWidget {
   final VoidCallback onToggleObscure;
   final ValueChanged<_AuthMode> onModeChanged;
   final VoidCallback onSubmit;
-  final VoidCallback onQuickAdmin;
   final int referralSpins;
 
   const _AuthGlassCard({
@@ -285,11 +272,9 @@ class _AuthGlassCard extends StatelessWidget {
     required this.onToggleObscure,
     required this.onModeChanged,
     required this.onSubmit,
-    required this.onQuickAdmin,
     this.referralSpins = 3,
   });
 
-  bool get isAdmin => mode == _AuthMode.admin;
   bool get isRegister => mode == _AuthMode.register;
 
   @override
@@ -356,16 +341,13 @@ class _AuthGlassCard extends StatelessWidget {
                   TextFormField(
                     controller: mobile,
                     style: const TextStyle(color: Colors.white),
-                    keyboardType:
-                        isAdmin ? TextInputType.text : TextInputType.phone,
+                    keyboardType: TextInputType.phone,
                     validator: (v) => (v == null || v.trim().isEmpty)
                         ? 'این فیلد الزامی است'
                         : null,
                     decoration: _fieldDecoration(
-                      icon: isAdmin
-                          ? Icons.admin_panel_settings_rounded
-                          : Icons.phone_android_rounded,
-                      label: isAdmin ? 'نام کاربری مدیر' : 'شماره موبایل',
+                      icon: Icons.phone_android_rounded,
+                      label: 'شماره موبایل',
                     ),
                   ),
                   if (isRegister) ...[
@@ -468,15 +450,11 @@ class _AuthGlassCard extends StatelessWidget {
             ),
             Gaps.vLg,
             FilledButton.icon(
-              icon: Icon(isAdmin
-                  ? Icons.dashboard_customize_rounded
-                  : Icons.login_rounded),
+              icon: const Icon(Icons.login_rounded),
               onPressed: loading ? null : onSubmit,
               style: FilledButton.styleFrom(
-                backgroundColor:
-                    isAdmin ? const Color(0xFF1C78FF) : const Color(0xFF00D49A),
-                foregroundColor:
-                    isAdmin ? Colors.white : const Color(0xFF00281D),
+                backgroundColor: const Color(0xFF00D49A),
+                foregroundColor: const Color(0xFF00281D),
               ),
               label: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 3),
@@ -487,22 +465,9 @@ class _AuthGlassCard extends StatelessWidget {
                         child: CircularProgressIndicator(
                             strokeWidth: 2.4, color: Colors.white),
                       )
-                    : Text(isAdmin
-                        ? 'ورود به مدیریت'
-                        : isRegister
-                            ? 'ساخت حساب'
-                            : 'ورود به قلقلی'),
+                    : Text(isRegister ? 'ساخت حساب' : 'ورود به قلقلی'),
               ),
             ),
-            if (!isAdmin) ...[
-              Gaps.vXs,
-              TextButton.icon(
-                onPressed: onQuickAdmin,
-                style: TextButton.styleFrom(foregroundColor: Colors.white70),
-                icon: const Icon(Icons.bolt_rounded, size: 18),
-                label: const Text('ورود مدیر تست با نام کاربری Admin'),
-              ),
-            ],
             AnimatedSwitcher(
               duration: Motion.fast,
               child: errorMessage == null
@@ -581,7 +546,6 @@ class _ModeSwitcher extends StatelessWidget {
           _segment(context, _AuthMode.login, 'ورود', Icons.login_rounded),
           _segment(context, _AuthMode.register, 'ثبت‌نام',
               Icons.person_add_alt_1_rounded),
-          _segment(context, _AuthMode.admin, 'مدیر', Icons.shield_rounded),
         ],
       ),
     );
