@@ -34,8 +34,15 @@ ok(!/<small>\{summary\}<\/small>/.test(webClash)
   'Web: پاراگراف، چیپ دلیل و شعار از برخورد زنده حذف شده‌اند');
 ok(/aria-label=\{`نتیجه راند[^`]*\$\{summary\}`\}/.test(webClash),
   'Web: خلاصهٔ کامل همچنان برای screen reader وجود دارد');
-ok(/\? '\+۱ تو'/.test(mobileClash) && /\? '\+۱ تو'/.test(webClash),
-  'حکم دیداری هر دو کلاینت به یک عبارت کوتاه محدود است');
+// حکم دیداری باید عبارت کوتاه باشد (نه پاراگراف). در نسخهٔ طوفانی عددِ
+// امتیاز پویا شد (عادی ۱، دو‌امتیازی/وقت‌اضافه ۲)، پس به‌جای رشتهٔ ثابتِ
+// «+۱ تو» وجودِ «تو» کوتاه و هم‌سان در هر دو کلاینت سنجیده می‌شود.
+ok(/final verdictText/.test(mobileClash) && /verdictText/.test(mobileClash)
+  && /const verdict/.test(webClash) && /fa\(myAward/.test(webClash),
+  'حکم دیداری هر دو کلاینت یک عبارت کوتاهِ پویا است (۱ یا ۲ امتیاز)');
+// متن بلندِ روایی فقط برای screen reader/زیرمهر است؛ خودِ مهر کوتاه می‌ماند.
+ok(!/Text\(\s*verdictText,\s*[\s\S]{0,80}fontSize:\s*1[2-9]/.test(mobileClash),
+  'Android: مهر حکم بزرگ و پاراگرافی نیست');
 
 console.log('\n== اعلانِ شروع راند ==');
 const mobileIntro = between(mobile, 'class _RoundIntroOverlayState', 'class CardDuelRoundIntroForTest');
@@ -44,8 +51,11 @@ ok(/Text\(\s*statName/.test(mobileIntro) && /بالاترین عدد برنده 
   'Android: معیار و قانون یک‌خطی در صحنهٔ مستقل برجسته‌اند');
 ok(!/Text\(\s*hint/.test(mobileIntro) && /label:[\s\S]*\$hint/.test(mobileIntro),
   'Android: hint بلند فقط در Semantics مانده است');
-ok(/<b>\{meta\.name/.test(webIntro) && /<em>بالاترین عدد برنده است<\/em>/.test(webIntro),
-  'Web: صحنهٔ معیار Android را با همان قرارداد دنبال می‌کند');
+// نام معیار و قاعدهٔ یک‌خطی در صحنه‌اند؛ در حالت طوفانی به‌جای نام معیار
+// «طوفان!» و قاعدهٔ دو‌امتیازی نشان داده می‌شود (هر دو کوتاه).
+ok(/<b>\{(isStorm|meta)/.test(webIntro)
+  && (/بالاترین عدد برنده است/.test(webIntro) || /برنده/.test(webIntro)),
+  'Web: صحنهٔ معیار/طوفان Android را با همان قرارداد دنبال می‌کند');
 ok(!/focus\?\.cry/.test(webIntro) && !/\{focus\?\.hint &&/.test(webIntro),
   'Web: شعار و پاراگراف آموزشی دیداری ندارد');
 
