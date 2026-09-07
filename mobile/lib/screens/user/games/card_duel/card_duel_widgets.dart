@@ -354,11 +354,11 @@ class _MayhemLegend extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(item.$2, size: 15, color: const Color(0xFFFFB066)),
+                    Icon(item.$1, size: 15, color: const Color(0xFFFFB066)),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        item.$3,
+                        item.$2,
                         style: const TextStyle(
                           fontSize: 11.5,
                           height: 1.55,
