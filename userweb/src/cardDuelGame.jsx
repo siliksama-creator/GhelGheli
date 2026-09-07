@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { asset, avatarUrl, fa, req } from './lib/api.js';
+import { useLive, ruleNumber } from './lib/liveConfig.js';
 import { primeImageCache } from './lib/imageCache.js';
 import { useGameSession } from './gameSession.js';
 import { selectionClick } from './haptics.js';
@@ -36,6 +37,32 @@ const rarityColor = rarity => ({
   legend: '#FF6B35', premium: '#A855F7', gold: '#F7C948',
   silver: '#C7D2FE', normal: '#22E7A6',
 }[rarity] || '#22E7A6');
+
+// ── افسانهٔ همیشگیِ «دوئل طوفان» ───────────────────────────────────────
+// فقط وقتی پرچمِ زنده روشن است رندر می‌شود (rules.duelMayhem === 1)؛ با پرچم
+// خاموش هیچ متن طوفانی روی صفحه نیست. زیرِ نوار «قوانین» می‌نشیند و سه مفهوم
+// تازه را به‌زبانِ آشنا و با همان آیکون‌های بازی توضیح می‌دهد:
+// راند دو‌امتیازی (شعله)، وقت اضافه (ساعت)، شانس روز (شبدر).
+function MayhemLegend() {
+  useLive();
+  const mayhemOn = Number(ruleNumber('duelMayhem', 0)) === 1;
+  if (!mayhemOn) return null;
+  const items = [
+    { icon: 'flame', text: 'در راند دو‌امتیازی برنده ۲ امتیاز می‌برد' },
+    { icon: 'clock', text: 'تساویِ آن راند وقت اضافه دارد؛ با قدرت کل ترکیب' },
+    { icon: 'clover', text: 'شانس روز روی کارت: سبز به سودت، قرمز به ضررت' },
+  ];
+  return (
+    <details className="duelMayhemLegend" open>
+      <summary><b>قانون دوئل طوفان</b></summary>
+      <ul>
+        {items.map(it => (
+          <li key={it.icon}><SvgIcon name={it.icon} size={14} /><span>{it.text}</span></li>
+        ))}
+      </ul>
+    </details>
+  );
+}
 
 function modeCopy({ stake, vsBot, roomCode, initialStart }) {
   if (vsBot) return { title: 'تمرین با ربات', subtitle: 'رایگان و بدون جابه‌جایی امتیاز', color: '#22E7A6', icon: 'robot' };
@@ -914,6 +941,7 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
           <i>›</i><div><span>۳</span><b>۵ راند</b></div>
         </div>
       </details>
+      <MayhemLegend />
       <Lineup selected={selected} cards={cards} toggle={toggle} />
       {/* ── چرا وقتی هیچ کارتی انتخاب نشده پنهان است ──
           «تحلیل بالانس ترکیب» دربارهٔ ترکیبی حرف می‌زند که هنوز وجود

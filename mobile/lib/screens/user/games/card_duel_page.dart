@@ -72,6 +72,8 @@ class _CardDuelPageState extends State<CardDuelPage> {
   bool _sharing = false;
   String? _error;
   Map<String, dynamic>? _data;
+  // دوئل طوفان (پرچم زندهٔ duelMayhem)؛ پیش‌فرض خاموش تا config بگوید.
+  bool _mayhem = false;
   final List<String> _selected = [];
   int _prewarmedRoundCount = -1;
   bool _didReloadFinishedBattle = false;
@@ -194,8 +196,21 @@ class _CardDuelPageState extends State<CardDuelPage> {
           .where((id) => id.isNotEmpty)
           .take(5)
           .toList();
+      // پرچم زندهٔ دوئل طوفان را هم بخوان (پیش‌فرض خاموش). شکستش بی‌سر و صدا
+      // است تا اگر config دیر رسید، تجربهٔ کلاسیک بماند.
+      var mayhem = false;
+      try {
+        final cfg = await widget.api.get('/api/config');
+        if (cfg is Map) {
+          final rules = (cfg['rules'] is Map) ? cfg['rules'] as Map : const {};
+          mayhem = '${rules['duelMayhem'] ?? 0}' == '1';
+        }
+      } catch (_) {
+        mayhem = false;
+      }
       setState(() {
         _data = map;
+        _mayhem = mayhem;
         if (refreshSelection && !_started) {
           _selected
             ..clear()
@@ -754,6 +769,9 @@ class _CardDuelPageState extends State<CardDuelPage> {
           subtitle: 'پنج کارت، انتخاب مخفی، پنج راند',
           child: _RuleStrip(),
         ),
+        // افسانهٔ دوئل طوفان فقط وقتی پرچم زنده روشن است رندر می‌شود.
+        if (_mayhem) const _MayhemLegend(),
+        if (_mayhem) Gaps.vXs,
         Gaps.vXs,
         _DeckIntelPanel(
           activeInsights: activeInsights,

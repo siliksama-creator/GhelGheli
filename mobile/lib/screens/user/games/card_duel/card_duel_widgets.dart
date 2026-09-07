@@ -302,6 +302,79 @@ class _RuleStep extends StatelessWidget {
       );
 }
 
+/// افسانهٔ همیشگیِ «دوئل طوفان» — فقط وقتی پرچم زنده روشن است روی صفحهٔ
+/// پیش از بازی می‌آید و سه مفهوم تازه را به‌زبانِ آشنا و با همان آیکون‌های
+/// بازی توضیح می‌دهد (شعله = راند دو‌امتیازی، ساعت = وقت اضافه، شبدر = شانس روز).
+class _MayhemLegend extends StatelessWidget {
+  const _MayhemLegend();
+
+  static const List<(IconData, String)> _items = [
+    (Icons.local_fire_department_rounded,
+        'در راند دو‌امتیازی برنده ۲ امتیاز می‌برد'),
+    (Icons.timer_rounded,
+        'تساویِ آن راند وقت اضافه دارد؛ قدرت کل ترکیب تعیین می‌کند'),
+    (Icons.eco_rounded,
+        'شانس روز روی کارت است: سبز به سودت، قرمز به ضررت'),
+  ];
+
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.only(top: Gaps.xs),
+        padding: const EdgeInsets.all(Gaps.sm),
+        decoration: BoxDecoration(
+          borderRadius: Corners.rLg,
+          gradient: const LinearGradient(
+            colors: [Color(0x1FFF7A1A), Color(0x1438BDF8)],
+          ),
+          border: Border.all(color: const Color(0x59FF7A1A)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.local_fire_department_rounded,
+                    size: 16, color: Color(0xFFFFB066)),
+                SizedBox(width: 6),
+                Text(
+                  'قانون دوئل طوفان',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFFFFB066),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            for (final item in _items)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 7),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(item.$2, size: 15, color: const Color(0xFFFFB066)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        item.$3,
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          height: 1.55,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFFE7F2FB),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      );
+}
+
 class _LineupPanel extends StatelessWidget {
   const _LineupPanel({
     required this.selected,
