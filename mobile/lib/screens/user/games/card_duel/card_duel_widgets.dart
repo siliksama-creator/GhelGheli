@@ -1563,7 +1563,7 @@ class _ClashStageState extends State<_ClashStage>
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w900,
-                                    fontSize: 10.5,
+                                    fontSize: 11,
                                   ),
                                 ),
                               ),
@@ -1656,7 +1656,7 @@ class _ClashStageState extends State<_ClashStage>
                                       textAlign: TextAlign.center,
                                       style: const TextStyle(
                                         color: Color(0xFFE7F2FB),
-                                        fontSize: 10.5,
+                                        fontSize: 11,
                                         height: 1.5,
                                         fontWeight: FontWeight.w800,
                                       ),

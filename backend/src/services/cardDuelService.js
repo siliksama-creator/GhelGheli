@@ -1,6 +1,10 @@
 const crypto = require('crypto');
 const { faDigits } = require('../lib/faNum');
 const { pool } = require('../config/db');
+// قانونِ زندهٔ پرچم طوفان (duelMayhem) — با requireِ تنبل در تابع هم می‌توانست
+// باشد ولی ماژول سطح‌بارگذاری حلقه‌ای ندارد (liveContent به این سرویس وابسته
+// نیست)، پس requireِ مستقیم امن‌تر و ساده‌تر است.
+const liveContent = require('./liveContent');
 
 // پنج راند = حس یک مسابقه واقعی، نه یک برخورد سه‌ثانیه‌ای.
 // هر راند یک ویژگی متفاوت را می‌سنجد تا قوی‌ترین کارت همیشه برنده نباشد.
