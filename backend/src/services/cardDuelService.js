@@ -1456,9 +1456,10 @@ async function botBattle(userId, ids = null) {
   if (userCards.length !== DECK_SIZE) { const e = new Error('اول ترکیب پنج‌کارتی را آماده کن'); e.status = 400; throw e; }
   const opponentCards = botDeck(userCards);
   const seed = `bot:${userId}:${Date.now()}`;
-  // تمرین هم از همان قانونِ زنده می‌خواند تا قبل از rollout آنلاین، طوفان
-  // اول در تمرین دیده و آزموده شود (پلهٔ اول rollout).
-  const mayhem = Number(liveContent.rules().duelMayhem) === 1;
+  // تمرین هم از همان قانونِ زنده می‌خواند: در مرحلهٔ ۱ rollout فقط تمرین
+  // طوفانی می‌شود (vsBot=true) تا قبل از روشن‌کردن آنلاین، مکانیک دیده و
+  // آزموده شود. قاعدهٔ واحد در liveContent.duelMayhemEnabled است.
+  const mayhem = liveContent.duelMayhemEnabled({ vsBot: true, stake: 0 });
   const sim = simulate(userCards, opponentCards, { opponentName: 'ربات تمرینی', seed, mayhem });
   // تمرین با ربات تاریخچه نمی‌سازد؛ جدول فقط نبرد امتیازی را نگه می‌دارد.
   return {

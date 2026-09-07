@@ -162,6 +162,49 @@ async function main() {
   ok(close < 0.78, `اختلافِ کم (۳) نزدیک ۵۰/۵۰ می‌ماند`, `X=${(close * 100).toFixed(1)}٪`);
   ok(far >= 0.85, `اختلافِ زیاد (۲۰) قوی‌تر ≥۸۵٪ می‌برد`, `X=${(far * 100).toFixed(1)}٪`);
 
+  // ── ۷) گیتِ rollout پلکانی (پرچم + مرحله) ────────────────────────────
+  console.log('\n== ۷. گیتِ مرحلهٔ روشن‌سازی (تمرین ← بی‌سهام ← سهامی) ==');
+  const liveContent = require('../src/services/liveContent');
+  const gate = liveContent.mayhemGateFor;
+  // پرچم خاموش در هر مرحله‌ای خاموش است (برگشتِ اضطراری).
+  for (const stage of [0, 1, 2, 3]) {
+    assert.strictEqual(gate({ flag: 0, stage, vsBot: true, stake: 0 }), false,
+      `پرچم خاموش مرحله ${stage} تمرین را روشن نمی‌کند`);
+    assert.strictEqual(gate({ flag: 0, stage, vsBot: false, stake: 100 }), false,
+      `پرچم خاموش مرحله ${stage} سهامی را روشن نمی‌کند`);
+  }
+  ok(true, 'پرچم خاموش = خاموشِ کامل در هر مرحله‌ای (برگشت اضطراری)');
+  // پرچم روشن، مرحله ۰: هیچ‌جا.
+  assert.strictEqual(gate({ flag: 1, stage: 0, vsBot: true }), false, 'مرحله ۰ تمرین خاموش');
+  assert.strictEqual(gate({ flag: 1, stage: 0, vsBot: false, stake: 0 }), false, 'مرحله ۰ آنلاین خاموش');
+  assert.strictEqual(gate({ flag: 1, stage: 0, vsBot: false, stake: 5 }), false, 'مرحله ۰ سهامی خاموش');
+  ok(true, 'مرحله ۰ با پرچم روشن هم هیچ‌جا طوفان نیست');
+  // مرحله ۱: فقط تمرین.
+  assert.strictEqual(gate({ flag: 1, stage: 1, vsBot: true }), true, 'مرحله ۱ تمرین روشن');
+  assert.strictEqual(gate({ flag: 1, stage: 1, vsBot: false, stake: 0 }), false, 'مرحله ۱ آنلاین خاموش');
+  assert.strictEqual(gate({ flag: 1, stage: 1, vsBot: false, stake: 5 }), false, 'مرحله ۱ سهامی خاموش');
+  ok(true, 'مرحله ۱ فقط تمرین با ربات طوفانی است');
+  // مرحله ۲: تمرین + آنلاین بی‌سهام.
+  assert.strictEqual(gate({ flag: 1, stage: 2, vsBot: true }), true, 'مرحله ۲ تمرین روشن');
+  assert.strictEqual(gate({ flag: 1, stage: 2, vsBot: false, stake: 0 }), true, 'مرحله ۲ آنلاین بی‌سهام روشن');
+  assert.strictEqual(gate({ flag: 1, stage: 2, vsBot: false, stake: 5 }), false, 'مرحله ۲ سهامی خاموش');
+  ok(true, 'مرحله ۲ تمرین و آنلاینِ بدون سهام روشن، سهامی خاموش');
+  // مرحله ۳: همه‌جا.
+  assert.strictEqual(gate({ flag: 1, stage: 3, vsBot: true }), true, 'مرحله ۳ تمرین روشن');
+  assert.strictEqual(gate({ flag: 1, stage: 3, vsBot: false, stake: 0 }), true, 'مرحله ۳ آنلاین روشن');
+  assert.strictEqual(gate({ flag: 1, stage: 3, vsBot: false, stake: 99 }), true, 'مرحله ۳ سهامی روشن');
+  ok(true, 'مرحله ۳ همه‌جا (شامل سهامی) روشن است');
+  // عددِ نامعتبرِ مرحله به ۰ می‌چسبد (امنیت پنل).
+  assert.strictEqual(gate({ flag: 1, stage: 99, vsBot: true }), false, 'مرحلهٔ نامعتبر = خاموش');
+  assert.strictEqual(gate({ flag: 1, stage: -2, vsBot: true }), false, 'مرحلهٔ منفی = خاموش');
+  ok(true, 'مرحلهٔ خارج از بازه (۹۹ یا منفی) طوفان را روشن نمی‌کند');
+  // قاعده در RULE_DEFS ثبت است تا /api/config و پنل آن را بشناسند.
+  const defs = liveContent.RULE_DEFS;
+  assert.ok(defs.duelMayhem && defs.duelMayhemStage, 'هر دو قانون در RULE_DEFS ثبت‌اند');
+  assert.strictEqual(defs.duelMayhemStage.min, 0);
+  assert.strictEqual(defs.duelMayhemStage.max, 3);
+  ok(true, 'duelMayhemStage با بازهٔ [0, 3] در RULE_DEFS ثبت است (پنل و /api/config می‌شناسند)');
+
   console.log(`\n✅ ${pass} نگهبانِ دوئل طوفان موفق بود`);
 }
 

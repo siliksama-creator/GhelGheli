@@ -91,7 +91,12 @@ const RULE_DEFS = Object.freeze({
   duelMayhem: {
     value: 0, min: 0, max: 1,
     label: 'دوئل طوفان (راند دو‌امتیازی و وقت اضافه)',
-    hint: '۰ = خاموش (داوری نسخهٔ ۲ مثل قبل). ۱ = روشن: در هر نبرد یک‌دو راند دو‌امتیازیِ «طوفانی» اعلام می‌شود و تساویِ آن به وقت اضافه می‌رود. برگشت به همین صفر است.',
+    hint: '۰ = خاموش کامل (داوری نسخهٔ ۲ مثل قبل). ۱ = روشن؛ دامنهٔ روشن‌بودن با «مرحلهٔ روشن‌سازی دوئل طوفان» کنترل می‌شود تا rollout پلکانی بدون دیپلوی ممکن باشد. برگشتِ اضطراری همین صفر است.',
+  },
+  duelMayhemStage: {
+    value: 0, min: 0, max: 3,
+    label: 'مرحلهٔ روشن‌سازی دوئل طوفان',
+    hint: '۰ = هیچ‌جا (حتی با پرچم روشن). ۱ = فقط تمرین با ربات. ۲ = تمرین + نبرد آنلاین بدون سهام. ۳ = همه‌جا شامل نبرد سهامی. پلکانِ پیشنهادی: اول ۱ (یک هفته دادهٔ تمرین)، بعد ۲، آخر ۳.',
   },
 });
 
@@ -380,6 +385,36 @@ function copy() {
   return whiteMerge(DEFAULT_COPY, stored);
 }
 
+/**
+ * داوریِ روشن‌بودنِ دوئل طوفان برای یک نبرد مشخص.
+ *
+ * یک منبعِ واحد برای engine (نبرد زنده) و cardDuelService (تمرین با ربات)
+ * تا rollout پلکانی فقط به دو عددِ پنل بند باشد:
+ *   پرچم duelMayhem (کلید اصلی) + مرحله duelMayhemStage (دامنه):
+ *     مرحله ۰: هیچ‌جا روشن نیست (حتی با پرچم ۱).
+ *     مرحله ۱: فقط تمرین با ربات (vsBot).
+ *     مرحله ۲: تمرین + نبردِ انسانیِ بدونِ سهام.
+ *     مرحله ۳: همه‌جا شامل نبرد سهامی.
+ * پرچم خاموش در هر مرحله‌ای = خاموش (برگشتِ اضطراری بدون دیپلوی).
+ */
+function mayhemGateFor({ flag, stage, vsBot = false, stake = 0 }) {
+  // نسخهٔ خالص (بدون وابستگی به کش) تا تست‌ها مستقیم داوری کنند.
+  // دفاع‌در‌عمق: حتی اگر مقدارِ خام (خارج از rules() کلَمپ‌شده) برسد،
+  // عدد خارج از بازهٔ [0,3] خاموش تلقی می‌شود.
+  if (Number(flag) !== 1) return false;
+  const s = Number(stage);
+  if (!Number.isInteger(s) || s < 0 || s > 3) return false;
+  if (s >= 3) return true;                           // همه‌جا
+  if (vsBot) return s >= 1;                          // تمرین با ربات
+  if (Number(stake) > 0) return false;               // نبرد سهامی فقط مرحله ۳
+  return s >= 2;                                     // آنلاین بدون سهام
+}
+
+function duelMayhemEnabled({ vsBot = false, stake = 0 } = {}) {
+  const r = rules();
+  return mayhemGateFor({ flag: r.duelMayhem, stage: r.duelMayhemStage, vsBot, stake });
+}
+
 /** نسخهٔ کنفِرایگ — هر ذخیرهٔ متن/عدد بالا می‌برد. */
 function configVersion() {
   const n = Number(opsConfig.syncGet(VERSION_KEY));
@@ -607,7 +642,7 @@ function preview(vars = {}) {
 module.exports = {
   COPY_KEY, RULES_KEY, VERSION_KEY, HISTORY_KEEP,
   RULE_DEFS, DEFAULT_COPY, COPY_CONTRACT,
-  rules, copy, configVersion, fillTemplate,
+  rules, copy, configVersion, fillTemplate, duelMayhemEnabled, mayhemGateFor,
   sanitizeRules, saveRules, sanitizeCopy, saveCopy,
   history, historyView, revert, bumpConfigVersion, defaultsView,
   panelView, preview,

@@ -6285,3 +6285,22 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 .duelMayhemLegend ul{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:7px}
 .duelMayhemLegend li{display:flex;align-items:flex-start;gap:8px;font-size:11.5px;line-height:1.6;color:#e7f2fb;font-weight:700}
 .duelMayhemLegend li svg{flex:none;margin-top:2px;color:#ffb066}
+
+/* ── آموزشِ بار اولِ دوئل طوفان (پرچم زنده) ───────────────────────────── */
+.duelMayhemIntroOverlay{position:fixed;inset:0;z-index:1200;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(8,14,24,.72);backdrop-filter:blur(6px);animation:duelMayhemFade .22s ease}
+@keyframes duelMayhemFade{from{opacity:0}to{opacity:1}}
+.duelMayhemIntroCard{width:min(440px,100%);max-height:86vh;overflow:auto;border-radius:24px;padding:22px 20px 18px;background:linear-gradient(160deg,#141c2b,#101724);border:1px solid rgba(255,122,26,.4);box-shadow:0 24px 70px rgba(0,0,0,.55),0 0 46px rgba(255,122,26,.14)}
+.duelMayhemIntroHead{display:grid;justify-items:center;text-align:center;gap:4px;color:#ffb066}
+.duelMayhemIntroHead h2{margin:6px 0 0;font-size:19px;font-weight:900;color:#fff}
+.duelMayhemIntroHead p{margin:0;font-size:12.5px;color:#9fb4c9}
+.duelMayhemIntroBody{display:grid;gap:12px;margin:16px 2px 14px}
+.duelMayhemIntroItem{display:flex;gap:11px;align-items:flex-start}
+.duelMayhemIntroIcon{flex:none;width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:rgba(255,255,255,.06)}
+.duelMayhemIntroItem b{display:block;font-size:13.5px;color:#eef6ff}
+.duelMayhemIntroItem p{margin:3px 0 0;font-size:12px;line-height:1.75;color:#a9bdcf;font-weight:600}
+.duelMayhemIntroTip{display:flex;gap:8px;align-items:flex-start;margin:2px 0 0;padding:10px 12px;border-radius:14px;background:rgba(34,231,166,.08);border:1px solid rgba(34,231,166,.25);font-size:11.5px;line-height:1.7;color:#8fe6c4;font-weight:700}
+.duelMayhemIntroTip svg{flex:none;margin-top:2px;color:#22E7A6}
+.duelMayhemIntroGo{width:100%;padding:13px;border:0;border-radius:16px;font:inherit;font-size:14px;font-weight:900;color:#1a0f00;background:linear-gradient(135deg,#FF9A3D,#FF7A1A);cursor:pointer;box-shadow:0 10px 26px rgba(255,122,26,.35)}
+.duelMayhemIntroGo:active{transform:translateY(1px)}
+.duelMayhemLegendHelp{margin-right:auto;padding:2px 10px;border-radius:999px;border:1px solid rgba(255,122,26,.4);background:rgba(255,122,26,.1);color:#ffb066;font:inherit;font-size:10.5px;font-weight:800;cursor:pointer}
+.duelMayhemLegend>summary{display:flex;align-items:center;gap:8px}

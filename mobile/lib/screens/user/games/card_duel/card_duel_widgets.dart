@@ -306,7 +306,10 @@ class _RuleStep extends StatelessWidget {
 /// پیش از بازی می‌آید و سه مفهوم تازه را به‌زبانِ آشنا و با همان آیکون‌های
 /// بازی توضیح می‌دهد (شعله = راند دو‌امتیازی، ساعت = وقت اضافه، شبدر = شانس روز).
 class _MayhemLegend extends StatelessWidget {
-  const _MayhemLegend();
+  const _MayhemLegend({this.onHelp});
+
+  /// با ضربهٔ «راهنما» همان آموزش بار اول دوباره باز می‌شود.
+  final VoidCallback? onHelp;
 
   static const List<(IconData, String)> _items = [
     (Icons.local_fire_department_rounded,
@@ -332,19 +335,43 @@ class _MayhemLegend extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Row(
+            Row(
               children: [
-                Icon(Icons.local_fire_department_rounded,
+                const Icon(Icons.local_fire_department_rounded,
                     size: 16, color: Color(0xFFFFB066)),
-                SizedBox(width: 6),
-                Text(
-                  'قانون دوئل طوفان',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFFFFB066),
+                const SizedBox(width: 6),
+                const Expanded(
+                  child: Text(
+                    'قانون دوئل طوفان',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFFFB066),
+                    ),
                   ),
                 ),
+                if (onHelp != null)
+                  GestureDetector(
+                    onTap: onHelp,
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0x1AFF7A1A),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: const Color(0x66FF7A1A)),
+                      ),
+                      child: const Text(
+                        'راهنما',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFFFFB066),
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: 8),
@@ -373,6 +400,183 @@ class _MayhemLegend extends StatelessWidget {
           ],
         ),
       );
+}
+
+/// آموزشِ یک‌صفحه‌ایِ بار اولِ دوئل طوفان (bottom sheet). فقط وقتی از صفحه
+/// صدا زده می‌شود که طوفان در تمرین فعال است (پرچم=۱ و مرحله≥۱)؛ با پرچم
+/// خاموش هیچ‌وقت باز نمی‌شود. متن‌ها آینهٔ وب‌اند (همان چهار کارت).
+class _MayhemIntroSheet extends StatelessWidget {
+  const _MayhemIntroSheet();
+
+  static const List<(IconData, Color, String, String)> _cards = [
+    (
+      Icons.local_fire_department_rounded,
+      Color(0xFFFF7A1A),
+      'راند دو‌امتیازی',
+      'در هر نبرد ۱ تا ۲ راند با علامت شعله اعلام می‌شود؛ برندهٔ آن راند به‌جای ۱، ۲ امتیاز می‌گیرد.'
+    ),
+    (
+      Icons.timer_rounded,
+      Color(0xFF38BDF8),
+      'وقت اضافه',
+      'اگر راند دو‌امتیازی مساوی شود، کارتی مصرف نمی‌شود؛ قدرتِ کلِ ترکیبِ هر دو طرف سنجیده می‌شود و برنده همان ۲ امتیاز را می‌برد.'
+    ),
+    (
+      Icons.eco_rounded,
+      Color(0xFF22E7A6),
+      'شانس روز',
+      'روی هر کارت عددی سبز (به سودت) یا قرمز (به ضررت) می‌نشیند. میانگین شانس صفر است؛ در راندهای طوفانی کمی بزرگ‌تر می‌شود ولی کارتِ خیلی قوی‌تر هرگز نمی‌بازد.'
+    ),
+    (
+      Icons.sports_soccer_rounded,
+      Color(0xFFF7C948),
+      'قانون قدیم پابرجاست',
+      'بقیهٔ راندها مثل همیشه ۱ امتیازی‌اند؛ همان ۵ کارت، همان انتخاب مخفی، همان ۵ راند. طوفان فقط فرصتِ جبران و فاصله‌گرفتن است.'
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
+        decoration: const BoxDecoration(
+          color: Color(0xFF141C2B),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+          border: Border.fromBorderSide(BorderSide(color: Color(0x66FF7A1A))),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 44, height: 4,
+                  margin: const EdgeInsets.only(bottom: 14),
+                  decoration: BoxDecoration(
+                    color: const Color(0x559FB4C9),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+                const Icon(Icons.local_fire_department_rounded,
+                    size: 30, color: Color(0xFFFFB066)),
+                const SizedBox(height: 8),
+                const Text(
+                  'دوئل طوفان رسید!',
+                  style: TextStyle(
+                    fontSize: 19, fontWeight: FontWeight.w900, color: Colors.white),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'همان بازی همیشگی، با چند راندِ آتشین‌تر',
+                  style: TextStyle(fontSize: 12.5, color: Color(0xFF9FB4C9)),
+                ),
+                const SizedBox(height: 16),
+                for (final c in _cards)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 38, height: 38,
+                          margin: const EdgeInsets.only(left: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0x0FFFFFFF),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(c.$1, size: 20, color: c.$2),
+                        ),
+                        const SizedBox(width: 11),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                c.$3,
+                                style: const TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFFEEF6FF),
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                c.$4,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  height: 1.7,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFFA9BDCF),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                Container(
+                  padding: const EdgeInsets.all(11),
+                  margin: const EdgeInsets.only(bottom: 14),
+                  decoration: BoxDecoration(
+                    color: const Color(0x1422E7A6),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0x4022E7A6)),
+                  ),
+                  child: const Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.auto_awesome_rounded,
+                          size: 15, color: Color(0xFF22E7A6)),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'نکته: راند دو‌امتیازی پیش از قفلِ انتخاب اعلام می‌شود؛ کارتِ قویِ هماهنگ با تمرکزِ همان راند را نگه دار.',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            height: 1.7,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF8FE6C4),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFFF7A1A),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: const Text(
+                      'فهمیدم، بریم طوفان!',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF1A0F00),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _LineupPanel extends StatelessWidget {

@@ -6,6 +6,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
@@ -117,6 +118,60 @@ class _CardDuelPageState extends State<CardDuelPage> {
     // اول کهنه را رسم کن (صفر انتظار)، بعد در پس‌زمینه تازه کن.
     _paintCached();
     unawaited(_load());
+    // آموزشِ بار اولِ طوفان فقط وقتی طوفان در *تمرین* فعال است (مرحله ۱+)؛
+    // نبرد زنده خودش state.mayhem دارد و افسانه فقط همان‌جا ظاهر می‌شود.
+    unawaited(_maybeShowMayhemIntro());
+  }
+
+  static const String _mayhemIntroSeenKey = 'duelMayhemIntroSeen';
+
+  Future<void> _openMayhemIntro() async {
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => const _MayhemIntroSheet(),
+      );
+    } catch (_) {
+      return;
+    }
+    try {
+      final sp = await SharedPreferences.getInstance();
+      await sp.setBool(_mayhemIntroSeenKey, true);
+    } catch (_) {}
+  }
+
+  Future<void> _maybeShowMayhemIntro() async {
+    // صبر تا config زنده برسد (AppConfig از مسیرهای دیگر پر می‌شود).
+    for (var i = 0; i < 20; i++) {
+      if (AppConfig.instance.ready) break;
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    }
+    if (!mounted) return;
+    if (liveRule('duelMayhem', 0) != 1 || liveRule('duelMayhemStage', 0) < 1) return;
+    bool seen = false;
+    try {
+      final sp = await SharedPreferences.getInstance();
+      seen = sp.getBool(_mayhemIntroSeenKey) == true;
+    } catch (_) {
+      seen = false;
+    }
+    if (seen || !mounted) return;
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => const _MayhemIntroSheet(),
+      );
+    } catch (_) {
+      return; // صفحه بسته شد؛ بی‌سر و صدا.
+    }
+    try {
+      final sp = await SharedPreferences.getInstance();
+      await sp.setBool(_mayhemIntroSeenKey, true);
+    } catch (_) {}
   }
 
   void _onSession() {
@@ -761,10 +816,11 @@ class _CardDuelPageState extends State<CardDuelPage> {
         ListenableBuilder(
           listenable: AppConfig.instance,
           builder: (context, _) => liveRule('duelMayhem', 0) == 1
-              ? const Column(
+              && liveRule('duelMayhemStage', 0) >= 1
+              ? Column(
                   children: [
-                    _MayhemLegend(),
-                    Gaps.vXs,
+                    _MayhemLegend(onHelp: () => _openMayhemIntro()),
+                    const Gaps.vXs,
                   ],
                 )
               : const SizedBox.shrink(),

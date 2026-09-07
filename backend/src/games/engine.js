@@ -808,8 +808,10 @@ async function startRoom(io, rules, gameId, a, b, stake, matchMode = null) {
   // از همین می‌خوانند تا دیاگرامِ بازی ثابت بماند؛ برای rollout پلکانی
   // (تمرین ← آنلاین بدون سهام ← با سهام) کافی است همین را با matchMode/
   // stake ترکیب کنیم. فعلاً یک سوییچِ سراسری است که پیش‌فرض خاموش است.
+  // مرحلهٔ rollout (تمرین ← آنلاین بی‌سهام ← سهامی) از پنل و بدون دیپلوی
+  // کنترل می‌شود؛ قاعدهٔ واحد در liveContent.duelMayhemEnabled است.
   const duelMayhemOn = gameId === 'card_duel'
-    && Number(liveContent.rules().duelMayhem) === 1;
+    && liveContent.duelMayhemEnabled({ vsBot, stake: s });
 
   // Personalized games (currently card duel) validate and snapshot both
   // decks BEFORE reserving stake. If a deck is invalid, no points have moved.

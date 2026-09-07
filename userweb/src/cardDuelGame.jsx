@@ -38,30 +38,106 @@ const rarityColor = rarity => ({
   silver: '#C7D2FE', normal: '#22E7A6',
 }[rarity] || '#22E7A6');
 
-// ── افسانهٔ همیشگیِ «دوئل طوفان» ───────────────────────────────────────
-// فقط وقتی پرچمِ زنده روشن است رندر می‌شود (rules.duelMayhem === 1)؛ با پرچم
-// خاموش هیچ متن طوفانی روی صفحه نیست. زیرِ نوار «قوانین» می‌نشیند و سه مفهوم
-// تازه را به‌زبانِ آشنا و با همان آیکون‌های بازی توضیح می‌دهد:
-// راند دو‌امتیازی (شعله)، وقت اضافه (ساعت)، شانس روز (شبدر).
-function MayhemLegend() {
+// ── افسانهٔ همیشگیِ «دوئل طوفان» + آموزش بار اول ───────────────────────
+// فقط وقتی پرچمِ زنده روشن است رندر می‌شود که طوفان در *همین* تجربه فعال
+// باشد: تمرین با ربات از مرحلهٔ ۱ rollout و نبرد زنده از روی خودِ state
+// (game.mayhem). با پرچم خاموش یا مرحلهٔ نرسیده، هیچ متن طوفانی روی صفحه
+// نیست. زیرِ نوار «قوانین» می‌نشیند و سه مفهوم تازه را به‌زبانِ آشنا و با
+// همان آیکون‌های بازی توضیح می‌دهد: راند دو‌امتیازی (شعله)، وقت اضافه
+// (ساعت)، شانس روز (شبدر).
+const MAYHEM_INTRO_KEY = 'duelMayhemIntroSeen';
+
+// تمرین از مرحلهٔ ۱ به طوفان می‌رسد؛ نبرد انسانی بدون/با سهام از مرحلهٔ ۲/۳.
+// روی صفحهٔ آماده‌سازی فقط تجربه‌ای را تبلیغ می‌کنیم که همین الان فعال است.
+function mayhemPracticeOn() {
+  return Number(ruleNumber('duelMayhem', 0)) === 1
+    && Number(ruleNumber('duelMayhemStage', 0)) >= 1;
+}
+
+function MayhemIntro({ open, onClose }) {
+  if (!open) return null;
+  const cards = [
+    { icon: 'flame', color: '#FF7A1A', title: 'راند دو‌امتیازی',
+      text: 'در هر نبرد ۱ تا ۲ راند با علامت شعله اعلام می‌شود؛ برندهٔ آن راند به‌جای ۱، ۲ امتیاز می‌گیرد.' },
+    { icon: 'clock', color: '#38BDF8', title: 'وقت اضافه',
+      text: 'اگر راند دو‌امتیازی مساوی شود، کارتی مصرف نمی‌شود؛ قدرتِ کلِ ترکیبِ هر دو طرف با هم مقایسه می‌شود و برنده همان ۲ امتیاز را می‌برد.' },
+    { icon: 'clover', color: '#22E7A6', title: 'شانس روز',
+      text: 'روی هر کارت عددی سبز (به سودت) یا قرمز (به ضررت) می‌نشیند. شانس میانگینش صفر است؛ در راندهای طوفانی کمی بزرگ‌تر می‌شود ولی هرگز کارتِ خیلی قوی‌تر را بازنده نمی‌کند.' },
+    { icon: 'swords', color: '#F7C948', title: 'قانون قدیم پابرجاست',
+      text: 'بقیهٔ راندها مثل همیشه ۱ امتیازی‌اند؛ همان ۵ کارت، همان انتخاب مخفی، همان ۵ راند. طوفان فقط فرصتِ جبران و فاصله‌گرفتن است.' },
+  ];
+  return (
+    <div className="duelMayhemIntroOverlay" role="dialog" aria-modal="true" aria-label="آموزش دوئل طوفان" onClick={onClose}>
+      <div className="duelMayhemIntroCard" onClick={e => e.stopPropagation()}>
+        <div className="duelMayhemIntroHead">
+          <SvgIcon name="flame" size={26} />
+          <h2>دوئل طوفان رسید!</h2>
+          <p>همان بازی همیشگی، با چند راندِ آتشین‌تر</p>
+        </div>
+        <div className="duelMayhemIntroBody">
+          {cards.map(c => (
+            <div className="duelMayhemIntroItem" key={c.icon}>
+              <span className="duelMayhemIntroIcon" style={{ color: c.color }}><SvgIcon name={c.icon} size={20} /></span>
+              <div><b>{c.title}</b><p>{c.text}</p></div>
+            </div>
+          ))}
+          <p className="duelMayhemIntroTip">
+            <SvgIcon name="sparkle" size={14} />
+            نکته: راند دو‌امتیازی پیش از قفلِ انتخاب اعلام می‌شود؛ کارتِ قویِ هماهنگ با تمرکزِ همان راند را نگه دار.
+          </p>
+        </div>
+        <button type="button" className="duelMayhemIntroGo" onClick={onClose}>فهمیدم، بریم طوفان!</button>
+      </div>
+    </div>
+  );
+}
+
+function MayhemLegend({ mayhemActive = false }) {
   useLive();
-  const mayhemOn = Number(ruleNumber('duelMayhem', 0)) === 1;
-  if (!mayhemOn) return null;
+  // طوفان یا همین نبرد زنده است (state اتاق می‌گوید) یا در تمرین فعال است.
+  const show = mayhemActive || mayhemPracticeOn();
+  const [introOpen, setIntroOpen] = useState(false);
+  if (!show) return null;
+  const reopen = () => { try { localStorage.removeItem(MAYHEM_INTRO_KEY); } catch { /* خصوصی */ } setIntroOpen(true); };
   const items = [
     { icon: 'flame', text: 'در راند دو‌امتیازی برنده ۲ امتیاز می‌برد' },
     { icon: 'clock', text: 'تساویِ آن راند وقت اضافه دارد؛ با قدرت کل ترکیب' },
     { icon: 'clover', text: 'شانس روز روی کارت: سبز به سودت، قرمز به ضررت' },
   ];
   return (
-    <details className="duelMayhemLegend" open>
-      <summary><b>قانون دوئل طوفان</b></summary>
-      <ul>
-        {items.map(it => (
-          <li key={it.icon}><SvgIcon name={it.icon} size={14} /><span>{it.text}</span></li>
-        ))}
-      </ul>
-    </details>
+    <>
+      <details className="duelMayhemLegend">
+        <summary><b>قانون دوئل طوفان</b>
+          <button type="button" className="duelMayhemLegendHelp" aria-label="آموزش دوئل طوفان"
+            onClick={e => { e.preventDefault(); e.stopPropagation(); setIntroOpen(true); }}>راهنما</button>
+        </summary>
+        <ul>
+          {items.map(it => (
+            <li key={it.icon}><SvgIcon name={it.icon} size={14} /><span>{it.text}</span></li>
+          ))}
+        </ul>
+      </details>
+      <MayhemIntro open={introOpen} onClose={() => setIntroOpen(false)} />
+    </>
   );
+}
+
+// آموزشِ بار اول: فقط در صفحهٔ آماده‌سازی و فقط جایی که طوفان فعال است؛
+// بعد از یک بار دیدن/بستن، انتخاب کاربر در localStorage می‌ماند و از دکمهٔ
+// «راهنما»ی افسانه هر وقت خواست دوباره باز می‌شود.
+function MayhemFirstTimeIntro() {
+  useLive();
+  const eligible = mayhemPracticeOn();
+  const [open, setOpen] = useState(() => {
+    if (!eligible) return false;
+    try { return localStorage.getItem(MAYHEM_INTRO_KEY) !== '1'; } catch { return true; }
+  });
+  useEffect(() => {
+    if (!open) return;
+    try { localStorage.setItem(MAYHEM_INTRO_KEY, '1'); } catch { /* حالت خصوصی */ }
+  }, [open]);
+  if (!eligible) return null;
+  return <MayhemIntro open={open} onClose={() => setOpen(false)} />;
 }
 
 function modeCopy({ stake, vsBot, roomCode, initialStart }) {
@@ -941,6 +1017,7 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
           <i>›</i><div><span>۳</span><b>۵ راند</b></div>
         </div>
       </details>
+      <MayhemFirstTimeIntro />
       <MayhemLegend />
       <Lineup selected={selected} cards={cards} toggle={toggle} />
       {/* ── چرا وقتی هیچ کارتی انتخاب نشده پنهان است ──
