@@ -224,53 +224,78 @@ function RoundReveal({ round, me, myFrame, opponentFrame, opponentRole = 'حری
   const phase = useRevealPhase(round ? round.round : null);
   if (!round) return null;
   const view = roundForViewer(round, me);
-  const { mine, theirs, myPower, theirPower, mineWon, draw, contractValid } = view;
-  const outcome = draw ? 'draw' : mineWon ? 'won' : 'lost';
+  const { mine, theirs, myPower, theirPower, mineWon, draw, contractValid,
+    isStorm, overtime, myLuck, theirLuck, myAward, theirAward, mySquad, theirSquad } = view;
+  // روایتِ فارسیِ بانمک را بک‌اند می‌سازد (narrX/narrO)؛ اگر نبود (کلاسیک)
+  // مهر ساده. این تضمین می‌کند وب و اندروید یک جمله نشان دهند.
+  const narr = me === 'O' ? round.narrO : round.narrX;
+  const inOvertime = Boolean(overtime);
+  // در وقت اضافه عملاً مساویِ کارتی رخ داده ولی برنده دارد؛ پس رنگ outcome
+  // از برندهٔ نهایی می‌آید.
+  const outcome = draw && !inOvertime ? 'draw' : mineWon ? 'won' : 'lost';
   const showNumbers = phase === 'numbers' || phase === 'verdict';
   const showVerdict = phase === 'verdict';
+  const awardVal = mineWon ? myAward : theirAward;
   const verdict = !contractValid
     ? 'خطای همگام‌سازی'
-    : draw ? 'مساوی' : mineWon ? '+۱ تو' : `+۱ ${opponentRole}`;
-  const summary = draw
-    ? `عدد نهایی تو و ${opponentRole} هر دو ${fa(myPower)} شد؛ امتیازی اضافه نشد.`
-    : mineWon
-      ? `کارت تو «${mine?.name || 'بدون نام'}» با ${fa(myPower)} در برابر ${fa(theirPower)} برد.`
-      : `کارت ${opponentRole} «${theirs?.name || 'بدون نام'}» با ${fa(theirPower)} در برابر ${fa(myPower)} برد.`;
+    : inOvertime
+      ? (mineWon ? `وقت اضافه: +${fa(awardVal || 2)} تو` : `وقت اضافه: +${fa(awardVal || 2)} ${opponentRole}`)
+      : draw ? (isStorm ? 'مساوی؛ وقت اضافه' : 'مساوی')
+        : mineWon ? `+${fa(myAward || 1)} تو` : `+${fa(theirAward || 1)} ${opponentRole}`;
+  const summary = inOvertime
+    ? (mineWon
+      ? `در وقت اضافه قدرت ترکیب تو (${fa(mySquad)}) سنگین‌تر بود؛ ${fa(awardVal || 2)} امتیاز گرفتی.`
+      : `در وقت اضافه ترکیب ${opponentRole} (${fa(theirSquad)}) سنگین‌تر بود؛ ${fa(awardVal || 2)} امتیاز رفت.`)
+    : draw
+      ? (isStorm
+        ? `راند دو‌امتیازی مساوی شد؛ کار به وقت اضافه کشید.`
+        : `عدد نهایی تو و ${opponentRole} هر دو ${fa(myPower)} شد؛ امتیازی اضافه نشد.`)
+      : mineWon
+        ? `کارت تو «${mine?.name || 'بدون نام'}» با ${fa(myPower)} در برابر ${fa(theirPower)} برد${isStorm ? ' و دو امتیاز گرفت' : ''}.`
+        : `کارت ${opponentRole} «${theirs?.name || 'بدون نام'}» با ${fa(theirPower)} در برابر ${fa(myPower)} برد${isStorm ? ' و دو امتیاز گرفت' : ''}.`;
   return (
     <section
-      className={`duelClash duelClashCine ${outcome} phase-${phase}${contractValid ? '' : ' invalid'}`}
+      className={`duelClash duelClashCine ${outcome} phase-${phase}${contractValid ? '' : ' invalid'}${isStorm ? ' isStorm' : ''}${inOvertime ? ' inOvertime' : ''}`}
       key={round.round}
       data-outcome={outcome}
       aria-label={`نتیجه راند ${fa(round.round)}؛ ${summary}`}
     >
       <span className="duelImpactRing" aria-hidden="true" />
       <span className="duelImpactFlash" aria-hidden="true" />
+      {isStorm && <span className="duelStormRibbon" aria-hidden="true"><SvgIcon name="flame" size={12} /> راند دو‌امتیازی</span>}
       {showVerdict && !draw && contractValid
-        && <span className={`duelPointFlight ${mineWon ? 'mine' : 'theirs'}`} aria-hidden="true">+۱</span>}
+        && <span className={`duelPointFlight ${mineWon ? 'mine' : 'theirs'}`} aria-hidden="true">+{fa(awardVal || 1)}</span>}
+      {inOvertime && showVerdict && <span className="duelOvertimeTag"><SvgIcon name="clock" size={13} /> وقت اضافه</span>}
 
       <div className="duelClashSide mine">
         <span className={`duelSideOwner${showVerdict && mineWon ? ' winner' : ''}`}>تو</span>
         <HoloCard card={mine} compact disabled frame={myFrame}
           winner={showVerdict && mineWon} loser={showVerdict && !draw && !mineWon} />
+        <LuckChip value={myLuck} />
       </div>
 
       <div className="duelClashCore">
-        <span>{fa(round.round)} • {round.focusLabel || round.title}</span>
+        <span>{fa(round.round)} • {inOvertime ? 'وقت اضافه' : (round.focusLabel || round.title)}</span>
         <strong className="duelPowerDuel" aria-live="polite">
           <span className={`duelPowerOwner mine ${showVerdict && mineWon ? 'lead' : ''}`}>
-            <small>تو</small>
+            <small>{inOvertime ? 'ترکیب تو' : 'تو'}</small>
             <em className="duelPowerNum">
-              <CountUp value={myPower} active={showNumbers} revealed={showNumbers} />
+              <CountUp value={inOvertime ? mySquad : myPower} active={showNumbers} revealed={showNumbers} />
             </em>
           </span>
           <span className={`duelPowerOwner theirs ${showVerdict && !draw && !mineWon ? 'lead' : ''}`}>
-            <small>{opponentRole}</small>
+            <small>{inOvertime ? `ترکیب ${opponentRole}` : opponentRole}</small>
             <em className="duelPowerNum">
-              <CountUp value={theirPower} active={showNumbers} revealed={showNumbers} />
+              <CountUp value={inOvertime ? theirSquad : theirPower} active={showNumbers} revealed={showNumbers} />
             </em>
           </span>
         </strong>
         {showVerdict && <em className="duelWinnerStamp">{verdict}</em>}
+        {showVerdict && narr?.headline && (
+          <em className="duelNarrate" aria-hidden="true">
+            {narr.headline}
+          </em>
+        )}
       </div>
 
       <div className="duelClashSide theirs">
@@ -279,6 +304,7 @@ function RoundReveal({ round, me, myFrame, opponentFrame, opponentRole = 'حری
         </span>
         <HoloCard card={theirs} compact disabled frame={opponentFrame}
           winner={showVerdict && !draw && !mineWon} loser={showVerdict && mineWon} />
+        <LuckChip value={theirLuck} />
       </div>
     </section>
   );
@@ -321,9 +347,10 @@ const FOCUS_META = {
 //
 // ⚠️ `key` روی شمارهٔ راند حیاتی است: بدونِ آن React همان گره را نگه
 //    می‌دارد و انیمیشن فقط یک بار در کلِ بازی اجرا می‌شود.
-function RoundIntroOverlay({ focus, roundNumber, totalRounds }) {
+function RoundIntroOverlay({ focus, roundNumber, totalRounds, mod = null, modAnnounce = null }) {
   const stat = focus?.stat || '';
   const [visible, setVisible] = React.useState(false);
+  const isStorm = mod === 'storm';
 
   React.useEffect(() => {
     if (!stat) return undefined;
@@ -334,11 +361,14 @@ function RoundIntroOverlay({ focus, roundNumber, totalRounds }) {
 
   if (!stat || !visible) return null;
   const meta = FOCUS_META[stat] || {};
-  const color = meta.color || '#38BDF8';
+  // راند دوامتیازی هالهٔ آتشی می‌گیرد تا یک نگاه معلوم باشد «این راند دو امتیاز دارد».
+  const color = isStorm ? '#FF7A1A' : (meta.color || '#38BDF8');
   return (
-    <div className="duelRoundIntro" key={`intro-${roundNumber}-${stat}`}
+    <div className={`duelRoundIntro${isStorm ? ' isStorm' : ''}`} key={`intro-${roundNumber}-${stat}-${mod || 'normal'}`}
       style={{ '--focus-color': color }} aria-live="assertive"
-      aria-label={`راند ${roundNumber} از ${totalRounds}، معیار ${meta.name || ''}. ${focus?.hint || ''}`}>
+      aria-label={isStorm
+        ? `راند دوامتیازی! ${modAnnounce?.text || 'برنده این راند دو امتیاز می‌برد'}`
+        : `راند ${roundNumber} از ${totalRounds}، معیار ${meta.name || ''}. ${focus?.hint || ''}`}>
       {/* پرتوهای پس‌زمینه («نورِ استادیوم») + دو موجِ ضربه‌ای که در لحظهٔ
           نشستنِ مدال بیرون می‌زنند. معادلِ `_RoundIntroBackdropPainter`
           در اندروید. */}
@@ -363,17 +393,40 @@ function RoundIntroOverlay({ focus, roundNumber, totalRounds }) {
           </div>
         </div>
         <span className="duelRoundIntroIcon" aria-hidden="true">
-          <i><SvgIcon name={meta.icon || 'star'} size={15} /></i>
+          <i><SvgIcon name={isStorm ? 'flame' : (meta.icon || 'star')} size={15} /></i>
         </span>
-        <label>معیار این راند</label>
-        <b>{meta.name || ''}</b>
+        {isStorm
+          ? <label className="duelStormTag"><SvgIcon name="flame" size={13} /> راند دو‌امتیازی</label>
+          : <label>معیار این راند</label>}
+        {isStorm
+          ? <b>طوفان!</b>
+          : <b>{meta.name || ''}</b>}
+        {isStorm && <em className="duelStormAward">برنده <strong>۲</strong> امتیاز می‌برد</em>}
         <span className="duelIntroRule" aria-hidden="true" />
-        <em>بالاترین عدد برنده است</em>
+        <em>{isStorm
+          ? (modAnnounce?.sub || 'اگر مساوی شد، وقت اضافه می‌رود')
+          : 'بالاترین عدد برنده است'}</em>
         <div className="duelIntroBeats" aria-hidden="true">
           <span>۳</span><span>۲</span><span>۱</span><strong>انتخاب!</strong>
         </div>
       </div>
     </div>
+  );
+}
+
+// ── چیپ شانس (دوئل طوفان) ──────────────────────────────────────────────
+// شانس باید «دیدنی» باشد: یک چیپِ کوچکِ سبز (مثبت) یا قرمز (منفی) روی کارت.
+// در نسخهٔ کلاسیک شانس ±۶ و در طوفان ±۹/±۱۳ است؛ صفر را نشان نمی‌دهیم تا
+// شلوغ نشود. این فقط نمایشِ همان عددی است که در breakdown وارد حکم شده.
+function LuckChip({ value }) {
+  const n = num(value);
+  if (!n) return null;
+  const good = n > 0;
+  return (
+    <span className={`duelLuckChip ${good ? 'good' : 'bad'}`} aria-hidden="true">
+      <SvgIcon name="clover" size={11} />
+      <em>{good ? `+${fa(n)}` : `−${fa(Math.abs(n))}`}</em>
+    </span>
   );
 }
 
@@ -443,6 +496,7 @@ function LiveArena({ session }) {
   const tension = matchTension({
     score, roundIndex: num(state.roundIndex),
     totalRounds: num(state.totalRounds) || 5, me: mine,
+    storm: state.storm || null, history: state.history || null,
   });
 
   return <div className={`duelLiveArena tension-${tension.level}`}
@@ -469,10 +523,15 @@ function LiveArena({ session }) {
 
     <div className="duelRoundPips">{Array.from({length: num(state.totalRounds) || 5}, (_, index) => {
       const result = history[index]?.winner;
-      const className = result
-        ? result === 'DRAW' ? 'draw' : result === mine ? 'won' : 'lost'
-        : index === num(state.roundIndex) ? 'live' : '';
-      return <i key={index} className={className} title={`راند ${fa(index + 1)}`} />;
+      const stormNow = state.storm && state.storm[index];
+      const className = [
+        result
+          ? result === 'DRAW' ? 'draw' : result === mine ? 'won' : 'lost'
+          : index === num(state.roundIndex) ? 'live' : '',
+        stormNow ? 'storm' : '',
+      ].filter(Boolean).join(' ');
+      return <i key={index} className={className}
+        title={`راند ${fa(index + 1)}${stormNow ? ' (دو‌امتیازی)' : ''}`} />;
     })}</div>
 
     {/* ── چرا بنرِ افقی جای خود را به اعلانِ وسطِ صفحه داد ──
@@ -488,6 +547,8 @@ function LiveArena({ session }) {
         focus={state.roundFocus}
         roundNumber={Math.min(num(state.totalRounds) || 5, num(state.roundIndex) + 1)}
         totalRounds={num(state.totalRounds) || 5}
+        mod={state.roundMod}
+        modAnnounce={state.roundModAnnounce}
       />
     )}
 
@@ -502,6 +563,12 @@ function LiveArena({ session }) {
         {/* نشانِ ماندگارِ ویژگیِ راند: اعلانِ وسطِ صفحه دو ثانیه‌ای است،
             این تا آخرِ راند می‌ماند تا کسی که اعلان را ندید هم بداند
             دنبالِ کدام عدد بگردد. */}
+        {state.roundMod === 'storm' && (
+          <span className="duelFocusPill duelStormPill" style={{ '--focus-color': '#FF7A1A' }}>
+            <i aria-hidden="true"><SvgIcon name="flame" size={13} /></i>
+            راند دو‌امتیازی
+          </span>
+        )}
         {state.roundFocus?.stat && FOCUS_META[state.roundFocus.stat] && (
           <span className="duelFocusPill"
             style={{ '--focus-color': FOCUS_META[state.roundFocus.stat].color }}>
@@ -589,20 +656,43 @@ function RoundTimeline({ history, mine, opponentRole = 'حریف' }) {
     </summary>
     {history.map((round, index) => {
       const view = roundForViewer(round, mine);
-      const { mineWon, draw, myPower, theirPower,
+      const { mineWon, draw, myPower, theirPower, isStorm, overtime,
+        myAward, theirAward, mySquad, theirSquad, myLuck, theirLuck,
         myBreakdown: mineBreak, theirBreakdown: theirBreak } = view;
       const accent = draw ? '#FFD166' : mineWon ? '#22E7A6' : '#FB7185';
-      return <article className="duelTimelineRow" key={round.seed || index} style={{ '--timeline-accent': accent }}>
+      const awardText = overtime
+        ? (mineWon ? `وقت اضافه: +${fa(myAward || 2)} برای تو` : `وقت اضافه: +${fa(theirAward || 2)} برای ${opponentRole}`)
+        : draw
+          ? (isStorm ? 'مساوی → وقت اضافه' : 'مساوی')
+          : mineWon ? `+${fa(myAward || 1)} برای تو` : `+${fa(theirAward || 1)} برای ${opponentRole}`;
+      const luckTxt = v => v ? `، شانس ${v > 0 ? '+' : '−'}${fa(Math.abs(v))}` : '';
+      return <article className={`duelTimelineRow${isStorm ? ' isStorm' : ''}${overtime ? ' inOvertime' : ''}`}
+        key={round.seed || index} style={{ '--timeline-accent': accent }}>
         <header>
-          <b>راند {fa(round.round || index + 1)} · {round.focusLabel || round.title}</b>
-          <span>{draw ? 'مساوی' : mineWon ? '+۱ برای تو' : `+۱ برای ${opponentRole}`}</span>
+          <b>
+            {isStorm && <SvgIcon name="flame" size={13} />}
+            {overtime && <SvgIcon name="clock" size={13} />}
+            راند {fa(round.round || index + 1)} · {overtime ? 'وقت اضافه' : (round.focusLabel || round.title)}
+            {isStorm && !overtime && <em className="duelTimelineStormTag">دو‌امتیازی</em>}
+          </b>
+          <span>{awardText}</span>
         </header>
-        <strong>تو {fa(myPower)} <i>•</i> {opponentRole} {fa(theirPower)}</strong>
-        <div className="duelTimelineBreaks">
-          <span><b>تو</b><small>{fa(mineBreak?.focus ?? 0)}{num(mineBreak?.effectBonus) ? ` + افکت ${fa(mineBreak.effectBonus)}` : ''} = {fa(mineBreak?.total ?? myPower)}</small></span>
-          <span><b>{opponentRole}</b><small>{fa(theirBreak?.focus ?? 0)}{num(theirBreak?.effectBonus) ? ` + افکت ${fa(theirBreak.effectBonus)}` : ''} = {fa(theirBreak?.total ?? theirPower)}</small></span>
-        </div>
-        <p>{round.reason}</p>
+        {overtime ? (
+          <>
+            <strong>ترکیب تو {fa(mySquad)} <i>•</i> ترکیب {opponentRole} {fa(theirSquad)}</strong>
+            <p>در وقت اضافه کارت مصرف نمی‌شود؛ قدرت کل ترکیب به‌همراه شانسِ بزرگ‌تر داوری می‌کند.
+              تو {fa(mySquad)}{luckTxt(myLuck)}، {opponentRole} {fa(theirSquad)}{luckTxt(theirLuck)}.</p>
+          </>
+        ) : (
+          <>
+            <strong>تو {fa(myPower)} <i>•</i> {opponentRole} {fa(theirPower)}</strong>
+            <div className="duelTimelineBreaks">
+              <span><b>تو</b><small>{fa(mineBreak?.focus ?? 0)}{num(mineBreak?.effectBonus) ? ` + افکت ${fa(mineBreak.effectBonus)}` : ''}{myLuck ? ` + شانس ${myLuck > 0 ? fa(myLuck) : '−' + fa(Math.abs(myLuck))}` : ''} = {fa(mineBreak?.total ?? myPower)}</small></span>
+              <span><b>{opponentRole}</b><small>{fa(theirBreak?.focus ?? 0)}{num(theirBreak?.effectBonus) ? ` + افکت ${fa(theirBreak.effectBonus)}` : ''}{theirLuck ? ` + شانس ${theirLuck > 0 ? fa(theirLuck) : '−' + fa(Math.abs(theirLuck))}` : ''} = {fa(theirBreak?.total ?? theirPower)}</small></span>
+            </div>
+            <p>{round.reason}</p>
+          </>
+        )}
       </article>;
     })}
   </details>;
@@ -655,12 +745,15 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
       const other = mine === 'X' ? 'O' : 'X';
       const myScore = num(scoreState[mine]);
       const theirScore = num(scoreState[other]);
-      const title = session.g.winner === 'DRAW' ? 'نبرد برابر!' : session.g.winner === mine ? 'من آرنا را بردم!' : 'این بار حریف برد!';
+      const narration = session.g.state?.narration;
+      const title = narration?.headline
+        || (session.g.winner === 'DRAW' ? 'نبرد برابر!' : session.g.winner === mine ? 'من آرنا را بردم!' : 'این بار حریف برد!');
       const mvp = resultMvp(session.g.state);
       const opponentRole = session.g.vsBot ? 'ربات' : 'حریف';
       const opponent = session.g.players?.[other]?.nickname || opponentRole;
       const scoreLabel = `تو ${fa(myScore)} — ${opponentRole} ${fa(theirScore)}`;
-      const text = `${title}\nنتیجه: ${scoreLabel}\nMVP: ${mvp?.name || 'ستاره آرنا'} (عدد راند ${fa(mvp?.mvpRoundPower || 0)})\nمستقیم به چالشم بیا:`;
+      const achievementLine = narration?.achievement ? `\nنشان: ${narration.achievement.label}` : '';
+      const text = `${title}\nنتیجه: ${scoreLabel}${achievementLine}\nMVP: ${mvp?.name || 'ستاره آرنا'} (عدد راند ${fa(mvp?.mvpRoundPower || 0)})\nمستقیم به چالشم بیا:`;
       const blob = await renderResultCard({ result: title, score: scoreLabel, mvp, opponent, url: invite.shareUrl });
       const file = blob ? new File([blob], 'ghelgheli-result.png', { type: 'image/png' }) : null;
       if (navigator.share && (!file || !navigator.canShare || navigator.canShare({ files: [file] }))) {
@@ -881,8 +974,17 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
         opponentRole={resultOpponentRole} sequence={session.g.stakePayoutSequence}
         balanceAfter={session.g.stakeWinnerBalanceAfter}/>
       <div className="duelFinalePanel">
-        <span style={{display:'flex', color: winner === 'DRAW' ? '#94A3B8' : iWon ? '#FFD166' : '#38BDF8'}}><SvgIcon name={winner === 'DRAW' ? 'handshake' : iWon ? 'trophy' : 'shield'} size={30} /></span>
-        <h2>{winner === 'DRAW' ? 'DRAW' : iWon ? 'VICTORY' : 'DEFEAT'}</h2>
+        <span style={{display:'flex', color: winner === 'DRAW' ? '#94A3B8' : iWon ? '#FFD166' : '#38BDF8'}}>
+          <SvgIcon name={session.g.state?.narration?.achievement?.icon || (winner === 'DRAW' ? 'handshake' : iWon ? 'trophy' : 'shield')} size={30} />
+        </span>
+        <h2>{session.g.state?.narration?.headline
+          || (winner === 'DRAW' ? 'پایه‌پایه؛ هیچ‌کس کم نیاورد' : iWon ? 'بردی؛ آرنا مالِ توست' : 'این دور مالِ حریف بود؛ انتقام شیرین‌تره')}</h2>
+        {session.g.state?.narration?.achievement && (
+          <em className="duelAchievement">
+            <SvgIcon name={session.g.state.narration.achievement.icon || 'trophy'} size={15} />
+            {session.g.state.narration.achievement.label}
+          </em>
+        )}
         <strong className="duelFinalScore">
           تو {fa(resultScore[resultMine])} <i>—</i> {resultOpponentRole} {fa(resultScore[resultOther])}
         </strong>

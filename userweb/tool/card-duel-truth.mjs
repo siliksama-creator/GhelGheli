@@ -112,4 +112,62 @@ for (let X = 0; X <= 5; X += 1) {
 }
 ok(sane, 'هیچ‌کدام از ۲۱ حالتِ ممکنِ امتیاز، سطح یا توپِ مسابقهٔ متناقض نمی‌دهد');
 
+// ─────────────────────────────────────────────────────────────────────────
+// دوئل طوفان (logicVersion 3): راند دو‌امتیازی، وقت اضافه، شانس دیدنی
+// ─────────────────────────────────────────────────────────────────────────
+console.log('\n== دوئل طوفان: راند دو‌امتیازی و وقت اضافه ==');
+
+// roundForViewer فیلدهای طوفان را برای «من» درست می‌چیند.
+const stormRound = {
+  round: 2, focusLabel: 'حمله',
+  cardX: { cardTypeId: 'a', name: 'مهاجم' }, cardO: { cardTypeId: 'b', name: 'مدافع' },
+  powerX: 80, powerO: 80, focusStatX: 80, focusStatO: 80,
+  breakdownX: { focus: 80, effectBonus: 0, total: 80 },
+  breakdownO: { focus: 80, effectBonus: 0, total: 80 },
+  luckX: 0, luckO: 0, winner: 'X', mod: 'storm',
+  awardX: 2, awardO: 0, overtime: null,
+};
+const sv = roundForViewer(stormRound, 'X');
+ok(sv.isStorm === true && sv.myAward === 2 && sv.theirAward === 0,
+  'راند طوفانیِ برنده برای من ۲ امتیاز است و پرچم طوفان می‌آید');
+
+// وقت اضافه: قدرت ترکیب و شانس بزرگ، برنده ۲ امتیاز.
+const otRound = {
+  round: 3, focusLabel: 'دفاع',
+  cardX: { cardTypeId: 'a', name: 'الف' }, cardO: { cardTypeId: 'b', name: 'ب' },
+  powerX: 70, powerO: 70, focusStatX: 70, focusStatO: 70,
+  breakdownX: { focus: 70, total: 70 }, breakdownO: { focus: 70, total: 70 },
+  luckX: 0, luckO: 0, winner: 'O', mod: 'storm', awardX: 0, awardO: 2,
+  overtime: { winner: 'O', baseX: 74, baseO: 78, luckX: -3, luckO: 6, totalX: 71, totalO: 84, luckRange: 13 },
+};
+const ov = roundForViewer(otRound, 'X');
+ok(Boolean(ov.overtime), 'وقت اضافه شناسایی می‌شود');
+ok(ov.theirSquad === 78 && ov.mySquad === 74, 'قدرت ترکیب در وقت اضافه از overtime خوانده می‌شود');
+ok(ov.theirLuck === 6 && ov.myLuck === -3, 'شانس در وقت اضافه از overtime خوانده می‌شود');
+ok(!ov.mineWon && ov.theirAward === 2, 'برندهٔ وقت اضافه ۲ امتیاز می‌گیرد');
+// همان راند از دید برنده (O) آینه می‌شود.
+const ovWin = roundForViewer(otRound, 'O');
+ok(ovWin.mineWon && ovWin.myAward === 2 && ovWin.mySquad === 78 && ovWin.myLuck === 6,
+  'زاویهٔ دید برندهٔ وقت اضافه آینه می‌شود');
+
+// حرارت با امتیاز متغیر: راند دو‌امتیازیِ آخر در امتیاز برابر = decider.
+const stormPattern = [false, true, false, false, true]; // راندهای ۲ و ۵ طوفانی
+const deciderStorm = matchTension({
+  score: { X: 3, O: 3 }, roundIndex: 4, totalRounds: 5, me: 'X',
+  storm: stormPattern, history: new Array(4),
+});
+ok(deciderStorm.decider === true, 'راند آخرِ دو‌امتیازیِ برابر هم decider است');
+// راند دوم طوفانی: اگر کسی راند اول را ۲-۰ برده باشد... منطق pointsLeft.
+const sealed = matchTension({
+  score: { X: 0, O: 0 }, roundIndex: 0, totalRounds: 5, me: 'X',
+  storm: stormPattern, history: [],
+});
+ok(sealed.level === 'calm', 'شروع نبرد با الگوی طوفان آرام است');
+// امتیاز بالای غیرقابل‌جبران با وجود راندهای دو‌امتیازی قفل می‌شود.
+const far = matchTension({
+  score: { X: 6, O: 0 }, roundIndex: 3, totalRounds: 5, me: 'X',
+  storm: stormPattern, history: new Array(3),
+});
+ok(far.level === 'calm', 'وقتی حتی همهٔ امتیازهای باقی‌مانده هم فاصله را پر نکند قفل است');
+
 console.log(`\n✅ ${pass} تست حقیقت دوئل Web موفق بود\n`);

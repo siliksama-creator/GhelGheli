@@ -284,6 +284,257 @@ function seededLuck(seed, side) {
   return (h % (2 * LUCK_RANGE + 1)) - LUCK_RANGE;
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// «دوئل طوفان» (logicVersion 3) — راندهای دوامتیازی + وقت اضافه + شانسِ بیشتر
+// ═══════════════════════════════════════════════════════════════════════
+//
+// همه‌چیز از seed مشتق می‌شود (قطعی، بازپخش‌پذیر، تقلب‌ناپذیر) و در راندِ
+// مربوطه و پیش از قفلِ انتخاب اعلام می‌شود. در حالتِ خاموش (mayhem=false)
+// هیچ‌کدام از این‌ها وارد داوری نمی‌شوند و رفتار بایت‌به‌بایت با نسخهٔ ۲ است.
+//
+// دامنهٔ شانس: نسخهٔ کلاسیک روی هر استات (۰..۱۰۰) ±۶ است. در طوفان شانس کمی
+// بزرگ‌تر می‌شود تا برتری‌های کوچک هیجان بگیرند، ولی نه آن‌قدر که کارتِ قوی
+// نتواند ببرد: اختلافِ شانسِ دو طرف حداکثر ۲×دامنه است، پس برتریِ استاتِ بیش
+// از ~۲×دامنه قابلِ برگرداندن نیست (گارد بالانس این را می‌سنجد).
+const LUCK_RANGE_STORM = 9;     // راند عادی در حالت طوفان
+const LUCK_RANGE_OT = 13;       // راند دوامتیازی و وقت اضافه
+const STORM_AWARD = 2;          // امتیاز راند دوامتیازی
+const OT_TOTAL_ROUNDS = 5;      // فقط ۵ راند کارتی داریم؛ وقت اضافه کارت نمی‌خورد
+
+// شانس با دامنهٔ دلخواه (همان هشِ قطعی، فقط مدولِ متفاوت).
+function luckInRange(seed, side, range) {
+  const r = Number.isFinite(range) && range >= 0 ? Math.round(range) : LUCK_RANGE;
+  if (!seed || r === 0) return 0;
+  let h = 0x811c9dc5;
+  const str = `${side}|${seed}`;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x85ebca6b) >>> 0;
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35) >>> 0;
+  h = (h ^ (h >>> 16)) >>> 0;
+  return (h % (2 * r + 1)) - r;
+}
+
+/**
+ * الگوی راندهای دوامتیازی برای یک مسابقه، قطعی از seed.
+ * خروجی: آرایه‌ای از ۵ بولین (اندیس = شماره راند ۰..۴).
+ * قاعده: ۱ یا ۲ راند دوامتیازی، و حداقل ۳ راند عادی (هستهٔ بازی بماند).
+ * الگو پنهان نیست؛ موتور در شروعِ هر راند آن را اعلام می‌کند.
+ */
+function stormPattern(seed) {
+  const pattern = [false, false, false, false, false];
+  if (!seed) return pattern;
+  const rng = createSeededRandom(`${seed}|storm`);
+  // ۱ یا ۲ طوفان در این نبرد.
+  const stormCount = rng() < 0.55 ? 1 : 2;
+  const indexes = [0, 1, 2, 3, 4];
+  // فیشر–یتس با همان PRNG قطعی.
+  for (let i = indexes.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [indexes[i], indexes[j]] = [indexes[j], indexes[i]];
+  }
+  for (let k = 0; k < stormCount; k++) pattern[indexes[k]] = true;
+  return pattern;
+}
+
+// قدرتِ کلِ ترکیب برای وقت اضافه: میانگینِ totalPower پنج کارتِ همان بازیکن.
+// وقت اضافه کارت مصرف نمی‌کند (دست هر کس دقیقاً ۵ کارت/۵ راند است)، پس با
+// قدرتِ کلِ تیم داوری می‌شود — کسی که ترکیب قوی‌تر چیده معمولاً می‌برد.
+function squadPower(deck) {
+  const cards = Array.isArray(deck) ? deck : [];
+  if (!cards.length) return 0;
+  const sum = cards.reduce((acc, c) => acc + Number(c?.power ?? totalPower(c || {})), 0);
+  return Math.round((sum / cards.length) * 10) / 10;
+}
+
+/**
+ * وقت اضافه پس از تساویِ راند دوامتیازی.
+ * برنده = قدرتِ ترکیب + شانسِ بزرگِ وقت اضافه (میانگین شانس دو طرف صفر است).
+ * تساویِ محض (عددِ نهاییِ برابر، که خیلی نادر است) با هشِ قطعیِ تای‌بریک
+ * به‌صورت متقارن می‌شکند تا نبرد همیشه برنده داشته باشد.
+ */
+function resolveOvertime({ deckX, deckO, seed }) {
+  const baseX = squadPower(deckX);
+  const baseO = squadPower(deckO);
+  const luckX = luckInRange(`${seed}|ot`, 'X', LUCK_RANGE_OT);
+  const luckO = luckInRange(`${seed}|ot`, 'O', LUCK_RANGE_OT);
+  const totalX = Math.round((baseX + luckX) * 10) / 10;
+  const totalO = Math.round((baseO + luckO) * 10) / 10;
+  let winner = totalX > totalO ? 'X' : totalO > totalX ? 'O' : null;
+  if (!winner) {
+    // تای‌بریکِ قطعی و متقارن (نه تصادفیِ زمان اجرا).
+    const tieRng = createSeededRandom(`${seed}|ot-tie`);
+    winner = tieRng() < 0.5 ? 'X' : 'O';
+  }
+  return {
+    overtime: true,
+    baseX, baseO, luckX, luckO, totalX, totalO,
+    winner,
+    luckRange: LUCK_RANGE_OT,
+  };
+}
+
+// ── روایت فارسیِ بانمک (انسانی، کوتاه، گزارشگری؛ بدون ایموجی) ────────────
+// کلِ متن‌ها این‌جا (بک‌اند) ساخته می‌شوند تا وب و اندروید عیناً یک جمله بگیرند.
+// هر رویداد یک «کلید آیکون» هم دارد که کلاینت از مجموعه آیکونِ موجود رسم می‌کند.
+const FA_DIGITS = '۰۱۲۳۴۵۶۷۸۹';
+const fa = n => String(Math.round(Number(n) || 0)).replace(/\d/g, d => FA_DIGITS[d]);
+
+// بنرِ اعلامِ راند دوامتیازی (پیش از قفلِ انتخاب).
+function stormAnnounce() {
+  return {
+    icon: 'flame',
+    tone: 'storm',
+    text: 'حالا وقتشه — راند دو‌امتیازی! برنده این راند دو امتیاز می‌برد.',
+    sub: 'اگر مساوی شد، وقت اضافه می‌رود.',
+  };
+}
+
+// روایتِ وقت اضافه.
+function narrateOvertime(ot) {
+  const won = ot.winner === 'X' ? 'X' : 'O';
+  return {
+    icon: 'clock',
+    tone: 'overtime',
+    title: 'وقت اضافه',
+    announce: 'تساویِ دو‌امتیازی! وقت اضافه — قدرتِ کلِ ترکیب تصمیم می‌گیرد.',
+    result: won === 'X'
+      ? 'در وقت اضافه ترکیب تو سنگین‌تر بود؛ دو امتیاز نشست.'
+      : 'در وقت اضافه ترکیب حریف سنگین‌تر بود؛ دو امتیاز رفت.',
+    line: `ترکیب تو ${fa(ot.baseX)} و شانس ${ot.luckX >= 0 ? '+' : '−'}${fa(Math.abs(ot.luckX))} — ترکیب حریف ${fa(ot.baseO)} و شانس ${ot.luckO >= 0 ? '+' : '−'}${fa(Math.abs(ot.luckO))}.`,
+    winner: ot.winner,
+  };
+}
+
+// روایتِ یک راندِ کارتی برای نمادِ تماشاگر `me` (X یا O).
+// `ctx` اطلاعات راند resolveRound است؛ `roundFocus` برای نام معیار.
+function narrateRound(resolved, me) {
+  const iWon = resolved.winner === me;
+  const draw = resolved.winner === 'DRAW';
+  const overtime = resolved.overtime || null;
+  const focus = resolved.focusLabel || resolved.title || '';
+  const mine = me === 'X' ? resolved.breakdownX : resolved.breakdownO;
+  const theirs = me === 'X' ? resolved.breakdownO : resolved.breakdownX;
+  const myLuck = overtime
+    ? (me === 'X' ? overtime.luckX : overtime.luckO)
+    : (me === 'X' ? resolved.luckX : resolved.luckO);
+  const theirLuck = overtime
+    ? (me === 'X' ? overtime.luckO : overtime.luckX)
+    : (me === 'X' ? resolved.luckO : resolved.luckX);
+  const events = [];
+
+  // افکتِ فعالِ کارتِ خودِ بازیکن.
+  if (mine && Number(mine.effectBonus) > 0) {
+    events.push({ icon: 'sparkle', tone: 'effect', text: `افکتِ کارتت فعال شد (${fa(mine.effectBonus)}+).` });
+  }
+  // شانس تعیین‌کننده (قدرِ مطلق بزرگ و در جهت تعیین نتیجه).
+  const luckDecisive = Math.abs(myLuck) >= (resolved.luckRange || 6) - 1;
+  if (luckDecisive) {
+    events.push(myLuck > 0
+      ? { icon: 'clover', tone: 'luck-good', text: 'شانسِ امروز با تو بود؛ عددت بالا پرید.' }
+      : { icon: 'clover', tone: 'luck-bad', text: 'این بار توپ نچرخید؛ ولی جنگ هنوز تموم نشده.' });
+  }
+
+  let headline;
+  let icon = 'bolt';
+  if (overtime) {
+    // تساویِ راند دو‌امتیازی به وقت اضافه رفته و برنده مشخص شده.
+    headline = iWon
+      ? 'در وقت اضافه ترکیبت سنگین‌تر بود؛ دو امتیاز نشست.'
+      : 'در وقت اضافه ترکیب حریف سنگین‌تر بود؛ دو امتیاز رفت.';
+    icon = 'clock';
+  } else if (draw) {
+    headline = resolved.mod === 'storm'
+      ? 'تساویِ دو‌امتیازی — وقت اضافه!'
+      : 'دو کارت زورشان به هم نرسید؛ بدون امتیاز.';
+    icon = resolved.mod === 'storm' ? 'clock' : 'scale';
+  } else if (iWon) {
+    headline = resolved.mod === 'storm'
+      ? `راند دو‌امتیازی را قاپیدی؛ دو امتیاز تو را جلو انداخت (${focus}).`
+      : `این راند مالِ تو بود (${focus}).`;
+    icon = resolved.mod === 'storm' ? 'flame' : 'check';
+  } else {
+    headline = resolved.mod === 'storm'
+      ? `حریف راند دو‌امتیازی را برد (${focus}).`
+      : `این راند را حریف برد (${focus}).`;
+    icon = 'shield';
+  }
+
+  const luckTxt = v => v ? ` + شانس ${v > 0 ? fa(v) : '−' + fa(Math.abs(v))}` : '';
+  const effTxt = b => Number(b?.effectBonus) ? ` + افکت ${fa(b.effectBonus)}` : '';
+  const myPowerNum = me === 'X' ? resolved.powerX : resolved.powerO;
+  const theirPowerNum = me === 'X' ? resolved.powerO : resolved.powerX;
+  return {
+    icon,
+    tone: draw ? 'draw' : iWon ? 'win' : 'lose',
+    headline,
+    events,
+    // خطِ «چرا باختم/بردم» — همان عددهای روی کارت، برای هر دو طرف.
+    line: overtime
+      ? `ترکیب تو ${fa(overtime.baseX !== undefined ? (me === 'X' ? overtime.baseX : overtime.baseO) : 0)}${luckTxt(myLuck)} — ترکیب حریف ${fa(me === 'X' ? overtime.baseO : overtime.baseX)}${luckTxt(theirLuck)}.`
+      : `تو ${fa(mine ? mine.focus : 0)}${effTxt(mine)}${luckTxt(myLuck)} = ${fa(myPowerNum)} — حریف ${fa(theirs ? theirs.focus : 0)}${effTxt(theirs)}${luckTxt(theirLuck)} = ${fa(theirPowerNum)}.`,
+  };
+}
+
+// روایتِ پایانِ نبرد: تیتر + تایتل‌کارت دستاورد.
+function narrateMatch({ history, score, winner, me, mod = false }) {
+  const draw = winner === 'DRAW';
+  const iWon = winner === me;
+  const rounds = Array.isArray(history) ? history : [];
+  const mine = me;
+  const other = me === 'X' ? 'O' : 'X';
+  const myScore = score?.[mine] ?? 0;
+  const theirScore = score?.[other] ?? 0;
+
+  // امتیازِ راندی که خودِ بازیکن برده (برای تشخیص کمبک).
+  const wonRounds = rounds.filter(r => r.winner === mine).map(r => r.round);
+  // کمبک: راند اول را باخته ولی در پایان برده.
+  const firstRound = rounds[0];
+  const comeback = !draw && iWon && firstRound && firstRound.winner === other;
+  // جاروی کامل (بدون باختِ راند).
+  const sweep = !draw && iWon && rounds.filter(r => r.winner === other || r.winner === 'DRAW').length === 0;
+  const decidedInOvertime = rounds.some(r => r.overtime && r.overtime.winner === mine);
+  const stormRound = rounds.some(r => r.mod === 'storm');
+
+  let headline;
+  let achievement = null;
+  if (draw) {
+    headline = 'پایه‌پایه؛ هیچ‌کس کم نیاورد.';
+  } else if (sweep) {
+    headline = 'یه‌تنه آرنا را جارو کردی!';
+    achievement = { icon: 'trophy', label: 'جاروی آرنا' };
+  } else if (comeback) {
+    headline = 'چه برگشتی! خودت را از ته چاه کشیدی بالا.';
+    achievement = { icon: 'flame', label: 'پادشاه کمبک' };
+  } else if (decidedInOvertime) {
+    headline = 'در وقت اضافه کار را تمام کردی. تماشایی!';
+    achievement = { icon: 'clock', label: 'ارباب وقت اضافه' };
+  } else if (iWon && stormRound) {
+    headline = 'توفان را به سودِ خودت خوابوندی!';
+    achievement = { icon: 'flame', label: 'توفان‌سوار' };
+  } else if (iWon) {
+    headline = 'بردی؛ آرنا مالِ توست.';
+  } else {
+    headline = 'این دور مالِ حریف بود؛ انتقام شیرین‌تره.';
+  }
+
+  // تایتل دستاوردِ فرعی اگر هنوز ست نشده (مثلاً بیشترین شانس مثبت).
+  if (!achievement && iWon) {
+    const bestLuck = rounds.reduce((acc, r) => Math.max(acc, (mine === 'X' ? r.luckX : r.luckO) || 0), 0);
+    if (bestLuck >= 8) achievement = { icon: 'clover', label: 'ستاره خوش‌شانس' };
+  }
+
+  return {
+    headline,
+    achievement,
+    scoreLine: `تو ${fa(myScore)} — حریف ${fa(theirScore)}`,
+  };
+}
+
 const STAT_WEIGHT = 0.19;   // هر پنج استاتِ راندی، برابر
 const ENERGY_WEIGHT = 0.05; // استاتِ بدونِ راند
 
@@ -681,16 +932,24 @@ function winnerReason(winner, focus, cardX, cardO, breakdownX, breakdownO) {
   return `${champ.name} در «${focus.label}» با عدد نهایی ${champFormula} در برابر ${otherFormula} از ${other.name} برد`;
 }
 
-function resolveRound(cardX, cardO, roundIndex, previousWinner = null, random = null, seed = '') {
+function resolveRound(cardX, cardO, roundIndex, previousWinner = null, random = null, seed = '', opts = {}) {
   const x = publicCard(cardX);
   const o = publicCard(cardO);
   const focus = ROUND_FOCUS[roundIndex] || ROUND_FOCUS[ROUND_FOCUS.length - 1];
+  const mayhem = opts && opts.mayhem === true;
+  const isStorm = mayhem && opts.mod === 'storm';
   // `random` در امضای عمومی برای سازگاری replayهای قدیمی می‌ماند، اما
   // مصرف نمی‌شود: شانس از seed مشتق می‌شود، نه از یک مولدِ حالت‌دار.
-  // نتیجه همچنان تعیینی است — همان seed، همان حکم — ولی دیگر صرفاً
-  // از روی استات‌ها قابل پیش‌بینی نیست.
-  const luckX = seededLuck(seed, 'X');
-  const luckO = seededLuck(seed, 'O');
+  // نتیجه همچنان تعیینی است — همان seed، همان حکم.
+  // دامنهٔ شانس در حالت طوفان بزرگ‌تر است (راند عادی ۹، راند دوامتیازی ۱۳)
+  // ولی کارتِ قوی همچنان غالب است؛ گارد بالانس این را می‌پاید.
+  const luckRange = mayhem ? (isStorm ? LUCK_RANGE_OT : LUCK_RANGE_STORM) : LUCK_RANGE;
+  const luckX = mayhem
+    ? luckInRange(seed, 'X', luckRange)
+    : seededLuck(seed, 'X');
+  const luckO = mayhem
+    ? luckInRange(seed, 'O', luckRange)
+    : seededLuck(seed, 'O');
   const breakdownX = roundScoreBreakdown(x, o, focus, roundIndex, previousWinner === 'X', luckX);
   const breakdownO = roundScoreBreakdown(o, x, focus, roundIndex, previousWinner === 'O', luckO);
   const powerX = breakdownX.total;
@@ -701,7 +960,15 @@ function resolveRound(cardX, cardO, roundIndex, previousWinner = null, random = 
   const winner = diff > 0 ? 'X' : diff < 0 ? 'O' : 'DRAW';
   const focusStatX = focusValue(x, focus);
   const focusStatO = focusValue(o, focus);
-  return {
+  // امتیازِ راند: عادی=۱ برای برنده؛ دوامتیازی=۲ برای برنده و مساوی=صفر
+  // (تساویِ دوامتیازی در rules/cardDuel به «وقت اضافه» می‌رود که آن‌جا
+  // برندهٔ دو امتیاز مشخص می‌شود). وقت اضافه خودش در history با award ثبت
+  // می‌شود. جمع این awardها اسکوربورد را می‌سازد (نگاه کنید به
+  // scoreFromHistory) — نسخهٔ کلاسیک (mayhem=false) همیشه award برنده=۱ است.
+  const award = isStorm ? STORM_AWARD : 1;
+  const awardX = mayhem && winner === 'X' ? award : 0;
+  const awardO = mayhem && winner === 'O' ? award : 0;
+  const result = {
     round: roundIndex + 1,
     seed,
     title: focus.label,
@@ -718,32 +985,59 @@ function resolveRound(cardX, cardO, roundIndex, previousWinner = null, random = 
     powerGap: Math.abs(powerX - powerO),
     luckX,
     luckO,
-    luckRange: LUCK_RANGE,
+    luckRange,
     breakdownX,
     breakdownO,
     winner,
-    logicVersion: 2,
+    logicVersion: mayhem ? 3 : 2,
     winnerCardId: winner === 'X' ? x.cardTypeId : winner === 'O' ? o.cardTypeId : null,
     reason: winnerReason(winner, focus, x, o, breakdownX, breakdownO),
-    cinematic: winner === 'DRAW' ? 'برخورد برابر!' : 'ضربهٔ برنده ثبت شد!',
+    cinematic: winner === 'DRAW'
+      ? (isStorm ? 'تساویِ دوامتیازی — وقت اضافه!' : 'برخورد برابر!')
+      : 'ضربهٔ برنده ثبت شد!',
   };
+  // فیلدهای طوفان فقط در حالت مایم به شیء راند اضافه می‌شوند تا شکلِ خروجیِ
+  // نسخهٔ ۲ (کلاسیک) دقیقاً همان باشد که الان روی سرور است — هیچ کلیدِ تازه‌ای
+  // به راندِ کلاسیک نشت نکند.
+  if (mayhem) {
+    result.mod = isStorm ? 'storm' : null;
+    result.awardX = awardX;
+    result.awardO = awardO;
+    result.overtime = null; // اگر تساویِ دوامتیازی به وقت اضافه رفت اینجا پر می‌شود
+    // روایتِ فارسیِ بانمک برای هر دو زاویهٔ دید — بک‌اند می‌سازد، کلاینت فقط
+    // رندر می‌کند تا وب و اندروید عیناً یک جمله نشان دهند (بدون ایموجی).
+    result.narrX = narrateRound(result, 'X');
+    result.narrO = narrateRound(result, 'O');
+  }
+  return result;
 }
 
 function scoreFromHistory(history = []) {
+  // نسخهٔ ۳: اسکوربورد = جمعِ award هر راند (راند دوامتیازی ۲؛ وقت اضافه هم
+  // دو امتیازِ همان راند را به برنده می‌دهد). نسخهٔ کلاسیک فیلد award ندارد؛
+  // همان شمارشِ «هر برنده یک امتیاز» (رفتار بایت‌به‌بایتِ نسخهٔ ۲).
   return history.reduce((score, round) => {
-    if (round?.winner === 'X') score.X += 1;
-    if (round?.winner === 'O') score.O += 1;
+    if (round?.awardX || round?.awardO) {
+      score.X += Number(round.awardX) || 0;
+      score.O += Number(round.awardO) || 0;
+    } else {
+      if (round?.winner === 'X') score.X += 1;
+      if (round?.winner === 'O') score.O += 1;
+    }
     return score;
   }, { X: 0, O: 0 });
 }
 
-function simulate(userCards, opponentCards, { opponentName = 'حریف', random = null, seed = '' } = {}) {
+function simulate(userCards, opponentCards, { opponentName = 'حریف', random = null, seed = '', mayhem = false } = {}) {
   let previousWinner = null;
   const rounds = [];
+  // الگوی راندهای دوامتیازی فقط در حالت طوفان و فقط از seed.
+  const storm = mayhem && seed ? stormPattern(seed) : [false, false, false, false, false];
   for (let i = 0; i < DECK_SIZE; i++) {
     const roundSeed = seed ? `${seed}:round:${i + 1}` : '';
-    const resolved = resolveRound(userCards[i], opponentCards[i], i, previousWinner, random, roundSeed);
-    rounds.push({
+    const mod = storm[i] ? 'storm' : null;
+    const resolved = resolveRound(userCards[i], opponentCards[i], i, previousWinner, random, roundSeed, { mayhem, mod });
+    const entry = {
       round: resolved.round, title: resolved.title, text: resolved.text,
       focusLabel: resolved.focusLabel,
       focusStatX: resolved.focusStatX,
@@ -759,10 +1053,38 @@ function simulate(userCards, opponentCards, { opponentName = 'حریف', random 
       seed: resolved.seed,
       breakdownX: resolved.breakdownX,
       breakdownO: resolved.breakdownO,
-    });
+    };
+    // فیلدهای طوفان فقط در حالت مایم وارد history می‌شوند تا نسخهٔ ۲ دست‌نخورده بماند.
+    if (mayhem) {
+      entry.mod = resolved.mod;
+      entry.awardX = resolved.awardX;
+      entry.awardO = resolved.awardO;
+      entry.announce = resolved.mod === 'storm' ? stormAnnounce() : null;
+      // تساویِ راند دوامتیازی → وقت اضافه (کارت مصرف نمی‌شود؛ قدرتِ کل ترکیب).
+      if (resolved.mod === 'storm' && resolved.winner === 'DRAW') {
+        const ot = resolveOvertime({ deckX: userCards, deckO: opponentCards, seed: roundSeed });
+        // وقت اضافه همان راند را قطعی می‌کند: برنده دو امتیاز.
+        resolved.winner = ot.winner;
+        entry.winner = ot.winner;
+        entry.outcome = ot.winner === 'X' ? 'user_goal' : 'opponent_goal';
+        entry.winnerCardId = ot.winner === 'X' ? resolved.cardX.cardTypeId : resolved.cardO.cardTypeId;
+        resolved.awardX = entry.awardX = ot.winner === 'X' ? STORM_AWARD : 0;
+        resolved.awardO = entry.awardO = ot.winner === 'O' ? STORM_AWARD : 0;
+        resolved.overtime = entry.overtime = ot;
+        entry.narrateOt = narrateOvertime(ot);
+        // روایت راند را با برندهٔ نهاییِ وقت اضافه بازسازی کن.
+        resolved.narrX = entry.narrX = narrateRound(resolved, 'X');
+        resolved.narrO = entry.narrO = narrateRound(resolved, 'O');
+        resolved.narrX.overtime = resolved.narrO.overtime = entry.narrateOt;
+      } else {
+        entry.narrX = resolved.narrX;
+        entry.narrO = resolved.narrO;
+      }
+    }
+    rounds.push(entry);
     const scoreAfter = scoreFromHistory(rounds);
     rounds[rounds.length - 1].scoreAfter = { ...scoreAfter };
-    previousWinner = resolved.winner;
+    previousWinner = rounds[rounds.length - 1].winner;
   }
   const score = scoreFromHistory(rounds);
   const winnerSide = score.X > score.O ? 'user' : score.O > score.X ? 'opponent' : 'draw';
@@ -781,9 +1103,11 @@ function simulate(userCards, opponentCards, { opponentName = 'حریف', random 
     roundPower: rounds[0]?.userPower || 0, round: 1,
   };
   const mvp = decisive[0] || fallback;
-  return {
+  const winner = winnerSide === 'user' ? 'X' : winnerSide === 'opponent' ? 'O' : 'DRAW';
+  const result = {
     seed,
-    logicVersion: 2,
+    logicVersion: mayhem ? 3 : 2,
+    mod: mayhem ? 'storm' : null,
     userScore: score.X, opponentScore: score.O, winnerSide, opponentName,
     mvp: {
       side: mvp.side, card: publicCard(mvp.card), round: mvp.round,
@@ -791,6 +1115,11 @@ function simulate(userCards, opponentCards, { opponentName = 'حریف', random 
     },
     rounds,
   };
+  if (mayhem) {
+    result.storm = storm;
+    result.narration = narrateMatch({ history: rounds, score, winner, me: 'X', mod: true });
+  }
+  return result;
 }
 
 function starterDeck() {
@@ -1123,7 +1452,10 @@ async function botBattle(userId, ids = null) {
   if (userCards.length !== DECK_SIZE) { const e = new Error('اول ترکیب پنج‌کارتی را آماده کن'); e.status = 400; throw e; }
   const opponentCards = botDeck(userCards);
   const seed = `bot:${userId}:${Date.now()}`;
-  const sim = simulate(userCards, opponentCards, { opponentName: 'ربات تمرینی', seed });
+  // تمرین هم از همان قانونِ زنده می‌خواند تا قبل از rollout آنلاین، طوفان
+  // اول در تمرین دیده و آزموده شود (پلهٔ اول rollout).
+  const mayhem = Number(liveContent.rules().duelMayhem) === 1;
+  const sim = simulate(userCards, opponentCards, { opponentName: 'ربات تمرینی', seed, mayhem });
   // تمرین با ربات تاریخچه نمی‌سازد؛ جدول فقط نبرد امتیازی را نگه می‌دارد.
   return {
     battle: null,
@@ -1151,7 +1483,22 @@ async function recordEngineBattle({ matchId = null, playerX, playerO, state, win
       vsBot ? null : state.decks.O.map(c => c.cardTypeId),
       Number(state.score?.X || 0), Number(state.score?.O || 0), winnerId,
       Number(stake || 0), xDelta, oDelta,
-      JSON.stringify({ score: state.score, rounds: state.history || [] })],
+      JSON.stringify({
+        score: state.score,
+        rounds: state.history || [],
+        // نسخهٔ منطق: ۳ اگر این نبرد طوفانی بوده، وگرنه فیلد را نمی‌گذاریم تا
+        // لاگ‌های قدیمی (که پیش از این تغییر ذخیره شده‌اند) دست‌نخورده بمانند.
+        ...(state.mayhem ? {
+          logicVersion: 3,
+          mod: 'storm',
+          narration: narrateMatch({
+            history: state.history || [],
+            score: state.score,
+            winner: winner === 'X' ? 'X' : winner === 'O' ? 'O' : 'DRAW',
+            me: 'X',
+          }),
+        } : {}),
+      })],
   );
   return rows[0];
 }
@@ -1164,6 +1511,10 @@ module.exports = {
   starterDeck, botDeck, resolveRound, simulate, scoreFromHistory, recentBattles, recordEngineBattle,
   LUCK_RANGE, seededLuck,
   analyzeDeck, suggestDeckFromPool, createSeededRandom, focusStatOf, balanceSnapshot,
+  // دوئل طوفان (logicVersion 3)
+  stormPattern, resolveOvertime, squadPower, luckInRange,
+  LUCK_RANGE_STORM, LUCK_RANGE_OT, STORM_AWARD,
+  stormAnnounce, narrateOvertime, narrateRound, narrateMatch,
   // ⚠️ این دو تا اینجا نبودند و کرونِ شبانهٔ server.js:2290 هر شب ساعت
   // ۴:۱۷ با «cardDuel.pruneBattleHistory is not a function» می‌شکست.
   // هر دو مسیرِ پاکسازی مرده بود، پس جدولِ نبردها هرگز هرس نمی‌شد.

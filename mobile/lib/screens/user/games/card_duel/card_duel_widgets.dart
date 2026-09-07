@@ -45,31 +45,52 @@ class DuelTension {
     required int theirScore,
     required int roundIndex,
     int totalRounds = 5,
+    List<dynamic>? storm,
+    int playedRounds = -1,
   }) {
     final total = totalRounds == 0 ? 5 : totalRounds;
-    final played = myScore + theirScore;
+    final played = playedRounds >= 0 ? playedRounds : roundIndex;
     // راندهای بازی‌نشده، شاملِ همینی که در جریان است.
-    final remaining = math.max(0, total - math.max(roundIndex, played));
+    final remaining = math.max(0, total - played);
     if (remaining <= 0) {
       return const DuelTension._(DuelTensionLevel.calm, null, false);
     }
 
+    // حداکثر امتیازِ راندهای باقی‌مانده: راند دو‌امتیازی ۲ می‌دهد، بقیه ۱.
+    var pointsLeft = 0;
+    for (var i = played; i < total; i++) {
+      pointsLeft += (storm != null && i < storm.length && storm[i] == true)
+          ? 2
+          : 1;
+    }
+    if (storm == null) pointsLeft = remaining;
+
     final lead = (myScore - theirScore).abs();
-    // فاصله از راندهای باقی‌مانده بیشتر است: نتیجه ریاضی‌وار قفل شده.
-    if (lead > remaining) {
+    // بیشترین امتیازِ ممکن هم فاصله را پر نکند: نتیجه قفل شده.
+    if (lead > pointsLeft) {
       return const DuelTension._(DuelTensionLevel.calm, null, false);
     }
+
+    final thisRoundMax =
+        (storm != null && played < storm.length && storm[played] == true)
+            ? 2
+            : 1;
 
     if (remaining == 1 && myScore == theirScore) {
       return const DuelTension._(DuelTensionLevel.decider, null, true);
     }
 
-    // توپِ مسابقه: بردِ این راند → lead+1 در برابر remaining-1 راندِ مانده.
-    final leaderCanSeal = lead >= 1 && (lead + 1) > (remaining - 1);
-    if (leaderCanSeal) {
+    // توپِ مسابقه: فردِ جلو با بردِ این راند به امتیازی برسد که حریف حتی
+    // با همهٔ راندهای بعدی نتواند جبران کند.
+    final leader = myScore > theirScore
+        ? 'mine'
+        : myScore < theirScore
+            ? 'theirs'
+            : null;
+    if (leader != null && (lead + thisRoundMax) > (pointsLeft - thisRoundMax)) {
       return DuelTension._(
         DuelTensionLevel.critical,
-        myScore > theirScore ? 'mine' : 'theirs',
+        leader,
         false,
       );
     }
@@ -99,6 +120,14 @@ class CardDuelRoundPerspective {
     required this.theirBreakdown,
     required this.winner,
     required this.mySymbol,
+    required this.isStorm,
+    required this.overtime,
+    required this.myLuck,
+    required this.theirLuck,
+    required this.myAward,
+    required this.theirAward,
+    required this.mySquad,
+    required this.theirSquad,
   });
 
   factory CardDuelRoundPerspective.from(
@@ -110,6 +139,14 @@ class CardDuelRoundPerspective {
     final theirKey = symbol == 'O' ? 'X' : 'O';
     Map<String, dynamic> map(String key) =>
         Map<String, dynamic>.from((round[key] as Map?) ?? const {});
+    // وقت اضافه روی همین راند می‌نشیند (نه راند کارتی تازه).
+    final ot = round['overtime'] is Map
+        ? Map<String, dynamic>.from(round['overtime'] as Map)
+        : const <String, dynamic>{};
+    final inOvertime = ot.isNotEmpty;
+    int luck(String side) => inOvertime
+        ? NumberParser.toInt(ot['luck$side'])
+        : NumberParser.toInt(round['luck$side']);
     return CardDuelRoundPerspective._(
       mine: map('card$mineKey'),
       theirs: map('card$theirKey'),
@@ -121,6 +158,14 @@ class CardDuelRoundPerspective {
       theirBreakdown: map('breakdown$theirKey'),
       winner: '${round['winner'] ?? ''}',
       mySymbol: symbol,
+      isStorm: '${round['mod'] ?? ''}' == 'storm',
+      overtime: ot,
+      myLuck: luck(mineKey),
+      theirLuck: luck(theirKey),
+      myAward: NumberParser.toInt(round['award$mineKey']),
+      theirAward: NumberParser.toInt(round['award$theirKey']),
+      mySquad: inOvertime ? NumberParser.toInt(ot['base$mineKey']) : 0,
+      theirSquad: inOvertime ? NumberParser.toInt(ot['base$theirKey']) : 0,
     );
   }
 
@@ -134,15 +179,32 @@ class CardDuelRoundPerspective {
   final Map<String, dynamic> theirBreakdown;
   final String winner;
   final String mySymbol;
+  final bool isStorm;
+  final Map<String, dynamic> overtime;
+  final int myLuck;
+  final int theirLuck;
+  final int myAward;
+  final int theirAward;
+  final int mySquad;
+  final int theirSquad;
 
+  bool get inOvertime => overtime.isNotEmpty;
   bool get draw => winner == 'DRAW';
   bool get iWon => winner == mySymbol;
   bool get opponentWon => !draw && !iWon;
-  bool get contractValid => draw
-      ? myPower == theirPower
-      : iWon
-          ? myPower > theirPower
-          : theirPower > myPower;
+  bool get contractValid => inOvertime
+      ? iWon || opponentWon // وقت اضافه همیشه برنده دارد
+      : draw
+          ? myPower == theirPower
+          : iWon
+              ? myPower > theirPower
+              : theirPower > myPower;
+  /// امتیازی که از این راند به برنده رسید (عادی ۱، طوفانی/وقت اضافه ۲).
+  int get awardForWinner => inOvertime
+      ? 2
+      : isStorm
+          ? 2
+          : 1;
 }
 
 class _ArenaHero extends StatelessWidget {
@@ -412,6 +474,12 @@ class _LiveBattle extends StatelessWidget {
         : null;
     final history =
         (state['history'] as List? ?? const []).whereType<Map>().toList();
+    // الگوی راندهای دو‌امتیازی (دوئل طوفان) از بک‌اند.
+    final storm = (state['storm'] as List?)?.cast<dynamic>();
+    final roundMod = '${state['roundMod'] ?? ''}';
+    final modAnnounce = state['roundModAnnounce'] is Map
+        ? Map<String, dynamic>.from(state['roundModAnnounce'] as Map)
+        : const <String, dynamic>{};
     final iChose = state['iChose'] == true;
     final total = NumberParser.toInt(state['totalRounds']) == 0
         ? 5
@@ -424,6 +492,8 @@ class _LiveBattle extends StatelessWidget {
       theirScore: NumberParser.toInt(score[opponent]),
       roundIndex: roundIndex,
       totalRounds: total,
+      storm: storm,
+      playedRounds: history.length,
     );
     return Column(
       children: [
@@ -450,8 +520,39 @@ class _LiveBattle extends StatelessWidget {
           history: history,
           mine: mine,
           color: color,
+          storm: storm,
           tension: tension,
         ),
+        // روبانِ ماندگارِ راند دو‌امتیازی در نوار بازی (تا پایان راند می‌ماند).
+        if (roundMod == 'storm')
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4, top: 2),
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(999),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFFF7A1A), Color(0xFFFF4D2E)],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFFF4D2E).withValues(alpha: .4),
+                    blurRadius: 12,
+                  ),
+                ],
+              ),
+              child: Text(
+                '${modAnnounce['text'] ?? 'راند دو‌امتیازی؛ برنده ۲ امتیاز می‌برد'}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 11.5,
+                ),
+              ),
+            ),
+          ),
         Gaps.vXs,
         // ── چرا بنرِ افقی حذف شد ──
         //
@@ -1073,6 +1174,7 @@ class _RoundPips extends StatelessWidget {
     required this.history,
     required this.mine,
     required this.color,
+    this.storm,
     this.tension = const DuelTension.calm(),
   });
   final int total;
@@ -1080,10 +1182,14 @@ class _RoundPips extends StatelessWidget {
   final List<Map> history;
   final String mine;
   final Color color;
+  /// الگوی راندهای دو‌امتیازی (از بک‌اند)؛ روی پیپِ طوفانی هالهٔ آتشی.
+  final List<dynamic>? storm;
 
   /// پیپِ راندِ جاری در لحظهٔ سرنوشت‌ساز رنگ و هالهٔ حرارت می‌گیرد.
   /// کوچک‌ترین عنصرِ صحنه است ولی همانی که «کجای نبردیم» را می‌گوید.
   final DuelTension tension;
+
+  bool _isStorm(int i) => storm != null && i < storm!.length && storm![i] == true;
 
   @override
   Widget build(BuildContext context) {
@@ -1098,30 +1204,47 @@ class _RoundPips extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         for (var i = 0; i < total; i++)
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 280),
-            width: i == current && hot ? 40 : 34,
-            height: i == current && hot ? 9 : 8,
+          Container(
             margin: const EdgeInsets.symmetric(horizontal: 3),
-            decoration: BoxDecoration(
-              borderRadius: Corners.rPill,
-              color: i < history.length
-                  ? ('${history[i]['winner']}' == mine
-                      ? _emerald
-                      : '${history[i]['winner']}' == 'DRAW'
-                          ? _gold
-                          : _rose)
-                  : i == current
-                      ? liveColor
-                      : Colors.white12,
-              boxShadow: i == current && hot
-                  ? [
-                      BoxShadow(
-                        color: liveColor.withValues(alpha: .55),
-                        blurRadius: 14,
-                      ),
-                    ]
-                  : const [],
+            padding: const EdgeInsets.all(1.4),
+            decoration: _isStorm(i)
+                ? BoxDecoration(
+                    borderRadius: Corners.rPill,
+                    border: Border.all(
+                      color: const Color(0xFFFF7A1A).withValues(alpha: .7),
+                      width: 1.4,
+                    ),
+                  )
+                : null,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 280),
+              width: i == current && hot ? 36 : 30,
+              height: i == current && hot ? 9 : 8,
+              decoration: BoxDecoration(
+                borderRadius: Corners.rPill,
+                color: i < history.length
+                    ? (_isStorm(i) && '${history[i]['winner']}' != 'DRAW'
+                        ? const Color(0xFFFF7A1A)
+                        : '${history[i]['winner']}' == mine
+                            ? _emerald
+                            : '${history[i]['winner']}' == 'DRAW'
+                                ? _gold
+                                : _rose)
+                    : i == current
+                        ? (_isStorm(i) ? const Color(0xFFFF7A1A) : liveColor)
+                        : Colors.white12,
+                boxShadow: i == current && hot
+                    ? [
+                        BoxShadow(
+                          color: (_isStorm(i)
+                                  ? const Color(0xFFFF7A1A)
+                                  : liveColor)
+                              .withValues(alpha: .55),
+                          blurRadius: 14,
+                        ),
+                      ]
+                    : const [],
+              ),
             ),
           ),
       ],
@@ -1267,18 +1390,34 @@ class _ClashStageState extends State<_ClashStage>
     final iWon = view.iWon;
     final draw = view.draw;
     final opponentRole = widget.opponentRole;
+    final isStorm = view.isStorm;
+    final inOvertime = view.inOvertime;
+    final awardVal = view.awardForWinner;
+    // در وقت اضافه عددهای دو طرف قدرتِ کل ترکیب‌اند، نه تک‌کارت.
+    final showMyPower = inOvertime ? view.mySquad : myPower;
+    final showOtherPower = inOvertime ? view.theirSquad : otherPower;
     final verdictText = !view.contractValid
         ? 'خطای همگام‌سازی'
+        : inOvertime
+            ? iWon
+                ? 'وقت اضافه: +${faNum(awardVal)} تو'
+                : 'وقت اضافه: +${faNum(awardVal)} $opponentRole'
+            : draw
+                ? (isStorm ? 'مساوی؛ وقت اضافه' : 'مساوی')
+                : iWon
+                    ? '+${faNum(view.myAward > 0 ? view.myAward : awardVal)} تو'
+                    : '+${faNum(view.theirAward > 0 ? view.theirAward : awardVal)} $opponentRole';
+    final winnerSummary = inOvertime
+        ? iWon
+            ? 'در وقت اضافه قدرت ترکیب تو (${faNum(showMyPower)}) سنگین‌تر بود؛ ${faNum(awardVal)} امتیاز گرفتی.'
+            : 'در وقت اضافه ترکیب $opponentRole (${faNum(showOtherPower)}) سنگین‌تر بود؛ ${faNum(awardVal)} امتیاز رفت.'
         : draw
-            ? 'مساوی'
+            ? (isStorm
+                ? 'راند دو‌امتیازی مساوی شد؛ کار به وقت اضافه کشید.'
+                : 'عدد نهایی تو و $opponentRole هر دو ${faNum(myPower)} شد؛ امتیازی اضافه نشد.')
             : iWon
-                ? '+۱ تو'
-                : '+۱ $opponentRole';
-    final winnerSummary = draw
-        ? 'عدد نهایی تو و $opponentRole هر دو ${faNum(myPower)} شد؛ امتیازی اضافه نشد.'
-        : iWon
-            ? 'کارت تو «${myCard['name'] ?? 'بدون نام'}» با ${faNum(myPower)} در برابر ${faNum(otherPower)} برد؛ یک امتیاز به تو اضافه شد.'
-            : 'کارت $opponentRole «${otherCard['name'] ?? 'بدون نام'}» با ${faNum(otherPower)} در برابر ${faNum(myPower)} برد؛ یک امتیاز به $opponentRole اضافه شد.';
+                ? 'کارت تو «${myCard['name'] ?? 'بدون نام'}» با ${faNum(myPower)} در برابر ${faNum(otherPower)} برد${isStorm ? ' و دو امتیاز گرفت' : ' یک امتیاز به تو اضافه شد'}.'
+                : 'کارت $opponentRole «${otherCard['name'] ?? 'بدون نام'}» با ${faNum(otherPower)} در برابر ${faNum(myPower)} برد${isStorm ? ' و دو امتیاز گرفت' : ' یک امتیاز به $opponentRole اضافه شد'}.';
     final phase = _phase;
     final outcome = draw
         ? _gold
@@ -1368,49 +1507,80 @@ class _ClashStageState extends State<_ClashStage>
                     children: [
                       // کارتِ من همیشه سمت راست؛ حریف همیشه سمت چپ.
                       Expanded(
-                        child: Opacity(
-                          opacity: charge,
-                          child: Transform.translate(
-                            offset: Offset(38 * (1 - charge), 0),
-                            child: Transform.rotate(
-                              angle: 0.12 * (1 - charge),
-                              child: _ClashCardOwner(
-                                owner: 'تو',
-                                tint: _emerald,
-                                card: myCard,
-                                winner: showVerdict && iWon,
-                                loser: showVerdict && !draw && !iWon,
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Opacity(
+                              opacity: charge,
+                              child: Transform.translate(
+                                offset: Offset(38 * (1 - charge), 0),
+                                child: Transform.rotate(
+                                  angle: 0.12 * (1 - charge),
+                                  child: _ClashCardOwner(
+                                    owner: 'تو',
+                                    tint: _emerald,
+                                    card: myCard,
+                                    winner: showVerdict && iWon,
+                                    loser: showVerdict && !draw && !iWon,
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
+                            if (view.myLuck != 0)
+                              Positioned(
+                                top: 0,
+                                right: 4,
+                                child: _LuckChip(value: view.myLuck),
+                              ),
+                          ],
                         ),
                       ),
                       Expanded(
                         child: Column(
                           children: [
                             Text(
-                              '${faNum(round['round'])} • ${round['focusLabel'] ?? round['title']}',
-                              style: const TextStyle(
+                              '${faNum(round['round'])} • ${inOvertime ? 'وقت اضافه' : (round['focusLabel'] ?? round['title'])}',
+                              style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.white60,
+                                color: inOvertime ? const Color(0xFF7DD3FC) : (isStorm ? const Color(0xFFFFB066) : Colors.white60),
                                 fontWeight: FontWeight.w900,
                               ),
                               textAlign: TextAlign.center,
                             ),
+                            if (isStorm || inOvertime)
+                              Container(
+                                margin: const EdgeInsets.only(top: 4, bottom: 2),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 3),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(999),
+                                  gradient: LinearGradient(colors: inOvertime
+                                      ? const [Color(0xFF38BDF8), Color(0xFF6366F1)]
+                                      : const [Color(0xFFFF7A1A), Color(0xFFFF4D2E)]),
+                                ),
+                                child: Text(
+                                  inOvertime ? 'وقت اضافه' : 'راند دو‌امتیازی',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 10.5,
+                                  ),
+                                ),
+                              ),
                             const SizedBox(height: 7),
                             Column(
                               children: [
                                 _RoundPowerLine(
-                                  owner: 'تو',
-                                  value: showNumbers ? myPower * countT : 0,
+                                  owner: inOvertime ? 'ترکیب تو' : 'تو',
+                                  value: showNumbers ? showMyPower * countT : 0,
                                   visible: showNumbers,
                                   lead: showVerdict && iWon,
                                   color: _emerald,
                                 ),
                                 const SizedBox(height: 3),
                                 _RoundPowerLine(
-                                  owner: opponentRole,
-                                  value: showNumbers ? otherPower * countT : 0,
+                                  owner: inOvertime ? 'ترکیب $opponentRole' : opponentRole,
+                                  value: showNumbers ? showOtherPower * countT : 0,
                                   visible: showNumbers,
                                   lead: showVerdict && !draw && !iWon,
                                   color: _rose,
@@ -1459,26 +1629,72 @@ class _ClashStageState extends State<_ClashStage>
                                   ),
                                 ),
                               ),
+                            // جملهٔ رواییِ فارسیِ بانمک (ساختهٔ بک‌اند)؛
+                            // فقط در دوئل طوفان می‌آید و آینهٔ وب است.
+                            if (showVerdict)
+                              Builder(builder: (_) {
+                                final narr = mine == 'O'
+                                    ? (round['narrO'] as Map?)
+                                    : (round['narrX'] as Map?);
+                                final head = '${narr?['headline'] ?? ''}';
+                                if (head.isEmpty) return const SizedBox.shrink();
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 7),
+                                  child: Container(
+                                    constraints: const BoxConstraints(maxWidth: 210),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(alpha: .06),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: Colors.white.withValues(alpha: .12),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      head,
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        color: Color(0xFFE7F2FB),
+                                        fontSize: 10.5,
+                                        height: 1.5,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }),
                           ],
                         ),
                       ),
                       // کارتِ حریف از چپ.
                       Expanded(
-                        child: Opacity(
-                          opacity: charge,
-                          child: Transform.translate(
-                            offset: Offset(-38 * (1 - charge), 0),
-                            child: Transform.rotate(
-                              angle: -0.12 * (1 - charge),
-                              child: _ClashCardOwner(
-                                owner: opponentRole,
-                                tint: _rose,
-                                card: otherCard,
-                                winner: showVerdict && !draw && !iWon,
-                                loser: showVerdict && iWon,
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Opacity(
+                              opacity: charge,
+                              child: Transform.translate(
+                                offset: Offset(-38 * (1 - charge), 0),
+                                child: Transform.rotate(
+                                  angle: -0.12 * (1 - charge),
+                                  child: _ClashCardOwner(
+                                    owner: opponentRole,
+                                    tint: _rose,
+                                    card: otherCard,
+                                    winner: showVerdict && !draw && !iWon,
+                                    loser: showVerdict && iWon,
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
+                            if (view.theirLuck != 0)
+                              Positioned(
+                                top: 0,
+                                left: 4,
+                                child: _LuckChip(value: view.theirLuck),
+                              ),
+                          ],
                         ),
                       ),
                     ],
@@ -1612,6 +1828,47 @@ class _ClashCardOwner extends StatelessWidget {
       );
 }
 
+/// چیپ شانس روی کارتِ صحنهٔ برخورد (دوئل طوفان).
+///
+/// شانس باید «دیدنی» باشد: سبز یعنی عددِ امروز بالا پرید، قرمز یعنی توپ
+/// نچرخید. صفر نشان داده نمی‌شود تا شلوغ نشود. فقط نمایشِ همان عددی است
+/// که در حکم وارد شده — هیچ منطق تازه‌ای اینجا نیست.
+class _LuckChip extends StatelessWidget {
+  const _LuckChip({required this.value});
+  final int value;
+
+  @override
+  Widget build(BuildContext context) {
+    if (value == 0) return const SizedBox.shrink();
+    final good = value > 0;
+    final bg = good ? const Color(0xFF0FB37F) : const Color(0xFFE23B57);
+    final fg = good ? const Color(0xFF042016) : Colors.white;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: good
+              ? const [Color(0xFF22E7A6), Color(0xFF0FB37F)]
+              : const [Color(0xFFFB7185), Color(0xFFE23B57)],
+        ),
+        borderRadius: BorderRadius.circular(999),
+        boxShadow: [
+          BoxShadow(color: bg.withValues(alpha: .5), blurRadius: 10),
+        ],
+      ),
+      child: Text(
+        good ? '+${faNum(value)}' : '−${faNum(value.abs())}',
+        style: TextStyle(
+          color: fg,
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+          height: 1.1,
+        ),
+      ),
+    );
+  }
+}
+
 class _RoundPowerLine extends StatelessWidget {
   const _RoundPowerLine({
     required this.owner,
@@ -1742,6 +1999,20 @@ class _Finale extends StatelessWidget {
         : const {};
     final me = session.mySymbol ?? 'X';
     final other = me == 'X' ? 'O' : 'X';
+    // روایتِ پایان نبرد را بک‌اند می‌سازد (state.narration)؛ اگر نبود
+    // (کلاسیک/کلاینت قدیمی) همان جملهٔ فارسیِ ساده.
+    final narration = session.state['narration'] is Map
+        ? Map<String, dynamic>.from(session.state['narration'] as Map)
+        : const <String, dynamic>{};
+    final headline = '${narration['headline'] ?? ''}';
+    final achievement = narration['achievement'] is Map
+        ? Map<String, dynamic>.from(narration['achievement'] as Map)
+        : const <String, dynamic>{};
+    final fallbackHeadline = draw
+        ? 'پایه‌پایه؛ هیچ‌کس کم نیاورد'
+        : won
+            ? 'بردی؛ آرنا مالِ توست'
+            : 'این دور مالِ حریف بود؛ انتقام شیرین‌تره';
     return Stack(
       clipBehavior: Clip.hardEdge,
       children: [
@@ -1757,15 +2028,12 @@ class _Finale extends StatelessWidget {
           child: Column(
             children: [
               Text(
-                draw
-                    ? 'DRAW'
-                    : won
-                        ? 'VICTORY'
-                        : 'DEFEAT',
+                headline.isNotEmpty ? headline : fallbackHeadline,
+                textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 34,
+                  fontSize: 26,
+                  height: 1.4,
                   fontWeight: FontWeight.w900,
-                  letterSpacing: 3,
                   color: draw
                       ? _gold
                       : won
@@ -1773,6 +2041,27 @@ class _Finale extends StatelessWidget {
                           : _rose,
                 ),
               ),
+              if (achievement.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(999),
+                    gradient: const LinearGradient(
+                      colors: [Color(0x33FFD166), Color(0x2EFF7A1A)],
+                    ),
+                    border: Border.all(color: _gold.withValues(alpha: .4)),
+                  ),
+                  child: Text(
+                    '${achievement['label'] ?? ''}',
+                    style: const TextStyle(
+                      color: _gold,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
               Text(
                 'تو ${faNum(score[me])} — ${session.vsBot ? 'ربات' : 'حریف'} ${faNum(score[other])}',
                 textAlign: TextAlign.center,
@@ -1816,6 +2105,7 @@ class _Finale extends StatelessWidget {
                   history: history,
                   mine: me,
                   color: color,
+                  storm: (session.state['storm'] as List?)?.cast<dynamic>(),
                 ),
               if (history.isNotEmpty) ...[
                 Gaps.vSm,
@@ -2249,22 +2539,40 @@ class _FinalRoundBreakdown extends StatelessWidget {
     final view = CardDuelRoundPerspective.from(round, mySymbol);
     final mineWon = view.iWon;
     final draw = view.draw;
+    final inOvertime = view.inOvertime;
+    final isStorm = view.isStorm;
     final mine = view.mine;
     final theirs = view.theirs;
     final breakdownMine = view.myBreakdown;
     final breakdownTheirs = view.theirBreakdown;
-    final headline = draw
-        ? _gold
-        : mineWon
-            ? _emerald
-            : _rose;
+    final headline = inOvertime
+        ? _cyan
+        : draw
+            ? _gold
+            : mineWon
+                ? _emerald
+                : _rose;
+    final awardText = inOvertime
+        ? (mineWon
+            ? 'وقت اضافه: +${faNum(view.myAward > 0 ? view.myAward : 2)} برای تو'
+            : 'وقت اضافه: +${faNum(view.theirAward > 0 ? view.theirAward : 2)} برای $opponentRole')
+        : draw
+            ? (isStorm ? 'مساوی → وقت اضافه' : 'مساوی')
+            : mineWon
+                ? '+${faNum(view.myAward > 0 ? view.myAward : 1)} برای تو'
+                : '+${faNum(view.theirAward > 0 ? view.theirAward : 1)} برای $opponentRole';
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(Gaps.sm),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: .04),
         borderRadius: Corners.rLg,
-        border: Border.all(color: headline.withValues(alpha: .22)),
+        border: Border.all(
+          color: inOvertime
+              ? _cyan.withValues(alpha: .4)
+              : isStorm
+                  ? const Color(0xFFFF7A1A).withValues(alpha: .45)
+                  : headline.withValues(alpha: .22)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2273,7 +2581,7 @@ class _FinalRoundBreakdown extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'راند ${faNum(round['round'])} · ${round['focusLabel'] ?? round['title']}',
+                  'راند ${faNum(round['round'])} · ${inOvertime ? 'وقت اضافه' : (round['focusLabel'] ?? round['title'])}${isStorm && !inOvertime ? '  (دو‌امتیازی)' : ''}',
                   style: const TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w900,
@@ -2287,11 +2595,7 @@ class _FinalRoundBreakdown extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  draw
-                      ? 'مساوی'
-                      : mineWon
-                          ? '+۱ برای تو'
-                          : '+۱ برای $opponentRole',
+                  awardText,
                   style: TextStyle(
                     color: headline,
                     fontSize: 11.5,
@@ -2302,51 +2606,102 @@ class _FinalRoundBreakdown extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 6),
-          Text(
-            'کارت تو: ${mine['name'] ?? 'بدون نام'}  •  کارت $opponentRole: ${theirs['name'] ?? 'بدون نام'}',
-            style: const TextStyle(fontSize: 12, color: Colors.white70),
-          ),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              _MiniBreakChip(
-                label: 'ویژگی',
-                value: '${round['focusLabel'] ?? round['title']}',
-                tint: _cyan,
+          if (inOvertime) ...[
+            Text(
+              'وقت اضافه کارت مصرف نمی‌کند؛ قدرت کل ترکیب به‌همراه شانس بزرگ‌تر داوری می‌کند.',
+              style: TextStyle(
+                fontSize: 12,
+                color: _cyan.withValues(alpha: .95),
+                height: 1.5,
+                fontWeight: FontWeight.w800,
               ),
-              _MiniBreakChip(
-                label: 'عدد نهایی تو',
-                value: faNum(view.myPower),
-                tint: mineWon ? _emerald : _cyan,
-              ),
-              _MiniBreakChip(
-                label: 'عدد نهایی $opponentRole',
-                value: faNum(view.theirPower),
-                tint: !draw && !mineWon ? _rose : _gold,
-              ),
-              _MiniBreakChip(
-                label: 'اختلاف',
-                value: faNum(round['powerGap'] ?? 0),
-                tint: headline,
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          _BreakdownRow(title: 'تو', data: breakdownMine),
-          const SizedBox(height: 6),
-          _BreakdownRow(title: opponentRole, data: breakdownTheirs),
-          const SizedBox(height: 8),
-          Text(
-            '${round['reason'] ?? ''}',
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.white70,
-              height: 1.5,
-              fontWeight: FontWeight.w700,
             ),
-          ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                _MiniBreakChip(
+                  label: 'قدرت ترکیب تو',
+                  value: faNum(view.mySquad),
+                  tint: mineWon ? _emerald : _cyan,
+                ),
+                _MiniBreakChip(
+                  label: 'قدرت ترکیب $opponentRole',
+                  value: faNum(view.theirSquad),
+                  tint: !mineWon ? _rose : _gold,
+                ),
+                _MiniBreakChip(
+                  label: 'شانس تو',
+                  value: view.myLuck >= 0
+                      ? '+${faNum(view.myLuck)}'
+                      : '−${faNum(view.myLuck.abs())}',
+                  tint: view.myLuck >= 0 ? _emerald : _rose,
+                ),
+                _MiniBreakChip(
+                  label: 'شانس $opponentRole',
+                  value: view.theirLuck >= 0
+                      ? '+${faNum(view.theirLuck)}'
+                      : '−${faNum(view.theirLuck.abs())}',
+                  tint: view.theirLuck >= 0 ? _emerald : _rose,
+                ),
+              ],
+            ),
+          ] else ...[
+            Text(
+              'کارت تو: ${mine['name'] ?? 'بدون نام'}  •  کارت $opponentRole: ${theirs['name'] ?? 'بدون نام'}',
+              style: const TextStyle(fontSize: 12, color: Colors.white70),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                _MiniBreakChip(
+                  label: 'ویژگی',
+                  value: '${round['focusLabel'] ?? round['title']}',
+                  tint: _cyan,
+                ),
+                _MiniBreakChip(
+                  label: 'عدد نهایی تو',
+                  value: faNum(view.myPower),
+                  tint: mineWon ? _emerald : _cyan,
+                ),
+                _MiniBreakChip(
+                  label: 'عدد نهایی $opponentRole',
+                  value: faNum(view.theirPower),
+                  tint: !draw && !mineWon ? _rose : _gold,
+                ),
+                _MiniBreakChip(
+                  label: 'اختلاف',
+                  value: faNum(round['powerGap'] ?? 0),
+                  tint: headline,
+                ),
+                if (view.myLuck != 0)
+                  _MiniBreakChip(
+                    label: 'شانس تو',
+                    value: view.myLuck >= 0
+                        ? '+${faNum(view.myLuck)}'
+                        : '−${faNum(view.myLuck.abs())}',
+                    tint: view.myLuck >= 0 ? _emerald : _rose,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            _BreakdownRow(title: 'تو', data: breakdownMine),
+            const SizedBox(height: 6),
+            _BreakdownRow(title: opponentRole, data: breakdownTheirs),
+            const SizedBox(height: 8),
+            Text(
+              '${round['reason'] ?? ''}',
+              style: const TextStyle(
+                fontSize: 12,
+                color: Colors.white70,
+                height: 1.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -2947,11 +3302,16 @@ class _RoundIntroOverlay extends StatefulWidget {
     required this.focus,
     required this.roundNumber,
     required this.totalRounds,
+    this.mod,
+    this.modAnnounce,
   });
 
   final Map<String, dynamic>? focus;
   final int roundNumber;
   final int totalRounds;
+  // دوئل طوفان: 'storm' یعنی این راند دو‌امتیازی است.
+  final String? mod;
+  final Map<String, dynamic>? modAnnounce;
 
   @override
   State<_RoundIntroOverlay> createState() => _RoundIntroOverlayState();
@@ -3014,13 +3374,27 @@ class _RoundIntroOverlayState extends State<_RoundIntroOverlay>
     if (!_hasFocus) return const SizedBox.shrink();
     final stat = '${widget.focus?['stat'] ?? ''}';
     final hint = '${widget.focus?['hint'] ?? ''}';
-    final tint = _FocusBannerState._statColors[stat] ?? _cyan;
-    final icon = _FocusBannerState._statIcons[stat] ?? Icons.stars_rounded;
-    final statName = _FocusBannerState._statNames[stat] ?? '';
+    final isStorm = widget.mod == 'storm';
+    // راند دو‌امتیازی هالهٔ آتشی می‌گیرد تا یک نگاه معلوم باشد.
+    final tint = isStorm
+        ? const Color(0xFFFF7A1A)
+        : (_FocusBannerState._statColors[stat] ?? _cyan);
+    final icon = isStorm
+        ? Icons.local_fire_department_rounded
+        : (_FocusBannerState._statIcons[stat] ?? Icons.stars_rounded);
+    final statName = isStorm
+        ? 'طوفان!'
+        : (_FocusBannerState._statNames[stat] ?? '');
+    final kicker = isStorm ? 'راند دو‌امتیازی' : 'معیار این راند';
+    final subLine = isStorm
+        ? '${widget.modAnnounce?['sub'] ?? 'برنده ۲ امتیاز می‌برد؛ مساوی یعنی وقت اضافه'}'
+        : 'بالاترین عدد برنده است';
+    final announce = '${widget.modAnnounce?['text'] ?? ''}';
 
     return Semantics(
-      label:
-          'راند ${widget.roundNumber} از ${widget.totalRounds}. نبرد $statName. $hint',
+      label: isStorm
+          ? 'راند دو‌امتیازی! ${announce.isNotEmpty ? announce : 'برنده این راند دو امتیاز می‌برد.'}'
+          : 'راند ${widget.roundNumber} از ${widget.totalRounds}. نبرد $statName. $hint',
       child: AnimatedBuilder(
         animation: _c!,
         builder: (context, _) {
@@ -3260,12 +3634,12 @@ class _RoundIntroOverlayState extends State<_RoundIntroOverlay>
                           Opacity(
                             opacity: nameIn.clamp(0.0, 1.0),
                             child: Text(
-                              'معیار این راند',
+                              kicker,
                               style: TextStyle(
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.w800,
-                                color: tint.withValues(alpha: .90),
-                                letterSpacing: 1.6,
+                                color: tint.withValues(alpha: .95),
+                                letterSpacing: 1.2,
                               ),
                             ),
                           ),
@@ -3332,15 +3706,35 @@ class _RoundIntroOverlayState extends State<_RoundIntroOverlay>
                           const SizedBox(height: 9),
                           Opacity(
                             opacity: nameIn.clamp(0.0, 1.0),
-                            child: const Text(
-                              'بالاترین عدد برنده است',
+                            child: Text(
+                              isStorm
+                                  ? 'برنده ۲ امتیاز می‌برد'
+                                  : 'بالاترین عدد برنده است',
                               style: TextStyle(
                                 fontSize: 13.5,
-                                color: Colors.white70,
-                                fontWeight: FontWeight.w800,
+                                color: isStorm
+                                    ? const Color(0xFFFFD9B0)
+                                    : Colors.white70,
+                                fontWeight: FontWeight.w900,
                               ),
                             ),
                           ),
+                          if (isStorm)
+                            Opacity(
+                              opacity: nameIn.clamp(0.0, 1.0),
+                              child: Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  subLine,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    color: Colors.white60,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
                           const SizedBox(height: 18),
                           Transform.scale(
                             scale: beatScale,

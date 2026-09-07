@@ -131,4 +131,45 @@ void main() {
       expect(find.byType(CardDuelScoreboardForTest), findsOneWidget);
     });
   });
+
+  // ── دوئل طوفان: حرارت با امتیازِ متغیر (راند دو‌امتیازی) ──
+  group('حرارتِ نبرد — دوئل طوفان', () {
+    // راندهای ۲ و ۵ دو‌امتیازی‌اند (اندیس ۱ و ۴).
+    const storm = <dynamic>[false, true, false, false, true];
+
+    test('راند آخرِ دو‌امتیازیِ برابر decider است', () {
+      final t = DuelTension.from(
+        myScore: 3,
+        theirScore: 3,
+        roundIndex: 4,
+        storm: storm,
+        playedRounds: 4,
+      );
+      expect(t.decider, isTrue);
+    });
+
+    test('شروع نبرد با الگوی طوفان آرام است', () {
+      final t = DuelTension.from(
+        myScore: 0,
+        theirScore: 0,
+        roundIndex: 0,
+        storm: storm,
+        playedRounds: 0,
+      );
+      expect(t.level, DuelTensionLevel.calm);
+    });
+
+    test('وقتی همهٔ امتیازهای ممکن هم فاصله را پر نکند قفل است', () {
+      // ۶-۰ با سه راند مانده که یکی دو‌امتیازی است (حداکثر ۴ امتیاز).
+      final t = DuelTension.from(
+        myScore: 6,
+        theirScore: 0,
+        roundIndex: 2,
+        storm: storm,
+        playedRounds: 2,
+      );
+      expect(t.level, DuelTensionLevel.calm);
+      expect(t.matchPoint, isNull);
+    });
+  });
 }

@@ -803,6 +803,14 @@ async function startRoom(io, rules, gameId, a, b, stake, matchMode = null) {
   const id = crypto.randomUUID();
   const vsBot = !b;
 
+  // «دوئل طوفان» (فقط دوئل کارت) با قانونِ زندهٔ duelMayhem روشن می‌شود.
+  // rollout به همین یک عدد بند است: تمرین و با‌ربات و لابی و آنلاین همگی
+  // از همین می‌خوانند تا دیاگرامِ بازی ثابت بماند؛ برای rollout پلکانی
+  // (تمرین ← آنلاین بدون سهام ← با سهام) کافی است همین را با matchMode/
+  // stake ترکیب کنیم. فعلاً یک سوییچِ سراسری است که پیش‌فرض خاموش است.
+  const duelMayhemOn = gameId === 'card_duel'
+    && Number(liveContent.rules().duelMayhem) === 1;
+
   // Personalized games (currently card duel) validate and snapshot both
   // decks BEFORE reserving stake. If a deck is invalid, no points have moved.
   // Existing pure board rules continue to use their zero-argument create().
@@ -813,6 +821,7 @@ async function startRoom(io, rules, gameId, a, b, stake, matchMode = null) {
       vsBot,
       stake: s,
       matchMode,
+      mayhem: duelMayhemOn,
     })
     : rules.create();
 

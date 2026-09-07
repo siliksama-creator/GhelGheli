@@ -19,9 +19,30 @@ export function roundForViewer(round, me = 'X') {
   const contractValid = draw
     ? myPower === theirPower
     : mineWon ? myPower > theirPower : theirPower > myPower;
+
+  // ── دوئل طوفان (logicVersion 3) ──
+  const isStorm = round.mod === 'storm';
+  const overtime = round.overtime || null;
+  // شانسِ من/حریف برای چیپِ روی کارت (در وقت اضافه از overtime خوانده می‌شود).
+  const myLuck = overtime
+    ? num(mineIsO ? overtime.luckO : overtime.luckX)
+    : num(mineIsO ? round.luckO : round.luckX);
+  const theirLuck = overtime
+    ? num(mineIsO ? overtime.luckX : overtime.luckO)
+    : num(mineIsO ? round.luckX : round.luckO);
+  const luckRange = overtime ? num(overtime.luckRange) : num(round.luckRange);
+  // امتیازی که از این راند به من/حریف رسید (عادی ۱، طوفانی/وقت اضافه ۲).
+  const myAward = num(mineIsO ? round.awardO : round.awardX);
+  const theirAward = num(mineIsO ? round.awardX : round.awardO);
+  // در وقت اضافه، قدرتِ کل ترکیب به‌جای قدرتِ تک‌کارت می‌نشیند.
+  const mySquad = overtime ? num(mineIsO ? overtime.baseO : overtime.baseX) : null;
+  const theirSquad = overtime ? num(mineIsO ? overtime.baseX : overtime.baseO) : null;
+
   return {
     mine, theirs, myPower, theirPower, myFocus, theirFocus,
     myBreakdown, theirBreakdown, mineWon, draw, contractValid,
+    isStorm, overtime, myLuck, theirLuck, luckRange,
+    myAward, theirAward, mySquad, theirSquad,
   };
 }
 
@@ -88,39 +109,47 @@ export function resultMvp(state) {
 //   heated    → یک‌قدم تا تعیینِ تکلیف؛ راندهای میانیِ نزدیک.
 //   critical  → این راند می‌تواند نبرد را تمام کند (توپِ مسابقه).
 //   decider   → راندِ آخر و امتیاز برابر؛ همه‌چیز روی یک کارت.
-export function matchTension({ score, roundIndex, totalRounds = 5, me = 'X' }) {
+export function matchTension({ score, roundIndex, totalRounds = 5, me = 'X', storm = null, history = null }) {
   const opponent = me === 'X' ? 'O' : 'X';
   const mineScore = num(score?.[me]);
   const theirScore = num(score?.[opponent]);
-  const played = mineScore + theirScore;
   const total = num(totalRounds) || 5;
-  // راندهایی که هنوز بازی نشده‌اند، شاملِ همینی که در جریان است.
-  const remaining = Math.max(0, total - Math.max(num(roundIndex), played));
+  const playedRounds = Math.max(num(roundIndex), Array.isArray(history) ? history.length : 0);
+  const roundsLeft = Math.max(0, total - playedRounds);
 
-  if (remaining <= 0) return { level: 'calm', matchPoint: null, decider: false };
+  if (roundsLeft <= 0) return { level: 'calm', matchPoint: null, decider: false };
 
-  const lead = Math.abs(mineScore - theirScore);
-  // اگر فاصله از راندهای باقی‌مانده بیشتر باشد، نتیجه ریاضی‌وار قفل شده.
-  if (lead > remaining) return { level: 'calm', matchPoint: null, decider: false };
+  // حداکثر امتیازی که از راندهای باقی‌مانده می‌آید: در طوفان راندهای
+  // دوامتیازی ۲ می‌دهند، بقیه ۱. الگو از بک‌اند می‌آید (storm[i]).
+  let pointsLeft = 0;
+  for (let i = playedRounds; i < total; i++) {
+    pointsLeft += (storm && storm[i]) ? 2 : 1;
+  }
+  // اگر الگو در دسترس نبود (کلاینت قدیمی/کلاسیک)، ساده‌انگارانه هر راند ۱.
+  if (!storm) pointsLeft = roundsLeft;
 
-  // راندِ آخر با امتیازِ برابر: تنها حالتی که یک کارت همه‌چیز را می‌برد.
-  if (remaining === 1 && mineScore === theirScore) {
+  const lead = mineScore - theirScore;
+  const absLead = Math.abs(lead);
+  // اگر بیشترین امتیازِ ممکنِ حریف هم فاصله را پر نکند، نتیجه قفل شده.
+  // حریف حداکثر pointsLeft می‌گیرد و ما صفر: پس برتریِ > pointsLeft قفل است.
+  if (absLead > pointsLeft) return { level: 'calm', matchPoint: null, decider: false };
+
+  const thisRoundMax = (storm && storm[playedRounds]) ? 2 : 1;
+
+  // راندِ آخر و امتیاز برابر: همه‌چیز روی یک راند (که ممکن است دوامتیازی باشد).
+  if (roundsLeft === 1 && mineScore === theirScore) {
     return { level: 'decider', matchPoint: null, decider: true };
   }
 
-  // «توپِ مسابقه»: کسی که جلوست، با بردِ همین راند دیگر قابلِ جبران نیست.
-  // بردِ این راند → lead+1 در برابر remaining-1 راندِ باقی‌مانده.
-  const leaderCanSeal = lead >= 1 && (lead + 1) > (remaining - 1);
-  if (leaderCanSeal) {
-    return {
-      level: 'critical',
-      matchPoint: mineScore > theirScore ? 'mine' : 'theirs',
-      decider: false,
-    };
+  // «توپِ مسابقه»: فردِ جلو با بردنِ این راند به امتیازی برسد که حریف حتی
+  // با تمامِ راندهای بعدی نتواند جبران کند.
+  const leaderAhead = lead > 0 ? 'mine' : lead < 0 ? 'theirs' : null;
+  if (leaderAhead && (absLead + thisRoundMax) > (pointsLeft - thisRoundMax)) {
+    return { level: 'critical', matchPoint: leaderAhead, decider: false };
   }
 
-  // نبردِ نزدیک در نیمهٔ دوم: گرم اما هنوز سرنوشت‌ساز نیست.
-  if (remaining <= 2 || (lead === 0 && played >= 2)) {
+  // نبردِ نزدیک در نیمهٔ دوم.
+  if (roundsLeft <= 2 || (absLead === 0 && playedRounds >= 2)) {
     return { level: 'heated', matchPoint: null, decider: false };
   }
 

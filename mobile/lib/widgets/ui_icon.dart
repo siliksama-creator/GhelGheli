@@ -91,6 +91,10 @@ class UiIcons {
     'question': Icons.help_rounded,
     'ticket': Icons.confirmation_number_rounded,
     'glove': Icons.sports_mma_rounded,
+    // دوئل طوفان: شبدر (شانس روز)، ساعت (وقت اضافه)، ترازو (تساوی).
+    'clover': Icons.eco_rounded,
+    'clock': Icons.timer_rounded,
+    'scale': Icons.balance_rounded,
   };
 
   static IconData of(String name) => map[name] ?? Icons.circle;

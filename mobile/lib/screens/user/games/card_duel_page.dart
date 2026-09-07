@@ -419,16 +419,29 @@ class _CardDuelPageState extends State<CardDuelPage> {
       final me = _session.mySymbol ?? 'X';
       final other = me == 'X' ? 'O' : 'X';
       final mvp = _resultMvp();
-      final title = _session.winner == 'DRAW'
-          ? 'نبرد برابر!'
-          : _session.iWon
-              ? 'من آرنا را بردم!'
-              : 'این بار حریف برد!';
+      final narration = _session.state['narration'] is Map
+          ? _session.state['narration'] as Map
+          : const {};
+      final narratedTitle = '${narration['headline'] ?? ''}';
+      final achievement = narration['achievement'] is Map
+          ? narration['achievement'] as Map
+          : const {};
+      final title = narratedTitle.isNotEmpty
+          ? narratedTitle
+          : _session.winner == 'DRAW'
+              ? 'نبرد برابر!'
+              : _session.iWon
+                  ? 'من آرنا را بردم!'
+                  : 'این بار حریف برد!';
       final opponentRole = _session.vsBot ? 'ربات' : 'حریف';
       final scoreLabel =
           'تو ${faNum(score[me])} — $opponentRole ${faNum(score[other])}';
+      final achievementLine = achievement['label'] != null
+          ? 'نشان: ${achievement['label']}\n'
+          : '';
       final message = '$title\n'
           'نتیجه: $scoreLabel\n'
+          '$achievementLine'
           'MVP: ${mvp?['name'] ?? 'ستاره آرنا'} (عدد راند ${faNum(mvp?['mvpRoundPower'])})\n'
           'جرأت داری؟ مستقیم به چالشم بیا:\n${invite['shareUrl']}';
       final card = await _renderResultCard(
@@ -1022,6 +1035,13 @@ class _CardDuelPageState extends State<CardDuelPage> {
                     totalR,
                   ),
                   totalRounds: totalR,
+                  mod: '${st['roundMod'] ?? ''}'.isEmpty
+                      ? null
+                      : '${st['roundMod']}',
+                  modAnnounce: st['roundModAnnounce'] is Map
+                      ? Map<String, dynamic>.from(
+                          st['roundModAnnounce'] as Map)
+                      : null,
                 ),
               ),
           ],

@@ -26,7 +26,7 @@ function create() {
   );
 }
 
-function createFromDecks(deckX, deckO, { seed = 'duel-seed' } = {}) {
+function createFromDecks(deckX, deckO, { seed = 'duel-seed', mayhem = false } = {}) {
   if (!Array.isArray(deckX) || !Array.isArray(deckO)
       || deckX.length !== duel.DECK_SIZE || deckO.length !== duel.DECK_SIZE) {
     throw new Error('هر بازیکن باید ترکیب پنج‌کارتی معتبر داشته باشد');
@@ -35,6 +35,9 @@ function createFromDecks(deckX, deckO, { seed = 'duel-seed' } = {}) {
     X: deckX.map(duel.publicCard),
     O: deckO.map(duel.publicCard),
   };
+  // الگوی راندهای دوامتیازی فقط در حالت طوفان و فقط از seed — پنهان نیست و
+  // موتور در شروع هر راند (پیش از قفل) آن را اعلام می‌کند.
+  const storm = mayhem ? duel.stormPattern(seed) : [false, false, false, false, false];
   return {
     decks,
     remaining: {
@@ -48,6 +51,8 @@ function createFromDecks(deckX, deckO, { seed = 'duel-seed' } = {}) {
     lastRound: null,
     previousWinner: null,
     seed,
+    mayhem: mayhem === true,
+    storm,
   };
 }
 
@@ -62,7 +67,7 @@ async function validatePlayer(user, { vsBot = false } = {}) {
   return prepared.cards;
 }
 
-async function createWithContext({ playerX, playerO, vsBot, seed = 'live-seed' }) {
+async function createWithContext({ playerX, playerO, vsBot, seed = 'live-seed', mayhem = false }) {
   const own = await duel.deckCards(playerX?.id);
   const ownCards = own.cards.length === duel.DECK_SIZE
     ? own.cards
@@ -72,7 +77,7 @@ async function createWithContext({ playerX, playerO, vsBot, seed = 'live-seed' }
     error.status = 400;
     throw error;
   }
-  if (vsBot) return createFromDecks(ownCards, duel.botDeck(ownCards), { seed });
+  if (vsBot) return createFromDecks(ownCards, duel.botDeck(ownCards), { seed, mayhem });
 
   const opponent = await duel.deckCards(playerO?.id);
   if (opponent.cards.length !== duel.DECK_SIZE) {
@@ -80,7 +85,7 @@ async function createWithContext({ playerX, playerO, vsBot, seed = 'live-seed' }
     error.status = 409;
     throw error;
   }
-  return createFromDecks(own.cards, opponent.cards, { seed });
+  return createFromDecks(own.cards, opponent.cards, { seed, mayhem });
 }
 
 function isValidMove(state, move, player) {
@@ -103,16 +108,47 @@ function applyMove(state, move, player) {
   }
 
   const roundSeed = `${state.seed || 'live'}:${state.roundIndex}:${state.pending.X}:${state.pending.O}:${state.previousWinner || 'start'}`;
+  const isStorm = state.mayhem && state.storm[state.roundIndex] === true;
+  const mod = isStorm ? 'storm' : null;
   const resolved = duel.resolveRound(
     cardX, cardO, state.roundIndex, state.previousWinner, null, roundSeed,
+    { mayhem: state.mayhem === true, mod },
   );
+
+  // ── راند دوامتیازیِ مساوی → وقت اضافه ──
+  // کارتی مصرف نمی‌شود (قاعدهٔ ۵ کارت/۵ راند نمی‌شکند): وقت اضافه با قدرتِ
+  // کلِ ترکیب + شانسِ بزرگ داوری می‌شود و برنده همان دو امتیاز را می‌گیرد.
+  // نتیجه به‌صورت `overtime` روی همین راند می‌نشیند، نه راند کارتی جدید.
+  if (resolved.mod === 'storm' && resolved.winner === 'DRAW') {
+    const ot = duel.resolveOvertime({
+      deckX: state.decks.X,
+      deckO: state.decks.O,
+      seed: roundSeed,
+    });
+    resolved.winner = ot.winner;
+    resolved.winnerCardId = ot.winner === 'X' ? cardX.cardTypeId ?? idOf(cardX) : cardO.cardTypeId ?? idOf(cardO);
+    resolved.awardX = ot.winner === 'X' ? duel.STORM_AWARD : 0;
+    resolved.awardO = ot.winner === 'O' ? duel.STORM_AWARD : 0;
+    resolved.overtime = ot;
+    resolved.cinematic = 'وقت اضافه — کار به ترکیب کشید!';
+    // روایتِ راند را با برندهٔ وقت اضافه بازسازی کن تا جمله با حکم نهایی
+    // بخواند (و روایتِ وقت اضافه هم ضمیمه باشد).
+    if (resolved.narrX && resolved.narrO) {
+      resolved.narrX = duel.narrateRound(resolved, 'X');
+      resolved.narrO = duel.narrateRound(resolved, 'O');
+      resolved.narrX.overtime = duel.narrateOvertime(ot);
+      resolved.narrO.overtime = duel.narrateOvertime(ot);
+    }
+  }
+
   state.remaining.X = state.remaining.X.filter(id => id !== state.pending.X);
   state.remaining.O = state.remaining.O.filter(id => id !== state.pending.O);
   state.history.push(resolved);
 
   // اسکوربورد از همان historyِ حکم‌ها مشتق می‌شود؛ دیگر یک شمارندهٔ دوم
   // نیست که بتواند از برندهٔ کارت جدا شود. این invariant قلبِ لوپ پنج‌گانه
-  // است: برای X/O دقیقاً تعدادِ round.winnerهای همان سمت را می‌شماریم.
+  // است: در نسخهٔ ۳ جمعِ awardها (راند عادی ۱، دوامتیازی/وقت اضافه ۲) و در
+  // نسخهٔ ۲ شمارشِ سادهٔ برنده.
   state.score = duel.scoreFromHistory(state.history);
   resolved.scoreAfter = { ...state.score };
   resolved.pointAwardedTo = resolved.winner === 'DRAW' ? null : resolved.winner;
@@ -134,12 +170,46 @@ function result(state) {
 
 function nextTurn() { return 'X'; }
 
+function decorate(s, player) {
+  // تیتر/دستاوردِ پایان نبرد را بک‌اند می‌سازد؛ فقط طوفان و فقط پایان.
+  if (s && s.mayhem) {
+    const mine = ['X', 'O'].includes(player) ? player : 'X';
+    const finalWinner = resultState(s);
+    if (finalWinner) {
+      s.narration = duel.narrateMatch({
+        history: s.history || [],
+        score: s.score,
+        winner: finalWinner,
+        me: mine,
+      });
+    }
+  }
+  return s;
+}
+
+// برندهٔ نهایی از روی publicState (که history کامل دارد) — بدون دستکاری state.
+function resultState(pub) {
+  const rounds = (pub && pub.history) || [];
+  if (rounds.length < duel.DECK_SIZE) return null;
+  const score = pub.score || duel.scoreFromHistory(rounds);
+  if (score.X === score.O) return 'DRAW';
+  return score.X > score.O ? 'X' : 'O';
+}
+
 function publicState(state, player) {
   const mine = ['X', 'O'].includes(player) ? player : 'X';
   const opponent = mine === 'X' ? 'O' : 'X';
   const score = duel.scoreFromHistory(state.history);
+  const mayhem = state.mayhem === true;
+  const roundMod = mayhem && state.storm && state.storm[state.roundIndex] ? 'storm' : null;
   return {
-    logicVersion: 2,
+    logicVersion: mayhem ? 3 : 2,
+    mod: mayhem ? 'storm' : null,
+    mayhem,
+    storm: mayhem ? state.storm : null,
+    // مادِ راندِ جاری (پیش از قفل اعلام می‌شود) + بنرِ فارسی/آیکون.
+    roundMod,
+    roundModAnnounce: roundMod === 'storm' ? duel.stormAnnounce() : null,
     score,
     roundIndex: state.history.length,
     totalRounds: duel.DECK_SIZE,
@@ -275,6 +345,7 @@ module.exports = {
   result,
   nextTurn,
   publicState,
+  decorate,
   botMove,
   onFinish,
 };
