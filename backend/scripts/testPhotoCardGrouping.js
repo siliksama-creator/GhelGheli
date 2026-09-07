@@ -81,12 +81,11 @@ check(/inventory_count/.test(routes) && /submission_count/.test(routes)
   && /committed_code_count/.test(routes),
   'whole-card deletion protects user inventory, history, and committed codes');
 
+// پنل ادمین اندروید حذف شده (docs/ADMIN_PANEL_MOBILE_RETIREMENT.md)؛ مدیریت
+// فقط وب است، پس سمت ادمین روی پنل وب سنجیده می‌شود.
 const adminWeb = read('admin/src/pages/photo-cards.jsx');
-const adminMobile = read('mobile/lib/screens/admin/admin_photo_cards.dart');
 check(/GroupedCardTile/.test(adminWeb) && /deleteCard\(card\)/.test(adminWeb),
   'Admin Web edits and deletes grouped cards');
-check(/GroupedPhotoCardTile/.test(adminMobile) && /_deleteCard\(Map card\)/.test(adminMobile),
-  'Admin Android edits and deletes grouped cards');
 
 const tapAndroid = read('mobile/lib/screens/user/games/tap/tap_screen.dart');
 const tapWeb = read('userweb/src/tapGame.jsx');

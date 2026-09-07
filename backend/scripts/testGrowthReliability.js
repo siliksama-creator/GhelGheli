@@ -84,9 +84,8 @@ ok(webGames.includes('cosmetics: d.cosmetics') && mobileGames.includes("_cosmeti
 ok(read('userweb/src/screens/Home.jsx').includes('دعوت و کسب درآمد')
   && read('mobile/lib/screens/user/dashboard_page.dart').includes('دعوت و کسب درآمد'),
   'dashboard invitation shortcut communicates earning on both clients');
-ok(read('admin/src/pages/analytics.jsx').includes('/api/admin/analytics')
-  && read('mobile/lib/screens/admin/admin_analytics.dart').includes('/api/admin/analytics'),
-  'analytics/crash dashboard ships on both admin clients');
+ok(read('admin/src/pages/analytics.jsx').includes('/api/admin/analytics'),
+  'analytics/crash dashboard ships on the web admin panel');
 
 // ── بند ۶الف/۶بِ ممیزیِ مستقلِ دوم: ایندکسِ جدول‌های پرترافیک و
 //    هرسِ analytics_events. مایگریشن ۰۸۱ باید هر دو ایندکسِ جدید را

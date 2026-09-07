@@ -102,7 +102,6 @@ const mobileFrame = read('mobile/lib/widgets/rarity_card_frame.dart');
 const mobileInventory = read('mobile/lib/screens/user/inventory_page.dart');
 const mobileDetail = read('mobile/lib/screens/shared/card_detail_sheet.dart');
 const mobileDuel = read('mobile/lib/screens/user/games/card_duel/card_duel_widgets.dart');
-const mobileAdmin = read('mobile/lib/screens/admin/photo_cards/grouped_card_tile.dart');
 check(['معمولی','نقره‌ای','طلایی','پرمیوم','لجند'].every(label => mobileFrame.includes(label)),
   'Android rarity frame carries the same five Persian tier labels');
 check(/AnimationController/.test(mobileFrame) && /SweepGradient/.test(mobileFrame)
@@ -115,9 +114,8 @@ check(!/football_icon/.test(mobileInventory) && !/football_icon/.test(mobileDeta
 check(/RarityCardFrame/.test(mobileInventory) && /RarityCardFrame/.test(mobileDetail)
   && /RarityCardFrame/.test(mobileDuel),
   'Android inventory, detail, and duel share the runtime rarity frame');
-check(/RarityCardFrame/.test(mobileAdmin) && /analysis_complete/.test(mobileAdmin)
-  && /fingerprint_complete/.test(mobileAdmin) && /side\['width'\]/.test(mobileAdmin),
-  'Android Admin preview shows rarity, analyzer health, dimensions, and sides');
+// پنل ادمین اندروید حذف شده؛ پیش‌نمایش کارت در پنل وب ادمین سنجیده می‌شود
+// (پایین‌تر، adminTile).
 
 const adminTile = read('admin/src/components/photoCards/GroupedCardTile.jsx');
 const adminCss = read('admin/src/styles.css');

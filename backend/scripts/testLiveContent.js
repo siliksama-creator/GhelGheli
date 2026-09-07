@@ -217,12 +217,12 @@ ok('history endpoint از historyView رد می‌شود (ردیفِ لاغر)',
 ok('تاریخچه، نامِ ادمین را با LEFT JOIN از admin_users می‌گیرد',
   /LEFT JOIN admin_users/.test(svcSrc) && /admin_username/.test(svcSrc));
 {
+  // پنل ادمین اندروید حذف شده (docs/ADMIN_PANEL_MOBILE_RETIREMENT.md)؛ فقط وب.
   const up = path.join(root, '..');
   const webPanel = fs.readFileSync(path.join(up, 'admin/src/pages/live-copy.jsx'), 'utf8');
-  const mobPanel = fs.readFileSync(path.join(up, 'mobile/lib/screens/admin/admin_live_copy.dart'), 'utf8');
-  ok('هر دو پنل نامِ ادمین را نشان می‌دهند و فیلدِ camelCase را می‌خوانند',
+  ok('پنل وب نامِ ادمین را نشان می‌دهد و فیلدِ camelCase را می‌خواند',
   /whoFor/.test(webPanel) && /adminUsername/.test(webPanel)
-    && /adminUsername/.test(mobPanel) && /createdAt/.test(mobPanel));
+    && /createdAt/.test(webPanel));
 }
 ok('/api/config copy می‌دهد', /copy: liveContent\.copy\(\)/.test(routeSrc));
 ok('/api/config rules می‌دهد', /rules: liveContent\.rules\(\)/.test(routeSrc));

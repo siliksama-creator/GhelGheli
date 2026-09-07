@@ -65,24 +65,23 @@ const server = read('backend/src/server.js');
 ok(server.includes("require('./routes/adminCardBox')"),
   'مسیر ادمین صندوق در server.js mount شده');
 
+// پنل ادمین اندروید حذف شده (docs/ADMIN_PANEL_MOBILE_RETIREMENT.md)؛ مدیریت
+// فقط از پنل وب است، پس سمت ادمین روی پنل وب سنجیده می‌شود.
 const web = read('admin/src/pages/card-box.jsx');
-const droid = read('mobile/lib/screens/admin/admin_card_box.dart');
-ok(web.includes('/api/admin/card-box') && droid.includes('/api/admin/card-box'),
-  'هر دو پنل همان مسیر را صدا می‌زنند');
-ok(web.includes('CardBoxAdminPage') && droid.includes('class AdminCardBox'),
-  'هر دو پنل صفحهٔ واقعی دارند نه دکمهٔ مرده');
-ok(read('admin/src/main.jsx').includes('card-box')
-  && read('mobile/lib/screens/admin/admin_shell.dart').includes('AdminCardBox'),
-  'هر دو شل ادمین صفحه را نشان می‌دهند');
+ok(web.includes('/api/admin/card-box'),
+  'پنل وب ادمین همان مسیر صندوق را صدا می‌زند');
+ok(web.includes('CardBoxAdminPage'),
+  'پنل وب ادمین صفحهٔ واقعی صندوق دارد نه دکمهٔ مرده');
+ok(read('admin/src/main.jsx').includes('card-box'),
+  'شل وب ادمین صفحهٔ صندوق را نشان می‌دهد');
 
 // سوییچ فروش (خواستهٔ مالک: «مدیریت صندوق کارت فروشگاه از ادمین»).
 ok(/saveEnabled/.test(svc) && /card_box_enabled/.test(svc),
   'سرویس سوییچ فروش را در app_settings ذخیره می‌کند');
 ok(/body\.enabled/.test(routes) && /saveEnabled/.test(routes),
   'PUT ادمین سوییچ فروش را می‌پذیرد');
-ok(web.includes('وضعیت فروش') && web.includes('enabled')
-  && droid.includes('وضعیت فروش') && droid.includes("'enabled': _enabled"),
-  'هر دو پنل سوییچ فروش را نشان می‌دهند و ذخیره می‌کنند');
+ok(web.includes('وضعیت فروش') && web.includes('enabled'),
+  'پنل وب ادمین سوییچ فروش را نشان می‌دهد و ذخیره می‌کند');
 const shopSvc = read('backend/src/services/shopService.js');
 ok(/card_box_enabled/.test(shopSvc) && /BOX_DISABLED/.test(shopSvc),
   'خرید صندوق وقتی فروش بسته است در سرور رد می‌شود — نه فقط در ظاهر');
@@ -90,22 +89,6 @@ ok(read('userweb/src/components/CardBox.jsx').includes('موقتاً غیرفع�
   && read('mobile/lib/widgets/card_box.dart').includes('موقتاً غیرفعال'),
   'هر دو کلاینت کاربر پیام بسته‌بودن فروش را نشان می‌دهند');
 
-const shell = read('mobile/lib/screens/admin/admin_shell.dart');
-const pages = shell.match(/Admin[A-Za-z]+\(api:/g) || [];
-const titlesBlock = shell.split('static const _titles = [')[1].split('];')[0];
-const titles = titlesBlock.match(/'[^']+'/g) || [];
-const iconsBlock = shell.split('static const _icons = [')[1].split('];')[0];
-const icons = iconsBlock.match(/Icons\.\w+/g) || [];
-ok(pages.length === titles.length && titles.length === icons.length,
-  `شل اندروید ${pages.length} صفحه/عنوان/آیکون هم‌اندازه دارد`);
-ok(titles.some((t) => t.includes('صندوق کارت')),
-  'عنوان صندوق کارت در ناوبری اندروید هست');
-
-// ساده‌خوانیِ پنل: هر صفحه در هر دو کلاینت توضیحِ یک‌خطی دارد.
-const subsMatch = shell.match(/_subtitles = \[([\s\S]*?)\];/);
-const subCount = subsMatch ? (subsMatch[1].match(/'[^']+',/g) || []).length : 0;
-ok(subCount === titles.length,
-  `شل اندروید برای هر صفحه توضیح دارد (${subCount}/${titles.length})`);
 const webNav = read('admin/src/main.jsx');
 // قالبِ NAV از ۳.۲ به بعد سه‌سطری است: توضیح در سطرِ خودش و کلیدِ گروه در
 // سطرِ بعد. الگوی قبلی «'],» را می‌خواست — یعنی خطای سینتکسِ JS نه، بلکه

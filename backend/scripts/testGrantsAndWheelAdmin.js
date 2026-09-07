@@ -139,23 +139,17 @@ ok(/grant-item/.test(webUsers)
   && /اعطا کن/.test(webUsers)
   && /submitGrant/.test(webUsers),
   'وب فرم اعطای جایزه را واقعاً رندر می‌کند — نه فقط API را صدا بزند');
-ok(/grant-item/.test(read('mobile/lib/screens/admin/admin_users.dart'))
-  && /_grantItem/.test(read('mobile/lib/screens/admin/admin_users.dart'))
-  && /showDialog/.test(read('mobile/lib/screens/admin/admin_users.dart')),
-  'اندروید دیالوگ اعطای جایزه دارد');
+// پنل ادمین اندروید حذف شده (docs/ADMIN_PANEL_MOBILE_RETIREMENT.md)؛ مدیریت
+// فقط وب است، پس دیالوگ اعطا روی پنل وب (بالا) سنجیده می‌شود.
 
 ok(/TickerProviderStateMixin/.test(read('mobile/lib/screens/user/wheel_page.dart'))
   && !/class _WheelPageState[\s\S]{0,80}SingleTickerProviderStateMixin/
     .test(read('mobile/lib/screens/user/wheel_page.dart')),
   'گردونهٔ اندروید دو انیمیشن را با یک ticker نمی‌ترکاند');
 
-ok(/RefreshIndicator/.test(read('mobile/lib/screens/admin/admin_wheel.dart')),
-  'پنل گردونهٔ اندروید کشیدن-برای-تازه‌سازی دارد');
-
 ok(server.includes("require('./routes/adminCardBox')")
-  && read('admin/src/pages/card-box.jsx').includes('/api/admin/card-box')
-  && read('mobile/lib/screens/admin/admin_card_box.dart').includes('/api/admin/card-box'),
-  'شانس صندوق از هر دو پنل ادمین ذخیره می‌شود');
+  && read('admin/src/pages/card-box.jsx').includes('/api/admin/card-box'),
+  'شانس صندوق از پنل وب ادمین ذخیره می‌شود');
 
 ok(/<GrantChestOpener/.test(webWheelUi)
   && read('userweb/src/components/CardBoxReveal.jsx').includes('cardBoxReveal'),

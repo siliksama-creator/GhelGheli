@@ -95,8 +95,12 @@ console.log('\n== اندروید: ظاهر و رفتار ۲۰۲۶ ==');
     'داشبورد اندروید دادهٔ bootstrap را به کارت استریک پاس می‌دهد');
   ok(/RadialGradient/.test(read('mobile/lib/screens/user/home_shell.dart')),
     'پوستهٔ اندروید یک پس‌زمینهٔ aurora سراسری دارد');
-  ok(/_AdminBackdrop/.test(read('mobile/lib/screens/admin/admin_shell.dart')),
-    'پنل ادمین اندروید هم از پس‌زمینهٔ پریمیوم یکپارچه استفاده می‌کند');
+  // پنل ادمین از اپ موبایل حذف شده (docs/ADMIN_PANEL_MOBILE_RETIREMENT.md) و
+  // مدیریت فقط از پنل وب است؛ پس معیار یکپارچگیِ پس‌زمینه روی وبِ ادمین سنجیده
+  // می‌شود، نه روی فایلی که دیگر وجود ندارد.
+  ok(/body\s*\{[\s\S]*background/.test(read('admin/src/theme.css')) ||
+     /background/.test(read('admin/src/styles.css')),
+    'پنل وب ادمین هم پس‌زمینهٔ پریمیوم یکپارچه دارد');
 }
 
 console.log('\n== وب: هم‌تراز با اندروید ==');

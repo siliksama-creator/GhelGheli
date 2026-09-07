@@ -38,7 +38,7 @@ function ok(condition, message) {
 }
 
 const web = read('admin/src/pages/league.jsx');
-const droid = read('mobile/lib/screens/admin/admin_league.dart');
+// پنل ادمین اندروید حذف شده (docs/ADMIN_PANEL_MOBILE_RETIREMENT.md)؛ مدیریت فقط وب است.
 const route = read('backend/src/routes/adminLeague.js');
 const ui = read('admin/src/components/ui.jsx');
 
@@ -47,14 +47,10 @@ console.log('\n== پنل ادمین: جوایز غیرنقدی لیگ ==');
 // ── ۱) هر دو پنل جدول را می‌فرستند ────────────────────────────────────
 ok(/perkTable:\s*perks/.test(web),
   'وب هنگام ذخیره perkTable را در بدنهٔ PATCH می‌فرستد');
-ok(/'perkTable':\s*_perks/.test(droid),
-  'اندروید هنگام ذخیره perkTable را در بدنهٔ PATCH می‌فرستد');
 
 // ── ۲) هر دو پنل جدول را از پاسخ می‌خوانند ────────────────────────────
 ok(/setPerks\(Array\.isArray\(x\.perkTable\)/.test(web),
   'وب perkTable را از پاسخ سرور می‌خواند');
-ok(/_perks\s*=\s*List<Map>\.from\(d\?\['perkTable'\]/.test(droid),
-  'اندروید perkTable را از پاسخ سرور می‌خواند');
 
 // ── ۳) فهرست آیتم‌های فروشگاه برای منوی کشویی ─────────────────────────
 //
@@ -66,14 +62,10 @@ ok(/is_active\s*=\s*true/.test(route),
   'فقط آیتم‌های فعال پیشنهاد می‌شوند — جایزهٔ آیتمِ بازنشسته بی‌معناست');
 ok(/setShopItems\(x\.shopItems/.test(web) && /shopItems\.map/.test(web),
   'وب آیتم‌ها را در منوی کشویی نشان می‌دهد، نه ورودی متنی آزاد');
-ok(/_shopItems\s*=\s*List<Map>\.from\(d\?\['shopItems'\]/.test(droid)
-  && /DropdownButtonFormField<String>\(\s*key: ValueKey\('perk_slug_/.test(droid),
-  'اندروید آیتم‌ها را در منوی کشویی نشان می‌دهد، نه ورودی متنی آزاد');
 
 // ── ۴) هر سه نوع جایزه در هر دو پنل ───────────────────────────────────
 for (const kind of ['plus_days', 'points', 'shop_item', 'card_box']) {
   ok(web.includes(`'${kind}'`), `وب نوع ${kind} را پشتیبانی می‌کند`);
-  ok(droid.includes(`'${kind}'`), `اندروید نوع ${kind} را پشتیبانی می‌کند`);
   ok(route.includes(`'${kind}'`), `سرور نوع ${kind} را می‌پذیرد`);
 }
 
@@ -82,11 +74,8 @@ for (const kind of ['plus_days', 'points', 'shop_item', 'card_box']) {
 // دقیقاً خواستهٔ مالک: «۵۰ نفر نقدی، ۲۰ نفر بعدی غیرنقدی». بدون این
 // دکمه مدیر باید ۲۰ بار روی «افزودن» بزند و ۲۰ بار رتبه تایپ کند.
 ok(/length:\s*20/.test(web), 'وب دکمهٔ ساخت ۲۰ رتبهٔ یکجا دارد');
-ok(/List<Map>\.generate\(\s*20,/.test(droid),
-  'اندروید دکمهٔ ساخت ۲۰ رتبهٔ یکجا دارد');
-ok(/Number\(winnerCount\)\s*\+\s*1/.test(web)
-  && /_winnerCount\s*\+\s*1/.test(droid),
-  'در هر دو پنل رتبه‌ها از درست بعدِ ردهٔ نقدی شروع می‌شوند');
+ok(/Number\(winnerCount\)\s*\+\s*1/.test(web),
+  'وب رتبه‌ها را از درست بعدِ ردهٔ نقدی شروع می‌کند');
 
 // ── ۶) هشدارِ رتبهٔ تکراری، پیش از ذخیره ───────────────────────────────
 //
@@ -94,8 +83,6 @@ ok(/Number\(winnerCount\)\s*\+\s*1/.test(web)
 // پر کردنِ ۲۰ ردیف یک پیام خطای مبهم می‌گیرد و نمی‌داند کدام ردیف.
 ok(/perkRankCounts/.test(web) && /رتبهٔ تکراری/.test(web),
   'وب رتبهٔ تکراری را روی همان ردیف علامت می‌زند');
-ok(/_isDuplicateRank/.test(droid) && /errorText: dup/.test(droid),
-  'اندروید رتبهٔ تکراری را روی همان ردیف علامت می‌زند');
 ok(/تکراری است/.test(route),
   'سرور هم به‌عنوان آخرین خط دفاع رتبهٔ تکراری را رد می‌کند');
 
@@ -108,10 +95,6 @@ const saveBody = web.slice(web.indexOf('async function save()'),
   web.indexOf('async function saveDates()'));
 ok(/catch\s*\(e\)/.test(saveBody) && /notify\(/.test(saveBody),
   'وب پیام خطای اعتبارسنجی سرور را به مدیر نشان می‌دهد');
-const droidSave = droid.slice(droid.indexOf('Future<void> _save()'),
-  droid.indexOf('Future<DateTime?> _pickDateTime'));
-ok(/catch\s*\(e\)/.test(droidSave) && /_snack\(apiError\(e\)\)/.test(droidSave),
-  'اندروید پیام خطای اعتبارسنجی سرور را به مدیر نشان می‌دهد');
 
 // ── ۸) فصلِ ویرایش‌شونده همان فصلِ نمایش‌داده‌شده باشد ─────────────────
 //
@@ -126,17 +109,15 @@ ok(/data\.editingSeasonTitle/.test(route),
   'سرور عنوان فصلِ ویرایش‌شونده را برمی‌گرداند تا پنل صریح باشد');
 ok(/x\.prizeTable\?\.length\s*\?\s*x\.prizeTable/.test(web),
   'وب جدول نقدی را از prizeTable می‌خواند نه از season.prize_table');
-ok(/d\?\['prizeTable'\]/.test(droid),
-  'اندروید جدول نقدی را از prizeTable می‌خواند نه از season.prize_table');
-ok(/editingTitle/.test(web) && /_editingTitle/.test(droid),
-  'هر دو پنل نام فصلِ در حال ویرایش را به مدیر نشان می‌دهند');
+ok(/editingTitle/.test(web),
+  'وب نام فصلِ در حال ویرایش را به مدیر نشان می‌دهد');
 
 // ── ۹) جوایز غیرنقدی نباید در صف تأیید مالی بیفتند ────────────────────
 //
 // ردهٔ غیرنقدی هیچ ردیف `league_payouts` نمی‌گیرد، پس متنِ رابط هم
 // نباید به مدیر بگوید منتظر تأیید بماند.
-ok(/نیازی به تأیید مالی ندارد/.test(web) && /نیازی به تأیید مالی ندارد/.test(droid),
-  'هر دو پنل توضیح می‌دهند جایزهٔ غیرنقدی خودکار تحویل می‌شود');
+ok(/نیازی به تأیید مالی ندارد/.test(web),
+  'وب توضیح می‌دهد جایزهٔ غیرنقدی خودکار تحویل می‌شود');
 
 // ── ۱۰) کامپوننتِ جدولِ وب واقعاً `head`+children را رندر کند ──────────
 //
@@ -154,9 +135,6 @@ ok(/if \(head\) \{/.test(ui) && /<tbody>\{children\}<\/tbody>/.test(ui),
 // بار که مدیر یک نویسه تایپ می‌کند ری‌اکت/فلاتر ویجت را دوباره می‌سازد
 // و کیبورد بسته می‌شود.
 ok(/key=\{`perk-\$\{i\}`\}/.test(web), 'ردیف‌های وب کلید پایدار دارند');
-ok(/ValueKey\('perk_rank_\$i'\)/.test(droid)
-  && /ValueKey\('perk_value_\$i'\)/.test(droid),
-  'فیلدهای اندروید کلید پایدار دارند تا فوکوس نپرد');
 
 console.log(
   failed === 0

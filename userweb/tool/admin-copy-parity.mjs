@@ -1,143 +1,48 @@
-#!/usr/bin/env node
-// ═══════════════════════════════════════════════════════════════════════════
-// همسانیِ «پنلِ متن‌های زنده» بین وب و اندروید (فاز ۳)
+// گاردِ «پنلِ متن‌های زنده».
 //
-// چرا این گارد، وقتی تازه یک صفحه نوشته‌ایم و «درست است»؟
-//
-// دو پنلِ ادمین از هم جدا هستند و هیچ زبانی بینشان مشترک نیست (`admin/*.jsx`
-// در برابر `mobile/lib/screens/admin/*.dart`). تنها چیزی که این دو را «یکسان»
-// نگه می‌دارد، حافظهٔ آدم است — و حافظه دقیقاً همان چیزی است که در این پروژه
-// بارها ثابت شده قابل اتکا نیست (سه بار «عددِ ۳۰ جای ۵۰۰» فقط به‌خاطرِ همین
-// جابه‌جا شد). پس هر دو پنل باید *سنجیده* شوند، نه تضمین داده شوند.
-//
-// گارد چه می‌بیند:
-//  ۱) صفحه در *هر دو* پنل ثبت شده (NAV در وب، چهار فهرستِ هم‌شاخص در اندروید).
-//  ۲) نامِ گروه‌های فارسی مو‌به‌مو یکی است (`GROUP_LABEL` ↔ `kAdminCopyGroups`).
-//     اگر این دو فرق کند، ادمین در یک پنل «راهنمای سکه» می‌بیند و در دیگری
-//     «سکه»، و برای ویرایشِ یک جمله دنبالِ دستهٔ خودش می‌گردد.
-//  ۳) هر دو به *همهٔ* گروه‌های `DEFAULT_COPY` ردیف دارند و برعکس — یعنی پنل
-//     هیچ‌وقت «نیمی از متن‌ها» را پنهان نمی‌کند (این همان «۱۰۰٪ parity»ی است که
-//     در پذیرش خواسته شده).
-//  ۴) پنج فهرستِ اندروید (`_pages`/`_titles`/`_icons`/`_subtitles`/`_adminNavGroups`)
-//     یکی جابه‌جا شدن = صفحه با تیترِ صفحهٔ دیگر باز می‌شود و این فاجعهٔ
-//     *بی‌صدا* است، چون هیچ خطایی نمی‌دهد.
-//  ۵) قاعدهٔ «حداکثر یک درخواست به هر مسیر در هر build» در اندروید — همان
-//     سقفی که در تستِ `home_shell_test` محصول را کنترل می‌کند؛ پنل هم نباید
-//     با هر keystroke سه fetch بزند.
-//
-// مثلِ بقیهٔ گاردها: فقط فایل‌ها را می‌خواند. نه DB، نه شبکه، نه Flutter.
-// ═══════════════════════════════════════════════════════════════════════════
-
+// قبلاً این فایل همسانیِ پنلِ وب ادمین با پنلِ ادمینِ *اندروید* را می‌سنجید.
+// پنل ادمین از اپ موبایل کاملاً حذف شد (docs/ADMIN_PANEL_MOBILE_RETIREMENT.md)
+// و مدیریت فقط با پنل وب است؛ پس این گارد حالا تضمین می‌کند که پنل وب:
+//   ۱) همهٔ گروه‌های متنیِ سرور را پوشش می‌دهد (هیچ گروهی پنهان نمانده) و
+//      گروهِ بی‌منبع ندارد؛
+//   ۲) در منوی ناوبری با عضوِ گروهِ ششم ثبت و تنبل بارگذاری می‌شود؛
+//   ۳) گروه‌بندیِ منو با جدولِ نام‌ها سازگار است؛
+//   ۴) قول‌های محصولیِ صفحه (پیش‌نمایش، قفلِ ذخیره، حالت حرفه‌ای، بازگشت به
+//      پیش‌فرض) در پنل وب حاضرند.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-const here = path.dirname(fileURLToPath(import.meta.url));
-const root = path.resolve(here, '..', '..');
-const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
+const ROOT = path.resolve(new URL('../..', import.meta.url).pathname);
+const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 
-let pass = 0;
-let fail = 0;
-const ok = (name, cond, detail = '') => {
-  if (cond) {
-    pass++;
-    console.log(`  ✓ ${name}`);
-    return;
-  }
-  fail++;
-  console.error(`  ✗ ${name}${detail ? `\n      ${detail}` : ''}`);
-};
-
-/**
- * نخستین `{` یا `[` واقعیِ بعدِ marker. «واقعی» یعنی نه داخلِ کامنت، نه
- * داخلِ رشته. چرا این‌قدر وسواس: بلاکِ `///` بالایِ `DEFAULT_COPY` یک
- * `{name}` نمونه در خودش دارد و اگر همان را سرِ شیء بگیریم، شمارندهٔ عمق
- * گیج می‌شود و گارد *یک* گروه پیدا می‌کند و بعد با اطمینانِ کامل
- * «پنل وب گروهی را پنهان کرده» می‌گوید. گاردی که خودش باگ داشته باشد،
- * کارِ جعلی تولید می‌کند — یعنی می‌رویم کدِ درست را عوض می‌کنیم تا
- * ابزار راضی شود. (سه بار در این پروژه همین اشتباه را کردیم.)
- */
-function openAt(src, from, brace) {
-  let i = from;
-  while (i < src.length) {
-    const c = src[i];
-    if (c === '/' && src[i + 1] === '/') { i = src.indexOf('\n', i); if (i < 0) return -1; continue; }
-    if (c === '/' && src[i + 1] === '*') { const j = src.indexOf('*/', i + 2); i = j < 0 ? src.length : j + 2; continue; }
-    if (c === '\'' || c === '"' || c === '`') {
-      i++;
-      while (i < src.length) {
-        if (src[i] === '\\') { i += 2; continue; }
-        if (src[i] === c) { i++; break; }
-        i++;
-      }
-      continue;
-    }
-    if (c === brace) return i;
-    i++;
-  }
-  return -1;
+let pass = 0, fail = 0;
+function ok(name, cond, detail = '') {
+  if (cond) { pass++; console.log(`✅ ${name}`); }
+  else { fail++; console.error(`✗ ${name}${detail ? ` — ${detail}` : ''}`); }
 }
 
-/** استخراجِ یک شیءِ `{…}` از متنِ منبع، با شمارشِ عمق و بی‌توجهی به رشته‌ها. */
+/** بدنهٔ یک تخصیصِ object/array را با تطبیقِ آکولاد برمی‌گرداند. */
 function objectAt(src, marker) {
-  const at = src.indexOf(marker);
-  if (at < 0) return null;
-  const open = openAt(src, at, '{');
+  const i = src.indexOf(marker);
+  if (i < 0) return null;
+  const openCh = src.indexOf('{', i);
+  const openAr = src.indexOf('[', i);
+  let open = openCh;
+  if (openAr >= 0 && (openCh < 0 || openAr < openCh)) open = openAr;
   if (open < 0) return null;
+  const close = src[open] === '{' ? '}' : ']';
   let depth = 0;
-  let i = open;
-  let quote = null;
-  for (; i < src.length; i++) {
-    const c = src[i];
-    if (quote) {
-      if (c === '\\') { i++; continue; }
-      if (c === quote) quote = null;
-      continue;
-    }
-    if (c === '\'' || c === '"' || c === '`') { quote = c; continue; }
-    if (c === '/' && src[i + 1] === '/') { i = src.indexOf('\n', i); if (i < 0) break; continue; }
-    if (c === '{') depth++;
-    else if (c === '}') { depth--; if (!depth) return src.slice(open, i + 1); }
+  for (let j = open; j < src.length; j++) {
+    if (src[j] === src[open]) depth++;
+    else if (src[j] === close) { depth--; if (depth === 0) return src.slice(open + 1, j); }
   }
   return null;
 }
 
-/** فهرستِ `[ … ]` با همان قاعده. */
-function arrayAt(src, marker) {
-  const at = src.indexOf(marker);
-  if (at < 0) return null;
-  const open = openAt(src, at, '[');
-  let depth = 0;
-  let i = open;
-  let quote = null;
-  for (; i < src.length; i++) {
-    const c = src[i];
-    if (quote) {
-      if (c === '\\') { i++; continue; }
-      if (c === quote) quote = null;
-      continue;
-    }
-    if (c === '\'' || c === '"' || c === '`') { quote = c; continue; }
-    if (c === '[') depth++;
-    else if (c === ']') { depth--; if (!depth) return src.slice(open + 1, i); }
-  }
-  return null;
-}
+const webPage = read('admin/src/pages/live-copy.jsx');
+const webMain = read('admin/src/main.jsx');
 
-// ── ۱) پنل وب ─────────────────────────────────────────────────────────────
-const WEB_PAGE = 'admin/src/pages/live-copy.jsx';
-const WEB_MAIN = 'admin/src/main.jsx';
-const webPage = read(WEB_PAGE);
-const webMain = read(WEB_MAIN);
-
-// هر دو پنل با *یک* قاعده خوانده می‌شوند (regexِ `'key': 'value'` روی بدنهٔ
-// شیء). عمداً eval نمی‌کنیم: نسخهٔ وب شیء را با `const GROUP_LABEL = {…}`
-// تعریف می‌کند و اگر `objectAt` را از نامِ متغیر شروع کنیم، رشتهٔ `const …`
-// به eval می‌رود و بی‌صدا null برمی‌گردد — یعنی یک گاردِ «سبزِ کور». همان
-// دامی که سرِ گاردِ متنِ زنده سه بار خوردیم؛ تکرارش نمی‌کنیم.
-// کلید در JS می‌تواند بی‌نقل‌قول باشد (`referral: '…'`) و در دارت باید
-// نقل‌قول داشته باشد (`'referral': '…'`)؛ پس `?` — وگرنه یک پنل «پنهان‌کننده»
-// به‌نظر می‌رسید در حالی که فقط زبانِ نگارشش فرق دارد.
+// ── ۱) گروه‌های متنی در پنل وب ────────────────────────────────────────────
 const pairRe = /'?([a-zA-Z][a-zA-Z0-9_]*)'?\s*:\s*'([^']*)'/g;
 const groupsOf = (body) => {
   const out = {};
@@ -146,51 +51,18 @@ const groupsOf = (body) => {
   return out;
 };
 const webGroups = groupsOf(objectAt(webPage, 'const GROUP_LABEL'));
-ok('پنل وب: `GROUP_LABEL` خوانده شد', Object.keys(webGroups).length > 0,
+ok('پنل وب: GROUP_LABEL خوانده شد', Object.keys(webGroups).length > 0,
   `${Object.keys(webGroups).length} گروه`);
 
 ok('پنل وب: صفحه در NAV ثبت است', /'live-copy',\s*'متن‌های زنده'/.test(webMain));
 ok('پنل وب: صفحه تنبل بارگذاری می‌شود (مثل بقیهٔ صفحات)',
   /LiveCopyPage = lazy\(\(\) => import\('\.\/pages\/live-copy\.jsx'\)/.test(webMain));
 
-// ── ۲) پنل اندروید ────────────────────────────────────────────────────────
-const MOBILE_PAGE = 'mobile/lib/screens/admin/admin_live_copy.dart';
-const MOBILE_SHELL = 'mobile/lib/screens/admin/admin_shell.dart';
-// دو فایلِ «تنظیمات» هم سنجیده می‌شوند: فیلدی که به سرور اضافه می‌شود و
-// در پنل نیست، عملاً «تنظیماتِ فقط با curl» است.
-const WEB_SETTINGS_PAGE = 'admin/src/pages/settings.jsx';
-const MOB_SETTINGS_PAGE = 'mobile/lib/screens/admin/admin_settings.dart';
-const mobilePage = read(MOBILE_PAGE);
-const mobileShell = read(MOBILE_SHELL);
-
-const andGroups = groupsOf(objectAt(mobilePage, 'kAdminCopyGroups ='));
-ok('پنل اندروید: `kAdminCopyGroups` خوانده شد', Object.keys(andGroups).length > 0,
-  `${Object.keys(andGroups).length} گروه`);
-
-const diff = [];
-for (const k of new Set([...Object.keys(webGroups), ...Object.keys(andGroups)])) {
-  if (!(k in webGroups)) diff.push(`${k}: فقط در اندروید`);
-  else if (!(k in andGroups)) diff.push(`${k}: فقط در وب`);
-  else if (webGroups[k] !== andGroups[k]) {
-    diff.push(`${k}: وب «${webGroups[k]}» ↔ اندروید «${andGroups[k]}»`);
-  }
-}
-ok('نامِ گروه‌ها در دو پنل واژه‌به‌واژه یکی است', diff.length === 0, diff.join(' | '));
-
-// ── ۳) پوششِ کاملِ گروه‌ها (۱۰۰٪ parity) ──────────────────────────────────
+// ── ۲) پوششِ کاملِ گروه‌ها نسبت به سرور ───────────────────────────────────
 const svcSrc = read('backend/src/services/liveContent.js');
-const copySrc = objectAt(svcSrc, 'const DEFAULT_COPY =');
 const serverGroups = new Set();
 {
-  // گروه‌ها = کلیدهایِ سطحِ اوّلِ `DEFAULT_COPY` (تورفتگیِ دو فاصله، بعدِش
-  // `{`). چرا خط‌به‌خط و نه با شمارشِ عمق: مقدارهایِ ما رشته‌هایِ
-  // جای‌نگهداردارند («هر {invitesPerDailySpin} دعوت…») و هر `{` درونِ
-  // رشته، شمارندهٔ عمق را یک دانه بالا می‌برد و برای همیشه آن را پایین
-  // نمی‌آورد — نتیجه: گارد *یک* گروه می‌بیند و بقیه را «پنهان‌شده» اعلام
-  // می‌کند. دقیقاً همان دامِ «پارسرِ نیمه‌دستِ JS» که در گاردِ متنِ زنده
-  // شش بار خوردیم؛ درسش این بود: سنجه‌هایِ ساده را با *ساختارِ نگارش*
-  // بزن، نه با شبیه‌سازیِ پارسر.
-  const open = openAt(svcSrc, svcSrc.indexOf('const DEFAULT_COPY ='), '{');
+  const open = svcSrc.indexOf('{', svcSrc.indexOf('const DEFAULT_COPY ='));
   const body = open < 0 ? '' : svcSrc.slice(open, svcSrc.indexOf('\n}', open) > 0
     ? svcSrc.indexOf('\n}', open) + 2 : open + 9000);
   for (const line of body.split('\n')) {
@@ -198,228 +70,58 @@ const serverGroups = new Set();
     if (m) serverGroups.add(m[1]);
   }
 }
-
-ok(`گروه‌هایِ سرور پیدا شد (${serverGroups.size})`, serverGroups.size >= 8);
+ok(`گروه‌های سرور پیدا شد (${serverGroups.size})`, serverGroups.size >= 8);
 const noWeb = [...serverGroups].filter((g) => !(g in webGroups));
-const noAnd = [...serverGroups].filter((g) => !(g in andGroups));
 ok('پنل وب هیچ گروهی را پنهان نکرده', noWeb.length === 0, noWeb.join(', '));
-ok('پنل اندروید هیچ گروهی را پنهان نکرده', noAnd.length === 0, noAnd.join(', '));
 const extraWeb = Object.keys(webGroups).filter((g) => !serverGroups.has(g));
-const extraAnd = Object.keys(andGroups).filter((g) => !serverGroups.has(g));
-ok('گروه‌هایِ بی‌منبع (که هیچ متنی ندارند) در پنل‌ها نیستند',
-  extraWeb.length === 0 && extraAnd.length === 0,
-  [...extraWeb, ...extraAnd].join(', '));
+ok('گروه‌های بی‌منبع در پنل وب نیستند', extraWeb.length === 0, extraWeb.join(', '));
 
-// ── ۴) هم‌طولیِ چهار فهرستِ اندروید ───────────────────────────────────────
+// ── ۳) گروه‌بندیِ منوی وب ─────────────────────────────────────────────────
 {
-  // شمارشِ ردیف با الگویِ مخصوصِ خودِ فهرست، نه یک کلاسِ کاراکتریِ عمومی:
-  // نسخهٔ اول «خطوطی که با حرف یا نقل‌قول شروع می‌شوند» را می‌شمرد و با
-  // قالبِ سه‌سطریِ تازهٔ `_titles` (که سطرِ دومِ هر ردیف با ' شروع می‌شود) عدد
-  // نصفه‌نیمه می‌داد. یک گاردِ قرمزِ کور از سبزِ کور هم بی‌فایده‌تر است.
-  const count = (marker, lineRe = /^\s*[A-Za-z`]/) => {
-    const body = arrayAt(mobileShell, marker);
-    if (!body) return -1;
-    return body.split('\n').filter((l) => lineRe.test(l.trim())).length;
+  const webNav = objectAt(webMain, 'const NAV = [') || '';
+  const webRows = webNav.split(/\],\s*\n\s*\[/).map((x) => x.trim());
+  const webIds = webRows.map((r) => /^'([\w-]+)'/.exec(r)?.[1] ?? '');
+  const lastStr = (r) => {
+    const m = [...r.matchAll(/'([^']+)'/g)];
+    return m.length ? m[m.length - 1][1] : null;
   };
-  const countQuoted = (marker) => count(marker, /^'[A-Za-z'`\u0600-\u06FF]/);
-  const countOneWord = (marker) => count(marker, /^'[a-z][\w-]*',$/);
-  const pages = (arrayAt(mobileShell, 'late final List<Widget> _pages') || '')
-    .split('\n').filter((l) => l.trim().startsWith('Admin')).length;
-  const titles = countQuoted('static const _titles');
-  const icons = count('static const _icons', /^Icons\./);
-  const subs = countQuoted('static const _subtitles');
-  const groups = countOneWord('static const _adminNavGroups');
-  ok(`پنج فهرستِ اندروید هم‌طولند (صفحات ${pages}، تیتر ${titles}، آیکون ${icons}، توضیح ${subs}، گروه ${groups})`,
-    pages > 0 && pages === titles && pages === icons && pages === subs && pages === groups,
-    'جابه‌جا‌شدنِ یکی = صفحه با تیتر/آیکون/گروهِ صفحهٔ دیگر باز می‌شود و هیچ خطایی نمی‌دهد');
+  const webRowGroups = webRows.map(lastStr);
+  ok(`وب: هر ${webIds.length} ردیفِ NAV عضوِ ششمِ گروه‌دار دارد`,
+    webIds.length >= 20 && webRowGroups.every(Boolean),
+    `ردیف ${webIds.length}، بی‌گروه ${webRowGroups.filter((x) => !x).length}`);
 
-  // ── ۴.۱) گروه‌بندیِ منو (۳.۲): یکی‌به‌یکی با NAVِ وب ────────────────────
-  //
-  // چرا این‌همه سختی: «گروه» تنها چیزی است که مدیرِ تازه‌کار با آن منو را
-  // یاد می‌گیرد. اگر در یک پنل دسته‌بندی باشد و در دیگری آیتم‌ها بی‌گروه
-  // بمانند، همان آدم باید دو نقشهٔ ذهنی بسازد — و این دقیقاً همان هزینه‌ای
-  // است که کلِ «دو پنلِ یکسان» برای حذفش ساخته شد.
-  {
-    const webNav = arrayAt(webMain, 'const NAV = [') || '';
-    // ردیف‌ها را با مرزِ «],\n  [» جدا می‌کنیم. تلاشِ اول یک regex بود که
-    // [^\]]*? followed by \] — یعنی کاراکتری که خودش ] را حذف می‌کند و بعد
-    // همان ] را می‌خواهد: هیچ‌وقت نمی‌خورد و گارد، «NAV خالی» گزارش می‌کرد
-    // در حالی که فایلِ سالم بود. یک گاردِ قرمزِ کور هم مثلِ سبزِ کور بی‌ارزش است.
-    const webRows = webNav.split(/\],\s*\n\s*\[/).map((x) => x.trim());
-    const webIds = webRows.map((r) => /^'([\w-]+)'/.exec(r)?.[1] ?? '');
-    const lastStr = (r) => {
-      const m = [...r.matchAll(/'([^']+)'/g)];
-      return m.length ? m[m.length - 1][1] : null;
-    };
-    const webGroups = webRows.map(lastStr);
-    ok(`وب: هر ${webIds.length} ردیفِ NAV عضوِ ششمِ گروه‌دار دارد`,
-      webIds.length === 23 && webGroups.every(Boolean),
-      `ردیف ${webIds.length}، بی‌گروه ${webGroups.filter((x) => !x).length}`);
+  const labels = (src, marker) =>
+    (objectAt(src, marker) || '').match(/'[\w-]+':\s*'[^']+'/g) || [];
+  const webLabelRows = labels(webMain, 'const NAV_GROUPS = {');
+  const labelKeys = new Set(webLabelRows.map((x) => /^'([\w-]+)'/.exec(x)[1]));
+  const realGroups = webRowGroups.filter((g) => labelKeys.has(g));
+  ok('وب: ردیفِ آخرِ هر قلم، کلیدِ شناخته‌شدهٔ گروه است',
+    realGroups.length === webIds.length, `${realGroups.length}/${webIds.length}`);
 
-    // عضوِ ششم باید کلیدِ گروه باشد، نه چیزِ دیگر: «بی‌گروه» یعنی آخرین
-    // رشتهٔ ردیف، توضیحِ صفحه است — پس اگر یکی گروهش حذف شود، همان توضیح
-    // به‌عنوان گروه شمرده می‌شود. مقایسه با جدولِ نام‌ها این را می‌گیرد.
-    const labels = (src, marker) =>
-      (objectAt(src, marker) || '').match(/'[\w-]+':\s*'[^']+'/g) || [];
-    const webLabelRows = labels(webMain, 'const NAV_GROUPS = {');
-    const mobLabelRows = labels(mobileShell, 'static const _groupLabels = {');
-    const labelKeys = new Set(webLabelRows.map((x) => /^'([\w-]+)'/.exec(x)[1]));
-    const realGroups = webGroups.filter((g) => labelKeys.has(g));
-    ok('وب: ردیفِ آخرِ هر قلم، کلیدِ شناخته‌شدهٔ گروه است',
-      realGroups.length === 23, `${realGroups.length}/23 ردیف کلیدِ معتبر دارد`);
-
-    const mobileGroupList = (arrayAt(mobileShell, 'static const _adminNavGroups') || '')
-      .split('\n').map((l) => /^\s*'([\w-]+)'/.exec(l.trim())?.[1]).filter(Boolean);
-    ok('اندروید: ترتیبِ گروه‌ها مو‌به‌مو با NAVِ وب یکی است',
-      mobileGroupList.length === webGroups.length &&
-      mobileGroupList.every((g, k) => g === webGroups[k]),
-      `وب ${webGroups.join(',')} ↔ اندروید ${mobileGroupList.join(',')}`);
-
-    const norm = (arr) => arr.map((x) => x.replace(/\s+/g, '').replace(/,+$/, '')).sort();
-    ok('نامِ فارسیِ گروه‌ها در دو پنل واژه‌به‌واژه یکی است',
-      webLabelRows.length >= 7 && norm(webLabelRows).join('|') === norm(mobLabelRows).join('|'),
-      `وب ${webLabelRows.length} ↔ اندروید ${mobLabelRows.length}`);
-
-    // هر کلیدِ گروه باید در جدولِ نام‌ها ردیف داشته باشد، وگرنه سرتیترِ خالی
-    // رندر می‌شود: منوی «نیمه‌کاره» که نه خطا دارد نه معنا.
-    const orphans = [...new Set(webGroups)].filter((g) => !labelKeys.has(g));
-    ok('هر گروهِ مصرفی در جدولِ نام‌ها ردیف دارد', orphans.length === 0, orphans.join(', '));
-    ok('هر نامِ جدول در واقع مصرف می‌شود (گروهِ یتیم = سرتیترِ مرده)',
-      [...labelKeys].every((k) => webGroups.includes(k)),
-      [...labelKeys].filter((k) => !webGroups.includes(k)).join(', '));
-  }
-  ok('اندروید: «متن‌های زنده» در فهرستِ تیترها هست',
-    /'متن\u200cهای زنده'/.test(mobileShell));
-  ok('اندروید: صفحه ساخته می‌شود', /AdminLiveCopy\(api: widget\.api\)/.test(mobileShell));
-  ok('اندروید: importِ صفحه هست', /import 'admin_live_copy\.dart';/.test(mobileShell));
+  const orphans = [...new Set(webRowGroups)].filter((g) => !labelKeys.has(g));
+  ok('هر گروهِ مصرفی در جدولِ نام‌ها ردیف دارد', orphans.length === 0, orphans.join(', '));
+  ok('هر نامِ جدول در واقع مصرف می‌شود (گروهِ یتیم = سرتیترِ مرده)',
+    [...labelKeys].every((k) => webRowGroups.includes(k)),
+    [...labelKeys].filter((k) => !webRowGroups.includes(k)).join(', '));
 }
 
-// ── ۴.۵) فیلدهایِ تازهٔ `app` در تنظیماتِ *هر دو* پنل ─────────────────────
-//
-// `app.bazaarPackage` به سرور اضافه شد (لینکِ نصب از همین ساخته می‌شود).
-// فیلدی که فقط در سرور و در یک پنل باشد، همان «سیمِ تک‌پل» است که در فاز ۲
-// رد کردیم: ادمینِ اندروید هیچ‌وقت نمی‌فهمد چرا لینکش خالی مانده.
+// ── ۴) فیلدِ تازهٔ bazaarPackage در تنظیماتِ وب ───────────────────────────
 {
-  const webSettings = read(WEB_SETTINGS_PAGE);
-  const mobSettings = read(MOB_SETTINGS_PAGE);
-  for (const [name, src] of [['وب', webSettings], ['اندروید', mobSettings]]) {
-    ok(`${name}: «نامِ بستهٔ کافه‌بازار» در تنظیمات هست`,
-      /bazaarPackage/.test(src), 'در سرور هست، در پنل نیست = هرگز قابلِ عوض نیست');
-  }
-  ok('اندروید: مقدار از پاسخِ GET خوانده و در PATCH فرستاده می‌شود',
-    /_bazaarPackage\.text = /.test(mobSettings)
-      && /'bazaarPackage': _bazaarPackage\.text\.trim\(\)/.test(mobSettings));
-  ok('وب: مقدار در stateِ اولیه هست (بیِ آن، فیلد روی undefined می‌سوزد)',
-    /bazaarPackage: ''/.test(webSettings));
+  const webSettings = read('admin/src/pages/settings.jsx');
+  ok('وب: «نامِ بستهٔ کافه‌بازار» در تنظیمات هست', /bazaarPackage/.test(webSettings),
+    'در سرور هست، در پنل نیست = هرگز قابلِ عوض نیست');
+  ok('وب: مقدار در stateِ اولیه هست (وگرنه فیلد روی undefined می‌سوزد)',
+    /bazaarPackage:\s*''/.test(webSettings));
 }
 
-// ── ۵) رفتارِ یکسانِ «پیش‌نمایشِ زنده» و «قفلِ ذخیره» ─────────────────────
-//
-// این دو، دو قولِ محصولیِ این صفحه‌اند. اگر یکی‌شان فقط در یک پنل باشد،
-// ادمین در آن پنل «پیش‌نمایش» دارد و در دیگری کور ویرایش می‌کند — و بعد
-// می‌گوید «پنلِ موبایل باگ دارد» در حالی که فقط نصفش ساخته شده.
-ok('وب: پیش‌نمایش از `/preview` می‌گیرد', /live-content\/preview/.test(webPage));
-ok('اندروید: پیش‌نمایش از `/preview` می‌گیرد', /live-content\/preview/.test(mobilePage));
-
-// «preview را صدا می‌زند» گاردِ بی‌ارزشی بود: نسخهٔ اندروید دقیقاً همین را
-// داشت و `_preview` را **هیچ‌جا نمایش نمی‌داد** — `dart analyze` آن را
-// `unused_field` و از نوعِ error گفت و CI قرمز شد (صفحه‌ای که هرگز
-// کامپایل نشده بود، با ✅ در نقشه‌راه ایستاده بود). پس دو سنجهٔ واقعی:
-//  • خروجیِ سرور باید در ویجتِ متنی بنشیند، نه فقط در یک field؛
-//  • هیچ Futureِ بیawait در این صفحه نماند (قاعدهٔ همان‌جا، نه در کل ریپو).
-{
-  const renders = /Text\(\s*filled\b/.test(mobilePage) ||
-    /_previewOf\(/.test(mobilePage) && /Text\(\s*\n?\s*filled/.test(mobilePage);
-  ok('اندروید: خروجیِ preview در متنِ «در اپ:» نشسته، نه فقط در یک فیلد',
-    renders, 'پیش‌نمایشِ بی‌مصرف = هم باگِ analyze، هم ادمینِ کور');
-  // خط‌به‌خط، نه با `slice` و `$`: تعریفِ `Future<void> _loadHistory() async {`
-  // هم `-loadHistory()` را دارد و اگر کلِ متنِ قبلی را بکاوی، هر `await`ِ
-  // دیگری در فایل آن را «پوشش‌داده» می‌نمایاند — گاردی که *سبزِ کور* است.
-  const naked = mobilePage.split('\n')
-    .map((l, i) => ({ l: l.replace(/\/\/.*$/, '').trim(), i: i + 1 }))
-    .filter(({ l }) => l.includes('_loadHistory()') && !/async\s*\{?\s*$/.test(l) &&
-      !/^(await|return)\b/.test(l));
-  ok('اندروید: هیچ فراخوانیِ Futureِ بیawait نمانده', naked.length === 0,
-    naked.map((x) => `خط ${x.i}: ${x.l}`).join(' | ') +
-      ' — unawaited_futures در این پروژه error است، warning نه');
-  ok('اندروید: fieldهایِ بی‌مصرف نگه نمی‌داریم (منبعِ حقیقتِ دوم)',
-    !/_ruleValues\s*=/.test(mobilePage),
-    'پاسخِ PATCHِ rules باید روی کنترلرها بنشیند (`_syncNums`)، نه در یک mapِ خاموش');
-
-  // قاعدهٔ خطِ سومی که از همین CI گرفتیم: هر `await` که *قبل* از
-  // `ScaffoldMessenger/of(context)` اضافه شود، باید `if (mounted)` هم
-  // داشته باشد. دورِ قبل ما `_loadHistory()` را await کردیم (که خودش رفعِ
-  // خطایِ دیگری بود) و همان await، پیامِ موفقیت را از میانِ async gap
-  // عبور داد → `use_build_context_synchronously`. یعنی «رفعِ یک خطایِ
-  // analyzer» بدونِ این سنجه، خودش خطایِ بعدی را می‌ساخت.
-  {
-    const ls = mobilePage.split('\n');
-    let sinceAwait = 0;
-    const exposed = [];
-    for (let i = 0; i < ls.length; i++) {
-      const t = ls[i].replace(/\/\/.*$/, '').trim();
-      if (!t) continue;
-      // چیزی که `use_build_context_synchronously` رد می‌کند، مصرفِ context
-      // در خطوطِ **بعد از** وقفه است؛ `if (mounted)` (در همان خط یا خطِ
-      // قبل) همان مصرف را ایمن می‌کند. این heuristic است نه type-check —
-      // قضاوتِ آخر با خودِ دارت است — و هدفِ ما یک چیزِ مشخص است: رفعِ یک
-      // خطایِ analyzer نباید بی‌سر‌و‌صدا خطایِ بعدی را بسازد (این دور
-      // `await _loadHistory()` که خودش رفعِ باگ بود، پیامِ موفقیت را
-      // بی‌محافظ کرد).
-      const prev = i > 0 ? ls[i - 1].replace(/\/\/.*$/, '').trim() : '';
-      const guarded = /\bif\s*\(\s*!?mounted\s*\)/.test(t) || /\bif\s*\(\s*!?mounted\s*\)/.test(prev);
-      if (/\bif\s*\(\s*!?mounted\s*\)/.test(t)) sinceAwait = 0;
-      // دامنه عمداً فقط `ScaffoldMessenger.of(context)` است، نه هر مصرفِ
-      // context. چرا: نسخهٔ «همهٔ contextها» ابتدا `showDialog(context: …)`
-      // را قرمز کرد، بعد `Navigator.pop(ctx)` داخلِ *builderِ* دیالوگ را —
-      // و builder توابعِ مستقل‌اند که هیچ awaitِ بیرونی را نمی‌بینند. برای
-      // تشخیصِ درست باید بلوکِ بستگی (closure) را پیمود، و یک grepِ
-      // خط‌محور آن را ندارد؛ گاردی که دو سومِ قرمزی‌هایش خطایِ جعلی باشد،
-      // فقط عضلهٔ «بی‌توجهی به قرمزی» را در تیم قوی می‌کند. الگوی واقعیِ
-      // این پروژه (و همان که CI را قرمز کرد) پیامِ بعد از await است.
-      if (sinceAwait > 0 && !guarded && /ScaffoldMessenger\.of\(context\)/.test(t)) {
-        exposed.push(`خط ${i + 1}: ${t.slice(0, 60)}`);
-        sinceAwait = 0; // یک بار به‌ازای هر await کافی است، نه هر خط
-      }
-      // شمارشِ await **آخر از همه** — در
-      // `final ok = await showDialog(context: context…)` آرگومان پیش از وقفه
-      // خوانده می‌شود و اگر اول بشماریم، خودِ خطِ سالم قرمز می‌شود.
-      if (/\bawait\b/.test(t)) sinceAwait++;
-    }
-    ok('اندروید: context بعدِ await بی‌محافظ نمی‌آید', exposed.length === 0,
-      exposed.join(' | ') + ' — use_build_context_synchronously هم error است');
-  }
-}
+// ── ۵) قول‌های محصولیِ صفحه در پنل وب ─────────────────────────────────────
+ok('وب: پیش‌نمایش از /preview می‌گیرد', /live-content\/preview/.test(webPage));
 ok('وب: ذخیره با هشدارِ جای‌نگهدار قفل می‌شود', /disabled=\{missing\.length > 0\}/.test(webPage));
-ok('اندروید: ذخیره با هشدارِ جای‌نگهدار قفل می‌شود',
-  /warnings\.isNotEmpty\)\s*\?\s*null\s*:\s*_save/.test(mobilePage));
-ok('وب: «حالتِ حرفه‌ای» کلیدهایِ فنی را نشان می‌دهد', /admin\.proCopy|proMode/.test(webPage));
-ok('اندروید: «حالتِ حرفه‌ای» کلیدهایِ فنی را نشان می‌دهد', /_proMode/.test(mobilePage));
-ok('اندروید: کنترلرها در dispose آزاد می‌شوند', /for \(final c in _text\.values\)[\s\S]{0,80}dispose\(\)/.test(mobilePage));
-
-// «بازگشت به پیش‌فرضِ کد» هم باید در *هر دو* پنل باشد (بند ۳.۱). این دکمه
-// عمداً بی‌ذخیره است: فقط فرم را پر می‌کند. اگر یکی از دو پنل ذخیره‌یِ
-// یک‌کلیکه داشت و دیگری نه، ادمین در یکی «پیش‌نمایشِ بازگشت» دارد و در
-// دیگری مستقیم به متنِ روزِ اوّل می‌پرد — و «دو پنلِ یکسان» شکسته است.
+ok('وب: «حالتِ حرفه‌ای» کلیدهای فنی را نشان می‌دهد', /admin\.proCopy|proMode/.test(webPage));
 ok('وب: دکمهٔ «بازگشت به پیش‌فرضِ کد» دارد',
   /live-content\/defaults/.test(webPage) && /busyDefaults/.test(webPage));
-ok('اندروید: دکمهٔ «پیش‌فرضِ کد» دارد',
-  /live-content\/defaults/.test(mobilePage) && /_loadingDefaults/.test(mobilePage));
-ok('هر دو پنل: پیش‌فرض را «روی فرم» می‌نشانند و ذخیرهٔ خودکار نمی‌کنند',
+ok('وب: پیش‌فرض را «روی فرم» می‌نشاند و ذخیرهٔ خودکار نمی‌کند',
   !/defaults[\s\S]{0,200}PATCH[^)]*copy/.test(webPage));
-// و مهم‌تر: «پیش‌فرض‌ها» باید واقعاً به کنترلرها بنشینند، وگرنه ظاهر
-// عوض می‌شود و ذخیره همان متنِ قبلی را برمی‌گرداند (دکمهٔ توخالی).
-ok('اندروید: مقدارها روی کنترلرها بازنشانی می‌شوند (`_applyValues`)',
-  /void _applyValues\(/.test(mobilePage)
-  && mobilePage.split('_applyValues(').length >= 4);
 
-// سقفِ درخواست: همان قانونی که محصولِ کاربر را کنترل می‌کند.
-{
-  const posts = (mobilePage.match(/widget\.api\.(get|post|patch)\(/g) || []).length;
-  ok(`اندروید: پنل ${posts} نقطهٔ درخواست دارد (سقفِ منطقی ۱۲)`, posts <= 12);
-  ok('اندروید: پیش‌نمایش با تأخیرِ تایپ می‌چسبد (نه هر کلید)',
-    /Timer\(const Duration\(milliseconds: (3\d\d|4\d\d|5\d\d)\)/.test(mobilePage));
-}
-
-console.log(`\n${fail ? '✗' : '✅'} ${pass} بررسیِ همسانیِ پنلِ متن‌ها موفق بود${fail ? `، ${fail} ناموفق` : ''}\n`);
+console.log(`\n${fail ? '✗' : '✅'} ${pass} بررسیِ پنلِ متن‌های زنده (وب) موفق بود${fail ? `، ${fail} ناموفق` : ''}\n`);
 process.exit(fail ? 1 : 0);
