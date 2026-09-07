@@ -365,7 +365,7 @@ class _MayhemLegend extends StatelessWidget {
                       child: const Text(
                         'راهنما',
                         style: TextStyle(
-                          fontSize: 10.5,
+                          fontSize: 11,
                           fontWeight: FontWeight.w800,
                           color: Color(0xFFFFB066),
                         ),
