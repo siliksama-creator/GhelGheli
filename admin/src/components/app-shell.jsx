@@ -23,6 +23,15 @@ export function AppShell({ nav, navGroups = {}, activePage, onNavigate, onLogout
             <b>قلقلی</b>
             <small>پنل مدیریت وفاداری</small>
           </div>
+          {/* C5: روی موبایل کشو با دکمهٔ صریح بسته شود (نه فقط scrim/انتخاب آیتم) —
+              دسترس‌پذیری و یافتنِ راه خروج برای مدیرِ تازه‌کار. روی دسکتاپ مخفی. */}
+          <button
+            className="btn btn-icon btn-ghost sidebar-close"
+            onClick={() => setMobileOpen(false)}
+            aria-label="بستن منو"
+          >
+            <X size={20} />
+          </button>
         </div>
         {nav.map(([id, label, Icon], i) => (
           <React.Fragment key={id}>

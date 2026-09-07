@@ -54,6 +54,12 @@
   margin-top: 2px;
 }
 
+.sidebar-brand > div { flex: 1; min-width: 0; }
+
+/* C5: دکمهٔ بستنِ کشو فقط روی موبایل (زیر ۹۶۰px که سایدبار کشوست) دیده
+   می‌شود؛ روی دسکتاپ که سایدبار دائمی است پنهان است. */
+.sidebar-close { display: none; margin-inline-start: auto; }
+
 .nav-item {
   display: flex;
   align-items: center;
@@ -853,6 +859,7 @@ table.data-table {
   .mobile-menu-btn {
     display: inline-flex;
   }
+  .sidebar-close { display: inline-flex; }
   .content-area {
     padding: var(--gg-space-4);
   }
@@ -868,6 +875,38 @@ table.data-table {
   .report-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+  /* C1: صف بررسی کارت — مهم‌ترین کارِ لمسی مدیر. عکس‌های مقایسه روی موبایل
+     بزرگ‌تر و در دو ستونِ مساوی پخش شوند تا چهره/کاربر و طرح پیشنهادی با یک
+     نگاه سنجیده شوند، نه دو بندانگشتیِ ۷۴px. */
+  .reviewShots {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: var(--gg-space-2);
+  }
+  .reviewShots figure { min-width: 0; }
+  .reviewShots img {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 3 / 4;
+    max-height: 200px;
+  }
+  .reviewShots figcaption { font-size: 10.5px; }
+  /* دکمه‌های تأیید/رد در ردیف کامل‌عرض و با هدف لمسیِ بزرگ؛ راست‌چین
+     (محل طبیعیِ دکمهٔ اصلی در RTL). */
+  .reviewActions {
+    flex-direction: row;
+    gap: 8px;
+  }
+  .reviewActions .btn {
+    flex: 1 1 0;
+    min-height: 46px;
+    justify-content: center;
+  }
+  /* سوییچِ «در انتظار/تأیید/رد» در هدر کارت روی گوشی باریک نباید بیرون
+     بزند؛ کل عرض را بگیرد و سرتاسری بچین. */
+  .card-head .segmented,
+  .segmented { flex-wrap: wrap; }
   /* C2: روی لمس، هدفِ ضربه باید دست‌کم ۴۴×۴۴ باشد (راهنمای دسترس‌پذیری
      اپل/اندروید). دکمه‌های آیکونیِ فرم/جدول با padding 10px روی دسکتاپ
      خوب‌اند ولی روی گوشی ~۳۸px می‌شدند و ریز بود. فقط در حالت موبایل
