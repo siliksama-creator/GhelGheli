@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { asset, avatarUrl, fa, req } from './lib/api.js';
 import { useLive, ruleNumber } from './lib/liveConfig.js';
 import { primeImageCache } from './lib/imageCache.js';
 import { useGameSession } from './gameSession.js';
-import { selectionClick } from './haptics.js';
+import { selectionClick, mediumImpact, heavyImpact } from './haptics.js';
 import { CosmeticAvatarFrame, CosmeticFrame, DisplayName } from './components/Cosmetics.jsx';
 import PlayerCard from './components/PlayerCard.jsx';
 import { cardIdOf, cardPowerOf } from './lib/cards.js';
@@ -325,8 +325,31 @@ function CountUp({ value, active, revealed = true }) {
 
 function RoundReveal({ round, me, myFrame, opponentFrame, opponentRole = 'حریف' }) {
   const phase = useRevealPhase(round ? round.round : null);
-  if (!round) return null;
-  const view = roundForViewer(round, me);
+  const view = round ? roundForViewer(round, me) : null;
+  const lastHapticPhase = useRef(null);
+  // ── حسِ لمسی برای دو لحظهٔ ویژه ──
+  // خواستهٔ مالک: «با انیمیشن‌های جذاب‌تر و مکث‌های بیشتر بازی را جذاب‌تر
+  // کنی؟» — کارشناسی: طولانی‌کردنِ عمومیِ راند در گاردِ ۱۵۰۰–۳۲۰۰ms جا
+  // نمی‌شود و ریتم نبردِ ۵ راندی را خسته‌کننده می‌کند. ولی دو لحظهٔ اوج هنوز
+  // «حس» نشده‌اند: لحظهٔ برخوردِ راندِ طوفانی (دو امتیاز) و حکمِ وقتِ اضافه.
+  // این لرزش هیچ ثانیه‌ای به زمان‌بندی اضافه نمی‌کند، پس گاردِ
+  // `testCardDuelPacing` را رد نمی‌کند و با `prefers-reduced-motion` هم
+  // تداخل ندارد. آینهٔ اندروید: `HapticFeedback.heavyImpact/mediumImpact`.
+  useEffect(() => {
+    if (!round || !view?.contractValid) return undefined;
+    // فقط در گذارِ فاز شلیک کن، نه در هر renderِ بی‌ربط؛ وگرنه اگر در
+    // طولِ فازِ impact دوباره رندر شود لرزش تکراری حس می‌شود. آینهٔ
+    // `_lastHaptic` اندروید است.
+    if (phase === lastHapticPhase.current) return undefined;
+    lastHapticPhase.current = phase;
+    if (phase === 'impact') {
+      if (view.isStorm || view.overtime) heavyImpact();
+    } else if (phase === 'verdict' && view.overtime) {
+      mediumImpact();
+    }
+    return undefined;
+  }, [phase, round, view]);
+  if (!round || !view) return null;
   const { mine, theirs, myPower, theirPower, mineWon, draw, contractValid,
     isStorm, overtime, myLuck, theirLuck, myAward, theirAward, mySquad, theirSquad } = view;
   // روایتِ فارسیِ بانمک را بک‌اند می‌سازد (narrX/narrO)؛ اگر نبود (کلاسیک)

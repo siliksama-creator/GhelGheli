@@ -1596,10 +1596,30 @@ class _ClashStageState extends State<_ClashStage>
     duration: _total,
   );
 
+  // آینهٔ وب: برای راندِ طوفانی و وقتِ اضافه، لحظهٔ برخورد ضربهٔ سنگین و
+  // لحظهٔ حکمِ وقتِ اضافه ضربهٔ متوسط می‌زند. هیچ زمانی به _total اضافه
+  // نمی‌شود پس گاردِ زمان‌بندیِ سرور را رد نمی‌کند؛ فقط «حسِ» لحظهٔ مهم.
+  _RevealPhase? _lastHaptic;
+
   @override
   void initState() {
     super.initState();
     if (widget.round != null) _c.forward();
+    _c.addListener(_onAnimationTick);
+  }
+
+  void _onAnimationTick() {
+    final p = _phase;
+    if (p == _lastHaptic) return;
+    _lastHaptic = p;
+    final round = widget.round;
+    if (round == null) return;
+    final view = CardDuelRoundPerspective.from(round, widget.mine);
+    if (p == _RevealPhase.impact) {
+      if (view.isStorm || view.inOvertime) HapticFeedback.heavyImpact();
+    } else if (p == _RevealPhase.verdict && view.inOvertime) {
+      HapticFeedback.mediumImpact();
+    }
   }
 
   @override
@@ -1610,6 +1630,7 @@ class _ClashStageState extends State<_ClashStage>
     final before = old.round?['round'];
     final now = widget.round?['round'];
     if (before != now && widget.round != null) {
+      _lastHaptic = null;
       _c
         ..reset()
         ..forward();
@@ -1618,6 +1639,7 @@ class _ClashStageState extends State<_ClashStage>
 
   @override
   void dispose() {
+    _c.removeListener(_onAnimationTick);
     _c.dispose();
     super.dispose();
   }
