@@ -3118,7 +3118,14 @@ app.use((err, req, res, next) => {
       context: { requestId: req.headers['x-request-id'] || null },
     }).catch(reportError => console.error('[crash-report] failed:', reportError.message));
   } else {
-    console.warn(`[${status}] ${req.method} ${req.originalUrl} — ${err.message}`);
+    // فقط خطاهای واقعی (۵xx/کرش) باید در فایلِ error باشند. خطاهای ۴xx و
+    // پیام‌هایِ کسب‌وکارِ عادی (مثلاً «چرخش امروزت تمام شده» با 429) یک
+    // وضعیتِ پیش‌بینی‌شده‌اند، نه خرابیِ ما. `console.warn` به stderr می‌رود و
+    // چون PM2 stderr را در فایلِ `*-error-*.log` می‌ریزد، این خطوط فایلِ error
+    // را پر می‌کردند و سیگنالِ خطای واقعی را می‌پوشاندند. `console.log` به
+    // stdout می‌رود؛ اگر `merge_logs` خاموش باشد در فایلِ `*-out-*.log` می‌نشیند
+    // و فایلِ error فقط دنبالِ خرابیِ واقعی می‌ماند.
+    console.log(`[${status}] ${req.method} ${req.originalUrl} — ${err.message}`);
   }
   // Malformed JSON reached the user as the raw parser message in English
   // ("Unexpected token 'n'..."), inside an otherwise Persian UI.

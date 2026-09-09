@@ -1,4 +1,5 @@
 // PM2 process definition.
+const path = require('path');
 //
 // ── مقیاسِ چندپروسه‌ای بدون شکستنِ بازیِ زنده ────────────────────────
 //
@@ -31,6 +32,11 @@ function app(name, port, role) {
     cwd: __dirname,
     instances: 1,
     exec_mode: 'fork',
+    // stdout (لاگ عادی/پیام‌های ۴xx) و stderr (فقط خطای واقعی) را جدا نگه دار تا
+    // فایلِ error فقط خرابیِ واقعی را نشان دهد.
+    merge_logs: false,
+    out_file: path.join(__dirname, 'logs', role + '-' + name + '-out.log'),
+    error_file: path.join(__dirname, 'logs', role + '-' + name + '-error.log'),
     // نشت حافظه یا پردازشِ آپلودیِ رهاکرده باید پروسه را recycle کند،
     // نه اینکه kernel با OOM همه چیز (حتی Postgres) را بکشد.
     max_memory_restart: '850M',
