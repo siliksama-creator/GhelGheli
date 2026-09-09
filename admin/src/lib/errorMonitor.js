@@ -81,9 +81,17 @@ export function installAdminErrorMonitor() {
 
   window.addEventListener('unhandledrejection', (event) => {
     const reason = event.reason;
+    const status = reason?.status ?? (reason?.response ? reason.response.status : null);
     const message = reason?.message || String(reason);
+    // آستانهٔ تمیز: هر خطایِ HTTP 4xx یک «پاسخِ کسب‌وکارِ معمولی» از API است
+    // (نشستِ منقضی، ورودِ لازم، حقوقِ کم و…) — نه کرشِ JS خودِ پنل. پنل در
+    // این حالت‌ها کاربر را به ورود/پیامِ مناسب می‌برد؛ گزارشِ آن به‌عنوان crash
+    // فقط صندوق را کور می‌کند. فقط خطاهای واقعیِ اکسپشن (TypeError، promise
+    // رهاشدهٔ کدِ ما، …) باید ثبت شوند. 5xx را نگه می‌داریم چون نشانه‌ی مشکلِ
+    // سرور است.
+    if (Number.isInteger(status) && status >= 400 && status < 500) return;
     // خطای عمدیِ «نشست منقضی شده» که خودمان هندل می‌کنیم را کرش نگیریم.
-    if (/منقضی|لغو شده|unauthorized|401/i.test(message)) return;
+    if (/منقضی|لغو شده|unauthorized|401|ورود ادمین|ورود لازم|احراز/i.test(message)) return;
     send('unhandledrejection', message, reason?.stack);
   });
 }

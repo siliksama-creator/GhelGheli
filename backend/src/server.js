@@ -3158,9 +3158,17 @@ app.use((err, req, res, next) => {
 // keep serving; PM2 still restarts us if the process genuinely dies.
 process.on('unhandledRejection', (reason) => {
   console.error('[fatal] unhandled promise rejection:', reason);
+  // fail-fast: به‌جای اینکه پروسه در وضعیتِ نامعتبر به کار ادامه دهد (و
+  // state را بی‌صدا خراب کند)، خارج می‌شویم تا PM2 تمیز ری‌استارت کند.
+  // کمی مکث تا لاگِ stderr قبل از خروج لاک شود.
+  setTimeout(() => process.exit(1), 10);
 });
 process.on('uncaughtException', (err) => {
   console.error('[fatal] uncaught exception:', err);
+  // استانداردِ صنعت: uncaughtException بازگشت‌ناپذیر است؛ پروسه را سریع
+  // خارج و PM2 را وادار به ری‌استارتِ تمیز می‌کنیم، نه سرویس‌دهیِ ادامه‌دار
+  // در حالتِ کور. (توصیهٔ رسمیِ Node)
+  setTimeout(() => process.exit(1), 10);
 });
 
 const port = process.env.PORT || 4000;

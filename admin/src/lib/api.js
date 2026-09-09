@@ -26,7 +26,13 @@ export function createApi(token, onUnauthorized) {
     });
     if (res.status === 401 && token) onUnauthorized?.();
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.message || 'خطای ارتباط با سرور');
+    if (!res.ok) {
+      const err = new Error(data.message || 'خطای ارتباط با سرور');
+      // پیوستنِ کد وضعیت تا مونیتورِ خطا بتواند 4xx را از «کرشِ واقعیِ JS»
+      // جدا کند. یک 401/403 پاسخِ عادیِ API است، نه خرابیِ پنل.
+      err.status = res.status;
+      throw err;
+    }
     return data;
   };
   request.uploadImage = async (file) => {
@@ -39,7 +45,11 @@ export function createApi(token, onUnauthorized) {
     });
     if (res.status === 401 && token) onUnauthorized?.();
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.message || 'خطای آپلود عکس');
+    if (!res.ok) {
+      const err = new Error(data.message || 'خطای آپلود عکس');
+      err.status = res.status;
+      throw err;
+    }
     return data.url;
   };
 
@@ -76,7 +86,13 @@ export function createApi(token, onUnauthorized) {
     });
     if (res.status === 401 && token) onUnauthorized?.();
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.message || 'خطای ارتباط با سرور');
+    if (!res.ok) {
+      const err = new Error(data.message || 'خطای ارتباط با سرور');
+      // پیوستنِ کد وضعیت تا مونیتورِ خطا بتواند 4xx را از «کرشِ واقعیِ JS»
+      // جدا کند. یک 401/403 پاسخِ عادیِ API است، نه خرابیِ پنل.
+      err.status = res.status;
+      throw err;
+    }
     return data;
   };
 
@@ -87,7 +103,11 @@ export function createApi(token, onUnauthorized) {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     if (res.status === 401 && token) onUnauthorized?.();
-    if (!res.ok) throw new Error('خطا در دریافت فایل');
+    if (!res.ok) {
+      const err = new Error('خطا در دریافت فایل');
+      err.status = res.status;
+      throw err;
+    }
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
