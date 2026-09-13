@@ -83,7 +83,12 @@ const webInventory = read('userweb/src/screens/Inventory.jsx');
 const webDuel = read('userweb/src/cardDuelGame.jsx');
 const webPlayerCard = read('userweb/src/components/PlayerCard.jsx');
 const webCardsLib = read('userweb/src/lib/cards.js');
-const webCss = read('userweb/src/style.css');
+let webCss = read('userweb/src/style.css');
+try {
+  const stylesDir = path.join(root, 'userweb/src/styles');
+  if (fs.existsSync(stylesDir)) for (const f of fs.readdirSync(stylesDir).sort()) if (f.endsWith('.css')) webCss += '\n' + read('userweb/src/styles/' + f);
+  try { webCss += '\n' + read('userweb/src/typography.css'); } catch {}
+} catch {}
 check(['معمولی','نقره‌ای','طلایی','پرمیوم','لجند'].every(label => webFrame.includes(label)),
   'Web rarity frame has small readable Persian labels for every tier');
 check(/<PlayerCard/.test(webInventory) && /ggCardStats/.test(webPlayerCard)

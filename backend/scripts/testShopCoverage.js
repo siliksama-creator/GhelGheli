@@ -191,7 +191,12 @@ for (const kind of KINDS) {
 // ── منابعِ رندر ──
 const webCosmetics = read(path.join(REPO, 'userweb/src/components/Cosmetics.jsx'));
 const webMotion = read(path.join(REPO, 'userweb/src/components/cosmeticsMotion.css'));
-const webStyle = read(path.join(REPO, 'userweb/src/style.css'));
+let webStyle = read(path.join(REPO, 'userweb/src/style.css'));
+try {
+  const stylesDir = path.join(REPO, 'userweb/src/styles');
+  if (fs.existsSync(stylesDir)) for (const f of fs.readdirSync(stylesDir).sort()) if (f.endsWith('.css')) webStyle += '\n' + read(path.join(REPO, 'userweb/src/styles/' + f));
+  try { webStyle += '\n' + read(path.join(REPO, 'userweb/src/typography.css')); } catch {}
+} catch {}
 const webAll = `${webCosmetics}\n${webMotion}\n${webStyle}`;
 
 const dartPalette = read(path.join(REPO, 'mobile/lib/core/cosmetic_palette.dart'));

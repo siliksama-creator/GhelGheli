@@ -82,7 +82,12 @@ ck('service worker کش‌های قدیمی را در activate پاک می‌ک�
 
 console.log('\n══ ۳ب. عکسِ کارت روی جانشین نقاشی می‌شود ══');
 {
-  const css = read('userweb/src/style.css');
+  let css = read('userweb/src/style.css');
+  try {
+    const stylesDir = path.join(REPO, 'userweb/src/styles');
+    if (fs.existsSync(stylesDir)) for (const f of fs.readdirSync(stylesDir).sort()) if (f.endsWith('.css')) css += '\n' + read('userweb/src/styles/' + f);
+    try { css += '\n' + read('userweb/src/typography.css'); } catch {}
+  } catch {}
   // ── باگی که فقط با اسکرین‌شات پیدا شد ──
   //
   // `.ggCardFallbackWrap` (حرفِ اولِ نامِ بازیکن) `position:absolute`

@@ -14,7 +14,12 @@ const tapScreen = read('mobile/lib/screens/user/games/tap/tap_screen.dart');
 const tapChar = read('mobile/lib/screens/user/games/tap/tap_character.dart');
 const webTap = read('userweb/src/tapGame.jsx');
 const home = read('userweb/src/screens/Home.jsx');
-const css = read('userweb/src/style.css');
+let css = read('userweb/src/style.css');
+try {
+  const stylesDir = path.join(root, 'userweb/src/styles');
+  if (fs.existsSync(stylesDir)) for (const f of fs.readdirSync(stylesDir).sort()) if (f.endsWith('.css')) css += '\n' + read('userweb/src/styles/' + f);
+  try { css += '\n' + read('userweb/src/typography.css'); } catch {}
+} catch {}
 const homeShell = read('mobile/lib/screens/user/home_shell.dart');
 const scrollHint = read('mobile/lib/widgets/scroll_hint.dart');
 

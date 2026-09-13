@@ -9,7 +9,12 @@ const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const mobile = read('mobile/lib/screens/user/games/card_duel/card_duel_widgets.dart');
 const mobilePage = read('mobile/lib/screens/user/games/card_duel_page.dart');
 const web = read('userweb/src/cardDuelGame.jsx');
-const webStyle = read('userweb/src/style.css');
+let webStyle = read('userweb/src/style.css');
+try {
+  const stylesDir = path.join(root, 'userweb/src/styles');
+  if (fs.existsSync(stylesDir)) for (const f of fs.readdirSync(stylesDir).sort()) if (f.endsWith('.css')) webStyle += '\n' + read('userweb/src/styles/' + f);
+  try { webStyle += '\n' + read('userweb/src/typography.css'); } catch {}
+} catch {}
 let pass = 0;
 function ok(condition, label) {
   assert.ok(condition, label);

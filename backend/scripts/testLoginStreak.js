@@ -24,7 +24,19 @@ const dashboard = read('mobile/lib/screens/user/dashboard_page.dart');
 const webCard = read('userweb/src/components/LoginStreak.jsx');
 const webHome = read('userweb/src/screens/Home.jsx');
 const webMain = read('userweb/src/main.jsx');
-const webCss = read('userweb/src/style.css');
+let webCss = read('userweb/src/style.css');
+// modular refactor: style.css is now an import hub (split-style.mjs, 7 modules)
+// test must check the aggregated effective CSS, not just the hub
+try {
+  const stylesDir = path.join(root, 'userweb/src/styles');
+  if (fs.existsSync(stylesDir)) {
+    for (const f of fs.readdirSync(stylesDir).sort()) {
+      if (f.endsWith('.css')) webCss += '\n' + read('userweb/src/styles/' + f);
+    }
+  }
+} catch {}
+// also include typography.css which may hold streak variants
+try { webCss += '\n' + read('userweb/src/typography.css'); } catch {}
 
 console.log('\n== قرارداد سرور استریک روزانه ==');
 {
