@@ -5,6 +5,7 @@ import { fa } from '../lib/api.js';
 // همان متنِ دیروز. عدد هرگز در متن نوشته نمی‌شود: همیشه از جای‌نگهدار
 // می‌آید تا «جمله یک‌چیز بگوید و منطقِ سرور چیزِ دیگر».
 import { text, useLive } from '../lib/liveConfig.js';
+import { stakeLabel } from '../lib/coinCopy.js';
 import { ASSETS, SvgIcon } from './IconAsset.jsx';
 
 // کارتِ «سکه چیست و چطور به دست می‌آید» — بالای جدولِ لیگ.
