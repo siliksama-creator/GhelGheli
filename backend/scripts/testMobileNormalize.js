@@ -51,8 +51,16 @@ for (let i = start; i < src.length; i++) {
   else if (src[i] === '}') { depth--; if (started && depth === 0) { end = i + 1; break; } }
 }
 const fnSource = src.slice(start, end);
-// eslint-disable-next-line no-new-func
-const normalizeMobile = new Function(`${fnSource}; return normalizeMobile;`)();
+let normalizeMobile;
+if (fnSource.includes('_normalizeMobile')) {
+  // server.js اکنون تابع را از lib/auth-helpers می‌گیرد (refactor یکپارچه).
+  // استخراجِ رشته‌ای دیگر جواب نمی‌دهد، پس مستقیم از ماژولِ واحدِ حقیقت می‌خوانیم.
+  // این دقیقاً همان تابعی است که سرور در runtime استفاده می‌کند.
+  normalizeMobile = require('../src/lib/auth-helpers').normalizeMobile;
+} else {
+  // eslint-disable-next-line no-new-func
+  normalizeMobile = new Function(`${fnSource}; return normalizeMobile;`)();
+}
 
 console.log('\n== ارقام فارسی (باگ اصلی) ==');
 {
