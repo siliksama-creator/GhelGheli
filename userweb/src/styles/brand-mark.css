@@ -640,7 +640,7 @@
 /* ── ورود صفحه ────────────────────────────────────────────────────────
    هر تب با یک محو + بالا آمدن کوتاه وارد می‌شود. ۲۲۰ms عمدی است: کمتر
    از این دیده نمی‌شود، بیشتر از این کند حس می‌شود. */
-.tabPane { animation: paneIn .22s cubic-bezier(.2, .8, .3, 1) }
+.tabPane { min-height: 52vh; content-visibility: auto; contain-intrinsic-size: auto 600px; animation: paneIn .16s ease-out } /* FIX: قبلاً .22s با overshoot فنر می‌پرید */
 @keyframes paneIn {
   from { opacity: 0; transform: translateY(8px) }
   to { opacity: 1; transform: none }
@@ -694,7 +694,7 @@ a:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tabPane { animation: none }
+  .tabPane { min-height: 52vh; content-visibility: auto; contain-intrinsic-size: auto 600px; animation: none }
   .bar span::after { animation: none }
   .notifDot, .wheelBadge { animation: none }
   .bar span { transition: none }
@@ -4551,7 +4551,7 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 
 
 /* ── ScrollHint: راهنمای «پایین هم ادامه دارد» (آینهٔ Flutter ScrollHint) ── */
-.scrollHintRoot{position:relative;width:100%}
+.scrollHintRoot{position:relative;width:100%;contain:layout;min-height:40vh} /* FIX: جلوگیری از پرش ارتفاع */
 .scrollHintFade{
   position:fixed;left:0;right:0;height:64px;z-index:28;pointer-events:none;
   background:linear-gradient(to bottom, transparent, rgba(6,16,29,.78));
@@ -4579,7 +4579,8 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 }
 .scrollHintPill span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .scrollHintPill b{font-weight:900;letter-spacing:-2px}
-@keyframes scrollHintBob{from{transform:translateY(0)}to{transform:translateY(5px)}}
+@keyframes scrollHintBob{from{transform:translateY(0)}to{transform:translateY(2.5px)}} /* FIX: فنر کمتر */
+.scrollHintPill{ will-change: transform; }
 @media (prefers-reduced-motion:reduce){
   .scrollHintPill{animation:none}
 }

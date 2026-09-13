@@ -2,13 +2,9 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
  * راهنمای اسکرول — آینهٔ mobile/lib/widgets/scroll_hint.dart
- *
- * سه نشانه وقتی محتوا از viewport بلندتر است:
- *  ۱) ریل کناری همیشه دیده
- *  ۲) محوشدگی لبهٔ پایین
- *  ۳) قرصِ «پایین‌تر» با bob تا اولین اسکرول کاربر
- *
- * target: 'window' | HTMLElement | ref
+ * FIX FUNDAMENTAL v2: حذف MutationObserver سنگین روی کل document.body که هر تغییر
+ * در لیگ/چت باعث اندازه‌گیری و رندروم می‌شد و "فنر" ایجاد می‌کرد.
+ * حالا فقط ResizeObserver روی خودِ محتوا + window resize/scroll
  */
 export function ScrollHint({
   children,
@@ -27,44 +23,48 @@ export function ScrollHint({
     touched: false,
   });
   const touchedRef = useRef(false);
+  const rafRef = useRef(0);
 
   const resolveEl = useCallback(() => {
-    if (target === 'window') return null; // window metrics
+    if (target === 'window') return null;
     if (target && target.current) return target.current;
     if (target instanceof HTMLElement) return target;
     return wrapRef.current;
   }, [target]);
 
   const measure = useCallback(() => {
-    const el = resolveEl();
-    let scrollTop, clientH, scrollH;
-    if (!el || target === 'window') {
-      const doc = document.documentElement;
-      scrollTop = window.scrollY || doc.scrollTop || 0;
-      clientH = window.innerHeight || doc.clientHeight || 1;
-      scrollH = Math.max(doc.scrollHeight, document.body?.scrollHeight || 0);
-    } else {
-      scrollTop = el.scrollTop;
-      clientH = el.clientHeight || 1;
-      scrollH = el.scrollHeight || 0;
-    }
-    const max = Math.max(0, scrollH - clientH);
-    const scrollable = max > 12;
-    const fraction = max <= 0 ? 0 : Math.min(1, Math.max(0, scrollTop / max));
-    const viewport = clientH / Math.max(1, scrollH);
-    const atBottom = max - scrollTop <= 28;
-    setState((prev) => {
-      const touched = touchedRef.current;
-      if (
-        prev.scrollable === scrollable &&
-        Math.abs(prev.fraction - fraction) < 0.004 &&
-        Math.abs(prev.viewport - viewport) < 0.004 &&
-        prev.atBottom === atBottom &&
-        prev.touched === touched
-      ) {
-        return prev;
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => {
+      const el = resolveEl();
+      let scrollTop, clientH, scrollH;
+      if (!el || target === 'window') {
+        const doc = document.documentElement;
+        scrollTop = window.scrollY || doc.scrollTop || 0;
+        clientH = window.innerHeight || doc.clientHeight || 1;
+        scrollH = Math.max(doc.scrollHeight, document.body?.scrollHeight || 0);
+      } else {
+        scrollTop = el.scrollTop;
+        clientH = el.clientHeight || 1;
+        scrollH = el.scrollHeight || 0;
       }
-      return { scrollable, fraction, viewport, atBottom, touched };
+      const max = Math.max(0, scrollH - clientH);
+      const scrollable = max > 12;
+      const fraction = max <= 0 ? 0 : Math.min(1, Math.max(0, scrollTop / max));
+      const viewport = clientH / Math.max(1, scrollH);
+      const atBottom = max - scrollTop <= 28;
+      setState((prev) => {
+        const touched = touchedRef.current;
+        if (
+          prev.scrollable === scrollable &&
+          Math.abs(prev.fraction - fraction) < 0.006 &&
+          Math.abs(prev.viewport - viewport) < 0.006 &&
+          prev.atBottom === atBottom &&
+          prev.touched === touched
+        ) {
+          return prev;
+        }
+        return { scrollable, fraction, viewport, atBottom, touched };
+      });
     });
   }, [resolveEl, target]);
 
@@ -72,7 +72,6 @@ export function ScrollHint({
     const el = resolveEl();
     const onScroll = () => {
       if (!touchedRef.current) {
-        // فقط وقتی واقعاً حرکت کرده
         const st = target === 'window' || !el
           ? (window.scrollY || document.documentElement.scrollTop || 0)
           : el.scrollTop;
@@ -83,10 +82,9 @@ export function ScrollHint({
     const onResize = () => measure();
 
     measure();
-    // بعد از paintهای تنبل (تصاویر/فونت) دوباره اندازه بگیر
-    const t1 = setTimeout(measure, 120);
-    const t2 = setTimeout(measure, 600);
-    const t3 = setTimeout(measure, 1800);
+    // فقط دو بار بعد از لود اولیه اندازه بگیر، نه سه بار + MutationObserver سنگین
+    const t1 = setTimeout(measure, 300);
+    const t2 = setTimeout(measure, 1200);
 
     if (target === 'window' || !el) {
       window.addEventListener('scroll', onScroll, { passive: true });
@@ -95,29 +93,37 @@ export function ScrollHint({
       el.addEventListener('scroll', onScroll, { passive: true });
       window.addEventListener('resize', onResize, { passive: true });
     }
-    // MutationObserver سبک برای محتوای دیررس
-    let mo;
+    // ResizeObserver سبک فقط روی خودِ محتوا، نه کل body
+    let ro;
     try {
-      mo = new MutationObserver(() => measure());
-      mo.observe(el || document.body, { childList: true, subtree: true, characterData: false });
+      const targetEl = el || wrapRef.current;
+      if (targetEl && typeof ResizeObserver !== 'undefined') {
+        ro = new ResizeObserver(() => measure());
+        ro.observe(targetEl);
+        // اگر window target است، body را هم observe کن ولی فقط size نه childList
+        if (target === 'window' && document.body) {
+          ro.observe(document.body);
+        }
+      }
     } catch (_) { /* ignore */ }
 
     return () => {
-      clearTimeout(t1); clearTimeout(t2); clearTimeout(t3);
+      clearTimeout(t1); clearTimeout(t2);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onResize);
       if (el) el.removeEventListener('scroll', onScroll);
-      if (mo) mo.disconnect();
+      if (ro) ro.disconnect();
     };
-  }, [measure, resolveEl, target, children]);
+  }, [measure, resolveEl, target]);
 
   // reset touch when tab/content identity changes via key on parent
   useEffect(() => {
     touchedRef.current = false;
     setState((s) => ({ ...s, touched: false }));
-    const t = setTimeout(measure, 50);
+    const t = setTimeout(measure, 80);
     return () => clearTimeout(t);
-  }, [label]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [label, measure]);
 
   const pillVisible =
     showPill && state.scrollable && !state.atBottom && !state.touched;
@@ -127,6 +133,7 @@ export function ScrollHint({
       ref={wrapRef}
       className={`scrollHintRoot ${className}`.trim()}
       data-scrollable={state.scrollable ? '1' : '0'}
+      style={{ contain: 'layout' }}
     >
       {children}
       {state.scrollable && !state.atBottom && (

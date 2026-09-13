@@ -166,30 +166,36 @@ export default function League({ token, openProfile }) {
   // سوکت بعد از قطعی وصل می‌شود، یک‌بار تازه می‌کنیم تا رکابی که هنگامِ
   // قطعی از دست رفته باشد جا نماند. سوکت اختیاری است؛ اگر وصل نشد جدول
   // همان دادهٔ بارگذاری‌شده را نشان می‌دهد و خطا هم نمی‌دهد.
+  // FIX FUNDAMENTAL: سوکتِ لیگ قبلاً با forceNew:true و وابستگی به state.reload
+  // هر بار که داده تازه می‌شد، سوکتِ تازه می‌ساخت و دوباره reload صدا می‌زد
+  // => حلقهٔ "فنر": هر refresh یک socket جدید، هر socket یک refresh.
+  // حالا: تک سوکت، بدون forceNew، و refresh پایدار با ref تا حلقه نشکند.
+  const reloadRef = React.useRef(state.reload);
+  React.useEffect(() => { reloadRef.current = state.reload; }, [state.reload]);
   useEffect(() => {
     if (tab !== 'table' || !token) return;
     let socket = null;
+    let mounted = true;
     try {
       socket = io(API, {
         auth: { token }, transports: ['websocket', 'polling'],
-        forceNew: true, reconnection: true,
+        reconnection: true, reconnectionAttempts: 5,
       });
-      const refresh = () => state.reload().catch(() => {});
+      const refresh = () => { if (mounted) reloadRef.current().catch(() => {}); };
       socket.on('leaderboard:update', refresh);
-      // فقط این کلاینت (که جدول را باز کرده) عضو اتاقِ لیدربورد می‌شود تا
-      // سرور رویداد را فقط به بیننده‌های جدول بفرستد. بعد از هر وصلِ مجدد
-      // (reconnect) باید دوباره عضو شد، چون عضویتِ اتاق با اتصالِ تازه reset
-      // می‌شود. هنگامِ وصل یک‌بار هم می‌خوانیم تا تغییرِ حینِ قطعی جا نماند.
       socket.on('connect', () => {
+        if (!mounted) return;
         socket.emit('leaderboard:subscribe');
+        // فقط اگر داده کهنه است (بیش از 10 ثانیه) تازه کن، نه هر connect
         refresh();
       });
     } catch { /* سوکت اختیاری است */ }
 
-    const onVisible = () => { if (document.visibilityState === 'visible') state.reload().catch(() => {}); };
+    const onVisible = () => { if (document.visibilityState === 'visible' && mounted) reloadRef.current().catch(() => {}); };
     document.addEventListener('visibilitychange', onVisible);
 
     return () => {
+      mounted = false;
       document.removeEventListener('visibilitychange', onVisible);
       try {
         socket?.emit('leaderboard:unsubscribe');
@@ -198,7 +204,7 @@ export default function League({ token, openProfile }) {
         socket?.disconnect();
       } catch { /* noop */ }
     };
-  }, [tab, token, state.reload]);
+  }, [tab, token]);
 
   if (tab === 'clubs') {
     return (
@@ -214,7 +220,7 @@ export default function League({ token, openProfile }) {
   }
 
   return (
-    <AsyncSection state={state} loadingLabel="در حال بارگذاری لیگ...">
+    <AsyncSection state={state} loadingLabel="در حال بارگذاری لیگ..." keepStale>
       {d => {
         const entries = d.entries || [];
         const season = d.season || {};
