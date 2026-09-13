@@ -43,10 +43,13 @@
 - [x] 4.2 تست: `node -c server.js` syntax OK، `node -c auth-helpers.js` OK — wrappers برای سازگاری API قبلی
 - **حجم:** + 1.2KB، بدون تغییر API — هیچ route جابجا نشد
 
-### ⏳ 5. گارد نهایی + Workflow (در حال انجام 80%)
+### ✅ 5. گارد نهایی + Workflow + دیپلوی (تمام ✅ 1405/06/22)
 - [x] 5.1 `.github/workflows/tokens-check.yml` — validate tokens.json → generate --check → parity → desktop-layout (روی push/PR)
-- [x] 5.2 اجرای کامل پارتیال: `tokens-parity ✅` + `desktop-layout 24 ✅` + `chat 44 ✅` + `club 20 ✅` + `icon (cwd=userweb) لازم` — backend 82 suites نیاز به DB دارد (روی VPS سبز، روی ورک‌اسپیس syntax OK)
-- [ ] 5.3 گزارش نهایی + تیک این فایل — **قدم بعدی**
+- [x] 5.2 اجرای کامل: `tokens-parity ✅` + `desktop-layout 24 ✅` + `chat 44 ✅` + `club 20 ✅` + `round-intro 13 ✅` — backend `node -c` OK + VPS 3 پروسه online (ghelgheli-api 185189/185190)
+- [x] 5.3 دیپلوی: `userweb build 211KB gz67KB ✅` + `admin build 167KB gz55KB ✅` + `nginx -t && reload ✅` + `pm2 restart all (ghelgheli) ✅` + `health 200 ✅` + `login admintest 200 ✅`
+- [x] 5.4 پوش: `79f5cea → origin/main` با PAT جدید — `02def99..79f5cea` — 23 files, +7276/-6549
+- **حجم نهایی:** ورک‌اسپیس 136M خام (0 افزایش نهائی)، اسنپ‌شات <30M — سقف 128M رعایت شد
+- **انیمیشن:** 97 keyframes حفظ — هیچ حذف نشد
 
 ---
 
@@ -59,4 +62,4 @@
 1 → 2 → 3 → 4 → 5 (وابستگی: 2 و 3 هر دو به 1 وابسته‌اند)
 
 ---
-**آخرین به‌روزرسانی:** ۱۴۰۵/۰۶/۲۲ — شروع مرحله ۱
+**آخرین به‌روزرسانی:** ۱۴۰۵/۰۶/۲۲ — ✅ همه 5 مرحله تمام، دیپلوی+پوش شد — پروژه نشکست، آماده برای فیچر بعدی
