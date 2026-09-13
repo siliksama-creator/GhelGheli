@@ -31,6 +31,7 @@
 // دو لایه، چون یک لایه یعنی یک تغییرِ ساده در cron می‌تواند نیمه‌شب
 // هزاران گوشی را روشن کند.
 const { pool } = require('../config/db');
+const logger = require('../lib/logger');
 const { createNotification } = require('./notificationService');
 
 /** ساعت فعلی به وقت تهران، به صورت عدد ۰ تا ۲۳. */
@@ -70,7 +71,7 @@ function withinQuietHours(now = new Date()) {
  */
 async function sendDailyReminder({ force = false } = {}) {
   if (!force && withinQuietHours()) {
-    console.log('[wheel-reminder] در ساعات استراحت — ارسال نشد');
+    logger.info('[wheel-reminder] در ساعات استراحت — ارسال نشد');
     return { sent: 0, skipped: 'quiet_hours' };
   }
 
@@ -101,7 +102,7 @@ async function sendDailyReminder({ force = false } = {}) {
       sent++;
     } catch { /* یک کاربر ناموفق نباید بقیه را متوقف کند */ }
   }
-  console.log(`[wheel-reminder] ${sent} یادآور ارسال شد`);
+  logger.info(`[wheel-reminder] ${sent} یادآور ارسال شد`);
   return { sent, total: rows.length };
 }
 

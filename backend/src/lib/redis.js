@@ -23,6 +23,7 @@ try {
   Redis = null; // پکیج نصب نیست — همان مسیر تک‌پروسه
 }
 
+const logger = require('./logger');
 const URL = String(process.env.REDIS_URL || '').trim();
 
 /** آیا اصلاً باید سراغ ردیس برویم؟ */
@@ -50,7 +51,7 @@ function makeClient(role) {
   });
   client.on('ready', () => {
     warned = false;
-    console.log(`[redis:${role}] متصل شد`);
+    logger.info(`[redis:${role}] متصل شد`);
   });
   return client;
 }

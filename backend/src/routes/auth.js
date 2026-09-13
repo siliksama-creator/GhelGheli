@@ -2,6 +2,7 @@
 const express = require('express');
 const signupGift = require('../services/signupGiftService');
 const smsService = require('../services/smsService');
+const logger = require('../lib/logger');
 
 module.exports = function createAuthRoutes(deps) {
   const {
@@ -30,7 +31,7 @@ router.post('/auth/request-otp', otpLimiter, asyncHandler(async (req, res) => {
   if (sms.sent === false && sms.reason === 'failed') {
     return res.status(502).json({ message: 'ارسال پیامک ناموفق بود؛ کمی بعد دوباره تلاش کنید' });
   }
-  if (process.env.OTP_DEV_MODE === 'true') console.log(`DEV OTP for ${mobile}: ${code}`);
+  if (process.env.OTP_DEV_MODE === 'true') logger.debug(`DEV OTP for ${mobile}: ${code}`);
   res.json({
     message: 'کد تایید ارسال شد',
     devCode: process.env.OTP_DEV_MODE === 'true' ? code : undefined,

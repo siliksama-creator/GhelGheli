@@ -6,7 +6,7 @@
 // every change risky — the "stuck on a loading spinner forever" bug in the
 // league tab survived several passes precisely because it was invisible in
 // that wall of text.
-import React, { useEffect, useState, Suspense, lazy } from 'react';
+import React, { useEffect, useState, Suspense, lazy, Component } from 'react';
 import { createRoot } from 'react-dom/client';
 
 // «دانلود / ورود» عمداً در `live_copy` نیست: این برچسب فقط در وب وجود
@@ -66,6 +66,39 @@ function prefetchTabs() {
   };
   if (typeof requestIdleCallback === 'function') requestIdleCallback(warm, { timeout: 4000 });
   else setTimeout(warm, 2500);
+}
+
+// ── ErrorBoundary برای جلوگیری از صفحه سیاه (آینهٔ admin) ────────────────
+class UserErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  componentDidCatch(error, info) {
+    try { console.error('[userweb] ErrorBoundary:', error, info); } catch {}
+  }
+  handleRetry = () => {
+    this.setState({ hasError: false, error: null });
+    if (String(this.state.error?.message || '').includes('Chunk') || String(this.state.error?.message || '').includes('Loading')) {
+      window.location.reload();
+    } else {
+      this.props.onReset?.();
+    }
+  };
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '32px', textAlign: 'center', direction: 'rtl' }}>
+          <div style={{ maxWidth: 480, margin: '40px auto', background: 'var(--surface, #0E1826)', border: '1px solid var(--border, rgba(255,255,255,0.1))', borderRadius: 16, padding: 24 }}>
+            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>خطا خورد</div>
+            <div style={{ fontSize: 14, opacity: 0.85, marginBottom: 16, lineHeight: 1.7 }}>دوباره تلاش کن و صفحه رو رفرش کن</div>
+            <div style={{ fontSize: 12, opacity: 0.6, marginBottom: 16, direction: 'ltr', overflow: 'auto', maxHeight: 80 }}>{String(this.state.error?.message || '').slice(0, 300)}</div>
+            <button onClick={this.handleRetry} style={{ background: 'var(--gg-emerald, #00D49A)', color: '#060D18', border: 'none', borderRadius: 999, padding: '10px 20px', fontWeight: 700, cursor: 'pointer' }}>تلاش دوباره</button>
+            <button onClick={() => window.location.reload()} style={{ marginRight: 8, background: 'transparent', color: 'var(--text, #EAF1FB)', border: '1px solid var(--border)', borderRadius: 999, padding: '10px 20px', cursor: 'pointer' }}>رفرش کامل</button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 import './style.css';
@@ -597,9 +630,7 @@ function Portal({ token, logout, cfg }) {
         padBottom={72}
       >
       <main className="tabPane" key={tab} data-tab={tab}>
-        {/* fallback عمداً `LoadingView` نیست: چانک‌ها معمولاً چند ده
-            میلی‌ثانیه می‌آیند و اسپینرِ کوتاه‌مدت بیشتر از نبودش آزار
-            دارد. یک ظرفِ هم‌ارتفاع می‌گذاریم تا صفحه نپرد. */}
+        <UserErrorBoundary key={tab} onReset={() => window.location.reload()}>
         <Suspense fallback={<div className="tabLoading" aria-busy="true" />}>
         {tab === 'home' && (
           <Home token={token} p={p} rewards={rewards} load={load}
@@ -649,14 +680,17 @@ function Portal({ token, logout, cfg }) {
             (!v ? '' : String(v).startsWith('http') ? v : API + v)} />
         )}
         </Suspense>
+        </UserErrorBoundary>
       </main>
       </ScrollHint>
 
       {publicUser && (
+        <UserErrorBoundary>
         <Suspense fallback={null}>
         <PublicProfile token={token} userId={publicUser}
           close={() => setPublicUser(null)} />
         </Suspense>
+        </UserErrorBoundary>
       )}
     </div>
   );

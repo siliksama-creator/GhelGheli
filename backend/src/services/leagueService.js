@@ -1,4 +1,5 @@
 const { pool } = require('../config/db');
+const logger = require('../lib/logger');
 const walletService = require('./walletService');
 const { createNotification } = require('./notificationService');
 const pointLedger = require('./pointService');
@@ -264,7 +265,7 @@ async function repairSeasonBounds(client, season) {
             timezone='Asia/Tehran', updated_at=NOW()
       WHERE id=$1 RETURNING *`,
     [season.id, label, start, end]);
-  console.log(
+  logger.info(
     `[league] season ${season.month_year} re-based to Jalali ${label} ` +
     `(${start.toISOString()} → ${end.toISOString()})`);
   return rows[0];
@@ -1061,7 +1062,7 @@ async function closeExpiredSeasons() {
       const res = await closeActiveSeason({ seasonId: row.id });
       results.push({ ...res, title: row.title, monthYear: row.month_year });
       if (!res.skipped) {
-        console.log(`[league] فصل «${row.title || row.month_year}» بسته شد — ${res.winners} برنده`);
+        logger.info(`[league] فصل «${row.title || row.month_year}» بسته شد — ${res.winners} برنده`);
       }
     } catch (e) {
       console.error(`[league] بستنِ فصل ${row.month_year} شکست خورد:`, e.message);

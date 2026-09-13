@@ -36,6 +36,7 @@
 // اگر REDIS_URL نباشد این ماژول بی‌صدا هیچ کاری نمی‌کند و اپ دقیقاً مثل
 // امروز تک‌پروسه بالا می‌آید.
 
+const logger = require('./logger');
 const { redisEnabled, makeClient } = require('./redis');
 
 /**
@@ -61,7 +62,7 @@ async function attachRedisAdapter(io) {
   if (!pub || !sub) return false;
 
   io.adapter(createAdapter(pub, sub));
-  console.log('[cluster] آداپتور ردیس فعال شد — پخش رویداد بین پروسه‌ها برقرار است');
+  logger.info('[cluster] آداپتور ردیس فعال شد — پخش رویداد بین پروسه‌ها برقرار است');
   return true;
 }
 

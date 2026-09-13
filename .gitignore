@@ -25,3 +25,7 @@ userweb/dist/
 *.keystore
 **/key.properties
 __pycache__/
+
+# env variants — local/staging/production configs live on the VPS, not in git
+.env.*
+!.env.example

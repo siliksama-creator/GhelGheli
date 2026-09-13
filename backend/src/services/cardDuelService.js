@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const logger = require('../lib/logger');
 const { faDigits } = require('../lib/faNum');
 const { pool } = require('../config/db');
 // قانونِ زندهٔ پرچم طوفان (duelMayhem) — با requireِ تنبل در تابع هم می‌توانست
@@ -1334,7 +1335,7 @@ async function maybePruneBattleHistory() {
   lastHistoryPruneAt = Date.now();
   try {
     const removed = await pruneBattleHistory();
-    if (removed) console.log(`[card-duel] pruned ${removed} old battle log(s)`);
+    if (removed) logger.info(`[card-duel] pruned ${removed} old battle log(s)`);
   } catch (err) {
     console.error('[card-duel] history prune failed:', err.message);
   }

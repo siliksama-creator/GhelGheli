@@ -29,6 +29,7 @@ const cron = require('node-cron');
 const swaggerUi = require('swagger-ui-express');
 const YAML = require('yaml');
 const { Server } = require('socket.io');
+const logger = require('./lib/logger');
 const { pool } = require('./config/db');
 const { normalizeMobile: _normalizeMobile, faDigits: _faDigits, anonymousNickname: _anonymousNickname, isValidPasswordLength: _isValidPasswordLength } = require('./lib/auth-helpers');
 // تنها فهرستِ آواتارها — هم `safeAvatarKey` از آن می‌خواند و هم
@@ -168,7 +169,7 @@ try {
     } catch { /* فایل سرِجایش ماند؛ بعد از فیلترِ تازه فایلِ تازه‌ای اضافه نمی‌شود */ }
   }
   if (quarantined > 0) {
-    console.warn(`[uploads] ${quarantined} فایلِ غیرتصویری به قرنطینه منتقل شد (uploads/.quarantine)`);
+    logger.warn(`[uploads] ${quarantined} فایلِ غیرتصویری به قرنطینه منتقل شد (uploads/.quarantine)`);
   }
 } catch { /* پوشهٔ images هنوز وجود ندارد — بی‌خطر */ }
 // CROSS-ORIGIN FIX: helmet() sets Cross-Origin-Resource-Policy: same-origin
@@ -258,7 +259,7 @@ app.get('/uploads/images/:file', async (req, res, next) => {
   } catch (err) {
     // اگر sharp نبود یا فایل خراب بود، اصلِ تصویر سرو می‌شود — هرگز
     // خطای ۵۰۰ به کاربر نمی‌دهیم، فقط کندتر می‌شود.
-    console.error('[thumb] failed:', err.message);
+    logger.error('[thumb] failed:', err.message);
     return next();
   }
 });
@@ -2170,7 +2171,7 @@ app.post('/api/support/uploads/image', auth, uploadLimiter, imageUpload.single('
   await verifyUpload(req.file);
   // Phone photos are multi-megabyte; shrink before anyone has to download it.
   const r = await optimizeUpload(req.file);
-  console.log(`[upload] support ${kb(r.bytesBefore)} -> ${kb(r.bytesAfter)}`);
+  logger.info(`[upload] support ${kb(r.bytesBefore)} -> ${kb(r.bytesAfter)}`);
   res.json({ url: `/uploads/images/${r.filename}`, bytes: r.bytesAfter });
 }));
 
@@ -2498,7 +2499,7 @@ app.post('/api/admin/uploads/image', adminAuth, requireRole('support'), imageUpl
   // و پسوندِ اعلامیِ فرستنده هر دو جعل‌شدنی‌اند (توضیح کامل در imageService).
   await verifyUpload(req.file);
   const r = await optimizeUpload(req.file);
-  console.log(`[upload] admin ${kb(r.bytesBefore)} -> ${kb(r.bytesAfter)}`);
+  logger.info(`[upload] admin ${kb(r.bytesBefore)} -> ${kb(r.bytesAfter)}`);
   res.json({ url: `/uploads/images/${r.filename}`, bytes: r.bytesAfter });
 }));
 
@@ -2882,12 +2883,12 @@ if (PROCESS_ROLE !== 'http') {
 // دیتابیس می‌ماند. startup و sweep ساعتی اصل امتیاز را برمی‌گردانند؛ در
 // نتیجه crash/reboot هرگز ورودی کاربر را برای همیشه قفل نمی‌کند.
 gameStakes.refundStaleMatches(60)
-  .then(n => { if (n) console.log(`[games:stake] startup refunded ${n} stale match(es)`); })
-  .catch(e => console.error('[games:stake] startup recovery failed:', e.message));
+  .then(n => { if (n) logger.info(`[games:stake] startup refunded ${n} stale match(es)`); })
+  .catch(e => logger.error('[games:stake] startup recovery failed:', e.message));
 cron.schedule('29 * * * *', () => {
   gameStakes.refundStaleMatches(60)
-    .then(n => { if (n) console.log(`[games:stake] refunded ${n} stale match(es)`); })
-    .catch(e => console.error('[games:stake] recovery failed:', e.message));
+    .then(n => { if (n) logger.info(`[games:stake] refunded ${n} stale match(es)`); })
+    .catch(e => logger.error('[games:stake] recovery failed:', e.message));
 });
 
 // ── بستنِ لیگ‌های تمام‌شده — ساعتی، نه «اولِ ماه» ────────────────────────
@@ -2910,8 +2911,8 @@ cron.schedule('29 * * * *', () => {
 // مدیر به وقتِ ایران وارد کرده جابه‌جا نشود.
 cron.schedule('5 * * * *', () => {
   closeExpiredSeasons()
-    .then(r => { if (r.closed) console.log(`[league] ${r.closed} فصل بسته شد`); })
-    .catch(e => console.error('[league] بستنِ خودکارِ فصل شکست خورد:', e.message));
+    .then(r => { if (r.closed) logger.info(`[league] ${r.closed} فصل بسته شد`); })
+    .catch(e => logger.error('[league] بستنِ خودکارِ فصل شکست خورد:', e.message));
 }, { timezone: 'Asia/Tehran' });
 
 // Sweep expired tap-game nonces hourly.
@@ -2929,21 +2930,21 @@ cron.schedule('5 * * * *', () => {
 // دو لایه عمدی است. جزئیات در wheelReminderService.
 cron.schedule('30 18 * * *', () => {
   wheelReminder.sendDailyReminder()
-    .catch(e => console.error('[wheel-reminder] failed:', e.message));
+    .catch(e => logger.error('[wheel-reminder] failed:', e.message));
 }, { timezone: 'Asia/Tehran' });
 
 cron.schedule('17 * * * *', () => {
   tapGame.pruneNonces()
-    .then(n => { if (n > 0) console.log(`[tap] pruned ${n} expired nonces`); })
-    .catch(e => console.error('[tap] nonce prune failed:', e.message));
+    .then(n => { if (n > 0) logger.info(`[tap] pruned ${n} expired nonces`); })
+    .catch(e => logger.error('[tap] nonce prune failed:', e.message));
 });
 
 // تاریخچهٔ دوئل فقط پنج بازی امتیازی اخیر را نشان می‌دهد؛ ربات و ردیف‌های
 // کهنه‌تر از دو هفته اینجا پاک می‌شوند تا جدول سبک بماند.
 cron.schedule('17 4 * * *', () => {
   cardDuel.pruneBattleHistory()
-    .then(n => { if (n) console.log(`[card-duel] pruned ${n} old battle log(s)`); })
-    .catch(e => console.error('[card-duel] history prune failed:', e.message));
+    .then(n => { if (n) logger.info(`[card-duel] pruned ${n} old battle log(s)`); })
+    .catch(e => logger.error('[card-duel] history prune failed:', e.message));
 }, { timezone: 'Asia/Tehran' });
 
 // جدولِ سهمیهٔ سکه به ازای هر کاربرِ فعال روزی یک ردیف می‌سازد. بدونِ
@@ -2951,8 +2952,8 @@ cron.schedule('17 4 * * *', () => {
 // می‌ماند. هفت روز نگه می‌داریم تا اگر لازم شد بشود دیروز را بررسی کرد.
 cron.schedule('23 4 * * *', () => {
   coins.pruneQuota(7)
-    .then(n => { if (n) console.log(`[coins] pruned ${n} old quota row(s)`); })
-    .catch(e => console.error('[coins] quota prune failed:', e.message));
+    .then(n => { if (n) logger.info(`[coins] pruned ${n} old quota row(s)`); })
+    .catch(e => logger.error('[coins] quota prune failed:', e.message));
 }, { timezone: 'Asia/Tehran' });
 
 // هرسِ رویدادهای تحلیلیِ کهنه — بند ۶بِ ممیزیِ مستقلِ دوم: این جدول
@@ -2961,13 +2962,13 @@ cron.schedule('23 4 * * *', () => {
 // از آن نه کاربردی دارد نه ارزش نگهداری.
 cron.schedule('41 4 * * *', () => {
   analytics.pruneOld(90)
-    .then(n => { if (n) console.log(`[analytics] pruned ${n} old event(s)`); })
-    .catch(e => console.error('[analytics] event prune failed:', e.message));
+    .then(n => { if (n) logger.info(`[analytics] pruned ${n} old event(s)`); })
+    .catch(e => logger.error('[analytics] event prune failed:', e.message));
   // صندوقِ کرش هم سقف دارد: رخدادهای حل/نادیدهٔ قدیمی‌تر از ۱۸۰ روز پاک
   // می‌شوند (گزارش‌های «باز» هرگز). بدون این، جدولِ کرش برای همیشه رشد می‌کرد.
   analytics.pruneCrashes(180)
-    .then(n => { if (n) console.log(`[analytics] pruned ${n} old crash report(s)`); })
-    .catch(e => console.error('[analytics] crash prune failed:', e.message));
+    .then(n => { if (n) logger.info(`[analytics] pruned ${n} old crash report(s)`); })
+    .catch(e => logger.error('[analytics] crash prune failed:', e.message));
 }, { timezone: 'Asia/Tehran' });
 // ── پاک‌سازی عکس‌های رها شده (۳ روز) ───────────────────────────────────
 // عکس کاربر بعد از تأیید خودکار حذف می‌شود (serverReviewQueue)، ولی اگر
@@ -3002,9 +3003,9 @@ cron.schedule('33 3 * * *', async () => {
         removed++;
       } catch {}
     }
-    if (removed) console.log(`[cleanup] ${removed} عکس قدیمی رها پاک شد`);
+    if (removed) logger.info(`[cleanup] ${removed} عکس قدیمی رها پاک شد`);
   } catch (e) {
-    console.error('[cleanup] failed:', e.message);
+    logger.error('[cleanup] failed:', e.message);
   }
 }, { timezone: 'Asia/Tehran' });
 
@@ -3025,9 +3026,9 @@ cron.schedule('33 3 * * *', async () => {
     },
   }).then(r => {
     if (r.processed || r.approved) {
-      console.log(`[photoReview] sweep: ${r.processed} بررسی، ${r.approved} تأیید خودکار، ${r.queued} در صف، ${r.errors} خطا`);
+      logger.info(`[photoReview] sweep: ${r.processed} بررسی، ${r.approved} تأیید خودکار، ${r.queued} در صف، ${r.errors} خطا`);
     }
-  }).catch(e => console.error('[photoReview] sweep failed:', e.message));
+  }).catch(e => logger.error('[photoReview] sweep failed:', e.message));
   // یک‌بار بعد از بالا‌آمدن (فرصت لودشدن مدل)، سپس هر ده دقیقه.
   setTimeout(runPhotoSweep, 45 * 1000);
   cron.schedule('*/10 * * * *', runPhotoSweep);
@@ -3104,7 +3105,7 @@ app.use((err, req, res, next) => {
   // دیگری (مثلاً قطعیِ واقعیِ یک سرویس) کماکان کرش حساب می‌شود.
   const intentionallyOff = status === 503 && err.code === 'GATEWAY_OFF';
   if (status >= 500 && !intentionallyOff) {
-    console.error(err);
+    logger.error(err);
     analytics.reportCrash({
       platform: 'backend',
       source: `${req.method} ${req.route?.path || req.path}`,
@@ -3112,7 +3113,7 @@ app.use((err, req, res, next) => {
       message: err.message,
       stack: err.stack,
       context: { requestId: req.headers['x-request-id'] || null },
-    }).catch(reportError => console.error('[crash-report] failed:', reportError.message));
+    }).catch(reportError => logger.error('[crash-report] failed:', reportError.message));
   } else {
     // فقط خطاهای واقعی (۵xx/کرش) باید در فایلِ error باشند. خطاهای ۴xx و
     // پیام‌هایِ کسب‌وکارِ عادی (مثلاً «چرخش امروزت تمام شده» با 429) یک
@@ -3121,7 +3122,7 @@ app.use((err, req, res, next) => {
     // را پر می‌کردند و سیگنالِ خطای واقعی را می‌پوشاندند. `console.log` به
     // stdout می‌رود؛ اگر `merge_logs` خاموش باشد در فایلِ `*-out-*.log` می‌نشیند
     // و فایلِ error فقط دنبالِ خرابیِ واقعی می‌ماند.
-    console.log(`[${status}] ${req.method} ${req.originalUrl} — ${err.message}`);
+    logger.info(`[${status}] ${req.method} ${req.originalUrl} — ${err.message}`);
   }
   // Malformed JSON reached the user as the raw parser message in English
   // ("Unexpected token 'n'..."), inside an otherwise Persian UI.
@@ -3153,14 +3154,14 @@ app.use((err, req, res, next) => {
 // the whole API down and disconnect every player mid-game. Log loudly and
 // keep serving; PM2 still restarts us if the process genuinely dies.
 process.on('unhandledRejection', (reason) => {
-  console.error('[fatal] unhandled promise rejection:', reason);
+  logger.error('[fatal] unhandled promise rejection:', reason);
   // fail-fast: به‌جای اینکه پروسه در وضعیتِ نامعتبر به کار ادامه دهد (و
   // state را بی‌صدا خراب کند)، خارج می‌شویم تا PM2 تمیز ری‌استارت کند.
   // کمی مکث تا لاگِ stderr قبل از خروج لاک شود.
   setTimeout(() => process.exit(1), 10);
 });
 process.on('uncaughtException', (err) => {
-  console.error('[fatal] uncaught exception:', err);
+  logger.error('[fatal] uncaught exception:', err);
   // استانداردِ صنعت: uncaughtException بازگشت‌ناپذیر است؛ پروسه را سریع
   // خارج و PM2 را وادار به ری‌استارتِ تمیز می‌کنیم، نه سرویس‌دهیِ ادامه‌دار
   // در حالتِ کور. (توصیهٔ رسمیِ Node)
@@ -3181,7 +3182,7 @@ const { attachRedisAdapter } = require('./lib/socketCluster');
 
 server.listen(port, async () => {
   await attachRedisAdapter(io).catch(e => {
-    console.error('[cluster] اتصال آداپتور ناموفق بود، تک‌پروسه ادامه می‌دهیم:', e.message);
+    logger.error('[cluster] اتصال آداپتور ناموفق بود، تک‌پروسه ادامه می‌دهیم:', e.message);
   });
   // پیش‌بارگذاری اهرم‌های عملیاتی پنل: بعد از ری‌استارت، تنظیمِ ادمین
   // از دیتابیس برگردانده می‌شود نه اینکه به پیش‌فرض کد برگردد.
@@ -3194,9 +3195,9 @@ server.listen(port, async () => {
     // liveContent خالی بود و همهٔ مسیرهای داغ (ساختِ تختهٔ جفت‌یاب،
     // پنجرهٔ اتصال) از پیش‌فرض کد می‌خواندند نه از دیتابیس.
     'live_copy', 'live_rules', 'config_version',
-  ]).catch(e => console.error('[ops] پیش‌بارگذاری تنظیمات ناموفق بود:', e.message));
+  ]).catch(e => logger.error('[ops] پیش‌بارگذاری تنظیمات ناموفق بود:', e.message));
   await ensureActiveSeason();
-  console.log(`GhelGheli API on :${port}`);
+  logger.info(`GhelGheli API on :${port}`);
 });
 
 // خاموشی تمیز: ردپای حضور این پروسه از ردیس پاک شود تا کاربران برای
