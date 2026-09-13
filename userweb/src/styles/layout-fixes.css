@@ -1,0 +1,177 @@
+/* layout fixes + wallet — split from style.css (lines 557-732) — do not edit style.css directly */
+/* ============ layout fixes found by the headless screenshot pass ============ */
+
+/* Chat composer was `position: sticky` inside the card, so it floated ON TOP
+   of the message list and covered the last few messages. Make it a normal
+   flow element at the end of the column instead. */
+.chatPage { display: flex; flex-direction: column; }
+.sendDock {
+  position: relative; bottom: auto;
+  margin-top: 12px; box-shadow: 0 -6px 24px #0006;
+}
+/* The canned-message popover anchored to the page, not the dock, and landed
+   across the conversation. Anchor it to the composer. */
+.chatPage { position: relative; }
+
+/* Chat bubbles: the dark override made text sit on near-black inside an
+   already-dark card, which read as clipped/unreadable. */
+.chatbody {
+  background: transparent !important;
+  border: 0 !important;
+  color: inherit !important;
+  min-width: 0;
+}
+.chatmsg { align-items: flex-start; }
+.chatmsg p { word-break: break-word; }
+
+/* Signed-in pages start at the app bar, no hero gap. */
+.page.signedIn { padding-top: 10px; }
+
+/* Nav overflowed to a second row on narrow phones; keep it one tidy strip. */
+@media (max-width: 720px) {
+  .mobileNav { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; }
+  .mobileNav button { flex: 0 0 auto; }
+}
+
+/* Composer: the middle button's label wrapped to two lines and squeezed the
+   layout ("انتخاب / پیام" stacked vertically). Give it room and keep it on
+   one line. */
+.sendDock { grid-template-columns: 52px 1fr 96px; }
+.sendDock > button { white-space: nowrap; }
+.sendDock .emojiBtn { padding: 9px 0; }
+@media (max-width: 900px) {
+  .sendDock { grid-template-columns: 46px 1fr 84px; gap: 6px; }
+  .sendDock > button { font-size: 13px; padding: 11px 8px; }
+}
+
+/* ── کیف پول تومانی ────────────────────────────────────────────────────
+   طلایی عمداً از سبز/بنفش بقیهٔ اپ جدا است: کیف پول تنها جایی است که پول
+   واقعی در آن است و باید در نگاه اول از بقیهٔ بخش‌ها تفکیک شود. */
+/* ── چرا توقفِ آخر #0b7058 است و نه #00d49a ──
+   با نمونه‌برداریِ واقعی از پیکسل (اسکرین‌شات با متنِ نامرئی) معلوم شد
+   گوشهٔ روشنِ گرادیان به rgb(36,190,147) می‌رسد و شش متنِ این کارت
+   رویش زیرِ حدِ WCAG بودند:
+
+     «موجودی قابل برداشت» ۳.۸۲ · «تومان» ۳.۸۴ · «کل دریافتی» ۲.۵۲
+     «کارت بانکی ثبت نشده» ۲.۸۳ · «برای برداشت لازم است» ۱.۹۷ ·  ۲.۳۷
+
+   این بدترین جای ممکن برای متنِ ناخوانا است: تنها صفحه‌ای که پولِ
+   واقعی را نشان می‌دهد. کاربر باید موجودی‌اش را بی‌زحمت بخواند.
+
+   #0b7058 همان سبزِ زمردی است، فقط تیره‌تر — هویتِ رنگیِ کیف پول حفظ
+   می‌شود و سفید رویش ۶.۰۵ می‌گیرد. */
+.walletHero{position:relative;overflow:hidden;border-radius:26px;padding:22px;margin-bottom:16px;background:linear-gradient(135deg,#0b2b4f,#0e5c4a 55%,#0b7058);box-shadow:0 24px 60px #00d49a30, inset 0 1px 0 #ffffff25}
+.walletHeroTop{display:flex;align-items:center;gap:10px;margin-bottom:14px;color:#fff;font-weight:800}
+.walletChip{display:inline-block;width:30px;height:22px;border-radius:5px;background:linear-gradient(135deg,#ffe9a8,#d4a227);flex:none}
+/* آلفا (#ffffffbb ≈ ۷۳٪) کنتراست را از ۶.۰۵ به ۴.۰۱ می‌آورد و روی
+   روشن‌ترین نقطهٔ گرادیان زیرِ ۴.۵ می‌رفت. رنگِ **مات** روشن همان حسِ
+   «برچسبِ فرعی» را می‌دهد بدون اینکه شفافیت کنتراست را بخورد. */
+.walletLabel{margin:0;color:#dff3ec;font-size:12px}
+.walletBalance{margin:2px 0 0;color:#fff;font-size:34px;font-weight:900;letter-spacing:-.5px}
+.walletBalance small{font-size:14px;font-weight:600;color:#e6f6f0;margin-inline-start:4px}
+.walletPill{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:4px 12px;border-radius:999px;background:#ffd36b30;border:1px solid #ffd36b70;color:#ffd36b;font-size:12px;font-weight:700}
+.walletStats{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:10px;margin-top:16px}
+.walletStats>div+div{border-inline-start:1px solid #ffffff2e}
+.walletStats>div{text-align:center;color:#fff}
+/* ۱۱px با آلفای ۶۷٪ روی سبزِ روشن ۲.۵۲ می‌داد — ناخواناترین متنِ کارت. */
+.walletStats>div span{display:block;font-size:11px;color:#dff3ec}
+.walletStats>div b{font-size:15px;font-weight:800}
+/* ── چرا آلفای پس‌زمینه کم شد (1f→14 و 2b→1f) ──
+   این ردیف روی گرادیانِ سبزِ .walletHero می‌نشیند و پوششِ سفیدِ نیمه‌شفاف
+   پس‌زمینه را *روشن‌تر* می‌کند، پس هرچه آلفا بیشتر، کنتراستِ متنِ سفید کمتر.
+   خطای قبلی این بود که فقط رنگِ متن را روشن‌تر کردیم (#f2fbf8) و حالتِ
+   hover اصلاً سنجیده نشد: با #ffffff2b نسبت به ۴.۰۵ سقوط می‌کرد — یعنی
+   کاربر با موس روی دکمه، متن را بدتر می‌دید. اینجا به‌جای متن، پس‌زمینه
+   تیره‌تر شد که هر دو حالت را با حاشیهٔ واقعی رد کند:
+   عادی ۵.۱۵ و hover ۴.۷۲ (سنجیده روی #0b7058، روشن‌ترین نقطهٔ گرادیان). */
+.walletCardRow{display:flex;align-items:center;gap:10px;width:100%;margin-top:16px;padding:10px 12px;border-radius:14px;background:#ffffff14;border:1px solid #ffffff2e;color:#fff;cursor:pointer;text-align:start;font:inherit}
+.walletCardRow:hover{background:#ffffff1f}
+.wcIcon{font-size:18px}
+.wcBody{flex:1;display:flex;flex-direction:column;min-width:0}
+.wcBody b{font-size:14px;letter-spacing:1px;direction:ltr;text-align:left;unicode-bidi:isolate}
+/* ── چرا سفیدِ خالص، نه #f2fbf8 ──
+   تلاشِ قبلی #f2fbf8 بود که فقط ۴.۴۸ می‌داد: هنوز زیرِ ۴.۵ و آن‌قدر
+   مرزی که با گِردکردن «قبول» به‌نظر می‌رسید. #f2fbf8 عملاً سفید است
+   ولی سودِ کنتراستی‌اش صفر است، پس سفیدِ خالص هم روشن‌تر است هم صادق‌تر.
+   با آلفای اصلاح‌شدهٔ ردیف، نسبت به ۵.۱۵ می‌رسد — حاشیه‌ای واقعی،
+   نه بردی که از گِردکردن به‌دست آمده باشد. */
+.wcBody small{font-size:11px;color:#fff}
+.wcArrow{font-size:20px;color:#ffffffb0}
+
+.walletActions{display:flex;gap:10px;margin-bottom:10px}
+.walletActions .main{flex:1}
+.walletActions button{padding:12px 16px;border-radius:14px;font-weight:700;cursor:pointer;background:#ffffff12;color:#dbeeff;border:1px solid #ffffff22}
+.walletActions button:hover{background:#ffffff1f}
+.walletActions .main{background:linear-gradient(135deg,#b5ef58 0%,#00d49a 48%,#1c78ff 100%);color:#04101c;border:0}
+.walletNote{margin:0 0 12px;padding:10px 12px;border-radius:12px;background:#f59e0b1f;border:1px solid #f59e0b4d;color:#ffd9a0;font-size:13px}
+
+.walletGuide{margin-bottom:16px;padding:14px;border-radius:16px;background:#ffffff0d;border:1px solid #ffffff1a}
+.walletGuide h3{margin:0 0 8px;font-size:15px}
+.walletGuide ul{margin:0;padding-inline-start:18px;color:#c9ddf2;font-size:13px;line-height:2}
+
+.walletTabs{margin-bottom:12px}
+.walletList{display:flex;flex-direction:column;gap:8px}
+.walletTx{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:#ffffff0b;border:1px solid #ffffff14}
+.txDot{width:10px;height:10px;border-radius:50%;flex:none}
+.txDot.in{background:#22c58b;box-shadow:0 0 10px #22c58b90}
+.txDot.out{background:#f2a93b;box-shadow:0 0 10px #f2a93b90}
+.txBody{flex:1;display:flex;flex-direction:column;min-width:0}
+.txBody b{font-size:13px}
+.txBody small{font-size:11px;color:#c9ddf2b0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.txDate{color:#c9ddf280!important}
+.txAmt{text-align:end;display:flex;flex-direction:column}
+.txAmt b{font-size:14px;font-weight:800}
+.txAmt b.in{color:#22c58b}
+.txAmt b.out{color:#f2a93b}
+.txAmt small{font-size:10px;color:#c9ddf290}
+
+.walletWd{display:flex;flex-direction:column;gap:4px;padding:12px;border-radius:16px;background:#ffffff0b;border:1px solid #ffffff16}
+.wdHead{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.wdHead b{font-size:16px;font-weight:800}
+.wdBadge{padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700}
+.wPending{background:#f2a93b26;color:#f2a93b}
+.wApproved{background:#4ea1ff26;color:#4ea1ff}
+.wPaid{background:#22c58b26;color:#22c58b}
+.wRejected{background:#ff5d6c26;color:#ff5d6c}
+.wCanceled{background:#ffffff18;color:#c9ddf2}
+.walletWd small{font-size:11.5px;color:#c9ddf2c0}
+.wdOk{color:#22c58b!important}
+.wdNote{padding:6px 8px;border-radius:8px;background:#ffffff10}
+.wdCancel{align-self:flex-start;margin-top:4px;padding:6px 12px;border-radius:10px;background:#ff5d6c1f;border:1px solid #ff5d6c4d;color:#ff5d6c;font-size:12px;font-weight:700;cursor:pointer}
+
+/* ورودی کیف پول در صفحهٔ خانه */
+.walletEntry{display:flex;align-items:center;gap:10px;width:100%;margin-top:12px;padding:10px 12px;border-radius:16px;background:#00000038;border:1px solid #ffd36b47;color:#fff;cursor:pointer;text-align:start;font:inherit;transition:border-color .2s,background .2s}
+.walletEntry:hover{background:#00000050;border-color:#ffd36b88}
+.walletEntry.hasMoney{border-color:#ffd36b8c}
+.weIcon{font-size:20px}
+.weBody{flex:1;display:flex;flex-direction:column;min-width:0}
+.weBody small{font-size:11px;color:#ffffffaa}
+.weBody b{font-size:17px;font-weight:900;color:#fff}
+.walletEntry.hasMoney .weBody b{color:#ffd36b}
+.weBody b i{font-size:11px;font-style:normal;font-weight:600;opacity:.75}
+.weCta{padding:4px 10px;border-radius:999px;background:#ffffff1a;font-size:11.5px;font-weight:800;white-space:nowrap}
+.walletEntry.hasMoney .weCta{background:#ffd36b2e;color:#ffd36b}
+
+/* مودال‌های کیف پول */
+.walletModal{width:min(460px,96vw)}
+.walletModal input{width:100%;margin-bottom:8px}
+.cardPreview{border-radius:18px;padding:16px;margin:12px 0 16px;background:linear-gradient(135deg,#243447,#33465f);border:1px solid #ffffff1a;transition:background .3s}
+.cardPreview.ok{background:linear-gradient(135deg,#0e5c4a,#00d49a)}
+.cpTop{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;color:#fff;font-size:12px;font-weight:700}
+.cpNum{font-size:18px;font-weight:800;letter-spacing:3px;color:#fff;text-align:center}
+.cpHolder{margin-top:10px;font-size:13px;font-weight:600;color:#ffffffd0}
+.okHint{color:#00d49a!important}
+.presetRow{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.presetRow button{padding:6px 12px;border-radius:999px;background:#ffffff14;border:1px solid #ffffff26;color:#dbeeff;font-size:12px;font-weight:700;cursor:pointer}
+.presetRow button:hover{background:#ffffff24}
+.wdTarget{display:flex;flex-direction:column;gap:2px;padding:12px;border-radius:14px;background:#ffffff0f;border:1px solid #ffffff1a;margin-bottom:10px}
+.wdTarget b{font-size:12px;color:#c9ddf2}
+.wdTarget span{font-size:15px;font-weight:800;letter-spacing:1px}
+.wdTarget small{font-size:11.5px;color:#c9ddf2b0}
+
+@media (max-width:600px){
+  .walletBalance{font-size:28px}
+  .walletActions{flex-direction:column}
+  .cpNum{font-size:15px;letter-spacing:2px}
+}
+

@@ -42,7 +42,22 @@ function strip(src) {
     .replace(/([^:])\/\/.*$/gm, '$1');
 }
 
-const css = strip(fs.readFileSync(path.join(root, 'userweb/src/style.css'), 'utf8'));
+function loadCss() {
+  const hub = fs.readFileSync(path.join(root, 'userweb/src/style.css'), 'utf8');
+  // اگر hub فقط import باشد، ماژول‌ها را بخوان و بچسبان (ترتیبِ import حفظ می‌شود)
+  if (hub.includes("@import './styles/")) {
+    const imports = [...hub.matchAll(/@import\s+['"]\.\/styles\/([^'"]+)['"]/g)].map(m => m[1]);
+    let combined = '';
+    for (const f of imports) {
+      const p = path.join(root, 'userweb/src/styles', f);
+      if (fs.existsSync(p)) combined += '\n' + fs.readFileSync(p, 'utf8');
+    }
+    // اگر به هر دلیلی import یافت نشد، خودِ hub را برگردان
+    return combined || hub;
+  }
+  return hub;
+}
+const css = strip(loadCss());
 
 /** یک فایلِ سورسِ userweb را می‌خواند و کامنت‌هایش را حذف می‌کند. */
 const read = (rel) => strip(fs.readFileSync(path.join(root, 'userweb', rel), 'utf8'));

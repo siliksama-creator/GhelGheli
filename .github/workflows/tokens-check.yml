@@ -1,0 +1,32 @@
+name: Tokens Parity
+
+on:
+  push:
+    paths:
+      - 'design/tokens.json'
+      - 'tools/generate-tokens.mjs'
+      - 'userweb/src/theme.css'
+      - 'admin/src/theme.css'
+      - 'mobile/lib/theme/colors.dart'
+  pull_request:
+    paths:
+      - 'design/tokens.json'
+      - 'tools/generate-tokens.mjs'
+      - 'userweb/src/theme.css'
+      - 'admin/src/theme.css'
+      - 'mobile/lib/theme/colors.dart'
+
+jobs:
+  tokens:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Generate tokens --check
+        run: node tools/generate-tokens.mjs --check
+      - name: Tokens parity guard
+        run: node userweb/tool/tokens-parity.mjs
+      - name: Desktop layout guard (verifies modular CSS hub)
+        run: node userweb/tool/desktop-layout.mjs

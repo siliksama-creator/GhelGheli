@@ -25,7 +25,20 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
 const android = read('mobile/lib/screens/user/games/card_duel/card_duel_widgets.dart');
 const jsx = read('userweb/src/cardDuelGame.jsx');
-const css = read('userweb/src/style.css');
+function loadCssForRound() {
+  const hub = read('userweb/src/style.css');
+  if (hub.includes("@import './styles/")) {
+    const imports = [...hub.matchAll(/@import\s+['"]\.\/styles\/([^'"]+)['"]/g)].map(m => m[1]);
+    let combined = '';
+    for (const f of imports) {
+      const p = `userweb/src/styles/${f}`;
+      try { combined += '\n' + read(p); } catch {}
+    }
+    return combined || hub;
+  }
+  return hub;
+}
+const css = loadCssForRound();
 const rules = read('backend/src/games/rules/cardDuel.js');
 
 let passed = 0;

@@ -105,7 +105,20 @@ ok('اندروید جهتِ ردیف را بر اساس isMe برعکس می‌�
 ok('وب `is_mine` سرور را مبنا می‌گیرد', /m\.is_mine === true/.test(web));
 ok('اندروید `is_mine` سرور را مبنا می‌گیرد', /m\['is_mine'\] == true/.test(android));
 
-const css = read('userweb/src/style.css');
+function loadCss() {
+  const hub = fs.readFileSync(path.join(root, 'userweb/src/style.css'), 'utf8');
+  if (hub.includes("@import './styles/")) {
+    const imports = [...hub.matchAll(/@import\s+['"]\.\/styles\/([^'"]+)['"]/g)].map(m => m[1]);
+    let combined = '';
+    for (const f of imports) {
+      const p = path.join(root, 'userweb/src/styles', f);
+      if (fs.existsSync(p)) combined += '\n' + fs.readFileSync(p, 'utf8');
+    }
+    return strip(combined || hub);
+  }
+  return strip(hub);
+}
+const css = loadCss();
 ok('CSS وب پیامِ خودی را به سمتِ مقابل می‌برد',
   /\.chatMsg\.me\{[^}]*row-reverse/.test(css));
 

@@ -1,0 +1,668 @@
+/* CHAT rebuilt + shop + profile — split from style.css (lines 968-1634) — do not edit style.css directly */
+/* ═══════════════════════════════════════════════════════════════════════
+   CHAT — rebuilt.
+
+   What was wrong (visible in a real screenshot on a 1080p desktop):
+
+   * `.cannedPopover` referenced `var(--surface)` and `var(--bg)`, which are
+     defined NOWHERE. Both resolved to nothing, so the panel had no
+     background and its buttons rendered as a black slab over the messages.
+   * `.chatmsg` had no max-width, so on a wide screen a short message
+     stretched the full width and the layout read as a pile of empty boxes.
+   * `.chatbox` is a fixed 56vh with `.sendDock` sticky INSIDE the same flow,
+     so on a short viewport the dock overlapped the last messages.
+   * Nothing distinguished the reader's own messages from everyone else's.
+   * `.chatActions` buttons wrapped under each message, tripling its height.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── چرا این padding با بقیهٔ صفحه‌ها فرق دارد ──
+   نوارِ ناوبری `position:fixed` است و ۷۰ پیکسل پایینِ صفحه را می‌پوشاند.
+   `.portal` برای همین ۷۸px پدینگ دارد، ولی `.chatPage` پدینگِ خودش را
+   روی آن می‌نویسد و مقدارِ قبلی (۱۴px) کمتر از ارتفاعِ نوار بود.
+
+   در عمل چیزی گم نمی‌شد چون `.sendDock` ته صفحه فاصلهٔ کافی می‌ساخت —
+   ولی این یک تصادف بود، نه طراحی: هر تغییری در ارتفاعِ داکِ ارسال
+   می‌توانست آخرین پیام را زیرِ نوار ببرد.
+
+   حالا صریحاً به ارتفاعِ نوار گره خورده و به `safe-area` گوشی‌های
+   دارای نوارِ خانه هم احترام می‌گذارد. */
+.chatPage{display:flex;flex-direction:column;gap:10px;
+  padding-bottom:calc(84px + env(safe-area-inset-bottom, 0px))}
+
+.chatbox{
+  /* Grows with the card instead of a hard 56vh that fought the sticky dock. */
+  height:clamp(320px,58vh,620px);
+  overflow-y:auto;overscroll-behavior:contain;scroll-behavior:smooth;
+  display:flex;flex-direction:column;gap:10px;
+  border:1px solid #ffffff12;border-radius:22px;
+  padding:14px;background:#00000016;
+}
+
+.chatmsg{
+  display:flex;gap:10px;align-items:flex-start;
+  /* Bubbles, not full-width bars. */
+  max-width:min(76%,560px);align-self:flex-start;
+  margin:0;padding:10px 12px;border-radius:18px;
+  border-top-right-radius:6px;              /* tail towards the avatar (RTL) */
+  background:#ffffff0d;border:1px solid #ffffff10;
+  animation:popIn .22s ease-out;
+}
+/* The reader's own messages sit on the other side, in brand colour, so a
+   conversation is readable at a glance. */
+.chatmsg.mine{
+  align-self:flex-end;
+  background:linear-gradient(135deg,#b5ef5824,#00d49a1c);
+  border-color:#b5ef5840;
+  border-top-right-radius:18px;border-top-left-radius:6px;
+}
+.chatmsg img{width:40px;height:40px;border-radius:50%;object-fit:cover;cursor:pointer;flex:none}
+.chatbody{flex:1;min-width:0}          /* min-width:0 lets long words wrap */
+.chatbody>b{font-size:13px;font-weight:800;color:#7dd3fc}
+.chatmsg.mine .chatbody>b{color:var(--brand-ink)}
+.chatmsg p{
+  margin:4px 0 0;font-size:14px;line-height:1.7;
+  /* A pasted URL used to blow out the bubble width. */
+  overflow-wrap:anywhere;word-break:break-word;
+}
+.chatTime{display:block;margin-top:3px;font-size:11.5px;color:#c9ddf266}
+
+.reply{
+  display:block;color:var(--brand-ink);background:#ffffff0c;
+  border-inline-start:3px solid #b5ef5866;
+  border-radius:8px;padding:5px 8px;margin:5px 0;font-size:12px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+
+/* Actions stay on one line and only reveal themselves on hover/focus so a
+   message is one compact unit rather than a three-storey card. */
+.chatActions{display:flex;gap:6px;margin-top:7px;flex-wrap:nowrap}
+.chatActions button{
+  font-size:11.5px;padding:4px 9px;border-radius:999px;
+  background:#ffffff10;color:#c9ddf2cc;font-weight:600;
+  opacity:.65;transition:opacity .15s,background .15s;
+}
+.chatmsg:hover .chatActions button,
+.chatActions button:focus-visible{opacity:1;background:#ffffff1c}
+.chatActions button:hover{transform:none;background:#ffffff28;color:#fff}
+
+.stickerTray{
+  display:flex;gap:8px;overflow-x:auto;overscroll-behavior-x:contain;
+  padding:8px;background:#ffffff0a;border-radius:18px;
+  max-height:82px;flex:none;
+}
+.stickerTray button{min-width:58px;height:58px;padding:5px;background:#ffffff12;flex:none}
+.stickerTray img{width:48px;height:48px;object-fit:contain}
+.stickerMsg{width:120px;max-height:120px;object-fit:contain;display:block;border-radius:12px}
+
+.sendDock{
+  position:relative;                   /* anchors the popover to the dock */
+  display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;
+  background:#07111fe6;border:1px solid #ffffff18;border-radius:22px;
+  padding:8px;backdrop-filter:blur(18px);box-shadow:0 -10px 35px #0007;
+  flex:none;
+}
+.sendDock input{
+  margin:0;padding:11px 14px;border-radius:15px;font-size:13.5px;
+  background:#ffffff0e;border-color:#ffffff1f;cursor:pointer;
+}
+.sendDock .main{margin:0;white-space:nowrap;padding:11px 18px}
+.emojiBtn{background:#ffffff12;color:#fff;font-size:13px;padding:11px 14px;white-space:nowrap}
+
+/* THE BLACK BOX FIX: these two rules had no background at all. */
+.cannedPopover{
+  position:absolute;bottom:calc(100% + 10px);inset-inline:0;
+  display:flex;flex-flow:row wrap;gap:6px;
+  max-height:min(260px,40vh);overflow-y:auto;
+  background:rgba(12, 33, 56, 0.95);border:1px solid rgba(255, 255, 255, 0.16);border-radius:20px;
+  padding:12px;box-shadow:0 18px 60px rgba(0,0,0,0.6);z-index:40;
+  backdrop-filter:blur(15px);
+  -webkit-backdrop-filter:blur(15px);
+}
+.cannedPopover button{
+  background:rgba(255,255,255,0.06);color:#eef8ff;border:1px solid rgba(255,255,255,0.08);
+  padding:6px 12px;border-radius:20px;cursor:pointer;
+  text-align:center;font-family:inherit;font-size:12.5px;font-weight:700;
+  transition:all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display:inline-flex;align-items:center;
+  white-space:nowrap;
+}
+.cannedPopover button:hover{
+  background:rgba(181, 239, 88, 0.2);
+  border-color:#b5ef58;
+  transform:scale(1.03) !important;
+}
+
+.pinnedBanner{
+  display:flex;gap:10px;align-items:flex-start;
+  padding:11px 13px;border-radius:16px;
+  background:color-mix(in srgb,var(--pin) 14%,transparent);
+  border:1px solid color-mix(in srgb,var(--pin) 45%,transparent);
+}
+.pinnedBanner b{display:block;font-size:12.5px;color:var(--pin)}
+.pinnedBanner p{margin:3px 0 0;font-size:13px;line-height:1.7}
+.pinIcon{font-size:17px;flex:none}
+
+@media(max-width:600px){
+  .chatmsg{max-width:88%}
+  .sendDock{grid-template-columns:auto 1fr auto;gap:6px}
+  .sendDock .main{padding:11px 14px}
+  .emojiBtn{padding:11px}
+  /* Touch has no hover, so actions must always be visible on a phone. */
+  .chatActions button{opacity:1}
+}
+
+/* ═══ Reward groups ═════════════════════════════════════════════════════ */
+.rgWrap{display:flex;flex-direction:column;gap:18px;width:100%;align-items:center}
+.rgGroup{display:flex;flex-direction:column;gap:16px}
+
+.rgHead{display:flex;align-items:center;gap:12px}
+.rgHead h2{margin:0;font-size:22px}
+.rgHead .hint{margin:3px 0 0;font-size:12.5px}
+.rgGroupArt{width:52px;height:52px;border-radius:16px;object-fit:cover;flex:none}
+.rgType{
+  margin-inline-start:auto;padding:5px 12px;border-radius:999px;
+  font-size:11.5px;font-weight:800;color:#04101c;white-space:nowrap;
+}
+
+/* progress bar */
+.rgBar{
+  display:flex;flex-direction:column;gap:8px;
+  padding:14px;border-radius:20px;
+  background:#ffffff08;border:1px solid #ffffff14;
+}
+.rgBarHead{display:flex;align-items:center;gap:11px}
+.rgPrizeArt{
+  width:54px;height:54px;border-radius:14px;object-fit:cover;flex:none;
+  border:2px solid var(--accent);box-shadow:0 6px 18px #0006;
+}
+.rgBarText{flex:1;min-width:0}
+.rgBarText b{display:block;font-size:14.5px;font-weight:800}
+.rgBarText small{font-size:12px;color:#c9ddf2a0}
+.rgPct{font-size:17px;font-weight:900;flex:none}
+
+.rgTrack{height:14px;border-radius:999px;background:#ffffff14;overflow:hidden}
+.rgTrack span{
+  display:block;height:100%;border-radius:999px;
+  transition:width .45s cubic-bezier(.22,1,.36,1);
+}
+.rgScale{display:flex;justify-content:space-between;font-size:11px;color:#c9ddf280}
+.rgScale b{color:#eef8ff;font-weight:700}
+
+.rgCards{display:flex;flex-direction:column;gap:6px;margin-top:2px}
+.rgCards>small{font-size:11.5px;color:#c9ddf2a0}
+.rgCardStrip{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px}
+.rgCard{
+  position:relative;flex:none;width:56px;text-align:center;
+  opacity:.5;transition:opacity .2s;
+}
+.rgCard.met{opacity:1}
+.rgCard img{
+  width:56px;height:56px;border-radius:12px;object-fit:cover;
+  border:2px solid #ffffff22;
+}
+.rgCard.met img{border-color:var(--brand-ink)}
+.rgCard b{display:block;font-size:10.5px;margin-top:3px}
+.rgCard.met b{color:var(--brand-ink)}
+
+/* tiers */
+.rgTiers{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.rgTier{
+  display:flex;flex-direction:column;align-items:center;gap:5px;
+  padding:13px;border-radius:20px;text-align:center;
+  background:#ffffff0b;border:1px solid #ffffff14;
+}
+.rgTier.eligible{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.rgTierArt{position:relative;width:100%}
+.rgTierArt img{width:82px;height:82px;border-radius:18px;object-fit:cover}
+.rgKind{
+  position:absolute;top:-4px;inset-inline-end:-2px;
+  font-size:10px;font-weight:800;padding:3px 8px;border-radius:999px;
+  background:#0c2138e8;border:1px solid #ffffff22;
+}
+.rgTier b{font-size:13.5px;font-weight:800;line-height:1.4}
+.rgPoints{margin:0;font-size:12px;color:#c9ddf2b0}
+.rgCash{margin:0;font-size:13px;font-weight:800;color:var(--brand-ink)}
+.rgTier small{font-size:11px;color:#c9ddf290}
+.rgTierCards{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin-top:2px}
+.rgTierCards span{
+  font-size:10px;padding:2px 7px;border-radius:999px;
+  background:#ffffff10;color:#c9ddf2a0;
+}
+.rgTierCards span.met{background:#b5ef5822;color:var(--brand-ink)}
+.rgClaim{width:100%;margin-top:6px;padding:9px;font-size:13px;color:#04101c}
+.rgLocked{margin-top:6px;font-size:11px;color:#c9ddf280}
+
+@media(max-width:600px){
+  .rgTiers{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+  .rgHead h2{font-size:19px}
+}
+
+/* Trophy shelf: physical prizes a user has won. */
+.trophyCard{margin-bottom:18px}
+.trophyShelf{display:flex;gap:12px;overflow-x:auto;padding:4px 0 8px}
+.trophy{position:relative;flex:none;width:96px;text-align:center}
+.trophy img{width:96px;height:80px;object-fit:cover;border-radius:14px;border:1px solid #ffffff1f}
+.trophy b{display:block;margin-top:5px;font-size:11.5px;font-weight:700;line-height:1.4}
+.trophyPending{
+  position:absolute;top:5px;inset-inline-end:5px;
+  font-size:9.5px;font-weight:800;padding:2px 6px;border-radius:999px;
+  background:#f2a93b;color:#2a1a00;
+}
+
+/* ── Claim confirmation ──────────────────────────────────────────────────
+   Claiming spends points AND resets the group's bar. Both consequences were
+   buried in a sentence; as a list with icons they are impossible to miss. */
+.claimConfirm{width:min(440px,94vw)}
+.ccHead{display:flex;gap:12px;align-items:center;margin-bottom:14px}
+.ccHead img{width:62px;height:62px;border-radius:16px;object-fit:cover;flex:none;border:2px solid #b5ef5866}
+.ccHead h3{margin:0 0 3px;font-size:16px;line-height:1.5}
+.ccName{font-size:13px;color:var(--brand-ink)}
+
+.ccList{list-style:none;margin:0 0 12px;padding:0;display:flex;flex-direction:column;gap:11px}
+.ccList li{display:flex;gap:10px;align-items:flex-start}
+.ccIcon{font-size:19px;flex:none;line-height:1.4}
+.ccList b{color:#fff}
+.ccList small{display:block;margin-top:2px;font-size:11.5px;color:#c9ddf290;line-height:1.7}
+.ccList>li>span:last-child{font-size:13.5px;line-height:1.7}
+
+.ccWarn{
+  margin:0 0 14px;padding:9px 12px;border-radius:12px;font-size:12.5px;
+  background:#ffd36b18;border:1px solid #ffd36b40;color:#ffd36b;text-align:center;
+}
+
+/* ── Nav: reachable on every phone ───────────────────────────────────────
+   THE BUG: the strip is `flex-wrap:nowrap; overflow-x:auto` so it should
+   scroll — but with seven tabs on a 360px screen the last two ("پشتیبانی",
+   "پروفایل") measured at left:-199px, i.e. off-screen and unreachable. In an
+   RTL flex row `justify-content:flex-start` packs items toward the right edge
+   and the overflow spills to the LEFT, which browsers do not expose as
+   scrollable content the way they do for LTR.
+
+   Two fixes, both needed:
+     * scroll-snap plus explicit `direction` keeps the row scrollable in RTL,
+     * the row also stays usable if scrolling fails, because the tabs shrink
+       to fit rather than overflowing at all on the narrowest screens. */
+@media (max-width: 900px) {
+  .mobileNav {
+    /* `safe` prevents the browser clipping the overflow edge in RTL. */
+    justify-content: safe flex-start;
+    scroll-snap-type: x proximity;
+    /* A visible hint that there is more to scroll. */
+    mask-image: linear-gradient(to left, #000 88%, transparent 100%);
+  }
+  .mobileNav button { scroll-snap-align: start; }
+}
+
+/* Below ~430px seven tabs cannot fit even scrolled comfortably, so let them
+   shrink instead: icon stays, label gets smaller, nothing leaves the screen. */
+@media (max-width: 430px) {
+  .mobileNav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 3px;
+    padding: 7px 5px;
+    /* Keep the fade so a row that DOES overflow looks scrollable rather
+       than cut off. */
+    mask-image: linear-gradient(to left, #000 92%, transparent 100%);
+  }
+  .mobileNav button {
+    /* BUG: `flex: 1 1 0` split the row into seven EQUAL 37px columns, but
+       the labels are `white-space: nowrap`, so "چت و بازی" (58px) and
+       "پشتیبانی" (47px) spilled out of their buttons and printed on top of
+       the neighbouring tab — the nav read "چت و بازپشتیبانی". Sizing each
+       button to its own content and scrolling the row keeps every label
+       whole and legible; the seven tabs still fit on a 390px screen, and on
+       anything narrower the row scrolls with the gradient hint above. */
+    min-width: 0;
+    flex: 0 0 auto;
+    /* Tight enough that all seven tabs fit a 390px screen without scrolling
+       while each button stays wider than its own label. Measured, not
+       guessed: 3px padding puts the row at 362px inside a 364px strip.
+       Anything narrower than ~380px still scrolls, which is why the fade
+       hint above stays. */
+    padding: 7px 3px;
+  }
+  .mobileNav .navIcon { font-size: 16px; }
+  .mobileNav .navLabel {
+    /* Small enough that the longest label ("کیف پول", "پشتیبانی") fits
+       whole. Truncating to "پشت..." saved no space and just made the tab
+       unreadable — the icon above it is the primary cue, but a half-word
+       label is worse than a small one. */
+    font-size: 8px;
+    letter-spacing: -.3px;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+}
+
+/* Very narrow phones (<=340px): the label genuinely cannot fit, so drop it
+   and let the icon carry the tab. An icon alone reads better than "پشت...". */
+@media (max-width: 340px) {
+  .mobileNav .navLabel { display: none; }
+  .mobileNav .navIcon { font-size: 20px; }
+  .mobileNav button { padding: 9px 4px; }
+}
+
+/* ── Touch targets ───────────────────────────────────────────────────────
+   Chat action chips measured 27px tall. Apple and Material both put the
+   minimum comfortable target at ~44px; below ~30px mis-taps become common. */
+.chatActions button { min-height: 32px; padding: 6px 11px; }
+.confirmActions button,
+.rgClaim,
+.tapHead .ghost { min-height: 40px; }
+
+/* League history: rank + prize survive the monthly points reset. */
+.lhList{display:flex;flex-direction:column;gap:8px}
+.lhRow{
+  display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+  padding:10px 12px;border-radius:14px;
+  background:#ffffff0a;border:1px solid #ffffff14;
+}
+.lhMedal{font-size:20px;flex:none}
+.lhMonth{font-weight:800;font-size:13px}
+.lhRank{font-size:12.5px;color:#c9ddf2}
+.lhPts{font-size:11.5px;color:#c9ddf280}
+.lhPrize{
+  margin-inline-start:auto;font-size:12px;font-weight:800;
+  background:#b5ef5822;color:var(--brand-ink);border-radius:999px;padding:3px 10px;
+}
+
+/* ═══ Shop ══════════════════════════════════════════════════════════════ */
+.shopWrap{display:flex;flex-direction:column;gap:18px;width:100%;align-items:center}
+
+.plusCard{border-color:#ffd36b55}
+.plusCard.on{border-color:#ffd36b;box-shadow:0 0 0 1px #ffd36b66,0 30px 90px #0009}
+.plusHead{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.plusStar{font-size:30px;flex:none}
+.plusHead h2{margin:0;font-size:20px}
+.plusHead .hint{margin:2px 0 0;font-size:12.5px}
+.plusPrice{margin-inline-start:auto;font-size:17px;font-weight:900;color:#ffd36b;white-space:nowrap}
+.plusPrice i{font-size:11px;font-style:normal;font-weight:600}
+.plusList{list-style:none;margin:0 0 14px;padding:0;display:flex;flex-direction:column;gap:7px}
+.plusList li{font-size:13px;line-height:1.7;color:#c9ddf2}
+
+.shopHead{display:flex;align-items:center;gap:11px;margin-bottom:12px}
+.shopIcon{font-size:24px;flex:none}
+.shopHead h2{margin:0;font-size:18px}
+.shopHead .hint{margin:2px 0 0;font-size:12px}
+.shopClear{margin-inline-start:auto;font-size:12px;padding:6px 12px;min-height:32px}
+
+.shopGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:11px}
+.shopItem{
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  padding:11px 9px;border-radius:18px;text-align:center;
+  background:#ffffff0a;border:1px solid #ffffff14;
+}
+.shopItem.equipped{border-color:var(--brand-ink);box-shadow:0 0 0 1px #b5ef5855}
+/* The art well must be allowed to SHRINK. It was fixed at a 72px image
+   inside a grid cell that can fall to ~56px on a 360px phone, so every crest
+   overflowed its tile by 6px and clipped against the neighbour. `width:100%`
+   plus a max keeps the artwork at its intended size when there is room and
+   lets it scale down when there is not. */
+.shopArt{position:relative;display:grid;place-items:center;height:72px;width:100%;min-width:0}
+.shopArt img{width:100%;max-width:72px;height:72px;object-fit:contain;border-radius:14px}
+.colorChip{width:56px;height:56px;border-radius:50%;border:3px solid #ffffff26}
+.framePreview{width:60px;height:60px;border-radius:14px;border:3px solid #ffffff26}
+.shopOn{
+  position:absolute;bottom:-4px;font-size:9.5px;font-weight:800;
+  background:#b5ef58;color:#10210a;border-radius:999px;padding:2px 8px;
+}
+.shopItem b{font-size:12px;font-weight:700;line-height:1.4;min-height:2.4em}
+.shopPrice{font-size:11.5px;font-weight:800;color:#ffd36b}
+.shopTag{font-size:10px;font-weight:800;border-radius:999px;padding:2px 8px}
+.shopTag.owned{background:#b5ef5822;color:var(--brand-ink)}
+.shopTag.plus{background:#ffd36b22;color:#ffd36b}
+.shopBtn{width:100%;margin:0;padding:7px;font-size:12px;min-height:34px}
+
+@media(max-width:600px){
+  .shopGrid{grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:9px}
+  .plusHead h2{font-size:18px}
+}
+
+/* ═══ Public profile — compact, tabbed ═════════════════════════════════ */
+.pp{width:min(520px,96vw);max-height:88vh;display:flex;flex-direction:column;padding:18px}
+
+.ppHead{display:flex;align-items:center;gap:13px;margin-bottom:14px}
+.ppAvatarWrap{
+  position:relative;width:78px;height:78px;border-radius:50%;flex:none;
+  padding:3px;background:#ffffff1f;display:grid;place-items:center;
+}
+.ppAvatar{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}
+.ppClub{
+  position:absolute;bottom:-2px;inset-inline-end:-4px;
+  width:30px;height:30px;border-radius:50%;object-fit:cover;
+  border:2px solid #0e1826;background:#0e1826;
+}
+.ppWho{flex:1;min-width:0}
+.ppWho h2{margin:0;font-size:20px;font-weight:900;line-height:1.3}
+.ppPlus{font-size:14px;margin-inline-start:5px}
+.ppWho small{display:block;font-size:11.5px;color:#c9ddf280;margin-top:2px}
+.ppBest{
+  display:inline-block;margin-top:5px;font-size:11.5px;font-weight:700;
+  background:#ffd36b1f;color:#ffd36b;border-radius:999px;padding:3px 10px;
+}
+
+.ppStats{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(78px,1fr));gap:8px;
+  margin-bottom:13px;
+}
+.ppStats>div{
+  text-align:center;padding:9px 6px;border-radius:14px;
+  background:#ffffff0a;border:1px solid #ffffff12;
+}
+.ppStats b{display:block;font-size:15px;font-weight:900}
+.ppStats span{font-size:10px;color:#c9ddf290}
+.ppStats .ppMoney b{color:var(--brand-ink)}
+
+.ppTabs{display:flex;gap:6px;margin-bottom:11px}
+.ppTabs button{
+  flex:1;padding:8px 6px;font-size:11.5px;border-radius:12px;
+  background:#ffffff0d;color:#c9ddf2;border:1px solid #ffffff14;min-height:36px;
+}
+.ppTabs button.on{background:#b5ef58;color:#10210a;border-color:var(--brand-ink)}
+.ppTabs button:hover{transform:none}
+
+.ppPane{overflow-y:auto;flex:1;min-height:120px}
+.ppGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:9px}
+.ppPrize{
+  display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;
+  padding:9px 6px;border-radius:15px;
+  background:#ffffff0a;border:1px solid #ffffff12;
+}
+.ppPrize img{width:56px;height:56px;border-radius:12px;object-fit:cover}
+.ppPrize b{font-size:11px;line-height:1.4;font-weight:700}
+.ppPrize em{font-style:normal;font-size:9.5px;color:#c9ddf290}
+.ppPrize.cash{border-color:#b5ef5840}
+
+.ppLeague{display:flex;flex-direction:column;gap:7px}
+.ppLeagueRow{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:9px 11px;border-radius:13px;
+  background:#ffffff0a;border:1px solid #ffffff12;
+}
+.ppMedal{font-size:18px}
+.ppMonth{font-weight:800;font-size:12.5px}
+.ppRank{font-size:12px;color:#c9ddf2}
+.ppPts{font-size:11px;color:#c9ddf280}
+.ppPrizeTag{
+  margin-inline-start:auto;font-size:11px;font-weight:800;
+  background:#b5ef5822;color:var(--brand-ink);border-radius:999px;padding:2px 9px;
+}
+
+/* Club badge next to a name in chat and the league table. */
+.nameClub{width:16px;height:16px;border-radius:50%;object-fit:cover;
+  vertical-align:-3px;margin-inline-end:4px}
+
+/* Previous season's podium, kept visible after the monthly reset. */
+.prevSeason{margin-top:18px;padding-top:14px;border-top:1px solid #ffffff14}
+.prevSeason h3{margin:0 0 10px;font-size:14px}
+.prevList{display:flex;flex-direction:column;gap:7px}
+.prevRow{
+  display:flex;align-items:center;gap:9px;cursor:pointer;
+  padding:8px 11px;border-radius:13px;
+  background:#ffffff0a;border:1px solid #ffffff12;
+}
+.prevRow:hover{border-color:#b5ef5866}
+.prevMedal{font-size:17px}
+.prevRow img{width:32px;height:32px;border-radius:50%;object-fit:cover}
+.prevRow b{font-size:12.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prevPts{font-size:11px;color:#c9ddf280;white-space:nowrap}
+.prevPrize{font-size:11px;font-weight:800;background:#b5ef5822;color:var(--brand-ink);
+  border-radius:999px;padding:2px 9px;white-space:nowrap}
+.plusStarSm{font-size:10px;margin-inline-start:3px}
+
+/* The public-profile sheet is a flex column, and `float` does nothing in a
+   flex container — the close button stretched to full width and became a big
+   red bar across the top. Pin it instead. */
+.pp{position:relative}
+.pp .close{
+  position:absolute;top:12px;inset-inline-start:12px;z-index:2;
+  float:none;width:34px;height:34px;padding:0;border-radius:50%;
+  display:grid;place-items:center;font-size:18px;line-height:1;
+}
+.pp .ppHead{padding-inline-start:44px}
+
+/* ═══ Shop v2: permanence, Plus terms, club membership ═════════════════ */
+.shopIntro h2{margin:0 0 8px;font-size:19px}
+.shopIntro p{margin:0 0 6px;font-size:13px;line-height:1.9;color:#c9ddf2}
+
+/* The subscription's small print. Deliberately loud enough to read before
+   paying, not a grey footnote — a lapsed Plus takes things away, and the
+   user has to know that first. */
+.plusNote{
+  background:#ffd36b12;border:1px solid #ffd36b33;border-radius:16px;
+  padding:11px 13px;margin:0 0 12px;
+}
+.plusNote b{display:block;font-size:12.5px;color:#ffd36b;margin-bottom:5px}
+.plusNote p{margin:0;font-size:12px;line-height:1.9;color:#c9ddf2}
+.plusRenewHint{margin:8px 0 0;font-size:11.5px}
+
+.myClubs h2{margin:0 0 12px;font-size:18px}
+.myClubGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:11px}
+.myClub{
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  padding:12px 9px;border-radius:18px;text-align:center;
+  background:#ffffff0a;border:1px solid #ffffff14;
+}
+.myClub img{width:46px;height:46px;object-fit:contain}
+.myClub b{font-size:12.5px;line-height:1.4}
+.clubTag{font-size:10px;font-weight:800;border-radius:999px;padding:2px 9px}
+.clubTag.own{background:#b5ef5822;color:var(--brand-ink)}
+.clubTag.plus{background:#ffd36b22;color:#ffd36b}
+.tiny{font-size:10.5px;padding:6px 8px;min-height:32px;width:100%;margin:0}
+.clubWarn{margin:12px 0 0;font-size:12px;line-height:1.8}
+
+.offerCrest{display:block;margin:0 auto 12px;object-fit:contain}
+.short{color:#ff8fa3}
+
+/* ═══ League tabs + club rosters ═══════════════════════════════════════ */
+/* ── چرا تبِ غیرفعال پس‌زمینهٔ تیرهٔ خودش را دارد ────────────────────────
+   صفحهٔ لیگ گرادیانِ فیروزه‌ای دارد و روشن‌ترین نقطه‌اش rgb(40,103,106)
+   اندازه‌گیری شد. متنِ خاکستریِ #94A3B8 روی آن نسبتِ **۲.۴۴** می‌داد —
+   یعنی برچسبِ تبِ غیرفعال تقریباً ناخوانا بود. (ابزارِ CSS-محور این را
+   نمی‌دید چون پس‌زمینهٔ دکمه `transparent` بود و او گرادیانِ زیرش را
+   دنبال نمی‌کرد؛ فقط `audit_pixels.py` که پیکسلِ واقعی را می‌خواند
+   گرفتش.)
+
+   روشن‌کردنِ متن به‌تنهایی کافی نبود: حتی #CBD5E1 روی آن پس‌زمینه فقط
+   ۴.۲۱ می‌داد. پس به‌جای دستکاریِ رنگِ متن، به تبِ غیرفعال یک
+   پس‌زمینهٔ تیرهٔ **مات** داده شد تا زمینهٔ زیرش دیگر متغیر نباشد.
+   نتیجه: ۶.۰۹ — و ضمناً تب‌ها شبیه یک کنترلِ عمدی دیده می‌شوند نه
+   متنِ شناور. */
+.leagueTabs{display:flex;gap:8px;margin-bottom:14px}
+.leagueTabs button{
+  flex:1;background:#0d2b33;color:#cbd5e1;border:1px solid #ffffff1f;
+  font-size:13.5px;padding:10px;min-height:42px;font-weight:700;
+}
+.leagueTabs .on{background:#b5ef58;color:#10210a;border-color:transparent;font-weight:800}
+
+.clubsIntro{margin:0 0 14px;font-size:12.5px;line-height:1.9}
+.clubGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(124px,1fr));gap:11px}
+.clubCard{
+  position:relative;display:flex;flex-direction:column;align-items:center;
+  gap:6px;padding:14px 9px;border-radius:20px;text-align:center;
+  background:#ffffff0a;border:1px solid #ffffff14;color:inherit;
+  font-family:inherit;cursor:pointer;
+}
+.clubCard:hover{border-color:var(--brand-ink)}
+.clubCard.mine{border-color:#b5ef5866;background:#b5ef580d}
+.clubCard img{width:56px;height:56px;object-fit:contain}
+.clubCard b{font-size:12.5px;font-weight:800;line-height:1.4;min-height:2.4em}
+.clubCount{font-size:11px;color:#c9ddf2}
+.clubMine{
+  position:absolute;top:7px;inset-inline-start:7px;font-size:9.5px;
+  font-weight:800;background:#b5ef58;color:#10210a;border-radius:999px;
+  padding:2px 7px;
+}
+
+.rosterHead{display:flex;align-items:center;gap:11px;margin-bottom:14px}
+.rosterHead img{width:42px;height:42px;object-fit:contain}
+.rosterHead h3{margin:0;font-size:17px}
+.rosterHead small{color:#c9ddf2;font-size:11.5px}
+.rosterHead .ghost{font-size:12px;padding:6px 11px;min-height:32px}
+
+.rosterRow{gap:10px}
+.rosterRank{flex:none;min-width:34px;font-size:12.5px;color:#c9ddf2}
+.rosterPic{width:34px;height:34px;border-radius:50%;object-fit:cover;flex:none}
+.rosterName{flex:1;text-align:start;font-size:13.5px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rosterPts{flex:none;font-size:12px;font-weight:800;color:var(--brand-ink)}
+.rosterPts small{font-weight:500;color:#c9ddf2;font-size:10px}
+
+@media(max-width:600px){
+  .clubGrid,.myClubGrid{grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:9px}
+  .clubCard img{width:46px;height:46px}
+}
+
+/* Club crests in the avatar picker: square-ish artwork inside a round well,
+   so a crest never gets its corners clipped like a photo would. */
+.avatars .clubAvatarPick{
+  object-fit:contain;padding:6px;background:#ffffff12;
+}
+.avatarNote{margin:0 0 10px;font-size:12px}
+.rosterNew{color:#c9ddf2;font-weight:600}
+
+/* ── Decorative pseudo-elements must not eat taps ─────────────────────────
+   BUG: `.auth:before` is a 260px blurred circle anchored to the login card's
+   bottom-left corner. It has no pointer-events rule, so it is a real hit
+   target painted OVER the submit button. On a 320px screen the card is
+   narrow enough that the circle covers the button's centre, and tapping
+   "ورود" did nothing at all — the login page was unusable on small phones.
+   Verified with elementFromPoint: at 320px the topmost element at the
+   button's centre was the FORM, at 360px+ it was the BUTTON.
+
+   Decoration is never interactive, so opt every decorative layer out. */
+.auth:before,
+.card:before,
+.card:after {
+  pointer-events: none;
+}
+
+/* ── Two last overflow findings from the visual audit ──────────────────── */
+
+/* The unread-count badge sits 3px OUTSIDE the bell by design, so the button
+   reports scrollWidth 39 against clientWidth 36. That is NOT a defect — an
+   `overflow: visible` box does not scroll and nothing is clipped; it is the
+   audit's scrollWidth heuristic being fooled by a deliberate overhang. Stated
+   explicitly so the next person does not "fix" the badge back inside the
+   button. */
+.iconBtn.bell { overflow: visible; }
+
+/* THE 8px OF HORIZONTAL SCROLL ON EVERY PAGE.
+   `.appBar`, `.mobileNav` and `.tabPane` are all `width: min(1080px, 96vw)`.
+   vw is measured against the VIEWPORT, but these sit inside `.page`, which
+   has 12px of padding each side. On a 390px phone 96vw = 374.4px against a
+   366px content box, so each one is 8px too wide and the whole app has a
+   permanent horizontal jiggle.
+   `max-width: 100%` alone did not help: these elements set an explicit
+   `width`, and max-width caps the used width but the grid track has already
+   been sized from it. Setting the width relative to the CONTAINER (100%)
+   with the 1080px cap preserved fixes the cause instead of the symptom. */
+.portal { min-width: 0; }
+.portal > .appBar,
+.portal > .mobileNav,
+.portal > .tabPane {
+  width: 100%;
+  max-width: 1080px;
+}
+

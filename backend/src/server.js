@@ -30,6 +30,7 @@ const swaggerUi = require('swagger-ui-express');
 const YAML = require('yaml');
 const { Server } = require('socket.io');
 const { pool } = require('./config/db');
+const { normalizeMobile: _normalizeMobile, faDigits: _faDigits, anonymousNickname: _anonymousNickname, isValidPasswordLength: _isValidPasswordLength } = require('./lib/auth-helpers');
 // تنها فهرستِ آواتارها — هم `safeAvatarKey` از آن می‌خواند و هم
 // `GET /api/avatars` که «چند مدل آواتار داریم» را از متنِ APK بیرون می‌آورد
 // (فاز ۲ نقشه‌راه یکپارچه‌سازی: هیچ عددِ بازاری در متن UI کلاینت نماند).
@@ -363,56 +364,12 @@ const signAdmin = admin => jwt.sign({ sub: admin.id, type: 'admin', role: admin.
  * موجودِ دیتابیس پیش از این تغییر بررسی شد: همه لاتین‌اند، پس هیچ‌کس
  * قفل نمی‌شود.
  */
-function normalizeMobile(m) {
-  let s = String(m || '').trim();
-  // ارقام فارسی (U+06F0–U+06F9) و عربی-هندی (U+0660–U+0669) → لاتین.
-  s = s.replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 0x06F0));
-  s = s.replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660));
-  // فاصله‌های معمولی، نیم‌فاصله و فاصلهٔ باریک که از کپی‌پیست می‌آیند.
-  s = s.replace(/[\s\u200c\u200f\u200e\u202a-\u202e]/g, '');
-
-  // فقط وقتی شماره است دست به شکلش می‌زنیم؛ نام کاربری را رها می‌کنیم.
-  if (/^[+0-9()\-.]+$/.test(s)) {
-    s = s.replace(/[()\-.]/g, '');
-    if (s.startsWith('+98')) s = '0' + s.slice(3);
-    else if (s.startsWith('0098')) s = '0' + s.slice(4);
-    else if (s.startsWith('98') && s.length === 12) s = '0' + s.slice(2);
-    // «9123456789» بدون صفر ابتدایی — شکلی که خیلی‌ها تایپ می‌کنند.
-    else if (/^9\d{9}$/.test(s)) s = '0' + s;
-  }
-  return s;
-}
-
-/**
- * ارقام لاتین را به فارسی تبدیل می‌کند، برای متن اعلان‌ها.
- *
- * اعلان‌ها تنها جای سرور هستند که متن فارسی مستقیم به کاربر نشان می‌دهند؛
- * «۳ چرخش» کنار «3 چرخش» در یک لیست، بد به‌نظر می‌رسد.
- */
-const FA_DIGITS = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
-function faDigits(n) {
-  return String(n).replace(/\d/g, (d) => FA_DIGITS[Number(d)]);
-}
-// PRIVACY FIX: register-password used to fall back to the raw mobile
-// number/username as the public nickname whenever the optional nickname
-// field was left blank. Nickname is shown to every other user on the
-// public leaderboard and in the chat room, so any user who skipped that
-// one optional field had their phone number broadcast to the entire user
-// base. Generate an anonymous placeholder instead; the user can still set
-// a real nickname later from their profile.
-function anonymousNickname() {
-  return `کاربر-${Math.floor(1000 + Math.random() * 9000)}`;
-}
-// bcrypt silently truncates input at 72 BYTES — anything past that is
-// ignored when hashing, so e.g. "AAAA...(72 x's)...AAAA-realsecret" and
-// "AAAA...(72 x's)...AAAA-totallydifferent" hash identically and both
-// "work" as the password. That's confusing/unsafe for a password field, so
-// cap length explicitly instead of silently accepting (and discarding) the
-// extra characters.
-function isValidPasswordLength(pw) {
-  const s = String(pw || '');
-  return s.length >= 6 && Buffer.byteLength(s, 'utf8') <= 72;
-}
+// ── pure helpers extracted → backend/src/lib/auth-helpers.js (single source) ──
+// wrapperها برای سازگاریِ فراخوانی‌های موجود در همین فایل
+function normalizeMobile(m) { return _normalizeMobile(m); }
+function faDigits(n) { return _faDigits(n); }
+function anonymousNickname() { return _anonymousNickname(); }
+function isValidPasswordLength(pw) { return _isValidPasswordLength(pw); }
 async function auth(req, res, next) {
   try {
     const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');

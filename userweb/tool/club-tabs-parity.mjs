@@ -58,7 +58,20 @@ const check = (name, fn) => {
 
 const web = strip(read('userweb/src/main.jsx'));
 const android = strip(read('mobile/lib/screens/user/social_page.dart'));
-const css = strip(read('userweb/src/style.css'));
+function loadCssForTabs() {
+  const hub = read('userweb/src/style.css');
+  if (hub.includes("@import './styles/")) {
+    const imports = [...hub.matchAll(/@import\s+['"]\.\/styles\/([^'"]+)['"]/g)].map(m => m[1]);
+    let combined = '';
+    for (const f of imports) {
+      const p = `userweb/src/styles/${f}`;
+      try { combined += '\n' + read(p); } catch {}
+    }
+    return strip(combined || hub);
+  }
+  return strip(hub);
+}
+const css = loadCssForTabs();
 
 console.log('نوارِ تب‌های باشگاه — آینگی و جاشدن در نما\n');
 
