@@ -12,6 +12,7 @@ on:
       - 'userweb/**'
       - '.github/workflows/backend-admin-ci.yml'
   pull_request:
+  workflow_dispatch:
 
 jobs:
   backend-syntax:
