@@ -1,4 +1,5 @@
 // PM2 process definition.
+//
 const path = require('path');
 //
 // ── مقیاسِ چندپروسه‌ای بدون شکستنِ بازیِ زنده ────────────────────────
@@ -32,11 +33,15 @@ function app(name, port, role) {
     cwd: __dirname,
     instances: 1,
     exec_mode: 'fork',
-    // stdout (لاگ عادی/پیام‌های ۴xx) و stderr (فقط خطای واقعی) را جدا نگه دار تا
-    // فایلِ error فقط خرابیِ واقعی را نشان دهد.
+    // stdout (لاگِ عادی، شاملِ پیام‌های ۴xx/کسب‌وکار) و stderr (فقط خطای
+    // واقعی/۵xx/کرش) را در دو فایلِ جدا نگه داریم. با `merge_logs: true`
+    // (پیش‌فرضِ PM2 در fork) هر دو به فایلِ error می‌رفتند و مانیتورینگ
+    // هشدارِ کتابخانه و پیامِ «سهمیهٔ روزانه تمام شد» را «خطا» نشان می‌داد.
+    // `merge_logs: false` + مسیرهای صریح، stdout را به `out` و stderr را به
+    // `error` می‌فرستد تا فایلِ error فقط دنبالِ خرابیِ واقعی بماند.
     merge_logs: false,
-    out_file: path.join(__dirname, 'logs', role + '-' + name + '-out.log'),
-    error_file: path.join(__dirname, 'logs', role + '-' + name + '-error.log'),
+    out_file: path.join(__dirname, 'logs', `${role}-${name}-out.log`),
+    error_file: path.join(__dirname, 'logs', `${role}-${name}-error.log`),
     // نشت حافظه یا پردازشِ آپلودیِ رهاکرده باید پروسه را recycle کند،
     // نه اینکه kernel با OOM همه چیز (حتی Postgres) را بکشد.
     max_memory_restart: '850M',
@@ -50,6 +55,7 @@ function app(name, port, role) {
 module.exports = {
   apps: [
     app('ghelgheli-api', 4000, 'game'),   // گره بازی/سوکت — اسمِ اصلی برای سازگاری با deploy.sh
-    app('ghelgheli-api-http', 4001, 'http'), // گره کمکیِ HTTP/REST
+    app('ghelgheli-api-http', 4001, 'http'), // گره کمکیِ HTTP/REST — محکم‌کاری ۱
+    app('ghelgheli-api-http2', 4002, 'http'), // گره کمکیِ دوم HTTP/REST — محکم‌کاری ۲ (۳ پروسه فعال)
   ],
 };

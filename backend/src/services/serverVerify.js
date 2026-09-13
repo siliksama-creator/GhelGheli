@@ -23,6 +23,32 @@
 const fs = require('fs');
 const path = require('path');
 const vision = require('./serverVision');
+const visionQueue = (() => {
+  try { return require('./visionQueue'); } catch { return null; }
+})();
+async function visionEmbedCard(buf) {
+  if (visionQueue) {
+    try { return await visionQueue.workerEmbed('embedCard', buf); } catch (e) { /* fallback */ }
+  }
+  return vision.embedCard(buf);
+}
+async function visionEmbedFace(buf) {
+  if (visionQueue) {
+    try { return await visionQueue.workerEmbed('embedFace', buf); } catch (e) { /* fallback */ }
+  }
+  return vision.embedFace(buf);
+}
+async function visionCropVariants(buf) {
+  if (visionQueue) {
+    try {
+      const r = await visionQueue.workerEmbed('cropVariants', buf);
+      // worker returns base64, decode
+      if (Array.isArray(r) && r[0]?.buf) return r.map(x => ({ label: x.label, buf: Buffer.from(x.buf, 'base64') }));
+      return r;
+    } catch (e) { /* fallback */ }
+  }
+  return vision.cropVariants(buf);
+}
 
 // نسخهٔ بردارهای سرور؛ اگر مدلِ سرور عوض شد بالا می‌رود.
 const SERVER_EMBED_VERSION = 1;
@@ -86,7 +112,7 @@ async function ensureReferenceEmbeddings(pool) {
     let i = 1;
 
     if (needCard) {
-      const cv = await vision.embedCard(buf);
+      const cv = await visionEmbedCard(buf);
       if (cv) {
         params.push(JSON.stringify(cv)); set.push(`server_embedding=$${i++}`);
         params.push(SERVER_EMBED_VERSION); set.push(`server_embedding_version=$${i++}`);
@@ -94,7 +120,7 @@ async function ensureReferenceEmbeddings(pool) {
       }
     }
     if (needFace) {
-      const fe = await vision.embedFace(buf);
+      const fe = await visionEmbedFace(buf);
       // مرجع فقط وقتی بردار چهره می‌گیرد که **یک چهرهٔ تمیز و مطمئن** باشد؛
       // کارت‌های چندچهره‌ای/پوستر طبیعتاً بردار چهره نمی‌گیرند (نسخه ثبت می‌شود
       // تا دوباره اجرا نشود، ولی برداری ذخیره نمی‌شود).
@@ -165,12 +191,12 @@ async function decide(pool, submission, imageBuf) {
 
   const refs = await loadRefs(pool);
 
-  const variants = await vision.cropVariants(imageBuf);
+  const variants = await visionCropVariants(imageBuf);
   let best = null;
   for (const v of variants) {
     const [cardVec, faceRes] = await Promise.all([
-      vision.embedCard(v.buf),
-      vision.embedFace(v.buf),
+      visionEmbedCard(v.buf),
+      visionEmbedFace(v.buf),
     ]);
     const cardRank = rankVector(cardVec, refs, 'cardVec');
     const topCard = cardRank[0] || null;

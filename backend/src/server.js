@@ -1804,7 +1804,7 @@ app.get('/api/league/current', auth, asyncHandler(async (req, res) => {
           })),
         } : null,
       };
-      await cacheSet(cacheKey, payload, 8000);
+      await cacheSet(cacheKey, payload, 60000);
       return payload;
     })();
 
@@ -2969,6 +2969,45 @@ cron.schedule('41 4 * * *', () => {
     .then(n => { if (n) console.log(`[analytics] pruned ${n} old crash report(s)`); })
     .catch(e => console.error('[analytics] crash prune failed:', e.message));
 }, { timezone: 'Asia/Tehran' });
+// ── پاک‌سازی عکس‌های رها شده (۳ روز) ───────────────────────────────────
+// عکس کاربر بعد از تأیید خودکار حذف می‌شود (serverReviewQueue)، ولی اگر
+// پنل ۳ روز پرونده را نبندد یا فایل orphan بماند، اینجا روزانه جارو می‌شود.
+// عکس طرح‌ها (designs) دست نمی‌خورد — فقط uploads/images که در هیچ جدولِ
+// مرجع نیست و قدیمی است.
+cron.schedule('33 3 * * *', async () => {
+  try {
+    const cutoff = Date.now() - 3 * 24 * 60 * 60 * 1000;
+    let removed = 0;
+    for (const name of fs.readdirSync(imageUploadDir)) {
+      if (!IMAGE_EXT_RE.test(name)) continue;
+      const fp = path.join(imageUploadDir, name);
+      try {
+        const stat = fs.statSync(fp);
+        if (stat.mtimeMs > cutoff) continue;
+        // آیا این فایل هنوز در photo_card_submissions یا designs ارجاع دارد؟
+        const rel = `/uploads/images/${name}`;
+        const { rows: s1 } = await pool.query(`SELECT 1 FROM photo_card_submissions WHERE user_image_path LIKE '%' || $1 LIMIT 1`, [name]);
+        if (s1[0]) continue;
+        const { rows: s2 } = await pool.query(`SELECT 1 FROM photo_card_designs WHERE image_url=$1 LIMIT 1`, [rel]);
+        if (s2[0]) continue;
+        // همچنین اگر در پشتیبانی پیوست شده باشد (attachments json)
+        const { rows: s3 } = await pool.query(`SELECT 1 FROM support_ticket_messages WHERE attachments::text LIKE '%' || $1 || '%' LIMIT 1`, [name]);
+        if (s3[0]) continue;
+        fs.unlinkSync(fp);
+        // thumbnail‌ِ مربوطه را هم پاک کن
+        for (const w of THUMB_WIDTHS) {
+          const tp = path.join(thumbRoot, `${w}-${name}.webp`);
+          try { if (fs.existsSync(tp)) fs.unlinkSync(tp); } catch {}
+        }
+        removed++;
+      } catch {}
+    }
+    if (removed) console.log(`[cleanup] ${removed} عکس قدیمی رها پاک شد`);
+  } catch (e) {
+    console.error('[cleanup] failed:', e.message);
+  }
+}, { timezone: 'Asia/Tehran' });
+
 
 // ── فاز ۴: جاروبِ بازبینیِ خودکارِ صفِ کارت‌های عکسی ──
 //

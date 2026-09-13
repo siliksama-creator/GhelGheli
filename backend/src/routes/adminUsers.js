@@ -20,11 +20,15 @@ router.get('/admin/users', adminAuth, requireRole('support'), asyncHandler(async
   const normalizedDigits = rawQ.replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
   const searchDigits = `%${normalizedDigits}%`;
 
+  const limit = Math.min(Math.max(parseInt(req.query.limit || req.query.perPage || '50', 10) || 50, 1), 100);
+  const page = Math.max(parseInt(req.query.page || '1', 10) || 1, 1);
+  const offset = req.query.offset != null ? Math.max(parseInt(req.query.offset, 10) || 0, 0) : (page - 1) * limit;
   const rows = (await pool.query(
     // `wallet_balance` برای رابطِ «اصلاح کیف پول» لازم است: مدیر باید
     // موجودیِ فعلی را کنارِ دکمه ببیند، وگرنه کسر کورکورانه انجام می‌دهد
     // و با خطای «موجودی کافی نیست» روبه‌رو می‌شود بدون آنکه بداند چقدر
     // هست.
+    // صفحه‌بندی برای ۲۰k+ کاربر: LIMIT/OFFSET با ایندکس joined_at
     `SELECT u.id,u.mobile,u.first_name,u.last_name,u.nickname,u.age,u.city,u.province,u.bank_account,
             u.profile_image_url,u.profile_avatar_key,u.current_points,u.lifetime_points,
             u.monthly_league_points,u.status,u.joined_at,u.game_xp,u.wallet_balance,
@@ -38,8 +42,8 @@ router.get('/admin/users', adminAuth, requireRole('support'), asyncHandler(async
        ) plus ON true
       WHERE u.mobile ILIKE $1 OR u.mobile ILIKE $2 OR u.nickname ILIKE $1 OR u.first_name ILIKE $1 
          OR u.last_name ILIKE $1 OR (u.first_name || ' ' || u.last_name) ILIKE $1
-      ORDER BY u.joined_at DESC LIMIT 300`,
-    [search, searchDigits]
+      ORDER BY u.joined_at DESC LIMIT $3 OFFSET $4`,
+    [search, searchDigits, limit, offset]
   )).rows;
   res.json(rows.map((u) => ({
     ...u,

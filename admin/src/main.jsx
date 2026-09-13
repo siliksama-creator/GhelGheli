@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, Suspense, lazy } from 'react';
+import { useCallback, useEffect, useMemo, useState, Suspense, lazy, Component } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BarChart3, Bell, BookText, Coins, Gift, MessageCircle, LifeBuoy, ScanLine, Settings, Shield, Sigma, Trophy, Users, Gamepad2, Wallet, Activity, CircleDot, Package, Store, Layers, Target, SlidersHorizontal } from 'lucide-react';
 
@@ -49,6 +49,42 @@ const ShopAdminPage = lazy(() => import('./pages/shop.jsx').then(m => ({ default
 const BattlePassPage = lazy(() => import('./pages/battle-pass.jsx').then(m => ({ default: m.BattlePassPage })));
 const MissionsPage = lazy(() => import('./pages/missions.jsx').then(m => ({ default: m.MissionsPage })));
 const EnginePage = lazy(() => import('./pages/engine.jsx').then(m => ({ default: m.EnginePage })));
+
+// ── ErrorBoundary برای جلوگیری از صفحه سیاه ──────────────────────────────
+class AdminErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  componentDidCatch(error, info) {
+    // لاگ به صندوق کرش (از قبل نصب شده) + کنسول
+    try { console.error('[admin] ErrorBoundary:', error, info); } catch {}
+  }
+  handleRetry = () => {
+    this.setState({ hasError: false, error: null });
+    // اگر خطای چانک بود، رفرش کامل لازم است
+    if (String(this.state.error?.message || '').includes('Chunk') || String(this.state.error?.message || '').includes('Loading')) {
+      window.location.reload();
+    } else {
+      // تلاش مجدد بدون رفرش (برای خطای رندر)
+      this.props.onReset?.();
+    }
+  };
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '32px', textAlign: 'center', direction: 'rtl' }}>
+          <div style={{ maxWidth: 480, margin: '40px auto', background: 'var(--surface, #0E1826)', border: '1px solid var(--border, rgba(255,255,255,0.1))', borderRadius: 16, padding: 24 }}>
+            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>خطا خورد</div>
+            <div style={{ fontSize: 14, opacity: 0.85, marginBottom: 16, lineHeight: 1.7 }}>دوباره تلاش کن و صفحه رو رفرش کن</div>
+            <div style={{ fontSize: 12, opacity: 0.6, marginBottom: 16, direction: 'ltr', overflow: 'auto', maxHeight: 80 }}>{String(this.state.error?.message || '').slice(0, 300)}</div>
+            <button onClick={this.handleRetry} style={{ background: 'var(--gg-emerald, #00D49A)', color: '#060D18', border: 'none', borderRadius: 999, padding: '10px 20px', fontWeight: 700, cursor: 'pointer' }}>تلاش دوباره</button>
+            <button onClick={() => window.location.reload()} style={{ marginRight: 8, background: 'transparent', color: 'var(--text, #EAF1FB)', border: '1px solid var(--border)', borderRadius: 999, padding: '10px 20px', cursor: 'pointer' }}>رفرش کامل</button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 // ── ۳.۲ گروه‌بندیِ منو (هر دو پنل) ────────────────────────────────────────
 //
 // چرا: ۲۳ قلمِ بی‌درجه در نوارِ کنار یعنی «بگرد تا پیدایش کنی». ترتیبِ
@@ -223,9 +259,11 @@ function App() {
       title={active[1]}
       subtitle={activeDesc}
     >
-      <Suspense fallback={<div className="pageLoading" aria-busy="true" />}>
-        <ActivePage request={request} onNavigate={setPage} isSuperAdmin={isSuperAdmin(role)} />
-      </Suspense>
+      <AdminErrorBoundary key={effectiveKey} onReset={() => setPage(effectiveKey)}>
+        <Suspense fallback={<div className="pageLoading" aria-busy="true" />}>
+          <ActivePage request={request} onNavigate={setPage} isSuperAdmin={isSuperAdmin(role)} />
+        </Suspense>
+      </AdminErrorBoundary>
     </AppShell>
   );
 }

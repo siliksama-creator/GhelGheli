@@ -270,6 +270,8 @@ router.patch('/admin/reward-claims/:id', adminAuth, validateUuid('id'), requireR
         // `lifetime_points` را زیاد می‌کند که اینجا **غلط** است: کاربر
         // این امتیاز را قبلاً یک بار کسب کرده و در lifetime هست.
         // پس مستقیم می‌نویسیم و فقط ردیفِ دفتر را از سرویس می‌گیریم.
+        // قفل ردیف کاربر برای جلوگیری از گم‌شدن امتیاز در درخواست‌های هم‌زمان
+        await client.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [claim.user_id]);
         const { rows: back } = await client.query(
           `UPDATE users SET current_points = current_points + $2, updated_at=NOW()
             WHERE id=$1 RETURNING current_points`,
