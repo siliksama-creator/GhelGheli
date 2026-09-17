@@ -20,6 +20,9 @@ const path = require('path');
 const rateLimit = require('express-rate-limit');
 
 const fpEngine = require('../services/imageFingerprint');
+// اعلانِ نتیجهٔ کارت (تأیید/رد) — یک متنِ واحد برای هر سه مسیرِ تصمیم.
+// توضیحِ کامل و باگی که این ماژول می‌بندد در خودِ فایل.
+const cardNotify = require('../services/cardDecisionNotify');
 const photoCards = require('../services/photoCardService');
 const cardIdentity = require('../services/cardIdentity');
 const cardEmbedding = require('../services/cardEmbedding');
@@ -833,11 +836,12 @@ module.exports = function createPhotoCardRoutes(deps) {
         'photo_card_submissions', req.params.id, reason || null, {});
 
       if (approve && payload) {
-        createNotification(userId, 'card',
-          'کارت شما تأیید شد',
-          `کارت «${payload.cardTypeName}» به مجموعهٔ شما اضافه شد`
-          + (payload.points ? ` و ${payload.points} امتیاز گرفتید.` : '.'),
-        ).catch(() => {});
+        // متنِ مشترک با مسیرِ خودکار/درون‌درخواستی (cardDecisionNotify).
+        cardNotify.cardApproved(userId, {
+          cardTypeName: payload.cardTypeName,
+          points: payload.points,
+          push: true,
+        }).catch(() => {});
         // ── چرا XP گذر نبرد داده نمی‌شود ──
         //
         // خواستهٔ صریح مالک. منطقش هم روشن است: گذر نبرد پاداشِ
@@ -851,10 +855,7 @@ module.exports = function createPhotoCardRoutes(deps) {
         // (سیگنال داده ندارد؛ کلاینت `/api/league/current` را دوباره می‌زند.)
         leaderboardSignal.leaderboardChanged();
       } else if (!approve) {
-        createNotification(userId, 'card',
-          'کارت شما تأیید نشد',
-          reason || 'عکس ارسالی با هیچ کارتی مطابقت نداشت. لطفاً عکس واضح‌تری بگیرید.',
-        ).catch(() => {});
+        cardNotify.cardRejected(userId, { reason, push: true }).catch(() => {});
       }
 
       res.json({ ok: true, approved: approve });
@@ -1732,6 +1733,20 @@ module.exports = function createPhotoCardRoutes(deps) {
             `${payload.cash.toLocaleString('en-US')} تومان بابت کارت «${payload.cardTypeName}» واریز شد.`,
           ).catch(() => {});
         }
+
+        // ── ردیفِ اعلانِ تأییدِ کارت ──
+        //
+        // قبلاً در این مسیر اصلاً اعلانی ثبت نمی‌شد؛ یعنی کاربر بعداً در
+        // زنگولهٔ اعلان‌ها نمی‌دید که این کارت چه زمانی و چگونه تأیید شده.
+        // اینجا اما **پوش فرستاده نمی‌شود** (`push:false`): نتیجه همین حالا
+        // در پاسخِ همین درخواست به کاربر نشان داده می‌شود و اعلانِ گوشی
+        // چند صد میلی‌ثانیه بعد، تکراری و آزاردهنده است. مسیرِ غیرِهم‌زمان
+        // (صف) پوش را می‌فرستد — توضیح در cardDecisionNotify.js.
+        cardNotify.cardApproved(req.user.id, {
+          cardTypeName: payload.cardTypeName,
+          points: payload.points,
+          push: false,
+        }).catch(() => {});
         // جدولِ لیگ عوض شد: کشِ فهرست بی‌اعتبار و سیگنالِ سوکت پخش می‌شود.
         // (سیگنال داده ندارد؛ کلاینت `/api/league/current` را دوباره می‌زند.)
         leaderboardSignal.leaderboardChanged();

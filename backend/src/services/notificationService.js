@@ -44,7 +44,23 @@ function setFirebaseForTests(value) {
   firebaseTried = true;
 }
 
-async function createNotification(userId, type, title, body) {
+/**
+ * ساختِ اعلان.
+ *
+ * @param {string|null} userId
+ * @param {string} type      kind («card»، «wallet»، …)
+ * @param {string} title
+ * @param {string} body
+ * @param {{push?: boolean}} [opts]
+ *   `push:false` یعنی اعلان **فقط در زنگولهٔ اعلان‌ها ثبت شود و نوتیفیکیشن
+ *   گوشی نرود**. چرا لازم است: وقتی نتیجه همان لحظه در پاسخِ همان درخواست
+ *   به کاربر نشان داده می‌شود (تأییدِ درون‌درخواستیِ کارت)، فرستادنِ پوش
+ *   چند صد میلی‌ثانیه بعد = اعلانِ تکراری و آزاردهنده. ولی همان اتفاق باید
+ *   در فهرستِ اعلان‌ها بماند تا کاربر بعداً بتواند تاریخچه را ببیند.
+ *   مسیرهای **غیرِهم‌زمان** (تأییدِ خودکارِ سرور، تصمیمِ ادمین، تلاشِ مجدد)
+ *   پوش را می‌فرستند، چون کاربر آن لحظه جلوی صفحه نیست.
+ */
+async function createNotification(userId, type, title, body, opts = {}) {
   const cleanTitle = String(title || '').trim().slice(0, 160);
   const cleanBody = String(body || '').trim().slice(0, 4000);
   if (!cleanTitle || !cleanBody) {
@@ -54,6 +70,7 @@ async function createNotification(userId, type, title, body) {
     'INSERT INTO notifications(user_id,type,title,body) VALUES ($1,$2,$3,$4) RETURNING *',
     [userId || null, type, cleanTitle, cleanBody]
   );
+  if (opts.push === false) return rows[0];
   if (userId) await sendPushToUser(userId, cleanTitle, cleanBody, { type });
   else await sendPushToAll(cleanTitle, cleanBody, { type });
   return rows[0];

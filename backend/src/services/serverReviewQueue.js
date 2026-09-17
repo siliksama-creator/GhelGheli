@@ -13,6 +13,10 @@
 const fs = require('fs');
 const path = require('path');
 const serverVerify = require('./serverVerify');
+// اعلانِ نتیجهٔ کارت — مسیرِ خودکار تا امروز **هیچ** اعلانی نمی‌فرستاد و
+// کاربر تا بازکردنِ دوبارهٔ برنامه از تأیید بی‌خبر می‌ماند. شرح کامل در خودِ
+// فایلِ cardDecisionNotify.js.
+const cardNotify = require('./cardDecisionNotify');
 const photoCards = require('./photoCardService');
 
 // تأییدِ خودکارِ مواردِ پراطمینان.
@@ -180,6 +184,27 @@ async function reviewOne(pool, submissionId, hooks = {}) {
 
     // بعد از کامیت: عکس و اعلان.
     try { fs.unlinkSync(file); } catch { /* بی‌خیال */ }
+
+    // ── اعلانِ کاربر ──
+    //
+    // اینجا کارت **تأیید** شده و کاربر هیچ‌جا منتظر نبوده (نه درخواستی در
+    // جریان است، نه صفحه‌ای باز). پس اعلان باید پوش هم بفرستد.
+    //
+    // «دقیقاً یک بار»: بالای همین تابع، هر پرونده‌ای که `status`ش
+    // `pending` نباشد با ROLLBACK برمی‌گردد و هیچ‌وقت به این خط نمی‌رسد؛
+    // پس حتی اگر صف و مسیرِ درون‌درخواستی هم‌زمان یک پرونده را بردارند،
+    // فقط یکی از آن‌ها تا اینجا می‌آید (قفلِ `FOR UPDATE` روی ردیف).
+    try {
+      const notifyApproved = hooks.notifyCardApproved || cardNotify.cardApproved;
+      await notifyApproved(sub.user_id, {
+        cardTypeName: payload?.cardTypeName,
+        points: payload?.points,
+        push: true,
+      });
+    } catch (e) {
+      console.warn('[serverReview] اعلانِ تأیید ناموفق بود (نادیده):', e.message);
+    }
+
     if (hooks.leaderboardSignal) hooks.leaderboardSignal();
     if (hooks.audit) {
       hooks.audit(null, 'auto_approve_photo_card', 'photo_card_submissions', sub.id,
