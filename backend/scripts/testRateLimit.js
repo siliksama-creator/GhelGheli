@@ -130,6 +130,71 @@ for (const pub of ['otpLimiter', 'otpVerifyLimiter', 'adminLoginLimiter', 'userL
   }
 }
 
+console.log('\n══ سقف‌های «شماره‌محور» (خواستهٔ مالک، ۲۶ شهریور) ══');
+// مالک: «سقفِ سختِ ورود/درخواستِ کد پیامکی، با شمارش روی **شمارهٔ خودِ
+// کاربر** نه آی‌پی — مثلاً ۵ کد در ۱۰ دقیقه.»
+//
+// چرا این بخش لازم است: اگر روزی کسی keyGeneratorِ این‌ها را به `req.ip`
+// برگرداند، سقفِ مالک بی‌صدا از کار می‌افتد (کاربرانِ CGNAT را می‌بندد و
+// هندلرِ اسپمِ پیامک را باز می‌کند) و هیچ تستی قرمز نمی‌شود. این گارد همان
+// دو چیز را قفل می‌کند: کلید از شماره بیاید، و روی مسیرِ درست سوار باشد.
+{
+  const blocks = limiterBlocks(serverSrc);
+  const byName = (n) => blocks.find(b => b.name === n);
+  const authSrc = files.find(([n]) => n === 'routes/auth.js')?.[1] || '';
+
+  // ⚠️ تله‌ای که خودِ همین گارد در آن افتاد: دو تا از این limiterها کلیدشان
+  // را از یک تابعِ مشترک (`otpMobileKey`) می‌گیرند، نه با فراخوانیِ درون‌خطیِ
+  // `normalizeMobile`. نسخهٔ اول فقط متنِ بدنهٔ limiter را می‌سنجید و دروغ
+  // قرمز می‌شد. حالا اگر `keyGenerator` به یک شناسه اشاره کند، تعریفِ همان
+  // شناسه هم داخلِ متنِ بررسی‌شده می‌آید.
+  const keySourceOf = (body) => {
+    const m = body.match(/keyGenerator\s*:\s*([A-Za-z_$][\w$]*)\s*[,}]/);
+    if (!m) return body;
+    const def = serverSrc.match(new RegExp(`const\\s+${m[1]}\\s*=[^;]+;`));
+    return `${body}\n${def ? def[0] : ''}`;
+  };
+
+  for (const name of ['otpMobileLimiter', 'otpDailyLimiter', 'userAccountLimiter']) {
+    const blk = byName(name);
+    ok(`${name} تعریف شده`, !!blk);
+    if (!blk) continue;
+    const src = keySourceOf(blk.body);
+    ok(`${name} کلیدش از شمارهٔ کاربر است`,
+      /keyGenerator\s*:/.test(blk.body) && /normalizeMobile\(req\.body\?\.mobile\)/.test(src),
+      'کلید باید از `normalizeMobile(req.body.mobile)` بیاید، نه آی‌پی');
+    ok(`${name} به آی‌پی وابسته نیست`, !/req\.ip/.test(src),
+      'سقفِ شماره‌محور نباید آی‌پی را در کلید داشته باشد؛ وگرنه کاربرانِ یک اپراتور هم‌دیگر را قفل می‌کنند');
+  }
+
+  const mobileLimiter = byName('otpMobileLimiter');
+  if (mobileLimiter) {
+    ok('otpMobileLimiter = ۵ کد در ۱۰ دقیقهٔ هر شماره',
+      /windowMs:\s*10\s*\*\s*60_000/.test(mobileLimiter.body) && /limit:\s*5\b/.test(mobileLimiter.body),
+      'عددِ خواستهٔ مالک (۵ در ۱۰ دقیقه) عوض شده');
+  }
+  const dailyLimiter = byName('otpDailyLimiter');
+  if (dailyLimiter) {
+    ok('otpDailyLimiter سقفِ شبانه‌روز دارد (بیمهٔ صورتحسابِ پیامک)',
+      /windowMs:\s*24\s*\*\s*60\s*\*\s*60_000/.test(dailyLimiter.body));
+  }
+  // آی‌پی عمداً *شل‌تر* از شماره است: نقشش فقط جلوگیری از پیمایشِ انبوهِ
+  // شماره‌هاست؛ اگر سفت‌تر از شماره باشد، همان مشکلِ CGNAT برمی‌گردد.
+  const ipLimiter = byName('otpLimiter');
+  if (ipLimiter) {
+    const m = ipLimiter.body.match(/limit:\s*(\d+)/);
+    ok('otpLimiter (آی‌پی) شل‌تر از سقفِ شماره است', !!m && Number(m[1]) >= 20,
+      `مقدارِ فعلی: ${m ? m[1] : '؟'} — باید ≥ ۲۰ باشد تا کاربرانِ CGNAT قفل نشوند`);
+  }
+
+  ok('مسیرِ /auth/request-otp هر سه سقف را دارد',
+    /\/auth\/request-otp'\s*,\s*otpLimiter\s*,\s*otpMobileLimiter\s*,\s*otpDailyLimiter/.test(authSrc),
+    'اگر یکی جا بیفتد، یا اسپمِ پیامک باز می‌شود یا پیمایشِ شماره‌ها');
+  ok('مسیرِ /auth/login سقفِ حساب هم دارد',
+    /\/auth\/login'\s*,\s*userLoginLimiter\s*,\s*userAccountLimiter/.test(authSrc),
+    'بدونِ آن، حدسِ رمز روی یک حساب از چند آی‌پی محدود نمی‌شود');
+}
+
 console.log('\n══ perUserKey فقط یک بار تعریف شده ══');
 // دو `const` هم‌نام در یک ماژول یعنی SyntaxError و سرور اصلاً بالا نمی‌آید.
 // این دقیقاً چیزی است که موقع رفعِ باگِ بالا نزدیک بود اتفاق بیفتد.

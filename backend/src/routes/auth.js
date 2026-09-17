@@ -12,13 +12,17 @@ const missionService = require('../services/missionService');
 module.exports = function createAuthRoutes(deps) {
   const {
     pool, asyncHandler, otpLimiter, otpVerifyLimiter, userLoginLimiter,
+    otpMobileLimiter, otpDailyLimiter, userAccountLimiter,
     bcrypt, normalizeMobile, referrals, createNotification, faDigits,
     signUser, safeUser, safeAvatarKey, safeImageUrl, boundedText, intInRange,
     anonymousNickname, isValidPasswordLength,
   } = deps;
   const router = express.Router();
 
-router.post('/auth/request-otp', otpLimiter, asyncHandler(async (req, res) => {
+// سه سقفِ پشتِ‌سرهم: آی‌پی (ضدپیمایشِ انبوه) + شماره (۵ کد در ۱۰ دقیقه،
+// خواستهٔ مالک) + روزانه (بیمهٔ صورتحسابِ پیامک). ترتیب مهم نیست چون هر سه
+// روی همان درخواست اجرا می‌شوند.
+router.post('/auth/request-otp', otpLimiter, otpMobileLimiter, otpDailyLimiter, asyncHandler(async (req, res) => {
   const mobile = normalizeMobile(req.body.mobile);
   const purpose = req.body.purpose || 'register';
   if (!/^\+?\d{10,15}$/.test(mobile) || !['register','login','reset_password'].includes(purpose)) return res.status(400).json({ message: 'شماره یا نوع درخواست معتبر نیست' });
@@ -328,7 +332,7 @@ router.post('/auth/register-password', userLoginLimiter, asyncHandler(async (req
 
 }));
 
-router.post('/auth/login', userLoginLimiter, asyncHandler(async (req, res) => {
+router.post('/auth/login', userLoginLimiter, userAccountLimiter, asyncHandler(async (req, res) => {
   const mobile = normalizeMobile(req.body.mobile);
   const { rows } = await pool.query('SELECT * FROM users WHERE mobile=$1', [mobile]);
   const user = rows[0];

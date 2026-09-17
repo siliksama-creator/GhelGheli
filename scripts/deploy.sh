@@ -124,6 +124,36 @@ if [ "$HEALTHY" -ne 1 ]; then
   die "Deploy rolled back. Check the $SERVICE_USER PM2 logs for $PM2_APP"
 fi
 
+log "Installing nginx snippets (rate limit)"
+# ═══════════════════════════════════════════════════════════════════════════
+# سقفِ درخواستِ عمومی — خواستهٔ مالک (۲۶ شهریور): «۳۰ درخواست در ثانیه از هر
+# آی‌پی؛ جلوی موجِ ربات‌ها را می‌گیرد و برای کاربرِ واقعی بی‌ضرر است.»
+#
+# دو اسنیپتِ ردیابی‌شده در مخزن به پوشهٔ snippets نصب می‌شوند:
+#   • ghelgheli-ratelimit.conf          → تعریفِ zone (سطحِ http)
+#   · ghelgheli-ratelimit-location.conf → خطِ limit_req (داخلِ location)
+#
+# نصب idempotent است: فقط اگر محتوا فرق کند کپی می‌شود، پس هر دیپلوی
+# ساعتِ تغییرِ فایلِ nginx را بی‌دلیل عوض نمی‌کند.
+RATELIMIT_SNIPPETS=(
+  "deploy/ghelgheli-ratelimit.conf:ghelgheli-ratelimit.conf"
+  "deploy/ghelgheli-ratelimit-location.conf:ghelgheli-ratelimit-location.conf"
+)
+for pair in "${RATELIMIT_SNIPPETS[@]}"; do
+  src="${pair%%:*}"; dst="/etc/nginx/snippets/${pair##*:}"
+  [ -f "$src" ] || continue
+  if ! cmp -s "$src" "$dst"; then
+    install -m 0644 "$src" "$dst"
+    printf '  updated %s\n' "$dst"
+  fi
+done
+# ⚠️ فایلِ کانفیگِ سایت روی سرور زندگی می‌کند (در مخزن نیست: بلوکِ upstream را
+#    اسکریپتِ ظرفیت بازنویسی می‌کند). اگر include جا افتاده باشد، اسنیپت‌ها
+#    نصب می‌شوند ولی کاری نمی‌کنند — پس صریح هشدار می‌دهیم، نه بی‌صدا.
+if ! grep -q 'ghelgheli-ratelimit.conf' /etc/nginx/sites-enabled/ghelgheli 2>/dev/null; then
+  printf '  \033[1;33mهشدار: include سقفِ درخواست در کانفیگِ nginx نیست — سقف اعمال نمی‌شود\033[0m\n' >&2
+fi
+
 log "Reloading nginx"
 nginx -t && systemctl reload nginx
 

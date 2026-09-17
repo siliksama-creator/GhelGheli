@@ -588,7 +588,53 @@ function opsRateLimit(name, defaults, extra = {}) {
 // همهٔ limiterهای زیر روی مسیرهای احراز هویت‌شده‌اند، پس همه `perUserKey`
 // می‌گیرند. (فهرست کامل در تستِ testRateLimit.js نگهبانی می‌شود.)
 const chatLimiter = opsRateLimit('chat', { windowMs: 60_000, limit: 20 }, { keyGenerator: perUserKey });
-const otpLimiter = rateLimit({ windowMs: 10 * 60_000, limit: 5, standardHeaders: true, legacyHeaders: false, ...rlStore('otp') });
+// ── سقفِ درخواستِ کدِ پیامکی — دو لایه (خواستهٔ مالک، ۲۶ شهریور) ─────────
+//
+// مالک خواست: «سقفِ سختِ ورود/درخواستِ کد پیامکی، ولی با شمارش روی
+// **شمارهٔ خودِ کاربر**، نه آی‌پی — مثلِ ۵ کد در ۱۰ دقیقه. جلوی حدس‌زدنِ رمز
+// و اسپمِ پیامک را می‌گیرد و برای کاربرانِ اپراتوری (که یک آی‌پیِ مشترکِ
+// CGNAT دارند) مزاحم نیست.»
+//
+// چرا دو لایه و نه یکی:
+//
+//   • **شماره** (`otpMobileLimiter`): سقفِ اصلیِ مالک — ۵ کد در ۱۰ دقیقه.
+//     این همان چیزی است که «اسپمِ پیامک» و «تلاشِ پیاپی روی یک حساب» را
+//     می‌بندد، و به آی‌پی کاری ندارد؛ پس هزار کاربرِ یک اپراتور که پشتِ یک
+//     آی‌پی‌اند هم‌دیگر را قفل نمی‌کنند.
+//   • **آی‌پی** (`otpLimiter`): از ۵ به ۳۰ در ۱۰ دقیقه **شل** شد. قبلاً خودِ
+//     همین عددِ ۵ روی آی‌پی بود و کاربرانِ CGNAT را بی‌دلیل می‌بست (ششمین
+//     نفر در یک شبکهٔ بزرگ باید ۱۰ دقیقه صبر می‌کرد). حالا نقشش فقط
+//     «جلوگیری از پیمایشِ انبوهِ شماره‌ها از یک منبع» است — که ۳۰ کد در
+//     ۱۰ دقیقه برایش کافی است و برای کاربرِ واقعی هرگز دیده نمی‌شود.
+//   • **روزانه** (`otpDailyLimiter`): سقفِ ۲۰ کد در شبانه‌روز برای هر شماره —
+//     بیمهٔ صورتحسابِ پیامک. بدونِ آن، سقفِ ۱۰دقیقه‌ای اجازهٔ ۷۲۰ پیامک در
+//     روز به یک شماره می‌داد.
+const otpLimiter = rateLimit({
+  windowMs: 10 * 60_000, limit: 30, standardHeaders: true, legacyHeaders: false, ...rlStore('otp'),
+  message: { message: 'تعداد درخواست‌های کد از این اتصال زیاد بوده؛ چند دقیقه دیگر دوباره امتحان کنید' },
+});
+// کلیدِ این دو limiter **فقط شمارهٔ کاربر** است (به‌عمد بدونِ آی‌پی) — همان
+// خواستهٔ مالک. `normalizeMobile` استفاده می‌شود تا «۰۹۱۲…» و «+۹۸۹۱۲…» یک
+// کلید شوند وگرنه با تغییرِ قالبِ شماره، سقف دور زده می‌شد.
+const otpMobileKey = (req) => `m:${normalizeMobile(req.body?.mobile) || 'none'}`;
+const otpMobileLimiter = rateLimit({
+  windowMs: 10 * 60_000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  ...rlStore('otpmobile'),
+  keyGenerator: otpMobileKey,
+  message: { message: 'برای این شماره در ۱۰ دقیقهٔ گذشته چند کد درخواست شده؛ کمی بعد دوباره امتحان کنید' },
+});
+const otpDailyLimiter = rateLimit({
+  windowMs: 24 * 60 * 60_000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  ...rlStore('otpdaily'),
+  keyGenerator: otpMobileKey,
+  message: { message: 'سقفِ پیامکِ امروزِ این شماره پر شده؛ فردا دوباره تلاش کنید' },
+});
 // Brute-force protection for the 6-digit OTP code itself. request-otp only
 // throttled how many codes could be requested — verify-otp and the password
 // reset endpoint (which also consumes an OTP) had NO limiter at all, so a
@@ -624,6 +670,22 @@ const userLoginLimiter = rateLimit({
   ...rlStore('userlogin'),
   keyGenerator: (req) => `${req.ip}:${normalizeMobile(req.body?.mobile)}`,
   message: { message: 'تعداد تلاش ورود زیاد است؛ چند دقیقه دیگر دوباره امتحان کنید' },
+});
+// ── سقفِ «خودِ حساب» برای حدسِ رمز (خواستهٔ مالک، ۲۶ شهریور) ─────────────
+//
+// `userLoginLimiter` بالا کلیدش «آی‌پی + شماره» است؛ یعنی مهاجمی که چند
+// آی‌پی دارد می‌تواند روی **یک شماره** بی‌نهایت رمز امتحان کند. این یکی
+// فقط به شماره نگاه می‌کند و سقفِ مستقلِ خودش را دارد: حتی با هزار آی‌پی،
+// یک حساب در ۱۵ دقیقه بیش از ۱۵ تلاش نمی‌گیرد. کاربرِ واقعی که رمزش را
+// اشتباه می‌زند هرگز به این سقف نمی‌رسد.
+const userAccountLimiter = rateLimit({
+  windowMs: 15 * 60_000,
+  limit: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  ...rlStore('useraccount'),
+  keyGenerator: (req) => `m:${normalizeMobile(req.body?.mobile) || 'none'}`,
+  message: { message: 'برای این شماره تلاش‌های ورود زیاد بوده؛ کمی بعد دوباره امتحان کنید' },
 });
 const loginStreakLimiter = rateLimit({
   windowMs: 60_000,
@@ -839,6 +901,7 @@ function safeImageUrl(v) {
 // Authentication and account registration.
 app.use('/api', require('./routes/auth')({
   pool, asyncHandler, otpLimiter, otpVerifyLimiter, userLoginLimiter,
+  otpMobileLimiter, otpDailyLimiter, userAccountLimiter,
   bcrypt, normalizeMobile, referrals, createNotification, faDigits,
   signUser, safeUser, safeAvatarKey, safeImageUrl, boundedText, intInRange,
   anonymousNickname, isValidPasswordLength,
