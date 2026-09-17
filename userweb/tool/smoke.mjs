@@ -51,6 +51,33 @@ if (/^https?:\/\/(localhost|127\.0\.0\.1)(:|\/)/.test(BASE)) {
 page.on('pageerror', e => pageErrors.push(String(e)));
 page.on('console', m => { if (m.type() === 'error') pageErrors.push(m.text()); });
 
+/**
+ * پوششِ راه‌اندازی («صفحهٔ بارگذاریِ سینمایی») چند لحظه بعد از بالا آمدنِ اپ
+ * محو می‌شود. برای سنجشِ «اصلاً می‌آید یا نه» باید از فریمِ اول نگاه کرد،
+ * نه بعد از `networkidle`.
+ *
+ * نمونه‌گیری تا ۳ ثانیه ادامه دارد و «دیده شد / دیده نشد» را برمی‌گرداند.
+ */
+async function watchSplash(target) {
+  let seen = false;
+  for (let i = 0; i < 60; i++) {
+    if (await target.evaluate(() => !!document.querySelector('.splashRoot'))) {
+      seen = true;
+      break;
+    }
+    await target.waitForTimeout(50);
+  }
+  // اگر دیده شد، صبر می‌کنیم تا برود؛ وگرنه تست‌های بعدی روی یک لایهٔ
+  // تمام‌صفحه اجرا می‌شوند.
+  if (seen) {
+    for (let i = 0; i < 60; i++) {
+      if (!(await target.evaluate(() => !!document.querySelector('.splashRoot')))) break;
+      await target.waitForTimeout(50);
+    }
+  }
+  return seen;
+}
+
 async function openDestination(id) {
   if (DIRECT[id]) {
     await page.locator('.mobileNav button', { hasText: DIRECT[id] }).click();
@@ -72,6 +99,50 @@ try {
   ok(pageErrors.length === 0,
     `login page renders cleanly${pageErrors[0] ? ` (${pageErrors[0].slice(0, 90)})` : ''}`);
   ok((await page.innerText('body')).trim().length > 0, 'login page is not blank');
+
+  // ═══════════════════════════════════════════════════════════════════════
+  //  پوششِ راه‌اندازی: روی گوشی باید باشد، روی دسکتاپ نه
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // خواستهٔ مالک (۲۷ شهریور): «این لودینگ برای وب دسکتاپ رو حذف کن، برای وب
+  // موبایل ولی عالیه.» آن تصمیم دو طرف دارد و هر دو باید قفل شوند — وگرنه
+  // نفرِ بعدی با «چرا روی مانیتور نمی‌آید؟» حذفش می‌کند، یا برعکس، برمی‌گرداندش.
+  //
+  // بریکپوینت همان `max-width: 900px` چیدمانِ اپ است (base.css). پس عددِ
+  // ۹۰۰ در دو طرفِ مرز سنجیده می‌شود: ۸۹۹ (گوشی) و ۱۴۴۰ (دسکتاپ).
+  //
+  // ⚠️ چرا با مرورگرِ واقعی و نه با خواندنِ سورس: استاتیک فقط می‌تواند بگوید
+  //    «شرط نوشته شده»، نه «شرط کار می‌کند». یک `matchMedia` با پرانتزِ اشتباه
+  //    هم از هر بررسیِ متنی رد می‌شود.
+  {
+    const phone = await browser.newPage({
+      viewport: { width: 390, height: 844 },
+      deviceScaleFactor: 3,
+    });
+    await phone.goto(BASE, { waitUntil: 'domcontentloaded' });
+    // `waitUntil: 'domcontentloaded'` تا پوشش را در همان پنجرهٔ خودش ببینیم.
+    const phoneSaw = await watchSplash(phone);
+    ok(phoneSaw, 'نمای گوشی (۳۹۰px): پوششِ راه‌اندازی نمایش داده می‌شود');
+    await phone.close();
+
+    const desk = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    await desk.goto(BASE, { waitUntil: 'domcontentloaded' });
+    const deskSaw = await watchSplash(desk);
+    ok(!deskSaw, 'نمای دسکتاپ (۱۴۴۰px): پوششِ راه‌اندازی نمایش داده نمی‌شود');
+    // و صفحه نباید خالی بماند: با حذفِ پوشش، واسطِ اصلی باید خودش بیاید.
+    ok((await desk.innerText('body')).trim().length > 15,
+      'نمای دسکتاپ: واسطِ اصلی بدونِ پوشش رندر می‌شود');
+    // لوگوی دسکتاپ باید همان انیمیشنِ همیشگی را داشته باشد. اگر حذفِ پوشش
+    // علامتِ «راه‌اندازی تمام شد» را جا بیندازد، این انیمیشن قفل می‌ماند و
+    // هیچ‌کس نمی‌فهمد چرا لوگو بی‌حرکت شده.
+    const markAnim = await desk.evaluate(() => {
+      const el = document.querySelector('.heroMark');
+      return el ? getComputedStyle(el).animationName : '';
+    });
+    ok(/heroSettle/.test(markAnim),
+      `نمای دسکتاپ: انیمیشنِ ورودِ لوگو آزاد است (${markAnim || 'لوگو پیدا نشد'})`);
+    await desk.close();
+  }
 
   if (!TOKEN) {
     console.log('  (no token supplied — skipping the logged-in checks)');

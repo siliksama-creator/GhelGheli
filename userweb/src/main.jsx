@@ -226,6 +226,34 @@ function squeeze(value, limit) {
   return `${text.slice(0, head)} … [${text.length}] … ${text.slice(-tail)}`;
 }
 
+/// بریکپوینتِ چیدمانِ گوشی — **همان عددی که `base.css` استفاده می‌کند**.
+///
+/// اگر روزی آن مدیا کوئری عوض شود، این عدد هم باید عوض شود؛ به همین دلیل
+/// یک گاردِ خودکار در `tool/smoke.mjs` رفتار را روی مرورگرِ واقعی می‌سنجد
+/// (نمای ۱۴۴۰: پوشش نباید باشد — نمای ۳۹۰: باید باشد).
+const PHONE_MAX_WIDTH = 900;
+
+/// آیا این بارگذاری روی «وبِ موبایل» است؟
+///
+/// ⚠️ عمداً **یک‌بار در شروع** خوانده می‌شود و به تغییرِ اندازهٔ پنجره
+/// گوش نمی‌دهد. دو دلیل:
+///
+///   ۱. پوششِ راه‌اندازی یک چیزِ زمانِ بالا‌آمدن است. کسی که پنجره‌اش را
+///      باریک می‌کند، وسطِ کارِ خودش نباید یک صفحهٔ بارگذاری ببیند.
+///   ۲. اگر به تغییرِ اندازه گوش می‌داد، یک کاربرِ دسکتاپ با کوچک‌کردنِ
+///      پنجره (یا چرخاندنِ تبلت) ناگهان پوشش را می‌دید — در حالی که
+///      `bootGated` مدت‌ها پیش false شده و پوشش بلافاصله محو می‌شد؛ یعنی
+///      یک فلاشِ بی‌معنی به‌جای یک انتقال.
+function isPhoneViewport() {
+  try {
+    return window.matchMedia(`(max-width: ${PHONE_MAX_WIDTH}px)`).matches;
+  } catch {
+    // نمی‌توانیم بپرسیم؟ رفتارِ پیش‌فرضِ محافظه‌کارانه: پوشش را نشان بده.
+    // (نبودنِ پوشش یعنی صفحهٔ بارگذاریِ بی‌برند؛ نشان‌دادنش ضررِ کمتری دارد.)
+    return true;
+  }
+}
+
 function App() {
   const [token, setToken] = useState(() => {
     try { return localStorage.token || ''; } catch { return ''; }
@@ -253,6 +281,15 @@ function App() {
   const [floorDone, setFloorDone] = useState(false);
   const [splashLeaving, setSplashLeaving] = useState(false);
   const [splashGone, setSplashGone] = useState(false);
+
+  /// آیا این بارگذاری حق دارد پوششِ سینمایی را نشان بدهد؟
+  ///
+  /// خواستهٔ مالک: «برای وب موبایل عالیه، برای دسکتاپ حذفش کن.» روی دسکتاپ
+  /// صفحهٔ بارگذاری نشان داده **نمی‌شود** و کاربر همان چیزی را می‌بیند که
+  /// قبل از ساخته‌شدنِ این قابلیت می‌دید: صفحهٔ ورود/پرتال که خودش حالتِ
+  /// بارگذاریِ سبکِ خودش را دارد (`LoadingView` برای پرتال).
+  const [splashEligible] = useState(isPhoneViewport);
+  const showSplash = splashEligible && !splashGone;
 
   // کفِ لحظهٔ برند — همان ۶۰۰ms اپ اندروید.
   useEffect(() => {
@@ -307,6 +344,15 @@ function App() {
   // و صفحهٔ خانه یک‌دفعه «کلیک» می‌کند. ۴۲۰ms همان عددِ انتقالِ اپ اندروید
   // است، پس دو کلاینت با یک ریتم باز می‌شوند.
   useEffect(() => {
+    if (!splashEligible) {
+      // دسکتاپ: پوششی وجود ندارد، پس فقط علامتِ «راه‌اندازی تمام شد» را
+      // می‌گذاریم. آن علامت، انیمیشنِ ورودِ لوگوی صفحهٔ ورود را آزاد می‌کند
+      // (قاعده‌اش در `splash.css` است و بدونِ این خط، لوگو روی دسکتاپ
+      // بی‌حرکت می‌ماند — یعنی حذفِ پوشش، یک رگرسیونِ خاموش می‌ساخت).
+      try { document.documentElement.setAttribute('data-booted', '1'); }
+      catch { /* در محیطِ غیرمرورگر بی‌اهمیت */ }
+      return undefined;
+    }
     if (bootGated || splashGone) return undefined;
     setSplashLeaving(true);
     // علامتِ «راه‌اندازی تمام شد» روی خودِ ریشهٔ سند.
@@ -319,7 +365,7 @@ function App() {
     catch { /* در محیطِ غیرمرورگر (تست) بی‌اهمیت */ }
     const t = setTimeout(() => setSplashGone(true), 420);
     return () => clearTimeout(t);
-  }, [bootGated, splashGone]);
+  }, [bootGated, splashGone, splashEligible]);
   useEffect(() => {
     req('/api/config', 'GET', null, null).then((d) => {
       setCfg(d);
@@ -538,7 +584,7 @@ function App() {
           مانت بماند (داده‌هایش را می‌گیرد، چانک‌هایش دانلود می‌شوند) —
           پوششِ `fixed` یعنی انتقال، «کشفِ صفحهٔ آماده» است، نه «شروعِ
           بارگذاریِ صفحه». */}
-      {!splashGone && (
+      {showSplash && (
         <SplashScreen
           stage={bootCurrent?.key || null}
           label={bootCurrent ? bootCurrent.label : ''}
