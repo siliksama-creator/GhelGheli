@@ -14,6 +14,7 @@ on:
       # `bash -n` و آزمونِ ایزولهٔ آن‌ها را اجرا می‌کند، تغییرشان هم باید
       # CI را راه بیندازد؛ وگرنه آزمون‌ها بی‌سروصدا از تغییر عقب می‌مانند.
       - 'scripts/**'
+      - 'monitor/**'
       - 'deploy/**'
       - '.github/workflows/backend-admin-ci.yml'
   pull_request:
