@@ -40,6 +40,8 @@ DELETE روی جدول فقط ردیف را می‌برد؛ فایلِ webp رو
   • `reward_tiers`       — پلکانِ جوایز (۶۳ ردیف؛ ساختار است نه دادهٔ تست)
   • `pass_tiers` / `pass_seasons` / `league_seasons` — تقویمِ فصل‌ها
   • `shop_items`         — کاتالوگِ فروشگاهِ کازمتیک
+  • `recommended_apps`   — برنامه‌های پیشنهادیِ «بیشتر» (مایگریشن ۰۹۳): همان
+    محتوایی که ادمین با پنل می‌سازد؛ پاک‌شدنش یعنی «صبحِ عرضه با بخشِ خالی»
   • `wheel_prizes`       — چیدمانِ گردونه
   • `chat_stickers`      — استیکرهایِ پیش‌فرض (چیزی که کاربر می‌فرستد در
     `chat_messages` است و آنجا پاک می‌شود؛ خودِ کاتالوگ تنظیمات است)
@@ -266,6 +268,9 @@ SELECT image_url         FROM card_types            WHERE image_url IS NOT NULL
 UNION ALL SELECT image_url FROM photo_card_designs
 UNION ALL SELECT user_image_path FROM photo_card_submissions WHERE user_image_path IS NOT NULL
 UNION ALL SELECT image_url FROM shop_items          WHERE image_url IS NOT NULL
+-- برنامه‌های پیشنهادی (مایگریشن ۰۹۳): عکسِ کارت‌های معرفی محتوای ادمین است،
+-- نه فایلِ یتیم. بدونِ این خط، اولین اجرای این ابزار همهٔ عکس‌های معرفی را پاک می‌کرد.
+UNION ALL SELECT image_url FROM recommended_apps    WHERE image_url IS NOT NULL
 UNION ALL SELECT image_url FROM reward_tiers        WHERE image_url IS NOT NULL
 UNION ALL SELECT image_url FROM reward_groups       WHERE image_url IS NOT NULL
 UNION ALL SELECT image_url FROM chat_stickers       WHERE image_url IS NOT NULL

@@ -41,6 +41,7 @@ const { normalizeMobile: _normalizeMobile, faDigits: _faDigits, anonymousNicknam
 const avatarKeys = require('./lib/avatarKeys');
 const { audit } = require('./services/auditService');
 const opsConfig = require('./services/opsConfig');
+const recommendedApps = require('./services/recommendedApps');
 const opsLimits = require('./services/opsLimits');
 const liveContent = require('./services/liveContent');
 const {
@@ -3030,6 +3031,22 @@ const cloudflareGuard = require('./services/cloudflareGuard').createCloudflareGu
 });
 app.use('/api', require('./routes/adminCloudflare')({
   adminAuth, requireRole, asyncHandler, audit, cloudflareGuard,
+}));
+
+// ═══════════════════════════════════════════════════════════════════════════
+// برنامه‌های پیشنهادی — خواستهٔ مالک (۲۶ شهریور): «یک قسمت برنامهٔ پیشنهادی
+// در قسمت (بیشتر) وب و اندروید که از پنل ادمین مدیریت بشه.»
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// یک مسیرِ عمومی (ورودیِ صفحهٔ «بیشتر») و پنج مسیرِ مدیریتی. سرویس جدا
+// تزریق می‌شود تا قواعدِ اعتبارسنجی و صفحه‌بندی، بدونِ دیتابیس هم
+// آزمایش‌شدنی باشند.
+app.use('/api', require('./routes/recommendedApps')({
+  pool, adminAuth, requireRole, asyncHandler, audit, validateUuid,
+  service: recommendedApps,
+  // `featureFlags` را همان‌جا require می‌کنیم: در این فایل جاهای دیگر هم
+  // همین الگو هست (require تنبل) و متغیرِ سراسریِ تازه نمی‌سازیم.
+  featureFlags: require('./services/featureFlags'),
 }));
 
 // ── اهرم‌های موتور (آستانه‌های تشخیص، سطح، استریک، پیام‌های آماده) ──────

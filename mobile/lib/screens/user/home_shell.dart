@@ -27,6 +27,7 @@ import 'support_page.dart';
 import 'wheel_page.dart';
 import 'referral_page.dart';
 import 'points_ledger_page.dart';
+import 'recommended_apps_page.dart';
 
 /// Root shell for the regular user app: top bar + animated page switcher +
 /// bottom navigation. Functionally identical to the legacy `HomeShell`
@@ -139,6 +140,51 @@ class _HomeShellState extends State<HomeShell>
   /// می‌شود.
   List<Map<String, dynamic>> _inventory = const [];
   List<Map<String, dynamic>> _pendingGrants = const [];
+
+  /// ── برنامه‌های پیشنهادی ───────────────────────────────────────────────
+  ///
+  /// خواستهٔ مالک (۲۶ شهریور): «یک قسمت برنامهٔ پیشنهادی در قسمت (بیشتر)
+  /// وب و اندروید... در صورتی که ادمین تیکِ فعال را زد، این قسمت در
+  /// اپلیکیشن و وب‌سایت نمایش داده بشه.»
+  ///
+  /// این پرچم تعیین می‌کند ردیفِ شیت دیده شود یا نه. **مقدارِ اولیه
+  /// `true` است** — عمداً خوش‌بینانه: تا وقتی سرور جواب نداده، یا وقتی
+  /// اینترنت قطع است، ردیف پنهان نمی‌شود. پنهان‌کردنِ محتوا به‌خاطرِ یک
+  /// قطعیِ گذرا بدهی است به کاربری که به این صفحه نیاز دارد.
+  bool _appsReady = true;
+  DateTime? _appsProbedAt;
+
+  /// آیا بخشِ «برنامه‌های پیشنهادی» روشن است و چیزی برای نشان دادن دارد؟
+  ///
+  /// یک درخواستِ کوچک (۱۰ مورد) — همان چیزی که خودِ صفحه می‌گیرد. همین
+  /// است که وعدهٔ «بدونِ نیاز به آپدیت» را واقعی می‌کند: ادمین برنامه‌ای
+  /// اضافه می‌کند و کاربر با همان نسخهٔ نصب‌شده ردیف را می‌بیند.
+  ///
+  /// ⚠️ خطای شبکه ردیف را پنهان **نمی‌کند**؛ فقط اطلاعاتِ کهنه می‌ماند.
+  Future<void> _probeApps({bool force = false}) async {
+    final last = _appsProbedAt;
+    if (!force &&
+        last != null &&
+        DateTime.now().difference(last) < const Duration(seconds: 60)) {
+      return; // تازه پرسیده‌ایم؛ شیت را شلوغ نکن
+    }
+    _appsProbedAt = DateTime.now();
+    try {
+      final res = await widget.api.get('/api/recommended-apps?page=1&per_page=10');
+      if (!mounted || res is! Map) return;
+      final m = Map<String, dynamic>.from(res);
+      final items = (m['items'] as List? ?? const []);
+      final enabled = m['enabled'] != false;
+      final info = m['page'] is Map
+          ? Map<String, dynamic>.from(m['page'] as Map)
+          : const <String, dynamic>{};
+      final total = (info['total'] as num?)?.toInt() ?? items.length;
+      final ready = enabled && total > 0;
+      if (ready != _appsReady && mounted) setState(() => _appsReady = ready);
+    } catch (_) {
+      // عمداً بی‌صدا: پیش‌کاوشِ منو هرگز نباید چیزی را بشکند یا پیام بدهد.
+    }
+  }
 
   // A subtle one-shot "welcome" entrance the moment the user lands on the
   // home shell after logging in — fades and lifts the whole shell into
@@ -294,6 +340,8 @@ class _HomeShellState extends State<HomeShell>
       // اطلاعات شخصی اسکرول می‌کرد تا ببیند امتیازش از کجا آمده.
       case ledgerIndex:
         return PointsLedgerPage(api: widget.api);
+      case recommendedAppsIndex:
+        return RecommendedAppsPage(api: widget.api);
       case inventoryIndex:
         return InventoryPage(
           items: _inventory,
@@ -342,6 +390,13 @@ class _HomeShellState extends State<HomeShell>
   ///    navigation_test قبلاً گرفت).
   static const ledgerIndex = 12;
 
+  /// شمارهٔ صفحهٔ «برنامه‌های پیشنهادی».
+  ///
+  /// ⚠️ ۱۳ = شمارهٔ آزادِ بعدی. دقیقاً مثل `ledgerIndex`، **فقط در انتها**
+  ///    اضافه می‌شود: درجِ وسط یعنی جابه‌جا شدنِ همهٔ ایندکس‌ها و RangeError
+  ///    و کرشِ کاملِ اپ (همان چیزی که navigation_test قبلاً گرفت).
+  static const recommendedAppsIndex = 13;
+
   // UI FIX: seven destinations squeezed into one bar made every icon and
   // label tiny (and the Persian labels were truncating). Material's own
   // guidance caps a navigation bar at five.
@@ -389,18 +444,23 @@ class _HomeShellState extends State<HomeShell>
   List<int> get _moreIndexes {
     // دفتر امتیازات کنارِ پروفایل می‌آید (هر دو «دادهٔ من» هستند) ولی
     // بالاتر از پشتیبانی: مالی است و بیشتر از پشتیبانی باز می‌شود.
+    // «برنامه‌های پیشنهادی» آخرِ فهرست می‌آید (هم‌تراز با وب): ردیفِ محتوایی
+    // است که ادمین می‌سازد، نه ابزارِ روزمره‌ای که هر روز باز شود.
     const defaultOrder = [
-      shopIndex, inventoryIndex, 2, referralIndex, ledgerIndex, 5, 6];
+      shopIndex, inventoryIndex, 2, referralIndex, ledgerIndex, 5, 6, recommendedAppsIndex];
     const idOf = {
       shopIndex: 'shop', inventoryIndex: 'inventory', 2: 'wallet',
       referralIndex: 'invite', ledgerIndex: 'ledger', 5: 'support',
-      6: 'profile',
+      6: 'profile', recommendedAppsIndex: 'apps',
     };
     int pos(int page) {
       final i = _tabOrder.indexOf(idOf[page]!);
       return i < 0 ? 999 : i;
     }
     final order = defaultOrder.toList()..sort((a, b) => pos(a).compareTo(pos(b)));
+    // تیکِ «فعال» در پنل، مالکِ دیده‌شدنِ این ردیف است. مقصدِ شمارهٔ ۱۳ سرِ
+    // جایش می‌ماند، پس خاموش‌کردن از پنل هیچ‌چیز را نمی‌شکند.
+    if (!_appsReady) order.remove(recommendedAppsIndex);
     return order;
   }
 
@@ -479,6 +539,14 @@ class _HomeShellState extends State<HomeShell>
       selectedIcon: Icon(Icons.receipt_long_rounded),
       label: 'دفتر امتیازات',
     ),
+    // ۱۳ — برنامه‌های پیشنهادی (خواستهٔ مالک). مثلِ ۱۲ در انتها اضافه شد؛
+    // شیتِ «بیشتر» با همین شماره در این آرایه و در `_titles` جست‌وجو
+    // می‌کند، پس بودنش اینجا اجباری است (وگرنه RangeError).
+    NavigationDestination(
+      icon: Icon(Icons.link_outlined),
+      selectedIcon: Icon(Icons.link_rounded),
+      label: 'برنامه‌های پیشنهادی',
+    ),
   ];
 
   @override
@@ -490,6 +558,9 @@ class _HomeShellState extends State<HomeShell>
     WidgetsBinding.instance.addPostFrameCallback((_) => _registerFcm());
     // پیکربندی کلاینت: درگاه نسخه + بنر اطلاعیه — بدون نیاز به آپدیت.
     unawaited(_checkClientConfig());
+    // بخشِ «برنامه‌های پیشنهادی»: اگر ادمین تیک را برداشته باشد یا هنوز
+    // برنامه‌ای ثبت نشده باشد، ردیفِ شیت نباید نمایش داده شود.
+    unawaited(_probeApps(force: true));
   }
 
   /// بنر اطلاعیهٔ مدیریتی (از /api/config) — null یعنی فعال نیست.
@@ -781,6 +852,8 @@ class _HomeShellState extends State<HomeShell>
     'گذر نبرد',
     'کلکسیون کارت‌ها',
     'دفتر امتیازات',
+    // ۱۳ — برنامه‌های پیشنهادی
+    'برنامه‌های پیشنهادی',
   ];
 
   /// متن قرصِ راهنمای اسکرول، برای هر صفحه.
@@ -803,6 +876,7 @@ class _HomeShellState extends State<HomeShell>
     9: 'محصولات بیشتری پایین‌تر است',
     10: 'پله‌های گذر نبرد پایین‌تر است',
     11: 'کارت‌های بیشتری پایین‌تر است',
+    13: 'برنامه‌های بیشتری پایین‌تر است',
   };
 
   /// Which bar slot to highlight — the "more" slot when a sheet-only page
@@ -830,6 +904,10 @@ class _HomeShellState extends State<HomeShell>
     // شیتِ «بیشتر» جایی است که کاربر دنبالِ «دفتر امتیازات» و بقیهٔ
     // صفحه‌ها می‌گردد؛ همین لحظه متن/عددِ زنده هم تازه می‌شود.
     unawaited(AppConfig.instance.refresh());
+    // و بخشِ «برنامه‌های پیشنهادی» هم: ادمین می‌تواند همان لحظه برنامه‌ای
+    // اضافه یا تیک را خاموش کرده باشد — بدونِ آپدیتِ اپ. (خفه‌کنِ ۶۰
+    // ثانیه‌ای داخلی یعنی این خط شیت را کند نمی‌کند.)
+    unawaited(_probeApps());
     final picked = await showModalBottomSheet<int>(
       context: context,
       showDragHandle: true,

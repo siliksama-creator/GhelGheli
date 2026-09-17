@@ -17,7 +17,10 @@ const OBSERVER_PAGES = new Set(['dashboard', 'support']);
 // صفحهٔ «سپرِ سرور» هم فقط مدیرکل: یک کلیک اشتباه در آن می‌تواند دسترسیِ کلِ
 // برنامه (اپ + وب + پنل) را عوض کند؛ هم‌تراز با backend که requireRole()
 // بدونِ آرگومان = فقط super_admin است.
-const SUPER_ONLY_PAGES = new Set(['admins', 'cloudflare']);
+// «برنامه‌های پیشنهادی» هم فقط مدیرکل: محتوایش در اپ و وبِ *همهٔ* کاربران
+// دیده می‌شود و لینکش کاربر را به بیرونِ اپ می‌برد؛ هم‌تراز با backend که
+// مسیرهای نوشتنِ آن `requireRole()` (فقط super_admin) دارند.
+const SUPER_ONLY_PAGES = new Set(['admins', 'cloudflare', 'recommended-apps']);
 
 /** آیا این نقش اجازهٔ دیدنِ این صفحه (کلید NAV) را دارد؟ */
 export function canSeePage(role, pageKey) {

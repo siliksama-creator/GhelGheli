@@ -45,6 +45,7 @@ photo_card_submissions
 point_transactions
 purchase_referral_commissions
 referral_earnings
+recommended_apps
 reward_groups
 reward_tier_cards
 reward_tiers

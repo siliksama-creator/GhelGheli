@@ -6,7 +6,7 @@
 // every change risky — the "stuck on a loading spinner forever" bug in the
 // league tab survived several passes precisely because it was invisible in
 // that wall of text.
-import React, { useEffect, useState, Suspense, lazy, Component } from 'react';
+import React, { useEffect, useRef, useState, Suspense, lazy, Component } from 'react';
 import { createRoot } from 'react-dom/client';
 
 // «دانلود / ورود» عمداً در `live_copy` نیست: این برچسب فقط در وب وجود
@@ -52,6 +52,8 @@ const GrowthHub = lazy(() => import('./GrowthHub.jsx'));
 const Support = lazy(() => import('./support.jsx'));
 const Wallet = lazy(() => import('./wallet.jsx'));
 const Inventory = lazy(() => import('./screens/Inventory.jsx'));
+// برنامه‌های پیشنهادی — صفحهٔ مستقل، از «بیشتر» باز می‌شود (خواستهٔ مالک).
+const RecommendedApps = lazy(() => import('./screens/RecommendedApps.jsx'));
 
 // وقتی کاربر روی تبی می‌زند، چانکش تازه دانلود می‌شود. برای اینکه آن
 // لحظه صفر حس شود، به‌محضِ بی‌کار شدنِ مرورگر چانک‌های پرتردد را از
@@ -163,6 +165,16 @@ const MORE_TABS = [
   // بود و کاربر باید وارد فرمِ ویرایشِ اطلاعات شخصی می‌شد تا ببیند امتیازش
   // از کجا آمده. آینهٔ اندروید: `ledgerIndex` در home_shell.dart.
   ['ledger', 'دفتر امتیازات', 'star'],
+  // ── برنامه‌های پیشنهادی — خواستهٔ مالک (۲۶ شهریور) ──────────────────────
+  //
+  // «در قسمت (بیشتر) وب و اندروید، از پنل ادمین مدیریت بشه؛ اگه ادمین تیکِ
+  //  فعال رو زد، این قسمت نمایش داده بشه.»
+  //
+  // ⚠️ این ردیف **همیشه** نشان داده نمی‌شود: اگر ادمین تیک را بردارد یا
+  //    هیچ برنامه‌ای ثبت نشده باشد، از فهرست حذف می‌شود (`appsReady`). آن
+  //    تشخیص با همان یک درخواستِ کوچکی است که صفحه هم استفاده می‌کند، پس
+  //    هیچ رفت‌وبرگشتِ اضافه‌ای ندارد.
+  ['apps', 'برنامه‌های پیشنهادی', 'link'],
   // دعوت دوستان قبلاً فقط از میان‌بر داشبورد باز می‌شد؛ اگر کاربر آن
   // کارت را رد می‌کرد، صفحه عملاً گم می‌شد.
   ['invite', 'دعوت دوستان', 'group'],
@@ -441,6 +453,31 @@ function Portal({ token, logout, cfg, onToken }) {
   // پس هیچ رفت‌وبرگشت اضافه‌ای ندارد.
   const [passBrief, setPassBrief] = useState(null);
   const [moreOpen, setMoreOpen] = useState(false);
+  // ── برنامه‌های پیشنهادی ────────────────────────────────────────────────
+  //
+  // `probe` همان صفحهٔ اولِ فهرست است؛ هم برای تصمیمِ «ردیفِ منو را نشان
+  // بده یا نه»، هم به‌عنوان دادهٔ اولیهٔ صفحه تا کاربر دو بار منتظر نماند.
+  // `appsReady` = بخش روشن است **و** حداقل یک برنامهٔ فعال دارد.
+  const [appsProbe, setAppsProbe] = useState(null);
+  const [appsReady, setAppsReady] = useState(false);
+  const appsProbedAt = useRef(0);
+
+  // یک‌بار در شروع، و هر بار که کاربر شیتِ «بیشتر» را باز می‌کند اگر بیش از
+  // یک دقیقه گذشته باشد. این «بدونِ آپدیت» بودن را واقعی می‌کند: ادمین
+  // برنامه اضافه می‌کند و کاربر بدونِ رفرش صفحه می‌بیندش.
+  async function probeApps(force = false) {
+    if (!force && Date.now() - appsProbedAt.current < 60_000) return;
+    appsProbedAt.current = Date.now();
+    try {
+      const data = await req('/api/recommended-apps?page=1&per_page=10', 'GET', null, null);
+      const items = Array.isArray(data?.items) ? data.items : [];
+      setAppsProbe({ enabled: data?.enabled !== false, items, page: data?.page || null });
+      setAppsReady(data?.enabled !== false && items.length > 0);
+    } catch {
+      // شبکه لرزید؟ بخش را نشان نمی‌دهیم، ولی هیچ‌چیز دیگری نمی‌شکند.
+      setAppsReady(false);
+    }
+  }
 
   async function load() {
     try {
@@ -482,6 +519,10 @@ function Portal({ token, logout, cfg, onToken }) {
   }
 
   useEffect(() => { load(); }, []);
+
+  // کاوشِ بخشِ «برنامه‌های پیشنهادی» — مستقل از ورود کاربر (مسیر عمومی است).
+  useEffect(() => { probeApps(true); // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Auto-dismiss toasts; they used to stay on screen forever and pile up.
   useEffect(() => {
@@ -584,7 +625,7 @@ function Portal({ token, logout, cfg, onToken }) {
           className={MORE_TABS.some(([id]) => id === tab) ? 'on' : ''}
           aria-haspopup="true"
           aria-expanded={moreOpen}
-          onClick={() => setMoreOpen(v => !v)}>
+          onClick={() => { setMoreOpen(v => !v); probeApps(); }}>
           <span className="navIcon">⋯</span>
           <span className="navLabel">بیشتر</span>
         </button>
@@ -597,7 +638,11 @@ function Portal({ token, logout, cfg, onToken }) {
           <div className="sheetShade" onClick={() => setMoreOpen(false)} />
           <div className="moreSheet" role="menu">
             <div className="sheetGrip" />
-            {orderByServer(MORE_TABS, t => t[0]).map(([id, label, icon]) => (
+            {orderByServer(MORE_TABS, t => t[0])
+              // ردیفِ «برنامه‌های پیشنهادی» فقط وقتی می‌آید که واقعاً چیزی
+              // برای نشان دادن باشد — وگرنه کاربر صفحهٔ خالی باز می‌کند.
+              .filter(([id]) => id !== 'apps' || appsReady)
+              .map(([id, label, icon]) => (
               <button key={id} role="menuitem"
                 className={tab === id ? 'on' : ''}
                 onClick={() => { setTab(id); setMoreOpen(false); }}>
@@ -634,6 +679,7 @@ function Portal({ token, logout, cfg, onToken }) {
           invite: 'راهنمای دعوت پایین‌تر است',
           shop: 'محصولات بیشتری پایین‌تر است',
           inventory: 'کارت‌های بیشتری پایین‌تر است',
+          apps: 'برنامه‌های بیشتری پایین‌تر است',
           profile: 'تنظیمات پایین‌تر است',
           support: 'تیکت‌ها پایین‌ترند',
           pass: 'پله‌های بیشتری پایین‌تر است',
@@ -657,6 +703,12 @@ function Portal({ token, logout, cfg, onToken }) {
         )}
         {tab === 'ledger' && (
           <Ledger token={token} setMsg={setMsg} />
+        )}
+        {tab === 'apps' && (
+          <RecommendedApps
+            initial={appsProbe}
+            onAvailability={(info) => setAppsReady(!!info?.enabled && Number(info?.total || 0) > 0)}
+          />
         )}
         {tab === 'profile' && (
           <Profile token={token} p={p} load={load} setMsg={setMsg} onToken={onToken} />

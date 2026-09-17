@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, Suspense, lazy, Component } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BarChart3, Bell, BookText, Coins, Gift, MessageCircle, LifeBuoy, ScanLine, Settings, Shield, ShieldCheck, Sigma, Trophy, Users, Gamepad2, Wallet, Activity, CircleDot, Package, Store, Layers, Target, SlidersHorizontal, Megaphone } from 'lucide-react';
+import { BarChart3, Bell, BookText, Coins, Gift, MessageCircle, LifeBuoy, ScanLine, Settings, Shield, ShieldCheck, Sigma, Trophy, Users, Gamepad2, Wallet, Activity, CircleDot, Package, Store, Layers, Target, SlidersHorizontal, Megaphone, Smartphone } from 'lucide-react';
 
 import './theme.css';
 import './styles.css';
@@ -51,6 +51,9 @@ const MissionsPage = lazy(() => import('./pages/missions.jsx').then(m => ({ defa
 const CustomMissionPage = lazy(() => import('./pages/custom-mission.jsx').then(m => ({ default: m.CustomMissionPage })));
 // سپرِ سرور (کلادفلر) — خواستهٔ مالک: آماده بماند، با تأیید روشن شود.
 const CloudflarePage = lazy(() => import('./pages/cloudflare.jsx').then(m => ({ default: m.CloudflarePage })));
+// برنامه‌های پیشنهادی — خواستهٔ مالک (۲۶ شهریور): «در قسمت (بیشتر) وب و
+// اندروید، از پنل ادمین مدیریت بشه.»
+const RecommendedAppsPage = lazy(() => import('./pages/recommended-apps.jsx').then(m => ({ default: m.RecommendedAppsPage })));
 const EnginePage = lazy(() => import('./pages/engine.jsx').then(m => ({ default: m.EnginePage })));
 
 // ── ErrorBoundary برای جلوگیری از صفحه سیاه ──────────────────────────────
@@ -185,6 +188,14 @@ const NAV = [
     'talk'],
   ['settings', 'تنظیمات', Settings, SettingsPage,
     'تنظیمات چت و پیامک + تنظیمات اپ: نسخهٔ اجباری، بنر اطلاعیه و چیدمان تب‌ها.',
+    'config'],
+  // ── برنامه‌های پیشنهادی — گروهِ «پیکربندیِ متن و اپ» ─────────────────────
+  //
+  // چرا این گروه: دقیقاً همان وعدهٔ گروه است — «محتوایی که بدونِ آپدیتِ اپ
+  // عوض می‌شود». کنارِ «متن‌های زنده» می‌نشیند چون هر دو از یک جنس‌اند:
+  // محتوای زنده‌ای که کاربر در وب و اندروید می‌بیند.
+  ['recommended-apps', 'برنامه‌های پیشنهادی', Smartphone, RecommendedAppsPage,
+    'کادرهای معرفیِ برنامه/سایت در بخشِ «بیشتر» اپ و وب — با عکس، توضیح و لینک؛ بدونِ نیاز به انتشار نسخهٔ تازه.',
     'config'],
   ['live-copy', 'متن‌های زنده', BookText, LiveCopyPage,
     'هرچه کاربر در وب و اندروید می‌خواند: جمله‌ها و عددهایش، با پیش‌نمایشِ زنده و بازگردانی.',

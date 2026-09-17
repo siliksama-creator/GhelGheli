@@ -240,7 +240,7 @@ export function SettingsPage({ request }) {
             <Input
               dir="ltr"
               value={(client.tabOrder || []).join(', ')}
-              placeholder="home, rewards, league, social, shop, inventory, wallet, invite, support, profile"
+              placeholder="home, rewards, league, social, shop, inventory, wallet, invite, support, profile, ledger, apps"
               onChange={e => setClient({
                 ...client,
                 tabOrder: e.target.value.split(',').map(x => x.trim()).filter(Boolean),
