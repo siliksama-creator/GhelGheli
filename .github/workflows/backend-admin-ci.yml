@@ -27,6 +27,24 @@ jobs:
       # Rules + engine tests (matchmaking, bots, turn order, and the hostile
       # payload fuzz that guards against socket handlers crashing the API).
       - run: npm test
+      # ── اسکریپت‌های ظرفیت ──
+      #
+      # چرا اینجا: این اسکریپت‌ها روی **سرورِ واقعی** به upstreamِ nginx و
+      # پروفایلِ PM2 دست می‌زنند. اولین اجرای واقعی‌شان یک باگ داشت که سایت
+      # را در وضعیتِ «سرو می‌کند ولی reload نمی‌شود» گذاشت — یعنی تا اولین
+      # reload/ری‌استارت همه‌چیز عادی به نظر می‌رسید. آزمونِ زیر روی
+      # شبیه‌سازها اجرا می‌شود (nginx/systemctl/pm2 جعلی) و به هیچ سرویسِ
+      # واقعی دست نمی‌زند، ولی هر چهار مسیرِ خطرناک را می‌سنجد: مهاجرت،
+      # بازگشت پس از شکست، اجرای بی‌تغییر، و سناریوی ارتقا/تنزلِ سخت‌افزار.
+      - run: |
+          cd ..
+          bash -n scripts/capacity-apply.sh
+          bash -n scripts/capacity-install.sh
+          bash -n scripts/test-capacity-apply.sh
+          bash scripts/test-capacity-apply.sh
+      # پردازشِ عکس: «قبل در برابر بعد» — بایت‌به‌بایت بودنِ فایلِ اصلی،
+      # ابعادِ thumbnail‌ها، سرعت، و اینکه سقفِ هم‌زمانی رعایت می‌شود.
+      - run: node scripts/test-image-pipeline.js
 
   # ═══════════════════════════════════════════════════════════════════════
   # تستِ سرتاسری روی یک سرورِ واقعی
