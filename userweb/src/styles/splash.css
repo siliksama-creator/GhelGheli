@@ -1,0 +1,344 @@
+/* ═══ صفحهٔ بارگذاری ══════════════════════════════════════════════════════
+   هم‌زادِ mobile/lib/screens/auth/splash_screen.dart. هر عدد و هر رنگِ اینجا
+   یک معادلِ دقیق در آن فایل دارد؛ اگر یکی عوض شد، دیگری هم باید عوض شود.
+
+   WHY A FIXED FULL-SCREEN LAYER AND NOT A ROUTE: صفحهٔ بارگذاری یک «صفحه»
+   نیست، یک **پوشش** است. اپ زیرش می‌تواند کامل مانت شده باشد و داده‌هایش را
+   بگیرد (چانک‌های صفحهٔ خانه حتی پیش از تمام‌شدنِ نوار دانلود می‌شوند)؛
+   فقط رویش کشیده شده. اگر مسیر (route) بود، اپ زیرش وجود نداشت و هر
+   انتقالی یک «بارگذاریِ دوم» می‌ساخت.
+
+   اصلِ راهنما: رنگِ پس‌زمینه مو‌به‌مو همان #060D18 اسپلشِ سیستمی و اپ
+   اندروید است. یک درجه اختلاف، در لحظهٔ ورود مثلِ چشمک زدن دیده می‌شود. */
+
+.splashRoot {
+  position: fixed;
+  inset: 0;
+  /* بالاتر از هر چیزی که اپ می‌سازد، ولی پایین‌تر از دیالوگ‌های
+     `position: fixed` با z-index بالاتر اگر روزی اضافه شدند. */
+  z-index: 9000;
+  /* ⚠️ `pointer-events: none` — عمدی، و دلیلش دو چیز است:
+     (۱) این پوشش **تزئینی** است و هیچ چیزی برای کلیک ندارد. یک لایهٔ
+     تمام‌صفحه که کلیک را می‌بلعد، در پنجرهٔ کوتاهی که خودش هست، هیچ کاری
+     برای کاربر نمی‌کند جز «چیزی که زدم کار نکرد».
+     (۲) ابزارِ نگهبانِ تایپوگرافی (`tool/typography.mjs`) روی هر عنصرِ
+     تعاملی `elementFromPoint` می‌زند تا مطمئن شود زیرِ چیزی پنهان نشده. یک
+     پوششِ تمام‌صفحه که کلیک را می‌گیرد، از دیدِ آن ابزار یعنی «۹ دکمهٔ
+     صفحهٔ ورود قابل دسترسی نیستند» — قرمزِ کاذبی که باعث می‌شود آدم‌ها
+     کلِ خروجیِ ابزار را نادیده بگیرند.
+     استثنا: کارتِ خرابی که پایین `pointer-events: auto` می‌گیرد؛ آنجا
+     کاربر واقعاً باید دکمه بزند. */
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #060d18;
+  overflow: hidden;
+  /* ورود/خروجِ نرمِ خودِ پوشش؛ کلاسِ خروج را App می‌گذارد. */
+  animation: splashIn 240ms ease-out both;
+  direction: rtl;
+}
+.splashRoot.isLeaving {
+  animation: splashOut 420ms cubic-bezier(.4, 0, .2, 1) both;
+  pointer-events: none;
+}
+@keyframes splashIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes splashOut {
+  from { transform: scale(1);      opacity: 1; }
+  to   { transform: scale(1.045);  opacity: 0; }
+}
+
+/* ═══ مورفِ قهرمان به جایگاهش در صفحهٔ ورود ═══════════════════════════════
+   اندازه‌گیریِ واقعی در مرورگر (۴۰۰×۸۶۰، حالتِ مهمان):
+       اسپلش:  لوگو در y≈۲۵۵ تا ۴۵۰، عرض ۲۴۸
+       ورود:   لوگو در y≈۰ تا ۲۴۱،  عرض ۲۹۱
+   یعنی حدود ۲۳۰ پیکسل فاصله و ۱۷٪ اختلافِ اندازه. بدونِ این انیمیشن، کاربر
+   یک «پرش» بین دو صفحه می‌دید؛ با آن، همان نشان از وسط بلند می‌شود و
+   جایی می‌نشیند که صفحهٔ بعد منتظرش است.
+
+   چرا `vh` و نه پیکسلِ ثابت: جایگاهِ هر دو لوگو با ارتفاعِ پنجره مقیاس
+   می‌گیرد (چیدمانِ ستونیِ صفحهٔ ورود هم بالا-چین است). ۲۶vh روی ۸۶۰
+   می‌شود ۲۲۴ پیکسل — همان مسیر.
+
+   ⚠️ چون این حرکت **هم‌زمان با محوشدن** اجرا می‌شود، مقصد لازم نیست
+   پیکسلی دقیق باشد؛ در پایانِ انیمیشن شفافیت صفر است. */
+.splashMarkWrap {
+  /* لایهٔ خنثی در حالتِ عادی؛ فقط ظرفِ مورفِ خروج است. */
+  will-change: transform;
+  /* ⚠️ `margin-top: auto` باید روی خودِ آیتمِ فلکس باشد، نه روی فرزندش.
+     نسخهٔ اولِ این تغییر، آن را روی `.splashMark` گذاشت و قهرمان ۲۰۰ پیکسل
+     بالا پرید (اندازه‌گیری شد: top از ۲۵۴ به ۴۹ رفت) — چون auto-margin
+     داخلِ یک ظرفِ بلوکی هیچ اثری بر چیدمانِ فلکسِ بیرونی ندارد. */
+  margin-top: auto;
+}
+.splashRoot.isLeaving .splashMarkWrap {
+  animation: splashHandoff 420ms cubic-bezier(.4, 0, .2, 1) both;
+}
+@keyframes splashHandoff {
+  from { transform: translateY(0)     scale(1); }
+  to   { transform: translateY(-26vh) scale(1.17); }
+}
+
+/* ═══ «نشان به داخلِ صفحهٔ ورود می‌رود» ═══════════════════════════════════
+   روی وب، صفحهٔ ورود از فریمِ اول زیرِ این پوشش **مانت‌شده** است (که عمدی
+   است: انتقال باید «کشفِ صفحهٔ آماده» باشد، نه شروعِ بارگذاریِ دوباره).
+   ولی همین یعنی انیمیشنِ ورودِ خودِ نشان (`heroSettle`) هم از فریمِ اول
+   بازی می‌شود و وقتی پوشش محو می‌شود، کاربر یک لوگوی **ایستا** می‌بیند —
+   یعنی همان لحظهٔ «نشستنِ» برند، که کلِ دلیلِ ساختِ این توالی است، گم
+   می‌شود.
+
+   راه‌حل: تا وقتی `data-booted` نگذاشته‌ایم، انیمیشنِ نشان متوقف (paused)
+   است. با اولین فریمِ خروجِ پوشش، `main.jsx` آن صفت را می‌گذارد و نشان
+   همان لحظه شروع می‌کند به نشستن — پس لوگو از صفحهٔ بارگذاری به جای
+   خودش در صفحهٔ ورود «منتقل» می‌شود، نه اینکه دوباره از صفر بیاید. */
+html:not([data-booted]) .heroMark {
+  /* بدونِ انیمیشن = دقیقاً حالتِ نشسته (بدونِ تبدیل، شفافیتِ کامل). پنهان
+     زیرِ پوشش است، پس دیده نمی‌شود؛ مهم فقط لحظهٔ برداشتنِ پوشش است. */
+  animation: none;
+}
+html[data-booted] .heroMark {
+  /* و از آن لحظه، فقط شناوریِ آرام. ورودِ `heroSettle` عمداً اجرا **نمی‌شود**:
+     نقشش را قهرمانِ صفحهٔ بارگذاری بازی کرده و همان نشان، همان‌جا فرود آمده
+     است. اگر دوباره از صفر اجرا می‌شد، لوگو یک‌بار دیگر از کوچک به بزرگ
+     می‌رفت و کاربر دو ورودِ پشتِ‌سرهم برای یک لوگو می‌دید.
+     (این قاعده از `.heroMark` پایین‌تر در همین فایل قوی‌تر است: یک انتخابگرِ
+     صفت + کلاس در برابر یک کلاس.) */
+  animation: heroFloat 6s ease-in-out 1s infinite;
+}
+
+/* ── نورافکن‌ها ──
+   دو مخروطِ کم‌رنگ و **نامتقارن**. تقارنِ کامل ریاضی به‌نظر می‌رسد؛ دو
+   نورافکنِ واقعی هیچ‌وقت دقیقاً هم‌شدت نیستند. نسخهٔ اول (پررنگ‌تر و
+   باریک‌تر) روی هم یک «V» درشت می‌ساخت که بیشتر شبیهِ نشانِ یک برندِ
+   دیگر بود تا نورِ ورزشگاه. */
+.splashStadium {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.splashCone {
+  position: absolute;
+  top: -6%;
+  width: 46vw;
+  height: 112%;
+  filter: blur(6px);
+  animation: splashBreathe 9s ease-in-out infinite;
+}
+.splashConeA {
+  left: 2%;
+  transform: rotate(11deg);
+  background: linear-gradient(to bottom, #00d49a26, transparent 78%);
+}
+.splashConeB {
+  right: 2%;
+  transform: rotate(-9deg);
+  background: linear-gradient(to bottom, #00d49a1c, transparent 82%);
+  animation-delay: -3s;
+}
+@keyframes splashBreathe {
+  0%, 100% { opacity: .7; }
+  50%      { opacity: 1; }
+}
+
+/* ── غبارِ چمن ── */
+.splashDust {
+  position: absolute;
+  inset: 0;
+}
+.splashDust i {
+  position: absolute;
+  bottom: -4%;
+  border-radius: 50%;
+  opacity: 0;
+  animation-name: splashRise;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+@keyframes splashRise {
+  0%   { transform: translateY(0);      opacity: 0; }
+  12%  { opacity: .34; }
+  88%  { opacity: .18; }
+  100% { transform: translateY(-108vh); opacity: 0; }
+}
+
+/* ── چیدمانِ ستونی ── */
+.splashStack {
+  position: relative;
+  z-index: 2;
+  width: min(560px, 100%);
+  height: 100%;
+  padding: 6vh 24px 3vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+/* ── قهرمان ── */
+.splashMark {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* پرش از همان اندازهٔ کوچکِ «قابِ اولِ آشنا» شروع می‌شود و به اندازهٔ
+     نهایی می‌رسد؛ همان دلیلی که در موبایل ۰٫۶۲ برای مقیاسِ شروع گذاشته
+     شد: اسپلشِ سیستمی/فریمِ اولِ مرورگر لوگو را کوچک نشان می‌دهد و پرشِ
+     اندازه بینِ این دو، لرزش خوانده می‌شود. */
+  animation: splashHop 1.15s cubic-bezier(.2, .8, .3, 1) both;
+}
+/* لهیدگی و کشیدگیِ کارتونی — ۷٪ و ۱۰٪. بیش از این، لوگو به لاستیکِ
+   کشیده تبدیل می‌شود. */
+@keyframes splashHop {
+  0%   { transform: translateY(0)    scale(.62, .70); }
+  12%  { transform: translateY(0)    scale(.68, .60); }
+  42%  { transform: translateY(-26px) scale(1.02, 1.14); }
+  68%  { transform: translateY(0)    scale(1.06, .90); }
+  86%  { transform: translateY(0)    scale(.98, 1.03); }
+  100% { transform: translateY(0)    scale(1, 1); }
+}
+.splashMark.isReduced { animation: none; }
+
+/* `heroMark` خودش ورود و شناوری دارد؛ اینجا فقط اندازهٔ قهرمان و شناوری
+   بعد از پرش را می‌خواهیم. ورودِ خودش خاموش می‌شود چون پرشِ بالا
+   جایش را گرفته — دو انیمیشنِ ورودِ هم‌زمان روی یک عنصر، همدیگر را
+   خنثی می‌کنند. */
+.splashMark .heroMark {
+  animation: heroFloat 6s ease-in-out 1.2s infinite;
+}
+.splashMark.isReduced .heroMark { animation: none; }
+.splashMark .heroMark img {
+  width: min(300px, 62vw);
+  filter: drop-shadow(0 22px 44px #000a);
+}
+/* درخششِ نرم پشتِ لوگو، هم‌زادِ «هالهٔ نفس‌کشندهٔ» موبایل. */
+.splashGlow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(420px, 86vw);
+  height: min(330px, 68vw);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  background: radial-gradient(closest-side, #b5ef581f, #00d49a10 48%, transparent 74%);
+  animation: heroBreathe 7s ease-in-out infinite;
+}
+
+/* ── پیام ── */
+.splashNotice {
+  margin-top: 38px;
+  min-height: 52px;
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+.splashLabel {
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 700;
+  line-height: 1.7;
+  color: #ffffffde;
+}
+
+/* کارتِ خرابی — **هرگز** کاربر را قفل نمی‌کند. */
+.splashFailCard {
+  /* تنها جای کلیک‌شدنیِ این صفحه. */
+  pointer-events: auto;
+  width: min(400px, 100%);
+  padding: 14px 16px 12px;
+  border-radius: 16px;
+  background: #0e1727;
+  border: 1px solid #ffc94d57;
+}
+.splashFailCard p {
+  margin: 0 0 10px;
+  font-size: 14.5px;
+  font-weight: 700;
+  line-height: 1.7;
+  color: #ffffffe6;
+}
+.splashFailBtns {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.splashFailBtns button {
+  padding: 9px 18px;
+  border-radius: 11px;
+  font-size: 13.5px;
+  font-weight: 800;
+  background: #ffffff0d;
+  color: #ffffffc7;
+  border: 0;
+  cursor: pointer;
+}
+.splashFailBtns button.main {
+  background: #00d49a29;
+  color: #00d49a;
+}
+
+/* ── نوارِ پیشرفت ──
+   زمرد → لیمویی → طلایی: مسیرِ خودِ بازی (کارت، امتیاز، جایزه). */
+.splashBar {
+  position: relative;
+  margin-top: auto;
+  width: min(300px, 78vw);
+  height: 7px;
+  border-radius: 99px;
+  background: #ffffff12;
+  overflow: hidden;
+}
+.splashBarFill {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #00d49a, #9be86b 55%, #ffc94d);
+  box-shadow: 0 0 10px #00d49a4d;
+  transition: width 420ms cubic-bezier(.33, 1, .68, 1);
+}
+.splashPct {
+  margin: 14px 0 0;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: .5px;
+  color: #ffffff80;
+  font-variant-numeric: tabular-nums;
+}
+.splashFoot {
+  margin: 26px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff61;
+}
+
+/* ── «کاهش حرکت» ──
+   نه پرشی، نه ذره‌ای، نه نورافکنی، نه هاله‌ای. فقط قابِ نهاییِ ثابت و
+   نوارِ پیشرفت که مستقیم می‌پرد. الزامِ WCAG 2.3.3 — و برای کسی که اختلال
+   دهلیزی دارد، تفاوتِ بینِ یک صفحهٔ قابل استفاده و یک صفحهٔ آزاردهنده. */
+@media (prefers-reduced-motion: reduce) {
+  .splashRoot,
+  .splashRoot.isLeaving,
+  .splashMarkWrap,
+  .splashMark,
+  .splashMark .heroMark,
+  .splashGlow,
+  .splashCone,
+  .splashDust i,
+  .splashMark .heroSweep,
+  .splashMark .heroGlint {
+    animation: none !important;
+  }
+  .splashBarFill { transition: none; }
+}
+
+/* روی گوشیِ کوتاه (۳۶۰×۶۴۰) ارتفاع کم است؛ فاصله‌ها کوچک می‌شوند تا نوار و
+   پیام بیرون نزنند. */
+@media (max-height: 700px) {
+  .splashNotice { margin-top: 24px; min-height: 44px; }
+  .splashMark .heroMark img { width: min(230px, 54vw); }
+  .splashFoot { margin-top: 16px; }
+}

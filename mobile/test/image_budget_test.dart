@@ -309,14 +309,20 @@ void main() {
       expect(decl.contains('- assets/splash/\n'), isFalse,
           reason: 'کل پوشهٔ splash نباید بندل شود — splash_logo.png '
               'فقط ورودی بیلد است');
-      // ولی این یکی واقعاً در زمان اجرا کشیده می‌شود.
-      // نسخهٔ webp بندل می‌شود (۲۲۸KB → ۳۶KB). فایل png کنارش می‌ماند
-      // چون ورودی flutter_native_splash است، ولی بندل نمی‌شود.
-      expect(decl.contains('assets/splash/splash_android12.webp'), isTrue,
-          reason: 'splash_screen.dart این را می‌کشد؛ بدونش صفحهٔ لودینگ '
-              'خالی می‌شود');
+      // ── ادعای معکوس‌شده (۲۷ شهریور) ──
+      //
+      // این تست قبلاً می‌گفت «webp باید بندل شود چون splash_screen.dart
+      // آن را می‌کشد». آن جمله دیگر درست نیست: صفحهٔ لودینگ بازنویسی شد و
+      // قهرمانش لوگوی برند (`assets/brand/logo_large.webp`) است. نگه‌داشتنِ
+      // ادعای قدیمی یعنی مجبور کردنِ کد به بندل‌کردنِ ۳۶ کیلوبایت فایلِ
+      // بی‌مصرف — و بدتر، تستی که یک واقعیتِ نادرست را قفل می‌کند.
+      //
+      // حالا هر دو نسخه فقط ورودیِ بیلدند (png ورودیِ flutter_native_splash،
+      // webp مرجعش)، و هیچ‌کدام بندل نمی‌شوند.
+      expect(decl.contains('assets/splash/splash_android12.webp'), isFalse,
+          reason: 'هیچ‌جا کشیده نمی‌شود — نباید در APK باشد');
       expect(decl.contains('assets/splash/splash_android12.png'), isFalse,
-          reason: 'png فقط ورودی بیلد است — نسخهٔ webp بندل می‌شود');
+          reason: 'png فقط ورودی بیلد است');
     });
 
     test('اسپلش تصویر تیرهٔ تکراری اعلام نمی‌کند', () {

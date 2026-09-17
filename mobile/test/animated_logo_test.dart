@@ -86,6 +86,47 @@ void main() {
       expect(opacity.opacity, 1.0);
     });
 
+    testWidgets('ورودِ بازیگوش: رشد می‌کند، می‌پرد و کشسان می‌نشیند',
+        (tester) async {
+      // خواستهٔ مالک (۲۷ شهریور) برای صفحهٔ بارگذاری. سه چیزی که این تست
+      // قفل می‌کند، همان سه چیزی است که «کارتونی» را از «بزرگ‌شدنِ ساده»
+      // جدا می‌کند:
+      await tester.pumpWidget(_wrap(const AnimatedLogo(
+        width: 200,
+        asset: 'assets/brand/logo_large.webp',
+        entrance: LogoEntrance.playful,
+        cacheWidth: 780,
+      )));
+
+      final first = tester.getRect(find.byType(Image).first);
+      await tester.pump(const Duration(milliseconds: 300));
+      final airborne = tester.getRect(find.byType(Image).first);
+      await tester.pump(const Duration(milliseconds: 700));
+      final settled = tester.getRect(find.byType(Image).first);
+
+      // ۱) از اندازهٔ کوچکِ «قابِ اولِ آشنا» شروع می‌شود و بزرگ می‌شود.
+      //    اگر کسی حالت را به نشستن برگرداند، اینجا قرمز می‌شود.
+      expect(airborne.width, greaterThan(first.width),
+          reason: 'پرشِ بازیگوش باید لوگو را بزرگ کند');
+      // ۲) در اوجِ پرش از جای خودش بلند می‌شود (بالاتر از حالتِ نشسته).
+      expect(airborne.top, lessThan(settled.top),
+          reason: 'در اوجِ پرش باید بالاتر از حالتِ نهایی باشد');
+      // ۳) و در آخر روی همان اندازهٔ نهایی می‌نشیند، نه بزرگ‌تر.
+      expect(settled.width, closeTo(200, 6),
+          reason: 'بعد از نشستن، عرض باید همان عرضِ خواسته‌شده باشد');
+    });
+
+    testWidgets('ورودِ بازیگوش با «کاهش حرکت» آدم را نمی‌ترساند',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        const AnimatedLogo(width: 200, entrance: LogoEntrance.playful),
+        reduceMotion: true,
+      ));
+      final a = tester.getRect(find.byType(Image).first);
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(tester.getRect(find.byType(Image).first), a);
+    });
+
     testWidgets('کنترلرها نشتی ندارند', (tester) async {
       await tester.pumpWidget(_wrap(const AnimatedLogo(width: 200)));
       await tester.pump(const Duration(milliseconds: 400));

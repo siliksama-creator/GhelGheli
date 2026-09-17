@@ -35,12 +35,27 @@ import 'package:flutter/rendering.dart';
 /// PERFORMANCE. The image is decoded once and reused by all passes. The sweep
 /// and the sparkles are painted with a shader and a handful of circles, not
 /// with extra Image widgets, so the whole thing is one texture upload.
+/// حالتِ ورودِ لوگو به صفحه.
+enum LogoEntrance {
+  /// نشستن با وزن: کمی بزرگ‌تر از اندازهٔ نهایی می‌آید و آرام جا می‌افتد.
+  /// پیش‌فرض، و همان چیزی که صفحهٔ ورود از قبل داشت.
+  settle,
+
+  /// پرشِ بازیگوش — خواستهٔ مالک (۲۷ شهریور) برای صفحهٔ بارگذاری:
+  /// اول خودش را جمع می‌کند (آماده‌شدن)، بعد بالا می‌پرد و کشیده می‌شود،
+  /// با زمین‌خوردن پَهن می‌شود و در آخر جا می‌افتد. همان «لهیدگی و
+  /// کشیدگیِ» کارتونی که یک شخصیتِ براقِ مثلِ قلقلی حقش است.
+  playful,
+}
+
 class AnimatedLogo extends StatefulWidget {
   const AnimatedLogo({
     super.key,
     this.width = 240,
     this.asset = 'assets/brand/logo.webp',
     this.intro = true,
+    this.entrance = LogoEntrance.settle,
+    this.cacheWidth,
   });
 
   final double width;
@@ -49,6 +64,16 @@ class AnimatedLogo extends StatefulWidget {
   /// Play the entrance. Off for places where the logo is already on screen
   /// (the drawer header), so it does not re-animate on every rebuild.
   final bool intro;
+
+  final LogoEntrance entrance;
+
+  /// هینتِ رمزگشایی.
+  ///
+  /// بدونِ آن، یک داراییِ ۱۱۳۰ پیکسلی روی صفحهٔ اول کامل رمزگشایی می‌شود
+  /// (۱۱۳۰×۸۸۳×۴ ≈ ۴ مگابایت) — گران‌ترین بیت‌مپِ کلِ اپ، دقیقاً در
+  /// لحظه‌ای که موتور مشغولِ گرم‌کردن است. هر فراخوان اندازهٔ خودش را
+  /// می‌دهد تا فقط همان‌قدر رمزگشایی شود که کشیده می‌شود.
+  final int? cacheWidth;
 
   @override
   State<AnimatedLogo> createState() => _AnimatedLogoState();
@@ -83,6 +108,113 @@ class _AnimatedLogoState extends State<AnimatedLogo>
       weight: 38,
     ),
   ]).animate(_intro);
+
+  // ── قوسِ پرشِ بازیگوش ──────────────────────────────────────────────────
+  //
+  // ⚠️ چرا از ۰٫۹۶ (اندازهٔ نشسته) شروع می‌شود و نه از یک لوگوی از پیش
+  //    بزرگ: فریمِ اولِ فلاتر باید همان چیزی را نشان بدهد که اسپلشِ
+  //    سیستمی نشان داده بود. یک پرشِ ناگهانی از «کوچک» به «خیلی بزرگ»
+  //    بینِ این دو فریم، همان لرزشی است که این پروژه قبلاً یک‌بار
+  //    هزینه‌اش را داده (`splash_screen.dart`، بندِ ۱). پس پرش از
+  //    همان‌جا شروع می‌شود و **به** اندازهٔ بزرگ می‌رسد.
+  /// قوسِ رشدِ حالتِ بازیگوش.
+  ///
+  /// از ۰٫۶۲ شروع می‌شود، نه از یک: اسپلشِ سیستمیِ اندروید همان لوگو را
+  /// کوچک و وسطِ صفحه نشان می‌دهد (شبکهٔ آیکونِ اندروید ۱۲ حدود ۱۲۶dp
+  /// محتوا می‌دهد). اینجا هم از همان اندازهٔ آشنا شروع می‌کنیم و به اندازهٔ
+  /// قهرمان می‌رسیم؛ تفاوتِ اندازه به‌جای «پرشِ ناگهانی»، به یک **بازشدنِ
+  /// طراحی‌شده** تبدیل می‌شود. عددِ ۰٫۶۲ از نسبتِ ۱۶۱/۲۶۰ می‌آید.
+  late final Animation<double> _playfulScale = TweenSequence<double>([
+    TweenSequenceItem(tween: Tween(begin: 0.62, end: 0.58), weight: 14),
+    TweenSequenceItem(
+      tween: Tween(begin: 0.58, end: 1.09)
+          .chain(CurveTween(curve: Curves.easeOutCubic)),
+      weight: 40,
+    ),
+    TweenSequenceItem(
+      tween: Tween(begin: 1.09, end: 0.95)
+          .chain(CurveTween(curve: Curves.easeInCubic)),
+      weight: 22,
+    ),
+    TweenSequenceItem(
+      tween: Tween(begin: 0.95, end: 1.0)
+          .chain(CurveTween(curve: Curves.elasticOut)),
+      weight: 24,
+    ),
+  ]).animate(_intro);
+
+  /// مقیاسِ جاری: نشستن یا بازیگوش.
+  double get _scaleValue =>
+      (widget.intro && widget.entrance == LogoEntrance.playful)
+          ? _playfulScale.value
+          : _scale.value;
+
+  /// شفافیتِ جاری.
+  ///
+  /// در حالتِ بازیگوش **محوشدگیِ ورودی نداریم**. دو دلیل:
+  ///   ۱. بینِ اسپلشِ سیستمی و اولین فریمِ ما نباید لحظه‌ای صفحه خالی شود؛
+  ///      با محوشدگی، لوگویی که کاربر همین حالا دیده بود ناپدید می‌شد و
+  ///      بعد از نو می‌آمد — همان چیزی که به‌عنوان «لرزش» خوانده می‌شود.
+  ///   ۲. پرش و رشد به‌تنهایی ورود را می‌سازند؛ محوشدگی روی آن‌ها فقط
+  ///      حرکت را کم‌رنگ می‌کند.
+  double get _opacity =>
+      (widget.intro && widget.entrance == LogoEntrance.playful)
+          ? 1.0
+          : _fade.value;
+
+  /// دامنهٔ شناوریِ دائمی.
+  ///
+  /// در حالتِ نشستن، لوگو روی هوا شنا می‌کند (۹ پیکسل). در حالتِ بازیگوش
+  /// شناوری خاموش است، چون پرش از قبل زمین را ترک کرده و جمعِ آن دو حرکت
+  /// را بی‌وزن می‌کند: بیننده نمی‌فهمد شخصیت کجا فرود آمده.
+  double get _floatAmp =>
+      (widget.intro && widget.entrance == LogoEntrance.playful) ? 0.0 : 1.0;
+
+  late final Animation<double> _hop = TweenSequence<double>([
+    // ۱) آماده‌شدن: ته‌نشستنِ کوچک، مثلِ کسی که می‌خواهد بپرد.
+    TweenSequenceItem(tween: Tween(begin: 0.0, end: -0.06), weight: 16),
+    // ۲) پرشِ بالا + کمی بلندتر از مقصد (اوجِ قوس).
+    TweenSequenceItem(
+      tween: Tween(begin: -0.06, end: -1.0)
+          .chain(CurveTween(curve: Curves.easeOutQuad)),
+      weight: 30,
+    ),
+    // ۳) فرود با شتابِ جاذبه.
+    TweenSequenceItem(
+      tween: Tween(begin: -1.0, end: 0.0)
+          .chain(CurveTween(curve: Curves.easeInCubic)),
+      weight: 26,
+    ),
+    // ۴) بازیابیِ کشسان بعد از فرود.
+    TweenSequenceItem(
+      tween: Tween(begin: 0.0, end: 0.0)
+          .chain(CurveTween(curve: Curves.elasticOut)),
+      weight: 28,
+    ),
+  ]).animate(_intro);
+
+  /// کشیدگی: در اوجِ پرش بلند و باریک، در فرود پَهن و کوتاه.
+  ///
+  /// این همان «squash & stretch» کارتونی است و دلیلِ اصلیِ اینکه حرکت
+  /// زنده به‌نظر می‌رسد به‌جای اینکه فقط «بزرگ شود». نسبت‌ها کوچک‌اند
+  /// (۷٪ و ۱۰٪): بیش از این، لوگو به لاستیکِ کشیده تبدیل می‌شود.
+  late final Animation<double> _stretch = TweenSequence<double>([
+    TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.88), weight: 16),
+    TweenSequenceItem(tween: Tween(begin: 0.88, end: 1.14), weight: 30),
+    TweenSequenceItem(tween: Tween(begin: 1.14, end: 0.90), weight: 26),
+    TweenSequenceItem(
+      tween: Tween(begin: 0.90, end: 1.0)
+          .chain(CurveTween(curve: Curves.elasticOut)),
+      weight: 28,
+    ),
+  ]).animate(_intro);
+
+  /// کج‌شدنِ کوچکِ وسطِ پرش — همان نگاهِ شیطونی که در شخصیت هست.
+  /// ۲٫۴ درجه: دیده می‌شود، ولی به‌عنوانِ خطای چیدمان خوانده نمی‌شود.
+  late final Animation<double> _tilt = TweenSequence<double>([
+    TweenSequenceItem(tween: Tween(begin: 0.0, end: -0.042), weight: 46),
+    TweenSequenceItem(tween: Tween(begin: -0.042, end: 0.0), weight: 54),
+  ]).animate(CurvedAnimation(parent: _intro, curve: Curves.easeOutCubic));
 
   late final Animation<double> _fade = CurvedAnimation(
     parent: _intro,
@@ -119,6 +251,7 @@ class _AnimatedLogoState extends State<AnimatedLogo>
       widget.asset,
       width: widget.width,
       fit: BoxFit.contain,
+      cacheWidth: widget.cacheWidth,
       // The logo is decorative; the app name is announced by the text under
       // it, so a screen reader should skip this rather than read "image".
       excludeFromSemantics: true,
@@ -140,19 +273,41 @@ class _AnimatedLogoState extends State<AnimatedLogo>
         // reads as deliberate, so it registered only as a vague instability.
         // 9px with a matching scale breath is unmistakably intentional while
         // still calm.
-        final float = math.sin(t * 2 * math.pi) * 9.0;
+        final float = math.sin(t * 2 * math.pi) * 9.0 * _floatAmp;
         final breathe = 1 + math.sin(t * 2 * math.pi) * 0.012;
 
         // Glow breathes at half the float's rate, so the two drift apart.
         final glow = 0.5 + 0.5 * math.sin(t * math.pi);
 
+        // ── قوسِ پرش (فقط حالتِ بازیگوش) ──
+        //
+        // شناوریِ بالا در حالتِ بازیگوش خاموش است (`_floatAmp`). دلیلش
+        // فیزیکی است: یک شخصیت یا در حالِ پرش است یا روی هوا شنا می‌کند،
+        // و انجامِ هر دو با هم دقیقاً همان چیزی است که به حرکت، حسِ
+        // «قفل‌نشدن به زمین» می‌دهد. جابه‌جایی افقی هم کوچک و هم‌زمان با
+        // قوس است تا مسیر، قوس بخواند نه خطِ عمودیِ برق‌آسا.
+        final hopping = widget.intro && widget.entrance == LogoEntrance.playful;
+        // دامنهٔ پرش در حالتِ بازیگوش کوچک است (۱۱٪ عرض). دلیلش این است که
+        // «رشد» از مرکز اتفاق می‌افتد و پرشِ بزرگ روی آن، شخصیت را از
+        // مرکزِ صفحه بیرون می‌برد و بازگشتش شبیهِ لغزش می‌شود. پرش اینجا
+        // وزنِ فرود را می‌سازد، نه مسافت را.
+        final hopPx = hopping ? _hop.value * widget.width * 0.11 : 0.0;
+        final driftPx = hopping ? _tilt.value * widget.width * 0.22 : 0.0;
+        final stretch = hopping ? _stretch.value : 1.0;
+
         return Opacity(
-          opacity: _fade.value,
+          opacity: _opacity,
           child: Transform.translate(
-            offset: Offset(0, float),
+            offset: Offset(driftPx, float + hopPx),
             child: Transform.scale(
-              scale: _scale.value * breathe,
-              child: Stack(
+              // کشیدگی فقط محور افقی و عمودی را جدا می‌کند؛ اندازهٔ کلی
+              // نزدیکِ همان مقدارِ قبلی می‌ماند تا لوگو وسطِ پرش «پف»
+              // نکند.
+              scaleX: _scaleValue * breathe * stretch,
+              scaleY: _scaleValue * breathe / stretch,
+              child: Transform.rotate(
+                angle: hopping ? _tilt.value * -0.42 : 0.0,
+                child: Stack(
                 alignment: Alignment.center,
                 clipBehavior: Clip.none,
                 children: [
@@ -229,7 +384,8 @@ class _AnimatedLogoState extends State<AnimatedLogo>
                       ),
                     ),
                   ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

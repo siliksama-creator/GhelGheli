@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'api_client.dart';
+import 'core/boot_controller.dart';
 import 'screens/auth/auth_screen.dart';
 import 'screens/auth/splash_screen.dart';
 import 'screens/user/home_shell.dart';
@@ -87,7 +88,13 @@ class GhelGheliApp extends StatefulWidget {
 
 class _GhelGheliAppState extends State<GhelGheliApp> {
   final ApiClient api = ApiClient();
-  bool _ready = false;
+
+  /// دروازهٔ راه‌اندازی. تا وقتی `result` خالی است، صفحهٔ اسپلش روی است.
+  late final BootController _boot;
+
+  /// کلیدِ صفحهٔ اسپلش، برای صدا‌زدنِ خروجِ سینمایی پیش از تعویضِ صفحه.
+  final GlobalKey<SplashScreenState> _splashKey =
+      GlobalKey<SplashScreenState>();
 
   @override
   void initState() {
@@ -134,8 +141,6 @@ class _GhelGheliAppState extends State<GhelGheliApp> {
         },
       });
     });
-    // Restore the saved mute preference before any game can play a sound.
-    GameAudio.instance.load();
     // توکنِ منقضی نباید کاربر را در پوستهٔ خالی حبس کند.
     //
     // اگر سرور به هر درخواستی ۴۰۱ بدهد، ApiClient توکن مرده را پاک
@@ -160,13 +165,144 @@ class _GhelGheliAppState extends State<GhelGheliApp> {
     // می‌شود، پس حتی اگر روزی آن catch برداشته شود، اپ باز بالا
     // می‌آید. دو لایهٔ دفاعی برای چیزی که شکستش یعنی اپِ کاملاً
     // غیرقابل‌استفاده.
-    api.loadToken().whenComplete(() {
-      if (mounted) setState(() => _ready = true);
-    });
-    // config عمومی است (بدونِ توکن)، پس معطلِ توکن نمی‌مانیم. اگر این
-    // درخواست با fetchِ HomeShell هم‌زمان شود، پنجرهٔ ۱.۲ ثانیه‌ایِ
-    // ApiClient آن را ادغام می‌کند: دو فراخوانی = یک درخواستِ واقعی.
-    unawaited(AppConfig.instance.ensure(api));
+    //
+    // در بازنویسیِ دروازه (۲۷ شهریور) این خط عوض نشد — عمداً. تنها تفاوت
+    // این است که Futureِ آن حالا به‌عنوان کارِ «نشست» به دروازه داده
+    // می‌شود، پس همان گارانتی سرِ جایش می‌ماند و مسیر هم از خودِ آن
+    // خوانده می‌شود.
+    // ═══════════════════════════════════════════════════════════════════
+    // دروازهٔ راه‌اندازی — «صفحهٔ بارگذاری باید واقعی باشد»
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    // چهار کار، موازی، هر کدام با تایم‌اوتِ خودش:
+    //
+    //   ۱. بازیابیِ نشست (حیاتی) — تنها کاری که مسیر را تعیین می‌کند؛
+    //   ۲. تنظیماتِ زندهٔ پنل — تا جملهٔ اسپلش وسطِ خواندن عوض نشود و
+    //      صفحهٔ اول با پیش‌فرض‌های کد بالا نیاید؛
+    //   ۳. ترجیحِ قطعِ صدا — پیش از این رهاشده بود (`GameAudio.load()`
+    //      بدونِ await)، یعنی تا وقتی حافظه می‌خواند ممکن بود یک صدای
+    //      بازی روی گوشیِ بی‌صدا پخش شود (یا برعکس)؛
+    //   ۴. گرم‌کردنِ تصویرهای صفحهٔ ورود — تا لحظهٔ انتقال، لوگو و پس‌زمینه
+    //      از صفر رمزگشایی نشوند و پرشِ تصویری نداشته باشیم.
+    //
+    // `_boot.start()` همین‌جا صدا زده می‌شود، وگرنه انیمیشنِ ورودِ لوگو در
+    // اسپلش تمام می‌شود و کاربر فقط فریمِ آخر را می‌بیند.
+    final sessionRestore = api.loadToken().whenComplete(() {});
+    _boot = BootController(
+      tasks: [
+        BootTask(
+          stage: BootStage.session,
+          critical: true,
+          timeout: const Duration(seconds: 3),
+          label: 'نشستِ بازیکن را روی زمین می‌گذاریم…',
+          run: () => sessionRestore,
+        ),
+        BootTask(
+          stage: BootStage.config,
+          label: 'قوانینِ این فصل را از اتاقِ داور می‌گیریم…',
+          run: () => AppConfig.instance.ensure(api),
+        ),
+        BootTask(
+          stage: BootStage.audio,
+          timeout: const Duration(milliseconds: 1500),
+          label: 'صدای ورزشگاه را تنظیم می‌کنیم…',
+          run: () => GameAudio.instance.load(),
+        ),
+        BootTask(
+          stage: BootStage.art,
+          timeout: const Duration(seconds: 2),
+          label: 'چمنِ زمین را می‌کشیم…',
+          run: _precacheArt,
+        ),
+      ],
+      isAuthenticated: () => api.token != null,
+    );
+    // `start()` را here صدا می‌زنیم؛ نتیجه نگه داشته می‌شود تا اگر بعداً
+    // کسی به `elapsed` یا فهرستِ کارهای ناتمام نگاه کند، از دست نرفته باشد.
+    unawaited(_boot.start().then(_onBootFinished));
+  }
+
+  /// بعد از دروازه: یک بازسازی، تا `home:` مسیرِ درست را انتخاب کند.
+  ///
+  /// هیچ تصمیمِ مسیری اینجا گرفته نمی‌شود — `build` خودش از `api.token`
+  /// می‌خواند. این تابع فقط می‌گوید «دروازه تمام شد، دوباره بکش».
+  void _onBootFinished(BootResult result) {
+    if (!mounted) return;
+    _playSplashExit();
+    if (result.degraded) {
+      // شکستِ کارِ غیرحیاتی: کاربر معطل نمی‌شود، ولی ردیفِ تشخیصی می‌ماند.
+      // (`BootController` هم لاگ می‌کند؛ این خط برای کسی است که فهرستِ
+      // مرحله‌ها را در گزارشِ خطا می‌خواهد.)
+      debugPrint('[boot] ${result.elapsed.inMilliseconds}ms '
+          'با ${result.failures.length} کارِ ناتمام');
+    }
+    setState(() {});
+  }
+
+  /// رمزگشاییِ زودهنگامِ تصویرهای صفحهٔ ورود.
+  ///
+  /// چرا اینجا و نه داخلِ خودِ صفحهٔ ورود: تا وقتی اسپلش روی صفحه است، وقتِ
+  /// مرده داریم. رمزگشاییِ همین دو تصویر در آن پنجره، هم انتقال را نرم
+  /// می‌کند و هم بخشی از زمانِ کارِ واقعیِ راه‌اندازی را پر می‌کند.
+  ///
+  /// ⚠️ کلیدِ `cacheWidth` باید **دقیقاً** همان چیزی باشد که خودِ ویجت‌ها
+  /// می‌خواهند، وگرنه کشِ تصویر آن را یک ورودیِ جدا حساب می‌کند و کارِ
+  /// دوباره می‌شود: لوگوی صفحهٔ ورود `width: 230` و پس‌زمینه‌اش با
+  /// `cacheWidth: 360` کشیده می‌شوند (نگاه کنید به auth_screen.dart).
+  Future<void> _precacheArt() async {
+    // `precacheImage` به BuildContext نیاز دارد؛ اینجا نداریم. به‌جایش
+    // مستقیم از کشِ تصویرِ موتور استفاده می‌کنیم — همان چیزی که
+    // `precacheImage` هم انجام می‌دهد، بدونِ نیاز به ویجت.
+    final providers = <ImageProvider>[
+      const ResizeImage(
+        AssetImage('assets/brand/logo_large.webp'),
+        // همان عددی که خودِ اسپلش می‌خواهد — یک تعریف، دو مصرف‌کننده.
+        width: kSplashLogoCacheWidth,
+        policy: ResizeImagePolicy.fit,
+      ),
+      const ResizeImage(
+        AssetImage('assets/brand/logo.webp'),
+        width: 690, // 230 × 3 (بیشترین چگالیِ رایجِ گوشی‌ها)
+        policy: ResizeImagePolicy.fit,
+      ),
+      const ResizeImage(
+        AssetImage('assets/brand/login_hero.webp'),
+        width: 360,
+        policy: ResizeImagePolicy.fit,
+      ),
+    ];
+    await Future.wait(providers.map(_resolveOnce));
+  }
+
+  /// یک تصویر را در کش می‌نشاند و به‌محضِ آماده‌شدن برمی‌گردد.
+  Future<void> _resolveOnce(ImageProvider provider) {
+    final done = Completer<void>();
+    late final ImageStreamListener listener;
+    final stream = provider.resolve(ImageConfiguration.empty);
+    listener = ImageStreamListener(
+      (_, __) {
+        stream.removeListener(listener);
+        if (!done.isCompleted) done.complete();
+      },
+      onError: (_, __) {
+        stream.removeListener(listener);
+        if (!done.isCompleted) done.complete();
+      },
+    );
+    stream.addListener(listener);
+    return done.future;
+  }
+
+  /// خروجِ سینماییِ اسپلش.
+  ///
+  /// عمداً `await` نمی‌شود: انتقالِ `AnimatedSwitcher` هم‌زمان با آن شروع
+  /// می‌شود، پس حرکتِ لوگو و محوشدنِ صفحه روی هم می‌افتند و یک توالیِ
+  /// پیوسته می‌سازند، نه دو مرحلهٔ پشتِ‌سرهم. کلیدِ `_splashKey` بعد از
+  /// تعویض بی‌اثر است (state حذف شده)، به همین دلیل `currentState` را
+  /// چک می‌کنیم.
+  void _playSplashExit() {
+    final state = _splashKey.currentState;
+    if (state != null) unawaited(state.exit());
   }
 
   Future<void> _refresh() async => setState(() {});
@@ -211,15 +347,75 @@ class _GhelGheliAppState extends State<GhelGheliApp> {
       themeMode: ThemeMode.dark,
       builder: (context, child) =>
           Directionality(textDirection: TextDirection.rtl, child: child!),
-      home: !_ready
-          ? const SplashScreen()
-          : api.token == null
-          ? AuthScreen(api: api, onDone: _refresh)
-          // پنل ادمین از اپ موبایل حذف شده — مدیریت فقط با پنل وب است
-          // (`docs/ADMIN_PANEL_MOBILE_RETIREMENT.md`). حتی اگر توکنِ ادمین
-          // در حافظه مانده باشد، اپ همیشه پوستهٔ کاربر را نشان می‌دهد؛ هیچ
-          // مسیری به پوستهٔ ادمین نمی‌رود (کد ادمین در بیلد tree-shake شد).
-          : HomeShell(api: api, onLogout: _logout),
+      home: _buildHome(),
+    );
+  }
+
+  /// مسیرِ جاری.
+  ///
+  /// سه حالت، دو انتقال:
+  ///
+  ///   • **دروازه باز نشده** → صفحهٔ اسپلش (با دروازهٔ واقعی).
+  ///   • **دروازه باز شد و توکن هست** → پوستهٔ کاربر، با انتقالِ
+  ///     بزرگ‌شدنِ آرام (fade + scale). اینجا هیچ قابِ میانی و هیچ بازدیدِ
+  ///     الکی از صفحهٔ ورود نیست — کاربرِ واردشده مستقیم به خانه می‌رود.
+  ///   • **دروازه باز شد و توکن نیست** → صفحهٔ ورود. اسپلش پیش از رفتن،
+  ///     خروجِ خودش را بازی می‌کند (لوگو بزرگ می‌شود و محو می‌شود) و
+  ///     هم‌زمان برگهٔ ورود از پایین بالا می‌آید. یعنی لوگو «به داخلِ
+  ///     صفحهٔ ورود می‌رود» و صفحه دورِ همان جای خالی ساخته می‌شود.
+  Widget _buildHome() {
+    final Widget screen;
+    if (_boot.result == null) {
+      screen = SplashScreen(key: _splashKey, boot: _boot);
+    } else if (api.token == null) {
+      screen = AuthScreen(api: api, onDone: _refresh);
+    } else {
+      // پنل ادمین از اپ موبایل حذف شده — مدیریت فقط با پنل وب است
+      // (`docs/ADMIN_PANEL_MOBILE_RETIREMENT.md`). حتی اگر توکنِ ادمین
+      // در حافظه مانده باشد، اپ همیشه پوستهٔ کاربر را نشان می‌دهد؛ هیچ
+      // مسیری به پوستهٔ ادمین نمی‌رود (کد ادمین در بیلد tree-shake شد).
+      screen = HomeShell(api: api, onLogout: _logout);
+    }
+
+    return AnimatedSwitcher(
+      // ۴۲۰ms: کوتاه‌تر از این، تعویضِ صفحه «پرش» می‌شود؛ بلندتر، به‌نظر
+      // می‌رسد اپ معطل مانده. هم‌زمان با خروجِ لوگو در اسپلش اجرا می‌شود،
+      // پس مجموعِ تأخیرِ اضافه صفر است.
+      duration: const Duration(milliseconds: 420),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      layoutBuilder: (current, previous) => Stack(
+        alignment: Alignment.center,
+        children: [...previous, if (current != null) current],
+      ),
+      transitionBuilder: (child, anim) {
+        // بزرگ‌شدنِ آرام از ۰٫۹۷ + محوشدگی. صفحهٔ ورود یک سُرخوردنِ
+        // کوچکِ رو به بالا هم می‌گیرد تا «ورود از پایین» حس شود و
+        // لوگویِ در حالِ محو، مقصد داشته باشد.
+        final isAuth = child.key == const ValueKey('auth');
+        return FadeTransition(
+          opacity: anim,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.97, end: 1).animate(anim),
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: isAuth ? const Offset(0, 0.03) : Offset.zero,
+                end: Offset.zero,
+              ).animate(anim),
+              child: child,
+            ),
+          ),
+        );
+      },
+      // کلیدها تعیین می‌کنند کدام ویجت «همان» است و کدام تازه. صفحهٔ اسپلش
+      // باید یک‌بار ساخته و یک‌بار حذف شود؛ اگر کلید ثابت بماند، اسپلش و
+      // صفحهٔ بعد به‌عنوان یک ویجت دیده می‌شوند و هیچ انتقالی اجرا نمی‌شود.
+      child: KeyedSubtree(
+        key: ValueKey(
+          _boot.result == null ? 'splash' : (api.token == null ? 'auth' : 'home'),
+        ),
+        child: screen,
+      ),
     );
   }
 }

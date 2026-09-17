@@ -6,7 +6,7 @@
 // every change risky — the "stuck on a loading spinner forever" bug in the
 // league tab survived several passes precisely because it was invisible in
 // that wall of text.
-import React, { useEffect, useRef, useState, Suspense, lazy, Component } from 'react';
+import React, { useCallback, useEffect, useRef, useState, Suspense, lazy, Component } from 'react';
 import { createRoot } from 'react-dom/client';
 
 // «دانلود / ورود» عمداً در `live_copy` نیست: این برچسب فقط در وب وجود
@@ -24,6 +24,7 @@ import Notifications from './components/Notifications.jsx';
 import Auth from './screens/Auth.jsx';
 import Home from './screens/Home.jsx';
 import { LoadingView, ErrorView } from './components/states.jsx';
+import SplashScreen, { SPLASH_STAGES, SPLASH_MIN_MS } from './components/SplashScreen.jsx';
 import { UiIcon } from './components/IconAsset.jsx';
 
 // ── چرا این‌ها تنبل بارگذاری می‌شوند ──────────────────────────────────────
@@ -233,6 +234,87 @@ function App() {
   // پیکربندی کلاینت (بنر اطلاعیه و…) — از /api/config، بدون نیاز به آپدیت.
   const [cfg, setCfg] = useState(null);
   const [forceGate, setForceGate] = useState(null); // {forced, url, min}
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // دروازهٔ راه‌اندازی — صفحهٔ بارگذاریِ واقعی (۲۷ شهریور)
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // پیش از این، اولین چیزی که کاربر وب می‌دید `LoadingView` بود: یک کارت با
+  // چرخندهٔ عمومی و متنِ «در حال بارگذاری...» که **هیچ ربطی به کارِ واقعیِ
+  // در جریان نداشت**. حالا سه کارِ واقعیِ بالا صریح شده‌اند و نوارِ پیشرفت
+  // از تمام‌شدنِ خودشان پر می‌شود.
+  //
+  // ⚠️ «برنامه‌های پیشنهادی» عمداً پشتِ دروازه نیست (تصمیمِ مالک): آن یک
+  //    کاوشِ پس‌زمینه با بایاس ۶۰ ثانیه‌ای است و اگر کند باشد، کاربر نباید
+  //    منتظرش بماند.
+  const [cfgSettled, setCfgSettled] = useState(false);
+  const [artSettled, setArtSettled] = useState(false);
+  const [portalSettled, setPortalSettled] = useState(false);
+  const [floorDone, setFloorDone] = useState(false);
+  const [splashLeaving, setSplashLeaving] = useState(false);
+  const [splashGone, setSplashGone] = useState(false);
+
+  // کفِ لحظهٔ برند — همان ۶۰۰ms اپ اندروید.
+  useEffect(() => {
+    const t = setTimeout(() => setFloorDone(true), SPLASH_MIN_MS);
+    return () => clearTimeout(t);
+  }, []);
+
+  // رمزگشاییِ زودهنگامِ تصویرهای برند. کارِ واقعی است (نه تزئینی): اگر این
+  // تصویرها در لحظهٔ انتقال تازه شروع به دانلود کنند، صفحهٔ خانه با یک
+  // «پاپ»ِ تصویری بالا می‌آید.
+  useEffect(() => {
+    let alive = true;
+    const urls = ['/brand/logo-large.webp', '/logo.webp', '/brand/login_hero.webp'];
+    const one = (url) => new Promise((resolve) => {
+      const img = new Image();
+      const done = () => resolve();
+      img.onload = done;
+      img.onerror = done; // شکستِ یک تصویر نباید دروازه را ببندد
+      img.src = url;
+      // سقفِ سخت: یک تصویرِ گیرکرده در کشِ مرورگر نباید بیش از ۲ ثانیه
+      // کاربر را نگه دارد.
+      setTimeout(done, 2000);
+    });
+    Promise.all(urls.map(one)).then(() => { if (alive) setArtSettled(true); });
+    return () => { alive = false; };
+  }, []);
+
+  /// فهرستِ مرحله‌های دروازه، به ترتیبِ نمایش.
+  ///
+  /// `session` فقط وقتی هست که کاربر توکن دارد — همان قاعدهٔ اپ: مهمان
+  /// نباید منتظرِ درخواستی بماند که برایش معنا ندارد.
+  const bootSteps = [
+    { key: 'config', label: SPLASH_STAGES.config, done: cfgSettled },
+    ...(token
+      ? [{ key: 'session', label: SPLASH_STAGES.session, done: portalSettled }]
+      : []),
+    { key: 'art', label: SPLASH_STAGES.art, done: artSettled },
+  ];
+  const bootDoneCount = bootSteps.filter((x) => x.done).length;
+  const bootProgress = bootDoneCount / bootSteps.length;
+  const bootCurrent = bootSteps.find((x) => !x.done) || null;
+  const bootGated = !(cfgSettled && artSettled && floorDone && (!token || portalSettled));
+
+  // خروجِ سینمایی: پوشش محو می‌شود و بعد از درخت بیرون می‌آید.
+  //
+  // چرا دو حالت: اگر پوشش بلافاصله unmount شود، هیچ محوشدگی‌ای دیده نمی‌شود
+  // و صفحهٔ خانه یک‌دفعه «کلیک» می‌کند. ۴۲۰ms همان عددِ انتقالِ اپ اندروید
+  // است، پس دو کلاینت با یک ریتم باز می‌شوند.
+  useEffect(() => {
+    if (bootGated || splashGone) return undefined;
+    setSplashLeaving(true);
+    // علامتِ «راه‌اندازی تمام شد» روی خودِ ریشهٔ سند.
+    //
+    // چرا روی <html> و نه یک state: انیمیشنِ ورودِ نشانِ صفحهٔ ورود در CSS
+    // نوشته شده و بیرونِ درختِ ری‌اکت است. تا این صفت نباشد، آن انیمیشن
+    // «متوقف» می‌ماند (قاعده‌اش در splash.css است) و دقیقاً در لحظهٔ خروجِ
+    // پوشش شروع می‌شود — همان دلیلی که بالای همان قاعده نوشته شده.
+    try { document.documentElement.setAttribute('data-booted', '1'); }
+    catch { /* در محیطِ غیرمرورگر (تست) بی‌اهمیت */ }
+    const t = setTimeout(() => setSplashGone(true), 420);
+    return () => clearTimeout(t);
+  }, [bootGated, splashGone]);
   useEffect(() => {
     req('/api/config', 'GET', null, null).then((d) => {
       setCfg(d);
@@ -287,7 +369,12 @@ function App() {
           });
         }
       } catch (_) { /* ignore */ }
-    }).catch(() => {});
+    })
+      // حتی اگر config نیاید، دروازه باز می‌شود: اپ با پیش‌فرض‌های کد بالا
+      // می‌آید. شکستِ یک درخواستِ غیرحیاتی نباید کاربر را روی اسپلش حبس
+      // کند — همان قاعده‌ای که در `BootController` اپ هم پیاده شده.
+      .catch(() => {})
+      .finally(() => setCfgSettled(true));
   }, []);
   useEffect(() => {
     if (!token) return undefined;
@@ -336,6 +423,12 @@ function App() {
   }, [token]);
   const [mode, setMode] = useState(
     location.hostname.startsWith('register.') ? 'register' : 'login');
+
+  /// `useCallback` لازم است: `Portal` یک `useEffect(..., [])` دارد که `load`
+  /// را صدا می‌زند؛ اگر این مرجع در هر رندر عوض شود، رفتارِ دروازه فقط
+  /// شکننده می‌شود (نه اشتباه) — ولی یک تابعِ تازه در هر رندر، همان کلاسی
+  /// از باگ است که بعداً کسی را زمین می‌زند.
+  const onPortalSettled = useCallback(() => setPortalSettled(true), []);
 
   function logout() {
     try {
@@ -419,7 +512,7 @@ function App() {
       )}
 
       {token ? (
-        <Portal token={token} logout={logout} cfg={cfg} onToken={t => {
+        <Portal token={token} logout={logout} cfg={cfg} onBootSettled={onPortalSettled} onToken={t => {
           // توکنِ تازه (بعد از تغییرِ رمز) باید جایی بنشیند که رفرشِ صفحه هم
           // از آن استفاده کند — وگرنه کاربر با اولین رفرش بیرون می‌افتد.
           try { localStorage.token = t; } catch { /* private mode */ }
@@ -434,11 +527,25 @@ function App() {
             }} />
         </>
       )}
+
+      {/* پوششِ صفحهٔ بارگذاری.
+          عمداً **آخرین** فرزند است تا روی همه‌چیز بنشیند و اپ زیرش کامل
+          مانت بماند (داده‌هایش را می‌گیرد، چانک‌هایش دانلود می‌شوند) —
+          پوششِ `fixed` یعنی انتقال، «کشفِ صفحهٔ آماده» است، نه «شروعِ
+          بارگذاریِ صفحه». */}
+      {!splashGone && (
+        <SplashScreen
+          stage={bootCurrent?.key || null}
+          label={bootCurrent ? bootCurrent.label : ''}
+          progress={bootProgress}
+          leaving={splashLeaving}
+        />
+      )}
     </div>
   );
 }
 
-function Portal({ token, logout, cfg, onToken }) {
+function Portal({ token, logout, cfg, onToken, onBootSettled }) {
   const sharedRoom = new URLSearchParams(window.location.search).get('room');
   const [tab, setTab] = useState(sharedRoom ? 'club' : 'home');
   const [p, setP] = useState(null);
@@ -515,6 +622,12 @@ function Portal({ token, logout, cfg, onToken }) {
       // like a hang.
       setLoadError(e);
       if (e.status === 401) logout();
+    } finally {
+      // به دروازه می‌گوییم «این فاز تمام شد» — **هم در موفقیت و هم در
+      // شکست**. اگر فقط در موفقیت خبر می‌دادیم، یک خطای شبکه کاربر را
+      // برای همیشه پشتِ صفحهٔ بارگذاری نگه می‌داشت و هیچ‌وقت کارتِ خطا و
+      // دکمهٔ «تلاش دوباره» را نمی‌دید.
+      onBootSettled?.();
     }
   }
 
