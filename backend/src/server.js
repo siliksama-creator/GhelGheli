@@ -367,7 +367,7 @@ const USER_TOKEN_TTL = process.env.JWT_EXPIRES_IN || '3650d';
   const asDays = /^(\d+)\s*d$/i.exec(ttl);
   const longEnough = (!!asYears && Number(asYears[1]) >= 1) || (!!asDays && Number(asDays[1]) >= 365);
   if (!longEnough) {
-    console.warn(`[auth] ⚠️ JWT_EXPIRES_IN=${ttl} → جلسهٔ کاربران کوتاه است (خواستهٔ مالک: همیشگی). مقدارِ درست: 3650d`);
+    console.warn(`[auth] هشدار: JWT_EXPIRES_IN=${ttl} → جلسهٔ کاربران کوتاه است (خواستهٔ مالک: همیشگی). مقدارِ درست: 3650d`);
   }
 })();
 const signUser = user => jwt.sign(
