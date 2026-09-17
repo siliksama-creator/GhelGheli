@@ -3009,6 +3009,28 @@ app.use('/api', require('./routes/adminCustomMission')({
   adminAuth, requireRole, asyncHandler, audit,
   customMission: require('./services/customMission'),
 }));
+app.use('/api', require('./routes/adminCustomMission')({
+  adminAuth, requireRole, asyncHandler, audit,
+  customMission: require('./services/customMission'),
+}));
+
+// ═══════════════════════════════════════════════════════════════════════════
+// سپرِ سرور (کلادفلر) — خواستهٔ مالک، ۲۶ شهریور: «تو پنل ادمین آماده باشد و
+// تا وقتی حمله نشده خاموش بماند؛ با یک ثبت و تأیید روشنش کنم.»
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// سرویس به‌شکلِ factory ساخته می‌شود تا سه چیزِ بیرونی‌اش تزریق‌شدنی باشد:
+// ذخیره‌گاه (تنظیماتِ پنل)، اینترنت (API کلادفلر) و فایلِ حالتِ سمتِ سرور.
+// نتیجه‌اش این است که تست بتواند یک کلادفلرِ جعلی بالا بیاورد و هیچ تستی به
+// حسابِ واقعیِ مالک دست نزند.
+const cloudflareGuard = require('./services/cloudflareGuard').createCloudflareGuard({
+  store: opsConfig,
+  crypto: fieldCrypto,
+  logger,
+});
+app.use('/api', require('./routes/adminCloudflare')({
+  adminAuth, requireRole, asyncHandler, audit, cloudflareGuard,
+}));
 
 // ── اهرم‌های موتور (آستانه‌های تشخیص، سطح، استریک، پیام‌های آماده) ──────
 app.use('/api', require('./routes/adminOps')({
@@ -3498,6 +3520,9 @@ server.listen(port, async () => {
     // پنجرهٔ اتصال) از پیش‌فرض کد می‌خواندند نه از دیتابیس.
     'live_copy', 'live_rules', 'config_version',
     'custom_mission',
+    // تنظیماتِ سپرِ سرور: بدونِ این، بعد از هر ری‌استارت توکنِ کلادفلر و
+    // فهرستِ دامنه‌ها از کش می‌رفتند و پنل «تنظیم نشده» نشان می‌داد.
+    'cloudflare_guard',
   ]).catch(e => logger.error('[ops] پیش‌بارگذاری تنظیمات ناموفق بود:', e.message));
   await ensureActiveSeason();
   logger.info(`GhelGheli API on :${port}`);

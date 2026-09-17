@@ -1,0 +1,13 @@
+[Unit]
+Description=GhelGheli Cloudflare mode applier (30s) — خواندنِ آی‌پیِ واقعیِ کاربر
+Documentation=file:/var/www/GhelGheli/scripts/cloudflare-mode-apply.sh
+After=network-online.target nginx.service
+
+[Service]
+Type=oneshot
+# ⚠️ root لازم است: کانفیگِ nginx و اسنیپت‌هایش دستِ root است.
+# ⚠️ ورودیِ این اسکریپت فقط یک فایلِ دو کلمه‌ای است که پنل (کاربرِ ghelgheli)
+#    می‌نویسد؛ هیچ متنِ کاربری‌ای اجرا نمی‌شود.
+ExecStart=/bin/bash /var/www/GhelGheli/scripts/cloudflare-mode-apply.sh
+TimeoutStartSec=60
+Nice=5

@@ -1,0 +1,11 @@
+[Unit]
+Description=Apply GhelGheli Cloudflare mode every 30s
+
+[Timer]
+OnBootSec=60
+OnUnitActiveSec=30
+AccuracySec=5
+Persistent=false
+
+[Install]
+WantedBy=timers.target

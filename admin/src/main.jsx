@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, Suspense, lazy, Component } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BarChart3, Bell, BookText, Coins, Gift, MessageCircle, LifeBuoy, ScanLine, Settings, Shield, Sigma, Trophy, Users, Gamepad2, Wallet, Activity, CircleDot, Package, Store, Layers, Target, SlidersHorizontal, Megaphone } from 'lucide-react';
+import { BarChart3, Bell, BookText, Coins, Gift, MessageCircle, LifeBuoy, ScanLine, Settings, Shield, ShieldCheck, Sigma, Trophy, Users, Gamepad2, Wallet, Activity, CircleDot, Package, Store, Layers, Target, SlidersHorizontal, Megaphone } from 'lucide-react';
 
 import './theme.css';
 import './styles.css';
@@ -49,6 +49,8 @@ const ShopAdminPage = lazy(() => import('./pages/shop.jsx').then(m => ({ default
 const BattlePassPage = lazy(() => import('./pages/battle-pass.jsx').then(m => ({ default: m.BattlePassPage })));
 const MissionsPage = lazy(() => import('./pages/missions.jsx').then(m => ({ default: m.MissionsPage })));
 const CustomMissionPage = lazy(() => import('./pages/custom-mission.jsx').then(m => ({ default: m.CustomMissionPage })));
+// سپرِ سرور (کلادفلر) — خواستهٔ مالک: آماده بماند، با تأیید روشن شود.
+const CloudflarePage = lazy(() => import('./pages/cloudflare.jsx').then(m => ({ default: m.CloudflarePage })));
 const EnginePage = lazy(() => import('./pages/engine.jsx').then(m => ({ default: m.EnginePage })));
 
 // ── ErrorBoundary برای جلوگیری از صفحه سیاه ──────────────────────────────
@@ -105,6 +107,7 @@ const NAV_GROUPS = {
   'talk': 'گفت‌وگو و اطلاع‌رسانی',
   'config': 'پیکربندیِ متن و اپ',
   'admin': 'حساب‌های ادمین',
+  'infra': 'زیرساخت و امنیت',
 };
 
 const NAV = [
@@ -117,6 +120,14 @@ const NAV = [
   ['metrics', 'مانیتورینگ سرور', Activity, MetricsPage,
     'سلامت سرور و سرویس‌ها — فقط مانیتورینگ؛ اینجا چیزی تغییر نمی‌کند.',
     'today'],
+  // ── سپرِ سرور (کلادفلر) — خواستهٔ مالک، ۲۶ شهریور ────────────────────────
+  //
+  // «آماده باشه تو پنل ادمین، تا وقتی حمله نشده غیرفعال بمونه، بعداً با یک
+  // ثبت و تایید فعالش کنم.» پس صفحهٔ پیروِ «مانیتورینگ» می‌آید: آن‌جا خطر را
+  // می‌بینی، این‌جا جوابش را می‌دهی.
+  ['cloudflare', 'سپرِ سرور (کلادفلر)', ShieldCheck, CloudflarePage,
+    'سپرِ ضدحملهٔ کلادفلر: خاموش می‌ماند تا خودت با یک تأیید روشنش کنی (اپ و وب، هر دو).',
+    'infra'],
   ['photo-cards', 'ثبت کارت', ScanLine, PhotoCardsPage,
     'ثبت کارت‌های فیزیکی با عکس؛ کارتِ تأییدشده وارد کاتالوگِ صندوق و دوئل می‌شود.',
     'cards'],

@@ -14,7 +14,10 @@
 const OBSERVER_PAGES = new Set(['dashboard', 'support']);
 // صفحه‌ای که فقط مدیرکل می‌بیند (مدیریت ادمین‌ها و کارنامهٔ ممیزی در
 // بک‌اند تماماً super_admin-only است).
-const SUPER_ONLY_PAGES = new Set(['admins']);
+// صفحهٔ «سپرِ سرور» هم فقط مدیرکل: یک کلیک اشتباه در آن می‌تواند دسترسیِ کلِ
+// برنامه (اپ + وب + پنل) را عوض کند؛ هم‌تراز با backend که requireRole()
+// بدونِ آرگومان = فقط super_admin است.
+const SUPER_ONLY_PAGES = new Set(['admins', 'cloudflare']);
 
 /** آیا این نقش اجازهٔ دیدنِ این صفحه (کلید NAV) را دارد؟ */
 export function canSeePage(role, pageKey) {
