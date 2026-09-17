@@ -87,10 +87,24 @@ fi
 build_snippet() {
   local ips
   # نسخهٔ تازه از خودِ کلادفلر؛ اگر نرسید، فهرستِ پشتیبانِ مخزن.
-  ips=$( { curl -sf -m 15 https://www.cloudflare.com/ips-v4; curl -sf -m 15 https://www.cloudflare.com/ips-v6; } 2>/dev/null | grep -E '^[0-9a-fA-F:./]+$' || true )
+  #
+  # ⚠️ دو باگِ واقعی که روی سرورِ تولید دیده شدند و این‌جا بسته شده‌اند:
+  #
+  #   ۱. خروجیِ curl همیشه با خطِ جدید تمام نمی‌شود، پس چسباندنِ دو فهرستِ
+  #      v4 و v6 آخرین آی‌پیِ نسخهٔ ۴ را به اولین آی‌پیِ نسخهٔ ۶ می‌چسباند
+  #      («131.0.72.0/222400:cb00::/32») و nginx کلِ کانفیگ را رد می‌کند.
+  #      حالا بین دو فهرست صریحاً خطِ جدید گذاشته می‌شود.
+  #   ۲. فیلترِ قبلی هر رشتهٔ بی‌معنی را می‌پذیرفت. حالا فقط چیزی قبول است
+  #      که شکلِ درستِ CIDR داشته باشد — هم IPv4 (با نقطه) و هم IPv6.
+  #      ⚠️ در نسخهٔ اولِ همین اصلاح، نقطه از الگو جا افتاد و کلِ IPv4 حذف
+  #      شد؛ گاردِ رفتاری همان لحظه قرمز شد و نگذاشت به تولید برسد.
+  ips=$( {
+        curl -sf -m 15 https://www.cloudflare.com/ips-v4; printf '\n'
+        curl -sf -m 15 https://www.cloudflare.com/ips-v6; printf '\n'
+      } 2>/dev/null | grep -E '^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$|^[0-9a-fA-F:]{2,45}/[0-9]{1,3}$' || true )
   if [ -z "$ips" ] && [ -r "$FALLBACK_IPS" ]; then
     log "دریافتِ فهرستِ آی‌پی‌ها از کلادفلر ممکن نشد؛ فهرستِ پشتیبانِ مخزن استفاده شد."
-    ips=$(grep -E '^[0-9a-fA-F:./]+$' "$FALLBACK_IPS")
+    ips=$(grep -E '^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$|^[0-9a-fA-F:]{2,45}/[0-9]{1,3}$' "$FALLBACK_IPS")
   fi
   [ -n "$ips" ] || { log "خطا: هیچ فهرستِ آی‌پی‌ای در دسترس نبود."; return 1; }
 
@@ -158,12 +172,16 @@ PY
 # در برگشت، همان حالتِ ناسالم بازگردانده می‌شد. این را آزمایشِ رفتاریِ
 # backend/scripts/testCloudflarePanel.js گرفت («کانفیگ به وضعیتِ قبلی برمی‌گردد»).
 apply_nginx() {
-  local backup="$1"
-  if nginx -t >/dev/null 2>&1 && systemctl reload nginx; then
+  local backup="$1" test_out=""
+  # ⚠️ خروجیِ nginx باید در لاگ بیفتد. نسخهٔ اول آن را به /dev/null می‌ریخت و
+  #    وقتی روی سرورِ تولید کانفیگ رد شد، تنها چیزی که می‌شد فهمید «رد شد» بود
+  #    نه «چرا». (علت واقعی: چسبیدنِ دو فهرستِ آی‌پی به هم.)
+  if test_out=$(nginx -t 2>&1) && systemctl reload nginx; then
     log "کانفیگِ nginx سالم بود و reload شد. (پشتیبان: $backup)"
     return 0
   fi
   log "خطا: کانفیگِ nginx رد شد؛ برگشت به پشتیبان."
+  printf '%s\n' "$test_out" | head -5 | sed 's/^/    nginx: /' | tee -a "$LOG" >/dev/null
   cp -p "$backup" "$SITE"
   if nginx -t >/dev/null 2>&1 && systemctl reload nginx; then
     log "بازگردانی موفق بود؛ سایت روی حالتِ قبلی سالم است."

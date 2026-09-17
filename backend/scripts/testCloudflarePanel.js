@@ -312,9 +312,11 @@ function makeGuard({ base, tmp, store, fetchImpl }) {
       fs.chmodSync(p, 0o755);
     };
     // nginx قلابی: اگر پرچمِ خرابی باشد، تست را رد می‌کند (برای سنجشِ برگشت).
-    stub('nginx', '[ -f "$NGINX_FAIL" ] && exit 1; exit 0');
+    stub('nginx', '[ -f "$NGINX_FAIL" ] && { echo "emerg: host not found in set_real_ip_from"; exit 1; }; exit 0');
     stub('systemctl', 'exit 0');
-    stub('curl', 'printf "173.245.48.0/20\\n104.16.0.0/13\\n"');
+    // ⚠️ عمداً «بدونِ خطِ جدیدِ پایانی» — همان چیزی که روی سرورِ تولید
+    //    آخرین آی‌پیِ v4 را به اولین آی‌پیِ v6 چسباند و nginx را رد کرد.
+    stub('curl', 'case "$*" in *ips-v6*) printf "2400:cb00::/32";; *) printf "173.245.48.0/20\\n104.16.0.0/13";; esac');
     const site = path.join(sand, 'site.conf');
     fs.writeFileSync(site, 'server {\n    listen 80;\n    include /etc/nginx/snippets/ghelgheli-upstream.conf;\n}\n');
     const stateDir = path.join(sand, 'state');
@@ -355,6 +357,16 @@ function makeGuard({ base, tmp, store, fetchImpl }) {
       fs.readFileSync(snippet, 'utf8').includes('set_real_ip_from 173.245.48.0/20;') &&
       fs.readFileSync(snippet, 'utf8').includes('real_ip_header CF-Connecting-IP;'));
     ok('وضعیتِ اعمال‌شده ثبت می‌شود', fs.readFileSync(appliedFile, 'utf8').split('\n')[0].trim() === 'on');
+    // رگرسیونِ تولید: بدونِ خطِ جدیدِ جداکننده، دو فهرستِ آی‌پی به هم می‌چسبند
+    // («131.0.72.0/222400:cb00::/32») و nginx کلِ کانفیگ را رد می‌کند.
+    const snippetLines = fs.readFileSync(snippet, 'utf8')
+      .split('\n').filter(l => l.startsWith('set_real_ip_from'));
+    ok('هر خطِ آی‌پی شکلِ درستِ CIDR دارد (فهرست‌های v4 و v6 به هم نمی‌چسبند)',
+      snippetLines.length === 3 && snippetLines.every(l =>
+        /^set_real_ip_from (([0-9]{1,3}\.){3}[0-9]{1,3}\/[0-9]{1,2}|[0-9a-fA-F:]{2,45}\/[0-9]{1,3});$/.test(l)),
+      JSON.stringify(snippetLines));
+    ok('هم محدودهٔ IPv4 و هم IPv6 در اسنیپت هست (کلاینتِ موبایل IPv6 دارد)',
+      snippetLines.some(l => l.includes('173.245.48.0/20')) && snippetLines.some(l => l.includes('2400:cb00::/32')));
 
     const after1 = fs.readFileSync(site, 'utf8');
     const logLen = fs.readFileSync(logFile, 'utf8').split('\n').length;
@@ -369,6 +381,8 @@ function makeGuard({ base, tmp, store, fetchImpl }) {
     try { apply(); } catch { rolledBack = true; }
     ok('اگر کانفیگِ نو رد شود، نگهبان با خطا برمی‌گردد (خودنمایی نمی‌کند)', rolledBack);
     ok('و کانفیگ به وضعیتِ قبلی برمی‌گردد (سایت سالم می‌ماند)', siteText() === after1);
+    ok('علتِ رد شدنِ کانفیگ در لاگ ثبت می‌شود (وگرنه عیب‌یابی کورکورانه است)',
+      fs.readFileSync(logFile, 'utf8').includes('host not found in set_real_ip_from'));
     fs.rmSync(path.join(sand, 'fail'));
 
     apply();
