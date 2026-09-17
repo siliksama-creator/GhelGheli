@@ -52,6 +52,11 @@ const DEFAULT_MODE_FILE = process.env.CF_MODE_FILE || '/var/lib/ghelgheli/cloudf
 const DEFAULT_APPLIED_FILE = process.env.CF_APPLIED_FILE || '/var/lib/ghelgheli/cloudflare-mode.applied';
 const MAX_DOMAINS = 12;
 
+// portability-ok-begin
+// ⚠️ این فهرست **دادهٔ پیش‌فرض** است، نه منطقِ کار: فقط کادرِ
+//    دامنه‌های پنل را پر می‌کند و مالک می‌تواند در پنل کامل عوضش
+//    کند (برای انتقال به دامنهٔ `.com`). پس هاردکد بودنش این‌جا
+//    اشکالی ندارد — گاردِ دامنه همین استثنا را می‌شناسد.
 const DEFAULT_DOMAINS = [
   'api.ghelghelishop.ir',
   'ghelghelishop.ir',
@@ -59,6 +64,7 @@ const DEFAULT_DOMAINS = [
   'user.ghelghelishop.ir',
   'register.ghelghelishop.ir',
 ];
+// portability-ok-end
 
 /** پیامِ خطا با ساختارِ یکسان، تا پنل بتواند مستقیم نشانش بدهد. */
 function err(message, code = 'error') {

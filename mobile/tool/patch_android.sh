@@ -14,6 +14,10 @@
 set -Eeuo pipefail
 
 MANIFEST="android/app/src/main/AndroidManifest.xml"
+# دامنه‌های وبی که به اپ وصل می‌شوند (برای تب‌های باز کردنِ لینکِ اتاق).
+# پیش‌فرض همان دامنهٔ فعلی است؛ برای انتقال به دامنهٔ نو کافی است
+# PUBLIC_WEB_HOSTS="user.ghelghelishop.ir user.ghelghelishop.com" ست شود.
+export PUBLIC_WEB_HOSTS="${PUBLIC_WEB_HOSTS:-user.ghelghelishop.ir}"
 [ -f "$MANIFEST" ] || { echo "ERROR: $MANIFEST not found (run flutter create first)"; exit 1; }
 
 python3 - "$MANIFEST" <<'PY'
@@ -130,7 +134,15 @@ else:
 #
 # این بلوک داخل تگ <activity>ی موجود (همان‌جا که LAUNCHER هست) تزریق
 # می‌شود وگرنه intent-filter بدون activity بی‌اثر است.
-DEEP_LINK_BLOCK = """
+# دامنه‌ها از محیط می‌آیند (چند دامنه = چند <data> در همان intent-filter)،
+# تا انتقالِ وب به یک دامنهٔ نو نیاز به تغییرِ کد نداشته باشد و در فاصلهٔ
+# انتقال، لینک‌های دامنهٔ قدیمی هم همچنان اپ را باز کنند.
+import os
+WEB_HOSTS = [h for h in os.environ.get('PUBLIC_WEB_HOSTS', '').split() if h] or ['user.ghelghelishop.ir']
+HTTPS_DATA = "\n".join(
+    f'                <data android:scheme="https" android:host="{h}"/>' for h in WEB_HOSTS
+)
+DEEP_LINK_BLOCK = f"""
             <intent-filter android:autoVerify="false">
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
@@ -141,7 +153,7 @@ DEEP_LINK_BLOCK = """
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="https" android:host="user.ghelghelishop.ir"/>
+{HTTPS_DATA}
             </intent-filter>
 """
 

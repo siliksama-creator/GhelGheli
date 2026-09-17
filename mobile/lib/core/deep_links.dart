@@ -19,6 +19,40 @@ import 'dart:async';
 
 import 'package:app_links/app_links.dart';
 
+/// دامنهٔ وبی که متنِ دعوت و لینکِ اتاق روی آن ساخته می‌شود.
+///
+/// همان کلیدِ `--dart-define=PUBLIC_WEB_URL` که `share_invite.dart` استفاده
+/// می‌کند؛ پس با تغییرِ یک متغیر در CI، اپ به دامنهٔ نو منتقل می‌شود.
+const String _publicWebUrlDefine = String.fromEnvironment(
+  'PUBLIC_WEB_URL',
+  defaultValue: 'https://ghelghelishop.ir',
+);
+
+/// دامنه‌هایی که لینکِ https آن‌ها داخلِ اپ پذیرفته می‌شود.
+///
+/// ⚠️ چرا فهرست و نه یک دامنه: مالک در حالِ انتقال به یک دامنهٔ `.com` است.
+/// اگر فقط دامنهٔ نو پذیرفته شود، لینک‌های نصب‌شده/قدیمی می‌شکنند؛ اگر فقط
+/// دامنهٔ قدیمی بماند، لینکِ نو داخلِ اپ باز نمی‌شود. پس هر دو پذیرفته
+/// می‌شوند: دامنهٔ فعلی از تنظیماتِ بیلد، و دامنهٔ تاریخی همیشه.
+const List<String> _legacyWebHosts = <String>[
+  'ghelghelishop.ir',
+  'user.ghelghelishop.ir',
+  'www.ghelghelishop.ir',
+];
+
+final Set<String> _webHosts = _collectWebHosts();
+
+Set<String> _collectWebHosts() {
+  final hosts = <String>{..._legacyWebHosts};
+  final uri = Uri.tryParse(_publicWebUrlDefine.trim());
+  final host = uri?.host.toLowerCase() ?? '';
+  if (host.isNotEmpty) {
+    hosts.add(host);
+    if (!host.startsWith('www.')) hosts.add('www.$host');
+  }
+  return hosts;
+}
+
 class PendingRoomJoin {
   const PendingRoomJoin({required this.roomCode, this.gameId});
   final String roomCode;
@@ -46,7 +80,7 @@ class DeepLinks {
       room = uri.queryParameters['room'];
       game = uri.queryParameters['game'];
     } else if (uri.scheme == 'https' &&
-        uri.host == 'user.ghelghelishop.ir' &&
+        _webHosts.contains(uri.host.toLowerCase()) &&
         uri.queryParameters.containsKey('room')) {
       // https://user.ghelghelishop.ir/?game=card_duel&room=1234
       room = uri.queryParameters['room'];
