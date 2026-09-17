@@ -312,5 +312,74 @@ console.log('\n══ ۶) کپیِ فارسی، بدونِ ایموجی ══')
   }
 }
 
+console.log('\n══ ۷) «هیچ لیگی بدونِ ساختِ ادمین»: پنل نباید ۵۰۰ بدهد ══');
+{
+  // ── چرا این بخش اضافه شد ──────────────────────────────────────────────
+  //
+  // خواستهٔ مالک: «از این به بعد بدونِ ساختِ تنظیماتِ لیگ توسطِ ادمین هیچ
+  // لیگی نباید در جریان باشه.» تا آن روز `ensureActiveSeason()` بی‌قید یک
+  // فصل می‌ساخت، پس هیچ مسیری به حالتِ «فصلِ `null`» نمی‌رسید.
+  //
+  // در CI همین شکست خورد (`backend-e2e`): `PATCH /admin/league/current/prizes`
+  // با یک جدولِ جایزهٔ **سالم** کدِ ۵۰۰ برمی‌گرداند — یعنی «بدونِ لیگ، پنل
+  // می‌ترکد». حالا هر مسیر یا ۲۰۰ با پرچم می‌دهد یا ۴۰۹ با کدِ روشن.
+  const admin = stripComments(read('backend/src/routes/adminLeague.js'));
+  ok('کدِ ماشینی و پیامِ فارسی برای «لیگی نیست» تعریف شده',
+    /NO_ACTIVE_LEAGUE_CODE\s*=\s*'no_active_league'/.test(admin)
+    && /NO_ACTIVE_LEAGUE_MESSAGE\s*=\s*\n?\s*'در حال حاضر هیچ لیگِ فعالی/.test(admin));
+  ok('صفحهٔ «لیگ ماهانه» با پرچم باز می‌شود، نه با خطا',
+    /if \(!season\) \{[\s\S]{0,300}data\.noActiveLeague = true/.test(admin));
+  const guardHits = admin.match(/if \(!season\) return noActiveLeague\(res\);/g) || [];
+  ok('ذخیرهٔ جوایز و تغییرِ تاریخ هر دو نگهبانِ فصل دارند', guardHits.length === 2,
+    `${guardHits.length} از ۲`);
+  ok('بستنِ «لیگِ جاری» هم بدونِ لیگ ۴۰۹ می‌دهد',
+    /if \(!\(await ensureActiveSeason\(\)\)\) return noActiveLeague\(res\)/.test(admin));
+  ok('سرویسِ بستنِ فصل با فصلِ `null` برنمی‌گردد (به‌جای `season.id`)',
+    /if \(!season\) \{[\s\S]{0,200}skipped: 'no active season'/.test(
+      stripComments(read('backend/src/services/leagueService.js'))));
+
+  // ── گرم‌کردنِ کش در بوت ──
+  //
+  // گیت‌های سوکت **همگام** از کشِ شماره معکوس می‌خوانند؛ اگر کش در بوت سرد
+  // بماند، بعد از هر دیپلوی یک پنجرهٔ کوتاه باز می‌شود. ترتیب هم مهم است:
+  // اول کش، بعد تصمیمِ «شروعِ خودکارِ لیگ».
+  const boot = read('backend/src/server.js');
+  const iRef = boot.indexOf('leagueCountdown.refresh()');
+  ok('کشِ شماره معکوس در بوت گرم می‌شود',
+    iRef > 0 && boot.slice(iRef, iRef + 900).includes('await ensureActiveSeason();'),
+    `index=${iRef}`);
+  ok('و تستِ زنجیرهٔ CI این رفتار را می‌سنجد',
+    /no_active_league/.test(read('backend/scripts/testE2E.js')));
+  // ── مسیرِ داغِ امتیازِ لیگ ──
+  //
+  // دومین جایی که `season.id` روی `null` می‌ترکید: fallbackِ
+  // `addLeaguePoints` وقتی هیچ لیگی نیست. این یکی روی **مسیرِ داغِ بازیِ
+  // ضربه‌زن** بود، یعنی کاربر عادی با ۵۰۰ روبه‌رو می‌شد (روی سرور با
+  // `testLeaderboardSocket.js` گرفته شد).
+  ok('امتیازِ لیگ بدونِ فصلِ فعال بی‌صدا رد می‌شود (نه ۵۰۰ روی بازی)',
+    /if \(!season\) return;[\s\S]{0,600}\[season\.id, userId, points\]/.test(
+      stripComments(read('backend/src/services/leagueService.js'))));
+  ok('تستِ سوکتِ لیدربورد خودش لیگِ آزمایشی می‌سازد (بدونِ لیگِ خودکار)',
+    /admin\/league\/seasons/.test(read('backend/scripts/testLeaderboardSocket.js')));
+
+  // ── واگراییِ اسکیما: ستونِ `league_seasons.month_year` ──
+  //
+  // `001_initial_schema.sql` آن را `VARCHAR(7)` می‌سازد، ولی «دو لیگِ
+  // هم‌زمان» شناسهٔ بلندِ `monthly-2026-09-17` می‌سازد. روی تولید دستی به
+  // ۳۲ پهن شده بود و همان ALTER هرگز به `migrations/` نرسید؛ یعنی هر
+  // دیتابیسِ تازه‌ای (CI، بازیابی از بکاپ، نصبِ تازه) با ساختنِ لیگ از پنل
+  // ۵۰۰ می‌داد: `value too long for type character varying(7)`.
+  //
+  // حالا که ساختنِ لیگ توسطِ ادمین **مسیرِ اصلی** است، این باید در
+  // مایگریشن‌ها بسته شده باشد — نه با یک ALTER دستیِ دیگر روی سرور.
+  const migDir = path.join(ROOT, 'backend/migrations');
+  const widener = fs.readdirSync(migDir)
+    .filter((f) => f.endsWith('.sql'))
+    .find((f) => /ALTER TABLE league_seasons[\s\S]{0,120}ALTER COLUMN month_year TYPE VARCHAR\(32\)/
+      .test(fs.readFileSync(path.join(migDir, f), 'utf8').replace(/--[^\n]*/g, ' ')));
+  ok('مایگریشنی `month_year` را پهن می‌کند (دیتابیسِ تازه = تولید)',
+    !!widener, 'بدونِ آن، ساختنِ لیگِ دوم روی دیتابیسِ تازه ۵۰۰ می‌دهد');
+}
+
 console.log(`\n${fail === 0 ? '✓' : '✗'} ${pass} بررسی موفق، ${fail} ناموفق\n`);
 process.exit(fail === 0 ? 0 : 1);

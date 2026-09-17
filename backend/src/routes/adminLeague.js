@@ -12,6 +12,27 @@ module.exports = function createAdminLeagueRoutes(deps) {
   } = deps;
   const router = express.Router();
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // «هیچ لیگی بدونِ ساختِ ادمین در جریان نباشد» — و دیگر ۵۰۰ ندهیم
+  // ═══════════════════════════════════════════════════════════════════════════
+  //
+  // خواستهٔ مالک (۲۷ شهریور): «از این به بعد بدونِ ساختِ تنظیماتِ لیگ توسطِ
+  // ادمین هیچ لیگی نباید در جریان باشه.» تا آن روز `ensureActiveSeason()`
+  // بی‌قید یک فصلِ تازه می‌ساخت، پس این مسیرها هیچ‌وقت به حالتِ «لیگی در
+  // جریان نیست» نمی‌رسیدند و کسی متوجه نشده بود که هر خطی که `season.id`
+  // می‌خواند با `null` به `TypeError` و بعد ۵۰۰ تبدیل می‌شود.
+  //
+  // در CI روی همین کد گرفته شد: `PATCH /admin/league/current/prizes` با یک
+  // جدولِ جایزهٔ **سالم** هم کدِ ۵۰۰ برمی‌گرداند (job `backend-e2e`).
+  const NO_ACTIVE_LEAGUE_CODE = 'no_active_league';
+  const NO_ACTIVE_LEAGUE_MESSAGE =
+    'در حال حاضر هیچ لیگِ فعالی در جریان نیست. از همین صفحه یک لیگِ تازه بسازید، یا در «شماره معکوسِ لیگ» گزینهٔ «شروعِ خودکارِ لیگ» را روشن کنید.';
+  /** فصلِ فعال لازم است؛ اگر نبود پیامِ روشن می‌دهد و `null` برمی‌گرداند. */
+  function noActiveLeague(res) {
+    res.status(409).json({ code: NO_ACTIVE_LEAGUE_CODE, message: NO_ACTIVE_LEAGUE_MESSAGE });
+    return null;
+  }
+
 router.get('/admin/league', adminAuth, asyncHandler(async (req, res) => {
   const data = await getLeaderboard(100);
   data.winnerCount = await getLeagueWinnerCount();
@@ -36,13 +57,26 @@ router.get('/admin/league', adminAuth, asyncHandler(async (req, res) => {
   //    عنوانِ فصلِ ویرایش‌شونده هم برمی‌گردد تا پنل بتواند صریح بگوید
   //    «داری جوایزِ کدام لیگ را می‌چینی».
   const season = await ensureActiveSeason();
-  const { rows } = await pool.query(
-    'SELECT prize_table, perk_table, title, month_year FROM league_seasons WHERE id=$1',
-    [season.id]);
-  data.prizeTable = rows[0]?.prize_table || [];
-  data.perkTable = rows[0]?.perk_table || [];
-  data.seasonId = season.id;
-  data.editingSeasonTitle = rows[0]?.title || rows[0]?.month_year || '';
+  // ── لیگی در جریان نیست — و این حالا واقعاً پیش می‌آید ──
+  //
+  // پنل باید باز شود تا مدیر بتواند لیگ بسازد؛ پس اینجا ۲۰۰ با پرچمِ
+  // `noActiveLeague` می‌دهیم (نه ۵۰۰ و نه ۴۰۹): فرمِ جوایز خالی می‌ماند و
+  // صفحه پیامِ راهنما نشان می‌دهد.
+  if (!season) {
+    data.noActiveLeague = true;
+    data.prizeTable = [];
+    data.perkTable = [];
+    data.seasonId = null;
+    data.editingSeasonTitle = '';
+  } else {
+    const { rows } = await pool.query(
+      'SELECT prize_table, perk_table, title, month_year FROM league_seasons WHERE id=$1',
+      [season.id]);
+    data.prizeTable = rows[0]?.prize_table || [];
+    data.perkTable = rows[0]?.perk_table || [];
+    data.seasonId = season.id;
+    data.editingSeasonTitle = rows[0]?.title || rows[0]?.month_year || '';
+  }
 
   // فهرستِ آیتم‌های فروشگاه برای منویِ کشوییِ جایزهٔ غیرنقدی.
   // بدونِ این، مدیر باید slug را از حفظ تایپ کند — و یک تایپو تا لحظهٔ
@@ -55,6 +89,7 @@ router.get('/admin/league', adminAuth, asyncHandler(async (req, res) => {
 }));
 router.patch('/admin/league/current/prizes', adminAuth, requireRole(), asyncHandler(async (req, res) => {
   const season = await ensureActiveSeason();
+  if (!season) return noActiveLeague(res);
 
   // AUDIT FIX: prizeTable هرچه بود خام ذخیره می‌شد. یک مبلغ منفی (یا متنی
   // که به NaN تبدیل می‌شود) بعداً در closeActiveSeason به league_payouts
@@ -178,7 +213,13 @@ router.patch('/admin/league/current/prizes', adminAuth, requireRole(), asyncHand
     perkRanks: perkTable === null ? undefined : perkTable.length,
   });
 }));
-router.post('/admin/league/close', adminAuth, requireRole(), asyncHandler(async (req, res) => res.json(await closeActiveSeason({ force: req.body?.force === true }))));
+// ⚠️ بدونِ لیگِ فعال چیزی برای بستن نیست. پیش از این `ensureActiveSeason`
+//    همیشه یکی می‌ساخت؛ حالا که نمی‌سازد، بدونِ این بررسی دکمهٔ «بستنِ
+//    لیگِ جاری» به ۵۰۰ می‌خورد.
+router.post('/admin/league/close', adminAuth, requireRole(), asyncHandler(async (req, res) => {
+  if (!(await ensureActiveSeason())) return noActiveLeague(res);
+  res.json(await closeActiveSeason({ force: req.body?.force === true }));
+}));
 
 // ═══════════════════════════════════════════════════════════════════════════
 // تاریخِ شروع و پایانِ لیگ — به‌دستِ مدیر
@@ -192,6 +233,7 @@ router.post('/admin/league/close', adminAuth, requireRole(), asyncHandler(async 
 //    مدیر بی‌صدا برمی‌گردد.
 router.patch('/admin/league/current/dates', adminAuth, requireRole(), asyncHandler(async (req, res) => {
   const season = await ensureActiveSeason();
+  if (!season) return noActiveLeague(res);
   const startsAt = req.body.startsAt ? new Date(req.body.startsAt) : null;
   const endsAt = req.body.endsAt ? new Date(req.body.endsAt) : null;
 

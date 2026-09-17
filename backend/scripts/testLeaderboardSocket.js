@@ -101,6 +101,56 @@ async function seedTopCoins(userId) {
   }
 }
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * «هیچ لیگی بدونِ ساختِ تنظیماتِ لیگ توسطِ ادمین»
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * خواستهٔ مالک (۲۷ شهریور). تا آن روز `ensureActiveSeason` بی‌قید یک فصلِ
+ * تازه می‌ساخت، پس این تست همیشه فصلی فعال داشت که امتیازها رویش بنشیند.
+ * حالا ممکن است **هیچ** فصلی نباشد و آن‌وقت:
+ *
+ *   • امتیازِ ضربه‌زن جایی ثبت نمی‌شود، پس رویدادِ `leaderboard:update` هم
+ *     صادر نمی‌شود — و تستی که باید سیگنالِ زنده را بسنجد، بی‌معنا سبز
+ *     یا بی‌دلیل قرمز می‌شود. هر دو بد است.
+ *
+ * راه‌حل، همان راهکارِ خودِ محصول است: اگر لیگی نیست، ادمین یکی می‌سازد.
+ */
+async function ensureLeagueExists() {
+  const adminUser = process.env.E2E_ADMIN_USER || 'Admin';
+  const adminPass = process.env.E2E_ADMIN_PASS;
+  if (!adminPass) {
+    ok('فصلی فعال برای امتیازِ لیگ هست', false,
+      'E2E_ADMIN_PASS نداده‌ای؛ با خاموش‌بودنِ «شروعِ خودکارِ لیگ» ممکن است هیچ فصلی نباشد');
+    return null;
+  }
+  const login = await req('POST', '/api/admin/auth/login', {
+    body: { username: adminUser, password: adminPass },
+  });
+  const token = login.data?.token;
+  if (!token) {
+    ok('ادمین وارد شد (برای بررسی و ساختِ لیگ)', false, `status=${login.status}`);
+    return null;
+  }
+  const state = await req('GET', '/api/admin/league', { token });
+  if (!state.data?.noActiveLeague) {
+    ok('لیگِ فعال از قبل در جریان است', state.status === 200, `status=${state.status}`);
+    return token;
+  }
+  const made = await req('POST', '/api/admin/league/seasons', {
+    token,
+    body: {
+      title: 'لیگِ آزمایشیِ سوکتِ لیدربورد', leagueType: 'monthly',
+      startsAt: new Date(Date.now() - 3600e3).toISOString(),
+      endsAt: new Date(Date.now() + 20 * 86400e3).toISOString(),
+    },
+  });
+  ok('لیگِ آزمایشی ساخته شد — همان‌طور که فقط ادمین می‌تواند',
+    made.status === 201,
+    `status=${made.status} body=${JSON.stringify(made.data).slice(0, 140)}`);
+  return token;
+}
+
 async function main() {
   console.log(`\n╔══════════════════════════════════════════╗`);
   console.log(`║  تست زندهٔ سوکتِ لیدربورد                ║`);
@@ -130,6 +180,9 @@ async function main() {
   const viewer = await makeUser('بیننده');
   const player = await makeUser('بازیکن');
   ok('بیننده و بازیکن ساخته شدند', !!(viewer.token && player.token));
+
+  // پیش از هر امتیازی: لیگ باید در جریان باشد (توضیح در `ensureLeagueExists`).
+  const adminTokenAtStart = await ensureLeagueExists();
 
   // ── بیننده وصل و عضو اتاق می‌شود ────────────────────────────────────
   const viewerSock = await connect(viewer.token);
@@ -200,12 +253,17 @@ async function main() {
     const adminPass = process.env.E2E_ADMIN_PASS;
     if (!adminPass) throw new Error('TEST_SEASON_CLOSE=1 ولی E2E_ADMIN_PASS نداده‌ای');
 
-    const adminLogin = await req('POST', '/api/admin/auth/login', {
-      body: { username: adminUser, password: adminPass },
-    });
-    const adminToken = adminLogin.data?.token;
-    ok('ادمین وارد شد (برای بستنِ فصل)', adminLogin.status === 200 && !!adminToken,
-      `status=${adminLogin.status}`);
+    // توکنِ ادمین از فازِ آغازین می‌آید (همان‌جا وارد شد و در صورتِ نبودِ
+    // لیگ یکی ساخت). اگر به هر دلیلی نبود، همین‌جا وارد می‌شویم.
+    let adminToken = adminTokenAtStart;
+    if (!adminToken) {
+      const adminLogin = await req('POST', '/api/admin/auth/login', {
+        body: { username: adminUser, password: adminPass },
+      });
+      adminToken = adminLogin.data?.token;
+      ok('ادمین وارد شد (برای بستنِ فصل)', adminLogin.status === 200 && !!adminToken,
+        `status=${adminLogin.status}`);
+    }
 
     // یک بینندهٔ تازه که عضو اتاق است.
     const closerViewer = await connect(viewer.token);

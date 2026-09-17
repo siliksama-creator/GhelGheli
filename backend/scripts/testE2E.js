@@ -1008,6 +1008,56 @@ async function testAuditFindings() {
   if (!ctx.adminToken) { skipped('جدول جایزهٔ لیگ', 'توکن مدیر نداریم'); return; }
   const A = ctx.adminToken;
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // «هیچ لیگی بدونِ ساختِ تنظیماتِ لیگ توسطِ ادمین»
+  // ═══════════════════════════════════════════════════════════════════════════
+  //
+  // خواستهٔ مالک (۲۷ شهریور). تا آن روز `ensureActiveSeason()` بی‌قید یک فصلِ
+  // تازه می‌ساخت، پس حالتِ «لیگی در جریان نیست» روی هیچ دیتابیسی دیده
+  // نمی‌شد و هیچ‌کس نفهمیده بود که مسیرهای پنل با فصلِ `null` به ۵۰۰
+  // می‌خورند.
+  //
+  // ── چرا این تست اینجاست و نه در تست‌های واحد ──
+  //
+  // همان شکستی که در CI گرفت: `PATCH /admin/league/current/prizes` با یک
+  // جدولِ جایزهٔ **سالم** کدِ ۵۰۰ برمی‌گرداند. تست واحد نمی‌توانست ببیندش،
+  // چون به سرورِ واقعی و دیتابیسِ خالیِ تازه‌مایگریشن‌شده نیاز دارد.
+  group('⚠️ «هیچ لیگی بدونِ ساختِ ادمین»: مسیرهای پنل نباید ۵۰۰ بدهند');
+  const leagueState = await GET('/api/admin/league', A);
+  ok(leagueState.status === 200,
+    'صفحهٔ «لیگ ماهانه» حتی بدونِ فصلِ فعال هم باز می‌شود',
+    `status=${leagueState.status}`);
+  if (leagueState.data?.noActiveLeague) {
+    ok(leagueState.data?.seasonId === null && Array.isArray(leagueState.data?.prizeTable),
+      'پنل با پرچمِ روشن می‌گوید لیگی در جریان نیست (نه خطای سرور)');
+    const noLeague = await PATCH('/api/admin/league/current/prizes',
+      { prizeTable: [{ rank: 1, amount: 1000 }] }, A);
+    ok(noLeague.status === 409 && noLeague.data?.code === 'no_active_league',
+      'ذخیرهٔ جوایز بدونِ لیگ: ۴۰۹ با کدِ روشن، نه ۵۰۰',
+      `status=${noLeague.status} code=${noLeague.data?.code}`);
+    const noDates = await PATCH('/api/admin/league/current/dates', {
+      startsAt: new Date(Date.now() - 3600e3).toISOString(),
+      endsAt: new Date(Date.now() + 86400e3).toISOString(),
+    }, A);
+    ok(noDates.status === 409, 'تغییرِ تاریخِ «لیگِ جاری» بدونِ لیگ هم ۴۰۹ می‌دهد',
+      `status=${noDates.status}`);
+    const noClose = await POST('/api/admin/league/close', { force: true }, A);
+    ok(noClose.status === 409, 'بستنِ «لیگِ جاری» بدونِ لیگ ۴۰۹ می‌دهد (قبلاً ۵۰۰)',
+      `status=${noClose.status}`);
+
+    // و حالا همان کاری که مالک خواسته: فقط ادمین لیگ می‌سازد.
+    const made = await POST('/api/admin/league/seasons', {
+      title: 'لیگِ آزمایشیِ E2E', leagueType: 'monthly',
+      startsAt: new Date(Date.now() - 3600e3).toISOString(),
+      endsAt: new Date(Date.now() + 20 * 86400e3).toISOString(),
+    }, A);
+    ok(made.status === 201 && made.data?.season?.status === 'active',
+      'ادمین لیگ می‌سازد و از همان لحظه فعال است',
+      `status=${made.status} seasonStatus=${made.data?.season?.status}`);
+  } else {
+    skipped('حالتِ «لیگی در جریان نیست»', 'دیتابیس از قبل لیگِ فعال دارد');
+  }
+
   group('⚠️ جدول جایزهٔ لیگ: مقدار بد نباید بستن لیگ را بخواباند');
   // یافتهٔ ممیزی: prizeTable خام ذخیره می‌شد. یک مبلغ منفی بعداً قید
   // league_payouts_amount_check را می‌شکست و **کل بستن لیگ** شکست

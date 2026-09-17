@@ -371,6 +371,16 @@ async function addLeaguePoints(client, userId, points) {
   // امتیازِ کاربر **بی‌صدا گم می‌شود**. آن بدتر از ثبت در لیگِ منقضی است.
   if (rowCount === 0) {
     const season = await ensureActiveSeason(client);
+    // ── هیچ لیگی در جریان نیست ──
+    //
+    // با خاموش‌بودنِ «شروعِ خودکارِ لیگ» ممکن است هیچ فصلی فعال نباشد؛
+    // امتیازِ لیگ هم جایی برای ثبت ندارد و «گم شدن» بی‌معنا است.
+    //
+    // ⚠️ بدونِ این خط، `season.id` روی `null` می‌ترکید و **کلِ درخواستِ
+    //    بازی ضربه‌زن با ۵۰۰ برمی‌گشت** — کاربر فقط یک خطای سرور می‌دید.
+    //    روی سرور با `testLeaderboardSocket.js` گرفته شد:
+    //    `Cannot read properties of null (reading 'id')`.
+    if (!season) return;
     await client.query(
       `INSERT INTO league_leaderboard_entries(league_season_id,user_id,points)
        VALUES($1,$2,$3)
@@ -668,6 +678,15 @@ async function closeActiveSeason({ force = false, seasonId = null } = {}) {
       }
     } else {
       season = await ensureActiveSeason(client);
+    }
+    // ── لیگی در جریان نیست ──
+    //
+    // با خاموش‌بودنِ «شروعِ خودکارِ لیگ» این حالت واقعاً پیش می‌آید
+    // (پیش از این `ensureActiveSeason` همیشه یکی می‌ساخت). خطِ بعدی
+    // `season.id` می‌خواند و با `null` به ۵۰۰ تبدیل می‌شد.
+    if (!season) {
+      await client.query('ROLLBACK');
+      return { seasonId: null, winners: 0, skipped: 'no active season' };
     }
     const locked = await client.query(
       'SELECT status, ends_at FROM league_seasons WHERE id=$1 FOR UPDATE', [season.id]);
