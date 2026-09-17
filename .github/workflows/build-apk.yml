@@ -242,15 +242,28 @@ jobs:
           ok=0
           for attempt in 1 2 3 4; do
             echo "── flutter build attempt $attempt ──"
+            # ⚠️ پیش‌فرضِ `PUBLIC_WEB_URL` باید همان آدرسی باشد که واقعاً
+            #    جواب می‌دهد: `ghelghelishop.ir` بدونِ زیردامنه از بیرون
+            #    پاسخ نمی‌دهد (بررسیِ زنده: کدِ ۰۰۰)، پس هر نسخه‌ای که با آن
+            #    ساخته شود لینکِ دعوتِ مرده پخش می‌کند. این مقدار باید با
+            #    `share_invite.dart` و بک‌اند یکی بماند؛ گاردِ
+            #    `testDomainPortability.js` همین را می‌سنجد.
+            #
+            # ═══════════════════════════════════════════════════════════════
+            # 🔴 کامنت **داخلِ** این دستور نگذار
+            # ═══════════════════════════════════════════════════════════════
+            # نسخهٔ اولِ همین توضیح، وسطِ دستورِ `flutter build apk` (بینِ
+            # خطوطِ ادامه‌دارِ `\`) نوشته شده بود. نتیجه: شل، خطِ کامنت را
+            # به خطِ قبلی چسباند و کامنت، **بقیهٔ دستور را خورد**؛ خطِ بعدی
+            # به‌عنوان یک فرمانِ تازه اجرا شد
+            # (`--dart-define=…: No such file or directory`) و مرحله با
+            # شکست تمام شد — با اینکه APK ساخته شده بود. دو تعریفِ آخر
+            # (`PUBLIC_WEB_URL` و `APP_RELEASE`) هم بی‌سروصدا از بیلد
+            # افتادند. گاردِ `testDomainPortability.js` حالا نبودِ کامنت
+            # داخلِ این دستور را می‌سنجد.
             if flutter build apk --release --split-per-abi \
               --target-platform=android-arm,android-arm64 \
               --dart-define=API_BASE_URL=${{ vars.API_BASE_URL || 'https://api.ghelghelishop.ir' }} \
-              # ⚠️ پیش‌فرض باید همان آدرسی باشد که واقعاً جواب می‌دهد.
-              #    `ghelghelishop.ir` بدونِ زیردامنه از بیرون پاسخ نمی‌دهد
-              #    (بررسیِ زنده: کدِ ۰۰۰)، پس هر نسخه‌ای که با آن ساخته شود
-              #    لینکِ دعوتِ مرده پخش می‌کند. این مقدار باید با
-              #    `share_invite.dart` و بک‌اند یکی بماند؛ گاردِ
-              #    `testDomainPortability.js` همین را می‌سنجد.
               --dart-define=PUBLIC_WEB_URL=${{ vars.PUBLIC_WEB_URL || 'https://user.ghelghelishop.ir' }} \
               --dart-define=APP_RELEASE="$APP_RELEASE"; then
               ok=1

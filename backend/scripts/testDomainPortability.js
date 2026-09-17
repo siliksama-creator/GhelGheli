@@ -76,6 +76,17 @@ console.log('\n══ ۱) اپ (Flutter): آدرس‌ها از متغیرِ بی
   //    جدا بیفتند.
   ok('پیش‌فرضِ PUBLIC_WEB_URL در ورک‌فلو همان دامنهٔ کارکننده است',
     /vars\.PUBLIC_WEB_URL \|\| 'https:\/\/user\.ghelghelishop\.ir'/.test(apk));
+  // 🔴 کامنت داخلِ یک دستورِ ادامه‌دار (`\` در آخرِ خط) خطرناک است: شل
+  //    خطِ بعد را به همان دستور می‌چسباند و `#` بقیهٔ دستور را می‌خورد.
+  //    نسخهٔ اولِ همین توضیح‌ها دقیقاً همین‌جا بود و بیلدِ APK را با
+  //    شکست تمام کرد، در حالی که APK ساخته شده بود و دو تعریفِ آخر هم
+  //    بی‌صدا حذف شده بودند. این بررسی همان باگ را قفل می‌کند.
+  const cmdStart = apk.indexOf('if flutter build apk');
+  const cmdEnd = apk.indexOf('; then', cmdStart);
+  const buildCmd = cmdStart < 0 || cmdEnd < 0 ? '' : apk.slice(cmdStart, cmdEnd);
+  ok('دستورِ بیلدِ APK هیچ کامنتی داخلش ندارد (وگرنه شل بقیهٔ دستور را می‌خورد)',
+    buildCmd.length > 0 && !/#/.test(buildCmd));
+
   ok('و در `share_invite.dart` هم همان دامنه پیش‌فرض است',
     /defaultValue: 'https:\/\/user\.ghelghelishop\.ir'/.test(share));
 }
