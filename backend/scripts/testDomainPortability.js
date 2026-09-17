@@ -40,7 +40,19 @@ console.log('\n══ ۱) اپ (Flutter): آدرس‌ها از متغیرِ بی
   ok('دامنهٔ لینکِ دعوت از `PUBLIC_WEB_URL` خوانده می‌شود',
     /String\.fromEnvironment\(\s*'PUBLIC_WEB_URL'/.test(share));
 
+  // ⚠️ رگرسیونِ واقعی که در بررسیِ زنده پیدا شد: پیش‌فرضِ اپ دامنهٔ اصلی
+  //    بود که از بیرون جواب نمی‌دهد (کدِ ۰۰۰) در حالی که بک‌اند از زیردامنهٔ
+  //    `user.` استفاده می‌کند (کدِ ۲۰۰). یعنی متنِ دعوت لینکِ مرده داشت.
+  //    این‌جا قفل می‌شود که هر سه جا یک میزبان را نشان بدهند.
+  const backendShareHost = (read('backend/src/services/presenceService.js')
+    .match(/'https:\/\/([a-z.]+)'/) || [])[1];
+  const appHost = (share.match(/defaultValue:\s*'https:\/\/([a-z.]+)'/) || [])[1];
+  ok('دامنهٔ پیش‌فرضِ اپ و بک‌اند یکی است (لینکِ دعوت و اتاق یک‌جا را نشان می‌دهند)',
+    !!backendShareHost && appHost === backendShareHost, `اپ=${appHost} بک‌اند=${backendShareHost}`);
+
   const deep = read('mobile/lib/core/deep_links.dart');
+  ok('دامنهٔ پیش‌فرضِ لینکِ اتاق هم همان میزبانِ پاسخ‌دهنده است',
+    new RegExp(`defaultValue: 'https://${backendShareHost}'`).test(deep), backendShareHost);
   ok('لینکِ ورود به اتاق، دامنه را از متغیر می‌گیرد (نه چسبیده در کد)',
     /String\.fromEnvironment\(\s*'PUBLIC_WEB_URL'/.test(deep) && /_collectWebHosts\(\)/.test(deep));
   ok('دامنهٔ فعلی هم در فهرستِ پذیرفته‌شده می‌ماند (لینک‌های قدیمی نمی‌شکنند)',

@@ -83,9 +83,15 @@ enum ShareOutcome {
 /// متن دعوت — اعداد از سرور (`/api/config.referral`) می‌آیند تا با تغییر
 /// پنل بدون آپدیت اپ عوض شوند. پیش‌فرض‌ها همان مقادیر تاریخی‌اند.
 /// دامنهٔ عمومی وب — از --dart-define=PUBLIC_WEB_URL در CI قابل override است.
+///
+/// ⚠️ پیش‌فرض عوض شد (۲۶ شهریور): قبلاً دامنهٔ اصلی (`ghelghelishop.ir`
+/// بدونِ زیردامنه) بود که از بیرون هیچ پاسخی نمی‌دهد (بررسیِ زنده: کدِ ۰۰۰،
+/// در حالی که `user.ghelghelishop.ir` کدِ ۲۰۰ می‌دهد). یعنی متنِ دعوتی که
+/// کاربر می‌فرستاد، لینکِ مرده داشت. حالا همان آدرسی است که بک‌اند هم در
+/// لینکِ اشتراکِ اتاق استفاده می‌کند تا هر دو یک جا را نشان بدهند.
 const String kPublicWebUrl = String.fromEnvironment(
   'PUBLIC_WEB_URL',
-  defaultValue: 'https://ghelghelishop.ir',
+  defaultValue: 'https://user.ghelghelishop.ir',
 );
 
 String inviteMessage(
