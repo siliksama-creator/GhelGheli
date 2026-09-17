@@ -407,7 +407,12 @@ function App() {
       )}
 
       {token ? (
-        <Portal token={token} logout={logout} cfg={cfg} />
+        <Portal token={token} logout={logout} cfg={cfg} onToken={t => {
+          // توکنِ تازه (بعد از تغییرِ رمز) باید جایی بنشیند که رفرشِ صفحه هم
+          // از آن استفاده کند — وگرنه کاربر با اولین رفرش بیرون می‌افتد.
+          try { localStorage.token = t; } catch { /* private mode */ }
+          setToken(t);
+        }} />
       ) : (
         <>
           <Auth mode={mode} setMode={setMode}
@@ -421,7 +426,7 @@ function App() {
   );
 }
 
-function Portal({ token, logout, cfg }) {
+function Portal({ token, logout, cfg, onToken }) {
   const sharedRoom = new URLSearchParams(window.location.search).get('room');
   const [tab, setTab] = useState(sharedRoom ? 'club' : 'home');
   const [p, setP] = useState(null);
@@ -654,7 +659,7 @@ function Portal({ token, logout, cfg }) {
           <Ledger token={token} setMsg={setMsg} />
         )}
         {tab === 'profile' && (
-          <Profile token={token} p={p} load={load} setMsg={setMsg} />
+          <Profile token={token} p={p} load={load} setMsg={setMsg} onToken={onToken} />
         )}
         {tab === 'rewards' && (
           <Rewards token={token} setMsg={setMsg} reloadProfile={load} />

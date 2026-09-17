@@ -337,7 +337,42 @@ const imageUpload = multer({
 });
 
 const asyncHandler = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
-const signUser = user => jwt.sign({ sub: user.id, type: 'user' }, JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '30d' });
+// ═══════════════════════════════════════════════════════════════════════════
+// جلسهٔ کاربر «تمام نمی‌شود» (خواستهٔ مالک، ۲۶ شهریور)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// قبلاً: توکنِ کاربر ۳۰ روزه بود و بعد از آن کاربر باید دوباره شماره و کد
+// را وارد می‌کرد. مالک گفت: «وقتی ورودِ موفق داشتند، جلسه‌شان برای همیشه
+// فعال بماند» — پس عمرِ توکن به ۱۰ سال رفت که عملاً «همیشه» است (هر اپِ
+// زنده‌ای بیش از ۱۰ سال بدونِ آپدیت نمی‌ماند) و با JWT_EXPIRES_IN قابلِ
+// تنظیم است.
+//
+// ⚠️ توکنِ طولانی بدونِ «کلیدِ خاموش‌کردن» یک قرضِ امنیتی است. آن کلید
+//    ستونِ `users.session_epoch` است (migration 092) که به‌شکلِ claimِ `tv`
+//    داخلِ توکن می‌رود و در auth/authOptional/سوکت بررسی می‌شود. هر تغییرِ
+//    رمز عدد را بالا می‌برد ⇒ همهٔ توکن‌های قبلی همان لحظه بی‌اعتبار.
+//
+// توکنِ **ادمین** عمداً ۱۲ ساعته ماند: پنلِ مدیریت دسترسیِ پول و کاربران را
+// دارد و اگر گوشیِ یک ادمین گم شود، جلسهٔ همیشه‌به‌همراهش فاجعه است.
+const USER_TOKEN_TTL = process.env.JWT_EXPIRES_IN || '3650d';
+const signUser = user => jwt.sign(
+  { sub: user.id, type: 'user', tv: Number(user.session_epoch || 0) },
+  JWT_SECRET,
+  { expiresIn: USER_TOKEN_TTL },
+);
+/**
+ * توکنی که همین حالا در دستِ کاربر است با نسخهٔ جلسهٔ فعلیِ حسابش می‌خواند؟
+ *
+ * چرا تابعِ جدا: این بررسی در چهار جا لازم است (auth، authOptional، سوکت و
+ * تست). چهار کپیِ دستی یعنی روزی یکی‌شان جا می‌ماند و «خاموش‌کردنِ جلسه»
+ * بی‌صدا از کار می‌افتد.
+ *
+ * توکنِ بدونِ `tv` (صادرشده قبل از این تغییر) عمداً ۰ حساب می‌شود تا
+ * کاربرانِ واردشدهٔ فعلی یک‌باره از حسابشان پرت نشوند.
+ */
+function sessionEpochMatches(payload, userRow) {
+  return Number(payload?.tv || 0) === Number(userRow?.session_epoch || 0);
+}
 const signAdmin = admin => jwt.sign({ sub: admin.id, type: 'admin', role: admin.role }, JWT_SECRET, { expiresIn: '12h' });
 /**
  * شمارهٔ موبایل / نام کاربری را به شکل متعارف در می‌آورد.
@@ -389,6 +424,8 @@ async function auth(req, res, next) {
     if (payload.type !== 'user') throw new Error('bad token');
     const { rows } = await pool.query('SELECT * FROM users WHERE id=$1', [payload.sub]);
     if (!rows[0] || rows[0].status !== 'active') return res.status(401).json({ message: 'کاربر فعال نیست' });
+    // توکنِ صادرشدهٔ قبل از آخرین تغییرِ رمز، مرده است.
+    if (!sessionEpochMatches(payload, rows[0])) return res.status(401).json({ message: 'نیاز به ورود مجدد دارید' });
     req.user = rows[0]; next();
   } catch { res.status(401).json({ message: 'نیاز به ورود مجدد دارید' }); }
 }
@@ -403,7 +440,7 @@ async function authOptional(req, res, next) {
     const payload = jwt.verify(token, JWT_SECRET);
     if (payload.type !== 'user') return next();
     const { rows } = await pool.query('SELECT * FROM users WHERE id=$1', [payload.sub]);
-    if (rows[0] && rows[0].status === 'active') req.user = rows[0];
+    if (rows[0] && rows[0].status === 'active' && sessionEpochMatches(payload, rows[0])) req.user = rows[0];
   } catch { /* مهمان فرض می‌کنیم */ }
   return next();
 }
@@ -1367,8 +1404,22 @@ app.post('/api/profile/change-password', auth, changePasswordLimiter, asyncHandl
   if (!req.user.password_hash || !currentPassword || !(await bcrypt.compare(String(currentPassword), req.user.password_hash))) {
     return res.status(401).json({ message: 'رمز فعلی درست نیست' });
   }
-  await pool.query('UPDATE users SET password_hash=$1, updated_at=NOW() WHERE id=$2', [await bcrypt.hash(String(newPassword), 12), req.user.id]);
-  res.json({ message: 'رمز عبور با موفقیت تغییر کرد' });
+  // ═══════════════════════════════════════════════════════════════════════
+  // تغییرِ رمز ⇒ بالا رفتنِ نسخهٔ جلسه ⇒ همهٔ دستگاه‌های دیگر بیرون
+  // ═══════════════════════════════════════════════════════════════════════
+  // خواستهٔ مالک این بود که کاربر «همیشه وارد بماند»، پس اگر فقط توکن‌ها را
+  // می‌کشتیم، خودِ کاربری که همین حالا رمزش را عوض کرده هم پرت می‌شد و این
+  // شبیهِ خرابی به‌نظر می‌رسید. پس همین دستگاه توکنِ تازه می‌گیرد و بقیه
+  // می‌میرند. کلاینتی که پیام را نادیده بگیرد هم چیزِ بدی نمی‌بیند: در
+  // درخواستِ بعدی ۴۰۱ می‌گیرد و (مثلِ قبل) صفحهٔ ورود می‌آید.
+  const { rows } = await pool.query(
+    'UPDATE users SET password_hash=$1, session_epoch=session_epoch+1, updated_at=NOW() WHERE id=$2 RETURNING *',
+    [await bcrypt.hash(String(newPassword), 12), req.user.id],
+  );
+  res.json({
+    message: 'رمز عبور با موفقیت تغییر کرد — بقیهٔ دستگاه‌ها از حساب خارج شدند',
+    token: signUser(rows[0]),
+  });
 }));
 
 app.get('/api/users/:id/public', auth, validateUuid('id'), asyncHandler(async (req, res) => {
@@ -2972,9 +3023,12 @@ io.use(async (socket, next) => {
     const { rows } = await pool.query(`SELECT id,nickname,first_name,last_name,
       profile_image_url,profile_avatar_key,chat_banned_until,status,
       lifetime_points,current_points,game_xp,coins, equipped_club,equipped_frame,
-      equipped_color,equipped_profile_background,equipped_emote_pack,profile_title
+      equipped_color,equipped_profile_background,equipped_emote_pack,profile_title,
+      session_epoch
       FROM users WHERE id=$1`, [payload.sub]);
     if (!rows[0] || rows[0].status !== 'active') throw new Error('inactive');
+    // همان بررسیِ REST برای سوکت: تغییرِ رمز یعنی سوکت‌های قدیمی هم بمیرند.
+    if (!sessionEpochMatches(payload, rows[0])) throw new Error('stale-session');
     const socketCosmetics = await shop.cosmeticsFor([rows[0].id]);
     socket.user = {
       ...rows[0],

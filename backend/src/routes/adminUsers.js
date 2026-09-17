@@ -475,10 +475,17 @@ router.post('/admin/users/:id/reset-password', adminAuth, validateUuid('id'), re
   const newPassword = String(req.body.newPassword || '');
   if (!isValidPasswordLength(newPassword)) return res.status(400).json({ message: 'رمز جدید باید بین ۶ تا ۷۲ کاراکتر باشد' });
   const hash = await bcrypt.hash(newPassword, 12);
-  const { rows } = await pool.query('UPDATE users SET password_hash=$1, updated_at=NOW() WHERE id=$2 RETURNING id,mobile', [hash, req.params.id]);
+  // `session_epoch+1` — این مسیر همان «کاربر گوشی‌اش را گم کرده» است، پس
+  // باید جلسهٔ روی همان گوشی هم بمیرد؛ وگرنه پشتیبانی رمز را عوض می‌کرد و
+  // توکنِ ۱۰سالهٔ قدیمی (که حالا «همیشگی» است) دستِ پیداکنندهٔ گوشی می‌ماند.
+  // migration 092.
+  const { rows } = await pool.query(
+    'UPDATE users SET password_hash=$1, session_epoch=session_epoch+1, updated_at=NOW() WHERE id=$2 RETURNING id,mobile',
+    [hash, req.params.id],
+  );
   if (!rows[0]) return res.status(404).json({ message: 'کاربر پیدا نشد' });
   await audit(req.admin.id, 'admin_reset_user_password', 'users', req.params.id, req.body.reason || 'بازیابی رمز توسط پشتیبانی (SMS هنوز فعال نیست)', {});
-  res.json({ message: 'رمز عبور کاربر تغییر کرد' });
+  res.json({ message: 'رمز عبور کاربر تغییر کرد — دستگاه‌های آن کاربر از حساب خارج شدند' });
 }));
 
   return router;

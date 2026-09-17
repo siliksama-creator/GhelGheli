@@ -9,7 +9,7 @@ import { clubImg, CosmeticAvatarFrame, DisplayName, profileBackgroundClass, prof
 import Field from '../components/Field.jsx';
 
 
-export default function Profile({ token, p, load, setMsg }) {
+export default function Profile({ token, p, load, setMsg, onToken }) {
   useLive();
   const u = p.user;
   const [edit, setEdit] = useState({
@@ -50,8 +50,18 @@ export default function Profile({ token, p, load, setMsg }) {
     setPwMsg('');
     setChangingPw(true);
     try {
-      await req('/api/profile/change-password', 'POST', pw, token);
-      setPwMsg('رمز عبور با موفقیت تغییر کرد');
+      const res = await req('/api/profile/change-password', 'POST', pw, token);
+      // ═══════════════════════════════════════════════════════════════════════
+      // تغییرِ رمز یعنی «بقیهٔ دستگاه‌ها بیرون» (session_epoch در سرور) و
+      // سرور برای همین مرورگر توکنِ تازه می‌فرستد. اگر ذخیره نشود، اولین
+      // درخواستِ بعدی ۴۰۱ می‌شود و کاربر بلافاصله از حسابش پرت می‌شود —
+      // خلافِ خواستهٔ مالک که «همیشه وارد بماند».
+      // ═══════════════════════════════════════════════════════════════════════
+      if (res && typeof res.token === 'string' && res.token) {
+        try { localStorage.token = res.token; } catch { /* private mode */ }
+        if (typeof onToken === 'function') onToken(res.token);
+      }
+      setPwMsg((res && res.message) || 'رمز عبور با موفقیت تغییر کرد');
       setPw({ currentPassword: '', newPassword: '' });
     } catch (err) { setPwMsg(err.message); } finally { setChangingPw(false); }
   }

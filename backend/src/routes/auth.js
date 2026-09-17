@@ -69,8 +69,11 @@ router.post('/auth/register', asyncHandler(async (req, res) => {
   const nick = nicknamePolicy.validate(nickname, { allowEmpty: true });
   if (!nick.ok) return res.status(400).json({ message: nick.error, code: nick.code });
   const hash = await bcrypt.hash(password, 12);
+  // `session_epoch=session_epoch+1` — رمزِ تازه یعنی توکن‌های صادرشدهٔ قبلیِ
+  // همین حساب (اگر بود) بی‌اعتبار شوند. RETURNING عددِ جدید را می‌دهد، پس
+  // توکنی که پایین‌تر صادر می‌شود سالم است. جزئیات: migration 092.
   const updated = await pool.query(
-    'UPDATE users SET password_hash=$1, first_name=$2, last_name=$3, nickname=$4, updated_at=NOW() WHERE mobile=$5 RETURNING *',
+    'UPDATE users SET password_hash=$1, first_name=$2, last_name=$3, nickname=$4, session_epoch=session_epoch+1, updated_at=NOW() WHERE mobile=$5 RETURNING *',
     [hash, firstName, lastName, nick.value, mobile]
   );
 
@@ -226,7 +229,7 @@ router.post('/auth/register-password', userLoginLimiter, asyncHandler(async (req
   const { rows } = await pool.query(
     `INSERT INTO users(mobile,mobile_verified,password_hash,first_name,last_name,nickname,age,city,province,profile_image_url,profile_avatar_key,bank_account,status)
      VALUES($1,true,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'active')
-     ON CONFLICT(mobile) DO UPDATE SET password_hash=EXCLUDED.password_hash, first_name=EXCLUDED.first_name, last_name=EXCLUDED.last_name, nickname=EXCLUDED.nickname, age=EXCLUDED.age, city=EXCLUDED.city, province=EXCLUDED.province, profile_image_url=EXCLUDED.profile_image_url, profile_avatar_key=EXCLUDED.profile_avatar_key, bank_account=EXCLUDED.bank_account, mobile_verified=true, updated_at=NOW()
+     ON CONFLICT(mobile) DO UPDATE SET password_hash=EXCLUDED.password_hash, first_name=EXCLUDED.first_name, last_name=EXCLUDED.last_name, nickname=EXCLUDED.nickname, age=EXCLUDED.age, city=EXCLUDED.city, province=EXCLUDED.province, profile_image_url=EXCLUDED.profile_image_url, profile_avatar_key=EXCLUDED.profile_avatar_key, bank_account=EXCLUDED.bank_account, mobile_verified=true, session_epoch=users.session_epoch+1, updated_at=NOW()
      RETURNING *`,
 
     // همان محدودیت طولی که PATCH /api/profile اعمال می‌کند، تا رشتهٔ بلند
@@ -348,8 +351,14 @@ router.post('/auth/forgot-password/reset', otpVerifyLimiter, asyncHandler(async 
   const { rows } = await pool.query("SELECT * FROM otp_codes WHERE mobile=$1 AND purpose='reset_password' AND consumed_at IS NULL AND expires_at>NOW() ORDER BY created_at DESC LIMIT 1", [mobile]);
   if (!rows[0] || !(await bcrypt.compare(String(code || ''), rows[0].code_hash))) return res.status(400).json({ message: 'کد بازیابی معتبر نیست' });
   await pool.query('UPDATE otp_codes SET consumed_at=NOW() WHERE id=$1', [rows[0].id]);
-  await pool.query('UPDATE users SET password_hash=$1 WHERE mobile=$2', [await bcrypt.hash(newPassword, 12), mobile]);
-  res.json({ message: 'رمز عبور تغییر کرد' });
+  // بازیابیِ رمز یعنی «حسابم دستِ کسی افتاده» — پس همهٔ دستگاه‌ها باید بیرون
+  // بیایند، نه فقط رمز عوض شود. بدونِ این خط، توکنِ ۱۰سالهٔ دزد روی گوشیِ
+  // دزدیده‌شده حتی بعد از بازیابیِ رمز هم کار می‌کرد (migration 092).
+  await pool.query(
+    'UPDATE users SET password_hash=$1, session_epoch=session_epoch+1 WHERE mobile=$2',
+    [await bcrypt.hash(newPassword, 12), mobile],
+  );
+  res.json({ message: 'رمز عبور تغییر کرد — همهٔ دستگاه‌ها از حساب خارج شدند' });
 }));
 
   return router;

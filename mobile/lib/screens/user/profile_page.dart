@@ -149,15 +149,26 @@ class _ProfilePageState extends State<ProfilePage> {
       _passwordMessage = null;
     });
     try {
-      await widget.api.post('/api/profile/change-password', {
+      final res = await widget.api.post('/api/profile/change-password', {
         'currentPassword': _currentPassword.text,
         'newPassword': _newPassword.text,
       });
+      // ═══════════════════════════════════════════════════════════════════════
+      // تغییرِ رمز، بقیهٔ دستگاه‌ها را از حساب بیرون می‌کند (session_epoch) و
+      // سرور برای *همین* دستگاه یک توکنِ تازه می‌فرستد. اگر اینجا ذخیره
+      // نشود، کاربر بلافاصله با اولین درخواستِ بعدی ۴۰۱ می‌خورد و از حساب
+      // پرت می‌شود — دقیقاً خلافِ خواستهٔ مالک («همیشه وارد بماند»).
+      // ═══════════════════════════════════════════════════════════════════════
+      if (res is Map && res['token'] is String && (res['token'] as String).isNotEmpty) {
+        await widget.api.saveToken(res['token'] as String);
+      }
       _currentPassword.clear();
       _newPassword.clear();
       if (!mounted) return;
       setState(() {
-        _passwordMessage = 'رمز عبور با موفقیت تغییر کرد';
+        _passwordMessage = (res is Map && res['message'] is String)
+            ? res['message'] as String
+            : 'رمز عبور با موفقیت تغییر کرد';
         _passwordMessageIsError = false;
       });
     } catch (e) {
