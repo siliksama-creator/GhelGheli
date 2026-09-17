@@ -1,0 +1,14 @@
+[Unit]
+Description=GhelGheli attack watcher (60s) — هشدارِ حمله در تلگرام
+Documentation=file:/var/www/GhelGheli/monitor/attack-watch.sh
+After=network-online.target
+
+[Service]
+Type=oneshot
+# ⚠️ root لازم است: لاگِ nginx (0640 www-data:adm) و فایلِ تنظیماتِ تلگرام
+#    (0600 در /root) هر دو برای کاربرِ سرویس قابلِ خواندن نیستند. خودِ
+#    اسکریپت هیچ چیزی را تغییر نمی‌دهد؛ فقط می‌خواند و پیام می‌فرستد.
+ExecStart=/bin/bash /var/www/GhelGheli/monitor/attack-watch.sh
+# اگر پیامِ تلگرام کند بود، اجرای بعدی پشتِ این نماند.
+TimeoutStartSec=50
+Nice=10
