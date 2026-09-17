@@ -225,7 +225,8 @@ WEB="$(curl -s -o /dev/null -w '%{http_code}' -m 5 http://127.0.0.1:8088/ 2>/dev
 GG="$(curl -s -o /dev/null -w '%{http_code}' -m 5 http://127.0.0.1:4000/health 2>/dev/null)"
 say "  وبِ Invoicle (8088): $WEB   |   قلقلی (/health): $GG"
 SLICE_BYTES="$(cat "/sys/fs/cgroup/${SLICE}/memory.current" 2>/dev/null || echo 0)"
-say "  مصرفِ واقعیِ سینی روی کرنل: $(( SLICE_BYTES / 1048576 ))MB  (سقفِ نرم ۶۰۰MB / سخت ۹۰۰MB)"
+mb_of() { awk -v b="$(cat "/sys/fs/cgroup/${SLICE}/$1" 2>/dev/null || echo 0)" 'BEGIN{printf "%.0f", b/1048576}'; }
+say "  مصرفِ واقعیِ سینی روی کرنل: $(( SLICE_BYTES / 1048576 ))MB  (سقفِ نرم $(mb_of memory.high)MB / سخت $(mb_of memory.max)MB)"
 [ "$SLICE_BYTES" -gt 0 ] || say "  ❌ سینی خالی است — یعنی هنوز هیچ سرویسی داخلش نرفته (باید ری‌استارت شوند)."
 say "  سهمِ CPU: $(quota_pct "$SLICE") از یک هسته  |  وزنِ رقابتی: $(systemctl show -p CPUWeight --value "$SLICE") (قلقلی: $(systemctl show -p CPUWeight --value "$GG_UNIT"))"
 if [ "$OK" = "1" ]; then
