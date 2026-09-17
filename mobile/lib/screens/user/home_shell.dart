@@ -818,7 +818,7 @@ class _HomeShellState extends State<HomeShell>
     // تنها محرکِ تازه‌سازی، برگشتن از پس‌زمینه بود؛ اپِ باز همان کش را
     // نشان می‌داد. جابه‌جاییِ تب، ارزان‌ترین جای ممکن برای تازه‌کردن است
     // (config کوچک است و `refresh()` خودش ۲۰ ثانیه خفه‌کن دارد).
-    AppConfig.instance.refresh();
+    unawaited(AppConfig.instance.refresh());
     if (slot < _navIndexes.length) {
       setState(() => _index = _navIndexes[slot]);
     } else {
@@ -829,7 +829,7 @@ class _HomeShellState extends State<HomeShell>
   Future<void> _openMore() async {
     // شیتِ «بیشتر» جایی است که کاربر دنبالِ «دفتر امتیازات» و بقیهٔ
     // صفحه‌ها می‌گردد؛ همین لحظه متن/عددِ زنده هم تازه می‌شود.
-    AppConfig.instance.refresh();
+    unawaited(AppConfig.instance.refresh());
     final picked = await showModalBottomSheet<int>(
       context: context,
       showDragHandle: true,

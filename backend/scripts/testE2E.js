@@ -181,7 +181,8 @@ async function testAuth() {
   const password = 'Test@12345';
 
   const reg = await POST('/api/auth/register-password', {
-    mobile, password, nickname: `تست${uniq()}`,
+    // ۳ + ۱ + ۴ = ۸ نویسه؛ قانونِ `nicknamePolicy` سقفِ ۸ دارد.
+    mobile, password, nickname: `تست_${uniq().slice(0, 4)}`,
   });
   if (reg.status !== 200) {
     skipped('ثبت‌نام کاربر آزمایشی', `status=${reg.status} — ${reg.data?.message}`);
@@ -638,7 +639,7 @@ async function testCrossUserIsolation() {
   const mobile = `e2e${Date.now().toString().slice(-9)}b`;
   const password = 'Test@12345';
   const reg = await POST('/api/auth/register-password',
-    { mobile, password, nickname: `تست${uniq()}` });
+    { mobile, password, nickname: `تست_${uniq().slice(0, 4)}` });
   if (reg.status !== 200) { skipped('جداسازی کاربران', 'ساخت کاربر دوم ناموفق'); return; }
   ctx.users.push({ mobile, password, token: reg.data.token, id: reg.data.user?.id });
   const t2 = reg.data.token;

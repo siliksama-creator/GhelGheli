@@ -119,7 +119,8 @@ async function main() {
   async function makeUser(tag) {
     const mobile = `lbs${uniq()}`;
     const reg = await req('POST', '/api/auth/register-password', {
-      body: { mobile, password: 'Lbs@123456', nickname: `تست‌لیگ_${tag}` },
+      // حداکثر ۸ نویسه — قانونِ `nicknamePolicy` (دورِ ۳۴).
+      body: { mobile, password: 'Lbs@123456', nickname: `تست_${String(tag).slice(0, 4)}` },
     });
     const token = reg.data?.token;
     if (!token) throw new Error(`ثبت‌نام ${tag} شکست: ${reg.status} ${JSON.stringify(reg.data).slice(0, 180)}`);

@@ -204,7 +204,9 @@ async function main() {
   async function makePlayer(tag) {
     const mobile = `sge2e${uniq()}`;
     const reg = await req('POST', '/api/auth/register-password', {
-      body: { mobile, password: 'Sge2e@12345', nickname: `تست‌بازیکن_${tag}` },
+      // ⚠️ نامِ مستعار از دورِ ۳۴ حداکثر ۸ نویسه است (`nicknamePolicy`)؛
+      //    فیکسچرِ بلندتر در CI با ۴۰۰ رد می‌شود.
+      body: { mobile, password: 'Sge2e@12345', nickname: `تست_${String(tag).slice(0, 4)}` },
     });
     const token = reg.data?.token;
     if (!token) throw new Error(`ثبت‌نام ${tag} شکست: ${reg.status} ${JSON.stringify(reg.data).slice(0, 200)}`);

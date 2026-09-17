@@ -286,7 +286,9 @@ async function main() {
   // ثبت‌نام یک کاربر عادی
   const mobile = `roledepth${uniq()}`;
   const reg = await req('POST', '/api/auth/register-password', {
-    body: { mobile, password: 'Rd@1234567', nickname: 'تست نقش' },
+    // بدونِ فاصله: قانونِ نامِ مستعار فاصله را نمی‌پذیرد (جعلِ نمایش)، و
+    // حداکثر ۸ نویسه است.
+    body: { mobile, password: 'Rd@1234567', nickname: 'تستنقش' },
   });
   const userToken = reg.data?.token;
   ok(!!userToken, 'کاربر عادی ساخته شد');
