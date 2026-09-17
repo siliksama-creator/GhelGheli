@@ -1,0 +1,24 @@
+[Unit]
+# ═══════════════════════════════════════════════════════════════════════════
+#  تشخیص خودکار ظرفیت سرور — «سرور ارتقا داده شد؟ خودم می‌فهمم»
+# ═══════════════════════════════════════════════════════════════════════════
+# سخت‌افزار را می‌خواند (هسته/رم)، پروفایلِ ظرفیت را می‌سازد و اگر با
+# وضعیتِ ذخیره‌شده فرق داشت، تعداد گره‌های PM2 و upstreamِ nginx را خودش
+# بازچینی می‌کند و در تلگرام خبر می‌دهد. شرح کامل در scripts/capacity-apply.sh
+#
+# بعد از PM2 اجرا می‌شود تا گره‌ها بالا آمده باشند؛ خودِ اسکریپت هم تا ۶۰
+# ثانیه منتظر سالم‌شدنِ پورت‌ها می‌ماند.
+Description=GhelGheli capacity auto-tune (detect CPU/RAM change, re-tune PM2 + nginx)
+Documentation=file:///var/www/GhelGheli/scripts/capacity-apply.sh
+After=network-online.target pm2-ghelgheli.service nginx.service
+Wants=network-online.target pm2-ghelgheli.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/ghelgheli-capacity-apply.sh
+# کارِ اداری است، نه کاربر-محور: اگر روی سرورِ شلوغ اجرا شود، مزاحمِ
+# بازی/API نشود.
+Nice=15
+IOSchedulingClass=idle
+# خودِ اسکریپت ۶۰ ثانیه انتظار + reload دارد؛ سقفِ بزرگ‌تر برای احتیاط.
+TimeoutStartSec=420

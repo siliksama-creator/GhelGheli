@@ -3,6 +3,13 @@
  * پیام: { id, task: 'embedCard'|'embedFace'|'cropVariants', buffer: <Buffer> }
  * پاسخ: { id, result, error }
  */
+// این رشته، کارمندِ اجرایی است نه دروازه‌بان: هر پیامی که می‌رسد، والدِ خودش
+// از قبل یک «جا» برایش گرفته است (lib/heavy.js). اگر اینجا هم بشماریم، سقفِ
+// همزمانی دو برابر می‌شود و محافظت روی سرورِ ۲ هسته‌ای بی‌اثر می‌شود.
+// env در worker_threads کپیِ والد است، پس این تغییر به حلقهٔ اصلی سرایت نمی‌کند.
+process.env.HEAVY_OFF = '1';
+
+
 const { parentPort } = require('worker_threads');
 
 let vision = null;

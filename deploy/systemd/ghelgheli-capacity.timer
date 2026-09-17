@@ -1,0 +1,17 @@
+[Unit]
+Description=روزی یک‌بار + بعد از هر بوت: بررسی ارتقا/تنزلِ سرور و بازچینیِ خودکار
+Documentation=file:///var/www/GhelGheli/scripts/capacity-apply.sh
+
+[Timer]
+# ۹۰ ثانیه بعد از بوت: تا این لحظه PM2 و nginx بالا آمده‌اند و اسکریپت
+# می‌تواند پورت‌ها را واقعاً سلامت‌سنجی کند (نه فقط «پروسه هست»).
+OnBootSec=90
+# شبانه، ساعتی که ترافیکِ بازی کم است (بکاپ ۰۳:۳۰ است، این ۰۴:۲۰).
+OnCalendar=*-*-* 04:20:00
+AccuracySec=2min
+# اگر سرور در آن ساعت خاموش بود، اجرای جامانده جبران می‌شود.
+Persistent=true
+RandomizedDelaySec=3min
+
+[Install]
+WantedBy=timers.target

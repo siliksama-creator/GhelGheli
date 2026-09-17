@@ -48,6 +48,10 @@ const {
 const gameStakes = require('./services/gameStakeService');
 const { ensureActiveSeason, addLeaguePoints, getLeaderboard, closeActiveSeason, closeExpiredSeasons, approvePayouts: leagueApprove, defaultPrizeTable, seedCarryoverFromLatestClosed } = require('./services/leagueService');
 const { optimizeUpload, verifyUpload, kb, IMAGE_EXT_RE } = require('./services/imageService');
+// ظرفیتِ سخت‌افزاری و سقفِ کارِ سنگین: هم برای نمایش در /health، هم برای اینکه
+// هر پروسه بداند سهمش از CPU/رم چقدر است (توضیح کامل در src/lib/capacity.js).
+const capacity = require('./lib/capacity');
+const { heavyStats } = require('./lib/heavy');
 const { getGameRewardSettings, saveGameRewardSettings } = require('./services/gameRewardService');
 const walletService = require('./services/walletService');
 const referrals = require('./services/referralService');
@@ -624,7 +628,57 @@ const loginStreakLimiter = rateLimit({
   message: { message: 'کمی صبر کن و دوباره تلاش کن' },
 });
 
-app.get('/health', (req, res) => res.json({ ok: true, name: 'GhelGheli API' }));
+// ── /health ──────────────────────────────────────────────────────────────
+//
+// سلامتِ سرویس + «این پروسه چقدر از سخت‌افزار را می‌بیند و چقدر استفاده
+// می‌کند». قبلاً فقط `{ok:true,name}` بود؛ یعنی هیچ‌جا نمی‌شد فهمید سرور
+// با چند هسته بالا آمده و صفِ کارِ سنگین چقدر شلوغ است.
+//
+// نکتهٔ امنیتی: جزئیات (هسته، رم، صف) فقط برای درخواستِ مستقیمِ داخلی
+// برگردانده می‌شود. درخواستِ بیرونی همیشه از nginx می‌آید و
+// `X-Forwarded-For` دارد؛ برای آن فقط پاسخِ کمینه برمی‌گردد تا شمارِ هسته و
+// بارِ سرور برای غریبه‌ها لو نرود. اسکریپت‌های مانیتورینگ سرور که
+// `curl 127.0.0.1:PORT/health` می‌زنند، جزئیات را می‌بینند.
+//
+// `ok:true` همیشه فیلدِ **اولِ** پاسخ است چون دو اسکریپتِ مانیتورینگِ سرور
+// خروجی را با `grep '"ok":true'` بررسی می‌کنند (health.sh و
+// ghelgheli-healthcheck.sh). ترتیبِ کلیدها را عوض نکنید.
+const healthIsInternal = (req) =>
+  !req.headers['x-forwarded-for']
+  && /^(::1|127\.0\.0\.1|::ffff:127\.0\.0\.1)$/.test(req.socket.remoteAddress || '');
+
+app.get('/health', (req, res) => {
+  const base = { ok: true, name: 'GhelGheli API' };
+  if (!healthIsInternal(req)) return res.json(base);
+
+  const cap = capacity.detect();
+  const mem = process.memoryUsage();
+  return res.json({
+    ...base,
+    role: process.env.PROCESS_ROLE || 'game',
+    port: Number(process.env.PORT) || null,
+    pid: process.pid,
+    uptimeSec: Math.round(process.uptime()),
+    // پروفایلِ سخت‌افزاری که این پروسه خودش تشخیص داده — همان چیزی که
+    // تعداد پروسه‌ها و سقفِ کارِ سنگین از آن می‌آید.
+    capacity: {
+      cores: cap.cores,
+      memTotalMB: cap.memTotalMB,
+      procs: cap.procs,
+      vision: cap.vision,
+      uv: cap.uv,
+      poolMax: cap.poolMax,
+      forced: cap.forced || undefined,
+    },
+    // صفِ کارِ سنگین: اگر `queued` پیوسته بالا بماند یعنی سرور به سقف رسیده
+    // و وقتِ ارتقا/افزودنِ هسته است (نقطهٔ تصمیمِ عینی، نه حدس).
+    heavy: heavyStats(),
+    memMB: {
+      rss: Math.round(mem.rss / 1048576),
+      heapUsed: Math.round(mem.heapUsed / 1048576),
+    },
+  });
+});
 
 // Catalogue of playable games, so the mobile/web clients can render the hub
 // dynamically instead of shipping a hardcoded list that drifts out of sync.
@@ -3215,6 +3269,10 @@ server.listen(port, async () => {
   ]).catch(e => logger.error('[ops] پیش‌بارگذاری تنظیمات ناموفق بود:', e.message));
   await ensureActiveSeason();
   logger.info(`GhelGheli API on :${port}`);
+  // خطِ «ظرفیت» در بوت: تنها جایی که بعد از ارتقای سرور (بدون گشتن در
+  // کانفیگ‌ها) می‌شود فهمید پروسه سخت‌افزار را درست دیده یا نه.
+  logger.info(`${capacity.summary()} | نقش=${process.env.PROCESS_ROLE || 'game'}`);
+  logger.info(`[heavy] سقفِ هم‌زمانیِ پردازش عکس/مدل=${heavyStats().max}`);
 });
 
 // خاموشی تمیز: ردپای حضور این پروسه از ردیس پاک شود تا کاربران برای

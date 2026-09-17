@@ -23,31 +23,43 @@
 const fs = require('fs');
 const path = require('path');
 const vision = require('./serverVision');
+// دروازهٔ ظرفیت: هر کارِ سنگین (استنتاجِ کارت/چهره/برش) یک «جا» می‌گیرد.
+// چرا اینجا و نه داخلِ خودِ embedCard: مسیرِ سرور، کار را به یک worker thread
+// می‌سپارد؛ اگر داخلِ worker هم بشماریم، سقف دو برابر می‌شود. پس **والد**
+// جا را می‌گیرد و تا برگشتنِ جوابِ worker نگه می‌دارد. اعداد و دلیل در
+// lib/heavy.js.
+const { runHeavy } = require('../lib/heavy');
 const visionQueue = (() => {
   try { return require('./visionQueue'); } catch { return null; }
 })();
 async function visionEmbedCard(buf) {
-  if (visionQueue) {
-    try { return await visionQueue.workerEmbed('embedCard', buf); } catch (e) { /* fallback */ }
-  }
-  return vision.embedCard(buf);
+  return runHeavy(async () => {
+    if (visionQueue) {
+      try { return await visionQueue.workerEmbed('embedCard', buf); } catch (e) { /* fallback */ }
+    }
+    return vision.embedCard(buf);
+  });
 }
 async function visionEmbedFace(buf) {
-  if (visionQueue) {
-    try { return await visionQueue.workerEmbed('embedFace', buf); } catch (e) { /* fallback */ }
-  }
-  return vision.embedFace(buf);
+  return runHeavy(async () => {
+    if (visionQueue) {
+      try { return await visionQueue.workerEmbed('embedFace', buf); } catch (e) { /* fallback */ }
+    }
+    return vision.embedFace(buf);
+  });
 }
 async function visionCropVariants(buf) {
-  if (visionQueue) {
-    try {
-      const r = await visionQueue.workerEmbed('cropVariants', buf);
-      // worker returns base64, decode
-      if (Array.isArray(r) && r[0]?.buf) return r.map(x => ({ label: x.label, buf: Buffer.from(x.buf, 'base64') }));
-      return r;
-    } catch (e) { /* fallback */ }
-  }
-  return vision.cropVariants(buf);
+  return runHeavy(async () => {
+    if (visionQueue) {
+      try {
+        const r = await visionQueue.workerEmbed('cropVariants', buf);
+        // worker returns base64, decode
+        if (Array.isArray(r) && r[0]?.buf) return r.map(x => ({ label: x.label, buf: Buffer.from(x.buf, 'base64') }));
+        return r;
+      } catch (e) { /* fallback */ }
+    }
+    return vision.cropVariants(buf);
+  });
 }
 
 // نسخهٔ بردارهای سرور؛ اگر مدلِ سرور عوض شد بالا می‌رود.
