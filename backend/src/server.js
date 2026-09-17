@@ -646,6 +646,17 @@ const loginStreakLimiter = rateLimit({
 // `ok:true` همیشه فیلدِ **اولِ** پاسخ است چون دو اسکریپتِ مانیتورینگِ سرور
 // خروجی را با `grep '"ok":true'` بررسی می‌کنند (health.sh و
 // ghelgheli-healthcheck.sh). ترتیبِ کلیدها را عوض نکنید.
+// سقفِ heap را از فلگِ اجرای همین پروسه می‌خواند (هم execArgv هم NODE_OPTIONS).
+// null یعنی «هیچ سقفی پاس نشده» — همان باگی که ۱۷ شهریور روی تولید دیده شد.
+function maxOldSpaceMb() {
+  const fromEnv = String(process.env.NODE_OPTIONS || '').split(/\s+/);
+  for (const a of [...process.execArgv, ...fromEnv]) {
+    const m = /^--max-old-space-size=(\d+)$/.exec(String(a).trim());
+    if (m) return Number(m[1]);
+  }
+  return null;
+}
+
 const healthIsInternal = (req) =>
   !req.headers['x-forwarded-for']
   && /^(::1|127\.0\.0\.1|::ffff:127\.0\.0\.1)$/.test(req.socket.remoteAddress || '');
@@ -692,6 +703,14 @@ app.get('/health', (req, res) => {
     runtime: {
       node: process.version,
       execArgv: process.execArgv,
+      // سقفِ *خواسته‌شده* — از فلگِ خودِ پروسه خوانده می‌شود (اگر روزی کسی
+      // NODE_OPTIONS را بردارد، این null می‌شود و فوراً معلوم است).
+      maxOldSpaceMB: maxOldSpaceMb(),
+      // سقفِ *واقعیِ V8*. همیشه کمی بالاتر از maxOldSpaceMB است (V8 فضای
+      // جوان/کد را روی آن اضافه می‌کند — روی این سرور ۹۲۳ → ~۱۱۱۵). پس این
+      // دو عدد را نباید مساوی انتظار داشت؛ معنی‌دار این است که
+      // maxOldSpaceMB == capacity.heapMB باشد و v8HeapLimitMB هم نزدیکش
+      // بماند (نه چند گیگِ پیش‌فرض).
       v8HeapLimitMB: Math.round(v8.getHeapStatistics().heap_size_limit / 1048576),
     },
     // صفِ کارِ سنگین: اگر `queued` پیوسته بالا بماند یعنی سرور به سقف رسیده

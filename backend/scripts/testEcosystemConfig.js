@@ -95,7 +95,16 @@ console.log('\n۴) نقش‌ها و لاگ‌های جدا');
   }
 }
 
-console.log('\n۵) رزروِ رم (هم‌ترازیِ بودجه)');
+console.log('\n۵) اثباتِ سقف در /health (نگهبانِ سطحِ منبع)');
+{
+  const server = fs.readFileSync(path.join(__dirname, '..', 'src', 'server.js'), 'utf8');
+  ok(/maxOldSpaceMB/.test(server), '/health سقفِ خواسته‌شده را گزارش می‌کند (maxOldSpaceMB)');
+  ok(/heap_size_limit/.test(server), '/health سقفِ واقعیِ V8 را گزارش می‌کند (v8HeapLimitMB)');
+  ok(/reserveMB/.test(server) && /memForAppMB/.test(server), '/health بودجهٔ رم را گزارش می‌کند');
+  ok(/NODE_OPTIONS/.test(src), 'کانفیگ NODE_OPTIONS را ست می‌کند (باگِ ۱۷ شهریور)');
+}
+
+console.log('\n۶) رزروِ رم (هم‌ترازیِ بودجه)');
 {
   ok(cap.reserveMB >= 512, `reserveMB=${cap.reserveMB} منطقی است`);
   ok(cap.memForAppMB >= 1024, `memForAppMB=${cap.memForAppMB} کفِ بودجهٔ اپ`);
