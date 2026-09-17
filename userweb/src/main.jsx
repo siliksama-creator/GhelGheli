@@ -260,25 +260,28 @@ function App() {
     return () => clearTimeout(t);
   }, []);
 
-  // رمزگشاییِ زودهنگامِ تصویرهای برند. کارِ واقعی است (نه تزئینی): اگر این
-  // تصویرها در لحظهٔ انتقال تازه شروع به دانلود کنند، صفحهٔ خانه با یک
-  // «پاپ»ِ تصویری بالا می‌آید.
+  // ═══════════════════════════════════════════════════════════════════════
+  //  گرم‌کردنِ پس‌زمینه — **بیرونِ** دروازه، عمداً
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // نسخهٔ اولِ این کد سه تصویر را **داخلِ** دروازه پیش‌دانلود می‌کرد
+  // (۳۵۶ + ۱۲۵ + ۱۲۳ کیلوبایت ≈ ۶۰۰KB). اندازه‌گیریِ زنده روی سایت نشان داد
+  // پوشش ۲٫۵ ثانیه می‌ماند و بیشترِ آن، دانلودِ تصویرهایی بود که کاربر در
+  // صفحهٔ بارگذاری **هیچ‌وقت نمی‌بیند**. این دقیقاً همان «تأخیرِ ساختگی» است
+  // که قرار بود این کار حذفش کند — فقط این بار پشتِ «کارِ واقعی» قایم شده
+  // بود.
+  //
+  // قاعدهٔ ثابت‌شده: **دروازه فقط تا وقتی بسته می‌ماند که کاری که کاربر
+  // می‌بیند تمام شود.** مرحلهٔ `art` حالا فقط رمزگشاییِ خودِ قهرمانِ
+  // صفحهٔ بارگذاری است (که مرورگر به‌هرحال دانلودش می‌کند) و بقیه اینجا
+  // بی‌صدا گرم می‌شوند.
   useEffect(() => {
-    let alive = true;
-    const urls = ['/brand/logo-large.webp', '/logo.webp', '/brand/login_hero.webp'];
-    const one = (url) => new Promise((resolve) => {
-      const img = new Image();
-      const done = () => resolve();
-      img.onload = done;
-      img.onerror = done; // شکستِ یک تصویر نباید دروازه را ببندد
-      img.src = url;
-      // سقفِ سخت: یک تصویرِ گیرکرده در کشِ مرورگر نباید بیش از ۲ ثانیه
-      // کاربر را نگه دارد.
-      setTimeout(done, 2000);
-    });
-    Promise.all(urls.map(one)).then(() => { if (alive) setArtSettled(true); });
-    return () => { alive = false; };
+    const imgs = ['/brand/login_hero.webp'].map((u) => { const i = new Image(); i.src = u; return i; });
+    return () => { imgs.length = 0; };
   }, []);
+
+  // مرحلهٔ «هنر» = تصویرِ خودِ قهرمانِ صفحهٔ بارگذاری، از زبانِ خودش.
+  const onHeroReady = useCallback(() => setArtSettled(true), []);
 
   /// فهرستِ مرحله‌های دروازه، به ترتیبِ نمایش.
   ///
@@ -289,6 +292,8 @@ function App() {
     ...(token
       ? [{ key: 'session', label: SPLASH_STAGES.session, done: portalSettled }]
       : []),
+    // مرحلهٔ `art` = رمزگشاییِ خودِ قهرمان (تنها تصویری که کاربر اینجا
+    // می‌بیند). متنش هم همین را می‌گوید.
     { key: 'art', label: SPLASH_STAGES.art, done: artSettled },
   ];
   const bootDoneCount = bootSteps.filter((x) => x.done).length;
@@ -539,6 +544,7 @@ function App() {
           label={bootCurrent ? bootCurrent.label : ''}
           progress={bootProgress}
           leaving={splashLeaving}
+          onHeroReady={onHeroReady}
         />
       )}
     </div>

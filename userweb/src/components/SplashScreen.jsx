@@ -31,7 +31,7 @@
 // فریم جاوااسکریپت مصرف می‌کرد — درست در لحظه‌ای که مرورگر مشغولِ باز کردنِ
 // چانک‌های اپ است.
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import '../styles/splash.css';
 
 /// مراحلِ واقعیِ راه‌اندازیِ وب. متن‌ها عیناً همان متن‌های اپ اندروید هستند؛
@@ -39,6 +39,9 @@ import '../styles/splash.css';
 export const SPLASH_STAGES = {
   config: 'قوانینِ این فصل را از اتاقِ داور می‌گیریم…',
   session: 'نشستِ بازیکن را روی زمین می‌گذاریم…',
+  // «چمنِ زمین» حالا تصویرِ خودِ قهرمان است (لوگوی صفحهٔ بارگذاری) — متن
+  // باید همان چیزی را بگوید که واقعاً در جریان است، نه یک استعارهٔ باقی‌مانده
+  // از نسخهٔ قبلی.
   art: 'چمنِ زمین را می‌کشیم…',
 };
 
@@ -116,6 +119,13 @@ function dust(count = 22) {
 }
 
 export default function SplashScreen({
+  /// وقتی تصویرِ خودِ قهرمان رمزگشایی شد خبر می‌دهد.
+  ///
+  /// چرا از داخلِ خودِ کامپوننت و نه با یک پیش‌دانلود در والد: تنها تصویری
+  /// که کاربر در این صفحه **می‌بیند** همین است، پس تنها کاری که ارزشِ
+  /// نگه‌داشتنِ پوشش را دارد همین است. پیش‌دانلودِ چیزهای دیگر (پس‌زمینهٔ
+  /// صفحهٔ ورود و…) در پس‌زمینه انجام می‌شود و کاربر را معطل نمی‌کند.
+  onHeroReady,
   stage,
   label,
   progress = 0,
@@ -130,6 +140,22 @@ export default function SplashScreen({
   const reduced = usePrefersReducedMotion();
   const motes = useMemo(() => dust(), []);
   const pct = Math.max(0, Math.min(1, Number(progress) || 0));
+  const heroImgRef = useRef(null);
+
+  useEffect(() => {
+    const img = heroImgRef.current;
+    if (!img) return undefined;
+    if (img.complete && img.naturalWidth > 0) { onHeroReady?.(); return undefined; }
+    let alive = true;
+    const done = () => { if (alive) onHeroReady?.(); };
+    img.addEventListener('load', done);
+    img.addEventListener('error', done);   // شکست هم «تمام شد» است، نه «منتظر بمان»
+    // `decode()` جلوتر از تصویر جبران می‌کند: روی موبایل، لحظهٔ «لود شد»
+    // با «آماده برای نقاشی» یکی نیست و بدونِ این، اولین فریمِ قهرمان می‌تواند
+    // خالی باشد.
+    if (img.decode) img.decode().then(done).catch(() => {});
+    return () => { alive = false; img.removeEventListener('load', done); img.removeEventListener('error', done); };
+  }, [onHeroReady]);
 
   return (
     <div
@@ -182,8 +208,21 @@ export default function SplashScreen({
         <div className={`splashMark ${reduced ? 'isReduced' : ''}`}>
           <span className="heroAurora" aria-hidden="true" />
           <span className="splashGlow" aria-hidden="true" />
+          {/* ⚠️ **همان فایلی که صفحهٔ ورود استفاده می‌کند** — و این یک
+              انتخابِ ظاهری نیست، دو دلیلِ اندازه‌گیری‌شده دارد:
+
+              ۱. **هم‌راستاییِ ماسک.** `heroSweep` در brand-mark.css با
+                 `mask-image: url(/logo.webp)` بریده می‌شود. اگر تصویرِ
+                 اسپلش فایلِ دیگری باشد (مثلاً نسخهٔ بزرگ‌تر)، ماسک و تصویر
+                 دو هندسهٔ متفاوت دارند و ردِ نور روی جای اشتباه می‌افتد.
+              ۲. **وزنِ دروازه.** نسخهٔ بزرگ ۳۵۶KB است و صفحهٔ ورود ۱۲۵KB.
+                 پوششِ بارگذاری باید فقط تا وقتی بماند که کارِ **دیده‌شده**
+                 تمام شود؛ دانلودِ ۲۳۱KB اضافه که کاربر هیچ‌وقت در این صفحه
+                 نمی‌بیند، یعنی ثانیه‌های اضافیِ انتظار. ۲۴۸px عرضِ نمایشی
+                 است و این فایل ۷۲۰px پهنا دارد — برای هر صفحهٔ ۳x کافی است. */}
           <div className="heroMark">
-            <img src="/brand/logo-large.webp" alt="" width="1130" height="883" />
+            <img src="/logo.webp" alt="" width="720" height="595"
+                 ref={heroImgRef} />
             <span className="heroSweep" aria-hidden="true" />
             <span className="heroGlint" aria-hidden="true" />
           </div>

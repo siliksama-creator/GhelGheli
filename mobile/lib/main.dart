@@ -229,6 +229,8 @@ class _GhelGheliAppState extends State<GhelGheliApp> {
   void _onBootFinished(BootResult result) {
     if (!mounted) return;
     _playSplashExit();
+    // و از همین لحظه، گرم‌کردنِ پس‌زمینه‌ای — بدونِ اینکه کسی معطلش بماند.
+    unawaited(_warmUpLoginArt());
     if (result.degraded) {
       // شکستِ کارِ غیرحیاتی: کاربر معطل نمی‌شود، ولی ردیفِ تشخیصی می‌ماند.
       // (`BootController` هم لاگ می‌کند؛ این خط برای کسی است که فهرستِ
@@ -239,39 +241,59 @@ class _GhelGheliAppState extends State<GhelGheliApp> {
     setState(() {});
   }
 
-  /// رمزگشاییِ زودهنگامِ تصویرهای صفحهٔ ورود.
+  /// رمزگشاییِ زودهنگامِ **تصویرِ خودِ قهرمانِ صفحهٔ بارگذاری**.
   ///
-  /// چرا اینجا و نه داخلِ خودِ صفحهٔ ورود: تا وقتی اسپلش روی صفحه است، وقتِ
-  /// مرده داریم. رمزگشاییِ همین دو تصویر در آن پنجره، هم انتقال را نرم
-  /// می‌کند و هم بخشی از زمانِ کارِ واقعیِ راه‌اندازی را پر می‌کند.
+  /// ⚠️ قاعده‌ای که با اندازه‌گیریِ زنده روی وب ثابت شد و اینجا هم حاکم است:
+  /// **دروازه فقط تا وقتی بسته می‌ماند که کاری که کاربر می‌بیند تمام شود.**
+  /// نسخهٔ اولِ این کار سه تصویر را داخلِ دروازه رمزگشایی می‌کرد؛ دو تای
+  /// دیگر (لوگو و پس‌زمینهٔ صفحهٔ ورود) در صفحهٔ بارگذاری هیچ‌وقت دیده
+  /// نمی‌شوند، پس نگه‌داشتنِ کاربر برایشان «تأخیرِ ساختاری» است، نه کارِ
+  /// واقعی. آن دو به `_warmUpLoginArt` منتقل شدند که **بعد** از باز شدنِ
+  /// دروازه و در پس‌زمینه اجرا می‌شود.
   ///
-  /// ⚠️ کلیدِ `cacheWidth` باید **دقیقاً** همان چیزی باشد که خودِ ویجت‌ها
-  /// می‌خواهند، وگرنه کشِ تصویر آن را یک ورودیِ جدا حساب می‌کند و کارِ
-  /// دوباره می‌شود: لوگوی صفحهٔ ورود `width: 230` و پس‌زمینه‌اش با
-  /// `cacheWidth: 360` کشیده می‌شوند (نگاه کنید به auth_screen.dart).
+  /// تنها استثنا، همین یک تصویر است: قهرمانِ اسپلش، که کاربر دقیقاً همان را
+  /// نگاه می‌کند و بدونِ آن اولین فریم خالی می‌ماند.
   Future<void> _precacheArt() async {
     // `precacheImage` به BuildContext نیاز دارد؛ اینجا نداریم. به‌جایش
     // مستقیم از کشِ تصویرِ موتور استفاده می‌کنیم — همان چیزی که
     // `precacheImage` هم انجام می‌دهد، بدونِ نیاز به ویجت.
-    final providers = <ImageProvider>[
+    //
+    // ✅ عددِ `width` باید **مو‌به‌مو** همان چیزی باشد که خودِ `AnimatedLogo`
+    // در اسپلش می‌خواهد (`kSplashLogoCacheWidth`)، وگرنه کشِ تصویر آن را یک
+    // ورودیِ جدا حساب می‌کند و همان کار دوباره انجام می‌شود — این بار
+    // وسطِ انتقال.
+    await _resolveOnce(
       const ResizeImage(
         AssetImage('assets/brand/logo_large.webp'),
-        // همان عددی که خودِ اسپلش می‌خواهد — یک تعریف، دو مصرف‌کننده.
         width: kSplashLogoCacheWidth,
         policy: ResizeImagePolicy.fit,
       ),
-      const ResizeImage(
-        AssetImage('assets/brand/logo.webp'),
-        width: 690, // 230 × 3 (بیشترین چگالیِ رایجِ گوشی‌ها)
-        policy: ResizeImagePolicy.fit,
-      ),
-      const ResizeImage(
-        AssetImage('assets/brand/login_hero.webp'),
-        width: 360,
-        policy: ResizeImagePolicy.fit,
-      ),
-    ];
-    await Future.wait(providers.map(_resolveOnce));
+    );
+  }
+
+  /// گرم‌کردنِ پس‌زمینه‌ایِ تصویرهای صفحهٔ ورود.
+  ///
+  /// بعد از باز شدنِ دروازه اجرا می‌شود و **هیچ‌وقت** کسی منتظرش نمی‌ماند؛
+  /// نتیجه‌اش اگر برسد، انتقال به صفحهٔ ورود نرم‌تر می‌شود و اگر نرسد، هیچ
+  /// اتفاقی نمی‌افتد. (خطایش هم گرفته می‌شود تا به‌صورتِ خطای رهاشده در
+  /// لاگ ننشیند.)
+  Future<void> _warmUpLoginArt() async {
+    try {
+      await Future.wait(<Future<void>>[
+        _resolveOnce(const ResizeImage(
+          AssetImage('assets/brand/logo.webp'),
+          width: 690, // 230 × 3 (بیشترین چگالیِ رایجِ گوشی‌ها)
+          policy: ResizeImagePolicy.fit,
+        )),
+        _resolveOnce(const ResizeImage(
+          AssetImage('assets/brand/login_hero.webp'),
+          width: 360,
+          policy: ResizeImagePolicy.fit,
+        )),
+      ]);
+    } catch (_) {
+      // گرم‌کردنِ اختیاری؛ شکستش نباید هیچ‌جا دیده شود.
+    }
   }
 
   /// یک تصویر را در کش می‌نشاند و به‌محضِ آماده‌شدن برمی‌گردد.
