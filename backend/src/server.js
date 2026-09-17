@@ -1,4 +1,6 @@
 require('dotenv').config();
+// رمزگذاریِ فیلدهای مالی (کارت/شبا/حساب قدیمی).
+const fieldCrypto = require('./lib/fieldCrypto');
 const express = require('express');
 const http = require('http');
 const path = require('path');
@@ -673,6 +675,11 @@ app.get('/health', (req, res) => {
     // صفِ کارِ سنگین: اگر `queued` پیوسته بالا بماند یعنی سرور به سقف رسیده
     // و وقتِ ارتقا/افزودنِ هسته است (نقطهٔ تصمیمِ عینی، نه حدس).
     heavy: heavyStats(),
+    // وضعیتِ رمزگذاریِ فیلدهای مالی. `enabled:false` روی سرورِ تولید یعنی
+    // FIELD_ENCRYPTION_KEY تنظیم نشده و شمارهٔ کارت‌ها متنِ ساده ذخیره
+    // می‌شوند — همان چیزی که باید بفهمیم، نه اینکه حدس بزنیم.
+    // `failures` شمارندهٔ مقدارهایی است که با کلیدِ فعلی باز نشدند.
+    fieldCrypto: fieldCrypto.status(),
     memMB: {
       rss: Math.round(mem.rss / 1048576),
       heapUsed: Math.round(mem.heapUsed / 1048576),
@@ -691,13 +698,20 @@ app.get('/api/games', (req, res) => res.json(require('./games').CATALOG));
 // number is the admin withdrawal list (behind adminAuth), because the admin
 // physically has to make the transfer.
 function safeUser(u) {
+  // ستون‌های خام بیرون نمی‌روند (چون رمزشده‌اند و به‌کارِ کلاینت نمی‌آیند)؛
+  // به‌جایشان نسخهٔ ماسک‌شدهٔ **بازشده** برگردانده می‌شود.
   const { password_hash, bank_card_number, bank_card_sheba, ...rest } = u;
+  const cardNumber = fieldCrypto.decrypt(bank_card_number);
+  const cardSheba = fieldCrypto.decrypt(bank_card_sheba);
   return {
     ...rest,
+    // `bank_account` (ستون قدیمی و آزاد) هم رمز می‌شود؛ در پاسخ رمزشده
+    // نمی‌فرستیمش، متنِ ساده‌اش می‌فرستیم (صاحبِ حساب خودِ کاربر است).
+    bank_account: rest.bank_account ? fieldCrypto.decrypt(rest.bank_account) : rest.bank_account,
     wallet_balance: Number(rest.wallet_balance || 0),
-    bank_card_masked: bank_card_number ? walletService.maskCard(bank_card_number) : null,
-    bank_card_sheba_masked: bank_card_sheba ? `${bank_card_sheba.slice(0, 6)}••••${bank_card_sheba.slice(-4)}` : null,
-    has_bank_card: Boolean(bank_card_number),
+    bank_card_masked: cardNumber ? walletService.maskCard(cardNumber) : null,
+    bank_card_sheba_masked: cardSheba ? `${cardSheba.slice(0, 6)}••••${cardSheba.slice(-4)}` : null,
+    has_bank_card: Boolean(cardNumber),
   };
 }
 
@@ -1167,7 +1181,10 @@ app.patch('/api/profile', auth, asyncHandler(async (req, res) => {
       boundedText(b.nickname, 40),
       safeImageUrl(b.profileImageUrl),
       safeAvatarKey(b.profileAvatarKey),
-      boundedText(b.bankAccount, 40),
+      // ورودیِ کاربر قبل از نوشتن رمز می‌شود. `boundedText` اول طول را
+      // می‌بُرد و بعد رمز می‌شود — ترتیب مهم است، وگرنه بُرش روی متنِ
+      // رمزشده می‌افتد و داده را خراب می‌کند.
+      fieldCrypto.encrypt(boundedText(b.bankAccount, 40)),
       age,
       boundedText(b.city, 60),
       boundedText(b.province, 60),

@@ -630,28 +630,36 @@ module.exports = function createPhotoCardRoutes(deps) {
     });
   }));
 
-  router.post(
-    '/admin/photo-cards/submissions/:id/decide',
-    adminAuth, validateUuid('id'), requireRole('support'),
-    asyncHandler(async (req, res) => {
-      if (!UUID_RE.test(String(req.params.id))) {
-        return res.status(400).json({ message: 'شناسه معتبر نیست' });
-      }
-      const approve = req.body.approve === true || req.body.approve === 'true';
-      const reason = String(req.body.reason || '').trim().slice(0, 500);
-
-      // ── طرحی که مدیر **خودش** انتخاب کرده ──
-      //
-      // خواستهٔ مالک: وقتی کد معتبر است ولی عکس شناخته نشد، مدیر باید
-      // بتواند بگوید «این کد مالِ کدام طرح بوده». پس تأیید می‌تواند با
-      // طرحی غیر از حدسِ موتور انجام شود — یا حتی وقتی موتور اصلاً
-      // حدسی نداشته.
-      const chosenId = req.body.designId ? String(req.body.designId) : null;
-      if (chosenId && !UUID_RE.test(chosenId)) {
-        return res.status(400).json({ message: 'شناسهٔ طرح معتبر نیست' });
-      }
-
-      const client = await pool.connect();
+  // ═══════════════════════════════════════════════════════════════════════════
+  // تصمیمِ مدیر روی **یک** پروندهٔ کارت عکسی — تنها جای این منطق
+  // ═══════════════════════════════════════════════════════════════════════════
+  //
+  // ── چرا از هندلر جدا شد ──
+  //
+  // خواستهٔ مالک: «تأیید گروهی — تأیید چند کارت با یک کلیک». اگر صفِ گروهی
+  // منطقِ تأیید را **کپی** می‌کرد، دو کدِ موازی پیدا می‌کردیم: هر باگی که
+  // فردا در یکی درست شود، در آن یکی می‌ماند — و بدترین جا برای چنین کپی‌ای
+  // همین‌جاست، چون این تابع امتیاز و کارتِ کاربر را جابه‌جا می‌کند.
+  // پس تأییدِ تک‌نفره و تأییدِ گروهی هر دو از همین یک تابع می‌گذرند.
+  //
+  // قرارداد خطا: هر خطای قابل‌انتظار (پروندهٔ ناموجود، بررسی‌شده، کدِ بی‌طرح)
+  // با `status` پرتاب می‌شود؛ صفِ گروهی همان را به «رد شد» ترجمه می‌کند و
+  // بقیهٔ فهرست را ادامه می‌دهد — یک پروندهٔ خراب کل گروه را نمی‌سوزاند.
+  /**
+   * @param {string} submissionId
+   * @param {boolean} approve
+   * @param {string} [reason]      دلیلِ رد (فقط وقتی approve=false)
+   * @param {string|null} [chosenId]  طرحی که مدیر صریحاً انتخاب کرده
+   * @param {string} adminId       مدیرِ تصمیم‌گیرنده (در حسابرسی می‌نشیند)
+   * @param {{signal?: boolean}} [hooks]  signal=false یعنی پخشِ سوکت به عهدهٔ صداکننده
+   */
+  async function decideOneSubmission({
+    submissionId, approve, reason = '', chosenId = null, adminId, hooks = {},
+  }) {
+    // اعتبارِ شناسه در مسیرهای صداکننده بررسی می‌شود (مسیرِ تک‌نفره با
+    // میدل‌ور `validateUuid`، مسیرِ گروهی با یک پاس روی فهرست). اینجا
+    // دوباره چک نمی‌کنیم تا دو جا از هم جدا نشوند.
+    const client = await pool.connect();
       let imagePathToDelete = null;
       let payload = null;
       let userId = null;
@@ -659,7 +667,7 @@ module.exports = function createPhotoCardRoutes(deps) {
         await client.query('BEGIN');
         const s = await client.query(
           `SELECT * FROM photo_card_submissions WHERE id=$1 FOR UPDATE`,
-          [req.params.id],
+          [submissionId],
         );
         const sub = s.rows[0];
         if (!sub) throw Object.assign(new Error('پرونده پیدا نشد'), { status: 404 });
@@ -733,7 +741,7 @@ module.exports = function createPhotoCardRoutes(deps) {
             design,
             // انتخابِ صریحِ مدیر مقدم است؛ وگرنه نوعِ کارتِ گره‌خورده.
             cardTypeId: design ? null : expectedTypeId,
-            adminId: req.admin.id,
+            adminId: adminId,
           });
           if (payload.points > 0) {
             await addLeaguePoints(client, sub.user_id, payload.points);
@@ -744,7 +752,7 @@ module.exports = function createPhotoCardRoutes(deps) {
           await client.query(
             `UPDATE photo_card_submissions
                 SET chosen_design_id=$1, decision_path='admin' WHERE id=$2`,
-            [design?.id ?? null, req.params.id],
+            [design?.id ?? null, submissionId],
           );
 
           // ── ردیفِ توافقِ حالت سایه برای تصمیمِ دستیِ ادمین ──
@@ -816,7 +824,7 @@ module.exports = function createPhotoCardRoutes(deps) {
                   user_image_path=NULL
             WHERE id=$4`,
           [approve ? 'approved' : 'rejected', approve ? null : reason,
-            req.admin.id, req.params.id],
+            adminId, submissionId],
         );
 
         await client.query('COMMIT');
@@ -832,8 +840,8 @@ module.exports = function createPhotoCardRoutes(deps) {
       // شده، دلیلی برای نگه داشتنش نیست.
       safeUnlink(imagePathToDelete);
 
-      await audit(req.admin.id, approve ? 'approve_photo_card' : 'reject_photo_card',
-        'photo_card_submissions', req.params.id, reason || null, {});
+      await audit(adminId, approve ? 'approve_photo_card' : 'reject_photo_card',
+        'photo_card_submissions', submissionId, reason || null, {});
 
       if (approve && payload) {
         // متنِ مشترک با مسیرِ خودکار/درون‌درخواستی (cardDecisionNotify).
@@ -853,12 +861,120 @@ module.exports = function createPhotoCardRoutes(deps) {
         // مسیرِ قدیمیِ «ثبت کد کارت» (server.js) عمداً دست‌نخورده ماند.
         // جدولِ لیگ عوض شد: کشِ فهرست بی‌اعتبار و سیگنالِ سوکت پخش می‌شود.
         // (سیگنال داده ندارد؛ کلاینت `/api/league/current` را دوباره می‌زند.)
-        leaderboardSignal.leaderboardChanged();
+        if (hooks.signal !== false) leaderboardSignal.leaderboardChanged();
       } else if (!approve) {
         cardNotify.cardRejected(userId, { reason, push: true }).catch(() => {});
       }
 
-      res.json({ ok: true, approved: approve });
+      return {
+        points: payload?.points ?? null,
+        cardTypeName: payload?.cardTypeName ?? null,
+      };
+  }
+
+  router.post(
+    '/admin/photo-cards/submissions/:id/decide',
+    adminAuth, validateUuid('id'), requireRole('support'),
+    asyncHandler(async (req, res) => {
+      if (!UUID_RE.test(String(req.params.id))) {
+        return res.status(400).json({ message: 'شناسه معتبر نیست' });
+      }
+      const approve = req.body.approve === true || req.body.approve === 'true';
+      const reason = String(req.body.reason || '').trim().slice(0, 500);
+      // ── طرحی که مدیر **خودش** انتخاب کرده ──
+      //
+      // خواستهٔ مالک: وقتی کد معتبر است ولی عکس شناخته نشد، مدیر باید
+      // بتواند بگوید «این کد مالِ کدام طرح بوده». پس تأیید می‌تواند با
+      // طرحی غیر از حدسِ موتور انجام شود — یا حتی وقتی موتور اصلاً
+      // حدسی نداشته.
+      const chosenId = req.body.designId ? String(req.body.designId) : null;
+      if (chosenId && !UUID_RE.test(chosenId)) {
+        return res.status(400).json({ message: 'شناسهٔ طرح معتبر نیست' });
+      }
+
+      const out = await decideOneSubmission({
+        submissionId: req.params.id, approve, reason, chosenId, adminId: req.admin.id,
+      });
+      res.json({
+        ok: true, approved: approve,
+        points: out.points, cardTypeName: out.cardTypeName,
+      });
+    }),
+  );
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // تأیید/ردِ گروهی — «چند کارت با یک کلیک»
+  // ═══════════════════════════════════════════════════════════════════════════
+  //
+  // ── چرا گروهی و نه ۵۰ درخواست از پنل ──
+  //
+  // هر تأییدِ تک‌نفره یک تراکنش، یک اعلان و یک پخشِ سوکت است. ناظری که ۴۰
+  // پروندهٔ معلق دارد، با ۴۰ کلیک هم ۴۰ بار منتظرِ رفت‌وبرگشت شبکه می‌ماند.
+  // اینجا **تراکنش‌ها هنوز جدا هستند** (تأییدِ گروهی ≠ تراکنشِ گروهی): اگر
+  // یکی شکست بخورد، بقیه سالم می‌مانند و گزارشِ دقیقش به مدیر برمی‌گردد.
+  //
+  // سقفِ ۵۰: یک درخواستِ HTTP نباید دقیقه‌ها طول بکشد. یک تأیید ~۲۰ms کارِ
+  // دیتابیس است، پس ۵۰ مورد زیر چند ثانیه تمام می‌شود.
+  const BULK_MAX = 50;
+
+  router.post(
+    '/admin/photo-cards/submissions/bulk-decide',
+    adminAuth, requireRole('support'),
+    asyncHandler(async (req, res) => {
+      const raw = Array.isArray(req.body?.ids) ? req.body.ids : [];
+      // حذفِ تکراری/خالی: دوبار کلیک روی یک ردیف نباید یک پرونده را
+      // دو بار در فهرست بگذارد (تأییدِ دوم با ۴۰۹ رد می‌شد و گزارش را
+      // شلوغ می‌کرد).
+      const ids = [...new Set(raw.map((v) => String(v ?? '').trim()).filter(Boolean))];
+      if (!ids.length) return res.status(400).json({ message: 'هیچ موردی انتخاب نشده است' });
+      if (ids.length > BULK_MAX) {
+        return res.status(400).json({ message: `حداکثر ${BULK_MAX} مورد در هر نوبت` });
+      }
+      const invalid = ids.find((id) => !UUID_RE.test(id));
+      if (invalid) return res.status(400).json({ message: 'در فهرست، شناسهٔ نامعتبر هست' });
+
+      // پیش‌فرض «تأیید» است (خواستهٔ مالک: تأیید گروهی). ردِ گروهی هم کار
+      // می‌کند ولی فقط با دلیلِ صریح — رد کردنِ دسته‌جمعی بی‌دلیل، کاربر را
+      // با ۴۰ اعلانِ «تأیید نشد» و هیچ توضیحی تنها می‌گذارد.
+      const approve = req.body.approve !== false;
+      const reason = String(req.body.reason || '').trim().slice(0, 500);
+      if (!approve && !reason) {
+        return res.status(400).json({ message: 'برای رد کردن، نوشتنِ دلیل لازم است' });
+      }
+
+      const results = [];
+      let anyApproved = false;
+      for (const id of ids) {
+        try {
+          const out = await decideOneSubmission({
+            submissionId: id, approve, reason, chosenId: null,
+            adminId: req.admin.id,
+            // سوکت یک‌بار در پایان پخش می‌شود، نه ۵۰ بار پشت‌سرهم.
+            hooks: { signal: false },
+          });
+          if (approve) anyApproved = true;
+          results.push({
+            id, ok: true, approved: approve,
+            points: out.points, cardTypeName: out.cardTypeName,
+          });
+        } catch (e) {
+          // دلیلِ واقعی به مدیر برمی‌گردد («قبلاً بررسی شده است»، «طرح پیدا
+          // نشد» …) تا بداند کدام پرونده دستی لازم دارد.
+          results.push({
+            id, ok: false, approved: false,
+            message: e?.message || 'خطای نامشخص',
+          });
+        }
+      }
+      if (anyApproved) leaderboardSignal.leaderboardChanged();
+
+      const summary = {
+        total: results.length,
+        approved: results.filter((r) => r.ok && r.approved).length,
+        rejected: results.filter((r) => r.ok && !r.approved).length,
+        failed: results.filter((r) => !r.ok).length,
+      };
+      res.json({ ok: true, summary, results });
     }),
   );
 

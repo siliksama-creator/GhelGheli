@@ -9,6 +9,9 @@
 //   ۲. هر ریال یک ردیف با منبع و مرجع مشخص داشته باشد،
 //   ۳. قفل ردیف کاربر مانع مسابقهٔ همزمانی (race) شود.
 
+// رمزگذاریِ فیلدهای مالی: شمارهٔ کارت/شبا در دیتابیس رمز شده‌اند و
+// فقط از این ماژول باز/بسته می‌شوند. شرحِ کامل در خودِ فایل.
+const fieldCrypto = require('../lib/fieldCrypto');
 const { pool } = require('../config/db');
 
 const DEFAULTS = {
@@ -252,6 +255,11 @@ async function summary(userId) {
     [userId],
   );
   const user = u.rows[0] || {};
+  // ── رمزگشایی پیش از هر استفاده ──
+  // مقدارِ ستون در دیتابیس `enc:v1:...` است؛ اگر یادمان برود بازش کنیم،
+  // ماسکِ کارت روی رشتهٔ رمزشده حساب می‌شود و کاربر «—» می‌بیند.
+  const cardNumber = fieldCrypto.decrypt(user.bank_card_number);
+  const cardSheba = fieldCrypto.decrypt(user.bank_card_sheba);
   const agg = await pool.query(
     `SELECT
        COALESCE(SUM(amount) FILTER (WHERE direction='credit'),0)::bigint AS total_in,
@@ -267,7 +275,7 @@ async function summary(userId) {
     [userId],
   );
   const balance = Number(user.wallet_balance || 0);
-  const hasCard = Boolean(user.bank_card_number);
+  const hasCard = Boolean(cardNumber);
   const pendingCount = pending.rows[0].c;
 
   // دلیل دقیق «چرا نمی‌توانم برداشت کنم» را همین‌جا حساب می‌کنیم تا کلاینت
@@ -288,10 +296,10 @@ async function summary(userId) {
     card: hasCard ? {
       // فقط ۴ رقم اول و آخر برمی‌گردد. شمارهٔ کامل کارت هرگز به کلاینت
       // برنمی‌گردد؛ اگر لاگ یا اسکرین‌شاتی نشت کند، کارت لو نمی‌رود.
-      maskedNumber: maskCard(user.bank_card_number),
+      maskedNumber: maskCard(cardNumber),
       holder: user.bank_card_holder,
       bank: user.bank_card_bank,
-      sheba: user.bank_card_sheba ? `${user.bank_card_sheba.slice(0, 6)}••••${user.bank_card_sheba.slice(-4)}` : null,
+      sheba: cardSheba ? `${cardSheba.slice(0, 6)}••••${cardSheba.slice(-4)}` : null,
       savedAt: user.bank_card_saved_at,
     } : null,
     canWithdraw: blockReason === null,

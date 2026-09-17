@@ -1,4 +1,5 @@
 /** User administration and immutable point-ledger inspection routes. */
+const fieldCrypto = require('../lib/fieldCrypto');
 const express = require('express');
 const signupGift = require('../services/signupGiftService');
 const { parseFaNumber } = require('../lib/faNum');
@@ -47,6 +48,10 @@ router.get('/admin/users', adminAuth, requireRole('support'), asyncHandler(async
   )).rows;
   res.json(rows.map((u) => ({
     ...u,
+    // ── `bank_account` رمزگذاری‌شده است ──
+    // پنل مدیر این ستون را نشان می‌دهد (ستونِ قدیمیِ آزاد، جدا از
+    // شمارهٔ کارتِ معتبر). بدونِ بازکردن، مدیر رشتهٔ `enc:v1:...` می‌دید.
+    bank_account: u.bank_account ? fieldCrypto.decrypt(u.bank_account) : u.bank_account,
     // پستگرس `numeric` را رشته برمی‌گرداند؛ بدون Number سمتِ کلاینت
     // «۱۰۰۰۰» با «۵۰۰» رشته‌ای مقایسه می‌شد و قالب‌بندی عدد می‌شکست.
     wallet_balance: Number(u.wallet_balance || 0),

@@ -63,6 +63,17 @@ export function PhotoCardsPage({ request }) {
   // می‌دهد. `null` یعنی همه بسته.
   const [openGroup, setOpenGroup] = useState(null);
   const [subFilter, setSubFilter] = useState('pending');
+  // ── تأیید گروهی ──
+  //
+  // خواستهٔ مالک: «تأیید چند کارت با یک کلیک». ناظرِ صف اغلب چند پروندهٔ
+  // روشن دارد و تأییدِ تک‌تک یعنی ۴۰ رفت‌وبرگشتِ شبکه.
+  //
+  // `selectedIds` فقط شناسه نگه می‌دارد (نه خودِ پرونده‌ها) تا بعد از
+  // بازخوانیِ فهرست، انتخابِ کاربر از بین نرود.
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  // گزارشِ مواردی که در تأییدِ گروهی **نشدند** — با دلیلِ دقیقِ سرور.
+  const [bulkFails, setBulkFails] = useState([]);
   const [mismatch, setMismatch] = useState(null);
   const [shadow, setShadow] = useState(null);
   const [quickCode, setQuickCode] = useState('');
@@ -205,6 +216,9 @@ export function PhotoCardsPage({ request }) {
     [loadDesigns, loadCodes, loadOptions, loadMismatch, loadShadow]);
   useEffect(() => { loadCodeList(); }, [loadCodeList]);
   useEffect(() => { setSubs(null); loadSubs(subFilter); }, [subFilter, loadSubs]);
+  // با عوض شدنِ فیلتر (در انتظار/تأییدشده/ردشده) انتخابِ قبلی بی‌معنا
+  // می‌شود؛ نگه داشتنش یعنی کاربر فکر کند هنوز ۱۰ مورد انتخاب است.
+  useEffect(() => { setSelectedIds([]); setBulkFails([]); }, [subFilter]);
 
   // ══════════════════════════════════════════════════════════════════════
   // گروه‌بندیِ کدها بر پایهٔ کارتی که به آن گره خورده‌اند
@@ -553,6 +567,55 @@ export function PhotoCardsPage({ request }) {
       loadSubs(subFilter);
       loadCodes();
     } catch (e) { notify(e.message, 'error'); }
+  }
+
+  // ── آیا این پرونده در تأییدِ گروهی جا دارد؟ ──
+  //
+  // ⚠️ آینهٔ همان شرطی است که تأییدِ تک‌نفره در خط اول چک می‌کند (بالای
+  //    تابع `decide`): اگر نه طرحی انتخاب شده، نه مدلِ عصبی حدسی دارد و نه
+  //    تطبیقِ تصویری، سرور ۴۰۰ می‌دهد و معلوم نیست کدام کارت باید ثبت شود.
+  //    پس چنین ردیفی را از پیش تیک‌نخورده می‌گذاریم و دلیلش را نشان می‌دهیم.
+  function bulkEligible(sub) {
+    return Boolean(picks[sub.id] || sub.neural_image || sub.design_image);
+  }
+
+  async function bulkApprove() {
+    const subsById = new Map((subs || []).map(x => [x.id, x]));
+    const ids = selectedIds.filter(id => {
+      const sub = subsById.get(id);
+      return sub && bulkEligible(sub);
+    });
+    if (!ids.length) return notify('موردی انتخاب نشده است', 'error');
+
+    const okGo = await confirmAction({
+      title: `تأیید ${fmtNumber(ids.length)} کارت`,
+      message: 'برای هر کارت، امتیازش به کاربر اضافه و اعلان تأیید فرستاده می‌شود. '
+        + 'این کار مثل تأییدِ تک‌تک است، فقط با یک کلیک.',
+      confirmText: 'تأیید کن',
+    });
+    if (!okGo) return;
+
+    setBulkBusy(true);
+    setBulkFails([]);
+    try {
+      const r = await request('/api/admin/photo-cards/submissions/bulk-decide', {
+        method: 'POST',
+        body: { ids, approve: true },
+      });
+      const sum = r.summary || {};
+      const fails = (r.results || []).filter(x => !x.ok);
+      setBulkFails(fails);
+      notify(
+        `${fmtNumber(sum.approved || 0)} کارت تأیید شد`
+        + (fails.length ? ` · ${fmtNumber(fails.length)} مورد نشد (پایین را ببینید)` : ''),
+        // `toast-warning` در CSS وجود ندارد؛ برای همین از variantهای
+        // موجود استفاده می‌شود تا رنگِ هشدار واقعاً دیده شود.
+        fails.length ? 'error' : 'success',
+      );
+      setSelectedIds([]);
+      loadSubs(subFilter);
+      loadCodes();
+    } catch (e) { notify(e.message, 'error'); } finally { setBulkBusy(false); }
   }
 
   const pendingCount = subFilter === 'pending' && subs ? subs.length : null;
@@ -1295,8 +1358,94 @@ export function PhotoCardsPage({ request }) {
               : 'موردی یافت نشد.'}
           />
         )}
+        {/* ── نوارِ تأیید گروهی ──
+            فقط در فهرست «در انتظار» معنا دارد: موردی که قبلاً تصمیم گرفته
+            شده با خطای ۴۰۹ برمی‌گردد و گزارش را شلوغ می‌کند. */}
+        {subFilter === 'pending' && subs && subs.length > 0 && (() => {
+          const eligibleIds = subs.filter(bulkEligible).map(x => x.id);
+          const allSelected = eligibleIds.length > 0
+            && eligibleIds.every(id => selectedIds.includes(id));
+          const notEligible = subs.length - eligibleIds.length;
+          return (
+            <div style={{
+              display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center',
+              padding: '10px 12px', marginBottom: 10, borderRadius: 10,
+              border: '1px solid var(--gg-border, rgba(127,127,127,.25))',
+            }}>
+              <label style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={e => setSelectedIds(e.target.checked ? eligibleIds : [])}
+                />
+                <span className="topbar-sub">
+                  {allSelected ? 'برداشتنِ انتخابِ همه' : 'انتخابِ همهٔ قابل‌تأییدها'}
+                  {` (${fmtNumber(eligibleIds.length)})`}
+                </span>
+              </label>
+              {notEligible > 0 && (
+                <span className="topbar-sub">
+                  · {fmtNumber(notEligible)} مورد قابلِ تأییدِ گروهی نیست
+                  (سیستم کارتی را تشخیص نداده؛ انتخابِ دستیِ کارت لازم است)
+                </span>
+              )}
+              <div style={{ marginInlineStart: 'auto', display: 'flex', gap: 8 }}>
+                <Button size="sm" variant="secondary"
+                  onClick={() => setSelectedIds([])}
+                  disabled={!selectedIds.length}>لغو انتخاب</Button>
+                <Button size="sm" icon={CheckCircle2} loading={bulkBusy}
+                  onClick={bulkApprove}
+                  disabled={!selectedIds.length || bulkBusy}>
+                  تأییدِ انتخاب‌شده‌ها{selectedIds.length ? ` (${fmtNumber(selectedIds.length)})` : ''}
+                </Button>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ── گزارشِ مواردی که در تأیید گروهی نشدند ──
+            دلیلِ واقعیِ سرور نوشته می‌شود؛ بی‌آن، مدیر نمی‌داند کدام پرونده
+            دستی لازم دارد و باید یکی‌یکی امتحان کند. */}
+        {bulkFails.length > 0 && (
+          <div style={{
+            border: '1px solid rgba(239,68,68,.3)', background: 'rgba(239,68,68,.06)',
+            borderRadius: 8, padding: 10, marginBottom: 10,
+          }}>
+            <b style={{ color: '#ef4444' }}>
+              {fmtNumber(bulkFails.length)} مورد تأیید نشد
+            </b>
+            <ul style={{ margin: '6px 0 0', paddingInlineStart: 18 }}>
+              {bulkFails.slice(0, 10).map(f => {
+                const sub = (subs || []).find(x => x.id === f.id);
+                return (
+                  <li key={f.id} className="topbar-sub">
+                    {(sub?.nickname || sub?.mobile || f.id.slice(0, 8))} — {f.message}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
         {subs && subs.map(s => (
           <div key={s.id} className="reviewRow">
+            {/* تیکِ انتخابِ گروهی — فقط برای پرونده‌های در انتظار و آن‌هایی
+                که سرور می‌تواند تأییدشان کند (طرحِ مشخصی دارد). */}
+            {subFilter === 'pending' && (
+              <div style={{ paddingTop: 6 }}>
+                <input
+                  type="checkbox"
+                  aria-label="انتخاب برای تأیید گروهی"
+                  checked={selectedIds.includes(s.id)}
+                  disabled={!bulkEligible(s)}
+                  title={bulkEligible(s)
+                    ? 'انتخاب برای تأیید گروهی'
+                    : 'سیستم کارتی را تشخیص نداده؛ این پرونده انتخابِ دستیِ کارت لازم دارد'}
+                  onChange={e => setSelectedIds(prev => (
+                    e.target.checked ? [...prev, s.id] : prev.filter(x => x !== s.id)
+                  ))}
+                />
+              </div>
+            )}
             <div className="reviewShots">
               <figure>
                 <img src={assetUrl(s.userImageUrl)} alt="عکس کاربر" />

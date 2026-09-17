@@ -12,6 +12,9 @@
 // در صورت رد یا لغو، مبلغ با یک تراکنش `withdrawal_refund` برمی‌گردد — پول
 // هرگز بی‌صدا ناپدید نمی‌شود و مسیرش در دفتر کل دیده می‌شود.
 
+// شمارهٔ کارت/شبا رمزگذاری‌شده ذخیره می‌شوند (AES-256-GCM) — نه فقط در
+// `users`، بلکه در اسنپ‌شاتِ لحظهٔ درخواستِ برداشت. شرح در lib/fieldCrypto.js.
+const fieldCrypto = require('../lib/fieldCrypto');
 const { pool } = require('../config/db');
 const wallet = require('./walletService');
 const { validateCardInput } = require('./bankCardService');
@@ -53,14 +56,24 @@ async function saveBankCard(userId, body) {
             bank_card_bank=$4, bank_card_saved_at=NOW(), updated_at=NOW()
        WHERE id=$5
      RETURNING bank_card_number, bank_card_holder, bank_card_sheba, bank_card_bank, bank_card_saved_at`,
-    [v.card.number, v.card.holder, v.card.sheba, v.card.bank, userId],
+    // ── چرا اینجا رمز می‌کنیم و نه در دیتابیس ──
+    //
+    // کلید فقط در اختیارِ برنامه است (`FIELD_ENCRYPTION_KEY` در .env).
+    // اگر رمزگذاری سمتِ پستگرس بود، کلید باید در کوئری‌ها می‌رفت و در
+    // لاگِ کوئری‌ها می‌نشست — که همان لو رفتن است.
+    [fieldCrypto.encrypt(v.card.number), v.card.holder,
+      fieldCrypto.encrypt(v.card.sheba), v.card.bank, userId],
   );
   const u = rows[0];
+  // ⚠️ مقدارِ برگشتیِ `RETURNING` **رمزشده** است (همان چیزی که نوشتیم).
+  // ماسک باید روی متنِ ساده حساب شود، وگرنه کاربر «—» می‌بیند.
+  const savedNumber = fieldCrypto.decrypt(u.bank_card_number);
+  const savedSheba = fieldCrypto.decrypt(u.bank_card_sheba);
   return {
-    maskedNumber: wallet.maskCard(u.bank_card_number),
+    maskedNumber: wallet.maskCard(savedNumber),
     holder: u.bank_card_holder,
     bank: u.bank_card_bank,
-    sheba: u.bank_card_sheba ? `${u.bank_card_sheba.slice(0, 6)}••••${u.bank_card_sheba.slice(-4)}` : null,
+    sheba: savedSheba ? `${savedSheba.slice(0, 6)}••••${savedSheba.slice(-4)}` : null,
     savedAt: u.bank_card_saved_at,
   };
 }
@@ -127,7 +140,11 @@ async function createRequest(userId, rawAmount) {
     const user = u.rows[0];
     if (!user) throw Object.assign(new Error('کاربر پیدا نشد'), { status: 404 });
 
-    if (!user.bank_card_number) {
+    // شمارهٔ رمزشده را باز می‌کنیم و بعد از این نقطه فقط با متنِ ساده کار
+    // می‌کنیم (اعتبارسنجی، بلوکه‌کردن، ثبت درخواست).
+    const cardNumber = fieldCrypto.decrypt(user.bank_card_number);
+    const cardSheba = fieldCrypto.decrypt(user.bank_card_sheba);
+    if (!cardNumber) {
       throw Object.assign(
         new Error('برای ثبت درخواست برداشت ابتدا باید کارت بانکی خود را ذخیره کنید'),
         { status: 400 },
@@ -153,7 +170,11 @@ async function createRequest(userId, rawAmount) {
       `INSERT INTO withdrawal_requests
          (user_id, amount, card_number, card_holder, card_sheba, card_bank, status)
        VALUES ($1,$2,$3,$4,$5,$6,'pending') RETURNING *`,
-      [userId, amount, user.bank_card_number, user.bank_card_holder, user.bank_card_sheba, user.bank_card_bank],
+      // اسنپ‌شات هم رمز می‌شود: این ردیف ماه‌ها می‌ماند و اگر فقط ستونِ
+      // `users` رمز می‌شد، تاریخچهٔ برداشت‌ها متنِ سادهٔ کارت‌ها را نگه
+      // می‌داشت — یعنی همان چیزی که می‌خواستیم از دست نرود.
+      [userId, amount, fieldCrypto.encrypt(cardNumber), user.bank_card_holder,
+        fieldCrypto.encrypt(cardSheba), user.bank_card_bank],
     );
     const request = created.rows[0];
 
@@ -336,7 +357,9 @@ function publicRequest(row) {
     amount: Number(row.amount),
     status: row.status,
     statusLabel: faStatus(row.status),
-    cardMasked: wallet.maskCard(row.card_number),
+    // مقدارِ ستون رمزشده است؛ ماسک باید روی متنِ سادهٔ بازشده حساب شود
+    // وگرنه «—» می‌شد (باگی که همین لحظه، پیش از رسیدن به کاربر، گرفته شد).
+    cardMasked: wallet.maskCard(fieldCrypto.decrypt(row.card_number)),
     cardHolder: row.card_holder,
     cardBank: row.card_bank,
     adminNote: row.admin_note,
@@ -407,8 +430,10 @@ async function listForAdmin({ status, search, limit = 200 } = {}) {
   );
   return rows.map((r) => ({
     ...publicRequest(r),
-    cardNumber: r.card_number,
-    cardSheba: r.card_sheba,
+    // مدیر برای انجامِ واریز به شمارهٔ کامل نیاز دارد؛ این تنها جایی است
+    // که متنِ ساده از سرور بیرون می‌رود و پشتِ adminAuth است.
+    cardNumber: fieldCrypto.decrypt(r.card_number),
+    cardSheba: fieldCrypto.decrypt(r.card_sheba),
     user: {
       id: r.user_id,
       mobile: r.mobile,

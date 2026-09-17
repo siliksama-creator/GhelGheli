@@ -1,4 +1,5 @@
 /** League season, prize, and payout administration routes. */
+const fieldCrypto = require('../lib/fieldCrypto');
 const express = require('express');
 const { parseFaNumber } = require('../lib/faNum');
 
@@ -453,7 +454,19 @@ router.post('/admin/league/payouts/approve-all', adminAuth, requireRole(), async
 // SECURITY (ممیزی دورِ ۲۳): requireRole('support') اضافه شد — این پاسخ
 // موبایل و شمارهٔ حسابِ بانکیِ برندگانِ لیگ را برمی‌گرداند؛ نقشِ «ناظر»
 // (observer) نیازی به PII بانکی ندارد.
-router.get('/admin/league/payouts', adminAuth, requireRole('support'), asyncHandler(async (req, res) => res.json((await pool.query('SELECT p.*, u.mobile,u.first_name,u.last_name,u.nickname,u.bank_account FROM league_payouts p JOIN users u ON u.id=p.user_id ORDER BY p.created_at DESC')).rows)));
+// ⚠️ `bank_account` در دیتابیس رمزگذاری‌شده است؛ باید باز شود وگرنه مدیر
+//    رشتهٔ `enc:v1:...` می‌بیند و نمی‌تواند جایزه را واریز کند.
+router.get('/admin/league/payouts', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT p.*, u.mobile, u.first_name, u.last_name, u.nickname, u.bank_account
+       FROM league_payouts p JOIN users u ON u.id = p.user_id
+      ORDER BY p.created_at DESC`,
+  );
+  res.json(rows.map(r => ({
+    ...r,
+    bank_account: r.bank_account ? fieldCrypto.decrypt(r.bank_account) : r.bank_account,
+  })));
+}));
 router.patch('/admin/league/payouts/:id', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => {
   const status = req.body.status;
   if (!['pending', 'approved', 'paid'].includes(status)) {

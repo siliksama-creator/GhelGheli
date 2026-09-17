@@ -1,4 +1,5 @@
 /** OTP, registration, password login, and password reset routes. */
+const fieldCrypto = require('../lib/fieldCrypto');
 const express = require('express');
 const signupGift = require('../services/signupGiftService');
 const smsService = require('../services/smsService');
@@ -218,7 +219,8 @@ router.post('/auth/register-password', userLoginLimiter, asyncHandler(async (req
       boundedText(province, 60),
       safeImageUrl(profileImageUrl),
       safeAvatarKey(profileAvatarKey),
-      boundedText(bankAccount, 40),
+      // همان دلیلِ PATCH پروفایل: اول بُرش، بعد رمزگذاری.
+      fieldCrypto.encrypt(boundedText(bankAccount, 40)),
     ]
   );
 
