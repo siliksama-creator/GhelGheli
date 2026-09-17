@@ -296,7 +296,21 @@ html[data-booted] .heroMark {
   display: block;
   height: 100%;
   border-radius: 99px;
-  background: linear-gradient(90deg, #00d49a, #9be86b 55%, #ffc94d);
+  /* ⚠️ سه جزئیات که با چشم روی سایتِ زنده اصلاح شدند:
+
+     ۱. `270deg` یعنی گرادیان **راست‌به‌چپ**. نوار داخلِ `dir="rtl"` از سمتِ
+        راست پر می‌شود، پس زمرد باید همان‌جا باشد که نوار شروع می‌شود.
+     ۲. `background-size` به عرضِ **ریل** قفل شده (نه عرضِ نوارِ پر) و
+        `background-position: right` — یعنی گرادیان همیشه کامل است و فقط
+        «بریده» می‌شود. نسخهٔ اول گرادیان را در عرضِ خودِ نوار می‌کشید و
+        نتیجه این بود که در ۵٪ هم کاربر **طلایی** می‌دید: رنگِ جایزه، پیش از
+        به‌دست‌آوردنش.
+     ۳. `background-repeat: no-repeat` چون گرادیانِ قفل‌شده به عرضِ ریل باید
+        بیرونِ کادر تکرار نشود. */
+  background: linear-gradient(270deg, #00d49a, #9be86b 55%, #ffc94d);
+  background-size: min(300px, 78vw) 100%;
+  background-position: right center;
+  background-repeat: no-repeat;
   box-shadow: 0 0 10px #00d49a4d;
   transition: width 420ms cubic-bezier(.33, 1, .68, 1);
 }
