@@ -36,8 +36,11 @@ fi
 
 [ -f "$APP_DIR/monitor/attack-watch.sh" ] || { echo "اسکریپتِ نگهبان در $APP_DIR/monitor پیدا نشد — اول دیپلوی کن." >&2; exit 1; }
 
-echo "==> نصبِ اسکریپت و اجراپذیر کردنش"
-run install -m 0755 "$APP_DIR/monitor/attack-watch.sh" "$APP_DIR/monitor/attack-watch.sh"
+echo "==> اجراپذیر کردنِ اسکریپت"
+# ⚠️ تلهٔ واقعیِ همین امروز: نسخهٔ اول `install src src` می‌کرد (خودش روی خودش)
+# و install با خطای «same file» می‌ایستاد؛ چون اسکریپت‌ها از قبل در مخزنِ سرور
+# هستند، تنها کاری که لازم است اجراپذیر کردنشان است.
+run chmod 0755 "$APP_DIR/monitor/attack-watch.sh"
 
 echo "==> بررسیِ نحو"
 if [ "$DRY" -eq 0 ]; then bash -n "$APP_DIR/monitor/attack-watch.sh" || { echo "نحوِ اسکریپت خراب است." >&2; exit 1; }; fi

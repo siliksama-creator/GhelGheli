@@ -41,6 +41,10 @@
 
 set -Eeuo pipefail
 
+# کمکیِ مشترکِ تلگرام (خواندنِ تنظیمات با تحملِ کوتیشن — باگِ ۲۶ شهریور)
+# shellcheck source=lib/telegram.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/telegram.sh"
+
 LOG_FILE="${LOG_FILE:-/var/log/nginx/access.log}"
 STATE_FILE="${STATE_FILE:-/run/ghelgheli-attack-watch.state}"
 STATE_LOG="${STATE_LOG:-/var/log/ghelgheli-attack-watch.log}"
@@ -185,23 +189,21 @@ main() {
     exit 0
   fi
 
-  # ── ارسالِ تلگرام — دقیقاً همان مسیر و همان فایلِ تنظیماتیِ پشتیبان‌گیری ──
-  local TOKEN="" CHAT=""
-  if [ -r "$TG_CONF" ]; then
-    TOKEN=$(grep -m1 -E '^TELEGRAM_BOT_TOKEN=' "$TG_CONF" | cut -d= -f2- || true)
-    CHAT=$(grep -m1 -E '^TELEGRAM_CHAT_ID=' "$TG_CONF" | cut -d= -f2- || true)
-  fi
+  # ── ارسالِ تلگرام — همان فایلِ تنظیماتیِ پشتیبان‌گیری، از راهِ کمکیِ مشترک ──
+  local TOKEN CHAT
+  TOKEN=$(tg_conf_get "$TG_CONF" TELEGRAM_BOT_TOKEN)
+  CHAT=$(tg_conf_get "$TG_CONF" TELEGRAM_CHAT_ID)
   if [ -z "$TOKEN" ] || [ -z "$CHAT" ]; then
-    log "telegram config missing; alert not sent"
+    log "telegram config missing; alert not sent ($TG_CONF)"
     exit 0
   fi
-  # parse_mode=HTML تا پاراگراف‌بندی خوانا باشد (بدونِ هیچ ایموجی — سبکِ خودِ پروژه).
-  curl -sf -m 15 -X POST "https://api.telegram.org/bot${TOKEN}/sendMessage" \
-    -d "chat_id=${CHAT}" \
-    --data-urlencode "text=${text}" \
-    -d "parse_mode=HTML" >/dev/null 2>&1 \
-    && log "telegram alert sent" \
-    || log "telegram send failed"
+  local err
+  if err=$(tg_send_message "$TOKEN" "$CHAT" "$text"); then
+    log "telegram alert sent"
+  else
+    # دلیلِ شکست در لاگ می‌ماند — «send failed»ِ بی‌توضیح، یک ساعت عیب‌یابی است.
+    log "telegram send failed: ${err:0:300}"
+  fi
 }
 
 main "$@"

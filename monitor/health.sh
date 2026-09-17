@@ -38,6 +38,12 @@
 #   HEARTBEAT_S  فاصلهٔ «همه‌چیز آرام» (پیش‌فرض ۶۰۰ ثانیه)
 set -uo pipefail
 
+# کمکیِ مشترکِ تلگرام — خواندنِ تنظیمات با تحمّلِ کوتیشن (باگِ ۲۶ شهریور:
+# نگهبان با `cut -d= -f2-` مقدارِ داخلِ کوتیشن را هم برمی‌داشت و هیچ هشداری
+# به تلگرام نمی‌رسید، بدونِ آنکه کسی بفهمد).
+# shellcheck source=lib/telegram.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/telegram.sh"
+
 APP_DIR="${APP_DIR:-/var/www/GhelGheli}"
 PORTS_FILE="${PORTS_FILE:-/etc/ghelgheli-capacity-ports}"
 LOG_FILE="${LOG_FILE:-/var/log/ghelgheli-health.log}"
@@ -70,19 +76,24 @@ tg_send() {
     log "ALERT (بدونِ کلیدِ تلگرام): $text"
     return 0
   fi
-  # shellcheck disable=SC1090
+  # ═══════════════════════════════════════════════════════════════════════
+  # باگِ واقعیِ ۲۶ شهریور: این‌جا مقدارها با `cut -d= -f2-` خوانده می‌شدند،
+  # یعنی **با کوتیشن** — و فایلِ تنظیمات مقدارها را داخل کوتیشن نگه می‌دارد.
+  # نتیجه این بود که هیچ هشداری به تلگرام نمی‌رسید (۴۰۴)، ولی کسی نمی‌فهمید
+  # چون نگهبان فقط هنگامِ خرابی پیام می‌فرستد. حالا از کمکیِ مشترک می‌خواند.
+  # ═══════════════════════════════════════════════════════════════════════
   local TELEGRAM_BOT_TOKEN="" TELEGRAM_CHAT_ID=""
-  TELEGRAM_BOT_TOKEN="$(grep -m1 -E '^TELEGRAM_BOT_TOKEN=' "$conf" | cut -d= -f2-)"
-  TELEGRAM_CHAT_ID="$(grep -m1 -E '^TELEGRAM_CHAT_ID=' "$conf" | cut -d= -f2-)"
+  TELEGRAM_BOT_TOKEN="$(tg_conf_get "$conf" TELEGRAM_BOT_TOKEN)"
+  TELEGRAM_CHAT_ID="$(tg_conf_get "$conf" TELEGRAM_CHAT_ID)"
   if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
     log "ALERT (کلیدِ تلگرام ناقص): $text"
     return 0
   fi
-  curl -sS --max-time 20 -X POST \
-    "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-    -d "chat_id=${TELEGRAM_CHAT_ID}" \
-    --data-urlencode "text=$(printf '🖥 <b>نگهبانِ GhelGheli</b>\n\n%s\n\nزمان: %s' "$text" "$(date '+%Y-%m-%d %H:%M:%S %z')")" \
-    -d "parse_mode=HTML" >/dev/null 2>&1 || log "telegram send failed: $text"
+  local err
+  if ! err=$(tg_send_message "$TELEGRAM_BOT_TOKEN" "$TELEGRAM_CHAT_ID" \
+      "$(printf '<b>نگهبانِ GhelGheli</b>\n\n%s\n\nزمان: %s' "$text" "$(date '+%Y-%m-%d %H:%M:%S %z')")"); then
+    log "telegram send failed: $text | ${err:0:300}"
+  fi
 }
 
 # وضعیتِ یک آلارم: فقط هنگامِ تغییر خبر می‌دهد (نه اسپمِ هر ۳۰ ثانیه).
