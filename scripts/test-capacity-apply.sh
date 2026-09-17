@@ -28,6 +28,21 @@ APPLY="$SCRIPT_DIR/capacity-apply.sh"
 
 ROOT="$(mktemp -d /tmp/captest.XXXXXX)"
 BIN="$ROOT/bin"; mkdir -p "$BIN"
+NODE_REAL="$(command -v node)"
+# وضعیتِ PM2ِ شبیه‌سازی‌شده — از ابتدا تعریف می‌شود چون تابعِ run_apply به آن‌ها
+# ارجاع می‌دهد و اسکریپت با `set -u` اجرا می‌شود (متغیرِ تعریف‌نشده = خطا).
+PM2_STUB_LOG="$ROOT/pm2.log"
+PM2_STUB_STATE="$ROOT/pm2.state"
+: > "$PM2_STUB_LOG"
+# «node» جعلی برای هر تعداد هسته: همان capacity.js واقعی، با سخت‌افزارِ
+# شبیه‌سازی‌شده. این‌طور آزمون روی هر ماشینی نتیجهٔ یکسان می‌دهد.
+for c in 1 2 4 8; do
+  cat > "$BIN/node-${c}cores" <<EOF
+#!/usr/bin/env bash
+exec env CAPACITY_FORCE_CORES=${c} "$NODE_REAL" "\$@"
+EOF
+  chmod +x "$BIN/node-${c}cores"
+done
 PASS=0; FAIL=0
 ok()   { printf '  \033[32m✅ %s\033[0m\n' "$*"; PASS=$((PASS+1)); }
 bad()  { printf '  \033[31m❌ %s\033[0m\n' "$*"; FAIL=$((FAIL+1)); }
@@ -119,7 +134,16 @@ for PORT in 4000 4001 4002; do echo "$PORT"; done
 if ls /home/ghelgheli/.pm2/logs/*error*.log >/dev/null 2>&1; then echo x; fi
 EOF
 
+# ── تابعِ مرکزیِ اجرا ────────────────────────────────────────────────────
+#
+# ⚠️ درسِ گرفته‌شده از CI: نسخهٔ اولِ این آزمون «تعدادِ هستهٔ همان ماشین» را
+#    می‌خواند. روی ماشینِ توسعه ۲ هسته بود و همه‌چیز سبز؛ روی رانرِ ۴ هسته‌ای
+#    گیت‌هاب قرمز شد، چون شبیه‌سازِ PM2 و خودِ اسکریپت دو «دیدِ» متفاوت از
+#    سخت‌افزار پیدا می‌کردند. حالا هسته **صریح** پاس داده می‌شود (پیش‌فرض ۲)
+#    تا نتیجه در هر محیطی یکی باشد. آزمونی که به ماشین وابسته باشد، آزمون نیست.
 run_apply() {
+  local cores=2
+  if [[ "${1:-}" =~ ^[0-9]+$ ]]; then cores="$1"; shift; fi
   env \
     APP_DIR="$APP_DIR" \
     NGINX_SITE="$SITE" \
@@ -132,7 +156,10 @@ run_apply() {
     LOCK_FILE="$ROOT/lock" \
     STATE="$BACKEND/.capacity-state.json" \
     PM2_BIN="$BIN/pm2" \
-    NODE_BIN="$(command -v node)" \
+    NODE_BIN="$BIN/node-${cores}cores" \
+    PM2_STUB_LOG="$PM2_STUB_LOG" \
+    PM2_STUB_STATE="$PM2_STUB_STATE" \
+    SIM_CORES="$cores" \
     SNIPPET_UNDER_TEST="$ROOT/snippets/ghelgheli-upstream.conf" \
     TG_CONF="$ROOT/no-such-conf" TG_CONF_ALT="$ROOT/no-such-conf2" \
     NGINX_FAIL="${NGINX_FAIL:-0}" \
@@ -222,12 +249,6 @@ head "سناریو ۵ — ⭐ ارتقای سرور: ۲ هسته → ۴ هسته
 # سخت‌افزار را نمی‌شود در آزمون عوض کرد، پس یک «node» جعلی می‌سازیم که
 # همان capacity.js واقعی را با CAPACITY_FORCE_CORES=4 اجرا می‌کند — یعنی
 # دقیقاً همان چیزی که سرورِ ارتقایافته می‌بیند.
-cat > "$BIN/node-4cores" <<'EOF'
-#!/usr/bin/env bash
-exec env CAPACITY_FORCE_CORES=4 "$NODE_REAL" "$@"
-EOF
-chmod +x "$BIN/node-4cores"
-export NODE_REAL="$(command -v node)"
 
 # pm2 شبیه‌سازی‌شده: حذفِ گره را ثبت می‌کند تا بشود بررسی کرد
 cat > "$BIN/pm2" <<'EOF'
@@ -277,22 +298,9 @@ esac
 exit 0
 EOF
 chmod +x "$BIN/pm2"
-export PM2_STUB_LOG="$ROOT/pm2.log"
-export PM2_STUB_STATE="$ROOT/pm2.state"
 : > "$PM2_STUB_LOG"
 
-# اجرای قبلی (۲ هسته) وضعیت را ثبت کرده؛ حالا با ۴ هسته اجرا می‌کنیم
-env   APP_DIR="$APP_DIR" NGINX_SITE="$SITE" \
-  NGINX_SNIPPET="$ROOT/snippets/ghelgheli-upstream.conf" \
-  NGINX_BACKUP_DIR="$ROOT/backups" \
-  SITE_AVAILABLE="$ROOT/sites-available-ghelgheli" \
-  PORTS_FILE="$ROOT/ports" HEALTH_SH="$HEALTH" LOG_FILE="$ROOT/log" \
-  LOCK_FILE="$ROOT/lock" STATE="$BACKEND/.capacity-state.json" \
-  PM2_BIN="$BIN/pm2" NODE_BIN="$BIN/node-4cores" \
-  PM2_STUB_LOG="$PM2_STUB_LOG" PM2_STUB_STATE="$PM2_STUB_STATE" SIM_CORES=4 \
-  SNIPPET_UNDER_TEST="$ROOT/snippets/ghelgheli-upstream.conf" \
-  TG_CONF="$ROOT/no-such-conf" TG_CONF_ALT="$ROOT/no-such-conf2" \
-  bash "$APPLY" > "$ROOT/run5.out" 2>&1
+run_apply 4 > "$ROOT/run5.out" 2>&1
 
 grep -q '⚙️ تغییر تشخیص داده شد' "$ROOT/run5.out" && ok "ارتقا را تشخیص داد" || bad "ارتقا را تشخیص نداد"
 grep -q 'upstream ghelgheli_http' "$SNIPPET" && ok "upstreamِ جدید ساخته شد" || bad "upstream ساخته نشد"
@@ -306,37 +314,15 @@ jq -e '.cores == 4 and .procs == 5 and .vision == 3 and .uv == 8' "$BACKEND/.cap
 grep -q '4003' "$ROOT/ports" && ok "لیستِ پورت‌های پایش هم به‌روز شد" || bad "لیستِ پورت‌ها به‌روز نشد"
 grep -q 'سقفِ هم‌زمانیِ پردازش عکس/مدل: <b>3</b>' "$ROOT/run5.out" || true
 # و بعد از آن: اجرای دوباره باید ساکت باشد (وگرنه هر روز ری‌استارت می‌زند)
-env APP_DIR="$APP_DIR" NGINX_SITE="$SITE" NGINX_SNIPPET="$ROOT/snippets/ghelgheli-upstream.conf" \
-  NGINX_BACKUP_DIR="$ROOT/backups" SITE_AVAILABLE="$ROOT/sites-available-ghelgheli" \
-  PORTS_FILE="$ROOT/ports" HEALTH_SH="$HEALTH" LOG_FILE="$ROOT/log" LOCK_FILE="$ROOT/lock" \
-  STATE="$BACKEND/.capacity-state.json" PM2_BIN="$BIN/pm2" NODE_BIN="$BIN/node-4cores" \
-  PM2_STUB_LOG="$PM2_STUB_LOG" PM2_STUB_STATE="$PM2_STUB_STATE" SIM_CORES=4 \
-  SNIPPET_UNDER_TEST="$ROOT/snippets/ghelgheli-upstream.conf" \
-  TG_CONF="$ROOT/no-such-conf" TG_CONF_ALT="$ROOT/no-such-conf2" bash "$APPLY" > "$ROOT/run6.out" 2>&1
+run_apply 4 > "$ROOT/run6.out" 2>&1
 grep -q 'بدون تغییر' "$ROOT/run6.out" && ok "اجرای بعدی ساکت است (هیچ ری‌استارتِ تکراری)" || bad "روی همان سخت‌افزار دوباره دست برد"
 
 # ═══════════════════════════════════════════════════════════════════════════
 head "سناریو ۶ — تنزل: ۴ هسته → ۲ هسته (گره‌های اضافی باید حذف شوند)"
 # ═══════════════════════════════════════════════════════════════════════════
-cat > "$BIN/node-2cores" <<'EOF'
-#!/usr/bin/env bash
-exec env CAPACITY_FORCE_CORES=2 "$NODE_REAL" "$@"
-EOF
-chmod +x "$BIN/node-2cores"
 : > "$PM2_STUB_LOG"
 
-env \
-  APP_DIR="$APP_DIR" NGINX_SITE="$SITE" \
-  NGINX_SNIPPET="$ROOT/snippets/ghelgheli-upstream.conf" \
-  NGINX_BACKUP_DIR="$ROOT/backups" \
-  SITE_AVAILABLE="$ROOT/sites-available-ghelgheli" \
-  PORTS_FILE="$ROOT/ports" HEALTH_SH="$HEALTH" LOG_FILE="$ROOT/log" \
-  LOCK_FILE="$ROOT/lock" STATE="$BACKEND/.capacity-state.json" \
-  PM2_BIN="$BIN/pm2" NODE_BIN="$BIN/node-2cores" \
-  PM2_STUB_LOG="$PM2_STUB_LOG" PM2_STUB_STATE="$PM2_STUB_STATE" SIM_CORES=2 \
-  SNIPPET_UNDER_TEST="$ROOT/snippets/ghelgheli-upstream.conf" \
-  TG_CONF="$ROOT/no-such-conf" TG_CONF_ALT="$ROOT/no-such-conf2" \
-  bash "$APPLY" > "$ROOT/run7.out" 2>&1
+run_apply 2 > "$ROOT/run7.out" 2>&1
 
 grep -q 'تغییر تشخیص داده شد' "$ROOT/run7.out" && ok "تنزل را تشخیص داد" || bad "تنزل را تشخیص نداد"
 grep -q ':4003;' "$SNIPPET" && bad "پورت ۴۰۰۳ در upstreamِ جدید مانده (۵۰۲ می‌دهد!)" || ok "گره‌های اضافی از upstream حذف شدند"
