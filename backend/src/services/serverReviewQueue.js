@@ -26,6 +26,50 @@ const AUTO_APPROVE_ENABLED = process.env.SERVER_AUTO_APPROVE !== 'false';
 
 const UPLOAD_DISK_ROOT = path.resolve(__dirname, '..', '..', 'uploads');
 
+// ═══════════════════════════════════════════════════════════════════════════
+// تک‌مسئولِ جاروب + تلاشِ مجددِ صریح
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ── مشکلِ قبلی ──
+//
+// سه پروسهٔ API هر کدام مستقل `cron.schedule('*/10 * * * *', runPhotoSweep)`
+// را ثبت می‌کردند، پس هر ده دقیقه **سه‌بار** یک جاروبِ کامل شروع می‌شد:
+// هر سه همان ۲۰ پروندهٔ اول را برمی‌داشتند، هر سه بردارهای مرجع را
+// بازمی‌ساختند و هر سه یک استنتاجِ سنگین اجرا می‌کردند تا برسند به
+// `SELECT ... FOR UPDATE` و ببینند ردیف قفل است. کارِ تکراریِ محض روی
+// دو هسته، و رقابت روی قفلِ ردیف‌ها.
+//
+// (خوشبختانه خودِ `reviewOne` سالم بود: قفلِ ردیف + شرطِ `status='pending'`
+//  مانعِ تأییدِ دوباره و امتیازِ دوباره می‌شد. یعنی اتلاف بود، نه فسادِ داده.)
+//
+// ── راه‌حل ──
+//
+// به‌جای «حذفِ دو پروسه از سه» (که اگر گرهِ بازی روزی بخوابد جاروب را
+// کامل متوقف می‌کرد)، از **قفلِ مشورتیِ پستگرس** استفاده می‌کنیم:
+//
+//   • هر سه پروسه هر ده دقیقه تلاش می‌کنند، ولی فقط یکی `pg_try_advisory_lock`
+//     را می‌گیرد و بقیه در همان میلی‌ثانیه بی‌سروصدا برمی‌گردند.
+//   • قفل به **اتصال** گره خورده است، پس اگر پروسهٔ دارنده کرش کند یا
+//     ری‌استارت شود، قفل خودبه‌خود آزاد می‌شود و پروسهٔ زندهٔ بعدی
+//     جاروب را برمی‌دارد ⇒ هیچ‌وقت «جاروبِ مرده» نداریم.
+//
+// ── و چرا «تلاشِ مجدد» اضافه شد ──
+//
+// اجرای سه‌باره یک فایدهٔ *تصادفی* داشت: اگر استنتاج در یک پروسه خطا
+// می‌خورد، پروسهٔ دوم که روی همان ردیف منتظر بود بلافاصله دوباره تلاش
+// می‌کرد — به‌جای انتظارِ ده‌دقیقه‌ای تا جاروبِ بعدی. با تک‌مسئول‌شدن آن
+// فایده از بین می‌رفت، پس این‌بار **صریح** پیاده شد: هر پرونده تا
+// `SERVER_REVIEW_ATTEMPTS` بار (پیش‌فرض ۳) با فاصلهٔ کوتاه تلاش می‌شود.
+// نتیجه از قبل بهتر است: انتظارِ تا ۱۰ دقیقه (و در دادهٔ واقعیِ همین
+// پروژه، یک پرونده ۲۵ دقیقه معطل مانده بود) به چند ثانیه می‌رسد.
+//
+// نکتهٔ مهم: فقط **خطا/استثنا** باعث تلاشِ مجدد می‌شود. «در صف ماندن»
+// (اکشنِ `queue`) یک تصمیمِ درست و قطعی است، نه شکست — پس صدبار هم
+// تکرار شود به تأیید نمی‌رسد و تکرارش فقط CPU می‌سوزاند.
+const SWEEP_LOCK_KEY = 818151001; // کلیدِ دلخواه و یکتا برای این جاروب
+const REVIEW_ATTEMPTS = Math.max(1, Number(process.env.SERVER_REVIEW_ATTEMPTS || 3));
+const REVIEW_RETRY_DELAYS_MS = [1500, 4000]; // فاصلهٔ پیش از تلاشِ دوم و سوم
+
 function diskPath(userImagePath) {
   if (!userImagePath) return null;
   if (fs.existsSync(userImagePath)) return userImagePath;
@@ -157,43 +201,105 @@ async function reviewOne(pool, submissionId, hooks = {}) {
 }
 
 /**
- * همهٔ پرونده‌های در انتظار را (با سقف) بازبینی می‌کند.
- * @returns {Promise<{processed:number, approved:number, queued:number, errors:number}>}
+ * مثل `reviewOne` ولی با تلاشِ مجددِ کوتاه روی **خطا**.
+ *
+ * چرا اینجا و نه داخلِ `reviewOne`: خودِ `reviewOne` تراکنشِ خودش را دارد و
+ * در صورتِ خطا ROLLBACK می‌کند؛ تکرار باید از بیرونِ آن تراکنش انجام شود تا
+ * یک اتصالِ خراب، نتیجهٔ خطا را به تلاشِ بعدی کش نکند.
+ *
+ * @param {import('pg').Pool} pool
+ * @param {string} submissionId
+ * @param {object} hooks
+ * @returns {Promise<object>} همان خروجیِ reviewOne
  */
-async function sweepPending(pool, { limit = 20, ...hooks } = {}) {
-  // اگر ابزار بینایی آماده نیست، بی‌سروصدا هیچ‌کاری نکن.
-  const ready = await require('./serverVision').available();
-  if (!ready) return { processed: 0, approved: 0, queued: 0, errors: 0, vision: false };
-
-  try {
-    await serverVerify.ensureReferenceEmbeddings(pool);
-  } catch (e) {
-    // اگر ساخت مرجع نیمه‌کاره ماند، باز هم با مرجع‌های موجود پیش برو.
-  }
-
-  const rows = (await pool.query(
-    `SELECT id FROM photo_card_submissions
-      WHERE status='pending'
-      ORDER BY created_at ASC LIMIT $1`,
-    [limit],
-  )).rows;
-
-  let approved = 0, queued = 0, errors = 0;
-  for (const r of rows) {
+async function reviewWithRetry(pool, submissionId, hooks = {}, onAttempt = null) {
+  let lastError;
+  for (let attempt = 1; attempt <= REVIEW_ATTEMPTS; attempt++) {
+    if (onAttempt) onAttempt(attempt);
     try {
-      const out = await reviewOne(pool, r.id, hooks);
-      if (out.action === 'approved') approved++;
-      else if (out.checked) queued++;
+      const out = await reviewOne(pool, submissionId, hooks);
+      if (attempt > 1) {
+        // ثبتِ اینکه تلاشِ مجدد لازم شد — برای دیدنِ سلامتِ مدل/دیتابیس.
+        console.warn(`[serverReview] ${submissionId} در تلاشِ ${attempt} انجام شد`);
+      }
+      return out;
     } catch (e) {
-      errors++;
-      // یک پروندهٔ خراب نباید کل جاروب را بشکند.
+      lastError = e;
+      if (attempt < REVIEW_ATTEMPTS) {
+        const wait = REVIEW_RETRY_DELAYS_MS[attempt - 1] ?? 4000;
+        await new Promise(r => setTimeout(r, wait));
+      }
     }
   }
-  return { processed: rows.length, approved, queued, errors, vision: true };
+  throw lastError;
+}
+
+/**
+ * همهٔ پرونده‌های در انتظار را (با سقف) بازبینی می‌کند.
+ *
+ * در هر لحظه فقط **یک** جاروب در کل خوشه اجرا می‌شود؛ بقیهٔ پروسه‌ها
+ * بی‌سروصدا `{ skipped: true }` برمی‌گردانند (توضیحِ کامل بالای فایل).
+ *
+ * @returns {Promise<{processed:number, approved:number, queued:number,
+ *   errors:number, skipped?:boolean, retries?:number}>}
+ */
+async function sweepPending(pool, { limit = 20, ...hooks } = {}) {
+  // ── گاردِ تک‌اجرا: قفلِ مشورتیِ پستگرس ──
+  // باید **پیش از** هر کارِ سنگین گرفته شود (حتی پیش از `available()` و
+  // ساختِ بردارهای مرجع)، وگرنه همان کارِ تکراری برمی‌گردد.
+  const lockClient = await pool.connect();
+  let holdsLock = false;
+  try {
+    const got = await lockClient.query('SELECT pg_try_advisory_lock($1) AS got', [SWEEP_LOCK_KEY]);
+    holdsLock = got.rows[0]?.got === true;
+    if (!holdsLock) {
+      return { processed: 0, approved: 0, queued: 0, errors: 0, skipped: true };
+    }
+
+    // اگر ابزار بینایی آماده نیست، بی‌سروصدا هیچ‌کاری نکن.
+    const ready = await require('./serverVision').available();
+    if (!ready) return { processed: 0, approved: 0, queued: 0, errors: 0, vision: false };
+
+    try {
+      await serverVerify.ensureReferenceEmbeddings(pool);
+    } catch (e) {
+      // اگر ساخت مرجع نیمه‌کاره ماند، باز هم با مرجع‌های موجود پیش برو.
+    }
+
+    const rows = (await pool.query(
+      `SELECT id FROM photo_card_submissions
+        WHERE status='pending'
+        ORDER BY created_at ASC LIMIT $1`,
+      [limit],
+    )).rows;
+
+    let approved = 0, queued = 0, errors = 0, retries = 0;
+    for (const r of rows) {
+      let attemptsUsed = 0;
+      try {
+        const out = await reviewWithRetry(pool, r.id, hooks, (n) => { attemptsUsed = n; });
+        if (out.action === 'approved') approved++;
+        else if (out.checked) queued++;
+      } catch (e) {
+        errors++;
+        // یک پروندهٔ خراب نباید کل جاروب را بشکند.
+      }
+      if (attemptsUsed > 1) retries += attemptsUsed - 1;
+    }
+    return { processed: rows.length, approved, queued, errors, retries, vision: true };
+  } finally {
+    // آزادسازیِ قفل روی **همان** اتصال (قفلِ مشورتی به session گره خورده).
+    if (holdsLock) {
+      await lockClient.query('SELECT pg_advisory_unlock($1)', [SWEEP_LOCK_KEY]).catch(() => {});
+    }
+    lockClient.release();
+  }
 }
 
 module.exports = {
   reviewOne,
+  reviewWithRetry,
   sweepPending,
   AUTO_APPROVE_ENABLED,
+  REVIEW_ATTEMPTS,
 };

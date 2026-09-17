@@ -1585,10 +1585,17 @@ module.exports = function createPhotoCardRoutes(deps) {
           // مدلِ خودش (چهره+بصری) پرونده را دوباره می‌سنجد؛ اگر پراطمینان بود
           // خودکار تأیید می‌شود، وگرنه در صفِ ادمین می‌ماند. خطای این پردازش
           // نباید ثبت را بشکند؛ پس فقط لاگ می‌شود.
+          //
+          // `reviewWithRetry` و نه `reviewOne`: اگر استنتاج یک خطای گذرا
+          // بخورد (اتصالِ دیتابیس، لودشدنِ دیرهنگامِ مدل، قفلِ ردیف)،
+          // تلاشِ دوم ~۱.۵ ثانیه بعد و تلاشِ سوم ~۴ ثانیه بعد انجام
+          // می‌شود. قبلاً چنین پرونده‌ای تا جاروبِ بعدی (تا ۱۰ دقیقه)
+          // «در انتظار» می‌ماند — همان چیزی که در دادهٔ واقعی یک بار
+          // ۲۵ دقیقه طول کشید.
           {
             const pendingId = insertSub.rows[0].id;
             setTimeout(() => {
-              serverReviewQueue.reviewOne(pool, pendingId, {
+              serverReviewQueue.reviewWithRetry(pool, pendingId, {
                 addLeaguePoints,
                 leaderboardSignal: () => leaderboardSignal.leaderboardChanged(),
                 audit: (adminId, action, entity, entityId, detail, meta) =>
