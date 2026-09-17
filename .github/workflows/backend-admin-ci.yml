@@ -47,6 +47,11 @@ jobs:
           bash -n scripts/capacity-install.sh
           bash -n scripts/test-capacity-apply.sh
           bash scripts/test-capacity-apply.sh
+          # نگهبانِ سلامتِ سرور (systemd، هر ۳۰ ثانیه) + سلامت‌سنجِ cron.
+          # این دو بیرونِ مسیرِ دیپلوی اجرا می‌شوند؛ اگر نحوشان بشکند،
+          # آلارمِ تلگرام بی‌صدا خاموش می‌شود.
+          bash -n monitor/health.sh
+          bash -n scripts/healthcheck.sh
       # پردازشِ عکس: «قبل در برابر بعد» — بایت‌به‌بایت بودنِ فایلِ اصلی،
       # ابعادِ thumbnail‌ها، سرعت، و اینکه سقفِ هم‌زمانی رعایت می‌شود.
       - run: node scripts/test-image-pipeline.js

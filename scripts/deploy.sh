@@ -127,5 +127,17 @@ fi
 log "Reloading nginx"
 nginx -t && systemctl reload nginx
 
+# ── نگهبانِ سلامتِ سرور ────────────────────────────────────────────────────
+# monitor/health.sh هر ۳۰ ثانیه با systemd اجرا می‌شود و گره‌های API، دیسک و
+# رم را می‌پاید. یک‌بار نسخهٔ بیرونِ گیتِ همین فایل با `git clean` در دیپلوی
+# پاک شد و سرویس بی‌صدا از کار افتاد؛ حالا فایل ردیابی‌شده است، ولی این‌جا هم
+# یک‌بار وضعیتش را گزارش می‌دهیم تا اگر روزی جابه‌جا/غیرفعال شد، همان لحظه
+# در لاگِ دیپلوی پیدا باشد (بدونِ شکستنِ انتشار).
+if [ -x "$APP_DIR/monitor/health.sh" ] && systemctl is-active --quiet ghelgheli-health.timer; then
+  echo "monitor: ✅ نگهبانِ سلامتِ ۳۰ثانیه‌ای فعال است"
+else
+  echo "monitor: ⚠️ نگهبانِ سلامتِ ۳۰ثانیه‌ای فعال نیست — monitor/health.sh و ghelgheli-health.timer را ببینید" >&2
+fi
+
 log "Deploy OK — $NEW_SHA is live"
 curl -fsS -m 5 "$API_URL"; echo
