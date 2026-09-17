@@ -3,6 +3,7 @@ const fieldCrypto = require('../lib/fieldCrypto');
 const express = require('express');
 const signupGift = require('../services/signupGiftService');
 const { parseFaNumber } = require('../lib/faNum');
+const coinsLedger = require('../services/coinLedger');
 
 module.exports = function createAdminUserRoutes(deps) {
   const {
@@ -447,8 +448,22 @@ router.get('/admin/points/top', adminAuth, asyncHandler(async (req, res) => {
 router.get('/points/history', auth, asyncHandler(async (req, res) => {
   const h = await points.history(req.user.id, {
     limit: req.query.limit, offset: req.query.offset,
+    // فیلترِ منبع از قبل در سرویس بود ولی این مسیر پاسش نمی‌داد؛ یعنی
+    // «فقط امتیازهای بازی را نشانم بده» از هیچ کلاینتی کار نمی‌کرد.
+    source: req.query.source,
   });
   res.json({ ...h, summary: await points.summary(req.user.id) });
+}));
+
+// ── دفترِ سکه — همان «دفتر امتیاز»، برای سکه ──────────────────────────────
+//
+// چرا مسیرِ جدا: سکه و امتیاز دو اقتصادِ متفاوت‌اند (سکه فقط داخلِ لیگِ فعال
+// معنا دارد و پایانِ هر لیگ صفر می‌شود). کاربری که می‌پرسد «سکه‌هایم کجا
+// رفت؟» باید جوابِ تاریخ‌دار بگیرد، نه فقط عددِ کل.
+router.get('/coins/history', auth, asyncHandler(async (req, res) => {
+  res.json(await coinsLedger.history(req.user.id, {
+    limit: req.query.limit, offset: req.query.offset, source: req.query.source,
+  }));
 }));
 router.post('/admin/users/:id/notify', adminAuth, validateUuid('id'), requireRole('support'), asyncHandler(async (req, res) => { await createNotification(req.params.id, 'admin_private', req.body.title || 'پیام اختصاصی مدیریت', req.body.body || req.body.message || ''); await audit(req.admin.id,'private_message_user','users',req.params.id,null,{title:req.body.title}); res.json({message:'پیام اختصاصی ارسال شد'}); }));
 // SMS OTP is not wired up yet, so the self-service "forgot password" flow

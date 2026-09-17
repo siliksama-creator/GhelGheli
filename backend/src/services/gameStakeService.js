@@ -2,6 +2,8 @@ const { pool } = require('../config/db');
 const { faAmount } = require('../lib/faNum');
 const pointService = require('./pointService');
 const coinService = require('./coinService');
+// دفترِ سکه — ثبتِ هر واریزِ سکه با شمارهٔ همان مسابقه (خواستهٔ مالک).
+const coinLedger = require('./coinLedger');
 const {
   coinRewardFor, hasCoinReward, quotaTracked, tehranDate,
 } = require('./coinService');
@@ -284,6 +286,23 @@ function createGameStakeService(db = pool, points = pointService, coins = coinSe
           return 0;
         }
         const paid = await coins.awardCoins(client, userId, amount);
+        // ── دفترِ سکه: بازیِ آنلاین ──────────────────────────────────────
+        // خواستهٔ مالک: «بررسی کن اضافه‌شدنِ سکه با تمامی بازی‌ها ثبت
+        // می‌شود یا نه.» پیش از این فقط عددِ کل عوض می‌شد و هیچ ردیفی
+        // نمی‌ماند؛ حالا هر پرداختِ واقعیِ سکه (برد/باخت/مساوی) با شمارهٔ
+        // همان مسابقه در `coin_transactions` می‌نشیند.
+        // ⚠️ روی همان `client` تراکنشی: اگر تسویه rollback شود، دفتر هم
+        //    برمی‌گردد و دو عدد از هم جدا نمی‌افتند.
+        if (paid > 0) {
+          await coinLedger.record(client, {
+            userId,
+            delta: paid,
+            source: 'game',
+            referenceType: 'game_match',
+            referenceId: match.id,
+            description: `سکهٔ مسابقهٔ آنلاین (شرط ${stake} امتیاز)`,
+          });
+        }
         // آنچه **واقعاً** پرداخت شد، کلیدخورده به کاربر. عددِ جدول کافی
         // نیست: اگر سهمیهٔ کاربر پر باشد یا لیگِ فعالی نباشد، پرداخت صفر
         // می‌شود و کلاینت نباید عددی ببیند که به موجودی‌اش اضافه نشده.

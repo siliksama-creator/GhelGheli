@@ -73,6 +73,8 @@ const level = require('./services/levelService');
 const chatRetention = require('./services/chatRetentionService');
 // سکه — ارزِ مهارتِ لیگ. سهمیهٔ روزانه‌اش در bootstrap پخش می‌شود.
 const coins = require('./services/coinService');
+// دفترِ سکه — ثبتِ واریزهای بازی‌ها و پایانِ لیگ (خواستهٔ مالک).
+const coinLedger = require('./services/coinLedger');
 // تنظیماتِ اقتصادِ بازی‌ها (سکهٔ برد/مساوی/باخت، سهمیه، درصدِ انتقالِ
 // سکه بین لیگ‌ها، سکهٔ هر لولِ ضربه‌زن) — قابل کنترل از پنل ادمین و
 // قابل خواندن توسط کلاینت‌ها از `/api/config` بدونِ آپدیتِ اپ.
@@ -85,6 +87,8 @@ const withdrawalService = require('./services/withdrawalService');
 // دفترِ ریزِ امتیازات — تنها نقطهٔ مجازِ تغییرِ امتیاز. توضیحِ کامل در
 // `services/pointService.js` و مایگریشنِ ۰۴۵.
 const points = require('./services/pointService');
+// قانونِ نامِ مستعار (۸ نویسه + فیلترِ فحش) — یک‌جا برای ثبت‌نام و پروفایل.
+const nicknamePolicy = require('./lib/nicknamePolicy');
 const analytics = require('./services/analyticsService');
 const { createPresenceService } = require('./services/presenceService');
 // سیگنالِ «لیدربورد لیگ عوض شد»: کش را بی‌اعتبار و رویدادِ سوکت را پخش
@@ -930,7 +934,21 @@ app.post('/api/games/tap/progress', auth, tapBatchLimiter.mw, asyncHandler(async
       //    فعالی نباشد `awardCoins` صفر می‌دهد؛ برگرداندنِ `amount`
       //    یعنی کلاینت «+۵ سکه» نشان می‌دهد در حالی که موجودی‌اش
       //    تکان نخورده.
-      return coins.awardCoins(client, userId, amount);
+      const paid = await coins.awardCoins(client, userId, amount);
+      // ── دفترِ سکه: ضربه‌زن ───────────────────────────────────────────
+      // فقط عددی که **واقعاً** واریز شده ثبت می‌شود (`paid`)، نه `amount`:
+      // اگر لیگِ فعالی نباشد یا سهمیه پر باشد، `awardCoins` صفر می‌دهد و
+      // دفتر نباید سکهٔ واریزشدهٔ خیالی نشان بدهد.
+      if (paid > 0) {
+        await coinLedger.record(client, {
+          userId,
+          delta: paid,
+          source: 'tap',
+          referenceType: 'tap_levels',
+          description: `سکهٔ لول‌های ضربه‌زن (${Array.isArray(levels) ? levels.length : 0} لول)`,
+        });
+      }
+      return paid;
     },
   );
   // XP گذر نبرد به ازای هر لولی که در همین بستهٔ ارسالی تمام شده.
@@ -1207,6 +1225,21 @@ app.patch('/api/profile', auth, asyncHandler(async (req, res) => {
     return res.status(400).json({ message: 'آدرس عکس پروفایل معتبر نیست' });
   }
 
+  // ── نامِ مستعار: حداکثر ۸ نویسه + فیلترِ فحش‌های فارسی/انگلیسی ────────
+  //
+  // خواستهٔ مالک (۱۷ شهریور): «در قسمت نامِ مستعار ... تا ۸ حرف نهایت، شامل
+  // حرف و عدد و تمامی کاراکترهای خاص باشد. باید یک لیست از کلماتِ فارسی و
+  // انگلیسیِ رکیک جمع‌آوری کنی که اگر کاربر آن‌ها را انتخاب کرد، به کاربر
+  // بگوید انتخابِ این نام موردِ قبول نیست.»
+  //
+  // ⚠️ خالی/null یعنی «نامم را عوض نکن» (همان رفتارِ COALESCE)، پس
+  //    `allowEmpty` روشن است؛ ولی اگر چیزی فرستاد و نامردود بود، صریحاً
+  //    ۴۰۰ با پیامِ فارسی برمی‌گردد (نه سکوت و نه کوتاه‌شدنِ خودکار).
+  const nickCheck = nicknamePolicy.validate(b.nickname, { allowEmpty: true });
+  if (!nickCheck.ok) {
+    return res.status(400).json({ message: nickCheck.error, code: nickCheck.code });
+  }
+
   const { rows } = await pool.query(
     `UPDATE users SET
        first_name=COALESCE($1,first_name), last_name=COALESCE($2,last_name),
@@ -1219,7 +1252,7 @@ app.patch('/api/profile', auth, asyncHandler(async (req, res) => {
     [
       boundedText(b.firstName, 60),
       boundedText(b.lastName, 60),
-      boundedText(b.nickname, 40),
+      nickCheck.value,
       safeImageUrl(b.profileImageUrl),
       safeAvatarKey(b.profileAvatarKey),
       // ورودیِ کاربر قبل از نوشتن رمز می‌شود. `boundedText` اول طول را
@@ -2840,6 +2873,14 @@ app.use('/api', require('./routes/adminMissions')({
   missions: require('./services/missionService'), opsConfig,
 }));
 
+// ── ماموریتِ اختصاصی (همگانی) — یک تنظیمِ یگانه که ادمین می‌نویسد ──────
+// بالای «ماموریت‌های امروز» به همهٔ کاربران نشان داده می‌شود و لینکِ رنگی
+// پشتِ «اینجا کلیک کنید» می‌گیرد. بدونِ آپدیتِ اپ.
+app.use('/api', require('./routes/adminCustomMission')({
+  adminAuth, requireRole, asyncHandler, audit,
+  customMission: require('./services/customMission'),
+}));
+
 // ── اهرم‌های موتور (آستانه‌های تشخیص، سطح، استریک، پیام‌های آماده) ──────
 app.use('/api', require('./routes/adminOps')({
   adminAuth, requireRole, asyncHandler, audit, opsConfig,
@@ -3324,6 +3365,7 @@ server.listen(port, async () => {
     // liveContent خالی بود و همهٔ مسیرهای داغ (ساختِ تختهٔ جفت‌یاب،
     // پنجرهٔ اتصال) از پیش‌فرض کد می‌خواندند نه از دیتابیس.
     'live_copy', 'live_rules', 'config_version',
+    'custom_mission',
   ]).catch(e => logger.error('[ops] پیش‌بارگذاری تنظیمات ناموفق بود:', e.message));
   await ensureActiveSeason();
   logger.info(`GhelGheli API on :${port}`);

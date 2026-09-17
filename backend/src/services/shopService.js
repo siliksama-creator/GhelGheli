@@ -80,6 +80,23 @@ const SLOT_FOR_KIND = Object.freeze({
 });
 const PLUS_UNLOCK_KINDS = new Set(['club_badge', 'card_frame', 'name_color']);
 
+// ── آیتم‌هایی که از **فروشگاهِ کاربر** برداشته شده‌اند ──────────────────────
+//
+// خواستهٔ مالک (۱۷ شهریور): «فروشِ پیام‌ها و پس‌زمینه در بخش فروشگاهِ کاربر
+// کاملاً حذف بشه — در وب و اندروید.»
+//
+// چرا حذف در سمتِ **سرور** و نه فقط از تب‌های UI:
+//   • APKهای منتشرشدهٔ روی کافه‌بازار قابل آپدیتِ فوری نیستند؛ اگر فقط تب
+//     را از کد برداریم، کاربرِ نسخهٔ قدیمی همان آیتم‌ها را می‌بیند و
+//     می‌خرد.
+//   • خرید از مسیرِ API (با slug) هم باید بسته شود، وگرنه «حذف از فروشگاه»
+//     فقط پنهان‌کردن است، نه برداشتن.
+//
+// این‌ها **حذف نمی‌شوند** بلکه از ویترین برداشته می‌شوند: کاربری که قبلاً
+// پس‌زمینه خریده، مالکیتش و پس‌زمینهٔ تجهیزشده‌اش دست‌نخورده می‌ماند
+// (`equipped_*` در جدولِ users است، نه در فروشگاه).
+const SHELF_HIDDEN_KINDS = new Set(['emote_pack', 'profile_background']);
+
 function fail(message, status = 400) {
   return Object.assign(new Error(message), { status });
 }
@@ -233,10 +250,14 @@ async function catalogue(userId, shape) {
   const wantGroups = shape !== 'items';
   const wantItems = shape !== 'groups';
 
+  // آیتم‌های برداشته‌شده از ویترین، از **هر دو** شکلِ پاسخ حذف می‌شوند تا
+  // هیچ کلاینتی (وب، اندرویدِ تازه، APKهای قدیمی) آن‌ها را نبیند.
+  const shelf = decorated.filter((item) => !SHELF_HIDDEN_KINDS.has(item.kind));
+
   let groups;
   if (wantGroups) {
     groups = {};
-    for (const item of decorated) (groups[item.kind] ||= []).push(item);
+    for (const item of shelf) (groups[item.kind] ||= []).push(item);
   }
   const walletBalance = Number(userRecord?.wallet_balance || 0);
   const plansCfg = plusPlansConfig();
@@ -369,6 +390,13 @@ async function deliverItem(client, { userId, itemId, amount, walletPaid = 0 }) {
   if (!item) throw fail('کالا پیدا نشد', 404);
   if (!item.is_purchasable || item.access_tier === 'annual') {
     throw fail('این هدیه فقط همراه پلاس سالانه فعال می‌شود', 409);
+  }
+  // ⚠️ این گارد لازم است چون سفارشِ **پرداخت‌شدهٔ** قدیمی می‌تواند بعد از
+  //    بستهٔ شدنِ ویترین تأیید شود (کاربر قبل از حذف، سفارش ساخته و
+  //    بعد پرداخت کرده). تحویلِ کالایی که دیگر در فروشگاه نیست، هم
+  //    غافلگیری است و هم ممکن است ناخواسته باشد.
+  if (SHELF_HIDDEN_KINDS.has(item.kind)) {
+    throw fail('این کالا از فروشگاه برداشته شده است', 410);
   }
 
   // مالکیت دوباره بررسی می‌شود گرچه `createShopOrder` هم بررسی کرده:
@@ -696,7 +724,7 @@ async function resolveShopItem(slug) {
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     .test(key);
   const { rows } = await pool.query(
-    `SELECT id, slug, name, price, access_tier, is_purchasable
+    `SELECT id, slug, kind, name, price, access_tier, is_purchasable
        FROM shop_items
       WHERE ${isUuid ? 'id=$1::uuid' : 'slug=$1'} AND is_active=true`,
     [key]);
@@ -704,6 +732,11 @@ async function resolveShopItem(slug) {
   if (!item) throw fail('کالا پیدا نشد', 404);
   if (!item.is_purchasable || item.access_tier === 'annual') {
     throw fail('این هدیه فقط همراه پلاس سالانه فعال می‌شود', 409);
+  }
+  // ویترینِ بسته‌شده: خریدِ مستقیمِ همین کالا از API هم رد می‌شود، وگرنه
+  // «برداشتن از فروشگاه» فقط پنهان‌کردنِ بصری بود.
+  if (SHELF_HIDDEN_KINDS.has(item.kind)) {
+    throw fail('این کالا از فروشگاه برداشته شده است', 410);
   }
   return item;
 }

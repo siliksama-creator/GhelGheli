@@ -73,6 +73,8 @@ const CASCADE_OK = new Set([
   'user_mission_progress', 'user_entitlements', 'user_subscriptions',
   'user_clubs', 'user_shop_items', 'user_pass_progress', 'user_pass_claims',
   'user_reward_claims', 'user_group_progress', 'point_transactions',
+  // دفترِ سکه (مایگریشن ۰۹۱): مثلِ دفترِ امتیاز، با حذفِ کاربر cascade می‌شود.
+  'coin_transactions',
   'referral_earnings', 'purchase_referral_commissions', 'withdrawal_requests',
   'withdrawal_status_history', 'support_tickets', 'support_ticket_messages',
   'otp_codes', 'tap_game_progress', 'tap_game_nonces', 'game_results',

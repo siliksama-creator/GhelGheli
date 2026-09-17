@@ -26,6 +26,7 @@ import 'wallet_page.dart';
 import 'support_page.dart';
 import 'wheel_page.dart';
 import 'referral_page.dart';
+import 'points_ledger_page.dart';
 
 /// Root shell for the regular user app: top bar + animated page switcher +
 /// bottom navigation. Functionally identical to the legacy `HomeShell`
@@ -288,6 +289,11 @@ class _HomeShellState extends State<HomeShell>
       // shopIndex=9 و …) و شیتِ «بیشتر» هم با همین شماره‌ها کار می‌کند.
       // درج در وسط یعنی جابه‌جا شدنِ همهٔ آن‌ها و — همان‌طور که
       // navigation_test قبلاً گرفت — RangeError و کرشِ کاملِ اپ.
+      // ── دفتر امتیازات (خواستهٔ مالک: از پروفایل به «بیشتر») ──
+      // قبلاً دو ردیفِ آخرِ پروفایل بود؛ کاربر باید تا ته صفحهٔ ویرایشِ
+      // اطلاعات شخصی اسکرول می‌کرد تا ببیند امتیازش از کجا آمده.
+      case ledgerIndex:
+        return PointsLedgerPage(api: widget.api);
       case inventoryIndex:
         return InventoryPage(
           items: _inventory,
@@ -327,6 +333,14 @@ class _HomeShellState extends State<HomeShell>
 
   /// شمارهٔ صفحهٔ کلکسیون کارت‌ها.
   static const inventoryIndex = 11;
+
+  /// شمارهٔ صفحهٔ دفتر امتیازات/سکه.
+  ///
+  /// ⚠️ ۱۲ = اولین شمارهٔ آزاد. شماره‌ها نباید جابه‌جا شوند: در چند جای
+  ///    این فایل ثابت‌اند و `_destinations[i]` با همان ایندکس خوانده
+  ///    می‌شود — جابه‌جایی یعنی RangeError و کرشِ کلِ اپ (همان چیزی که
+  ///    navigation_test قبلاً گرفت).
+  static const ledgerIndex = 12;
 
   // UI FIX: seven destinations squeezed into one bar made every icon and
   // label tiny (and the Persian labels were truncating). Material's own
@@ -373,10 +387,14 @@ class _HomeShellState extends State<HomeShell>
   /// دیده نمی‌شود. فروشگاه تنها مسیرِ درآمدیِ اپ است و باید مقصدِ نام‌دار
   /// داشته باشد. میان‌برِ هدر سرِ جایش می‌ماند.
   List<int> get _moreIndexes {
-    const defaultOrder = [shopIndex, inventoryIndex, 2, referralIndex, 5, 6];
+    // دفتر امتیازات کنارِ پروفایل می‌آید (هر دو «دادهٔ من» هستند) ولی
+    // بالاتر از پشتیبانی: مالی است و بیشتر از پشتیبانی باز می‌شود.
+    const defaultOrder = [
+      shopIndex, inventoryIndex, 2, referralIndex, ledgerIndex, 5, 6];
     const idOf = {
       shopIndex: 'shop', inventoryIndex: 'inventory', 2: 'wallet',
-      referralIndex: 'invite', 5: 'support', 6: 'profile',
+      referralIndex: 'invite', ledgerIndex: 'ledger', 5: 'support',
+      6: 'profile',
     };
     int pos(int page) {
       final i = _tabOrder.indexOf(idOf[page]!);
@@ -453,6 +471,13 @@ class _HomeShellState extends State<HomeShell>
       icon: Icon(Icons.style_outlined),
       selectedIcon: Icon(Icons.style_rounded),
       label: 'کلکسیون',
+    ),
+    // ۱۲ — دفتر امتیازات. ترتیبِ این آرایه = شمارهٔ صفحه؛ اینجا آخر است
+    // تا هیچ ایندکسِ قبلی جابه‌جا نشود.
+    NavigationDestination(
+      icon: Icon(Icons.receipt_long_outlined),
+      selectedIcon: Icon(Icons.receipt_long_rounded),
+      label: 'دفتر امتیازات',
     ),
   ];
 
@@ -755,6 +780,7 @@ class _HomeShellState extends State<HomeShell>
     'فروشگاه',
     'گذر نبرد',
     'کلکسیون کارت‌ها',
+    'دفتر امتیازات',
   ];
 
   /// متن قرصِ راهنمای اسکرول، برای هر صفحه.
@@ -787,6 +813,12 @@ class _HomeShellState extends State<HomeShell>
   }
 
   void _onNavTap(int slot) {
+    // ── چرا این‌جا config تازه می‌شود ─────────────────────────────────────
+    // کاربر گفت: «متنی را در پنل عوض کردم و در اپ ندیدم.» علتش این بود که
+    // تنها محرکِ تازه‌سازی، برگشتن از پس‌زمینه بود؛ اپِ باز همان کش را
+    // نشان می‌داد. جابه‌جاییِ تب، ارزان‌ترین جای ممکن برای تازه‌کردن است
+    // (config کوچک است و `refresh()` خودش ۲۰ ثانیه خفه‌کن دارد).
+    AppConfig.instance.refresh();
     if (slot < _navIndexes.length) {
       setState(() => _index = _navIndexes[slot]);
     } else {
@@ -795,6 +827,9 @@ class _HomeShellState extends State<HomeShell>
   }
 
   Future<void> _openMore() async {
+    // شیتِ «بیشتر» جایی است که کاربر دنبالِ «دفتر امتیازات» و بقیهٔ
+    // صفحه‌ها می‌گردد؛ همین لحظه متن/عددِ زنده هم تازه می‌شود.
+    AppConfig.instance.refresh();
     final picked = await showModalBottomSheet<int>(
       context: context,
       showDragHandle: true,

@@ -206,6 +206,9 @@ DELETE FROM audit_log;
 -- «۴۵۷ فایلِ یتیم» هم دیده شد: ابزارِ پاکسازی باید همراهِ هر مایگریشنِ
 -- تازه به‌روز شود، وگرنه بی‌صدا ناقص می‌شود.
 DELETE FROM point_transactions;
+-- ⚠️ دفترِ سکه (مایگریشن ۰۹۱). همان درسِ بالا دوباره: جدولِ تازه اضافه شد.
+-- بدونِ این خط، بعد از پاکسازیِ کامل ردیفِ سکه با کاربرِ حذف‌شده می‌ماند.
+DELETE FROM coin_transactions;
 DELETE FROM login_streaks;
 DELETE FROM league_payouts;
 DELETE FROM league_leaderboard_entries;
@@ -388,6 +391,7 @@ def main():
                      "  union all select 'wallet_transactions', count(*) from wallet_transactions"
                      "  union all select 'analytics_events', count(*) from analytics_events"
                      "  union all select 'point_transactions', count(*) from point_transactions"
+                     "  union all select 'coin_transactions', count(*) from coin_transactions"
                      "  union all select 'user_coin_quota', count(*) from user_coin_quota"
                      "  union all select 'card_box_purchases', count(*) from card_box_purchases"
                      ") x where x.n > 0".format(m=ADMIN_MOBILE)).strip()

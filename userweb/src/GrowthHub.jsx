@@ -93,6 +93,11 @@ export default function GrowthHub({ api, token, onSocketGame }) {
     () => req(`/api/missions/${mission.key}/claim`, 'POST', {}, token));
   const claimDailyBonus = () => run('daily-bonus',
     () => req('/api/missions/daily-bonus/claim', 'POST', {}, token));
+  // ماموریتِ اختصاصیِ ادمین — همان مسیرِ اپ. مسیرِ `custom` **قبل** از
+  // `/api/missions/:key/claim` روی سرور تعریف شده؛ وگرنه «custom» به‌عنوان
+  // کلیدِ ماموریت خوانده می‌شد.
+  const claimCustom = () => run('custom-mission',
+    () => req('/api/missions/custom/claim', 'POST', {}, token));
   const inviteFriend = async () => {
     const code = data?.referral?.code;
     if (!code) return;
@@ -106,6 +111,7 @@ export default function GrowthHub({ api, token, onSocketGame }) {
   };
   const daily = [...(data?.daily || [])].sort((a, b) => Number(a.claimed) - Number(b.claimed));
   const weekly = [...(data?.weekly || [])].sort((a, b) => Number(a.claimed) - Number(b.claimed));
+  const custom = data?.custom || null;   // ماموریت اختصاصی ادمین (یا null)
   const friends = data?.friends || [];
   const incoming = data?.incoming || [];
   const online = (data?.friends || []).filter(friend => friend.online).length;
@@ -116,6 +122,18 @@ export default function GrowthHub({ api, token, onSocketGame }) {
       <div><b>ماموریت و دوستان</b><small>پاداش بگیر؛ حریف آنلاین پیدا کن</small></div>
       <span>{online} آنلاین</span>
     </header>
+
+    {/* ══ ماموریتِ اختصاصی — بالای «ماموریت امروز» ══════════════════════
+        خواستهٔ مالک (۱۷ شهریور): «قبلِ ماموریت امروز یک قسمت به‌عنوانِ
+        ماموریت اختصاصی قرار بگیرد؛ ادمین در پنل مشخص و امتیازدهی کند؛ اگر
+        فعالش کند به همهٔ کاربران نشان داده شود؛ لینکِ قابلِ کلیک با رنگِ
+        مثلاً آبی یا سبز هم داشته باشد.»
+
+        این کارت **هیچ متنِ هاردکدی ندارد** — عنوان/توضیح/امتیاز/متنِ لینک
+        و رنگش همه از پنل می‌آیند، پس ادمین بدون آپدیتِ اپ کمپین را عوض
+        می‌کند. اگر ادمین فعالش نکرده باشد `data.custom` تهی است و هیچ‌چیز
+        رندر نمی‌شود (رفتارِ امروزِ محصول دست‌نخورده می‌ماند). */}
+    {custom && <CustomMissionCard mission={custom} busy={busy === 'custom-mission'} onClaim={claimCustom} />}
 
     <div className="growthSummary">
       <div className="dailyQuestMeter" style={{'--daily-progress':(data?.dailyBonus?.completed || 0)/Math.max(1, data?.dailyBonus?.goal || 5)}}><strong>{data?.dailyBonus?.completed || 0}<i>/{fa(data?.dailyBonus?.goal || 5)}</i></strong><span>ماموریت امروز</span></div>
@@ -198,5 +216,45 @@ export default function GrowthHub({ api, token, onSocketGame }) {
       </div>)}
     </>}
     {notice && <p className="growthNotice">{notice}</p>}
+  </section>;
+}
+
+/**
+ * کارتِ «ماموریت اختصاصی» — دقیقاً همان چیزی که کاربرِ اندروید می‌بیند.
+ *
+ * قرینهٔ `_CustomMissionCard` در `mobile/.../growth_panel.dart`؛ هر دو یک
+ * شکلِ داده از سرور می‌گیرند (`{title, body, points, link:{url,text,color},
+ * claimed, claimable}`) تا دو پلتفرم هرگز دو متنِ مختلف نشان ندهند.
+ */
+function CustomMissionCard({ mission, busy, onClaim }) {
+  const points = Number(mission.points || 0);
+  const claimed = mission.claimed === true;
+  const claimable = mission.claimable === true;
+  const link = mission.link || null;
+  const linkColor = link?.color === 'green' ? '#22E7A6' : '#7DD8FF';
+  const body = String(mission.body || '').trim();
+
+  return <section className="customMissionCard" aria-label="ماموریت اختصاصی">
+    <div className="customMissionHead">
+      <i><SvgIcon name="target" size={16} /></i>
+      <b>ماموریت اختصاصی</b>
+      {points > 0 && <strong>+{fa(points)}</strong>}
+    </div>
+    <p className="customMissionTitle">{mission.title}</p>
+    {body && <p className="customMissionBody">{body}</p>}
+    {link?.url && (
+      // rel/target: لینک از پنل می‌آید؛ بدون noopener یک صفحهٔ مقصد
+      // می‌تواند به window.opener دست بزند. رنگ هم از پنل است (آبی/سبز).
+      <a className="customMissionLink" href={link.url} target="_blank"
+        rel="noreferrer noopener" style={{ color: linkColor }}>
+        {link.text || 'اینجا کلیک کنید'}
+      </a>
+    )}
+    {points > 0 && (
+      <button className="customMissionClaim" disabled={!claimable || claimed || busy}
+        onClick={onClaim}>
+        {claimed ? 'گرفته شد' : busy ? 'در حال دریافت…' : 'دریافت امتیاز'}
+      </button>
+    )}
   </section>;
 }

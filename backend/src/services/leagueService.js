@@ -3,6 +3,8 @@ const logger = require('../lib/logger');
 const walletService = require('./walletService');
 const { createNotification } = require('./notificationService');
 const pointLedger = require('./pointService');
+// دفترِ سکه — «سکه‌هایم کجا رفت؟» در انتقال و پایانِ لیگ (خواستهٔ مالک).
+const coinLedger = require('./coinLedger');
 const grants = require('./grantService');
 // تنظیماتِ اقتصادِ بازی‌ها — درصدِ انتقالِ سکه بین لیگ‌ها را ادمین
 // از پنل تعیین می‌کند (صفر هم مجاز است).
@@ -511,6 +513,18 @@ async function carryoverBetween(client, sourceSeasonId, targetSeasonId) {
   }
 
   if (touched.length) {
+    // ── موجودیِ «قبل» را نگه می‌داریم تا تفاوت را در دفترِ سکه بنویسیم ──
+    //
+    // ⚠️ این UPDATE عدد را **بازمحاسبه** می‌کند (جمعِ سکهٔ لیگ‌های فعال)،
+    //    نه اینکه جمع بزند. پس بدونِ قبل/بعد، جهت و اندازهٔ تغییر معلوم
+    //    نمی‌شد — و این تغییر معمولاً **کاهش** است: سکه‌های لیگِ بسته‌شده
+    //    از شمارنده می‌افتند و فقط درصدِ انتقالی به لیگِ بعد می‌رود. همان
+    //    لحظه‌ای که کاربر سکه‌اش را «کم‌شده» می‌بیند و باید توضیح داشته
+    //    باشد، نه سکوت.
+    const { rows: beforeRows } = await client.query(
+      'SELECT id, coins FROM users WHERE id = ANY($1::uuid[])', [touched]);
+    const beforeMap = new Map(beforeRows.map(r => [r.id, Number(r.coins) || 0]));
+
     // شمارندهٔ نمایشیِ users.coins باید مجموعِ سکهٔ لیگ‌های **فعالِ**
     // همان کاربر باشد — وگرنه بعد از انتقال، کاربر سکه‌ای را می‌بیند که
     // در هیچ لیگِ فعالی ندارد.
@@ -524,6 +538,23 @@ async function carryoverBetween(client, sourceSeasonId, targetSeasonId) {
          updated_at = NOW()
        WHERE u.id = ANY($1::uuid[])`,
       [touched]);
+
+    const { rows: afterRows } = await client.query(
+      'SELECT id, coins FROM users WHERE id = ANY($1::uuid[])', [touched]);
+    await coinLedger.recordBulk(client, afterRows
+      .map((r) => {
+        const after = Number(r.coins) || 0;
+        return {
+          userId: r.id,
+          delta: after - (beforeMap.get(r.id) ?? 0),
+          balanceAfter: after,
+          source: 'league_carryover',
+          referenceType: 'league_season',
+          referenceId: targetSeasonId,
+          description: `انتقالِ ${pct}٪ سکه به لیگِ بعد (سکهٔ لیگِ بسته‌شده از شمارنده کم شد)`,
+        };
+      })
+      .filter(e => e.delta !== 0));
   }
 
   // نشانِ «این لیگِ بسته منتقل شد» — جلوی انتقالِ دوباره را می‌گیرد.
@@ -1181,8 +1212,25 @@ async function approvePayouts(payoutId, adminId) {
         `SELECT 1 FROM league_payouts
           WHERE paid_at IS NULL AND amount > 0 LIMIT 1`);
       if (!stillActive.length && !stillPending.length) {
+        // ── دفترِ سکه: «سکه‌هایم کجا رفت؟» ─────────────────────────────
+        // این تنها جایی است که عددِ سکه بی‌واسطه صفر می‌شود. پیش از این
+        // کاربر فردا وارد اپ می‌شد و سکه‌اش ناپدید بود، بی‌هیچ ردپایی.
+        // حالا هر کاربر ردیفِ تاریخ‌دار می‌گیرد: «چقدر داشتم، چرا صفر شد».
+        const { rows: zeroed } = await client.query(
+          'SELECT id, coins FROM users WHERE coins > 0 FOR UPDATE');
         await client.query(
           'UPDATE users SET coins=0, updated_at=NOW() WHERE coins > 0');
+        await coinLedger.recordBulk(client, zeroed
+          .map(r => ({
+            userId: r.id,
+            delta: -Number(r.coins),
+            balanceAfter: 0,
+            source: 'league_end',
+            referenceType: 'league_end',
+            referenceId: null,
+            description: 'پایانِ لیگ: سکه‌های لیگِ بسته‌شده صفر شد و ۱۰٪ به فصلِ بعد منتقل شد',
+          }))
+          .filter(e => e.delta !== 0));
         coinsReset = true;
       }
     }

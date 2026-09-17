@@ -7,7 +7,7 @@
 import React from 'react';
 
 export default function Field({
-  label, value, onChange, type = 'text', hint, inputMode, disabled,
+  label, value, onChange, type = 'text', hint, inputMode, disabled, maxLength,
 }) {
   return (
     <label className="field">
@@ -18,6 +18,9 @@ export default function Field({
         value={value}
         disabled={disabled}
         placeholder={hint || label}
+        // سقفِ نویسه در خودِ فیلد (قانونِ نامِ مستعار: ۸ نویسه). مثلِ اپ:
+        // سرور هم مستقل همین را بررسی می‌کند؛ این‌جا فقط تجربهٔ کاربری است.
+        maxLength={maxLength}
         onChange={e => onChange(e.target.value)}
       />
       {hint && <small className="fieldHint">{hint}</small>}

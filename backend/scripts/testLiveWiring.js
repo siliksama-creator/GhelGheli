@@ -55,12 +55,32 @@ console.log('\n== گاردِ همسانیِ متنِ زنده ==');
     out.slice(-400));
 }
 
+// ── ۱.ب) گاردِ «متنِ زندهٔ خوانده‌نشده» ────────────────────────────────────
+//
+// چرا جدا از گاردِ بالا: آن یکی می‌سنجد «کلیدی که کلاینت می‌خواند، در سرور
+// هست؟»؛ این یکی برعکس — «کلیدی که در پنل ویرایش می‌شود، جایی خوانده می‌شود؟».
+// باگِ واقعیِ مالک از جنسِ دوم بود: متنی که ویرایشش هیچ‌جا دیده نمی‌شود.
+console.log('\n== گاردِ متنِ زندهٔ خوانده‌نشده ==');
+{
+  const { spawnSync } = require('child_process');
+  const r = spawnSync(process.execPath,
+    [path.join(root, 'userweb/tool/live-copy-coverage.mjs')],
+    { encoding: 'utf8', cwd: path.join(root, 'userweb') });
+  const out = `${r.stdout || ''}${r.stderr || ''}`;
+  const m = out.match(/(\d+) کلید، (\d+) در وب، (\d+) در اندروید/);
+  ok(r.status === 0, '`live-copy-coverage` بدون خطا تمام شد', out.slice(-700));
+  ok(m && Number(m[2]) >= 25 && Number(m[3]) >= 25,
+    'هر دو کلاینت حداقل ۲۵ متنِ زنده می‌خوانند', out.slice(-300));
+}
+
 // ── ۲) ثبت‌شدن در هر دو npm test ────────────────────────────────────────
 console.log('\n== گارد در CI فهرست شده ==');
 {
   const web = JSON.parse(read('userweb/package.json'));
   ok(!!web.scripts['test:live-copy-parity'],
     'userweb: اسکریپت `test:live-copy-parity` وجود دارد');
+  ok(!!web.scripts['test:live-copy-coverage'],
+    'userweb: اسکریپت `test:live-copy-coverage` ثبت شده');
   const be = JSON.parse(read('backend/package.json'));
   ok(be.scripts.test.includes('testLiveWiring.js'),
     'backend: `npm test` این گارد را صدا می‌زند');

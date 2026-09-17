@@ -1,6 +1,9 @@
 const express = require('express');
 const social = require('../services/socialService');
 const missions = require('../services/missionService');
+// ماموریتِ اختصاصیِ ادمین — یک تنظیمِ یگانه که اگر ادمین روشن کند به همهٔ
+// کاربران نشان داده می‌شود (خواستهٔ مالک، ۱۷ شهریور).
+const customMission = require('../services/customMission');
 const analytics = require('../services/analyticsService');
 
 module.exports = function growthRoutes({
@@ -68,10 +71,21 @@ module.exports = function growthRoutes({
   }));
 
   router.get('/missions', auth, asyncHandler(async (req, res) => {
+    // ⚠️ ماموریتِ اختصاصی داخلِ خودِ `missions.status` اضافه می‌شود، نه
+    //    اینجا. دلیلش `/api/growth/overview` است: آن مسیر هم همین
+    //    `status()` را صدا می‌زند و اندروید ماموریت‌ها را از **آن** می‌خواند
+    //    (`growth_panel.dart` → `/api/growth/overview`). اگر اینجا merge
+    //    می‌شد، وب ماموریتِ اختصاصی را می‌دید و اندروید نه.
     res.json(await missions.status(req.user.id));
   }));
   router.post('/missions/daily-bonus/claim', auth, writeLimiter, asyncHandler(async (req, res) => {
     res.json(await missions.claimDailyBonus(req.user.id));
+  }));
+  // ⚠️ این مسیر **باید** قبل از `/missions/:key/claim` بیاید؛ وگرنه
+  //    Express رشتهٔ 'custom' را به‌عنوانِ کلیدِ ماموریت می‌گیرد و
+  //    درخواستِ کاربر به «این ماموریت فعال نیست» می‌خورد.
+  router.post('/missions/custom/claim', auth, writeLimiter, asyncHandler(async (req, res) => {
+    res.json(await customMission.claim(req.user.id));
   }));
   router.post('/missions/:key/claim', auth, writeLimiter, asyncHandler(async (req, res) => {
     res.json(await missions.claim(req.user.id, String(req.params.key || '').slice(0, 64)));

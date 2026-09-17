@@ -18,6 +18,11 @@ const featureFlags = require('../services/featureFlags');
 const TAB_IDS = Object.freeze([
   'home', 'rewards', 'league', 'social',
   'shop', 'inventory', 'wallet', 'invite', 'support', 'profile',
+  // دفتر امتیازات/سکه — خواستهٔ مالک: «از پروفایل به «بیشتر» منتقل شود»
+  // (۱۷ شهریور). افزودنِ id یعنی ادمین هم می‌تواند ترتیبش را از پنل عوض
+  // کند؛ بدونِ آن، `normalizeTabOrder` نادیده‌اش می‌گرفت و به انتهای
+  // فهرست می‌افتاد.
+  'ledger',
 ]);
 
 /** ترتیبِ پیش‌فرض — دقیقاً چیدمانِ فعلیِ هر دو کلاینت. */
@@ -118,6 +123,11 @@ module.exports = function createClientConfigRoutes(deps) {
 
   // ── عمومی: پیکربندی اجرای کلاینت ─────────────────────────────────────
   router.get('/config', configLimiter, asyncHandler(async (req, res) => {
+    // ⚠️ دورِ ۳۴ — «متنِ زنده» یعنی **همین لحظه**. بدونِ این هدر، هر
+    //    واسطه‌ای (پروکسی، مرورگر، CDN) مجاز بود پاسخ را بر اساسِ
+    //    heuristic کش کند و کاربر همان متنِ قدیمی را ببیند در حالی که
+    //    ادمین مطمئن است ذخیره شده. httponly نیست، `no-store` کافی است.
+    res.setHeader('Cache-Control', 'no-store, must-revalidate');
     const cfg = await loadConfig();
 
     // چند پرچم زندهٔ مشتق‌شده تا کلاینت درخواست اضافه نزند.

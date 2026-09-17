@@ -4,6 +4,10 @@ const express = require('express');
 const signupGift = require('../services/signupGiftService');
 const smsService = require('../services/smsService');
 const logger = require('../lib/logger');
+// قانونِ نامِ مستعار (۸ نویسه + فیلترِ فحش) — همان قانونی که در پروفایل اعمال می‌شود.
+const nicknamePolicy = require('../lib/nicknamePolicy');
+// ماموریتِ «دعوتِ دوستان» — رویدادِ دعوتِ موفق برای **معرف** ثبت می‌شود.
+const missionService = require('../services/missionService');
 
 module.exports = function createAuthRoutes(deps) {
   const {
@@ -56,10 +60,14 @@ router.post('/auth/register', asyncHandler(async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM users WHERE mobile=$1 AND mobile_verified=true', [mobile]);
   if (!rows[0]) return res.status(400).json({ message: 'ابتدا شماره موبایل را با OTP تایید کنید' });
   if (!isValidPasswordLength(password)) return res.status(400).json({ message: 'رمز عبور باید بین ۶ تا ۷۲ کاراکتر باشد' });
+  // نامِ مستعار اینجا هم باید از همان قانونِ پروفایل بگذرد؛ وگرنه کاربر
+  // می‌توانست با ثبت‌نامِ دوباره، نامِ رکیک/بلندِ ردشده را بنشاند.
+  const nick = nicknamePolicy.validate(nickname, { allowEmpty: true });
+  if (!nick.ok) return res.status(400).json({ message: nick.error, code: nick.code });
   const hash = await bcrypt.hash(password, 12);
   const updated = await pool.query(
     'UPDATE users SET password_hash=$1, first_name=$2, last_name=$3, nickname=$4, updated_at=NOW() WHERE mobile=$5 RETURNING *',
-    [hash, firstName, lastName, nickname, mobile]
+    [hash, firstName, lastName, nick.value, mobile]
   );
 
   // همان منطق مسیر ثبت‌نام مستقیم — این مسیر (OTP) وقتی درگاه پیامک وصل
@@ -80,6 +88,14 @@ router.post('/auth/register', asyncHandler(async (req, res) => {
       referral = { ok: false, reason: 'error' };
     } finally {
       refClient.release();
+    }
+    if (referral?.ok && referral.referrerId) {
+      // ── ماموریتِ «دعوتِ دوستان» ────────────────────────────────────────
+      // ⚠️ بعد از COMMIT و بیرونِ تراکنش. اگر داخلِ تراکنش بود و بعداً
+      //    خطایی می‌خورد، پیشرفتِ ماموریتِ معرف ثبت می‌شد در حالی که
+      //    دعوت هرگز ثبت نشده بود. خطا هم بی‌صدا خورده می‌شود: شکستِ
+      //    یک ماموریت نباید ثبت‌نامِ کاربر را خراب کند.
+      missionService.record(referral.referrerId, 'referral_signup').catch(() => {});
     }
     if (referral?.ok) {
       // اعلان فقط برای معرف. دعوت‌شونده جایزه‌اش را همان لحظه در پاسخ
@@ -169,7 +185,9 @@ router.post('/auth/register-password', userLoginLimiter, asyncHandler(async (req
   // Keep an already-set nickname when re-registering to change the password
   // (don't clobber it with a fresh random placeholder); only fall back to
   // an anonymous placeholder for a brand-new account with no nickname.
-  const finalNickname = nickname || existing.rows[0]?.nickname || anonymousNickname();
+  const nick = nicknamePolicy.validate(nickname, { allowEmpty: true });
+  if (!nick.ok) return res.status(400).json({ message: nick.error, code: nick.code });
+  const finalNickname = nick.value || existing.rows[0]?.nickname || anonymousNickname();
 
   // AUDIT FIX: این مسیر همان فیلدهایی را می‌نویسد که PATCH /api/profile
   // می‌نویسد، ولی هیچ‌کدام از اعتبارسنجی‌های آن را نداشت. بازتولید روی
@@ -246,6 +264,14 @@ router.post('/auth/register-password', userLoginLimiter, asyncHandler(async (req
       referral = { ok: false, reason: 'error' };
     } finally {
       refClient.release();
+    }
+    if (referral?.ok && referral.referrerId) {
+      // ── ماموریتِ «دعوتِ دوستان» ────────────────────────────────────────
+      // ⚠️ بعد از COMMIT و بیرونِ تراکنش. اگر داخلِ تراکنش بود و بعداً
+      //    خطایی می‌خورد، پیشرفتِ ماموریتِ معرف ثبت می‌شد در حالی که
+      //    دعوت هرگز ثبت نشده بود. خطا هم بی‌صدا خورده می‌شود: شکستِ
+      //    یک ماموریت نباید ثبت‌نامِ کاربر را خراب کند.
+      missionService.record(referral.referrerId, 'referral_signup').catch(() => {});
     }
     if (referral?.ok) {
       // اعلان فقط برای معرف. دعوت‌شونده جایزه‌اش را همان لحظه در پاسخ

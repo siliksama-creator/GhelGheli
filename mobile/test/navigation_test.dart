@@ -181,6 +181,24 @@ void main() {
           reason: 'صفحهٔ دعوت باید از شیت باز شود، نه فقط از میان‌بر داشبورد');
     });
 
+    testWidgets('«دفتر امتیازات» از شیتِ بیشتر قابل دسترس است', (tester) async {
+      // خواستهٔ مالک (۱۷ شهریور): «دفتر امتیاز را در اپ اندروید و وب از
+      // پروفایل به «بیشتر» منتقل کن.» این تست همان جابه‌جایی را می‌پاید:
+      // اگر روزی ردیفِ شیت حذف شود، صفحه از دسترسِ کاربر بیرون می‌رود و
+      // تست قرمز می‌شود (نه یک ماه بعد که کسی بپرسد «کجاست؟»).
+      await _pumpShell(tester);
+
+      await tester.tap(find.text('بیشتر'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(
+          find.descendant(
+              of: find.byType(ListTile), matching: find.text('دفتر امتیازات')),
+          findsOneWidget,
+          reason: 'دفتر امتیازات باید از شیتِ «بیشتر» باز شود');
+    });
+
     testWidgets('کیف پول، پشتیبانی و پروفایل هم در شیت هستند', (tester) async {
       await _pumpShell(tester);
       await tester.tap(find.text('بیشتر'));

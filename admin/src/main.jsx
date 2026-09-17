@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, Suspense, lazy, Component } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BarChart3, Bell, BookText, Coins, Gift, MessageCircle, LifeBuoy, ScanLine, Settings, Shield, Sigma, Trophy, Users, Gamepad2, Wallet, Activity, CircleDot, Package, Store, Layers, Target, SlidersHorizontal } from 'lucide-react';
+import { BarChart3, Bell, BookText, Coins, Gift, MessageCircle, LifeBuoy, ScanLine, Settings, Shield, Sigma, Trophy, Users, Gamepad2, Wallet, Activity, CircleDot, Package, Store, Layers, Target, SlidersHorizontal, Megaphone } from 'lucide-react';
 
 import './theme.css';
 import './styles.css';
@@ -48,6 +48,7 @@ const AnalyticsPage = lazy(() => import('./pages/analytics.jsx').then(m => ({ de
 const ShopAdminPage = lazy(() => import('./pages/shop.jsx').then(m => ({ default: m.ShopAdminPage })));
 const BattlePassPage = lazy(() => import('./pages/battle-pass.jsx').then(m => ({ default: m.BattlePassPage })));
 const MissionsPage = lazy(() => import('./pages/missions.jsx').then(m => ({ default: m.MissionsPage })));
+const CustomMissionPage = lazy(() => import('./pages/custom-mission.jsx').then(m => ({ default: m.CustomMissionPage })));
 const EnginePage = lazy(() => import('./pages/engine.jsx').then(m => ({ default: m.EnginePage })));
 
 // ── ErrorBoundary برای جلوگیری از صفحه سیاه ──────────────────────────────
@@ -127,6 +128,13 @@ const NAV = [
     'cards'],
   ['battle-pass', 'گذر نبرد', Layers, BattlePassPage,
     'فصل‌های گذر نبرد، پله‌های XP و جایزهٔ هر پله — همه قابل تغییر بدون آپدیت.',
+    'rewards'],
+  // ── ماموریتِ اختصاصی — **قبلِ** «ماموریت‌ها» می‌آید ────────────────────
+  //
+  // خواستهٔ مالک: «قبلِ ماموریتِ امروز یک قسمت به‌عنوانِ ماموریتِ اختصاصی
+  // قرار بگیرد.» همان ترتیب در منو هم رعایت شد تا مدیر دنبالش نگردد.
+  ['custom-mission', 'ماموریت اختصاصی', Megaphone, CustomMissionPage,
+    'یک کارتِ دلخواه (متن + امتیاز + لینکِ رنگی) برای همهٔ کاربران، بالای «ماموریت‌های امروز» — بدون آپدیت اپ.',
     'rewards'],
   ['missions', 'ماموریت‌ها', Target, MissionsPage,
     'ماموریت‌های روزانه و هفتگی، جایزهٔ هر ماموریت و جایزهٔ تکمیلِ همه.',

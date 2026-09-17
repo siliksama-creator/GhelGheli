@@ -131,11 +131,25 @@ class AppConfig extends ChangeNotifier {
   }
 
   /// تازه‌سازیِ اجباری — وقتی ادمین چیزی را در پنل عوض کرد و کاربر وسطِ
-  /// استفاده است. مسیرِ داغِ خودش fetch نمی‌زند؛ این را `home_shell` در
-  /// `resumed` صدا می‌زند (رفتارِ «برگشتن به اپ = تازه‌شدن»).
+  /// استفاده است.
+  ///
+  /// ⚠️ دورِ ۳۴ — چرا این تابع حالا از دو جا صدا زده می‌شود: مالک متنی را
+  ///    در پنل عوض کرد و در اپ ندید. مسیر سالم بود، ولی **تنها** محرکِ
+  ///    تازه‌سازی «برگشتن از پس‌زمینه» بود؛ کاربری که اپ باز بود و بین
+  ///    تب‌ها می‌رفت، همان کشِ قدیمی را می‌دید. حالا `home_shell` هنگامِ
+  ///    جابه‌جاییِ تب و باز کردنِ شیتِ «بیشتر» هم همین را صدا می‌زند.
+  ///
+  /// خفه‌کنِ ۲۰ ثانیه‌ای عمدی است: کاربری که سریع بین تب‌ها می‌پرد نباید
+  /// برای هر لمس یک درخواست بفرستد؛ ولی هر تغییرِ تازهٔ پنل هم حداکثر در
+  /// ۲۰ ثانیه دیده می‌شود.
+  DateTime? _lastRefreshAt;
   Future<void> refresh() async {
     final client = _api;
     if (client == null) return;
+    final now = DateTime.now();
+    final last = _lastRefreshAt;
+    if (last != null && now.difference(last) < const Duration(seconds: 20)) return;
+    _lastRefreshAt = now;
     try {
       apply(await client.get(configPath, fresh: true));
     } catch (_) {}

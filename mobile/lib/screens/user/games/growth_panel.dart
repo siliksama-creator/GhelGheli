@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+// بازکردنِ لینکِ ماموریتِ اختصاصی در مرورگر/اپِ مقصد (خواستهٔ مالک).
+import 'package:url_launcher/url_launcher.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../../api_client.dart';
@@ -206,6 +208,13 @@ class _GrowthPanelState extends State<GrowthPanel> {
       ..sort((a, b) => (a['claimed'] == true ? 1 : 0).compareTo(b['claimed'] == true ? 1 : 0));
     final weekly = ((_data?['weekly'] as List?) ?? const []).whereType<Map>().toList();
     final bonus = _data?['dailyBonus'] is Map ? _data!['dailyBonus'] as Map : const {};
+    // ── ماموریتِ اختصاصیِ ادمین (خواستهٔ مالک) ──────────────────────────
+    // از همان `/api/growth/overview` می‌آید که بقیهٔ ماموریت‌ها؛ سرور آن را
+    // داخلِ `missions.status` می‌گذارد، پس هیچ درخواستِ اضافه‌ای لازم نیست.
+    // اگر ادمین فعالش نکرده باشد `null` است و هیچ کارتی رندر نمی‌شود.
+    final custom = _data?['custom'] is Map
+        ? Map<String, dynamic>.from(_data!['custom'] as Map)
+        : const <String, dynamic>{};
     final friends = ((_data?['friends'] as List?) ?? const []).whereType<Map>().toList();
     final incoming = ((_data?['incoming'] as List?) ?? const []).whereType<Map>().toList();
     return Container(
@@ -233,7 +242,20 @@ class _GrowthPanelState extends State<GrowthPanel> {
             decoration: BoxDecoration(color: const Color(0xFF22E7A6).withValues(alpha: .13), borderRadius: Corners.rPill),
             child: Text('${friends.where((f) => f['online'] == true).length} آنلاین', style: const TextStyle(color: Color(0xFF22E7A6), fontSize: 9.5, fontWeight: FontWeight.w900))),
         ]),
-        Gaps.vSm,
+        // ⚠️ ماموریتِ اختصاصی **اولِ** بخشِ ماموریت‌ها می‌آید — بالای
+        //    «ماموریت امروز» و شمارنده‌اش. مالک دقیقاً همین را خواست:
+        //    «قبلِ ماموریتِ امروز یک قسمت به‌عنوانِ ماموریتِ اختصاصی قرار
+        //    بگیرد.» اعلانِ ادمین باید اولین چیزِ این کارت باشد، نه چیزی
+        //    که کاربر بعد از خواندنِ آمارِ روزانه ببیند.
+        if (custom.isNotEmpty && '${custom['title'] ?? ''}'.trim().isNotEmpty) ...[
+          _CustomMissionCard(
+            mission: custom,
+            busy: _busy == 'custom-mission',
+            onClaim: () => _run('custom-mission',
+                () => widget.api.post('/api/missions/custom/claim', {})),
+          ),
+          Gaps.vSm,
+        ],
         _DailyMissionSummary(
           completed: (bonus['completed'] as num?)?.toInt() ?? 0,
           goal: (bonus['goal'] as num?)?.toInt() ?? 5,
@@ -579,4 +601,127 @@ String _inviteHint(Map referral) {
   final spins = (referral['spinsPerReferral'] as num?)?.toInt() ?? 3;
   final pct = (referral['purchaseCommissionPercent'] as num?)?.toInt() ?? 5;
   return 'هر دو $spins چرخش هدیه می‌گیرید و خرید مستقیم دوستت برایت $pct٪ درآمد معرفی می‌سازد.';
+}
+
+/// ═══════════════════════════════════════════════════════════════════════════
+/// کارتِ «ماموریت اختصاصی» — نوشتهٔ ادمین، بالای «ماموریت‌های امروز»
+/// ═══════════════════════════════════════════════════════════════════════════
+///
+/// خواستهٔ مالک (۱۷ شهریور): «قبلِ ماموریتِ امروز یک قسمتِ ماموریتِ اختصاصی
+/// قرار می‌گیرد؛ ادمین در پنل مشخص و امتیازدهی می‌کند. اگر ادمین فعالش کند
+/// به همهٔ کاربران نشان داده می‌شود. مدیر حتی اجازه دارد لینکِ قابلِ کلیک
+/// بسازد و لینک را پشتِ کلمهٔ «اینجا کلیک کنید» بگذارد، به رنگِ مثلاً آبی
+/// یا سبز.»
+///
+/// نکته‌های پیاده‌سازی:
+///   • **هیچ متنی در این فایل هاردکد نیست**: عنوان، توضیح، امتیاز، متنِ
+///     لینک و رنگِ لینک همه از پنل می‌آیند. یعنی ادمین می‌تواند کمپین را
+///     عوض کند و کاربر بدونِ آپدیتِ اپ آن را می‌بیند (اهرمِ بدون‌آپدیت).
+///   • رنگ سفیدِ متنِ لینک در تمِ تیره: `blue` = آبیِ برند، `green` =
+///     سبزِ نئونی. هر رنگِ دیگری که سرور بفرستد به آبی می‌افتد.
+///   • اگر لینکی نباشد، فقط متن و دکمهٔ دریافت نشان داده می‌شود.
+class _CustomMissionCard extends StatelessWidget {
+  const _CustomMissionCard({
+    required this.mission,
+    required this.busy,
+    required this.onClaim,
+  });
+
+  final Map<String, dynamic> mission;
+  final bool busy;
+  final VoidCallback onClaim;
+
+  @override
+  Widget build(BuildContext context) {
+    final points = (mission['points'] as num?)?.toInt() ?? 0;
+    final claimed = mission['claimed'] == true;
+    final claimable = mission['claimable'] == true;
+    final link = mission['link'] is Map
+        ? Map<String, dynamic>.from(mission['link'] as Map)
+        : const <String, dynamic>{};
+    final url = '${link['url'] ?? ''}';
+    final linkColor = '${link['color'] ?? 'blue'}' == 'green'
+        ? const Color(0xFF22E7A6)
+        : const Color(0xFF7DD8FF);
+    final body = '${mission['body'] ?? ''}'.trim();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+            colors: [Color(0xFF241B45), Color(0xFF0C2135)]),
+        borderRadius: Corners.rMd,
+        border: Border.all(color: const Color(0xFFFFD166).withValues(alpha: .5)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Icon(Icons.campaign_rounded,
+              color: Color(0xFFFFD166), size: 17),
+          Gaps.hXs,
+          const Expanded(
+            child: Text('ماموریت اختصاصی',
+                style: TextStyle(
+                    fontSize: 11.5,
+                    color: Color(0xFFFFD166),
+                    fontWeight: FontWeight.w900)),
+          ),
+          if (points > 0)
+            Text('+${faNum(points)}',
+                style: const TextStyle(
+                    color: Color(0xFFFFD166),
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w900)),
+        ]),
+        const SizedBox(height: 5),
+        Text('${mission['title'] ?? ''}',
+            style: const TextStyle(
+                fontSize: 14.5, fontWeight: FontWeight.w900, height: 1.35)),
+        if (body.isNotEmpty) ...[
+          const SizedBox(height: 3),
+          Text(body,
+              style: const TextStyle(
+                  fontSize: 12, color: Color(0xFFB6C6D8), height: 1.55)),
+        ],
+        if (url.isNotEmpty) ...[
+          const SizedBox(height: 7),
+          InkWell(
+            onTap: () => launchUrl(Uri.parse(url),
+                mode: LaunchMode.externalApplication),
+            borderRadius: Corners.rSm,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 2),
+              child: Text('${link['text'] ?? 'اینجا کلیک کنید'}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    color: linkColor,
+                    decoration: TextDecoration.underline,
+                    decorationColor: linkColor,
+                  )),
+            ),
+          ),
+        ],
+        if (points > 0) ...[
+          const SizedBox(height: 9),
+          SizedBox(
+            height: 36,
+            child: FilledButton(
+              style: _compactClaimStyle(),
+              onPressed: (!claimable || claimed || busy) ? null : onClaim,
+              child: Text(
+                claimed
+                    ? 'گرفته شد'
+                    : busy
+                        ? 'در حال دریافت…'
+                        : 'دریافت امتیاز',
+                style:
+                    const TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+              ),
+            ),
+          ),
+        ],
+      ]),
+    );
+  }
 }

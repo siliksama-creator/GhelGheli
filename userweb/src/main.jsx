@@ -38,6 +38,7 @@ import { UiIcon } from './components/IconAsset.jsx';
 //
 // هیچ امکانی حذف نشده — فقط زمانِ رسیدنش عوض شده.
 const Profile = lazy(() => import('./screens/Profile.jsx'));
+const Ledger = lazy(() => import('./screens/Ledger.jsx'));
 const League = lazy(() => import('./screens/League.jsx'));
 const Chat = lazy(() => import('./screens/Chat.jsx'));
 const PublicProfile = lazy(() => import('./screens/PublicProfile.jsx'));
@@ -157,6 +158,11 @@ const MORE_TABS = [
   ['shop', 'فروشگاه', 'shop'],
   ['inventory', 'کلکسیون کارت‌ها', 'card'],
   ['wallet', 'کیف پول', 'wallet'],
+  // دفتر امتیازات — خواستهٔ مالک (۱۷ شهریور): «این قسمت دفتر امتیازات رو
+  // انتقال بده به قسمت بیشتر، در اپلیکیشن اندروید و وب.» قبلاً داخل پروفایل
+  // بود و کاربر باید وارد فرمِ ویرایشِ اطلاعات شخصی می‌شد تا ببیند امتیازش
+  // از کجا آمده. آینهٔ اندروید: `ledgerIndex` در home_shell.dart.
+  ['ledger', 'دفتر امتیازات', 'star'],
   // دعوت دوستان قبلاً فقط از میان‌بر داشبورد باز می‌شد؛ اگر کاربر آن
   // کارت را رد می‌کرد، صفحه عملاً گم می‌شد.
   ['invite', 'دعوت دوستان', 'group'],
@@ -643,6 +649,9 @@ function Portal({ token, logout, cfg }) {
         {tab === 'inventory' && (
           <Inventory items={p.inventory || []} grants={p.pendingGrants || []}
             token={token} reload={load} />
+        )}
+        {tab === 'ledger' && (
+          <Ledger token={token} setMsg={setMsg} />
         )}
         {tab === 'profile' && (
           <Profile token={token} p={p} load={load} setMsg={setMsg} />

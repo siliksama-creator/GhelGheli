@@ -55,8 +55,18 @@ class _ShopPageState extends State<ShopPage> {
     ('card_frame', 'قاب‌ها', Icons.crop_portrait_rounded),
     ('name_color', 'افکت نام', Icons.auto_awesome_rounded),
     ('profile_badge', 'امضای پروفایل', Icons.workspace_premium_rounded),
-    ('profile_background', 'پس‌زمینه', Icons.wallpaper_rounded),
-    ('emote_pack', 'پیام‌ها', Icons.forum_rounded),
+    // ── «پیام‌ها» (emote_pack) و «پس‌زمینه» (profile_background) حذف شدند ──
+    //
+    // خواستهٔ مالک (۱۷ شهریور): «فروشِ پیام‌ها و پس‌زمینه در بخش فروشگاهِ
+    // کاربر کاملاً حذف بشه — در وب و اندروید.»
+    //
+    // ⚠️ حذفِ سرور هم انجام شده (`SHELF_HIDDEN_KINDS` در shopService.js):
+    //    اگر فقط این دو ردیف را از UI برداریم، کاربرِ APK قدیمی (که
+    //    به‌روزرسانیِ فوری ندارد) همان دو تب را می‌بیند و می‌خرد. حذفِ
+    //    دوسویه یعنی هیچ نسخه‌ای آن‌ها را نه می‌بیند و نه می‌خرد.
+    //
+    // کسی که قبلاً پس‌زمینه خریده، مالکیتش دست‌نخورده است (در پروفایل
+    // همچنان پس‌زمینهٔ تجهیزشده‌اش را دارد).
   ];
 
   /// خرید مستقیم از کافه‌بازار — سه گام، و گام سوم حیاتی است.

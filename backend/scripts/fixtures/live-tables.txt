@@ -1,8 +1,8 @@
-# اسنیپ‌شاتِ جدول‌هایِ schema public رویِ پروداکشن — ۲۰۲۶-۰۹-۰۳
-# گاردِ testResetGuard.js این را با فهرستِ PURGE/«دست‌نخورده‌ها»ی tools/reset_for_launch.py
-# مقایسه می‌کند؛ جدولِ تازه‌ای که اینجا هست و در ابزار نام‌برده نشده = قرمز.
-# به‌روزکردن: ssh root@server 'sudo -u postgres psql -d ghelgheli -Atc "select table_name
 #   from information_schema.tables where table_schema='public' and table_type='BASE TABLE' order by 1"'
+# اسنیپ‌شاتِ جدول‌هایِ schema public رویِ پروداکشن — ۲۰۲۶-۰۹-۰۳
+# به‌روزکردن: ssh root@server 'sudo -u postgres psql -d ghelgheli -Atc "select table_name
+# مقایسه می‌کند؛ جدولِ تازه‌ای که اینجا هست و در ابزار نام‌برده نشده = قرمز.
+# گاردِ testResetGuard.js این را با فهرستِ PURGE/«دست‌نخورده‌ها»ی tools/reset_for_launch.py
 admin_users
 analytics_events
 app_crash_reports
@@ -18,6 +18,7 @@ card_types
 chat_message_likes
 chat_messages
 chat_stickers
+coin_transactions
 friendships
 game_results
 game_stake_matches

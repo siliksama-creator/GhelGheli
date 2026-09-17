@@ -5,27 +5,9 @@ import '../../core/app_config.dart';
 import '../../core/assets.dart';
 import '../../core/cosmetics.dart';
 import '../../theme/tokens.dart';
-import '../../utils/fa_date.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/avatar_image.dart';
 import '../../widgets/state_views.dart';
-
-/// برچسبِ فارسیِ منبعِ هر ردیفِ امتیاز — کلیدها با CHECK مایگریشنِ ۰۴۵ و
-/// با نقشهٔ پنل ادمین (`admin_points.dart`) یکی است. کاربر از همین‌جا
-/// می‌فهمد «این امتیاز از کجا آمد / چرا کم شد»، بدون تماس با پشتیبانی.
-const Map<String, String> _pointSourceFa = {
-  'photo_card': 'ثبت کارت با عکس',
-  'card_code': 'ثبت کارت با کد',
-  'referral': 'کمیسیون معرفی',
-  'game': 'بازی',
-  'pass_reward': 'گذر نبرد',
-  'wheel': 'گردونهٔ شانس',
-  'reward_claim': 'دریافت جایزه',
-  'admin_adjust': 'تنظیم مدیر',
-  'admin_deduct': 'کسر مدیر',
-  'signup_gift': 'هدیهٔ عضویت',
-  'other': 'سایر',
-};
 
 /// Private profile editor: dense 2-column layout + full avatar grid showing all 10 avatars and club crests.
 class ProfilePage extends StatefulWidget {
@@ -59,8 +41,6 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _passwordMessageIsError = false;
   List _myClubs = const [];
   List _leagueHistory = const [];
-  List _pointHistory = const [];
-  Map<String, dynamic> _pointSummary = const {};
   Map<String, dynamic> _cosmetics = const {};
 
   @override
@@ -68,7 +48,6 @@ class _ProfilePageState extends State<ProfilePage> {
     super.initState();
     _load();
     _loadLeagueHistory();
-    _loadPointHistory();
   }
 
   @override
@@ -97,26 +76,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 : const []);
       });
     } catch (_) {}
-  }
-
-  /// دفترِ ریزامتیازِ خودِ کاربر — مسیر `GET /api/points/history` از قبل
-  /// در بک‌اند کامل بود ولی به هیچ کلاینتی وصل نبود؛ کاربر فقط عددِ کلِ
-  /// امتیاز را می‌دید نه «از کجا آمد». اینجا وصلش می‌کنیم.
-  Future<void> _loadPointHistory() async {
-    try {
-      final res = await widget.api.get('/api/points/history?limit=30');
-      if (!mounted || res is! Map) return;
-      setState(() {
-        _pointHistory = (res['transactions'] is List)
-            ? res['transactions'] as List
-            : const [];
-        _pointSummary = (res['summary'] is Map)
-            ? Map<String, dynamic>.from(res['summary'] as Map)
-            : <String, dynamic>{};
-      });
-    } catch (_) {
-      // بی‌صدا: دفتر امتیاز نباید باز شدنِ پروفایل را بشکند.
-    }
   }
 
   Future<void> _load() async {
@@ -275,102 +234,6 @@ class _ProfilePageState extends State<ProfilePage> {
           Gaps.vSm,
         ],
 
-        // ── دفتر ریزامتیازِ خودِ کاربر ──
-        if (_pointHistory.isNotEmpty) ...[
-          AppCard(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: [
-                  const Icon(Icons.stars_rounded, color: Color(0xFF84CC16), size: 18),
-                  Gaps.hXs,
-                  Expanded(
-                    child: Text('دفتر امتیازهای من',
-                        style: theme.textTheme.titleSmall
-                            ?.copyWith(fontWeight: FontWeight.w800)),
-                  ),
-                  if (_pointSummary['totals'] is Map)
-                    Builder(builder: (_) {
-                      final t = Map<String, dynamic>.from(
-                          _pointSummary['totals'] as Map);
-                      final earned = (t['earned'] as num?)?.toInt() ?? 0;
-                      final spent = (t['spent'] as num?)?.toInt() ?? 0;
-                      return Text(
-                          'کسب ${faNum(earned)} · خرج ${faNum(spent)}',
-                          style: const TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF94A3B8)));
-                    }),
-                ]),
-                const SizedBox(height: 6),
-                for (final raw in _pointHistory.take(20))
-                  Builder(builder: (ctx) {
-                    final tx = Map<String, dynamic>.from(raw as Map);
-                    final delta = (tx['delta'] as num?)?.toInt() ?? 0;
-                    final positive = delta >= 0;
-                    final source = '${tx['source'] ?? ''}';
-                    final desc = '${tx['description'] ?? ''}'.trim();
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 5),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 6,
-                            height: 6,
-                            margin: const EdgeInsets.only(top: 6),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: positive
-                                  ? const Color(0xFF84CC16)
-                                  : const Color(0xFFEF4444),
-                            ),
-                          ),
-                          Gaps.hXs,
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  desc.isNotEmpty
-                                      ? desc
-                                      : (_pointSourceFa[source] ?? source),
-                                  style: const TextStyle(
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w700),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                Text(
-                                  '${_pointSourceFa[source] ?? source} · ${faDate(tx['created_at'])}',
-                                  style: const TextStyle(
-                                      fontSize: 9.5, color: Color(0xFF94A3B8)),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Text(
-                            '${positive ? '+' : ''}${faNum(delta)}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w900,
-                              color: positive
-                                  ? const Color(0xFF84CC16)
-                                  : const Color(0xFFEF4444),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
-              ],
-            ),
-          ),
-          Gaps.vSm,
-        ],
-
         // ── Main Profile Form ──
         AppCard(
           padding: const EdgeInsets.all(14),
@@ -487,7 +350,18 @@ class _ProfilePageState extends State<ProfilePage> {
                     flex: 2,
                     child: TextField(
                       controller: _nick,
-                      decoration: const InputDecoration(labelText: 'نام مستعار چت و بازی', isDense: true),
+                      // ── قانونِ نامِ مستعار (خواستهٔ مالک، ۱۷ شهریور) ──
+                      // سقفِ ۸ نویسه همان‌جاست که کاربر تایپ می‌کند؛
+                      // سرور هم مستقل همین را بررسی می‌کند (lib/
+                      // nicknamePolicy.js) چون درخواست می‌تواند از اپ
+                      // نیاید. عدد اینجا **فقط** تجربهٔ کاربری است.
+                      maxLength: 8,
+                      decoration: const InputDecoration(
+                        labelText: 'نام مستعار چت و بازی',
+                        isDense: true,
+                        counterText: '',
+                        helperText: 'حداکثر ۸ نویسه — حرف، عدد و کاراکتر خاص',
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),

@@ -18,8 +18,14 @@ for (const table of ['friendships', 'user_mission_progress', 'analytics_events',
 ok(migration.includes('ADD COLUMN IF NOT EXISTS match_id'), 'card history gets authoritative match id');
 ok(missions.DEFINITIONS.some(m => m.period === 'daily') && missions.DEFINITIONS.some(m => m.period === 'weekly'),
   'daily and weekly missions are both defined');
-ok(missions.DEFINITIONS.length > 100 && missions.DAILY_POOL.length === 120,
-  'mission catalogue contains more than 100 real rotations');
+// ⚠️ دورِ ۳۴: این سنجه `=== 120` بود. با اضافه شدنِ خانوادهٔ ششم («دعوتِ
+// دوستان» — ۲۴ نسخه) چرخشِ روزانه ۱۴۴ شد. عددِ دقیق این‌جا اشتباهِ کار بود:
+// منظور «کاتالوگ غنی است» بود، نه «دقیقاً ۱۲۰». حالا هم کف دارد (۱۲۰) و هم
+// بخش‌پذیری بر ۲۴ — یعنی اگر روزی کسی خانواده‌ای را ناقص اضافه کند (مثلاً
+// ۵ نسخه به‌جای ۲۴) همین‌جا لو می‌رود.
+ok(missions.DEFINITIONS.length > 100 && missions.DAILY_POOL.length >= 120
+  && missions.DAILY_POOL.length % 24 === 0,
+  `mission catalogue contains more than 100 real rotations (${missions.DAILY_POOL.length})`);
 const growthRoutes = read('backend/src/routes/growth.js');
 ok(growthRoutes.includes("'/missions/daily-bonus/claim'") && growthRoutes.includes('claimDailyBonus'),
   'daily completion bonus has an authenticated claim endpoint');
