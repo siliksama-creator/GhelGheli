@@ -54,7 +54,7 @@ HEALTH_SH="${HEALTH_SH:-$APP_DIR/monitor/health.sh}"
 LOG_FILE="${LOG_FILE:-/var/log/ghelgheli-capacity.log}"
 TG_CONF="${TG_CONF:-/root/.ghelgheli_backup.conf}"
 TG_CONF_ALT="${TG_CONF_ALT:-$APP_DIR/monitor/telegram.env}"
-LOCK_FILE="/var/lock/ghelgheli-capacity.lock"
+LOCK_FILE="${LOCK_FILE:-/var/lock/ghelgheli-capacity.lock}"
 
 MODE="apply"
 for a in "$@"; do
@@ -164,20 +164,7 @@ fi
 log "⚙️ تغییر تشخیص داده شد → هسته: ${OLD_CORES:--} → $NEW_CORES | پروسه: ${OLD_PROCS:--} → $NEW_PROCS | پورت‌ها: [${OLD_PORTS:--}] → [$NEW_PORTS]"
 
 # ═══════════════════════════════════════════════════════════════════════════
-#  ۳) رفعِ گره‌های اضافی/کمبودِ گره (تنزل و ارتقا هر دو)
-# ═══════════════════════════════════════════════════════════════════════════
-# startOrReload گره‌های تازه را می‌سازد ولی گره‌هایی که از فایل برداشته
-# شده‌اند را حذف نمی‌کند؛ پس خودمان حذف می‌کنیم (فقط نام‌های ghelgheli-api*).
-STALE="$(pm2_user jlist 2>/dev/null | jq -r '.[] | select(.name|startswith("ghelgheli-api")) | .name' 2>/dev/null || true)"
-for name in $STALE; do
-  if ! grep -qw "$name" <<<"$NEW_NAMES"; then
-    log "🧹 حذفِ گرهِ اضافیِ PM2: $name"
-    pm2_user delete "$name" >/dev/null 2>&1 || true
-  fi
-done
-
-# ═══════════════════════════════════════════════════════════════════════════
-#  ۴) بالا آوردن PM2 با پروفایلِ جدید
+#  ۳) بالا آوردن PM2 با پروفایلِ جدید
 # ═══════════════════════════════════════════════════════════════════════════
 # ecosystem.config.cjs خودش capacity.js را صدا می‌زند، پس شمارِ گره‌ها،
 # UV_THREADPOOL_SIZE، PG_POOL_MAX و سقف‌های حافظه خودکار درست می‌شوند.
@@ -186,7 +173,7 @@ log "🚀 pm2 startOrReload با پروفایلِ جدید…"
   || die "pm2 startOrReload شکست خورد"
 pm2_user save >/dev/null 2>&1 || true
 
-# ── ۵) انتظار برای سالم‌شدنِ همهٔ پورت‌ها (فقط سالم‌ها به nginx می‌روند) ──
+# ── ۴) انتظار برای سالم‌شدنِ همهٔ پورت‌ها (فقط سالم‌ها به nginx می‌روند) ──
 HEALTHY_PORTS=""
 for i in $(seq 1 30); do
   HEALTHY_PORTS=""
@@ -234,8 +221,42 @@ fi
 # ═══════════════════════════════════════════════════════════════════════════
 #  ۶) upstreamِ nginx — با نسخهٔ آزمایشی و بازگشتِ خودکار
 # ═══════════════════════════════════════════════════════════════════════════
+#
+# ⚠️ دو درسی که با آزمونِ واقعی روی همین سرور گرفته شد (و این کد حالا رعایت
+#    می‌کند) — هر دو یک بار سایت را در وضعیتِ «قابلِ سرو ولی غیرِقابلِ
+#    reload» گذاشتند:
+#
+#   ۱) فایلِ پشتیبانِ کانفیگ **نباید داخلِ sites-enabled باشد**. nginx
+#      همهٔ فایل‌های آن پوشه را include می‌کند؛ پس یک نسخهٔ `.bak` کنارِ
+#      فایلِ اصلی یعنی `duplicate upstream "ghelgheli_game"` و شکستِ
+#      `nginx -t`. پشتیبان‌ها می‌روند در $NGINX_BACKUP_DIR.
+#      (سرویسِ در حالِ اجرا تا زمانی که reload نشود سالم می‌ماند، ولی هر
+#      reload/ری‌استارتِ بعدی شکست می‌خورد — یعنی بمبِ ساعتی. پس اول این
+#      پوشه پاک‌سازی می‌شود.)
+#
+#   ۲) ترتیبِ کار مهم است: **اول snippet ساخته شود، بعد کانفیگِ سایت include
+#      کند**. اگر برعکس شود، بینِ دو مرحله یک لحظه کانفیگِ ناقص روی دیسک
+#      هست. و بازگشت (rollback) باید **هر دو** فایل را برگرداند، نه فقط
+#      یکی — وگرنه include به فایلِ ناموجود می‌ماند.
 GAME_PORT="${NEW_PORTS%% *}"     # گرهِ بازی همیشه پورتِ اول است (۴۰۰۰)
 HTTP_PORTS="$HEALTHY_PORTS"      # همهٔ گره‌ها HTTP هم سرو می‌کنند (مثلِ امروز)
+NGINX_BACKUP_DIR="${NGINX_BACKUP_DIR:-/root/ghelgheli-nginx-backups}"
+
+# ── ۶-۰) پاک‌سازی: هیچ فایلِ دیگری در sites-enabled نباید upstream داشته باشد
+mkdir -p "$NGINX_BACKUP_DIR"
+while IFS= read -r stray; do
+  [ -z "$stray" ] && continue
+  [ "$stray" = "$NGINX_SITE" ] && continue
+  case "$(basename "$stray")" in
+    *bak*|*old*|*~|*.save)
+      log "🧹 فایلِ پشتیبانِ سرگردان در sites-enabled (باعثِ خطای duplicate upstream می‌شد) → $NGINX_BACKUP_DIR"
+      mv -f "$stray" "$NGINX_BACKUP_DIR/"
+      ;;
+    *)
+      die "فایلِ نامنتظر با upstream در sites-enabled: $stray — دستی بررسی کنید (دست نزدم)"
+      ;;
+  esac
+done < <(grep -rlE '^[[:space:]]*upstream[[:space:]]+ghelgheli_' /etc/nginx/sites-enabled/ 2>/dev/null || true)
 
 mkdir -p "$(dirname "$NGINX_SNIPPET")"
 TMP_SNIPPET="$(mktemp /tmp/gg-upstream.XXXXXX)"
@@ -252,15 +273,22 @@ TMP_SNIPPET="$(mktemp /tmp/gg-upstream.XXXXXX)"
   echo "}"
 } > "$TMP_SNIPPET"
 
-# اولین اجرا: بلوکِ upstreamِ داخلِ کانفیگِ سایت به include تبدیل می‌شود.
+# ── ۶-۱) اول snippet سرِ جایش برود (سایت هنوز دست‌نخورده است) ──
+SITE_BACKUP=""
+SNIPPET_BACKUP=""
+[ -f "$NGINX_SNIPPET" ] && { SNIPPET_BACKUP="$NGINX_BACKUP_DIR/ghelgheli-upstream.conf.$(date +%s).bak"; cp -a "$NGINX_SNIPPET" "$SNIPPET_BACKUP"; }
+install -m 644 "$TMP_SNIPPET" "$NGINX_SNIPPET"
+rm -f "$TMP_SNIPPET"
+
+# ── ۶-۲) بعد کانفیگِ سایت: بلوکِ upstreamِ سخت‌کدشده → include (یک‌بار) ──
 if grep -qE '^[[:space:]]*upstream[[:space:]]+ghelgheli_(game|http)' "$NGINX_SITE" 2>/dev/null; then
   log "🔧 تبدیلِ upstreamِ سخت‌کدشده به include (یک‌بار برای همیشه)"
-  cp -a "$NGINX_SITE" "${NGINX_SITE}.bak.$(date +%s)"
+  SITE_BACKUP="$NGINX_BACKUP_DIR/$(basename "$NGINX_SITE").$(date +%s).bak"
+  cp -a "$NGINX_SITE" "$SITE_BACKUP"
   python3 - "$NGINX_SITE" <<'PY'
 import re, sys
 p = sys.argv[1]
 src = open(p, encoding='utf-8').read()
-# هر بلوکِ upstream ghelgheli_* را بردار و جایش یک include بگذار (فقط بار اول)
 new, n = re.subn(r'(?ms)^upstream\s+ghelgheli_(?:game|http)\s*\{.*?\n\}\n?', '', src)
 if n:
     inc = ('# upstreamها از پروفایلِ ظرفیت ساخته می‌شوند (خودکار). '
@@ -272,23 +300,42 @@ if n:
 PY
 fi
 
-# نصبِ نسخهٔ جدید + تست؛ اگر خراب بود برگردان
-NGINX_BACKUP=""
-if [ -f "$NGINX_SNIPPET" ]; then
-  NGINX_BACKUP="$(mktemp /tmp/gg-upstream-backup.XXXXXX)"
-  cp -a "$NGINX_SNIPPET" "$NGINX_BACKUP"
-fi
-install -m 644 "$TMP_SNIPPET" "$NGINX_SNIPPET"
-rm -f "$TMP_SNIPPET"
-
+# ── ۶-۳) تست؛ اگر خراب بود، **هر دو** فایل برگردند ──
 if ! nginx -t >>"$LOG_FILE" 2>&1; then
-  log "❌ کانفیگِ nginx با این سخت‌افزار معتبر نبود → بازگشت به نسخهٔ قبلی"
-  if [ -n "$NGINX_BACKUP" ]; then cp -a "$NGINX_BACKUP" "$NGINX_SNIPPET"; else rm -f "$NGINX_SNIPPET"; fi
-  nginx -t >>"$LOG_FILE" 2>&1 || true
-  die "تستِ nginx شکست خورد؛ هیچ تغییری اعمال نشد (nginx با کانفیگِ قبلی سرو می‌کند)"
+  log "❌ کانفیگِ nginx معتبر نبود → بازگشتِ کاملِ کانفیگ"
+  [ -n "$SITE_BACKUP" ] && cp -a "$SITE_BACKUP" "$NGINX_SITE"
+  if [ -n "$SNIPPET_BACKUP" ]; then cp -a "$SNIPPET_BACKUP" "$NGINX_SNIPPET"; else rm -f "$NGINX_SNIPPET"; fi
+  if nginx -t >>"$LOG_FILE" 2>&1; then
+    die "تستِ nginx شکست خورد؛ کانفیگِ قبلی برگردانده شد و nginx دست‌نخورده است"
+  else
+    die "تستِ nginx شکست خورد و بازگشت هم نگرفت — نیازِ فوری به بررسیِ دستی: nginx -t"
+  fi
 fi
-[ -n "$NGINX_BACKUP" ] && rm -f "$NGINX_BACKUP"
 systemctl reload nginx >>"$LOG_FILE" 2>&1 || die "reloadِ nginx شکست خورد"
+
+# ── ۶-۴) حالا که nginx دیگر به گره‌های قدیمی اشاره نمی‌کند، حذفشان کن ──
+#
+# ⚠️ ترتیب مهم است: اگر **قبل** از به‌روزرسانیِ nginx گره‌ها را حذف کنیم،
+#    روی تنزل (مثلاً ۸ هسته → ۲) ترافیک به پورتی می‌رود که دیگر وجود ندارد
+#    و ۵۰۲ می‌گیریم. حالا اول nginx با لیستِ جدید بازنویسی می‌شود و بعد
+#    گره‌های بی‌استفاده خاموش می‌شوند.
+STALE="$(pm2_user jlist 2>/dev/null | jq -r '.[] | select(.name|startswith("ghelgheli-api")) | .name' 2>/dev/null || true)"
+for name in $STALE; do
+  if ! grep -qw "$name" <<<"$NEW_NAMES"; then
+    log "🧹 حذفِ گرهِ اضافیِ PM2 (دیگر در nginx نیست): $name"
+    pm2_user delete "$name" >/dev/null 2>&1 || true
+  fi
+done
+pm2_user save >/dev/null 2>&1 || true
+
+# کپیِ sites-available هم‌راستا شود تا اگر روزی کسی از آن کپی گرفت،
+# نسخهٔ قدیمی با upstreamِ سخت‌کد برنگردد (روی این سرور آن فایل symlink نیست).
+SITE_AVAILABLE="${SITE_AVAILABLE:-/etc/nginx/sites-available/$(basename "$NGINX_SITE")}"
+if [ -f "$SITE_AVAILABLE" ] && ! cmp -s "$SITE_AVAILABLE" "$NGINX_SITE"; then
+  cp -a "$SITE_AVAILABLE" "$NGINX_BACKUP_DIR/$(basename "$SITE_AVAILABLE").$(date +%s).bak"
+  install -m 644 "$NGINX_SITE" "$SITE_AVAILABLE"
+  log "🔧 sites-available هم‌راستا شد (زیرِ پشتیبان گرفته شد)"
+fi
 
 # ── ۷) لیستِ پورت‌ها برای اسکریپتِ سلامت (وگرنه روی پورتِ نبوده هشدار می‌دهد) ──
 printf '%s\n' "$HTTP_PORTS" | tr ' ' '\n' | sed '/^$/d' > "$PORTS_FILE"
