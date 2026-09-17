@@ -245,7 +245,13 @@ jobs:
             if flutter build apk --release --split-per-abi \
               --target-platform=android-arm,android-arm64 \
               --dart-define=API_BASE_URL=${{ vars.API_BASE_URL || 'https://api.ghelghelishop.ir' }} \
-              --dart-define=PUBLIC_WEB_URL=${{ vars.PUBLIC_WEB_URL || 'https://ghelghelishop.ir' }} \
+              # ⚠️ پیش‌فرض باید همان آدرسی باشد که واقعاً جواب می‌دهد.
+              #    `ghelghelishop.ir` بدونِ زیردامنه از بیرون پاسخ نمی‌دهد
+              #    (بررسیِ زنده: کدِ ۰۰۰)، پس هر نسخه‌ای که با آن ساخته شود
+              #    لینکِ دعوتِ مرده پخش می‌کند. این مقدار باید با
+              #    `share_invite.dart` و بک‌اند یکی بماند؛ گاردِ
+              #    `testDomainPortability.js` همین را می‌سنجد.
+              --dart-define=PUBLIC_WEB_URL=${{ vars.PUBLIC_WEB_URL || 'https://user.ghelghelishop.ir' }} \
               --dart-define=APP_RELEASE="$APP_RELEASE"; then
               ok=1
               break

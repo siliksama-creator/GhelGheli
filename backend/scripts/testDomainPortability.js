@@ -68,6 +68,16 @@ console.log('\n══ ۱) اپ (Flutter): آدرس‌ها از متغیرِ بی
   const apk = read('.github/workflows/build-apk.yml');
   ok('بیلدِ APK هر دو متغیر را از تنظیماتِ مخزن می‌خواند (بدونِ تغییرِ کد)',
     /vars\.API_BASE_URL/.test(apk) && /vars\.PUBLIC_WEB_URL/.test(apk));
+
+  // ⚠️ پیش‌فرضِ داخلِ ورک‌فلو **هم** مهم است: وقتی متغیرِ مخزن تعریف نشده
+  //    باشد (وضعیتِ فعلی)، همین رشته در بیلد می‌نشیند. نسخهٔ قبلی دامنهٔ
+  //    بدونِ زیردامنه بود که از بیرون پاسخ نمی‌دهد ⇒ لینکِ دعوتِ مرده در
+  //    هر APK. این بررسی نمی‌گذارد سه جا (ورک‌فلو، اپ، بک‌اند) از هم
+  //    جدا بیفتند.
+  ok('پیش‌فرضِ PUBLIC_WEB_URL در ورک‌فلو همان دامنهٔ کارکننده است',
+    /vars\.PUBLIC_WEB_URL \|\| 'https:\/\/user\.ghelghelishop\.ir'/.test(apk));
+  ok('و در `share_invite.dart` هم همان دامنه پیش‌فرض است',
+    /defaultValue: 'https:\/\/user\.ghelghelishop\.ir'/.test(share));
 }
 
 console.log('\n══ ۲) بک‌اند: هیچ آدرسی در منطقِ کار هاردکد نیست ══');
