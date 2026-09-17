@@ -20,7 +20,10 @@ const OBSERVER_PAGES = new Set(['dashboard', 'support']);
 // «برنامه‌های پیشنهادی» هم فقط مدیرکل: محتوایش در اپ و وبِ *همهٔ* کاربران
 // دیده می‌شود و لینکش کاربر را به بیرونِ اپ می‌برد؛ هم‌تراز با backend که
 // مسیرهای نوشتنِ آن `requireRole()` (فقط super_admin) دارند.
-const SUPER_ONLY_PAGES = new Set(['admins', 'cloudflare', 'recommended-apps']);
+// «شماره معکوسِ لیگ» هم فقط مدیرکل: یک کلیک در آن دسترسیِ همهٔ کاربران به
+// بازیِ سکه‌ای را می‌بندد و متنش در اپ و وبِ همه دیده می‌شود؛ هم‌تراز با
+// بک‌اند که مسیرهای نوشتنش `requireRole()` (فقط super_admin) دارند.
+const SUPER_ONLY_PAGES = new Set(['admins', 'cloudflare', 'recommended-apps', 'league-countdown']);
 
 /** آیا این نقش اجازهٔ دیدنِ این صفحه (کلید NAV) را دارد؟ */
 export function canSeePage(role, pageKey) {

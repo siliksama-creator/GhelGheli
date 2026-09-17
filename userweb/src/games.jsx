@@ -8,6 +8,9 @@ import TapGame from './tapGame.jsx';
 import CardDuelWeb from './cardDuelGame.jsx';
 import { useGameSession } from './gameSession.js';
 import { CosmeticAvatarFrame, LevelBadge, DisplayName } from './components/Cosmetics.jsx';
+// کارتِ شماره معکوسِ شروعِ لیگ + قفلِ مسیرهای سکه‌ای (خواستهٔ مالک).
+// یک کامپوننت، سه صفحه را پوشش می‌دهد و یک درخواست می‌گیرد.
+import LeagueCountdown, { useLeagueCountdown } from './components/LeagueCountdown.jsx';
 import CoinAward from './components/CoinAward.jsx';
 import CoinRateStrip from './components/CoinRateStrip.jsx';
 import { ASSETS, SvgIcon } from './components/IconAsset.jsx';
@@ -115,6 +118,9 @@ export default function Games({ api, token, externalLaunch = null }) {
   const [economy, setEconomy] = useState(null);
   const [gamePoints, setGamePoints] = useState(null);
   const [features, setFeatures] = useState(null);
+  // وضعیتِ شماره معکوسِ لیگ: تا شروعِ لیگ، فقط مسیرهای **سکه‌ای** بسته‌اند
+  // (بازیِ سریع و لابیِ عمومی). «تمرین با ربات» و اتاقِ کددار باز می‌مانند.
+  const leagueCd = useLeagueCountdown();
 
   useEffect(() => {
     if (!externalLaunch?.start || !externalLaunch?.socket) return;
@@ -294,6 +300,9 @@ export default function Games({ api, token, externalLaunch = null }) {
 
   return (
     <div style={{ width: '100%', minWidth: 0, maxWidth: '820px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      {/* شماره معکوسِ شروعِ لیگ — بالاترین عنصرِ صفحه تا کاربر پیش از هر
+          کلیکی بفهمد چرا بازیِ آنلاین بسته است. */}
+      <LeagueCountdown />
       {/* ── Header ترکیبی: پروفایل + XP + لول (۲ باکس قبلی ترکیب شدند) ── */}
       <div
         className="card"
@@ -521,6 +530,12 @@ export default function Games({ api, token, externalLaunch = null }) {
                   alert(`برای این لابی حداقل ${fa(customStake)} امتیاز لازم داری`);
                   return;
                 }
+                if (leagueCd.active) {
+                  // لابیِ عمومی سهم دارد ⇒ سکه می‌دهد ⇒ بسته. (اتاقِ کددار
+                  // که پایین‌تر ساخته می‌شود سهمِ صفر دارد و باز است.)
+                  alert(leagueCd.message || 'تا شروعِ لیگ، ساخت لابی بسته است');
+                  return;
+                }
                 setLobbyNotice('در حال ساخت لابی…');
                 const s = prepareLobbySocket(sock => sock.emit('game:create_lobby', {
                   gameId: customGame, stake: customStake, password: customPass,
@@ -561,6 +576,10 @@ export default function Games({ api, token, externalLaunch = null }) {
                     <button
                       type="button"
                       onClick={() => {
+                        if (leagueCd.active) {
+                          alert(leagueCd.message || 'تا شروعِ لیگ، این لابی بسته است');
+                          return;
+                        }
                         let pass = '';
                         if (l.hasPassword) {
                           pass = prompt('رمز عبور اتاق را وارد کنید:') || '';
@@ -633,6 +652,13 @@ export default function Games({ api, token, externalLaunch = null }) {
               key={g.id}
               className="card gameTileSquare"
               onClick={() => {
+                // سهم‌دار = مسابقهٔ آنلاین = سکه‌دار ⇒ تا شروعِ لیگ بسته.
+                // سرور هم همین را رد می‌کند؛ این فقط جلوی کلیکِ بی‌فایده را
+                // می‌گیرد و دلیلش را به زبانِ خودِ ادمین می‌گوید.
+                if (mode > 0 && leagueCd.active) {
+                  alert(leagueCd.message || 'تا شروعِ لیگ، بازیِ آنلاین بسته است');
+                  return;
+                }
                 if (mode > 0 && Number(user?.current_points || 0) < mode) {
                   alert(`برای این مسابقه حداقل ${fa(mode)} امتیاز لازم داری`);
                   return;
@@ -712,6 +738,9 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
     stillSearching, connectionNotice, rematchWaiting,
   } = useGameSession(
     api, token, gameId, stake, vsBot, roomCode, externalSocket, initialStart);
+  // قفلِ شماره معکوس داخلِ صحنهٔ بازی: دکمهٔ «پیدا کردن حریف آنلاین» غیرفعال
+  // می‌شود و «تلاش دوباره» به تمرین با ربات می‌رود، چون سهم‌دار بسته است.
+  const cd = useLeagueCountdown();
   const activeGameId = g.gameId || gameId;
   const activeStake = Number(g.stake ?? stake ?? 0);
   const pX = g.players?.X || { nickname: 'کاربر ۱' };
@@ -787,8 +816,13 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
           <div style={{ color:'#64748B', display:'flex', justifyContent:'center' }}><SvgIcon name="game" size={40} /></div>
           <h3 style={{ margin:0, color:'#FFF' }}>آماده‌ای شروع کنیم؟</h3>
           <p className="hint">آنلاین با حریف واقعی رقابت کن یا فوری با ربات تمرین کن.</p>
+          {cd.active && (
+            // دلیلِ غیرفعالی را همان متنی می‌گوید که ادمین نوشته — نه یک
+            // جملهٔ هاردکدشده در این فایل که با تغییرِ پنل کهنه می‌شد.
+            <p className="hint" style={{ color: '#FFD166' }}>{cd.message}</p>
+          )}
           <div style={{ display:'flex', flexWrap:'wrap', justifyContent:'center', gap:'8px' }}>
-            <button className="main" type="button" onClick={joinOnline}>پیدا کردن حریف آنلاین</button>
+            <button className="main" type="button" onClick={joinOnline} disabled={cd.active}>پیدا کردن حریف آنلاین</button>
             <button type="button" onClick={playBot}>بازی فوری با ربات</button>
             {onSolo && <button type="button" onClick={onSolo}>بازی رکوردی با ساعت</button>}
           </div>
@@ -797,7 +831,7 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
 
       {phase === 'error' && (
         <div style={{ padding:'28px 18px', display:'flex', justifyContent:'center', gap:'8px', flexWrap:'wrap' }}>
-          <button type="button" className="main" onClick={stake > 0 ? joinOnline : playBot}>تلاش دوباره</button>
+          <button type="button" className="main" onClick={(stake > 0 && !cd.active) ? joinOnline : playBot}>تلاش دوباره</button>
           <button type="button" onClick={() => { leave(); onBack(); }}>بازگشت</button>
         </div>
       )}

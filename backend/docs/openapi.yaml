@@ -1968,6 +1968,126 @@ paths:
                 $ref: "#/components/schemas/JsonResponse"
       security:
         - bearerAuth: []
+  /api/admin/league-countdown:
+    get:
+      tags:
+        - Admin
+      summary: دریافت /api/admin/league-countdown
+      operationId: get_api_admin_league_countdown
+      responses:
+        "200":
+          description: موفق
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "400":
+          description: درخواست نامعتبر
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "401":
+          description: نیازمند ورود
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "403":
+          description: دسترسی غیرمجاز
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "404":
+          description: یافت نشد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "409":
+          description: تعارض وضعیت
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "429":
+          description: تعداد درخواست بیش از حد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "500":
+          description: خطای داخلی سرور
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+      security:
+        - bearerAuth: []
+    put:
+      tags:
+        - Admin
+      summary: جایگزینی /api/admin/league-countdown
+      operationId: put_api_admin_league_countdown
+      responses:
+        "200":
+          description: موفق
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "400":
+          description: درخواست نامعتبر
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "401":
+          description: نیازمند ورود
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "403":
+          description: دسترسی غیرمجاز
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "404":
+          description: یافت نشد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "409":
+          description: تعارض وضعیت
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "429":
+          description: تعداد درخواست بیش از حد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "500":
+          description: خطای داخلی سرور
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      security:
+        - bearerAuth: []
   /api/admin/league/close:
     post:
       tags:
@@ -12942,6 +13062,63 @@ paths:
         - API
       summary: دریافت /api/growth/overview
       operationId: get_api_growth_overview
+      responses:
+        "200":
+          description: موفق
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "400":
+          description: درخواست نامعتبر
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "401":
+          description: نیازمند ورود
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "403":
+          description: دسترسی غیرمجاز
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "404":
+          description: یافت نشد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "409":
+          description: تعارض وضعیت
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "429":
+          description: تعداد درخواست بیش از حد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "500":
+          description: خطای داخلی سرور
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+      security:
+        - bearerAuth: []
+  /api/league/countdown:
+    get:
+      tags:
+        - League
+      summary: دریافت /api/league/countdown
+      operationId: get_api_league_countdown
       responses:
         "200":
           description: موفق

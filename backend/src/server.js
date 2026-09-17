@@ -42,6 +42,8 @@ const avatarKeys = require('./lib/avatarKeys');
 const { audit } = require('./services/auditService');
 const opsConfig = require('./services/opsConfig');
 const recommendedApps = require('./services/recommendedApps');
+// شماره معکوسِ شروعِ لیگ — «هرچیزی که سکه می‌دهد بسته، بقیه باز».
+const leagueCountdown = require('./services/leagueCountdown');
 const opsLimits = require('./services/opsLimits');
 const liveContent = require('./services/liveContent');
 const {
@@ -985,12 +987,29 @@ const tapBatchLimiter = opsRateLimit('tapBatch',
   });
 
 app.get('/api/games/tap/progress', auth, asyncHandler(async (req, res) => {
-  res.json(await tapGame.getProgress(req.user.id));
+  const progress = await tapGame.getProgress(req.user.id);
+  // صفحهٔ ضربه‌زن با همین یک درخواست هم پیشرفتش را می‌گیرد، هم می‌فهمد
+  // قفل است یا نه — پس کارتِ شماره معکوس بدونِ رفت‌وبرگشتِ اضافه نشان داده
+  // می‌شود (الگویِ `/api/bootstrap`).
+  const gate = leagueCountdown.cached();
+  res.json({ ...progress, leagueLocked: gate.blocks.tap, countdown: gate });
 }));
 
 app.post('/api/games/tap/progress', auth, tapBatchLimiter.mw, asyncHandler(async (req, res) => {
   const play = await require('./services/featureFlags').checkPlayable('tap', pool);
   if (!play.ok) return res.status(503).json({ message: play.message });
+  // ── شماره معکوسِ لیگ ──────────────────────────────────────────────────
+  // ضربه‌زن منبعِ سکه است و خواستهٔ مالک این بود که تا شروعِ لیگ بسته بماند.
+  // ۴۲۳ (Locked) و نه ۴۰۳: کلاینت باید بفهمد «الان بسته است، خرابی نیست»
+  // و کارتِ شماره معکوس را نشان بدهد، نه پیامِ خطای عمومی.
+  const gate = leagueCountdown.cached();
+  if (gate.blocks.tap) {
+    return res.status(423).json({
+      message: gate.message,
+      code: 'league_countdown',
+      countdown: gate,
+    });
+  }
   // The raw token doubles as the HMAC key material, so the signature can only
   // be produced by whoever holds a live session for this user.
   const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
@@ -3041,6 +3060,12 @@ app.use('/api', require('./routes/adminCloudflare')({
 // یک مسیرِ عمومی (ورودیِ صفحهٔ «بیشتر») و پنج مسیرِ مدیریتی. سرویس جدا
 // تزریق می‌شود تا قواعدِ اعتبارسنجی و صفحه‌بندی، بدونِ دیتابیس هم
 // آزمایش‌شدنی باشند.
+// شماره معکوسِ شروعِ لیگ: یک مسیرِ عمومی + دو مسیرِ پنل. سرویس جدا تزریق
+// می‌شود تا موتورِ بازی هم بتواند همان تصمیم را (از همان کش) بخواند.
+app.use('/api', require('./routes/leagueCountdown')({
+  adminAuth, requireRole, asyncHandler, audit, service: leagueCountdown,
+}));
+
 app.use('/api', require('./routes/recommendedApps')({
   pool, adminAuth, requireRole, asyncHandler, audit, validateUuid,
   service: recommendedApps,

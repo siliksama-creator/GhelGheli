@@ -380,3 +380,131 @@
   background: #f59e0b22; border: 1px solid #f59e0b66; color: #f59e0b; font-weight: 800;
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   کارتِ شماره معکوسِ شروعِ لیگ
+   ═══════════════════════════════════════════════════════════════════════════
+   خواستهٔ مالک: «شماره معکوس در قسمتِ لیگ یا بازیِ آنلاین یا بازیِ ضربه‌زن
+   نمایش داده بشه، خیلی زیبا.»
+
+   ── چرا این‌جا و نه داخلِ کامپوننت ──
+   کلیدفریم (`@keyframes`) را نمی‌شود inline نوشت، و بلوکِ
+   `<style>{`…`}</style>` داخلِ JSX یک تلهٔ واقعی دارد (گاردِ
+   `tool/style-backtick.mjs`): یک بک‌تیکِ ساده وسطِ کامنت، کلِ رشتهٔ قالبی را
+   می‌بندد و صفحه سفید می‌شود. `games.css` سراسری است، پس هیچ‌کدام از این دو
+   مشکل را ندارد.
+
+   ── تصمیم‌های ظاهری ──
+   • پس‌زمینهٔ گرادیانیِ سردِ سرمه‌ای → بنفش با لبهٔ طلایی: همان پالتِ برند
+     (`#FFD166` طلا، `#38BDF8` آبی) تا کارت مثلِ وصله دیده نشود.
+   • ربع‌های شمارش در چهار کادرِ شیشه‌ای؛ رقم‌ها `font-variant-numeric:
+     tabular-nums` هستند تا با هر تغییرِ رقم، عرض نلرزد (لرزشِ عدد در
+     شمارشِ ثانیه‌ای روی موبایل آزاردهنده است).
+   • نوارِ پیشرفتِ بالای کارت، سهمِ زمانِ **سپری‌شده** را نشان می‌دهد، پس
+     با هر ثانیه کمی جلو می‌رود و حسِ «دارد نزدیک می‌شود» می‌دهد.
+   • همهٔ اندازه‌های متن ≥ ۱۲ پیکسل — گاردِ تایپوگرافی زیرِ ۱۱.۵ پیکسل را
+     خطا می‌گیرد و روی موبایل هم خوانا نیست.
+
+   ⚠️ اگر متن‌های این کارت را عوض کردی، به‌جای هاردکدکردن این‌جا، از پنل
+      («شماره معکوسِ لیگ») عوض کن: متن از سرور می‌آید تا کاربرِ اندروید هم
+      بدونِ آپدیت ببیندش. */
+.leagueCountdown {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  margin: 0 0 14px;
+  padding: 15px 15px 13px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 209, 102, .42);
+  background:
+    radial-gradient(circle at 88% 8%, rgba(255, 209, 102, .16), transparent 46%),
+    radial-gradient(circle at 12% 92%, rgba(56, 189, 248, .14), transparent 52%),
+    linear-gradient(150deg, #1a2a4e 0%, #0c1830 46%, #2a163a 100%);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, .42), inset 0 1px 0 rgba(255, 255, 255, .08);
+}
+.leagueCountdown::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 42%, rgba(255, 255, 255, .09) 50%, transparent 58%);
+  animation: lgcdSheen 5s ease-in-out infinite;
+}
+@keyframes lgcdSheen {
+  0% { transform: translateX(-110%); }
+  55%, 100% { transform: translateX(110%); }
+}
+
+.lgcdHead { display: flex; align-items: center; gap: 10px; }
+.lgcdIcon {
+  flex: 0 0 auto; width: 38px; height: 38px; border-radius: 13px;
+  display: grid; place-items: center; color: #21160a;
+  background: linear-gradient(135deg, #FFD166, #f59e0b);
+  box-shadow: 0 8px 20px rgba(255, 209, 102, .3);
+  animation: lgcdBeat 2.4s ease-in-out infinite;
+}
+@keyframes lgcdBeat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+.lgcdTitles { display: grid; gap: 3px; min-width: 0; }
+.lgcdTitles b { color: #fff; font-size: 15.5px; font-weight: 900; line-height: 1.35; }
+.lgcdTitles small { color: #b9cbe0; font-size: 12.5px; line-height: 1.6; }
+
+.lgcdGrid {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px; margin: 13px 0 11px;
+}
+.lgcdBox {
+  display: grid; justify-items: center; gap: 2px;
+  padding: 9px 4px 7px; border-radius: 15px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .10), rgba(255, 255, 255, .03));
+  border: 1px solid rgba(255, 255, 255, .12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07);
+}
+.lgcdBox strong {
+  color: #fff; font-size: clamp(21px, 6.4vw, 27px); font-weight: 900;
+  line-height: 1.1; letter-spacing: -1px;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 16px rgba(255, 209, 102, .35);
+}
+.lgcdBox span { color: #9fb4cc; font-size: 12px; font-weight: 800; }
+
+.lgcdBar {
+  height: 8px; border-radius: 99px; overflow: hidden;
+  background: rgba(255, 255, 255, .09);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, .35);
+}
+.lgcdBar i {
+  display: block; height: 100%; border-radius: 99px;
+  background: linear-gradient(90deg, #FFD166, #22e7a6);
+  box-shadow: 0 0 14px rgba(255, 209, 102, .5);
+  transition: width .9s linear;
+}
+
+.lgcdFoot {
+  display: grid; gap: 4px; margin-top: 10px;
+}
+.lgcdFoot span { color: #cfe0f2; font-size: 12.5px; font-weight: 800; }
+.lgcdFoot small { color: #93a7bd; font-size: 12px; line-height: 1.65; }
+
+/* نسخهٔ جمع‌وجور — برای صفحهٔ ضربه‌زن که بالای صفحه جای کمتری دارد. */
+.leagueCountdown.compact { padding: 12px 12px 11px; border-radius: 18px; margin-bottom: 10px; }
+.leagueCountdown.compact .lgcdIcon { width: 32px; height: 32px; border-radius: 11px; }
+.leagueCountdown.compact .lgcdTitles b { font-size: 14px; }
+.leagueCountdown.compact .lgcdTitles small { font-size: 12px; }
+.leagueCountdown.compact .lgcdGrid { margin: 10px 0 9px; gap: 6px; }
+.leagueCountdown.compact .lgcdBox strong { font-size: clamp(19px, 5.6vw, 23px); }
+.leagueCountdown.compact .lgcdFoot small { display: none; }
+
+@media (max-width: 400px) {
+  .lgcdBox { padding: 8px 2px 6px; }
+  .lgcdBox span { font-size: 11.5px; }
+}
+
+/* احترام به «کاهش حرکت» — کاربرهایی که انیمیشن اذیتشان می‌کند. */
+@media (prefers-reduced-motion: reduce) {
+  .leagueCountdown::after, .lgcdIcon { animation: none; }
+  .lgcdBar i { transition: none; }
+}

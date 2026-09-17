@@ -13,6 +13,9 @@ import 'package:flutter/services.dart';
 import '../../../../api_client.dart';
 import '../../../../theme/tokens.dart';
 import '../../../../widgets/avatar_image.dart';
+// شماره معکوسِ شروعِ لیگ — ضربه‌زن منبعِ سکه است، پس تا شروعِ لیگ بسته است.
+import '../../../../widgets/league_countdown.dart';
+import '../../../../widgets/ui_icon.dart';
 import 'tap_character.dart';
 import 'tap_config.dart';
 import 'tap_day.dart';
@@ -327,7 +330,30 @@ class _TapGameScreenState extends State<TapGameScreen>
     );
   }
 
-  bool _handleTap(TapDownDetails _) => _engine.tap();
+  /// آخرین پیامِ قفل که به کاربر نشان داده شد — تا با هر ضربهٔ روی ناحیهٔ
+  /// بسته، پشت‌سرهم SnackBar تکراری نمایش داده نشود.
+  String _leagueLockNotice = '';
+
+  bool _handleTap(TapDownDetails _) {
+    // ── قفلِ شماره معکوسِ لیگ ──
+    // ناحیهٔ ضربه در این حالت جایگزین می‌شود، ولی این بند می‌ماند: ضربه‌ای
+    // که در همان فریمِ روشن‌شدنِ قفل صف شده باشد نباید رد شود. سرور هم
+    // POST /api/games/tap/progress را با ۴۲۳ رد می‌کند — سه لایه، چون این‌جا
+    // تنها منبعِ سکه است.
+    final store = LeagueCountdownStore.instance;
+    if (store.blocksTap) {
+      final msg = store.message.isEmpty
+          ? 'تا شروعِ لیگ، ضربه‌زن بسته است'
+          : store.message;
+      if (msg != _leagueLockNotice) {
+        _leagueLockNotice = msg;
+        final messenger = ScaffoldMessenger.maybeOf(context);
+        messenger?.showSnackBar(SnackBar(content: Text(msg)));
+      }
+      return false;
+    }
+    return _engine.tap();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -357,6 +383,13 @@ class _TapGameScreenState extends State<TapGameScreen>
             isComplete: _engine.isComplete,
             accent: _accent,
           ),
+        ),
+        // ── شماره معکوسِ شروعِ لیگ (خواستهٔ مالک) ──
+        // نسخهٔ جمع‌وجور: این صفحه بالای شلوغی دارد (نوارِ لول + سهمیهٔ روز)،
+        // پس کارت فشرده‌تر رندر می‌شود تا ناحیهٔ ضربه تنگ نشود.
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: Gaps.lg),
+          child: LeagueCountdownCard(api: widget.api, compact: true),
         ),
         Gaps.vSm,
         Padding(
@@ -405,7 +438,13 @@ class _TapGameScreenState extends State<TapGameScreen>
                       level: _engine.level,
                       skin: _engine.skin,
                     )
-                  : Padding(
+                  // ── قفلِ شماره معکوسِ لیگ ──
+                  // ناحیهٔ ضربه **جایگزین** می‌شود، نه غیرفعال — همان
+                  // دلیلی که برای سهمیهٔ روز نوشته شده: شخصیتی که ضربه
+                  // می‌خورد و هیچ اتفاقی نمی‌افتد از «بسته بودن» بدتر است.
+                  : LeagueCountdownStore.instance.blocksTap
+                      ? const _LeagueLockView()
+                      : Padding(
                       padding: const EdgeInsets.fromLTRB(
                           Gaps.sm, Gaps.xs, Gaps.sm, Gaps.xs),
                       child: LayoutBuilder(builder: (context, c) {
@@ -1738,6 +1777,85 @@ class _RankBadge extends StatelessWidget {
         style: TextStyle(
             fontSize: 11, fontWeight: FontWeight.w900, color: textColor),
       ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// پنلِ «تا شروعِ لیگ بسته است»
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// همان جای ناحیهٔ ضربه می‌نشیند (نه روی آن) و متن‌ها را از پاسخِ سرور
+// می‌خواند؛ پس ادمین بدونِ انتشارِ نسخهٔ تازه می‌تواند جمله‌ها را عوض کند.
+// `ValueListenableBuilder` لازم است چون ممکن است همین حالا شمارش به صفر
+// برسد — در آن لحظه این پنل خودش کنار می‌رود و ناحیهٔ ضربه برمی‌گردد.
+class _LeagueLockView extends StatelessWidget {
+  const _LeagueLockView();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return ValueListenableBuilder<Map<String, dynamic>?>(
+      valueListenable: LeagueCountdownStore.instance.state,
+      builder: (context, data, _) {
+        final title = '${data?['title'] ?? ''}'.trim();
+        final message = '${data?['message'] ?? ''}'.trim();
+        final note = '${data?['note'] ?? ''}'.trim();
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(Gaps.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 62,
+                  height: 62,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Color(0x1AFFD166),
+                  ),
+                  child: const Center(
+                    child: UiIcon('lock', size: 28, color: Color(0xFFFFD166)),
+                  ),
+                ),
+                Gaps.vSm,
+                Text(
+                  title.isEmpty ? 'لیگ به‌زودی شروع می‌شود' : title,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                if (message.isNotEmpty) ...[
+                  Gaps.vXs,
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Color(0xFFCBD5E1),
+                      fontSize: 13,
+                      height: 1.7,
+                    ),
+                  ),
+                ],
+                if (note.isNotEmpty) ...[
+                  Gaps.vXs,
+                  Text(
+                    note,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Color(0xFF93A7BD),
+                      fontSize: 12.5,
+                      height: 1.7,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

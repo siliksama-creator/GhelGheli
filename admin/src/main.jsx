@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, Suspense, lazy, Component } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BarChart3, Bell, BookText, Coins, Gift, MessageCircle, LifeBuoy, ScanLine, Settings, Shield, ShieldCheck, Sigma, Trophy, Users, Gamepad2, Wallet, Activity, CircleDot, Package, Store, Layers, Target, SlidersHorizontal, Megaphone, Smartphone } from 'lucide-react';
+import { BarChart3, Bell, BookText, Coins, Gift, MessageCircle, LifeBuoy, ScanLine, Settings, Shield, ShieldCheck, Sigma, Timer, Trophy, Users, Gamepad2, Wallet, Activity, CircleDot, Package, Store, Layers, Target, SlidersHorizontal, Megaphone, Smartphone } from 'lucide-react';
 
 import './theme.css';
 import './styles.css';
@@ -54,6 +54,9 @@ const CloudflarePage = lazy(() => import('./pages/cloudflare.jsx').then(m => ({ 
 // برنامه‌های پیشنهادی — خواستهٔ مالک (۲۶ شهریور): «در قسمت (بیشتر) وب و
 // اندروید، از پنل ادمین مدیریت بشه.»
 const RecommendedAppsPage = lazy(() => import('./pages/recommended-apps.jsx').then(m => ({ default: m.RecommendedAppsPage })));
+// شماره معکوسِ شروعِ لیگ — خواستهٔ مالک (۲۷ شهریور): «بازیِ آنلاین و ضربه‌زن
+// تا شروعِ لیگ بسته باشد، شمارش در سه صفحه دیده شود و متنش از پنل عوض شود.»
+const LeagueCountdownPage = lazy(() => import('./pages/league-countdown.jsx').then(m => ({ default: m.LeagueCountdownPage })));
 const EnginePage = lazy(() => import('./pages/engine.jsx').then(m => ({ default: m.EnginePage })));
 
 // ── ErrorBoundary برای جلوگیری از صفحه سیاه ──────────────────────────────
@@ -158,6 +161,11 @@ const NAV = [
     'rewards'],
   ['wallet', 'کیف پول', Wallet, WalletPage,
     'تراکنش‌های کیف پول، درخواست‌های برداشت و واریز/برداشت دستی.',
+    'rewards'],
+  // شماره معکوسِ شروعِ لیگ — عمداً کنارِ «لیگ ماهانه» است: هر دو یک کار
+  // می‌کنند (تعیینِ زمانِ لیگ) و ادمین باید کنارِ هم ببیندشان.
+  ['league-countdown', 'شماره معکوسِ لیگ', Timer, LeagueCountdownPage,
+    'زمانِ شروعِ لیگ + متنِ کارت: تا آن ساعت، بازیِ آنلاین و ضربه‌زن بسته است (اتاقِ خصوصی و ربات باز می‌مانند).',
     'rewards'],
   ['league', 'لیگ ماهانه', Trophy, LeaguePage,
     'لیگ ماهانه: شروع و پایان فصل، جوایز نفرات برتر و تاریخچهٔ پرداخت‌ها.',

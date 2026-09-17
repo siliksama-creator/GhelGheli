@@ -9,6 +9,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { req, asset, avatarUrl } from './lib/api.js';
 import { heavyImpact, mediumImpact, selectionClick } from './haptics.js';
 import { SvgIcon } from './components/IconAsset.jsx';
+// شماره معکوسِ شروعِ لیگ — خواستهٔ مالک: «ضربه‌زن هم تا شروعِ لیگ بسته
+// باشه و شمارش در همون قسمت نمایش داده بشه.» ضربه‌زن منبعِ سکه است.
+import LeagueCountdown, { useLeagueCountdown } from './components/LeagueCountdown.jsx';
 
 // ── config (mirrors TapGameConfig in Dart) ─────────────────────────────────
 export const TAP_CONFIG = {
@@ -275,6 +278,12 @@ function registerTap(guard, nowMs) {
 
 // ── component ──────────────────────────────────────────────────────────────
 export default function TapGame({ token, onBack, economy }) {
+  // ── قفلِ شماره معکوسِ لیگ ──
+  // تا شروعِ لیگ، ضربه‌زن بسته است: هم دکمه (ناحیهٔ ضربه جایگزین می‌شود)،
+  // هم این بندِ زیر در `handleTap`، و هم سرور که POST پیشرفت را با ۴۲۳ رد
+  // می‌کند. سه لایه چون اینجا تنها منبعِ سکه است و یک راهِ فرار یعنی قفلِ
+  // بی‌معنا.
+  const leagueLock = useLeagueCountdown();
   // ── سکهٔ لول‌آپ جلوی چشمِ کاربر (خواستهٔ مالک) ──
   // وقتی سرور پاسخِ بسته را با coinsEarned برمی‌گرداند، یک نشانِ شناور
   // «+N سکه» چند ثانیه نمایش داده می‌شود.
@@ -637,6 +646,15 @@ export default function TapGame({ token, onBack, economy }) {
     // Ignore synthetic events: a script dispatching click() has isTrusted
     // false. Real users are unaffected.
     if (e && e.isTrusted === false) return;
+    // ── شماره معکوسِ شروعِ لیگ ──
+    // ناحیهٔ ضربه در این حالت جایگزین شده، ولی این بند می‌ماند: رویدادی که
+    // در همان فریمِ روشن‌شدنِ قفل صف شده باشد نباید رد شود — همان دلیلی که
+    // برای `capped` هم نوشته شده («UI پنهانش می‌کند» قاعده نیست).
+    if (leagueLock.active) {
+      const lcMsg = leagueLock.message || 'تا شروعِ لیگ، ضربه‌زن بسته است';
+      if (lcMsg !== notice) setNotice(lcMsg);
+      return;
+    }
 
     const verdict = registerTap(guardRef.current, clock());
     // Use the compositor directly instead of two React state changes and a
@@ -803,6 +821,8 @@ export default function TapGame({ token, onBack, economy }) {
       </div>
 
       {/* ── راهنمای سکه: «هر لول N سکه» — عدد از تنظیماتِ ادمین می‌آید ── */}
+      <LeagueCountdown compact />
+
       <div className="tapCoinGuide">
         <img src="/pass/icon_coin.webp" alt="" width={15} height={15}
           style={{ display: 'block', opacity: 0.9 }} />
@@ -902,6 +922,16 @@ export default function TapGame({ token, onBack, economy }) {
             <SvgIcon name="lock" size={15} />
             تا زمانی که مدیر بازی را ریست نکند نمی‌توانی دوباره بازی کنی.
           </p>
+        </div>
+      ) : leagueLock.active ? (
+        // ناحیهٔ ضربه **جایگزین** می‌شود، نه غیرفعال — همان تصمیمی که در
+        // `capped` گرفته شد: شخصیتی که ضربه می‌خورد و هیچ اتفاقی نمی‌افتد
+        // از «بسته بودن» بدتر است.
+        <div className="tapDone tapCapped" data-league-lock="1">
+          <img src={skin} alt="" />
+          <h2>{leagueLock.title}</h2>
+          <p>{leagueLock.message}</p>
+          {leagueLock.note ? <p className="tapFinishLock">{leagueLock.note}</p> : null}
         </div>
       ) : capped ? (
         // The tap area is REPLACED, not merely disabled. Leaving a tappable

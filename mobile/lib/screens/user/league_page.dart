@@ -14,6 +14,9 @@ import '../shared/public_profile_sheet.dart';
 import '../shared/rank_tile.dart';
 import '../../widgets/coin_chip.dart';
 import '../../widgets/coin_guide.dart';
+// کارتِ شماره معکوسِ شروعِ لیگ — خواستهٔ مالک: «وقتی واردِ قسمتِ لیگ شد،
+// شماره معکوس نمایش داده بشه.» آینهٔ userweb/src/components/LeagueCountdown.jsx.
+import '../../widgets/league_countdown.dart';
 import 'clubs_page.dart';
 import '../../widgets/ui_icon.dart';
 import '../../core/app_config.dart';
@@ -150,18 +153,31 @@ class _LeaguePageState extends State<LeaguePage> with WidgetsBindingObserver {
     }
   }
 
-  Widget _tabs() => Padding(
-        padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, 0),
-        child: SegmentedButton<int>(
-          segments: const [
-            ButtonSegment(value: 0, label: Text('جدول لیگ')),
-            ButtonSegment(value: 1, label: Text('باشگاه‌ها')),
-            ButtonSegment(value: 2, label: Text('برندگان قبل')),
-          ],
-          selected: {_tab},
-          showSelectedIcon: false,
-          onSelectionChanged: (s) => setState(() => _tab = s.first),
-        ),
+  /// تب‌ها + کارتِ شماره معکوس.
+  ///
+  /// ⚠️ کارت **داخلِ همین تابع** آمد تا هر سه تب پوشش داده شوند بدونِ سه بار
+  ///    تکرار. خودِ کارت وقتی شمارشی در جریان نباشد `SizedBox.shrink` است،
+  ///    پس نه فاصله‌ای می‌گیرد و نه چیزی جابه‌جا می‌کند.
+  Widget _tabs() => Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, 0),
+            child: SegmentedButton<int>(
+              segments: const [
+                ButtonSegment(value: 0, label: Text('جدول لیگ')),
+                ButtonSegment(value: 1, label: Text('باشگاه‌ها')),
+                ButtonSegment(value: 2, label: Text('برندگان قبل')),
+              ],
+              selected: {_tab},
+              showSelectedIcon: false,
+              onSelectionChanged: (s) => setState(() => _tab = s.first),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, 0),
+            child: LeagueCountdownCard(api: widget.api),
+          ),
+        ],
       );
 
   @override

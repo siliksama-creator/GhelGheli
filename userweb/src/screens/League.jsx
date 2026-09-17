@@ -12,6 +12,10 @@ import CoinGuide from '../components/CoinGuide.jsx';
 // اقتصادِ بازی از کشِ مشترکِ config خوانده می‌شود (فاز ۲). این صفحه یکی از
 // fetchهای تکراریِ `/api/config` بود که حالا حذف شده است.
 import { useLive } from '../lib/liveConfig.js';
+// کارتِ شماره معکوسِ شروعِ لیگ — خواستهٔ مالک: «وقتی واردِ قسمتِ لیگ شد،
+// شماره معکوس نمایش داده بشه.» این کارت خودش داده‌اش را می‌گیرد و وقتی
+// شمارش تمام/خاموش شود هیچ‌چیز رندر نمی‌کند.
+import LeagueCountdown from '../components/LeagueCountdown.jsx';
 
 /**
  * نشانِ سکه در ردیفِ جدول.
@@ -214,13 +218,18 @@ export default function League({ token, openProfile }) {
           <button className="on">باشگاه‌ها</button>
           <button onClick={()=>setTab('prev')} >برندگان قبل</button>
         </div>
+        <LeagueCountdown />
         <Clubs token={token} openProfile={openProfile} />
       </section>
     );
   }
 
   return (
-    <AsyncSection state={state} loadingLabel="در حال بارگذاری لیگ..." keepStale>
+    <>
+      {/* بیرونِ AsyncSection: شمارشِ شروعِ لیگ به دادهٔ جدول وابسته نیست و
+          اگر بارگذاریِ جدول کند یا خطا بدهد، این کارت باید سرِ جایش بماند. */}
+      <LeagueCountdown />
+      <AsyncSection state={state} loadingLabel="در حال بارگذاری لیگ..." keepStale>
       {d => {
         const entries = d.entries || [];
         const season = d.season || {};
@@ -327,7 +336,8 @@ export default function League({ token, openProfile }) {
             {entries.length===0 && <div style={{ textAlign:'center', padding:'30px', color:'#64748B' }}><div style={{ color:'#FFD166', display:'flex', justifyContent:'center' }}><SvgIcon name="trophy" size={38} /></div><b style={{ fontSize:'15px', display:'block', marginTop:'6px' }}>هنوز کسی در این لیگ سکه‌ای نبرده است</b><span style={{ fontSize:'13px', display:'block', marginTop:'6px', lineHeight:1.6 }}>اولین برد شما مقابل حریف واقعی، شما را صدرنشین می‌کند.</span></div>}
           </section>
         );
-      }}
-    </AsyncSection>
+        }}
+      </AsyncSection>
+    </>
   );
 }

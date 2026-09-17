@@ -78,6 +78,41 @@ function rejectIfDisabled(socket, gameId) {
   return false;
 }
 
+/**
+ * دروازهٔ شماره معکوسِ لیگ.
+ *
+ * ── چرا «مسیرهای سکه‌ای» و نه «همه‌چیزِ آنلاین» ────────────────────────────
+ *
+ * خواستهٔ مالک: «هدف اینه که هرچیزی که داره سکه می‌ده بسته بمونه» و
+ * «بازی با ربات و اتاقِ خصوصی سکه نمی‌دن، فقط امتیاز می‌دن».
+ *
+ * سکه در مسابقه از **تسویهٔ سهم** می‌آید (`gameStakeService.settle`) و سهم
+ * فقط در سه مسیر ساخته می‌شود که همین‌جا بسته می‌شوند: بازیِ سریعِ آنلاین
+ * (`game:join`)، ساختِ لابیِ عمومی (`game:create_lobby`) و پیوستن به آن
+ * (`game:join_lobby`). اتاقِ خصوصی با سهمِ صفر و بازیِ ربات، سکه‌ای ندارند
+ * و عمداً باز می‌مانند تا کاربر در فاصلهٔ پیش از لیگ بی‌کار نماند.
+ *
+ * ⚠️ همگام است (بدونِ await) تا رفتارِ هندلرهای سوکت عوض نشود؛ همان دلیلِ
+ *    `rejectIfDisabled` در بالا.
+ */
+function rejectIfLeagueLocked(socket) {
+  try {
+    const state = leagueCountdown.cached();
+    if (!state.blocks.online) return false;
+    safeEmit(socket, 'game:error', {
+      message: state.message,
+      // ⚠️ کلیدِ ماشینی: کلاینت با همین، کارتِ شماره معکوس را نشان می‌دهد
+      //    به‌جای اینکه متنِ خطا را حدس بزند یا به فارسی وابسته شود.
+      code: 'league_countdown',
+      countdown: state,
+    });
+    return true;
+  } catch {
+    // شکستِ تصمیم‌گیری = باز. محصول نباید به‌خاطرِ این قفل شود.
+    return false;
+  }
+}
+
 // How long we hunt for a REAL opponent before falling back to the bot. The
 // client shows this as a visible countdown so waiting feels intentional
 // rather than broken.
@@ -99,6 +134,10 @@ const QUEUE_PING_MS = 25_000;
 // **تازه** با پنجرهٔ تازه می‌سازند. اتاقی که وسطِ بازی است پنجرهٔ لحظهٔ
 // قطعِ خودش را نگه می‌دارد (تایمر همان ثانیه‌ای ساخته شده که قطع شد).
 const liveContent = require('../services/liveContent');
+// شماره معکوسِ شروعِ لیگ. مستقیم require می‌شود (هم‌شکلِ liveContent) تا
+// هندلرهای سوکت بتوانند **همگام** تصمیم بگیرند؛ سرویس خودش کشِ ۵ ثانیه‌ای
+// دارد و تازه‌سازی را در پشت‌زمینه می‌فرستد.
+const leagueCountdown = require('../services/leagueCountdown');
 const reconnectWindowMs = () => liveContent.rules().reconnectSeconds * 1000;
 const REMATCH_WINDOW_MS = 90_000;
 const turnMsFor = rules => Number(rules.turnMs) || DEFAULT_TURN_MS;
@@ -986,6 +1025,18 @@ async function requestRematch(io, socket, roomId) {
   if (!contract || contract.expiresAt <= Date.now()) {
     throw Object.assign(new Error('زمان نبرد دوباره تمام شده است'), { status: 410 });
   }
+  // ── نبردِ دوباره روی مسابقهٔ سهم‌دار ──────────────────────────────────
+  //
+  // بدونِ این بند، شماره معکوس یک راهِ فرار داشت: مسابقهٔ آنلاینِ سهم‌دار را
+  // **قبلِ** شروعِ شمارش شروع کن، و بعد از شروعِ شمارش مکرر «دوباره» بزن —
+  // هر نبردِ دوباره همان سهم را تسویه می‌کند و سکه می‌دهد. اتاقِ خصوصی
+  // (سهمِ صفر) و ربات از این بند مستثنا هستند، هم‌راستا با بقیهٔ دروازه‌ها.
+  if (Number(contract.stake || 0) > 0) {
+    const state = leagueCountdown.cached();
+    if (state.blocks.online) {
+      throw Object.assign(new Error(state.message), { status: 409, code: 'league_countdown' });
+    }
+  }
   let symbol = null;
   for (const candidate of ['X', 'O']) {
     if (String(contract.players?.[candidate]?.id || '') === String(socket.user?.id || '')) symbol = candidate;
@@ -1110,6 +1161,8 @@ const attachGames = function attachGames(io, rulesById) {
       const rules = rulesById[gameId];
       if (!rules) return safeEmit(socket, 'game:error', { message: 'بازی مورد نظر یافت نشد' });
       if (rejectIfDisabled(socket, gameId)) return;
+      // لابیِ عمومی برای غریبه‌هاست و سهم دارد ⇒ سکه‌دار ⇒ بسته.
+      if (rejectIfLeagueLocked(socket)) return;
       try {
         if (rules.validatePlayer) await ensurePlayerReady(rules, socket);
       } catch (e) {
@@ -1185,6 +1238,8 @@ const attachGames = function attachGames(io, rulesById) {
     });
 
     socket.on('game:join_lobby', async payload => {
+      // پیوستن به لابیِ عمومیِ سهم‌دار = همان مسیرِ سکه‌ای ⇒ بسته.
+      if (rejectIfLeagueLocked(socket)) return;
       const lobbyId = String(payload?.lobbyId || '');
       const pass = String(payload?.password || '').trim();
       const lobby = lobbies.get(lobbyId);
@@ -1231,6 +1286,8 @@ const attachGames = function attachGames(io, rulesById) {
         const rules = rulesById[gameId];
         if (!rules) return safeEmit(socket, 'game:error', { message: 'این بازی در دسترس نیست' });
         if (rejectIfDisabled(socket, gameId)) return;
+        // بازیِ سریع = حریفِ واقعی + سهم ⇒ سکه‌دار ⇒ تا شروعِ لیگ بسته.
+        if (rejectIfLeagueLocked(socket)) return;
         try {
           if (rules.validatePlayer) await ensurePlayerReady(rules, socket);
         } catch (e) {

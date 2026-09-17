@@ -5,6 +5,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../../api_client.dart';
+// شماره معکوسِ شروعِ لیگ: کارتِ بالای صفحه + قفلِ مسیرهای سکه‌ای.
+import '../../widgets/league_countdown.dart';
 import '../../core/app_config.dart';
 import '../../core/cosmetics.dart';
 import '../../core/deep_links.dart';
@@ -494,6 +496,12 @@ class _GamesHubPageState extends State<GamesHubPage> {
           ),
         Gaps.vMd,
 
+        // ── شماره معکوسِ شروعِ لیگ ──
+        // بالای انتخابِ حالت: کاربر پیش از انتخابِ «۱۰۰ امتیاز» ببیند که
+        // آن مسیر تا شروعِ لیگ بسته است. «تمرین با ربات» و «اتاق خصوصی»
+        // باز می‌مانند و پایین‌تر توضیح داده شده‌اند.
+        LeagueCountdownCard(api: widget.api),
+
         // نوارِ کوچکِ نرخِ سکه — پیش از انتخابِ ورودی، چون همین‌جا تصمیم
         // گرفته می‌شود کدام بازی ارزش دارد. آینهٔ games.jsx.
         // دورِ ۳۲: حالت پاس داده می‌شود تا در تمرین و لابی — که سکه
@@ -606,6 +614,17 @@ class _GamesHubPageState extends State<GamesHubPage> {
                   mode: _selectedMode,
                   subtitle: _gameSubtitle(g),
                   onTap: () {
+                    // سهم‌دار = مسابقهٔ آنلاین = سکه‌دار ⇒ تا شروعِ لیگ بسته.
+                    // سرور هم رد می‌کند؛ این فقط کلیکِ بی‌فایده را می‌گیرد و
+                    // دلیلش را به زبانِ خودِ ادمین می‌گوید.
+                    if (_selectedMode > 0 && LeagueCountdownStore.instance.blocksOnline) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text(LeagueCountdownStore.instance.message.isEmpty
+                            ? 'تا شروعِ لیگ، بازیِ آنلاین بسته است'
+                            : LeagueCountdownStore.instance.message),
+                      ));
+                      return;
+                    }
                     if (_selectedMode > 0 &&
                         ((_user?['current_points'] as num?)?.toInt() ?? 0) < _selectedMode) {
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -1154,6 +1173,15 @@ class _PrivateLobbyHubState extends State<_PrivateLobbyHub> {
   }
 
   void _createLobby() {
+    // لابیِ عمومی سهم دارد ⇒ سکه می‌دهد ⇒ تا شروعِ لیگ بسته است. (اتاقِ
+    // کددار که پایین‌تر ساخته می‌شود سهمِ صفر دارد و باز است.)
+    if (LeagueCountdownStore.instance.blocksOnline) {
+      final msg = LeagueCountdownStore.instance.message;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(msg.isEmpty ? 'تا شروعِ لیگ، ساختِ لابی بسته است' : msg),
+      ));
+      return;
+    }
     if (_stake > widget.currentPoints) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('برای این لابی حداقل ${faNum(_stake)} امتیاز لازم داری'),
@@ -1172,6 +1200,13 @@ class _PrivateLobbyHubState extends State<_PrivateLobbyHub> {
   }
 
   void _promptPasswordAndJoin(Map<String, dynamic> lobby) {
+    if (LeagueCountdownStore.instance.blocksOnline) {
+      final msg = LeagueCountdownStore.instance.message;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(msg.isEmpty ? 'تا شروعِ لیگ، این لابی بسته است' : msg),
+      ));
+      return;
+    }
     final hasPass = lobby['hasPassword'] == true;
     final lobbyId = lobby['lobbyId'] as String? ?? '';
     final stake = (lobby['stake'] as num?)?.toInt() ?? 100;

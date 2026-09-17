@@ -1,4 +1,6 @@
 const { pool } = require('../config/db');
+// شماره معکوس/شروعِ لیگ: «بدونِ ساختِ ادمین، هیچ لیگی در جریان نباشد.»
+const leagueCountdown = require('./leagueCountdown');
 const logger = require('../lib/logger');
 const walletService = require('./walletService');
 const { createNotification } = require('./notificationService');
@@ -276,6 +278,16 @@ async function repairSeasonBounds(client, season) {
 async function ensureActiveSeason(client = pool) {
   const { rows } = await client.query("SELECT * FROM league_seasons WHERE status='active' ORDER BY starts_at DESC LIMIT 1");
   if (rows[0]) return repairSeasonBounds(client, rows[0]);
+  // ── «هیچ لیگی بدونِ ساختِ ادمین در جریان نباشد» ─────────────────────────
+  //
+  // خواستهٔ مالک (۲۷ شهریور): «از این به بعد بدونِ ساختِ تنظیماتِ لیگ توسطِ
+  // ادمین هیچ لیگی نباید در جریان باشه.» تا امروز این تابع هر ماه یک فصلِ
+  // تازه می‌ساخت، پس هیچ‌وقت حالتِ «لیگی در جریان نیست» دیده نمی‌شد و
+  // شماره معکوسِ ادمین هم بی‌معنا بود (لیگ از قبل شروع شده بود).
+  //
+  // پیش‌فرضِ سوئیچ **خاموش** است؛ اگر روزی ادمین بخواهد رفتارِ قدیمی برگردد،
+  // از همان صفحهٔ «شماره معکوسِ لیگ» یک تیک دارد.
+  if (!leagueCountdown.cached().leagueAutostart) return null;
   const { start, end } = monthBounds();
   const my = currentMonthYear();
   const inserted = await client.query(
@@ -385,6 +397,22 @@ async function getLeaderboard(limit = 100, seasonId = null, userId = null) {
     season = activeSeasons[0] || (await ensureActiveSeason(pool));
   }
 
+  // ── هیچ لیگی در جریان نیست ───────────────────────────────────────────────
+  //
+  // با خاموش‌بودنِ «لیگِ خودکار»، این حالت **واقعاً** پیش می‌آید (پیش از این
+  // `ensureActiveSeason` همیشه یکی می‌ساخت و این خط هرگز اجرا نمی‌شد). کلاینت
+  // باید بتواند بدونِ خطا رندر کند: صفحهٔ لیگ در این حالت کارتِ شماره معکوس
+  // یا پیامِ «لیگ به‌زودی» را نشان می‌دهد.
+  if (!season) {
+    return {
+      season: null,
+      activeLeagues: [],
+      entries: [],
+      previousWinners: [],
+      myEntry: null,
+    };
+  }
+
   // برندگان دوره قبلی لیگ
   const { rows: prevWinners } = await pool.query(`
     SELECT p.rank, p.amount AS prize_amount, p.paid_at,
@@ -438,7 +466,7 @@ async function getLeaderboard(limit = 100, seasonId = null, userId = null) {
 
   return {
     season,
-    activeLeagues: activeSeasons.length ? activeSeasons : [season],
+    activeLeagues: activeSeasons.length ? activeSeasons : (season ? [season] : []),
     entries: rows,
     previousWinners: prevWinners,
     myEntry,
