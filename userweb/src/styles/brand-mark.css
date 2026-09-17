@@ -541,6 +541,15 @@
 
 .moreSheet {
   position: fixed; z-index: 42;
+  /* ⚠️ سقفِ ارتفاع + اسکرول: این شیت از پایین رشد می‌کند و ارتفاعش را
+     محتوا تعیین می‌کند. با ردیفِ «برنامه‌های پیشنهادی» به ۹ ردیف (~۵۱۰px)
+     رسید و روی گوشیِ کوتاه از بالا بیرون می‌زد — بدونِ اسکرول، ردیف‌های
+     اول دست‌نیافتنی بودند. همان باگی که در شیتِ اندروید رفع شده بود.
+     خطِ دوم برای مرورگرهای قدیمی‌ای است که `dvh` را نمی‌فهمند. */
+  max-height: 72vh;
+  max-height: min(72vh, calc(100dvh - 150px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
   left: 0; right: 0;
   bottom: calc(72px + env(safe-area-inset-bottom, 0px));
   margin-inline: 10px;

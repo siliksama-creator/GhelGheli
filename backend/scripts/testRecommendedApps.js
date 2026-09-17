@@ -280,6 +280,16 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
       ok(`${name}: متنِ فارسیِ خامِ بی‌ربط ندارد (پیامِ خطای فارسی دارد)`,
         /[\u0600-\u06FF]/.test(src));
     }
+    // ⚠️ ردیفِ تازه، شیتِ «بیشتر» را به ۹ ردیف رساند. این شیت از پایین رشد
+    //    می‌کند و سقفِ ارتفاع نداشت؛ روی گوشیِ کوتاه، ردیف‌های اول بیرون
+    //    می‌زدند و اسکرولی هم نبود. (آینهٔ همان رفعِ باگ در شیتِ اندروید.)
+    // بلوکِ قاعده را با indexOf جدا می‌کنیم، نه با سقفِ نویسه: کامنتِ
+    // توضیحیِ خودِ همین رفعِ باگ، بلوک را از هر سقفی طولانی‌تر می‌کرد.
+    const sheetFile = read('userweb/src/styles/brand-mark.css');
+    const sheetAt = sheetFile.indexOf('.moreSheet {');
+    const sheetCss = sheetAt < 0 ? '' : sheetFile.slice(sheetAt, sheetFile.indexOf('\n}', sheetAt) + 2);
+    ok('شیتِ «بیشتر» در وب سقفِ ارتفاع و اسکرول دارد (ردیفِ تازه بریده نشود)',
+      /max-height/.test(sheetCss) && /overflow-y:\s*auto/.test(sheetCss));
     ok('وب: برای «برنامه‌ای نیست» حالتِ خالی دارد (کادرِ سفیدِ بی‌توضیح نه)',
       /برنامه/.test(read('userweb/src/screens/RecommendedApps.jsx')));
     ok('اندروید: برای «برنامه‌ای نیست» حالتِ خالی دارد',
