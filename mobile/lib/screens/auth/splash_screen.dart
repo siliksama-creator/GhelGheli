@@ -712,26 +712,50 @@ class _ProgressBar extends StatelessWidget {
                       borderRadius: BorderRadius.circular(99),
                     ),
                   ),
-                  // پرکننده. عرض با عدد حساب می‌شود، نه با `Alignment`
-                  // تا به جهتِ چیدمان گره نخورد.
-                  Container(
-                    width: c.maxWidth * v,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [
-                          Color(0xFF00D49A), // زمرد — برند
-                          Color(0xFF9BE86B), // لیمویی — رنگِ خودِ قلقلی
-                          Color(0xFFFFC94D), // طلایی — جایزه
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(99),
-                      boxShadow: [
-                        BoxShadow(
-                          color: BrandColors.emerald.withValues(alpha: 0.30),
-                          blurRadius: 10,
-                          spreadRadius: -1,
+                  // ── پرکننده ──
+                  //
+                  // دو نکتهٔ ظاهری که با چشم روی سایتِ زنده پیدا شدند:
+                  //
+                  //   ۱. **جهتِ گرادیان باید راست‌به‌چپ باشد.** نوار داخلِ
+                  //      یک `Directionality.rtl` از سمتِ راست پر می‌شود، و
+                  //      گرادیانِ پیش‌فرض (`centerLeft → centerRight`) رنگِ
+                  //      طلایی را دقیقاً روی همان لبه‌ای می‌گذاشت که نوار از
+                  //      آن شروع می‌شود. یعنی کاربر در ۵٪ اول **طلا** می‌دید:
+                  //      رنگِ جایزه، پیش از به‌دست‌آوردنش.
+                  //   ۲. **گرادیان باید به عرضِ ریل کشیده شود و بعد بریده
+                  //      شود**، نه به عرضِ خودِ نوارِ پر. نسخهٔ اول گرادیان را
+                  //      در عرضِ نوار می‌کشید، پس در هر درصدی هر سه رنگ فشرده
+                  //      و حاضر بودند. حالا در ۵٪ فقط زمرد دیده می‌شود و
+                  //      طلایی به‌عنوانِ پاداشِ رسیدن به ۱۰۰٪ ظاهر می‌شود.
+                  ClipRect(
+                    child: Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      widthFactor: v,
+                      child: SizedBox(
+                        width: c.maxWidth,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              begin: Alignment.centerRight,
+                              end: Alignment.centerLeft,
+                              colors: [
+                                Color(0xFF00D49A), // زمرد — برند
+                                Color(0xFF9BE86B), // لیمویی — خودِ قلقلی
+                                Color(0xFFFFC94D), // طلایی — جایزه
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(99),
+                            boxShadow: [
+                              BoxShadow(
+                                color:
+                                    BrandColors.emerald.withValues(alpha: 0.30),
+                                blurRadius: 10,
+                                spreadRadius: -1,
+                              ),
+                            ],
+                          ),
                         ),
-                      ],
+                      ),
                     ),
                   ),
                   // درخششِ پایان — یک برقِ کوتاه روی کلِ نوار وقتی
