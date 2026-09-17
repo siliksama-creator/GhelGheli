@@ -26,6 +26,13 @@ userweb/dist/
 **/key.properties
 __pycache__/
 
+# حالتِ اجراییِ خودکارِ ظرفیت — روی سرور نوشته می‌شود، در گیت جایی ندارد.
+# چرا در gitignore است و نه فقط بی‌تعقیب: deploy.sh بعد از reset --hard یک
+# `git clean -fd` می‌زند و فایل‌های بی‌تعقیبِ *نادیده‌گرفته‌نشده* را پاک
+# می‌کند. بدونِ این خط، هر انتشار «حافظهٔ ظرفیت» را پاک می‌کرد و اجرای بعدیِ
+# تایمر دوباره از صفر تصمیم می‌گرفت (و nginx را بی‌دلیل بازنویسی می‌کرد).
+backend/.capacity-state.json
+
 # env variants — local/staging/production configs live on the VPS, not in git
 .env.*
 !.env.example
