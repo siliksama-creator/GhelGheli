@@ -73,10 +73,15 @@ module.exports = function createRecommendedAppsRoutes(deps) {
       } catch (e) { fail(res, e); }
     }));
 
+  // ⚠️ شناسهٔ ردیف **UUID** است؛ `Number(req.params.id)` یعنی `NaN` و
+  //    یعنی هر ویرایش/حذف/جابه‌جاییِ پنل بی‌صدا از کار می‌افتد. این باگِ
+  //    نسخهٔ اولِ همین فایل بود (یادگارِ زمانی که جدول SERIAL بود) و
+  //    آزمونِ زندهٔ تولید گرفتش؛ گاردِ `testRecommendedApps.js` حالا قفلش
+  //    می‌کند.
   router.put('/admin/recommended-apps/:id', adminAuth, validateUuid('id'), requireRole(),
     asyncHandler(async (req, res) => {
       try {
-        const item = await service.update(Number(req.params.id), req.body || {}, req.admin.id);
+        const item = await service.update(req.params.id, req.body || {}, req.admin.id);
         await audit(req.admin.id, 'update_recommended_app', 'recommended_apps', item.id,
           'ویرایشِ برنامهٔ پیشنهادی', { title: item.title, isActive: item.isActive });
         res.json({ item });
@@ -86,7 +91,7 @@ module.exports = function createRecommendedAppsRoutes(deps) {
   router.delete('/admin/recommended-apps/:id', adminAuth, validateUuid('id'), requireRole(),
     asyncHandler(async (req, res) => {
       try {
-        const out = await service.remove(Number(req.params.id));
+        const out = await service.remove(req.params.id);
         await audit(req.admin.id, 'delete_recommended_app', 'recommended_apps', out.id,
           'حذفِ برنامهٔ پیشنهادی', null);
         res.json({ removed: out.id });
@@ -97,8 +102,8 @@ module.exports = function createRecommendedAppsRoutes(deps) {
   router.post('/admin/recommended-apps/:id/move', adminAuth, validateUuid('id'), requireRole(),
     asyncHandler(async (req, res) => {
       try {
-        const out = await service.move(Number(req.params.id), req.body?.direction);
-        await audit(req.admin.id, 'move_recommended_app', 'recommended_apps', Number(req.params.id),
+        const out = await service.move(req.params.id, req.body?.direction);
+        await audit(req.admin.id, 'move_recommended_app', 'recommended_apps', req.params.id,
           'جابه‌جاییِ ترتیبِ برنامهٔ پیشنهادی', { direction: req.body?.direction, moved: out.moved });
         res.json(out);
       } catch (e) { fail(res, e); }

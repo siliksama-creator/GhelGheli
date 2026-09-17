@@ -248,6 +248,16 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
       (routeSrc.match(/await audit\(/g) || []).length === 5, String((routeSrc.match(/await audit\(/g) || []).length));
     ok('سقفِ تعدادِ برنامه‌ها وجود دارد (خاموشی/فهرستِ بی‌نهایت)',
       /MAX_ITEMS/.test(read('backend/src/services/recommendedApps.js')) && /حداکثر/.test(read('backend/src/services/recommendedApps.js')));
+    // ⚠️ سه باگِ واقعی که آزمونِ زندهٔ تولید گرفت و اکنون قفل می‌شوند:
+    //    شناسهٔ UUID که به عدد تبدیل می‌شد (`Number(req.params.id)` ⇒ NaN)،
+    //    و شکلِ پاسخِ مسیرها که باید پایدار بماند تا پنل و آزمون‌ها به آن
+    //    تکیه کنند.
+    ok('مسیرها شناسهٔ UUID را به عدد تبدیل نمی‌کنند (باگی که فقط در تولید پیدا شد)',
+      !/Number\(req\.params\.id\)/.test(stripComments(routeSrc)));
+    ok('پاسخِ ساخت/ویرایش `{item}` و پاسخِ حذف `{removed}` است (قراردادِ پایدار)',
+      /res\.status\(201\)\.json\(\{ item \}\)/.test(routeSrc)
+      && /res\.json\(\{ item \}\)/.test(routeSrc)
+      && /res\.json\(\{ removed: out\.id \}\)/.test(routeSrc));
     ok('شمارشِ کل و LIMIT/OFFSET با پارامتر می‌روند (بدونِ رشته‌سازیِ کوئری)',
       /LIMIT \$1 OFFSET \$2/.test(read('backend/src/services/recommendedApps.js')));
   }
