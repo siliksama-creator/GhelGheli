@@ -355,6 +355,21 @@ const asyncHandler = fn => (req, res, next) => Promise.resolve(fn(req, res, next
 // توکنِ **ادمین** عمداً ۱۲ ساعته ماند: پنلِ مدیریت دسترسیِ پول و کاربران را
 // دارد و اگر گوشیِ یک ادمین گم شود، جلسهٔ همیشه‌به‌همراهش فاجعه است.
 const USER_TOKEN_TTL = process.env.JWT_EXPIRES_IN || '3650d';
+// ⚠️ هشدارِ راه‌اندازی — این یکی از تله‌های واقعیِ همین تغییر بود: کدِ پیش‌فرض
+// ۱۰ سال است، ولی `.env` سرور `JWT_EXPIRES_IN=30d` داشت و بی‌صدا خواستهٔ مالک
+// («همیشگی») را بی‌اثر می‌کرد؛ فقط چون هنگامِ تست، عمرِ توکن را از خودِ پاسخِ
+// ورود اندازه گرفتیم معلوم شد. پس اگر مقدارِ env کوتاه باشد، همین اولِ کار
+// در لاگ اعلام می‌شود تا دوباره پنهان نماند.
+(() => {
+  const ttl = String(process.env.JWT_EXPIRES_IN || '').trim();
+  if (!ttl) return; // خالی ⇒ پیش‌فرضِ خودمان ۱۰ سال است، حرفی نیست
+  const asYears = /^(\d+)\s*y$/i.exec(ttl);
+  const asDays = /^(\d+)\s*d$/i.exec(ttl);
+  const longEnough = (!!asYears && Number(asYears[1]) >= 1) || (!!asDays && Number(asDays[1]) >= 365);
+  if (!longEnough) {
+    console.warn(`[auth] ⚠️ JWT_EXPIRES_IN=${ttl} → جلسهٔ کاربران کوتاه است (خواستهٔ مالک: همیشگی). مقدارِ درست: 3650d`);
+  }
+})();
 const signUser = user => jwt.sign(
   { sub: user.id, type: 'user', tv: Number(user.session_epoch || 0) },
   JWT_SECRET,

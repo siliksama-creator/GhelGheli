@@ -121,6 +121,14 @@ console.log('\n══ ۵) دیتابیس: ستونِ مهر وجود دارد و
 {
   ok('migration 092 ستون را با پیش‌فرضِ ۰ می‌سازد',
     /ALTER TABLE users ADD COLUMN IF NOT EXISTS session_epoch INTEGER NOT NULL DEFAULT 0/.test(migration));
+  // ⚠️ دو نگهبانِ عملیاتی: کدِ پیش‌فرض کافی نیست، چون `.env` سرور آن را
+  // بازنویسی می‌کند. یک‌بار همین اتفاق افتاد (env=۳۰d و کد=۱۰ سال) و
+  // هیچ‌کس نفهمید. این دو بررسی نمی‌گذارند آن نگهبان‌ها حذف شوند.
+  const deploySrc = fs.readFileSync(path.join(__dirname, '..', '..', 'scripts', 'deploy.sh'), 'utf8');
+  ok('دیپلوی، مقدارِ کوتاهِ JWT_EXPIRES_IN را هشدار می‌دهد',
+    /JWT_EXPIRES_IN=\$TTL_VALUE|JWT_EXPIRES_IN=%s/.test(deploySrc) && /TTL_DAYS/.test(deploySrc));
+  ok('خودِ سرور هم هنگامِ بالا آمدن دربارهٔ مقدارِ کوتاه هشدار می‌دهد',
+    /JWT_EXPIRES_IN=\$\{ttl\} → جلسهٔ کاربران کوتاه است/.test(serverSrc));
   ok('migration توضیحِ «چرا» را دارد (نه فقط SQL)',
     migration.includes('کلیدِ خاموش') || migration.includes('خاموش'));
   // ⚠️ تلهٔ سفارشِ مایگریشن‌ها: شماره باید یکتا باشد وگرنه `migrate.js`

@@ -124,6 +124,24 @@ if [ "$HEALTHY" -ne 1 ]; then
   die "Deploy rolled back. Check the $SERVICE_USER PM2 logs for $PM2_APP"
 fi
 
+log "Checking user session TTL (جلسهٔ همیشگی)"
+# ⚠️ چرا این بررسی لازم است: خواستهٔ مالک «همیشگی» است و در *کد* پیش‌فرضِ
+# توکنِ کاربر ۱۰ سال است — ولی سرور یک `.env` جدا دارد که همان مقدار را
+# بازنویسی می‌کند. یک‌بار همین اتفاق افتاد (env روی ۳۰d مانده بود) و هیچ
+# چیزی هم هشدار نداد. این بررسی آن حالت را پرصدا می‌کند.
+ENV_FILE="$APP_DIR/backend/.env"
+if [ -f "$ENV_FILE" ]; then
+  TTL_VALUE=$(grep -E '^JWT_EXPIRES_IN=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"'\'' ')
+  TTL_DAYS=$(printf '%s' "$TTL_VALUE" | sed -n 's/^\([0-9]\+\)d$/\1/p')
+  case "$TTL_VALUE" in
+    "") : ;;   # خالی ⇒ پیش‌فرضِ کد (۱۰ سال) اعمال می‌شود
+    *y) : ;;   # بر حسبِ سال ⇒ کوتاه نیست
+    *) if [ -z "$TTL_DAYS" ] || [ "$TTL_DAYS" -lt 365 ]; then
+         printf '  \033[1;33mهشدار: JWT_EXPIRES_IN=%s → جلسهٔ کاربران کوتاه است (درست: 3650d)\033[0m\n' "$TTL_VALUE" >&2
+       fi ;;
+  esac
+fi
+
 log "Installing nginx snippets (rate limit)"
 # ═══════════════════════════════════════════════════════════════════════════
 # سقفِ درخواستِ عمومی — خواستهٔ مالک (۲۶ شهریور): «۳۰ درخواست در ثانیه از هر
