@@ -73,8 +73,16 @@ function app(name, port, role) {
     // موقتاً ۲۵۰-۳۰۰ مگ به RSS اضافه کند و ری‌استارتِ وسطِ موج، مسابقهٔ
     // در جریان را می‌کشد.
     max_memory_restart: `${cap.memRestartMB}M`,
+    // ⚠️ `node_args` تنها **کافی نیست**: روی سرورِ تولید دیدیم پنلِ PM2 مقدار
+    // `node_args=['--max-old-space-size=923']` را نشان می‌داد ولی پروسهٔ واقعی
+    // بدونِ آن فلگ بالا آمده بود (`/proc/<pid>/cmdline` فقط `node src/server.js`
+    // بود) — یعنی V8 با سقفِ پیش‌فرضِ خودش اجرا می‌شد و به‌جای GCِ به‌موقع،
+    // اول به سقفِ ری‌استارتِ PM2 می‌خورد و وسطِ کار ری‌استارت می‌شد.
+    // `NODE_OPTIONS` را Node خودش همیشه می‌خواند و PM2 هم در fork/cluster
+    // پاسش می‌دهد؛ هر دو را می‌فرستیم تا روی هر نسخهٔ PM2 درست بماند.
     node_args: `--max-old-space-size=${cap.heapMB}`,
     env: {
+      NODE_OPTIONS: `--max-old-space-size=${cap.heapMB}`,
       NODE_ENV: 'production',
       PORT: String(port),
       PROCESS_ROLE: role,

@@ -1,5 +1,6 @@
 require('dotenv').config();
 // رمزگذاریِ فیلدهای مالی (کارت/شبا/حساب قدیمی).
+const v8 = require('v8');
 const fieldCrypto = require('./lib/fieldCrypto');
 const express = require('express');
 const http = require('http');
@@ -670,7 +671,28 @@ app.get('/health', (req, res) => {
       vision: cap.vision,
       uv: cap.uv,
       poolMax: cap.poolMax,
+      // بودجهٔ رم: این سه عدد نشان می‌دهند پروسه «چقدر جا دارد». تا امروز
+      // `heapMB` فقط داخلِ کد بود و کسی از بیرون نمی‌توانست ببیند واقعاً
+      // اعمال شده یا نه — که نشده بود (پایین را ببینید).
+      reserveMB: cap.reserveMB,
+      memForAppMB: cap.memForAppMB,
+      heapMB: cap.heapMB,
+      memRestartMB: cap.memRestartMB,
       forced: cap.forced || undefined,
+    },
+    // ── اثباتِ سقفِ heap ────────────────────────────────────────────────
+    // چرا این‌جاست: `ecosystem.config.cjs` مدتی `node_args:
+    // --max-old-space-size=…` می‌داد و پنلِ PM2 هم همان را نشان می‌داد، ولی
+    // پروسهٔ واقعی **بدونِ آن فلگ** بالا می‌آمد (PM2 7 در حالتِ fork آن را
+    // پاس نمی‌داد). یعنی سقفِ حافظه فقط روی کاغذ وجود داشت و V8 تا سقفِ
+    // پیش‌فرض (چند گیگ) رشد می‌کرد؛ در نتیجه به‌جای GCِ به‌موقع، پروسه به
+    // سقفِ ری‌استارتِ PM2 می‌خورد و **وسطِ کار** ری‌استارت می‌شد.
+    // حالا `NODE_OPTIONS` هم ست می‌شود و این دو عدد از داخلِ خودِ پروسه
+    // خوانده می‌شوند؛ اگر روزی باز خراب شود، همین‌جا معلوم است.
+    runtime: {
+      node: process.version,
+      execArgv: process.execArgv,
+      v8HeapLimitMB: Math.round(v8.getHeapStatistics().heap_size_limit / 1048576),
     },
     // صفِ کارِ سنگین: اگر `queued` پیوسته بالا بماند یعنی سرور به سقف رسیده
     // و وقتِ ارتقا/افزودنِ هسته است (نقطهٔ تصمیمِ عینی، نه حدس).
