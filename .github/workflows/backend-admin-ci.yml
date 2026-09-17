@@ -10,6 +10,11 @@ on:
       - 'backend/**'
       - 'admin/**'
       - 'userweb/**'
+      # اسکریپت‌های عملیاتی (deploy، بکاپ، ظرفیت) — چون همین job حالا
+      # `bash -n` و آزمونِ ایزولهٔ آن‌ها را اجرا می‌کند، تغییرشان هم باید
+      # CI را راه بیندازد؛ وگرنه آزمون‌ها بی‌سروصدا از تغییر عقب می‌مانند.
+      - 'scripts/**'
+      - 'deploy/**'
       - '.github/workflows/backend-admin-ci.yml'
   pull_request:
   workflow_dispatch:
