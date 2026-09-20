@@ -20,6 +20,8 @@
  * فقط به منطقِ خالص تکیه می‌کنند).
  */
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
 const duel = require('../src/services/cardDuelService');
 const rules = require('../src/games/rules/cardDuel');
 
@@ -204,6 +206,86 @@ async function main() {
   assert.strictEqual(defs.duelMayhemStage.min, 0);
   assert.strictEqual(defs.duelMayhemStage.max, 3);
   ok(true, 'duelMayhemStage با بازهٔ [0, 3] در RULE_DEFS ثبت است (پنل و /api/config می‌شناسند)');
+
+  // ── ۸) کلیدِ پنل: «پیدا نشد» دیگر تکرار نشود ───────────────────────────
+  //
+  // خواستهٔ مالک (۲۹ شهریور): «۲ تا مود ساخته شده؛ یکیش باید دستی از پنل
+  // ادمین فعال شه — هرچی گشتم پیدا نکردم. پیدا کن و یک جای توچشم بگذار.»
+  //
+  // این بخش همان خواسته را به گاردِ دائمی تبدیل می‌کند: کلید همیشه باید
+  // *دیده‌شدنی* بماند — یک ردیفِ NAV، یک صفحهٔ اختصاصی، یک کارتِ داشبورد،
+  // و یک نقطهٔ نوشتن. اگر روزی کسی صفحه را از NAV بردارد یا کارتِ داشبورد
+  // را جابه‌جا کند، این تست قرمز می‌شود، نه چشمِ مالک.
+  console.log('\n== ۸. کلیدِ مودِ دوم در پنل: پیدا و تو‌چشم ==');
+  const readAdmin = (rel) => fs.readFileSync(path.join(__dirname, '../../admin/src', rel), 'utf8');
+  const adminMain = readAdmin('main.jsx');
+  const panelPage = readAdmin('pages/duel-modes.jsx');
+  const control = readAdmin('components/mayhem-control.jsx');
+  const dashboard = readAdmin('pages/dashboard.jsx');
+  const liveCopy = readAdmin('pages/live-copy.jsx');
+  const rolesFile = readAdmin('lib/roles.js');
+  const routes = fs.readFileSync(path.join(__dirname, '../src/routes/clientConfig.js'), 'utf8');
+
+  // ۸٫۱ ردیفِ NAV در گروهِ «بازی‌ها» — جایی که مدیر دنبال بازی می‌گردد.
+  const navRow = /\['duel-modes',\s*'مود دوئل کارت'[\s\S]{0,220}?'games'\],/.test(adminMain);
+  ok(navRow, 'ردیفِ NAV «مود دوئل کارت» در گروهِ «بازی‌ها» هست (تو‌چشمِ منو)');
+  ok(/lazy\(\(\) => import\('\.\/pages\/duel-modes\.jsx'\)/.test(adminMain),
+    'صفحهٔ اختصاصیِ کلید در پنل ثبت (lazy) شده است');
+
+  // ۸٫۲ صفحه و کارتِ مشترک: پلکانِ چهارپله‌ای و وضعیتِ خوانا.
+  ok(/<MayhemControl/.test(panelPage), 'صفحهٔ «مود دوئل کارت» همان کارتِ مشترک را می‌سازد');
+  const stageValues = [...control.matchAll(/value:\s*([0-3]),\n\s*label:/g)].map(m => Number(m[1]));
+  assert.deepStrictEqual(stageValues, [0, 1, 2, 3],
+    'پلکانِ مرحله‌ها ۰..۳ است (هم‌ترازِ mayhemGateFor)');
+  ok(/data-mayhem-stage=\{s\.value\}/.test(control), 'هر مرحله دکمهٔ انتخابِ خودش را دارد (data-mayhem-stage)');
+  ok(/تمرین با ربات/.test(control) && /بدونِ سهام/.test(control) && /همه‌جا/.test(control),
+    'متنِ مرحله‌ها می‌گوید هر پله «چه کسی چه چیزی می‌بیند»');
+  // «یک منبعِ واحد» یعنی جملهٔ وضعیت فقط یک‌جا نوشته شده: اگر داشبورد یا صفحه
+  // نسخهٔ دومِ متن را بسازد، دیر یا زود دو جای پنل دو چیزِ متفاوت می‌گویند.
+  ok(/function mayhemSentence/.test(control)
+    && (control.match(/function mayhemSentence/g) || []).length === 1
+    && !/خاموش است: همهٔ نبردها/.test(dashboard)
+    && !/خاموش است: همهٔ نبردها/.test(panelPage),
+    'جملهٔ وضعیت یک منبعِ واحد دارد (داشبورد و صفحه فقط همان کارت را سوار می‌کنند)');
+
+  // ۸٫۳ یک نقطهٔ نوشتن: همان دو عدد، همان مسیرِ بک‌اند (بدونِ تایپوی آدرس).
+  ok(/duelMayhem:\s*Number\(nextFlag\)/.test(control) && /duelMayhemStage:\s*Number\(nextStage\)/.test(control),
+    'کارتِ پنل دقیقاً همان دو کلیدِ سرور را می‌نویسد: duelMayhem و duelMayhemStage');
+  ok(/live-content\/rules'/.test(control.replace('MAYHEM_RULES_PATCH = ', 'MAYHEM_RULES_PATCH = ')),
+    'نوشتن از مسیرِ رسمیِ قوانینِ زنده انجام می‌شود');
+  const patchPath = '/admin/settings/live-content/rules';
+  ok(routes.includes(patchPath) && control.includes(patchPath),
+    'مسیرِ PATCH در پنل و بک‌اند حرف‌به‌حرف یکی است');
+  ok(/save\(0,\s*Number\(stage\)\)/.test(control) && /خاموشش کن \(بازگشتِ فوری\)/.test(control),
+    'خاموشیِ فوری (برگشتِ اضطراری) با یک دکمه در دسترس است');
+
+  // ۸٫۴ روشن‌کردن با کلید، مرحله را صفر نمی‌گذارد (وگرنه «روشن» بی‌اثر است).
+  ok(/const nextStage = Number\(stage\) >= 1 \? Number\(stage\) : 1;/.test(control),
+    'دکمهٔ «روشنش کن» مرحلهٔ صفر را به ۱ (فقط تمرین) می‌برد — روشن‌شدنِ بی‌اثر نمی‌ماند');
+
+  // ۸٫۵ اولین کارتِ داشبورد: بدونِ گشتن دیده می‌شود.
+  // لنگر از «return»یِ حالتِ داده‌دار گرفته می‌شود؛ وگرنه اسکلتونِ بارگذاری
+  // (که خودش یک card-grid دارد) مقایسه را بی‌معنا می‌کرد.
+  const dashAnchor = dashboard.indexOf("style={{ display: 'grid', gap: 20 }}");
+  const dashControlAt = dashboard.indexOf('<MayhemControl', dashAnchor);
+  const dashGridAt = dashboard.indexOf('className="card-grid"', dashAnchor);
+  ok(dashControlAt > 0 && dashGridAt > 0 && dashControlAt < dashGridAt,
+    'کارتِ کلید در داشبورد، *بالاتر* از کارت‌های آماری است (اولین چیزِ چشم)');
+  ok(/compact/.test(dashboard.slice(dashControlAt, dashControlAt + 80)),
+    'نسخهٔ داشبورد فشرده است (وضعیت + دکمهٔ روشن/خاموش + لینکِ تنظیمِ کامل)');
+
+  // ۸٫۶ دیگر دو جای ناهم‌خوان: عددهای خام از فهرستِ «متن‌های زنده» برداشته شدند.
+  ok(/RULES_MOVED_TO_DUEL_PAGE = new Set\(\['duelMayhem', 'duelMayhemStage'\]\)/.test(liveCopy),
+    'در صفحهٔ «متن‌های زنده» این دو عدد از فهرستِ خام کنار گذاشته شده‌اند');
+  ok(/filter\(\(\[name\]\) => !RULES_MOVED_TO_DUEL_PAGE\.has\(name\)\)/.test(liveCopy),
+    'فهرستِ خام واقعاً فیلتر می‌شود (نه فقط کامنت)');
+  ok(/'duel-modes'/.test(rolesFile), 'صفحهٔ کلید در فهرستِ صفحه‌های فقط‌مدیرکل است (هم‌ترازِ requireRole بک‌اند)');
+
+  // ۸٫۷ دو مود، هم‌روایت با اپ: صفحه هر دو مود را با زبانِ کاربر توضیح می‌دهد.
+  ok(/دوئل کلاسیک/.test(panelPage) && /دوئل طوفان/.test(panelPage),
+    'صفحه هر دو مود را نام می‌برد (کلاسیک + طوفان)');
+  ok(/time-out|وقت اضافه/.test(panelPage) && /دو‌امتیازی/.test(panelPage),
+    'قاعدهٔ راندِ دو‌امتیازی و وقت اضافه در توضیحِ پنل آمده است');
 
   console.log(`\n✅ ${pass} نگهبانِ دوئل طوفان موفق بود`);
 }

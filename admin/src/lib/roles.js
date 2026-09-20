@@ -23,7 +23,11 @@ const OBSERVER_PAGES = new Set(['dashboard', 'support']);
 // «شماره معکوسِ لیگ» هم فقط مدیرکل: یک کلیک در آن دسترسیِ همهٔ کاربران به
 // بازیِ سکه‌ای را می‌بندد و متنش در اپ و وبِ همه دیده می‌شود؛ هم‌تراز با
 // بک‌اند که مسیرهای نوشتنش `requireRole()` (فقط super_admin) دارند.
-const SUPER_ONLY_PAGES = new Set(['admins', 'cloudflare', 'recommended-apps', 'league-countdown']);
+// «مود دوئل کارت» هم فقط مدیرکل: مسیر نوشتنش (`PATCH .../live-content/rules`)
+// در بک‌اند `requireRole()` بدونِ آرگومان است — یعنی فقط super_admin. اگر
+// این صفحه برای نقشِ support دیده شود، دکمه‌اش ۴۰۳ می‌دهد و همان تجربهٔ بدی
+// می‌شود که این فایل برای جلوگیری از آن نوشته شده است.
+const SUPER_ONLY_PAGES = new Set(['admins', 'cloudflare', 'recommended-apps', 'league-countdown', 'duel-modes']);
 
 /** آیا این نقش اجازهٔ دیدنِ این صفحه (کلید NAV) را دارد؟ */
 export function canSeePage(role, pageKey) {

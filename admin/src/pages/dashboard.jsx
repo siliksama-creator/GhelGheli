@@ -4,7 +4,8 @@ import {
   UserPlus, Users, Wallet, Coins, CircleDot,
 } from 'lucide-react';
 import { fmtNumber } from '../lib/api.js';
-import { Card, Skeleton } from '../components/ui.jsx';
+import { Badge, Card, Skeleton } from '../components/ui.jsx';
+import { MayhemControl } from '../components/mayhem-control.jsx';
 import { RankList } from '../components/rank-list.jsx';
 
 /**
@@ -86,6 +87,19 @@ export function Dashboard({ request, onNavigate }) {
 
   return (
     <div style={{ display: 'grid', gap: 20 }}>
+      {/* ── کلیدِ مودِ دوئل کارت — اولین کارتِ داشبورد ────────────────────
+          خواستهٔ مالک: کلیدِ مودِ دومِ دوئل کارت («دوئل طوفان») در پنل پیدا
+          نمی‌شد. حالا وضعیتش همان لحظهٔ ورود دیده می‌شود و با یک دکمه
+          روشن/خاموش می‌شود؛ صفحهٔ «مود دوئل کارت» هم پلکانِ مرحله‌ها و
+          برگشتِ اضطراری را دارد. */}
+      <Card
+        title="مودِ دوئل کارت‌ها"
+        subtitle="دو مود دارد: «کلاسیک» همیشه روشن است و «دوئل طوفان» با همین کلید روشن می‌شود — بدونِ انتشار نسخهٔ تازه."
+        action={<Badge tone="info">کلیدِ دستی</Badge>}
+      >
+        <MayhemControl request={request} compact onNavigate={onNavigate} />
+      </Card>
+
       <div className="card-grid">
         {overview.map(([label, value, Icon, page]) => (
           <Card

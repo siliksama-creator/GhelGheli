@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, Suspense, lazy, Component } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BarChart3, Bell, BookText, Coins, Gift, MessageCircle, LifeBuoy, ScanLine, Settings, Shield, ShieldCheck, Sigma, Timer, Trophy, Users, Gamepad2, Wallet, Activity, CircleDot, Package, Store, Layers, Target, SlidersHorizontal, Megaphone, Smartphone } from 'lucide-react';
+import {
+  Activity, BarChart3, Bell, BookText, CircleDot, Coins, Gamepad2, Gift, Layers, LifeBuoy, Megaphone, MessageCircle, Package, ScanLine, Settings, Shield, ShieldCheck, Sigma, SlidersHorizontal, Smartphone, Store, Swords, Target, Timer, Trophy, Users, Wallet,
+} from 'lucide-react';
 
 import './theme.css';
 import './styles.css';
@@ -36,6 +38,11 @@ const ChatModerationPage = lazy(() => import('./pages/chat-moderation.jsx').then
 const SupportPage = lazy(() => import('./pages/support.jsx').then(m => ({ default: m.SupportPage })));
 const NotificationsPage = lazy(() => import('./pages/notifications.jsx').then(m => ({ default: m.NotificationsPage })));
 const GameRewardsPage = lazy(() => import('./pages/game-rewards.jsx').then(m => ({ default: m.GameRewardsPage })));
+// ── «مود دوئل کارت» — کلیدِ دستیِ مودِ دومِ دوئل ────────────────────────
+// خواستهٔ مالک: «۲ تا مود ساخته شده؛ یکیش باید دستی از پنل فعال شه.»
+// پس صفحهٔ اختصاصی شد تا کلیدِ `duelMayhem` از فهرستِ خامِ عددها بیرون
+// بیاید و در NAV هم دیده شود.
+const DuelModesPage = lazy(() => import('./pages/duel-modes.jsx').then(m => ({ default: m.DuelModesPage })));
 const GameEconomyPage = lazy(() => import('./pages/game-economy.jsx').then(m => ({ default: m.GameEconomyPage })));
 const WheelPage = lazy(() => import('./pages/wheel.jsx').then(m => ({ default: m.WheelAdminPage })));
 const CardBoxPage = lazy(() => import('./pages/card-box.jsx').then(m => ({ default: m.CardBoxAdminPage })));
@@ -170,6 +177,17 @@ const NAV = [
   ['league', 'لیگ ماهانه', Trophy, LeaguePage,
     'لیگ ماهانه: شروع و پایان فصل، جوایز نفرات برتر و تاریخچهٔ پرداخت‌ها.',
     'rewards'],
+  // ── «مود دوئل کارت» — اولین ردیفِ گروهِ بازی‌ها ───────────────────────
+  //
+  // خواستهٔ مالک: «۲ تا مود ساخته شده؛ یکیش باید دستی از پنل فعال شه،
+  // هرچی گشتم پیداش نکردم — یه جای توچشم قرارش بده.» کلیدِ آن مود
+  // («دوئل طوفان») دو عددِ زندهٔ `duelMayhem` و `duelMayhemStage` است؛
+  // پیش‌تر فقط وسطِ فهرستِ خامِ عددها بود. حالا صفحهٔ خودش را دارد و
+  // در NAV هم زیرِ «بازی‌ها» می‌آید — همان گروهی که مدیر برای بازی‌ها
+  // می‌رود. کامپوننتِ مشترکش در داشبورد هم سوار است.
+  ['duel-modes', 'مود دوئل کارت', Swords, DuelModesPage,
+    'دو مودِ دوئل کارت: «کلاسیک» همیشه روشن است و «دوئل طوفان» با کلیدِ همین صفحه روشن می‌شود — بدونِ انتشار نسخهٔ تازه.',
+    'games'],
   ['game-rewards', 'امتیاز بازی', Gamepad2, GameRewardsPage,
     'امتیازِ هر بازی و ضریب‌های جایزه — عددها مستقیم به سرور می‌روند.',
     'games'],

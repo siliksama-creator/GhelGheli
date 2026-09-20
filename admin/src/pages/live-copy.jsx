@@ -96,7 +96,15 @@ function isSections(key, value) {
     && value.every((it) => it && typeof it === 'object' && !Array.isArray(it));
 }
 
-export function LiveCopyPage({ request }) {
+// ── دو عددی که از این فهرست بیرون رفتند ─────────────────────────────────
+// `duelMayhem` و `duelMayhemStage` کلیدِ مودِ دومِ دوئل کارت‌اند، نه
+// «عددِ متن». تا امروز اینجا به‌شکلِ دو فیلدِ خام بینِ ده‌ها عدد دیگر
+// بودند و مالک پیدایشان نمی‌کرد. حالا کارتِ اختصاصیِ خودشان را دارند
+// (صفحهٔ «مود دوئل کارت» + خلاصه‌اش در داشبورد) و اینجا فقط یک خطِ
+// راهنما می‌ماند تا کسی دنبالشان نگردد.
+const RULES_MOVED_TO_DUEL_PAGE = new Set(['duelMayhem', 'duelMayhemStage']);
+
+export function LiveCopyPage({ request, onNavigate }) {
   const notify = useToast();
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState('');
@@ -316,8 +324,25 @@ export function LiveCopyPage({ request }) {
         title="عددهایی که در متن نوشته می‌شوند"
         subtitle="این‌ها در اپ «خوانده» می‌شوند و هم‌زمان در بازی «کار» می‌کنند؛ پس بازه‌شان بسته است و بیرونِ بازه ذخیره نمی‌شود."
       >
+        <p style={{ margin: '0 0 10px', fontSize: 13, lineHeight: 1.9, opacity: .85 }}>
+          دو کلیدِ «دوئل طوفان» از این فهرست برداشته شدند: آن‌ها «عددِ متن»
+          نیستند، کلیدِ روشن‌کردنِ مودِ دومِ دوئل کارت‌اند و کارتِ اختصاصیِ
+          خودشان را دارند.
+          {onNavigate && (
+            <>
+              {' '}
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => onNavigate('duel-modes')}
+              >
+                برو به «مود دوئل کارت»
+              </button>
+            </>
+          )}
+        </p>
         <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
-          {Object.entries(rules.defs).map(([name, def]) => {
+          {Object.entries(rules.defs).filter(([name]) => !RULES_MOVED_TO_DUEL_PAGE.has(name)).map(([name, def]) => {
             const cur = ruleEdits[name] ?? rules.values[name] ?? def.value;
             return (
               <Field key={name} label={def.label} hint={`${def.hint}${proMode ? ` — ${name}` : ''}`}>
