@@ -17,6 +17,7 @@ import { play as playSfx } from '../gameAudio.js';
 import { heavyImpact } from '../haptics.js';
 import { SvgIcon, AssetIcon } from '../components/IconAsset.jsx';
 import { GrantChestOpener } from '../components/CardBoxReveal.jsx';
+import { celebrateReward } from '../lib/rewards.js';
 
 const fa = n => new Intl.NumberFormat('fa-IR').format(Number(n || 0));
 
@@ -198,6 +199,14 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
         playSfx(res.prize.kind === 'cash' ? 'win' : 'match_found');
         heavyImpact();
         setSpinning(false);
+        // جشنِ گردونه: برچسبِ جایزه از سرور می‌آید («۱۰۰ امتیاز»،
+        // «۵۰٬۰۰۰ تومان») و خودش رقمِ فارسی دارد؛ پس همان را نشان می‌دهیم و
+        // عدد را از نو قالب نمی‌کنیم تا دو روایتِ متفاوت ساخته نشود.
+        celebrateReward({
+          source: 'wheel',
+          note: res.prize?.label,
+          points: res.prize?.kind === 'points' ? res.prize.value : 0,
+        });
         load();
         // موجودی/امتیاز هدر باید فوراً درست شود، وگرنه کاربر جایزه را
         // می‌بیند ولی عددِ بالای صفحه هنوز قدیمی است.

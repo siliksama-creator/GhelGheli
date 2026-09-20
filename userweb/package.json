@@ -21,6 +21,7 @@
     "test:desktop-layout": "node tool/desktop-layout.mjs",
     "test:round-intro-parity": "node tool/round-intro-parity.mjs",
     "test:club-tabs": "node tool/club-tabs-parity.mjs",
+    "test:reward-parity": "node tool/reward-parity.mjs",
     "test:no-emoji": "node tool/no-emoji.mjs",
     "test:icon-parity": "node tool/icon-parity.mjs",
     "test:card-box": "node tool/card-box-parity.mjs",

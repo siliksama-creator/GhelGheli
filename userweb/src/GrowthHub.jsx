@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import { req, fa } from './lib/api.js';
 import { SvgIcon } from './components/IconAsset.jsx';
+import { celebrateReward } from './lib/rewards.js';
 
 export default function GrowthHub({ api, token, onSocketGame }) {
   const [data, setData] = useState(null);
@@ -55,6 +56,15 @@ export default function GrowthHub({ api, token, onSocketGame }) {
     try {
       const response = await action();
       setNotice(response?.message || 'انجام شد');
+      // ── جشنِ دریافت ──
+      // سرور مقدارِ واریزشده را `reward` می‌فرستد (ماموریت‌ها) و برای
+      // مسیرهای دیگر `points`. اگر هیچ‌کدام عدد نبود (مثلاً «دعوت فرستاده
+      // شد») جشن نمایش داده نمی‌شود؛ `celebrateReward` خودش هم همین را
+      // چک می‌کند تا این‌جا شرطِ تکراری نگذاریم.
+      celebrateReward({
+        source: key === 'daily-bonus' ? 'daily' : key === 'custom-mission' ? 'custom' : 'mission',
+        points: Number(response?.reward ?? response?.points ?? 0),
+      });
       await load();
     } catch (error) {
       setNotice(error.message);

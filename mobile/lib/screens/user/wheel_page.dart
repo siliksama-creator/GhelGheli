@@ -28,6 +28,7 @@ import '../../api_client.dart';
 import '../../core/app_config.dart';
 import '../../utils/fa_date.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/reward_burst.dart';
 import 'games/game_audio.dart';
 
 /// یک برش، همان‌طور که سرور توصیفش می‌کند.
@@ -331,6 +332,19 @@ class _WheelPageState extends State<WheelPage>
         unawaited(_glowCtl.repeat(reverse: true, count: 6));
       }
       widget.onChanged?.call();
+
+      // جشنِ گردونه — *پس از* توقفِ سوزن، نه پیش از آن: اگر وسطِ چرخش
+      // بیاید، عددِ جایزه را لو می‌دهد و تعلیقِ بازی از بین می‌رود.
+      // برچسب از سرور می‌آید («۱۰۰ امتیاز»، «۵۰٬۰۰۰ تومان») و خودش رقمِ
+      // فارسی دارد؛ همان را نشان می‌دهیم تا دو روایتِ متفاوت ساخته نشود.
+      RewardBurst.celebrate(
+        context,
+        RewardBurstData(
+          source: RewardSource.wheel,
+          note: prize.label,
+          points: prize.kind == 'points' ? prize.value : 0,
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() => _spinning = false);

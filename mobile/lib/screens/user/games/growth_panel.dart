@@ -6,8 +6,10 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../../api_client.dart';
+import '../../../core/assets.dart';
 import '../../../core/share_invite.dart';
 import '../../../theme/tokens.dart';
+import '../../../widgets/reward_burst.dart';
 import '../../../widgets/ui_icon.dart';
 
 class GrowthPanel extends StatefulWidget {
@@ -116,6 +118,29 @@ class _GrowthPanelState extends State<GrowthPanel> {
     try {
       final response = await action();
       if (mounted) setState(() => _notice = response is Map ? '${response['message'] ?? 'انجام شد'}' : 'انجام شد');
+      // ── جشنِ دریافت ──
+      // `_run` برای کارهای بی‌جایزه هم استفاده می‌شود (پذیرشِ دوستی،
+      // درخواستِ دوستی). عددِ واریزشده را از پاسخ می‌خوانیم و اگر صفر بود
+      // `RewardBurst` خودش هیچ‌چیز نشان نمی‌دهد — یعنی «درخواست فرستاده شد»
+      // جشن راه نمی‌اندازد. کلیدها: ماموریت‌ها `reward` می‌دهند و مسیرهای
+      // دیگر `points`.
+      final gained = NumberParser.toInt(
+          response is Map ? (response['reward'] ?? response['points']) : null);
+      // `mounted` لازم است و نه تشریفاتی: کاربر می‌تواند در فاصلهٔ پاسخِ
+      // سرور تب را عوض کند؛ `Overlay`ِ والدی که رفته دیگر وجود ندارد.
+      if (mounted) {
+        RewardBurst.celebrate(
+          context,
+          RewardBurstData(
+            source: key == 'daily-bonus'
+                ? RewardSource.daily
+                : key == 'custom-mission'
+                    ? RewardSource.custom
+                    : RewardSource.mission,
+            points: gained,
+          ),
+        );
+      }
       await _load();
     } catch (error) {
       if (mounted) setState(() => _notice = apiError(error));

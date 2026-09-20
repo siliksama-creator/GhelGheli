@@ -142,6 +142,23 @@ const DEFAULT_COPY = Object.freeze({
     annualBadge: 'حدود {savingPercent}٪ تخفیف',
     benefitsNote: 'دسترسی قاب‌ها و افکت نام، ستاره پلاس، Premium Pass و حذف تبلیغات برای {days} روز فعال می‌شود.',
   },
+  // ═══ جشنِ دریافت (۳۱ شهریور) ═══════════════════════════════════════
+  // خواستهٔ مالک: «وقتی کاربر ماموریت انجام می‌دهد یا از گردونه چیزی
+  // می‌گیرد باید جلوی چشمش یک جشنِ کوچک ببیند که دریافت کردم — بدونِ
+  // ایموجی». پیش از این، پیام در `toast` بالای صفحه می‌نشست؛ کاربری که
+  // وسطِ اسکرول بود هیچ‌وقت نمی‌دیدش. حالا هر دو کلاینت یک لایهٔ
+  // وسطِ نما نشان می‌دهند و متن از همین‌جا می‌آید تا هرگز واگرا نشود.
+  reward: {
+    received: 'دریافت شد',
+    mission: 'جایزهٔ ماموریت',
+    daily: 'جایزهٔ روزانه',
+    custom: 'ماموریت اختصاصی',
+    wheel: 'جایزهٔ گردونه',
+    streak: 'پاداش زنجیرهٔ ورود',
+    points: '{amount} امتیاز',
+    coins: '{amount} سکه',
+    xp: '{amount} تجربه',
+  },
   streak: {
     cycleDone: 'چرخه {days} روزه · امروز روز {day} تکمیل شد',
     cycleNext: 'چرخه {days} روزه · روز {day} · {reward} امتیاز هدیه',
@@ -252,6 +269,14 @@ const COPY_CONTRACT = Object.freeze({
     monthlyBadge: ['days'],
     annualBadge: ['savingPercent'],
     benefitsNote: ['days'],
+  },
+  reward: {
+    received: [], mission: [], daily: [], custom: [], wheel: [], streak: [],
+    // عدد از کلاینت با رقمِ فارسی می‌آید (قاعدهٔ «عددِ فهرستِ سفید»)، پس
+    // تنها جای‌نگهدارِ مجاز این‌جا `amount` است.
+    points: ['amount'],
+    coins: ['amount'],
+    xp: ['amount'],
   },
   streak: {
     cycleDone: ['days', 'day'],

@@ -4463,3 +4463,97 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 .duelMayhemLegendHelp{margin-right:auto;padding:2px 10px;border-radius:999px;border:1px solid rgba(255,122,26,.4);background:rgba(255,122,26,.1);color:#ffb066;font:inherit;font-size:10.5px;font-weight:800;cursor:pointer}
 .duelMayhemLegend>summary{display:flex;align-items:center;gap:8px}
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   جشنِ کوچکِ «دریافت شد» (۳۱ شهریور)
+   ───────────────────────────────────────────────────────────────────────────
+   خواستهٔ مالک: «کاربر باید جلوی چشمش ببیند که جایزه را گرفت — بدونِ
+   ایموجی، و یکپارچه در وب و اندروید». پیش از این پیام در `.toast` بالای
+   صفحه می‌نشست و کاربرِ درحالِ‌اسکرول هرگز نمی‌دیدش.
+
+   چرا `position: fixed` و نه استیکی/داخلِ جریانِ صفحه: این لایه باید به
+   اسکرول و به صفحهٔ جاری کار نداشته باشد. `pointer-events:none` هم لازم
+   است وگرنه دکمهٔ «دریافت» بعدی زیرش گیر می‌کند.
+
+   آینهٔ اندروید: `mobile/lib/widgets/reward_burst.dart` — همان زمان‌بندی
+   (۲٬۴ ثانیه)، همان چیدمانِ آیکون+عنوان+مقدار، همان رنگ‌ها.
+   ═══════════════════════════════════════════════════════════════════════ */
+.rewardBurstHost {
+  position: fixed;
+  inset-inline: 0;
+  /* کمی بالاتر از مرکز: نوار ناوبریِ پایین و نوار پیشرفتِ بازی‌ها آن‌جا
+     هستند و رویشان می‌افتاد. ۱۸٪ ارتفاع، همان‌جایی است که در اندروید هم
+     نشسته (`Alignment(0, -0.55)`). */
+  top: 18%;
+  z-index: 60;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.rewardBurst {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(420px, 92vw);
+  padding: 12px 16px 12px 12px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #10322a, #0b2135 60%, #0d2a20);
+  border: 1px solid #b5ef5866;
+  box-shadow: 0 22px 60px #000b, inset 0 1px 0 #ffffff1f;
+  animation: rewardBurstIn 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.rewardBurst[data-source='wheel'] { border-color: #ffd16677; }
+.rewardBurst[data-source='streak'] { border-color: #38bdf866; }
+.rewardBurstIcon {
+  flex: none;
+  width: 46px; height: 46px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  background: radial-gradient(circle at 30% 25%, #b5ef58, #00d49a 70%);
+  color: #06220f;
+  box-shadow: 0 0 22px #b5ef5855;
+}
+.rewardBurstBody { display: grid; gap: 1px; min-width: 0; }
+.rewardBurstBody b { font-size: 14.5px; font-weight: 900; color: #eaf6ff; }
+.rewardBurstState {
+  font-size: 12px; font-weight: 800; color: #b5ef58;
+  letter-spacing: 0;
+}
+.rewardBurstRow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; }
+.rewardBurstChip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 99px;
+  background: #ffffff12; border: 1px solid #ffffff24;
+  font-size: 12.5px; font-weight: 900; color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+.rewardBurstNote {
+  font-size: 12.5px; font-weight: 800; color: #ffd166;
+}
+/* کاغذرنگی: همان الگوی WinnerCelebration، کوچک‌تر و بی‌صدا. */
+.rewardBurstConfetti { position: absolute; inset: -14px 0 0; pointer-events: none; }
+.rewardBurstConfetti span {
+  position: absolute;
+  top: 0; left: calc(6% + (var(--i) * 9.5%));
+  width: 6px; height: 10px;
+  background: var(--c);
+  border-radius: 2px;
+  opacity: 0;
+  animation: rewardBurstFall 1.05s ease-out calc(var(--i) * 0.045s) both;
+}
+@keyframes rewardBurstIn {
+  from { opacity: 0; transform: translateY(-14px) scale(0.92); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes rewardBurstFall {
+  0%   { opacity: 0; transform: translateY(-6px) rotate(0deg); }
+  18%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(52px) rotate(200deg); }
+}
+/* احترام به «کم‌کردنِ حرکت»: انیمیشن حذف نمی‌شود، فقط کوتاه — چون این
+   تنها نشانهٔ «چیزی گرفتم» است و نباید ناپدید شود. */
+@media (prefers-reduced-motion: reduce) {
+  .rewardBurst { animation-duration: 0.01s; }
+  .rewardBurstConfetti { display: none; }
+}
